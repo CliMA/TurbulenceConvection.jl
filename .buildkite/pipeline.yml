@@ -1,0 +1,162 @@
+env:
+  JULIA_VERSION: "1.6.0"
+  OPENMPI_VERSION: "4.0.4"
+  CUDA_VERSION: "11.2"
+  OPENBLAS_NUM_THREADS: 1
+  CLIMATEMACHINE_SETTINGS_FIX_RNG_SEED: "true"
+
+steps:
+  - label: "init :computer:"
+    key: "init_cpu_env"
+    command:
+      - "julia --project -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=test -e 'using Pkg; Pkg.develop(path=\".\"); Pkg.instantiate(;verbose=true)'"
+      - "julia --project -e 'using Pkg; Pkg.status()'"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - wait
+
+  - label: ":computer: unit tests"
+    key: "cpu_unittests"
+    command:
+      - "julia --color=yes --project=test test/runtests.jl"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":partly_sunny: Bomex"
+    key: "cpu_bomex"
+    command:
+      - "julia --color=yes --project=test integration_tests/Bomex.jl"
+    artifact_paths:
+      - "output/Bomex/plots/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scissors: Nieuwstadt"
+    key: "cpu_nieuwstadt"
+    command:
+      - "julia --color=yes --project=test integration_tests/Nieuwstadt.jl"
+    artifact_paths:
+      - "output/Nieuwstadt/plots/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scissors: life_cycle_Tan2018"
+    key: "cpu_life_cycle_tan2018"
+    command:
+      - "julia --color=yes --project=test integration_tests/life_cycle_Tan2018.jl"
+    artifact_paths:
+      - "output/life_cycle_Tan2018/plots/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scissors: Soares"
+    key: "cpu_soares"
+    command:
+      - "julia --color=yes --project=test integration_tests/Soares.jl"
+    artifact_paths:
+      - "output/Soares/plots/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scissors: Rico"
+    key: "cpu_rico"
+    command:
+      - "julia --color=yes --project=test integration_tests/Rico.jl"
+    artifact_paths:
+      - "output/Rico/plots/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scissors: TRMM_LBA"
+    key: "cpu_trmm_lba"
+    command:
+      - "julia --color=yes --project=test integration_tests/TRMM_LBA.jl"
+    artifact_paths:
+      - "output/TRMM_LBA/plots/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scissors: ARM_SGP"
+    key: "cpu_arm_sgp"
+    command:
+      - "julia --color=yes --project=test integration_tests/ARM_SGP.jl"
+    artifact_paths:
+      - "output/ARM_SGP/plots/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scissors: GATE_III"
+    key: "cpu_gate_iii"
+    command:
+      - "julia --color=yes --project=test integration_tests/GATE_III.jl"
+    artifact_paths:
+      - "output/GATE_III/plots/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scissors: DYCOMS_RF01"
+    key: "cpu_dycoms_rf01"
+    command:
+      - "julia --color=yes --project=test integration_tests/DYCOMS_RF01.jl"
+    artifact_paths:
+      - "output/DYCOMS_RF01/plots/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scissors: GABLS"
+    key: "cpu_gabls"
+    command:
+      - "julia --color=yes --project=test integration_tests/GABLS.jl"
+    artifact_paths:
+      - "output/GABLS/plots/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scissors: SP"
+    key: "cpu_sp"
+    command:
+      - "julia --color=yes --project=test integration_tests/SP.jl"
+    artifact_paths:
+      - "output/SP/plots/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scissors: DryBubble"
+    key: "cpu_drybubble"
+    command:
+      - "julia --color=yes --project=test integration_tests/DryBubble.jl"
+    artifact_paths:
+      - "output/DryBubble/plots/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
