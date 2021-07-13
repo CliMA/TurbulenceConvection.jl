@@ -1,6 +1,6 @@
 # TurbulenceConvection.jl #
 
-TurbulenceConvection (Single Column Atmospheric Model in Python) provides a framework for testing parameterizations of clouds and turbulence.
+TurbulenceConvection (Single Column Atmospheric Model in Julia) provides a framework for testing parameterizations of clouds and turbulence.
 It is particularly designed to support eddy-diffusivity mass-flux modeling frameworks.
 
 Information about the EDMF parameterization implemented in TurbulenceConvection can be found in:
@@ -25,12 +25,23 @@ Additional Acknowledgements:
 	Tapio Schneider (Caltech),
 	Joao Teixeira (JPL).
 
-# Installation #
+# User Installation #
 
 Installation is easy:
 
 ```julia-repl
 (@v1.x) pkg> add https://github.com/CliMA/TurbulenceConvection.jl
+```
+
+If you plan to develop TurbulenceConvection.jl, you may want to clone it instead:
+
+
+```
+git clone https://github.com/CliMA/TurbulenceConvection.jl
+cd TurbulenceConvection.jl
+julia --project
+julia> ]
+pkg> instantiate
 ```
 
 # Running #

@@ -110,4 +110,5 @@ function main1d(namelist, paramlist, inpath=pwd(); time_run = false)
         run(Simulation)
     end
     println("The simulation has completed.")
+    return Simulation.Stats.path_plus_file
 end

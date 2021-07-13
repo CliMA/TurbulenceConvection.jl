@@ -32,13 +32,13 @@ mutable struct NetCDFIO_Stats
         # Setup the statistics output path
         simname = namelist["meta"]["simname"]
         casename = paramlist["meta"]["casename"]
-        outpath = namelist["output"]["output_root"] * "Output.{$simname}.{$(uuid)}"
+        outpath = joinpath(namelist["output"]["output_root"], "Output.$simname.$uuid")
         mkpath(outpath)
 
         stats_path = joinpath(outpath, namelist["stats_io"]["stats_dir"])
         mkpath(stats_path)
 
-        path_plus_file = stats_path * "Stats.{$simname}.nc"
+        path_plus_file = joinpath(stats_path, "Stats.{$simname}.nc")
 
         # TODO: uncomment restart
         # if isfile(path_plus_file)
@@ -175,7 +175,7 @@ end
 
 function write_ts(self::NetCDFIO_Stats, var_name::String, data::Float64)
     # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    @inbounds self.vars["timeseries"][var_name][end+1] = data :: Float64
+    @inbounds self.vars["timeseries"][var_name][end] = data :: Float64
     # Ideally, we remove self.vars and use:
     # var = self.ts_grp[var_name]
     # @inbounds var[end+1] = data :: Float64
