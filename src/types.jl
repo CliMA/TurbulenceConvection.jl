@@ -601,6 +601,11 @@ struct ForcingNone end
 struct ForcingStandard end
 struct ForcingDYCOMS_RF01 end
 
+struct RadiationBaseType end
+struct RadiationNone end
+struct RadiationStandard end
+struct RadiationDYCOMS_RF01 end
+
 Base.@kwdef mutable struct ForcingBase{T}
     subsidence::AbstractArray{Float64,1} = zeros(1)
     dTdt::AbstractArray{Float64,1} = zeros(1) # horizontal advection temperature tendency
@@ -615,11 +620,19 @@ Base.@kwdef mutable struct ForcingBase{T}
     convert_forcing_prog_fp::Function = x->x
     Gr::Grid
     Ref::ReferenceState
+end
+
+Base.@kwdef mutable struct RadiationBase{T}
+    dTdt::AbstractArray{Float64,1} = zeros(1) # horizontal advection temperature tendency
+    dqtdt::AbstractArray{Float64,1} = zeros(1) # horizontal advection moisture tendency
+    convert_forcing_prog_fp::Function = x->x
+    Gr::Grid
+    Ref::ReferenceState
+    divergence::Float64 = 0
     alpha_z::Float64 = 0
     kappa::Float64 = 0
     F0::Float64 = 0
     F1::Float64 = 0
-    divergence::Float64 = 0
     f_rad::AbstractArray{Float64,1} = zeros(1)
 end
 
@@ -628,6 +641,7 @@ Base.@kwdef mutable struct CasesBase{T}
     inversion_option::String = "default_inversion_option"
     Sur::SurfaceBase
     Fo::ForcingBase
+    Rad::RadiationBase
     rad_time::StepRangeLen = linspace(10,360;num=36) .* 60
     rad::AbstractMatrix{Float64} = zeros(1,1)
     lhf0::Float64 = 0
