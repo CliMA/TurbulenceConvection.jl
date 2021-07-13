@@ -30,40 +30,28 @@ PyCLES_output_dataset_path = get_data_folder(PyCLES_output_dataset)
 include("variable_map.jl")
 
 function compute_mse(
-    grid,
-    q,
-    aux,
-    params,
     ds,
+    ds_pycles,
     experiment,
     best_mse,
-    t_compare,
-    plot_dir = nothing,
+    foldername;
+    plot_comparison=true,
 )
     mse = Dict()
-    # TODO: we need to store entire solution to compare. Right now
-    # we repeat the last solution along the time axis. In addition,
-    # We need at least 4 temporal points for interpolation. So, we half
-    # the time-step to double the number of points.
-    # time_scm = range(0, params[:t_end], step=params[:Δt][1])
-    time_scm = range(0, params[:t_end], step = params[:Δt][1] / 2)
-    n_time_points = length(time_scm)
-
-    n_fields = length(q.fields[1].vals)
-    n_grid_points = length(q.fields)
+    time_tcc = ds.group["timeseries"]["t"][:]
+    time_les = ds_pycles["t"][:]
+    n_time_points = length(time_tcc)
 
     # Ensure domain matches:
-    z_les = ds["z_half"][:]
-    # z_scm = get_z(grid; rm_dupes = true)
-    z_scm = grid.zc
+    z_les = ds_pycles["z_half"][:]
+    z_tcc = ds.group["profiles"]["z_half"][:]
+    n_grid_points = length(z_tcc)
     @info "Z extent for LES vs CLIMA:"
-    @show extrema(z_scm)
+    @show extrema(z_tcc)
     @show extrema(z_les)
 
-    time_les = ds["t"][:]
-
     # Find the nearest matching final time:
-    t_cmp = min(time_scm[end], time_les[end])
+    t_cmp = min(time_tcc[end], time_les[end])
 
     # Accidentally running a short simulation
     # could improve MSE. So, let's test that
@@ -71,12 +59,12 @@ function compute_mse(
     # increase this as we can reach higher CFL.
     # @test t_cmp >= t_compare
 
-    # Ensure z_scm and fields are consistent lengths:
-    @test length(z_scm) == n_grid_points
+    # Ensure z_tcc and fields are consistent lengths:
+    @test length(z_tcc) == n_grid_points
 
-    data_scm = Dict()
+    data_tcc = Dict()
     dons_cont = Dict()
-    scm_variables = []
+    tcc_variables = []
     computed_mse = []
     table_best_mse = []
     mse_reductions = []
@@ -87,28 +75,31 @@ function compute_mse(
 
         # TODO: clean this up and generalize
         ftc_str = string(ftc)
-        gm, en, ud, sd, al = allcombinations(q)
-        is_updraft = occursin("_up", ftc_str)
-        is_environment = occursin("_en", ftc_str)
-        is_grid_mean = occursin("_gm", ftc_str)
-        if is_updraft
-            domain_decomp = ud[1]
-        elseif is_environment
-            domain_decomp = en
-        elseif is_grid_mean
-            domain_decomp = gm
-        else
-            error("Bad domain")
-        end
-        if is_updraft
-            ftc_scm = Symbol(replace(ftc_str, "_up" => ""))
-        elseif is_environment
-            ftc_scm = Symbol(replace(ftc_str, "_en" => ""))
-        elseif is_grid_mean
-            ftc_scm = Symbol(replace(ftc_str, "_gm" => ""))
-        else
-            error("Bad domain")
-        end
+        @show ftc
+
+        # gm, en, ud, sd, al = allcombinations(q)
+        # is_updraft = occursin("_up", ftc_str)
+        # is_environment = occursin("_en", ftc_str)
+        # is_grid_mean = occursin("_gm", ftc_str)
+        # if is_updraft
+        #     domain_decomp = ud[1]
+        # elseif is_environment
+        #     domain_decomp = en
+        # elseif is_grid_mean
+        #     domain_decomp = gm
+        # else
+        #     error("Bad domain")
+        # end
+        # if is_updraft
+        #     ftc_tcc = Symbol(replace(ftc_str, "_up" => ""))
+        # elseif is_environment
+        #     ftc_tcc = Symbol(replace(ftc_str, "_en" => ""))
+        # elseif is_grid_mean
+        #     ftc_tcc = Symbol(replace(ftc_str, "_gm" => ""))
+        # else
+        #     error("Bad domain")
+        # end
+        @show ftc
 
         # Only compare fields defined for var_map
         tup = var_map(ftc)
@@ -117,27 +108,29 @@ function compute_mse(
         # Unpack the data
         LES_var = tup[1]
         facts = tup[2]
-        push!(scm_variables, ftc)
+        @show LES_var
+        @show facts
+        push!(tcc_variables, ftc)
         push!(pycles_variables, LES_var)
-        data_ds = ds.group["profiles"]
+        data_ds = ds_pycles.group["profiles"]
         data_les = data_ds[LES_var][:]
 
         # Scale the data for comparison
-        ρ = data_ds["rho"][:]
-        a_up = data_ds["updraft_fraction"][:]
-        a_en = 1 .- data_ds["updraft_fraction"][:]
-        ρa_up = ρ .* a_up
-        ρa_en = ρ .* a_en
-        ρa = is_updraft ? ρa_up : ρa_en
-        if :a in facts && :ρ in facts
-            data_les .*= ρa
-            push!(pycles_weight, "ρa")
-        elseif :ρ in facts
-            data_les .*= ρ
-            push!(pycles_weight, "ρ")
-        else
+        # ρ = data_ds["rho"][:]
+        # a_up = data_ds["updraft_fraction"][:]
+        # a_en = 1 .- data_ds["updraft_fraction"][:]
+        # ρa_up = ρ .* a_up
+        # ρa_en = ρ .* a_en
+        # ρa = is_updraft ? ρa_up : ρa_en
+        # if :a in facts && :ρ in facts
+        #     data_les .*= ρa
+        #     push!(pycles_weight, "ρa")
+        # elseif :ρ in facts
+        #     data_les .*= ρ
+        #     push!(pycles_weight, "ρ")
+        # else
             push!(pycles_weight, "1")
-        end
+        # end
 
         # Interpolate data
         steady_data = length(size(data_les)) == 1
@@ -146,54 +139,50 @@ function compute_mse(
         else # unsteady data
             data_les_cont = Spline2D(time_les, z_les, data_les')
         end
-        # TODO: we need to store entire solution to compare. Right now
-        # we repeat the last solution along the time axis
-        data_scm_arr_ = [
-            q[ftc_scm, i_z, domain_decomp]
-            for i in 1:n_time_points, i_z in 1:length(z_scm)
-        ]
-        data_scm_arr = reshape(data_scm_arr_, (n_time_points, length(z_scm)))
-        data_scm[ftc] = Spline2D(time_scm, z_scm, data_scm_arr)
+
+        data_tcc_arr_ = ds.group["profiles"][ftc][:]
+        data_tcc_arr = reshape(data_tcc_arr_, (n_time_points, length(z_tcc)))
+        data_tcc[ftc] = Spline2D(time_tcc, z_tcc, data_tcc_arr)
 
         # Compute data scale
         data_scale = sum(abs.(data_les)) / length(data_les)
         push!(data_scales, data_scale)
 
         # Plot comparison
-        if plot_dir ≠ nothing
+        if plot_comparison
             p = plot()
             if steady_data
-                data_les_cont_mapped = map(z -> data_les_cont(z), z_scm)
+                data_les_cont_mapped = map(z -> data_les_cont(z), z_tcc)
             else
-                data_les_cont_mapped = map(z -> data_les_cont(t_cmp, z), z_scm)
+                data_les_cont_mapped = map(z -> data_les_cont(t_cmp, z), z_tcc)
             end
             plot!(
                 data_les_cont_mapped,
-                z_scm ./ 10^3,
+                z_tcc ./ 10^3,
                 xlabel = ftc,
                 ylabel = "z [km]",
                 label = "PyCLES",
             )
             plot!(
-                map(z -> data_scm[ftc](t_cmp, z), z_scm),
-                z_scm ./ 10^3,
+                map(z -> data_tcc[ftc](t_cmp, z), z_tcc),
+                z_tcc ./ 10^3,
                 xlabel = ftc,
                 ylabel = "z [km]",
-                label = "SCM",
+                label = "TC.jl",
             )
-            mkpath(plot_dir)
+            mkpath(foldername)
             ftc_name = replace(ftc_str, "." => "_")
-            savefig(joinpath(plot_dir, "$ftc_name.png"))
+            savefig(joinpath(foldername, "$ftc_name.png"))
         end
 
         # Compute mean squared error (mse)
         if steady_data
-            mse_single_var = sum(map(z_scm) do z
-                (data_les_cont(z) - data_scm[ftc](t_cmp, z))^2
+            mse_single_var = sum(map(z_tcc) do z
+                (data_les_cont(z) - data_tcc[ftc](t_cmp, z))^2
             end)
         else
-            mse_single_var = sum(map(z_scm) do z
-                (data_les_cont(t_cmp, z) - data_scm[ftc](t_cmp, z))^2
+            mse_single_var = sum(map(z_tcc) do z
+                (data_les_cont(t_cmp, z) - data_tcc[ftc](t_cmp, z))^2
             end)
         end
         # Normalize by data scale
@@ -207,10 +196,10 @@ function compute_mse(
     # Tabulate output
     header = [
         "Variable" "Variable" "Weight" "Data scale" "MSE" "MSE" "MSE"
-        "SCM (EDMF)" "PyCLES" "PyCLES" "" "Computed" "Best" "Reduction (%)"
+        "TC.jl (EDMF)" "PyCLES" "PyCLES" "" "Computed" "Best" "Reduction (%)"
     ]
     table_data = hcat(
-        scm_variables,
+        tcc_variables,
         pycles_variables,
         pycles_weight,
         data_scales,
