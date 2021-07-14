@@ -211,9 +211,9 @@ function set_means(self::UpdraftVariables, GMV::GridMeanVariables)
     self.B.bulkvalues .= 0.0
     self.RH.bulkvalues .= 0.0
 
-  @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg-self.Gr.gw)
+    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg-self.Gr.gw)
         if self.Area.bulkvalues[k] > 1.0e-20
-          @inbounds for i in xrange(self.n_updrafts)
+            @inbounds for i in xrange(self.n_updrafts)
                 self.QT.bulkvalues[k] += self.Area.values[i,k] * self.QT.values[i,k]/self.Area.bulkvalues[k]
                 self.QL.bulkvalues[k] += self.Area.values[i,k] * self.QL.values[i,k]/self.Area.bulkvalues[k]
                 self.H.bulkvalues[k] += self.Area.values[i,k] * self.H.values[i,k]/self.Area.bulkvalues[k]

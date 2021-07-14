@@ -27,7 +27,7 @@ best_mse["u_mean"] = 3.5718662854892038e+01
 best_mse["tke_mean"] = 2.9756050060113374e+01
 
 
-@testset "DYCOMS_RF01" begin
+# @testset "DYCOMS_RF01" begin
     println("Running DYCOMS_RF01...")
     namelist = NameList.DYCOMS_RF01(default_namelist("DYCOMS_RF01"))
     paramlist = ParamList.DYCOMS_RF01(default_paramlist("DYCOMS_RF01"))
@@ -59,5 +59,5 @@ best_mse["tke_mean"] = 2.9756050060113374e+01
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
     nothing
-end
+# end
 

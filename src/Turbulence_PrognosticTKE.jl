@@ -287,8 +287,11 @@ function update(
         self::EDMF_PrognosticTKE,
         GMV::GridMeanVariables,
         Case::CasesBase,
-        TS::TimeStepping
+        TS::TimeStepping,
+        Stats::NetCDFIO_Stats
     )
+
+    # export_all(Case, self, GMV, TS, Stats) # good
     kmin = grid(self).gw
     kmax = grid(self).nzg - grid(self).gw
     check_nans(GMV, self, "4.1")
@@ -298,8 +301,7 @@ function update(
     check_nans(GMV, self, "4.3")
     self.wstar = get_wstar(Case.Sur.bflux, self.base.zi)
     if TS.nstep == 0
-        decompose_environment(self, GMV, "values")
-
+        decompose_environment(self, GMV, Case, TS, "values")
         if Case.casename == "DryBubble"
             saturation_adjustment(self.EnvThermo, self.EnvVar)
             buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
@@ -321,17 +323,18 @@ function update(
     end
     check_nans(GMV, self, "4.4")
 
-    decompose_environment(self, GMV, "values")
+    decompose_environment(self, GMV, Case, TS, "values")
+    # export_all(Case, self, GMV, TS, Stats) # good
     if self.use_steady_updrafts
         compute_diagnostic_updrafts(self, GMV, Case)
     else
-        compute_prognostic_updrafts(self, GMV, Case, TS)
+        compute_prognostic_updrafts(self, GMV, Case, TS, Stats)
     end
     check_nans(GMV, self, "4.5")
 
     # TODO -maybe not needed? - both diagnostic and prognostic updrafts end with decompose_environment
     # But in general ok here without thermodynamics because MF doesnt depend directly on buoyancy
-    decompose_environment(self, GMV, "values")
+    decompose_environment(self, GMV, Case, TS, "values")
     update_GMV_MF(self, GMV, TS)
     check_nans(GMV, self, "4.6")
     # (###)
@@ -341,7 +344,7 @@ function update(
     #   - the buoyancy of updrafts and environment is updated such that
     #     the mean buoyancy with repect to reference state alpha_0 is zero.
 
-    decompose_environment(self, GMV, "mf_update")
+    decompose_environment(self, GMV, Case, TS, "mf_update")
     check_nans(GMV, self, "4.61")
     microphysics(self.EnvThermo, self.EnvVar, self.Rain, TS.dt) # saturation adjustment + rain creation
     check_nans(GMV, self, "4.62")
@@ -385,10 +388,15 @@ function update(
     return
 end
 
-function compute_prognostic_updrafts(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
+function compute_prognostic_updrafts(
+    self::EDMF_PrognosticTKE,
+    GMV::GridMeanVariables,
+    Case::CasesBase,
+    TS::TimeStepping,
+    Stats::NetCDFIO_Stats
+)
 
     time_elapsed = 0.0
-
     set_subdomain_bcs(self)
     set_new_with_values(self.UpdVar)
     set_old_with_values(self.UpdVar)
@@ -399,6 +407,7 @@ function compute_prognostic_updrafts(self::EDMF_PrognosticTKE, GMV::GridMeanVari
     clear_precip_sources(self.UpdThermo)
 
     while time_elapsed < TS.dt
+        # export_all(Case, self, GMV, TS, Stats)
         compute_entrainment_detrainment(self, GMV, Case)
         if self.turbulent_entrainment_factor > 1.0e-6
             compute_horizontal_eddy_diffusivities(self, GMV)
@@ -409,6 +418,7 @@ function compute_prognostic_updrafts(self::EDMF_PrognosticTKE, GMV::GridMeanVari
         solve_updraft_scalars(self, GMV)
         microphysics(self.UpdThermo, self.UpdVar, self.Rain, TS.dt) # causes division error in dry bubble first time step
 
+        # export_all(Case, self, GMV, TS, Stats) # good-ish
         set_values_with_new(self.UpdVar)
         zero_area_fraction_cleanup(self, GMV)
         time_elapsed += self.dt_upd
@@ -417,12 +427,13 @@ function compute_prognostic_updrafts(self::EDMF_PrognosticTKE, GMV::GridMeanVari
         # TODO - see comment (###)
         # It would be better to have a simple linear rule for updating environment here
         # instead of calling EnvThermo saturation adjustment scheme for every updraft.
-        decompose_environment(self, GMV, "values")
+        decompose_environment(self, GMV, Case, TS, "values")
         saturation_adjustment(self.EnvThermo, self.EnvVar)
         buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
         set_subdomain_bcs(self)
     end
 
+    export_all(Case, self, GMV, TS, Stats)
     update_total_precip_sources(self.UpdThermo)
     return
 end
@@ -472,7 +483,7 @@ function compute_diagnostic_updrafts(self::EDMF_PrognosticTKE, GMV::GridMeanVari
     set_bcs(self.UpdVar.H, grid(self))
 
     # TODO - see comment (####)
-    decompose_environment(self, GMV, "values")
+    decompose_environment(self, GMV, Case, TS, "values")
     saturation_adjustment(self.EnvThermo, self.EnvVar)
     buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
 
@@ -541,7 +552,7 @@ function compute_diagnostic_updrafts(self::EDMF_PrognosticTKE, GMV::GridMeanVari
     end
 
     # TODO - see comment (####)
-    decompose_environment(self, GMV, "values")
+    decompose_environment(self, GMV, Case, TS, "values")
     saturation_adjustment(self.EnvThermo, self.EnvVar)
     buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
 
@@ -878,6 +889,7 @@ function set_updraft_surface_bc(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
     a_ = a_total/self.n_updrafts
     @inbounds for i in xrange(self.n_updrafts)
         surface_scalar_coeff= percentile_bounds_mean_norm(1.0-a_total+i*a_, 1.0-a_total + (i+1)*a_ , 1000)
+        @show surface_scalar_coeff
         self.area_surface_bc[i] = a_
         self.w_surface_bc[i] = 0.0
         self.h_surface_bc[i] = (GMV.H.values[gw] + surface_scalar_coeff * sqrt(h_var))
@@ -920,11 +932,16 @@ end
 # Find values of environmental variables by subtracting updraft values from grid mean values
 # whichvals used to check which substep we are on--correspondingly use "GMV.SomeVar.value" (last timestep value)
 # or GMV.SomeVar.mf_update (GMV value following massflux substep)
-function decompose_environment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, whichvals)
+function decompose_environment(
+        self::EDMF_PrognosticTKE,
+        GMV::GridMeanVariables,
+        Case::CasesBase,
+        TS::TimeStepping,
+        whichvals
+    )
 
     # first make sure the "bulkvalues" of the updraft variables are updated
     set_means(self.UpdVar, GMV)
-
     gw = grid(self).gw
 
     if whichvals == "values"
