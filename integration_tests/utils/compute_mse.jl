@@ -7,6 +7,8 @@ using PrettyTables
 using Printf
 using ArtifactWrappers
 
+ENV["GKSwstype"] = "nul"
+
 # Get PyCLES_output dataset folder:
 #! format: off
 PyCLES_output_dataset = ArtifactWrapper(
@@ -71,66 +73,20 @@ function compute_mse(
     pycles_variables = []
     data_scales = []
     pycles_weight = []
-    for (ftc) in keys(best_mse)
-
-        # TODO: clean this up and generalize
-        ftc_str = string(ftc)
-        @show ftc
-
-        # gm, en, ud, sd, al = allcombinations(q)
-        # is_updraft = occursin("_up", ftc_str)
-        # is_environment = occursin("_en", ftc_str)
-        # is_grid_mean = occursin("_gm", ftc_str)
-        # if is_updraft
-        #     domain_decomp = ud[1]
-        # elseif is_environment
-        #     domain_decomp = en
-        # elseif is_grid_mean
-        #     domain_decomp = gm
-        # else
-        #     error("Bad domain")
-        # end
-        # if is_updraft
-        #     ftc_tcc = Symbol(replace(ftc_str, "_up" => ""))
-        # elseif is_environment
-        #     ftc_tcc = Symbol(replace(ftc_str, "_en" => ""))
-        # elseif is_grid_mean
-        #     ftc_tcc = Symbol(replace(ftc_str, "_gm" => ""))
-        # else
-        #     error("Bad domain")
-        # end
-        @show ftc
+    for tc_var in keys(best_mse)
 
         # Only compare fields defined for var_map
-        tup = var_map(ftc)
-        tup == nothing && continue
+        les_var = var_map(tc_var)
+        les_var == nothing && continue
+        les_var isa String || continue
 
-        # Unpack the data
-        LES_var = tup[1]
-        facts = tup[2]
-        @show LES_var
-        @show facts
-        push!(tcc_variables, ftc)
-        push!(pycles_variables, LES_var)
-        data_ds = ds_pycles.group["profiles"]
-        data_les = data_ds[LES_var][:]
+        push!(tcc_variables, tc_var)
+        push!(pycles_variables, les_var)
+        ds_les = ds_pycles.group["profiles"]
+        data_les = ds_les[les_var][:]
 
         # Scale the data for comparison
-        # ρ = data_ds["rho"][:]
-        # a_up = data_ds["updraft_fraction"][:]
-        # a_en = 1 .- data_ds["updraft_fraction"][:]
-        # ρa_up = ρ .* a_up
-        # ρa_en = ρ .* a_en
-        # ρa = is_updraft ? ρa_up : ρa_en
-        # if :a in facts && :ρ in facts
-        #     data_les .*= ρa
-        #     push!(pycles_weight, "ρa")
-        # elseif :ρ in facts
-        #     data_les .*= ρ
-        #     push!(pycles_weight, "ρ")
-        # else
-            push!(pycles_weight, "1")
-        # end
+        push!(pycles_weight, "1")
 
         # Interpolate data
         steady_data = length(size(data_les)) == 1
@@ -140,9 +96,15 @@ function compute_mse(
             data_les_cont = Spline2D(time_les, z_les, data_les')
         end
 
-        data_tcc_arr_ = ds.group["profiles"][ftc][:]
+        if haskey(ds.group["profiles"], tc_var)
+            data_tcc_arr_ = ds.group["profiles"][tc_var][:]
+        elseif haskey(ds.group["reference"], tc_var)
+            data_tcc_arr_ = ds.group["reference"][tc_var][:]
+        else
+            error("No key for $tc_var found in the nc file.")
+        end
         data_tcc_arr = reshape(data_tcc_arr_, (n_time_points, length(z_tcc)))
-        data_tcc[ftc] = Spline2D(time_tcc, z_tcc, data_tcc_arr)
+        data_tcc[tc_var] = Spline2D(time_tcc, z_tcc, data_tcc_arr)
 
         # Compute data scale
         data_scale = sum(abs.(data_les)) / length(data_les)
@@ -159,38 +121,37 @@ function compute_mse(
             plot!(
                 data_les_cont_mapped,
                 z_tcc ./ 10^3,
-                xlabel = ftc,
+                xlabel = tc_var,
                 ylabel = "z [km]",
                 label = "PyCLES",
             )
             plot!(
-                map(z -> data_tcc[ftc](t_cmp, z), z_tcc),
+                map(z -> data_tcc[tc_var](t_cmp, z), z_tcc),
                 z_tcc ./ 10^3,
-                xlabel = ftc,
+                xlabel = tc_var,
                 ylabel = "z [km]",
                 label = "TC.jl",
             )
             mkpath(foldername)
-            ftc_name = replace(ftc_str, "." => "_")
-            savefig(joinpath(foldername, "$ftc_name.png"))
+            savefig(joinpath(foldername, "$tc_var.png"))
         end
 
         # Compute mean squared error (mse)
         if steady_data
             mse_single_var = sum(map(z_tcc) do z
-                (data_les_cont(z) - data_tcc[ftc](t_cmp, z))^2
+                (data_les_cont(z) - data_tcc[tc_var](t_cmp, z))^2
             end)
         else
             mse_single_var = sum(map(z_tcc) do z
-                (data_les_cont(t_cmp, z) - data_tcc[ftc](t_cmp, z))^2
+                (data_les_cont(t_cmp, z) - data_tcc[tc_var](t_cmp, z))^2
             end)
         end
         # Normalize by data scale
-        mse[ftc] = mse_single_var / data_scale^2
+        mse[tc_var] = mse_single_var / data_scale^2
 
-        push!(mse_reductions, (best_mse[ftc] - mse[ftc]) / best_mse[ftc] * 100)
-        push!(computed_mse, mse[ftc])
-        push!(table_best_mse, best_mse[ftc])
+        push!(mse_reductions, (best_mse[tc_var] - mse[tc_var]) / best_mse[tc_var] * 100)
+        push!(computed_mse, mse[tc_var])
+        push!(table_best_mse, best_mse[tc_var])
     end
 
     # Tabulate output
