@@ -38,14 +38,14 @@ mutable struct NetCDFIO_Stats
         stats_path = joinpath(outpath, namelist["stats_io"]["stats_dir"])
         mkpath(stats_path)
 
-        path_plus_file = joinpath(stats_path, "Stats.{$simname}.nc")
+        path_plus_file = joinpath(stats_path, "Stats.$simname.nc")
 
         # TODO: uncomment restart
         # if isfile(path_plus_file)
         #   @inbounds for i in 1:100
-        #         res_name = "Restart_{$i}"
+        #         res_name = "Restart_$i"
         #         if isfile(path_plus_file)
-        #             path_plus_file = stats_path * "Stats.{$simname}.{$res_name}.nc"
+        #             path_plus_file = stats_path * "Stats.$simname.$res_name.nc"
         #         else
         #             break
         #         end
@@ -54,8 +54,8 @@ mutable struct NetCDFIO_Stats
 
         # Copy namefile and paramfile to output directory
         # TODO: this was commented:
-        # cp(joinpath(inpath, "{$simname}.in"), joinpath(outpath, "{$simname}.in"))
-        # cp(joinpath(inpath, "paramlist_{casename}.in"), joinpath(outpath, "paramlist_{casename}.in"))
+        # cp(joinpath(inpath, "$simname.in"), joinpath(outpath, "$simname.in"))
+        # cp(joinpath(inpath, "paramlist_$casename.in"), joinpath(outpath, "paramlist_$casename.in"))
 
         # TODO: make cell centers and cell faces different sizes
         cinterior = Gr.cinterior
@@ -124,7 +124,7 @@ end
 function add_profile(self::NetCDFIO_Stats, var_name::String)
     Dataset(self.path_plus_file, "a") do root_grp
         profile_grp = root_grp.group["profiles"]
-        new_var = defVar(profile_grp, var_name, Float64, ("t", "z"))
+        new_var = defVar(profile_grp, var_name, Float64, ("z", "t"))
     end
 end
 
@@ -166,7 +166,7 @@ end
 
 function write_profile(self::NetCDFIO_Stats, var_name::String, data::T) where {T <: AbstractArray{Float64,1}}
     # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    @inbounds self.vars["profiles"][var_name][end, :] = data :: T
+    @inbounds self.vars["profiles"][var_name][:, end] = data
     # Ideally, we remove self.vars and use:
     # var = self.profiles_grp[var_name]
     # Not sure why `end` instead of `end+1`, but `end+1` produces garbage output

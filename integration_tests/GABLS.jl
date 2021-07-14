@@ -4,10 +4,6 @@ end
 import TurbulenceConvection
 using TurbulenceConvection
 using Test
-using Random
-
-# Make deterministic:
-Random.seed!(1234)
 
 include(joinpath("utils", "Cases.jl"))
 include(joinpath("utils", "generate_paramlist.jl"))
@@ -29,8 +25,6 @@ best_mse["v_mean"] = 1.0939547963673784e+01
 best_mse["u_mean"] = 5.7078250617016124e+02
 best_mse["tke_mean"] = 7.7344960671102756e+00
 
-ds_pycles = Dataset(joinpath(PyCLES_output_dataset_path, "Gabls.nc"), "r")
-
 @testset "GABLS" begin
     println("Running GABLS...")
     namelist = NameList.GABLS(default_namelist("GABLS"))
@@ -39,14 +33,19 @@ ds_pycles = Dataset(joinpath(PyCLES_output_dataset_path, "Gabls.nc"), "r")
     ds_filename = @time main(namelist, paramlist)
 
     computed_mse = Dataset(ds_filename, "r") do ds
-        compute_mse(
-            ds,
-            ds_pycles,
-            "GABLS",
-            best_mse,
-            dirname(ds_filename);
-            plot_comparison=true
-        )
+        Dataset(joinpath(PyCLES_output_dataset_path, "Gabls.nc"), "r") do ds_pycles
+            Dataset(joinpath(SCAMPy_output_dataset_path, "GABLS.nc"), "r") do ds_scampy
+                compute_mse(
+                    "GABLS",
+                    best_mse,
+                    joinpath(dirname(ds_filename), "comparison");
+                    ds_turb_conv=ds,
+                    ds_scampy=ds_scampy,
+                    ds_pycles=ds_pycles,
+                    plot_comparison=true
+                )
+            end
+        end
     end
 
     test_mse(computed_mse, best_mse, "updraft_area")

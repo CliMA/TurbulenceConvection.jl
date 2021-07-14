@@ -306,7 +306,7 @@ end
 function TurbulenceConvection.initialize_io(self::CasesBase{Nieuwstadt}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
 end
-function TurbulenceConvection.io(self, Stats::NetCDFIO_Stats)
+function TurbulenceConvection.io(self::CasesBase{Nieuwstadt}, Stats::NetCDFIO_Stats)
     io(self, Stats, BaseCase())
 end
 
@@ -341,8 +341,8 @@ function initialize_profiles(self::CasesBase{BomexCase}, Gr::Grid, GMV::GridMean
     ql=0.0
     qi =0.0 # IC of Bomex is cloud-free
 
-    theta_pert = 0.1
-    qt_pert = 0.025/1000.0
+    theta_pert = 0.0
+    qt_pert = 0.0
 
     @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
         #Set Thetal profile
@@ -380,12 +380,6 @@ function initialize_profiles(self::CasesBase{BomexCase}, Gr::Grid, GMV::GridMean
         end
         if Gr.z_half[k] > 700.0
             GMV.U.values[k] = -8.75 + (Gr.z_half[k] - 700.0) * (-4.61 - -8.75)/(3000.0 - 700.0)
-        end
-
-        #Set perturbations on qt and theta_l
-        if Gr.z_half[k] <= 1600.0
-            thetal[k] = thetal[k] + theta_pert*(rand()-0.5)
-            GMV.QT.values[k] = GMV.QT.values[k] + qt_pert*(rand()-0.5)
         end
     end
 

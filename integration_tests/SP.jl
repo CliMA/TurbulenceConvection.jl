@@ -4,10 +4,6 @@ end
 import TurbulenceConvection
 using TurbulenceConvection
 using Test
-using Random
-
-# Make deterministic:
-Random.seed!(1234)
 
 include(joinpath("utils", "Cases.jl"))
 include(joinpath("utils", "generate_paramlist.jl"))

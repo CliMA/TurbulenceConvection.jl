@@ -1206,15 +1206,6 @@ function compute_entrainment_detrainment(self::EDMF_PrognosticTKE, GMV::GridMean
                 end
 
                 input.T_mean = (self.EnvVar.T.values[k]+self.UpdVar.T.values[i,k])/2
-                ## Ignacio
-                if input.zbl-self.UpdVar.cloud_base[i] > 0.0
-                    num = grid(self).dz/((input.zbl-self.UpdVar.cloud_base[i])/10.0)
-                    # input.poisson = np.random.poisson(num)
-                    input.poisson = pois_rand(num)
-                else
-                    input.poisson = 0.0
-                end
-                ## End: Ignacio
                 ret = self.entr_detr_fp(input)
                 self.entr_sc[i,k] = ret.entr_sc
                 self.detr_sc[i,k] = ret.detr_sc

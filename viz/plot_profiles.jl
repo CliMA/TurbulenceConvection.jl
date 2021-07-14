@@ -30,7 +30,6 @@ function plot_profiles(ds,
     t_end = length(time)
     t_start = ((time .- 3600) .> 0)[1][1]
 
-    @show keys(ds.group[group])
     for var in keys(ds.group[group])
         var=="z" && continue
         var=="z_half" && continue
@@ -39,17 +38,19 @@ function plot_profiles(ds,
 
         values = ds.group[group][var][:]
         figname = "profile_"*var
-        yvals = mean(values[t_start+1:t_end,:], dims = 1)
+        yvals = mean(values[:,t_start+1:t_end], dims = 2)
         yvals = reshape(yvals, length(yvals))
         if skip_all_zeros_data && all(values .≈ 0)
             @warn "Skipping $var, since all data is 0"
             continue
+        else
+            println("Plotting $var...")
         end
         plot(
             yvals,
             z;
-            xlabel = var,
-            ylabel = "height (m)"
+            label = "TurbConv.jl",
+
         )
         xlabel!(var)
         ylabel!("height (m)")
@@ -60,7 +61,7 @@ function plot_profiles(ds,
         skip_contours && continue
         figname = "contours_"*var
         contourf(
-            time[:], z, values';
+            time[:], z, values;
             xlabel = var,
             ylabel = "height (m)",
             c = :viridis

@@ -83,7 +83,7 @@ end
 
 # Compute eddy diffusivities from similarity theory (Siebesma 2007)
 function compute_eddy_diffusivities_similarity(
-        self,
+        self::ParameterizationBase,
         GMV::GridMeanVariables,
         Case::CasesBase
     )
@@ -135,7 +135,7 @@ function SimilarityED(
     return SimilarityED(base ,extrapolate_buoyancy)
 end
 
-initialize(self, Case, GMV, Ref) = nothing
+initialize(self::SimilarityED, Case::CasesBase, GMV::GridMeanVariables, Ref::ReferenceState) = nothing
 
 function initialize_io(self::SimilarityED, Stats::NetCDFIO_Stats)
     add_profile(Stats, "eddy_viscosity")
@@ -153,7 +153,7 @@ function io(
 end
 
 function update(
-    self,
+    self::SimilarityED,
     GMV::GridMeanVariables,
     Case::CasesBase,
     TS::TimeStepping)
