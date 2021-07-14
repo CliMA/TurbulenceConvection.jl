@@ -39,18 +39,7 @@ steps:
       queue: central
       slurm_ntasks: 1
 
-  - label: ":scissors: Nieuwstadt"
-    key: "cpu_nieuwstadt"
-    command:
-      - "julia --color=yes --project=test integration_tests/Nieuwstadt.jl"
-    artifact_paths:
-      - "output/Nieuwstadt/plots/*"
-    agents:
-      config: cpu
-      queue: central
-      slurm_ntasks: 1
-
-  - label: ":scissors: life_cycle_Tan2018"
+  - label: ":partly_sunny: life_cycle_Tan2018"
     key: "cpu_life_cycle_tan2018"
     command:
       - "julia --color=yes --project=test integration_tests/life_cycle_Tan2018.jl"
@@ -61,7 +50,7 @@ steps:
       queue: central
       slurm_ntasks: 1
 
-  - label: ":scissors: Soares"
+  - label: ":partly_sunny: Soares"
     key: "cpu_soares"
     command:
       - "julia --color=yes --project=test integration_tests/Soares.jl"
@@ -72,7 +61,7 @@ steps:
       queue: central
       slurm_ntasks: 1
 
-  - label: ":scissors: Rico"
+  - label: ":partly_sunny: Rico"
     key: "cpu_rico"
     command:
       - "julia --color=yes --project=test integration_tests/Rico.jl"
@@ -94,7 +83,7 @@ steps:
       queue: central
       slurm_ntasks: 1
 
-  - label: ":scissors: ARM_SGP"
+  - label: ":partly_sunny: ARM_SGP"
     key: "cpu_arm_sgp"
     command:
       - "julia --color=yes --project=test integration_tests/ARM_SGP.jl"
@@ -105,18 +94,19 @@ steps:
       queue: central
       slurm_ntasks: 1
 
-  - label: ":scissors: GATE_III"
-    key: "cpu_gate_iii"
-    command:
-      - "julia --color=yes --project=test integration_tests/GATE_III.jl"
-    artifact_paths:
-      - "output/GATE_III/plots/*"
-    agents:
-      config: cpu
-      queue: central
-      slurm_ntasks: 1
+  # Takes a bit too long...
+  # - label: ":partly_sunny: GATE_III"
+  #   key: "cpu_gate_iii"
+  #   command:
+  #     - "julia --color=yes --project=test integration_tests/GATE_III.jl"
+  #   artifact_paths:
+  #     - "output/GATE_III/plots/*"
+  #   agents:
+  #     config: cpu
+  #     queue: central
+  #     slurm_ntasks: 1
 
-  - label: ":scissors: DYCOMS_RF01"
+  - label: ":partly_sunny: DYCOMS_RF01"
     key: "cpu_dycoms_rf01"
     command:
       - "julia --color=yes --project=test integration_tests/DYCOMS_RF01.jl"
@@ -127,7 +117,7 @@ steps:
       queue: central
       slurm_ntasks: 1
 
-  - label: ":scissors: GABLS"
+  - label: ":partly_sunny: GABLS"
     key: "cpu_gabls"
     command:
       - "julia --color=yes --project=test integration_tests/GABLS.jl"
@@ -138,7 +128,7 @@ steps:
       queue: central
       slurm_ntasks: 1
 
-  - label: ":scissors: SP"
+  - label: ":partly_sunny: SP"
     key: "cpu_sp"
     command:
       - "julia --color=yes --project=test integration_tests/SP.jl"
@@ -149,7 +139,7 @@ steps:
       queue: central
       slurm_ntasks: 1
 
-  - label: ":scissors: DryBubble"
+  - label: ":thought_balloon: DryBubble"
     key: "cpu_drybubble"
     command:
       - "julia --color=yes --project=test integration_tests/DryBubble.jl"
