@@ -278,28 +278,13 @@ mutable struct UpdraftVariables{A1}
         QT = UpdraftVariable(nu, nzg, "half", "scalar", "qt","kg/kg" )
         QL = UpdraftVariable(nu, nzg, "half", "scalar", "ql","kg/kg" )
         RH = UpdraftVariable(nu, nzg, "half", "scalar", "RH","%" )
-
-        if namelist["thermodynamics"]["thermal_variable"] == "entropy"
-            H = UpdraftVariable(nu, nzg, "half", "scalar", "s","J/kg/K" )
-        elseif namelist["thermodynamics"]["thermal_variable"] == "thetal"
-            H = UpdraftVariable(nu, nzg, "half", "scalar", "thetal","K" )
-        end
-
+        H = UpdraftVariable(nu, nzg, "half", "scalar", "thetal","K" )
         THL = UpdraftVariable(nu, nzg, "half", "scalar", "thetal", "K")
         T   = UpdraftVariable(nu, nzg, "half", "scalar", "temperature","K" )
         B   = UpdraftVariable(nu, nzg, "half", "scalar", "buoyancy","m^2/s^3" )
 
         if namelist["turbulence"]["scheme"] == "EDMF_PrognosticTKE"
-            use_steady_updrafts = try
-                namelist["turbulence"]["EDMF_PrognosticTKE"]["use_steady_updrafts"]
-            catch
-                false
-            end
-            if use_steady_updrafts
-                prognostic = false
-            else
-                prognostic = true
-            end
+            prognostic = true
             updraft_fraction = paramlist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
         else
             prognostic = false
@@ -372,13 +357,8 @@ struct UpdraftThermodynamics{A1, A2}
             UpdVar::UpdraftVariables,
             Rain::RainVariables
         )
-        if UpdVar.H.name == "s"
-            t_to_prog_fp = t_to_entropy_c
-            prog_to_t_fp = eos_first_guess_entropy
-        elseif UpdVar.H.name == "thetal"
-            t_to_prog_fp = t_to_thetali_c
-            prog_to_t_fp = eos_first_guess_thetal
-        end
+        t_to_prog_fp = t_to_thetali_c
+        prog_to_t_fp = eos_first_guess_thetal
 
         # rain source from each updraft from all sub-timesteps
         prec_source_h  = pyzeros(n_updraft, Gr.nzg)
@@ -528,13 +508,8 @@ struct EnvironmentThermodynamics{A1}
         catch
             "gaussian"
         end
-        if EnvVar.H.name == "s"
-            t_to_prog_fp = t_to_entropy_c
-            prog_to_t_fp = eos_first_guess_entropy
-        elseif EnvVar.H.name == "thetal"
-            t_to_prog_fp = t_to_thetali_c
-            prog_to_t_fp = eos_first_guess_thetal
-        end
+        t_to_prog_fp = t_to_thetali_c
+        prog_to_t_fp = eos_first_guess_thetal
 
         qt_dry = pyzeros(Gr.nzg)
         th_dry = pyzeros(Gr.nzg)
@@ -697,7 +672,6 @@ end
 mutable struct EDMF_PrognosticTKE{A1,A2}
     base::ParameterizationBase
     n_updrafts::Int
-    use_steady_updrafts::Bool
     calc_tke::Bool
     use_const_plume_spacing::Bool
     calc_scalar_var::Bool
@@ -798,13 +772,6 @@ mutable struct EDMF_PrognosticTKE{A1,A2}
         catch
             println("Turbulence--EDMF_PrognosticTKE: defaulting to single updraft")
             1
-        end
-
-        # TODO - steady updrafts have not been tested!
-        use_steady_updrafts = try
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["use_steady_updrafts"]
-        catch
-            false
         end
 
         calc_tke = try
@@ -982,9 +949,6 @@ mutable struct EDMF_PrognosticTKE{A1,A2}
 
         # Create the class for rain
         Rain = RainVariables(namelist, Gr)
-        if use_steady_updrafts == true && Rain.rain_model != "None"
-            error("PrognosticTKE: rain model is available for prognostic updrafts only")
-        end
 
         # Create the updraft variable class (major diagnostic and prognostic variables)
         UpdVar = UpdraftVariables(n_updrafts, namelist,paramlist, Gr)
@@ -1077,7 +1041,6 @@ mutable struct EDMF_PrognosticTKE{A1,A2}
         return new{A1,A2}(
             base,
             n_updrafts,
-            use_steady_updrafts,
             calc_tke,
             use_const_plume_spacing,
             calc_scalar_var,

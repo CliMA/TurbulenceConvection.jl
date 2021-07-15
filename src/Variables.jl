@@ -82,18 +82,10 @@ function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState)
     QT = VariablePrognostic(Gr.nzg, "half", "scalar","sym", "qt", "kg/kg")
     RH = VariablePrognostic(Gr.nzg, "half", "scalar","sym", "RH", "%")
 
-    if namelist["thermodynamics"]["thermal_variable"] == "entropy"
-        H = VariablePrognostic(Gr.nzg, "half", "scalar", "sym","s", "J/kg/K" )
-        t_to_prog_fp = t_to_entropy_c
-        prog_to_t_fp = eos_first_guess_entropy
-    elseif namelist["thermodynamics"]["thermal_variable"] == "thetal"
-        H = VariablePrognostic(Gr.nzg, "half", "scalar", "sym","thetal", "K")
-        t_to_prog_fp = t_to_thetali_c
-        prog_to_t_fp = eos_first_guess_thetal
-    else
-        error("Did not recognize thermal variable " + namelist["thermodynamics"]["thermal_variable"])
-    end
-
+    H = VariablePrognostic(Gr.nzg, "half", "scalar", "sym","thetal", "K")
+    t_to_prog_fp = t_to_thetali_c
+    prog_to_t_fp = eos_first_guess_thetal
+    
     # Diagnostic Variables--same class as the prognostic variables, but we append to diagnostics list
     QL  = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "ql",              "kg/kg")
     T   = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "temperature",     "K")
@@ -134,15 +126,9 @@ function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState)
     if calc_scalar_var
         QTvar = VariableDiagnostic(Gr.nzg, "half", "scalar","sym", "qt_var","kg^2/kg^2" )
         QT_third_m = VariableDiagnostic(Gr.nzg, "half", "scalar","sym", "qt_third_m","kg^3/kg^3" )
-        if namelist["thermodynamics"]["thermal_variable"] == "entropy"
-            Hvar = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "s_var", "(J/kg/K)^2")
-            H_third_m = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "s__third_m", "-")
-            HQTcov = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym" ,"s_qt_covar", "(J/kg/K)(kg/kg)" )
-        elseif namelist["thermodynamics"]["thermal_variable"] == "thetal"
-            Hvar = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym" ,"thetal_var", "K^2")
-            H_third_m = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "thetal_third_m", "-")
-            HQTcov = VariableDiagnostic(Gr.nzg, "half", "scalar","sym" ,"thetal_qt_covar", "K(kg/kg)" )
-        end
+        Hvar = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym" ,"thetal_var", "K^2")
+        H_third_m = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "thetal_third_m", "-")
+        HQTcov = VariableDiagnostic(Gr.nzg, "half", "scalar","sym" ,"thetal_qt_covar", "K(kg/kg)" )
     end
 
     return GridMeanVariables(;Gr,
@@ -217,12 +203,7 @@ function initialize_io(self::GridMeanVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "v_mean")
     add_profile(Stats, "qt_mean")
     add_profile(Stats, "RH_mean")
-    if self.H.name == "s"
-        add_profile(Stats, "s_mean")
-        add_profile(Stats, "thetal_mean")
-    elseif self.H.name == "thetal"
-        add_profile(Stats, "thetal_mean")
-    end
+    add_profile(Stats, "thetal_mean")
 
     add_profile(Stats, "temperature_mean")
     add_profile(Stats, "buoyancy_mean")
@@ -260,12 +241,8 @@ function io(self::GridMeanVariables, Stats::NetCDFIO_Stats)
     write_profile(Stats, "temperature_mean",self.T.values[cinterior])
     write_profile(Stats, "RH_mean",self.RH.values[cinterior])
     write_profile(Stats, "buoyancy_mean",self.B.values[cinterior])
-    if self.H.name == "s"
-        write_profile(Stats, "s_mean",self.H.values[cinterior])
-        write_profile(Stats, "thetal_mean",self.THL.values[cinterior])
-    elseif self.H.name == "thetal"
-        write_profile(Stats, "thetal_mean",self.H.values[cinterior])
-    end
+    write_profile(Stats, "thetal_mean",self.H.values[cinterior])
+
     if self.calc_tke
         write_profile(Stats, "tke_mean",self.TKE.values[cinterior])
         write_profile(Stats, "W_third_m",self.W_third_m.values[cinterior])
