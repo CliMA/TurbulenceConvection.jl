@@ -33,7 +33,7 @@ steps:
     command:
       - "julia --color=yes --project=test integration_tests/Bomex.jl"
     artifact_paths:
-      - "output/Bomex/plots/*"
+      - "Output.Bomex.01/stats/comparison/*"
     agents:
       config: cpu
       queue: central
@@ -44,7 +44,7 @@ steps:
     command:
       - "julia --color=yes --project=test integration_tests/life_cycle_Tan2018.jl"
     artifact_paths:
-      - "output/life_cycle_Tan2018/plots/*"
+      - "Output.life_cycle_Tan2018.01/stats/comparison/*"
     agents:
       config: cpu
       queue: central
@@ -55,7 +55,7 @@ steps:
     command:
       - "julia --color=yes --project=test integration_tests/Soares.jl"
     artifact_paths:
-      - "output/Soares/plots/*"
+      - "Output.Soares.01/stats/comparison/*"
     agents:
       config: cpu
       queue: central
@@ -66,7 +66,7 @@ steps:
     command:
       - "julia --color=yes --project=test integration_tests/Rico.jl"
     artifact_paths:
-      - "output/Rico/plots/*"
+      - "Output.Rico.01/stats/comparison/*"
     agents:
       config: cpu
       queue: central
@@ -77,7 +77,7 @@ steps:
     command:
       - "julia --color=yes --project=test integration_tests/TRMM_LBA.jl"
     artifact_paths:
-      - "output/TRMM_LBA/plots/*"
+      - "Output.TRMM_LBA.01/stats/comparison/*"
     agents:
       config: cpu
       queue: central
@@ -88,7 +88,7 @@ steps:
     command:
       - "julia --color=yes --project=test integration_tests/ARM_SGP.jl"
     artifact_paths:
-      - "output/ARM_SGP/plots/*"
+      - "Output.ARM_SGP.01/stats/comparison/*"
     agents:
       config: cpu
       queue: central
@@ -100,7 +100,7 @@ steps:
   #   command:
   #     - "julia --color=yes --project=test integration_tests/GATE_III.jl"
   #   artifact_paths:
-  #     - "output/GATE_III/plots/*"
+  #     - "Output.GATE_III.01/stats/comparison/*"
   #   agents:
   #     config: cpu
   #     queue: central
@@ -111,7 +111,7 @@ steps:
     command:
       - "julia --color=yes --project=test integration_tests/DYCOMS_RF01.jl"
     artifact_paths:
-      - "output/DYCOMS_RF01/plots/*"
+      - "Output.DYCOMS_RF01.01/stats/comparison/*"
     agents:
       config: cpu
       queue: central
@@ -122,7 +122,7 @@ steps:
     command:
       - "julia --color=yes --project=test integration_tests/GABLS.jl"
     artifact_paths:
-      - "output/GABLS/plots/*"
+      - "Output.GABLS.01/stats/comparison/*"
     agents:
       config: cpu
       queue: central
@@ -133,7 +133,7 @@ steps:
     command:
       - "julia --color=yes --project=test integration_tests/SP.jl"
     artifact_paths:
-      - "output/SP/plots/*"
+      - "Output.SP.01/stats/comparison/*"
     agents:
       config: cpu
       queue: central
@@ -144,7 +144,7 @@ steps:
     command:
       - "julia --color=yes --project=test integration_tests/DryBubble.jl"
     artifact_paths:
-      - "output/DryBubble/plots/*"
+      - "Output.DryBubble.01/stats/comparison/*"
     agents:
       config: cpu
       queue: central
