@@ -4,10 +4,6 @@ end
 import TurbulenceConvection
 using TurbulenceConvection
 using Test
-using Random
-
-# Make deterministic:
-Random.seed!(1234)
 
 include(joinpath("utils", "Cases.jl"))
 include(joinpath("utils", "generate_paramlist.jl"))
@@ -20,16 +16,13 @@ using .ParamList
 include(joinpath("utils", "main.jl"))
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 2.5102418088986439e-01
-best_mse["updraft_area"] = 2.0267630391221073e+02
-best_mse["updraft_w"] = 1.6282411683570519e+01
-best_mse["updraft_qt"] = 2.1825912039857140e+01
-best_mse["updraft_thetal"] = 6.2489182389073072e+01
-best_mse["v_mean"] = 1.9736543073311742e+02
-best_mse["u_mean"] = 5.3385203089809568e+02
-best_mse["tke_mean"] = 1.7549619573373798e+02
-
-ds_pycles = Dataset(joinpath(PyCLES_output_dataset_path, "Soares.nc"), "r")
+best_mse["qt_mean"] = 2.5027212537518156e-01
+best_mse["updraft_area"] = 6.4239580429210287e+02
+best_mse["updraft_w"] = 2.1749467787820109e+01
+best_mse["updraft_qt"] = 1.0545688944491198e+01
+best_mse["updraft_thetal"] = 2.1622142991870589e+01
+best_mse["u_mean"] = 4.2581362136921070e+03
+best_mse["tke_mean"] = 8.1041972411414534e+01
 
 @testset "Soares" begin
     println("Running Soares...")
@@ -39,14 +32,19 @@ ds_pycles = Dataset(joinpath(PyCLES_output_dataset_path, "Soares.nc"), "r")
     ds_filename = @time main(namelist, paramlist)
 
     computed_mse = Dataset(ds_filename, "r") do ds
-        compute_mse(
-            ds,
-            ds_pycles,
-            "Soares",
-            best_mse,
-            dirname(ds_filename);
-            plot_comparison=true
-        )
+        Dataset(joinpath(PyCLES_output_dataset_path, "Soares.nc"), "r") do ds_pycles
+            Dataset(joinpath(SCAMPy_output_dataset_path, "Soares.nc"), "r") do ds_scampy
+                compute_mse(
+                    "Soares",
+                    best_mse,
+                    joinpath(dirname(ds_filename), "comparison");
+                    ds_turb_conv=ds,
+                    ds_scampy=ds_scampy,
+                    ds_pycles=ds_pycles,
+                    plot_comparison=true
+                )
+            end
+        end
     end
 
     test_mse(computed_mse, best_mse, "qt_mean")
@@ -54,7 +52,6 @@ ds_pycles = Dataset(joinpath(PyCLES_output_dataset_path, "Soares.nc"), "r")
     test_mse(computed_mse, best_mse, "updraft_w")
     test_mse(computed_mse, best_mse, "updraft_qt")
     test_mse(computed_mse, best_mse, "updraft_thetal")
-    test_mse(computed_mse, best_mse, "v_mean")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
     nothing

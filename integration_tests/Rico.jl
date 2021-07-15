@@ -4,10 +4,6 @@ end
 import TurbulenceConvection
 using TurbulenceConvection
 using Test
-using Random
-
-# Make deterministic:
-Random.seed!(1234)
 
 include(joinpath("utils", "Cases.jl"))
 include(joinpath("utils", "generate_paramlist.jl"))
@@ -20,16 +16,14 @@ using .ParamList
 include(joinpath("utils", "main.jl"))
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 4.0145821221362488e-01
-best_mse["updraft_area"] = 4.6525267644195679e+02
-best_mse["updraft_w"] = 2.2908548924319413e+02
-best_mse["updraft_qt"] = 2.5661494340253533e+01
-best_mse["updraft_thetal"] = 4.2409565376016479e+02
-best_mse["v_mean"] = 3.6252873079755642e+04
-best_mse["u_mean"] = 2.4726879986917771e+02
-best_mse["tke_mean"] = 2.0708781629689062e+02
-
-ds_pycles = Dataset(joinpath(PyCLES_output_dataset_path, "Rico.nc"), "r")
+best_mse["qt_mean"] = 4.2224256587669962e-01
+best_mse["updraft_area"] = 1.9233273311592638e+03
+best_mse["updraft_w"] = 5.0296135886933655e+02
+best_mse["updraft_qt"] = 2.3554324914261098e+01
+best_mse["updraft_thetal"] = 6.5600891407859962e+01
+best_mse["v_mean"] = 1.0600195077063628e+02
+best_mse["u_mean"] = 1.1403381273885380e+02
+best_mse["tke_mean"] = 9.9348960281258223e+02
 
 @testset "Rico" begin
     println("Running Rico...")
@@ -39,14 +33,19 @@ ds_pycles = Dataset(joinpath(PyCLES_output_dataset_path, "Rico.nc"), "r")
     ds_filename = @time main(namelist, paramlist)
 
     computed_mse = Dataset(ds_filename, "r") do ds
-        compute_mse(
-            ds,
-            ds_pycles,
-            "Rico",
-            best_mse,
-            dirname(ds_filename);
-            plot_comparison=true
-        )
+        Dataset(joinpath(PyCLES_output_dataset_path, "Rico.nc"), "r") do ds_pycles
+            Dataset(joinpath(SCAMPy_output_dataset_path, "Rico.nc"), "r") do ds_scampy
+                compute_mse(
+                    "Rico",
+                    best_mse,
+                    joinpath(dirname(ds_filename), "comparison");
+                    ds_turb_conv=ds,
+                    ds_scampy=ds_scampy,
+                    ds_pycles=ds_pycles,
+                    plot_comparison=true
+                )
+            end
+        end
     end
 
     test_mse(computed_mse, best_mse, "qt_mean")

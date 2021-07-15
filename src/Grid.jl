@@ -25,14 +25,14 @@ struct Grid{A1}
         nzg = nz + 2 * gw
 
 
-        # TODO: fix this
-        cinterior = gw+1:(nzg-gw)
-        finterior = gw+1:(nzg-gw)
+        cinterior = gw:(nzg-gw)-1
+        finterior = gw:(nzg-gw)-1
+
         # TODO: make cell centers and cell faces different sizes
         z_half = pyzeros(nz+2*gw)
         z = pyzeros(nz+2*gw)
         count = 0
-        @inbounds for i in xrange(-gw,nz+gw-1)
+        @inbounds for i in xrange(-gw,nz+gw)
             z[count] = (i + 1) * dz
             z_half[count] = (i+0.5)*dz
             count += 1

@@ -1,6 +1,6 @@
-get_ds_filename(case) = "test/Output.{$case}.{01}/statsStats.{$case}.nc";
+get_ds_filename(case) = "test/Output.$case.01/stats/Stats.$case.nc";
 
-get_ds_filename(case) = "Output.{$case}.{01}/statsStats.{$case}.nc";
+get_ds_filename(case) = "Output.$case.01/stats/Stats.$case.nc";
 
 # plot_profiles(get_ds_filename("BOMEX"), "profiles"; skip_contours=true)
 # plot_profiles(get_ds_filename("Soares"), "profiles"; skip_contours=true)
