@@ -17,13 +17,10 @@ include(joinpath("utils", "main.jl"))
 
 best_mse = OrderedDict()
 
-best_mse["updraft_area"] = 1.8227678974387011e+01
-best_mse["updraft_w"] = 1.2435239287489708e+01
-
-best_mse["updraft_thetal"] = 4.6453137166954967e+01
-best_mse["v_mean"] = 1.0939547963673784e+01
-best_mse["u_mean"] = 5.7078250617016124e+02
-best_mse["tke_mean"] = 7.7344960671102756e+00
+best_mse["updraft_thetal"] = 5.0395303941753484e+00
+best_mse["v_mean"] = 6.1823518722858504e+00
+best_mse["u_mean"] = 9.6830856629173105e+00
+best_mse["tke_mean"] = 5.3941202810898465e+00
 
 @testset "GABLS" begin
     println("Running GABLS...")
@@ -48,8 +45,6 @@ best_mse["tke_mean"] = 7.7344960671102756e+00
         end
     end
 
-    test_mse(computed_mse, best_mse, "updraft_area")
-    test_mse(computed_mse, best_mse, "updraft_w")
     test_mse(computed_mse, best_mse, "updraft_thetal")
     test_mse(computed_mse, best_mse, "v_mean")
     test_mse(computed_mse, best_mse, "u_mean")

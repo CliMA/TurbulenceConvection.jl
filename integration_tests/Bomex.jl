@@ -16,14 +16,14 @@ using .ParamList
 include(joinpath("utils", "main.jl"))
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 1.1700898235450277e-01
-best_mse["updraft_area"] = 9.0913838349298851e+02
-best_mse["updraft_w"] = 8.3884629369855617e+01
-best_mse["updraft_qt"] = 4.5427992440075329e+00
-best_mse["updraft_thetal"] = 2.3231211962387402e+01
-best_mse["v_mean"] = 1.5312166699292689e+02
-best_mse["u_mean"] = 5.4320898043541348e+01
-best_mse["tke_mean"] = 3.7352598707346871e+01
+best_mse["qt_mean"] = 1.0701019653530450e-01
+best_mse["updraft_area"] = 6.9127918666220057e+02
+best_mse["updraft_w"] = 8.3196631916073699e+01
+best_mse["updraft_qt"] = 5.9300799798912323e+00
+best_mse["updraft_thetal"] = 2.3063368634456552e+01
+best_mse["v_mean"] = 1.2992861032456707e+02
+best_mse["u_mean"] = 5.3536353327695572e+01
+best_mse["tke_mean"] = 3.3193072857888232e+01
 
 @testset "Bomex" begin
     println("Running Bomex...")

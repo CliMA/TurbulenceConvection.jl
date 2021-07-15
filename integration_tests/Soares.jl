@@ -16,13 +16,13 @@ using .ParamList
 include(joinpath("utils", "main.jl"))
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 2.5379707482392216e-01
-best_mse["updraft_area"] = 6.9134632696535311e+02
-best_mse["updraft_w"] = 2.2088311400548207e+01
-best_mse["updraft_qt"] = 1.0737238763474318e+01
-best_mse["updraft_thetal"] = 2.2118711589015625e+01
-best_mse["u_mean"] = 4.1797211980595075e+03
-best_mse["tke_mean"] = 7.9767693285775977e+01
+best_mse["qt_mean"] = 2.5027212537518156e-01
+best_mse["updraft_area"] = 6.4239580429210287e+02
+best_mse["updraft_w"] = 2.1749467787820109e+01
+best_mse["updraft_qt"] = 1.0545688944491198e+01
+best_mse["updraft_thetal"] = 2.1622142991870589e+01
+best_mse["u_mean"] = 4.2581362136921070e+03
+best_mse["tke_mean"] = 8.1041972411414534e+01
 
 @testset "Soares" begin
     println("Running Soares...")
@@ -52,7 +52,6 @@ best_mse["tke_mean"] = 7.9767693285775977e+01
     test_mse(computed_mse, best_mse, "updraft_w")
     test_mse(computed_mse, best_mse, "updraft_qt")
     test_mse(computed_mse, best_mse, "updraft_thetal")
-    test_mse(computed_mse, best_mse, "v_mean")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
     nothing
