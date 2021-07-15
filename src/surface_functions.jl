@@ -30,17 +30,6 @@ function psi_h_stable(zeta, zeta0)
     return  psi_h
 end
 
-function entropy_flux(tflux,qtflux, p0_1, T_1, qt_1)
-    cp_1 = cpm_c(qt_1)
-    pd_1 = pd_c(p0_1, qt_1, qt_1)
-    pv_1 = pv_c(p0_1, qt_1, qt_1)
-    sd_1 = sd_c(pd_1, T_1)
-    sv_1 = sv_c(pv_1, T_1)
-    return cp_1*tflux/T_1 + qtflux*(sv_1-sd_1)
-end
-
-
-
 function compute_ustar(windspeed, buoyancy_flux, z0, z1)
 
     logz = log(z1 / z0)

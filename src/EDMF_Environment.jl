@@ -34,13 +34,7 @@ function EnvironmentVariables(namelist, Gr::Grid)
     QT = EnvironmentVariable( nz, "half", "scalar", "qt","kg/kg" )
     QL = EnvironmentVariable( nz, "half", "scalar", "ql","kg/kg" )
     RH = EnvironmentVariable( nz, "half", "scalar", "RH","%" )
-
-    if namelist["thermodynamics"]["thermal_variable"] == "entropy"
-        H = EnvironmentVariable( nz, "half", "scalar", "s","J/kg/K" )
-    elseif namelist["thermodynamics"]["thermal_variable"] == "thetal"
-        H = EnvironmentVariable( nz, "half", "scalar", "thetal","K" )
-    end
-
+    H = EnvironmentVariable( nz, "half", "scalar", "thetal","K" )
     THL = EnvironmentVariable(nz, "half", "scalar", "thetal", "K")
     T = EnvironmentVariable( nz, "half", "scalar", "temperature","K" )
     B = EnvironmentVariable( nz, "half", "scalar", "buoyancy","m^2/s^3" )
@@ -48,11 +42,7 @@ function EnvironmentVariables(namelist, Gr::Grid)
     cloud_fraction = EnvironmentVariable(nz, "half", "scalar", "env_cloud_fraction", "-")
 
     # TODO - the flag setting is repeated from Variables.pyx logic
-    if  namelist["turbulence"]["scheme"] == "EDMF_PrognosticTKE"
-        calc_tke = true
-    else
-        calc_tke = false
-    end
+    calc_tke = true
     calc_tke = try
         namelist["turbulence"]["EDMF_PrognosticTKE"]["calculate_tke"]
     catch
@@ -79,13 +69,8 @@ function EnvironmentVariables(namelist, Gr::Grid)
 
     if calc_scalar_var
         QTvar = EnvironmentVariable_2m( nz, "half", "scalar", "qt_var","kg^2/kg^2" )
-        if namelist["thermodynamics"]["thermal_variable"] == "entropy"
-            Hvar = EnvironmentVariable_2m(nz, "half", "scalar", "s_var", "(J/kg/K)^2")
-            HQTcov = EnvironmentVariable_2m(nz, "half", "scalar", "s_qt_covar", "(J/kg/K)(kg/kg)" )
-        elseif namelist["thermodynamics"]["thermal_variable"] == "thetal"
-            Hvar = EnvironmentVariable_2m(nz, "half", "scalar", "thetal_var", "K^2")
-            HQTcov = EnvironmentVariable_2m(nz, "half", "scalar", "thetal_qt_covar", "K(kg/kg)" )
-        end
+        Hvar = EnvironmentVariable_2m(nz, "half", "scalar", "thetal_var", "K^2")
+        HQTcov = EnvironmentVariable_2m(nz, "half", "scalar", "thetal_qt_covar", "K(kg/kg)" )
     end
 
     if EnvThermo_scheme == "quadrature"
@@ -121,12 +106,7 @@ function initialize_io(self::EnvironmentVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "env_area")
     add_profile(Stats, "env_temperature")
     add_profile(Stats, "env_RH")
-
-    if self.H.name == "s"
-        add_profile(Stats, "env_s")
-    else
-        add_profile(Stats, "env_thetal")
-    end
+    add_profile(Stats, "env_thetal")
 
     if self.calc_tke
         add_profile(Stats, "env_tke")
@@ -156,12 +136,7 @@ function io(self::EnvironmentVariables, Stats::NetCDFIO_Stats, Ref::ReferenceSta
     write_profile(Stats, "env_area", self.Area.values[cinterior])
     write_profile(Stats, "env_temperature", self.T.values[cinterior])
     write_profile(Stats, "env_RH", self.RH.values[cinterior])
-
-    if self.H.name == "s"
-        write_profile(Stats, "env_s", self.H.values[cinterior])
-    else
-        write_profile(Stats, "env_thetal", self.H.values[cinterior])
-    end
+    write_profile(Stats, "env_thetal", self.H.values[cinterior])
 
     if self.calc_tke
         write_profile(Stats, "env_tke", self.TKE.values[cinterior])
