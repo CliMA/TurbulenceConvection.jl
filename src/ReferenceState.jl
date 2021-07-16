@@ -135,7 +135,7 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
     # TODO: centers and faces are sliced with equal sizes,
     # they should be unequal.
     cinterior = Gr.cinterior
-    finterior = Gr.finterior
+    finterior = Gr.cinterior # TODO: THIS SHOULD BE CHANGED, it's just what scampy does
     add_reference_profile(Stats, "alpha0")
     write_reference_profile(Stats, "alpha0", alpha[finterior])
     add_reference_profile(Stats, "alpha0_half")

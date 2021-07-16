@@ -131,7 +131,7 @@ update_forcing(self::CasesBase, GMV::GridMeanVariables,  TS::TimeStepping, ::Bas
 function Soares(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "Soares2004"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(;Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase(TurbulenceConvection.ForcingNone;Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -226,7 +226,7 @@ end
 function Nieuwstadt(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "Nieuwstadt"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(;Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase(TurbulenceConvection.ForcingNone;Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -320,7 +320,7 @@ end
 function Bomex(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "Bomex"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase(TurbulenceConvection.ForcingStandard;Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
@@ -468,7 +468,7 @@ update_forcing(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepp
 function life_cycle_Tan2018(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "life_cycle_Tan2018"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase(TurbulenceConvection.ForcingStandard;Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
@@ -618,7 +618,7 @@ end
 function Rico(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "Rico"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedCoeffs}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase(TurbulenceConvection.ForcingStandard;Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 18.0
@@ -744,7 +744,7 @@ end
 function TRMM_LBA(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "TRMM_LBA"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase(TurbulenceConvection.ForcingStandard;Gr, Ref)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -1066,7 +1066,7 @@ end
 function ARM_SGP(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "ARM_SGP"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase(TurbulenceConvection.ForcingStandard;Gr, Ref)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 8.5e-5
@@ -1194,7 +1194,7 @@ end
 function GATE_III(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "GATE_III"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedCoeffs}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase(TurbulenceConvection.ForcingStandard;Gr, Ref)
     inversion_option = "thetal_maxgrad"
     Fo.apply_subsidence = false
     Fo.apply_coriolis = false
@@ -1328,7 +1328,7 @@ doi: http://dx.doi.org/10.1175/MWR2930.1
 function DYCOMS_RF01(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "DYCOMS_RF01"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingDYCOMS_RF01}(;Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase(TurbulenceConvection.ForcingDYCOMS_RF01;Gr, Ref)
     inversion_option = "thetal_maxgrad"
     return TurbulenceConvection.CasesBase{DYCOMS_RF01}(
         ;casename = "DYCOMS_RF01", inversion_option, Sur, Fo)
@@ -1522,7 +1522,7 @@ end
 function GABLS(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "GABLS"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceMoninObukhovDry}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase(TurbulenceConvection.ForcingStandard;Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 73.0
@@ -1625,7 +1625,7 @@ end
 function SP(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "SP"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceSullivanPatton}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase(TurbulenceConvection.ForcingStandard;Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 1.0e-4 # s^{-1}
@@ -1726,7 +1726,7 @@ end
 function DryBubble(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "DryBubble"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceNone}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(;Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase(TurbulenceConvection.ForcingNone;Gr, Ref)
     inversion_option = "theta_rho"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false

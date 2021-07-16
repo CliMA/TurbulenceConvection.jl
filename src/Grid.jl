@@ -26,7 +26,7 @@ struct Grid{A1}
 
 
         cinterior = gw:(nzg-gw)-1
-        finterior = gw:(nzg-gw)-1
+        finterior = gw+1:(nzg-gw)
 
         # TODO: make cell centers and cell faces different sizes
         z_half = pyzeros(nz+2*gw)

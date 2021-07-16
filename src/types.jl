@@ -657,14 +657,14 @@ struct ForcingStandard end
 struct ForcingDYCOMS_RF01 end
 
 Base.@kwdef mutable struct ForcingBase{T}
-    subsidence::AbstractArray{Float64,1} = zeros(1)
-    dTdt::AbstractArray{Float64,1} = zeros(1) # horizontal advection temperature tendency
-    dqtdt::AbstractArray{Float64,1} = zeros(1) # horizontal advection moisture tendency
+    subsidence::AbstractArray{Float64,1}
+    dTdt::AbstractArray{Float64,1} # horizontal advection temperature tendency
+    dqtdt::AbstractArray{Float64,1} # horizontal advection moisture tendency
     apply_coriolis::Bool = false
     apply_subsidence::Bool = false
     coriolis_param::Float64 = 0
-    ug::AbstractArray{Float64,1} = zeros(1)
-    vg::AbstractArray{Float64,1} = zeros(1)
+    ug::AbstractArray{Float64,1}
+    vg::AbstractArray{Float64,1}
     # (*convert_forcing_prog_fp)(p0, qt, qv, T,::Float64
     #                                   qt_tendency, T_tendency) ::Float64
     convert_forcing_prog_fp::Function = x->x
@@ -675,7 +675,17 @@ Base.@kwdef mutable struct ForcingBase{T}
     F0::Float64 = 0
     F1::Float64 = 0
     divergence::Float64 = 0
-    f_rad::AbstractArray{Float64,1} = zeros(1)
+    f_rad::AbstractArray{Float64,1}
+end
+function ForcingBase(::Type{T}; Gr, Ref) where {T}
+    return ForcingBase{T}(;Gr, Ref,
+        dTdt=pyzeros(Gr.nzg),
+        subsidence=pyzeros(Gr.nzg),
+        dqtdt=pyzeros(Gr.nzg),
+        f_rad=pyzeros(Gr.nzg + 1),
+        ug = pyzeros(Gr.nzg),
+        vg = pyzeros(Gr.nzg)
+    )
 end
 
 Base.@kwdef mutable struct CasesBase{T}

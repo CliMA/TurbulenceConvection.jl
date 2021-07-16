@@ -26,8 +26,8 @@ function TurbulenceConvection.initialize(self::Simulation1d, namelist)
     Cases.initialize_profiles(self.Case, self.Gr, self.GMV, self.Ref)
     Cases.initialize_surface(self.Case, self.Gr, self.Ref )
     Cases.initialize_forcing(self.Case, self.Gr, self.Ref, self.GMV)
-    TurbulenceConvection.initialize(self.Turb, self.Case, self.GMV, self.Ref)
     TurbulenceConvection.initialize_io(self)
+    TurbulenceConvection.initialize(self.Turb, self.Case, self.GMV, self.Ref)
     TurbulenceConvection.io(self)
     return
 end
@@ -46,11 +46,13 @@ function run(self::Simulation1d)
         # TurbulenceConvection.check_nans(self.GMV, self.Turb, "4")
         # Good up to here.
         TurbulenceConvection.update(self.Turb, self.GMV, self.Case, self.TS, self.Stats)
+        # TurbulenceConvection.export_all(self.Case, self.Turb, self.GMV, self.TS, self.Stats) # 1e-8 error
         # TurbulenceConvection.check_nans(self.GMV, self.Turb, "5")
         TurbulenceConvection.update(self.TS)
         # TurbulenceConvection.check_nans(self.GMV, self.Turb, "6")
         # Apply the tendencies, also update the BCs and diagnostic thermodynamics
-        TurbulenceConvection.update(self.GMV, self.TS)
+        # TurbulenceConvection.export_all(self.Case, self.Turb, self.GMV, self.TS, self.Stats) # machine error
+        TurbulenceConvection.update(self.GMV, self.TS, self.Case, self.Turb, self.Stats)
         # TurbulenceConvection.check_nans(self.GMV, self.Turb, "7")
         TurbulenceConvection.update_GMV_diagnostics(self.Turb, self.GMV)
         # TurbulenceConvection.check_nans(self.GMV, self.Turb, "8")

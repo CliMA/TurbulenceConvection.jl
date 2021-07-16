@@ -72,27 +72,27 @@ function compute_mse(
 )
     mse = Dict()
     time_tcc = ds_turb_conv.group["timeseries"]["t"][:]
-    time_les = ds_pycles["t"][:]
+    # time_les = ds_pycles["t"][:]
     time_scm = ds_scampy.group["timeseries"]["t"][:]
     n_time_points = length(time_tcc)
 
     mkpath(foldername)
     # Ensure domain matches:
-    z_les = ds_pycles["z_half"][:]
+    # z_les = ds_pycles["z_half"][:]
     z_tcc = ds_turb_conv.group["profiles"]["z_half"][:]
     z_scm = ds_scampy.group["profiles"]["z_half"][:]
     n_grid_points = length(z_tcc)
     @info "Z extent for LES vs CLIMA:"
     @show extrema(z_tcc)
-    @show extrema(z_les)
+    # @show extrema(z_les)
     @show extrema(z_scm)
     @info "n-grid points"
     @show length(z_tcc)
-    @show length(z_les)
+    # @show length(z_les)
     @show length(z_scm)
 
     # Find the nearest matching final time:
-    t_cmp = min(time_tcc[end], time_les[end], time_scm[end])
+    t_cmp = min(time_tcc[end], time_scm[end])
 
     # Accidentally running a short simulation
     # could improve MSE. So, let's test that
@@ -108,64 +108,80 @@ function compute_mse(
     mse_reductions = []
     pycles_variables = []
     data_scales_scm = []
-    data_scales_les = []
+    # data_scales_les = []
     data_scales_tcc = []
     pycles_weight = []
-    for tc_var in keys(best_mse)
+
+    all_keys = unique([keys(ds_scampy.group["profiles"])..., keys(best_mse)...])
+    # for tc_var in keys(best_mse)
+    # @show keys(ds_scampy.group["profiles"])
+    for tc_var in all_keys
 
         # Only compare fields defined for var_map_les
-        les_var = var_map_les(tc_var)
+        # les_var = var_map_les(tc_var)
         scm_var = var_map_scampy(tc_var)
-        les_var == nothing && continue
-        les_var isa String || continue
+        tc_var == "z" && continue
+        tc_var == "z_half" && continue
+        tc_var == "t" && continue
+        # les_var == nothing && continue
+        # les_var isa String || continue
 
         push!(tcc_variables, tc_var)
-        push!(pycles_variables, les_var)
+        # push!(pycles_variables, les_var)
 
-        data_les_arr = get_data(ds_pycles, les_var)'
+        # data_les_arr = get_data(ds_pycles, les_var)'
         data_tcc_arr = get_data(ds_turb_conv, tc_var)'
         data_scm_arr = get_data(ds_scampy, scm_var)'
 
         # Scale the data for comparison
-        push!(pycles_weight, "1")
+        # push!(pycles_weight, "1")
 
         # Interpolate data
-        steady_data = length(size(data_les_arr)) == 1
+        steady_data = size(data_tcc_arr,1) == 1
         @show tc_var, steady_data
+        # if steady_data
+        #     # data_les_cont = Spline1D(z_les, data_les_arr)
+        #     data_tcc_cont = Spline1D(z_tcc, data_tcc_arr)
+        #     data_scm_cont = Spline1D(z_scm, data_scm_arr)
+        #     data_les_cont_mapped = map(z -> data_les_cont(z), z_tcc)
+        #     data_tcc_cont_mapped = map(z -> data_tcc_cont(z), z_tcc)
+        #     data_scm_cont_mapped = map(z -> data_scm_cont(z), z_tcc)
+        # else # unsteady data
+        #     # data_les_cont = Spline2D(time_les, z_les, data_les_arr)
+        #     data_tcc_cont = Spline2D(time_tcc, z_tcc, data_tcc_arr)
+        #     data_scm_cont = Spline2D(time_scm, z_scm, data_scm_arr)
+        #     # data_les_cont_mapped = map(z -> data_les_cont(t_cmp, z), z_tcc)
+        #     data_tcc_cont_mapped = map(z -> data_tcc_cont(t_cmp, z), z_tcc)
+        #     data_scm_cont_mapped = map(z -> data_scm_cont(t_cmp, z), z_tcc)
+        # end
+
         if steady_data
-            data_les_cont = Spline1D(z_les, data_les_arr)
-            data_tcc_cont = Spline1D(z_tcc, data_tcc_arr)
-            data_scm_cont = Spline1D(z_scm, data_scm_arr)
-            data_les_cont_mapped = map(z -> data_les_cont(z), z_tcc)
-            data_tcc_cont_mapped = map(z -> data_tcc_cont(z), z_tcc)
-            data_scm_cont_mapped = map(z -> data_scm_cont(z), z_tcc)
+            # data_les_cont = Spline1D(z_les, data_les_arr)
+            data_tcc_cont_mapped = data_tcc_arr[:]
+            data_scm_cont_mapped = data_scm_arr[:]
         else # unsteady data
-            data_les_cont = Spline2D(time_les, z_les, data_les_arr)
-            data_tcc_cont = Spline2D(time_tcc, z_tcc, data_tcc_arr)
-            data_scm_cont = Spline2D(time_scm, z_scm, data_scm_arr)
-            data_les_cont_mapped = map(z -> data_les_cont(t_cmp, z), z_tcc)
-            data_tcc_cont_mapped = map(z -> data_tcc_cont(t_cmp, z), z_tcc)
-            data_scm_cont_mapped = map(z -> data_scm_cont(t_cmp, z), z_tcc)
+            data_tcc_cont_mapped = data_tcc_arr[:,end]
+            data_scm_cont_mapped = data_scm_arr[:,end]
         end
 
         # Compute data scale
         data_scale_tcc = sum(abs.(data_tcc_arr)) / length(data_tcc_arr)
         data_scale_scm = sum(abs.(data_scm_arr)) / length(data_scm_arr)
-        data_scale_les = sum(abs.(data_les_arr)) / length(data_les_arr)
+        # data_scale_les = sum(abs.(data_les_arr)) / length(data_les_arr)
         push!(data_scales_tcc, data_scale_tcc)
         push!(data_scales_scm, data_scale_scm)
-        push!(data_scales_les, data_scale_les)
+        # push!(data_scales_les, data_scale_les)
 
         # Plot comparison
         if plot_comparison
             p = plot()
-            plot!(
-                data_les_cont_mapped,
-                z_tcc ./ 10^3,
-                xlabel = tc_var,
-                ylabel = "z [km]",
-                label = "PyCLES",
-            )
+            # plot!(
+            #     data_les_cont_mapped,
+            #     z_tcc ./ 10^3,
+            #     xlabel = tc_var,
+            #     ylabel = "z [km]",
+            #     label = "PyCLES",
+            # )
             plot!(
                 data_tcc_cont_mapped,
                 z_tcc ./ 10^3,
@@ -183,33 +199,31 @@ function compute_mse(
             @info "Saving $(joinpath(foldername, "$tc_var.png"))"
             savefig(joinpath(foldername, "$tc_var.png"))
 
-            contourf(
-                time_scm, z_scm, data_scm_arr';
-                xlabel = tc_var,
-                ylabel = "height (m)",
-                c = :viridis
-            )
-            savefig(joinpath(foldername,"contours_"*tc_var*"_scampy"*".png"))
+            # contourf(
+            #     time_scm, z_scm, data_scm_arr';
+            #     xlabel = tc_var,
+            #     ylabel = "height (m)",
+            #     c = :viridis
+            # )
+            # savefig(joinpath(foldername,"contours_"*tc_var*"_scampy"*".png"))
 
-            contourf(
-                time_tcc, z_tcc, data_tcc_arr';
-                xlabel = tc_var,
-                ylabel = "height (m)",
-                c = :viridis
-            )
-            savefig(joinpath(foldername,"contours_"*tc_var*"_tc"*".png"))
+            # contourf(
+            #     time_tcc, z_tcc, data_tcc_arr';
+            #     xlabel = tc_var,
+            #     ylabel = "height (m)",
+            #     c = :viridis
+            # )
+            # savefig(joinpath(foldername,"contours_"*tc_var*"_tc"*".png"))
         end
 
         # Compute mean squared error (mse)
-        if steady_data
-            mse_single_var = sum(map(z_tcc) do z
-                (data_les_cont(z) - data_tcc_cont(t_cmp, z))^2
-            end)
-        else
-            mse_single_var = sum(map(z_tcc) do z
-                (data_les_cont(t_cmp, z) - data_tcc_cont(t_cmp, z))^2
-            end)
-        end
+        # if steady_data
+        #     mse_single_var = sum(map(z_tcc) do z
+        #         (data_scm_cont(z) - data_tcc_cont(t_cmp, z))^2
+        #     end)
+        # else
+        mse_single_var = sum((data_scm_cont_mapped .- data_tcc_cont_mapped).^2)
+        # end
         # Normalize by data scale
         mse[tc_var] = mse_single_var / data_scale_tcc^2
 
@@ -220,13 +234,12 @@ function compute_mse(
 
     # Tabulate output
     header = [
-        "Variable" "Variable" "Weight" "Data scale" "Data scale" "MSE" "MSE" "MSE"
-        "TC.jl (EDMF)" "PyCLES" "PyCLES" "tcc" "scm" "Computed" "Best" "Reduction (%)"
+        "Variable" "Data scale" "Data scale" "MSE" "MSE" "MSE"
+        "" "tcc" "scm" "Computed" "Best" "Reduction (%)"
     ]
     table_data = hcat(
         tcc_variables,
-        pycles_variables,
-        pycles_weight,
+        # pycles_weight,
         data_scales_tcc,
         data_scales_scm,
         computed_mse,
@@ -240,21 +253,21 @@ function compute_mse(
         t_cmp
     )
     hl_worsened_mse = Highlighter(
-        (data, i, j) -> !sufficient_mse(data[i, 6], data[i, 7]) && j == 6,
+        (data, i, j) -> !sufficient_mse(data[i, 4], data[i, 5]) && j == 4,
         crayon"red bold",
     )
     hl_worsened_mse_reduction = Highlighter(
-        (data, i, j) -> !sufficient_mse(data[i, 6], data[i, 7]) && j == 8,
+        (data, i, j) -> !sufficient_mse(data[i, 4], data[i, 5]) && j == 6,
         crayon"red bold",
     )
     hl_improved_mse = Highlighter(
-        (data, i, j) -> sufficient_mse(data[i, 6], data[i, 7]) && j == 8,
+        (data, i, j) -> sufficient_mse(data[i, 4], data[i, 5]) && j == 6,
         crayon"green bold",
     )
     pretty_table(
         table_data,
         header,
-        formatters = ft_printf("%.16e", 6:7),
+        formatters = ft_printf("%.16e", 4:5),
         header_crayon = crayon"yellow bold",
         subheader_crayon = crayon"green bold",
         highlighters = (

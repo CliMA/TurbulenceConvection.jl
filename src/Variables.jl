@@ -185,8 +185,14 @@ function zero_tendencies(self::GridMeanVariables)
     return
 end
 
-function update(self::GridMeanVariables, TS::TimeStepping)
-  @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg-self.Gr.gw)
+function update(
+        self::GridMeanVariables,
+        TS::TimeStepping,
+        Case::CasesBase,
+        Turb,
+        Stats::NetCDFIO_Stats
+    )
+    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg-self.Gr.gw)
         self.U.values[k]  +=  self.U.tendencies[k] * TS.dt
         self.V.values[k]  +=  self.V.tendencies[k] * TS.dt
         self.H.values[k]  +=  self.H.tendencies[k] * TS.dt
@@ -241,11 +247,14 @@ function initialize_io(self::GridMeanVariables, Stats::NetCDFIO_Stats)
     end
 
     add_profile(Stats, "cloud_fraction_mean")
+    add_profile(Stats, "QT_mf_update")
+    add_profile(Stats, "QT_new")
 
     add_ts(Stats, "lwp_mean")
     add_ts(Stats, "cloud_base_mean")
     add_ts(Stats, "cloud_top_mean")
     add_ts(Stats, "cloud_cover_mean")
+    add_profile(Stats, "QT_tendencies")
     return
 end
 
@@ -253,6 +262,9 @@ function io(self::GridMeanVariables, Stats::NetCDFIO_Stats)
     cinterior = self.Gr.cinterior
     finterior = self.Gr.finterior
 
+    write_profile(Stats, "QT_mf_update", self.QT.mf_update[cinterior])
+    write_profile(Stats, "QT_new", self.QT.new[cinterior])
+    write_profile(Stats, "QT_tendencies", self.QT.tendencies[cinterior])
     write_profile(Stats, "u_mean", self.U.values[cinterior])
     write_profile(Stats, "v_mean",self.V.values[cinterior])
     write_profile(Stats, "qt_mean",self.QT.values[cinterior])

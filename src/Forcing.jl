@@ -104,7 +104,6 @@ function calculate_radiation(self::ForcingBase{ForcingDYCOMS_RF01}, GMV::GridMea
             break
         end
     end
-
     # cloud-top cooling
     q_0 = 0.0
 
@@ -137,7 +136,6 @@ function calculate_radiation(self::ForcingBase{ForcingDYCOMS_RF01}, GMV::GridMea
     # condition at the top
     cbrt_z                   = cbrt(self.Gr.z[k_last] + self.Gr.dz - zi)
     self.f_rad[self.Gr.nzg] += rhoi * dycoms_cp * self.divergence * self.alpha_z * (power(cbrt_z, 4) / 4.0 + zi * cbrt_z)
-
     @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
         self.dTdt[k] = - (self.f_rad[k + 1] - self.f_rad[k]) / self.Gr.dz / self.Ref.rho0_half[k] / dycoms_cp
     end
@@ -177,6 +175,7 @@ end
 
 function initialize_io(self::ForcingBase{ForcingDYCOMS_RF01}, Stats::NetCDFIO_Stats)
     add_profile(Stats, "rad_dTdt")
+    add_profile(Stats, "subsidence")
     add_profile(Stats, "rad_flux")
     return
 end
@@ -185,6 +184,7 @@ function io(self::ForcingBase{ForcingDYCOMS_RF01}, Stats::NetCDFIO_Stats)
     cinterior = self.Gr.cinterior
     finterior = self.Gr.finterior
     write_profile(Stats, "rad_dTdt", self.dTdt[cinterior])
+    write_profile(Stats, "subsidence", self.subsidence[cinterior])
     write_profile(Stats, "rad_flux", self.f_rad[finterior])
     return
 end

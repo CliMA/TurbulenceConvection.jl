@@ -95,6 +95,8 @@ function initialize_io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     add_profile(Stats, "mixing_length_ratio")
     add_profile(Stats, "entdet_balance_length")
     add_profile(Stats, "interdomain_tke_t")
+    add_profile(Stats, "prec_source_qt")
+    add_profile(Stats, "rain_evap_source_qt")
     if self.calc_tke
         add_profile(Stats, "tke_buoy")
         add_profile(Stats, "tke_dissipation")
@@ -197,6 +199,8 @@ function io(
         end
     end
 
+    write_profile(Stats, "prec_source_qt", self.EnvThermo.prec_source_qt[cinterior])
+    write_profile(Stats, "rain_evap_source_qt", self.rainphysics.rain_evap_source_qt[cinterior])
     write_profile(Stats, "turbulent_entrainment", mean_frac_turb_entr[cinterior])
     write_profile(Stats, "turbulent_entrainment_full", mean_frac_turb_entr_full[cinterior])
     write_profile(Stats, "turbulent_entrainment_W", mean_turb_entr_W[cinterior])
@@ -353,11 +357,13 @@ function update(
     check_nans(GMV, self, "4.63")
     compute_eddy_diffusivities_tke(self, GMV, Case)
     check_nans(GMV, self, "4.7")
-    update_GMV_ED(self, GMV, Case, TS)
+    update_GMV_ED(self, GMV, Case, TS, Stats)
+    # export_all(Case, self, GMV, TS, Stats)
     check_nans(GMV, self, "4.72")
     compute_covariance(self, GMV, Case, TS)
 
     check_nans(GMV, self, "4.75")
+    # export_all(Case, self, GMV, TS, Stats) # good to machine precision
     if self.Rain.rain_model == "clima_1m"
         # sum updraft and environment rain into bulk rain
         sum_subdomains_rain(self.Rain, self.UpdThermo, self.EnvThermo)
@@ -385,6 +391,7 @@ function update(
     # by differencing GMV.new and GMV.values
     update(self.base, GMV, Case, TS)
     check_nans(GMV, self, "4.10")
+    # export_all(Case, self, GMV, TS, Stats) # good to machine precision
     return
 end
 
@@ -433,7 +440,7 @@ function compute_prognostic_updrafts(
         set_subdomain_bcs(self)
     end
 
-    export_all(Case, self, GMV, TS, Stats)
+    # export_all(Case, self, GMV, TS, Stats) # good to machine precision
     update_total_precip_sources(self.UpdThermo)
     return
 end
@@ -1601,7 +1608,8 @@ function update_GMV_ED(
         self::EDMF_PrognosticTKE,
         GMV::GridMeanVariables,
         Case::CasesBase,
-        TS::TimeStepping
+        TS::TimeStepping,
+        Stats::NetCDFIO_Stats,
     )
     gw = grid(self).gw
     nzg = grid(self).nzg
@@ -1616,10 +1624,16 @@ function update_GMV_ED(
     KM = diffusivity_m(self)
     KH = diffusivity_h(self)
     check_nans(GMV, self, "update_GMV_ED 1")
+    # @show rho_ae_K
+    # @show ae
+    # @show KM.values
+    # @show KH.values
+    # @show ref_state(self).rho0
     @inbounds for k in xrange(nzg-1)
-        rho_ae_K[k] = 0.5 * (ae[k]*KM.values[k]+ ae[k+1]*KH.values[k+1]) * ref_state(self).rho0[k]
+        rho_ae_K[k] = 0.5 * (ae[k]*KH.values[k]+ ae[k+1]*KH.values[k+1]) * ref_state(self).rho0[k]
     end
 
+    @show rho_ae_K
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
     construct_tridiag_diffusion(nzg, gw, dzi, TS.dt, rho_ae_K, ref_state(self).rho0_half,
                                 ae, a, b, c)
@@ -1630,9 +1644,14 @@ function update_GMV_ED(
     end
     x[0] = x[0] + TS.dt * Case.Sur.rho_qtflux * dzi * ref_state(self).alpha0_half[gw]/ae[gw]
     check_nans(GMV, self, "update_GMV_ED 3")
+    @show a
+    @show b
+    @show c
+    @show x
     tridiag_solve(grid(self).nz, x,a, b, c)
     check_nans(GMV, self, "update_GMV_ED 4")
-
+    @show x
+    export_all(Case, self, GMV, TS, Stats)
     @inbounds for k in xrange(nz)
         GMV.QT.new[k+gw] = fmax(
                            GMV.QT.mf_update[k+gw]+
