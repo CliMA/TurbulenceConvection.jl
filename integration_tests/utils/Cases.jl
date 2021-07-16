@@ -110,6 +110,7 @@ initialize_reference(self::CasesBase, Gr::Grid, Ref::ReferenceState, Stats::NetC
 initialize_profiles(self::CasesBase, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState, ::BaseCase) = nothing
 initialize_surface(self::CasesBase, Gr::Grid, Ref::ReferenceState, ::BaseCase) = nothing
 initialize_forcing(self::CasesBase, Gr::Grid,  Ref::ReferenceState, GMV::GridMeanVariables, ::BaseCase) = nothing
+initialize_radiation(self::CasesBase, Gr::Grid,  Ref::ReferenceState, GMV::GridMeanVariables, ::BaseCase) = nothing
 
 function TurbulenceConvection.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
     add_ts(Stats, "Tsurface")
@@ -126,17 +127,19 @@ end
 
 update_surface(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping, ::BaseCase) = nothing
 update_forcing(self::CasesBase, GMV::GridMeanVariables,  TS::TimeStepping, ::BaseCase) = nothing
+update_radiation(self::CasesBase, GMV::GridMeanVariables,  TS::TimeStepping, ::BaseCase) = nothing
 
 
 function Soares(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "Soares2004"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(;Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
     return TurbulenceConvection.CasesBase{SoaresCase}(
-        ;casename = "SoaresCase", inversion_option, Sur, Fo)
+        ;casename = "SoaresCase", inversion_option, Sur, Fo, Rad)
 end
 function initialize_reference(self::CasesBase{SoaresCase},
     Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -200,6 +203,13 @@ function initialize_forcing(self::CasesBase{SoaresCase},
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
 end
+
+function initialize_radiation(self::CasesBase{SoaresCase}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    initialize(self.Rad, GMV)
+end
+
+
+
 function TurbulenceConvection.initialize_io(self::CasesBase{SoaresCase}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
 end
@@ -213,15 +223,20 @@ function update_forcing(self::CasesBase{SoaresCase}, GMV::GridMeanVariables, TS:
     update(self.Fo, GMV)
 end
 
+function update_radiation(self::CasesBase{SoaresCase}, GMV::GridMeanVariables, TS::TimeStepping)
+   update(self.Rad, GMV)
+end
+
 function Nieuwstadt(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "Nieuwstadt"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(;Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
     return TurbulenceConvection.CasesBase{Nieuwstadt}(
-        ;casename = "Nieuwstadt", inversion_option, Sur, Fo)
+        ;casename = "Nieuwstadt", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -282,6 +297,10 @@ function initialize_forcing(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::Referenc
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
 end
+function initialize_radiation(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    initialize(self.Rad, GMV)
+end
+
 function TurbulenceConvection.initialize_io(self::CasesBase{Nieuwstadt}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
 end
@@ -295,17 +314,21 @@ end
 function update_forcing(self::CasesBase{Nieuwstadt}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Fo, GMV)
 end
+function update_radiation(self::CasesBase{Nieuwstadt}, GMV::GridMeanVariables, TS::TimeStepping)
+   update(self.Rad, GMV)
+end
 
 function Bomex(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "Bomex"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
     Fo.apply_subsidence = true
     return TurbulenceConvection.CasesBase{BomexCase}(
-        ;casename = "Bomex", inversion_option, Sur, Fo)
+        ;casename = "Bomex", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{BomexCase}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -420,6 +443,9 @@ function initialize_forcing(self::CasesBase{BomexCase}, Gr::Grid, Ref::Reference
     end
     return nothing
 end
+function initialize_radiation(self::CasesBase{BomexCase}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    initialize(self.Rad, GMV)
+end
 
 TurbulenceConvection.initialize_io(self::CasesBase{BomexCase}, Stats::NetCDFIO_Stats) =
     initialize_io(self, Stats, BaseCase())
@@ -432,17 +458,21 @@ update_surface(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepp
 
 update_forcing(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepping) =
     update(self.Fo, GMV)
+update_radiation(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepping) =
+   update(self.Rad, GMV)
+
 
 function life_cycle_Tan2018(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "life_cycle_Tan2018"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
     Fo.apply_subsidence = true
     return TurbulenceConvection.CasesBase{life_cycle_Tan2018}(
-        ;casename = "life_cycle_Tan2018", inversion_option, Sur, Fo)
+        ;casename = "life_cycle_Tan2018", inversion_option, Sur, Fo, Rad)
 end
 function initialize_reference(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
     Ref.Pg = 1.015e5  #Pressure at ground
@@ -554,6 +584,12 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::
     end
     return nothing
 end
+
+function initialize_radiation(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    initialize(self.Rad, GMV)
+end
+
+
 function TurbulenceConvection.initialize_io(self::CasesBase{life_cycle_Tan2018}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
 end
@@ -572,18 +608,22 @@ end
 function update_forcing(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVariables,  TS::TimeStepping)
     update(self.Fo, GMV)
 end
+function update_radiation(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVariables, TS::TimeStepping)
+   update(self.Rad, GMV)
+end
 
 function Rico(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "Rico"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedCoeffs}(;Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 18.0
     Fo.coriolis_param = 2.0 * omega * sin(latitude * pi / 180.0 ) # s^{-1}
     Fo.apply_subsidence = true
     return TurbulenceConvection.CasesBase{Rico}(
-        ;casename = "Rico", inversion_option, Sur, Fo)
+        ;casename = "Rico", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -675,6 +715,11 @@ function initialize_forcing(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState
     return nothing
 end
 
+function initialize_radiation(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    initialize(self.Rad, GMV)
+end
+
+
 function TurbulenceConvection.initialize_io(self::CasesBase{Rico}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
 end
@@ -688,16 +733,20 @@ end
 function update_forcing(self::CasesBase{Rico}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Fo, GMV)
 end
+function update_radiation(self::CasesBase{Rico}, GMV::GridMeanVariables, TS::TimeStepping)
+   update(self.Rad, GMV)
+end
 
 function TRMM_LBA(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "TRMM_LBA"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
     return TurbulenceConvection.CasesBase{TRMM_LBA}(
-        ;casename = "TRMM_LBA", inversion_option, Sur, Fo)
+        ;casename = "TRMM_LBA", inversion_option, Sur, Fo, Rad)
 end
 function initialize_reference(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
     Ref.Pg = 991.3*100  #Pressure at ground
@@ -958,6 +1007,9 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
     end
     return nothing
 end
+function initialize_radiation(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    initialize(self.Rad, GMV)
+end
 
 
 function TurbulenceConvection.initialize_io(self::CasesBase{TRMM_LBA}, Stats::NetCDFIO_Stats)
@@ -1003,6 +1055,9 @@ function update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables,  TS::
     update(self.Fo, GMV)
 
 end
+function update_radiation(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::TimeStepping)
+   update(self.Rad, GMV)
+end
 
 # adopted from: "Large-eddy simulation of the diurnal cycle of shallow cumulus convection over land",
 # By Brown et al. (2002)  Q. J. R. Meteorol. Soc. 128, 1075-1093
@@ -1010,12 +1065,13 @@ function ARM_SGP(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "ARM_SGP"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 8.5e-5
     Fo.apply_subsidence =false
     return TurbulenceConvection.CasesBase{ARM_SGP}(
-        ;casename = "ARM_SGP", inversion_option, Sur, Fo)
+        ;casename = "ARM_SGP", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{ARM_SGP}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1080,6 +1136,10 @@ function initialize_forcing(self::CasesBase{ARM_SGP}, Gr::Grid, Ref::ReferenceSt
     return nothing
 end
 
+function initialize_radiation(self::CasesBase{ARM_SGP}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    initialize(self.Rad, GMV)
+end
+
 function TurbulenceConvection.initialize_io(self::CasesBase{ARM_SGP}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
 end
@@ -1126,6 +1186,9 @@ function update_forcing(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables,  TS::T
     update(self.Fo, GMV)
 end
 
+function update_radiation(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::TimeStepping)
+   update(self.Rad, GMV)
+end
 
 # adopted from: "Large eddy simulation of Maritime Deep Tropical Convection",
 # By Khairoutdinov et al (2009)  JAMES, vol. 1, article #15
@@ -1133,11 +1196,12 @@ function GATE_III(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "GATE_III"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedCoeffs}(;Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
     inversion_option = "thetal_maxgrad"
     Fo.apply_subsidence = false
     Fo.apply_coriolis = false
     return TurbulenceConvection.CasesBase{GATE_III}(
-        ;casename = "GATE_III", inversion_option, Sur, Fo)
+        ;casename = "GATE_III", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1236,6 +1300,9 @@ function initialize_forcing(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceS
     self.Fo.dTdt = pyinterp(Gr.z_half,z_in,Ttend_in) + pyinterp(Gr.z_half,z_in,RAD_in)
 end
 
+function initialize_radiation(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    initialize(self.Rad, GMV)
+end
 
 function TurbulenceConvection.initialize_io(self::CasesBase{GATE_III}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
@@ -1251,6 +1318,9 @@ end
 function update_forcing(self::CasesBase{GATE_III}, GMV::GridMeanVariables,  TS::TimeStepping)
     update(self.Fo, GMV)
 end
+function update_radiation(self::CasesBase{GATE_III}, GMV::GridMeanVariables, TS::TimeStepping)
+   update(self.Rad, GMV)
+end
 
 """
 see Stevens et al 2005
@@ -1262,9 +1332,10 @@ function DYCOMS_RF01(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "DYCOMS_RF01"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingDYCOMS_RF01}(;Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationDYCOMS_RF01}(;Gr, Ref)
     inversion_option = "thetal_maxgrad"
     return TurbulenceConvection.CasesBase{DYCOMS_RF01}(
-        ;casename = "DYCOMS_RF01", inversion_option, Sur, Fo)
+        ;casename = "DYCOMS_RF01", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1428,10 +1499,19 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::Referen
 
     # no large-scale drying
     self.Fo.dqtdt .= 0. #kg/(kg * s)
+end
 
-    # radiation is treated as a forcing term (see eq. 3 in Stevens et. al. 2005)
+function initialize_radiation(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    self.Rad.Gr = Gr
+    self.Rad.Ref = Ref
+    initialize(self.Rad, GMV)
+
+    # no large-scale drying
+    self.Rad.dqtdt .= 0. #kg/(kg * s)
+
+    # Radiation based on eq. 3 in Stevens et. al., (2005)
     # cloud-top cooling + cloud-base warming + cooling in free troposphere
-    TurbulenceConvection.calculate_radiation(self.Fo, GMV)
+    TurbulenceConvection.calculate_radiation(self.Rad, GMV)
 end
 
 function TurbulenceConvection.initialize_io(self::CasesBase{DYCOMS_RF01}, Stats::NetCDFIO_Stats)
@@ -1449,10 +1529,15 @@ function update_forcing(self::CasesBase{DYCOMS_RF01}, GMV::GridMeanVariables, TS
     update(self.Fo, GMV)
 end
 
+function update_radiation(self::CasesBase{DYCOMS_RF01}, GMV::GridMeanVariables, TS::TimeStepping)
+    update(self.Rad, GMV)
+end
+
 function GABLS(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "GABLS"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceMoninObukhovDry}(;Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 73.0
@@ -1460,7 +1545,7 @@ function GABLS(paramlist, Gr::Grid, Ref::ReferenceState)
     # Fo.coriolis_param = 2.0 * omega * np.sin(latitude * pi / 180.0 ) # s^{-1}
     Fo.apply_subsidence = false
     return TurbulenceConvection.CasesBase{GABLS}(
-        ;casename = "GABLS", inversion_option, Sur, Fo)
+        ;casename = "GABLS", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{GABLS}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1524,6 +1609,10 @@ function initialize_forcing(self::CasesBase{GABLS}, Gr::Grid, Ref::ReferenceStat
     return nothing
 end
 
+function initialize_radiation(self::CasesBase{GABLS}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    initialize(self.Rad, GMV)
+end
+
 function TurbulenceConvection.initialize_io(self::CasesBase{GABLS}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
 end
@@ -1540,19 +1629,23 @@ end
 function update_forcing(self::CasesBase{GABLS}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Fo, GMV)
 end
+function update_radiation(self::CasesBase{GABLS}, GMV::GridMeanVariables, TS::TimeStepping)
+    update(self.Rad, GMV)
+end
 
 # Not fully implemented yet - Ignacio
 function SP(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "SP"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceSullivanPatton}(;Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 1.0e-4 # s^{-1}
     # Fo.coriolis_param = 2.0 * omega * np.sin(latitude * pi / 180.0 ) # s^{-1}
     Fo.apply_subsidence = false
     return TurbulenceConvection.CasesBase{SP}(
-        ;casename = "SP", inversion_option, Sur, Fo)
+        ;casename = "SP", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1619,7 +1712,9 @@ function initialize_forcing(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState, 
         self.Fo.vg[k] = 0.0
     end
 end
-
+function initialize_radiation(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    initialize(self.Rad, GMV)
+end
 function TurbulenceConvection.initialize_io(self::CasesBase{SP}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
 end
@@ -1632,16 +1727,20 @@ end
 function update_forcing(self::CasesBase{SP}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Fo, GMV)
 end
+function update_radiation(self::CasesBase{SP}, GMV::GridMeanVariables, TS::TimeStepping)
+    update(self.Rad, GMV)
+end
 
 function DryBubble(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "DryBubble"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceNone}(;Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(;Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
     inversion_option = "theta_rho"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
     return TurbulenceConvection.CasesBase{DryBubble}(
-        ;casename = "DryBubble", inversion_option, Sur, Fo)
+        ;casename = "DryBubble", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{DryBubble}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1748,6 +1847,10 @@ function initialize_forcing(self::CasesBase{DryBubble}, Gr::Grid,  Ref::Referenc
     initialize(self.Fo, GMV)
 end
 
+function initialize_radiation(self::CasesBase{DryBubble}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    initialize(self.Rad, GMV)
+end
+
 function TurbulenceConvection.initialize_io(self::CasesBase{DryBubble}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
 end
@@ -1762,6 +1865,9 @@ end
 
 function update_forcing(self::CasesBase{DryBubble}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Fo, GMV)
+end
+function update_radiation(self::CasesBase{DryBubble}, GMV::GridMeanVariables, TS::TimeStepping)
+   update(self.Rad, GMV)
 end
 
 end
