@@ -16,14 +16,14 @@ using .ParamList
 include(joinpath("utils", "main.jl"))
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 4.2224256587669962e-01
-best_mse["updraft_area"] = 1.9233273311592638e+03
-best_mse["updraft_w"] = 5.0296135886933655e+02
-best_mse["updraft_qt"] = 2.3554324914261098e+01
-best_mse["updraft_thetal"] = 6.5600891407859962e+01
-best_mse["v_mean"] = 1.0600195077063628e+02
-best_mse["u_mean"] = 1.1403381273885380e+02
-best_mse["tke_mean"] = 9.9348960281258223e+02
+best_mse["qt_mean"] = 3.6390882603444535e-01
+best_mse["updraft_area"] = 1.8853365676495407e+03
+best_mse["updraft_w"] = 4.7945623382280445e+02
+best_mse["updraft_qt"] = 2.3388706679021720e+01
+best_mse["updraft_thetal"] = 6.5607702975773350e+01
+best_mse["v_mean"] = 1.0612839837263861e+02
+best_mse["u_mean"] = 1.1376717535211569e+02
+best_mse["tke_mean"] = 9.3298033101721171e+02
 
 @testset "Rico" begin
     println("Running Rico...")

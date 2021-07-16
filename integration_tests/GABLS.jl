@@ -17,10 +17,10 @@ include(joinpath("utils", "main.jl"))
 
 best_mse = OrderedDict()
 
-best_mse["updraft_thetal"] = 5.0395303941753484e+00
-best_mse["v_mean"] = 6.1823518722858504e+00
-best_mse["u_mean"] = 9.6830856629173105e+00
-best_mse["tke_mean"] = 5.3941202810898465e+00
+best_mse["updraft_thetal"] = 5.0418613105717345e+00
+best_mse["v_mean"] = 5.2842359224499695e+00
+best_mse["u_mean"] = 9.7164923816186999e+00
+best_mse["tke_mean"] = 4.1067897074868842e+00
 
 @testset "GABLS" begin
     println("Running GABLS...")

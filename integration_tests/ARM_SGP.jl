@@ -16,13 +16,13 @@ using .ParamList
 include(joinpath("utils", "main.jl"))
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 6.7253949604380310e+00
-best_mse["updraft_area"] = 2.6191675217022652e+02
-best_mse["updraft_w"] = 1.3305963910208354e-01
-best_mse["updraft_qt"] = 6.0246107271571432e+01
-best_mse["updraft_thetal"] = 6.9058884002300104e+01
-best_mse["u_mean"] = 8.7994360629093890e+01
-best_mse["tke_mean"] = 4.1806689009099687e+00
+best_mse["qt_mean"] = 6.3536385843055188e+00
+best_mse["updraft_area"] = 2.5438198039492320e+02
+best_mse["updraft_w"] = 1.4580760890721545e-01
+best_mse["updraft_qt"] = 6.2206824225474186e+01
+best_mse["updraft_thetal"] = 6.9045907993199918e+01
+best_mse["u_mean"] = 8.7994360629093563e+01
+best_mse["tke_mean"] = 4.1928585158278855e+00
 
 @testset "ARM_SGP" begin
     println("Running ARM_SGP...")
