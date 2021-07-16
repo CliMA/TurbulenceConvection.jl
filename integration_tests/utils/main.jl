@@ -46,7 +46,7 @@ function run(self::Simulation1d)
         # TurbulenceConvection.check_nans(self.GMV, self.Turb, "4")
         # Good up to here.
         TurbulenceConvection.update(self.Turb, self.GMV, self.Case, self.TS, self.Stats)
-        # TurbulenceConvection.export_all(self.Case, self.Turb, self.GMV, self.TS, self.Stats) # 1e-8 error
+        # TurbulenceConvection.export_all(self.Case, self.Turb, self.GMV, self.TS, self.Stats)
         # TurbulenceConvection.check_nans(self.GMV, self.Turb, "5")
         TurbulenceConvection.update(self.TS)
         # TurbulenceConvection.check_nans(self.GMV, self.Turb, "6")
@@ -71,6 +71,7 @@ function run(self::Simulation1d)
             # TurbulenceConvection.io(self.Case, self.Stats) # #removeVarsHack
             # TurbulenceConvection.io(self.Turb, self.Stats, self.TS) # #removeVarsHack
         end
+        TurbulenceConvection.update_iter(self.TS)
         # TurbulenceConvection.check_nans(self.GMV, self.Turb, "9")
         iter+=1
     end

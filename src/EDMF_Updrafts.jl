@@ -190,6 +190,13 @@ function initialize_io(self::UpdraftVariables, Stats::NetCDFIO_Stats)
 
     add_profile(Stats, "updraft_temperature")
     add_profile(Stats, "updraft_buoyancy")
+    add_profile(Stats, "updraft_buoyancy_values")
+    add_profile(Stats, "T_values")
+    add_profile(Stats, "QT_values")
+    add_profile(Stats, "QL_values")
+    add_profile(Stats, "RH_values")
+    add_profile(Stats, "H_values")
+    add_profile(Stats, "Area_values")
 
     add_profile(Stats, "updraft_cloud_fraction")
 
@@ -312,6 +319,13 @@ function io(self::UpdraftVariables, Stats::NetCDFIO_Stats, Ref::ReferenceState)
 
     write_profile(Stats, "updraft_temperature", self.T.bulkvalues[cinterior])
     write_profile(Stats, "updraft_buoyancy", self.B.bulkvalues[cinterior])
+    write_profile(Stats, "updraft_buoyancy_values", self.B.values[0,cinterior])
+    write_profile(Stats, "T_values", self.T.values[0,cinterior])
+    write_profile(Stats, "QT_values", self.QT.values[0,cinterior])
+    write_profile(Stats, "QL_values", self.QL.values[0,cinterior])
+    write_profile(Stats, "RH_values", self.RH.values[0,cinterior])
+    write_profile(Stats, "H_values", self.H.values[0,cinterior])
+    write_profile(Stats, "Area_values", self.Area.values[0,cinterior])
 
     upd_cloud_diagnostics(self, Ref)
     write_profile(Stats, "updraft_cloud_fraction", self.cloud_fraction[cinterior])
@@ -394,9 +408,9 @@ function buoyancy(
                     UpdVar.B.values[i,k] = buoyancy_c(self.Ref.rho0_half[k], rho)
                 else
                     UpdVar.B.values[i,k] = EnvVar.B.values[k]
+                end
                 UpdVar.RH.values[i,k] = relative_humidity_c(self.Ref.p0_half[k], UpdVar.QT.values[i,k],
                                             UpdVar.QL.values[i,k], 0.0, UpdVar.T.values[i,k])
-                end
             end
         end
     else

@@ -295,7 +295,6 @@ function update(
         Stats::NetCDFIO_Stats
     )
 
-    # export_all(Case, self, GMV, TS, Stats) # good
     kmin = grid(self).gw
     kmax = grid(self).nzg - grid(self).gw
     check_nans(GMV, self, "4.1")
@@ -328,12 +327,12 @@ function update(
     check_nans(GMV, self, "4.4")
 
     decompose_environment(self, GMV, Case, TS, "values")
-    # export_all(Case, self, GMV, TS, Stats) # good
     if self.use_steady_updrafts
         compute_diagnostic_updrafts(self, GMV, Case)
     else
         compute_prognostic_updrafts(self, GMV, Case, TS, Stats)
     end
+    # export_all(Case, self, GMV, TS, Stats) # good
     check_nans(GMV, self, "4.5")
 
     # TODO -maybe not needed? - both diagnostic and prognostic updrafts end with decompose_environment
@@ -347,6 +346,7 @@ function update(
     #   - the buoyancy of updrafts and environment is up to date with the most recent decomposition,
     #   - the buoyancy of updrafts and environment is updated such that
     #     the mean buoyancy with repect to reference state alpha_0 is zero.
+    # export_all(Case, self, GMV, TS, Stats) # bad
 
     decompose_environment(self, GMV, Case, TS, "mf_update")
     check_nans(GMV, self, "4.61")
@@ -358,9 +358,9 @@ function update(
     compute_eddy_diffusivities_tke(self, GMV, Case)
     check_nans(GMV, self, "4.7")
     update_GMV_ED(self, GMV, Case, TS, Stats)
-    # export_all(Case, self, GMV, TS, Stats)
     check_nans(GMV, self, "4.72")
-    compute_covariance(self, GMV, Case, TS)
+    # export_all(Case, self, GMV, TS, Stats) # good
+    compute_covariance(self, GMV, Case, TS, Stats)
 
     check_nans(GMV, self, "4.75")
     # export_all(Case, self, GMV, TS, Stats) # good to machine precision
@@ -391,7 +391,8 @@ function update(
     # by differencing GMV.new and GMV.values
     update(self.base, GMV, Case, TS)
     check_nans(GMV, self, "4.10")
-    # export_all(Case, self, GMV, TS, Stats) # good to machine precision
+    # export_all(Case, self, GMV, TS, Stats)
+    export_all(Case, self, GMV, TS, Stats)
     return
 end
 
@@ -412,6 +413,7 @@ function compute_prognostic_updrafts(
     self.dt_upd = min(TS.dt, 0.5 * grid(self).dz/fmax(maximum(self.UpdVar.W.values),1e-10))
 
     clear_precip_sources(self.UpdThermo)
+    # export_all(Case, self, GMV, TS, Stats)
 
     while time_elapsed < TS.dt
         # export_all(Case, self, GMV, TS, Stats)
@@ -442,6 +444,7 @@ function compute_prognostic_updrafts(
 
     # export_all(Case, self, GMV, TS, Stats) # good to machine precision
     update_total_precip_sources(self.UpdThermo)
+        # export_all(Case, self, GMV, TS, Stats) # good
     return
 end
 
@@ -1282,12 +1285,15 @@ function compute_nh_pressure(self)
     ret_w = pressure_drag_struct()
     input = pressure_in_struct()
 
-    cinterior = grid(self).cinterior
+    # cinterior = grid(self).cinterior
+    cinterior = grid(self).gw:grid(self).nzg-grid(self).gw
 
-    @inbounds for i in xrange(self.n_updrafts)
+    for i in xrange(self.n_updrafts)
         input.updraft_top = self.UpdVar.updraft_top[i]
-        alen = length(self.UpdVar.Area.values[i,cinterior])
-        input.a_med = Statistics.median(self.UpdVar.Area.values[i,cinterior][alen])
+        alen = length(argwhere(self.UpdVar.Area.values[i,cinterior]))
+        avals = off_arr(self.UpdVar.Area.values[i,cinterior])
+        med_in = avals[xrange(0, alen)]
+        input.a_med = Statistics.median(med_in)
         @inbounds for k in xrange(grid(self).gw, grid(self).nzg-grid(self).gw)
             input.a_kfull = interp2pt(self.UpdVar.Area.values[i,k], self.UpdVar.Area.values[i,k+1])
             if input.a_kfull >= self.minimum_area
@@ -1316,6 +1322,7 @@ function compute_nh_pressure(self)
                     # _ret.asp_ratio = 1.72
                     input.asp_ratio = 1.0
                 end
+
 
                 if input.a_kfull>0.0
                     ret_b = self.pressure_func_buoy(input)
@@ -1624,16 +1631,10 @@ function update_GMV_ED(
     KM = diffusivity_m(self)
     KH = diffusivity_h(self)
     check_nans(GMV, self, "update_GMV_ED 1")
-    # @show rho_ae_K
-    # @show ae
-    # @show KM.values
-    # @show KH.values
-    # @show ref_state(self).rho0
     @inbounds for k in xrange(nzg-1)
         rho_ae_K[k] = 0.5 * (ae[k]*KH.values[k]+ ae[k+1]*KH.values[k+1]) * ref_state(self).rho0[k]
     end
 
-    @show rho_ae_K
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
     construct_tridiag_diffusion(nzg, gw, dzi, TS.dt, rho_ae_K, ref_state(self).rho0_half,
                                 ae, a, b, c)
@@ -1644,14 +1645,8 @@ function update_GMV_ED(
     end
     x[0] = x[0] + TS.dt * Case.Sur.rho_qtflux * dzi * ref_state(self).alpha0_half[gw]/ae[gw]
     check_nans(GMV, self, "update_GMV_ED 3")
-    @show a
-    @show b
-    @show c
-    @show x
     tridiag_solve(grid(self).nz, x,a, b, c)
     check_nans(GMV, self, "update_GMV_ED 4")
-    @show x
-    export_all(Case, self, GMV, TS, Stats)
     @inbounds for k in xrange(nz)
         GMV.QT.new[k+gw] = fmax(
                            GMV.QT.mf_update[k+gw]+
@@ -1825,7 +1820,7 @@ function update_GMV_diagnostics(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
     return
 end
 
-function compute_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
+function compute_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping, Stats::NetCDFIO_Stats)
 
     if self.similarity_diffusivity # otherwise, we computed mixing length when we computed
         compute_mixing_length(self, Case.Sur.obukhov_length, Case.Sur.ustar, GMV)
@@ -1864,6 +1859,7 @@ function compute_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Ca
         update_covariance_ED(self, GMV, Case,TS, GMV.H, GMV.QT, GMV.HQTcov, self.EnvVar.HQTcov, self.EnvVar.H, self.EnvVar.QT, self.UpdVar.H, self.UpdVar.QT)
         cleanup_covariance(self, GMV)
     end
+    # export_all(Case, self, GMV, TS, Stats)
     return
 end
 
@@ -2298,7 +2294,7 @@ function update_covariance_ED(
     return
 end
 
-function GMV_third_m(self, Gmv_third_m::VariableDiagnostic, env_covar::EnvironmentVariable_2m,
+function GMV_third_m(self, gmv_third_m::VariableDiagnostic, env_covar::EnvironmentVariable_2m,
                        env_mean::EnvironmentVariable, upd_mean::UpdraftVariable)
 
     ae = pyones(grid(self).nzg) .- self.UpdVar.Area.bulkvalues
@@ -2327,8 +2323,9 @@ function GMV_third_m(self, Gmv_third_m::VariableDiagnostic, env_covar::Environme
             Upd_cubed += au[i,k]*upd_mean.values[i,k]^3
         end
 
-        Gmv_third_m.values[k] = Upd_cubed + ae[k]*(env_mean.values[k]^3 + 3.0*env_mean.values[k]*Envcov_) - GMVv_^3.0- 3.0*GMVcov_*GMVv_
+        # gmv_third_m.values[k] = Upd_cubed + ae[k]*(env_mean.values[k]^3 + 3.0*env_mean.values[k]*Envcov_) - GMVv_^3.0- 3.0*GMVcov_*GMVv_
+        gmv_third_m.values[k] = 0
     end
-    Gmv_third_m.values[grid(self).gw] = 0.0 # this is here as first value is biased with BC area fraction
+    gmv_third_m.values[grid(self).gw] = 0.0 # this is here as first value is biased with BC area fraction
     return
 end

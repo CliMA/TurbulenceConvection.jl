@@ -111,6 +111,7 @@ function compute_mse(
     # data_scales_les = []
     data_scales_tcc = []
     pycles_weight = []
+    max_mse = 0
 
     all_keys = unique([keys(ds_scampy.group["profiles"])..., keys(best_mse)...])
     # for tc_var in keys(best_mse)
@@ -226,6 +227,11 @@ function compute_mse(
         # end
         # Normalize by data scale
         mse[tc_var] = mse_single_var / data_scale_tcc^2
+        if !(data_scale_tcc ≈ 0 && data_scale_scm ≈ 0)
+            if !isnan(mse[tc_var])
+                max_mse = max(max_mse, mse[tc_var])
+            end
+        end
 
         push!(mse_reductions, (best_mse[tc_var] - mse[tc_var]) / best_mse[tc_var] * 100)
         push!(computed_mse, mse[tc_var])
@@ -277,6 +283,7 @@ function compute_mse(
         ),
         crop = :none,
     )
+    @info "max_mse = $max_mse"
 
     return mse
 end

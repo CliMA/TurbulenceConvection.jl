@@ -40,6 +40,7 @@ best_mse["v_mean"] = 3.9947573428069575e+01
 best_mse["u_mean"] = 3.5718662854892038e+01
 best_mse["tke_mean"] = 2.9756050060113374e+01
 
+best_mse["updraft_buoyancy_values"] = 2.9756050060113374e+01
 best_mse["updraft_buoyancy"] = 1.0
 best_mse["eddy_viscosity"] = 1.0
 best_mse["mixing_length"] = 1.0
@@ -50,6 +51,12 @@ best_mse["subsidence"] = 1.0
 best_mse["QT_tendencies"] = 1.0
 
 
+best_mse["T_values"] = 1.0
+best_mse["QT_values"] = 1.0
+best_mse["QL_values"] = 1.0
+best_mse["RH_values"] = 1.0
+best_mse["H_values"] = 1.0
+best_mse["Area_values"] = 1.0
 best_mse["RH_mean"] = 1.0
 best_mse["thetal_mean"] = 1.0
 best_mse["temperature_mean"] = 1.0

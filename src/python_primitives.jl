@@ -6,6 +6,7 @@ fmin(a, b) = min(a, b)
 fabs(a) = abs(a)
 
 # Use stop-1 to emulate python ranges
+argwhere(a) = findall(a .> 0)
 xrange(start, stop, step=1) = range(start, stop-1; step=step)
 xrange(stop) = xrange(0, stop)
 

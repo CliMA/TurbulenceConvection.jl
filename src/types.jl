@@ -873,8 +873,10 @@ mutable struct EDMF_PrognosticTKE{A1,A2}
 
         pressure_func_buoy = try
             if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"]) == "tan18"
+                println("tan18")
                 pressure_tan18_buoy
             elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"]) == "normalmode"
+                println("normalmode")
                 pressure_normalmode_buoy
             else
                 error("Turbulence--EDMF_PrognosticTKE: pressure closure in namelist option is not recognized")

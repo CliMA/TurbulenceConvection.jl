@@ -220,7 +220,7 @@ function DYCOMS_RF01(namelist_defaults)
 
     namelist["time_stepping"]["dt"] = 10.0
     # namelist["time_stepping"]["t_max"] = 60 * 60 * 16.
-    namelist["time_stepping"]["t_max"] = 10.0
+    namelist["time_stepping"]["t_max"] = 30.0
     namelist["meta"]["simname"] = "DYCOMS_RF01"
     namelist["meta"]["casename"] = "DYCOMS_RF01"
 

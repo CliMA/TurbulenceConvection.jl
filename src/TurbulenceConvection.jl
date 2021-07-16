@@ -38,13 +38,16 @@ include("Surface.jl")
 include("surface_functions.jl")
 
 function export_all(Case, Turb, GMV, TS, Stats)
-    open_files(Stats)
-    write_simulation_time(Stats, TS.t)
-    io(GMV, Stats)
-    io(Case, Stats)
-    io(Turb, Stats, TS)
-    close_files(Stats)
-    error("Done")
+    if TS.i_iter == 1
+        @show TS.i_iter
+        open_files(Stats)
+        write_simulation_time(Stats, TS.t)
+        io(GMV, Stats)
+        io(Case, Stats)
+        io(Turb, Stats, TS)
+        close_files(Stats)
+        error("Done")
+    end
 end
 
 end
