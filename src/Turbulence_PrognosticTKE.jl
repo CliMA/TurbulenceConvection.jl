@@ -1118,12 +1118,14 @@ function compute_nh_pressure(self)
     ret_w = pressure_drag_struct()
     input = pressure_in_struct()
 
-    cinterior = grid(self).cinterior
+    # TODO: this should eventually match the grid
+    cinterior = grid(self).gw:grid(self).nzg-grid(self).gw
 
     @inbounds for i in xrange(self.n_updrafts)
         input.updraft_top = self.UpdVar.updraft_top[i]
-        alen = length(self.UpdVar.Area.values[i,cinterior])
-        input.a_med = Statistics.median(self.UpdVar.Area.values[i,cinterior][alen])
+        alen = length(argwhere(self.UpdVar.Area.values[i,cinterior]))
+        avals = off_arr(self.UpdVar.Area.values[i,cinterior])
+        input.a_med = Statistics.median(avals[0:alen])
         @inbounds for k in xrange(grid(self).gw, grid(self).nzg-grid(self).gw)
             input.a_kfull = interp2pt(self.UpdVar.Area.values[i,k], self.UpdVar.Area.values[i,k+1])
             if input.a_kfull >= self.minimum_area

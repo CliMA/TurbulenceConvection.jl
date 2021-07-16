@@ -191,7 +191,7 @@ function update_EnvVar(self::EnvironmentThermodynamics,
 end
 
 function update_EnvRain_sources(
-    self,
+    self::EnvironmentThermodynamics,
     k,
     EnvVar::EnvironmentVariables,
     qr_src,
@@ -204,7 +204,7 @@ function update_EnvRain_sources(
 end
 
 function update_cloud_dry(
-    self,
+    self::EnvironmentThermodynamics,
     k,
     EnvVar::EnvironmentVariables,
     T, th, qt, ql, qv)
@@ -222,7 +222,7 @@ function update_cloud_dry(
     return
 end
 
-function saturation_adjustment(self, EnvVar::EnvironmentVariables)
+function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables)
 
     gw = self.Gr.gw
     sa = eos_struct()
@@ -252,7 +252,7 @@ function saturation_adjustment(self, EnvVar::EnvironmentVariables)
 end
 
 
-function sgs_mean(self, EnvVar::EnvironmentVariables, Rain::RainVariables, dt)
+function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables, Rain::RainVariables, dt)
 
     gw = self.Gr.gw
     sa = eos_struct()
@@ -288,7 +288,7 @@ function sgs_mean(self, EnvVar::EnvironmentVariables, Rain::RainVariables, dt)
 end
 
 function sgs_quadrature(
-        self,
+        self::EnvironmentThermodynamics,
         EnvVar::EnvironmentVariables,
         Rain::RainVariables,
         dt
@@ -498,7 +498,7 @@ function sgs_quadrature(
 end
 
 function microphysics(
-    self,
+    self::EnvironmentThermodynamics,
     EnvVar::EnvironmentVariables,
     Rain::RainVariables,
     dt)

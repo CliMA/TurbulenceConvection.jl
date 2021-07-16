@@ -394,9 +394,9 @@ function buoyancy(
                     UpdVar.B.values[i,k] = buoyancy_c(self.Ref.rho0_half[k], rho)
                 else
                     UpdVar.B.values[i,k] = EnvVar.B.values[k]
+                end
                 UpdVar.RH.values[i,k] = relative_humidity_c(self.Ref.p0_half[k], UpdVar.QT.values[i,k],
                                             UpdVar.QL.values[i,k], 0.0, UpdVar.T.values[i,k])
-                end
             end
         end
     else
