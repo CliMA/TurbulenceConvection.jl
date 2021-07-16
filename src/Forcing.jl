@@ -5,12 +5,7 @@ function initialize(self::ForcingBase, GMV::GridMeanVariables, ::ForcingBaseType
     self.dqtdt = pyzeros(self.Gr.nzg)
     self.ug = pyzeros(self.Gr.nzg)
     self.vg = pyzeros(self.Gr.nzg)
-
-    if GMV.H.name == "s"
-        self.convert_forcing_prog_fp = convert_forcing_entropy
-    elseif GMV.H.name == "thetal"
-        self.convert_forcing_prog_fp = convert_forcing_thetal
-    end
+    self.convert_forcing_prog_fp = convert_forcing_thetal
     return
 end
 

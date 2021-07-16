@@ -25,7 +25,6 @@ function default_namelist(case_name)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["extrapolate_buoyancy"] = true
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_steady_updrafts"] = false
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_local_micro"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_constant_plume_spacing"] = false
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_similarity_diffusivity"] = false

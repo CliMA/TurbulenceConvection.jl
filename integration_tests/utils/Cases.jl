@@ -166,20 +166,10 @@ function initialize_profiles(self::CasesBase{SoaresCase},
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
 
-    if GMV.H.name == "thetal"
-        @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-            GMV.H.values[k] = theta[k]
-            GMV.T.values[k] =  theta[k] * exner_c(Ref.p0_half[k])
-            GMV.THL.values[k] = theta[k]
-        end
-    elseif GMV.H.name == "s"
-        @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-            GMV.T.values[k] = theta[k] * exner_c(Ref.p0_half[k])
-            GMV.H.values[k] = t_to_entropy_c(Ref.p0_half[k],GMV.T.values[k],
-                                             GMV.QT.values[k], ql, qi)
-            GMV.THL.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                             GMV.QT.values[k], ql, qi, latent_heat(GMV.T.values[k]))
-        end
+    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+        GMV.H.values[k] = theta[k]
+        GMV.T.values[k] =  theta[k] * exner_c(Ref.p0_half[k])
+        GMV.THL.values[k] = theta[k]
     end
 
     set_bcs(GMV.H, Gr)
@@ -260,22 +250,11 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, Gr::Grid, GMV::GridMea
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
 
-    if GMV.H.name == "thetal"
-        @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-            GMV.H.values[k] = theta[k]
-            GMV.T.values[k] =  theta[k] * exner_c(Ref.p0_half[k])
-            GMV.THL.values[k] = theta[k]
-        end
-    elseif GMV.H.name == "s"
-        @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-            GMV.T.values[k] = theta[k] * exner_c(Ref.p0_half[k])
-            GMV.H.values[k] = t_to_entropy_c(Ref.p0_half[k],GMV.T.values[k],
-                                             GMV.QT.values[k], ql, qi)
-            GMV.THL.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                             GMV.QT.values[k], ql, qi, latent_heat(GMV.T.values[k]))
-        end
+    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+        GMV.H.values[k] = theta[k]
+        GMV.T.values[k] =  theta[k] * exner_c(Ref.p0_half[k])
+        GMV.THL.values[k] = theta[k] 
     end
-
     set_bcs(GMV.H, Gr)
     set_bcs(GMV.T, Gr)
     satadjust(GMV)
@@ -383,22 +362,11 @@ function initialize_profiles(self::CasesBase{BomexCase}, Gr::Grid, GMV::GridMean
         end
     end
 
-    if GMV.H.name == "thetal"
-        @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-            GMV.H.values[k] = thetal[k]
-            GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k])
-            GMV.THL.values[k] = thetal[k]
-        end
-    elseif GMV.H.name == "s"
-        @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-            GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
-            GMV.H.values[k] = t_to_entropy_c(Ref.p0_half[k],GMV.T.values[k],
-                                             GMV.QT.values[k], ql, qi)
-            GMV.THL.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                             GMV.QT.values[k], ql, qi, latent_heat(GMV.T.values[k]))
-        end
+    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+        GMV.H.values[k] = thetal[k]
+        GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k])
+        GMV.THL.values[k] = thetal[k]
     end
-
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
     set_bcs(GMV.H, Gr)
@@ -526,20 +494,10 @@ function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, GMV:
     end
 
 
-    if GMV.H.name == "thetal"
       @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
             GMV.H.values[k] = thetal[k]
             GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k])
             GMV.THL.values[k] = thetal[k]
-        end
-    elseif GMV.H.name == "s"
-      @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-            GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
-            GMV.H.values[k] = t_to_entropy_c(Ref.p0_half[k],GMV.T.values[k],
-                                             GMV.QT.values[k], ql, qi)
-            GMV.THL.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                             GMV.QT.values[k], ql, qi, latent_heat(GMV.T.values[k]))
-        end
     end
 
     set_bcs(GMV.U, Gr)
@@ -660,20 +618,10 @@ function initialize_profiles(self::CasesBase{Rico}, Gr::Grid, GMV::GridMeanVaria
         end
     end
 
-    if GMV.H.name == "thetal"
-      @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-            GMV.H.values[k] = thetal[k]
-            GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k])
-            GMV.THL.values[k] = thetal[k]
-        end
-    elseif GMV.H.name == "s"
-      @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-            GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
-            GMV.H.values[k] = t_to_entropy_c(Ref.p0_half[k],GMV.T.values[k],
-                                             GMV.QT.values[k], ql, qi)
-            GMV.THL.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                             GMV.QT.values[k], ql, qi, latent_heat(GMV.T.values[k]))
-        end
+    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+        GMV.H.values[k] = thetal[k]
+        GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k])
+        GMV.THL.values[k] = thetal[k]
     end
 
     set_bcs(GMV.U, Gr)
@@ -838,13 +786,8 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
         qv_star = PV_star*epsi/(p1[k]- PV_star + epsi*PV_star*RH[k]/100.0) # eq. 37 in pressel et al and the def of RH
         qv = GMV.QT.values[k] - GMV.QL.values[k]
         GMV.QT.values[k] = qv_star*RH[k]/100.0
-        if GMV.H.name == "s"
-            GMV.H.values[k] = t_to_entropy_c(Ref.p0_half[k],GMV.T.values[k],
-                                            GMV.QT.values[k], 0.0, 0.0)
-        elseif GMV.H.name == "thetal"
-             GMV.H.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                            GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
-        end
+        GMV.H.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
+                                    GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
 
         GMV.THL.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
                                             GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
@@ -1100,13 +1043,8 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVa
         GMV.U.values[k] = 10.0
         GMV.QT.values[k] = qt[k]
         GMV.T.values[k] = Theta[k]*exner_c(Ref.p0_half[k])
-        if GMV.H.name == "s"
-            GMV.H.values[k] = t_to_entropy_c(Ref.p0_half[k],GMV.T.values[k],
-                                            GMV.QT.values[k], 0.0, 0.0)
-        elseif GMV.H.name == "thetal"
-             GMV.H.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                            GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
-        end
+        GMV.H.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
+                                    GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
 
         GMV.THL.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
                                             GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
@@ -1242,13 +1180,8 @@ function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanV
         GMV.T.values[k] = T[k]
         GMV.U.values[k] = U[k]
 
-        if GMV.H.name == "s"
-            GMV.H.values[k] = t_to_entropy_c(Ref.p0_half[k],GMV.T.values[k],
-                                            GMV.QT.values[k], 0.0, 0.0)
-        elseif GMV.H.name == "thetal"
-             GMV.H.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                            GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
-        end
+        GMV.H.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
+                                    GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
 
         GMV.THL.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
                                             GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
@@ -1427,11 +1360,8 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
         # (calculated based on T and ql profiles.
         # Here we use Rd, cp and L constants as defined in TurbulenceConvection)
         GMV.THL.values[k] = t_to_thetali_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], GMV.QL.values[k], qi)
-        if GMV.H.name == "thetal"
-            GMV.H.values[k] = t_to_thetali_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], GMV.QL.values[k], qi)
-        elseif GMV.H.name == "s"
-            GMV.H.values[k] = t_to_entropy_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], GMV.QL.values[k], qi)
-        end
+        GMV.H.values[k] = t_to_thetali_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], GMV.QL.values[k], qi)
+        
 
         # buoyancy profile
         qv = GMV.QT.values[k] - qi - GMV.QL.values[k]
@@ -1560,20 +1490,10 @@ function initialize_profiles(self::CasesBase{GABLS}, Gr::Grid, GMV::GridMeanVari
         GMV.QT.values[k] = 0.0
     end
 
-    if GMV.H.name == "thetal"
-      @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-            GMV.H.values[k] = thetal[k]
-            GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k]) # No water content
-            GMV.THL.values[k] = thetal[k]
-        end
-    elseif GMV.H.name == "s"
-      @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-            GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
-            GMV.H.values[k] = t_to_entropy_c(Ref.p0_half[k],GMV.T.values[k],
-                                             GMV.QT.values[k], ql, qi)
-            GMV.THL.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                             GMV.QT.values[k], ql, qi, latent_heat(GMV.T.values[k]))
-        end
+    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+        GMV.H.values[k] = thetal[k]
+        GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k]) # No water content
+        GMV.THL.values[k] = thetal[k]
     end
 
     set_bcs(GMV.U, Gr)
@@ -1663,20 +1583,10 @@ function initialize_profiles(self::CasesBase{SP}, Gr::Grid, GMV::GridMeanVariabl
         GMV.QT.values[k] = 0.0
     end
 
-    if GMV.H.name == "thetal"
-      @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-            GMV.H.values[k] = thetal[k]
-            GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k])
-            GMV.THL.values[k] = thetal[k]
-        end
-    elseif GMV.H.name == "s"
-      @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-            GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
-            GMV.H.values[k] = t_to_entropy_c(Ref.p0_half[k],GMV.T.values[k],
-                                             GMV.QT.values[k], ql, qi)
-            GMV.THL.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                             GMV.QT.values[k], ql, qi, latent_heat(GMV.T.values[k]))
-        end
+    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+        GMV.H.values[k] = thetal[k]
+        GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k])
+        GMV.THL.values[k] = thetal[k]
     end
 
     set_bcs(GMV.U, Gr)
