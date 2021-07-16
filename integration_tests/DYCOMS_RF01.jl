@@ -16,15 +16,15 @@ using .ParamList
 include(joinpath("utils", "main.jl"))
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 3.4203549443317979e-02
-best_mse["ql_mean"] = 1.8556088804370651e+02
-best_mse["updraft_area"] = 2.1254899281263803e+02
-best_mse["updraft_w"] = 3.3720682408389879e+00
-best_mse["updraft_qt"] = 7.3758208297447347e-01
-best_mse["updraft_thetal"] = 1.2774041797120240e+01
-best_mse["v_mean"] = 3.9947573428069575e+01
-best_mse["u_mean"] = 3.5718662854892038e+01
-best_mse["tke_mean"] = 2.9756050060113374e+01
+best_mse["qt_mean"] = 2.4080653050071930e-02
+best_mse["ql_mean"] = 1.2384009655013500e+02
+best_mse["updraft_area"] = 2.0289574450333936e+02
+best_mse["updraft_w"] = 3.7381317919464681e+00
+best_mse["updraft_qt"] = 7.3627730160904625e-01
+best_mse["updraft_thetal"] = 1.2763401818623445e+01
+best_mse["v_mean"] = 3.9937577145913970e+01
+best_mse["u_mean"] = 3.5689297667797483e+01
+best_mse["tke_mean"] = 2.8069695242105951e+01
 
 
 @testset "DYCOMS_RF01" begin
