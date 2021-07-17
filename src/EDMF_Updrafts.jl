@@ -382,6 +382,8 @@ function buoyancy(
     )
 
     gw = self.Gr.gw
+    qt = 0.0
+    h = 0.0
 
     UpdVar.Area.bulkvalues .= up_sum(UpdVar.Area.values)
 
@@ -413,8 +415,6 @@ function buoyancy(
                 elseif UpdVar.Area.values[i,k-1] > 0.0 && k>self.Gr.gw
                     # TODO: report bug:
                     # qt and h were not defined here before the function call.
-                    qt = UpdVar.QT.values[i,k]
-                    h = UpdVar.H.values[i,k]
                     sa = eos(self.t_to_prog_fp,
                         self.prog_to_t_fp,
                         self.Ref.p0_half[k],

@@ -181,7 +181,7 @@ function compute_mse(
                 label = "SCAMPy",
             )
             @info "Saving $(joinpath(foldername, "$tc_var.png"))"
-            savefig(joinpath(foldername, "$tc_var.png"))
+            savefig(joinpath(foldername, "profile_$tc_var.png"))
 
             contourf(
                 time_scm, z_scm, data_scm_arr';
