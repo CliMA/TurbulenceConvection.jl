@@ -68,6 +68,8 @@ function default_namelist(case_name)
         namelist = GABLS(namelist_defaults)
     elseif case_name == "SP"
         namelist = SP(namelist_defaults)
+    elseif case_name == "LES_driven_SCM"
+        namelist = LES_driven_SCM(namelist_defaults)
     elseif case_name == "DryBubble"
         namelist = DryBubble(namelist_defaults)
     else
@@ -272,6 +274,19 @@ function DryBubble(namelist_defaults)
 
     return namelist
 end
+
+function  LES_driven_SCM(namelist_defaults)
+    namelist = deepcopy(namelist_defaults)
+    namelist['grid']['dz'] = 50.0
+
+    namelist['stats_io']['frequency'] = 10.0
+    namelist['time_stepping']['dt'] = 10.0
+    namelist['meta']['lesfolder'] = './LES_driven_SCM/'
+    namelist['meta']['lesfile'] = 'cfsite23_HadGEM2-A_amip_2004-2008.07'
+    namelist['meta']['simname'] = 'LES_driven_SCM'
+    namelist['meta']['casename'] = 'LES_driven_SCM'
+
+    return namelist
 
 # function write_file(namelist)
 

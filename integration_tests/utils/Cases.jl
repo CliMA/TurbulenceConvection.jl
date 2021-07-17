@@ -74,6 +74,7 @@ struct TRMM_LBA end
 struct ARM_SGP end
 struct Nieuwstadt end
 struct life_cycle_Tan2018 end
+struct life_cycle_Tan2018 end
 
 function CasesFactory(namelist, paramlist, Gr, Ref)
     if namelist["meta"]["casename"] == "Soares"
@@ -1871,16 +1872,25 @@ function update_radiation(self::CasesBase{DryBubble}, GMV::GridMeanVariables, TS
 end
 
 function LES_driven_SCM(paramlist, Gr::Grid, Ref::ReferenceState)
-    casename = "LES_driven_SCM"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
-    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
-    inversion_option = "critical_Ri"
-    Fo.apply_coriolis = true
-    Fo.coriolis_param = 0.376e-4 # s^{-1}
+    casename  = "LES_driven_SCM"
+    lesfolder = namelist['meta']['lesfolder']
+    lesfile   = namelist['meta']['lesfile']
+    self.les_filename = joinpath(lesfolder, 'Stats.' + lesfile +'.nc')
+    self.Sur = Surface.SurfaceLES(paramlist)
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceLES}(;Gr, Ref)
+    Fo  = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingLES}(;Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationLES}(;Gr, Ref)
+    inversion_option    = "critical_Ri"
+    Fo.apply_coriolis   = false
+    Fo.coriolis_param   = 0.376e-4 # s^{-1}
     Fo.apply_subsidence = true
     return TurbulenceConvection.CasesBase{LES_driven_SCM}(
         ;casename = "LES_driven_SCM", inversion_option, Sur, Fo, Rad)
+
+    self.Fo.apply_coriolis = False
+    # get LES latitiude
+    self.Fo.apply_subsidence = True
+    self.Fo.nudge_tau = paramlist['forcing']['nudging_timescale']
 end
 
 function initialize_reference(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1891,57 +1901,16 @@ function initialize_reference(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::Re
 end
 
 function initialize_profiles(self::CasesBase{LES_driven_SCM}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    thetal = TurbulenceConvection.pyzeros(Gr.nzg)
-    ql=0.0
-    qi =0.0 # IC of LES_driven_SCM is cloud-free
 
-    theta_pert = 0.0
-    qt_pert = 0.0
+    les_data = Dataset(self.les_filename, "r")
+    # find the indexes for a 6h interval at the end of the simualtion
+    z_les_half    = data.group["profiles"]["z_half"][:,1];
+    GMV.H.values  = mean(data.group["profiles"]["thetali_mean"][:,1], dims = 1)
+    GMV.QT.values = mean(data.group["profiles"]["qt_mean"][:,1], dims = 1)
+    GMV.U.values  = mean(data.group["profiles"]["u_mean"][:,1], dims = 1)
+    GMV.V.values  = mean(data.group["profiles"]["v_mean"][:,1], dims = 1)
+    # TODO - interp1d from LES to SCM in case z-grid does not match
 
-    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-        #Set Thetal profile
-        if Gr.z_half[k] <= 520.
-            thetal[k] = 298.7
-        end
-        if Gr.z_half[k] > 520.0 && Gr.z_half[k] <= 1480.0
-            thetal[k] = 298.7 + (Gr.z_half[k] - 520)  * (302.4 - 298.7)/(1480.0 - 520.0)
-        end
-        if Gr.z_half[k] > 1480.0 && Gr.z_half[k] <= 2000
-            thetal[k] = 302.4 + (Gr.z_half[k] - 1480.0) * (308.2 - 302.4)/(2000.0 - 1480.0)
-        end
-        if Gr.z_half[k] > 2000.0
-            thetal[k] = 308.2 + (Gr.z_half[k] - 2000.0) * (311.85 - 308.2)/(3000.0 - 2000.0)
-        end
-
-        #Set qt profile
-        if Gr.z_half[k] <= 520
-            GMV.QT.values[k] = (17.0 + (Gr.z_half[k]) * (16.3-17.0)/520.0)/1000.0
-        end
-        if Gr.z_half[k] > 520.0 && Gr.z_half[k] <= 1480.0
-            GMV.QT.values[k] = (16.3 + (Gr.z_half[k] - 520.0)*(10.7 - 16.3)/(1480.0 - 520.0))/1000.0
-        end
-        if Gr.z_half[k] > 1480.0 && Gr.z_half[k] <= 2000.0
-            GMV.QT.values[k] = (10.7 + (Gr.z_half[k] - 1480.0) * (4.2 - 10.7)/(2000.0 - 1480.0))/1000.0
-        end
-        if Gr.z_half[k] > 2000.0
-            GMV.QT.values[k] = (4.2 + (Gr.z_half[k] - 2000.0) * (3.0 - 4.2)/(3000.0  - 2000.0))/1000.0
-        end
-
-
-        #Set u profile
-        if Gr.z_half[k] <= 700.0
-            GMV.U.values[k] = -8.75
-        end
-        if Gr.z_half[k] > 700.0
-            GMV.U.values[k] = -8.75 + (Gr.z_half[k] - 700.0) * (-4.61 - -8.75)/(3000.0 - 700.0)
-        end
-    end
-
-    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-        GMV.H.values[k] = thetal[k]
-        GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k])
-        GMV.THL.values[k] = thetal[k]
-    end
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
     set_bcs(GMV.H, Gr)
@@ -1950,13 +1919,10 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, Gr::Grid, GMV::Gri
 end
 
 function initialize_surface(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState)
-    self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
-    self.Sur.Tsurface = 299.1 * exner_c(Ref.Pg)
-    self.Sur.qsurface = 22.45e-3 # kg/kg
-    self.Sur.lhf = 5.2e-5 * Ref.rho0[Gr.gw-1] * latent_heat(self.Sur.Tsurface)
-    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * Ref.rho0[Gr.gw-1]
-    self.Sur.ustar_fixed = true
-    self.Sur.ustar = 0.28 # m/s
+    self.Sur.Gr = Gr
+    self.Sur.Ref = Ref
+    self.Sur.qsurface = 1.0e-5
+    self.Sur.zrough = 1.0e-4
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
     initialize(self.Sur)

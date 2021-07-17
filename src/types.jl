@@ -615,6 +615,7 @@ Base.@kwdef mutable struct ForcingBase{T}
     coriolis_param::Float64 = 0
     ug::AbstractArray{Float64,1} = zeros(1)
     vg::AbstractArray{Float64,1} = zeros(1)
+    nudge_tau::Float64 = 1.0
     # (*convert_forcing_prog_fp)(p0, qt, qv, T,::Float64
     #                                   qt_tendency, T_tendency) ::Float64
     convert_forcing_prog_fp::Function = x->x
@@ -639,6 +640,7 @@ end
 Base.@kwdef mutable struct CasesBase{T}
     casename::String = "default_casename"
     inversion_option::String = "default_inversion_option"
+    les_filename::String
     Sur::SurfaceBase
     Fo::ForcingBase
     Rad::RadiationBase

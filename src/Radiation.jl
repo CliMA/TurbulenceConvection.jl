@@ -120,3 +120,51 @@ function io(self::RadiationBase{RadiationDYCOMS_RF01}, Stats::NetCDFIO_Stats)
     write_profile(Stats, "rad_flux", self.f_rad[finterior])
     return
 end
+
+
+function initialize(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables)
+    initialize(self, GMV, RadiationBaseType())
+
+    
+    self.divergence = 3.75e-6  # divergence is defined twice: here and in initialize_forcing method of DYCOMS_RF01 case class
+                               # where it is used to initialize large scale subsidence
+    self.alpha_z    = 1.
+    self.kappa      = 85.
+    self.F0         = 70.
+    self.F1         = 22.
+    self.divergence = 3.75e-6 
+    self.f_rad = pyzeros(self.Gr.nzg + 1) # radiative flux at cell edges
+    return
+end
+
+function update(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables)
+
+    les_data = Dataset(self.les_filename, "r")
+    # find the indexes for a 6h interval at the end of the simualtion
+    t = data.group["profiles"]["t"][:];
+    imin = Int(3600.0*6.0/(t[2]-t[1]))    
+    self.dTdt = mean(data.group["profiles"]["dtdt_rad"][:][:,imin:end],dims = 2)
+    self.dqtdt = zeros(size(self.dTdt))
+
+    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg-self.Gr.gw)
+        # Apply large-scale horizontal advection tendencies
+        qv = GMV.QT.values[k] - GMV.QL.values[k]
+        GMV.H.tendencies[k]  += self.convert_forcing_prog_fp(self.Ref.p0_half[k],GMV.QT.values[k], qv, GMV.T.values[k], self.dqtdt[k], self.dTdt[k])
+    end
+
+    return
+end
+
+function initialize_io(self::RadiationBase{RadiationLES}, Stats::NetCDFIO_Stats)
+    add_profile(Stats, "rad_dTdt")
+    add_profile(Stats, "rad_flux")
+    return
+end
+
+function io(self::RadiationBase{RadiationLES}, Stats::NetCDFIO_Stats)
+    cinterior = self.Gr.cinterior
+    finterior = self.Gr.finterior
+    write_profile(Stats, "rad_dTdt", self.dTdt[cinterior])
+    write_profile(Stats, "rad_flux", self.f_rad[finterior])
+    return
+end
