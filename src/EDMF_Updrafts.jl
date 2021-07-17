@@ -196,6 +196,7 @@ function initialize_io(self::UpdraftVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "QL_values")
     add_profile(Stats, "RH_values")
     add_profile(Stats, "H_values")
+    add_profile(Stats, "W_values")
     add_profile(Stats, "Area_values")
 
     add_profile(Stats, "updraft_cloud_fraction")
@@ -209,7 +210,8 @@ end
 
 function set_means(self::UpdraftVariables, GMV::GridMeanVariables)
 
-    self.Area.bulkvalues .= up_sum(self.Area.values)
+    up_sum_res = up_sum(self.Area.values)
+    self.Area.bulkvalues .= up_sum_res
     self.W.bulkvalues .= 0.0
     self.QT.bulkvalues .= 0.0
     self.QL.bulkvalues .= 0.0
@@ -227,8 +229,8 @@ function set_means(self::UpdraftVariables, GMV::GridMeanVariables)
                 self.T.bulkvalues[k] += self.Area.values[i,k] * self.T.values[i,k]/self.Area.bulkvalues[k]
                 self.RH.bulkvalues[k] += self.Area.values[i,k] * self.RH.values[i,k]/self.Area.bulkvalues[k]
                 self.B.bulkvalues[k] += self.Area.values[i,k] * self.B.values[i,k]/self.Area.bulkvalues[k]
-                self.W.bulkvalues[k] += ((self.Area.values[i,k] + self.Area.values[i,k+1]) * self.W.values[i,k]
-                                    /(self.Area.bulkvalues[k] + self.Area.bulkvalues[k+1]))
+                self.W.bulkvalues[k] += ((self.Area.values[i,k] + self.Area.values[i,k+1]) * self.W.values[i,k]/
+                                     (self.Area.bulkvalues[k] + self.Area.bulkvalues[k+1]))
             end
 
         else
@@ -305,7 +307,7 @@ function io(self::UpdraftVariables, Stats::NetCDFIO_Stats, Ref::ReferenceState)
     cinterior = self.Gr.cinterior
     finterior = self.Gr.finterior
     write_profile(Stats, "updraft_area", self.Area.bulkvalues[cinterior])
-    write_profile(Stats, "updraft_w", self.W.bulkvalues[finterior])
+    write_profile(Stats, "updraft_w", self.W.bulkvalues[cinterior])
     write_profile(Stats, "updraft_qt", self.QT.bulkvalues[cinterior])
     write_profile(Stats, "updraft_ql", self.QL.bulkvalues[cinterior])
     write_profile(Stats, "updraft_RH", self.RH.bulkvalues[cinterior])
@@ -323,6 +325,7 @@ function io(self::UpdraftVariables, Stats::NetCDFIO_Stats, Ref::ReferenceState)
     write_profile(Stats, "T_values", self.T.values[0,cinterior])
     write_profile(Stats, "QT_values", self.QT.values[0,cinterior])
     write_profile(Stats, "QL_values", self.QL.values[0,cinterior])
+    write_profile(Stats, "W_values", self.W.values[0,cinterior])
     write_profile(Stats, "RH_values", self.RH.values[0,cinterior])
     write_profile(Stats, "H_values", self.H.values[0,cinterior])
     write_profile(Stats, "Area_values", self.Area.values[0,cinterior])

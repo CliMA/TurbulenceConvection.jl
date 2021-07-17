@@ -65,10 +65,6 @@ mutable struct NetCDFIO_Stats
 
             zf = Gr.z[finterior]
             zc = Gr.z_half[cinterior]
-            @show zf
-            @show zc
-            @show length(zf)
-            @show length(zc)
             # Set profile dimensions
             profile_grp = defGroup(root_grp, "profiles")
             defDim(profile_grp, "z", Gr.nz)

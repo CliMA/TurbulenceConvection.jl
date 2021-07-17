@@ -150,7 +150,7 @@ end
 function io(self::EnvironmentVariables, Stats::NetCDFIO_Stats, Ref::ReferenceState)
     cinterior = self.Gr.cinterior
     finterior = self.Gr.finterior
-    write_profile(Stats, "env_w", self.W.values[finterior])
+    write_profile(Stats, "env_w", self.W.values[cinterior])
     write_profile(Stats, "env_qt", self.QT.values[cinterior])
     write_profile(Stats, "env_ql", self.QL.values[cinterior])
     write_profile(Stats, "env_area", self.Area.values[cinterior])

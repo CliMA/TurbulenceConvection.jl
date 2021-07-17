@@ -5,6 +5,7 @@ mutable struct TimeStepping
     t::Float64
     nstep::Int
     i_iter::Int
+    isolate::Bool
 end
 
 function TimeStepping(namelist)
@@ -26,8 +27,9 @@ function TimeStepping(namelist)
     t = 0.0
     nstep = 0
     i_iter = 0
+    isolate = false
 
-    return TimeStepping(dt,dti,t_max,t,nstep, i_iter)
+    return TimeStepping(dt,dti,t_max,t,nstep, i_iter,isolate)
 end
 
 function update(self)
@@ -38,5 +40,15 @@ end
 
 function update_iter(self)
     self.i_iter += 1
+    return
+end
+
+function isolate_on(self)
+    self.isolate = true
+    return
+end
+
+function isolate_off(self)
+    self.isolate = false
     return
 end

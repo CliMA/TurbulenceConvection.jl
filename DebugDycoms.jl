@@ -57,6 +57,7 @@ best_mse["QL_values"] = 1.0
 best_mse["RH_values"] = 1.0
 best_mse["H_values"] = 1.0
 best_mse["Area_values"] = 1.0
+best_mse["W_values"] = 1.0
 best_mse["RH_mean"] = 1.0
 best_mse["thetal_mean"] = 1.0
 best_mse["temperature_mean"] = 1.0
@@ -180,7 +181,7 @@ computed_mse = Dataset(ds_filename, "r") do ds
             joinpath(dirname(ds_filename), "DebuggingDycoms_comparison");
             ds_turb_conv=ds,
             ds_scampy=ds_scampy,
-            plot_comparison=false
+            plot_comparison=true
         )
     end
 end

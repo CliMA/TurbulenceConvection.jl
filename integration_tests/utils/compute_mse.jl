@@ -139,7 +139,7 @@ function compute_mse(
 
         # Interpolate data
         steady_data = size(data_tcc_arr,1) == 1
-        @show tc_var, steady_data
+        @show tc_var, steady_data, size(data_tcc_arr), size(data_scm_arr)
         # if steady_data
         #     # data_les_cont = Spline1D(z_les, data_les_arr)
         #     data_tcc_cont = Spline1D(z_tcc, data_tcc_arr)
@@ -198,23 +198,23 @@ function compute_mse(
                 label = "SCAMPy",
             )
             @info "Saving $(joinpath(foldername, "$tc_var.png"))"
-            savefig(joinpath(foldername, "$tc_var.png"))
+            savefig(joinpath(foldername, "profiles_$tc_var.png"))
 
-            # contourf(
-            #     time_scm, z_scm, data_scm_arr';
-            #     xlabel = tc_var,
-            #     ylabel = "height (m)",
-            #     c = :viridis
-            # )
-            # savefig(joinpath(foldername,"contours_"*tc_var*"_scampy"*".png"))
+            contourf(
+                time_scm, z_scm, data_scm_arr';
+                xlabel = tc_var,
+                ylabel = "height (m)",
+                c = :viridis
+            )
+            savefig(joinpath(foldername,"contours_"*tc_var*"_scampy"*".png"))
 
-            # contourf(
-            #     time_tcc, z_tcc, data_tcc_arr';
-            #     xlabel = tc_var,
-            #     ylabel = "height (m)",
-            #     c = :viridis
-            # )
-            # savefig(joinpath(foldername,"contours_"*tc_var*"_tc"*".png"))
+            contourf(
+                time_tcc, z_tcc, data_tcc_arr';
+                xlabel = tc_var,
+                ylabel = "height (m)",
+                c = :viridis
+            )
+            savefig(joinpath(foldername,"contours_"*tc_var*"_tc"*".png"))
         end
 
         # Compute mean squared error (mse)

@@ -346,7 +346,6 @@ end
 
 function pressure_normalmode_buoy(press_in::pressure_in_struct)
     _ret = pressure_buoy_struct()
-    println("using pressure_normalmode_buoy")
     _ret.b_coeff = press_in.alpha1 / ( 1+press_in.alpha2*press_in.asp_ratio^2 )
     _ret.nh_pressure_b = -1.0 * press_in.rho0_kfull * press_in.a_kfull * press_in.b_kfull * _ret.b_coeff
 
