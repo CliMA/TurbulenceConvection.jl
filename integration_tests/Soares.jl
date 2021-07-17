@@ -16,13 +16,13 @@ using .ParamList
 include(joinpath("utils", "main.jl"))
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 2.5281925724570736e-01
-best_mse["updraft_area"] = 8.0505846143469341e+02
-best_mse["updraft_w"] = 2.4989429382521031e+01
-best_mse["updraft_qt"] = 1.0556629689231746e+01
-best_mse["updraft_thetal"] = 2.1622593049473402e+01
-best_mse["u_mean"] = 4.2420351837474118e+03
-best_mse["tke_mean"] = 7.9909840262364895e+01
+best_mse["qt_mean"] = 2.5654529603089010e-01
+best_mse["updraft_area"] = 7.7772077592145229e+02
+best_mse["updraft_w"] = 2.4476512452627702e+01
+best_mse["updraft_qt"] = 1.0639744567172206e+01
+best_mse["updraft_thetal"] = 2.1622331422297314e+01
+best_mse["u_mean"] = 4.2569022743548685e+03
+best_mse["tke_mean"] = 8.1460797862144929e+01
 
 @testset "Soares" begin
     println("Running Soares...")
