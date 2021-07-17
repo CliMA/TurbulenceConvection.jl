@@ -1873,9 +1873,9 @@ end
 
 function LES_driven_SCM(paramlist, Gr::Grid, Ref::ReferenceState)
     casename  = "LES_driven_SCM"
-    lesfolder = namelist['meta']['lesfolder']
-    lesfile   = namelist['meta']['lesfile']
-    self.les_filename = joinpath(lesfolder, 'Stats.' + lesfile +'.nc')
+    lesfolder = namelist["meta"]["lesfolder"]
+    lesfile   = namelist["meta"]["lesfile"]
+    self.les_filename = joinpath(lesfolder, lesfile)
     self.Sur = Surface.SurfaceLES(paramlist)
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceLES}(;Gr, Ref)
     Fo  = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingLES}(;Gr, Ref)
@@ -1890,7 +1890,7 @@ function LES_driven_SCM(paramlist, Gr::Grid, Ref::ReferenceState)
     self.Fo.apply_coriolis = False
     # get LES latitiude
     self.Fo.apply_subsidence = True
-    self.Fo.nudge_tau = paramlist['forcing']['nudging_timescale']
+    self.Fo.nudge_tau = paramlist["forcing"]["nudging_timescale"]
 end
 
 function initialize_reference(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)

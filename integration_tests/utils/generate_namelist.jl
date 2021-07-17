@@ -277,16 +277,17 @@ end
 
 function  LES_driven_SCM(namelist_defaults)
     namelist = deepcopy(namelist_defaults)
-    namelist['grid']['dz'] = 50.0
+    namelist["grid"]["dz"] = 50.0
 
-    namelist['stats_io']['frequency'] = 10.0
-    namelist['time_stepping']['dt'] = 10.0
-    namelist['meta']['lesfolder'] = './LES_driven_SCM/'
-    namelist['meta']['lesfile'] = 'cfsite23_HadGEM2-A_amip_2004-2008.07'
-    namelist['meta']['simname'] = 'LES_driven_SCM'
-    namelist['meta']['casename'] = 'LES_driven_SCM'
+    namelist["stats_io"]["frequency"] = 10.0
+    namelist["time_stepping"]["dt"] = 10.0
+    namelist["meta"]["lesfolder"] = "./LES_driven_SCM/"
+    namelist["meta"]["lesfile"] = "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc"
+    namelist["meta"]["simname"] = "LES_driven_SCM"
+    namelist["meta"]["casename"] = "LES_driven_SCM"
 
     return namelist
+end
 
 # function write_file(namelist)
 

@@ -600,16 +600,27 @@ struct ForcingBaseType end
 struct ForcingNone end
 struct ForcingStandard end
 struct ForcingDYCOMS_RF01 end
+struct ForcingLES end
 
 struct RadiationBaseType end
 struct RadiationNone end
 struct RadiationStandard end
 struct RadiationDYCOMS_RF01 end
+struct RadiationLES end
 
 Base.@kwdef mutable struct ForcingBase{T}
     subsidence::AbstractArray{Float64,1} = zeros(1)
     dTdt::AbstractArray{Float64,1} = zeros(1) # horizontal advection temperature tendency
     dqtdt::AbstractArray{Float64,1} = zeros(1) # horizontal advection moisture tendency
+    les_dtdt_hadv::AbstractArray{Float64,1} = zeros(1)
+    les_dtdt_nudge::AbstractArray{Float64,1} = zeros(1)
+    les_dtdt_fluc::AbstractArray{Float64,1} = zeros(1)
+    les_dqtdt_hadv::AbstractArray{Float64,1} = zeros(1)
+    les_dqtdt_nudge::AbstractArray{Float64,1} = zeros(1)
+    les_dqtdt_fluc::AbstractArray{Float64,1} = zeros(1)
+    les_subsidence::AbstractArray{Float64,1} = zeros(1)
+    les_u_nudge::AbstractArray{Float64,1} = zeros(1)
+    les_v_nudge::AbstractArray{Float64,1} = zeros(1)
     apply_coriolis::Bool = false
     apply_subsidence::Bool = false
     coriolis_param::Float64 = 0

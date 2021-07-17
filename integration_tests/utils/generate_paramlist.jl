@@ -170,9 +170,9 @@ end
 function LES_driven_SCM(paramlist_defaults)
 
     paramlist = deepcopy(paramlist_defaults)
-    paramlist['meta']['casename'] = 'LES_driven_SCM'
-    paramlist['forcing'] = Dict()
-    paramlist['forcing']['nudging_timescale'] = 6.0*3600.0
+    paramlist["meta"]["casename"] = "LES_driven_SCM"
+    paramlist["forcing"] = Dict()
+    paramlist["forcing"]["nudging_timescale"] = 6.0*3600.0
 
     return  paramlist
 end
