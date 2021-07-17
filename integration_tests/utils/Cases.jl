@@ -101,6 +101,8 @@ function CasesFactory(namelist, paramlist, Gr, Ref)
         return SP(paramlist, Gr, Ref)
     elseif namelist["meta"]["casename"] == "DryBubble"
         return DryBubble(paramlist, Gr, Ref)
+    elseif namelist["meta"]["casename"] == "LES_driven_SCM"
+        return LES_driven_SCM(namelist, paramlist, Gr, Ref)
     else
         error("case not recognized")
     end
@@ -1871,13 +1873,12 @@ function update_radiation(self::CasesBase{DryBubble}, GMV::GridMeanVariables, TS
    update(self.Rad, GMV)
 end
 
-function LES_driven_SCM(paramlist, Gr::Grid, Ref::ReferenceState)
+function LES_driven_SCM(namelist, paramlist, Gr::Grid, Ref::ReferenceState)
     casename  = "LES_driven_SCM"
     lesfolder = namelist["meta"]["lesfolder"]
     lesfile   = namelist["meta"]["lesfile"]
-    self.les_filename = joinpath(lesfolder, lesfile)
-    self.Sur = Surface.SurfaceLES(paramlist)
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceLES}(;Gr, Ref)
+    les_filename = joinpath(lesfolder, lesfile)
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedCoeffs}(;Gr, Ref)
     Fo  = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingLES}(;Gr, Ref)
     Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationLES}(;Gr, Ref)
     inversion_option    = "critical_Ri"
@@ -1885,7 +1886,7 @@ function LES_driven_SCM(paramlist, Gr::Grid, Ref::ReferenceState)
     Fo.coriolis_param   = 0.376e-4 # s^{-1}
     Fo.apply_subsidence = true
     return TurbulenceConvection.CasesBase{LES_driven_SCM}(
-        ;casename = "LES_driven_SCM", inversion_option, Sur, Fo, Rad)
+        ;casename = "LES_driven_SCM", les_filename, inversion_option, Sur, Fo, Rad)
 
     self.Fo.apply_coriolis = False
     # get LES latitiude

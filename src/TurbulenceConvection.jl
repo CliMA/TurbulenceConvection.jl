@@ -8,6 +8,7 @@ import LambertW
 using Distributions: Normal, quantile
 using OffsetArrays
 using FastGaussQuadrature: gausshermite
+using Dataset
 
 # For dispatching to inherited class
 struct BaseCase end

@@ -72,6 +72,8 @@ function default_namelist(case_name)
         namelist = LES_driven_SCM(namelist_defaults)
     elseif case_name == "DryBubble"
         namelist = DryBubble(namelist_defaults)
+    elseif case_name == "LES_driven_SCM"
+        namelist = LES_driven_SCM(namelist_defaults)
     else
         error("Not a valid case name")
     end
@@ -278,6 +280,7 @@ end
 function  LES_driven_SCM(namelist_defaults)
     namelist = deepcopy(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
+    namelist["grid"]["nz"] = 60
 
     namelist["stats_io"]["frequency"] = 10.0
     namelist["time_stepping"]["dt"] = 10.0
