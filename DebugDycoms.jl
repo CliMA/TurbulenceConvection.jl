@@ -172,6 +172,7 @@ best_mse["QT_mf_update"] = 1.0
 best_mse["QT_new"] = 1.0
 
 ds_scm_filename = joinpath(scampy_dir, "Output.DYCOMS_RF01.01", "stats", "Stats.DYCOMS_RF01.nc")
+# ds_scm_filename = joinpath(SCAMPy_output_dataset_path, "DYCOMS_RF01.nc")
 
 computed_mse = Dataset(ds_filename, "r") do ds
     Dataset(ds_scm_filename, "r") do ds_scampy

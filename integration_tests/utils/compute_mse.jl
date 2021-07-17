@@ -5,6 +5,7 @@ using NCDatasets
 using Dierckx
 using PrettyTables
 using Printf
+using Statistics
 using ArtifactWrappers
 
 ENV["GKSwstype"] = "nul"
@@ -50,6 +51,16 @@ SCAMPy_output_dataset_path = get_data_folder(SCAMPy_output_dataset)
 #! format: on
 
 include("variable_map.jl")
+
+function has_data(ds, var)
+    if haskey(ds.group["profiles"], var)
+        return true
+    elseif haskey(ds.group["reference"], var)
+        return true
+    else
+        return false
+    end
+end
 
 function get_data(ds, var)
     if haskey(ds.group["profiles"], var)
@@ -124,15 +135,27 @@ function compute_mse(
         tc_var == "z" && continue
         tc_var == "z_half" && continue
         tc_var == "t" && continue
+        tc_var == "rho0" && continue
+        tc_var == "rho0_half" && continue
+        tc_var == "p0" && continue
+        tc_var == "p0_half" && continue
+        tc_var == "alpha0" && continue
+        tc_var == "alpha0_half" && continue
         # les_var == nothing && continue
         # les_var isa String || continue
 
-        push!(tcc_variables, tc_var)
         # push!(pycles_variables, les_var)
 
         # data_les_arr = get_data(ds_pycles, les_var)'
+        data_tcc_arr = has_data(ds_turb_conv, tc_var)
+        data_scm_arr = has_data(ds_scampy, scm_var)
+        if !(data_tcc_arr && data_scm_arr)
+            continue
+        end
         data_tcc_arr = get_data(ds_turb_conv, tc_var)'
         data_scm_arr = get_data(ds_scampy, scm_var)'
+
+        push!(tcc_variables, tc_var)
 
         # Scale the data for comparison
         # push!(pycles_weight, "1")
@@ -156,14 +179,22 @@ function compute_mse(
         #     data_scm_cont_mapped = map(z -> data_scm_cont(t_cmp, z), z_tcc)
         # end
 
-        if steady_data
-            # data_les_cont = Spline1D(z_les, data_les_arr)
-            data_tcc_cont_mapped = data_tcc_arr[:]
-            data_scm_cont_mapped = data_scm_arr[:]
-        else # unsteady data
-            data_tcc_cont_mapped = data_tcc_arr[:,end]
-            data_scm_cont_mapped = data_scm_arr[:,end]
-        end
+        # if steady_data
+        #     # data_les_cont = Spline1D(z_les, data_les_arr)
+        #     data_tcc_cont_mapped = data_tcc_arr[:]
+        #     data_scm_cont_mapped = data_scm_arr[:]
+        # else # unsteady data
+        #     data_tcc_cont_mapped = data_tcc_arr[:,end]
+        #     data_scm_cont_mapped = data_scm_arr[:,end]
+        # end
+
+        data_tcc_cont_mapped = data_tcc_arr[:,:]
+        data_scm_cont_mapped = data_scm_arr[:,:]
+
+        profile_data_tcc_cont_mapped = Statistics.mean(data_tcc_arr[:,:]; dims=1)
+        profile_data_scm_cont_mapped = Statistics.mean(data_scm_arr[:,:]; dims=1)
+        profile_data_tcc_cont_mapped = reshape(profile_data_tcc_cont_mapped, length(z_tcc))
+        profile_data_scm_cont_mapped = reshape(profile_data_scm_cont_mapped, length(z_scm))
 
         # Compute data scale
         data_scale_tcc = sum(abs.(data_tcc_arr)) / length(data_tcc_arr)
@@ -172,7 +203,6 @@ function compute_mse(
         push!(data_scales_tcc, data_scale_tcc)
         push!(data_scales_scm, data_scale_scm)
         # push!(data_scales_les, data_scale_les)
-
         # Plot comparison
         if plot_comparison
             p = plot()
@@ -184,14 +214,14 @@ function compute_mse(
             #     label = "PyCLES",
             # )
             plot!(
-                data_tcc_cont_mapped,
+                profile_data_tcc_cont_mapped,
                 z_tcc ./ 10^3,
                 xlabel = tc_var,
                 ylabel = "z [km]",
                 label = "TC.jl",
             )
             plot!(
-                data_scm_cont_mapped,
+                profile_data_scm_cont_mapped,
                 z_tcc ./ 10^3,
                 xlabel = tc_var,
                 ylabel = "z [km]",
@@ -199,7 +229,6 @@ function compute_mse(
             )
             @info "Saving $(joinpath(foldername, "$tc_var.png"))"
             savefig(joinpath(foldername, "profiles_$tc_var.png"))
-
             contourf(
                 time_scm, z_scm, data_scm_arr';
                 xlabel = tc_var,
@@ -243,9 +272,16 @@ function compute_mse(
         "Variable" "Data scale" "Data scale" "MSE" "MSE" "MSE"
         "" "tcc" "scm" "Computed" "Best" "Reduction (%)"
     ]
+
+    @show size(tcc_variables)
+    @show size(data_scales_tcc)
+    @show size(data_scales_scm)
+    @show size(computed_mse)
+    @show size(table_best_mse)
+    @show size(mse_reductions)
+
     table_data = hcat(
         tcc_variables,
-        # pycles_weight,
         data_scales_tcc,
         data_scales_scm,
         computed_mse,
