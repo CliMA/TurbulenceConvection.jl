@@ -1887,7 +1887,10 @@ function LES_driven_SCM(namelist, paramlist, Gr::Grid, Ref::ReferenceState)
     Fo.apply_subsidence = true
     return TurbulenceConvection.CasesBase{LES_driven_SCM}(
         ;casename = "LES_driven_SCM", les_filename, inversion_option, Sur, Fo, Rad)
-
+    t = data.group["profiles"]["t"][:];
+    imin = Int(3600.0*6.0/(t[2]-t[1]))
+    self.Sur.Tsurface = mean(data.group["timeseries"]["surface_temperature"])
+    self.Sur.qsurface = mean(data.group["profiles"]["qt_mean"][:][1,imin:end],dims = 2))
     self.Fo.apply_coriolis = False
     # get LES latitiude
     self.Fo.apply_subsidence = True
@@ -1922,7 +1925,6 @@ end
 function initialize_surface(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState)
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
-    self.Sur.qsurface = 1.0e-5
     self.Sur.zrough = 1.0e-4
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
