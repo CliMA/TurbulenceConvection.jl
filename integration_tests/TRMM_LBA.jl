@@ -16,14 +16,14 @@ using .ParamList
 include(joinpath("utils", "main.jl"))
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 3.7784895127822691e+00
-best_mse["updraft_area"] = 2.7932861179816442e+04
-best_mse["updraft_w"] = 7.9807592428239616e+02
-best_mse["updraft_qt"] = 2.6879922764853120e+01
-best_mse["updraft_thetal"] = 1.1132652293962494e+02
-best_mse["v_mean"] = 2.9900539879604491e+02
-best_mse["u_mean"] = 1.6846881943214375e+03
-best_mse["tke_mean"] = 3.3427159327412292e+03
+best_mse["qt_mean"] = 3.0653862333906230e+00
+best_mse["updraft_area"] = 2.7495023710812657e+04
+best_mse["updraft_w"] = 9.7223483893047478e+02
+best_mse["updraft_qt"] = 2.6322481932140143e+01
+best_mse["updraft_thetal"] = 1.1133829792791128e+02
+best_mse["v_mean"] = 2.9873166404994379e+02
+best_mse["u_mean"] = 1.6851451431733847e+03
+best_mse["tke_mean"] = 2.5415289921483309e+03
 
 @testset "TRMM_LBA" begin
     println("Running TRMM_LBA...")
