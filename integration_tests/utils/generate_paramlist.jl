@@ -16,7 +16,31 @@ module ParamList
 # entrainment/detrainment rate formulation, diagnostic vs. prognostic updrafts, and vertical resolution
 export default_paramlist
 
-function default_paramlist(case_name)
+using ArgParse
+import JSON
+
+function parse_commandline()
+    s = ArgParseSettings(;description="Paramlist Generator")
+
+    @add_arg_table! s begin
+        "case_name"
+            help = "The case name"
+            arg_type = String
+            required = true
+    end
+
+    return parse_args(s)
+end
+
+function default_paramlist(::Nothing)
+
+    args = parse_commandline()
+    case_name = args["case_name"]
+    return default_paramlist(case_name)
+end
+
+function default_paramlist(case_name::String)
+
     paramlist_defaults = Dict()
     paramlist_defaults["meta"] = Dict()
 
@@ -81,7 +105,8 @@ function default_paramlist(case_name)
         error("Not a valid case name")
     end
 
-    # write_file(paramlist)
+    write_file(paramlist)
+    return paramlist
 end
 function Soares(paramlist_defaults)
 
@@ -176,16 +201,17 @@ function DryBubble(paramlist_defaults)
     return  paramlist
 end
 
-# function write_file(paramlist)
+function write_file(paramlist)
 
-#     fh = open("paramlist_"+paramlist["meta"]["casename"]+ ".in", "w")
-#     #pprint.pprint(paramlist)
-#     json.dump(paramlist, fh, sort_keys=True, indent=4)
-#     fh.close()
+    open("paramlist_"*paramlist["meta"]["casename"]*".in", "w") do io
+        JSON.print(io, paramlist, 4)
+    end
 
-#     return
+    return
+end
 
+if abspath(PROGRAM_FILE) == @__FILE__
+    default_paramlist(nothing)
+end
 
-# if __name__ == "__main__"
-#     main()
 end

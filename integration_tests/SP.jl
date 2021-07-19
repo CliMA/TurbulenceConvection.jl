@@ -5,14 +5,12 @@ import TurbulenceConvection
 using TurbulenceConvection
 using Test
 
-include(joinpath("utils", "Cases.jl"))
+include(joinpath("utils", "main.jl"))
 include(joinpath("utils", "generate_paramlist.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
-using .Cases
+include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 using .ParamList
-
-include(joinpath("utils", "main.jl"))
 
 @testset "SP" begin
     println("Running SP...")

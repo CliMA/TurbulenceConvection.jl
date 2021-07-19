@@ -1,4 +1,8 @@
+import JSON
+using ArgParse
 import TurbulenceConvection
+include("Cases.jl")
+import .Cases
 
 mutable struct Simulation1d
     Gr
@@ -114,4 +118,32 @@ function main1d(namelist, paramlist, inpath=pwd(); time_run = false)
     end
     println("The simulation has completed.")
     return Simulation.Stats.path_plus_file
+end
+
+
+function parse_commandline()
+    s = ArgParseSettings(;description="Run case input")
+
+    @add_arg_table! s begin
+        "case_name"
+            help = "The case name"
+            arg_type = String
+            required = true
+    end
+
+    return parse_args(s)
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+
+    args = parse_commandline()
+    case_name = args["case_name"]
+
+    namelist = open("$case_name.in", "r") do io
+       JSON.parse(io; dicttype=Dict, inttype=Int64)
+    end
+    paramlist = open("paramlist_"*"$case_name.in", "r") do io
+       JSON.parse(io; dicttype=Dict, inttype=Int64)
+    end
+    main(namelist, paramlist)
 end

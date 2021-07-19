@@ -1,7 +1,33 @@
 module NameList
+
 #Adapated from PyCLES: https://github.com/pressel/pycles
+
+using ArgParse
+import JSON
+
 export default_namelist
-function default_namelist(case_name)
+
+function parse_commandline()
+    s = ArgParseSettings(;description="Namelist Generator")
+
+    @add_arg_table! s begin
+        "case_name"
+            help = "The case name"
+            arg_type = String
+            required = true
+    end
+
+    return parse_args(s)
+end
+
+function default_namelist(::Nothing)
+    args = parse_commandline()
+    case_name = args["case_name"]
+    return default_namelist(case_name)
+end
+
+function default_namelist(case_name::String)
+
     namelist_defaults = Dict()
     namelist_defaults["grid"] = Dict()
     namelist_defaults["grid"]["dims"] = 1
@@ -71,9 +97,10 @@ function default_namelist(case_name)
     elseif case_name == "DryBubble"
         namelist = DryBubble(namelist_defaults)
     else
-        error("Not a valid case name")
+        error("Not a valid case name in namelist")
     end
-    # write_file(namelist)
+    write_file(namelist)
+    return namelist
 end
 
 
@@ -273,27 +300,22 @@ function DryBubble(namelist_defaults)
     return namelist
 end
 
-# function write_file(namelist)
+function write_file(namelist)
 
-#     try
-#         type(namelist["meta"]["simname"])
-#     catch
-#         print("Casename not specified in namelist dictionary!")
-#         print("FatalError")
-#         exit()
-#     end
+    @assert haskey(namelist, "meta")
+    @assert haskey(namelist["meta"], "simname")
 
-#     namelist["meta"]["uuid"] = str(uuid.uuid4())
+    namelist["meta"]["uuid"] = basename(tempname())
 
-#     fh = open(namelist["meta"]["simname"] + ".in", "w")
-#     #pprint.pprint(namelist)
-#     json.dump(namelist, fh, sort_keys=true, indent=4)
-#     fh.close()
+    open(namelist["meta"]["simname"]*".in", "w") do io
+        JSON.print(io, namelist, 4)
+    end
 
-#     return
-# end
+    return
+end
 
-# if __name__ == "__main__"
-#     main()
+if abspath(PROGRAM_FILE) == @__FILE__
+    default_namelist(nothing)
+end
 
 end
