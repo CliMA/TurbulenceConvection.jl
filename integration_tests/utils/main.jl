@@ -14,21 +14,21 @@ mutable struct Simulation1d
     Stats
 end
 
-function Simulation1d(namelist, paramlist, inpath=pwd())
+function Simulation1d(namelist, paramlist, inpath = pwd())
     Gr = TurbulenceConvection.Grid(namelist)
     Ref = TurbulenceConvection.ReferenceState(Gr)
     GMV = TurbulenceConvection.GridMeanVariables(namelist, Gr, Ref)
     Case = Cases.CasesFactory(namelist, paramlist, Gr, Ref)
-    Turb = TurbulenceConvection.ParameterizationFactory(namelist,paramlist, Gr, Ref)
+    Turb = TurbulenceConvection.ParameterizationFactory(namelist, paramlist, Gr, Ref)
     TS = TurbulenceConvection.TimeStepping(namelist)
     Stats = TurbulenceConvection.NetCDFIO_Stats(namelist, paramlist, Gr, inpath)
-    return Simulation1d(Gr,Ref,GMV,Case,Turb,TS,Stats)
+    return Simulation1d(Gr, Ref, GMV, Case, Turb, TS, Stats)
 end
 
 function TurbulenceConvection.initialize(self::Simulation1d, namelist)
     Cases.initialize_reference(self.Case, self.Gr, self.Ref, self.Stats)
     Cases.initialize_profiles(self.Case, self.Gr, self.GMV, self.Ref)
-    Cases.initialize_surface(self.Case, self.Gr, self.Ref )
+    Cases.initialize_surface(self.Case, self.Gr, self.Ref)
     Cases.initialize_forcing(self.Case, self.Gr, self.Ref, self.GMV)
     Cases.initialize_radiation(self.Case, self.Gr, self.Ref, self.GMV)
     TurbulenceConvection.initialize(self.Turb, self.Case, self.GMV, self.Ref)
@@ -62,7 +62,7 @@ function run(self::Simulation1d)
         TurbulenceConvection.check_nans(self.GMV, self.Turb, "9")
 
         if mod(iter, 100) == 0
-            progress = self.TS.t/self.TS.t_max
+            progress = self.TS.t / self.TS.t_max
             @show progress
         end
         if mod(self.TS.t, self.Stats.frequency) == 0
@@ -76,7 +76,7 @@ function run(self::Simulation1d)
             TurbulenceConvection.io(self.Turb, self.Stats, self.TS) # #removeVarsHack
         end
         TurbulenceConvection.check_nans(self.GMV, self.Turb, "9")
-        iter+=1
+        iter += 1
     end
     TurbulenceConvection.close_files(self.Stats) # #removeVarsHack
     return
@@ -104,11 +104,11 @@ function force_io(self::Simulation1d)
     return
 end
 
-function main(namelist, paramlist, inpath=pwd(); kwargs...)
+function main(namelist, paramlist, inpath = pwd(); kwargs...)
     main1d(namelist, paramlist, inpath; kwargs...)
 end
 
-function main1d(namelist, paramlist, inpath=pwd(); time_run = false)
+function main1d(namelist, paramlist, inpath = pwd(); time_run = false)
     Simulation = Simulation1d(namelist, paramlist, inpath)
     TurbulenceConvection.initialize(Simulation, namelist)
     if time_run
@@ -122,13 +122,13 @@ end
 
 
 function parse_commandline()
-    s = ArgParseSettings(;description="Run case input")
+    s = ArgParseSettings(; description = "Run case input")
 
     @add_arg_table! s begin
         "case_name"
-            help = "The case name"
-            arg_type = String
-            required = true
+        help = "The case name"
+        arg_type = String
+        required = true
     end
 
     return parse_args(s)
@@ -140,10 +140,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
     case_name = args["case_name"]
 
     namelist = open("$case_name.in", "r") do io
-       JSON.parse(io; dicttype=Dict, inttype=Int64)
+        JSON.parse(io; dicttype = Dict, inttype = Int64)
     end
-    paramlist = open("paramlist_"*"$case_name.in", "r") do io
-       JSON.parse(io; dicttype=Dict, inttype=Int64)
+    paramlist = open("paramlist_" * "$case_name.in", "r") do io
+        JSON.parse(io; dicttype = Dict, inttype = Int64)
     end
     main(namelist, paramlist)
 end

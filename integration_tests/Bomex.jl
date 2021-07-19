@@ -36,10 +36,10 @@ best_mse["tke_mean"] = 3.2225602904370149e+01
                     "Bomex",
                     best_mse,
                     joinpath(dirname(ds_filename), "comparison");
-                    ds_turb_conv=ds,
-                    ds_scampy=ds_scampy,
-                    ds_pycles=ds_pycles,
-                    plot_comparison=true
+                    ds_turb_conv = ds,
+                    ds_scampy = ds_scampy,
+                    ds_pycles = ds_pycles,
+                    plot_comparison = true,
                 )
             end
         end
@@ -55,4 +55,3 @@ best_mse["tke_mean"] = 3.2225602904370149e+01
     test_mse(computed_mse, best_mse, "tke_mean")
     nothing
 end
-

@@ -8,13 +8,13 @@ import JSON
 export default_namelist
 
 function parse_commandline()
-    s = ArgParseSettings(;description="Namelist Generator")
+    s = ArgParseSettings(; description = "Namelist Generator")
 
     @add_arg_table! s begin
         "case_name"
-            help = "The case name"
-            arg_type = String
-            required = true
+        help = "The case name"
+        arg_type = String
+        required = true
     end
 
     return parse_args(s)
@@ -160,7 +160,7 @@ function life_cycle_Tan2018(namelist_defaults)
     namelist["grid"]["dz"] = 40.0
 
     namelist["time_stepping"]["dt"] = 30.0
-    namelist["time_stepping"]["t_max"] = 6*3600.0
+    namelist["time_stepping"]["t_max"] = 6 * 3600.0
     namelist["meta"]["simname"] = "life_cycle_Tan2018"
     namelist["meta"]["casename"] = "life_cycle_Tan2018"
 
@@ -210,7 +210,7 @@ function ARM_SGP(namelist_defaults)
     namelist = deepcopy(namelist_defaults)
 
     namelist["grid"]["nz"] = 88
-    namelist["grid"]["dz"] =  50.0
+    namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["dt"] = 10.0
     namelist["time_stepping"]["t_max"] = 3600.0 * 14.5
@@ -245,7 +245,7 @@ function DYCOMS_RF01(namelist_defaults)
     namelist["grid"]["dz"] = 50
 
     namelist["time_stepping"]["dt"] = 10.0
-    namelist["time_stepping"]["t_max"] = 60 * 60 * 16.
+    namelist["time_stepping"]["t_max"] = 60 * 60 * 16.0
     namelist["meta"]["simname"] = "DYCOMS_RF01"
     namelist["meta"]["casename"] = "DYCOMS_RF01"
 
@@ -307,7 +307,7 @@ function write_file(namelist)
 
     namelist["meta"]["uuid"] = basename(tempname())
 
-    open(namelist["meta"]["simname"]*".in", "w") do io
+    open(namelist["meta"]["simname"] * ".in", "w") do io
         JSON.print(io, namelist, 4)
     end
 

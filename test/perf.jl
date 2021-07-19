@@ -13,11 +13,11 @@ using .ParamList
 
 include(joinpath("integration_tests", "utils", "main.jl"))
 
-function run_main(; time_run=false)
+function run_main(; time_run = false)
     namelist = NameList.Bomex(default_namelist("Bomex"))
     paramlist = ParamList.Bomex(default_paramlist("Bomex"))
     namelist["meta"]["uuid"] = "01"
-    main(namelist, paramlist; time_run=time_run)
+    main(namelist, paramlist; time_run = time_run)
 end
 
 run_main() # run first to compile
