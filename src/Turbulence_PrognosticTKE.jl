@@ -1523,7 +1523,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         x[k] = self.EnvVar.QT.values[k + gw]
     end
     x[0] = x[0] + TS.dt * Case.Sur.rho_qtflux * dzi * ref_state(self).alpha0_half[gw] / ae[gw]
-    tridiag_solve(grid(self).nz, x, a, b, c)
+    x .= tridiag_solve(x, a, b, c)
 
     @inbounds for k in xrange(nz)
         GMV.QT.new[k + gw] = fmax(
@@ -1555,7 +1555,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         x[k] = self.EnvVar.H.values[k + gw]
     end
     x[0] = x[0] + TS.dt * Case.Sur.rho_hflux * dzi * ref_state(self).alpha0_half[gw] / ae[gw]
-    tridiag_solve(grid(self).nz, x, a, b, c)
+    x .= tridiag_solve(x, a, b, c)
     @inbounds for k in xrange(nz)
         GMV.H.new[k + gw] =
             GMV.H.mf_update[k + gw] +
@@ -1588,7 +1588,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         x[k] = GMV.U.values[k + gw]
     end
     x[0] = x[0] + TS.dt * Case.Sur.rho_uflux * dzi * ref_state(self).alpha0_half[gw] / ae[gw]
-    tridiag_solve(grid(self).nz, x, a, b, c)
+    x .= tridiag_solve(x, a, b, c)
 
     @inbounds for k in xrange(nz)
         GMV.U.new[k + gw] = x[k]
@@ -1610,7 +1610,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         x[k] = GMV.V.values[k + gw]
     end
     x[0] = x[0] + TS.dt * Case.Sur.rho_vflux * dzi * ref_state(self).alpha0_half[gw] / ae[gw]
-    tridiag_solve(grid(self).nz, x, a, b, c)
+    x .= tridiag_solve(x, a, b, c)
     @inbounds for k in xrange(nz)
         GMV.V.new[k + gw] = x[k]
     end
@@ -2425,7 +2425,7 @@ function update_covariance_ED(
         b[nz - 1] += c[nz - 1]
         c[nz - 1] = 0.0
     end
-    tridiag_solve(grid(self).nz, x, a, b, c)
+    x .= tridiag_solve(x, a, b, c)
 
     @inbounds for kk in xrange(nz)
         k = kk + gw

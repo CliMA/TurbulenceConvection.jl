@@ -13,14 +13,14 @@ using .NameList
 using .ParamList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 8.3714605287379840e-02
-best_mse["updraft_area"] = 7.0261471608838769e+02
-best_mse["updraft_w"] = 8.7816638538794919e+01
-best_mse["updraft_qt"] = 5.9507020645408675e+00
-best_mse["updraft_thetal"] = 2.3060117074268717e+01
-best_mse["v_mean"] = 1.2345803739170998e+02
-best_mse["u_mean"] = 5.3487302586046809e+01
-best_mse["tke_mean"] = 3.2225602904370149e+01
+best_mse["qt_mean"] = 8.2625377129815783e-02
+best_mse["updraft_area"] = 7.0269263421038499e+02
+best_mse["updraft_w"] = 8.7981763090171825e+01
+best_mse["updraft_qt"] = 5.9526663775057314e+00
+best_mse["updraft_thetal"] = 2.3059913728916317e+01
+best_mse["v_mean"] = 1.2340566846095439e+02
+best_mse["u_mean"] = 5.3487046322597514e+01
+best_mse["tke_mean"] = 3.2160344619556398e+01
 
 @testset "Bomex" begin
     println("Running Bomex...")

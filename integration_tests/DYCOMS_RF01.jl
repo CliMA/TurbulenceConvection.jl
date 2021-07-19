@@ -13,15 +13,15 @@ using .NameList
 using .ParamList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 3.8001673126194867e-02
-best_mse["ql_mean"] = 8.4578478184878048e+00
-best_mse["updraft_area"] = 2.2324280164372593e+02
-best_mse["updraft_w"] = 3.4444820774461329e+00
-best_mse["updraft_qt"] = 1.3810722649106608e+00
-best_mse["updraft_thetal"] = 1.2761175148454377e+01
-best_mse["v_mean"] = 4.0030908804636987e+01
-best_mse["u_mean"] = 3.5747541514399444e+01
-best_mse["tke_mean"] = 1.4604768548409767e+01
+best_mse["qt_mean"] = 3.8001673193763866e-02
+best_mse["ql_mean"] = 8.4578166019144572e+00
+best_mse["updraft_area"] = 2.2324268563051058e+02
+best_mse["updraft_w"] = 3.4444816188282350e+00
+best_mse["updraft_qt"] = 1.3810723356865693e+00
+best_mse["updraft_thetal"] = 1.2761175136065331e+01
+best_mse["v_mean"] = 4.0030908811727009e+01
+best_mse["u_mean"] = 3.5747541520730884e+01
+best_mse["tke_mean"] = 1.4604756459862408e+01
 
 
 @testset "DYCOMS_RF01" begin

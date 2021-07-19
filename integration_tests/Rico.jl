@@ -13,14 +13,14 @@ using .NameList
 using .ParamList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 4.0432375728696790e-01
-best_mse["updraft_area"] = 1.8875614747005029e+03
-best_mse["updraft_w"] = 4.7945553218441751e+02
-best_mse["updraft_qt"] = 2.3512519674647539e+01
-best_mse["updraft_thetal"] = 6.5601910609184642e+01
-best_mse["v_mean"] = 1.0614382605973881e+02
-best_mse["u_mean"] = 1.1383366513167900e+02
-best_mse["tke_mean"] = 8.9241612675577824e+02
+best_mse["qt_mean"] = 7.3916397957064728e-01
+best_mse["updraft_area"] = 1.8781080963701904e+03
+best_mse["updraft_w"] = 5.4859669497453456e+02
+best_mse["updraft_qt"] = 2.5617970556916582e+01
+best_mse["updraft_thetal"] = 6.5599432325182406e+01
+best_mse["v_mean"] = 1.0613497891486283e+02
+best_mse["u_mean"] = 1.1380626643864045e+02
+best_mse["tke_mean"] = 9.0963393857911535e+02
 
 @testset "Rico" begin
     println("Running Rico...")
