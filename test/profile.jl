@@ -23,4 +23,4 @@ end
 run_main() # run first to compile
 @profile run_main()
 # Profile.print()
-Profile.print(;format=:flat,sortedby=:count)
+Profile.print(; format = :flat, sortedby = :count)

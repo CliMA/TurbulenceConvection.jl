@@ -26,7 +26,7 @@ mutable struct ReferenceState{A1}
         Tg::Float64 = 0
         qtg::Float64 = 0
         sg::Float64 = 0
-        return new{typeof(p0)}(p0,p0_half,alpha0,alpha0_half,rho0,rho0_half,Pg,Tg,qtg,sg)
+        return new{typeof(p0)}(p0, p0_half, alpha0, alpha0_half, rho0, rho0_half, Pg, Tg, qtg, sg)
     end
 end
 
@@ -48,7 +48,7 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
     # determine the reference pressure
 
     function rhs(p, u, z)
-        ret =  eos(t_to_entropy_c, eos_first_guess_entropy, exp(p),  self.qtg, self.sg)
+        ret = eos(t_to_entropy_c, eos_first_guess_entropy, exp(p), self.qtg, self.sg)
         q_i = 0.0
         q_l = ret.ql
         T = ret.T
@@ -57,7 +57,8 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
 
     # We are integrating the log pressure so need to take the log of the
     # surface pressure
-    p0 = log(self.Pg); logp = p0
+    p0 = log(self.Pg)
+    logp = p0
 
     p = pyzeros(Gr.nzg)
     p_half = pyzeros(Gr.nzg)
@@ -69,19 +70,19 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
     @show z_span
     prob = ODEProblem(rhs, logp, z_span)
     sol = solve(prob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    p_0 = [exp(sol(Gr.z[k])) for k in Gr.gw-1:Gr.nzg-Gr.gw]
-    p_0_half = [exp(sol(Gr.z_half[k])) for k in Gr.gw-1:Gr.nzg-Gr.gw]
+    p_0 = [exp(sol(Gr.z[k])) for k in (Gr.gw - 1):(Gr.nzg - Gr.gw)]
+    p_0_half = [exp(sol(Gr.z_half[k])) for k in (Gr.gw - 1):(Gr.nzg - Gr.gw)]
 
-    p[Gr.gw-1:Gr.nzg-Gr.gw] .= p_0
-    p_half[Gr.gw-1:Gr.nzg-Gr.gw] .= p_0_half
+    p[(Gr.gw - 1):(Gr.nzg - Gr.gw)] .= p_0
+    p_half[(Gr.gw - 1):(Gr.nzg - Gr.gw)] .= p_0_half
 
     # Set boundary conditions
     # TODO: re-generalize
     p[0] = p[1]
-    p[end] = p[end-1]
+    p[end] = p[end - 1]
 
     p_half[0] = p_half[1]
-    p_half[end] = p_half[end-1]
+    p_half[end] = p_half[end - 1]
 
     p_ = deepcopy(p)
     p_half_ = deepcopy(p_half)
@@ -117,8 +118,8 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
     # saturation adjustment
     local s
     @inbounds for k in xrange(Gr.nzg)
-        s = t_to_entropy_c(p_half[k],temperature_half[k],self.qtg,ql_half[k],qi_half[k])
-        if abs(s - self.sg)/self.sg > 0.01
+        s = t_to_entropy_c(p_half[k], temperature_half[k], self.qtg, ql_half[k], qi_half[k])
+        if abs(s - self.sg) / self.sg > 0.01
             println("Error in reference profiles entropy not constant !")
             println("Likely error in saturation adjustment")
         end

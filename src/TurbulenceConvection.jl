@@ -12,7 +12,7 @@ using FastGaussQuadrature: gausshermite
 # For dispatching to inherited class
 struct BaseCase end
 
-up_sum(vals::OffsetArray) = off_arr(reshape(sum(vals; dims=1), size(vals, 2)))
+up_sum(vals::OffsetArray) = off_arr(reshape(sum(vals; dims = 1), size(vals, 2)))
 
 include("python_primitives.jl")
 include("parameters.jl")

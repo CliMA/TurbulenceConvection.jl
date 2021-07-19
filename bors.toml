@@ -1,5 +1,6 @@
 status = [
   "buildkite/turbulenceconvection-ci",
+  "format",
 ]
 delete_merged_branches = true
 timeout_sec = 10800

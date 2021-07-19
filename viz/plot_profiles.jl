@@ -9,7 +9,8 @@ function plot_profiles(ds_filename::String, group; kwargs...)
     end
 end
 
-function plot_profiles(ds,
+function plot_profiles(
+    ds,
     output_dir,
     group;
     skip_fields = [],
@@ -19,11 +20,7 @@ function plot_profiles(ds,
     skip_all_zeros_data = true,
 )
     mkpath(output_dir)
-    @assert any((
-        group == "profiles",
-        group == "reference",
-        group == "timeseries",
-    ))
+    @assert any((group == "profiles", group == "reference", group == "timeseries"))
     z = ds.group["profiles"]["z"][:]
     z_half = ds.group["profiles"]["z"][:]
     time = ds.group[group]["t"]
@@ -31,14 +28,14 @@ function plot_profiles(ds,
     t_start = ((time .- 3600) .> 0)[1][1]
 
     for var in keys(ds.group[group])
-        var=="z" && continue
-        var=="z_half" && continue
-        var=="t" && continue
+        var == "z" && continue
+        var == "z_half" && continue
+        var == "t" && continue
         var in skip_fields && continue
 
         values = ds.group[group][var][:]
-        figname = "profile_"*var
-        yvals = mean(values[:,t_start+1:t_end], dims = 2)
+        figname = "profile_" * var
+        yvals = mean(values[:, (t_start + 1):t_end], dims = 2)
         yvals = reshape(yvals, length(yvals))
         if skip_all_zeros_data && all(values .≈ 0)
             @warn "Skipping $var, since all data is 0"
@@ -46,29 +43,18 @@ function plot_profiles(ds,
         else
             println("Plotting $var...")
         end
-        plot(
-            yvals,
-            z;
-            label = "TurbConv.jl",
-
-        )
+        plot(yvals, z; label = "TurbConv.jl")
         xlabel!(var)
         ylabel!("height (m)")
-        fname = joinpath(output_dir,figname*".png")
-        isfile(fname) && rm(fname; force=true)
+        fname = joinpath(output_dir, figname * ".png")
+        isfile(fname) && rm(fname; force = true)
         savefig(fname)
 
         skip_contours && continue
-        figname = "contours_"*var
-        contourf(
-            time[:], z, values;
-            xlabel = var,
-            ylabel = "height (m)",
-            c = :viridis
-        )
+        figname = "contours_" * var
+        contourf(time[:], z, values; xlabel = var, ylabel = "height (m)", c = :viridis)
         xlabel!(var)
         ylabel!("height (m)")
-        savefig(joinpath(output_dir,figname*".png"))
+        savefig(joinpath(output_dir, figname * ".png"))
     end
 end
-

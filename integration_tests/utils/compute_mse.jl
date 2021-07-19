@@ -65,10 +65,10 @@ function compute_mse(
     experiment,
     best_mse,
     foldername;
-    ds_scampy=nothing,
-    ds_pycles=nothing,
-    ds_turb_conv=nothing,
-    plot_comparison=true,
+    ds_scampy = nothing,
+    ds_pycles = nothing,
+    ds_turb_conv = nothing,
+    plot_comparison = true,
 )
     mse = Dict()
     time_tcc = ds_turb_conv.group["timeseries"]["t"][:]
@@ -159,45 +159,17 @@ function compute_mse(
         # Plot comparison
         if plot_comparison
             p = plot()
-            plot!(
-                data_les_cont_mapped,
-                z_tcc ./ 10^3,
-                xlabel = tc_var,
-                ylabel = "z [km]",
-                label = "PyCLES",
-            )
-            plot!(
-                data_tcc_cont_mapped,
-                z_tcc ./ 10^3,
-                xlabel = tc_var,
-                ylabel = "z [km]",
-                label = "TC.jl",
-            )
-            plot!(
-                data_scm_cont_mapped,
-                z_tcc ./ 10^3,
-                xlabel = tc_var,
-                ylabel = "z [km]",
-                label = "SCAMPy",
-            )
+            plot!(data_les_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "PyCLES")
+            plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "TC.jl")
+            plot!(data_scm_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "SCAMPy")
             @info "Saving $(joinpath(foldername, "$tc_var.png"))"
             savefig(joinpath(foldername, "profile_$tc_var.png"))
 
-            contourf(
-                time_scm, z_scm, data_scm_arr';
-                xlabel = tc_var,
-                ylabel = "height (m)",
-                c = :viridis
-            )
-            savefig(joinpath(foldername,"contours_"*tc_var*"_scampy"*".png"))
+            contourf(time_scm, z_scm, data_scm_arr'; xlabel = tc_var, ylabel = "height (m)", c = :viridis)
+            savefig(joinpath(foldername, "contours_" * tc_var * "_scampy" * ".png"))
 
-            contourf(
-                time_tcc, z_tcc, data_tcc_arr';
-                xlabel = tc_var,
-                ylabel = "height (m)",
-                c = :viridis
-            )
-            savefig(joinpath(foldername,"contours_"*tc_var*"_tc"*".png"))
+            contourf(time_tcc, z_tcc, data_tcc_arr'; xlabel = tc_var, ylabel = "height (m)", c = :viridis)
+            savefig(joinpath(foldername, "contours_" * tc_var * "_tc" * ".png"))
         end
 
         # Compute mean squared error (mse)
@@ -234,34 +206,18 @@ function compute_mse(
         mse_reductions,
     )
 
-    @info @sprintf(
-        "Experiment comparison: %s at time t=%s\n",
-        experiment,
-        t_cmp
-    )
-    hl_worsened_mse = Highlighter(
-        (data, i, j) -> !sufficient_mse(data[i, 6], data[i, 7]) && j == 6,
-        crayon"red bold",
-    )
-    hl_worsened_mse_reduction = Highlighter(
-        (data, i, j) -> !sufficient_mse(data[i, 6], data[i, 7]) && j == 8,
-        crayon"red bold",
-    )
-    hl_improved_mse = Highlighter(
-        (data, i, j) -> sufficient_mse(data[i, 6], data[i, 7]) && j == 8,
-        crayon"green bold",
-    )
+    @info @sprintf("Experiment comparison: %s at time t=%s\n", experiment, t_cmp)
+    hl_worsened_mse = Highlighter((data, i, j) -> !sufficient_mse(data[i, 6], data[i, 7]) && j == 6, crayon"red bold")
+    hl_worsened_mse_reduction =
+        Highlighter((data, i, j) -> !sufficient_mse(data[i, 6], data[i, 7]) && j == 8, crayon"red bold")
+    hl_improved_mse = Highlighter((data, i, j) -> sufficient_mse(data[i, 6], data[i, 7]) && j == 8, crayon"green bold")
     pretty_table(
         table_data,
         header,
         formatters = ft_printf("%.16e", 6:7),
         header_crayon = crayon"yellow bold",
         subheader_crayon = crayon"green bold",
-        highlighters = (
-            hl_worsened_mse,
-            hl_improved_mse,
-            hl_worsened_mse_reduction,
-        ),
+        highlighters = (hl_worsened_mse, hl_improved_mse, hl_worsened_mse_reduction),
         crop = :none,
     )
 

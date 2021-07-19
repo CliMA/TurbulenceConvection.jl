@@ -109,8 +109,8 @@ end
 initialize_reference(self::CasesBase, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats, ::BaseCase) = nothing
 initialize_profiles(self::CasesBase, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState, ::BaseCase) = nothing
 initialize_surface(self::CasesBase, Gr::Grid, Ref::ReferenceState, ::BaseCase) = nothing
-initialize_forcing(self::CasesBase, Gr::Grid,  Ref::ReferenceState, GMV::GridMeanVariables, ::BaseCase) = nothing
-initialize_radiation(self::CasesBase, Gr::Grid,  Ref::ReferenceState, GMV::GridMeanVariables, ::BaseCase) = nothing
+initialize_forcing(self::CasesBase, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables, ::BaseCase) = nothing
+initialize_radiation(self::CasesBase, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables, ::BaseCase) = nothing
 
 function TurbulenceConvection.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
     add_ts(Stats, "Tsurface")
@@ -126,42 +126,39 @@ function TurbulenceConvection.io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseC
 end
 
 update_surface(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping, ::BaseCase) = nothing
-update_forcing(self::CasesBase, GMV::GridMeanVariables,  TS::TimeStepping, ::BaseCase) = nothing
-update_radiation(self::CasesBase, GMV::GridMeanVariables,  TS::TimeStepping, ::BaseCase) = nothing
+update_forcing(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping, ::BaseCase) = nothing
+update_radiation(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping, ::BaseCase) = nothing
 
 
 function Soares(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "Soares2004"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(;Gr, Ref)
-    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(; Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
-    return TurbulenceConvection.CasesBase{SoaresCase}(
-        ;casename = "SoaresCase", inversion_option, Sur, Fo, Rad)
+    return TurbulenceConvection.CasesBase{SoaresCase}(; casename = "SoaresCase", inversion_option, Sur, Fo, Rad)
 end
-function initialize_reference(self::CasesBase{SoaresCase},
-    Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
+function initialize_reference(self::CasesBase{SoaresCase}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
     Ref.Pg = 1000.0 * 100.0
     Ref.qtg = 5.0e-3
     Ref.Tg = 300.0
     initialize(Ref, Gr, Stats)
 end
-function initialize_profiles(self::CasesBase{SoaresCase},
-    Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize_profiles(self::CasesBase{SoaresCase}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
     theta = TurbulenceConvection.pyzeros(Gr.nzg)
     ql = 0.0
     qi = 0.0
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         if Gr.z_half[k] <= 1350.0
-            GMV.QT.values[k] = 5.0e-3 - 3.7e-4* Gr.z_half[k]/1000.0
+            GMV.QT.values[k] = 5.0e-3 - 3.7e-4 * Gr.z_half[k] / 1000.0
             theta[k] = 300.0
 
         else
-            GMV.QT.values[k] = 5.0e-3 - 3.7e-4 * 1.35 - 9.4e-4 * (Gr.z_half[k]-1350.0)/1000.0
-            theta[k] = 300.0 + 2.0 * (Gr.z_half[k]-1350.0)/1000.0
+            GMV.QT.values[k] = 5.0e-3 - 3.7e-4 * 1.35 - 9.4e-4 * (Gr.z_half[k] - 1350.0) / 1000.0
+            theta[k] = 300.0 + 2.0 * (Gr.z_half[k] - 1350.0) / 1000.0
         end
         GMV.U.values[k] = 0.01
     end
@@ -169,9 +166,9 @@ function initialize_profiles(self::CasesBase{SoaresCase},
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
 
-    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         GMV.H.values[k] = theta[k]
-        GMV.T.values[k] =  theta[k] * exner_c(Ref.p0_half[k])
+        GMV.T.values[k] = theta[k] * exner_c(Ref.p0_half[k])
         GMV.THL.values[k] = theta[k]
     end
 
@@ -180,25 +177,26 @@ function initialize_profiles(self::CasesBase{SoaresCase},
     satadjust(GMV)
 end
 
-function initialize_surface(self::CasesBase{SoaresCase},
-    Gr::Grid, Ref::ReferenceState)
+function initialize_surface(self::CasesBase{SoaresCase}, Gr::Grid, Ref::ReferenceState)
     self.Sur.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     self.Sur.Tsurface = 300.0
     self.Sur.qsurface = 5.0e-3
     theta_flux = 6.0e-2
     qt_flux = 2.5e-5
     theta_surface = self.Sur.Tsurface
-    self.Sur.lhf = qt_flux * Ref.rho0[Gr.gw-1] * latent_heat(self.Sur.Tsurface) # It would be 0.0 if we follow Nieuwstadt.
-    self.Sur.shf = theta_flux * cpm_c(self.Sur.qsurface) * Ref.rho0[Gr.gw-1]
+    self.Sur.lhf = qt_flux * Ref.rho0[Gr.gw - 1] * latent_heat(self.Sur.Tsurface) # It would be 0.0 if we follow Nieuwstadt.
+    self.Sur.shf = theta_flux * cpm_c(self.Sur.qsurface) * Ref.rho0[Gr.gw - 1]
     self.Sur.ustar_fixed = false
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
-    self.Sur.bflux   =  g * ((theta_flux + (eps_vi - 1.0) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux))
-                             / (theta_surface * (1.0 + (eps_vi-1) * self.Sur.qsurface)))
+    self.Sur.bflux =
+        g * (
+            (theta_flux + (eps_vi - 1.0) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
+            (theta_surface * (1.0 + (eps_vi - 1) * self.Sur.qsurface))
+        )
     initialize(self.Sur)
 end
-function initialize_forcing(self::CasesBase{SoaresCase},
-    Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{SoaresCase}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
@@ -224,19 +222,18 @@ function update_forcing(self::CasesBase{SoaresCase}, GMV::GridMeanVariables, TS:
 end
 
 function update_radiation(self::CasesBase{SoaresCase}, GMV::GridMeanVariables, TS::TimeStepping)
-   update(self.Rad, GMV)
+    update(self.Rad, GMV)
 end
 
 function Nieuwstadt(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "Nieuwstadt"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(;Gr, Ref)
-    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(; Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
-    return TurbulenceConvection.CasesBase{Nieuwstadt}(
-        ;casename = "Nieuwstadt", inversion_option, Sur, Fo, Rad)
+    return TurbulenceConvection.CasesBase{Nieuwstadt}(; casename = "Nieuwstadt", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -250,14 +247,14 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, Gr::Grid, GMV::GridMea
     ql = 0.0
     qi = 0.0
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         if Gr.z_half[k] <= 1350.0
             GMV.QT.values[k] = 0.0
             theta[k] = 300.0
 
         else
             GMV.QT.values[k] = 0.0
-            theta[k] = 300.0 + 3.0 * (Gr.z_half[k]-1350.0)/1000.0
+            theta[k] = 300.0 + 3.0 * (Gr.z_half[k] - 1350.0) / 1000.0
         end
         GMV.U.values[k] = 0.01
     end
@@ -265,16 +262,16 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, Gr::Grid, GMV::GridMea
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
 
-    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         GMV.H.values[k] = theta[k]
-        GMV.T.values[k] =  theta[k] * exner_c(Ref.p0_half[k])
-        GMV.THL.values[k] = theta[k] 
+        GMV.T.values[k] = theta[k] * exner_c(Ref.p0_half[k])
+        GMV.THL.values[k] = theta[k]
     end
     set_bcs(GMV.H, Gr)
     set_bcs(GMV.T, Gr)
     satadjust(GMV)
 end
-function initialize_surface(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::ReferenceState )
+function initialize_surface(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::ReferenceState)
     self.Sur.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     self.Sur.Tsurface = 300.0
     self.Sur.qsurface = 0.0
@@ -282,12 +279,15 @@ function initialize_surface(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::Referenc
     qt_flux = 0.0
     theta_surface = self.Sur.Tsurface
     self.Sur.lhf = 0.0 # It would be 0.0 if we follow Nieuwstadt.
-    self.Sur.shf = theta_flux * cpm_c(self.Sur.qsurface) * Ref.rho0[Gr.gw-1]
+    self.Sur.shf = theta_flux * cpm_c(self.Sur.qsurface) * Ref.rho0[Gr.gw - 1]
     self.Sur.ustar_fixed = false
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
-    self.Sur.bflux   =  g * ((theta_flux + (eps_vi - 1.0) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux))
-                             / (theta_surface * (1.0 + (eps_vi-1) * self.Sur.qsurface)))
+    self.Sur.bflux =
+        g * (
+            (theta_flux + (eps_vi - 1.0) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
+            (theta_surface * (1.0 + (eps_vi - 1) * self.Sur.qsurface))
+        )
     initialize(self.Sur)
 
     return
@@ -315,20 +315,19 @@ function update_forcing(self::CasesBase{Nieuwstadt}, GMV::GridMeanVariables, TS:
     update(self.Fo, GMV)
 end
 function update_radiation(self::CasesBase{Nieuwstadt}, GMV::GridMeanVariables, TS::TimeStepping)
-   update(self.Rad, GMV)
+    update(self.Rad, GMV)
 end
 
 function Bomex(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "Bomex"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
-    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
     Fo.apply_subsidence = true
-    return TurbulenceConvection.CasesBase{BomexCase}(
-        ;casename = "Bomex", inversion_option, Sur, Fo, Rad)
+    return TurbulenceConvection.CasesBase{BomexCase}(; casename = "Bomex", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{BomexCase}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -340,39 +339,39 @@ end
 
 function initialize_profiles(self::CasesBase{BomexCase}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
     thetal = TurbulenceConvection.pyzeros(Gr.nzg)
-    ql=0.0
-    qi =0.0 # IC of Bomex is cloud-free
+    ql = 0.0
+    qi = 0.0 # IC of Bomex is cloud-free
 
     theta_pert = 0.0
     qt_pert = 0.0
 
-    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         #Set Thetal profile
-        if Gr.z_half[k] <= 520.
+        if Gr.z_half[k] <= 520.0
             thetal[k] = 298.7
         end
         if Gr.z_half[k] > 520.0 && Gr.z_half[k] <= 1480.0
-            thetal[k] = 298.7 + (Gr.z_half[k] - 520)  * (302.4 - 298.7)/(1480.0 - 520.0)
+            thetal[k] = 298.7 + (Gr.z_half[k] - 520) * (302.4 - 298.7) / (1480.0 - 520.0)
         end
         if Gr.z_half[k] > 1480.0 && Gr.z_half[k] <= 2000
-            thetal[k] = 302.4 + (Gr.z_half[k] - 1480.0) * (308.2 - 302.4)/(2000.0 - 1480.0)
+            thetal[k] = 302.4 + (Gr.z_half[k] - 1480.0) * (308.2 - 302.4) / (2000.0 - 1480.0)
         end
         if Gr.z_half[k] > 2000.0
-            thetal[k] = 308.2 + (Gr.z_half[k] - 2000.0) * (311.85 - 308.2)/(3000.0 - 2000.0)
+            thetal[k] = 308.2 + (Gr.z_half[k] - 2000.0) * (311.85 - 308.2) / (3000.0 - 2000.0)
         end
 
         #Set qt profile
         if Gr.z_half[k] <= 520
-            GMV.QT.values[k] = (17.0 + (Gr.z_half[k]) * (16.3-17.0)/520.0)/1000.0
+            GMV.QT.values[k] = (17.0 + (Gr.z_half[k]) * (16.3 - 17.0) / 520.0) / 1000.0
         end
         if Gr.z_half[k] > 520.0 && Gr.z_half[k] <= 1480.0
-            GMV.QT.values[k] = (16.3 + (Gr.z_half[k] - 520.0)*(10.7 - 16.3)/(1480.0 - 520.0))/1000.0
+            GMV.QT.values[k] = (16.3 + (Gr.z_half[k] - 520.0) * (10.7 - 16.3) / (1480.0 - 520.0)) / 1000.0
         end
         if Gr.z_half[k] > 1480.0 && Gr.z_half[k] <= 2000.0
-            GMV.QT.values[k] = (10.7 + (Gr.z_half[k] - 1480.0) * (4.2 - 10.7)/(2000.0 - 1480.0))/1000.0
+            GMV.QT.values[k] = (10.7 + (Gr.z_half[k] - 1480.0) * (4.2 - 10.7) / (2000.0 - 1480.0)) / 1000.0
         end
         if Gr.z_half[k] > 2000.0
-            GMV.QT.values[k] = (4.2 + (Gr.z_half[k] - 2000.0) * (3.0 - 4.2)/(3000.0  - 2000.0))/1000.0
+            GMV.QT.values[k] = (4.2 + (Gr.z_half[k] - 2000.0) * (3.0 - 4.2) / (3000.0 - 2000.0)) / 1000.0
         end
 
 
@@ -381,13 +380,13 @@ function initialize_profiles(self::CasesBase{BomexCase}, Gr::Grid, GMV::GridMean
             GMV.U.values[k] = -8.75
         end
         if Gr.z_half[k] > 700.0
-            GMV.U.values[k] = -8.75 + (Gr.z_half[k] - 700.0) * (-4.61 - -8.75)/(3000.0 - 700.0)
+            GMV.U.values[k] = -8.75 + (Gr.z_half[k] - 700.0) * (-4.61 - -8.75) / (3000.0 - 700.0)
         end
     end
 
-    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         GMV.H.values[k] = thetal[k]
-        GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k])
+        GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
         GMV.THL.values[k] = thetal[k]
     end
     set_bcs(GMV.U, Gr)
@@ -401,8 +400,8 @@ function initialize_surface(self::CasesBase{BomexCase}, Gr::Grid, Ref::Reference
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.Tsurface = 299.1 * exner_c(Ref.Pg)
     self.Sur.qsurface = 22.45e-3 # kg/kg
-    self.Sur.lhf = 5.2e-5 * Ref.rho0[Gr.gw-1] * latent_heat(self.Sur.Tsurface)
-    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * Ref.rho0[Gr.gw-1]
+    self.Sur.lhf = 5.2e-5 * Ref.rho0[Gr.gw - 1] * latent_heat(self.Sur.Tsurface)
+    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * Ref.rho0[Gr.gw - 1]
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # m/s
     self.Sur.Gr = Gr
@@ -414,15 +413,16 @@ function initialize_forcing(self::CasesBase{BomexCase}, Gr::Grid, Ref::Reference
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-    @inbounds for k in xrange(Gr.gw, Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         # Geostrophic velocity profiles. vg = 0
-        self.Fo.ug[k] = -10.0 + (1.8e-3)*Gr.z_half[k]
+        self.Fo.ug[k] = -10.0 + (1.8e-3) * Gr.z_half[k]
         # Set large-scale cooling
         if Gr.z_half[k] <= 1500.0
-            self.Fo.dTdt[k] =  (-2.0/(3600 * 24.0))  * exner_c(Ref.p0_half[k])
+            self.Fo.dTdt[k] = (-2.0 / (3600 * 24.0)) * exner_c(Ref.p0_half[k])
         else
-            self.Fo.dTdt[k] = (-2.0/(3600 * 24.0) + (Gr.z_half[k] - 1500.0)
-                                * (0.0 - -2.0/(3600 * 24.0)) / (3000.0 - 1500.0)) * exner_c(Ref.p0_half[k])
+            self.Fo.dTdt[k] =
+                (-2.0 / (3600 * 24.0) + (Gr.z_half[k] - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) *
+                exner_c(Ref.p0_half[k])
         end
 
         # Set large-scale drying
@@ -430,15 +430,15 @@ function initialize_forcing(self::CasesBase{BomexCase}, Gr::Grid, Ref::Reference
             self.Fo.dqtdt[k] = -1.2e-8   #kg/(kg * s)
         end
         if Gr.z_half[k] > 300.0 && Gr.z_half[k] <= 500.0
-            self.Fo.dqtdt[k] = -1.2e-8 + (Gr.z_half[k] - 300.0)*(0.0 - -1.2e-8)/(500.0 - 300.0) #kg/(kg * s)
+            self.Fo.dqtdt[k] = -1.2e-8 + (Gr.z_half[k] - 300.0) * (0.0 - -1.2e-8) / (500.0 - 300.0) #kg/(kg * s)
         end
 
         #Set large scale subsidence
         if Gr.z_half[k] <= 1500.0
-            self.Fo.subsidence[k] = 0.0 + Gr.z_half[k]*(-0.65/100.0 - 0.0)/(1500.0 - 0.0)
+            self.Fo.subsidence[k] = 0.0 + Gr.z_half[k] * (-0.65 / 100.0 - 0.0) / (1500.0 - 0.0)
         end
         if Gr.z_half[k] > 1500.0 && Gr.z_half[k] <= 2100.0
-            self.Fo.subsidence[k] = -0.65/100 + (Gr.z_half[k] - 1500.0)* (0.0 - -0.65/100.0)/(2100.0 - 1500.0)
+            self.Fo.subsidence[k] = -0.65 / 100 + (Gr.z_half[k] - 1500.0) * (0.0 - -0.65 / 100.0) / (2100.0 - 1500.0)
         end
     end
     return nothing
@@ -450,29 +450,30 @@ end
 TurbulenceConvection.initialize_io(self::CasesBase{BomexCase}, Stats::NetCDFIO_Stats) =
     initialize_io(self, Stats, BaseCase())
 
-TurbulenceConvection.io(self::CasesBase{BomexCase}, Stats::NetCDFIO_Stats) =
-    io(self, Stats, BaseCase())
+TurbulenceConvection.io(self::CasesBase{BomexCase}, Stats::NetCDFIO_Stats) = io(self, Stats, BaseCase())
 
-update_surface(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepping) =
-    update(self.Sur, GMV)
+update_surface(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Sur, GMV)
 
-update_forcing(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepping) =
-    update(self.Fo, GMV)
-update_radiation(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepping) =
-   update(self.Rad, GMV)
+update_forcing(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Fo, GMV)
+update_radiation(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Rad, GMV)
 
 
 function life_cycle_Tan2018(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "life_cycle_Tan2018"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
-    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
     Fo.apply_subsidence = true
-    return TurbulenceConvection.CasesBase{life_cycle_Tan2018}(
-        ;casename = "life_cycle_Tan2018", inversion_option, Sur, Fo, Rad)
+    return TurbulenceConvection.CasesBase{life_cycle_Tan2018}(;
+        casename = "life_cycle_Tan2018",
+        inversion_option,
+        Sur,
+        Fo,
+        Rad,
+    )
 end
 function initialize_reference(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
     Ref.Pg = 1.015e5  #Pressure at ground
@@ -482,35 +483,35 @@ function initialize_reference(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref
 end
 function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
     thetal = TurbulenceConvection.pyzeros(Gr.nzg)
-    ql=0.0
-    qi =0.0 # IC of Bomex is cloud-free
-  @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+    ql = 0.0
+    qi = 0.0 # IC of Bomex is cloud-free
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         #Set Thetal profile
-        if Gr.z_half[k] <= 520.
+        if Gr.z_half[k] <= 520.0
             thetal[k] = 298.7
         end
         if Gr.z_half[k] > 520.0 && Gr.z_half[k] <= 1480.0
-            thetal[k] = 298.7 + (Gr.z_half[k] - 520)  * (302.4 - 298.7)/(1480.0 - 520.0)
+            thetal[k] = 298.7 + (Gr.z_half[k] - 520) * (302.4 - 298.7) / (1480.0 - 520.0)
         end
         if Gr.z_half[k] > 1480.0 && Gr.z_half[k] <= 2000
-            thetal[k] = 302.4 + (Gr.z_half[k] - 1480.0) * (308.2 - 302.4)/(2000.0 - 1480.0)
+            thetal[k] = 302.4 + (Gr.z_half[k] - 1480.0) * (308.2 - 302.4) / (2000.0 - 1480.0)
         end
         if Gr.z_half[k] > 2000.0
-            thetal[k] = 308.2 + (Gr.z_half[k] - 2000.0) * (311.85 - 308.2)/(3000.0 - 2000.0)
+            thetal[k] = 308.2 + (Gr.z_half[k] - 2000.0) * (311.85 - 308.2) / (3000.0 - 2000.0)
         end
 
         #Set qt profile
         if Gr.z_half[k] <= 520
-            GMV.QT.values[k] = (17.0 + (Gr.z_half[k]) * (16.3-17.0)/520.0)/1000.0
+            GMV.QT.values[k] = (17.0 + (Gr.z_half[k]) * (16.3 - 17.0) / 520.0) / 1000.0
         end
         if Gr.z_half[k] > 520.0 && Gr.z_half[k] <= 1480.0
-            GMV.QT.values[k] = (16.3 + (Gr.z_half[k] - 520.0)*(10.7 - 16.3)/(1480.0 - 520.0))/1000.0
+            GMV.QT.values[k] = (16.3 + (Gr.z_half[k] - 520.0) * (10.7 - 16.3) / (1480.0 - 520.0)) / 1000.0
         end
         if Gr.z_half[k] > 1480.0 && Gr.z_half[k] <= 2000.0
-            GMV.QT.values[k] = (10.7 + (Gr.z_half[k] - 1480.0) * (4.2 - 10.7)/(2000.0 - 1480.0))/1000.0
+            GMV.QT.values[k] = (10.7 + (Gr.z_half[k] - 1480.0) * (4.2 - 10.7) / (2000.0 - 1480.0)) / 1000.0
         end
         if Gr.z_half[k] > 2000.0
-            GMV.QT.values[k] = (4.2 + (Gr.z_half[k] - 2000.0) * (3.0 - 4.2)/(3000.0  - 2000.0))/1000.0
+            GMV.QT.values[k] = (4.2 + (Gr.z_half[k] - 2000.0) * (3.0 - 4.2) / (3000.0 - 2000.0)) / 1000.0
         end
 
 
@@ -519,15 +520,15 @@ function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, GMV:
             GMV.U.values[k] = -8.75
         end
         if Gr.z_half[k] > 700.0
-            GMV.U.values[k] = -8.75 + (Gr.z_half[k] - 700.0) * (-4.61 - -8.75)/(3000.0 - 700.0)
+            GMV.U.values[k] = -8.75 + (Gr.z_half[k] - 700.0) * (-4.61 - -8.75) / (3000.0 - 700.0)
         end
     end
 
 
-      @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-            GMV.H.values[k] = thetal[k]
-            GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k])
-            GMV.THL.values[k] = thetal[k]
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+        GMV.H.values[k] = thetal[k]
+        GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
+        GMV.THL.values[k] = thetal[k]
     end
 
     set_bcs(GMV.U, Gr)
@@ -541,51 +542,62 @@ function initialize_surface(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.Tsurface = 299.1 * exner_c(Ref.Pg)
     self.Sur.qsurface = 22.45e-3 # kg/kg
-    self.Sur.lhf = 5.2e-5 * Ref.rho0[Gr.gw-1] * latent_heat(self.Sur.Tsurface)
-    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * Ref.rho0[Gr.gw-1]
+    self.Sur.lhf = 5.2e-5 * Ref.rho0[Gr.gw - 1] * latent_heat(self.Sur.Tsurface)
+    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * Ref.rho0[Gr.gw - 1]
     self.lhf0 = self.Sur.lhf
     self.shf0 = self.Sur.shf
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # m/s
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
-    self.Sur.bflux = (g * ((8.0e-3 + (eps_vi-1.0)*(299.1 * 5.2e-5  + 22.45e-3 * 8.0e-3)) /(299.1 * (1.0 + (eps_vi-1) * 22.45e-3))))
+    self.Sur.bflux = (
+        g * (
+            (8.0e-3 + (eps_vi - 1.0) * (299.1 * 5.2e-5 + 22.45e-3 * 8.0e-3)) /
+            (299.1 * (1.0 + (eps_vi - 1) * 22.45e-3))
+        )
+    )
     initialize(self.Sur)
 end
 function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-  @inbounds for k in xrange(Gr.gw, Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         # Geostrophic velocity profiles. vg = 0
-        self.Fo.ug[k] = -10.0 + (1.8e-3)*Gr.z_half[k]
+        self.Fo.ug[k] = -10.0 + (1.8e-3) * Gr.z_half[k]
         # Set large-scale cooling
         if Gr.z_half[k] <= 1500.0
-            self.Fo.dTdt[k] =  (-2.0/(3600 * 24.0))  * exner_c(Ref.p0_half[k])
+            self.Fo.dTdt[k] = (-2.0 / (3600 * 24.0)) * exner_c(Ref.p0_half[k])
         else
-            self.Fo.dTdt[k] = (-2.0/(3600 * 24.0) + (Gr.z_half[k] - 1500.0)
-                                * (0.0 - -2.0/(3600 * 24.0)) / (3000.0 - 1500.0)) * exner_c(Ref.p0_half[k])
+            self.Fo.dTdt[k] =
+                (-2.0 / (3600 * 24.0) + (Gr.z_half[k] - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) *
+                exner_c(Ref.p0_half[k])
         end
         # Set large-scale drying
         if Gr.z_half[k] <= 300.0
             self.Fo.dqtdt[k] = -1.2e-8   #kg/(kg * s)
         end
         if Gr.z_half[k] > 300.0 && Gr.z_half[k] <= 500.0
-            self.Fo.dqtdt[k] = -1.2e-8 + (Gr.z_half[k] - 300.0)*(0.0 - -1.2e-8)/(500.0 - 300.0) #kg/(kg * s)
+            self.Fo.dqtdt[k] = -1.2e-8 + (Gr.z_half[k] - 300.0) * (0.0 - -1.2e-8) / (500.0 - 300.0) #kg/(kg * s)
         end
 
         #Set large scale subsidence
         if Gr.z_half[k] <= 1500.0
-            self.Fo.subsidence[k] = 0.0 + Gr.z_half[k]*(-0.65/100.0 - 0.0)/(1500.0 - 0.0)
+            self.Fo.subsidence[k] = 0.0 + Gr.z_half[k] * (-0.65 / 100.0 - 0.0) / (1500.0 - 0.0)
         end
         if Gr.z_half[k] > 1500.0 && Gr.z_half[k] <= 2100.0
-            self.Fo.subsidence[k] = -0.65/100 + (Gr.z_half[k] - 1500.0)* (0.0 - -0.65/100.0)/(2100.0 - 1500.0)
+            self.Fo.subsidence[k] = -0.65 / 100 + (Gr.z_half[k] - 1500.0) * (0.0 - -0.65 / 100.0) / (2100.0 - 1500.0)
         end
     end
     return nothing
 end
 
-function initialize_radiation(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_radiation(
+    self::CasesBase{life_cycle_Tan2018},
+    Gr::Grid,
+    Ref::ReferenceState,
+    GMV::GridMeanVariables,
+)
     initialize(self.Rad, GMV)
 end
 
@@ -594,73 +606,77 @@ function TurbulenceConvection.initialize_io(self::CasesBase{life_cycle_Tan2018},
     initialize_io(self, Stats, BaseCase())
 end
 function TurbulenceConvection.io(self::CasesBase{life_cycle_Tan2018}, Stats::NetCDFIO_Stats)
-    io(self,Stats, BaseCase())
+    io(self, Stats, BaseCase())
 end
 function update_surface(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVariables, TS::TimeStepping)
     weight = 1.0
-    weight_factor = 0.01 + 0.99 *(cos(2.0*pi * TS.t /3600.0) + 1.0)/2.0
+    weight_factor = 0.01 + 0.99 * (cos(2.0 * pi * TS.t / 3600.0) + 1.0) / 2.0
     weight = weight * weight_factor
-    self.Sur.lhf = self.lhf0*weight
-    self.Sur.shf = self.shf0*weight
-    self.Sur.bflux = (g * ((8.0e-3*weight + (eps_vi-1.0)*(299.1 * 5.2e-5*weight  + 22.45e-3 * 8.0e-3*weight)) /(299.1 * (1.0 + (eps_vi-1) * 22.45e-3))))
+    self.Sur.lhf = self.lhf0 * weight
+    self.Sur.shf = self.shf0 * weight
+    self.Sur.bflux = (
+        g * (
+            (8.0e-3 * weight + (eps_vi - 1.0) * (299.1 * 5.2e-5 * weight + 22.45e-3 * 8.0e-3 * weight)) /
+            (299.1 * (1.0 + (eps_vi - 1) * 22.45e-3))
+        )
+    )
     update(self.Sur, GMV)
 end
-function update_forcing(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVariables,  TS::TimeStepping)
+function update_forcing(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Fo, GMV)
 end
 function update_radiation(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVariables, TS::TimeStepping)
-   update(self.Rad, GMV)
+    update(self.Rad, GMV)
 end
 
 function Rico(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "Rico"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedCoeffs}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
-    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedCoeffs}(; Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 18.0
-    Fo.coriolis_param = 2.0 * omega * sin(latitude * pi / 180.0 ) # s^{-1}
+    Fo.coriolis_param = 2.0 * omega * sin(latitude * pi / 180.0) # s^{-1}
     Fo.apply_subsidence = true
-    return TurbulenceConvection.CasesBase{Rico}(
-        ;casename = "Rico", inversion_option, Sur, Fo, Rad)
+    return TurbulenceConvection.CasesBase{Rico}(; casename = "Rico", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
     Ref.Pg = 1.0154e5  #Pressure at ground
     Ref.Tg = 299.8  #Temperature at ground
     pvg = pv_star(Ref.Tg)
-    Ref.qtg = eps_v * pvg/(Ref.Pg - pvg)   #Total water mixing ratio at surface
+    Ref.qtg = eps_v * pvg / (Ref.Pg - pvg)   #Total water mixing ratio at surface
     initialize(Ref, Gr, Stats)
 end
 function initialize_profiles(self::CasesBase{Rico}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
     thetal = TurbulenceConvection.pyzeros(Gr.nzg)
-    ql=0.0
-    qi =0.0 # IC of Rico is cloud-free
+    ql = 0.0
+    qi = 0.0 # IC of Rico is cloud-free
 
-  @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-        GMV.U.values[k] =  -9.9 + 2.0e-3 * Gr.z_half[k]
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+        GMV.U.values[k] = -9.9 + 2.0e-3 * Gr.z_half[k]
         GMV.V.values[k] = -3.8
         #Set Thetal profile
         if Gr.z_half[k] <= 740.0
             thetal[k] = 297.9
         else
-            thetal[k] = 297.9 + (317.0-297.9)/(4000.0-740.0)*(Gr.z_half[k] - 740.0)
+            thetal[k] = 297.9 + (317.0 - 297.9) / (4000.0 - 740.0) * (Gr.z_half[k] - 740.0)
         end
 
         #Set qt profile
         if Gr.z_half[k] <= 740.0
-            GMV.QT.values[k] =  (16.0 + (13.8 - 16.0)/740.0 * Gr.z_half[k])/1000.0
+            GMV.QT.values[k] = (16.0 + (13.8 - 16.0) / 740.0 * Gr.z_half[k]) / 1000.0
         elseif Gr.z_half[k] > 740.0 && Gr.z_half[k] <= 3260.0
-            GMV.QT.values[k] = (13.8 + (2.4 - 13.8)/(3260.0-740.0) * (Gr.z_half[k] - 740.0))/1000.0
+            GMV.QT.values[k] = (13.8 + (2.4 - 13.8) / (3260.0 - 740.0) * (Gr.z_half[k] - 740.0)) / 1000.0
         else
-            GMV.QT.values[k] = (2.4 + (1.8-2.4)/(4000.0-3260.0)*(Gr.z_half[k] - 3260.0))/1000.0
+            GMV.QT.values[k] = (2.4 + (1.8 - 2.4) / (4000.0 - 3260.0) * (Gr.z_half[k] - 3260.0)) / 1000.0
         end
     end
 
-    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         GMV.H.values[k] = thetal[k]
-        GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k])
+        GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
         GMV.THL.values[k] = thetal[k]
     end
 
@@ -675,11 +691,11 @@ function initialize_surface(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
     self.Sur.zrough = 0.00015
-    self.Sur.cm  = 0.001229
+    self.Sur.cm = 0.001229
     self.Sur.ch = 0.001094
     self.Sur.cq = 0.001133
     # Adjust for non-IC grid spacing
-    grid_adjust = (log(20.0/self.Sur.zrough)/log(Gr.z_half[Gr.gw]/self.Sur.zrough))^2
+    grid_adjust = (log(20.0 / self.Sur.zrough) / log(Gr.z_half[Gr.gw] / self.Sur.zrough))^2
     self.Sur.cm = self.Sur.cm * grid_adjust
     self.Sur.ch = self.Sur.ch * grid_adjust
     self.Sur.cq = self.Sur.cq * grid_adjust
@@ -691,23 +707,23 @@ function initialize_forcing(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-  @inbounds for k in xrange(Gr.nzg)
+    @inbounds for k in xrange(Gr.nzg)
         # Geostrophic velocity profiles
         self.Fo.ug[k] = -9.9 + 2.0e-3 * Gr.z_half[k]
         self.Fo.vg[k] = -3.8
         # Set large-scale cooling
-        self.Fo.dTdt[k] =  (-2.5/(3600.0 * 24.0))  * exner_c(Ref.p0_half[k])
+        self.Fo.dTdt[k] = (-2.5 / (3600.0 * 24.0)) * exner_c(Ref.p0_half[k])
 
         # Set large-scale moistening
         if Gr.z_half[k] <= 2980.0
-            self.Fo.dqtdt[k] =  (-1.0 + 1.3456/2980.0 * Gr.z_half[k])/86400.0/1000.0   #kg/(kg * s)
+            self.Fo.dqtdt[k] = (-1.0 + 1.3456 / 2980.0 * Gr.z_half[k]) / 86400.0 / 1000.0   #kg/(kg * s)
         else
-            self.Fo.dqtdt[k] = 0.3456/86400.0/1000.0
+            self.Fo.dqtdt[k] = 0.3456 / 86400.0 / 1000.0
         end
 
         #Set large scale subsidence
         if Gr.z_half[k] <= 2260.0
-            self.Fo.subsidence[k] = -(0.005/2260.0) * Gr.z_half[k]
+            self.Fo.subsidence[k] = -(0.005 / 2260.0) * Gr.z_half[k]
         else
             self.Fo.subsidence[k] = -0.005
         end
@@ -724,7 +740,7 @@ function TurbulenceConvection.initialize_io(self::CasesBase{Rico}, Stats::NetCDF
     initialize_io(self, Stats, BaseCase())
 end
 function TurbulenceConvection.io(self::CasesBase{Rico}, Stats::NetCDFIO_Stats)
-    io(self,Stats, BaseCase())
+    io(self, Stats, BaseCase())
 end
 function update_surface(self::CasesBase{Rico}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Sur, GMV)
@@ -734,31 +750,31 @@ function update_forcing(self::CasesBase{Rico}, GMV::GridMeanVariables, TS::TimeS
     update(self.Fo, GMV)
 end
 function update_radiation(self::CasesBase{Rico}, GMV::GridMeanVariables, TS::TimeStepping)
-   update(self.Rad, GMV)
+    update(self.Rad, GMV)
 end
 
 function TRMM_LBA(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "TRMM_LBA"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
-    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
-    return TurbulenceConvection.CasesBase{TRMM_LBA}(
-        ;casename = "TRMM_LBA", inversion_option, Sur, Fo, Rad)
+    return TurbulenceConvection.CasesBase{TRMM_LBA}(; casename = "TRMM_LBA", inversion_option, Sur, Fo, Rad)
 end
 function initialize_reference(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    Ref.Pg = 991.3*100  #Pressure at ground
+    Ref.Pg = 991.3 * 100  #Pressure at ground
     Ref.Tg = 296.85   # surface values for reference state (RS) which outputs p0 rho0 alpha0
     pvg = pv_star(Ref.Tg)
-    Ref.qtg = eps_v * pvg/(Ref.Pg - pvg)#Total water mixing ratio at surface
+    Ref.qtg = eps_v * pvg / (Ref.Pg - pvg)#Total water mixing ratio at surface
     initialize(Ref, Gr, Stats)
 end
 function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
     p1 = TurbulenceConvection.pyzeros(Gr.nzg)
 
     # TRMM_LBA inputs from Grabowski et al. 2006
+    #! format: off
     z_in = off_arr([0.130,  0.464,  0.573,  1.100,  1.653,  2.216,  2.760,
                      3.297,  3.824,  4.327,  4.787,  5.242,  5.686,  6.131,
                      6.578,  6.996,  7.431,  7.881,  8.300,  8.718,  9.149,
@@ -806,40 +822,41 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
                       3.14,   3.93,   7.57,   2.58,   2.50,   6.44,   6.84,
                       0.19,  -2.20,  -3.60,   0.56,   6.68,   9.41,   7.03,
                       5.32,   1.14,  -0.65,   5.27,   5.27])
+    #! format: on
     # interpolate to the model grid-points
 
-    p1 = pyinterp(Gr.z_half,z_in,p_in)
-    GMV.U.values .= pyinterp(Gr.z_half,z_in,u_in)
-    GMV.V.values .= pyinterp(Gr.z_half,z_in,v_in)
+    p1 = pyinterp(Gr.z_half, z_in, p_in)
+    GMV.U.values .= pyinterp(Gr.z_half, z_in, u_in)
+    GMV.V.values .= pyinterp(Gr.z_half, z_in, v_in)
 
     # get the entropy from RH, p, T
     RH = TurbulenceConvection.pyzeros(Gr.nzg)
-    z_half_in = off_arr(Gr.z_half[Gr.gw:Gr.nzg-Gr.gw])
-    RH[Gr.gw:Gr.nzg-Gr.gw] = pyinterp(z_half_in,z_in,RH_in)
+    z_half_in = off_arr(Gr.z_half[(Gr.gw):(Gr.nzg - Gr.gw)])
+    RH[(Gr.gw):(Gr.nzg - Gr.gw)] = pyinterp(z_half_in, z_in, RH_in)
     RH[0] = RH[3]
     RH[1] = RH[2]
-    RH[Gr.nzg-Gr.gw+1] = RH[Gr.nzg-Gr.gw-1]
+    RH[Gr.nzg - Gr.gw + 1] = RH[Gr.nzg - Gr.gw - 1]
 
     T = TurbulenceConvection.pyzeros(Gr.nzg)
-    T[Gr.gw:Gr.nzg-Gr.gw] = pyinterp(z_half_in,z_in,T_in)
+    T[(Gr.gw):(Gr.nzg - Gr.gw)] = pyinterp(z_half_in, z_in, T_in)
     GMV.T.values .= T
-    theta_rho = RH*0.0
-    epsi = 287.1/461.5
+    theta_rho = RH * 0.0
+    epsi = 287.1 / 461.5
 
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.T, Gr)
 
 
-  @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         PV_star = pv_star(GMV.T.values[k])
-        qv_star = PV_star*epsi/(p1[k]- PV_star + epsi*PV_star*RH[k]/100.0) # eq. 37 in pressel et al and the def of RH
+        qv_star = PV_star * epsi / (p1[k] - PV_star + epsi * PV_star * RH[k] / 100.0) # eq. 37 in pressel et al and the def of RH
         qv = GMV.QT.values[k] - GMV.QL.values[k]
-        GMV.QT.values[k] = qv_star*RH[k]/100.0
-        GMV.H.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                    GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
+        GMV.QT.values[k] = qv_star * RH[k] / 100.0
+        GMV.H.values[k] =
+            thetali_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
 
-        GMV.THL.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                            GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
+        GMV.THL.values[k] =
+            thetali_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
         theta_rho[k] = theta_rho_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
     end
 
@@ -850,10 +867,10 @@ end
 
 function initialize_surface(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceState)
     #self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
-    self.Sur.Tsurface = (273.15+23) * exner_c(Ref.Pg)
+    self.Sur.Tsurface = (273.15 + 23) * exner_c(Ref.Pg)
     self.Sur.qsurface = 22.45e-3 # kg/kg
-    self.Sur.lhf = 5.2e-5 * Ref.rho0[Gr.gw-1] * latent_heat(self.Sur.Tsurface)
-    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * Ref.rho0[Gr.gw-1]
+    self.Sur.lhf = 5.2e-5 * Ref.rho0[Gr.gw - 1] * latent_heat(self.Sur.Tsurface)
+    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * Ref.rho0[Gr.gw - 1]
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
     self.Sur.Gr = Gr
@@ -866,7 +883,8 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
     self.Fo.dTdt = TurbulenceConvection.pyzeros(Gr.nzg)
-    self.rad_time = linspace(10,360;num=36) .* 60
+    self.rad_time = linspace(10, 360; num = 36) .* 60
+    #! format: off
     z_in         = off_arr([42.5, 200.92, 456.28, 743, 1061.08, 1410.52, 1791.32, 2203.48, 2647,3121.88, 3628.12,
                              4165.72, 4734.68, 5335, 5966.68, 6629.72, 7324.12,
                              8049.88, 8807, 9595.48, 10415.32, 11266.52, 12149.08, 13063, 14008.28,
@@ -980,29 +998,29 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
                            0.316,  0.287,  0.293,  0.361,  0.345,  0.225,  0.082,  0.035,  0.071,  0.046,  0.172,  0.708,
                            0.255,   0.21,  0.325,  0.146,      0,      0,      0,      0,      0]] ./ 86400
 
+    #! format: on
     # TODO: check translation
     rad_in = reduce(vcat, rad_in')
     rad_in = off_arr(rad_in)
-    A = hcat(
-        map(xrange(0,36)) do tt
-            a = Gr.z_half
-            b = z_in
-            c = reshape(rad_in[tt,:], size(rad_in, 2))
-            c = off_arr(c)
-            pyinterp(a,b,c)
-        end...
-    )
+    A = hcat(map(xrange(0, 36)) do tt
+        a = Gr.z_half
+        b = z_in
+        c = reshape(rad_in[tt, :], size(rad_in, 2))
+        c = off_arr(c)
+        pyinterp(a, b, c)
+    end...)
     A = off_arr(A')
 
     self.rad = A # store matrix in self
-    ind1 = Int(trunc(10.0/600.0))
-    ind2 = Int(ceil(10.0/600.0)) - 1
-  @inbounds for k in xrange(Gr.nzg)
-        if 10%600.0 == 0
-            self.Fo.dTdt[k] = self.rad[ind1,k]
+    ind1 = Int(trunc(10.0 / 600.0))
+    ind2 = Int(ceil(10.0 / 600.0)) - 1
+    @inbounds for k in xrange(Gr.nzg)
+        if 10 % 600.0 == 0
+            self.Fo.dTdt[k] = self.rad[ind1, k]
         else
-            self.Fo.dTdt[k]    = (self.rad[ind2,k]-self.rad[ind1,k])/
-                                  (self.rad_time[ind2+1]-self.rad_time[ind1+1])*(10.0)+self.rad[ind1,k]
+            self.Fo.dTdt[k] =
+                (self.rad[ind2, k] - self.rad[ind1, k]) / (self.rad_time[ind2 + 1] - self.rad_time[ind1 + 1]) * (10.0) +
+                self.rad[ind1, k]
         end
     end
     return nothing
@@ -1016,38 +1034,38 @@ function TurbulenceConvection.initialize_io(self::CasesBase{TRMM_LBA}, Stats::Ne
     initialize_io(self, Stats, BaseCase())
 end
 function TurbulenceConvection.io(self::CasesBase{TRMM_LBA}, Stats::NetCDFIO_Stats)
-    io(self,Stats, BaseCase())
+    io(self, Stats, BaseCase())
 end
 
 function update_surface(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::TimeStepping)
-    self.Sur.lhf = 554.0 * pow(max(0, cos(π/2*((5.25*3600.0 - TS.t)/5.25/3600.0))),1.3)
-    self.Sur.shf = 270.0 * pow(max(0, cos(π/2*((5.25*3600.0 - TS.t)/5.25/3600.0))),1.5)
+    self.Sur.lhf = 554.0 * pow(max(0, cos(π / 2 * ((5.25 * 3600.0 - TS.t) / 5.25 / 3600.0))), 1.3)
+    self.Sur.shf = 270.0 * pow(max(0, cos(π / 2 * ((5.25 * 3600.0 - TS.t) / 5.25 / 3600.0))), 1.5)
     update(self.Sur, GMV)
     # fix momentum fluxes to zero as they are not used in the paper
     self.Sur.rho_uflux = 0.0
     self.Sur.rho_vflux = 0.0
 end
 
-function update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables,  TS::TimeStepping)
+function update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::TimeStepping)
 
-    ind2 = Int(ceil(TS.t/600.0))
-    ind1 = Int(trunc(TS.t/600.0))
-  @inbounds for k in xrange(self.Fo.Gr.nzg)
+    ind2 = Int(ceil(TS.t / 600.0))
+    ind1 = Int(trunc(TS.t / 600.0))
+    @inbounds for k in xrange(self.Fo.Gr.nzg)
         if self.Fo.Gr.z_half[k] >= 22699.48
             self.Fo.dTdt[k] = 0.0
         else
-            if TS.t<600.0 # first 10 min use the radiative forcing of t=10min (as in the paper)
-                self.Fo.dTdt[k] = self.rad[0,k]
-            elseif TS.t<21600.0 && ind2<36
-                if TS.t%600.0 == 0
-                    self.Fo.dTdt[k] = self.rad[ind1,k]
+            if TS.t < 600.0 # first 10 min use the radiative forcing of t=10min (as in the paper)
+                self.Fo.dTdt[k] = self.rad[0, k]
+            elseif TS.t < 21600.0 && ind2 < 36
+                if TS.t % 600.0 == 0
+                    self.Fo.dTdt[k] = self.rad[ind1, k]
                 else
-                    self.Fo.dTdt[k] = (self.rad[ind2,k]-self.rad[ind1,k])/
-                                             (self.rad_time[ind2]-self.rad_time[ind1])*
-                                             (TS.t-self.rad_time[ind1])+self.rad[ind1,k]
+                    self.Fo.dTdt[k] =
+                        (self.rad[ind2, k] - self.rad[ind1, k]) / (self.rad_time[ind2] - self.rad_time[ind1]) *
+                        (TS.t - self.rad_time[ind1]) + self.rad[ind1, k]
                 end
             else
-                self.Fo.dTdt[k] = self.rad[35,k]
+                self.Fo.dTdt[k] = self.rad[35, k]
             end
         end
     end
@@ -1056,28 +1074,27 @@ function update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables,  TS::
 
 end
 function update_radiation(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::TimeStepping)
-   update(self.Rad, GMV)
+    update(self.Rad, GMV)
 end
 
 # adopted from: "Large-eddy simulation of the diurnal cycle of shallow cumulus convection over land",
 # By Brown et al. (2002)  Q. J. R. Meteorol. Soc. 128, 1075-1093
 function ARM_SGP(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "ARM_SGP"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
-    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 8.5e-5
-    Fo.apply_subsidence =false
-    return TurbulenceConvection.CasesBase{ARM_SGP}(
-        ;casename = "ARM_SGP", inversion_option, Sur, Fo, Rad)
+    Fo.apply_subsidence = false
+    return TurbulenceConvection.CasesBase{ARM_SGP}(; casename = "ARM_SGP", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{ARM_SGP}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    Ref.Pg = 970.0*100 #Pressure at ground
+    Ref.Pg = 970.0 * 100 #Pressure at ground
     Ref.Tg = 299.0   # surface values for reference state (RS) which outputs p0 rho0 alpha0
-    Ref.qtg = 15.2/1000#Total water mixing ratio at surface
+    Ref.qtg = 15.2 / 1000#Total water mixing ratio at surface
     initialize(Ref, Gr, Stats)
 end
 
@@ -1085,25 +1102,27 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVa
     p1 = TurbulenceConvection.pyzeros(Gr.nzg)
 
     # ARM_SGP inputs
+    #! format: off
     z_in = off_arr([0.0, 50.0, 350.0, 650.0, 700.0, 1300.0, 2500.0, 5500.0 ]) #LES z is in meters
     Theta_in = off_arr([299.0, 301.5, 302.5, 303.53, 303.7, 307.13, 314.0, 343.2]) # K
     r_in = off_arr([15.2,15.17,14.98,14.8,14.7,13.5,3.0,3.0])/1000 # qt should be in kg/kg
+    #! format: on
     qt_in = r_in ./ (1 .+ r_in)
 
     # interpolate to the model grid-points
-    Theta = pyinterp(Gr.z_half,z_in,Theta_in)
-    qt = pyinterp(Gr.z_half,z_in,qt_in)
+    Theta = pyinterp(Gr.z_half, z_in, Theta_in)
+    qt = pyinterp(Gr.z_half, z_in, qt_in)
 
 
-  @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         GMV.U.values[k] = 10.0
         GMV.QT.values[k] = qt[k]
-        GMV.T.values[k] = Theta[k]*exner_c(Ref.p0_half[k])
-        GMV.H.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                    GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
+        GMV.T.values[k] = Theta[k] * exner_c(Ref.p0_half[k])
+        GMV.H.values[k] =
+            thetali_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
 
-        GMV.THL.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                            GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
+        GMV.THL.values[k] =
+            thetali_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
     end
 
     set_bcs(GMV.U, Gr)
@@ -1129,7 +1148,7 @@ function initialize_forcing(self::CasesBase{ARM_SGP}, Gr::Grid, Ref::ReferenceSt
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-  @inbounds for k in xrange(Gr.nzg)
+    @inbounds for k in xrange(Gr.nzg)
         self.Fo.ug[k] = 10.0
         self.Fo.vg[k] = 0.0
     end
@@ -1144,15 +1163,15 @@ function TurbulenceConvection.initialize_io(self::CasesBase{ARM_SGP}, Stats::Net
     initialize_io(self, Stats, BaseCase())
 end
 function TurbulenceConvection.io(self::CasesBase{ARM_SGP}, Stats::NetCDFIO_Stats)
-    io(self,Stats, BaseCase())
+    io(self, Stats, BaseCase())
 end
 
 function update_surface(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::TimeStepping)
     t_Sur_in = off_arr([0.0, 4.0, 6.5, 7.5, 10.0, 12.5, 14.5]) .* 3600 #LES time is in sec
     SH = off_arr([-30.0, 90.0, 140.0, 140.0, 100.0, -10, -10]) # W/m^2
     LH = off_arr([5.0, 250.0, 450.0, 500.0, 420.0, 180.0, 0.0]) # W/m^2
-    self.Sur.shf = pyinterp(off_arr([TS.t]),t_Sur_in,SH)[0]
-    self.Sur.lhf = pyinterp(off_arr([TS.t]),t_Sur_in,LH)[0]
+    self.Sur.shf = pyinterp(off_arr([TS.t]), t_Sur_in, SH)[0]
+    self.Sur.lhf = pyinterp(off_arr([TS.t]), t_Sur_in, LH)[0]
     # if fluxes vanish bflux vanish and wstar and obukov length are NaNs
     ## CK +++ I commented out the lines below as I don"t think this is how we want to fix things!
     # if self.Sur.shf < 1.0
@@ -1166,48 +1185,46 @@ function update_surface(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::Ti
     self.Sur.rho_vflux = 0.0
 end
 
-function update_forcing(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables,  TS::TimeStepping)
+function update_forcing(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::TimeStepping)
     t_in = off_arr([0.0, 3.0, 6.0, 9.0, 12.0, 14.5]) .* 3600.0 #LES time is in sec
     AT_in = off_arr([0.0, 0.0, 0.0, -0.08, -0.016, -0.016]) ./ 3600.0 # Advective forcing for theta [K/h] converted to [K/sec]
     RT_in = off_arr([-0.125, 0.0, 0.0, 0.0, 0.0, -0.1]) ./ 3600.0  # Radiative forcing for theta [K/h] converted to [K/sec]
     Rqt_in = off_arr([0.08, 0.02, 0.04, -0.1, -0.16, -0.3]) ./ 1000.0 ./ 3600.0 # Radiative forcing for qt converted to [kg/kg/sec]
-    dTdt = pyinterp(off_arr([TS.t]),t_in,AT_in)[0] + pyinterp(off_arr([TS.t]),t_in,RT_in)[0]
-    dqtdt =  pyinterp(off_arr([TS.t]),t_in,Rqt_in)[0]
-  @inbounds for k in xrange(self.Fo.Gr.nzg) # correct dims
-        if self.Fo.Gr.z_half[k] <=1000.0
+    dTdt = pyinterp(off_arr([TS.t]), t_in, AT_in)[0] + pyinterp(off_arr([TS.t]), t_in, RT_in)[0]
+    dqtdt = pyinterp(off_arr([TS.t]), t_in, Rqt_in)[0]
+    @inbounds for k in xrange(self.Fo.Gr.nzg) # correct dims
+        if self.Fo.Gr.z_half[k] <= 1000.0
             self.Fo.dTdt[k] = dTdt
-            self.Fo.dqtdt[k]  = dqtdt * exner_c(self.Fo.Ref.p0_half[k])
-        elseif self.Fo.Gr.z_half[k] > 1000.0  && self.Fo.Gr.z_half[k] <= 2000.0
-            self.Fo.dTdt[k] = dTdt*(1-(self.Fo.Gr.z_half[k]-1000.0)/1000.0)
-            self.Fo.dqtdt[k]  = dqtdt * exner_c(self.Fo.Ref.p0_half[k])*
-                                (1-(self.Fo.Gr.z_half[k]-1000.0)/1000.0)
+            self.Fo.dqtdt[k] = dqtdt * exner_c(self.Fo.Ref.p0_half[k])
+        elseif self.Fo.Gr.z_half[k] > 1000.0 && self.Fo.Gr.z_half[k] <= 2000.0
+            self.Fo.dTdt[k] = dTdt * (1 - (self.Fo.Gr.z_half[k] - 1000.0) / 1000.0)
+            self.Fo.dqtdt[k] = dqtdt * exner_c(self.Fo.Ref.p0_half[k]) * (1 - (self.Fo.Gr.z_half[k] - 1000.0) / 1000.0)
         end
     end
     update(self.Fo, GMV)
 end
 
 function update_radiation(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::TimeStepping)
-   update(self.Rad, GMV)
+    update(self.Rad, GMV)
 end
 
 # adopted from: "Large eddy simulation of Maritime Deep Tropical Convection",
 # By Khairoutdinov et al (2009)  JAMES, vol. 1, article #15
 function GATE_III(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "GATE_III"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedCoeffs}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
-    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedCoeffs}(; Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "thetal_maxgrad"
     Fo.apply_subsidence = false
     Fo.apply_coriolis = false
-    return TurbulenceConvection.CasesBase{GATE_III}(
-        ;casename = "GATE_III", inversion_option, Sur, Fo, Rad)
+    return TurbulenceConvection.CasesBase{GATE_III}(; casename = "GATE_III", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    Ref.Pg = 1013.0*100  #Pressure at ground
+    Ref.Pg = 1013.0 * 100  #Pressure at ground
     Ref.Tg = 299.184   # surface values for reference state (RS) which outputs p0 rho0 alpha0
-    Ref.qtg = 16.5/1000#Total water mixing ratio at surface
+    Ref.qtg = 16.5 / 1000#Total water mixing ratio at surface
     initialize(Ref, Gr, Stats)
 end
 
@@ -1218,6 +1235,7 @@ function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanV
     theta_rho = TurbulenceConvection.pyzeros(Gr.nzg)
 
     # GATE_III inputs - I extended them to z=22 km
+    #! format: off
     z_in  = off_arr([ 0.0,   0.5,  1.0,  1.5,  2.0,   2.5,    3.0,   3.5,   4.0,   4.5,   5.0,  5.5,  6.0,  6.5,
                        7.0, 7.5, 8.0,  8.5,   9.0,   9.5, 10.0,   10.5,   11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0,
                        14.5, 15.0, 15.5, 16.0, 16.5, 17.0, 17.5, 18.0, 27.0]) * 1000.0 #z is in meters
@@ -1227,28 +1245,31 @@ function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanV
     U_in  = off_arr([  -1, -1.75, -2.5, -3.6, -6.0, -8.75, -11.75, -13.0, -13.1, -12.1, -11.0, -8.5, -5.0, -2.6, 0.0,
                         0.5, 0.4,  0.3,   0.0,  -1.0, -2.5,   -3.5,   -4.5, -4.8, -5.0, -3.5, -2.0, -1.0, -1.0, -1.0,
                         -1.5, -2.0, -2.5, -2.6, -2.7, -3.0, -3.0, -3.0])# [m/s]
+    #! format: on
     qt_in = r_in ./ (1 .+ r_in) # convert mixing ratio to specific humidity
 
     # temperature is taken from a different input plot at different z levels
+    #! format: off
     T_in = off_arr([299.184, 294.836, 294.261, 288.773, 276.698, 265.004, 253.930, 243.662, 227.674, 214.266, 207.757, 201.973, 198.278, 197.414, 198.110, 198.110])
     z_T_in = off_arr([0.0, 0.492, 0.700, 1.698, 3.928, 6.039, 7.795, 9.137, 11.055, 12.645, 13.521, 14.486, 15.448, 16.436, 17.293, 22.0])*1000.0 # for km
+    #! format: on
 
     # interpolate to the model grid-points
-    T = pyinterp(Gr.z_half,z_T_in,T_in) # interpolate to ref pressure level
-    qt = pyinterp(Gr.z_half,z_in,qt_in)
-    U = pyinterp(Gr.z_half,z_in,U_in)
+    T = pyinterp(Gr.z_half, z_T_in, T_in) # interpolate to ref pressure level
+    qt = pyinterp(Gr.z_half, z_in, qt_in)
+    U = pyinterp(Gr.z_half, z_in, U_in)
 
 
-  @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         GMV.QT.values[k] = qt[k]
         GMV.T.values[k] = T[k]
         GMV.U.values[k] = U[k]
 
-        GMV.H.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                    GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
+        GMV.H.values[k] =
+            thetali_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
 
-        GMV.THL.values[k] = thetali_c(Ref.p0_half[k],GMV.T.values[k],
-                                            GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
+        GMV.THL.values[k] =
+            thetali_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
     end
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
@@ -1260,10 +1281,10 @@ end
 function initialize_surface(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceState)
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
-    self.Sur.qsurface = 16.5/1000.0 # kg/kg
+    self.Sur.qsurface = 16.5 / 1000.0 # kg/kg
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
-    self.Sur.cm  = 0.0012
+    self.Sur.cm = 0.0012
     self.Sur.ch = 0.0034337
     self.Sur.cq = 0.0034337
     self.Sur.Tsurface = 299.184
@@ -1275,6 +1296,7 @@ function initialize_forcing(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceS
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
     #LES z is in meters
+    #! format: off
     z_in     = off_arr([ 0.0,   0.5,  1.0,  1.5,   2.0,   2.5,    3.0,   3.5,   4.0,   4.5,   5.0,   5.5,   6.0,
                           6.5,  7.0,  7.5,   8.0,  8.5,   9.0,  9.5,  10.0,  10.5,  11.0,    11.5,   12.0, 12.5,
                           13.0, 13.5, 14.0, 14.5, 15.0, 15.5, 16.0, 16.5, 17.0, 17.5, 18.0]) * 1000.0
@@ -1293,11 +1315,12 @@ function initialize_forcing(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceS
     Ttend_in = off_arr([ 0.0,  -1.0, -2.2, -3.0,  -3.5,  -3.8,   -4.0,  -4.1,  -4.2,  -4.2,  -4.1,  -4.0, -3.85,
                           -3.7, -3.5, -3.25, -3.0, -2.8,  -2.5, -2.1,  -1.7,  -1.3,   -1.0,   -0.7,   -0.5, -0.4,
                           -0.3, -0.2, -0.1,-0.05,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0])/(24.0*3600.0)
+    #! format: on
 
     Qtend_in = r_tend_in ./ (1 .+ r_tend_in) # convert mixing ratio to specific humidity
 
-    self.Fo.dqtdt = pyinterp(Gr.z_half,z_in,Qtend_in)
-    self.Fo.dTdt = pyinterp(Gr.z_half,z_in,Ttend_in) + pyinterp(Gr.z_half,z_in,RAD_in)
+    self.Fo.dqtdt = pyinterp(Gr.z_half, z_in, Qtend_in)
+    self.Fo.dTdt = pyinterp(Gr.z_half, z_in, Ttend_in) + pyinterp(Gr.z_half, z_in, RAD_in)
 end
 
 function initialize_radiation(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
@@ -1308,18 +1331,18 @@ function TurbulenceConvection.initialize_io(self::CasesBase{GATE_III}, Stats::Ne
     initialize_io(self, Stats, BaseCase())
 end
 function TurbulenceConvection.io(self::CasesBase{GATE_III}, Stats::NetCDFIO_Stats)
-    io(self,Stats, BaseCase())
+    io(self, Stats, BaseCase())
 end
 
 function update_surface(self::CasesBase{GATE_III}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Sur, GMV) # here lhf and shf are needed for calcualtion of bflux in surface and thus u_star
 end
 
-function update_forcing(self::CasesBase{GATE_III}, GMV::GridMeanVariables,  TS::TimeStepping)
+function update_forcing(self::CasesBase{GATE_III}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Fo, GMV)
 end
 function update_radiation(self::CasesBase{GATE_III}, GMV::GridMeanVariables, TS::TimeStepping)
-   update(self.Rad, GMV)
+    update(self.Rad, GMV)
 end
 
 """
@@ -1330,19 +1353,18 @@ doi: http://dx.doi.org/10.1175/MWR2930.1
 """
 function DYCOMS_RF01(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "DYCOMS_RF01"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingDYCOMS_RF01}(;Gr, Ref)
-    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationDYCOMS_RF01}(;Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingDYCOMS_RF01}(; Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationDYCOMS_RF01}(; Gr, Ref)
     inversion_option = "thetal_maxgrad"
-    return TurbulenceConvection.CasesBase{DYCOMS_RF01}(
-        ;casename = "DYCOMS_RF01", inversion_option, Sur, Fo, Rad)
+    return TurbulenceConvection.CasesBase{DYCOMS_RF01}(; casename = "DYCOMS_RF01", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    Ref.Pg   = 1017.8 * 100.0
-    Ref.qtg  = 9.0 / 1000.0
+    Ref.Pg = 1017.8 * 100.0
+    Ref.qtg = 9.0 / 1000.0
     # Use an exner function with values for Rd, and cp given in Stevens 2005 to compute temperature
-    Ref.Tg   = 289.0 * exner_c(Ref.Pg; kappa = dycoms_Rd / dycoms_cp)
+    Ref.Tg = 289.0 * exner_c(Ref.Pg; kappa = dycoms_Rd / dycoms_cp)
     initialize(Ref, Gr, Stats)
 end
 # helper function
@@ -1355,7 +1377,7 @@ Compute thetal using constants from Stevens et al 2005 DYCOMS case.
 """
 function dycoms_compute_thetal(self::CasesBase{DYCOMS_RF01}, p_, T_, ql_)
     theta_ = T_ / exner_c(p_, kappa = dycoms_Rd / dycoms_cp)
-    return theta_ * exp(-1. * dycoms_L * ql_ / (dycoms_cp * T_))
+    return theta_ * exp(-1.0 * dycoms_L * ql_ / (dycoms_cp * T_))
 end
 # helper function
 """
@@ -1390,7 +1412,7 @@ function dycoms_sat_adjst(self::CasesBase{DYCOMS_RF01}, p_, thetal_, qt_)
             qs_2 = qv_star_c(p_, qt_, pv_star_2)
             ql_2 = qt_ - qs_2
             f_2 = thetal_ - dycoms_compute_thetal(self, p_, t_2, ql_2)
-            t_n = t_2 - f_2 * (t_2 - t_1)/(f_2 - f_1)
+            t_n = t_2 - f_2 * (t_2 - t_1) / (f_2 - f_1)
             t_1 = t_2
             t_2 = t_n
             f_1 = f_2
@@ -1402,24 +1424,24 @@ end
 
 function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
     thetal = TurbulenceConvection.pyzeros(Gr.nzg) # helper variable to recalculate temperature
-    ql     = TurbulenceConvection.pyzeros(Gr.nzg) # DYCOMS case is saturated
-    qi     = 0.0                                             # no ice
+    ql = TurbulenceConvection.pyzeros(Gr.nzg) # DYCOMS case is saturated
+    qi = 0.0                                             # no ice
 
-  @inbounds for k in xrange(Gr.gw, Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         # thetal profile as defined in DYCOMS
         if Gr.z_half[k] <= 840.0
-           thetal[k] = 289.0
+            thetal[k] = 289.0
         end
         if Gr.z_half[k] > 840.0
-           thetal[k] = (297.5 + (Gr.z_half[k] - 840.0)^(1.0/3.0))
+            thetal[k] = (297.5 + (Gr.z_half[k] - 840.0)^(1.0 / 3.0))
         end
 
         # qt profile as defined in DYCOMS
         if Gr.z_half[k] <= 840.0
-           GMV.QT.values[k] = 9. / 1000.0
+            GMV.QT.values[k] = 9.0 / 1000.0
         end
         if Gr.z_half[k] > 840.0
-           GMV.QT.values[k] = 1.5 / 1000.0
+            GMV.QT.values[k] = 1.5 / 1000.0
         end
 
         # ql and T profile
@@ -1432,7 +1454,7 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
         # Here we use Rd, cp and L constants as defined in TurbulenceConvection)
         GMV.THL.values[k] = t_to_thetali_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], GMV.QL.values[k], qi)
         GMV.H.values[k] = t_to_thetali_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], GMV.QL.values[k], qi)
-        
+
 
         # buoyancy profile
         qv = GMV.QT.values[k] - qi - GMV.QL.values[k]
@@ -1456,10 +1478,10 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
     return
 end
 
-function initialize_surface(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::ReferenceState )
-    self.Sur.zrough      = 1.0e-4
+function initialize_surface(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::ReferenceState)
+    self.Sur.zrough = 1.0e-4
     self.Sur.ustar_fixed = false
-    self.Sur.cm          = 0.0011
+    self.Sur.cm = 0.0011
 
     # sensible heat flux
     self.Sur.shf = 15.0
@@ -1471,12 +1493,15 @@ function initialize_surface(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::Referen
     #density_surface  = 1.22     # kg/m^3
 
     # buoyancy flux
-    theta_flux       = self.Sur.shf / cpm_c(self.Sur.qsurface)        / Ref.rho0[Gr.gw-1]
-    qt_flux          = self.Sur.lhf / latent_heat(self.Sur.Tsurface)  / Ref.rho0[Gr.gw-1]
-    theta_surface    = self.Sur.Tsurface / exner_c(Ref.Pg)
-    self.Sur.bflux   =  g * ((theta_flux + (eps_vi - 1.0) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux))
-                             / (theta_surface * (1.0 + (eps_vi-1) * self.Sur.qsurface)))
-    self.Sur.Gr  = Gr
+    theta_flux = self.Sur.shf / cpm_c(self.Sur.qsurface) / Ref.rho0[Gr.gw - 1]
+    qt_flux = self.Sur.lhf / latent_heat(self.Sur.Tsurface) / Ref.rho0[Gr.gw - 1]
+    theta_surface = self.Sur.Tsurface / exner_c(Ref.Pg)
+    self.Sur.bflux =
+        g * (
+            (theta_flux + (eps_vi - 1.0) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
+            (theta_surface * (1.0 + (eps_vi - 1) * self.Sur.qsurface))
+        )
+    self.Sur.Gr = Gr
     self.Sur.Ref = Ref
     initialize(self.Sur)
 end
@@ -1491,14 +1516,14 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::Referen
 
     # large scale subsidence
     divergence = 3.75e-6    # divergence is defined twice: here and in __init__ of ForcingDYCOMS_RF01 class
-                            # To be able to have self.Fo.divergence available here,
-                            # we would have to change the signature of ForcingBase class
-  @inbounds for k in xrange(Gr.gw, Gr.nzg-Gr.gw)
-        self.Fo.subsidence[k] = - Gr.z_half[k] * divergence
+    # To be able to have self.Fo.divergence available here,
+    # we would have to change the signature of ForcingBase class
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+        self.Fo.subsidence[k] = -Gr.z_half[k] * divergence
     end
 
     # no large-scale drying
-    self.Fo.dqtdt .= 0. #kg/(kg * s)
+    self.Fo.dqtdt .= 0.0 #kg/(kg * s)
 end
 
 function initialize_radiation(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
@@ -1507,7 +1532,7 @@ function initialize_radiation(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::Refer
     initialize(self.Rad, GMV)
 
     # no large-scale drying
-    self.Rad.dqtdt .= 0. #kg/(kg * s)
+    self.Rad.dqtdt .= 0.0 #kg/(kg * s)
 
     # Radiation based on eq. 3 in Stevens et. al., (2005)
     # cloud-top cooling + cloud-base warming + cooling in free troposphere
@@ -1535,17 +1560,16 @@ end
 
 function GABLS(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "GABLS"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceMoninObukhovDry}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
-    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceMoninObukhovDry}(; Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 73.0
     Fo.coriolis_param = 1.39e-4 # s^{-1}
     # Fo.coriolis_param = 2.0 * omega * np.sin(latitude * pi / 180.0 ) # s^{-1}
     Fo.apply_subsidence = false
-    return TurbulenceConvection.CasesBase{GABLS}(
-        ;casename = "GABLS", inversion_option, Sur, Fo, Rad)
+    return TurbulenceConvection.CasesBase{GABLS}(; casename = "GABLS", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{GABLS}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1556,13 +1580,13 @@ function initialize_reference(self::CasesBase{GABLS}, Gr::Grid, Ref::ReferenceSt
 end
 function initialize_profiles(self::CasesBase{GABLS}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
     thetal = TurbulenceConvection.pyzeros(Gr.nzg)
-    ql=0.0
-    qi =0.0 # IC of GABLS cloud-free
+    ql = 0.0
+    qi = 0.0 # IC of GABLS cloud-free
 
-  @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         #Set wind velocity profile
-        GMV.U.values[k] =  8.0
-        GMV.V.values[k] =  0.0
+        GMV.U.values[k] = 8.0
+        GMV.V.values[k] = 0.0
 
         #Set Thetal profile
         if Gr.z_half[k] <= 100.0
@@ -1575,9 +1599,9 @@ function initialize_profiles(self::CasesBase{GABLS}, Gr::Grid, GMV::GridMeanVari
         GMV.QT.values[k] = 0.0
     end
 
-    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         GMV.H.values[k] = thetal[k]
-        GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k]) # No water content
+        GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k]) # No water content
         GMV.THL.values[k] = thetal[k]
     end
 
@@ -1601,7 +1625,7 @@ function initialize_forcing(self::CasesBase{GABLS}, Gr::Grid, Ref::ReferenceStat
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-  @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         # Geostrophic velocity profiles.
         self.Fo.ug[k] = 8.0
         self.Fo.vg[k] = 0.0
@@ -1618,11 +1642,11 @@ function TurbulenceConvection.initialize_io(self::CasesBase{GABLS}, Stats::NetCD
 end
 
 function TurbulenceConvection.io(self::CasesBase{GABLS}, Stats::NetCDFIO_Stats)
-    io(self,Stats, BaseCase())
+    io(self, Stats, BaseCase())
 end
 
 function update_surface(self::CasesBase{GABLS}, GMV::GridMeanVariables, TS::TimeStepping)
-    self.Sur.Tsurface = 265.0 - (0.25/3600.0)*TS.t
+    self.Sur.Tsurface = 265.0 - (0.25 / 3600.0) * TS.t
     update(self.Sur, GMV)
 end
 
@@ -1636,16 +1660,15 @@ end
 # Not fully implemented yet - Ignacio
 function SP(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "SP"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceSullivanPatton}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
-    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceSullivanPatton}(; Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 1.0e-4 # s^{-1}
     # Fo.coriolis_param = 2.0 * omega * np.sin(latitude * pi / 180.0 ) # s^{-1}
     Fo.apply_subsidence = false
-    return TurbulenceConvection.CasesBase{SP}(
-        ;casename = "SP", inversion_option, Sur, Fo, Rad)
+    return TurbulenceConvection.CasesBase{SP}(; casename = "SP", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1657,12 +1680,12 @@ end
 
 function initialize_profiles(self::CasesBase{SP}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
     thetal = TurbulenceConvection.pyzeros(Gr.nzg)
-    ql=0.0
-    qi =0.0 # IC of SP cloud-free
+    ql = 0.0
+    qi = 0.0 # IC of SP cloud-free
 
-  @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
-        GMV.U.values[k] =  1.0
-        GMV.V.values[k] =  0.0
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+        GMV.U.values[k] = 1.0
+        GMV.V.values[k] = 0.0
         #Set Thetal profile
         if Gr.z_half[k] <= 974.0
             thetal[k] = 300.0
@@ -1676,9 +1699,9 @@ function initialize_profiles(self::CasesBase{SP}, Gr::Grid, GMV::GridMeanVariabl
         GMV.QT.values[k] = 0.0
     end
 
-    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         GMV.H.values[k] = thetal[k]
-        GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k])
+        GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
         GMV.THL.values[k] = thetal[k]
     end
 
@@ -1695,9 +1718,9 @@ function initialize_surface(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState)
     self.Sur.Ref = Ref
     self.Sur.zrough = 0.1
     self.Sur.Tsurface = 300.0
-    theta_surface    = self.Sur.Tsurface / exner_c(Ref.Pg)
+    theta_surface = self.Sur.Tsurface / exner_c(Ref.Pg)
     theta_flux = 0.24
-    self.Sur.bflux   =  g * theta_flux / theta_surface
+    self.Sur.bflux = g * theta_flux / theta_surface
     # self.Sur.bflux = 0.24 * exner_c(Ref.p0_half[Gr.gw]) * g / (Ref.p0_half[Gr.gw]*Ref.alpha0_half[Gr.gw]/Rd)
     initialize(self.Sur)
 end
@@ -1706,7 +1729,7 @@ function initialize_forcing(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState, 
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-  @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         # Geostrophic velocity profiles. vg = 0
         self.Fo.ug[k] = 1.0
         self.Fo.vg[k] = 0.0
@@ -1719,7 +1742,7 @@ function TurbulenceConvection.initialize_io(self::CasesBase{SP}, Stats::NetCDFIO
     initialize_io(self, Stats, BaseCase())
 end
 function TurbulenceConvection.io(self::CasesBase{SP}, Stats::NetCDFIO_Stats)
-    io(self,Stats, BaseCase())
+    io(self, Stats, BaseCase())
 end
 function update_surface(self::CasesBase{SP}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Sur, GMV)
@@ -1733,14 +1756,13 @@ end
 
 function DryBubble(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "DryBubble"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceNone}(;Gr, Ref)
-    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(;Gr, Ref)
-    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(;Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceNone}(; Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(; Gr, Ref)
+    Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "theta_rho"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
-    return TurbulenceConvection.CasesBase{DryBubble}(
-        ;casename = "DryBubble", inversion_option, Sur, Fo, Rad)
+    return TurbulenceConvection.CasesBase{DryBubble}(; casename = "DryBubble", inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{DryBubble}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1752,12 +1774,13 @@ end
 
 function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
 
-  @inbounds for k in xrange(Gr.nzg)
+    @inbounds for k in xrange(Gr.nzg)
         GMV.U.values[k] = 0.01
     end
 
     n_updrafts = 1
     # initialize Grid Mean Profiles of thetali and qt
+    #! format: off
     z_in = off_arr([
                       25.,   75.,  125.,  175.,  225.,  275.,  325.,  375.,  425.,
                      475.,  525.,  575.,  625.,  675.,  725.,  775.,  825.,  875.,
@@ -1819,13 +1842,14 @@ function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMean
                     299.9837, 299.9837, 299.9837, 299.9837, 299.9837, 299.9837,
                     299.9837, 299.9837
     ])
+    #! format: on
                        #LES temperature_mean in K
     thetali = TurbulenceConvection.pyzeros(Gr.nzg)
-    z_half_in = off_arr(Gr.z_half[Gr.gw:Gr.nzg-Gr.gw])
-    thetali[Gr.gw:Gr.nzg-Gr.gw] = pyinterp(z_half_in,z_in,thetali_in)
+    z_half_in = off_arr(Gr.z_half[(Gr.gw):(Gr.nzg - Gr.gw)])
+    thetali[(Gr.gw):(Gr.nzg - Gr.gw)] = pyinterp(z_half_in, z_in, thetali_in)
     GMV.THL.values .= thetali
     GMV.H.values .= thetali
-    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         GMV.QT.values[k] = 0.0
     end
     set_bcs(GMV.QT, Gr)
@@ -1833,15 +1857,15 @@ function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMean
     satadjust(GMV)
 end
 
-function initialize_surface(self::CasesBase{DryBubble}, Gr::Grid,  Ref::ReferenceState )
+function initialize_surface(self::CasesBase{DryBubble}, Gr::Grid, Ref::ReferenceState)
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
     self.Sur.qsurface = 1.0e-5
-    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * Ref.rho0[Gr.gw-1]
+    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * Ref.rho0[Gr.gw - 1]
     initialize(self.Sur)
 end
 
-function initialize_forcing(self::CasesBase{DryBubble}, Gr::Grid,  Ref::ReferenceState, GMV::GridMeanVariables )
+function initialize_forcing(self::CasesBase{DryBubble}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
@@ -1867,7 +1891,7 @@ function update_forcing(self::CasesBase{DryBubble}, GMV::GridMeanVariables, TS::
     update(self.Fo, GMV)
 end
 function update_radiation(self::CasesBase{DryBubble}, GMV::GridMeanVariables, TS::TimeStepping)
-   update(self.Rad, GMV)
+    update(self.Rad, GMV)
 end
 
 end

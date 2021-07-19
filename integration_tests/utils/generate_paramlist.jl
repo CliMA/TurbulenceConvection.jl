@@ -20,13 +20,13 @@ using ArgParse
 import JSON
 
 function parse_commandline()
-    s = ArgParseSettings(;description="Paramlist Generator")
+    s = ArgParseSettings(; description = "Paramlist Generator")
 
     @add_arg_table! s begin
         "case_name"
-            help = "The case name"
-            arg_type = String
-            required = true
+        help = "The case name"
+        arg_type = String
+        required = true
     end
 
     return parse_args(s)
@@ -70,7 +70,7 @@ function default_paramlist(case_name::String)
     #with values plume_spacing=500.0, alpha_d = 0.375
     paramlist_defaults["turbulence"]["EDMF_PrognosticTKE"]["constant_plume_spacing"] = 1333.0
     # TODO: merge the tan18 buoyancy forluma into normalmode formula -> simply set buoy_coeff1 as 1./3. and buoy_coeff2 as 0.
-    paramlist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_buoy_coeff"] = 1.0/3.0
+    paramlist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_buoy_coeff"] = 1.0 / 3.0
 
     paramlist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] = 0.12
     paramlist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff2"] = 0.0
@@ -127,14 +127,14 @@ function Bomex(paramlist_defaults)
     paramlist = deepcopy(paramlist_defaults)
     paramlist["meta"]["casename"] = "Bomex"
 
-    return  paramlist
+    return paramlist
 end
 function life_cycle_Tan2018(paramlist_defaults)
 
     paramlist = deepcopy(paramlist_defaults)
     paramlist["meta"]["casename"] = "life_cycle_Tan2018"
 
-    return  paramlist
+    return paramlist
 end
 function Rico(paramlist_defaults)
 
@@ -142,7 +142,7 @@ function Rico(paramlist_defaults)
 
     paramlist["meta"]["casename"] = "Rico"
 
-    return  paramlist
+    return paramlist
 end
 function TRMM_LBA(paramlist_defaults)
 
@@ -150,21 +150,21 @@ function TRMM_LBA(paramlist_defaults)
 
     paramlist["meta"]["casename"] = "TRMM_LBA"
 
-    return  paramlist
+    return paramlist
 end
 function ARM_SGP(paramlist_defaults)
 
     paramlist = deepcopy(paramlist_defaults)
     paramlist["meta"]["casename"] = "ARM_SGP"
 
-    return  paramlist
+    return paramlist
 end
 function GATE_III(paramlist_defaults)
 
     paramlist = deepcopy(paramlist_defaults)
     paramlist["meta"]["casename"] = "GATE_III"
 
-    return  paramlist
+    return paramlist
 end
 function DYCOMS_RF01(paramlist_defaults)
 
@@ -172,14 +172,14 @@ function DYCOMS_RF01(paramlist_defaults)
 
     paramlist["meta"]["casename"] = "DYCOMS_RF01"
 
-    return  paramlist
+    return paramlist
 end
 function GABLS(paramlist_defaults)
 
     paramlist = deepcopy(paramlist_defaults)
 
     paramlist["meta"]["casename"] = "GABLS"
-    return  paramlist
+    return paramlist
 end
 # Not fully implemented yet - Ignacio
 function SP(paramlist_defaults)
@@ -187,7 +187,7 @@ function SP(paramlist_defaults)
     paramlist = deepcopy(paramlist_defaults)
     paramlist["meta"]["casename"] = "SP"
 
-    return  paramlist
+    return paramlist
 end
 function DryBubble(paramlist_defaults)
     paramlist = deepcopy(paramlist_defaults)
@@ -198,12 +198,12 @@ function DryBubble(paramlist_defaults)
     paramlist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = 0.25
     paramlist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = 0.1
 
-    return  paramlist
+    return paramlist
 end
 
 function write_file(paramlist)
 
-    open("paramlist_"*paramlist["meta"]["casename"]*".in", "w") do io
+    open("paramlist_" * paramlist["meta"]["casename"] * ".in", "w") do io
         JSON.print(io, paramlist, 4)
     end
 

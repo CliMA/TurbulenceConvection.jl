@@ -103,15 +103,15 @@ struct RainVariable{T}
     new::T
     flux::T
     function RainVariable(nz, name, units)
-        loc   = "half"
-        kind  = "scalar"
-        name  = name
+        loc = "half"
+        kind = "scalar"
+        name = name
         units = units
 
-        values      = pyzeros(nz)
-        new         = pyzeros(nz)
-        flux        = pyzeros(nz)
-        return new{typeof(values)}(loc,kind,name,units,values,new,flux)
+        values = pyzeros(nz)
+        new = pyzeros(nz)
+        flux = pyzeros(nz)
+        return new{typeof(values)}(loc, kind, name, units, values, new, flux)
     end
 end
 
@@ -140,7 +140,7 @@ struct VariablePrognostic{T}
     kind::String
     name::String
     units::String
-    function VariablePrognostic(nz_tot,loc, kind, bc, name, units)
+    function VariablePrognostic(nz_tot, loc, kind, bc, name, units)
         # Value at the current timestep
         values = pyzeros(nz_tot)
         # Value at the next timestep, used for calculating turbulence tendencies
@@ -185,11 +185,11 @@ struct VariableDiagnostic{T}
         kind = kind
         name = name
         units = units
-        return new{typeof(values)}(values,loc,bc,kind,name,units)
+        return new{typeof(values)}(values, loc, bc, kind, name, units)
     end
 end
 
-struct UpdraftVariable{A1,A2}
+struct UpdraftVariable{A1, A2}
     values::A2
     old::A2
     new::A2
@@ -201,11 +201,11 @@ struct UpdraftVariable{A1,A2}
     name::String
     units::String
     function UpdraftVariable(nu, nz, loc, kind, name, units)
-        values = pyzeros(nu,nz)
-        old = pyzeros(nu,nz)  # needed for prognostic updrafts
-        new = pyzeros(nu,nz) # needed for prognostic updrafts
-        tendencies = pyzeros(nu,nz)
-        flux = pyzeros(nu,nz)
+        values = pyzeros(nu, nz)
+        old = pyzeros(nu, nz)  # needed for prognostic updrafts
+        new = pyzeros(nu, nz) # needed for prognostic updrafts
+        tendencies = pyzeros(nu, nz)
+        flux = pyzeros(nu, nz)
         bulkvalues = pyzeros(nz)
         if loc != "half" && loc != "full"
             print("Invalid location setting for variable! Must be half or full")
@@ -219,7 +219,7 @@ struct UpdraftVariable{A1,A2}
         units = units
         A1 = typeof(bulkvalues)
         A2 = typeof(values)
-        return new{A1,A2}(values,old,new,tendencies,flux,bulkvalues,loc,kind,name,units)
+        return new{A1, A2}(values, old, new, tendencies, flux, bulkvalues, loc, kind, name, units)
     end
 end
 
@@ -247,16 +247,16 @@ mutable struct UpdraftVariables{A1}
         n_updrafts = nu
         nzg = Gr.nzg
 
-        W    = UpdraftVariable(nu, nzg, "full", "velocity", "w","m/s" )
+        W = UpdraftVariable(nu, nzg, "full", "velocity", "w", "m/s")
 
-        Area = UpdraftVariable(nu, nzg, "half", "scalar", "area_fraction","[-]" )
-        QT = UpdraftVariable(nu, nzg, "half", "scalar", "qt","kg/kg" )
-        QL = UpdraftVariable(nu, nzg, "half", "scalar", "ql","kg/kg" )
-        RH = UpdraftVariable(nu, nzg, "half", "scalar", "RH","%" )
-        H = UpdraftVariable(nu, nzg, "half", "scalar", "thetal","K" )
+        Area = UpdraftVariable(nu, nzg, "half", "scalar", "area_fraction", "[-]")
+        QT = UpdraftVariable(nu, nzg, "half", "scalar", "qt", "kg/kg")
+        QL = UpdraftVariable(nu, nzg, "half", "scalar", "ql", "kg/kg")
+        RH = UpdraftVariable(nu, nzg, "half", "scalar", "RH", "%")
+        H = UpdraftVariable(nu, nzg, "half", "scalar", "thetal", "K")
         THL = UpdraftVariable(nu, nzg, "half", "scalar", "thetal", "K")
-        T   = UpdraftVariable(nu, nzg, "half", "scalar", "temperature","K" )
-        B   = UpdraftVariable(nu, nzg, "half", "scalar", "buoyancy","m^2/s^3" )
+        T = UpdraftVariable(nu, nzg, "half", "scalar", "temperature", "K")
+        B = UpdraftVariable(nu, nzg, "half", "scalar", "buoyancy", "m^2/s^3")
 
         prognostic = true
         updraft_fraction = paramlist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
@@ -264,17 +264,34 @@ mutable struct UpdraftVariables{A1}
         # cloud and rain diagnostics for output
         cloud_fraction = pyzeros(nzg)
 
-        cloud_base     = pyzeros(nu)
-        cloud_top      = pyzeros(nu)
-        cloud_cover    = pyzeros(nu)
-        updraft_top    = pyzeros(nu)
+        cloud_base = pyzeros(nu)
+        cloud_top = pyzeros(nu)
+        cloud_cover = pyzeros(nu)
+        updraft_top = pyzeros(nu)
 
-        lwp = 0.
+        lwp = 0.0
         A1 = typeof(cloud_fraction)
-        return new{A1}(Gr, n_updrafts, W, Area, QT, QL,
-            RH, H, THL, T, B, prognostic, updraft_fraction,
-            cloud_fraction, cloud_base, cloud_top, cloud_cover,
-            updraft_top, lwp)
+        return new{A1}(
+            Gr,
+            n_updrafts,
+            W,
+            Area,
+            QT,
+            QL,
+            RH,
+            H,
+            THL,
+            T,
+            B,
+            prognostic,
+            updraft_fraction,
+            cloud_fraction,
+            cloud_base,
+            cloud_top,
+            cloud_cover,
+            updraft_top,
+            lwp,
+        )
     end
 end
 
@@ -321,25 +338,36 @@ struct UpdraftThermodynamics{A1, A2}
     prec_source_qt::A2
     prec_source_h_tot::A1
     prec_source_qt_tot::A1
-    function UpdraftThermodynamics(n_updraft::Int,
-            Gr::Grid,
-            Ref::ReferenceState,
-            UpdVar::UpdraftVariables,
-            Rain::RainVariables
-        )
+    function UpdraftThermodynamics(
+        n_updraft::Int,
+        Gr::Grid,
+        Ref::ReferenceState,
+        UpdVar::UpdraftVariables,
+        Rain::RainVariables,
+    )
         t_to_prog_fp = t_to_thetali_c
         prog_to_t_fp = eos_first_guess_thetal
 
         # rain source from each updraft from all sub-timesteps
-        prec_source_h  = pyzeros(n_updraft, Gr.nzg)
+        prec_source_h = pyzeros(n_updraft, Gr.nzg)
         prec_source_qt = pyzeros(n_updraft, Gr.nzg)
 
         # rain source from all updrafts from all sub-timesteps
-        prec_source_h_tot  = pyzeros(Gr.nzg)
+        prec_source_h_tot = pyzeros(Gr.nzg)
         prec_source_qt_tot = pyzeros(Gr.nzg)
         A1 = typeof(prec_source_h_tot)
         A2 = typeof(prec_source_h)
-        return new{A1, A2}(Gr, Ref, n_updraft, t_to_prog_fp, prog_to_t_fp, prec_source_h, prec_source_qt, prec_source_h_tot, prec_source_qt_tot)
+        return new{A1, A2}(
+            Gr,
+            Ref,
+            n_updraft,
+            t_to_prog_fp,
+            prog_to_t_fp,
+            prec_source_h,
+            prec_source_qt,
+            prec_source_h_tot,
+            prec_source_qt_tot,
+        )
     end
 
 end
@@ -364,7 +392,7 @@ struct EnvironmentVariable{T}
         kind = kind
         name = name
         units = units
-        return new{typeof(values)}(values,flux,loc,kind,name,units)
+        return new{typeof(values)}(values, flux, loc, kind, name, units)
     end
 end
 
@@ -402,7 +430,8 @@ struct EnvironmentVariable_2m{A1}
         kind = kind
         name = name
         units = units
-        return new{typeof(values)}(values,
+        return new{typeof(values)}(
+            values,
             dissipation,
             shear,
             entr_gain,
@@ -414,7 +443,8 @@ struct EnvironmentVariable_2m{A1}
             loc,
             kind,
             name,
-            units)
+            units,
+        )
     end
 end
 
@@ -462,12 +492,12 @@ struct EnvironmentThermodynamics{A1}
     prec_source_qt::A1
     prec_source_h::A1
     function EnvironmentThermodynamics(
-            namelist,
-            Gr::Grid,
-            Ref::ReferenceState,
-            EnvVar::EnvironmentVariables,
-            Rain::RainVariables
-        )
+        namelist,
+        Gr::Grid,
+        Ref::ReferenceState,
+        EnvVar::EnvironmentVariables,
+        Rain::RainVariables,
+    )
         quadrature_order = try
             namelist["thermodynamics"]["quadrature_order"]
         catch
@@ -484,19 +514,20 @@ struct EnvironmentThermodynamics{A1}
         qt_dry = pyzeros(Gr.nzg)
         th_dry = pyzeros(Gr.nzg)
 
-        t_cloudy  = pyzeros(Gr.nzg)
+        t_cloudy = pyzeros(Gr.nzg)
         qv_cloudy = pyzeros(Gr.nzg)
         qt_cloudy = pyzeros(Gr.nzg)
         th_cloudy = pyzeros(Gr.nzg)
 
-        Hvar_rain_dt   = pyzeros(Gr.nzg)
-        QTvar_rain_dt  = pyzeros(Gr.nzg)
+        Hvar_rain_dt = pyzeros(Gr.nzg)
+        QTvar_rain_dt = pyzeros(Gr.nzg)
         HQTcov_rain_dt = pyzeros(Gr.nzg)
 
         prec_source_qt = pyzeros(Gr.nzg)
-        prec_source_h  = pyzeros(Gr.nzg)
+        prec_source_h = pyzeros(Gr.nzg)
         A1 = typeof(qt_dry)
-        return new{A1}(Gr,
+        return new{A1}(
+            Gr,
             Ref,
             quadrature_order,
             quadrature_type,
@@ -512,7 +543,8 @@ struct EnvironmentThermodynamics{A1}
             QTvar_rain_dt,
             HQTcov_rain_dt,
             prec_source_qt,
-            prec_source_h)
+            prec_source_h,
+        )
     end
 end
 
@@ -527,22 +559,14 @@ mutable struct ParameterizationBase{T}
     zi::Float64
     # A base class common to all turbulence parameterizations
     function ParameterizationBase(paramlist, Gr::Grid, Ref::ReferenceState)
-        turbulence_tendency  = pyzeros(Gr.nzg)
-        KM = VariableDiagnostic(Gr.nzg,"half", "scalar","sym", "diffusivity", "m^2/s") # eddy viscosity
-        KH = VariableDiagnostic(Gr.nzg,"half", "scalar","sym", "viscosity", "m^2/s") # eddy diffusivity
+        turbulence_tendency = pyzeros(Gr.nzg)
+        KM = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "diffusivity", "m^2/s") # eddy viscosity
+        KH = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "viscosity", "m^2/s") # eddy diffusivity
         # get values from paramlist
         prandtl_number = paramlist["turbulence"]["prandtl_number_0"]
         Ri_bulk_crit = paramlist["turbulence"]["Ri_bulk_crit"]
 
-        return new{typeof(turbulence_tendency)}(
-            turbulence_tendency,
-            Gr,
-            Ref,
-            KM,
-            KH,
-            prandtl_number,
-            Ri_bulk_crit,
-            0)
+        return new{typeof(turbulence_tendency)}(turbulence_tendency, Gr, Ref, KM, KH, prandtl_number, Ri_bulk_crit, 0)
     end
 end
 
@@ -590,9 +614,9 @@ struct RainPhysics{T}
     rain_evap_source_h::T
     rain_evap_source_qt::T
     function RainPhysics(Gr::Grid, Ref::ReferenceState)
-        rain_evap_source_h  = pyzeros(Gr.nzg)
+        rain_evap_source_h = pyzeros(Gr.nzg)
         rain_evap_source_qt = pyzeros(Gr.nzg)
-        return new{typeof(rain_evap_source_h)}(Gr,Ref,rain_evap_source_h,rain_evap_source_qt)
+        return new{typeof(rain_evap_source_h)}(Gr, Ref, rain_evap_source_h, rain_evap_source_qt)
     end
 end
 
@@ -607,25 +631,25 @@ struct RadiationStandard end
 struct RadiationDYCOMS_RF01 end
 
 Base.@kwdef mutable struct ForcingBase{T}
-    subsidence::AbstractArray{Float64,1} = zeros(1)
-    dTdt::AbstractArray{Float64,1} = zeros(1) # horizontal advection temperature tendency
-    dqtdt::AbstractArray{Float64,1} = zeros(1) # horizontal advection moisture tendency
+    subsidence::AbstractArray{Float64, 1} = zeros(1)
+    dTdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection temperature tendency
+    dqtdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection moisture tendency
     apply_coriolis::Bool = false
     apply_subsidence::Bool = false
     coriolis_param::Float64 = 0
-    ug::AbstractArray{Float64,1} = zeros(1)
-    vg::AbstractArray{Float64,1} = zeros(1)
+    ug::AbstractArray{Float64, 1} = zeros(1)
+    vg::AbstractArray{Float64, 1} = zeros(1)
     # (*convert_forcing_prog_fp)(p0, qt, qv, T,::Float64
     #                                   qt_tendency, T_tendency) ::Float64
-    convert_forcing_prog_fp::Function = x->x
+    convert_forcing_prog_fp::Function = x -> x
     Gr::Grid
     Ref::ReferenceState
 end
 
 Base.@kwdef mutable struct RadiationBase{T}
-    dTdt::AbstractArray{Float64,1} = zeros(1) # horizontal advection temperature tendency
-    dqtdt::AbstractArray{Float64,1} = zeros(1) # horizontal advection moisture tendency
-    convert_forcing_prog_fp::Function = x->x
+    dTdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection temperature tendency
+    dqtdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection moisture tendency
+    convert_forcing_prog_fp::Function = x -> x
     Gr::Grid
     Ref::ReferenceState
     divergence::Float64 = 0
@@ -633,7 +657,7 @@ Base.@kwdef mutable struct RadiationBase{T}
     kappa::Float64 = 0
     F0::Float64 = 0
     F1::Float64 = 0
-    f_rad::AbstractArray{Float64,1} = zeros(1)
+    f_rad::AbstractArray{Float64, 1} = zeros(1)
 end
 
 Base.@kwdef mutable struct CasesBase{T}
@@ -642,8 +666,8 @@ Base.@kwdef mutable struct CasesBase{T}
     Sur::SurfaceBase
     Fo::ForcingBase
     Rad::RadiationBase
-    rad_time::StepRangeLen = linspace(10,360;num=36) .* 60
-    rad::AbstractMatrix{Float64} = zeros(1,1)
+    rad_time::StepRangeLen = linspace(10, 360; num = 36) .* 60
+    rad::AbstractMatrix{Float64} = zeros(1, 1)
     lhf0::Float64 = 0
     shf0::Float64 = 0
 end
@@ -653,7 +677,7 @@ struct SimilarityED
     extrapolate_buoyancy::Bool
 end
 
-mutable struct EDMF_PrognosticTKE{A1,A2}
+mutable struct EDMF_PrognosticTKE{A1, A2}
     base::ParameterizationBase
     n_updrafts::Int
     calc_tke::Bool
@@ -775,7 +799,7 @@ mutable struct EDMF_PrognosticTKE{A1,A2}
         catch
             false
         end
-        if (calc_scalar_var==true && calc_tke==false)
+        if (calc_scalar_var == true && calc_tke == false)
             error("Turbulence--EDMF_PrognosticTKE: >>calculate_tke<< must be set to true when >>calc_scalar_var<< is true (to calculate the mixing length for the variance and covariance calculations")
         end
 
@@ -807,7 +831,7 @@ mutable struct EDMF_PrognosticTKE{A1,A2}
             println("Turbulence--EDMF_PrognosticTKE: defaulting to cloudy entrainment formulation")
             entr_detr_b_w2
         end
-        if(calc_tke == false && "tke" in string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]))
+        if (calc_tke == false && "tke" in string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]))
             error("Turbulence--EDMF_PrognosticTKE: >>calc_tke<< must be set to true when entrainment is using tke")
         end
 
@@ -855,12 +879,12 @@ mutable struct EDMF_PrognosticTKE{A1,A2}
             println("Turbulence--EDMF_PrognosticTKE: defaulting to TKE-based eddy diffusivity")
             false
         end
-        if(similarity_diffusivity == false && calc_tke ==false)
+        if (similarity_diffusivity == false && calc_tke == false)
             error("Turbulence--EDMF_PrognosticTKE: either >>use_similarity_diffusivity<< or >>calc_tke<< flag is needed to get the eddy diffusivities")
         end
 
-        if(similarity_diffusivity == true && calc_tke == true)
-           println("TKE will be calculated but not used for eddy diffusivity calculation")
+        if (similarity_diffusivity == true && calc_tke == true)
+            println("TKE will be calculated but not used for eddy diffusivity calculation")
         end
 
         extrapolate_buoyancy = try
@@ -901,8 +925,10 @@ mutable struct EDMF_PrognosticTKE{A1,A2}
 
         if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"]) == "normalmode"
             pressure_normalmode_buoy_coeff1, pressure_normalmode_buoy_coeff2 = try
-                (paramlist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"],
-                paramlist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff2"])
+                (
+                    paramlist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"],
+                    paramlist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff2"],
+                )
             catch
                 println("Using (Tan et al, 2018) parameters as default for Normal Mode pressure formula buoyancy term")
                 (pressure_buoy_coeff, 0.0)
@@ -911,8 +937,10 @@ mutable struct EDMF_PrognosticTKE{A1,A2}
 
         if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"]) == "normalmode"
             pressure_normalmode_adv_coeff, pressure_normalmode_drag_coeff = try
-                (paramlist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"],
-                paramlist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"])
+                (
+                    paramlist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"],
+                    paramlist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"],
+                )
             catch
                 println("Using (Tan et al, 2018) parameters as default for Normal Mode pressure formula drag term")
                 (0.0, 1.0)
@@ -920,7 +948,7 @@ mutable struct EDMF_PrognosticTKE{A1,A2}
         end
 
         # "Legacy" coefficients used by the steady updraft routine
-        vel_buoy_coeff = 1.0-pressure_buoy_coeff
+        vel_buoy_coeff = 1.0 - pressure_buoy_coeff
         if calc_tke == true
             tke_ed_coeff = paramlist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
             tke_diss_coeff = paramlist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"]
@@ -935,12 +963,12 @@ mutable struct EDMF_PrognosticTKE{A1,A2}
         Rain = RainVariables(namelist, Gr)
 
         # Create the updraft variable class (major diagnostic and prognostic variables)
-        UpdVar = UpdraftVariables(n_updrafts, namelist,paramlist, Gr)
+        UpdVar = UpdraftVariables(n_updrafts, namelist, paramlist, Gr)
         # Create the class for updraft thermodynamics
         UpdThermo = UpdraftThermodynamics(n_updrafts, Gr, Ref, UpdVar, Rain)
 
         # Create the environment variable class (major diagnostic and prognostic variables)
-        EnvVar = EnvironmentVariables(namelist,Gr)
+        EnvVar = EnvironmentVariables(namelist, Gr)
         # Create the class for environment thermodynamics
         EnvThermo = EnvironmentThermodynamics(namelist, Gr, Ref, EnvVar, Rain)
 
@@ -982,10 +1010,10 @@ mutable struct EDMF_PrognosticTKE{A1,A2}
         tke_advection = pyzeros(Gr.nzg)
 
         # Near-surface BC of updraft area fraction
-        area_surface_bc= pyzeros(n_updrafts)
-        w_surface_bc= pyzeros(n_updrafts)
-        h_surface_bc= pyzeros(n_updrafts)
-        qt_surface_bc= pyzeros(n_updrafts)
+        area_surface_bc = pyzeros(n_updrafts)
+        w_surface_bc = pyzeros(n_updrafts)
+        h_surface_bc = pyzeros(n_updrafts)
+        qt_surface_bc = pyzeros(n_updrafts)
         pressure_plume_spacing = pyzeros(n_updrafts)
 
         # Mass flux tendencies of mean scalars (for output)
@@ -1022,7 +1050,7 @@ mutable struct EDMF_PrognosticTKE{A1,A2}
         dt_upd = 0
         A1 = typeof(mixing_length)
         A2 = typeof(horizontal_KM)
-        return new{A1,A2}(
+        return new{A1, A2}(
             base,
             n_updrafts,
             calc_tke,
@@ -1114,7 +1142,8 @@ mutable struct EDMF_PrognosticTKE{A1,A2}
             wstar,
             entr_surface_bc,
             detr_surface_bc,
-            dt_upd)
+            dt_upd,
+        )
     end
 end
 grid(edmf::EDMF_PrognosticTKE) = edmf.base.Gr

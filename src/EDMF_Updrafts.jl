@@ -1,23 +1,23 @@
-function set_bcs(self::UpdraftVariable,Gr::Grid)
+function set_bcs(self::UpdraftVariable, Gr::Grid)
     start_low = Gr.gw - 1
     start_high = Gr.nzg - Gr.gw - 1
 
     n_updrafts = size(self.values)[1]
 
     if self.name == "w"
-      @inbounds for i in xrange(n_updrafts)
-            self.values[i,start_high] = 0.0
-            self.values[i,start_low] = 0.0
-          @inbounds for k in xrange(1,Gr.gw)
-                self.values[i,start_high+ k] = -self.values[i,start_high - k ]
-                self.values[i,start_low- k] = -self.values[i,start_low + k  ]
+        @inbounds for i in xrange(n_updrafts)
+            self.values[i, start_high] = 0.0
+            self.values[i, start_low] = 0.0
+            @inbounds for k in xrange(1, Gr.gw)
+                self.values[i, start_high + k] = -self.values[i, start_high - k]
+                self.values[i, start_low - k] = -self.values[i, start_low + k]
             end
         end
     else
-      @inbounds for k in xrange(Gr.gw)
-          @inbounds for i in xrange(n_updrafts)
-                self.values[i,start_high+k+1] = self.values[i,start_high  - k]
-                self.values[i,start_low-k] = self.values[i,start_low + 1 + k]
+        @inbounds for k in xrange(Gr.gw)
+            @inbounds for i in xrange(n_updrafts)
+                self.values[i, start_high + k + 1] = self.values[i, start_high - k]
+                self.values[i, start_low - k] = self.values[i, start_low + 1 + k]
             end
         end
     end
@@ -28,24 +28,24 @@ function initialize(self::UpdraftVariables, GMV::GridMeanVariables)
     gw = self.Gr.gw
     dz = self.Gr.dz
 
-  @inbounds for i in xrange(self.n_updrafts)
-      @inbounds for k in xrange(self.Gr.nzg)
-            self.W.values[i,k] = 0.0
+    @inbounds for i in xrange(self.n_updrafts)
+        @inbounds for k in xrange(self.Gr.nzg)
+            self.W.values[i, k] = 0.0
             # Simple treatment for now, revise when multiple updraft closures
             # become more well defined
             if self.prognostic
-                self.Area.values[i,k] = 0.0 #self.updraft_fraction/self.n_updrafts
+                self.Area.values[i, k] = 0.0 #self.updraft_fraction/self.n_updrafts
             else
-                self.Area.values[i,k] = self.updraft_fraction/self.n_updrafts
+                self.Area.values[i, k] = self.updraft_fraction / self.n_updrafts
             end
-            self.QT.values[i,k] = GMV.QT.values[k]
-            self.QL.values[i,k] = GMV.QL.values[k]
-            self.H.values[i,k]  = GMV.H.values[k]
-            self.T.values[i,k]  = GMV.T.values[k]
-            self.B.values[i,k]  = 0.0
+            self.QT.values[i, k] = GMV.QT.values[k]
+            self.QL.values[i, k] = GMV.QL.values[k]
+            self.H.values[i, k] = GMV.H.values[k]
+            self.T.values[i, k] = GMV.T.values[k]
+            self.B.values[i, k] = 0.0
         end
 
-        self.Area.values[i,gw] = self.updraft_fraction/self.n_updrafts
+        self.Area.values[i, gw] = self.updraft_fraction / self.n_updrafts
     end
 
     set_bcs(self.QT, self.Gr)
@@ -59,6 +59,7 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
     dz = self.Gr.dz
 
     # criterion 2: b>1e-4
+    #! format: off
     z_in = [
           75.,  125.,  175.,  225.,  275.,  325.,  375.,  425.,  475.,
          525.,  575.,  625.,  675.,  725.,  775.,  825.,  875.,  925.,
@@ -68,8 +69,7 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
         2325., 2375., 2425., 2475., 2525., 2575., 2625., 2675., 2725.,
         2775., 2825., 2875., 2925., 2975., 3025., 3075., 3125., 3175.,
         3225., 3275., 3325., 3375., 3425., 3475., 3525., 3575., 3625.,
-        3675., 3725., 3775., 3825., 3875., 3925.
-    ]
+        3675., 3725., 3775., 3825., 3875., 3925.]
 
     thetal_in = [
         299.9882, 299.996 , 300.0063, 300.0205, 300.04  , 300.0594,
@@ -84,8 +84,7 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
         300.8108, 300.7806, 300.7256, 300.6701, 300.6338, 300.5772,
         300.5212, 300.482 , 300.4272, 300.3875, 300.3354, 300.2968,
         300.2587, 300.2216, 300.1782, 300.1452, 300.1143, 300.0859,
-        300.0603, 300.0408, 300.0211, 300.0067, 299.9963, 299.9884
-    ]
+        300.0603, 300.0408, 300.0211, 300.0067, 299.9963, 299.9884    ]
 
     Area_in = [
         0.04 , 0.055, 0.07 , 0.08 , 0.085, 0.095, 0.1  , 0.105, 0.11 ,
@@ -96,8 +95,7 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
         0.155, 0.155, 0.155, 0.155, 0.155, 0.155, 0.15 , 0.15 , 0.15 ,
         0.15 , 0.145, 0.145, 0.145, 0.14 , 0.14 , 0.14 , 0.135, 0.135,
         0.13 , 0.13 , 0.125, 0.12 , 0.115, 0.115, 0.11 , 0.105, 0.1  ,
-        0.095, 0.085, 0.08 , 0.07 , 0.055, 0.04
-    ]
+        0.095, 0.085, 0.08 , 0.07 , 0.055, 0.04    ]
 
     W_in = [
         0.017 , 0.0266, 0.0344, 0.0417, 0.0495, 0.0546, 0.061 , 0.0668,
@@ -109,8 +107,7 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
         0.1686, 0.1664, 0.1639, 0.1698, 0.1667, 0.1634, 0.1599, 0.1641,
         0.1601, 0.1559, 0.1589, 0.1543, 0.1496, 0.1514, 0.1464, 0.1475,
         0.1422, 0.1425, 0.1424, 0.1419, 0.1361, 0.135 , 0.1335, 0.1316,
-        0.1294, 0.1302, 0.1271, 0.1264, 0.1269, 0.1256
-    ]
+        0.1294, 0.1302, 0.1271, 0.1264, 0.1269, 0.1256    ]
 
     T_in = [
         299.2557, 298.775 , 298.2969, 297.8227, 297.3536, 296.8843,
@@ -125,27 +122,27 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
         273.6327, 273.1155, 272.576 , 272.0363, 271.514 , 270.9736,
         270.4339, 269.9094, 269.3711, 268.8465, 268.311 , 267.7877,
         267.2649, 266.7432, 266.2159, 265.698 , 265.1821, 264.6685,
-        264.1574, 263.6518, 263.1461, 262.6451, 262.1476, 261.6524
-    ]
+        264.1574, 263.6518, 263.1461, 262.6451, 262.1476, 261.6524]
+    #! format: on
 
     z_in = off_arr(z_in)
     Area_in = off_arr(Area_in)
     thetal_in = off_arr(thetal_in)
     T_in = off_arr(T_in)
 
-    Area_in = off_arr(pyinterp(self.Gr.z_half,z_in,Area_in))
-    thetal_in = off_arr(pyinterp(self.Gr.z_half,z_in,thetal_in))
-    T_in = off_arr(pyinterp(self.Gr.z_half,z_in,T_in))
-  @inbounds for i in xrange(self.n_updrafts)
-      @inbounds for k in xrange(self.Gr.nzg)
-            if minimum(z_in)<=self.Gr.z_half[k]<=maximum(z_in)
-                self.W.values[i,k] = 0.0
-                self.Area.values[i,k] = Area_in[k] #self.updraft_fraction/self.n_updrafts
-                self.H.values[i,k] = thetal_in[k]
-                self.QT.values[i,k] = 0.0
-                self.QL.values[i,k] = 0.0
+    Area_in = off_arr(pyinterp(self.Gr.z_half, z_in, Area_in))
+    thetal_in = off_arr(pyinterp(self.Gr.z_half, z_in, thetal_in))
+    T_in = off_arr(pyinterp(self.Gr.z_half, z_in, T_in))
+    @inbounds for i in xrange(self.n_updrafts)
+        @inbounds for k in xrange(self.Gr.nzg)
+            if minimum(z_in) <= self.Gr.z_half[k] <= maximum(z_in)
+                self.W.values[i, k] = 0.0
+                self.Area.values[i, k] = Area_in[k] #self.updraft_fraction/self.n_updrafts
+                self.H.values[i, k] = thetal_in[k]
+                self.QT.values[i, k] = 0.0
+                self.QL.values[i, k] = 0.0
 
-                self.T.values[i,k] = T_in[k]
+                self.T.values[i, k] = T_in[k]
                 # for now temperature is provided as diagnostics from LES
 
                 # sa = eos(
@@ -157,9 +154,9 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
                 # )
                 # self.T.values[i,k] = sa.T
             else
-                self.Area.values[i,k] = 0.0 #self.updraft_fraction/self.n_updrafts
-                self.H.values[i,k] = GMV.THL.values[k]
-                self.T.values[i,k] = GMV.T.values[k]
+                self.Area.values[i, k] = 0.0 #self.updraft_fraction/self.n_updrafts
+                self.H.values[i, k] = GMV.THL.values[k]
+                self.T.values[i, k] = GMV.T.values[k]
             end
         end
     end
@@ -211,17 +208,19 @@ function set_means(self::UpdraftVariables, GMV::GridMeanVariables)
     self.B.bulkvalues .= 0.0
     self.RH.bulkvalues .= 0.0
 
-  @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg-self.Gr.gw)
+    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
         if self.Area.bulkvalues[k] > 1.0e-20
-          @inbounds for i in xrange(self.n_updrafts)
-                self.QT.bulkvalues[k] += self.Area.values[i,k] * self.QT.values[i,k]/self.Area.bulkvalues[k]
-                self.QL.bulkvalues[k] += self.Area.values[i,k] * self.QL.values[i,k]/self.Area.bulkvalues[k]
-                self.H.bulkvalues[k] += self.Area.values[i,k] * self.H.values[i,k]/self.Area.bulkvalues[k]
-                self.T.bulkvalues[k] += self.Area.values[i,k] * self.T.values[i,k]/self.Area.bulkvalues[k]
-                self.RH.bulkvalues[k] += self.Area.values[i,k] * self.RH.values[i,k]/self.Area.bulkvalues[k]
-                self.B.bulkvalues[k] += self.Area.values[i,k] * self.B.values[i,k]/self.Area.bulkvalues[k]
-                self.W.bulkvalues[k] += ((self.Area.values[i,k] + self.Area.values[i,k+1]) * self.W.values[i,k]
-                                    /(self.Area.bulkvalues[k] + self.Area.bulkvalues[k+1]))
+            @inbounds for i in xrange(self.n_updrafts)
+                self.QT.bulkvalues[k] += self.Area.values[i, k] * self.QT.values[i, k] / self.Area.bulkvalues[k]
+                self.QL.bulkvalues[k] += self.Area.values[i, k] * self.QL.values[i, k] / self.Area.bulkvalues[k]
+                self.H.bulkvalues[k] += self.Area.values[i, k] * self.H.values[i, k] / self.Area.bulkvalues[k]
+                self.T.bulkvalues[k] += self.Area.values[i, k] * self.T.values[i, k] / self.Area.bulkvalues[k]
+                self.RH.bulkvalues[k] += self.Area.values[i, k] * self.RH.values[i, k] / self.Area.bulkvalues[k]
+                self.B.bulkvalues[k] += self.Area.values[i, k] * self.B.values[i, k] / self.Area.bulkvalues[k]
+                self.W.bulkvalues[k] += (
+                    (self.Area.values[i, k] + self.Area.values[i, k + 1]) * self.W.values[i, k] /
+                    (self.Area.bulkvalues[k] + self.Area.bulkvalues[k + 1])
+                )
             end
 
         else
@@ -237,7 +236,7 @@ function set_means(self::UpdraftVariables, GMV::GridMeanVariables)
         if self.QL.bulkvalues[k] > 1e-8 && self.Area.bulkvalues[k] > 1e-3
             self.cloud_fraction[k] = 1.0
         else
-            self.cloud_fraction[k] = 0.
+            self.cloud_fraction[k] = 0.0
         end
     end
     return
@@ -245,52 +244,52 @@ end
 
 # quick utility to set "new" arrays with values in the "values" arrays
 function set_new_with_values(self::UpdraftVariables)
-      @inbounds for i in xrange(self.n_updrafts)
-          @inbounds for k in xrange(self.Gr.nzg)
-                self.W.new[i,k] = self.W.values[i,k]
-                self.Area.new[i,k] = self.Area.values[i,k]
-                self.QT.new[i,k] = self.QT.values[i,k]
-                self.QL.new[i,k] = self.QL.values[i,k]
-                self.H.new[i,k] = self.H.values[i,k]
-                self.THL.new[i,k] = self.THL.values[i,k]
-                self.T.new[i,k] = self.T.values[i,k]
-                self.B.new[i,k] = self.B.values[i,k]
-            end
+    @inbounds for i in xrange(self.n_updrafts)
+        @inbounds for k in xrange(self.Gr.nzg)
+            self.W.new[i, k] = self.W.values[i, k]
+            self.Area.new[i, k] = self.Area.values[i, k]
+            self.QT.new[i, k] = self.QT.values[i, k]
+            self.QL.new[i, k] = self.QL.values[i, k]
+            self.H.new[i, k] = self.H.values[i, k]
+            self.THL.new[i, k] = self.THL.values[i, k]
+            self.T.new[i, k] = self.T.values[i, k]
+            self.B.new[i, k] = self.B.values[i, k]
         end
+    end
     return
 end
 
-    # quick utility to set "new" arrays with values in the "values" arrays
+# quick utility to set "new" arrays with values in the "values" arrays
 function set_old_with_values(self::UpdraftVariables)
-      @inbounds for i in xrange(self.n_updrafts)
-          @inbounds for k in xrange(self.Gr.nzg)
-                self.W.old[i,k] = self.W.values[i,k]
-                self.Area.old[i,k] = self.Area.values[i,k]
-                self.QT.old[i,k] = self.QT.values[i,k]
-                self.QL.old[i,k] = self.QL.values[i,k]
-                self.H.old[i,k] = self.H.values[i,k]
-                self.THL.old[i,k] = self.THL.values[i,k]
-                self.T.old[i,k] = self.T.values[i,k]
-                self.B.old[i,k] = self.B.values[i,k]
-            end
+    @inbounds for i in xrange(self.n_updrafts)
+        @inbounds for k in xrange(self.Gr.nzg)
+            self.W.old[i, k] = self.W.values[i, k]
+            self.Area.old[i, k] = self.Area.values[i, k]
+            self.QT.old[i, k] = self.QT.values[i, k]
+            self.QL.old[i, k] = self.QL.values[i, k]
+            self.H.old[i, k] = self.H.values[i, k]
+            self.THL.old[i, k] = self.THL.values[i, k]
+            self.T.old[i, k] = self.T.values[i, k]
+            self.B.old[i, k] = self.B.values[i, k]
         end
+    end
     return
 end
 
-    # quick utility to set "tmp" arrays with values in the "new" arrays
+# quick utility to set "tmp" arrays with values in the "new" arrays
 function set_values_with_new(self::UpdraftVariables)
-      @inbounds for i in xrange(self.n_updrafts)
-          @inbounds for k in xrange(self.Gr.nzg)
-                self.W.values[i,k] = self.W.new[i,k]
-                self.Area.values[i,k] = self.Area.new[i,k]
-                self.QT.values[i,k] = self.QT.new[i,k]
-                self.QL.values[i,k] = self.QL.new[i,k]
-                self.H.values[i,k] = self.H.new[i,k]
-                self.THL.values[i,k] = self.THL.new[i,k]
-                self.T.values[i,k] = self.T.new[i,k]
-                self.B.values[i,k] = self.B.new[i,k]
-            end
+    @inbounds for i in xrange(self.n_updrafts)
+        @inbounds for k in xrange(self.Gr.nzg)
+            self.W.values[i, k] = self.W.new[i, k]
+            self.Area.values[i, k] = self.Area.new[i, k]
+            self.QT.values[i, k] = self.QT.new[i, k]
+            self.QL.values[i, k] = self.QL.new[i, k]
+            self.H.values[i, k] = self.H.new[i, k]
+            self.THL.values[i, k] = self.THL.new[i, k]
+            self.T.values[i, k] = self.T.new[i, k]
+            self.B.values[i, k] = self.B.new[i, k]
         end
+    end
     return
 end
 
@@ -320,33 +319,32 @@ function io(self::UpdraftVariables, Stats::NetCDFIO_Stats, Ref::ReferenceState)
     # itself (i.e. no consideration of tilting due to shear) while the updraft classes are assumed to have no overlap
     # at all. Thus total updraft cover is the sum of each updraft"s cover
     write_ts(Stats, "updraft_cloud_cover", sum(self.cloud_cover))
-    write_ts(Stats, "updraft_cloud_base",  minimum(abs.(self.cloud_base)))
-    write_ts(Stats, "updraft_cloud_top",   maximum(abs.(self.cloud_top)))
-    write_ts(Stats, "updraft_lwp",         self.lwp)
+    write_ts(Stats, "updraft_cloud_base", minimum(abs.(self.cloud_base)))
+    write_ts(Stats, "updraft_cloud_top", maximum(abs.(self.cloud_top)))
+    write_ts(Stats, "updraft_lwp", self.lwp)
     return
 end
 
 function upd_cloud_diagnostics(self::UpdraftVariables, Ref::ReferenceState)
-    self.lwp = 0.
+    self.lwp = 0.0
 
     @inbounds for i in xrange(self.n_updrafts)
         #TODO check the setting of ghost point z_half
 
-        self.cloud_base[i] = self.Gr.z_half[self.Gr.nzg-self.Gr.gw-1]
+        self.cloud_base[i] = self.Gr.z_half[self.Gr.nzg - self.Gr.gw - 1]
         self.cloud_top[i] = 0.0
         self.updraft_top[i] = 0.0
         self.cloud_cover[i] = 0.0
 
-        @inbounds for k in xrange(self.Gr.gw,self.Gr.nzg-self.Gr.gw)
-
-            if self.Area.values[i,k] > 1e-3
+        @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+            if self.Area.values[i, k] > 1e-3
                 self.updraft_top[i] = fmax(self.updraft_top[i], self.Gr.z_half[k])
-                self.lwp += Ref.rho0_half[k] * self.QL.values[i,k] * self.Area.values[i,k] * self.Gr.dz
+                self.lwp += Ref.rho0_half[k] * self.QL.values[i, k] * self.Area.values[i, k] * self.Gr.dz
 
-                if self.QL.values[i,k] > 1e-8
-                    self.cloud_base[i]  = fmin(self.cloud_base[i],  self.Gr.z_half[k])
-                    self.cloud_top[i]   = fmax(self.cloud_top[i],   self.Gr.z_half[k])
-                    self.cloud_cover[i] = fmax(self.cloud_cover[i], self.Area.values[i,k])
+                if self.QL.values[i, k] > 1e-8
+                    self.cloud_base[i] = fmin(self.cloud_base[i], self.Gr.z_half[k])
+                    self.cloud_top[i] = fmax(self.cloud_top[i], self.Gr.z_half[k])
+                    self.cloud_cover[i] = fmax(self.cloud_cover[i], self.Area.values[i, k])
                 end
             end
         end
@@ -368,18 +366,18 @@ end
 sum precipitation source terms for QT and H from all sub-timesteps
 """
 function update_total_precip_sources(self::UpdraftThermodynamics)
-    self.prec_source_h_tot  .= up_sum(self.prec_source_h)
+    self.prec_source_h_tot .= up_sum(self.prec_source_h)
     self.prec_source_qt_tot .= up_sum(self.prec_source_qt)
     return
 end
 
 function buoyancy(
-        self::UpdraftThermodynamics,
-        UpdVar::UpdraftVariables,
-        EnvVar::EnvironmentVariables,
-        GMV::GridMeanVariables,
-        extrap::Bool
-    )
+    self::UpdraftThermodynamics,
+    UpdVar::UpdraftVariables,
+    EnvVar::EnvironmentVariables,
+    GMV::GridMeanVariables,
+    extrap::Bool,
+)
 
     gw = self.Gr.gw
     qt = 0.0
@@ -390,58 +388,59 @@ function buoyancy(
     if !extrap
         @inbounds for i in xrange(self.n_updraft)
             @inbounds for k in xrange(self.Gr.nzg)
-                if UpdVar.Area.values[i,k] > 0.0
-                    qv = UpdVar.QT.values[i,k] - UpdVar.QL.values[i,k]
-                    rho = rho_c(self.Ref.p0_half[k], UpdVar.T.values[i,k], UpdVar.QT.values[i,k], qv)
-                    UpdVar.B.values[i,k] = buoyancy_c(self.Ref.rho0_half[k], rho)
+                if UpdVar.Area.values[i, k] > 0.0
+                    qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
+                    rho = rho_c(self.Ref.p0_half[k], UpdVar.T.values[i, k], UpdVar.QT.values[i, k], qv)
+                    UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
                 else
-                    UpdVar.B.values[i,k] = EnvVar.B.values[k]
+                    UpdVar.B.values[i, k] = EnvVar.B.values[k]
                 end
-                UpdVar.RH.values[i,k] = relative_humidity_c(self.Ref.p0_half[k], UpdVar.QT.values[i,k],
-                                            UpdVar.QL.values[i,k], 0.0, UpdVar.T.values[i,k])
+                UpdVar.RH.values[i, k] = relative_humidity_c(
+                    self.Ref.p0_half[k],
+                    UpdVar.QT.values[i, k],
+                    UpdVar.QL.values[i, k],
+                    0.0,
+                    UpdVar.T.values[i, k],
+                )
             end
         end
     else
         @inbounds for i in xrange(self.n_updraft)
-            @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg-self.Gr.gw)
-                if UpdVar.Area.values[i,k] > 0.0
-                    qt = UpdVar.QT.values[i,k]
-                    qv = UpdVar.QT.values[i,k] - UpdVar.QL.values[i,k]
-                    h = UpdVar.H.values[i,k]
-                    t = UpdVar.T.values[i,k]
+            @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+                if UpdVar.Area.values[i, k] > 0.0
+                    qt = UpdVar.QT.values[i, k]
+                    qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
+                    h = UpdVar.H.values[i, k]
+                    t = UpdVar.T.values[i, k]
                     rho = rho_c(self.Ref.p0_half[k], t, qt, qv)
-                    UpdVar.B.values[i,k] = buoyancy_c(self.Ref.rho0_half[k], rho)
-                    UpdVar.RH.values[i,k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt-qv, 0.0, t)
-                elseif UpdVar.Area.values[i,k-1] > 0.0 && k>self.Gr.gw
+                    UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
+                    UpdVar.RH.values[i, k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, t)
+                elseif UpdVar.Area.values[i, k - 1] > 0.0 && k > self.Gr.gw
                     # TODO: report bug:
                     # qt and h were not defined here before the function call.
-                    sa = eos(self.t_to_prog_fp,
-                        self.prog_to_t_fp,
-                        self.Ref.p0_half[k],
-                        qt,
-                        h)
+                    sa = eos(self.t_to_prog_fp, self.prog_to_t_fp, self.Ref.p0_half[k], qt, h)
                     qt -= sa.ql
                     qv = qt
                     t = sa.T
                     rho = rho_c(self.Ref.p0_half[k], t, qt, qv)
-                    UpdVar.B.values[i,k] = buoyancy_c(self.Ref.rho0_half[k], rho)
-                    UpdVar.RH.values[i,k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt-qv, 0.0, t)
+                    UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
+                    UpdVar.RH.values[i, k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, t)
                 else
-                    UpdVar.B.values[i,k] = EnvVar.B.values[k]
-                    UpdVar.RH.values[i,k] = EnvVar.RH.values[k]
+                    UpdVar.B.values[i, k] = EnvVar.B.values[k]
+                    UpdVar.RH.values[i, k] = EnvVar.RH.values[k]
                 end
             end
         end
     end
 
 
-    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg-self.Gr.gw)
+    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
         GMV.B.values[k] = (1.0 - UpdVar.Area.bulkvalues[k]) * EnvVar.B.values[k]
         @inbounds for i in xrange(self.n_updraft)
-            GMV.B.values[k] += UpdVar.Area.values[i,k] * UpdVar.B.values[i,k]
+            GMV.B.values[k] += UpdVar.Area.values[i, k] * UpdVar.B.values[i, k]
         end
         @inbounds for i in xrange(self.n_updraft)
-            UpdVar.B.values[i,k] -= GMV.B.values[k]
+            UpdVar.B.values[i, k] -= GMV.B.values[k]
         end
         EnvVar.B.values[k] -= GMV.B.values[k]
     end
@@ -463,24 +462,24 @@ function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rai
             # autoconversion and accretion
             mph = microphysics_rain_src(
                 Rain.rain_model,
-                UpdVar.QT.new[i,k],
-                UpdVar.QL.new[i,k],
+                UpdVar.QT.new[i, k],
+                UpdVar.QL.new[i, k],
                 Rain.Upd_QR.values[k],
-                UpdVar.Area.new[i,k],
-                UpdVar.T.new[i,k],
+                UpdVar.Area.new[i, k],
+                UpdVar.T.new[i, k],
                 self.Ref.p0_half[k],
                 self.Ref.rho0_half[k],
-                dt
+                dt,
             )
 
             # update Updraft.new
-            UpdVar.QT.new[i,k] = mph.qt
-            UpdVar.QL.new[i,k] = mph.ql
-            UpdVar.H.new[i,k]  = mph.thl
+            UpdVar.QT.new[i, k] = mph.qt
+            UpdVar.QL.new[i, k] = mph.ql
+            UpdVar.H.new[i, k] = mph.thl
 
             # update rain sources of state variables
-            self.prec_source_qt[i,k] -= mph.qr_src * UpdVar.Area.new[i,k]
-            self.prec_source_h[i,k]  += mph.thl_rain_src * UpdVar.Area.new[i,k]
+            self.prec_source_qt[i, k] -= mph.qr_src * UpdVar.Area.new[i, k]
+            self.prec_source_h[i, k] += mph.thl_rain_src * UpdVar.Area.new[i, k]
         end
     end
     return

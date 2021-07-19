@@ -13,7 +13,7 @@ function TimeStepping(namelist)
         1.0
     end
 
-    dti = 1.0/dt
+    dti = 1.0 / dt
 
     t_max = try
         namelist["time_stepping"]["t_max"]
@@ -25,7 +25,7 @@ function TimeStepping(namelist)
     t = 0.0
     nstep = 0
 
-    return TimeStepping(dt,dti,t_max,t,nstep)
+    return TimeStepping(dt, dti, t_max, t, nstep)
 end
 
 function update(self)

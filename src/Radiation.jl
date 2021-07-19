@@ -24,14 +24,14 @@ io(self::RadiationBase{RadiationNone}, Stats::NetCDFIO_Stats) = nothing
 function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariables)
     initialize(self, GMV, RadiationBaseType())
 
-    
+
     self.divergence = 3.75e-6  # divergence is defined twice: here and in initialize_forcing method of DYCOMS_RF01 case class
-                               # where it is used to initialize large scale subsidence
-    self.alpha_z    = 1.
-    self.kappa      = 85.
-    self.F0         = 70.
-    self.F1         = 22.
-    self.divergence = 3.75e-6 
+    # where it is used to initialize large scale subsidence
+    self.alpha_z = 1.0
+    self.kappa = 85.0
+    self.F0 = 70.0
+    self.F1 = 22.0
+    self.divergence = 3.75e-6
     self.f_rad = pyzeros(self.Gr.nzg + 1) # radiative flux at cell edges
     return
 end
@@ -48,8 +48,8 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
         if (GMV.QT.values[k] < 8.0 / 1000)
             idx_zi = k
             # will be used at cell edges
-            zi     = self.Gr.z[idx_zi]
-            rhoi   = self.Ref.rho0[idx_zi]
+            zi = self.Gr.z[idx_zi]
+            rhoi = self.Ref.rho0[idx_zi]
             break
         end
     end
@@ -59,23 +59,23 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
 
     self.f_rad = pyzeros(self.Gr.nzg + 1)
     self.f_rad[self.Gr.nzg] = self.F0 * exp(-q_0)
-    @inbounds for k in revxrange(self.Gr.nzg-1, 0, -1)
-        q_0           += self.kappa * self.Ref.rho0_half[k] * GMV.QL.values[k] * self.Gr.dz
-        self.f_rad[k]  = self.F0 * exp(-q_0)
+    @inbounds for k in revxrange(self.Gr.nzg - 1, 0, -1)
+        q_0 += self.kappa * self.Ref.rho0_half[k] * GMV.QL.values[k] * self.Gr.dz
+        self.f_rad[k] = self.F0 * exp(-q_0)
     end
 
     # cloud-base warming
     q_1 = 0.0
     self.f_rad[0] += self.F1 * exp(-q_1)
     @inbounds for k in xrange(1, self.Gr.nzg + 1)
-        q_1           += self.kappa * self.Ref.rho0_half[k - 1] * GMV.QL.values[k - 1] * self.Gr.dz
+        q_1 += self.kappa * self.Ref.rho0_half[k - 1] * GMV.QL.values[k - 1] * self.Gr.dz
         self.f_rad[k] += self.F1 * exp(-q_1)
     end
 
     # cooling in free troposphere
     @inbounds for k in xrange(0, self.Gr.nzg)
         if self.Gr.z[k] > zi
-            cbrt_z         = cbrt(self.Gr.z[k] - zi)
+            cbrt_z = cbrt(self.Gr.z[k] - zi)
             self.f_rad[k] += rhoi * dycoms_cp * self.divergence * self.alpha_z * (power(cbrt_z, 4) / 4.0 + zi * cbrt_z)
         end
     end
@@ -84,11 +84,12 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
     # is equivalent.
     k_last = last(xrange(0, self.Gr.nzg))
     # condition at the top
-    cbrt_z                   = cbrt(self.Gr.z[k_last] + self.Gr.dz - zi)
-    self.f_rad[self.Gr.nzg] += rhoi * dycoms_cp * self.divergence * self.alpha_z * (power(cbrt_z, 4) / 4.0 + zi * cbrt_z)
+    cbrt_z = cbrt(self.Gr.z[k_last] + self.Gr.dz - zi)
+    self.f_rad[self.Gr.nzg] +=
+        rhoi * dycoms_cp * self.divergence * self.alpha_z * (power(cbrt_z, 4) / 4.0 + zi * cbrt_z)
 
     @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
-        self.dTdt[k] = - (self.f_rad[k + 1] - self.f_rad[k]) / self.Gr.dz / self.Ref.rho0_half[k] / dycoms_cp
+        self.dTdt[k] = -(self.f_rad[k + 1] - self.f_rad[k]) / self.Gr.dz / self.Ref.rho0_half[k] / dycoms_cp
     end
 
     return
@@ -98,10 +99,17 @@ function update(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariable
 
     calculate_radiation(self, GMV)
 
-    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg-self.Gr.gw)
+    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
         # Apply large-scale horizontal advection tendencies
         qv = GMV.QT.values[k] - GMV.QL.values[k]
-        GMV.H.tendencies[k]  += self.convert_forcing_prog_fp(self.Ref.p0_half[k],GMV.QT.values[k], qv, GMV.T.values[k], self.dqtdt[k], self.dTdt[k])
+        GMV.H.tendencies[k] += self.convert_forcing_prog_fp(
+            self.Ref.p0_half[k],
+            GMV.QT.values[k],
+            qv,
+            GMV.T.values[k],
+            self.dqtdt[k],
+            self.dTdt[k],
+        )
     end
 
     return

@@ -12,8 +12,8 @@ mutable struct NetCDFIO_Stats
     frequency::Float64
     stats_path::String
     path_plus_file::String
-    vars::Dict{String,Any} # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    function NetCDFIO_Stats(namelist, paramlist, Gr::Grid, inpath=pwd())
+    vars::Dict{String, Any} # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
+    function NetCDFIO_Stats(namelist, paramlist, Gr::Grid, inpath = pwd())
 
         # Initialize properties with valid type:
         tmp = tempname()
@@ -83,7 +83,7 @@ mutable struct NetCDFIO_Stats
             defDim(ts_grp, "t", Inf)
             defVar(ts_grp, "t", Float64, ("t",))
         end
-        vars = Dict{String,Any}()
+        vars = Dict{String, Any}()
         return new(
             root_grp,
             profiles_grp,
@@ -94,7 +94,7 @@ mutable struct NetCDFIO_Stats
             frequency,
             stats_path,
             path_plus_file,
-            vars
+            vars,
         )
     end
 end
@@ -107,11 +107,11 @@ function open_files(self)
     vars = self.vars
 
     # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    vars["profiles"] = Dict{String,Any}()
+    vars["profiles"] = Dict{String, Any}()
     for k in keys(self.profiles_grp)
         vars["profiles"][k] = self.profiles_grp[k]
     end
-    vars["timeseries"] = Dict{String,Any}()
+    vars["timeseries"] = Dict{String, Any}()
     for k in keys(self.ts_grp)
         vars["timeseries"][k] = self.ts_grp[k]
     end
@@ -151,12 +151,12 @@ Parameters
 var_name :: name of variables
 data :: data to be written to file
 """
-function write_reference_profile(self::NetCDFIO_Stats, var_name, data::T) where {T <: AbstractArray{Float64,1}}
+function write_reference_profile(self::NetCDFIO_Stats, var_name, data::T) where {T <: AbstractArray{Float64, 1}}
 
     Dataset(self.path_plus_file, "a") do root_grp
         reference_grp = root_grp.group["reference"]
         var = reference_grp[var_name]
-        var .= data :: T
+        var .= data::T
     end
 end
 
@@ -164,7 +164,7 @@ end
 ##### Performance critical IO
 #####
 
-function write_profile(self::NetCDFIO_Stats, var_name::String, data::T) where {T <: AbstractArray{Float64,1}}
+function write_profile(self::NetCDFIO_Stats, var_name::String, data::T) where {T <: AbstractArray{Float64, 1}}
     # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
     @inbounds self.vars["profiles"][var_name][:, end] = data
     # Ideally, we remove self.vars and use:
@@ -175,7 +175,7 @@ end
 
 function write_ts(self::NetCDFIO_Stats, var_name::String, data::Float64)
     # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    @inbounds self.vars["timeseries"][var_name][end] = data :: Float64
+    @inbounds self.vars["timeseries"][var_name][end] = data::Float64
     # Ideally, we remove self.vars and use:
     # var = self.ts_grp[var_name]
     # @inbounds var[end+1] = data :: Float64
@@ -184,9 +184,9 @@ end
 function write_simulation_time(self::NetCDFIO_Stats, t::Float64)
     # # Write to profiles group
     profile_t = self.profiles_grp["t"]
-    @inbounds profile_t[end+1] = t :: Float64
+    @inbounds profile_t[end + 1] = t::Float64
 
     # # Write to timeseries group
     ts_t = self.ts_grp["t"]
-    @inbounds ts_t[end+1] = t :: Float64
+    @inbounds ts_t[end + 1] = t::Float64
 end
