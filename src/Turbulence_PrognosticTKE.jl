@@ -1,36 +1,3 @@
-function check_nans(GMV, Turb, loc)
-    # B = (
-    #     any(isnan.(Turb.mixing_length)),
-    #     any(isnan.(Turb.EnvVar.TKE.values)),
-    #     any(isnan.(GMV.TKE.values)),
-    #     any(isnan.(diffusivity_h(Turb).values)),
-    #     any(isnan.(diffusivity_m(Turb).values)),
-    #     any(isnan.(GMV.H.values)),
-    #     any(isnan.(GMV.QT.values)),
-    #     any(isnan.(GMV.QL.values)),
-    #     any(isnan.(GMV.T.values)),
-    #     any(isnan.(GMV.B.values)),
-    #     any(isnan.(GMV.U.values)),
-    #     any(isnan.(GMV.V.values)),
-    #     any(isnan.(GMV.H.new)),
-    #     any(isnan.(GMV.QT.new)),
-    #     any(isnan.(GMV.U.new)),
-    #     any(isnan.(GMV.V.new)),
-    #     any(isnan.(GMV.H.mf_update)),
-    #     any(isnan.(GMV.QT.mf_update)),
-    #     any(isnan.(GMV.U.mf_update)),
-    #     any(isnan.(GMV.V.mf_update)),
-    #     any(isnan.(GMV.H.tendencies)),
-    #     any(isnan.(GMV.QT.tendencies)),
-    #     any(isnan.(GMV.U.tendencies)),
-    #     any(isnan.(GMV.V.tendencies)),
-    # )
-    # if any(B)
-    #     @show loc
-    #     @show B
-    #     error("Got nans")
-    # end
-end
 
 function initialize(self::EDMF_PrognosticTKE, Case::CasesBase, GMV::GridMeanVariables, Ref::ReferenceState)
     if Case.casename == "DryBubble"
@@ -291,11 +258,8 @@ end
 function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
     kmin = grid(self).gw
     kmax = grid(self).nzg - grid(self).gw
-    check_nans(GMV, self, "4.1")
     update_inversion(self, GMV, Case.inversion_option)
-    check_nans(GMV, self, "4.2")
     compute_pressure_plume_spacing(self, GMV, Case)
-    check_nans(GMV, self, "4.3")
     self.wstar = get_wstar(Case.Sur.bflux, self.base.zi)
     if TS.nstep == 0
         decompose_environment(self, GMV, "values")
@@ -319,17 +283,14 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
             end
         end
     end
-    check_nans(GMV, self, "4.4")
 
     decompose_environment(self, GMV, "values")
     compute_prognostic_updrafts(self, GMV, Case, TS)
-    check_nans(GMV, self, "4.5")
 
     # TODO -maybe not needed? - both diagnostic and prognostic updrafts end with decompose_environment
     # But in general ok here without thermodynamics because MF doesnt depend directly on buoyancy
     decompose_environment(self, GMV, "values")
     update_GMV_MF(self, GMV, TS)
-    check_nans(GMV, self, "4.6")
     # (###)
     # decompose_environment +  EnvThermo.saturation_adjustment + UpdThermo.buoyancy should always be used together
     # This ensures that
@@ -338,19 +299,13 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     #     the mean buoyancy with repect to reference state alpha_0 is zero.
 
     decompose_environment(self, GMV, "mf_update")
-    check_nans(GMV, self, "4.61")
     microphysics(self.EnvThermo, self.EnvVar, self.Rain, TS.dt) # saturation adjustment + rain creation
-    check_nans(GMV, self, "4.62")
     # Sink of environmental QT and H due to rain creation is applied in tridiagonal solver
     buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
-    check_nans(GMV, self, "4.63")
     compute_eddy_diffusivities_tke(self, GMV, Case)
-    check_nans(GMV, self, "4.7")
     update_GMV_ED(self, GMV, Case, TS)
-    check_nans(GMV, self, "4.72")
     compute_covariance(self, GMV, Case, TS)
 
-    check_nans(GMV, self, "4.75")
     if self.Rain.rain_model == "clima_1m"
         # sum updraft and environment rain into bulk rain
         sum_subdomains_rain(self.Rain, self.UpdThermo, self.EnvThermo)
@@ -365,7 +320,6 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
         solve_rain_evap(self.rainphysics, GMV, TS, self.Rain.Upd_QR, self.Rain.Upd_RainArea)
         solve_rain_evap(self.rainphysics, GMV, TS, self.Rain.Env_QR, self.Rain.Env_RainArea)
     end
-    check_nans(GMV, self, "4.8")
     # update grid-mean cloud fraction and cloud cover
     @inbounds for k in xrange(grid(self).nzg)
         self.EnvVar.Area.values[k] = 1.0 - self.UpdVar.Area.bulkvalues[k]
@@ -374,11 +328,9 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
             self.UpdVar.Area.bulkvalues[k] * self.UpdVar.cloud_fraction[k]
     end
     GMV.cloud_cover = min(self.EnvVar.cloud_cover + sum(self.UpdVar.cloud_cover), 1)
-    check_nans(GMV, self, "4.9")
     # Back out the tendencies of the grid mean variables for the whole timestep
     # by differencing GMV.new and GMV.values
     update(self.base, GMV, Case, TS)
-    check_nans(GMV, self, "4.10")
     return
 end
 
@@ -429,129 +381,6 @@ function compute_prognostic_updrafts(
     return
 end
 
-# function compute_diagnostic_updrafts(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
-#     gw = grid(self).gw
-#     dz = grid(self).dz
-#     dzi = grid(self).dzi
-#     sa = eos_struct()
-#     mph = mph_struct()
-#     ret = entr_struct()
-#     input = entr_in_struct()
-
-#     set_updraft_surface_bc(self, GMV, Case)
-#     compute_entrainment_detrainment(self, GMV, Case)
-
-#     @inbounds for i in xrange(self.n_updrafts)
-#         self.UpdVar.H.values[i,gw]  = self.h_surface_bc[i]
-#         self.UpdVar.QT.values[i,gw] = self.qt_surface_bc[i]
-
-#         # do saturation adjustment
-#         sa = eos(
-#             self.UpdThermo.t_to_prog_fp,self.UpdThermo.prog_to_t_fp,
-#             ref_state(self).p0_half[gw], self.UpdVar.QT.values[i,gw],
-#             self.UpdVar.H.values[i,gw]
-#         )
-#         self.UpdVar.QL.values[i,gw] = sa.ql
-#         self.UpdVar.T.values[i, gw] = sa.T
-
-#         @inbounds for k in xrange(gw+1, grid(self).nzg-gw)
-#             denom = 1.0 + self.entr_sc[i,k] * dz
-#             self.UpdVar.H.values[i,k]  = (self.UpdVar.H.values[i, k-1] + self.entr_sc[i,k] * dz * GMV.H.values[k])/denom
-#             self.UpdVar.QT.values[i,k] = (self.UpdVar.QT.values[i,k-1] + self.entr_sc[i,k] * dz * GMV.QT.values[k])/denom
-
-#             # do saturation adjustment
-#             sa = eos(
-#                 self.UpdThermo.t_to_prog_fp, self.UpdThermo.prog_to_t_fp,
-#                 ref_state(self).p0_half[k], self.UpdVar.QT.values[i,k],
-#                 self.UpdVar.H.values[i,k]
-#             )
-#             self.UpdVar.QL.values[i,k] = sa.ql
-#             self.UpdVar.T.values[i, k] = sa.T
-#         end
-#     end
-
-#     set_bcs(self.UpdVar.QT, grid(self))
-#     set_bcs(self.UpdVar.H, grid(self))
-
-#     # TODO - see comment (####)
-#     decompose_environment(self, GMV, "values")
-#     saturation_adjustment(self.EnvThermo, self.EnvVar)
-#     buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
-
-#     # Solve updraft velocity equation
-#     @inbounds for i in xrange(self.n_updrafts)
-#         self.UpdVar.W.values[i, grid(self).gw-1] = self.w_surface_bc[i]
-#         self.entr_sc[i,gw] = 2.0 /dz # 0.0 ?
-#         self.detr_sc[i,gw] = 0.0
-#         @inbounds for k in xrange(grid(self).gw, grid(self).nzg-grid(self).gw)
-#             area_k = interp2pt(self.UpdVar.Area.values[i,k], self.UpdVar.Area.values[i,k+1])
-#             if area_k >= self.minimum_area
-#                 w_km = self.UpdVar.W.values[i,k-1]
-#                 entr_w = interp2pt(self.entr_sc[i,k], self.entr_sc[i,k+1])
-#                 detr_w = interp2pt(self.detr_sc[i,k], self.detr_sc[i,k+1])
-#                 B_k = interp2pt(self.UpdVar.B.values[i,k], self.UpdVar.B.values[i,k+1])
-#                 w2 = ((self.vel_buoy_coeff * B_k + 0.5 * w_km * w_km * dzi)
-#                       /(0.5 * dzi +entr_w + (1.0/self.pressure_plume_spacing[i])))
-#                 if w2 > 0.0
-#                     self.UpdVar.W.values[i,k] = sqrt(w2)
-#                 else
-#                     self.UpdVar.W.values[i,k:end] .= 0
-#                     break
-#                 end
-#             else
-#                 self.UpdVar.W.values[i,k:end] .= 0
-#             end
-#         end
-#     end
-
-#     set_bcs(self.UpdVar.W, grid(self))
-
-#     @inbounds for i in xrange(self.n_updrafts)
-#         au_lim = self.max_area
-#         self.UpdVar.Area.values[i,gw] = self.area_surface_bc[i]
-#         w_mid = 0.5* (self.UpdVar.W.values[i,gw])
-#         @inbounds for k in xrange(gw+1, grid(self).nzg)
-#             w_low = w_mid
-#             w_mid = interp2pt(self.UpdVar.W.values[i,k],self.UpdVar.W.values[i,k-1])
-#             if w_mid > 0.0
-#                 if self.entr_sc[i,k]>(0.9/dz)
-#                     self.entr_sc[i,k] = 0.9/dz
-#                 end
-
-#                 self.UpdVar.Area.values[i,k] = (ref_state(self).rho0_half[k-1]*self.UpdVar.Area.values[i,k-1]*w_low/
-#                                                 (1.0-(self.entr_sc[i,k]-self.detr_sc[i,k])*dz)/w_mid/ref_state(self).rho0_half[k])
-#                 # # Limit the increase in updraft area when the updraft decelerates
-#                 if self.UpdVar.Area.values[i,k] >  au_lim
-#                     self.UpdVar.Area.values[i,k] = au_lim
-#                     self.detr_sc[i,k] =(ref_state(self).rho0_half[k-1] * self.UpdVar.Area.values[i,k-1]
-#                                         * w_low / au_lim / w_mid / ref_state(self).rho0_half[k] + self.entr_sc[i,k] * dz -1.0)/dz
-#                 end
-#             else
-#                 # the updraft has terminated so set its area fraction to zero at this height and all heights above
-#                 self.UpdVar.Area.values[i,k] = 0.0
-#                 self.UpdVar.H.values[i,k] = GMV.H.values[k]
-#                 self.UpdVar.QT.values[i,k] = GMV.QT.values[k]
-#                 #TODO wouldnt it be more consistent to have here?
-#                 #self.UpdVar.QL.values[i,k] = GMV.QL.values[k]
-#                 #self.UpdVar.T.values[i,k] = GMV.T.values[k]
-#                 sa = eos(self.UpdThermo.t_to_prog_fp,self.UpdThermo.prog_to_t_fp, ref_state(self).p0_half[k],
-#                          self.UpdVar.QT.values[i,k], self.UpdVar.H.values[i,k])
-#                 self.UpdVar.QL.values[i,k] = sa.ql
-#                 self.UpdVar.T.values[i,k] = sa.T
-#             end
-#         end
-#     end
-
-#     # TODO - see comment (####)
-#     decompose_environment(self, GMV, "values")
-#     saturation_adjustment(self.EnvThermo, self.EnvVar)
-#     buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
-
-#     set_bcs(self.UpdVar.Area, grid(self))
-
-#     return
-# end
-
 function update_inversion(self, GMV::GridMeanVariables, option)
     update_inversion(self.base, GMV, option)
     return
@@ -566,7 +395,6 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
     grad_qt_plus = 0.0
     grad_thv_plus = 0.0
     m_eps = 1.0e-9 # Epsilon to avoid zero
-    check_nans(GMV, self, "CML 1")
     @inbounds for k in xrange(gw, grid(self).nzg - gw)
         z_ = grid(self).z_half[k]
         # kz scale (surface layer)
@@ -722,7 +550,6 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         self.mixing_length[k] = lamb_smooth_minimum(l, 0.1, 1.5)
         self.ml_ratio[k] = self.mixing_length[k] / l[Int(self.mls[k])]
     end
-    check_nans(GMV, self, "CML end")
     return
 end
 
@@ -732,9 +559,7 @@ function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanV
     if self.similarity_diffusivity
         compute_eddy_diffusivities_similarity(self.base, GMV, Case)
     else
-        check_nans(GMV, self, "CEDtke 1")
         compute_mixing_length(self, Case.Sur.obukhov_length, Case.Sur.ustar, GMV)
-        check_nans(GMV, self, "CEDtke 2")
         KM = diffusivity_m(self)
         KH = diffusivity_h(self)
         @inbounds for k in xrange(gw, grid(self).nzg - gw)
@@ -1687,22 +1512,18 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     rho_ae_K = pyzeros(nzg)
     KM = diffusivity_m(self)
     KH = diffusivity_h(self)
-    check_nans(GMV, self, "update_GMV_ED 1")
     @inbounds for k in xrange(nzg - 1)
         rho_ae_K[k] = 0.5 * (ae[k] * KH.values[k] + ae[k + 1] * KH.values[k + 1]) * ref_state(self).rho0[k]
     end
 
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
     construct_tridiag_diffusion(nzg, gw, dzi, TS.dt, rho_ae_K, ref_state(self).rho0_half, ae, a, b, c)
-    check_nans(GMV, self, "update_GMV_ED 2")
     # Solve QT
     @inbounds for k in xrange(nz)
         x[k] = self.EnvVar.QT.values[k + gw]
     end
     x[0] = x[0] + TS.dt * Case.Sur.rho_qtflux * dzi * ref_state(self).alpha0_half[gw] / ae[gw]
-    check_nans(GMV, self, "update_GMV_ED 3")
     tridiag_solve(grid(self).nz, x, a, b, c)
-    check_nans(GMV, self, "update_GMV_ED 4")
 
     @inbounds for k in xrange(nz)
         GMV.QT.new[k + gw] = fmax(
@@ -1714,7 +1535,6 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         )
         self.diffusive_tendency_qt[k + gw] = (GMV.QT.new[k + gw] - GMV.QT.mf_update[k + gw]) * TS.dti
     end
-    check_nans(GMV, self, "update_GMV_ED 5")
     # get the diffusive flux
     self.diffusive_flux_qt[gw] = interp2pt(
         Case.Sur.rho_qtflux,
@@ -1729,7 +1549,6 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
             dzi *
             (self.EnvVar.QT.values[k + 1] - self.EnvVar.QT.values[k - 1])
     end
-    check_nans(GMV, self, "update_GMV_ED 6")
 
     # Solve H
     @inbounds for k in xrange(nz)
@@ -1737,7 +1556,6 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     end
     x[0] = x[0] + TS.dt * Case.Sur.rho_hflux * dzi * ref_state(self).alpha0_half[gw] / ae[gw]
     tridiag_solve(grid(self).nz, x, a, b, c)
-    check_nans(GMV, self, "update_GMV_ED 7")
     @inbounds for k in xrange(nz)
         GMV.H.new[k + gw] =
             GMV.H.mf_update[k + gw] +
@@ -1758,7 +1576,6 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
             dzi *
             (self.EnvVar.H.values[k + 1] - self.EnvVar.H.values[k - 1])
     end
-    check_nans(GMV, self, "update_GMV_ED 8")
 
     # Solve U
     @inbounds for k in xrange(nzg - 1)
@@ -1770,10 +1587,8 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     @inbounds for k in xrange(nz)
         x[k] = GMV.U.values[k + gw]
     end
-    check_nans(GMV, self, "update_GMV_ED 9")
     x[0] = x[0] + TS.dt * Case.Sur.rho_uflux * dzi * ref_state(self).alpha0_half[gw] / ae[gw]
     tridiag_solve(grid(self).nz, x, a, b, c)
-    check_nans(GMV, self, "update_GMV_ED 10")
 
     @inbounds for k in xrange(nz)
         GMV.U.new[k + gw] = x[k]
@@ -1796,7 +1611,6 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     end
     x[0] = x[0] + TS.dt * Case.Sur.rho_vflux * dzi * ref_state(self).alpha0_half[gw] / ae[gw]
     tridiag_solve(grid(self).nz, x, a, b, c)
-    check_nans(GMV, self, "update_GMV_ED 11")
     @inbounds for k in xrange(nz)
         GMV.V.new[k + gw] = x[k]
     end
@@ -1811,12 +1625,10 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
             dzi *
             (GMV.V.values[k + 1] - GMV.V.values[k - 1])
     end
-    check_nans(GMV, self, "update_GMV_ED 11")
     set_bcs(GMV.QT, grid(self))
     set_bcs(GMV.H, grid(self))
     set_bcs(GMV.U, grid(self))
     set_bcs(GMV.V, grid(self))
-    check_nans(GMV, self, "update_GMV_ED 12")
 
     return
 end

@@ -42,24 +42,15 @@ function run(self::Simulation1d)
     iter = 0
     TurbulenceConvection.open_files(self.Stats) # #removeVarsHack
     while self.TS.t <= self.TS.t_max
-        TurbulenceConvection.check_nans(self.GMV, self.Turb, "1")
         TurbulenceConvection.zero_tendencies(self.GMV)
-        TurbulenceConvection.check_nans(self.GMV, self.Turb, "2")
         Cases.update_surface(self.Case, self.GMV, self.TS)
-        TurbulenceConvection.check_nans(self.GMV, self.Turb, "3")
         Cases.update_forcing(self.Case, self.GMV, self.TS)
-        TurbulenceConvection.check_nans(self.GMV, self.Turb, "4")
         Cases.update_radiation(self.Case, self.GMV, self.TS)
-        TurbulenceConvection.check_nans(self.GMV, self.Turb, "5")
         TurbulenceConvection.update(self.Turb, self.GMV, self.Case, self.TS)
-        TurbulenceConvection.check_nans(self.GMV, self.Turb, "6")
         TurbulenceConvection.update(self.TS)
-        TurbulenceConvection.check_nans(self.GMV, self.Turb, "7")
         # Apply the tendencies, also update the BCs and diagnostic thermodynamics
         TurbulenceConvection.update(self.GMV, self.TS)
-        TurbulenceConvection.check_nans(self.GMV, self.Turb, "8")
         TurbulenceConvection.update_GMV_diagnostics(self.Turb, self.GMV)
-        TurbulenceConvection.check_nans(self.GMV, self.Turb, "9")
 
         if mod(iter, 100) == 0
             progress = self.TS.t / self.TS.t_max
@@ -75,7 +66,6 @@ function run(self::Simulation1d)
             TurbulenceConvection.io(self.Case, self.Stats) # #removeVarsHack
             TurbulenceConvection.io(self.Turb, self.Stats, self.TS) # #removeVarsHack
         end
-        TurbulenceConvection.check_nans(self.GMV, self.Turb, "9")
         iter += 1
     end
     TurbulenceConvection.close_files(self.Stats) # #removeVarsHack

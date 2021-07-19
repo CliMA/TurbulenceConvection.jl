@@ -342,9 +342,6 @@ function initialize_profiles(self::CasesBase{BomexCase}, Gr::Grid, GMV::GridMean
     ql = 0.0
     qi = 0.0 # IC of Bomex is cloud-free
 
-    theta_pert = 0.0
-    qt_pert = 0.0
-
     @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
         #Set Thetal profile
         if Gr.z_half[k] <= 520.0
