@@ -651,7 +651,7 @@ end
 Base.@kwdef mutable struct CasesBase{T}
     casename::String = "default_casename"
     inversion_option::String = "default_inversion_option"
-    les_filename::String
+    les_filename::String = "None"
     Sur::SurfaceBase
     Fo::ForcingBase
     Rad::RadiationBase
