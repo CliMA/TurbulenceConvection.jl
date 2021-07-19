@@ -112,3 +112,41 @@ function io(self::RadiationBase{RadiationDYCOMS_RF01}, Stats::NetCDFIO_Stats)
     write_profile(Stats, "rad_flux", self.f_rad[finterior])
     return
 end
+
+function initialize(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables, LESDat::LESData)
+    initialize(self, GMV, RadiationBaseType())
+    # load from LES
+    Dataset(LESDat.les_filename, "r") do data
+        imin = LESDat.imin
+        imax = LESDat.imax
+
+        # interpolate here
+        z_les_half = data.group["profiles"]["z_half"][:, 1]
+        self.dTdt = pyinterp(self.Gr.z_half, z_les_half, get_nc_data(data, "profiles", "dtdt_rad", imin, imax))
+    end
+    return
+end
+
+function update(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables)
+
+    @inbounds for k in xrange(1, self.Gr.nz)
+        # Apply large-scale horizontal advection tendencies
+        GMV.H.tendencies[k] += self.dTdt[k] / exner_c(self.Ref.p0_half[k])
+    end
+
+    return
+end
+
+function initialize_io(self::RadiationBase{RadiationLES}, Stats::NetCDFIO_Stats)
+    add_profile(Stats, "rad_dTdt")
+    add_profile(Stats, "rad_flux")
+    return
+end
+
+function io(self::RadiationBase{RadiationLES}, Stats::NetCDFIO_Stats)
+    cinterior = self.Gr.cinterior
+    finterior = self.Gr.finterior
+    write_profile(Stats, "rad_dTdt", self.dTdt[cinterior])
+    write_profile(Stats, "rad_flux", self.f_rad[finterior])
+    return
+end

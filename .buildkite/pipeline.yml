@@ -154,6 +154,17 @@ steps:
       queue: central
       slurm_ntasks: 1
 
+  - label: ":partly_sunny: LES_driven_SCM"
+    key: "cpu_lesdrivenscm"
+    command:
+      - "julia --color=yes --project=test integration_tests/LES_driven_SCM.jl"
+    artifact_paths:
+      - "Output.LES_driven_SCM.01/stats/comparison/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
   - wait: ~
     continue_on_failure: true
 

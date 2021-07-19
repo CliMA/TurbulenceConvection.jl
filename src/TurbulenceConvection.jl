@@ -5,6 +5,7 @@ using StatsBase
 using LinearAlgebra
 import DocStringExtensions
 
+using NCDatasets
 import Dierckx
 import Statistics
 import LambertW
