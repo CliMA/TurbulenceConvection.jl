@@ -5,15 +5,12 @@ import TurbulenceConvection
 using TurbulenceConvection
 using Test
 
-include(joinpath("utils", "Cases.jl"))
+include(joinpath("utils", "main.jl"))
 include(joinpath("utils", "generate_paramlist.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
-using .Cases
 using .NameList
 using .ParamList
-
-include(joinpath("utils", "main.jl"))
 
 best_mse = OrderedDict()
 best_mse["qt_mean"] = 2.5654529603089010e-01

@@ -4,10 +4,12 @@ authors = ["Charles Kawczynski <kawczynski.charles@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
 ArtifactWrappers = "a14bc488-3040-4b00-9dc1-f6467924858a"
 Dierckx = "39dd38d3-220a-591b-8e3c-4c3a8c710a94"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 LambertW = "984bce1d-4616-540c-a9ee-88d1112d94c9"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"

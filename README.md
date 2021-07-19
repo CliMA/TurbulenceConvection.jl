@@ -10,7 +10,7 @@ An extended eddy-diffusivity mass-flux scheme for unified representation of
 subgrid-scale turbulence and convection. Journal of Advances in Modeling Earth Systems, 2018.
 (see [Tan et al., 2018](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1002/2017MS001162)).
 
-The code is written in Julia, and was translated from [SCAMPy](https://github.com/CliMA/SCAMPy) on 7/13/2021.
+The code is written in Julia, and was translated from [SCAMPy](https://github.com/CliMA/SCAMPy) for the commit 496dad0c2438235684823511cacbf5761d6a237c.
 
 Code Contributors:
 	Colleen Kaul (PNNL) --initial/primary developer,
@@ -50,7 +50,7 @@ pkg> instantiate
 $ cd TurbulenceConvection.jl
 ```
 
-Note that, we will soon support running TurbulenceConvection.jl in the same way that SCAMPy used to. For now, run one of the cases:
+TurbulenceConvection.jl can be run in the same way that SCAMPy used to, given one of the following cases:
 
  - Bomex
  - life_cycle_Tan2018
@@ -63,10 +63,13 @@ Note that, we will soon support running TurbulenceConvection.jl in the same way 
  - GABLS
  - SP
 
-with
+with, for example:
 
 ```
-julia --project integration_tests/Soares.jl
+julia --project integration_tests/utils/generate_namelist.jl Soares
+julia --project integration_tests/utils/generate_paramlist.jl Soares
+julia --project integration_tests/utils/main.jl Soares
+
 ```
 or, interactively, with
 ```julia-repl
