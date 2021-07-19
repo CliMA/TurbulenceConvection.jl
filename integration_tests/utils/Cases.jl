@@ -74,6 +74,8 @@ struct TRMM_LBA end
 struct ARM_SGP end
 struct Nieuwstadt end
 struct life_cycle_Tan2018 end
+struct BomexRRTMG end
+
 
 function CasesFactory(namelist, paramlist, Gr, Ref)
     if namelist["meta"]["casename"] == "Soares"
@@ -454,6 +456,148 @@ update_surface(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepp
 update_forcing(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Fo, GMV)
 update_radiation(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Rad, GMV)
 
+function BomexRRTMG(paramlist, Gr::Grid, Ref::ReferenceState)
+    casename = "BomexRRTMG"
+    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(;Gr, Ref)
+    Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(;Gr, Ref)
+    Rad = TurbulenceConvection.RadiationRRTMG{TurbulenceConvection.RadiationNone}(;Gr, Ref)
+    inversion_option = "critical_Ri"
+    Fo.apply_coriolis = true
+    Fo.coriolis_param = 0.376e-4 # s^{-1}
+    Fo.apply_subsidence = true
+    return TurbulenceConvection.CasesBase{BomexRRTMG}(
+        ;casename = "BomexRRTMG", inversion_option, Sur, Fo, Rad)
+end
+
+function initialize_reference(self::CasesBase{BomexRRTMG}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
+    Ref.Pg = 1.015e5  #Pressure at ground
+    Ref.Tg = 300.4  #Temperature at ground
+    Ref.qtg = 0.02245   #Total water mixing ratio at surface
+    TurbulenceConvection.initialize(Ref, Gr, Stats)
+end
+
+function initialize_profiles(self::CasesBase{BomexRRTMG}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+    thetal = TurbulenceConvection.pyzeros(Gr.nzg)
+    ql=0.0
+    qi =0.0 # IC of Bomex is cloud-free
+
+    theta_pert = 0.0
+    qt_pert = 0.0
+
+    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+        #Set Thetal profile
+        if Gr.z_half[k] <= 520.
+            thetal[k] = 298.7
+        end
+        if Gr.z_half[k] > 520.0 && Gr.z_half[k] <= 1480.0
+            thetal[k] = 298.7 + (Gr.z_half[k] - 520)  * (302.4 - 298.7)/(1480.0 - 520.0)
+        end
+        if Gr.z_half[k] > 1480.0 && Gr.z_half[k] <= 2000
+            thetal[k] = 302.4 + (Gr.z_half[k] - 1480.0) * (308.2 - 302.4)/(2000.0 - 1480.0)
+        end
+        if Gr.z_half[k] > 2000.0
+            thetal[k] = 308.2 + (Gr.z_half[k] - 2000.0) * (311.85 - 308.2)/(3000.0 - 2000.0)
+        end
+
+        #Set qt profile
+        if Gr.z_half[k] <= 520
+            GMV.QT.values[k] = (17.0 + (Gr.z_half[k]) * (16.3-17.0)/520.0)/1000.0
+        end
+        if Gr.z_half[k] > 520.0 && Gr.z_half[k] <= 1480.0
+            GMV.QT.values[k] = (16.3 + (Gr.z_half[k] - 520.0)*(10.7 - 16.3)/(1480.0 - 520.0))/1000.0
+        end
+        if Gr.z_half[k] > 1480.0 && Gr.z_half[k] <= 2000.0
+            GMV.QT.values[k] = (10.7 + (Gr.z_half[k] - 1480.0) * (4.2 - 10.7)/(2000.0 - 1480.0))/1000.0
+        end
+        if Gr.z_half[k] > 2000.0
+            GMV.QT.values[k] = (4.2 + (Gr.z_half[k] - 2000.0) * (3.0 - 4.2)/(3000.0  - 2000.0))/1000.0
+        end
+
+
+        #Set u profile
+        if Gr.z_half[k] <= 700.0
+            GMV.U.values[k] = -8.75
+        end
+        if Gr.z_half[k] > 700.0
+            GMV.U.values[k] = -8.75 + (Gr.z_half[k] - 700.0) * (-4.61 - -8.75)/(3000.0 - 700.0)
+        end
+    end
+
+    @inbounds for k in xrange(Gr.gw,Gr.nzg-Gr.gw)
+        GMV.H.values[k] = thetal[k]
+        GMV.T.values[k] =  thetal[k] * exner_c(Ref.p0_half[k])
+        GMV.THL.values[k] = thetal[k]
+    end
+    set_bcs(GMV.U, Gr)
+    set_bcs(GMV.QT, Gr)
+    set_bcs(GMV.H, Gr)
+    set_bcs(GMV.T, Gr)
+    satadjust(GMV)
+end
+
+function initialize_surface(self::CasesBase{BomexRRTMG}, Gr::Grid, Ref::ReferenceState)
+    self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
+    self.Sur.Tsurface = 299.1 * exner_c(Ref.Pg)
+    self.Sur.qsurface = 22.45e-3 # kg/kg
+    self.Sur.lhf = 5.2e-5 * Ref.rho0[Gr.gw-1] * latent_heat(self.Sur.Tsurface)
+    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * Ref.rho0[Gr.gw-1]
+    self.Sur.ustar_fixed = true
+    self.Sur.ustar = 0.28 # m/s
+    self.Sur.Gr = Gr
+    self.Sur.Ref = Ref
+    initialize(self.Sur)
+end
+
+function initialize_forcing(self::CasesBase{BomexRRTMG}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    self.Fo.Gr = Gr
+    self.Fo.Ref = Ref
+    initialize(self.Fo, GMV)
+    @inbounds for k in xrange(Gr.gw, Gr.nzg-Gr.gw)
+        # Geostrophic velocity profiles. vg = 0
+        self.Fo.ug[k] = -10.0 + (1.8e-3)*Gr.z_half[k]
+        # Set large-scale cooling
+        if Gr.z_half[k] <= 1500.0
+            self.Fo.dTdt[k] =  (-2.0/(3600 * 24.0))  * exner_c(Ref.p0_half[k])
+        else
+            self.Fo.dTdt[k] = (-2.0/(3600 * 24.0) + (Gr.z_half[k] - 1500.0)
+                                * (0.0 - -2.0/(3600 * 24.0)) / (3000.0 - 1500.0)) * exner_c(Ref.p0_half[k])
+        end
+
+        # Set large-scale drying
+        if Gr.z_half[k] <= 300.0
+            self.Fo.dqtdt[k] = -1.2e-8   #kg/(kg * s)
+        end
+        if Gr.z_half[k] > 300.0 && Gr.z_half[k] <= 500.0
+            self.Fo.dqtdt[k] = -1.2e-8 + (Gr.z_half[k] - 300.0)*(0.0 - -1.2e-8)/(500.0 - 300.0) #kg/(kg * s)
+        end
+
+        #Set large scale subsidence
+        if Gr.z_half[k] <= 1500.0
+            self.Fo.subsidence[k] = 0.0 + Gr.z_half[k]*(-0.65/100.0 - 0.0)/(1500.0 - 0.0)
+        end
+        if Gr.z_half[k] > 1500.0 && Gr.z_half[k] <= 2100.0
+            self.Fo.subsidence[k] = -0.65/100 + (Gr.z_half[k] - 1500.0)* (0.0 - -0.65/100.0)/(2100.0 - 1500.0)
+        end
+    end
+    return nothing
+end
+function initialize_radiation(self::CasesBase{BomexRRTMG}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    initialize(self.Rad, GMV)
+end
+
+TurbulenceConvection.initialize_io(self::CasesBase{BomexRRTMG}, Stats::NetCDFIO_Stats) =
+    initialize_io(self, Stats, BaseCase())
+
+TurbulenceConvection.io(self::CasesBase{BomexRRTMG}, Stats::NetCDFIO_Stats) =
+    io(self, Stats, BaseCase())
+
+update_surface(self::CasesBase{BomexRRTMG}, GMV::GridMeanVariables, TS::TimeStepping) =
+    update(self.Sur, GMV)
+
+update_forcing(self::CasesBase{BomexRRTMG}, GMV::GridMeanVariables, TS::TimeStepping) =
+    update(self.Fo, GMV)
+update_radiation(self::CasesBase{BomexRRTMG}, GMV::GridMeanVariables, TS::TimeStepping) =
+   update(self.Rad, GMV)
 
 function life_cycle_Tan2018(paramlist, Gr::Grid, Ref::ReferenceState)
     casename = "life_cycle_Tan2018"

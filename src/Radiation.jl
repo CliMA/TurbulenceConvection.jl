@@ -128,3 +128,47 @@ function io(self::RadiationBase{RadiationDYCOMS_RF01}, Stats::NetCDFIO_Stats)
     write_profile(Stats, "rad_flux", self.f_rad[finterior])
     return
 end
+
+# RRTMG Radiation
+function initialize(self::RadiationBase{RadiationRRTMG}, GMV::GridMeanVariables)
+    initialize(self, GMV, RadiationBaseType())
+    self.f_rad = pyzeros(self.Gr.nzg + 1) # radiative flux at cell edges
+    return
+end
+
+"""
+see eq. 3 in Stevens et. al. 2005 DYCOMS paper
+"""
+function calculate_radiation(self::RadiationBase{RadiationRRTMG}, GMV::GridMeanVariables)
+    # Use RRTMGP to compute dTdt and add to tendency vector
+    
+
+    return
+end
+
+function update(self::RadiationBase{RadiationRRTMG}, GMV::GridMeanVariables)
+
+    calculate_radiation(self, GMV)
+
+    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg-self.Gr.gw)
+        # Apply large-scale horizontal advection tendencies
+        qv = GMV.QT.values[k] - GMV.QL.values[k]
+        GMV.H.tendencies[k]  += self.convert_forcing_prog_fp(self.Ref.p0_half[k],GMV.QT.values[k], qv, GMV.T.values[k], self.dqtdt[k], self.dTdt[k])
+    end
+
+    return
+end
+
+function initialize_io(self::RadiationBase{RadiationRRTMG}, Stats::NetCDFIO_Stats)
+    add_profile(Stats, "rad_dTdt")
+    add_profile(Stats, "rad_flux")
+    return
+end
+
+function io(self::RadiationBase{RadiationRRTMG}, Stats::NetCDFIO_Stats)
+    cinterior = self.Gr.cinterior
+    finterior = self.Gr.finterior
+    write_profile(Stats, "rad_dTdt", self.dTdt[cinterior])
+    write_profile(Stats, "rad_flux", self.f_rad[finterior])
+    return
+end
