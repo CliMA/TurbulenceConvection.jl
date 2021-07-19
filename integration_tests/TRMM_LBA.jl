@@ -10,6 +10,9 @@ include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
+# Note: temperatures in this case become extremely low.
+CLIMAParameters.Planet.T_freeze(::EarthParameterSet) = 100.0
+
 best_mse = OrderedDict()
 best_mse["qt_mean"] = 1.7430285968163504e+00
 best_mse["updraft_area"] = 3.2545401197014067e+04

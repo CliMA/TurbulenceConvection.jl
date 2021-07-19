@@ -7,11 +7,15 @@ using LinearAlgebra
 import Dierckx
 import Statistics
 import LambertW
+import Thermodynamics
 import Distributions
 import FastGaussQuadrature
-
 import CLIMAParameters
+
+const TD = Thermodynamics
+
 const CP = CLIMAParameters
+const CPP = CP.Planet
 const APS = CP.AbstractEarthParameterSet
 
 const CPMP = CP.Atmos.Microphysics

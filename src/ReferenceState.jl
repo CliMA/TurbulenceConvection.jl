@@ -44,30 +44,33 @@ specific initialization function defined in Initialization.pyx
 """
 function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
 
-    self.sg = t_to_entropy_c(self.Pg, self.Tg, self.qtg, 0.0, 0.0)
-
-    # Form a right hand side for integrating the hydrostatic equation to
-    # determine the reference pressure
-
-    function rhs(p, u, z)
-        ret = eos(exp(p), self.qtg, self.sg; t_to_prog = t_to_entropy_c, prog_to_t = eos_first_guess_entropy)
-        q_i = 0.0
-        q_l = ret.ql
-        T = ret.T
-        return -g / (Rd * T * (1.0 - self.qtg + eps_vi * (self.qtg - q_l - q_i)))
-    end
+    FT = eltype(grid)
+    P_g = self.Pg
+    T_g = self.Tg
+    q_tot_g = self.qtg
+    param_set = parameter_set(self)
+    q_pt_g = TD.PhasePartition(q_tot_g)
+    ts_g = TD.PhaseEquil_pTq(param_set, P_g, T_g, q_tot_g)
+    θ_liq_ice_g = TD.liquid_ice_pottemp(ts_g)
 
     # We are integrating the log pressure so need to take the log of the
     # surface pressure
-    p0 = log(self.Pg)
-    logp = p0
+    logp = log(P_g)
+
+    # Form a right hand side for integrating the hydrostatic equation to
+    # determine the reference pressure
+    function rhs(logp, u, z)
+        p_ = exp(logp)
+        ts = TD.PhaseEquil_pθq(param_set, p_, θ_liq_ice_g, q_tot_g)
+        R_m = TD.gas_constant_air(ts)
+        T = TD.air_temperature(ts)
+        return -FT(CPP.grav(param_set)) / (T * R_m)
+    end
 
     p = face_field(grid)
     p_half = center_field(grid)
 
     # Perform the integration
-    # TODO: replace with OrdinaryDiffEq
-
     z_span = (grid.zmin, grid.zmax)
     @show z_span
     prob = ODEProblem(rhs, logp, z_span)
@@ -109,34 +112,21 @@ function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
     qv_half = center_field(grid)
 
     # Compute reference state thermodynamic profiles
-
     @inbounds for k in center_indicies(grid)
-        ret = eos(p_half_[k], self.qtg, self.sg; t_to_prog = t_to_entropy_c, prog_to_t = eos_first_guess_entropy)
-        temperature_half[k] = ret.T
-        ql_half[k] = ret.ql
-        qv_half[k] = self.qtg - (ql_half[k] + qi_half[k])
-        alpha_half[k] = alpha_c(p_half_[k], temperature_half[k], self.qtg, qv_half[k])
+        ts = TD.PhaseEquil_pθq(param_set, p_half_[k], θ_liq_ice_g, q_tot_g)
+        temperature_half[k] = TD.air_temperature(ts)
+        ql_half[k] = TD.liquid_specific_humidity(ts)
+        qv_half[k] = TD.vapor_specific_humidity(ts)
+        alpha_half[k] = TD.specific_volume(ts)
     end
 
     @inbounds for k in face_indicies(grid)
-        ret = eos(p_[k], self.qtg, self.sg; t_to_prog = t_to_entropy_c, prog_to_t = eos_first_guess_entropy)
-        temperature[k] = ret.T
-        ql[k] = ret.ql
-        qv[k] = self.qtg - (ql[k] + qi[k])
-        alpha[k] = alpha_c(p_[k], temperature[k], self.qtg, qv[k])
+        ts = TD.PhaseEquil_pθq(param_set, p_[k], θ_liq_ice_g, q_tot_g)
+        temperature[k] = TD.air_temperature(ts)
+        ql[k] = TD.liquid_specific_humidity(ts)
+        qv[k] = TD.vapor_specific_humidity(ts)
+        alpha[k] = TD.specific_volume(ts)
     end
-
-    # Now do a sanity check to make sure that the Reference State entropy profile is uniform following
-    # saturation adjustment
-    local s
-    @inbounds for k in center_indicies(grid)
-        s = t_to_entropy_c(p_half[k], temperature_half[k], self.qtg, ql_half[k], qi_half[k])
-        if abs(s - self.sg) / self.sg > 0.01
-            println("Error in reference profiles entropy not constant !")
-            println("Likely error in saturation adjustment")
-        end
-    end
-
 
     self.alpha0_half = alpha_half
     self.alpha0 = alpha
