@@ -129,6 +129,47 @@ Base.@kwdef mutable struct RainVariables
     Env_QR::RainVariable
     Env_RainArea::RainVariable
 end
+function RainVariables(namelist, Gr::Grid)
+    nzg = Gr.nzg
+
+    QR = RainVariable(nzg, "qr_mean", "kg/kg")
+    # temporary variables for diagnostics to know where the rain is coming from
+    Upd_QR = RainVariable(nzg, "upd_qr", "kg/kg")
+    Env_QR = RainVariable(nzg, "env_qr", "kg/kg")
+    # in the future we could test prognostic equations for stratiform and updraft rain
+    RainArea = RainVariable(nzg, "rain_area", "rain_area_fraction [-]")
+    Upd_RainArea = RainVariable(nzg, "upd_rain_area", "updraft_rain_area_fraction [-]")
+    Env_RainArea = RainVariable(nzg, "env_rain_area", "environment_rain_area_fraction [-]")
+
+    mean_rwp = 0.0
+    upd_rwp = 0.0
+    env_rwp = 0.0
+
+    rain_model = try
+        string(namelist["microphysics"]["rain_model"])
+    catch
+        println("EDMF_Rain: defaulting to no rain")
+        "None"
+    end
+
+    if !(rain_model in ["None", "cutoff", "clima_1m"])
+        error("rain model not recognized")
+    end
+
+    return RainVariables(;
+        rain_model,
+        mean_rwp,
+        env_rwp,
+        upd_rwp,
+        Gr,
+        QR,
+        RainArea,
+        Upd_QR,
+        Upd_RainArea,
+        Env_QR,
+        Env_RainArea,
+    )
+end
 
 struct VariablePrognostic{T}
     values::T
@@ -326,6 +367,98 @@ Base.@kwdef mutable struct GridMeanVariables
     H_third_m::VariableDiagnostic
     HQTcov::VariableDiagnostic
 end
+function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState)
+    lwp = 0.0
+    cloud_base = 0.0
+    cloud_top = 0.0
+    cloud_cover = 0.0
+
+    U = VariablePrognostic(Gr.nzg, "half", "velocity", "sym", "u", "m/s")
+    V = VariablePrognostic(Gr.nzg, "half", "velocity", "sym", "v", "m/s")
+    # Just leave this zero for now!
+    W = VariablePrognostic(Gr.nzg, "full", "velocity", "asym", "v", "m/s")
+
+    # Create thermodynamic variables
+    QT = VariablePrognostic(Gr.nzg, "half", "scalar", "sym", "qt", "kg/kg")
+    RH = VariablePrognostic(Gr.nzg, "half", "scalar", "sym", "RH", "%")
+
+    H = VariablePrognostic(Gr.nzg, "half", "scalar", "sym", "thetal", "K")
+    t_to_prog_fp = t_to_thetali_c
+    prog_to_t_fp = eos_first_guess_thetal
+
+    # Diagnostic Variables--same class as the prognostic variables, but we append to diagnostics list
+    QL = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "ql", "kg/kg")
+    T = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "temperature", "K")
+    B = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "buoyancy", "m^2/s^3")
+    THL = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "thetal", "K")
+
+    cloud_fraction = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "cloud fraction", "-")
+
+    # TKE   TODO   repeated from EDMF_Environment.pyx logic
+    calc_tke = true
+    try
+        calc_tke = namelist["turbulence"]["EDMF_PrognosticTKE"]["calculate_tke"]
+    catch
+    end
+
+    calc_scalar_var = try
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["calc_scalar_var"]
+    catch
+        false
+    end
+
+    EnvThermo_scheme = try
+        string(namelist["thermodynamics"]["sgs"])
+    catch
+        "mean"
+    end
+
+    #Now add the 2nd moment variables
+    if calc_tke
+        TKE = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "tke", "m^2/s^2")
+        W_third_m = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "W_third_m", "m^3/s^3")
+    end
+
+    if calc_scalar_var
+        QTvar = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "qt_var", "kg^2/kg^2")
+        QT_third_m = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "qt_third_m", "kg^3/kg^3")
+        Hvar = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "thetal_var", "K^2")
+        H_third_m = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "thetal_third_m", "-")
+        HQTcov = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "thetal_qt_covar", "K(kg/kg)")
+    end
+
+    return GridMeanVariables(;
+        Gr,
+        Ref,
+        lwp,
+        cloud_base,
+        cloud_top,
+        cloud_cover,
+        U,
+        V,
+        W,
+        QT,
+        RH,
+        H,
+        t_to_prog_fp,
+        prog_to_t_fp,
+        QL,
+        T,
+        B,
+        THL,
+        cloud_fraction,
+        calc_tke,
+        calc_scalar_var,
+        EnvThermo_scheme,
+        TKE,
+        W_third_m,
+        QTvar,
+        QT_third_m,
+        Hvar,
+        H_third_m,
+        HQTcov,
+    )
+end
 
 
 struct UpdraftThermodynamics{A1, A2}
@@ -471,6 +604,79 @@ Base.@kwdef mutable struct EnvironmentVariables
     cloud_cover::Float64 = 0
     lwp::Float64 = 0
     EnvThermo_scheme::String = "default_EnvThermo_scheme"
+end
+function EnvironmentVariables(namelist, Gr::Grid)
+    nz = Gr.nzg
+
+    W = EnvironmentVariable(nz, "full", "velocity", "w", "m/s")
+    QT = EnvironmentVariable(nz, "half", "scalar", "qt", "kg/kg")
+    QL = EnvironmentVariable(nz, "half", "scalar", "ql", "kg/kg")
+    RH = EnvironmentVariable(nz, "half", "scalar", "RH", "%")
+    H = EnvironmentVariable(nz, "half", "scalar", "thetal", "K")
+    THL = EnvironmentVariable(nz, "half", "scalar", "thetal", "K")
+    T = EnvironmentVariable(nz, "half", "scalar", "temperature", "K")
+    B = EnvironmentVariable(nz, "half", "scalar", "buoyancy", "m^2/s^3")
+    Area = EnvironmentVariable(nz, "half", "scalar", "env_area", "-")
+    cloud_fraction = EnvironmentVariable(nz, "half", "scalar", "env_cloud_fraction", "-")
+
+    # TODO - the flag setting is repeated from Variables.pyx logic
+    calc_tke = true
+    calc_tke = try
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["calculate_tke"]
+    catch
+        nothing
+    end
+
+    calc_scalar_var = try
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["calc_scalar_var"]
+    catch
+        println("Defaulting to non-calculation of scalar variances")
+        false
+    end
+
+    EnvThermo_scheme = try
+        string(namelist["thermodynamics"]["sgs"])
+    catch
+        println("Defaulting to saturation adjustment and microphysics with respect to environmental means")
+        "mean"
+    end
+
+    if calc_tke
+        TKE = EnvironmentVariable_2m(nz, "half", "scalar", "tke", "m^2/s^2")
+    end
+
+    if calc_scalar_var
+        QTvar = EnvironmentVariable_2m(nz, "half", "scalar", "qt_var", "kg^2/kg^2")
+        Hvar = EnvironmentVariable_2m(nz, "half", "scalar", "thetal_var", "K^2")
+        HQTcov = EnvironmentVariable_2m(nz, "half", "scalar", "thetal_qt_covar", "K(kg/kg)")
+    end
+
+    if EnvThermo_scheme == "quadrature"
+        if (calc_scalar_var == false)
+            error("EDMF_Environment.pyx: scalar variance has to be calculated for quadrature saturation and microphysics")
+        end
+    end
+
+    return EnvironmentVariables(;
+        Gr,
+        W,
+        Area,
+        QT,
+        QL,
+        H,
+        THL,
+        RH,
+        T,
+        B,
+        cloud_fraction,
+        TKE,
+        Hvar,
+        QTvar,
+        HQTcov,
+        calc_tke,
+        calc_scalar_var,
+        EnvThermo_scheme,
+    )
 end
 
 struct EnvironmentThermodynamics{A1}

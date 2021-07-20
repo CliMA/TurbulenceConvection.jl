@@ -13,14 +13,14 @@ using .NameList
 using .ParamList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 3.0653862176850386e+00
-best_mse["updraft_area"] = 2.7495023648103426e+04
-best_mse["updraft_w"] = 9.7223483487538476e+02
-best_mse["updraft_qt"] = 2.6322481897702389e+01
-best_mse["updraft_thetal"] = 1.1133829792789672e+02
-best_mse["v_mean"] = 2.9873166402390615e+02
-best_mse["u_mean"] = 1.6851451432097572e+03
-best_mse["tke_mean"] = 2.5415290560812978e+03
+best_mse["qt_mean"] = 3.0653870799814622e+00
+best_mse["updraft_area"] = 2.7495027092511747e+04
+best_mse["updraft_w"] = 9.7223505744470913e+02
+best_mse["updraft_qt"] = 2.6322483788147938e+01
+best_mse["updraft_thetal"] = 1.1133829792870439e+02
+best_mse["v_mean"] = 2.9873166545343321e+02
+best_mse["u_mean"] = 1.6851451412164733e+03
+best_mse["tke_mean"] = 2.5415255485687139e+03
 
 @testset "TRMM_LBA" begin
     println("Running TRMM_LBA...")

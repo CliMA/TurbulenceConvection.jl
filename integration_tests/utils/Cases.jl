@@ -607,7 +607,7 @@ function TurbulenceConvection.io(self::CasesBase{life_cycle_Tan2018}, Stats::Net
 end
 function update_surface(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVariables, TS::TimeStepping)
     weight = 1.0
-    weight_factor = 0.01 + 0.99 * (cos(2.0 * pi * TS.t / 3600.0) + 1.0) / 2.0
+    weight_factor = 0.01 + 0.99 * (cos(2.0 * π * TS.t / 3600.0) + 1.0) / 2.0
     weight = weight * weight_factor
     self.Sur.lhf = self.lhf0 * weight
     self.Sur.shf = self.shf0 * weight
@@ -634,7 +634,7 @@ function Rico(paramlist, Gr::Grid, Ref::ReferenceState)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 18.0
-    Fo.coriolis_param = 2.0 * omega * sin(latitude * pi / 180.0) # s^{-1}
+    Fo.coriolis_param = 2.0 * omega * sin(latitude * π / 180.0) # s^{-1}
     Fo.apply_subsidence = true
     return TurbulenceConvection.CasesBase{Rico}(; casename = "Rico", inversion_option, Sur, Fo, Rad)
 end
@@ -1564,7 +1564,7 @@ function GABLS(paramlist, Gr::Grid, Ref::ReferenceState)
     Fo.apply_coriolis = true
     latitude = 73.0
     Fo.coriolis_param = 1.39e-4 # s^{-1}
-    # Fo.coriolis_param = 2.0 * omega * np.sin(latitude * pi / 180.0 ) # s^{-1}
+    # Fo.coriolis_param = 2.0 * omega * np.sin(latitude * π / 180.0 ) # s^{-1}
     Fo.apply_subsidence = false
     return TurbulenceConvection.CasesBase{GABLS}(; casename = "GABLS", inversion_option, Sur, Fo, Rad)
 end
@@ -1663,7 +1663,7 @@ function SP(paramlist, Gr::Grid, Ref::ReferenceState)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 1.0e-4 # s^{-1}
-    # Fo.coriolis_param = 2.0 * omega * np.sin(latitude * pi / 180.0 ) # s^{-1}
+    # Fo.coriolis_param = 2.0 * omega * np.sin(latitude * π / 180.0 ) # s^{-1}
     Fo.apply_subsidence = false
     return TurbulenceConvection.CasesBase{SP}(; casename = "SP", inversion_option, Sur, Fo, Rad)
 end

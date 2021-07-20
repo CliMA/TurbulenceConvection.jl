@@ -13,13 +13,13 @@ using .NameList
 using .ParamList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 6.6783840991128933e+00
-best_mse["updraft_area"] = 2.6731571524925778e+02
-best_mse["updraft_w"] = 3.1176004846612287e-01
-best_mse["updraft_qt"] = 6.0255206972178442e+01
-best_mse["updraft_thetal"] = 6.9061289936438854e+01
-best_mse["u_mean"] = 8.7994360629094174e+01
-best_mse["tke_mean"] = 4.0696100808496718e+00
+best_mse["qt_mean"] = 6.7066415019414212e+00
+best_mse["updraft_area"] = 2.6634274082490697e+02
+best_mse["updraft_w"] = 2.6471400756560365e-01
+best_mse["updraft_qt"] = 6.0143099892375709e+01
+best_mse["updraft_thetal"] = 6.9062807673298735e+01
+best_mse["u_mean"] = 8.7994360629094302e+01
+best_mse["tke_mean"] = 4.1628443606689931e+00
 
 @testset "ARM_SGP" begin
     println("Running ARM_SGP...")

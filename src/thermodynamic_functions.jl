@@ -29,14 +29,6 @@ function theta_virt_c(p0, T, qt, ql)
     # Ignacio: This formulation holds when qt = qv + ql (negligible/no ice)
     return theta_c(p0, T) * (1.0 + 0.61 * (qt - ql) - ql)
 end
-function theta_eq_c(p0, T, qt, ql)
-    # From (Durran and Klemp, 1982), eq. 17
-    # qd = 1 - qt
-    # qt = qv + ql + qi
-    # qr = mr/md+mv+ml+mi
-    # Ignacio: This formulation holds when qt = qv + ql (negligible/no ice)
-    return theta_c(p0, T) * exp(latent_heat(T) * (qt - ql) / (T * cpd))
-end
 function pd_c(p0, qt, qv)
     return p0 * (1.0 - qt) / (1.0 - qt + eps_vi * qv)
 end
@@ -55,9 +47,6 @@ function cpm_c(qt)
     return (1.0 - qt) * cpd + qt * cpv
 end
 
-function thetas_entropy_c(s, qt)
-    return T_tilde * exp((s - (1.0 - qt) * sd_tilde - qt * sv_tilde) / cpm_c(qt))
-end
 function relative_humidity_c(p0, qt, ql, qi, T)
     qv = qt - ql - qi
     pv = pv_c(p0, qt, qv)
@@ -65,16 +54,6 @@ function relative_humidity_c(p0, qt, ql, qi, T)
     return 100.0 * pv / pv_star_
 end
 
-function thetas_t_c(p0, T, qt, qv, qc, L)
-    qd = 1.0 - qt
-    pd_ = pd_c(p0, qt, qt - qc)
-    pv_ = pv_c(p0, qt, qt - qc)
-    cpm_ = cpm_c(qt)
-    return T * pow(p_tilde / pd_, qd * Rd / cpm_) * pow(p_tilde / pv_, qt * Rv / cpm_) * exp(-L * qc / (cpm_ * T))
-end
-function entropy_from_thetas_c(thetas, qt)
-    return cpm_c(qt) * log(thetas / T_tilde) + (1.0 - qt) * sd_tilde + qt * sv_tilde
-end
 function buoyancy_c(rho0, rho)
     return g * (rho0 - rho) / rho0
 end

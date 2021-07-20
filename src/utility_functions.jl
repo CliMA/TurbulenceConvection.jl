@@ -1,12 +1,3 @@
-
-# compute the mean of the values above a given percentile (0 to 1) for a standard normal distribution
-# this gives the surface scalar coefficient for a single updraft or nth updraft of n updrafts
-function percentile_mean_norm(percentile, nsamples)
-    x = norm.rvs(size = nsamples)
-    xp = norm.ppf(percentile)
-    return np.ma.mean(np.ma.masked_less(x, xp))
-end
-
 # compute the mean of the values between two percentiles (0 to 1) for a standard normal distribution
 # this gives the surface scalar coefficients for 1 to n-1 updrafts when using n updrafts
 function percentile_bounds_mean_norm(low_percentile::FT, high_percentile::FT, n_samples::I) where {FT <: Real, I}
