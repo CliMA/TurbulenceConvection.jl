@@ -1,4 +1,5 @@
 using NCDatasets
+using JSON
 
 # TODO: remove `vars` hack that avoids https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
 
@@ -13,7 +14,7 @@ mutable struct NetCDFIO_Stats
     stats_path::String
     path_plus_file::String
     vars::Dict{String, Any} # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    function NetCDFIO_Stats(namelist, paramlist, Gr::Grid, inpath = pwd())
+    function NetCDFIO_Stats(namelist, paramlist, Gr::Grid)
 
         # Initialize properties with valid type:
         tmp = tempname()
@@ -52,10 +53,13 @@ mutable struct NetCDFIO_Stats
         #     end
         # end
 
-        # Copy namefile and paramfile to output directory
-        # TODO: this was commented:
-        # cp(joinpath(inpath, "$simname.in"), joinpath(outpath, "$simname.in"))
-        # cp(joinpath(inpath, "paramlist_$casename.in"), joinpath(outpath, "paramlist_$casename.in"))
+        # Write namefile and paramfile to output directory
+        open(joinpath(outpath, "$simname.in"), "w") do io
+            JSON.print(io, namelist, 4)
+        end
+        open(joinpath(outpath, "paramlist_$casename.in"), "w") do io
+            JSON.print(io, namelist, 4)
+        end
 
         # TODO: make cell centers and cell faces different sizes
         cinterior = Gr.cinterior
