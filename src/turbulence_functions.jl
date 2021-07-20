@@ -297,21 +297,10 @@ function construct_tridiag_diffusion_dirichlet(nzg, gw, dzi, dt, rho_ae_K_m, rho
 end
 
 
-
-function tridiag_solve(nz, x, a, b, c)
-    scratch = pyzeros(length(x))
-    scratch[0] = c[0] / b[0]
-    x[0] = x[0] / b[0]
-    @inbounds for i in xrange(1, nz)
-        m = 1.0 / (b[i] - a[i] * scratch[i - 1])
-        scratch[i] = c[i] * m
-        x[i] = (x[i] - a[i] * x[i - 1]) * m
-    end
-    # TODO: verify translation
-    @inbounds for i in revxrange(nz - 2, 0, -1)
-        x[i] = x[i] - scratch[i] * x[i + 1]
-    end
-    return
+function tridiag_solve(b_rhs, a, b, c)
+    # Note that `1:end` is zero-based indexing.
+    A = Tridiagonal(a[1:end], parent(b), c[0:(end - 1)])
+    return off_arr(A \ parent(b_rhs))
 end
 
 # Dustbin

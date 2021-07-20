@@ -171,7 +171,7 @@ function update(self::SimilarityED, GMV::GridMeanVariables, Case::CasesBase, TS:
     end
     x[0] = x[0] + TS.dt * Case.Sur.rho_qtflux * self.Gr.dzi * self.Ref.alpha0_half[gw]
 
-    tridiag_solve(self.Gr.nz, x, a, b, c)
+    x .= tridiag_solve(x, a, b, c)
 
     @inbounds for k in xrange(nz)
         GMV.QT.new[k + gw] = x[k]
@@ -183,7 +183,7 @@ function update(self::SimilarityED, GMV::GridMeanVariables, Case::CasesBase, TS:
     end
     x[0] = x[0] + TS.dt * Case.Sur.rho_hflux * self.Gr.dzi * self.Ref.alpha0_half[gw]
 
-    tridiag_solve(self.Gr.nz, x, a, b, c)
+    x .= tridiag_solve(x, a, b, c)
     @inbounds for k in xrange(nz)
         GMV.H.new[k + gw] = x[k]
     end
@@ -195,7 +195,7 @@ function update(self::SimilarityED, GMV::GridMeanVariables, Case::CasesBase, TS:
     end
     x[0] = x[0] + TS.dt * Case.Sur.rho_uflux * self.Gr.dzi * self.Ref.alpha0_half[gw]
 
-    tridiag_solve(self.Gr.nz, x, a, b, c)
+    x .= tridiag_solve(x, a, b, c)
 
     @inbounds for k in xrange(nz)
         GMV.U.new[k + gw] = x[k]
@@ -207,7 +207,7 @@ function update(self::SimilarityED, GMV::GridMeanVariables, Case::CasesBase, TS:
     end
     x[0] = x[0] + TS.dt * Case.Sur.rho_vflux * self.Gr.dzi * self.Ref.alpha0_half[gw]
 
-    tridiag_solve(self.Gr.nz, x, a, b, c)
+    x .= tridiag_solve(x, a, b, c)
     @inbounds for k in xrange(nz)
         GMV.V.new[k + gw] = x[k]
     end
