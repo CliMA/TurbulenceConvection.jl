@@ -1,6 +1,6 @@
 name = "TurbulenceConvection"
 uuid = "8e072fc4-01f8-44fb-b9dc-f9336c367e6b"
-authors = ["Charles Kawczynski <kawczynski.charles@gmail.com>"]
+authors = ["Climate Modeling Alliance"]
 version = "0.1.0"
 
 [deps]
