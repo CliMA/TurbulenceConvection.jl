@@ -1,11 +1,17 @@
 using TurbulenceConvection, Documenter
 using DocumenterCitations
+import Glob
+
+# https://github.com/jheinen/GR.jl/issues/278#issuecomment-587090846
+ENV["GKSwstype"] = "nul"
 
 bib = CitationBibliography(joinpath(@__DIR__, "bibliography.bib"))
 
 #! format: off
 pages = Any[
     "Home" => "index.md",
+    "Reference states" => "ReferenceStates.md",
+    "References" => "References.md",
 ]
 
 mathengine = MathJax(Dict(
@@ -41,3 +47,16 @@ deploydocs(
     devbranch = "main",
     forcepush = true,
 )
+
+# Clean up
+build_dir = joinpath(@__DIR__, "build")
+if isdir(build_dir)
+    cd(build_dir) do
+        for filename in Glob.glob("Output.*")
+            rm(filename; force = true, recursive = true)
+        end
+        for filename in Glob.glob("*.in")
+            rm(filename; force = true)
+        end
+    end
+end
