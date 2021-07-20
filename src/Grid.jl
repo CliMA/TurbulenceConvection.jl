@@ -45,4 +45,9 @@ struct Grid{A1, FT}
     end
 end
 
+center_indicies(grid::Grid) = xrange(grid.nzg)
+face_indicies(grid::Grid) = xrange(grid.nzg)
+real_center_indicies(grid::Grid) = xrange(grid.gw, grid.nzg - grid.gw)
+real_face_indicies(grid::Grid) = xrange(grid.gw, grid.nzg - grid.gw)
+
 Base.eltype(::Grid{A1, FT}) where {A1, FT} = FT
