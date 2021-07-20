@@ -14,14 +14,14 @@ mutable struct Simulation1d
     Stats
 end
 
-function Simulation1d(namelist, paramlist, inpath = pwd())
+function Simulation1d(namelist, paramlist)
     Gr = TurbulenceConvection.Grid(namelist)
     Ref = TurbulenceConvection.ReferenceState(Gr)
     GMV = TurbulenceConvection.GridMeanVariables(namelist, Gr, Ref)
     Case = Cases.CasesFactory(namelist, paramlist, Gr, Ref)
     Turb = TurbulenceConvection.ParameterizationFactory(namelist, paramlist, Gr, Ref)
     TS = TurbulenceConvection.TimeStepping(namelist)
-    Stats = TurbulenceConvection.NetCDFIO_Stats(namelist, paramlist, Gr, inpath)
+    Stats = TurbulenceConvection.NetCDFIO_Stats(namelist, paramlist, Gr)
     return Simulation1d(Gr, Ref, GMV, Case, Turb, TS, Stats)
 end
 
@@ -94,12 +94,12 @@ function force_io(self::Simulation1d)
     return
 end
 
-function main(namelist, paramlist, inpath = pwd(); kwargs...)
-    main1d(namelist, paramlist, inpath; kwargs...)
+function main(namelist, paramlist; kwargs...)
+    main1d(namelist, paramlist; kwargs...)
 end
 
-function main1d(namelist, paramlist, inpath = pwd(); time_run = false)
-    Simulation = Simulation1d(namelist, paramlist, inpath)
+function main1d(namelist, paramlist; time_run = false)
+    Simulation = Simulation1d(namelist, paramlist)
     TurbulenceConvection.initialize(Simulation, namelist)
     if time_run
         @time run(Simulation)
