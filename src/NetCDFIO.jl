@@ -1,4 +1,5 @@
 using NCDatasets
+using JSON
 
 # TODO: remove `vars` hack that avoids https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
 
