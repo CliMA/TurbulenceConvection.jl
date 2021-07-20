@@ -1135,7 +1135,7 @@ function compute_nh_pressure(self)
 
     @inbounds for i in xrange(self.n_updrafts)
         input.updraft_top = self.UpdVar.updraft_top[i]
-        alen = length(argwhere(self.UpdVar.Area.values[i, cinterior]))
+        alen = max(length(argwhere(self.UpdVar.Area.values[i, cinterior])) - 1, 0)
         avals = off_arr(self.UpdVar.Area.values[i, cinterior])
         input.a_med = Statistics.median(avals[0:alen])
         @inbounds for k in xrange(grid(self).gw, grid(self).nzg - grid(self).gw)
