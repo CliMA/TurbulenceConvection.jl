@@ -6,11 +6,9 @@ using TurbulenceConvection
 using Test
 
 include(joinpath("utils", "main.jl"))
-include(joinpath("utils", "generate_paramlist.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
-using .NameList
-using .ParamList
+using .namelist
 
 best_mse = OrderedDict()
 best_mse["qt_mean"] = 1.1424341230332884e-01
@@ -25,9 +23,8 @@ best_mse["tke_mean"] = 4.1588123897851069e+01
 @testset "Nieuwstadt" begin
     println("Running Nieuwstadt...")
     namelist = default_namelist("Nieuwstadt")
-    paramlist = default_paramlist("Nieuwstadt")
     namelist["meta"]["uuid"] = "01"
-    ds_filename = @time main(namelist, paramlist)
+    ds_filename = @time main(namelist)
 
     computed_mse = Dataset(ds_filename, "r") do ds
         Dataset(joinpath(PyCLES_output_dataset_path, "Nieuwstadt.nc"), "r") do ds_pycles

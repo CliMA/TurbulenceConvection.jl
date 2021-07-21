@@ -6,11 +6,9 @@ using TurbulenceConvection
 using Test
 
 include(joinpath("utils", "main.jl"))
-include(joinpath("utils", "generate_paramlist.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
-using .NameList
-using .ParamList
+using .namelist
 
 best_mse = OrderedDict()
 best_mse["qt_mean"] = 8.2838502450548468e-02
@@ -25,9 +23,8 @@ best_mse["tke_mean"] = 3.2178713832216246e+01
 @testset "Bomex" begin
     println("Running Bomex...")
     namelist = default_namelist("Bomex")
-    paramlist = default_paramlist("Bomex")
     namelist["meta"]["uuid"] = "01"
-    ds_filename = @time main(namelist, paramlist)
+    ds_filename = @time main(namelist)
 
     computed_mse = Dataset(ds_filename, "r") do ds
         Dataset(joinpath(PyCLES_output_dataset_path, "Bomex.nc"), "r") do ds_pycles

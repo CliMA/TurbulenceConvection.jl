@@ -15,9 +15,9 @@ struct BaseCase end
 
 up_sum(vals::OffsetArray) = off_arr(reshape(sum(vals; dims = 1), size(vals, 2)))
 
-function parse_param(paramlist, keys...; default = nothing)
+function parse_param(namelist, keys...; default = nothing)
     @assert default ≠ nothing
-    param = paramlist
+    param = namelist
     for k in keys
         if haskey(param, k)
             param = param[k]

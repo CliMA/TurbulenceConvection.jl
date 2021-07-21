@@ -6,11 +6,9 @@ using TurbulenceConvection
 using Test
 
 include(joinpath("utils", "main.jl"))
-include(joinpath("utils", "generate_paramlist.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
-using .NameList
-using .ParamList
+using .namelist
 
 best_mse = OrderedDict()
 best_mse["qt_mean"] = 6.7066415019414212e+00
@@ -24,9 +22,8 @@ best_mse["tke_mean"] = 4.1628443606689931e+00
 @testset "ARM_SGP" begin
     println("Running ARM_SGP...")
     namelist = default_namelist("ARM_SGP")
-    paramlist = default_paramlist("ARM_SGP")
     namelist["meta"]["uuid"] = "01"
-    ds_filename = @time main(namelist, paramlist)
+    ds_filename = @time main(namelist)
 
     computed_mse = Dataset(ds_filename, "r") do ds
         Dataset(joinpath(PyCLES_output_dataset_path, "ARM_SGP.nc"), "r") do ds_pycles

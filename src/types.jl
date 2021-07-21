@@ -284,7 +284,7 @@ mutable struct UpdraftVariables{A1}
     cloud_cover::A1
     updraft_top::A1
     lwp::Float64
-    function UpdraftVariables(nu, namelist, paramlist, Gr::Grid)
+    function UpdraftVariables(nu, namelist, Gr::Grid)
         n_updrafts = nu
         nzg = Gr.nzg
 
@@ -300,7 +300,7 @@ mutable struct UpdraftVariables{A1}
         B = UpdraftVariable(nu, nzg, "half", "scalar", "buoyancy", "m^2/s^3")
 
         prognostic = true
-        updraft_fraction = paramlist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
+        updraft_fraction = namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
 
         # cloud and rain diagnostics for output
         cloud_fraction = pyzeros(nzg)
@@ -764,13 +764,13 @@ mutable struct ParameterizationBase{T}
     Ri_bulk_crit::Float64
     zi::Float64
     # A base class common to all turbulence parameterizations
-    function ParameterizationBase(paramlist, Gr::Grid, Ref::ReferenceState)
+    function ParameterizationBase(namelist, Gr::Grid, Ref::ReferenceState)
         turbulence_tendency = pyzeros(Gr.nzg)
         KM = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "diffusivity", "m^2/s") # eddy viscosity
         KH = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "viscosity", "m^2/s") # eddy diffusivity
-        # get values from paramlist
-        prandtl_number = paramlist["turbulence"]["prandtl_number_0"]
-        Ri_bulk_crit = paramlist["turbulence"]["Ri_bulk_crit"]
+        # get values from namelist
+        prandtl_number = namelist["turbulence"]["prandtl_number_0"]
+        Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
 
         return new{typeof(turbulence_tendency)}(turbulence_tendency, Gr, Ref, KM, KH, prandtl_number, Ri_bulk_crit, 0)
     end
@@ -976,9 +976,9 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
     entr_surface_bc::Float64
     detr_surface_bc::Float64
     dt_upd::Float64
-    function EDMF_PrognosticTKE(namelist, paramlist, Gr::Grid, Ref::ReferenceState)
+    function EDMF_PrognosticTKE(namelist, Gr::Grid, Ref::ReferenceState)
         # Initialize the base parameterization class
-        base = ParameterizationBase(paramlist, Gr, Ref)
+        base = ParameterizationBase(namelist, Gr, Ref)
 
         # Set the number of updrafts (1)
         n_updrafts = try
@@ -1107,33 +1107,33 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
             "default"
         end
 
-        # Get values from paramlist
+        # Get values from namelist
         # set defaults at some point?
-        surface_area = paramlist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
-        max_area = paramlist["turbulence"]["EDMF_PrognosticTKE"]["max_area"]
-        entrainment_factor = paramlist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"]
+        surface_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
+        max_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"]
+        entrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"]
         entrainment_Mdiv_factor = try
-            paramlist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"]
+            namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"]
         catch
             0.0
         end
-        updraft_mixing_frac = paramlist["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"]
-        entrainment_sigma = paramlist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_sigma"]
-        entrainment_smin_tke_coeff = paramlist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"]
-        entrainment_ed_mf_sigma = paramlist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"]
-        entrainment_scale = paramlist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"]
-        constant_plume_spacing = paramlist["turbulence"]["EDMF_PrognosticTKE"]["constant_plume_spacing"]
-        detrainment_factor = paramlist["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"]
-        sorting_power = paramlist["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"]
-        turbulent_entrainment_factor = paramlist["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"]
-        pressure_buoy_coeff = paramlist["turbulence"]["EDMF_PrognosticTKE"]["pressure_buoy_coeff"]
-        aspect_ratio = paramlist["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"]
+        updraft_mixing_frac = namelist["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"]
+        entrainment_sigma = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_sigma"]
+        entrainment_smin_tke_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"]
+        entrainment_ed_mf_sigma = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"]
+        entrainment_scale = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"]
+        constant_plume_spacing = namelist["turbulence"]["EDMF_PrognosticTKE"]["constant_plume_spacing"]
+        detrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"]
+        sorting_power = namelist["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"]
+        turbulent_entrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"]
+        pressure_buoy_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_buoy_coeff"]
+        aspect_ratio = namelist["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"]
 
         if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"]) == "normalmode"
             pressure_normalmode_buoy_coeff1, pressure_normalmode_buoy_coeff2 = try
                 (
-                    paramlist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"],
-                    paramlist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff2"],
+                    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"],
+                    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff2"],
                 )
             catch
                 println("Using (Tan et al, 2018) parameters as default for Normal Mode pressure formula buoyancy term")
@@ -1144,8 +1144,8 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
         if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"]) == "normalmode"
             pressure_normalmode_adv_coeff, pressure_normalmode_drag_coeff = try
                 (
-                    paramlist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"],
-                    paramlist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"],
+                    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"],
+                    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"],
                 )
             catch
                 println("Using (Tan et al, 2018) parameters as default for Normal Mode pressure formula drag term")
@@ -1156,20 +1156,20 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
         # "Legacy" coefficients used by the steady updraft routine
         vel_buoy_coeff = 1.0 - pressure_buoy_coeff
         if calc_tke == true
-            tke_ed_coeff = paramlist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
-            tke_diss_coeff = paramlist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"]
-            static_stab_coeff = paramlist["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"]
+            tke_ed_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
+            tke_diss_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"]
+            static_stab_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"]
             # Latent heat stability effect
-            lambda_stab = paramlist["turbulence"]["EDMF_PrognosticTKE"]["lambda_stab"]
+            lambda_stab = namelist["turbulence"]["EDMF_PrognosticTKE"]["lambda_stab"]
         end
-        # Need to code up as paramlist option?
+        # Need to code up as namelist option?
         minimum_area = 1e-5
 
         # Create the class for rain
         Rain = RainVariables(namelist, Gr)
 
         # Create the updraft variable class (major diagnostic and prognostic variables)
-        UpdVar = UpdraftVariables(n_updrafts, namelist, paramlist, Gr)
+        UpdVar = UpdraftVariables(n_updrafts, namelist, Gr)
         # Create the class for updraft thermodynamics
         UpdThermo = UpdraftThermodynamics(n_updrafts, Gr, Ref, UpdVar, Rain)
 

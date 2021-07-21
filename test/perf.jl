@@ -5,19 +5,16 @@ using Test
 using Profile
 
 include(joinpath("integration_tests", "utils", "Cases.jl"))
-include(joinpath("integration_tests", "utils", "generate_paramlist.jl"))
 include(joinpath("integration_tests", "utils", "generate_namelist.jl"))
 using .Cases
-using .NameList
-using .ParamList
+using .namelist
 
 include(joinpath("integration_tests", "utils", "main.jl"))
 
 function run_main(; time_run = false)
     namelist = default_namelist("Bomex")
-    paramlist = default_paramlist("Bomex")
     namelist["meta"]["uuid"] = "01"
-    main(namelist, paramlist; time_run = time_run)
+    main(namelist; time_run = time_run)
 end
 
 run_main() # run first to compile
