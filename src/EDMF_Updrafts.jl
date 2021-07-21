@@ -26,11 +26,11 @@ end
 
 function initialize(self::UpdraftVariables, GMV::GridMeanVariables)
     gw = self.Gr.gw
-    dz = self.Gr.dz
 
+    self.W.values .= 0
+    self.B.values .= 0
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in xrange(self.Gr.nzg)
-            self.W.values[i, k] = 0.0
+        @inbounds for k in center_indicies(self.Gr)
             # Simple treatment for now, revise when multiple updraft closures
             # become more well defined
             if self.prognostic
@@ -42,7 +42,6 @@ function initialize(self::UpdraftVariables, GMV::GridMeanVariables)
             self.QL.values[i, k] = GMV.QL.values[k]
             self.H.values[i, k] = GMV.H.values[k]
             self.T.values[i, k] = GMV.T.values[k]
-            self.B.values[i, k] = 0.0
         end
 
         self.Area.values[i, gw] = self.updraft_fraction / self.n_updrafts
@@ -134,9 +133,14 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
     thetal_in = off_arr(pyinterp(self.Gr.z_half, z_in, thetal_in))
     T_in = off_arr(pyinterp(self.Gr.z_half, z_in, T_in))
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in xrange(self.Gr.nzg)
+        @inbounds for k in face_indicies(self.Gr)
             if minimum(z_in) <= self.Gr.z_half[k] <= maximum(z_in)
                 self.W.values[i, k] = 0.0
+            end
+        end
+
+        @inbounds for k in center_indicies(self.Gr)
+            if minimum(z_in) <= self.Gr.z_half[k] <= maximum(z_in)
                 self.Area.values[i, k] = Area_in[k] #self.updraft_fraction/self.n_updrafts
                 self.H.values[i, k] = thetal_in[k]
                 self.QT.values[i, k] = 0.0
@@ -208,7 +212,7 @@ function set_means(self::UpdraftVariables, GMV::GridMeanVariables)
     self.B.bulkvalues .= 0.0
     self.RH.bulkvalues .= 0.0
 
-    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         if self.Area.bulkvalues[k] > 1.0e-20
             @inbounds for i in xrange(self.n_updrafts)
                 self.QT.bulkvalues[k] += self.Area.values[i, k] * self.QT.values[i, k] / self.Area.bulkvalues[k]
@@ -245,8 +249,11 @@ end
 # quick utility to set "new" arrays with values in the "values" arrays
 function set_new_with_values(self::UpdraftVariables)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in xrange(self.Gr.nzg)
+        @inbounds for k in face_indicies(self.Gr)
             self.W.new[i, k] = self.W.values[i, k]
+        end
+
+        @inbounds for k in center_indicies(self.Gr)
             self.Area.new[i, k] = self.Area.values[i, k]
             self.QT.new[i, k] = self.QT.values[i, k]
             self.QL.new[i, k] = self.QL.values[i, k]
@@ -262,7 +269,11 @@ end
 # quick utility to set "new" arrays with values in the "values" arrays
 function set_old_with_values(self::UpdraftVariables)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in xrange(self.Gr.nzg)
+        @inbounds for k in face_indicies(self.Gr)
+            self.W.old[i, k] = self.W.values[i, k]
+        end
+
+        @inbounds for k in center_indicies(self.Gr)
             self.W.old[i, k] = self.W.values[i, k]
             self.Area.old[i, k] = self.Area.values[i, k]
             self.QT.old[i, k] = self.QT.values[i, k]
@@ -279,7 +290,11 @@ end
 # quick utility to set "tmp" arrays with values in the "new" arrays
 function set_values_with_new(self::UpdraftVariables)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in xrange(self.Gr.nzg)
+        @inbounds for k in face_indicies(self.Gr)
+            self.W.values[i, k] = self.W.new[i, k]
+        end
+
+        @inbounds for k in center_indicies(self.Gr)
             self.W.values[i, k] = self.W.new[i, k]
             self.Area.values[i, k] = self.Area.new[i, k]
             self.QT.values[i, k] = self.QT.new[i, k]
@@ -336,7 +351,7 @@ function upd_cloud_diagnostics(self::UpdraftVariables, Ref::ReferenceState)
         self.updraft_top[i] = 0.0
         self.cloud_cover[i] = 0.0
 
-        @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+        @inbounds for k in real_center_indicies(self.Gr)
             if self.Area.values[i, k] > 1e-3
                 self.updraft_top[i] = fmax(self.updraft_top[i], self.Gr.z_half[k])
                 self.lwp += Ref.rho0_half[k] * self.QL.values[i, k] * self.Area.values[i, k] * self.Gr.dz
@@ -387,7 +402,7 @@ function buoyancy(
 
     if !extrap
         @inbounds for i in xrange(self.n_updraft)
-            @inbounds for k in xrange(self.Gr.nzg)
+            @inbounds for k in center_indicies(self.Gr)
                 if UpdVar.Area.values[i, k] > 0.0
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
                     rho = rho_c(self.Ref.p0_half[k], UpdVar.T.values[i, k], UpdVar.QT.values[i, k], qv)
@@ -406,7 +421,7 @@ function buoyancy(
         end
     else
         @inbounds for i in xrange(self.n_updraft)
-            @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+            @inbounds for k in real_center_indicies(self.Gr)
                 if UpdVar.Area.values[i, k] > 0.0
                     qt = UpdVar.QT.values[i, k]
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
@@ -434,7 +449,7 @@ function buoyancy(
     end
 
 
-    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         GMV.B.values[k] = (1.0 - UpdVar.Area.bulkvalues[k]) * EnvVar.B.values[k]
         @inbounds for i in xrange(self.n_updraft)
             GMV.B.values[k] += UpdVar.Area.values[i, k] * UpdVar.B.values[i, k]
@@ -457,7 +472,7 @@ function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rai
     sa = eos_struct()
 
     @inbounds for i in xrange(self.n_updraft)
-        @inbounds for k in xrange(self.Gr.nzg)
+        @inbounds for k in center_indicies(self.Gr)
 
             # autoconversion and accretion
             mph = microphysics_rain_src(

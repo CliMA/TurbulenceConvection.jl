@@ -13,7 +13,7 @@ update(self::ForcingBase, GMV::GridMeanVariables) = nothing
 
 function coriolis_force(self::ForcingBase, U::VariablePrognostic, V::VariablePrognostic, ::ForcingBaseType)
     gw = self.Gr.gw
-    @inbounds for k in xrange(gw, self.Gr.nzg - gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         U.tendencies[k] -= self.coriolis_param * (self.vg[k] - V.values[k])
         V.tendencies[k] += self.coriolis_param * (self.ug[k] - U.values[k])
     end
@@ -42,7 +42,7 @@ initialize(self::ForcingBase{ForcingStandard}, GMV) = initialize(self, GMV, Forc
 
 function update(self::ForcingBase{ForcingStandard}, GMV::GridMeanVariables)
 
-    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         # Apply large-scale horizontal advection tendencies
         qv = GMV.QT.values[k] - GMV.QL.values[k]
         GMV.H.tendencies[k] += self.convert_forcing_prog_fp(
@@ -56,7 +56,7 @@ function update(self::ForcingBase{ForcingStandard}, GMV::GridMeanVariables)
         GMV.QT.tendencies[k] += self.dqtdt[k]
     end
     if self.apply_subsidence
-        @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+        @inbounds for k in real_center_indicies(self.Gr)
             # Apply large-scale subsidence tendencies
             GMV.H.tendencies[k] -= (GMV.H.values[k + 1] - GMV.H.values[k]) * self.Gr.dzi * self.subsidence[k]
             GMV.QT.tendencies[k] -= (GMV.QT.values[k + 1] - GMV.QT.values[k]) * self.Gr.dzi * self.subsidence[k]
@@ -82,7 +82,7 @@ end
 
 function update(self::ForcingBase{ForcingDYCOMS_RF01}, GMV::GridMeanVariables)
 
-    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         GMV.QT.tendencies[k] += self.dqtdt[k]
         # Apply large-scale subsidence tendencies
         GMV.H.tendencies[k] -= (GMV.H.values[k + 1] - GMV.H.values[k]) * self.Gr.dzi * self.subsidence[k]

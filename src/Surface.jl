@@ -3,17 +3,14 @@ initialize(self::SurfaceBase, ::BaseCase) = nothing
 update(self::SurfaceBase, GMV::GridMeanVariables, ::BaseCase) = nothing
 
 function free_convection_windspeed(self::SurfaceBase, GMV::GridMeanVariables, ::BaseCase)
-    gw = self.Gr.gw
-    kmin = gw
-    kmax = self.Gr.nzg - gw
     theta_rho = pyzeros(self.Gr.nzg)
 
     # Need to get theta_rho
-    @inbounds for k in xrange(self.Gr.nzg)
+    @inbounds for k in center_indicies(self.Gr)
         qv = GMV.QT.values[k] - GMV.QL.values[k]
         theta_rho[k] = theta_rho_c(self.Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
     end
-    zi = get_inversion(theta_rho, GMV.U.values, GMV.V.values, self.Gr.z_half, kmin, kmax, self.Ri_bulk_crit)
+    zi = get_inversion(theta_rho, GMV.U.values, GMV.V.values, self.Gr, self.Ri_bulk_crit)
     wstar = get_wstar(self.bflux, zi) # yair here zi in TRMM should be adjusted
     self.windspeed = sqrt(self.windspeed * self.windspeed + (1.2 * wstar) * (1.2 * wstar))
     return
