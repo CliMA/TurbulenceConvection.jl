@@ -24,8 +24,8 @@ best_mse["tke_mean"] = 3.2178713832216246e+01
 
 @testset "Bomex" begin
     println("Running Bomex...")
-    namelist = NameList.Bomex(default_namelist("Bomex"))
-    paramlist = ParamList.Bomex(default_paramlist("Bomex"))
+    namelist = default_namelist("Bomex")
+    paramlist = default_paramlist("Bomex")
     namelist["meta"]["uuid"] = "01"
     ds_filename = @time main(namelist, paramlist)
 

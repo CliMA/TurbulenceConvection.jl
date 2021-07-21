@@ -14,8 +14,8 @@ using .ParamList
 
 @testset "life_cycle_Tan2018" begin
     println("Running life_cycle_Tan2018...")
-    namelist = NameList.life_cycle_Tan2018(default_namelist("life_cycle_Tan2018"))
-    paramlist = ParamList.life_cycle_Tan2018(default_paramlist("life_cycle_Tan2018"))
+    namelist = default_namelist("life_cycle_Tan2018")
+    paramlist = default_paramlist("life_cycle_Tan2018")
     namelist["meta"]["uuid"] = "01"
     @time main(namelist, paramlist)
 end

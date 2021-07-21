@@ -23,8 +23,8 @@ best_mse["tke_mean"] = 8.1372294749084432e+01
 
 @testset "Soares" begin
     println("Running Soares...")
-    namelist = NameList.Soares(default_namelist("Soares"))
-    paramlist = ParamList.Soares(default_paramlist("Soares"))
+    namelist = default_namelist("Soares")
+    paramlist = default_paramlist("Soares")
     namelist["meta"]["uuid"] = "01"
     ds_filename = @time main(namelist, paramlist)
 

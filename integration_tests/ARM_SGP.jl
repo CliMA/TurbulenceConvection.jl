@@ -23,8 +23,8 @@ best_mse["tke_mean"] = 4.1628443606689931e+00
 
 @testset "ARM_SGP" begin
     println("Running ARM_SGP...")
-    namelist = NameList.ARM_SGP(default_namelist("ARM_SGP"))
-    paramlist = ParamList.ARM_SGP(default_paramlist("ARM_SGP"))
+    namelist = default_namelist("ARM_SGP")
+    paramlist = default_paramlist("ARM_SGP")
     namelist["meta"]["uuid"] = "01"
     ds_filename = @time main(namelist, paramlist)
 

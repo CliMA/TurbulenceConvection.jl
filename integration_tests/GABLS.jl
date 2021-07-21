@@ -21,8 +21,8 @@ best_mse["tke_mean"] = 4.1067897074868842e+00
 
 @testset "GABLS" begin
     println("Running GABLS...")
-    namelist = NameList.GABLS(default_namelist("GABLS"))
-    paramlist = ParamList.GABLS(default_paramlist("GABLS"))
+    namelist = default_namelist("GABLS")
+    paramlist = default_paramlist("GABLS")
     namelist["meta"]["uuid"] = "01"
     ds_filename = @time main(namelist, paramlist)
 

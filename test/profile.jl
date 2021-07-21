@@ -14,8 +14,8 @@ using .ParamList
 include(joinpath("integration_tests", "utils", "main.jl"))
 
 function run_main()
-    namelist = NameList.GATE_III(default_namelist("GATE_III"))
-    paramlist = ParamList.GATE_III(default_paramlist("GATE_III"))
+    namelist = default_namelist("GATE_III")
+    paramlist = default_paramlist("GATE_III")
     namelist["meta"]["uuid"] = "01"
     main(namelist, paramlist)
 end

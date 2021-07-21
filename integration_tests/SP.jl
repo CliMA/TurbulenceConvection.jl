@@ -14,8 +14,8 @@ using .ParamList
 
 @testset "SP" begin
     println("Running SP...")
-    namelist = NameList.SP(default_namelist("SP"))
-    paramlist = ParamList.SP(default_paramlist("SP"))
+    namelist = default_namelist("SP")
+    paramlist = default_paramlist("SP")
     namelist["meta"]["uuid"] = "01"
     @time main(namelist, paramlist)
 end

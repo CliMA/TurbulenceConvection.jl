@@ -24,8 +24,8 @@ best_mse["tke_mean"] = 2.5415255485687139e+03
 
 @testset "TRMM_LBA" begin
     println("Running TRMM_LBA...")
-    namelist = NameList.TRMM_LBA(default_namelist("TRMM_LBA"))
-    paramlist = ParamList.TRMM_LBA(default_paramlist("TRMM_LBA"))
+    namelist = default_namelist("TRMM_LBA")
+    paramlist = default_paramlist("TRMM_LBA")
     namelist["meta"]["uuid"] = "01"
     ds_filename = @time main(namelist, paramlist)
 
