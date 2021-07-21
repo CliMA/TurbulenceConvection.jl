@@ -8,7 +8,7 @@ using Test
 include(joinpath("utils", "main.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
-using .namelist
+using .NameList
 
 @testset "GATE_III" begin
     println("Running GATE_III...")

@@ -9,7 +9,7 @@ tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
 include(joinpath(tc_dir, "integration_tests", "utils", "generate_namelist.jl"))
 include(joinpath(tc_dir, "integration_tests", "utils", "Cases.jl"))
 include(joinpath(tc_dir, "integration_tests", "utils", "parameter_set.jl"))
-using .namelist
+using .NameList
 import .Cases
 function export_ref_profile(case_name::String)
     namelist = default_namelist(case_name)
