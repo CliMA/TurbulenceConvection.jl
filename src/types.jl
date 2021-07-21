@@ -1352,8 +1352,8 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
         )
     end
 end
-grid(edmf::EDMF_PrognosticTKE) = edmf.base.Gr
-ref_state(edmf::EDMF_PrognosticTKE) = edmf.base.Ref
+get_grid(edmf::EDMF_PrognosticTKE) = edmf.base.Gr
+reference_state(edmf::EDMF_PrognosticTKE) = edmf.base.Ref
 prandtl_number(edmf::EDMF_PrognosticTKE) = edmf.base.prandtl_number
 turbulence_tendency(edmf::EDMF_PrognosticTKE) = edmf.base.turbulence_tendency
 diffusivity_m(edmf::EDMF_PrognosticTKE) = edmf.base.KM
