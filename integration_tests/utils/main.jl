@@ -1,6 +1,8 @@
 import JSON
 using ArgParse
 import TurbulenceConvection
+
+include("parameter_set.jl")
 include("Cases.jl")
 import .Cases
 
@@ -15,11 +17,12 @@ mutable struct Simulation1d
 end
 
 function Simulation1d(namelist)
+    param_set = create_parameter_set(namelist)
     Gr = TurbulenceConvection.Grid(namelist)
-    Ref = TurbulenceConvection.ReferenceState(Gr)
-    GMV = TurbulenceConvection.GridMeanVariables(namelist, Gr, Ref)
+    Ref = TurbulenceConvection.ReferenceState(Gr, param_set)
+    GMV = TurbulenceConvection.GridMeanVariables(namelist, Gr, Ref, param_set)
     Case = Cases.CasesFactory(namelist, Gr, Ref)
-    Turb = TurbulenceConvection.ParameterizationFactory(namelist, Gr, Ref)
+    Turb = TurbulenceConvection.ParameterizationFactory(namelist, Gr, Ref, param_set)
     TS = TurbulenceConvection.TimeStepping(namelist)
     Stats = TurbulenceConvection.NetCDFIO_Stats(namelist, Gr)
     return Simulation1d(Gr, Ref, GMV, Case, Turb, TS, Stats)

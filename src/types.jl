@@ -336,7 +336,8 @@ mutable struct UpdraftVariables{A1}
     end
 end
 
-Base.@kwdef mutable struct GridMeanVariables
+Base.@kwdef mutable struct GridMeanVariables{PS}
+    param_set::PS
     Gr::Grid
     Ref::ReferenceState
     lwp::Float64
@@ -367,7 +368,7 @@ Base.@kwdef mutable struct GridMeanVariables
     H_third_m::VariableDiagnostic
     HQTcov::VariableDiagnostic
 end
-function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState)
+function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState, param_set::PS) where {PS}
     lwp = 0.0
     cloud_base = 0.0
     cloud_top = 0.0
@@ -428,6 +429,7 @@ function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState)
     end
 
     return GridMeanVariables(;
+        param_set,
         Gr,
         Ref,
         lwp,
@@ -581,7 +583,8 @@ struct EnvironmentVariable_2m{A1}
     end
 end
 
-Base.@kwdef mutable struct EnvironmentVariables
+Base.@kwdef mutable struct EnvironmentVariables{PS}
+    param_set::PS
     Gr::Grid
     W::EnvironmentVariable
     Area::EnvironmentVariable
@@ -605,7 +608,7 @@ Base.@kwdef mutable struct EnvironmentVariables
     lwp::Float64 = 0
     EnvThermo_scheme::String = "default_EnvThermo_scheme"
 end
-function EnvironmentVariables(namelist, Gr::Grid)
+function EnvironmentVariables(namelist, Gr::Grid, param_set::PS) where {PS}
     nz = Gr.nzg
 
     W = EnvironmentVariable(nz, "full", "velocity", "w", "m/s")
@@ -657,7 +660,8 @@ function EnvironmentVariables(namelist, Gr::Grid)
         end
     end
 
-    return EnvironmentVariables(;
+    return EnvironmentVariables{PS}(;
+        param_set,
         Gr,
         W,
         Area,
@@ -878,12 +882,14 @@ Base.@kwdef mutable struct CasesBase{T}
     shf0::Float64 = 0
 end
 
-struct SimilarityED
+struct SimilarityED{PS}
+    param_set::PS
     base::ParameterizationBase
     extrapolate_buoyancy::Bool
 end
 
-mutable struct EDMF_PrognosticTKE{A1, A2}
+mutable struct EDMF_PrognosticTKE{PS, A1, A2}
+    param_set::PS
     base::ParameterizationBase
     n_updrafts::Int
     calc_tke::Bool
@@ -976,7 +982,7 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
     entr_surface_bc::Float64
     detr_surface_bc::Float64
     dt_upd::Float64
-    function EDMF_PrognosticTKE(namelist, Gr::Grid, Ref::ReferenceState)
+    function EDMF_PrognosticTKE(namelist, Gr::Grid, Ref::ReferenceState, param_set::PS) where {PS}
         # Initialize the base parameterization class
         base = ParameterizationBase(namelist, Gr, Ref)
 
@@ -1174,7 +1180,7 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
         UpdThermo = UpdraftThermodynamics(n_updrafts, Gr, Ref, UpdVar, Rain)
 
         # Create the environment variable class (major diagnostic and prognostic variables)
-        EnvVar = EnvironmentVariables(namelist, Gr)
+        EnvVar = EnvironmentVariables(namelist, Gr, param_set)
         # Create the class for environment thermodynamics
         EnvThermo = EnvironmentThermodynamics(namelist, Gr, Ref, EnvVar, Rain)
 
@@ -1256,7 +1262,8 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
         dt_upd = 0
         A1 = typeof(mixing_length)
         A2 = typeof(horizontal_KM)
-        return new{A1, A2}(
+        return new{PS, A1, A2}(
+            param_set,
             base,
             n_updrafts,
             calc_tke,
@@ -1360,3 +1367,4 @@ diffusivity_m(edmf::EDMF_PrognosticTKE) = edmf.base.KM
 diffusivity_h(edmf::EDMF_PrognosticTKE) = edmf.base.KH
 Ri_bulk_crit(edmf::EDMF_PrognosticTKE) = edmf.base.Ri_bulk_crit
 Ri_bulk_crit(base::ParameterizationBase) = base.Ri_bulk_crit
+parameter_set(obj) = obj.param_set

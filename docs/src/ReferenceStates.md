@@ -4,16 +4,19 @@
 import TurbulenceConvection
 import Plots
 using NCDatasets
+using CLIMAParameters
 tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
 include(joinpath(tc_dir, "integration_tests", "utils", "generate_namelist.jl"))
 include(joinpath(tc_dir, "integration_tests", "utils", "Cases.jl"))
+include(joinpath(tc_dir, "integration_tests", "utils", "parameter_set.jl"))
 using .namelist
 import .Cases
 function export_ref_profile(case_name::String)
     namelist = default_namelist(case_name)
+    param_set = create_parameter_set(namelist)
     namelist["meta"]["uuid"] = "01"
     grid = TurbulenceConvection.Grid(namelist)
-    ref_state = TurbulenceConvection.ReferenceState(grid)
+    ref_state = TurbulenceConvection.ReferenceState(grid, param_set)
     Stats = TurbulenceConvection.NetCDFIO_Stats(namelist, grid)
     case = Cases.CasesFactory(namelist, grid, ref_state)
     Cases.initialize_reference(case, grid, ref_state, Stats)
