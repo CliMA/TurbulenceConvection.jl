@@ -1,4 +1,4 @@
-module namelist
+module NameList
 # See Table 1 of Tan et al, 2018
 #namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] ==> c_k (scaling constant for eddy diffusivity/viscosity
 #namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] == > c_e (scaling constant for tke dissipation)

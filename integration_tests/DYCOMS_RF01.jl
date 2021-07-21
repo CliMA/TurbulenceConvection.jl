@@ -8,7 +8,7 @@ using Test
 include(joinpath("utils", "main.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
-using .namelist
+using .NameList
 
 best_mse = OrderedDict()
 best_mse["qt_mean"] = 3.8001673417054252e-02
