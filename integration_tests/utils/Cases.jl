@@ -40,6 +40,10 @@ using ..TurbulenceConvection: ReferenceState
 using ..TurbulenceConvection: NetCDFIO_Stats
 using ..TurbulenceConvection: GridMeanVariables
 using ..TurbulenceConvection: TimeStepping
+using ..TurbulenceConvection: center_indicies
+using ..TurbulenceConvection: face_indicies
+using ..TurbulenceConvection: real_center_indicies
+using ..TurbulenceConvection: real_face_indicies
 
 # For dispatching to inherited class
 struct BaseCase end
@@ -151,7 +155,7 @@ function initialize_profiles(self::CasesBase{SoaresCase}, Gr::Grid, GMV::GridMea
     ql = 0.0
     qi = 0.0
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         if Gr.z_half[k] <= 1350.0
             GMV.QT.values[k] = 5.0e-3 - 3.7e-4 * Gr.z_half[k] / 1000.0
             theta[k] = 300.0
@@ -166,7 +170,7 @@ function initialize_profiles(self::CasesBase{SoaresCase}, Gr::Grid, GMV::GridMea
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         GMV.H.values[k] = theta[k]
         GMV.T.values[k] = theta[k] * exner_c(Ref.p0_half[k])
         GMV.THL.values[k] = theta[k]
@@ -247,7 +251,7 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, Gr::Grid, GMV::GridMea
     ql = 0.0
     qi = 0.0
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         if Gr.z_half[k] <= 1350.0
             GMV.QT.values[k] = 0.0
             theta[k] = 300.0
@@ -262,7 +266,7 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, Gr::Grid, GMV::GridMea
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         GMV.H.values[k] = theta[k]
         GMV.T.values[k] = theta[k] * exner_c(Ref.p0_half[k])
         GMV.THL.values[k] = theta[k]
@@ -342,7 +346,7 @@ function initialize_profiles(self::CasesBase{BomexCase}, Gr::Grid, GMV::GridMean
     ql = 0.0
     qi = 0.0 # IC of Bomex is cloud-free
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         #Set Thetal profile
         if Gr.z_half[k] <= 520.0
             thetal[k] = 298.7
@@ -381,7 +385,7 @@ function initialize_profiles(self::CasesBase{BomexCase}, Gr::Grid, GMV::GridMean
         end
     end
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         GMV.H.values[k] = thetal[k]
         GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
         GMV.THL.values[k] = thetal[k]
@@ -410,7 +414,7 @@ function initialize_forcing(self::CasesBase{BomexCase}, Gr::Grid, Ref::Reference
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         # Geostrophic velocity profiles. vg = 0
         self.Fo.ug[k] = -10.0 + (1.8e-3) * Gr.z_half[k]
         # Set large-scale cooling
@@ -482,7 +486,7 @@ function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, GMV:
     thetal = TurbulenceConvection.pyzeros(Gr.nzg)
     ql = 0.0
     qi = 0.0 # IC of Bomex is cloud-free
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         #Set Thetal profile
         if Gr.z_half[k] <= 520.0
             thetal[k] = 298.7
@@ -522,7 +526,7 @@ function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, GMV:
     end
 
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         GMV.H.values[k] = thetal[k]
         GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
         GMV.THL.values[k] = thetal[k]
@@ -559,7 +563,7 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         # Geostrophic velocity profiles. vg = 0
         self.Fo.ug[k] = -10.0 + (1.8e-3) * Gr.z_half[k]
         # Set large-scale cooling
@@ -651,7 +655,7 @@ function initialize_profiles(self::CasesBase{Rico}, Gr::Grid, GMV::GridMeanVaria
     ql = 0.0
     qi = 0.0 # IC of Rico is cloud-free
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         GMV.U.values[k] = -9.9 + 2.0e-3 * Gr.z_half[k]
         GMV.V.values[k] = -3.8
         #Set Thetal profile
@@ -671,7 +675,7 @@ function initialize_profiles(self::CasesBase{Rico}, Gr::Grid, GMV::GridMeanVaria
         end
     end
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         GMV.H.values[k] = thetal[k]
         GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
         GMV.THL.values[k] = thetal[k]
@@ -704,7 +708,7 @@ function initialize_forcing(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-    @inbounds for k in xrange(Gr.nzg)
+    @inbounds for k in real_center_indicies(Gr)
         # Geostrophic velocity profiles
         self.Fo.ug[k] = -9.9 + 2.0e-3 * Gr.z_half[k]
         self.Fo.vg[k] = -3.8
@@ -844,7 +848,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
     set_bcs(GMV.T, Gr)
 
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         PV_star = pv_star(GMV.T.values[k])
         qv_star = PV_star * epsi / (p1[k] - PV_star + epsi * PV_star * RH[k] / 100.0) # eq. 37 in pressel et al and the def of RH
         qv = GMV.QT.values[k] - GMV.QL.values[k]
@@ -1011,7 +1015,7 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
     self.rad = A # store matrix in self
     ind1 = Int(trunc(10.0 / 600.0))
     ind2 = Int(ceil(10.0 / 600.0)) - 1
-    @inbounds for k in xrange(Gr.nzg)
+    @inbounds for k in face_indicies(Gr)
         if 10 % 600.0 == 0
             self.Fo.dTdt[k] = self.rad[ind1, k]
         else
@@ -1045,10 +1049,11 @@ end
 
 function update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::TimeStepping)
 
+    Gr = self.Fo.Gr
     ind2 = Int(ceil(TS.t / 600.0))
     ind1 = Int(trunc(TS.t / 600.0))
-    @inbounds for k in xrange(self.Fo.Gr.nzg)
-        if self.Fo.Gr.z_half[k] >= 22699.48
+    @inbounds for k in face_indicies(Gr)
+        if Gr.z_half[k] >= 22699.48
             self.Fo.dTdt[k] = 0.0
         else
             if TS.t < 600.0 # first 10 min use the radiative forcing of t=10min (as in the paper)
@@ -1111,7 +1116,7 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVa
     qt = pyinterp(Gr.z_half, z_in, qt_in)
 
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         GMV.U.values[k] = 10.0
         GMV.QT.values[k] = qt[k]
         GMV.T.values[k] = Theta[k] * exner_c(Ref.p0_half[k])
@@ -1145,7 +1150,7 @@ function initialize_forcing(self::CasesBase{ARM_SGP}, Gr::Grid, Ref::ReferenceSt
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-    @inbounds for k in xrange(Gr.nzg)
+    @inbounds for k in center_indicies(Gr)
         self.Fo.ug[k] = 10.0
         self.Fo.vg[k] = 0.0
     end
@@ -1189,13 +1194,14 @@ function update_forcing(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::Ti
     Rqt_in = off_arr([0.08, 0.02, 0.04, -0.1, -0.16, -0.3]) ./ 1000.0 ./ 3600.0 # Radiative forcing for qt converted to [kg/kg/sec]
     dTdt = pyinterp(off_arr([TS.t]), t_in, AT_in)[0] + pyinterp(off_arr([TS.t]), t_in, RT_in)[0]
     dqtdt = pyinterp(off_arr([TS.t]), t_in, Rqt_in)[0]
-    @inbounds for k in xrange(self.Fo.Gr.nzg) # correct dims
-        if self.Fo.Gr.z_half[k] <= 1000.0
+    Gr = self.Fo.Gr
+    @inbounds for k in center_indicies(Gr)
+        if Gr.z_half[k] <= 1000.0
             self.Fo.dTdt[k] = dTdt
             self.Fo.dqtdt[k] = dqtdt * exner_c(self.Fo.Ref.p0_half[k])
-        elseif self.Fo.Gr.z_half[k] > 1000.0 && self.Fo.Gr.z_half[k] <= 2000.0
-            self.Fo.dTdt[k] = dTdt * (1 - (self.Fo.Gr.z_half[k] - 1000.0) / 1000.0)
-            self.Fo.dqtdt[k] = dqtdt * exner_c(self.Fo.Ref.p0_half[k]) * (1 - (self.Fo.Gr.z_half[k] - 1000.0) / 1000.0)
+        elseif Gr.z_half[k] > 1000.0 && Gr.z_half[k] <= 2000.0
+            self.Fo.dTdt[k] = dTdt * (1 - (Gr.z_half[k] - 1000.0) / 1000.0)
+            self.Fo.dqtdt[k] = dqtdt * exner_c(self.Fo.Ref.p0_half[k]) * (1 - (Gr.z_half[k] - 1000.0) / 1000.0)
         end
     end
     update(self.Fo, GMV)
@@ -1257,7 +1263,7 @@ function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanV
     U = pyinterp(Gr.z_half, z_in, U_in)
 
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         GMV.QT.values[k] = qt[k]
         GMV.T.values[k] = T[k]
         GMV.U.values[k] = U[k]
@@ -1424,7 +1430,7 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
     ql = TurbulenceConvection.pyzeros(Gr.nzg) # DYCOMS case is saturated
     qi = 0.0                                             # no ice
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         # thetal profile as defined in DYCOMS
         if Gr.z_half[k] <= 840.0
             thetal[k] = 289.0
@@ -1515,7 +1521,7 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::Referen
     divergence = 3.75e-6    # divergence is defined twice: here and in __init__ of ForcingDYCOMS_RF01 class
     # To be able to have self.Fo.divergence available here,
     # we would have to change the signature of ForcingBase class
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         self.Fo.subsidence[k] = -Gr.z_half[k] * divergence
     end
 
@@ -1580,7 +1586,7 @@ function initialize_profiles(self::CasesBase{GABLS}, Gr::Grid, GMV::GridMeanVari
     ql = 0.0
     qi = 0.0 # IC of GABLS cloud-free
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         #Set wind velocity profile
         GMV.U.values[k] = 8.0
         GMV.V.values[k] = 0.0
@@ -1596,7 +1602,7 @@ function initialize_profiles(self::CasesBase{GABLS}, Gr::Grid, GMV::GridMeanVari
         GMV.QT.values[k] = 0.0
     end
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         GMV.H.values[k] = thetal[k]
         GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k]) # No water content
         GMV.THL.values[k] = thetal[k]
@@ -1622,7 +1628,7 @@ function initialize_forcing(self::CasesBase{GABLS}, Gr::Grid, Ref::ReferenceStat
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         # Geostrophic velocity profiles.
         self.Fo.ug[k] = 8.0
         self.Fo.vg[k] = 0.0
@@ -1680,7 +1686,7 @@ function initialize_profiles(self::CasesBase{SP}, Gr::Grid, GMV::GridMeanVariabl
     ql = 0.0
     qi = 0.0 # IC of SP cloud-free
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         GMV.U.values[k] = 1.0
         GMV.V.values[k] = 0.0
         #Set Thetal profile
@@ -1696,7 +1702,7 @@ function initialize_profiles(self::CasesBase{SP}, Gr::Grid, GMV::GridMeanVariabl
         GMV.QT.values[k] = 0.0
     end
 
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         GMV.H.values[k] = thetal[k]
         GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
         GMV.THL.values[k] = thetal[k]
@@ -1726,7 +1732,7 @@ function initialize_forcing(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState, 
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         # Geostrophic velocity profiles. vg = 0
         self.Fo.ug[k] = 1.0
         self.Fo.vg[k] = 0.0
@@ -1771,7 +1777,7 @@ end
 
 function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
 
-    @inbounds for k in xrange(Gr.nzg)
+    @inbounds for k in center_indicies(Gr)
         GMV.U.values[k] = 0.01
     end
 
@@ -1846,7 +1852,7 @@ function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMean
     thetali[(Gr.gw):(Gr.nzg - Gr.gw)] = pyinterp(z_half_in, z_in, thetali_in)
     GMV.THL.values .= thetali
     GMV.H.values .= thetali
-    @inbounds for k in xrange(Gr.gw, Gr.nzg - Gr.gw)
+    @inbounds for k in real_center_indicies(Gr)
         GMV.QT.values[k] = 0.0
     end
     set_bcs(GMV.QT, Gr)
