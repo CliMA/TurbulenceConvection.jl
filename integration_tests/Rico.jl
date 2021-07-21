@@ -24,8 +24,8 @@ best_mse["tke_mean"] = 8.7760700153879964e+02
 
 @testset "Rico" begin
     println("Running Rico...")
-    namelist = NameList.Rico(default_namelist("Rico"))
-    paramlist = ParamList.Rico(default_paramlist("Rico"))
+    namelist = default_namelist("Rico")
+    paramlist = default_paramlist("Rico")
     namelist["meta"]["uuid"] = "01"
     ds_filename = @time main(namelist, paramlist)
 

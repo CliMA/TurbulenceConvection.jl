@@ -1,10 +1,10 @@
-struct Grid{A1}
-    zmin::Float64
-    zmax::Float64
+struct Grid{A1, FT}
+    zmin::FT
+    zmax::FT
     cinterior::UnitRange
     finterior::UnitRange
-    dz::Float64
-    dzi::Float64
+    dz::FT
+    dzi::FT
     gw::Int
     nz::Int
     nzg::Int
@@ -40,6 +40,9 @@ struct Grid{A1}
         zmin = z[gw - 1]
         zmax = z[nzg - gw - 1]
         A1 = typeof(z)
-        return new{A1}(zmin, zmax, cinterior, finterior, dz, dzi, gw, nz, nzg, z_half, z)
+        FT = typeof(zmax)
+        return new{A1, FT}(zmin, zmax, cinterior, finterior, dz, dzi, gw, nz, nzg, z_half, z)
     end
 end
+
+Base.eltype(::Grid{A1, FT}) where {A1, FT} = FT

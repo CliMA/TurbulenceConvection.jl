@@ -14,8 +14,8 @@ using .ParamList
 
 @testset "GATE_III" begin
     println("Running GATE_III...")
-    namelist = NameList.GATE_III(default_namelist("GATE_III"))
-    paramlist = ParamList.GATE_III(default_paramlist("GATE_III"))
+    namelist = default_namelist("GATE_III")
+    paramlist = default_paramlist("GATE_III")
     namelist["meta"]["uuid"] = "01"
     @time main(namelist, paramlist)
 end

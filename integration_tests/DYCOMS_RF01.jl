@@ -26,8 +26,8 @@ best_mse["tke_mean"] = 1.4604034781584005e+01
 
 @testset "DYCOMS_RF01" begin
     println("Running DYCOMS_RF01...")
-    namelist = NameList.DYCOMS_RF01(default_namelist("DYCOMS_RF01"))
-    paramlist = ParamList.DYCOMS_RF01(default_paramlist("DYCOMS_RF01"))
+    namelist = default_namelist("DYCOMS_RF01")
+    paramlist = default_paramlist("DYCOMS_RF01")
     namelist["meta"]["uuid"] = "01"
     ds_filename = @time main(namelist, paramlist)
 

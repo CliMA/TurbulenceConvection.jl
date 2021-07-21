@@ -2,7 +2,7 @@
 
 ```@example
 import TurbulenceConvection
-using Plots
+import Plots
 using NCDatasets
 tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
 include(joinpath(tc_dir, "integration_tests", "utils", "generate_namelist.jl"))
@@ -28,32 +28,32 @@ function export_ref_profile(case_name::String)
         ρf_0 = ds.group["reference"]["rho0"][:]
         pf_0 = ds.group["reference"]["p0"][:]
         αf_0 = ds.group["reference"]["alpha0"][:]
-        p1 = plot(ρc_0, zc ./ 1000;label="centers")
-        plot!(ρf_0, zf ./ 1000;label="faces")
-        plot!(size=(1000,400))
-        plot!(margin=5Plots.mm)
-        xlabel!("ρ_0")
-        ylabel!("z (km)")
-        title!("ρ_0")
 
-        p2 = plot(pc_0 ./ 1000, zc ./ 1000;label="centers")
-        plot!(pf_0 ./ 1000, zf ./ 1000;label="faces")
-        plot!(size=(1000,400))
-        plot!(margin=5Plots.mm)
-        xlabel!("p_0 (kPa)")
-        ylabel!("z (km)")
-        title!("p_0 (kPa)")
+        p1 = Plots.plot(ρc_0, zc ./ 1000;label="centers")
+        Plots.plot!(ρf_0, zf ./ 1000;label="faces")
+        Plots.plot!(size=(1000,400))
+        Plots.plot!(margin=5Plots.mm)
+        Plots.xlabel!("ρ_0")
+        Plots.ylabel!("z (km)")
+        Plots.title!("ρ_0")
 
-        p3 = plot(αc_0, zc ./ 1000;label="centers")
-        plot!(αf_0, zf ./ 1000;label="faces")
-        plot!(size=(1000,400))
-        plot!(margin=5Plots.mm)
-        xlabel!("α_0")
-        ylabel!("z (km)")
-        title!("α_0")
+        p2 = Plots.plot(pc_0 ./ 1000, zc ./ 1000;label="centers")
+        Plots.plot!(pf_0 ./ 1000, zf ./ 1000;label="faces")
+        Plots.plot!(size=(1000,400))
+        Plots.plot!(margin=5Plots.mm)
+        Plots.xlabel!("p_0 (kPa)")
+        Plots.ylabel!("z (km)")
+        Plots.title!("p_0 (kPa)")
 
-        plot(p1,p2,p3; layout=(1,3))
-        savefig("$case_name.svg")
+        p3 = Plots.plot(αc_0, zc ./ 1000;label="centers")
+        Plots.plot!(αf_0, zf ./ 1000;label="faces")
+        Plots.plot!(size=(1000,400))
+        Plots.plot!(margin=5Plots.mm)
+        Plots.xlabel!("α_0")
+        Plots.ylabel!("z (km)")
+        Plots.title!("α_0")
+        Plots.plot(p1,p2,p3; layout=(1,3))
+        Plots.savefig("$case_name.svg")
     end
 end
 for case_name in (

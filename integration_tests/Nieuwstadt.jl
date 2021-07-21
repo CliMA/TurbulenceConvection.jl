@@ -24,8 +24,8 @@ best_mse["tke_mean"] = 4.1588123897851069e+01
 
 @testset "Nieuwstadt" begin
     println("Running Nieuwstadt...")
-    namelist = NameList.Nieuwstadt(default_namelist("Nieuwstadt"))
-    paramlist = ParamList.Nieuwstadt(default_paramlist("Nieuwstadt"))
+    namelist = default_namelist("Nieuwstadt")
+    paramlist = default_paramlist("Nieuwstadt")
     namelist["meta"]["uuid"] = "01"
     ds_filename = @time main(namelist, paramlist)
 

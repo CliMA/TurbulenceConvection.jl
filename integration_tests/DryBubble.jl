@@ -14,8 +14,8 @@ using .ParamList
 
 @testset "DryBubble" begin
     println("Running DryBubble...")
-    namelist = NameList.DryBubble(default_namelist("DryBubble"))
-    paramlist = ParamList.DryBubble(default_paramlist("DryBubble"))
+    namelist = default_namelist("DryBubble")
+    paramlist = default_paramlist("DryBubble")
     namelist["meta"]["uuid"] = "01"
     @time main(namelist, paramlist)
 end

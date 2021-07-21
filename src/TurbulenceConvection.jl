@@ -15,6 +15,20 @@ struct BaseCase end
 
 up_sum(vals::OffsetArray) = off_arr(reshape(sum(vals; dims = 1), size(vals, 2)))
 
+function parse_param(paramlist, keys...; default = nothing)
+    @assert default ≠ nothing
+    param = paramlist
+    for k in keys
+        if haskey(param, k)
+            param = param[k]
+        else
+            @info "Using default value, $default, for parameter ($(join(keys, ", ")))."
+            return default
+        end
+    end
+    return param
+end
+
 include("python_primitives.jl")
 include("parameters.jl")
 include("Grid.jl")
