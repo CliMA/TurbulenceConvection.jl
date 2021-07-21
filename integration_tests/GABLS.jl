@@ -6,11 +6,9 @@ using TurbulenceConvection
 using Test
 
 include(joinpath("utils", "main.jl"))
-include(joinpath("utils", "generate_paramlist.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
-using .NameList
-using .ParamList
+using .namelist
 
 best_mse = OrderedDict()
 
@@ -22,9 +20,8 @@ best_mse["tke_mean"] = 4.1067897074868842e+00
 @testset "GABLS" begin
     println("Running GABLS...")
     namelist = default_namelist("GABLS")
-    paramlist = default_paramlist("GABLS")
     namelist["meta"]["uuid"] = "01"
-    ds_filename = @time main(namelist, paramlist)
+    ds_filename = @time main(namelist)
 
     computed_mse = Dataset(ds_filename, "r") do ds
         Dataset(joinpath(PyCLES_output_dataset_path, "Gabls.nc"), "r") do ds_pycles

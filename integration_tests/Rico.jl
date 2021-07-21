@@ -6,11 +6,9 @@ using TurbulenceConvection
 using Test
 
 include(joinpath("utils", "main.jl"))
-include(joinpath("utils", "generate_paramlist.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
-using .NameList
-using .ParamList
+using .namelist
 
 best_mse = OrderedDict()
 best_mse["qt_mean"] = 4.8938409872334176e-01
@@ -25,9 +23,8 @@ best_mse["tke_mean"] = 8.7760700153879964e+02
 @testset "Rico" begin
     println("Running Rico...")
     namelist = default_namelist("Rico")
-    paramlist = default_paramlist("Rico")
     namelist["meta"]["uuid"] = "01"
-    ds_filename = @time main(namelist, paramlist)
+    ds_filename = @time main(namelist)
 
     computed_mse = Dataset(ds_filename, "r") do ds
         Dataset(joinpath(PyCLES_output_dataset_path, "Rico.nc"), "r") do ds_pycles

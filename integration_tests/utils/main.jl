@@ -14,14 +14,14 @@ mutable struct Simulation1d
     Stats
 end
 
-function Simulation1d(namelist, paramlist)
+function Simulation1d(namelist)
     Gr = TurbulenceConvection.Grid(namelist)
     Ref = TurbulenceConvection.ReferenceState(Gr)
     GMV = TurbulenceConvection.GridMeanVariables(namelist, Gr, Ref)
-    Case = Cases.CasesFactory(namelist, paramlist, Gr, Ref)
-    Turb = TurbulenceConvection.ParameterizationFactory(namelist, paramlist, Gr, Ref)
+    Case = Cases.CasesFactory(namelist, Gr, Ref)
+    Turb = TurbulenceConvection.ParameterizationFactory(namelist, Gr, Ref)
     TS = TurbulenceConvection.TimeStepping(namelist)
-    Stats = TurbulenceConvection.NetCDFIO_Stats(namelist, paramlist, Gr)
+    Stats = TurbulenceConvection.NetCDFIO_Stats(namelist, Gr)
     return Simulation1d(Gr, Ref, GMV, Case, Turb, TS, Stats)
 end
 
@@ -94,12 +94,12 @@ function force_io(self::Simulation1d)
     return
 end
 
-function main(namelist, paramlist; kwargs...)
-    main1d(namelist, paramlist; kwargs...)
+function main(namelist; kwargs...)
+    main1d(namelist; kwargs...)
 end
 
-function main1d(namelist, paramlist; time_run = false)
-    Simulation = Simulation1d(namelist, paramlist)
+function main1d(namelist; time_run = false)
+    Simulation = Simulation1d(namelist)
     TurbulenceConvection.initialize(Simulation, namelist)
     if time_run
         @time run(Simulation)
@@ -129,11 +129,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
     args = parse_commandline()
     case_name = args["case_name"]
 
-    namelist = open("$case_name.in", "r") do io
+    namelist = open("namelist_" * "$case_name.in", "r") do io
         JSON.parse(io; dicttype = Dict, inttype = Int64)
     end
-    paramlist = open("paramlist_" * "$case_name.in", "r") do io
-        JSON.parse(io; dicttype = Dict, inttype = Int64)
-    end
-    main(namelist, paramlist)
+    main(namelist)
 end

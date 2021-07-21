@@ -1,14 +1,26 @@
-module NameList
+module namelist
+# See Table 1 of Tan et al, 2018
+#namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] ==> c_k (scaling constant for eddy diffusivity/viscosity
+#namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] == > c_e (scaling constant for tke dissipation)
+#namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_buoy_coeff"] ==> alpha_b (scaling constant for virtual mass term)
+#namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_drag_coeff"] ==> alpha_d (scaling constant for drag term)
+# namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_plume_spacing"] ==> r_d (horizontal length scale of plume spacing)
 
-#Adapated from PyCLES: https://github.com/pressel/pycles
+# Parameters below can be used to multiply any entrainment rate for quick tuning/experimentation
+# (NOTE: these are not c_epsilon, c_delta,0 defined in Tan et al 2018)
+# namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.1
+# namelist["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 1.0
+
+#NB: except for Bomex and life_cycle_Tan2018 cases, the parameters listed have not been thoroughly tuned/tested
+# and should be regarded as placeholders only. Optimal parameters may also depend on namelist options, such as
+# entrainment/detrainment rate formulation, diagnostic vs. prognostic updrafts, and vertical resolution
+export default_namelist
 
 using ArgParse
 import JSON
 
-export default_namelist
-
 function parse_commandline()
-    s = ArgParseSettings(; description = "Namelist Generator")
+    s = ArgParseSettings(; description = "namelist Generator")
 
     @add_arg_table! s begin
         "case_name"
@@ -21,6 +33,7 @@ function parse_commandline()
 end
 
 function default_namelist(::Nothing)
+
     args = parse_commandline()
     case_name = args["case_name"]
     return default_namelist(case_name)
@@ -29,6 +42,42 @@ end
 function default_namelist(case_name::String)
 
     namelist_defaults = Dict()
+    namelist_defaults["meta"] = Dict()
+
+    namelist_defaults["turbulence"] = Dict()
+    namelist_defaults["turbulence"]["Ri_bulk_crit"] = 0.2
+    namelist_defaults["turbulence"]["prandtl_number_0"] = 0.74
+
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"] = Dict()
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.1
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.14
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.22
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"] = 0.4
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["lambda_stab"] = 0.9
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = 0.9
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.4
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.015
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_ed_mf_sigma"] = 50.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.25
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_sigma"] = 10.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"] = 0.004
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"] = 2.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"] = 0.2
+    # This constant_plume_spacing corresponds to plume_spacing/alpha_d in the Tan et al paper,
+    #with values plume_spacing=500.0, alpha_d = 0.375
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["constant_plume_spacing"] = 1333.0
+    # TODO: merge the tan18 buoyancy forluma into normalmode formula -> simply set buoy_coeff1 as 1./3. and buoy_coeff2 as 0.
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_buoy_coeff"] = 1.0 / 3.0
+
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] = 0.12
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff2"] = 0.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = 0.1
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = 10.0
+
+    # From namelist
     namelist_defaults["grid"] = Dict()
     namelist_defaults["grid"]["dims"] = 1
     namelist_defaults["grid"]["gw"] = 2
@@ -44,10 +93,8 @@ function default_namelist(case_name::String)
     namelist_defaults["microphysics"] = Dict()
     namelist_defaults["microphysics"]["rain_model"] = "None"
 
-    namelist_defaults["turbulence"] = Dict()
     namelist_defaults["turbulence"]["scheme"] = "EDMF_PrognosticTKE"
 
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"] = Dict()
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["extrapolate_buoyancy"] = true
@@ -70,16 +117,14 @@ function default_namelist(case_name::String)
     namelist_defaults["stats_io"]["stats_dir"] = "stats"
     namelist_defaults["stats_io"]["frequency"] = 60.0
 
-    namelist_defaults["meta"] = Dict()
-
-    if case_name == "Bomex"
-        namelist = Bomex(namelist_defaults)
+    if case_name == "Soares"
+        namelist = Soares(namelist_defaults)
     elseif case_name == "Nieuwstadt"
         namelist = Nieuwstadt(namelist_defaults)
+    elseif case_name == "Bomex"
+        namelist = Bomex(namelist_defaults)
     elseif case_name == "life_cycle_Tan2018"
         namelist = life_cycle_Tan2018(namelist_defaults)
-    elseif case_name == "Soares"
-        namelist = Soares(namelist_defaults)
     elseif case_name == "Rico"
         namelist = Rico(namelist_defaults)
     elseif case_name == "TRMM_LBA"
@@ -97,16 +142,16 @@ function default_namelist(case_name::String)
     elseif case_name == "DryBubble"
         namelist = DryBubble(namelist_defaults)
     else
-        error("Not a valid case name in namelist")
+        error("Not a valid case name")
     end
+
     write_file(namelist)
     return namelist
 end
-
-
 function Soares(namelist_defaults)
 
     namelist = deepcopy(namelist_defaults)
+    namelist["meta"]["casename"] = "Soares"
 
     namelist["grid"]["nz"] = 75
     namelist["grid"]["dz"] = 50.0
@@ -119,10 +164,10 @@ function Soares(namelist_defaults)
 
     return namelist
 end
-
 function Nieuwstadt(namelist_defaults)
 
     namelist = deepcopy(namelist_defaults)
+    namelist["meta"]["casename"] = "Nieuwstadt"
 
     namelist["grid"]["nz"] = 75
     namelist["grid"]["dz"] = 50.0
@@ -135,10 +180,10 @@ function Nieuwstadt(namelist_defaults)
 
     return namelist
 end
-
 function Bomex(namelist_defaults)
 
     namelist = deepcopy(namelist_defaults)
+    namelist["meta"]["casename"] = "Bomex"
 
     namelist["grid"]["nz"] = 60
     namelist["grid"]["dz"] = 50.0
@@ -151,10 +196,10 @@ function Bomex(namelist_defaults)
 
     return namelist
 end
-
 function life_cycle_Tan2018(namelist_defaults)
 
     namelist = deepcopy(namelist_defaults)
+    namelist["meta"]["casename"] = "life_cycle_Tan2018"
 
     namelist["grid"]["nz"] = 75
     namelist["grid"]["dz"] = 40.0
@@ -166,10 +211,11 @@ function life_cycle_Tan2018(namelist_defaults)
 
     return namelist
 end
-
 function Rico(namelist_defaults)
 
     namelist = deepcopy(namelist_defaults)
+
+    namelist["meta"]["casename"] = "Rico"
 
     namelist["grid"]["nz"] = 120
     namelist["grid"]["dz"] = 50.0
@@ -185,10 +231,11 @@ function Rico(namelist_defaults)
 
     return namelist
 end
-
 function TRMM_LBA(namelist_defaults)
 
     namelist = deepcopy(namelist_defaults)
+
+    namelist["meta"]["casename"] = "TRMM_LBA"
 
     namelist["grid"]["nz"] = 320
     namelist["grid"]["dz"] = 50.0
@@ -204,10 +251,10 @@ function TRMM_LBA(namelist_defaults)
 
     return namelist
 end
-
 function ARM_SGP(namelist_defaults)
 
     namelist = deepcopy(namelist_defaults)
+    namelist["meta"]["casename"] = "ARM_SGP"
 
     namelist["grid"]["nz"] = 88
     namelist["grid"]["dz"] = 50.0
@@ -219,12 +266,10 @@ function ARM_SGP(namelist_defaults)
 
     return namelist
 end
-
 function GATE_III(namelist_defaults)
 
-    # adopted from: "Large eddy simulation of Maritime Deep Tropical Convection",
-    # By Khairoutdinov et al (2009)  JAMES, vol. 1, article #15
     namelist = deepcopy(namelist_defaults)
+    namelist["meta"]["casename"] = "GATE_III"
 
     namelist["grid"]["nz"] = 1700
     namelist["grid"]["dz"] = 10
@@ -236,10 +281,11 @@ function GATE_III(namelist_defaults)
 
     return namelist
 end
-
 function DYCOMS_RF01(namelist_defaults)
 
     namelist = deepcopy(namelist_defaults)
+
+    namelist["meta"]["casename"] = "DYCOMS_RF01"
 
     namelist["grid"]["nz"] = 30
     namelist["grid"]["dz"] = 50
@@ -251,10 +297,11 @@ function DYCOMS_RF01(namelist_defaults)
 
     return namelist
 end
-
 function GABLS(namelist_defaults)
 
     namelist = deepcopy(namelist_defaults)
+
+    namelist["meta"]["casename"] = "GABLS"
 
     namelist["grid"]["nz"] = 8
     namelist["grid"]["dz"] = 50.0
@@ -266,11 +313,11 @@ function GABLS(namelist_defaults)
 
     return namelist
 end
-
-# Sullivan Patton not fully implemented - Ignacio
+# Not fully implemented yet - Ignacio
 function SP(namelist_defaults)
 
     namelist = deepcopy(namelist_defaults)
+    namelist["meta"]["casename"] = "SP"
 
     namelist["grid"]["nz"] = 256
     namelist["grid"]["dz"] = 8
@@ -282,9 +329,14 @@ function SP(namelist_defaults)
 
     return namelist
 end
-
 function DryBubble(namelist_defaults)
     namelist = deepcopy(namelist_defaults)
+    namelist["meta"]["casename"] = "DryBubble"
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.0
+
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] = 0.12
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = 0.25
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = 0.1
 
     namelist["grid"]["nz"] = 200
     namelist["grid"]["dz"] = 50.0
@@ -302,12 +354,7 @@ end
 
 function write_file(namelist)
 
-    @assert haskey(namelist, "meta")
-    @assert haskey(namelist["meta"], "simname")
-
-    namelist["meta"]["uuid"] = basename(tempname())
-
-    open(namelist["meta"]["simname"] * ".in", "w") do io
+    open("namelist_" * namelist["meta"]["casename"] * ".in", "w") do io
         JSON.print(io, namelist, 4)
     end
 

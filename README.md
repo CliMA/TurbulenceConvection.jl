@@ -87,7 +87,6 @@ with, for example:
 
 ```
 julia --project integration_tests/utils/generate_namelist.jl Soares
-julia --project integration_tests/utils/generate_paramlist.jl Soares
 julia --project integration_tests/utils/main.jl Soares
 
 ```

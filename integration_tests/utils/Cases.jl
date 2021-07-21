@@ -75,31 +75,31 @@ struct ARM_SGP end
 struct Nieuwstadt end
 struct life_cycle_Tan2018 end
 
-function CasesFactory(namelist, paramlist, Gr, Ref)
+function CasesFactory(namelist, Gr, Ref)
     if namelist["meta"]["casename"] == "Soares"
-        return Soares(paramlist, Gr, Ref)
+        return Soares(namelist, Gr, Ref)
     elseif namelist["meta"]["casename"] == "Nieuwstadt"
-        return Nieuwstadt(paramlist, Gr, Ref)
+        return Nieuwstadt(namelist, Gr, Ref)
     elseif namelist["meta"]["casename"] == "Bomex"
-        return Bomex(paramlist, Gr, Ref)
+        return Bomex(namelist, Gr, Ref)
     elseif namelist["meta"]["casename"] == "life_cycle_Tan2018"
-        return life_cycle_Tan2018(paramlist, Gr, Ref)
+        return life_cycle_Tan2018(namelist, Gr, Ref)
     elseif namelist["meta"]["casename"] == "Rico"
-        return Rico(paramlist, Gr, Ref)
+        return Rico(namelist, Gr, Ref)
     elseif namelist["meta"]["casename"] == "TRMM_LBA"
-        return TRMM_LBA(paramlist, Gr, Ref)
+        return TRMM_LBA(namelist, Gr, Ref)
     elseif namelist["meta"]["casename"] == "ARM_SGP"
-        return ARM_SGP(paramlist, Gr, Ref)
+        return ARM_SGP(namelist, Gr, Ref)
     elseif namelist["meta"]["casename"] == "GATE_III"
-        return GATE_III(paramlist, Gr, Ref)
+        return GATE_III(namelist, Gr, Ref)
     elseif namelist["meta"]["casename"] == "DYCOMS_RF01"
-        return DYCOMS_RF01(paramlist, Gr, Ref)
+        return DYCOMS_RF01(namelist, Gr, Ref)
     elseif namelist["meta"]["casename"] == "GABLS"
-        return GABLS(paramlist, Gr, Ref)
+        return GABLS(namelist, Gr, Ref)
     elseif namelist["meta"]["casename"] == "SP"
-        return SP(paramlist, Gr, Ref)
+        return SP(namelist, Gr, Ref)
     elseif namelist["meta"]["casename"] == "DryBubble"
-        return DryBubble(paramlist, Gr, Ref)
+        return DryBubble(namelist, Gr, Ref)
     else
         error("case not recognized")
     end
@@ -130,7 +130,7 @@ update_forcing(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping, ::Base
 update_radiation(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping, ::BaseCase) = nothing
 
 
-function Soares(paramlist, Gr::Grid, Ref::ReferenceState)
+function Soares(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "Soares2004"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(; Gr, Ref)
@@ -225,7 +225,7 @@ function update_radiation(self::CasesBase{SoaresCase}, GMV::GridMeanVariables, T
     update(self.Rad, GMV)
 end
 
-function Nieuwstadt(paramlist, Gr::Grid, Ref::ReferenceState)
+function Nieuwstadt(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "Nieuwstadt"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(; Gr, Ref)
@@ -318,7 +318,7 @@ function update_radiation(self::CasesBase{Nieuwstadt}, GMV::GridMeanVariables, T
     update(self.Rad, GMV)
 end
 
-function Bomex(paramlist, Gr::Grid, Ref::ReferenceState)
+function Bomex(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "Bomex"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
@@ -455,7 +455,7 @@ update_forcing(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepp
 update_radiation(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Rad, GMV)
 
 
-function life_cycle_Tan2018(paramlist, Gr::Grid, Ref::ReferenceState)
+function life_cycle_Tan2018(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "life_cycle_Tan2018"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
@@ -626,7 +626,7 @@ function update_radiation(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVari
     update(self.Rad, GMV)
 end
 
-function Rico(paramlist, Gr::Grid, Ref::ReferenceState)
+function Rico(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "Rico"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedCoeffs}(; Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
@@ -750,7 +750,7 @@ function update_radiation(self::CasesBase{Rico}, GMV::GridMeanVariables, TS::Tim
     update(self.Rad, GMV)
 end
 
-function TRMM_LBA(paramlist, Gr::Grid, Ref::ReferenceState)
+function TRMM_LBA(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "TRMM_LBA"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
@@ -1076,7 +1076,7 @@ end
 
 # adopted from: "Large-eddy simulation of the diurnal cycle of shallow cumulus convection over land",
 # By Brown et al. (2002)  Q. J. R. Meteorol. Soc. 128, 1075-1093
-function ARM_SGP(paramlist, Gr::Grid, Ref::ReferenceState)
+function ARM_SGP(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "ARM_SGP"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
@@ -1207,7 +1207,7 @@ end
 
 # adopted from: "Large eddy simulation of Maritime Deep Tropical Convection",
 # By Khairoutdinov et al (2009)  JAMES, vol. 1, article #15
-function GATE_III(paramlist, Gr::Grid, Ref::ReferenceState)
+function GATE_III(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "GATE_III"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedCoeffs}(; Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
@@ -1348,7 +1348,7 @@ Evaluation of Large-Eddy Simulations via Observations of Nocturnal Marine Strato
 Mon. Wea. Rev., 133, 1443â€“1462.
 doi: http://dx.doi.org/10.1175/MWR2930.1
 """
-function DYCOMS_RF01(paramlist, Gr::Grid, Ref::ReferenceState)
+function DYCOMS_RF01(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "DYCOMS_RF01"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingDYCOMS_RF01}(; Gr, Ref)
@@ -1555,7 +1555,7 @@ function update_radiation(self::CasesBase{DYCOMS_RF01}, GMV::GridMeanVariables, 
     update(self.Rad, GMV)
 end
 
-function GABLS(paramlist, Gr::Grid, Ref::ReferenceState)
+function GABLS(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "GABLS"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceMoninObukhovDry}(; Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
@@ -1655,7 +1655,7 @@ function update_radiation(self::CasesBase{GABLS}, GMV::GridMeanVariables, TS::Ti
 end
 
 # Not fully implemented yet - Ignacio
-function SP(paramlist, Gr::Grid, Ref::ReferenceState)
+function SP(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "SP"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceSullivanPatton}(; Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
@@ -1751,7 +1751,7 @@ function update_radiation(self::CasesBase{SP}, GMV::GridMeanVariables, TS::TimeS
     update(self.Rad, GMV)
 end
 
-function DryBubble(paramlist, Gr::Grid, Ref::ReferenceState)
+function DryBubble(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "DryBubble"
     Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceNone}(; Gr, Ref)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(; Gr, Ref)

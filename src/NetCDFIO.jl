@@ -14,7 +14,7 @@ mutable struct NetCDFIO_Stats
     stats_path::String
     path_plus_file::String
     vars::Dict{String, Any} # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    function NetCDFIO_Stats(namelist, paramlist, Gr::Grid)
+    function NetCDFIO_Stats(namelist, Gr::Grid)
 
         # Initialize properties with valid type:
         tmp = tempname()
@@ -32,7 +32,7 @@ mutable struct NetCDFIO_Stats
 
         # Setup the statistics output path
         simname = namelist["meta"]["simname"]
-        casename = paramlist["meta"]["casename"]
+        casename = namelist["meta"]["casename"]
         outpath = joinpath(namelist["output"]["output_root"], "Output.$simname.$uuid")
         mkpath(outpath)
 
@@ -53,11 +53,8 @@ mutable struct NetCDFIO_Stats
         #     end
         # end
 
-        # Write namefile and paramfile to output directory
-        open(joinpath(outpath, "$simname.in"), "w") do io
-            JSON.print(io, namelist, 4)
-        end
-        open(joinpath(outpath, "paramlist_$casename.in"), "w") do io
+        # Write namelist file to output directory
+        open(joinpath(outpath, "namelist_$casename.in"), "w") do io
             JSON.print(io, namelist, 4)
         end
 
