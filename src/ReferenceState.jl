@@ -3,7 +3,8 @@
 using OrdinaryDiffEq
 using UnPack
 
-mutable struct ReferenceState{A1}
+mutable struct ReferenceState{PS, A1}
+    param_set::PS
     p0::A1
     p0_half::A1
     alpha0::A1
@@ -14,7 +15,7 @@ mutable struct ReferenceState{A1}
     Tg::Float64
     qtg::Float64
     sg::Float64
-    function ReferenceState(Gr::Grid)
+    function ReferenceState(Gr::Grid, param_set::PS) where {PS}
 
         p0 = pyzeros(Gr.nzg)
         p0_half = pyzeros(Gr.nzg)
@@ -26,7 +27,7 @@ mutable struct ReferenceState{A1}
         Tg::Float64 = 0
         qtg::Float64 = 0
         sg::Float64 = 0
-        return new{typeof(p0)}(p0, p0_half, alpha0, alpha0_half, rho0, rho0_half, Pg, Tg, qtg, sg)
+        return new{PS, typeof(p0)}(param_set, p0, p0_half, alpha0, alpha0_half, rho0, rho0_half, Pg, Tg, qtg, sg)
     end
 end
 

@@ -1,13 +1,12 @@
 
-function ParameterizationFactory(namelist, Gr::Grid, Ref::ReferenceState)
+function ParameterizationFactory(namelist, Gr::Grid, Ref::ReferenceState, param_set::PS) where {PS}
     scheme = namelist["turbulence"]["scheme"]
     if scheme == "EDMF_PrognosticTKE"
-        return EDMF_PrognosticTKE(namelist, Gr, Ref)
+        return EDMF_PrognosticTKE(namelist, Gr, Ref, param_set)
     elseif scheme == "SimilarityED"
-        return SimilarityED(namelist, Gr, Ref)
+        return SimilarityED(namelist, Gr, Ref, param_set)
     else
-        print("Did not recognize parameterization " * scheme)
-        return
+        error("Did not recognize parameterization $scheme")
     end
 end
 
@@ -119,10 +118,10 @@ end
 
 #####################################################################################################################
 
-function SimilarityED(namelist, Gr::Grid, Ref::ReferenceState)
+function SimilarityED(namelist, Gr::Grid, Ref::ReferenceState, param_set::PS) where {PS}
     extrapolate_buoyancy = false
     base = ParameterizationBase(namelist, Gr, Ref)
-    return SimilarityED(base, extrapolate_buoyancy)
+    return SimilarityED{PS}(param_set, base, extrapolate_buoyancy)
 end
 
 initialize(self::SimilarityED, Case::CasesBase, GMV::GridMeanVariables, Ref::ReferenceState) = nothing
