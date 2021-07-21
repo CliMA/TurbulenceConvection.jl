@@ -1,4 +1,4 @@
-using Plots
+import Plots
 using OrderedCollections
 using Test
 using NCDatasets
@@ -82,17 +82,15 @@ function compute_mse(
     z_tcc = ds_turb_conv.group["profiles"]["z_half"][:]
     z_scm = ds_scampy.group["profiles"]["z_half"][:]
     n_grid_points = length(z_tcc)
-    @info "Z extent for LES vs CLIMA:"
-    @show extrema(z_tcc)
-    @show extrema(z_les)
-    @show extrema(z_scm)
-    @info "n-grid points"
-    @show length(z_tcc)
-    @show length(z_les)
-    @show length(z_scm)
+    @info "z extrema (les,scm,tcc): $(extrema(z_les)), $(extrema(z_scm)), $(extrema(z_tcc))"
+    @info "n-grid points (les,scm,tcc): $(length(z_les)), $(length(z_scm)), $(length(z_tcc))"
+
+    @info "time extrema (les,scm,tcc): $(extrema(time_les)), $(extrema(time_scm)), $(extrema(time_tcc))"
+    @info "n-time points (les,scm,tcc): $(length(time_les)), $(length(time_scm)), $(length(time_tcc))"
 
     # Find the nearest matching final time:
     t_cmp = min(time_tcc[end], time_les[end], time_scm[end])
+    @info "time compared: $t_cmp"
 
     # Accidentally running a short simulation
     # could improve MSE. So, let's test that
@@ -118,20 +116,19 @@ function compute_mse(
         scm_var = var_map_scampy(tc_var)
         les_var == nothing && continue
         les_var isa String || continue
-
+        @info "Assembling plots for $tc_var"
         push!(tcc_variables, tc_var)
         push!(pycles_variables, les_var)
 
         data_les_arr = get_data(ds_pycles, les_var)'
         data_tcc_arr = get_data(ds_turb_conv, tc_var)'
         data_scm_arr = get_data(ds_scampy, scm_var)'
-
+        @info "     Data sizes (les,scm,tcc): $(size(data_les_arr)), $(size(data_scm_arr)), $(size(data_tcc_arr))"
         # Scale the data for comparison
         push!(pycles_weight, "1")
 
         # Interpolate data
         steady_data = length(size(data_les_arr)) == 1
-        @show tc_var, steady_data
         if steady_data
             data_les_cont = Spline1D(z_les, data_les_arr)
             data_tcc_cont = Spline1D(z_tcc, data_tcc_arr)
@@ -158,18 +155,38 @@ function compute_mse(
 
         # Plot comparison
         if plot_comparison
-            p = plot()
-            plot!(data_les_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "PyCLES")
-            plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "TC.jl")
-            plot!(data_scm_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "SCAMPy")
-            @info "Saving $(joinpath(foldername, "$tc_var.png"))"
-            savefig(joinpath(foldername, "profile_$tc_var.png"))
+            p = Plots.plot()
+            Plots.plot!(data_les_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "PyCLES")
+            Plots.plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "TC.jl")
+            Plots.plot!(data_scm_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "SCAMPy")
+            @info "     Saving $(joinpath(foldername, "$tc_var.png"))"
+            Plots.savefig(joinpath(foldername, "profile_$tc_var.png"))
+            clims_min = min(minimum(data_scm_arr), minimum(data_tcc_arr))
+            clims_max = max(maximum(data_scm_arr), maximum(data_tcc_arr))
+            clims = (clims_min, clims_max)
 
-            contourf(time_scm, z_scm, data_scm_arr'; xlabel = tc_var, ylabel = "height (m)", c = :viridis)
-            savefig(joinpath(foldername, "contours_" * tc_var * "_scampy" * ".png"))
-
-            contourf(time_tcc, z_tcc, data_tcc_arr'; xlabel = tc_var, ylabel = "height (m)", c = :viridis)
-            savefig(joinpath(foldername, "contours_" * tc_var * "_tc" * ".png"))
+            p1 = Plots.contourf(
+                time_scm,
+                z_scm,
+                data_scm_arr';
+                xlabel = tc_var,
+                ylabel = "height (m)",
+                c = :viridis,
+                clims = clims,
+                title = "SCAMPy",
+            )
+            p2 = Plots.contourf(
+                time_tcc,
+                z_tcc,
+                data_tcc_arr';
+                xlabel = tc_var,
+                ylabel = "height (m)",
+                c = :viridis,
+                clims = clims,
+                title = "TC.jl",
+            )
+            Plots.plot(p1, p2; layout = (2, 1))
+            Plots.savefig(joinpath(foldername, "contours_" * tc_var * ".png"))
         end
 
         # Compute mean squared error (mse)
