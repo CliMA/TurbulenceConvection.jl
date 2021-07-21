@@ -27,80 +27,6 @@ function set_bcs(self::EnvironmentVariable_2m, Gr::Grid)
     end
 end
 
-function EnvironmentVariables(namelist, Gr::Grid)
-    nz = Gr.nzg
-
-    W = EnvironmentVariable(nz, "full", "velocity", "w", "m/s")
-    QT = EnvironmentVariable(nz, "half", "scalar", "qt", "kg/kg")
-    QL = EnvironmentVariable(nz, "half", "scalar", "ql", "kg/kg")
-    RH = EnvironmentVariable(nz, "half", "scalar", "RH", "%")
-    H = EnvironmentVariable(nz, "half", "scalar", "thetal", "K")
-    THL = EnvironmentVariable(nz, "half", "scalar", "thetal", "K")
-    T = EnvironmentVariable(nz, "half", "scalar", "temperature", "K")
-    B = EnvironmentVariable(nz, "half", "scalar", "buoyancy", "m^2/s^3")
-    Area = EnvironmentVariable(nz, "half", "scalar", "env_area", "-")
-    cloud_fraction = EnvironmentVariable(nz, "half", "scalar", "env_cloud_fraction", "-")
-
-    # TODO - the flag setting is repeated from Variables.pyx logic
-    calc_tke = true
-    calc_tke = try
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["calculate_tke"]
-    catch
-        nothing
-    end
-
-    calc_scalar_var = try
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["calc_scalar_var"]
-    catch
-        println("Defaulting to non-calculation of scalar variances")
-        false
-    end
-
-    EnvThermo_scheme = try
-        string(namelist["thermodynamics"]["sgs"])
-    catch
-        println("Defaulting to saturation adjustment and microphysics with respect to environmental means")
-        "mean"
-    end
-
-    if calc_tke
-        TKE = EnvironmentVariable_2m(nz, "half", "scalar", "tke", "m^2/s^2")
-    end
-
-    if calc_scalar_var
-        QTvar = EnvironmentVariable_2m(nz, "half", "scalar", "qt_var", "kg^2/kg^2")
-        Hvar = EnvironmentVariable_2m(nz, "half", "scalar", "thetal_var", "K^2")
-        HQTcov = EnvironmentVariable_2m(nz, "half", "scalar", "thetal_qt_covar", "K(kg/kg)")
-    end
-
-    if EnvThermo_scheme == "quadrature"
-        if (calc_scalar_var == false)
-            error("EDMF_Environment.pyx: scalar variance has to be calculated for quadrature saturation and microphysics")
-        end
-    end
-
-    return EnvironmentVariables(;
-        Gr,
-        W,
-        Area,
-        QT,
-        QL,
-        H,
-        THL,
-        RH,
-        T,
-        B,
-        cloud_fraction,
-        TKE,
-        Hvar,
-        QTvar,
-        HQTcov,
-        calc_tke,
-        calc_scalar_var,
-        EnvThermo_scheme,
-    )
-end
-
 function initialize_io(self::EnvironmentVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "env_w")
     add_profile(Stats, "env_qt")
@@ -296,7 +222,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
     env_len = 10
     src_len = 6
 
-    sqpi_inv = 1.0 / sqrt(pi)
+    sqpi_inv = 1.0 / sqrt(π)
     sqrt2 = sqrt(2.0)
     sa = eos_struct()
     mph = mph_struct()

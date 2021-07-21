@@ -7,48 +7,6 @@ function set_bcs(self::RainVariable, Gr::Grid)
     return
 end
 
-function RainVariables(namelist, Gr::Grid)
-    nzg = Gr.nzg
-
-    QR = RainVariable(nzg, "qr_mean", "kg/kg")
-    # temporary variables for diagnostics to know where the rain is coming from
-    Upd_QR = RainVariable(nzg, "upd_qr", "kg/kg")
-    Env_QR = RainVariable(nzg, "env_qr", "kg/kg")
-    # in the future we could test prognostic equations for stratiform and updraft rain
-    RainArea = RainVariable(nzg, "rain_area", "rain_area_fraction [-]")
-    Upd_RainArea = RainVariable(nzg, "upd_rain_area", "updraft_rain_area_fraction [-]")
-    Env_RainArea = RainVariable(nzg, "env_rain_area", "environment_rain_area_fraction [-]")
-
-    mean_rwp = 0.0
-    upd_rwp = 0.0
-    env_rwp = 0.0
-
-    rain_model = try
-        string(namelist["microphysics"]["rain_model"])
-    catch
-        println("EDMF_Rain: defaulting to no rain")
-        "None"
-    end
-
-    if !(rain_model in ["None", "cutoff", "clima_1m"])
-        error("rain model not recognized")
-    end
-
-    return RainVariables(;
-        rain_model,
-        mean_rwp,
-        env_rwp,
-        upd_rwp,
-        Gr,
-        QR,
-        RainArea,
-        Upd_QR,
-        Upd_RainArea,
-        Env_QR,
-        Env_RainArea,
-    )
-end
-
 function initialize_io(self::RainVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "qr_mean")
     add_profile(Stats, "updraft_qr")

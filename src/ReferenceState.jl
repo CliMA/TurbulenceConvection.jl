@@ -153,15 +153,5 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
     add_reference_profile(Stats, "rho0_half")
     write_reference_profile(Stats, "rho0_half", 1.0 ./ alpha_half[cinterior])
 
-    # add_reference_profile(Stats, "temperature0", Gr, Pa)
-    # write_reference_profile(Stats, "temperature0", temperature_half, Pa)
-    # add_reference_profile(Stats, "ql0", Gr, Pa)
-    # write_reference_profile(Stats, "ql0", ql_half, Pa)
-    # add_reference_profile(Stats, "qv0", Gr, Pa)
-    # write_reference_profile(Stats, "qv0", qv_half, Pa)
-    # add_reference_profile(Stats, "qi0", Gr, Pa)
-    # write_reference_profile(Stats, "qi0", qi_half, Pa)
-
-
     return
 end
