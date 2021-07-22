@@ -33,8 +33,9 @@ end
 
 
 """
-Initilize the reference profiles. The function is typically called from the case
-specific initialization fucntion defined in Initialization.pyx
+Initialize the reference profiles. The function is typically called from the case
+specific initialization function defined in Initialization.pyx
+
 :param Gr: Grid class
 :param Thermodynamics: Thermodynamics class
 :param NS: StatsIO class

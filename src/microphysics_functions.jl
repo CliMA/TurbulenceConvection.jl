@@ -22,7 +22,7 @@ function rain_source_to_thetal_detailed(p0, T, qt, ql, qr)
 end
 
 # instantly convert all cloud water exceeding a threshold to rain water
-# the threshold is specified as axcess saturation
+# the threshold is specified as excess saturation
 # rain water is immediately removed from the domain
 function acnv_instant(max_supersaturation, ql, qt, T, p0)
 
@@ -111,7 +111,6 @@ function microphysics_rain_src(rain_model, max_supersaturation, qt, ql, qr, area
     _ret.rho = rho_c(p0, T, qt, _ret.qv)
 
     #TODO - temporary way to handle different autoconversion rates
-    # cython doesn"t allow for string comparison without gil
     tmp_clima_acnv_flag = false
     tmp_cutoff_acnv_flag = false
     tmp_no_acnv_flag = false
@@ -154,7 +153,7 @@ function microphysics_rain_src(rain_model, max_supersaturation, qt, ql, qr, area
 end
 
 """
-Source terams for rain and rain area
+Source terms for rain and rain area
 assuming constant rain area fraction of 1
 """
 function rain_area(source_area, source_qr, current_area, current_qr)

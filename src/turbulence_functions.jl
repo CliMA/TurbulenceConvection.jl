@@ -220,9 +220,6 @@ function get_mixing_tau(zi, wstar)
     return zi / (wstar + 0.001)
 end
 
-
-
-
 # MO scaling of near surface tke and scalar variance
 
 function get_surface_tke(ustar, wstar, zLL, oblength)
@@ -242,8 +239,6 @@ function get_surface_variance(flux1, flux2, ustar, zLL, oblength)
     end
 end
 
-
-# Math-y stuff
 function construct_tridiag_diffusion(grid, dt, rho_ae_K_m, rho, ae, a, b, c)
     gw = grid.gw
     dzi = grid.dzi
@@ -264,50 +259,6 @@ function construct_tridiag_diffusion(grid, dt, rho_ae_K_m, rho, ae, a, b, c)
     end
     return
 end
-
-function construct_tridiag_diffusion_implicitMF(grid, dt, rho_ae_K_m, massflux, rho, alpha, ae, a, b, c)
-    gw = grid.gw
-    nz = grid.nz
-    nzg = grid.nzg
-    nz = nzg - 2 * gw
-    @inbounds for k in real_face_indicies(grid)
-        X = rho[k] * ae[k] / dt
-        Y = rho_ae_K_m[k] * dzi * dzi
-        Z = rho_ae_K_m[k - 1] * dzi * dzi
-        if k == gw
-            Z = 0.0
-        elseif k == nzg - gw - 1
-            Y = 0.0
-        end
-        a[k - gw] = -Z / X + 0.5 * massflux[k - 1] * dt * dzi / rho[k]
-        b[k - gw] = 1.0 + Y / X + Z / X + 0.5 * dt * dzi * (massflux[k - 1] - massflux[k]) / rho[k]
-        c[k - gw] = -Y / X - 0.5 * dt * dzi * massflux[k] / rho[k]
-    end
-    return
-end
-
-function construct_tridiag_diffusion_dirichlet(grid, dt, rho_ae_K_m, rho, ae, a, b, c)
-    gw = grid.gw
-    nz = grid.nz
-    nzg = grid.nzg
-    nz = nzg - 2 * gw
-    @inbounds for k in real_face_indicies(grid)
-        X = rho[k] * ae[k] / dt
-        Y = rho_ae_K_m[k] * dzi * dzi
-        Z = rho_ae_K_m[k - 1] * dzi * dzi
-        if k == gw
-            Z = 0.0
-            Y = 0.0
-        elseif k == nzg - gw - 1
-            Y = 0.0
-        end
-        a[k - gw] = -Z / X
-        b[k - gw] = 1.0 + Y / X + Z / X
-        c[k - gw] = -Y / X
-    end
-    return
-end
-
 
 function tridiag_solve(b_rhs, a, b, c)
     # Note that `1:end` is zero-based indexing.
