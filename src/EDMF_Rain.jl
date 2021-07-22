@@ -61,7 +61,7 @@ function rain_diagnostics(
     self.mean_rwp = 0.0
     self.cutoff_rain_rate = 0.0
 
-    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         self.upd_rwp += Ref.rho0_half[k] * self.Upd_QR.values[k] * self.Upd_RainArea.values[k] * self.Gr.dz
         self.env_rwp += Ref.rho0_half[k] * self.Env_QR.values[k] * self.Env_RainArea.values[k] * self.Gr.dz
         self.mean_rwp += Ref.rho0_half[k] * self.QR.values[k] * self.RainArea.values[k] * self.Gr.dz
@@ -84,7 +84,7 @@ function sum_subdomains_rain(
     UpdThermo::UpdraftThermodynamics,
     EnvThermo::EnvironmentThermodynamics,
 )
-    @inbounds for k in xrange(self.Gr.nzg)
+    @inbounds for k in center_indicies(self.Gr)
         self.QR.values[k] -= (EnvThermo.prec_source_qt[k] + UpdThermo.prec_source_qt_tot[k])
         self.Upd_QR.values[k] -= UpdThermo.prec_source_qt_tot[k]
         self.Env_QR.values[k] -= EnvThermo.prec_source_qt[k]
@@ -183,15 +183,10 @@ function solve_rain_evap(
     QR::RainVariable,
     RainArea::RainVariable,
 )
-    gw = self.Gr.gw
-    nzg = self.Gr.nzg
-
-    dz = self.Gr.dz
     dt_model = TS.dt
-
     flag_evaporate_all = false
 
-    @inbounds for k in xrange(gw, nzg - gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         flag_evaporate_all = false
 
         tmp_evap = max(

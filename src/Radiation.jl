@@ -44,7 +44,7 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
     # TODO: report bug: zi and rhoi are not initialized
     zi = 0
     rhoi = 0
-    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         if (GMV.QT.values[k] < 8.0 / 1000)
             idx_zi = k
             # will be used at cell edges
@@ -73,7 +73,7 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
     end
 
     # cooling in free troposphere
-    @inbounds for k in xrange(0, self.Gr.nzg)
+    @inbounds for k in face_indicies(self.Gr)
         if self.Gr.z[k] > zi
             cbrt_z = cbrt(self.Gr.z[k] - zi)
             self.f_rad[k] += rhoi * dycoms_cp * self.divergence * self.alpha_z * (power(cbrt_z, 4) / 4.0 + zi * cbrt_z)
@@ -88,7 +88,7 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
     self.f_rad[self.Gr.nzg] +=
         rhoi * dycoms_cp * self.divergence * self.alpha_z * (power(cbrt_z, 4) / 4.0 + zi * cbrt_z)
 
-    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         self.dTdt[k] = -(self.f_rad[k + 1] - self.f_rad[k]) / self.Gr.dz / self.Ref.rho0_half[k] / dycoms_cp
     end
 
@@ -99,7 +99,7 @@ function update(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariable
 
     calculate_radiation(self, GMV)
 
-    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         # Apply large-scale horizontal advection tendencies
         qv = GMV.QT.values[k] - GMV.QL.values[k]
         GMV.H.tendencies[k] += self.convert_forcing_prog_fp(

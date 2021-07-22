@@ -13,10 +13,8 @@ end
 # Calculate the tendency of the grid mean variables due to turbulence as
 # the difference between the values at the beginning and  end of all substeps taken
 function update(self::ParameterizationBase, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
-    gw = self.Gr.gw
-    nzg = self.Gr.nzg
 
-    @inbounds for k in xrange(gw, nzg - gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         GMV.H.tendencies[k] += (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
         GMV.QT.tendencies[k] += (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
         GMV.U.tendencies[k] += (GMV.U.new[k] - GMV.U.values[k]) * TS.dti
@@ -30,26 +28,24 @@ end
 function update_inversion(self::ParameterizationBase, GMV::GridMeanVariables, option)
     theta_rho = pyzeros(self.Gr.nzg)
     maxgrad = 0.0
-    gw = self.Gr.gw
-    kmin = gw
-    kmax = self.Gr.nzg - gw
+    k_fi = first_center(self.Gr)
 
-    @inbounds for k in xrange(gw, self.Gr.nzg - gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         qv = GMV.QT.values[k] - GMV.QL.values[k]
         theta_rho[k] = theta_rho_c(self.Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
     end
 
 
     if option == "theta_rho"
-        @inbounds for k in xrange(kmin, kmax)
-            if theta_rho[k] > theta_rho[kmin]
+        @inbounds for k in real_center_indicies(self.Gr)
+            if theta_rho[k] > theta_rho[k_fi]
                 self.zi = self.Gr.z_half[k]
                 break
             end
         end
     elseif option == "thetal_maxgrad"
 
-        @inbounds for k in xrange(kmin, kmax)
+        @inbounds for k in real_center_indicies(self.Gr)
             grad = (GMV.THL.values[k + 1] - GMV.THL.values[k]) * self.Gr.dzi
             if grad > maxgrad
                 maxgrad = grad
@@ -57,13 +53,11 @@ function update_inversion(self::ParameterizationBase, GMV::GridMeanVariables, op
             end
         end
     elseif option == "critical_Ri"
-        self.zi = get_inversion(theta_rho, GMV.U.values, GMV.V.values, self.Gr.z_half, kmin, kmax, Ri_bulk_crit(self))
+        self.zi = get_inversion(theta_rho, GMV.U.values, GMV.V.values, self.Gr, Ri_bulk_crit(self))
 
     else
         error("INVERSION HEIGHT OPTION NOT RECOGNIZED")
     end
-
-    # print("Inversion height ", self.zi)
 
     return
 end
@@ -76,12 +70,9 @@ function compute_eddy_diffusivities_similarity(self::ParameterizationBase, GMV::
     self.wstar = get_wstar(Case.Sur.bflux, self.zi)
 
     ustar = Case.Sur.ustar
-    gw = self.Gr.gw
-    nzg = self.Gr.nzg
-    nz = self.Gr.nz
     KH = diffusivity_h(self)
     KM = diffusivity_m(self)
-    @inbounds for k in xrange(gw, nzg - gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         zzi = self.Gr.z_half[k] / self.zi
         if zzi <= 1.0
             if self.wstar < 1e-6
@@ -154,14 +145,15 @@ function update(self::SimilarityED, GMV::GridMeanVariables, Case::CasesBase, TS:
     x = pyzeros(nz)
     dummy_ae = pyones(nzg)
     rho_K_m = pyzeros(nzg)
+    KH = diffusivity_h(self).values
 
-    @inbounds for k in xrange(nzg - 1)
-        rho_K_m[k] = 0.5 * (diffusivity_h(self).values[k] + diffusivity_h(self).values[k + 1]) * self.Ref.rho0[k]
+    @inbounds for k in face_indicies(self.Gr)
+        rho_K_m[k] = 0.5 * (KH[k] + KH[k + 1]) * self.Ref.rho0[k]
     end
 
 
     # Matrix is the same for all variables that use the same eddy diffusivity
-    construct_tridiag_diffusion(nzg, gw, self.Gr.dzi, TS.dt, rho_K_m, self.Ref.rho0_half, dummy_ae, a, b, c)
+    construct_tridiag_diffusion(self.Gr, TS.dt, rho_K_m, self.Ref.rho0_half, dummy_ae, a, b, c)
 
     # Solve QT
 

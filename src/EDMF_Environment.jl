@@ -92,7 +92,7 @@ function env_cloud_diagnostics(self::EnvironmentVariables, Ref::ReferenceState)
     self.cloud_cover = 0.0
     self.lwp = 0.0
 
-    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         self.lwp += Ref.rho0_half[k] * self.QL.values[k] * self.Area.values[k] * self.Gr.dz
 
         if self.QL.values[k] > 1e-8 && self.Area.values[k] > 1e-3
@@ -144,7 +144,7 @@ function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::Environm
     sa = eos_struct()
     mph = mph_struct()
 
-    @inbounds for k in xrange(gw, self.Gr.nzg - gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         sa = eos(self.t_to_prog_fp, self.prog_to_t_fp, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
 
         EnvVar.T.values[k] = sa.T
@@ -182,7 +182,7 @@ function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables,
         error("EDMF_Environment: rain source terms are defined for thetal as model variable")
     end
 
-    @inbounds for k in xrange(gw, self.Gr.nzg - gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         # condensation
         sa = eos(self.t_to_prog_fp, self.prog_to_t_fp, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
         # autoconversion and accretion
@@ -240,7 +240,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
     i_ql, i_T, i_thl, i_rho, i_cf, i_qt_cld, i_qt_dry, i_T_cld, i_T_dry, i_rf = xrange(env_len)
     i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH = xrange(src_len)
 
-    @inbounds for k in xrange(gw, self.Gr.nzg - gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         if (
             EnvVar.QTvar.values[k] > epsilon &&
             EnvVar.Hvar.values[k] > epsilon &&

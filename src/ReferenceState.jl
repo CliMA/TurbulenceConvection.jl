@@ -102,17 +102,20 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
 
     # Compute reference state thermodynamic profiles
 
-    @inbounds for k in xrange(Gr.nzg)
-        ret = eos(t_to_entropy_c, eos_first_guess_entropy, p_[k], self.qtg, self.sg)
-        temperature[k] = ret.T
-        ql[k] = ret.ql
-        qv[k] = self.qtg - (ql[k] + qi[k])
-        alpha[k] = alpha_c(p_[k], temperature[k], self.qtg, qv[k])
+    @inbounds for k in center_indicies(Gr)
         ret = eos(t_to_entropy_c, eos_first_guess_entropy, p_half_[k], self.qtg, self.sg)
         temperature_half[k] = ret.T
         ql_half[k] = ret.ql
         qv_half[k] = self.qtg - (ql_half[k] + qi_half[k])
         alpha_half[k] = alpha_c(p_half_[k], temperature_half[k], self.qtg, qv_half[k])
+    end
+
+    @inbounds for k in face_indicies(Gr)
+        ret = eos(t_to_entropy_c, eos_first_guess_entropy, p_[k], self.qtg, self.sg)
+        temperature[k] = ret.T
+        ql[k] = ret.ql
+        qv[k] = self.qtg - (ql[k] + qi[k])
+        alpha[k] = alpha_c(p_[k], temperature[k], self.qtg, qv[k])
     end
 
     # Now do a sanity check to make sure that the Reference State entropy profile is uniform following
