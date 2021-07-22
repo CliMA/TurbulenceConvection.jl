@@ -354,6 +354,11 @@ end
 
 function write_file(namelist)
 
+    @assert haskey(namelist, "meta")
+    @assert haskey(namelist["meta"], "simname")
+
+    namelist["meta"]["uuid"] = basename(tempname())
+
     open("namelist_" * namelist["meta"]["casename"] * ".in", "w") do io
         JSON.print(io, namelist, 4)
     end
