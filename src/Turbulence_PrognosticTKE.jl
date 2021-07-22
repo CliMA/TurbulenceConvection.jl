@@ -1166,6 +1166,7 @@ function solve_updraft_velocity_area(self::EDMF_PrognosticTKE)
 end
 
 function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
+    param_set = parameter_set(GMV)
     grid = get_grid(self)
     ref_state = reference_state(self)
     dzi = grid.dzi
@@ -1187,9 +1188,16 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
                 end
 
                 # saturation adjustment
-                sa = eos(ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-                self.UpdVar.QL.new[i, k] = sa.ql
-                self.UpdVar.T.new[i, k] = sa.T
+                ts = TD.PhaseEquil_pθq(
+                    param_set,
+                    ref_state.p0_half[k],
+                    self.UpdVar.H.new[i, k],
+                    self.UpdVar.QT.new[i, k],
+                )
+                ql = TD.liquid_specific_humidity(ts)
+                T = TD.air_temperature(ts)
+                self.UpdVar.QL.new[i, k] = ql
+                self.UpdVar.T.new[i, k] = T
                 continue
             end
 
@@ -1233,9 +1241,11 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
             end
 
             # saturation adjustment
-            sa = eos(ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-            self.UpdVar.QL.new[i, k] = sa.ql
-            self.UpdVar.T.new[i, k] = sa.T
+            ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], self.UpdVar.H.new[i, k], self.UpdVar.QT.new[i, k])
+            ql = TD.liquid_specific_humidity(ts)
+            T = TD.air_temperature(ts)
+            self.UpdVar.QL.new[i, k] = ql
+            self.UpdVar.T.new[i, k] = T
         end
     end
 
