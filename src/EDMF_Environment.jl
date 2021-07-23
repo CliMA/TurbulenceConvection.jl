@@ -188,6 +188,7 @@ function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables,
         # autoconversion and accretion
         mph = microphysics_rain_src(
             Rain.rain_model,
+            Rain.max_supersaturation,
             EnvVar.QT.values[k],
             sa.ql,
             Rain.Env_QR.values[k],
@@ -323,6 +324,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                     # autoconversion and accretion
                     mph = microphysics_rain_src(
                         Rain.rain_model,
+                        Rain.max_supersaturation,
                         qt_hat,
                         sa.ql,
                         Rain.Env_QR.values[k],
@@ -402,6 +404,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
             sa = eos(self.t_to_prog_fp, self.prog_to_t_fp, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
             mph = microphysics_rain_src(
                 Rain.rain_model,
+                Rain.max_supersaturation,
                 EnvVar.QT.values[k],
                 sa.ql,
                 Rain.Env_QR.values[k],

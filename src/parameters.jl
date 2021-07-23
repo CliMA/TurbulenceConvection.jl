@@ -36,5 +36,3 @@ const K_therm = 2.4e-2
 const D_vapor = 2.26e-5
 const a_vent = 1.5
 const b_vent = 0.53
-# cutoff microphysics parameter
-const max_supersaturation = 0.02

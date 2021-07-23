@@ -117,6 +117,7 @@ end
 
 Base.@kwdef mutable struct RainVariables
     rain_model::String = "default_rain_model"
+    max_supersaturation::Float64
     mean_rwp::Float64 = 0
     env_rwp::Float64 = 0
     upd_rwp::Float64 = 0
@@ -156,8 +157,15 @@ function RainVariables(namelist, Gr::Grid)
         error("rain model not recognized")
     end
 
+    max_supersaturation = try
+        namelist["microphysics"]["max_supersaturation"]
+    catch
+        0.02
+    end
+
     return RainVariables(;
         rain_model,
+        max_supersaturation,
         mean_rwp,
         env_rwp,
         upd_rwp,
