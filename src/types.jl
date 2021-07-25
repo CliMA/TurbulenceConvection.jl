@@ -116,6 +116,14 @@ end
 Base.@kwdef mutable struct RainVariables
     rain_model::String = "default_rain_model"
     max_supersaturation::Float64
+    C_drag::Float64
+    MP_n_0::Float64
+    tau_cond_evap::Float64
+    q_liq_threshold::Float64
+    tau_acnv::Float64
+    E_col::Float64
+    a_vent::Float64
+    b_vent::Float64
     mean_rwp::Float64 = 0
     env_rwp::Float64 = 0
     upd_rwp::Float64 = 0
@@ -160,9 +168,65 @@ function RainVariables(namelist, Gr::Grid)
         0.02
     end
 
+    C_drag = try
+        namelist["microphysics"]["C_drag"]
+    catch
+        0.55
+    end
+
+    MP_n_0 = try
+        namelist["microphysics"]["MP_n_0"]
+    catch
+        16 * 1e6
+    end
+
+    tau_cond_evap = try
+        namelist["microphysics"]["tau_cond_evap"]
+    catch
+        10.0
+    end
+
+    q_liq_threshold = try
+        namelist["microphysics"]["q_liq_threshold"]
+    catch
+        5e-4
+    end
+
+    tau_acnv = try
+        namelist["microphysics"]["tau_acnv"]
+    catch
+        1e3
+    end
+
+    E_col = try
+        namelist["microphysics"]["E_col"]
+    catch
+        0.8
+    end
+
+    a_vent = try
+        namelist["microphysics"]["a_vent"]
+    catch
+        1.5
+    end
+
+    b_vent = try
+        namelist["microphysics"]["b_vent"]
+    catch
+        0.53
+    end
+
     return RainVariables(;
         rain_model,
         max_supersaturation,
+        C_drag,
+        MP_n_0,
+        tau_cond_evap,
+        q_liq_threshold,
+        tau_acnv,
+        E_col,
+        a_vent,
+        b_vent,
         mean_rwp,
         env_rwp,
         upd_rwp,

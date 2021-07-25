@@ -32,14 +32,14 @@ function acnv_instant(max_supersaturation, ql, qt, T, p0)
     return fmax(0.0, ql - max_supersaturation * qsat)
 end
 # CLIMA microphysics rates
-function terminal_velocity_single_drop_coeff(rho)
+function terminal_velocity_single_drop_coeff(C_drag, rho)
 
     return sqrt(8 / 3 / C_drag * (rho_cloud_liq / rho - 1))
 end
 
-function terminal_velocity(q_rai, rho)
+function terminal_velocity(C_drag, MP_n_0, q_rai, rho)
 
-    v_c = terminal_velocity_single_drop_coeff(rho)
+    v_c = terminal_velocity_single_drop_coeff(C_drag, rho)
     gamma_9_2 = 11.631728396567448
 
     term_vel = 0.0
@@ -52,19 +52,19 @@ function terminal_velocity(q_rai, rho)
     return term_vel
 end
 
-function conv_q_vap_to_q_liq(q_sat_liq, q_liq)
+function conv_q_vap_to_q_liq(tau_cond_evap, q_sat_liq, q_liq)
 
     return (q_sat_liq - q_liq) / tau_cond_evap
 end
 
-function conv_q_liq_to_q_rai_acnv(q_liq)
+function conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, q_liq)
 
     return fmax(0.0, q_liq - q_liq_threshold) / tau_acnv
 end
 
-function conv_q_liq_to_q_rai_accr(q_liq, q_rai, rho)
+function conv_q_liq_to_q_rai_accr(C_drag, MP_n_0, E_col, q_liq, q_rai, rho)
 
-    v_c = terminal_velocity_single_drop_coeff(rho)
+    v_c = terminal_velocity_single_drop_coeff(C_drag, rho)
     gamma_7_2 = 3.3233509704478426
 
     accr_coeff = gamma_7_2 * 8^(-7 / 8) * π^(1 / 8) * v_c * E_col * (rho / rho_cloud_liq)^(7 / 8)
@@ -72,11 +72,11 @@ function conv_q_liq_to_q_rai_accr(q_liq, q_rai, rho)
     return accr_coeff * MP_n_0^(1 / 8) * sqrt(g) * q_liq * q_rai^(7 / 8)
 end
 
-function conv_q_rai_to_q_vap(q_rai, q_tot, q_liq, T, p, rho)
+function conv_q_rai_to_q_vap(C_drag, MP_n_0, a_vent, b_vent, q_rai, q_tot, q_liq, T, p, rho)
 
     L = latent_heat(T)
     gamma_11_4 = 1.6083594219855457
-    v_c = terminal_velocity_single_drop_coeff(rho)
+    v_c = terminal_velocity_single_drop_coeff(C_drag, rho)
     N_Sc = nu_air / D_vapor
 
     av_param = sqrt(2.0 * π) * a_vent * sqrt(rho / rho_cloud_liq)
@@ -101,7 +101,23 @@ return
   new values: qt, ql, qv, thl, th, alpha
   rates: qr_src, thl_rain_src
 """
-function microphysics_rain_src(rain_model, max_supersaturation, qt, ql, qr, area, T, p0, rho, dt)
+function microphysics_rain_src(
+    rain_model,
+    max_supersaturation,
+    C_drag,
+    MP_n_0,
+    q_liq_threshold,
+    tau_acnv,
+    E_col,
+    qt,
+    ql,
+    qr,
+    area,
+    T,
+    p0,
+    rho,
+    dt,
+)
 
     # TODO assumes no ice
     _ret = mph_struct(0, 0, 0, 0, 0, 0, 0, 0, 0)
@@ -126,7 +142,13 @@ function microphysics_rain_src(rain_model, max_supersaturation, qt, ql, qr, area
 
     if area > 0.0
         if tmp_clima_acnv_flag
-            _ret.qr_src = fmin(ql, (conv_q_liq_to_q_rai_acnv(ql) + conv_q_liq_to_q_rai_accr(ql, qr, rho)) * dt)
+            _ret.qr_src = fmin(
+                ql,
+                (
+                    conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, ql) +
+                    conv_q_liq_to_q_rai_accr(C_drag, MP_n_0, E_col, ql, qr, rho)
+                ) * dt,
+            )
         end
 
         if tmp_cutoff_acnv_flag

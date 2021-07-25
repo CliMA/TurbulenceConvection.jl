@@ -24,15 +24,7 @@ const dycoms_cp = 1015.0
 const dycoms_L = 2.47 * 1e6
 const dycoms_Rd = 287.0
 # CLIMA microphysics parameters
-const C_drag = 0.55
 const rho_cloud_liq = 1e3
-const MP_n_0 = 16 * 1e6
-const tau_cond_evap = 10
-const q_liq_threshold = 5e-4 #5e-4
-const tau_acnv = 1e3
-const E_col = 0.8
 const nu_air = 1.6e-5
 const K_therm = 2.4e-2
 const D_vapor = 2.26e-5
-const a_vent = 1.5
-const b_vent = 0.53

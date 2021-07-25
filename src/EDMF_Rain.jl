@@ -105,6 +105,7 @@ end
 
 function solve_rain_fall(
     self::RainPhysics,
+    Rain::RainVariables,
     GMV::GridMeanVariables,
     TS::TimeStepping,
     QR::RainVariable,
@@ -125,7 +126,7 @@ function solve_rain_fall(
     # TODO: assuming GMV.W = 0
     # TODO: verify translation
     @inbounds for k in revxrange(nzg - gw - 1, gw, -1)
-        term_vel[k] = terminal_velocity(QR.values[k], self.Ref.rho0_half[k])
+        term_vel[k] = terminal_velocity(Rain.C_drag, Rain.MP_n_0, QR.values[k], self.Ref.rho0_half[k])
     end
 
     # calculate the allowed timestep (CFL_limit >= v dt / dz)
@@ -156,7 +157,7 @@ function solve_rain_fall(
                 RainArea.new[k] = 1.0
             end
 
-            term_vel_new[k] = terminal_velocity(QR.new[k], self.Ref.rho0_half[k])
+            term_vel_new[k] = terminal_velocity(Rain.C_drag, Rain.MP_n_0, QR.new[k], self.Ref.rho0_half[k])
         end
 
         t_elapsed += dt_rain
@@ -178,6 +179,7 @@ end
 
 function solve_rain_evap(
     self::RainPhysics,
+    Rain::RainVariables,
     GMV::GridMeanVariables,
     TS::TimeStepping,
     QR::RainVariable,
@@ -192,6 +194,10 @@ function solve_rain_evap(
         tmp_evap = max(
             0,
             conv_q_rai_to_q_vap(
+                Rain.C_drag,
+                Rain.MP_n_0,
+                Rain.a_vent,
+                Rain.b_vent,
                 QR.values[k],
                 GMV.QT.values[k],
                 GMV.QL.values[k],
