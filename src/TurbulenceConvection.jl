@@ -46,6 +46,7 @@ end
 
 include("python_primitives.jl")
 include("parameters.jl")
+include("thermo_extension.jl")
 include("Grid.jl")
 include("Fields.jl")
 include("Operators.jl")

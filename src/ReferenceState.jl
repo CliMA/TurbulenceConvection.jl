@@ -44,17 +44,19 @@ specific initialization function defined in Initialization.pyx
 """
 function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
 
-    self.sg = t_to_entropy_c(self.Pg, self.Tg, self.qtg, 0.0, 0.0)
+    param_set = parameter_set(self)
+    self.sg = entropy(param_set, self.Pg, self.Tg, TD.PhasePartition(self.qtg))
+    FT = eltype(Gr)
 
     # Form a right hand side for integrating the hydrostatic equation to
     # determine the reference pressure
 
-    function rhs(p, u, z)
-        ret = eos(exp(p), self.qtg, self.sg; t_to_prog = t_to_entropy_c, prog_to_t = eos_first_guess_entropy)
-        q_i = 0.0
-        q_l = ret.ql
-        T = ret.T
-        return -g / (Rd * T * (1.0 - self.qtg + eps_vi * (self.qtg - q_l - q_i)))
+    function rhs(logp, u, z)
+        ts = PhaseEquil_psq(param_set, exp(logp), self.sg, self.qtg)
+        T = TD.air_temperature(ts)
+        R_m = TD.gas_constant_air(ts)
+        H = (R_m * T) / FT(grav(param_set))
+        return -1 / H
     end
 
     # We are integrating the log pressure so need to take the log of the
@@ -66,8 +68,6 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
     p_half = center_field(Gr)
 
     # Perform the integration
-    # TODO: replace with OrdinaryDiffEq
-
     z_span = (Gr.zmin, Gr.zmax)
     @show z_span
     prob = ODEProblem(rhs, logp, z_span)
