@@ -612,8 +612,6 @@ function set_updraft_surface_bc(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
     qt_var = get_surface_variance(Case.Sur.rho_qtflux * alpha0LL, Case.Sur.rho_qtflux * alpha0LL, ustar, zLL, oblength)
     h_var = get_surface_variance(Case.Sur.rho_hflux * alpha0LL, Case.Sur.rho_hflux * alpha0LL, ustar, zLL, oblength)
 
-    # a_ = self.surface_area/self.n_updrafts
-
     if Case.Sur.bflux > 0.0
         a_total = self.surface_area
         self.entr_surface_bc = 2.0 * dzi

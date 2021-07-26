@@ -96,10 +96,5 @@ function update(self::ForcingBase{ForcingDYCOMS_RF01}, GMV::GridMeanVariables)
     return
 end
 
-function initialize_io(self::ForcingBase{ForcingDYCOMS_RF01}, Stats::NetCDFIO_Stats)
-    return
-end
-
-function io(self::ForcingBase{ForcingDYCOMS_RF01}, Stats::NetCDFIO_Stats)
-    return
-end
+initialize_io(self::ForcingBase{ForcingDYCOMS_RF01}, Stats::NetCDFIO_Stats) = nothing
+io(self::ForcingBase{ForcingDYCOMS_RF01}, Stats::NetCDFIO_Stats) = nothing
