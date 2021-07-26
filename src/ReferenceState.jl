@@ -122,7 +122,7 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
     # Now do a sanity check to make sure that the Reference State entropy profile is uniform following
     # saturation adjustment
     local s
-    @inbounds for k in xrange(Gr.nzg)
+    @inbounds for k in center_indicies(Gr)
         s = t_to_entropy_c(p_half[k], temperature_half[k], self.qtg, ql_half[k], qi_half[k])
         if abs(s - self.sg) / self.sg > 0.01
             println("Error in reference profiles entropy not constant !")
