@@ -1,9 +1,10 @@
 # Compare TurbulenceConvection.jl with SCAMPy
 using TurbulenceConvection
+case_name = "TRMM_LBA"
 tc_dir = dirname(dirname(pathof(TurbulenceConvection)));
 include(joinpath("integration_tests", "utils", "compute_mse.jl"))
 
-ds_filename = joinpath(tc_dir, "Output.DYCOMS_RF01.01", "stats", "Stats.DYCOMS_RF01.nc")
+ds_filename = joinpath(tc_dir, "Output.$(case_name).01", "stats", "Stats.$(case_name).nc")
 
 scampy_dir = joinpath(tc_dir, "..", "SCAMPyRepos", "SCAMPyMaster", "SCAMPy")
 using Glob
@@ -15,10 +16,10 @@ try
         for f in glob("*.so")
              rm(f)
         end
-        Base.run(`python generate_namelist.py DYCOMS_RF01`)
-        Base.run(`python generate_paramlist.py DYCOMS_RF01`)
+        Base.run(`python generate_namelist.py $(case_name)`)
+        Base.run(`python generate_paramlist.py $(case_name)`)
         Base.run(`python setup.py build_ext --inplace`)
-        Base.run(`python main.py DYCOMS_RF01.in paramlist_DYCOMS_RF01.in`)
+        Base.run(`python main.py $(case_name).in paramlist_$(case_name).in`)
     end
 catch
     println("catch")
@@ -171,13 +172,13 @@ best_mse["rain_evap_source_qt"] = 1.0
 best_mse["QT_mf_update"] = 1.0
 best_mse["QT_new"] = 1.0
 
-ds_scm_filename = joinpath(scampy_dir, "Output.DYCOMS_RF01.01", "stats", "Stats.DYCOMS_RF01.nc")
-# ds_scm_filename = joinpath(SCAMPy_output_dataset_path, "DYCOMS_RF01.nc")
+ds_scm_filename = joinpath(scampy_dir, "Output.$(case_name).01", "stats", "Stats.$(case_name).nc")
+# ds_scm_filename = joinpath(SCAMPy_output_dataset_path, "$(case_name).nc")
 
 computed_mse = Dataset(ds_filename, "r") do ds
     Dataset(ds_scm_filename, "r") do ds_scampy
         compute_mse(
-            "DYCOMS_RF01",
+            case_name,
             best_mse,
             joinpath(dirname(ds_filename), "DebuggingDycoms_comparison");
             ds_turb_conv=ds,

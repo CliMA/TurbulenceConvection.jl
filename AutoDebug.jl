@@ -1,5 +1,5 @@
 try
-    include("RunDycoms.jl")
+    include("RunCase.jl")
 catch
-    include("DebugDycoms.jl")
+    include("DebugCase.jl")
 end
