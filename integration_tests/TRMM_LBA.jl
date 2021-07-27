@@ -11,14 +11,14 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 3.0653870799814622e+00
-best_mse["updraft_area"] = 2.7495027092511747e+04
-best_mse["updraft_w"] = 9.7223505744470913e+02
-best_mse["updraft_qt"] = 2.6322483788147938e+01
-best_mse["updraft_thetal"] = 1.1133829792870439e+02
-best_mse["v_mean"] = 2.9873166545343321e+02
-best_mse["u_mean"] = 1.6851451412164733e+03
-best_mse["tke_mean"] = 2.5415255485687139e+03
+best_mse["qt_mean"] = 3.9046069426901999e+00
+best_mse["updraft_area"] = 2.8342045114790926e+04
+best_mse["updraft_w"] = 6.5629758352987142e+02
+best_mse["updraft_qt"] = 2.5132229019229900e+01
+best_mse["updraft_thetal"] = 1.1134327794549542e+02
+best_mse["v_mean"] = 2.9403541501868523e+02
+best_mse["u_mean"] = 1.6903138683581105e+03
+best_mse["tke_mean"] = 2.8534421778168139e+03
 
 @testset "TRMM_LBA" begin
     println("Running TRMM_LBA...")
