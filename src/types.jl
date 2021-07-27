@@ -105,8 +105,6 @@ struct RainVariable{T}
     function RainVariable(nz, name, units)
         loc = "half"
         kind = "scalar"
-        name = name
-        units = units
 
         values = pyzeros(nz)
         new = pyzeros(nz)
@@ -200,14 +198,9 @@ struct VariablePrognostic{T}
         if loc != "half" && loc != "full"
             print("Invalid location setting for variable! Must be half or full")
         end
-        loc = loc
         if kind != "scalar" && kind != "velocity"
             print("Invalid kind setting for variable! Must be scalar or velocity")
         end
-        bc = bc
-        kind = kind
-        name = name
-        units = units
         return new{typeof(values)}(values, new, mf_update, tendencies, loc, bc, kind, name, units)
     end
 end
@@ -226,14 +219,9 @@ struct VariableDiagnostic{T}
         if loc != "half" && loc != "full"
             print("Invalid location setting for variable! Must be half or full")
         end
-        loc = loc
         if kind != "scalar" && kind != "velocity"
             print("Invalid kind setting for variable! Must be scalar or velocity")
         end
-        bc = bc
-        kind = kind
-        name = name
-        units = units
         return new{typeof(values)}(values, loc, bc, kind, name, units)
     end
 end
@@ -259,13 +247,9 @@ struct UpdraftVariable{A1, A2}
         if loc != "half" && loc != "full"
             print("Invalid location setting for variable! Must be half or full")
         end
-        loc = loc
         if kind != "scalar" && kind != "velocity"
             print("Invalid kind setting for variable! Must be scalar or velocity")
         end
-        kind = kind
-        name = name
-        units = units
         A1 = typeof(bulkvalues)
         A2 = typeof(values)
         return new{A1, A2}(values, old, new, tendencies, flux, bulkvalues, loc, kind, name, units)
@@ -528,13 +512,9 @@ struct EnvironmentVariable{T}
         if loc != "half" && loc != "full"
             println("Invalid location setting for variable! Must be half or full")
         end
-        loc = loc
         if kind != "scalar" && kind != "velocity"
             println("Invalid kind setting for variable! Must be scalar or velocity")
         end
-        kind = kind
-        name = name
-        units = units
         return new{typeof(values)}(values, flux, loc, kind, name, units)
     end
 end
@@ -566,13 +546,9 @@ struct EnvironmentVariable_2m{A1}
         if loc != "half"
             println("Invalid location setting for variable! Must be half")
         end
-        loc = loc
         if kind != "scalar" && kind != "velocity"
             println("Invalid kind setting for variable! Must be scalar or velocity")
         end
-        kind = kind
-        name = name
-        units = units
         return new{typeof(values)}(
             values,
             dissipation,

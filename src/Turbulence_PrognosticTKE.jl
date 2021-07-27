@@ -863,7 +863,7 @@ end
 # Note: this assumes all variables are defined on half levels not full levels (i.e. phi, psi are not w)
 # if covar_e.name is not "tke".
 function get_GMV_CoVar(
-    self,
+    self::EDMF_PrognosticTKE,
     au::UpdraftVariable,
     phi_u::UpdraftVariable,
     psi_u::UpdraftVariable,
@@ -931,7 +931,7 @@ end
 
 
 function get_env_covar_from_GMV(
-    self,
+    self::EDMF_PrognosticTKE,
     au::UpdraftVariable,
     phi_u::UpdraftVariable,
     psi_u::UpdraftVariable,
@@ -943,7 +943,8 @@ function get_env_covar_from_GMV(
     gmv_covar,
 )
 
-    ae = pyones(get_grid(self).nzg) .- au.bulkvalues
+    grid = get_grid(self)
+    ae = pyones(grid.nzg) .- au.bulkvalues
     tke_factor = 1.0
     is_tke = covar_e.name == "tke"
     if is_tke
@@ -1376,28 +1377,32 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
 
     @inbounds for i in xrange(self.n_updrafts)
 
-        # at the surface
-        if self.UpdVar.Area.new[i, gw] >= self.minimum_area
-            self.UpdVar.H.new[i, gw] = self.h_surface_bc[i]
-            self.UpdVar.QT.new[i, gw] = self.qt_surface_bc[i]
-        else
-            self.UpdVar.H.new[i, gw] = GMV.H.values[gw]
-            self.UpdVar.QT.new[i, gw] = GMV.QT.values[gw]
-        end
-
-        # saturation adjustment
-        sa = eos(
-            self.UpdThermo.t_to_prog_fp,
-            self.UpdThermo.prog_to_t_fp,
-            ref_state.p0_half[gw],
-            self.UpdVar.QT.new[i, gw],
-            self.UpdVar.H.new[i, gw],
-        )
-        self.UpdVar.QL.new[i, gw] = sa.ql
-        self.UpdVar.T.new[i, gw] = sa.T
-
         # starting from the bottom do entrainment at each level
-        @inbounds for k in xrange(gw + 1, grid.nzg - gw)
+        @inbounds for k in real_center_indicies(grid)
+            if k == gw
+                # at the surface
+                if self.UpdVar.Area.new[i, k] >= self.minimum_area
+                    self.UpdVar.H.new[i, k] = self.h_surface_bc[i]
+                    self.UpdVar.QT.new[i, k] = self.qt_surface_bc[i]
+                else
+                    self.UpdVar.H.new[i, k] = GMV.H.values[k]
+                    self.UpdVar.QT.new[i, k] = GMV.QT.values[k]
+                end
+
+                # saturation adjustment
+                sa = eos(
+                    self.UpdThermo.t_to_prog_fp,
+                    self.UpdThermo.prog_to_t_fp,
+                    ref_state.p0_half[k],
+                    self.UpdVar.QT.new[i, k],
+                    self.UpdVar.H.new[i, k],
+                )
+                self.UpdVar.QL.new[i, k] = sa.ql
+                self.UpdVar.T.new[i, k] = sa.T
+                continue
+            end
+
+
             H_entr = self.EnvVar.H.values[k]
             QT_entr = self.EnvVar.QT.values[k]
 
@@ -2307,9 +2312,7 @@ function compute_tke_advection(self::EDMF_PrognosticTKE)
     ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues # area of environment
     drho_ae_we_e_plus = 0.0
 
-    # TODO: why minus 1?
-    # @inbounds for k in real_center_indicies(grid) # TODO: try changing to this
-    @inbounds for k in xrange(gw, get_grid(self).nzg - gw - 1)
+    @inbounds for k in real_face_indicies(grid)
         drho_ae_we_e_minus = drho_ae_we_e_plus
         drho_ae_we_e_plus =
             (
@@ -2338,9 +2341,7 @@ function compute_tke_transport(self::EDMF_PrognosticTKE)
     KM = diffusivity_m(self).values
     rho0_half = reference_state(self).rho0_half
 
-    # TODO: why minus 1?
-    # @inbounds for k in real_center_indicies(grid) # TODO: try changing to this
-    @inbounds for k in xrange(gw, grid.nzg - gw - 1)
+    @inbounds for k in real_face_indicies(grid)
         drho_ae_K_m_de_low = drho_ae_K_m_de_plus
         drho_ae_K_m_de_plus =
             (
