@@ -11,13 +11,13 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 6.7066415019414212e+00
-best_mse["updraft_area"] = 2.6634274082490697e+02
-best_mse["updraft_w"] = 2.6471400756560365e-01
-best_mse["updraft_qt"] = 6.0143099892375709e+01
-best_mse["updraft_thetal"] = 6.9062807673298735e+01
-best_mse["u_mean"] = 8.7994360629094302e+01
-best_mse["tke_mean"] = 4.1628443606689931e+00
+best_mse["qt_mean"] = 5.5166749573532592e-01
+best_mse["updraft_area"] = 2.8505841871593282e+02
+best_mse["updraft_w"] = 7.7404844506417481e-01
+best_mse["updraft_qt"] = 5.2600486259435868e+01
+best_mse["updraft_thetal"] = 6.9238569266089868e+01
+best_mse["u_mean"] = 8.7994360629094174e+01
+best_mse["tke_mean"] = 2.9609371778386242e+00
 
 @testset "ARM_SGP" begin
     println("Running ARM_SGP...")
