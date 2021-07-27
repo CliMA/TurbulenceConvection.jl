@@ -151,7 +151,7 @@ function initialize_reference(self::CasesBase{SoaresCase}, Gr::Grid, Ref::Refere
     initialize(Ref, Gr, Stats)
 end
 function initialize_profiles(self::CasesBase{SoaresCase}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    theta = TurbulenceConvection.pyzeros(Gr.nzg)
+    theta = TurbulenceConvection.center_field(Gr)
     ql = 0.0
     qi = 0.0
 
@@ -247,7 +247,7 @@ function initialize_reference(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::Refere
     initialize(Ref, Gr, Stats)
 end
 function initialize_profiles(self::CasesBase{Nieuwstadt}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    theta = TurbulenceConvection.pyzeros(Gr.nzg)
+    theta = TurbulenceConvection.center_field(Gr)
     ql = 0.0
     qi = 0.0
 
@@ -342,7 +342,7 @@ function initialize_reference(self::CasesBase{BomexCase}, Gr::Grid, Ref::Referen
 end
 
 function initialize_profiles(self::CasesBase{BomexCase}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    thetal = TurbulenceConvection.pyzeros(Gr.nzg)
+    thetal = TurbulenceConvection.center_field(Gr)
     ql = 0.0
     qi = 0.0 # IC of Bomex is cloud-free
 
@@ -483,7 +483,7 @@ function initialize_reference(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref
     initialize(Ref, Gr, Stats)
 end
 function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    thetal = TurbulenceConvection.pyzeros(Gr.nzg)
+    thetal = TurbulenceConvection.center_field(Gr)
     ql = 0.0
     qi = 0.0 # IC of Bomex is cloud-free
     @inbounds for k in real_center_indicies(Gr)
@@ -651,7 +651,7 @@ function initialize_reference(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceSta
     initialize(Ref, Gr, Stats)
 end
 function initialize_profiles(self::CasesBase{Rico}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    thetal = TurbulenceConvection.pyzeros(Gr.nzg)
+    thetal = TurbulenceConvection.center_field(Gr)
     ql = 0.0
     qi = 0.0 # IC of Rico is cloud-free
 
@@ -772,7 +772,6 @@ function initialize_reference(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::Referenc
     initialize(Ref, Gr, Stats)
 end
 function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    p1 = TurbulenceConvection.pyzeros(Gr.nzg)
 
     # TRMM_LBA inputs from Grabowski et al. 2006
     #! format: off
@@ -831,14 +830,14 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
     GMV.V.values .= pyinterp(Gr.z_half, z_in, v_in)
 
     # get the entropy from RH, p, T
-    RH = TurbulenceConvection.pyzeros(Gr.nzg)
+    RH = TurbulenceConvection.center_field(Gr)
     z_half_in = off_arr(Gr.z_half[(Gr.gw):(Gr.nzg - Gr.gw)])
     RH[(Gr.gw):(Gr.nzg - Gr.gw)] = pyinterp(z_half_in, z_in, RH_in)
     RH[0] = RH[3]
     RH[1] = RH[2]
     RH[Gr.nzg - Gr.gw + 1] = RH[Gr.nzg - Gr.gw - 1]
 
-    T = TurbulenceConvection.pyzeros(Gr.nzg)
+    T = TurbulenceConvection.center_field(Gr)
     T[(Gr.gw):(Gr.nzg - Gr.gw)] = pyinterp(z_half_in, z_in, T_in)
     GMV.T.values .= T
     theta_rho = RH * 0.0
@@ -883,7 +882,7 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-    self.Fo.dTdt = TurbulenceConvection.pyzeros(Gr.nzg)
+    self.Fo.dTdt = TurbulenceConvection.center_field(Gr)
     self.rad_time = linspace(10, 360; num = 36) .* 60
     #! format: off
     z_in         = off_arr([42.5, 200.92, 456.28, 743, 1061.08, 1410.52, 1791.32, 2203.48, 2647,3121.88, 3628.12,
@@ -1101,8 +1100,6 @@ function initialize_reference(self::CasesBase{ARM_SGP}, Gr::Grid, Ref::Reference
 end
 
 function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    p1 = TurbulenceConvection.pyzeros(Gr.nzg)
-
     # ARM_SGP inputs
     #! format: off
     z_in = off_arr([0.0, 50.0, 350.0, 650.0, 700.0, 1300.0, 2500.0, 5500.0 ]) #LES z is in meters
@@ -1232,10 +1229,10 @@ function initialize_reference(self::CasesBase{GATE_III}, Gr::Grid, Ref::Referenc
 end
 
 function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    qt = TurbulenceConvection.pyzeros(Gr.nzg)
-    T = TurbulenceConvection.pyzeros(Gr.nzg) # Gr.nzg = Gr.nz + 2*Gr.gw
-    U = TurbulenceConvection.pyzeros(Gr.nzg)
-    theta_rho = TurbulenceConvection.pyzeros(Gr.nzg)
+    qt = TurbulenceConvection.center_field(Gr)
+    T = TurbulenceConvection.center_field(Gr)
+    U = TurbulenceConvection.center_field(Gr)
+    theta_rho = TurbulenceConvection.center_field(Gr)
 
     # GATE_III inputs - I extended them to z=22 km
     #! format: off
@@ -1426,8 +1423,8 @@ function dycoms_sat_adjst(self::CasesBase{DYCOMS_RF01}, p_, thetal_, qt_)
 end
 
 function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    thetal = TurbulenceConvection.pyzeros(Gr.nzg) # helper variable to recalculate temperature
-    ql = TurbulenceConvection.pyzeros(Gr.nzg) # DYCOMS case is saturated
+    thetal = TurbulenceConvection.center_field(Gr) # helper variable to recalculate temperature
+    ql = TurbulenceConvection.center_field(Gr) # DYCOMS case is saturated
     qi = 0.0                                             # no ice
 
     @inbounds for k in real_center_indicies(Gr)
@@ -1582,7 +1579,7 @@ function initialize_reference(self::CasesBase{GABLS}, Gr::Grid, Ref::ReferenceSt
     initialize(Ref, Gr, Stats)
 end
 function initialize_profiles(self::CasesBase{GABLS}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    thetal = TurbulenceConvection.pyzeros(Gr.nzg)
+    thetal = TurbulenceConvection.center_field(Gr)
     ql = 0.0
     qi = 0.0 # IC of GABLS cloud-free
 
@@ -1682,7 +1679,7 @@ function initialize_reference(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState
 end
 
 function initialize_profiles(self::CasesBase{SP}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    thetal = TurbulenceConvection.pyzeros(Gr.nzg)
+    thetal = TurbulenceConvection.center_field(Gr)
     ql = 0.0
     qi = 0.0 # IC of SP cloud-free
 
@@ -1847,7 +1844,7 @@ function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMean
     ])
     #! format: on
                        #LES temperature_mean in K
-    thetali = TurbulenceConvection.pyzeros(Gr.nzg)
+    thetali = TurbulenceConvection.center_field(Gr)
     z_half_in = off_arr(Gr.z_half[(Gr.gw):(Gr.nzg - Gr.gw)])
     thetali[(Gr.gw):(Gr.nzg - Gr.gw)] = pyinterp(z_half_in, z_in, thetali_in)
     GMV.THL.values .= thetali

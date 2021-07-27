@@ -1,7 +1,7 @@
 
 function initialize(self::RadiationBase, GMV::GridMeanVariables, ::RadiationBaseType)
-    self.dTdt = pyzeros(self.Gr.nzg)
-    self.dqtdt = pyzeros(self.Gr.nzg)
+    self.dTdt = center_field(self.Gr)
+    self.dqtdt = center_field(self.Gr)
 
     self.convert_forcing_prog_fp = convert_forcing_thetal
     return
@@ -32,7 +32,7 @@ function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVari
     self.F0 = 70.0
     self.F1 = 22.0
     self.divergence = 3.75e-6
-    self.f_rad = pyzeros(self.Gr.nzg + 1) # radiative flux at cell edges
+    self.f_rad = pyzeros(self.Gr.nzg + 1) # radiative flux at cell faces
     return
 end
 
@@ -47,7 +47,7 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
     @inbounds for k in real_center_indicies(self.Gr)
         if (GMV.QT.values[k] < 8.0 / 1000)
             idx_zi = k
-            # will be used at cell edges
+            # will be used at cell faces
             zi = self.Gr.z[idx_zi]
             rhoi = self.Ref.rho0[idx_zi]
             break
