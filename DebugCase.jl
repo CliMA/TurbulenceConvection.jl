@@ -180,7 +180,7 @@ computed_mse = Dataset(ds_filename, "r") do ds
         compute_mse(
             case_name,
             best_mse,
-            joinpath(dirname(ds_filename), "DebuggingDycoms_comparison");
+            joinpath(dirname(ds_filename), "Debugging_$(case_name)_comparison");
             ds_turb_conv=ds,
             ds_scampy=ds_scampy,
             plot_comparison=true

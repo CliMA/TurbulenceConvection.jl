@@ -42,11 +42,11 @@ function run(self::Simulation1d)
         Cases.update_surface(self.Case, self.GMV, self.TS)
         # TurbulenceConvection.check_nans(self.GMV, self.Turb, "3")
         Cases.update_forcing(self.Case, self.GMV, self.TS)
+        TurbulenceConvection.export_all(self.Case, self.Turb, self.GMV, self.TS, self.Stats)
 
         # TurbulenceConvection.check_nans(self.GMV, self.Turb, "4")
         # Good up to here.
         TurbulenceConvection.update(self.Turb, self.GMV, self.Case, self.TS, self.Stats)
-        # TurbulenceConvection.export_all(self.Case, self.Turb, self.GMV, self.TS, self.Stats)
         # TurbulenceConvection.check_nans(self.GMV, self.Turb, "5")
         TurbulenceConvection.update(self.TS)
         # TurbulenceConvection.check_nans(self.GMV, self.Turb, "6")

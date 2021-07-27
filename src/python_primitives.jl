@@ -33,6 +33,7 @@ power(a::AbstractVector, b::AbstractVector) = a .^ b
 linspace(a, b; num=50) = range(a, b; length=num)
 
 function pyinterp(x::T, xp::T, fp::T) where {T}
-    spl = Dierckx.Spline1D([xp...], [fp...])
+    # spl = Dierckx.Spline1D([xp...], [fp...])
+    spl = Dierckx.Spline1D([xp...], [fp...]; k=1)
     return off_arr(spl([x...]))
 end

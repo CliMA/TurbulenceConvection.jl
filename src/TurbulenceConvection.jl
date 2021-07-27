@@ -40,7 +40,7 @@ include("surface_functions.jl")
 function export_all(Case, Turb, GMV, TS, Stats)
     # if TS.i_iter == 1 && TS.isolate
     # if TS.i_iter == 10
-    if TS.i_iter == 1000
+    if TS.i_iter == 0
     # if TS.i_iter == 5759
         @show TS.i_iter
         open_files(Stats)

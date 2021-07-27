@@ -1,4 +1,4 @@
-using Plots
+import Plots
 using OrderedCollections
 using Test
 using NCDatasets
@@ -205,7 +205,7 @@ function compute_mse(
         # push!(data_scales_les, data_scale_les)
         # Plot comparison
         if plot_comparison
-            p = plot()
+            p = Plots.plot()
             # plot!(
             #     data_les_cont_mapped,
             #     z_tcc ./ 10^3,
@@ -213,14 +213,14 @@ function compute_mse(
             #     ylabel = "z [km]",
             #     label = "PyCLES",
             # )
-            plot!(
+            Plots.plot!(
                 profile_data_tcc_cont_mapped,
                 z_tcc ./ 10^3,
                 xlabel = tc_var,
                 ylabel = "z [km]",
                 label = "TC.jl",
             )
-            plot!(
+            Plots.plot!(
                 profile_data_scm_cont_mapped,
                 z_tcc ./ 10^3,
                 xlabel = tc_var,
@@ -228,22 +228,31 @@ function compute_mse(
                 label = "SCAMPy",
             )
             @info "Saving $(joinpath(foldername, "$tc_var.png"))"
-            savefig(joinpath(foldername, "profiles_$tc_var.png"))
-            contourf(
+            Plots.savefig(joinpath(foldername, "profiles_$tc_var.png"))
+
+            clims_min = min(minimum(data_tcc_arr), minimum(data_tcc_arr))
+            clims_max = max(maximum(data_tcc_arr), maximum(data_tcc_arr))
+            clims = (clims_min, clims_max)
+            p1 = Plots.contourf(
                 time_scm, z_scm, data_scm_arr';
                 xlabel = tc_var,
                 ylabel = "height (m)",
-                c = :viridis
+                c = :viridis,
+                clims = clims,
+                title="SCAMPy",
             )
-            savefig(joinpath(foldername,"contours_"*tc_var*"_scampy"*".png"))
 
-            contourf(
+            p2 = Plots.contourf(
                 time_tcc, z_tcc, data_tcc_arr';
                 xlabel = tc_var,
                 ylabel = "height (m)",
-                c = :viridis
+                c = :viridis,
+                clims = clims,
+                title="TC.jl",
             )
-            savefig(joinpath(foldername,"contours_"*tc_var*"_tc"*".png"))
+            Plots.plot(p1, p2; layout= (2, 1))
+
+            Plots.savefig(joinpath(foldername,"contours_"*tc_var*".png"))
         end
 
         # Compute mean squared error (mse)
