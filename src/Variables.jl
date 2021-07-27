@@ -76,7 +76,7 @@ function zero_tendencies(self::GridMeanVariables)
 end
 
 function update(self::GridMeanVariables, TS::TimeStepping)
-    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+    @inbounds for k in center_indicies(self.Gr)
         self.U.values[k] += self.U.tendencies[k] * TS.dt
         self.V.values[k] += self.V.tendencies[k] * TS.dt
         self.H.values[k] += self.H.tendencies[k] * TS.dt
@@ -173,7 +173,7 @@ function mean_cloud_diagnostics(self)
     self.cloud_base = self.Gr.z_half[self.Gr.nzg - self.Gr.gw - 1]
     self.cloud_top = 0.0
 
-    @inbounds for k in xrange(self.Gr.gw, self.Gr.nzg - self.Gr.gw)
+    @inbounds for k in real_center_indicies(self.Gr)
         self.lwp += self.Ref.rho0_half[k] * self.QL.values[k] * self.Gr.dz
 
         if self.QL.values[k] > 1e-8
@@ -186,7 +186,7 @@ end
 
 function satadjust(self::GridMeanVariables)
     sa = eos_struct()
-    @inbounds for k in xrange(self.Gr.nzg)
+    @inbounds for k in center_indicies(self.Gr)
         h = self.H.values[k]
         qt = self.QT.values[k]
         p0 = self.Ref.p0_half[k]
