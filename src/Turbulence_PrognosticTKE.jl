@@ -637,18 +637,16 @@ end
 function reset_surface_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
     flux1 = Case.Sur.rho_hflux
     flux2 = Case.Sur.rho_qtflux
-    zLL = get_grid(self).z_half[get_grid(self).gw]
+    grid = get_grid(self)
+    ref_state = reference_state(self)
+    zLL = get_grid(self).z_half[grid.gw]
     ustar = Case.Sur.ustar
     oblength = Case.Sur.obukhov_length
-    alpha0LL = reference_state(self).alpha0_half[get_grid(self).gw]
+    alpha0LL = ref_state.alpha0_half[grid.gw]
 
     if self.calc_tke
-        self.EnvVar.TKE.values[get_grid(self).gw] = get_surface_tke(
-            Case.Sur.ustar,
-            self.wstar,
-            get_grid(self).z_half[get_grid(self).gw],
-            Case.Sur.obukhov_length,
-        )
+        self.EnvVar.TKE.values[grid.gw] =
+            get_surface_tke(Case.Sur.ustar, self.wstar, grid.z_half[grid.gw], Case.Sur.obukhov_length)
         get_GMV_CoVar(
             self,
             self.UpdVar.Area,
@@ -664,11 +662,11 @@ function reset_surface_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     end
 
     if self.calc_scalar_var
-        self.EnvVar.Hvar.values[get_grid(self).gw] =
+        self.EnvVar.Hvar.values[grid.gw] =
             get_surface_variance(flux1 * alpha0LL, flux1 * alpha0LL, ustar, zLL, oblength)
-        self.EnvVar.QTvar.values[get_grid(self).gw] =
+        self.EnvVar.QTvar.values[grid.gw] =
             get_surface_variance(flux2 * alpha0LL, flux2 * alpha0LL, ustar, zLL, oblength)
-        self.EnvVar.HQTcov.values[get_grid(self).gw] =
+        self.EnvVar.HQTcov.values[grid.gw] =
             get_surface_variance(flux1 * alpha0LL, flux2 * alpha0LL, ustar, zLL, oblength)
         get_GMV_CoVar(
             self,
@@ -717,11 +715,12 @@ function decompose_environment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
 
     # first make sure the "bulkvalues" of the updraft variables are updated
     set_means(self.UpdVar, GMV)
+    grid = get_grid(self)
 
-    gw = get_grid(self).gw
+    gw = grid.gw
 
     if whichvals == "values"
-        @inbounds for k in xrange(get_grid(self).nzg - 1)
+        @inbounds for k in real_face_indicies(grid)
             val1 = 1.0 / (1.0 - self.UpdVar.Area.bulkvalues[k])
             val2 = self.UpdVar.Area.bulkvalues[k] * val1
 
@@ -791,7 +790,7 @@ function decompose_environment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
     elseif whichvals == "mf_update"
         # same as above but replace GMV.SomeVar.values with GMV.SomeVar.mf_update
 
-        @inbounds for k in xrange(get_grid(self).nzg - 1)
+        @inbounds for k in real_face_indicies(grid)
             val1 = 1.0 / (1.0 - self.UpdVar.Area.bulkvalues[k])
             val2 = self.UpdVar.Area.bulkvalues[k] * val1
 
@@ -876,12 +875,13 @@ function get_GMV_CoVar(
     gmv_covar,
 )
 
-    ae = pyones(get_grid(self).nzg) .- au.bulkvalues
+    grid = get_grid(self)
+    ae = pyones(grid.nzg) .- au.bulkvalues
     tke_factor = 1.0
     is_tke = covar_e.name == "tke"
 
-    @inbounds for k in xrange(get_grid(self).nzg)
-        if is_tke
+    if is_tke
+        @inbounds for k in face_indicies(grid)
             tke_factor = 0.5
             # TODO: report bug: k-1 for k = 0 yields
             # -1, indexing phi_e.values[-1] yields the
@@ -894,16 +894,9 @@ function get_GMV_CoVar(
                 phi_diff = phi_e.values[k] - gmv_phi[k]
                 psi_diff = psi_e.values[k] - gmv_psi[k]
             end
-        else
-            tke_factor = 1.0
-            phi_diff = phi_e.values[k] - gmv_phi[k]
-            psi_diff = psi_e.values[k] - gmv_psi[k]
-        end
 
-
-        gmv_covar[k] = tke_factor * ae[k] * phi_diff * psi_diff + ae[k] * covar_e.values[k]
-        @inbounds for i in xrange(self.n_updrafts)
-            if is_tke
+            gmv_covar[k] = tke_factor * ae[k] * phi_diff * psi_diff + ae[k] * covar_e.values[k]
+            @inbounds for i in xrange(self.n_updrafts)
                 # TODO: report bug: k-1 for k = 0 yields
                 # -1, indexing phi_e.values[-1] yields the
                 # _last_ value in the array. This is certainly
@@ -915,12 +908,22 @@ function get_GMV_CoVar(
                     phi_diff = phi_u.values[i, k] - gmv_phi[k]
                     psi_diff = psi_u.values[i, k] - gmv_psi[k]
                 end
-            else
+                gmv_covar[k] += tke_factor * au.values[i, k] * phi_diff * psi_diff
+            end
+        end
+    else
+
+        @inbounds for k in center_indicies(grid)
+            tke_factor = 1.0
+            phi_diff = phi_e.values[k] - gmv_phi[k]
+            psi_diff = psi_e.values[k] - gmv_psi[k]
+
+            gmv_covar[k] = tke_factor * ae[k] * phi_diff * psi_diff + ae[k] * covar_e.values[k]
+            @inbounds for i in xrange(self.n_updrafts)
                 phi_diff = phi_u.values[i, k] - gmv_phi[k]
                 psi_diff = psi_u.values[i, k] - gmv_psi[k]
+                gmv_covar[k] += tke_factor * au.values[i, k] * phi_diff * psi_diff
             end
-
-            gmv_covar[k] += tke_factor * au.values[i, k] * phi_diff * psi_diff
         end
     end
     return
@@ -947,33 +950,43 @@ function get_env_covar_from_GMV(
         tke_factor = 0.5
     end
 
-    @inbounds for k in xrange(get_grid(self).nzg)
-        if ae[k] > 0.0
-            if is_tke
+    if is_tke
+        @inbounds for k in face_indicies(grid)
+            if ae[k] > 0.0
                 phi_diff = interp2pt(phi_e.values[k - 1] - gmv_phi[k - 1], phi_e.values[k] - gmv_phi[k])
                 psi_diff = interp2pt(psi_e.values[k - 1] - gmv_psi[k - 1], psi_e.values[k] - gmv_psi[k])
-            else
-                phi_diff = phi_e.values[k] - gmv_phi[k]
-                psi_diff = psi_e.values[k] - gmv_psi[k]
-            end
 
-            covar_e.values[k] = gmv_covar[k] - tke_factor * ae[k] * phi_diff * psi_diff
-            @inbounds for i in xrange(self.n_updrafts)
-                if is_tke
+                covar_e.values[k] = gmv_covar[k] - tke_factor * ae[k] * phi_diff * psi_diff
+                @inbounds for i in xrange(self.n_updrafts)
                     phi_diff = interp2pt(phi_u.values[i, k - 1] - gmv_phi[k - 1], phi_u.values[i, k] - gmv_phi[k])
                     psi_diff = interp2pt(psi_u.values[i, k - 1] - gmv_psi[k - 1], psi_u.values[i, k] - gmv_psi[k])
-                else
+                    covar_e.values[k] -= tke_factor * au.values[i, k] * phi_diff * psi_diff
+                end
+                covar_e.values[k] = covar_e.values[k] / ae[k]
+            else
+                covar_e.values[k] = 0.0
+            end
+        end
+    else
+        @inbounds for k in center_indicies(grid)
+            if ae[k] > 0.0
+                phi_diff = phi_e.values[k] - gmv_phi[k]
+                psi_diff = psi_e.values[k] - gmv_psi[k]
+
+                covar_e.values[k] = gmv_covar[k] - tke_factor * ae[k] * phi_diff * psi_diff
+                @inbounds for i in xrange(self.n_updrafts)
                     phi_diff = phi_u.values[i, k] - gmv_phi[k]
                     psi_diff = psi_u.values[i, k] - gmv_psi[k]
-                end
 
-                covar_e.values[k] -= tke_factor * au.values[i, k] * phi_diff * psi_diff
+                    covar_e.values[k] -= tke_factor * au.values[i, k] * phi_diff * psi_diff
+                end
+                covar_e.values[k] = covar_e.values[k] / ae[k]
+            else
+                covar_e.values[k] = 0.0
             end
-            covar_e.values[k] = covar_e.values[k] / ae[k]
-        else
-            covar_e.values[k] = 0.0
         end
     end
+
     return
 end
 
@@ -1208,7 +1221,8 @@ end
 
 function zero_area_fraction_cleanup(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
 
-    @inbounds for k in xrange(get_grid(self).gw, get_grid(self).nzg - get_grid(self).gw)
+    grid = get_grid(self)
+    @inbounds for k in real_center_indicies(grid)
         @inbounds for i in xrange(self.n_updrafts)
             if self.UpdVar.Area.values[i, k] < self.minimum_area
                 self.UpdVar.Area.values[i, k] = 0.0
@@ -1270,7 +1284,7 @@ function solve_updraft_velocity_area(self::EDMF_PrognosticTKE)
         self.UpdVar.Area.new[i, gw] = self.area_surface_bc[i]
         au_lim = self.max_area
 
-        @inbounds for k in xrange(gw, grid.nzg - gw)
+        @inbounds for k in real_center_indicies(grid)
 
             # First solve for updated area fraction at k+1
             whalf_kp = interp2pt(self.UpdVar.W.values[i, k], self.UpdVar.W.values[i, k + 1])
@@ -1383,7 +1397,7 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
         self.UpdVar.T.new[i, gw] = sa.T
 
         # starting from the bottom do entrainment at each level
-        @inbounds for k in xrange(gw + 1, get_grid(self).nzg - gw)
+        @inbounds for k in xrange(gw + 1, grid.nzg - gw)
             H_entr = self.EnvVar.H.values[k]
             QT_entr = self.EnvVar.QT.values[k]
 
@@ -1463,7 +1477,7 @@ function update_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     # Compute the mass flux and associated scalar fluxes
     @inbounds for i in xrange(self.n_updrafts)
         self.m[i, gw - 1] = 0.0
-        @inbounds for k in xrange(grid.gw, grid.nzg - 1)
+        @inbounds for k in real_face_indicies(grid)
             a = interp2pt(self.UpdVar.Area.values[i, k], self.UpdVar.Area.values[i, k + 1])
             self.m[i, k] =
                 rho0[k] * a * interp2pt(ae[k], ae[k + 1]) * (self.UpdVar.W.values[i, k] - self.EnvVar.W.values[k])
@@ -1474,7 +1488,7 @@ function update_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     self.massflux_h[gw - 1] = 0.0
     self.massflux_qt[gw - 1] = 0.0
 
-    @inbounds for k in xrange(gw, grid.nzg - gw - 1)
+    @inbounds for k in real_face_indicies(grid)
         self.massflux_h[k] = 0.0
         self.massflux_qt[k] = 0.0
         env_h_interp = interp2pt(self.EnvVar.H.values[k], self.EnvVar.H.values[k + 1])
@@ -1489,7 +1503,7 @@ function update_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
 
     # Compute the  mass flux tendencies
     # Adjust the values of the grid mean variables
-    @inbounds for k in xrange(grid.gw, grid.nzg)
+    @inbounds for k in real_center_indicies(grid)
         mf_tend_h = -(self.massflux_h[k] - self.massflux_h[k - 1]) * (ref_state.alpha0_half[k] * grid.dzi)
         mf_tend_qt = -(self.massflux_qt[k] - self.massflux_qt[k - 1]) * (ref_state.alpha0_half[k] * grid.dzi)
 
