@@ -11,12 +11,9 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 1.1424341230332884e-01
 best_mse["updraft_area"] = 1.1765062251021085e+02
 best_mse["updraft_w"] = 6.9115336258511732e+01
-best_mse["updraft_qt"] = 6.6796467668487018e+00
 best_mse["updraft_thetal"] = 7.2026005353910350e+01
-best_mse["v_mean"] = 1.2520237439186344e+02
 best_mse["u_mean"] = 2.2785293881438179e+03
 best_mse["tke_mean"] = 4.1588123897851069e+01
 
