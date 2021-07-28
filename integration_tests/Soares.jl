@@ -11,13 +11,13 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 2.5727413594552939e-01
-best_mse["updraft_area"] = 7.5885156771317850e+02
-best_mse["updraft_w"] = 2.4453370696931305e+01
-best_mse["updraft_qt"] = 1.0639946130272541e+01
-best_mse["updraft_thetal"] = 2.1622328837895424e+01
-best_mse["u_mean"] = 4.2569436192396179e+03
-best_mse["tke_mean"] = 8.1372294749084432e+01
+best_mse["qt_mean"] = 2.5843807856554074e-01
+best_mse["updraft_area"] = 8.8039804794002623e+02
+best_mse["updraft_w"] = 2.6632875471066519e+01
+best_mse["updraft_qt"] = 1.0651734450298703e+01
+best_mse["updraft_thetal"] = 2.1622611589959376e+01
+best_mse["u_mean"] = 3.9550058876376834e+03
+best_mse["tke_mean"] = 5.8683619102955831e+01
 
 @testset "Soares" begin
     println("Running Soares...")

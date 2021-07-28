@@ -11,11 +11,11 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["updraft_area"] = 1.1765062251021085e+02
-best_mse["updraft_w"] = 6.9115336258511732e+01
-best_mse["updraft_thetal"] = 7.2026005353910350e+01
-best_mse["u_mean"] = 2.2785293881438179e+03
-best_mse["tke_mean"] = 4.1588123897851069e+01
+best_mse["updraft_area"] = 6.2270686101489321e+02
+best_mse["updraft_w"] = 3.9197923601593011e+01
+best_mse["updraft_thetal"] = 2.9892400636969811e+01
+best_mse["u_mean"] = 7.6422297657642343e+02
+best_mse["tke_mean"] = 6.9178066709527812e+01
 
 @testset "Nieuwstadt" begin
     println("Running Nieuwstadt...")
@@ -39,12 +39,9 @@ best_mse["tke_mean"] = 4.1588123897851069e+01
         end
     end
 
-    test_mse(computed_mse, best_mse, "qt_mean")
     test_mse(computed_mse, best_mse, "updraft_area")
     test_mse(computed_mse, best_mse, "updraft_w")
-    test_mse(computed_mse, best_mse, "updraft_qt")
     test_mse(computed_mse, best_mse, "updraft_thetal")
-    test_mse(computed_mse, best_mse, "v_mean")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
     nothing
