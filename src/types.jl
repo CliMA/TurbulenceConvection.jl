@@ -102,13 +102,13 @@ struct RainVariable{T}
     values::T
     new::T
     flux::T
-    function RainVariable(nz, name, units)
+    function RainVariable(grid, name, units)
         loc = "half"
         kind = "scalar"
 
-        values = pyzeros(nz)
-        new = pyzeros(nz)
-        flux = pyzeros(nz)
+        values = center_field(grid)
+        new = center_field(grid)
+        flux = center_field(grid)
         return new{typeof(values)}(loc, kind, name, units, values, new, flux)
     end
 end
@@ -129,16 +129,15 @@ Base.@kwdef mutable struct RainVariables
     Env_RainArea::RainVariable
 end
 function RainVariables(namelist, Gr::Grid)
-    nzg = Gr.nzg
 
-    QR = RainVariable(nzg, "qr_mean", "kg/kg")
+    QR = RainVariable(Gr, "qr_mean", "kg/kg")
     # temporary variables for diagnostics to know where the rain is coming from
-    Upd_QR = RainVariable(nzg, "upd_qr", "kg/kg")
-    Env_QR = RainVariable(nzg, "env_qr", "kg/kg")
+    Upd_QR = RainVariable(Gr, "upd_qr", "kg/kg")
+    Env_QR = RainVariable(Gr, "env_qr", "kg/kg")
     # in the future we could test prognostic equations for stratiform and updraft rain
-    RainArea = RainVariable(nzg, "rain_area", "rain_area_fraction [-]")
-    Upd_RainArea = RainVariable(nzg, "upd_rain_area", "updraft_rain_area_fraction [-]")
-    Env_RainArea = RainVariable(nzg, "env_rain_area", "environment_rain_area_fraction [-]")
+    RainArea = RainVariable(Gr, "rain_area", "rain_area_fraction [-]")
+    Upd_RainArea = RainVariable(Gr, "upd_rain_area", "updraft_rain_area_fraction [-]")
+    Env_RainArea = RainVariable(Gr, "env_rain_area", "environment_rain_area_fraction [-]")
 
     mean_rwp = 0.0
     upd_rwp = 0.0
@@ -187,17 +186,13 @@ struct VariablePrognostic{T}
     kind::String
     name::String
     units::String
-    function VariablePrognostic(nz_tot, loc, kind, bc, name, units)
+    function VariablePrognostic(grid, loc, kind, bc, name, units)
         # Value at the current timestep
-        values = pyzeros(nz_tot)
+        values = field(grid, loc)
         # Value at the next timestep, used for calculating turbulence tendencies
-        new = pyzeros(nz_tot)
-        mf_update = pyzeros(nz_tot)
-        tendencies = pyzeros(nz_tot)
-        # Placement on staggered grid
-        if loc != "half" && loc != "full"
-            print("Invalid location setting for variable! Must be half or full")
-        end
+        new = field(grid, loc)
+        mf_update = field(grid, loc)
+        tendencies = field(grid, loc)
         if kind != "scalar" && kind != "velocity"
             print("Invalid kind setting for variable! Must be scalar or velocity")
         end
@@ -212,13 +207,10 @@ struct VariableDiagnostic{T}
     kind::String
     name::String
     units::String
-    function VariableDiagnostic(nz_tot, loc, kind, bc, name, units)
+    function VariableDiagnostic(grid, loc, kind, bc, name, units)
         # Value at the current timestep
-        values = pyzeros(nz_tot)
+        values = field(grid, loc)
         # Placement on staggered grid
-        if loc != "half" && loc != "full"
-            print("Invalid location setting for variable! Must be half or full")
-        end
         if kind != "scalar" && kind != "velocity"
             print("Invalid kind setting for variable! Must be scalar or velocity")
         end
@@ -237,16 +229,13 @@ struct UpdraftVariable{A1, A2}
     kind::String
     name::String
     units::String
-    function UpdraftVariable(nu, nz, loc, kind, name, units)
-        values = pyzeros(nu, nz)
-        old = pyzeros(nu, nz)  # needed for prognostic updrafts
-        new = pyzeros(nu, nz) # needed for prognostic updrafts
-        tendencies = pyzeros(nu, nz)
-        flux = pyzeros(nu, nz)
-        bulkvalues = pyzeros(nz)
-        if loc != "half" && loc != "full"
-            print("Invalid location setting for variable! Must be half or full")
-        end
+    function UpdraftVariable(grid, nu, loc, kind, name, units)
+        values = field(grid, loc, nu)
+        old = field(grid, loc, nu)  # needed for prognostic updrafts
+        new = field(grid, loc, nu) # needed for prognostic updrafts
+        tendencies = field(grid, loc, nu)
+        flux = field(grid, loc, nu)
+        bulkvalues = field(grid, loc)
         if kind != "scalar" && kind != "velocity"
             print("Invalid kind setting for variable! Must be scalar or velocity")
         end
@@ -276,26 +265,25 @@ mutable struct UpdraftVariables{A1}
     cloud_cover::A1
     updraft_top::A1
     lwp::Float64
-    function UpdraftVariables(nu, namelist, Gr::Grid)
+    function UpdraftVariables(nu, namelist, grid::Grid)
         n_updrafts = nu
-        nzg = Gr.nzg
 
-        W = UpdraftVariable(nu, nzg, "full", "velocity", "w", "m/s")
+        W = UpdraftVariable(grid, nu, "full", "velocity", "w", "m/s")
 
-        Area = UpdraftVariable(nu, nzg, "half", "scalar", "area_fraction", "[-]")
-        QT = UpdraftVariable(nu, nzg, "half", "scalar", "qt", "kg/kg")
-        QL = UpdraftVariable(nu, nzg, "half", "scalar", "ql", "kg/kg")
-        RH = UpdraftVariable(nu, nzg, "half", "scalar", "RH", "%")
-        H = UpdraftVariable(nu, nzg, "half", "scalar", "thetal", "K")
-        THL = UpdraftVariable(nu, nzg, "half", "scalar", "thetal", "K")
-        T = UpdraftVariable(nu, nzg, "half", "scalar", "temperature", "K")
-        B = UpdraftVariable(nu, nzg, "half", "scalar", "buoyancy", "m^2/s^3")
+        Area = UpdraftVariable(grid, nu, "half", "scalar", "area_fraction", "[-]")
+        QT = UpdraftVariable(grid, nu, "half", "scalar", "qt", "kg/kg")
+        QL = UpdraftVariable(grid, nu, "half", "scalar", "ql", "kg/kg")
+        RH = UpdraftVariable(grid, nu, "half", "scalar", "RH", "%")
+        H = UpdraftVariable(grid, nu, "half", "scalar", "thetal", "K")
+        THL = UpdraftVariable(grid, nu, "half", "scalar", "thetal", "K")
+        T = UpdraftVariable(grid, nu, "half", "scalar", "temperature", "K")
+        B = UpdraftVariable(grid, nu, "half", "scalar", "buoyancy", "m^2/s^3")
 
         prognostic = true
         updraft_fraction = namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
 
         # cloud and rain diagnostics for output
-        cloud_fraction = pyzeros(nzg)
+        cloud_fraction = center_field(grid)
 
         cloud_base = pyzeros(nu)
         cloud_top = pyzeros(nu)
@@ -305,7 +293,7 @@ mutable struct UpdraftVariables{A1}
         lwp = 0.0
         A1 = typeof(cloud_fraction)
         return new{A1}(
-            Gr,
+            grid,
             n_updrafts,
             W,
             Area,
@@ -366,26 +354,26 @@ function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState, param_set::P
     cloud_top = 0.0
     cloud_cover = 0.0
 
-    U = VariablePrognostic(Gr.nzg, "half", "velocity", "sym", "u", "m/s")
-    V = VariablePrognostic(Gr.nzg, "half", "velocity", "sym", "v", "m/s")
+    U = VariablePrognostic(Gr, "half", "velocity", "sym", "u", "m/s")
+    V = VariablePrognostic(Gr, "half", "velocity", "sym", "v", "m/s")
     # Just leave this zero for now!
-    W = VariablePrognostic(Gr.nzg, "full", "velocity", "asym", "v", "m/s")
+    W = VariablePrognostic(Gr, "full", "velocity", "asym", "v", "m/s")
 
     # Create thermodynamic variables
-    QT = VariablePrognostic(Gr.nzg, "half", "scalar", "sym", "qt", "kg/kg")
-    RH = VariablePrognostic(Gr.nzg, "half", "scalar", "sym", "RH", "%")
+    QT = VariablePrognostic(Gr, "half", "scalar", "sym", "qt", "kg/kg")
+    RH = VariablePrognostic(Gr, "half", "scalar", "sym", "RH", "%")
 
-    H = VariablePrognostic(Gr.nzg, "half", "scalar", "sym", "thetal", "K")
+    H = VariablePrognostic(Gr, "half", "scalar", "sym", "thetal", "K")
     t_to_prog_fp = t_to_thetali_c
     prog_to_t_fp = eos_first_guess_thetal
 
     # Diagnostic Variables--same class as the prognostic variables, but we append to diagnostics list
-    QL = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "ql", "kg/kg")
-    T = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "temperature", "K")
-    B = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "buoyancy", "m^2/s^3")
-    THL = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "thetal", "K")
+    QL = VariableDiagnostic(Gr, "half", "scalar", "sym", "ql", "kg/kg")
+    T = VariableDiagnostic(Gr, "half", "scalar", "sym", "temperature", "K")
+    B = VariableDiagnostic(Gr, "half", "scalar", "sym", "buoyancy", "m^2/s^3")
+    THL = VariableDiagnostic(Gr, "half", "scalar", "sym", "thetal", "K")
 
-    cloud_fraction = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "cloud fraction", "-")
+    cloud_fraction = VariableDiagnostic(Gr, "half", "scalar", "sym", "cloud fraction", "-")
 
     # TKE   TODO   repeated from EDMF_Environment.pyx logic
     calc_tke = true
@@ -408,16 +396,16 @@ function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState, param_set::P
 
     #Now add the 2nd moment variables
     if calc_tke
-        TKE = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "tke", "m^2/s^2")
-        W_third_m = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "W_third_m", "m^3/s^3")
+        TKE = VariableDiagnostic(Gr, "half", "scalar", "sym", "tke", "m^2/s^2")
+        W_third_m = VariableDiagnostic(Gr, "half", "scalar", "sym", "W_third_m", "m^3/s^3")
     end
 
     if calc_scalar_var
-        QTvar = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "qt_var", "kg^2/kg^2")
-        QT_third_m = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "qt_third_m", "kg^3/kg^3")
-        Hvar = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "thetal_var", "K^2")
-        H_third_m = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "thetal_third_m", "-")
-        HQTcov = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "thetal_qt_covar", "K(kg/kg)")
+        QTvar = VariableDiagnostic(Gr, "half", "scalar", "sym", "qt_var", "kg^2/kg^2")
+        QT_third_m = VariableDiagnostic(Gr, "half", "scalar", "sym", "qt_third_m", "kg^3/kg^3")
+        Hvar = VariableDiagnostic(Gr, "half", "scalar", "sym", "thetal_var", "K^2")
+        H_third_m = VariableDiagnostic(Gr, "half", "scalar", "sym", "thetal_third_m", "-")
+        HQTcov = VariableDiagnostic(Gr, "half", "scalar", "sym", "thetal_qt_covar", "K(kg/kg)")
     end
 
     return GridMeanVariables(;
@@ -476,12 +464,12 @@ struct UpdraftThermodynamics{A1, A2}
         prog_to_t_fp = eos_first_guess_thetal
 
         # rain source from each updraft from all sub-timesteps
-        prec_source_h = pyzeros(n_updraft, Gr.nzg)
-        prec_source_qt = pyzeros(n_updraft, Gr.nzg)
+        prec_source_h = center_field(Gr, n_updraft)
+        prec_source_qt = center_field(Gr, n_updraft)
 
         # rain source from all updrafts from all sub-timesteps
-        prec_source_h_tot = pyzeros(Gr.nzg)
-        prec_source_qt_tot = pyzeros(Gr.nzg)
+        prec_source_h_tot = center_field(Gr)
+        prec_source_qt_tot = center_field(Gr)
         A1 = typeof(prec_source_h_tot)
         A2 = typeof(prec_source_h)
         return new{A1, A2}(
@@ -506,12 +494,9 @@ struct EnvironmentVariable{T}
     kind::String
     name::String
     units::String
-    function EnvironmentVariable(nz, loc, kind, name, units)
-        values = pyzeros(nz)
-        flux = pyzeros(nz)
-        if loc != "half" && loc != "full"
-            println("Invalid location setting for variable! Must be half or full")
-        end
+    function EnvironmentVariable(grid, loc, kind, name, units)
+        values = field(grid, loc)
+        flux = field(grid, loc)
         if kind != "scalar" && kind != "velocity"
             println("Invalid kind setting for variable! Must be scalar or velocity")
         end
@@ -533,16 +518,16 @@ struct EnvironmentVariable_2m{A1}
     kind::String
     name::String
     units::String
-    function EnvironmentVariable_2m(nz, loc, kind, name, units)
-        values = pyzeros(nz)
-        dissipation = pyzeros(nz)
-        entr_gain = pyzeros(nz)
-        detr_loss = pyzeros(nz)
-        buoy = pyzeros(nz)
-        press = pyzeros(nz)
-        shear = pyzeros(nz)
-        interdomain = pyzeros(nz)
-        rain_src = pyzeros(nz)
+    function EnvironmentVariable_2m(grid, loc, kind, name, units)
+        values = center_field(grid)
+        dissipation = center_field(grid)
+        entr_gain = center_field(grid)
+        detr_loss = center_field(grid)
+        buoy = center_field(grid)
+        press = center_field(grid)
+        shear = center_field(grid)
+        interdomain = center_field(grid)
+        rain_src = center_field(grid)
         if loc != "half"
             println("Invalid location setting for variable! Must be half")
         end
@@ -593,18 +578,16 @@ Base.@kwdef mutable struct EnvironmentVariables{PS}
     EnvThermo_scheme::String = "default_EnvThermo_scheme"
 end
 function EnvironmentVariables(namelist, Gr::Grid, param_set::PS) where {PS}
-    nz = Gr.nzg
-
-    W = EnvironmentVariable(nz, "full", "velocity", "w", "m/s")
-    QT = EnvironmentVariable(nz, "half", "scalar", "qt", "kg/kg")
-    QL = EnvironmentVariable(nz, "half", "scalar", "ql", "kg/kg")
-    RH = EnvironmentVariable(nz, "half", "scalar", "RH", "%")
-    H = EnvironmentVariable(nz, "half", "scalar", "thetal", "K")
-    THL = EnvironmentVariable(nz, "half", "scalar", "thetal", "K")
-    T = EnvironmentVariable(nz, "half", "scalar", "temperature", "K")
-    B = EnvironmentVariable(nz, "half", "scalar", "buoyancy", "m^2/s^3")
-    Area = EnvironmentVariable(nz, "half", "scalar", "env_area", "-")
-    cloud_fraction = EnvironmentVariable(nz, "half", "scalar", "env_cloud_fraction", "-")
+    W = EnvironmentVariable(Gr, "full", "velocity", "w", "m/s")
+    QT = EnvironmentVariable(Gr, "half", "scalar", "qt", "kg/kg")
+    QL = EnvironmentVariable(Gr, "half", "scalar", "ql", "kg/kg")
+    RH = EnvironmentVariable(Gr, "half", "scalar", "RH", "%")
+    H = EnvironmentVariable(Gr, "half", "scalar", "thetal", "K")
+    THL = EnvironmentVariable(Gr, "half", "scalar", "thetal", "K")
+    T = EnvironmentVariable(Gr, "half", "scalar", "temperature", "K")
+    B = EnvironmentVariable(Gr, "half", "scalar", "buoyancy", "m^2/s^3")
+    Area = EnvironmentVariable(Gr, "half", "scalar", "env_area", "-")
+    cloud_fraction = EnvironmentVariable(Gr, "half", "scalar", "env_cloud_fraction", "-")
 
     # TODO - the flag setting is repeated from Variables.pyx logic
     calc_tke = true
@@ -629,13 +612,13 @@ function EnvironmentVariables(namelist, Gr::Grid, param_set::PS) where {PS}
     end
 
     if calc_tke
-        TKE = EnvironmentVariable_2m(nz, "half", "scalar", "tke", "m^2/s^2")
+        TKE = EnvironmentVariable_2m(Gr, "half", "scalar", "tke", "m^2/s^2")
     end
 
     if calc_scalar_var
-        QTvar = EnvironmentVariable_2m(nz, "half", "scalar", "qt_var", "kg^2/kg^2")
-        Hvar = EnvironmentVariable_2m(nz, "half", "scalar", "thetal_var", "K^2")
-        HQTcov = EnvironmentVariable_2m(nz, "half", "scalar", "thetal_qt_covar", "K(kg/kg)")
+        QTvar = EnvironmentVariable_2m(Gr, "half", "scalar", "qt_var", "kg^2/kg^2")
+        Hvar = EnvironmentVariable_2m(Gr, "half", "scalar", "thetal_var", "K^2")
+        HQTcov = EnvironmentVariable_2m(Gr, "half", "scalar", "thetal_qt_covar", "K(kg/kg)")
     end
 
     if EnvThermo_scheme == "quadrature"
@@ -705,20 +688,20 @@ struct EnvironmentThermodynamics{A1}
         t_to_prog_fp = t_to_thetali_c
         prog_to_t_fp = eos_first_guess_thetal
 
-        qt_dry = pyzeros(Gr.nzg)
-        th_dry = pyzeros(Gr.nzg)
+        qt_dry = center_field(Gr)
+        th_dry = center_field(Gr)
 
-        t_cloudy = pyzeros(Gr.nzg)
-        qv_cloudy = pyzeros(Gr.nzg)
-        qt_cloudy = pyzeros(Gr.nzg)
-        th_cloudy = pyzeros(Gr.nzg)
+        t_cloudy = center_field(Gr)
+        qv_cloudy = center_field(Gr)
+        qt_cloudy = center_field(Gr)
+        th_cloudy = center_field(Gr)
 
-        Hvar_rain_dt = pyzeros(Gr.nzg)
-        QTvar_rain_dt = pyzeros(Gr.nzg)
-        HQTcov_rain_dt = pyzeros(Gr.nzg)
+        Hvar_rain_dt = center_field(Gr)
+        QTvar_rain_dt = center_field(Gr)
+        HQTcov_rain_dt = center_field(Gr)
 
-        prec_source_qt = pyzeros(Gr.nzg)
-        prec_source_h = pyzeros(Gr.nzg)
+        prec_source_qt = center_field(Gr)
+        prec_source_h = center_field(Gr)
         A1 = typeof(qt_dry)
         return new{A1}(
             Gr,
@@ -753,9 +736,9 @@ mutable struct ParameterizationBase{T}
     zi::Float64
     # A base class common to all turbulence parameterizations
     function ParameterizationBase(namelist, Gr::Grid, Ref::ReferenceState)
-        turbulence_tendency = pyzeros(Gr.nzg)
-        KM = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "diffusivity", "m^2/s") # eddy viscosity
-        KH = VariableDiagnostic(Gr.nzg, "half", "scalar", "sym", "viscosity", "m^2/s") # eddy diffusivity
+        turbulence_tendency = center_field(Gr)
+        KM = VariableDiagnostic(Gr, "half", "scalar", "sym", "diffusivity", "m^2/s") # eddy viscosity
+        KH = VariableDiagnostic(Gr, "half", "scalar", "sym", "viscosity", "m^2/s") # eddy diffusivity
         # get values from namelist
         prandtl_number = namelist["turbulence"]["prandtl_number_0"]
         Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
@@ -808,8 +791,8 @@ struct RainPhysics{T}
     rain_evap_source_h::T
     rain_evap_source_qt::T
     function RainPhysics(Gr::Grid, Ref::ReferenceState)
-        rain_evap_source_h = pyzeros(Gr.nzg)
-        rain_evap_source_qt = pyzeros(Gr.nzg)
+        rain_evap_source_h = center_field(Gr)
+        rain_evap_source_qt = center_field(Gr)
         return new{typeof(rain_evap_source_h)}(Gr, Ref, rain_evap_source_h, rain_evap_source_qt)
     end
 end
@@ -1169,41 +1152,41 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         EnvThermo = EnvironmentThermodynamics(namelist, Gr, Ref, EnvVar, Rain)
 
         # Entrainment rates
-        entr_sc = pyzeros(n_updrafts, Gr.nzg)
-        press = pyzeros(n_updrafts, Gr.nzg)
+        entr_sc = center_field(Gr, n_updrafts)
+        press = center_field(Gr, n_updrafts)
 
         # Detrainment rates
-        detr_sc = pyzeros(n_updrafts, Gr.nzg)
+        detr_sc = center_field(Gr, n_updrafts)
 
-        sorting_function = pyzeros(n_updrafts, Gr.nzg)
-        b_mix = pyzeros(n_updrafts, Gr.nzg)
+        sorting_function = center_field(Gr, n_updrafts)
+        b_mix = center_field(Gr, n_updrafts)
 
         # turbulent entrainment
-        frac_turb_entr = pyzeros(n_updrafts, Gr.nzg)
-        frac_turb_entr_full = pyzeros(n_updrafts, Gr.nzg)
-        turb_entr_W = pyzeros(n_updrafts, Gr.nzg)
-        turb_entr_H = pyzeros(n_updrafts, Gr.nzg)
-        turb_entr_QT = pyzeros(n_updrafts, Gr.nzg)
+        frac_turb_entr = center_field(Gr, n_updrafts)
+        frac_turb_entr_full = face_field(Gr, n_updrafts)
+        turb_entr_W = center_field(Gr, n_updrafts)
+        turb_entr_H = center_field(Gr, n_updrafts)
+        turb_entr_QT = center_field(Gr, n_updrafts)
 
         # Pressure term in updraft vertical momentum equation
-        nh_pressure = pyzeros(n_updrafts, Gr.nzg)
-        nh_pressure_b = pyzeros(n_updrafts, Gr.nzg)
-        nh_pressure_adv = pyzeros(n_updrafts, Gr.nzg)
-        nh_pressure_drag = pyzeros(n_updrafts, Gr.nzg)
-        asp_ratio = pyzeros(n_updrafts, Gr.nzg)
-        b_coeff = pyzeros(n_updrafts, Gr.nzg)
+        nh_pressure = center_field(Gr, n_updrafts)
+        nh_pressure_b = center_field(Gr, n_updrafts)
+        nh_pressure_adv = center_field(Gr, n_updrafts)
+        nh_pressure_drag = center_field(Gr, n_updrafts)
+        asp_ratio = center_field(Gr, n_updrafts)
+        b_coeff = center_field(Gr, n_updrafts)
 
         # Mass flux
-        m = pyzeros(n_updrafts, Gr.nzg)
+        m = center_field(Gr, n_updrafts)
 
         # mixing length
-        mixing_length = pyzeros(Gr.nzg)
-        horizontal_KM = pyzeros(n_updrafts, Gr.nzg)
-        horizontal_KH = pyzeros(n_updrafts, Gr.nzg)
+        mixing_length = center_field(Gr)
+        horizontal_KM = center_field(Gr, n_updrafts)
+        horizontal_KH = center_field(Gr, n_updrafts)
 
         # diagnosed tke budget terms
-        tke_transport = pyzeros(Gr.nzg)
-        tke_advection = pyzeros(Gr.nzg)
+        tke_transport = center_field(Gr)
+        tke_advection = center_field(Gr)
 
         # Near-surface BC of updraft area fraction
         area_surface_bc = pyzeros(n_updrafts)
@@ -1213,33 +1196,33 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         pressure_plume_spacing = pyzeros(n_updrafts)
 
         # Mass flux tendencies of mean scalars (for output)
-        massflux_tendency_h = pyzeros(Gr.nzg)
-        massflux_tendency_qt = pyzeros(Gr.nzg)
+        massflux_tendency_h = center_field(Gr)
+        massflux_tendency_qt = center_field(Gr)
         rainphysics = RainPhysics(Gr, Ref)
 
         # (Eddy) diffusive tendencies of mean scalars (for output)
-        diffusive_tendency_h = pyzeros(Gr.nzg)
-        diffusive_tendency_qt = pyzeros(Gr.nzg)
+        diffusive_tendency_h = center_field(Gr)
+        diffusive_tendency_qt = center_field(Gr)
 
         # Vertical fluxes for output
-        massflux_h = pyzeros(Gr.nzg)
-        massflux_qt = pyzeros(Gr.nzg)
-        diffusive_flux_h = pyzeros(Gr.nzg)
-        diffusive_flux_qt = pyzeros(Gr.nzg)
-        diffusive_flux_u = pyzeros(Gr.nzg)
-        diffusive_flux_v = pyzeros(Gr.nzg)
+        massflux_h = center_field(Gr)
+        massflux_qt = center_field(Gr)
+        diffusive_flux_h = center_field(Gr)
+        diffusive_flux_qt = center_field(Gr)
+        diffusive_flux_u = center_field(Gr)
+        diffusive_flux_v = center_field(Gr)
         if calc_tke
-            massflux_tke = pyzeros(Gr.nzg)
+            massflux_tke = center_field(Gr)
         end
 
         # Added by Ignacio : Length scheme in use (mls), and smooth min effect (ml_ratio)
         # Variable Prandtl number initialized as neutral value.
-        ones_vec = pyones(Gr.nzg)
+        ones_vec = center_field(Gr)
         prandtl_nvec = base.prandtl_number .* ones_vec
-        mls = pyzeros(Gr.nzg)
-        ml_ratio = pyzeros(Gr.nzg)
-        l_entdet = pyzeros(Gr.nzg)
-        b = pyzeros(Gr.nzg)
+        mls = center_field(Gr)
+        ml_ratio = center_field(Gr)
+        l_entdet = center_field(Gr)
+        b = center_field(Gr)
         wstar = 0
         entr_surface_bc = 0
         detr_surface_bc = 0
