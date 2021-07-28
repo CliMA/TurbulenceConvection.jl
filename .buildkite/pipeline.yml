@@ -72,6 +72,17 @@ steps:
       queue: central
       slurm_ntasks: 1
 
+  - label: ":partly_sunny: Nieuwstadt"
+    key: "cpu_nieuwstadt"
+    command:
+      - "julia --color=yes --project=test integration_tests/Nieuwstadt.jl"
+    artifact_paths:
+      - "Output.Nieuwstadt.01/stats/comparison/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
   - label: ":scissors: TRMM_LBA"
     key: "cpu_trmm_lba"
     command:

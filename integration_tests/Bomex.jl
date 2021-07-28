@@ -11,14 +11,14 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 8.2838502450548468e-02
-best_mse["updraft_area"] = 7.0266886965972117e+02
-best_mse["updraft_w"] = 8.7978020733338596e+01
-best_mse["updraft_qt"] = 5.9524910648811638e+00
-best_mse["updraft_thetal"] = 2.3059952333763825e+01
-best_mse["v_mean"] = 1.2341357691588233e+02
-best_mse["u_mean"] = 5.3487103320582811e+01
-best_mse["tke_mean"] = 3.2178713832216246e+01
+best_mse["qt_mean"] = 8.2239735839064965e-02
+best_mse["updraft_area"] = 7.0282567418077099e+02
+best_mse["updraft_w"] = 8.7997106745562263e+01
+best_mse["updraft_qt"] = 5.9534668549222083e+00
+best_mse["updraft_thetal"] = 2.3059746455183749e+01
+best_mse["v_mean"] = 1.2344255867930939e+02
+best_mse["u_mean"] = 5.3486981021128493e+01
+best_mse["tke_mean"] = 3.2038984505851317e+01
 
 @testset "Bomex" begin
     println("Running Bomex...")

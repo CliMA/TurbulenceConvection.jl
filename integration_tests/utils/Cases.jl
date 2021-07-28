@@ -136,7 +136,7 @@ update_radiation(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping, ::Ba
 
 function Soares(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "Soares2004"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase(TurbulenceConvection.SurfaceFixedFlux; Gr, Ref, namelist)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(; Gr, Ref)
     Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "critical_Ri"
@@ -231,7 +231,7 @@ end
 
 function Nieuwstadt(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "Nieuwstadt"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase(TurbulenceConvection.SurfaceFixedFlux; Gr, Ref, namelist)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(; Gr, Ref)
     Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "critical_Ri"
@@ -324,7 +324,7 @@ end
 
 function Bomex(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "Bomex"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase(TurbulenceConvection.SurfaceFixedFlux; Gr, Ref, namelist)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
     Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "critical_Ri"
@@ -461,7 +461,7 @@ update_radiation(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeSte
 
 function life_cycle_Tan2018(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "life_cycle_Tan2018"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase(TurbulenceConvection.SurfaceFixedFlux; Gr, Ref, namelist)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
     Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "critical_Ri"
@@ -632,7 +632,7 @@ end
 
 function Rico(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "Rico"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedCoeffs}(; Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase(TurbulenceConvection.SurfaceFixedCoeffs; Gr, Ref, namelist)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
     Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "critical_Ri"
@@ -756,7 +756,7 @@ end
 
 function TRMM_LBA(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "TRMM_LBA"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase(TurbulenceConvection.SurfaceFixedFlux; Gr, Ref, namelist)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
     Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "thetal_maxgrad"
@@ -1082,7 +1082,7 @@ end
 # By Brown et al. (2002)  Q. J. R. Meteorol. Soc. 128, 1075-1093
 function ARM_SGP(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "ARM_SGP"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase(TurbulenceConvection.SurfaceFixedFlux; Gr, Ref, namelist)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
     Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "thetal_maxgrad"
@@ -1212,7 +1212,7 @@ end
 # By Khairoutdinov et al (2009)  JAMES, vol. 1, article #15
 function GATE_III(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "GATE_III"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedCoeffs}(; Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase(TurbulenceConvection.SurfaceFixedCoeffs; Gr, Ref, namelist)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
     Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "thetal_maxgrad"
@@ -1353,7 +1353,7 @@ doi: http://dx.doi.org/10.1175/MWR2930.1
 """
 function DYCOMS_RF01(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "DYCOMS_RF01"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceFixedFlux}(; Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase(TurbulenceConvection.SurfaceFixedFlux; Gr, Ref, namelist)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingDYCOMS_RF01}(; Gr, Ref)
     Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationDYCOMS_RF01}(; Gr, Ref)
     inversion_option = "thetal_maxgrad"
@@ -1560,7 +1560,7 @@ end
 
 function GABLS(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "GABLS"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceMoninObukhovDry}(; Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase(TurbulenceConvection.SurfaceMoninObukhovDry; Gr, Ref, namelist)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
     Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "critical_Ri"
@@ -1660,7 +1660,7 @@ end
 # Not fully implemented yet - Ignacio
 function SP(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "SP"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceSullivanPatton}(; Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase(TurbulenceConvection.SurfaceSullivanPatton; Gr, Ref, namelist)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingStandard}(; Gr, Ref)
     Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "critical_Ri"
@@ -1756,7 +1756,7 @@ end
 
 function DryBubble(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "DryBubble"
-    Sur = TurbulenceConvection.SurfaceBase{TurbulenceConvection.SurfaceNone}(; Gr, Ref)
+    Sur = TurbulenceConvection.SurfaceBase(TurbulenceConvection.SurfaceNone; Gr, Ref, namelist)
     Fo = TurbulenceConvection.ForcingBase{TurbulenceConvection.ForcingNone}(; Gr, Ref)
     Rad = TurbulenceConvection.RadiationBase{TurbulenceConvection.RadiationNone}(; Gr, Ref)
     inversion_option = "theta_rho"
