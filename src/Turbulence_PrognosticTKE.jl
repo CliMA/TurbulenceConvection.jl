@@ -99,6 +99,7 @@ function initialize_io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     add_profile(Stats, "rain_evap_source_qt")
     if self.calc_tke
         add_profile(Stats, "tke_buoy")
+        add_profile(Stats, "tke_values")
         add_profile(Stats, "tke_dissipation")
         add_profile(Stats, "tke_entr_gain")
         add_profile(Stats, "tke_detr_loss")
@@ -243,6 +244,7 @@ function io(
     write_profile(Stats, "interdomain_tke_t", self.b[cinterior])
     if self.calc_tke
         compute_covariance_dissipation(self, self.EnvVar.TKE)
+        write_profile(Stats, "tke_values", self.EnvVar.TKE.values[cinterior])
         write_profile(Stats, "tke_dissipation", self.EnvVar.TKE.dissipation[cinterior])
         write_profile(Stats, "tke_entr_gain", self.EnvVar.TKE.entr_gain[cinterior])
         compute_covariance_detr(self, self.EnvVar.TKE)
@@ -311,7 +313,8 @@ function update(
         end
 
         microphysics(self.EnvThermo, self.EnvVar, self.Rain, TS.dt)
-        initialize_covariance(self, GMV, Case)
+        # export_all(Case, self, GMV, TS, Stats)
+        initialize_covariance(self, GMV, Case, TS, Stats)
 
         @inbounds for k in xrange(grid(self).nzg)
             if self.calc_tke
@@ -332,7 +335,6 @@ function update(
     else
         compute_prognostic_updrafts(self, GMV, Case, TS, Stats)
     end
-    # export_all(Case, self, GMV, TS, Stats) # good
     check_nans(GMV, self, "4.5")
 
     # TODO -maybe not needed? - both diagnostic and prognostic updrafts end with decompose_environment
@@ -346,7 +348,6 @@ function update(
     #   - the buoyancy of updrafts and environment is up to date with the most recent decomposition,
     #   - the buoyancy of updrafts and environment is updated such that
     #     the mean buoyancy with repect to reference state alpha_0 is zero.
-    # export_all(Case, self, GMV, TS, Stats) # bad
 
     decompose_environment(self, GMV, Case, TS, Stats, "mf_update")
     check_nans(GMV, self, "4.61")
@@ -355,7 +356,8 @@ function update(
     # Sink of environmental QT and H due to rain creation is applied in tridiagonal solver
     buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
     check_nans(GMV, self, "4.63")
-    compute_eddy_diffusivities_tke(self, GMV, Case)
+    # export_all(Case, self, GMV, TS, Stats)
+    compute_eddy_diffusivities_tke(self, GMV, Case, Stats, TS)
     check_nans(GMV, self, "4.7")
     update_GMV_ED(self, GMV, Case, TS, Stats)
     check_nans(GMV, self, "4.72")
@@ -837,12 +839,13 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
 end
 
 
-function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
+function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, Stats::NetCDFIO_Stats, TS::TimeStepping)
     gw = grid(self).gw
     if self.similarity_diffusivity
         compute_eddy_diffusivities_similarity(self.base, GMV, Case)
     else
         check_nans(GMV, self, "CEDtke 1")
+        # export_all(Case, self, GMV, TS, Stats)
         compute_mixing_length(self, Case.Sur.obukhov_length, Case.Sur.ustar, GMV)
         check_nans(GMV, self, "CEDtke 2")
         KM = diffusivity_m(self)
@@ -1878,12 +1881,14 @@ end
 function initialize_covariance(
     self::EDMF_PrognosticTKE,
     GMV::GridMeanVariables,
-    Case::CasesBase)
+    Case::CasesBase,
+    TS::TimeStepping, Stats::NetCDFIO_Stats)
 
     ws = self.wstar
     us = Case.Sur.ustar
     zs = self.base.zi
 
+    # export_all(Case, self, GMV, TS, Stats)
     reset_surface_covariance(self, GMV, Case)
 
     if self.calc_tke

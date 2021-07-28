@@ -40,7 +40,16 @@ include("surface_functions.jl")
 function export_all(Case, Turb, GMV, TS, Stats)
     # if TS.i_iter == 1 && TS.isolate
     # if TS.i_iter == 10
+
+
     if TS.i_iter == 0
+        println("------- inside export_all")
+        @show Case.Sur.rho_hflux
+        @show Case.Sur.rho_qtflux
+        @show GMV.Gr.z_half[GMV.Gr.gw]
+        @show Case.Sur.ustar
+        @show Case.Sur.obukhov_length
+        @show Turb.wstar
     # if TS.i_iter == 5759
         @show TS.i_iter
         open_files(Stats)

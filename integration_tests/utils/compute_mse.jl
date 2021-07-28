@@ -80,6 +80,7 @@ function compute_mse(
     ds_pycles=nothing,
     ds_turb_conv=nothing,
     plot_comparison=true,
+    skip_contours = true,
 )
     mse = Dict()
     time_tcc = ds_turb_conv.group["timeseries"]["t"][:]
@@ -123,6 +124,7 @@ function compute_mse(
     data_scales_tcc = []
     pycles_weight = []
     max_mse = 0
+    mismatch_found = false
 
     all_keys = unique([keys(ds_scampy.group["profiles"])..., keys(best_mse)...])
     # for tc_var in keys(best_mse)
@@ -162,7 +164,7 @@ function compute_mse(
 
         # Interpolate data
         steady_data = size(data_tcc_arr,1) == 1
-        @show tc_var, steady_data, size(data_tcc_arr), size(data_scm_arr)
+        # @show tc_var, steady_data, size(data_tcc_arr), size(data_scm_arr)
         # if steady_data
         #     # data_les_cont = Spline1D(z_les, data_les_arr)
         #     data_tcc_cont = Spline1D(z_tcc, data_tcc_arr)
@@ -214,45 +216,50 @@ function compute_mse(
             #     label = "PyCLES",
             # )
             Plots.plot!(
-                profile_data_tcc_cont_mapped,
-                z_tcc ./ 10^3,
-                xlabel = tc_var,
-                ylabel = "z [km]",
-                label = "TC.jl",
-            )
-            Plots.plot!(
                 profile_data_scm_cont_mapped,
                 z_tcc ./ 10^3,
                 xlabel = tc_var,
                 ylabel = "z [km]",
                 label = "SCAMPy",
+                markershape = :circle,
+                markersize = 6,
+            )
+            Plots.plot!(
+                profile_data_tcc_cont_mapped,
+                z_tcc ./ 10^3,
+                xlabel = tc_var,
+                ylabel = "z [km]",
+                label = "TC.jl",
+                markershape = :diamond,
             )
             @info "Saving $(joinpath(foldername, "$tc_var.png"))"
             Plots.savefig(joinpath(foldername, "profiles_$tc_var.png"))
 
-            clims_min = min(minimum(data_tcc_arr), minimum(data_tcc_arr))
-            clims_max = max(maximum(data_tcc_arr), maximum(data_tcc_arr))
-            clims = (clims_min, clims_max)
-            p1 = Plots.contourf(
-                time_scm, z_scm, data_scm_arr';
-                xlabel = tc_var,
-                ylabel = "height (m)",
-                c = :viridis,
-                clims = clims,
-                title="SCAMPy",
-            )
+            if !skip_contours
+                clims_min = min(minimum(data_tcc_arr), minimum(data_tcc_arr))
+                clims_max = max(maximum(data_tcc_arr), maximum(data_tcc_arr))
+                clims = (clims_min, clims_max)
+                p1 = Plots.contourf(
+                    time_scm, z_scm, data_scm_arr';
+                    xlabel = tc_var,
+                    ylabel = "height (m)",
+                    c = :viridis,
+                    clims = clims,
+                    title="SCAMPy",
+                )
 
-            p2 = Plots.contourf(
-                time_tcc, z_tcc, data_tcc_arr';
-                xlabel = tc_var,
-                ylabel = "height (m)",
-                c = :viridis,
-                clims = clims,
-                title="TC.jl",
-            )
-            Plots.plot(p1, p2; layout= (2, 1))
+                p2 = Plots.contourf(
+                    time_tcc, z_tcc, data_tcc_arr';
+                    xlabel = tc_var,
+                    ylabel = "height (m)",
+                    c = :viridis,
+                    clims = clims,
+                    title="TC.jl",
+                )
+                Plots.plot(p1, p2; layout= (2, 1))
 
-            Plots.savefig(joinpath(foldername,"contours_"*tc_var*".png"))
+                Plots.savefig(joinpath(foldername,"contours_"*tc_var*".png"))
+            end
         end
 
         # Compute mean squared error (mse)
@@ -268,6 +275,12 @@ function compute_mse(
         if !(data_scale_tcc ≈ 0 && data_scale_scm ≈ 0)
             if !isnan(mse[tc_var])
                 max_mse = max(max_mse, mse[tc_var])
+            elseif (isnan(data_scale_tcc) && !isnan(data_scale_scm)) ||
+                   (isnan(data_scale_scm) && !isnan(data_scale_tcc))
+                mismatch_found = true
+            elseif ((data_scale_tcc ≈ 0) && !(data_scale_scm ≈ 0)) ||
+                   ((data_scale_scm ≈ 0) && !(data_scale_tcc ≈ 0))
+                mismatch_found = true
             end
         end
 
@@ -329,6 +342,9 @@ function compute_mse(
         crop = :none,
     )
     @info "max_mse = $max_mse"
+    if mismatch_found
+        @warn "Mismatch found (one sim has NaNs, while the other does not)"
+    end
 
     return mse
 end

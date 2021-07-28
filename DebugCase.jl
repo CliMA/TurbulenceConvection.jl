@@ -1,6 +1,6 @@
 # Compare TurbulenceConvection.jl with SCAMPy
 using TurbulenceConvection
-case_name = "TRMM_LBA"
+# Need to define case_name, first. e.g., `case_name = "Nieuwstadt"`
 tc_dir = dirname(dirname(pathof(TurbulenceConvection)));
 include(joinpath("integration_tests", "utils", "compute_mse.jl"))
 
@@ -25,23 +25,24 @@ catch
     println("catch")
 end
 best_mse = OrderedDict()
-best_mse["rho0"] = 3.3444957379390586e-02
-best_mse["p0"] = 3.3444957379390586e-02
-best_mse["alpha0"] = 3.3444957379390586e-02
-best_mse["rho0_half"] = 3.3444957379390586e-02
-best_mse["p0_half"] = 3.3444957379390586e-02
-best_mse["alpha0_half"] = 3.3444957379390586e-02
-best_mse["qt_mean"] = 3.4203549443317979e-02
-best_mse["ql_mean"] = 1.8556088804370651e+02
-best_mse["updraft_area"] = 2.1254899281263803e+02
-best_mse["updraft_w"] = 3.3720682408389879e+00
-best_mse["updraft_qt"] = 7.3758208297447347e-01
-best_mse["updraft_thetal"] = 1.2774041797120240e+01
-best_mse["v_mean"] = 3.9947573428069575e+01
-best_mse["u_mean"] = 3.5718662854892038e+01
-best_mse["tke_mean"] = 2.9756050060113374e+01
+best_mse["rho0"] = 1.0
+best_mse["p0"] = 1.0
+best_mse["alpha0"] = 1.0
+best_mse["rho0_half"] = 1.0
+best_mse["p0_half"] = 1.0
+best_mse["alpha0_half"] = 1.0
+best_mse["qt_mean"] = 1.0
+best_mse["ql_mean"] = 1.0
+best_mse["updraft_area"] = 1.0
+best_mse["updraft_w"] = 1.0
+best_mse["updraft_qt"] = 1.0
+best_mse["updraft_thetal"] = 1.0
+best_mse["v_mean"] = 1.0
+best_mse["u_mean"] = 1.0
+best_mse["tke_mean"] = 1.0
+best_mse["tke_values"] = 1.0
 
-best_mse["updraft_buoyancy_values"] = 2.9756050060113374e+01
+best_mse["updraft_buoyancy_values"] = 1.0
 best_mse["updraft_buoyancy"] = 1.0
 best_mse["eddy_viscosity"] = 1.0
 best_mse["mixing_length"] = 1.0

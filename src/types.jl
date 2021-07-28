@@ -639,6 +639,11 @@ Base.@kwdef mutable struct SurfaceBase{T}
     Ref::ReferenceState
 end
 
+function SurfaceBase(::Type{T}; Gr::Grid, Ref::ReferenceState, paramlist) where {T}
+    Ri_bulk_crit = paramlist["turbulence"]["Ri_bulk_crit"]
+    return SurfaceBase{T}(;Gr, Ref, Ri_bulk_crit)
+end
+
 struct RainPhysics{T}
     Gr::Grid
     Ref::ReferenceState
