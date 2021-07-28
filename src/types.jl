@@ -528,9 +528,6 @@ struct EnvironmentVariable_2m{A1}
         shear = center_field(grid)
         interdomain = center_field(grid)
         rain_src = center_field(grid)
-        if loc != "half"
-            println("Invalid location setting for variable! Must be half")
-        end
         if kind != "scalar" && kind != "velocity"
             println("Invalid kind setting for variable! Must be scalar or velocity")
         end
