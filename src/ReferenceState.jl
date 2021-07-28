@@ -17,12 +17,12 @@ mutable struct ReferenceState{PS, A1}
     sg::Float64
     function ReferenceState(Gr::Grid, param_set::PS) where {PS}
 
-        p0 = pyzeros(Gr.nzg)
-        p0_half = pyzeros(Gr.nzg)
-        alpha0 = pyzeros(Gr.nzg)
-        alpha0_half = pyzeros(Gr.nzg)
-        rho0 = pyzeros(Gr.nzg)
-        rho0_half = pyzeros(Gr.nzg)
+        p0 = face_field(Gr)
+        p0_half = center_field(Gr)
+        alpha0 = face_field(Gr)
+        alpha0_half = center_field(Gr)
+        rho0 = face_field(Gr)
+        rho0_half = center_field(Gr)
         Pg::Float64 = 0
         Tg::Float64 = 0
         qtg::Float64 = 0
@@ -62,8 +62,8 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
     p0 = log(self.Pg)
     logp = p0
 
-    p = pyzeros(Gr.nzg)
-    p_half = pyzeros(Gr.nzg)
+    p = face_field(Gr)
+    p_half = center_field(Gr)
 
     # Perform the integration
     # TODO: replace with OrdinaryDiffEq
@@ -88,18 +88,18 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
 
     p_ = deepcopy(p)
     p_half_ = deepcopy(p_half)
-    temperature = pyzeros(Gr.nzg)
-    temperature_half = pyzeros(Gr.nzg)
-    alpha = pyzeros(Gr.nzg)
-    alpha_half = pyzeros(Gr.nzg)
+    temperature = face_field(Gr)
+    temperature_half = center_field(Gr)
+    alpha = face_field(Gr)
+    alpha_half = center_field(Gr)
 
-    ql = pyzeros(Gr.nzg)
-    qi = pyzeros(Gr.nzg)
-    qv = pyzeros(Gr.nzg)
+    ql = face_field(Gr)
+    qi = face_field(Gr)
+    qv = face_field(Gr)
 
-    ql_half = pyzeros(Gr.nzg)
-    qi_half = pyzeros(Gr.nzg)
-    qv_half = pyzeros(Gr.nzg)
+    ql_half = center_field(Gr)
+    qi_half = center_field(Gr)
+    qv_half = center_field(Gr)
 
     # Compute reference state thermodynamic profiles
 

@@ -32,6 +32,7 @@ end
 include("python_primitives.jl")
 include("parameters.jl")
 include("Grid.jl")
+include("Fields.jl")
 include("NetCDFIO.jl")
 include("ReferenceState.jl")
 include("types.jl")

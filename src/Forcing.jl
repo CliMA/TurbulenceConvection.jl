@@ -1,10 +1,10 @@
 
 function initialize(self::ForcingBase, GMV::GridMeanVariables, ::ForcingBaseType)
-    self.subsidence = pyzeros(self.Gr.nzg)
-    self.dTdt = pyzeros(self.Gr.nzg)
-    self.dqtdt = pyzeros(self.Gr.nzg)
-    self.ug = pyzeros(self.Gr.nzg)
-    self.vg = pyzeros(self.Gr.nzg)
+    self.subsidence = center_field(self.Gr)
+    self.dTdt = center_field(self.Gr)
+    self.dqtdt = center_field(self.Gr)
+    self.ug = center_field(self.Gr)
+    self.vg = center_field(self.Gr)
     self.convert_forcing_prog_fp = convert_forcing_thetal
     return
 end

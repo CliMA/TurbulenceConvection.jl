@@ -3,7 +3,7 @@ initialize(self::SurfaceBase, ::BaseCase) = nothing
 update(self::SurfaceBase, GMV::GridMeanVariables, ::BaseCase) = nothing
 
 function free_convection_windspeed(self::SurfaceBase, GMV::GridMeanVariables, ::BaseCase)
-    theta_rho = pyzeros(self.Gr.nzg)
+    theta_rho = center_field(self.Gr)
 
     # Need to get theta_rho
     @inbounds for k in center_indicies(self.Gr)

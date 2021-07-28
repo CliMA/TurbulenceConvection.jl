@@ -116,8 +116,8 @@ function solve_rain_fall(
     dt_model = TS.dt
     CFL_limit = 0.5
 
-    term_vel = pyzeros(nzg)
-    term_vel_new = pyzeros(nzg)
+    term_vel = center_field(self.Gr)
+    term_vel_new = center_field(self.Gr)
 
     t_elapsed = 0.0
 

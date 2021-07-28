@@ -26,7 +26,7 @@ end
 
 # Update the diagnosis of the inversion height, using the maximum temperature gradient method
 function update_inversion(self::ParameterizationBase, GMV::GridMeanVariables, option)
-    theta_rho = pyzeros(self.Gr.nzg)
+    theta_rho = center_field(self.Gr)
     maxgrad = 0.0
     k_fi = first_center(self.Gr)
 
