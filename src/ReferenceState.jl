@@ -72,19 +72,24 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
     @show z_span
     prob = ODEProblem(rhs, logp, z_span)
     sol = solve(prob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    p_0 = [exp(sol(Gr.z[k])) for k in (Gr.gw - 1):(Gr.nzg - Gr.gw)]
-    p_0_half = [exp(sol(Gr.z_half[k])) for k in (Gr.gw - 1):(Gr.nzg - Gr.gw)]
+    p_0 = [sol(Gr.z[k]) for k in (Gr.gw - 1):(Gr.nzg - Gr.gw)]
+    p_0_half = [sol(Gr.z_half[k]) for k in (Gr.gw):(Gr.nzg - Gr.gw - 1)]
 
     p[(Gr.gw - 1):(Gr.nzg - Gr.gw)] .= p_0
-    p_half[(Gr.gw - 1):(Gr.nzg - Gr.gw)] .= p_0_half
+    p_half[(Gr.gw):(Gr.nzg - Gr.gw - 1)] .= p_0_half
 
-    # Set boundary conditions
-    # TODO: re-generalize
+    # Set boundary conditions (in log-space) by mirroring log-pressure
+    # TODO: re-generalize, is setting the BCs like this correct?
     p[0] = p[1]
     p[end] = p[end - 1]
 
-    p_half[0] = p_half[1]
-    p_half[end] = p_half[end - 1]
+    p_half[1] = p_half[2]
+    p_half[end - 1] = p_half[end - 2]
+    p_half[0] = p_half[3]
+    p_half[end] = p_half[end - 3]
+
+    p .= exp.(p)
+    p_half .= exp.(p_half)
 
     p_ = deepcopy(p)
     p_half_ = deepcopy(p_half)
