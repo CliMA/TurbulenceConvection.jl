@@ -157,8 +157,8 @@ function compute_mse(
         if plot_comparison
             p = Plots.plot()
             Plots.plot!(data_les_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "PyCLES")
-            Plots.plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "TC.jl")
             Plots.plot!(data_scm_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "SCAMPy")
+            Plots.plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "TC.jl")
             @info "     Saving $(joinpath(foldername, "$tc_var.png"))"
             Plots.savefig(joinpath(foldername, "profile_$tc_var.png"))
             clims_min = min(minimum(data_scm_arr), minimum(data_tcc_arr))
