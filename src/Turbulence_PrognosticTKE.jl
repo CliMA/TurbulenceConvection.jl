@@ -588,7 +588,7 @@ function update_inversion(self,GMV::GridMeanVariables, option)
     return
 end
 
-function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariables)
+function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariables, TS::TimeStepping)
 
     gw = grid(self).gw
     tau =  get_mixing_tau(self.base.zi, self.wstar)
@@ -700,6 +700,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
 
     elseif (self.mixing_scheme == "sbtd_eq")
         @inbounds for k in xrange(gw, grid(self).nzg-gw)
+            last_point = k == last(xrange(gw, grid(self).nzg-gw))
             z_ = grid(self).z_half[k]
             # kz scale (surface layer)
             if obukhov_length < 0.0 #unstable
@@ -811,7 +812,9 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
                 end
                 j += 1
             end
-
+            if TS.i_iter == 1 && last_point
+                @show k, l
+            end
             self.mls[k] = argmin(l)
             self.mixing_length[k] = lamb_smooth_minimum(l, 0.1, 1.5)
             self.ml_ratio[k] = self.mixing_length[k]/l[Int(self.mls[k])]
@@ -845,8 +848,8 @@ function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanV
         compute_eddy_diffusivities_similarity(self.base, GMV, Case)
     else
         check_nans(GMV, self, "CEDtke 1")
-        # export_all(Case, self, GMV, TS, Stats)
-        compute_mixing_length(self, Case.Sur.obukhov_length, Case.Sur.ustar, GMV)
+        compute_mixing_length(self, Case.Sur.obukhov_length, Case.Sur.ustar, GMV, TS)
+        export_all(Case, self, GMV, TS, Stats)
         check_nans(GMV, self, "CEDtke 2")
         KM = diffusivity_m(self)
         KH = diffusivity_h(self)
@@ -1838,7 +1841,7 @@ end
 function compute_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping, Stats::NetCDFIO_Stats)
 
     if self.similarity_diffusivity # otherwise, we computed mixing length when we computed
-        compute_mixing_length(self, Case.Sur.obukhov_length, Case.Sur.ustar, GMV)
+        compute_mixing_length(self, Case.Sur.obukhov_length, Case.Sur.ustar, GMV, TS)
     end
     if self.calc_tke
         compute_tke_buoy(self, GMV)
