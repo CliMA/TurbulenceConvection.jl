@@ -18,6 +18,7 @@ best_mse["updraft_qt"] = 1.0651734450298703e+01
 best_mse["updraft_thetal"] = 2.1622611589959376e+01
 best_mse["u_mean"] = 3.9550058876376834e+03
 best_mse["tke_mean"] = 5.8683619102955831e+01
+best_mse["temperature_mean"] = 1.9035536936412582e-05
 
 @testset "Soares" begin
     println("Running Soares...")
@@ -48,5 +49,6 @@ best_mse["tke_mean"] = 5.8683619102955831e+01
     test_mse(computed_mse, best_mse, "updraft_thetal")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    test_mse(computed_mse, best_mse, "temperature_mean")
     nothing
 end

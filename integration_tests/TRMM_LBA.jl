@@ -19,6 +19,7 @@ best_mse["updraft_thetal"] = 1.1072811439923926e+02
 best_mse["v_mean"] = 2.9406070722883624e+02
 best_mse["u_mean"] = 1.6903159369948669e+03
 best_mse["tke_mean"] = 2.8961135498264639e+03
+best_mse["temperature_mean"] = 8.3990495389032029e-04
 
 @testset "TRMM_LBA" begin
     println("Running TRMM_LBA...")
@@ -50,5 +51,6 @@ best_mse["tke_mean"] = 2.8961135498264639e+03
     test_mse(computed_mse, best_mse, "v_mean")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    test_mse(computed_mse, best_mse, "temperature_mean")
     nothing
 end

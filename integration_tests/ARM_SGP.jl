@@ -18,6 +18,7 @@ best_mse["updraft_qt"] = 5.2600486259435868e+01
 best_mse["updraft_thetal"] = 6.9238569266089868e+01
 best_mse["u_mean"] = 8.7994360629094174e+01
 best_mse["tke_mean"] = 2.9609371778386242e+00
+best_mse["temperature_mean"] = 2.5666937507309872e-04
 
 @testset "ARM_SGP" begin
     println("Running ARM_SGP...")
@@ -48,5 +49,6 @@ best_mse["tke_mean"] = 2.9609371778386242e+00
     test_mse(computed_mse, best_mse, "updraft_thetal")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    test_mse(computed_mse, best_mse, "temperature_mean")
     nothing
 end
