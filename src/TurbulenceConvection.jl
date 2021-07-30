@@ -2,6 +2,7 @@ module TurbulenceConvection
 
 import Dierckx
 using StatsBase
+using StaticArrays
 import Statistics
 using PoissonRandom: pois_rand
 import LambertW
@@ -33,6 +34,7 @@ include("python_primitives.jl")
 include("parameters.jl")
 include("Grid.jl")
 include("Fields.jl")
+include("Operators.jl")
 include("NetCDFIO.jl")
 include("ReferenceState.jl")
 include("types.jl")

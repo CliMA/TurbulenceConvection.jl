@@ -58,8 +58,8 @@ function update(self::ForcingBase{ForcingStandard}, GMV::GridMeanVariables)
     if self.apply_subsidence
         @inbounds for k in real_center_indicies(self.Gr)
             # Apply large-scale subsidence tendencies
-            GMV.H.tendencies[k] -= (GMV.H.values[k + 1] - GMV.H.values[k]) * self.Gr.dzi * self.subsidence[k]
-            GMV.QT.tendencies[k] -= (GMV.QT.values[k + 1] - GMV.QT.values[k]) * self.Gr.dzi * self.subsidence[k]
+            GMV.H.tendencies[k] -= ∇_upwind(GMV.H.values, self.Gr, k) * self.subsidence[k]
+            GMV.QT.tendencies[k] -= ∇_upwind(GMV.QT.values, self.Gr, k) * self.subsidence[k]
         end
     end
     if self.apply_coriolis
@@ -85,8 +85,8 @@ function update(self::ForcingBase{ForcingDYCOMS_RF01}, GMV::GridMeanVariables)
     @inbounds for k in real_center_indicies(self.Gr)
         GMV.QT.tendencies[k] += self.dqtdt[k]
         # Apply large-scale subsidence tendencies
-        GMV.H.tendencies[k] -= (GMV.H.values[k + 1] - GMV.H.values[k]) * self.Gr.dzi * self.subsidence[k]
-        GMV.QT.tendencies[k] -= (GMV.QT.values[k + 1] - GMV.QT.values[k]) * self.Gr.dzi * self.subsidence[k]
+        GMV.H.tendencies[k] -= ∇_upwind(GMV.H.values, self.Gr, k) * self.subsidence[k]
+        GMV.QT.tendencies[k] -= ∇_upwind(GMV.QT.values, self.Gr, k) * self.subsidence[k]
     end
 
     if self.apply_coriolis

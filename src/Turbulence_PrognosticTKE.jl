@@ -410,10 +410,12 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         end
 
         # Buoyancy-shear-subdomain exchange-dissipation TKE equilibrium scale
+        U_cut = cut(GMV.U.values, k)
+        V_cut = cut(GMV.V.values, k)
         shear2 =
-            pow((GMV.U.values[k + 1] - GMV.U.values[k - 1]) * 0.5 * dzi, 2) +
-            pow((GMV.V.values[k + 1] - GMV.V.values[k - 1]) * 0.5 * dzi, 2) +
-            pow((self.EnvVar.W.values[k] - self.EnvVar.W.values[k - 1]) * dzi, 2)
+            pow(∇_collocated(U_cut, grid), 2) +
+            pow(∇_collocated(V_cut, grid), 2) +
+            pow(∇f2c(self.EnvVar.W.values, grid, k), 2)
         qt_dry = self.EnvThermo.qt_dry[k]
         th_dry = self.EnvThermo.th_dry[k]
         t_cloudy = self.EnvThermo.t_cloudy[k]
