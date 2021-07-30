@@ -311,14 +311,14 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
         sum_subdomains_rain(self.Rain, self.UpdThermo, self.EnvThermo)
 
         # rain fall (all three categories are assumed to be falling though "grid-mean" conditions
-        solve_rain_fall(self.rainphysics, GMV, TS, self.Rain.QR, self.Rain.RainArea)
-        solve_rain_fall(self.rainphysics, GMV, TS, self.Rain.Upd_QR, self.Rain.Upd_RainArea)
-        solve_rain_fall(self.rainphysics, GMV, TS, self.Rain.Env_QR, self.Rain.Env_RainArea)
+        solve_rain_fall(self.rainphysics, self.Rain, GMV, TS, self.Rain.QR, self.Rain.RainArea)
+        solve_rain_fall(self.rainphysics, self.Rain, GMV, TS, self.Rain.Upd_QR, self.Rain.Upd_RainArea)
+        solve_rain_fall(self.rainphysics, self.Rain, GMV, TS, self.Rain.Env_QR, self.Rain.Env_RainArea)
 
         # rain evaporation (all three categories are assumed to be evaporating in "grid-mean" conditions
-        solve_rain_evap(self.rainphysics, GMV, TS, self.Rain.QR, self.Rain.RainArea)
-        solve_rain_evap(self.rainphysics, GMV, TS, self.Rain.Upd_QR, self.Rain.Upd_RainArea)
-        solve_rain_evap(self.rainphysics, GMV, TS, self.Rain.Env_QR, self.Rain.Env_RainArea)
+        solve_rain_evap(self.rainphysics, self.Rain, GMV, TS, self.Rain.QR, self.Rain.RainArea)
+        solve_rain_evap(self.rainphysics, self.Rain, GMV, TS, self.Rain.Upd_QR, self.Rain.Upd_RainArea)
+        solve_rain_evap(self.rainphysics, self.Rain, GMV, TS, self.Rain.Env_QR, self.Rain.Env_RainArea)
     end
     # update grid-mean cloud fraction and cloud cover
     @inbounds for k in center_indicies(grid)
