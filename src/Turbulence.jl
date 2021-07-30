@@ -27,7 +27,7 @@ end
 # Update the diagnosis of the inversion height, using the maximum temperature gradient method
 function update_inversion(self::ParameterizationBase, GMV::GridMeanVariables, option)
     theta_rho = center_field(self.Gr)
-    maxgrad = 0.0
+    ∇θ_liq_max = 0.0
     k_fi = first_center(self.Gr)
 
     @inbounds for k in real_center_indicies(self.Gr)
@@ -46,9 +46,9 @@ function update_inversion(self::ParameterizationBase, GMV::GridMeanVariables, op
     elseif option == "thetal_maxgrad"
 
         @inbounds for k in real_center_indicies(self.Gr)
-            grad = (GMV.THL.values[k + 1] - GMV.THL.values[k]) * self.Gr.dzi
-            if grad > maxgrad
-                maxgrad = grad
+            ∇θ_liq = ∇_upwind(GMV.THL.values, self.Gr, k)
+            if ∇θ_liq > ∇θ_liq_max
+                ∇θ_liq_max = ∇θ_liq
                 self.zi = self.Gr.z[k]
             end
         end
