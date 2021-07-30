@@ -48,6 +48,7 @@ function initialize(self::UpdraftVariables, GMV::GridMeanVariables)
     end
 
     set_bcs(self.QT, self.Gr)
+    set_bcs(self.THL, self.Gr)
     set_bcs(self.H, self.Gr)
 
     return
@@ -167,6 +168,7 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
 
     set_bcs(self.QT, self.Gr)
     set_bcs(self.H, self.Gr)
+    set_bcs(self.THL, self.Gr)
     set_bcs(self.W, self.Gr)
     set_bcs(self.T, self.Gr)
 

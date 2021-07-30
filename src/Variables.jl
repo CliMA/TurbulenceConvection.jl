@@ -76,26 +76,28 @@ function zero_tendencies(self::GridMeanVariables)
 end
 
 function update(self::GridMeanVariables, TS::TimeStepping)
-    @inbounds for k in center_indicies(self.Gr)
+    grid = self.Gr
+    @inbounds for k in center_indicies(grid)
         self.U.values[k] += self.U.tendencies[k] * TS.dt
         self.V.values[k] += self.V.tendencies[k] * TS.dt
         self.H.values[k] += self.H.tendencies[k] * TS.dt
         self.QT.values[k] += self.QT.tendencies[k] * TS.dt
     end
 
-    set_bcs(self.U, self.Gr)
-    set_bcs(self.V, self.Gr)
-    set_bcs(self.H, self.Gr)
-    set_bcs(self.QT, self.Gr)
+    set_bcs(self.U, grid)
+    set_bcs(self.V, grid)
+    set_bcs(self.H, grid)
+    set_bcs(self.QT, grid)
+    set_bcs(self.THL, grid)
 
     if self.calc_tke
-        set_bcs(self.TKE, self.Gr)
+        set_bcs(self.TKE, grid)
     end
 
     if self.calc_scalar_var
-        set_bcs(self.QTvar, self.Gr)
-        set_bcs(self.Hvar, self.Gr)
-        set_bcs(self.HQTcov, self.Gr)
+        set_bcs(self.QTvar, grid)
+        set_bcs(self.Hvar, grid)
+        set_bcs(self.HQTcov, grid)
     end
 
     zero_tendencies(self)
