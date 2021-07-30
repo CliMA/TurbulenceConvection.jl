@@ -356,8 +356,8 @@ function update(
     # Sink of environmental QT and H due to rain creation is applied in tridiagonal solver
     buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
     check_nans(GMV, self, "4.63")
-    # export_all(Case, self, GMV, TS, Stats)
     compute_eddy_diffusivities_tke(self, GMV, Case, Stats, TS)
+    # export_all(Case, self, GMV, TS, Stats)
     check_nans(GMV, self, "4.7")
     update_GMV_ED(self, GMV, Case, TS, Stats)
     check_nans(GMV, self, "4.72")
@@ -700,7 +700,6 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
 
     elseif (self.mixing_scheme == "sbtd_eq")
         @inbounds for k in xrange(gw, grid(self).nzg-gw)
-            last_point = k == last(xrange(gw, grid(self).nzg-gw))
             z_ = grid(self).z_half[k]
             # kz scale (surface layer)
             if obukhov_length < 0.0 #unstable
@@ -812,9 +811,6 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
                 end
                 j += 1
             end
-            if TS.i_iter == 1 && last_point
-                @show k, l
-            end
             self.mls[k] = argmin(l)
             self.mixing_length[k] = lamb_smooth_minimum(l, 0.1, 1.5)
             self.ml_ratio[k] = self.mixing_length[k]/l[Int(self.mls[k])]
@@ -849,7 +845,7 @@ function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanV
     else
         check_nans(GMV, self, "CEDtke 1")
         compute_mixing_length(self, Case.Sur.obukhov_length, Case.Sur.ustar, GMV, TS)
-        export_all(Case, self, GMV, TS, Stats)
+        # export_all(Case, self, GMV, TS, Stats)
         check_nans(GMV, self, "CEDtke 2")
         KM = diffusivity_m(self)
         KH = diffusivity_h(self)

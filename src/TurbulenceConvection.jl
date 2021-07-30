@@ -42,7 +42,7 @@ function export_all(Case, Turb, GMV, TS, Stats)
     # if TS.i_iter == 10
 
 
-    if TS.i_iter == 1
+    if TS.i_iter == 22
         println("------- inside export_all")
         @show Case.Sur.rho_hflux
         @show Case.Sur.rho_qtflux
