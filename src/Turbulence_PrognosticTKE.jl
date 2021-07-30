@@ -394,8 +394,8 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
     dzi = grid.dzi
     tau = get_mixing_tau(self.base.zi, self.wstar)
     l = pyzeros(3)
-    grad_thl_plus = 0.0
     grad_qt_plus = 0.0
+    grad_thl_plus = 0.0
     grad_thv_plus = 0.0
     m_eps = 1.0e-9 # Epsilon to avoid zero
     @inbounds for k in real_center_indicies(grid)
@@ -428,8 +428,35 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         grad_qt_low = grad_qt_plus
         grad_thl_plus = (self.EnvVar.THL.values[k + 1] - self.EnvVar.THL.values[k]) * dzi
         grad_qt_plus = (self.EnvVar.QT.values[k + 1] - self.EnvVar.QT.values[k]) * dzi
-        grad_thl = interp2pt(grad_thl_low, grad_thl_plus)
-        grad_qt = interp2pt(grad_qt_low, grad_qt_plus)
+        grad_thl_old = interp2pt(grad_thl_low, grad_thl_plus)
+        grad_qt_old = interp2pt(grad_qt_low, grad_qt_plus)
+
+        QT_cut = cut(self.EnvVar.QT.values, k)
+        grad_qt_new = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
+        THL_cut = cut(self.EnvVar.THL.values, k)
+        grad_thl_new = c∇(THL_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
+
+        grad_qt = grad_qt_new
+        grad_thl = grad_thl_new
+        # if !(grad_qt ≈ grad_qt_new)
+        #     println("-----")
+        #     @show k
+        #     @show grad_qt
+        #     @show grad_qt_new
+        #     @show abs(grad_qt - grad_qt_new)
+        #     @show QT_cut
+        #     error("Done")
+        # end
+        # if !(grad_thl ≈ grad_thl_new)
+        #     println("-----")
+        #     @show k
+        #     @show grad_thl
+        #     @show grad_thl_new
+        #     @show abs(grad_thl - grad_thl_new)
+        #     @show THL_cut
+        #     error("Done")
+        # end
+
         # g/theta_ref
         prefactor = g * (Rd / ref_state.alpha0_half[k] / ref_state.p0_half[k]) * exner_c(ref_state.p0_half[k])
         d_buoy_thetal_dry = prefactor * (1.0 + (eps_vi - 1.0) * qt_dry)
