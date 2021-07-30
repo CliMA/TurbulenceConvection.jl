@@ -52,5 +52,6 @@ best_mse["tke_mean"] = 1.4604034781584005e+01
     test_mse(computed_mse, best_mse, "v_mean")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    print_artifact_file("DYCOMS_RF01")
     nothing
 end

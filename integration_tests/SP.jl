@@ -15,4 +15,5 @@ using .NameList
     namelist = default_namelist("SP")
     namelist["meta"]["uuid"] = "01"
     @time main(namelist)
+    print_artifact_file("SP")
 end

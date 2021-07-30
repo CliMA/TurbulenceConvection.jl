@@ -15,4 +15,5 @@ using .NameList
     namelist = default_namelist("life_cycle_Tan2018")
     namelist["meta"]["uuid"] = "01"
     @time main(namelist)
+    print_artifact_file("life_cycle_Tan2018")
 end

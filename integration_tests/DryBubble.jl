@@ -15,4 +15,5 @@ using .NameList
     namelist = default_namelist("DryBubble")
     namelist["meta"]["uuid"] = "01"
     @time main(namelist)
+    print_artifact_file("DryBubble")
 end

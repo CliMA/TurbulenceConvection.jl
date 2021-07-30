@@ -48,5 +48,6 @@ best_mse["tke_mean"] = 2.9609371778386242e+00
     test_mse(computed_mse, best_mse, "updraft_thetal")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    print_artifact_file("ARM_SGP")
     nothing
 end

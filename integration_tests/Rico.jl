@@ -50,5 +50,6 @@ best_mse["tke_mean"] = 9.1707254861508807e+02
     test_mse(computed_mse, best_mse, "v_mean")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    print_artifact_file("Rico")
     nothing
 end

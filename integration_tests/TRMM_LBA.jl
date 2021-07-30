@@ -50,5 +50,7 @@ best_mse["tke_mean"] = 2.8715535630659565e+03
     test_mse(computed_mse, best_mse, "v_mean")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    print_artifact_file("TRMM_LBA")
     nothing
 end
+

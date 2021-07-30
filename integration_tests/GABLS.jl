@@ -43,5 +43,6 @@ best_mse["tke_mean"] = 4.1067897074868842e+00
     test_mse(computed_mse, best_mse, "v_mean")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    print_artifact_file("GABLS")
     nothing
 end

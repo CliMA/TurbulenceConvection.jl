@@ -44,5 +44,6 @@ best_mse["tke_mean"] = 6.9178066709527812e+01
     test_mse(computed_mse, best_mse, "updraft_thetal")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    print_artifact_file("Nieuwstadt")
     nothing
 end

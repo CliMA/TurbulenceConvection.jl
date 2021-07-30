@@ -50,5 +50,6 @@ best_mse["tke_mean"] = 3.2038984505851317e+01
     test_mse(computed_mse, best_mse, "v_mean")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    print_artifact_file("Bomex")
     nothing
 end

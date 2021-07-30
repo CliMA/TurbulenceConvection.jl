@@ -248,3 +248,13 @@ function test_mse(computed_mse, best_mse, key)
     @test mse_not_regressed
     mse_not_regressed || @show key
 end
+
+function print_artifact_file(from)
+    println("----------")
+    @show from
+    tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
+    contents = open(joinpath(tc_dir, "integration_tests", "utils", "Artifacts.toml")) do io
+        read(io, String)
+    end
+    @show contents
+end

@@ -15,4 +15,5 @@ using .NameList
     namelist = default_namelist("GATE_III")
     namelist["meta"]["uuid"] = "01"
     @time main(namelist)
+    print_artifact_file("GATE_III")
 end
