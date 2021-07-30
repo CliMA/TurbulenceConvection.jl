@@ -19,4 +19,5 @@ var_map_les(::Val{:updraft_ql}) = "updraft_ql"
 var_map_les(::Val{:updraft_qr}) = "updraft_ql"
 var_map_les(::Val{:updraft_thetal}) = "updraft_thetali"
 var_map_les(::Val{:tke_mean}) = "tke_mean"
+var_map_les(::Val{:temperature_mean}) = "temperature_mean"
 #! format: on

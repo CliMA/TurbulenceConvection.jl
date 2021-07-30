@@ -16,6 +16,7 @@ best_mse["updraft_w"] = 3.9197923601593011e+01
 best_mse["updraft_thetal"] = 2.9892400636969811e+01
 best_mse["u_mean"] = 7.6422297657642343e+02
 best_mse["tke_mean"] = 6.9178066709527812e+01
+best_mse["temperature_mean"] = 1.6456374707932590e-05
 
 @testset "Nieuwstadt" begin
     println("Running Nieuwstadt...")
@@ -44,5 +45,6 @@ best_mse["tke_mean"] = 6.9178066709527812e+01
     test_mse(computed_mse, best_mse, "updraft_thetal")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    test_mse(computed_mse, best_mse, "temperature_mean")
     nothing
 end

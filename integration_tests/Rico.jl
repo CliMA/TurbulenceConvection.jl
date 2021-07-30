@@ -19,6 +19,7 @@ best_mse["updraft_thetal"] = 6.5601697606639760e+01
 best_mse["v_mean"] = 1.0610811546766800e+02
 best_mse["u_mean"] = 1.1387870745418634e+02
 best_mse["tke_mean"] = 9.1707254861508807e+02
+best_mse["temperature_mean"] = 2.4294131149581795e-04
 
 @testset "Rico" begin
     println("Running Rico...")
@@ -50,5 +51,6 @@ best_mse["tke_mean"] = 9.1707254861508807e+02
     test_mse(computed_mse, best_mse, "v_mean")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    test_mse(computed_mse, best_mse, "temperature_mean")
     nothing
 end

@@ -20,6 +20,7 @@ best_mse["updraft_thetal"] = 1.2761175177117382e+01
 best_mse["v_mean"] = 4.0030917247593457e+01
 best_mse["u_mean"] = 3.5747549053942961e+01
 best_mse["tke_mean"] = 1.4604034781584005e+01
+best_mse["temperature_mean"] = 3.8670907549444306e-06
 
 
 @testset "DYCOMS_RF01" begin
@@ -52,5 +53,6 @@ best_mse["tke_mean"] = 1.4604034781584005e+01
     test_mse(computed_mse, best_mse, "v_mean")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    test_mse(computed_mse, best_mse, "temperature_mean")
     nothing
 end

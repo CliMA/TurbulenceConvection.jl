@@ -16,6 +16,7 @@ best_mse["updraft_thetal"] = 5.0418613105717345e+00
 best_mse["v_mean"] = 5.2842359224499695e+00
 best_mse["u_mean"] = 9.7164923816186999e+00
 best_mse["tke_mean"] = 4.1067897074868842e+00
+best_mse["temperature_mean"] = 1.1313951480001104e-05
 
 @testset "GABLS" begin
     println("Running GABLS...")
@@ -43,5 +44,6 @@ best_mse["tke_mean"] = 4.1067897074868842e+00
     test_mse(computed_mse, best_mse, "v_mean")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    test_mse(computed_mse, best_mse, "temperature_mean")
     nothing
 end

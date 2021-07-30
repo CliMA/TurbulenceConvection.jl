@@ -19,6 +19,7 @@ best_mse["updraft_thetal"] = 2.3059746455183749e+01
 best_mse["v_mean"] = 1.2344255867930939e+02
 best_mse["u_mean"] = 5.3486981021128493e+01
 best_mse["tke_mean"] = 3.2038984505851317e+01
+best_mse["temperature_mean"] = 3.1019627325766795e-05
 
 @testset "Bomex" begin
     println("Running Bomex...")
@@ -50,5 +51,6 @@ best_mse["tke_mean"] = 3.2038984505851317e+01
     test_mse(computed_mse, best_mse, "v_mean")
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
+    test_mse(computed_mse, best_mse, "temperature_mean")
     nothing
 end
