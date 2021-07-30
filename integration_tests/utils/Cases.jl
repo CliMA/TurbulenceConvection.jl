@@ -177,6 +177,7 @@ function initialize_profiles(self::CasesBase{SoaresCase}, Gr::Grid, GMV::GridMea
     end
 
     set_bcs(GMV.H, Gr)
+    set_bcs(GMV.THL, Gr)
     set_bcs(GMV.T, Gr)
     satadjust(GMV)
 end
@@ -271,6 +272,7 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, Gr::Grid, GMV::GridMea
         GMV.T.values[k] = theta[k] * exner_c(Ref.p0_half[k])
         GMV.THL.values[k] = theta[k]
     end
+    set_bcs(GMV.THL, Gr)
     set_bcs(GMV.H, Gr)
     set_bcs(GMV.T, Gr)
     satadjust(GMV)
@@ -390,6 +392,7 @@ function initialize_profiles(self::CasesBase{BomexCase}, Gr::Grid, GMV::GridMean
         GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
         GMV.THL.values[k] = thetal[k]
     end
+    set_bcs(GMV.THL, Gr)
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
     set_bcs(GMV.H, Gr)
@@ -532,6 +535,7 @@ function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, GMV:
         GMV.THL.values[k] = thetal[k]
     end
 
+    set_bcs(GMV.THL, Gr)
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
     set_bcs(GMV.H, Gr)
@@ -681,6 +685,7 @@ function initialize_profiles(self::CasesBase{Rico}, Gr::Grid, GMV::GridMeanVaria
         GMV.THL.values[k] = thetal[k]
     end
 
+    set_bcs(GMV.THL, Gr)
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
     set_bcs(GMV.H, Gr)
@@ -860,6 +865,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
         theta_rho[k] = theta_rho_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
     end
 
+    set_bcs(GMV.THL, Gr)
     set_bcs(GMV.QT, Gr)
     set_bcs(GMV.H, Gr)
     satadjust(GMV)
@@ -1124,6 +1130,7 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVa
             thetali_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
     end
 
+    set_bcs(GMV.THL, Gr)
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
     set_bcs(GMV.H, Gr)
@@ -1271,6 +1278,7 @@ function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanV
         GMV.THL.values[k] =
             thetali_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, latent_heat(GMV.T.values[k]))
     end
+    set_bcs(GMV.THL, Gr)
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
     set_bcs(GMV.T, Gr)
@@ -1605,6 +1613,7 @@ function initialize_profiles(self::CasesBase{GABLS}, Gr::Grid, GMV::GridMeanVari
         GMV.THL.values[k] = thetal[k]
     end
 
+    set_bcs(GMV.THL, Gr)
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.V, Gr)
     set_bcs(GMV.QT, Gr)
@@ -1705,6 +1714,7 @@ function initialize_profiles(self::CasesBase{SP}, Gr::Grid, GMV::GridMeanVariabl
         GMV.THL.values[k] = thetal[k]
     end
 
+    set_bcs(GMV.THL, Gr)
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.V, Gr)
     set_bcs(GMV.QT, Gr)
@@ -1852,6 +1862,7 @@ function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMean
     @inbounds for k in real_center_indicies(Gr)
         GMV.QT.values[k] = 0.0
     end
+    set_bcs(GMV.THL, Gr)
     set_bcs(GMV.QT, Gr)
     set_bcs(GMV.H, Gr)
     satadjust(GMV)

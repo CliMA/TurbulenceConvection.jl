@@ -42,13 +42,16 @@ function initialize(self::UpdraftVariables, GMV::GridMeanVariables)
             self.QL.values[i, k] = GMV.QL.values[k]
             self.H.values[i, k] = GMV.H.values[k]
             self.T.values[i, k] = GMV.T.values[k]
+            self.THL.values[i, k] = GMV.THL.values[k]
         end
 
         self.Area.values[i, gw] = self.updraft_fraction / self.n_updrafts
     end
 
     set_bcs(self.QT, self.Gr)
+    set_bcs(self.THL, self.Gr)
     set_bcs(self.H, self.Gr)
+    set_means(self, GMV)
 
     return
 end
@@ -167,6 +170,7 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
 
     set_bcs(self.QT, self.Gr)
     set_bcs(self.H, self.Gr)
+    set_bcs(self.THL, self.Gr)
     set_bcs(self.W, self.Gr)
     set_bcs(self.T, self.Gr)
 
@@ -221,6 +225,7 @@ function set_means(self::UpdraftVariables, GMV::GridMeanVariables)
                 self.T.bulkvalues[k] += self.Area.values[i, k] * self.T.values[i, k] / self.Area.bulkvalues[k]
                 self.RH.bulkvalues[k] += self.Area.values[i, k] * self.RH.values[i, k] / self.Area.bulkvalues[k]
                 self.B.bulkvalues[k] += self.Area.values[i, k] * self.B.values[i, k] / self.Area.bulkvalues[k]
+                self.THL.bulkvalues[k] += self.Area.values[i, k] * self.THL.values[i, k] / self.Area.bulkvalues[k]
                 self.W.bulkvalues[k] += (
                     (self.Area.values[i, k] + self.Area.values[i, k + 1]) * self.W.values[i, k] /
                     (self.Area.bulkvalues[k] + self.Area.bulkvalues[k + 1])
@@ -233,6 +238,7 @@ function set_means(self::UpdraftVariables, GMV::GridMeanVariables)
             self.H.bulkvalues[k] = GMV.H.values[k]
             self.RH.bulkvalues[k] = GMV.RH.values[k]
             self.T.bulkvalues[k] = GMV.T.values[k]
+            self.THL.bulkvalues[k] = GMV.THL.values[k]
             self.B.bulkvalues[k] = 0.0
             self.W.bulkvalues[k] = 0.0
         end

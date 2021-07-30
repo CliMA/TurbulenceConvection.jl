@@ -133,6 +133,7 @@ function update(self::SimilarityED, GMV::GridMeanVariables, Case::CasesBase, TS:
 
     set_bcs(GMV.H, self.Gr)
     set_bcs(GMV.QT, self.Gr)
+    set_bcs(GMV.THL, self.Gr)
 
     compute_eddy_diffusivities_similarity(self.base, GMV, Case)
 

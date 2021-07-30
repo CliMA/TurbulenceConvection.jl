@@ -161,9 +161,18 @@ function compute_mse(
             Plots.plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "TC.jl")
             @info "     Saving $(joinpath(foldername, "$tc_var.png"))"
             Plots.savefig(joinpath(foldername, "profile_$tc_var.png"))
-            clims_min = min(minimum(data_scm_arr), minimum(data_tcc_arr))
-            clims_max = max(maximum(data_scm_arr), maximum(data_tcc_arr))
-            clims = (clims_min, clims_max)
+
+            if tc_var == "updraft_thetal"
+                # TODO: remove this if-else when artifacts are updated
+                #       So that updraft_thetal is initialized before IO
+                clims_min = minimum(data_tcc_arr)
+                clims_max = maximum(data_tcc_arr)
+                clims = (clims_min, clims_max)
+            else
+                clims_min = min(minimum(data_scm_arr), minimum(data_tcc_arr))
+                clims_max = max(maximum(data_scm_arr), maximum(data_tcc_arr))
+                clims = (clims_min, clims_max)
+            end
 
             p1 = Plots.contourf(
                 time_scm,

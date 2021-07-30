@@ -1256,18 +1256,21 @@ end
 
 function set_subdomain_bcs(self::EDMF_PrognosticTKE)
 
-    set_bcs(self.UpdVar.W, get_grid(self))
-    set_bcs(self.UpdVar.Area, get_grid(self))
-    set_bcs(self.UpdVar.H, get_grid(self))
-    set_bcs(self.UpdVar.QT, get_grid(self))
-    set_bcs(self.UpdVar.T, get_grid(self))
-    set_bcs(self.UpdVar.B, get_grid(self))
+    grid = get_grid(self)
+    set_bcs(self.UpdVar.W, grid)
+    set_bcs(self.UpdVar.Area, grid)
+    set_bcs(self.UpdVar.H, grid)
+    set_bcs(self.UpdVar.THL, grid)
+    set_bcs(self.UpdVar.QT, grid)
+    set_bcs(self.UpdVar.T, grid)
+    set_bcs(self.UpdVar.B, grid)
 
-    set_bcs(self.EnvVar.W, get_grid(self))
-    set_bcs(self.EnvVar.H, get_grid(self))
-    set_bcs(self.EnvVar.T, get_grid(self))
-    set_bcs(self.EnvVar.QL, get_grid(self))
-    set_bcs(self.EnvVar.QT, get_grid(self))
+    set_bcs(self.EnvVar.W, grid)
+    set_bcs(self.EnvVar.H, grid)
+    set_bcs(self.EnvVar.THL, grid)
+    set_bcs(self.EnvVar.T, grid)
+    set_bcs(self.EnvVar.QL, grid)
+    set_bcs(self.EnvVar.QT, grid)
 
     return
 end
@@ -1653,10 +1656,11 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         self.diffusive_flux_v[k] =
             -0.5 * ref_state.rho0_half[k] * ae[k] * KM.values[k] * dzi * (GMV.V.values[k + 1] - GMV.V.values[k - 1])
     end
-    set_bcs(GMV.QT, get_grid(self))
-    set_bcs(GMV.H, get_grid(self))
-    set_bcs(GMV.U, get_grid(self))
-    set_bcs(GMV.V, get_grid(self))
+    set_bcs(GMV.QT, grid)
+    set_bcs(GMV.THL, grid)
+    set_bcs(GMV.H, grid)
+    set_bcs(GMV.U, grid)
+    set_bcs(GMV.V, grid)
 
     return
 end
