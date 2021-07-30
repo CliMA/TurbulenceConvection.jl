@@ -62,6 +62,9 @@ mutable struct NetCDFIO_Stats
         cinterior = Gr.cinterior
         finterior = Gr.finterior
 
+        # Remove the NC file if it exists, in case it accidentally wasn't closed
+        isfile(path_plus_file) && rm(path_plus_file; force = true)
+
         Dataset(path_plus_file, "c") do root_grp
 
             zf = Gr.z[finterior]
