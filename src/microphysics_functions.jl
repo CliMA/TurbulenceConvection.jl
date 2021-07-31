@@ -52,9 +52,9 @@ function terminal_velocity(C_drag, MP_n_0, q_rai, rho)
     return term_vel
 end
 
-function conv_q_vap_to_q_liq(tau_cond_evap, q_sat_liq, q_liq)
+function conv_q_vap_to_q_liq(param_set::APS, q_sat_liq, q_liq)
 
-    return (q_sat_liq - q_liq) / tau_cond_evap
+    return (q_sat_liq - q_liq) / CPMP.τ_cond_evap(param_set)
 end
 
 function conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, q_liq)
