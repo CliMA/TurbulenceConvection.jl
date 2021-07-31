@@ -11,6 +11,7 @@ end
 struct SetGradient{FT}
     value::FT
 end
+struct Extrapolate end
 
 function ∇f2c(f, grid::Grid, k::Int)
     return (f[k] - f[k - 1]) * grid.dzi
@@ -26,6 +27,18 @@ end
 
 function interpc2f(f, grid::Grid, k::Int)
     return 0.5 * (f[k + 1] + f[k])
+end
+
+function interpc2f(f, grid::Grid, k::Int, i_up::Int)
+    return 0.5 * (f[i_up, k + 1] + f[i_up, k])
+end
+
+function interpf2c(f, grid::Grid, k::Int)
+    return 0.5 * (f[k] + f[k - 1])
+end
+
+function interpf2c(f, grid::Grid, k::Int, i_up::Int)
+    return 0.5 * (f[i_up, k] + f[i_up, k - 1])
 end
 
 #####
@@ -76,6 +89,20 @@ function c∇(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient)
     f_dual⁺ = SVector(f[2], f[3])
     f_dual⁻ = SVector(f[1], f[2])
     return (∇_staggered(f_dual⁺, grid) + bc.value) / 2
+end
+function c∇(f::SVector, grid::Grid, ::TopBCTag, ::Extrapolate)
+    @assert length(f) == 3
+    # 2ci = cg+cii => cg = 2ci-cii. Note: f[3] not used
+    f_dual⁺ = SVector(f[2], 2 * f[2] - f[1])
+    f_dual⁻ = SVector(f[1], f[2])
+    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
+end
+function c∇(f::SVector, grid::Grid, ::BottomBCTag, ::Extrapolate)
+    @assert length(f) == 3
+    # 2ci = cg+cii => cg = 2ci-cii. Note: f[1] not used
+    f_dual⁺ = SVector(f[2], f[3])
+    f_dual⁻ = SVector(2 * f[2] - f[3], f[2])
+    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
 end
 
 #####
