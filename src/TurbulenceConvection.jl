@@ -11,12 +11,20 @@ using OffsetArrays
 using FastGaussQuadrature: gausshermite
 using LinearAlgebra
 
+import CLIMAParameters
+using CLIMAParameters: AbstractEarthParameterSet
+const APS = AbstractEarthParameterSet
+
+const CPMP = CLIMAParameters.Atmos.Microphysics
+const CPEDMF = CLIMAParameters.Atmos.EDMF
+const CPSGS = CLIMAParameters.Atmos.SubgridScale
+
 # For dispatching to inherited class
 struct BaseCase end
 
 up_sum(vals::OffsetArray) = off_arr(reshape(sum(vals; dims = 1), size(vals, 2)))
 
-function parse_param(namelist, keys...; default = nothing)
+function parse_namelist(namelist, keys...; default = nothing)
     @assert default ≠ nothing
     param = namelist
     for k in keys

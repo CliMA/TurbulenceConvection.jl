@@ -118,7 +118,6 @@ Base.@kwdef mutable struct RainVariables
     max_supersaturation::Float64
     C_drag::Float64
     MP_n_0::Float64
-    tau_cond_evap::Float64
     q_liq_threshold::Float64
     tau_acnv::Float64
     E_col::Float64
@@ -180,12 +179,6 @@ function RainVariables(namelist, Gr::Grid)
         16 * 1e6
     end
 
-    tau_cond_evap = try
-        namelist["microphysics"]["tau_cond_evap"]
-    catch
-        10.0
-    end
-
     q_liq_threshold = try
         namelist["microphysics"]["q_liq_threshold"]
     catch
@@ -221,7 +214,6 @@ function RainVariables(namelist, Gr::Grid)
         max_supersaturation,
         C_drag,
         MP_n_0,
-        tau_cond_evap,
         q_liq_threshold,
         tau_acnv,
         E_col,
