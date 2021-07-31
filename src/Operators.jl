@@ -29,6 +29,18 @@ function interpc2f(f, grid::Grid, k::Int)
     return 0.5 * (f[k + 1] + f[k])
 end
 
+function interpc2f(f, grid::Grid, k::Int, i_up::Int)
+    return 0.5 * (f[i_up, k + 1] + f[i_up, k])
+end
+
+function interpf2c(f, grid::Grid, k::Int)
+    return 0.5 * (f[k] + f[k - 1])
+end
+
+function interpf2c(f, grid::Grid, k::Int, i_up::Int)
+    return 0.5 * (f[i_up, k] + f[i_up, k - 1])
+end
+
 #####
 ##### ∇(center data)
 #####

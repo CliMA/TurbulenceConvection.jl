@@ -391,7 +391,6 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
     grid = get_grid(self)
     ref_state = reference_state(self)
     gw = grid.gw
-    dzi = grid.dzi
     tau = get_mixing_tau(self.base.zi, self.wstar)
     l = pyzeros(3)
     m_eps = 1.0e-9 # Epsilon to avoid zero
@@ -1062,14 +1061,14 @@ function compute_entrainment_detrainment(self::EDMF_PrognosticTKE, GMV::GridMean
             input.buoy_ed_flux = self.EnvVar.TKE.buoy[k]
             if self.UpdVar.Area.values[i, k] > 0.0
                 input.b_upd = self.UpdVar.B.values[i, k]
-                input.w_upd = interp2pt(self.UpdVar.W.values[i, k], self.UpdVar.W.values[i, k - 1])
+                input.w_upd = interpf2c(self.UpdVar.W.values, grid, k, i)
                 input.z = grid.z_half[k]
                 input.a_upd = self.UpdVar.Area.values[i, k]
                 input.a_env = 1.0 - self.UpdVar.Area.bulkvalues[k]
                 input.tke = self.EnvVar.TKE.values[k]
                 input.ql_env = self.EnvVar.QL.values[k]
                 input.b_env = self.EnvVar.B.values[k]
-                input.w_env = interp2pt(self.EnvVar.W.values[k], self.EnvVar.W.values[k - 1])
+                input.w_env = interpf2c(self.EnvVar.W.values, grid, k)
                 input.ql_up = self.UpdVar.QL.values[i, k]
                 input.ql_env = self.EnvVar.QL.values[k]
                 input.nh_pressure = self.nh_pressure[i, k]
@@ -1077,9 +1076,9 @@ function compute_entrainment_detrainment(self::EDMF_PrognosticTKE, GMV::GridMean
                 input.RH_env = self.EnvVar.RH.values[k]
 
                 # compute dMdz at half levels
-                gmv_w_k = interp2pt(GMV.W.values[k], GMV.W.values[k - 1])
-                gmv_w_km = interp2pt(GMV.W.values[k - 1], GMV.W.values[k - 2])
-                upd_w_km = interp2pt(self.UpdVar.W.values[i, k - 1], self.UpdVar.W.values[i, k - 2])
+                gmv_w_k = interpf2c(GMV.W.values, grid, k)
+                gmv_w_km = interpf2c(GMV.W.values, grid, k - 1)
+                upd_w_km = interpf2c(self.UpdVar.W.values, grid, k - 1, i)
                 input.M = input.a_upd * (input.w_upd - gmv_w_k)
                 Mm = self.UpdVar.Area.values[i, k - 1] * (upd_w_km - gmv_w_km)
                 input.dMdz = (input.M - Mm) * grid.dzi
@@ -1143,9 +1142,10 @@ function compute_nh_pressure(self::EDMF_PrognosticTKE)
     ret_w = pressure_drag_struct()
     input = pressure_in_struct()
     grid = get_grid(self)
+    ref_state = reference_state(self)
 
     # TODO: this should eventually match the grid
-    cinterior = (get_grid(self).gw):(get_grid(self).nzg - get_grid(self).gw)
+    cinterior = (grid.gw):(grid.nzg - grid.gw)
 
     @inbounds for i in xrange(self.n_updrafts)
         input.updraft_top = self.UpdVar.updraft_top[i]
@@ -1153,12 +1153,12 @@ function compute_nh_pressure(self::EDMF_PrognosticTKE)
         avals = off_arr(self.UpdVar.Area.values[i, cinterior])
         input.a_med = Statistics.median(avals[0:alen])
         @inbounds for k in real_center_indicies(grid)
-            input.a_kfull = interp2pt(self.UpdVar.Area.values[i, k], self.UpdVar.Area.values[i, k + 1])
+            input.a_kfull = interpc2f(self.UpdVar.Area.values, grid, k, i)
             if input.a_kfull >= self.minimum_area
-                input.dzi = get_grid(self).dzi
+                input.dzi = grid.dzi
 
-                input.b_kfull = interp2pt(self.UpdVar.B.values[i, k], self.UpdVar.B.values[i, k + 1])
-                input.rho0_kfull = reference_state(self).rho0[k]
+                input.b_kfull = interpc2f(self.UpdVar.B.values, grid, k, i)
+                input.rho0_kfull = ref_state.rho0[k]
                 input.alpha1 = self.pressure_normalmode_buoy_coeff1
                 input.alpha2 = self.pressure_normalmode_buoy_coeff2
                 input.beta1 = self.pressure_normalmode_adv_coeff
