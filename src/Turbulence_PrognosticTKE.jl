@@ -1045,7 +1045,7 @@ function compute_entrainment_detrainment(self::EDMF_PrognosticTKE, GMV::GridMean
     input.wstar = self.wstar
 
     input.dz = get_grid(self).dz
-    input.zbl = compute_zbl_qt_grad(self, GMV)
+    input.zbl = compute_zbl_qt_grad(GMV)
     input.sort_pow = self.sorting_power
     input.c_ent = self.entrainment_factor
     input.c_det = self.detrainment_factor
@@ -1104,24 +1104,14 @@ function compute_entrainment_detrainment(self::EDMF_PrognosticTKE, GMV::GridMean
     return
 end
 
-function compute_zbl_qt_grad(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
+function compute_zbl_qt_grad(GMV::GridMeanVariables)
+    grid = get_grid(GMV)
     # computes inversion height as z with max gradient of qt
-    zbl_qt = 0.0
-    qt_grad = 0.0
-    grid = get_grid(self)
-    dzi = grid.dzi
-
-    @inbounds for k in real_center_indicies(grid)
-        z_ = grid.z_half[k]
-        qt_up = GMV.QT.values[k + 1]
-        qt_ = GMV.QT.values[k]
-
-        if fabs(qt_up - qt_) * dzi > qt_grad
-            qt_grad = fabs(qt_up - qt_) * dzi
-            zbl_qt = z_
-        end
+    z∇q_tot = map(real_center_indicies(grid)) do k
+        (grid.z_half[k], abs(∇c2f(GMV.QT.values, grid, k)))
     end
-    return zbl_qt
+    k_star = argmax(last.(z∇q_tot))
+    return first.(z∇q_tot)[k_star]
 end
 
 function compute_pressure_plume_spacing(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)

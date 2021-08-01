@@ -1386,6 +1386,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     end
 end
 get_grid(edmf::EDMF_PrognosticTKE) = edmf.base.Gr
+get_grid(obj) = obj.Gr
 reference_state(edmf::EDMF_PrognosticTKE) = edmf.base.Ref
 prandtl_number(edmf::EDMF_PrognosticTKE) = edmf.base.prandtl_number
 turbulence_tendency(edmf::EDMF_PrognosticTKE) = edmf.base.turbulence_tendency
