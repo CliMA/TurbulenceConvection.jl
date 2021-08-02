@@ -934,6 +934,7 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     sa = eos_struct()
     quadrature_order = 3
     grid = get_grid(self)
+    param_set = parameter_set(self)
 
     upd_cloud_diagnostics(self.UpdVar, reference_state(self))
 
@@ -942,7 +943,6 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     input.dz = get_grid(self).dz
     input.zbl = compute_zbl_qt_grad(GMV)
     input.sort_pow = self.sorting_power
-    input.c_ent = self.entrainment_factor
     input.c_det = self.detrainment_factor
     input.c_div = self.entrainment_Mdiv_factor
     input.c_mu = self.entrainment_sigma
@@ -999,7 +999,7 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
                 input.dMdz = (input.M - Mm) * grid.dzi
                 input.tke = self.EnvVar.TKE.values[k]
 
-                ret = self.entr_detr_fp(input)
+                ret = self.entr_detr_fp(param_set, input)
                 self.entr_sc[i, k] = ret.entr_sc
                 self.detr_sc[i, k] = ret.detr_sc
                 self.sorting_function[i, k] = ret.sorting_function
