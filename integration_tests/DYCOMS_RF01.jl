@@ -21,6 +21,9 @@ best_mse["v_mean"] = 4.0030917247593457e+01
 best_mse["u_mean"] = 3.5747549053942961e+01
 best_mse["tke_mean"] = 1.4604034781584005e+01
 best_mse["temperature_mean"] = 3.8670907549444306e-06
+best_mse["thetal_mean"] = 5.7402823217894555e-06
+best_mse["Hvar_mean"] = 8.2258518882332137e+04
+best_mse["QTvar_mean"] = 6.2275442597879110e+03
 
 
 @testset "DYCOMS_RF01" begin
@@ -54,5 +57,8 @@ best_mse["temperature_mean"] = 3.8670907549444306e-06
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
     test_mse(computed_mse, best_mse, "temperature_mean")
+    test_mse(computed_mse, best_mse, "thetal_mean")
+    test_mse(computed_mse, best_mse, "Hvar_mean")
+    test_mse(computed_mse, best_mse, "QTvar_mean")
     nothing
 end

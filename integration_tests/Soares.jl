@@ -19,6 +19,9 @@ best_mse["updraft_thetal"] = 2.1622611589959376e+01
 best_mse["u_mean"] = 3.9550058876376834e+03
 best_mse["tke_mean"] = 5.8683619102955831e+01
 best_mse["temperature_mean"] = 1.9035536936412582e-05
+best_mse["thetal_mean"] = 3.1601763199735002e-05
+best_mse["Hvar_mean"] = 2.4252112238315871e+02
+
 
 @testset "Soares" begin
     println("Running Soares...")
@@ -50,5 +53,7 @@ best_mse["temperature_mean"] = 1.9035536936412582e-05
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
     test_mse(computed_mse, best_mse, "temperature_mean")
+    test_mse(computed_mse, best_mse, "thetal_mean")
+    test_mse(computed_mse, best_mse, "Hvar_mean")
     nothing
 end

@@ -17,6 +17,9 @@ best_mse["v_mean"] = 5.2842359224499695e+00
 best_mse["u_mean"] = 9.7164923816186999e+00
 best_mse["tke_mean"] = 4.1067897074868842e+00
 best_mse["temperature_mean"] = 1.1313951480001104e-05
+best_mse["thetal_mean"] = 1.1272274443890045e-05
+best_mse["Hvar_mean"] = 1.3874561158298034e+01
+best_mse["QTvar_mean"] = 1.5572488410685068e-01
 
 @testset "GABLS" begin
     println("Running GABLS...")
@@ -45,5 +48,8 @@ best_mse["temperature_mean"] = 1.1313951480001104e-05
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
     test_mse(computed_mse, best_mse, "temperature_mean")
+    test_mse(computed_mse, best_mse, "thetal_mean")
+    test_mse(computed_mse, best_mse, "Hvar_mean")
+    test_mse(computed_mse, best_mse, "QTvar_mean")
     nothing
 end
