@@ -150,64 +150,22 @@ function RainVariables(namelist, Gr::Grid)
     upd_rwp = 0.0
     env_rwp = 0.0
 
-    rain_model = try
-        string(namelist["microphysics"]["rain_model"])
-    catch
-        println("EDMF_Rain: defaulting to no rain")
-        "None"
-    end
+    rain_model = parse_namelist(
+        namelist,
+        "microphysics",
+        "rain_model";
+        default = "None",
+        valid_options = ["None", "cutoff", "clima_1m"],
+    )
 
-    if !(rain_model in ["None", "cutoff", "clima_1m"])
-        error("rain model not recognized")
-    end
-
-    max_supersaturation = try
-        namelist["microphysics"]["max_supersaturation"]
-    catch
-        0.02
-    end
-
-    C_drag = try
-        namelist["microphysics"]["C_drag"]
-    catch
-        0.55
-    end
-
-    MP_n_0 = try
-        namelist["microphysics"]["MP_n_0"]
-    catch
-        16 * 1e6
-    end
-
-    q_liq_threshold = try
-        namelist["microphysics"]["q_liq_threshold"]
-    catch
-        5e-4
-    end
-
-    tau_acnv = try
-        namelist["microphysics"]["tau_acnv"]
-    catch
-        1e3
-    end
-
-    E_col = try
-        namelist["microphysics"]["E_col"]
-    catch
-        0.8
-    end
-
-    a_vent = try
-        namelist["microphysics"]["a_vent"]
-    catch
-        1.5
-    end
-
-    b_vent = try
-        namelist["microphysics"]["b_vent"]
-    catch
-        0.53
-    end
+    max_supersaturation = parse_namelist(namelist, "microphysics", "max_supersaturation"; default = 0.02)
+    C_drag = parse_namelist(namelist, "microphysics", "C_drag"; default = 0.55)
+    MP_n_0 = parse_namelist(namelist, "microphysics", "MP_n_0"; default = 16 * 1e6)
+    q_liq_threshold = parse_namelist(namelist, "microphysics", "q_liq_threshold"; default = 5e-4)
+    tau_acnv = parse_namelist(namelist, "microphysics", "tau_acnv"; default = 1e3)
+    E_col = parse_namelist(namelist, "microphysics", "E_col"; default = 0.8)
+    a_vent = parse_namelist(namelist, "microphysics", "a_vent"; default = 1.5)
+    b_vent = parse_namelist(namelist, "microphysics", "b_vent"; default = 0.53)
 
     return RainVariables(;
         rain_model,
@@ -425,12 +383,7 @@ function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState, param_set::P
 
     cloud_fraction = VariableDiagnostic(Gr, "half", "scalar", "sym", "cloud fraction", "-")
 
-    # TKE   TODO   repeated from EDMF_Environment.pyx logic
-    EnvThermo_scheme = try
-        string(namelist["thermodynamics"]["sgs"])
-    catch
-        "mean"
-    end
+    EnvThermo_scheme = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
 
     #Now add the 2nd moment variables
 
@@ -602,12 +555,7 @@ function EnvironmentVariables(namelist, Gr::Grid, param_set::PS) where {PS}
     cloud_fraction = EnvironmentVariable(Gr, "half", "scalar", "env_cloud_fraction", "-")
 
     # TODO - the flag setting is repeated from Variables.pyx logic
-    EnvThermo_scheme = try
-        string(namelist["thermodynamics"]["sgs"])
-    catch
-        println("Defaulting to saturation adjustment and microphysics with respect to environmental means")
-        "mean"
-    end
+    EnvThermo_scheme = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
     TKE = EnvironmentVariable_2m(Gr, "half", "scalar", "tke", "m^2/s^2")
     QTvar = EnvironmentVariable_2m(Gr, "half", "scalar", "qt_var", "kg^2/kg^2")
     Hvar = EnvironmentVariable_2m(Gr, "half", "scalar", "thetal_var", "K^2")
@@ -657,16 +605,8 @@ struct EnvironmentThermodynamics{A1}
         EnvVar::EnvironmentVariables,
         Rain::RainVariables,
     )
-        quadrature_order = try
-            namelist["thermodynamics"]["quadrature_order"]
-        catch
-            3
-        end
-        quadrature_type = try
-            namelist["thermodynamics"]["quadrature_type"]
-        catch
-            "gaussian"
-        end
+        quadrature_order = parse_namelist(namelist, "thermodynamics", "quadrature_order"; default = 3)
+        quadrature_type = parse_namelist(namelist, "thermodynamics", "quadrature_type"; default = "gaussian")
 
         qt_dry = center_field(Gr)
         th_dry = center_field(Gr)
@@ -850,7 +790,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     pressure_func_drag::Function
     asp_label
     extrapolate_buoyancy::Bool
-    mixing_scheme::String
     surface_area::Float64
     max_area::Float64
     entrainment_factor::Float64
@@ -935,82 +874,71 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         base = ParameterizationBase(namelist, Gr, Ref)
 
         # Set the number of updrafts (1)
-        n_updrafts = try
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"]
-        catch
-            println("Turbulence--EDMF_PrognosticTKE: defaulting to single updraft")
-            1
-        end
-        use_const_plume_spacing = try
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["use_constant_plume_spacing"]
-        catch
-            false
-        end
+        n_updrafts = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_number"; default = 1)
+        use_const_plume_spacing =
+            parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "use_constant_plume_spacing"; default = false)
 
-        entr_detr_fp = try
-            if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "moisture_deficit"
-                entr_detr_env_moisture_deficit
-            elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "moisture_deficit_b_ED_MF"
-                entr_detr_env_moisture_deficit_b_ED_MF
-            elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "moisture_deficit_div"
-                entr_detr_env_moisture_deficit_div
-            elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "none"
-                entr_detr_none
-            else
-                error("Turbulence--EDMF_PrognosticTKE: Entrainment rate namelist option is not recognized")
-            end
-        catch
-            println("Turbulence--EDMF_PrognosticTKE: defaulting to cloudy entrainment formulation")
-            entr_detr_b_w2
+        entr_detr_fp_str = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "entrainment";
+            default = "entr_detr_env_moisture_deficit",
+        )
+        entr_detr_fp = if entr_detr_fp_str == "moisture_deficit"
+            entr_detr_env_moisture_deficit
+        elseif entr_detr_fp_str == "moisture_deficit_b_ED_MF"
+            entr_detr_env_moisture_deficit_b_ED_MF
+        elseif entr_detr_fp_str == "moisture_deficit_div"
+            entr_detr_env_moisture_deficit_div
+        elseif entr_detr_fp_str == "none"
+            entr_detr_none
+        else
+            error("Turbulence--EDMF_PrognosticTKE: Entrainment rate namelist option is not recognized")
         end
 
         pressure_func_buoy = pressure_normalmode_buoy
+
+        pressure_func_drag_str = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "pressure_closure_drag";
+            default = "normalmode",
+            valid_options = ["normalmode", "normalmode_signdf"],
+        )
+
         drag_sign = false
-        pressure_func_drag = try
-            if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"]) == "normalmode"
-                pressure_normalmode_drag
-            elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"]) == "normalmode_signdf"
-                drag_sign = true
-                pressure_normalmode_drag
-            else
-                error("Turbulence--EDMF_PrognosticTKE: pressure closure in namelist option is not recognized")
-            end
-        catch
-            println("Turbulence--EDMF_PrognosticTKE: defaulting to pressure closure Tan2018")
-            pressure_tan18_drag
+        pressure_func_drag = if pressure_func_drag_str == "normalmode"
+            pressure_normalmode_drag
+        elseif pressure_func_drag_str == "normalmode_signdf"
+            drag_sign = true
+            pressure_normalmode_drag
         end
 
-        asp_label = try
-            string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_asp_label"])
-        catch
-            println("Turbulence--EDMF_PrognosticTKE: H/2R defaulting to constant")
-            "const"
-        end
+        asp_label = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "pressure_closure_asp_label";
+            default = "const",
+        )
 
-        extrapolate_buoyancy = try
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["extrapolate_buoyancy"]
-        catch
-            println("Turbulence--EDMF_PrognosticTKE: defaulting to extrapolation of updraft buoyancy along a pseudoadiabat")
-            true
-        end
-
-        mixing_scheme = try
-            string(namelist["turbulence"]["EDMF_PrognosticTKE"]["mixing_length"])
-        catch
-            println("Using (Tan et al, 2018) default")
-            "default"
-        end
+        extrapolate_buoyancy =
+            parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "extrapolate_buoyancy"; default = true)
 
         # Get values from namelist
         # set defaults at some point?
         surface_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
         max_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"]
         entrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"]
-        entrainment_Mdiv_factor = try
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"]
-        catch
-            0.0
-        end
+        entrainment_Mdiv_factor = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "entrainment_massflux_div_factor";
+            default = 0.0,
+        )
         updraft_mixing_frac = namelist["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"]
         entrainment_sigma = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_sigma"]
         entrainment_smin_tke_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"]
@@ -1024,27 +952,37 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         aspect_ratio = namelist["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"]
 
         if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"]) == "normalmode"
-            pressure_normalmode_buoy_coeff1, pressure_normalmode_buoy_coeff2 = try
-                (
-                    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"],
-                    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff2"],
-                )
-            catch
-                println("Using (Tan et al, 2018) parameters as default for Normal Mode pressure formula buoyancy term")
-                (pressure_buoy_coeff, 0.0)
-            end
+            pressure_normalmode_buoy_coeff1 = parse_namelist(
+                namelist,
+                "turbulence",
+                "EDMF_PrognosticTKE",
+                "pressure_normalmode_buoy_coeff1";
+                default = pressure_buoy_coeff,
+            )
+            pressure_normalmode_buoy_coeff2 = parse_namelist(
+                namelist,
+                "turbulence",
+                "EDMF_PrognosticTKE",
+                "pressure_normalmode_buoy_coeff2";
+                default = 0.0,
+            )
         end
 
         if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"]) == "normalmode"
-            pressure_normalmode_adv_coeff, pressure_normalmode_drag_coeff = try
-                (
-                    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"],
-                    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"],
-                )
-            catch
-                println("Using (Tan et al, 2018) parameters as default for Normal Mode pressure formula drag term")
-                (0.0, 1.0)
-            end
+            pressure_normalmode_adv_coeff = parse_namelist(
+                namelist,
+                "turbulence",
+                "EDMF_PrognosticTKE",
+                "pressure_normalmode_adv_coeff";
+                default = 0.0,
+            )
+            pressure_normalmode_drag_coeff = parse_namelist(
+                namelist,
+                "turbulence",
+                "EDMF_PrognosticTKE",
+                "pressure_normalmode_drag_coeff";
+                default = 1.0,
+            )
         end
 
         # "Legacy" coefficients used by the steady updraft routine
@@ -1157,7 +1095,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             pressure_func_drag,
             asp_label,
             extrapolate_buoyancy,
-            mixing_scheme,
             surface_area,
             max_area,
             entrainment_factor,
