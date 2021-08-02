@@ -20,6 +20,10 @@ best_mse["v_mean"] = 1.2344255867930939e+02
 best_mse["u_mean"] = 5.3486981021128493e+01
 best_mse["tke_mean"] = 3.2038984505851317e+01
 best_mse["temperature_mean"] = 3.1019627325766795e-05
+best_mse["ql_mean"] = 1.5630034030829634e+01
+best_mse["thetal_mean"] = 3.1601763199735002e-05
+best_mse["Hvar_mean"] = 3.4265143495072330e+01
+best_mse["QTvar_mean"] = 1.4543323453279942e+01
 
 @testset "Bomex" begin
     println("Running Bomex...")
@@ -52,5 +56,7 @@ best_mse["temperature_mean"] = 3.1019627325766795e-05
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
     test_mse(computed_mse, best_mse, "temperature_mean")
+    test_mse(computed_mse, best_mse, "ql_mean")
+    test_mse(computed_mse, best_mse, "thetal_mean")
     nothing
 end

@@ -2,6 +2,7 @@ import Plots
 using OrderedCollections
 using Test
 using NCDatasets
+using StatsBase
 using Dierckx
 using PrettyTables
 using Printf

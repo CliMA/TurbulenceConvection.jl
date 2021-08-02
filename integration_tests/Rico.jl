@@ -20,6 +20,10 @@ best_mse["v_mean"] = 1.0610811546766800e+02
 best_mse["u_mean"] = 1.1387870745418634e+02
 best_mse["tke_mean"] = 9.1707254861508807e+02
 best_mse["temperature_mean"] = 2.4294131149581795e-04
+best_mse["ql_mean"] = 1.3122452320829298e+04
+best_mse["thetal_mean"] = 1.8634680078510443e-04
+best_mse["Hvar_mean"] = 1.9466083203062441e+04
+best_mse["QTvar_mean"] = 1.0274739422376710e+05
 
 @testset "Rico" begin
     println("Running Rico...")
@@ -52,5 +56,9 @@ best_mse["temperature_mean"] = 2.4294131149581795e-04
     test_mse(computed_mse, best_mse, "u_mean")
     test_mse(computed_mse, best_mse, "tke_mean")
     test_mse(computed_mse, best_mse, "temperature_mean")
+    test_mse(computed_mse, best_mse, "ql_mean")
+    test_mse(computed_mse, best_mse, "thetal_mean")
+    test_mse(computed_mse, best_mse, "Hvar_mean")
+    test_mse(computed_mse, best_mse, "QTvar_mean")
     nothing
 end
