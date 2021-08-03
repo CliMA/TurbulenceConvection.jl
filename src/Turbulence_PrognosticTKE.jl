@@ -57,38 +57,33 @@ function initialize_io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     add_profile(Stats, "mixing_length_ratio")
     add_profile(Stats, "entdet_balance_length")
     add_profile(Stats, "interdomain_tke_t")
-    if self.calc_tke
-        add_profile(Stats, "tke_buoy")
-        add_profile(Stats, "tke_dissipation")
-        add_profile(Stats, "tke_entr_gain")
-        add_profile(Stats, "tke_detr_loss")
-        add_profile(Stats, "tke_shear")
-        add_profile(Stats, "tke_pressure")
-        add_profile(Stats, "tke_interdomain")
-        add_profile(Stats, "tke_transport")
-        add_profile(Stats, "tke_advection")
-    end
-
-    if self.calc_scalar_var
-        add_profile(Stats, "Hvar_dissipation")
-        add_profile(Stats, "QTvar_dissipation")
-        add_profile(Stats, "HQTcov_dissipation")
-        add_profile(Stats, "Hvar_entr_gain")
-        add_profile(Stats, "QTvar_entr_gain")
-        add_profile(Stats, "Hvar_detr_loss")
-        add_profile(Stats, "QTvar_detr_loss")
-        add_profile(Stats, "HQTcov_detr_loss")
-        add_profile(Stats, "HQTcov_entr_gain")
-        add_profile(Stats, "Hvar_shear")
-        add_profile(Stats, "QTvar_shear")
-        add_profile(Stats, "HQTcov_shear")
-        add_profile(Stats, "Hvar_rain")
-        add_profile(Stats, "QTvar_rain")
-        add_profile(Stats, "HQTcov_rain")
-        add_profile(Stats, "Hvar_interdomain")
-        add_profile(Stats, "QTvar_interdomain")
-        add_profile(Stats, "HQTcov_interdomain")
-    end
+    add_profile(Stats, "tke_buoy")
+    add_profile(Stats, "tke_dissipation")
+    add_profile(Stats, "tke_entr_gain")
+    add_profile(Stats, "tke_detr_loss")
+    add_profile(Stats, "tke_shear")
+    add_profile(Stats, "tke_pressure")
+    add_profile(Stats, "tke_interdomain")
+    add_profile(Stats, "tke_transport")
+    add_profile(Stats, "tke_advection")
+    add_profile(Stats, "Hvar_dissipation")
+    add_profile(Stats, "QTvar_dissipation")
+    add_profile(Stats, "HQTcov_dissipation")
+    add_profile(Stats, "Hvar_entr_gain")
+    add_profile(Stats, "QTvar_entr_gain")
+    add_profile(Stats, "Hvar_detr_loss")
+    add_profile(Stats, "QTvar_detr_loss")
+    add_profile(Stats, "HQTcov_detr_loss")
+    add_profile(Stats, "HQTcov_entr_gain")
+    add_profile(Stats, "Hvar_shear")
+    add_profile(Stats, "QTvar_shear")
+    add_profile(Stats, "HQTcov_shear")
+    add_profile(Stats, "Hvar_rain")
+    add_profile(Stats, "QTvar_rain")
+    add_profile(Stats, "HQTcov_rain")
+    add_profile(Stats, "Hvar_interdomain")
+    add_profile(Stats, "QTvar_interdomain")
+    add_profile(Stats, "HQTcov_interdomain")
     return
 end
 
@@ -209,48 +204,44 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     write_profile(Stats, "mixing_length_ratio", self.ml_ratio[cinterior])
     write_profile(Stats, "entdet_balance_length", self.l_entdet[cinterior])
     write_profile(Stats, "interdomain_tke_t", self.b[cinterior])
-    if self.calc_tke
-        compute_covariance_dissipation(self, self.EnvVar.TKE)
-        write_profile(Stats, "tke_dissipation", self.EnvVar.TKE.dissipation[cinterior])
-        write_profile(Stats, "tke_entr_gain", self.EnvVar.TKE.entr_gain[cinterior])
-        compute_covariance_detr(self, self.EnvVar.TKE)
-        write_profile(Stats, "tke_detr_loss", self.EnvVar.TKE.detr_loss[cinterior])
-        write_profile(Stats, "tke_shear", self.EnvVar.TKE.shear[cinterior])
-        write_profile(Stats, "tke_buoy", self.EnvVar.TKE.buoy[cinterior])
-        write_profile(Stats, "tke_pressure", self.EnvVar.TKE.press[cinterior])
-        write_profile(Stats, "tke_interdomain", self.EnvVar.TKE.interdomain[cinterior])
-        compute_tke_transport(self)
-        write_profile(Stats, "tke_transport", self.tke_transport[cinterior])
-        compute_tke_advection(self)
-        write_profile(Stats, "tke_advection", self.tke_advection[cinterior])
-    end
+    compute_covariance_dissipation(self, self.EnvVar.TKE)
+    write_profile(Stats, "tke_dissipation", self.EnvVar.TKE.dissipation[cinterior])
+    write_profile(Stats, "tke_entr_gain", self.EnvVar.TKE.entr_gain[cinterior])
+    compute_covariance_detr(self, self.EnvVar.TKE)
+    write_profile(Stats, "tke_detr_loss", self.EnvVar.TKE.detr_loss[cinterior])
+    write_profile(Stats, "tke_shear", self.EnvVar.TKE.shear[cinterior])
+    write_profile(Stats, "tke_buoy", self.EnvVar.TKE.buoy[cinterior])
+    write_profile(Stats, "tke_pressure", self.EnvVar.TKE.press[cinterior])
+    write_profile(Stats, "tke_interdomain", self.EnvVar.TKE.interdomain[cinterior])
+    compute_tke_transport(self)
+    write_profile(Stats, "tke_transport", self.tke_transport[cinterior])
+    compute_tke_advection(self)
+    write_profile(Stats, "tke_advection", self.tke_advection[cinterior])
 
-    if self.calc_scalar_var
-        compute_covariance_dissipation(self, self.EnvVar.Hvar)
-        write_profile(Stats, "Hvar_dissipation", self.EnvVar.Hvar.dissipation[cinterior])
-        compute_covariance_dissipation(self, self.EnvVar.QTvar)
-        write_profile(Stats, "QTvar_dissipation", self.EnvVar.QTvar.dissipation[cinterior])
-        compute_covariance_dissipation(self, self.EnvVar.HQTcov)
-        write_profile(Stats, "HQTcov_dissipation", self.EnvVar.HQTcov.dissipation[cinterior])
-        write_profile(Stats, "Hvar_entr_gain", self.EnvVar.Hvar.entr_gain[cinterior])
-        write_profile(Stats, "QTvar_entr_gain", self.EnvVar.QTvar.entr_gain[cinterior])
-        write_profile(Stats, "HQTcov_entr_gain", self.EnvVar.HQTcov.entr_gain[cinterior])
-        compute_covariance_detr(self, self.EnvVar.Hvar)
-        compute_covariance_detr(self, self.EnvVar.QTvar)
-        compute_covariance_detr(self, self.EnvVar.HQTcov)
-        write_profile(Stats, "Hvar_detr_loss", self.EnvVar.Hvar.detr_loss[cinterior])
-        write_profile(Stats, "QTvar_detr_loss", self.EnvVar.QTvar.detr_loss[cinterior])
-        write_profile(Stats, "HQTcov_detr_loss", self.EnvVar.HQTcov.detr_loss[cinterior])
-        write_profile(Stats, "Hvar_shear", self.EnvVar.Hvar.shear[cinterior])
-        write_profile(Stats, "QTvar_shear", self.EnvVar.QTvar.shear[cinterior])
-        write_profile(Stats, "HQTcov_shear", self.EnvVar.HQTcov.shear[cinterior])
-        write_profile(Stats, "Hvar_rain", self.EnvVar.Hvar.rain_src[cinterior])
-        write_profile(Stats, "QTvar_rain", self.EnvVar.QTvar.rain_src[cinterior])
-        write_profile(Stats, "HQTcov_rain", self.EnvVar.HQTcov.rain_src[cinterior])
-        write_profile(Stats, "Hvar_interdomain", self.EnvVar.Hvar.interdomain[cinterior])
-        write_profile(Stats, "QTvar_interdomain", self.EnvVar.QTvar.interdomain[cinterior])
-        write_profile(Stats, "HQTcov_interdomain", self.EnvVar.HQTcov.interdomain[cinterior])
-    end
+    compute_covariance_dissipation(self, self.EnvVar.Hvar)
+    write_profile(Stats, "Hvar_dissipation", self.EnvVar.Hvar.dissipation[cinterior])
+    compute_covariance_dissipation(self, self.EnvVar.QTvar)
+    write_profile(Stats, "QTvar_dissipation", self.EnvVar.QTvar.dissipation[cinterior])
+    compute_covariance_dissipation(self, self.EnvVar.HQTcov)
+    write_profile(Stats, "HQTcov_dissipation", self.EnvVar.HQTcov.dissipation[cinterior])
+    write_profile(Stats, "Hvar_entr_gain", self.EnvVar.Hvar.entr_gain[cinterior])
+    write_profile(Stats, "QTvar_entr_gain", self.EnvVar.QTvar.entr_gain[cinterior])
+    write_profile(Stats, "HQTcov_entr_gain", self.EnvVar.HQTcov.entr_gain[cinterior])
+    compute_covariance_detr(self, self.EnvVar.Hvar)
+    compute_covariance_detr(self, self.EnvVar.QTvar)
+    compute_covariance_detr(self, self.EnvVar.HQTcov)
+    write_profile(Stats, "Hvar_detr_loss", self.EnvVar.Hvar.detr_loss[cinterior])
+    write_profile(Stats, "QTvar_detr_loss", self.EnvVar.QTvar.detr_loss[cinterior])
+    write_profile(Stats, "HQTcov_detr_loss", self.EnvVar.HQTcov.detr_loss[cinterior])
+    write_profile(Stats, "Hvar_shear", self.EnvVar.Hvar.shear[cinterior])
+    write_profile(Stats, "QTvar_shear", self.EnvVar.QTvar.shear[cinterior])
+    write_profile(Stats, "HQTcov_shear", self.EnvVar.HQTcov.shear[cinterior])
+    write_profile(Stats, "Hvar_rain", self.EnvVar.Hvar.rain_src[cinterior])
+    write_profile(Stats, "QTvar_rain", self.EnvVar.QTvar.rain_src[cinterior])
+    write_profile(Stats, "HQTcov_rain", self.EnvVar.HQTcov.rain_src[cinterior])
+    write_profile(Stats, "Hvar_interdomain", self.EnvVar.Hvar.interdomain[cinterior])
+    write_profile(Stats, "QTvar_interdomain", self.EnvVar.QTvar.interdomain[cinterior])
+    write_profile(Stats, "HQTcov_interdomain", self.EnvVar.HQTcov.interdomain[cinterior])
     return
 end
 
@@ -273,14 +264,10 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
         initialize_covariance(self, GMV, Case)
 
         @inbounds for k in center_indicies(grid)
-            if self.calc_tke
-                self.EnvVar.TKE.values[k] = GMV.TKE.values[k]
-            end
-            if self.calc_scalar_var
-                self.EnvVar.Hvar.values[k] = GMV.Hvar.values[k]
-                self.EnvVar.QTvar.values[k] = GMV.QTvar.values[k]
-                self.EnvVar.HQTcov.values[k] = GMV.HQTcov.values[k]
-            end
+            self.EnvVar.TKE.values[k] = GMV.TKE.values[k]
+            self.EnvVar.Hvar.values[k] = GMV.Hvar.values[k]
+            self.EnvVar.QTvar.values[k] = GMV.QTvar.values[k]
+            self.EnvVar.HQTcov.values[k] = GMV.HQTcov.values[k]
         end
     end
 
@@ -546,18 +533,14 @@ end
 
 function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
     grid = get_grid(self)
-    if self.similarity_diffusivity
-        compute_eddy_diffusivities_similarity(self.base, GMV, Case)
-    else
-        compute_mixing_length(self, Case.Sur.obukhov_length, Case.Sur.ustar, GMV)
-        KM = diffusivity_m(self)
-        KH = diffusivity_h(self)
-        @inbounds for k in real_center_indicies(grid)
-            lm = self.mixing_length[k]
-            pr = self.prandtl_nvec[k]
-            KM.values[k] = self.tke_ed_coeff * lm * sqrt(fmax(self.EnvVar.TKE.values[k], 0.0))
-            KH.values[k] = KM.values[k] / pr
-        end
+    compute_mixing_length(self, Case.Sur.obukhov_length, Case.Sur.ustar, GMV)
+    KM = diffusivity_m(self)
+    KH = diffusivity_h(self)
+    @inbounds for k in real_center_indicies(grid)
+        lm = self.mixing_length[k]
+        pr = self.prandtl_nvec[k]
+        KM.values[k] = self.tke_ed_coeff * lm * sqrt(fmax(self.EnvVar.TKE.values[k], 0.0))
+        KH.values[k] = KM.values[k] / pr
     end
     return
 end
@@ -631,10 +614,87 @@ function reset_surface_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     ustar = Case.Sur.ustar
     oblength = Case.Sur.obukhov_length
     alpha0LL = ref_state.alpha0_half[grid.gw]
+    self.EnvVar.TKE.values[grid.gw] =
+        get_surface_tke(Case.Sur.ustar, self.wstar, grid.z_half[grid.gw], Case.Sur.obukhov_length)
+    get_GMV_CoVar(
+        self,
+        self.UpdVar.Area,
+        self.UpdVar.W,
+        self.UpdVar.W,
+        self.EnvVar.W,
+        self.EnvVar.W,
+        self.EnvVar.TKE,
+        GMV.W.values,
+        GMV.W.values,
+        GMV.TKE.values,
+    )
 
-    if self.calc_tke
-        self.EnvVar.TKE.values[grid.gw] =
-            get_surface_tke(Case.Sur.ustar, self.wstar, grid.z_half[grid.gw], Case.Sur.obukhov_length)
+    self.EnvVar.Hvar.values[grid.gw] = get_surface_variance(flux1 * alpha0LL, flux1 * alpha0LL, ustar, zLL, oblength)
+    self.EnvVar.QTvar.values[grid.gw] = get_surface_variance(flux2 * alpha0LL, flux2 * alpha0LL, ustar, zLL, oblength)
+    self.EnvVar.HQTcov.values[grid.gw] = get_surface_variance(flux1 * alpha0LL, flux2 * alpha0LL, ustar, zLL, oblength)
+    get_GMV_CoVar(
+        self,
+        self.UpdVar.Area,
+        self.UpdVar.H,
+        self.UpdVar.H,
+        self.EnvVar.H,
+        self.EnvVar.H,
+        self.EnvVar.Hvar,
+        GMV.H.values,
+        GMV.H.values,
+        GMV.Hvar.values,
+    )
+    get_GMV_CoVar(
+        self,
+        self.UpdVar.Area,
+        self.UpdVar.QT,
+        self.UpdVar.QT,
+        self.EnvVar.QT,
+        self.EnvVar.QT,
+        self.EnvVar.QTvar,
+        GMV.QT.values,
+        GMV.QT.values,
+        GMV.QTvar.values,
+    )
+    get_GMV_CoVar(
+        self,
+        self.UpdVar.Area,
+        self.UpdVar.H,
+        self.UpdVar.QT,
+        self.EnvVar.H,
+        self.EnvVar.QT,
+        self.EnvVar.HQTcov,
+        GMV.H.values,
+        GMV.QT.values,
+        GMV.HQTcov.values,
+    )
+    return
+end
+
+# Find values of environmental variables by subtracting updraft values from grid mean values
+# whichvals used to check which substep we are on--correspondingly use "GMV.SomeVar.value" (last timestep value)
+# or GMV.SomeVar.mf_update (GMV value following massflux substep)
+function decompose_environment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, whichvals)
+
+    # first make sure the "bulkvalues" of the updraft variables are updated
+    set_means(self.UpdVar, GMV)
+    grid = get_grid(self)
+
+    gw = grid.gw
+
+    if whichvals == "values"
+        @inbounds for k in real_face_indicies(grid)
+            val1 = 1.0 / (1.0 - self.UpdVar.Area.bulkvalues[k])
+            val2 = self.UpdVar.Area.bulkvalues[k] * val1
+
+            self.EnvVar.Area.values[k] = 1.0 - self.UpdVar.Area.bulkvalues[k]
+            self.EnvVar.QT.values[k] = fmax(val1 * GMV.QT.values[k] - val2 * self.UpdVar.QT.bulkvalues[k], 0.0) #Yair - this is here to prevent negative QT
+            self.EnvVar.H.values[k] = val1 * GMV.H.values[k] - val2 * self.UpdVar.H.bulkvalues[k]
+            # Have to account for staggering of W--interpolate area fraction to the "full" grid points
+            # Assuming GMV.W = 0!
+            au_full = 0.5 * (self.UpdVar.Area.bulkvalues[k + 1] + self.UpdVar.Area.bulkvalues[k])
+            self.EnvVar.W.values[k] = -au_full / (1.0 - au_full) * self.UpdVar.W.bulkvalues[k]
+        end
         get_GMV_CoVar(
             self,
             self.UpdVar.Area,
@@ -647,15 +707,6 @@ function reset_surface_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
             GMV.W.values,
             GMV.TKE.values,
         )
-    end
-
-    if self.calc_scalar_var
-        self.EnvVar.Hvar.values[grid.gw] =
-            get_surface_variance(flux1 * alpha0LL, flux1 * alpha0LL, ustar, zLL, oblength)
-        self.EnvVar.QTvar.values[grid.gw] =
-            get_surface_variance(flux2 * alpha0LL, flux2 * alpha0LL, ustar, zLL, oblength)
-        self.EnvVar.HQTcov.values[grid.gw] =
-            get_surface_variance(flux1 * alpha0LL, flux2 * alpha0LL, ustar, zLL, oblength)
         get_GMV_CoVar(
             self,
             self.UpdVar.Area,
@@ -692,87 +743,6 @@ function reset_surface_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
             GMV.QT.values,
             GMV.HQTcov.values,
         )
-    end
-    return
-end
-
-# Find values of environmental variables by subtracting updraft values from grid mean values
-# whichvals used to check which substep we are on--correspondingly use "GMV.SomeVar.value" (last timestep value)
-# or GMV.SomeVar.mf_update (GMV value following massflux substep)
-function decompose_environment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, whichvals)
-
-    # first make sure the "bulkvalues" of the updraft variables are updated
-    set_means(self.UpdVar, GMV)
-    grid = get_grid(self)
-
-    gw = grid.gw
-
-    if whichvals == "values"
-        @inbounds for k in real_face_indicies(grid)
-            val1 = 1.0 / (1.0 - self.UpdVar.Area.bulkvalues[k])
-            val2 = self.UpdVar.Area.bulkvalues[k] * val1
-
-            self.EnvVar.Area.values[k] = 1.0 - self.UpdVar.Area.bulkvalues[k]
-            self.EnvVar.QT.values[k] = fmax(val1 * GMV.QT.values[k] - val2 * self.UpdVar.QT.bulkvalues[k], 0.0) #Yair - this is here to prevent negative QT
-            self.EnvVar.H.values[k] = val1 * GMV.H.values[k] - val2 * self.UpdVar.H.bulkvalues[k]
-            # Have to account for staggering of W--interpolate area fraction to the "full" grid points
-            # Assuming GMV.W = 0!
-            au_full = 0.5 * (self.UpdVar.Area.bulkvalues[k + 1] + self.UpdVar.Area.bulkvalues[k])
-            self.EnvVar.W.values[k] = -au_full / (1.0 - au_full) * self.UpdVar.W.bulkvalues[k]
-        end
-
-        if self.calc_tke
-            get_GMV_CoVar(
-                self,
-                self.UpdVar.Area,
-                self.UpdVar.W,
-                self.UpdVar.W,
-                self.EnvVar.W,
-                self.EnvVar.W,
-                self.EnvVar.TKE,
-                GMV.W.values,
-                GMV.W.values,
-                GMV.TKE.values,
-            )
-        end
-        if self.calc_scalar_var
-            get_GMV_CoVar(
-                self,
-                self.UpdVar.Area,
-                self.UpdVar.H,
-                self.UpdVar.H,
-                self.EnvVar.H,
-                self.EnvVar.H,
-                self.EnvVar.Hvar,
-                GMV.H.values,
-                GMV.H.values,
-                GMV.Hvar.values,
-            )
-            get_GMV_CoVar(
-                self,
-                self.UpdVar.Area,
-                self.UpdVar.QT,
-                self.UpdVar.QT,
-                self.EnvVar.QT,
-                self.EnvVar.QT,
-                self.EnvVar.QTvar,
-                GMV.QT.values,
-                GMV.QT.values,
-                GMV.QTvar.values,
-            )
-            get_GMV_CoVar(
-                self,
-                self.UpdVar.Area,
-                self.UpdVar.H,
-                self.UpdVar.QT,
-                self.EnvVar.H,
-                self.EnvVar.QT,
-                self.EnvVar.HQTcov,
-                GMV.H.values,
-                GMV.QT.values,
-                GMV.HQTcov.values,
-            )
-        end
 
 
     elseif whichvals == "mf_update"
@@ -790,59 +760,55 @@ function decompose_environment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
             self.EnvVar.W.values[k] = -au_full / (1.0 - au_full) * self.UpdVar.W.bulkvalues[k]
         end
 
-        if self.calc_tke
-            get_GMV_CoVar(
-                self,
-                self.UpdVar.Area,
-                self.UpdVar.W,
-                self.UpdVar.W,
-                self.EnvVar.W,
-                self.EnvVar.W,
-                self.EnvVar.TKE,
-                GMV.W.values,
-                GMV.W.values,
-                GMV.TKE.values,
-            )
-        end
+        get_GMV_CoVar(
+            self,
+            self.UpdVar.Area,
+            self.UpdVar.W,
+            self.UpdVar.W,
+            self.EnvVar.W,
+            self.EnvVar.W,
+            self.EnvVar.TKE,
+            GMV.W.values,
+            GMV.W.values,
+            GMV.TKE.values,
+        )
 
-        if self.calc_scalar_var
-            get_GMV_CoVar(
-                self,
-                self.UpdVar.Area,
-                self.UpdVar.H,
-                self.UpdVar.H,
-                self.EnvVar.H,
-                self.EnvVar.H,
-                self.EnvVar.Hvar,
-                GMV.H.values,
-                GMV.H.values,
-                GMV.Hvar.values,
-            )
-            get_GMV_CoVar(
-                self,
-                self.UpdVar.Area,
-                self.UpdVar.QT,
-                self.UpdVar.QT,
-                self.EnvVar.QT,
-                self.EnvVar.QT,
-                self.EnvVar.QTvar,
-                GMV.QT.values,
-                GMV.QT.values,
-                GMV.QTvar.values,
-            )
-            get_GMV_CoVar(
-                self,
-                self.UpdVar.Area,
-                self.UpdVar.H,
-                self.UpdVar.QT,
-                self.EnvVar.H,
-                self.EnvVar.QT,
-                self.EnvVar.HQTcov,
-                GMV.H.values,
-                GMV.QT.values,
-                GMV.HQTcov.values,
-            )
-        end
+        get_GMV_CoVar(
+            self,
+            self.UpdVar.Area,
+            self.UpdVar.H,
+            self.UpdVar.H,
+            self.EnvVar.H,
+            self.EnvVar.H,
+            self.EnvVar.Hvar,
+            GMV.H.values,
+            GMV.H.values,
+            GMV.Hvar.values,
+        )
+        get_GMV_CoVar(
+            self,
+            self.UpdVar.Area,
+            self.UpdVar.QT,
+            self.UpdVar.QT,
+            self.EnvVar.QT,
+            self.EnvVar.QT,
+            self.EnvVar.QTvar,
+            GMV.QT.values,
+            GMV.QT.values,
+            GMV.QTvar.values,
+        )
+        get_GMV_CoVar(
+            self,
+            self.UpdVar.Area,
+            self.UpdVar.H,
+            self.UpdVar.QT,
+            self.EnvVar.H,
+            self.EnvVar.QT,
+            self.EnvVar.HQTcov,
+            GMV.H.values,
+            GMV.QT.values,
+            GMV.HQTcov.values,
+        )
     end
 
     return
@@ -1082,10 +1048,7 @@ function compute_entrainment_detrainment(self::EDMF_PrognosticTKE, GMV::GridMean
                 input.M = input.a_upd * (input.w_upd - gmv_w_k)
                 Mm = self.UpdVar.Area.values[i, k - 1] * (upd_w_km - gmv_w_km)
                 input.dMdz = (input.M - Mm) * grid.dzi
-
-                if self.calc_tke
-                    input.tke = self.EnvVar.TKE.values[k]
-                end
+                input.tke = self.EnvVar.TKE.values[k]
 
                 ret = self.entr_detr_fp(input)
                 self.entr_sc[i, k] = ret.entr_sc
@@ -1737,195 +1700,184 @@ end
 
 function compute_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
 
-    if self.similarity_diffusivity # otherwise, we computed mixing length when we computed
-        compute_mixing_length(self, Case.Sur.obukhov_length, Case.Sur.ustar, GMV)
-    end
-    if self.calc_tke
-        compute_tke_buoy(self, GMV)
-        compute_covariance_entr(
-            self,
-            self.EnvVar.TKE,
-            self.UpdVar.W,
-            self.UpdVar.W,
-            self.EnvVar.W,
-            self.EnvVar.W,
-            GMV.W,
-            GMV.W,
-        )
-        compute_covariance_shear(
-            self,
-            GMV,
-            self.EnvVar.TKE,
-            self.UpdVar.W.values,
-            self.UpdVar.W.values,
-            self.EnvVar.W.values,
-            self.EnvVar.W.values,
-        )
-        compute_covariance_interdomain_src(
-            self,
-            self.UpdVar.Area,
-            self.UpdVar.W,
-            self.UpdVar.W,
-            self.EnvVar.W,
-            self.EnvVar.W,
-            self.EnvVar.TKE,
-        )
-        compute_tke_pressure(self)
-    end
-    if self.calc_scalar_var
-        compute_covariance_entr(
-            self,
-            self.EnvVar.Hvar,
-            self.UpdVar.H,
-            self.UpdVar.H,
-            self.EnvVar.H,
-            self.EnvVar.H,
-            GMV.H,
-            GMV.H,
-        )
-        compute_covariance_entr(
-            self,
-            self.EnvVar.QTvar,
-            self.UpdVar.QT,
-            self.UpdVar.QT,
-            self.EnvVar.QT,
-            self.EnvVar.QT,
-            GMV.QT,
-            GMV.QT,
-        )
-        compute_covariance_entr(
-            self,
-            self.EnvVar.HQTcov,
-            self.UpdVar.H,
-            self.UpdVar.QT,
-            self.EnvVar.H,
-            self.EnvVar.QT,
-            GMV.H,
-            GMV.QT,
-        )
-        compute_covariance_shear(
-            self,
-            GMV,
-            self.EnvVar.Hvar,
-            self.UpdVar.H.values,
-            self.UpdVar.H.values,
-            self.EnvVar.H.values,
-            self.EnvVar.H.values,
-        )
-        compute_covariance_shear(
-            self,
-            GMV,
-            self.EnvVar.QTvar,
-            self.UpdVar.QT.values,
-            self.UpdVar.QT.values,
-            self.EnvVar.QT.values,
-            self.EnvVar.QT.values,
-        )
-        compute_covariance_shear(
-            self,
-            GMV,
-            self.EnvVar.HQTcov,
-            self.UpdVar.H.values,
-            self.UpdVar.QT.values,
-            self.EnvVar.H.values,
-            self.EnvVar.QT.values,
-        )
-        compute_covariance_interdomain_src(
-            self,
-            self.UpdVar.Area,
-            self.UpdVar.H,
-            self.UpdVar.H,
-            self.EnvVar.H,
-            self.EnvVar.H,
-            self.EnvVar.Hvar,
-        )
-        compute_covariance_interdomain_src(
-            self,
-            self.UpdVar.Area,
-            self.UpdVar.QT,
-            self.UpdVar.QT,
-            self.EnvVar.QT,
-            self.EnvVar.QT,
-            self.EnvVar.QTvar,
-        )
-        compute_covariance_interdomain_src(
-            self,
-            self.UpdVar.Area,
-            self.UpdVar.H,
-            self.UpdVar.QT,
-            self.EnvVar.H,
-            self.EnvVar.QT,
-            self.EnvVar.HQTcov,
-        )
-        compute_covariance_rain(self, TS, GMV) # need to update this one
+    compute_tke_buoy(self, GMV)
+    compute_covariance_entr(
+        self,
+        self.EnvVar.TKE,
+        self.UpdVar.W,
+        self.UpdVar.W,
+        self.EnvVar.W,
+        self.EnvVar.W,
+        GMV.W,
+        GMV.W,
+    )
+    compute_covariance_shear(
+        self,
+        GMV,
+        self.EnvVar.TKE,
+        self.UpdVar.W.values,
+        self.UpdVar.W.values,
+        self.EnvVar.W.values,
+        self.EnvVar.W.values,
+    )
+    compute_covariance_interdomain_src(
+        self,
+        self.UpdVar.Area,
+        self.UpdVar.W,
+        self.UpdVar.W,
+        self.EnvVar.W,
+        self.EnvVar.W,
+        self.EnvVar.TKE,
+    )
+    compute_tke_pressure(self)
+    compute_covariance_entr(
+        self,
+        self.EnvVar.Hvar,
+        self.UpdVar.H,
+        self.UpdVar.H,
+        self.EnvVar.H,
+        self.EnvVar.H,
+        GMV.H,
+        GMV.H,
+    )
+    compute_covariance_entr(
+        self,
+        self.EnvVar.QTvar,
+        self.UpdVar.QT,
+        self.UpdVar.QT,
+        self.EnvVar.QT,
+        self.EnvVar.QT,
+        GMV.QT,
+        GMV.QT,
+    )
+    compute_covariance_entr(
+        self,
+        self.EnvVar.HQTcov,
+        self.UpdVar.H,
+        self.UpdVar.QT,
+        self.EnvVar.H,
+        self.EnvVar.QT,
+        GMV.H,
+        GMV.QT,
+    )
+    compute_covariance_shear(
+        self,
+        GMV,
+        self.EnvVar.Hvar,
+        self.UpdVar.H.values,
+        self.UpdVar.H.values,
+        self.EnvVar.H.values,
+        self.EnvVar.H.values,
+    )
+    compute_covariance_shear(
+        self,
+        GMV,
+        self.EnvVar.QTvar,
+        self.UpdVar.QT.values,
+        self.UpdVar.QT.values,
+        self.EnvVar.QT.values,
+        self.EnvVar.QT.values,
+    )
+    compute_covariance_shear(
+        self,
+        GMV,
+        self.EnvVar.HQTcov,
+        self.UpdVar.H.values,
+        self.UpdVar.QT.values,
+        self.EnvVar.H.values,
+        self.EnvVar.QT.values,
+    )
+    compute_covariance_interdomain_src(
+        self,
+        self.UpdVar.Area,
+        self.UpdVar.H,
+        self.UpdVar.H,
+        self.EnvVar.H,
+        self.EnvVar.H,
+        self.EnvVar.Hvar,
+    )
+    compute_covariance_interdomain_src(
+        self,
+        self.UpdVar.Area,
+        self.UpdVar.QT,
+        self.UpdVar.QT,
+        self.EnvVar.QT,
+        self.EnvVar.QT,
+        self.EnvVar.QTvar,
+    )
+    compute_covariance_interdomain_src(
+        self,
+        self.UpdVar.Area,
+        self.UpdVar.H,
+        self.UpdVar.QT,
+        self.EnvVar.H,
+        self.EnvVar.QT,
+        self.EnvVar.HQTcov,
+    )
+    compute_covariance_rain(self, TS, GMV) # need to update this one
 
-        GMV_third_m(self, GMV.H_third_m, self.EnvVar.Hvar, self.EnvVar.H, self.UpdVar.H)
-        GMV_third_m(self, GMV.QT_third_m, self.EnvVar.QTvar, self.EnvVar.QT, self.UpdVar.QT)
-        GMV_third_m(self, GMV.W_third_m, self.EnvVar.TKE, self.EnvVar.W, self.UpdVar.W)
-    end
+    GMV_third_m(self, GMV.H_third_m, self.EnvVar.Hvar, self.EnvVar.H, self.UpdVar.H)
+    GMV_third_m(self, GMV.QT_third_m, self.EnvVar.QTvar, self.EnvVar.QT, self.UpdVar.QT)
+    GMV_third_m(self, GMV.W_third_m, self.EnvVar.TKE, self.EnvVar.W, self.UpdVar.W)
 
     reset_surface_covariance(self, GMV, Case)
-    if self.calc_tke
-        update_covariance_ED(
-            self,
-            GMV,
-            Case,
-            TS,
-            GMV.W,
-            GMV.W,
-            GMV.TKE,
-            self.EnvVar.TKE,
-            self.EnvVar.W,
-            self.EnvVar.W,
-            self.UpdVar.W,
-            self.UpdVar.W,
-        )
-    end
-    if self.calc_scalar_var
-        update_covariance_ED(
-            self,
-            GMV,
-            Case,
-            TS,
-            GMV.H,
-            GMV.H,
-            GMV.Hvar,
-            self.EnvVar.Hvar,
-            self.EnvVar.H,
-            self.EnvVar.H,
-            self.UpdVar.H,
-            self.UpdVar.H,
-        )
-        update_covariance_ED(
-            self,
-            GMV,
-            Case,
-            TS,
-            GMV.QT,
-            GMV.QT,
-            GMV.QTvar,
-            self.EnvVar.QTvar,
-            self.EnvVar.QT,
-            self.EnvVar.QT,
-            self.UpdVar.QT,
-            self.UpdVar.QT,
-        )
-        update_covariance_ED(
-            self,
-            GMV,
-            Case,
-            TS,
-            GMV.H,
-            GMV.QT,
-            GMV.HQTcov,
-            self.EnvVar.HQTcov,
-            self.EnvVar.H,
-            self.EnvVar.QT,
-            self.UpdVar.H,
-            self.UpdVar.QT,
-        )
-        cleanup_covariance(self, GMV)
-    end
+    update_covariance_ED(
+        self,
+        GMV,
+        Case,
+        TS,
+        GMV.W,
+        GMV.W,
+        GMV.TKE,
+        self.EnvVar.TKE,
+        self.EnvVar.W,
+        self.EnvVar.W,
+        self.UpdVar.W,
+        self.UpdVar.W,
+    )
+    update_covariance_ED(
+        self,
+        GMV,
+        Case,
+        TS,
+        GMV.H,
+        GMV.H,
+        GMV.Hvar,
+        self.EnvVar.Hvar,
+        self.EnvVar.H,
+        self.EnvVar.H,
+        self.UpdVar.H,
+        self.UpdVar.H,
+    )
+    update_covariance_ED(
+        self,
+        GMV,
+        Case,
+        TS,
+        GMV.QT,
+        GMV.QT,
+        GMV.QTvar,
+        self.EnvVar.QTvar,
+        self.EnvVar.QT,
+        self.EnvVar.QT,
+        self.UpdVar.QT,
+        self.UpdVar.QT,
+    )
+    update_covariance_ED(
+        self,
+        GMV,
+        Case,
+        TS,
+        GMV.H,
+        GMV.QT,
+        GMV.HQTcov,
+        self.EnvVar.HQTcov,
+        self.EnvVar.H,
+        self.EnvVar.QT,
+        self.UpdVar.H,
+        self.UpdVar.QT,
+    )
+    cleanup_covariance(self, GMV)
     return
 end
 
@@ -1938,77 +1890,74 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
 
     reset_surface_covariance(self, GMV, Case)
 
-    if self.calc_tke
-        if ws > 0.0
-            @inbounds for k in center_indicies(grid)
-                z = grid.z_half[k]
-                GMV.TKE.values[k] =
-                    ws * 1.3 * cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) * sqrt(fmax(1.0 - z / zs, 0.0))
+
+    if ws > 0.0
+        @inbounds for k in center_indicies(grid)
+            z = grid.z_half[k]
+            GMV.TKE.values[k] =
+                ws * 1.3 * cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) * sqrt(fmax(1.0 - z / zs, 0.0))
+        end
+    end
+    # TKE initialization from Beare et al, 2006
+    if Case.casename == "GABLS"
+        @inbounds for k in center_indicies(grid)
+            z = grid.z_half[k]
+            if (z <= 250.0)
+                GMV.TKE.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
             end
         end
-        # TKE initialization from Beare et al, 2006
-        if Case.casename == "GABLS"
-            @inbounds for k in center_indicies(grid)
-                z = grid.z_half[k]
-                if (z <= 250.0)
-                    GMV.TKE.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
-                end
-            end
 
-        elseif Case.casename == "Bomex"
-            @inbounds for k in center_indicies(grid)
-                z = grid.z_half[k]
-                if (z <= 2500.0)
-                    GMV.TKE.values[k] = 1.0 - z / 3000.0
-                end
+    elseif Case.casename == "Bomex"
+        @inbounds for k in center_indicies(grid)
+            z = grid.z_half[k]
+            if (z <= 2500.0)
+                GMV.TKE.values[k] = 1.0 - z / 3000.0
             end
+        end
 
-        elseif Case.casename == "Soares" || Case.casename == "Nieuwstadt"
-            @inbounds for k in center_indicies(grid)
-                z = grid.z_half[k]
-                if (z <= 1600.0)
-                    GMV.TKE.values[k] = 0.1 * 1.46 * 1.46 * (1.0 - z / 1600.0)
-                end
+    elseif Case.casename == "Soares" || Case.casename == "Nieuwstadt"
+        @inbounds for k in center_indicies(grid)
+            z = grid.z_half[k]
+            if (z <= 1600.0)
+                GMV.TKE.values[k] = 0.1 * 1.46 * 1.46 * (1.0 - z / 1600.0)
             end
         end
     end
 
-    if self.calc_scalar_var
-        if ws > 0.0
-            @inbounds for k in center_indicies(grid)
-                z = grid.z_half[k]
-                # need to rethink of how to initilize the covarinace profiles - for nowmI took the TKE profile
-                GMV.Hvar.values[k] =
-                    GMV.Hvar.values[grid.gw] *
-                    ws *
-                    1.3 *
-                    cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) *
-                    sqrt(fmax(1.0 - z / zs, 0.0))
-                GMV.QTvar.values[k] =
-                    GMV.QTvar.values[grid.gw] *
-                    ws *
-                    1.3 *
-                    cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) *
-                    sqrt(fmax(1.0 - z / zs, 0.0))
-                GMV.HQTcov.values[k] =
-                    GMV.HQTcov.values[grid.gw] *
-                    ws *
-                    1.3 *
-                    cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) *
-                    sqrt(fmax(1.0 - z / zs, 0.0))
-            end
+    if ws > 0.0
+        @inbounds for k in center_indicies(grid)
+            z = grid.z_half[k]
+            # need to rethink of how to initilize the covarinace profiles - for nowmI took the TKE profile
+            GMV.Hvar.values[k] =
+                GMV.Hvar.values[grid.gw] *
+                ws *
+                1.3 *
+                cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) *
+                sqrt(fmax(1.0 - z / zs, 0.0))
+            GMV.QTvar.values[k] =
+                GMV.QTvar.values[grid.gw] *
+                ws *
+                1.3 *
+                cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) *
+                sqrt(fmax(1.0 - z / zs, 0.0))
+            GMV.HQTcov.values[k] =
+                GMV.HQTcov.values[grid.gw] *
+                ws *
+                1.3 *
+                cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) *
+                sqrt(fmax(1.0 - z / zs, 0.0))
         end
+    end
 
-        # TKE initialization from Beare et al, 2006
-        if Case.casename == "GABLS"
-            @inbounds for k in center_indicies(grid)
-                z = grid.z_half[k]
-                if (z <= 250.0)
-                    GMV.Hvar.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
-                end
-                GMV.QTvar.values[k] = 0.0
-                GMV.HQTcov.values[k] = 0.0
+    # TKE initialization from Beare et al, 2006
+    if Case.casename == "GABLS"
+        @inbounds for k in center_indicies(grid)
+            z = grid.z_half[k]
+            if (z <= 250.0)
+                GMV.Hvar.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
             end
+            GMV.QTvar.values[k] = 0.0
+            GMV.HQTcov.values[k] = 0.0
         end
     end
     return

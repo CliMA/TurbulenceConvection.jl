@@ -23,7 +23,6 @@ def sim_data(request):
     setup = cmn.simulation_setup("ARM_SGP")
 
     # change the defaults if needed
-    # setup["namelist"]["turbulence"]["EDMF_PrognosticTKE"]["calc_scalar_var"] = True
 
     # run TurbulenceConvection
     subprocess.call("python setup.py build_ext --inplace", shell=True, cwd="../")

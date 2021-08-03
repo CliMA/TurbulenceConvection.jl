@@ -22,7 +22,6 @@ def sim_data(request):
     # generate namelists and paramlists
     setup = cmn.simulation_setup("Bomex")
     # change the defaults
-    #setup["namelist"]["turbulence"]["EDMF_PrognosticTKE"]["calc_scalar_var"] = True
 
     # run TurbulenceConvection
     subprocess.call("python setup.py build_ext --inplace", shell=True, cwd="../")

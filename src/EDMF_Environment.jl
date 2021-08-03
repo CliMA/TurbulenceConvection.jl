@@ -35,15 +35,10 @@ function initialize_io(self::EnvironmentVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "env_temperature")
     add_profile(Stats, "env_RH")
     add_profile(Stats, "env_thetal")
-
-    if self.calc_tke
-        add_profile(Stats, "env_tke")
-    end
-    if self.calc_scalar_var
-        add_profile(Stats, "env_Hvar")
-        add_profile(Stats, "env_QTvar")
-        add_profile(Stats, "env_HQTcov")
-    end
+    add_profile(Stats, "env_tke")
+    add_profile(Stats, "env_Hvar")
+    add_profile(Stats, "env_QTvar")
+    add_profile(Stats, "env_HQTcov")
 
     add_profile(Stats, "env_cloud_fraction")
 
@@ -65,15 +60,10 @@ function io(self::EnvironmentVariables, Stats::NetCDFIO_Stats, Ref::ReferenceSta
     write_profile(Stats, "env_temperature", self.T.values[cinterior])
     write_profile(Stats, "env_RH", self.RH.values[cinterior])
     write_profile(Stats, "env_thetal", self.H.values[cinterior])
-
-    if self.calc_tke
-        write_profile(Stats, "env_tke", self.TKE.values[cinterior])
-    end
-    if self.calc_scalar_var
-        write_profile(Stats, "env_Hvar", self.Hvar.values[cinterior])
-        write_profile(Stats, "env_QTvar", self.QTvar.values[cinterior])
-        write_profile(Stats, "env_HQTcov", self.HQTcov.values[cinterior])
-    end
+    write_profile(Stats, "env_tke", self.TKE.values[cinterior])
+    write_profile(Stats, "env_Hvar", self.Hvar.values[cinterior])
+    write_profile(Stats, "env_QTvar", self.QTvar.values[cinterior])
+    write_profile(Stats, "env_HQTcov", self.HQTcov.values[cinterior])
 
     write_profile(Stats, "env_cloud_fraction", self.cloud_fraction.values[cinterior])
 
