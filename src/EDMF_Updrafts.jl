@@ -153,8 +153,6 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
                 # for now temperature is provided as diagnostics from LES
 
                 # sa = eos(
-                #     t_to_thetali_c,
-                #     eos_first_guess_thetal,
                 #     Ref.p0_half[k],
                 #     self.QT.values[i,k],
                 #     self.H.values[i,k]
@@ -439,7 +437,7 @@ function buoyancy(
                 elseif UpdVar.Area.values[i, k - 1] > 0.0 && k > self.Gr.gw
                     # TODO: report bug:
                     # qt and h were not defined here before the function call.
-                    sa = eos(self.t_to_prog_fp, self.prog_to_t_fp, self.Ref.p0_half[k], qt, h)
+                    sa = eos(self.Ref.p0_half[k], qt, h)
                     qt -= sa.ql
                     qv = qt
                     t = sa.T

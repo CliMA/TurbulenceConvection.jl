@@ -107,7 +107,7 @@ function eos_first_guess_entropy(H, pd, pv, qt)
     )
 end
 
-function eos(t_to_prog, prog_to_t, p0, qt, prog)
+function eos(p0, qt, prog; t_to_prog = t_to_thetali_c, prog_to_t = eos_first_guess_thetal)
     qv = qt
     ql = 0.0
 

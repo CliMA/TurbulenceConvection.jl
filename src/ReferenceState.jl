@@ -50,7 +50,7 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
     # determine the reference pressure
 
     function rhs(p, u, z)
-        ret = eos(t_to_entropy_c, eos_first_guess_entropy, exp(p), self.qtg, self.sg)
+        ret = eos(exp(p), self.qtg, self.sg; t_to_prog = t_to_entropy_c, prog_to_t = eos_first_guess_entropy)
         q_i = 0.0
         q_l = ret.ql
         T = ret.T
@@ -109,7 +109,7 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
     # Compute reference state thermodynamic profiles
 
     @inbounds for k in center_indicies(Gr)
-        ret = eos(t_to_entropy_c, eos_first_guess_entropy, p_half_[k], self.qtg, self.sg)
+        ret = eos(p_half_[k], self.qtg, self.sg; t_to_prog = t_to_entropy_c, prog_to_t = eos_first_guess_entropy)
         temperature_half[k] = ret.T
         ql_half[k] = ret.ql
         qv_half[k] = self.qtg - (ql_half[k] + qi_half[k])
@@ -117,7 +117,7 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
     end
 
     @inbounds for k in face_indicies(Gr)
-        ret = eos(t_to_entropy_c, eos_first_guess_entropy, p_[k], self.qtg, self.sg)
+        ret = eos(p_[k], self.qtg, self.sg; t_to_prog = t_to_entropy_c, prog_to_t = eos_first_guess_entropy)
         temperature[k] = ret.T
         ql[k] = ret.ql
         qv[k] = self.qtg - (ql[k] + qi[k])
