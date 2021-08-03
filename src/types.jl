@@ -1096,7 +1096,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         b_coeff = center_field(Gr, n_updrafts)
 
         # Mass flux
-        m = center_field(Gr, n_updrafts)
+        m = face_field(Gr, n_updrafts)
 
         # mixing length
         mixing_length = center_field(Gr)
@@ -1124,8 +1124,8 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         diffusive_tendency_qt = center_field(Gr)
 
         # Vertical fluxes for output
-        massflux_h = center_field(Gr)
-        massflux_qt = center_field(Gr)
+        massflux_h = face_field(Gr)
+        massflux_qt = face_field(Gr)
         diffusive_flux_h = center_field(Gr)
         diffusive_flux_qt = center_field(Gr)
         diffusive_flux_u = center_field(Gr)
