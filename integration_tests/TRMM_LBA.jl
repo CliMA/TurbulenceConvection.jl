@@ -11,19 +11,19 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 3.9046069426558216e+00
-best_mse["updraft_area"] = 2.8331099674735910e+04
-best_mse["updraft_w"] = 6.5629758352987142e+02
-best_mse["updraft_qt"] = 2.5012703977470046e+01
-best_mse["updraft_thetal"] = 1.1072811439926345e+02
-best_mse["v_mean"] = 2.9406070727525389e+02
-best_mse["u_mean"] = 1.6903159369983448e+03
-best_mse["tke_mean"] = 2.8961135369556791e+03
-best_mse["temperature_mean"] = 8.3946608562868500e-04
-best_mse["ql_mean"] = 4.3631392987274085e+03
-best_mse["thetal_mean"] = 5.7967137448949413e-04
-best_mse["Hvar_mean"] = 1.3320049142979460e+04
-best_mse["QTvar_mean"] = 1.5870164338554601e+04
+best_mse["qt_mean"] = 3.9066401784413203e+00
+best_mse["updraft_area"] = 2.8333333642947131e+04
+best_mse["updraft_w"] = 6.5662893402745362e+02
+best_mse["updraft_qt"] = 2.5017304239563906e+01
+best_mse["updraft_thetal"] = 1.1072812435859557e+02
+best_mse["v_mean"] = 2.9403959926399466e+02
+best_mse["u_mean"] = 1.6903038672404982e+03
+best_mse["tke_mean"] = 2.8972134698112682e+03
+best_mse["temperature_mean"] = 8.3944025946955543e-04
+best_mse["ql_mean"] = 4.3199525166349194e+03
+best_mse["thetal_mean"] = 5.7974301596273598e-04
+best_mse["Hvar_mean"] = 1.3419697125412104e+04
+best_mse["QTvar_mean"] = 1.6238639092892809e+04
 
 @testset "TRMM_LBA" begin
     println("Running TRMM_LBA...")

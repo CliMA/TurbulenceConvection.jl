@@ -16,6 +16,20 @@ struct Extrapolate end
 function ∇f2c(f, grid::Grid, k::Int)
     return (f[k] - f[k - 1]) * grid.dzi
 end
+function ∇f2c(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
+    if is_surface_bc_faces(grid, k)
+        return ∇f2c(f_dual, grid, BottomBCTag(), bottom)
+    elseif is_toa_bc_faces(grid, k)
+        return ∇f2c(f_dual, grid, TopBCTag(), top)
+    else
+        return ∇f2c(f_dual, grid, InteriorTag())
+    end
+end
+∇f2c(f::SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
+∇f2c(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * grid.dzi
+∇f2c(f::SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
+∇f2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[2] - bc.value) * grid.dzi
+∇f2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
 function ∇c2f(f, grid::Grid, k::Int)
     return (f[k + 1] - f[k]) * grid.dzi
@@ -45,13 +59,12 @@ end
 ##### ∇(center data)
 #####
 
-c∇(f, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError()) = c∇(cut(f, k), grid, k; bottom, top)
+c∇(f, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError()) = c∇(cut(f, grid, k), grid, k; bottom, top)
 
 function c∇(f_cut::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
-    gw = grid.gw
-    if k == gw # NOTE: 0-based indexing (k = 3 for 1-based indexing) bottom boundary
+    if is_surface_bc_centers(grid, k)
         return c∇(f_cut, grid, BottomBCTag(), bottom)
-    elseif k == grid.nzg - gw - 1 # NOTE: 0-based indexing
+    elseif is_toa_bc_centers(grid, k)
         return c∇(f_cut, grid, TopBCTag(), top)
     else
         return c∇(f_cut, grid, InteriorTag())
@@ -65,43 +78,41 @@ function c∇(f::SVector, grid::Grid, ::InteriorTag)
     return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
 end
 function c∇(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue)
-    @assert length(f) == 3
+    @assert length(f) == 2
     # 2fb = cg+ci => cg = 2fb-ci
     f_dual⁺ = SVector(f[2], 2 * bc.value - f[2])
     f_dual⁻ = SVector(f[1], f[2])
     return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
 end
 function c∇(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue)
-    @assert length(f) == 3
+    @assert length(f) == 2
     # 2fb = cg+ci => cg = 2fb-ci
-    f_dual⁺ = SVector(f[2], f[3])
-    f_dual⁻ = SVector(2 * bc.value - f[2], f[2])
+    f_dual⁺ = SVector(f[1], f[2])
+    f_dual⁻ = SVector(2 * bc.value - f[1], f[1])
     return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
 end
 function c∇(f::SVector, grid::Grid, ::TopBCTag, bc::SetGradient)
-    @assert length(f) == 3
-    f_dual⁺ = SVector(f[2], f[3])
+    @assert length(f) == 2
     f_dual⁻ = SVector(f[1], f[2])
     return (bc.value + ∇_staggered(f_dual⁻, grid)) / 2
 end
 function c∇(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient)
-    @assert length(f) == 3
-    f_dual⁺ = SVector(f[2], f[3])
-    f_dual⁻ = SVector(f[1], f[2])
+    @assert length(f) == 2
+    f_dual⁺ = SVector(f[1], f[2])
     return (∇_staggered(f_dual⁺, grid) + bc.value) / 2
 end
 function c∇(f::SVector, grid::Grid, ::TopBCTag, ::Extrapolate)
-    @assert length(f) == 3
+    @assert length(f) == 2
     # 2ci = cg+cii => cg = 2ci-cii. Note: f[3] not used
     f_dual⁺ = SVector(f[2], 2 * f[2] - f[1])
     f_dual⁻ = SVector(f[1], f[2])
     return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
 end
 function c∇(f::SVector, grid::Grid, ::BottomBCTag, ::Extrapolate)
-    @assert length(f) == 3
+    @assert length(f) == 2
     # 2ci = cg+cii => cg = 2ci-cii. Note: f[1] not used
-    f_dual⁺ = SVector(f[2], f[3])
-    f_dual⁻ = SVector(2 * f[2] - f[3], f[2])
+    f_dual⁺ = SVector(f[1], f[2])
+    f_dual⁻ = SVector(2 * f[1] - f[2], f[1])
     return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
 end
 
@@ -114,25 +125,48 @@ function ∇_staggered(f::SVector, grid::Grid)
     return (f[2] - f[1]) * grid.dzi
 end
 
-# A 3-point field stencil
-function cut(f::AbstractVector, k::Int)
-    return SVector(f[k - 1], f[k], f[k + 1])
+# A 3-point field stencil for ordinary and updraft variables
+function cut(f::AbstractVector, grid, k::Int)
+    if is_surface_bc_centers(grid, k)
+        return SVector(f[k], f[k + 1])
+    elseif is_toa_bc_centers(grid, k)
+        return SVector(f[k - 1], f[k])
+    else
+        return SVector(f[k - 1], f[k], f[k + 1])
+    end
+end
+function cut(f::AbstractMatrix, grid, k::Int, i_up::Int)
+    if is_surface_bc_centers(grid, k)
+        return SVector(f[i_up, k], f[i_up, k + 1])
+    elseif is_toa_bc_centers(grid, k)
+        return SVector(f[i_up, k - 1], f[i_up, k])
+    else
+        return SVector(f[i_up, k - 1], f[i_up, k], f[i_up, k + 1])
+    end
 end
 
-# A 3-point field stencil for updraft variables
-function cut(f::AbstractMatrix, k::Int, i_up::Int)
-    return SVector(f[i_up, k - 1], f[i_up, k], f[i_up, k + 1])
+# A 2-point field stencil for ordinary and updraft variables
+function dual_faces(f::AbstractVector, grid, k::Int)
+    if is_surface_bc_faces(grid, k)
+        return SVector(f[k])
+    elseif is_toa_bc_centers(grid, k)
+        return SVector(f[k - 1])
+    else
+        return SVector(f[k], f[k - 1])
+    end
+end
+function dual_faces(f::AbstractMatrix, grid, k::Int, i_up::Int)
+    if is_surface_bc_faces(grid, k)
+        return SVector(f[i_up, k])
+    elseif is_toa_bc_centers(grid, k)
+        return SVector(f[i_up, k - 1])
+    else
+        return SVector(f[i_up, k], f[i_up, k - 1])
+    end
 end
 
-function ∇_collocated(f::SVector, grid::Grid)
-    @assert length(f) == 3
-    return (f[3] - f[1]) * 0.5 * grid.dzi
-end
+is_surface_bc_centers(grid::Grid, k::Int) = k == grid.gw            # NOTE: 0-based indexing
+is_toa_bc_centers(grid::Grid, k::Int) = k == grid.nzg - grid.gw - 1 # NOTE: 0-based indexing
 
-# TODO: use this implementation
-# function ∇_collocated(f::SVector, grid::Grid)
-#     @assert length(f) == 3
-#     f_dual⁺ = SVector(f[2], f[3])
-#     f_dual⁻ = SVector(f[1], f[2])
-#     return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
-# end
+is_surface_bc_faces(grid::Grid, k::Int) = k == grid.gw            # NOTE: 0-based indexing
+is_toa_bc_faces(grid::Grid, k::Int) = k == grid.nzg - grid.gw - 1 # NOTE: 0-based indexing
