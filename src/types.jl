@@ -386,8 +386,6 @@ Base.@kwdef mutable struct GridMeanVariables{PS}
     QT::VariablePrognostic
     RH::VariablePrognostic
     H::VariablePrognostic
-    t_to_prog_fp::Function
-    prog_to_t_fp::Function
     QL::VariableDiagnostic
     T::VariableDiagnostic
     B::VariableDiagnostic
@@ -420,8 +418,6 @@ function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState, param_set::P
     RH = VariablePrognostic(Gr, "half", "scalar", "sym", "RH", "%")
 
     H = VariablePrognostic(Gr, "half", "scalar", "sym", "thetal", "K")
-    t_to_prog_fp = t_to_thetali_c
-    prog_to_t_fp = eos_first_guess_thetal
 
     # Diagnostic Variables--same class as the prognostic variables, but we append to diagnostics list
     QL = VariableDiagnostic(Gr, "half", "scalar", "sym", "ql", "kg/kg")
@@ -478,8 +474,6 @@ function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState, param_set::P
         QT,
         RH,
         H,
-        t_to_prog_fp,
-        prog_to_t_fp,
         QL,
         T,
         B,
@@ -503,8 +497,6 @@ struct UpdraftThermodynamics{A1, A2}
     Gr::Grid
     Ref::ReferenceState
     n_updraft::Int
-    t_to_prog_fp::Function
-    prog_to_t_fp::Function
     prec_source_h::A2
     prec_source_qt::A2
     prec_source_h_tot::A1
@@ -516,8 +508,6 @@ struct UpdraftThermodynamics{A1, A2}
         UpdVar::UpdraftVariables,
         Rain::RainVariables,
     )
-        t_to_prog_fp = t_to_thetali_c
-        prog_to_t_fp = eos_first_guess_thetal
 
         # rain source from each updraft from all sub-timesteps
         prec_source_h = center_field(Gr, n_updraft)
@@ -528,17 +518,7 @@ struct UpdraftThermodynamics{A1, A2}
         prec_source_qt_tot = center_field(Gr)
         A1 = typeof(prec_source_h_tot)
         A2 = typeof(prec_source_h)
-        return new{A1, A2}(
-            Gr,
-            Ref,
-            n_updraft,
-            t_to_prog_fp,
-            prog_to_t_fp,
-            prec_source_h,
-            prec_source_qt,
-            prec_source_h_tot,
-            prec_source_qt_tot,
-        )
+        return new{A1, A2}(Gr, Ref, n_updraft, prec_source_h, prec_source_qt, prec_source_h_tot, prec_source_qt_tot)
     end
 
 end
@@ -708,8 +688,6 @@ struct EnvironmentThermodynamics{A1}
     Ref::ReferenceState
     quadrature_order::Int
     quadrature_type::String
-    t_to_prog_fp::Function
-    prog_to_t_fp::Function
     qt_dry::A1
     th_dry::A1
     t_cloudy::A1
@@ -738,8 +716,6 @@ struct EnvironmentThermodynamics{A1}
         catch
             "gaussian"
         end
-        t_to_prog_fp = t_to_thetali_c
-        prog_to_t_fp = eos_first_guess_thetal
 
         qt_dry = center_field(Gr)
         th_dry = center_field(Gr)
@@ -761,8 +737,6 @@ struct EnvironmentThermodynamics{A1}
             Ref,
             quadrature_order,
             quadrature_type,
-            t_to_prog_fp,
-            prog_to_t_fp,
             qt_dry,
             th_dry,
             t_cloudy,

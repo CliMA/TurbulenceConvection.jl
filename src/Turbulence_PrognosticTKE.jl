@@ -1372,13 +1372,7 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
                 end
 
                 # saturation adjustment
-                sa = eos(
-                    self.UpdThermo.t_to_prog_fp,
-                    self.UpdThermo.prog_to_t_fp,
-                    ref_state.p0_half[k],
-                    self.UpdVar.QT.new[i, k],
-                    self.UpdVar.H.new[i, k],
-                )
+                sa = eos(ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
                 self.UpdVar.QL.new[i, k] = sa.ql
                 self.UpdVar.T.new[i, k] = sa.T
                 continue
@@ -1427,13 +1421,7 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
             end
 
             # saturation adjustment
-            sa = eos(
-                self.UpdThermo.t_to_prog_fp,
-                self.UpdThermo.prog_to_t_fp,
-                ref_state.p0_half[k],
-                self.UpdVar.QT.new[i, k],
-                self.UpdVar.H.new[i, k],
-            )
+            sa = eos(ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
             self.UpdVar.QL.new[i, k] = sa.ql
             self.UpdVar.T.new[i, k] = sa.T
         end

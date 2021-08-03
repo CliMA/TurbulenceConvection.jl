@@ -145,7 +145,7 @@ function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::Environm
     mph = mph_struct()
 
     @inbounds for k in real_center_indicies(self.Gr)
-        sa = eos(self.t_to_prog_fp, self.prog_to_t_fp, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
+        sa = eos(self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
 
         EnvVar.T.values[k] = sa.T
         EnvVar.QL.values[k] = sa.ql
@@ -184,7 +184,7 @@ function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables,
 
     @inbounds for k in real_center_indicies(self.Gr)
         # condensation
-        sa = eos(self.t_to_prog_fp, self.prog_to_t_fp, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
+        sa = eos(self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
         # autoconversion and accretion
         mph = microphysics_rain_src(
             Rain.rain_model,
@@ -325,7 +325,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                     end
 
                     # condensation
-                    sa = eos(self.t_to_prog_fp, self.prog_to_t_fp, self.Ref.p0_half[k], qt_hat, h_hat)
+                    sa = eos(self.Ref.p0_half[k], qt_hat, h_hat)
                     # autoconversion and accretion
                     mph = microphysics_rain_src(
                         Rain.rain_model,
@@ -411,7 +411,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
 
         else
             # if variance and covariance are zero do the same as in SA_mean
-            sa = eos(self.t_to_prog_fp, self.prog_to_t_fp, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
+            sa = eos(self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
             mph = microphysics_rain_src(
                 Rain.rain_model,
                 Rain.max_supersaturation,
