@@ -89,16 +89,11 @@ function update(self::GridMeanVariables, TS::TimeStepping)
     set_bcs(self.H, grid)
     set_bcs(self.QT, grid)
     set_bcs(self.THL, grid)
+    set_bcs(self.TKE, grid)
 
-    if self.calc_tke
-        set_bcs(self.TKE, grid)
-    end
-
-    if self.calc_scalar_var
-        set_bcs(self.QTvar, grid)
-        set_bcs(self.Hvar, grid)
-        set_bcs(self.HQTcov, grid)
-    end
+    set_bcs(self.QTvar, grid)
+    set_bcs(self.Hvar, grid)
+    set_bcs(self.HQTcov, grid)
 
     zero_tendencies(self)
     return
@@ -113,18 +108,14 @@ function initialize_io(self::GridMeanVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "temperature_mean")
     add_profile(Stats, "buoyancy_mean")
     add_profile(Stats, "ql_mean")
-    if self.calc_tke
-        add_profile(Stats, "tke_mean")
-    end
-    if self.calc_scalar_var
-        add_profile(Stats, "Hvar_mean")
-        add_profile(Stats, "QTvar_mean")
-        add_profile(Stats, "HQTcov_mean")
+    add_profile(Stats, "tke_mean")
+    add_profile(Stats, "Hvar_mean")
+    add_profile(Stats, "QTvar_mean")
+    add_profile(Stats, "HQTcov_mean")
 
-        add_profile(Stats, "W_third_m")
-        add_profile(Stats, "H_third_m")
-        add_profile(Stats, "QT_third_m")
-    end
+    add_profile(Stats, "W_third_m")
+    add_profile(Stats, "H_third_m")
+    add_profile(Stats, "QT_third_m")
 
     add_profile(Stats, "cloud_fraction_mean")
 
@@ -147,18 +138,14 @@ function io(self::GridMeanVariables, Stats::NetCDFIO_Stats)
     write_profile(Stats, "RH_mean", self.RH.values[cinterior])
     write_profile(Stats, "buoyancy_mean", self.B.values[cinterior])
     write_profile(Stats, "thetal_mean", self.H.values[cinterior])
-    if self.calc_tke
-        write_profile(Stats, "tke_mean", self.TKE.values[cinterior])
-        write_profile(Stats, "W_third_m", self.W_third_m.values[cinterior])
-    end
-    if self.calc_scalar_var
-        write_profile(Stats, "Hvar_mean", self.Hvar.values[cinterior])
-        write_profile(Stats, "QTvar_mean", self.QTvar.values[cinterior])
-        write_profile(Stats, "HQTcov_mean", self.HQTcov.values[cinterior])
+    write_profile(Stats, "tke_mean", self.TKE.values[cinterior])
+    write_profile(Stats, "W_third_m", self.W_third_m.values[cinterior])
+    write_profile(Stats, "Hvar_mean", self.Hvar.values[cinterior])
+    write_profile(Stats, "QTvar_mean", self.QTvar.values[cinterior])
+    write_profile(Stats, "HQTcov_mean", self.HQTcov.values[cinterior])
 
-        write_profile(Stats, "H_third_m", self.H_third_m.values[cinterior])
-        write_profile(Stats, "QT_third_m", self.QT_third_m.values[cinterior])
-    end
+    write_profile(Stats, "H_third_m", self.H_third_m.values[cinterior])
+    write_profile(Stats, "QT_third_m", self.QT_third_m.values[cinterior])
 
     write_profile(Stats, "cloud_fraction_mean", self.cloud_fraction.values[cinterior])
     write_ts(Stats, "cloud_cover_mean", self.cloud_cover)

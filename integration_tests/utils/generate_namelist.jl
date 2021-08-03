@@ -100,10 +100,8 @@ function default_namelist(case_name::String)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["extrapolate_buoyancy"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_local_micro"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_constant_plume_spacing"] = false
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_similarity_diffusivity"] = false
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["constant_area"] = false
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["calculate_tke"] = true
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["calc_scalar_var"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["mixing_length"] = "sbtd_eq"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"] = "normalmode"

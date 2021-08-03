@@ -391,8 +391,6 @@ Base.@kwdef mutable struct GridMeanVariables{PS}
     B::VariableDiagnostic
     THL::VariableDiagnostic
     cloud_fraction::VariableDiagnostic
-    calc_tke::Bool
-    calc_scalar_var::Bool
     EnvThermo_scheme::String
     TKE::VariableDiagnostic
     W_third_m::VariableDiagnostic
@@ -428,18 +426,6 @@ function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState, param_set::P
     cloud_fraction = VariableDiagnostic(Gr, "half", "scalar", "sym", "cloud fraction", "-")
 
     # TKE   TODO   repeated from EDMF_Environment.pyx logic
-    calc_tke = true
-    try
-        calc_tke = namelist["turbulence"]["EDMF_PrognosticTKE"]["calculate_tke"]
-    catch
-    end
-
-    calc_scalar_var = try
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["calc_scalar_var"]
-    catch
-        false
-    end
-
     EnvThermo_scheme = try
         string(namelist["thermodynamics"]["sgs"])
     catch
@@ -447,18 +433,15 @@ function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState, param_set::P
     end
 
     #Now add the 2nd moment variables
-    if calc_tke
-        TKE = VariableDiagnostic(Gr, "half", "scalar", "sym", "tke", "m^2/s^2")
-        W_third_m = VariableDiagnostic(Gr, "half", "scalar", "sym", "W_third_m", "m^3/s^3")
-    end
 
-    if calc_scalar_var
-        QTvar = VariableDiagnostic(Gr, "half", "scalar", "sym", "qt_var", "kg^2/kg^2")
-        QT_third_m = VariableDiagnostic(Gr, "half", "scalar", "sym", "qt_third_m", "kg^3/kg^3")
-        Hvar = VariableDiagnostic(Gr, "half", "scalar", "sym", "thetal_var", "K^2")
-        H_third_m = VariableDiagnostic(Gr, "half", "scalar", "sym", "thetal_third_m", "-")
-        HQTcov = VariableDiagnostic(Gr, "half", "scalar", "sym", "thetal_qt_covar", "K(kg/kg)")
-    end
+    TKE = VariableDiagnostic(Gr, "half", "scalar", "sym", "tke", "m^2/s^2")
+    W_third_m = VariableDiagnostic(Gr, "half", "scalar", "sym", "W_third_m", "m^3/s^3")
+
+    QTvar = VariableDiagnostic(Gr, "half", "scalar", "sym", "qt_var", "kg^2/kg^2")
+    QT_third_m = VariableDiagnostic(Gr, "half", "scalar", "sym", "qt_third_m", "kg^3/kg^3")
+    Hvar = VariableDiagnostic(Gr, "half", "scalar", "sym", "thetal_var", "K^2")
+    H_third_m = VariableDiagnostic(Gr, "half", "scalar", "sym", "thetal_third_m", "-")
+    HQTcov = VariableDiagnostic(Gr, "half", "scalar", "sym", "thetal_qt_covar", "K(kg/kg)")
 
     return GridMeanVariables(;
         param_set,
@@ -479,8 +462,6 @@ function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState, param_set::P
         B,
         THL,
         cloud_fraction,
-        calc_tke,
-        calc_scalar_var,
         EnvThermo_scheme,
         TKE,
         W_third_m,
@@ -602,8 +583,6 @@ Base.@kwdef mutable struct EnvironmentVariables{PS}
     Hvar::EnvironmentVariable_2m
     QTvar::EnvironmentVariable_2m
     HQTcov::EnvironmentVariable_2m
-    calc_tke::Bool = false
-    calc_scalar_var::Bool = false
     cloud_base::Float64 = 0
     cloud_top::Float64 = 0
     cloud_cover::Float64 = 0
@@ -623,42 +602,16 @@ function EnvironmentVariables(namelist, Gr::Grid, param_set::PS) where {PS}
     cloud_fraction = EnvironmentVariable(Gr, "half", "scalar", "env_cloud_fraction", "-")
 
     # TODO - the flag setting is repeated from Variables.pyx logic
-    calc_tke = true
-    calc_tke = try
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["calculate_tke"]
-    catch
-        nothing
-    end
-
-    calc_scalar_var = try
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["calc_scalar_var"]
-    catch
-        println("Defaulting to non-calculation of scalar variances")
-        false
-    end
-
     EnvThermo_scheme = try
         string(namelist["thermodynamics"]["sgs"])
     catch
         println("Defaulting to saturation adjustment and microphysics with respect to environmental means")
         "mean"
     end
-
-    if calc_tke
-        TKE = EnvironmentVariable_2m(Gr, "half", "scalar", "tke", "m^2/s^2")
-    end
-
-    if calc_scalar_var
-        QTvar = EnvironmentVariable_2m(Gr, "half", "scalar", "qt_var", "kg^2/kg^2")
-        Hvar = EnvironmentVariable_2m(Gr, "half", "scalar", "thetal_var", "K^2")
-        HQTcov = EnvironmentVariable_2m(Gr, "half", "scalar", "thetal_qt_covar", "K(kg/kg)")
-    end
-
-    if EnvThermo_scheme == "quadrature"
-        if (calc_scalar_var == false)
-            error("EDMF_Environment.pyx: scalar variance has to be calculated for quadrature saturation and microphysics")
-        end
-    end
+    TKE = EnvironmentVariable_2m(Gr, "half", "scalar", "tke", "m^2/s^2")
+    QTvar = EnvironmentVariable_2m(Gr, "half", "scalar", "qt_var", "kg^2/kg^2")
+    Hvar = EnvironmentVariable_2m(Gr, "half", "scalar", "thetal_var", "K^2")
+    HQTcov = EnvironmentVariable_2m(Gr, "half", "scalar", "thetal_qt_covar", "K(kg/kg)")
 
     return EnvironmentVariables{PS}(;
         param_set,
@@ -677,8 +630,6 @@ function EnvironmentVariables(namelist, Gr::Grid, param_set::PS) where {PS}
         Hvar,
         QTvar,
         HQTcov,
-        calc_tke,
-        calc_scalar_var,
         EnvThermo_scheme,
     )
 end
@@ -892,15 +843,12 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     param_set::PS
     base::ParameterizationBase
     n_updrafts::Int
-    calc_tke::Bool
     use_const_plume_spacing::Bool
-    calc_scalar_var::Bool
     entr_detr_fp::Function
     pressure_func_buoy::Function
     drag_sign::Int
     pressure_func_drag::Function
     asp_label
-    similarity_diffusivity
     extrapolate_buoyancy::Bool
     mixing_scheme::String
     surface_area::Float64
@@ -993,45 +941,17 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             println("Turbulence--EDMF_PrognosticTKE: defaulting to single updraft")
             1
         end
-
-        calc_tke = try
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["calculate_tke"]
-        catch
-            true
-        end
-
         use_const_plume_spacing = try
             namelist["turbulence"]["EDMF_PrognosticTKE"]["use_constant_plume_spacing"]
         catch
             false
         end
 
-        calc_scalar_var = try
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["calc_scalar_var"]
-        catch
-            false
-        end
-        if (calc_scalar_var == true && calc_tke == false)
-            error("Turbulence--EDMF_PrognosticTKE: >>calculate_tke<< must be set to true when >>calc_scalar_var<< is true (to calculate the mixing length for the variance and covariance calculations")
-        end
-
         entr_detr_fp = try
-            if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "inverse_z"
-                entr_detr_inverse_z
-            elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "dry"
-                entr_detr_dry
-            elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "inverse_w"
-                entr_detr_inverse_w
-            elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "b_w2"
-                entr_detr_b_w2
-            elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "entr_detr_tke"
-                entr_detr_tke
-            elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "suselj"
-                entr_detr_suselj
-            elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "buoyancy_sorting"
-                entr_detr_buoyancy_sorting
-            elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "moisture_deficit"
+            if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "moisture_deficit"
                 entr_detr_env_moisture_deficit
+            elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "moisture_deficit_b_ED_MF"
+                entr_detr_env_moisture_deficit_b_ED_MF
             elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "moisture_deficit_div"
                 entr_detr_env_moisture_deficit_div
             elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]) == "none"
@@ -1043,29 +963,11 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             println("Turbulence--EDMF_PrognosticTKE: defaulting to cloudy entrainment formulation")
             entr_detr_b_w2
         end
-        if (calc_tke == false && "tke" in string(namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"]))
-            error("Turbulence--EDMF_PrognosticTKE: >>calc_tke<< must be set to true when entrainment is using tke")
-        end
 
-
-        pressure_func_buoy = try
-            if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"]) == "tan18"
-                pressure_tan18_buoy
-            elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"]) == "normalmode"
-                pressure_normalmode_buoy
-            else
-                error("Turbulence--EDMF_PrognosticTKE: pressure closure in namelist option is not recognized")
-            end
-        catch
-            println("Turbulence--EDMF_PrognosticTKE: defaulting to pressure closure Tan2018")
-            pressure_tan18_buoy
-        end
-
+        pressure_func_buoy = pressure_normalmode_buoy
         drag_sign = false
         pressure_func_drag = try
-            if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"]) == "tan18"
-                pressure_tan18_drag
-            elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"]) == "normalmode"
+            if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"]) == "normalmode"
                 pressure_normalmode_drag
             elseif string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"]) == "normalmode_signdf"
                 drag_sign = true
@@ -1083,20 +985,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         catch
             println("Turbulence--EDMF_PrognosticTKE: H/2R defaulting to constant")
             "const"
-        end
-
-        similarity_diffusivity = try
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["use_similarity_diffusivity"]
-        catch
-            println("Turbulence--EDMF_PrognosticTKE: defaulting to TKE-based eddy diffusivity")
-            false
-        end
-        if (similarity_diffusivity == false && calc_tke == false)
-            error("Turbulence--EDMF_PrognosticTKE: either >>use_similarity_diffusivity<< or >>calc_tke<< flag is needed to get the eddy diffusivities")
-        end
-
-        if (similarity_diffusivity == true && calc_tke == true)
-            println("TKE will be calculated but not used for eddy diffusivity calculation")
         end
 
         extrapolate_buoyancy = try
@@ -1161,13 +1049,11 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
 
         # "Legacy" coefficients used by the steady updraft routine
         vel_buoy_coeff = 1.0 - pressure_buoy_coeff
-        if calc_tke == true
-            tke_ed_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
-            tke_diss_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"]
-            static_stab_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"]
-            # Latent heat stability effect
-            lambda_stab = namelist["turbulence"]["EDMF_PrognosticTKE"]["lambda_stab"]
-        end
+        tke_ed_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
+        tke_diss_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"]
+        static_stab_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"]
+        # Latent heat stability effect
+        lambda_stab = namelist["turbulence"]["EDMF_PrognosticTKE"]["lambda_stab"]
         # Need to code up as namelist option?
         minimum_area = 1e-5
 
@@ -1244,9 +1130,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         diffusive_flux_qt = center_field(Gr)
         diffusive_flux_u = center_field(Gr)
         diffusive_flux_v = center_field(Gr)
-        if calc_tke
-            massflux_tke = center_field(Gr)
-        end
+        massflux_tke = center_field(Gr)
 
         # Added by Ignacio : Length scheme in use (mls), and smooth min effect (ml_ratio)
         # Variable Prandtl number initialized as neutral value.
@@ -1266,15 +1150,12 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             param_set,
             base,
             n_updrafts,
-            calc_tke,
             use_const_plume_spacing,
-            calc_scalar_var,
             entr_detr_fp,
             pressure_func_buoy,
             drag_sign,
             pressure_func_drag,
             asp_label,
-            similarity_diffusivity,
             extrapolate_buoyancy,
             mixing_scheme,
             surface_area,
