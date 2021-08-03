@@ -393,12 +393,13 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         end
 
         # Buoyancy-shear-subdomain exchange-dissipation TKE equilibrium scale
-        U_cut = cut(GMV.U.values, k)
-        V_cut = cut(GMV.V.values, k)
-        shear2 =
-            pow(∇_collocated(U_cut, grid), 2) +
-            pow(∇_collocated(V_cut, grid), 2) +
-            pow(∇f2c(self.EnvVar.W.values, grid, k), 2)
+        U_cut = cut(GMV.U.values, grid, k)
+        V_cut = cut(GMV.V.values, grid, k)
+        w_dual = dual_faces(self.EnvVar.W.values, grid, k)
+        ∇U = c∇(U_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
+        ∇V = c∇(V_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
+        ∇w = ∇f2c(w_dual, grid, k; bottom = SetGradient(0), top = SetGradient(0))
+        shear2 = pow(∇U, 2) + pow(∇V, 2) + pow(∇w, 2)
         qt_dry = self.EnvThermo.qt_dry[k]
         th_dry = self.EnvThermo.th_dry[k]
         t_cloudy = self.EnvThermo.t_cloudy[k]
@@ -408,9 +409,9 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         lh = latent_heat(t_cloudy)
         cpm = cpm_c(qt_cloudy)
 
-        QT_cut = cut(self.EnvVar.QT.values, k)
+        QT_cut = cut(self.EnvVar.QT.values, grid, k)
         grad_qt = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
-        THL_cut = cut(self.EnvVar.THL.values, k)
+        THL_cut = cut(self.EnvVar.THL.values, grid, k)
         grad_thl = c∇(THL_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
 
         # g/theta_ref
@@ -483,13 +484,18 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         l3 = self.l_entdet[k]
 
         # Limiting stratification scale (Deardorff, 1976)
-        p0_cut = cut(ref_state.p0_half, k)
-        T_cut = cut(self.EnvVar.T.values, k)
-        QT_cut = cut(self.EnvVar.QT.values, k)
-        QL_cut = cut(self.EnvVar.QL.values, k)
+        p0_cut = cut(ref_state.p0_half, grid, k)
+        T_cut = cut(self.EnvVar.T.values, grid, k)
+        QT_cut = cut(self.EnvVar.QT.values, grid, k)
+        QL_cut = cut(self.EnvVar.QL.values, grid, k)
         thv_cut = theta_virt_c.(p0_cut, T_cut, QT_cut, QL_cut)
-        thv = thv_cut[2]
         grad_thv = c∇(thv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
+
+        p0_k = ref_state.p0_half[k]
+        T_k = self.EnvVar.T.values[k]
+        QT_k = self.EnvVar.QT.values[k]
+        QL_k = self.EnvVar.QL.values[k]
+        thv = theta_virt_c(p0_k, T_k, QT_k, QL_k)
 
         # Effective static stability using environmental mean.
         # Set lambda for now to environmental cloud_fraction (TBD: Rain)
