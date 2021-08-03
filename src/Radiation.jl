@@ -32,7 +32,7 @@ function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVari
     self.F0 = 70.0
     self.F1 = 22.0
     self.divergence = 3.75e-6
-    self.f_rad = pyzeros(self.Gr.nzg + 1) # radiative flux at cell faces
+    self.f_rad = face_field(self.Gr)
     return
 end
 
@@ -41,52 +41,46 @@ see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
 function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariables)
     # find zi (level of 8.0 g/kg isoline of qt)
-    # TODO: report bug: zi and rhoi are not initialized
+    # TODO: report bug: zi and ρ_i are not initialized
     zi = 0
-    rhoi = 0
+    ρ_i = 0
     @inbounds for k in real_center_indicies(self.Gr)
         if (GMV.QT.values[k] < 8.0 / 1000)
             idx_zi = k
             # will be used at cell faces
             zi = self.Gr.z[idx_zi]
-            rhoi = self.Ref.rho0[idx_zi]
+            ρ_i = self.Ref.rho0[idx_zi]
             break
         end
     end
 
-    # cloud-top cooling
-    q_0 = 0.0
+    ρ_z = Dierckx.Spline1D([self.Gr.z_half...], [self.Ref.rho0_half...]; k = 1)
+    q_liq_z = Dierckx.Spline1D([self.Gr.z_half...], [GMV.QL.values...]; k = 1)
 
-    self.f_rad = pyzeros(self.Gr.nzg + 1)
-    self.f_rad[self.Gr.nzg] = self.F0 * exp(-q_0)
-    @inbounds for k in revxrange(self.Gr.nzg - 1, 0, -1)
-        q_0 += self.kappa * self.Ref.rho0_half[k] * GMV.QL.values[k] * self.Gr.dz
-        self.f_rad[k] = self.F0 * exp(-q_0)
-    end
+    integrand(ρq_l, params, z) = params.κ * ρ_z(z) * q_liq_z(z)
+    rintegrand(ρq_l, params, z) = -integrand(ρq_l, params, z)
 
-    # cloud-base warming
-    q_1 = 0.0
-    self.f_rad[0] += self.F1 * exp(-q_1)
-    @inbounds for k in xrange(1, self.Gr.nzg + 1)
-        q_1 += self.kappa * self.Ref.rho0_half[k - 1] * GMV.QL.values[k - 1] * self.Gr.dz
-        self.f_rad[k] += self.F1 * exp(-q_1)
-    end
+    z_span = (self.Gr.zmin, self.Gr.zmax)
+    rz_span = (self.Gr.zmax, self.Gr.zmin)
+    params = (; κ = self.kappa)
+
+    rprob = ODEProblem(rintegrand, 0.0, rz_span, params; dt = self.Gr.dz)
+    rsol = solve(rprob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
+    q_0 = off_arr([rsol(self.Gr.z_half[k]) for k in face_indicies(self.Gr)])
+
+    prob = ODEProblem(integrand, 0.0, z_span, params; dt = self.Gr.dz)
+    sol = solve(prob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
+    q_1 = off_arr([sol(self.Gr.z_half[k]) for k in face_indicies(self.Gr)])
+    self.f_rad .= self.F0 .* exp.(-q_0)
+    self.f_rad .+= self.F1 .* exp.(-q_1)
 
     # cooling in free troposphere
     @inbounds for k in face_indicies(self.Gr)
         if self.Gr.z[k] > zi
             cbrt_z = cbrt(self.Gr.z[k] - zi)
-            self.f_rad[k] += rhoi * dycoms_cp * self.divergence * self.alpha_z * (power(cbrt_z, 4) / 4.0 + zi * cbrt_z)
+            self.f_rad[k] += ρ_i * dycoms_cp * self.divergence * self.alpha_z * (power(cbrt_z, 4) / 4.0 + zi * cbrt_z)
         end
     end
-    # TODO: report bug: k is not initialized
-    # in the following expression, check that this
-    # is equivalent.
-    k_last = last(xrange(0, self.Gr.nzg))
-    # condition at the top
-    cbrt_z = cbrt(self.Gr.z[k_last] + self.Gr.dz - zi)
-    self.f_rad[self.Gr.nzg] +=
-        rhoi * dycoms_cp * self.divergence * self.alpha_z * (power(cbrt_z, 4) / 4.0 + zi * cbrt_z)
 
     @inbounds for k in real_center_indicies(self.Gr)
         self.dTdt[k] = -(self.f_rad[k + 1] - self.f_rad[k]) / self.Gr.dz / self.Ref.rho0_half[k] / dycoms_cp
