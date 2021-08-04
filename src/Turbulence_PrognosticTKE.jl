@@ -1475,120 +1475,143 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     nz = grid.nz
     dzi = grid.dzi
     ref_state = reference_state(self)
-    a = pyzeros(nz) # for tridiag solver
-    b = pyzeros(nz) # for tridiag solver
-    c = pyzeros(nz) # for tridiag solver
-    x = pyzeros(nz) # for tridiag solver
-    ae = pyones(nzg) .- self.UpdVar.Area.bulkvalues # area of environment
-    rho_ae_K = pyzeros(nzg)
+    a = center_field(grid) # for tridiag solver
+    b = center_field(grid) # for tridiag solver
+    c = center_field(grid) # for tridiag solver
+    x = center_field(grid) # for tridiag solver
+    ae = 1 .- self.UpdVar.Area.bulkvalues # area of environment
+    rho_ae_K = face_field(grid)
     KM = diffusivity_m(self)
     KH = diffusivity_h(self)
-    @inbounds for k in xrange(nzg - 1)
+    @inbounds for k in real_face_indicies(grid)
         rho_ae_K[k] = 0.5 * (ae[k] * KH.values[k] + ae[k + 1] * KH.values[k + 1]) * ref_state.rho0[k]
     end
 
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
     construct_tridiag_diffusion(grid, TS.dt, rho_ae_K, ref_state.rho0_half, ae, a, b, c)
     # Solve QT
-    @inbounds for k in xrange(nz)
-        x[k] = self.EnvVar.QT.values[k + gw]
+    @inbounds for k in real_center_indicies(grid)
+        x[k] = self.EnvVar.QT.values[k]
+        if is_surface_bc_centers(grid, k)
+            x[k] = x[k] + TS.dt * Case.Sur.rho_qtflux * dzi * ref_state.alpha0_half[k] / ae[k]
+        end
     end
-    x[0] = x[0] + TS.dt * Case.Sur.rho_qtflux * dzi * ref_state.alpha0_half[gw] / ae[gw]
-    x .= tridiag_solve(x, a, b, c)
+    cinterior = real_center_indicies(grid)
+    x[cinterior] .=
+        tridiag_solve(off_arr(x[cinterior]), off_arr(a[cinterior]), off_arr(b[cinterior]), off_arr(c[cinterior]))
 
-    @inbounds for k in xrange(nz)
-        GMV.QT.new[k + gw] = fmax(
-            GMV.QT.mf_update[k + gw] +
-            ae[k + gw] * (x[k] - self.EnvVar.QT.values[k + gw]) +
-            self.EnvThermo.prec_source_qt[k + gw] +
-            self.rainphysics.rain_evap_source_qt[k + gw],
+    @inbounds for k in real_center_indicies(grid)
+        GMV.QT.new[k] = fmax(
+            GMV.QT.mf_update[k] +
+            ae[k] * (x[k] - self.EnvVar.QT.values[k]) +
+            self.EnvThermo.prec_source_qt[k] +
+            self.rainphysics.rain_evap_source_qt[k],
             0.0,
         )
-        self.diffusive_tendency_qt[k + gw] = (GMV.QT.new[k + gw] - GMV.QT.mf_update[k + gw]) * TS.dti
+        self.diffusive_tendency_qt[k] = (GMV.QT.new[k] - GMV.QT.mf_update[k]) * TS.dti
     end
     # get the diffusive flux
-    self.diffusive_flux_qt[gw] = interp2pt(
-        Case.Sur.rho_qtflux,
-        -rho_ae_K[gw] * dzi * (self.EnvVar.QT.values[gw + 1] - self.EnvVar.QT.values[gw]),
-    )
     @inbounds for k in real_center_indicies(grid)
-        k == gw && continue # skip bc
-        self.diffusive_flux_qt[k] =
-            -0.5 *
-            ref_state.rho0_half[k] *
-            ae[k] *
-            KH.values[k] *
-            dzi *
-            (self.EnvVar.QT.values[k + 1] - self.EnvVar.QT.values[k - 1])
+        if is_surface_bc_centers(grid, k)
+            self.diffusive_flux_qt[k] = interp2pt(
+                Case.Sur.rho_qtflux,
+                -rho_ae_K[k] * dzi * (self.EnvVar.QT.values[k + 1] - self.EnvVar.QT.values[k]),
+            )
+        else
+            self.diffusive_flux_qt[k] =
+                -0.5 *
+                ref_state.rho0_half[k] *
+                ae[k] *
+                KH.values[k] *
+                dzi *
+                (self.EnvVar.QT.values[k + 1] - self.EnvVar.QT.values[k - 1])
+        end
     end
 
     # Solve H
-    @inbounds for k in xrange(nz)
-        x[k] = self.EnvVar.H.values[k + gw]
+    @inbounds for k in real_center_indicies(grid)
+        x[k] = self.EnvVar.H.values[k]
+        if is_surface_bc_centers(grid, k)
+            x[k] = x[k] + TS.dt * Case.Sur.rho_hflux * dzi * ref_state.alpha0_half[k] / ae[k]
+        end
     end
-    x[0] = x[0] + TS.dt * Case.Sur.rho_hflux * dzi * ref_state.alpha0_half[gw] / ae[gw]
-    x .= tridiag_solve(x, a, b, c)
-    @inbounds for k in xrange(nz)
-        GMV.H.new[k + gw] =
-            GMV.H.mf_update[k + gw] +
-            ae[k + gw] * (x[k] - self.EnvVar.H.values[k + gw]) +
-            self.EnvThermo.prec_source_h[k + gw] +
-            self.rainphysics.rain_evap_source_h[k + gw]
-        self.diffusive_tendency_h[k + gw] = (GMV.H.new[k + gw] - GMV.H.mf_update[k + gw]) * TS.dti
+    x[cinterior] .=
+        tridiag_solve(off_arr(x[cinterior]), off_arr(a[cinterior]), off_arr(b[cinterior]), off_arr(c[cinterior]))
+    @inbounds for k in real_center_indicies(grid)
+        GMV.H.new[k] =
+            GMV.H.mf_update[k] +
+            ae[k] * (x[k] - self.EnvVar.H.values[k]) +
+            self.EnvThermo.prec_source_h[k] +
+            self.rainphysics.rain_evap_source_h[k]
+        self.diffusive_tendency_h[k] = (GMV.H.new[k] - GMV.H.mf_update[k]) * TS.dti
     end
     # get the diffusive flux
-    self.diffusive_flux_h[gw] =
-        interp2pt(Case.Sur.rho_hflux, -rho_ae_K[gw] * dzi * (self.EnvVar.H.values[gw + 1] - self.EnvVar.H.values[gw]))
     @inbounds for k in real_center_indicies(grid)
-        k == gw && continue # skip bc
-        self.diffusive_flux_h[k] =
-            -0.5 *
-            ref_state.rho0_half[k] *
-            ae[k] *
-            KH.values[k] *
-            dzi *
-            (self.EnvVar.H.values[k + 1] - self.EnvVar.H.values[k - 1])
+        if is_surface_bc_centers(grid, k)
+            self.diffusive_flux_h[k] = interp2pt(
+                Case.Sur.rho_hflux,
+                -rho_ae_K[k] * dzi * (self.EnvVar.H.values[k + 1] - self.EnvVar.H.values[k]),
+            )
+        else
+            self.diffusive_flux_h[k] =
+                -0.5 *
+                ref_state.rho0_half[k] *
+                ae[k] *
+                KH.values[k] *
+                dzi *
+                (self.EnvVar.H.values[k + 1] - self.EnvVar.H.values[k - 1])
+        end
     end
 
     # Solve U
-    @inbounds for k in xrange(nzg - 1)
+    @inbounds for k in real_face_indicies(grid)
         rho_ae_K[k] = 0.5 * (ae[k] * KM.values[k] + ae[k + 1] * KM.values[k + 1]) * ref_state.rho0[k]
     end
 
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
     construct_tridiag_diffusion(grid, TS.dt, rho_ae_K, ref_state.rho0_half, ae, a, b, c)
-    @inbounds for k in xrange(nz)
-        x[k] = GMV.U.values[k + gw]
-    end
-    x[0] = x[0] + TS.dt * Case.Sur.rho_uflux * dzi * ref_state.alpha0_half[gw] / ae[gw]
-    x .= tridiag_solve(x, a, b, c)
-
-    @inbounds for k in xrange(nz)
-        GMV.U.new[k + gw] = x[k]
-    end
-    self.diffusive_flux_u[gw] =
-        interp2pt(Case.Sur.rho_uflux, -rho_ae_K[gw] * dzi * (GMV.U.values[gw + 1] - GMV.U.values[gw]))
     @inbounds for k in real_center_indicies(grid)
-        k == gw && continue # skip bc
-        self.diffusive_flux_u[k] =
-            -0.5 * ref_state.rho0_half[k] * ae[k] * KM.values[k] * dzi * (GMV.U.values[k + 1] - GMV.U.values[k - 1])
+        x[k] = GMV.U.values[k]
+        if is_surface_bc_centers(grid, k)
+            x[k] = x[k] + TS.dt * Case.Sur.rho_uflux * dzi * ref_state.alpha0_half[k] / ae[k]
+        end
+    end
+    x[cinterior] .=
+        tridiag_solve(off_arr(x[cinterior]), off_arr(a[cinterior]), off_arr(b[cinterior]), off_arr(c[cinterior]))
+
+    @inbounds for k in real_center_indicies(grid)
+        GMV.U.new[k] = x[k]
+    end
+    @inbounds for k in real_center_indicies(grid)
+        if is_surface_bc_centers(grid, k)
+            self.diffusive_flux_u[k] =
+                interp2pt(Case.Sur.rho_uflux, -rho_ae_K[k] * dzi * (GMV.U.values[k + 1] - GMV.U.values[k]))
+        else
+            self.diffusive_flux_u[k] =
+                -0.5 * ref_state.rho0_half[k] * ae[k] * KM.values[k] * dzi * (GMV.U.values[k + 1] - GMV.U.values[k - 1])
+        end
     end
 
     # Solve V
-    @inbounds for k in xrange(nz)
-        x[k] = GMV.V.values[k + gw]
-    end
-    x[0] = x[0] + TS.dt * Case.Sur.rho_vflux * dzi * ref_state.alpha0_half[gw] / ae[gw]
-    x .= tridiag_solve(x, a, b, c)
-    @inbounds for k in xrange(nz)
-        GMV.V.new[k + gw] = x[k]
-    end
-    self.diffusive_flux_v[gw] =
-        interp2pt(Case.Sur.rho_vflux, -rho_ae_K[gw] * dzi * (GMV.V.values[gw + 1] - GMV.V.values[gw]))
     @inbounds for k in real_center_indicies(grid)
-        k == gw && continue # skip bc
-        self.diffusive_flux_v[k] =
-            -0.5 * ref_state.rho0_half[k] * ae[k] * KM.values[k] * dzi * (GMV.V.values[k + 1] - GMV.V.values[k - 1])
+        x[k] = GMV.V.values[k]
+        if is_surface_bc_centers(grid, k)
+            x[k] = x[k] + TS.dt * Case.Sur.rho_vflux * dzi * ref_state.alpha0_half[k] / ae[k]
+        end
+    end
+    x[cinterior] .=
+        tridiag_solve(off_arr(x[cinterior]), off_arr(a[cinterior]), off_arr(b[cinterior]), off_arr(c[cinterior]))
+    @inbounds for k in real_center_indicies(grid)
+        GMV.V.new[k] = x[k]
+    end
+    @inbounds for k in real_center_indicies(grid)
+        if is_surface_bc_centers(grid, k)
+            self.diffusive_flux_v[k] =
+                interp2pt(Case.Sur.rho_vflux, -rho_ae_K[k] * dzi * (GMV.V.values[k + 1] - GMV.V.values[k]))
+        else
+            self.diffusive_flux_v[k] =
+                -0.5 * ref_state.rho0_half[k] * ae[k] * KM.values[k] * dzi * (GMV.V.values[k + 1] - GMV.V.values[k - 1])
+        end
     end
     set_bcs(GMV.QT, grid)
     set_bcs(GMV.THL, grid)
@@ -2234,7 +2257,6 @@ function compute_tke_advection(self::EDMF_PrognosticTKE)
     grid = get_grid(self)
     ref_state = reference_state(self)
     rho0_half = ref_state.rho0_half
-    gw = get_grid(self).gw
     ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues # area of environment
     drho_ae_we_e_plus = 0.0
 
@@ -2260,7 +2282,6 @@ function compute_tke_transport(self::EDMF_PrognosticTKE)
 
     grid = get_grid(self)
     dzi = grid.dzi
-    gw = grid.gw
     ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues # area of environment
     dtke_high = 0.0
     drho_ae_K_m_de_plus = 0.0
@@ -2306,21 +2327,19 @@ function update_covariance_ED(
 
     grid = get_grid(self)
     gw = grid.gw
-    nzg = grid.nzg
-    nz = grid.nz
     dzi = grid.dzi
     dti = TS.dti
     Ref = reference_state(self)
     alpha0LL = Ref.alpha0_half[grid.gw]
     zLL = grid.z_half[grid.gw]
-    a = pyzeros(nz)
-    b = pyzeros(nz)
-    c = pyzeros(nz)
-    x = pyzeros(nz)
-    ae = pyones(nzg) .- self.UpdVar.Area.bulkvalues
-    ae_old = pyones(nzg) .- up_sum(self.UpdVar.Area.old)
-    rho_ae_K_m = pyzeros(nzg)
-    whalf = pyzeros(nzg)
+    a = center_field(grid)
+    b = center_field(grid)
+    c = center_field(grid)
+    x = center_field(grid)
+    ae = 1 .- self.UpdVar.Area.bulkvalues
+    ae_old = 1 .- up_sum(self.UpdVar.Area.old)
+    rho_ae_K_m = face_field(grid)
+    whalf = center_field(grid)
     D_env = 0.0
     KM = diffusivity_m(self)
     KH = diffusivity_h(self)
@@ -2351,8 +2370,7 @@ function update_covariance_ED(
 
     Covar_surf = Covar.values[gw]
 
-    @inbounds for kk in xrange(nz)
-        k = kk + gw
+    @inbounds for k in real_center_indicies(grid)
         D_env = 0.0
 
         @inbounds for i in xrange(self.n_updrafts)
@@ -2371,8 +2389,8 @@ function update_covariance_ED(
             end
         end
 
-        a[kk] = (-rho_ae_K_m[k - 1] * dzi * dzi)
-        b[kk] = (
+        a[k] = (-rho_ae_K_m[k - 1] * dzi * dzi)
+        b[k] = (
             Ref.rho0_half[k] * ae[k] * dti - Ref.rho0_half[k] * ae[k] * whalf[k] * dzi +
             rho_ae_K_m[k] * dzi * dzi +
             rho_ae_K_m[k - 1] * dzi * dzi +
@@ -2380,8 +2398,8 @@ function update_covariance_ED(
             Ref.rho0_half[k] * ae[k] * self.tke_diss_coeff * sqrt(fmax(self.EnvVar.TKE.values[k], 0)) /
             fmax(self.mixing_length[k], 1.0)
         )
-        c[kk] = (Ref.rho0_half[k + 1] * ae[k + 1] * whalf[k + 1] * dzi - rho_ae_K_m[k] * dzi * dzi)
-        x[kk] = (
+        c[k] = (Ref.rho0_half[k + 1] * ae[k + 1] * whalf[k + 1] * dzi - rho_ae_K_m[k] * dzi * dzi)
+        x[k] = (
             Ref.rho0_half[k] * ae_old[k] * Covar.values[k] * dti +
             Covar.press[k] +
             Covar.buoy[k] +
@@ -2390,23 +2408,29 @@ function update_covariance_ED(
             Covar.rain_src[k]
         ) #
 
-        a[0] = 0.0
-        b[0] = 1.0
-        c[0] = 0.0
-        x[0] = Covar_surf
+        if is_surface_bc_centers(grid, k)
+            a[k] = 0.0
+            b[k] = 1.0
+            c[k] = 0.0
+            x[k] = Covar_surf
+        end
 
-        b[nz - 1] += c[nz - 1]
-        c[nz - 1] = 0.0
+        if is_toa_bc_centers(grid, k)
+            b[k] += c[k]
+            c[k] = 0.0
+        end
     end
-    x .= tridiag_solve(x, a, b, c)
+    # x .= tridiag_solve(x, a, b, c)
+    cinterior = real_center_indicies(grid)
+    x[cinterior] .=
+        tridiag_solve(off_arr(x[cinterior]), off_arr(a[cinterior]), off_arr(b[cinterior]), off_arr(c[cinterior]))
 
-    @inbounds for kk in xrange(nz)
-        k = kk + gw
+    @inbounds for k in real_center_indicies(grid)
         if Covar.name == "thetal_qt_covar"
-            Covar.values[k] = fmax(x[kk], -sqrt(self.EnvVar.Hvar.values[k] * self.EnvVar.QTvar.values[k]))
-            Covar.values[k] = fmin(x[kk], sqrt(self.EnvVar.Hvar.values[k] * self.EnvVar.QTvar.values[k]))
+            Covar.values[k] = fmax(x[k], -sqrt(self.EnvVar.Hvar.values[k] * self.EnvVar.QTvar.values[k]))
+            Covar.values[k] = fmin(x[k], sqrt(self.EnvVar.Hvar.values[k] * self.EnvVar.QTvar.values[k]))
         else
-            Covar.values[k] = fmax(x[kk], 0.0)
+            Covar.values[k] = fmax(x[k], 0.0)
         end
     end
     set_bcs(Covar, grid)
@@ -2464,10 +2488,13 @@ function GMV_third_m(
             Upd_cubed += au[i, k] * upd_mean.values[i, k]^3
         end
 
-        Gmv_third_m.values[k] =
-            Upd_cubed + ae[k] * (env_mean.values[k]^3 + 3.0 * env_mean.values[k] * Envcov_) - GMVv_^3.0 -
-            3.0 * GMVcov_ * GMVv_
+        if is_surface_bc_centers(grid, k)
+            Gmv_third_m.values[k] = 0.0 # this is here as first value is biased with BC area fraction
+        else
+            Gmv_third_m.values[k] =
+                Upd_cubed + ae[k] * (env_mean.values[k]^3 + 3.0 * env_mean.values[k] * Envcov_) - GMVv_^3.0 -
+                3.0 * GMVcov_ * GMVv_
+        end
     end
-    Gmv_third_m.values[grid.gw] = 0.0 # this is here as first value is biased with BC area fraction
     return
 end

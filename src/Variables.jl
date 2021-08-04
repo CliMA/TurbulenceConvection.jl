@@ -1,5 +1,5 @@
 function zero_tendencies(self::VariablePrognostic, Gr::Grid)
-    @inbounds for k in xrange(Gr.nzg)
+    @inbounds for k in center_indicies(Gr)
         self.tendencies[k] = 0.0
     end
     return

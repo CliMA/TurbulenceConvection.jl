@@ -244,22 +244,19 @@ function get_surface_variance(flux1, flux2, ustar, zLL, oblength)
 end
 
 function construct_tridiag_diffusion(grid, dt, rho_ae_K_m, rho, ae, a, b, c)
-    gw = grid.gw
     dzi = grid.dzi
-    nzg = grid.nzg
-    nz = nzg - 2 * gw
-    @inbounds for k in real_face_indicies(grid)
+    @inbounds for k in real_center_indicies(grid)
         X = rho[k] * ae[k] / dt
         Y = rho_ae_K_m[k] * dzi * dzi
         Z = rho_ae_K_m[k - 1] * dzi * dzi
-        if k == gw
+        if is_surface_bc_centers(grid, k)
             Z = 0.0
-        elseif k == nzg - gw - 1
+        elseif is_toa_bc_centers(grid, k)
             Y = 0.0
         end
-        a[k - gw] = -Z / X
-        b[k - gw] = 1.0 + Y / X + Z / X
-        c[k - gw] = -Y / X
+        a[k] = -Z / X
+        b[k] = 1.0 + Y / X + Z / X
+        c[k] = -Y / X
     end
     return
 end
@@ -267,7 +264,7 @@ end
 function tridiag_solve(b_rhs, a, b, c)
     # Note that `1:end` is zero-based indexing.
     A = Tridiagonal(a[1:end], parent(b), c[0:(end - 1)])
-    return off_arr(A \ parent(b_rhs))
+    return A \ parent(b_rhs)
 end
 
 # Dustbin
