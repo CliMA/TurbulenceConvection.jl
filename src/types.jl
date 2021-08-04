@@ -643,28 +643,6 @@ struct EnvironmentThermodynamics{A1}
     end
 end
 
-mutable struct ParameterizationBase{T}
-    turbulence_tendency::T
-    Gr::Grid
-    Ref::ReferenceState
-    KM::VariableDiagnostic
-    KH::VariableDiagnostic
-    prandtl_number::Float64
-    Ri_bulk_crit::Float64
-    zi::Float64
-    # A base class common to all turbulence parameterizations
-    function ParameterizationBase(namelist, Gr::Grid, Ref::ReferenceState)
-        turbulence_tendency = center_field(Gr)
-        KM = VariableDiagnostic(Gr, "half", "scalar", "sym", "diffusivity", "m^2/s") # eddy viscosity
-        KH = VariableDiagnostic(Gr, "half", "scalar", "sym", "viscosity", "m^2/s") # eddy diffusivity
-        # get values from namelist
-        prandtl_number = namelist["turbulence"]["prandtl_number_0"]
-        Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
-
-        return new{typeof(turbulence_tendency)}(turbulence_tendency, Gr, Ref, KM, KH, prandtl_number, Ri_bulk_crit, 0)
-    end
-end
-
 # SurfaceMoninObukhovDry:
 #     Needed for dry cases (qt=0). They have to be initialized with nonzero qtg for the
 #     reference profiles. This surface subroutine sets the latent heat flux to zero
@@ -773,15 +751,15 @@ Base.@kwdef mutable struct CasesBase{T}
     shf0::Float64 = 0
 end
 
-struct SimilarityED{PS}
-    param_set::PS
-    base::ParameterizationBase
-    extrapolate_buoyancy::Bool
-end
-
 mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     param_set::PS
-    base::ParameterizationBase
+    turbulence_tendency::A1
+    Gr::Grid
+    Ref::ReferenceState
+    KM::VariableDiagnostic
+    KH::VariableDiagnostic
+    Ri_bulk_crit::Float64
+    zi::Float64
     n_updrafts::Int
     use_const_plume_spacing::Bool
     entr_detr_fp::Function
@@ -870,8 +848,13 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     detr_surface_bc::Float64
     dt_upd::Float64
     function EDMF_PrognosticTKE(namelist, Gr::Grid, Ref::ReferenceState, param_set::PS) where {PS}
-        # Initialize the base parameterization class
-        base = ParameterizationBase(namelist, Gr, Ref)
+        turbulence_tendency = center_field(Gr)
+        KM = VariableDiagnostic(Gr, "half", "scalar", "sym", "diffusivity", "m^2/s") # eddy viscosity
+        KH = VariableDiagnostic(Gr, "half", "scalar", "sym", "viscosity", "m^2/s") # eddy diffusivity
+        # get values from namelist
+        prandtl_number = namelist["turbulence"]["prandtl_number_0"]
+        Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
+        zi = 0.0
 
         # Set the number of updrafts (1)
         n_updrafts = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_number"; default = 1)
@@ -1073,7 +1056,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         # Added by Ignacio : Length scheme in use (mls), and smooth min effect (ml_ratio)
         # Variable Prandtl number initialized as neutral value.
         ones_vec = center_field(Gr)
-        prandtl_nvec = base.prandtl_number .* ones_vec
+        prandtl_nvec = prandtl_number .* ones_vec
         mls = center_field(Gr)
         ml_ratio = center_field(Gr)
         l_entdet = center_field(Gr)
@@ -1086,7 +1069,13 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         A2 = typeof(horizontal_KM)
         return new{PS, A1, A2}(
             param_set,
-            base,
+            turbulence_tendency,
+            Gr,
+            Ref,
+            KM,
+            KH,
+            Ri_bulk_crit,
+            zi,
             n_updrafts,
             use_const_plume_spacing,
             entr_detr_fp,
@@ -1165,7 +1154,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             diffusive_flux_v,
             massflux_tke,
             prandtl_nvec,
-            base.prandtl_number,
+            prandtl_number,
             mls,
             ml_ratio,
             l_entdet,
@@ -1177,13 +1166,12 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         )
     end
 end
-get_grid(edmf::EDMF_PrognosticTKE) = edmf.base.Gr
+get_grid(edmf::EDMF_PrognosticTKE) = edmf.Gr
 get_grid(obj) = obj.Gr
-reference_state(edmf::EDMF_PrognosticTKE) = edmf.base.Ref
-prandtl_number(edmf::EDMF_PrognosticTKE) = edmf.base.prandtl_number
-turbulence_tendency(edmf::EDMF_PrognosticTKE) = edmf.base.turbulence_tendency
-diffusivity_m(edmf::EDMF_PrognosticTKE) = edmf.base.KM
-diffusivity_h(edmf::EDMF_PrognosticTKE) = edmf.base.KH
-Ri_bulk_crit(edmf::EDMF_PrognosticTKE) = edmf.base.Ri_bulk_crit
-Ri_bulk_crit(base::ParameterizationBase) = base.Ri_bulk_crit
+reference_state(edmf::EDMF_PrognosticTKE) = edmf.Ref
+prandtl_number(edmf::EDMF_PrognosticTKE) = edmf.prandtl_number
+turbulence_tendency(edmf::EDMF_PrognosticTKE) = edmf.turbulence_tendency
+diffusivity_m(edmf::EDMF_PrognosticTKE) = edmf.KM
+diffusivity_h(edmf::EDMF_PrognosticTKE) = edmf.KH
+Ri_bulk_crit(edmf::EDMF_PrognosticTKE) = edmf.Ri_bulk_crit
 parameter_set(obj) = obj.param_set

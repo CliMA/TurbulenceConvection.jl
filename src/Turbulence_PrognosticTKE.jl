@@ -251,7 +251,7 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     grid = get_grid(self)
     update_inversion(self, GMV, Case.inversion_option)
     compute_pressure_plume_spacing(self, GMV, Case)
-    self.wstar = get_wstar(Case.Sur.bflux, self.base.zi)
+    self.wstar = get_wstar(Case.Sur.bflux, self.zi)
     if TS.nstep == 0
         decompose_environment(self, GMV, "values")
 
@@ -317,7 +317,19 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     GMV.cloud_cover = min(self.EnvVar.cloud_cover + sum(self.UpdVar.cloud_cover), 1)
     # Back out the tendencies of the grid mean variables for the whole timestep
     # by differencing GMV.new and GMV.values
-    update(self.base, GMV, Case, TS)
+    update_turbulence(self, GMV, Case, TS)
+    return
+end
+
+function update_turbulence(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
+
+    @inbounds for k in real_center_indicies(self.Gr)
+        GMV.H.tendencies[k] += (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
+        GMV.QT.tendencies[k] += (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
+        GMV.U.tendencies[k] += (GMV.U.new[k] - GMV.U.values[k]) * TS.dti
+        GMV.V.tendencies[k] += (GMV.V.new[k] - GMV.V.values[k]) * TS.dti
+    end
+
     return
 end
 
@@ -368,17 +380,12 @@ function compute_prognostic_updrafts(
     return
 end
 
-function update_inversion(self, GMV::GridMeanVariables, option)
-    update_inversion(self.base, GMV, option)
-    return
-end
-
 function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariables)
 
     grid = get_grid(self)
     ref_state = reference_state(self)
     gw = grid.gw
-    tau = get_mixing_tau(self.base.zi, self.wstar)
+    tau = get_mixing_tau(self.zi, self.wstar)
     l = pyzeros(3)
     m_eps = 1.0e-9 # Epsilon to avoid zero
     @inbounds for k in real_center_indicies(grid)
@@ -578,7 +585,7 @@ end
 function set_updraft_surface_bc(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
 
     update_inversion(self, GMV, Case.inversion_option)
-    self.wstar = get_wstar(Case.Sur.bflux, self.base.zi)
+    self.wstar = get_wstar(Case.Sur.bflux, self.zi)
 
     gw = get_grid(self).gw
     dzi = get_grid(self).dzi
@@ -955,7 +962,7 @@ function compute_turbulent_entrainment(self::EDMF_PrognosticTKE, GMV::GridMeanVa
 
     grid = get_grid(self)
     ref_state = reference_state(self)
-    tau = get_mixing_tau(self.base.zi, self.wstar)
+    tau = get_mixing_tau(self.zi, self.wstar)
 
     @inbounds for i in xrange(self.n_updrafts)
         @inbounds for k in real_center_indicies(grid)
@@ -1914,7 +1921,7 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
 
     ws = self.wstar
     us = Case.Sur.ustar
-    zs = self.base.zi
+    zs = self.zi
     grid = get_grid(self)
 
     reset_surface_covariance(self, GMV, Case)
@@ -2496,5 +2503,44 @@ function GMV_third_m(
                 3.0 * GMVcov_ * GMVv_
         end
     end
+    return
+end
+
+
+# Update the diagnosis of the inversion height, using the maximum temperature gradient method
+function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, option)
+    theta_rho = center_field(self.Gr)
+    ∇θ_liq_max = 0.0
+    k_fi = first_center(self.Gr)
+
+    @inbounds for k in real_center_indicies(self.Gr)
+        qv = GMV.QT.values[k] - GMV.QL.values[k]
+        theta_rho[k] = theta_rho_c(self.Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
+    end
+
+
+    if option == "theta_rho"
+        @inbounds for k in real_center_indicies(self.Gr)
+            if theta_rho[k] > theta_rho[k_fi]
+                self.zi = self.Gr.z_half[k]
+                break
+            end
+        end
+    elseif option == "thetal_maxgrad"
+
+        @inbounds for k in real_center_indicies(self.Gr)
+            ∇θ_liq = ∇_upwind(GMV.THL.values, self.Gr, k)
+            if ∇θ_liq > ∇θ_liq_max
+                ∇θ_liq_max = ∇θ_liq
+                self.zi = self.Gr.z[k]
+            end
+        end
+    elseif option == "critical_Ri"
+        self.zi = get_inversion(theta_rho, GMV.U.values, GMV.V.values, self.Gr, Ri_bulk_crit(self))
+
+    else
+        error("INVERSION HEIGHT OPTION NOT RECOGNIZED")
+    end
+
     return
 end
