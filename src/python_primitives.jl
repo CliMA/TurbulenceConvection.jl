@@ -10,9 +10,6 @@ argwhere(a) = findall(a .> 0)
 xrange(start, stop, step = 1) = range(start, stop - 1; step = step)
 xrange(stop) = xrange(0, stop)
 
-revxrange(start, stop, step = 1) = range(start, stop; step = step)
-revxrange(stop) = revxrange(0, stop)
-
 pyzeros(n::Int) = OffsetArray(zeros(n), 0:(n - 1))
 pyzeros(m::Int, n::Int) = OffsetArray(zeros(m, n), 0:(m - 1), 0:(n - 1))
 
