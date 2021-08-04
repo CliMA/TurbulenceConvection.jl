@@ -24,15 +24,21 @@ struct BaseCase end
 
 up_sum(vals::OffsetArray) = off_arr(reshape(sum(vals; dims = 1), size(vals, 2)))
 
-function parse_namelist(namelist, keys...; default = nothing)
-    @assert default ≠ nothing
+function parse_namelist(namelist, keys...; default = nothing, valid_options = nothing)
     param = namelist
     for k in keys
         if haskey(param, k)
             param = param[k]
+            if valid_options ≠ nothing && !(param isa Dict)
+                @assert param in valid_options
+            end
         else
-            @info "Using default value, $default, for parameter ($(join(keys, ", ")))."
-            return default
+            if default == nothing
+                error("No default value given for parameter ($(join(keys, ", "))).")
+            else
+                @info "Using default value, $default, for parameter ($(join(keys, ", ")))."
+                return default
+            end
         end
     end
     return param
