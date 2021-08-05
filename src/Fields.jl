@@ -33,3 +33,5 @@ function field(grid::Grid, loc::String, nu::Int)
         return center_field(grid, nu)
     end
 end
+
+surface_value(f::AbstractVector, grid::Grid) = f[kf_surface(grid)]

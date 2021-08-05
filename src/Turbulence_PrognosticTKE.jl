@@ -379,7 +379,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
 
     grid = get_grid(self)
     ref_state = reference_state(self)
-    gw = grid.gw
+    kc_surf = kc_surface(grid)
     tau = get_mixing_tau(self.zi, self.wstar)
     l = pyzeros(3)
     m_eps = 1.0e-9 # Epsilon to avoid zero
@@ -388,10 +388,10 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         # kz scale (surface layer)
         if obukhov_length < 0.0 #unstable
             l2 =
-                vkb * z_ / (sqrt(self.EnvVar.TKE.values[grid.gw] / ustar / ustar) * self.tke_ed_coeff) *
+                vkb * z_ / (sqrt(self.EnvVar.TKE.values[kc_surf] / ustar / ustar) * self.tke_ed_coeff) *
                 fmin((1.0 - 100.0 * z_ / obukhov_length)^0.2, 1.0 / vkb)
         else # neutral or stable
-            l2 = vkb * z_ / (sqrt(self.EnvVar.TKE.values[grid.gw] / ustar / ustar) * self.tke_ed_coeff)
+            l2 = vkb * z_ / (sqrt(self.EnvVar.TKE.values[kc_surf] / ustar / ustar) * self.tke_ed_coeff)
         end
 
         # Buoyancy-shear-subdomain exchange-dissipation TKE equilibrium scale
@@ -554,16 +554,16 @@ function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanV
 end
 
 function set_updraft_surface_bc(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
-
+    grid = get_grid(self)
+    kc_surf = kc_surface(grid)
     update_inversion(self, GMV, Case.inversion_option)
     self.wstar = get_wstar(Case.Sur.bflux, self.zi)
 
-    gw = get_grid(self).gw
-    dzi = get_grid(self).dzi
-    zLL = get_grid(self).z_half[gw]
+    dzi = grid.dzi
+    zLL = grid.z_half[kc_surf]
     ustar = Case.Sur.ustar
     oblength = Case.Sur.obukhov_length
-    alpha0LL = reference_state(self).alpha0_half[gw]
+    alpha0LL = reference_state(self).alpha0_half[kc_surf]
     qt_var = get_surface_variance(Case.Sur.rho_qtflux * alpha0LL, Case.Sur.rho_qtflux * alpha0LL, ustar, zLL, oblength)
     h_var = get_surface_variance(Case.Sur.rho_hflux * alpha0LL, Case.Sur.rho_hflux * alpha0LL, ustar, zLL, oblength)
 
@@ -583,8 +583,8 @@ function set_updraft_surface_bc(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
         surface_scalar_coeff = percentile_bounds_mean_norm(1.0 - a_total + i * a_, 1.0 - a_total + (i + 1) * a_, 1000)
         self.area_surface_bc[i] = a_
         self.w_surface_bc[i] = 0.0
-        self.h_surface_bc[i] = (GMV.H.values[gw] + surface_scalar_coeff * sqrt(h_var))
-        self.qt_surface_bc[i] = (GMV.QT.values[gw] + surface_scalar_coeff * sqrt(qt_var))
+        self.h_surface_bc[i] = (GMV.H.values[kc_surf] + surface_scalar_coeff * sqrt(h_var))
+        self.qt_surface_bc[i] = (GMV.QT.values[kc_surf] + surface_scalar_coeff * sqrt(qt_var))
     end
     return
 end
@@ -593,13 +593,14 @@ function reset_surface_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     flux1 = Case.Sur.rho_hflux
     flux2 = Case.Sur.rho_qtflux
     grid = get_grid(self)
+    kc_surf = kc_surface(grid)
     ref_state = reference_state(self)
-    zLL = get_grid(self).z_half[grid.gw]
+    zLL = grid.z_half[kc_surf]
     ustar = Case.Sur.ustar
     oblength = Case.Sur.obukhov_length
-    alpha0LL = ref_state.alpha0_half[grid.gw]
-    self.EnvVar.TKE.values[grid.gw] =
-        get_surface_tke(Case.Sur.ustar, self.wstar, grid.z_half[grid.gw], Case.Sur.obukhov_length)
+    alpha0LL = ref_state.alpha0_half[kc_surf]
+    self.EnvVar.TKE.values[kc_surf] =
+        get_surface_tke(Case.Sur.ustar, self.wstar, grid.z_half[kc_surf], Case.Sur.obukhov_length)
     get_GMV_CoVar(
         self,
         self.UpdVar.Area,
@@ -613,9 +614,9 @@ function reset_surface_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
         GMV.TKE.values,
     )
 
-    self.EnvVar.Hvar.values[grid.gw] = get_surface_variance(flux1 * alpha0LL, flux1 * alpha0LL, ustar, zLL, oblength)
-    self.EnvVar.QTvar.values[grid.gw] = get_surface_variance(flux2 * alpha0LL, flux2 * alpha0LL, ustar, zLL, oblength)
-    self.EnvVar.HQTcov.values[grid.gw] = get_surface_variance(flux1 * alpha0LL, flux2 * alpha0LL, ustar, zLL, oblength)
+    self.EnvVar.Hvar.values[kc_surf] = get_surface_variance(flux1 * alpha0LL, flux1 * alpha0LL, ustar, zLL, oblength)
+    self.EnvVar.QTvar.values[kc_surf] = get_surface_variance(flux2 * alpha0LL, flux2 * alpha0LL, ustar, zLL, oblength)
+    self.EnvVar.HQTcov.values[kc_surf] = get_surface_variance(flux1 * alpha0LL, flux2 * alpha0LL, ustar, zLL, oblength)
     get_GMV_CoVar(
         self,
         self.UpdVar.Area,
@@ -663,8 +664,6 @@ function decompose_environment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
     # first make sure the "bulkvalues" of the updraft variables are updated
     set_means(self.UpdVar, GMV)
     grid = get_grid(self)
-
-    gw = grid.gw
 
     if whichvals == "values"
         @inbounds for k in real_face_indicies(grid)
@@ -955,8 +954,10 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     ret_w = pressure_drag_struct()
     input_p = pressure_in_struct()
 
-    # TODO: this should eventually match the grid
-    cinterior = (grid.gw):(grid.nzg - grid.gw)
+    # TODO: merge this with grid.cinterior
+    kc_surf = kc_surface(grid)
+    kc_toa = kc_top_of_atmos(grid)
+    cinterior = kc_surf:kc_toa
 
     ref_state = reference_state(self)
     tau = get_mixing_tau(self.zi, self.wstar)
@@ -1202,16 +1203,17 @@ end
 function solve_updraft_velocity_area(self::EDMF_PrognosticTKE)
     grid = get_grid(self)
     ref_state = reference_state(self)
-    gw = grid.gw
+    kc_surf = kc_surface(grid)
+    kf_surf = kf_surface(grid)
     dzi = grid.dzi
     dti_ = 1.0 / self.dt_upd
     dt_ = 1.0 / dti_
 
     @inbounds for i in xrange(self.n_updrafts)
-        self.entr_sc[i, gw] = self.entr_surface_bc
-        self.detr_sc[i, gw] = self.detr_surface_bc
-        self.UpdVar.W.new[i, gw - 1] = self.w_surface_bc[i]
-        self.UpdVar.Area.new[i, gw] = self.area_surface_bc[i]
+        self.entr_sc[i, kc_surf] = self.entr_surface_bc
+        self.detr_sc[i, kc_surf] = self.detr_surface_bc
+        self.UpdVar.W.new[i, kf_surf] = self.w_surface_bc[i]
+        self.UpdVar.Area.new[i, kc_surf] = self.area_surface_bc[i]
         au_lim = self.max_area
 
         @inbounds for k in real_center_indicies(grid)
@@ -1301,14 +1303,13 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     ref_state = reference_state(self)
     dzi = grid.dzi
     dti_ = 1.0 / self.dt_upd
-    gw = grid.gw
     sa = eos_struct()
 
     @inbounds for i in xrange(self.n_updrafts)
 
         # starting from the bottom do entrainment at each level
         @inbounds for k in real_center_indicies(grid)
-            if k == gw
+            if is_surface_bc_centers(grid, k)
                 # at the surface
                 if self.UpdVar.Area.new[i, k] >= self.minimum_area
                     self.UpdVar.H.new[i, k] = self.h_surface_bc[i]
@@ -1388,7 +1389,7 @@ function update_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     grid = get_grid(self)
     ref_state = reference_state(self)
     rho0 = ref_state.rho0
-    gw = grid.gw
+    kf_surf = kf_surface(grid)
     mf_tend_h = 0.0
     mf_tend_qt = 0.0
     ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues # area of environment
@@ -1398,7 +1399,7 @@ function update_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
 
     # Compute the mass flux and associated scalar fluxes
     @inbounds for i in xrange(self.n_updrafts)
-        self.m[i, gw - 1] = 0.0
+        self.m[i, kf_surf] = 0.0
         @inbounds for k in real_face_indicies(grid)
             a = interp2pt(self.UpdVar.Area.values[i, k], self.UpdVar.Area.values[i, k + 1])
             self.m[i, k] =
@@ -1407,8 +1408,8 @@ function update_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     end
 
 
-    self.massflux_h[gw - 1] = 0.0
-    self.massflux_qt[gw - 1] = 0.0
+    self.massflux_h[kf_surf] = 0.0
+    self.massflux_qt[kf_surf] = 0.0
 
     @inbounds for k in real_face_indicies(grid)
         self.massflux_h[k] = 0.0
@@ -1448,7 +1449,6 @@ end
 # Update from GMV.SomeVar.mf_update to GMV.SomeVar.new
 function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
     grid = get_grid(self)
-    gw = grid.gw
     nzg = grid.nzg
     nz = grid.nz
     dzi = grid.dzi
@@ -1610,8 +1610,9 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues
     KH = diffusivity_h(self).values
 
-    # Note that source terms at the gw grid point are not really used because that is where tke boundary condition is
-    # enforced (according to MO similarity). Thus here I am being sloppy about lowest grid point
+    # Note that source terms at the first center interior grid point are not really used because
+    # that is where tke boundary condition is enforced (according to MO similarity). Thus here I
+    # am being sloppy about lowest grid point
     @inbounds for k in real_center_indicies(grid)
         qt_dry = self.EnvThermo.qt_dry[k]
         th_dry = self.EnvThermo.th_dry[k]
@@ -1894,6 +1895,7 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
     us = Case.Sur.ustar
     zs = self.zi
     grid = get_grid(self)
+    kc_surf = kc_surface(grid)
 
     reset_surface_covariance(self, GMV, Case)
 
@@ -1936,19 +1938,19 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
             z = grid.z_half[k]
             # need to rethink of how to initilize the covarinace profiles - for nowmI took the TKE profile
             GMV.Hvar.values[k] =
-                GMV.Hvar.values[grid.gw] *
+                GMV.Hvar.values[kc_surf] *
                 ws *
                 1.3 *
                 cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) *
                 sqrt(fmax(1.0 - z / zs, 0.0))
             GMV.QTvar.values[k] =
-                GMV.QTvar.values[grid.gw] *
+                GMV.QTvar.values[kc_surf] *
                 ws *
                 1.3 *
                 cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) *
                 sqrt(fmax(1.0 - z / zs, 0.0))
             GMV.HQTcov.values[k] =
-                GMV.HQTcov.values[grid.gw] *
+                GMV.HQTcov.values[kc_surf] *
                 ws *
                 1.3 *
                 cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) *
@@ -2304,12 +2306,13 @@ function update_covariance_ED(
 )
 
     grid = get_grid(self)
-    gw = grid.gw
+    kc_surf = kc_surface(grid)
+    kf_surf = kf_surface(grid)
     dzi = grid.dzi
     dti = TS.dti
     Ref = reference_state(self)
-    alpha0LL = Ref.alpha0_half[grid.gw]
-    zLL = grid.z_half[grid.gw]
+    alpha0LL = Ref.alpha0_half[kc_surf]
+    zLL = grid.z_half[kc_surf]
     a = center_field(grid)
     b = center_field(grid)
     c = center_field(grid)
@@ -2333,20 +2336,20 @@ function update_covariance_ED(
         rho_ae_K_m[k] = 0.5 * (ae[k] * K + ae[k + 1] * Kp) * Ref.rho0[k]
         whalf[k] = interp2pt(self.EnvVar.W.values[k - 1], self.EnvVar.W.values[k])
     end
-    wu_half = interp2pt(self.UpdVar.W.bulkvalues[gw - 1], self.UpdVar.W.bulkvalues[gw])
+    wu_half = interp2pt(self.UpdVar.W.bulkvalues[kf_surf], self.UpdVar.W.bulkvalues[kf_surf + 1])
 
     # Not necessary if BCs for variances are applied to environment.
     # if GmvCovar.name=="tke"
-    #     GmvCovar.values[gw] =get_surface_tke(Case.Sur.ustar, self.wstar, get_grid(self).z_half[gw], Case.Sur.obukhov_length)
+    #     GmvCovar.values[kc_surf] =get_surface_tke(Case.Sur.ustar, self.wstar, get_grid(self).z_half[kc_surf], Case.Sur.obukhov_length)
     # elseif GmvCovar.name=="thetal_var"
-    #     GmvCovar.values[gw] = get_surface_variance(Case.Sur.rho_hflux * alpha0LL, Case.Sur.rho_hflux * alpha0LL, Case.Sur.ustar, zLL, Case.Sur.obukhov_length)
+    #     GmvCovar.values[kc_surf] = get_surface_variance(Case.Sur.rho_hflux * alpha0LL, Case.Sur.rho_hflux * alpha0LL, Case.Sur.ustar, zLL, Case.Sur.obukhov_length)
     # elseif GmvCovar.name=="qt_var"
-    #     GmvCovar.values[gw] = get_surface_variance(Case.Sur.rho_qtflux * alpha0LL, Case.Sur.rho_qtflux * alpha0LL, Case.Sur.ustar, zLL, Case.Sur.obukhov_length)
+    #     GmvCovar.values[kc_surf] = get_surface_variance(Case.Sur.rho_qtflux * alpha0LL, Case.Sur.rho_qtflux * alpha0LL, Case.Sur.ustar, zLL, Case.Sur.obukhov_length)
     # elseif GmvCovar.name=="thetal_qt_covar"
-    #     GmvCovar.values[gw] = get_surface_variance(Case.Sur.rho_hflux * alpha0LL, Case.Sur.rho_qtflux * alpha0LL, Case.Sur.ustar, zLL, Case.Sur.obukhov_length)
+    #     GmvCovar.values[kc_surf] = get_surface_variance(Case.Sur.rho_hflux * alpha0LL, Case.Sur.rho_qtflux * alpha0LL, Case.Sur.ustar, zLL, Case.Sur.obukhov_length)
     # self.get_env_covar_from_GMV(self.UpdVar.Area, UpdVar1, UpdVar2, EnvVar1, EnvVar2, Covar, GmvVar1.values, GmvVar2.values, GmvCovar.values)
 
-    Covar_surf = Covar.values[gw]
+    Covar_surf = Covar.values[kc_surf]
 
     @inbounds for k in real_center_indicies(grid)
         D_env = 0.0
@@ -2482,7 +2485,7 @@ end
 function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, option)
     theta_rho = center_field(self.Gr)
     ∇θ_liq_max = 0.0
-    k_fi = first_center(self.Gr)
+    kc_surf = kc_surface(self.Gr)
 
     @inbounds for k in real_center_indicies(self.Gr)
         qv = GMV.QT.values[k] - GMV.QL.values[k]
@@ -2492,7 +2495,7 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
 
     if option == "theta_rho"
         @inbounds for k in real_center_indicies(self.Gr)
-            if theta_rho[k] > theta_rho[k_fi]
+            if theta_rho[k] > theta_rho[kc_surf]
                 self.zi = self.Gr.z_half[k]
                 break
             end

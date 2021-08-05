@@ -25,7 +25,7 @@ function set_bcs(self::UpdraftVariable, Gr::Grid)
 end
 
 function initialize(self::UpdraftVariables, GMV::GridMeanVariables)
-    gw = self.Gr.gw
+    kc_surf = kc_surface(self.Gr)
 
     self.W.values .= 0
     self.B.values .= 0
@@ -45,7 +45,7 @@ function initialize(self::UpdraftVariables, GMV::GridMeanVariables)
             self.THL.values[i, k] = GMV.THL.values[k]
         end
 
-        self.Area.values[i, gw] = self.updraft_fraction / self.n_updrafts
+        self.Area.values[i, kc_surf] = self.updraft_fraction / self.n_updrafts
     end
 
     set_bcs(self.QT, self.Gr)
@@ -57,7 +57,6 @@ function initialize(self::UpdraftVariables, GMV::GridMeanVariables)
 end
 
 function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Ref::ReferenceState)
-    gw = self.Gr.gw
     dz = self.Gr.dz
 
     # criterion 2: b>1e-4
@@ -350,7 +349,7 @@ function upd_cloud_diagnostics(self::UpdraftVariables, Ref::ReferenceState)
     @inbounds for i in xrange(self.n_updrafts)
         #TODO check the setting of ghost point z_half
 
-        self.cloud_base[i] = self.Gr.z_half[self.Gr.nzg - self.Gr.gw - 1]
+        self.cloud_base[i] = zc_toa(self.Gr)
         self.cloud_top[i] = 0.0
         self.updraft_top[i] = 0.0
         self.cloud_cover[i] = 0.0
@@ -398,15 +397,16 @@ function buoyancy(
     extrap::Bool,
 )
 
-    gw = self.Gr.gw
     qt = 0.0
     h = 0.0
+    grid = self.Gr
+    kc_surf = kc_surface(grid)
 
     UpdVar.Area.bulkvalues .= up_sum(UpdVar.Area.values)
 
     if !extrap
         @inbounds for i in xrange(self.n_updraft)
-            @inbounds for k in center_indicies(self.Gr)
+            @inbounds for k in center_indicies(grid)
                 if UpdVar.Area.values[i, k] > 0.0
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
                     rho = rho_c(self.Ref.p0_half[k], UpdVar.T.values[i, k], UpdVar.QT.values[i, k], qv)
@@ -425,7 +425,7 @@ function buoyancy(
         end
     else
         @inbounds for i in xrange(self.n_updraft)
-            @inbounds for k in real_center_indicies(self.Gr)
+            @inbounds for k in real_center_indicies(grid)
                 if UpdVar.Area.values[i, k] > 0.0
                     qt = UpdVar.QT.values[i, k]
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
@@ -434,7 +434,7 @@ function buoyancy(
                     rho = rho_c(self.Ref.p0_half[k], t, qt, qv)
                     UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
                     UpdVar.RH.values[i, k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, t)
-                elseif UpdVar.Area.values[i, k - 1] > 0.0 && k > self.Gr.gw
+                elseif UpdVar.Area.values[i, k - 1] > 0.0 && k > kc_surf
                     # TODO: report bug:
                     # qt and h were not defined here before the function call.
                     sa = eos(self.Ref.p0_half[k], qt, h)

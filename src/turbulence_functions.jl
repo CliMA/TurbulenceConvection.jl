@@ -181,8 +181,8 @@ end
 
 # BL height
 function get_inversion(theta_rho, u, v, grid::Grid, Ri_bulk_crit)
-    gw = grid.gw
-    kmin = gw
+    kc_surf = kc_surface(grid)
+    kmin = kc_surf
     theta_rho_b = theta_rho[kmin]
     k = kmin
     Ri_bulk = 0.0

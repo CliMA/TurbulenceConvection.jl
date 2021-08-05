@@ -78,7 +78,7 @@ end
 
 function env_cloud_diagnostics(self::EnvironmentVariables, Ref::ReferenceState)
     self.cloud_top = 0.0
-    self.cloud_base = self.Gr.z_half[self.Gr.nzg - self.Gr.gw - 1]
+    self.cloud_base = zc_toa(self.Gr)
     self.cloud_cover = 0.0
     self.lwp = 0.0
 
@@ -130,7 +130,6 @@ end
 
 function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables)
 
-    gw = self.Gr.gw
     sa = eos_struct()
     mph = mph_struct()
 
@@ -164,7 +163,6 @@ end
 
 function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables, Rain::RainVariables, dt)
 
-    gw = self.Gr.gw
     sa = eos_struct()
     mph = mph_struct()
 
@@ -210,7 +208,6 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
     #TODO - if we start using eos_smpl for the updrafts calculations
     #       we can get rid of the two categories for outer and inner quad. points
 
-    gw = self.Gr.gw
     abscissas = off_arr(a)
     weights = off_arr(w)
     # arrays for storing quadarature points and ints for labeling items in the arrays
