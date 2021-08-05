@@ -7,19 +7,9 @@ mutable struct TimeStepping
 end
 
 function TimeStepping(namelist)
-    dt = try
-        namelist["time_stepping"]["dt"]
-    catch
-        1.0
-    end
-
+    dt = parse_namelist(namelist, "time_stepping", "dt"; default = 1.0)
     dti = 1.0 / dt
-
-    t_max = try
-        namelist["time_stepping"]["t_max"]
-    catch
-        7200.0
-    end
+    t_max = parse_namelist(namelist, "time_stepping", "t_max"; default = 7200.0)
 
     # set time
     t = 0.0
