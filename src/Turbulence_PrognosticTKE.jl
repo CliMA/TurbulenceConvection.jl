@@ -352,12 +352,7 @@ function compute_prognostic_updrafts(
     clear_precip_sources(self.UpdThermo)
 
     while time_elapsed < TS.dt
-        compute_entrainment_detrainment(self, GMV, Case)
-        if self.turbulent_entrainment_factor > 1.0e-6
-            compute_horizontal_eddy_diffusivities(self, GMV)
-            compute_turbulent_entrainment(self, GMV, Case)
-        end
-        compute_nh_pressure(self)
+        compute_updraft_closures(self, GMV, Case)
         solve_updraft_velocity_area(self)
         solve_updraft_scalars(self, GMV)
         microphysics(self.UpdThermo, self.UpdVar, self.Rain, TS.dt) # causes division error in dry bubble first time step
@@ -555,30 +550,6 @@ function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanV
         KM.values[k] = self.tke_ed_coeff * lm * sqrt(fmax(self.EnvVar.TKE.values[k], 0.0))
         KH.values[k] = KM.values[k] / pr
     end
-    return
-end
-
-function compute_horizontal_eddy_diffusivities(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
-    grid = get_grid(self)
-    ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues
-    l = pyzeros(2)
-
-    @inbounds for k in real_center_indicies(grid)
-        @inbounds for i in xrange(self.n_updrafts)
-            if self.UpdVar.Area.values[i, k] > 0.0
-                self.horizontal_KM[i, k] =
-                    self.UpdVar.Area.values[i, k] *
-                    self.turbulent_entrainment_factor *
-                    sqrt(fmax(self.EnvVar.TKE.values[k], 0.0)) *
-                    self.pressure_plume_spacing[i]
-                self.horizontal_KH[i, k] = self.horizontal_KM[i, k] / self.prandtl_nvec[k]
-            else
-                self.horizontal_KM[i, k] = 0.0
-                self.horizontal_KH[i, k] = 0.0
-            end
-        end
-    end
-
     return
 end
 
@@ -958,14 +929,102 @@ function get_env_covar_from_GMV(
     return
 end
 
-function compute_turbulent_entrainment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
-
+function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
+    ret = entr_struct()
+    input = entr_in_struct()
+    sa = eos_struct()
+    quadrature_order = 3
     grid = get_grid(self)
+
+    upd_cloud_diagnostics(self.UpdVar, reference_state(self))
+
+    input.wstar = self.wstar
+
+    input.dz = get_grid(self).dz
+    input.zbl = compute_zbl_qt_grad(GMV)
+    input.sort_pow = self.sorting_power
+    input.c_ent = self.entrainment_factor
+    input.c_det = self.detrainment_factor
+    input.c_div = self.entrainment_Mdiv_factor
+    input.c_mu = self.entrainment_sigma
+    input.c_mu0 = self.entrainment_scale
+    input.c_ed_mf = self.entrainment_ed_mf_sigma
+    input.chi_upd = self.updraft_mixing_frac
+    input.tke_coef = self.entrainment_smin_tke_coeff
+    ret_b = pressure_buoy_struct()
+    ret_w = pressure_drag_struct()
+    input_p = pressure_in_struct()
+
+    # TODO: this should eventually match the grid
+    cinterior = (grid.gw):(grid.nzg - grid.gw)
+
     ref_state = reference_state(self)
     tau = get_mixing_tau(self.zi, self.wstar)
 
-    @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_center_indicies(grid)
+    ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues
+    l = pyzeros(2)
+
+    @inbounds for k in real_center_indicies(grid)
+        @inbounds for i in xrange(self.n_updrafts)
+            input_p.updraft_top = self.UpdVar.updraft_top[i]
+            alen = max(length(argwhere(self.UpdVar.Area.values[i, cinterior])) - 1, 0)
+            avals = off_arr(self.UpdVar.Area.values[i, cinterior])
+            input_p.a_med = Statistics.median(avals[0:alen])
+            input.zi = self.UpdVar.cloud_base[i]
+            # entrainment
+            input.buoy_ed_flux = self.EnvVar.TKE.buoy[k]
+            if self.UpdVar.Area.values[i, k] > 0.0
+                input.b_upd = self.UpdVar.B.values[i, k]
+                input.w_upd = interpf2c(self.UpdVar.W.values, grid, k, i)
+                input.z = grid.z_half[k]
+                input.a_upd = self.UpdVar.Area.values[i, k]
+                input.a_env = 1.0 - self.UpdVar.Area.bulkvalues[k]
+                input.tke = self.EnvVar.TKE.values[k]
+                input.ql_env = self.EnvVar.QL.values[k]
+                input.b_env = self.EnvVar.B.values[k]
+                input.w_env = interpf2c(self.EnvVar.W.values, grid, k)
+                input.ql_up = self.UpdVar.QL.values[i, k]
+                input.ql_env = self.EnvVar.QL.values[k]
+                input.nh_pressure = self.nh_pressure[i, k]
+                input.RH_upd = self.UpdVar.RH.values[i, k]
+                input.RH_env = self.EnvVar.RH.values[k]
+
+                # compute dMdz at half levels
+                gmv_w_k = interpf2c(GMV.W.values, grid, k)
+                gmv_w_km = interpf2c(GMV.W.values, grid, k - 1)
+                upd_w_km = interpf2c(self.UpdVar.W.values, grid, k - 1, i)
+                input.M = input.a_upd * (input.w_upd - gmv_w_k)
+                Mm = self.UpdVar.Area.values[i, k - 1] * (upd_w_km - gmv_w_km)
+                input.dMdz = (input.M - Mm) * grid.dzi
+                input.tke = self.EnvVar.TKE.values[k]
+
+                ret = self.entr_detr_fp(input)
+                self.entr_sc[i, k] = ret.entr_sc
+                self.detr_sc[i, k] = ret.detr_sc
+                self.sorting_function[i, k] = ret.sorting_function
+                self.b_mix[i, k] = ret.b_mix
+
+            else
+                self.entr_sc[i, k] = 0.0
+                self.detr_sc[i, k] = 0.0
+                self.sorting_function[i, k] = 0.0
+                self.b_mix[i, k] = self.EnvVar.B.values[k]
+            end
+
+            # horizontal eddy diffusivities
+            if self.UpdVar.Area.values[i, k] > 0.0
+                self.horizontal_KM[i, k] =
+                    self.UpdVar.Area.values[i, k] *
+                    self.turbulent_entrainment_factor *
+                    sqrt(fmax(self.EnvVar.TKE.values[k], 0.0)) *
+                    self.pressure_plume_spacing[i]
+                self.horizontal_KH[i, k] = self.horizontal_KM[i, k] / self.prandtl_nvec[k]
+            else
+                self.horizontal_KM[i, k] = 0.0
+                self.horizontal_KH[i, k] = 0.0
+            end
+
+            # turbulent entrainment
             a = self.UpdVar.Area.values[i, k]
             a_full = interp2pt(self.UpdVar.Area.values[i, k], self.UpdVar.Area.values[i, k + 1])
             R_up = self.pressure_plume_spacing[i]
@@ -1007,74 +1066,58 @@ function compute_turbulent_entrainment(self::EDMF_PrognosticTKE, GMV::GridMeanVa
             else
                 self.turb_entr_W[i, k] = 0.0
             end
-        end
-    end
-    return
-end
 
-function compute_entrainment_detrainment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
-    ret = entr_struct()
-    input = entr_in_struct()
-    sa = eos_struct()
-    quadrature_order = 3
-    grid = get_grid(self)
+            # pressure
+            input_p.a_kfull = interpc2f(self.UpdVar.Area.values, grid, k, i)
+            if input_p.a_kfull >= self.minimum_area
+                input_p.dzi = grid.dzi
 
-    upd_cloud_diagnostics(self.UpdVar, reference_state(self))
+                input_p.b_kfull = interpc2f(self.UpdVar.B.values, grid, k, i)
+                input_p.rho0_kfull = ref_state.rho0[k]
+                input_p.alpha1 = self.pressure_normalmode_buoy_coeff1
+                input_p.alpha2 = self.pressure_normalmode_buoy_coeff2
+                input_p.beta1 = self.pressure_normalmode_adv_coeff
+                input_p.beta2 = self.pressure_normalmode_drag_coeff
+                input_p.w_kfull = self.UpdVar.W.values[i, k]
+                input_p.w_kmfull = self.UpdVar.W.values[i, k - 1]
+                input_p.w_kenv = self.EnvVar.W.values[k]
 
-    input.wstar = self.wstar
+                if self.asp_label == "z_dependent"
+                    input_p.asp_ratio = input_p.updraft_top / 2.0 / sqrt(input_p.a_kfull) / input_p.rd
+                elseif self.asp_label == "median"
+                    input_p.asp_ratio = input_p.updraft_top / 2.0 / sqrt(input_p.a_med) / input_p.rd
+                elseif self.asp_label == "const"
+                    input_p.asp_ratio = 1.0
+                end
 
-    input.dz = get_grid(self).dz
-    input.zbl = compute_zbl_qt_grad(GMV)
-    input.sort_pow = self.sorting_power
-    input.c_ent = self.entrainment_factor
-    input.c_det = self.detrainment_factor
-    input.c_div = self.entrainment_Mdiv_factor
-    input.c_mu = self.entrainment_sigma
-    input.c_mu0 = self.entrainment_scale
-    input.c_ed_mf = self.entrainment_ed_mf_sigma
-    input.chi_upd = self.updraft_mixing_frac
-    input.tke_coef = self.entrainment_smin_tke_coeff
-    @inbounds for i in xrange(self.n_updrafts)
-        input.zi = self.UpdVar.cloud_base[i]
-        @inbounds for k in real_center_indicies(grid)
-            input.buoy_ed_flux = self.EnvVar.TKE.buoy[k]
-            if self.UpdVar.Area.values[i, k] > 0.0
-                input.b_upd = self.UpdVar.B.values[i, k]
-                input.w_upd = interpf2c(self.UpdVar.W.values, grid, k, i)
-                input.z = grid.z_half[k]
-                input.a_upd = self.UpdVar.Area.values[i, k]
-                input.a_env = 1.0 - self.UpdVar.Area.bulkvalues[k]
-                input.tke = self.EnvVar.TKE.values[k]
-                input.ql_env = self.EnvVar.QL.values[k]
-                input.b_env = self.EnvVar.B.values[k]
-                input.w_env = interpf2c(self.EnvVar.W.values, grid, k)
-                input.ql_up = self.UpdVar.QL.values[i, k]
-                input.ql_env = self.EnvVar.QL.values[k]
-                input.nh_pressure = self.nh_pressure[i, k]
-                input.RH_upd = self.UpdVar.RH.values[i, k]
-                input.RH_env = self.EnvVar.RH.values[k]
+                if input_p.a_kfull > 0.0
+                    ret_b = self.pressure_func_buoy(input_p)
+                    ret_w = self.pressure_func_drag(input_p)
+                    self.nh_pressure_b[i, k] = ret_b.nh_pressure_b
+                    self.nh_pressure_adv[i, k] = ret_w.nh_pressure_adv
+                    self.nh_pressure_drag[i, k] = ret_w.nh_pressure_drag
 
-                # compute dMdz at half levels
-                gmv_w_k = interpf2c(GMV.W.values, grid, k)
-                gmv_w_km = interpf2c(GMV.W.values, grid, k - 1)
-                upd_w_km = interpf2c(self.UpdVar.W.values, grid, k - 1, i)
-                input.M = input.a_upd * (input.w_upd - gmv_w_k)
-                Mm = self.UpdVar.Area.values[i, k - 1] * (upd_w_km - gmv_w_km)
-                input.dMdz = (input.M - Mm) * grid.dzi
-                input.tke = self.EnvVar.TKE.values[k]
+                    self.b_coeff[i, k] = ret_b.b_coeff
+                    self.asp_ratio[i, k] = input_p.asp_ratio
 
-                ret = self.entr_detr_fp(input)
-                self.entr_sc[i, k] = ret.entr_sc
-                self.detr_sc[i, k] = ret.detr_sc
-                self.sorting_function[i, k] = ret.sorting_function
-                self.b_mix[i, k] = ret.b_mix
+                else
+                    self.nh_pressure_b[i, k] = 0.0
+                    self.nh_pressure_adv[i, k] = 0.0
+                    self.nh_pressure_drag[i, k] = 0.0
 
+                    self.b_coeff[i, k] = 0.0
+                    self.asp_ratio[i, k] = 0.0
+                end
             else
-                self.entr_sc[i, k] = 0.0
-                self.detr_sc[i, k] = 0.0
-                self.sorting_function[i, k] = 0.0
-                self.b_mix[i, k] = self.EnvVar.B.values[k]
+                self.nh_pressure_b[i, k] = 0.0
+                self.nh_pressure_adv[i, k] = 0.0
+                self.nh_pressure_drag[i, k] = 0.0
+
+                self.b_coeff[i, k] = 0.0
+                self.asp_ratio[i, k] = 0.0
             end
+
+            self.nh_pressure[i, k] = self.nh_pressure_b[i, k] + self.nh_pressure_adv[i, k] + self.nh_pressure_drag[i, k]
         end
     end
     return
@@ -1100,78 +1143,6 @@ function compute_pressure_plume_spacing(self::EDMF_PrognosticTKE, GMV::GridMeanV
                 fmax(self.aspect_ratio * self.UpdVar.updraft_top[i], 500.0 * self.aspect_ratio)
         end
     end
-    return
-end
-
-function compute_nh_pressure(self::EDMF_PrognosticTKE)
-    ret_b = pressure_buoy_struct()
-    ret_w = pressure_drag_struct()
-    input = pressure_in_struct()
-    grid = get_grid(self)
-    ref_state = reference_state(self)
-
-    # TODO: this should eventually match the grid
-    cinterior = (grid.gw):(grid.nzg - grid.gw)
-
-    @inbounds for i in xrange(self.n_updrafts)
-        input.updraft_top = self.UpdVar.updraft_top[i]
-        alen = max(length(argwhere(self.UpdVar.Area.values[i, cinterior])) - 1, 0)
-        avals = off_arr(self.UpdVar.Area.values[i, cinterior])
-        input.a_med = Statistics.median(avals[0:alen])
-        @inbounds for k in real_center_indicies(grid)
-            input.a_kfull = interpc2f(self.UpdVar.Area.values, grid, k, i)
-            if input.a_kfull >= self.minimum_area
-                input.dzi = grid.dzi
-
-                input.b_kfull = interpc2f(self.UpdVar.B.values, grid, k, i)
-                input.rho0_kfull = ref_state.rho0[k]
-                input.alpha1 = self.pressure_normalmode_buoy_coeff1
-                input.alpha2 = self.pressure_normalmode_buoy_coeff2
-                input.beta1 = self.pressure_normalmode_adv_coeff
-                input.beta2 = self.pressure_normalmode_drag_coeff
-                input.w_kfull = self.UpdVar.W.values[i, k]
-                input.w_kmfull = self.UpdVar.W.values[i, k - 1]
-                input.w_kenv = self.EnvVar.W.values[k]
-
-                if self.asp_label == "z_dependent"
-                    input.asp_ratio = input.updraft_top / 2.0 / sqrt(input.a_kfull) / input.rd
-                elseif self.asp_label == "median"
-                    input.asp_ratio = input.updraft_top / 2.0 / sqrt(input.a_med) / input.rd
-                elseif self.asp_label == "const"
-                    input.asp_ratio = 1.0
-                end
-
-                if input.a_kfull > 0.0
-                    ret_b = self.pressure_func_buoy(input)
-                    ret_w = self.pressure_func_drag(input)
-                    self.nh_pressure_b[i, k] = ret_b.nh_pressure_b
-                    self.nh_pressure_adv[i, k] = ret_w.nh_pressure_adv
-                    self.nh_pressure_drag[i, k] = ret_w.nh_pressure_drag
-
-                    self.b_coeff[i, k] = ret_b.b_coeff
-                    self.asp_ratio[i, k] = input.asp_ratio
-
-                else
-                    self.nh_pressure_b[i, k] = 0.0
-                    self.nh_pressure_adv[i, k] = 0.0
-                    self.nh_pressure_drag[i, k] = 0.0
-
-                    self.b_coeff[i, k] = 0.0
-                    self.asp_ratio[i, k] = 0.0
-                end
-            else
-                self.nh_pressure_b[i, k] = 0.0
-                self.nh_pressure_adv[i, k] = 0.0
-                self.nh_pressure_drag[i, k] = 0.0
-
-                self.b_coeff[i, k] = 0.0
-                self.asp_ratio[i, k] = 0.0
-            end
-
-            self.nh_pressure[i, k] = self.nh_pressure_b[i, k] + self.nh_pressure_adv[i, k] + self.nh_pressure_drag[i, k]
-        end
-    end
-
     return
 end
 
