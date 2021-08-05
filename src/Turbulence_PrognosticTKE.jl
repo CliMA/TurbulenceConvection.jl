@@ -919,10 +919,9 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
 
     upd_cloud_diagnostics(self.UpdVar, reference_state(self))
 
-    input.wstar = self.wstar
+    # input.wstar = self.wstar
 
     input.dz = get_grid(self).dz
-    input.zbl = compute_zbl_qt_grad(GMV)
     input.sort_pow = self.sorting_power
     input.c_det = self.detrainment_factor
     input.c_div = self.entrainment_Mdiv_factor
@@ -954,7 +953,6 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
             input_p.a_med = Statistics.median(avals[1:alen])
             input.zi = self.UpdVar.cloud_base[i]
             # entrainment
-            input.buoy_ed_flux = self.EnvVar.TKE.buoy[k]
             if self.UpdVar.Area.values[i, k] > 0.0
                 input.b_upd = self.UpdVar.B.values[i, k]
                 input.w_upd = interpf2c(self.UpdVar.W.values, grid, k, i)
@@ -967,7 +965,6 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
                 input.w_env = interpf2c(self.EnvVar.W.values, grid, k)
                 input.ql_up = self.UpdVar.QL.values[i, k]
                 input.ql_env = self.EnvVar.QL.values[k]
-                input.nh_pressure = self.nh_pressure[i, k]
                 input.RH_upd = self.UpdVar.RH.values[i, k]
                 input.RH_env = self.EnvVar.RH.values[k]
 
@@ -1015,46 +1012,28 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
             end
 
             # pressure
-            input_p.a_kfull = interpc2f(self.UpdVar.Area.values, grid, k, i)
-            if input_p.a_kfull >= self.minimum_area
-                input_p.dzi = grid.dzi
+            a_kfull = interpc2f(self.UpdVar.Area.values, grid, k, i)
+            if a_kfull > 0.0
+                b_kfull = interpc2f(self.UpdVar.B.values, grid, k, i)
+                asp_ratio = 1.0
 
-                input_p.b_kfull = interpc2f(self.UpdVar.B.values, grid, k, i)
-                input_p.rho0_kfull = ref_state.rho0[k]
-                input_p.alpha1 = self.pressure_normalmode_buoy_coeff1
-                input_p.alpha2 = self.pressure_normalmode_buoy_coeff2
-                input_p.beta1 = self.pressure_normalmode_adv_coeff
-                input_p.beta2 = self.pressure_normalmode_drag_coeff
-                input_p.w_kfull = self.UpdVar.W.values[i, k]
-                input_p.w_kmfull = self.UpdVar.W.values[i, k - 1]
-                input_p.w_kenv = self.EnvVar.W.values[k]
+                ∇w_up = ∇f2c(self.UpdVar.W.values, grid, k, i)
+                self.nh_pressure_b[i, k], self.nh_pressure_adv[i, k], self.nh_pressure_drag[i, k], self.b_coeff[i, k] =
+                    perturbation_pressure(
+                        self.UpdVar.updraft_top[i],
+                        a_kfull,
+                        b_kfull,
+                        ref_state.rho0[k],
+                        self.pressure_normalmode_buoy_coeff1,
+                        self.pressure_normalmode_buoy_coeff2,
+                        self.pressure_normalmode_adv_coeff,
+                        self.pressure_normalmode_drag_coeff,
+                        self.UpdVar.W.values[i, k],
+                        ∇w_up,
+                        self.EnvVar.W.values[k],
+                        asp_ratio,
+                    )
 
-                if self.asp_label == "z_dependent"
-                    input_p.asp_ratio = input_p.updraft_top / 2.0 / sqrt(input_p.a_kfull) / input_p.rd
-                elseif self.asp_label == "median"
-                    input_p.asp_ratio = input_p.updraft_top / 2.0 / sqrt(input_p.a_med) / input_p.rd
-                elseif self.asp_label == "const"
-                    input_p.asp_ratio = 1.0
-                end
-
-                if input_p.a_kfull > 0.0
-                    ret_b = self.pressure_func_buoy(input_p)
-                    ret_w = self.pressure_func_drag(input_p)
-                    self.nh_pressure_b[i, k] = ret_b.nh_pressure_b
-                    self.nh_pressure_adv[i, k] = ret_w.nh_pressure_adv
-                    self.nh_pressure_drag[i, k] = ret_w.nh_pressure_drag
-
-                    self.b_coeff[i, k] = ret_b.b_coeff
-                    self.asp_ratio[i, k] = input_p.asp_ratio
-
-                else
-                    self.nh_pressure_b[i, k] = 0.0
-                    self.nh_pressure_adv[i, k] = 0.0
-                    self.nh_pressure_drag[i, k] = 0.0
-
-                    self.b_coeff[i, k] = 0.0
-                    self.asp_ratio[i, k] = 0.0
-                end
             else
                 self.nh_pressure_b[i, k] = 0.0
                 self.nh_pressure_adv[i, k] = 0.0
