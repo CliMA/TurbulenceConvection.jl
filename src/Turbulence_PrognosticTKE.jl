@@ -824,7 +824,7 @@ function get_GMV_CoVar(
             # -1, indexing phi_e.values[-1] yields the
             # _last_ value in the array. This is certainly
             # not intended
-            if k ≠ 0
+            if k ≠ 1
                 phi_diff = interp2pt(phi_e.values[k - 1] - gmv_phi[k - 1], phi_e.values[k] - gmv_phi[k])
                 psi_diff = interp2pt(psi_e.values[k - 1] - gmv_psi[k - 1], psi_e.values[k] - gmv_psi[k])
             else # just use 0th order approximation
@@ -838,7 +838,7 @@ function get_GMV_CoVar(
                 # -1, indexing phi_e.values[-1] yields the
                 # _last_ value in the array. This is certainly
                 # not intended
-                if k ≠ 0
+                if k ≠ 1
                     phi_diff = interp2pt(phi_u.values[i, k - 1] - gmv_phi[k - 1], phi_u.values[i, k] - gmv_phi[k])
                     psi_diff = interp2pt(psi_u.values[i, k - 1] - gmv_psi[k - 1], psi_u.values[i, k] - gmv_psi[k])
                 else # just use 0th order approximation
@@ -968,9 +968,9 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     @inbounds for k in real_center_indicies(grid)
         @inbounds for i in xrange(self.n_updrafts)
             input_p.updraft_top = self.UpdVar.updraft_top[i]
-            alen = max(length(argwhere(self.UpdVar.Area.values[i, cinterior])) - 1, 0)
+            alen = max(length(argwhere(self.UpdVar.Area.values[i, cinterior])), 1)
             avals = off_arr(self.UpdVar.Area.values[i, cinterior])
-            input_p.a_med = Statistics.median(avals[0:alen])
+            input_p.a_med = Statistics.median(avals[1:alen])
             input.zi = self.UpdVar.cloud_base[i]
             # entrainment
             input.buoy_ed_flux = self.EnvVar.TKE.buoy[k]
@@ -2092,7 +2092,7 @@ function compute_covariance_interdomain_src(
                 # -1, indexing phi_e.values[-1] yields the
                 # _last_ value in the array. This is certainly
                 # not intended
-                if k ≠ 0
+                if k ≠ 1
                     phi_diff =
                         interp2pt(phi_u.values[i, k - 1], phi_u.values[i, k]) -
                         interp2pt(phi_e.values[k - 1], phi_e.values[k])

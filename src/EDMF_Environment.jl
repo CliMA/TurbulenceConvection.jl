@@ -1,16 +1,18 @@
 function set_bcs(self::EnvironmentVariable, Gr::Grid)
-    start_low = Gr.gw - 1
-    start_high = Gr.nzg - Gr.gw - 1
+    start_low = Gr.gw
+    start_high = Gr.nzg - Gr.gw
 
     if self.name == "w"
         self.values[start_high] = 0.0
         self.values[start_low] = 0.0
-        @inbounds for k in xrange(1, Gr.gw)
+        @inbounds for kk in xrange(1, Gr.gw)
+            k = kk - 1
             self.values[start_high + k] = -self.values[start_high - k]
             self.values[start_low - k] = -self.values[start_low + k]
         end
     else
-        @inbounds for k in xrange(Gr.gw)
+        @inbounds for kk in xrange(Gr.gw)
+            k = kk - 1
             self.values[start_high + k + 1] = self.values[start_high - k]
             self.values[start_low - k] = self.values[start_low + 1 + k]
         end
@@ -18,10 +20,11 @@ function set_bcs(self::EnvironmentVariable, Gr::Grid)
 end
 
 function set_bcs(self::EnvironmentVariable_2m, Gr::Grid)
-    start_low = Gr.gw - 1
-    start_high = Gr.nzg - Gr.gw - 1
+    start_low = Gr.gw
+    start_high = Gr.nzg - Gr.gw
 
-    @inbounds for k in xrange(Gr.gw)
+    @inbounds for kk in xrange(Gr.gw)
+        k = kk - 1
         self.values[start_high + k + 1] = self.values[start_high - k]
         self.values[start_low - k] = self.values[start_low + 1 + k]
     end
@@ -270,7 +273,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                 corr = fmax(fmin(EnvVar.HQTcov.values[k] / fmax(sd_h * sd_q, 1e-13), 1.0), -1.0)
 
                 # limit sd_q to prevent negative qt_hat
-                sd_q_lim = (1e-10 - EnvVar.QT.values[k]) / (sqrt2 * abscissas[0])
+                sd_q_lim = (1e-10 - EnvVar.QT.values[k]) / (sqrt2 * abscissas[1])
                 # walking backwards to assure your q_t will not be smaller than 1e-10
                 # TODO - check
                 # TODO - change 1e-13 and 1e-10 to some epislon

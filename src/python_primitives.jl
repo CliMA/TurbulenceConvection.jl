@@ -7,21 +7,17 @@ fabs(a) = abs(a)
 
 argwhere(a) = findall(a .> 0)
 # Use stop-1 to emulate python ranges
-xrange(start, stop, step = 1) = range(start, stop - 1; step = step)
+xrange(start, stop, step = 1) = range(start + 1, stop; step = step)
 xrange(stop) = xrange(0, stop)
 
-pyzeros(n::Int) = OffsetArray(zeros(n), 0:(n - 1))
-pyzeros(m::Int, n::Int) = OffsetArray(zeros(m, n), 0:(m - 1), 0:(n - 1))
 
-pyones(n::Int) = OffsetArray(ones(n), 0:(n - 1))
-pyones(m::Int, n::Int) = OffsetArray(ones(m, n), 0:(m - 1), 0:(n - 1))
+pyzeros(n::Int) = zeros(n)
+pyzeros(m::Int, n::Int) = zeros(m, n)
 
-function off_arr(a::AbstractArray)
-    dims = ntuple(ndims(a)) do i
-        0:(size(a, i) - 1)
-    end
-    return OffsetArray(a, dims)
-end
+pyones(n::Int) = ones(n)
+pyones(m::Int, n::Int) = ones(m, n)
+
+off_arr(a::AbstractArray) = a
 
 pow(a::Real, b::Real) = a^b
 pow(a::AbstractVector, b::AbstractVector) = a .^ b

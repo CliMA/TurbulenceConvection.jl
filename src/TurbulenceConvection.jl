@@ -22,7 +22,7 @@ const CPSGS = CLIMAParameters.Atmos.SubgridScale
 # For dispatching to inherited class
 struct BaseCase end
 
-up_sum(vals::OffsetArray) = off_arr(reshape(sum(vals; dims = 1), size(vals, 2)))
+up_sum(vals::AbstractArray) = off_arr(reshape(sum(vals; dims = 1), size(vals, 2)))
 
 function parse_namelist(namelist, keys...; default = nothing, valid_options = nothing)
     param = namelist

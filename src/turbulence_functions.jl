@@ -262,8 +262,7 @@ function construct_tridiag_diffusion(grid, dt, rho_ae_K_m, rho, ae, a, b, c)
 end
 
 function tridiag_solve(b_rhs, a, b, c)
-    # Note that `1:end` is zero-based indexing.
-    A = Tridiagonal(a[1:end], parent(b), c[0:(end - 1)])
+    A = Tridiagonal(a[2:end], parent(b), c[1:(end - 1)])
     return A \ parent(b_rhs)
 end
 

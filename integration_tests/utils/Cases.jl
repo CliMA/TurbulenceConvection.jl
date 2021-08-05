@@ -1010,8 +1010,8 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
     A = off_arr(A')
 
     self.rad = A # store matrix in self
-    ind1 = Int(trunc(10.0 / 600.0))
-    ind2 = Int(ceil(10.0 / 600.0)) - 1
+    ind1 = Int(trunc(10.0 / 600.0)) + 1
+    ind2 = Int(ceil(10.0 / 600.0))
     @inbounds for k in face_indicies(Gr)
         if 10 % 600.0 == 0
             self.Fo.dTdt[k] = self.rad[ind1, k]
@@ -1047,15 +1047,15 @@ end
 function update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::TimeStepping)
 
     Gr = self.Fo.Gr
-    ind2 = Int(ceil(TS.t / 600.0))
-    ind1 = Int(trunc(TS.t / 600.0))
+    ind2 = Int(ceil(TS.t / 600.0)) + 1
+    ind1 = Int(trunc(TS.t / 600.0)) + 1
     @inbounds for k in face_indicies(Gr)
         if Gr.z_half[k] >= 22699.48
             self.Fo.dTdt[k] = 0.0
         else
             if TS.t < 600.0 # first 10 min use the radiative forcing of t=10min (as in the paper)
-                self.Fo.dTdt[k] = self.rad[0, k]
-            elseif TS.t < 21600.0 && ind2 < 36
+                self.Fo.dTdt[k] = self.rad[1, k]
+            elseif TS.t < 21600.0 && ind2 < 37
                 if TS.t % 600.0 == 0
                     self.Fo.dTdt[k] = self.rad[ind1, k]
                 else
@@ -1064,7 +1064,8 @@ function update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::T
                         (TS.t - self.rad_time[ind1]) + self.rad[ind1, k]
                 end
             else
-                self.Fo.dTdt[k] = self.rad[35, k]
+                # TODO: remove hard-coded index
+                self.Fo.dTdt[k] = self.rad[36, k]
             end
         end
     end
@@ -1168,8 +1169,8 @@ function update_surface(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::Ti
     t_Sur_in = off_arr([0.0, 4.0, 6.5, 7.5, 10.0, 12.5, 14.5]) .* 3600 #LES time is in sec
     SH = off_arr([-30.0, 90.0, 140.0, 140.0, 100.0, -10, -10]) # W/m^2
     LH = off_arr([5.0, 250.0, 450.0, 500.0, 420.0, 180.0, 0.0]) # W/m^2
-    self.Sur.shf = pyinterp(off_arr([TS.t]), t_Sur_in, SH)[0]
-    self.Sur.lhf = pyinterp(off_arr([TS.t]), t_Sur_in, LH)[0]
+    self.Sur.shf = pyinterp(off_arr([TS.t]), t_Sur_in, SH)[1]
+    self.Sur.lhf = pyinterp(off_arr([TS.t]), t_Sur_in, LH)[1]
     # if fluxes vanish bflux vanish and wstar and obukov length are NaNs
     ## CK +++ I commented out the lines below as I don"t think this is how we want to fix things!
     # if self.Sur.shf < 1.0
@@ -1188,8 +1189,8 @@ function update_forcing(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::Ti
     AT_in = off_arr([0.0, 0.0, 0.0, -0.08, -0.016, -0.016]) ./ 3600.0 # Advective forcing for theta [K/h] converted to [K/sec]
     RT_in = off_arr([-0.125, 0.0, 0.0, 0.0, 0.0, -0.1]) ./ 3600.0  # Radiative forcing for theta [K/h] converted to [K/sec]
     Rqt_in = off_arr([0.08, 0.02, 0.04, -0.1, -0.16, -0.3]) ./ 1000.0 ./ 3600.0 # Radiative forcing for qt converted to [kg/kg/sec]
-    dTdt = pyinterp(off_arr([TS.t]), t_in, AT_in)[0] + pyinterp(off_arr([TS.t]), t_in, RT_in)[0]
-    dqtdt = pyinterp(off_arr([TS.t]), t_in, Rqt_in)[0]
+    dTdt = pyinterp(off_arr([TS.t]), t_in, AT_in)[1] + pyinterp(off_arr([TS.t]), t_in, RT_in)[1]
+    dqtdt = pyinterp(off_arr([TS.t]), t_in, Rqt_in)[1]
     Gr = self.Fo.Gr
     @inbounds for k in center_indicies(Gr)
         if Gr.z_half[k] <= 1000.0
