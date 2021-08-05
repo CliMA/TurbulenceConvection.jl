@@ -111,28 +111,27 @@ function solve_rain_fall(
     QR::RainVariable,
     RainArea::RainVariable,
 )
-    gw = self.Gr.gw
-    nzg = self.Gr.nzg
-    dz = self.Gr.dz
+    grid = get_grid(GMV)
+    dz = grid.dz
     dt_model = TS.dt
     CFL_limit = 0.5
 
-    term_vel = center_field(self.Gr)
-    term_vel_new = center_field(self.Gr)
+    term_vel = center_field(grid)
+    term_vel_new = center_field(grid)
 
     t_elapsed = 0.0
 
     # helper to calculate the rain velocity
     # TODO: assuming GMV.W = 0
     # TODO: verify translation
-    @inbounds for k in revxrange(nzg - gw - 1, gw, -1)
+    @inbounds for k in real_center_indicies(grid)
         term_vel[k] = terminal_velocity(Rain.C_drag, Rain.MP_n_0, QR.values[k], self.Ref.rho0_half[k])
     end
 
     # calculate the allowed timestep (CFL_limit >= v dt / dz)
     # TODO: report bug: dt_rain has no value in else-case
     if !(maximum(term_vel) ≈ 0)
-        dt_rain = min(dt_model, CFL_limit * self.Gr.dz / maximum(term_vel))
+        dt_rain = min(dt_model, CFL_limit * grid.dz / maximum(term_vel))
     else
         dt_rain = dt_model
     end
@@ -140,10 +139,10 @@ function solve_rain_fall(
     # rain falling through the domain
     while t_elapsed < dt_model
         # TODO: verify translation
-        @inbounds for k in revxrange(nzg - gw - 1, gw, -1)
+        @inbounds for k in reverse(real_center_indicies(grid))
             CFL_out = dt_rain / dz * term_vel[k]
 
-            if k == (nzg - gw - 1)
+            if is_toa_bc_centers(grid, k)
                 CFL_in = 0.0
             else
                 CFL_in = dt_rain / dz * term_vel[k + 1]
@@ -168,7 +167,7 @@ function solve_rain_fall(
         term_vel .= term_vel_new
 
         if maximum(abs.(term_vel)) > eps(Float64)
-            dt_rain = min(dt_model - t_elapsed, CFL_limit * self.Gr.dz / maximum(term_vel))
+            dt_rain = min(dt_model - t_elapsed, CFL_limit * grid.dz / maximum(term_vel))
         else
             dt_rain = dt_model - t_elapsed
         end
