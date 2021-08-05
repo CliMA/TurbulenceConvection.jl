@@ -46,7 +46,15 @@ struct Grid{A1, FT}
 end
 
 # Index of the first interior cell above the surface
-first_center(grid::Grid) = grid.gw
+kc_surface(grid::Grid) = grid.gw
+kf_surface(grid::Grid) = grid.gw - 1
+kc_top_of_atmos(grid::Grid) = grid.nzg - grid.gw - 1
+# kf_toa(grid::Grid) = grid.nzg - grid.gw - 1
+
+zc_surface(grid::Grid) = grid.z_half[kc_surface(grid)]
+zf_surface(grid::Grid) = grid.z[kf_surface(grid)]
+zc_toa(grid::Grid) = grid.z_half[kc_top_of_atmos(grid)]
+# zf_toa(grid::Grid) = grid.z[kf_toa(grid)]
 
 center_indicies(grid::Grid) = xrange(grid.nzg)
 face_indicies(grid::Grid) = xrange(grid.nzg)

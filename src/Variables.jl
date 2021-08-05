@@ -159,7 +159,8 @@ end
 
 function mean_cloud_diagnostics(self)
     self.lwp = 0.0
-    self.cloud_base = self.Gr.z_half[self.Gr.nzg - self.Gr.gw - 1]
+    kc_toa = kc_top_of_atmos(self.Gr)
+    self.cloud_base = self.Gr.z_half[kc_toa]
     self.cloud_top = 0.0
 
     @inbounds for k in real_center_indicies(self.Gr)
