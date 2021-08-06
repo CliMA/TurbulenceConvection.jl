@@ -268,7 +268,6 @@ mutable struct UpdraftVariables{A1}
     QL::UpdraftVariable
     RH::UpdraftVariable
     H::UpdraftVariable
-    THL::UpdraftVariable
     T::UpdraftVariable
     B::UpdraftVariable
     prognostic::Bool
@@ -289,7 +288,6 @@ mutable struct UpdraftVariables{A1}
         QL = UpdraftVariable(grid, nu, "half", "scalar", "ql", "kg/kg")
         RH = UpdraftVariable(grid, nu, "half", "scalar", "RH", "%")
         H = UpdraftVariable(grid, nu, "half", "scalar", "thetal", "K")
-        THL = UpdraftVariable(grid, nu, "half", "scalar", "thetal", "K")
         T = UpdraftVariable(grid, nu, "half", "scalar", "temperature", "K")
         B = UpdraftVariable(grid, nu, "half", "scalar", "buoyancy", "m^2/s^3")
 
@@ -315,7 +313,6 @@ mutable struct UpdraftVariables{A1}
             QL,
             RH,
             H,
-            THL,
             T,
             B,
             prognostic,
@@ -347,7 +344,6 @@ Base.@kwdef mutable struct GridMeanVariables{PS}
     QL::VariableDiagnostic
     T::VariableDiagnostic
     B::VariableDiagnostic
-    THL::VariableDiagnostic
     cloud_fraction::VariableDiagnostic
     EnvThermo_scheme::String
     TKE::VariableDiagnostic
@@ -379,7 +375,6 @@ function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState, param_set::P
     QL = VariableDiagnostic(Gr, "half", "scalar", "sym", "ql", "kg/kg")
     T = VariableDiagnostic(Gr, "half", "scalar", "sym", "temperature", "K")
     B = VariableDiagnostic(Gr, "half", "scalar", "sym", "buoyancy", "m^2/s^3")
-    THL = VariableDiagnostic(Gr, "half", "scalar", "sym", "thetal", "K")
 
     cloud_fraction = VariableDiagnostic(Gr, "half", "scalar", "sym", "cloud fraction", "-")
 
@@ -413,7 +408,6 @@ function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState, param_set::P
         QL,
         T,
         B,
-        THL,
         cloud_fraction,
         EnvThermo_scheme,
         TKE,
@@ -527,7 +521,6 @@ Base.@kwdef mutable struct EnvironmentVariables{PS}
     QT::EnvironmentVariable
     QL::EnvironmentVariable
     H::EnvironmentVariable
-    THL::EnvironmentVariable
     RH::EnvironmentVariable
     T::EnvironmentVariable
     B::EnvironmentVariable
@@ -548,7 +541,6 @@ function EnvironmentVariables(namelist, Gr::Grid, param_set::PS) where {PS}
     QL = EnvironmentVariable(Gr, "half", "scalar", "ql", "kg/kg")
     RH = EnvironmentVariable(Gr, "half", "scalar", "RH", "%")
     H = EnvironmentVariable(Gr, "half", "scalar", "thetal", "K")
-    THL = EnvironmentVariable(Gr, "half", "scalar", "thetal", "K")
     T = EnvironmentVariable(Gr, "half", "scalar", "temperature", "K")
     B = EnvironmentVariable(Gr, "half", "scalar", "buoyancy", "m^2/s^3")
     Area = EnvironmentVariable(Gr, "half", "scalar", "env_area", "-")
@@ -569,7 +561,6 @@ function EnvironmentVariables(namelist, Gr::Grid, param_set::PS) where {PS}
         QT,
         QL,
         H,
-        THL,
         RH,
         T,
         B,

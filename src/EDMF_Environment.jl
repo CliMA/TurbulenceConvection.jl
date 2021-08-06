@@ -99,7 +99,6 @@ end
 
 function update_EnvVar(self::EnvironmentThermodynamics, k, EnvVar::EnvironmentVariables, T, H, qt, ql, rho)
     EnvVar.T.values[k] = T
-    EnvVar.THL.values[k] = H
     EnvVar.H.values[k] = H
     EnvVar.QT.values[k] = qt
     EnvVar.QL.values[k] = ql
@@ -154,7 +153,7 @@ function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::Environm
             k,
             EnvVar,
             EnvVar.T.values[k],
-            EnvVar.THL.values[k],
+            EnvVar.H.values[k],
             EnvVar.QT.values[k],
             EnvVar.QL.values[k],
             EnvVar.QT.values[k] - EnvVar.QL.values[k],

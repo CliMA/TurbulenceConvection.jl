@@ -44,14 +44,12 @@ function initialize(self::UpdraftVariables, GMV::GridMeanVariables)
             self.QL.values[i, k] = GMV.QL.values[k]
             self.H.values[i, k] = GMV.H.values[k]
             self.T.values[i, k] = GMV.T.values[k]
-            self.THL.values[i, k] = GMV.THL.values[k]
         end
 
         self.Area.values[i, kc_surf] = self.updraft_fraction / self.n_updrafts
     end
 
     set_bcs(self.QT, self.Gr)
-    set_bcs(self.THL, self.Gr)
     set_bcs(self.H, self.Gr)
     set_means(self, GMV)
 
@@ -161,7 +159,7 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
                 # self.T.values[i,k] = sa.T
             else
                 self.Area.values[i, k] = 0.0 #self.updraft_fraction/self.n_updrafts
-                self.H.values[i, k] = GMV.THL.values[k]
+                self.H.values[i, k] = GMV.H.values[k]
                 self.T.values[i, k] = GMV.T.values[k]
             end
         end
@@ -169,7 +167,6 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
 
     set_bcs(self.QT, self.Gr)
     set_bcs(self.H, self.Gr)
-    set_bcs(self.THL, self.Gr)
     set_bcs(self.W, self.Gr)
     set_bcs(self.T, self.Gr)
 
@@ -224,7 +221,6 @@ function set_means(self::UpdraftVariables, GMV::GridMeanVariables)
                 self.T.bulkvalues[k] += self.Area.values[i, k] * self.T.values[i, k] / self.Area.bulkvalues[k]
                 self.RH.bulkvalues[k] += self.Area.values[i, k] * self.RH.values[i, k] / self.Area.bulkvalues[k]
                 self.B.bulkvalues[k] += self.Area.values[i, k] * self.B.values[i, k] / self.Area.bulkvalues[k]
-                self.THL.bulkvalues[k] += self.Area.values[i, k] * self.THL.values[i, k] / self.Area.bulkvalues[k]
                 self.W.bulkvalues[k] += (
                     (self.Area.values[i, k] + self.Area.values[i, k + 1]) * self.W.values[i, k] /
                     (self.Area.bulkvalues[k] + self.Area.bulkvalues[k + 1])
@@ -237,7 +233,6 @@ function set_means(self::UpdraftVariables, GMV::GridMeanVariables)
             self.H.bulkvalues[k] = GMV.H.values[k]
             self.RH.bulkvalues[k] = GMV.RH.values[k]
             self.T.bulkvalues[k] = GMV.T.values[k]
-            self.THL.bulkvalues[k] = GMV.THL.values[k]
             self.B.bulkvalues[k] = 0.0
             self.W.bulkvalues[k] = 0.0
         end
@@ -263,7 +258,6 @@ function set_new_with_values(self::UpdraftVariables)
             self.QT.new[i, k] = self.QT.values[i, k]
             self.QL.new[i, k] = self.QL.values[i, k]
             self.H.new[i, k] = self.H.values[i, k]
-            self.THL.new[i, k] = self.THL.values[i, k]
             self.T.new[i, k] = self.T.values[i, k]
             self.B.new[i, k] = self.B.values[i, k]
         end
@@ -284,7 +278,6 @@ function set_old_with_values(self::UpdraftVariables)
             self.QT.old[i, k] = self.QT.values[i, k]
             self.QL.old[i, k] = self.QL.values[i, k]
             self.H.old[i, k] = self.H.values[i, k]
-            self.THL.old[i, k] = self.THL.values[i, k]
             self.T.old[i, k] = self.T.values[i, k]
             self.B.old[i, k] = self.B.values[i, k]
         end
@@ -305,7 +298,6 @@ function set_values_with_new(self::UpdraftVariables)
             self.QT.values[i, k] = self.QT.new[i, k]
             self.QL.values[i, k] = self.QL.new[i, k]
             self.H.values[i, k] = self.H.new[i, k]
-            self.THL.values[i, k] = self.THL.new[i, k]
             self.T.values[i, k] = self.T.new[i, k]
             self.B.values[i, k] = self.B.new[i, k]
         end
@@ -326,7 +318,6 @@ function io(self::UpdraftVariables, Stats::NetCDFIO_Stats, Ref::ReferenceState)
         write_profile(Stats, "updraft_thetal", self.H.bulkvalues[cinterior])
     else
         write_profile(Stats, "updraft_s", self.H.bulkvalues[cinterior])
-        #write_profile(Stats, "updraft_thetal", self.THL.bulkvalues[cinterior])
     end
 
     write_profile(Stats, "updraft_temperature", self.T.bulkvalues[cinterior])
