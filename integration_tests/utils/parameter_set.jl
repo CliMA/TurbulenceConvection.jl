@@ -59,6 +59,11 @@ function create_parameter_set(namelist)
         smin_ub = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_ub"),
         smin_rm = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_rm"),
         l_max = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),
+        
+        # Stochastic parameters
+        stoch_closure = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stochastic", "closure"; default = "none", valid_options = ["none", "lognormal"]),
+        stoch_ε_lognormal_var = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stochastic", "entr_lognormal_var"; default = 0.0),
+        stoch_δ_lognormal_var = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stochastic", "detr_lognormal_var"; default = 0.0),
     )
     return EarthParameterSet(nt)
 end
