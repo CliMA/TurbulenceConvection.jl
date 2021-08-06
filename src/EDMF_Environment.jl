@@ -211,8 +211,8 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
     #TODO - if we start using eos_smpl for the updrafts calculations
     #       we can get rid of the two categories for outer and inner quad. points
 
-    abscissas = off_arr(a)
-    weights = off_arr(w)
+    abscissas = a
+    weights = w
     # arrays for storing quadarature points and ints for labeling items in the arrays
     # a python dict would be nicer, but its 30% slower than this (for python 2.7. It might not be the case for python 3)
     env_len = 10
