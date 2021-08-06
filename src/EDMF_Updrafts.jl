@@ -1,6 +1,6 @@
 function set_bcs(self::UpdraftVariable, Gr::Grid)
-    start_low = Gr.gw - 1
-    start_high = Gr.nzg - Gr.gw - 1
+    start_low = Gr.gw
+    start_high = Gr.nzg - Gr.gw
 
     n_updrafts = size(self.values)[1]
 
@@ -8,13 +8,15 @@ function set_bcs(self::UpdraftVariable, Gr::Grid)
         @inbounds for i in xrange(n_updrafts)
             self.values[i, start_high] = 0.0
             self.values[i, start_low] = 0.0
-            @inbounds for k in xrange(1, Gr.gw)
+            @inbounds for kk in xrange(1, Gr.gw)
+                k = kk - 1
                 self.values[i, start_high + k] = -self.values[i, start_high - k]
                 self.values[i, start_low - k] = -self.values[i, start_low + k]
             end
         end
     else
-        @inbounds for k in xrange(Gr.gw)
+        @inbounds for kk in xrange(Gr.gw)
+            k = kk - 1
             @inbounds for i in xrange(n_updrafts)
                 self.values[i, start_high + k + 1] = self.values[i, start_high - k]
                 self.values[i, start_low - k] = self.values[i, start_low + 1 + k]

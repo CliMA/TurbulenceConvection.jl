@@ -68,7 +68,6 @@ function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
     # Perform the integration
     # TODO: replace with OrdinaryDiffEq
 
-    grid
     z_span = (grid.zmin, grid.zmax)
     @show z_span
     prob = ODEProblem(rhs, logp, z_span)
@@ -83,12 +82,12 @@ function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
 
     # Set boundary conditions (in log-space) by mirroring log-pressure
     # TODO: re-generalize, is setting the BCs like this correct?
-    p[0] = p[1]
+    p[1] = p[2]
     p[end] = p[end - 1]
 
-    p_half[1] = p_half[2]
+    p_half[2] = p_half[3]
     p_half[end - 1] = p_half[end - 2]
-    p_half[0] = p_half[3]
+    p_half[1] = p_half[4]
     p_half[end] = p_half[end - 3]
 
     p .= exp.(p)

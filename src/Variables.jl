@@ -6,11 +6,12 @@ function zero_tendencies(self::VariablePrognostic, Gr::Grid)
 end
 
 function set_bcs(self::VariablePrognostic, Gr::Grid)
-    start_low = Gr.gw - 1
-    start_high = Gr.nzg - Gr.gw - 1
+    start_low = Gr.gw
+    start_high = Gr.nzg - Gr.gw
 
     if self.bc == "sym"
-        @inbounds for k in xrange(Gr.gw)
+        @inbounds for kk in xrange(Gr.gw)
+            k = kk - 1
             self.values[start_high + k + 1] = self.values[start_high - k]
             self.values[start_low - k] = self.values[start_low + 1 + k]
 
@@ -30,7 +31,8 @@ function set_bcs(self::VariablePrognostic, Gr::Grid)
         self.new[start_high] = 0.0
         self.new[start_low] = 0.0
 
-        @inbounds for k in xrange(1, Gr.gw)
+        @inbounds for kk in xrange(1, Gr.gw)
+            k = kk - 1
             self.values[start_high + k] = -self.values[start_high - k]
             self.values[start_low - k] = -self.values[start_low + k]
 
@@ -46,11 +48,12 @@ function set_bcs(self::VariablePrognostic, Gr::Grid)
 end
 
 function set_bcs(self::VariableDiagnostic, Gr::Grid)
-    start_low = Gr.gw - 1
-    start_high = Gr.nzg - Gr.gw
+    start_low = Gr.gw
+    start_high = Gr.nzg - Gr.gw + 1
 
     if self.bc == "sym"
-        @inbounds for k in xrange(Gr.gw)
+        @inbounds for kk in xrange(Gr.gw)
+            k = kk - 1
             self.values[start_high + k] = self.values[start_high - 1]
             self.values[start_low - k] = self.values[start_low + 1]
         end
@@ -58,7 +61,8 @@ function set_bcs(self::VariableDiagnostic, Gr::Grid)
     else
         self.values[start_high] = 0.0
         self.values[start_low] = 0.0
-        @inbounds for k in xrange(1, Gr.gw)
+        @inbounds for kk in xrange(1, Gr.gw)
+            k = kk - 1
             self.values[start_high + k] = 0.0  #-self.values[start_high - k ]
             self.values[start_low - k] = 0.0 #-self.values[start_low + k ]
         end
