@@ -17,9 +17,9 @@ function ∇f2c(f, grid::Grid, k::Int)
     return (f[k] - f[k - 1]) * grid.dzi
 end
 function ∇f2c(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
-    if is_surface_bc_faces(grid, k)
+    if is_surface_face(grid, k - 1)
         return ∇f2c(f_dual, grid, BottomBCTag(), bottom)
-    elseif is_toa_bc_faces(grid, k)
+    elseif is_toa_face(grid, k)
         return ∇f2c(f_dual, grid, TopBCTag(), top)
     else
         return ∇f2c(f_dual, grid, InteriorTag())
@@ -62,9 +62,9 @@ end
 c∇(f, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError()) = c∇(cut(f, grid, k), grid, k; bottom, top)
 
 function c∇(f_cut::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
-    if is_surface_bc_centers(grid, k)
+    if is_surface_center(grid, k)
         return c∇(f_cut, grid, BottomBCTag(), bottom)
-    elseif is_toa_bc_centers(grid, k)
+    elseif is_toa_center(grid, k)
         return c∇(f_cut, grid, TopBCTag(), top)
     else
         return c∇(f_cut, grid, InteriorTag())
@@ -127,18 +127,18 @@ end
 
 # A 3-point field stencil for ordinary and updraft variables
 function cut(f::AbstractVector, grid, k::Int)
-    if is_surface_bc_centers(grid, k)
+    if is_surface_center(grid, k)
         return SVector(f[k], f[k + 1])
-    elseif is_toa_bc_centers(grid, k)
+    elseif is_toa_center(grid, k)
         return SVector(f[k - 1], f[k])
     else
         return SVector(f[k - 1], f[k], f[k + 1])
     end
 end
 function cut(f::AbstractMatrix, grid, k::Int, i_up::Int)
-    if is_surface_bc_centers(grid, k)
+    if is_surface_center(grid, k)
         return SVector(f[i_up, k], f[i_up, k + 1])
-    elseif is_toa_bc_centers(grid, k)
+    elseif is_toa_center(grid, k)
         return SVector(f[i_up, k - 1], f[i_up, k])
     else
         return SVector(f[i_up, k - 1], f[i_up, k], f[i_up, k + 1])
@@ -147,26 +147,20 @@ end
 
 # A 2-point field stencil for ordinary and updraft variables
 function dual_faces(f::AbstractVector, grid, k::Int)
-    if is_surface_bc_faces(grid, k)
+    if is_surface_face(grid, k - 1)
         return SVector(f[k])
-    elseif is_toa_bc_centers(grid, k)
+    elseif is_toa_center(grid, k)
         return SVector(f[k - 1])
     else
         return SVector(f[k], f[k - 1])
     end
 end
 function dual_faces(f::AbstractMatrix, grid, k::Int, i_up::Int)
-    if is_surface_bc_faces(grid, k)
+    if is_surface_face(grid, k - 1)
         return SVector(f[i_up, k])
-    elseif is_toa_bc_centers(grid, k)
+    elseif is_toa_center(grid, k)
         return SVector(f[i_up, k - 1])
     else
         return SVector(f[i_up, k], f[i_up, k - 1])
     end
 end
-
-is_surface_bc_centers(grid::Grid, k::Int) = k == grid.gw            # NOTE: 0-based indexing
-is_toa_bc_centers(grid::Grid, k::Int) = k == grid.nzg - grid.gw - 1 # NOTE: 0-based indexing
-
-is_surface_bc_faces(grid::Grid, k::Int) = k == grid.gw            # NOTE: 0-based indexing
-is_toa_bc_faces(grid::Grid, k::Int) = k == grid.nzg - grid.gw - 1 # NOTE: 0-based indexing

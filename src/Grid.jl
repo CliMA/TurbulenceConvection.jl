@@ -24,7 +24,6 @@ struct Grid{A1, FT}
         nz = namelist["grid"]["nz"]
         nzg = nz + 2 * gw
 
-
         cinterior = gw:((nzg - gw) - 1)
         finterior = gw:((nzg - gw) - 1)
 
@@ -49,16 +48,23 @@ end
 kc_surface(grid::Grid) = grid.gw
 kf_surface(grid::Grid) = grid.gw - 1
 kc_top_of_atmos(grid::Grid) = grid.nzg - grid.gw - 1
-# kf_toa(grid::Grid) = grid.nzg - grid.gw - 1
+kf_top_of_atmos(grid::Grid) = grid.nzg - grid.gw - 1
+
+is_surface_center(grid::Grid, k::Int) = k == kc_surface(grid)
+is_toa_center(grid::Grid, k::Int) = k == kc_top_of_atmos(grid)
+is_surface_face(grid::Grid, k::Int) = k == kf_surface(grid)
+is_toa_face(grid::Grid, k::Int) = k == kf_top_of_atmos(grid)
 
 zc_surface(grid::Grid) = grid.z_half[kc_surface(grid)]
 zf_surface(grid::Grid) = grid.z[kf_surface(grid)]
 zc_toa(grid::Grid) = grid.z_half[kc_top_of_atmos(grid)]
-# zf_toa(grid::Grid) = grid.z[kf_toa(grid)]
+zf_toa(grid::Grid) = grid.z[kf_top_of_atmos(grid)]
 
 center_indicies(grid::Grid) = xrange(grid.nzg)
 face_indicies(grid::Grid) = xrange(grid.nzg)
-real_center_indicies(grid::Grid) = xrange(grid.gw, grid.nzg - grid.gw)
-real_face_indicies(grid::Grid) = xrange(grid.gw, grid.nzg - grid.gw)
+real_center_indicies(grid::Grid) = kc_surface(grid):kc_top_of_atmos(grid)
+real_face_indicies(grid::Grid) = kf_surface(grid):kf_top_of_atmos(grid)
+
+
 
 Base.eltype(::Grid{A1, FT}) where {A1, FT} = FT

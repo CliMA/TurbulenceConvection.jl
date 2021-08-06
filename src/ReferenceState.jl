@@ -15,14 +15,14 @@ mutable struct ReferenceState{PS, A1}
     Tg::Float64
     qtg::Float64
     sg::Float64
-    function ReferenceState(Gr::Grid, param_set::PS) where {PS}
+    function ReferenceState(grid::Grid, param_set::PS) where {PS}
 
-        p0 = face_field(Gr)
-        p0_half = center_field(Gr)
-        alpha0 = face_field(Gr)
-        alpha0_half = center_field(Gr)
-        rho0 = face_field(Gr)
-        rho0_half = center_field(Gr)
+        p0 = face_field(grid)
+        p0_half = center_field(grid)
+        alpha0 = face_field(grid)
+        alpha0_half = center_field(grid)
+        rho0 = face_field(grid)
+        rho0_half = center_field(grid)
         Pg::Float64 = 0
         Tg::Float64 = 0
         qtg::Float64 = 0
@@ -36,13 +36,13 @@ end
 Initialize the reference profiles. The function is typically called from the case
 specific initialization function defined in Initialization.pyx
 
-:param Gr: Grid class
+:param grid: Grid class
 :param Thermodynamics: Thermodynamics class
 :param NS: StatsIO class
 :param Pa:  ParallelMPI class
 :return
 """
-function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
+function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
 
     self.sg = t_to_entropy_c(self.Pg, self.Tg, self.qtg, 0.0, 0.0)
 
@@ -62,21 +62,24 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
     p0 = log(self.Pg)
     logp = p0
 
-    p = face_field(Gr)
-    p_half = center_field(Gr)
+    p = face_field(grid)
+    p_half = center_field(grid)
 
     # Perform the integration
     # TODO: replace with OrdinaryDiffEq
 
-    z_span = (Gr.zmin, Gr.zmax)
+    grid
+    z_span = (grid.zmin, grid.zmax)
     @show z_span
     prob = ODEProblem(rhs, logp, z_span)
     sol = solve(prob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    p_0 = [sol(Gr.z[k]) for k in (Gr.gw - 1):(Gr.nzg - Gr.gw)]
-    p_0_half = [sol(Gr.z_half[k]) for k in (Gr.gw):(Gr.nzg - Gr.gw - 1)]
+    cinterior = kc_surface(grid):kc_top_of_atmos(grid)
+    finterior = kf_surface(grid):(kf_top_of_atmos(grid) + 1) # TODO: this should not have +1
+    p_0 = [sol(grid.z[k]) for k in finterior]
+    p_0_half = [sol(grid.z_half[k]) for k in cinterior]
 
-    p[(Gr.gw - 1):(Gr.nzg - Gr.gw)] .= p_0
-    p_half[(Gr.gw):(Gr.nzg - Gr.gw - 1)] .= p_0_half
+    p[finterior] .= p_0
+    p_half[cinterior] .= p_0_half
 
     # Set boundary conditions (in log-space) by mirroring log-pressure
     # TODO: re-generalize, is setting the BCs like this correct?
@@ -93,22 +96,22 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
 
     p_ = deepcopy(p)
     p_half_ = deepcopy(p_half)
-    temperature = face_field(Gr)
-    temperature_half = center_field(Gr)
-    alpha = face_field(Gr)
-    alpha_half = center_field(Gr)
+    temperature = face_field(grid)
+    temperature_half = center_field(grid)
+    alpha = face_field(grid)
+    alpha_half = center_field(grid)
 
-    ql = face_field(Gr)
-    qi = face_field(Gr)
-    qv = face_field(Gr)
+    ql = face_field(grid)
+    qi = face_field(grid)
+    qv = face_field(grid)
 
-    ql_half = center_field(Gr)
-    qi_half = center_field(Gr)
-    qv_half = center_field(Gr)
+    ql_half = center_field(grid)
+    qi_half = center_field(grid)
+    qv_half = center_field(grid)
 
     # Compute reference state thermodynamic profiles
 
-    @inbounds for k in center_indicies(Gr)
+    @inbounds for k in center_indicies(grid)
         ret = eos(p_half_[k], self.qtg, self.sg; t_to_prog = t_to_entropy_c, prog_to_t = eos_first_guess_entropy)
         temperature_half[k] = ret.T
         ql_half[k] = ret.ql
@@ -116,7 +119,7 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
         alpha_half[k] = alpha_c(p_half_[k], temperature_half[k], self.qtg, qv_half[k])
     end
 
-    @inbounds for k in face_indicies(Gr)
+    @inbounds for k in face_indicies(grid)
         ret = eos(p_[k], self.qtg, self.sg; t_to_prog = t_to_entropy_c, prog_to_t = eos_first_guess_entropy)
         temperature[k] = ret.T
         ql[k] = ret.ql
@@ -127,7 +130,7 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
     # Now do a sanity check to make sure that the Reference State entropy profile is uniform following
     # saturation adjustment
     local s
-    @inbounds for k in center_indicies(Gr)
+    @inbounds for k in center_indicies(grid)
         s = t_to_entropy_c(p_half[k], temperature_half[k], self.qtg, ql_half[k], qi_half[k])
         if abs(s - self.sg) / self.sg > 0.01
             println("Error in reference profiles entropy not constant !")
@@ -145,8 +148,8 @@ function initialize(self::ReferenceState, Gr::Grid, Stats::NetCDFIO_Stats)
 
     # TODO: centers and faces are sliced with equal sizes,
     # they should be unequal.
-    cinterior = Gr.cinterior
-    finterior = Gr.finterior
+    cinterior = grid.cinterior
+    finterior = grid.finterior
     add_reference_profile(Stats, "alpha0")
     write_reference_profile(Stats, "alpha0", alpha[finterior])
     add_reference_profile(Stats, "alpha0_half")
