@@ -126,14 +126,9 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
         264.1574, 263.6518, 263.1461, 262.6451, 262.1476, 261.6524]
     #! format: on
 
-    z_in = off_arr(z_in)
-    Area_in = off_arr(Area_in)
-    thetal_in = off_arr(thetal_in)
-    T_in = off_arr(T_in)
-
-    Area_in = off_arr(pyinterp(self.Gr.z_half, z_in, Area_in))
-    thetal_in = off_arr(pyinterp(self.Gr.z_half, z_in, thetal_in))
-    T_in = off_arr(pyinterp(self.Gr.z_half, z_in, T_in))
+    Area_in = pyinterp(self.Gr.z_half, z_in, Area_in)
+    thetal_in = pyinterp(self.Gr.z_half, z_in, thetal_in)
+    T_in = pyinterp(self.Gr.z_half, z_in, T_in)
     @inbounds for i in xrange(self.n_updrafts)
         @inbounds for k in face_indicies(self.Gr)
             if minimum(z_in) <= self.Gr.z_half[k] <= maximum(z_in)

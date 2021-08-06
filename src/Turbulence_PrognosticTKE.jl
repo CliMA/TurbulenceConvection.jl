@@ -969,7 +969,7 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
         @inbounds for i in xrange(self.n_updrafts)
             input_p.updraft_top = self.UpdVar.updraft_top[i]
             alen = max(length(argwhere(self.UpdVar.Area.values[i, cinterior])), 1)
-            avals = off_arr(self.UpdVar.Area.values[i, cinterior])
+            avals = self.UpdVar.Area.values[i, cinterior]
             input_p.a_med = Statistics.median(avals[1:alen])
             input.zi = self.UpdVar.cloud_base[i]
             # entrainment
@@ -1471,8 +1471,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         end
     end
     cinterior = real_center_indicies(grid)
-    x[cinterior] .=
-        tridiag_solve(off_arr(x[cinterior]), off_arr(a[cinterior]), off_arr(b[cinterior]), off_arr(c[cinterior]))
+    x[cinterior] .= tridiag_solve(x[cinterior], a[cinterior], b[cinterior], c[cinterior])
 
     @inbounds for k in real_center_indicies(grid)
         GMV.QT.new[k] = fmax(
@@ -1509,8 +1508,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
             x[k] = x[k] + TS.dt * Case.Sur.rho_hflux * dzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
-    x[cinterior] .=
-        tridiag_solve(off_arr(x[cinterior]), off_arr(a[cinterior]), off_arr(b[cinterior]), off_arr(c[cinterior]))
+    x[cinterior] .= tridiag_solve(x[cinterior], a[cinterior], b[cinterior], c[cinterior])
     @inbounds for k in real_center_indicies(grid)
         GMV.H.new[k] =
             GMV.H.mf_update[k] +
@@ -1550,8 +1548,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
             x[k] = x[k] + TS.dt * Case.Sur.rho_uflux * dzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
-    x[cinterior] .=
-        tridiag_solve(off_arr(x[cinterior]), off_arr(a[cinterior]), off_arr(b[cinterior]), off_arr(c[cinterior]))
+    x[cinterior] .= tridiag_solve(x[cinterior], a[cinterior], b[cinterior], c[cinterior])
 
     @inbounds for k in real_center_indicies(grid)
         GMV.U.new[k] = x[k]
@@ -1573,8 +1570,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
             x[k] = x[k] + TS.dt * Case.Sur.rho_vflux * dzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
-    x[cinterior] .=
-        tridiag_solve(off_arr(x[cinterior]), off_arr(a[cinterior]), off_arr(b[cinterior]), off_arr(c[cinterior]))
+    x[cinterior] .= tridiag_solve(x[cinterior], a[cinterior], b[cinterior], c[cinterior])
     @inbounds for k in real_center_indicies(grid)
         GMV.V.new[k] = x[k]
     end
@@ -2396,8 +2392,7 @@ function update_covariance_ED(
     end
     # x .= tridiag_solve(x, a, b, c)
     cinterior = real_center_indicies(grid)
-    x[cinterior] .=
-        tridiag_solve(off_arr(x[cinterior]), off_arr(a[cinterior]), off_arr(b[cinterior]), off_arr(c[cinterior]))
+    x[cinterior] .= tridiag_solve(x[cinterior], a[cinterior], b[cinterior], c[cinterior])
 
     @inbounds for k in real_center_indicies(grid)
         if Covar.name == "thetal_qt_covar"
