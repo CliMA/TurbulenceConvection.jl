@@ -1017,7 +1017,7 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
             self.Fo.dTdt[k] = self.rad[ind1, k]
         else
             self.Fo.dTdt[k] =
-                (self.rad[ind2, k] - self.rad[ind1, k]) / (self.rad_time[ind2 + 1] - self.rad_time[ind1 + 1]) * (10.0) +
+                (self.rad[ind2, k] - self.rad[ind1, k]) / (self.rad_time[ind2] - self.rad_time[ind1]) * (10.0) +
                 self.rad[ind1, k]
         end
     end
@@ -1060,8 +1060,8 @@ function update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::T
                     self.Fo.dTdt[k] = self.rad[ind1, k]
                 else
                     self.Fo.dTdt[k] =
-                        (self.rad[ind2, k] - self.rad[ind1, k]) / (self.rad_time[ind2] - self.rad_time[ind1]) *
-                        (TS.t - self.rad_time[ind1]) + self.rad[ind1, k]
+                        (self.rad[ind2, k] - self.rad[ind1, k]) / (self.rad_time[ind2 - 1] - self.rad_time[ind1 - 1]) *
+                        (TS.t - self.rad_time[ind1 - 1]) + self.rad[ind1, k]
                 end
             else
                 # TODO: remove hard-coded index
