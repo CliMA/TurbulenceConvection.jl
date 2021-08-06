@@ -142,7 +142,7 @@ function solve_rain_fall(
         @inbounds for k in reverse(real_center_indicies(grid))
             CFL_out = dt_rain / dz * term_vel[k]
 
-            if is_toa_bc_centers(grid, k)
+            if is_toa_center(grid, k)
                 CFL_in = 0.0
             else
                 CFL_in = dt_rain / dz * term_vel[k + 1]

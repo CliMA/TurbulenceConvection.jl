@@ -47,7 +47,7 @@ end
 
 function entr_detr_env_moisture_deficit(entr_in::entr_in_struct)
     _ret = entr_struct()
-    l = pyzeros(2)
+    l = zeros(2)
 
     moisture_deficit_d =
         (fmax(
@@ -80,8 +80,8 @@ function entr_detr_env_moisture_deficit(entr_in::entr_in_struct)
     logistic_d = 1.0 / (1.0 + exp(mu * db / dw * (entr_in.chi_upd - entr_in.a_upd / (entr_in.a_upd + entr_in.a_env))))
 
     #smooth min
-    l[0] = entr_in.tke_coef * fabs(db / sqrt(entr_in.tke + 1e-8))
-    l[1] = fabs(db / dw)
+    l[1] = entr_in.tke_coef * fabs(db / sqrt(entr_in.tke + 1e-8))
+    l[2] = fabs(db / dw)
     inv_timescale = lamb_smooth_minimum(l, 0.1, 0.0005)
     _ret.entr_sc = inv_timescale / dw * (entr_in.c_ent * logistic_e + c_det * moisture_deficit_e)
     _ret.detr_sc = inv_timescale / dw * (entr_in.c_ent * logistic_d + c_det * moisture_deficit_d)
@@ -91,7 +91,7 @@ end
 
 function entr_detr_env_moisture_deficit_div(entr_in::entr_struct)
     _ret = entr_struct()
-    l = pyzeros(2)
+    l = zeros(2)
 
     moisture_deficit_d =
         (fmax(
@@ -128,8 +128,8 @@ function entr_detr_env_moisture_deficit_div(entr_in::entr_struct)
 
 
     #smooth min
-    l[0] = entr_in.tke_coef * fabs(db / sqrt(entr_in.tke + 1e-8))
-    l[1] = fabs(db / dw)
+    l[1] = entr_in.tke_coef * fabs(db / sqrt(entr_in.tke + 1e-8))
+    l[2] = fabs(db / dw)
     inv_timescale = lamb_smooth_minimum(l, 0.1, 0.0005)
 
     _ret.entr_sc =
@@ -249,9 +249,9 @@ function construct_tridiag_diffusion(grid, dt, rho_ae_K_m, rho, ae, a, b, c)
         X = rho[k] * ae[k] / dt
         Y = rho_ae_K_m[k] * dzi * dzi
         Z = rho_ae_K_m[k - 1] * dzi * dzi
-        if is_surface_bc_centers(grid, k)
+        if is_surface_center(grid, k)
             Z = 0.0
-        elseif is_toa_bc_centers(grid, k)
+        elseif is_toa_center(grid, k)
             Y = 0.0
         end
         a[k] = -Z / X

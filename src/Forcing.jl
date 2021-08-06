@@ -12,7 +12,6 @@ end
 update(self::ForcingBase, GMV::GridMeanVariables) = nothing
 
 function coriolis_force(self::ForcingBase, U::VariablePrognostic, V::VariablePrognostic, ::ForcingBaseType)
-    gw = self.Gr.gw
     @inbounds for k in real_center_indicies(self.Gr)
         U.tendencies[k] -= self.coriolis_param * (self.vg[k] - V.values[k])
         V.tendencies[k] += self.coriolis_param * (self.ug[k] - U.values[k])

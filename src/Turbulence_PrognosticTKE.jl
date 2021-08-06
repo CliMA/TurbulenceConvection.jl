@@ -381,7 +381,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
     ref_state = reference_state(self)
     kc_surf = kc_surface(grid)
     tau = get_mixing_tau(self.zi, self.wstar)
-    l = pyzeros(3)
+    l = zeros(3)
     m_eps = 1.0e-9 # Epsilon to avoid zero
     @inbounds for k in real_center_indicies(grid)
         z_ = grid.z_half[k]
@@ -519,12 +519,12 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
             l1 = 1.0e6
         end
 
-        l[0] = l1
-        l[1] = l3
-        l[2] = l2
+        l[1] = l1
+        l[2] = l3
+        l[3] = l2
 
-        j = 0
-        while (j < length(l))
+        j = 1
+        while (j <= length(l))
             if l[j] < m_eps || l[j] > 1.0e6
                 l[j] = 1.0e6
             end
@@ -1309,7 +1309,7 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
 
         # starting from the bottom do entrainment at each level
         @inbounds for k in real_center_indicies(grid)
-            if is_surface_bc_centers(grid, k)
+            if is_surface_center(grid, k)
                 # at the surface
                 if self.UpdVar.Area.new[i, k] >= self.minimum_area
                     self.UpdVar.H.new[i, k] = self.h_surface_bc[i]
@@ -1470,7 +1470,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     # Solve QT
     @inbounds for k in real_center_indicies(grid)
         x[k] = self.EnvVar.QT.values[k]
-        if is_surface_bc_centers(grid, k)
+        if is_surface_center(grid, k)
             x[k] = x[k] + TS.dt * Case.Sur.rho_qtflux * dzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
@@ -1490,7 +1490,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     end
     # get the diffusive flux
     @inbounds for k in real_center_indicies(grid)
-        if is_surface_bc_centers(grid, k)
+        if is_surface_center(grid, k)
             self.diffusive_flux_qt[k] = interp2pt(
                 Case.Sur.rho_qtflux,
                 -rho_ae_K[k] * dzi * (self.EnvVar.QT.values[k + 1] - self.EnvVar.QT.values[k]),
@@ -1509,7 +1509,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     # Solve H
     @inbounds for k in real_center_indicies(grid)
         x[k] = self.EnvVar.H.values[k]
-        if is_surface_bc_centers(grid, k)
+        if is_surface_center(grid, k)
             x[k] = x[k] + TS.dt * Case.Sur.rho_hflux * dzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
@@ -1525,7 +1525,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     end
     # get the diffusive flux
     @inbounds for k in real_center_indicies(grid)
-        if is_surface_bc_centers(grid, k)
+        if is_surface_center(grid, k)
             self.diffusive_flux_h[k] = interp2pt(
                 Case.Sur.rho_hflux,
                 -rho_ae_K[k] * dzi * (self.EnvVar.H.values[k + 1] - self.EnvVar.H.values[k]),
@@ -1550,7 +1550,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     construct_tridiag_diffusion(grid, TS.dt, rho_ae_K, ref_state.rho0_half, ae, a, b, c)
     @inbounds for k in real_center_indicies(grid)
         x[k] = GMV.U.values[k]
-        if is_surface_bc_centers(grid, k)
+        if is_surface_center(grid, k)
             x[k] = x[k] + TS.dt * Case.Sur.rho_uflux * dzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
@@ -1561,7 +1561,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         GMV.U.new[k] = x[k]
     end
     @inbounds for k in real_center_indicies(grid)
-        if is_surface_bc_centers(grid, k)
+        if is_surface_center(grid, k)
             self.diffusive_flux_u[k] =
                 interp2pt(Case.Sur.rho_uflux, -rho_ae_K[k] * dzi * (GMV.U.values[k + 1] - GMV.U.values[k]))
         else
@@ -1573,7 +1573,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     # Solve V
     @inbounds for k in real_center_indicies(grid)
         x[k] = GMV.V.values[k]
-        if is_surface_bc_centers(grid, k)
+        if is_surface_center(grid, k)
             x[k] = x[k] + TS.dt * Case.Sur.rho_vflux * dzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
@@ -1583,7 +1583,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         GMV.V.new[k] = x[k]
     end
     @inbounds for k in real_center_indicies(grid)
-        if is_surface_bc_centers(grid, k)
+        if is_surface_center(grid, k)
             self.diffusive_flux_v[k] =
                 interp2pt(Case.Sur.rho_vflux, -rho_ae_K[k] * dzi * (GMV.V.values[k + 1] - GMV.V.values[k]))
         else
@@ -2389,14 +2389,14 @@ function update_covariance_ED(
             Covar.rain_src[k]
         ) #
 
-        if is_surface_bc_centers(grid, k)
+        if is_surface_center(grid, k)
             a[k] = 0.0
             b[k] = 1.0
             c[k] = 0.0
             x[k] = Covar_surf
         end
 
-        if is_toa_bc_centers(grid, k)
+        if is_toa_center(grid, k)
             b[k] += c[k]
             c[k] = 0.0
         end
@@ -2469,7 +2469,7 @@ function GMV_third_m(
             Upd_cubed += au[i, k] * upd_mean.values[i, k]^3
         end
 
-        if is_surface_bc_centers(grid, k)
+        if is_surface_center(grid, k)
             Gmv_third_m.values[k] = 0.0 # this is here as first value is biased with BC area fraction
         else
             Gmv_third_m.values[k] =
