@@ -413,7 +413,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
 
         QT_cut = cut(self.EnvVar.QT.values, grid, k)
         grad_qt = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
-        THL_cut = cut(self.EnvVar.THL.values, grid, k)
+        THL_cut = cut(self.EnvVar.H.values, grid, k)
         grad_thl = c∇(THL_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
 
         # g/theta_ref
@@ -509,7 +509,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
                     self.EnvVar.T.values[k],
                 ) * (
                     (1.0 + (eps_vi - 1.0) * self.EnvVar.QT.values[k]) * grad_thl +
-                    (eps_vi - 1.0) * self.EnvVar.THL.values[k] * grad_qt
+                    (eps_vi - 1.0) * self.EnvVar.H.values[k] * grad_qt
                 )
             )
         N = sqrt(fmax(g / thv * grad_th_eff, 0.0))
@@ -1160,7 +1160,6 @@ function zero_area_fraction_cleanup(self::EDMF_PrognosticTKE, GMV::GridMeanVaria
                 self.UpdVar.QT.values[i, k] = GMV.QT.values[k]
                 self.UpdVar.T.values[i, k] = GMV.T.values[k]
                 self.UpdVar.QL.values[i, k] = GMV.QL.values[k]
-                self.UpdVar.THL.values[i, k] = GMV.THL.values[k]
             end
         end
 
@@ -1171,7 +1170,6 @@ function zero_area_fraction_cleanup(self::EDMF_PrognosticTKE, GMV::GridMeanVaria
             self.EnvVar.QT.values[k] = GMV.QT.values[k]
             self.EnvVar.T.values[k] = GMV.T.values[k]
             self.EnvVar.QL.values[k] = GMV.QL.values[k]
-            self.EnvVar.THL.values[k] = GMV.THL.values[k]
         end
     end
 
@@ -1185,14 +1183,12 @@ function set_subdomain_bcs(self::EDMF_PrognosticTKE)
     set_bcs(self.UpdVar.W, grid)
     set_bcs(self.UpdVar.Area, grid)
     set_bcs(self.UpdVar.H, grid)
-    set_bcs(self.UpdVar.THL, grid)
     set_bcs(self.UpdVar.QT, grid)
     set_bcs(self.UpdVar.T, grid)
     set_bcs(self.UpdVar.B, grid)
 
     set_bcs(self.EnvVar.W, grid)
     set_bcs(self.EnvVar.H, grid)
-    set_bcs(self.EnvVar.THL, grid)
     set_bcs(self.EnvVar.T, grid)
     set_bcs(self.EnvVar.QL, grid)
     set_bcs(self.EnvVar.QT, grid)
@@ -1592,7 +1588,6 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         end
     end
     set_bcs(GMV.QT, grid)
-    set_bcs(GMV.THL, grid)
     set_bcs(GMV.H, grid)
     set_bcs(GMV.U, grid)
     set_bcs(GMV.V, grid)
@@ -1624,7 +1619,7 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
         cpm = cpm_c(qt_cloudy)
         grad_thl_minus = grad_thl_plus
         grad_qt_minus = grad_qt_plus
-        grad_thl_plus = (self.EnvVar.THL.values[k + 1] - self.EnvVar.THL.values[k]) * grid.dzi
+        grad_thl_plus = (self.EnvVar.H.values[k + 1] - self.EnvVar.H.values[k]) * grid.dzi
         grad_qt_plus = (self.EnvVar.QT.values[k + 1] - self.EnvVar.QT.values[k]) * grid.dzi
         prefactor = Rd * exner_c(ref_state.p0_half[k]) / ref_state.p0_half[k]
         d_alpha_thetal_dry = prefactor * (1.0 + (eps_vi - 1.0) * qt_dry)
@@ -1694,8 +1689,6 @@ function update_GMV_diagnostics(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
         )
 
         qv = GMV.QT.values[k] - GMV.QL.values[k]
-
-        GMV.THL.values[k] = t_to_thetali_c(p0_half[k], GMV.T.values[k], GMV.QT.values[k], GMV.QL.values[k], 0.0)
 
         GMV.B.values[k] = (
             self.UpdVar.Area.bulkvalues[k] * self.UpdVar.B.bulkvalues[k] +
@@ -2503,7 +2496,7 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
     elseif option == "thetal_maxgrad"
 
         @inbounds for k in real_center_indicies(self.Gr)
-            ∇θ_liq = ∇_upwind(GMV.THL.values, self.Gr, k)
+            ∇θ_liq = ∇_upwind(GMV.H.values, self.Gr, k)
             if ∇θ_liq > ∇θ_liq_max
                 ∇θ_liq_max = ∇θ_liq
                 self.zi = self.Gr.z[k]

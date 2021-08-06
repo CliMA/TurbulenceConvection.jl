@@ -88,7 +88,6 @@ function update(self::GridMeanVariables, TS::TimeStepping)
     set_bcs(self.V, grid)
     set_bcs(self.H, grid)
     set_bcs(self.QT, grid)
-    set_bcs(self.THL, grid)
     set_bcs(self.TKE, grid)
 
     set_bcs(self.QTvar, grid)
@@ -184,7 +183,6 @@ function satadjust(self::GridMeanVariables)
         self.QL.values[k] = sa.ql
         self.T.values[k] = sa.T
         qv = qt - sa.ql
-        self.THL.values[k] = t_to_thetali_c(p0, sa.T, qt, sa.ql, 0.0)
         rho = rho_c(p0, sa.T, qt, qv)
         self.B.values[k] = buoyancy_c(self.Ref.rho0_half[k], rho)
         self.RH.values[k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, self.T.values[k])
