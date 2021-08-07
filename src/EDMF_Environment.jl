@@ -1,35 +1,3 @@
-function set_bcs(self::EnvironmentVariable, Gr::Grid)
-    start_low = Gr.gw
-    start_high = Gr.nzg - Gr.gw
-
-    if self.name == "w"
-        self.values[start_high] = 0.0
-        self.values[start_low] = 0.0
-        @inbounds for kk in xrange(1, Gr.gw)
-            k = kk - 1
-            self.values[start_high + k] = -self.values[start_high - k]
-            self.values[start_low - k] = -self.values[start_low + k]
-        end
-    else
-        @inbounds for kk in xrange(Gr.gw)
-            k = kk - 1
-            self.values[start_high + k + 1] = self.values[start_high - k]
-            self.values[start_low - k] = self.values[start_low + 1 + k]
-        end
-    end
-end
-
-function set_bcs(self::EnvironmentVariable_2m, Gr::Grid)
-    start_low = Gr.gw
-    start_high = Gr.nzg - Gr.gw
-
-    @inbounds for kk in xrange(Gr.gw)
-        k = kk - 1
-        self.values[start_high + k + 1] = self.values[start_high - k]
-        self.values[start_low - k] = self.values[start_low + 1 + k]
-    end
-end
-
 function initialize_io(self::EnvironmentVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "env_w")
     add_profile(Stats, "env_qt")

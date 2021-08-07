@@ -53,6 +53,7 @@ include("NetCDFIO.jl")
 include("ReferenceState.jl")
 include("types.jl")
 
+include("set_bcs.jl")
 include("thermodynamic_functions.jl")
 include("microphysics_functions.jl")
 include("turbulence_functions.jl")
