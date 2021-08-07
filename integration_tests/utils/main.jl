@@ -17,43 +17,46 @@ mutable struct Simulation1d
 end
 
 function Simulation1d(namelist)
+    TC = TurbulenceConvection
     param_set = create_parameter_set(namelist)
-    Gr = TurbulenceConvection.Grid(namelist)
-    Ref = TurbulenceConvection.ReferenceState(Gr, param_set)
-    GMV = TurbulenceConvection.GridMeanVariables(namelist, Gr, Ref, param_set)
+    Gr = TC.Grid(namelist)
+    Ref = TC.ReferenceState(Gr, param_set)
+    GMV = TC.GridMeanVariables(namelist, Gr, Ref, param_set)
     Case = Cases.CasesFactory(namelist, Gr, Ref)
-    Turb = TurbulenceConvection.EDMF_PrognosticTKE(namelist, Gr, Ref, param_set)
-    TS = TurbulenceConvection.TimeStepping(namelist)
-    Stats = TurbulenceConvection.NetCDFIO_Stats(namelist, Gr)
+    Turb = TC.EDMF_PrognosticTKE(namelist, Gr, Ref, param_set)
+    TS = TC.TimeStepping(namelist)
+    Stats = TC.NetCDFIO_Stats(namelist, Gr)
     return Simulation1d(Gr, Ref, GMV, Case, Turb, TS, Stats)
 end
 
 function TurbulenceConvection.initialize(self::Simulation1d, namelist)
+    TC = TurbulenceConvection
     Cases.initialize_reference(self.Case, self.Gr, self.Ref, self.Stats)
     Cases.initialize_profiles(self.Case, self.Gr, self.GMV, self.Ref)
     Cases.initialize_surface(self.Case, self.Gr, self.Ref)
     Cases.initialize_forcing(self.Case, self.Gr, self.Ref, self.GMV)
     Cases.initialize_radiation(self.Case, self.Gr, self.Ref, self.GMV)
-    TurbulenceConvection.initialize(self.Turb, self.Case, self.GMV, self.Ref)
-    TurbulenceConvection.initialize_io(self)
-    TurbulenceConvection.io(self)
+    TC.initialize(self.Turb, self.Case, self.GMV, self.Ref)
+    TC.initialize_io(self)
+    TC.io(self)
 
     return
 end
 
 function run(self::Simulation1d)
+    TC = TurbulenceConvection
     iter = 0
-    TurbulenceConvection.open_files(self.Stats) # #removeVarsHack
+    TC.open_files(self.Stats) # #removeVarsHack
     while self.TS.t <= self.TS.t_max
-        TurbulenceConvection.zero_tendencies(self.GMV)
+        TC.zero_tendencies(self.GMV)
         Cases.update_surface(self.Case, self.GMV, self.TS)
         Cases.update_forcing(self.Case, self.GMV, self.TS)
         Cases.update_radiation(self.Case, self.GMV, self.TS)
-        TurbulenceConvection.update(self.Turb, self.GMV, self.Case, self.TS)
-        TurbulenceConvection.update(self.TS)
+        TC.update(self.Turb, self.GMV, self.Case, self.TS)
+        TC.update(self.TS)
         # Apply the tendencies, also update the BCs and diagnostic thermodynamics
-        TurbulenceConvection.update(self.GMV, self.TS)
-        TurbulenceConvection.update_GMV_diagnostics(self.Turb, self.GMV)
+        TC.update(self.GMV, self.TS)
+        TC.update_GMV_diagnostics(self.Turb, self.GMV)
 
         if mod(iter, 100) == 0
             progress = self.TS.t / self.TS.t_max
@@ -64,36 +67,33 @@ function run(self::Simulation1d)
             # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
             # opening/closing files every step should be okay. #removeVarsHack
             # TurbulenceConvection.io(self) # #removeVarsHack
-            TurbulenceConvection.write_simulation_time(self.Stats, self.TS.t) # #removeVarsHack
-            TurbulenceConvection.io(self.GMV, self.Stats) # #removeVarsHack
-            TurbulenceConvection.io(self.Case, self.Stats) # #removeVarsHack
-            TurbulenceConvection.io(self.Turb, self.Stats, self.TS) # #removeVarsHack
+            TC.write_simulation_time(self.Stats, self.TS.t) # #removeVarsHack
+            TC.io(self.GMV, self.Stats) # #removeVarsHack
+            TC.io(self.Case, self.Stats) # #removeVarsHack
+            TC.io(self.Turb, self.Stats, self.TS) # #removeVarsHack
         end
         iter += 1
     end
-    TurbulenceConvection.close_files(self.Stats) # #removeVarsHack
+    TC.close_files(self.Stats) # #removeVarsHack
     return
 end
 
 function TurbulenceConvection.initialize_io(self::Simulation1d)
-
-    TurbulenceConvection.initialize_io(self.GMV, self.Stats)
-    TurbulenceConvection.initialize_io(self.Case, self.Stats)
-    TurbulenceConvection.initialize_io(self.Turb, self.Stats)
+    TC = TurbulenceConvection
+    TC.initialize_io(self.GMV, self.Stats)
+    TC.initialize_io(self.Case, self.Stats)
+    TC.initialize_io(self.Turb, self.Stats)
     return
 end
 
 function TurbulenceConvection.io(self::Simulation1d)
-    TurbulenceConvection.open_files(self.Stats)
-    TurbulenceConvection.write_simulation_time(self.Stats, self.TS.t)
-    TurbulenceConvection.io(self.GMV, self.Stats)
-    TurbulenceConvection.io(self.Case, self.Stats)
-    TurbulenceConvection.io(self.Turb, self.Stats, self.TS)
-    TurbulenceConvection.close_files(self.Stats)
-    return
-end
-
-function force_io(self::Simulation1d)
+    TC = TurbulenceConvection
+    TC.open_files(self.Stats)
+    TC.write_simulation_time(self.Stats, self.TS.t)
+    TC.io(self.GMV, self.Stats)
+    TC.io(self.Case, self.Stats)
+    TC.io(self.Turb, self.Stats, self.TS)
+    TC.close_files(self.Stats)
     return
 end
 
