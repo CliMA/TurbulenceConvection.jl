@@ -1,12 +1,4 @@
 
-function set_bcs(self::RainVariable, Gr::Grid)
-    @inbounds for k in xrange(Gr.gw)
-        self.values[Gr.nzg - Gr.gw + k] = self.values[Gr.nzg - Gr.gw - 1 - k]
-        self.values[Gr.gw - 1 - k] = self.values[Gr.gw + k]
-    end
-    return
-end
-
 function initialize_io(self::RainVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "qr_mean")
     add_profile(Stats, "updraft_qr")

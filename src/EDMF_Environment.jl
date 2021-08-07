@@ -1,35 +1,3 @@
-function set_bcs(self::EnvironmentVariable, Gr::Grid)
-    start_low = Gr.gw
-    start_high = Gr.nzg - Gr.gw
-
-    if self.name == "w"
-        self.values[start_high] = 0.0
-        self.values[start_low] = 0.0
-        @inbounds for kk in xrange(1, Gr.gw)
-            k = kk - 1
-            self.values[start_high + k] = -self.values[start_high - k]
-            self.values[start_low - k] = -self.values[start_low + k]
-        end
-    else
-        @inbounds for kk in xrange(Gr.gw)
-            k = kk - 1
-            self.values[start_high + k + 1] = self.values[start_high - k]
-            self.values[start_low - k] = self.values[start_low + 1 + k]
-        end
-    end
-end
-
-function set_bcs(self::EnvironmentVariable_2m, Gr::Grid)
-    start_low = Gr.gw
-    start_high = Gr.nzg - Gr.gw
-
-    @inbounds for kk in xrange(Gr.gw)
-        k = kk - 1
-        self.values[start_high + k + 1] = self.values[start_high - k]
-        self.values[start_low - k] = self.values[start_low + 1 + k]
-    end
-end
-
 function initialize_io(self::EnvironmentVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "env_w")
     add_profile(Stats, "env_qt")
@@ -228,10 +196,10 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
     end
 
     # initialize the quadrature points and their labels
-    inner_env = pyzeros(env_len)
-    outer_env = pyzeros(env_len)
-    inner_src = pyzeros(src_len)
-    outer_src = pyzeros(src_len)
+    inner_env = zeros(env_len)
+    outer_env = zeros(env_len)
+    inner_src = zeros(src_len)
+    outer_src = zeros(src_len)
     i_ql, i_T, i_thl, i_rho, i_cf, i_qt_cld, i_qt_dry, i_T_cld, i_T_dry, i_rf = xrange(env_len)
     i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH = xrange(src_len)
 

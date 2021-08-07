@@ -12,7 +12,6 @@ using ..TurbulenceConvection: pyinterp
 using ..TurbulenceConvection: eps_vi
 using ..TurbulenceConvection: thetali_c
 using ..TurbulenceConvection: theta_rho_c
-using ..TurbulenceConvection: linspace
 using ..TurbulenceConvection: eps_v
 using ..TurbulenceConvection: pv_star
 using ..TurbulenceConvection: fabs
@@ -868,7 +867,7 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
     self.Fo.dTdt = TC.center_field(Gr)
-    self.rad_time = linspace(10, 360; num = 36) .* 60
+    self.rad_time = range(10, 360; length = 36) .* 60
     #! format: off
     z_in         = off_arr([42.5, 200.92, 456.28, 743, 1061.08, 1410.52, 1791.32, 2203.48, 2647,3121.88, 3628.12,
                              4165.72, 4734.68, 5335, 5966.68, 6629.72, 7324.12,
