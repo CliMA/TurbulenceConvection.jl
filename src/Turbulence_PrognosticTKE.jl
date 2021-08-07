@@ -813,7 +813,7 @@ function get_GMV_CoVar(
 )
 
     grid = get_grid(self)
-    ae = pyones(grid.nzg) .- au.bulkvalues
+    ae = ones(grid.nzg) .- au.bulkvalues
     tke_factor = 1.0
     is_tke = covar_e.name == "tke"
 
@@ -881,7 +881,7 @@ function get_env_covar_from_GMV(
 )
 
     grid = get_grid(self)
-    ae = pyones(grid.nzg) .- au.bulkvalues
+    ae = ones(grid.nzg) .- au.bulkvalues
     tke_factor = 1.0
     is_tke = covar_e.name == "tke"
     if is_tke
@@ -962,8 +962,8 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     ref_state = reference_state(self)
     tau = get_mixing_tau(self.zi, self.wstar)
 
-    ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues
-    l = pyzeros(2)
+    ae = ones(grid.nzg) .- self.UpdVar.Area.bulkvalues
+    l = zeros(2)
 
     @inbounds for k in real_center_indicies(grid)
         @inbounds for i in xrange(self.n_updrafts)
@@ -1388,7 +1388,7 @@ function update_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     kf_surf = kf_surface(grid)
     mf_tend_h = 0.0
     mf_tend_qt = 0.0
-    ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues # area of environment
+    ae = ones(grid.nzg) .- self.UpdVar.Area.bulkvalues # area of environment
 
     self.massflux_h .= 0.0
     self.massflux_qt .= 0.0
@@ -1598,7 +1598,7 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     grad_qt_minus = 0.0
     grad_thl_plus = 0
     grad_qt_plus = 0
-    ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues
+    ae = ones(grid.nzg) .- self.UpdVar.Area.bulkvalues
     KH = diffusivity_h(self).values
 
     # Note that source terms at the first center interior grid point are not really used because
@@ -2016,7 +2016,7 @@ function compute_covariance_shear(
 
     grid = get_grid(self)
     dzi = grid.dzi
-    ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues
+    ae = ones(grid.nzg) .- self.UpdVar.Area.bulkvalues
     diff_var1 = 0.0
     diff_var2 = 0.0
     du = 0.0
@@ -2192,7 +2192,7 @@ end
 function compute_covariance_rain(self::EDMF_PrognosticTKE, TS::TimeStepping, GMV::GridMeanVariables)
     # TODO defined again in compute_covariance_shear and compute_covaraince
     grid = get_grid(self)
-    ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues # area of environment
+    ae = ones(grid.nzg) .- self.UpdVar.Area.bulkvalues # area of environment
     rho0_half = reference_state(self).rho0_half
 
     @inbounds for k in real_center_indicies(grid)
@@ -2208,7 +2208,7 @@ end
 
 function compute_covariance_dissipation(self::EDMF_PrognosticTKE, Covar::EnvironmentVariable_2m)
     grid = get_grid(self)
-    ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues
+    ae = ones(grid.nzg) .- self.UpdVar.Area.bulkvalues
     rho0_half = reference_state(self).rho0_half
 
     @inbounds for k in real_center_indicies(grid)
@@ -2226,7 +2226,7 @@ function compute_tke_advection(self::EDMF_PrognosticTKE)
     grid = get_grid(self)
     ref_state = reference_state(self)
     rho0_half = ref_state.rho0_half
-    ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues # area of environment
+    ae = ones(grid.nzg) .- self.UpdVar.Area.bulkvalues # area of environment
     drho_ae_we_e_plus = 0.0
 
     @inbounds for k in real_face_indicies(grid)
@@ -2251,7 +2251,7 @@ function compute_tke_transport(self::EDMF_PrognosticTKE)
 
     grid = get_grid(self)
     dzi = grid.dzi
-    ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues # area of environment
+    ae = ones(grid.nzg) .- self.UpdVar.Area.bulkvalues # area of environment
     dtke_high = 0.0
     drho_ae_K_m_de_plus = 0.0
     KM = diffusivity_m(self).values
@@ -2429,7 +2429,7 @@ function GMV_third_m(
 )
 
     grid = get_grid(self)
-    ae = pyones(grid.nzg) .- self.UpdVar.Area.bulkvalues
+    ae = ones(grid.nzg) .- self.UpdVar.Area.bulkvalues
     au = self.UpdVar.Area.values
 
     @inbounds for k in real_center_indicies(grid)

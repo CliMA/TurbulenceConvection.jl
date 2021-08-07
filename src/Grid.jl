@@ -28,8 +28,8 @@ struct Grid{A1, FT}
         finterior = (gw + 1):(nzg - gw)
 
         # TODO: make cell centers and cell faces different sizes
-        z_half = pyzeros(nz + 2 * gw)
-        z = pyzeros(nz + 2 * gw)
+        z_half = zeros(nz + 2 * gw)
+        z = zeros(nz + 2 * gw)
         count = 1
         @inbounds for i in range(1 - gw, stop = nz + gw)
             z[count] = i * dz

@@ -196,10 +196,10 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
     end
 
     # initialize the quadrature points and their labels
-    inner_env = pyzeros(env_len)
-    outer_env = pyzeros(env_len)
-    inner_src = pyzeros(src_len)
-    outer_src = pyzeros(src_len)
+    inner_env = zeros(env_len)
+    outer_env = zeros(env_len)
+    inner_src = zeros(src_len)
+    outer_src = zeros(src_len)
     i_ql, i_T, i_thl, i_rho, i_cf, i_qt_cld, i_qt_dry, i_T_cld, i_T_dry, i_rf = xrange(env_len)
     i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH = xrange(src_len)
 

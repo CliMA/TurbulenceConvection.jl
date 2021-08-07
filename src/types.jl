@@ -297,10 +297,10 @@ mutable struct UpdraftVariables{A1}
         # cloud and rain diagnostics for output
         cloud_fraction = center_field(grid)
 
-        cloud_base = pyzeros(nu)
-        cloud_top = pyzeros(nu)
-        cloud_cover = pyzeros(nu)
-        updraft_top = pyzeros(nu)
+        cloud_base = zeros(nu)
+        cloud_top = zeros(nu)
+        cloud_cover = zeros(nu)
+        updraft_top = zeros(nu)
 
         lwp = 0.0
         A1 = typeof(cloud_fraction)
@@ -736,7 +736,7 @@ Base.@kwdef mutable struct CasesBase{T}
     Sur::SurfaceBase
     Fo::ForcingBase
     Rad::RadiationBase
-    rad_time::StepRangeLen = linspace(10, 360; num = 36) .* 60
+    rad_time::StepRangeLen = range(10, 360; length = 36) .* 60
     rad::AbstractMatrix{Float64} = zeros(1, 1)
     lhf0::Float64 = 0
     shf0::Float64 = 0
@@ -1020,11 +1020,11 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         tke_advection = center_field(Gr)
 
         # Near-surface BC of updraft area fraction
-        area_surface_bc = pyzeros(n_updrafts)
-        w_surface_bc = pyzeros(n_updrafts)
-        h_surface_bc = pyzeros(n_updrafts)
-        qt_surface_bc = pyzeros(n_updrafts)
-        pressure_plume_spacing = pyzeros(n_updrafts)
+        area_surface_bc = zeros(n_updrafts)
+        w_surface_bc = zeros(n_updrafts)
+        h_surface_bc = zeros(n_updrafts)
+        qt_surface_bc = zeros(n_updrafts)
+        pressure_plume_spacing = zeros(n_updrafts)
 
         # Mass flux tendencies of mean scalars (for output)
         massflux_tendency_h = center_field(Gr)
