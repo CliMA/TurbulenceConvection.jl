@@ -11,19 +11,19 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 8.4924728795344143e-02
-best_mse["updraft_area"] = 7.0195368138769777e+02
-best_mse["updraft_w"] = 8.7703050153771670e+01
-best_mse["updraft_qt"] = 5.9194060591321715e+00
-best_mse["updraft_thetal"] = 2.2932547498112353e+01
-best_mse["v_mean"] = 1.2350993295040250e+02
-best_mse["u_mean"] = 5.3487467706554988e+01
-best_mse["tke_mean"] = 3.2337733855931930e+01
-best_mse["temperature_mean"] = 3.1767291118329973e-05
-best_mse["ql_mean"] = 1.4250971600048450e+01
-best_mse["thetal_mean"] = 3.2420072527836003e-05
-best_mse["Hvar_mean"] = 6.2697869671981366e+01
-best_mse["QTvar_mean"] = 2.2154880539077912e+01
+best_mse["qt_mean"] = 8.9644597356208541e-02
+best_mse["updraft_area"] = 6.9327817412026047e+02
+best_mse["updraft_w"] = 8.9057089858539797e+01
+best_mse["updraft_qt"] = 5.9179688063528078e+00
+best_mse["updraft_thetal"] = 2.2933264810554988e+01
+best_mse["v_mean"] = 1.2348440297549568e+02
+best_mse["u_mean"] = 5.3484778922733959e+01
+best_mse["tke_mean"] = 3.2847767205446033e+01
+best_mse["temperature_mean"] = 3.4874387520736297e-05
+best_mse["ql_mean"] = 2.1344864368686135e+01
+best_mse["thetal_mean"] = 3.5327188090292184e-05
+best_mse["Hvar_mean"] = 1.7623971358198961e+02
+best_mse["QTvar_mean"] = 4.0583986764371645e+01
 
 @testset "Bomex" begin
     println("Running Bomex...")

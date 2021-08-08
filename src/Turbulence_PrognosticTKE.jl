@@ -26,8 +26,7 @@ function initialize_io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     add_profile(Stats, "asp_ratio")
     add_profile(Stats, "b_coeff")
 
-    add_profile(Stats, "horizontal_KM")
-    add_profile(Stats, "horizontal_KH")
+    add_profile(Stats, "horiz_K_eddy")
     add_profile(Stats, "sorting_function")
     add_profile(Stats, "b_mix")
     add_ts(Stats, "rd")
@@ -107,12 +106,7 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     mf_h = face_field(grid)
     mf_qt = face_field(grid)
     mean_frac_turb_entr = center_field(grid)
-    mean_frac_turb_entr_full = center_field(grid)
-    mean_turb_entr_W = center_field(grid)
-    mean_turb_entr_H = center_field(grid)
-    mean_turb_entr_QT = center_field(grid)
-    mean_horizontal_KM = center_field(grid)
-    mean_horizontal_KH = center_field(grid)
+    mean_horiz_K_eddy = center_field(grid)
     mean_sorting_function = center_field(grid)
     mean_b_mix = center_field(grid)
 
@@ -143,20 +137,10 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
                     self.UpdVar.Area.values[i, k] * self.asp_ratio[i, k] / self.UpdVar.Area.bulkvalues[k]
                 mean_b_coeff[k] += self.UpdVar.Area.values[i, k] * self.b_coeff[i, k] / self.UpdVar.Area.bulkvalues[k]
 
-                mean_frac_turb_entr_full[k] +=
-                    self.UpdVar.Area.values[i, k] * self.frac_turb_entr_full[i, k] / self.UpdVar.Area.bulkvalues[k]
                 mean_frac_turb_entr[k] +=
                     self.UpdVar.Area.values[i, k] * self.frac_turb_entr[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_turb_entr_W[k] +=
-                    self.UpdVar.Area.values[i, k] * self.turb_entr_W[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_turb_entr_H[k] +=
-                    self.UpdVar.Area.values[i, k] * self.turb_entr_H[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_turb_entr_QT[k] +=
-                    self.UpdVar.Area.values[i, k] * self.turb_entr_QT[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_horizontal_KM[k] +=
-                    self.UpdVar.Area.values[i, k] * self.horizontal_KM[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_horizontal_KH[k] +=
-                    self.UpdVar.Area.values[i, k] * self.horizontal_KH[i, k] / self.UpdVar.Area.bulkvalues[k]
+                mean_horiz_K_eddy[k] +=
+                    self.UpdVar.Area.values[i, k] * self.horiz_K_eddy[i, k] / self.UpdVar.Area.bulkvalues[k]
                 mean_sorting_function[k] +=
                     self.UpdVar.Area.values[i, k] * self.sorting_function[i, k] / self.UpdVar.Area.bulkvalues[k]
                 mean_b_mix[k] += self.UpdVar.Area.values[i, k] * self.b_mix[i, k] / self.UpdVar.Area.bulkvalues[k]
@@ -165,12 +149,7 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     end
 
     write_profile(Stats, "turbulent_entrainment", mean_frac_turb_entr[cinterior])
-    write_profile(Stats, "turbulent_entrainment_full", mean_frac_turb_entr_full[cinterior])
-    write_profile(Stats, "turbulent_entrainment_W", mean_turb_entr_W[cinterior])
-    write_profile(Stats, "turbulent_entrainment_H", mean_turb_entr_H[cinterior])
-    write_profile(Stats, "turbulent_entrainment_QT", mean_turb_entr_QT[cinterior])
-    write_profile(Stats, "horizontal_KM", mean_horizontal_KM[cinterior])
-    write_profile(Stats, "horizontal_KH", mean_horizontal_KH[cinterior])
+    write_profile(Stats, "horiz_K_eddy", mean_horiz_K_eddy[cinterior])
     write_profile(Stats, "entrainment_sc", mean_entr_sc[cinterior])
     write_profile(Stats, "detrainment_sc", mean_detr_sc[cinterior])
     write_profile(Stats, "sorting_function", mean_sorting_function[cinterior])
@@ -469,13 +448,15 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         for nn in xrange(self.n_updrafts)
             wc_upd_nn = (self.UpdVar.W.values[nn, k] + self.UpdVar.W.values[nn, k - 1]) / 2.0
             wc_env = (self.EnvVar.W.values[k] + self.EnvVar.W.values[k - 1]) / 2.0
-            frac_turb_entr_half = interp2pt(self.frac_turb_entr_full[nn, k], self.frac_turb_entr_full[nn, k - 1])
             self.b[k] +=
                 self.UpdVar.Area.values[nn, k] * wc_upd_nn * self.detr_sc[nn, k] /
                 (1.0 - self.UpdVar.Area.bulkvalues[k]) *
                 ((wc_upd_nn - wc_env) * (wc_upd_nn - wc_env) / 2.0 - self.EnvVar.TKE.values[k]) -
-                self.UpdVar.Area.values[nn, k] * wc_upd_nn * (wc_upd_nn - wc_env) * frac_turb_entr_half * wc_env /
-                (1.0 - self.UpdVar.Area.bulkvalues[k])
+                self.UpdVar.Area.values[nn, k] *
+                wc_upd_nn *
+                (wc_upd_nn - wc_env) *
+                self.frac_turb_entr[nn, k] *
+                wc_env / (1.0 - self.UpdVar.Area.bulkvalues[k])
         end
 
         if abs(a) > m_eps && 4.0 * a * c_neg > -self.b[k] * self.b[k]
@@ -1014,58 +995,23 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
 
             # horizontal eddy diffusivities
             if self.UpdVar.Area.values[i, k] > 0.0
-                self.horizontal_KM[i, k] =
+                self.horiz_K_eddy[i, k] =
                     self.UpdVar.Area.values[i, k] *
                     self.turbulent_entrainment_factor *
                     sqrt(fmax(self.EnvVar.TKE.values[k], 0.0)) *
                     self.pressure_plume_spacing[i]
-                self.horizontal_KH[i, k] = self.horizontal_KM[i, k] / self.prandtl_nvec[k]
             else
-                self.horizontal_KM[i, k] = 0.0
-                self.horizontal_KH[i, k] = 0.0
+                self.horiz_K_eddy[i, k] = 0.0
             end
 
             # turbulent entrainment
-            a = self.UpdVar.Area.values[i, k]
-            a_full = interp2pt(self.UpdVar.Area.values[i, k], self.UpdVar.Area.values[i, k + 1])
-            R_up = self.pressure_plume_spacing[i]
-            R_up_full = self.pressure_plume_spacing[i]
             wu_half = interp2pt(self.UpdVar.W.values[i, k], self.UpdVar.W.values[i, k - 1])
-            we_half = interp2pt(self.EnvVar.W.values[k], self.EnvVar.W.values[k - 1])
-            if a * wu_half > 0.0
-                self.turb_entr_H[i, k] =
-                    (2.0 / R_up^2.0) *
-                    ref_state.rho0_half[k] *
-                    a *
-                    self.horizontal_KH[i, k] *
-                    (self.EnvVar.H.values[k] - self.UpdVar.H.values[i, k])
-                self.turb_entr_QT[i, k] =
-                    (2.0 / R_up^2.0) *
-                    ref_state.rho0_half[k] *
-                    a *
-                    self.horizontal_KH[i, k] *
-                    (self.EnvVar.QT.values[k] - self.UpdVar.QT.values[i, k])
-                self.frac_turb_entr[i, k] = (2.0 / R_up^2.0) * self.horizontal_KH[i, k] / wu_half / a
+            if self.UpdVar.Area.values[i, k] * wu_half > 0.0
+                self.frac_turb_entr[i, k] =
+                    (2.0 / self.pressure_plume_spacing[i]^2.0) * self.horiz_K_eddy[i, k] / wu_half /
+                    self.UpdVar.Area.values[i, k]
             else
-                self.turb_entr_H[i, k] = 0.0
-                self.turb_entr_QT[i, k] = 0.0
-            end
-
-            if a_full * self.UpdVar.W.values[i, k] > 0.0
-                K_full = interp2pt(self.horizontal_KM[i, k], self.horizontal_KM[i, k - 1])
-                b_upd_full = interp2pt(self.UpdVar.B.values[i, k], self.UpdVar.B.values[i, k - 1])
-                b_env_full = interp2pt(self.EnvVar.B.values[k], self.EnvVar.B.values[k - 1])
-                env_tke_full = interp2pt(self.EnvVar.TKE.buoy[k], self.EnvVar.TKE.buoy[k - 1])
-
-                self.turb_entr_W[i, k] =
-                    (2.0 / R_up_full^2.0) *
-                    ref_state.rho0[k] *
-                    a_full *
-                    K_full *
-                    (self.EnvVar.W.values[k] - self.UpdVar.W.values[i, k])
-                self.frac_turb_entr_full[i, k] = (2.0 / R_up_full^2.0) * K_full / self.UpdVar.W.values[i, k] / a_full
-            else
-                self.turb_entr_W[i, k] = 0.0
+                self.frac_turb_entr[i, k] = 0.0
             end
 
             # pressure
@@ -1251,8 +1197,14 @@ function solve_updraft_velocity_area(self::EDMF_PrognosticTKE)
             if anew_k >= self.minimum_area
                 a_k = interp2pt(self.UpdVar.Area.values[i, k], self.UpdVar.Area.values[i, k + 1])
                 a_km = interp2pt(self.UpdVar.Area.values[i, k - 1], self.UpdVar.Area.values[i, k])
-                entr_w = interp2pt(self.entr_sc[i, k], self.entr_sc[i, k + 1])
-                detr_w = interp2pt(self.detr_sc[i, k], self.detr_sc[i, k + 1])
+                entr_w = interp2pt(
+                    self.entr_sc[i, k] + self.frac_turb_entr[i, k],
+                    self.entr_sc[i, k + 1] + self.frac_turb_entr[i, k + 1],
+                )
+                detr_w = interp2pt(
+                    self.detr_sc[i, k] + self.frac_turb_entr[i, k],
+                    self.detr_sc[i, k + 1] + self.frac_turb_entr[i, k + 1],
+                )
                 B_k = interp2pt(self.UpdVar.B.values[i, k], self.UpdVar.B.values[i, k + 1])
 
                 adv = (
@@ -1267,8 +1219,7 @@ function solve_updraft_velocity_area(self::EDMF_PrognosticTKE)
                     ref_state.rho0[k] *
                     a_k *
                     self.UpdVar.W.values[i, k] *
-                    (entr_w * self.EnvVar.W.values[k] - detr_w * self.UpdVar.W.values[i, k]) +
-                    self.turb_entr_W[i, k]
+                    (entr_w * self.EnvVar.W.values[k] - detr_w * self.UpdVar.W.values[i, k])
                 )
                 buoy = ref_state.rho0[k] * a_k * B_k
                 self.UpdVar.W.new[i, k] =
@@ -1322,10 +1273,6 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
                 continue
             end
 
-
-            H_entr = self.EnvVar.H.values[k]
-            QT_entr = self.EnvVar.QT.values[k]
-
             # write the discrete equations in form
             # c1 * phi_new[k] = c2 * phi[k] + c3 * phi[k-1] + c4 * phi_entr
             if self.UpdVar.Area.new[i, k] >= self.minimum_area
@@ -1340,23 +1287,24 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
                     interp2pt(self.UpdVar.W.values[i, k - 2], self.UpdVar.W.values[i, k - 1])
                 )
                 c1 = ref_state.rho0_half[k] * self.UpdVar.Area.new[i, k] * dti_
-                c2 = (ref_state.rho0_half[k] * self.UpdVar.Area.values[i, k] * dti_ - m_k * (dzi + self.detr_sc[i, k]))
+                c2 = (
+                    ref_state.rho0_half[k] * self.UpdVar.Area.values[i, k] * dti_ -
+                    m_k * (dzi + self.detr_sc[i, k] + self.frac_turb_entr[i, k])
+                )
                 c3 = m_km * dzi
-                c4 = m_k * self.entr_sc[i, k]
+                c4 = m_k * (self.entr_sc[i, k] + self.frac_turb_entr[i, k])
 
                 self.UpdVar.H.new[i, k] =
                     (
                         c2 * self.UpdVar.H.values[i, k] +
                         c3 * self.UpdVar.H.values[i, k - 1] +
-                        c4 * H_entr +
-                        self.turb_entr_H[i, k]
+                        c4 * self.EnvVar.H.values[k]
                     ) / c1
                 self.UpdVar.QT.new[i, k] =
                     (
                         c2 * self.UpdVar.QT.values[i, k] +
                         c3 * self.UpdVar.QT.values[i, k - 1] +
-                        c4 * QT_entr +
-                        self.turb_entr_QT[i, k]
+                        c4 * self.EnvVar.QT.values[k]
                     ) / c1
 
             else
@@ -2132,7 +2080,7 @@ function compute_covariance_entr(
                     envvar2 = interp2pt(EnvVar2.values[k], EnvVar2.values[k - 1])
                     gmvvar1 = interp2pt(GmvVar1.values[k], GmvVar1.values[k - 1])
                     gmvvar2 = interp2pt(GmvVar2.values[k], GmvVar2.values[k - 1])
-                    eps_turb = interp2pt(self.frac_turb_entr_full[i, k], self.frac_turb_entr_full[i, k - 1])
+                    eps_turb = interp2pt(self.frac_turb_entr[i, k], self.frac_turb_entr[i, k - 1])
                 else
                     tke_factor = 1.0
                     updvar1 = UpdVar1.values[i, k]
@@ -2346,7 +2294,8 @@ function update_covariance_ED(
         @inbounds for i in xrange(self.n_updrafts)
             if self.UpdVar.Area.values[i, k] > self.minimum_area
                 if Covar.name == "tke"
-                    turb_entr = interp2pt(self.frac_turb_entr_full[i, k - 1], self.frac_turb_entr_full[i, k])
+                    turb_entr =
+                        interp2pt(self.frac_turb_entr[i, k - 1], self.frac_turb_entr[i, k]) / self.prandtl_nvec[k]
                 else
                     turb_entr = self.frac_turb_entr[i, k]
                 end
@@ -2444,7 +2393,7 @@ function GMV_third_m(
         i_last = last(xrange(self.n_updrafts))
         if env_covar.name == "tke"
             Envcov_ =
-                -self.horizontal_KM[i_last, k] * (self.EnvVar.W.values[k + 1] - self.EnvVar.W.values[k - 1]) /
+                -self.horiz_K_eddy[i_last, k] * (self.EnvVar.W.values[k + 1] - self.EnvVar.W.values[k - 1]) /
                 (2.0 * grid.dz)
         else
             Envcov_ = env_covar.values[k]

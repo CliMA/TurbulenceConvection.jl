@@ -794,10 +794,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     sorting_function::A2
     b_mix::A2
     frac_turb_entr::A2
-    frac_turb_entr_full::A2
-    turb_entr_W::A2
-    turb_entr_H::A2
-    turb_entr_QT::A2
     nh_pressure::A2
     nh_pressure_b::A2
     nh_pressure_adv::A2
@@ -806,8 +802,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     b_coeff::A2
     m::A2
     mixing_length::A1
-    horizontal_KM::A2
-    horizontal_KH::A2
+    horiz_K_eddy::A2
     tke_transport::A1
     tke_advection::A1
     area_surface_bc::A1
@@ -992,10 +987,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
 
         # turbulent entrainment
         frac_turb_entr = center_field(Gr, n_updrafts)
-        frac_turb_entr_full = face_field(Gr, n_updrafts)
-        turb_entr_W = center_field(Gr, n_updrafts)
-        turb_entr_H = center_field(Gr, n_updrafts)
-        turb_entr_QT = center_field(Gr, n_updrafts)
 
         # Pressure term in updraft vertical momentum equation
         nh_pressure = center_field(Gr, n_updrafts)
@@ -1010,8 +1001,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
 
         # mixing length
         mixing_length = center_field(Gr)
-        horizontal_KM = center_field(Gr, n_updrafts)
-        horizontal_KH = center_field(Gr, n_updrafts)
+        horiz_K_eddy = center_field(Gr, n_updrafts)
 
         # diagnosed tke budget terms
         tke_transport = center_field(Gr)
@@ -1055,7 +1045,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         detr_surface_bc = 0
         dt_upd = 0
         A1 = typeof(mixing_length)
-        A2 = typeof(horizontal_KM)
+        A2 = typeof(horiz_K_eddy)
         return new{PS, A1, A2}(
             param_set,
             turbulence_tendency,
@@ -1109,10 +1099,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             sorting_function,
             b_mix,
             frac_turb_entr,
-            frac_turb_entr_full,
-            turb_entr_W,
-            turb_entr_H,
-            turb_entr_QT,
             nh_pressure,
             nh_pressure_b,
             nh_pressure_adv,
@@ -1121,8 +1107,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             b_coeff,
             m,
             mixing_length,
-            horizontal_KM,
-            horizontal_KH,
+            horiz_K_eddy,
             tke_transport,
             tke_advection,
             area_surface_bc,

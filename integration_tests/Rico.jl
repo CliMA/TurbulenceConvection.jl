@@ -11,19 +11,19 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 5.0707745192217146e-01
-best_mse["updraft_area"] = 1.6283285530615315e+03
-best_mse["updraft_w"] = 5.7196482018497807e+02
-best_mse["updraft_qt"] = 2.4565269303654755e+01
-best_mse["updraft_thetal"] = 6.5505090179439435e+01
-best_mse["v_mean"] = 1.0611825566231954e+02
-best_mse["u_mean"] = 1.1390377464452069e+02
-best_mse["tke_mean"] = 8.9525123248795580e+02
-best_mse["temperature_mean"] = 1.4787364980827869e-04
-best_mse["ql_mean"] = 1.7937532436604911e+02
-best_mse["thetal_mean"] = 1.4098220595492702e-04
-best_mse["Hvar_mean"] = 1.6499437998682095e+03
-best_mse["QTvar_mean"] = 7.3181087637066230e+02
+best_mse["qt_mean"] = 4.9523533702786315e-01
+best_mse["updraft_area"] = 1.7419532961183722e+03
+best_mse["updraft_w"] = 5.3893010779565452e+02
+best_mse["updraft_qt"] = 2.4530572533274270e+01
+best_mse["updraft_thetal"] = 6.5509509302767754e+01
+best_mse["v_mean"] = 1.0615326468150907e+02
+best_mse["u_mean"] = 1.1393191702720974e+02
+best_mse["tke_mean"] = 8.4090034387266689e+02
+best_mse["temperature_mean"] = 1.4274314152822176e-04
+best_mse["ql_mean"] = 2.1441653002617767e+02
+best_mse["thetal_mean"] = 1.3609606969128344e-04
+best_mse["Hvar_mean"] = 3.7305257502890240e+03
+best_mse["QTvar_mean"] = 1.2241261056877631e+03
 
 @testset "Rico" begin
     println("Running Rico...")
