@@ -1,5 +1,3 @@
-using OffsetArrays
-
 # TODO: check that these primitives are correct
 fmax(a, b) = max(a, b)
 fmin(a, b) = min(a, b)
@@ -19,6 +17,6 @@ power(a::Real, b::Real) = a^b
 power(a::AbstractVector, b::AbstractVector) = a .^ b
 
 function pyinterp(x::T, xp::T, fp::T) where {T}
-    spl = Dierckx.Spline1D([xp...], [fp...]; k = 1)
-    return spl([x...])
+    spl = Dierckx.Spline1D(xp, fp; k = 1)
+    return spl(x)
 end

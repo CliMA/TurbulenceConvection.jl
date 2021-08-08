@@ -171,7 +171,7 @@ end
 function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables, Rain::RainVariables, dt)
     # TODO: double check this python-> julia translation
     # a, w = np.polynomial.hermite.hermgauss(self.quadrature_order)
-    a, w = gausshermite(self.quadrature_order)
+    a, w = FastGaussQuadrature.gausshermite(self.quadrature_order)
 
     #TODO - remember you output source terms multipierd by dt (bec. of instanteneous autoconcv)
     #TODO - add tendencies for GMV H, QT and QR due to rain

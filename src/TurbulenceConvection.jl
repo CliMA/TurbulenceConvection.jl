@@ -1,23 +1,22 @@
 module TurbulenceConvection
 
-import Dierckx
-using StatsBase
 using StaticArrays
-import Statistics
-using PoissonRandom: pois_rand
-import LambertW
-using Distributions: Normal, quantile
-using OffsetArrays
-using FastGaussQuadrature: gausshermite
+using StatsBase
 using LinearAlgebra
 
-import CLIMAParameters
-using CLIMAParameters: AbstractEarthParameterSet
-const APS = AbstractEarthParameterSet
+import Dierckx
+import Statistics
+import LambertW
+import Distributions
+import FastGaussQuadrature
 
-const CPMP = CLIMAParameters.Atmos.Microphysics
-const CPEDMF = CLIMAParameters.Atmos.EDMF
-const CPSGS = CLIMAParameters.Atmos.SubgridScale
+import CLIMAParameters
+const CP = CLIMAParameters
+const APS = CP.AbstractEarthParameterSet
+
+const CPMP = CP.Atmos.Microphysics
+const CPEDMF = CP.Atmos.EDMF
+const CPSGS = CP.Atmos.SubgridScale
 
 # For dispatching to inherited class
 struct BaseCase end
