@@ -1,6 +1,6 @@
 # Entrainment Rates
 
-function entr_detr_env_moisture_deficit_b_ED_MF(entr_in::entr_struct)
+function entr_detr_env_moisture_deficit_b_ED_MF(param_set::APS, entr_in::entr_struct)
     _ret = entr_struct()
 
     moisture_deficit_d =
@@ -39,13 +39,14 @@ function entr_detr_env_moisture_deficit_b_ED_MF(entr_in::entr_struct)
         fabs(entr_in.buoy_ed_flux) /
         (fabs(entr_in.a_upd * entr_in.a_env * (entr_in.w_upd - entr_in.w_env) * (entr_in.b_upd - entr_in.b_env)) + 1e-8)
     logistic_e *= (1.0 / (1.0 + exp(entr_in.c_ed_mf * (ed_mf_ratio - 1.0))))
-    _ret.entr_sc = inv_timescale / dw * (entr_in.c_ent * logistic_e + c_det * moisture_deficit_e)
-    _ret.detr_sc = inv_timescale / dw * (entr_in.c_ent * logistic_d + c_det * moisture_deficit_d)
+    c_ε = CPEDMF.c_ε(param_set)
+    _ret.entr_sc = inv_timescale / dw * (c_ε * logistic_e + c_det * moisture_deficit_e)
+    _ret.detr_sc = inv_timescale / dw * (c_ε * logistic_d + c_det * moisture_deficit_d)
 
     return _ret
 end
 
-function entr_detr_env_moisture_deficit(entr_in::entr_in_struct)
+function entr_detr_env_moisture_deficit(param_set::APS, entr_in::entr_in_struct)
     _ret = entr_struct()
     l = zeros(2)
 
@@ -83,13 +84,14 @@ function entr_detr_env_moisture_deficit(entr_in::entr_in_struct)
     l[1] = entr_in.tke_coef * fabs(db / sqrt(entr_in.tke + 1e-8))
     l[2] = fabs(db / dw)
     inv_timescale = lamb_smooth_minimum(l, 0.1, 0.0005)
-    _ret.entr_sc = inv_timescale / dw * (entr_in.c_ent * logistic_e + c_det * moisture_deficit_e)
-    _ret.detr_sc = inv_timescale / dw * (entr_in.c_ent * logistic_d + c_det * moisture_deficit_d)
+    c_ε = CPEDMF.c_ε(param_set)
+    _ret.entr_sc = inv_timescale / dw * (c_ε * logistic_e + c_det * moisture_deficit_e)
+    _ret.detr_sc = inv_timescale / dw * (c_ε * logistic_d + c_det * moisture_deficit_d)
 
     return _ret
 end
 
-function entr_detr_env_moisture_deficit_div(entr_in::entr_struct)
+function entr_detr_env_moisture_deficit_div(param_set::APS, entr_in::entr_struct)
     _ret = entr_struct()
     l = zeros(2)
 
@@ -132,10 +134,9 @@ function entr_detr_env_moisture_deficit_div(entr_in::entr_struct)
     l[2] = fabs(db / dw)
     inv_timescale = lamb_smooth_minimum(l, 0.1, 0.0005)
 
-    _ret.entr_sc =
-        inv_timescale / dw * (entr_in.c_ent * logistic_e + c_det * moisture_deficit_e) + entr_MdMdz * entr_in.c_div
-    _ret.detr_sc =
-        inv_timescale / dw * (entr_in.c_ent * logistic_d + c_det * moisture_deficit_d) + detr_MdMdz * entr_in.c_div
+    c_ε = CPEDMF.c_ε(param_set)
+    _ret.entr_sc = inv_timescale / dw * (c_ε * logistic_e + c_det * moisture_deficit_e) + entr_MdMdz * entr_in.c_div
+    _ret.detr_sc = inv_timescale / dw * (c_ε * logistic_d + c_det * moisture_deficit_d) + detr_MdMdz * entr_in.c_div
 
 
     return _ret

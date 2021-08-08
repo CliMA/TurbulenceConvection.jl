@@ -73,7 +73,6 @@ Base.@kwdef mutable struct entr_in_struct
     dz::Float64 = 0
     w_upd::Float64 = 0
     b_upd::Float64 = 0
-    c_ent::Float64 = 0
     dt::Float64 = 0
     b_env::Float64 = 0
     a_upd::Float64 = 0
@@ -761,7 +760,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     extrapolate_buoyancy::Bool
     surface_area::Float64
     max_area::Float64
-    entrainment_factor::Float64
     entrainment_Mdiv_factor::Float64
     updraft_mixing_frac::Float64
     entrainment_sigma::Float64
@@ -1077,7 +1075,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             extrapolate_buoyancy,
             surface_area,
             max_area,
-            entrainment_factor,
             entrainment_Mdiv_factor,
             updraft_mixing_frac,
             entrainment_sigma,
