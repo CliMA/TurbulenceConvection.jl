@@ -40,6 +40,8 @@ best_mse["Hvar_mean"] = 2.6039266998435176e+02
                     ds_scampy = ds_scampy,
                     ds_pycles = ds_pycles,
                     plot_comparison = true,
+                    t_start = 6 * 3600,
+                    t_stop = 8 * 3600,
                 )
             end
         end

@@ -42,6 +42,8 @@ best_mse["QTvar_mean"] = 9.2129571715440597e+03
                     ds_scampy = ds_scampy,
                     ds_pycles = ds_pycles,
                     plot_comparison = true,
+                    t_start = 4 * 3600,
+                    t_stop = 6 * 3600,
                 )
             end
         end

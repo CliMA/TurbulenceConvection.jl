@@ -2,7 +2,7 @@ import Plots
 using OrderedCollections
 using Test
 using NCDatasets
-using StatsBase
+import StatsBase
 using Dierckx
 using PrettyTables
 using Printf
@@ -70,6 +70,8 @@ function compute_mse(
     ds_pycles = nothing,
     ds_turb_conv = nothing,
     plot_comparison = true,
+    t_start,
+    t_stop,
 )
     mse = Dict()
     time_tcc = ds_turb_conv.group["timeseries"]["t"][:]
@@ -90,7 +92,7 @@ function compute_mse(
     @info "n-time points (les,scm,tcc): $(length(time_les)), $(length(time_scm)), $(length(time_tcc))"
 
     # Find the nearest matching final time:
-    t_cmp = min(time_tcc[end], time_les[end], time_scm[end])
+    t_cmp = min(time_tcc[end], time_les[end], time_scm[end], t_stop)
     @info "time compared: $t_cmp"
 
     # Accidentally running a short simulation
@@ -141,9 +143,17 @@ function compute_mse(
             data_les_cont = Spline2D(time_les, z_les, data_les_arr)
             data_tcc_cont = Spline2D(time_tcc, z_tcc, data_tcc_arr)
             data_scm_cont = Spline2D(time_scm, z_scm, data_scm_arr)
-            data_les_cont_mapped = map(z -> data_les_cont(t_cmp, z), z_tcc)
-            data_tcc_cont_mapped = map(z -> data_tcc_cont(t_cmp, z), z_tcc)
-            data_scm_cont_mapped = map(z -> data_scm_cont(t_cmp, z), z_tcc)
+            R = range(t_start, t_cmp; length = 50)
+            data_les_cont_mapped = map(z_tcc) do z
+                StatsBase.mean(map(t -> data_les_cont(t, z), R))
+            end
+            data_tcc_cont_mapped = map(z_tcc) do z
+                StatsBase.mean(map(t -> data_tcc_cont(t, z), R))
+            end
+            data_scm_cont_mapped = map(z_tcc) do z
+                StatsBase.mean(map(t -> data_scm_cont(t, z), R))
+            end
+
         end
 
         # Compute data scale
