@@ -11,20 +11,19 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 1.5987989356173508e-02
-best_mse["ql_mean"] = 5.9262542639081852e+00
-best_mse["updraft_area"] = 2.3887443993964089e+02
-best_mse["updraft_w"] = 4.3317357122037770e+00
-best_mse["updraft_qt"] = 1.1983341056077728e+00
-best_mse["updraft_thetal"] = 1.2739627176096105e+01
-best_mse["v_mean"] = 3.9736878160027324e+01
-best_mse["u_mean"] = 3.7037227811674803e+01
-best_mse["tke_mean"] = 1.4955313626928097e+01
-best_mse["temperature_mean"] = 1.6122516172306611e-05
-best_mse["thetal_mean"] = 1.7630641025752975e-05
-best_mse["Hvar_mean"] = 1.2452024821778659e+04
-best_mse["QTvar_mean"] = 7.6626261862502452e+02
-
+best_mse["qt_mean"] = 1.5987989288888820e-02
+best_mse["ql_mean"] = 5.9262500323990217e+00
+best_mse["updraft_area"] = 2.3887443639936907e+02
+best_mse["updraft_w"] = 4.3317426538007693e+00
+best_mse["updraft_qt"] = 1.1983341214387264e+00
+best_mse["updraft_thetal"] = 1.2739627177179765e+01
+best_mse["v_mean"] = 3.9736878190256498e+01
+best_mse["u_mean"] = 3.7037227839730683e+01
+best_mse["tke_mean"] = 1.4955295527017412e+01
+best_mse["temperature_mean"] = 1.6122517253407575e-05
+best_mse["thetal_mean"] = 1.7630642054888154e-05
+best_mse["Hvar_mean"] = 1.2452017842800817e+04
+best_mse["QTvar_mean"] = 7.6626218978684426e+02
 
 @testset "DYCOMS_RF01" begin
     println("Running DYCOMS_RF01...")

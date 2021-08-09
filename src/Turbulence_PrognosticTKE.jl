@@ -24,8 +24,6 @@ function initialize_io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     add_profile(Stats, "nh_pressure_drag")
     add_profile(Stats, "nh_pressure_b")
     add_profile(Stats, "asp_ratio")
-    add_profile(Stats, "b_coeff")
-
     add_profile(Stats, "horiz_K_eddy")
     add_profile(Stats, "sorting_function")
     add_profile(Stats, "b_mix")
@@ -99,8 +97,6 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     mean_nh_pressure_drag = center_field(grid)
     mean_nh_pressure_b = center_field(grid)
     mean_asp_ratio = center_field(grid)
-    mean_b_coeff = center_field(grid)
-
     mean_detr_sc = center_field(grid)
     massflux = face_field(grid)
     mf_h = face_field(grid)
@@ -135,8 +131,6 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
                     self.UpdVar.Area.values[i, k] * self.nh_pressure_drag[i, k] / self.UpdVar.Area.bulkvalues[k]
                 mean_asp_ratio[k] +=
                     self.UpdVar.Area.values[i, k] * self.asp_ratio[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_b_coeff[k] += self.UpdVar.Area.values[i, k] * self.b_coeff[i, k] / self.UpdVar.Area.bulkvalues[k]
-
                 mean_frac_turb_entr[k] +=
                     self.UpdVar.Area.values[i, k] * self.frac_turb_entr[i, k] / self.UpdVar.Area.bulkvalues[k]
                 mean_horiz_K_eddy[k] +=
@@ -159,8 +153,6 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     write_profile(Stats, "nh_pressure_drag", mean_nh_pressure_drag[cinterior])
     write_profile(Stats, "nh_pressure_b", mean_nh_pressure_b[cinterior])
     write_profile(Stats, "asp_ratio", mean_asp_ratio[cinterior])
-    write_profile(Stats, "b_coeff", mean_b_coeff[cinterior])
-
     write_profile(Stats, "massflux", massflux[cinterior])
     write_profile(Stats, "massflux_h", mf_h[cinterior])
     write_profile(Stats, "massflux_qt", mf_qt[cinterior])
@@ -931,9 +923,6 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     input.c_ed_mf = self.entrainment_ed_mf_sigma
     input.chi_upd = self.updraft_mixing_frac
     input.tke_coef = self.entrainment_smin_tke_coeff
-    ret_b = pressure_buoy_struct()
-    ret_w = pressure_drag_struct()
-    input_p = pressure_in_struct()
 
     # TODO: merge this with grid.cinterior
     kc_surf = kc_surface(grid)
@@ -948,10 +937,8 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
 
     @inbounds for k in real_center_indicies(grid)
         @inbounds for i in xrange(self.n_updrafts)
-            input_p.updraft_top = self.UpdVar.updraft_top[i]
             alen = max(length(argwhere(self.UpdVar.Area.values[i, cinterior])), 1)
             avals = self.UpdVar.Area.values[i, cinterior]
-            input_p.a_med = Statistics.median(avals[1:alen])
             input.zi = self.UpdVar.cloud_base[i]
             # entrainment
             input.buoy_ed_flux = self.EnvVar.TKE.buoy[k]
@@ -967,7 +954,6 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
                 input.w_env = interpf2c(self.EnvVar.W.values, grid, k)
                 input.ql_up = self.UpdVar.QL.values[i, k]
                 input.ql_env = self.EnvVar.QL.values[k]
-                input.nh_pressure = self.nh_pressure[i, k]
                 input.RH_upd = self.UpdVar.RH.values[i, k]
                 input.RH_env = self.EnvVar.RH.values[k]
 
@@ -1015,55 +1001,32 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
             end
 
             # pressure
-            input_p.a_kfull = interpc2f(self.UpdVar.Area.values, grid, k, i)
-            if input_p.a_kfull >= self.minimum_area
-                input_p.dzi = grid.dzi
-
-                input_p.b_kfull = interpc2f(self.UpdVar.B.values, grid, k, i)
-                input_p.rho0_kfull = ref_state.rho0[k]
-                input_p.alpha1 = self.pressure_normalmode_buoy_coeff1
-                input_p.alpha2 = self.pressure_normalmode_buoy_coeff2
-                input_p.beta1 = self.pressure_normalmode_adv_coeff
-                input_p.beta2 = self.pressure_normalmode_drag_coeff
-                input_p.w_kfull = self.UpdVar.W.values[i, k]
-                input_p.w_kmfull = self.UpdVar.W.values[i, k - 1]
-                input_p.w_kenv = self.EnvVar.W.values[k]
-
-                if self.asp_label == "z_dependent"
-                    input_p.asp_ratio = input_p.updraft_top / 2.0 / sqrt(input_p.a_kfull) / input_p.rd
-                elseif self.asp_label == "median"
-                    input_p.asp_ratio = input_p.updraft_top / 2.0 / sqrt(input_p.a_med) / input_p.rd
-                elseif self.asp_label == "const"
-                    input_p.asp_ratio = 1.0
-                end
-
-                if input_p.a_kfull > 0.0
-                    ret_b = self.pressure_func_buoy(input_p)
-                    ret_w = self.pressure_func_drag(input_p)
-                    self.nh_pressure_b[i, k] = ret_b.nh_pressure_b
-                    self.nh_pressure_adv[i, k] = ret_w.nh_pressure_adv
-                    self.nh_pressure_drag[i, k] = ret_w.nh_pressure_drag
-
-                    self.b_coeff[i, k] = ret_b.b_coeff
-                    self.asp_ratio[i, k] = input_p.asp_ratio
-
-                else
-                    self.nh_pressure_b[i, k] = 0.0
-                    self.nh_pressure_adv[i, k] = 0.0
-                    self.nh_pressure_drag[i, k] = 0.0
-
-                    self.b_coeff[i, k] = 0.0
-                    self.asp_ratio[i, k] = 0.0
-                end
+            a_kfull = interpc2f(self.UpdVar.Area.values, grid, k, i)
+            if a_kfull > 0.0
+                b_kfull = interpc2f(self.UpdVar.B.values, grid, k, i)
+                ∇w_up = ∇f2c(self.UpdVar.W.values, grid, k, i)
+                asp_ratio = 1.0
+                self.nh_pressure_b[i, k], self.nh_pressure_adv[i, k], self.nh_pressure_drag[i, k] =
+                    perturbation_pressure(
+                        self.UpdVar.updraft_top[i],
+                        500.0,
+                        a_kfull,
+                        b_kfull,
+                        ref_state.rho0[k],
+                        self.pressure_normalmode_buoy_coeff1,
+                        self.pressure_normalmode_buoy_coeff2,
+                        self.pressure_normalmode_adv_coeff,
+                        self.pressure_normalmode_drag_coeff,
+                        self.UpdVar.W.values[i, k],
+                        ∇w_up,
+                        self.EnvVar.W.values[k],
+                        asp_ratio,
+                    )
             else
                 self.nh_pressure_b[i, k] = 0.0
                 self.nh_pressure_adv[i, k] = 0.0
                 self.nh_pressure_drag[i, k] = 0.0
-
-                self.b_coeff[i, k] = 0.0
-                self.asp_ratio[i, k] = 0.0
             end
-
             self.nh_pressure[i, k] = self.nh_pressure_b[i, k] + self.nh_pressure_adv[i, k] + self.nh_pressure_drag[i, k]
         end
     end
