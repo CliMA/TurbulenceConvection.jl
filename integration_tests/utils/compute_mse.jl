@@ -210,15 +210,7 @@ function compute_mse(
         end
 
         # Compute mean squared error (mse)
-        if steady_data
-            mse_single_var = sum(map(z_tcc) do z
-                (data_les_cont(z) - data_tcc_cont(t_cmp, z))^2
-            end)
-        else
-            mse_single_var = sum(map(z_tcc) do z
-                (data_les_cont(t_cmp, z) - data_tcc_cont(t_cmp, z))^2
-            end)
-        end
+        mse_single_var = sum((data_les_cont_mapped .- data_tcc_cont_mapped) .^ 2)
         # Normalize by data scale
         mse[tc_var] = mse_single_var / data_scale_tcc^2
 
