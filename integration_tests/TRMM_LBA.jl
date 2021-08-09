@@ -25,7 +25,7 @@ best_mse["tke_mean"] = 1.3627971247685127e+03
 best_mse["temperature_mean"] = 6.8597416865395539e-04
 best_mse["ql_mean"] = 1.0669889889408917e+03
 best_mse["thetal_mean"] = 8.1757856795585861e-03
-best_mse["Hvar_mean"] = 6.8922213953686887e+03
+best_mse["Hvar_mean"] = 6.8922213965200044e+03
 best_mse["QTvar_mean"] = 2.5975685843697461e+03
 
 @testset "TRMM_LBA" begin
@@ -52,14 +52,8 @@ best_mse["QTvar_mean"] = 2.5975685843697461e+03
         end
     end
 
-    test_mse(computed_mse, best_mse, "qt_mean")
-    test_mse(computed_mse, best_mse, "updraft_area")
-    test_mse(computed_mse, best_mse, "updraft_w")
-    test_mse(computed_mse, best_mse, "updraft_qt")
-    test_mse(computed_mse, best_mse, "updraft_thetal")
-    test_mse(computed_mse, best_mse, "v_mean")
-    test_mse(computed_mse, best_mse, "u_mean")
-    test_mse(computed_mse, best_mse, "tke_mean")
-    test_mse(computed_mse, best_mse, "temperature_mean")
+    for k in keys(best_mse)
+        test_mse(computed_mse, best_mse, k)
+    end
     nothing
 end
