@@ -11,14 +11,14 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["updraft_area"] = 5.9123316810068854e+02
-best_mse["updraft_w"] = 2.6743480109271673e+01
-best_mse["updraft_thetal"] = 3.0475272195292995e+01
-best_mse["u_mean"] = 1.5245784141331271e+02
-best_mse["tke_mean"] = 7.3707701211117509e+01
-best_mse["temperature_mean"] = 1.2199756418560522e-05
-best_mse["thetal_mean"] = 1.2066937466844642e-05
-best_mse["Hvar_mean"] = 1.9140385882308689e+02
+best_mse["updraft_area"] = 5.9103576007452034e+02
+best_mse["updraft_w"] = 2.6741082264407293e+01
+best_mse["updraft_thetal"] = 3.0475272117346940e+01
+best_mse["u_mean"] = 1.5245873874565478e+02
+best_mse["tke_mean"] = 7.3707728452173882e+01
+best_mse["temperature_mean"] = 1.2199914281992930e-05
+best_mse["thetal_mean"] = 1.2067109520894632e-05
+best_mse["Hvar_mean"] = 1.9140690462510639e+02
 
 @testset "Nieuwstadt" begin
     println("Running Nieuwstadt...")

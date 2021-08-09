@@ -142,39 +142,6 @@ function entr_detr_env_moisture_deficit_div(param_set::APS, entr_in::entr_struct
     return _ret
 end
 
-
-function pressure_normalmode_buoy(press_in::pressure_in_struct)
-    _ret = pressure_buoy_struct()
-
-    _ret.b_coeff = press_in.alpha1 / (1 + press_in.alpha2 * press_in.asp_ratio^2)
-    _ret.nh_pressure_b = -1.0 * press_in.rho0_kfull * press_in.a_kfull * press_in.b_kfull * _ret.b_coeff
-
-    return _ret
-end
-
-function pressure_normalmode_drag(press_in::pressure_in_struct)
-    _ret = pressure_drag_struct()
-
-    _ret.nh_pressure_adv =
-        press_in.rho0_kfull *
-        press_in.a_kfull *
-        press_in.beta1 *
-        press_in.w_kfull *
-        (press_in.w_kfull - press_in.w_kmfull) *
-        press_in.dzi
-
-    # drag as w_dif and account for downdrafts
-    _ret.nh_pressure_drag =
-        -1.0 *
-        press_in.rho0_kfull *
-        press_in.a_kfull *
-        press_in.beta2 *
-        (press_in.w_kfull - press_in.w_kenv) *
-        fabs(press_in.w_kfull - press_in.w_kenv) / fmax(press_in.updraft_top, 500.0)
-
-    return _ret
-end
-
 # convective velocity scale
 function get_wstar(bflux, zi)
     return cbrt(fmax(bflux * zi, 0.0))

@@ -16,6 +16,9 @@ struct Extrapolate end
 function ∇f2c(f, grid::Grid, k::Int)
     return (f[k] - f[k - 1]) * grid.dzi
 end
+function ∇f2c(f, grid::Grid, k::Int, i::Int)
+    return (f[i, k] - f[i, k - 1]) * grid.dzi
+end
 function ∇f2c(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
     if is_surface_face(grid, k - 1)
         return ∇f2c(f_dual, grid, BottomBCTag(), bottom)

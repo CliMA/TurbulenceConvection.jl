@@ -1,32 +1,3 @@
-Base.@kwdef mutable struct pressure_drag_struct
-    nh_pressure_adv::Float64 = 0
-    nh_pressure_drag::Float64 = 0
-end
-
-Base.@kwdef mutable struct pressure_buoy_struct
-    b_coeff::Float64 = 0
-    nh_pressure_b::Float64 = 0
-end
-
-Base.@kwdef mutable struct pressure_in_struct
-    updraft_top::Float64 = 0
-    asp_label::Float64 = 0
-    a_med::Float64 = 0
-    a_kfull::Float64 = 0
-    b_kfull::Float64 = 0
-    rho0_kfull::Float64 = 0
-    alpha1::Float64 = 0
-    alpha2::Float64 = 0
-    beta1::Float64 = 0
-    beta2::Float64 = 0
-    w_kfull::Float64 = 0
-    w_kmfull::Float64 = 0
-    w_kenv::Float64 = 0
-    dzi::Float64 = 0
-    drag_sign::Float64 = 0
-    asp_ratio::Float64 = 0
-end
-
 Base.@kwdef mutable struct entr_struct
     entr_sc::Float64 = 0
     detr_sc::Float64 = 0
@@ -753,9 +724,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     n_updrafts::Int
     use_const_plume_spacing::Bool
     entr_detr_fp::Function
-    pressure_func_buoy::Function
     drag_sign::Int
-    pressure_func_drag::Function
     asp_label
     extrapolate_buoyancy::Bool
     surface_area::Float64
@@ -799,7 +768,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     nh_pressure_adv::A2
     nh_pressure_drag::A2
     asp_ratio::A2
-    b_coeff::A2
     m::A2
     mixing_length::A1
     horiz_K_eddy::A2
@@ -864,8 +832,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             error("Turbulence--EDMF_PrognosticTKE: Entrainment rate namelist option is not recognized")
         end
 
-        pressure_func_buoy = pressure_normalmode_buoy
-
         pressure_func_drag_str = parse_namelist(
             namelist,
             "turbulence",
@@ -875,12 +841,10 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             valid_options = ["normalmode", "normalmode_signdf"],
         )
 
-        drag_sign = false
-        pressure_func_drag = if pressure_func_drag_str == "normalmode"
-            pressure_normalmode_drag
+        if pressure_func_drag_str == "normalmode"
+            drag_sign = false
         elseif pressure_func_drag_str == "normalmode_signdf"
             drag_sign = true
-            pressure_normalmode_drag
         end
 
         asp_label = parse_namelist(
@@ -994,7 +958,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         nh_pressure_adv = center_field(Gr, n_updrafts)
         nh_pressure_drag = center_field(Gr, n_updrafts)
         asp_ratio = center_field(Gr, n_updrafts)
-        b_coeff = center_field(Gr, n_updrafts)
 
         # Mass flux
         m = face_field(Gr, n_updrafts)
@@ -1058,9 +1021,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             n_updrafts,
             use_const_plume_spacing,
             entr_detr_fp,
-            pressure_func_buoy,
             drag_sign,
-            pressure_func_drag,
             asp_label,
             extrapolate_buoyancy,
             surface_area,
@@ -1104,7 +1065,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             nh_pressure_adv,
             nh_pressure_drag,
             asp_ratio,
-            b_coeff,
             m,
             mixing_length,
             horiz_K_eddy,
