@@ -11,18 +11,18 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 6.4559638590248924e-01
-best_mse["updraft_area"] = 2.9732339500518958e+02
-best_mse["updraft_w"] = 1.0894427841756977e+00
-best_mse["updraft_qt"] = 5.2188511467832939e+01
-best_mse["updraft_thetal"] = 6.9082849512451588e+01
-best_mse["u_mean"] = 8.7994360629094146e+01
-best_mse["tke_mean"] = 3.0426947022991828e+00
-best_mse["temperature_mean"] = 2.9081377572297745e-04
-best_mse["ql_mean"] = 0.0000000000000000e+00
-best_mse["thetal_mean"] = 2.8896514406812518e-04
-best_mse["Hvar_mean"] = 8.9154045834618110e+00
-best_mse["QTvar_mean"] = 4.3180594810766799e+01
+best_mse["qt_mean"] = 3.0998954346529128e-01
+best_mse["updraft_area"] = 1.9456011695010488e+03
+best_mse["updraft_w"] = 3.1996277691153108e+02
+best_mse["updraft_qt"] = 1.2645380500158543e+01
+best_mse["updraft_thetal"] = 2.7684653720274000e+01
+best_mse["u_mean"] = 8.7998547277817863e+01
+best_mse["tke_mean"] = 6.2536497518678300e+02
+best_mse["temperature_mean"] = 1.3316949170699788e-04
+best_mse["ql_mean"] = 2.5314704151953435e+02
+best_mse["thetal_mean"] = 1.3123118572261322e-04
+best_mse["Hvar_mean"] = 1.0770693519961310e+03
+best_mse["QTvar_mean"] = 1.9003025309800736e+02
 
 @testset "ARM_SGP" begin
     println("Running ARM_SGP...")
