@@ -62,9 +62,7 @@ for case_name in (
     "life_cycle_Tan2018",
     "Soares",
     "Rico",
-    "TRMM_LBA",
     "ARM_SGP",
-    "GATE_III",
     "DYCOMS_RF01",
     "GABLS",
     "SP",
@@ -72,6 +70,11 @@ for case_name in (
 )
     export_ref_profile(case_name)
 end;
+
+# Note: temperatures in this case become extremely low.
+CLIMAParameters.Planet.T_freeze(::EarthParameterSet) = 100.0
+export_ref_profile("TRMM_LBA")
+export_ref_profile("GATE_III")
 ```
 
 ## Bomex

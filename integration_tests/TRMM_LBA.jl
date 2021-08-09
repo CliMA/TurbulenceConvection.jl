@@ -10,20 +10,23 @@ include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
+# Note: temperatures in this case become extremely low.
+CLIMAParameters.Planet.T_freeze(::EarthParameterSet) = 100.0
+
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 1.7430285968163504e+00
-best_mse["updraft_area"] = 3.2545401197014067e+04
-best_mse["updraft_w"] = 9.2113782722003907e+02
-best_mse["updraft_qt"] = 3.0306781659879494e+01
-best_mse["updraft_thetal"] = 1.1108867837608678e+02
-best_mse["v_mean"] = 2.9291577336310036e+02
-best_mse["u_mean"] = 1.6874237352911189e+03
-best_mse["tke_mean"] = 1.5857027462501208e+03
-best_mse["temperature_mean"] = 6.3088676948654218e-04
-best_mse["ql_mean"] = 9.4722581733362244e+02
-best_mse["thetal_mean"] = 4.1952296308447006e-04
-best_mse["Hvar_mean"] = 8.1275664794363738e+03
-best_mse["QTvar_mean"] = 2.7043370821860535e+03
+best_mse["qt_mean"] = 1.7995063250630168e+00
+best_mse["updraft_area"] = 3.1529411391564761e+04
+best_mse["updraft_w"] = 1.0325943376733990e+03
+best_mse["updraft_qt"] = 3.1156138180627952e+01
+best_mse["updraft_thetal"] = 1.1001893832675252e+02
+best_mse["v_mean"] = 2.9275592916609139e+02
+best_mse["u_mean"] = 1.6873153880206969e+03
+best_mse["tke_mean"] = 1.3627971247685127e+03
+best_mse["temperature_mean"] = 6.8597416865395539e-04
+best_mse["ql_mean"] = 1.0669889889408917e+03
+best_mse["thetal_mean"] = 8.1757856795585861e-03
+best_mse["Hvar_mean"] = 6.8922213953686887e+03
+best_mse["QTvar_mean"] = 2.5975685843697461e+03
 
 @testset "TRMM_LBA" begin
     println("Running TRMM_LBA...")
