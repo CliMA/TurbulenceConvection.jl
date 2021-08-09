@@ -1170,7 +1170,7 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     ref_state = reference_state(self)
     dzi = grid.dzi
     dti_ = 1.0 / self.dt_upd
-    sa = eos_struct()
+    param_set = parameter_set(self)
 
     @inbounds for i in xrange(self.n_updrafts)
 
@@ -1187,9 +1187,12 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
                 end
 
                 # saturation adjustment
-                sa = eos(ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-                self.UpdVar.QL.new[i, k] = sa.ql
-                self.UpdVar.T.new[i, k] = sa.T
+                p0_c = ref_state.p0_half[k]
+                θ_liq_ice = self.UpdVar.H.new[i, k]
+                q_tot = self.UpdVar.QT.new[i, k]
+                ts = TD.PhaseEquil_pθq(param_set, p0_c, θ_liq_ice, q_tot)
+                self.UpdVar.QL.new[i, k] = TD.liquid_specific_humidity(ts)
+                self.UpdVar.T.new[i, k] = TD.air_temperature(ts)
                 continue
             end
 
@@ -1233,9 +1236,13 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
             end
 
             # saturation adjustment
-            sa = eos(ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-            self.UpdVar.QL.new[i, k] = sa.ql
-            self.UpdVar.T.new[i, k] = sa.T
+            p0_c = ref_state.p0_half[k]
+            θ_liq_ice = self.UpdVar.H.new[i, k]
+            q_tot = self.UpdVar.QT.new[i, k]
+            ts = TD.PhaseEquil_pθq(param_set, p0_c, θ_liq_ice, q_tot)
+
+            self.UpdVar.QL.new[i, k] = TD.liquid_specific_humidity(ts)
+            self.UpdVar.T.new[i, k] = TD.air_temperature(ts)
         end
     end
 

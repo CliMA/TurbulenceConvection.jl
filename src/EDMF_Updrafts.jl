@@ -117,13 +117,6 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
 
                 self.T.values[i, k] = T_in[k]
                 # for now temperature is provided as diagnostics from LES
-
-                # sa = eos(
-                #     Ref.p0_half[k],
-                #     self.QT.values[i,k],
-                #     self.H.values[i,k]
-                # )
-                # self.T.values[i,k] = sa.T
             else
                 self.Area.values[i, k] = 0.0 #self.updraft_fraction/self.n_updrafts
                 self.H.values[i, k] = GMV.H.values[k]
