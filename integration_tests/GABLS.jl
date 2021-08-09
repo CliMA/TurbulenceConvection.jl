@@ -12,14 +12,14 @@ using .NameList
 
 best_mse = OrderedDict()
 
-best_mse["updraft_thetal"] = 5.0418613105717345e+00
-best_mse["v_mean"] = 5.2842359224499695e+00
-best_mse["u_mean"] = 9.7164923816186999e+00
-best_mse["tke_mean"] = 4.1067897074868842e+00
-best_mse["temperature_mean"] = 1.1313951480001104e-05
-best_mse["thetal_mean"] = 1.1272274443890045e-05
-best_mse["Hvar_mean"] = 1.3874561158298034e+01
-best_mse["QTvar_mean"] = 1.5572488410685068e-01
+best_mse["updraft_thetal"] = 5.0248682056386063e+00
+best_mse["v_mean"] = 4.4635954562618867e+00
+best_mse["u_mean"] = 9.6412415987917157e+00
+best_mse["tke_mean"] = 2.4692059869443228e+00
+best_mse["temperature_mean"] = 8.8268614667882937e-06
+best_mse["thetal_mean"] = 8.7932314577535832e-06
+best_mse["Hvar_mean"] = 1.2890693335381430e+01
+best_mse["QTvar_mean"] = 4.4413913923170839e-01
 
 @testset "GABLS" begin
     println("Running GABLS...")
@@ -38,6 +38,8 @@ best_mse["QTvar_mean"] = 1.5572488410685068e-01
                     ds_scampy = ds_scampy,
                     ds_pycles = ds_pycles,
                     plot_comparison = true,
+                    t_start = 7 * 3600,
+                    t_stop = 9 * 3600,
                 )
             end
         end
