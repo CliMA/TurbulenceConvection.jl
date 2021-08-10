@@ -11,18 +11,18 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 3.4420193413687117e-01
-best_mse["updraft_area"] = 1.9818317322584239e+03
-best_mse["updraft_w"] = 3.1101869507553300e+02
-best_mse["updraft_qt"] = 1.2779005319987142e+01
-best_mse["updraft_thetal"] = 2.7687174775467490e+01
-best_mse["u_mean"] = 8.7998547277817835e+01
-best_mse["tke_mean"] = 6.7532125088372368e+02
-best_mse["temperature_mean"] = 1.3976231155597154e-04
-best_mse["ql_mean"] = 2.9406894196734129e+02
-best_mse["thetal_mean"] = 1.4216021128644291e-04
-best_mse["Hvar_mean"] = 1.4219930941047571e+03
-best_mse["QTvar_mean"] = 2.7979236616322686e+02
+best_mse["qt_mean"] = 3.5691847012203143e-01
+best_mse["updraft_area"] = 1.9645743867371027e+03
+best_mse["updraft_w"] = 3.5781735855735855e+02
+best_mse["updraft_qt"] = 1.3457137434986310e+01
+best_mse["updraft_thetal"] = 2.7680764603306077e+01
+best_mse["u_mean"] = 8.7998547277817920e+01
+best_mse["tke_mean"] = 6.3658705239459096e+02
+best_mse["temperature_mean"] = 1.3818806435138376e-04
+best_mse["ql_mean"] = 3.6220527567539864e+02
+best_mse["thetal_mean"] = 1.4145191959567767e-04
+best_mse["Hvar_mean"] = 1.5980068858564114e+03
+best_mse["QTvar_mean"] = 3.6076370680937271e+02
 
 @testset "ARM_SGP" begin
     println("Running ARM_SGP...")
@@ -48,17 +48,8 @@ best_mse["QTvar_mean"] = 2.7979236616322686e+02
         end
     end
 
-    test_mse(computed_mse, best_mse, "qt_mean")
-    test_mse(computed_mse, best_mse, "updraft_area")
-    test_mse(computed_mse, best_mse, "updraft_w")
-    test_mse(computed_mse, best_mse, "updraft_qt")
-    test_mse(computed_mse, best_mse, "updraft_thetal")
-    test_mse(computed_mse, best_mse, "u_mean")
-    test_mse(computed_mse, best_mse, "tke_mean")
-    test_mse(computed_mse, best_mse, "temperature_mean")
-    test_mse(computed_mse, best_mse, "ql_mean")
-    test_mse(computed_mse, best_mse, "thetal_mean")
-    test_mse(computed_mse, best_mse, "Hvar_mean")
-    test_mse(computed_mse, best_mse, "QTvar_mean")
+    for k in keys(best_mse)
+        test_mse(computed_mse, best_mse, k)
+    end
     nothing
 end

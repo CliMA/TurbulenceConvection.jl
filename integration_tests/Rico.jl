@@ -11,19 +11,19 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 4.2745465446436787e-01
-best_mse["updraft_area"] = 1.5810580213880007e+03
-best_mse["updraft_w"] = 3.0293830804824944e+02
-best_mse["updraft_qt"] = 1.8036840808532091e+01
-best_mse["updraft_thetal"] = 6.3565923109974378e+01
-best_mse["v_mean"] = 1.0637284782337001e+02
-best_mse["u_mean"] = 1.1444354015737491e+02
-best_mse["tke_mean"] = 8.6553999307149547e+02
-best_mse["temperature_mean"] = 1.2540517259642333e-04
-best_mse["ql_mean"] = 5.1325163153016852e+01
-best_mse["thetal_mean"] = 1.2561593164473264e-04
-best_mse["Hvar_mean"] = 1.4739277424672016e+03
-best_mse["QTvar_mean"] = 7.1366176286414179e+02
+best_mse["qt_mean"] = 4.3104248538733420e-01
+best_mse["updraft_area"] = 1.5789778929006447e+03
+best_mse["updraft_w"] = 2.9474627527892022e+02
+best_mse["updraft_qt"] = 1.7944807685758455e+01
+best_mse["updraft_thetal"] = 6.3569098888788886e+01
+best_mse["v_mean"] = 1.0627585162881577e+02
+best_mse["u_mean"] = 1.1431212367609878e+02
+best_mse["tke_mean"] = 8.8307805728796393e+02
+best_mse["temperature_mean"] = 1.2372854790132712e-04
+best_mse["ql_mean"] = 6.9240573720579249e+01
+best_mse["thetal_mean"] = 1.2362373538586256e-04
+best_mse["Hvar_mean"] = 1.5559806585826123e+03
+best_mse["QTvar_mean"] = 7.3615953416203286e+02
 
 @testset "Rico" begin
     println("Running Rico...")
@@ -49,18 +49,8 @@ best_mse["QTvar_mean"] = 7.1366176286414179e+02
         end
     end
 
-    test_mse(computed_mse, best_mse, "qt_mean")
-    test_mse(computed_mse, best_mse, "updraft_area")
-    test_mse(computed_mse, best_mse, "updraft_w")
-    test_mse(computed_mse, best_mse, "updraft_qt")
-    test_mse(computed_mse, best_mse, "updraft_thetal")
-    test_mse(computed_mse, best_mse, "v_mean")
-    test_mse(computed_mse, best_mse, "u_mean")
-    test_mse(computed_mse, best_mse, "tke_mean")
-    test_mse(computed_mse, best_mse, "temperature_mean")
-    test_mse(computed_mse, best_mse, "ql_mean")
-    test_mse(computed_mse, best_mse, "thetal_mean")
-    test_mse(computed_mse, best_mse, "Hvar_mean")
-    test_mse(computed_mse, best_mse, "QTvar_mean")
+    for k in keys(best_mse)
+        test_mse(computed_mse, best_mse, k)
+    end
     nothing
 end

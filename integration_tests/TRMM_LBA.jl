@@ -14,19 +14,19 @@ using .NameList
 CLIMAParameters.Planet.T_freeze(::EarthParameterSet) = 100.0
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 1.7995063250630168e+00
-best_mse["updraft_area"] = 3.1529411391564761e+04
-best_mse["updraft_w"] = 1.0325943376733990e+03
-best_mse["updraft_qt"] = 3.1156138180627952e+01
-best_mse["updraft_thetal"] = 1.1001893832675252e+02
-best_mse["v_mean"] = 2.9275592916609139e+02
-best_mse["u_mean"] = 1.6873153880206969e+03
-best_mse["tke_mean"] = 1.3627971247685127e+03
-best_mse["temperature_mean"] = 6.8597416865395539e-04
-best_mse["ql_mean"] = 1.0669889889408917e+03
-best_mse["thetal_mean"] = 8.1757856795585861e-03
-best_mse["Hvar_mean"] = 6.8922213953686887e+03
-best_mse["QTvar_mean"] = 2.5975685843697461e+03
+best_mse["qt_mean"] = 1.6060537595274345e+00
+best_mse["updraft_area"] = 2.4326719919434730e+04
+best_mse["updraft_w"] = 8.9781354744734904e+02
+best_mse["updraft_qt"] = 2.7840588043213661e+01
+best_mse["updraft_thetal"] = 1.1000857010242179e+02
+best_mse["v_mean"] = 2.9255417406952165e+02
+best_mse["u_mean"] = 1.6872488577305819e+03
+best_mse["tke_mean"] = 1.5447663031746142e+03
+best_mse["temperature_mean"] = 6.8027838562588429e-04
+best_mse["ql_mean"] = 9.5570328764458566e+02
+best_mse["thetal_mean"] = 8.1813107572736785e-03
+best_mse["Hvar_mean"] = 6.7055563585233622e+03
+best_mse["QTvar_mean"] = 2.6582568278836857e+03
 
 @testset "TRMM_LBA" begin
     println("Running TRMM_LBA...")
@@ -52,14 +52,8 @@ best_mse["QTvar_mean"] = 2.5975685843697461e+03
         end
     end
 
-    test_mse(computed_mse, best_mse, "qt_mean")
-    test_mse(computed_mse, best_mse, "updraft_area")
-    test_mse(computed_mse, best_mse, "updraft_w")
-    test_mse(computed_mse, best_mse, "updraft_qt")
-    test_mse(computed_mse, best_mse, "updraft_thetal")
-    test_mse(computed_mse, best_mse, "v_mean")
-    test_mse(computed_mse, best_mse, "u_mean")
-    test_mse(computed_mse, best_mse, "tke_mean")
-    test_mse(computed_mse, best_mse, "temperature_mean")
+    for k in keys(best_mse)
+        test_mse(computed_mse, best_mse, k)
+    end
     nothing
 end

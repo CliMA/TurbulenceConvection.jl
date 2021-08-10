@@ -393,11 +393,10 @@ function buoyancy(
                     UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
                     UpdVar.RH.values[i, k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, t)
                 elseif UpdVar.Area.values[i, k - 1] > 0.0 && k > kc_surf
-                    qt = UpdVar.QT.values[i,k-1]
-                    h  = UpdVar.H.values[i,k-1]
+                    qt = UpdVar.QT.values[i, k - 1]
+                    h = UpdVar.H.values[i, k - 1]
                     sa = eos(self.Ref.p0_half[k], qt, h)
-                    qt -= sa.ql
-                    qv = qt
+                    qv = qt - sa.ql
                     t = sa.T
                     rho = rho_c(self.Ref.p0_half[k], t, qt, qv)
                     UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
