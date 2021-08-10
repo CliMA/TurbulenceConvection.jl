@@ -53,13 +53,23 @@ SCAMPy_output_dataset_path = get_data_folder(SCAMPy_output_dataset)
 include("variable_map.jl")
 
 function get_data(ds, var)
-    if haskey(ds.group["profiles"], var)
+    if haskey(ds, var)
+        return ds[var][:]
+    elseif haskey(ds.group["profiles"], var)
         return ds.group["profiles"][var][:]
     elseif haskey(ds.group["reference"], var)
         return ds.group["reference"][var][:]
-    else
-        error("No key for $var found in the nc file.")
     end
+    error("No key for $var found in the nc file.")
+end
+
+function get_time(ds, var)
+    if haskey(ds, var)
+        return ds[var][:]
+    elseif haskey(ds.group["timeseries"], var)
+        return ds.group["profiles"][var][:]
+    end
+    error("No key for $var found in the nc file.")
 end
 
 function compute_mse(
@@ -73,17 +83,22 @@ function compute_mse(
     t_start,
     t_stop,
 )
+    # Make pycles optional
+    have_pycles_ds = ds_pycles ≠ nothing
+    if !have_pycles_ds
+        ds_pycles = ds_scampy
+    end
     mse = Dict()
-    time_tcc = ds_turb_conv.group["timeseries"]["t"][:]
-    time_les = ds_pycles["t"][:]
-    time_scm = ds_scampy.group["timeseries"]["t"][:]
+    time_tcc = get_time(ds_turb_conv, "t")
+    time_les = get_time(ds_pycles, "t")
+    time_scm = get_time(ds_scampy, "t")
     n_time_points = length(time_tcc)
 
     mkpath(foldername)
     # Ensure domain matches:
-    z_les = ds_pycles["z_half"][:]
-    z_tcc = ds_turb_conv.group["profiles"]["z_half"][:]
-    z_scm = ds_scampy.group["profiles"]["z_half"][:]
+    z_les = get_data(ds_pycles, "z_half")
+    z_tcc = get_data(ds_turb_conv, "z_half")
+    z_scm = get_data(ds_scampy, "z_half")
     n_grid_points = length(z_tcc)
     @info "z extrema (les,scm,tcc): $(extrema(z_les)), $(extrema(z_scm)), $(extrema(z_tcc))"
     @info "n-grid points (les,scm,tcc): $(length(z_les)), $(length(z_scm)), $(length(z_tcc))"
@@ -115,7 +130,11 @@ function compute_mse(
     for tc_var in keys(best_mse)
 
         # Only compare fields defined for var_map_les
-        les_var = var_map_les(tc_var)
+        if have_pycles_ds
+            les_var = var_map_les(tc_var)
+        else
+            les_var = var_map_scampy(tc_var)
+        end
         scm_var = var_map_scampy(tc_var)
         les_var == nothing && continue
         les_var isa String || continue
@@ -167,7 +186,9 @@ function compute_mse(
         # Plot comparison
         if plot_comparison
             p = Plots.plot()
-            Plots.plot!(data_les_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "PyCLES")
+            if have_pycles_ds
+                Plots.plot!(data_les_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "PyCLES")
+            end
             Plots.plot!(data_scm_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "SCAMPy")
             Plots.plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "TC.jl")
             @info "     Saving $(joinpath(foldername, "$tc_var.png"))"

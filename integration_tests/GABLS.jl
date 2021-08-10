@@ -45,13 +45,8 @@ best_mse["QTvar_mean"] = 4.4424755799649029e-01
         end
     end
 
-    test_mse(computed_mse, best_mse, "updraft_thetal")
-    test_mse(computed_mse, best_mse, "v_mean")
-    test_mse(computed_mse, best_mse, "u_mean")
-    test_mse(computed_mse, best_mse, "tke_mean")
-    test_mse(computed_mse, best_mse, "temperature_mean")
-    test_mse(computed_mse, best_mse, "thetal_mean")
-    test_mse(computed_mse, best_mse, "Hvar_mean")
-    test_mse(computed_mse, best_mse, "QTvar_mean")
+    for k in keys(best_mse)
+        test_mse(computed_mse, best_mse, k)
+    end
     nothing
 end
