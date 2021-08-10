@@ -57,7 +57,7 @@ function default_namelist(case_name::String)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = 0.9
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.4
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.015
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_ed_mf_sigma"] = 50.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
@@ -345,7 +345,7 @@ function DryBubble(namelist_defaults)
     namelist["meta"]["simname"] = "DryBubble"
     namelist["meta"]["casename"] = "DryBubble"
 
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit_div"
+    namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.4
 
     return namelist
 end

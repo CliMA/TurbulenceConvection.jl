@@ -146,8 +146,6 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     write_profile(Stats, "horiz_K_eddy", mean_horiz_K_eddy[cinterior])
     write_profile(Stats, "entrainment_sc", mean_entr_sc[cinterior])
     write_profile(Stats, "detrainment_sc", mean_detr_sc[cinterior])
-    write_profile(Stats, "sorting_function", mean_sorting_function[cinterior])
-    write_profile(Stats, "b_mix", mean_b_mix[cinterior])
     write_profile(Stats, "nh_pressure", mean_nh_pressure[cinterior])
     write_profile(Stats, "nh_pressure_adv", mean_nh_pressure_adv[cinterior])
     write_profile(Stats, "nh_pressure_drag", mean_nh_pressure_drag[cinterior])
@@ -902,8 +900,7 @@ function get_env_covar_from_GMV(
 end
 
 function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
-    ret = entr_struct()
-    input = entr_in_struct()
+    εδ_model = entr_detr_model()
     sa = eos_struct()
     quadrature_order = 3
     grid = get_grid(self)
@@ -911,93 +908,63 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
 
     upd_cloud_diagnostics(self.UpdVar, reference_state(self))
 
-    input.wstar = self.wstar
-
-    input.dz = get_grid(self).dz
-    input.zbl = compute_zbl_qt_grad(GMV)
-    input.sort_pow = self.sorting_power
-    input.c_det = self.detrainment_factor
-    input.c_div = self.entrainment_Mdiv_factor
-    input.c_mu = self.entrainment_sigma
-    input.c_mu0 = self.entrainment_scale
-    input.c_ed_mf = self.entrainment_ed_mf_sigma
-    input.chi_upd = self.updraft_mixing_frac
-    input.tke_coef = self.entrainment_smin_tke_coeff
-
     # TODO: merge this with grid.cinterior
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     cinterior = kc_surf:kc_toa
 
     ref_state = reference_state(self)
-    tau = get_mixing_tau(self.zi, self.wstar)
-
-    ae = 1 .- self.UpdVar.Area.bulkvalues
     l = zeros(2)
 
     @inbounds for k in real_center_indicies(grid)
         @inbounds for i in xrange(self.n_updrafts)
-            alen = max(length(argwhere(self.UpdVar.Area.values[i, cinterior])), 1)
-            avals = self.UpdVar.Area.values[i, cinterior]
-            input.zi = self.UpdVar.cloud_base[i]
             # entrainment
-            input.buoy_ed_flux = self.EnvVar.TKE.buoy[k]
+            w_upd = interpf2c(self.UpdVar.W.values, grid, k, i)
             if self.UpdVar.Area.values[i, k] > 0.0
-                input.b_upd = self.UpdVar.B.values[i, k]
-                input.w_upd = interpf2c(self.UpdVar.W.values, grid, k, i)
-                input.z = grid.z_half[k]
-                input.a_upd = self.UpdVar.Area.values[i, k]
-                input.a_env = 1.0 - self.UpdVar.Area.bulkvalues[k]
-                input.tke = self.EnvVar.TKE.values[k]
-                input.ql_env = self.EnvVar.QL.values[k]
-                input.b_env = self.EnvVar.B.values[k]
-                input.w_env = interpf2c(self.EnvVar.W.values, grid, k)
-                input.ql_up = self.UpdVar.QL.values[i, k]
-                input.ql_env = self.EnvVar.QL.values[k]
-                input.RH_upd = self.UpdVar.RH.values[i, k]
-                input.RH_env = self.EnvVar.RH.values[k]
-
                 # compute dMdz at half levels
                 gmv_w_k = interpf2c(GMV.W.values, grid, k)
                 gmv_w_km = interpf2c(GMV.W.values, grid, k - 1)
                 upd_w_km = interpf2c(self.UpdVar.W.values, grid, k - 1, i)
-                input.M = input.a_upd * (input.w_upd - gmv_w_k)
+                M = self.UpdVar.Area.values[i, k] * (w_upd - gmv_w_k)
                 Mm = self.UpdVar.Area.values[i, k - 1] * (upd_w_km - gmv_w_km)
-                input.dMdz = (input.M - Mm) * grid.dzi
-                input.tke = self.EnvVar.TKE.values[k]
+                dMdz = (M - Mm) * grid.dzi
+                w_min = 0.001
 
-                ret = self.entr_detr_fp(param_set, input)
-                self.entr_sc[i, k] = ret.entr_sc
-                self.detr_sc[i, k] = ret.detr_sc
-                self.sorting_function[i, k] = ret.sorting_function
-                self.b_mix[i, k] = ret.b_mix
+                εδ_model.b_upd = self.UpdVar.B.values[i, k]
+                εδ_model.b_env = self.EnvVar.B.values[k]
+                εδ_model.w_upd = interpf2c(self.UpdVar.W.values, grid, k, i)
+                εδ_model.w_env = interpf2c(self.EnvVar.W.values, grid, k)
+                εδ_model.a_upd = self.UpdVar.Area.values[i, k]
+                εδ_model.a_env = self.EnvVar.Area.values[k]
+                εδ_model.ql_upd = self.UpdVar.QL.values[i, k]
+                εδ_model.ql_env = self.EnvVar.QL.values[k]
+                εδ_model.RH_upd = self.UpdVar.RH.values[i, k]
+                εδ_model.RH_env = self.EnvVar.RH.values[k]
+                εδ_model.M = M
+                εδ_model.dMdz = dMdz
+                εδ_model.tke = self.EnvVar.TKE.values[k]
+                εδ_model.n_up = self.n_updrafts
+                εδ_model.ρ = ref_state.rho0[k]
+                εδ_model.R_up = self.pressure_plume_spacing[i]
 
+                self.entr_sc[i, k], self.detr_sc[i, k], self.frac_turb_entr[i, k], self.horiz_K_eddy[i, k] = entr_detr(
+                    param_set,
+                    w_min,
+                    self.sorting_power,
+                    self.detrainment_factor,
+                    self.entrainment_Mdiv_factor,
+                    self.entrainment_sigma,
+                    self.entrainment_scale,
+                    self.updraft_mixing_frac,
+                    self.entrainment_smin_tke_coeff,
+                    self.turbulent_entrainment_factor,
+                    εδ_model,
+                )
             else
                 self.entr_sc[i, k] = 0.0
                 self.detr_sc[i, k] = 0.0
-                self.sorting_function[i, k] = 0.0
-                self.b_mix[i, k] = self.EnvVar.B.values[k]
-            end
-
-            # horizontal eddy diffusivities
-            if self.UpdVar.Area.values[i, k] > 0.0
-                self.horiz_K_eddy[i, k] =
-                    self.UpdVar.Area.values[i, k] *
-                    self.turbulent_entrainment_factor *
-                    sqrt(fmax(self.EnvVar.TKE.values[k], 0.0)) *
-                    self.pressure_plume_spacing[i]
-            else
-                self.horiz_K_eddy[i, k] = 0.0
-            end
-
-            # turbulent entrainment
-            wu_half = interp2pt(self.UpdVar.W.values[i, k], self.UpdVar.W.values[i, k - 1])
-            if self.UpdVar.Area.values[i, k] * wu_half > 0.0
-                self.frac_turb_entr[i, k] =
-                    (2.0 / self.pressure_plume_spacing[i]^2.0) * self.horiz_K_eddy[i, k] / wu_half /
-                    self.UpdVar.Area.values[i, k]
-            else
                 self.frac_turb_entr[i, k] = 0.0
+                self.horiz_K_eddy[i, k] = 0.0
             end
 
             # pressure
@@ -1031,16 +998,6 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
         end
     end
     return
-end
-
-function compute_zbl_qt_grad(GMV::GridMeanVariables)
-    grid = get_grid(GMV)
-    # computes inversion height as z with max gradient of qt
-    z∇q_tot = map(real_center_indicies(grid)) do k
-        (grid.z_half[k], abs(∇c2f(GMV.QT.values, grid, k)))
-    end
-    k_star = argmax(last.(z∇q_tot))
-    return first.(z∇q_tot)[k_star]
 end
 
 function compute_pressure_plume_spacing(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
@@ -1785,7 +1742,6 @@ function compute_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Ca
         self.UpdVar.H,
         self.UpdVar.QT,
     )
-    cleanup_covariance(self, GMV)
     return
 end
 
@@ -1871,49 +1827,6 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
     end
     return
 end
-
-function cleanup_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
-
-    tmp_eps = 1e-18
-    grid = get_grid(self)
-
-    @inbounds for k in real_center_indicies(grid)
-        if GMV.TKE.values[k] < tmp_eps
-            GMV.TKE.values[k] = 0.0
-        end
-        if GMV.Hvar.values[k] < tmp_eps
-            GMV.Hvar.values[k] = 0.0
-        end
-        if GMV.QTvar.values[k] < tmp_eps
-            GMV.QTvar.values[k] = 0.0
-        end
-        if fabs(GMV.HQTcov.values[k]) < tmp_eps
-            GMV.HQTcov.values[k] = 0.0
-        end
-        if fabs(GMV.W_third_m.values[k]) < tmp_eps
-            GMV.W_third_m.values[k] = 0.0
-        end
-        if fabs(GMV.H_third_m.values[k]) < tmp_eps
-            GMV.H_third_m.values[k] = 0.0
-        end
-        if fabs(GMV.QT_third_m.values[k]) < tmp_eps
-            GMV.QT_third_m.values[k] = 0.0
-        end
-        if self.EnvVar.Hvar.values[k] < tmp_eps
-            self.EnvVar.Hvar.values[k] = 0.0
-        end
-        if self.EnvVar.TKE.values[k] < tmp_eps
-            self.EnvVar.TKE.values[k] = 0.0
-        end
-        if self.EnvVar.QTvar.values[k] < tmp_eps
-            self.EnvVar.QTvar.values[k] = 0.0
-        end
-        if fabs(self.EnvVar.HQTcov.values[k]) < tmp_eps
-            self.EnvVar.HQTcov.values[k] = 0.0
-        end
-    end
-end
-
 
 function compute_covariance_shear(
     self::EDMF_PrognosticTKE,

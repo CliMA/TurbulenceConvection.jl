@@ -11,16 +11,16 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 1.9368730351926020e-01
-best_mse["updraft_area"] = 4.8515130524256091e+02
-best_mse["updraft_w"] = 3.1260485555848359e+01
-best_mse["updraft_qt"] = 1.1137263871861222e+01
-best_mse["updraft_thetal"] = 2.2395183773350311e+01
-best_mse["u_mean"] = 7.2111916707127898e+02
-best_mse["tke_mean"] = 4.7882808390238374e+01
-best_mse["temperature_mean"] = 1.3818642271008120e-05
-best_mse["thetal_mean"] = 1.4383770217873919e-05
-best_mse["Hvar_mean"] = 2.3235278609470686e+02
+best_mse["qt_mean"] = 1.9368730493269354e-01
+best_mse["updraft_area"] = 4.8515131142491634e+02
+best_mse["updraft_w"] = 3.1260485803642322e+01
+best_mse["updraft_qt"] = 1.1137263873078020e+01
+best_mse["updraft_thetal"] = 2.2395183773363378e+01
+best_mse["u_mean"] = 7.2111916666642423e+02
+best_mse["tke_mean"] = 4.7882808859338290e+01
+best_mse["temperature_mean"] = 1.3818642368852120e-05
+best_mse["thetal_mean"] = 1.4383770315305301e-05
+best_mse["Hvar_mean"] = 2.3235278783484819e+02
 
 @testset "Soares" begin
     println("Running Soares...")

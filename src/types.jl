@@ -1,10 +1,3 @@
-Base.@kwdef mutable struct entr_struct
-    entr_sc::Float64 = 0
-    detr_sc::Float64 = 0
-    sorting_function::Float64 = 0
-    b_mix::Float64 = 0
-end
-
 Base.@kwdef mutable struct eos_struct
     T::Float64 = 0
     ql::Float64 = 0
@@ -26,42 +19,41 @@ Base.@kwdef mutable struct mph_struct
     thl_rain_src::Float64 = 0
     qr_src::Float64 = 0
 end
-
-Base.@kwdef mutable struct entr_in_struct
-    c_div::Float64 = 0
-    M::Float64 = 0
-    dMdz::Float64 = 0
-    zi::Float64 = 0
-    wstar::Float64 = 0
-    z::Float64 = 0
-    sort_pow::Float64 = 0
-    c_det::Float64 = 0
-    chi_upd::Float64 = 0
-    tke_coef::Float64 = 0
-    c_mu::Float64 = 0
-    c_ed_mf::Float64 = 0
-    c_mu0::Float64 = 0
-    dz::Float64 = 0
-    w_upd::Float64 = 0
+"""
+ Entrainment detrainment model type
+ - `εδ_model.b_upd`: updraft buoyancy
+ - `εδ_model.b_env`: environment vertical velocity
+ - `εδ_model.w_upd`: updraft vertical velocity
+ - `εδ_model.w_env`: environment area fraction
+ - `εδ_model.a_upd`: updraft area fraction
+ - `εδ_model.a_env`: environment buoyancy
+ - `εδ_model.ql_up`: updraft liquid water
+ - `εδ_model.ql_env`: environment liquid water 
+ - `εδ_model.RH_upd`: updraft relative humidity
+ - `εδ_model.RH_env`: environment relative humidity
+ - `εδ_model.M`: updraft momentum
+ - `εδ_model.dMdz`: updraft momentum divergence
+ - `εδ_model.tke`: env TKE
+ - `εδ_model.N_up`: total number of updrafts
+ - `εδ_model.ρ`: referance density
+"""
+Base.@kwdef mutable struct entr_detr_model
     b_upd::Float64 = 0
-    dt::Float64 = 0
     b_env::Float64 = 0
+    w_upd::Float64 = 0
+    w_env::Float64 = 0
     a_upd::Float64 = 0
     a_env::Float64 = 0
-    tke::Float64 = 0
+    ql_upd::Float64 = 0
+    ql_env::Float64 = 0
     RH_upd::Float64 = 0
     RH_env::Float64 = 0
-    qt_up::Float64 = 0
-    ql_up::Float64 = 0
-    T_env::Float64 = 0
-    qt_env::Float64 = 0
-    ql_env::Float64 = 0
-    w_env::Float64 = 0
-    nh_pressure::Float64 = 0
-    L::Float64 = 0
-    zbl::Float64 = 0
-    poisson::Float64 = 0
-    buoy_ed_flux::Float64 = 0
+    M::Float64 = 0
+    dMdz::Float64 = 0
+    tke::Float64 = 0
+    n_up::Float64 = 0
+    ρ::Float64 = 0
+    R_up::Float64 = 0
 end
 
 struct RainVariable{T}
@@ -723,7 +715,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     zi::Float64
     n_updrafts::Int
     use_const_plume_spacing::Bool
-    entr_detr_fp::Function
     drag_sign::Int
     asp_label
     extrapolate_buoyancy::Bool
@@ -813,25 +804,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         use_const_plume_spacing =
             parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "use_constant_plume_spacing"; default = false)
 
-        entr_detr_fp_str = parse_namelist(
-            namelist,
-            "turbulence",
-            "EDMF_PrognosticTKE",
-            "entrainment";
-            default = "entr_detr_env_moisture_deficit",
-        )
-        entr_detr_fp = if entr_detr_fp_str == "moisture_deficit"
-            entr_detr_env_moisture_deficit
-        elseif entr_detr_fp_str == "moisture_deficit_b_ED_MF"
-            entr_detr_env_moisture_deficit_b_ED_MF
-        elseif entr_detr_fp_str == "moisture_deficit_div"
-            entr_detr_env_moisture_deficit_div
-        elseif entr_detr_fp_str == "none"
-            entr_detr_none
-        else
-            error("Turbulence--EDMF_PrognosticTKE: Entrainment rate namelist option is not recognized")
-        end
-
         pressure_func_drag_str = parse_namelist(
             namelist,
             "turbulence",
@@ -863,13 +835,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         surface_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
         max_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"]
         entrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"]
-        entrainment_Mdiv_factor = parse_namelist(
-            namelist,
-            "turbulence",
-            "EDMF_PrognosticTKE",
-            "entrainment_massflux_div_factor";
-            default = 0.0,
-        )
+        entrainment_Mdiv_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"]
         updraft_mixing_frac = namelist["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"]
         entrainment_sigma = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_sigma"]
         entrainment_smin_tke_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"]
@@ -1020,7 +986,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             zi,
             n_updrafts,
             use_const_plume_spacing,
-            entr_detr_fp,
             drag_sign,
             asp_label,
             extrapolate_buoyancy,
