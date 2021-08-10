@@ -1,4 +1,18 @@
 
+# function TD.saturation_vapor_pressure(
+#     param_set::APS,
+#     T::FT,
+#     LH_0::FT,
+#     Δcp::FT,
+# ) where {FT <: Real}
+#     return pv_star(T)
+# end
+
+function TD.latent_heat_vapor(param_set::APS, T::FT) where {FT <: Real}
+    return latent_heat(T)
+end
+
+
 function sd_c(pd, T)
     return sd_tilde + cpd * log(T / T_tilde) - Rd * log(pd / p_tilde)
 end

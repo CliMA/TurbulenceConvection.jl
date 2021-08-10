@@ -1190,7 +1190,28 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
                 p0_c = ref_state.p0_half[k]
                 θ_liq_ice = self.UpdVar.H.new[i, k]
                 q_tot = self.UpdVar.QT.new[i, k]
+
+                # sa = eos(p0_c, q_tot, θ_liq_ice)
+                # self.UpdVar.QL.new[i, k] = sa.ql
+                # self.UpdVar.T.new[i, k] = sa.T
+
                 ts = TD.PhaseEquil_pθq(param_set, p0_c, θ_liq_ice, q_tot)
+
+                # @show sa.ql, TD.liquid_specific_humidity(ts)
+                # @show sa.T, TD.air_temperature(ts)
+
+                # Δq_liq = (sa.ql - TD.liquid_specific_humidity(ts))/sa.ql*100
+                # z = grid.z_half[k]
+                # q_liq_old = sa.ql
+                # q_liq_new = TD.liquid_specific_humidity(ts)
+                # if Δq_liq > 10 && q_liq_old > 1e-4
+                #     @show z, q_liq_old, q_liq_new, Δq_liq, p0_c, θ_liq_ice, q_tot
+                # end
+                # ΔT = (sa.T - TD.air_temperature(ts))/sa.T*100
+                # if ΔT > 1
+                #     @show grid.z_half[k], sa.T, TD.air_temperature(ts), ΔT
+                # end
+
                 self.UpdVar.QL.new[i, k] = TD.liquid_specific_humidity(ts)
                 self.UpdVar.T.new[i, k] = TD.air_temperature(ts)
                 continue
@@ -1239,7 +1260,25 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
             p0_c = ref_state.p0_half[k]
             θ_liq_ice = self.UpdVar.H.new[i, k]
             q_tot = self.UpdVar.QT.new[i, k]
+
+            # sa = eos(p0_c, q_tot, θ_liq_ice)
+            # self.UpdVar.QL.new[i, k] = sa.ql
+            # self.UpdVar.T.new[i, k] = sa.T
+
             ts = TD.PhaseEquil_pθq(param_set, p0_c, θ_liq_ice, q_tot)
+
+            # z = grid.z_half[k]
+            # q_liq_old = sa.ql
+            # q_liq_new = TD.liquid_specific_humidity(ts)
+
+            # Δq_liq = (sa.ql - TD.liquid_specific_humidity(ts))/sa.ql*100
+            # if Δq_liq > 10 && q_liq_old > 1e-4
+            #     @show z, q_liq_old, q_liq_new, Δq_liq, p0_c, θ_liq_ice, q_tot
+            # end
+            # ΔT = (sa.T - TD.air_temperature(ts))/sa.T*100
+            # if ΔT > 1
+            #     @show grid.z_half[k], sa.T, TD.air_temperature(ts), ΔT
+            # end
 
             self.UpdVar.QL.new[i, k] = TD.liquid_specific_humidity(ts)
             self.UpdVar.T.new[i, k] = TD.air_temperature(ts)
