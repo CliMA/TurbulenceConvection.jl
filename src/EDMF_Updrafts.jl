@@ -357,8 +357,6 @@ function buoyancy(
     extrap::Bool,
 )
 
-    qt = 0.0
-    h = 0.0
     grid = self.Gr
     kc_surf = kc_surface(grid)
 
@@ -395,8 +393,8 @@ function buoyancy(
                     UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
                     UpdVar.RH.values[i, k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, t)
                 elseif UpdVar.Area.values[i, k - 1] > 0.0 && k > kc_surf
-                    # TODO: report bug:
-                    # qt and h were not defined here before the function call.
+                    qt = UpdVar.QT.values[i,k-1]
+                    h  = UpdVar.H.values[i,k-1]
                     sa = eos(self.Ref.p0_half[k], qt, h)
                     qt -= sa.ql
                     qv = qt
