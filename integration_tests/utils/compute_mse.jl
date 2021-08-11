@@ -90,6 +90,14 @@ function compute_mse_wrapper(
     plot_dir = joinpath(dirname(ds_tc_filename), "comparison"),
     kwargs...,
 )
+    # Note: cluster_data_prefix is also defined in utils/move_output.jl
+    if haskey(ENV, "BUILDKITE_COMMIT")
+        cluster_data_prefix = "/central/scratch/climaci/turbulenceconvection-main"
+        commit_sha = ENV["BUILDKITE_COMMIT"][1:7]
+        path = joinpath(cluster_data_prefix, commit_sha)
+        folder_name = "Output.$case_name.01" # TODO: make this more robust in case 01 changes
+        ds_tc_main_filename = joinpath(path, folder_name, "$case_name.nc")
+    end
     # Note that we're using a closure over
     #  - PyCLES_output_dataset_path
     #  - SCAMPy_output_dataset_path
