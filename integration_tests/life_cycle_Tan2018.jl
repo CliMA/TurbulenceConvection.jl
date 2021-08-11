@@ -31,13 +31,13 @@ best_mse["QTvar_mean"] = 9.2756222550545093e+00
     namelist["meta"]["uuid"] = "01"
     ds_filename = @time main(namelist)
 
-    computed_mse = Dataset(ds_filename, "r") do ds
+    computed_mse = Dataset(ds_filename, "r") do ds_tc
         Dataset(joinpath(SCAMPy_output_dataset_path, "life_cycle_Tan2018.nc"), "r") do ds_scampy
             compute_mse(
                 "life_cycle_Tan2018",
                 best_mse,
                 joinpath(dirname(ds_filename), "comparison");
-                ds_turb_conv = ds,
+                ds_tc = ds_tc,
                 ds_scampy = ds_scampy,
                 plot_comparison = true,
                 t_start = 4 * 3600,
