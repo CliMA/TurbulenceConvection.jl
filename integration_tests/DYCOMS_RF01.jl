@@ -26,28 +26,20 @@ best_mse["Hvar_mean"] = 1.1587461866566149e+04
 best_mse["QTvar_mean"] = 7.3381590434030170e+02
 
 @testset "DYCOMS_RF01" begin
-    println("Running DYCOMS_RF01...")
-    namelist = default_namelist("DYCOMS_RF01")
+    case_name = "DYCOMS_RF01"
+    println("Running $case_name...")
+    namelist = default_namelist(case_name)
     namelist["meta"]["uuid"] = "01"
-    ds_filename = @time main(namelist)
+    ds_tc_filename = @time main(namelist)
 
-    computed_mse = Dataset(ds_filename, "r") do ds_tc
-        Dataset(joinpath(PyCLES_output_dataset_path, "DYCOMS_RF01.nc"), "r") do ds_pycles
-            Dataset(joinpath(SCAMPy_output_dataset_path, "DYCOMS_RF01.nc"), "r") do ds_scampy
-                compute_mse(
-                    "DYCOMS_RF01",
-                    best_mse,
-                    joinpath(dirname(ds_filename), "comparison");
-                    ds_tc = ds_tc,
-                    ds_scampy = ds_scampy,
-                    ds_pycles = ds_pycles,
-                    plot_comparison = true,
-                    t_start = 2 * 3600,
-                    t_stop = 4 * 3600,
-                )
-            end
-        end
-    end
+    computed_mse = compute_mse_wrapper(
+        case_name,
+        best_mse,
+        ds_tc_filename;
+        plot_comparison = true,
+        t_start = 2 * 3600,
+        t_stop = 4 * 3600,
+    )
 
     for k in keys(best_mse)
         test_mse(computed_mse, best_mse, k)

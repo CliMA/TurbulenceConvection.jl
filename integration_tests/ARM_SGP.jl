@@ -25,28 +25,20 @@ best_mse["Hvar_mean"] = 1.5980068858564114e+03
 best_mse["QTvar_mean"] = 3.6076370680937271e+02
 
 @testset "ARM_SGP" begin
-    println("Running ARM_SGP...")
-    namelist = default_namelist("ARM_SGP")
+    case_name = "ARM_SGP"
+    println("Running $case_name...")
+    namelist = default_namelist(case_name)
     namelist["meta"]["uuid"] = "01"
-    ds_filename = @time main(namelist)
+    ds_tc_filename = @time main(namelist)
 
-    computed_mse = Dataset(ds_filename, "r") do ds_tc
-        Dataset(joinpath(PyCLES_output_dataset_path, "ARM_SGP.nc"), "r") do ds_pycles
-            Dataset(joinpath(SCAMPy_output_dataset_path, "ARM_SGP.nc"), "r") do ds_scampy
-                compute_mse(
-                    "ARM_SGP",
-                    best_mse,
-                    joinpath(dirname(ds_filename), "comparison");
-                    ds_tc = ds_tc,
-                    ds_scampy = ds_scampy,
-                    ds_pycles = ds_pycles,
-                    plot_comparison = true,
-                    t_start = 8 * 3600,
-                    t_stop = 11 * 3600,
-                )
-            end
-        end
-    end
+    computed_mse = compute_mse_wrapper(
+        case_name,
+        best_mse,
+        ds_tc_filename;
+        plot_comparison = true,
+        t_start = 8 * 3600,
+        t_stop = 11 * 3600,
+    )
 
     for k in keys(best_mse)
         test_mse(computed_mse, best_mse, k)

@@ -26,28 +26,20 @@ best_mse["Hvar_mean"] = 5.9914307236483694e+01
 best_mse["QTvar_mean"] = 1.9732739289298404e+01
 
 @testset "Bomex" begin
-    println("Running Bomex...")
-    namelist = default_namelist("Bomex")
+    case_name = "Bomex"
+    println("Running $case_name...")
+    namelist = default_namelist(case_name)
     namelist["meta"]["uuid"] = "01"
-    ds_filename = @time main(namelist)
+    ds_tc_filename = @time main(namelist)
 
-    computed_mse = Dataset(ds_filename, "r") do ds_tc
-        Dataset(joinpath(PyCLES_output_dataset_path, "Bomex.nc"), "r") do ds_pycles
-            Dataset(joinpath(SCAMPy_output_dataset_path, "Bomex.nc"), "r") do ds_scampy
-                compute_mse(
-                    "Bomex",
-                    best_mse,
-                    joinpath(dirname(ds_filename), "comparison");
-                    ds_tc = ds_tc,
-                    ds_scampy = ds_scampy,
-                    ds_pycles = ds_pycles,
-                    plot_comparison = true,
-                    t_start = 4 * 3600,
-                    t_stop = 6 * 3600,
-                )
-            end
-        end
-    end
+    computed_mse = compute_mse_wrapper(
+        case_name,
+        best_mse,
+        ds_tc_filename;
+        plot_comparison = true,
+        t_start = 4 * 3600,
+        t_stop = 6 * 3600,
+    )
 
     for k in keys(best_mse)
         test_mse(computed_mse, best_mse, k)

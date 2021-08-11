@@ -26,25 +26,20 @@ best_mse["Hvar_mean"] = 2.6446943448553096e+01
 best_mse["QTvar_mean"] = 9.2756222550545093e+00
 
 @testset "life_cycle_Tan2018" begin
-    println("Running life_cycle_Tan2018...")
-    namelist = default_namelist("life_cycle_Tan2018")
+    case_name = "life_cycle_Tan2018"
+    println("Running $case_name...")
+    namelist = default_namelist(case_name)
     namelist["meta"]["uuid"] = "01"
-    ds_filename = @time main(namelist)
+    ds_tc_filename = @time main(namelist)
 
-    computed_mse = Dataset(ds_filename, "r") do ds_tc
-        Dataset(joinpath(SCAMPy_output_dataset_path, "life_cycle_Tan2018.nc"), "r") do ds_scampy
-            compute_mse(
-                "life_cycle_Tan2018",
-                best_mse,
-                joinpath(dirname(ds_filename), "comparison");
-                ds_tc = ds_tc,
-                ds_scampy = ds_scampy,
-                plot_comparison = true,
-                t_start = 4 * 3600,
-                t_stop = 6 * 3600,
-            )
-        end
-    end
+    computed_mse = compute_mse_wrapper(
+        case_name,
+        best_mse,
+        ds_tc_filename;
+        plot_comparison = true,
+        t_start = 4 * 3600,
+        t_stop = 6 * 3600,
+    )
 
     for k in keys(best_mse)
         test_mse(computed_mse, best_mse, k)
