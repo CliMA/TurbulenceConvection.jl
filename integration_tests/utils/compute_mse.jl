@@ -77,37 +77,44 @@ function compute_mse(
     best_mse,
     foldername;
     ds_scampy = nothing,
+    ds_tc_main = nothing,
     ds_pycles = nothing,
-    ds_turb_conv = nothing,
+    ds_tc = nothing,
     plot_comparison = true,
     t_start,
     t_stop,
 )
     # Make pycles optional
     have_pycles_ds = ds_pycles ≠ nothing
+    have_tc_main = ds_tc_main ≠ nothing
     if !have_pycles_ds
         ds_pycles = ds_scampy
     end
+    if !have_tc_main
+        ds_tc_main = ds_tc
+    end
     mse = Dict()
-    time_tcc = get_time(ds_turb_conv, "t")
+    time_tcc = get_time(ds_tc, "t")
     time_les = get_time(ds_pycles, "t")
+    time_tcm = get_time(ds_tc_main, "t")
     time_scm = get_time(ds_scampy, "t")
     n_time_points = length(time_tcc)
 
     mkpath(foldername)
     # Ensure domain matches:
     z_les = get_data(ds_pycles, "z_half")
-    z_tcc = get_data(ds_turb_conv, "z_half")
+    z_tcc = get_data(ds_tc, "z_half")
+    z_tcm = get_data(ds_tc_main, "z_half")
     z_scm = get_data(ds_scampy, "z_half")
     n_grid_points = length(z_tcc)
-    @info "z extrema (les,scm,tcc): $(extrema(z_les)), $(extrema(z_scm)), $(extrema(z_tcc))"
-    @info "n-grid points (les,scm,tcc): $(length(z_les)), $(length(z_scm)), $(length(z_tcc))"
+    @info "z extrema (les,scm,tcm,tcc): $(extrema(z_les)), $(extrema(z_scm)), $(extrema(z_tcm)), $(extrema(z_tcc))"
+    @info "n-grid points (les,scm,tcm,tcc): $(length(z_les)), $(length(z_scm)), $(length(z_tcm)), $(length(z_tcc))"
 
-    @info "time extrema (les,scm,tcc): $(extrema(time_les)), $(extrema(time_scm)), $(extrema(time_tcc))"
-    @info "n-time points (les,scm,tcc): $(length(time_les)), $(length(time_scm)), $(length(time_tcc))"
+    @info "time extrema (les,scm,tcm,tcc): $(extrema(time_les)), $(extrema(time_scm)), $(extrema(time_tcm)), $(extrema(time_tcc))"
+    @info "n-time points (les,scm,tcm,tcc): $(length(time_les)), $(length(time_scm)), $(length(time_tcm)), $(length(time_tcc))"
 
     # Find the nearest matching final time:
-    t_cmp = min(time_tcc[end], time_les[end], time_scm[end], t_stop)
+    t_cmp = min(time_tcc[end], time_tcm[end], time_les[end], time_scm[end], t_stop)
     @info "time compared: $t_cmp"
 
     # Accidentally running a short simulation
@@ -126,6 +133,7 @@ function compute_mse(
     data_scales_scm = []
     data_scales_les = []
     data_scales_tcc = []
+    data_scales_tcm = []
     pycles_weight = []
     for tc_var in keys(best_mse)
 
@@ -143,9 +151,10 @@ function compute_mse(
         push!(pycles_variables, les_var)
 
         data_les_arr = get_data(ds_pycles, les_var)'
-        data_tcc_arr = get_data(ds_turb_conv, tc_var)'
+        data_tcm_arr = get_data(ds_tc_main, tc_var)'
+        data_tcc_arr = get_data(ds_tc, tc_var)'
         data_scm_arr = get_data(ds_scampy, scm_var)'
-        @info "     Data sizes (les,scm,tcc): $(size(data_les_arr)), $(size(data_scm_arr)), $(size(data_tcc_arr))"
+        @info "     Data sizes (les,scm,tcc,tcm): $(size(data_les_arr)), $(size(data_scm_arr)), $(size(data_tcc_arr)), $(size(data_tcm_arr))"
         # Scale the data for comparison
         push!(pycles_weight, "1")
 
@@ -154,17 +163,23 @@ function compute_mse(
         if steady_data
             data_les_cont = Spline1D(z_les, data_les_arr)
             data_tcc_cont = Spline1D(z_tcc, data_tcc_arr)
+            data_tcm_cont = Spline1D(z_tcm, data_tcm_arr)
             data_scm_cont = Spline1D(z_scm, data_scm_arr)
             data_les_cont_mapped = map(z -> data_les_cont(z), z_tcc)
+            data_tcm_cont_mapped = map(z -> data_tcm_cont(z), z_tcc)
             data_tcc_cont_mapped = map(z -> data_tcc_cont(z), z_tcc)
             data_scm_cont_mapped = map(z -> data_scm_cont(z), z_tcc)
         else # unsteady data
             data_les_cont = Spline2D(time_les, z_les, data_les_arr)
+            data_tcm_cont = Spline2D(time_tcm, z_tcm, data_tcm_arr)
             data_tcc_cont = Spline2D(time_tcc, z_tcc, data_tcc_arr)
             data_scm_cont = Spline2D(time_scm, z_scm, data_scm_arr)
             R = range(t_start, t_cmp; length = 50)
             data_les_cont_mapped = map(z_tcc) do z
                 StatsBase.mean(map(t -> data_les_cont(t, z), R))
+            end
+            data_tcm_cont_mapped = map(z_tcc) do z
+                StatsBase.mean(map(t -> data_tcm_cont(t, z), R))
             end
             data_tcc_cont_mapped = map(z_tcc) do z
                 StatsBase.mean(map(t -> data_tcc_cont(t, z), R))
@@ -176,9 +191,11 @@ function compute_mse(
         end
 
         # Compute data scale
+        data_scale_tcm = sum(abs.(data_tcm_arr)) / length(data_tcm_arr)
         data_scale_tcc = sum(abs.(data_tcc_arr)) / length(data_tcc_arr)
         data_scale_scm = sum(abs.(data_scm_arr)) / length(data_scm_arr)
         data_scale_les = sum(abs.(data_les_arr)) / length(data_les_arr)
+        push!(data_scales_tcm, data_scale_tcm)
         push!(data_scales_tcc, data_scale_tcc)
         push!(data_scales_scm, data_scale_scm)
         push!(data_scales_les, data_scale_les)
@@ -190,6 +207,15 @@ function compute_mse(
                 Plots.plot!(data_les_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "PyCLES")
             end
             Plots.plot!(data_scm_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "SCAMPy")
+            if have_tc_main
+                Plots.plot!(
+                    data_tcm_cont_mapped,
+                    z_tcc ./ 10^3,
+                    xlabel = tc_var,
+                    ylabel = "z [km]",
+                    label = "TC.jl (placeholder for main)",
+                )
+            end
             Plots.plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "TC.jl")
             @info "     Saving $(joinpath(foldername, "$tc_var.png"))"
             Plots.savefig(joinpath(foldername, "profile_$tc_var.png"))
@@ -216,7 +242,19 @@ function compute_mse(
                 clims = clims,
                 title = "SCAMPy",
             )
-            p2 = Plots.contourf(
+            if have_tc_main
+                p2 = Plots.contourf(
+                    time_tcc,
+                    z_tcc,
+                    data_tcm_arr';
+                    xlabel = tc_var,
+                    ylabel = "height (m)",
+                    c = :viridis,
+                    clims = clims,
+                    title = "TC.jl (placeholder for main)",
+                )
+            end
+            p3 = Plots.contourf(
                 time_tcc,
                 z_tcc,
                 data_tcc_arr';
@@ -226,7 +264,11 @@ function compute_mse(
                 clims = clims,
                 title = "TC.jl",
             )
-            Plots.plot(p1, p2; layout = (2, 1))
+            if have_tc_main
+                Plots.plot(p1, p2, p3; layout = (3, 1))
+            else
+                Plots.plot(p1, p3; layout = (2, 1))
+            end
             Plots.savefig(joinpath(foldername, "contours_" * tc_var * ".png"))
         end
 

@@ -31,14 +31,14 @@ best_mse["QTvar_mean"] = 1.9732739289298404e+01
     namelist["meta"]["uuid"] = "01"
     ds_filename = @time main(namelist)
 
-    computed_mse = Dataset(ds_filename, "r") do ds
+    computed_mse = Dataset(ds_filename, "r") do ds_tc
         Dataset(joinpath(PyCLES_output_dataset_path, "Bomex.nc"), "r") do ds_pycles
             Dataset(joinpath(SCAMPy_output_dataset_path, "Bomex.nc"), "r") do ds_scampy
                 compute_mse(
                     "Bomex",
                     best_mse,
                     joinpath(dirname(ds_filename), "comparison");
-                    ds_turb_conv = ds,
+                    ds_tc = ds_tc,
                     ds_scampy = ds_scampy,
                     ds_pycles = ds_pycles,
                     plot_comparison = true,
