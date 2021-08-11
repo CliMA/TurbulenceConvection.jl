@@ -72,18 +72,50 @@ function get_time(ds, var)
     error("No key for $var found in the nc file.")
 end
 
-function compute_mse(
-    experiment,
+append_dict(::Nothing, sym::Symbol, dict = Dict()) = dict
+function append_dict(filename::AbstractString, sym::Symbol, dict = Dict())
+    if isfile(filename)
+        dict[sym] = Dataset(filename, "r")
+    end
+    return dict
+end
+
+function compute_mse_wrapper(
+    case_name,
     best_mse,
-    foldername;
-    ds_scampy = nothing,
-    ds_tc_main = nothing,
-    ds_pycles = nothing,
-    ds_tc = nothing,
-    plot_comparison = true,
-    t_start,
-    t_stop,
+    ds_tc_filename,
+    ds_tc_main_filename = nothing;
+    ds_les_filename = joinpath(PyCLES_output_dataset_path, "$case_name.nc"),
+    ds_scm_filename = joinpath(SCAMPy_output_dataset_path, "$case_name.nc"),
+    plot_dir = joinpath(dirname(ds_tc_filename), "comparison"),
+    kwargs...,
 )
+    # Note that we're using a closure over
+    #  - PyCLES_output_dataset_path
+    #  - SCAMPy_output_dataset_path
+    all_args = (case_name, best_mse, plot_dir)
+
+    ds_dict = append_dict(ds_les_filename, :ds_pycles)
+    ds_dict = append_dict(ds_scm_filename, :ds_scampy, ds_dict)
+    ds_dict = append_dict(ds_tc_filename, :ds_tc, ds_dict)
+    ds_dict = append_dict(ds_tc_main_filename, :ds_tc_main, ds_dict)
+
+    try
+        computed_mse = compute_mse(all_args...; ds_dict, kwargs...)
+    finally
+        for ds in values(ds_dict)
+            close(ds)
+        end
+    end
+end
+
+
+function compute_mse(experiment, best_mse, plot_dir; ds_dict, plot_comparison = true, t_start, t_stop)
+
+    ds_scampy = haskey(ds_dict, :ds_scampy) ? ds_dict[:ds_scampy] : nothing
+    ds_tc_main = haskey(ds_dict, :ds_tc_main) ? ds_dict[:ds_tc_main] : nothing
+    ds_pycles = haskey(ds_dict, :ds_pycles) ? ds_dict[:ds_pycles] : nothing
+    ds_tc = haskey(ds_dict, :ds_tc) ? ds_dict[:ds_tc] : nothing
     # Make pycles optional
     have_pycles_ds = ds_pycles ≠ nothing
     have_tc_main = ds_tc_main ≠ nothing
@@ -100,7 +132,7 @@ function compute_mse(
     time_scm = get_time(ds_scampy, "t")
     n_time_points = length(time_tcc)
 
-    mkpath(foldername)
+    mkpath(plot_dir)
     # Ensure domain matches:
     z_les = get_data(ds_pycles, "z_half")
     z_tcc = get_data(ds_tc, "z_half")
@@ -217,8 +249,8 @@ function compute_mse(
                 )
             end
             Plots.plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "TC.jl")
-            @info "     Saving $(joinpath(foldername, "$tc_var.png"))"
-            Plots.savefig(joinpath(foldername, "profile_$tc_var.png"))
+            @info "     Saving $(joinpath(plot_dir, "$tc_var.png"))"
+            Plots.savefig(joinpath(plot_dir, "profile_$tc_var.png"))
 
             if tc_var == "updraft_thetal"
                 # TODO: remove this if-else when artifacts are updated
@@ -269,7 +301,7 @@ function compute_mse(
             else
                 Plots.plot(p1, p3; layout = (2, 1))
             end
-            Plots.savefig(joinpath(foldername, "contours_" * tc_var * ".png"))
+            Plots.savefig(joinpath(plot_dir, "contours_" * tc_var * ".png"))
         end
 
         # Compute mean squared error (mse)
@@ -320,6 +352,6 @@ sufficient_mse(computed_mse, best_mse) = computed_mse <= best_mse + sqrt(eps())
 
 function test_mse(computed_mse, best_mse, key)
     mse_not_regressed = sufficient_mse(computed_mse[key], best_mse[key])
-    @test mse_not_regressed
     mse_not_regressed || @show key
+    @test mse_not_regressed
 end

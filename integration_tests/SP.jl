@@ -25,25 +25,14 @@ best_mse["Hvar_mean"] = 2.3999517246677664e+02
 best_mse["QTvar_mean"] = 1.6280851822250700e+01
 
 @testset "SP" begin
-    println("Running SP...")
-    namelist = default_namelist("SP")
+    case_name = "SP"
+    println("Running $case_name...")
+    namelist = default_namelist(case_name)
     namelist["meta"]["uuid"] = "01"
-    ds_filename = @time main(namelist)
+    ds_tc_filename = @time main(namelist)
 
-    computed_mse = Dataset(ds_filename, "r") do ds_tc
-        Dataset(joinpath(SCAMPy_output_dataset_path, "SP.nc"), "r") do ds_scampy
-            compute_mse(
-                "SP",
-                best_mse,
-                joinpath(dirname(ds_filename), "comparison");
-                ds_tc = ds_tc,
-                ds_scampy = ds_scampy,
-                plot_comparison = true,
-                t_start = 0,
-                t_stop = 7200,
-            )
-        end
-    end
+    computed_mse =
+        compute_mse_wrapper(case_name, best_mse, ds_tc_filename; plot_comparison = true, t_start = 0, t_stop = 2 * 3600)
 
     for k in keys(best_mse)
         test_mse(computed_mse, best_mse, k)

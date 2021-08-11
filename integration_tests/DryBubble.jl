@@ -21,25 +21,14 @@ best_mse["thetal_mean"] = 2.5687103839396313e-05
 best_mse["Hvar_mean"] = 3.2146754706000658e+00
 
 @testset "DryBubble" begin
-    println("Running DryBubble...")
-    namelist = default_namelist("DryBubble")
+    case_name = "DryBubble"
+    println("Running $case_name...")
+    namelist = default_namelist(case_name)
     namelist["meta"]["uuid"] = "01"
-    ds_filename = @time main(namelist)
+    ds_tc_filename = @time main(namelist)
 
-    computed_mse = Dataset(ds_filename, "r") do ds_tc
-        Dataset(joinpath(SCAMPy_output_dataset_path, "DryBubble.nc"), "r") do ds_scampy
-            compute_mse(
-                "DryBubble",
-                best_mse,
-                joinpath(dirname(ds_filename), "comparison");
-                ds_tc = ds_tc,
-                ds_scampy = ds_scampy,
-                plot_comparison = true,
-                t_start = 900,
-                t_stop = 1000,
-            )
-        end
-    end
+    computed_mse =
+        compute_mse_wrapper(case_name, best_mse, ds_tc_filename; plot_comparison = true, t_start = 900, t_stop = 1000)
 
     for k in keys(best_mse)
         test_mse(computed_mse, best_mse, k)

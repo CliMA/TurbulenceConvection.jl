@@ -23,28 +23,20 @@ best_mse["thetal_mean"] = 1.4383770315305301e-05
 best_mse["Hvar_mean"] = 2.3235278783484819e+02
 
 @testset "Soares" begin
-    println("Running Soares...")
-    namelist = default_namelist("Soares")
+    case_name = "Soares"
+    println("Running $case_name...")
+    namelist = default_namelist(case_name)
     namelist["meta"]["uuid"] = "01"
-    ds_filename = @time main(namelist)
+    ds_tc_filename = @time main(namelist)
 
-    computed_mse = Dataset(ds_filename, "r") do ds_tc
-        Dataset(joinpath(PyCLES_output_dataset_path, "Soares.nc"), "r") do ds_pycles
-            Dataset(joinpath(SCAMPy_output_dataset_path, "Soares.nc"), "r") do ds_scampy
-                compute_mse(
-                    "Soares",
-                    best_mse,
-                    joinpath(dirname(ds_filename), "comparison");
-                    ds_tc = ds_tc,
-                    ds_scampy = ds_scampy,
-                    ds_pycles = ds_pycles,
-                    plot_comparison = true,
-                    t_start = 6 * 3600,
-                    t_stop = 8 * 3600,
-                )
-            end
-        end
-    end
+    computed_mse = compute_mse_wrapper(
+        case_name,
+        best_mse,
+        ds_tc_filename;
+        plot_comparison = true,
+        t_start = 6 * 3600,
+        t_stop = 8 * 3600,
+    )
 
     for k in keys(best_mse)
         test_mse(computed_mse, best_mse, k)
