@@ -102,18 +102,14 @@ function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::Environm
 
     sa = eos_struct()
     mph = mph_struct()
+    param_set = parameter_set(EnvVar)
 
     @inbounds for k in real_center_indicies(self.Gr)
-        sa = eos(self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], EnvVar.H.values[k], EnvVar.QT.values[k])
 
-        EnvVar.T.values[k] = sa.T
-        EnvVar.QL.values[k] = sa.ql
-        rho = rho_c(
-            self.Ref.p0_half[k],
-            EnvVar.T.values[k],
-            EnvVar.QT.values[k],
-            EnvVar.QT.values[k] - EnvVar.QL.values[k],
-        )
+        EnvVar.T.values[k] = TD.air_temperature(ts)
+        EnvVar.QL.values[k] = TD.liquid_specific_humidity(ts)
+        rho = TD.air_density(ts)
         EnvVar.B.values[k] = buoyancy_c(self.Ref.rho0_half[k], rho)
 
         update_cloud_dry(
@@ -142,7 +138,10 @@ function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables,
 
     @inbounds for k in real_center_indicies(self.Gr)
         # condensation
-        sa = eos(self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], EnvVar.H.values[k], EnvVar.QT.values[k])
+        ql = TD.liquid_specific_humidity(ts)
+        T = TD.air_temperature(ts)
+
         # autoconversion and accretion
         mph = microphysics_rain_src(
             Rain.rain_model,
@@ -153,16 +152,16 @@ function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables,
             Rain.tau_acnv,
             Rain.E_col,
             EnvVar.QT.values[k],
-            sa.ql,
+            ql,
             Rain.Env_QR.values[k],
             EnvVar.Area.values[k],
-            sa.T,
+            T,
             self.Ref.p0_half[k],
             self.Ref.rho0_half[k],
             dt,
         )
-        update_EnvVar(self, k, EnvVar, sa.T, mph.thl, mph.qt, mph.ql, mph.rho)
-        update_cloud_dry(self, k, EnvVar, sa.T, mph.th, mph.qt, mph.ql, mph.qv)
+        update_EnvVar(self, k, EnvVar, T, mph.thl, mph.qt, mph.ql, mph.rho)
+        update_cloud_dry(self, k, EnvVar, T, mph.th, mph.qt, mph.ql, mph.qv)
         update_EnvRain_sources(self, k, EnvVar, mph.qr_src, mph.thl_rain_src)
     end
     return
@@ -171,6 +170,7 @@ end
 function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables, Rain::RainVariables, dt)
     # TODO: double check this python-> julia translation
     # a, w = np.polynomial.hermite.hermgauss(self.quadrature_order)
+    param_set = parameter_set(EnvVar)
     a, w = FastGaussQuadrature.gausshermite(self.quadrature_order)
 
     #TODO - remember you output source terms multipierd by dt (bec. of instanteneous autoconcv)
@@ -282,8 +282,10 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                     end
 
                     # condensation
-                    sa = eos(self.Ref.p0_half[k], qt_hat, h_hat)
+                    ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], h_hat, qt_hat)
                     # autoconversion and accretion
+                    ql = TD.liquid_specific_humidity(ts)
+                    T = TD.air_temperature(ts)
                     mph = microphysics_rain_src(
                         Rain.rain_model,
                         Rain.max_supersaturation,
@@ -293,10 +295,10 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                         Rain.tau_acnv,
                         Rain.E_col,
                         qt_hat,
-                        sa.ql,
+                        ql,
                         Rain.Env_QR.values[k],
                         EnvVar.Area.values[k],
-                        sa.T,
+                        T,
                         self.Ref.p0_half[k],
                         self.Ref.rho0_half[k],
                         dt,
@@ -304,7 +306,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
 
                     # environmental variables
                     inner_env[i_ql] += mph.ql * weights[m_h] * sqpi_inv
-                    inner_env[i_T] += sa.T * weights[m_h] * sqpi_inv
+                    inner_env[i_T] += T * weights[m_h] * sqpi_inv
                     inner_env[i_thl] += mph.thl * weights[m_h] * sqpi_inv
                     inner_env[i_rho] += mph.rho * weights[m_h] * sqpi_inv
                     # rain area fraction
@@ -315,10 +317,10 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                     if mph.ql > 0.0
                         inner_env[i_cf] += weights[m_h] * sqpi_inv
                         inner_env[i_qt_cld] += mph.qt * weights[m_h] * sqpi_inv
-                        inner_env[i_T_cld] += sa.T * weights[m_h] * sqpi_inv
+                        inner_env[i_T_cld] += T * weights[m_h] * sqpi_inv
                     else
                         inner_env[i_qt_dry] += mph.qt * weights[m_h] * sqpi_inv
-                        inner_env[i_T_dry] += sa.T * weights[m_h] * sqpi_inv
+                        inner_env[i_T_dry] += T * weights[m_h] * sqpi_inv
                     end
                     # products for variance and covariance source terms
                     inner_src[i_Sqt] += -mph.qr_src * weights[m_h] * sqpi_inv
@@ -368,7 +370,9 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
 
         else
             # if variance and covariance are zero do the same as in SA_mean
-            sa = eos(self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
+            ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], EnvVar.H.values[k], EnvVar.QT.values[k])
+            ql = TD.liquid_specific_humidity(ts)
+            T = TD.air_temperature(ts)
             mph = microphysics_rain_src(
                 Rain.rain_model,
                 Rain.max_supersaturation,
@@ -378,17 +382,17 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                 Rain.tau_acnv,
                 Rain.E_col,
                 EnvVar.QT.values[k],
-                sa.ql,
+                ql,
                 Rain.Env_QR.values[k],
                 EnvVar.Area.values[k],
-                sa.T,
+                T,
                 self.Ref.p0_half[k],
                 self.Ref.rho0_half[k],
                 dt,
             )
-            update_EnvVar(self, k, EnvVar, sa.T, mph.thl, mph.qt, mph.ql, mph.rho)
+            update_EnvVar(self, k, EnvVar, T, mph.thl, mph.qt, mph.ql, mph.rho)
             update_EnvRain_sources(self, k, EnvVar, mph.qr_src, mph.thl_rain_src)
-            update_cloud_dry(self, k, EnvVar, sa.T, mph.th, mph.qt, mph.ql, mph.qv)
+            update_cloud_dry(self, k, EnvVar, T, mph.th, mph.qt, mph.ql, mph.qv)
 
             self.Hvar_rain_dt[k] = 0.0
             self.QTvar_rain_dt[k] = 0.0

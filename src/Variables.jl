@@ -113,17 +113,21 @@ end
 
 function satadjust(self::GridMeanVariables)
     sa = eos_struct()
+    param_set = parameter_set(self)
     @inbounds for k in center_indicies(self.Gr)
-        h = self.H.values[k]
-        qt = self.QT.values[k]
-        p0 = self.Ref.p0_half[k]
-        sa = eos(p0, qt, h)
-        self.QL.values[k] = sa.ql
-        self.T.values[k] = sa.T
-        qv = qt - sa.ql
-        rho = rho_c(p0, sa.T, qt, qv)
-        self.B.values[k] = buoyancy_c(self.Ref.rho0_half[k], rho)
-        self.RH.values[k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, self.T.values[k])
+        θ_liq_ice = self.H.values[k]
+        q_tot = self.QT.values[k]
+        p0_c = self.Ref.p0_half[k]
+        ts = TD.PhaseEquil_pθq(param_set, p0_c, θ_liq_ice, q_tot)
+        q_liq = TD.liquid_specific_humidity(ts)
+        self.QL.values[k] = TD.liquid_specific_humidity(ts)
+        self.T.values[k] = TD.air_temperature(ts)
+        self.H.values[k] = TD.liquid_ice_pottemp(ts)
+
+        ρ0_c = self.Ref.rho0_half[k]
+        ρ = TD.air_density(ts)
+        self.B.values[k] = buoyancy_c(ρ0_c, ρ)
+        self.RH.values[k] = TD.relative_humidity(ts)
     end
     return
 end

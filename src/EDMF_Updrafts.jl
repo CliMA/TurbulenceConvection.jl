@@ -117,13 +117,6 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
 
                 self.T.values[i, k] = T_in[k]
                 # for now temperature is provided as diagnostics from LES
-
-                # sa = eos(
-                #     Ref.p0_half[k],
-                #     self.QT.values[i,k],
-                #     self.H.values[i,k]
-                # )
-                # self.T.values[i,k] = sa.T
             else
                 self.Area.values[i, k] = 0.0 #self.updraft_fraction/self.n_updrafts
                 self.H.values[i, k] = GMV.H.values[k]
@@ -357,6 +350,7 @@ function buoyancy(
     extrap::Bool,
 )
 
+    param_set = parameter_set(GMV)
     grid = self.Gr
     kc_surf = kc_surface(grid)
 
@@ -388,19 +382,20 @@ function buoyancy(
                     qt = UpdVar.QT.values[i, k]
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
                     h = UpdVar.H.values[i, k]
-                    t = UpdVar.T.values[i, k]
-                    rho = rho_c(self.Ref.p0_half[k], t, qt, qv)
+                    T = UpdVar.T.values[i, k]
+                    rho = rho_c(self.Ref.p0_half[k], T, qt, qv)
                     UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
-                    UpdVar.RH.values[i, k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, t)
+                    UpdVar.RH.values[i, k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, T)
                 elseif UpdVar.Area.values[i, k - 1] > 0.0 && k > kc_surf
                     qt = UpdVar.QT.values[i, k - 1]
                     h = UpdVar.H.values[i, k - 1]
-                    sa = eos(self.Ref.p0_half[k], qt, h)
-                    qv = qt - sa.ql
-                    t = sa.T
-                    rho = rho_c(self.Ref.p0_half[k], t, qt, qv)
+                    ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], h, qt)
+                    ql = TD.liquid_specific_humidity(ts)
+                    T = TD.air_temperature(ts)
+                    qv = TD.vapor_specific_humidity(ts)
+                    rho = rho_c(self.Ref.p0_half[k], T, qt, qv)
                     UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
-                    UpdVar.RH.values[i, k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, t)
+                    UpdVar.RH.values[i, k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, T)
                 else
                     UpdVar.B.values[i, k] = EnvVar.B.values[k]
                     UpdVar.RH.values[i, k] = EnvVar.RH.values[k]
