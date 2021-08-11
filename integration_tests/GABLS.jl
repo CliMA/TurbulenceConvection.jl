@@ -12,14 +12,14 @@ using .NameList
 
 best_mse = OrderedDict()
 
-best_mse["updraft_thetal"] = 5.0248694008424222e+00
-best_mse["v_mean"] = 4.4630163253493214e+00
-best_mse["u_mean"] = 9.6412500983148846e+00
-best_mse["tke_mean"] = 2.4683562232142533e+00
-best_mse["temperature_mean"] = 8.8678308948818863e-06
-best_mse["thetal_mean"] = 8.7900622849842488e-06
-best_mse["Hvar_mean"] = 1.2891667586703637e+01
-best_mse["QTvar_mean"] = 4.4424755799649029e-01
+best_mse["updraft_thetal"] = 5.0248696023347037e+00
+best_mse["v_mean"] = 4.4593534457868529e+00
+best_mse["u_mean"] = 9.6414943665200035e+00
+best_mse["tke_mean"] = 2.4674095133951375e+00
+best_mse["temperature_mean"] = 8.8584843672667532e-06
+best_mse["thetal_mean"] = 8.7856734759460943e-06
+best_mse["Hvar_mean"] = 1.2892749042279126e+01
+best_mse["QTvar_mean"] = 4.4456710317999498e-01
 
 @testset "GABLS" begin
     case_name = "GABLS"

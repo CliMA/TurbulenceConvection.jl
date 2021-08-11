@@ -316,29 +316,24 @@ function compute_prognostic_updrafts(
     set_old_with_values(self.UpdVar)
 
     set_updraft_surface_bc(self, GMV, Case)
-    self.dt_upd = min(TS.dt, 0.5 * get_grid(self).dz / max(maximum(self.UpdVar.W.values), 1e-10))
 
     clear_precip_sources(self.UpdThermo)
 
-    while time_elapsed < TS.dt
-        compute_updraft_closures(self, GMV, Case)
-        solve_updraft_velocity_area(self)
-        solve_updraft_scalars(self, GMV)
-        microphysics(self.UpdThermo, self.UpdVar, self.Rain, TS.dt) # causes division error in dry bubble first time step
+    compute_updraft_closures(self, GMV, Case)
+    solve_updraft_velocity_area(self, TS)
+    solve_updraft_scalars(self, GMV, TS)
+    microphysics(self.UpdThermo, self.UpdVar, self.Rain, TS.dt) # causes division error in dry bubble first time step
 
-        set_values_with_new(self.UpdVar)
-        zero_area_fraction_cleanup(self, GMV)
-        time_elapsed += self.dt_upd
-        self.dt_upd = min(TS.dt - time_elapsed, 0.5 * get_grid(self).dz / max(maximum(self.UpdVar.W.values), 1e-10))
-        # (####)
-        # TODO - see comment (###)
-        # It would be better to have a simple linear rule for updating environment here
-        # instead of calling EnvThermo saturation adjustment scheme for every updraft.
-        decompose_environment(self, GMV, "values")
-        saturation_adjustment(self.EnvThermo, self.EnvVar)
-        buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
-        set_subdomain_bcs(self)
-    end
+    set_values_with_new(self.UpdVar)
+    zero_area_fraction_cleanup(self, GMV)
+    # (####)
+    # TODO - see comment (###)
+    # It would be better to have a simple linear rule for updating environment here
+    # instead of calling EnvThermo saturation adjustment scheme for every updraft.
+    decompose_environment(self, GMV, "values")
+    saturation_adjustment(self.EnvThermo, self.EnvVar)
+    buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
+    set_subdomain_bcs(self)
 
     update_total_precip_sources(self.UpdThermo)
     return
@@ -1058,13 +1053,13 @@ function set_subdomain_bcs(self::EDMF_PrognosticTKE)
     return
 end
 
-function solve_updraft_velocity_area(self::EDMF_PrognosticTKE)
+function solve_updraft_velocity_area(self::EDMF_PrognosticTKE, TS::TimeStepping)
     grid = get_grid(self)
     ref_state = reference_state(self)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     dzi = grid.dzi
-    dti_ = 1.0 / self.dt_upd
+    dti_ = 1.0 / TS.dt
     dt_ = 1.0 / dti_
 
     @inbounds for i in xrange(self.n_updrafts)
@@ -1161,11 +1156,11 @@ function solve_updraft_velocity_area(self::EDMF_PrognosticTKE)
     return
 end
 
-function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
+function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::TimeStepping)
     grid = get_grid(self)
     ref_state = reference_state(self)
     dzi = grid.dzi
-    dti_ = 1.0 / self.dt_upd
+    dti_ = 1.0 / TS.dt
     sa = eos_struct()
 
     @inbounds for i in xrange(self.n_updrafts)
@@ -2022,7 +2017,6 @@ function compute_covariance_rain(self::EDMF_PrognosticTKE, TS::TimeStepping, GMV
 
     return
 end
-
 
 function compute_covariance_dissipation(self::EDMF_PrognosticTKE, Covar::EnvironmentVariable_2m)
     grid = get_grid(self)
