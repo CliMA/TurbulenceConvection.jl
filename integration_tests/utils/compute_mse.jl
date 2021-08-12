@@ -130,7 +130,16 @@ function compute_mse_wrapper(
 end
 
 
-function compute_mse(experiment, best_mse, plot_dir; ds_dict, plot_comparison = true, t_start, t_stop)
+function compute_mse(
+    experiment,
+    best_mse,
+    plot_dir;
+    ds_dict,
+    plot_comparison = true,
+    group_figs = true,
+    t_start,
+    t_stop,
+)
 
     ds_scampy = haskey(ds_dict, :ds_scampy) ? ds_dict[:ds_scampy] : nothing
     ds_tc_main = haskey(ds_dict, :ds_tc_main) ? ds_dict[:ds_tc_main] : nothing
@@ -187,6 +196,15 @@ function compute_mse(experiment, best_mse, plot_dir; ds_dict, plot_comparison = 
     data_scales_tcc = []
     data_scales_tcm = []
     pycles_weight = []
+    plots_dict = Dict()
+    plots_dict["profiles"] = Dict()
+    plots_dict["contours"] = Dict()
+    plot_attr = Dict()
+    plot_attr[true] = Dict()
+    plot_attr[false] = Dict()
+    last_key = last(collect(keys(best_mse)))
+    local fig_height
+
     for tc_var in keys(best_mse)
 
         # Only compare fields defined for var_map_les
@@ -206,7 +224,7 @@ function compute_mse(experiment, best_mse, plot_dir; ds_dict, plot_comparison = 
         data_tcm_arr = get_data(ds_tc_main, tc_var)'
         data_tcc_arr = get_data(ds_tc, tc_var)'
         data_scm_arr = get_data(ds_scampy, scm_var)'
-        @info "     Data sizes (les,scm,tcc,tcm): $(size(data_les_arr)), $(size(data_scm_arr)), $(size(data_tcc_arr)), $(size(data_tcm_arr))"
+        # @info "     Data sizes (les,scm,tcc,tcm): $(size(data_les_arr)), $(size(data_scm_arr)), $(size(data_tcc_arr)), $(size(data_tcm_arr))"
         # Scale the data for comparison
         push!(pycles_weight, "1")
 
@@ -268,9 +286,8 @@ function compute_mse(experiment, best_mse, plot_dir; ds_dict, plot_comparison = 
                     label = "TC.jl (main)",
                 )
             end
-            Plots.plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "TC.jl")
-            @info "     Saving $(joinpath(plot_dir, "$tc_var.png"))"
-            Plots.savefig(joinpath(plot_dir, "profile_$tc_var.png"))
+            plots_dict["profiles"][tc_var] =
+                Plots.plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "TC.jl")
 
             if tc_var == "updraft_thetal"
                 # TODO: remove this if-else when artifacts are updated
@@ -284,44 +301,88 @@ function compute_mse(experiment, best_mse, plot_dir; ds_dict, plot_comparison = 
                 clims = (clims_min, clims_max)
             end
 
+            width_to_height_ratio = have_tc_main ? 15 / 10 : 15 / 10
+            fig_height = 900
+
+            plot_attr[true]["contour_1_kwargs"] = (
+                bottom_margin = 0 * Plots.PlotMeasures.px,
+                left_margin = 30 * Plots.PlotMeasures.px,
+                right_margin = 0 * Plots.PlotMeasures.px,
+                top_margin = 0 * Plots.PlotMeasures.px,
+                xticks = false,
+                colorbar = false,
+                size = (width_to_height_ratio * fig_height, fig_height),
+                ylabel = "height (km)",
+            )
+            plot_attr[true]["contour_2_kwargs"] = (
+                bottom_margin = 0 * Plots.PlotMeasures.px,
+                left_margin = 0 * Plots.PlotMeasures.px,
+                right_margin = 0 * Plots.PlotMeasures.px,
+                top_margin = 0 * Plots.PlotMeasures.px,
+                xticks = false,
+                yticks = false,
+                colorbar = false,
+                size = (width_to_height_ratio * fig_height, fig_height),
+            )
+            plot_attr[true]["contour_3_kwargs"] = (
+                bottom_margin = 0 * Plots.PlotMeasures.px,
+                left_margin = 0 * Plots.PlotMeasures.px,
+                top_margin = 0 * Plots.PlotMeasures.px,
+                xticks = false,
+                yticks = false,
+                colorbar = true,
+                size = (width_to_height_ratio * fig_height, fig_height), # extra space for colorbar
+            )
+            plot_attr[false]["contour_1_kwargs"] = (ylabel = "height (km)",)
+            plot_attr[false]["contour_2_kwargs"] = (ylabel = "height (km)",)
+            plot_attr[false]["contour_3_kwargs"] = (ylabel = "height (km)",)
+
             p1 = Plots.contourf(
-                time_scm,
-                z_scm,
+                time_scm ./ 3600,
+                z_scm ./ 10^3,
                 data_scm_arr';
-                xlabel = tc_var,
-                ylabel = "height (m)",
                 c = :viridis,
                 clims = clims,
-                title = "SCAMPy",
+                title = "$tc_var (SCAMPy)",
+                plot_attr[group_figs]["contour_1_kwargs"]...,
             )
             if have_tc_main
                 p2 = Plots.contourf(
-                    time_tcc,
-                    z_tcc,
+                    time_tcc ./ 3600,
+                    z_tcc ./ 10^3,
                     data_tcm_arr';
-                    xlabel = tc_var,
-                    ylabel = "height (m)",
                     c = :viridis,
                     clims = clims,
-                    title = "TC.jl (main)",
+                    title = "$tc_var (TC.jl main)",
+                    plot_attr[group_figs]["contour_2_kwargs"]...,
                 )
             end
             p3 = Plots.contourf(
-                time_tcc,
-                z_tcc,
+                time_tcc ./ 3600,
+                z_tcc ./ 10^3,
                 data_tcc_arr';
-                xlabel = tc_var,
-                ylabel = "height (m)",
                 c = :viridis,
                 clims = clims,
-                title = have_tc_main ? "TC.jl (PR)" : "TC.jl",
+                title = have_tc_main ? "$tc_var (TC.jl PR)" : "$tc_var (TC.jl)",
+                plot_attr[group_figs]["contour_3_kwargs"]...,
             )
-            if have_tc_main
-                Plots.plot(p1, p2, p3; layout = (3, 1), size = (400, 600))
+            if group_figs
+                if have_tc_main
+                    widths = [0.29, 0.31]
+                    push!(widths, 1 - sum(widths))
+                    plots_dict["contours"][tc_var] = Plots.plot(p1, p2, p3; layout = Plots.grid(1, 3, widths = widths))
+                else
+                    widths = [0.45]
+                    push!(widths, 1 - sum(widths))
+                    plots_dict["contours"][tc_var] = Plots.plot(p1, p3; layout = Plots.grid(1, 2, widths = widths))
+                end
             else
-                Plots.plot(p1, p3; layout = (2, 1))
+                if have_tc_main
+                    plots_dict["contours"][tc_var] = Plots.plot(p1, p2, p3; layout = (3, 1))
+                else
+                    plots_dict["contours"][tc_var] = Plots.plot(p1, p3; layout = (2, 1))
+                end
             end
-            Plots.savefig(joinpath(plot_dir, "contours_" * tc_var * ".png"))
         end
 
         # Compute mean squared error (mse)
@@ -333,6 +394,8 @@ function compute_mse(experiment, best_mse, plot_dir; ds_dict, plot_comparison = 
         push!(computed_mse, mse[tc_var])
         push!(table_best_mse, best_mse[tc_var])
     end
+
+    save_plots(plot_dir, plots_dict; group_figs = group_figs, have_tc_main = have_tc_main, fig_height = fig_height)
 
     # Tabulate output
     header = [
@@ -366,6 +429,64 @@ function compute_mse(experiment, best_mse, plot_dir; ds_dict, plot_comparison = 
     )
 
     return mse
+end
+
+function save_plots(plot_dir, plots_dict; group_figs = true, have_tc_main, fig_height)
+    vars_to_skip = [
+        "thetal_mean",
+        "updraft_thetal",
+        "u_mean",
+        "v_mean",
+        "qt_mean",
+        "updraft_qt",
+        "temperature_mean",
+        "total_flux_h",
+        "total_flux_qt",
+        "massflux",
+    ]
+    all_contours = plots_dict["contours"]
+    filter!(p -> !occursin("var", p.first), all_contours) # skip higher order moment contours
+    filter!(p -> !any(map(x -> occursin(x, p.first), vars_to_skip)), all_contours)
+    if group_figs
+        all_contours = collect(values(all_contours))
+        Plots.plot!(all_contours[end], xticks = true, xlabel = "Time (hr)", bottom_margin = 20 * Plots.PlotMeasures.px)
+
+        n_plots = length(all_contours)
+        n_cols = 1
+        n_rows = ceil(Int, n_plots / n_cols)
+        @info "     Saving $(joinpath(plot_dir, "contours.png"))"
+        Plots.plot(all_contours...; layout = (n_rows, n_cols), framestyle = :box, margin = 20 * Plots.PlotMeasures.px)
+        Plots.savefig(joinpath(plot_dir, "contours.png"))
+
+        width_to_height_ratio = 15 / 10
+        n_cols = 3
+
+        all_profiles = values(plots_dict["profiles"])
+        n_plots = length(all_profiles)
+        n_rows = ceil(Int, n_plots / n_cols)
+        @info "     Saving $(joinpath(plot_dir, "profiles.png"))"
+        Plots.plot(
+            all_profiles...;
+            layout = n_plots,
+            size = (width_to_height_ratio * fig_height, fig_height),
+            framestyle = :box,
+            margin = 20 * Plots.PlotMeasures.px,
+        )
+        Plots.savefig(joinpath(plot_dir, "profiles.png"))
+    else
+        for tc_var in keys(all_contours)
+            @info "     Saving $(joinpath(plot_dir, "contours_$tc_var.png"))"
+            Plots.plot(all_contours[tc_var])
+            Plots.savefig(joinpath(plot_dir, "contours_$tc_var.png"))
+        end
+
+        all_profiles = plots_dict["profiles"]
+        for tc_var in keys(all_profiles)
+            @info "     Saving $(joinpath(plot_dir, "profiles_$tc_var.png"))"
+            Plots.plot(all_profiles[tc_var])
+            Plots.savefig(joinpath(plot_dir, "profiles_$tc_var.png"))
+        end
+    end
 end
 
 sufficient_mse(computed_mse, best_mse) = computed_mse <= best_mse + sqrt(eps())
