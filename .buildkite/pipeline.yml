@@ -167,8 +167,16 @@ steps:
 
   - label: ":robot_face: Move main results"
     key: "cpu_mv_main_res"
+    # if: build.branch == "staging" # add back in after debugging
     command:
-      - "julia --color=yes --project utils/move_output.jl"
+      - commit_sha="${BUILDKITE_COMMIT}" | cut -c1-7
+      - cluster_data_prefix="/central/scratch/climaci/turbulenceconvection-main/${commit_sha}/"
+      - tmp_dir=$(mktemp -d)
+      - echo commit_sha
+      - echo cluster_data_prefix
+      - mv Output.* ${tmp_dir}
+      - mv ${tmp_dir} ${cluster_data_prefix}
+      - ( cd ${cluster_data_prefix}; ls )
     agents:
       config: cpu
       queue: central
