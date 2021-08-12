@@ -102,16 +102,16 @@ function compute_mse_wrapper(
     kwargs...,
 )
     # Note: cluster_data_prefix is also defined in pipeline.yml
-    if haskey(ENV, "BUILDKITE_BUILD_PATH") && haskey(ENV, "BUILDKITE_PIPELINE_SLUG")
-        bkp = ENV["BUILDKITE_BUILD_PATH"]
-        bks = ENV["BUILDKITE_PIPELINE_SLUG"]
-        cluster_data_prefix = joinpath(bkp, bks, "main_results")
-        path = find_latest_dataset_folder(; dir = cluster_data_prefix)
+    # if haskey(ENV, "BUILDKITE_BUILD_PATH") && haskey(ENV, "BUILDKITE_PIPELINE_SLUG")
+    #     bkp = ENV["BUILDKITE_BUILD_PATH"]
+    #     bks = ENV["BUILDKITE_PIPELINE_SLUG"]
+    #     cluster_data_prefix = joinpath(bkp, bks, "main_results")
+    #     path = find_latest_dataset_folder(; dir = cluster_data_prefix)
 
-        # TODO: make this more robust in case folder/file changes
-        folder_name = joinpath("Output.$case_name.01", "stats")
-        ds_tc_main_filename = joinpath(path, folder_name, "Stats.$case_name.nc")
-    end
+    #     # TODO: make this more robust in case folder/file changes
+    #     folder_name = joinpath("Output.$case_name.01", "stats")
+    #     ds_tc_main_filename = joinpath(path, folder_name, "Stats.$case_name.nc")
+    # end
     # Note that we're using a closure over
     #  - PyCLES_output_dataset_path
     #  - SCAMPy_output_dataset_path
