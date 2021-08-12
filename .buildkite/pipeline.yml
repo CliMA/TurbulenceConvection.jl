@@ -4,8 +4,8 @@ env:
   CUDA_VERSION: "11.2"
   OPENBLAS_NUM_THREADS: 1
   CLIMATEMACHINE_SETTINGS_FIX_RNG_SEED: "true"
-  BUILDKITE_COMMIT: "${BUILDKITE_COMMIT}"
-  BUILDKITE_BRANCH: "${BUILDKITE_BRANCH}"
+  BUILDKITE_BUILD_PATH: "${BUILDKITE_BUILD_PATH}"
+  BUILDKITE_PIPELINE_SLUG: "${BUILDKITE_PIPELINE_SLUG}"
 
 steps:
   - label: "init :computer:"
@@ -170,7 +170,7 @@ steps:
     # if: build.branch == "staging" # add back in after debugging
     command:
       # Note: cluster_data_prefix is also defined in compute_mse.jl
-      - cluster_data_prefix=${BUILDKITE_BUILD_PATH}/${BUILDKITE_PIPELINE_SLUG}/main_results
+      - cluster_data_prefix="${BUILDKITE_BUILD_PATH}/${BUILDKITE_PIPELINE_SLUG}/main_results"
       - echo "${cluster_data_prefix}"
       - tmp_dir=$(mktemp -d)
       - mv Output.* "${tmp_dir}"
