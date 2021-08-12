@@ -80,6 +80,17 @@ function append_dict(filename::AbstractString, sym::Symbol, dict = Dict())
     return dict
 end
 
+function find_latest_dataset_folder(; dir = pwd())
+    matching_paths = String[]
+    for file in readdir(dir)
+        !ispath(joinpath(dir, file)) && continue
+        push!(matching_paths, joinpath(dir, file))
+    end
+    isempty(matching_paths) && return ""
+    # sort by timestamp
+    return pop!(sort(matching_paths))
+end
+
 function compute_mse_wrapper(
     case_name,
     best_mse,
@@ -93,10 +104,11 @@ function compute_mse_wrapper(
     # Note: cluster_data_prefix is also defined in utils/move_output.jl
     if haskey(ENV, "BUILDKITE_COMMIT")
         cluster_data_prefix = "/central/scratch/climaci/turbulenceconvection-main"
-        commit_sha = ENV["BUILDKITE_COMMIT"][1:7]
-        path = joinpath(cluster_data_prefix, commit_sha)
-        folder_name = "Output.$case_name.01" # TODO: make this more robust in case 01 changes
-        ds_tc_main_filename = joinpath(path, folder_name, "$case_name.nc")
+        path = find_latest_dataset_folder(; dir = cluster_data_prefix)
+
+        # TODO: make this more robust in case folder/file changes
+        folder_name = joinpath("Output.$case_name.01", "stats")
+        ds_tc_main_filename = joinpath(path, folder_name, "Stats.$case_name.nc")
     end
     # Note that we're using a closure over
     #  - PyCLES_output_dataset_path
@@ -253,7 +265,7 @@ function compute_mse(experiment, best_mse, plot_dir; ds_dict, plot_comparison = 
                     z_tcc ./ 10^3,
                     xlabel = tc_var,
                     ylabel = "z [km]",
-                    label = "TC.jl (placeholder for main)",
+                    label = "TC.jl (main)",
                 )
             end
             Plots.plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "TC.jl")
@@ -291,7 +303,7 @@ function compute_mse(experiment, best_mse, plot_dir; ds_dict, plot_comparison = 
                     ylabel = "height (m)",
                     c = :viridis,
                     clims = clims,
-                    title = "TC.jl (placeholder for main)",
+                    title = "TC.jl (main)",
                 )
             end
             p3 = Plots.contourf(
@@ -302,10 +314,10 @@ function compute_mse(experiment, best_mse, plot_dir; ds_dict, plot_comparison = 
                 ylabel = "height (m)",
                 c = :viridis,
                 clims = clims,
-                title = "TC.jl",
+                title = have_tc_main ? "TC.jl (PR)" : "TC.jl",
             )
             if have_tc_main
-                Plots.plot(p1, p2, p3; layout = (3, 1))
+                Plots.plot(p1, p2, p3; layout = (3, 1), size = (400, 600))
             else
                 Plots.plot(p1, p3; layout = (2, 1))
             end
