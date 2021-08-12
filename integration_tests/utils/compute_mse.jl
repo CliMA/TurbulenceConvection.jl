@@ -101,9 +101,11 @@ function compute_mse_wrapper(
     plot_dir = joinpath(dirname(ds_tc_filename), "comparison"),
     kwargs...,
 )
-    # Note: cluster_data_prefix is also defined in utils/move_output.jl
-    if haskey(ENV, "BUILDKITE_COMMIT")
-        cluster_data_prefix = "/central/scratch/climaci/turbulenceconvection-main"
+    # Note: cluster_data_prefix is also defined in pipeline.yml
+    if haskey(ENV, "BUILDKITE_BUILD_PATH") && haskey(ENV, "BUILDKITE_PIPELINE_SLUG")
+        bkp = ENV["BUILDKITE_BUILD_PATH"]
+        bks = ENV["BUILDKITE_PIPELINE_SLUG"]
+        cluster_data_prefix = joinpath(bkp, bks, "main_results")
         path = find_latest_dataset_folder(; dir = cluster_data_prefix)
 
         # TODO: make this more robust in case folder/file changes
