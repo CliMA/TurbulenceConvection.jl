@@ -4,6 +4,8 @@ env:
   CUDA_VERSION: "11.2"
   OPENBLAS_NUM_THREADS: 1
   CLIMATEMACHINE_SETTINGS_FIX_RNG_SEED: "true"
+  BUILDKITE_COMMIT: "${BUILDKITE_COMMIT}"
+  BUILDKITE_BRANCH: "${BUILDKITE_BRANCH}"
 
 steps:
   - label: "init :computer:"
@@ -161,3 +163,13 @@ steps:
       queue: central
       slurm_ntasks: 1
 
+  - wait
+
+  - label: ":robot_face: Move main results"
+    key: "cpu_mv_main_res"
+    command:
+      - "julia --color=yes --project utils/move_output.jl"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
