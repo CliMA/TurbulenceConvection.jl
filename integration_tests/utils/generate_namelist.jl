@@ -89,6 +89,7 @@ function default_namelist(case_name::String)
     namelist_defaults["thermodynamics"]["quadrature_type"] = "log-normal" #"gaussian" or "log-normal"
 
     namelist_defaults["time_stepping"] = Dict()
+    namelist_defaults["time_stepping"]["dt"] = 3.0
 
     namelist_defaults["microphysics"] = Dict()
     namelist_defaults["microphysics"]["rain_model"] = "None"
@@ -154,7 +155,6 @@ function Soares(namelist_defaults)
     namelist["grid"]["nz"] = 75
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["dt"] = 30.0
     namelist["time_stepping"]["t_max"] = 8 * 3600.0
 
     namelist["meta"]["simname"] = "Soares"
@@ -170,7 +170,6 @@ function Nieuwstadt(namelist_defaults)
     namelist["grid"]["nz"] = 75
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["dt"] = 10.0
     namelist["time_stepping"]["t_max"] = 8 * 3600.0
 
     namelist["meta"]["simname"] = "Nieuwstadt"
@@ -186,7 +185,6 @@ function Bomex(namelist_defaults)
     namelist["grid"]["nz"] = 60
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["dt"] = 20.0
     namelist["time_stepping"]["t_max"] = 21600.0
 
     namelist["meta"]["simname"] = "Bomex"
@@ -202,7 +200,6 @@ function life_cycle_Tan2018(namelist_defaults)
     namelist["grid"]["nz"] = 75
     namelist["grid"]["dz"] = 40.0
 
-    namelist["time_stepping"]["dt"] = 30.0
     namelist["time_stepping"]["t_max"] = 6 * 3600.0
     namelist["meta"]["simname"] = "life_cycle_Tan2018"
     namelist["meta"]["casename"] = "life_cycle_Tan2018"
@@ -218,15 +215,14 @@ function Rico(namelist_defaults)
     namelist["grid"]["nz"] = 120
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["dt"] = 20.0
     namelist["time_stepping"]["t_max"] = 86400.0
 
     # namelist["microphysics"]["rain_model"] = "cutoff"
     namelist["microphysics"]["rain_model"] = "clima_1m"
+    namelist["microphysics"]["tau_acnv"] = 1e4
 
     namelist["meta"]["simname"] = "Rico"
     namelist["meta"]["casename"] = "Rico"
-
     return namelist
 end
 function TRMM_LBA(namelist_defaults)
@@ -238,7 +234,6 @@ function TRMM_LBA(namelist_defaults)
     namelist["grid"]["nz"] = 320
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["dt"] = 30.0
     namelist["time_stepping"]["t_max"] = 21600.0
 
     namelist["microphysics"]["rain_model"] = "cutoff"
@@ -257,7 +252,6 @@ function ARM_SGP(namelist_defaults)
     namelist["grid"]["nz"] = 88
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["dt"] = 10.0
     namelist["time_stepping"]["t_max"] = 3600.0 * 14.5
     namelist["meta"]["simname"] = "ARM_SGP"
     namelist["meta"]["casename"] = "ARM_SGP"
@@ -272,7 +266,6 @@ function GATE_III(namelist_defaults)
     namelist["grid"]["nz"] = 1700
     namelist["grid"]["dz"] = 10
 
-    namelist["time_stepping"]["dt"] = 5.0
     namelist["time_stepping"]["t_max"] = 3600.0 * 24.0
     namelist["meta"]["simname"] = "GATE_III"
     namelist["meta"]["casename"] = "GATE_III"
@@ -288,7 +281,6 @@ function DYCOMS_RF01(namelist_defaults)
     namelist["grid"]["nz"] = 30
     namelist["grid"]["dz"] = 50
 
-    namelist["time_stepping"]["dt"] = 10.0
     namelist["time_stepping"]["t_max"] = 60 * 60 * 16.0
     namelist["meta"]["simname"] = "DYCOMS_RF01"
     namelist["meta"]["casename"] = "DYCOMS_RF01"
@@ -304,7 +296,6 @@ function GABLS(namelist_defaults)
     namelist["grid"]["nz"] = 8
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["dt"] = 1.0
     namelist["time_stepping"]["t_max"] = 9 * 3600.0
     namelist["meta"]["simname"] = "GABLS"
     namelist["meta"]["casename"] = "GABLS"
@@ -320,7 +311,6 @@ function SP(namelist_defaults)
     namelist["grid"]["nz"] = 256
     namelist["grid"]["dz"] = 8
 
-    namelist["time_stepping"]["dt"] = 5.0
     namelist["time_stepping"]["t_max"] = 7200.0
     namelist["meta"]["simname"] = "SP"
     namelist["meta"]["casename"] = "SP"
@@ -340,7 +330,6 @@ function DryBubble(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["stats_io"]["frequency"] = 10.0
-    namelist["time_stepping"]["dt"] = 10.0
     namelist["time_stepping"]["t_max"] = 1000.0
     namelist["meta"]["simname"] = "DryBubble"
     namelist["meta"]["casename"] = "DryBubble"
