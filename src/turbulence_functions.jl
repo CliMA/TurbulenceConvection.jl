@@ -1,6 +1,6 @@
 # convective velocity scale
 function get_wstar(bflux, zi)
-    return cbrt(fmax(bflux * zi, 0.0))
+    return cbrt(max(bflux * zi, 0.0))
 end
 
 # BL height
@@ -44,7 +44,7 @@ end
 # Teixiera convective tau
 function get_mixing_tau(zi, wstar)
     # return 0.5 * zi / wstar
-    #return zi / (fmax(wstar, 1e-5))
+    #return zi / (max(wstar, 1e-5))
     return zi / (wstar + 0.001)
 end
 
@@ -61,7 +61,7 @@ function get_surface_variance(flux1, flux2, ustar, zLL, oblength)
     c_star1 = -flux1 / ustar
     c_star2 = -flux2 / ustar
     if oblength < 0.0
-        return 4.0 * c_star1 * c_star2 * pow(1.0 - 8.3 * zLL / oblength, -2.0 / 3.0)
+        return 4.0 * c_star1 * c_star2 * (1.0 - 8.3 * zLL / oblength)^(-2.0 / 3.0)
     else
         return 4.0 * c_star1 * c_star2
     end

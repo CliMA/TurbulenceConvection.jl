@@ -316,13 +316,13 @@ function upd_cloud_diagnostics(self::UpdraftVariables, Ref::ReferenceState)
 
         @inbounds for k in real_center_indicies(self.Gr)
             if self.Area.values[i, k] > 1e-3
-                self.updraft_top[i] = fmax(self.updraft_top[i], self.Gr.z_half[k])
+                self.updraft_top[i] = max(self.updraft_top[i], self.Gr.z_half[k])
                 self.lwp += Ref.rho0_half[k] * self.QL.values[i, k] * self.Area.values[i, k] * self.Gr.dz
 
                 if self.QL.values[i, k] > 1e-8
-                    self.cloud_base[i] = fmin(self.cloud_base[i], self.Gr.z_half[k])
-                    self.cloud_top[i] = fmax(self.cloud_top[i], self.Gr.z_half[k])
-                    self.cloud_cover[i] = fmax(self.cloud_cover[i], self.Area.values[i, k])
+                    self.cloud_base[i] = min(self.cloud_base[i], self.Gr.z_half[k])
+                    self.cloud_top[i] = max(self.cloud_top[i], self.Gr.z_half[k])
+                    self.cloud_cover[i] = max(self.cloud_cover[i], self.Area.values[i, k])
                 end
             end
         end
