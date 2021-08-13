@@ -1003,12 +1003,8 @@ end
 function compute_pressure_plume_spacing(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
 
     @inbounds for i in xrange(self.n_updrafts)
-        if self.use_const_plume_spacing
-            self.pressure_plume_spacing[i] = self.constant_plume_spacing
-        else
-            self.pressure_plume_spacing[i] =
-                max(self.aspect_ratio * self.UpdVar.updraft_top[i], 500.0 * self.aspect_ratio)
-        end
+        self.pressure_plume_spacing[i] =
+            max(self.aspect_ratio * self.UpdVar.updraft_top[i], self.min_updraft_top * self.aspect_ratio)
     end
     return
 end
