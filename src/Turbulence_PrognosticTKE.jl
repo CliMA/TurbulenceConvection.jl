@@ -1201,26 +1201,23 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
                     self.UpdVar.Area.values[i, k - 1] *
                     interp2pt(self.UpdVar.W.values[i, k - 2], self.UpdVar.W.values[i, k - 1])
                 )
-                c1 = ref_state.rho0_half[k] * self.UpdVar.Area.new[i, k] * dti_
-                c2 = (
-                    ref_state.rho0_half[k] * self.UpdVar.Area.values[i, k] * dti_ -
-                    m_k * (dzi + self.detr_sc[i, k] + self.frac_turb_entr[i, k])
-                )
-                c3 = m_km * dzi
-                c4 = m_k * (self.entr_sc[i, k] + self.frac_turb_entr[i, k])
 
+                adv = (m_k * self.UpdVar.H.values[i, k] - m_km * self.UpdVar.H.values[i, k - 1]) * dzi
+                entr = (self.entr_sc[i, k] + self.frac_turb_entr[i, k]) * self.EnvVar.H.values[k]
+                detr = (self.detr_sc[i, k] + self.frac_turb_entr[i, k]) * self.UpdVar.H.values[i, k]
                 self.UpdVar.H.new[i, k] =
                     (
-                        c2 * self.UpdVar.H.values[i, k] +
-                        c3 * self.UpdVar.H.values[i, k - 1] +
-                        c4 * self.EnvVar.H.values[k]
-                    ) / c1
+                        ref_state.rho0_half[k] * self.UpdVar.Area.values[i, k] * dti_ * self.UpdVar.H.values[i, k] -
+                        adv + m_k * (entr - detr)
+                    ) / (ref_state.rho0_half[k] * self.UpdVar.Area.new[i, k] * dti_)
+
+                adv = (m_k * self.UpdVar.QT.values[i, k] - m_km * self.UpdVar.QT.values[i, k - 1]) * dzi
+                entr = (self.entr_sc[i, k] + self.frac_turb_entr[i, k]) * self.EnvVar.QT.values[k]
+                detr = (self.detr_sc[i, k] + self.frac_turb_entr[i, k]) * self.UpdVar.QT.values[i, k]
                 self.UpdVar.QT.new[i, k] = max(
                     (
-                        c2 * self.UpdVar.QT.values[i, k] +
-                        c3 * self.UpdVar.QT.values[i, k - 1] +
-                        c4 * self.EnvVar.QT.values[k]
-                    ) / c1,
+                        ref_state.rho0_half[k] * self.UpdVar.Area.values[i, k] * dti_ * self.UpdVar.QT.values[i, k] - adv + m_k * (entr - detr)
+                    ) / (ref_state.rho0_half[k] * self.UpdVar.Area.new[i, k] * dti_),
                     0.0,
                 )
 

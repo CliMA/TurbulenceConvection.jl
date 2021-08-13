@@ -11,19 +11,19 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 5.2649432939457785e-03
-best_mse["ql_mean"] = 8.3701044168155769e-01
-best_mse["updraft_area"] = 7.0432678120046099e-01
-best_mse["updraft_w"] = 5.8558890544083542e-01
-best_mse["updraft_qt"] = 1.1615774393933681e-01
-best_mse["updraft_thetal"] = 6.2885864461831401e-05
-best_mse["v_mean"] = 2.4748668041280980e-01
-best_mse["u_mean"] = 7.1361727014691585e-04
-best_mse["tke_mean"] = 2.0664613598760551e-01
-best_mse["temperature_mean"] = 2.5719775476904971e-06
-best_mse["thetal_mean"] = 2.4566433106218294e-06
-best_mse["Hvar_mean"] = 2.1515325662209743e+03
-best_mse["QTvar_mean"] = 1.1458060992053790e+03
+best_mse["qt_mean"] = 5.2649429859732335e-03
+best_mse["ql_mean"] = 8.3701130817214975e-01
+best_mse["updraft_area"] = 7.0432677991444692e-01
+best_mse["updraft_w"] = 5.8558890484998805e-01
+best_mse["updraft_qt"] = 1.1615774284759468e-01
+best_mse["updraft_thetal"] = 6.2885863821116435e-05
+best_mse["v_mean"] = 2.4748668316753225e-01
+best_mse["u_mean"] = 7.1361729071471190e-04
+best_mse["tke_mean"] = 2.0664613818639557e-01
+best_mse["temperature_mean"] = 2.5719773912461363e-06
+best_mse["thetal_mean"] = 2.4566431564965449e-06
+best_mse["Hvar_mean"] = 2.1515252048343000e+03
+best_mse["QTvar_mean"] = 1.1458013034475746e+03
 
 @testset "life_cycle_Tan2018" begin
     case_name = "life_cycle_Tan2018"
