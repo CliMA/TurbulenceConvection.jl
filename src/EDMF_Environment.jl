@@ -57,9 +57,9 @@ function env_cloud_diagnostics(self::EnvironmentVariables, Ref::ReferenceState)
         self.lwp += Ref.rho0_half[k] * self.QL.values[k] * self.Area.values[k] * self.Gr.dz
 
         if self.QL.values[k] > 1e-8 && self.Area.values[k] > 1e-3
-            self.cloud_base = fmin(self.cloud_base, self.Gr.z_half[k])
-            self.cloud_top = fmax(self.cloud_top, self.Gr.z_half[k])
-            self.cloud_cover = fmax(self.cloud_cover, self.Area.values[k] * self.cloud_fraction.values[k])
+            self.cloud_base = min(self.cloud_base, self.Gr.z_half[k])
+            self.cloud_top = max(self.cloud_top, self.Gr.z_half[k])
+            self.cloud_cover = max(self.cloud_cover, self.Area.values[k] * self.cloud_fraction.values[k])
         end
     end
     return
@@ -207,7 +207,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
         if (
             EnvVar.QTvar.values[k] > epsilon &&
             EnvVar.Hvar.values[k] > epsilon &&
-            fabs(EnvVar.HQTcov.values[k]) > epsilon &&
+            abs(EnvVar.HQTcov.values[k]) > epsilon &&
             EnvVar.QT.values[k] > epsilon &&
             sqrt(EnvVar.QTvar.values[k]) < EnvVar.QT.values[k]
         )
@@ -217,15 +217,13 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                 sd_q = sqrt(log(EnvVar.QTvar.values[k] / EnvVar.QT.values[k] / EnvVar.QT.values[k] + 1.0))
                 sd_h = sqrt(log(EnvVar.Hvar.values[k] / EnvVar.H.values[k] / EnvVar.H.values[k] + 1.0))
                 # Enforce Schwarz"s inequality
-                corr = fmax(
-                    fmin(EnvVar.HQTcov.values[k] / sqrt(EnvVar.Hvar.values[k] * EnvVar.QTvar.values[k]), 1.0),
-                    -1.0,
-                )
+                corr =
+                    max(min(EnvVar.HQTcov.values[k] / sqrt(EnvVar.Hvar.values[k] * EnvVar.QTvar.values[k]), 1.0), -1.0)
                 sd2_hq = log(
                     corr * sqrt(EnvVar.Hvar.values[k] * EnvVar.QTvar.values[k]) / EnvVar.H.values[k] /
                     EnvVar.QT.values[k] + 1.0,
                 )
-                sd_cond_h_q = sqrt(fmax(sd_h * sd_h - sd2_hq * sd2_hq / sd_q / sd_q, 0.0))
+                sd_cond_h_q = sqrt(max(sd_h * sd_h - sd2_hq * sd2_hq / sd_q / sd_q, 0.0))
                 mu_q = log(
                     EnvVar.QT.values[k] * EnvVar.QT.values[k] /
                     sqrt(EnvVar.QT.values[k] * EnvVar.QT.values[k] + EnvVar.QTvar.values[k]),
@@ -237,16 +235,16 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
             else
                 sd_q = sqrt(EnvVar.QTvar.values[k])
                 sd_h = sqrt(EnvVar.Hvar.values[k])
-                corr = fmax(fmin(EnvVar.HQTcov.values[k] / fmax(sd_h * sd_q, 1e-13), 1.0), -1.0)
+                corr = max(min(EnvVar.HQTcov.values[k] / max(sd_h * sd_q, 1e-13), 1.0), -1.0)
 
                 # limit sd_q to prevent negative qt_hat
                 sd_q_lim = (1e-10 - EnvVar.QT.values[k]) / (sqrt2 * abscissas[1])
                 # walking backwards to assure your q_t will not be smaller than 1e-10
                 # TODO - check
                 # TODO - change 1e-13 and 1e-10 to some epislon
-                sd_q = fmin(sd_q, sd_q_lim)
+                sd_q = min(sd_q, sd_q_lim)
                 qt_var = sd_q * sd_q
-                sigma_h_star = sqrt(fmax(1.0 - corr * corr, 0.0)) * sd_h
+                sigma_h_star = sqrt(max(1.0 - corr * corr, 0.0)) * sd_h
             end
 
             # zero outer quadrature points

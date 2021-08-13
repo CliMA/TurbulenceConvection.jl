@@ -78,7 +78,7 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
     @inbounds for k in face_indicies(self.Gr)
         if self.Gr.z[k] > zi
             cbrt_z = cbrt(self.Gr.z[k] - zi)
-            self.f_rad[k] += ρ_i * dycoms_cp * self.divergence * self.alpha_z * (power(cbrt_z, 4) / 4.0 + zi * cbrt_z)
+            self.f_rad[k] += ρ_i * dycoms_cp * self.divergence * self.alpha_z * (cbrt_z^4 / 4 + zi * cbrt_z)
         end
     end
 

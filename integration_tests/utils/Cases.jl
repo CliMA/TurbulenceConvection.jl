@@ -5,7 +5,6 @@ using Random
 import ..TurbulenceConvection
 using ..TurbulenceConvection: CasesBase
 using ..TurbulenceConvection: set_bcs
-using ..TurbulenceConvection: pow
 using ..TurbulenceConvection: off_arr
 using ..TurbulenceConvection: omega
 using ..TurbulenceConvection: pyinterp
@@ -14,7 +13,6 @@ using ..TurbulenceConvection: thetali_c
 using ..TurbulenceConvection: theta_rho_c
 using ..TurbulenceConvection: eps_v
 using ..TurbulenceConvection: pv_star
-using ..TurbulenceConvection: fabs
 using ..TurbulenceConvection: buoyancy_c
 using ..TurbulenceConvection: dycoms_L
 using ..TurbulenceConvection: qv_star_c
@@ -1022,8 +1020,8 @@ function TC.io(self::CasesBase{TRMM_LBA}, Stats::NetCDFIO_Stats)
 end
 
 function update_surface(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::TimeStepping)
-    self.Sur.lhf = 554.0 * pow(max(0, cos(π / 2 * ((5.25 * 3600.0 - TS.t) / 5.25 / 3600.0))), 1.3)
-    self.Sur.shf = 270.0 * pow(max(0, cos(π / 2 * ((5.25 * 3600.0 - TS.t) / 5.25 / 3600.0))), 1.5)
+    self.Sur.lhf = 554.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - TS.t) / 5.25 / 3600.0)))^1.3
+    self.Sur.shf = 270.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - TS.t) / 5.25 / 3600.0)))^1.5
     update(self.Sur, GMV)
     # fix momentum fluxes to zero as they are not used in the paper
     self.Sur.rho_uflux = 0.0
@@ -1386,7 +1384,7 @@ function dycoms_sat_adjst(self::CasesBase{DYCOMS_RF01}, p_, thetal_, qt_)
         qs_2 = qv_star_c(p_, qt_, pv_star_2)
         ql_2 = qt_ - qs_2
 
-        while fabs(t_2 - t_1) >= 1e-9
+        while abs(t_2 - t_1) >= 1e-9
             pv_star_2 = pv_star(t_2)
             qs_2 = qv_star_c(p_, qt_, pv_star_2)
             ql_2 = qt_ - qs_2

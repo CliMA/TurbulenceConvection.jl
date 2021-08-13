@@ -48,17 +48,17 @@ function entr_detr(param_set, w_min, β, c_δ, c_div, c_μ, c_μ0, χ_upd, c_λ,
 
     D_ε, D_δ, M_δ, M_ε = nondimensional_exchange_functions(c_ε, c_δ, c_μ, c_μ0, β, χ_upd, Δw, Δb, εδ_model)
 
-    l[1] = c_λ * fabs(Δb / sqrt(εδ_model.tke + 1e-8))
-    l[2] = fabs(Δb / Δw)
+    l[1] = c_λ * abs(Δb / sqrt(εδ_model.tke + 1e-8))
+    l[2] = abs(Δb / Δw)
     λ = lamb_smooth_minimum(l, 0.1, 0.0005)
 
-    MdMdz = fmax(εδ_model.dMdz / fmax(εδ_model.M, 1e-12), 0.0)
-    MdMdz = fmax(-εδ_model.dMdz / fmax(εδ_model.M, 1e-12), 0.0)
+    MdMdz = max(εδ_model.dMdz / max(εδ_model.M, 1e-12), 0.0)
+    MdMdz = max(-εδ_model.dMdz / max(εδ_model.M, 1e-12), 0.0)
 
 
 
     # turbulent entrainment
-    k_ε = εδ_model.a_upd * c_εt * sqrt(fmax(εδ_model.tke, 0.0)) * εδ_model.R_up
+    k_ε = εδ_model.a_upd * c_εt * sqrt(max(εδ_model.tke, 0.0)) * εδ_model.R_up
     if εδ_model.w_upd * εδ_model.a_upd > 0.0
         ε_turb = (2.0 / εδ_model.R_up^2.0) * k_ε / (εδ_model.w_upd * εδ_model.a_upd)
     else

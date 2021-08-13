@@ -104,8 +104,8 @@ function mean_cloud_diagnostics(self)
         self.lwp += self.Ref.rho0_half[k] * self.QL.values[k] * self.Gr.dz
 
         if self.QL.values[k] > 1e-8
-            self.cloud_base = fmin(self.cloud_base, self.Gr.z_half[k])
-            self.cloud_top = fmax(self.cloud_top, self.Gr.z_half[k])
+            self.cloud_base = min(self.cloud_base, self.Gr.z_half[k])
+            self.cloud_top = max(self.cloud_top, self.Gr.z_half[k])
         end
     end
     return
