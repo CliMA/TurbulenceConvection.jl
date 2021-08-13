@@ -1173,7 +1173,6 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     sa = eos_struct()
 
     @inbounds for i in xrange(self.n_updrafts)
-
         # starting from the bottom do entrainment at each level
         @inbounds for k in real_center_indicies(grid)
             if is_surface_center(grid, k)
@@ -1220,12 +1219,14 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
                         c3 * self.UpdVar.H.values[i, k - 1] +
                         c4 * self.EnvVar.H.values[k]
                     ) / c1
-                self.UpdVar.QT.new[i, k] =
+                self.UpdVar.QT.new[i, k] = max(
                     (
                         c2 * self.UpdVar.QT.values[i, k] +
                         c3 * self.UpdVar.QT.values[i, k - 1] +
                         c4 * self.EnvVar.QT.values[k]
-                    ) / c1
+                    ) / c1,
+                    0.0,
+                )
 
             else
                 self.UpdVar.H.new[i, k] = GMV.H.values[k]
