@@ -103,7 +103,7 @@ function update(self::SurfaceBase{SurfaceFixedCoeffs}, GMV::GridMeanVariables)
 
     self.ustar = sqrt(self.cm) * windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
-    if fabs(self.bflux) < 1e-10
+    if abs(self.bflux) < 1e-10
         self.obukhov_length = 0.0
     else
         self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb
@@ -152,7 +152,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
         buoyancy_flux(self.shf, self.lhf, GMV.T.values[kc_surf], GMV.QT.values[kc_surf], self.Ref.alpha0[kf_surf])
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
-    if fabs(self.bflux) < 1e-10
+    if abs(self.bflux) < 1e-10
         self.obukhov_length = 0.0
     else
         self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb
@@ -198,7 +198,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
     self.bflux = buoyancy_flux(self.shf, self.lhf, GMV.T.values[kc_surf], 0.0, self.Ref.alpha0[kf_surf])
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
-    if fabs(self.bflux) < 1e-10
+    if abs(self.bflux) < 1e-10
         self.obukhov_length = 0.0
     else
         self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb
@@ -246,7 +246,7 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
 
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
-    if fabs(self.bflux) < 1e-10
+    if abs(self.bflux) < 1e-10
         self.obukhov_length = 0.0
     else
         self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb

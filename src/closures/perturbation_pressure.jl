@@ -50,7 +50,7 @@ function perturbation_pressure(
 
     nh_pressure_adv = ρ0_k * a_up * β₁ * w_up * ∇w_up
     # drag as w_dif and account for downdrafts
-    nh_pressure_drag = -1.0 * ρ0_k * a_up * β₂ * (w_up - w_en) * fabs(w_up - w_en) / fmax(updraft_top, min_updraft_top)
+    nh_pressure_drag = -1.0 * ρ0_k * a_up * β₂ * (w_up - w_en) * abs(w_up - w_en) / max(updraft_top, min_updraft_top)
 
     return nh_press_buoy, nh_pressure_adv, nh_pressure_drag
 end;

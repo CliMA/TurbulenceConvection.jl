@@ -29,7 +29,7 @@ function acnv_instant(max_supersaturation, ql, qt, T, p0)
     psat = pv_star(T)
     qsat = qv_star_c(p0, qt, psat)
 
-    return fmax(0.0, ql - max_supersaturation * qsat)
+    return max(0.0, ql - max_supersaturation * qsat)
 end
 # CLIMA microphysics rates
 function terminal_velocity_single_drop_coeff(C_drag, rho)
@@ -59,7 +59,7 @@ end
 
 function conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, q_liq)
 
-    return fmax(0.0, q_liq - q_liq_threshold) / tau_acnv
+    return max(0.0, q_liq - q_liq_threshold) / tau_acnv
 end
 
 function conv_q_liq_to_q_rai_accr(C_drag, MP_n_0, E_col, q_liq, q_rai, rho)
@@ -142,7 +142,7 @@ function microphysics_rain_src(
 
     if area > 0.0
         if tmp_clima_acnv_flag
-            _ret.qr_src = fmin(
+            _ret.qr_src = min(
                 ql,
                 (
                     conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, ql) +
@@ -152,7 +152,7 @@ function microphysics_rain_src(
         end
 
         if tmp_cutoff_acnv_flag
-            _ret.qr_src = fmin(ql, acnv_instant(max_supersaturation, ql, qt, T, p0))
+            _ret.qr_src = min(ql, acnv_instant(max_supersaturation, ql, qt, T, p0))
         end
 
         if tmp_no_acnv_flag

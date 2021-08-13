@@ -108,7 +108,7 @@ function exchange_coefficients_byun(Ri, zb, z0, cm, ch, lmo)
         pb = 1.0 / 54.0 * (-2.0 / (gamma_m * gamma_m * gamma_m) + 9.0 / gamma_m * (-gamma_h / gamma_m + 3.0) * sb * sb)
         crit = qb * qb * qb - pb * pb
         if crit < 0.0
-            tb = cbrt(sqrt(-crit) + fabs(pb))
+            tb = cbrt(sqrt(-crit) + abs(pb))
             zeta = zfactor * (1.0 / (3.0 * gamma_m) - (tb + qb / tb))
         else
             angle = acos(pb / sqrt(qb * qb * qb))

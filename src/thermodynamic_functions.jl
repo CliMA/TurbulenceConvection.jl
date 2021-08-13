@@ -130,7 +130,7 @@ function eos(p0, qt, prog; t_to_prog = t_to_thetali_c, prog_to_t = eos_first_gue
         prog_1 = t_to_prog(p0, T_1, qt, ql_1, 0.0)
         f_1 = prog - prog_1
         T_2 = T_1 + ql_1 * latent_heat(T_1) / ((1.0 - qt) * cpd + qv_star_1 * cpv)
-        delta_T = fabs(T_2 - T_1)
+        delta_T = abs(T_2 - T_1)
         qv_star_2 = 0
         while delta_T > 1.0e-3 || ql_2 < 0.0
             pv_star_2 = pv_star(T_2)
@@ -144,7 +144,7 @@ function eos(p0, qt, prog; t_to_prog = t_to_thetali_c, prog_to_t = eos_first_gue
             T_1 = T_2
             T_2 = T_n
             f_1 = f_2
-            delta_T = fabs(T_2 - T_1)
+            delta_T = abs(T_2 - T_1)
         end
 
         _ret.T = T_2
