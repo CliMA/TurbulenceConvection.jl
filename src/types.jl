@@ -714,7 +714,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     Ri_bulk_crit::Float64
     zi::Float64
     n_updrafts::Int
-    use_const_plume_spacing::Bool
+    min_updraft_top::Float64
     drag_sign::Int
     asp_label
     extrapolate_buoyancy::Bool
@@ -724,19 +724,15 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     updraft_mixing_frac::Float64
     entrainment_sigma::Float64
     entrainment_smin_tke_coeff::Float64
-    entrainment_ed_mf_sigma::Float64
     entrainment_scale::Float64
-    constant_plume_spacing::Float64
     detrainment_factor::Float64
     sorting_power::Float64
     turbulent_entrainment_factor::Float64
-    pressure_buoy_coeff::Float64
     aspect_ratio::Float64
     pressure_normalmode_buoy_coeff1::Float64
     pressure_normalmode_buoy_coeff2::Float64
     pressure_normalmode_adv_coeff::Float64
     pressure_normalmode_drag_coeff::Float64
-    vel_buoy_coeff::Float64
     tke_ed_coeff::Float64
     tke_diss_coeff::Float64
     static_stab_coeff::Float64
@@ -801,8 +797,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
 
         # Set the number of updrafts (1)
         n_updrafts = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_number"; default = 1)
-        use_const_plume_spacing =
-            parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "use_constant_plume_spacing"; default = false)
 
         pressure_func_drag_str = parse_namelist(
             namelist,
@@ -834,61 +828,31 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         # set defaults at some point?
         surface_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
         max_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"]
+        # entrainment parameters
         entrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"]
         entrainment_Mdiv_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"]
         updraft_mixing_frac = namelist["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"]
         entrainment_sigma = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_sigma"]
         entrainment_smin_tke_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"]
-        entrainment_ed_mf_sigma = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"]
         entrainment_scale = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"]
-        constant_plume_spacing = namelist["turbulence"]["EDMF_PrognosticTKE"]["constant_plume_spacing"]
         detrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"]
         sorting_power = namelist["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"]
         turbulent_entrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"]
-        pressure_buoy_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_buoy_coeff"]
+        # pressure parameters
         aspect_ratio = namelist["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"]
+        pressure_normalmode_buoy_coeff1 =
+            namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"]
+        pressure_normalmode_buoy_coeff2 =
+            namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff2"]
+        pressure_normalmode_adv_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"]
+        pressure_normalmode_drag_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"]
+        min_updraft_top = namelist["turbulence"]["EDMF_PrognosticTKE"]["min_updraft_top"]
 
-        if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"]) == "normalmode"
-            pressure_normalmode_buoy_coeff1 = parse_namelist(
-                namelist,
-                "turbulence",
-                "EDMF_PrognosticTKE",
-                "pressure_normalmode_buoy_coeff1";
-                default = pressure_buoy_coeff,
-            )
-            pressure_normalmode_buoy_coeff2 = parse_namelist(
-                namelist,
-                "turbulence",
-                "EDMF_PrognosticTKE",
-                "pressure_normalmode_buoy_coeff2";
-                default = 0.0,
-            )
-        end
-
-        if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"]) == "normalmode"
-            pressure_normalmode_adv_coeff = parse_namelist(
-                namelist,
-                "turbulence",
-                "EDMF_PrognosticTKE",
-                "pressure_normalmode_adv_coeff";
-                default = 0.0,
-            )
-            pressure_normalmode_drag_coeff = parse_namelist(
-                namelist,
-                "turbulence",
-                "EDMF_PrognosticTKE",
-                "pressure_normalmode_drag_coeff";
-                default = 1.0,
-            )
-        end
-
-        # "Legacy" coefficients used by the steady updraft routine
-        vel_buoy_coeff = 1.0 - pressure_buoy_coeff
+        # mixing length parameters
         tke_ed_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
         tke_diss_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"]
         static_stab_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"]
-        # Latent heat stability effect
-        lambda_stab = namelist["turbulence"]["EDMF_PrognosticTKE"]["lambda_stab"]
+        lambda_stab = namelist["turbulence"]["EDMF_PrognosticTKE"]["lambda_stab"] # Latent heat stability effect
         # Need to code up as namelist option?
         minimum_area = 1e-5
 
@@ -985,7 +949,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             Ri_bulk_crit,
             zi,
             n_updrafts,
-            use_const_plume_spacing,
+            min_updraft_top,
             drag_sign,
             asp_label,
             extrapolate_buoyancy,
@@ -995,19 +959,15 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             updraft_mixing_frac,
             entrainment_sigma,
             entrainment_smin_tke_coeff,
-            entrainment_ed_mf_sigma,
             entrainment_scale,
-            constant_plume_spacing,
             detrainment_factor,
             sorting_power,
             turbulent_entrainment_factor,
-            pressure_buoy_coeff,
             aspect_ratio,
             pressure_normalmode_buoy_coeff1,
             pressure_normalmode_buoy_coeff2,
             pressure_normalmode_adv_coeff,
             pressure_normalmode_drag_coeff,
-            vel_buoy_coeff,
             tke_ed_coeff,
             tke_diss_coeff,
             static_stab_coeff,

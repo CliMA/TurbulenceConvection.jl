@@ -11,14 +11,14 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["updraft_area"] = 8.8107267096730493e+02
-best_mse["updraft_w"] = 1.8973498180481789e+02
-best_mse["updraft_thetal"] = 5.2905285445151222e-05
-best_mse["u_mean"] = 2.4701556169535316e-27
-best_mse["tke_mean"] = 4.0953307784558532e+00
-best_mse["temperature_mean"] = 3.2275977622863615e-05
-best_mse["thetal_mean"] = 2.5687103839396313e-05
-best_mse["Hvar_mean"] = 3.2146754706000658e+00
+best_mse["updraft_area"] = 6.8552893703976156e+02
+best_mse["updraft_w"] = 1.6342412689086376e+02
+best_mse["updraft_thetal"] = 3.9780037295736014e-05
+best_mse["u_mean"] = 1.9502448099351233e-27
+best_mse["tke_mean"] = 1.9987696066076023e+05
+best_mse["temperature_mean"] = 3.2539779149902821e-05
+best_mse["thetal_mean"] = 2.5848228458179228e-05
+best_mse["Hvar_mean"] = 7.3771757968047757e+02
 
 @testset "DryBubble" begin
     case_name = "DryBubble"

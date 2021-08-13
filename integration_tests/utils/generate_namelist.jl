@@ -1,15 +1,28 @@
 module NameList
-# See Table 1 of Tan et al, 2018
-#namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] ==> c_k (scaling constant for eddy diffusivity/viscosity
-#namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] == > c_e (scaling constant for tke dissipation)
-#namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_buoy_coeff"] ==> alpha_b (scaling constant for virtual mass term)
-#namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_drag_coeff"] ==> alpha_d (scaling constant for drag term)
-# namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_plume_spacing"] ==> r_d (horizontal length scale of plume spacing)
+# See Table ? of Cohen et al, 2020
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.0
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.015
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.25
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_sigma"] = 10.0
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"] = 0.004
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"] = 2.0
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"] = 0.2
 
-# Parameters below can be used to multiply any entrainment rate for quick tuning/experimentation
-# (NOTE: these are not c_epsilon, c_delta,0 defined in Tan et al 2018)
-# namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.1
-# namelist["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 1.0
+# See Table ? of Lopez Gomez et al, 2020
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.14
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.22
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"] = 0.4
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["lambda_stab"] = 0.9
+
+# See Table ? of He et al, 2021
+# namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] = 0.12 ==> alpha_b (scaling constant for virtual mass term)
+# namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff2"] = 0.0 ==> alpha_b (scaling constant for virtual mass term)
+# namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = 0.1 alpha_a (scaling constant for advection term)
+# namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = 10.0 ==> alpha_d (scaling constant for drag term)
+# namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_plume_spacing"] ==> r_d (horizontal length scale of plume spacing)
 
 #NB: except for Bomex and life_cycle_Tan2018 cases, the parameters listed have not been thoroughly tuned/tested
 # and should be regarded as placeholders only. Optimal parameters may also depend on namelist options, such as
@@ -50,28 +63,25 @@ function default_namelist(case_name::String)
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"] = Dict()
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.1
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = 0.9
+    # mixing_length
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.14
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.22
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"] = 0.4
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["lambda_stab"] = 0.9
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = 0.9
+    # entrainment
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.015
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_ed_mf_sigma"] = 50.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.25
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_sigma"] = 10.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"] = 0.004
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"] = 2.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"] = 0.2
-    # This constant_plume_spacing corresponds to plume_spacing/alpha_d in the Tan et al paper,
-    #with values plume_spacing=500.0, alpha_d = 0.375
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["constant_plume_spacing"] = 1333.0
-    # TODO: merge the tan18 buoyancy forluma into normalmode formula -> simply set buoy_coeff1 as 1./3. and buoy_coeff2 as 0.
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_buoy_coeff"] = 1.0 / 3.0
-
+    # pressure 
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["min_updraft_top"] = 500.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] = 0.12
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff2"] = 0.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = 0.1
@@ -89,6 +99,7 @@ function default_namelist(case_name::String)
     namelist_defaults["thermodynamics"]["quadrature_type"] = "log-normal" #"gaussian" or "log-normal"
 
     namelist_defaults["time_stepping"] = Dict()
+    namelist_defaults["time_stepping"]["dt"] = 3.0
 
     namelist_defaults["microphysics"] = Dict()
     namelist_defaults["microphysics"]["rain_model"] = "None"
@@ -99,7 +110,6 @@ function default_namelist(case_name::String)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["extrapolate_buoyancy"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_local_micro"] = true
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_constant_plume_spacing"] = false
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["constant_area"] = false
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["calculate_tke"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["mixing_length"] = "sbtd_eq"
@@ -154,7 +164,6 @@ function Soares(namelist_defaults)
     namelist["grid"]["nz"] = 75
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["dt"] = 30.0
     namelist["time_stepping"]["t_max"] = 8 * 3600.0
 
     namelist["meta"]["simname"] = "Soares"
@@ -170,7 +179,6 @@ function Nieuwstadt(namelist_defaults)
     namelist["grid"]["nz"] = 75
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["dt"] = 10.0
     namelist["time_stepping"]["t_max"] = 8 * 3600.0
 
     namelist["meta"]["simname"] = "Nieuwstadt"
@@ -186,7 +194,6 @@ function Bomex(namelist_defaults)
     namelist["grid"]["nz"] = 60
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["dt"] = 20.0
     namelist["time_stepping"]["t_max"] = 21600.0
 
     namelist["meta"]["simname"] = "Bomex"
@@ -202,7 +209,6 @@ function life_cycle_Tan2018(namelist_defaults)
     namelist["grid"]["nz"] = 75
     namelist["grid"]["dz"] = 40.0
 
-    namelist["time_stepping"]["dt"] = 30.0
     namelist["time_stepping"]["t_max"] = 6 * 3600.0
     namelist["meta"]["simname"] = "life_cycle_Tan2018"
     namelist["meta"]["casename"] = "life_cycle_Tan2018"
@@ -218,15 +224,14 @@ function Rico(namelist_defaults)
     namelist["grid"]["nz"] = 120
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["dt"] = 20.0
     namelist["time_stepping"]["t_max"] = 86400.0
 
     # namelist["microphysics"]["rain_model"] = "cutoff"
     namelist["microphysics"]["rain_model"] = "clima_1m"
+    namelist["microphysics"]["tau_acnv"] = 1e4
 
     namelist["meta"]["simname"] = "Rico"
     namelist["meta"]["casename"] = "Rico"
-
     return namelist
 end
 function TRMM_LBA(namelist_defaults)
@@ -238,7 +243,6 @@ function TRMM_LBA(namelist_defaults)
     namelist["grid"]["nz"] = 320
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["dt"] = 30.0
     namelist["time_stepping"]["t_max"] = 21600.0
 
     namelist["microphysics"]["rain_model"] = "cutoff"
@@ -257,7 +261,6 @@ function ARM_SGP(namelist_defaults)
     namelist["grid"]["nz"] = 88
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["dt"] = 10.0
     namelist["time_stepping"]["t_max"] = 3600.0 * 14.5
     namelist["meta"]["simname"] = "ARM_SGP"
     namelist["meta"]["casename"] = "ARM_SGP"
@@ -272,7 +275,6 @@ function GATE_III(namelist_defaults)
     namelist["grid"]["nz"] = 1700
     namelist["grid"]["dz"] = 10
 
-    namelist["time_stepping"]["dt"] = 5.0
     namelist["time_stepping"]["t_max"] = 3600.0 * 24.0
     namelist["meta"]["simname"] = "GATE_III"
     namelist["meta"]["casename"] = "GATE_III"
@@ -288,7 +290,6 @@ function DYCOMS_RF01(namelist_defaults)
     namelist["grid"]["nz"] = 30
     namelist["grid"]["dz"] = 50
 
-    namelist["time_stepping"]["dt"] = 10.0
     namelist["time_stepping"]["t_max"] = 60 * 60 * 16.0
     namelist["meta"]["simname"] = "DYCOMS_RF01"
     namelist["meta"]["casename"] = "DYCOMS_RF01"
@@ -304,7 +305,6 @@ function GABLS(namelist_defaults)
     namelist["grid"]["nz"] = 8
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["dt"] = 1.0
     namelist["time_stepping"]["t_max"] = 9 * 3600.0
     namelist["meta"]["simname"] = "GABLS"
     namelist["meta"]["casename"] = "GABLS"
@@ -320,7 +320,6 @@ function SP(namelist_defaults)
     namelist["grid"]["nz"] = 256
     namelist["grid"]["dz"] = 8
 
-    namelist["time_stepping"]["dt"] = 5.0
     namelist["time_stepping"]["t_max"] = 7200.0
     namelist["meta"]["simname"] = "SP"
     namelist["meta"]["casename"] = "SP"
@@ -340,7 +339,6 @@ function DryBubble(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["stats_io"]["frequency"] = 10.0
-    namelist["time_stepping"]["dt"] = 10.0
     namelist["time_stepping"]["t_max"] = 1000.0
     namelist["meta"]["simname"] = "DryBubble"
     namelist["meta"]["casename"] = "DryBubble"
