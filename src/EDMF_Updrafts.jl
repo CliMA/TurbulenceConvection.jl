@@ -422,7 +422,7 @@ end
 """
 compute precipitation source terms
 """
-function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rain::RainVariables, dt)
+function microphysics(param_set, self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rain::RainVariables, dt)
     rst = rain_struct()
     mph = mph_struct()
     sa = eos_struct()

@@ -185,7 +185,7 @@ end
 
 function initialize_surface(self::CasesBase{SoaresCase}, Gr::Grid, Ref::ReferenceState)
 
-    param_set = parameter_set(Ref)
+    param_set = TC.parameter_set(Ref)
 
     self.Sur.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     self.Sur.Tsurface = 300.0
@@ -402,7 +402,7 @@ end
 
 function initialize_surface(self::CasesBase{BomexCase}, Gr::Grid, Ref::ReferenceState)
 
-    param_set = parameter_set(Ref)
+    param_set = TC.parameter_set(Ref)
 
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.Tsurface = 299.1 * exner_c(Ref.Pg)
@@ -539,7 +539,7 @@ end
 
 function initialize_surface(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::ReferenceState)
 
-    param_set = parameter_set(Ref)
+    param_set = TC.parameter_set(Ref)
 
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.Tsurface = 299.1 * exner_c(Ref.Pg)
@@ -773,7 +773,7 @@ function initialize_reference(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::Referenc
 end
 function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
 
-    param_set = parameter_set(Ref)
+    param_set = TC.parameter_set(Ref)
 
     # TRMM_LBA inputs from Grabowski et al. 2006
     #! format: off
@@ -864,7 +864,7 @@ end
 
 function initialize_surface(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceState)
 
-    param_set = parameter_set(Ref)
+    param_set = TC.parameter_set(Ref)
 
     #self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.Tsurface = (273.15 + 23) * exner_c(Ref.Pg)
@@ -1102,7 +1102,7 @@ end
 
 function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
 
-    param_set = parameter_set(Ref)
+    param_set = TC.parameter_set(Ref)
 
     # ARM_SGP inputs
     #! format: off
@@ -1231,7 +1231,7 @@ end
 
 function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
 
-    param_set = parameter_set(Ref)
+    param_set = TC.parameter_set(Ref)
 
     qt = TC.center_field(Gr)
     T = TC.center_field(Gr)
@@ -1425,7 +1425,7 @@ end
 
 function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
 
-    param_set = parameter_set(Ref)
+    param_set = TC.parameter_set(Ref)
 
     thetal = TC.center_field(Gr) # helper variable to recalculate temperature
     ql = TC.center_field(Gr) # DYCOMS case is saturated
@@ -1482,7 +1482,7 @@ end
 
 function initialize_surface(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::ReferenceState)
 
-    param_set = parameter_set(Ref)
+    param_set = TC.parameter_set(Ref)
 
     self.Sur.zrough = 1.0e-4
     self.Sur.ustar_fixed = false

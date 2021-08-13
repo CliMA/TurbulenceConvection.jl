@@ -406,7 +406,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
     return
 end
 
-function microphysics(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables, Rain::RainVariables, dt)
+function microphysics(param_set, self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables, Rain::RainVariables, dt)
 
     if EnvVar.EnvThermo_scheme == "mean"
         sgs_mean(self, EnvVar, Rain, dt)

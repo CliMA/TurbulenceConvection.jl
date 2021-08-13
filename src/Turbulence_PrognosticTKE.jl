@@ -217,6 +217,8 @@ end
 # Perform the update of the scheme
 function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
 
+    param_set = parameter_set(self)
+
     grid = get_grid(self)
     update_inversion(self, GMV, Case.inversion_option)
     compute_pressure_plume_spacing(self, GMV, Case)
@@ -229,7 +231,7 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
             buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
         end
 
-        microphysics(self.EnvThermo, self.EnvVar, self.Rain, TS.dt)
+        microphysics(param_set, self.EnvThermo, self.EnvVar, self.Rain, TS.dt)
         initialize_covariance(self, GMV, Case)
 
         @inbounds for k in center_indicies(grid)
@@ -255,7 +257,7 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     #     the mean buoyancy with repect to reference state alpha_0 is zero.
 
     decompose_environment(self, GMV, "mf_update")
-    microphysics(self.EnvThermo, self.EnvVar, self.Rain, TS.dt) # saturation adjustment + rain creation
+    microphysics(param_set, self.EnvThermo, self.EnvVar, self.Rain, TS.dt) # saturation adjustment + rain creation
     # Sink of environmental QT and H due to rain creation is applied in tridiagonal solver
     buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
     compute_eddy_diffusivities_tke(self, GMV, Case)
@@ -308,6 +310,7 @@ function compute_prognostic_updrafts(
     Case::CasesBase,
     TS::TimeStepping,
 )
+    param_set = parameter_set(self)
 
     time_elapsed = 0.0
 
@@ -324,7 +327,7 @@ function compute_prognostic_updrafts(
         compute_updraft_closures(self, GMV, Case)
         solve_updraft_velocity_area(self)
         solve_updraft_scalars(self, GMV)
-        microphysics(self.UpdThermo, self.UpdVar, self.Rain, TS.dt) # causes division error in dry bubble first time step
+        microphysics(param_set, self.UpdThermo, self.UpdVar, self.Rain, TS.dt) # causes division error in dry bubble first time step
 
         set_values_with_new(self.UpdVar)
         zero_area_fraction_cleanup(self, GMV)
