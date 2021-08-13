@@ -432,6 +432,7 @@ function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rai
 
             # autoconversion and accretion
             mph = microphysics_rain_src(
+                param_set,
                 Rain.rain_model,
                 Rain.max_supersaturation,
                 Rain.C_drag,

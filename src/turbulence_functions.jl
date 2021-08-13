@@ -92,6 +92,7 @@ end
 
 # Dustbin
 
+#TODO-AJ: should be ql + qi
 function set_cloudbase_flag(ql, current_flag)
     if ql > 1.0e-8
         new_flag = true

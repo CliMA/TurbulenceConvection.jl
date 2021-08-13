@@ -1,7 +1,7 @@
 
-function buoyancy_flux(shf, lhf, T_b, qt_b, alpha0_0)
+function buoyancy_flux(param_set, shf, lhf, T_b, qt_b, alpha0_0)
     cp_ = cpm_c(qt_b)
-    lv = latent_heat(T_b)
+    lv = TD.latent_heat_vapor(param_set, T_b)
     return (g * alpha0_0 / cp_ / T_b * (shf + (eps_vi - 1.0) * cp_ * T_b * lhf / lv))
 end
 

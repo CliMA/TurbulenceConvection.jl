@@ -28,7 +28,7 @@ end
  - `εδ_model.a_upd`: updraft area fraction
  - `εδ_model.a_env`: environment buoyancy
  - `εδ_model.ql_up`: updraft liquid water
- - `εδ_model.ql_env`: environment liquid water 
+ - `εδ_model.ql_env`: environment liquid water
  - `εδ_model.RH_upd`: updraft relative humidity
  - `εδ_model.RH_env`: environment relative humidity
  - `εδ_model.M`: updraft momentum

@@ -179,12 +179,15 @@ function solve_rain_evap(
     dt_model = TS.dt
     flag_evaporate_all = false
 
+    param_set = parameter_set(GMV)
+
     @inbounds for k in real_center_indicies(self.Gr)
         flag_evaporate_all = false
 
         tmp_evap = max(
             0,
             conv_q_rai_to_q_vap(
+                param_set,
                 Rain.C_drag,
                 Rain.MP_n_0,
                 Rain.a_vent,
@@ -206,7 +209,7 @@ function solve_rain_evap(
         self.rain_evap_source_qt[k] = tmp_evap * RainArea.values[k]
 
         self.rain_evap_source_h[k] =
-            rain_source_to_thetal(self.Ref.p0[k], GMV.T.values[k], -tmp_evap) * RainArea.values[k]
+            rain_source_to_thetal(param_set, self.Ref.p0[k], GMV.T.values[k], -tmp_evap) * RainArea.values[k]
 
         if flag_evaporate_all
             QR.values[k] = 0.0

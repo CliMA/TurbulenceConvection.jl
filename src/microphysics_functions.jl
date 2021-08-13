@@ -3,16 +3,16 @@
 Source term for thetal because of qr transitioning between the working fluid and rain
 (simple version to avoid exponents)
 """
-function rain_source_to_thetal(p0, T, qr)
-    return latent_heat(T) * qr / exner_c(p0) / cpd
+function rain_source_to_thetal(param_set, p0, T, qr)
+    return TD.latent_heat_vapor(param_set, T) * qr / exner_c(p0) / cpd
 end
 
 """
 Source term for thetal because of qr transitioning between the working fluid and rain
 (more detailed version, but still ignoring dqt/dqr)
 """
-function rain_source_to_thetal_detailed(p0, T, qt, ql, qr)
-    L = latent_heat(T)
+function rain_source_to_thetal_detailed(param_set, p0, T, qt, ql, qr)
+    L = TD.latent_heat_vapor(param_set, T)
 
     old_source = L * qr / exner_c(p0) / cpd
 
@@ -52,7 +52,7 @@ function terminal_velocity(C_drag, MP_n_0, q_rai, rho)
     return term_vel
 end
 
-function conv_q_vap_to_q_liq(param_set::APS, q_sat_liq, q_liq)
+function conv_q_vap_to_q_liq(param_set, q_sat_liq, q_liq)
 
     return (q_sat_liq - q_liq) / CPMP.τ_cond_evap(param_set)
 end
@@ -72,9 +72,9 @@ function conv_q_liq_to_q_rai_accr(C_drag, MP_n_0, E_col, q_liq, q_rai, rho)
     return accr_coeff * MP_n_0^(1 / 8) * sqrt(g) * q_liq * q_rai^(7 / 8)
 end
 
-function conv_q_rai_to_q_vap(C_drag, MP_n_0, a_vent, b_vent, q_rai, q_tot, q_liq, T, p, rho)
+function conv_q_rai_to_q_vap(param_set, C_drag, MP_n_0, a_vent, b_vent, q_rai, q_tot, q_liq, T, p, rho)
 
-    L = latent_heat(T)
+    L = TD.latent_heat_vapor(param_set, T)
     gamma_11_4 = 1.6083594219855457
     v_c = terminal_velocity_single_drop_coeff(C_drag, rho)
     N_Sc = nu_air / D_vapor
@@ -102,6 +102,7 @@ return
   rates: qr_src, thl_rain_src
 """
 function microphysics_rain_src(
+    param_set,
     rain_model,
     max_supersaturation,
     C_drag,
@@ -122,7 +123,7 @@ function microphysics_rain_src(
     # TODO assumes no ice
     _ret = mph_struct(0, 0, 0, 0, 0, 0, 0, 0, 0)
     _ret.qv = qt - ql
-    _ret.thl = t_to_thetali_c(p0, T, qt, ql, 0.0)
+    _ret.thl = t_to_thetali_c(param_set, p0, T, qt, ql, 0.0)
     _ret.th = theta_c(p0, T)
     _ret.rho = rho_c(p0, T, qt, _ret.qv)
 
@@ -159,7 +160,7 @@ function microphysics_rain_src(
             _ret.qr_src = 0.0
         end
 
-        _ret.thl_rain_src = rain_source_to_thetal(p0, T, _ret.qr_src)
+        _ret.thl_rain_src = rain_source_to_thetal(param_set, p0, T, _ret.qr_src)
 
     else
         _ret.qr_src = 0.0

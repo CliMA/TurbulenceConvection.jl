@@ -144,6 +144,7 @@ function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables,
 
         # autoconversion and accretion
         mph = microphysics_rain_src(
+            param_set,
             Rain.rain_model,
             Rain.max_supersaturation,
             Rain.C_drag,
@@ -287,6 +288,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                     ql = TD.liquid_specific_humidity(ts)
                     T = TD.air_temperature(ts)
                     mph = microphysics_rain_src(
+                        param_set,
                         Rain.rain_model,
                         Rain.max_supersaturation,
                         Rain.C_drag,
@@ -374,6 +376,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
             ql = TD.liquid_specific_humidity(ts)
             T = TD.air_temperature(ts)
             mph = microphysics_rain_src(
+                param_set,
                 Rain.rain_model,
                 Rain.max_supersaturation,
                 Rain.C_drag,

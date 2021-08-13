@@ -119,6 +119,7 @@ function satadjust(self::GridMeanVariables)
         q_tot = self.QT.values[k]
         p0_c = self.Ref.p0_half[k]
         ts = TD.PhaseEquil_pθq(param_set, p0_c, θ_liq_ice, q_tot)
+        #TODO-AJ - should be updated once we add ice
         q_liq = TD.liquid_specific_humidity(ts)
         self.QL.values[k] = TD.liquid_specific_humidity(ts)
         self.T.values[k] = TD.air_temperature(ts)

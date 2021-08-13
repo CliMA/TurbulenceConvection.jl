@@ -346,6 +346,7 @@ end
 
 function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariables)
 
+    param_set = parameter_set(self)
     grid = get_grid(self)
     ref_state = reference_state(self)
     kc_surf = kc_surface(grid)
@@ -377,8 +378,8 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         qv_cloudy = self.EnvThermo.qv_cloudy[k]
         qt_cloudy = self.EnvThermo.qt_cloudy[k]
         th_cloudy = self.EnvThermo.th_cloudy[k]
-        lh = latent_heat(t_cloudy)
-        cpm = cpm_c(qt_cloudy)
+        lh = TD.latent_heat_vapor(param_set, t_cloudy)
+        cpm = cpm_c(qt_cloudy) #TODO-AJ
 
         QT_cut = cut(self.EnvVar.QT.values, grid, k)
         grad_qt = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
@@ -476,7 +477,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
             (1.0 - self.EnvVar.cloud_fraction.values[k]) * grad_thv +
             self.EnvVar.cloud_fraction.values[k] * (
                 1.0 / exp(
-                    -latent_heat(self.EnvVar.T.values[k]) * self.EnvVar.QL.values[k] / cpm_c(self.EnvVar.QT.values[k]) /
+                    -TD.latent_heat_vapor(param_set, self.EnvVar.T.values[k]) * self.EnvVar.QL.values[k] / cpm_c(self.EnvVar.QT.values[k]) /
                     self.EnvVar.T.values[k],
                 ) * (
                     (1.0 + (eps_vi - 1.0) * self.EnvVar.QT.values[k]) * grad_thl +
@@ -1470,6 +1471,8 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
 end
 
 function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
+
+    param_set = parameter_set(self)
     grid = get_grid(self)
     ref_state = reference_state(self)
     grad_thl_minus = 0.0
@@ -1489,7 +1492,7 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
         qv_cloudy = self.EnvThermo.qv_cloudy[k]
         qt_cloudy = self.EnvThermo.qt_cloudy[k]
         th_cloudy = self.EnvThermo.th_cloudy[k]
-        lh = latent_heat(t_cloudy)
+        lh = TD.latent_heat_vapor(param_set, t_cloudy)
         cpm = cpm_c(qt_cloudy)
         grad_thl_minus = grad_thl_plus
         grad_qt_minus = grad_qt_plus

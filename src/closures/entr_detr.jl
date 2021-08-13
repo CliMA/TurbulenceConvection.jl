@@ -21,7 +21,7 @@ Cohen et al. (JAMES, 2020), given:
  - `β`: sorting power for moist mixing
  - `c_δ`: detrainment factor
  - `c_div`: divergence factor for bubble case (zero otherwise)
- - `c_μ`: logisitc function scale 
+ - `c_μ`: logisitc function scale
  - `c_μ0`: logisitc function timescale
  - `χ_upd`: updraft mixing fraction
  - `c_λ`: tke scale factor
@@ -33,6 +33,7 @@ function entr_detr(param_set, w_min, β, c_δ, c_div, c_μ, c_μ0, χ_upd, c_λ,
     l = zeros(2)
     c_ε = CPEDMF.c_ε(param_set)
 
+    #TODO-AJ - should be ql + qi?
     if (εδ_model.ql_upd + εδ_model.ql_env) == 0.0
         c_δ = 0.0
     end
