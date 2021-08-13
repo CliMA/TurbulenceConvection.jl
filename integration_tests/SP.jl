@@ -11,18 +11,18 @@ include(joinpath("utils", "compute_mse.jl"))
 using .NameList
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 3.5246740566216994e+00
-best_mse["updraft_area"] = 3.4922216987359178e+00
-best_mse["updraft_w"] = 1.0216753899526712e+00
-best_mse["updraft_qt"] = 1.4126704196501478e+00
-best_mse["updraft_thetal"] = 1.0513205076428579e-01
-best_mse["v_mean"] = 4.6470417414900161e-01
-best_mse["u_mean"] = 7.3604590399213739e-05
-best_mse["tke_mean"] = 4.7848458015049938e-01
-best_mse["temperature_mean"] = 6.9541909880873242e-07
-best_mse["thetal_mean"] = 5.2370121754610367e-07
-best_mse["Hvar_mean"] = 2.3999517246677664e+02
-best_mse["QTvar_mean"] = 1.6280851822250700e+01
+best_mse["qt_mean"] = 3.5073036120908645e+00
+best_mse["updraft_area"] = 3.9071035000833305e+00
+best_mse["updraft_w"] = 9.3648209543530914e-01
+best_mse["updraft_qt"] = 1.3868858638582151e+00
+best_mse["updraft_thetal"] = 1.0515272505644875e-01
+best_mse["v_mean"] = 4.6000262198139841e-01
+best_mse["u_mean"] = 7.3724093159641325e-05
+best_mse["tke_mean"] = 4.7833665690724869e-01
+best_mse["temperature_mean"] = 6.8550010655096847e-07
+best_mse["thetal_mean"] = 5.1299556224606434e-07
+best_mse["Hvar_mean"] = 3.1719858004705035e+01
+best_mse["QTvar_mean"] = 3.9762684967056670e+00
 
 @testset "SP" begin
     case_name = "SP"

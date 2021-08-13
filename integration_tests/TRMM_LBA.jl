@@ -14,19 +14,19 @@ using .NameList
 CLIMAParameters.Planet.T_freeze(::EarthParameterSet) = 100.0
 
 best_mse = OrderedDict()
-best_mse["qt_mean"] = 1.6060537595274345e+00
-best_mse["updraft_area"] = 2.4326719919434730e+04
-best_mse["updraft_w"] = 8.9781354744734904e+02
-best_mse["updraft_qt"] = 2.7840588043213661e+01
-best_mse["updraft_thetal"] = 1.1000857010242179e+02
-best_mse["v_mean"] = 2.9255417406952165e+02
-best_mse["u_mean"] = 1.6872488577305819e+03
-best_mse["tke_mean"] = 1.5447663031746142e+03
-best_mse["temperature_mean"] = 6.8027838562588429e-04
-best_mse["ql_mean"] = 9.5570328764458566e+02
-best_mse["thetal_mean"] = 8.1813107572736785e-03
-best_mse["Hvar_mean"] = 6.7055563585233622e+03
-best_mse["QTvar_mean"] = 2.6582568278836857e+03
+best_mse["qt_mean"] = 2.1123818316732890e+00
+best_mse["updraft_area"] = 2.2936100671417156e+04
+best_mse["updraft_w"] = 9.7871834635955668e+02
+best_mse["updraft_qt"] = 3.0602076179776624e+01
+best_mse["updraft_thetal"] = 1.1001487658207374e+02
+best_mse["v_mean"] = 2.9250821023927989e+02
+best_mse["u_mean"] = 1.6873198920592913e+03
+best_mse["tke_mean"] = 9.3648065032327702e+02
+best_mse["temperature_mean"] = 8.1826613367091830e-04
+best_mse["ql_mean"] = 7.2432912180809672e+02
+best_mse["thetal_mean"] = 8.2748526944961612e-03
+best_mse["Hvar_mean"] = 3.5701761097981662e+03
+best_mse["QTvar_mean"] = 1.7865858571838050e+03
 
 @testset "TRMM_LBA" begin
     case_name = "TRMM_LBA"
