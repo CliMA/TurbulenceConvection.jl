@@ -277,20 +277,20 @@ function compute_mse(
         if plot_comparison
             p = Plots.plot()
             if have_pycles_ds
-                Plots.plot!(data_les_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "PyCLES")
+                Plots.plot!(data_les_cont_mapped, z_tcc ./ 10^3, title = tc_var, ylabel = "z [km]", label = "PyCLES")
             end
-            Plots.plot!(data_scm_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "SCAMPy")
+            Plots.plot!(data_scm_cont_mapped, z_tcc ./ 10^3, title = tc_var, ylabel = "z [km]", label = "SCAMPy")
             if have_tc_main
                 Plots.plot!(
                     data_tcm_cont_mapped,
                     z_tcc ./ 10^3,
-                    xlabel = tc_var,
+                    title = tc_var,
                     ylabel = "z [km]",
                     label = "TC.jl (main)",
                 )
             end
             plots_dict["profiles"][tc_var] =
-                Plots.plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, xlabel = tc_var, ylabel = "z [km]", label = "TC.jl")
+                Plots.plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, title = tc_var, ylabel = "z [km]", label = "TC.jl")
 
             if tc_var == "updraft_thetal"
                 # TODO: remove this if-else when artifacts are updated
@@ -462,15 +462,49 @@ function save_plots(plot_dir, plots_dict; group_figs = true, have_tc_main, fig_h
         Plots.savefig(joinpath(plot_dir, "contours.png"))
 
         width_to_height_ratio = 15 / 10
-        n_cols = 3
-
-        all_profiles = values(plots_dict["profiles"])
+        all_profiles = collect(values(plots_dict["profiles"]))
         n_plots = length(all_profiles)
+        n_cols = 5
         n_rows = ceil(Int, n_plots / n_cols)
         @info "     Saving $(joinpath(plot_dir, "profiles.png"))"
+        n_empty_plots = n_rows * n_cols - n_plots
+        all_profiles =
+            [all_profiles..., ntuple(i -> Plots.plot(; framestyle = :none, xticks = false), n_empty_plots)...]
+        for (k, I) in enumerate(CartesianIndices((1:n_cols, 1:n_rows)))
+            k > length(all_profiles) && continue
+            j, i = (Tuple(I)...,)
+            if j == 1
+                Plots.plot!(
+                    all_profiles[k],
+                    bottom_margin = -2 * Plots.PlotMeasures.px,
+                    right_margin = -2 * Plots.PlotMeasures.px,
+                    top_margin = -2 * Plots.PlotMeasures.px,
+                )
+            elseif j == n_cols
+                Plots.plot!(
+                    all_profiles[k],
+                    yticks = false,
+                    ylabel = "",
+                    bottom_margin = -2 * Plots.PlotMeasures.px,
+                    left_margin = -2 * Plots.PlotMeasures.px,
+                    right_margin = -2 * Plots.PlotMeasures.px,
+                    top_margin = -2 * Plots.PlotMeasures.px,
+                )
+            else # middle plot
+                Plots.plot!(
+                    all_profiles[k],
+                    yticks = false,
+                    ylabel = "",
+                    bottom_margin = -2 * Plots.PlotMeasures.px,
+                    left_margin = -2 * Plots.PlotMeasures.px,
+                    right_margin = -2 * Plots.PlotMeasures.px,
+                    top_margin = -2 * Plots.PlotMeasures.px,
+                )
+            end
+        end
         Plots.plot(
             all_profiles...;
-            layout = n_plots,
+            layout = Plots.grid(n_rows, n_cols),
             size = (width_to_height_ratio * fig_height, fig_height),
             framestyle = :box,
             margin = 20 * Plots.PlotMeasures.px,
