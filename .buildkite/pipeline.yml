@@ -21,15 +21,6 @@ steps:
 
   - wait
 
-  - label: ":computer: unit tests"
-    key: "cpu_unittests"
-    command:
-      - "julia --color=yes --project=test test/runtests.jl"
-    agents:
-      config: cpu
-      queue: central
-      slurm_ntasks: 1
-
   - label: ":partly_sunny: Bomex"
     key: "cpu_bomex"
     command:
