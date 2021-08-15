@@ -900,27 +900,17 @@ function get_env_covar_from_GMV(
 end
 
 function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
-    εδ_model = entr_detr_model()
-    sa = eos_struct()
-    quadrature_order = 3
     grid = get_grid(self)
     param_set = parameter_set(self)
-
-    upd_cloud_diagnostics(self.UpdVar, reference_state(self))
-
-    # TODO: merge this with grid.cinterior
-    kc_surf = kc_surface(grid)
-    kc_toa = kc_top_of_atmos(grid)
-    cinterior = kc_surf:kc_toa
-
     ref_state = reference_state(self)
-    l = zeros(2)
+
+    upd_cloud_diagnostics(self.UpdVar, ref_state)
 
     @inbounds for k in real_center_indicies(grid)
         @inbounds for i in xrange(self.n_updrafts)
             # entrainment
-            w_upd = interpf2c(self.UpdVar.W.values, grid, k, i)
             if self.UpdVar.Area.values[i, k] > 0.0
+                w_upd = interpf2c(self.UpdVar.W.values, grid, k, i)
                 # compute dMdz at half levels
                 gmv_w_k = interpf2c(GMV.W.values, grid, k)
                 gmv_w_km = interpf2c(GMV.W.values, grid, k - 1)
@@ -930,24 +920,24 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
                 dMdz = (M - Mm) * grid.dzi
                 w_min = 0.001
 
-                εδ_model.b_upd = self.UpdVar.B.values[i, k]
-                εδ_model.b_env = self.EnvVar.B.values[k]
-                εδ_model.w_upd = interpf2c(self.UpdVar.W.values, grid, k, i)
-                εδ_model.w_env = interpf2c(self.EnvVar.W.values, grid, k)
-                εδ_model.a_upd = self.UpdVar.Area.values[i, k]
-                εδ_model.a_env = self.EnvVar.Area.values[k]
-                εδ_model.ql_upd = self.UpdVar.QL.values[i, k]
-                εδ_model.ql_env = self.EnvVar.QL.values[k]
-                εδ_model.RH_upd = self.UpdVar.RH.values[i, k]
-                εδ_model.RH_env = self.EnvVar.RH.values[k]
-                εδ_model.M = M
-                εδ_model.dMdz = dMdz
-                εδ_model.tke = self.EnvVar.TKE.values[k]
-                εδ_model.n_up = self.n_updrafts
-                εδ_model.ρ = ref_state.rho0[k]
-                εδ_model.R_up = self.pressure_plume_spacing[i]
+                εδ_model = MoistureDeficitEntr(;
+                    q_liq_up = self.UpdVar.QL.values[i, k],
+                    q_liq_en = self.EnvVar.QL.values[k],
+                    w_up = interpf2c(self.UpdVar.W.values, grid, k, i),
+                    w_en = interpf2c(self.EnvVar.W.values, grid, k),
+                    b_up = self.UpdVar.B.values[i, k],
+                    b_en = self.EnvVar.B.values[k],
+                    tke = self.EnvVar.TKE.values[k],
+                    dMdz = dMdz,
+                    M = M,
+                    a_up = self.UpdVar.Area.values[i, k],
+                    a_en = self.EnvVar.Area.values[k],
+                    R_up = self.pressure_plume_spacing[i],
+                    RH_up = self.UpdVar.RH.values[i, k],
+                    RH_en = self.EnvVar.RH.values[k],
+                )
 
-                self.entr_sc[i, k], self.detr_sc[i, k], self.frac_turb_entr[i, k], self.horiz_K_eddy[i, k] = entr_detr(
+                er = entr_detr(
                     param_set,
                     w_min,
                     self.sorting_power,
@@ -960,6 +950,10 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
                     self.turbulent_entrainment_factor,
                     εδ_model,
                 )
+                self.entr_sc[i, k] = er.ε_dyn
+                self.detr_sc[i, k] = er.δ_dyn
+                self.frac_turb_entr[i, k] = er.ε_turb
+                self.horiz_K_eddy[i, k] = er.K_ε
             else
                 self.entr_sc[i, k] = 0.0
                 self.detr_sc[i, k] = 0.0

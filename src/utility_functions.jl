@@ -22,7 +22,6 @@ function logistic(x, slope, mid)
 end
 
 function lamb_smooth_minimum(l, lower_bound, upper_bound)
-    leng = size(l)
     x_min = minimum(l)
     λ_0 = max(x_min * lower_bound / real(LambertW.lambertw(2.0 / MathConstants.e)), upper_bound)
 
