@@ -133,16 +133,7 @@ function compute_mse_wrapper(
 end
 
 
-function compute_mse(
-    experiment,
-    best_mse,
-    plot_dir;
-    ds_dict,
-    plot_comparison = true,
-    group_figs = true,
-    t_start,
-    t_stop,
-)
+function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = true, group_figs = true, t_start, t_stop)
 
     ds_scampy = haskey(ds_dict, :ds_scampy) ? ds_dict[:ds_scampy] : nothing
     ds_tc_main = haskey(ds_dict, :ds_tc_main) ? ds_dict[:ds_tc_main] : nothing
@@ -305,11 +296,11 @@ function compute_mse(
             end
 
             width_to_height_ratio = have_tc_main ? 15 / 10 : 15 / 10
-            fig_height = 900
+            fig_height = 1500
 
             plot_attr[true]["contour_1_kwargs"] = (
                 bottom_margin = 0 * Plots.PlotMeasures.px,
-                left_margin = 30 * Plots.PlotMeasures.px,
+                left_margin = 40 * Plots.PlotMeasures.px,
                 right_margin = 0 * Plots.PlotMeasures.px,
                 top_margin = 0 * Plots.PlotMeasures.px,
                 xticks = false,
@@ -330,6 +321,7 @@ function compute_mse(
             plot_attr[true]["contour_3_kwargs"] = (
                 bottom_margin = 0 * Plots.PlotMeasures.px,
                 left_margin = 0 * Plots.PlotMeasures.px,
+                right_margin = -20 * Plots.PlotMeasures.px,
                 top_margin = 0 * Plots.PlotMeasures.px,
                 xticks = false,
                 yticks = false,
@@ -398,7 +390,7 @@ function compute_mse(
         push!(table_best_mse, best_mse[tc_var])
     end
 
-    save_plots(plot_dir, plots_dict; group_figs = group_figs, have_tc_main = have_tc_main, fig_height = fig_height)
+    save_plots(plot_dir, plots_dict; group_figs, have_tc_main, fig_height, case_name)
 
     # Tabulate output
     header = [
@@ -416,7 +408,7 @@ function compute_mse(
         mse_reductions,
     )
 
-    @info @sprintf("Experiment comparison: %s at time t=%s\n", experiment, t_cmp)
+    @info @sprintf("case_name comparison: %s at time t=%s\n", case_name, t_cmp)
     hl_worsened_mse = Highlighter((data, i, j) -> !sufficient_mse(data[i, 6], data[i, 7]) && j == 6, crayon"red bold")
     hl_worsened_mse_reduction =
         Highlighter((data, i, j) -> !sufficient_mse(data[i, 6], data[i, 7]) && j == 8, crayon"red bold")
@@ -434,7 +426,7 @@ function compute_mse(
     return mse
 end
 
-function save_plots(plot_dir, plots_dict; group_figs = true, have_tc_main, fig_height)
+function save_plots(plot_dir, plots_dict; group_figs = true, have_tc_main, fig_height, case_name)
     vars_to_skip = [
         "thetal_mean",
         "updraft_thetal",
@@ -458,7 +450,24 @@ function save_plots(plot_dir, plots_dict; group_figs = true, have_tc_main, fig_h
         n_cols = 1
         n_rows = ceil(Int, n_plots / n_cols)
         @info "     Saving $(joinpath(plot_dir, "contours.png"))"
-        Plots.plot(all_contours...; layout = (n_rows, n_cols), framestyle = :box, margin = 20 * Plots.PlotMeasures.px)
+        title = Plots.plot(
+            title = case_name,
+            grid = false,
+            showaxis = false,
+            xticks = false,
+            yticks = false,
+            bottom_margin = -20 * Plots.PlotMeasures.px,
+        )
+        layout = Plots.@layout [a{0.01h}; Plots.grid(n_rows, n_cols)]
+
+        Plots.plot(
+            title,
+            all_contours...;
+            layout = layout,
+            framestyle = :box,
+            margin = 20 * Plots.PlotMeasures.px,
+            dpi = 200,
+        )
         Plots.savefig(joinpath(plot_dir, "contours.png"))
 
         width_to_height_ratio = 15 / 10
@@ -473,14 +482,15 @@ function save_plots(plot_dir, plots_dict; group_figs = true, have_tc_main, fig_h
         for (k, I) in enumerate(CartesianIndices((1:n_cols, 1:n_rows)))
             k > length(all_profiles) && continue
             j, i = (Tuple(I)...,)
-            if j == 1
+            if j == 1 # left plots
                 Plots.plot!(
                     all_profiles[k],
+                    left_margin = 50 * Plots.PlotMeasures.px,
                     bottom_margin = -2 * Plots.PlotMeasures.px,
                     right_margin = -2 * Plots.PlotMeasures.px,
                     top_margin = -2 * Plots.PlotMeasures.px,
                 )
-            elseif j == n_cols
+            elseif j == n_cols # right plots
                 Plots.plot!(
                     all_profiles[k],
                     yticks = false,
@@ -490,7 +500,7 @@ function save_plots(plot_dir, plots_dict; group_figs = true, have_tc_main, fig_h
                     right_margin = -2 * Plots.PlotMeasures.px,
                     top_margin = -2 * Plots.PlotMeasures.px,
                 )
-            else # middle plot
+            else # middle plots
                 Plots.plot!(
                     all_profiles[k],
                     yticks = false,
@@ -502,12 +512,23 @@ function save_plots(plot_dir, plots_dict; group_figs = true, have_tc_main, fig_h
                 )
             end
         end
+        title = Plots.plot(
+            title = case_name,
+            grid = false,
+            showaxis = false,
+            xticks = false,
+            yticks = false,
+            bottom_margin = -20 * Plots.PlotMeasures.px,
+        )
+        layout = Plots.@layout [a{0.01h}; Plots.grid(n_rows, n_cols)]
         Plots.plot(
+            title,
             all_profiles...;
-            layout = Plots.grid(n_rows, n_cols),
+            layout = layout,
             size = (width_to_height_ratio * fig_height, fig_height),
             framestyle = :box,
             margin = 20 * Plots.PlotMeasures.px,
+            dpi = 200,
         )
         Plots.savefig(joinpath(plot_dir, "profiles.png"))
     else
