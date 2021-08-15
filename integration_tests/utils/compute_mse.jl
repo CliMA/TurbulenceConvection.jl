@@ -1,6 +1,7 @@
 import Plots
 using OrderedCollections
 using Test
+import Dates
 using NCDatasets
 import StatsBase
 using Dierckx
@@ -88,7 +89,8 @@ function find_latest_dataset_folder(; dir = pwd())
     end
     isempty(matching_paths) && return ""
     # sort by timestamp
-    return pop!(sort(matching_paths))
+    sorted_paths = sort(matching_paths; by = f -> Dates.unix2datetime(stat(f).mtime))
+    return pop!(sorted_paths)
 end
 
 function compute_mse_wrapper(
@@ -109,6 +111,7 @@ function compute_mse_wrapper(
         # TODO: make this more robust in case folder/file changes
         folder_name = joinpath("Output.$case_name.01", "stats")
         ds_tc_main_filename = joinpath(path, folder_name, "Stats.$case_name.nc")
+        @info "TC.jl main dataset: $ds_tc_main_filename"
     end
     # Note that we're using a closure over
     #  - PyCLES_output_dataset_path
