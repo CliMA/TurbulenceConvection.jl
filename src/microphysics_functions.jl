@@ -37,8 +37,9 @@ function terminal_velocity_single_drop_coeff(C_drag, rho)
     return sqrt(8 / 3 / C_drag * (rho_cloud_liq / rho - 1))
 end
 
-function terminal_velocity(C_drag, MP_n_0, q_rai, rho)
+function terminal_velocity(param_set, C_drag, MP_n_0, q_rai, rho)
 
+    g = CPP.grav(param_set)
     v_c = terminal_velocity_single_drop_coeff(C_drag, rho)
     gamma_9_2 = 11.631728396567448
 
@@ -57,13 +58,14 @@ function conv_q_vap_to_q_liq(param_set::APS, q_sat_liq, q_liq)
     return (q_sat_liq - q_liq) / CPMP.τ_cond_evap(param_set)
 end
 
-function conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, q_liq)
+function conv_q_liq_to_q_rai_acnv(param_set, q_liq_threshold, tau_acnv, q_liq)
 
     return max(0.0, q_liq - q_liq_threshold) / tau_acnv
 end
 
-function conv_q_liq_to_q_rai_accr(C_drag, MP_n_0, E_col, q_liq, q_rai, rho)
+function conv_q_liq_to_q_rai_accr(param_set, C_drag, MP_n_0, E_col, q_liq, q_rai, rho)
 
+    g = CPP.grav(param_set)
     v_c = terminal_velocity_single_drop_coeff(C_drag, rho)
     gamma_7_2 = 3.3233509704478426
 
@@ -72,8 +74,9 @@ function conv_q_liq_to_q_rai_accr(C_drag, MP_n_0, E_col, q_liq, q_rai, rho)
     return accr_coeff * MP_n_0^(1 / 8) * sqrt(g) * q_liq * q_rai^(7 / 8)
 end
 
-function conv_q_rai_to_q_vap(C_drag, MP_n_0, a_vent, b_vent, q_rai, q_tot, q_liq, T, p, rho)
+function conv_q_rai_to_q_vap(param_set, C_drag, MP_n_0, a_vent, b_vent, q_rai, q_tot, q_liq, T, p, rho)
 
+    g = CPP.grav(param_set)
     L = latent_heat(T)
     gamma_11_4 = 1.6083594219855457
     v_c = terminal_velocity_single_drop_coeff(C_drag, rho)
@@ -102,6 +105,7 @@ return
   rates: qr_src, thl_rain_src
 """
 function microphysics_rain_src(
+    param_set::APS,
     rain_model,
     max_supersaturation,
     C_drag,
@@ -145,8 +149,8 @@ function microphysics_rain_src(
             _ret.qr_src = min(
                 ql,
                 (
-                    conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, ql) +
-                    conv_q_liq_to_q_rai_accr(C_drag, MP_n_0, E_col, ql, qr, rho)
+                    conv_q_liq_to_q_rai_acnv(param_set, q_liq_threshold, tau_acnv, ql) +
+                    conv_q_liq_to_q_rai_accr(param_set, C_drag, MP_n_0, E_col, ql, qr, rho)
                 ) * dt,
             )
         end

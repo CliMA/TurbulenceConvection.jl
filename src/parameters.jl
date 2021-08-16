@@ -1,5 +1,4 @@
 #Adapated from PyCLES: https://github.com/pressel/pycles
-const g = 9.80665
 const Rd = 287.1
 const Rv = 461.5
 const eps_v = 0.62210184182   # Rd / Rv

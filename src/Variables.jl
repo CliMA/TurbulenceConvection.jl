@@ -113,6 +113,7 @@ end
 
 function satadjust(self::GridMeanVariables)
     sa = eos_struct()
+    param_set = parameter_set(self)
     @inbounds for k in center_indicies(self.Gr)
         h = self.H.values[k]
         qt = self.QT.values[k]
@@ -122,7 +123,7 @@ function satadjust(self::GridMeanVariables)
         self.T.values[k] = sa.T
         qv = qt - sa.ql
         rho = rho_c(p0, sa.T, qt, qv)
-        self.B.values[k] = buoyancy_c(self.Ref.rho0_half[k], rho)
+        self.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
         self.RH.values[k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, self.T.values[k])
     end
     return

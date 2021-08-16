@@ -103,6 +103,7 @@ function solve_rain_fall(
     QR::RainVariable,
     RainArea::RainVariable,
 )
+    param_set = parameter_set(GMV)
     grid = get_grid(GMV)
     dz = grid.dz
     dt_model = TS.dt
@@ -117,7 +118,7 @@ function solve_rain_fall(
     # TODO: assuming GMV.W = 0
     # TODO: verify translation
     @inbounds for k in real_center_indicies(grid)
-        term_vel[k] = terminal_velocity(Rain.C_drag, Rain.MP_n_0, QR.values[k], self.Ref.rho0_half[k])
+        term_vel[k] = terminal_velocity(param_set, Rain.C_drag, Rain.MP_n_0, QR.values[k], self.Ref.rho0_half[k])
     end
 
     # rain falling through the domain
@@ -142,7 +143,7 @@ function solve_rain_fall(
             RainArea.new[k] = 1.0
         end
 
-        term_vel_new[k] = terminal_velocity(Rain.C_drag, Rain.MP_n_0, QR.new[k], self.Ref.rho0_half[k])
+        term_vel_new[k] = terminal_velocity(param_set, Rain.C_drag, Rain.MP_n_0, QR.new[k], self.Ref.rho0_half[k])
     end
 
     QR.values .= QR.new
@@ -160,6 +161,7 @@ function solve_rain_evap(
     QR::RainVariable,
     RainArea::RainVariable,
 )
+    param_set = parameter_set(GMV)
     dt_model = TS.dt
     flag_evaporate_all = false
 
@@ -169,6 +171,7 @@ function solve_rain_evap(
         tmp_evap = max(
             0,
             conv_q_rai_to_q_vap(
+                param_set,
                 Rain.C_drag,
                 Rain.MP_n_0,
                 Rain.a_vent,

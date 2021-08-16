@@ -342,6 +342,8 @@ end
 function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariables)
 
     grid = get_grid(self)
+    param_set = parameter_set(GMV)
+    g = CPP.grav(param_set)
     ref_state = reference_state(self)
     kc_surf = kc_surface(grid)
     tau = get_mixing_tau(self.zi, self.wstar)
@@ -1443,6 +1445,8 @@ end
 function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     grid = get_grid(self)
     ref_state = reference_state(self)
+    param_set = parameter_set(GMV)
+    g = CPP.grav(param_set)
     grad_thl_minus = 0.0
     grad_qt_minus = 0.0
     grad_thl_plus = 0
@@ -2279,6 +2283,7 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
     theta_rho = center_field(self.Gr)
     ∇θ_liq_max = 0.0
     kc_surf = kc_surface(self.Gr)
+    param_set = parameter_set(GMV)
 
     @inbounds for k in real_center_indicies(self.Gr)
         qv = GMV.QT.values[k] - GMV.QL.values[k]
@@ -2303,7 +2308,7 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
             end
         end
     elseif option == "critical_Ri"
-        self.zi = get_inversion(theta_rho, GMV.U.values, GMV.V.values, self.Gr, Ri_bulk_crit(self))
+        self.zi = get_inversion(param_set, theta_rho, GMV.U.values, GMV.V.values, self.Gr, Ri_bulk_crit(self))
 
     else
         error("INVERSION HEIGHT OPTION NOT RECOGNIZED")

@@ -359,6 +359,7 @@ function buoyancy(
 
     grid = self.Gr
     kc_surf = kc_surface(grid)
+    param_set = parameter_set(GMV)
 
     UpdVar.Area.bulkvalues .= up_sum(UpdVar.Area.values)
 
@@ -368,7 +369,7 @@ function buoyancy(
                 if UpdVar.Area.values[i, k] > 0.0
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
                     rho = rho_c(self.Ref.p0_half[k], UpdVar.T.values[i, k], UpdVar.QT.values[i, k], qv)
-                    UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
+                    UpdVar.B.values[i, k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
                 else
                     UpdVar.B.values[i, k] = EnvVar.B.values[k]
                 end
@@ -390,7 +391,7 @@ function buoyancy(
                     h = UpdVar.H.values[i, k]
                     t = UpdVar.T.values[i, k]
                     rho = rho_c(self.Ref.p0_half[k], t, qt, qv)
-                    UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
+                    UpdVar.B.values[i, k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
                     UpdVar.RH.values[i, k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, t)
                 elseif UpdVar.Area.values[i, k - 1] > 0.0 && k > kc_surf
                     qt = UpdVar.QT.values[i, k - 1]
@@ -399,7 +400,7 @@ function buoyancy(
                     qv = qt - sa.ql
                     t = sa.T
                     rho = rho_c(self.Ref.p0_half[k], t, qt, qv)
-                    UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
+                    UpdVar.B.values[i, k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
                     UpdVar.RH.values[i, k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, t)
                 else
                     UpdVar.B.values[i, k] = EnvVar.B.values[k]
@@ -431,12 +432,14 @@ function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rai
     rst = rain_struct()
     mph = mph_struct()
     sa = eos_struct()
+    param_set = parameter_set(Rain)
 
     @inbounds for i in xrange(self.n_updraft)
         @inbounds for k in center_indicies(self.Gr)
 
             # autoconversion and accretion
             mph = microphysics_rain_src(
+                param_set,
                 Rain.rain_model,
                 Rain.max_supersaturation,
                 Rain.C_drag,

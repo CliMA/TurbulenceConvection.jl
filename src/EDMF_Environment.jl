@@ -66,11 +66,12 @@ function env_cloud_diagnostics(self::EnvironmentVariables, Ref::ReferenceState)
 end
 
 function update_EnvVar(self::EnvironmentThermodynamics, k, EnvVar::EnvironmentVariables, T, H, qt, ql, rho)
+    param_set = parameter_set(EnvVar)
     EnvVar.T.values[k] = T
     EnvVar.H.values[k] = H
     EnvVar.QT.values[k] = qt
     EnvVar.QL.values[k] = ql
-    EnvVar.B.values[k] = buoyancy_c(self.Ref.rho0_half[k], rho)
+    EnvVar.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
     EnvVar.RH.values[k] = relative_humidity_c(self.Ref.p0_half[k], qt, ql, 0.0, T)
     return
 end
@@ -99,7 +100,7 @@ function update_cloud_dry(self::EnvironmentThermodynamics, k, EnvVar::Environmen
 end
 
 function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables)
-
+    param_set = parameter_set(EnvVar)
     sa = eos_struct()
     mph = mph_struct()
 
@@ -114,7 +115,7 @@ function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::Environm
             EnvVar.QT.values[k],
             EnvVar.QT.values[k] - EnvVar.QL.values[k],
         )
-        EnvVar.B.values[k] = buoyancy_c(self.Ref.rho0_half[k], rho)
+        EnvVar.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
 
         update_cloud_dry(
             self,
@@ -133,6 +134,7 @@ end
 
 function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables, Rain::RainVariables, dt)
 
+    param_set = parameter_set(EnvVar)
     sa = eos_struct()
     mph = mph_struct()
 
@@ -145,6 +147,7 @@ function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables,
         sa = eos(self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
         # autoconversion and accretion
         mph = microphysics_rain_src(
+            param_set,
             Rain.rain_model,
             Rain.max_supersaturation,
             Rain.C_drag,
@@ -169,6 +172,7 @@ function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables,
 end
 
 function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables, Rain::RainVariables, dt)
+    param_set = parameter_set(EnvVar)
     # TODO: double check this python-> julia translation
     # a, w = np.polynomial.hermite.hermgauss(self.quadrature_order)
     a, w = FastGaussQuadrature.gausshermite(self.quadrature_order)
@@ -283,6 +287,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                     sa = eos(self.Ref.p0_half[k], qt_hat, h_hat)
                     # autoconversion and accretion
                     mph = microphysics_rain_src(
+                        param_set,
                         Rain.rain_model,
                         Rain.max_supersaturation,
                         Rain.C_drag,
@@ -368,6 +373,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
             # if variance and covariance are zero do the same as in SA_mean
             sa = eos(self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
             mph = microphysics_rain_src(
+                param_set,
                 Rain.rain_model,
                 Rain.max_supersaturation,
                 Rain.C_drag,
