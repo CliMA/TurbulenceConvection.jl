@@ -2,6 +2,7 @@ import Plots
 using OrderedCollections
 using Test
 import Dates
+import JSON
 using NCDatasets
 import StatsBase
 using Dierckx
@@ -148,7 +149,7 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
     if !have_tc_main
         ds_tc_main = ds_tc
     end
-    mse = Dict()
+    mse = OrderedDict()
     time_tcc = get_time(ds_tc, "t")
     time_les = get_time(ds_pycles, "t")
     time_tcm = get_time(ds_tc_main, "t")
