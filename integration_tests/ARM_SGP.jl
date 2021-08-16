@@ -8,21 +8,10 @@ using Test
 include(joinpath("utils", "main.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
+include(joinpath("utils", "mse_tables.jl"))
 using .NameList
 
-best_mse = OrderedDict()
-best_mse["qt_mean"] = 3.7029179410890994e-01
-best_mse["updraft_area"] = 2.0066768291734027e+03
-best_mse["updraft_w"] = 3.3021026158842852e+02
-best_mse["updraft_qt"] = 1.3362770693863471e+01
-best_mse["updraft_thetal"] = 2.7682689602916721e+01
-best_mse["u_mean"] = 8.7998547277817892e+01
-best_mse["tke_mean"] = 6.5902888656341383e+02
-best_mse["temperature_mean"] = 1.4835874987504939e-04
-best_mse["ql_mean"] = 2.5289195067821601e+02
-best_mse["thetal_mean"] = 1.5194012840291993e-04
-best_mse["Hvar_mean"] = 3.6200709711739819e+03
-best_mse["QTvar_mean"] = 2.5763919693088642e+03
+best_mse = all_best_mse["ARM_SGP"]
 
 @testset "ARM_SGP" begin
     case_name = "ARM_SGP"
@@ -39,6 +28,10 @@ best_mse["QTvar_mean"] = 2.5763919693088642e+03
         t_start = 8 * 3600,
         t_stop = 11 * 3600,
     )
+
+    open("computed_mse_$case_name.json", "w") do io
+        JSON.print(io, computed_mse)
+    end
 
     for k in keys(best_mse)
         test_mse(computed_mse, best_mse, k)

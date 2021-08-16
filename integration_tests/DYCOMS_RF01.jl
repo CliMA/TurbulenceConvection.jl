@@ -8,22 +8,10 @@ using Test
 include(joinpath("utils", "main.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
+include(joinpath("utils", "mse_tables.jl"))
 using .NameList
 
-best_mse = OrderedDict()
-best_mse["qt_mean"] = 1.6511493474924487e-02
-best_mse["ql_mean"] = 5.2388152463600228e+00
-best_mse["updraft_area"] = 2.3937655332711191e+02
-best_mse["updraft_w"] = 4.2950818025166271e+00
-best_mse["updraft_qt"] = 1.1670622064912242e+00
-best_mse["updraft_thetal"] = 1.2740701334370282e+01
-best_mse["v_mean"] = 3.9746921720562241e+01
-best_mse["u_mean"] = 3.7046560343565211e+01
-best_mse["tke_mean"] = 1.4700070268008988e+01
-best_mse["temperature_mean"] = 2.1532443073348772e-05
-best_mse["thetal_mean"] = 2.2397858591617206e-05
-best_mse["Hvar_mean"] = 8.2677316059854074e+03
-best_mse["QTvar_mean"] = 6.0266525107346490e+02
+best_mse = all_best_mse["DYCOMS_RF01"]
 
 key = "Hvar_mean"
 @testset "DYCOMS_RF01" begin
@@ -41,6 +29,10 @@ key = "Hvar_mean"
         t_start = 2 * 3600,
         t_stop = 4 * 3600,
     )
+
+    open("computed_mse_$case_name.json", "w") do io
+        JSON.print(io, computed_mse)
+    end
 
     for k in keys(best_mse)
         test_mse(computed_mse, best_mse, k)

@@ -154,6 +154,18 @@ steps:
       queue: central
       slurm_ntasks: 1
 
+  - wait: ~
+    continue_on_failure: true
+
+  - label: ":robot_face: Print new mse tables"
+    key: "cpu_print_new_mse"
+    command:
+      - "julia --color=yes --project utils/print_new_mse.jl"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
   - wait
 
   - label: ":robot_face: Move main results"
