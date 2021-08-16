@@ -732,7 +732,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     Ri_bulk_crit::Float64
     zi::Float64
     n_updrafts::Int
-    min_updraft_top::Float64
     drag_sign::Int
     asp_label
     extrapolate_buoyancy::Bool
@@ -747,10 +746,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     sorting_power::Float64
     turbulent_entrainment_factor::Float64
     aspect_ratio::Float64
-    pressure_normalmode_buoy_coeff1::Float64
-    pressure_normalmode_buoy_coeff2::Float64
-    pressure_normalmode_adv_coeff::Float64
-    pressure_normalmode_drag_coeff::Float64
     tke_ed_coeff::Float64
     tke_diss_coeff::Float64
     static_stab_coeff::Float64
@@ -858,13 +853,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         turbulent_entrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"]
         # pressure parameters
         aspect_ratio = namelist["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"]
-        pressure_normalmode_buoy_coeff1 =
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"]
-        pressure_normalmode_buoy_coeff2 =
-            namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff2"]
-        pressure_normalmode_adv_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"]
-        pressure_normalmode_drag_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"]
-        min_updraft_top = namelist["turbulence"]["EDMF_PrognosticTKE"]["min_updraft_top"]
 
         # mixing length parameters
         tke_ed_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
@@ -967,7 +955,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             Ri_bulk_crit,
             zi,
             n_updrafts,
-            min_updraft_top,
             drag_sign,
             asp_label,
             extrapolate_buoyancy,
@@ -982,10 +969,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             sorting_power,
             turbulent_entrainment_factor,
             aspect_ratio,
-            pressure_normalmode_buoy_coeff1,
-            pressure_normalmode_buoy_coeff2,
-            pressure_normalmode_adv_coeff,
-            pressure_normalmode_drag_coeff,
             tke_ed_coeff,
             tke_diss_coeff,
             static_stab_coeff,
