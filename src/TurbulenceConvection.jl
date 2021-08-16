@@ -3,6 +3,7 @@ module TurbulenceConvection
 using StaticArrays
 using StatsBase
 using LinearAlgebra
+import DocStringExtensions
 
 import Dierckx
 import Statistics

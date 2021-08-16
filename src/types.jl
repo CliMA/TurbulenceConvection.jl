@@ -19,41 +19,59 @@ Base.@kwdef mutable struct mph_struct
     thl_rain_src::Float64 = 0
     qr_src::Float64 = 0
 end
+
 """
- Entrainment detrainment model type
- - `εδ_model.b_upd`: updraft buoyancy
- - `εδ_model.b_env`: environment vertical velocity
- - `εδ_model.w_upd`: updraft vertical velocity
- - `εδ_model.w_env`: environment area fraction
- - `εδ_model.a_upd`: updraft area fraction
- - `εδ_model.a_env`: environment buoyancy
- - `εδ_model.ql_up`: updraft liquid water
- - `εδ_model.ql_env`: environment liquid water 
- - `εδ_model.RH_upd`: updraft relative humidity
- - `εδ_model.RH_env`: environment relative humidity
- - `εδ_model.M`: updraft momentum
- - `εδ_model.dMdz`: updraft momentum divergence
- - `εδ_model.tke`: env TKE
- - `εδ_model.N_up`: total number of updrafts
- - `εδ_model.ρ`: referance density
+    EntrDetr
+
+$(DocStringExtensions.FIELDS)
 """
-Base.@kwdef mutable struct entr_detr_model
-    b_upd::Float64 = 0
-    b_env::Float64 = 0
-    w_upd::Float64 = 0
-    w_env::Float64 = 0
-    a_upd::Float64 = 0
-    a_env::Float64 = 0
-    ql_upd::Float64 = 0
-    ql_env::Float64 = 0
-    RH_upd::Float64 = 0
-    RH_env::Float64 = 0
-    M::Float64 = 0
-    dMdz::Float64 = 0
-    tke::Float64 = 0
-    n_up::Float64 = 0
-    ρ::Float64 = 0
-    R_up::Float64 = 0
+Base.@kwdef struct EntrDetr{FT}
+    "Dynamical entrainment"
+    ε_dyn::FT
+    "Dynamical detrainment"
+    δ_dyn::FT
+    "Turbulent entrainment"
+    ε_turb::FT
+    "Horizontal eddy-diffusivity"
+    K_ε::FT
+end
+
+"""
+    MoistureDeficitEntr
+
+My entrainment detrainment model
+
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct MoistureDeficitEntr{FT}
+    "updraft liquid water"
+    q_liq_up::FT
+    "environment liquid water"
+    q_liq_en::FT
+    "updraft vertical velocity"
+    w_up::FT
+    "environment vertical velocity"
+    w_en::FT
+    "updraft buoyancy"
+    b_up::FT
+    "environment buoyancy"
+    b_en::FT
+    "environment tke"
+    tke::FT
+    "updraft momentum divergence"
+    dMdz::FT
+    "updraft momentum"
+    M::FT
+    "updraft area fraction"
+    a_up::FT
+    "environment area fraction"
+    a_en::FT
+    "pressure plume spacing"
+    R_up::FT
+    "updraft relative humidity"
+    RH_up::FT
+    "environment relative humidity"
+    RH_en::FT
 end
 
 struct RainVariable{T}
