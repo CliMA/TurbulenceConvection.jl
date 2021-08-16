@@ -737,7 +737,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     extrapolate_buoyancy::Bool
     surface_area::Float64
     max_area::Float64
-    entrainment_Mdiv_factor::Float64
     updraft_mixing_frac::Float64
     entrainment_sigma::Float64
     entrainment_smin_tke_coeff::Float64
@@ -843,7 +842,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         max_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"]
         # entrainment parameters
         entrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"]
-        entrainment_Mdiv_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"]
         updraft_mixing_frac = namelist["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"]
         entrainment_sigma = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_sigma"]
         entrainment_smin_tke_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"]
@@ -960,7 +958,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             extrapolate_buoyancy,
             surface_area,
             max_area,
-            entrainment_Mdiv_factor,
             updraft_mixing_frac,
             entrainment_sigma,
             entrainment_smin_tke_coeff,
