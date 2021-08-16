@@ -93,7 +93,8 @@ struct RainVariable{T}
     end
 end
 
-Base.@kwdef mutable struct RainVariables
+Base.@kwdef mutable struct RainVariables{PS}
+    param_set::PS
     rain_model::String = "default_rain_model"
     max_supersaturation::Float64
     C_drag::Float64
@@ -115,7 +116,7 @@ Base.@kwdef mutable struct RainVariables
     Env_QR::RainVariable
     Env_RainArea::RainVariable
 end
-function RainVariables(namelist, Gr::Grid)
+function RainVariables(namelist, Gr::Grid, param_set::APS)
 
     QR = RainVariable(Gr, "qr_mean", "kg/kg")
     # temporary variables for diagnostics to know where the rain is coming from
@@ -147,7 +148,8 @@ function RainVariables(namelist, Gr::Grid)
     a_vent = parse_namelist(namelist, "microphysics", "a_vent"; default = 1.5)
     b_vent = parse_namelist(namelist, "microphysics", "b_vent"; default = 0.53)
 
-    return RainVariables(;
+    return RainVariables{typeof(param_set)}(;
+        param_set,
         rain_model,
         max_supersaturation,
         C_drag,
@@ -861,7 +863,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         minimum_area = 1e-5
 
         # Create the class for rain
-        Rain = RainVariables(namelist, Gr)
+        Rain = RainVariables(namelist, Gr, param_set)
 
         # Create the updraft variable class (major diagnostic and prognostic variables)
         UpdVar = UpdraftVariables(n_updrafts, namelist, Gr)

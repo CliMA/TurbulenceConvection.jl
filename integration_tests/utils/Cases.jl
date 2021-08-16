@@ -2,6 +2,10 @@ module Cases
 
 using Random
 
+import CLIMAParameters
+const CP = CLIMAParameters
+const CPP = CP.Planet
+
 import ..TurbulenceConvection
 using ..TurbulenceConvection: CasesBase
 using ..TurbulenceConvection: set_bcs
@@ -18,7 +22,6 @@ using ..TurbulenceConvection: dycoms_L
 using ..TurbulenceConvection: qv_star_c
 using ..TurbulenceConvection: t_to_thetali_c
 using ..TurbulenceConvection: rho_c
-using ..TurbulenceConvection: g
 using ..TurbulenceConvection: dycoms_Rd
 using ..TurbulenceConvection: dycoms_cp
 using ..TurbulenceConvection: add_ts
@@ -180,6 +183,8 @@ function initialize_profiles(self::CasesBase{SoaresCase}, Gr::Grid, GMV::GridMea
 end
 
 function initialize_surface(self::CasesBase{SoaresCase}, Gr::Grid, Ref::ReferenceState)
+    param_set = TC.parameter_set(Ref)
+    g = CPP.grav(param_set)
     self.Sur.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     self.Sur.Tsurface = 300.0
     self.Sur.qsurface = 5.0e-3
@@ -273,6 +278,8 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, Gr::Grid, GMV::GridMea
     satadjust(GMV)
 end
 function initialize_surface(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::ReferenceState)
+    param_set = TC.parameter_set(Ref)
+    g = CPP.grav(param_set)
     self.Sur.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     self.Sur.Tsurface = 300.0
     self.Sur.qsurface = 0.0
@@ -528,6 +535,8 @@ function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, GMV:
 end
 
 function initialize_surface(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::ReferenceState)
+    param_set = TC.parameter_set(Ref)
+    g = CPP.grav(param_set)
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.Tsurface = 299.1 * exner_c(Ref.Pg)
     self.Sur.qsurface = 22.45e-3 # kg/kg
@@ -598,6 +607,8 @@ function TC.io(self::CasesBase{life_cycle_Tan2018}, Stats::NetCDFIO_Stats)
     io(self, Stats, BaseCase())
 end
 function update_surface(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVariables, TS::TimeStepping)
+    param_set = TC.parameter_set(GMV)
+    g = CPP.grav(param_set)
     weight = 1.0
     weight_factor = 0.01 + 0.99 * (cos(2.0 * π * TS.t / 3600.0) + 1.0) / 2.0
     weight = weight * weight_factor
@@ -1400,6 +1411,7 @@ function dycoms_sat_adjst(self::CasesBase{DYCOMS_RF01}, p_, thetal_, qt_)
 end
 
 function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+    param_set = TC.parameter_set(GMV)
     thetal = TC.center_field(Gr) # helper variable to recalculate temperature
     ql = TC.center_field(Gr) # DYCOMS case is saturated
     qi = 0.0                                             # no ice
@@ -1435,7 +1447,7 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
         # buoyancy profile
         qv = GMV.QT.values[k] - qi - GMV.QL.values[k]
         rho = rho_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
-        GMV.B.values[k] = buoyancy_c(Ref.rho0_half[k], rho)
+        GMV.B.values[k] = buoyancy_c(param_set, Ref.rho0_half[k], rho)
 
         # velocity profile (geostrophic)
         GMV.U.values[k] = 7.0
@@ -1454,6 +1466,8 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
 end
 
 function initialize_surface(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::ReferenceState)
+    param_set = TC.parameter_set(Ref)
+    g = CPP.grav(param_set)
     self.Sur.zrough = 1.0e-4
     self.Sur.ustar_fixed = false
     self.Sur.cm = 0.0011
@@ -1687,6 +1701,8 @@ function initialize_profiles(self::CasesBase{SP}, Gr::Grid, GMV::GridMeanVariabl
 end
 
 function initialize_surface(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState)
+    param_set = TC.parameter_set(Ref)
+    g = CPP.grav(param_set)
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
     self.Sur.zrough = 0.1

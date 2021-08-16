@@ -54,7 +54,8 @@ function relative_humidity_c(p0, qt, ql, qi, T)
     return 100.0 * pv / pv_star_
 end
 
-function buoyancy_c(rho0, rho)
+function buoyancy_c(param_set, rho0, rho)
+    g = CPP.grav(param_set)
     return g * (rho0 - rho) / rho0
 end
 function qv_star_c(p0, qt, pv)
