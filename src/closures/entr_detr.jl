@@ -6,7 +6,6 @@
         w_min,
         β,
         c_δ,
-        c_div,
         c_μ,
         c_μ0,
         χ_upd,
@@ -21,7 +20,6 @@ Cohen et al. (JAMES, 2020), given:
  - `w_min`: minimum veritcal velocity
  - `β`: sorting power for moist mixing
  - `c_δ`: detrainment factor
- - `c_div`: divergence factor for bubble case (zero otherwise)
  - `c_μ`: logisitc function scale
  - `c_μ0`: logisitc function timescale
  - `χ_upd`: updraft mixing fraction
@@ -29,9 +27,10 @@ Cohen et al. (JAMES, 2020), given:
  - `c_εt`: turbulent entrainment factor
  - `εδ_model`: a [`MoistureDeficitEntr`](@ref)
 """
-function entr_detr(param_set, w_min, β, c_δ, c_div, c_μ, c_μ0, χ_upd, c_λ, c_εt, εδ_model::MoistureDeficitEntr)
+function entr_detr(param_set, w_min, β, c_δ, c_μ, c_μ0, χ_upd, c_λ, c_εt, εδ_model::MoistureDeficitEntr)
 
     c_ε = CPEDMF.c_ε(param_set)
+    c_div = ICP.entrainment_massflux_div_factor(param_set)
 
     if (εδ_model.q_liq_up + εδ_model.q_liq_en) == 0.0
         c_δ = 0.0

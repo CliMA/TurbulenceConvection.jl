@@ -937,7 +937,6 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
                     w_min,
                     self.sorting_power,
                     self.detrainment_factor,
-                    self.entrainment_Mdiv_factor,
                     self.entrainment_sigma,
                     self.entrainment_scale,
                     self.updraft_mixing_frac,
