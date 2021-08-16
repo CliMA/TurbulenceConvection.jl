@@ -964,15 +964,11 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
                 asp_ratio = 1.0
                 self.nh_pressure_b[i, k], self.nh_pressure_adv[i, k], self.nh_pressure_drag[i, k] =
                     perturbation_pressure(
+                        param_set,
                         self.UpdVar.updraft_top[i],
-                        500.0,
                         a_kfull,
                         b_kfull,
                         ref_state.rho0[k],
-                        self.pressure_normalmode_buoy_coeff1,
-                        self.pressure_normalmode_buoy_coeff2,
-                        self.pressure_normalmode_adv_coeff,
-                        self.pressure_normalmode_drag_coeff,
                         self.UpdVar.W.values[i, k],
                         ∇w_up,
                         self.EnvVar.W.values[k],
@@ -991,9 +987,11 @@ end
 
 function compute_pressure_plume_spacing(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
 
+    param_set = parameter_set(self)
+    H_up_min = CPEDMF.H_up_min(param_set)
     @inbounds for i in xrange(self.n_updrafts)
         self.pressure_plume_spacing[i] =
-            max(self.aspect_ratio * self.UpdVar.updraft_top[i], self.min_updraft_top * self.aspect_ratio)
+            max(self.aspect_ratio * self.UpdVar.updraft_top[i], H_up_min * self.aspect_ratio)
     end
     return
 end
