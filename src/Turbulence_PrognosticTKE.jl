@@ -909,18 +909,7 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
                     RH_en = self.EnvVar.RH.values[k],
                 )
 
-                er = entr_detr(
-                    param_set,
-                    w_min,
-                    self.sorting_power,
-                    self.detrainment_factor,
-                    self.entrainment_sigma,
-                    self.entrainment_scale,
-                    self.updraft_mixing_frac,
-                    self.entrainment_smin_tke_coeff,
-                    self.turbulent_entrainment_factor,
-                    εδ_model,
-                )
+                er = entr_detr(param_set, εδ_model)
                 self.entr_sc[i, k] = er.ε_dyn
                 self.detr_sc[i, k] = er.δ_dyn
                 self.frac_turb_entr[i, k] = er.ε_turb
