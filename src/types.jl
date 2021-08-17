@@ -739,13 +739,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     extrapolate_buoyancy::Bool
     surface_area::Float64
     max_area::Float64
-    updraft_mixing_frac::Float64
-    entrainment_sigma::Float64
-    entrainment_smin_tke_coeff::Float64
-    entrainment_scale::Float64
-    detrainment_factor::Float64
-    sorting_power::Float64
-    turbulent_entrainment_factor::Float64
     aspect_ratio::Float64
     tke_ed_coeff::Float64
     tke_diss_coeff::Float64
@@ -843,14 +836,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         surface_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
         max_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"]
         # entrainment parameters
-        entrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"]
-        updraft_mixing_frac = namelist["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"]
-        entrainment_sigma = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_sigma"]
-        entrainment_smin_tke_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"]
-        entrainment_scale = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"]
-        detrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"]
-        sorting_power = namelist["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"]
-        turbulent_entrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"]
         # pressure parameters
         aspect_ratio = namelist["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"]
 
@@ -960,13 +945,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             extrapolate_buoyancy,
             surface_area,
             max_area,
-            updraft_mixing_frac,
-            entrainment_sigma,
-            entrainment_smin_tke_coeff,
-            entrainment_scale,
-            detrainment_factor,
-            sorting_power,
-            turbulent_entrainment_factor,
             aspect_ratio,
             tke_ed_coeff,
             tke_diss_coeff,
