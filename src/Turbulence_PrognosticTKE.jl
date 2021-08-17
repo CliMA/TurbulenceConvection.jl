@@ -348,7 +348,9 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
     kc_surf = kc_surface(grid)
     tau = get_mixing_tau(self.zi, self.wstar)
     l = zeros(3)
-    m_eps = 1.0e-9 # Epsilon to avoid zero
+    ϵ = 1.0e-9 # Epsilon to avoid zero
+    ω_pr = CPEDMF.ω_pr(param_set)
+
     @inbounds for k in real_center_indicies(grid)
         z_ = grid.z_half[k]
         # kz scale (surface layer)
@@ -367,7 +369,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         ∇U = c∇(U_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         ∇V = c∇(V_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         ∇w = ∇f2c(w_dual, grid, k; bottom = SetGradient(0), top = SetGradient(0))
-        shear2 = ∇U^2 + ∇V^2 + ∇w^2
+        Shear² = ∇U^2 + ∇V^2 + ∇w^2
         qt_dry = self.EnvThermo.qt_dry[k]
         th_dry = self.EnvThermo.th_dry[k]
         t_cloudy = self.EnvThermo.t_cloudy[k]
@@ -407,26 +409,16 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         )
 
         # Partial buoyancy gradients
-        grad_b_thl = grad_thl * d_buoy_thetal_total
-        grad_b_qt = grad_qt * d_buoy_qt_total
-        ri_grad = min(grad_b_thl / max(shear2, m_eps) + grad_b_qt / max(shear2, m_eps), 0.25)
+        ∂b∂θ_l = grad_thl * d_buoy_thetal_total
+        ∂b∂q_tot = grad_qt * d_buoy_qt_total
 
-        # Turbulent Prandtl number
-        if obukhov_length > 0.0 && ri_grad > 0.0 #stable
-            # CSB (Dan Li, 2019), with Pr_neutral=0.74 and w1=40.0/13.0
-            self.prandtl_nvec[k] =
-                prandtl_number(self) * (
-                    2.0 * ri_grad /
-                    (1.0 + (53.0 / 13.0) * ri_grad - sqrt((1.0 + (53.0 / 13.0) * ri_grad)^2.0 - 4.0 * ri_grad))
-                )
-        else
-            self.prandtl_nvec[k] = prandtl_number(self)
-        end
+        ∇Ri = gradient_Richardson_number(∂b∂θ_l, ∂b∂q_tot, Shear², ϵ)
+        self.prandtl_nvec[k] = turbulent_Prandtl_number(obukhov_length, ∇Ri, prandtl_number(self), ω_pr)
 
         # Production/destruction terms
         a =
             self.tke_ed_coeff *
-            (shear2 - grad_b_thl / self.prandtl_nvec[k] - grad_b_qt / self.prandtl_nvec[k]) *
+            (Shear² - ∂b∂θ_l / self.prandtl_nvec[k] - ∂b∂q_tot / self.prandtl_nvec[k]) *
             sqrt(self.EnvVar.TKE.values[k])
         # Dissipation term
         c_neg = self.tke_diss_coeff * self.EnvVar.TKE.values[k] * sqrt(self.EnvVar.TKE.values[k])
@@ -446,9 +438,9 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
                 wc_env / (1.0 - self.UpdVar.Area.bulkvalues[k])
         end
 
-        if abs(a) > m_eps && 4.0 * a * c_neg > -self.b[k] * self.b[k]
+        if abs(a) > ϵ && 4.0 * a * c_neg > -self.b[k] * self.b[k]
             self.l_entdet[k] = max(-self.b[k] / 2.0 / a + sqrt(self.b[k] * self.b[k] + 4.0 * a * c_neg) / 2.0 / a, 0.0)
-        elseif abs(a) < m_eps && abs(self.b[k]) > m_eps
+        elseif abs(a) < ϵ && abs(self.b[k]) > ϵ
             self.l_entdet[k] = c_neg / self.b[k]
         end
         l3 = self.l_entdet[k]
@@ -493,7 +485,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
 
         j = 1
         while (j <= length(l))
-            if l[j] < m_eps || l[j] > 1.0e6
+            if l[j] < ϵ || l[j] > 1.0e6
                 l[j] = 1.0e6
             end
             j += 1
