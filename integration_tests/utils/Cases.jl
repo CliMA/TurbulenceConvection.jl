@@ -194,6 +194,7 @@ function initialize_surface(self::CasesBase{SoaresCase}, Gr::Grid, Ref::Referenc
     self.Sur.lhf = qt_flux * TC.surface_value(Ref.rho0, Gr) * latent_heat(self.Sur.Tsurface) # It would be 0.0 if we follow Nieuwstadt.
     self.Sur.shf = theta_flux * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
     self.Sur.ustar_fixed = false
+    self.Sur.ustar = 0.28 # just to initilize grid mean covariances
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
     self.Sur.bflux =
@@ -289,6 +290,7 @@ function initialize_surface(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::Referenc
     self.Sur.lhf = 0.0 # It would be 0.0 if we follow Nieuwstadt.
     self.Sur.shf = theta_flux * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
     self.Sur.ustar_fixed = false
+    self.Sur.ustar = 0.28 # just to initilize grid mean covariances
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
     self.Sur.bflux =
@@ -1470,6 +1472,7 @@ function initialize_surface(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::Referen
     g = CPP.grav(param_set)
     self.Sur.zrough = 1.0e-4
     self.Sur.ustar_fixed = false
+    self.Sur.ustar = 0.28 # just to initilize grid mean covariances
     self.Sur.cm = 0.0011
 
     # sensible heat flux
@@ -1709,6 +1712,7 @@ function initialize_surface(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState)
     self.Sur.Tsurface = 300.0
     theta_surface = self.Sur.Tsurface / exner_c(Ref.Pg)
     theta_flux = 0.24
+    self.Sur.ustar = 0.28 # just to initilize grid mean covariances
     self.Sur.bflux = g * theta_flux / theta_surface
     initialize(self.Sur)
 end

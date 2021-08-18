@@ -36,7 +36,7 @@ function TurbulenceConvection.initialize(self::Simulation1d, namelist)
     Cases.initialize_surface(self.Case, self.Gr, self.Ref)
     Cases.initialize_forcing(self.Case, self.Gr, self.Ref, self.GMV)
     Cases.initialize_radiation(self.Case, self.Gr, self.Ref, self.GMV)
-    TC.initialize(self.Turb, self.Case, self.GMV, self.Ref)
+    TC.initialize(self.Turb, self.Case, self.GMV, self.Ref, self.TS)
     TC.initialize_io(self)
     TC.io(self)
 

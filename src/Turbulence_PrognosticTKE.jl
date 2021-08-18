@@ -1,10 +1,24 @@
 
-function initialize(self::EDMF_PrognosticTKE, Case::CasesBase, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize(
+    self::EDMF_PrognosticTKE,
+    Case::CasesBase,
+    GMV::GridMeanVariables,
+    Ref::ReferenceState,
+    TS::TimeStepping,
+)
     if Case.casename == "DryBubble"
         initialize_DryBubble(self.UpdVar, GMV, Ref)
+        decompose_environment(self, GMV, "values")
+        saturation_adjustment(self.EnvThermo, self.EnvVar)
+        buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
     else
         initialize(self.UpdVar, GMV)
+        decompose_environment(self, GMV, "values")
     end
+    update_inversion(self, GMV, Case.inversion_option)
+    self.wstar = get_wstar(Case.Sur.bflux, self.zi)
+    microphysics(self.EnvThermo, self.EnvVar, self.Rain, TS.dt)
+    initialize_covariance(self, GMV, Case)
     return
 end
 
@@ -218,30 +232,35 @@ end
 function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
 
     grid = get_grid(self)
-    update_inversion(self, GMV, Case.inversion_option)
     compute_pressure_plume_spacing(self, GMV, Case)
-    self.wstar = get_wstar(Case.Sur.bflux, self.zi)
-    if TS.nstep == 0
-        decompose_environment(self, GMV, "values")
+    # compute_prognostic_updrafts --
+    set_subdomain_bcs(self)
+    # set_new_with_values(self.UpdVar)
+    set_old_with_values(self.UpdVar)
 
-        if Case.casename == "DryBubble"
-            saturation_adjustment(self.EnvThermo, self.EnvVar)
-            buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
-        end
+    set_updraft_surface_bc(self, GMV, Case)
 
-        microphysics(self.EnvThermo, self.EnvVar, self.Rain, TS.dt)
-        initialize_covariance(self, GMV, Case)
+    clear_precip_sources(self.UpdThermo)
 
-        @inbounds for k in center_indicies(grid)
-            self.EnvVar.TKE.values[k] = GMV.TKE.values[k]
-            self.EnvVar.Hvar.values[k] = GMV.Hvar.values[k]
-            self.EnvVar.QTvar.values[k] = GMV.QTvar.values[k]
-            self.EnvVar.HQTcov.values[k] = GMV.HQTcov.values[k]
-        end
-    end
+    compute_updraft_closures(self, GMV, Case)
+    solve_updraft_velocity_area(self, TS)
+    solve_updraft_scalars(self, GMV, TS)
+    microphysics(self.UpdThermo, self.UpdVar, self.Rain, TS.dt) # causes division error in dry bubble first time step
 
+    set_values_with_new(self.UpdVar)
+    zero_area_fraction_cleanup(self, GMV)
+    # compute_prognostic_updrafts --
+
+    # (####)
+    # TODO - see comment (###)
+    # It would be better to have a simple linear rule for updating environment here
+    # instead of calling EnvThermo saturation adjustment scheme for every updraft.
     decompose_environment(self, GMV, "values")
-    compute_prognostic_updrafts(self, GMV, Case, TS)
+    saturation_adjustment(self.EnvThermo, self.EnvVar)
+    buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
+    set_subdomain_bcs(self)
+
+    update_total_precip_sources(self.UpdThermo)
 
     # TODO -maybe not needed? - both diagnostic and prognostic updrafts end with decompose_environment
     # But in general ok here without thermodynamics because MF doesnt depend directly on buoyancy
@@ -260,7 +279,8 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
     compute_eddy_diffusivities_tke(self, GMV, Case)
     update_GMV_ED(self, GMV, Case, TS)
-    compute_covariance(self, GMV, Case, TS)
+    compute_covariance_rhs(self, GMV, Case, TS)
+    update_covariance(self, GMV, Case, TS)
 
     if self.Rain.rain_model == "clima_1m"
         # sum updraft and environment rain into bulk rain
@@ -299,43 +319,6 @@ function update_turbulence(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Cas
         GMV.V.tendencies[k] += (GMV.V.new[k] - GMV.V.values[k]) * TS.dti
     end
 
-    return
-end
-
-function compute_prognostic_updrafts(
-    self::EDMF_PrognosticTKE,
-    GMV::GridMeanVariables,
-    Case::CasesBase,
-    TS::TimeStepping,
-)
-
-    time_elapsed = 0.0
-
-    set_subdomain_bcs(self)
-    set_new_with_values(self.UpdVar)
-    set_old_with_values(self.UpdVar)
-
-    set_updraft_surface_bc(self, GMV, Case)
-
-    clear_precip_sources(self.UpdThermo)
-
-    compute_updraft_closures(self, GMV, Case)
-    solve_updraft_velocity_area(self, TS)
-    solve_updraft_scalars(self, GMV, TS)
-    microphysics(self.UpdThermo, self.UpdVar, self.Rain, TS.dt) # causes division error in dry bubble first time step
-
-    set_values_with_new(self.UpdVar)
-    zero_area_fraction_cleanup(self, GMV)
-    # (####)
-    # TODO - see comment (###)
-    # It would be better to have a simple linear rule for updating environment here
-    # instead of calling EnvThermo saturation adjustment scheme for every updraft.
-    decompose_environment(self, GMV, "values")
-    saturation_adjustment(self.EnvThermo, self.EnvVar)
-    buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
-    set_subdomain_bcs(self)
-
-    update_total_precip_sources(self.UpdThermo)
     return
 end
 
@@ -1528,7 +1511,7 @@ function update_GMV_diagnostics(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
     return
 end
 
-function compute_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
+function compute_covariance_rhs(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
 
     compute_tke_buoy(self, GMV)
     compute_covariance_entr(
@@ -1651,6 +1634,10 @@ function compute_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Ca
     GMV_third_m(self, GMV.W_third_m, self.EnvVar.TKE, self.EnvVar.W, self.UpdVar.W)
 
     reset_surface_covariance(self, GMV, Case)
+    return
+end
+
+function update_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
     update_covariance_ED(
         self,
         GMV,
@@ -1757,7 +1744,7 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
     if ws > 0.0
         @inbounds for k in center_indicies(grid)
             z = grid.z_half[k]
-            # need to rethink of how to initilize the covarinace profiles - for nowmI took the TKE profile
+            # need to rethink of how to initilize the covarinace profiles - for now took the TKE profile
             GMV.Hvar.values[k] =
                 GMV.Hvar.values[kc_surf] *
                 ws *
@@ -1777,6 +1764,12 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
                 cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) *
                 sqrt(max(1.0 - z / zs, 0.0))
         end
+    else
+        @inbounds for k in center_indicies(grid)
+            GMV.Hvar.values[k] = 0.0
+            GMV.QTvar.values[k] = 0.0
+            GMV.HQTcov.values[k] = 0.0
+        end
     end
 
     # TKE initialization from Beare et al, 2006
@@ -1789,6 +1782,13 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
             GMV.QTvar.values[k] = 0.0
             GMV.HQTcov.values[k] = 0.0
         end
+    end
+
+    @inbounds for k in center_indicies(grid)
+        self.EnvVar.TKE.values[k] = GMV.TKE.values[k]
+        self.EnvVar.Hvar.values[k] = GMV.Hvar.values[k]
+        self.EnvVar.QTvar.values[k] = GMV.QTvar.values[k]
+        self.EnvVar.HQTcov.values[k] = GMV.HQTcov.values[k]
     end
     return
 end
