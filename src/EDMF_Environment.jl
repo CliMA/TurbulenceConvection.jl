@@ -66,12 +66,17 @@ function env_cloud_diagnostics(self::EnvironmentVariables, Ref::ReferenceState)
 end
 
 function update_EnvVar(self::EnvironmentThermodynamics, k, EnvVar::EnvironmentVariables, T, H, qt, ql, rho)
+
     EnvVar.T.values[k] = T
     EnvVar.H.values[k] = H
     EnvVar.QT.values[k] = qt
     EnvVar.QL.values[k] = ql
+
+    param_set = parameter_set(EnvVar)
+    ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], EnvVar.H.values[k], EnvVar.QT.values[k])
+
     EnvVar.B.values[k] = buoyancy_c(self.Ref.rho0_half[k], rho)
-    EnvVar.RH.values[k] = relative_humidity_c(self.Ref.p0_half[k], qt, ql, 0.0, T)
+    EnvVar.RH.values[k] = TD.relative_humidity(ts)
     return
 end
 

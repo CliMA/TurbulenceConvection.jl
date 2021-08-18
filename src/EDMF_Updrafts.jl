@@ -359,43 +359,53 @@ function buoyancy(
     if !extrap
         @inbounds for i in xrange(self.n_updraft)
             @inbounds for k in center_indicies(grid)
+
+                qt = UpdVar.QT.values[i, k]
+                h = UpdVar.H.values[i, k]
+                ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], h, qt)
+
+                UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
+
                 if UpdVar.Area.values[i, k] > 0.0
-                    qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
-                    rho = rho_c(self.Ref.p0_half[k], UpdVar.T.values[i, k], UpdVar.QT.values[i, k], qv)
+
+                    qv = TD.vapor_specific_humidity(ts)
+                    T = TD.air_temperature
+                    rho = rho_c(self.Ref.p0_half[k], T, qt, qv)
+
                     UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
                 else
                     UpdVar.B.values[i, k] = EnvVar.B.values[k]
-                end
-                UpdVar.RH.values[i, k] = relative_humidity_c(
-                    self.Ref.p0_half[k],
-                    UpdVar.QT.values[i, k],
-                    UpdVar.QL.values[i, k],
-                    0.0,
-                    UpdVar.T.values[i, k],
-                )
+               end
+
             end
         end
     else
         @inbounds for i in xrange(self.n_updraft)
             @inbounds for k in real_center_indicies(grid)
                 if UpdVar.Area.values[i, k] > 0.0
+
                     qt = UpdVar.QT.values[i, k]
-                    qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
                     h = UpdVar.H.values[i, k]
-                    T = UpdVar.T.values[i, k]
+                    ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], h, qt)
+
+                    qv = TD.vapor_specific_humidity(ts)
+                    T = TD.air_temperature(ts)
                     rho = rho_c(self.Ref.p0_half[k], T, qt, qv)
+
                     UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
-                    UpdVar.RH.values[i, k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, T)
+                    UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
+
                 elseif UpdVar.Area.values[i, k - 1] > 0.0 && k > kc_surf
                     qt = UpdVar.QT.values[i, k - 1]
                     h = UpdVar.H.values[i, k - 1]
                     ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], h, qt)
-                    ql = TD.liquid_specific_humidity(ts)
+
                     T = TD.air_temperature(ts)
                     qv = TD.vapor_specific_humidity(ts)
                     rho = rho_c(self.Ref.p0_half[k], T, qt, qv)
+
                     UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
-                    UpdVar.RH.values[i, k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, T)
+                    UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
                 else
                     UpdVar.B.values[i, k] = EnvVar.B.values[k]
                     UpdVar.RH.values[i, k] = EnvVar.RH.values[k]
