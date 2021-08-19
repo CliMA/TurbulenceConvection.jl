@@ -101,13 +101,14 @@ function satadjust(self::GridMeanVariables)
         h = self.H.values[k]
         qt = self.QT.values[k]
         p0 = self.Ref.p0_half[k]
-        sa = eos(p0, qt, h)
+        sa = eos(param_set, p0, qt, h)
         self.QL.values[k] = sa.ql
         self.T.values[k] = sa.T
         qv = qt - sa.ql
         rho = rho_c(p0, sa.T, qt, qv)
         self.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
-        self.RH.values[k] = relative_humidity_c(self.Ref.p0_half[k], qt, qt - qv, 0.0, self.T.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], h, qt)
+        self.RH.values[k] = TD.relative_humidity(ts)
     end
     return
 end
