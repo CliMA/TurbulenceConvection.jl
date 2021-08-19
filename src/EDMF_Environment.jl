@@ -72,7 +72,8 @@ function update_EnvVar(self::EnvironmentThermodynamics, k, EnvVar::EnvironmentVa
     EnvVar.QT.values[k] = qt
     EnvVar.QL.values[k] = ql
     EnvVar.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
-    EnvVar.RH.values[k] = relative_humidity_c(self.Ref.p0_half[k], qt, ql, 0.0, T)
+    ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], H, qt)
+    EnvVar.RH.values[k] = TD.relative_humidity(ts)
     return
 end
 
@@ -105,7 +106,7 @@ function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::Environm
     mph = mph_struct()
 
     @inbounds for k in real_center_indicies(self.Gr)
-        sa = eos(self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
+        sa = eos(param_set, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
 
         EnvVar.T.values[k] = sa.T
         EnvVar.QL.values[k] = sa.ql
@@ -144,7 +145,7 @@ function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables,
 
     @inbounds for k in real_center_indicies(self.Gr)
         # condensation
-        sa = eos(self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
+        sa = eos(param_set, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
         # autoconversion and accretion
         mph = microphysics_rain_src(
             param_set,
@@ -284,7 +285,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                     end
 
                     # condensation
-                    sa = eos(self.Ref.p0_half[k], qt_hat, h_hat)
+                    sa = eos(param_set, self.Ref.p0_half[k], qt_hat, h_hat)
                     # autoconversion and accretion
                     mph = microphysics_rain_src(
                         param_set,
@@ -371,7 +372,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
 
         else
             # if variance and covariance are zero do the same as in SA_mean
-            sa = eos(self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
+            sa = eos(param_set, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
             mph = microphysics_rain_src(
                 param_set,
                 Rain.rain_model,

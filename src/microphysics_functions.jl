@@ -3,16 +3,16 @@
 Source term for thetal because of qr transitioning between the working fluid and rain
 (simple version to avoid exponents)
 """
-function rain_source_to_thetal(p0, T, qr)
-    return latent_heat(T) * qr / exner_c(p0) / cpd
+function rain_source_to_thetal(param_set, p0, T, qr)
+    return TD.latent_heat_vapor(param_set, T) * qr / exner_c(p0) / cpd
 end
 
 """
 Source term for thetal because of qr transitioning between the working fluid and rain
 (more detailed version, but still ignoring dqt/dqr)
 """
-function rain_source_to_thetal_detailed(p0, T, qt, ql, qr)
-    L = latent_heat(T)
+function rain_source_to_thetal_detailed(param_set, p0, T, qt, ql, qr)
+    L = TD.latent_heat_vapor(param_set, T)
 
     old_source = L * qr / exner_c(p0) / cpd
 
@@ -24,10 +24,10 @@ end
 # instantly convert all cloud water exceeding a threshold to rain water
 # the threshold is specified as excess saturation
 # rain water is immediately removed from the domain
-function acnv_instant(max_supersaturation, ql, qt, T, p0)
+function acnv_instant(param_set, max_supersaturation, ql, qt, T, p0)
 
-    psat = pv_star(T)
-    qsat = qv_star_c(p0, qt, psat)
+    ts = TD.PhaseEquil_pTq(param_set, p0, T, qt)
+    qsat = TD.q_vap_saturation(ts)
 
     return max(0.0, ql - max_supersaturation * qsat)
 end
@@ -58,7 +58,7 @@ function conv_q_vap_to_q_liq(param_set::APS, q_sat_liq, q_liq)
     return (q_sat_liq - q_liq) / CPMP.τ_cond_evap(param_set)
 end
 
-function conv_q_liq_to_q_rai_acnv(param_set, q_liq_threshold, tau_acnv, q_liq)
+function conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, q_liq)
 
     return max(0.0, q_liq - q_liq_threshold) / tau_acnv
 end
@@ -77,7 +77,7 @@ end
 function conv_q_rai_to_q_vap(param_set, C_drag, MP_n_0, a_vent, b_vent, q_rai, q_tot, q_liq, T, p, rho)
 
     g = CPP.grav(param_set)
-    L = latent_heat(T)
+    L = TD.latent_heat_vapor(param_set, T)
     gamma_11_4 = 1.6083594219855457
     v_c = terminal_velocity_single_drop_coeff(C_drag, rho)
     N_Sc = nu_air / D_vapor
@@ -86,8 +86,11 @@ function conv_q_rai_to_q_vap(param_set, C_drag, MP_n_0, a_vent, b_vent, q_rai, q
     bv_param =
         2^(7 / 16) * gamma_11_4 * π^(5 / 16) * b_vent * N_Sc^(1 / 3) * sqrt(v_c) * (rho / rho_cloud_liq)^(11 / 16)
 
-    p_vs = pv_star(T)
-    qv_sat = qv_star_c(p, q_tot, p_vs)
+    p_vs = TD.saturation_vapor_pressure(param_set, T, TD.Liquid())
+
+    ts = TD.PhaseEquil_pTq(param_set, p, T, q_tot)
+    qv_sat = TD.q_vap_saturation(ts)
+
     q_v = q_tot - q_liq
     S = q_v / qv_sat - 1
 
@@ -126,7 +129,7 @@ function microphysics_rain_src(
     # TODO assumes no ice
     _ret = mph_struct(0, 0, 0, 0, 0, 0, 0, 0, 0)
     _ret.qv = qt - ql
-    _ret.thl = t_to_thetali_c(p0, T, qt, ql, 0.0)
+    _ret.thl = t_to_thetali_c(param_set, p0, T, qt, ql, 0.0)
     _ret.th = theta_c(p0, T)
     _ret.rho = rho_c(p0, T, qt, _ret.qv)
 
@@ -149,21 +152,21 @@ function microphysics_rain_src(
             _ret.qr_src = min(
                 ql,
                 (
-                    conv_q_liq_to_q_rai_acnv(param_set, q_liq_threshold, tau_acnv, ql) +
+                    conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, ql) +
                     conv_q_liq_to_q_rai_accr(param_set, C_drag, MP_n_0, E_col, ql, qr, rho)
                 ) * dt,
             )
         end
 
         if tmp_cutoff_acnv_flag
-            _ret.qr_src = min(ql, acnv_instant(max_supersaturation, ql, qt, T, p0))
+            _ret.qr_src = min(ql, acnv_instant(param_set, max_supersaturation, ql, qt, T, p0))
         end
 
         if tmp_no_acnv_flag
             _ret.qr_src = 0.0
         end
 
-        _ret.thl_rain_src = rain_source_to_thetal(p0, T, _ret.qr_src)
+        _ret.thl_rain_src = rain_source_to_thetal(param_set, p0, T, _ret.qr_src)
 
     else
         _ret.qr_src = 0.0

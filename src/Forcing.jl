@@ -39,10 +39,12 @@ end
 initialize(self::ForcingBase{ForcingStandard}, GMV) = initialize(self, GMV, ForcingBaseType())
 
 function update(self::ForcingBase{ForcingStandard}, GMV::GridMeanVariables)
-    grid = self.Gr
+    param_set = parameter_set(GMV)
     @inbounds for k in real_center_indicies(grid)
         # Apply large-scale horizontal advection tendencies
-        GMV.H.tendencies[k] += self.dTdt[k] / exner_c(self.Ref.p0_half[k])
+        phase_part = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0) # DOTO add QI
+        Π = TD.exner_given_pressure(param_set, self.Ref.p0_half[k], phase_part)
+        GMV.H.tendencies[k] += self.dTdt[k] / Π
         GMV.QT.tendencies[k] += self.dqtdt[k]
     end
     if self.apply_subsidence
