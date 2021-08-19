@@ -31,7 +31,7 @@ function acnv_instant(param_set, max_supersaturation, ql, qt, T, p0)
     psat = TD.saturation_vapor_pressure(param_set, T, TD.Liquid())
     qsat = qv_star_c(p0, qt, psat)
 
-    return fmax(0.0, ql - max_supersaturation * qsat)
+    return max(0.0, ql - max_supersaturation * qsat)
 end
 # CLIMA microphysics rates
 function terminal_velocity_single_drop_coeff(C_drag, rho)
@@ -39,8 +39,9 @@ function terminal_velocity_single_drop_coeff(C_drag, rho)
     return sqrt(8 / 3 / C_drag * (rho_cloud_liq / rho - 1))
 end
 
-function terminal_velocity(C_drag, MP_n_0, q_rai, rho)
+function terminal_velocity(param_set, C_drag, MP_n_0, q_rai, rho)
 
+    g = CPP.grav(param_set)
     v_c = terminal_velocity_single_drop_coeff(C_drag, rho)
     gamma_9_2 = 11.631728396567448
 
@@ -59,13 +60,14 @@ function conv_q_vap_to_q_liq(param_set, q_sat_liq, q_liq)
     return (q_sat_liq - q_liq) / CPMP.τ_cond_evap(param_set)
 end
 
-function conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, q_liq)
+function conv_q_liq_to_q_rai_acnv(param_set, q_liq_threshold, tau_acnv, q_liq)
 
-    return fmax(0.0, q_liq - q_liq_threshold) / tau_acnv
+    return max(0.0, q_liq - q_liq_threshold) / tau_acnv
 end
 
-function conv_q_liq_to_q_rai_accr(C_drag, MP_n_0, E_col, q_liq, q_rai, rho)
+function conv_q_liq_to_q_rai_accr(param_set, C_drag, MP_n_0, E_col, q_liq, q_rai, rho)
 
+    g = CPP.grav(param_set)
     v_c = terminal_velocity_single_drop_coeff(C_drag, rho)
     gamma_7_2 = 3.3233509704478426
 
@@ -76,6 +78,7 @@ end
 
 function conv_q_rai_to_q_vap(param_set, C_drag, MP_n_0, a_vent, b_vent, q_rai, q_tot, q_liq, T, p, rho)
 
+    g = CPP.grav(param_set)
     L = TD.latent_heat_vapor(param_set, T)
     gamma_11_4 = 1.6083594219855457
     v_c = terminal_velocity_single_drop_coeff(C_drag, rho)
@@ -104,7 +107,7 @@ return
   rates: qr_src, thl_rain_src
 """
 function microphysics_rain_src(
-    param_set,
+    param_set::APS,
     rain_model,
     max_supersaturation,
     C_drag,
@@ -145,17 +148,17 @@ function microphysics_rain_src(
 
     if area > 0.0
         if tmp_clima_acnv_flag
-            _ret.qr_src = fmin(
+            _ret.qr_src = min(
                 ql,
                 (
-                    conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, ql) +
-                    conv_q_liq_to_q_rai_accr(C_drag, MP_n_0, E_col, ql, qr, rho)
+                    conv_q_liq_to_q_rai_acnv(param_set, q_liq_threshold, tau_acnv, ql) +
+                    conv_q_liq_to_q_rai_accr(param_set, C_drag, MP_n_0, E_col, ql, qr, rho)
                 ) * dt,
             )
         end
 
         if tmp_cutoff_acnv_flag
-            _ret.qr_src = fmin(ql, acnv_instant(param_set, max_supersaturation, ql, qt, T, p0))
+            _ret.qr_src = min(ql, acnv_instant(param_set, max_supersaturation, ql, qt, T, p0))
         end
 
         if tmp_no_acnv_flag

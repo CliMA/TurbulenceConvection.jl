@@ -19,41 +19,59 @@ Base.@kwdef mutable struct mph_struct
     thl_rain_src::Float64 = 0
     qr_src::Float64 = 0
 end
+
 """
- Entrainment detrainment model type
- - `εδ_model.b_upd`: updraft buoyancy
- - `εδ_model.b_env`: environment vertical velocity
- - `εδ_model.w_upd`: updraft vertical velocity
- - `εδ_model.w_env`: environment area fraction
- - `εδ_model.a_upd`: updraft area fraction
- - `εδ_model.a_env`: environment buoyancy
- - `εδ_model.ql_up`: updraft liquid water
- - `εδ_model.ql_env`: environment liquid water
- - `εδ_model.RH_upd`: updraft relative humidity
- - `εδ_model.RH_env`: environment relative humidity
- - `εδ_model.M`: updraft momentum
- - `εδ_model.dMdz`: updraft momentum divergence
- - `εδ_model.tke`: env TKE
- - `εδ_model.N_up`: total number of updrafts
- - `εδ_model.ρ`: referance density
+    EntrDetr
+
+$(DocStringExtensions.FIELDS)
 """
-Base.@kwdef mutable struct entr_detr_model
-    b_upd::Float64 = 0
-    b_env::Float64 = 0
-    w_upd::Float64 = 0
-    w_env::Float64 = 0
-    a_upd::Float64 = 0
-    a_env::Float64 = 0
-    ql_upd::Float64 = 0
-    ql_env::Float64 = 0
-    RH_upd::Float64 = 0
-    RH_env::Float64 = 0
-    M::Float64 = 0
-    dMdz::Float64 = 0
-    tke::Float64 = 0
-    n_up::Float64 = 0
-    ρ::Float64 = 0
-    R_up::Float64 = 0
+Base.@kwdef struct EntrDetr{FT}
+    "Dynamical entrainment"
+    ε_dyn::FT
+    "Dynamical detrainment"
+    δ_dyn::FT
+    "Turbulent entrainment"
+    ε_turb::FT
+    "Horizontal eddy-diffusivity"
+    K_ε::FT
+end
+
+"""
+    MoistureDeficitEntr
+
+My entrainment detrainment model
+
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct MoistureDeficitEntr{FT}
+    "updraft liquid water"
+    q_liq_up::FT
+    "environment liquid water"
+    q_liq_en::FT
+    "updraft vertical velocity"
+    w_up::FT
+    "environment vertical velocity"
+    w_en::FT
+    "updraft buoyancy"
+    b_up::FT
+    "environment buoyancy"
+    b_en::FT
+    "environment tke"
+    tke::FT
+    "updraft momentum divergence"
+    dMdz::FT
+    "updraft momentum"
+    M::FT
+    "updraft area fraction"
+    a_up::FT
+    "environment area fraction"
+    a_en::FT
+    "pressure plume spacing"
+    R_up::FT
+    "updraft relative humidity"
+    RH_up::FT
+    "environment relative humidity"
+    RH_en::FT
 end
 
 struct RainVariable{T}
@@ -75,7 +93,8 @@ struct RainVariable{T}
     end
 end
 
-Base.@kwdef mutable struct RainVariables
+Base.@kwdef mutable struct RainVariables{PS}
+    param_set::PS
     rain_model::String = "default_rain_model"
     max_supersaturation::Float64
     C_drag::Float64
@@ -97,7 +116,7 @@ Base.@kwdef mutable struct RainVariables
     Env_QR::RainVariable
     Env_RainArea::RainVariable
 end
-function RainVariables(namelist, Gr::Grid)
+function RainVariables(namelist, Gr::Grid, param_set::APS)
 
     QR = RainVariable(Gr, "qr_mean", "kg/kg")
     # temporary variables for diagnostics to know where the rain is coming from
@@ -129,7 +148,8 @@ function RainVariables(namelist, Gr::Grid)
     a_vent = parse_namelist(namelist, "microphysics", "a_vent"; default = 1.5)
     b_vent = parse_namelist(namelist, "microphysics", "b_vent"; default = 0.53)
 
-    return RainVariables(;
+    return RainVariables{typeof(param_set)}(;
+        param_set,
         rain_model,
         max_supersaturation,
         C_drag,
@@ -714,29 +734,12 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     Ri_bulk_crit::Float64
     zi::Float64
     n_updrafts::Int
-    use_const_plume_spacing::Bool
     drag_sign::Int
     asp_label
     extrapolate_buoyancy::Bool
     surface_area::Float64
     max_area::Float64
-    entrainment_Mdiv_factor::Float64
-    updraft_mixing_frac::Float64
-    entrainment_sigma::Float64
-    entrainment_smin_tke_coeff::Float64
-    entrainment_ed_mf_sigma::Float64
-    entrainment_scale::Float64
-    constant_plume_spacing::Float64
-    detrainment_factor::Float64
-    sorting_power::Float64
-    turbulent_entrainment_factor::Float64
-    pressure_buoy_coeff::Float64
     aspect_ratio::Float64
-    pressure_normalmode_buoy_coeff1::Float64
-    pressure_normalmode_buoy_coeff2::Float64
-    pressure_normalmode_adv_coeff::Float64
-    pressure_normalmode_drag_coeff::Float64
-    vel_buoy_coeff::Float64
     tke_ed_coeff::Float64
     tke_diss_coeff::Float64
     static_stab_coeff::Float64
@@ -801,8 +804,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
 
         # Set the number of updrafts (1)
         n_updrafts = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_number"; default = 1)
-        use_const_plume_spacing =
-            parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "use_constant_plume_spacing"; default = false)
 
         pressure_func_drag_str = parse_namelist(
             namelist,
@@ -834,66 +835,20 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         # set defaults at some point?
         surface_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
         max_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"]
-        entrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"]
-        entrainment_Mdiv_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"]
-        updraft_mixing_frac = namelist["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"]
-        entrainment_sigma = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_sigma"]
-        entrainment_smin_tke_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"]
-        entrainment_ed_mf_sigma = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"]
-        entrainment_scale = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"]
-        constant_plume_spacing = namelist["turbulence"]["EDMF_PrognosticTKE"]["constant_plume_spacing"]
-        detrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"]
-        sorting_power = namelist["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"]
-        turbulent_entrainment_factor = namelist["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"]
-        pressure_buoy_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_buoy_coeff"]
+        # entrainment parameters
+        # pressure parameters
         aspect_ratio = namelist["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"]
 
-        if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"]) == "normalmode"
-            pressure_normalmode_buoy_coeff1 = parse_namelist(
-                namelist,
-                "turbulence",
-                "EDMF_PrognosticTKE",
-                "pressure_normalmode_buoy_coeff1";
-                default = pressure_buoy_coeff,
-            )
-            pressure_normalmode_buoy_coeff2 = parse_namelist(
-                namelist,
-                "turbulence",
-                "EDMF_PrognosticTKE",
-                "pressure_normalmode_buoy_coeff2";
-                default = 0.0,
-            )
-        end
-
-        if string(namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"]) == "normalmode"
-            pressure_normalmode_adv_coeff = parse_namelist(
-                namelist,
-                "turbulence",
-                "EDMF_PrognosticTKE",
-                "pressure_normalmode_adv_coeff";
-                default = 0.0,
-            )
-            pressure_normalmode_drag_coeff = parse_namelist(
-                namelist,
-                "turbulence",
-                "EDMF_PrognosticTKE",
-                "pressure_normalmode_drag_coeff";
-                default = 1.0,
-            )
-        end
-
-        # "Legacy" coefficients used by the steady updraft routine
-        vel_buoy_coeff = 1.0 - pressure_buoy_coeff
+        # mixing length parameters
         tke_ed_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
         tke_diss_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"]
         static_stab_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"]
-        # Latent heat stability effect
-        lambda_stab = namelist["turbulence"]["EDMF_PrognosticTKE"]["lambda_stab"]
+        lambda_stab = namelist["turbulence"]["EDMF_PrognosticTKE"]["lambda_stab"] # Latent heat stability effect
         # Need to code up as namelist option?
         minimum_area = 1e-5
 
         # Create the class for rain
-        Rain = RainVariables(namelist, Gr)
+        Rain = RainVariables(namelist, Gr, param_set)
 
         # Create the updraft variable class (major diagnostic and prognostic variables)
         UpdVar = UpdraftVariables(n_updrafts, namelist, Gr)
@@ -985,29 +940,12 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             Ri_bulk_crit,
             zi,
             n_updrafts,
-            use_const_plume_spacing,
             drag_sign,
             asp_label,
             extrapolate_buoyancy,
             surface_area,
             max_area,
-            entrainment_Mdiv_factor,
-            updraft_mixing_frac,
-            entrainment_sigma,
-            entrainment_smin_tke_coeff,
-            entrainment_ed_mf_sigma,
-            entrainment_scale,
-            constant_plume_spacing,
-            detrainment_factor,
-            sorting_power,
-            turbulent_entrainment_factor,
-            pressure_buoy_coeff,
             aspect_ratio,
-            pressure_normalmode_buoy_coeff1,
-            pressure_normalmode_buoy_coeff2,
-            pressure_normalmode_adv_coeff,
-            pressure_normalmode_drag_coeff,
-            vel_buoy_coeff,
             tke_ed_coeff,
             tke_diss_coeff,
             static_stab_coeff,

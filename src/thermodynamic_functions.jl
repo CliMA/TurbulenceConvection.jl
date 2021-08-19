@@ -47,7 +47,8 @@ function cpm_c(qt)
     return (1.0 - qt) * cpd + qt * cpv
 end
 
-function buoyancy_c(rho0, rho)
+function buoyancy_c(param_set, rho0, rho)
+    g = CPP.grav(param_set)
     return g * (rho0 - rho) / rho0
 end
 function qv_star_c(p0, qt, pv)
@@ -68,3 +69,4 @@ function qv_star_t(p0, T)
     pv = pv_star(T)
     return eps_v * pv / (p0 + (eps_v - 1.0) * pv)
 end
+

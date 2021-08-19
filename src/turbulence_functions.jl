@@ -1,10 +1,11 @@
 # convective velocity scale
 function get_wstar(bflux, zi)
-    return cbrt(fmax(bflux * zi, 0.0))
+    return cbrt(max(bflux * zi, 0.0))
 end
 
 # BL height
-function get_inversion(theta_rho, u, v, grid::Grid, Ri_bulk_crit)
+function get_inversion(param_set, theta_rho, u, v, grid::Grid, Ri_bulk_crit)
+    g = CPP.grav(param_set)
     kc_surf = kc_surface(grid)
     kmin = kc_surf
     theta_rho_b = theta_rho[kmin]
@@ -44,7 +45,7 @@ end
 # Teixiera convective tau
 function get_mixing_tau(zi, wstar)
     # return 0.5 * zi / wstar
-    #return zi / (fmax(wstar, 1e-5))
+    #return zi / (max(wstar, 1e-5))
     return zi / (wstar + 0.001)
 end
 
@@ -61,7 +62,7 @@ function get_surface_variance(flux1, flux2, ustar, zLL, oblength)
     c_star1 = -flux1 / ustar
     c_star2 = -flux2 / ustar
     if oblength < 0.0
-        return 4.0 * c_star1 * c_star2 * pow(1.0 - 8.3 * zLL / oblength, -2.0 / 3.0)
+        return 4.0 * c_star1 * c_star2 * (1.0 - 8.3 * zLL / oblength)^(-2.0 / 3.0)
     else
         return 4.0 * c_star1 * c_star2
     end
@@ -100,4 +101,18 @@ function set_cloudbase_flag(ql, current_flag)
         new_flag = current_flag
     end
     return new_flag
+end
+
+function gradient_Richardson_number(∂b∂θ_l, ∂b∂q_tot, Shear², ϵ)
+    return min(∂b∂θ_l / max(Shear², ϵ) + ∂b∂q_tot / max(Shear², ϵ), 0.25)
+end
+
+function turbulent_Prandtl_number(obukhov_length, ∇Ri, Pr, ω_pr)
+    if obukhov_length > 0.0 && ∇Ri > 0.0 #stable
+        # CSB (Dan Li, 2019), with Pr_neutral=0.74 and w1=40.0/13.0
+        prandtl_nvec = Pr * (2 * ∇Ri / (1 + ω_pr * ∇Ri - sqrt((1 + ω_pr * ∇Ri)^2 - 4 * ∇Ri)))
+    else
+        prandtl_nvec = Pr
+    end
+    return prandtl_nvec
 end

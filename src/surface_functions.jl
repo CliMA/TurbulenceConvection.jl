@@ -1,5 +1,6 @@
 
 function buoyancy_flux(param_set, shf, lhf, T_b, qt_b, alpha0_0)
+    g = CPP.grav(param_set)
     cp_ = cpm_c(qt_b)
     lv = TD.latent_heat_vapor(param_set, T_b)
     return (g * alpha0_0 / cp_ / T_b * (shf + (eps_vi - 1.0) * cp_ * T_b * lhf / lv))
@@ -108,7 +109,7 @@ function exchange_coefficients_byun(Ri, zb, z0, cm, ch, lmo)
         pb = 1.0 / 54.0 * (-2.0 / (gamma_m * gamma_m * gamma_m) + 9.0 / gamma_m * (-gamma_h / gamma_m + 3.0) * sb * sb)
         crit = qb * qb * qb - pb * pb
         if crit < 0.0
-            tb = cbrt(sqrt(-crit) + fabs(pb))
+            tb = cbrt(sqrt(-crit) + abs(pb))
             zeta = zfactor * (1.0 / (3.0 * gamma_m) - (tb + qb / tb))
         else
             angle = acos(pb / sqrt(qb * qb * qb))

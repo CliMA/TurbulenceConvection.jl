@@ -4,6 +4,8 @@ env:
   CUDA_VERSION: "11.2"
   OPENBLAS_NUM_THREADS: 1
   CLIMATEMACHINE_SETTINGS_FIX_RNG_SEED: "true"
+  BUILDKITE_COMMIT: "${BUILDKITE_COMMIT}"
+  BUILDKITE_BRANCH: "${BUILDKITE_BRANCH}"
 
 steps:
   - label: "init :computer:"
@@ -18,15 +20,6 @@ steps:
       slurm_ntasks: 1
 
   - wait
-
-  - label: ":computer: unit tests"
-    key: "cpu_unittests"
-    command:
-      - "julia --color=yes --project=test test/runtests.jl"
-    agents:
-      config: cpu
-      queue: central
-      slurm_ntasks: 1
 
   - label: ":partly_sunny: Bomex"
     key: "cpu_bomex"
@@ -161,3 +154,25 @@ steps:
       queue: central
       slurm_ntasks: 1
 
+  - wait: ~
+    continue_on_failure: true
+
+  - label: ":robot_face: Print new mse tables"
+    key: "cpu_print_new_mse"
+    command:
+      - "julia --color=yes --project utils/print_new_mse.jl"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - wait
+
+  - label: ":robot_face: Move main results"
+    key: "cpu_mv_main_res"
+    command:
+      - "julia --color=yes --project utils/move_output.jl"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1

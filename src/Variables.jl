@@ -104,30 +104,30 @@ function mean_cloud_diagnostics(self)
         self.lwp += self.Ref.rho0_half[k] * self.QL.values[k] * self.Gr.dz
 
         if self.QL.values[k] > 1e-8
-            self.cloud_base = fmin(self.cloud_base, self.Gr.z_half[k])
-            self.cloud_top = fmax(self.cloud_top, self.Gr.z_half[k])
+            self.cloud_base = min(self.cloud_base, self.Gr.z_half[k])
+            self.cloud_top = max(self.cloud_top, self.Gr.z_half[k])
         end
     end
     return
 end
 
 function satadjust(self::GridMeanVariables)
-    sa = eos_struct()
+
     param_set = parameter_set(self)
+
     @inbounds for k in center_indicies(self.Gr)
-        θ_liq_ice = self.H.values[k]
-        q_tot = self.QT.values[k]
-        p0_c = self.Ref.p0_half[k]
-        ts = TD.PhaseEquil_pθq(param_set, p0_c, θ_liq_ice, q_tot)
-        #TODO-AJ - should be updated once we add ice
-        q_liq = TD.liquid_specific_humidity(ts)
+        p0 = self.Ref.p0_half[k]
+
+        h = self.H.values[k]
+        qt = self.QT.values[k]
+        ts = TD.PhaseEquil_pθq(param_set, p0, h, qt)
+
         self.QL.values[k] = TD.liquid_specific_humidity(ts)
         self.T.values[k] = TD.air_temperature(ts)
-        self.H.values[k] = TD.liquid_ice_pottemp(ts)
+        qv = TD.vapor_specific_humidity(ts)
 
-        ρ0_c = self.Ref.rho0_half[k]
-        ρ = TD.air_density(ts)
-        self.B.values[k] = buoyancy_c(ρ0_c, ρ)
+        rho = rho_c(p0, self.T.values[k], self.QT.values[k], qv)
+        self.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
         self.RH.values[k] = TD.relative_humidity(ts)
     end
     return

@@ -103,6 +103,7 @@ function solve_rain_fall(
     QR::RainVariable,
     RainArea::RainVariable,
 )
+    param_set = parameter_set(GMV)
     grid = get_grid(GMV)
     dz = grid.dz
     dt_model = TS.dt
@@ -117,54 +118,38 @@ function solve_rain_fall(
     # TODO: assuming GMV.W = 0
     # TODO: verify translation
     @inbounds for k in real_center_indicies(grid)
-        term_vel[k] = terminal_velocity(Rain.C_drag, Rain.MP_n_0, QR.values[k], self.Ref.rho0_half[k])
-    end
-
-    # calculate the allowed timestep (CFL_limit >= v dt / dz)
-    # TODO: report bug: dt_rain has no value in else-case
-    if !(maximum(term_vel) ≈ 0)
-        dt_rain = min(dt_model, CFL_limit * grid.dz / maximum(term_vel))
-    else
-        dt_rain = dt_model
+        term_vel[k] = terminal_velocity(param_set, Rain.C_drag, Rain.MP_n_0, QR.values[k], self.Ref.rho0_half[k])
     end
 
     # rain falling through the domain
-    while t_elapsed < dt_model
-        # TODO: verify translation
-        @inbounds for k in reverse(real_center_indicies(grid))
-            CFL_out = dt_rain / dz * term_vel[k]
+    @inbounds for k in reverse(real_center_indicies(grid))
+        CFL_out = dt_model / dz * term_vel[k]
 
-            if is_toa_center(grid, k)
-                CFL_in = 0.0
-            else
-                CFL_in = dt_rain / dz * term_vel[k + 1]
-            end
-
-            rho_frac = self.Ref.rho0_half[k + 1] / self.Ref.rho0_half[k]
-            area_frac = 1.0 # RainArea.values[k] / RainArea.new[k]
-
-            QR.new[k] = (QR.values[k] * (1 - CFL_out) + QR.values[k + 1] * CFL_in * rho_frac) * area_frac
-            if QR.new[k] != 0.0
-                RainArea.new[k] = 1.0
-            end
-
-            term_vel_new[k] = terminal_velocity(Rain.C_drag, Rain.MP_n_0, QR.new[k], self.Ref.rho0_half[k])
-        end
-
-        t_elapsed += dt_rain
-
-        QR.values .= QR.new
-        RainArea.values .= RainArea.new
-
-        term_vel .= term_vel_new
-
-        if maximum(abs.(term_vel)) > eps(Float64)
-            dt_rain = min(dt_model - t_elapsed, CFL_limit * grid.dz / maximum(term_vel))
+        if is_toa_center(grid, k)
+            CFL_in = 0.0
         else
-            dt_rain = dt_model - t_elapsed
+            CFL_in = dt_model / dz * term_vel[k + 1]
         end
+
+        if max(CFL_in, CFL_out) > CFL_limit
+            error("Time step is too large for rain fall velocity!")
+        end
+
+        rho_frac = self.Ref.rho0_half[k + 1] / self.Ref.rho0_half[k]
+        area_frac = 1.0 # RainArea.values[k] / RainArea.new[k]
+
+        QR.new[k] = (QR.values[k] * (1 - CFL_out) + QR.values[k + 1] * CFL_in * rho_frac) * area_frac
+        if QR.new[k] != 0.0
+            RainArea.new[k] = 1.0
+        end
+
+        term_vel_new[k] = terminal_velocity(param_set, Rain.C_drag, Rain.MP_n_0, QR.new[k], self.Ref.rho0_half[k])
     end
 
+    QR.values .= QR.new
+    RainArea.values .= RainArea.new
+
+    term_vel .= term_vel_new
     return
 end
 
@@ -176,6 +161,7 @@ function solve_rain_evap(
     QR::RainVariable,
     RainArea::RainVariable,
 )
+    param_set = parameter_set(GMV)
     dt_model = TS.dt
     flag_evaporate_all = false
 

@@ -309,13 +309,13 @@ function upd_cloud_diagnostics(self::UpdraftVariables, Ref::ReferenceState)
 
         @inbounds for k in real_center_indicies(self.Gr)
             if self.Area.values[i, k] > 1e-3
-                self.updraft_top[i] = fmax(self.updraft_top[i], self.Gr.z_half[k])
+                self.updraft_top[i] = max(self.updraft_top[i], self.Gr.z_half[k])
                 self.lwp += Ref.rho0_half[k] * self.QL.values[i, k] * self.Area.values[i, k] * self.Gr.dz
 
                 if self.QL.values[i, k] > 1e-8
-                    self.cloud_base[i] = fmin(self.cloud_base[i], self.Gr.z_half[k])
-                    self.cloud_top[i] = fmax(self.cloud_top[i], self.Gr.z_half[k])
-                    self.cloud_cover[i] = fmax(self.cloud_cover[i], self.Area.values[i, k])
+                    self.cloud_base[i] = min(self.cloud_base[i], self.Gr.z_half[k])
+                    self.cloud_top[i] = max(self.cloud_top[i], self.Gr.z_half[k])
+                    self.cloud_cover[i] = max(self.cloud_cover[i], self.Area.values[i, k])
                 end
             end
         end
@@ -353,6 +353,7 @@ function buoyancy(
     param_set = parameter_set(GMV)
     grid = self.Gr
     kc_surf = kc_surface(grid)
+    param_set = parameter_set(GMV)
 
     UpdVar.Area.bulkvalues .= up_sum(UpdVar.Area.values)
 
@@ -367,12 +368,11 @@ function buoyancy(
                 UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
 
                 if UpdVar.Area.values[i, k] > 0.0
-
                     qv = TD.vapor_specific_humidity(ts)
                     T = TD.air_temperature
                     rho = rho_c(self.Ref.p0_half[k], T, qt, qv)
 
-                    UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
+                    UpdVar.B.values[i, k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
                 else
                     UpdVar.B.values[i, k] = EnvVar.B.values[k]
                end
@@ -386,16 +386,18 @@ function buoyancy(
 
                     qt = UpdVar.QT.values[i, k]
                     h = UpdVar.H.values[i, k]
+
                     ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], h, qt)
 
                     qv = TD.vapor_specific_humidity(ts)
                     T = TD.air_temperature(ts)
                     rho = rho_c(self.Ref.p0_half[k], T, qt, qv)
 
-                    UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
+                    UpdVar.B.values[i, k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
                     UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
 
                 elseif UpdVar.Area.values[i, k - 1] > 0.0 && k > kc_surf
+
                     qt = UpdVar.QT.values[i, k - 1]
                     h = UpdVar.H.values[i, k - 1]
                     ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], h, qt)
@@ -404,7 +406,7 @@ function buoyancy(
                     qv = TD.vapor_specific_humidity(ts)
                     rho = rho_c(self.Ref.p0_half[k], T, qt, qv)
 
-                    UpdVar.B.values[i, k] = buoyancy_c(self.Ref.rho0_half[k], rho)
+                    UpdVar.B.values[i, k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
                     UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
                 else
                     UpdVar.B.values[i, k] = EnvVar.B.values[k]
@@ -436,6 +438,7 @@ function microphysics(param_set, self::UpdraftThermodynamics, UpdVar::UpdraftVar
     rst = rain_struct()
     mph = mph_struct()
     sa = eos_struct()
+    param_set = parameter_set(Rain)
 
     @inbounds for i in xrange(self.n_updraft)
         @inbounds for k in center_indicies(self.Gr)

@@ -3,6 +3,7 @@ module TurbulenceConvection
 using StaticArrays
 using StatsBase
 using LinearAlgebra
+import DocStringExtensions
 
 import Dierckx
 import Statistics
@@ -46,6 +47,10 @@ function parse_namelist(namelist, keys...; default = nothing, valid_options = no
     end
     return param
 end
+
+include("ClimaParams.jl")
+import .ClimaParams
+const ICP = ClimaParams # internal clima parameters
 
 include("python_primitives.jl")
 include("parameters.jl")

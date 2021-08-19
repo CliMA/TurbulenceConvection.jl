@@ -4,13 +4,14 @@ update(self::SurfaceBase, GMV::GridMeanVariables, ::BaseCase) = nothing
 
 function free_convection_windspeed(self::SurfaceBase, GMV::GridMeanVariables, ::BaseCase)
     theta_rho = center_field(self.Gr)
+    param_set = parameter_set(GMV)
 
     # Need to get theta_rho
     @inbounds for k in center_indicies(self.Gr)
         qv = GMV.QT.values[k] - GMV.QL.values[k]
         theta_rho[k] = theta_rho_c(self.Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
     end
-    zi = get_inversion(theta_rho, GMV.U.values, GMV.V.values, self.Gr, self.Ri_bulk_crit)
+    zi = get_inversion(param_set, theta_rho, GMV.U.values, GMV.V.values, self.Gr, self.Ri_bulk_crit)
     wstar = get_wstar(self.bflux, zi) # yair here zi in TRMM should be adjusted
     self.windspeed = sqrt(self.windspeed * self.windspeed + (1.2 * wstar) * (1.2 * wstar))
     return
@@ -43,8 +44,14 @@ function update(self::SurfaceBase{SurfaceFixedFlux}, GMV::GridMeanVariables)
     self.rho_qtflux = self.lhf / (TD.latent_heat_vapor(param_set, self.Tsurface))
 
     self.rho_hflux = rho_tflux / exner_c(self.Ref.Pg)
-    self.bflux =
-        buoyancy_flux(param_set, self.shf, self.lhf, GMV.T.values[kc_surf], GMV.QT.values[kc_surf], self.Ref.alpha0[kf_surf])
+    self.bflux = buoyancy_flux(
+        param_set,
+        self.shf,
+        self.lhf,
+        GMV.T.values[kc_surf],
+        GMV.QT.values[kc_surf],
+        self.Ref.alpha0[kf_surf],
+    )
 
     if !self.ustar_fixed
         # Correction to windspeed for free convective cases (Beljaars, QJRMS (1994), 121, pp. 255-270)
@@ -82,11 +89,14 @@ end
 function initialize(self::SurfaceBase{SurfaceFixedCoeffs})
 
     param_set = parameter_set(self.Ref)
+    kf_surf = kf_surface(self.Gr)
 
-    pvg = saturation_vapor_pressure(param_set, self.Tsurface, Liquid())
+    pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
     pdg = self.Ref.Pg - pvg
-    self.qsurface = q_vap_saturation_from_pressure(param_set, self.Tsurface, ρ::FT, pvg)
-    self.qsurface = qv_star_t(self.Ref.Pg, self.Tsurface)                    # TODO - what rho should I have here?
+
+    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.Ref.rho0[kf_surf], pvg)
+    #                                                                        TODO - what rho should I have
+
     self.s_surface = (1.0 - self.qsurface) * sd_c(pdg, self.Tsurface) + self.qsurface * sv_c(pvg, self.Tsurface)
     return
 end
@@ -108,12 +118,18 @@ function update(self::SurfaceBase{SurfaceFixedCoeffs}, GMV::GridMeanVariables)
         -self.ch * windspeed * (GMV.H.values[kc_surf] - self.Tsurface / exner_c(self.Ref.Pg)) * self.Ref.rho0[kf_surf]
     self.shf = cp_ * self.rho_hflux
 
-    self.bflux =
-        buoyancy_flux(param_set, self.shf, self.lhf, GMV.T.values[kc_surf], GMV.QT.values[kc_surf], self.Ref.alpha0[kf_surf])
+    self.bflux = buoyancy_flux(
+        param_set,
+        self.shf,
+        self.lhf,
+        GMV.T.values[kc_surf],
+        GMV.QT.values[kc_surf],
+        self.Ref.alpha0[kf_surf],
+    )
 
     self.ustar = sqrt(self.cm) * windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
-    if fabs(self.bflux) < 1e-10
+    if abs(self.bflux) < 1e-10
         self.obukhov_length = 0.0
     else
         self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb
@@ -134,6 +150,7 @@ initialize(self::SurfaceBase{SurfaceMoninObukhov}) = nothing
 function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
 
     param_set = parameter_set(GMV)
+    g = CPP.grav(param_set)
 
     kc_surf = kc_surface(self.Gr)
     kf_surf = kf_surface(self.Gr)
@@ -161,11 +178,17 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
 
     self.shf = cpm_c(GMV.QT.values[kc_surf]) * self.rho_hflux
 
-    self.bflux =
-        buoyancy_flux(param_set, self.shf, self.lhf, GMV.T.values[kc_surf], GMV.QT.values[kc_surf], self.Ref.alpha0[kf_surf])
+    self.bflux = buoyancy_flux(
+        param_set,
+        self.shf,
+        self.lhf,
+        GMV.T.values[kc_surf],
+        GMV.QT.values[kc_surf],
+        self.Ref.alpha0[kf_surf],
+    )
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
-    if fabs(self.bflux) < 1e-10
+    if abs(self.bflux) < 1e-10
         self.obukhov_length = 0.0
     else
         self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb
@@ -184,6 +207,7 @@ initialize(self::SurfaceBase{SurfaceMoninObukhovDry}) = nothing
 function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariables)
 
     param_set = parameter_set(GMV)
+    g = CPP.grav(param_set)
 
     self.qsurface = qv_star_t(self.Ref.Pg, self.Tsurface)
     kc_surf = kc_surface(self.Gr)
@@ -214,7 +238,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
     self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, GMV.T.values[kc_surf], 0.0, self.Ref.alpha0[kf_surf])
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
-    if fabs(self.bflux) < 1e-10
+    if abs(self.bflux) < 1e-10
         self.obukhov_length = 0.0
     else
         self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb
@@ -231,6 +255,7 @@ initialize(self::SurfaceBase{SurfaceSullivanPatton}) = nothing
 function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables)
 
     param_set = parameter_set(GMV)
+    g = CPP.grav(param_set)
 
     kc_surf = kc_surface(self.Gr)
     kf_surf = kf_surface(self.Gr)
@@ -238,7 +263,6 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
     theta_rho_g = theta_rho_c(self.Ref.Pg, self.Tsurface, self.qsurface, self.qsurface)
     theta_rho_b = theta_rho_c(self.Ref.p0_half[kc_surf], GMV.T.values[kc_surf], self.qsurface, self.qsurface)
     lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
-    g = 9.81
     T0 = self.Ref.p0_half[kc_surf] * self.Ref.alpha0_half[kc_surf] / Rd
 
     theta_flux = 0.24
@@ -265,7 +289,7 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
 
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
-    if fabs(self.bflux) < 1e-10
+    if abs(self.bflux) < 1e-10
         self.obukhov_length = 0.0
     else
         self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb
