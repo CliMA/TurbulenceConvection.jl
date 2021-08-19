@@ -118,7 +118,7 @@ function satadjust(self::GridMeanVariables)
         h = self.H.values[k]
         qt = self.QT.values[k]
         p0 = self.Ref.p0_half[k]
-        sa = eos(p0, qt, h)
+        sa = eos(param_set, p0, qt, h)
         self.QL.values[k] = sa.ql
         self.T.values[k] = sa.T
         qv = qt - sa.ql

@@ -118,7 +118,7 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
                 self.T.values[i, k] = T_in[k]
                 # for now temperature is provided as diagnostics from LES
 
-                # sa = eos(
+                # sa = eos(param_set,
                 #     Ref.p0_half[k],
                 #     self.QT.values[i,k],
                 #     self.H.values[i,k]
@@ -396,7 +396,7 @@ function buoyancy(
                 elseif UpdVar.Area.values[i, k - 1] > 0.0 && k > kc_surf
                     qt = UpdVar.QT.values[i, k - 1]
                     h = UpdVar.H.values[i, k - 1]
-                    sa = eos(self.Ref.p0_half[k], qt, h)
+                    sa = eos(param_set, self.Ref.p0_half[k], qt, h)
                     qv = qt - sa.ql
                     t = sa.T
                     rho = rho_c(self.Ref.p0_half[k], t, qt, qv)
