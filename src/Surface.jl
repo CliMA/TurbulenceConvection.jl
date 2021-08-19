@@ -39,7 +39,7 @@ function update(self::SurfaceBase{SurfaceFixedFlux}, GMV::GridMeanVariables)
     rho_tflux = self.shf / (cpm_c(self.qsurface))
 
     self.windspeed = sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf])
-    self.rho_qtflux = self.lhf / (latent_heat(self.Tsurface))
+    self.rho_qtflux = self.lhf / TD.latent_heat_vapor(param_set, self.Tsurface)
 
     self.rho_hflux = rho_tflux / exner_c(self.Ref.Pg)
     self.bflux = buoyancy_flux(
@@ -99,7 +99,7 @@ function update(self::SurfaceBase{SurfaceFixedCoeffs}, GMV::GridMeanVariables)
     windspeed =
         max(sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf]), 0.01)
     cp_ = cpm_c(GMV.QT.values[kc_surf])
-    lv = latent_heat(GMV.T.values[kc_surf])
+    lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
 
     self.rho_qtflux = -self.cq * windspeed * (GMV.QT.values[kc_surf] - self.qsurface) * self.Ref.rho0[kf_surf]
     self.lhf = lv * self.rho_qtflux
@@ -145,9 +145,9 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
     zb = self.Gr.z_half[kc_surf]
     theta_rho_g = theta_rho_c(self.Ref.Pg, self.Tsurface, self.qsurface, self.qsurface)
     theta_rho_b = theta_rho_c(self.Ref.p0_half[kc_surf], GMV.T.values[kc_surf], self.qsurface, self.qsurface)
-    lv = latent_heat(GMV.T.values[kc_surf])
+    TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
 
-    h_star = t_to_thetali_c(self.Ref.Pg, self.Tsurface, self.qsurface, 0.0, 0.0)
+    h_star = t_to_thetali_c(param_set, self.Ref.Pg, self.Tsurface, self.qsurface, 0.0, 0.0)
 
     self.windspeed = sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf])
     Nb2 = g / theta_rho_g * (theta_rho_b - theta_rho_g) / zb
@@ -200,9 +200,9 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
     zb = self.Gr.z_half[kc_surf]
     theta_rho_g = theta_rho_c(self.Ref.Pg, self.Tsurface, self.qsurface, self.qsurface)
     theta_rho_b = theta_rho_c(self.Ref.p0_half[kc_surf], GMV.T.values[kc_surf], self.qsurface, self.qsurface)
-    lv = latent_heat(GMV.T.values[kc_surf])
+    lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
 
-    h_star = t_to_thetali_c(self.Ref.Pg, self.Tsurface, self.qsurface, 0.0, 0.0)
+    h_star = t_to_thetali_c(param_set, self.Ref.Pg, self.Tsurface, self.qsurface, 0.0, 0.0)
 
     self.windspeed = sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf])
     Nb2 = g / theta_rho_g * (theta_rho_b - theta_rho_g) / zb
@@ -245,13 +245,13 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
     zb = self.Gr.z_half[kc_surf]
     theta_rho_g = theta_rho_c(self.Ref.Pg, self.Tsurface, self.qsurface, self.qsurface)
     theta_rho_b = theta_rho_c(self.Ref.p0_half[kc_surf], GMV.T.values[kc_surf], self.qsurface, self.qsurface)
-    lv = latent_heat(GMV.T.values[kc_surf])
+    lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
     T0 = self.Ref.p0_half[kc_surf] * self.Ref.alpha0_half[kc_surf] / Rd
 
     theta_flux = 0.24
     self.bflux = g * theta_flux * exner_c(self.Ref.p0_half[kc_surf]) / T0
     self.qsurface = qv_star_t(self.Ref.Pg, self.Tsurface)
-    h_star = t_to_thetali_c(self.Ref.Pg, self.Tsurface, self.qsurface, 0.0, 0.0)
+    h_star = t_to_thetali_c(param_set, self.Ref.Pg, self.Tsurface, self.qsurface, 0.0, 0.0)
 
 
     self.windspeed = sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf])

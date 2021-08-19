@@ -337,7 +337,8 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         qv_cloudy = self.EnvThermo.qv_cloudy[k]
         qt_cloudy = self.EnvThermo.qt_cloudy[k]
         th_cloudy = self.EnvThermo.th_cloudy[k]
-        lh = latent_heat(t_cloudy)
+
+        lh = TD.latent_heat_vapor(param_set, t_cloudy)
         cpm = cpm_c(qt_cloudy)
 
         QT_cut = cut(self.EnvVar.QT.values, grid, k)
@@ -426,8 +427,8 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
             (1.0 - self.EnvVar.cloud_fraction.values[k]) * grad_thv +
             self.EnvVar.cloud_fraction.values[k] * (
                 1.0 / exp(
-                    -latent_heat(self.EnvVar.T.values[k]) * self.EnvVar.QL.values[k] / cpm_c(self.EnvVar.QT.values[k]) /
-                    self.EnvVar.T.values[k],
+                    -TD.latent_heat_vapor(param_set, self.EnvVar.T.values[k]) * self.EnvVar.QL.values[k] /
+                    cpm_c(self.EnvVar.QT.values[k]) / self.EnvVar.T.values[k],
                 ) * (
                     (1.0 + (eps_vi - 1.0) * self.EnvVar.QT.values[k]) * grad_thl +
                     (eps_vi - 1.0) * self.EnvVar.H.values[k] * grad_qt
@@ -1093,6 +1094,7 @@ end
 
 function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::TimeStepping)
     grid = get_grid(self)
+    param_set = parameter_set(GMV)
     ref_state = reference_state(self)
     dzi = grid.dzi
     dti_ = 1.0 / TS.dt
@@ -1112,7 +1114,7 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
                 end
 
                 # saturation adjustment
-                sa = eos(ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
+                sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
                 self.UpdVar.QL.new[i, k] = sa.ql
                 self.UpdVar.T.new[i, k] = sa.T
                 continue
@@ -1157,7 +1159,7 @@ function solve_updraft_scalars(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
             end
 
             # saturation adjustment
-            sa = eos(ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
+            sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
             self.UpdVar.QL.new[i, k] = sa.ql
             self.UpdVar.T.new[i, k] = sa.T
         end
@@ -1405,7 +1407,7 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
         qv_cloudy = self.EnvThermo.qv_cloudy[k]
         qt_cloudy = self.EnvThermo.qt_cloudy[k]
         th_cloudy = self.EnvThermo.th_cloudy[k]
-        lh = latent_heat(t_cloudy)
+        lh = TD.latent_heat_vapor(param_set, t_cloudy)
         cpm = cpm_c(qt_cloudy)
         grad_thl_minus = grad_thl_plus
         grad_qt_minus = grad_qt_plus
