@@ -10,17 +10,17 @@ function initialize(
 
     if Case.casename == "DryBubble"
         initialize_DryBubble(self.UpdVar, GMV, Ref)
-        decompose_environment(self, GMV, "values")
-        saturation_adjustment(self.EnvThermo, self.EnvVar)
-        buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
     else
         initialize(self.UpdVar, GMV)
-        decompose_environment(self, GMV, "values")
     end
+    decompose_environment(self, GMV, "values")
+    saturation_adjustment(self.EnvThermo, self.EnvVar)
+    buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
     update_inversion(self, GMV, Case.inversion_option)
     self.wstar = get_wstar(Case.Sur.bflux, self.zi)
     microphysics(param_set, self.EnvThermo, self.EnvVar, self.Rain, TS.dt)
     initialize_covariance(self, GMV, Case)
+    set_subdomain_bcs(self)
     return
 end
 
@@ -236,55 +236,27 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     param_set = parameter_set(self)
 
     grid = get_grid(self)
-    compute_pressure_plume_spacing(self, GMV, Case)
-    # compute_prognostic_updrafts --
-    set_subdomain_bcs(self)
-    # set_new_with_values(self.UpdVar)
     set_old_with_values(self.UpdVar)
-
     set_updraft_surface_bc(self, GMV, Case)
 
-    clear_precip_sources(self.UpdThermo)
-
+    # compute RHS
+    compute_pressure_plume_spacing(self, GMV, Case)
     compute_updraft_closures(self, GMV, Case)
+    compute_eddy_diffusivities_tke(self, GMV, Case)
+    compute_GMV_MF(self, GMV, TS)
+    compute_covariance_rhs(self, GMV, Case, TS)
+
+    # update
     solve_updraft_velocity_area(self, TS)
     solve_updraft_scalars(self, GMV, TS)
-    microphysics(param_set, self.UpdThermo, self.UpdVar, self.Rain, TS.dt) # causes division error in dry bubble first time step
-
-    set_values_with_new(self.UpdVar)
-    zero_area_fraction_cleanup(self, GMV)
-    # compute_prognostic_updrafts --
-
-    # (####)
-    # TODO - see comment (###)
-    # It would be better to have a simple linear rule for updating environment here
-    # instead of calling EnvThermo saturation adjustment scheme for every updraft.
-    decompose_environment(self, GMV, "values")
-    saturation_adjustment(self.EnvThermo, self.EnvVar)
-    buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
-    set_subdomain_bcs(self)
-
-    update_total_precip_sources(self.UpdThermo)
-
-    # TODO -maybe not needed? - both diagnostic and prognostic updrafts end with decompose_environment
-    # But in general ok here without thermodynamics because MF doesnt depend directly on buoyancy
-    decompose_environment(self, GMV, "values")
-    update_GMV_MF(self, GMV, TS)
-    # (###)
-    # decompose_environment +  EnvThermo.saturation_adjustment + UpdThermo.buoyancy should always be used together
-    # This ensures that
-    #   - the buoyancy of updrafts and environment is up to date with the most recent decomposition,
-    #   - the buoyancy of updrafts and environment is updated such that
-    #     the mean buoyancy with repect to reference state alpha_0 is zero.
-
-    decompose_environment(self, GMV, "mf_update")
-    microphysics(param_set, self.EnvThermo, self.EnvVar, self.Rain, TS.dt) # saturation adjustment + rain creation
-    # Sink of environmental QT and H due to rain creation is applied in tridiagonal solver
-    buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
-    compute_eddy_diffusivities_tke(self, GMV, Case)
     update_GMV_ED(self, GMV, Case, TS)
-    compute_covariance_rhs(self, GMV, Case, TS)
     update_covariance(self, GMV, Case, TS)
+    update_GMV_turbulence(self, GMV, Case, TS)
+
+    # update microphysics
+    microphysics(param_set, self.UpdThermo, self.UpdVar, self.Rain, TS.dt) # causes division error in dry bubble first time step
+    microphysics(param_set, self.EnvThermo, self.EnvVar, self.Rain, TS.dt) # saturation adjustment + rain creation
+    update_total_precip_sources(self.UpdThermo)
 
     if self.Rain.rain_model == "clima_1m"
         # sum updraft and environment rain into bulk rain
@@ -308,13 +280,19 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
             self.UpdVar.Area.bulkvalues[k] * self.UpdVar.cloud_fraction[k]
     end
     GMV.cloud_cover = min(self.EnvVar.cloud_cover + sum(self.UpdVar.cloud_cover), 1)
-    # Back out the tendencies of the grid mean variables for the whole timestep
-    # by differencing GMV.new and GMV.values
-    update_turbulence(self, GMV, Case, TS)
+
+    # set values
+    set_values_with_new(self.UpdVar)
+    zero_area_fraction_cleanup(self, GMV)
+    decompose_environment(self, GMV, "values")
+    saturation_adjustment(self.EnvThermo, self.EnvVar)
+    buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
+    set_subdomain_bcs(self)
+    clear_precip_sources(self.UpdThermo)
     return
 end
 
-function update_turbulence(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
+function update_GMV_turbulence(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
 
     @inbounds for k in real_center_indicies(self.Gr)
         GMV.H.tendencies[k] += (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
@@ -1211,7 +1189,7 @@ end
 # thereby updating to GMV.SomeVar.mf_update
 # mass flux tendency is computed as 1st order upwind
 
-function update_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::TimeStepping)
+function compute_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::TimeStepping)
     grid = get_grid(self)
     ref_state = reference_state(self)
     rho0 = ref_state.rho0
