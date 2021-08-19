@@ -59,14 +59,14 @@ all_best_mse["DYCOMS_RF01"]["Hvar_mean"] = 8098.711166922056
 all_best_mse["DYCOMS_RF01"]["QTvar_mean"] = 632.2267595058471
 #
 all_best_mse["GABLS"] = OrderedDict()
-all_best_mse["GABLS"]["updraft_thetal"] = 0.0
-all_best_mse["GABLS"]["v_mean"] = 0.0
-all_best_mse["GABLS"]["u_mean"] = 0.0
-all_best_mse["GABLS"]["tke_mean"] = 0.0
-all_best_mse["GABLS"]["temperature_mean"] = 0.0
-all_best_mse["GABLS"]["thetal_mean"] = 0.0
-all_best_mse["GABLS"]["Hvar_mean"] = 0.0
-all_best_mse["GABLS"]["QTvar_mean"] = 0.0
+all_best_mse["GABLS"]["updraft_thetal"] = 5.0248691471536375e+00
+all_best_mse["GABLS"]["v_mean"] = 4.4621632300460643e+00
+all_best_mse["GABLS"]["u_mean"] = 9.6407378717817807e+00
+all_best_mse["GABLS"]["tke_mean"] = 2.4668550396223474e+00
+all_best_mse["GABLS"]["temperature_mean"] = 8.7863070340963982e-06
+all_best_mse["GABLS"]["thetal_mean"] = 8.7848654389581558e-06
+all_best_mse["GABLS"]["Hvar_mean"] = 1.2140569458348514e+01
+all_best_mse["GABLS"]["QTvar_mean"] = 4.6477056464381605e-01
 #
 all_best_mse["life_cycle_Tan2018"] = OrderedDict()
 all_best_mse["life_cycle_Tan2018"]["qt_mean"] = 0.0

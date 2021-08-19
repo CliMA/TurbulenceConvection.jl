@@ -90,10 +90,12 @@ end
 function update(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariables)
 
     calculate_radiation(self, GMV)
-
+    param_set = parameter_set(GMV)
     @inbounds for k in real_center_indicies(self.Gr)
         # Apply large-scale horizontal advection tendencies
-        GMV.H.tendencies[k] += self.dTdt[k] / exner_c(self.Ref.p0_half[k])
+        phase_part = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0)
+        Π = TD.exner_given_pressure(param_set, self.Ref.p0_half[k], phase_part)
+        GMV.H.tendencies[k] += self.dTdt[k] / Π
     end
 
     return
@@ -130,8 +132,11 @@ end
 function update(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables)
 
     @inbounds for k in real_center_indicies(self.Gr)
+        param_set = parameter_set(GMV)
         # Apply large-scale horizontal advection tendencies
-        GMV.H.tendencies[k] += self.dTdt[k] / exner_c(self.Ref.p0_half[k])
+        phase_part = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0)
+        Π = TD.exner_given_pressure(param_set, self.Ref.p0_half[k], phase_part)
+        GMV.H.tendencies[k] += self.dTdt[k] / Π
     end
 
     return

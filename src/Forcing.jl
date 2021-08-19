@@ -40,9 +40,12 @@ initialize(self::ForcingBase{ForcingStandard}, GMV) = initialize(self, GMV, Forc
 
 function update(self::ForcingBase{ForcingStandard}, GMV::GridMeanVariables)
     grid = self.Gr
+    param_set = parameter_set(GMV)
     @inbounds for k in real_center_indicies(grid)
         # Apply large-scale horizontal advection tendencies
-        GMV.H.tendencies[k] += self.dTdt[k] / exner_c(self.Ref.p0_half[k])
+        phase_part = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0)
+        Π = TD.exner_given_pressure(param_set, self.Ref.p0_half[k], phase_part)
+        GMV.H.tendencies[k] += self.dTdt[k] / Π
         GMV.QT.tendencies[k] += self.dqtdt[k]
     end
     if self.apply_subsidence
@@ -126,12 +129,14 @@ function initialize(self::ForcingBase{ForcingLES}, GMV::GridMeanVariables, Gr::G
 end
 
 function update(self::ForcingBase{ForcingLES}, GMV::GridMeanVariables)
-
     grid = self.Gr
-    @inbounds for k in real_center_indicies(grid)
-        H_horz_adv = self.dtdt_hadv[k] / exner_c(self.Ref.p0_half[k])
-        H_nudge = self.dtdt_nudge[k] / exner_c(self.Ref.p0_half[k])
-        H_fluc = self.dtdt_fluc[k] / exner_c(self.Ref.p0_half[k])
+    param_set = parameter_set(GMV)
+    @inbounds for k in real_center_indicies(self.Gr)
+        phase_part = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0)
+        Π = TD.exner_given_pressure(param_set, self.Ref.p0_half[k], phase_part)
+        H_horz_adv = self.dtdt_hadv[k] / Π
+        H_nudge = self.dtdt_nudge[k] / Π
+        H_fluc = self.dtdt_fluc[k] / Π
 
         GMV_U_nudge_k = (self.u_nudge[k] - GMV.U.values[k]) / self.nudge_tau
         GMV_V_nudge_k = (self.v_nudge[k] - GMV.V.values[k]) / self.nudge_tau

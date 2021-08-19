@@ -1,4 +1,3 @@
-
 initialize(self::SurfaceBase, ::BaseCase) = nothing
 update(self::SurfaceBase, GMV::GridMeanVariables, ::BaseCase) = nothing
 
@@ -9,7 +8,8 @@ function free_convection_windspeed(self::SurfaceBase, GMV::GridMeanVariables, ::
     # Need to get theta_rho
     @inbounds for k in center_indicies(self.Gr)
         qv = GMV.QT.values[k] - GMV.QL.values[k]
-        theta_rho[k] = theta_rho_c(self.Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
+        ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        theta_rho[k] = TD.virtual_pottemp(ts)
     end
     zi = get_inversion(param_set, theta_rho, GMV.U.values, GMV.V.values, self.Gr, self.Ri_bulk_crit)
     wstar = get_wstar(self.bflux, zi) # yair here zi in TRMM should be adjusted
@@ -36,12 +36,15 @@ function update(self::SurfaceBase{SurfaceFixedFlux}, GMV::GridMeanVariables)
     param_set = parameter_set(GMV)
     kc_surf = kc_surface(self.Gr)
     kf_surf = kf_surface(self.Gr)
-    rho_tflux = self.shf / (cpm_c(self.qsurface))
+    ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0[kf_surf], self.Tsurface, self.qsurface)
+    rho_tflux = self.shf / TD.cp_m(ts)
 
     self.windspeed = sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf])
-    self.rho_qtflux = self.lhf / (latent_heat(self.Tsurface))
+    self.rho_qtflux = self.lhf / TD.latent_heat_vapor(param_set, self.Tsurface)
 
-    self.rho_hflux = rho_tflux / exner_c(self.Ref.Pg)
+    phase_part = TD.PhasePartition(GMV.QT.values[kc_surf], 0.0, 0.0)
+    Π = TD.exner_given_pressure(param_set, self.Ref.p0[kf_surf], phase_part)
+    self.rho_hflux = rho_tflux / Π
     self.bflux = buoyancy_flux(
         param_set,
         self.shf,
@@ -49,6 +52,7 @@ function update(self::SurfaceBase{SurfaceFixedFlux}, GMV::GridMeanVariables)
         GMV.T.values[kc_surf],
         GMV.QT.values[kc_surf],
         self.Ref.alpha0[kf_surf],
+        ts,
     )
 
     if !self.ustar_fixed
@@ -85,9 +89,10 @@ end
 
 # Cases such as Rico which provide values of transfer coefficients
 function initialize(self::SurfaceBase{SurfaceFixedCoeffs})
-    pvg = pv_star(self.Tsurface)
-    pdg = self.Ref.Pg - pvg
-    self.qsurface = qv_star_t(self.Ref.Pg, self.Tsurface)
+    param_set = parameter_set(self.Ref)
+    kf_surf = kf_surface(self.Gr)
+    pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
+    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.Ref.rho0[kf_surf], pvg)
     return
 end
 
@@ -95,15 +100,18 @@ function update(self::SurfaceBase{SurfaceFixedCoeffs}, GMV::GridMeanVariables)
     param_set = parameter_set(GMV)
     kc_surf = kc_surface(self.Gr)
     kf_surf = kf_surface(self.Gr)
+    ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0[kf_surf], self.Tsurface, self.qsurface)
     windspeed =
         max(sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf]), 0.01)
-    cp_ = cpm_c(GMV.QT.values[kc_surf])
-    lv = latent_heat(GMV.T.values[kc_surf])
+    cp_ = TD.cp_m(ts)
+    lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
 
     self.rho_qtflux = -self.cq * windspeed * (GMV.QT.values[kc_surf] - self.qsurface) * self.Ref.rho0[kf_surf]
     self.lhf = lv * self.rho_qtflux
-    self.rho_hflux =
-        -self.ch * windspeed * (GMV.H.values[kc_surf] - self.Tsurface / exner_c(self.Ref.Pg)) * self.Ref.rho0[kf_surf]
+
+    phase_part = TD.PhasePartition(GMV.QT.values[kc_surf], 0.0, 0.0)
+    Π = TD.exner_given_pressure(param_set, self.Ref.p0[kf_surf], phase_part)
+    self.rho_hflux = -self.ch * windspeed * (GMV.H.values[kc_surf] - self.Tsurface / Π) * self.Ref.rho0[kf_surf]
     self.shf = cp_ * self.rho_hflux
 
     self.bflux = buoyancy_flux(
@@ -113,6 +121,7 @@ function update(self::SurfaceBase{SurfaceFixedCoeffs}, GMV::GridMeanVariables)
         GMV.T.values[kc_surf],
         GMV.QT.values[kc_surf],
         self.Ref.alpha0[kf_surf],
+        ts,
     )
 
     self.ustar = sqrt(self.cm) * windspeed
@@ -140,13 +149,19 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
     g = CPP.grav(param_set)
     kc_surf = kc_surface(self.Gr)
     kf_surf = kf_surface(self.Gr)
-    self.qsurface = qv_star_t(self.Ref.Pg, self.Tsurface)
+    pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
+    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.Ref.rho0[kf_surf], pvg)
     zb = self.Gr.z_half[kc_surf]
-    theta_rho_g = theta_rho_c(self.Ref.Pg, self.Tsurface, self.qsurface, self.qsurface)
-    theta_rho_b = theta_rho_c(self.Ref.p0_half[kc_surf], GMV.T.values[kc_surf], self.qsurface, self.qsurface)
-    lv = latent_heat(GMV.T.values[kc_surf])
+    lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
 
-    h_star = t_to_thetali_c(self.Ref.Pg, self.Tsurface, self.qsurface, 0.0, 0.0)
+    phase_part = TD.PhasePartition(self.qsurface, 0.0, 0.0)
+    h_star = TD.liquid_ice_pottemp_given_pressure(param_set, self.Tsurface, self.Ref.Pg, phase_part)
+
+    ts_g = TD.PhaseEquil_pθq(param_set, self.Ref.Pg, h_star, self.qsurface)
+    theta_rho_g = TD.virtual_pottemp(ts_g)
+
+    ts_b = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[kc_surf], GMV.H.values[kc_surf], self.qsurface)
+    theta_rho_b = TD.virtual_pottemp(ts_b)
 
     self.windspeed = sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf])
     Nb2 = g / theta_rho_g * (theta_rho_b - theta_rho_g) / zb
@@ -162,7 +177,8 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
     self.rho_qtflux = -self.ch * self.windspeed * (GMV.QT.values[kc_surf] - self.qsurface) * self.Ref.rho0[kf_surf]
     self.lhf = lv * self.rho_qtflux
 
-    self.shf = cpm_c(GMV.QT.values[kc_surf]) * self.rho_hflux
+    ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0[kf_surf], self.Tsurface, self.qsurface)
+    self.shf = TD.cp_m(ts) * self.rho_hflux
 
     self.bflux = buoyancy_flux(
         param_set,
@@ -171,6 +187,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
         GMV.T.values[kc_surf],
         GMV.QT.values[kc_surf],
         self.Ref.alpha0[kf_surf],
+        ts,
     )
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
@@ -193,15 +210,21 @@ initialize(self::SurfaceBase{SurfaceMoninObukhovDry}) = nothing
 function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariables)
     param_set = parameter_set(GMV)
     g = CPP.grav(param_set)
-    self.qsurface = qv_star_t(self.Ref.Pg, self.Tsurface)
     kc_surf = kc_surface(self.Gr)
     kf_surf = kf_surface(self.Gr)
+    pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
+    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.Ref.rho0[kf_surf], pvg)
     zb = self.Gr.z_half[kc_surf]
-    theta_rho_g = theta_rho_c(self.Ref.Pg, self.Tsurface, self.qsurface, self.qsurface)
-    theta_rho_b = theta_rho_c(self.Ref.p0_half[kc_surf], GMV.T.values[kc_surf], self.qsurface, self.qsurface)
-    lv = latent_heat(GMV.T.values[kc_surf])
+    lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
 
-    h_star = t_to_thetali_c(self.Ref.Pg, self.Tsurface, self.qsurface, 0.0, 0.0)
+    phase_part = TD.PhasePartition(self.qsurface, 0.0, 0.0)
+    h_star = TD.liquid_ice_pottemp_given_pressure(param_set, self.Tsurface, self.Ref.Pg, phase_part)
+
+    ts_g = TD.PhaseEquil_pθq(param_set, self.Ref.Pg, h_star, self.qsurface)
+    theta_rho_g = TD.virtual_pottemp(ts_g)
+
+    ts_b = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[kc_surf], GMV.H.values[kc_surf], self.qsurface)
+    theta_rho_b = TD.virtual_pottemp(ts_b)
 
     self.windspeed = sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf])
     Nb2 = g / theta_rho_g * (theta_rho_b - theta_rho_g) / zb
@@ -217,9 +240,10 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
     self.rho_qtflux = -self.ch * self.windspeed * (GMV.QT.values[kc_surf] - self.qsurface) * self.Ref.rho0[kf_surf]
     self.lhf = lv * 0.0
 
-    self.shf = cpm_c(0.0) * self.rho_hflux
+    ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0[kf_surf], self.Tsurface, self.qsurface)
+    self.shf = TD.cp_m(ts) * self.rho_hflux
 
-    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, GMV.T.values[kc_surf], 0.0, self.Ref.alpha0[kf_surf])
+    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, GMV.T.values[kc_surf], 0.0, self.Ref.alpha0[kf_surf], ts)
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
     if abs(self.bflux) < 1e-10
@@ -242,15 +266,23 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
     kc_surf = kc_surface(self.Gr)
     kf_surf = kf_surface(self.Gr)
     zb = self.Gr.z_half[kc_surf]
-    theta_rho_g = theta_rho_c(self.Ref.Pg, self.Tsurface, self.qsurface, self.qsurface)
-    theta_rho_b = theta_rho_c(self.Ref.p0_half[kc_surf], GMV.T.values[kc_surf], self.qsurface, self.qsurface)
-    lv = latent_heat(GMV.T.values[kc_surf])
+    ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0[kc_surf], self.Tsurface, self.qsurface)
+    lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
     T0 = self.Ref.p0_half[kc_surf] * self.Ref.alpha0_half[kc_surf] / Rd
 
     theta_flux = 0.24
-    self.bflux = g * theta_flux * exner_c(self.Ref.p0_half[kc_surf]) / T0
-    self.qsurface = qv_star_t(self.Ref.Pg, self.Tsurface)
-    h_star = t_to_thetali_c(self.Ref.Pg, self.Tsurface, self.qsurface, 0.0, 0.0)
+    phase_part = TD.PhasePartition(GMV.QT.values[kc_surf], 0.0, 0.0)
+    Π = TD.exner_given_pressure(param_set, self.Ref.p0[kf_surf], phase_part)
+    self.bflux = g * theta_flux * Π / T0
+    pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
+    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.Ref.rho0[kf_surf], pvg)
+    h_star = TD.liquid_ice_pottemp_given_pressure(param_set, self.Tsurface, self.Ref.Pg, phase_part)
+
+    ts_g = TD.PhaseEquil_pθq(param_set, self.Ref.Pg, h_star, self.qsurface)
+    theta_rho_g = TD.virtual_pottemp(ts_g)
+
+    ts_b = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[kc_surf], GMV.H.values[kc_surf], self.qsurface)
+    theta_rho_b = TD.virtual_pottemp(ts_b)
 
 
     self.windspeed = sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf])
@@ -266,8 +298,7 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
     self.rho_hflux = -self.ch * self.windspeed * (GMV.H.values[kc_surf] - h_star) * self.Ref.rho0[kf_surf]
     self.rho_qtflux = -self.ch * self.windspeed * (GMV.QT.values[kc_surf] - self.qsurface) * self.Ref.rho0[kf_surf]
     self.lhf = lv * self.rho_qtflux
-
-    self.shf = cpm_c(GMV.QT.values[kc_surf]) * self.rho_hflux
+    self.shf = TD.cp_m(ts) * self.rho_hflux
 
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,

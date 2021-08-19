@@ -23,8 +23,8 @@ function nondimensional_exchange_functions(param_set, Δw, Δb, εδ_model)
     D_ε = 1.0 / (1.0 + exp(-μ / μ_0 * μ_ij))
     D_δ = 1.0 / (1.0 + exp(μ / μ_0 * μ_ij))
 
-    M_δ = (max((εδ_model.RH_up / 100.0)^β - (εδ_model.RH_en / 100.0)^β, 0.0))^(1.0 / β)
-    M_ε = (max((εδ_model.RH_en / 100.0)^β - (εδ_model.RH_up / 100.0)^β, 0.0))^(1.0 / β)
+    M_δ = (max((εδ_model.RH_up)^β - (εδ_model.RH_en)^β, 0.0))^(1.0 / β)
+    M_ε = (max((εδ_model.RH_en)^β - (εδ_model.RH_up)^β, 0.0))^(1.0 / β)
 
     return D_ε, D_δ, M_δ, M_ε
 end;
