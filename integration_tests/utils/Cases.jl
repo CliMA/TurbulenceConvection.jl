@@ -653,9 +653,11 @@ function Rico(namelist, Gr::Grid, Ref::ReferenceState)
 end
 
 function initialize_reference(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
+    param_set = TC.parameter_set(Ref)
     Ref.Pg = 1.0154e5  #Pressure at ground
     Ref.Tg = 299.8  #Temperature at ground
-    pvg = pv_star(Ref.Tg)
+    # pvg = pv_star(Ref.Tg)
+    pvg = TD.saturation_vapor_pressure(param_set, Ref.Tg, TD.Liquid())
     Ref.qtg = eps_v * pvg / (Ref.Pg - pvg)   #Total water mixing ratio at surface
     initialize(Ref, Gr, Stats)
 end
@@ -773,9 +775,11 @@ function TRMM_LBA(namelist, Gr::Grid, Ref::ReferenceState)
     return TC.CasesBase{TRMM_LBA}(; casename = "TRMM_LBA", inversion_option, Sur, Fo, Rad)
 end
 function initialize_reference(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
+    param_set = TC.parameter_set(Ref)
     Ref.Pg = 991.3 * 100  #Pressure at ground
     Ref.Tg = 296.85   # surface values for reference state (RS) which outputs p0 rho0 alpha0
-    pvg = pv_star(Ref.Tg)
+    # pvg = pv_star(Ref.Tg)
+    pvg = TD.saturation_vapor_pressure(param_set, Ref.Tg, TD.Liquid())
     Ref.qtg = eps_v * pvg / (Ref.Pg - pvg)#Total water mixing ratio at surface
     initialize(Ref, Gr, Stats)
 end
@@ -853,7 +857,8 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
 
 
     @inbounds for k in real_center_indicies(Gr)
-        PV_star = pv_star(GMV.T.values[k])
+        # PV_star = pv_star(GMV.T.values[k])
+        PV_star = TD.saturation_vapor_pressure(param_set, GMV.T.values[k], TD.Liquid())
         qv_star = PV_star * epsi / (p1[k] - PV_star + epsi * PV_star * RH[k] / 100.0) # eq. 37 in pressel et al and the def of RH
         qv = GMV.QT.values[k] - GMV.QL.values[k]
         GMV.QT.values[k] = qv_star * RH[k] / 100.0
@@ -1388,11 +1393,12 @@ We can"t use the default TurbulenceConvection function because of different valu
 :param qt:  total water specific humidity
 :return: T, ql
 """
-function dycoms_sat_adjst(self::CasesBase{DYCOMS_RF01}, p_, thetal_, qt_)
+function dycoms_sat_adjst(param_set, self::CasesBase{DYCOMS_RF01}, p_, thetal_, qt_)
     #Compute temperature
     t_1 = thetal_ * exner_c(p_, kappa = dycoms_Rd / dycoms_cp)
     #Compute saturation vapor pressure
-    pv_star_1 = pv_star(t_1)
+    # pv_star_1 = pv_star(t_1)
+    pv_star_1 = TD.saturation_vapor_pressure(param_set, t_1, TD.Liquid())
     #Compute saturation specific humidity
     qs_1 = qv_star_c(p_, qt_, pv_star_1)
 
@@ -1403,12 +1409,14 @@ function dycoms_sat_adjst(self::CasesBase{DYCOMS_RF01}, p_, thetal_, qt_)
         ql_1 = qt_ - qs_1
         f_1 = thetal_ - dycoms_compute_thetal(self, p_, t_1, ql_1)
         t_2 = t_1 + dycoms_L * ql_1 / dycoms_cp
-        pv_star_2 = pv_star(t_2)
+        # pv_star_2 = pv_star(t_2)
+        pv_star_2 = TD.saturation_vapor_pressure(param_set, t_2, TD.Liquid())
         qs_2 = qv_star_c(p_, qt_, pv_star_2)
         ql_2 = qt_ - qs_2
 
         while abs(t_2 - t_1) >= 1e-9
-            pv_star_2 = pv_star(t_2)
+            # pv_star_2 = pv_star(t_2)
+            pv_star_2 = TD.saturation_vapor_pressure(param_set, t_2, TD.Liquid())
             qs_2 = qv_star_c(p_, qt_, pv_star_2)
             ql_2 = qt_ - qs_2
             f_2 = thetal_ - dycoms_compute_thetal(self, p_, t_2, ql_2)
@@ -1448,7 +1456,7 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
         # ql and T profile
         # (calculated by saturation adjustment using thetal and qt values provided in DYCOMS
         # and using Rd, cp and L constants as defined in DYCOMS)
-        GMV.T.values[k], GMV.QL.values[k] = dycoms_sat_adjst(self, Ref.p0_half[k], thetal[k], GMV.QT.values[k])
+        GMV.T.values[k], GMV.QL.values[k] = dycoms_sat_adjst(param_set, self, Ref.p0_half[k], thetal[k], GMV.QT.values[k])
 
         # thermodynamic variable profile (either entropy or thetal)
         # (calculated based on T and ql profiles.
