@@ -19,7 +19,6 @@ using ..TurbulenceConvection: eps_vi
 using ..TurbulenceConvection: thetali_c
 using ..TurbulenceConvection: theta_rho_c
 using ..TurbulenceConvection: eps_v
-using ..TurbulenceConvection: pv_star
 using ..TurbulenceConvection: buoyancy_c
 using ..TurbulenceConvection: dycoms_L
 using ..TurbulenceConvection: qv_star_c
@@ -656,7 +655,6 @@ function initialize_reference(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceSta
     param_set = TC.parameter_set(Ref)
     Ref.Pg = 1.0154e5  #Pressure at ground
     Ref.Tg = 299.8  #Temperature at ground
-    # pvg = pv_star(Ref.Tg)
     pvg = TD.saturation_vapor_pressure(param_set, Ref.Tg, TD.Liquid())
     Ref.qtg = eps_v * pvg / (Ref.Pg - pvg)   #Total water mixing ratio at surface
     initialize(Ref, Gr, Stats)
@@ -778,7 +776,6 @@ function initialize_reference(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::Referenc
     param_set = TC.parameter_set(Ref)
     Ref.Pg = 991.3 * 100  #Pressure at ground
     Ref.Tg = 296.85   # surface values for reference state (RS) which outputs p0 rho0 alpha0
-    # pvg = pv_star(Ref.Tg)
     pvg = TD.saturation_vapor_pressure(param_set, Ref.Tg, TD.Liquid())
     Ref.qtg = eps_v * pvg / (Ref.Pg - pvg)#Total water mixing ratio at surface
     initialize(Ref, Gr, Stats)
@@ -857,7 +854,6 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
 
 
     @inbounds for k in real_center_indicies(Gr)
-        # PV_star = pv_star(GMV.T.values[k])
         PV_star = TD.saturation_vapor_pressure(param_set, GMV.T.values[k], TD.Liquid())
         qv_star = PV_star * epsi / (p1[k] - PV_star + epsi * PV_star * RH[k] / 100.0) # eq. 37 in pressel et al and the def of RH
         qv = GMV.QT.values[k] - GMV.QL.values[k]
@@ -1397,7 +1393,6 @@ function dycoms_sat_adjst(param_set, self::CasesBase{DYCOMS_RF01}, p_, thetal_, 
     #Compute temperature
     t_1 = thetal_ * exner_c(p_, kappa = dycoms_Rd / dycoms_cp)
     #Compute saturation vapor pressure
-    # pv_star_1 = pv_star(t_1)
     pv_star_1 = TD.saturation_vapor_pressure(param_set, t_1, TD.Liquid())
     #Compute saturation specific humidity
     qs_1 = qv_star_c(p_, qt_, pv_star_1)
@@ -1409,13 +1404,11 @@ function dycoms_sat_adjst(param_set, self::CasesBase{DYCOMS_RF01}, p_, thetal_, 
         ql_1 = qt_ - qs_1
         f_1 = thetal_ - dycoms_compute_thetal(self, p_, t_1, ql_1)
         t_2 = t_1 + dycoms_L * ql_1 / dycoms_cp
-        # pv_star_2 = pv_star(t_2)
         pv_star_2 = TD.saturation_vapor_pressure(param_set, t_2, TD.Liquid())
         qs_2 = qv_star_c(p_, qt_, pv_star_2)
         ql_2 = qt_ - qs_2
 
         while abs(t_2 - t_1) >= 1e-9
-            # pv_star_2 = pv_star(t_2)
             pv_star_2 = TD.saturation_vapor_pressure(param_set, t_2, TD.Liquid())
             qs_2 = qv_star_c(p_, qt_, pv_star_2)
             ql_2 = qt_ - qs_2
