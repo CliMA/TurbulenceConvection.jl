@@ -692,6 +692,17 @@ struct EnvironmentThermodynamics{A1}
     end
 end
 
+# Stochastic entrainment/detrainment closures:
+struct NoneClosureType end
+struct LogNormalClosureType end
+struct SDEClosureType end
+
+# Stochastic differential equation memory
+Base.@kwdef mutable struct sde_struct{T}
+    u0::Float64
+    dt::Float64
+end
+
 # SurfaceMoninObukhovDry:
 #     Needed for dry cases (qt=0). They have to be initialized with nonzero qtg for the
 #     reference profiles. This surface subroutine sets the latent heat flux to zero
@@ -883,6 +894,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     entr_surface_bc::Float64
     detr_surface_bc::Float64
     dt_upd::Float64
+    sde_model::sde_struct
     function EDMF_PrognosticTKE(namelist, Gr::Grid, Ref::ReferenceState, param_set::PS) where {PS}
         turbulence_tendency = center_field(Gr)
         KM = VariableDiagnostic(Gr, "half", "scalar", "sym", "diffusivity", "m^2/s") # eddy viscosity
@@ -1002,6 +1014,28 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         diffusive_flux_v = center_field(Gr)
         massflux_tke = center_field(Gr)
 
+        # Initialize SDE parameters
+        dt = parse_namelist(namelist, "time_stepping", "dt"; default = 1.0)
+        closure = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "stochastic",
+            "closure";
+            default = "none",
+            valid_options = ["none", "lognormal", "sde"],
+        )
+        closure_type = if closure == "none"
+            NoneClosureType
+        elseif closure == "lognormal"
+            LogNormalClosureType
+        elseif closure == "sde"
+            SDEClosureType
+        else
+            error("Something went wrong. Invalid stochastic closure type '$closure'")
+        end
+        sde_model = sde_struct{closure_type}(u0 = 1, dt = dt)
+
         # Added by Ignacio : Length scheme in use (mls), and smooth min effect (ml_ratio)
         # Variable Prandtl number initialized as neutral value.
         ones_vec = center_field(Gr)
@@ -1083,6 +1117,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             entr_surface_bc,
             detr_surface_bc,
             dt_upd,
+            sde_model,
         )
     end
 end

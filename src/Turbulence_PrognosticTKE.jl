@@ -671,7 +671,6 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
                 upd_w_km = interpf2c(self.UpdVar.W.values, grid, k - 1, i)
                 M = self.UpdVar.Area.values[i, k] * (w_upd - gmv_w_k)
                 Mm = self.UpdVar.Area.values[i, k - 1] * (upd_w_km - gmv_w_km)
-
                 dMdz = (M - Mm) * grid.dzi
                 w_min = 0.001
 
@@ -696,14 +695,14 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
                 self.entr_sc[i, k] = er.ε_dyn
                 self.detr_sc[i, k] = er.δ_dyn
                 # stochastic closure
-                stoch_ε = stochastic_closure(param_set, Entrainment())
-                stoch_δ = stochastic_closure(param_set, Detrainment())
+                sde_model = self.sde_model
+                stoch_ε = stochastic_closure(param_set, sde_model, Entrainment())
+                stoch_δ = stochastic_closure(param_set, sde_model, Detrainment())
                 self.entr_sc[i, k] *= stoch_ε
                 self.detr_sc[i, k] *= stoch_δ
 
                 self.frac_turb_entr[i, k] = er.ε_turb
                 self.horiz_K_eddy[i, k] = er.K_ε
-
             else
                 self.entr_sc[i, k] = 0.0
                 self.detr_sc[i, k] = 0.0
