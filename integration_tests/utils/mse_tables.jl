@@ -44,19 +44,19 @@ all_best_mse["DryBubble"]["thetal_mean"] = 3.5552820910334556e-5
 all_best_mse["DryBubble"]["Hvar_mean"] = 8.313182534736389e10
 
 all_best_mse["DYCOMS_RF01"] = OrderedDict()
-all_best_mse["DYCOMS_RF01"]["qt_mean"] = 0.015977303168764667
-all_best_mse["DYCOMS_RF01"]["ql_mean"] = 3.0874851696118855
-all_best_mse["DYCOMS_RF01"]["updraft_area"] = 237.5046901173807
-all_best_mse["DYCOMS_RF01"]["updraft_w"] = 4.4163666721061325
-all_best_mse["DYCOMS_RF01"]["updraft_qt"] = 1.1443679190896758
-all_best_mse["DYCOMS_RF01"]["updraft_thetal"] = 12.741454730015796
-all_best_mse["DYCOMS_RF01"]["v_mean"] = 39.847446428735
-all_best_mse["DYCOMS_RF01"]["u_mean"] = 37.135696529545164
-all_best_mse["DYCOMS_RF01"]["tke_mean"] = 12.399965132239352
-all_best_mse["DYCOMS_RF01"]["temperature_mean"] = 2.5177428888058484e-5
-all_best_mse["DYCOMS_RF01"]["thetal_mean"] = 2.546023746024992e-5
-all_best_mse["DYCOMS_RF01"]["Hvar_mean"] = 8169.210106871212
-all_best_mse["DYCOMS_RF01"]["QTvar_mean"] = 638.6928681916056
+all_best_mse["DYCOMS_RF01"]["qt_mean"] = 1.5975513521109604e-02
+all_best_mse["DYCOMS_RF01"]["ql_mean"] = 3.0858293308245970e+00
+all_best_mse["DYCOMS_RF01"]["updraft_area"] = 2.3749949747474739e+02
+all_best_mse["DYCOMS_RF01"]["updraft_w"] = 4.4165144886700478e+00
+all_best_mse["DYCOMS_RF01"]["updraft_qt"] = 1.1442869727516853e+00
+all_best_mse["DYCOMS_RF01"]["updraft_thetal"] = 1.2741478481081163e+01
+all_best_mse["DYCOMS_RF01"]["v_mean"] = 3.9847428180197454e+01
+all_best_mse["DYCOMS_RF01"]["u_mean"] = 3.7135679386189537e+01
+all_best_mse["DYCOMS_RF01"]["tke_mean"] = 1.2400797220665618e+01
+all_best_mse["DYCOMS_RF01"]["temperature_mean"] = 2.5168827941997981e-05
+all_best_mse["DYCOMS_RF01"]["thetal_mean"] = 2.5450862324761139e-05
+all_best_mse["DYCOMS_RF01"]["Hvar_mean"] = 8.1691171790600993e+03
+all_best_mse["DYCOMS_RF01"]["QTvar_mean"] = 6.3865660237304257e+02
 
 all_best_mse["GABLS"] = OrderedDict()
 all_best_mse["GABLS"]["updraft_thetal"] = 1.860770054942234e-11
@@ -135,19 +135,20 @@ all_best_mse["SP"]["Hvar_mean"] = 48.907618959600704
 all_best_mse["SP"]["QTvar_mean"] = 24.8054269866188
 
 all_best_mse["TRMM_LBA"] = OrderedDict()
-all_best_mse["TRMM_LBA"]["qt_mean"] = 1.5646673031688658
-all_best_mse["TRMM_LBA"]["updraft_area"] = 23597.541153792605
-all_best_mse["TRMM_LBA"]["updraft_w"] = 895.3442945954977
-all_best_mse["TRMM_LBA"]["updraft_qt"] = 27.817314098837485
-all_best_mse["TRMM_LBA"]["updraft_thetal"] = 110.01404192164462
-all_best_mse["TRMM_LBA"]["v_mean"] = 292.46145977746517
-all_best_mse["TRMM_LBA"]["u_mean"] = 1687.3607694545074
-all_best_mse["TRMM_LBA"]["tke_mean"] = 1304.7247717864295
-all_best_mse["TRMM_LBA"]["temperature_mean"] = 0.0006417623215254345
-all_best_mse["TRMM_LBA"]["ql_mean"] = 951.203924274425
-all_best_mse["TRMM_LBA"]["thetal_mean"] = 0.008154607165938113
-all_best_mse["TRMM_LBA"]["Hvar_mean"] = 4581.906298591497
-all_best_mse["TRMM_LBA"]["QTvar_mean"] = 2067.415889961651
+all_best_mse["TRMM_LBA"]["qt_mean"] = 1.5572787863486224e+00
+all_best_mse["TRMM_LBA"]["updraft_area"] = 2.3820346905510982e+04
+all_best_mse["TRMM_LBA"]["updraft_w"] = 9.0469900567904358e+02
+all_best_mse["TRMM_LBA"]["updraft_qt"] = 2.8010124563369182e+01
+all_best_mse["TRMM_LBA"]["updraft_thetal"] = 1.1000863683084609e+02
+all_best_mse["TRMM_LBA"]["v_mean"] = 2.9244764189879180e+02
+all_best_mse["TRMM_LBA"]["u_mean"] = 1.6873285308095067e+03
+all_best_mse["TRMM_LBA"]["tke_mean"] = 1.2695450966263065e+03
+all_best_mse["TRMM_LBA"]["temperature_mean"] = 6.8063911467361113e-04
+all_best_mse["TRMM_LBA"]["ql_mean"] = 9.6999521075579662e+02
+all_best_mse["TRMM_LBA"]["thetal_mean"] = 8.2028121058554913e-03
+all_best_mse["TRMM_LBA"]["Hvar_mean"] = 4.5168819360862763e+03
+all_best_mse["TRMM_LBA"]["QTvar_mean"] = 2.0915289292651191e+03
+
 #################################
 #################################
 #################################
