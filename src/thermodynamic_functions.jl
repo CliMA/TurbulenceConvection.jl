@@ -18,9 +18,11 @@ function theta_c(p0, T)
     return T / exner_c(p0)
 end
 
-function thetali_c(param_set, p0, T, qt, ql, qi, L)
+
+function thetali_c(param_set, p0, T, qt, ql, qi)
     # Liquid ice potential temperature consistent with Triopoli and Cotton (1981)
-    return theta_c(p0, T) * exp(-TD.latent_heat_vapor(param_set, T) * (ql / (1.0 - qt) + qi / (1.0 - qt)) / (T * cpd))
+    L = TD.latent_heat_vapor(param_set, T)
+    return theta_c(p0, T) * exp(-L * (ql / (1.0 - qt) + qi / (1.0 - qt)) / (T * cpd))
 end
 function theta_virt_c(p0, T, qt, ql)
     # qd = 1 - qt
@@ -69,4 +71,3 @@ function qv_star_t(p0, T)
     pv = pv_star(T)
     return eps_v * pv / (p0 + (eps_v - 1.0) * pv)
 end
-

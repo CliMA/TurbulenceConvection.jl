@@ -9,6 +9,9 @@ import CLIMAParameters
 const CP = CLIMAParameters
 const CPP = CP.Planet
 
+import Thermodynamics
+const TD = Thermodynamics
+
 import ..TurbulenceConvection
 using ..TurbulenceConvection: CasesBase
 using ..TurbulenceConvection: set_bcs
@@ -34,7 +37,6 @@ using ..TurbulenceConvection: initialize_io
 using ..TurbulenceConvection: io
 using ..TurbulenceConvection: satadjust
 using ..TurbulenceConvection: exner_c
-using ..TurbulenceConvection: cpm_c
 using ..TurbulenceConvection: xrange
 using ..TurbulenceConvection: Grid
 using ..TurbulenceConvection: ReferenceState
@@ -194,8 +196,9 @@ function initialize_surface(self::CasesBase{SoaresCase}, Gr::Grid, Ref::Referenc
     theta_flux = 6.0e-2
     qt_flux = 2.5e-5
     theta_surface = self.Sur.Tsurface
-    self.Sur.lhf = qt_flux * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(param_set, self.Sur.Tsurface) # It would be 0.0 if we follow Nieuwstadt.
-    self.Sur.shf = theta_flux * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
+    ts = TD.PhaseEquil_pθq(param_set, Ref.p0[Gr.gw], theta_surface, self.Sur.qsurface)
+    self.Sur.lhf = qt_flux * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(ts)
+    self.Sur.shf = theta_flux * TD.cp_m(ts) * TC.surface_value(Ref.rho0, Gr)
     self.Sur.ustar_fixed = false
     self.Sur.ustar = 0.28 # just to initilize grid mean covariances
     self.Sur.Gr = Gr
@@ -289,9 +292,10 @@ function initialize_surface(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::Referenc
     self.Sur.qsurface = 0.0
     theta_flux = 6.0e-2
     qt_flux = 0.0
-    theta_surface = self.Sur.Tsurface
     self.Sur.lhf = 0.0 # It would be 0.0 if we follow Nieuwstadt.
-    self.Sur.shf = theta_flux * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
+    theta_surface = self.Sur.Tsurface
+    ts = TD.PhaseEquil_pθq(param_set, Ref.p0[Gr.gw], theta_surface, self.Sur.qsurface)
+    self.Sur.shf = theta_flux * TD.cp_m(ts) * TC.surface_value(Ref.rho0, Gr)
     self.Sur.ustar_fixed = false
     self.Sur.ustar = 0.28 # just to initilize grid mean covariances
     self.Sur.Gr = Gr
@@ -408,12 +412,13 @@ end
 function initialize_surface(self::CasesBase{BomexCase}, Gr::Grid, Ref::ReferenceState)
 
     param_set = TC.parameter_set(Ref)
-
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.Tsurface = 299.1 * exner_c(Ref.Pg)
     self.Sur.qsurface = 22.45e-3 # kg/kg
-    self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(param_set, self.Sur.Tsurface)
-    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
+    theta_surface = self.Sur.Tsurface
+    ts = TD.PhaseEquil_pθq(param_set, Ref.p0[Gr.gw], theta_surface, self.Sur.qsurface)
+    self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(ts)
+    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * TC.surface_value(Ref.rho0, Gr)
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # m/s
     self.Sur.Gr = Gr
@@ -550,8 +555,10 @@ function initialize_surface(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.Tsurface = 299.1 * exner_c(Ref.Pg)
     self.Sur.qsurface = 22.45e-3 # kg/kg
-    self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(param_set, self.Sur.Tsurface)
-    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
+    theta_surface = self.Sur.Tsurface
+    ts = TD.PhaseEquil_pθq(param_set, Ref.p0[Gr.gw], theta_surface, self.Sur.qsurface)
+    self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(ts)
+    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * TC.surface_value(Ref.rho0, Gr)
     self.lhf0 = self.Sur.lhf
     self.shf0 = self.Sur.shf
     self.Sur.ustar_fixed = true
@@ -653,9 +660,7 @@ function Rico(namelist, Gr::Grid, Ref::ReferenceState)
 end
 
 function initialize_reference(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-
     param_set = TC.parameter_set(Ref)
-
     Ref.Pg = 1.0154e5  #Pressure at ground
     Ref.Tg = 299.8  #Temperature at ground
     pvg = TD.saturation_vapor_pressure(param_set, Ref.Tg, TD.Liquid())
@@ -776,9 +781,7 @@ function TRMM_LBA(namelist, Gr::Grid, Ref::ReferenceState)
     return TC.CasesBase{TRMM_LBA}(; casename = "TRMM_LBA", inversion_option, Sur, Fo, Rad)
 end
 function initialize_reference(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-
     param_set = TC.parameter_set(Ref)
-
     Ref.Pg = 991.3 * 100  #Pressure at ground
     Ref.Tg = 296.85   # surface values for reference state (RS) which outputs p0 rho0 alpha0
     pvg = TD.saturation_vapor_pressure(param_set, Ref.Tg, TD.Liquid())
@@ -786,9 +789,7 @@ function initialize_reference(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::Referenc
     initialize(Ref, Gr, Stats)
 end
 function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-
     param_set = TC.parameter_set(Ref)
-
     # TRMM_LBA inputs from Grabowski et al. 2006
     #! format: off
     z_in = off_arr([0.130,  0.464,  0.573,  1.100,  1.653,  2.216,  2.760,
@@ -867,7 +868,6 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
         GMV.QT.values[k] = qv_star * RH[k] / 100.0
         GMV.H.values[k] =
             thetali_c(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, TD.latent_heat_vapor(param_set, GMV.T.values[k]))
-
         theta_rho[k] = theta_rho_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
     end
 
@@ -881,10 +881,13 @@ function initialize_surface(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
     param_set = TC.parameter_set(Ref)
 
     #self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
+    param_set = TC.parameter_set(Ref)
     self.Sur.Tsurface = (273.15 + 23) * exner_c(Ref.Pg)
     self.Sur.qsurface = 22.45e-3 # kg/kg
-    self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(param_set, self.Sur.Tsurface)
-    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
+    theta_surface = self.Sur.Tsurface
+    ts = TD.PhaseEquil_pθq(param_set, Ref.p0[Gr.gw], theta_surface, self.Sur.qsurface)
+    self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(ts)
+    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * TC.surface_value(Ref.rho0, Gr)
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
     self.Sur.Gr = Gr
@@ -1120,6 +1123,7 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVa
 
     # ARM_SGP inputs
     #! format: off
+    param_set = TC.parameter_set(Ref)
     z_in = off_arr([0.0, 50.0, 350.0, 650.0, 700.0, 1300.0, 2500.0, 5500.0 ]) #LES z is in meters
     Theta_in = off_arr([299.0, 301.5, 302.5, 303.53, 303.7, 307.13, 314.0, 343.2]) # K
     r_in = off_arr([15.2,15.17,14.98,14.8,14.7,13.5,3.0,3.0])/1000 # qt should be in kg/kg
@@ -1244,9 +1248,7 @@ function initialize_reference(self::CasesBase{GATE_III}, Gr::Grid, Ref::Referenc
 end
 
 function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-
     param_set = TC.parameter_set(Ref)
-
     qt = TC.center_field(Gr)
     T = TC.center_field(Gr)
     U = TC.center_field(Gr)
@@ -1465,12 +1467,14 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
         # ql and T profile
         # (calculated by saturation adjustment using thetal and qt values provided in DYCOMS
         # and using Rd, cp and L constants as defined in DYCOMS)
-        GMV.T.values[k], GMV.QL.values[k] = dycoms_sat_adjst(param_set, self, Ref.p0_half[k], thetal[k], GMV.QT.values[k])
+        GMV.T.values[k], GMV.QL.values[k] =
+            dycoms_sat_adjst(param_set, self, Ref.p0_half[k], thetal[k], GMV.QT.values[k])
 
         # thermodynamic variable profile (either entropy or thetal)
         # (calculated based on T and ql profiles.
         # Here we use Rd, cp and L constants as defined in TurbulenceConvection)
-        GMV.H.values[k] = t_to_thetali_c(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], GMV.QL.values[k], qi)
+        GMV.H.values[k] =
+            t_to_thetali_c(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], GMV.QL.values[k], qi)
 
 
         # buoyancy profile
@@ -1514,8 +1518,10 @@ function initialize_surface(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::Referen
     #density_surface  = 1.22     # kg/m^3
 
     # buoyancy flux
-    theta_flux = self.Sur.shf / cpm_c(self.Sur.qsurface) / TC.surface_value(Ref.rho0, Gr)
-    qt_flux = self.Sur.lhf / TD.latent_heat_vapor(param_set, self.Sur.Tsurface) / TC.surface_value(Ref.rho0, Gr)
+    theta_surface = self.Sur.Tsurface
+    ts = TD.PhaseEquil_pθq(param_set, Ref.p0[Gr.gw], theta_surface, self.Sur.qsurface)
+    theta_flux = self.Sur.shf / TD.cp_m(ts) / TC.surface_value(Ref.rho0, Gr)
+    qt_flux = self.Sur.lhf / TD.latent_heat_vapor(ts) / TC.surface_value(Ref.rho0, Gr)
     theta_surface = self.Sur.Tsurface / exner_c(Ref.Pg)
     self.Sur.bflux =
         g * (
@@ -1881,8 +1887,8 @@ end
 function initialize_surface(self::CasesBase{DryBubble}, Gr::Grid, Ref::ReferenceState)
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
-    self.Sur.qsurface = 1.0e-5
-    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
+    self.Sur.qsurface = 0.0
+    self.Sur.shf = 0.0
     initialize(self.Sur)
 end
 

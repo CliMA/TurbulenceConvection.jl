@@ -1,9 +1,11 @@
+import Thermodynamics
+const TD = Thermodynamics
 
-function buoyancy_flux(param_set, shf, lhf, T_b, qt_b, alpha0_0)
+function buoyancy_flux(param_set, shf, lhf, T_b, qt_b, alpha0_0, ts)
     g = CPP.grav(param_set)
-    cp_ = cpm_c(qt_b)
     lv = TD.latent_heat_vapor(param_set, T_b)
-    return (g * alpha0_0 / cp_ / T_b * (shf + (eps_vi - 1.0) * cp_ * T_b * lhf / lv))
+    cpm = TD.cp_m(ts)
+    return (g * alpha0_0 / cpm / T_b * (shf + (eps_vi - 1.0) * cpm * T_b * lhf / lv))
 end
 
 function psi_m_unstable(zeta, zeta0)

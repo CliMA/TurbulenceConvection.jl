@@ -60,7 +60,7 @@ function conv_q_vap_to_q_liq(param_set, q_sat_liq, q_liq)
     return (q_sat_liq - q_liq) / CPMP.τ_cond_evap(param_set)
 end
 
-function conv_q_liq_to_q_rai_acnv(param_set, q_liq_threshold, tau_acnv, q_liq)
+function conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, q_liq)
 
     return max(0.0, q_liq - q_liq_threshold) / tau_acnv
 end
@@ -151,7 +151,7 @@ function microphysics_rain_src(
             _ret.qr_src = min(
                 ql,
                 (
-                    conv_q_liq_to_q_rai_acnv(param_set, q_liq_threshold, tau_acnv, ql) +
+                    conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, ql) +
                     conv_q_liq_to_q_rai_accr(param_set, C_drag, MP_n_0, E_col, ql, qr, rho)
                 ) * dt,
             )
