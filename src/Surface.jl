@@ -86,7 +86,9 @@ end
 
 # Cases such as Rico which provide values of transfer coefficients
 function initialize(self::SurfaceBase{SurfaceFixedCoeffs})
-    pvg = pv_star(self.Tsurface)
+    param_set = parameter_set(self.Ref)
+    kf_surf = kf_surface(self.Gr)
+    pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
     pdg = self.Ref.Pg - pvg
     self.qsurface = qv_star_t(self.Ref.Pg, self.Tsurface)
     self.s_surface = (1.0 - self.qsurface) * sd_c(pdg, self.Tsurface) + self.qsurface * sv_c(pvg, self.Tsurface)

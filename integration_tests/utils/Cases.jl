@@ -1449,7 +1449,8 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
         # ql and T profile
         # (calculated by saturation adjustment using thetal and qt values provided in DYCOMS
         # and using Rd, cp and L constants as defined in DYCOMS)
-        GMV.T.values[k], GMV.QL.values[k] = dycoms_sat_adjst(param_set, self, Ref.p0_half[k], thetal[k], GMV.QT.values[k])
+        GMV.T.values[k], GMV.QL.values[k] =
+            dycoms_sat_adjst(param_set, self, Ref.p0_half[k], thetal[k], GMV.QT.values[k])
 
         # thermodynamic variable profile (either entropy or thetal)
         # (calculated based on T and ql profiles.

@@ -24,9 +24,9 @@ end
 # instantly convert all cloud water exceeding a threshold to rain water
 # the threshold is specified as excess saturation
 # rain water is immediately removed from the domain
-function acnv_instant(max_supersaturation, ql, qt, T, p0)
+function acnv_instant(param_set, max_supersaturation, ql, qt, T, p0)
 
-    psat = pv_star(T)
+    psat = TD.saturation_vapor_pressure(param_set, T, TD.Liquid())
     qsat = qv_star_c(p0, qt, psat)
 
     return max(0.0, ql - max_supersaturation * qsat)
@@ -86,7 +86,7 @@ function conv_q_rai_to_q_vap(param_set, C_drag, MP_n_0, a_vent, b_vent, q_rai, q
     bv_param =
         2^(7 / 16) * gamma_11_4 * π^(5 / 16) * b_vent * N_Sc^(1 / 3) * sqrt(v_c) * (rho / rho_cloud_liq)^(11 / 16)
 
-    p_vs = pv_star(T)
+    p_vs = TD.saturation_vapor_pressure(param_set, T, TD.Liquid())
     qv_sat = qv_star_c(p, q_tot, p_vs)
     q_v = q_tot - q_liq
     S = q_v / qv_sat - 1
@@ -156,7 +156,7 @@ function microphysics_rain_src(
         end
 
         if tmp_cutoff_acnv_flag
-            _ret.qr_src = min(ql, acnv_instant(max_supersaturation, ql, qt, T, p0))
+            _ret.qr_src = min(ql, acnv_instant(param_set, max_supersaturation, ql, qt, T, p0))
         end
 
         if tmp_no_acnv_flag
