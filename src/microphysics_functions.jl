@@ -29,7 +29,7 @@ end
 function acnv_instant(param_set, max_supersaturation, ql, qt, T, ρ)
 
     pp = TD.PhasePartition(qt, ql, 0.0)
-    qsat = TD.q_vap_saturation(param_set, T, ρ, TD.Liquid(), pp)
+    qsat = TD.q_vap_saturation_generic(param_set, T, ρ, TD.Liquid())
 
     return max(0.0, ql - max_supersaturation * qsat)
 end

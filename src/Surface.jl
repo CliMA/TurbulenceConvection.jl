@@ -9,7 +9,7 @@ function free_convection_windspeed(self::SurfaceBase, GMV::GridMeanVariables, ::
     # Need to get theta_rho
     @inbounds for k in center_indicies(self.Gr)
         pp = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0)
-        qv = vapor_specific_humidity(pp)
+        qv = TD.vapor_specific_humidity(pp)
         theta_rho[k] = theta_rho_c(self.Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
     end
     zi = get_inversion(param_set, theta_rho, GMV.U.values, GMV.V.values, self.Gr, self.Ri_bulk_crit)

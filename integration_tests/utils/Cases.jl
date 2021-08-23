@@ -1135,7 +1135,7 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVa
         GMV.QT.values[k] = qt[k]
         GMV.T.values[k] = Theta[k] * exner_c(Ref.p0_half[k])
         GMV.H.values[k] =
-            thetali_c(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, Ref.latent_heat_vapor(param_set, GMV.T.values[k]))
+            thetali_c(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, TD.latent_heat_vapor(param_set, GMV.T.values[k]))
     end
 
     set_bcs(GMV.U, Gr)
@@ -1477,7 +1477,7 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
 
         # buoyancy profile
         pp = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], qi)
-        qv = vapor_specific_humidity(pp)
+        qv = TD.vapor_specific_humidity(pp)
         rho = TD.air_density(param_set, GMV.T.values[k], Ref.p0_half[k], pp)
         GMV.B.values[k] = buoyancy_c(param_set, Ref.rho0_half[k], rho)
 
