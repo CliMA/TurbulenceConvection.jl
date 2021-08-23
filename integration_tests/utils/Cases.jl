@@ -444,7 +444,7 @@ function initialize_forcing(self::CasesBase{BomexCase}, Gr::Grid, Ref::Reference
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
 
-    param_set = parameter_Set(Ref)
+    param_set = parameter_set(Ref)
 
     initialize(self.Fo, GMV)
 
@@ -603,7 +603,7 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
 
-    param_set = TC.para,eter_set(Ref)
+    param_set = TC.parameter_set(Ref)
 
     @inbounds for k in real_center_indicies(Gr)
         # Geostrophic velocity profiles. vg = 0
@@ -1704,7 +1704,7 @@ function initialize_profiles(self::CasesBase{GABLS}, Gr::Grid, GMV::GridMeanVari
     end
 
     @inbounds for k in real_center_indicies(Gr)
-        pp = PhasePartition(GMV.QT.values[k], ql, qi)
+        pp = TD.PhasePartition(GMV.QT.values[k], ql, qi)
         GMV.H.values[k] = thetal[k]
         GMV.T.values[k] = thetal[k] * TD.exner_given_pressure(param_set, Ref.p0_half[k], pp) # No water content
     end
