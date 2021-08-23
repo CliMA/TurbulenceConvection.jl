@@ -130,10 +130,11 @@ function microphysics_rain_src(
     # TODO assumes no ice
     _ret = mph_struct(0, 0, 0, 0, 0, 0, 0, 0, 0)
     pp = TD.PhasePartition(qt, ql, 0.0)
-    _ret.qv = TD.vapor_specific_humidity(pp)
-    _ret.thl = t_to_thetali_c(param_set, p0, T, qt, ql, 0.0)
-    _ret.th = theta_c(p0, T)
     _ret.rho = TD.air_density(param_set, T, p0, pp)
+    _ret.qv = TD.vapor_specific_humidity(pp)
+    _ret.thl = TD.liquid_ice_pottemp(param_set, T, _ret.rho, pp)
+    # should it be dry air pot temp or just pot temp?
+    _ret.th = TD.dry_pottemp_given_pressure(param_set, T, p0)
 
     #TODO - temporary way to handle different autoconversion rates
     tmp_clima_acnv_flag = false

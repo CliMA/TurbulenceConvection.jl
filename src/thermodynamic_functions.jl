@@ -10,20 +10,12 @@ function exner_c(p0; kappa = kappa)
     return (p0 / p_tilde)^kappa
 end
 
-function theta_c(p0, T)
-    return T / exner_c(p0)
-end
-
-function thetali_c(param_set, p0, T, qt, ql, qi, L)
-    # Liquid ice potential temperature consistent with Triopoli and Cotton (1981)
-    return theta_c(p0, T) * exp(-TD.latent_heat_vapor(param_set, T) * (ql / (1.0 - qt) + qi / (1.0 - qt)) / (T * cpd))
-end
 function theta_virt_c(p0, T, qt, ql)
     # qd = 1 - qt
     # qt = qv + ql + qi
     # qr = mr/md+mv+ml+mi
     # Ignacio: This formulation holds when qt = qv + ql (negligible/no ice)
-    return theta_c(p0, T) * (1.0 + 0.61 * (qt - ql) - ql)
+    return T / exner_c(p0) * (1.0 + 0.61 * (qt - ql) - ql)
 end
 
 function pd_c(p0, qt, qv)
@@ -49,9 +41,4 @@ end
 function buoyancy_c(param_set, rho0, rho)
     g = CPP.grav(param_set)
     return g * (rho0 - rho) / rho0
-end
-
-function t_to_thetali_c(param_set, p0, T, qt, ql, qi)
-    L = TD.latent_heat_vapor(param_set, T)
-    return thetali_c(param_set, p0, T, qt, ql, qi, L)
 end

@@ -16,12 +16,10 @@ using ..TurbulenceConvection: off_arr
 using ..TurbulenceConvection: omega
 using ..TurbulenceConvection: pyinterp
 using ..TurbulenceConvection: eps_vi
-using ..TurbulenceConvection: thetali_c
 using ..TurbulenceConvection: theta_rho_c
 using ..TurbulenceConvection: eps_v
 using ..TurbulenceConvection: buoyancy_c
 using ..TurbulenceConvection: dycoms_L
-using ..TurbulenceConvection: t_to_thetali_c
 using ..TurbulenceConvection: dycoms_Rd
 using ..TurbulenceConvection: dycoms_cp
 using ..TurbulenceConvection: add_ts
@@ -860,12 +858,14 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
 
     @inbounds for k in real_center_indicies(Gr)
         PV_star = TD.saturation_vapor_pressure(param_set, GMV.T.values[k], TD.Liquid())
+        # TODO - replace with TD.jl
         qv_star = PV_star * epsi / (p1[k] - PV_star + epsi * PV_star * RH[k] / 100.0) # eq. 37 in pressel et al and the def of RH
-        pp = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0)
-        qv = TD.vapor_specific_humidity(pp)
         GMV.QT.values[k] = qv_star * RH[k] / 100.0
-        GMV.H.values[k] =
-            thetali_c(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, TD.latent_heat_vapor(param_set, GMV.T.values[k]))
+
+        pp = TD.PhasePartition(GMV.QT.values[k], 0.0, 0.0)
+        qv = TD.vapor_specific_humidity(pp)
+
+        GMV.H.values[k] = TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], Ref.p0_half[k], pp)
 
         theta_rho[k] = theta_rho_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
     end
@@ -1134,8 +1134,10 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVa
         GMV.U.values[k] = 10.0
         GMV.QT.values[k] = qt[k]
         GMV.T.values[k] = Theta[k] * exner_c(Ref.p0_half[k])
-        GMV.H.values[k] =
-            thetali_c(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, TD.latent_heat_vapor(param_set, GMV.T.values[k]))
+
+        pp = TD.PhasePartition(GMV.QT.values[k], 0.0, 0.0)
+
+        GMV.H.values[k] = TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], Ref.p0_half[k], pp)
     end
 
     set_bcs(GMV.U, Gr)
@@ -1282,8 +1284,10 @@ function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanV
         GMV.T.values[k] = T[k]
         GMV.U.values[k] = U[k]
 
-        GMV.H.values[k] =
-            thetali_c(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, TD.latent_heat_vapor(param_set, GMV.T.values[k]))
+        pp = TD.PhasePartition(GMV.QT.values[k], 0.0, 0.0)
+
+        GMV.H.values[k] = TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], Ref.p0_half[k], pp)
+
     end
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
@@ -1394,6 +1398,14 @@ function dycoms_compute_thetal(self::CasesBase{DYCOMS_RF01}, p_, T_, ql_)
     return theta_ * exp(-1.0 * dycoms_L * ql_ / (dycoms_cp * T_))
 end
 # helper function
+function qv_star_c_dycoms_helper(p0, qt, pv)
+    return eps_v * (1.0 - qt) * pv / (p0 - pv)
+end
+function t_to_thetali_c_dycoms_helper(param_set, p0, T, qt, ql, qi)
+    L = TD.latent_heat_vapor(param_set, T)
+    cpd = 1004.0
+    return T / exner_c(p0) * exp(-L * (ql / (1.0 - qt) + qi / (1.0 - qt)) / (T * cpd))
+end
 """
 Use saturation adjustment scheme to compute temperature and ql given thetal and qt.
 We can"t use the default TurbulenceConvection function because of different values of cp, Rd and L
@@ -1402,16 +1414,13 @@ We can"t use the default TurbulenceConvection function because of different valu
 :param qt:  total water specific humidity
 :return: T, ql
 """
-function qv_star_c(p0, qt, pv)
-    return eps_v * (1.0 - qt) * pv / (p0 - pv)
-end
 function dycoms_sat_adjst(param_set, self::CasesBase{DYCOMS_RF01}, p_, thetal_, qt_)
     #Compute temperature
     t_1 = thetal_ * exner_c(p_, kappa = dycoms_Rd / dycoms_cp)
     #Compute saturation vapor pressure
     pv_star_1 = TD.saturation_vapor_pressure(param_set, t_1, TD.Liquid())
     #Compute saturation specific humidity
-    qs_1 = qv_star_c(p_, qt_, pv_star_1)
+    qs_1 = qv_star_c_dycoms_helper(p_, qt_, pv_star_1)
 
     if qt_ <= qs_1
         #If not saturated return temperature and ql = 0.0
@@ -1421,12 +1430,12 @@ function dycoms_sat_adjst(param_set, self::CasesBase{DYCOMS_RF01}, p_, thetal_, 
         f_1 = thetal_ - dycoms_compute_thetal(self, p_, t_1, ql_1)
         t_2 = t_1 + dycoms_L * ql_1 / dycoms_cp
         pv_star_2 = TD.saturation_vapor_pressure(param_set, t_2, TD.Liquid())
-        qs_2 = qv_star_c(p_, qt_, pv_star_2)
+        qs_2 = qv_star_c_dycoms_helper(p_, qt_, pv_star_2)
         ql_2 = qt_ - qs_2
 
         while abs(t_2 - t_1) >= 1e-9
             pv_star_2 = TD.saturation_vapor_pressure(param_set, t_2, TD.Liquid())
-            qs_2 = qv_star_c(p_, qt_, pv_star_2)
+            qs_2 = qv_star_c_dycoms_helper(p_, qt_, pv_star_2)
             ql_2 = qt_ - qs_2
             f_2 = thetal_ - dycoms_compute_thetal(self, p_, t_2, ql_2)
             t_n = t_2 - f_2 * (t_2 - t_1) / (f_2 - f_1)
@@ -1472,7 +1481,7 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
         # thermodynamic variable profile (either entropy or thetal)
         # (calculated based on T and ql profiles.
         # Here we use Rd, cp and L constants as defined in TurbulenceConvection)
-        GMV.H.values[k] = t_to_thetali_c(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], GMV.QL.values[k], qi)
+        GMV.H.values[k] = t_to_thetali_c_dycoms_helper(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], GMV.QL.values[k], qi)
 
 
         # buoyancy profile

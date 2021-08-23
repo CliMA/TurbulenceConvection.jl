@@ -362,13 +362,15 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
 
             # update cloudy/dry variables for buoyancy in TKE
             EnvVar.cloud_fraction.values[k] = outer_env[i_cf]
+
             self.qt_dry[k] = outer_env[i_qt_dry]
-            self.th_dry[k] = theta_c(self.Ref.p0_half[k], outer_env[i_T_dry])
-            self.t_cloudy[k] = outer_env[i_T_cld]
+            self.th_dry[k] = TD.dry_pottemp_given_pressure(param_set, outer_env[i_T_dry], self.Ref.p0_half[k])
+
             pp = TD.PhasePartition(outer_env[i_qt_cld], outer_env[i_ql], 0.0)
+            self.t_cloudy[k] = outer_env[i_T_cld]
             self.qv_cloudy[k] = TD.vapor_specific_humidity(pp)
             self.qt_cloudy[k] = outer_env[i_qt_cld]
-            self.th_cloudy[k] = theta_c(self.Ref.p0_half[k], outer_env[i_T_cld])
+            self.th_cloudy[k] = TD.dry_pottemp_given_pressure(param_set, outer_env[i_T_cld], self.Ref.p0_half[k], pp)
 
             # update var/covar rain sources
             self.Hvar_rain_dt[k] = outer_src[i_SH_H] - outer_src[i_SH] * EnvVar.H.values[k]
