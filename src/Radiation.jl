@@ -92,12 +92,15 @@ end
 function update(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariables)
 
     calculate_radiation(self, GMV)
+    param_set = parameter_set(GMV)
 
     @inbounds for k in real_center_indicies(self.Gr)
         # Apply large-scale horizontal advection tendencies
         pp = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0)
         qv = TD.vapor_specific_humidity(pp)
+
         GMV.H.tendencies[k] += self.convert_forcing_prog_fp(
+            param_set,
             self.Ref.p0_half[k],
             GMV.QT.values[k],
             qv,

@@ -44,7 +44,9 @@ function update(self::SurfaceBase{SurfaceFixedFlux}, GMV::GridMeanVariables)
     self.windspeed = sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf])
     self.rho_qtflux = self.lhf / (TD.latent_heat_vapor(param_set, self.Tsurface))
 
-    self.rho_hflux = rho_tflux / exner_c(self.Ref.Pg)
+    pp = TD.PhasePartition(GMV.QT.values[kc_surf], 0.0, 0.0)
+
+    self.rho_hflux = rho_tflux / TD.exner_given_pressure(param_set, self.Ref.Pg, pp)
     self.bflux = buoyancy_flux(
         param_set,
         self.shf,
@@ -115,8 +117,10 @@ function update(self::SurfaceBase{SurfaceFixedCoeffs}, GMV::GridMeanVariables)
 
     self.rho_qtflux = -self.cq * windspeed * (GMV.QT.values[kc_surf] - self.qsurface) * self.Ref.rho0[kf_surf]
     self.lhf = lv * self.rho_qtflux
+
+    pp = TD.PhasePartition(GMV.QT.values[kc_surf], 0.0, 0.0)
     self.rho_hflux =
-        -self.ch * windspeed * (GMV.H.values[kc_surf] - self.Tsurface / exner_c(self.Ref.Pg)) * self.Ref.rho0[kf_surf]
+        -self.ch * windspeed * (GMV.H.values[kc_surf] - self.Tsurface / TD.exner_given_pressure(param_set, self.Ref.Pg, pp)) * self.Ref.rho0[kf_surf]
     self.shf = cp_ * self.rho_hflux
 
     self.bflux = buoyancy_flux(
@@ -274,7 +278,8 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
     T0 = self.Ref.p0_half[kc_surf] * self.Ref.alpha0_half[kc_surf] / Rd
 
     theta_flux = 0.24
-    self.bflux = g * theta_flux * exner_c(self.Ref.p0_half[kc_surf]) / T0
+    pp = TD.PhasePartition(self.qsurface, 0.0, 0.0)
+    self.bflux = g * theta_flux * TD.exner_given_pressure(param_set, self.Ref.p0_half[kc_surf], pp) / T0
 
     pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
     self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.Ref.rho0[kf_surf], pvg)

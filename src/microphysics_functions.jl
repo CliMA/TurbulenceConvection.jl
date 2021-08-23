@@ -6,7 +6,8 @@ Source term for thetal because of qr transitioning between the working fluid and
 (simple version to avoid exponents)
 """
 function rain_source_to_thetal(param_set, p0, T, qr)
-    return TD.latent_heat_vapor(param_set, T) * qr / exner_c(p0) / cpd
+    # TODO - should the exner function be given phase partition?
+    return TD.latent_heat_vapor(param_set, T) * qr / TD.exner_given_pressure(param_set, p0) / cpd
 end
 
 """
@@ -16,7 +17,8 @@ Source term for thetal because of qr transitioning between the working fluid and
 function rain_source_to_thetal_detailed(param_set, p0, T, qt, ql, qr)
     L = TD.latent_heat_vapor(param_set, T)
 
-    old_source = L * qr / exner_c(p0) / cpd
+    # TODO - should the exner function be given phase partition?
+    old_source = L * qr / TD.exner_given_pressure(param_set, p0) / cpd
 
     new_source = old_source / (1 - qt) * exp(-L * ql / T / cpd / (1 - qt))
 

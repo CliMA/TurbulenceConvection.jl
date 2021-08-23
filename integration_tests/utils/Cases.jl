@@ -10,27 +10,31 @@ const CP = CLIMAParameters
 const CPP = CP.Planet
 
 import ..TurbulenceConvection
-using ..TurbulenceConvection: CasesBase
-using ..TurbulenceConvection: set_bcs
-using ..TurbulenceConvection: off_arr
-using ..TurbulenceConvection: omega
-using ..TurbulenceConvection: pyinterp
+
 using ..TurbulenceConvection: eps_vi
-using ..TurbulenceConvection: theta_rho_c
 using ..TurbulenceConvection: eps_v
+using ..TurbulenceConvection: omega
+using ..TurbulenceConvection: theta_rho_c
 using ..TurbulenceConvection: buoyancy_c
+using ..TurbulenceConvection: cpm_c
+using ..TurbulenceConvection: p_tilde
+
+using ..TurbulenceConvection: satadjust
+
 using ..TurbulenceConvection: dycoms_L
 using ..TurbulenceConvection: dycoms_Rd
 using ..TurbulenceConvection: dycoms_cp
+
+using ..TurbulenceConvection: CasesBase
+using ..TurbulenceConvection: set_bcs
+using ..TurbulenceConvection: off_arr
+using ..TurbulenceConvection: pyinterp
 using ..TurbulenceConvection: add_ts
 using ..TurbulenceConvection: update
 using ..TurbulenceConvection: write_ts
 using ..TurbulenceConvection: initialize
 using ..TurbulenceConvection: initialize_io
 using ..TurbulenceConvection: io
-using ..TurbulenceConvection: satadjust
-using ..TurbulenceConvection: exner_c
-using ..TurbulenceConvection: cpm_c
 using ..TurbulenceConvection: xrange
 using ..TurbulenceConvection: Grid
 using ..TurbulenceConvection: ReferenceState
@@ -150,6 +154,9 @@ function initialize_reference(self::CasesBase{SoaresCase}, Gr::Grid, Ref::Refere
     initialize(Ref, Gr, Stats)
 end
 function initialize_profiles(self::CasesBase{SoaresCase}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+
+    param_set = TC.parameter_set(GMV)
+
     theta = TC.center_field(Gr)
     ql = 0.0
     qi = 0.0
@@ -170,8 +177,9 @@ function initialize_profiles(self::CasesBase{SoaresCase}, Gr::Grid, GMV::GridMea
     set_bcs(GMV.QT, Gr)
 
     @inbounds for k in real_center_indicies(Gr)
+        pp = TD.PhasePartition(GMV.QT.values[k], ql, qi)
         GMV.H.values[k] = theta[k]
-        GMV.T.values[k] = theta[k] * exner_c(Ref.p0_half[k])
+        GMV.T.values[k] = theta[k] * TD.exner_given_pressure(param_set, Ref.p0_half[k], pp)
     end
 
     set_bcs(GMV.H, Gr)
@@ -250,6 +258,9 @@ function initialize_reference(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::Refere
     initialize(Ref, Gr, Stats)
 end
 function initialize_profiles(self::CasesBase{Nieuwstadt}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+
+    param_set = TC.parameter_set(GMV)
+
     theta = TC.center_field(Gr)
     ql = 0.0
     qi = 0.0
@@ -270,8 +281,9 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, Gr::Grid, GMV::GridMea
     set_bcs(GMV.QT, Gr)
 
     @inbounds for k in real_center_indicies(Gr)
+        pp = TD.PhasePartition(GMV.QT.values[k], ql, qi)
         GMV.H.values[k] = theta[k]
-        GMV.T.values[k] = theta[k] * exner_c(Ref.p0_half[k])
+        GMV.T.values[k] = theta[k] * TD.exner_given_pressure(param_set, Ref.p0_half[k], pp)
     end
     set_bcs(GMV.H, Gr)
     set_bcs(GMV.T, Gr)
@@ -347,6 +359,8 @@ function initialize_reference(self::CasesBase{BomexCase}, Gr::Grid, Ref::Referen
 end
 
 function initialize_profiles(self::CasesBase{BomexCase}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+
+    param_set = TC.parameter_set(GMV)
     thetal = TC.center_field(Gr)
     ql = 0.0
     qi = 0.0 # IC of Bomex is cloud-free
@@ -391,8 +405,9 @@ function initialize_profiles(self::CasesBase{BomexCase}, Gr::Grid, GMV::GridMean
     end
 
     @inbounds for k in real_center_indicies(Gr)
+        pp = TD.PhasePartition(GMV.QT.values[k], ql, qi)
         GMV.H.values[k] = thetal[k]
-        GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
+        GMV.T.values[k] = thetal[k] * TD.exner_given_pressure(param_set, Ref.p0_half[k], pp)
     end
     set_bcs(GMV.U, Gr)
     set_bcs(GMV.QT, Gr)
@@ -406,31 +421,45 @@ function initialize_surface(self::CasesBase{BomexCase}, Gr::Grid, Ref::Reference
     param_set = TC.parameter_set(Ref)
 
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
-    self.Sur.Tsurface = 299.1 * exner_c(Ref.Pg)
     self.Sur.qsurface = 22.45e-3 # kg/kg
+
+    pp = TD.PhasePartition(self.Sur.qsurface, 0.0, 0.0)
+    self.Sur.Tsurface = 299.1 * TD.exner_given_pressure(param_set, Ref.Pg, pp)
+
     self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(param_set, self.Sur.Tsurface)
     self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
+
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # m/s
+
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
+
     initialize(self.Sur)
+
 end
 
 function initialize_forcing(self::CasesBase{BomexCase}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
+
+    param_set = parameter_Set(Ref)
+
     initialize(self.Fo, GMV)
+
     @inbounds for k in real_center_indicies(Gr)
         # Geostrophic velocity profiles. vg = 0
         self.Fo.ug[k] = -10.0 + (1.8e-3) * Gr.z_half[k]
+
         # Set large-scale cooling
+        # TODO - should exner here get PhasePartition?
         if Gr.z_half[k] <= 1500.0
-            self.Fo.dTdt[k] = (-2.0 / (3600 * 24.0)) * exner_c(Ref.p0_half[k])
+            self.Fo.dTdt[k] = (-2.0 / (3600 * 24.0)) * TD.exner_given_pressure(param_set, Ref.p0_half[k])
         else
             self.Fo.dTdt[k] =
                 (-2.0 / (3600 * 24.0) + (Gr.z_half[k] - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) *
-                exner_c(Ref.p0_half[k])
+                TD.exner_given_pressure(param_set, Ref.p0_half[k])
         end
 
         # Set large-scale drying
@@ -483,9 +512,13 @@ function initialize_reference(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref
     initialize(Ref, Gr, Stats)
 end
 function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+
     thetal = TC.center_field(Gr)
     ql = 0.0
     qi = 0.0 # IC of Bomex is cloud-free
+
+    param_set = TC.parameter_set(Ref)
+
     @inbounds for k in real_center_indicies(Gr)
         #Set Thetal profile
         if Gr.z_half[k] <= 520.0
@@ -527,8 +560,9 @@ function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, GMV:
 
 
     @inbounds for k in real_center_indicies(Gr)
+        pp = TD.PhasePartition(GMV.QT.values[k], 0.0, 0.0)
         GMV.H.values[k] = thetal[k]
-        GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
+        GMV.T.values[k] = thetal[k] * TD.exner_given_pressure(param_set, Ref.p0_half[k], pp)
     end
 
     set_bcs(GMV.U, Gr)
@@ -544,8 +578,10 @@ function initialize_surface(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::
     g = CPP.grav(param_set)
 
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
-    self.Sur.Tsurface = 299.1 * exner_c(Ref.Pg)
     self.Sur.qsurface = 22.45e-3 # kg/kg
+    pp = TD.PhasePartition(self.Sur.qsurface, 0.0, 0.0)
+
+    self.Sur.Tsurface = 299.1 * TD.exner_given_pressure(param_set, Ref.Pg, pp)
     self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(param_set, self.Sur.Tsurface)
     self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
     self.lhf0 = self.Sur.lhf
@@ -566,16 +602,19 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
+
+    param_set = TC.para,eter_set(Ref)
+
     @inbounds for k in real_center_indicies(Gr)
         # Geostrophic velocity profiles. vg = 0
         self.Fo.ug[k] = -10.0 + (1.8e-3) * Gr.z_half[k]
         # Set large-scale cooling
         if Gr.z_half[k] <= 1500.0
-            self.Fo.dTdt[k] = (-2.0 / (3600 * 24.0)) * exner_c(Ref.p0_half[k])
+            self.Fo.dTdt[k] = (-2.0 / (3600 * 24.0)) * TD.exner_given_pressure(param_set, Ref.p0_half[k])
         else
             self.Fo.dTdt[k] =
                 (-2.0 / (3600 * 24.0) + (Gr.z_half[k] - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) *
-                exner_c(Ref.p0_half[k])
+                TD.exner_given_pressure(param_set, Ref.p0_half[k])
         end
         # Set large-scale drying
         if Gr.z_half[k] <= 300.0
@@ -663,6 +702,8 @@ function initialize_profiles(self::CasesBase{Rico}, Gr::Grid, GMV::GridMeanVaria
     ql = 0.0
     qi = 0.0 # IC of Rico is cloud-free
 
+    param_set = TC.parameter_set(Ref)
+
     @inbounds for k in real_center_indicies(Gr)
         GMV.U.values[k] = -9.9 + 2.0e-3 * Gr.z_half[k]
         GMV.V.values[k] = -3.8
@@ -684,8 +725,9 @@ function initialize_profiles(self::CasesBase{Rico}, Gr::Grid, GMV::GridMeanVaria
     end
 
     @inbounds for k in real_center_indicies(Gr)
+        pp = TD.PhasePartition(GMV.QT.values[k], ql, qi)
         GMV.H.values[k] = thetal[k]
-        GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
+        GMV.T.values[k] = thetal[k] * TD.exner_given_pressure(param_set, Ref.p0_half[k], pp)
     end
 
     set_bcs(GMV.U, Gr)
@@ -715,12 +757,15 @@ function initialize_forcing(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
+
+    param_set = TC.parameter_set(Ref)
+
     @inbounds for k in real_center_indicies(Gr)
         # Geostrophic velocity profiles
         self.Fo.ug[k] = -9.9 + 2.0e-3 * Gr.z_half[k]
         self.Fo.vg[k] = -3.8
         # Set large-scale cooling
-        self.Fo.dTdt[k] = (-2.5 / (3600.0 * 24.0)) * exner_c(Ref.p0_half[k])
+        self.Fo.dTdt[k] = (-2.5 / (3600.0 * 24.0)) * TD.exner_given_pressure(param_set, Ref.p0_half[k])
 
         # Set large-scale moistening
         if Gr.z_half[k] <= 2980.0
@@ -880,8 +925,9 @@ function initialize_surface(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
     param_set = TC.parameter_set(Ref)
 
     #self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
-    self.Sur.Tsurface = (273.15 + 23) * exner_c(Ref.Pg)
     self.Sur.qsurface = 22.45e-3 # kg/kg
+    pp = TD.PhasePartition(self.Sur.qsurface, 0.0, 0.0)
+    self.Sur.Tsurface = (273.15 + 23) * TD.exner_given_pressure(param_set, Ref.Pg, pp)
     self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(param_set, self.Sur.Tsurface)
     self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
     self.Sur.ustar_fixed = true
@@ -1129,14 +1175,13 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVa
     Theta = pyinterp(Gr.z_half, z_in, Theta_in)
     qt = pyinterp(Gr.z_half, z_in, qt_in)
 
-
     @inbounds for k in real_center_indicies(Gr)
         GMV.U.values[k] = 10.0
         GMV.QT.values[k] = qt[k]
-        GMV.T.values[k] = Theta[k] * exner_c(Ref.p0_half[k])
 
         pp = TD.PhasePartition(GMV.QT.values[k], 0.0, 0.0)
 
+        GMV.T.values[k] = Theta[k] * TD.exner_given_pressure(param_set, Ref.p0_half[k], pp)
         GMV.H.values[k] = TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], Ref.p0_half[k], pp)
     end
 
@@ -1148,12 +1193,19 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVa
 end
 
 function initialize_surface(self::CasesBase{ARM_SGP}, Gr::Grid, Ref::ReferenceState)
-    self.Sur.Tsurface = 299.0 * exner_c(Ref.Pg)
+
+    param_set = TC.parameter_set(Ref)
+
     self.Sur.qsurface = 15.2e-3 # kg/kg
+    pp = TD.PhasePartition(self.Sur.qsurface, 0.0, 0.0)
+    self.Sur.Tsurface = 299.0 * TD.exner_given_pressure(param_set, Ref.Pg, pp)
+
     self.Sur.lhf = 5.0
     self.Sur.shf = -30.0
+
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
+
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
     initialize(self.Sur)
@@ -1201,6 +1253,9 @@ function update_surface(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::Ti
 end
 
 function update_forcing(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::TimeStepping)
+
+    param_set = TC.parameter_set(GMV)
+
     t_in = off_arr([0.0, 3.0, 6.0, 9.0, 12.0, 14.5]) .* 3600.0 #LES time is in sec
     AT_in = off_arr([0.0, 0.0, 0.0, -0.08, -0.016, -0.016]) ./ 3600.0 # Advective forcing for theta [K/h] converted to [K/sec]
     RT_in = off_arr([-0.125, 0.0, 0.0, 0.0, 0.0, -0.1]) ./ 3600.0  # Radiative forcing for theta [K/h] converted to [K/sec]
@@ -1208,13 +1263,14 @@ function update_forcing(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::Ti
     dTdt = pyinterp(off_arr([TS.t]), t_in, AT_in)[1] + pyinterp(off_arr([TS.t]), t_in, RT_in)[1]
     dqtdt = pyinterp(off_arr([TS.t]), t_in, Rqt_in)[1]
     Gr = self.Fo.Gr
+
     @inbounds for k in center_indicies(Gr)
         if Gr.z_half[k] <= 1000.0
             self.Fo.dTdt[k] = dTdt
-            self.Fo.dqtdt[k] = dqtdt * exner_c(self.Fo.Ref.p0_half[k])
+            self.Fo.dqtdt[k] = dqtdt * TD.exner_given_pressure(param_set, self.Fo.Ref.p0_half[k])
         elseif Gr.z_half[k] > 1000.0 && Gr.z_half[k] <= 2000.0
             self.Fo.dTdt[k] = dTdt * (1 - (Gr.z_half[k] - 1000.0) / 1000.0)
-            self.Fo.dqtdt[k] = dqtdt * exner_c(self.Fo.Ref.p0_half[k]) * (1 - (Gr.z_half[k] - 1000.0) / 1000.0)
+            self.Fo.dqtdt[k] = dqtdt * TD.exner_given_pressure(param_set, self.Fo.Ref.p0_half[k]) * (1 - (Gr.z_half[k] - 1000.0) / 1000.0)
         end
     end
     update(self.Fo, GMV)
@@ -1378,11 +1434,17 @@ function DYCOMS_RF01(namelist, Gr::Grid, Ref::ReferenceState)
     return TC.CasesBase{DYCOMS_RF01}(; casename = "DYCOMS_RF01", inversion_option, Sur, Fo, Rad)
 end
 
+function exner_dycoms_helper(p0)
+    return (p0 / p_tilde)^(dycoms_Rd / dycoms_cp)
+end
+
 function initialize_reference(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
+
+
     Ref.Pg = 1017.8 * 100.0
     Ref.qtg = 9.0 / 1000.0
     # Use an exner function with values for Rd, and cp given in Stevens 2005 to compute temperature
-    Ref.Tg = 289.0 * exner_c(Ref.Pg; kappa = dycoms_Rd / dycoms_cp)
+    Ref.Tg = 289.0 * exner_dycoms_helper(Ref.Pg)
     initialize(Ref, Gr, Stats)
 end
 # helper function
@@ -1394,7 +1456,7 @@ Compute thetal using constants from Stevens et al 2005 DYCOMS case.
 :return: theta l
 """
 function dycoms_compute_thetal(self::CasesBase{DYCOMS_RF01}, p_, T_, ql_)
-    theta_ = T_ / exner_c(p_, kappa = dycoms_Rd / dycoms_cp)
+    theta_ = T_ / exner_dycoms_helper(p_)
     return theta_ * exp(-1.0 * dycoms_L * ql_ / (dycoms_cp * T_))
 end
 # helper function
@@ -1404,7 +1466,7 @@ end
 function t_to_thetali_c_dycoms_helper(param_set, p0, T, qt, ql, qi)
     L = TD.latent_heat_vapor(param_set, T)
     cpd = 1004.0
-    return T / exner_c(p0) * exp(-L * (ql / (1.0 - qt) + qi / (1.0 - qt)) / (T * cpd))
+    return T / TD.exner_given_pressure(param_set, p0) * exp(-L * (ql / (1.0 - qt) + qi / (1.0 - qt)) / (T * cpd))
 end
 """
 Use saturation adjustment scheme to compute temperature and ql given thetal and qt.
@@ -1415,8 +1477,11 @@ We can"t use the default TurbulenceConvection function because of different valu
 :return: T, ql
 """
 function dycoms_sat_adjst(param_set, self::CasesBase{DYCOMS_RF01}, p_, thetal_, qt_)
+
+    # TODO - double check the initialization for DyCOMS!
+
     #Compute temperature
-    t_1 = thetal_ * exner_c(p_, kappa = dycoms_Rd / dycoms_cp)
+    t_1 = thetal_ * exner_dycoms_helper(p_)
     #Compute saturation vapor pressure
     pv_star_1 = TD.saturation_vapor_pressure(param_set, t_1, TD.Liquid())
     #Compute saturation specific humidity
@@ -1528,7 +1593,10 @@ function initialize_surface(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::Referen
     # buoyancy flux
     theta_flux = self.Sur.shf / cpm_c(self.Sur.qsurface) / TC.surface_value(Ref.rho0, Gr)
     qt_flux = self.Sur.lhf / TD.latent_heat_vapor(param_set, self.Sur.Tsurface) / TC.surface_value(Ref.rho0, Gr)
-    theta_surface = self.Sur.Tsurface / exner_c(Ref.Pg)
+
+    pp = TD.PhasePartition(self.Sur.qsurface)
+
+    theta_surface = self.Sur.Tsurface / TD.exner_given_pressure(param_set, Ref.Pg, pp)
     self.Sur.bflux =
         g * (
             (theta_flux + (eps_vi - 1.0) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
@@ -1612,6 +1680,9 @@ function initialize_reference(self::CasesBase{GABLS}, Gr::Grid, Ref::ReferenceSt
     initialize(Ref, Gr, Stats)
 end
 function initialize_profiles(self::CasesBase{GABLS}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+
+    param_set = TC.parameter_set(GMV)
+
     thetal = TC.center_field(Gr)
     ql = 0.0
     qi = 0.0 # IC of GABLS cloud-free
@@ -1633,8 +1704,9 @@ function initialize_profiles(self::CasesBase{GABLS}, Gr::Grid, GMV::GridMeanVari
     end
 
     @inbounds for k in real_center_indicies(Gr)
+        pp = PhasePartition(GMV.QT.values[k], ql, qi)
         GMV.H.values[k] = thetal[k]
-        GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k]) # No water content
+        GMV.T.values[k] = thetal[k] * TD.exner_given_pressure(param_set, Ref.p0_half[k], pp) # No water content
     end
 
     set_bcs(GMV.U, Gr)
@@ -1711,6 +1783,9 @@ function initialize_reference(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState
 end
 
 function initialize_profiles(self::CasesBase{SP}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+
+    param_set = TC.parameter_set(GMV)
+
     thetal = TC.center_field(Gr)
     ql = 0.0
     qi = 0.0 # IC of SP cloud-free
@@ -1732,8 +1807,9 @@ function initialize_profiles(self::CasesBase{SP}, Gr::Grid, GMV::GridMeanVariabl
     end
 
     @inbounds for k in real_center_indicies(Gr)
+        pp = TD.PhasePartition(GMV.QT.values[k], ql, qi)
         GMV.H.values[k] = thetal[k]
-        GMV.T.values[k] = thetal[k] * exner_c(Ref.p0_half[k])
+        GMV.T.values[k] = thetal[k] * TD.exner_given_pressure(param_set, Ref.p0_half[k], pp)
     end
 
     set_bcs(GMV.U, Gr)
@@ -1751,7 +1827,7 @@ function initialize_surface(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState)
     self.Sur.Ref = Ref
     self.Sur.zrough = 0.1
     self.Sur.Tsurface = 300.0
-    theta_surface = self.Sur.Tsurface / exner_c(Ref.Pg)
+    theta_surface = self.Sur.Tsurface / TD.exner_given_pressure(param_set, Ref.Pg)
     theta_flux = 0.24
     self.Sur.ustar = 0.28 # just to initilize grid mean covariances
     self.Sur.bflux = g * theta_flux / theta_surface
