@@ -2,8 +2,6 @@
 function initialize(self::RadiationBase, GMV::GridMeanVariables, ::RadiationBaseType)
     self.dTdt = center_field(self.Gr)
     self.dqtdt = center_field(self.Gr)
-
-    self.convert_forcing_prog_fp = convert_forcing_thetal
     return
 end
 
@@ -95,15 +93,7 @@ function update(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariable
 
     @inbounds for k in real_center_indicies(self.Gr)
         # Apply large-scale horizontal advection tendencies
-        qv = GMV.QT.values[k] - GMV.QL.values[k]
-        GMV.H.tendencies[k] += self.convert_forcing_prog_fp(
-            self.Ref.p0_half[k],
-            GMV.QT.values[k],
-            qv,
-            GMV.T.values[k],
-            self.dqtdt[k],
-            self.dTdt[k],
-        )
+        GMV.H.tendencies[k] += self.dTdt[k] / exner_c(self.Ref.p0_half[k])
     end
 
     return
