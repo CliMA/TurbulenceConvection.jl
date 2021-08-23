@@ -306,30 +306,24 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
     g = CPP.grav(param_set)
     ref_state = reference_state(self)
     kc_surf = kc_surface(grid)
-    tau = get_mixing_tau(self.zi, self.wstar)
-    l = zeros(3)
-    ϵ = 1.0e-9 # Epsilon to avoid zero
     ω_pr = CPEDMF.ω_pr(param_set)
+    Pr_n = CPEDMF.Pr_n(param_set)
 
     @inbounds for k in real_center_indicies(grid)
-        z_ = grid.z_half[k]
-        # kz scale (surface layer)
-        if obukhov_length < 0.0 #unstable
-            l2 =
-                vkb * z_ / (sqrt(self.EnvVar.TKE.values[kc_surf] / ustar / ustar) * self.tke_ed_coeff) *
-                min((1.0 - 100.0 * z_ / obukhov_length)^0.2, 1.0 / vkb)
-        else # neutral or stable
-            l2 = vkb * z_ / (sqrt(self.EnvVar.TKE.values[kc_surf] / ustar / ustar) * self.tke_ed_coeff)
-        end
 
-        # Buoyancy-shear-subdomain exchange-dissipation TKE equilibrium scale
+        # compute shear
         U_cut = cut(GMV.U.values, grid, k)
         V_cut = cut(GMV.V.values, grid, k)
+        wc_en = interpf2c(self.EnvVar.W.values, grid, k)
+        wc_up = interpf2c.(Ref(self.UpdVar.W.values), Ref(grid), k, 1:(self.n_updrafts))
         w_dual = dual_faces(self.EnvVar.W.values, grid, k)
+
         ∇U = c∇(U_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         ∇V = c∇(V_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         ∇w = ∇f2c(w_dual, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         Shear² = ∇U^2 + ∇V^2 + ∇w^2
+
+        # buoyancy_gradients
         qt_dry = self.EnvThermo.qt_dry[k]
         th_dry = self.EnvThermo.th_dry[k]
         t_cloudy = self.EnvThermo.t_cloudy[k]
@@ -340,70 +334,32 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         cpm = cpm_c(qt_cloudy)
 
         QT_cut = cut(self.EnvVar.QT.values, grid, k)
-        grad_qt = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
+        ∂qt∂z = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         THL_cut = cut(self.EnvVar.H.values, grid, k)
-        grad_thl = c∇(THL_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
+        ∂θl∂z = c∇(THL_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
 
-        # g/theta_ref
         prefactor = g * (Rd / ref_state.alpha0_half[k] / ref_state.p0_half[k]) * exner_c(ref_state.p0_half[k])
-        d_buoy_thetal_dry = prefactor * (1.0 + (eps_vi - 1.0) * qt_dry)
-        d_buoy_qt_dry = prefactor * th_dry * (eps_vi - 1.0)
+        ∂b∂θl_dry = prefactor * (1.0 + (eps_vi - 1.0) * qt_dry)
+        ∂b∂qt_dry = prefactor * th_dry * (eps_vi - 1.0)
 
         if self.EnvVar.cloud_fraction.values[k] > 0.0
-            d_buoy_thetal_cloudy = (
+            ∂b∂θl_cld = (
                 prefactor * (1.0 + eps_vi * (1.0 + lh / Rv / t_cloudy) * qv_cloudy - qt_cloudy) /
                 (1.0 + lh * lh / cpm / Rv / t_cloudy / t_cloudy * qv_cloudy)
             )
-            d_buoy_qt_cloudy = (lh / cpm / t_cloudy * d_buoy_thetal_cloudy - prefactor) * th_cloudy
+            ∂b∂qt_cld = (lh / cpm / t_cloudy * ∂b∂θl_cld - prefactor) * th_cloudy
         else
-            d_buoy_thetal_cloudy = 0.0
-            d_buoy_qt_cloudy = 0.0
+            ∂b∂θl_cld = 0.0
+            ∂b∂qt_cld = 0.0
         end
-        d_buoy_thetal_total = (
-            self.EnvVar.cloud_fraction.values[k] * d_buoy_thetal_cloudy +
-            (1.0 - self.EnvVar.cloud_fraction.values[k]) * d_buoy_thetal_dry
+        ∂b∂θl = (
+            self.EnvVar.cloud_fraction.values[k] * ∂b∂θl_cld + (1.0 - self.EnvVar.cloud_fraction.values[k]) * ∂b∂θl_dry
         )
-        d_buoy_qt_total = (
-            self.EnvVar.cloud_fraction.values[k] * d_buoy_qt_cloudy +
-            (1.0 - self.EnvVar.cloud_fraction.values[k]) * d_buoy_qt_dry
+        ∂b∂qt = (
+            self.EnvVar.cloud_fraction.values[k] * ∂b∂qt_cld + (1.0 - self.EnvVar.cloud_fraction.values[k]) * ∂b∂qt_dry
         )
-
-        # Partial buoyancy gradients
-        ∂b∂θ_l = grad_thl * d_buoy_thetal_total
-        ∂b∂q_tot = grad_qt * d_buoy_qt_total
-
-        ∇Ri = gradient_Richardson_number(∂b∂θ_l, ∂b∂q_tot, Shear², ϵ)
-        self.prandtl_nvec[k] = turbulent_Prandtl_number(obukhov_length, ∇Ri, prandtl_number(self), ω_pr)
-
-        # Production/destruction terms
-        a =
-            self.tke_ed_coeff *
-            (Shear² - ∂b∂θ_l / self.prandtl_nvec[k] - ∂b∂q_tot / self.prandtl_nvec[k]) *
-            sqrt(self.EnvVar.TKE.values[k])
-        # Dissipation term
-        c_neg = self.tke_diss_coeff * self.EnvVar.TKE.values[k] * sqrt(self.EnvVar.TKE.values[k])
-        # Subdomain exchange term
-        self.b[k] = 0.0
-        for nn in xrange(self.n_updrafts)
-            wc_upd_nn = (self.UpdVar.W.values[nn, k] + self.UpdVar.W.values[nn, k - 1]) / 2.0
-            wc_env = (self.EnvVar.W.values[k] + self.EnvVar.W.values[k - 1]) / 2.0
-            self.b[k] +=
-                self.UpdVar.Area.values[nn, k] * wc_upd_nn * self.detr_sc[nn, k] /
-                (1.0 - self.UpdVar.Area.bulkvalues[k]) *
-                ((wc_upd_nn - wc_env) * (wc_upd_nn - wc_env) / 2.0 - self.EnvVar.TKE.values[k]) -
-                self.UpdVar.Area.values[nn, k] *
-                wc_upd_nn *
-                (wc_upd_nn - wc_env) *
-                self.frac_turb_entr[nn, k] *
-                wc_env / (1.0 - self.UpdVar.Area.bulkvalues[k])
-        end
-
-        if abs(a) > ϵ && 4.0 * a * c_neg > -self.b[k] * self.b[k]
-            self.l_entdet[k] = max(-self.b[k] / 2.0 / a + sqrt(self.b[k] * self.b[k] + 4.0 * a * c_neg) / 2.0 / a, 0.0)
-        elseif abs(a) < ϵ && abs(self.b[k]) > ϵ
-            self.l_entdet[k] = c_neg / self.b[k]
-        end
-        l3 = self.l_entdet[k]
+        ∂b∂z_θl = ∂b∂θl * ∂θl∂z
+        ∂b∂z_qt = ∂b∂qt * ∂qt∂z
 
         # Limiting stratification scale (Deardorff, 1976)
         p0_cut = cut(ref_state.p0_half, grid, k)
@@ -411,63 +367,65 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         QT_cut = cut(self.EnvVar.QT.values, grid, k)
         QL_cut = cut(self.EnvVar.QL.values, grid, k)
         thv_cut = theta_virt_c.(p0_cut, T_cut, QT_cut, QL_cut)
-        grad_thv = c∇(thv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
+        θv = theta_virt_c(
+            ref_state.p0_half[k],
+            self.EnvVar.T.values[k],
+            self.EnvVar.QT.values[k],
+            self.EnvVar.QL.values[k],
+        )
+        ∂θv∂z = c∇(thv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
+        # compute ∇Ri and Pr
+        ∇_Ri = gradient_Richardson_number(∂b∂z_θl, ∂b∂z_qt, Shear², eps(0.0))
+        self.prandtl_nvec[k] = turbulent_Prandtl_number(obukhov_length, ∇_Ri, Pr_n, ω_pr)
 
-        p0_k = ref_state.p0_half[k]
-        T_k = self.EnvVar.T.values[k]
-        QT_k = self.EnvVar.QT.values[k]
-        QL_k = self.EnvVar.QL.values[k]
-        thv = theta_virt_c(p0_k, T_k, QT_k, QL_k)
+        ml_model = MinDisspLen(;
+            z = grid.z_half[k],
+            obukhov_length = obukhov_length,
+            κ_vk = vkb,
+            tke_surf = self.EnvVar.TKE.values[kc_surf],
+            ustar = ustar,
+            Pr = self.prandtl_nvec[k],
+            ∂b∂z_θl = ∂b∂z_θl,
+            Shear² = Shear²,
+            ∂b∂z_qt = ∂b∂z_qt,
+            ∂θv∂z = ∂θv∂z,
+            ∂qt∂z = ∂qt∂z,
+            ∂θl∂z = ∂θl∂z,
+            θv = θv,
+            tke = self.EnvVar.TKE.values[k],
+            a_en = (1 - self.UpdVar.Area.bulkvalues[k]),
+            wc_en = wc_en,
+            wc_up = Tuple(wc_up),
+            a_up = Tuple(self.UpdVar.Area.values[:, k]),
+            ε_turb = Tuple(self.frac_turb_entr[:, k]),
+            δ_dyn = Tuple(self.detr_sc[:, k]),
+            en_cld_frac = self.EnvVar.cloud_fraction.values[k],
+            θ_li_en = self.EnvVar.H.values[k],
+            ql_en = self.EnvVar.QL.values[k],
+            qt_en = self.EnvVar.QT.values[k],
+            T_en = self.EnvVar.T.values[k],
+            N_up = self.n_updrafts,
+        )
 
-        # Effective static stability using environmental mean.
-        # Set lambda for now to environmental cloud_fraction (TBD: Rain)
-        grad_th_eff =
-            (1.0 - self.EnvVar.cloud_fraction.values[k]) * grad_thv +
-            self.EnvVar.cloud_fraction.values[k] * (
-                1.0 / exp(
-                    -latent_heat(self.EnvVar.T.values[k]) * self.EnvVar.QL.values[k] / cpm_c(self.EnvVar.QT.values[k]) /
-                    self.EnvVar.T.values[k],
-                ) * (
-                    (1.0 + (eps_vi - 1.0) * self.EnvVar.QT.values[k]) * grad_thl +
-                    (eps_vi - 1.0) * self.EnvVar.H.values[k] * grad_qt
-                )
-            )
-        N = sqrt(max(g / thv * grad_th_eff, 0.0))
-        if N > 0.0
-            l1 = min(sqrt(max(self.static_stab_coeff * self.EnvVar.TKE.values[k], 0.0)) / N, 1.0e6)
-        else
-            l1 = 1.0e6
-        end
-
-        l[1] = l1
-        l[2] = l3
-        l[3] = l2
-
-        j = 1
-        while (j <= length(l))
-            if l[j] < ϵ || l[j] > 1.0e6
-                l[j] = 1.0e6
-            end
-            j += 1
-        end
-
-        self.mls[k] = argmin(l)
-        self.mixing_length[k] = lamb_smooth_minimum(l, 0.1, 1.5)
-        self.ml_ratio[k] = self.mixing_length[k] / l[Int(self.mls[k])]
+        ml = mixing_length(param_set, ml_model)
+        self.mls[k] = ml.min_len_ind
+        self.mixing_length[k] = ml.mixing_length
+        self.ml_ratio[k] = ml.ml_ratio
     end
     return
 end
 
-
 function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
     grid = get_grid(self)
+    param_set = parameter_set(self)
+    c_m = CPEDMF.c_m(param_set)
     compute_mixing_length(self, Case.Sur.obukhov_length, Case.Sur.ustar, GMV)
     KM = diffusivity_m(self)
     KH = diffusivity_h(self)
     @inbounds for k in real_center_indicies(grid)
         lm = self.mixing_length[k]
         pr = self.prandtl_nvec[k]
-        KM.values[k] = self.tke_ed_coeff * lm * sqrt(max(self.EnvVar.TKE.values[k], 0.0))
+        KM.values[k] = c_m * lm * sqrt(max(self.EnvVar.TKE.values[k], 0.0))
         KH.values[k] = KM.values[k] / pr
     end
     return
@@ -1976,13 +1934,15 @@ end
 
 function compute_covariance_dissipation(self::EDMF_PrognosticTKE, Covar::EnvironmentVariable_2m)
     grid = get_grid(self)
+    param_set = parameter_set(self)
+    c_d = CPEDMF.c_d(param_set)
     ae = 1 .- self.UpdVar.Area.bulkvalues
     rho0_half = reference_state(self).rho0_half
 
     @inbounds for k in real_center_indicies(grid)
         Covar.dissipation[k] = (
             rho0_half[k] * ae[k] * Covar.values[k] * max(self.EnvVar.TKE.values[k], 0)^0.5 /
-            max(self.mixing_length[k], 1.0e-3) * self.tke_diss_coeff
+            max(self.mixing_length[k], 1.0e-3) * c_d
         )
     end
     return
@@ -2063,6 +2023,8 @@ function update_covariance_ED(
 )
 
     grid = get_grid(self)
+    param_set = parameter_set(self)
+    c_d = CPEDMF.c_d(param_set)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     dzi = grid.dzi
@@ -2134,8 +2096,7 @@ function update_covariance_ED(
             rho_ae_K_m[k] * dzi * dzi +
             rho_ae_K_m[k - 1] * dzi * dzi +
             D_env +
-            Ref.rho0_half[k] * ae[k] * self.tke_diss_coeff * sqrt(max(self.EnvVar.TKE.values[k], 0)) /
-            max(self.mixing_length[k], 1.0)
+            Ref.rho0_half[k] * ae[k] * c_d * sqrt(max(self.EnvVar.TKE.values[k], 0)) / max(self.mixing_length[k], 1.0)
         )
         c[k] = (Ref.rho0_half[k + 1] * ae[k + 1] * whalf[k + 1] * dzi - rho_ae_K_m[k] * dzi * dzi)
         x[k] = (
