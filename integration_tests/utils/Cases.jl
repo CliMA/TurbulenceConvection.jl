@@ -21,9 +21,7 @@ using ..TurbulenceConvection: theta_rho_c
 using ..TurbulenceConvection: eps_v
 using ..TurbulenceConvection: buoyancy_c
 using ..TurbulenceConvection: dycoms_L
-using ..TurbulenceConvection: qv_star_c
 using ..TurbulenceConvection: t_to_thetali_c
-using ..TurbulenceConvection: rho_c
 using ..TurbulenceConvection: dycoms_Rd
 using ..TurbulenceConvection: dycoms_cp
 using ..TurbulenceConvection: add_ts
@@ -1404,6 +1402,9 @@ We can"t use the default TurbulenceConvection function because of different valu
 :param qt:  total water specific humidity
 :return: T, ql
 """
+function qv_star_c(p0, qt, pv)
+    return eps_v * (1.0 - qt) * pv / (p0 - pv)
+end
 function dycoms_sat_adjst(param_set, self::CasesBase{DYCOMS_RF01}, p_, thetal_, qt_)
     #Compute temperature
     t_1 = thetal_ * exner_c(p_, kappa = dycoms_Rd / dycoms_cp)
@@ -1477,7 +1478,7 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
         # buoyancy profile
         pp = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], qi)
         qv = vapor_specific_humidity(pp)
-        rho = rho_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
+        rho = TD.air_density(param_set, GMV.T.values[k], Ref.p0_half[k], pp)
         GMV.B.values[k] = buoyancy_c(param_set, Ref.rho0_half[k], rho)
 
         # velocity profile (geostrophic)

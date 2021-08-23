@@ -369,8 +369,8 @@ function buoyancy(
 
                 if UpdVar.Area.values[i, k] > 0.0
                     qv = TD.vapor_specific_humidity(ts)
-                    T = TD.air_temperature
-                    rho = rho_c(self.Ref.p0_half[k], T, qt, qv)
+                    T = TD.air_temperature(ts)
+                    rho = TD.air_density(ts)
 
                     UpdVar.B.values[i, k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
                 else
@@ -391,7 +391,7 @@ function buoyancy(
 
                     qv = TD.vapor_specific_humidity(ts)
                     T = TD.air_temperature(ts)
-                    rho = rho_c(self.Ref.p0_half[k], T, qt, qv)
+                    rho = TD.air_density(ts)
 
                     UpdVar.B.values[i, k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
                     UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
@@ -404,7 +404,7 @@ function buoyancy(
 
                     T = TD.air_temperature(ts)
                     qv = TD.vapor_specific_humidity(ts)
-                    rho = rho_c(self.Ref.p0_half[k], T, qt, qv)
+                    rho = TD.air_density(ts)
 
                     UpdVar.B.values[i, k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
                     UpdVar.RH.values[i, k] = TD.relative_humidity(ts)

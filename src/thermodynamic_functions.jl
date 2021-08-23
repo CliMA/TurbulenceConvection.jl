@@ -1,4 +1,3 @@
-
 function sd_c(pd, T)
     return sd_tilde + cpd * log(T / T_tilde) - Rd * log(pd / p_tilde)
 end
@@ -52,25 +51,11 @@ function buoyancy_c(param_set, rho0, rho)
     return g * (rho0 - rho) / rho0
 end
 
-function qv_star_c(p0, qt, pv)
-    return eps_v * (1.0 - qt) * pv / (p0 - pv)
-end
-
 function alpha_c(p0, T, qt, qv)
     return (Rd * T) / p0 * (1.0 - qt + eps_vi * qv)
-end
-
-function rho_c(p0, T, qt, qv)
-    return p0 / ((Rd * T) * (1.0 - qt + eps_vi * qv))
 end
 
 function t_to_thetali_c(param_set, p0, T, qt, ql, qi)
     L = TD.latent_heat_vapor(param_set, T)
     return thetali_c(param_set, p0, T, qt, ql, qi, L)
 end
-
-function qv_star_t(p0, T)
-    pv = pv_star(T)
-    return eps_v * pv / (p0 + (eps_v - 1.0) * pv)
-end
-

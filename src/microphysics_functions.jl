@@ -26,10 +26,10 @@ end
 # instantly convert all cloud water exceeding a threshold to rain water
 # the threshold is specified as excess saturation
 # rain water is immediately removed from the domain
-function acnv_instant(param_set, max_supersaturation, ql, qt, T, p0)
+function acnv_instant(param_set, max_supersaturation, ql, qt, T, ρ)
 
-    psat = TD.saturation_vapor_pressure(param_set, T, TD.Liquid())
-    qsat = qv_star_c(p0, qt, psat)
+    pp = TD.PhasePartition(qt, ql, 0.0)
+    qsat = TD.q_vap_saturation(param_set, T, ρ, TD.Liquid(), pp)
 
     return max(0.0, ql - max_supersaturation * qsat)
 end
@@ -88,9 +88,11 @@ function conv_q_rai_to_q_vap(param_set, C_drag, MP_n_0, a_vent, b_vent, q_rai, q
     bv_param =
         2^(7 / 16) * gamma_11_4 * π^(5 / 16) * b_vent * N_Sc^(1 / 3) * sqrt(v_c) * (rho / rho_cloud_liq)^(11 / 16)
 
+
+    pp = TD.PhasePartition(q_tot, q_liq, 0.0)
     p_vs = TD.saturation_vapor_pressure(param_set, T, TD.Liquid())
-    qv_sat = qv_star_c(p, q_tot, p_vs)
-    q_v = q_tot - q_liq
+    qv_sat = TD.q_vap_saturation_generic(param_set, T, rho, TD.Liquid())
+    q_v = TD.vapor_specific_humidity(pp)
     S = q_v / qv_sat - 1
 
     G_param = 1 / (L / K_therm / T * (L / Rv / T - 1.0) + Rv * T / D_vapor / p_vs)
@@ -131,7 +133,7 @@ function microphysics_rain_src(
     _ret.qv = TD.vapor_specific_humidity(pp)
     _ret.thl = t_to_thetali_c(param_set, p0, T, qt, ql, 0.0)
     _ret.th = theta_c(p0, T)
-    _ret.rho = rho_c(p0, T, qt, _ret.qv)
+    _ret.rho = TD.air_density(param_set, T, p0, pp)
 
     #TODO - temporary way to handle different autoconversion rates
     tmp_clima_acnv_flag = false
@@ -159,7 +161,7 @@ function microphysics_rain_src(
         end
 
         if tmp_cutoff_acnv_flag
-            _ret.qr_src = min(ql, acnv_instant(param_set, max_supersaturation, ql, qt, T, p0))
+            _ret.qr_src = min(ql, acnv_instant(param_set, max_supersaturation, ql, qt, T, rho))
         end
 
         if tmp_no_acnv_flag
