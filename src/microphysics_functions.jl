@@ -127,7 +127,8 @@ function microphysics_rain_src(
 
     # TODO assumes no ice
     _ret = mph_struct(0, 0, 0, 0, 0, 0, 0, 0, 0)
-    _ret.qv = qt - ql
+    pp = TD.PhasePartition(qt, ql, 0.0)
+    _ret.qv = TD.vapor_specific_humidity(pp)
     _ret.thl = t_to_thetali_c(param_set, p0, T, qt, ql, 0.0)
     _ret.th = theta_c(p0, T)
     _ret.rho = rho_c(p0, T, qt, _ret.qv)

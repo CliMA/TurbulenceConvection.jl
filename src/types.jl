@@ -268,7 +268,7 @@ mutable struct UpdraftVariables{A1}
         Area = UpdraftVariable(grid, nu, "half", "scalar", "area_fraction", "[-]")
         QT = UpdraftVariable(grid, nu, "half", "scalar", "qt", "kg/kg")
         QL = UpdraftVariable(grid, nu, "half", "scalar", "ql", "kg/kg")
-        RH = UpdraftVariable(grid, nu, "half", "scalar", "RH", "%")
+        RH = UpdraftVariable(grid, nu, "half", "scalar", "RH", "-")
         H = UpdraftVariable(grid, nu, "half", "scalar", "thetal", "K")
         T = UpdraftVariable(grid, nu, "half", "scalar", "temperature", "K")
         B = UpdraftVariable(grid, nu, "half", "scalar", "buoyancy", "m^2/s^3")
@@ -349,7 +349,7 @@ function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState, param_set::P
 
     # Create thermodynamic variables
     QT = VariablePrognostic(Gr, "half", "scalar", "sym", "qt", "kg/kg")
-    RH = VariablePrognostic(Gr, "half", "scalar", "sym", "RH", "%")
+    RH = VariablePrognostic(Gr, "half", "scalar", "sym", "RH", "-")
 
     H = VariablePrognostic(Gr, "half", "scalar", "sym", "thetal", "K")
 
@@ -521,7 +521,7 @@ function EnvironmentVariables(namelist, Gr::Grid, param_set::PS) where {PS}
     W = EnvironmentVariable(Gr, "full", "velocity", "w", "m/s")
     QT = EnvironmentVariable(Gr, "half", "scalar", "qt", "kg/kg")
     QL = EnvironmentVariable(Gr, "half", "scalar", "ql", "kg/kg")
-    RH = EnvironmentVariable(Gr, "half", "scalar", "RH", "%")
+    RH = EnvironmentVariable(Gr, "half", "scalar", "RH", "-")
     H = EnvironmentVariable(Gr, "half", "scalar", "thetal", "K")
     T = EnvironmentVariable(Gr, "half", "scalar", "temperature", "K")
     B = EnvironmentVariable(Gr, "half", "scalar", "buoyancy", "m^2/s^3")

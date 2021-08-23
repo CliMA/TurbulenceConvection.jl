@@ -365,7 +365,8 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
             self.qt_dry[k] = outer_env[i_qt_dry]
             self.th_dry[k] = theta_c(self.Ref.p0_half[k], outer_env[i_T_dry])
             self.t_cloudy[k] = outer_env[i_T_cld]
-            self.qv_cloudy[k] = outer_env[i_qt_cld] - outer_env[i_ql]
+            pp = TD.PhasePartition(outer_env[i_qt_cld], outer_env[i_ql], 0.0)
+            self.qv_cloudy[k] = TD.vapor_specific_humidity(pp)
             self.qt_cloudy[k] = outer_env[i_qt_cld]
             self.th_cloudy[k] = theta_c(self.Ref.p0_half[k], outer_env[i_T_cld])
 

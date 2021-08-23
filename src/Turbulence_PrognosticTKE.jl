@@ -1496,7 +1496,8 @@ function update_GMV_diagnostics(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
             (1.0 - self.UpdVar.Area.bulkvalues[k]) * self.EnvVar.T.values[k]
         )
 
-        qv = GMV.QT.values[k] - GMV.QL.values[k]
+        pp = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0)
+        qv = TD.vapor_specific_humidity(pp)
 
         GMV.B.values[k] = (
             self.UpdVar.Area.bulkvalues[k] * self.UpdVar.B.bulkvalues[k] +
@@ -2262,7 +2263,8 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
     param_set = parameter_set(GMV)
 
     @inbounds for k in real_center_indicies(self.Gr)
-        qv = GMV.QT.values[k] - GMV.QL.values[k]
+        pp = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0)
+        qv = TD.vapor_specific_humidity(pp)
         theta_rho[k] = theta_rho_c(self.Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
     end
 

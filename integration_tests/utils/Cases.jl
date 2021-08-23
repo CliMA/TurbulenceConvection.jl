@@ -863,7 +863,8 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
     @inbounds for k in real_center_indicies(Gr)
         PV_star = TD.saturation_vapor_pressure(param_set, GMV.T.values[k], TD.Liquid())
         qv_star = PV_star * epsi / (p1[k] - PV_star + epsi * PV_star * RH[k] / 100.0) # eq. 37 in pressel et al and the def of RH
-        qv = GMV.QT.values[k] - GMV.QL.values[k]
+        pp = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0)
+        qv = TD.vapor_specific_humidity(pp)
         GMV.QT.values[k] = qv_star * RH[k] / 100.0
         GMV.H.values[k] =
             thetali_c(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], 0.0, 0.0, TD.latent_heat_vapor(param_set, GMV.T.values[k]))
@@ -1474,7 +1475,8 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
 
 
         # buoyancy profile
-        qv = GMV.QT.values[k] - qi - GMV.QL.values[k]
+        pp = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], qi)
+        qv = vapor_specific_humidity(pp)
         rho = rho_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
         GMV.B.values[k] = buoyancy_c(param_set, Ref.rho0_half[k], rho)
 
