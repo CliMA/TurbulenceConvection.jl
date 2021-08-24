@@ -75,12 +75,14 @@ function c∇(f_cut::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top
 end
 c∇(f::SVector, grid::Grid, ::AbstractBCTag, ::NoBCGivenError) = error("No BC given")
 function c∇(f::SVector, grid::Grid, ::InteriorTag)
+    print("1")
     @assert length(f) == 3
     f_dual⁺ = SVector(f[2], f[3])
     f_dual⁻ = SVector(f[1], f[2])
     return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
 end
 function c∇(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue)
+    print("2")
     @assert length(f) == 2
     # 2fb = cg+ci => cg = 2fb-ci
     f_dual⁺ = SVector(f[2], 2 * bc.value - f[2])
@@ -88,6 +90,7 @@ function c∇(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue)
     return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
 end
 function c∇(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue)
+    print("3")
     @assert length(f) == 2
     # 2fb = cg+ci => cg = 2fb-ci
     f_dual⁺ = SVector(f[1], f[2])
@@ -95,16 +98,19 @@ function c∇(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue)
     return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
 end
 function c∇(f::SVector, grid::Grid, ::TopBCTag, bc::SetGradient)
+    print("4")
     @assert length(f) == 2
     f_dual⁻ = SVector(f[1], f[2])
     return (bc.value + ∇_staggered(f_dual⁻, grid)) / 2
 end
 function c∇(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient)
+    print("5")
     @assert length(f) == 2
     f_dual⁺ = SVector(f[1], f[2])
     return (∇_staggered(f_dual⁺, grid) + bc.value) / 2
 end
 function c∇(f::SVector, grid::Grid, ::TopBCTag, ::Extrapolate)
+    print("6")
     @assert length(f) == 2
     # 2ci = cg+cii => cg = 2ci-cii. Note: f[3] not used
     f_dual⁺ = SVector(f[2], 2 * f[2] - f[1])
@@ -112,6 +118,7 @@ function c∇(f::SVector, grid::Grid, ::TopBCTag, ::Extrapolate)
     return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
 end
 function c∇(f::SVector, grid::Grid, ::BottomBCTag, ::Extrapolate)
+    print("7")
     @assert length(f) == 2
     # 2ci = cg+cii => cg = 2ci-cii. Note: f[1] not used
     f_dual⁺ = SVector(f[1], f[2])
