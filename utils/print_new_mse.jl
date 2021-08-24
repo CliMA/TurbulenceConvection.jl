@@ -26,15 +26,15 @@ end
 println("#################################")
 println("################################# MSE tables")
 println("#################################")
-println()
+println("#")
 
-println("all_best_mse = OrderedDict()\n")
+println("all_best_mse = OrderedDict()\n#")
 for case in keys(dict)
     println("all_best_mse[\"$case\"] = OrderedDict()")
     for var in keys(dict[case])
         println("all_best_mse[\"$case\"][\"$var\"] = $(dict[case][var])")
     end
-    println()
+    println("#")
 end
 
 println("#################################")
