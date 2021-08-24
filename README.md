@@ -100,32 +100,7 @@ julia --project
 julia> include(joinpath("integration_tests", "Soares.jl"))
 ```
 
-# automated plotting  #
+# Automated plotting  #
 
-All automated plots are located in the `viz/` folder and are generated. This section is under construction.
-
-To run all automatic plots please try:
-
-```
-$ cd tests/
-
-$ py.test -s -v plots/
-
-$ cd ../
-
-```
-To run an individual plot please try:
-
-```
-$ cd tests/
-
-$ py.test -s -v plots/test_plot_Soares.py
-
-$ cd ../
-
-```
-
-The subfolder TurbulenceConvection/tests/les_data contains several netCDF files. These are reduced data files from the stats files of pycles
-in which only the relevant data is saved. The code "reduce_pycles_netcdf.py" reduces pycles files given the input location of a pycles file.
-
+Upon running a particular experiment (described above), comparison plots (against [SCAMPy](https://github.com/CliMA/SCAMPy)) are automatically generated in, for example, `Output.Bomex.01/stats/comparison/`.
 
