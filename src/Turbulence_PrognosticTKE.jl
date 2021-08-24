@@ -417,14 +417,18 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         T_cut = cut(self.EnvVar.T.values, grid, k)
         QT_cut = cut(self.EnvVar.QT.values, grid, k)
         QL_cut = cut(self.EnvVar.QL.values, grid, k)
-        thv_cut = theta_virt_c.(p0_cut, T_cut, QT_cut, QL_cut)
+        #TODO  assumes no ice
+        pp_cut = TD.PhasePartition(QT_cut, QL_cut, 0.0)
+        rho_cut = TD.air_density(param_set, T_cut, p0_cut, pp_cut)
+        thv_cut = TD.virtual_pottemp(param_set, T_cut, rho_cut, pp_cut)
         grad_thv = c∇(thv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
 
         p0_k = ref_state.p0_half[k]
         T_k = self.EnvVar.T.values[k]
         QT_k = self.EnvVar.QT.values[k]
         QL_k = self.EnvVar.QL.values[k]
-        thv = theta_virt_c(p0_k, T_k, QT_k, QL_k)
+        pp_k = TD.PhasePartition(QT_k, QL_k, 0.0)
+        thv = TD.virtual_pottemp(param_set, T_k, p0_k, pp_k)
 
         # Effective static stability using environmental mean.
         # Set lambda for now to environmental cloud_fraction (TBD: Rain)
