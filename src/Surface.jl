@@ -251,7 +251,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
     self.rho_qtflux = -self.ch * self.windspeed * (GMV.QT.values[kc_surf] - self.qsurface) * self.Ref.rho0[kf_surf]
     self.lhf = lv * 0.0
 
-    self.shf = TD.cp_m(param_set) * self.rho_hflux
+    self.shf = TD.cp_m(param_set, typeof(g)) * self.rho_hflux
 
     self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, GMV.T.values[kc_surf], 0.0, self.Ref.alpha0[kf_surf])
     self.ustar = sqrt(self.cm) * self.windspeed

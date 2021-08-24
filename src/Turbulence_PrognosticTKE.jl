@@ -417,24 +417,13 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         T_cut = cut(self.EnvVar.T.values, grid, k)
         QT_cut = cut(self.EnvVar.QT.values, grid, k)
         QL_cut = cut(self.EnvVar.QL.values, grid, k)
+        #TODO  assumes no ice
+        QI_cut = QL_cut .* 0.0
 
-        #thv_cut = similar(typeof(QT_cut))
-        thv_cut = QT_cut .* 0.0
-        for (it, val) in enumerate(QT_cut)
-            #TODO  assumes no ice
-            pp_cut = TD.PhasePartition(QT_cut[it], QL_cut[it], 0.0)
-            rho_cut = TD.air_density(param_set, T_cut[it], p0_cut[it], pp_cut)
-            thv_cut[it] = TD.virtual_pottemp(param_set, T_cut[it], rho_cut, pp_cut)
-        end
-
-        println("----------------------")
-        println(QT_cut)
-        println(thv_cut)
-        println(typeof(QT_cut))
-        println(typeof(thv_cut))
-
+        pp_cut = TD.PhasePartition.(QT_cut, QL_cut, QI_cut)
+        rho_cut = TD.air_density.(param_set, T_cut, p0_cut, pp_cut)
+        thv_cut = TD.virtual_pottemp.(param_set, T_cut, rho_cut, pp_cut)
         grad_thv = c∇(thv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
-        println("----------------------")
 
         p0_k = ref_state.p0_half[k]
         T_k = self.EnvVar.T.values[k]
