@@ -1,9 +1,9 @@
 
 function buoyancy_flux(param_set, shf, lhf, T_b, qt_b, alpha0_0)
     g = CPP.grav(param_set)
-    cp_ = cpm_c(qt_b)
+    cp = TD.cp_m(param_set, TD.PhasePartition(qt_b, 0.0, 0.0))
     lv = TD.latent_heat_vapor(param_set, T_b)
-    return (g * alpha0_0 / cp_ / T_b * (shf + (eps_vi - 1.0) * cp_ * T_b * lhf / lv))
+    return (g * alpha0_0 / cp / T_b * (shf + (eps_vi - 1.0) * cp * T_b * lhf / lv))
 end
 
 function psi_m_unstable(zeta, zeta0)

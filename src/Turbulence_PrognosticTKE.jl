@@ -343,7 +343,8 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         qt_cloudy = self.EnvThermo.qt_cloudy[k]
         th_cloudy = self.EnvThermo.th_cloudy[k]
         lh = TD.latent_heat_vapor(param_set, t_cloudy)
-        cpm = cpm_c(qt_cloudy) #TODO-AJ
+        #TODO - add ql and qi to cloudy output to better compute cpm here
+        cpm = TD.cp_m(param_set, TD.PhasePartition(qt_cloudy, qt_cloudy - qv_cloudy, 0.0))
 
         QT_cut = cut(self.EnvVar.QT.values, grid, k)
         grad_qt = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
@@ -427,12 +428,15 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
 
         # Effective static stability using environmental mean.
         # Set lambda for now to environmental cloud_fraction (TBD: Rain)
+        # also TODO - assumes no ice
         grad_th_eff =
             (1.0 - self.EnvVar.cloud_fraction.values[k]) * grad_thv +
             self.EnvVar.cloud_fraction.values[k] * (
                 1.0 / exp(
-                    -TD.latent_heat_vapor(param_set, self.EnvVar.T.values[k]) * self.EnvVar.QL.values[k] / cpm_c(self.EnvVar.QT.values[k]) /
-                    self.EnvVar.T.values[k],
+                    -TD.latent_heat_vapor(param_set, self.EnvVar.T.values[k]) *
+                     self.EnvVar.QL.values[k] /
+                     TD.cp_m(param_set, TD.PhasePartition(self.EnvVar.QT.values[k], self.EnvVar.QL.values[k], 0.0)) /
+                     self.EnvVar.T.values[k],
                 ) * (
                     (1.0 + (eps_vi - 1.0) * self.EnvVar.QT.values[k]) * grad_thl +
                     (eps_vi - 1.0) * self.EnvVar.H.values[k] * grad_qt
@@ -1423,8 +1427,10 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
         qv_cloudy = self.EnvThermo.qv_cloudy[k]
         qt_cloudy = self.EnvThermo.qt_cloudy[k]
         th_cloudy = self.EnvThermo.th_cloudy[k]
-        lh = TD.latent_heat_vapor(param_set, t_cloudy)
-        cpm = cpm_c(qt_cloudy)
+
+        lh = TD.latent_heat_vapor(param_set, t_cloudy)        # TODO pass in phase partition for cloudy conditions
+        cpm = TD.cp_m(param_set, TD.PhasePartition(qt_cloudy, qt_cloudy-qv_cloudy, 0.0))
+
         grad_thl_minus = grad_thl_plus
         grad_qt_minus = grad_qt_plus
         grad_thl_plus = (self.EnvVar.H.values[k + 1] - self.EnvVar.H.values[k]) * grid.dzi

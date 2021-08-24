@@ -39,12 +39,14 @@ function update(self::SurfaceBase{SurfaceFixedFlux}, GMV::GridMeanVariables)
 
     kc_surf = kc_surface(self.Gr)
     kf_surf = kf_surface(self.Gr)
-    rho_tflux = self.shf / (cpm_c(self.qsurface))
+
+    pp = TD.PhasePartition(self.qsurface, 0.0, 0.0)
+
+    rho_tflux = self.shf / TD.cp_m(param_set, pp)
 
     self.windspeed = sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf])
     self.rho_qtflux = self.lhf / (TD.latent_heat_vapor(param_set, self.Tsurface))
 
-    pp = TD.PhasePartition(GMV.QT.values[kc_surf], 0.0, 0.0)
 
     self.rho_hflux = rho_tflux / TD.exner_given_pressure(param_set, self.Ref.Pg, pp)
     self.bflux = buoyancy_flux(
@@ -110,18 +112,22 @@ function update(self::SurfaceBase{SurfaceFixedCoeffs}, GMV::GridMeanVariables)
 
     kc_surf = kc_surface(self.Gr)
     kf_surf = kf_surface(self.Gr)
+
+    pp = TD.PhasePartition(self.qsurface, 0.0, 0.0)
+
     windspeed =
         max(sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf]), 0.01)
-    cp_ = cpm_c(GMV.QT.values[kc_surf])
-    lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
+
+    # TODO - they should be averaged over the levels?
+    cpm = TD.cp_m(param_set, pp)
+    lv = TD.latent_heat_vapor(param_set, self.Tsurface)
 
     self.rho_qtflux = -self.cq * windspeed * (GMV.QT.values[kc_surf] - self.qsurface) * self.Ref.rho0[kf_surf]
     self.lhf = lv * self.rho_qtflux
 
-    pp = TD.PhasePartition(GMV.QT.values[kc_surf], 0.0, 0.0)
     self.rho_hflux =
         -self.ch * windspeed * (GMV.H.values[kc_surf] - self.Tsurface / TD.exner_given_pressure(param_set, self.Ref.Pg, pp)) * self.Ref.rho0[kf_surf]
-    self.shf = cp_ * self.rho_hflux
+    self.shf = cpm * self.rho_hflux
 
     self.bflux = buoyancy_flux(
         param_set,
@@ -184,7 +190,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
     self.rho_qtflux = -self.ch * self.windspeed * (GMV.QT.values[kc_surf] - self.qsurface) * self.Ref.rho0[kf_surf]
     self.lhf = lv * self.rho_qtflux
 
-    self.shf = cpm_c(GMV.QT.values[kc_surf]) * self.rho_hflux
+    self.shf = TD.cp_m(param_set, TD.PhasePartition(GMV.QT.values[kc_surf], 0.0, 0.0)) * self.rho_hflux
 
     self.bflux = buoyancy_flux(
         param_set,
@@ -245,7 +251,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
     self.rho_qtflux = -self.ch * self.windspeed * (GMV.QT.values[kc_surf] - self.qsurface) * self.Ref.rho0[kf_surf]
     self.lhf = lv * 0.0
 
-    self.shf = cpm_c(0.0) * self.rho_hflux
+    self.shf = TD.cp_m(param_set) * self.rho_hflux
 
     self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, GMV.T.values[kc_surf], 0.0, self.Ref.alpha0[kf_surf])
     self.ustar = sqrt(self.cm) * self.windspeed
@@ -301,7 +307,7 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
     self.rho_qtflux = -self.ch * self.windspeed * (GMV.QT.values[kc_surf] - self.qsurface) * self.Ref.rho0[kf_surf]
     self.lhf = lv * self.rho_qtflux
 
-    self.shf = cpm_c(GMV.QT.values[kc_surf]) * self.rho_hflux
+    self.shf = TD.cp_m(param_set, TD.PhasePartition(GMV.QT.values[kc_surf], 0.0, 0.0)) * self.rho_hflux
 
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,

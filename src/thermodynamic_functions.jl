@@ -36,10 +36,6 @@ function theta_rho_c(p0, T, qt, qv)
     return density_temperature_c(T, qt, qv) / exner
 end
 
-function cpm_c(qt)
-    return (1.0 - qt) * cpd + qt * cpv
-end
-
 function buoyancy_c(param_set, rho0, rho)
     g = CPP.grav(param_set)
     return g * (rho0 - rho) / rho0

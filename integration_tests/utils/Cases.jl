@@ -14,10 +14,9 @@ import ..TurbulenceConvection
 using ..TurbulenceConvection: eps_vi
 using ..TurbulenceConvection: eps_v
 using ..TurbulenceConvection: omega
+using ..TurbulenceConvection: p_tilde
 using ..TurbulenceConvection: theta_rho_c
 using ..TurbulenceConvection: buoyancy_c
-using ..TurbulenceConvection: cpm_c
-using ..TurbulenceConvection: p_tilde
 
 using ..TurbulenceConvection: satadjust
 
@@ -199,7 +198,7 @@ function initialize_surface(self::CasesBase{SoaresCase}, Gr::Grid, Ref::Referenc
     qt_flux = 2.5e-5
     theta_surface = self.Sur.Tsurface
     self.Sur.lhf = qt_flux * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(param_set, self.Sur.Tsurface) # It would be 0.0 if we follow Nieuwstadt.
-    self.Sur.shf = theta_flux * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
+    self.Sur.shf = theta_flux * TD.cp_m(param_set, TD.PhasePartition(self.Sur.qsurface, 0.0, 0.0)) * TC.surface_value(Ref.rho0, Gr)
     self.Sur.ustar_fixed = false
     self.Sur.ustar = 0.28 # just to initilize grid mean covariances
     self.Sur.Gr = Gr
@@ -299,7 +298,7 @@ function initialize_surface(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::Referenc
     qt_flux = 0.0
     theta_surface = self.Sur.Tsurface
     self.Sur.lhf = 0.0 # It would be 0.0 if we follow Nieuwstadt.
-    self.Sur.shf = theta_flux * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
+    self.Sur.shf = theta_flux * TD.cp_m(param_set, TD.PhasePartition(self.Sur.qsurface, 0.0, 0.0)) * TC.surface_value(Ref.rho0, Gr)
     self.Sur.ustar_fixed = false
     self.Sur.ustar = 0.28 # just to initilize grid mean covariances
     self.Sur.Gr = Gr
@@ -427,7 +426,7 @@ function initialize_surface(self::CasesBase{BomexCase}, Gr::Grid, Ref::Reference
     self.Sur.Tsurface = 299.1 * TD.exner_given_pressure(param_set, Ref.Pg, pp)
 
     self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(param_set, self.Sur.Tsurface)
-    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
+    self.Sur.shf = 8.0e-3 * TD.cp_m(param_set, TD.PhasePartition(self.Sur.qsurface, 0.0, 0.0)) * TC.surface_value(Ref.rho0, Gr)
 
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # m/s
@@ -583,7 +582,7 @@ function initialize_surface(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::
 
     self.Sur.Tsurface = 299.1 * TD.exner_given_pressure(param_set, Ref.Pg, pp)
     self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(param_set, self.Sur.Tsurface)
-    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
+    self.Sur.shf = 8.0e-3 * TD.cp_m(param_set, pp) * TC.surface_value(Ref.rho0, Gr)
     self.lhf0 = self.Sur.lhf
     self.shf0 = self.Sur.shf
     self.Sur.ustar_fixed = true
@@ -929,7 +928,7 @@ function initialize_surface(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
     pp = TD.PhasePartition(self.Sur.qsurface, 0.0, 0.0)
     self.Sur.Tsurface = (273.15 + 23) * TD.exner_given_pressure(param_set, Ref.Pg, pp)
     self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(param_set, self.Sur.Tsurface)
-    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
+    self.Sur.shf = 8.0e-3 * TD.cp_m(param_set, pp) * TC.surface_value(Ref.rho0, Gr)
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
     self.Sur.Gr = Gr
@@ -1590,11 +1589,11 @@ function initialize_surface(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::Referen
     self.Sur.qsurface = 13.84e-3 # kg/kg  # TODO - taken from Pycles, maybe it would be better to calculate the q_star(sst) for TurbulenceConvection?
     #density_surface  = 1.22     # kg/m^3
 
-    # buoyancy flux
-    theta_flux = self.Sur.shf / cpm_c(self.Sur.qsurface) / TC.surface_value(Ref.rho0, Gr)
-    qt_flux = self.Sur.lhf / TD.latent_heat_vapor(param_set, self.Sur.Tsurface) / TC.surface_value(Ref.rho0, Gr)
-
     pp = TD.PhasePartition(self.Sur.qsurface)
+
+    # buoyancy flux
+    theta_flux = self.Sur.shf / TD.cp_m(param_set, pp) / TC.surface_value(Ref.rho0, Gr)
+    qt_flux = self.Sur.lhf / TD.latent_heat_vapor(param_set, self.Sur.Tsurface) / TC.surface_value(Ref.rho0, Gr)
 
     theta_surface = self.Sur.Tsurface / TD.exner_given_pressure(param_set, Ref.Pg, pp)
     self.Sur.bflux =
@@ -1967,10 +1966,13 @@ function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMean
 end
 
 function initialize_surface(self::CasesBase{DryBubble}, Gr::Grid, Ref::ReferenceState)
+
+    param_set = TC.parameter_set(Ref)
+
     self.Sur.Gr = Gr
     self.Sur.Ref = Ref
     self.Sur.qsurface = 1.0e-5
-    self.Sur.shf = 8.0e-3 * cpm_c(self.Sur.qsurface) * TC.surface_value(Ref.rho0, Gr)
+    self.Sur.shf = 8.0e-3 * TD.cp_m(param_set, TD.PhasePartition(self.Sur.qsurface, 0.0, 0.0)) * TC.surface_value(Ref.rho0, Gr)
     initialize(self.Sur)
 end
 
