@@ -691,9 +691,6 @@ Base.@kwdef mutable struct ForcingBase{T}
     coriolis_param::Float64 = 0
     ug::AbstractArray{Float64, 1} = zeros(1)
     vg::AbstractArray{Float64, 1} = zeros(1)
-    # (*convert_forcing_prog_fp)(p0, qt, qv, T,::Float64
-    #                                   qt_tendency, T_tendency) ::Float64
-    convert_forcing_prog_fp::Function = x -> x
     Gr::Grid
     Ref::ReferenceState
 end
@@ -701,7 +698,6 @@ end
 Base.@kwdef mutable struct RadiationBase{T}
     dTdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection temperature tendency
     dqtdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection moisture tendency
-    convert_forcing_prog_fp::Function = x -> x
     Gr::Grid
     Ref::ReferenceState
     divergence::Float64 = 0
