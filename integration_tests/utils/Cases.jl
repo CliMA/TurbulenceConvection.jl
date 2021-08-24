@@ -444,7 +444,7 @@ function initialize_forcing(self::CasesBase{BomexCase}, Gr::Grid, Ref::Reference
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
 
-    param_set = parameter_set(Ref)
+    param_set = TC.parameter_set(Ref)
 
     initialize(self.Fo, GMV)
 
