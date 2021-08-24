@@ -17,11 +17,6 @@ const beta_m = 4.8
 const beta_h = 6.5 # beta_h = beta_m / Pr0
 const gamma_m = 15.0
 const gamma_h = 9.0
-# constants defined in Stevens et al 2005 (that are different from TurbulenceConvection)
-# needed for DYCOMS case setup
-const dycoms_cp = 1015.0
-const dycoms_L = 2.47 * 1e6
-const dycoms_Rd = 287.0
 # CLIMA microphysics parameters
 const rho_cloud_liq = 1e3
 const nu_air = 1.6e-5
