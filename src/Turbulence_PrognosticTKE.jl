@@ -903,7 +903,8 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
             a_kfull = interpc2f(self.UpdVar.Area.values, grid, k, i)
             if a_kfull > 0.0
                 b_kfull = interpc2f(self.UpdVar.B.values, grid, k, i)
-                ∇w_up = ∇f2c(self.UpdVar.W.values, grid, k, i)
+                w_dual = dual_faces(self.UpdVar.W.values, grid, k, i)
+                ∇w_up = ∇f2c(w_dual, grid, k; bottom = SetValue(0), top = SetGradient(0))
                 asp_ratio = 1.0
                 self.nh_pressure_b[i, k], self.nh_pressure_adv[i, k], self.nh_pressure_drag[i, k] =
                     perturbation_pressure(
