@@ -13,12 +13,6 @@ struct SetGradient{FT}
 end
 struct Extrapolate end
 
-function ∇f2c(f, grid::Grid, k::Int)
-    return (f[k] - f[k - 1]) * grid.dzi
-end
-function ∇f2c(f, grid::Grid, k::Int, i::Int)
-    return (f[i, k] - f[i, k - 1]) * grid.dzi
-end
 function ∇f2c(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
     if is_surface_face(grid, k - 1)
         return ∇f2c(f_dual, grid, BottomBCTag(), bottom)
@@ -31,7 +25,7 @@ end
 ∇f2c(f::SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
 ∇f2c(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * grid.dzi
 ∇f2c(f::SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
-∇f2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[2] - bc.value) * grid.dzi
+∇f2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[1] - bc.value) * grid.dzi
 ∇f2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
 function ∇c2f(f, grid::Grid, k::Int)
