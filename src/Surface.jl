@@ -9,8 +9,7 @@ function free_convection_windspeed(self::SurfaceBase, GMV::GridMeanVariables, ::
     # Need to get theta_rho
     @inbounds for k in center_indicies(self.Gr)
         pp = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0)
-        qv = TD.vapor_specific_humidity(pp)
-        theta_rho[k] = theta_rho_c(self.Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
+        theta_rho[k] = TD.virtual_pottemp(param_set, GMV.T.values[k], self.Ref.rho0_half[k], pp)
     end
     zi = get_inversion(param_set, theta_rho, GMV.U.values, GMV.V.values, self.Gr, self.Ri_bulk_crit)
     wstar = get_wstar(self.bflux, zi) # yair here zi in TRMM should be adjusted
@@ -165,15 +164,22 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
 
     kc_surf = kc_surface(self.Gr)
     kf_surf = kf_surface(self.Gr)
+
     pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
-    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.Ref.rho0[kf_surf], pvg)
+    pp = TD.PhasePartition(self.qsurface, 0.0, 0.0)
+    Rm = TD.gas_constant_air(param_set, pp)
+    # TODO consider adding this to Ref
+    rhog = self.Ref.Pg / Rm / self.Ref.Tg
+
+    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, rhog, pvg)
 
     zb = self.Gr.z_half[kc_surf]
-    theta_rho_g = theta_rho_c(self.Ref.Pg, self.Tsurface, self.qsurface, self.qsurface)
-    theta_rho_b = theta_rho_c(self.Ref.p0_half[kc_surf], GMV.T.values[kc_surf], self.qsurface, self.qsurface)
+
+    theta_rho_g = TD.virtual_pottemp(param_set, self.Tsurface, rhog, pp)
+    theta_rho_b = TD.virtual_pottemp(param_set, GMV.T.values[kc_surf], self.Ref.rho0_half[kc_surf], pp)
+
     lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
 
-    pp = TD.PhasePartition(self.qsurface, 0.0, 0.0)
     h_star = TD.liquid_ice_pottemp_given_pressure(param_set, self.Tsurface, self.Ref.Pg, pp)
 
     self.windspeed = sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf])
@@ -227,14 +233,18 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
     kf_surf = kf_surface(self.Gr)
     zb = self.Gr.z_half[kc_surf]
 
-    pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
-    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.Ref.rho0[kf_surf], pvg)
+    pp = TD.PhasePartition(self.qsurface, 0.0, 0.0)
+    Rm = TD.gas_constant_air(param_set, pp)
+    # TODO consider adding this to Ref
+    rhog = self.Ref.Pg / Rm / self.Ref.Tg
 
-    theta_rho_g = theta_rho_c(self.Ref.Pg, self.Tsurface, self.qsurface, self.qsurface)
-    theta_rho_b = theta_rho_c(self.Ref.p0_half[kc_surf], GMV.T.values[kc_surf], self.qsurface, self.qsurface)
+    pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
+    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface,  rhog, pvg)
+
+    theta_rho_g = TD.virtual_pottemp(param_set, self.Tsurface, rhog, pp)
+    theta_rho_b = TD.virtual_pottemp(param_set, GMV.T.values[kc_surf], self.Ref.rho0_half[kc_surf], pp)
     lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
 
-    pp = TD.PhasePartition(self.qsurface, 0.0, 0.0)
     h_star = TD.liquid_ice_pottemp_given_pressure(param_set, self.Tsurface, self.Ref.Pg, pp)
 
     self.windspeed = sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf])
@@ -278,19 +288,22 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
     kc_surf = kc_surface(self.Gr)
     kf_surf = kf_surface(self.Gr)
     zb = self.Gr.z_half[kc_surf]
-    theta_rho_g = theta_rho_c(self.Ref.Pg, self.Tsurface, self.qsurface, self.qsurface)
-    theta_rho_b = theta_rho_c(self.Ref.p0_half[kc_surf], GMV.T.values[kc_surf], self.qsurface, self.qsurface)
+
+    pp = TD.PhasePartition(self.qsurface, 0.0, 0.0)
+    Rm = TD.gas_constant_air(param_set, pp)
+    # TODO consider adding this to Ref
+    rhog = self.Ref.Pg / Rm / self.Ref.Tg
+
+    theta_rho_g = TD.virtual_pottemp(param_set, self.Tsurface, rhog, pp)
+    theta_rho_b = TD.virtual_pottemp(param_set, GMV.T.values[kc_surf], self.Ref.rho0_half[kc_surf], pp)
     lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
     T0 = self.Ref.p0_half[kc_surf] * self.Ref.alpha0_half[kc_surf] / Rd
 
     theta_flux = 0.24
-    pp = TD.PhasePartition(self.qsurface, 0.0, 0.0)
     self.bflux = g * theta_flux * TD.exner_given_pressure(param_set, self.Ref.p0_half[kc_surf], pp) / T0
 
     pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
-    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.Ref.rho0[kf_surf], pvg)
-
-    pp = TD.PhasePartition(self.qsurface, 0.0, 0.0)
+    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, rhog, pvg)
     h_star = TD.liquid_ice_pottemp_given_pressure(param_set, self.Tsurface, self.Ref.Pg, pp)
 
     self.windspeed = sqrt(GMV.U.values[kc_surf] * GMV.U.values[kc_surf] + GMV.V.values[kc_surf] * GMV.V.values[kc_surf])

@@ -2276,8 +2276,7 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
 
     @inbounds for k in real_center_indicies(self.Gr)
         pp = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0)
-        qv = TD.vapor_specific_humidity(pp)
-        theta_rho[k] = theta_rho_c(self.Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
+        theta_rho[k] = TD.virtual_pottemp(param_set, GMV.T.values[k], self.Ref.rho0_half[k], pp)
     end
 
 

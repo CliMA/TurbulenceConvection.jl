@@ -15,7 +15,6 @@ using ..TurbulenceConvection: eps_vi
 using ..TurbulenceConvection: eps_v
 using ..TurbulenceConvection: omega
 using ..TurbulenceConvection: p_tilde
-using ..TurbulenceConvection: theta_rho_c
 using ..TurbulenceConvection: buoyancy_c
 
 using ..TurbulenceConvection: satadjust
@@ -911,7 +910,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
 
         GMV.H.values[k] = TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], Ref.p0_half[k], pp)
 
-        theta_rho[k] = theta_rho_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
+        theta_rho[k] = TD.virtual_pottemp(param_set, GMV.T.values[k], Ref.rho0_half[k], pp)
     end
 
     set_bcs(GMV.QT, Gr)
