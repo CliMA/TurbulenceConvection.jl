@@ -98,10 +98,12 @@ function initialize(self::SurfaceBase{SurfaceFixedCoeffs})
     pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
     pdg = self.Ref.Pg - pvg
 
-    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.Ref.rho0[kf_surf], pvg)
-    #                                                                        TODO - what rho should I have
+    pp = TD.PhasePartition(self.qsurface, 0.0, 0.0)
+    Rm = TD.gas_constant_air(param_set, pp)
+    # TODO consider adding this to Ref
+    rhog = self.Ref.Pg / Rm / self.Ref.Tg
 
-    self.s_surface = (1.0 - self.qsurface) * sd_c(pdg, self.Tsurface) + self.qsurface * sv_c(pvg, self.Tsurface)
+    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, rhog, pvg)
     return
 end
 
