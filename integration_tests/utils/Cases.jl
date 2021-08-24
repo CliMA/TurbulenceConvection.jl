@@ -14,16 +14,15 @@ using ..TurbulenceConvection: omega
 using ..TurbulenceConvection: pyinterp
 using ..TurbulenceConvection: eps_vi
 using ..TurbulenceConvection: thetali_c
+using ..TurbulenceConvection: eos
 using ..TurbulenceConvection: theta_rho_c
 using ..TurbulenceConvection: eps_v
+using ..TurbulenceConvection: cpd
 using ..TurbulenceConvection: pv_star
 using ..TurbulenceConvection: buoyancy_c
-using ..TurbulenceConvection: dycoms_L
 using ..TurbulenceConvection: qv_star_c
 using ..TurbulenceConvection: t_to_thetali_c
 using ..TurbulenceConvection: rho_c
-using ..TurbulenceConvection: dycoms_Rd
-using ..TurbulenceConvection: dycoms_cp
 using ..TurbulenceConvection: add_ts
 using ..TurbulenceConvection: update
 using ..TurbulenceConvection: write_ts
@@ -1354,62 +1353,8 @@ function initialize_reference(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::Refer
     Ref.Pg = 1017.8 * 100.0
     Ref.qtg = 9.0 / 1000.0
     # Use an exner function with values for Rd, and cp given in Stevens 2005 to compute temperature
-    Ref.Tg = 289.0 * exner_c(Ref.Pg; kappa = dycoms_Rd / dycoms_cp)
+    Ref.Tg = 289.0 * exner_c(Ref.Pg)
     initialize(Ref, Gr, Stats)
-end
-# helper function
-"""
-Compute thetal using constants from Stevens et al 2005 DYCOMS case.
-:param p: pressure [Pa]
-:param T: temperature [K]
-:param ql: liquid water specific humidity
-:return: theta l
-"""
-function dycoms_compute_thetal(self::CasesBase{DYCOMS_RF01}, p_, T_, ql_)
-    theta_ = T_ / exner_c(p_, kappa = dycoms_Rd / dycoms_cp)
-    return theta_ * exp(-1.0 * dycoms_L * ql_ / (dycoms_cp * T_))
-end
-# helper function
-"""
-Use saturation adjustment scheme to compute temperature and ql given thetal and qt.
-We can"t use the default TurbulenceConvection function because of different values of cp, Rd and L
-:param p: pressure [Pa]
-:param thetal: liquid water potential temperature  [K]
-:param qt:  total water specific humidity
-:return: T, ql
-"""
-function dycoms_sat_adjst(self::CasesBase{DYCOMS_RF01}, p_, thetal_, qt_)
-    #Compute temperature
-    t_1 = thetal_ * exner_c(p_, kappa = dycoms_Rd / dycoms_cp)
-    #Compute saturation vapor pressure
-    pv_star_1 = pv_star(t_1)
-    #Compute saturation specific humidity
-    qs_1 = qv_star_c(p_, qt_, pv_star_1)
-
-    if qt_ <= qs_1
-        #If not saturated return temperature and ql = 0.0
-        return t_1, 0.0
-    else
-        ql_1 = qt_ - qs_1
-        f_1 = thetal_ - dycoms_compute_thetal(self, p_, t_1, ql_1)
-        t_2 = t_1 + dycoms_L * ql_1 / dycoms_cp
-        pv_star_2 = pv_star(t_2)
-        qs_2 = qv_star_c(p_, qt_, pv_star_2)
-        ql_2 = qt_ - qs_2
-
-        while abs(t_2 - t_1) >= 1e-9
-            pv_star_2 = pv_star(t_2)
-            qs_2 = qv_star_c(p_, qt_, pv_star_2)
-            ql_2 = qt_ - qs_2
-            f_2 = thetal_ - dycoms_compute_thetal(self, p_, t_2, ql_2)
-            t_n = t_2 - f_2 * (t_2 - t_1) / (f_2 - f_1)
-            t_1 = t_2
-            t_2 = t_n
-            f_1 = f_2
-        end
-
-        return t_2, ql_2
-    end
 end
 
 function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
@@ -1435,14 +1380,9 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
             GMV.QT.values[k] = 1.5 / 1000.0
         end
 
-        # ql and T profile
-        # (calculated by saturation adjustment using thetal and qt values provided in DYCOMS
-        # and using Rd, cp and L constants as defined in DYCOMS)
-        GMV.T.values[k], GMV.QL.values[k] = dycoms_sat_adjst(self, Ref.p0_half[k], thetal[k], GMV.QT.values[k])
-
-        # thermodynamic variable profile (either entropy or thetal)
-        # (calculated based on T and ql profiles.
-        # Here we use Rd, cp and L constants as defined in TurbulenceConvection)
+        sa = eos(Ref.p0_half[k], GMV.QT.values[k], thetal[k])
+        GMV.QL.values[k] = sa.ql
+        GMV.T.values[k] = sa.T
         GMV.H.values[k] = t_to_thetali_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], GMV.QL.values[k], qi)
 
 
