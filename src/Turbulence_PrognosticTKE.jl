@@ -345,7 +345,9 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         grad_thl = c∇(THL_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
 
         # g/theta_ref
-        prefactor = g * (Rd / ref_state.alpha0_half[k] / ref_state.p0_half[k]) * exner_c(ref_state.p0_half[k])
+        phase_part = TD.PhasePartition(qt_cloudy, self.EnvVar.QL.values[k], 0.0)
+        Π = TD.exner_given_pressure(param_set, ref_state.p0_half[k], phase_part)
+        prefactor = g * (Rd / ref_state.alpha0_half[k] / ref_state.p0_half[k]) * Π
         d_buoy_thetal_dry = prefactor * (1.0 + (eps_vi - 1.0) * qt_dry)
         d_buoy_qt_dry = prefactor * th_dry * (eps_vi - 1.0)
 
@@ -993,6 +995,7 @@ end
 
 function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::TimeStepping)
     grid = get_grid(self)
+    param_set = parameter_set(GMV)
     ref_state = reference_state(self)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -1414,7 +1417,10 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
         grad_qt_minus = grad_qt_plus
         grad_thl_plus = (self.EnvVar.H.values[k + 1] - self.EnvVar.H.values[k]) * grid.dzi
         grad_qt_plus = (self.EnvVar.QT.values[k + 1] - self.EnvVar.QT.values[k]) * grid.dzi
-        prefactor = Rd * exner_c(ref_state.p0_half[k]) / ref_state.p0_half[k]
+        #DOTO add ice
+        phase_part = TD.PhasePartition(qt_cloudy, self.EnvVar.QL.values[k], 0.0)
+        Π = TD.exner_given_pressure(param_set, ref_state.p0_half[k], phase_part)
+        prefactor = Rd * Π / ref_state.p0_half[k]
         d_alpha_thetal_dry = prefactor * (1.0 + (eps_vi - 1.0) * qt_dry)
         d_alpha_qt_dry = prefactor * th_dry * (eps_vi - 1.0)
 
