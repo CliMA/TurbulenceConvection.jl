@@ -51,9 +51,9 @@ function eos(param_set, p0, qt, prog)
 
     pv_1 = p0 * eps_vi * qt / (1.0 - qt + eps_vi * qt)
     pd_1 = p0 - pv_1
-    T_1 = prog * exner_c(pd_1 + pv_1)
-    # pp = TD.PhasePartition(qt, 0.0, 0.0) # first assumption is dry air
-    # T_1 = prog * TD.exner_given_pressure(param_set, p0, pp)
+    # In the original version a completly dry (qt=0) is set - changing this effect the results!
+    pp = TD.PhasePartition(0.0, 0.0, 0.0) 
+    T_1 = prog * TD.exner_given_pressure(param_set, pd_1 + pv_1, pp)
     pv_star_1 = 6.1094 * exp((17.625 * (T_1 - 273.15)) / float((T_1 - 273.15) + 243.04)) * 100
     qv_star_1 = eps_v * (1.0 - qt) * pv_star_1 / (p0 - pv_star_1)
 
