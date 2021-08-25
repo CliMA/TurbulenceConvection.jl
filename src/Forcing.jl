@@ -40,6 +40,7 @@ initialize(self::ForcingBase{ForcingStandard}, GMV) = initialize(self, GMV, Forc
 
 function update(self::ForcingBase{ForcingStandard}, GMV::GridMeanVariables)
     param_set = parameter_set(GMV)
+    grid = self.Gr
     @inbounds for k in real_center_indicies(grid)
         # Apply large-scale horizontal advection tendencies
         phase_part = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0) # DOTO add QI
