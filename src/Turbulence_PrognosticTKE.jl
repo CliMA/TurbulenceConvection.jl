@@ -329,7 +329,9 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         qv_cloudy = self.EnvThermo.qv_cloudy[k]
         qt_cloudy = self.EnvThermo.qt_cloudy[k]
         th_cloudy = self.EnvThermo.th_cloudy[k]
-
+        ts_cloudy = TD.PhaseEquil_pθq(param_set, ref_state.p0[k], th_cloudy, qt_cloudy)
+        lh = TD.latent_heat_vapor(param_set, t_cloudy)
+        cpm = TD.cp_m(ts_cloudy)
         QT_cut = cut(self.EnvVar.QT.values, grid, k)
         ∂qt∂z = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         THL_cut = cut(self.EnvVar.H.values, grid, k)
