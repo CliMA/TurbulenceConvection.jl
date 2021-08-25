@@ -108,6 +108,8 @@ Base.@kwdef struct MinDisspLen{FT, T}
     ustar::FT
     "turbulent Prandtl number"
     Pr::FT
+    "reference pressure"
+    p0::FT
     "partial change in buoyancy due to θl changes"
     ∂b∂z_θl::FT
     "env shear"

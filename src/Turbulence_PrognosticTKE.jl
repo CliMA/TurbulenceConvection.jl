@@ -329,7 +329,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         qv_cloudy = self.EnvThermo.qv_cloudy[k]
         qt_cloudy = self.EnvThermo.qt_cloudy[k]
         th_cloudy = self.EnvThermo.th_cloudy[k]
-        ts_cloudy = TD.PhaseEquil_pθq(param_set, ref_state.p0[k], th_cloudy, qt_cloudy)
+        ts_cloudy = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], th_cloudy, qt_cloudy)
         lh = TD.latent_heat_vapor(param_set, t_cloudy)
         cpm = TD.cp_m(ts_cloudy)
         QT_cut = cut(self.EnvVar.QT.values, grid, k)
@@ -384,6 +384,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
             tke_surf = self.EnvVar.TKE.values[kc_surf],
             ustar = ustar,
             Pr = self.prandtl_nvec[k],
+            p0 = ref_state.p0_half[k],
             ∂b∂z_θl = ∂b∂z_θl,
             Shear² = Shear²,
             ∂b∂z_qt = ∂b∂z_qt,
@@ -1377,7 +1378,7 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
         d_alpha_qt_dry = prefactor * th_dry * (eps_vi - 1.0)
 
         if self.EnvVar.cloud_fraction.values[k] > 0.0
-            ts_cloudy = TD.PhaseEquil_pθq(param_set, ref_state.p0[k], th_cloudy, qt_cloudy)
+            ts_cloudy = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], th_cloudy, qt_cloudy)
             lh = TD.latent_heat_vapor(param_set, t_cloudy)
             cpm = TD.cp_m(ts_cloudy)
             d_alpha_thetal_cloudy = (
