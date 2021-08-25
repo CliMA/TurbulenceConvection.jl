@@ -8,7 +8,7 @@ function free_convection_windspeed(self::SurfaceBase, GMV::GridMeanVariables, ::
     # Need to get theta_rho
     @inbounds for k in center_indicies(self.Gr)
         qv = GMV.QT.values[k] - GMV.QL.values[k]
-        theta_rho[k] = theta_rho_c(self.Ref.p0_half[kf_surf], GMV.T.values[k], GMV.QT.values[k], qv)
+        theta_rho[k] = theta_rho_c(self.Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
     end
     zi = get_inversion(param_set, theta_rho, GMV.U.values, GMV.V.values, self.Gr, self.Ri_bulk_crit)
     wstar = get_wstar(self.bflux, zi) # yair here zi in TRMM should be adjusted
