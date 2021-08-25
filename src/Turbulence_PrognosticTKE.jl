@@ -105,12 +105,12 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     cinterior = grid.cinterior
     finterior = grid.finterior
 
-    mean_entr_sc = center_field(grid)
-    mean_nh_pressure = center_field(grid)
-    mean_nh_pressure_adv = center_field(grid)
-    mean_nh_pressure_drag = center_field(grid)
-    mean_nh_pressure_b = center_field(grid)
+    mean_nh_pressure = face_field(grid)
+    mean_nh_pressure_adv = face_field(grid)
+    mean_nh_pressure_drag = face_field(grid)
+    mean_nh_pressure_b = face_field(grid)
     mean_asp_ratio = center_field(grid)
+    mean_entr_sc = center_field(grid)
     mean_detr_sc = center_field(grid)
     massflux = face_field(grid)
     mf_h = face_field(grid)
