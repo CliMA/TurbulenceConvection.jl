@@ -18,5 +18,7 @@ const APS = CP.AbstractEarthParameterSet
 """ divergence factor for bubble case (zero otherwise) """
 entrainment_massflux_div_factor(ps::APS) = ps.nt.c_div
 entrainment_sigma(ps::APS) = ps.nt.μ
+static_stab_coeff(ps::APS) = ps.nt.c_b
+l_max(ps::APS) = ps.nt.l_max
 
 end
