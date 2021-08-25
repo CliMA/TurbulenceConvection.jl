@@ -2239,35 +2239,37 @@ end
 
 # Update the diagnosis of the inversion height, using the maximum temperature gradient method
 function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, option)
-    theta_rho = center_field(self.Gr)
+    grid = self.Gr
+    theta_rho = center_field(grid)
     ∇θ_liq_max = 0.0
-    kc_surf = kc_surface(self.Gr)
+    kc_surf = kc_surface(grid)
     param_set = parameter_set(GMV)
 
-    @inbounds for k in real_center_indicies(self.Gr)
+    @inbounds for k in real_center_indicies(grid)
         qv = GMV.QT.values[k] - GMV.QL.values[k]
         theta_rho[k] = theta_rho_c(self.Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
     end
 
 
     if option == "theta_rho"
-        @inbounds for k in real_center_indicies(self.Gr)
+        @inbounds for k in real_center_indicies(grid)
             if theta_rho[k] > theta_rho[kc_surf]
-                self.zi = self.Gr.z_half[k]
+                self.zi = grid.z_half[k]
                 break
             end
         end
     elseif option == "thetal_maxgrad"
 
-        @inbounds for k in real_center_indicies(self.Gr)
-            ∇θ_liq = ∇_upwind(GMV.H.values, self.Gr, k)
+        @inbounds for k in real_center_indicies(grid)
+            ∇θ_liq_cut = cut_onesided(GMV.H.values, grid, k)
+            ∇θ_liq = ∇_onesided(∇θ_liq_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
             if ∇θ_liq > ∇θ_liq_max
                 ∇θ_liq_max = ∇θ_liq
-                self.zi = self.Gr.z[k]
+                self.zi = grid.z[k]
             end
         end
     elseif option == "critical_Ri"
-        self.zi = get_inversion(param_set, theta_rho, GMV.U.values, GMV.V.values, self.Gr, Ri_bulk_crit(self))
+        self.zi = get_inversion(param_set, theta_rho, GMV.U.values, GMV.V.values, grid, Ri_bulk_crit(self))
 
     else
         error("INVERSION HEIGHT OPTION NOT RECOGNIZED")

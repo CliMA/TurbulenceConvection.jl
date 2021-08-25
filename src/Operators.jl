@@ -12,6 +12,7 @@ struct SetGradient{FT}
     value::FT
 end
 struct Extrapolate end
+struct FreeBoundary end # when no BC is used (one-sided derivative at surface that takes first and second interior points)
 
 function ∇f2c(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
     if is_surface_face(grid, k - 1)
@@ -28,9 +29,26 @@ end
 ∇f2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[1] - bc.value) * grid.dzi
 ∇f2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
-function ∇c2f(f, grid::Grid, k::Int)
-    return (f[k + 1] - f[k]) * grid.dzi
+function ∇_onesided(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
+    if is_surface_center(grid, k)
+        return ∇_onesided(f_dual, grid, BottomBCTag(), bottom)
+    elseif is_toa_center(grid, k)
+        return ∇_onesided(f_dual, grid, TopBCTag(), top)
+    else
+        return ∇_onesided(f_dual, grid, InteriorTag())
+    end
 end
+∇_onesided(f::SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
+∇_onesided(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.dzi / 2)
+# TODO: this is a crud approximation, as we're specifying what should be the derivative
+# at the boundary, and we're taking this as the derivative at the first interior at the
+# top of the domain.
+∇_onesided(f::SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
+∇_onesided(f::SVector, grid::Grid, ::BottomBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.dzi # don't use BC info
+# TODO: this is a crud approximation, as we're specifying what should be the derivative
+# at the boundary, and we're taking this as the derivative at the first interior at the
+# top of the domain.
+∇_onesided(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
 function ∇_upwind(f, grid::Grid, k::Int)
     return (f[k + 1] - f[k]) * grid.dzi
@@ -139,6 +157,22 @@ function cut(f::AbstractMatrix, grid, k::Int, i_up::Int)
         return SVector(f[i_up, k - 1], f[i_up, k])
     else
         return SVector(f[i_up, k - 1], f[i_up, k], f[i_up, k + 1])
+    end
+end
+
+# A 2-point field stencil for ordinary and updraft variables
+function cut_onesided(f::AbstractVector, grid, k::Int)
+    if is_toa_center(grid, k)
+        return SVector(f[k])
+    else
+        return SVector(f[k], f[k + 1])
+    end
+end
+function cut_onesided(f::AbstractMatrix, grid, k::Int, i_up::Int)
+    if is_toa_center(grid, k)
+        return SVector(f[i_up, k])
+    else
+        return SVector(f[i_up, k], f[i_up, k + 1])
     end
 end
 
