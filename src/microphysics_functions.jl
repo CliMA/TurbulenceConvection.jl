@@ -3,18 +3,21 @@
 Source term for thetal because of qr transitioning between the working fluid and rain
 (simple version to avoid exponents)
 """
-function rain_source_to_thetal(param_set, p0, T, qr)
-    return TD.latent_heat_vapor(param_set, T) * qr / exner_c(p0) / cpd
+function rain_source_to_thetal(param_set, p0, T, qt, ql, qi, qr)
+    phase_part = TD.PhasePartition(qt, ql, qi)
+    Π = TD.exner_given_pressure(param_set, p0, phase_part)
+    return TD.latent_heat_vapor(param_set, T) * qr / Π / cpd
 end
 
 """
 Source term for thetal because of qr transitioning between the working fluid and rain
 (more detailed version, but still ignoring dqt/dqr)
 """
-function rain_source_to_thetal_detailed(param_set, p0, T, qt, ql, qr)
+function rain_source_to_thetal_detailed(param_set, p0, T, qt, ql, qi, qr)
+    phase_part = TD.PhasePartition(qt, ql, qi)
     L = TD.latent_heat_vapor(param_set, T)
-
-    old_source = L * qr / exner_c(p0) / cpd
+    Π = TD.exner_given_pressure(param_set, p0, phase_part)
+    old_source = L * qr / Π / cpd
 
     new_source = old_source / (1 - qt) * exp(-L * ql / T / cpd / (1 - qt))
 
@@ -166,7 +169,8 @@ function microphysics_rain_src(
             _ret.qr_src = 0.0
         end
 
-        _ret.thl_rain_src = rain_source_to_thetal(param_set, p0, T, _ret.qr_src)
+        # DOTO add ice here
+        _ret.thl_rain_src = rain_source_to_thetal(param_set, p0, T, qt, ql, 0.0, _ret.qr_src)
 
     else
         _ret.qr_src = 0.0
