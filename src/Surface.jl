@@ -109,8 +109,7 @@ function update(self::SurfaceBase{SurfaceFixedCoeffs}, GMV::GridMeanVariables)
     self.lhf = lv * self.rho_qtflux
     phase_part = TD.PhasePartition(GMV.QT.values[kc_surf], 0.0, 0.0)
     Π = TD.exner_given_pressure(param_set, self.Ref.p0[kf_surf], phase_part)
-    self.rho_hflux =
-        -self.ch * windspeed * (GMV.H.values[kc_surf] - self.Tsurface / Π) * self.Ref.rho0[kf_surf]
+    self.rho_hflux = -self.ch * windspeed * (GMV.H.values[kc_surf] - self.Tsurface / Π) * self.Ref.rho0[kf_surf]
     self.shf = cp_ * self.rho_hflux
 
     self.bflux = buoyancy_flux(

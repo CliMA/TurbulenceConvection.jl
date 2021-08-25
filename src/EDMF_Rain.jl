@@ -193,7 +193,15 @@ function solve_rain_evap(
         self.rain_evap_source_qt[k] = tmp_evap * RainArea.values[k]
 
         # DOTO add ice
-        rain_source_to_thetal(param_set, self.Ref.p0[k], GMV.T.values[k], GMV.QT.values[k], GMV.QL.values[k], 0.0, -tmp_evap) * RainArea.values[k]
+        rain_source_to_thetal(
+            param_set,
+            self.Ref.p0[k],
+            GMV.T.values[k],
+            GMV.QT.values[k],
+            GMV.QL.values[k],
+            0.0,
+            -tmp_evap,
+        ) * RainArea.values[k]
 
         if flag_evaporate_all
             QR.values[k] = 0.0
