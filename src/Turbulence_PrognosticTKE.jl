@@ -1645,12 +1645,14 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
 
     reset_surface_covariance(self, GMV, Case)
 
+    # grid-mean tke closure over all but z:
+    tke_gm(z) = ws * 1.3 * cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) * sqrt(max(1 - z / zs, 0))
+
 
     if ws > 0.0
         @inbounds for k in center_indicies(grid)
             z = grid.z_half[k]
-            GMV.TKE.values[k] =
-                ws * 1.3 * cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) * sqrt(max(1.0 - z / zs, 0.0))
+            GMV.TKE.values[k] = tke_gm(z)
         end
     end
     # TKE initialization from Beare et al, 2006
@@ -1683,24 +1685,9 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
         @inbounds for k in center_indicies(grid)
             z = grid.z_half[k]
             # need to rethink of how to initilize the covarinace profiles - for now took the TKE profile
-            GMV.Hvar.values[k] =
-                GMV.Hvar.values[kc_surf] *
-                ws *
-                1.3 *
-                cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) *
-                sqrt(max(1.0 - z / zs, 0.0))
-            GMV.QTvar.values[k] =
-                GMV.QTvar.values[kc_surf] *
-                ws *
-                1.3 *
-                cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) *
-                sqrt(max(1.0 - z / zs, 0.0))
-            GMV.HQTcov.values[k] =
-                GMV.HQTcov.values[kc_surf] *
-                ws *
-                1.3 *
-                cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) *
-                sqrt(max(1.0 - z / zs, 0.0))
+            GMV.Hvar.values[k] = GMV.Hvar.values[kc_surf] * tke_gm(z)
+            GMV.QTvar.values[k] = GMV.QTvar.values[kc_surf] * tke_gm(z)
+            GMV.HQTcov.values[k] = GMV.HQTcov.values[kc_surf] * tke_gm(z)
         end
     else
         @inbounds for k in center_indicies(grid)
