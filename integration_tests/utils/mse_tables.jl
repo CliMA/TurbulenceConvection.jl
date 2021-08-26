@@ -109,16 +109,16 @@ all_best_mse["Rico"]["Hvar_mean"] = 17543.46402373834
 all_best_mse["Rico"]["QTvar_mean"] = 11213.288776530182
 #
 all_best_mse["Soares"] = OrderedDict()
-all_best_mse["Soares"]["qt_mean"] = 0.12970517561592276
-all_best_mse["Soares"]["updraft_area"] = 469.3018926427049
-all_best_mse["Soares"]["updraft_w"] = 18.984984059705134
-all_best_mse["Soares"]["updraft_qt"] = 10.991710569140755
-all_best_mse["Soares"]["updraft_thetal"] = 22.394740820057454
-all_best_mse["Soares"]["u_mean"] = 729.5932689085503
-all_best_mse["Soares"]["tke_mean"] = 59.0030644707742
-all_best_mse["Soares"]["temperature_mean"] = 1.097217820640804e-5
-all_best_mse["Soares"]["thetal_mean"] = 1.1539906011758751e-5
-all_best_mse["Soares"]["Hvar_mean"] = 233.21803645570782
+all_best_mse["Soares"]["qt_mean"] = 0.1307900956241168
+all_best_mse["Soares"]["updraft_area"] = 438.76468941085903
+all_best_mse["Soares"]["updraft_w"] = 19.379768387925118
+all_best_mse["Soares"]["updraft_qt"] = 10.991243502994012
+all_best_mse["Soares"]["updraft_thetal"] = 22.394796405255317
+all_best_mse["Soares"]["u_mean"] = 727.8223543487718
+all_best_mse["Soares"]["tke_mean"] = 62.00243646561718
+all_best_mse["Soares"]["temperature_mean"] = 1.1023482479159843e-5
+all_best_mse["Soares"]["thetal_mean"] = 1.1593214251078093e-5
+all_best_mse["Soares"]["Hvar_mean"] = 237.05037894581898
 #
 all_best_mse["SP"] = OrderedDict()
 all_best_mse["SP"]["qt_mean"] = 1.531467094722502

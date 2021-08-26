@@ -48,40 +48,49 @@ using ..TurbulenceConvection: real_face_indicies
 
 const TC = TurbulenceConvection
 
+#####
+##### Case types
+#####
+
 # For dispatching to inherited class
 struct BaseCase end
 
-#=
-    TRMM_LBA
-adopted from: "Daytime convective development over land- A model intercomparison based on LBA observations",
-By Grabowski et al (2006)  Q. J. R. Meteorol. Soc. 132 317-344
+""" [Soares2004](@cite) """
+struct Soares end
 
-    SoaresCase
-
-Soares, P.M.M., Miranda, P.M.A., Siebesma, A.P. and Teixeira, J. (2004),
-An eddy‐diffusivity/mass‐flux parametrization for dry and shallow cumulus convection.
-Q.J.R. Meteorol. Soc., 130: 3365-3383. doi:10.1256/qj.03.223
-
-    Nieuwstadt
-"Nieuwstadt, F. T., Mason, P. J., Moeng, C. H., & Schumann, U. (1993).
-Large-eddy simulation of the convective boundary layer: A comparison of
-four computer codes. In Turbulent shear flows 8 (pp. 343-367). Springer, Berlin, Heidelberg."
-
-    life_cycle_Tan2018
-Taken from: "An extended eddy- diffusivity mass-flux scheme for unified representation of subgrid-scale turbulence and convection"
-Tan, Z., Kaul, C. M., Pressel, K. G., Cohen, Y., Schneider, T., & Teixeira, J. (2018).
- Journal of Advances in Modeling Earth Systems, 10. https://doi.org/10.1002/2017MS001162
-
-=#
-
-struct SoaresCase end
-struct BomexCase end
-struct Rico end
-struct TRMM_LBA end
-struct ARM_SGP end
+""" [Nieuwstadt1993](@cite) """
 struct Nieuwstadt end
+
+struct Bomex end
+
+""" [Tan2018](@cite) """
 struct life_cycle_Tan2018 end
+
+struct Rico end
+
+""" [Grabowski2006](@cite) """
+struct TRMM_LBA end
+
+""" [Brown2002](@cite) """
+struct ARM_SGP end
+
+""" [Khairoutdinov2009](@cite) """
+struct GATE_III end
+
+""" [Stevens2005](@cite) """
+struct DYCOMS_RF01 end
+
+struct GABLS end
+
+struct SP end
+
+struct DryBubble end
+
 struct LES_driven_SCM end
+
+#####
+#####
+#####
 
 function CasesFactory(namelist, Gr, Ref)
     if namelist["meta"]["casename"] == "Soares"
@@ -139,6 +148,9 @@ update_surface(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping, ::Base
 update_forcing(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping, ::BaseCase) = nothing
 update_radiation(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping, ::BaseCase) = nothing
 
+#####
+##### Soares
+#####
 
 function Soares(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "Soares2004"
@@ -148,15 +160,15 @@ function Soares(namelist, Gr::Grid, Ref::ReferenceState)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
-    return TC.CasesBase{SoaresCase}(; casename = "SoaresCase", inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase{Soares}(; casename = "Soares", inversion_option, Sur, Fo, Rad)
 end
-function initialize_reference(self::CasesBase{SoaresCase}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
+function initialize_reference(self::CasesBase{Soares}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
     Ref.Pg = 1000.0 * 100.0
     Ref.qtg = 5.0e-3
     Ref.Tg = 300.0
     initialize(Ref, Gr, Stats)
 end
-function initialize_profiles(self::CasesBase{SoaresCase}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize_profiles(self::CasesBase{Soares}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
     theta = TC.center_field(Gr)
     ql = 0.0
     qi = 0.0
@@ -186,7 +198,7 @@ function initialize_profiles(self::CasesBase{SoaresCase}, Gr::Grid, GMV::GridMea
     satadjust(GMV)
 end
 
-function initialize_surface(self::CasesBase{SoaresCase}, Gr::Grid, Ref::ReferenceState)
+function initialize_surface(self::CasesBase{Soares}, Gr::Grid, Ref::ReferenceState)
     param_set = TC.parameter_set(Ref)
     g = CPP.grav(param_set)
     self.Sur.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
@@ -208,34 +220,38 @@ function initialize_surface(self::CasesBase{SoaresCase}, Gr::Grid, Ref::Referenc
         )
     initialize(self.Sur)
 end
-function initialize_forcing(self::CasesBase{SoaresCase}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{Soares}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
 end
 
-function initialize_radiation(self::CasesBase{SoaresCase}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_radiation(self::CasesBase{Soares}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
     initialize(self.Rad, GMV)
 end
 
 
 
-function TC.initialize_io(self::CasesBase{SoaresCase}, Stats::NetCDFIO_Stats)
+function TC.initialize_io(self::CasesBase{Soares}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
 end
-function TC.io(self::CasesBase{SoaresCase}, Stats::NetCDFIO_Stats)
+function TC.io(self::CasesBase{Soares}, Stats::NetCDFIO_Stats)
     io(self, Stats, BaseCase())
 end
-function update_surface(self::CasesBase{SoaresCase}, GMV::GridMeanVariables, TS::TimeStepping)
+function update_surface(self::CasesBase{Soares}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Sur, GMV)
 end
-function update_forcing(self::CasesBase{SoaresCase}, GMV::GridMeanVariables, TS::TimeStepping)
+function update_forcing(self::CasesBase{Soares}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Fo, GMV)
 end
 
-function update_radiation(self::CasesBase{SoaresCase}, GMV::GridMeanVariables, TS::TimeStepping)
+function update_radiation(self::CasesBase{Soares}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Rad, GMV)
 end
+
+#####
+##### Nieuwstadt
+#####
 
 function Nieuwstadt(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "Nieuwstadt"
@@ -332,6 +348,10 @@ function update_radiation(self::CasesBase{Nieuwstadt}, GMV::GridMeanVariables, T
     update(self.Rad, GMV)
 end
 
+#####
+##### Bomex
+#####
+
 function Bomex(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "Bomex"
     Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; Gr, Ref, namelist)
@@ -341,17 +361,17 @@ function Bomex(namelist, Gr::Grid, Ref::ReferenceState)
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
     Fo.apply_subsidence = true
-    return TC.CasesBase{BomexCase}(; casename = "Bomex", inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase{Bomex}(; casename = "Bomex", inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{BomexCase}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
+function initialize_reference(self::CasesBase{Bomex}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
     Ref.Pg = 1.015e5  #Pressure at ground
     Ref.Tg = 300.4  #Temperature at ground
     Ref.qtg = 0.02245   #Total water mixing ratio at surface
     TC.initialize(Ref, Gr, Stats)
 end
 
-function initialize_profiles(self::CasesBase{BomexCase}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize_profiles(self::CasesBase{Bomex}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
     thetal = TC.center_field(Gr)
     ql = 0.0
     qi = 0.0 # IC of Bomex is cloud-free
@@ -406,7 +426,7 @@ function initialize_profiles(self::CasesBase{BomexCase}, Gr::Grid, GMV::GridMean
     satadjust(GMV)
 end
 
-function initialize_surface(self::CasesBase{BomexCase}, Gr::Grid, Ref::ReferenceState)
+function initialize_surface(self::CasesBase{Bomex}, Gr::Grid, Ref::ReferenceState)
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.Tsurface = 299.1 * exner_c(Ref.Pg)
     self.Sur.qsurface = 22.45e-3 # kg/kg
@@ -419,7 +439,7 @@ function initialize_surface(self::CasesBase{BomexCase}, Gr::Grid, Ref::Reference
     initialize(self.Sur)
 end
 
-function initialize_forcing(self::CasesBase{BomexCase}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{Bomex}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
@@ -453,19 +473,22 @@ function initialize_forcing(self::CasesBase{BomexCase}, Gr::Grid, Ref::Reference
     end
     return nothing
 end
-function initialize_radiation(self::CasesBase{BomexCase}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_radiation(self::CasesBase{Bomex}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
     initialize(self.Rad, GMV)
 end
 
-TC.initialize_io(self::CasesBase{BomexCase}, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
+TC.initialize_io(self::CasesBase{Bomex}, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
 
-TC.io(self::CasesBase{BomexCase}, Stats::NetCDFIO_Stats) = io(self, Stats, BaseCase())
+TC.io(self::CasesBase{Bomex}, Stats::NetCDFIO_Stats) = io(self, Stats, BaseCase())
 
-update_surface(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Sur, GMV)
+update_surface(self::CasesBase{Bomex}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Sur, GMV)
 
-update_forcing(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Fo, GMV)
-update_radiation(self::CasesBase{BomexCase}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Rad, GMV)
+update_forcing(self::CasesBase{Bomex}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Fo, GMV)
+update_radiation(self::CasesBase{Bomex}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Rad, GMV)
 
+#####
+##### life_cycle_Tan2018
+#####
 
 function life_cycle_Tan2018(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "life_cycle_Tan2018"
@@ -635,6 +658,10 @@ function update_radiation(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVari
     update(self.Rad, GMV)
 end
 
+#####
+##### Rico
+#####
+
 function Rico(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "Rico"
     Sur = TC.SurfaceBase(TC.SurfaceFixedCoeffs; Gr, Ref, namelist)
@@ -740,7 +767,6 @@ function initialize_radiation(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceSta
     initialize(self.Rad, GMV)
 end
 
-
 function TC.initialize_io(self::CasesBase{Rico}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
 end
@@ -757,6 +783,10 @@ end
 function update_radiation(self::CasesBase{Rico}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Rad, GMV)
 end
+
+#####
+##### TRMM_LBA
+#####
 
 function TRMM_LBA(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "TRMM_LBA"
@@ -1024,14 +1054,15 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
     end
     return nothing
 end
+
 function initialize_radiation(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
     initialize(self.Rad, GMV)
 end
 
-
 function TC.initialize_io(self::CasesBase{TRMM_LBA}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
 end
+
 function TC.io(self::CasesBase{TRMM_LBA}, Stats::NetCDFIO_Stats)
     io(self, Stats, BaseCase())
 end
@@ -1074,12 +1105,15 @@ function update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::T
     update(self.Fo, GMV)
 
 end
+
 function update_radiation(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Rad, GMV)
 end
 
-# adopted from: "Large-eddy simulation of the diurnal cycle of shallow cumulus convection over land",
-# By Brown et al. (2002)  Q. J. R. Meteorol. Soc. 128, 1075-1093
+#####
+##### ARM_SGP
+#####
+
 function ARM_SGP(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "ARM_SGP"
     Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; Gr, Ref, namelist)
@@ -1205,8 +1239,10 @@ function update_radiation(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::
     update(self.Rad, GMV)
 end
 
-# adopted from: "Large eddy simulation of Maritime Deep Tropical Convection",
-# By Khairoutdinov et al (2009)  JAMES, vol. 1, article #15
+#####
+##### GATE_III
+#####
+
 function GATE_III(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "GATE_III"
     Sur = TC.SurfaceBase(TC.SurfaceFixedCoeffs; Gr, Ref, namelist)
@@ -1339,12 +1375,10 @@ function update_radiation(self::CasesBase{GATE_III}, GMV::GridMeanVariables, TS:
     update(self.Rad, GMV)
 end
 
-"""
-see Stevens et al 2005
-Evaluation of Large-Eddy Simulations via Observations of Nocturnal Marine Stratocumulus.
-Mon. Wea. Rev., 133, 1443â€“1462.
-doi: http://dx.doi.org/10.1175/MWR2930.1
-"""
+#####
+##### DYCOMS_RF01
+#####
+
 function DYCOMS_RF01(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "DYCOMS_RF01"
     Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; Gr, Ref, namelist)
@@ -1495,6 +1529,10 @@ function update_radiation(self::CasesBase{DYCOMS_RF01}, GMV::GridMeanVariables, 
     update(self.Rad, GMV)
 end
 
+#####
+##### GABLS
+#####
+
 function GABLS(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "GABLS"
     Sur = TC.SurfaceBase(TC.SurfaceMoninObukhovDry; Gr, Ref, namelist)
@@ -1593,6 +1631,10 @@ function update_radiation(self::CasesBase{GABLS}, GMV::GridMeanVariables, TS::Ti
     update(self.Rad, GMV)
 end
 
+#####
+##### SP
+#####
+
 # Not fully implemented yet - Ignacio
 function SP(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "SP"
@@ -1690,6 +1732,10 @@ end
 function update_radiation(self::CasesBase{SP}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Rad, GMV)
 end
+
+#####
+##### DryBubble
+#####
 
 function DryBubble(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "DryBubble"
@@ -1831,6 +1877,9 @@ function update_radiation(self::CasesBase{DryBubble}, GMV::GridMeanVariables, TS
     update(self.Rad, GMV)
 end
 
+#####
+##### LES_driven_SCM
+#####
 
 function LES_driven_SCM(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "LES_driven_SCM"
