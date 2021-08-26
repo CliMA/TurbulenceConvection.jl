@@ -75,8 +75,6 @@ function initialize_io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     add_profile(Stats, "tke_shear")
     add_profile(Stats, "tke_pressure")
     add_profile(Stats, "tke_interdomain")
-    add_profile(Stats, "tke_transport")
-    add_profile(Stats, "tke_advection")
     add_profile(Stats, "Hvar_dissipation")
     add_profile(Stats, "QTvar_dissipation")
     add_profile(Stats, "HQTcov_dissipation")
@@ -196,10 +194,6 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     write_profile(Stats, "tke_buoy", self.EnvVar.TKE.buoy[cinterior])
     write_profile(Stats, "tke_pressure", self.EnvVar.TKE.press[cinterior])
     write_profile(Stats, "tke_interdomain", self.EnvVar.TKE.interdomain[cinterior])
-    compute_tke_transport(self)
-    write_profile(Stats, "tke_transport", self.tke_transport[cinterior])
-    compute_tke_advection(self)
-    write_profile(Stats, "tke_advection", self.tke_advection[cinterior])
 
     compute_covariance_dissipation(self, self.EnvVar.Hvar)
     write_profile(Stats, "Hvar_dissipation", self.EnvVar.Hvar.dissipation[cinterior])
@@ -1944,65 +1938,6 @@ function compute_covariance_dissipation(self::EDMF_PrognosticTKE, Covar::Environ
             rho0_half[k] * ae[k] * Covar.values[k] * max(self.EnvVar.TKE.values[k], 0)^0.5 /
             max(self.mixing_length[k], 1.0e-3) * c_d
         )
-    end
-    return
-end
-
-
-function compute_tke_advection(self::EDMF_PrognosticTKE)
-
-    grid = get_grid(self)
-    ref_state = reference_state(self)
-    rho0_half = ref_state.rho0_half
-    ae = 1 .- self.UpdVar.Area.bulkvalues # area of environment
-    drho_ae_we_e_plus = 0.0
-
-    @inbounds for k in real_face_indicies(grid)
-        drho_ae_we_e_minus = drho_ae_we_e_plus
-        drho_ae_we_e_plus =
-            (
-                rho0_half[k + 1] *
-                ae[k + 1] *
-                self.EnvVar.TKE.values[k + 1] *
-                (self.EnvVar.W.values[k + 1] + self.EnvVar.W.values[k]) / 2.0 -
-                rho0_half[k] *
-                ae[k] *
-                self.EnvVar.TKE.values[k] *
-                (self.EnvVar.W.values[k] + self.EnvVar.W.values[k - 1]) / 2.0
-            ) * grid.dzi
-        self.tke_advection[k] = interp2pt(drho_ae_we_e_minus, drho_ae_we_e_plus)
-    end
-    return
-end
-
-function compute_tke_transport(self::EDMF_PrognosticTKE)
-
-    grid = get_grid(self)
-    dzi = grid.dzi
-    ae = 1 .- self.UpdVar.Area.bulkvalues # area of environment
-    dtke_high = 0.0
-    drho_ae_K_m_de_plus = 0.0
-    KM = diffusivity_m(self).values
-    rho0_half = reference_state(self).rho0_half
-
-    @inbounds for k in real_face_indicies(grid)
-        drho_ae_K_m_de_low = drho_ae_K_m_de_plus
-        drho_ae_K_m_de_plus =
-            (
-                rho0_half[k + 1] *
-                ae[k + 1] *
-                KM[k + 1] *
-                (self.EnvVar.TKE.values[k + 2] - self.EnvVar.TKE.values[k]) *
-                0.5 *
-                dzi -
-                rho0_half[k] *
-                ae[k] *
-                KM[k] *
-                (self.EnvVar.TKE.values[k + 1] - self.EnvVar.TKE.values[k - 1]) *
-                0.5 *
-                dzi
-            ) * dzi
-        self.tke_transport[k] = interp2pt(drho_ae_K_m_de_low, drho_ae_K_m_de_plus)
     end
     return
 end
