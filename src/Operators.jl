@@ -50,10 +50,6 @@ end
 # top of the domain.
 ∇_onesided(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
-function ∇_upwind(f, grid::Grid, k::Int)
-    return (f[k + 1] - f[k]) * grid.dzi
-end
-
 function interpc2f(f, grid::Grid, k::Int)
     return 0.5 * (f[k + 1] + f[k])
 end
