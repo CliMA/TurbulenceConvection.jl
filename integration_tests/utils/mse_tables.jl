@@ -153,9 +153,9 @@ all_best_mse["LES_driven_SCM"] = OrderedDict()
 all_best_mse["LES_driven_SCM"]["qt_mean"] = 6.955579572711767
 all_best_mse["LES_driven_SCM"]["v_mean"] = 3.7115932474857054
 all_best_mse["LES_driven_SCM"]["u_mean"] = 1.1968938524379116
-all_best_mse["LES_driven_SCM"]["temperature_mean"] = 0.0049582110398801475
+all_best_mse["LES_driven_SCM"]["temperature_mean"] = 0.004895789161917334
 all_best_mse["LES_driven_SCM"]["ql_mean"] = 335.2282274951558
-all_best_mse["LES_driven_SCM"]["thetal_mean"] = 0.0031649884296338373
+all_best_mse["LES_driven_SCM"]["thetal_mean"] = 0.003185373544782518
 #
 #################################
 #################################

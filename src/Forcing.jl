@@ -127,7 +127,8 @@ end
 
 function update(self::ForcingBase{ForcingLES}, GMV::GridMeanVariables)
 
-    @inbounds for k in real_center_indicies(self.Gr)
+    grid = self.Gr
+    @inbounds for k in real_center_indicies(grid)
         H_horz_adv = self.dtdt_hadv[k] / exner_c(self.Ref.p0_half[k])
         H_nudge = self.dtdt_nudge[k] / exner_c(self.Ref.p0_half[k])
         H_fluc = self.dtdt_fluc[k] / exner_c(self.Ref.p0_half[k])
@@ -136,8 +137,13 @@ function update(self::ForcingBase{ForcingLES}, GMV::GridMeanVariables)
         GMV_V_nudge_k = (self.v_nudge[k] - GMV.V.values[k]) / self.nudge_tau
         if self.apply_subsidence
             # Apply large-scale subsidence tendencies
-            GMV_H_subsidence_k = -(GMV.H.values[k + 1] - GMV.H.values[k]) * self.Gr.dzi * self.subsidence[k]
-            GMV_QT_subsidence_k = -(GMV.QT.values[k + 1] - GMV.QT.values[k]) * self.Gr.dzi * self.subsidence[k]
+
+            H_cut = cut_onesided(GMV.H.values, grid, k)
+            q_tot_cut = cut_onesided(GMV.QT.values, grid, k)
+            ∇H = ∇_onesided(H_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
+            ∇q_tot = ∇_onesided(q_tot_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
+            GMV_H_subsidence_k = -∇H * self.subsidence[k]
+            GMV_QT_subsidence_k = -∇q_tot * self.subsidence[k]
         else
             GMV_H_subsidence_k = 0.0
             GMV_QT_subsidence_k = 0.0

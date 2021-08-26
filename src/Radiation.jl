@@ -129,7 +129,7 @@ end
 
 function update(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables)
 
-    @inbounds for k in xrange(1, self.Gr.nz)
+    @inbounds for k in real_center_indicies(self.Gr)
         # Apply large-scale horizontal advection tendencies
         GMV.H.tendencies[k] += self.dTdt[k] / exner_c(self.Ref.p0_half[k])
     end

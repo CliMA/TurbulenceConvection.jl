@@ -1486,12 +1486,13 @@ function compute_covariance_interdomain_src(
     Covar::EnvironmentVariable_2m,
 )
 
+    is_tke = Covar.name == "tke"
+    tke_factor = is_tke ? 0.5 : 1
     grid = get_grid(self)
-    @inbounds for k in xrange(grid.nzg)
-        Covar.interdomain[k] = 0.0
-        @inbounds for i in xrange(self.n_updrafts)
-            if Covar.name == "tke"
-                tke_factor = 0.5
+    if is_tke
+        @inbounds for k in face_indicies(grid)
+            Covar.interdomain[k] = 0.0
+            @inbounds for i in xrange(self.n_updrafts)
                 # TODO: report bug: k-1 for k = 0 yields
                 # -1, indexing phi_e.values[-1] yields the
                 # _last_ value in the array. This is certainly
@@ -1507,13 +1508,18 @@ function compute_covariance_interdomain_src(
                     phi_diff = phi_u.values[i, k] - phi_e.values[k]
                     psi_diff = psi_u.values[i, k] - psi_e.values[k]
                 end
-            else
-                tke_factor = 1.0
+
+                Covar.interdomain[k] += tke_factor * au.values[i, k] * (1.0 - au.values[i, k]) * phi_diff * psi_diff
+            end
+        end
+    else
+        @inbounds for k in center_indicies(grid)
+            Covar.interdomain[k] = 0.0
+            @inbounds for i in xrange(self.n_updrafts)
                 phi_diff = phi_u.values[i, k] - phi_e.values[k]
                 psi_diff = psi_u.values[i, k] - psi_e.values[k]
+                Covar.interdomain[k] += tke_factor * au.values[i, k] * (1.0 - au.values[i, k]) * phi_diff * psi_diff
             end
-
-            Covar.interdomain[k] += tke_factor * au.values[i, k] * (1.0 - au.values[i, k]) * phi_diff * psi_diff
         end
     end
     return
