@@ -87,9 +87,11 @@ function compute_ustar(windspeed, buoyancy_flux, z0, z1)
     return ustar
 end
 
-#Monin-Obukhov similarity based on
-#Daewon W. Byun, 1990: On the Analytical Solutions of Flux-Profile Relationships for the Atmospheric Surface Layer. J. Appl. Meteor., 29, 652–657.
-#doi: http://dx.doi.org/10.1175/1520-0450(1990)029<0652:OTASOF>2.0.CO;2
+"""
+    exchange_coefficients_byun(Ri, zb, z0, cm, ch, lmo)
+
+Ref: [Byun1990](@cite)
+"""
 function exchange_coefficients_byun(Ri, zb, z0, cm, ch, lmo)
 
     logz = log(zb / z0)
