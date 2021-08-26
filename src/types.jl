@@ -857,8 +857,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     m::A2
     mixing_length::A1
     horiz_K_eddy::A2
-    tke_transport::A1
-    tke_advection::A1
     area_surface_bc::A1
     w_surface_bc::A1
     h_surface_bc::A1
@@ -979,10 +977,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         mixing_length = center_field(Gr)
         horiz_K_eddy = center_field(Gr, n_updrafts)
 
-        # diagnosed tke budget terms
-        tke_transport = center_field(Gr)
-        tke_advection = center_field(Gr)
-
         # Near-surface BC of updraft area fraction
         area_surface_bc = zeros(n_updrafts)
         w_surface_bc = zeros(n_updrafts)
@@ -1063,8 +1057,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             m,
             mixing_length,
             horiz_K_eddy,
-            tke_transport,
-            tke_advection,
             area_surface_bc,
             w_surface_bc,
             h_surface_bc,
