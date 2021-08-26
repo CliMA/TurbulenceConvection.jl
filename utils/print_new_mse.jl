@@ -14,6 +14,7 @@ all_cases = [
     "Soares",
     "SP",
     "TRMM_LBA",
+    "LES_driven_SCM",
 ]
 
 filter!(x -> x ≠ "GATE_III", all_cases) # no mse tables for GATE_III

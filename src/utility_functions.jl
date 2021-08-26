@@ -63,3 +63,5 @@ function upwind_advection_scalar(
     m_km = (ρ0_half[k - 1] * a_up[k - 1] * interp2pt(w_up[k - 2], w_up[k - 1]))
     return (m_k * var[k] - m_km * var[k - 1]) * dzi
 end
+
+get_nc_data(data, group, var, imin, imax) = mean(data.group[group][var][:][:, imin:imax], dims = 2)[:]

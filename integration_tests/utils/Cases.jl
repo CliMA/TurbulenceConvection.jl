@@ -1,5 +1,7 @@
 module Cases
 
+using NCDatasets
+using Statistics
 using Random
 
 import CLIMAParameters
@@ -79,6 +81,7 @@ struct TRMM_LBA end
 struct ARM_SGP end
 struct Nieuwstadt end
 struct life_cycle_Tan2018 end
+struct LES_driven_SCM end
 
 function CasesFactory(namelist, Gr, Ref)
     if namelist["meta"]["casename"] == "Soares"
@@ -105,6 +108,8 @@ function CasesFactory(namelist, Gr, Ref)
         return SP(namelist, Gr, Ref)
     elseif namelist["meta"]["casename"] == "DryBubble"
         return DryBubble(namelist, Gr, Ref)
+    elseif namelist["meta"]["casename"] == "LES_driven_SCM"
+        return LES_driven_SCM(namelist, Gr, Ref)
     else
         error("case not recognized")
     end
@@ -1825,5 +1830,109 @@ end
 function update_radiation(self::CasesBase{DryBubble}, GMV::GridMeanVariables, TS::TimeStepping)
     update(self.Rad, GMV)
 end
+
+
+function LES_driven_SCM(namelist, Gr::Grid, Ref::ReferenceState)
+    casename = "LES_driven_SCM"
+    les_filename = namelist["meta"]["lesfile"]
+    # load data here
+    LESDat = Dataset(les_filename, "r") do data
+        t = data.group["profiles"]["t"][:]
+        t_interval_from_end_s = 6 * 3600
+        t_from_end_s = t .- t[end]
+        # find inds within time interval
+        time_interval_bool = findall(>(-t_interval_from_end_s), t_from_end_s)
+        imin = time_interval_bool[1]
+        imax = time_interval_bool[end]
+
+        TC.LESData(imin, imax, les_filename)
+    end
+    Sur = TC.SurfaceBase{TC.SurfaceMoninObukhov}(; Gr, Ref)
+    Fo = TC.ForcingBase{TC.ForcingLES}(; Gr, Ref)
+    Rad = TC.RadiationBase{TC.RadiationLES}(; Gr, Ref)
+    inversion_option = "critical_Ri"
+    Fo.apply_coriolis = false
+    Fo.coriolis_param = 0.376e-4 # s^{-1}
+    Fo.apply_subsidence = true
+    Fo.apply_coriolis = false
+    Fo.apply_subsidence = true
+    Fo.nudge_tau = namelist["forcing"]["nudging_timescale"]
+    return TC.CasesBase{LES_driven_SCM}(; casename = "LES_driven_SCM", inversion_option, Sur, Fo, Rad, LESDat)
+end
+
+function initialize_reference(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
+    # # old version
+    Ref.Pg = 1.015e5  #Pressure at ground
+    Ref.Tg = 300.4  #Temperature at ground
+    Ref.qtg = 0.02245   #Total water mixing ratio at surface
+    TC.initialize(Ref, Gr, Stats)
+end
+
+function initialize_profiles(self::CasesBase{LES_driven_SCM}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+
+    Dataset(self.LESDat.les_filename, "r") do data
+        imin = self.LESDat.imin
+        imax = self.LESDat.imax
+        t = data.group["profiles"]["t"][:]
+        # define time interval
+        t_interval_from_end_s = 6 * 3600
+        t_from_end_s = Array(t) .- t[end]
+        # find inds within time interval
+        time_interval_bool = findall(>(-t_interval_from_end_s), t_from_end_s)
+        imin = time_interval_bool[1]
+        imax = time_interval_bool[end]
+
+        z_les_half = data.group["profiles"]["z_half"][:, 1]
+        GMV.H.values .= pyinterp(Gr.z_half, z_les_half, TC.get_nc_data(data, "profiles", "thetali_mean", imin, imax))
+        GMV.QT.values .= pyinterp(Gr.z_half, z_les_half, TC.get_nc_data(data, "profiles", "qt_mean", imin, imax))
+        GMV.U.values .= pyinterp(Gr.z_half, z_les_half, TC.get_nc_data(data, "profiles", "u_mean", imin, imax))
+        GMV.V.values .= pyinterp(Gr.z_half, z_les_half, TC.get_nc_data(data, "profiles", "v_mean", imin, imax))
+        set_bcs(GMV.U, Gr)
+        set_bcs(GMV.QT, Gr)
+        set_bcs(GMV.H, Gr)
+        set_bcs(GMV.T, Gr)
+        satadjust(GMV)
+    end
+end
+
+function initialize_surface(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState)
+
+    Dataset(self.LESDat.les_filename, "r") do data
+        imin = self.LESDat.imin
+        imax = self.LESDat.imax
+
+        self.Sur.Gr = Gr
+        self.Sur.Ref = Ref
+        self.Sur.zrough = 1.0e-4
+        self.Sur.Gr = Gr
+        self.Sur.Tsurface = mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims = 1)[1]
+        # get surface value of q
+        mean_qt_prof = mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)
+        self.Sur.qsurface = TC.interpf2c(mean_qt_prof, Gr, TC.kc_surface(Gr))
+        self.Sur.lhf = mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1]
+        self.Sur.shf = mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1]
+        self.Sur.Ref = Ref
+    end
+    initialize(self.Sur)
+end
+
+function initialize_forcing(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    self.Fo.Gr = Gr
+    self.Fo.Ref = Ref
+    initialize(self.Fo, GMV, Gr, self.LESDat)
+    return nothing
+end
+function initialize_radiation(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    initialize(self.Rad, GMV, self.LESDat)
+end
+
+TC.initialize_io(self::CasesBase{LES_driven_SCM}, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
+
+TC.io(self::CasesBase{LES_driven_SCM}, Stats::NetCDFIO_Stats) = io(self, Stats, BaseCase())
+
+update_surface(self::CasesBase{LES_driven_SCM}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Sur, GMV)
+
+update_forcing(self::CasesBase{LES_driven_SCM}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Fo, GMV)
+update_radiation(self::CasesBase{LES_driven_SCM}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Rad, GMV)
 
 end

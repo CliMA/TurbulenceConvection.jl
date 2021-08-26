@@ -30,6 +30,21 @@ module NameList
 export default_namelist
 
 using ArgParse
+using ArtifactWrappers
+
+#! format: off
+LESDrivenSCM_output_dataset = ArtifactWrapper(
+    @__DIR__,
+    isempty(get(ENV, "CI", "")),
+    "LESDrivenSCM_output_dataset",
+    ArtifactFile[
+        ArtifactFile(url = "https://caltech.box.com/shared/static/0hnf7nkttueraaqf9tpkqsx38gjqx41p.nc", filename = "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc",),
+    ],
+)
+LESDrivenSCM_output_dataset_path = get_data_folder(LESDrivenSCM_output_dataset)
+#! format: on
+
+
 import JSON
 
 function parse_commandline()
@@ -154,6 +169,8 @@ function default_namelist(case_name::String)
         namelist = SP(namelist_defaults)
     elseif case_name == "DryBubble"
         namelist = DryBubble(namelist_defaults)
+    elseif case_name == "LES_driven_SCM"
+        namelist = LES_driven_SCM(namelist_defaults)
     else
         error("Not a valid case name")
     end
@@ -349,6 +366,25 @@ function DryBubble(namelist_defaults)
     namelist["meta"]["casename"] = "DryBubble"
 
     namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.4
+
+    return namelist
+end
+
+function LES_driven_SCM(namelist_defaults)
+    namelist = deepcopy(namelist_defaults)
+    namelist["grid"]["dz"] = 20.0
+    namelist["grid"]["nz"] = 200
+
+    namelist["stats_io"]["frequency"] = 10.0
+    namelist["time_stepping"]["dt"] = 3.0 #10.0
+    namelist["time_stepping"]["t_max"] = 3600.0 * 12
+
+    namelist["meta"]["lesfile"] =
+        joinpath(LESDrivenSCM_output_dataset_path, "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc")
+    namelist["meta"]["simname"] = "LES_driven_SCM"
+    namelist["meta"]["casename"] = "LES_driven_SCM"
+    namelist["forcing"] = Dict()
+    namelist["forcing"]["nudging_timescale"] = 6.0 * 3600.0
 
     return namelist
 end

@@ -142,9 +142,13 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
     ds_tc = haskey(ds_dict, :ds_tc) ? ds_dict[:ds_tc] : nothing
     # Make pycles optional
     have_pycles_ds = ds_pycles ≠ nothing
+    have_scampy_ds = ds_scampy ≠ nothing
     have_tc_main = ds_tc_main ≠ nothing
     if !have_pycles_ds
-        ds_pycles = ds_scampy
+        ds_pycles = ds_tc
+    end
+    if !have_scampy_ds
+        ds_scampy = ds_tc
     end
     if !have_tc_main
         ds_tc_main = ds_tc

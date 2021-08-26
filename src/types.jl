@@ -752,21 +752,39 @@ struct ForcingBaseType end
 struct ForcingNone end
 struct ForcingStandard end
 struct ForcingDYCOMS_RF01 end
+struct ForcingLES end
 
 struct RadiationBaseType end
 struct RadiationNone end
 struct RadiationStandard end
 struct RadiationDYCOMS_RF01 end
+struct RadiationLES end
+
+Base.@kwdef mutable struct LESData
+    imin::Int = 0
+    imax::Int = 0
+    les_filename::String = nothing
+end
 
 Base.@kwdef mutable struct ForcingBase{T}
     subsidence::AbstractArray{Float64, 1} = zeros(1)
     dTdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection temperature tendency
     dqtdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection moisture tendency
+    dtdt_hadv::AbstractArray{Float64, 1} = zeros(1)
+    dtdt_nudge::AbstractArray{Float64, 1} = zeros(1)
+    dtdt_fluc::AbstractArray{Float64, 1} = zeros(1)
+    dqtdt_hadv::AbstractArray{Float64, 1} = zeros(1)
+    dqtdt_nudge::AbstractArray{Float64, 1} = zeros(1)
+    dqtdt_fluc::AbstractArray{Float64, 1} = zeros(1)
+    u_nudge::AbstractArray{Float64, 1} = zeros(1)
+    v_nudge::AbstractArray{Float64, 1} = zeros(1)
     apply_coriolis::Bool = false
     apply_subsidence::Bool = false
     coriolis_param::Float64 = 0
     ug::AbstractArray{Float64, 1} = zeros(1)
     vg::AbstractArray{Float64, 1} = zeros(1)
+    nudge_tau::Float64 = 0.0 # default is set to a value that will break
+    convert_forcing_prog_fp::Function = x -> x
     Gr::Grid
     Ref::ReferenceState
 end
@@ -787,6 +805,7 @@ end
 Base.@kwdef mutable struct CasesBase{T}
     casename::String = "default_casename"
     inversion_option::String = "default_inversion_option"
+    les_filename::String = "None"
     Sur::SurfaceBase
     Fo::ForcingBase
     Rad::RadiationBase
@@ -794,6 +813,7 @@ Base.@kwdef mutable struct CasesBase{T}
     rad::AbstractMatrix{Float64} = zeros(1, 1)
     lhf0::Float64 = 0
     shf0::Float64 = 0
+    LESDat::Union{LESData, Nothing} = nothing
 end
 
 mutable struct EDMF_PrognosticTKE{PS, A1, A2}

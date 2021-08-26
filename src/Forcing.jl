@@ -95,5 +95,65 @@ function update(self::ForcingBase{ForcingDYCOMS_RF01}, GMV::GridMeanVariables)
     return
 end
 
-initialize_io(self::ForcingBase{ForcingDYCOMS_RF01}, Stats::NetCDFIO_Stats) = nothing
-io(self::ForcingBase{ForcingDYCOMS_RF01}, Stats::NetCDFIO_Stats) = nothing
+function initialize_io(self::ForcingBase{ForcingDYCOMS_RF01}, Stats::NetCDFIO_Stats)
+    return
+end
+
+function io(self::ForcingBase{ForcingDYCOMS_RF01}, Stats::NetCDFIO_Stats)
+    return
+end
+
+function initialize(self::ForcingBase{ForcingLES}, GMV::GridMeanVariables, Gr::Grid, LESDat::LESData)
+    initialize(self, GMV, ForcingBaseType())
+
+    Dataset(LESDat.les_filename, "r") do data
+        imin = LESDat.imin
+        imax = LESDat.imax
+
+        z_les_half = data.group["profiles"]["z_half"][:, 1]
+
+        self.dtdt_hadv = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "dtdt_hadv", imin, imax))
+        self.dtdt_nudge = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "dtdt_nudge", imin, imax))
+        self.dtdt_fluc = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "dtdt_fluc", imin, imax))
+        self.dqtdt_hadv = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "dqtdt_hadv", imin, imax))
+        self.dqtdt_nudge = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "dqtdt_nudge", imin, imax))
+        self.dqtdt_fluc = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "dqtdt_fluc", imin, imax))
+        self.subsidence = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "ls_subsidence", imin, imax))
+        self.u_nudge = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "u_mean", imin, imax))
+        self.v_nudge = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "v_mean", imin, imax))
+    end
+
+end
+
+function update(self::ForcingBase{ForcingLES}, GMV::GridMeanVariables)
+
+    @inbounds for k in real_center_indicies(self.Gr)
+        H_horz_adv = self.dtdt_hadv[k] / exner_c(self.Ref.p0_half[k])
+        H_nudge = self.dtdt_nudge[k] / exner_c(self.Ref.p0_half[k])
+        H_fluc = self.dtdt_fluc[k] / exner_c(self.Ref.p0_half[k])
+
+        GMV_U_nudge_k = (self.u_nudge[k] - GMV.U.values[k]) / self.nudge_tau
+        GMV_V_nudge_k = (self.v_nudge[k] - GMV.V.values[k]) / self.nudge_tau
+        if self.apply_subsidence
+            # Apply large-scale subsidence tendencies
+            GMV_H_subsidence_k = -(GMV.H.values[k + 1] - GMV.H.values[k]) * self.Gr.dzi * self.subsidence[k]
+            GMV_QT_subsidence_k = -(GMV.QT.values[k + 1] - GMV.QT.values[k]) * self.Gr.dzi * self.subsidence[k]
+        else
+            GMV_H_subsidence_k = 0.0
+            GMV_QT_subsidence_k = 0.0
+        end
+
+        GMV.H.tendencies[k] += H_horz_adv + H_nudge + H_fluc + GMV_H_subsidence_k
+        GMV.QT.tendencies[k] += self.dqtdt_hadv[k] + self.dqtdt_nudge[k] + GMV_QT_subsidence_k + self.dqtdt_fluc[k]
+
+        GMV.U.tendencies[k] += GMV_U_nudge_k
+        GMV.V.tendencies[k] += GMV_V_nudge_k
+    end
+
+    if self.apply_coriolis
+        coriolis_force(self, GMV.U, GMV.V, ForcingBaseType())
+    end
+    return
+end
+initialize_io(self::ForcingBase{ForcingLES}, Stats) = nothing
+io(self::ForcingBase{ForcingLES}, Stats) = nothing
