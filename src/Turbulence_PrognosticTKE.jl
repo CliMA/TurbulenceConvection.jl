@@ -1085,20 +1085,10 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     end
     # get the diffusive flux
     @inbounds for k in real_center_indicies(grid)
-        if is_surface_center(grid, k)
-            self.diffusive_flux_qt[k] = interp2pt(
-                Case.Sur.rho_qtflux,
-                -rho_ae_K[k] * dzi * (self.EnvVar.QT.values[k + 1] - self.EnvVar.QT.values[k]),
-            )
-        else
-            self.diffusive_flux_qt[k] =
-                -0.5 *
-                ref_state.rho0_half[k] *
-                ae[k] *
-                KH.values[k] *
-                dzi *
-                (self.EnvVar.QT.values[k + 1] - self.EnvVar.QT.values[k - 1])
-        end
+        q_cut = cut(self.EnvVar.QT.values, grid, k)
+        q_bc = -Case.Sur.rho_qtflux / rho_ae_K[k]
+        ∇q_tot = c∇(q_cut, grid, k; bottom = SetGradient(q_bc), top = SetGradient(0))
+        self.diffusive_flux_qt[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KH.values[k] * ∇q_tot
     end
 
     # Solve H
@@ -1119,20 +1109,10 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     end
     # get the diffusive flux
     @inbounds for k in real_center_indicies(grid)
-        if is_surface_center(grid, k)
-            self.diffusive_flux_h[k] = interp2pt(
-                Case.Sur.rho_hflux,
-                -rho_ae_K[k] * dzi * (self.EnvVar.H.values[k + 1] - self.EnvVar.H.values[k]),
-            )
-        else
-            self.diffusive_flux_h[k] =
-                -0.5 *
-                ref_state.rho0_half[k] *
-                ae[k] *
-                KH.values[k] *
-                dzi *
-                (self.EnvVar.H.values[k + 1] - self.EnvVar.H.values[k - 1])
-        end
+        θ_liq_ice_cut = cut(self.EnvVar.H.values, grid, k)
+        θ_liq_ice_bc = -Case.Sur.rho_hflux / rho_ae_K[k]
+        ∇θ_liq_ice = c∇(θ_liq_ice_cut, grid, k; bottom = SetGradient(θ_liq_ice_bc), top = SetGradient(0))
+        self.diffusive_flux_h[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KH.values[k] * ∇θ_liq_ice
     end
 
     # Solve U
@@ -1154,13 +1134,10 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         GMV.U.new[k] = x[k]
     end
     @inbounds for k in real_center_indicies(grid)
-        if is_surface_center(grid, k)
-            self.diffusive_flux_u[k] =
-                interp2pt(Case.Sur.rho_uflux, -rho_ae_K[k] * dzi * (GMV.U.values[k + 1] - GMV.U.values[k]))
-        else
-            self.diffusive_flux_u[k] =
-                -0.5 * ref_state.rho0_half[k] * ae[k] * KM.values[k] * dzi * (GMV.U.values[k + 1] - GMV.U.values[k - 1])
-        end
+        u_cut = cut(GMV.U.values, grid, k)
+        u_bc = -Case.Sur.rho_uflux / rho_ae_K[k]
+        ∇u = c∇(u_cut, grid, k; bottom = SetGradient(u_bc), top = SetGradient(0))
+        self.diffusive_flux_u[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KM.values[k] * ∇u
     end
 
     # Solve V
@@ -1175,13 +1152,10 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         GMV.V.new[k] = x[k]
     end
     @inbounds for k in real_center_indicies(grid)
-        if is_surface_center(grid, k)
-            self.diffusive_flux_v[k] =
-                interp2pt(Case.Sur.rho_vflux, -rho_ae_K[k] * dzi * (GMV.V.values[k + 1] - GMV.V.values[k]))
-        else
-            self.diffusive_flux_v[k] =
-                -0.5 * ref_state.rho0_half[k] * ae[k] * KM.values[k] * dzi * (GMV.V.values[k + 1] - GMV.V.values[k - 1])
-        end
+        v_cut = cut(GMV.V.values, grid, k)
+        v_bc = -Case.Sur.rho_vflux / rho_ae_K[k]
+        ∇v = c∇(v_cut, grid, k; bottom = SetGradient(v_bc), top = SetGradient(0))
+        self.diffusive_flux_v[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KM.values[k] * ∇v
     end
     set_bcs(GMV.QT, grid)
     set_bcs(GMV.H, grid)
