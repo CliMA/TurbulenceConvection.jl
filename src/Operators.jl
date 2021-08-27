@@ -4,17 +4,22 @@ struct BottomBCTag <: AbstractBCTag end
 struct TopBCTag <: AbstractBCTag end
 struct InteriorTag <: AbstractBCTag end
 
-struct NoBCGivenError end
-struct SetValue{FT}
+abstract type AbstractBC end
+struct UseBoundaryValue <: AbstractBC end
+struct NoBCGivenError <: AbstractBC end
+struct SetValue{FT} <: AbstractBC
     value::FT
 end
-struct SetGradient{FT}
+struct SetGradient{FT} <: AbstractBC
     value::FT
 end
-struct Extrapolate end
-struct FreeBoundary end # when no BC is used (one-sided derivative at surface that takes first and second interior points)
+struct Extrapolate <: AbstractBC end
+struct FreeBoundary <: AbstractBC end # when no BC is used (one-sided derivative at surface that takes first and second interior points)
 
-function ∇f2c(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
+∇f2c(f_dual::SVector, grid::Grid, k::Int; bottom = UseBoundaryValue(), top = UseBoundaryValue()) =
+    ∇f2c(f_dual, grid, k, bottom, top)
+
+function ∇f2c(f_dual::SVector, grid::Grid, k::Int, bottom::AbstractBC, top::AbstractBC)
     if is_surface_face(grid, k - 1)
         return ∇f2c(f_dual, grid, BottomBCTag(), bottom)
     elseif is_toa_face(grid, k)
@@ -23,10 +28,11 @@ function ∇f2c(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), 
         return ∇f2c(f_dual, grid, InteriorTag())
     end
 end
+∇f2c(f::SVector, grid::Grid, ::Int, ::UseBoundaryValue, top::UseBoundaryValue) = ∇f2c(f, grid, InteriorTag())
 ∇f2c(f::SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
 ∇f2c(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * grid.dzi
 ∇f2c(f::SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
-∇f2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[1] - bc.value) * grid.dzi
+∇f2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[2] - bc.value) * grid.dzi
 ∇f2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
 function ∇_onesided(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
@@ -173,21 +179,5 @@ function cut_onesided(f::AbstractMatrix, grid, k::Int, i_up::Int)
 end
 
 # A 2-point field stencil for ordinary and updraft variables
-function dual_faces(f::AbstractVector, grid, k::Int)
-    if is_surface_face(grid, k - 1)
-        return SVector(f[k])
-    elseif is_toa_center(grid, k)
-        return SVector(f[k - 1])
-    else
-        return SVector(f[k - 1], f[k])
-    end
-end
-function dual_faces(f::AbstractMatrix, grid, k::Int, i_up::Int)
-    if is_surface_face(grid, k - 1)
-        return SVector(f[i_up, k])
-    elseif is_toa_center(grid, k)
-        return SVector(f[i_up, k - 1])
-    else
-        return SVector(f[i_up, k - 1], f[i_up, k])
-    end
-end
+dual_faces(f::AbstractVector, grid, k::Int) = SVector(f[k - 1], f[k])
+dual_faces(f::AbstractMatrix, grid, k::Int, i_up::Int) = SVector(f[i_up, k - 1], f[i_up, k])
