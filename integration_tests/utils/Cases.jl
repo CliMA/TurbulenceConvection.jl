@@ -1910,11 +1910,16 @@ function LES_driven_SCM(namelist, Gr::Grid, Ref::ReferenceState)
 end
 
 function initialize_reference(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    # # old version
-    Ref.Pg = 1.015e5  #Pressure at ground
-    Ref.Tg = 300.4  #Temperature at ground
-    Ref.qtg = 0.02245   #Total water mixing ratio at surface
-    TC.initialize(Ref, Gr, Stats)
+
+    Dataset(self.LESDat.les_filename, "r") do data
+        Ref.Pg = data.group["reference"]["p0_full"][1] #Pressure at ground
+        Ref.Tg = data.group["reference"]["temperature0"][1] #Temperature at ground
+        ql_ground = data.group["reference"]["ql0"][1]
+        qv_ground = data.group["reference"]["qv0"][1]
+        qi_ground = data.group["reference"]["qi0"][1]
+        Ref.qtg = ql_ground + qv_ground + qi_ground #Total water mixing ratio at surface
+        TC.initialize(Ref, Gr, Stats)
+    end
 end
 
 function initialize_profiles(self::CasesBase{LES_driven_SCM}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
