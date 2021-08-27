@@ -1023,8 +1023,14 @@ function compute_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Ti
     # Compute the  mass flux tendencies
     # Adjust the values of the grid mean variables
     @inbounds for k in real_center_indicies(grid)
-        mf_tend_h = -(self.massflux_h[k] - self.massflux_h[k - 1]) * (ref_state.alpha0_half[k] * grid.dzi)
-        mf_tend_qt = -(self.massflux_qt[k] - self.massflux_qt[k - 1]) * (ref_state.alpha0_half[k] * grid.dzi)
+        mf_tend_h_dual = dual_faces(self.massflux_h, grid, k)
+        mf_tend_qt_dual = dual_faces(self.massflux_qt, grid, k)
+
+        ∇mf_tend_h = ∇f2c(mf_tend_h_dual, grid, k)
+        ∇mf_tend_qt = ∇f2c(mf_tend_qt_dual, grid, k)
+
+        mf_tend_h = -∇mf_tend_h * ref_state.alpha0_half[k]
+        mf_tend_qt = -∇mf_tend_qt * ref_state.alpha0_half[k]
 
         GMV.H.mf_update[k] = GMV.H.values[k] + TS.dt * mf_tend_h + self.UpdThermo.prec_source_h_tot[k]
         GMV.QT.mf_update[k] = GMV.QT.values[k] + TS.dt * mf_tend_qt + self.UpdThermo.prec_source_qt_tot[k]
