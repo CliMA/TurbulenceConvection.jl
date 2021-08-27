@@ -1427,48 +1427,42 @@ function compute_covariance_shear(
 )
 
     grid = get_grid(self)
-    dzi = grid.dzi
     ae = 1 .- self.UpdVar.Area.bulkvalues
     diff_var1 = 0.0
     diff_var2 = 0.0
-    du = 0.0
-    dv = 0.0
-    tke_factor = 1.0
-    du_high = 0.0
-    dv_high = 0.0
     KH = diffusivity_h(self).values
     rho0_half = reference_state(self).rho0_half
+    is_tke = Covar.name == "tke"
+    tke_factor = is_tke ? 0.5 : 1
+    k_eddy = is_tke ? diffusivity_m(self).values : diffusivity_h(self).values
 
-    @inbounds for k in real_center_indicies(grid)
-        if Covar.name == "tke"
-            du_low = du_high
-            dv_low = dv_high
-            du_high = (GMV.U.values[k + 1] - GMV.U.values[k]) * dzi
-            dv_high = (GMV.V.values[k + 1] - GMV.V.values[k]) * dzi
-            diff_var2 = (EnvVar2[k] - EnvVar2[k - 1]) * dzi
-            diff_var1 = (EnvVar1[k] - EnvVar1[k - 1]) * dzi
-            tke_factor = 0.5
-            k_eddy = diffusivity_m(self).values[k]
-        else
-            # Defined correctly only for covariance between half-level variables.
-            du_low = 0.0
-            dv_low = 0.0
-            du_high = 0.0
-            dv_high = 0.0
-            diff_var2 = interp2pt((EnvVar2[k + 1] - EnvVar2[k]), (EnvVar2[k] - EnvVar2[k - 1])) * dzi
-            diff_var1 = interp2pt((EnvVar1[k + 1] - EnvVar1[k]), (EnvVar1[k] - EnvVar1[k - 1])) * dzi
-            tke_factor = 1.0
-            k_eddy = KH[k]
+    if is_tke
+        @inbounds for k in real_center_indicies(grid)
+            v_cut = cut(GMV.V.values, grid, k)
+            ∇v = c∇(v_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
+
+            u_cut = cut(GMV.U.values, grid, k)
+            ∇u = c∇(u_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
+
+            var2_dual = dual_faces(EnvVar2, grid, k)
+            var1_dual = dual_faces(EnvVar1, grid, k)
+
+            ∇var2 = ∇f2c(var2_dual, grid, k; bottom = SetValue(0), top = SetGradient(0))
+            ∇var1 = ∇f2c(var1_dual, grid, k; bottom = SetValue(0), top = SetGradient(0))
+
+            Covar.shear[k] = tke_factor * 2 * (rho0_half[k] * ae[k] * k_eddy[k] * (∇var1 * ∇var2 + ∇u^2 + ∇v^2))
         end
-        Covar.shear[k] =
-            tke_factor *
-            2.0 *
-            (
-                rho0_half[k] *
-                ae[k] *
-                k_eddy *
-                (diff_var1 * diff_var2 + interp2pt(du_low, du_high)^2 + interp2pt(dv_low, dv_high)^2)
-            )
+    else
+        @inbounds for k in real_center_indicies(grid)
+            # Defined correctly only for covariance between half-level variables.
+            var1_cut = cut(EnvVar1, grid, k)
+            ∇var1 = c∇(var1_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
+
+            var2_cut = cut(EnvVar2, grid, k)
+            ∇var2 = c∇(var2_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
+
+            Covar.shear[k] = tke_factor * 2 * (rho0_half[k] * ae[k] * k_eddy[k] * (∇var1 * ∇var2))
+        end
     end
     return
 end
