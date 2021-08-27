@@ -35,33 +35,33 @@ function lamb_smooth_minimum(l, lower_bound, upper_bound)
     return smin
 end
 
-function upwind_advection_area(k, dzi, ρ0_half::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64})
+function upwind_advection_area(ρ0_half::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64}, grid, k)
     whalf_kp = interp2pt(w_up[k - 1], w_up[k])
     whalf_k = interp2pt(w_up[k - 2], w_up[k - 1])
 
     m_kp = (ρ0_half[k] * a_up[k] * whalf_kp)
     m_k = (ρ0_half[k - 1] * a_up[k - 1] * whalf_k)
-    return -dzi * (m_kp - m_k) / ρ0_half[k]
+    return -grid.dzi * (m_kp - m_k) / ρ0_half[k]
 end
 
-function upwind_advection_velocity(k, dzi, ρ0::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64})
+function upwind_advection_velocity(ρ0::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64}, grid, k)
     a_k = interp2pt(a_up[k], a_up[k + 1])
     a_km = interp2pt(a_up[k - 1], a_up[k])
-    adv = (ρ0[k] * a_k * w_up[k] * w_up[k] * dzi - ρ0[k - 1] * a_km * w_up[k - 1] * w_up[k - 1] * dzi)
+    adv = (ρ0[k] * a_k * w_up[k] * w_up[k] * grid.dzi - ρ0[k - 1] * a_km * w_up[k - 1] * w_up[k - 1] * grid.dzi)
     return adv
 end
 
 function upwind_advection_scalar(
-    k,
-    dzi,
     ρ0_half::Vector{Float64},
     a_up::Vector{Float64},
     w_up::Vector{Float64},
     var::Vector{Float64},
+    grid,
+    k,
 )
     m_k = (ρ0_half[k] * a_up[k] * interp2pt(w_up[k - 1], w_up[k]))
     m_km = (ρ0_half[k - 1] * a_up[k - 1] * interp2pt(w_up[k - 2], w_up[k - 1]))
-    return (m_k * var[k] - m_km * var[k - 1]) * dzi
+    return (m_k * var[k] - m_km * var[k - 1]) * grid.dzi
 end
 
 get_nc_data(data, group, var, imin, imax) = mean(data.group[group][var][:][:, imin:imax], dims = 2)[:]

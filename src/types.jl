@@ -893,7 +893,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     wstar::Float64
     entr_surface_bc::Float64
     detr_surface_bc::Float64
-    dt_upd::Float64
     sde_model::sde_struct
     function EDMF_PrognosticTKE(namelist, Gr::Grid, Ref::ReferenceState, param_set::PS) where {PS}
         turbulence_tendency = center_field(Gr)
@@ -1047,7 +1046,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         wstar = 0
         entr_surface_bc = 0
         detr_surface_bc = 0
-        dt_upd = 0
         A1 = typeof(mixing_length)
         A2 = typeof(horiz_K_eddy)
         return new{PS, A1, A2}(
@@ -1116,7 +1114,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             wstar,
             entr_surface_bc,
             detr_surface_bc,
-            dt_upd,
             sde_model,
         )
     end

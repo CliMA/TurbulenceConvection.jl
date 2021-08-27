@@ -805,7 +805,6 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     ref_state = reference_state(self)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
-    dzi = grid.dzi
     dti_ = 1.0 / TS.dt
     dt_ = 1.0 / dti_
     sa = eos_struct()
@@ -822,11 +821,11 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
             # First solve for updated area fraction at k+1
             whalf_kp = interp2pt(self.UpdVar.W.values[i, k], self.UpdVar.W.values[i, k + 1])
             adv = upwind_advection_area(
-                k + 1,
-                dzi,
                 ref_state.rho0_half,
                 self.UpdVar.Area.values[i, :],
                 self.UpdVar.W.values[i, :],
+                grid,
+                k + 1,
             )
 
             entr_term = self.UpdVar.Area.values[i, k + 1] * whalf_kp * (self.entr_sc[i, k + 1])
@@ -869,11 +868,11 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 B_k = interp2pt(self.UpdVar.B.values[i, k], self.UpdVar.B.values[i, k + 1])
 
                 adv = upwind_advection_velocity(
-                    k,
-                    dzi,
                     ref_state.rho0,
                     self.UpdVar.Area.values[i, :],
                     self.UpdVar.W.values[i, :],
+                    grid,
+                    k,
                 )
                 exch = (
                     ref_state.rho0[k] *
@@ -933,12 +932,12 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 )
 
                 adv = upwind_advection_scalar(
-                    k,
-                    dzi,
                     ref_state.rho0_half,
                     self.UpdVar.Area.values[i, :],
                     self.UpdVar.W.values[i, :],
                     self.UpdVar.H.values[i, :],
+                    grid,
+                    k,
                 )
                 entr = (self.entr_sc[i, k] + self.frac_turb_entr[i, k]) * self.EnvVar.H.values[k]
                 detr = (self.detr_sc[i, k] + self.frac_turb_entr[i, k]) * self.UpdVar.H.values[i, k]
@@ -949,12 +948,12 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                     ) / (ref_state.rho0_half[k] * self.UpdVar.Area.new[i, k] * dti_)
 
                 adv = upwind_advection_scalar(
-                    k,
-                    dzi,
                     ref_state.rho0_half,
                     self.UpdVar.Area.values[i, :],
                     self.UpdVar.W.values[i, :],
                     self.UpdVar.QT.values[i, :],
+                    grid,
+                    k,
                 )
                 entr = (self.entr_sc[i, k] + self.frac_turb_entr[i, k]) * self.EnvVar.QT.values[k]
                 detr = (self.detr_sc[i, k] + self.frac_turb_entr[i, k]) * self.UpdVar.QT.values[i, k]
