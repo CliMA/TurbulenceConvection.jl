@@ -925,11 +925,6 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                     self.UpdVar.Area.values[i, k] *
                     interp2pt(self.UpdVar.W.values[i, k - 1], self.UpdVar.W.values[i, k])
                 )
-                m_km = (
-                    ref_state.rho0_half[k - 1] *
-                    self.UpdVar.Area.values[i, k - 1] *
-                    interp2pt(self.UpdVar.W.values[i, k - 2], self.UpdVar.W.values[i, k - 1])
-                )
 
                 adv = upwind_advection_scalar(
                     ref_state.rho0_half,
@@ -1696,7 +1691,6 @@ function update_covariance_ED(
         rho_ae_K_m[k] = 0.5 * (ae[k] * K + ae[k + 1] * Kp) * Ref.rho0[k]
         whalf[k] = interp2pt(self.EnvVar.W.values[k - 1], self.EnvVar.W.values[k])
     end
-    wu_half = interp2pt(self.UpdVar.W.bulkvalues[kf_surf], self.UpdVar.W.bulkvalues[kf_surf + 1])
 
     # Not necessary if BCs for variances are applied to environment.
     # if GmvCovar.name=="tke"
