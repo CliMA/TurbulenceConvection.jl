@@ -107,6 +107,16 @@ function default_namelist(case_name::String)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = 0.1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = 10.0
 
+    # stochastic closures
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"] = Dict()
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"]["closure"] = "none"
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"]["entr_lognormal_var"] = 0.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"]["detr_lognormal_var"] = 0.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"]["sde_entr_theta"] = 1.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"]["sde_entr_std"] = 0.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"]["sde_detr_theta"] = 1.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"]["sde_detr_std"] = 0.0
+
     # From namelist
     namelist_defaults["grid"] = Dict()
     namelist_defaults["grid"]["dims"] = 1
