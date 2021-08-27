@@ -179,7 +179,7 @@ function dual_faces(f::AbstractVector, grid, k::Int)
     elseif is_toa_center(grid, k)
         return SVector(f[k - 1])
     else
-        return SVector(f[k], f[k - 1])
+        return SVector(f[k - 1], f[k])
     end
 end
 function dual_faces(f::AbstractMatrix, grid, k::Int, i_up::Int)
@@ -188,6 +188,6 @@ function dual_faces(f::AbstractMatrix, grid, k::Int, i_up::Int)
     elseif is_toa_center(grid, k)
         return SVector(f[i_up, k - 1])
     else
-        return SVector(f[i_up, k], f[i_up, k - 1])
+        return SVector(f[i_up, k - 1], f[i_up, k])
     end
 end
