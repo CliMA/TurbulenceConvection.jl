@@ -1196,10 +1196,6 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     ref_state = reference_state(self)
     param_set = parameter_set(GMV)
     g = CPP.grav(param_set)
-    grad_thl_minus = 0.0
-    grad_qt_minus = 0.0
-    grad_thl_plus = 0
-    grad_qt_plus = 0
     ae = 1 .- self.UpdVar.Area.bulkvalues
     KH = diffusivity_h(self).values
 
@@ -1215,10 +1211,13 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
         th_cloudy = self.EnvThermo.th_cloudy[k]
         lh = latent_heat(t_cloudy)
         cpm = cpm_c(qt_cloudy)
-        grad_thl_minus = grad_thl_plus
-        grad_qt_minus = grad_qt_plus
-        grad_thl_plus = (self.EnvVar.H.values[k + 1] - self.EnvVar.H.values[k]) * grid.dzi
-        grad_qt_plus = (self.EnvVar.QT.values[k + 1] - self.EnvVar.QT.values[k]) * grid.dzi
+
+        q_tot_cut = cut(self.EnvVar.QT.values, grid, k)
+        ∇q_tot = c∇(q_tot_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
+
+        θ_liq_ice_cut = cut(self.EnvVar.H.values, grid, k)
+        ∇θ_liq_ice = c∇(θ_liq_ice_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
+
         prefactor = Rd * exner_c(ref_state.p0_half[k]) / ref_state.p0_half[k]
         d_alpha_thetal_dry = prefactor * (1.0 + (eps_vi - 1.0) * qt_dry)
         d_alpha_qt_dry = prefactor * th_dry * (eps_vi - 1.0)
@@ -1248,10 +1247,7 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
             g / ref_state.alpha0_half[k] *
             ae[k] *
             ref_state.rho0_half[k] *
-            (
-                -KH[k] * interp2pt(grad_thl_plus, grad_thl_minus) * d_alpha_thetal_total -
-                KH[k] * interp2pt(grad_qt_plus, grad_qt_minus) * d_alpha_qt_total
-            )
+            (-KH[k] * ∇θ_liq_ice * d_alpha_thetal_total - KH[k] * ∇q_tot * d_alpha_qt_total)
     end
     return
 end
