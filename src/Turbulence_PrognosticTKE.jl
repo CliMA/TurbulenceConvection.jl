@@ -710,13 +710,18 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
         end
     end
 
+    kf_surf = kf_surface(grid)
+    kf_toa = kf_top_of_atmos(grid)
     @inbounds for k in real_face_indicies(grid)
         @inbounds for i in xrange(self.n_updrafts)
 
             # pressure
-            a_kfull = interpc2f(self.UpdVar.Area.values, grid, k, i)
+            a_bcs = (; bottom = SetValue(self.area_surface_bc[i]), top = SetValue(0))
+            a_kfull = interpc2f(self.UpdVar.Area.values, grid, k, i; a_bcs...)
             if a_kfull > 0.0
-                b_kfull = interpc2f(self.UpdVar.B.values, grid, k, i)
+                B = self.UpdVar.B.values
+                b_bcs = (; bottom = SetValue(B[i, kf_surf]), top = SetValue(B[i, kf_toa]))
+                b_kfull = interpc2f(self.UpdVar.B.values, grid, k, i; b_bcs...)
                 w_cut = fcut(self.UpdVar.W.values, grid, k, i)
                 ∇w_up = f∇(w_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
                 asp_ratio = 1.0

@@ -56,13 +56,26 @@ end
 # top of the domain.
 ∇_onesided(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
-function interpc2f(f, grid::Grid, k::Int)
-    return 0.5 * (f[k + 1] + f[k])
-end
+# Used when traversing cell faces
 
-function interpc2f(f, grid::Grid, k::Int, i_up::Int)
-    return 0.5 * (f[i_up, k + 1] + f[i_up, k])
+interpc2f(f, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError()) =
+    interpc2f(dual_centers(f, grid, k), grid, k; bottom, top)
+
+interpc2f(f, grid::Grid, k::Int, i_up::Int; bottom = NoBCGivenError(), top = NoBCGivenError()) =
+    interpc2f(dual_centers(f, grid, k, i_up), grid, k; bottom, top)
+
+function interpc2f(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
+    if is_surface_face(grid, k)
+        return interpc2f(f_dual, grid, BottomBCTag(), bottom)
+    elseif is_toa_face(grid, k)
+        return interpc2f(f_dual, grid, TopBCTag(), top)
+    else
+        return interpc2f(f_dual, grid, InteriorTag())
+    end
 end
+interpc2f(f::SVector, grid::Grid, ::InteriorTag) = (f[1] + f[2]) / 2
+interpc2f(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = bc.value
+interpc2f(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = bc.value
 
 function interpf2c(f, grid::Grid, k::Int)
     return 0.5 * (f[k] + f[k - 1])
@@ -261,3 +274,22 @@ end
 # A 2-point field stencil for ordinary and updraft variables
 dual_faces(f::AbstractVector, grid, k::Int) = SVector(f[k - 1], f[k])
 dual_faces(f::AbstractMatrix, grid, k::Int, i_up::Int) = SVector(f[i_up, k - 1], f[i_up, k])
+
+function dual_centers(f::AbstractVector, grid, k::Int)
+    if is_surface_face(grid, k)
+        return SVector(f[k + 1])
+    elseif is_toa_face(grid, k)
+        return SVector(f[k])
+    else
+        return SVector(f[k], f[k + 1])
+    end
+end
+function dual_centers(f::AbstractMatrix, grid, k::Int, i_up::Int)
+    if is_surface_face(grid, k)
+        return SVector(f[i_up, k + 1])
+    elseif is_toa_face(grid, k)
+        return SVector(f[i_up, k])
+    else
+        return SVector(f[i_up, k], f[i_up, k + 1])
+    end
+end
