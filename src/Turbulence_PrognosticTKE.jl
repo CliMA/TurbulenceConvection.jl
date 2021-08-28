@@ -306,8 +306,8 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
     @inbounds for k in real_center_indicies(grid)
 
         # compute shear
-        U_cut = cut(GMV.U.values, grid, k)
-        V_cut = cut(GMV.V.values, grid, k)
+        U_cut = ccut(GMV.U.values, grid, k)
+        V_cut = ccut(GMV.V.values, grid, k)
         wc_en = interpf2c(self.EnvVar.W.values, grid, k)
         wc_up = interpf2c.(Ref(self.UpdVar.W.values), Ref(grid), k, 1:(self.n_updrafts))
         w_dual = dual_faces(self.EnvVar.W.values, grid, k)
@@ -327,16 +327,18 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         lh = latent_heat(t_cloudy)
         cpm = cpm_c(qt_cloudy)
 
-        QT_cut = cut(self.EnvVar.QT.values, grid, k)
+        QT_cut = ccut(self.EnvVar.QT.values, grid, k)
         ∂qt∂z = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
-        THL_cut = cut(self.EnvVar.H.values, grid, k)
+        THL_cut = ccut(self.EnvVar.H.values, grid, k)
         ∂θl∂z = c∇(THL_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
 
         prefactor = g * (Rd / ref_state.alpha0_half[k] / ref_state.p0_half[k]) * exner_c(ref_state.p0_half[k])
         ∂b∂θl_dry = prefactor * (1.0 + (eps_vi - 1.0) * qt_dry)
         ∂b∂qt_dry = prefactor * th_dry * (eps_vi - 1.0)
 
-        if self.EnvVar.cloud_fraction.values[k] > 0.0
+        en_cld_frac = self.EnvVar.cloud_fraction.values[k]
+
+        if en_cld_frac > 0.0
             ∂b∂θl_cld = (
                 prefactor * (1.0 + eps_vi * (1.0 + lh / Rv / t_cloudy) * qv_cloudy - qt_cloudy) /
                 (1.0 + lh * lh / cpm / Rv / t_cloudy / t_cloudy * qv_cloudy)
@@ -346,20 +348,16 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
             ∂b∂θl_cld = 0.0
             ∂b∂qt_cld = 0.0
         end
-        ∂b∂θl = (
-            self.EnvVar.cloud_fraction.values[k] * ∂b∂θl_cld + (1.0 - self.EnvVar.cloud_fraction.values[k]) * ∂b∂θl_dry
-        )
-        ∂b∂qt = (
-            self.EnvVar.cloud_fraction.values[k] * ∂b∂qt_cld + (1.0 - self.EnvVar.cloud_fraction.values[k]) * ∂b∂qt_dry
-        )
+        ∂b∂θl = (en_cld_frac * ∂b∂θl_cld + (1.0 - en_cld_frac) * ∂b∂θl_dry)
+        ∂b∂qt = (en_cld_frac * ∂b∂qt_cld + (1.0 - en_cld_frac) * ∂b∂qt_dry)
         ∂b∂z_θl = ∂b∂θl * ∂θl∂z
         ∂b∂z_qt = ∂b∂qt * ∂qt∂z
 
         # Limiting stratification scale (Deardorff, 1976)
-        p0_cut = cut(ref_state.p0_half, grid, k)
-        T_cut = cut(self.EnvVar.T.values, grid, k)
-        QT_cut = cut(self.EnvVar.QT.values, grid, k)
-        QL_cut = cut(self.EnvVar.QL.values, grid, k)
+        p0_cut = ccut(ref_state.p0_half, grid, k)
+        T_cut = ccut(self.EnvVar.T.values, grid, k)
+        QT_cut = ccut(self.EnvVar.QT.values, grid, k)
+        QL_cut = ccut(self.EnvVar.QL.values, grid, k)
         thv_cut = theta_virt_c.(p0_cut, T_cut, QT_cut, QL_cut)
         θv = theta_virt_c(
             ref_state.p0_half[k],
@@ -393,7 +391,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
             a_up = Tuple(self.UpdVar.Area.values[:, k]),
             ε_turb = Tuple(self.frac_turb_entr[:, k]),
             δ_dyn = Tuple(self.detr_sc[:, k]),
-            en_cld_frac = self.EnvVar.cloud_fraction.values[k],
+            en_cld_frac = en_cld_frac,
             θ_li_en = self.EnvVar.H.values[k],
             ql_en = self.EnvVar.QL.values[k],
             qt_en = self.EnvVar.QT.values[k],
@@ -709,13 +707,18 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
                 self.frac_turb_entr[i, k] = 0.0
                 self.horiz_K_eddy[i, k] = 0.0
             end
+        end
+    end
+
+    @inbounds for k in real_face_indicies(grid)
+        @inbounds for i in xrange(self.n_updrafts)
 
             # pressure
             a_kfull = interpc2f(self.UpdVar.Area.values, grid, k, i)
             if a_kfull > 0.0
                 b_kfull = interpc2f(self.UpdVar.B.values, grid, k, i)
-                w_dual = dual_faces(self.UpdVar.W.values, grid, k, i)
-                ∇w_up = ∇f2c(w_dual, grid, k; bottom = SetValue(0), top = SetGradient(0))
+                w_cut = fcut(self.UpdVar.W.values, grid, k, i)
+                ∇w_up = f∇(w_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
                 asp_ratio = 1.0
                 self.nh_pressure_b[i, k], self.nh_pressure_adv[i, k], self.nh_pressure_drag[i, k] =
                     perturbation_pressure(
@@ -1091,7 +1094,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     end
     # get the diffusive flux
     @inbounds for k in real_center_indicies(grid)
-        q_cut = cut(self.EnvVar.QT.values, grid, k)
+        q_cut = ccut(self.EnvVar.QT.values, grid, k)
         q_bc = -Case.Sur.rho_qtflux / rho_ae_K[k]
         ∇q_tot = c∇(q_cut, grid, k; bottom = SetGradient(q_bc), top = SetGradient(0))
         self.diffusive_flux_qt[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KH.values[k] * ∇q_tot
@@ -1115,7 +1118,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     end
     # get the diffusive flux
     @inbounds for k in real_center_indicies(grid)
-        θ_liq_ice_cut = cut(self.EnvVar.H.values, grid, k)
+        θ_liq_ice_cut = ccut(self.EnvVar.H.values, grid, k)
         θ_liq_ice_bc = -Case.Sur.rho_hflux / rho_ae_K[k]
         ∇θ_liq_ice = c∇(θ_liq_ice_cut, grid, k; bottom = SetGradient(θ_liq_ice_bc), top = SetGradient(0))
         self.diffusive_flux_h[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KH.values[k] * ∇θ_liq_ice
@@ -1140,7 +1143,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         GMV.U.new[k] = x[k]
     end
     @inbounds for k in real_center_indicies(grid)
-        u_cut = cut(GMV.U.values, grid, k)
+        u_cut = ccut(GMV.U.values, grid, k)
         u_bc = -Case.Sur.rho_uflux / rho_ae_K[k]
         ∇u = c∇(u_cut, grid, k; bottom = SetGradient(u_bc), top = SetGradient(0))
         self.diffusive_flux_u[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KM.values[k] * ∇u
@@ -1158,7 +1161,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         GMV.V.new[k] = x[k]
     end
     @inbounds for k in real_center_indicies(grid)
-        v_cut = cut(GMV.V.values, grid, k)
+        v_cut = ccut(GMV.V.values, grid, k)
         v_bc = -Case.Sur.rho_vflux / rho_ae_K[k]
         ∇v = c∇(v_cut, grid, k; bottom = SetGradient(v_bc), top = SetGradient(0))
         self.diffusive_flux_v[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KM.values[k] * ∇v
@@ -1192,10 +1195,10 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
         lh = latent_heat(t_cloudy)
         cpm = cpm_c(qt_cloudy)
 
-        q_tot_cut = cut(self.EnvVar.QT.values, grid, k)
+        q_tot_cut = ccut(self.EnvVar.QT.values, grid, k)
         ∇q_tot = c∇(q_tot_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
 
-        θ_liq_ice_cut = cut(self.EnvVar.H.values, grid, k)
+        θ_liq_ice_cut = ccut(self.EnvVar.H.values, grid, k)
         ∇θ_liq_ice = c∇(θ_liq_ice_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
 
         prefactor = Rd * exner_c(ref_state.p0_half[k]) / ref_state.p0_half[k]
@@ -1418,10 +1421,10 @@ function compute_covariance_shear(
 
     if is_tke
         @inbounds for k in real_center_indicies(grid)
-            v_cut = cut(GMV.V.values, grid, k)
+            v_cut = ccut(GMV.V.values, grid, k)
             ∇v = c∇(v_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
 
-            u_cut = cut(GMV.U.values, grid, k)
+            u_cut = ccut(GMV.U.values, grid, k)
             ∇u = c∇(u_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
 
             var2_dual = dual_faces(EnvVar2, grid, k)
@@ -1435,10 +1438,10 @@ function compute_covariance_shear(
     else
         @inbounds for k in real_center_indicies(grid)
             # Defined correctly only for covariance between half-level variables.
-            var1_cut = cut(EnvVar1, grid, k)
+            var1_cut = ccut(EnvVar1, grid, k)
             ∇var1 = c∇(var1_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
 
-            var2_cut = cut(EnvVar2, grid, k)
+            var2_cut = ccut(EnvVar2, grid, k)
             ∇var2 = c∇(var2_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
 
             Covar.shear[k] = tke_factor * 2 * (rho0_half[k] * ae[k] * k_eddy[k] * (∇var1 * ∇var2))
@@ -1828,7 +1831,7 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
     elseif option == "thetal_maxgrad"
 
         @inbounds for k in real_center_indicies(grid)
-            ∇θ_liq_cut = cut_onesided(GMV.H.values, grid, k)
+            ∇θ_liq_cut = ccut_onesided(GMV.H.values, grid, k)
             ∇θ_liq = ∇_onesided(∇θ_liq_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
             if ∇θ_liq > ∇θ_liq_max
                 ∇θ_liq_max = ∇θ_liq
