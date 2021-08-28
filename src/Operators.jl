@@ -76,7 +76,8 @@ end
 ##### ∇(center data)
 #####
 
-c∇(f, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError()) = c∇(cut(f, grid, k), grid, k; bottom, top)
+c∇(f, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError()) =
+    c∇(ccut(f, grid, k), grid, k; bottom, top)
 
 function c∇(f_cut::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
     if is_surface_center(grid, k)
@@ -134,6 +135,66 @@ function c∇(f::SVector, grid::Grid, ::BottomBCTag, ::Extrapolate)
 end
 
 #####
+##### ∇(face data)
+#####
+
+f∇(f, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError()) =
+    f∇(fcut(f, grid, k), grid, k; bottom, top)
+
+function f∇(f_cut::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
+    if is_surface_face(grid, k)
+        return f∇(f_cut, grid, BottomBCTag(), bottom)
+    elseif is_toa_face(grid, k)
+        return f∇(f_cut, grid, TopBCTag(), top)
+    else
+        return f∇(f_cut, grid, InteriorTag())
+    end
+end
+f∇(f::SVector, grid::Grid, ::AbstractBCTag, ::NoBCGivenError) = error("No BC given")
+function f∇(f::SVector, grid::Grid, ::InteriorTag)
+    @assert length(f) == 3
+    f_dual⁺ = SVector(f[2], f[3])
+    f_dual⁻ = SVector(f[1], f[2])
+    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
+end
+function f∇(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue)
+    @assert length(f) == 2
+    # 2fb = fg+fi => fg = 2fb-fi
+    f_dual⁺ = SVector(bc.value, 2 * bc.value - f[1])
+    f_dual⁻ = SVector(f[1], bc.value)
+    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
+end
+function f∇(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue)
+    @assert length(f) == 2
+    # 2fb = fg+fi => fg = 2fb-fi
+    f_dual⁺ = SVector(bc.value, f[2])
+    f_dual⁻ = SVector(2 * bc.value - f[2], bc.value)
+    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
+end
+function f∇(f::SVector, grid::Grid, ::TopBCTag, bc::SetGradient)
+    @assert length(f) == 2
+    return bc.value
+end
+function f∇(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient)
+    @assert length(f) == 2
+    return bc.value
+end
+function f∇(f::SVector, grid::Grid, ::TopBCTag, ::Extrapolate)
+    @assert length(f) == 2
+    # 2fb = fg+fi => fg = 2fb-fi
+    f_dual⁺ = SVector(f[2], 2 * f[2] - f[1])
+    f_dual⁻ = SVector(f[1], f[2])
+    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
+end
+function f∇(f::SVector, grid::Grid, ::BottomBCTag, ::Extrapolate)
+    @assert length(f) == 2
+    # 2fb = fg+fi => fg = 2fb-fi
+    f_dual⁺ = SVector(f[1], f[2])
+    f_dual⁻ = SVector(2 * f[1] - f[2], f[1])
+    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
+end
+
+#####
 ##### Generic functions
 #####
 
@@ -143,7 +204,7 @@ function ∇_staggered(f::SVector, grid::Grid)
 end
 
 # A 3-point field stencil for ordinary and updraft variables
-function cut(f::AbstractVector, grid, k::Int)
+function ccut(f::AbstractVector, grid, k::Int)
     if is_surface_center(grid, k)
         return SVector(f[k], f[k + 1])
     elseif is_toa_center(grid, k)
@@ -152,7 +213,7 @@ function cut(f::AbstractVector, grid, k::Int)
         return SVector(f[k - 1], f[k], f[k + 1])
     end
 end
-function cut(f::AbstractMatrix, grid, k::Int, i_up::Int)
+function ccut(f::AbstractMatrix, grid, k::Int, i_up::Int)
     if is_surface_center(grid, k)
         return SVector(f[i_up, k], f[i_up, k + 1])
     elseif is_toa_center(grid, k)
@@ -162,15 +223,34 @@ function cut(f::AbstractMatrix, grid, k::Int, i_up::Int)
     end
 end
 
+function fcut(f::AbstractVector, grid, k::Int)
+    if is_surface_face(grid, k)
+        return SVector(f[k], f[k + 1])
+    elseif is_toa_face(grid, k)
+        return SVector(f[k - 1], f[k])
+    else
+        return SVector(f[k - 1], f[k], f[k + 1])
+    end
+end
+function fcut(f::AbstractMatrix, grid, k::Int, i_up::Int)
+    if is_surface_face(grid, k)
+        return SVector(f[i_up, k], f[i_up, k + 1])
+    elseif is_toa_face(grid, k)
+        return SVector(f[i_up, k - 1], f[i_up, k])
+    else
+        return SVector(f[i_up, k - 1], f[i_up, k], f[i_up, k + 1])
+    end
+end
+
 # A 2-point field stencil for ordinary and updraft variables
-function cut_onesided(f::AbstractVector, grid, k::Int)
+function ccut_onesided(f::AbstractVector, grid, k::Int)
     if is_toa_center(grid, k)
         return SVector(f[k])
     else
         return SVector(f[k], f[k + 1])
     end
 end
-function cut_onesided(f::AbstractMatrix, grid, k::Int, i_up::Int)
+function ccut_onesided(f::AbstractMatrix, grid, k::Int, i_up::Int)
     if is_toa_center(grid, k)
         return SVector(f[i_up, k])
     else
