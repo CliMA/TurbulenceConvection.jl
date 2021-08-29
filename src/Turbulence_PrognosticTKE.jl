@@ -1837,7 +1837,7 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
 
         @inbounds for k in real_center_indicies(grid)
             ∇θ_liq_cut = ccut_onesided(GMV.H.values, grid, k)
-            ∇θ_liq = ∇_onesided(∇θ_liq_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
+            ∇θ_liq = c∇_onesided(∇θ_liq_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
             if ∇θ_liq > ∇θ_liq_max
                 ∇θ_liq_max = ∇θ_liq
                 self.zi = grid.z[k]

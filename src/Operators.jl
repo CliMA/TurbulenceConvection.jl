@@ -35,26 +35,26 @@ end
 ∇f2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[2] - bc.value) * grid.dzi
 ∇f2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
-function ∇_onesided(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
+function c∇_onesided(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
     if is_surface_center(grid, k)
-        return ∇_onesided(f_dual, grid, BottomBCTag(), bottom)
+        return c∇_onesided(f_dual, grid, BottomBCTag(), bottom)
     elseif is_toa_center(grid, k)
-        return ∇_onesided(f_dual, grid, TopBCTag(), top)
+        return c∇_onesided(f_dual, grid, TopBCTag(), top)
     else
-        return ∇_onesided(f_dual, grid, InteriorTag())
+        return c∇_onesided(f_dual, grid, InteriorTag())
     end
 end
-∇_onesided(f::SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
-∇_onesided(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.dzi / 2)
+c∇_onesided(f::SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
+c∇_onesided(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.dzi / 2)
 # TODO: this is a crud approximation, as we're specifying what should be the derivative
 # at the boundary, and we're taking this as the derivative at the first interior at the
 # top of the domain.
-∇_onesided(f::SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
-∇_onesided(f::SVector, grid::Grid, ::BottomBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.dzi # don't use BC info
+c∇_onesided(f::SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
+c∇_onesided(f::SVector, grid::Grid, ::BottomBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.dzi # don't use BC info
 # TODO: this is a crud approximation, as we're specifying what should be the derivative
 # at the boundary, and we're taking this as the derivative at the first interior at the
 # top of the domain.
-∇_onesided(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
+c∇_onesided(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
 # Used when traversing cell faces
 
@@ -111,7 +111,7 @@ function upwind_advection_area(ρ0_half::Vector{Float64}, a_up::Vector{Float64},
     ρ_0_cut = ccut_onesided(ρ0_half, grid, k)
     a_up_cut = ccut_onesided(a_up, grid, k)
     m_cut = ρ_0_cut .* a_up_cut .* w_up_cut
-    ∇m = ∇_onesided(m_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
+    ∇m = c∇_onesided(m_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
     # TODO: Why are we dividing by ρ0_half[k + 1]?
     return -∇m / ρ0_half[k + 1]
 end
