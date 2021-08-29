@@ -35,26 +35,27 @@ end
 ∇f2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[2] - bc.value) * grid.dzi
 ∇f2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
-function c∇_onesided(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
+# TODO: this should be changed to `c∇` or `c∇_upwind`
+function c∇_downwind(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
     if is_surface_center(grid, k)
-        return c∇_onesided(f_dual, grid, BottomBCTag(), bottom)
+        return c∇_downwind(f_dual, grid, BottomBCTag(), bottom)
     elseif is_toa_center(grid, k)
-        return c∇_onesided(f_dual, grid, TopBCTag(), top)
+        return c∇_downwind(f_dual, grid, TopBCTag(), top)
     else
-        return c∇_onesided(f_dual, grid, InteriorTag())
+        return c∇_downwind(f_dual, grid, InteriorTag())
     end
 end
-c∇_onesided(f::SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
-c∇_onesided(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.dzi / 2)
+c∇_downwind(f::SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
+c∇_downwind(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.dzi / 2)
 # TODO: this is a crud approximation, as we're specifying what should be the derivative
 # at the boundary, and we're taking this as the derivative at the first interior at the
 # top of the domain.
-c∇_onesided(f::SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
-c∇_onesided(f::SVector, grid::Grid, ::BottomBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.dzi # don't use BC info
+c∇_downwind(f::SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
+c∇_downwind(f::SVector, grid::Grid, ::BottomBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.dzi # don't use BC info
 # TODO: this is a crud approximation, as we're specifying what should be the derivative
 # at the boundary, and we're taking this as the derivative at the first interior at the
 # top of the domain.
-c∇_onesided(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
+c∇_downwind(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
 function f∇_onesided(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
     if is_surface_face(grid, k)
@@ -123,10 +124,10 @@ interp2pt(val1, val2) = 0.5 * (val1 + val2)
 
 function upwind_advection_area(ρ0_half::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64}, grid, k)
     w_up_cut = fdaul_onesided(w_up, grid, k)
-    ρ_0_cut = ccut_onesided(ρ0_half, grid, k)
-    a_up_cut = ccut_onesided(a_up, grid, k)
+    ρ_0_cut = ccut_downwind(ρ0_half, grid, k)
+    a_up_cut = ccut_downwind(a_up, grid, k)
     m_cut = ρ_0_cut .* a_up_cut .* w_up_cut
-    ∇m = c∇_onesided(m_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
+    ∇m = c∇_downwind(m_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
     # TODO: Why are we dividing by ρ0_half[k + 1]?
     return -∇m / ρ0_half[k + 1]
 end
@@ -325,14 +326,14 @@ function fcut(f::AbstractMatrix, grid, k::Int, i_up::Int)
 end
 
 # A 2-point field stencil for ordinary and updraft variables
-function ccut_onesided(f::AbstractVector, grid, k::Int)
+function ccut_downwind(f::AbstractVector, grid, k::Int)
     if is_toa_center(grid, k)
         return SVector(f[k])
     else
         return SVector(f[k], f[k + 1])
     end
 end
-function ccut_onesided(f::AbstractMatrix, grid, k::Int, i_up::Int)
+function ccut_downwind(f::AbstractMatrix, grid, k::Int, i_up::Int)
     if is_toa_center(grid, k)
         return SVector(f[i_up, k])
     else
