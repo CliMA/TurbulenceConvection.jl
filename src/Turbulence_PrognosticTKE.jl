@@ -110,9 +110,9 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     mean_asp_ratio = center_field(grid)
     mean_entr_sc = center_field(grid)
     mean_detr_sc = center_field(grid)
-    massflux = face_field(grid)
-    mf_h = face_field(grid)
-    mf_qt = face_field(grid)
+    massflux = center_field(grid)
+    mf_h = center_field(grid)
+    mf_qt = center_field(grid)
     mean_frac_turb_entr = center_field(grid)
     mean_horiz_K_eddy = center_field(grid)
     mean_sorting_function = center_field(grid)
@@ -126,11 +126,11 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     write_profile(Stats, "eddy_diffusivity", diffusivity_h(self).values[cinterior])
     write_ts(Stats, "rd", mean(self.pressure_plume_spacing))
     @inbounds for k in real_center_indicies(grid)
-        mf_h[k] = interp2pt(self.massflux_h[k], self.massflux_h[k - 1])
-        mf_qt[k] = interp2pt(self.massflux_qt[k], self.massflux_qt[k - 1])
+        mf_h[k] = interpf2c(self.massflux_h, grid, k)
+        mf_qt[k] = interpf2c(self.massflux_qt, grid, k)
         if self.UpdVar.Area.bulkvalues[k] > 0.0
             @inbounds for i in xrange(self.n_updrafts)
-                massflux[k] += interp2pt(self.m[i, k], self.m[i, k - 1])
+                massflux[k] += interpf2c(self.m, grid, k, i)
                 mean_entr_sc[k] += self.UpdVar.Area.values[i, k] * self.entr_sc[i, k] / self.UpdVar.Area.bulkvalues[k]
                 mean_detr_sc[k] += self.UpdVar.Area.values[i, k] * self.detr_sc[i, k] / self.UpdVar.Area.bulkvalues[k]
                 mean_nh_pressure[k] +=
@@ -542,13 +542,25 @@ function get_GMV_CoVar(
 
     if is_tke
         @inbounds for k in real_face_indicies(grid)
-            Δϕ = interp2pt(ϕ_en.values[k - 1] - ϕ_gm[k - 1], ϕ_en.values[k] - ϕ_gm[k])
-            Δψ = interp2pt(ψ_en.values[k - 1] - ψ_gm[k - 1], ψ_en.values[k] - ψ_gm[k])
+            ϕ_en_dual = dual_faces(ϕ_en.values, grid, k)
+            ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
+            ψ_en_dual = dual_faces(ψ_en.values, grid, k)
+            ψ_gm_dual = dual_faces(ψ_gm, grid, k)
+            Δϕ_dual = ϕ_en_dual .- ϕ_gm_dual
+            Δψ_dual = ψ_en_dual .- ψ_gm_dual
+            Δϕ = interpf2c(Δϕ_dual, grid, k)
+            Δψ = interpf2c(Δψ_dual, grid, k)
 
             gmv_covar[k] = tke_factor * ae[k] * Δϕ * Δψ + ae[k] * covar_e.values[k]
             @inbounds for i in xrange(self.n_updrafts)
-                Δϕ = interp2pt(ϕ_up.values[i, k - 1] - ϕ_gm[k - 1], ϕ_up.values[i, k] - ϕ_gm[k])
-                Δψ = interp2pt(ψ_up.values[i, k - 1] - ψ_gm[k - 1], ψ_up.values[i, k] - ψ_gm[k])
+                ϕ_up_dual = dual_faces(ϕ_up.values, grid, k, i)
+                ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
+                ψ_up_dual = dual_faces(ψ_up.values, grid, k, i)
+                ψ_gm_dual = dual_faces(ψ_gm, grid, k)
+                Δϕ_dual = ϕ_up_dual .- ϕ_gm_dual
+                Δψ_dual = ψ_up_dual .- ψ_gm_dual
+                Δϕ = interpf2c(Δϕ_dual, grid, k)
+                Δψ = interpf2c(Δψ_dual, grid, k)
                 gmv_covar[k] += tke_factor * au.values[i, k] * Δϕ * Δψ
             end
         end
@@ -591,14 +603,26 @@ function get_env_covar_from_GMV(
     if is_tke
         @inbounds for k in real_face_indicies(grid)
             if ae[k] > 0.0
-                Δϕ = interp2pt(ϕ_en.values[k - 1] - ϕ_gm[k - 1], ϕ_en.values[k] - ϕ_gm[k])
-                Δϕ = interp2pt(ϕ_en.values[k - 1] - ϕ_gm[k - 1], ϕ_en.values[k] - ϕ_gm[k])
-                Δψ = interp2pt(ψ_en.values[k - 1] - ψ_gm[k - 1], ψ_en.values[k] - ψ_gm[k])
+                ϕ_en_dual = dual_faces(ϕ_en.values, grid, k)
+                ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
+                ψ_en_dual = dual_faces(ψ_en.values, grid, k)
+                ψ_gm_dual = dual_faces(ψ_gm, grid, k)
+                Δϕ_dual = ϕ_en_dual .- ϕ_gm_dual
+                Δψ_dual = ψ_en_dual .- ψ_gm_dual
+                Δϕ = interpf2c(Δϕ_dual, grid, k)
+                Δψ = interpf2c(Δψ_dual, grid, k)
 
                 covar_e.values[k] = gmv_covar[k] - tke_factor * ae[k] * Δϕ * Δψ
                 @inbounds for i in xrange(self.n_updrafts)
-                    Δϕ = interp2pt(ϕ_up.values[i, k - 1] - ϕ_gm[k - 1], ϕ_up.values[i, k] - ϕ_gm[k])
-                    Δψ = interp2pt(ψ_up.values[i, k - 1] - ψ_gm[k - 1], ψ_up.values[i, k] - ψ_gm[k])
+                    ϕ_up_dual = dual_faces(ϕ_up.values, grid, k, i)
+                    ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
+                    ψ_up_dual = dual_faces(ψ_up.values, grid, k, i)
+                    ψ_gm_dual = dual_faces(ψ_gm, grid, k)
+                    Δϕ_dual = ϕ_up_dual .- ϕ_gm_dual
+                    Δψ_dual = ψ_up_dual .- ψ_gm_dual
+                    Δϕ = interpf2c(Δϕ_dual, grid, k)
+                    Δψ = interpf2c(Δψ_dual, grid, k)
+
                     covar_e.values[k] -= tke_factor * au.values[i, k] * Δϕ * Δψ
                 end
                 covar_e.values[k] = covar_e.values[k] / ae[k]
