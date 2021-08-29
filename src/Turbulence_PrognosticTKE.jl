@@ -833,7 +833,7 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 self.UpdVar.Area.values[i, :],
                 self.UpdVar.W.values[i, :],
                 grid,
-                k + 1,
+                k,
             )
 
             entr_term = self.UpdVar.Area.values[i, k + 1] * whalf_kp * (self.entr_sc[i, k + 1])

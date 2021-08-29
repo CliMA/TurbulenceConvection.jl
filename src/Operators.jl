@@ -107,13 +107,15 @@ interp2pt(val1, val2) = 0.5 * (val1 + val2)
 #####
 
 function upwind_advection_area(ρ0_half::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64}, grid, k)
-    whalf_kp = interp2pt(w_up[k - 1], w_up[k])
-    whalf_k = interp2pt(w_up[k - 2], w_up[k - 1])
-
-    m_kp = (ρ0_half[k] * a_up[k] * whalf_kp)
-    m_k = (ρ0_half[k - 1] * a_up[k - 1] * whalf_k)
-    return -grid.dzi * (m_kp - m_k) / ρ0_half[k]
+    w_up_cut = fdaul_onesided(w_up, grid, k)
+    ρ_0_cut = ccut_onesided(ρ0_half, grid, k)
+    a_up_cut = ccut_onesided(a_up, grid, k)
+    m_cut = ρ_0_cut .* a_up_cut .* w_up_cut
+    ∇m = ∇_onesided(m_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
+    # TODO: Why are we dividing by ρ0_half[k + 1]?
+    return -∇m / ρ0_half[k + 1]
 end
+
 
 function upwind_advection_velocity(ρ0::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64}, grid, k)
     a_k = interp2pt(a_up[k], a_up[k + 1])
@@ -318,6 +320,22 @@ function ccut_onesided(f::AbstractMatrix, grid, k::Int, i_up::Int)
         return SVector(f[i_up, k])
     else
         return SVector(f[i_up, k], f[i_up, k + 1])
+    end
+end
+
+# Called on cell centers
+function fdaul_onesided(f::AbstractVector, grid, k::Int)
+    if is_toa_center(grid, k)
+        return SVector((f[k - 1] + f[k]) / 2)
+    else
+        return SVector((f[k - 1] + f[k]) / 2, (f[k] + f[k + 1]) / 2)
+    end
+end
+function fdaul_onesided(f::AbstractMatrix, grid, k::Int, i_up::Int)
+    if is_toa_center(grid, k)
+        return SVector((f[i_up, k - 1] + f[i_up, k]) / 2)
+    else
+        return SVector((f[i_up, k - 1] + f[i_up, k]) / 2, (f[i_up, k] + f[i_up, k + 1]) / 2)
     end
 end
 
