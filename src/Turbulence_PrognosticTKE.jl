@@ -542,13 +542,25 @@ function get_GMV_CoVar(
 
     if is_tke
         @inbounds for k in real_face_indicies(grid)
-            Δϕ = interp2pt(ϕ_en.values[k - 1] - ϕ_gm[k - 1], ϕ_en.values[k] - ϕ_gm[k])
-            Δψ = interp2pt(ψ_en.values[k - 1] - ψ_gm[k - 1], ψ_en.values[k] - ψ_gm[k])
+            ϕ_en_dual = dual_faces(ϕ_en.values, grid, k)
+            ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
+            ψ_en_dual = dual_faces(ψ_en.values, grid, k)
+            ψ_gm_dual = dual_faces(ψ_gm, grid, k)
+            Δϕ_dual = ϕ_en_dual .- ϕ_gm_dual
+            Δψ_dual = ψ_en_dual .- ψ_gm_dual
+            Δϕ = interpf2c(Δϕ_dual, grid, k)
+            Δψ = interpf2c(Δψ_dual, grid, k)
 
             gmv_covar[k] = tke_factor * ae[k] * Δϕ * Δψ + ae[k] * covar_e.values[k]
             @inbounds for i in xrange(self.n_updrafts)
-                Δϕ = interp2pt(ϕ_up.values[i, k - 1] - ϕ_gm[k - 1], ϕ_up.values[i, k] - ϕ_gm[k])
-                Δψ = interp2pt(ψ_up.values[i, k - 1] - ψ_gm[k - 1], ψ_up.values[i, k] - ψ_gm[k])
+                ϕ_up_dual = dual_faces(ϕ_up.values, grid, k, i)
+                ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
+                ψ_up_dual = dual_faces(ψ_up.values, grid, k, i)
+                ψ_gm_dual = dual_faces(ψ_gm, grid, k)
+                Δϕ_dual = ϕ_up_dual .- ϕ_gm_dual
+                Δψ_dual = ψ_up_dual .- ψ_gm_dual
+                Δϕ = interpf2c(Δϕ_dual, grid, k)
+                Δψ = interpf2c(Δψ_dual, grid, k)
                 gmv_covar[k] += tke_factor * au.values[i, k] * Δϕ * Δψ
             end
         end
@@ -591,14 +603,26 @@ function get_env_covar_from_GMV(
     if is_tke
         @inbounds for k in real_face_indicies(grid)
             if ae[k] > 0.0
-                Δϕ = interp2pt(ϕ_en.values[k - 1] - ϕ_gm[k - 1], ϕ_en.values[k] - ϕ_gm[k])
-                Δϕ = interp2pt(ϕ_en.values[k - 1] - ϕ_gm[k - 1], ϕ_en.values[k] - ϕ_gm[k])
-                Δψ = interp2pt(ψ_en.values[k - 1] - ψ_gm[k - 1], ψ_en.values[k] - ψ_gm[k])
+                ϕ_en_dual = dual_faces(ϕ_en.values, grid, k)
+                ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
+                ψ_en_dual = dual_faces(ψ_en.values, grid, k)
+                ψ_gm_dual = dual_faces(ψ_gm, grid, k)
+                Δϕ_dual = ϕ_en_dual .- ϕ_gm_dual
+                Δψ_dual = ψ_en_dual .- ψ_gm_dual
+                Δϕ = interpf2c(Δϕ_dual, grid, k)
+                Δψ = interpf2c(Δψ_dual, grid, k)
 
                 covar_e.values[k] = gmv_covar[k] - tke_factor * ae[k] * Δϕ * Δψ
                 @inbounds for i in xrange(self.n_updrafts)
-                    Δϕ = interp2pt(ϕ_up.values[i, k - 1] - ϕ_gm[k - 1], ϕ_up.values[i, k] - ϕ_gm[k])
-                    Δψ = interp2pt(ψ_up.values[i, k - 1] - ψ_gm[k - 1], ψ_up.values[i, k] - ψ_gm[k])
+                    ϕ_up_dual = dual_faces(ϕ_up.values, grid, k, i)
+                    ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
+                    ψ_up_dual = dual_faces(ψ_up.values, grid, k, i)
+                    ψ_gm_dual = dual_faces(ψ_gm, grid, k)
+                    Δϕ_dual = ϕ_up_dual .- ϕ_gm_dual
+                    Δψ_dual = ψ_up_dual .- ψ_gm_dual
+                    Δϕ = interpf2c(Δϕ_dual, grid, k)
+                    Δψ = interpf2c(Δψ_dual, grid, k)
+
                     covar_e.values[k] -= tke_factor * au.values[i, k] * Δϕ * Δψ
                 end
                 covar_e.values[k] = covar_e.values[k] / ae[k]

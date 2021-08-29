@@ -111,9 +111,13 @@ interpc2f(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = bc.value
 # Used when traversing cell centers
 interpf2c(f, grid::Grid, k::Int; bottom = UseBoundaryValue(), top = UseBoundaryValue()) =
     interpf2c(dual_faces(f, grid, k), grid, k, bottom, top)
-
 interpf2c(f, grid::Grid, k::Int, i_up::Int; bottom = UseBoundaryValue(), top = UseBoundaryValue()) =
     interpf2c(dual_faces(f, grid, k, i_up), grid, k, bottom, top)
+
+interpf2c(f::SVector, grid::Grid, k::Int; bottom = UseBoundaryValue(), top = UseBoundaryValue()) =
+    interpf2c(f, grid, k, bottom, top)
+interpf2c(f::SVector, grid::Grid, k::Int, i_up::Int; bottom = UseBoundaryValue(), top = UseBoundaryValue()) =
+    interpf2c(f, grid, k, bottom, top)
 
 function interpf2c(f_dual::SVector, grid::Grid, k::Int, bottom::AbstractBC, top::AbstractBC)
     if is_surface_center(grid, k)
