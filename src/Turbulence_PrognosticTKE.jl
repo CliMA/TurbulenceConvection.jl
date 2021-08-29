@@ -1836,8 +1836,8 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
     elseif option == "thetal_maxgrad"
 
         @inbounds for k in real_center_indicies(grid)
-            ∇θ_liq_cut = ccut_onesided(GMV.H.values, grid, k)
-            ∇θ_liq = c∇_onesided(∇θ_liq_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
+            ∇θ_liq_cut = ccut(GMV.H.values, grid, k)
+            ∇θ_liq = c∇(∇θ_liq_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
             if ∇θ_liq > ∇θ_liq_max
                 ∇θ_liq_max = ∇θ_liq
                 self.zi = grid.z[k]

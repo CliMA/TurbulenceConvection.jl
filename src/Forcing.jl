@@ -48,10 +48,10 @@ function update(self::ForcingBase{ForcingStandard}, GMV::GridMeanVariables)
     if self.apply_subsidence
         @inbounds for k in real_center_indicies(grid)
             # Apply large-scale subsidence tendencies
-            H_cut = ccut_onesided(GMV.H.values, grid, k)
-            q_tot_cut = ccut_onesided(GMV.QT.values, grid, k)
-            ∇H = c∇_onesided(H_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
-            ∇q_tot = c∇_onesided(q_tot_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
+            H_cut = ccut(GMV.H.values, grid, k)
+            q_tot_cut = ccut(GMV.QT.values, grid, k)
+            ∇H = c∇(H_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
+            ∇q_tot = c∇(q_tot_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
             GMV.H.tendencies[k] -= ∇H * self.subsidence[k]
             GMV.QT.tendencies[k] -= ∇q_tot * self.subsidence[k]
         end
@@ -77,10 +77,10 @@ end
 function update(self::ForcingBase{ForcingDYCOMS_RF01}, GMV::GridMeanVariables)
     grid = self.Gr
     @inbounds for k in real_center_indicies(grid)
-        H_cut = ccut_onesided(GMV.H.values, grid, k)
-        q_tot_cut = ccut_onesided(GMV.QT.values, grid, k)
-        ∇H = c∇_onesided(H_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
-        ∇q_tot = c∇_onesided(q_tot_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
+        H_cut = ccut(GMV.H.values, grid, k)
+        q_tot_cut = ccut(GMV.QT.values, grid, k)
+        ∇H = c∇(H_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
+        ∇q_tot = c∇(q_tot_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
 
         GMV.QT.tendencies[k] += self.dqtdt[k]
         # Apply large-scale subsidence tendencies
@@ -138,10 +138,10 @@ function update(self::ForcingBase{ForcingLES}, GMV::GridMeanVariables)
         if self.apply_subsidence
             # Apply large-scale subsidence tendencies
 
-            H_cut = ccut_onesided(GMV.H.values, grid, k)
-            q_tot_cut = ccut_onesided(GMV.QT.values, grid, k)
-            ∇H = c∇_onesided(H_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
-            ∇q_tot = c∇_onesided(q_tot_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
+            H_cut = ccut(GMV.H.values, grid, k)
+            q_tot_cut = ccut(GMV.QT.values, grid, k)
+            ∇H = c∇(H_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
+            ∇q_tot = c∇(q_tot_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
             GMV_H_subsidence_k = -∇H * self.subsidence[k]
             GMV_QT_subsidence_k = -∇q_tot * self.subsidence[k]
         else
