@@ -537,44 +537,24 @@ function get_GMV_CoVar(
 
     grid = get_grid(self)
     ae = 1 .- au.bulkvalues
-    tke_factor = 1.0
     is_tke = covar_e.name == "tke"
+    tke_factor = is_tke ? 0.5 : 1
 
     if is_tke
-        @inbounds for k in face_indicies(grid)
-            tke_factor = 0.5
-            # TODO: report bug: k-1 for k = 0 yields
-            # -1, indexing phi_e.values[-1] yields the
-            # _last_ value in the array. This is certainly
-            # not intended
-            if k ≠ 1
-                phi_diff = interp2pt(phi_e.values[k - 1] - gmv_phi[k - 1], phi_e.values[k] - gmv_phi[k])
-                psi_diff = interp2pt(psi_e.values[k - 1] - gmv_psi[k - 1], psi_e.values[k] - gmv_psi[k])
-            else # just use 0th order approximation
-                phi_diff = phi_e.values[k] - gmv_phi[k]
-                psi_diff = psi_e.values[k] - gmv_psi[k]
-            end
+        @inbounds for k in real_face_indicies(grid)
+            phi_diff = interp2pt(phi_e.values[k - 1] - gmv_phi[k - 1], phi_e.values[k] - gmv_phi[k])
+            psi_diff = interp2pt(psi_e.values[k - 1] - gmv_psi[k - 1], psi_e.values[k] - gmv_psi[k])
 
             gmv_covar[k] = tke_factor * ae[k] * phi_diff * psi_diff + ae[k] * covar_e.values[k]
             @inbounds for i in xrange(self.n_updrafts)
-                # TODO: report bug: k-1 for k = 0 yields
-                # -1, indexing phi_e.values[-1] yields the
-                # _last_ value in the array. This is certainly
-                # not intended
-                if k ≠ 1
-                    phi_diff = interp2pt(phi_u.values[i, k - 1] - gmv_phi[k - 1], phi_u.values[i, k] - gmv_phi[k])
-                    psi_diff = interp2pt(psi_u.values[i, k - 1] - gmv_psi[k - 1], psi_u.values[i, k] - gmv_psi[k])
-                else # just use 0th order approximation
-                    phi_diff = phi_u.values[i, k] - gmv_phi[k]
-                    psi_diff = psi_u.values[i, k] - gmv_psi[k]
-                end
+                phi_diff = interp2pt(phi_u.values[i, k - 1] - gmv_phi[k - 1], phi_u.values[i, k] - gmv_phi[k])
+                psi_diff = interp2pt(psi_u.values[i, k - 1] - gmv_psi[k - 1], psi_u.values[i, k] - gmv_psi[k])
                 gmv_covar[k] += tke_factor * au.values[i, k] * phi_diff * psi_diff
             end
         end
     else
 
         @inbounds for k in center_indicies(grid)
-            tke_factor = 1.0
             phi_diff = phi_e.values[k] - gmv_phi[k]
             psi_diff = psi_e.values[k] - gmv_psi[k]
 
@@ -605,14 +585,11 @@ function get_env_covar_from_GMV(
 
     grid = get_grid(self)
     ae = 1 .- au.bulkvalues
-    tke_factor = 1.0
     is_tke = covar_e.name == "tke"
-    if is_tke
-        tke_factor = 0.5
-    end
+    tke_factor = is_tke ? 0.5 : 1
 
     if is_tke
-        @inbounds for k in face_indicies(grid)
+        @inbounds for k in real_face_indicies(grid)
             if ae[k] > 0.0
                 phi_diff = interp2pt(phi_e.values[k - 1] - gmv_phi[k - 1], phi_e.values[k] - gmv_phi[k])
                 psi_diff = interp2pt(psi_e.values[k - 1] - gmv_psi[k - 1], psi_e.values[k] - gmv_psi[k])
@@ -1469,24 +1446,15 @@ function compute_covariance_interdomain_src(
     tke_factor = is_tke ? 0.5 : 1
     grid = get_grid(self)
     if is_tke
-        @inbounds for k in face_indicies(grid)
+        @inbounds for k in real_face_indicies(grid)
             Covar.interdomain[k] = 0.0
             @inbounds for i in xrange(self.n_updrafts)
-                # TODO: report bug: k-1 for k = 0 yields
-                # -1, indexing phi_e.values[-1] yields the
-                # _last_ value in the array. This is certainly
-                # not intended
-                if k ≠ 1
-                    phi_diff =
-                        interp2pt(phi_u.values[i, k - 1], phi_u.values[i, k]) -
-                        interp2pt(phi_e.values[k - 1], phi_e.values[k])
-                    psi_diff =
-                        interp2pt(psi_u.values[i, k - 1], psi_u.values[i, k]) -
-                        interp2pt(psi_e.values[k - 1], psi_e.values[k])
-                else # use 0th order approximation
-                    phi_diff = phi_u.values[i, k] - phi_e.values[k]
-                    psi_diff = psi_u.values[i, k] - psi_e.values[k]
-                end
+                phi_diff =
+                    interp2pt(phi_u.values[i, k - 1], phi_u.values[i, k]) -
+                    interp2pt(phi_e.values[k - 1], phi_e.values[k])
+                psi_diff =
+                    interp2pt(psi_u.values[i, k - 1], psi_u.values[i, k]) -
+                    interp2pt(psi_e.values[k - 1], psi_e.values[k])
 
                 Covar.interdomain[k] += tke_factor * au.values[i, k] * (1.0 - au.values[i, k]) * phi_diff * psi_diff
             end
