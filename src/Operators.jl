@@ -98,6 +98,43 @@ interpf2c(f::SVector, grid::Grid, ::InteriorTag) = (f[1] + f[2]) / 2
 interpf2c(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (f[1] + bc.value) / 2
 interpf2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (bc.value + f[2]) / 2
 
+
+# To be deprecated
+interp2pt(val1, val2) = 0.5 * (val1 + val2)
+
+#####
+##### advection operators
+#####
+
+function upwind_advection_area(ρ0_half::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64}, grid, k)
+    whalf_kp = interp2pt(w_up[k - 1], w_up[k])
+    whalf_k = interp2pt(w_up[k - 2], w_up[k - 1])
+
+    m_kp = (ρ0_half[k] * a_up[k] * whalf_kp)
+    m_k = (ρ0_half[k - 1] * a_up[k - 1] * whalf_k)
+    return -grid.dzi * (m_kp - m_k) / ρ0_half[k]
+end
+
+function upwind_advection_velocity(ρ0::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64}, grid, k)
+    a_k = interp2pt(a_up[k], a_up[k + 1])
+    a_km = interp2pt(a_up[k - 1], a_up[k])
+    adv = (ρ0[k] * a_k * w_up[k] * w_up[k] * grid.dzi - ρ0[k - 1] * a_km * w_up[k - 1] * w_up[k - 1] * grid.dzi)
+    return adv
+end
+
+function upwind_advection_scalar(
+    ρ0_half::Vector{Float64},
+    a_up::Vector{Float64},
+    w_up::Vector{Float64},
+    var::Vector{Float64},
+    grid,
+    k,
+)
+    m_k = (ρ0_half[k] * a_up[k] * interp2pt(w_up[k - 1], w_up[k]))
+    m_km = (ρ0_half[k - 1] * a_up[k - 1] * interp2pt(w_up[k - 2], w_up[k - 1]))
+    return (m_k * var[k] - m_km * var[k - 1]) * grid.dzi
+end
+
 #####
 ##### ∇(center data)
 #####
