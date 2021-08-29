@@ -735,7 +735,6 @@ Base.@kwdef mutable struct SurfaceBase{T}
     rho_vflux::Float64 = 0
     obukhov_length::Float64 = 0
     Ri_bulk_crit::Float64 = 0
-    s_surface::Float64 = 0
     ustar_fixed::Bool = false
     Gr::Grid
     Ref::ReferenceState

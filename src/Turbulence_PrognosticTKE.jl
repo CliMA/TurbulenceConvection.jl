@@ -1207,35 +1207,30 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
         ∇θ_liq_ice = c∇(θ_liq_ice_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
 
         prefactor = Rd * exner_c(ref_state.p0_half[k]) / ref_state.p0_half[k]
-        d_alpha_thetal_dry = prefactor * (1.0 + (eps_vi - 1.0) * qt_dry)
-        d_alpha_qt_dry = prefactor * th_dry * (eps_vi - 1.0)
+        d_α_θ_liq_ice_dry = prefactor * (1 + (eps_vi - 1) * qt_dry)
+        d_α_q_tot_dry = prefactor * th_dry * (eps_vi - 1)
 
-        if self.EnvVar.cloud_fraction.values[k] > 0.0
-            d_alpha_thetal_cloudy = (
-                prefactor * (1.0 + eps_vi * (1.0 + lh / Rv / t_cloudy) * qv_cloudy - qt_cloudy) /
-                (1.0 + lh * lh / cpm / Rv / t_cloudy / t_cloudy * qv_cloudy)
+        cf_en = self.EnvVar.cloud_fraction.values[k]
+        if cf_en > 0.0
+            d_α_θ_liq_ice_cloudy = (
+                prefactor * (1 + eps_vi * (1 + lh / Rv / t_cloudy) * qv_cloudy - qt_cloudy) /
+                (1 + lh * lh / cpm / Rv / t_cloudy / t_cloudy * qv_cloudy)
             )
-            d_alpha_qt_cloudy = (lh / cpm / t_cloudy * d_alpha_thetal_cloudy - prefactor) * th_cloudy
+            d_α_q_tot_cloudy = (lh / cpm / t_cloudy * d_α_θ_liq_ice_cloudy - prefactor) * th_cloudy
         else
-            d_alpha_thetal_cloudy = 0.0
-            d_alpha_qt_cloudy = 0.0
+            d_α_θ_liq_ice_cloudy = 0
+            d_α_q_tot_cloudy = 0
         end
 
-        d_alpha_thetal_total = (
-            self.EnvVar.cloud_fraction.values[k] * d_alpha_thetal_cloudy +
-            (1.0 - self.EnvVar.cloud_fraction.values[k]) * d_alpha_thetal_dry
-        )
-        d_alpha_qt_total = (
-            self.EnvVar.cloud_fraction.values[k] * d_alpha_qt_cloudy +
-            (1.0 - self.EnvVar.cloud_fraction.values[k]) * d_alpha_qt_dry
-        )
+        d_α_θ_liq_ice_total = (cf_en * d_α_θ_liq_ice_cloudy + (1 - cf_en) * d_α_θ_liq_ice_dry)
+        d_α_q_tot_total = (cf_en * d_α_q_tot_cloudy + (1 - cf_en) * d_α_q_tot_dry)
 
         # TODO - check
         self.EnvVar.TKE.buoy[k] =
             g / ref_state.alpha0_half[k] *
             ae[k] *
             ref_state.rho0_half[k] *
-            (-KH[k] * ∇θ_liq_ice * d_alpha_thetal_total - KH[k] * ∇q_tot * d_alpha_qt_total)
+            (-KH[k] * ∇θ_liq_ice * d_α_θ_liq_ice_total - KH[k] * ∇q_tot * d_α_q_tot_total)
     end
     return
 end
@@ -1259,23 +1254,11 @@ function update_GMV_diagnostics(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
 
     grid = get_grid(self)
     p0_half = reference_state(self).p0_half
+    a_up_bulk = self.UpdVar.Area.bulkvalues
     @inbounds for k in real_center_indicies(grid)
-        GMV.QL.values[k] = (
-            self.UpdVar.Area.bulkvalues[k] * self.UpdVar.QL.bulkvalues[k] +
-            (1.0 - self.UpdVar.Area.bulkvalues[k]) * self.EnvVar.QL.values[k]
-        )
-
-        GMV.T.values[k] = (
-            self.UpdVar.Area.bulkvalues[k] * self.UpdVar.T.bulkvalues[k] +
-            (1.0 - self.UpdVar.Area.bulkvalues[k]) * self.EnvVar.T.values[k]
-        )
-
-        qv = GMV.QT.values[k] - GMV.QL.values[k]
-
-        GMV.B.values[k] = (
-            self.UpdVar.Area.bulkvalues[k] * self.UpdVar.B.bulkvalues[k] +
-            (1.0 - self.UpdVar.Area.bulkvalues[k]) * self.EnvVar.B.values[k]
-        )
+        GMV.QL.values[k] = (a_up_bulk[k] * self.UpdVar.QL.bulkvalues[k] + (1 - a_up_bulk[k]) * self.EnvVar.QL.values[k])
+        GMV.T.values[k] = (a_up_bulk[k] * self.UpdVar.T.bulkvalues[k] + (1 - a_up_bulk[k]) * self.EnvVar.T.values[k])
+        GMV.B.values[k] = (a_up_bulk[k] * self.UpdVar.B.bulkvalues[k] + (1 - a_up_bulk[k]) * self.EnvVar.B.values[k])
     end
 
     return
