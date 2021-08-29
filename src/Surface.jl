@@ -88,7 +88,6 @@ function initialize(self::SurfaceBase{SurfaceFixedCoeffs})
     pvg = pv_star(self.Tsurface)
     pdg = self.Ref.Pg - pvg
     self.qsurface = qv_star_t(self.Ref.Pg, self.Tsurface)
-    self.s_surface = (1.0 - self.qsurface) * sd_c(pdg, self.Tsurface) + self.qsurface * sv_c(pvg, self.Tsurface)
     return
 end
 
