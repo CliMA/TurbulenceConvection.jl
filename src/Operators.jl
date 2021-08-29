@@ -77,13 +77,26 @@ interpc2f(f::SVector, grid::Grid, ::InteriorTag) = (f[1] + f[2]) / 2
 interpc2f(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = bc.value
 interpc2f(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = bc.value
 
-function interpf2c(f, grid::Grid, k::Int)
-    return 0.5 * (f[k] + f[k - 1])
-end
+# Used when traversing cell centers
+interpf2c(f, grid::Grid, k::Int; bottom = UseBoundaryValue(), top = UseBoundaryValue()) =
+    interpf2c(dual_faces(f, grid, k), grid, k, bottom, top)
 
-function interpf2c(f, grid::Grid, k::Int, i_up::Int)
-    return 0.5 * (f[i_up, k] + f[i_up, k - 1])
+interpf2c(f, grid::Grid, k::Int, i_up::Int; bottom = UseBoundaryValue(), top = UseBoundaryValue()) =
+    interpf2c(dual_faces(f, grid, k, i_up), grid, k, bottom, top)
+
+function interpf2c(f_dual::SVector, grid::Grid, k::Int, bottom::AbstractBC, top::AbstractBC)
+    if is_surface_center(grid, k)
+        return interpf2c(f_dual, grid, BottomBCTag(), bottom)
+    elseif is_toa_center(grid, k)
+        return interpf2c(f_dual, grid, TopBCTag(), top)
+    else
+        return interpf2c(f_dual, grid, InteriorTag())
+    end
 end
+interpf2c(f::SVector, grid::Grid, ::Int, ::UseBoundaryValue, top::UseBoundaryValue) = interpf2c(f, grid, InteriorTag())
+interpf2c(f::SVector, grid::Grid, ::InteriorTag) = (f[1] + f[2]) / 2
+interpf2c(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (f[1] + bc.value) / 2
+interpf2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (bc.value + f[2]) / 2
 
 #####
 ##### ∇(center data)

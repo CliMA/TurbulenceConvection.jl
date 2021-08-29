@@ -1961,7 +1961,7 @@ function initialize_surface(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::Refe
         self.Sur.Gr = Gr
         self.Sur.Tsurface = mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims = 1)[1]
         # get surface value of q
-        mean_qt_prof = mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)
+        mean_qt_prof = mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)[:]
         self.Sur.qsurface = TC.interpf2c(mean_qt_prof, Gr, TC.kc_surface(Gr))
         self.Sur.lhf = mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1]
         self.Sur.shf = mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1]
