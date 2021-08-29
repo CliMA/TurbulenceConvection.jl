@@ -57,6 +57,21 @@ c∇_downwind(f::SVector, grid::Grid, ::BottomBCTag, bc::FreeBoundary) = (f[2] -
 # top of the domain.
 c∇_downwind(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
+function c∇_upwind(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
+    if is_surface_center(grid, k)
+        return c∇_upwind(f_dual, grid, BottomBCTag(), bottom)
+    elseif is_toa_center(grid, k)
+        return c∇_upwind(f_dual, grid, TopBCTag(), top)
+    else
+        return c∇_upwind(f_dual, grid, InteriorTag())
+    end
+end
+c∇_upwind(f::SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
+c∇_upwind(f::SVector, grid::Grid, ::TopBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.dzi
+c∇_upwind(f::SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
+c∇_upwind(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[1] - bc.value) * (grid.dzi / 2)
+c∇_upwind(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
+
 function f∇_onesided(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
     if is_surface_face(grid, k)
         return f∇_onesided(f_dual, grid, BottomBCTag(), bottom)
@@ -141,7 +156,6 @@ function upwind_advection_velocity(ρ0::Vector{Float64}, a_up::Vector{Float64}, 
     return ∇ρaw
 end
 
-
 function upwind_advection_scalar(
     ρ0_half::Vector{Float64},
     a_up::Vector{Float64},
@@ -150,9 +164,13 @@ function upwind_advection_scalar(
     grid,
     k,
 )
-    m_k = (ρ0_half[k] * a_up[k] * interp2pt(w_up[k - 1], w_up[k]))
-    m_km = (ρ0_half[k - 1] * a_up[k - 1] * interp2pt(w_up[k - 2], w_up[k - 1]))
-    return (m_k * var[k] - m_km * var[k - 1]) * grid.dzi
+    ρ_0_cut = ccut_upwind(ρ0_half, grid, k)
+    a_up_cut = ccut_upwind(a_up, grid, k)
+    w_up_cut = fdaul_upwind(w_up, grid, k)
+    var_cut = ccut_upwind(var, grid, k)
+    m_cut = ρ_0_cut .* a_up_cut .* w_up_cut .* var_cut
+    ∇m = c∇_upwind(m_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
+    return ∇m
 end
 
 #####
@@ -341,6 +359,22 @@ function ccut_downwind(f::AbstractMatrix, grid, k::Int, i_up::Int)
     end
 end
 
+# A 2-point field stencil for ordinary and updraft variables
+function ccut_upwind(f::AbstractVector, grid, k::Int)
+    if is_surface_center(grid, k)
+        return SVector(f[k])
+    else
+        return SVector(f[k - 1], f[k])
+    end
+end
+function ccut_upwind(f::AbstractMatrix, grid, k::Int, i_up::Int)
+    if is_surface_center(grid, k)
+        return SVector(f[i_up, k])
+    else
+        return SVector(f[i_up, k - 1], f[i_up, k])
+    end
+end
+
 # Called on cell centers
 function fdaul_onesided(f::AbstractVector, grid, k::Int)
     if is_toa_center(grid, k)
@@ -354,6 +388,21 @@ function fdaul_onesided(f::AbstractMatrix, grid, k::Int, i_up::Int)
         return SVector((f[i_up, k - 1] + f[i_up, k]) / 2)
     else
         return SVector((f[i_up, k - 1] + f[i_up, k]) / 2, (f[i_up, k] + f[i_up, k + 1]) / 2)
+    end
+end
+
+function fdaul_upwind(f::AbstractVector, grid, k::Int)
+    if is_surface_center(grid, k)
+        return SVector((f[k - 1] + f[k]) / 2)
+    else
+        return SVector((f[k - 2] + f[k - 1]) / 2, (f[k - 1] + f[k]) / 2)
+    end
+end
+function fdaul_upwind(f::AbstractMatrix, grid, k::Int, i_up::Int)
+    if is_surface_center(grid, k)
+        return SVector((f[i_up, k - 1] + f[i_up, k]) / 2)
+    else
+        return SVector((f[i_up, k - 2] + f[i_up, k - 1]) / 2, (f[i_up, k - 1] + f[i_up, k]) / 2)
     end
 end
 
