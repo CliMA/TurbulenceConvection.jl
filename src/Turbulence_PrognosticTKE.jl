@@ -525,13 +525,13 @@ end
 function get_GMV_CoVar(
     self::EDMF_PrognosticTKE,
     au::UpdraftVariable,
-    phi_u::UpdraftVariable,
-    psi_u::UpdraftVariable,
-    phi_e::EnvironmentVariable,
-    psi_e::EnvironmentVariable,
+    ϕ_up::UpdraftVariable,
+    ψ_up::UpdraftVariable,
+    ϕ_en::EnvironmentVariable,
+    ψ_en::EnvironmentVariable,
     covar_e::EnvironmentVariable_2m,
-    gmv_phi,
-    gmv_psi,
+    ϕ_gm,
+    ψ_gm,
     gmv_covar,
 )
 
@@ -542,27 +542,27 @@ function get_GMV_CoVar(
 
     if is_tke
         @inbounds for k in real_face_indicies(grid)
-            phi_diff = interp2pt(phi_e.values[k - 1] - gmv_phi[k - 1], phi_e.values[k] - gmv_phi[k])
-            psi_diff = interp2pt(psi_e.values[k - 1] - gmv_psi[k - 1], psi_e.values[k] - gmv_psi[k])
+            Δϕ = interp2pt(ϕ_en.values[k - 1] - ϕ_gm[k - 1], ϕ_en.values[k] - ϕ_gm[k])
+            Δψ = interp2pt(ψ_en.values[k - 1] - ψ_gm[k - 1], ψ_en.values[k] - ψ_gm[k])
 
-            gmv_covar[k] = tke_factor * ae[k] * phi_diff * psi_diff + ae[k] * covar_e.values[k]
+            gmv_covar[k] = tke_factor * ae[k] * Δϕ * Δψ + ae[k] * covar_e.values[k]
             @inbounds for i in xrange(self.n_updrafts)
-                phi_diff = interp2pt(phi_u.values[i, k - 1] - gmv_phi[k - 1], phi_u.values[i, k] - gmv_phi[k])
-                psi_diff = interp2pt(psi_u.values[i, k - 1] - gmv_psi[k - 1], psi_u.values[i, k] - gmv_psi[k])
-                gmv_covar[k] += tke_factor * au.values[i, k] * phi_diff * psi_diff
+                Δϕ = interp2pt(ϕ_up.values[i, k - 1] - ϕ_gm[k - 1], ϕ_up.values[i, k] - ϕ_gm[k])
+                Δψ = interp2pt(ψ_up.values[i, k - 1] - ψ_gm[k - 1], ψ_up.values[i, k] - ψ_gm[k])
+                gmv_covar[k] += tke_factor * au.values[i, k] * Δϕ * Δψ
             end
         end
     else
 
         @inbounds for k in center_indicies(grid)
-            phi_diff = phi_e.values[k] - gmv_phi[k]
-            psi_diff = psi_e.values[k] - gmv_psi[k]
+            Δϕ = ϕ_en.values[k] - ϕ_gm[k]
+            Δψ = ψ_en.values[k] - ψ_gm[k]
 
-            gmv_covar[k] = tke_factor * ae[k] * phi_diff * psi_diff + ae[k] * covar_e.values[k]
+            gmv_covar[k] = tke_factor * ae[k] * Δϕ * Δψ + ae[k] * covar_e.values[k]
             @inbounds for i in xrange(self.n_updrafts)
-                phi_diff = phi_u.values[i, k] - gmv_phi[k]
-                psi_diff = psi_u.values[i, k] - gmv_psi[k]
-                gmv_covar[k] += tke_factor * au.values[i, k] * phi_diff * psi_diff
+                Δϕ = ϕ_up.values[i, k] - ϕ_gm[k]
+                Δψ = ψ_up.values[i, k] - ψ_gm[k]
+                gmv_covar[k] += tke_factor * au.values[i, k] * Δϕ * Δψ
             end
         end
     end
@@ -573,13 +573,13 @@ end
 function get_env_covar_from_GMV(
     self::EDMF_PrognosticTKE,
     au::UpdraftVariable,
-    phi_u::UpdraftVariable,
-    psi_u::UpdraftVariable,
-    phi_e::EnvironmentVariable,
-    psi_e::EnvironmentVariable,
+    ϕ_up::UpdraftVariable,
+    ψ_up::UpdraftVariable,
+    ϕ_en::EnvironmentVariable,
+    ψ_en::EnvironmentVariable,
     covar_e::EnvironmentVariable_2m,
-    gmv_phi,
-    gmv_psi,
+    ϕ_gm,
+    ψ_gm,
     gmv_covar,
 )
 
@@ -591,14 +591,15 @@ function get_env_covar_from_GMV(
     if is_tke
         @inbounds for k in real_face_indicies(grid)
             if ae[k] > 0.0
-                phi_diff = interp2pt(phi_e.values[k - 1] - gmv_phi[k - 1], phi_e.values[k] - gmv_phi[k])
-                psi_diff = interp2pt(psi_e.values[k - 1] - gmv_psi[k - 1], psi_e.values[k] - gmv_psi[k])
+                Δϕ = interp2pt(ϕ_en.values[k - 1] - ϕ_gm[k - 1], ϕ_en.values[k] - ϕ_gm[k])
+                Δϕ = interp2pt(ϕ_en.values[k - 1] - ϕ_gm[k - 1], ϕ_en.values[k] - ϕ_gm[k])
+                Δψ = interp2pt(ψ_en.values[k - 1] - ψ_gm[k - 1], ψ_en.values[k] - ψ_gm[k])
 
-                covar_e.values[k] = gmv_covar[k] - tke_factor * ae[k] * phi_diff * psi_diff
+                covar_e.values[k] = gmv_covar[k] - tke_factor * ae[k] * Δϕ * Δψ
                 @inbounds for i in xrange(self.n_updrafts)
-                    phi_diff = interp2pt(phi_u.values[i, k - 1] - gmv_phi[k - 1], phi_u.values[i, k] - gmv_phi[k])
-                    psi_diff = interp2pt(psi_u.values[i, k - 1] - gmv_psi[k - 1], psi_u.values[i, k] - gmv_psi[k])
-                    covar_e.values[k] -= tke_factor * au.values[i, k] * phi_diff * psi_diff
+                    Δϕ = interp2pt(ϕ_up.values[i, k - 1] - ϕ_gm[k - 1], ϕ_up.values[i, k] - ϕ_gm[k])
+                    Δψ = interp2pt(ψ_up.values[i, k - 1] - ψ_gm[k - 1], ψ_up.values[i, k] - ψ_gm[k])
+                    covar_e.values[k] -= tke_factor * au.values[i, k] * Δϕ * Δψ
                 end
                 covar_e.values[k] = covar_e.values[k] / ae[k]
             else
@@ -608,15 +609,15 @@ function get_env_covar_from_GMV(
     else
         @inbounds for k in center_indicies(grid)
             if ae[k] > 0.0
-                phi_diff = phi_e.values[k] - gmv_phi[k]
-                psi_diff = psi_e.values[k] - gmv_psi[k]
+                Δϕ = ϕ_en.values[k] - ϕ_gm[k]
+                Δψ = ψ_en.values[k] - ψ_gm[k]
 
-                covar_e.values[k] = gmv_covar[k] - tke_factor * ae[k] * phi_diff * psi_diff
+                covar_e.values[k] = gmv_covar[k] - tke_factor * ae[k] * Δϕ * Δψ
                 @inbounds for i in xrange(self.n_updrafts)
-                    phi_diff = phi_u.values[i, k] - gmv_phi[k]
-                    psi_diff = psi_u.values[i, k] - gmv_psi[k]
+                    Δϕ = ϕ_up.values[i, k] - ϕ_gm[k]
+                    Δψ = ψ_up.values[i, k] - ψ_gm[k]
 
-                    covar_e.values[k] -= tke_factor * au.values[i, k] * phi_diff * psi_diff
+                    covar_e.values[k] -= tke_factor * au.values[i, k] * Δϕ * Δψ
                 end
                 covar_e.values[k] = covar_e.values[k] / ae[k]
             else
@@ -903,7 +904,7 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
             end
 
             # write the discrete equations in form
-            # c1 * phi_new[k] = c2 * phi[k] + c3 * phi[k-1] + c4 * phi_entr
+            # c1 * phi_new[k] = c2 * phi[k] + c3 * phi[k-1] + c4 * ϕ_enntr
             if self.UpdVar.Area.new[i, k] >= self.minimum_area
                 m_k = (
                     ref_state.rho0_half[k] *
@@ -1435,10 +1436,10 @@ end
 function compute_covariance_interdomain_src(
     self::EDMF_PrognosticTKE,
     au::UpdraftVariable,
-    phi_u::UpdraftVariable,
-    psi_u::UpdraftVariable,
-    phi_e::EnvironmentVariable,
-    psi_e::EnvironmentVariable,
+    ϕ_up::UpdraftVariable,
+    ψ_up::UpdraftVariable,
+    ϕ_en::EnvironmentVariable,
+    ψ_en::EnvironmentVariable,
     Covar::EnvironmentVariable_2m,
 )
 
@@ -1449,23 +1450,19 @@ function compute_covariance_interdomain_src(
         @inbounds for k in real_face_indicies(grid)
             Covar.interdomain[k] = 0.0
             @inbounds for i in xrange(self.n_updrafts)
-                phi_diff =
-                    interp2pt(phi_u.values[i, k - 1], phi_u.values[i, k]) -
-                    interp2pt(phi_e.values[k - 1], phi_e.values[k])
-                psi_diff =
-                    interp2pt(psi_u.values[i, k - 1], psi_u.values[i, k]) -
-                    interp2pt(psi_e.values[k - 1], psi_e.values[k])
+                Δϕ = interp2pt(ϕ_up.values[i, k - 1], ϕ_up.values[i, k]) - interp2pt(ϕ_en.values[k - 1], ϕ_en.values[k])
+                Δψ = interp2pt(ψ_up.values[i, k - 1], ψ_up.values[i, k]) - interp2pt(ψ_en.values[k - 1], ψ_en.values[k])
 
-                Covar.interdomain[k] += tke_factor * au.values[i, k] * (1.0 - au.values[i, k]) * phi_diff * psi_diff
+                Covar.interdomain[k] += tke_factor * au.values[i, k] * (1.0 - au.values[i, k]) * Δϕ * Δψ
             end
         end
     else
         @inbounds for k in center_indicies(grid)
             Covar.interdomain[k] = 0.0
             @inbounds for i in xrange(self.n_updrafts)
-                phi_diff = phi_u.values[i, k] - phi_e.values[k]
-                psi_diff = psi_u.values[i, k] - psi_e.values[k]
-                Covar.interdomain[k] += tke_factor * au.values[i, k] * (1.0 - au.values[i, k]) * phi_diff * psi_diff
+                Δϕ = ϕ_up.values[i, k] - ϕ_en.values[k]
+                Δψ = ψ_up.values[i, k] - ψ_en.values[k]
+                Covar.interdomain[k] += tke_factor * au.values[i, k] * (1.0 - au.values[i, k]) * Δϕ * Δψ
             end
         end
     end
