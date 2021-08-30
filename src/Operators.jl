@@ -7,6 +7,7 @@ struct InteriorTag <: AbstractBCTag end
 abstract type AbstractBC end
 struct UseBoundaryValue <: AbstractBC end
 struct NoBCGivenError <: AbstractBC end
+struct SetZeroGradient <: AbstractBC end
 struct SetValue{FT} <: AbstractBC
     value::FT
 end
@@ -106,6 +107,7 @@ function interpc2f(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(
 end
 interpc2f(f::SVector, grid::Grid, ::InteriorTag) = (f[1] + f[2]) / 2
 interpc2f(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = bc.value
+interpc2f(f::SVector, grid::Grid, ::TopBCTag, bc::SetZeroGradient) = f[1]
 interpc2f(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = bc.value
 
 # Used when traversing cell centers
