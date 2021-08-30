@@ -230,10 +230,28 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     return
 end
 
+update_surface(Case::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) =
+    error("update_surface should be overloaded in case-specific methods (in Cases.jl)")
+update_forcing(Case::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) =
+    error("update_forcing should be overloaded in case-specific methods (in Cases.jl)")
+update_radiation(Case::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) =
+    error("update_radiation should be overloaded in case-specific methods (in Cases.jl)")
+
 # Perform the update of the scheme
 function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
 
+
+    zero_tendencies(GMV)
+
+    update_surface(Case, GMV, TS)
+    update_forcing(Case, GMV, TS)
+    update_radiation(Case, GMV, TS)
+
     grid = get_grid(self)
+    clear_precip_sources(self.UpdThermo)
+
+    update_GMV_diagnostics(self, GMV)
+
     set_old_with_values(self.UpdVar)
     set_updraft_surface_bc(self, GMV, Case)
 
@@ -285,7 +303,8 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     saturation_adjustment(self.EnvThermo, self.EnvVar)
     buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
     set_subdomain_bcs(self)
-    clear_precip_sources(self.UpdThermo)
+
+    update(GMV, TS)
     return
 end
 
