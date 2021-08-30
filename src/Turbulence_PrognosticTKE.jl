@@ -827,54 +827,50 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     dt_ = 1.0 / dti_
     sa = eos_struct()
 
+    a_up = self.UpdVar.Area.values
+    a_up_new = self.UpdVar.Area.new
+    w_up = self.UpdVar.W.values
+    w_up_new = self.UpdVar.W.new
+    ρ_0_c = ref_state.rho0_half
+    ρ_0_f = ref_state.rho0
+    au_lim = self.max_area
+
     @inbounds for i in xrange(self.n_updrafts)
         self.entr_sc[i, kc_surf] = self.entr_surface_bc
         self.detr_sc[i, kc_surf] = self.detr_surface_bc
-        self.UpdVar.W.new[i, kf_surf] = self.w_surface_bc[i]
-        self.UpdVar.Area.new[i, kc_surf] = self.area_surface_bc[i]
-        au_lim = self.max_area
+        w_up_new[i, kf_surf] = self.w_surface_bc[i]
+        a_up_new[i, kc_surf] = self.area_surface_bc[i]
 
         @inbounds for k in real_center_indicies(grid)
 
             # First solve for updated area fraction at k+1
-            whalf_kp = interp2pt(self.UpdVar.W.values[i, k], self.UpdVar.W.values[i, k + 1])
-            adv = upwind_advection_area(
-                ref_state.rho0_half,
-                self.UpdVar.Area.values[i, :],
-                self.UpdVar.W.values[i, :],
-                grid,
-                k,
-            )
+            whalf_kp = interp2pt(w_up[i, k], w_up[i, k + 1])
+            adv = upwind_advection_area(ρ_0_c, a_up[i, :], w_up[i, :], grid, k)
 
-            entr_term = self.UpdVar.Area.values[i, k + 1] * whalf_kp * (self.entr_sc[i, k + 1])
-            detr_term = self.UpdVar.Area.values[i, k + 1] * whalf_kp * (-self.detr_sc[i, k + 1])
+            a_up_kp = a_up[i, k + 1]
+            entr_term = a_up_kp * whalf_kp * (self.entr_sc[i, k + 1])
+            detr_term = a_up_kp * whalf_kp * (-self.detr_sc[i, k + 1])
 
-            self.UpdVar.Area.new[i, k + 1] =
-                max(dt_ * (adv + entr_term + detr_term) + self.UpdVar.Area.values[i, k + 1], 0.0)
+            a_up_candidate = max(dt_ * (adv + entr_term + detr_term) + a_up_kp, 0.0)
 
-            if self.UpdVar.Area.new[i, k + 1] > au_lim
-                self.UpdVar.Area.new[i, k + 1] = au_lim
-                if self.UpdVar.Area.values[i, k + 1] > 0.0
-                    self.detr_sc[i, k + 1] = (
-                        ((au_lim - self.UpdVar.Area.values[i, k + 1]) * dti_ - adv - entr_term) /
-                        (-self.UpdVar.Area.values[i, k + 1] * whalf_kp)
-                    )
+            if a_up_candidate > au_lim
+                a_up_candidate = au_lim
+                if a_up_kp > 0.0
+                    self.detr_sc[i, k + 1] = (((au_lim - a_up_kp) * dti_ - adv - entr_term) / (-a_up_kp * whalf_kp))
                 else
-                    # this detrainment rate won"t affect scalars but would affect velocity
-                    self.detr_sc[i, k + 1] =
-                        (((au_lim - self.UpdVar.Area.values[i, k + 1]) * dti_ - adv - entr_term) / (-au_lim * whalf_kp))
+                    # this detrainment rate won't affect scalars but would affect velocity
+                    self.detr_sc[i, k + 1] = (((au_lim - a_up_kp) * dti_ - adv - entr_term) / (-au_lim * whalf_kp))
                 end
             end
 
+            a_up_new[i, k + 1] = a_up_candidate
 
 
             # Now solve for updraft velocity at k
-            rho_ratio = ref_state.rho0[k - 1] / ref_state.rho0[k]
-            anew_k = interp2pt(self.UpdVar.Area.new[i, k], self.UpdVar.Area.new[i, k + 1])
+            anew_k = interp2pt(a_up_new[i, k], a_up_new[i, k + 1])
 
             if anew_k >= self.minimum_area
-                a_k = interp2pt(self.UpdVar.Area.values[i, k], self.UpdVar.Area.values[i, k + 1])
-                a_km = interp2pt(self.UpdVar.Area.values[i, k - 1], self.UpdVar.Area.values[i, k])
+                a_k = interp2pt(a_up[i, k], a_up[i, k + 1])
                 entr_w = interp2pt(
                     self.entr_sc[i, k] + self.frac_turb_entr[i, k],
                     self.entr_sc[i, k + 1] + self.frac_turb_entr[i, k + 1],
@@ -885,42 +881,25 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 )
                 B_k = interp2pt(self.UpdVar.B.values[i, k], self.UpdVar.B.values[i, k + 1])
 
-                adv = upwind_advection_velocity(
-                    ref_state.rho0,
-                    self.UpdVar.Area.values[i, :],
-                    self.UpdVar.W.values[i, :],
-                    grid,
-                    k,
-                )
-                exch = (
-                    ref_state.rho0[k] *
-                    a_k *
-                    self.UpdVar.W.values[i, k] *
-                    (entr_w * self.EnvVar.W.values[k] - detr_w * self.UpdVar.W.values[i, k])
-                )
-                buoy = ref_state.rho0[k] * a_k * B_k
-                self.UpdVar.W.new[i, k] =
-                    (
-                        ref_state.rho0[k] * a_k * self.UpdVar.W.values[i, k] * dti_ - adv +
-                        exch +
-                        buoy +
-                        self.nh_pressure[i, k]
-                    ) / (ref_state.rho0[k] * anew_k * dti_)
+                adv = upwind_advection_velocity(ρ_0_f, a_up[i, :], w_up[i, :], grid, k)
+                exch = (ρ_0_f[k] * a_k * w_up[i, k] * (entr_w * self.EnvVar.W.values[k] - detr_w * w_up[i, k]))
+                buoy = ρ_0_f[k] * a_k * B_k
+                w_up_new[i, k] =
+                    (ρ_0_f[k] * a_k * w_up[i, k] * dti_ - adv + exch + buoy + self.nh_pressure[i, k]) /
+                    (ρ_0_f[k] * anew_k * dti_)
 
-                if self.UpdVar.W.new[i, k] <= 0.0
-                    self.UpdVar.W.new[i, k] = 0.0
-                    self.UpdVar.Area.new[i, k + 1] = 0.0
-                    #break
+                if w_up_new[i, k] <= 0.0
+                    w_up_new[i, k] = 0.0
+                    a_up_new[i, k + 1] = 0.0
                 end
             else
-                self.UpdVar.W.new[i, k] = 0.0
-                self.UpdVar.Area.new[i, k + 1] = 0.0
-                # keep this in mind if we modify updraft top treatment!
+                w_up_new[i, k] = 0.0
+                a_up_new[i, k + 1] = 0.0
             end
 
             if is_surface_center(grid, k)
                 # at the surface
-                if self.UpdVar.Area.new[i, k] >= self.minimum_area
+                if a_up_new[i, k] >= self.minimum_area
                     self.UpdVar.H.new[i, k] = self.h_surface_bc[i]
                     self.UpdVar.QT.new[i, k] = self.qt_surface_bc[i]
                 else
@@ -937,43 +916,22 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
 
             # write the discrete equations in form
             # c1 * phi_new[k] = c2 * phi[k] + c3 * phi[k-1] + c4 * ϕ_enntr
-            if self.UpdVar.Area.new[i, k] >= self.minimum_area
-                m_k = (
-                    ref_state.rho0_half[k] *
-                    self.UpdVar.Area.values[i, k] *
-                    interp2pt(self.UpdVar.W.values[i, k - 1], self.UpdVar.W.values[i, k])
-                )
+            if a_up_new[i, k] >= self.minimum_area
+                m_k = (ρ_0_c[k] * a_up[i, k] * interp2pt(w_up[i, k - 1], w_up[i, k]))
 
-                adv = upwind_advection_scalar(
-                    ref_state.rho0_half,
-                    self.UpdVar.Area.values[i, :],
-                    self.UpdVar.W.values[i, :],
-                    self.UpdVar.H.values[i, :],
-                    grid,
-                    k,
-                )
+                adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], self.UpdVar.H.values[i, :], grid, k)
                 entr = (self.entr_sc[i, k] + self.frac_turb_entr[i, k]) * self.EnvVar.H.values[k]
                 detr = (self.detr_sc[i, k] + self.frac_turb_entr[i, k]) * self.UpdVar.H.values[i, k]
                 self.UpdVar.H.new[i, k] =
-                    (
-                        ref_state.rho0_half[k] * self.UpdVar.Area.values[i, k] * dti_ * self.UpdVar.H.values[i, k] -
-                        adv + m_k * (entr - detr)
-                    ) / (ref_state.rho0_half[k] * self.UpdVar.Area.new[i, k] * dti_)
+                    (ρ_0_c[k] * a_up[i, k] * dti_ * self.UpdVar.H.values[i, k] - adv + m_k * (entr - detr)) /
+                    (ρ_0_c[k] * a_up_new[i, k] * dti_)
 
-                adv = upwind_advection_scalar(
-                    ref_state.rho0_half,
-                    self.UpdVar.Area.values[i, :],
-                    self.UpdVar.W.values[i, :],
-                    self.UpdVar.QT.values[i, :],
-                    grid,
-                    k,
-                )
+                adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], self.UpdVar.QT.values[i, :], grid, k)
                 entr = (self.entr_sc[i, k] + self.frac_turb_entr[i, k]) * self.EnvVar.QT.values[k]
                 detr = (self.detr_sc[i, k] + self.frac_turb_entr[i, k]) * self.UpdVar.QT.values[i, k]
                 self.UpdVar.QT.new[i, k] = max(
-                    (
-                        ref_state.rho0_half[k] * self.UpdVar.Area.values[i, k] * dti_ * self.UpdVar.QT.values[i, k] - adv + m_k * (entr - detr)
-                    ) / (ref_state.rho0_half[k] * self.UpdVar.Area.new[i, k] * dti_),
+                    (ρ_0_c[k] * a_up[i, k] * dti_ * self.UpdVar.QT.values[i, k] - adv + m_k * (entr - detr)) /
+                    (ρ_0_c[k] * a_up_new[i, k] * dti_),
                     0.0,
                 )
 
