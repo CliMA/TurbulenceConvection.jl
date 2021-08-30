@@ -829,7 +829,7 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
         @inbounds for k in real_center_indicies(grid)
 
             # First solve for updated area fraction at k+1
-            whalf_kp = interp2pt(self.UpdVar.W.values[i, k], self.UpdVar.W.values[i, k + 1])
+            w_up_c = interpf2c(self.UpdVar.W.values, grid, k, i)
             adv = upwind_advection_area(
                 ref_state.rho0_half,
                 self.UpdVar.Area.values[i, :],
@@ -838,8 +838,8 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 k,
             )
 
-            entr_term = self.UpdVar.Area.values[i, k + 1] * whalf_kp * (self.entr_sc[i, k + 1])
-            detr_term = self.UpdVar.Area.values[i, k + 1] * whalf_kp * (-self.detr_sc[i, k + 1])
+            entr_term = self.UpdVar.Area.values[i, k + 1] * w_up_c * (self.entr_sc[i, k + 1])
+            detr_term = self.UpdVar.Area.values[i, k + 1] * w_up_c * (-self.detr_sc[i, k + 1])
 
             self.UpdVar.Area.new[i, k + 1] =
                 max(dt_ * (adv + entr_term + detr_term) + self.UpdVar.Area.values[i, k + 1], 0.0)
@@ -849,12 +849,12 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 if self.UpdVar.Area.values[i, k + 1] > 0.0
                     self.detr_sc[i, k + 1] = (
                         ((au_lim - self.UpdVar.Area.values[i, k + 1]) * dti_ - adv - entr_term) /
-                        (-self.UpdVar.Area.values[i, k + 1] * whalf_kp)
+                        (-self.UpdVar.Area.values[i, k + 1] * w_up_c)
                     )
                 else
                     # this detrainment rate won"t affect scalars but would affect velocity
                     self.detr_sc[i, k + 1] =
-                        (((au_lim - self.UpdVar.Area.values[i, k + 1]) * dti_ - adv - entr_term) / (-au_lim * whalf_kp))
+                        (((au_lim - self.UpdVar.Area.values[i, k + 1]) * dti_ - adv - entr_term) / (-au_lim * w_up_c))
                 end
             end
 
@@ -930,11 +930,7 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
             # write the discrete equations in form
             # c1 * phi_new[k] = c2 * phi[k] + c3 * phi[k-1] + c4 * ϕ_enntr
             if self.UpdVar.Area.new[i, k] >= self.minimum_area
-                m_k = (
-                    ref_state.rho0_half[k] *
-                    self.UpdVar.Area.values[i, k] *
-                    interp2pt(self.UpdVar.W.values[i, k - 1], self.UpdVar.W.values[i, k])
-                )
+                m_k = (ref_state.rho0_half[k] * self.UpdVar.Area.values[i, k] * w_up_c)
 
                 adv = upwind_advection_scalar(
                     ref_state.rho0_half,
@@ -1243,10 +1239,10 @@ function compute_tke_pressure(self::EDMF_PrognosticTKE)
     @inbounds for k in real_center_indicies(grid)
         self.EnvVar.TKE.press[k] = 0.0
         @inbounds for i in xrange(self.n_updrafts)
-            wu_half = interp2pt(self.UpdVar.W.values[i, k - 1], self.UpdVar.W.values[i, k])
-            we_half = interp2pt(self.EnvVar.W.values[k - 1], self.EnvVar.W.values[k])
+            w_up_c = interpf2c(self.UpdVar.W.values, grid, k, i)
+            w_en_c = interpf2c(self.EnvVar.W.values, grid, k)
             press_half = interp2pt(self.nh_pressure[i, k - 1], self.nh_pressure[i, k])
-            self.EnvVar.TKE.press[k] += (we_half - wu_half) * press_half
+            self.EnvVar.TKE.press[k] += (w_en_c - w_up_c) * press_half
         end
     end
     return
@@ -1553,8 +1549,8 @@ function compute_covariance_detr(self::EDMF_PrognosticTKE, Covar::EnvironmentVar
     @inbounds for k in real_center_indicies(grid)
         Covar.detr_loss[k] = 0.0
         @inbounds for i in xrange(self.n_updrafts)
-            w_u = interp2pt(self.UpdVar.W.values[i, k - 1], self.UpdVar.W.values[i, k])
-            Covar.detr_loss[k] += self.UpdVar.Area.values[i, k] * abs(w_u) * self.entr_sc[i, k]
+            w_up_c = interpf2c(self.UpdVar.W.values, grid, k, i)
+            Covar.detr_loss[k] += self.UpdVar.Area.values[i, k] * abs(w_up_c) * self.entr_sc[i, k]
         end
         Covar.detr_loss[k] *= rho0_half[k] * Covar.values[k]
     end
@@ -1639,7 +1635,7 @@ function update_covariance_ED(
             Kp = KH.values[k + 1]
         end
         rho_ae_K_m[k] = 0.5 * (ae[k] * K + ae[k + 1] * Kp) * Ref.rho0[k]
-        whalf[k] = interp2pt(self.EnvVar.W.values[k - 1], self.EnvVar.W.values[k])
+        whalf[k] = interpf2c(self.EnvVar.W.values, grid, k)
     end
 
     # Not necessary if BCs for variances are applied to environment.
@@ -1668,8 +1664,8 @@ function update_covariance_ED(
                 end
 
                 R_up = self.pressure_plume_spacing[i]
-                wu_half = interp2pt(self.UpdVar.W.values[i, k - 1], self.UpdVar.W.values[i, k])
-                D_env += Ref.rho0_half[k] * self.UpdVar.Area.values[i, k] * wu_half * (self.entr_sc[i, k] + turb_entr)
+                w_up_c = interpf2c(self.UpdVar.W.values, grid, k, i)
+                D_env += Ref.rho0_half[k] * self.UpdVar.Area.values[i, k] * w_up_c * (self.entr_sc[i, k] + turb_entr)
             else
                 D_env = 0.0
             end
