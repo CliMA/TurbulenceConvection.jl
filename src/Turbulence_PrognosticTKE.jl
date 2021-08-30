@@ -107,6 +107,7 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     mean_nh_pressure_adv = face_field(grid)
     mean_nh_pressure_drag = face_field(grid)
     mean_nh_pressure_b = face_field(grid)
+
     mean_asp_ratio = center_field(grid)
     mean_entr_sc = center_field(grid)
     mean_detr_sc = center_field(grid)
@@ -122,34 +123,41 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     io(self.EnvVar, Stats, ref_state)
     io(self.Rain, Stats, ref_state, self.UpdThermo, self.EnvThermo, TS)
 
+    a_up_bulk = self.UpdVar.Area.bulkvalues
+    a_up = self.UpdVar.Area.values
+
     write_profile(Stats, "eddy_viscosity", diffusivity_m(self).values[cinterior])
     write_profile(Stats, "eddy_diffusivity", diffusivity_h(self).values[cinterior])
     write_ts(Stats, "rd", mean(self.pressure_plume_spacing))
+
     @inbounds for k in real_center_indicies(grid)
         mf_h[k] = interpf2c(self.massflux_h, grid, k)
         mf_qt[k] = interpf2c(self.massflux_qt, grid, k)
         if self.UpdVar.Area.bulkvalues[k] > 0.0
             @inbounds for i in xrange(self.n_updrafts)
                 massflux[k] += interpf2c(self.m, grid, k, i)
-                mean_entr_sc[k] += self.UpdVar.Area.values[i, k] * self.entr_sc[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_detr_sc[k] += self.UpdVar.Area.values[i, k] * self.detr_sc[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_nh_pressure[k] +=
-                    self.UpdVar.Area.values[i, k] * self.nh_pressure[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_nh_pressure_b[k] +=
-                    self.UpdVar.Area.values[i, k] * self.nh_pressure_b[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_nh_pressure_adv[k] +=
-                    self.UpdVar.Area.values[i, k] * self.nh_pressure_adv[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_nh_pressure_drag[k] +=
-                    self.UpdVar.Area.values[i, k] * self.nh_pressure_drag[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_asp_ratio[k] +=
-                    self.UpdVar.Area.values[i, k] * self.asp_ratio[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_frac_turb_entr[k] +=
-                    self.UpdVar.Area.values[i, k] * self.frac_turb_entr[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_horiz_K_eddy[k] +=
-                    self.UpdVar.Area.values[i, k] * self.horiz_K_eddy[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_sorting_function[k] +=
-                    self.UpdVar.Area.values[i, k] * self.sorting_function[i, k] / self.UpdVar.Area.bulkvalues[k]
-                mean_b_mix[k] += self.UpdVar.Area.values[i, k] * self.b_mix[i, k] / self.UpdVar.Area.bulkvalues[k]
+                mean_entr_sc[k] += a_up[i, k] * self.entr_sc[i, k] / a_up_bulk[k]
+                mean_detr_sc[k] += a_up[i, k] * self.detr_sc[i, k] / a_up_bulk[k]
+                mean_asp_ratio[k] += a_up[i, k] * self.asp_ratio[i, k] / a_up_bulk[k]
+                mean_frac_turb_entr[k] += a_up[i, k] * self.frac_turb_entr[i, k] / a_up_bulk[k]
+                mean_horiz_K_eddy[k] += a_up[i, k] * self.horiz_K_eddy[i, k] / a_up_bulk[k]
+                mean_sorting_function[k] += a_up[i, k] * self.sorting_function[i, k] / a_up_bulk[k]
+                mean_b_mix[k] += a_up[i, k] * self.b_mix[i, k] / a_up_bulk[k]
+            end
+        end
+    end
+
+    @inbounds for k in real_face_indicies(grid)
+        a_up_bulk_f =
+            interpc2f(a_up_bulk, grid, k; bottom = SetValue(sum(self.area_surface_bc)), top = SetZeroGradient())
+        if a_up_bulk_f > 0.0
+            @inbounds for i in xrange(self.n_updrafts)
+                a_up_f =
+                    interpc2f(a_up, grid, k, i; bottom = SetValue(self.area_surface_bc[i]), top = SetZeroGradient())
+                mean_nh_pressure[k] += a_up_f * self.nh_pressure[i, k] / a_up_bulk_f
+                mean_nh_pressure_b[k] += a_up_f * self.nh_pressure_b[i, k] / a_up_bulk_f
+                mean_nh_pressure_adv[k] += a_up_f * self.nh_pressure_adv[i, k] / a_up_bulk_f
+                mean_nh_pressure_drag[k] += a_up_f * self.nh_pressure_drag[i, k] / a_up_bulk_f
             end
         end
     end
