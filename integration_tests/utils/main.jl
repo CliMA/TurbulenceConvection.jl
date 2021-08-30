@@ -33,9 +33,11 @@ function TurbulenceConvection.initialize(self::Simulation1d, namelist)
     TC = TurbulenceConvection
     Cases.initialize_reference(self.Case, self.Gr, self.Ref, self.Stats)
     Cases.initialize_profiles(self.Case, self.Gr, self.GMV, self.Ref)
+
     Cases.initialize_surface(self.Case, self.Gr, self.Ref)
     Cases.initialize_forcing(self.Case, self.Gr, self.Ref, self.GMV)
     Cases.initialize_radiation(self.Case, self.Gr, self.Ref, self.GMV)
+
     TC.initialize(self.Turb, self.Case, self.GMV, self.Ref, self.TS)
     TC.initialize_io(self)
     TC.io(self)
@@ -48,15 +50,8 @@ function run(self::Simulation1d)
     iter = 0
     TC.open_files(self.Stats) # #removeVarsHack
     while self.TS.t <= self.TS.t_max
-        TC.zero_tendencies(self.GMV)
-        Cases.update_surface(self.Case, self.GMV, self.TS)
-        Cases.update_forcing(self.Case, self.GMV, self.TS)
-        Cases.update_radiation(self.Case, self.GMV, self.TS)
         TC.update(self.Turb, self.GMV, self.Case, self.TS)
         TC.update(self.TS)
-        # Apply the tendencies, also update the BCs and diagnostic thermodynamics
-        TC.update(self.GMV, self.TS)
-        TC.update_GMV_diagnostics(self.Turb, self.GMV)
 
         if mod(iter, 100) == 0
             progress = self.TS.t / self.TS.t_max
