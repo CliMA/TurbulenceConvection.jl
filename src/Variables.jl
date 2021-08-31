@@ -1,18 +1,3 @@
-function zero_tendencies(self::VariablePrognostic, Gr::Grid)
-    @inbounds for k in center_indicies(Gr)
-        self.tendencies[k] = 0.0
-    end
-    return
-end
-
-function zero_tendencies(self::GridMeanVariables)
-    zero_tendencies(self.U, self.Gr)
-    zero_tendencies(self.V, self.Gr)
-    zero_tendencies(self.QT, self.Gr)
-    zero_tendencies(self.H, self.Gr)
-    return
-end
-
 function update(self::GridMeanVariables, TS::TimeStepping)
     grid = self.Gr
     @inbounds for k in center_indicies(grid)
@@ -31,8 +16,6 @@ function update(self::GridMeanVariables, TS::TimeStepping)
     set_bcs(self.QTvar, grid)
     set_bcs(self.Hvar, grid)
     set_bcs(self.HQTcov, grid)
-
-    zero_tendencies(self)
     return
 end
 

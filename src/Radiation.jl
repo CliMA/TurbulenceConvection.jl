@@ -90,12 +90,6 @@ end
 function update(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariables)
 
     calculate_radiation(self, GMV)
-
-    @inbounds for k in real_center_indicies(self.Gr)
-        # Apply large-scale horizontal advection tendencies
-        GMV.H.tendencies[k] += self.dTdt[k] / exner_c(self.Ref.p0_half[k])
-    end
-
     return
 end
 
@@ -127,15 +121,7 @@ function initialize(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables, L
     return
 end
 
-function update(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables)
-
-    @inbounds for k in real_center_indicies(self.Gr)
-        # Apply large-scale horizontal advection tendencies
-        GMV.H.tendencies[k] += self.dTdt[k] / exner_c(self.Ref.p0_half[k])
-    end
-
-    return
-end
+update(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables) = nothing
 
 function initialize_io(self::RadiationBase{RadiationLES}, Stats::NetCDFIO_Stats)
     add_profile(Stats, "rad_dTdt")

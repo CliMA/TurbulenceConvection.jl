@@ -799,6 +799,8 @@ Base.@kwdef mutable struct ForcingBase{T}
     Ref::ReferenceState
 end
 
+force_type(::ForcingBase{T}) where {T} = T
+
 Base.@kwdef mutable struct RadiationBase{T}
     dTdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection temperature tendency
     dqtdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection moisture tendency
@@ -811,6 +813,8 @@ Base.@kwdef mutable struct RadiationBase{T}
     F1::Float64 = 0
     f_rad::AbstractArray{Float64, 1} = zeros(1)
 end
+
+rad_type(::RadiationBase{T}) where {T} = T
 
 Base.@kwdef mutable struct CasesBase{T}
     casename::String = "default_casename"
