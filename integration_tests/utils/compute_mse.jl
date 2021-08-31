@@ -124,12 +124,21 @@ function compute_mse_wrapper(
     ds_dict = append_dict(ds_tc_filename, :ds_tc, ds_dict)
     ds_dict = append_dict(ds_tc_main_filename, :ds_tc_main, ds_dict)
 
+    computed_mse_success = false
+
+    local computed_mse
     try
         computed_mse = compute_mse(all_args...; ds_dict, kwargs...)
+        computed_mse_success = true
     finally
         for ds in values(ds_dict)
             close(ds)
         end
+    end
+    if computed_mse_success
+        return computed_mse
+    else
+        error("MSE computation unsuccessful.")
     end
 end
 
@@ -386,7 +395,15 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         end
 
         # Compute mean squared error (mse)
-        mse_single_var = sum((data_les_cont_mapped .- data_tcc_cont_mapped) .^ 2)
+        if have_pycles_ds # LES takes first precedence
+            mse_single_var = sum((data_les_cont_mapped .- data_tcc_cont_mapped) .^ 2)
+        elseif have_scampy_ds # SCAMPy takes second precedence
+            mse_single_var = sum((data_scm_cont_mapped .- data_tcc_cont_mapped) .^ 2)
+        elseif have_tc_main # TC.jl main takes third precedence
+            mse_single_var = sum((data_tcm_cont_mapped .- data_tcc_cont_mapped) .^ 2)
+        else
+            error("No dataset to compute MSE")
+        end
         # Normalize by data scale
         mse[tc_var] = mse_single_var / data_scale_tcc^2
 
