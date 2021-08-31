@@ -237,6 +237,18 @@ update_forcing(Case::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) =
 update_radiation(Case::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) =
     error("update_radiation should be overloaded in case-specific methods (in Cases.jl)")
 
+function update_cloud_frac(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
+    grid = get_grid(self)
+    # update grid-mean cloud fraction and cloud cover
+    @inbounds for k in center_indicies(grid) # update grid-mean cloud fraction and cloud cover
+        self.EnvVar.Area.values[k] = 1 - self.UpdVar.Area.bulkvalues[k]
+        GMV.cloud_fraction.values[k] =
+            self.EnvVar.Area.values[k] * self.EnvVar.cloud_fraction.values[k] +
+            self.UpdVar.Area.bulkvalues[k] * self.UpdVar.cloud_fraction[k]
+    end
+    GMV.cloud_cover = min(self.EnvVar.cloud_cover + sum(self.UpdVar.cloud_cover), 1)
+end
+
 function compute_gm_tendencies!(grid, Case, GMV, Ref, TS)
     GMV.U.tendencies .= 0
     GMV.V.tendencies .= 0
@@ -307,25 +319,27 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
 
     grid = get_grid(self)
 
+    # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
+    # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
+    # treat them as auxiliary variables for now, until we disentangle the tendency computations.
     update_surface(Case, GMV, TS)
     update_forcing(Case, GMV, TS)
     update_radiation(Case, GMV, TS)
-
-    compute_gm_tendencies!(grid, Case, GMV, self.Ref, TS)
-
-    clear_precip_sources(self.UpdThermo)
-
     update_GMV_diagnostics(self, GMV)
-
-    set_old_with_values(self.UpdVar)
-    set_updraft_surface_bc(self, GMV, Case)
-
-    # compute RHS
     compute_pressure_plume_spacing(self, GMV, Case)
     compute_updraft_closures(self, GMV, Case)
     compute_eddy_diffusivities_tke(self, GMV, Case)
     compute_GMV_MF(self, GMV, TS)
     compute_covariance_rhs(self, GMV, Case, TS)
+
+
+    # compute tendencies
+    compute_gm_tendencies!(grid, Case, GMV, self.Ref, TS)
+
+    clear_precip_sources(self.UpdThermo)
+
+    set_old_with_values(self.UpdVar)
+    set_updraft_surface_bc(self, GMV, Case)
 
     # update
     solve_updraft(self, GMV, TS)
@@ -352,14 +366,7 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
         solve_rain_evap(self.rainphysics, self.Rain, GMV, TS, self.Rain.Upd_QR, self.Rain.Upd_RainArea)
         solve_rain_evap(self.rainphysics, self.Rain, GMV, TS, self.Rain.Env_QR, self.Rain.Env_RainArea)
     end
-    # update grid-mean cloud fraction and cloud cover
-    @inbounds for k in center_indicies(grid)
-        self.EnvVar.Area.values[k] = 1.0 - self.UpdVar.Area.bulkvalues[k]
-        GMV.cloud_fraction.values[k] =
-            self.EnvVar.Area.values[k] * self.EnvVar.cloud_fraction.values[k] +
-            self.UpdVar.Area.bulkvalues[k] * self.UpdVar.cloud_fraction[k]
-    end
-    GMV.cloud_cover = min(self.EnvVar.cloud_cover + sum(self.UpdVar.cloud_cover), 1)
+    update_cloud_frac(self, GMV)
 
     # set values
     set_values_with_new(self.UpdVar)
