@@ -104,3 +104,20 @@ julia> include(joinpath("integration_tests", "Soares.jl"))
 
 Upon running a particular experiment (described above), comparison plots (against [SCAMPy](https://github.com/CliMA/SCAMPy)) are automatically generated in, for example, `Output.Bomex.01/stats/comparison/`.
 
+# Table of prognostic and diagnostic variables
+
+ - Prognostic [✓]
+ - Diagnostic [x]
+ - NA [-]
+
+| **Variable** | **Grid-mean** | **Environment** | **Updrafts** |
+| ------------ | ------------- | --------------- | ------------ |
+| `u`          | [✓]           |  [x]            |  [✓]         |
+| `v`          | [✓]           |  [x]            |  [✓]         |
+| `w`          | [-]           |  [x]            |  [✓]         |
+| `θ_liq_ice`  | [✓]           |  [x]            |  [✓]         |
+| `q_tot`      | [✓]           |  [x]            |  [✓]         |
+| `a`          | [-]           |  [x]            |  [✓]         |
+| `tke`        | [x]           |  [✓]            |  [-]         |
+
+
