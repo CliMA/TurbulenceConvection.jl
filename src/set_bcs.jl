@@ -48,18 +48,12 @@ function set_bcs(self::VariablePrognostic, Gr::Grid)
             self.values[start_high + k + 1] = self.values[start_high - k]
             self.values[start_low - k] = self.values[start_low + 1 + k]
 
-            self.mf_update[start_high + k + 1] = self.mf_update[start_high - k]
-            self.mf_update[start_low - k] = self.mf_update[start_low + 1 + k]
-
             self.new[start_high + k + 1] = self.new[start_high - k]
             self.new[start_low - k] = self.new[start_low + 1 + k]
         end
     else
         self.values[start_high] = 0.0
         self.values[start_low] = 0.0
-
-        self.mf_update[start_high] = 0.0
-        self.mf_update[start_low] = 0.0
 
         self.new[start_high] = 0.0
         self.new[start_low] = 0.0
@@ -68,9 +62,6 @@ function set_bcs(self::VariablePrognostic, Gr::Grid)
             k = kk - 1
             self.values[start_high + k] = -self.values[start_high - k]
             self.values[start_low - k] = -self.values[start_low + k]
-
-            self.mf_update[start_high + k] = -self.mf_update[start_high - k]
-            self.mf_update[start_low - k] = -self.mf_update[start_low + k]
 
             self.new[start_high + k] = -self.new[start_high - k]
             self.new[start_low - k] = -self.new[start_low + k]

@@ -251,7 +251,6 @@ end
 struct VariablePrognostic{T}
     values::T
     new::T
-    mf_update::T
     tendencies::T
     loc::String
     bc::String
@@ -263,12 +262,11 @@ struct VariablePrognostic{T}
         values = field(grid, loc)
         # Value at the next timestep, used for calculating turbulence tendencies
         new = field(grid, loc)
-        mf_update = field(grid, loc)
         tendencies = field(grid, loc)
         if kind != "scalar" && kind != "velocity"
             print("Invalid kind setting for variable! Must be scalar or velocity")
         end
-        return new{typeof(values)}(values, new, mf_update, tendencies, loc, bc, kind, name, units)
+        return new{typeof(values)}(values, new, tendencies, loc, bc, kind, name, units)
     end
 end
 
