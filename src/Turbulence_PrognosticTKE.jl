@@ -250,6 +250,7 @@ function update_cloud_frac(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
 end
 
 function compute_gm_tendencies!(grid, Case, GMV, Ref, TS)
+    param_set = parameter_set(GMV)
     GMV.U.tendencies .= 0
     GMV.V.tendencies .= 0
     GMV.QT.tendencies .= 0
@@ -257,7 +258,8 @@ function compute_gm_tendencies!(grid, Case, GMV, Ref, TS)
 
     @inbounds for k in real_center_indicies(grid)
         # Apply large-scale horizontal advection tendencies
-        Π = exner_c(Ref.p0_half[k])
+        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        Π = TD.exner(ts)
 
         if Case.Fo.apply_coriolis
             GMV.U.tendencies[k] -= Case.Fo.coriolis_param * (Case.Fo.vg[k] - GMV.V.values[k])
@@ -423,21 +425,24 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         qv_cloudy = self.EnvThermo.qv_cloudy[k]
         qt_cloudy = self.EnvThermo.qt_cloudy[k]
         th_cloudy = self.EnvThermo.th_cloudy[k]
-        lh = latent_heat(t_cloudy)
-        cpm = cpm_c(qt_cloudy)
 
         QT_cut = ccut(self.EnvVar.QT.values, grid, k)
         ∂qt∂z = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         THL_cut = ccut(self.EnvVar.H.values, grid, k)
         ∂θl∂z = c∇(THL_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
 
-        prefactor = g * (Rd / ref_state.alpha0_half[k] / ref_state.p0_half[k]) * exner_c(ref_state.p0_half[k])
+        phase_part = TD.PhasePartition(0.0, 0.0, 0.0)
+        Π = TD.exner_given_pressure(param_set, ref_state.p0_half[k], phase_part)
+
+        prefactor = g * (Rd / ref_state.alpha0_half[k] / ref_state.p0_half[k]) * Π
         ∂b∂θl_dry = prefactor * (1.0 + (eps_vi - 1.0) * qt_dry)
         ∂b∂qt_dry = prefactor * th_dry * (eps_vi - 1.0)
-
         en_cld_frac = self.EnvVar.cloud_fraction.values[k]
 
         if en_cld_frac > 0.0
+            ts_cloudy = TD.PhaseEquil_pθq(param_set, ref_state.p0[k], th_cloudy, qt_cloudy)
+            lh = TD.latent_heat_vapor(param_set, t_cloudy)
+            cpm = TD.cp_m(ts_cloudy)
             ∂b∂θl_cld = (
                 prefactor * (1.0 + eps_vi * (1.0 + lh / Rv / t_cloudy) * qv_cloudy - qt_cloudy) /
                 (1.0 + lh * lh / cpm / Rv / t_cloudy / t_cloudy * qv_cloudy)
@@ -457,13 +462,11 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         T_cut = ccut(self.EnvVar.T.values, grid, k)
         QT_cut = ccut(self.EnvVar.QT.values, grid, k)
         QL_cut = ccut(self.EnvVar.QL.values, grid, k)
-        thv_cut = theta_virt_c.(p0_cut, T_cut, QT_cut, QL_cut)
-        θv = theta_virt_c(
-            ref_state.p0_half[k],
-            self.EnvVar.T.values[k],
-            self.EnvVar.QT.values[k],
-            self.EnvVar.QL.values[k],
-        )
+        ts_cut = TD.PhaseEquil_pTq.(param_set, p0_cut, T_cut, QT_cut)
+        thv_cut = TD.virtual_pottemp.(ts_cut)
+
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], self.EnvVar.H.values[k], self.EnvVar.QT.values[k])
+        θv = TD.virtual_pottemp(ts)
         ∂θv∂z = c∇(thv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
         # compute ∇Ri and Pr
         ∇_Ri = gradient_Richardson_number(∂b∂z_θl, ∂b∂z_qt, Shear², eps(0.0))
@@ -476,6 +479,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
             tke_surf = self.EnvVar.TKE.values[kc_surf],
             ustar = ustar,
             Pr = self.prandtl_nvec[k],
+            p0 = ref_state.p0_half[k],
             ∂b∂z_θl = ∂b∂z_θl,
             Shear² = Shear²,
             ∂b∂z_qt = ∂b∂z_qt,
@@ -910,6 +914,7 @@ end
 
 function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::TimeStepping)
     grid = get_grid(self)
+    param_set = parameter_set(GMV)
     ref_state = reference_state(self)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -998,7 +1003,7 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 end
 
                 # saturation adjustment
-                sa = eos(ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
+                sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
                 self.UpdVar.QL.new[i, k] = sa.ql
                 self.UpdVar.T.new[i, k] = sa.T
                 continue
@@ -1031,7 +1036,7 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
             end
 
             # saturation adjustment
-            sa = eos(ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
+            sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
             self.UpdVar.QL.new[i, k] = sa.ql
             self.UpdVar.T.new[i, k] = sa.T
         end
@@ -1257,8 +1262,11 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
         qv_cloudy = self.EnvThermo.qv_cloudy[k]
         qt_cloudy = self.EnvThermo.qt_cloudy[k]
         th_cloudy = self.EnvThermo.th_cloudy[k]
-        lh = latent_heat(t_cloudy)
-        cpm = cpm_c(qt_cloudy)
+
+        phase_part = TD.PhasePartition(0.0, 0.0, 0.0)
+        Π = TD.exner_given_pressure(param_set, ref_state.p0_half[k], phase_part)
+
+        prefactor = Rd * Π / ref_state.p0_half[k]
 
         q_tot_cut = ccut(self.EnvVar.QT.values, grid, k)
         ∇q_tot = c∇(q_tot_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
@@ -1266,12 +1274,14 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
         θ_liq_ice_cut = ccut(self.EnvVar.H.values, grid, k)
         ∇θ_liq_ice = c∇(θ_liq_ice_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
 
-        prefactor = Rd * exner_c(ref_state.p0_half[k]) / ref_state.p0_half[k]
         d_α_θ_liq_ice_dry = prefactor * (1 + (eps_vi - 1) * qt_dry)
         d_α_q_tot_dry = prefactor * th_dry * (eps_vi - 1)
 
         cf_en = self.EnvVar.cloud_fraction.values[k]
         if cf_en > 0.0
+            ts_cloudy = TD.PhaseEquil_pθq(param_set, ref_state.p0[k], th_cloudy, qt_cloudy)
+            lh = TD.latent_heat_vapor(param_set, t_cloudy)
+            cpm = TD.cp_m(ts_cloudy)
             d_α_θ_liq_ice_cloudy = (
                 prefactor * (1 + eps_vi * (1 + lh / Rv / t_cloudy) * qv_cloudy - qt_cloudy) /
                 (1 + lh * lh / cpm / Rv / t_cloudy / t_cloudy * qv_cloudy)
@@ -1852,7 +1862,8 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
 
     @inbounds for k in real_center_indicies(grid)
         qv = GMV.QT.values[k] - GMV.QL.values[k]
-        theta_rho[k] = theta_rho_c(self.Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
+        ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        theta_rho[k] = TD.virtual_pottemp(ts)
     end
 
 

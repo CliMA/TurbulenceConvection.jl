@@ -122,7 +122,6 @@ function initialize(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables, L
 end
 
 update(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables) = nothing
-
 function initialize_io(self::RadiationBase{RadiationLES}, Stats::NetCDFIO_Stats)
     add_profile(Stats, "rad_dTdt")
     add_profile(Stats, "rad_flux")
