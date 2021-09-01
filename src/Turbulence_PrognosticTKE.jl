@@ -1004,8 +1004,8 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
 
                 # saturation adjustment
                 sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-                self.UpdVar.QL.new[i, k] = sa.ql
-                self.UpdVar.T.new[i, k] = sa.T
+                self.UpdVar.QL.values[i, k] = sa.ql
+                self.UpdVar.T.values[i, k] = sa.T
                 continue
             end
 
@@ -1037,8 +1037,8 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
 
             # saturation adjustment
             sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-            self.UpdVar.QL.new[i, k] = sa.ql
-            self.UpdVar.T.new[i, k] = sa.T
+            self.UpdVar.QL.values[i, k] = sa.ql
+            self.UpdVar.T.values[i, k] = sa.T
         end
     end
 

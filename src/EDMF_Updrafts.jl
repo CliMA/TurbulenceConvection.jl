@@ -223,9 +223,7 @@ function set_new_with_values(self::UpdraftVariables)
         @inbounds for k in center_indicies(self.Gr)
             self.Area.new[i, k] = self.Area.values[i, k]
             self.QT.new[i, k] = self.QT.values[i, k]
-            self.QL.new[i, k] = self.QL.values[i, k]
             self.H.new[i, k] = self.H.values[i, k]
-            self.T.new[i, k] = self.T.values[i, k]
         end
     end
     return
@@ -252,9 +250,7 @@ function set_values_with_new(self::UpdraftVariables)
             self.W.values[i, k] = self.W.new[i, k]
             self.Area.values[i, k] = self.Area.new[i, k]
             self.QT.values[i, k] = self.QT.new[i, k]
-            self.QL.values[i, k] = self.QL.new[i, k]
             self.H.values[i, k] = self.H.new[i, k]
-            self.T.values[i, k] = self.T.new[i, k]
         end
     end
     return
@@ -433,10 +429,10 @@ function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rai
                 Rain.tau_acnv,
                 Rain.E_col,
                 UpdVar.QT.new[i, k],
-                UpdVar.QL.new[i, k],
+                UpdVar.QL.values[i, k],
                 Rain.Upd_QR.values[k],
                 UpdVar.Area.new[i, k],
-                UpdVar.T.new[i, k],
+                UpdVar.T.values[i, k],
                 self.Ref.p0_half[k],
                 self.Ref.rho0_half[k],
                 dt,
@@ -444,7 +440,7 @@ function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rai
 
             # update Updraft.new
             UpdVar.QT.new[i, k] = mph.qt
-            UpdVar.QL.new[i, k] = mph.ql
+            UpdVar.QL.values[i, k] = mph.ql
             UpdVar.H.new[i, k] = mph.thl
 
             # update rain sources of state variables
