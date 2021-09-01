@@ -226,7 +226,6 @@ function set_new_with_values(self::UpdraftVariables)
             self.QL.new[i, k] = self.QL.values[i, k]
             self.H.new[i, k] = self.H.values[i, k]
             self.T.new[i, k] = self.T.values[i, k]
-            self.B.new[i, k] = self.B.values[i, k]
         end
     end
     return
@@ -235,18 +234,8 @@ end
 # quick utility to set "new" arrays with values in the "values" arrays
 function set_old_with_values(self::UpdraftVariables)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in face_indicies(self.Gr)
-            self.W.old[i, k] = self.W.values[i, k]
-        end
-
         @inbounds for k in center_indicies(self.Gr)
-            self.W.old[i, k] = self.W.values[i, k]
             self.Area.old[i, k] = self.Area.values[i, k]
-            self.QT.old[i, k] = self.QT.values[i, k]
-            self.QL.old[i, k] = self.QL.values[i, k]
-            self.H.old[i, k] = self.H.values[i, k]
-            self.T.old[i, k] = self.T.values[i, k]
-            self.B.old[i, k] = self.B.values[i, k]
         end
     end
     return
@@ -266,7 +255,6 @@ function set_values_with_new(self::UpdraftVariables)
             self.QL.values[i, k] = self.QL.new[i, k]
             self.H.values[i, k] = self.H.new[i, k]
             self.T.values[i, k] = self.T.new[i, k]
-            self.B.values[i, k] = self.B.new[i, k]
         end
     end
     return
