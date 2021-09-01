@@ -144,13 +144,12 @@ interp2pt(val1, val2) = 0.5 * (val1 + val2)
 #####
 
 function upwind_advection_area(ρ0_half::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64}, grid, k)
-    w_up_cut = fdaul_onesided(w_up, grid, k)
-    ρ_0_cut = ccut_downwind(ρ0_half, grid, k)
-    a_up_cut = ccut_downwind(a_up, grid, k)
+    ρ_0_cut = ccut_upwind(ρ0_half, grid, k)
+    a_up_cut = ccut_upwind(a_up, grid, k)
+    w_up_cut = fdaul_upwind(w_up, grid, k)
     m_cut = ρ_0_cut .* a_up_cut .* w_up_cut
-    ∇m = c∇_downwind(m_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
-    # TODO: Why are we dividing by ρ0_half[k + 1]?
-    return -∇m / ρ0_half[k + 1]
+    ∇m = c∇_upwind(m_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
+    return -∇m / ρ0_half[k]
 end
 
 function upwind_advection_velocity(ρ0::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64}, grid, k)
