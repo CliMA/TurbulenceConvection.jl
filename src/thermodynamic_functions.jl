@@ -9,7 +9,6 @@ function rho_c(p0, T, qt, qv)
 end
 
 function eos(param_set, p0, qt, prog)
-    qv = qt
     ql = 0.0
 
     _ret = eos_struct()
@@ -22,40 +21,49 @@ function eos(param_set, p0, qt, prog)
     pv_star_1 = 6.1094 * exp((17.625 * (T_1 - 273.15)) / float((T_1 - 273.15) + 243.04)) * 100
     qv_star_1 = eps_v * (1.0 - qt) * pv_star_1 / (p0 - pv_star_1)
 
-    ql_2 = 0.0
     # If not saturated
     if (qt <= qv_star_1)
         _ret.T = T_1
         _ret.ql = 0.0
 
     else
-        ql_1 = qt - qv_star_1
-        prog_1 = TD.liquid_ice_pottemp_given_pressure(param_set, T_1, p0, TD.PhasePartition(qt, ql_1, 0.0))
 
-        f_1 = prog - prog_1
-        L = TD.latent_heat_vapor(param_set, T_1)
-        T_2 = T_1 + ql_1 * L / ((1.0 - qt) * cpd + qv_star_1 * cpv)
-        delta_T = abs(T_2 - T_1)
-        qv_star_2 = 0
-        while delta_T > 1.0e-3 || ql_2 < 0.0
-            pv_star_2 = 6.1094 * exp((17.625 * (T_2 - 273.15)) / float((T_2 - 273.15) + 243.04)) * 100
-            qv_star_2 = eps_v * (1.0 - qt) * pv_star_2 / (p0 - pv_star_2)
-            pv_2 = p0 * eps_vi * qv_star_2 / (1.0 - qt + eps_vi * qv_star_2)
-            pd_2 = p0 - pv_2
-            ql_2 = qt - qv_star_2
-
-            prog_2 = TD.liquid_ice_pottemp_given_pressure(param_set, T_2, p0, TD.PhasePartition(qt, ql_2, 0.0))
-            f_2 = prog - prog_2
-            T_n = T_2 - f_2 * (T_2 - T_1) / (f_2 - f_1)
-            T_1 = T_2
-            T_2 = T_n
-            f_1 = f_2
-            delta_T = abs(T_2 - T_1)
+        function compute_q_liq(T)
+            pv_star = 6.1094 * exp((17.625 * (T - 273.15)) / float((T - 273.15) + 243.04)) * 100
+            ql = qt - (eps_v * (1.0 - qt) * pv_star / (p0 - pv_star))
+            return ql
         end
 
-        _ret.T = T_2
-        qv = qv_star_2
-        _ret.ql = ql_2
+        function roots(T)
+            ql = compute_q_liq(T)
+            return oftype(T, prog) - TD.liquid_ice_pottemp_given_pressure(
+                param_set,
+                T,
+                oftype(T, p0),
+                TD.PhasePartition(oftype(T, qt), oftype(T, ql), oftype(T, 0.0)),
+            )
+        end
+
+        ql_1 = qt - qv_star_1
+        L = TD.latent_heat_vapor(param_set, T_1)
+        T_init = T_1 + ql_1 * L / ((1.0 - qt) * cpd + qv_star_1 * cpv)
+
+        maxiter = 50
+        tol = RS.SolutionTolerance(1.0e-3)
+        sol = RS.find_zero(roots, RS.NewtonsMethodAD(T_init), RS.CompactSolution(), tol, maxiter)
+        if !sol.converged
+            println("-----------------------------------------\n")
+            println("maxiter reached in eos:\n")
+            println("    Method=NewtonsMethodAD")
+            println(", θ_liq_ice=", prog)
+            println(", p_0=", p0)
+            println(", q_tot=", qt)
+            println(", T=", sol.root)
+            println(", maxiter=", maxiter)
+            println(", tol=", tol.tol, "\n")
+        end
+        _ret.T = sol.root
+        _ret.ql = compute_q_liq(_ret.T)
     end
 
     return _ret
