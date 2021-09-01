@@ -580,7 +580,6 @@ end
 
 # Find values of environmental variables by subtracting updraft values from grid mean values
 # whichvals used to check which substep we are on--correspondingly use "GMV.SomeVar.value" (last timestep value)
-# or GMV.SomeVar.mf_update (GMV value following massflux substep)
 function decompose_environment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
 
     # first make sure the "bulkvalues" of the updraft variables are updated
@@ -1038,7 +1037,6 @@ end
 # 1. compute the mass fluxes (currently not stored as class members, probably will want to do this
 # for output purposes)
 # 2. Apply mass flux tendencies and updraft microphysical tendencies to GMV.SomeVar.Values (old time step values)
-# thereby updating to GMV.SomeVar.mf_update
 # mass flux tendency is computed as 1st order upwind
 
 function compute_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::TimeStepping)
@@ -1092,12 +1090,6 @@ function compute_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Ti
         mf_tend_h = -∇mf_tend_h * ref_state.alpha0_half[k]
         mf_tend_qt = -∇mf_tend_qt * ref_state.alpha0_half[k]
 
-        GMV.H.mf_update[k] = GMV.H.values[k] + TS.dt * mf_tend_h + self.UpdThermo.prec_source_h_tot[k]
-        GMV.QT.mf_update[k] = GMV.QT.values[k] + TS.dt * mf_tend_qt + self.UpdThermo.prec_source_qt_tot[k]
-
-        #No mass flux tendency for U, V
-        GMV.U.mf_update[k] = GMV.U.values[k]
-        GMV.V.mf_update[k] = GMV.V.values[k]
         # Prepare the output
         self.massflux_tendency_h[k] = mf_tend_h
         self.massflux_tendency_qt[k] = mf_tend_qt
@@ -1108,7 +1100,6 @@ end
 # Update the grid mean variables with the tendency due to eddy diffusion
 # Km and Kh have already been updated
 # 2nd order finite differences plus implicit time step allows solution with tridiagonal matrix solver
-# Update from GMV.SomeVar.mf_update to GMV.SomeVar.new
 function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
     grid = get_grid(self)
     nzg = grid.nzg
@@ -1140,14 +1131,19 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     x[cinterior] .= tridiag_solve(x[cinterior], a[cinterior], b[cinterior], c[cinterior])
 
     @inbounds for k in real_center_indicies(grid)
+        mf_tend_qt_dual = dual_faces(self.massflux_qt, grid, k)
+        ∇mf_tend_qt = ∇f2c(mf_tend_qt_dual, grid, k)
+        mf_tend_qt = -∇mf_tend_qt * ref_state.alpha0_half[k]
+
         GMV.QT.new[k] = max(
-            GMV.QT.mf_update[k] +
+            (GMV.QT.values[k] + TS.dt * mf_tend_qt + self.UpdThermo.prec_source_qt_tot[k]) +
             ae[k] * (x[k] - self.EnvVar.QT.values[k]) +
             self.EnvThermo.prec_source_qt[k] +
             self.rainphysics.rain_evap_source_qt[k],
             0.0,
         )
-        self.diffusive_tendency_qt[k] = (GMV.QT.new[k] - GMV.QT.mf_update[k]) * TS.dti
+        self.diffusive_tendency_qt[k] =
+            (GMV.QT.new[k] - (GMV.QT.values[k] + TS.dt * mf_tend_qt + self.UpdThermo.prec_source_qt_tot[k])) * TS.dti
     end
     # get the diffusive flux
     @inbounds for k in real_center_indicies(grid)
@@ -1166,12 +1162,17 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     end
     x[cinterior] .= tridiag_solve(x[cinterior], a[cinterior], b[cinterior], c[cinterior])
     @inbounds for k in real_center_indicies(grid)
+        mf_tend_h_dual = dual_faces(self.massflux_h, grid, k)
+        ∇mf_tend_h = ∇f2c(mf_tend_h_dual, grid, k)
+        mf_tend_h = -∇mf_tend_h * ref_state.alpha0_half[k]
+
         GMV.H.new[k] =
-            GMV.H.mf_update[k] +
+            (GMV.H.values[k] + TS.dt * mf_tend_h + self.UpdThermo.prec_source_h_tot[k]) +
             ae[k] * (x[k] - self.EnvVar.H.values[k]) +
             self.EnvThermo.prec_source_h[k] +
             self.rainphysics.rain_evap_source_h[k]
-        self.diffusive_tendency_h[k] = (GMV.H.new[k] - GMV.H.mf_update[k]) * TS.dti
+        self.diffusive_tendency_h[k] =
+            (GMV.H.new[k] - (GMV.H.values[k] + TS.dt * mf_tend_h + self.UpdThermo.prec_source_h_tot[k])) * TS.dti
     end
     # get the diffusive flux
     @inbounds for k in real_center_indicies(grid)
