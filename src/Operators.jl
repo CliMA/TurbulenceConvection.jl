@@ -47,7 +47,7 @@ function c∇_downwind(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenEr
     end
 end
 c∇_downwind(f::SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
-c∇_downwind(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.dzi / 2)
+c∇_downwind(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.dzi * 2)
 # TODO: this is a crud approximation, as we're specifying what should be the derivative
 # at the boundary, and we're taking this as the derivative at the first interior at the
 # top of the domain.
@@ -70,7 +70,7 @@ end
 c∇_upwind(f::SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
 c∇_upwind(f::SVector, grid::Grid, ::TopBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.dzi
 c∇_upwind(f::SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
-c∇_upwind(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[1] - bc.value) * (grid.dzi / 2)
+c∇_upwind(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[1] - bc.value) * (grid.dzi * 2)
 c∇_upwind(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
 function f∇_onesided(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
@@ -83,7 +83,7 @@ function f∇_onesided(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenEr
     end
 end
 f∇_onesided(f::SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
-f∇_onesided(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.dzi / 2)
+f∇_onesided(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.dzi * 2)
 f∇_onesided(f::SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
 f∇_onesided(f::SVector, grid::Grid, ::BottomBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.dzi # don't use BC info
 f∇_onesided(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
