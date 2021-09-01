@@ -7,6 +7,7 @@ import DocStringExtensions
 
 using NCDatasets
 import Dierckx
+import RootSolvers
 import Statistics
 import LambertW
 import Thermodynamics
@@ -15,6 +16,7 @@ import FastGaussQuadrature
 import CLIMAParameters
 
 const TD = Thermodynamics
+const RS = RootSolvers
 
 const CP = CLIMAParameters
 const CPP = CP.Planet
