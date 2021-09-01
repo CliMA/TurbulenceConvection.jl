@@ -418,45 +418,29 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         ∇w = ∇f2c(w_dual, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         Shear² = ∇U^2 + ∇V^2 + ∇w^2
 
-        # buoyancy_gradients
-        qt_dry = self.EnvThermo.qt_dry[k]
-        th_dry = self.EnvThermo.th_dry[k]
-        t_cloudy = self.EnvThermo.t_cloudy[k]
-        qv_cloudy = self.EnvThermo.qv_cloudy[k]
-        qt_cloudy = self.EnvThermo.qt_cloudy[k]
-        th_cloudy = self.EnvThermo.th_cloudy[k]
-
         QT_cut = ccut(self.EnvVar.QT.values, grid, k)
         ∂qt∂z = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         THL_cut = ccut(self.EnvVar.H.values, grid, k)
         ∂θl∂z = c∇(THL_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
-
-        phase_part = TD.PhasePartition(0.0, 0.0, 0.0)
-        Π = TD.exner_given_pressure(param_set, ref_state.p0_half[k], phase_part)
-
-        prefactor = g * (Rd / ref_state.alpha0_half[k] / ref_state.p0_half[k]) * Π
-        ∂b∂θl_dry = prefactor * (1.0 + (eps_vi - 1.0) * qt_dry)
-        ∂b∂qt_dry = prefactor * th_dry * (eps_vi - 1.0)
-        en_cld_frac = self.EnvVar.cloud_fraction.values[k]
-
-        if en_cld_frac > 0.0
-            ts_cloudy = TD.PhaseEquil_pθq(param_set, ref_state.p0[k], th_cloudy, qt_cloudy)
-            lh = TD.latent_heat_vapor(param_set, t_cloudy)
-            cpm = TD.cp_m(ts_cloudy)
-            ∂b∂θl_cld = (
-                prefactor * (1.0 + eps_vi * (1.0 + lh / Rv / t_cloudy) * qv_cloudy - qt_cloudy) /
-                (1.0 + lh * lh / cpm / Rv / t_cloudy / t_cloudy * qv_cloudy)
-            )
-            ∂b∂qt_cld = (lh / cpm / t_cloudy * ∂b∂θl_cld - prefactor) * th_cloudy
-        else
-            ∂b∂θl_cld = 0.0
-            ∂b∂qt_cld = 0.0
-        end
-        ∂b∂θl = (en_cld_frac * ∂b∂θl_cld + (1.0 - en_cld_frac) * ∂b∂θl_dry)
-        ∂b∂qt = (en_cld_frac * ∂b∂qt_cld + (1.0 - en_cld_frac) * ∂b∂qt_dry)
-        ∂b∂z_θl = ∂b∂θl * ∂θl∂z
-        ∂b∂z_qt = ∂b∂qt * ∂qt∂z
-
+        # buoyancy_gradients
+        bg_model = Tan2018(;
+            qt_dry = self.EnvThermo.qt_dry[k],
+            th_dry = self.EnvThermo.th_dry[k],
+            t_cloudy = self.EnvThermo.t_cloudy[k],
+            qv_cloudy = self.EnvThermo.qv_cloudy[k],
+            qt_cloudy = self.EnvThermo.qt_cloudy[k],
+            th_cloudy = self.EnvThermo.th_cloudy[k],
+            ∂qt∂z = ∂qt∂z,
+            ∂θl∂z = ∂θl∂z,
+            p0 = ref_state.p0_half[k],
+            en_cld_frac = self.EnvVar.cloud_fraction.values[k],
+            alpha0 = ref_state.alpha0_half[k],
+        )
+        bg = buoyancy_gradients(param_set, bg_model)
+        ∂b∂θl = bg.∂b∂θl
+        ∂b∂qt = bg.∂b∂qt
+        ∂b∂z_qt = bg.∂b∂z_qt
+        ∂b∂z_θl = bg.∂b∂z_θl
         # Limiting stratification scale (Deardorff, 1976)
         p0_cut = ccut(ref_state.p0_half, grid, k)
         T_cut = ccut(self.EnvVar.T.values, grid, k)
@@ -469,7 +453,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         θv = TD.virtual_pottemp(ts)
         ∂θv∂z = c∇(thv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
         # compute ∇Ri and Pr
-        ∇_Ri = gradient_Richardson_number(∂b∂z_θl, ∂b∂z_qt, Shear², eps(0.0))
+        ∇_Ri = gradient_Richardson_number(bg.∂b∂z_θl, bg.∂b∂z_qt, Shear², eps(0.0))
         self.prandtl_nvec[k] = turbulent_Prandtl_number(obukhov_length, ∇_Ri, Pr_n, ω_pr)
 
         ml_model = MinDisspLen(;
@@ -480,9 +464,9 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
             ustar = ustar,
             Pr = self.prandtl_nvec[k],
             p0 = ref_state.p0_half[k],
-            ∂b∂z_θl = ∂b∂z_θl,
+            ∂b∂z_θl = bg.∂b∂z_θl,
             Shear² = Shear²,
-            ∂b∂z_qt = ∂b∂z_qt,
+            ∂b∂z_qt = bg.∂b∂z_qt,
             ∂θv∂z = ∂θv∂z,
             ∂qt∂z = ∂qt∂z,
             ∂θl∂z = ∂θl∂z,
@@ -494,7 +478,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
             a_up = Tuple(self.UpdVar.Area.values[:, k]),
             ε_turb = Tuple(self.frac_turb_entr[:, k]),
             δ_dyn = Tuple(self.detr_sc[:, k]),
-            en_cld_frac = en_cld_frac,
+            en_cld_frac = self.EnvVar.cloud_fraction.values[k],
             θ_li_en = self.EnvVar.H.values[k],
             ql_en = self.EnvVar.QL.values[k],
             qt_en = self.EnvVar.QT.values[k],
@@ -1259,51 +1243,30 @@ function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     # that is where tke boundary condition is enforced (according to MO similarity). Thus here I
     # am being sloppy about lowest grid point
     @inbounds for k in real_center_indicies(grid)
-        qt_dry = self.EnvThermo.qt_dry[k]
-        th_dry = self.EnvThermo.th_dry[k]
-        t_cloudy = self.EnvThermo.t_cloudy[k]
-        qv_cloudy = self.EnvThermo.qv_cloudy[k]
-        qt_cloudy = self.EnvThermo.qt_cloudy[k]
-        th_cloudy = self.EnvThermo.th_cloudy[k]
+        # buoyancy_gradients
+        QT_cut = ccut(self.EnvVar.QT.values, grid, k)
+        ∂qt∂z = c∇(QT_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
 
-        phase_part = TD.PhasePartition(0.0, 0.0, 0.0)
-        Π = TD.exner_given_pressure(param_set, ref_state.p0_half[k], phase_part)
+        THL_cut = ccut(self.EnvVar.H.values, grid, k)
+        ∂θl∂z = c∇(THL_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
 
-        prefactor = Rd * Π / ref_state.p0_half[k]
+        bg_model = Tan2018(;
+            qt_dry = self.EnvThermo.qt_dry[k],
+            th_dry = self.EnvThermo.th_dry[k],
+            t_cloudy = self.EnvThermo.t_cloudy[k],
+            qv_cloudy = self.EnvThermo.qv_cloudy[k],
+            qt_cloudy = self.EnvThermo.qt_cloudy[k],
+            th_cloudy = self.EnvThermo.th_cloudy[k],
+            ∂qt∂z = ∂qt∂z,
+            ∂θl∂z = ∂θl∂z,
+            p0 = ref_state.p0_half[k],
+            en_cld_frac = self.EnvVar.cloud_fraction.values[k],
+            alpha0 = ref_state.alpha0_half[k],
+        )
 
-        q_tot_cut = ccut(self.EnvVar.QT.values, grid, k)
-        ∇q_tot = c∇(q_tot_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
-
-        θ_liq_ice_cut = ccut(self.EnvVar.H.values, grid, k)
-        ∇θ_liq_ice = c∇(θ_liq_ice_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
-
-        d_α_θ_liq_ice_dry = prefactor * (1 + (eps_vi - 1) * qt_dry)
-        d_α_q_tot_dry = prefactor * th_dry * (eps_vi - 1)
-
-        cf_en = self.EnvVar.cloud_fraction.values[k]
-        if cf_en > 0.0
-            ts_cloudy = TD.PhaseEquil_pθq(param_set, ref_state.p0[k], th_cloudy, qt_cloudy)
-            lh = TD.latent_heat_vapor(param_set, t_cloudy)
-            cpm = TD.cp_m(ts_cloudy)
-            d_α_θ_liq_ice_cloudy = (
-                prefactor * (1 + eps_vi * (1 + lh / Rv / t_cloudy) * qv_cloudy - qt_cloudy) /
-                (1 + lh * lh / cpm / Rv / t_cloudy / t_cloudy * qv_cloudy)
-            )
-            d_α_q_tot_cloudy = (lh / cpm / t_cloudy * d_α_θ_liq_ice_cloudy - prefactor) * th_cloudy
-        else
-            d_α_θ_liq_ice_cloudy = 0
-            d_α_q_tot_cloudy = 0
-        end
-
-        d_α_θ_liq_ice_total = (cf_en * d_α_θ_liq_ice_cloudy + (1 - cf_en) * d_α_θ_liq_ice_dry)
-        d_α_q_tot_total = (cf_en * d_α_q_tot_cloudy + (1 - cf_en) * d_α_q_tot_dry)
-
+        bg = buoyancy_gradients(param_set, bg_model)
         # TODO - check
-        self.EnvVar.TKE.buoy[k] =
-            g / ref_state.alpha0_half[k] *
-            ae[k] *
-            ref_state.rho0_half[k] *
-            (-KH[k] * ∇θ_liq_ice * d_α_θ_liq_ice_total - KH[k] * ∇q_tot * d_α_q_tot_total)
+        self.EnvVar.TKE.buoy[k] = -ae[k] * ref_state.rho0_half[k] * KH[k] * (bg.∂b∂z_θl + bg.∂b∂z_qt)
     end
     return
 end
