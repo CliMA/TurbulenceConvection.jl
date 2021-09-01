@@ -237,17 +237,82 @@ update_forcing(Case::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) =
 update_radiation(Case::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) =
     error("update_radiation should be overloaded in case-specific methods (in Cases.jl)")
 
+function compute_gm_tendencies!(grid, Case, GMV, Ref, TS)
+    GMV.U.tendencies .= 0
+    GMV.V.tendencies .= 0
+    GMV.QT.tendencies .= 0
+    GMV.H.tendencies .= 0
+
+    @inbounds for k in real_center_indicies(grid)
+        # Apply large-scale horizontal advection tendencies
+        Π = exner_c(Ref.p0_half[k])
+
+        if Case.Fo.apply_coriolis
+            GMV.U.tendencies[k] -= Case.Fo.coriolis_param * (Case.Fo.vg[k] - GMV.V.values[k])
+            GMV.V.tendencies[k] += Case.Fo.coriolis_param * (Case.Fo.ug[k] - GMV.U.values[k])
+        end
+        if rad_type(Case.Rad) <: Union{RadiationDYCOMS_RF01, RadiationLES}
+            GMV.H.tendencies[k] += Case.Rad.dTdt[k] / Π
+        end
+        H_cut = ccut_downwind(GMV.H.values, grid, k)
+        q_tot_cut = ccut_downwind(GMV.QT.values, grid, k)
+        ∇H = c∇_downwind(H_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
+        ∇q_tot = c∇_downwind(q_tot_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
+
+        if force_type(Case.Fo) <: ForcingDYCOMS_RF01
+            GMV.QT.tendencies[k] += Case.Fo.dqtdt[k]
+            # Apply large-scale subsidence tendencies
+            GMV.H.tendencies[k] -= ∇H * Case.Fo.subsidence[k]
+            GMV.QT.tendencies[k] -= ∇q_tot * Case.Fo.subsidence[k]
+        end
+
+        if force_type(Case.Fo) <: ForcingStandard
+            if Case.Fo.apply_subsidence
+                GMV.H.tendencies[k] -= ∇H * Case.Fo.subsidence[k]
+                GMV.QT.tendencies[k] -= ∇q_tot * Case.Fo.subsidence[k]
+            end
+            GMV.H.tendencies[k] += Case.Fo.dTdt[k] / Π
+            GMV.QT.tendencies[k] += Case.Fo.dqtdt[k]
+        end
+
+        if force_type(Case.Fo) <: ForcingLES
+            H_horz_adv = Case.Fo.dtdt_hadv[k] / Π
+            H_nudge = Case.Fo.dtdt_nudge[k] / Π
+            H_fluc = Case.Fo.dtdt_fluc[k] / Π
+
+            GMV_U_nudge_k = (Case.Fo.u_nudge[k] - GMV.U.values[k]) / Case.Fo.nudge_tau
+            GMV_V_nudge_k = (Case.Fo.v_nudge[k] - GMV.V.values[k]) / Case.Fo.nudge_tau
+            if Case.Fo.apply_subsidence
+                # Apply large-scale subsidence tendencies
+                GMV_H_subsidence_k = -∇H * Case.Fo.subsidence[k]
+                GMV_QT_subsidence_k = -∇q_tot * Case.Fo.subsidence[k]
+            else
+                GMV_H_subsidence_k = 0.0
+                GMV_QT_subsidence_k = 0.0
+            end
+
+            GMV.H.tendencies[k] += H_horz_adv + H_nudge + H_fluc + GMV_H_subsidence_k
+            GMV.QT.tendencies[k] +=
+                Case.Fo.dqtdt_hadv[k] + Case.Fo.dqtdt_nudge[k] + GMV_QT_subsidence_k + Case.Fo.dqtdt_fluc[k]
+
+            GMV.U.tendencies[k] += GMV_U_nudge_k
+            GMV.V.tendencies[k] += GMV_V_nudge_k
+        end
+
+    end
+end
+
 # Perform the update of the scheme
 function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
 
-
-    zero_tendencies(GMV)
+    grid = get_grid(self)
 
     update_surface(Case, GMV, TS)
     update_forcing(Case, GMV, TS)
     update_radiation(Case, GMV, TS)
 
-    grid = get_grid(self)
+    compute_gm_tendencies!(grid, Case, GMV, self.Ref, TS)
+
     clear_precip_sources(self.UpdThermo)
 
     update_GMV_diagnostics(self, GMV)
