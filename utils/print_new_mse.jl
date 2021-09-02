@@ -21,7 +21,7 @@ filter!(x -> x ≠ "GATE_III", all_cases) # no mse tables for GATE_III
 
 include(joinpath("..", "integration_tests", "utils", "mse_tables.jl"))
 
-max_Δmse = Dict()
+percent_reduction_mse = Dict()
 
 computed_mse = OrderedDict()
 for case in all_cases
@@ -36,10 +36,13 @@ println("#")
 println("all_best_mse = OrderedDict()\n#")
 for case in keys(computed_mse)
     println("all_best_mse[\"$case\"] = OrderedDict()")
-    max_Δmse[case] = 0
+    percent_reduction_mse[case] = 0
     for var in keys(computed_mse[case])
         println("all_best_mse[\"$case\"][\"$var\"] = $(computed_mse[case][var])")
-        max_Δmse[case] = max(max_Δmse[case], abs(computed_mse[case][var] - all_best_mse[case][var]))
+        percent_reduction_mse[case] = min(
+            percent_reduction_mse[case],
+            (all_best_mse[case][var] - computed_mse[case][var]) / all_best_mse[case][var] * 100,
+        )
     end
     println("#")
 end
@@ -54,7 +57,7 @@ for case in all_cases
 end
 
 println("-- DO NOT COPY --")
-for case in keys(max_Δmse)
-    @info "max_Δmse[$case] = $(max_Δmse[case])"
+for case in keys(percent_reduction_mse)
+    @info "percent_reduction_mse[$case] = $(percent_reduction_mse[case])"
 end
-@info "max Δmse over all cases = $(max(values(max_Δmse)...))"
+@info "min mse reduction (%) over all cases = $(min(values(percent_reduction_mse)...))"
