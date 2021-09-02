@@ -912,7 +912,7 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     dti_ = 1.0 / TS.dt
-    Δt = 1.0 / dti_
+    Δt = TS.dt
     sa = eos_struct()
 
     a_up = self.UpdVar.Area.values
@@ -933,7 +933,7 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     # Solve for updraft area fraction
     @inbounds for k in real_center_indicies(grid)
         @inbounds for i in xrange(self.n_updrafts)
-            k == kc_surface && continue
+            is_surface_center(grid, k) && continue
             w_up_c = interpf2c(w_up, grid, k, i)
             adv = upwind_advection_area(ρ_0_c, a_up[i, :], w_up[i, :], grid, k)
 
@@ -958,12 +958,14 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
 
 
     # Solve for updraft velocity
-    @inbounds for k in real_center_indicies(grid)
+    @inbounds for k in real_face_indicies(grid)
+        is_surface_face(grid, k) && continue
         @inbounds for i in xrange(self.n_updrafts)
-            anew_k = interp2pt(a_up_new[i, k], a_up_new[i, k + 1])
+            a_up_bcs = (; bottom = SetValue(self.area_surface_bc[i]), top = SetZeroGradient())
+            anew_k = interpc2f(a_up_new, grid, k, i; a_up_bcs...)
 
             if anew_k >= self.minimum_area
-                a_k = interp2pt(a_up[i, k], a_up[i, k + 1])
+                a_k = interpc2f(a_up, grid, k, i; a_up_bcs...)
                 entr_w = interp2pt(entr_w_c[i, k], entr_w_c[i, k + 1])
                 detr_w = interp2pt(detr_w_c[i, k], detr_w_c[i, k + 1])
                 B_k = interp2pt(self.UpdVar.B.values[i, k], self.UpdVar.B.values[i, k + 1])
@@ -1003,21 +1005,24 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
             # write the discrete equations in form
             # c1 * phi_new[k] = c2 * phi[k] + c3 * phi[k-1] + c4 * ϕ_enntr
             if a_up_new[i, k] >= self.minimum_area
-                m_k = (ρ_0_c[k] * a_up[i, k] * interp2pt(w_up[i, k - 1], w_up[i, k]))
+                w_up_c = interpf2c(w_up, grid, k, i)
+                m_k = (ρ_0_c[k] * a_up[i, k] * w_up_c)
 
                 adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], self.UpdVar.H.values[i, :], grid, k)
                 entr = entr_w_c[i, k] * self.EnvVar.H.values[k]
                 detr = detr_w_c[i, k] * self.UpdVar.H.values[i, k]
+                θ_liq_ice_tendencies = -adv + m_k * (entr - detr)
                 self.UpdVar.H.new[i, k] =
-                    (ρ_0_c[k] * a_up[i, k] * dti_ * self.UpdVar.H.values[i, k] - adv + m_k * (entr - detr)) /
-                    (ρ_0_c[k] * a_up_new[i, k] * dti_)
+                    (ρ_0_c[k] * a_up[i, k] * self.UpdVar.H.values[i, k] + Δt * θ_liq_ice_tendencies) /
+                    (ρ_0_c[k] * a_up_new[i, k])
 
                 adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], self.UpdVar.QT.values[i, :], grid, k)
                 entr = entr_w_c[i, k] * self.EnvVar.QT.values[k]
                 detr = detr_w_c[i, k] * self.UpdVar.QT.values[i, k]
+                q_tot_tendencies = -adv + m_k * (entr - detr)
                 self.UpdVar.QT.new[i, k] = max(
-                    (ρ_0_c[k] * a_up[i, k] * dti_ * self.UpdVar.QT.values[i, k] - adv + m_k * (entr - detr)) /
-                    (ρ_0_c[k] * a_up_new[i, k] * dti_),
+                    (ρ_0_c[k] * a_up[i, k] * self.UpdVar.QT.values[i, k] + Δt * q_tot_tendencies) /
+                    (ρ_0_c[k] * a_up_new[i, k]),
                     0.0,
                 )
 
@@ -1052,10 +1057,11 @@ function compute_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Ti
     # Compute the mass flux and associated scalar fluxes
     @inbounds for i in xrange(self.n_updrafts)
         self.m[i, kf_surf] = 0.0
+        a_up_bcs = (; bottom = SetValue(self.area_surface_bc[i]), top = SetZeroGradient())
         @inbounds for k in real_face_indicies(grid)
-            a = interp2pt(self.UpdVar.Area.values[i, k], self.UpdVar.Area.values[i, k + 1])
-            self.m[i, k] =
-                rho0[k] * a * interp2pt(ae[k], ae[k + 1]) * (self.UpdVar.W.values[i, k] - self.EnvVar.W.values[k])
+            a_up = interpc2f(self.UpdVar.Area.values, grid, k, i; a_up_bcs...)
+            a_en = interpc2f(ae, grid, k; a_up_bcs...)
+            self.m[i, k] = rho0[k] * a_up * a_en * (self.UpdVar.W.values[i, k] - self.EnvVar.W.values[k])
         end
     end
 
