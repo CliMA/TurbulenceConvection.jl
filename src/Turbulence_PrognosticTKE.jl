@@ -1072,13 +1072,16 @@ function compute_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Ti
     @inbounds for k in real_face_indicies(grid)
         self.massflux_h[k] = 0.0
         self.massflux_qt[k] = 0.0
-        env_h_interp = interp2pt(self.EnvVar.H.values[k], self.EnvVar.H.values[k + 1])
-        env_qt_interp = interp2pt(self.EnvVar.QT.values[k], self.EnvVar.QT.values[k + 1])
+        # We know that, since W = 0 at z = 0, m = 0 also, and
+        # therefore θ_liq_ice / q_tot values do not matter
+        m_bcs = (; bottom = SetValue(0), top = SetValue(0))
+        h_en_f = interpc2f(self.EnvVar.H.values, grid, k; m_bcs...)
+        qt_en_f = interpc2f(self.EnvVar.QT.values, grid, k; m_bcs...)
         @inbounds for i in xrange(self.n_updrafts)
-            self.massflux_h[k] +=
-                self.m[i, k] * (interp2pt(self.UpdVar.H.values[i, k], self.UpdVar.H.values[i, k + 1]) - env_h_interp)
-            self.massflux_qt[k] +=
-                self.m[i, k] * (interp2pt(self.UpdVar.QT.values[i, k], self.UpdVar.QT.values[i, k + 1]) - env_qt_interp)
+            h_up_f = interpc2f(self.UpdVar.H.values, grid, k, i; m_bcs...)
+            qt_up_f = interpc2f(self.UpdVar.QT.values, grid, k, i; m_bcs...)
+            self.massflux_h[k] += self.m[i, k] * (h_up_f - h_en_f)
+            self.massflux_qt[k] += self.m[i, k] * (qt_up_f - qt_en_f)
         end
     end
 
@@ -1546,9 +1549,7 @@ function compute_covariance_entr(
                 gmvvar1 = is_tke ? interpf2c(GmvVar1.values, grid, k) : GmvVar1.values[k]
                 gmvvar2 = is_tke ? interpf2c(GmvVar2.values, grid, k) : GmvVar2.values[k]
 
-                # TODO: bugfix: frac_turb_entr should not be interpolated here
-                eps_turb = is_tke ? interp2pt(self.frac_turb_entr[i, k], self.frac_turb_entr[i, k - 1]) :
-                    self.frac_turb_entr[i, k]
+                eps_turb = self.frac_turb_entr[i, k]
 
                 w_u = interpf2c(self.UpdVar.W.values, grid, k, i)
                 dynamic_entr =
@@ -1659,33 +1660,18 @@ function update_covariance_ED(
     ae = 1 .- self.UpdVar.Area.bulkvalues
     ae_old = 1 .- up_sum(self.UpdVar.Area.old)
     rho_ae_K_m = face_field(grid)
-    whalf = center_field(grid)
+    w_en_c = center_field(grid)
     D_env = 0.0
-    KM = diffusivity_m(self)
-    KH = diffusivity_h(self)
+    KM = diffusivity_m(self).values
+    KH = diffusivity_h(self).values
+    is_tke = Covar.name == "tke"
+
+    aeK = is_tke ? ae .* KM : ae .* KH
 
     @inbounds for k in real_face_indicies(grid)
-        if Covar.name == "tke"
-            K = KM.values[k]
-            Kp = KM.values[k + 1]
-        else
-            K = KH.values[k]
-            Kp = KH.values[k + 1]
-        end
-        rho_ae_K_m[k] = 0.5 * (ae[k] * K + ae[k + 1] * Kp) * Ref.rho0[k]
-        whalf[k] = interpf2c(self.EnvVar.W.values, grid, k)
+        rho_ae_K_m[k] = 0.5 * (aeK[k] + aeK[k + 1]) * Ref.rho0[k]
+        w_en_c[k] = interpf2c(self.EnvVar.W.values, grid, k)
     end
-
-    # Not necessary if BCs for variances are applied to environment.
-    # if GmvCovar.name=="tke"
-    #     GmvCovar.values[kc_surf] =get_surface_tke(Case.Sur.ustar, self.wstar, get_grid(self).z_half[kc_surf], Case.Sur.obukhov_length)
-    # elseif GmvCovar.name=="thetal_var"
-    #     GmvCovar.values[kc_surf] = get_surface_variance(Case.Sur.rho_hflux * alpha0LL, Case.Sur.rho_hflux * alpha0LL, Case.Sur.ustar, zLL, Case.Sur.obukhov_length)
-    # elseif GmvCovar.name=="qt_var"
-    #     GmvCovar.values[kc_surf] = get_surface_variance(Case.Sur.rho_qtflux * alpha0LL, Case.Sur.rho_qtflux * alpha0LL, Case.Sur.ustar, zLL, Case.Sur.obukhov_length)
-    # elseif GmvCovar.name=="thetal_qt_covar"
-    #     GmvCovar.values[kc_surf] = get_surface_variance(Case.Sur.rho_hflux * alpha0LL, Case.Sur.rho_qtflux * alpha0LL, Case.Sur.ustar, zLL, Case.Sur.obukhov_length)
-    # self.get_env_covar_from_GMV(self.UpdVar.Area, UpdVar1, UpdVar2, EnvVar1, EnvVar2, Covar, GmvVar1.values, GmvVar2.values, GmvCovar.values)
 
     Covar_surf = Covar.values[kc_surf]
 
@@ -1694,16 +1680,10 @@ function update_covariance_ED(
 
         @inbounds for i in xrange(self.n_updrafts)
             if self.UpdVar.Area.values[i, k] > self.minimum_area
-                if Covar.name == "tke"
-                    turb_entr =
-                        interp2pt(self.frac_turb_entr[i, k - 1], self.frac_turb_entr[i, k]) / self.prandtl_nvec[k]
-                else
-                    turb_entr = self.frac_turb_entr[i, k]
-                end
-
+                turb_entr = self.frac_turb_entr[i, k]
                 R_up = self.pressure_plume_spacing[i]
-                wu_half = interp2pt(self.UpdVar.W.values[i, k - 1], self.UpdVar.W.values[i, k])
-                D_env += Ref.rho0_half[k] * self.UpdVar.Area.values[i, k] * wu_half * (self.entr_sc[i, k] + turb_entr)
+                w_up_c = interpf2c(self.UpdVar.W.values, grid, k, i)
+                D_env += Ref.rho0_half[k] * self.UpdVar.Area.values[i, k] * w_up_c * (self.entr_sc[i, k] + turb_entr)
             else
                 D_env = 0.0
             end
@@ -1711,13 +1691,13 @@ function update_covariance_ED(
 
         a[k] = (-rho_ae_K_m[k - 1] * dzi * dzi)
         b[k] = (
-            Ref.rho0_half[k] * ae[k] * dti - Ref.rho0_half[k] * ae[k] * whalf[k] * dzi +
+            Ref.rho0_half[k] * ae[k] * dti - Ref.rho0_half[k] * ae[k] * w_en_c[k] * dzi +
             rho_ae_K_m[k] * dzi * dzi +
             rho_ae_K_m[k - 1] * dzi * dzi +
             D_env +
             Ref.rho0_half[k] * ae[k] * c_d * sqrt(max(self.EnvVar.TKE.values[k], 0)) / max(self.mixing_length[k], 1.0)
         )
-        c[k] = (Ref.rho0_half[k + 1] * ae[k + 1] * whalf[k + 1] * dzi - rho_ae_K_m[k] * dzi * dzi)
+        c[k] = (Ref.rho0_half[k + 1] * ae[k + 1] * w_en_c[k + 1] * dzi - rho_ae_K_m[k] * dzi * dzi)
         x[k] = (
             Ref.rho0_half[k] * ae_old[k] * Covar.values[k] * dti +
             Covar.press[k] +
@@ -1739,7 +1719,7 @@ function update_covariance_ED(
             c[k] = 0.0
         end
     end
-    # x .= tridiag_solve(x, a, b, c)
+
     cinterior = real_center_indicies(grid)
     x[cinterior] .= tridiag_solve(x[cinterior], a[cinterior], b[cinterior], c[cinterior])
 
