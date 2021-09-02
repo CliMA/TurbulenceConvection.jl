@@ -966,9 +966,11 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
 
             if anew_k >= self.minimum_area
                 a_k = interpc2f(a_up, grid, k, i; a_up_bcs...)
-                entr_w = interp2pt(entr_w_c[i, k], entr_w_c[i, k + 1])
-                detr_w = interp2pt(detr_w_c[i, k], detr_w_c[i, k + 1])
-                B_k = interp2pt(self.UpdVar.B.values[i, k], self.UpdVar.B.values[i, k + 1])
+                # We know that, since W = 0 at z = 0, these BCs should
+                # not matter in the end:
+                entr_w = interpc2f(entr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
+                detr_w = interpc2f(detr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
+                B_k = interpc2f(self.UpdVar.B.values, grid, k, i; bottom = SetValue(0), top = SetValue(0))
 
                 adv = upwind_advection_velocity(ρ_0_f, a_up[i, :], w_up[i, :], grid, k)
                 exch = (ρ_0_f[k] * a_k * w_up[i, k] * (entr_w * self.EnvVar.W.values[k] - detr_w * w_up[i, k]))

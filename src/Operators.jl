@@ -135,10 +135,6 @@ interpf2c(f::SVector, grid::Grid, ::InteriorTag) = (f[1] + f[2]) / 2
 interpf2c(f::SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (f[1] + bc.value) / 2
 interpf2c(f::SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (bc.value + f[2]) / 2
 
-
-# To be deprecated
-interp2pt(val1, val2) = 0.5 * (val1 + val2)
-
 #####
 ##### advection operators
 #####
