@@ -935,45 +935,47 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
         self.detr_sc[i, kc_surf] = self.detr_surface_bc
         w_up_new[i, kf_surf] = self.w_surface_bc[i]
         a_up_new[i, kc_surf] = self.area_surface_bc[i]
+    end
 
-        @inbounds for k in real_center_indicies(grid)
-
+    @inbounds for k in real_center_indicies(grid)
+        @inbounds for i in xrange(self.n_updrafts)
+            k == kc_surface && continue
             # First solve for updated area fraction at k+1
-            whalf_kp = interp2pt(w_up[i, k], w_up[i, k + 1])
+            w_up_c = interp2pt(w_up[i, k - 1], w_up[i, k])
             adv = upwind_advection_area(ρ_0_c, a_up[i, :], w_up[i, :], grid, k)
 
-            a_up_kp = a_up[i, k + 1]
-            entr_term = a_up_kp * whalf_kp * (self.entr_sc[i, k + 1])
-            detr_term = a_up_kp * whalf_kp * (-self.detr_sc[i, k + 1])
+            a_up_c = a_up[i, k]
+            entr_term = a_up_c * w_up_c * (self.entr_sc[i, k])
+            detr_term = a_up_c * w_up_c * (-self.detr_sc[i, k])
 
-            a_up_candidate = max(dt_ * (adv + entr_term + detr_term) + a_up_kp, 0.0)
+            a_up_candidate = max(dt_ * (adv + entr_term + detr_term) + a_up_c, 0.0)
 
             if a_up_candidate > au_lim
                 a_up_candidate = au_lim
-                if a_up_kp > 0.0
-                    self.detr_sc[i, k + 1] = (((au_lim - a_up_kp) * dti_ - adv - entr_term) / (-a_up_kp * whalf_kp))
+                if a_up_c > 0.0
+                    self.detr_sc[i, k] = (((au_lim - a_up_c) * dti_ - adv - entr_term) / (-a_up_c * w_up_c))
                 else
                     # this detrainment rate won't affect scalars but would affect velocity
-                    self.detr_sc[i, k + 1] = (((au_lim - a_up_kp) * dti_ - adv - entr_term) / (-au_lim * whalf_kp))
+                    self.detr_sc[i, k] = (((au_lim - a_up_c) * dti_ - adv - entr_term) / (-au_lim * w_up_c))
                 end
             end
+            a_up_new[i, k] = a_up_candidate
+        end
+    end
 
-            a_up_new[i, k + 1] = a_up_candidate
+    entr_w_c = self.entr_sc .+ self.frac_turb_entr
+    detr_w_c = self.detr_sc .+ self.frac_turb_entr
 
 
+    @inbounds for k in real_center_indicies(grid)
+        @inbounds for i in xrange(self.n_updrafts)
             # Now solve for updraft velocity at k
             anew_k = interp2pt(a_up_new[i, k], a_up_new[i, k + 1])
 
             if anew_k >= self.minimum_area
                 a_k = interp2pt(a_up[i, k], a_up[i, k + 1])
-                entr_w = interp2pt(
-                    self.entr_sc[i, k] + self.frac_turb_entr[i, k],
-                    self.entr_sc[i, k + 1] + self.frac_turb_entr[i, k + 1],
-                )
-                detr_w = interp2pt(
-                    self.detr_sc[i, k] + self.frac_turb_entr[i, k],
-                    self.detr_sc[i, k + 1] + self.frac_turb_entr[i, k + 1],
-                )
+                entr_w = interp2pt(entr_w_c[i, k], entr_w_c[i, k + 1])
+                detr_w = interp2pt(detr_w_c[i, k], detr_w_c[i, k + 1])
                 B_k = interp2pt(self.UpdVar.B.values[i, k], self.UpdVar.B.values[i, k + 1])
 
                 adv = upwind_advection_velocity(ρ_0_f, a_up[i, :], w_up[i, :], grid, k)
@@ -983,13 +985,13 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                     (ρ_0_f[k] * a_k * w_up[i, k] * dti_ - adv + exch + buoy + self.nh_pressure[i, k]) /
                     (ρ_0_f[k] * anew_k * dti_)
 
+                w_up_new[i, k] = max(w_up_new[i, k], 0)
                 if w_up_new[i, k] <= 0.0
-                    w_up_new[i, k] = 0.0
                     a_up_new[i, k + 1] = 0.0
                 end
             else
-                w_up_new[i, k] = 0.0
-                a_up_new[i, k + 1] = 0.0
+                w_up_new[i, k] = 0
+                a_up_new[i, k + 1] = 0
             end
 
             if is_surface_center(grid, k)
@@ -1004,8 +1006,8 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
 
                 # saturation adjustment
                 sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-                self.UpdVar.QL.new[i, k] = sa.ql
-                self.UpdVar.T.new[i, k] = sa.T
+                self.UpdVar.QL.values[i, k] = sa.ql
+                self.UpdVar.T.values[i, k] = sa.T
                 continue
             end
 
@@ -1015,15 +1017,15 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 m_k = (ρ_0_c[k] * a_up[i, k] * interp2pt(w_up[i, k - 1], w_up[i, k]))
 
                 adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], self.UpdVar.H.values[i, :], grid, k)
-                entr = (self.entr_sc[i, k] + self.frac_turb_entr[i, k]) * self.EnvVar.H.values[k]
-                detr = (self.detr_sc[i, k] + self.frac_turb_entr[i, k]) * self.UpdVar.H.values[i, k]
+                entr = entr_w_c[i, k] * self.EnvVar.H.values[k]
+                detr = detr_w_c[i, k] * self.UpdVar.H.values[i, k]
                 self.UpdVar.H.new[i, k] =
                     (ρ_0_c[k] * a_up[i, k] * dti_ * self.UpdVar.H.values[i, k] - adv + m_k * (entr - detr)) /
                     (ρ_0_c[k] * a_up_new[i, k] * dti_)
 
                 adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], self.UpdVar.QT.values[i, :], grid, k)
-                entr = (self.entr_sc[i, k] + self.frac_turb_entr[i, k]) * self.EnvVar.QT.values[k]
-                detr = (self.detr_sc[i, k] + self.frac_turb_entr[i, k]) * self.UpdVar.QT.values[i, k]
+                entr = entr_w_c[i, k] * self.EnvVar.QT.values[k]
+                detr = detr_w_c[i, k] * self.UpdVar.QT.values[i, k]
                 self.UpdVar.QT.new[i, k] = max(
                     (ρ_0_c[k] * a_up[i, k] * dti_ * self.UpdVar.QT.values[i, k] - adv + m_k * (entr - detr)) /
                     (ρ_0_c[k] * a_up_new[i, k] * dti_),
@@ -1037,8 +1039,8 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
 
             # saturation adjustment
             sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-            self.UpdVar.QL.new[i, k] = sa.ql
-            self.UpdVar.T.new[i, k] = sa.T
+            self.UpdVar.QL.values[i, k] = sa.ql
+            self.UpdVar.T.values[i, k] = sa.T
         end
     end
 

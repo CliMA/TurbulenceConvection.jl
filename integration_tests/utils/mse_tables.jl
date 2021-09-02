@@ -5,18 +5,18 @@
 all_best_mse = OrderedDict()
 #
 all_best_mse["ARM_SGP"] = OrderedDict()
-all_best_mse["ARM_SGP"]["qt_mean"] = 0.324097336425186
-all_best_mse["ARM_SGP"]["updraft_area"] = 2173.5812206559795
-all_best_mse["ARM_SGP"]["updraft_w"] = 345.19912595893203
-all_best_mse["ARM_SGP"]["updraft_qt"] = 13.439715018580843
-all_best_mse["ARM_SGP"]["updraft_thetal"] = 27.68289437658255
+all_best_mse["ARM_SGP"]["qt_mean"] = 0.32396994974938026
+all_best_mse["ARM_SGP"]["updraft_area"] = 2146.679114212263
+all_best_mse["ARM_SGP"]["updraft_w"] = 346.40751025083614
+all_best_mse["ARM_SGP"]["updraft_qt"] = 13.475203222972088
+all_best_mse["ARM_SGP"]["updraft_thetal"] = 27.682893508920632
 all_best_mse["ARM_SGP"]["u_mean"] = 87.99854727781789
-all_best_mse["ARM_SGP"]["tke_mean"] = 533.6880049012119
-all_best_mse["ARM_SGP"]["temperature_mean"] = 0.000146932418053928
-all_best_mse["ARM_SGP"]["ql_mean"] = 582.5561580355243
-all_best_mse["ARM_SGP"]["thetal_mean"] = 0.0001373144280374018
-all_best_mse["ARM_SGP"]["Hvar_mean"] = 674.8243237231352
-all_best_mse["ARM_SGP"]["QTvar_mean"] = 542.6158493850338
+all_best_mse["ARM_SGP"]["tke_mean"] = 533.7578309323726
+all_best_mse["ARM_SGP"]["temperature_mean"] = 0.00014689906880098176
+all_best_mse["ARM_SGP"]["ql_mean"] = 581.4344829401158
+all_best_mse["ARM_SGP"]["thetal_mean"] = 0.00013727098607042848
+all_best_mse["ARM_SGP"]["Hvar_mean"] = 725.4790566194731
+all_best_mse["ARM_SGP"]["QTvar_mean"] = 583.7212196172449
 #
 all_best_mse["Bomex"] = OrderedDict()
 all_best_mse["Bomex"]["qt_mean"] = 0.11160922326361418
@@ -34,14 +34,14 @@ all_best_mse["Bomex"]["Hvar_mean"] = 7551.827186263898
 all_best_mse["Bomex"]["QTvar_mean"] = 5411.248798358812
 #
 all_best_mse["DryBubble"] = OrderedDict()
-all_best_mse["DryBubble"]["updraft_area"] = 559.9094900039105
-all_best_mse["DryBubble"]["updraft_w"] = 459.8164704830731
-all_best_mse["DryBubble"]["updraft_thetal"] = 7.10705522906273e-5
-all_best_mse["DryBubble"]["u_mean"] = 1.914314179410149e-27
-all_best_mse["DryBubble"]["tke_mean"] = 1.3923270532011692e6
-all_best_mse["DryBubble"]["temperature_mean"] = 3.931994162441512e-5
-all_best_mse["DryBubble"]["thetal_mean"] = 3.5690966920153915e-5
-all_best_mse["DryBubble"]["Hvar_mean"] = 8.325692218538521e10
+all_best_mse["DryBubble"]["updraft_area"] = 568.4765214034632
+all_best_mse["DryBubble"]["updraft_w"] = 459.99716716258393
+all_best_mse["DryBubble"]["updraft_thetal"] = 7.10705172677478e-5
+all_best_mse["DryBubble"]["u_mean"] = 1.9705874449727134e-27
+all_best_mse["DryBubble"]["tke_mean"] = 1.3923274439567153e6
+all_best_mse["DryBubble"]["temperature_mean"] = 3.9319941805686614e-5
+all_best_mse["DryBubble"]["thetal_mean"] = 3.5690967080211734e-5
+all_best_mse["DryBubble"]["Hvar_mean"] = 8.325691352729507e10
 #
 all_best_mse["DYCOMS_RF01"] = OrderedDict()
 all_best_mse["DYCOMS_RF01"]["qt_mean"] = 0.014239804062393021
@@ -59,14 +59,14 @@ all_best_mse["DYCOMS_RF01"]["Hvar_mean"] = 8592.338522268736
 all_best_mse["DYCOMS_RF01"]["QTvar_mean"] = 647.2800344286935
 #
 all_best_mse["GABLS"] = OrderedDict()
-all_best_mse["GABLS"]["updraft_thetal"] = 7.016418120159473e-9
-all_best_mse["GABLS"]["v_mean"] = 0.002844478700629891
-all_best_mse["GABLS"]["u_mean"] = 0.0002920270149080771
-all_best_mse["GABLS"]["tke_mean"] = 0.0016558822223108557
-all_best_mse["GABLS"]["temperature_mean"] = 6.2010550189825904e-9
-all_best_mse["GABLS"]["thetal_mean"] = 7.1685109969104796e-9
-all_best_mse["GABLS"]["Hvar_mean"] = 0.0025470153699228603
-all_best_mse["GABLS"]["QTvar_mean"] = 0.00010322312839098702
+all_best_mse["GABLS"]["updraft_thetal"] = 6.504045052989054e-9
+all_best_mse["GABLS"]["v_mean"] = 0.002727552420809137
+all_best_mse["GABLS"]["u_mean"] = 0.0002903436292782645
+all_best_mse["GABLS"]["tke_mean"] = 0.0016019986905597135
+all_best_mse["GABLS"]["temperature_mean"] = 5.730083723507108e-9
+all_best_mse["GABLS"]["thetal_mean"] = 6.651170623258389e-9
+all_best_mse["GABLS"]["Hvar_mean"] = 0.0023752370618952837
+all_best_mse["GABLS"]["QTvar_mean"] = 0.00012236410514577126
 #
 all_best_mse["life_cycle_Tan2018"] = OrderedDict()
 all_best_mse["life_cycle_Tan2018"]["qt_mean"] = 0.0052982361830948566
