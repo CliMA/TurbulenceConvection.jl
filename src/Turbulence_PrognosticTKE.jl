@@ -320,6 +320,8 @@ end
 function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
 
     grid = get_grid(self)
+    ref_state = reference_state(self)
+    param_set = parameter_set(self)
 
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
@@ -334,7 +336,6 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     compute_GMV_MF(self, GMV, TS)
     compute_covariance_rhs(self, GMV, Case, TS)
 
-
     # compute tendencies
     compute_gm_tendencies!(grid, Case, GMV, self.Ref, TS)
 
@@ -345,6 +346,14 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
 
     # update
     solve_updraft(self, GMV, TS)
+    @inbounds for k in real_center_indicies(grid)
+        @inbounds for i in xrange(self.n_updrafts)
+            # saturation adjustment
+            sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
+            self.UpdVar.QL.values[i, k] = sa.ql
+            self.UpdVar.T.values[i, k] = sa.T
+        end
+    end
     update_GMV_ED(self, GMV, Case, TS)
     update_covariance(self, GMV, Case, TS)
     update_GMV_turbulence(self, GMV, Case, TS)
@@ -1004,11 +1013,6 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                     self.UpdVar.H.new[i, k] = GMV.H.values[k]
                     self.UpdVar.QT.new[i, k] = GMV.QT.values[k]
                 end
-
-                # saturation adjustment
-                sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-                self.UpdVar.QL.values[i, k] = sa.ql
-                self.UpdVar.T.values[i, k] = sa.T
                 continue
             end
 
@@ -1037,11 +1041,6 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 self.UpdVar.H.new[i, k] = GMV.H.values[k]
                 self.UpdVar.QT.new[i, k] = GMV.QT.values[k]
             end
-
-            # saturation adjustment
-            sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-            self.UpdVar.QL.values[i, k] = sa.ql
-            self.UpdVar.T.values[i, k] = sa.T
         end
     end
 
