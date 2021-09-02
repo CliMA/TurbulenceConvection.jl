@@ -152,6 +152,51 @@ Base.@kwdef struct MinDisspLen{FT, T}
     N_up::Int
 end
 
+
+"""
+    GradBuoy
+
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct GradBuoy{FT}
+    ∂b∂θl::FT
+    ∂b∂qt::FT
+    ∂b∂z_qt::FT
+    ∂b∂z_θl::FT
+end
+
+"""
+    Tan2018
+
+The buoyancy gradient estimating in Eqs. () - () in Tan2018
+
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct Tan2018{FT}
+    "specific humidity in the non cloudy part"
+    qt_dry::FT
+    "potential temperature in the non cloudy part"
+    th_dry::FT
+    "temperature in the cloudy part"
+    t_cloudy::FT
+    "vapor specific humidity  in the cloudy part"
+    qv_cloudy::FT
+    "total specific humidity in the cloudy part"
+    qt_cloudy::FT
+    "potential temperature in the cloudy part"
+    th_cloudy::FT
+    "total specific humidity gradient"
+    ∂qt∂z::FT
+    "potential temperature gradient"
+    ∂θl∂z::FT
+    "reference pressure"
+    p0::FT
+    "cloud fraction"
+    en_cld_frac::FT
+    "specific volume"
+    alpha0::FT
+end
+
 struct RainVariable{T}
     loc::String
     kind::String
