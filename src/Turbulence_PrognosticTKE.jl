@@ -919,7 +919,7 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     dti_ = 1.0 / TS.dt
-    dt_ = 1.0 / dti_
+    Δt = 1.0 / dti_
     sa = eos_struct()
 
     a_up = self.UpdVar.Area.values
@@ -937,27 +937,24 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
         a_up_new[i, kc_surf] = self.area_surface_bc[i]
     end
 
+    # Solve for updraft area fraction
     @inbounds for k in real_center_indicies(grid)
         @inbounds for i in xrange(self.n_updrafts)
             k == kc_surface && continue
-            # First solve for updated area fraction at k+1
-            w_up_c = interp2pt(w_up[i, k - 1], w_up[i, k])
+            w_up_c = interpf2c(w_up, grid, k, i)
             adv = upwind_advection_area(ρ_0_c, a_up[i, :], w_up[i, :], grid, k)
 
             a_up_c = a_up[i, k]
             entr_term = a_up_c * w_up_c * (self.entr_sc[i, k])
             detr_term = a_up_c * w_up_c * (-self.detr_sc[i, k])
+            a_tendencies = adv + entr_term + detr_term
 
-            a_up_candidate = max(dt_ * (adv + entr_term + detr_term) + a_up_c, 0.0)
+            a_up_candidate = max(a_up_c + Δt * a_tendencies, 0.0)
 
             if a_up_candidate > au_lim
                 a_up_candidate = au_lim
-                if a_up_c > 0.0
-                    self.detr_sc[i, k] = (((au_lim - a_up_c) * dti_ - adv - entr_term) / (-a_up_c * w_up_c))
-                else
-                    # this detrainment rate won't affect scalars but would affect velocity
-                    self.detr_sc[i, k] = (((au_lim - a_up_c) * dti_ - adv - entr_term) / (-au_lim * w_up_c))
-                end
+                a_up_div = a_up_c > 0.0 ? a_up_c : au_lim
+                self.detr_sc[i, k] = (((au_lim - a_up_c) * dti_ - adv - entr_term) / (-a_up_div * w_up_c))
             end
             a_up_new[i, k] = a_up_candidate
         end
@@ -967,9 +964,9 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     detr_w_c = self.detr_sc .+ self.frac_turb_entr
 
 
+    # Solve for updraft velocity
     @inbounds for k in real_center_indicies(grid)
         @inbounds for i in xrange(self.n_updrafts)
-            # Now solve for updraft velocity at k
             anew_k = interp2pt(a_up_new[i, k], a_up_new[i, k + 1])
 
             if anew_k >= self.minimum_area
@@ -981,9 +978,8 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 adv = upwind_advection_velocity(ρ_0_f, a_up[i, :], w_up[i, :], grid, k)
                 exch = (ρ_0_f[k] * a_k * w_up[i, k] * (entr_w * self.EnvVar.W.values[k] - detr_w * w_up[i, k]))
                 buoy = ρ_0_f[k] * a_k * B_k
-                w_up_new[i, k] =
-                    (ρ_0_f[k] * a_k * w_up[i, k] * dti_ - adv + exch + buoy + self.nh_pressure[i, k]) /
-                    (ρ_0_f[k] * anew_k * dti_)
+                w_tendencies = -adv + exch + buoy + self.nh_pressure[i, k]
+                w_up_new[i, k] = (ρ_0_f[k] * a_k * w_up[i, k] + Δt * w_tendencies) / (ρ_0_f[k] * anew_k)
 
                 w_up_new[i, k] = max(w_up_new[i, k], 0)
                 if w_up_new[i, k] <= 0.0
@@ -993,7 +989,12 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 w_up_new[i, k] = 0
                 a_up_new[i, k + 1] = 0
             end
+        end
+    end
 
+    # Solve for θ_liq_ice & q_tot
+    @inbounds for k in real_center_indicies(grid)
+        @inbounds for i in xrange(self.n_updrafts)
             if is_surface_center(grid, k)
                 # at the surface
                 if a_up_new[i, k] >= self.minimum_area
