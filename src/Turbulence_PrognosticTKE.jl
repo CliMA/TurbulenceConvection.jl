@@ -595,16 +595,17 @@ function decompose_environment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     grid = get_grid(self)
 
     @inbounds for k in real_face_indicies(grid)
-        val1 = 1.0 / (1.0 - up.Area.bulkvalues[k])
+        val1 = 1 / (1 - up.Area.bulkvalues[k])
         val2 = up.Area.bulkvalues[k] * val1
 
-        en.Area.values[k] = 1.0 - up.Area.bulkvalues[k]
-        en.QT.values[k] = max(val1 * gm.QT.values[k] - val2 * up.QT.bulkvalues[k], 0.0) #Yair - this is here to prevent negative QT
+        en.Area.values[k] = 1 - up.Area.bulkvalues[k]
+        en.QT.values[k] = max(val1 * gm.QT.values[k] - val2 * up.QT.bulkvalues[k], 0) #Yair - this is here to prevent negative QT
         en.H.values[k] = val1 * gm.H.values[k] - val2 * up.H.bulkvalues[k]
         # Have to account for staggering of W--interpolate area fraction to the "full" grid points
         # Assuming gm.W = 0!
-        au_full = 0.5 * (up.Area.bulkvalues[k + 1] + up.Area.bulkvalues[k])
-        en.W.values[k] = -au_full / (1.0 - au_full) * up.W.bulkvalues[k]
+        a_bulk_bcs = (; bottom = SetValue(sum(self.area_surface_bc)), top = SetValue(0))
+        a_up_f = interpc2f(up.Area.bulkvalues, grid, k; a_bulk_bcs...)
+        en.W.values[k] = -a_up_f / (1 - a_up_f) * up.W.bulkvalues[k]
     end
 
     get_GMV_CoVar(self, up.Area, up.W, up.W, en.W, en.W, en.TKE, gm.W.values, gm.W.values, gm.TKE.values)
@@ -1760,6 +1761,7 @@ function GMV_third_m(
     grid = get_grid(self)
     ae = 1 .- self.UpdVar.Area.bulkvalues
     au = self.UpdVar.Area.values
+    is_tke = env_covar.name == "tke"
 
     @inbounds for k in real_center_indicies(grid)
         GMVv_ = ae[k] * env_mean.values[k]
@@ -1771,10 +1773,10 @@ function GMV_third_m(
         # This is only valid (assuming correct) for 1
         # updraft.
         i_last = last(xrange(self.n_updrafts))
-        if env_covar.name == "tke"
-            Envcov_ =
-                -self.horiz_K_eddy[i_last, k] * (self.EnvVar.W.values[k + 1] - self.EnvVar.W.values[k - 1]) /
-                (2.0 * grid.dz)
+        if is_tke
+            w_bcs = (; bottom = SetValue(0), top = SetValue(0))
+            ∇w_en = f∇(self.EnvVar.W.values, grid, k; w_bcs...)
+            Envcov_ = -self.horiz_K_eddy[i_last, k] * ∇w_en
         else
             Envcov_ = env_covar.values[k]
         end
