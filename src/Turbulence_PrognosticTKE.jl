@@ -1276,10 +1276,10 @@ function compute_tke_pressure(self::EDMF_PrognosticTKE)
     @inbounds for k in real_center_indicies(grid)
         self.EnvVar.TKE.press[k] = 0.0
         @inbounds for i in xrange(self.n_updrafts)
-            wu_half = interp2pt(self.UpdVar.W.values[i, k - 1], self.UpdVar.W.values[i, k])
-            we_half = interp2pt(self.EnvVar.W.values[k - 1], self.EnvVar.W.values[k])
-            press_half = interp2pt(self.nh_pressure[i, k - 1], self.nh_pressure[i, k])
-            self.EnvVar.TKE.press[k] += (we_half - wu_half) * press_half
+            w_up_c = interpf2c(self.UpdVar.W.values, grid, k, i)
+            w_en_c = interpf2c(self.EnvVar.W.values, grid, k)
+            press_c = interpf2c(self.nh_pressure, grid, k, i)
+            self.EnvVar.TKE.press[k] += (w_en_c - w_up_c) * press_c
         end
     end
     return
@@ -1490,8 +1490,8 @@ function compute_covariance_interdomain_src(
         @inbounds for k in real_face_indicies(grid)
             Covar.interdomain[k] = 0.0
             @inbounds for i in xrange(self.n_updrafts)
-                Δϕ = interp2pt(ϕ_up.values[i, k - 1], ϕ_up.values[i, k]) - interp2pt(ϕ_en.values[k - 1], ϕ_en.values[k])
-                Δψ = interp2pt(ψ_up.values[i, k - 1], ψ_up.values[i, k]) - interp2pt(ψ_en.values[k - 1], ψ_en.values[k])
+                Δϕ = interpf2c(ϕ_up.values, grid, k, i) - interpf2c(ϕ_en.values, grid, k)
+                Δψ = interpf2c(ψ_up.values, grid, k, i) - interpf2c(ψ_en.values, grid, k)
 
                 Covar.interdomain[k] += tke_factor * au.values[i, k] * (1.0 - au.values[i, k]) * Δϕ * Δψ
             end
@@ -1523,37 +1523,32 @@ function compute_covariance_entr(
     grid = get_grid(self)
     ref_state = reference_state(self)
     rho0_half = ref_state.rho0_half
+    is_tke = Covar.name == "tke"
+    tke_factor = is_tke ? 0.5 : 1
+    a_up = self.UpdVar.Area.values
+
     @inbounds for k in real_center_indicies(grid)
         Covar.entr_gain[k] = 0.0
         Covar.detr_loss[k] = 0.0
         @inbounds for i in xrange(self.n_updrafts)
             if self.UpdVar.Area.values[i, k] > self.minimum_area
                 R_up = self.pressure_plume_spacing[i]
-                if Covar.name == "tke" # (interp needed)
-                    tke_factor = 0.5
-                    updvar1 = interp2pt(UpdVar1.values[i, k], UpdVar1.values[i, k - 1])
-                    updvar2 = interp2pt(UpdVar2.values[i, k], UpdVar2.values[i, k - 1])
-                    envvar1 = interp2pt(EnvVar1.values[k], EnvVar1.values[k - 1])
-                    envvar2 = interp2pt(EnvVar2.values[k], EnvVar2.values[k - 1])
-                    gmvvar1 = interp2pt(GmvVar1.values[k], GmvVar1.values[k - 1])
-                    gmvvar2 = interp2pt(GmvVar2.values[k], GmvVar2.values[k - 1])
-                    eps_turb = interp2pt(self.frac_turb_entr[i, k], self.frac_turb_entr[i, k - 1])
-                else
-                    tke_factor = 1.0
-                    updvar1 = UpdVar1.values[i, k]
-                    updvar2 = UpdVar2.values[i, k]
-                    envvar1 = EnvVar1.values[k]
-                    envvar2 = EnvVar2.values[k]
-                    gmvvar1 = GmvVar1.values[k]
-                    gmvvar2 = GmvVar2.values[k]
-                    eps_turb = self.frac_turb_entr[i, k]
-                end
+                updvar1 = is_tke ? interpf2c(UpdVar1.values, grid, k, i) : UpdVar1.values[i, k]
+                updvar2 = is_tke ? interpf2c(UpdVar2.values, grid, k, i) : UpdVar2.values[i, k]
+                envvar1 = is_tke ? interpf2c(EnvVar1.values, grid, k) : EnvVar1.values[k]
+                envvar2 = is_tke ? interpf2c(EnvVar2.values, grid, k) : EnvVar2.values[k]
+                gmvvar1 = is_tke ? interpf2c(GmvVar1.values, grid, k) : GmvVar1.values[k]
+                gmvvar2 = is_tke ? interpf2c(GmvVar2.values, grid, k) : GmvVar2.values[k]
 
-                w_u = interp2pt(self.UpdVar.W.values[i, k - 1], self.UpdVar.W.values[i, k])
+                # TODO: bugfix: frac_turb_entr should not be interpolated here
+                eps_turb = is_tke ? interp2pt(self.frac_turb_entr[i, k], self.frac_turb_entr[i, k - 1]) :
+                    self.frac_turb_entr[i, k]
+
+                w_u = interpf2c(self.UpdVar.W.values, grid, k, i)
                 dynamic_entr =
                     tke_factor *
                     rho0_half[k] *
-                    self.UpdVar.Area.values[i, k] *
+                    a_up[i, k] *
                     abs(w_u) *
                     self.detr_sc[i, k] *
                     (updvar1 - envvar1) *
@@ -1561,7 +1556,7 @@ function compute_covariance_entr(
                 turbulent_entr =
                     tke_factor *
                     rho0_half[k] *
-                    self.UpdVar.Area.values[i, k] *
+                    a_up[i, k] *
                     abs(w_u) *
                     eps_turb *
                     ((envvar1 - gmvvar1) * (updvar2 - envvar2) + (envvar2 - gmvvar2) * (updvar1 - envvar1))
@@ -1569,7 +1564,7 @@ function compute_covariance_entr(
                 Covar.detr_loss[k] +=
                     tke_factor *
                     rho0_half[k] *
-                    self.UpdVar.Area.values[i, k] *
+                    a_up[i, k] *
                     abs(w_u) *
                     (self.entr_sc[i, k] + eps_turb) *
                     Covar.values[k]
@@ -1586,8 +1581,8 @@ function compute_covariance_detr(self::EDMF_PrognosticTKE, Covar::EnvironmentVar
     @inbounds for k in real_center_indicies(grid)
         Covar.detr_loss[k] = 0.0
         @inbounds for i in xrange(self.n_updrafts)
-            w_u = interp2pt(self.UpdVar.W.values[i, k - 1], self.UpdVar.W.values[i, k])
-            Covar.detr_loss[k] += self.UpdVar.Area.values[i, k] * abs(w_u) * self.entr_sc[i, k]
+            w_up_c = interpf2c(self.UpdVar.W.values, grid, k, i)
+            Covar.detr_loss[k] += self.UpdVar.Area.values[i, k] * abs(w_up_c) * self.entr_sc[i, k]
         end
         Covar.detr_loss[k] *= rho0_half[k] * Covar.values[k]
     end
@@ -1672,7 +1667,7 @@ function update_covariance_ED(
             Kp = KH.values[k + 1]
         end
         rho_ae_K_m[k] = 0.5 * (ae[k] * K + ae[k + 1] * Kp) * Ref.rho0[k]
-        whalf[k] = interp2pt(self.EnvVar.W.values[k - 1], self.EnvVar.W.values[k])
+        whalf[k] = interpf2c(self.EnvVar.W.values, grid, k)
     end
 
     # Not necessary if BCs for variances are applied to environment.
