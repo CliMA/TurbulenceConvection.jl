@@ -1549,9 +1549,7 @@ function compute_covariance_entr(
                 gmvvar1 = is_tke ? interpf2c(GmvVar1.values, grid, k) : GmvVar1.values[k]
                 gmvvar2 = is_tke ? interpf2c(GmvVar2.values, grid, k) : GmvVar2.values[k]
 
-                # TODO: bugfix: frac_turb_entr should not be interpolated here
-                eps_turb = is_tke ? interp2pt(self.frac_turb_entr[i, k], self.frac_turb_entr[i, k - 1]) :
-                    self.frac_turb_entr[i, k]
+                eps_turb = self.frac_turb_entr[i, k]
 
                 w_u = interpf2c(self.UpdVar.W.values, grid, k, i)
                 dynamic_entr =
@@ -1682,12 +1680,7 @@ function update_covariance_ED(
 
         @inbounds for i in xrange(self.n_updrafts)
             if self.UpdVar.Area.values[i, k] > self.minimum_area
-                if Covar.name == "tke"
-                    turb_entr =
-                        interp2pt(self.frac_turb_entr[i, k - 1], self.frac_turb_entr[i, k]) / self.prandtl_nvec[k]
-                else
-                    turb_entr = self.frac_turb_entr[i, k]
-                end
+                turb_entr = self.frac_turb_entr[i, k]
                 R_up = self.pressure_plume_spacing[i]
                 w_up_c = interpf2c(self.UpdVar.W.values, grid, k, i)
                 D_env += Ref.rho0_half[k] * self.UpdVar.Area.values[i, k] * w_up_c * (self.entr_sc[i, k] + turb_entr)
