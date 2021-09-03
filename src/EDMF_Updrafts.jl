@@ -1,4 +1,4 @@
-function initialize(self::UpdraftVariables, GMV::GridMeanVariables)
+function initialize(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
     kc_surf = kc_surface(self.Gr)
 
     self.W.values .= 0
@@ -23,12 +23,12 @@ function initialize(self::UpdraftVariables, GMV::GridMeanVariables)
 
     set_bcs(self.QT, self.Gr)
     set_bcs(self.H, self.Gr)
-    set_means(self, GMV)
+    set_means(tptke, self, GMV)
 
     return
 end
 
-function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize_DryBubble(tptke, self::UpdraftVariables, GMV::GridMeanVariables, Ref::ReferenceState)
     dz = self.Gr.dz
 
     # criterion 2: b>1e-4
@@ -137,7 +137,7 @@ function initialize_DryBubble(self::UpdraftVariables, GMV::GridMeanVariables, Re
     set_bcs(self.W, self.Gr)
     set_bcs(self.T, self.Gr)
 
-    set_means(self, GMV)
+    set_means(tptke, self, GMV)
 
     return
 end
@@ -168,7 +168,7 @@ function initialize_io(self::UpdraftVariables, Stats::NetCDFIO_Stats)
     return
 end
 
-function set_means(self::UpdraftVariables, GMV::GridMeanVariables)
+function set_means(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
 
     self.Area.bulkvalues .= up_sum(self.Area.values)
     self.W.bulkvalues .= 0.0
@@ -178,20 +178,22 @@ function set_means(self::UpdraftVariables, GMV::GridMeanVariables)
     self.T.bulkvalues .= 0.0
     self.B.bulkvalues .= 0.0
     self.RH.bulkvalues .= 0.0
+    grid = get_grid(GMV)
 
     @inbounds for k in real_center_indicies(self.Gr)
         if self.Area.bulkvalues[k] > 1.0e-20
             @inbounds for i in xrange(self.n_updrafts)
+                a_up_bcs = (; bottom = SetValue(tptke.area_surface_bc[i]), top = SetZeroGradient())
+                a_bulk_bcs = (; bottom = SetValue(sum(tptke.area_surface_bc)), top = SetZeroGradient())
                 self.QT.bulkvalues[k] += self.Area.values[i, k] * self.QT.values[i, k] / self.Area.bulkvalues[k]
                 self.QL.bulkvalues[k] += self.Area.values[i, k] * self.QL.values[i, k] / self.Area.bulkvalues[k]
                 self.H.bulkvalues[k] += self.Area.values[i, k] * self.H.values[i, k] / self.Area.bulkvalues[k]
                 self.T.bulkvalues[k] += self.Area.values[i, k] * self.T.values[i, k] / self.Area.bulkvalues[k]
                 self.RH.bulkvalues[k] += self.Area.values[i, k] * self.RH.values[i, k] / self.Area.bulkvalues[k]
                 self.B.bulkvalues[k] += self.Area.values[i, k] * self.B.values[i, k] / self.Area.bulkvalues[k]
-                self.W.bulkvalues[k] += (
-                    (self.Area.values[i, k] + self.Area.values[i, k + 1]) * self.W.values[i, k] /
-                    (self.Area.bulkvalues[k] + self.Area.bulkvalues[k + 1])
-                )
+                a_up_f = interpc2f(self.Area.values, grid, k, i; a_up_bcs...)
+                a_bulk_f = interpc2f(self.Area.bulkvalues, grid, k; a_bulk_bcs...)
+                self.W.bulkvalues[k] += a_up_f * self.W.values[i, k] / a_bulk_f
             end
 
         else
