@@ -58,6 +58,9 @@ c∇_downwind(f::SVector, grid::Grid, ::BottomBCTag, bc::FreeBoundary) = (f[2] -
 # top of the domain.
 c∇_downwind(f::SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
+c∇_upwind(f, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError()) =
+    c∇_upwind(ccut_upwind(f, grid, k), grid, k; bottom, top)
+
 function c∇_upwind(f_dual::SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
     if is_surface_center(grid, k)
         return c∇_upwind(f_dual, grid, BottomBCTag(), bottom)
