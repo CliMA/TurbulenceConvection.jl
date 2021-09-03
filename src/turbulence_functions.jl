@@ -17,16 +17,11 @@ function get_inversion(param_set, θ_ρ, u, v, grid::Grid, Ri_bulk_crit)
     k_last = last(real_center_indicies(grid))
     # test if we need to look at the free convective limit
     if (u[kmin] * u[kmin] + v[kmin] * v[kmin]) <= 0.01
-        @inbounds for k in real_center_indicies(grid)
-            if θ_ρ[k] > θ_ρ_b
-                k_last = k
-                break
-            end
-        end
-        k = k_last
-        h =
-            (z_half[k] - z_half[k - 1]) / (θ_ρ[k] - θ_ρ[k - 1]) * (θ_ρ_b - θ_ρ[k - 1]) +
-            z_half[k - 1]
+
+        kmask = map(k -> (k, θ_ρ[k] > θ_ρ_b), real_center_indicies(grid))
+        k = first(kmask[findlast(km -> km[2], kmask)])
+        ∇θ_ρ = c∇_upwind(θ_ρ, grid, k; bottom = SetGradient(0), top = FreeBoundary())
+        h = (θ_ρ_b - θ_ρ[k - 1]) / ∇θ_ρ + z_half[k - 1]
     else
         @inbounds for k in real_center_indicies(grid)
             Ri_bulk_low = Ri_bulk
