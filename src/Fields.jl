@@ -9,11 +9,11 @@ end
 
 # TODO: change to use unequal length to center_field
 function face_field(grid::Grid)
-    return zeros(grid.nzg)
+    return zeros(grid.nzg + 1)
 end
 
 function face_field(grid::Grid, nu::Int)
-    return zeros(nu, grid.nzg)
+    return zeros(nu, grid.nzg + 1)
 end
 
 function field(grid::Grid, loc::String)

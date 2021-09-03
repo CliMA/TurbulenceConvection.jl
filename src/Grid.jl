@@ -20,24 +20,26 @@ struct Grid{A1, FT}
         dzi = 1.0 / dz
 
         #Get the grid dimensions and ghost points
-        gw = namelist["grid"]["gw"]
+        gw = 0
         nz = namelist["grid"]["nz"]
-        nzg = nz + 2 * gw
+        nzg = nz
 
-        cinterior = (gw + 1):(nzg - gw)
-        finterior = (gw + 1):(nzg - gw)
+        cinterior = 1:nzg
+        finterior = 1:(nzg + 1)
 
         # TODO: make cell centers and cell faces different sizes
-        z_half = zeros(nz + 2 * gw)
-        z = zeros(nz + 2 * gw)
-        count = 1
-        @inbounds for i in range(1 - gw, stop = nz + gw)
-            z[count] = i * dz
-            z_half[count] = (i - 0.5) * dz
-            count += 1
+        z_half = zeros(nz)
+        z = zeros(nz + 1)
+
+        z .= map(1:(nz + 1)) do k
+            (k - 1.0) * dz
         end
-        zmin = z[gw]
-        zmax = z[nzg - gw]
+        z_half .= map(1:nz) do k
+            (z[k] + z[k + 1]) / 2.0
+        end
+
+        zmin = z[1]
+        zmax = z[nzg + 1]
         A1 = typeof(z)
         FT = typeof(zmax)
         return new{A1, FT}(zmin, zmax, cinterior, finterior, dz, dzi, gw, nz, nzg, z_half, z)
@@ -45,10 +47,10 @@ struct Grid{A1, FT}
 end
 
 # Index of the first interior cell above the surface
-kc_surface(grid::Grid) = grid.gw + 1
-kf_surface(grid::Grid) = grid.gw
-kc_top_of_atmos(grid::Grid) = grid.nzg - grid.gw
-kf_top_of_atmos(grid::Grid) = grid.nzg - grid.gw
+kc_surface(grid::Grid) = 1
+kf_surface(grid::Grid) = 1
+kc_top_of_atmos(grid::Grid) = grid.nzg
+kf_top_of_atmos(grid::Grid) = grid.nzg + 1
 
 is_surface_center(grid::Grid, k::Int) = k == kc_surface(grid)
 is_toa_center(grid::Grid, k::Int) = k == kc_top_of_atmos(grid)

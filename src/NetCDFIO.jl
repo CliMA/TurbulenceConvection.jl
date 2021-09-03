@@ -1,6 +1,23 @@
 using NCDatasets
 using JSON
 
+face_fields_list() = (
+    "W",
+    "alpha0",
+    "rho0",
+    "p0",
+    "updraft_w",
+    "env_w",
+    "nh_pressure",
+    "nh_pressure_adv",
+    "nh_pressure_drag",
+    "nh_pressure_b",
+)
+
+function is_face_field(var_name)
+    return var_name in face_fields_list()
+end
+
 # TODO: remove `vars` hack that avoids https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
 
 mutable struct NetCDFIO_Stats
@@ -58,28 +75,26 @@ mutable struct NetCDFIO_Stats
             JSON.print(io, namelist, 4)
         end
 
-        # TODO: make cell centers and cell faces different sizes
-        cinterior = Gr.cinterior
-        finterior = Gr.finterior
-
         # Remove the NC file if it exists, in case it accidentally wasn't closed
         isfile(path_plus_file) && rm(path_plus_file; force = true)
 
         Dataset(path_plus_file, "c") do root_grp
 
-            zf = Gr.z[finterior]
-            zc = Gr.z_half[cinterior]
+            zf = Gr.z
+            zc = Gr.z_half
 
             # Set profile dimensions
             profile_grp = defGroup(root_grp, "profiles")
-            defDim(profile_grp, "z", Gr.nz)
+            defDim(profile_grp, "z", Gr.nz + 1)
+            defDim(profile_grp, "z_half", Gr.nz)
             defDim(profile_grp, "t", Inf)
             defVar(profile_grp, "z", zf, ("z",))
             defVar(profile_grp, "z_half", zc, ("z_half",))
             defVar(profile_grp, "t", Float64, ("t",))
 
             reference_grp = defGroup(root_grp, "reference")
-            defDim(reference_grp, "z", Gr.nz)
+            defDim(reference_grp, "z", Gr.nz + 1)
+            defDim(reference_grp, "z_half", Gr.nz)
             defVar(reference_grp, "z", zf, ("z",))
             defVar(reference_grp, "z_half", zc, ("z_half",))
 
@@ -126,16 +141,18 @@ function close_files(self::NetCDFIO_Stats)
 end
 
 function add_profile(self::NetCDFIO_Stats, var_name::String)
+    coord = is_face_field(var_name) ? "z" : "z_half"
     Dataset(self.path_plus_file, "a") do root_grp
         profile_grp = root_grp.group["profiles"]
-        new_var = defVar(profile_grp, var_name, Float64, ("z", "t"))
+        new_var = defVar(profile_grp, var_name, Float64, (coord, "t"))
     end
 end
 
 function add_reference_profile(self::NetCDFIO_Stats, var_name::String)
+    coord = is_face_field(var_name) ? "z" : "z_half"
     Dataset(self.path_plus_file, "a") do root_grp
         reference_grp = root_grp.group["reference"]
-        new_var = defVar(reference_grp, var_name, Float64, ("z",))
+        new_var = defVar(reference_grp, var_name, Float64, (coord,))
     end
 end
 

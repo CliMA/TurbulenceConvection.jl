@@ -155,12 +155,15 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
     have_tc_main = ds_tc_main ≠ nothing
     if !have_pycles_ds
         ds_pycles = ds_tc
+        @warn "No PyCLES data, using TC.jl instead"
     end
     if !have_scampy_ds
         ds_scampy = ds_tc
+        @warn "No SCAMPy data, using TC.jl instead"
     end
     if !have_tc_main
         ds_tc_main = ds_tc
+        @warn "No TC.jl main data, using TC.jl instead"
     end
     mse = OrderedDict()
     time_tcc = get_time(ds_tc, "t")
@@ -172,12 +175,13 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
     mkpath(plot_dir)
     # Ensure domain matches:
     z_les = get_data(ds_pycles, "z_half")
-    z_tcc = get_data(ds_tc, "z_half")
+    z_tcc_c = get_data(ds_tc, "z_half")
+    z_tcc_f = get_data(ds_tc, "z")
     z_tcm = get_data(ds_tc_main, "z_half")
     z_scm = get_data(ds_scampy, "z_half")
-    n_grid_points = length(z_tcc)
-    @info "z extrema (les,scm,tcm,tcc): $(extrema(z_les)), $(extrema(z_scm)), $(extrema(z_tcm)), $(extrema(z_tcc))"
-    @info "n-grid points (les,scm,tcm,tcc): $(length(z_les)), $(length(z_scm)), $(length(z_tcm)), $(length(z_tcc))"
+    n_grid_points = length(z_tcc_c)
+    @info "z extrema (les,scm,tcm,tcc): $(extrema(z_les)), $(extrema(z_scm)), $(extrema(z_tcm)), $(extrema(z_tcc_c))"
+    @info "n-grid points (les,scm,tcm,tcc): $(length(z_les)), $(length(z_scm)), $(length(z_tcm)), $(length(z_tcc_c))"
 
     @info "time extrema (les,scm,tcm,tcc): $(extrema(time_les)), $(extrema(time_scm)), $(extrema(time_tcm)), $(extrema(time_tcc))"
     @info "n-time points (les,scm,tcm,tcc): $(length(time_les)), $(length(time_scm)), $(length(time_tcm)), $(length(time_tcc))"
@@ -193,7 +197,7 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
     # @test t_cmp >= t_compare
 
     # Ensure z_tcc and fields are consistent lengths:
-    @test length(z_tcc) == n_grid_points
+    @test length(z_tcc_c) == n_grid_points
     tcc_variables = []
     computed_mse = []
     table_best_mse = []
@@ -227,6 +231,21 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         @info "Assembling plots for $tc_var"
         push!(tcc_variables, tc_var)
         push!(pycles_variables, les_var)
+
+        if TurbulenceConvection.is_face_field(tc_var)
+            z_tcc = z_tcc_f
+        else
+            z_tcc = z_tcc_c
+        end
+        if !have_tc_main
+            z_tcm = z_tcc # TODO: fix this
+        end
+        if !have_scampy_ds
+            z_scm = z_tcc # TODO: fix this
+        end
+        if !have_pycles_ds
+            z_les = z_tcc # TODO: fix this
+        end
 
         data_les_arr = get_data(ds_pycles, les_var)'
         data_tcm_arr = get_data(ds_tc_main, tc_var)'
@@ -358,7 +377,7 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
             if have_tc_main
                 p2 = Plots.contourf(
                     time_tcc ./ 3600,
-                    z_tcc ./ 10^3,
+                    z_tcm ./ 10^3,
                     data_tcm_arr';
                     c = :viridis,
                     clims = clims,
