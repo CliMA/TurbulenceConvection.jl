@@ -751,6 +751,7 @@ end
 
 function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
     grid = get_grid(self)
+    FT = eltype(grid)
     param_set = parameter_set(self)
     ref_state = reference_state(self)
 
@@ -760,14 +761,17 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
         @inbounds for i in xrange(self.n_updrafts)
             # entrainment
             if self.UpdVar.Area.values[i, k] > 0.0
-                w_upd = interpf2c(self.UpdVar.W.values, grid, k, i)
-                # compute dMdz at half levels
-                gmv_w_k = interpf2c(GMV.W.values, grid, k)
-                gmv_w_km = interpf2c(GMV.W.values, grid, k - 1)
-                upd_w_km = interpf2c(self.UpdVar.W.values, grid, k - 1, i)
-                M = self.UpdVar.Area.values[i, k] * (w_upd - gmv_w_k)
-                Mm = self.UpdVar.Area.values[i, k - 1] * (upd_w_km - gmv_w_km)
-                dMdz = (M - Mm) * grid.dzi
+                # compute ∇m at cell centers
+                a_up_c = self.UpdVar.Area.values[i, k]
+                w_up_c = interpf2c(self.UpdVar.W.values, grid, k, i)
+                w_gm_c = interpf2c(GMV.W.values, grid, k)
+                m = a_up_c * (w_up_c - w_gm_c)
+                a_up_cut = ccut_upwind(self.UpdVar.Area.values, grid, k, i)
+                w_up_cut = fdaul_upwind(self.UpdVar.W.values, grid, k, i)
+                w_gm_cut = fdaul_upwind(GMV.W.values, grid, k)
+                m_cut = a_up_cut .* (w_up_cut .- w_gm_cut)
+                ∇m = FT(c∇_upwind(m_cut, grid, k; bottom = SetValue(0), top = FreeBoundary()))
+
                 w_min = 0.001
 
                 εδ_model = MoistureDeficitEntr(;
@@ -778,8 +782,8 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
                     b_up = self.UpdVar.B.values[i, k],
                     b_en = self.EnvVar.B.values[k],
                     tke = self.EnvVar.TKE.values[k],
-                    dMdz = dMdz,
-                    M = M,
+                    dMdz = ∇m,
+                    M = m,
                     a_up = self.UpdVar.Area.values[i, k],
                     a_en = self.EnvVar.Area.values[k],
                     R_up = self.pressure_plume_spacing[i],
