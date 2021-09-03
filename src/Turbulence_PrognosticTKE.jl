@@ -7,9 +7,9 @@ function initialize(
     TS::TimeStepping,
 )
     if Case.casename == "DryBubble"
-        initialize_DryBubble(self.UpdVar, GMV, Ref)
+        initialize_DryBubble(self, self.UpdVar, GMV, Ref)
     else
-        initialize(self.UpdVar, GMV)
+        initialize(self, self.UpdVar, GMV)
     end
     decompose_environment(self, GMV)
     saturation_adjustment(self.EnvThermo, self.EnvVar)
@@ -591,7 +591,7 @@ function decompose_environment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     up = self.UpdVar
     en = self.EnvVar
 
-    set_means(up, gm)
+    set_means(self, up, gm)
     grid = get_grid(self)
 
     @inbounds for k in real_face_indicies(grid)
@@ -943,7 +943,7 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
             detr_term = a_up_c * w_up_c * (-self.detr_sc[i, k])
             a_tendencies = adv + entr_term + detr_term
 
-            a_up_candidate = max(a_up_c + Δt * a_tendencies, 0.0)
+            a_up_candidate = max(a_up_c + Δt * a_tendencies, 0)
 
             if a_up_candidate > au_lim
                 a_up_candidate = au_lim
@@ -981,11 +981,11 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
 
                 w_up_new[i, k] = max(w_up_new[i, k], 0)
                 if w_up_new[i, k] <= 0.0
-                    a_up_new[i, k + 1] = 0.0
+                    is_toa_face(grid, k) || (a_up_new[i, k + 1] = 0)
                 end
             else
                 w_up_new[i, k] = 0
-                a_up_new[i, k + 1] = 0
+                is_toa_face(grid, k) || (a_up_new[i, k + 1] = 0)
             end
         end
     end
@@ -1701,34 +1701,37 @@ function update_covariance_ED(
             end
         end
 
-        a[k] = (-rho_ae_K_m[k - 1] * dzi * dzi)
-        b[k] = (
-            Ref.rho0_half[k] * ae[k] * dti - Ref.rho0_half[k] * ae[k] * w_en_c[k] * dzi +
-            rho_ae_K_m[k] * dzi * dzi +
-            rho_ae_K_m[k - 1] * dzi * dzi +
-            D_env +
-            Ref.rho0_half[k] * ae[k] * c_d * sqrt(max(self.EnvVar.TKE.values[k], 0)) / max(self.mixing_length[k], 1.0)
-        )
-        c[k] = (Ref.rho0_half[k + 1] * ae[k + 1] * w_en_c[k + 1] * dzi - rho_ae_K_m[k] * dzi * dzi)
-        x[k] = (
-            Ref.rho0_half[k] * ae_old[k] * Covar.values[k] * dti +
-            Covar.press[k] +
-            Covar.buoy[k] +
-            Covar.shear[k] +
-            Covar.entr_gain[k] +
-            Covar.rain_src[k]
-        ) #
-
+        # TODO: this tridiagonal matrix needs to be re-verified, as it's been pragmatically
+        #       modified to not depend on ghost points, and these changes have not been
+        #       carefully verified.
         if is_surface_center(grid, k)
             a[k] = 0.0
             b[k] = 1.0
             c[k] = 0.0
             x[k] = Covar_surf
-        end
-
-        if is_toa_center(grid, k)
-            b[k] += c[k]
-            c[k] = 0.0
+        else
+            a[k] = (-rho_ae_K_m[k - 1] * dzi * dzi)
+            b[k] = (
+                Ref.rho0_half[k] * ae[k] * dti - Ref.rho0_half[k] * ae[k] * w_en_c[k] * dzi +
+                rho_ae_K_m[k] * dzi * dzi +
+                rho_ae_K_m[k - 1] * dzi * dzi +
+                D_env +
+                Ref.rho0_half[k] * ae[k] * c_d * sqrt(max(self.EnvVar.TKE.values[k], 0)) /
+                max(self.mixing_length[k], 1)
+            )
+            x[k] = (
+                Ref.rho0_half[k] * ae_old[k] * Covar.values[k] * dti +
+                Covar.press[k] +
+                Covar.buoy[k] +
+                Covar.shear[k] +
+                Covar.entr_gain[k] +
+                Covar.rain_src[k]
+            )
+            if is_toa_center(grid, k)
+                c[k] = 0.0
+            else
+                c[k] = (Ref.rho0_half[k + 1] * ae[k + 1] * w_en_c[k + 1] * dzi - rho_ae_K_m[k] * dzi * dzi)
+            end
         end
     end
 
