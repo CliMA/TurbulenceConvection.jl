@@ -1122,10 +1122,17 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     x = center_field(grid) # for tridiag solver
     ae = 1 .- self.UpdVar.Area.bulkvalues # area of environment
     rho_ae_K = face_field(grid)
-    KM = diffusivity_m(self)
-    KH = diffusivity_h(self)
+    KM = diffusivity_m(self).values
+    KH = diffusivity_h(self).values
+    aeKM = ae .* KM
+    aeKH = ae .* KH
+    kc_surf = kc_surface(grid)
+    kc_toa = kc_top_of_atmos(grid)
+    aeKM_bcs = (; bottom = SetValue(aeKM[kc_surf]), top = SetValue(aeKM[kc_toa]))
+    aeKH_bcs = (; bottom = SetValue(aeKH[kc_surf]), top = SetValue(aeKH[kc_toa]))
+
     @inbounds for k in real_face_indicies(grid)
-        rho_ae_K[k] = 0.5 * (ae[k] * KH.values[k] + ae[k + 1] * KH.values[k + 1]) * ref_state.rho0[k]
+        rho_ae_K[k] = interpc2f(aeKH, grid, k; aeKH_bcs...) * ref_state.rho0[k]
     end
 
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
@@ -1160,7 +1167,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         q_cut = ccut(self.EnvVar.QT.values, grid, k)
         q_bc = -Case.Sur.rho_qtflux / rho_ae_K[k]
         ∇q_tot = c∇(q_cut, grid, k; bottom = SetGradient(q_bc), top = SetGradient(0))
-        self.diffusive_flux_qt[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KH.values[k] * ∇q_tot
+        self.diffusive_flux_qt[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KH[k] * ∇q_tot
     end
 
     # Solve H
@@ -1189,12 +1196,12 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         θ_liq_ice_cut = ccut(self.EnvVar.H.values, grid, k)
         θ_liq_ice_bc = -Case.Sur.rho_hflux / rho_ae_K[k]
         ∇θ_liq_ice = c∇(θ_liq_ice_cut, grid, k; bottom = SetGradient(θ_liq_ice_bc), top = SetGradient(0))
-        self.diffusive_flux_h[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KH.values[k] * ∇θ_liq_ice
+        self.diffusive_flux_h[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KH[k] * ∇θ_liq_ice
     end
 
     # Solve U
     @inbounds for k in real_face_indicies(grid)
-        rho_ae_K[k] = 0.5 * (ae[k] * KM.values[k] + ae[k + 1] * KM.values[k + 1]) * ref_state.rho0[k]
+        rho_ae_K[k] = interpc2f(aeKM, grid, k; aeKM_bcs...) * ref_state.rho0[k]
     end
 
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
@@ -1214,7 +1221,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         u_cut = ccut(GMV.U.values, grid, k)
         u_bc = -Case.Sur.rho_uflux / rho_ae_K[k]
         ∇u = c∇(u_cut, grid, k; bottom = SetGradient(u_bc), top = SetGradient(0))
-        self.diffusive_flux_u[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KM.values[k] * ∇u
+        self.diffusive_flux_u[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KM[k] * ∇u
     end
 
     # Solve V
@@ -1232,7 +1239,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         v_cut = ccut(GMV.V.values, grid, k)
         v_bc = -Case.Sur.rho_vflux / rho_ae_K[k]
         ∇v = c∇(v_cut, grid, k; bottom = SetGradient(v_bc), top = SetGradient(0))
-        self.diffusive_flux_v[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KM.values[k] * ∇v
+        self.diffusive_flux_v[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KM[k] * ∇v
     end
     set_bcs(GMV.QT, grid)
     set_bcs(GMV.H, grid)
@@ -1651,6 +1658,7 @@ function update_covariance_ED(
     c_d = CPEDMF.c_d(param_set)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
+    kc_toa = kc_top_of_atmos(grid)
     dzi = grid.dzi
     dti = TS.dti
     Ref = reference_state(self)
@@ -1670,9 +1678,10 @@ function update_covariance_ED(
     is_tke = Covar.name == "tke"
 
     aeK = is_tke ? ae .* KM : ae .* KH
+    aeK_bcs = (; bottom = SetValue(aeK[kc_surf]), top = SetValue(aeK[kc_toa]))
 
     @inbounds for k in real_face_indicies(grid)
-        rho_ae_K_m[k] = 0.5 * (aeK[k] + aeK[k + 1]) * Ref.rho0[k]
+        rho_ae_K_m[k] = interpc2f(aeK, grid, k; aeK_bcs...) * Ref.rho0[k]
         w_en_c[k] = interpf2c(self.EnvVar.W.values, grid, k)
     end
 
