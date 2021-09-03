@@ -106,13 +106,12 @@ function solve_rain_fall(
     param_set = parameter_set(GMV)
     grid = get_grid(GMV)
     dz = grid.dz
-    dt_model = TS.dt
+    Δt = TS.dt
     CFL_limit = 0.5
 
     term_vel = center_field(grid)
     term_vel_new = center_field(grid)
-
-    t_elapsed = 0.0
+    ρ_0_c_field = self.Ref.rho0_half
 
     # helper to calculate the rain velocity
     # TODO: assuming GMV.W = 0
@@ -123,27 +122,33 @@ function solve_rain_fall(
 
     # rain falling through the domain
     @inbounds for k in reverse(real_center_indicies(grid))
-        CFL_out = dt_model / dz * term_vel[k]
+        CFL_out = Δt / dz * term_vel[k]
 
         if is_toa_center(grid, k)
             CFL_in = 0.0
         else
-            CFL_in = dt_model / dz * term_vel[k + 1]
+            CFL_in = Δt / dz * term_vel[k + 1]
         end
 
         if max(CFL_in, CFL_out) > CFL_limit
             error("Time step is too large for rain fall velocity!")
         end
+        ρ_0_c = self.Ref.rho0_half[k]
 
-        rho_frac = self.Ref.rho0_half[k + 1] / self.Ref.rho0_half[k]
-        area_frac = 1.0 # RainArea.values[k] / RainArea.new[k]
+        ρ_0_cut = ccut_downwind(ρ_0_c_field, grid, k)
+        QR_cut = ccut_downwind(QR.values, grid, k)
+        w_cut = ccut_downwind(term_vel, grid, k)
+        ρQRw_cut = ρ_0_cut .* QR_cut .* w_cut
+        ∇ρQRw = c∇_downwind(ρQRw_cut, grid, k; bottom = FreeBoundary(), top = SetValue(0))
 
-        QR.new[k] = (QR.values[k] * (1 - CFL_out) + QR.values[k + 1] * CFL_in * rho_frac) * area_frac
-        if QR.new[k] != 0.0
+        # TODO: incorporate area fraction into this equation (right now assume a = 1)
+        QR.new[k] = (QR.values[k] * ρ_0_c + Δt * ∇ρQRw) / ρ_0_c
+        QR.new[k] = max(QR.new[k], 0)
+        if !(QR.new[k] ≈ 0)
             RainArea.new[k] = 1.0
         end
 
-        term_vel_new[k] = terminal_velocity(param_set, Rain.C_drag, Rain.MP_n_0, QR.new[k], self.Ref.rho0_half[k])
+        term_vel_new[k] = terminal_velocity(param_set, Rain.C_drag, Rain.MP_n_0, QR.new[k], ρ_0_c)
     end
 
     QR.values .= QR.new
@@ -162,7 +167,7 @@ function solve_rain_evap(
     RainArea::RainVariable,
 )
     param_set = parameter_set(GMV)
-    dt_model = TS.dt
+    Δt = TS.dt
     flag_evaporate_all = false
 
     @inbounds for k in real_center_indicies(self.Gr)
@@ -182,7 +187,7 @@ function solve_rain_evap(
                 GMV.T.values[k],
                 self.Ref.p0_half[k],
                 self.Ref.rho0[k],
-            ) * dt_model,
+            ) * Δt,
         )
 
         if tmp_evap > QR.values[k]
