@@ -579,7 +579,6 @@ struct EnvironmentVariable_2m{A1}
     detr_loss::A1
     press::A1
     buoy::A1
-    interdomain::A1
     rain_src::A1
     loc::String
     kind::String
@@ -593,7 +592,6 @@ struct EnvironmentVariable_2m{A1}
         buoy = center_field(grid)
         press = center_field(grid)
         shear = center_field(grid)
-        interdomain = center_field(grid)
         rain_src = center_field(grid)
         if kind != "scalar" && kind != "velocity"
             println("Invalid kind setting for variable! Must be scalar or velocity")
@@ -606,7 +604,6 @@ struct EnvironmentVariable_2m{A1}
             detr_loss,
             press,
             buoy,
-            interdomain,
             rain_src,
             loc,
             kind,
