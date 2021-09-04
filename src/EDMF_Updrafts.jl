@@ -101,7 +101,7 @@ function initialize_DryBubble(tptke, self::UpdraftVariables, GMV::GridMeanVariab
     T_in = pyinterp(self.Gr.z_half, z_in, T_in)
     @inbounds for i in xrange(self.n_updrafts)
         @inbounds for k in real_face_indicies(self.Gr)
-            if minimum(z_in) <= self.Gr.z_half[k] <= maximum(z_in)
+            if minimum(z_in) <= self.Gr.z[k] <= maximum(z_in)
                 self.W.values[i, k] = 0.0
             end
         end

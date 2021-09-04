@@ -1047,7 +1047,7 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
     self.rad = A # store matrix in self
     ind1 = Int(trunc(10.0 / 600.0)) + 1
     ind2 = Int(ceil(10.0 / 600.0))
-    @inbounds for k in face_indicies(Gr)
+    @inbounds for k in real_center_indicies(Gr)
         if 10 % 600.0 == 0
             self.Fo.dTdt[k] = self.rad[ind1, k]
         else
