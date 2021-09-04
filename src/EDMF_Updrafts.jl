@@ -4,7 +4,7 @@ function initialize(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
     self.W.values .= 0
     self.B.values .= 0
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in center_indicies(self.Gr)
+        @inbounds for k in real_center_indicies(self.Gr)
             # Simple treatment for now, revise when multiple updraft closures
             # become more well defined
             if self.prognostic
@@ -21,8 +21,6 @@ function initialize(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
         self.Area.values[i, kc_surf] = self.updraft_fraction / self.n_updrafts
     end
 
-    set_bcs(self.QT, self.Gr)
-    set_bcs(self.H, self.Gr)
     set_means(tptke, self, GMV)
 
     return
@@ -102,28 +100,21 @@ function initialize_DryBubble(tptke, self::UpdraftVariables, GMV::GridMeanVariab
     thetal_in = pyinterp(self.Gr.z_half, z_in, thetal_in)
     T_in = pyinterp(self.Gr.z_half, z_in, T_in)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in face_indicies(self.Gr)
+        @inbounds for k in real_face_indicies(self.Gr)
             if minimum(z_in) <= self.Gr.z_half[k] <= maximum(z_in)
                 self.W.values[i, k] = 0.0
             end
         end
 
-        @inbounds for k in center_indicies(self.Gr)
+        @inbounds for k in real_center_indicies(self.Gr)
             if minimum(z_in) <= self.Gr.z_half[k] <= maximum(z_in)
                 self.Area.values[i, k] = Area_in[k] #self.updraft_fraction/self.n_updrafts
                 self.H.values[i, k] = thetal_in[k]
                 self.QT.values[i, k] = 0.0
                 self.QL.values[i, k] = 0.0
 
-                self.T.values[i, k] = T_in[k]
                 # for now temperature is provided as diagnostics from LES
-
-                # sa = eos(param_set,
-                #     Ref.p0_half[k],
-                #     self.QT.values[i,k],
-                #     self.H.values[i,k]
-                # )
-                # self.T.values[i,k] = sa.T
+                self.T.values[i, k] = T_in[k]
             else
                 self.Area.values[i, k] = 0.0 #self.updraft_fraction/self.n_updrafts
                 self.H.values[i, k] = GMV.H.values[k]
@@ -131,11 +122,6 @@ function initialize_DryBubble(tptke, self::UpdraftVariables, GMV::GridMeanVariab
             end
         end
     end
-
-    set_bcs(self.QT, self.Gr)
-    set_bcs(self.H, self.Gr)
-    set_bcs(self.W, self.Gr)
-    set_bcs(self.T, self.Gr)
 
     set_means(tptke, self, GMV)
 
@@ -148,17 +134,9 @@ function initialize_io(self::UpdraftVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "updraft_qt")
     add_profile(Stats, "updraft_ql")
     add_profile(Stats, "updraft_RH")
-
-    if self.H.name == "thetal"
-        add_profile(Stats, "updraft_thetal")
-    else
-        # add_profile(Stats, "updraft_thetal")
-        add_profile(Stats, "updraft_s")
-    end
-
+    add_profile(Stats, "updraft_thetal")
     add_profile(Stats, "updraft_temperature")
     add_profile(Stats, "updraft_buoyancy")
-
     add_profile(Stats, "updraft_cloud_fraction")
 
     add_ts(Stats, "updraft_cloud_cover")
@@ -218,11 +196,11 @@ end
 # quick utility to set "new" arrays with values in the "values" arrays
 function set_new_with_values(self::UpdraftVariables)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in face_indicies(self.Gr)
+        @inbounds for k in real_face_indicies(self.Gr)
             self.W.new[i, k] = self.W.values[i, k]
         end
 
-        @inbounds for k in center_indicies(self.Gr)
+        @inbounds for k in real_center_indicies(self.Gr)
             self.Area.new[i, k] = self.Area.values[i, k]
             self.QT.new[i, k] = self.QT.values[i, k]
             self.H.new[i, k] = self.H.values[i, k]
@@ -234,7 +212,7 @@ end
 # quick utility to set "new" arrays with values in the "values" arrays
 function set_old_with_values(self::UpdraftVariables)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in center_indicies(self.Gr)
+        @inbounds for k in real_center_indicies(self.Gr)
             self.Area.old[i, k] = self.Area.values[i, k]
         end
     end
@@ -244,11 +222,11 @@ end
 # quick utility to set "tmp" arrays with values in the "new" arrays
 function set_values_with_new(self::UpdraftVariables)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in face_indicies(self.Gr)
+        @inbounds for k in real_face_indicies(self.Gr)
             self.W.values[i, k] = self.W.new[i, k]
         end
 
-        @inbounds for k in center_indicies(self.Gr)
+        @inbounds for k in real_center_indicies(self.Gr)
             self.W.values[i, k] = self.W.new[i, k]
             self.Area.values[i, k] = self.Area.new[i, k]
             self.QT.values[i, k] = self.QT.new[i, k]
@@ -266,13 +244,7 @@ function io(self::UpdraftVariables, Stats::NetCDFIO_Stats, Ref::ReferenceState)
     write_profile(Stats, "updraft_qt", self.QT.bulkvalues[cinterior])
     write_profile(Stats, "updraft_ql", self.QL.bulkvalues[cinterior])
     write_profile(Stats, "updraft_RH", self.RH.bulkvalues[cinterior])
-
-    if self.H.name == "thetal"
-        write_profile(Stats, "updraft_thetal", self.H.bulkvalues[cinterior])
-    else
-        write_profile(Stats, "updraft_s", self.H.bulkvalues[cinterior])
-    end
-
+    write_profile(Stats, "updraft_thetal", self.H.bulkvalues[cinterior])
     write_profile(Stats, "updraft_temperature", self.T.bulkvalues[cinterior])
     write_profile(Stats, "updraft_buoyancy", self.B.bulkvalues[cinterior])
 
@@ -351,7 +323,7 @@ function buoyancy(
 
     if !extrap
         @inbounds for i in xrange(self.n_updraft)
-            @inbounds for k in center_indicies(grid)
+            @inbounds for k in real_center_indicies(grid)
                 if UpdVar.Area.values[i, k] > 0.0
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
                     rho = rho_c(self.Ref.p0_half[k], UpdVar.T.values[i, k], UpdVar.QT.values[i, k], qv)
@@ -418,7 +390,7 @@ function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rai
     param_set = parameter_set(Rain)
 
     @inbounds for i in xrange(self.n_updraft)
-        @inbounds for k in center_indicies(self.Gr)
+        @inbounds for k in real_center_indicies(self.Gr)
 
             # autoconversion and accretion
             mph = microphysics_rain_src(

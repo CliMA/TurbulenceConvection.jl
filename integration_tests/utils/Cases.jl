@@ -13,7 +13,6 @@ const TD = Thermodynamics
 
 import ..TurbulenceConvection
 using ..TurbulenceConvection: CasesBase
-using ..TurbulenceConvection: set_bcs
 using ..TurbulenceConvection: off_arr
 using ..TurbulenceConvection: omega
 using ..TurbulenceConvection: pyinterp
@@ -181,8 +180,6 @@ function initialize_profiles(self::CasesBase{Soares}, Gr::Grid, GMV::GridMeanVar
         GMV.U.values[k] = 0.01
     end
 
-    set_bcs(GMV.U, Gr)
-    set_bcs(GMV.QT, Gr)
 
     @inbounds for k in real_center_indicies(Gr)
         GMV.H.values[k] = theta[k]
@@ -190,8 +187,6 @@ function initialize_profiles(self::CasesBase{Soares}, Gr::Grid, GMV::GridMeanVar
         GMV.T.values[k] = TD.air_temperature(ts)
     end
 
-    set_bcs(GMV.H, Gr)
-    set_bcs(GMV.T, Gr)
     satadjust(GMV)
 end
 
@@ -287,16 +282,12 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, Gr::Grid, GMV::GridMea
         GMV.U.values[k] = 0.01
     end
 
-    set_bcs(GMV.U, Gr)
-    set_bcs(GMV.QT, Gr)
 
     @inbounds for k in real_center_indicies(Gr)
         GMV.H.values[k] = theta[k]
         ts = TD.PhaseEquil_pθq(param_set, Ref.p0[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
-    set_bcs(GMV.H, Gr)
-    set_bcs(GMV.T, Gr)
     satadjust(GMV)
 end
 function initialize_surface(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::ReferenceState)
@@ -424,10 +415,6 @@ function initialize_profiles(self::CasesBase{Bomex}, Gr::Grid, GMV::GridMeanVari
         ts = TD.PhaseEquil_pθq(param_set, Ref.p0[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
-    set_bcs(GMV.U, Gr)
-    set_bcs(GMV.QT, Gr)
-    set_bcs(GMV.H, Gr)
-    set_bcs(GMV.T, Gr)
     satadjust(GMV)
 end
 
@@ -569,10 +556,6 @@ function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, GMV:
         GMV.T.values[k] = TD.air_temperature(ts)
     end
 
-    set_bcs(GMV.U, Gr)
-    set_bcs(GMV.QT, Gr)
-    set_bcs(GMV.H, Gr)
-    set_bcs(GMV.T, Gr)
     satadjust(GMV)
 end
 
@@ -734,10 +717,6 @@ function initialize_profiles(self::CasesBase{Rico}, Gr::Grid, GMV::GridMeanVaria
         GMV.T.values[k] = TD.air_temperature(ts)
     end
 
-    set_bcs(GMV.U, Gr)
-    set_bcs(GMV.QT, Gr)
-    set_bcs(GMV.H, Gr)
-    set_bcs(GMV.T, Gr)
     satadjust(GMV)
 end
 
@@ -900,8 +879,6 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
     theta_rho = RH * 0.0
     epsi = 287.1 / 461.5
 
-    set_bcs(GMV.U, Gr)
-    set_bcs(GMV.T, Gr)
 
 
     @inbounds for k in real_center_indicies(Gr)
@@ -914,8 +891,6 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
         GMV.H.values[k] = TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], Ref.p0_half[k], phase_part)
     end
 
-    set_bcs(GMV.QT, Gr)
-    set_bcs(GMV.H, Gr)
     satadjust(GMV)
 end
 
@@ -1187,10 +1162,6 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVa
         GMV.H.values[k] = TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], Ref.p0_half[k], phase_part)
     end
 
-    set_bcs(GMV.U, Gr)
-    set_bcs(GMV.QT, Gr)
-    set_bcs(GMV.H, Gr)
-    set_bcs(GMV.T, Gr)
     satadjust(GMV)
 end
 
@@ -1261,7 +1232,7 @@ function TC.update_forcing(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS:
     dTdt = pyinterp(off_arr([TS.t]), t_in, AT_in)[1] + pyinterp(off_arr([TS.t]), t_in, RT_in)[1]
     dqtdt = pyinterp(off_arr([TS.t]), t_in, Rqt_in)[1]
     Gr = self.Fo.Gr
-    @inbounds for k in center_indicies(Gr)
+    @inbounds for k in real_center_indicies(Gr)
         ts = TD.PhaseEquil_pθq(param_set, self.Fo.Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
         if Gr.z_half[k] <= 1000.0
@@ -1342,10 +1313,6 @@ function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanV
         ts = TD.PhaseEquil_pTq(param_set, Ref.p0[k], GMV.T.values[k], GMV.QT.values[k])
         GMV.H.values[k] = TD.liquid_ice_pottemp(ts)
     end
-    set_bcs(GMV.U, Gr)
-    set_bcs(GMV.QT, Gr)
-    set_bcs(GMV.T, Gr)
-    set_bcs(GMV.H, Gr)
     satadjust(GMV)
 end
 
@@ -1480,13 +1447,6 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
     end
 
     # fill out boundary conditions
-    set_bcs(GMV.U, Gr)
-    set_bcs(GMV.V, Gr)
-    set_bcs(GMV.QT, Gr)
-    set_bcs(GMV.QL, Gr)
-    set_bcs(GMV.H, Gr)
-    set_bcs(GMV.T, Gr)
-    set_bcs(GMV.B, Gr)
     return
 end
 
@@ -1629,11 +1589,6 @@ function initialize_profiles(self::CasesBase{GABLS}, Gr::Grid, GMV::GridMeanVari
         GMV.T.values[k] = TD.air_temperature(ts)
     end
 
-    set_bcs(GMV.U, Gr)
-    set_bcs(GMV.V, Gr)
-    set_bcs(GMV.QT, Gr)
-    set_bcs(GMV.H, Gr)
-    set_bcs(GMV.T, Gr)
     satadjust(GMV)
 end
 
@@ -1734,11 +1689,6 @@ function initialize_profiles(self::CasesBase{SP}, Gr::Grid, GMV::GridMeanVariabl
         GMV.T.values[k] = TD.air_temperature(ts)
     end
 
-    set_bcs(GMV.U, Gr)
-    set_bcs(GMV.V, Gr)
-    set_bcs(GMV.QT, Gr)
-    set_bcs(GMV.H, Gr)
-    set_bcs(GMV.T, Gr)
     satadjust(GMV)
 end
 
@@ -1890,8 +1840,6 @@ function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMean
     @inbounds for k in real_center_indicies(Gr)
         GMV.QT.values[k] = 0.0
     end
-    set_bcs(GMV.QT, Gr)
-    set_bcs(GMV.H, Gr)
     satadjust(GMV)
 end
 
@@ -1996,10 +1944,6 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, Gr::Grid, GMV::Gri
         GMV.QT.values .= pyinterp(Gr.z_half, z_les_half, TC.get_nc_data(data, "profiles", "qt_mean", imin, imax))
         GMV.U.values .= pyinterp(Gr.z_half, z_les_half, TC.get_nc_data(data, "profiles", "u_mean", imin, imax))
         GMV.V.values .= pyinterp(Gr.z_half, z_les_half, TC.get_nc_data(data, "profiles", "v_mean", imin, imax))
-        set_bcs(GMV.U, Gr)
-        set_bcs(GMV.QT, Gr)
-        set_bcs(GMV.H, Gr)
-        set_bcs(GMV.T, Gr)
         satadjust(GMV)
     end
 end

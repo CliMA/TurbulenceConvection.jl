@@ -6,16 +6,6 @@ function update(self::GridMeanVariables, TS::TimeStepping)
         self.H.values[k] += self.H.tendencies[k] * TS.dt
         self.QT.values[k] += self.QT.tendencies[k] * TS.dt
     end
-
-    set_bcs(self.U, grid)
-    set_bcs(self.V, grid)
-    set_bcs(self.H, grid)
-    set_bcs(self.QT, grid)
-    set_bcs(self.TKE, grid)
-
-    set_bcs(self.QTvar, grid)
-    set_bcs(self.Hvar, grid)
-    set_bcs(self.HQTcov, grid)
     return
 end
 
@@ -97,7 +87,7 @@ end
 function satadjust(self::GridMeanVariables)
     sa = eos_struct()
     param_set = parameter_set(self)
-    @inbounds for k in center_indicies(self.Gr)
+    @inbounds for k in real_center_indicies(self.Gr)
         h = self.H.values[k]
         qt = self.QT.values[k]
         p0 = self.Ref.p0_half[k]
