@@ -76,7 +76,7 @@ function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
     prob = ODEProblem(rhs, logp, z_span)
     sol = solve(prob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
     cinterior = kc_surface(grid):kc_top_of_atmos(grid)
-    finterior = kf_surface(grid):(kf_top_of_atmos(grid) + 1) # TODO: this should not have +1
+    finterior = kf_surface(grid):kf_top_of_atmos(grid)
     p_0 = [sol(grid.z[k]) for k in finterior]
     p_0_half = [sol(grid.z_half[k]) for k in cinterior]
 
