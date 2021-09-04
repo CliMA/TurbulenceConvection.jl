@@ -1023,10 +1023,10 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         frac_turb_entr = center_field(Gr, n_updrafts)
 
         # Pressure term in updraft vertical momentum equation
-        nh_pressure = center_field(Gr, n_updrafts)
-        nh_pressure_b = center_field(Gr, n_updrafts)
-        nh_pressure_adv = center_field(Gr, n_updrafts)
-        nh_pressure_drag = center_field(Gr, n_updrafts)
+        nh_pressure = face_field(Gr, n_updrafts)
+        nh_pressure_b = face_field(Gr, n_updrafts)
+        nh_pressure_adv = face_field(Gr, n_updrafts)
+        nh_pressure_drag = face_field(Gr, n_updrafts)
         asp_ratio = center_field(Gr, n_updrafts)
 
         # Mass flux

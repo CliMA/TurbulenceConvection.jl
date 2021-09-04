@@ -592,18 +592,21 @@ function decompose_environment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     set_means(self, up, gm)
     grid = get_grid(self)
 
-    @inbounds for k in real_face_indicies(grid)
-        val1 = 1 / (1 - up.Area.bulkvalues[k])
-        val2 = up.Area.bulkvalues[k] * val1
+    @inbounds for k in real_center_indicies(grid)
+        a_bulk_c = up.Area.bulkvalues[k]
+        val1 = 1 / (1 - a_bulk_c)
+        val2 = a_bulk_c * val1
 
-        en.Area.values[k] = 1 - up.Area.bulkvalues[k]
+        en.Area.values[k] = 1 - a_bulk_c
         en.QT.values[k] = max(val1 * gm.QT.values[k] - val2 * up.QT.bulkvalues[k], 0) #Yair - this is here to prevent negative QT
         en.H.values[k] = val1 * gm.H.values[k] - val2 * up.H.bulkvalues[k]
-        # Have to account for staggering of W--interpolate area fraction to the "full" grid points
+    end
+
+    @inbounds for k in real_face_indicies(grid)
         # Assuming gm.W = 0!
         a_bulk_bcs = (; bottom = SetValue(sum(self.area_surface_bc)), top = SetValue(0))
-        a_up_f = interpc2f(up.Area.bulkvalues, grid, k; a_bulk_bcs...)
-        en.W.values[k] = -a_up_f / (1 - a_up_f) * up.W.bulkvalues[k]
+        a_bulk_f = interpc2f(up.Area.bulkvalues, grid, k; a_bulk_bcs...)
+        en.W.values[k] = -a_bulk_f / (1 - a_bulk_f) * up.W.bulkvalues[k]
     end
 
     get_GMV_CoVar(self, up.Area, up.W, up.W, en.W, en.W, en.TKE, gm.W.values, gm.W.values, gm.TKE.values)
@@ -635,7 +638,7 @@ function get_GMV_CoVar(
     tke_factor = is_tke ? 0.5 : 1
 
     if is_tke
-        @inbounds for k in real_face_indicies(grid)
+        @inbounds for k in real_center_indicies(grid)
             ϕ_en_dual = dual_faces(ϕ_en.values, grid, k)
             ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
             ψ_en_dual = dual_faces(ψ_en.values, grid, k)
@@ -811,7 +814,7 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     end
 
     kf_surf = kf_surface(grid)
-    kf_toa = kf_top_of_atmos(grid)
+    kc_toa = kc_top_of_atmos(grid)
     @inbounds for k in real_face_indicies(grid)
         @inbounds for i in xrange(self.n_updrafts)
 
@@ -820,7 +823,7 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
             a_kfull = interpc2f(self.UpdVar.Area.values, grid, k, i; a_bcs...)
             if a_kfull > 0.0
                 B = self.UpdVar.B.values
-                b_bcs = (; bottom = SetValue(B[i, kf_surf]), top = SetValue(B[i, kf_toa]))
+                b_bcs = (; bottom = SetValue(B[i, kf_surf]), top = SetValue(B[i, kc_toa]))
                 b_kfull = interpc2f(self.UpdVar.B.values, grid, k, i; b_bcs...)
                 w_cut = fcut(self.UpdVar.W.values, grid, k, i)
                 ∇w_up = f∇(w_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
@@ -1484,7 +1487,7 @@ function compute_covariance_interdomain_src(
     tke_factor = is_tke ? 0.5 : 1
     grid = get_grid(self)
     if is_tke
-        @inbounds for k in real_face_indicies(grid)
+        @inbounds for k in real_center_indicies(grid)
             Covar.interdomain[k] = 0.0
             @inbounds for i in xrange(self.n_updrafts)
                 Δϕ = interpf2c(ϕ_up.values, grid, k, i) - interpf2c(ϕ_en.values, grid, k)
@@ -1660,6 +1663,9 @@ function update_covariance_ED(
 
     @inbounds for k in real_face_indicies(grid)
         rho_ae_K_m[k] = interpc2f(aeK, grid, k; aeK_bcs...) * Ref.rho0[k]
+    end
+
+    @inbounds for k in real_center_indicies(grid)
         w_en_c[k] = interpf2c(self.EnvVar.W.values, grid, k)
     end
 
