@@ -18,7 +18,6 @@ function initialize(
     self.wstar = get_wstar(Case.Sur.bflux, self.zi)
     microphysics(self.EnvThermo, self.EnvVar, self.Rain, TS.dt)
     initialize_covariance(self, GMV, Case)
-    set_subdomain_bcs(self)
     return
 end
 
@@ -240,7 +239,7 @@ update_radiation(Case::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) =
 function update_cloud_frac(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     grid = get_grid(self)
     # update grid-mean cloud fraction and cloud cover
-    @inbounds for k in center_indicies(grid) # update grid-mean cloud fraction and cloud cover
+    @inbounds for k in real_center_indicies(grid) # update grid-mean cloud fraction and cloud cover
         self.EnvVar.Area.values[k] = 1 - self.UpdVar.Area.bulkvalues[k]
         GMV.cloud_fraction.values[k] =
             self.EnvVar.Area.values[k] * self.EnvVar.cloud_fraction.values[k] +
@@ -385,7 +384,6 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     decompose_environment(self, GMV)
     saturation_adjustment(self.EnvThermo, self.EnvVar)
     buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
-    set_subdomain_bcs(self)
 
     update(GMV, TS)
     return
@@ -662,7 +660,7 @@ function get_GMV_CoVar(
         end
     else
 
-        @inbounds for k in center_indicies(grid)
+        @inbounds for k in real_center_indicies(grid)
             Δϕ = ϕ_en.values[k] - ϕ_gm[k]
             Δψ = ψ_en.values[k] - ψ_gm[k]
 
@@ -727,7 +725,7 @@ function get_env_covar_from_GMV(
             end
         end
     else
-        @inbounds for k in center_indicies(grid)
+        @inbounds for k in real_center_indicies(grid)
             if ae[k] > 0.0
                 Δϕ = ϕ_en.values[k] - ϕ_gm[k]
                 Δψ = ψ_en.values[k] - ψ_gm[k]
@@ -886,26 +884,6 @@ function zero_area_fraction_cleanup(self::EDMF_PrognosticTKE, GMV::GridMeanVaria
             self.EnvVar.QL.values[k] = GMV.QL.values[k]
         end
     end
-
-    return
-end
-
-
-function set_subdomain_bcs(self::EDMF_PrognosticTKE)
-
-    grid = get_grid(self)
-    set_bcs(self.UpdVar.W, grid)
-    set_bcs(self.UpdVar.Area, grid)
-    set_bcs(self.UpdVar.H, grid)
-    set_bcs(self.UpdVar.QT, grid)
-    set_bcs(self.UpdVar.T, grid)
-    set_bcs(self.UpdVar.B, grid)
-
-    set_bcs(self.EnvVar.W, grid)
-    set_bcs(self.EnvVar.H, grid)
-    set_bcs(self.EnvVar.T, grid)
-    set_bcs(self.EnvVar.QL, grid)
-    set_bcs(self.EnvVar.QT, grid)
 
     return
 end
@@ -1245,10 +1223,6 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         ∇v = c∇(v_cut, grid, k; bottom = SetGradient(v_bc), top = SetGradient(0))
         self.diffusive_flux_v[k] = -0.5 * ref_state.rho0_half[k] * ae[k] * KM[k] * ∇v
     end
-    set_bcs(GMV.QT, grid)
-    set_bcs(GMV.H, grid)
-    set_bcs(GMV.U, grid)
-    set_bcs(GMV.V, grid)
 
     return
 end
@@ -1377,14 +1351,14 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
 
 
     if ws > 0.0
-        @inbounds for k in center_indicies(grid)
+        @inbounds for k in real_center_indicies(grid)
             z = grid.z_half[k]
             GMV.TKE.values[k] = tke_gm(z)
         end
     end
     # TKE initialization from Beare et al, 2006
     if Case.casename == "GABLS"
-        @inbounds for k in center_indicies(grid)
+        @inbounds for k in real_center_indicies(grid)
             z = grid.z_half[k]
             if (z <= 250.0)
                 GMV.TKE.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
@@ -1392,7 +1366,7 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
         end
 
     elseif Case.casename == "Bomex"
-        @inbounds for k in center_indicies(grid)
+        @inbounds for k in real_center_indicies(grid)
             z = grid.z_half[k]
             if (z <= 2500.0)
                 GMV.TKE.values[k] = 1.0 - z / 3000.0
@@ -1400,7 +1374,7 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
         end
 
     elseif Case.casename == "Soares" || Case.casename == "Nieuwstadt"
-        @inbounds for k in center_indicies(grid)
+        @inbounds for k in real_center_indicies(grid)
             z = grid.z_half[k]
             if (z <= 1600.0)
                 GMV.TKE.values[k] = 0.1 * 1.46 * 1.46 * (1.0 - z / 1600.0)
@@ -1409,7 +1383,7 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
     end
 
     if ws > 0.0
-        @inbounds for k in center_indicies(grid)
+        @inbounds for k in real_center_indicies(grid)
             z = grid.z_half[k]
             # need to rethink of how to initilize the covarinace profiles - for now took the TKE profile
             GMV.Hvar.values[k] = GMV.Hvar.values[kc_surf] * tke_gm(z)
@@ -1417,7 +1391,7 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
             GMV.HQTcov.values[k] = GMV.HQTcov.values[kc_surf] * tke_gm(z)
         end
     else
-        @inbounds for k in center_indicies(grid)
+        @inbounds for k in real_center_indicies(grid)
             GMV.Hvar.values[k] = 0.0
             GMV.QTvar.values[k] = 0.0
             GMV.HQTcov.values[k] = 0.0
@@ -1426,7 +1400,7 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
 
     # TKE initialization from Beare et al, 2006
     if Case.casename == "GABLS"
-        @inbounds for k in center_indicies(grid)
+        @inbounds for k in real_center_indicies(grid)
             z = grid.z_half[k]
             if (z <= 250.0)
                 GMV.Hvar.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
@@ -1436,7 +1410,7 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
         end
     end
 
-    @inbounds for k in center_indicies(grid)
+    @inbounds for k in real_center_indicies(grid)
         self.EnvVar.TKE.values[k] = GMV.TKE.values[k]
         self.EnvVar.Hvar.values[k] = GMV.Hvar.values[k]
         self.EnvVar.QTvar.values[k] = GMV.QTvar.values[k]
@@ -1520,7 +1494,7 @@ function compute_covariance_interdomain_src(
             end
         end
     else
-        @inbounds for k in center_indicies(grid)
+        @inbounds for k in real_center_indicies(grid)
             Covar.interdomain[k] = 0.0
             @inbounds for i in xrange(self.n_updrafts)
                 Δϕ = ϕ_up.values[i, k] - ϕ_en.values[k]
@@ -1750,7 +1724,6 @@ function update_covariance_ED(
             Covar.values[k] = max(x[k], 0.0)
         end
     end
-    set_bcs(Covar, grid)
 
     get_GMV_CoVar(
         self,
