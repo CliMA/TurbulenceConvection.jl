@@ -401,8 +401,7 @@ function update_GMV_turbulence(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
     return
 end
 
-function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariables)
-
+function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
     grid = get_grid(self)
     param_set = parameter_set(GMV)
     g = CPP.grav(param_set)
@@ -410,6 +409,10 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
     kc_surf = kc_surface(grid)
     ω_pr = CPEDMF.ω_pr(param_set)
     Pr_n = CPEDMF.Pr_n(param_set)
+    c_m = CPEDMF.c_m(param_set)
+    KM = diffusivity_m(self)
+    KH = diffusivity_h(self)
+    obukhov_length = Case.Sur.obukhov_length
 
     @inbounds for k in real_center_indicies(grid)
 
@@ -444,10 +447,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
             alpha0 = ref_state.alpha0_half[k],
         )
         bg = buoyancy_gradients(param_set, bg_model)
-        ∂b∂θl = bg.∂b∂θl
-        ∂b∂qt = bg.∂b∂qt
-        ∂b∂z_qt = bg.∂b∂z_qt
-        ∂b∂z_θl = bg.∂b∂z_θl
+
         # Limiting stratification scale (Deardorff, 1976)
         p0_cut = ccut(ref_state.p0_half, grid, k)
         T_cut = ccut(self.EnvVar.T.values, grid, k)
@@ -468,7 +468,7 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
             obukhov_length = obukhov_length,
             κ_vk = vkb,
             tke_surf = self.EnvVar.TKE.values[kc_surf],
-            ustar = ustar,
+            ustar = Case.Sur.ustar,
             Pr = self.prandtl_nvec[k],
             p0 = ref_state.p0_half[k],
             ∂b∂z_θl = bg.∂b∂z_θl,
@@ -497,22 +497,11 @@ function compute_mixing_length(self, obukhov_length, ustar, GMV::GridMeanVariabl
         self.mls[k] = ml.min_len_ind
         self.mixing_length[k] = ml.mixing_length
         self.ml_ratio[k] = ml.ml_ratio
-    end
-    return
-end
 
-function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
-    grid = get_grid(self)
-    param_set = parameter_set(self)
-    c_m = CPEDMF.c_m(param_set)
-    compute_mixing_length(self, Case.Sur.obukhov_length, Case.Sur.ustar, GMV)
-    KM = diffusivity_m(self)
-    KH = diffusivity_h(self)
-    @inbounds for k in real_center_indicies(grid)
-        lm = self.mixing_length[k]
-        pr = self.prandtl_nvec[k]
-        KM.values[k] = c_m * lm * sqrt(max(self.EnvVar.TKE.values[k], 0.0))
-        KH.values[k] = KM.values[k] / pr
+        KM.values[k] = c_m * self.mixing_length[k] * sqrt(max(self.EnvVar.TKE.values[k], 0.0))
+        KH.values[k] = KM.values[k] / self.prandtl_nvec[k]
+
+        self.EnvVar.TKE.buoy[k] = -ml_model.a_en * ref_state.rho0_half[k] * KH.values[k] * (bg.∂b∂z_θl + bg.∂b∂z_qt)
     end
     return
 end
@@ -1230,46 +1219,6 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     return
 end
 
-function compute_tke_buoy(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
-    grid = get_grid(self)
-    ref_state = reference_state(self)
-    param_set = parameter_set(GMV)
-    g = CPP.grav(param_set)
-    ae = 1 .- self.UpdVar.Area.bulkvalues
-    KH = diffusivity_h(self).values
-
-    # Note that source terms at the first center interior grid point are not really used because
-    # that is where tke boundary condition is enforced (according to MO similarity). Thus here I
-    # am being sloppy about lowest grid point
-    @inbounds for k in real_center_indicies(grid)
-        # buoyancy_gradients
-        QT_cut = ccut(self.EnvVar.QT.values, grid, k)
-        ∂qt∂z = c∇(QT_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
-
-        THL_cut = ccut(self.EnvVar.H.values, grid, k)
-        ∂θl∂z = c∇(THL_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
-
-        bg_model = Tan2018(;
-            qt_dry = self.EnvThermo.qt_dry[k],
-            th_dry = self.EnvThermo.th_dry[k],
-            t_cloudy = self.EnvThermo.t_cloudy[k],
-            qv_cloudy = self.EnvThermo.qv_cloudy[k],
-            qt_cloudy = self.EnvThermo.qt_cloudy[k],
-            th_cloudy = self.EnvThermo.th_cloudy[k],
-            ∂qt∂z = ∂qt∂z,
-            ∂θl∂z = ∂θl∂z,
-            p0 = ref_state.p0_half[k],
-            en_cld_frac = self.EnvVar.cloud_fraction.values[k],
-            alpha0 = ref_state.alpha0_half[k],
-        )
-
-        bg = buoyancy_gradients(param_set, bg_model)
-        # TODO - check
-        self.EnvVar.TKE.buoy[k] = -ae[k] * ref_state.rho0_half[k] * KH[k] * (bg.∂b∂z_θl + bg.∂b∂z_qt)
-    end
-    return
-end
-
 function compute_tke_pressure(self::EDMF_PrognosticTKE)
     grid = get_grid(self)
 
@@ -1304,7 +1253,6 @@ function compute_covariance_rhs(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
     gm = GMV
     up = self.UpdVar
     en = self.EnvVar
-    compute_tke_buoy(self, gm)
     compute_covariance_entr(self, en.TKE, up.W, up.W, en.W, en.W, gm.W, gm.W)
     compute_covariance_shear(self, gm, en.TKE, up.W.values, up.W.values, en.W.values, en.W.values)
     compute_covariance_interdomain_src(self, up.Area, up.W, up.W, en.W, en.W, en.TKE)
