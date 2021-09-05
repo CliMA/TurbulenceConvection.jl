@@ -755,6 +755,8 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     FT = eltype(grid)
     param_set = parameter_set(self)
     ref_state = reference_state(self)
+    kf_surf = kf_surface(grid)
+    kc_toa = kc_top_of_atmos(grid)
 
     upd_cloud_diagnostics(self.UpdVar, ref_state)
 
@@ -810,14 +812,6 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
                 self.frac_turb_entr[i, k] = 0.0
                 self.horiz_K_eddy[i, k] = 0.0
             end
-        end
-    end
-
-    kf_surf = kf_surface(grid)
-    kc_toa = kc_top_of_atmos(grid)
-    @inbounds for k in real_face_indicies(grid)
-        @inbounds for i in xrange(self.n_updrafts)
-
             # pressure
             a_bcs = (; bottom = SetValue(self.area_surface_bc[i]), top = SetValue(0))
             a_kfull = interpc2f(self.UpdVar.Area.values, grid, k, i; a_bcs...)
