@@ -768,8 +768,8 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
                 w_gm_c = interpf2c(GMV.W.values, grid, k)
                 m = a_up_c * (w_up_c - w_gm_c)
                 a_up_cut = ccut_upwind(self.UpdVar.Area.values, grid, k, i)
-                w_up_cut = fdaul_upwind(self.UpdVar.W.values, grid, k, i)
-                w_gm_cut = fdaul_upwind(GMV.W.values, grid, k)
+                w_up_cut = daul_f2c_upwind(self.UpdVar.W.values, grid, k, i)
+                w_gm_cut = daul_f2c_upwind(GMV.W.values, grid, k)
                 m_cut = a_up_cut .* (w_up_cut .- w_gm_cut)
                 ∇m = FT(c∇_upwind(m_cut, grid, k; bottom = SetValue(0), top = FreeBoundary()))
 
