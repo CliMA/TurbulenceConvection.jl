@@ -18,7 +18,7 @@ function eos(param_set, p0, qt, prog)
     phase_part = TD.PhasePartition(qt, ql, 0.0)
     Π = TD.exner_given_pressure(param_set, pd_1 + pv_1, phase_part)
     T_1 = prog * Π
-    pv_star_1 = 6.1094 * exp((17.625 * (T_1 - 273.15)) / float((T_1 - 273.15) + 243.04)) * 100
+    pv_star_1 = TD.saturation_vapor_pressure(param_set, T_1, TD.Liquid())
     qv_star_1 = eps_v * (1.0 - qt) * pv_star_1 / (p0 - pv_star_1)
 
     # If not saturated
@@ -29,7 +29,7 @@ function eos(param_set, p0, qt, prog)
     else
 
         function compute_q_liq(T)
-            pv_star = 6.1094 * exp((17.625 * (T - 273.15)) / float((T - 273.15) + 243.04)) * 100
+            pv_star = TD.saturation_vapor_pressure(param_set, T, TD.Liquid())
             ql = qt - (eps_v * (1.0 - qt) * pv_star / (p0 - pv_star))
             return ql
         end
