@@ -60,10 +60,10 @@ zf_surface(grid::Grid) = grid.z[kf_surface(grid)]
 zc_toa(grid::Grid) = grid.z_half[kc_top_of_atmos(grid)]
 zf_toa(grid::Grid) = grid.z[kf_top_of_atmos(grid)]
 
-center_indicies(grid::Grid) = xrange(grid.nzg)
-face_indicies(grid::Grid) = xrange(grid.nzg)
-real_center_indicies(grid::Grid) = kc_surface(grid):kc_top_of_atmos(grid)
-real_face_indicies(grid::Grid) = kf_surface(grid):kf_top_of_atmos(grid)
+center_indices(grid::Grid) = xrange(grid.nzg)
+face_indices(grid::Grid) = xrange(grid.nzg)
+real_center_indices(grid::Grid) = kc_surface(grid):kc_top_of_atmos(grid)
+real_face_indices(grid::Grid) = kf_surface(grid):kf_top_of_atmos(grid)
 
 
 

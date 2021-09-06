@@ -12,17 +12,17 @@ function get_inversion(param_set, θ_ρ, u, v, grid::Grid, Ri_bulk_crit)
     Ri_bulk = center_field(grid)
     z_c = grid.z_half
 
-    k_last = last(real_center_indicies(grid))
+    k_last = last(real_center_indices(grid))
     # test if we need to look at the free convective limit
     if (u[kmin] * u[kmin] + v[kmin] * v[kmin]) <= 0.01
-        kmask = map(k -> (k, θ_ρ[k] > θ_ρ_b), real_center_indicies(grid))
+        kmask = map(k -> (k, θ_ρ[k] > θ_ρ_b), real_center_indices(grid))
         k_star = first(kmask[findlast(km -> km[2], kmask)])
         ∇θ_ρ = c∇_upwind(θ_ρ, grid, k_star; bottom = SetGradient(0), top = FreeBoundary())
         h = (θ_ρ_b - θ_ρ[k_star - 1]) / ∇θ_ρ + z_c[k_star - 1]
     else
         Ri_bulk_fn(k) = g * (θ_ρ[k] - θ_ρ_b) * z_c[k] / θ_ρ_b / (u[k] * u[k] + v[k] * v[k])
-        Ri_bulk .= map(k -> Ri_bulk_fn(k), center_indicies(grid))
-        kmask = map(k -> (k, Ri_bulk_fn(k) > Ri_bulk_crit), real_center_indicies(grid))
+        Ri_bulk .= map(k -> Ri_bulk_fn(k), center_indices(grid))
+        kmask = map(k -> (k, Ri_bulk_fn(k) > Ri_bulk_crit), real_center_indices(grid))
         k_star = first(kmask[findlast(km -> km[2], kmask)])
         ∇Ri_bulk = c∇_upwind(Ri_bulk, grid, k_star; bottom = SetGradient(0), top = FreeBoundary())
         h = (Ri_bulk_crit - Ri_bulk[k_star - 1]) / ∇Ri_bulk + z_c[k_star - 1]
@@ -58,7 +58,7 @@ end
 
 function construct_tridiag_diffusion(grid, dt, ρ_ae_K_m, ρ_0, ae, a, b, c)
     dzi = grid.dzi
-    @inbounds for k in real_center_indicies(grid)
+    @inbounds for k in real_center_indices(grid)
         X = ρ_0[k] * ae[k] / dt
         Y = ρ_ae_K_m[k] * dzi * dzi
         Z = ρ_ae_K_m[k - 1] * dzi * dzi

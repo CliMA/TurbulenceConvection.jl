@@ -1,6 +1,6 @@
 function update(self::GridMeanVariables, TS::TimeStepping)
     grid = self.Gr
-    @inbounds for k in center_indicies(grid)
+    @inbounds for k in center_indices(grid)
         self.U.values[k] += self.U.tendencies[k] * TS.dt
         self.V.values[k] += self.V.tendencies[k] * TS.dt
         self.H.values[k] += self.H.tendencies[k] * TS.dt
@@ -73,7 +73,7 @@ function mean_cloud_diagnostics(self)
     self.cloud_base = self.Gr.z_half[kc_toa]
     self.cloud_top = 0.0
 
-    @inbounds for k in real_center_indicies(self.Gr)
+    @inbounds for k in real_center_indices(self.Gr)
         self.lwp += self.Ref.rho0_half[k] * self.QL.values[k] * self.Gr.dz
 
         if self.QL.values[k] > 1e-8
@@ -87,7 +87,7 @@ end
 function satadjust(self::GridMeanVariables)
     sa = eos_struct()
     param_set = parameter_set(self)
-    @inbounds for k in real_center_indicies(self.Gr)
+    @inbounds for k in real_center_indices(self.Gr)
         h = self.H.values[k]
         qt = self.QT.values[k]
         p0 = self.Ref.p0_half[k]

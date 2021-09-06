@@ -4,7 +4,7 @@ function initialize(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
     self.W.values .= 0
     self.B.values .= 0
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_center_indicies(self.Gr)
+        @inbounds for k in real_center_indices(self.Gr)
             # Simple treatment for now, revise when multiple updraft closures
             # become more well defined
             if self.prognostic
@@ -100,13 +100,13 @@ function initialize_DryBubble(tptke, self::UpdraftVariables, GMV::GridMeanVariab
     thetal_in = pyinterp(self.Gr.z_half, z_in, thetal_in)
     T_in = pyinterp(self.Gr.z_half, z_in, T_in)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_face_indicies(self.Gr)
+        @inbounds for k in real_face_indices(self.Gr)
             if minimum(z_in) <= self.Gr.z[k] <= maximum(z_in)
                 self.W.values[i, k] = 0.0
             end
         end
 
-        @inbounds for k in real_center_indicies(self.Gr)
+        @inbounds for k in real_center_indices(self.Gr)
             if minimum(z_in) <= self.Gr.z_half[k] <= maximum(z_in)
                 self.Area.values[i, k] = Area_in[k] #self.updraft_fraction/self.n_updrafts
                 self.H.values[i, k] = thetal_in[k]
@@ -158,7 +158,7 @@ function set_means(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
     self.RH.bulkvalues .= 0.0
     grid = get_grid(GMV)
 
-    @inbounds for k in real_center_indicies(self.Gr)
+    @inbounds for k in real_center_indices(self.Gr)
         if self.Area.bulkvalues[k] > 1.0e-20
             @inbounds for i in xrange(self.n_updrafts)
                 a_up_bcs = (; bottom = SetValue(tptke.area_surface_bc[i]), top = SetZeroGradient())
@@ -196,11 +196,11 @@ end
 # quick utility to set "new" arrays with values in the "values" arrays
 function set_new_with_values(self::UpdraftVariables)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_face_indicies(self.Gr)
+        @inbounds for k in real_face_indices(self.Gr)
             self.W.new[i, k] = self.W.values[i, k]
         end
 
-        @inbounds for k in real_center_indicies(self.Gr)
+        @inbounds for k in real_center_indices(self.Gr)
             self.Area.new[i, k] = self.Area.values[i, k]
             self.QT.new[i, k] = self.QT.values[i, k]
             self.H.new[i, k] = self.H.values[i, k]
@@ -212,7 +212,7 @@ end
 # quick utility to set "new" arrays with values in the "values" arrays
 function set_old_with_values(self::UpdraftVariables)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_center_indicies(self.Gr)
+        @inbounds for k in real_center_indices(self.Gr)
             self.Area.old[i, k] = self.Area.values[i, k]
         end
     end
@@ -222,11 +222,11 @@ end
 # quick utility to set "tmp" arrays with values in the "new" arrays
 function set_values_with_new(self::UpdraftVariables)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_face_indicies(self.Gr)
+        @inbounds for k in real_face_indices(self.Gr)
             self.W.values[i, k] = self.W.new[i, k]
         end
 
-        @inbounds for k in real_center_indicies(self.Gr)
+        @inbounds for k in real_center_indices(self.Gr)
             self.W.values[i, k] = self.W.new[i, k]
             self.Area.values[i, k] = self.Area.new[i, k]
             self.QT.values[i, k] = self.QT.new[i, k]
@@ -272,7 +272,7 @@ function upd_cloud_diagnostics(self::UpdraftVariables, Ref::ReferenceState)
         self.updraft_top[i] = 0.0
         self.cloud_cover[i] = 0.0
 
-        @inbounds for k in real_center_indicies(self.Gr)
+        @inbounds for k in real_center_indices(self.Gr)
             if self.Area.values[i, k] > 1e-3
                 self.updraft_top[i] = max(self.updraft_top[i], self.Gr.z_half[k])
                 self.lwp += Ref.rho0_half[k] * self.QL.values[i, k] * self.Area.values[i, k] * self.Gr.dz
@@ -323,7 +323,7 @@ function buoyancy(
 
     if !extrap
         @inbounds for i in xrange(self.n_updraft)
-            @inbounds for k in real_center_indicies(grid)
+            @inbounds for k in real_center_indices(grid)
                 if UpdVar.Area.values[i, k] > 0.0
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
                     rho = rho_c(self.Ref.p0_half[k], UpdVar.T.values[i, k], UpdVar.QT.values[i, k], qv)
@@ -337,7 +337,7 @@ function buoyancy(
         end
     else
         @inbounds for i in xrange(self.n_updraft)
-            @inbounds for k in real_center_indicies(grid)
+            @inbounds for k in real_center_indices(grid)
                 if UpdVar.Area.values[i, k] > 0.0
                     qt = UpdVar.QT.values[i, k]
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
@@ -371,7 +371,7 @@ function buoyancy(
     end
 
 
-    @inbounds for k in real_center_indicies(self.Gr)
+    @inbounds for k in real_center_indices(self.Gr)
         GMV.B.values[k] = (1.0 - UpdVar.Area.bulkvalues[k]) * EnvVar.B.values[k]
         @inbounds for i in xrange(self.n_updraft)
             GMV.B.values[k] += UpdVar.Area.values[i, k] * UpdVar.B.values[i, k]
@@ -395,7 +395,7 @@ function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rai
     param_set = parameter_set(Rain)
 
     @inbounds for i in xrange(self.n_updraft)
-        @inbounds for k in real_center_indicies(self.Gr)
+        @inbounds for k in real_center_indices(self.Gr)
 
             # autoconversion and accretion
             mph = microphysics_rain_src(
