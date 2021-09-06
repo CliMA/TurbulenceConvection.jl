@@ -1,6 +1,6 @@
 function update(self::GridMeanVariables, TS::TimeStepping)
     grid = self.Gr
-    @inbounds for k in center_indices(grid)
+    @inbounds for k in real_center_indices(grid)
         self.U.values[k] += self.U.tendencies[k] * TS.dt
         self.V.values[k] += self.V.tendencies[k] * TS.dt
         self.H.values[k] += self.H.tendencies[k] * TS.dt

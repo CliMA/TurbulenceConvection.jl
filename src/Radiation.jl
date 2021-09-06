@@ -53,8 +53,10 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
         end
     end
 
-    ρ_z = Dierckx.Spline1D([grid.z_half...], [self.Ref.rho0_half...]; k = 1)
-    q_liq_z = Dierckx.Spline1D([grid.z_half...], [GMV.QL.values...]; k = 1)
+    cinterior = real_center_indices(grid)
+    finterior = real_face_indices(grid)
+    ρ_z = Dierckx.Spline1D([grid.z_half[cinterior]...], [self.Ref.rho0_half[cinterior]...]; k = 1)
+    q_liq_z = Dierckx.Spline1D([grid.z_half[cinterior]...], [GMV.QL.values[cinterior]...]; k = 1)
 
     integrand(ρq_l, params, z) = params.κ * ρ_z(z) * q_liq_z(z)
     rintegrand(ρq_l, params, z) = -integrand(ρq_l, params, z)
@@ -65,16 +67,16 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
 
     rprob = ODEProblem(rintegrand, 0.0, rz_span, params; dt = grid.dz)
     rsol = solve(rprob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    q_0 = [rsol(grid.z[k]) for k in face_indices(grid)]
+    q_0 = [rsol(grid.z[k]) for k in finterior]
 
     prob = ODEProblem(integrand, 0.0, z_span, params; dt = grid.dz)
     sol = solve(prob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    q_1 = [sol(grid.z[k]) for k in face_indices(grid)]
-    self.f_rad .= self.F0 .* exp.(-q_0)
-    self.f_rad .+= self.F1 .* exp.(-q_1)
+    q_1 = [sol(grid.z[k]) for k in finterior]
+    self.f_rad[finterior] .= self.F0 .* exp.(-q_0)
+    self.f_rad[finterior] .+= self.F1 .* exp.(-q_1)
 
     # cooling in free troposphere
-    @inbounds for k in face_indices(grid)
+    @inbounds for k in real_face_indices(grid)
         if grid.z[k] > zi
             cbrt_z = cbrt(grid.z[k] - zi)
             self.f_rad[k] += ρ_i * cpd * self.divergence * self.alpha_z * (cbrt_z^4 / 4 + zi * cbrt_z)

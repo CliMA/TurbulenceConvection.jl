@@ -76,7 +76,7 @@ function sum_subdomains_rain(
     UpdThermo::UpdraftThermodynamics,
     EnvThermo::EnvironmentThermodynamics,
 )
-    @inbounds for k in center_indices(self.Gr)
+    @inbounds for k in real_center_indices(self.Gr)
         self.QR.values[k] -= (EnvThermo.prec_source_qt[k] + UpdThermo.prec_source_qt_tot[k])
         self.Upd_QR.values[k] -= UpdThermo.prec_source_qt_tot[k]
         self.Env_QR.values[k] -= EnvThermo.prec_source_qt[k]
