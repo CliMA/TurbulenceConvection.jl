@@ -53,7 +53,7 @@ function rain_diagnostics(
     self.mean_rwp = 0.0
     self.cutoff_rain_rate = 0.0
 
-    @inbounds for k in real_center_indicies(self.Gr)
+    @inbounds for k in real_center_indices(self.Gr)
         self.upd_rwp += Ref.rho0_half[k] * self.Upd_QR.values[k] * self.Upd_RainArea.values[k] * self.Gr.dz
         self.env_rwp += Ref.rho0_half[k] * self.Env_QR.values[k] * self.Env_RainArea.values[k] * self.Gr.dz
         self.mean_rwp += Ref.rho0_half[k] * self.QR.values[k] * self.RainArea.values[k] * self.Gr.dz
@@ -76,7 +76,7 @@ function sum_subdomains_rain(
     UpdThermo::UpdraftThermodynamics,
     EnvThermo::EnvironmentThermodynamics,
 )
-    @inbounds for k in center_indicies(self.Gr)
+    @inbounds for k in center_indices(self.Gr)
         self.QR.values[k] -= (EnvThermo.prec_source_qt[k] + UpdThermo.prec_source_qt_tot[k])
         self.Upd_QR.values[k] -= UpdThermo.prec_source_qt_tot[k]
         self.Env_QR.values[k] -= EnvThermo.prec_source_qt[k]
@@ -116,12 +116,12 @@ function solve_rain_fall(
     # helper to calculate the rain velocity
     # TODO: assuming GMV.W = 0
     # TODO: verify translation
-    @inbounds for k in real_center_indicies(grid)
+    @inbounds for k in real_center_indices(grid)
         term_vel[k] = terminal_velocity(param_set, Rain.C_drag, Rain.MP_n_0, QR.values[k], self.Ref.rho0_half[k])
     end
 
     # rain falling through the domain
-    @inbounds for k in reverse(real_center_indicies(grid))
+    @inbounds for k in reverse(real_center_indices(grid))
         CFL_out = Δt / dz * term_vel[k]
 
         if is_toa_center(grid, k)
@@ -170,7 +170,7 @@ function solve_rain_evap(
     Δt = TS.dt
     flag_evaporate_all = false
 
-    @inbounds for k in real_center_indicies(self.Gr)
+    @inbounds for k in real_center_indices(self.Gr)
         flag_evaporate_all = false
 
         tmp_evap = max(

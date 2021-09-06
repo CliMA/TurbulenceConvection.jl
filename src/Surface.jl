@@ -6,7 +6,7 @@ function free_convection_windspeed(self::SurfaceBase, GMV::GridMeanVariables, ::
     param_set = parameter_set(GMV)
 
     # Need to get theta_rho
-    @inbounds for k in real_center_indicies(self.Gr)
+    @inbounds for k in real_center_indices(self.Gr)
         qv = GMV.QT.values[k] - GMV.QL.values[k]
         ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         theta_rho[k] = TD.virtual_pottemp(ts)

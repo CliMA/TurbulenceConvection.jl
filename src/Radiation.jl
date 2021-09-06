@@ -43,7 +43,7 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
     # TODO: report bug: zi and ρ_i are not initialized
     zi = 0
     ρ_i = 0
-    @inbounds for k in real_center_indicies(grid)
+    @inbounds for k in real_center_indices(grid)
         if (GMV.QT.values[k] < 8.0 / 1000)
             idx_zi = k
             # will be used at cell faces
@@ -65,23 +65,23 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
 
     rprob = ODEProblem(rintegrand, 0.0, rz_span, params; dt = grid.dz)
     rsol = solve(rprob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    q_0 = [rsol(grid.z_half[k]) for k in face_indicies(grid)]
+    q_0 = [rsol(grid.z_half[k]) for k in face_indices(grid)]
 
     prob = ODEProblem(integrand, 0.0, z_span, params; dt = grid.dz)
     sol = solve(prob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    q_1 = [sol(grid.z_half[k]) for k in face_indicies(grid)]
+    q_1 = [sol(grid.z_half[k]) for k in face_indices(grid)]
     self.f_rad .= self.F0 .* exp.(-q_0)
     self.f_rad .+= self.F1 .* exp.(-q_1)
 
     # cooling in free troposphere
-    @inbounds for k in face_indicies(grid)
+    @inbounds for k in face_indices(grid)
         if grid.z[k] > zi
             cbrt_z = cbrt(grid.z[k] - zi)
             self.f_rad[k] += ρ_i * cpd * self.divergence * self.alpha_z * (cbrt_z^4 / 4 + zi * cbrt_z)
         end
     end
 
-    @inbounds for k in real_center_indicies(grid)
+    @inbounds for k in real_center_indices(grid)
         # TODO: remove this hack: we should not be skipping toa_center
         is_toa_center(grid, k) && continue
         # TODO: bugfix needed: we're offset by +1, we should be calling dual_faces(self.f_rad, grid, k)
