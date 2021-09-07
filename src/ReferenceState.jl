@@ -75,46 +75,32 @@ function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
     @show z_span
     prob = ODEProblem(rhs, logp, z_span)
     sol = solve(prob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    cinterior = kc_surface(grid):kc_top_of_atmos(grid)
-    finterior = kf_surface(grid):kf_top_of_atmos(grid)
-    p_0 = [sol(grid.z[k]) for k in finterior]
-    p_0_half = [sol(grid.z_half[k]) for k in cinterior]
+    cinterior = real_center_indices(grid)
+    finterior = real_face_indices(grid)
 
-    p[finterior] .= p_0
-    p_half[cinterior] .= p_0_half
-
-    # Set boundary conditions (in log-space) by mirroring log-pressure
-    # TODO: re-generalize, is setting the BCs like this correct?
-    p[1] = p[2]
-    p[end] = p[end - 1]
-
-    p_half[2] = p_half[3]
-    p_half[end - 1] = p_half[end - 2]
-    p_half[1] = p_half[4]
-    p_half[end] = p_half[end - 3]
+    p[finterior] .= [sol(grid.z[k]) for k in finterior]
+    p_half[cinterior] .= [sol(grid.z_half[k]) for k in cinterior]
 
     p .= exp.(p)
     p_half .= exp.(p_half)
 
-    p_ = deepcopy(p)
-    p_half_ = deepcopy(p_half)
     alpha = face_field(grid)
     alpha_half = center_field(grid)
 
     # Compute reference state thermodynamic profiles
     @inbounds for k in real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p_half_[k], θ_liq_ice_g, q_tot_g)
+        ts = TD.PhaseEquil_pθq(param_set, p_half[k], θ_liq_ice_g, q_tot_g)
         alpha_half[k] = TD.specific_volume(ts)
     end
 
     @inbounds for k in real_face_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p_[k], θ_liq_ice_g, q_tot_g)
+        ts = TD.PhaseEquil_pθq(param_set, p[k], θ_liq_ice_g, q_tot_g)
         alpha[k] = TD.specific_volume(ts)
     end
 
     self.alpha0_half = alpha_half
     self.alpha0 = alpha
-    self.p0 = p_
+    self.p0 = p
     self.p0_half = p_half
     self.rho0 = 1.0 ./ self.alpha0
     self.rho0_half = 1.0 ./ self.alpha0_half
@@ -130,7 +116,7 @@ function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
 
 
     add_reference_profile(Stats, "p0")
-    write_reference_profile(Stats, "p0", p_[finterior])
+    write_reference_profile(Stats, "p0", p[finterior])
     add_reference_profile(Stats, "p0_half")
     write_reference_profile(Stats, "p0_half", p_half[cinterior])
 
