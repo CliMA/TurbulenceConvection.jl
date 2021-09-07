@@ -35,8 +35,6 @@ using ..TurbulenceConvection: ReferenceState
 using ..TurbulenceConvection: NetCDFIO_Stats
 using ..TurbulenceConvection: GridMeanVariables
 using ..TurbulenceConvection: TimeStepping
-using ..TurbulenceConvection: center_indices
-using ..TurbulenceConvection: face_indices
 using ..TurbulenceConvection: real_center_indices
 using ..TurbulenceConvection: real_face_indices
 
@@ -1085,7 +1083,7 @@ function TC.update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS
     Gr = self.Fo.Gr
     ind2 = Int(ceil(TS.t / 600.0)) + 1
     ind1 = Int(trunc(TS.t / 600.0)) + 1
-    @inbounds for k in face_indices(Gr)
+    @inbounds for k in real_face_indices(Gr)
         if Gr.z_half[k] >= 22699.48
             self.Fo.dTdt[k] = 0.0
         else
@@ -1186,7 +1184,7 @@ function initialize_forcing(self::CasesBase{ARM_SGP}, Gr::Grid, Ref::ReferenceSt
     self.Fo.Gr = Gr
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-    @inbounds for k in center_indices(Gr)
+    @inbounds for k in real_center_indices(Gr)
         self.Fo.ug[k] = 10.0
         self.Fo.vg[k] = 0.0
     end
@@ -1762,7 +1760,7 @@ end
 
 function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
 
-    @inbounds for k in center_indices(Gr)
+    @inbounds for k in real_center_indices(Gr)
         GMV.U.values[k] = 0.01
     end
 
