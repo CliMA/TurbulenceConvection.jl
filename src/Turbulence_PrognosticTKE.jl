@@ -955,11 +955,15 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
 
                 w_up_new[i, k] = max(w_up_new[i, k], 0)
                 if w_up_new[i, k] <= 0.0
-                    is_toa_face(grid, k) || (a_up_new[i, k + 1] = 0)
+                    if !(k + 1 > size(a_up_new, 2))
+                        a_up_new[i, k + 1] = 0
+                    end
                 end
             else
                 w_up_new[i, k] = 0
-                is_toa_face(grid, k) || (a_up_new[i, k + 1] = 0)
+                if !(k + 1 > size(a_up_new, 2))
+                    a_up_new[i, k + 1] = 0
+                end
             end
         end
     end
