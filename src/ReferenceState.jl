@@ -98,33 +98,17 @@ function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
 
     p_ = deepcopy(p)
     p_half_ = deepcopy(p_half)
-    temperature = face_field(grid)
-    temperature_half = center_field(grid)
     alpha = face_field(grid)
     alpha_half = center_field(grid)
-
-    ql = face_field(grid)
-    qi = face_field(grid)
-    qv = face_field(grid)
-
-    ql_half = center_field(grid)
-    qi_half = center_field(grid)
-    qv_half = center_field(grid)
 
     # Compute reference state thermodynamic profiles
     @inbounds for k in real_center_indices(grid)
         ts = TD.PhaseEquil_pθq(param_set, p_half_[k], θ_liq_ice_g, q_tot_g)
-        temperature_half[k] = TD.air_temperature(ts)
-        ql_half[k] = TD.liquid_specific_humidity(ts)
-        qv_half[k] = TD.vapor_specific_humidity(ts)
         alpha_half[k] = TD.specific_volume(ts)
     end
 
     @inbounds for k in real_face_indices(grid)
         ts = TD.PhaseEquil_pθq(param_set, p_[k], θ_liq_ice_g, q_tot_g)
-        temperature[k] = TD.air_temperature(ts)
-        ql[k] = TD.liquid_specific_humidity(ts)
-        qv[k] = TD.vapor_specific_humidity(ts)
         alpha[k] = TD.specific_volume(ts)
     end
 
