@@ -909,11 +909,11 @@ function initialize_surface(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
     initialize(self.Sur)
 end
 
-function initialize_forcing(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
-    self.Fo.Gr = Gr
+function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+    self.Fo.Gr = grid
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
-    self.Fo.dTdt = TC.center_field(Gr)
+    self.Fo.dTdt = TC.center_field(grid)
     self.rad_time = range(10, 360; length = 36) .* 60
     #! format: off
     z_in         = off_arr([42.5, 200.92, 456.28, 743, 1061.08, 1410.52, 1791.32, 2203.48, 2647,3121.88, 3628.12,
@@ -1032,20 +1032,20 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceS
     #! format: on
     # TODO: check translation
     rad_in = reduce(vcat, rad_in')
-    rad_in = off_arr(rad_in)
+    cinterior = real_center_indices(grid)
     A = hcat(map(xrange(0, 36)) do tt
-        a = Gr.z_half
+        a = grid.z_half[cinterior]
         b = z_in
         c = reshape(rad_in[tt, :], size(rad_in, 2))
-        c = off_arr(c)
         pyinterp(a, b, c)
     end...)
-    A = off_arr(A')
+    A = A'
 
-    self.rad = A # store matrix in self
+    self.rad = zeros(size(A, 1), length(TC.face_field(grid)))
+    self.rad[:, cinterior] .= A # store matrix in self
     ind1 = Int(trunc(10.0 / 600.0)) + 1
     ind2 = Int(ceil(10.0 / 600.0))
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         if 10 % 600.0 == 0
             self.Fo.dTdt[k] = self.rad[ind1, k]
         else
@@ -1083,7 +1083,7 @@ function TC.update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS
     Gr = self.Fo.Gr
     ind2 = Int(ceil(TS.t / 600.0)) + 1
     ind1 = Int(trunc(TS.t / 600.0)) + 1
-    @inbounds for k in real_face_indices(Gr)
+    @inbounds for k in real_center_indices(Gr)
         if Gr.z_half[k] >= 22699.48
             self.Fo.dTdt[k] = 0.0
         else
@@ -1832,7 +1832,7 @@ function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMean
                        #LES temperature_mean in K
     thetali = TC.center_field(Gr)
     cinterior = real_center_indices(Gr)
-    z_half_in = off_arr(Gr.z_half[cinterior])
+    z_half_in = Gr.z_half[cinterior]
     thetali[cinterior] = pyinterp(z_half_in, z_in, thetali_in)
     GMV.H.values .= thetali
     @inbounds for k in real_center_indices(Gr)
