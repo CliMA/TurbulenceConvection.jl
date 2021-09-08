@@ -802,7 +802,7 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
         end
     end
 
-    kf_surf = kf_surface(grid)
+    kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     @inbounds for k in real_face_indices(grid)
         @inbounds for i in xrange(self.n_updrafts)
@@ -812,7 +812,7 @@ function compute_updraft_closures(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
             a_kfull = interpc2f(self.UpdVar.Area.values, grid, k, i; a_bcs...)
             if a_kfull > 0.0
                 B = self.UpdVar.B.values
-                b_bcs = (; bottom = SetValue(B[i, kf_surf]), top = SetValue(B[i, kc_toa]))
+                b_bcs = (; bottom = SetValue(B[i, kc_surf]), top = SetValue(B[i, kc_toa]))
                 b_kfull = interpc2f(self.UpdVar.B.values, grid, k, i; b_bcs...)
                 w_cut = fcut(self.UpdVar.W.values, grid, k, i)
                 ∇w_up = f∇(w_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
