@@ -858,7 +858,6 @@ function zero_area_fraction_cleanup(self::EDMF_PrognosticTKE, GMV::GridMeanVaria
         @inbounds for i in xrange(self.n_updrafts)
             if self.UpdVar.Area.values[i, k] < self.minimum_area
                 self.UpdVar.Area.values[i, k] = 0.0
-                self.UpdVar.W.values[i, k] = GMV.W.values[k]
                 self.UpdVar.B.values[i, k] = GMV.B.values[k]
                 self.UpdVar.H.values[i, k] = GMV.H.values[k]
                 self.UpdVar.QT.values[i, k] = GMV.QT.values[k]
@@ -868,12 +867,30 @@ function zero_area_fraction_cleanup(self::EDMF_PrognosticTKE, GMV::GridMeanVaria
         end
 
         if sum(self.UpdVar.Area.values[:, k]) == 0.0
-            self.EnvVar.W.values[k] = GMV.W.values[k]
             self.EnvVar.B.values[k] = GMV.B.values[k]
             self.EnvVar.H.values[k] = GMV.H.values[k]
             self.EnvVar.QT.values[k] = GMV.QT.values[k]
             self.EnvVar.T.values[k] = GMV.T.values[k]
             self.EnvVar.QL.values[k] = GMV.QL.values[k]
+        end
+    end
+
+    @inbounds for k in real_face_indices(grid)
+        @inbounds for i in xrange(self.n_updrafts)
+            a_bcs = (; bottom = SetValue(self.area_surface_bc[i]), top = SetValue(0))
+            a_up_f_i = interpc2f(self.UpdVar.Area.values, grid, k, i; a_bcs...)
+            if a_up_f_i < self.minimum_area
+                self.UpdVar.W.values[i, k] = GMV.W.values[k]
+            end
+        end
+
+        a_up_f = map(1:(self.n_updrafts)) do i
+            a_bcs = (; bottom = SetValue(self.area_surface_bc[i]), top = SetValue(0))
+            interpc2f(self.UpdVar.Area.values, grid, k, i; a_bcs...)
+        end
+
+        if sum(a_up_f) == 0.0
+            self.EnvVar.W.values[k] = GMV.W.values[k]
         end
     end
 
