@@ -161,19 +161,13 @@ function set_means(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
     @inbounds for k in real_center_indices(self.Gr)
         if self.Area.bulkvalues[k] > 1.0e-20
             @inbounds for i in xrange(self.n_updrafts)
-                a_up_bcs = (; bottom = SetValue(tptke.area_surface_bc[i]), top = SetZeroGradient())
-                a_bulk_bcs = (; bottom = SetValue(sum(tptke.area_surface_bc)), top = SetZeroGradient())
                 self.QT.bulkvalues[k] += self.Area.values[i, k] * self.QT.values[i, k] / self.Area.bulkvalues[k]
                 self.QL.bulkvalues[k] += self.Area.values[i, k] * self.QL.values[i, k] / self.Area.bulkvalues[k]
                 self.H.bulkvalues[k] += self.Area.values[i, k] * self.H.values[i, k] / self.Area.bulkvalues[k]
                 self.T.bulkvalues[k] += self.Area.values[i, k] * self.T.values[i, k] / self.Area.bulkvalues[k]
                 self.RH.bulkvalues[k] += self.Area.values[i, k] * self.RH.values[i, k] / self.Area.bulkvalues[k]
                 self.B.bulkvalues[k] += self.Area.values[i, k] * self.B.values[i, k] / self.Area.bulkvalues[k]
-                a_up_f = interpc2f(self.Area.values, grid, k, i; a_up_bcs...)
-                a_bulk_f = interpc2f(self.Area.bulkvalues, grid, k; a_bulk_bcs...)
-                self.W.bulkvalues[k] += a_up_f * self.W.values[i, k] / a_bulk_f
             end
-
         else
             self.QT.bulkvalues[k] = GMV.QT.values[k]
             self.QL.bulkvalues[k] = 0.0
@@ -181,13 +175,25 @@ function set_means(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
             self.RH.bulkvalues[k] = GMV.RH.values[k]
             self.T.bulkvalues[k] = GMV.T.values[k]
             self.B.bulkvalues[k] = 0.0
-            self.W.bulkvalues[k] = 0.0
         end
-
         if self.QL.bulkvalues[k] > 1e-8 && self.Area.bulkvalues[k] > 1e-3
             self.cloud_fraction[k] = 1.0
         else
             self.cloud_fraction[k] = 0.0
+        end
+    end
+
+    @inbounds for k in real_face_indices(self.Gr)
+        a_bulk_bcs = (; bottom = SetValue(sum(tptke.area_surface_bc)), top = SetZeroGradient())
+        a_bulk_f = interpc2f(self.Area.bulkvalues, grid, k; a_bulk_bcs...)
+        if a_bulk_f > 1.0e-20
+            @inbounds for i in xrange(self.n_updrafts)
+                a_up_bcs = (; bottom = SetValue(tptke.area_surface_bc[i]), top = SetZeroGradient())
+                a_up_f = interpc2f(self.Area.values, grid, k, i; a_up_bcs...)
+                self.W.bulkvalues[k] += a_up_f * self.W.values[i, k] / a_bulk_f
+            end
+        else
+            self.W.bulkvalues[k] = 0.0
         end
     end
     return
