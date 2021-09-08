@@ -21,9 +21,9 @@ struct FreeBoundary <: AbstractBC end # when no BC is used (one-sided derivative
     ∇f2c(f_dual, grid, k, bottom, top)
 
 function ∇f2c(f_dual::SVector, grid::Grid, k::Int, bottom::AbstractBC, top::AbstractBC)
-    if is_surface_face(grid, k - 1)
+    if is_surface_center(grid, k)
         return ∇f2c(f_dual, grid, BottomBCTag(), bottom)
-    elseif is_toa_face(grid, k)
+    elseif is_toa_center(grid, k)
         return ∇f2c(f_dual, grid, TopBCTag(), top)
     else
         return ∇f2c(f_dual, grid, InteriorTag())
