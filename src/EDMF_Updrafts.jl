@@ -357,9 +357,9 @@ function buoyancy(
                     if UpdVar.Area.values[i, k - 1] > 0.0
                         qt = UpdVar.QT.values[i, k - 1]
                         h = UpdVar.H.values[i, k - 1]
-                        sa = eos(param_set, self.Ref.p0_half[k], qt, h)
-                        qv = qt - sa.ql
-                        t = sa.T
+                        ts = TD.PhaseEquil_pθq_anelastic(param_set, self.Ref.p0_half[k], h, qt)
+                        qv = qt - TD.liquid_specific_humidity(ts)
+                        t = TD.air_temperature(ts)
                         rho = rho_c(self.Ref.p0_half[k], t, qt, qv)
                         UpdVar.B.values[i, k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
                         ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], h, qt)

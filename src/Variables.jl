@@ -85,19 +85,17 @@ function mean_cloud_diagnostics(self)
 end
 
 function satadjust(self::GridMeanVariables)
-    sa = eos_struct()
     param_set = parameter_set(self)
     @inbounds for k in real_center_indices(self.Gr)
         h = self.H.values[k]
         qt = self.QT.values[k]
         p0 = self.Ref.p0_half[k]
-        sa = eos(param_set, p0, qt, h)
-        self.QL.values[k] = sa.ql
-        self.T.values[k] = sa.T
-        qv = qt - sa.ql
-        rho = rho_c(p0, sa.T, qt, qv)
+        ts = TD.PhaseEquil_pθq_anelastic(param_set, p0, h, qt)
+        self.QL.values[k] = TD.liquid_specific_humidity(ts)
+        self.T.values[k] = TD.air_temperature(ts)
+        qv = qt - self.QL.values[k]
+        rho = rho_c(p0, self.T.values[k], qt, qv)
         self.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
-        ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], h, qt)
         self.RH.values[k] = TD.relative_humidity(ts)
     end
     return
