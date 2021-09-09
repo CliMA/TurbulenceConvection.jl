@@ -106,10 +106,11 @@ function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::Environm
     mph = mph_struct()
 
     @inbounds for k in real_center_indices(self.Gr)
-        sa = eos(param_set, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
+        # sa = eos(param_set, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
+        ts = TD.PhaseEquil_pθq_anelastic(param_set, self.Ref.p0_half[k], EnvVar.H.values[k], EnvVar.QT.values[k])
 
-        EnvVar.T.values[k] = sa.T
-        EnvVar.QL.values[k] = sa.ql
+        EnvVar.T.values[k] = TD.air_temperature(ts)
+        EnvVar.QL.values[k] = TD.liquid_specific_humidity(ts)
         rho = rho_c(
             self.Ref.p0_half[k],
             EnvVar.T.values[k],
