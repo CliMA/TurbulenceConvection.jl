@@ -186,7 +186,7 @@ function solve_rain_evap(
                 GMV.QL.values[k],
                 GMV.T.values[k],
                 self.Ref.p0_half[k],
-                self.Ref.rho0[k],
+                self.Ref.rho0_half[k],
             ) * Δt,
         )
 
@@ -200,7 +200,7 @@ function solve_rain_evap(
         # TODO add ice
         rain_source_to_thetal(
             param_set,
-            self.Ref.p0[k],
+            self.Ref.p0_half[k],
             GMV.T.values[k],
             GMV.QT.values[k],
             GMV.QL.values[k],

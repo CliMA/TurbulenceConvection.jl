@@ -283,7 +283,7 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, Gr::Grid, GMV::GridMea
 
     @inbounds for k in real_center_indices(Gr)
         GMV.H.values[k] = theta[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
     satadjust(GMV)
@@ -410,7 +410,7 @@ function initialize_profiles(self::CasesBase{Bomex}, Gr::Grid, GMV::GridMeanVari
 
     @inbounds for k in real_center_indices(Gr)
         GMV.H.values[k] = thetal[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
     satadjust(GMV)
@@ -441,7 +441,7 @@ function initialize_forcing(self::CasesBase{Bomex}, Gr::Grid, Ref::ReferenceStat
     @inbounds for k in real_center_indices(Gr)
         # Geostrophic velocity profiles. vg = 0
         self.Fo.ug[k] = -10.0 + (1.8e-3) * Gr.z_half[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
         # Set large-scale cooling
         if Gr.z_half[k] <= 1500.0
@@ -550,7 +550,7 @@ function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, GMV:
 
     @inbounds for k in real_center_indices(Gr)
         GMV.H.values[k] = thetal[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
 
@@ -590,7 +590,7 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::
     @inbounds for k in real_center_indices(Gr)
         # Geostrophic velocity profiles. vg = 0
         self.Fo.ug[k] = -10.0 + (1.8e-3) * Gr.z_half[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
         # Set large-scale cooling
         if Gr.z_half[k] <= 1500.0
@@ -711,7 +711,7 @@ function initialize_profiles(self::CasesBase{Rico}, Gr::Grid, GMV::GridMeanVaria
 
     @inbounds for k in real_center_indices(Gr)
         GMV.H.values[k] = thetal[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
 
@@ -740,7 +740,7 @@ function initialize_forcing(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState
     self.Fo.Ref = Ref
     initialize(self.Fo, GMV)
     @inbounds for k in real_center_indices(Gr)
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
         # Geostrophic velocity profiles
         self.Fo.ug[k] = -9.9 + 2.0e-3 * Gr.z_half[k]
@@ -1308,7 +1308,7 @@ function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanV
         GMV.QT.values[k] = qt[k]
         GMV.T.values[k] = T[k]
         GMV.U.values[k] = U[k]
-        ts = TD.PhaseEquil_pTq(param_set, Ref.p0[k], GMV.T.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pTq(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k])
         GMV.H.values[k] = TD.liquid_ice_pottemp(ts)
     end
     satadjust(GMV)
@@ -1431,7 +1431,7 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
         sa = eos(param_set, Ref.p0_half[k], GMV.QT.values[k], thetal[k])
         GMV.QL.values[k] = sa.ql
         GMV.T.values[k] = sa.T
-        ts = TD.PhaseEquil_pTq(param_set, Ref.p0[k], GMV.T.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pTq(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k])
         GMV.H.values[k] = TD.liquid_ice_pottemp(ts)
 
         # buoyancy profile
@@ -1583,7 +1583,7 @@ function initialize_profiles(self::CasesBase{GABLS}, Gr::Grid, GMV::GridMeanVari
 
     @inbounds for k in real_center_indices(Gr)
         GMV.H.values[k] = thetal[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
 
@@ -1683,7 +1683,7 @@ function initialize_profiles(self::CasesBase{SP}, Gr::Grid, GMV::GridMeanVariabl
 
     @inbounds for k in real_center_indices(Gr)
         GMV.H.values[k] = thetal[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
 
