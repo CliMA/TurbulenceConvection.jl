@@ -152,8 +152,8 @@ function upwind_advection_area(ρ0_half::Vector{Float64}, a_up::Vector{Float64},
     return -∇m / ρ0_half[k]
 end
 
-function upwind_advection_velocity(ρ0::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64}, grid, k)
-    a_dual = daul_c2f_upwind(a_up, grid, k)
+function upwind_advection_velocity(ρ0::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64}, grid, k; a_up_bcs)
+    a_dual = daul_c2f_upwind(a_up, grid, k; a_up_bcs...)
     ρ_0_dual = fcut_upwind(ρ0, grid, k)
     w_up_dual = fcut_upwind(w_up, grid, k)
     adv_dual = a_dual .* ρ_0_dual .* w_up_dual .* w_up_dual
@@ -436,17 +436,24 @@ Used when
      - traversing cell faces
      - grabbing _interpolated_ one-sided (upwind) stencil of cell face `k` and cell face `k-1`
 """
-
-function daul_c2f_upwind(f::AbstractVector, grid, k::Int)
-    if is_toa_center(grid, k)
-        return SVector((f[k - 1] + f[k]) / 2)
+function daul_c2f_upwind(f::AbstractVector, grid, k::Int; bottom::SetValue, top::SetZeroGradient)
+    if is_toa_face(grid, k)
+        return SVector((f[k - 1] + f[k]) / 2, (f[k - 1] + f[k]) / 2)
+    elseif is_surface_face(grid, k) # never actually called
+        error("Uncaught case")
+    elseif is_surface_face(grid, k - 1)
+        return SVector(bottom.value, (f[k] + f[k + 1]) / 2)
     else
         return SVector((f[k - 1] + f[k]) / 2, (f[k] + f[k + 1]) / 2)
     end
 end
-function daul_c2f_upwind(f::AbstractMatrix, grid, k::Int, i_up::Int)
-    if is_toa_center(grid, k)
-        return SVector((f[i_up, k - 1] + f[i_up, k]) / 2)
+function daul_c2f_upwind(f::AbstractVector, grid, k::Int, i_up::Int; bottom::SetValue, top::SetZeroGradient)
+    if is_toa_face(grid, k)
+        return SVector((f[i_up, k - 1] + f[i_up, k]) / 2, (f[i_up, k - 1] + f[i_up, k]) / 2)
+    elseif is_surface_face(grid, k) # never actually called
+        error("Uncaught case")
+    elseif is_surface_face(grid, k - 1)
+        return SVector(bottom.value, (f[i_up, k] + f[i_up, k + 1]) / 2)
     else
         return SVector((f[i_up, k - 1] + f[i_up, k]) / 2, (f[i_up, k] + f[i_up, k + 1]) / 2)
     end

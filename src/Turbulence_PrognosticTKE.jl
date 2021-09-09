@@ -964,7 +964,7 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 detr_w = interpc2f(detr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
                 B_k = interpc2f(self.UpdVar.B.values, grid, k, i; bottom = SetValue(0), top = SetValue(0))
 
-                adv = upwind_advection_velocity(ρ_0_f, a_up[i, :], w_up[i, :], grid, k)
+                adv = upwind_advection_velocity(ρ_0_f, a_up[i, :], w_up[i, :], grid, k; a_up_bcs)
                 exch = (ρ_0_f[k] * a_k * w_up[i, k] * (entr_w * self.EnvVar.W.values[k] - detr_w * w_up[i, k]))
                 buoy = ρ_0_f[k] * a_k * B_k
                 w_tendencies = -adv + exch + buoy + self.nh_pressure[i, k]
