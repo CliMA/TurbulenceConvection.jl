@@ -1731,9 +1731,11 @@ function GMV_third_m(
     is_tke = env_covar.name == "tke"
 
     @inbounds for k in real_center_indices(grid)
-        GMVv_ = ae[k] * env_mean.values[k]
+        mean_en = is_tke ? interpf2c(env_mean.values, grid, k) : env_mean.values[k]
+        GMVv_ = ae[k] * mean_en
         @inbounds for i in xrange(self.n_updrafts)
-            GMVv_ += au[i, k] * upd_mean.values[i, k]
+            mean_up = is_tke ? interpf2c(upd_mean.values, grid, k, i) : upd_mean.values[i, k]
+            GMVv_ += au[i, k] * mean_up
         end
 
         # TODO: report bug: i used outside of scope.
@@ -1749,10 +1751,11 @@ function GMV_third_m(
         end
 
         Upd_cubed = 0.0
-        GMVcov_ = ae[k] * (Envcov_ + (env_mean.values[k] - GMVv_)^2.0)
+        GMVcov_ = ae[k] * (Envcov_ + (mean_en - GMVv_)^2)
         @inbounds for i in xrange(self.n_updrafts)
-            GMVcov_ += au[i, k] * (upd_mean.values[i, k] - GMVv_)^2.0
-            Upd_cubed += au[i, k] * upd_mean.values[i, k]^3
+            mean_up = is_tke ? interpf2c(upd_mean.values, grid, k, i) : upd_mean.values[i, k]
+            GMVcov_ += au[i, k] * (mean_up - GMVv_)^2
+            Upd_cubed += au[i, k] * mean_up^3
         end
 
         if is_surface_center(grid, k)
