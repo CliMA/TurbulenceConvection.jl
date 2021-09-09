@@ -1430,12 +1430,10 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
         ts = TD.PhaseEquil_pθq_anelastic(param_set, Ref.p0_half[k], thetal[k], GMV.QT.values[k])
         GMV.QL.values[k] = TD.liquid_specific_humidity(ts)
         GMV.T.values[k] = TD.air_temperature(ts)
-        # ts = TD.PhaseEquil_pTq(param_set, Ref.p0[k], GMV.T.values[k], GMV.QT.values[k])
         GMV.H.values[k] = TD.liquid_ice_pottemp(ts)
 
         # buoyancy profile
-        qv = GMV.QT.values[k] - qi - GMV.QL.values[k]
-        rho = rho_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
+        rho = TD.air_density(ts)
         GMV.B.values[k] = buoyancy_c(param_set, Ref.rho0_half[k], rho)
 
         # velocity profile (geostrophic)

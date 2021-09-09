@@ -39,7 +39,7 @@ function io(self::EnvironmentVariables, Stats::NetCDFIO_Stats, Ref::ReferenceSta
     write_profile(Stats, "env_cloud_fraction", self.cloud_fraction.values[cinterior])
 
     env_cloud_diagnostics(self, Ref)
-    # Assuming amximum overlap in environmental clouds
+    # Assuming maximum overlap in environmental clouds
     write_ts(Stats, "env_cloud_cover", self.cloud_cover)
     write_ts(Stats, "env_cloud_base", self.cloud_base)
     write_ts(Stats, "env_cloud_top", self.cloud_top)
@@ -71,8 +71,9 @@ function update_EnvVar(self::EnvironmentThermodynamics, k, EnvVar::EnvironmentVa
     EnvVar.H.values[k] = H
     EnvVar.QT.values[k] = qt
     EnvVar.QL.values[k] = ql
-    EnvVar.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
     ts = TD.PhaseEquil_pθq_anelastic(param_set, self.Ref.p0_half[k], H, qt)
+    rho = TD.air_density(ts)
+    EnvVar.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
     EnvVar.RH.values[k] = TD.relative_humidity(ts)
     return
 end
@@ -109,12 +110,13 @@ function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::Environm
 
         EnvVar.T.values[k] = TD.air_temperature(ts)
         EnvVar.QL.values[k] = TD.liquid_specific_humidity(ts)
-        rho = rho_c(
-            self.Ref.p0_half[k],
-            EnvVar.T.values[k],
-            EnvVar.QT.values[k],
-            EnvVar.QT.values[k] - EnvVar.QL.values[k],
-        )
+        rho = TD.air_density(ts)
+        # rho = rho_c(
+        #     self.Ref.p0_half[k],
+        #     EnvVar.T.values[k],
+        #     EnvVar.QT.values[k],
+        #     EnvVar.QT.values[k] - EnvVar.QL.values[k],
+        # )
         EnvVar.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
 
         update_cloud_dry(

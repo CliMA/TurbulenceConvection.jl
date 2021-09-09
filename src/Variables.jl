@@ -93,8 +93,9 @@ function satadjust(self::GridMeanVariables)
         ts = TD.PhaseEquil_pθq_anelastic(param_set, p0, h, qt)
         self.QL.values[k] = TD.liquid_specific_humidity(ts)
         self.T.values[k] = TD.air_temperature(ts)
-        qv = qt - self.QL.values[k]
-        rho = rho_c(p0, self.T.values[k], qt, qv)
+        # qv = qt - self.QL.values[k]
+        # rho = rho_c(p0, self.T.values[k], qt, qv)
+        rho = TD.air_density(ts)
         self.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
         self.RH.values[k] = TD.relative_humidity(ts)
     end
