@@ -8,6 +8,10 @@ struct EarthParameterSet{NT} <: AbstractEarthParameterSet
 end
 
 CLIMAParameters.Planet.MSLP(ps::EarthParameterSet) = ps.nt.MSLP
+CLIMAParameters.Planet.cp_d(ps::EarthParameterSet) = ps.nt.cp_d
+CLIMAParameters.Planet.cp_v(ps::EarthParameterSet) = ps.nt.cp_v
+CLIMAParameters.Planet.R_d(ps::EarthParameterSet) = ps.nt.R_d
+CLIMAParameters.Planet.R_v(ps::EarthParameterSet) = ps.nt.R_v
 CLIMAParameters.Atmos.Microphysics.τ_cond_evap(ps::EarthParameterSet) = ps.nt.τ_cond_evap
 # entrainment/detrainment parameters
 CLIMAParameters.Atmos.EDMF.c_ε(ps::EarthParameterSet) = ps.nt.c_ε # factor multiplyer for dry term in entrainment/detrainment
@@ -29,12 +33,15 @@ CLIMAParameters.Atmos.EDMF.c_d(ps::EarthParameterSet) = ps.nt.c_d # tke dissipat
 CLIMAParameters.Atmos.EDMF.Pr_n(ps::EarthParameterSet) = ps.nt.Pr_n # tke dissipation coefficient
 CLIMAParameters.Atmos.EDMF.smin_ub(ps::EarthParameterSet) = ps.nt.smin_ub #  lower limit for smin function
 CLIMAParameters.Atmos.EDMF.smin_rm(ps::EarthParameterSet) = ps.nt.smin_rm #  upper ratio limit for smin function
-
 #! format: off
 function create_parameter_set(namelist)
     TC = TurbulenceConvection
     nt = (;
         MSLP = 100000.0, # or grab from, e.g., namelist[""][...]
+        cp_d = 1004.0,
+        cp_v = 1859.0,
+        R_d = 287.1,
+        R_v = 461.5,
         τ_cond_evap = TC.parse_namelist(namelist, "microphysics", "τ_cond_evap"; default = 10.0),
         c_ε = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_factor"),
         c_div = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_massflux_div_factor"; default = 0.0),

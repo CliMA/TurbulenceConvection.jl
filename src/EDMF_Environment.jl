@@ -72,7 +72,7 @@ function update_EnvVar(self::EnvironmentThermodynamics, k, EnvVar::EnvironmentVa
     EnvVar.QT.values[k] = qt
     EnvVar.QL.values[k] = ql
     EnvVar.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
-    ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], H, qt)
+    ts = TD.PhaseEquil_pθq_anelastic(param_set, self.Ref.p0_half[k], H, qt)
     EnvVar.RH.values[k] = TD.relative_humidity(ts)
     return
 end
