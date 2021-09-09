@@ -348,9 +348,12 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in xrange(self.n_updrafts)
             # saturation adjustment
-            sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-            self.UpdVar.QL.values[i, k] = sa.ql
-            self.UpdVar.T.values[i, k] = sa.T
+            # sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
+            # self.UpdVar.QL.values[i, k] = sa.ql
+            # self.UpdVar.T.values[i, k] = sa.T
+            ts = TD.PhaseEquil_pθq_anelastic(param_set, ref_state.p0_half[k], self.UpdVar.H.new[i, k], self.UpdVar.QT.new[i, k])
+            self.UpdVar.QL.values[i, k] = TD.liquid_specific_humidity(ts)
+            self.UpdVar.T.values[i, k] = TD.air_temperature(ts)
         end
     end
     update_GMV_ED(self, GMV, Case, TS)

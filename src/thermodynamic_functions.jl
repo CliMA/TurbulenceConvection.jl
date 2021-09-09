@@ -24,13 +24,13 @@ function eos(param_set, p0, qt, prog)
     # If not saturated
     if (qt <= qv_star_1)
         _ret.T = T_1
-        _ret.ql = 0.0
-
+        pv_star = TD.saturation_vapor_pressure(param_set, T_1, TD.Liquid())
+        _ret.ql = max(qt - qv_star_1,0.0)
     else
 
         function compute_q_liq(T)
             pv_star = TD.saturation_vapor_pressure(param_set, T, TD.Liquid())
-            ql = qt - (eps_v * (1.0 - qt) * pv_star / (p0 - pv_star))
+            ql = max(qt - (eps_v * (1.0 - qt) * pv_star / (p0 - pv_star)),0.0)
             return ql
         end
 
