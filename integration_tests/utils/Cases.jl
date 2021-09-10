@@ -20,7 +20,6 @@ using ..TurbulenceConvection: eps_vi
 using ..TurbulenceConvection: eps_v
 using ..TurbulenceConvection: cpd
 using ..TurbulenceConvection: buoyancy_c
-using ..TurbulenceConvection: rho_c
 using ..TurbulenceConvection: add_ts
 using ..TurbulenceConvection: update
 using ..TurbulenceConvection: write_ts

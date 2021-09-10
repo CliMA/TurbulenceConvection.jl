@@ -111,12 +111,6 @@ function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::Environm
         EnvVar.T.values[k] = TD.air_temperature(ts)
         EnvVar.QL.values[k] = TD.liquid_specific_humidity(ts)
         rho = TD.air_density(ts)
-        # rho = rho_c(
-        #     self.Ref.p0_half[k],
-        #     EnvVar.T.values[k],
-        #     EnvVar.QT.values[k],
-        #     EnvVar.QT.values[k] - EnvVar.QL.values[k],
-        # )
         EnvVar.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
 
         update_cloud_dry(

@@ -139,7 +139,6 @@ function microphysics_rain_src(
     phase_part = TD.PhasePartition(qt, ql, qi)
     _ret.thl = TD.liquid_ice_pottemp_given_pressure(param_set, T, p0, phase_part)
     _ret.th = TD.dry_pottemp_given_pressure(param_set, T, p0, phase_part)
-    # _ret.rho = rho_c(p0, T, qt, _ret.qv)
 
     #TODO - temporary way to handle different autoconversion rates
     tmp_clima_acnv_flag = false
