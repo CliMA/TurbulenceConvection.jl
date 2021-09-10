@@ -177,11 +177,12 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
     z_les = get_data(ds_pycles, "z_half")
     z_tcc_c = get_data(ds_tc, "z_half")
     z_tcc_f = get_data(ds_tc, "z")
-    z_tcm = get_data(ds_tc_main, "z_half")
+    z_tcm_c = get_data(ds_tc_main, "z_half")
+    z_tcm_f = get_data(ds_tc_main, "z")
     z_scm = get_data(ds_scampy, "z_half")
     n_grid_points = length(z_tcc_c)
-    @info "z extrema (les,scm,tcm,tcc): $(extrema(z_les)), $(extrema(z_scm)), $(extrema(z_tcm)), $(extrema(z_tcc_c))"
-    @info "n-grid points (les,scm,tcm,tcc): $(length(z_les)), $(length(z_scm)), $(length(z_tcm)), $(length(z_tcc_c))"
+    @info "z extrema (les,scm,tcm,tcc): $(extrema(z_les)), $(extrema(z_scm)), $(extrema(z_tcm_c)), $(extrema(z_tcc_c))"
+    @info "n-grid points (les,scm,tcm,tcc): $(length(z_les)), $(length(z_scm)), $(length(z_tcm_c)), $(length(z_tcc_c))"
 
     @info "time extrema (les,scm,tcm,tcc): $(extrema(time_les)), $(extrema(time_scm)), $(extrema(time_tcm)), $(extrema(time_tcc))"
     @info "n-time points (les,scm,tcm,tcc): $(length(time_les)), $(length(time_scm)), $(length(time_tcm)), $(length(time_tcc))"
@@ -237,11 +238,17 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         else
             z_tcc = z_tcc_c
         end
-        if !have_tc_main
-            z_tcm = z_tcc # TODO: fix this
+        if have_tc_main
+            if TurbulenceConvection.is_face_field(tc_var)
+                z_tcm = z_tcm_f
+            else
+                z_tcm = z_tcm_c
+            end
+        else
+            z_tcm = z_tcc
         end
         if !have_scampy_ds
-            z_scm = z_tcc # TODO: fix this
+            z_scm = z_tcc
         end
         if !have_pycles_ds
             z_les = z_tcc # TODO: fix this
