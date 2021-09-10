@@ -22,15 +22,12 @@ function io(
     TS::TimeStepping,
 )
 
-    cinterior = self.Gr.cinterior
-    finterior = self.Gr.finterior
-
-    write_profile(Stats, "qr_mean", self.QR.values[cinterior])
-    write_profile(Stats, "updraft_qr", self.Upd_QR.values[cinterior])
-    write_profile(Stats, "env_qr", self.Env_QR.values[cinterior])
-    write_profile(Stats, "rain_area", self.RainArea.values[cinterior])
-    write_profile(Stats, "updraft_rain_area", self.Upd_RainArea.values[cinterior])
-    write_profile(Stats, "env_rain_area", self.Env_RainArea.values[cinterior])
+    write_profile(Stats, "qr_mean", self.QR.values)
+    write_profile(Stats, "updraft_qr", self.Upd_QR.values)
+    write_profile(Stats, "env_qr", self.Env_QR.values)
+    write_profile(Stats, "rain_area", self.RainArea.values)
+    write_profile(Stats, "updraft_rain_area", self.Upd_RainArea.values)
+    write_profile(Stats, "env_rain_area", self.Env_RainArea.values)
 
     rain_diagnostics(self, Ref, UpdThermo, EnvThermo, TS)
     write_ts(Stats, "rwp_mean", self.mean_rwp)

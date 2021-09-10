@@ -99,8 +99,6 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
 
     grid = get_grid(self)
     ref_state = reference_state(self)
-    cinterior = grid.cinterior
-    finterior = grid.finterior
 
     mean_nh_pressure = face_field(grid)
     mean_nh_pressure_adv = face_field(grid)
@@ -125,8 +123,8 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     a_up_bulk = self.UpdVar.Area.bulkvalues
     a_up = self.UpdVar.Area.values
 
-    write_profile(Stats, "eddy_viscosity", diffusivity_m(self).values[cinterior])
-    write_profile(Stats, "eddy_diffusivity", diffusivity_h(self).values[cinterior])
+    write_profile(Stats, "eddy_viscosity", diffusivity_m(self).values)
+    write_profile(Stats, "eddy_diffusivity", diffusivity_h(self).values)
     write_ts(Stats, "rd", mean(self.pressure_plume_spacing))
 
     @inbounds for k in real_center_indices(grid)
@@ -161,71 +159,71 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
         end
     end
 
-    write_profile(Stats, "turbulent_entrainment", mean_frac_turb_entr[cinterior])
-    write_profile(Stats, "horiz_K_eddy", mean_horiz_K_eddy[cinterior])
-    write_profile(Stats, "entrainment_sc", mean_entr_sc[cinterior])
-    write_profile(Stats, "detrainment_sc", mean_detr_sc[cinterior])
-    write_profile(Stats, "nh_pressure", mean_nh_pressure[finterior])
-    write_profile(Stats, "nh_pressure_adv", mean_nh_pressure_adv[finterior])
-    write_profile(Stats, "nh_pressure_drag", mean_nh_pressure_drag[finterior])
-    write_profile(Stats, "nh_pressure_b", mean_nh_pressure_b[finterior])
-    write_profile(Stats, "asp_ratio", mean_asp_ratio[cinterior])
-    write_profile(Stats, "massflux", massflux[cinterior])
-    write_profile(Stats, "massflux_h", mf_h[cinterior])
-    write_profile(Stats, "massflux_qt", mf_qt[cinterior])
-    write_profile(Stats, "massflux_tendency_h", self.massflux_tendency_h[cinterior])
-    write_profile(Stats, "massflux_tendency_qt", self.massflux_tendency_qt[cinterior])
-    write_profile(Stats, "diffusive_flux_h", self.diffusive_flux_h[cinterior])
-    write_profile(Stats, "diffusive_flux_qt", self.diffusive_flux_qt[cinterior])
-    write_profile(Stats, "diffusive_flux_u", self.diffusive_flux_u[cinterior])
-    write_profile(Stats, "diffusive_flux_v", self.diffusive_flux_v[cinterior])
-    write_profile(Stats, "diffusive_tendency_h", self.diffusive_tendency_h[cinterior])
-    write_profile(Stats, "diffusive_tendency_qt", self.diffusive_tendency_qt[cinterior])
-    write_profile(Stats, "total_flux_h", mf_h[cinterior] .+ self.diffusive_flux_h[cinterior])
-    write_profile(Stats, "total_flux_qt", mf_qt[cinterior] .+ self.diffusive_flux_qt[cinterior])
-    write_profile(Stats, "mixing_length", self.mixing_length[cinterior])
-    write_profile(Stats, "updraft_qt_precip", self.UpdThermo.prec_source_qt_tot[cinterior])
-    write_profile(Stats, "updraft_thetal_precip", self.UpdThermo.prec_source_h_tot[cinterior])
+    write_profile(Stats, "turbulent_entrainment", mean_frac_turb_entr)
+    write_profile(Stats, "horiz_K_eddy", mean_horiz_K_eddy)
+    write_profile(Stats, "entrainment_sc", mean_entr_sc)
+    write_profile(Stats, "detrainment_sc", mean_detr_sc)
+    write_profile(Stats, "nh_pressure", mean_nh_pressure)
+    write_profile(Stats, "nh_pressure_adv", mean_nh_pressure_adv)
+    write_profile(Stats, "nh_pressure_drag", mean_nh_pressure_drag)
+    write_profile(Stats, "nh_pressure_b", mean_nh_pressure_b)
+    write_profile(Stats, "asp_ratio", mean_asp_ratio)
+    write_profile(Stats, "massflux", massflux)
+    write_profile(Stats, "massflux_h", mf_h)
+    write_profile(Stats, "massflux_qt", mf_qt)
+    write_profile(Stats, "massflux_tendency_h", self.massflux_tendency_h)
+    write_profile(Stats, "massflux_tendency_qt", self.massflux_tendency_qt)
+    write_profile(Stats, "diffusive_flux_h", self.diffusive_flux_h)
+    write_profile(Stats, "diffusive_flux_qt", self.diffusive_flux_qt)
+    write_profile(Stats, "diffusive_flux_u", self.diffusive_flux_u)
+    write_profile(Stats, "diffusive_flux_v", self.diffusive_flux_v)
+    write_profile(Stats, "diffusive_tendency_h", self.diffusive_tendency_h)
+    write_profile(Stats, "diffusive_tendency_qt", self.diffusive_tendency_qt)
+    write_profile(Stats, "total_flux_h", mf_h .+ self.diffusive_flux_h)
+    write_profile(Stats, "total_flux_qt", mf_qt .+ self.diffusive_flux_qt)
+    write_profile(Stats, "mixing_length", self.mixing_length)
+    write_profile(Stats, "updraft_qt_precip", self.UpdThermo.prec_source_qt_tot)
+    write_profile(Stats, "updraft_thetal_precip", self.UpdThermo.prec_source_h_tot)
 
     #Different mixing lengths : Ignacio
-    write_profile(Stats, "ed_length_scheme", self.mls[cinterior])
-    write_profile(Stats, "mixing_length_ratio", self.ml_ratio[cinterior])
-    write_profile(Stats, "entdet_balance_length", self.l_entdet[cinterior])
-    write_profile(Stats, "interdomain_tke_t", self.b[cinterior])
+    write_profile(Stats, "ed_length_scheme", self.mls)
+    write_profile(Stats, "mixing_length_ratio", self.ml_ratio)
+    write_profile(Stats, "entdet_balance_length", self.l_entdet)
+    write_profile(Stats, "interdomain_tke_t", self.b)
     compute_covariance_dissipation(self, self.EnvVar.TKE)
-    write_profile(Stats, "tke_dissipation", self.EnvVar.TKE.dissipation[cinterior])
-    write_profile(Stats, "tke_entr_gain", self.EnvVar.TKE.entr_gain[cinterior])
+    write_profile(Stats, "tke_dissipation", self.EnvVar.TKE.dissipation)
+    write_profile(Stats, "tke_entr_gain", self.EnvVar.TKE.entr_gain)
     compute_covariance_detr(self, self.EnvVar.TKE)
-    write_profile(Stats, "tke_detr_loss", self.EnvVar.TKE.detr_loss[cinterior])
-    write_profile(Stats, "tke_shear", self.EnvVar.TKE.shear[cinterior])
-    write_profile(Stats, "tke_buoy", self.EnvVar.TKE.buoy[cinterior])
-    write_profile(Stats, "tke_pressure", self.EnvVar.TKE.press[cinterior])
-    write_profile(Stats, "tke_interdomain", self.EnvVar.TKE.interdomain[cinterior])
+    write_profile(Stats, "tke_detr_loss", self.EnvVar.TKE.detr_loss)
+    write_profile(Stats, "tke_shear", self.EnvVar.TKE.shear)
+    write_profile(Stats, "tke_buoy", self.EnvVar.TKE.buoy)
+    write_profile(Stats, "tke_pressure", self.EnvVar.TKE.press)
+    write_profile(Stats, "tke_interdomain", self.EnvVar.TKE.interdomain)
 
     compute_covariance_dissipation(self, self.EnvVar.Hvar)
-    write_profile(Stats, "Hvar_dissipation", self.EnvVar.Hvar.dissipation[cinterior])
+    write_profile(Stats, "Hvar_dissipation", self.EnvVar.Hvar.dissipation)
     compute_covariance_dissipation(self, self.EnvVar.QTvar)
-    write_profile(Stats, "QTvar_dissipation", self.EnvVar.QTvar.dissipation[cinterior])
+    write_profile(Stats, "QTvar_dissipation", self.EnvVar.QTvar.dissipation)
     compute_covariance_dissipation(self, self.EnvVar.HQTcov)
-    write_profile(Stats, "HQTcov_dissipation", self.EnvVar.HQTcov.dissipation[cinterior])
-    write_profile(Stats, "Hvar_entr_gain", self.EnvVar.Hvar.entr_gain[cinterior])
-    write_profile(Stats, "QTvar_entr_gain", self.EnvVar.QTvar.entr_gain[cinterior])
-    write_profile(Stats, "HQTcov_entr_gain", self.EnvVar.HQTcov.entr_gain[cinterior])
+    write_profile(Stats, "HQTcov_dissipation", self.EnvVar.HQTcov.dissipation)
+    write_profile(Stats, "Hvar_entr_gain", self.EnvVar.Hvar.entr_gain)
+    write_profile(Stats, "QTvar_entr_gain", self.EnvVar.QTvar.entr_gain)
+    write_profile(Stats, "HQTcov_entr_gain", self.EnvVar.HQTcov.entr_gain)
     compute_covariance_detr(self, self.EnvVar.Hvar)
     compute_covariance_detr(self, self.EnvVar.QTvar)
     compute_covariance_detr(self, self.EnvVar.HQTcov)
-    write_profile(Stats, "Hvar_detr_loss", self.EnvVar.Hvar.detr_loss[cinterior])
-    write_profile(Stats, "QTvar_detr_loss", self.EnvVar.QTvar.detr_loss[cinterior])
-    write_profile(Stats, "HQTcov_detr_loss", self.EnvVar.HQTcov.detr_loss[cinterior])
-    write_profile(Stats, "Hvar_shear", self.EnvVar.Hvar.shear[cinterior])
-    write_profile(Stats, "QTvar_shear", self.EnvVar.QTvar.shear[cinterior])
-    write_profile(Stats, "HQTcov_shear", self.EnvVar.HQTcov.shear[cinterior])
-    write_profile(Stats, "Hvar_rain", self.EnvVar.Hvar.rain_src[cinterior])
-    write_profile(Stats, "QTvar_rain", self.EnvVar.QTvar.rain_src[cinterior])
-    write_profile(Stats, "HQTcov_rain", self.EnvVar.HQTcov.rain_src[cinterior])
-    write_profile(Stats, "Hvar_interdomain", self.EnvVar.Hvar.interdomain[cinterior])
-    write_profile(Stats, "QTvar_interdomain", self.EnvVar.QTvar.interdomain[cinterior])
-    write_profile(Stats, "HQTcov_interdomain", self.EnvVar.HQTcov.interdomain[cinterior])
+    write_profile(Stats, "Hvar_detr_loss", self.EnvVar.Hvar.detr_loss)
+    write_profile(Stats, "QTvar_detr_loss", self.EnvVar.QTvar.detr_loss)
+    write_profile(Stats, "HQTcov_detr_loss", self.EnvVar.HQTcov.detr_loss)
+    write_profile(Stats, "Hvar_shear", self.EnvVar.Hvar.shear)
+    write_profile(Stats, "QTvar_shear", self.EnvVar.QTvar.shear)
+    write_profile(Stats, "HQTcov_shear", self.EnvVar.HQTcov.shear)
+    write_profile(Stats, "Hvar_rain", self.EnvVar.Hvar.rain_src)
+    write_profile(Stats, "QTvar_rain", self.EnvVar.QTvar.rain_src)
+    write_profile(Stats, "HQTcov_rain", self.EnvVar.HQTcov.rain_src)
+    write_profile(Stats, "Hvar_interdomain", self.EnvVar.Hvar.interdomain)
+    write_profile(Stats, "QTvar_interdomain", self.EnvVar.QTvar.interdomain)
+    write_profile(Stats, "HQTcov_interdomain", self.EnvVar.HQTcov.interdomain)
     return
 end
 
@@ -1139,8 +1137,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
             x[k] = x[k] + TS.dt * Case.Sur.rho_qtflux * dzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
-    cinterior = real_center_indices(grid)
-    x[cinterior] .= tridiag_solve(x[cinterior], a[cinterior], b[cinterior], c[cinterior])
+    x .= tridiag_solve(x, a, b, c)
 
     @inbounds for k in real_center_indices(grid)
         mf_tend_qt_dual = dual_faces(self.massflux_qt, grid, k)
@@ -1172,7 +1169,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
             x[k] = x[k] + TS.dt * Case.Sur.rho_hflux * dzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
-    x[cinterior] .= tridiag_solve(x[cinterior], a[cinterior], b[cinterior], c[cinterior])
+    x .= tridiag_solve(x, a, b, c)
     @inbounds for k in real_center_indices(grid)
         mf_tend_h_dual = dual_faces(self.massflux_h, grid, k)
         ∇mf_tend_h = ∇f2c(mf_tend_h_dual, grid, k)
@@ -1207,7 +1204,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
             x[k] = x[k] + TS.dt * Case.Sur.rho_uflux * dzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
-    x[cinterior] .= tridiag_solve(x[cinterior], a[cinterior], b[cinterior], c[cinterior])
+    x .= tridiag_solve(x, a, b, c)
 
     @inbounds for k in real_center_indices(grid)
         GMV.U.new[k] = x[k]
@@ -1226,7 +1223,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
             x[k] = x[k] + TS.dt * Case.Sur.rho_vflux * dzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
-    x[cinterior] .= tridiag_solve(x[cinterior], a[cinterior], b[cinterior], c[cinterior])
+    x .= tridiag_solve(x, a, b, c)
     @inbounds for k in real_center_indices(grid)
         GMV.V.new[k] = x[k]
     end
@@ -1688,8 +1685,7 @@ function update_covariance_ED(
         end
     end
 
-    cinterior = real_center_indices(grid)
-    x[cinterior] .= tridiag_solve(x[cinterior], a[cinterior], b[cinterior], c[cinterior])
+    x .= tridiag_solve(x, a, b, c)
 
     @inbounds for k in real_center_indices(grid)
         if Covar.name == "thetal_qt_covar"
