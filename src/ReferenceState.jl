@@ -61,7 +61,7 @@ function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
     # determine the reference pressure
     function rhs(logp, u, z)
         p_ = exp(logp)
-        ts = TD.PhaseEquil_pθq(param_set, p_, θ_liq_ice_g, q_tot_g)
+        ts = TD.PhaseDry_pθ(param_set, p_, θ_liq_ice_g)
         R_m = TD.gas_constant_air(ts)
         T = TD.air_temperature(ts)
         return -FT(CPP.grav(param_set)) / (T * R_m)
@@ -89,12 +89,12 @@ function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
 
     # Compute reference state thermodynamic profiles
     @inbounds for k in real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p_half[k], θ_liq_ice_g, q_tot_g)
+        ts = TD.PhaseDry_pθ(param_set, p_half[k], θ_liq_ice_g)
         alpha_half[k] = TD.specific_volume(ts)
     end
 
     @inbounds for k in real_face_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p[k], θ_liq_ice_g, q_tot_g)
+        ts = TD.PhaseDry_pθ(param_set, p[k], θ_liq_ice_g)
         alpha[k] = TD.specific_volume(ts)
     end
 
