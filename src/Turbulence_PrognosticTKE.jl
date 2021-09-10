@@ -1744,7 +1744,8 @@ function GMV_third_m(
         i_last = last(xrange(self.n_updrafts))
         if is_tke
             w_bcs = (; bottom = SetValue(0), top = SetValue(0))
-            ∇w_en = f∇(self.EnvVar.W.values, grid, k; w_bcs...)
+            w_en_dual = dual_faces(self.EnvVar.W.values, grid, k)
+            ∇w_en = ∇f2c(w_en_dual, grid, k; w_bcs...)
             Envcov_ = -self.horiz_K_eddy[i_last, k] * ∇w_en
         else
             Envcov_ = env_covar.values[k]
@@ -1762,8 +1763,7 @@ function GMV_third_m(
             Gmv_third_m.values[k] = 0.0 # this is here as first value is biased with BC area fraction
         else
             Gmv_third_m.values[k] =
-                Upd_cubed + ae[k] * (env_mean.values[k]^3 + 3.0 * env_mean.values[k] * Envcov_) - GMVv_^3.0 -
-                3.0 * GMVcov_ * GMVv_
+                Upd_cubed + ae[k] * (mean_en^3 + 3 * mean_en * Envcov_) - GMVv_^3 - 3 * GMVcov_ * GMVv_
         end
     end
     return
