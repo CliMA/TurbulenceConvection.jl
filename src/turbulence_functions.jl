@@ -61,8 +61,8 @@ function construct_tridiag_diffusion(grid, dt, ρ_ae_K_m, ρ_0, ae, a, b, c)
     dzi = grid.dzi
     @inbounds for k in real_center_indices(grid)
         X = ρ_0[k] * ae[k] / dt
-        Y = ρ_ae_K_m[k] * dzi * dzi
-        Z = ρ_ae_K_m[k - 1] * dzi * dzi
+        Y = ρ_ae_K_m[k + 1] * dzi * dzi
+        Z = ρ_ae_K_m[k] * dzi * dzi
         if is_surface_center(grid, k)
             Z = 0.0
         elseif is_toa_center(grid, k)
