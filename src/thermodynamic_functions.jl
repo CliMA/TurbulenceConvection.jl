@@ -8,7 +8,7 @@ function rho_c(p0, T, qt, qv)
     return p0 / ((Rd * T) * (1.0 - qt + eps_vi * qv))
 end
 
-function eos(param_set, p0, qt, prog)
+function eos(param_set, p0, qt, prog::FT) where {FT}
     ql = 0.0
 
     _ret = eos_struct()
@@ -50,7 +50,8 @@ function eos(param_set, p0, qt, prog)
 
         maxiter = 50
         tol = RS.SolutionTolerance(1.0e-3)
-        sol = RS.find_zero(roots, RS.NewtonsMethodAD(T_init), RS.CompactSolution(), tol, maxiter)
+        # TODO: remove these hard-coded bounds
+        sol = RS.find_zero(roots, RS.SecantMethod(T_1, T_init + FT(10)), RS.CompactSolution(), tol, maxiter)
         if !sol.converged
             println("-----------------------------------------\n")
             println("maxiter reached in eos:\n")
@@ -61,6 +62,7 @@ function eos(param_set, p0, qt, prog)
             println(", T=", sol.root)
             println(", maxiter=", maxiter)
             println(", tol=", tol.tol, "\n")
+            error("Halting execution")
         end
         _ret.T = sol.root
         _ret.ql = compute_q_liq(_ret.T)
