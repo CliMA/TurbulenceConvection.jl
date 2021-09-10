@@ -243,19 +243,17 @@ function set_values_with_new(self::UpdraftVariables)
 end
 
 function io(self::UpdraftVariables, Stats::NetCDFIO_Stats, Ref::ReferenceState)
-    cinterior = self.Gr.cinterior
-    finterior = self.Gr.finterior
-    write_profile(Stats, "updraft_area", self.Area.bulkvalues[cinterior])
-    write_profile(Stats, "updraft_w", self.W.bulkvalues[finterior])
-    write_profile(Stats, "updraft_qt", self.QT.bulkvalues[cinterior])
-    write_profile(Stats, "updraft_ql", self.QL.bulkvalues[cinterior])
-    write_profile(Stats, "updraft_RH", self.RH.bulkvalues[cinterior])
-    write_profile(Stats, "updraft_thetal", self.H.bulkvalues[cinterior])
-    write_profile(Stats, "updraft_temperature", self.T.bulkvalues[cinterior])
-    write_profile(Stats, "updraft_buoyancy", self.B.bulkvalues[cinterior])
+    write_profile(Stats, "updraft_area", self.Area.bulkvalues)
+    write_profile(Stats, "updraft_w", self.W.bulkvalues)
+    write_profile(Stats, "updraft_qt", self.QT.bulkvalues)
+    write_profile(Stats, "updraft_ql", self.QL.bulkvalues)
+    write_profile(Stats, "updraft_RH", self.RH.bulkvalues)
+    write_profile(Stats, "updraft_thetal", self.H.bulkvalues)
+    write_profile(Stats, "updraft_temperature", self.T.bulkvalues)
+    write_profile(Stats, "updraft_buoyancy", self.B.bulkvalues)
 
     upd_cloud_diagnostics(self, Ref)
-    write_profile(Stats, "updraft_cloud_fraction", self.cloud_fraction[cinterior])
+    write_profile(Stats, "updraft_cloud_fraction", self.cloud_fraction)
     # Note definition of cloud cover : each updraft is associated with a cloud cover equal to the maximum
     # area fraction of the updraft where ql > 0. Each updraft is assumed to have maximum overlap with respect to
     # itself (i.e. no consideration of tilting due to shear) while the updraft classes are assumed to have no overlap
@@ -271,8 +269,6 @@ function upd_cloud_diagnostics(self::UpdraftVariables, Ref::ReferenceState)
     self.lwp = 0.0
 
     @inbounds for i in xrange(self.n_updrafts)
-        #TODO check the setting of ghost point z_half
-
         self.cloud_base[i] = zc_toa(self.Gr)
         self.cloud_top[i] = 0.0
         self.updraft_top[i] = 0.0

@@ -251,7 +251,7 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
             z_scm = z_tcc
         end
         if !have_pycles_ds
-            z_les = z_tcc # TODO: fix this
+            z_les = z_tcc
         end
 
         data_les_arr = get_data(ds_pycles, les_var)'

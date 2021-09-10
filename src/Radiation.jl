@@ -56,10 +56,8 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
         end
     end
 
-    cinterior = real_center_indices(grid)
-    finterior = real_face_indices(grid)
-    ρ_z = Dierckx.Spline1D([grid.z_half[cinterior]...], [self.Ref.rho0_half[cinterior]...]; k = 1)
-    q_liq_z = Dierckx.Spline1D([grid.z_half[cinterior]...], [GMV.QL.values[cinterior]...]; k = 1)
+    ρ_z = Dierckx.Spline1D([grid.z_half...], [self.Ref.rho0_half...]; k = 1)
+    q_liq_z = Dierckx.Spline1D([grid.z_half...], [GMV.QL.values...]; k = 1)
 
     integrand(ρq_l, params, z) = params.κ * ρ_z(z) * q_liq_z(z)
     rintegrand(ρq_l, params, z) = -integrand(ρq_l, params, z)
@@ -70,13 +68,13 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
 
     rprob = ODEProblem(rintegrand, 0.0, rz_span, params; dt = grid.dz)
     rsol = solve(rprob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    q_0 = [rsol(grid.z[k]) for k in finterior]
+    q_0 = rsol.(grid.z)
 
     prob = ODEProblem(integrand, 0.0, z_span, params; dt = grid.dz)
     sol = solve(prob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    q_1 = [sol(grid.z[k]) for k in finterior]
-    self.f_rad[finterior] .= self.F0 .* exp.(-q_0)
-    self.f_rad[finterior] .+= self.F1 .* exp.(-q_1)
+    q_1 = sol.(grid.z)
+    self.f_rad .= self.F0 .* exp.(-q_0)
+    self.f_rad .+= self.F1 .* exp.(-q_1)
 
     # cooling in free troposphere
     @inbounds for k in real_face_indices(grid)
@@ -108,10 +106,8 @@ function initialize_io(self::RadiationBase{RadiationDYCOMS_RF01}, Stats::NetCDFI
 end
 
 function io(self::RadiationBase{RadiationDYCOMS_RF01}, Stats::NetCDFIO_Stats)
-    cinterior = self.Gr.cinterior
-    finterior = self.Gr.finterior
-    write_profile(Stats, "rad_dTdt", self.dTdt[cinterior])
-    write_profile(Stats, "rad_flux", self.f_rad[finterior])
+    write_profile(Stats, "rad_dTdt", self.dTdt)
+    write_profile(Stats, "rad_flux", self.f_rad)
     return
 end
 
@@ -137,9 +133,7 @@ function initialize_io(self::RadiationBase{RadiationLES}, Stats::NetCDFIO_Stats)
 end
 
 function io(self::RadiationBase{RadiationLES}, Stats::NetCDFIO_Stats)
-    cinterior = self.Gr.cinterior
-    finterior = self.Gr.finterior
-    write_profile(Stats, "rad_dTdt", self.dTdt[cinterior])
-    write_profile(Stats, "rad_flux", self.f_rad[finterior])
+    write_profile(Stats, "rad_dTdt", self.dTdt)
+    write_profile(Stats, "rad_flux", self.f_rad)
     return
 end

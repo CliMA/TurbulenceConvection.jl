@@ -75,11 +75,9 @@ function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
     @show z_span
     prob = ODEProblem(rhs, logp, z_span)
     sol = solve(prob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    cinterior = real_center_indices(grid)
-    finterior = real_face_indices(grid)
 
-    p[finterior] .= [sol(grid.z[k]) for k in finterior]
-    p_half[cinterior] .= [sol(grid.z_half[k]) for k in cinterior]
+    p .= sol.(grid.z)
+    p_half .= sol.(grid.z_half)
 
     p .= exp.(p)
     p_half .= exp.(p_half)
@@ -105,25 +103,21 @@ function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
     self.rho0 = 1.0 ./ self.alpha0
     self.rho0_half = 1.0 ./ self.alpha0_half
 
-    # TODO: centers and faces are sliced with equal sizes,
-    # they should be unequal.
-    cinterior = grid.cinterior
-    finterior = grid.finterior
     add_reference_profile(Stats, "alpha0")
-    write_reference_profile(Stats, "alpha0", alpha[finterior])
+    write_reference_profile(Stats, "alpha0", alpha)
     add_reference_profile(Stats, "alpha0_half")
-    write_reference_profile(Stats, "alpha0_half", alpha_half[cinterior])
+    write_reference_profile(Stats, "alpha0_half", alpha_half)
 
 
     add_reference_profile(Stats, "p0")
-    write_reference_profile(Stats, "p0", p[finterior])
+    write_reference_profile(Stats, "p0", p)
     add_reference_profile(Stats, "p0_half")
-    write_reference_profile(Stats, "p0_half", p_half[cinterior])
+    write_reference_profile(Stats, "p0_half", p_half)
 
     add_reference_profile(Stats, "rho0")
-    write_reference_profile(Stats, "rho0", 1.0 ./ alpha[finterior])
+    write_reference_profile(Stats, "rho0", 1.0 ./ alpha)
     add_reference_profile(Stats, "rho0_half")
-    write_reference_profile(Stats, "rho0_half", 1.0 ./ alpha_half[cinterior])
+    write_reference_profile(Stats, "rho0_half", 1.0 ./ alpha_half)
 
     return
 end

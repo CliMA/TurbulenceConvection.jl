@@ -37,27 +37,24 @@ function initialize_io(self::GridMeanVariables, Stats::NetCDFIO_Stats)
 end
 
 function io(self::GridMeanVariables, Stats::NetCDFIO_Stats)
-    cinterior = self.Gr.cinterior
-    finterior = self.Gr.finterior
+    write_profile(Stats, "u_mean", self.U.values)
+    write_profile(Stats, "v_mean", self.V.values)
+    write_profile(Stats, "qt_mean", self.QT.values)
+    write_profile(Stats, "ql_mean", self.QL.values)
+    write_profile(Stats, "temperature_mean", self.T.values)
+    write_profile(Stats, "RH_mean", self.RH.values)
+    write_profile(Stats, "buoyancy_mean", self.B.values)
+    write_profile(Stats, "thetal_mean", self.H.values)
+    write_profile(Stats, "tke_mean", self.TKE.values)
+    write_profile(Stats, "W_third_m", self.W_third_m.values)
+    write_profile(Stats, "Hvar_mean", self.Hvar.values)
+    write_profile(Stats, "QTvar_mean", self.QTvar.values)
+    write_profile(Stats, "HQTcov_mean", self.HQTcov.values)
 
-    write_profile(Stats, "u_mean", self.U.values[cinterior])
-    write_profile(Stats, "v_mean", self.V.values[cinterior])
-    write_profile(Stats, "qt_mean", self.QT.values[cinterior])
-    write_profile(Stats, "ql_mean", self.QL.values[cinterior])
-    write_profile(Stats, "temperature_mean", self.T.values[cinterior])
-    write_profile(Stats, "RH_mean", self.RH.values[cinterior])
-    write_profile(Stats, "buoyancy_mean", self.B.values[cinterior])
-    write_profile(Stats, "thetal_mean", self.H.values[cinterior])
-    write_profile(Stats, "tke_mean", self.TKE.values[cinterior])
-    write_profile(Stats, "W_third_m", self.W_third_m.values[cinterior])
-    write_profile(Stats, "Hvar_mean", self.Hvar.values[cinterior])
-    write_profile(Stats, "QTvar_mean", self.QTvar.values[cinterior])
-    write_profile(Stats, "HQTcov_mean", self.HQTcov.values[cinterior])
+    write_profile(Stats, "H_third_m", self.H_third_m.values)
+    write_profile(Stats, "QT_third_m", self.QT_third_m.values)
 
-    write_profile(Stats, "H_third_m", self.H_third_m.values[cinterior])
-    write_profile(Stats, "QT_third_m", self.QT_third_m.values[cinterior])
-
-    write_profile(Stats, "cloud_fraction_mean", self.cloud_fraction.values[cinterior])
+    write_profile(Stats, "cloud_fraction_mean", self.cloud_fraction.values)
     write_ts(Stats, "cloud_cover_mean", self.cloud_cover)
 
     mean_cloud_diagnostics(self)

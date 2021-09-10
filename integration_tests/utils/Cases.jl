@@ -865,14 +865,14 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
     p1 = pyinterp(Gr.z_half, z_in, p_in)
     GMV.U.values .= pyinterp(Gr.z_half, z_in, u_in)
     GMV.V.values .= pyinterp(Gr.z_half, z_in, v_in)
-    cinterior = real_center_indices(Gr)
+
     # get the entropy from RH, p, T
     RH = TC.center_field(Gr)
-    z_half_in = off_arr(Gr.z_half[cinterior])
-    RH[cinterior] = pyinterp(z_half_in, z_in, RH_in)
+    z_half_in = Gr.z_half
+    RH = pyinterp(z_half_in, z_in, RH_in)
 
     T = TC.center_field(Gr)
-    T[cinterior] = pyinterp(z_half_in, z_in, T_in)
+    T = pyinterp(z_half_in, z_in, T_in)
     GMV.T.values .= T
     theta_rho = RH * 0.0
     epsi = 287.1 / 461.5
@@ -1032,17 +1032,16 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, Ref::Referenc
     #! format: on
     # TODO: check translation
     rad_in = reduce(vcat, rad_in')
-    cinterior = real_center_indices(grid)
     A = hcat(map(xrange(0, 36)) do tt
-        a = grid.z_half[cinterior]
+        a = grid.z_half
         b = z_in
         c = reshape(rad_in[tt, :], size(rad_in, 2))
         pyinterp(a, b, c)
     end...)
     A = A'
 
-    self.rad = zeros(size(A, 1), length(TC.face_field(grid)))
-    self.rad[:, cinterior] .= A # store matrix in self
+    self.rad = zeros(size(A, 1), length(TC.center_field(grid)))
+    self.rad .= A # store matrix in self
     ind1 = Int(trunc(10.0 / 600.0)) + 1
     ind2 = Int(ceil(10.0 / 600.0))
     @inbounds for k in real_center_indices(grid)
@@ -1831,9 +1830,8 @@ function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMean
     #! format: on
                        #LES temperature_mean in K
     thetali = TC.center_field(Gr)
-    cinterior = real_center_indices(Gr)
-    z_half_in = Gr.z_half[cinterior]
-    thetali[cinterior] = pyinterp(z_half_in, z_in, thetali_in)
+    z_half_in = Gr.z_half
+    thetali = pyinterp(z_half_in, z_in, thetali_in)
     GMV.H.values .= thetali
     @inbounds for k in real_center_indices(Gr)
         GMV.QT.values[k] = 0.0

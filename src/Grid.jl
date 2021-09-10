@@ -1,11 +1,8 @@
 struct Grid{A1, FT}
     zmin::FT
     zmax::FT
-    cinterior::UnitRange
-    finterior::UnitRange
     dz::FT
     dzi::FT
-    gw::Int
     nz::Int
     nzg::Int
     z_half::A1
@@ -19,13 +16,9 @@ struct Grid{A1, FT}
 
         dzi = 1.0 / dz
 
-        #Get the grid dimensions and ghost points
-        gw = 0
+        # Get the grid dimensions
         nz = namelist["grid"]["nz"]
         nzg = nz
-
-        cinterior = 1:nzg
-        finterior = 1:(nzg + 1)
 
         # TODO: make cell centers and cell faces different sizes
         z_half = zeros(nz)
@@ -42,7 +35,7 @@ struct Grid{A1, FT}
         zmax = z[nzg + 1]
         A1 = typeof(z)
         FT = typeof(zmax)
-        return new{A1, FT}(zmin, zmax, cinterior, finterior, dz, dzi, gw, nz, nzg, z_half, z)
+        return new{A1, FT}(zmin, zmax, dz, dzi, nz, nzg, z_half, z)
     end
 end
 

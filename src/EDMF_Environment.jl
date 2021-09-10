@@ -22,21 +22,19 @@ function initialize_io(self::EnvironmentVariables, Stats::NetCDFIO_Stats)
 end
 
 function io(self::EnvironmentVariables, Stats::NetCDFIO_Stats, Ref::ReferenceState)
-    cinterior = self.Gr.cinterior
-    finterior = self.Gr.finterior
-    write_profile(Stats, "env_w", self.W.values[finterior])
-    write_profile(Stats, "env_qt", self.QT.values[cinterior])
-    write_profile(Stats, "env_ql", self.QL.values[cinterior])
-    write_profile(Stats, "env_area", self.Area.values[cinterior])
-    write_profile(Stats, "env_temperature", self.T.values[cinterior])
-    write_profile(Stats, "env_RH", self.RH.values[cinterior])
-    write_profile(Stats, "env_thetal", self.H.values[cinterior])
-    write_profile(Stats, "env_tke", self.TKE.values[cinterior])
-    write_profile(Stats, "env_Hvar", self.Hvar.values[cinterior])
-    write_profile(Stats, "env_QTvar", self.QTvar.values[cinterior])
-    write_profile(Stats, "env_HQTcov", self.HQTcov.values[cinterior])
+    write_profile(Stats, "env_w", self.W.values)
+    write_profile(Stats, "env_qt", self.QT.values)
+    write_profile(Stats, "env_ql", self.QL.values)
+    write_profile(Stats, "env_area", self.Area.values)
+    write_profile(Stats, "env_temperature", self.T.values)
+    write_profile(Stats, "env_RH", self.RH.values)
+    write_profile(Stats, "env_thetal", self.H.values)
+    write_profile(Stats, "env_tke", self.TKE.values)
+    write_profile(Stats, "env_Hvar", self.Hvar.values)
+    write_profile(Stats, "env_QTvar", self.QTvar.values)
+    write_profile(Stats, "env_HQTcov", self.HQTcov.values)
 
-    write_profile(Stats, "env_cloud_fraction", self.cloud_fraction.values[cinterior])
+    write_profile(Stats, "env_cloud_fraction", self.cloud_fraction.values)
 
     env_cloud_diagnostics(self, Ref)
     # Assuming amximum overlap in environmental clouds
