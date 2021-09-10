@@ -1306,7 +1306,7 @@ function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanV
         GMV.QT.values[k] = qt[k]
         GMV.T.values[k] = T[k]
         GMV.U.values[k] = U[k]
-        ts = TD.PhaseEquil_pTq(param_set, Ref.p0[k], GMV.T.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pTq(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k])
         GMV.H.values[k] = TD.liquid_ice_pottemp(ts)
     end
     satadjust(GMV)

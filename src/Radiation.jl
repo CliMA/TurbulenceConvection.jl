@@ -43,12 +43,15 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
     # TODO: report bug: zi and ρ_i are not initialized
     zi = 0
     ρ_i = 0
-    @inbounds for k in real_center_indices(grid)
-        if (GMV.QT.values[k] < 8.0 / 1000)
+    kc_surf = kc_surface(grid)
+    q_tot_surf = GMV.QT.values[kc_surf]
+    @inbounds for k in real_face_indices(grid)
+        q_tot_f = interpc2f(GMV.QT.values, grid, k; bottom = SetValue(q_tot_surf), top = SetGradient(0))
+        if (q_tot_f < 8.0 / 1000)
             idx_zi = k
             # will be used at cell faces
-            zi = grid.z[idx_zi]
-            ρ_i = self.Ref.rho0[idx_zi]
+            zi = grid.z[k]
+            ρ_i = self.Ref.rho0[k]
             break
         end
     end
