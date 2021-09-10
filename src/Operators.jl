@@ -438,24 +438,24 @@ Used when
 """
 function daul_c2f_upwind(f::AbstractVector, grid, k::Int; bottom::SetValue, top::SetZeroGradient)
     if is_toa_face(grid, k)
-        return SVector((f[k - 1] + f[k]) / 2, (f[k - 1] + f[k]) / 2)
+        return SVector((f[k - 2] + f[k - 1]) / 2, (f[k - 2] + f[k - 1]) / 2)
     elseif is_surface_face(grid, k) # never actually called
         error("Uncaught case")
     elseif is_surface_face(grid, k - 1)
-        return SVector(bottom.value, (f[k] + f[k + 1]) / 2)
+        return SVector(bottom.value, (f[k - 1] + f[k]) / 2)
     else
-        return SVector((f[k - 1] + f[k]) / 2, (f[k] + f[k + 1]) / 2)
+        return SVector((f[k - 2] + f[k - 1]) / 2, (f[k - 1] + f[k]) / 2)
     end
 end
 function daul_c2f_upwind(f::AbstractVector, grid, k::Int, i_up::Int; bottom::SetValue, top::SetZeroGradient)
     if is_toa_face(grid, k)
-        return SVector((f[i_up, k - 1] + f[i_up, k]) / 2, (f[i_up, k - 1] + f[i_up, k]) / 2)
+        return SVector((f[i_up, k - 2] + f[i_up, k - 1]) / 2, (f[i_up, k - 2] + f[i_up, k - 1]) / 2)
     elseif is_surface_face(grid, k) # never actually called
         error("Uncaught case")
     elseif is_surface_face(grid, k - 1)
-        return SVector(bottom.value, (f[i_up, k] + f[i_up, k + 1]) / 2)
+        return SVector(bottom.value, (f[i_up, k - 1] + f[i_up, k]) / 2)
     else
-        return SVector((f[i_up, k - 1] + f[i_up, k]) / 2, (f[i_up, k] + f[i_up, k + 1]) / 2)
+        return SVector((f[i_up, k - 2] + f[i_up, k - 1]) / 2, (f[i_up, k - 1] + f[i_up, k]) / 2)
     end
 end
 
@@ -468,16 +468,16 @@ Used when
 """
 function daul_f2c_upwind(f::AbstractVector, grid, k::Int)
     if is_surface_center(grid, k)
-        return SVector((f[k - 1] + f[k]) / 2)
+        return SVector((f[k] + f[k + 1]) / 2)
     else
-        return SVector((f[k - 2] + f[k - 1]) / 2, (f[k - 1] + f[k]) / 2)
+        return SVector((f[k - 1] + f[k]) / 2, (f[k] + f[k + 1]) / 2)
     end
 end
 function daul_f2c_upwind(f::AbstractMatrix, grid, k::Int, i_up::Int)
     if is_surface_center(grid, k)
-        return SVector((f[i_up, k - 1] + f[i_up, k]) / 2)
+        return SVector((f[i_up, k] + f[i_up, k + 1]) / 2)
     else
-        return SVector((f[i_up, k - 2] + f[i_up, k - 1]) / 2, (f[i_up, k - 1] + f[i_up, k]) / 2)
+        return SVector((f[i_up, k - 1] + f[i_up, k]) / 2, (f[i_up, k] + f[i_up, k + 1]) / 2)
     end
 end
 
@@ -488,8 +488,8 @@ Used when
      - traversing cell centers
      - grabbing stencil of 2 neighboring cell faces
 """
-dual_faces(f::AbstractVector, grid, k::Int) = SVector(f[k - 1], f[k])
-dual_faces(f::AbstractMatrix, grid, k::Int, i_up::Int) = SVector(f[i_up, k - 1], f[i_up, k])
+dual_faces(f::AbstractVector, grid, k::Int) = SVector(f[k], f[k + 1])
+dual_faces(f::AbstractMatrix, grid, k::Int, i_up::Int) = SVector(f[i_up, k], f[i_up, k + 1])
 
 """
     dual_centers
@@ -500,19 +500,19 @@ Used when
 """
 function dual_centers(f::AbstractVector, grid, k::Int)
     if is_surface_face(grid, k)
-        return SVector(f[k + 1])
-    elseif is_toa_face(grid, k)
         return SVector(f[k])
+    elseif is_toa_face(grid, k)
+        return SVector(f[k - 1])
     else
-        return SVector(f[k], f[k + 1])
+        return SVector(f[k - 1], f[k])
     end
 end
 function dual_centers(f::AbstractMatrix, grid, k::Int, i_up::Int)
     if is_surface_face(grid, k)
-        return SVector(f[i_up, k + 1])
-    elseif is_toa_face(grid, k)
         return SVector(f[i_up, k])
+    elseif is_toa_face(grid, k)
+        return SVector(f[i_up, k - 1])
     else
-        return SVector(f[i_up, k], f[i_up, k + 1])
+        return SVector(f[i_up, k - 1], f[i_up, k])
     end
 end

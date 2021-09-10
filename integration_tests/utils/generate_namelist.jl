@@ -120,7 +120,6 @@ function default_namelist(case_name::String)
     # From namelist
     namelist_defaults["grid"] = Dict()
     namelist_defaults["grid"]["dims"] = 1
-    namelist_defaults["grid"]["gw"] = 2
 
     namelist_defaults["thermodynamics"] = Dict()
     namelist_defaults["thermodynamics"]["thermal_variable"] = "thetal"

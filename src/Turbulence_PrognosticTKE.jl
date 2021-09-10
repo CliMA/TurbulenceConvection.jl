@@ -582,7 +582,6 @@ function decompose_environment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
 
     set_means(self, up, gm)
     grid = get_grid(self)
-
     @inbounds for k in real_center_indices(grid)
         a_bulk_c = up.Area.bulkvalues[k]
         val1 = 1 / (1 - a_bulk_c)
@@ -592,7 +591,6 @@ function decompose_environment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
         en.QT.values[k] = max(val1 * gm.QT.values[k] - val2 * up.QT.bulkvalues[k], 0) #Yair - this is here to prevent negative QT
         en.H.values[k] = val1 * gm.H.values[k] - val2 * up.H.bulkvalues[k]
     end
-
     @inbounds for k in real_face_indices(grid)
         # Assuming gm.W = 0!
         a_bulk_bcs = (; bottom = SetValue(sum(self.area_surface_bc)), top = SetValue(0))
@@ -973,15 +971,16 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 w_up_new[i, k] = (ρ_0_f[k] * a_k * w_up[i, k] + Δt * w_tendencies) / (ρ_0_f[k] * anew_k)
 
                 w_up_new[i, k] = max(w_up_new[i, k], 0)
+                # TODO: remove a_up_new from this loop.
                 if w_up_new[i, k] <= 0.0
-                    if !(k + 1 > size(a_up_new, 2))
-                        a_up_new[i, k + 1] = 0
+                    if !(k > size(a_up_new, 2))
+                        a_up_new[i, k] = 0
                     end
                 end
             else
                 w_up_new[i, k] = 0
-                if !(k + 1 > size(a_up_new, 2))
-                    a_up_new[i, k + 1] = 0
+                if !(k > size(a_up_new, 2))
+                    a_up_new[i, k] = 0
                 end
             end
         end
@@ -1666,11 +1665,11 @@ function update_covariance_ED(
             c[k] = 0.0
             x[k] = Covar_surf
         else
-            a[k] = (-rho_ae_K_m[k - 1] * dzi * dzi)
+            a[k] = (-rho_ae_K_m[k] * dzi * dzi)
             b[k] = (
                 Ref.rho0_half[k] * ae[k] * dti - Ref.rho0_half[k] * ae[k] * w_en_c[k] * dzi +
+                rho_ae_K_m[k + 1] * dzi * dzi +
                 rho_ae_K_m[k] * dzi * dzi +
-                rho_ae_K_m[k - 1] * dzi * dzi +
                 D_env +
                 Ref.rho0_half[k] * ae[k] * c_d * sqrt(max(self.EnvVar.TKE.values[k], 0)) /
                 max(self.mixing_length[k], 1)
@@ -1686,7 +1685,7 @@ function update_covariance_ED(
             if is_toa_center(grid, k)
                 c[k] = 0.0
             else
-                c[k] = (Ref.rho0_half[k + 1] * ae[k + 1] * w_en_c[k + 1] * dzi - rho_ae_K_m[k] * dzi * dzi)
+                c[k] = (Ref.rho0_half[k + 1] * ae[k + 1] * w_en_c[k + 1] * dzi - rho_ae_K_m[k + 1] * dzi * dzi)
             end
         end
     end
