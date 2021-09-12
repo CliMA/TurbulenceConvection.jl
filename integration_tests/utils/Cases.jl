@@ -1,8 +1,10 @@
 module Cases
 
-using NCDatasets
-using Statistics
-using Random
+import NCDatasets
+const NC = NCDatasets
+
+import Statistics
+import Random
 
 import CLIMAParameters
 const CP = CLIMAParameters
@@ -12,6 +14,8 @@ import Thermodynamics
 const TD = Thermodynamics
 
 import ..TurbulenceConvection
+const TC = TurbulenceConvection
+
 using ..TurbulenceConvection: CasesBase
 using ..TurbulenceConvection: off_arr
 using ..TurbulenceConvection: omega
@@ -38,7 +42,6 @@ using ..TurbulenceConvection: TimeStepping
 using ..TurbulenceConvection: real_center_indices
 using ..TurbulenceConvection: real_face_indices
 
-const TC = TurbulenceConvection
 
 #####
 ##### Case types
@@ -1884,7 +1887,7 @@ function LES_driven_SCM(namelist, Gr::Grid, Ref::ReferenceState)
     casename = "LES_driven_SCM"
     les_filename = namelist["meta"]["lesfile"]
     # load data here
-    LESDat = Dataset(les_filename, "r") do data
+    LESDat = NC.Dataset(les_filename, "r") do data
         t = data.group["profiles"]["t"][:]
         t_interval_from_end_s = 6 * 3600
         t_from_end_s = t .- t[end]
@@ -1910,7 +1913,7 @@ end
 
 function initialize_reference(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
 
-    Dataset(self.LESDat.les_filename, "r") do data
+    NC.Dataset(self.LESDat.les_filename, "r") do data
         Ref.Pg = data.group["reference"]["p0_full"][1] #Pressure at ground
         Ref.Tg = data.group["reference"]["temperature0"][1] #Temperature at ground
         ql_ground = data.group["reference"]["ql0"][1]
@@ -1923,7 +1926,7 @@ end
 
 function initialize_profiles(self::CasesBase{LES_driven_SCM}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
 
-    Dataset(self.LESDat.les_filename, "r") do data
+    NC.Dataset(self.LESDat.les_filename, "r") do data
         imin = self.LESDat.imin
         imax = self.LESDat.imax
         t = data.group["profiles"]["t"][:]
@@ -1946,7 +1949,7 @@ end
 
 function initialize_surface(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState)
 
-    Dataset(self.LESDat.les_filename, "r") do data
+    NC.Dataset(self.LESDat.les_filename, "r") do data
         imin = self.LESDat.imin
         imax = self.LESDat.imax
 
@@ -1954,12 +1957,12 @@ function initialize_surface(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::Refe
         self.Sur.Ref = Ref
         self.Sur.zrough = 1.0e-4
         self.Sur.Gr = Gr
-        self.Sur.Tsurface = mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims = 1)[1]
+        self.Sur.Tsurface = Statistics.mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims = 1)[1]
         # get surface value of q
-        mean_qt_prof = mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)[:]
+        mean_qt_prof = Statistics.mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)[:]
         self.Sur.qsurface = TC.interpf2c(mean_qt_prof, Gr, TC.kc_surface(Gr))
-        self.Sur.lhf = mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1]
-        self.Sur.shf = mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1]
+        self.Sur.lhf = Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1]
+        self.Sur.shf = Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1]
         self.Sur.Ref = Ref
     end
     initialize(self.Sur)

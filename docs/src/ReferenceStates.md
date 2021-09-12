@@ -3,7 +3,7 @@
 ```@example
 import TurbulenceConvection
 import Plots
-using NCDatasets
+import NCDatasets
 using CLIMAParameters
 tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
 include(joinpath(tc_dir, "integration_tests", "utils", "generate_namelist.jl"))
@@ -20,7 +20,7 @@ function export_ref_profile(case_name::String)
     Stats = TurbulenceConvection.NetCDFIO_Stats(namelist, grid)
     case = Cases.CasesFactory(namelist, grid, ref_state)
     Cases.initialize_reference(case, grid, ref_state, Stats)
-    Dataset(joinpath(Stats.path_plus_file), "r") do ds
+    NCDatasets.Dataset(joinpath(Stats.path_plus_file), "r") do ds
         zc = ds.group["profiles"]["z_half"][:]
         zf = ds.group["profiles"]["z"][:]
         ρc_0 = ds.group["reference"]["rho0_half"][:]

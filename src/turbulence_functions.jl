@@ -76,7 +76,7 @@ function construct_tridiag_diffusion(grid, dt, ρ_ae_K_m, ρ_0, ae, a, b, c)
 end
 
 function tridiag_solve(b_rhs, a, b, c)
-    A = Tridiagonal(a[2:end], parent(b), c[1:(end - 1)])
+    A = LinearAlgebra.Tridiagonal(a[2:end], parent(b), c[1:(end - 1)])
     return A \ parent(b_rhs)
 end
 

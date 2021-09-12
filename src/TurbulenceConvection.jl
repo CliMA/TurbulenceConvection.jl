@@ -1,11 +1,11 @@
 module TurbulenceConvection
 
-using StaticArrays
-using StatsBase
-using LinearAlgebra
+import LinearAlgebra
 import DocStringExtensions
-
-using NCDatasets
+import StaticArrays
+import StatsBase
+import NCDatasets
+import JSON
 import Dierckx
 import RootSolvers
 import Statistics
@@ -14,6 +14,9 @@ import Thermodynamics
 import Distributions
 import FastGaussQuadrature
 import CLIMAParameters
+
+const NC = NCDatasets
+const SA = StaticArrays
 
 const TD = Thermodynamics
 const RS = RootSolvers

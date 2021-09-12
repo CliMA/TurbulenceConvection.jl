@@ -137,10 +137,6 @@ function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables,
     sa = eos_struct()
     mph = mph_struct()
 
-    if EnvVar.H.name != "thetal"
-        error("EDMF_Environment: rain source terms are defined for thetal as model variable")
-    end
-
     @inbounds for k in real_center_indices(self.Gr)
         # condensation
         sa = eos(param_set, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
@@ -194,9 +190,6 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
     mph = mph_struct()
 
     epsilon = 10e-14 #np.finfo(np.float).eps
-    if EnvVar.H.name != "thetal"
-        error("EDMF_Environment: rain source terms are only defined for thetal as model variable")
-    end
 
     # initialize the quadrature points and their labels
     inner_env = zeros(env_len)

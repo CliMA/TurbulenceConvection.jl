@@ -114,7 +114,7 @@ end
 function initialize(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables, LESDat::LESData)
     initialize(self, GMV, RadiationBaseType())
     # load from LES
-    Dataset(LESDat.les_filename, "r") do data
+    NC.Dataset(LESDat.les_filename, "r") do data
         imin = LESDat.imin
         imax = LESDat.imax
 

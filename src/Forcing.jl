@@ -17,7 +17,7 @@ initialize(self::ForcingBase{ForcingDYCOMS_RF01}, GMV::GridMeanVariables) = init
 
 function initialize(self::ForcingBase{ForcingLES}, GMV::GridMeanVariables, Gr::Grid, LESDat::LESData)
     initialize(self, GMV, ForcingBaseType())
-    Dataset(LESDat.les_filename, "r") do data
+    NC.Dataset(LESDat.les_filename, "r") do data
         imin = LESDat.imin
         imax = LESDat.imax
 
