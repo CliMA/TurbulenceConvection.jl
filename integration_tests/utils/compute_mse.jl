@@ -54,15 +54,19 @@ SCAMPy_output_dataset_path = get_data_folder(SCAMPy_output_dataset)
 
 include("variable_map.jl")
 
-function get_data(ds, var)
+function get_data(ds, var, var_option2 = var)
     if haskey(ds, var)
         return ds[var][:]
     elseif haskey(ds.group["profiles"], var)
         return ds.group["profiles"][var][:]
     elseif haskey(ds.group["reference"], var)
         return ds.group["reference"][var][:]
+    elseif haskey(ds.group["profiles"], var_option2)
+        return ds.group["profiles"][var_option2][:]
+    elseif haskey(ds.group["reference"], var_option2)
+        return ds.group["reference"][var_option2][:]
     end
-    error("No key for $var found in the nc file.")
+    error("No key for $var or $var_option2 found in the nc file.")
 end
 
 function get_time(ds, var)
@@ -174,12 +178,12 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
 
     mkpath(plot_dir)
     # Ensure domain matches:
-    z_les = get_data(ds_pycles, "z_half")
-    z_tcc_c = get_data(ds_tc, "z_half")
-    z_tcc_f = get_data(ds_tc, "z")
-    z_tcm_c = get_data(ds_tc_main, "z_half")
-    z_tcm_f = get_data(ds_tc_main, "z")
-    z_scm = get_data(ds_scampy, "z_half")
+    z_les = get_data(ds_pycles, "z_half", "zc")
+    z_tcc_c = get_data(ds_tc, "zc")
+    z_tcc_f = get_data(ds_tc, "zf")
+    z_tcm_c = get_data(ds_tc_main, "z_half", "zc")
+    z_tcm_f = get_data(ds_tc_main, "z", "zf")
+    z_scm = get_data(ds_scampy, "z_half", "zc")
     n_grid_points = length(z_tcc_c)
     @info "z extrema (les,scm,tcm,tcc): $(extrema(z_les)), $(extrema(z_scm)), $(extrema(z_tcm_c)), $(extrema(z_tcc_c))"
     @info "n-grid points (les,scm,tcm,tcc): $(length(z_les)), $(length(z_scm)), $(length(z_tcm_c)), $(length(z_tcc_c))"

@@ -49,18 +49,19 @@ function rain_diagnostics(
     self.env_rwp = 0.0
     self.mean_rwp = 0.0
     self.cutoff_rain_rate = 0.0
+    grid = self.Gr
 
-    @inbounds for k in real_center_indices(self.Gr)
-        self.upd_rwp += Ref.rho0_half[k] * self.Upd_QR.values[k] * self.Upd_RainArea.values[k] * self.Gr.dz
-        self.env_rwp += Ref.rho0_half[k] * self.Env_QR.values[k] * self.Env_RainArea.values[k] * self.Gr.dz
-        self.mean_rwp += Ref.rho0_half[k] * self.QR.values[k] * self.RainArea.values[k] * self.Gr.dz
+    @inbounds for k in real_center_indices(grid)
+        self.upd_rwp += Ref.rho0_half[k] * self.Upd_QR.values[k] * self.Upd_RainArea.values[k] * grid.Δz
+        self.env_rwp += Ref.rho0_half[k] * self.Env_QR.values[k] * self.Env_RainArea.values[k] * grid.Δz
+        self.mean_rwp += Ref.rho0_half[k] * self.QR.values[k] * self.RainArea.values[k] * grid.Δz
 
         # rain rate from cutoff microphysics scheme defined as a total amount of removed water
         # per timestep per EDMF surface area [mm/h]
         if (self.rain_model == "cutoff")
             self.cutoff_rain_rate -=
-                (EnvThermo.prec_source_qt[k] + UpdThermo.prec_source_qt_tot[k]) * Ref.rho0_half[k] * self.Gr.dz /
-                TS.dt / rho_cloud_liq *
+                (EnvThermo.prec_source_qt[k] + UpdThermo.prec_source_qt_tot[k]) * Ref.rho0_half[k] * grid.Δz / TS.dt /
+                rho_cloud_liq *
                 3.6 *
                 1e6
         end
@@ -102,7 +103,7 @@ function solve_rain_fall(
 )
     param_set = parameter_set(GMV)
     grid = get_grid(GMV)
-    dz = grid.dz
+    Δz = grid.Δz
     Δt = TS.dt
     CFL_limit = 0.5
 
@@ -119,12 +120,12 @@ function solve_rain_fall(
 
     # rain falling through the domain
     @inbounds for k in reverse(real_center_indices(grid))
-        CFL_out = Δt / dz * term_vel[k]
+        CFL_out = Δt / Δz * term_vel[k]
 
         if is_toa_center(grid, k)
             CFL_in = 0.0
         else
-            CFL_in = Δt / dz * term_vel[k + 1]
+            CFL_in = Δt / Δz * term_vel[k + 1]
         end
 
         if max(CFL_in, CFL_out) > CFL_limit

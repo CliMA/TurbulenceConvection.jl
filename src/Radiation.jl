@@ -50,14 +50,14 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
         if (q_tot_f < 8.0 / 1000)
             idx_zi = k
             # will be used at cell faces
-            zi = grid.z[k]
+            zi = grid.zf[k]
             ρ_i = self.Ref.rho0[k]
             break
         end
     end
 
-    ρ_z = Dierckx.Spline1D([grid.z_half...], [self.Ref.rho0_half...]; k = 1)
-    q_liq_z = Dierckx.Spline1D([grid.z_half...], [GMV.QL.values...]; k = 1)
+    ρ_z = Dierckx.Spline1D(vec(grid.zc), vec(self.Ref.rho0_half); k = 1)
+    q_liq_z = Dierckx.Spline1D(vec(grid.zc), vec(GMV.QL.values); k = 1)
 
     integrand(ρq_l, params, z) = params.κ * ρ_z(z) * q_liq_z(z)
     rintegrand(ρq_l, params, z) = -integrand(ρq_l, params, z)
@@ -66,20 +66,20 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
     rz_span = (grid.zmax, grid.zmin)
     params = (; κ = self.kappa)
 
-    rprob = ODEProblem(rintegrand, 0.0, rz_span, params; dt = grid.dz)
+    rprob = ODEProblem(rintegrand, 0.0, rz_span, params; dt = grid.Δz)
     rsol = solve(rprob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    q_0 = rsol.(grid.z)
+    q_0 = rsol.(vec(grid.zf))
 
-    prob = ODEProblem(integrand, 0.0, z_span, params; dt = grid.dz)
+    prob = ODEProblem(integrand, 0.0, z_span, params; dt = grid.Δz)
     sol = solve(prob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    q_1 = sol.(grid.z)
+    q_1 = sol.(vec(grid.zf))
     self.f_rad .= self.F0 .* exp.(-q_0)
     self.f_rad .+= self.F1 .* exp.(-q_1)
 
     # cooling in free troposphere
     @inbounds for k in real_face_indices(grid)
-        if grid.z[k] > zi
-            cbrt_z = cbrt(grid.z[k] - zi)
+        if grid.zf[k] > zi
+            cbrt_z = cbrt(grid.zf[k] - zi)
             self.f_rad[k] += ρ_i * cpd * self.divergence * self.alpha_z * (cbrt_z^4 / 4 + zi * cbrt_z)
         end
     end
@@ -120,7 +120,7 @@ function initialize(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables, L
 
         # interpolate here
         z_les_half = data.group["profiles"]["z_half"][:, 1]
-        self.dTdt = pyinterp(self.Gr.z_half, z_les_half, get_nc_data(data, "profiles", "dtdt_rad", imin, imax))
+        self.dTdt = pyinterp(self.Gr.zc, z_les_half, get_nc_data(data, "profiles", "dtdt_rad", imin, imax))
     end
     return
 end
