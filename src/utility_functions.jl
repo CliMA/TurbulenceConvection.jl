@@ -30,4 +30,4 @@ function lamb_smooth_minimum(l, lower_bound, upper_bound)
     return smin
 end
 
-get_nc_data(data, group, var, imin, imax) = mean(data.group[group][var][:][:, imin:imax], dims = 2)[:]
+get_nc_data(data, group, var, imin, imax) = StatsBase.mean(data.group[group][var][:][:, imin:imax], dims = 2)[:]

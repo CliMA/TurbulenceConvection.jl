@@ -125,7 +125,7 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
 
     write_profile(Stats, "eddy_viscosity", diffusivity_m(self).values)
     write_profile(Stats, "eddy_diffusivity", diffusivity_h(self).values)
-    write_ts(Stats, "rd", mean(self.pressure_plume_spacing))
+    write_ts(Stats, "rd", StatsBase.mean(self.pressure_plume_spacing))
 
     @inbounds for k in real_center_indices(grid)
         mf_h[k] = interpf2c(self.massflux_h, grid, k)

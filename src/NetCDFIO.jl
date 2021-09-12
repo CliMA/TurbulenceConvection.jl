@@ -1,5 +1,3 @@
-using NCDatasets
-using JSON
 
 face_fields_list() = (
     "W",
@@ -21,9 +19,9 @@ end
 # TODO: remove `vars` hack that avoids https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
 
 mutable struct NetCDFIO_Stats
-    root_grp::NCDatasets.NCDataset{Nothing}
-    profiles_grp::NCDatasets.NCDataset{NCDatasets.NCDataset{Nothing}}
-    ts_grp::NCDatasets.NCDataset{NCDatasets.NCDataset{Nothing}}
+    root_grp::NC.NCDataset{Nothing}
+    profiles_grp::NC.NCDataset{NC.NCDataset{Nothing}}
+    ts_grp::NC.NCDataset{NC.NCDataset{Nothing}}
     Gr::Grid
     last_output_time::Float64
     uuid::String
@@ -35,9 +33,9 @@ mutable struct NetCDFIO_Stats
 
         # Initialize properties with valid type:
         tmp = tempname()
-        root_grp = Dataset(tmp, "c")
-        defGroup(root_grp, "profiles")
-        defGroup(root_grp, "timeseries")
+        root_grp = NC.Dataset(tmp, "c")
+        NC.defGroup(root_grp, "profiles")
+        NC.defGroup(root_grp, "timeseries")
         profiles_grp = root_grp.group["profiles"]
         ts_grp = root_grp.group["timeseries"]
         close(root_grp)
@@ -78,29 +76,29 @@ mutable struct NetCDFIO_Stats
         # Remove the NC file if it exists, in case it accidentally wasn't closed
         isfile(path_plus_file) && rm(path_plus_file; force = true)
 
-        Dataset(path_plus_file, "c") do root_grp
+        NC.Dataset(path_plus_file, "c") do root_grp
 
             zf = Gr.z
             zc = Gr.z_half
 
             # Set profile dimensions
-            profile_grp = defGroup(root_grp, "profiles")
-            defDim(profile_grp, "z", Gr.nz + 1)
-            defDim(profile_grp, "z_half", Gr.nz)
-            defDim(profile_grp, "t", Inf)
-            defVar(profile_grp, "z", zf, ("z",))
-            defVar(profile_grp, "z_half", zc, ("z_half",))
-            defVar(profile_grp, "t", Float64, ("t",))
+            profile_grp = NC.defGroup(root_grp, "profiles")
+            NC.defDim(profile_grp, "z", Gr.nz + 1)
+            NC.defDim(profile_grp, "z_half", Gr.nz)
+            NC.defDim(profile_grp, "t", Inf)
+            NC.defVar(profile_grp, "z", zf, ("z",))
+            NC.defVar(profile_grp, "z_half", zc, ("z_half",))
+            NC.defVar(profile_grp, "t", Float64, ("t",))
 
-            reference_grp = defGroup(root_grp, "reference")
-            defDim(reference_grp, "z", Gr.nz + 1)
-            defDim(reference_grp, "z_half", Gr.nz)
-            defVar(reference_grp, "z", zf, ("z",))
-            defVar(reference_grp, "z_half", zc, ("z_half",))
+            reference_grp = NC.defGroup(root_grp, "reference")
+            NC.defDim(reference_grp, "z", Gr.nz + 1)
+            NC.defDim(reference_grp, "z_half", Gr.nz)
+            NC.defVar(reference_grp, "z", zf, ("z",))
+            NC.defVar(reference_grp, "z_half", zc, ("z_half",))
 
-            ts_grp = defGroup(root_grp, "timeseries")
-            defDim(ts_grp, "t", Inf)
-            defVar(ts_grp, "t", Float64, ("t",))
+            ts_grp = NC.defGroup(root_grp, "timeseries")
+            NC.defDim(ts_grp, "t", Inf)
+            NC.defVar(ts_grp, "t", Float64, ("t",))
         end
         vars = Dict{String, Any}()
         return new(
@@ -120,7 +118,7 @@ end
 
 
 function open_files(self)
-    self.root_grp = Dataset(self.path_plus_file, "a")
+    self.root_grp = NC.Dataset(self.path_plus_file, "a")
     self.profiles_grp = self.root_grp.group["profiles"]
     self.ts_grp = self.root_grp.group["timeseries"]
     vars = self.vars
@@ -142,24 +140,24 @@ end
 
 function add_profile(self::NetCDFIO_Stats, var_name::String)
     coord = is_face_field(var_name) ? "z" : "z_half"
-    Dataset(self.path_plus_file, "a") do root_grp
+    NC.Dataset(self.path_plus_file, "a") do root_grp
         profile_grp = root_grp.group["profiles"]
-        new_var = defVar(profile_grp, var_name, Float64, (coord, "t"))
+        new_var = NC.defVar(profile_grp, var_name, Float64, (coord, "t"))
     end
 end
 
 function add_reference_profile(self::NetCDFIO_Stats, var_name::String)
     coord = is_face_field(var_name) ? "z" : "z_half"
-    Dataset(self.path_plus_file, "a") do root_grp
+    NC.Dataset(self.path_plus_file, "a") do root_grp
         reference_grp = root_grp.group["reference"]
-        new_var = defVar(reference_grp, var_name, Float64, (coord,))
+        new_var = NC.defVar(reference_grp, var_name, Float64, (coord,))
     end
 end
 
 function add_ts(self::NetCDFIO_Stats, var_name::String)
-    Dataset(self.path_plus_file, "a") do root_grp
+    NC.Dataset(self.path_plus_file, "a") do root_grp
         ts_grp = root_grp.group["timeseries"]
-        new_var = defVar(ts_grp, var_name, Float64, ("t",))
+        new_var = NC.defVar(ts_grp, var_name, Float64, ("t",))
     end
 end
 
@@ -174,7 +172,7 @@ data :: data to be written to file
 """
 function write_reference_profile(self::NetCDFIO_Stats, var_name, data::T) where {T <: AbstractArray{Float64, 1}}
 
-    Dataset(self.path_plus_file, "a") do root_grp
+    NC.Dataset(self.path_plus_file, "a") do root_grp
         reference_grp = root_grp.group["reference"]
         var = reference_grp[var_name]
         var .= data::T
