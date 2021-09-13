@@ -343,14 +343,6 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
 
     # update
     solve_updraft(self, GMV, TS)
-    @inbounds for k in real_center_indices(grid)
-        @inbounds for i in xrange(self.n_updrafts)
-            # saturation adjustment
-            sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-            self.UpdVar.QL.values[i, k] = sa.ql
-            self.UpdVar.T.values[i, k] = sa.T
-        end
-    end
     update_GMV_ED(self, GMV, Case, TS)
     update_covariance(self, GMV, Case, TS)
     update_GMV_turbulence(self, GMV, Case, TS)
@@ -1025,9 +1017,12 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 self.UpdVar.H.new[i, k] = GMV.H.values[k]
                 self.UpdVar.QT.new[i, k] = GMV.QT.values[k]
             end
+            # saturation adjustment
+            sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
+            self.UpdVar.QL.values[i, k] = sa.ql
+            self.UpdVar.T.values[i, k] = sa.T
         end
     end
-
     return
 end
 
