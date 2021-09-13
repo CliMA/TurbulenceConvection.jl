@@ -1794,7 +1794,7 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
             ∇θ_liq = c∇_downwind(∇θ_liq_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
             if ∇θ_liq > ∇θ_liq_max
                 ∇θ_liq_max = ∇θ_liq
-                self.zi = grid.z[k]
+                self.zi = grid.z_half[k]
             end
         end
     elseif option == "critical_Ri"

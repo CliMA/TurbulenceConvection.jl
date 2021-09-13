@@ -7,14 +7,12 @@ end
 function get_inversion(param_set, θ_ρ, u, v, grid::Grid, Ri_bulk_crit)
     g = CPP.grav(param_set)
     kc_surf = kc_surface(grid)
-    kmin = kc_surf
-    θ_ρ_b = θ_ρ[kmin]
+    θ_ρ_b = θ_ρ[kc_surf]
     Ri_bulk = center_field(grid)
     z_c = grid.z_half
 
-    k_last = last(real_center_indices(grid))
     # test if we need to look at the free convective limit
-    if (u[kmin] * u[kmin] + v[kmin] * v[kmin]) <= 0.01
+    if (u[kc_surf]^2 + v[kc_surf]^2) <= 0.01
         kmask = map(k -> (k, θ_ρ[k] > θ_ρ_b), real_center_indices(grid))
         k_star = first(kmask[findlast(km -> km[2], kmask)])
         ∇θ_ρ = c∇_upwind(θ_ρ, grid, k_star; bottom = SetGradient(0), top = FreeBoundary())
