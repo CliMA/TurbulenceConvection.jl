@@ -17,6 +17,11 @@ import FastGaussQuadrature
 import CLIMAParameters
 import OrdinaryDiffEq
 
+include("TCThermodynamics.jl")
+import .TCThermodynamics
+const TCTD = TCThermodynamics
+
+
 const ODE = OrdinaryDiffEq
 const CC = ClimaCore
 const NC = NCDatasets
@@ -72,7 +77,6 @@ include("types.jl")
 include("name_aliases.jl")
 include("Operators.jl")
 
-include("thermodynamic_functions.jl")
 include("microphysics_functions.jl")
 include("turbulence_functions.jl")
 include("utility_functions.jl")

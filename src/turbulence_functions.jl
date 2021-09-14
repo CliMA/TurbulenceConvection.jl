@@ -3,6 +3,11 @@ function get_wstar(bflux, zi)
     return cbrt(max(bflux * zi, 0.0))
 end
 
+function buoyancy_c(param_set, rho0, rho)
+    g = CPP.grav(param_set)
+    return g * (rho0 - rho) / rho0
+end
+
 # BL height
 function get_inversion(param_set, θ_ρ, u, v, grid::Grid, Ri_bulk_crit)
     g = CPP.grav(param_set)

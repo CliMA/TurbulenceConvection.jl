@@ -255,7 +255,7 @@ function compute_gm_tendencies!(grid, Case, GMV, ref_state, TS)
 
     @inbounds for k in real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TCTD.AnelasticPhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
 
         if Case.Fo.apply_coriolis
@@ -409,9 +409,14 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in xrange(self.n_updrafts)
             # saturation adjustment
-            sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-            self.UpdVar.QL.values[i, k] = sa.ql
-            self.UpdVar.T.values[i, k] = sa.T
+            ts = TCTD.AnelasticPhaseEquil_pθq(
+                param_set,
+                self.ref_state.p0_half[k],
+                self.UpdVar.H.new[i, k],
+                self.UpdVar.QT.new[i, k],
+            )
+            self.UpdVar.T.values[i, k] = TD.air_temperature(ts)
+            self.UpdVar.QL.values[i, k] = TD.liquid_specific_humidity(ts)
         end
     end
     if self.Rain.rain_model == "clima_1m"
@@ -556,7 +561,12 @@ function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanV
         ts_cut = TD.PhaseEquil_pTq.(param_set, p0_cut, T_cut, QT_cut)
         thv_cut = TD.virtual_pottemp.(ts_cut)
 
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], self.EnvVar.H.values[k], self.EnvVar.QT.values[k])
+        ts = TCTD.AnelasticPhaseEquil_pθq(
+            param_set,
+            ref_state.p0_half[k],
+            self.EnvVar.H.values[k],
+            self.EnvVar.QT.values[k],
+        )
         θv = TD.virtual_pottemp(ts)
         ∂θv∂z = c∇(thv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
         # compute ∇Ri and Pr
@@ -1655,7 +1665,7 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
 
     @inbounds for k in real_center_indices(grid)
         qv = GMV.QT.values[k] - GMV.QL.values[k]
-        ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TCTD.AnelasticPhaseEquil_pθq(param_set, self.ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         theta_rho[k] = TD.virtual_pottemp(ts)
     end
 

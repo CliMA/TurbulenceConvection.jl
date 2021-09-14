@@ -88,20 +88,13 @@ end
 
 function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables)
     param_set = parameter_set(EnvVar)
-    sa = eos_struct()
     mph = mph_struct()
 
     @inbounds for k in real_center_indices(self.grid)
-        sa = eos(param_set, self.ref_state.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
-
-        EnvVar.T.values[k] = sa.T
-        EnvVar.QL.values[k] = sa.ql
-        rho = rho_c(
-            self.ref_state.p0_half[k],
-            EnvVar.T.values[k],
-            EnvVar.QT.values[k],
-            EnvVar.QT.values[k] - EnvVar.QL.values[k],
-        )
+        ts = TCTD.AnelasticPhaseEquil_pθq(param_set, self.ref_state.p0_half[k], EnvVar.H.values[k], EnvVar.QT.values[k])
+        EnvVar.T.values[k] = TD.air_temperature(ts)
+        EnvVar.QL.values[k] = TD.liquid_specific_humidity(ts)
+        rho = TD.air_density(ts)
         EnvVar.B.values[k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
 
         update_cloud_dry(
@@ -124,15 +117,17 @@ end
 function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables, Rain::RainVariables, dt)
 
     param_set = parameter_set(EnvVar)
-    sa = eos_struct()
     mph = mph_struct()
 
     @inbounds for k in real_center_indices(self.grid)
         # condensation
+        p0 = self.ref_state.p0_half[k]
         q_tot_en = EnvVar.QT.values[k]
-        sa = eos(param_set, self.ref_state.p0_half[k], q_tot_en, EnvVar.H.values[k])
-        q_liq_en = sa.ql
-        T = sa.T
+        θ_liq_ice_en = EnvVar.H.values[k]
+        ts = TCTD.AnelasticPhaseEquil_pθq(param_set, p0, θ_liq_ice_en, q_tot_en)
+        T = TD.air_temperature(ts)
+        q_liq = TD.liquid_specific_humidity(ts)
+
         # autoconversion and accretion
         mph = microphysics_rain_src(
             param_set,
@@ -181,7 +176,6 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
 
     sqpi_inv = 1.0 / sqrt(π)
     sqrt2 = sqrt(2.0)
-    sa = eos_struct()
     mph = mph_struct()
 
     epsilon = 10e-14 #np.finfo(np.float).eps
@@ -271,9 +265,10 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                     end
 
                     # condensation
-                    sa = eos(param_set, self.ref_state.p0_half[k], qt_hat, h_hat)
-                    q_liq_en = sa.ql
-                    T = sa.T
+                    p0 = self.ref_state.p0_half[k]
+                    ts = TCTD.AnelasticPhaseEquil_pθq(param_set, p0, h_hat, qt_hat)
+                    T = TD.air_temperature(ts)
+                    q_liq_en = TD.liquid_specific_humidity(ts)
                     # autoconversion and accretion
                     mph = microphysics_rain_src(
                         param_set,
@@ -353,9 +348,13 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
 
         else
             # if variance and covariance are zero do the same as in SA_mean
-            sa = eos(param_set, self.ref_state.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
-            q_liq_en = sa.ql
-            T = sa.T
+            p0 = self.ref_state.p0_half[k]
+            θ_liq_ice_en = EnvVar.H.values[k]
+            q_tot_en = EnvVar.QT.values[k]
+            ts = TCTD.AnelasticPhaseEquil_pθq(param_set, p0, θ_liq_ice_en, q_tot_en)
+            T = TD.air_temperature(ts)
+            q_liq_en = TD.liquid_specific_humidity(ts)
+
             mph = microphysics_rain_src(
                 param_set,
                 Rain.rain_model,
@@ -378,7 +377,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
             theta = TD.dry_pottemp_given_pressure(param_set, T, self.ref_state.p0_half[k], phase_part)
             qv = EnvVar.QT.values[k] - q_liq_en
             update_EnvRain_sources(self, k, EnvVar, mph.qr_src, mph.thl_rain_src)
-            update_cloud_dry(self, k, EnvVar, T, theta, EnvVar.QT.values[k], q_liq_en, qv)
+            update_cloud_dry(self, k, EnvVar, T, theta, q_tot_en, q_liq_en, qv)
 
             self.Hvar_rain_dt[k] = 0.0
             self.QTvar_rain_dt[k] = 0.0
