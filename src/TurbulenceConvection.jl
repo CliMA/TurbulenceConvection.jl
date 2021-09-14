@@ -74,10 +74,6 @@ const ICP = ClimaParams # internal clima parameters
 include("python_primitives.jl")
 include("parameters.jl")
 
-include("thermodynamic_functions.jl")
-import .TCThermodynamics
-const TCTD = TCThermodynamics
-
 include("Grid.jl")
 include("Fields.jl")
 include("NetCDFIO.jl")

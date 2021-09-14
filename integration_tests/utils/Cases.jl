@@ -16,7 +16,6 @@ const TD = Thermodynamics
 
 import ..TurbulenceConvection
 const TC = TurbulenceConvection
-const TCTD = TC.TCThermodynamics
 
 using ..TurbulenceConvection: CasesBase
 using ..TurbulenceConvection: off_arr
@@ -1199,12 +1198,13 @@ function initialize_profiles(
         end
         GMV.QT.values[k] = q_tot_gm
 
-        ts = TCTD.eos(param_set, ref_state.p0_half[k], θ_liq_ice_gm, q_tot_gm)
-        GMV.QL.values[k] = TCTD.liquid_specific_humidity(ts)
-        GMV.T.values[k] = TCTD.air_temperature(ts)
-        ts = TD.PhaseEquil_pTq(param_set, ref_state.p0_half[k], GMV.T.values[k], q_tot_gm)
-        GMV.H.values[k] = TD.liquid_ice_pottemp(ts)
-
+        GMV.H.values[k] = thetal[k]
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], thetal[k], GMV.QT.values[k])
+        GMV.QL.values[k] = TD.liquid_specific_humidity(ts)
+        GMV.T.values[k] = TD.air_temperature(ts)
+        # buoyancy profile
+        rho = TD.air_density(ts)
+        GMV.B.values[k] = buoyancy_c(param_set, ref_state.rho0_half[k], rho)
         # velocity profile (geostrophic)
         GMV.U.values[k] = 7.0
         GMV.V.values[k] = -5.5

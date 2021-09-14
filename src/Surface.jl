@@ -151,7 +151,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
     kc_surf = kc_surface(self.grid)
     kf_surf = kf_surface(self.grid)
     pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
-    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.ref_state.rho0[kf_surf], pvg)
+    self.qsurface = TD.q_vap_saturation_from_density(param_set, self.Tsurface, self.ref_state.rho0[kf_surf], pvg)
     zb = self.grid.zc[kc_surf]
     lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
 
@@ -209,7 +209,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
     kc_surf = kc_surface(self.grid)
     kf_surf = kf_surface(self.grid)
     pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
-    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.ref_state.rho0[kf_surf], pvg)
+    self.qsurface = TD.q_vap_saturation_from_density(param_set, self.Tsurface, self.ref_state.rho0[kf_surf], pvg)
     zb = self.grid.zc[kc_surf]
     lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
 
@@ -270,7 +270,7 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
     Π = TD.exner_given_pressure(param_set, self.ref_state.p0[kf_surf], phase_part)
     self.bflux = g * theta_flux * Π / T0
     pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
-    self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.ref_state.rho0[kf_surf], pvg)
+    self.qsurface = TD.q_vap_saturation_from_density(param_set, self.Tsurface, self.ref_state.rho0[kf_surf], pvg)
     h_star = TD.liquid_ice_pottemp_given_pressure(param_set, self.Tsurface, self.ref_state.Pg, phase_part)
 
     ts_g = TD.PhaseEquil_pθq(param_set, self.ref_state.Pg, h_star, self.qsurface)

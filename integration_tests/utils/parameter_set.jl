@@ -13,6 +13,7 @@ CLIMAParameters.Planet.cp_v(ps::EarthParameterSet) = ps.nt.cp_v
 CLIMAParameters.Planet.R_d(ps::EarthParameterSet) = ps.nt.R_d
 CLIMAParameters.Planet.R_v(ps::EarthParameterSet) = ps.nt.R_v
 CLIMAParameters.Planet.molmass_ratio(ps::EarthParameterSet) = ps.nt.molmass_ratio
+CLIMAParameters.Planet.T_freeze(ps::EarthParameterSet) = ps.nt.T_freeze
 # microphysics 0-moment parameters
 CLIMAParameters.Atmos.Microphysics_0M.τ_precip(ps::EarthParameterSet) = ps.nt.τ_precip
 # microphysics 1-moment parameters
@@ -47,6 +48,7 @@ function create_parameter_set(namelist)
         cp_v = 1859.0,
         R_d = 287.1,
         R_v = 461.5,
+        T_freeze = 0.0, # liquid only for now until we add ice consistently in the model
         molmass_ratio = 461.5/287.1,
         τ_precip = TC.parse_namelist(namelist, "microphysics", "τ_precip"; default = 1000.0),
         τ_acnv = TC.parse_namelist(namelist, "microphysics", "τ_acnv"; default = 1000.0),

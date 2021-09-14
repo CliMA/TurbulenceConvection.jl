@@ -19,7 +19,6 @@ function microphysics_rain_src(param_set::APS, rain_model, qt, ql, qr, area, T, 
     _ret = mph_struct(0, 0)
     # TODO assumes no ice
     qi = 0.0
-
     #TODO - temporary way to handle different autoconversion rates
     tmp_clima_acnv_flag = false
     tmp_cutoff_acnv_flag = false

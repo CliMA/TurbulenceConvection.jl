@@ -4,6 +4,12 @@ import TurbulenceConvection
 import ClimaCore
 const CC = ClimaCore
 
+#------ TODO: Remove this when branch is ready to be merged
+import Pkg
+Pkg.rm("Thermodynamics")
+Pkg.add(Pkg.PackageSpec(name = "Thermodynamics", rev = "yc/add_anelastic_ts"))
+#------
+
 include("parameter_set.jl")
 include("Cases.jl")
 import .Cases
