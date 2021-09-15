@@ -66,8 +66,6 @@ end
 function update_EnvVar(self::EnvironmentThermodynamics, k, EnvVar::EnvironmentVariables, T, H, qt, ql, rho)
     param_set = parameter_set(EnvVar)
     EnvVar.T.values[k] = T
-    EnvVar.H.values[k] = H
-    EnvVar.QT.values[k] = qt
     EnvVar.QL.values[k] = ql
     EnvVar.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
     ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], H, qt)
