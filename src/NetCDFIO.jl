@@ -22,14 +22,14 @@ mutable struct NetCDFIO_Stats
     root_grp::NC.NCDataset{Nothing}
     profiles_grp::NC.NCDataset{NC.NCDataset{Nothing}}
     ts_grp::NC.NCDataset{NC.NCDataset{Nothing}}
-    Gr::Grid
+    grid::Grid
     last_output_time::Float64
     uuid::String
     frequency::Float64
     stats_path::String
     path_plus_file::String
     vars::Dict{String, Any} # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    function NetCDFIO_Stats(namelist, Gr::Grid)
+    function NetCDFIO_Stats(namelist, grid::Grid)
 
         # Initialize properties with valid type:
         tmp = tempname()
@@ -78,21 +78,21 @@ mutable struct NetCDFIO_Stats
 
         NC.Dataset(path_plus_file, "c") do root_grp
 
-            zf = vec(Gr.zf)
-            zc = vec(Gr.zc)
+            zf = vec(grid.zf)
+            zc = vec(grid.zc)
 
             # Set profile dimensions
             profile_grp = NC.defGroup(root_grp, "profiles")
-            NC.defDim(profile_grp, "zf", Gr.nz + 1)
-            NC.defDim(profile_grp, "zc", Gr.nz)
+            NC.defDim(profile_grp, "zf", grid.nz + 1)
+            NC.defDim(profile_grp, "zc", grid.nz)
             NC.defDim(profile_grp, "t", Inf)
             NC.defVar(profile_grp, "zf", zf, ("zf",))
             NC.defVar(profile_grp, "zc", zc, ("zc",))
             NC.defVar(profile_grp, "t", Float64, ("t",))
 
             reference_grp = NC.defGroup(root_grp, "reference")
-            NC.defDim(reference_grp, "zf", Gr.nz + 1)
-            NC.defDim(reference_grp, "zc", Gr.nz)
+            NC.defDim(reference_grp, "zf", grid.nz + 1)
+            NC.defDim(reference_grp, "zc", grid.nz)
             NC.defVar(reference_grp, "zf", zf, ("zf",))
             NC.defVar(reference_grp, "zc", zc, ("zc",))
 
@@ -105,7 +105,7 @@ mutable struct NetCDFIO_Stats
             root_grp,
             profiles_grp,
             ts_grp,
-            Gr,
+            grid,
             last_output_time,
             uuid,
             frequency,

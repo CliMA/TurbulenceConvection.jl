@@ -87,44 +87,47 @@ struct LES_driven_SCM end
 #####
 #####
 
-function CasesFactory(namelist, Gr, Ref)
+function CasesFactory(namelist, grid, ref_state)
     if namelist["meta"]["casename"] == "Soares"
-        return Soares(namelist, Gr, Ref)
+        return Soares(namelist, grid, ref_state)
     elseif namelist["meta"]["casename"] == "Nieuwstadt"
-        return Nieuwstadt(namelist, Gr, Ref)
+        return Nieuwstadt(namelist, grid, ref_state)
     elseif namelist["meta"]["casename"] == "Bomex"
-        return Bomex(namelist, Gr, Ref)
+        return Bomex(namelist, grid, ref_state)
     elseif namelist["meta"]["casename"] == "life_cycle_Tan2018"
-        return life_cycle_Tan2018(namelist, Gr, Ref)
+        return life_cycle_Tan2018(namelist, grid, ref_state)
     elseif namelist["meta"]["casename"] == "Rico"
-        return Rico(namelist, Gr, Ref)
+        return Rico(namelist, grid, ref_state)
     elseif namelist["meta"]["casename"] == "TRMM_LBA"
-        return TRMM_LBA(namelist, Gr, Ref)
+        return TRMM_LBA(namelist, grid, ref_state)
     elseif namelist["meta"]["casename"] == "ARM_SGP"
-        return ARM_SGP(namelist, Gr, Ref)
+        return ARM_SGP(namelist, grid, ref_state)
     elseif namelist["meta"]["casename"] == "GATE_III"
-        return GATE_III(namelist, Gr, Ref)
+        return GATE_III(namelist, grid, ref_state)
     elseif namelist["meta"]["casename"] == "DYCOMS_RF01"
-        return DYCOMS_RF01(namelist, Gr, Ref)
+        return DYCOMS_RF01(namelist, grid, ref_state)
     elseif namelist["meta"]["casename"] == "GABLS"
-        return GABLS(namelist, Gr, Ref)
+        return GABLS(namelist, grid, ref_state)
     elseif namelist["meta"]["casename"] == "SP"
-        return SP(namelist, Gr, Ref)
+        return SP(namelist, grid, ref_state)
     elseif namelist["meta"]["casename"] == "DryBubble"
-        return DryBubble(namelist, Gr, Ref)
+        return DryBubble(namelist, grid, ref_state)
     elseif namelist["meta"]["casename"] == "LES_driven_SCM"
-        return LES_driven_SCM(namelist, Gr, Ref)
+        return LES_driven_SCM(namelist, grid, ref_state)
     else
         error("case not recognized")
     end
     return
 end
 
-initialize_reference(self::CasesBase, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats, ::BaseCase) = nothing
-initialize_profiles(self::CasesBase, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState, ::BaseCase) = nothing
-initialize_surface(self::CasesBase, Gr::Grid, Ref::ReferenceState, ::BaseCase) = nothing
-initialize_forcing(self::CasesBase, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables, ::BaseCase) = nothing
-initialize_radiation(self::CasesBase, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables, ::BaseCase) = nothing
+initialize_reference(self::CasesBase, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats, ::BaseCase) =
+    nothing
+initialize_profiles(self::CasesBase, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState, ::BaseCase) =
+    nothing
+initialize_surface(self::CasesBase, grid::Grid, ref_state::ReferenceState, ::BaseCase) = nothing
+initialize_forcing(self::CasesBase, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables, ::BaseCase) = nothing
+initialize_radiation(self::CasesBase, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables, ::BaseCase) =
+    nothing
 
 function TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
     add_ts(Stats, "Tsurface")
@@ -147,67 +150,67 @@ TC.update_radiation(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping, :
 ##### Soares
 #####
 
-function Soares(namelist, Gr::Grid, Ref::ReferenceState)
+function Soares(namelist, grid::Grid, ref_state::ReferenceState)
     casename = "Soares2004"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; Gr, Ref, namelist)
-    Fo = TC.ForcingBase{TC.ForcingNone}(; Gr, Ref)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; Gr, Ref)
+    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; grid, ref_state, namelist)
+    Fo = TC.ForcingBase{TC.ForcingNone}(; grid, ref_state)
+    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
     return TC.CasesBase{Soares}(; casename = "Soares", inversion_option, Sur, Fo, Rad)
 end
-function initialize_reference(self::CasesBase{Soares}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    Ref.Pg = 1000.0 * 100.0
-    Ref.qtg = 5.0e-3
-    Ref.Tg = 300.0
-    initialize(Ref, Gr, Stats)
+function initialize_reference(self::CasesBase{Soares}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
+    ref_state.Pg = 1000.0 * 100.0
+    ref_state.qtg = 5.0e-3
+    ref_state.Tg = 300.0
+    initialize(ref_state, grid, Stats)
 end
-function initialize_profiles(self::CasesBase{Soares}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize_profiles(self::CasesBase{Soares}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
-    theta = TC.center_field(Gr)
+    theta = TC.center_field(grid)
     ql = 0.0
     qi = 0.0
 
-    @inbounds for k in real_center_indices(Gr)
-        if Gr.zc[k] <= 1350.0
-            GMV.QT.values[k] = 5.0e-3 - 3.7e-4 * Gr.zc[k] / 1000.0
+    @inbounds for k in real_center_indices(grid)
+        if grid.zc[k] <= 1350.0
+            GMV.QT.values[k] = 5.0e-3 - 3.7e-4 * grid.zc[k] / 1000.0
             theta[k] = 300.0
 
         else
-            GMV.QT.values[k] = 5.0e-3 - 3.7e-4 * 1.35 - 9.4e-4 * (Gr.zc[k] - 1350.0) / 1000.0
-            theta[k] = 300.0 + 2.0 * (Gr.zc[k] - 1350.0) / 1000.0
+            GMV.QT.values[k] = 5.0e-3 - 3.7e-4 * 1.35 - 9.4e-4 * (grid.zc[k] - 1350.0) / 1000.0
+            theta[k] = 300.0 + 2.0 * (grid.zc[k] - 1350.0) / 1000.0
         end
         GMV.U.values[k] = 0.01
     end
 
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         GMV.H.values[k] = theta[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
 
     satadjust(GMV)
 end
 
-function initialize_surface(self::CasesBase{Soares}, Gr::Grid, Ref::ReferenceState)
-    param_set = TC.parameter_set(Ref)
+function initialize_surface(self::CasesBase{Soares}, grid::Grid, ref_state::ReferenceState)
+    param_set = TC.parameter_set(ref_state)
     g = CPP.grav(param_set)
-    kf_surf = TC.kf_surface(Gr)
+    kf_surf = TC.kf_surface(grid)
     self.Sur.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     self.Sur.Tsurface = 300.0
     self.Sur.qsurface = 5.0e-3
     theta_flux = 6.0e-2
     qt_flux = 2.5e-5
-    ts = TD.PhaseEquil_pTq(param_set, Ref.p0[kf_surf], self.Sur.Tsurface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pTq(param_set, ref_state.p0[kf_surf], self.Sur.Tsurface, self.Sur.qsurface)
     theta_surface = TD.liquid_ice_pottemp(ts)
-    self.Sur.lhf = qt_flux * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(ts)
-    self.Sur.shf = theta_flux * TD.cp_m(ts) * TC.surface_value(Ref.rho0, Gr)
+    self.Sur.lhf = qt_flux * TC.surface_value(ref_state.rho0, grid) * TD.latent_heat_vapor(ts)
+    self.Sur.shf = theta_flux * TD.cp_m(ts) * TC.surface_value(ref_state.rho0, grid)
     self.Sur.ustar_fixed = false
     self.Sur.ustar = 0.28 # just to initilize grid mean covariances
-    self.Sur.Gr = Gr
-    self.Sur.Ref = Ref
+    self.Sur.grid = grid
+    self.Sur.ref_state = ref_state
     self.Sur.bflux =
         g * (
             (theta_flux + (eps_vi - 1.0) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
@@ -215,13 +218,13 @@ function initialize_surface(self::CasesBase{Soares}, Gr::Grid, Ref::ReferenceSta
         )
     initialize(self.Sur)
 end
-function initialize_forcing(self::CasesBase{Soares}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
-    self.Fo.Gr = Gr
-    self.Fo.Ref = Ref
+function initialize_forcing(self::CasesBase{Soares}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+    self.Fo.grid = grid
+    self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
 end
 
-function initialize_radiation(self::CasesBase{Soares}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_radiation(self::CasesBase{Soares}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
     initialize(self.Rad, GMV)
 end
 
@@ -248,66 +251,66 @@ end
 ##### Nieuwstadt
 #####
 
-function Nieuwstadt(namelist, Gr::Grid, Ref::ReferenceState)
+function Nieuwstadt(namelist, grid::Grid, ref_state::ReferenceState)
     casename = "Nieuwstadt"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; Gr, Ref, namelist)
-    Fo = TC.ForcingBase{TC.ForcingNone}(; Gr, Ref)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; Gr, Ref)
+    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; grid, ref_state, namelist)
+    Fo = TC.ForcingBase{TC.ForcingNone}(; grid, ref_state)
+    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
     return TC.CasesBase{Nieuwstadt}(; casename = "Nieuwstadt", inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    Ref.Pg = 1000.0 * 100.0
-    Ref.qtg = 1.0e-12 #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN (TBD)
-    Ref.Tg = 300.0
-    initialize(Ref, Gr, Stats)
+function initialize_reference(self::CasesBase{Nieuwstadt}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
+    ref_state.Pg = 1000.0 * 100.0
+    ref_state.qtg = 1.0e-12 #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN (TBD)
+    ref_state.Tg = 300.0
+    initialize(ref_state, grid, Stats)
 end
-function initialize_profiles(self::CasesBase{Nieuwstadt}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
-    theta = TC.center_field(Gr)
+    theta = TC.center_field(grid)
     ql = 0.0
     qi = 0.0
 
-    @inbounds for k in real_center_indices(Gr)
-        if Gr.zc[k] <= 1350.0
+    @inbounds for k in real_center_indices(grid)
+        if grid.zc[k] <= 1350.0
             GMV.QT.values[k] = 0.0
             theta[k] = 300.0
 
         else
             GMV.QT.values[k] = 0.0
-            theta[k] = 300.0 + 3.0 * (Gr.zc[k] - 1350.0) / 1000.0
+            theta[k] = 300.0 + 3.0 * (grid.zc[k] - 1350.0) / 1000.0
         end
         GMV.U.values[k] = 0.01
     end
 
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         GMV.H.values[k] = theta[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
     satadjust(GMV)
 end
-function initialize_surface(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::ReferenceState)
-    param_set = TC.parameter_set(Ref)
+function initialize_surface(self::CasesBase{Nieuwstadt}, grid::Grid, ref_state::ReferenceState)
+    param_set = TC.parameter_set(ref_state)
     g = CPP.grav(param_set)
-    kf_surf = TC.kf_surface(Gr)
+    kf_surf = TC.kf_surface(grid)
     self.Sur.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     self.Sur.Tsurface = 300.0
     self.Sur.qsurface = 0.0
     theta_flux = 6.0e-2
     qt_flux = 0.0
     self.Sur.lhf = 0.0 # It would be 0.0 if we follow Nieuwstadt.
-    ts = TD.PhaseEquil_pTq(param_set, Ref.p0[kf_surf], self.Sur.Tsurface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pTq(param_set, ref_state.p0[kf_surf], self.Sur.Tsurface, self.Sur.qsurface)
     theta_surface = TD.liquid_ice_pottemp(ts)
-    self.Sur.shf = theta_flux * TD.cp_m(ts) * TC.surface_value(Ref.rho0, Gr)
+    self.Sur.shf = theta_flux * TD.cp_m(ts) * TC.surface_value(ref_state.rho0, grid)
     self.Sur.ustar_fixed = false
     self.Sur.ustar = 0.28 # just to initilize grid mean covariances
-    self.Sur.Gr = Gr
-    self.Sur.Ref = Ref
+    self.Sur.grid = grid
+    self.Sur.ref_state = ref_state
     self.Sur.bflux =
         g * (
             (theta_flux + (eps_vi - 1.0) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
@@ -317,12 +320,17 @@ function initialize_surface(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::Referenc
 
     return
 end
-function initialize_forcing(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
-    self.Fo.Gr = Gr
-    self.Fo.Ref = Ref
+function initialize_forcing(self::CasesBase{Nieuwstadt}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+    self.Fo.grid = grid
+    self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
 end
-function initialize_radiation(self::CasesBase{Nieuwstadt}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_radiation(
+    self::CasesBase{Nieuwstadt},
+    grid::Grid,
+    ref_state::ReferenceState,
+    GMV::GridMeanVariables,
+)
     initialize(self.Rad, GMV)
 end
 
@@ -347,11 +355,11 @@ end
 ##### Bomex
 #####
 
-function Bomex(namelist, Gr::Grid, Ref::ReferenceState)
+function Bomex(namelist, grid::Grid, ref_state::ReferenceState)
     casename = "Bomex"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; Gr, Ref, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; Gr, Ref)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; Gr, Ref)
+    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; grid, ref_state, namelist)
+    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
+    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
@@ -359,120 +367,120 @@ function Bomex(namelist, Gr::Grid, Ref::ReferenceState)
     return TC.CasesBase{Bomex}(; casename = "Bomex", inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{Bomex}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    Ref.Pg = 1.015e5  #Pressure at ground
-    Ref.Tg = 300.4  #Temperature at ground
-    Ref.qtg = 0.02245   #Total water mixing ratio at surface
-    TC.initialize(Ref, Gr, Stats)
+function initialize_reference(self::CasesBase{Bomex}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
+    ref_state.Pg = 1.015e5  #Pressure at ground
+    ref_state.Tg = 300.4  #Temperature at ground
+    ref_state.qtg = 0.02245   #Total water mixing ratio at surface
+    TC.initialize(ref_state, grid, Stats)
 end
 
-function initialize_profiles(self::CasesBase{Bomex}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
-    thetal = TC.center_field(Gr)
+    thetal = TC.center_field(grid)
     ql = 0.0
     qi = 0.0 # IC of Bomex is cloud-free
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         #Set Thetal profile
-        if Gr.zc[k] <= 520.0
+        if grid.zc[k] <= 520.0
             thetal[k] = 298.7
         end
-        if Gr.zc[k] > 520.0 && Gr.zc[k] <= 1480.0
-            thetal[k] = 298.7 + (Gr.zc[k] - 520) * (302.4 - 298.7) / (1480.0 - 520.0)
+        if grid.zc[k] > 520.0 && grid.zc[k] <= 1480.0
+            thetal[k] = 298.7 + (grid.zc[k] - 520) * (302.4 - 298.7) / (1480.0 - 520.0)
         end
-        if Gr.zc[k] > 1480.0 && Gr.zc[k] <= 2000
-            thetal[k] = 302.4 + (Gr.zc[k] - 1480.0) * (308.2 - 302.4) / (2000.0 - 1480.0)
+        if grid.zc[k] > 1480.0 && grid.zc[k] <= 2000
+            thetal[k] = 302.4 + (grid.zc[k] - 1480.0) * (308.2 - 302.4) / (2000.0 - 1480.0)
         end
-        if Gr.zc[k] > 2000.0
-            thetal[k] = 308.2 + (Gr.zc[k] - 2000.0) * (311.85 - 308.2) / (3000.0 - 2000.0)
+        if grid.zc[k] > 2000.0
+            thetal[k] = 308.2 + (grid.zc[k] - 2000.0) * (311.85 - 308.2) / (3000.0 - 2000.0)
         end
 
         #Set qt profile
-        if Gr.zc[k] <= 520
-            GMV.QT.values[k] = (17.0 + (Gr.zc[k]) * (16.3 - 17.0) / 520.0) / 1000.0
+        if grid.zc[k] <= 520
+            GMV.QT.values[k] = (17.0 + (grid.zc[k]) * (16.3 - 17.0) / 520.0) / 1000.0
         end
-        if Gr.zc[k] > 520.0 && Gr.zc[k] <= 1480.0
-            GMV.QT.values[k] = (16.3 + (Gr.zc[k] - 520.0) * (10.7 - 16.3) / (1480.0 - 520.0)) / 1000.0
+        if grid.zc[k] > 520.0 && grid.zc[k] <= 1480.0
+            GMV.QT.values[k] = (16.3 + (grid.zc[k] - 520.0) * (10.7 - 16.3) / (1480.0 - 520.0)) / 1000.0
         end
-        if Gr.zc[k] > 1480.0 && Gr.zc[k] <= 2000.0
-            GMV.QT.values[k] = (10.7 + (Gr.zc[k] - 1480.0) * (4.2 - 10.7) / (2000.0 - 1480.0)) / 1000.0
+        if grid.zc[k] > 1480.0 && grid.zc[k] <= 2000.0
+            GMV.QT.values[k] = (10.7 + (grid.zc[k] - 1480.0) * (4.2 - 10.7) / (2000.0 - 1480.0)) / 1000.0
         end
-        if Gr.zc[k] > 2000.0
-            GMV.QT.values[k] = (4.2 + (Gr.zc[k] - 2000.0) * (3.0 - 4.2) / (3000.0 - 2000.0)) / 1000.0
+        if grid.zc[k] > 2000.0
+            GMV.QT.values[k] = (4.2 + (grid.zc[k] - 2000.0) * (3.0 - 4.2) / (3000.0 - 2000.0)) / 1000.0
         end
 
 
         #Set u profile
-        if Gr.zc[k] <= 700.0
+        if grid.zc[k] <= 700.0
             GMV.U.values[k] = -8.75
         end
-        if Gr.zc[k] > 700.0
-            GMV.U.values[k] = -8.75 + (Gr.zc[k] - 700.0) * (-4.61 - -8.75) / (3000.0 - 700.0)
+        if grid.zc[k] > 700.0
+            GMV.U.values[k] = -8.75 + (grid.zc[k] - 700.0) * (-4.61 - -8.75) / (3000.0 - 700.0)
         end
     end
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         GMV.H.values[k] = thetal[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
     satadjust(GMV)
 end
 
-function initialize_surface(self::CasesBase{Bomex}, Gr::Grid, Ref::ReferenceState)
-    param_set = TC.parameter_set(Ref)
-    kf_surf = TC.kf_surface(Gr)
+function initialize_surface(self::CasesBase{Bomex}, grid::Grid, ref_state::ReferenceState)
+    param_set = TC.parameter_set(ref_state)
+    kf_surf = TC.kf_surface(grid)
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.qsurface = 22.45e-3 # kg/kg
     theta_surface = 299.1
-    ts = TD.PhaseEquil_pθq(param_set, Ref.p0[kf_surf], theta_surface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, ref_state.p0[kf_surf], theta_surface, self.Sur.qsurface)
     self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(ts)
-    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * TC.surface_value(Ref.rho0, Gr)
+    self.Sur.lhf = 5.2e-5 * TC.surface_value(ref_state.rho0, grid) * TD.latent_heat_vapor(ts)
+    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * TC.surface_value(ref_state.rho0, grid)
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # m/s
-    self.Sur.Gr = Gr
-    self.Sur.Ref = Ref
+    self.Sur.grid = grid
+    self.Sur.ref_state = ref_state
     initialize(self.Sur)
 end
 
-function initialize_forcing(self::CasesBase{Bomex}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
-    self.Fo.Gr = Gr
-    self.Fo.Ref = Ref
+function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+    self.Fo.grid = grid
+    self.Fo.ref_state = ref_state
     param_set = TC.parameter_set(GMV)
     initialize(self.Fo, GMV)
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         # Geostrophic velocity profiles. vg = 0
-        self.Fo.ug[k] = -10.0 + (1.8e-3) * Gr.zc[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        self.Fo.ug[k] = -10.0 + (1.8e-3) * grid.zc[k]
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
         # Set large-scale cooling
-        if Gr.zc[k] <= 1500.0
+        if grid.zc[k] <= 1500.0
             self.Fo.dTdt[k] = (-2.0 / (3600 * 24.0)) * Π
         else
             self.Fo.dTdt[k] =
-                (-2.0 / (3600 * 24.0) + (Gr.zc[k] - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) * Π
+                (-2.0 / (3600 * 24.0) + (grid.zc[k] - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) * Π
         end
 
         # Set large-scale drying
-        if Gr.zc[k] <= 300.0
+        if grid.zc[k] <= 300.0
             self.Fo.dqtdt[k] = -1.2e-8   #kg/(kg * s)
         end
-        if Gr.zc[k] > 300.0 && Gr.zc[k] <= 500.0
-            self.Fo.dqtdt[k] = -1.2e-8 + (Gr.zc[k] - 300.0) * (0.0 - -1.2e-8) / (500.0 - 300.0) #kg/(kg * s)
+        if grid.zc[k] > 300.0 && grid.zc[k] <= 500.0
+            self.Fo.dqtdt[k] = -1.2e-8 + (grid.zc[k] - 300.0) * (0.0 - -1.2e-8) / (500.0 - 300.0) #kg/(kg * s)
         end
 
         #Set large scale subsidence
-        if Gr.zc[k] <= 1500.0
-            self.Fo.subsidence[k] = 0.0 + Gr.zc[k] * (-0.65 / 100.0 - 0.0) / (1500.0 - 0.0)
+        if grid.zc[k] <= 1500.0
+            self.Fo.subsidence[k] = 0.0 + grid.zc[k] * (-0.65 / 100.0 - 0.0) / (1500.0 - 0.0)
         end
-        if Gr.zc[k] > 1500.0 && Gr.zc[k] <= 2100.0
-            self.Fo.subsidence[k] = -0.65 / 100 + (Gr.zc[k] - 1500.0) * (0.0 - -0.65 / 100.0) / (2100.0 - 1500.0)
+        if grid.zc[k] > 1500.0 && grid.zc[k] <= 2100.0
+            self.Fo.subsidence[k] = -0.65 / 100 + (grid.zc[k] - 1500.0) * (0.0 - -0.65 / 100.0) / (2100.0 - 1500.0)
         end
     end
     return nothing
 end
-function initialize_radiation(self::CasesBase{Bomex}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_radiation(self::CasesBase{Bomex}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
     initialize(self.Rad, GMV)
 end
 
@@ -489,94 +497,104 @@ TC.update_radiation(self::CasesBase{Bomex}, GMV::GridMeanVariables, TS::TimeStep
 ##### life_cycle_Tan2018
 #####
 
-function life_cycle_Tan2018(namelist, Gr::Grid, Ref::ReferenceState)
+function life_cycle_Tan2018(namelist, grid::Grid, ref_state::ReferenceState)
     casename = "life_cycle_Tan2018"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; Gr, Ref, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; Gr, Ref)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; Gr, Ref)
+    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; grid, ref_state, namelist)
+    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
+    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
     Fo.apply_subsidence = true
     return TC.CasesBase{life_cycle_Tan2018}(; casename = "life_cycle_Tan2018", inversion_option, Sur, Fo, Rad)
 end
-function initialize_reference(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    Ref.Pg = 1.015e5  #Pressure at ground
-    Ref.Tg = 300.4  #Temperature at ground
-    Ref.qtg = 0.02245   #Total water mixing ratio at surface
-    initialize(Ref, Gr, Stats)
+function initialize_reference(
+    self::CasesBase{life_cycle_Tan2018},
+    grid::Grid,
+    ref_state::ReferenceState,
+    Stats::NetCDFIO_Stats,
+)
+    ref_state.Pg = 1.015e5  #Pressure at ground
+    ref_state.Tg = 300.4  #Temperature at ground
+    ref_state.qtg = 0.02245   #Total water mixing ratio at surface
+    initialize(ref_state, grid, Stats)
 end
-function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize_profiles(
+    self::CasesBase{life_cycle_Tan2018},
+    grid::Grid,
+    GMV::GridMeanVariables,
+    ref_state::ReferenceState,
+)
     param_set = TC.parameter_set(GMV)
-    thetal = TC.center_field(Gr)
+    thetal = TC.center_field(grid)
     ql = 0.0
     qi = 0.0 # IC of Bomex is cloud-free
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         #Set Thetal profile
-        if Gr.zc[k] <= 520.0
+        if grid.zc[k] <= 520.0
             thetal[k] = 298.7
         end
-        if Gr.zc[k] > 520.0 && Gr.zc[k] <= 1480.0
-            thetal[k] = 298.7 + (Gr.zc[k] - 520) * (302.4 - 298.7) / (1480.0 - 520.0)
+        if grid.zc[k] > 520.0 && grid.zc[k] <= 1480.0
+            thetal[k] = 298.7 + (grid.zc[k] - 520) * (302.4 - 298.7) / (1480.0 - 520.0)
         end
-        if Gr.zc[k] > 1480.0 && Gr.zc[k] <= 2000
-            thetal[k] = 302.4 + (Gr.zc[k] - 1480.0) * (308.2 - 302.4) / (2000.0 - 1480.0)
+        if grid.zc[k] > 1480.0 && grid.zc[k] <= 2000
+            thetal[k] = 302.4 + (grid.zc[k] - 1480.0) * (308.2 - 302.4) / (2000.0 - 1480.0)
         end
-        if Gr.zc[k] > 2000.0
-            thetal[k] = 308.2 + (Gr.zc[k] - 2000.0) * (311.85 - 308.2) / (3000.0 - 2000.0)
+        if grid.zc[k] > 2000.0
+            thetal[k] = 308.2 + (grid.zc[k] - 2000.0) * (311.85 - 308.2) / (3000.0 - 2000.0)
         end
 
         #Set qt profile
-        if Gr.zc[k] <= 520
-            GMV.QT.values[k] = (17.0 + (Gr.zc[k]) * (16.3 - 17.0) / 520.0) / 1000.0
+        if grid.zc[k] <= 520
+            GMV.QT.values[k] = (17.0 + (grid.zc[k]) * (16.3 - 17.0) / 520.0) / 1000.0
         end
-        if Gr.zc[k] > 520.0 && Gr.zc[k] <= 1480.0
-            GMV.QT.values[k] = (16.3 + (Gr.zc[k] - 520.0) * (10.7 - 16.3) / (1480.0 - 520.0)) / 1000.0
+        if grid.zc[k] > 520.0 && grid.zc[k] <= 1480.0
+            GMV.QT.values[k] = (16.3 + (grid.zc[k] - 520.0) * (10.7 - 16.3) / (1480.0 - 520.0)) / 1000.0
         end
-        if Gr.zc[k] > 1480.0 && Gr.zc[k] <= 2000.0
-            GMV.QT.values[k] = (10.7 + (Gr.zc[k] - 1480.0) * (4.2 - 10.7) / (2000.0 - 1480.0)) / 1000.0
+        if grid.zc[k] > 1480.0 && grid.zc[k] <= 2000.0
+            GMV.QT.values[k] = (10.7 + (grid.zc[k] - 1480.0) * (4.2 - 10.7) / (2000.0 - 1480.0)) / 1000.0
         end
-        if Gr.zc[k] > 2000.0
-            GMV.QT.values[k] = (4.2 + (Gr.zc[k] - 2000.0) * (3.0 - 4.2) / (3000.0 - 2000.0)) / 1000.0
+        if grid.zc[k] > 2000.0
+            GMV.QT.values[k] = (4.2 + (grid.zc[k] - 2000.0) * (3.0 - 4.2) / (3000.0 - 2000.0)) / 1000.0
         end
 
 
         #Set u profile
-        if Gr.zc[k] <= 700.0
+        if grid.zc[k] <= 700.0
             GMV.U.values[k] = -8.75
         end
-        if Gr.zc[k] > 700.0
-            GMV.U.values[k] = -8.75 + (Gr.zc[k] - 700.0) * (-4.61 - -8.75) / (3000.0 - 700.0)
+        if grid.zc[k] > 700.0
+            GMV.U.values[k] = -8.75 + (grid.zc[k] - 700.0) * (-4.61 - -8.75) / (3000.0 - 700.0)
         end
     end
 
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         GMV.H.values[k] = thetal[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
 
     satadjust(GMV)
 end
 
-function initialize_surface(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::ReferenceState)
-    param_set = TC.parameter_set(Ref)
+function initialize_surface(self::CasesBase{life_cycle_Tan2018}, grid::Grid, ref_state::ReferenceState)
+    param_set = TC.parameter_set(ref_state)
     g = CPP.grav(param_set)
-    kf_surf = TC.kf_surface(Gr)
+    kf_surf = TC.kf_surface(grid)
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.qsurface = 22.45e-3 # kg/kg
     theta_surface = 299.1
-    ts = TD.PhaseEquil_pθq(param_set, Ref.p0[kf_surf], theta_surface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, ref_state.p0[kf_surf], theta_surface, self.Sur.qsurface)
     self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(ts)
-    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * TC.surface_value(Ref.rho0, Gr)
+    self.Sur.lhf = 5.2e-5 * TC.surface_value(ref_state.rho0, grid) * TD.latent_heat_vapor(ts)
+    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * TC.surface_value(ref_state.rho0, grid)
     self.lhf0 = self.Sur.lhf
     self.shf0 = self.Sur.shf
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # m/s
-    self.Sur.Gr = Gr
-    self.Sur.Ref = Ref
+    self.Sur.grid = grid
+    self.Sur.ref_state = ref_state
     self.Sur.bflux = (
         g * (
             (8.0e-3 + (eps_vi - 1.0) * (299.1 * 5.2e-5 + 22.45e-3 * 8.0e-3)) /
@@ -585,37 +603,42 @@ function initialize_surface(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::
     )
     initialize(self.Sur)
 end
-function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(
+    self::CasesBase{life_cycle_Tan2018},
+    grid::Grid,
+    ref_state::ReferenceState,
+    GMV::GridMeanVariables,
+)
     param_set = TC.parameter_set(GMV)
-    self.Fo.Gr = Gr
-    self.Fo.Ref = Ref
+    self.Fo.grid = grid
+    self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         # Geostrophic velocity profiles. vg = 0
-        self.Fo.ug[k] = -10.0 + (1.8e-3) * Gr.zc[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        self.Fo.ug[k] = -10.0 + (1.8e-3) * grid.zc[k]
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
         # Set large-scale cooling
-        if Gr.zc[k] <= 1500.0
+        if grid.zc[k] <= 1500.0
             self.Fo.dTdt[k] = (-2.0 / (3600 * 24.0)) * Π
         else
             self.Fo.dTdt[k] =
-                (-2.0 / (3600 * 24.0) + (Gr.zc[k] - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) * Π
+                (-2.0 / (3600 * 24.0) + (grid.zc[k] - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) * Π
         end
         # Set large-scale drying
-        if Gr.zc[k] <= 300.0
+        if grid.zc[k] <= 300.0
             self.Fo.dqtdt[k] = -1.2e-8   #kg/(kg * s)
         end
-        if Gr.zc[k] > 300.0 && Gr.zc[k] <= 500.0
-            self.Fo.dqtdt[k] = -1.2e-8 + (Gr.zc[k] - 300.0) * (0.0 - -1.2e-8) / (500.0 - 300.0) #kg/(kg * s)
+        if grid.zc[k] > 300.0 && grid.zc[k] <= 500.0
+            self.Fo.dqtdt[k] = -1.2e-8 + (grid.zc[k] - 300.0) * (0.0 - -1.2e-8) / (500.0 - 300.0) #kg/(kg * s)
         end
 
         #Set large scale subsidence
-        if Gr.zc[k] <= 1500.0
-            self.Fo.subsidence[k] = 0.0 + Gr.zc[k] * (-0.65 / 100.0 - 0.0) / (1500.0 - 0.0)
+        if grid.zc[k] <= 1500.0
+            self.Fo.subsidence[k] = 0.0 + grid.zc[k] * (-0.65 / 100.0 - 0.0) / (1500.0 - 0.0)
         end
-        if Gr.zc[k] > 1500.0 && Gr.zc[k] <= 2100.0
-            self.Fo.subsidence[k] = -0.65 / 100 + (Gr.zc[k] - 1500.0) * (0.0 - -0.65 / 100.0) / (2100.0 - 1500.0)
+        if grid.zc[k] > 1500.0 && grid.zc[k] <= 2100.0
+            self.Fo.subsidence[k] = -0.65 / 100 + (grid.zc[k] - 1500.0) * (0.0 - -0.65 / 100.0) / (2100.0 - 1500.0)
         end
     end
     return nothing
@@ -623,8 +646,8 @@ end
 
 function initialize_radiation(
     self::CasesBase{life_cycle_Tan2018},
-    Gr::Grid,
-    Ref::ReferenceState,
+    grid::Grid,
+    ref_state::ReferenceState,
     GMV::GridMeanVariables,
 )
     initialize(self.Rad, GMV)
@@ -664,11 +687,11 @@ end
 ##### Rico
 #####
 
-function Rico(namelist, Gr::Grid, Ref::ReferenceState)
+function Rico(namelist, grid::Grid, ref_state::ReferenceState)
     casename = "Rico"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedCoeffs; Gr, Ref, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; Gr, Ref)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; Gr, Ref)
+    Sur = TC.SurfaceBase(TC.SurfaceFixedCoeffs; grid, ref_state, namelist)
+    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
+    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 18.0
@@ -677,59 +700,59 @@ function Rico(namelist, Gr::Grid, Ref::ReferenceState)
     return TC.CasesBase{Rico}(; casename = "Rico", inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    param_set = TC.parameter_set(Ref)
-    Ref.Pg = 1.0154e5  #Pressure at ground
-    Ref.Tg = 299.8  #Temperature at ground
+function initialize_reference(self::CasesBase{Rico}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
+    param_set = TC.parameter_set(ref_state)
+    ref_state.Pg = 1.0154e5  #Pressure at ground
+    ref_state.Tg = 299.8  #Temperature at ground
     # TODO think about constractor here
-    pvg = TD.saturation_vapor_pressure(param_set, Ref.Tg, TD.Liquid())
-    Ref.qtg = eps_v * pvg / (Ref.Pg - pvg)   #Total water mixing ratio at surface
-    initialize(Ref, Gr, Stats)
+    pvg = TD.saturation_vapor_pressure(param_set, ref_state.Tg, TD.Liquid())
+    ref_state.qtg = eps_v * pvg / (ref_state.Pg - pvg)   #Total water mixing ratio at surface
+    initialize(ref_state, grid, Stats)
 end
-function initialize_profiles(self::CasesBase{Rico}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    param_set = TC.parameter_set(Ref)
-    thetal = TC.center_field(Gr)
+function initialize_profiles(self::CasesBase{Rico}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
+    param_set = TC.parameter_set(ref_state)
+    thetal = TC.center_field(grid)
     ql = 0.0
     qi = 0.0 # IC of Rico is cloud-free
 
-    @inbounds for k in real_center_indices(Gr)
-        GMV.U.values[k] = -9.9 + 2.0e-3 * Gr.zc[k]
+    @inbounds for k in real_center_indices(grid)
+        GMV.U.values[k] = -9.9 + 2.0e-3 * grid.zc[k]
         GMV.V.values[k] = -3.8
         #Set Thetal profile
-        if Gr.zc[k] <= 740.0
+        if grid.zc[k] <= 740.0
             thetal[k] = 297.9
         else
-            thetal[k] = 297.9 + (317.0 - 297.9) / (4000.0 - 740.0) * (Gr.zc[k] - 740.0)
+            thetal[k] = 297.9 + (317.0 - 297.9) / (4000.0 - 740.0) * (grid.zc[k] - 740.0)
         end
 
         #Set qt profile
-        if Gr.zc[k] <= 740.0
-            GMV.QT.values[k] = (16.0 + (13.8 - 16.0) / 740.0 * Gr.zc[k]) / 1000.0
-        elseif Gr.zc[k] > 740.0 && Gr.zc[k] <= 3260.0
-            GMV.QT.values[k] = (13.8 + (2.4 - 13.8) / (3260.0 - 740.0) * (Gr.zc[k] - 740.0)) / 1000.0
+        if grid.zc[k] <= 740.0
+            GMV.QT.values[k] = (16.0 + (13.8 - 16.0) / 740.0 * grid.zc[k]) / 1000.0
+        elseif grid.zc[k] > 740.0 && grid.zc[k] <= 3260.0
+            GMV.QT.values[k] = (13.8 + (2.4 - 13.8) / (3260.0 - 740.0) * (grid.zc[k] - 740.0)) / 1000.0
         else
-            GMV.QT.values[k] = (2.4 + (1.8 - 2.4) / (4000.0 - 3260.0) * (Gr.zc[k] - 3260.0)) / 1000.0
+            GMV.QT.values[k] = (2.4 + (1.8 - 2.4) / (4000.0 - 3260.0) * (grid.zc[k] - 3260.0)) / 1000.0
         end
     end
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         GMV.H.values[k] = thetal[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
 
     satadjust(GMV)
 end
 
-function initialize_surface(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState)
-    self.Sur.Gr = Gr
-    self.Sur.Ref = Ref
+function initialize_surface(self::CasesBase{Rico}, grid::Grid, ref_state::ReferenceState)
+    self.Sur.grid = grid
+    self.Sur.ref_state = ref_state
     self.Sur.zrough = 0.00015
     self.Sur.cm = 0.001229
     self.Sur.ch = 0.001094
     self.Sur.cq = 0.001133
     # Adjust for non-IC grid spacing
-    grid_adjust = (log(20.0 / self.Sur.zrough) / log(TC.zc_surface(Gr) / self.Sur.zrough))^2
+    grid_adjust = (log(20.0 / self.Sur.zrough) / log(TC.zc_surface(grid) / self.Sur.zrough))^2
     self.Sur.cm = self.Sur.cm * grid_adjust
     self.Sur.ch = self.Sur.ch * grid_adjust
     self.Sur.cq = self.Sur.cq * grid_adjust
@@ -737,30 +760,30 @@ function initialize_surface(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState
     initialize(self.Sur)
 end
 
-function initialize_forcing(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{Rico}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
     param_set = TC.parameter_set(GMV)
-    self.Fo.Gr = Gr
-    self.Fo.Ref = Ref
+    self.Fo.grid = grid
+    self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
-    @inbounds for k in real_center_indices(Gr)
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+    @inbounds for k in real_center_indices(grid)
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
         # Geostrophic velocity profiles
-        self.Fo.ug[k] = -9.9 + 2.0e-3 * Gr.zc[k]
+        self.Fo.ug[k] = -9.9 + 2.0e-3 * grid.zc[k]
         self.Fo.vg[k] = -3.8
         # Set large-scale cooling
         self.Fo.dTdt[k] = (-2.5 / (3600.0 * 24.0)) * Π
 
         # Set large-scale moistening
-        if Gr.zc[k] <= 2980.0
-            self.Fo.dqtdt[k] = (-1.0 + 1.3456 / 2980.0 * Gr.zc[k]) / 86400.0 / 1000.0   #kg/(kg * s)
+        if grid.zc[k] <= 2980.0
+            self.Fo.dqtdt[k] = (-1.0 + 1.3456 / 2980.0 * grid.zc[k]) / 86400.0 / 1000.0   #kg/(kg * s)
         else
             self.Fo.dqtdt[k] = 0.3456 / 86400.0 / 1000.0
         end
 
         #Set large scale subsidence
-        if Gr.zc[k] <= 2260.0
-            self.Fo.subsidence[k] = -(0.005 / 2260.0) * Gr.zc[k]
+        if grid.zc[k] <= 2260.0
+            self.Fo.subsidence[k] = -(0.005 / 2260.0) * grid.zc[k]
         else
             self.Fo.subsidence[k] = -0.005
         end
@@ -768,7 +791,7 @@ function initialize_forcing(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState
     return nothing
 end
 
-function initialize_radiation(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_radiation(self::CasesBase{Rico}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
     initialize(self.Rad, GMV)
 end
 
@@ -793,26 +816,26 @@ end
 ##### TRMM_LBA
 #####
 
-function TRMM_LBA(namelist, Gr::Grid, Ref::ReferenceState)
+function TRMM_LBA(namelist, grid::Grid, ref_state::ReferenceState)
     casename = "TRMM_LBA"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; Gr, Ref, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; Gr, Ref)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; Gr, Ref)
+    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; grid, ref_state, namelist)
+    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
+    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
     return TC.CasesBase{TRMM_LBA}(; casename = "TRMM_LBA", inversion_option, Sur, Fo, Rad)
 end
-function initialize_reference(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    param_set = TC.parameter_set(Ref)
-    Ref.Pg = 991.3 * 100  #Pressure at ground
-    Ref.Tg = 296.85   # surface values for reference state (RS) which outputs p0 rho0 alpha0
-    pvg = TD.saturation_vapor_pressure(param_set, Ref.Tg, TD.Liquid())
-    Ref.qtg = eps_v * pvg / (Ref.Pg - pvg)#Total water mixing ratio at surface
-    initialize(Ref, Gr, Stats)
+function initialize_reference(self::CasesBase{TRMM_LBA}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
+    param_set = TC.parameter_set(ref_state)
+    ref_state.Pg = 991.3 * 100  #Pressure at ground
+    ref_state.Tg = 296.85   # surface values for reference state (RS) which outputs p0 rho0 alpha0
+    pvg = TD.saturation_vapor_pressure(param_set, ref_state.Tg, TD.Liquid())
+    ref_state.qtg = eps_v * pvg / (ref_state.Pg - pvg)#Total water mixing ratio at surface
+    initialize(ref_state, grid, Stats)
 end
-function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    param_set = TC.parameter_set(Ref)
+function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
+    param_set = TC.parameter_set(ref_state)
     # TRMM_LBA inputs from Grabowski et al. 2006
     #! format: off
     z_in = off_arr([0.130,  0.464,  0.573,  1.100,  1.653,  2.216,  2.760,
@@ -865,16 +888,16 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
     #! format: on
     # interpolate to the model grid-points
 
-    p1 = pyinterp(Gr.zc, z_in, p_in)
-    GMV.U.values .= pyinterp(Gr.zc, z_in, u_in)
-    GMV.V.values .= pyinterp(Gr.zc, z_in, v_in)
+    p1 = pyinterp(grid.zc, z_in, p_in)
+    GMV.U.values .= pyinterp(grid.zc, z_in, u_in)
+    GMV.V.values .= pyinterp(grid.zc, z_in, v_in)
 
     # get the entropy from RH, p, T
-    RH = TC.center_field(Gr)
-    zc_in = Gr.zc
+    RH = TC.center_field(grid)
+    zc_in = grid.zc
     RH = pyinterp(zc_in, z_in, RH_in)
 
-    T = TC.center_field(Gr)
+    T = TC.center_field(grid)
     T = pyinterp(zc_in, z_in, T_in)
     GMV.T.values .= T
     theta_rho = RH * 0.0
@@ -882,39 +905,40 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
 
 
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         ql = 0.0 # initial state is not saturated
         phase_part = TD.PhasePartition(GMV.QT.values[k], ql, 0.0)
         pv_star = TD.saturation_vapor_pressure(param_set, GMV.T.values[k], TD.Liquid())
         qv_star = pv_star * epsi / (p1[k] - pv_star + epsi * pv_star * RH[k] / 100.0) # eq. 37 in pressel et al and the def of RH
         qv = GMV.QT.values[k] - GMV.QL.values[k]
         GMV.QT.values[k] = qv_star * RH[k] / 100.0
-        GMV.H.values[k] = TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], Ref.p0_half[k], phase_part)
+        GMV.H.values[k] =
+            TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], ref_state.p0_half[k], phase_part)
     end
 
     satadjust(GMV)
 end
 
-function initialize_surface(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceState)
+function initialize_surface(self::CasesBase{TRMM_LBA}, grid::Grid, ref_state::ReferenceState)
     #self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
-    param_set = TC.parameter_set(Ref)
-    kf_surf = TC.kf_surface(Gr)
+    param_set = TC.parameter_set(ref_state)
+    kf_surf = TC.kf_surface(grid)
     self.Sur.qsurface = 22.45e-3 # kg/kg
     theta_surface = (273.15 + 23)
-    ts = TD.PhaseEquil_pθq(param_set, Ref.p0[kf_surf], theta_surface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, ref_state.p0[kf_surf], theta_surface, self.Sur.qsurface)
     self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = 5.2e-5 * TC.surface_value(Ref.rho0, Gr) * TD.latent_heat_vapor(ts)
-    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * TC.surface_value(Ref.rho0, Gr)
+    self.Sur.lhf = 5.2e-5 * TC.surface_value(ref_state.rho0, grid) * TD.latent_heat_vapor(ts)
+    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * TC.surface_value(ref_state.rho0, grid)
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
-    self.Sur.Gr = Gr
-    self.Sur.Ref = Ref
+    self.Sur.grid = grid
+    self.Sur.ref_state = ref_state
     initialize(self.Sur)
 end
 
-function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
-    self.Fo.Gr = grid
-    self.Fo.Ref = Ref
+function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+    self.Fo.grid = grid
+    self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
     self.Fo.dTdt = TC.center_field(grid)
     self.rad_time = range(10, 360; length = 36) .* 60
@@ -1059,7 +1083,7 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, Ref::Referenc
     return nothing
 end
 
-function initialize_radiation(self::CasesBase{TRMM_LBA}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_radiation(self::CasesBase{TRMM_LBA}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
     initialize(self.Rad, GMV)
 end
 
@@ -1082,11 +1106,11 @@ end
 
 function TC.update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::TimeStepping)
 
-    Gr = self.Fo.Gr
+    grid = self.Fo.grid
     ind2 = Int(ceil(TS.t / 600.0)) + 1
     ind1 = Int(trunc(TS.t / 600.0)) + 1
-    @inbounds for k in real_center_indices(Gr)
-        if Gr.zc[k] >= 22699.48
+    @inbounds for k in real_center_indices(grid)
+        if grid.zc[k] >= 22699.48
             self.Fo.dTdt[k] = 0.0
         else
             if TS.t < 600.0 # first 10 min use the radiative forcing of t=10min (as in the paper)
@@ -1118,11 +1142,11 @@ end
 ##### ARM_SGP
 #####
 
-function ARM_SGP(namelist, Gr::Grid, Ref::ReferenceState)
+function ARM_SGP(namelist, grid::Grid, ref_state::ReferenceState)
     casename = "ARM_SGP"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; Gr, Ref, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; Gr, Ref)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; Gr, Ref)
+    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; grid, ref_state, namelist)
+    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
+    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 8.5e-5
@@ -1130,17 +1154,17 @@ function ARM_SGP(namelist, Gr::Grid, Ref::ReferenceState)
     return TC.CasesBase{ARM_SGP}(; casename = "ARM_SGP", inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{ARM_SGP}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    Ref.Pg = 970.0 * 100 #Pressure at ground
-    Ref.Tg = 299.0   # surface values for reference state (RS) which outputs p0 rho0 alpha0
-    Ref.qtg = 15.2 / 1000#Total water mixing ratio at surface
-    initialize(Ref, Gr, Stats)
+function initialize_reference(self::CasesBase{ARM_SGP}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
+    ref_state.Pg = 970.0 * 100 #Pressure at ground
+    ref_state.Tg = 299.0   # surface values for reference state (RS) which outputs p0 rho0 alpha0
+    ref_state.qtg = 15.2 / 1000#Total water mixing ratio at surface
+    initialize(ref_state, grid, Stats)
 end
 
-function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     # ARM_SGP inputs
     #! format: off
-    param_set = TC.parameter_set(Ref)
+    param_set = TC.parameter_set(ref_state)
     z_in = off_arr([0.0, 50.0, 350.0, 650.0, 700.0, 1300.0, 2500.0, 5500.0 ]) #LES z is in meters
     Theta_in = off_arr([299.0, 301.5, 302.5, 303.53, 303.7, 307.13, 314.0, 343.2]) # K
     r_in = off_arr([15.2,15.17,14.98,14.8,14.7,13.5,3.0,3.0])/1000 # qt should be in kg/kg
@@ -1148,52 +1172,53 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVa
     qt_in = r_in ./ (1 .+ r_in)
 
     # interpolate to the model grid-points
-    Theta = pyinterp(Gr.zc, z_in, Theta_in)
-    qt = pyinterp(Gr.zc, z_in, qt_in)
+    Theta = pyinterp(grid.zc, z_in, Theta_in)
+    qt = pyinterp(grid.zc, z_in, qt_in)
 
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         # TODO figure out how to use ts here
         phase_part = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0)
-        Π = TD.exner_given_pressure(param_set, Ref.p0_half[k], phase_part)
+        Π = TD.exner_given_pressure(param_set, ref_state.p0_half[k], phase_part)
         GMV.U.values[k] = 10.0
         GMV.QT.values[k] = qt[k]
         GMV.T.values[k] = Theta[k] * Π
-        GMV.H.values[k] = TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], Ref.p0_half[k], phase_part)
+        GMV.H.values[k] =
+            TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], ref_state.p0_half[k], phase_part)
     end
 
     satadjust(GMV)
 end
 
-function initialize_surface(self::CasesBase{ARM_SGP}, Gr::Grid, Ref::ReferenceState)
-    param_set = TC.parameter_set(Ref)
+function initialize_surface(self::CasesBase{ARM_SGP}, grid::Grid, ref_state::ReferenceState)
+    param_set = TC.parameter_set(ref_state)
     self.Sur.qsurface = 15.2e-3 # kg/kg
-    kc_surf = TC.kc_surface(Gr)
-    kf_surf = TC.kf_surface(Gr)
+    kc_surf = TC.kc_surface(grid)
+    kf_surf = TC.kf_surface(grid)
     theta_surface = 299.0
-    ts = TD.PhaseEquil_pθq(param_set, Ref.p0[kf_surf], theta_surface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, ref_state.p0[kf_surf], theta_surface, self.Sur.qsurface)
     self.Sur.Tsurface = TD.air_temperature(ts)
     self.Sur.lhf = 5.0
     self.Sur.shf = -30.0
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
-    self.Sur.Gr = Gr
-    self.Sur.Ref = Ref
+    self.Sur.grid = grid
+    self.Sur.ref_state = ref_state
     initialize(self.Sur)
 end
 
-function initialize_forcing(self::CasesBase{ARM_SGP}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
-    self.Fo.Gr = Gr
-    self.Fo.Ref = Ref
+function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+    self.Fo.grid = grid
+    self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         self.Fo.ug[k] = 10.0
         self.Fo.vg[k] = 0.0
     end
     return nothing
 end
 
-function initialize_radiation(self::CasesBase{ARM_SGP}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_radiation(self::CasesBase{ARM_SGP}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
     initialize(self.Rad, GMV)
 end
 
@@ -1231,16 +1256,16 @@ function TC.update_forcing(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS:
     Rqt_in = off_arr([0.08, 0.02, 0.04, -0.1, -0.16, -0.3]) ./ 1000.0 ./ 3600.0 # Radiative forcing for qt converted to [kg/kg/sec]
     dTdt = pyinterp(off_arr([TS.t]), t_in, AT_in)[1] + pyinterp(off_arr([TS.t]), t_in, RT_in)[1]
     dqtdt = pyinterp(off_arr([TS.t]), t_in, Rqt_in)[1]
-    Gr = self.Fo.Gr
-    @inbounds for k in real_center_indices(Gr)
-        ts = TD.PhaseEquil_pθq(param_set, self.Fo.Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+    grid = self.Fo.grid
+    @inbounds for k in real_center_indices(grid)
+        ts = TD.PhaseEquil_pθq(param_set, self.Fo.ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
-        if Gr.zc[k] <= 1000.0
+        if grid.zc[k] <= 1000.0
             self.Fo.dTdt[k] = dTdt
             self.Fo.dqtdt[k] = dqtdt * Π
-        elseif Gr.zc[k] > 1000.0 && Gr.zc[k] <= 2000.0
-            self.Fo.dTdt[k] = dTdt * (1 - (Gr.zc[k] - 1000.0) / 1000.0)
-            self.Fo.dqtdt[k] = dqtdt * Π * (1 - (Gr.zc[k] - 1000.0) / 1000.0)
+        elseif grid.zc[k] > 1000.0 && grid.zc[k] <= 2000.0
+            self.Fo.dTdt[k] = dTdt * (1 - (grid.zc[k] - 1000.0) / 1000.0)
+            self.Fo.dqtdt[k] = dqtdt * Π * (1 - (grid.zc[k] - 1000.0) / 1000.0)
         end
     end
     update(self.Fo, GMV)
@@ -1254,30 +1279,30 @@ end
 ##### GATE_III
 #####
 
-function GATE_III(namelist, Gr::Grid, Ref::ReferenceState)
+function GATE_III(namelist, grid::Grid, ref_state::ReferenceState)
     casename = "GATE_III"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedCoeffs; Gr, Ref, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; Gr, Ref)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; Gr, Ref)
+    Sur = TC.SurfaceBase(TC.SurfaceFixedCoeffs; grid, ref_state, namelist)
+    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
+    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
     inversion_option = "thetal_maxgrad"
     Fo.apply_subsidence = false
     Fo.apply_coriolis = false
     return TC.CasesBase{GATE_III}(; casename = "GATE_III", inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    Ref.Pg = 1013.0 * 100  #Pressure at ground
-    Ref.Tg = 299.184   # surface values for reference state (RS) which outputs p0 rho0 alpha0
-    Ref.qtg = 16.5 / 1000#Total water mixing ratio at surface
-    initialize(Ref, Gr, Stats)
+function initialize_reference(self::CasesBase{GATE_III}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
+    ref_state.Pg = 1013.0 * 100  #Pressure at ground
+    ref_state.Tg = 299.184   # surface values for reference state (RS) which outputs p0 rho0 alpha0
+    ref_state.qtg = 16.5 / 1000#Total water mixing ratio at surface
+    initialize(ref_state, grid, Stats)
 end
 
-function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
-    param_set = TC.parameter_set(Ref)
-    qt = TC.center_field(Gr)
-    T = TC.center_field(Gr)
-    U = TC.center_field(Gr)
-    theta_rho = TC.center_field(Gr)
+function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
+    param_set = TC.parameter_set(ref_state)
+    qt = TC.center_field(grid)
+    T = TC.center_field(grid)
+    U = TC.center_field(grid)
+    theta_rho = TC.center_field(grid)
 
     # GATE_III inputs - I extended them to z=22 km
     #! format: off
@@ -1300,28 +1325,28 @@ function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanV
     #! format: on
 
     # interpolate to the model grid-points
-    T = pyinterp(Gr.zc, z_T_in, T_in) # interpolate to ref pressure level
-    qt = pyinterp(Gr.zc, z_in, qt_in)
-    U = pyinterp(Gr.zc, z_in, U_in)
+    T = pyinterp(grid.zc, z_T_in, T_in) # interpolate to ref pressure level
+    qt = pyinterp(grid.zc, z_in, qt_in)
+    U = pyinterp(grid.zc, z_in, U_in)
 
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         ql = 0.0# initial state is not saturated
         GMV.QT.values[k] = qt[k]
         GMV.T.values[k] = T[k]
         GMV.U.values[k] = U[k]
-        ts = TD.PhaseEquil_pTq(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pTq(param_set, ref_state.p0_half[k], GMV.T.values[k], GMV.QT.values[k])
         GMV.H.values[k] = TD.liquid_ice_pottemp(ts)
     end
     satadjust(GMV)
 end
 
-function initialize_surface(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceState)
-    self.Sur.Gr = Gr
-    self.Sur.Ref = Ref
+function initialize_surface(self::CasesBase{GATE_III}, grid::Grid, ref_state::ReferenceState)
+    self.Sur.grid = grid
+    self.Sur.ref_state = ref_state
     self.Sur.qsurface = 16.5 / 1000.0 # kg/kg
-    self.Sur.Gr = Gr
-    self.Sur.Ref = Ref
+    self.Sur.grid = grid
+    self.Sur.ref_state = ref_state
     self.Sur.cm = 0.0012
     self.Sur.ch = 0.0034337
     self.Sur.cq = 0.0034337
@@ -1329,9 +1354,9 @@ function initialize_surface(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceS
     initialize(self.Sur)
 end
 
-function initialize_forcing(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
-    self.Fo.Gr = Gr
-    self.Fo.Ref = Ref
+function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+    self.Fo.grid = grid
+    self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
     #LES z is in meters
     #! format: off
@@ -1357,11 +1382,11 @@ function initialize_forcing(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceS
 
     Qtend_in = r_tend_in ./ (1 .+ r_tend_in) # convert mixing ratio to specific humidity
 
-    self.Fo.dqtdt = pyinterp(Gr.zc, z_in, Qtend_in)
-    self.Fo.dTdt = pyinterp(Gr.zc, z_in, Ttend_in) + pyinterp(Gr.zc, z_in, RAD_in)
+    self.Fo.dqtdt = pyinterp(grid.zc, z_in, Qtend_in)
+    self.Fo.dTdt = pyinterp(grid.zc, z_in, Ttend_in) + pyinterp(grid.zc, z_in, RAD_in)
 end
 
-function initialize_radiation(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_radiation(self::CasesBase{GATE_III}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
     initialize(self.Rad, GMV)
 end
 
@@ -1387,59 +1412,69 @@ end
 ##### DYCOMS_RF01
 #####
 
-function DYCOMS_RF01(namelist, Gr::Grid, Ref::ReferenceState)
+function DYCOMS_RF01(namelist, grid::Grid, ref_state::ReferenceState)
     casename = "DYCOMS_RF01"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; Gr, Ref, namelist)
-    Fo = TC.ForcingBase{TC.ForcingDYCOMS_RF01}(; Gr, Ref)
-    Rad = TC.RadiationBase{TC.RadiationDYCOMS_RF01}(; Gr, Ref)
+    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; grid, ref_state, namelist)
+    Fo = TC.ForcingBase{TC.ForcingDYCOMS_RF01}(; grid, ref_state)
+    Rad = TC.RadiationBase{TC.RadiationDYCOMS_RF01}(; grid, ref_state)
     inversion_option = "thetal_maxgrad"
     return TC.CasesBase{DYCOMS_RF01}(; casename = "DYCOMS_RF01", inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    param_set = TC.parameter_set(Ref)
-    Ref.Pg = 1017.8 * 100.0
-    Ref.qtg = 9.0 / 1000.0
+function initialize_reference(
+    self::CasesBase{DYCOMS_RF01},
+    grid::Grid,
+    ref_state::ReferenceState,
+    Stats::NetCDFIO_Stats,
+)
+    param_set = TC.parameter_set(ref_state)
+    ref_state.Pg = 1017.8 * 100.0
+    ref_state.qtg = 9.0 / 1000.0
     # Use an exner function with values for Rd, and cp given in Stevens 2005 to compute temperature
     theta_surface = 289.0
-    ts = TD.PhaseEquil_pθq(param_set, Ref.Pg, theta_surface, Ref.qtg)
-    Ref.Tg = TD.air_temperature(ts)
-    initialize(Ref, Gr, Stats)
+    ts = TD.PhaseEquil_pθq(param_set, ref_state.Pg, theta_surface, ref_state.qtg)
+    ref_state.Tg = TD.air_temperature(ts)
+    initialize(ref_state, grid, Stats)
 end
 
-function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize_profiles(
+    self::CasesBase{DYCOMS_RF01},
+    grid::Grid,
+    GMV::GridMeanVariables,
+    ref_state::ReferenceState,
+)
     param_set = TC.parameter_set(GMV)
-    thetal = TC.center_field(Gr) # helper variable to recalculate temperature
-    ql = TC.center_field(Gr) # DYCOMS case is saturated
+    thetal = TC.center_field(grid) # helper variable to recalculate temperature
+    ql = TC.center_field(grid) # DYCOMS case is saturated
     qi = 0.0                                             # no ice
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         # thetal profile as defined in DYCOMS
-        if Gr.zc[k] <= 840.0
+        if grid.zc[k] <= 840.0
             thetal[k] = 289.0
         end
-        if Gr.zc[k] > 840.0
-            thetal[k] = (297.5 + (Gr.zc[k] - 840.0)^(1.0 / 3.0))
+        if grid.zc[k] > 840.0
+            thetal[k] = (297.5 + (grid.zc[k] - 840.0)^(1.0 / 3.0))
         end
 
         # qt profile as defined in DYCOMS
-        if Gr.zc[k] <= 840.0
+        if grid.zc[k] <= 840.0
             GMV.QT.values[k] = 9.0 / 1000.0
         end
-        if Gr.zc[k] > 840.0
+        if grid.zc[k] > 840.0
             GMV.QT.values[k] = 1.5 / 1000.0
         end
 
-        sa = eos(param_set, Ref.p0_half[k], GMV.QT.values[k], thetal[k])
+        sa = eos(param_set, ref_state.p0_half[k], GMV.QT.values[k], thetal[k])
         GMV.QL.values[k] = sa.ql
         GMV.T.values[k] = sa.T
-        ts = TD.PhaseEquil_pTq(param_set, Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pTq(param_set, ref_state.p0_half[k], GMV.T.values[k], GMV.QT.values[k])
         GMV.H.values[k] = TD.liquid_ice_pottemp(ts)
 
         # buoyancy profile
         qv = GMV.QT.values[k] - qi - GMV.QL.values[k]
-        rho = rho_c(Ref.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
-        GMV.B.values[k] = buoyancy_c(param_set, Ref.rho0_half[k], rho)
+        rho = rho_c(ref_state.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
+        GMV.B.values[k] = buoyancy_c(param_set, ref_state.rho0_half[k], rho)
 
         # velocity profile (geostrophic)
         GMV.U.values[k] = 7.0
@@ -1450,10 +1485,10 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
     return
 end
 
-function initialize_surface(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::ReferenceState)
-    param_set = TC.parameter_set(Ref)
+function initialize_surface(self::CasesBase{DYCOMS_RF01}, grid::Grid, ref_state::ReferenceState)
+    param_set = TC.parameter_set(ref_state)
     g = CPP.grav(param_set)
-    kf_surf = TC.kf_surface(Gr)
+    kf_surf = TC.kf_surface(grid)
     self.Sur.zrough = 1.0e-4
     self.Sur.ustar_fixed = false
     self.Sur.ustar = 0.28 # just to initilize grid mean covariances
@@ -1469,23 +1504,23 @@ function initialize_surface(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::Referen
     #density_surface  = 1.22     # kg/m^3
 
     # buoyancy flux
-    ts = TD.PhaseEquil_pTq(param_set, Ref.p0[kf_surf], self.Sur.Tsurface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pTq(param_set, ref_state.p0[kf_surf], self.Sur.Tsurface, self.Sur.qsurface)
     theta_surface = TD.liquid_ice_pottemp(ts)
-    theta_flux = self.Sur.shf / TD.cp_m(ts) / TC.surface_value(Ref.rho0, Gr)
-    qt_flux = self.Sur.lhf / TD.latent_heat_vapor(ts) / TC.surface_value(Ref.rho0, Gr)
+    theta_flux = self.Sur.shf / TD.cp_m(ts) / TC.surface_value(ref_state.rho0, grid)
+    qt_flux = self.Sur.lhf / TD.latent_heat_vapor(ts) / TC.surface_value(ref_state.rho0, grid)
 
     self.Sur.bflux =
         g * (
             (theta_flux + (eps_vi - 1.0) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
             (theta_surface * (1.0 + (eps_vi - 1) * self.Sur.qsurface))
         )
-    self.Sur.Gr = Gr
-    self.Sur.Ref = Ref
+    self.Sur.grid = grid
+    self.Sur.ref_state = ref_state
     initialize(self.Sur)
 end
-function initialize_forcing(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
-    self.Fo.Gr = Gr
-    self.Fo.Ref = Ref
+function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+    self.Fo.grid = grid
+    self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
 
     # geostrophic velocity profiles
@@ -1496,17 +1531,22 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::Referen
     divergence = 3.75e-6    # divergence is defined twice: here and in __init__ of ForcingDYCOMS_RF01 class
     # To be able to have self.Fo.divergence available here,
     # we would have to change the signature of ForcingBase class
-    @inbounds for k in real_center_indices(Gr)
-        self.Fo.subsidence[k] = -Gr.zc[k] * divergence
+    @inbounds for k in real_center_indices(grid)
+        self.Fo.subsidence[k] = -grid.zc[k] * divergence
     end
 
     # no large-scale drying
     self.Fo.dqtdt .= 0.0 #kg/(kg * s)
 end
 
-function initialize_radiation(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
-    self.Rad.Gr = Gr
-    self.Rad.Ref = Ref
+function initialize_radiation(
+    self::CasesBase{DYCOMS_RF01},
+    grid::Grid,
+    ref_state::ReferenceState,
+    GMV::GridMeanVariables,
+)
+    self.Rad.grid = grid
+    self.Rad.ref_state = ref_state
     initialize(self.Rad, GMV)
 
     # no large-scale drying
@@ -1540,11 +1580,11 @@ end
 ##### GABLS
 #####
 
-function GABLS(namelist, Gr::Grid, Ref::ReferenceState)
+function GABLS(namelist, grid::Grid, ref_state::ReferenceState)
     casename = "GABLS"
-    Sur = TC.SurfaceBase(TC.SurfaceMoninObukhovDry; Gr, Ref, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; Gr, Ref)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; Gr, Ref)
+    Sur = TC.SurfaceBase(TC.SurfaceMoninObukhovDry; grid, ref_state, namelist)
+    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
+    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 73.0
@@ -1554,57 +1594,57 @@ function GABLS(namelist, Gr::Grid, Ref::ReferenceState)
     return TC.CasesBase{GABLS}(; casename = "GABLS", inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{GABLS}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    Ref.Pg = 1.0e5  #Pressure at ground
-    Ref.Tg = 265.0  #Temperature at ground
-    Ref.qtg = 1.0e-12 #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN (TBD)
-    initialize(Ref, Gr, Stats)
+function initialize_reference(self::CasesBase{GABLS}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
+    ref_state.Pg = 1.0e5  #Pressure at ground
+    ref_state.Tg = 265.0  #Temperature at ground
+    ref_state.qtg = 1.0e-12 #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN (TBD)
+    initialize(ref_state, grid, Stats)
 end
-function initialize_profiles(self::CasesBase{GABLS}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
-    thetal = TC.center_field(Gr)
+    thetal = TC.center_field(grid)
     ql = 0.0
     qi = 0.0 # IC of GABLS cloud-free
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         param_set = TC.parameter_set(GMV)
         #Set wind velocity profile
         GMV.U.values[k] = 8.0
         GMV.V.values[k] = 0.0
 
         #Set Thetal profile
-        if Gr.zc[k] <= 100.0
+        if grid.zc[k] <= 100.0
             thetal[k] = 265.0
         else
-            thetal[k] = 265.0 + (Gr.zc[k] - 100.0) * 0.01
+            thetal[k] = 265.0 + (grid.zc[k] - 100.0) * 0.01
         end
 
         #Set qt profile
         GMV.QT.values[k] = 0.0
     end
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         GMV.H.values[k] = thetal[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
 
     satadjust(GMV)
 end
 
-function initialize_surface(self::CasesBase{GABLS}, Gr::Grid, Ref::ReferenceState)
-    self.Sur.Gr = Gr
-    self.Sur.Ref = Ref
+function initialize_surface(self::CasesBase{GABLS}, grid::Grid, ref_state::ReferenceState)
+    self.Sur.grid = grid
+    self.Sur.ref_state = ref_state
     self.Sur.zrough = 0.1
     self.Sur.Tsurface = 265.0
     initialize(self.Sur)
 end
 
-function initialize_forcing(self::CasesBase{GABLS}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
-    self.Fo.Gr = Gr
-    self.Fo.Ref = Ref
+function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+    self.Fo.grid = grid
+    self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         # Geostrophic velocity profiles.
         self.Fo.ug[k] = 8.0
         self.Fo.vg[k] = 0.0
@@ -1612,7 +1652,7 @@ function initialize_forcing(self::CasesBase{GABLS}, Gr::Grid, Ref::ReferenceStat
     return nothing
 end
 
-function initialize_radiation(self::CasesBase{GABLS}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_radiation(self::CasesBase{GABLS}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
     initialize(self.Rad, GMV)
 end
 
@@ -1641,11 +1681,11 @@ end
 #####
 
 # Not fully implemented yet - Ignacio
-function SP(namelist, Gr::Grid, Ref::ReferenceState)
+function SP(namelist, grid::Grid, ref_state::ReferenceState)
     casename = "SP"
-    Sur = TC.SurfaceBase(TC.SurfaceSullivanPatton; Gr, Ref, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; Gr, Ref)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; Gr, Ref)
+    Sur = TC.SurfaceBase(TC.SurfaceSullivanPatton; grid, ref_state, namelist)
+    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
+    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 1.0e-4 # s^{-1}
@@ -1654,54 +1694,54 @@ function SP(namelist, Gr::Grid, Ref::ReferenceState)
     return TC.CasesBase{SP}(; casename = "SP", inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    Ref.Pg = 1.0e5  #Pressure at ground
-    Ref.Tg = 300.0  #Temperature at ground
-    Ref.qtg = 1.0e-4   #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN.
-    initialize(Ref, Gr, Stats)
+function initialize_reference(self::CasesBase{SP}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
+    ref_state.Pg = 1.0e5  #Pressure at ground
+    ref_state.Tg = 300.0  #Temperature at ground
+    ref_state.qtg = 1.0e-4   #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN.
+    initialize(ref_state, grid, Stats)
 end
 
-function initialize_profiles(self::CasesBase{SP}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize_profiles(self::CasesBase{SP}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
-    thetal = TC.center_field(Gr)
+    thetal = TC.center_field(grid)
     ql = 0.0
     qi = 0.0 # IC of SP cloud-free
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         GMV.U.values[k] = 1.0
         GMV.V.values[k] = 0.0
         #Set Thetal profile
-        if Gr.zc[k] <= 974.0
+        if grid.zc[k] <= 974.0
             thetal[k] = 300.0
-        elseif Gr.zc[k] < 1074.0
-            thetal[k] = 300.0 + (Gr.zc[k] - 974.0) * 0.08
+        elseif grid.zc[k] < 1074.0
+            thetal[k] = 300.0 + (grid.zc[k] - 974.0) * 0.08
         else
-            thetal[k] = 308.0 + (Gr.zc[k] - 1074.0) * 0.003
+            thetal[k] = 308.0 + (grid.zc[k] - 1074.0) * 0.003
         end
 
         #Set qt profile
         GMV.QT.values[k] = 0.0
     end
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         GMV.H.values[k] = thetal[k]
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         GMV.T.values[k] = TD.air_temperature(ts)
     end
 
     satadjust(GMV)
 end
 
-function initialize_surface(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState)
-    param_set = TC.parameter_set(Ref)
-    kf_surf = TC.kf_surface(Gr)
+function initialize_surface(self::CasesBase{SP}, grid::Grid, ref_state::ReferenceState)
+    param_set = TC.parameter_set(ref_state)
+    kf_surf = TC.kf_surface(grid)
     g = CPP.grav(param_set)
-    self.Sur.Gr = Gr
-    self.Sur.Ref = Ref
+    self.Sur.grid = grid
+    self.Sur.ref_state = ref_state
     self.Sur.zrough = 0.1
     self.Sur.Tsurface = 300.0
     self.Sur.qsurface = 0.0
-    ts = TD.PhaseEquil_pTq(param_set, Ref.p0[kf_surf], self.Sur.Tsurface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pTq(param_set, ref_state.p0[kf_surf], self.Sur.Tsurface, self.Sur.qsurface)
     theta_surface = TD.liquid_ice_pottemp(ts)
     theta_flux = 0.24
     self.Sur.ustar = 0.28 # just to initilize grid mean covariances
@@ -1709,17 +1749,17 @@ function initialize_surface(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState)
     initialize(self.Sur)
 end
 
-function initialize_forcing(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
-    self.Fo.Gr = Gr
-    self.Fo.Ref = Ref
+function initialize_forcing(self::CasesBase{SP}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+    self.Fo.grid = grid
+    self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         # Geostrophic velocity profiles. vg = 0
         self.Fo.ug[k] = 1.0
         self.Fo.vg[k] = 0.0
     end
 end
-function initialize_radiation(self::CasesBase{SP}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_radiation(self::CasesBase{SP}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
     initialize(self.Rad, GMV)
 end
 function TC.initialize_io(self::CasesBase{SP}, Stats::NetCDFIO_Stats)
@@ -1742,27 +1782,27 @@ end
 ##### DryBubble
 #####
 
-function DryBubble(namelist, Gr::Grid, Ref::ReferenceState)
+function DryBubble(namelist, grid::Grid, ref_state::ReferenceState)
     casename = "DryBubble"
-    Sur = TC.SurfaceBase(TC.SurfaceNone; Gr, Ref, namelist)
-    Fo = TC.ForcingBase{TC.ForcingNone}(; Gr, Ref)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; Gr, Ref)
+    Sur = TC.SurfaceBase(TC.SurfaceNone; grid, ref_state, namelist)
+    Fo = TC.ForcingBase{TC.ForcingNone}(; grid, ref_state)
+    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
     inversion_option = "theta_rho"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
     return TC.CasesBase{DryBubble}(; casename = "DryBubble", inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{DryBubble}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
-    Ref.Pg = 1.0e5  #Pressure at ground
-    Ref.qtg = 1.0e-5
-    Ref.Tg = 296
-    initialize(Ref, Gr, Stats)
+function initialize_reference(self::CasesBase{DryBubble}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
+    ref_state.Pg = 1.0e5  #Pressure at ground
+    ref_state.qtg = 1.0e-5
+    ref_state.Tg = 296
+    initialize(ref_state, grid, Stats)
 end
 
-function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
 
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         GMV.U.values[k] = 0.01
     end
 
@@ -1832,31 +1872,31 @@ function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMean
     ])
     #! format: on
                        #LES temperature_mean in K
-    thetali = TC.center_field(Gr)
-    zc_in = Gr.zc
+    thetali = TC.center_field(grid)
+    zc_in = grid.zc
     thetali = pyinterp(zc_in, z_in, thetali_in)
     GMV.H.values .= thetali
-    @inbounds for k in real_center_indices(Gr)
+    @inbounds for k in real_center_indices(grid)
         GMV.QT.values[k] = 0.0
     end
     satadjust(GMV)
 end
 
-function initialize_surface(self::CasesBase{DryBubble}, Gr::Grid, Ref::ReferenceState)
-    self.Sur.Gr = Gr
-    self.Sur.Ref = Ref
+function initialize_surface(self::CasesBase{DryBubble}, grid::Grid, ref_state::ReferenceState)
+    self.Sur.grid = grid
+    self.Sur.ref_state = ref_state
     self.Sur.qsurface = 0.0
     self.Sur.shf = 0.0
     initialize(self.Sur)
 end
 
-function initialize_forcing(self::CasesBase{DryBubble}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
-    self.Fo.Gr = Gr
-    self.Fo.Ref = Ref
+function initialize_forcing(self::CasesBase{DryBubble}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+    self.Fo.grid = grid
+    self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
 end
 
-function initialize_radiation(self::CasesBase{DryBubble}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_radiation(self::CasesBase{DryBubble}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
     initialize(self.Rad, GMV)
 end
 
@@ -1883,7 +1923,7 @@ end
 ##### LES_driven_SCM
 #####
 
-function LES_driven_SCM(namelist, Gr::Grid, Ref::ReferenceState)
+function LES_driven_SCM(namelist, grid::Grid, ref_state::ReferenceState)
     casename = "LES_driven_SCM"
     les_filename = namelist["meta"]["lesfile"]
     # load data here
@@ -1898,9 +1938,9 @@ function LES_driven_SCM(namelist, Gr::Grid, Ref::ReferenceState)
 
         TC.LESData(imin, imax, les_filename)
     end
-    Sur = TC.SurfaceBase{TC.SurfaceMoninObukhov}(; Gr, Ref)
-    Fo = TC.ForcingBase{TC.ForcingLES}(; Gr, Ref)
-    Rad = TC.RadiationBase{TC.RadiationLES}(; Gr, Ref)
+    Sur = TC.SurfaceBase{TC.SurfaceMoninObukhov}(; grid, ref_state)
+    Fo = TC.ForcingBase{TC.ForcingLES}(; grid, ref_state)
+    Rad = TC.RadiationBase{TC.RadiationLES}(; grid, ref_state)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.coriolis_param = 0.376e-4 # s^{-1}
@@ -1911,20 +1951,30 @@ function LES_driven_SCM(namelist, Gr::Grid, Ref::ReferenceState)
     return TC.CasesBase{LES_driven_SCM}(; casename = "LES_driven_SCM", inversion_option, Sur, Fo, Rad, LESDat)
 end
 
-function initialize_reference(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState, Stats::NetCDFIO_Stats)
+function initialize_reference(
+    self::CasesBase{LES_driven_SCM},
+    grid::Grid,
+    ref_state::ReferenceState,
+    Stats::NetCDFIO_Stats,
+)
 
     NC.Dataset(self.LESDat.les_filename, "r") do data
-        Ref.Pg = data.group["reference"]["p0_full"][1] #Pressure at ground
-        Ref.Tg = data.group["reference"]["temperature0"][1] #Temperature at ground
+        ref_state.Pg = data.group["reference"]["p0_full"][1] #Pressure at ground
+        ref_state.Tg = data.group["reference"]["temperature0"][1] #Temperature at ground
         ql_ground = data.group["reference"]["ql0"][1]
         qv_ground = data.group["reference"]["qv0"][1]
         qi_ground = data.group["reference"]["qi0"][1]
-        Ref.qtg = ql_ground + qv_ground + qi_ground #Total water mixing ratio at surface
-        TC.initialize(Ref, Gr, Stats)
+        ref_state.qtg = ql_ground + qv_ground + qi_ground #Total water mixing ratio at surface
+        TC.initialize(ref_state, grid, Stats)
     end
 end
 
-function initialize_profiles(self::CasesBase{LES_driven_SCM}, Gr::Grid, GMV::GridMeanVariables, Ref::ReferenceState)
+function initialize_profiles(
+    self::CasesBase{LES_driven_SCM},
+    grid::Grid,
+    GMV::GridMeanVariables,
+    ref_state::ReferenceState,
+)
 
     NC.Dataset(self.LESDat.les_filename, "r") do data
         imin = self.LESDat.imin
@@ -1939,42 +1989,52 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, Gr::Grid, GMV::Gri
         imax = time_interval_bool[end]
 
         z_les_half = data.group["profiles"]["z_half"][:, 1]
-        GMV.H.values .= pyinterp(Gr.zc, z_les_half, TC.get_nc_data(data, "profiles", "thetali_mean", imin, imax))
-        GMV.QT.values .= pyinterp(Gr.zc, z_les_half, TC.get_nc_data(data, "profiles", "qt_mean", imin, imax))
-        GMV.U.values .= pyinterp(Gr.zc, z_les_half, TC.get_nc_data(data, "profiles", "u_mean", imin, imax))
-        GMV.V.values .= pyinterp(Gr.zc, z_les_half, TC.get_nc_data(data, "profiles", "v_mean", imin, imax))
+        GMV.H.values .= pyinterp(grid.zc, z_les_half, TC.get_nc_data(data, "profiles", "thetali_mean", imin, imax))
+        GMV.QT.values .= pyinterp(grid.zc, z_les_half, TC.get_nc_data(data, "profiles", "qt_mean", imin, imax))
+        GMV.U.values .= pyinterp(grid.zc, z_les_half, TC.get_nc_data(data, "profiles", "u_mean", imin, imax))
+        GMV.V.values .= pyinterp(grid.zc, z_les_half, TC.get_nc_data(data, "profiles", "v_mean", imin, imax))
         satadjust(GMV)
     end
 end
 
-function initialize_surface(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState)
+function initialize_surface(self::CasesBase{LES_driven_SCM}, grid::Grid, ref_state::ReferenceState)
 
     NC.Dataset(self.LESDat.les_filename, "r") do data
         imin = self.LESDat.imin
         imax = self.LESDat.imax
 
-        self.Sur.Gr = Gr
-        self.Sur.Ref = Ref
+        self.Sur.grid = grid
+        self.Sur.ref_state = ref_state
         self.Sur.zrough = 1.0e-4
-        self.Sur.Gr = Gr
+        self.Sur.grid = grid
         self.Sur.Tsurface = Statistics.mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims = 1)[1]
         # get surface value of q
         mean_qt_prof = Statistics.mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)[:]
-        self.Sur.qsurface = TC.interpf2c(mean_qt_prof, Gr, TC.kc_surface(Gr))
+        self.Sur.qsurface = TC.interpf2c(mean_qt_prof, grid, TC.kc_surface(grid))
         self.Sur.lhf = Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1]
         self.Sur.shf = Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1]
-        self.Sur.Ref = Ref
+        self.Sur.ref_state = ref_state
     end
     initialize(self.Sur)
 end
 
-function initialize_forcing(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
-    self.Fo.Gr = Gr
-    self.Fo.Ref = Ref
-    initialize(self.Fo, GMV, Gr, self.LESDat)
+function initialize_forcing(
+    self::CasesBase{LES_driven_SCM},
+    grid::Grid,
+    ref_state::ReferenceState,
+    GMV::GridMeanVariables,
+)
+    self.Fo.grid = grid
+    self.Fo.ref_state = ref_state
+    initialize(self.Fo, GMV, grid, self.LESDat)
     return nothing
 end
-function initialize_radiation(self::CasesBase{LES_driven_SCM}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
+function initialize_radiation(
+    self::CasesBase{LES_driven_SCM},
+    grid::Grid,
+    ref_state::ReferenceState,
+    GMV::GridMeanVariables,
+)
     initialize(self.Rad, GMV, self.LESDat)
 end
 

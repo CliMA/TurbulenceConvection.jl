@@ -7,8 +7,8 @@ include("Cases.jl")
 import .Cases
 
 mutable struct Simulation1d
-    Gr
-    Ref
+    grid
+    ref_state
     GMV
     Case
     Turb
@@ -19,26 +19,26 @@ end
 function Simulation1d(namelist)
     TC = TurbulenceConvection
     param_set = create_parameter_set(namelist)
-    Gr = TC.Grid(namelist)
-    Ref = TC.ReferenceState(Gr, param_set)
-    GMV = TC.GridMeanVariables(namelist, Gr, Ref, param_set)
-    Case = Cases.CasesFactory(namelist, Gr, Ref)
-    Turb = TC.EDMF_PrognosticTKE(namelist, Gr, Ref, param_set)
+    grid = TC.Grid(namelist)
+    ref_state = TC.ReferenceState(grid, param_set)
+    GMV = TC.GridMeanVariables(namelist, grid, ref_state, param_set)
+    Case = Cases.CasesFactory(namelist, grid, ref_state)
+    Turb = TC.EDMF_PrognosticTKE(namelist, grid, ref_state, param_set)
     TS = TC.TimeStepping(namelist)
-    Stats = TC.NetCDFIO_Stats(namelist, Gr)
-    return Simulation1d(Gr, Ref, GMV, Case, Turb, TS, Stats)
+    Stats = TC.NetCDFIO_Stats(namelist, grid)
+    return Simulation1d(grid, ref_state, GMV, Case, Turb, TS, Stats)
 end
 
 function TurbulenceConvection.initialize(self::Simulation1d, namelist)
     TC = TurbulenceConvection
-    Cases.initialize_reference(self.Case, self.Gr, self.Ref, self.Stats)
-    Cases.initialize_profiles(self.Case, self.Gr, self.GMV, self.Ref)
+    Cases.initialize_reference(self.Case, self.grid, self.ref_state, self.Stats)
+    Cases.initialize_profiles(self.Case, self.grid, self.GMV, self.ref_state)
 
-    Cases.initialize_surface(self.Case, self.Gr, self.Ref)
-    Cases.initialize_forcing(self.Case, self.Gr, self.Ref, self.GMV)
-    Cases.initialize_radiation(self.Case, self.Gr, self.Ref, self.GMV)
+    Cases.initialize_surface(self.Case, self.grid, self.ref_state)
+    Cases.initialize_forcing(self.Case, self.grid, self.ref_state, self.GMV)
+    Cases.initialize_radiation(self.Case, self.grid, self.ref_state, self.GMV)
 
-    TC.initialize(self.Turb, self.Case, self.GMV, self.Ref, self.TS)
+    TC.initialize(self.Turb, self.Case, self.GMV, self.ref_state, self.TS)
     TC.initialize_io(self)
     TC.io(self)
 

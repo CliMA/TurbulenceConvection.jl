@@ -3,11 +3,11 @@ function initialize(
     self::EDMF_PrognosticTKE,
     Case::CasesBase,
     GMV::GridMeanVariables,
-    Ref::ReferenceState,
+    ref_state::ReferenceState,
     TS::TimeStepping,
 )
     if Case.casename == "DryBubble"
-        initialize_DryBubble(self, self.UpdVar, GMV, Ref)
+        initialize_DryBubble(self, self.UpdVar, GMV, ref_state)
     else
         initialize(self, self.UpdVar, GMV)
     end
@@ -246,7 +246,7 @@ function update_cloud_frac(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     GMV.cloud_cover = min(self.EnvVar.cloud_cover + sum(self.UpdVar.cloud_cover), 1)
 end
 
-function compute_gm_tendencies!(grid, Case, GMV, Ref, TS)
+function compute_gm_tendencies!(grid, Case, GMV, ref_state, TS)
     param_set = parameter_set(GMV)
     GMV.U.tendencies .= 0
     GMV.V.tendencies .= 0
@@ -255,7 +255,7 @@ function compute_gm_tendencies!(grid, Case, GMV, Ref, TS)
 
     @inbounds for k in real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
-        ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
 
         if Case.Fo.apply_coriolis
@@ -334,7 +334,7 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     compute_covariance_rhs(self, GMV, Case, TS)
 
     # compute tendencies
-    compute_gm_tendencies!(grid, Case, GMV, self.Ref, TS)
+    compute_gm_tendencies!(grid, Case, GMV, self.ref_state, TS)
 
     clear_precip_sources(self.UpdThermo)
 
@@ -389,7 +389,7 @@ end
 
 function update_GMV_turbulence(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
 
-    @inbounds for k in real_center_indices(self.Gr)
+    @inbounds for k in real_center_indices(self.grid)
         GMV.H.tendencies[k] += (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
         GMV.QT.tendencies[k] += (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
         GMV.U.tendencies[k] += (GMV.U.new[k] - GMV.U.values[k]) * TS.dti
@@ -1606,8 +1606,8 @@ function update_covariance_ED(
     kc_toa = kc_top_of_atmos(grid)
     Δzi = grid.Δzi
     dti = TS.dti
-    Ref = reference_state(self)
-    alpha0LL = Ref.alpha0_half[kc_surf]
+    ref_state = reference_state(self)
+    alpha0LL = ref_state.alpha0_half[kc_surf]
     zLL = grid.zc[kc_surf]
     a = center_field(grid)
     b = center_field(grid)
@@ -1626,7 +1626,7 @@ function update_covariance_ED(
     aeK_bcs = (; bottom = SetValue(aeK[kc_surf]), top = SetValue(aeK[kc_toa]))
 
     @inbounds for k in real_face_indices(grid)
-        rho_ae_K_m[k] = interpc2f(aeK, grid, k; aeK_bcs...) * Ref.rho0[k]
+        rho_ae_K_m[k] = interpc2f(aeK, grid, k; aeK_bcs...) * ref_state.rho0[k]
     end
 
     @inbounds for k in real_center_indices(grid)
@@ -1643,7 +1643,8 @@ function update_covariance_ED(
                 turb_entr = self.frac_turb_entr[i, k]
                 R_up = self.pressure_plume_spacing[i]
                 w_up_c = interpf2c(self.UpdVar.W.values, grid, k, i)
-                D_env += Ref.rho0_half[k] * self.UpdVar.Area.values[i, k] * w_up_c * (self.entr_sc[i, k] + turb_entr)
+                D_env +=
+                    ref_state.rho0_half[k] * self.UpdVar.Area.values[i, k] * w_up_c * (self.entr_sc[i, k] + turb_entr)
             else
                 D_env = 0.0
             end
@@ -1660,15 +1661,15 @@ function update_covariance_ED(
         else
             a[k] = (-rho_ae_K_m[k] * Δzi * Δzi)
             b[k] = (
-                Ref.rho0_half[k] * ae[k] * dti - Ref.rho0_half[k] * ae[k] * w_en_c[k] * Δzi +
+                ref_state.rho0_half[k] * ae[k] * dti - ref_state.rho0_half[k] * ae[k] * w_en_c[k] * Δzi +
                 rho_ae_K_m[k + 1] * Δzi * Δzi +
                 rho_ae_K_m[k] * Δzi * Δzi +
                 D_env +
-                Ref.rho0_half[k] * ae[k] * c_d * sqrt(max(self.EnvVar.TKE.values[k], 0)) /
+                ref_state.rho0_half[k] * ae[k] * c_d * sqrt(max(self.EnvVar.TKE.values[k], 0)) /
                 max(self.mixing_length[k], 1)
             )
             x[k] = (
-                Ref.rho0_half[k] * ae_old[k] * Covar.values[k] * dti +
+                ref_state.rho0_half[k] * ae_old[k] * Covar.values[k] * dti +
                 Covar.press[k] +
                 Covar.buoy[k] +
                 Covar.shear[k] +
@@ -1678,7 +1679,7 @@ function update_covariance_ED(
             if is_toa_center(grid, k)
                 c[k] = 0.0
             else
-                c[k] = (Ref.rho0_half[k + 1] * ae[k + 1] * w_en_c[k + 1] * Δzi - rho_ae_K_m[k + 1] * Δzi * Δzi)
+                c[k] = (ref_state.rho0_half[k + 1] * ae[k + 1] * w_en_c[k + 1] * Δzi - rho_ae_K_m[k + 1] * Δzi * Δzi)
             end
         end
     end
@@ -1765,7 +1766,7 @@ end
 
 # Update the diagnosis of the inversion height, using the maximum temperature gradient method
 function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, option)
-    grid = self.Gr
+    grid = self.grid
     theta_rho = center_field(grid)
     ∇θ_liq_max = 0.0
     kc_surf = kc_surface(grid)
@@ -1773,7 +1774,7 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
 
     @inbounds for k in real_center_indices(grid)
         qv = GMV.QT.values[k] - GMV.QL.values[k]
-        ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         theta_rho[k] = TD.virtual_pottemp(ts)
     end
 
