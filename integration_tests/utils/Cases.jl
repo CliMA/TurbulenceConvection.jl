@@ -9,6 +9,7 @@ import Random
 import CLIMAParameters
 const CP = CLIMAParameters
 const CPP = CP.Planet
+const APS = CP.AbstractEarthParameterSet
 
 import Thermodynamics
 const TD = Thermodynamics
@@ -168,11 +169,11 @@ function CasesBase(case::Soares, namelist, grid::Grid, ref_state::ReferenceState
     Fo.apply_subsidence = false
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
-function initialize_reference(self::CasesBase{Soares}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
-    ref_state.Pg = 1000.0 * 100.0
-    ref_state.qtg = 5.0e-3
-    ref_state.Tg = 300.0
-    initialize(ref_state, grid, Stats)
+function reference_params(::Soares, grid::Grid, param_set::APS, namelist)
+    Pg = 1000.0 * 100.0
+    qtg = 5.0e-3
+    Tg = 300.0
+    return (; Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{Soares}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
@@ -243,11 +244,11 @@ function CasesBase(case::Nieuwstadt, namelist, grid::Grid, ref_state::ReferenceS
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{Nieuwstadt}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
-    ref_state.Pg = 1000.0 * 100.0
-    ref_state.qtg = 1.0e-12 #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN (TBD)
-    ref_state.Tg = 300.0
-    initialize(ref_state, grid, Stats)
+function reference_params(::Nieuwstadt, grid::Grid, param_set::APS, namelist)
+    Pg = 1000.0 * 100.0
+    Tg = 300.0
+    qtg = 1.0e-12 # Total water mixing ratio
+    return (; Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
@@ -319,11 +320,11 @@ function CasesBase(case::Bomex, namelist, grid::Grid, ref_state::ReferenceState,
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{Bomex}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
-    ref_state.Pg = 1.015e5  #Pressure at ground
-    ref_state.Tg = 300.4  #Temperature at ground
-    ref_state.qtg = 0.02245   #Total water mixing ratio at surface
-    TC.initialize(ref_state, grid, Stats)
+function reference_params(::Bomex, grid::Grid, param_set::APS, namelist)
+    Pg = 1.015e5 #Pressure at ground
+    Tg = 300.4 #Temperature at ground
+    qtg = 0.02245#Total water mixing ratio at surface
+    return (; Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
@@ -444,16 +445,11 @@ function CasesBase(case::life_cycle_Tan2018, namelist, grid::Grid, ref_state::Re
     Fo.apply_subsidence = true
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
-function initialize_reference(
-    self::CasesBase{life_cycle_Tan2018},
-    grid::Grid,
-    ref_state::ReferenceState,
-    Stats::NetCDFIO_Stats,
-)
-    ref_state.Pg = 1.015e5  #Pressure at ground
-    ref_state.Tg = 300.4  #Temperature at ground
-    ref_state.qtg = 0.02245   #Total water mixing ratio at surface
-    initialize(ref_state, grid, Stats)
+function reference_params(::life_cycle_Tan2018, grid::Grid, param_set::APS, namelist)
+    Pg = 1.015e5  #Pressure at ground
+    Tg = 300.4  #Temperature at ground
+    qtg = 0.02245   #Total water mixing ratio at surface
+    return (; Pg, Tg, qtg)
 end
 function initialize_profiles(
     self::CasesBase{life_cycle_Tan2018},
@@ -610,14 +606,13 @@ function CasesBase(case::Rico, namelist, grid::Grid, ref_state::ReferenceState, 
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{Rico}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
-    param_set = TC.parameter_set(ref_state)
-    ref_state.Pg = 1.0154e5  #Pressure at ground
-    ref_state.Tg = 299.8  #Temperature at ground
-    # TODO think about constractor here
-    pvg = TD.saturation_vapor_pressure(param_set, ref_state.Tg, TD.Liquid())
-    ref_state.qtg = eps_v * pvg / (ref_state.Pg - pvg)   #Total water mixing ratio at surface
-    initialize(ref_state, grid, Stats)
+function reference_params(::Rico, grid::Grid, param_set::APS, namelist)
+    # TODO: think about constractor here
+    Pg = 1.0154e5  #Pressure at ground
+    Tg = 299.8  #Temperature at ground
+    pvg = TD.saturation_vapor_pressure(param_set, Tg, TD.Liquid())
+    qtg = eps_v * pvg / (Pg - pvg)   #Total water mixing ratio at surface
+    return (; Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{Rico}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(ref_state)
@@ -711,13 +706,12 @@ function CasesBase(case::TRMM_LBA, namelist, grid::Grid, ref_state::ReferenceSta
     Fo.apply_subsidence = false
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
-function initialize_reference(self::CasesBase{TRMM_LBA}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
-    param_set = TC.parameter_set(ref_state)
-    ref_state.Pg = 991.3 * 100  #Pressure at ground
-    ref_state.Tg = 296.85   # surface values for reference state (RS) which outputs p0 rho0 alpha0
-    pvg = TD.saturation_vapor_pressure(param_set, ref_state.Tg, TD.Liquid())
-    ref_state.qtg = eps_v * pvg / (ref_state.Pg - pvg)#Total water mixing ratio at surface
-    initialize(ref_state, grid, Stats)
+function reference_params(::TRMM_LBA, grid::Grid, param_set::APS, namelist)
+    Pg = 991.3 * 100  #Pressure at ground
+    Tg = 296.85   # surface values for reference state (RS) which outputs p0 rho0 alpha0
+    pvg = TD.saturation_vapor_pressure(param_set, Tg, TD.Liquid())
+    qtg = eps_v * pvg / (Pg - pvg) #Total water mixing ratio at surface
+    return (; Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(ref_state)
@@ -1019,11 +1013,11 @@ function CasesBase(case::ARM_SGP, namelist, grid::Grid, ref_state::ReferenceStat
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{ARM_SGP}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
-    ref_state.Pg = 970.0 * 100 #Pressure at ground
-    ref_state.Tg = 299.0   # surface values for reference state (RS) which outputs p0 rho0 alpha0
-    ref_state.qtg = 15.2 / 1000#Total water mixing ratio at surface
-    initialize(ref_state, grid, Stats)
+function reference_params(::ARM_SGP, grid::Grid, param_set::APS, namelist)
+    Pg = 970.0 * 100 #Pressure at ground
+    Tg = 299.0   # surface values for reference state (RS) which outputs p0 rho0 alpha0
+    qtg = 15.2 / 1000 #Total water mixing ratio at surface
+    return (; Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
@@ -1136,11 +1130,11 @@ function CasesBase(case::GATE_III, namelist, grid::Grid, ref_state::ReferenceSta
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{GATE_III}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
-    ref_state.Pg = 1013.0 * 100  #Pressure at ground
-    ref_state.Tg = 299.184   # surface values for reference state (RS) which outputs p0 rho0 alpha0
-    ref_state.qtg = 16.5 / 1000#Total water mixing ratio at surface
-    initialize(ref_state, grid, Stats)
+function reference_params(::GATE_III, grid::Grid, param_set::APS, namelist)
+    Pg = 1013.0 * 100  #Pressure at ground
+    Tg = 299.184   # surface values for reference state (RS) which outputs p0 rho0 alpha0
+    qtg = 16.5 / 1000 #Total water mixing ratio at surface
+    return (; Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
@@ -1241,20 +1235,14 @@ function CasesBase(case::DYCOMS_RF01, namelist, grid::Grid, ref_state::Reference
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(
-    self::CasesBase{DYCOMS_RF01},
-    grid::Grid,
-    ref_state::ReferenceState,
-    Stats::NetCDFIO_Stats,
-)
-    param_set = TC.parameter_set(ref_state)
-    ref_state.Pg = 1017.8 * 100.0
-    ref_state.qtg = 9.0 / 1000.0
+function reference_params(::DYCOMS_RF01, grid::Grid, param_set::APS, namelist)
+    Pg = 1017.8 * 100.0
+    qtg = 9.0 / 1000.0
     # Use an exner function with values for Rd, and cp given in Stevens 2005 to compute temperature
     theta_surface = 289.0
-    ts = TD.PhaseEquil_pθq(param_set, ref_state.Pg, theta_surface, ref_state.qtg)
-    ref_state.Tg = TD.air_temperature(ts)
-    initialize(ref_state, grid, Stats)
+    ts = TD.PhaseEquil_pθq(param_set, Pg, theta_surface, qtg)
+    Tg = TD.air_temperature(ts)
+    return (; Pg, Tg, qtg)
 end
 
 function initialize_profiles(
@@ -1400,11 +1388,11 @@ function CasesBase(case::GABLS, namelist, grid::Grid, ref_state::ReferenceState,
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{GABLS}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
-    ref_state.Pg = 1.0e5  #Pressure at ground
-    ref_state.Tg = 265.0  #Temperature at ground
-    ref_state.qtg = 1.0e-12 #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN (TBD)
-    initialize(ref_state, grid, Stats)
+function reference_params(::GABLS, grid::Grid, param_set::APS, namelist)
+    Pg = 1.0e5  #Pressure at ground,
+    Tg = 265.0  #Temperature at ground,
+    qtg = 1.0e-12 #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN (TBD),
+    return (; Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
@@ -1477,11 +1465,11 @@ function CasesBase(case::SP, namelist, grid::Grid, ref_state::ReferenceState, Su
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{SP}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
-    ref_state.Pg = 1.0e5  #Pressure at ground
-    ref_state.Tg = 300.0  #Temperature at ground
-    ref_state.qtg = 1.0e-4   #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN.
-    initialize(ref_state, grid, Stats)
+function reference_params(::SP, grid::Grid, param_set::APS, namelist)
+    Pg = 1.0e5  #Pressure at ground
+    Tg = 300.0  #Temperature at ground
+    qtg = 1.0e-4   #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN.
+    return (; Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{SP}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
@@ -1554,11 +1542,11 @@ function CasesBase(case::DryBubble, namelist, grid::Grid, ref_state::ReferenceSt
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
-function initialize_reference(self::CasesBase{DryBubble}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
-    ref_state.Pg = 1.0e5  #Pressure at ground
-    ref_state.qtg = 1.0e-5
-    ref_state.Tg = 296
-    initialize(ref_state, grid, Stats)
+function reference_params(::DryBubble, grid::Grid, param_set::APS, namelist)
+    Pg = 1.0e5  #Pressure at ground
+    Tg = 296.0
+    qtg = 1.0e-5
+    return (; Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
@@ -1685,22 +1673,19 @@ function CasesBase(case::LES_driven_SCM, namelist, grid::Grid, ref_state::Refere
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad, LESDat)
 end
 
-function initialize_reference(
-    self::CasesBase{LES_driven_SCM},
-    grid::Grid,
-    ref_state::ReferenceState,
-    Stats::NetCDFIO_Stats,
-)
+function reference_params(::LES_driven_SCM, grid::Grid, param_set::APS, namelist)
+    les_filename = namelist["meta"]["lesfile"]
 
-    NC.Dataset(self.LESDat.les_filename, "r") do data
-        ref_state.Pg = data.group["reference"]["p0_full"][1] #Pressure at ground
-        ref_state.Tg = data.group["reference"]["temperature0"][1] #Temperature at ground
+    Pg, Tg, qtg = NC.Dataset(les_filename, "r") do data
+        Pg = data.group["reference"]["p0_full"][1] #Pressure at ground
+        Tg = data.group["reference"]["temperature0"][1] #Temperature at ground
         ql_ground = data.group["reference"]["ql0"][1]
         qv_ground = data.group["reference"]["qv0"][1]
         qi_ground = data.group["reference"]["qi0"][1]
-        ref_state.qtg = ql_ground + qv_ground + qi_ground #Total water mixing ratio at surface
-        TC.initialize(ref_state, grid, Stats)
+        qtg = ql_ground + qv_ground + qi_ground #Total water mixing ratio at surface
+        (Pg, Tg, qtg)
     end
+    return (; Pg, Tg, qtg)
 end
 
 function initialize_profiles(

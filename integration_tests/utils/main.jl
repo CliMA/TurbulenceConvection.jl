@@ -19,25 +19,26 @@ end
 function Simulation1d(namelist)
     TC = TurbulenceConvection
     param_set = create_parameter_set(namelist)
+
     grid = TC.Grid(namelist)
-    ref_state = TC.ReferenceState(grid, param_set)
+    Stats = TC.NetCDFIO_Stats(namelist, grid)
+    case = Cases.get_case(namelist)
+    ref_params = Cases.reference_params(case, grid, param_set, namelist)
+    ref_state = TC.ReferenceState(grid, param_set, Stats; ref_params...)
+
     GMV = TC.GridMeanVariables(namelist, grid, ref_state, param_set)
+    Sur = TC.SurfaceBase(Cases.get_surface_type(case); grid, ref_state, namelist)
+    Fo = TC.ForcingBase{Cases.get_forcing_type(case)}(; grid, ref_state)
+    Rad = TC.RadiationBase{Cases.get_radiation_type(case)}(; grid, ref_state)
 
-    case_type = Cases.get_case(namelist)
-    Sur = TC.SurfaceBase(Cases.get_surface_type(case_type); grid, ref_state, namelist)
-    Fo = TC.ForcingBase{Cases.get_forcing_type(case_type)}(; grid, ref_state)
-    Rad = TC.RadiationBase{Cases.get_radiation_type(case_type)}(; grid, ref_state)
-
-    Case = Cases.CasesBase(case_type, namelist, grid, ref_state, Sur, Fo, Rad)
+    Case = Cases.CasesBase(case, namelist, grid, ref_state, Sur, Fo, Rad)
     Turb = TC.EDMF_PrognosticTKE(namelist, grid, ref_state, param_set)
     TS = TC.TimeStepping(namelist)
-    Stats = TC.NetCDFIO_Stats(namelist, grid)
     return Simulation1d(grid, ref_state, GMV, Case, Turb, TS, Stats)
 end
 
 function TurbulenceConvection.initialize(self::Simulation1d, namelist)
     TC = TurbulenceConvection
-    Cases.initialize_reference(self.Case, self.grid, self.ref_state, self.Stats)
     Cases.initialize_profiles(self.Case, self.grid, self.GMV, self.ref_state)
 
     Cases.initialize_surface(self.Case, self.grid, self.ref_state)
