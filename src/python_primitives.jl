@@ -6,7 +6,7 @@ xrange(stop) = xrange(0, stop)
 
 off_arr(a::AbstractArray) = a
 
-function pyinterp(x::T, xp::T, fp::T) where {T}
+function pyinterp(x, xp, fp)
     spl = Dierckx.Spline1D(xp, fp; k = 1)
-    return spl(x)
+    return spl(vec(x))
 end

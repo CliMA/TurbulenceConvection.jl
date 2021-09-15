@@ -21,8 +21,8 @@ function export_ref_profile(case_name::String)
     case = Cases.CasesFactory(namelist, grid, ref_state)
     Cases.initialize_reference(case, grid, ref_state, Stats)
     NCDatasets.Dataset(joinpath(Stats.path_plus_file), "r") do ds
-        zc = ds.group["profiles"]["z_half"][:]
-        zf = ds.group["profiles"]["z"][:]
+        zc = ds.group["profiles"]["zc"][:]
+        zf = ds.group["profiles"]["zf"][:]
         ρc_0 = ds.group["reference"]["rho0_half"][:]
         pc_0 = ds.group["reference"]["p0_half"][:]
         αc_0 = ds.group["reference"]["alpha0_half"][:]

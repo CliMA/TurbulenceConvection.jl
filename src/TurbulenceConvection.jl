@@ -1,5 +1,6 @@
 module TurbulenceConvection
 
+import ClimaCore
 import LinearAlgebra
 import DocStringExtensions
 import StaticArrays
@@ -15,6 +16,7 @@ import Distributions
 import FastGaussQuadrature
 import CLIMAParameters
 
+const CC = ClimaCore
 const NC = NCDatasets
 const SA = StaticArrays
 

@@ -76,8 +76,8 @@ function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
     prob = ODEProblem(rhs, logp, z_span)
     sol = solve(prob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
 
-    p .= sol.(grid.z)
-    p_half .= sol.(grid.z_half)
+    p .= sol.(vec(grid.zf))
+    p_half .= sol.(vec(grid.zc))
 
     p .= exp.(p)
     p_half .= exp.(p_half)

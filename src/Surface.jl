@@ -25,7 +25,7 @@ function update(self::SurfaceBase{SurfaceNone}, GMV::GridMeanVariables)
     self.windspeed = 0.0001
     self.zrough = 1e-4
     self.bflux = 1e-4
-    self.ustar = compute_ustar(self.windspeed, self.bflux, self.zrough, self.Gr.z_half[kc_surf])
+    self.ustar = compute_ustar(self.windspeed, self.bflux, self.zrough, self.Gr.zc[kc_surf])
     return
 end
 free_convection_windspeed(self::SurfaceBase{SurfaceNone}, GMV::GridMeanVariables) = nothing
@@ -73,7 +73,7 @@ function update(self::SurfaceBase{SurfaceFixedFlux}, GMV::GridMeanVariables)
             end
         end
 
-        self.ustar = compute_ustar(self.windspeed, self.bflux, self.zrough, self.Gr.z_half[kc_surf])
+        self.ustar = compute_ustar(self.windspeed, self.bflux, self.zrough, self.Gr.zc[kc_surf])
     end
 
     self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb
@@ -152,7 +152,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
     kf_surf = kf_surface(self.Gr)
     pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
     self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.Ref.rho0[kf_surf], pvg)
-    zb = self.Gr.z_half[kc_surf]
+    zb = self.Gr.zc[kc_surf]
     lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
 
     phase_part = TD.PhasePartition(self.qsurface, 0.0, 0.0)
@@ -170,7 +170,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
 
     #TODO: make sure pass by reference: &self.cm, &self.ch, &self.obukhov_length
     self.cm, self.ch, self.obukhov_length =
-        exchange_coefficients_byun(Ri, self.Gr.z_half[kc_surf], self.zrough, self.cm, self.ch, self.obukhov_length)
+        exchange_coefficients_byun(Ri, self.Gr.zc[kc_surf], self.zrough, self.cm, self.ch, self.obukhov_length)
     self.rho_uflux = -self.cm * self.windspeed * (GMV.U.values[kc_surf]) * self.Ref.rho0[kf_surf]
     self.rho_vflux = -self.cm * self.windspeed * (GMV.V.values[kc_surf]) * self.Ref.rho0[kf_surf]
 
@@ -215,7 +215,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
     kf_surf = kf_surface(self.Gr)
     pvg = TD.saturation_vapor_pressure(param_set, self.Tsurface, TD.Liquid())
     self.qsurface = TD.q_vap_saturation_from_pressure(param_set, self.Tsurface, self.Ref.rho0[kf_surf], pvg)
-    zb = self.Gr.z_half[kc_surf]
+    zb = self.Gr.zc[kc_surf]
     lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
 
     phase_part = TD.PhasePartition(self.qsurface, 0.0, 0.0)
@@ -233,7 +233,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
 
     #TODO: make sure pass by reference: &self.cm, &self.ch, &self.obukhov_length
     self.cm, self.ch, self.obukhov_length =
-        exchange_coefficients_byun(Ri, self.Gr.z_half[kc_surf], self.zrough, self.cm, self.ch, self.obukhov_length)
+        exchange_coefficients_byun(Ri, self.Gr.zc[kc_surf], self.zrough, self.cm, self.ch, self.obukhov_length)
     self.rho_uflux = -self.cm * self.windspeed * (GMV.U.values[kc_surf]) * self.Ref.rho0[kf_surf]
     self.rho_vflux = -self.cm * self.windspeed * (GMV.V.values[kc_surf]) * self.Ref.rho0[kf_surf]
 
@@ -266,7 +266,7 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
     g = CPP.grav(param_set)
     kc_surf = kc_surface(self.Gr)
     kf_surf = kf_surface(self.Gr)
-    zb = self.Gr.z_half[kc_surf]
+    zb = self.Gr.zc[kc_surf]
     ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0[kc_surf], self.Tsurface, self.qsurface)
     lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
     T0 = self.Ref.p0_half[kc_surf] * self.Ref.alpha0_half[kc_surf] / Rd
@@ -292,7 +292,7 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
 
     #TODO: make sure pass by reference: &self.cm, &self.ch, &self.obukhov_length
     self.cm, self.ch, self.obukhov_length =
-        exchange_coefficients_byun(Ri, self.Gr.z_half[kc_surf], self.zrough, self.cm, self.ch, self.obukhov_length)
+        exchange_coefficients_byun(Ri, self.Gr.zc[kc_surf], self.zrough, self.cm, self.ch, self.obukhov_length)
     self.rho_uflux = -self.cm * self.windspeed * (GMV.U.values[kc_surf]) * self.Ref.rho0[kf_surf]
     self.rho_vflux = -self.cm * self.windspeed * (GMV.V.values[kc_surf]) * self.Ref.rho0[kf_surf]
 

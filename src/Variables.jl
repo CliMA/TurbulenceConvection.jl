@@ -67,15 +67,15 @@ end
 function mean_cloud_diagnostics(self)
     self.lwp = 0.0
     kc_toa = kc_top_of_atmos(self.Gr)
-    self.cloud_base = self.Gr.z_half[kc_toa]
+    self.cloud_base = self.Gr.zc[kc_toa]
     self.cloud_top = 0.0
 
     @inbounds for k in real_center_indices(self.Gr)
-        self.lwp += self.Ref.rho0_half[k] * self.QL.values[k] * self.Gr.dz
+        self.lwp += self.Ref.rho0_half[k] * self.QL.values[k] * self.Gr.Δz
 
         if self.QL.values[k] > 1e-8
-            self.cloud_base = min(self.cloud_base, self.Gr.z_half[k])
-            self.cloud_top = max(self.cloud_top, self.Gr.z_half[k])
+            self.cloud_base = min(self.cloud_base, self.Gr.zc[k])
+            self.cloud_top = max(self.cloud_top, self.Gr.zc[k])
         end
     end
     return

@@ -9,7 +9,7 @@ function get_inversion(param_set, θ_ρ, u, v, grid::Grid, Ri_bulk_crit)
     kc_surf = kc_surface(grid)
     θ_ρ_b = θ_ρ[kc_surf]
     Ri_bulk = center_field(grid)
-    z_c = grid.z_half
+    z_c = grid.zc
 
     # test if we need to look at the free convective limit
     if (u[kc_surf]^2 + v[kc_surf]^2) <= 0.01
@@ -56,11 +56,11 @@ function get_surface_variance(flux1, flux2, ustar, zLL, oblength)
 end
 
 function construct_tridiag_diffusion(grid, dt, ρ_ae_K_m, ρ_0, ae, a, b, c)
-    dzi = grid.dzi
+    Δzi = grid.Δzi
     @inbounds for k in real_center_indices(grid)
         X = ρ_0[k] * ae[k] / dt
-        Y = ρ_ae_K_m[k + 1] * dzi * dzi
-        Z = ρ_ae_K_m[k] * dzi * dzi
+        Y = ρ_ae_K_m[k + 1] * Δzi * Δzi
+        Z = ρ_ae_K_m[k] * Δzi * Δzi
         if is_surface_center(grid, k)
             Z = 0.0
         elseif is_toa_center(grid, k)

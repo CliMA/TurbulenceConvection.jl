@@ -27,7 +27,7 @@ function initialize(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
 end
 
 function initialize_DryBubble(tptke, self::UpdraftVariables, GMV::GridMeanVariables, Ref::ReferenceState)
-    dz = self.Gr.dz
+    dz = self.Gr.Δz
 
     # criterion 2: b>1e-4
     #! format: off
@@ -96,18 +96,18 @@ function initialize_DryBubble(tptke, self::UpdraftVariables, GMV::GridMeanVariab
         264.1574, 263.6518, 263.1461, 262.6451, 262.1476, 261.6524]
     #! format: on
 
-    Area_in = pyinterp(self.Gr.z_half, z_in, Area_in)
-    thetal_in = pyinterp(self.Gr.z_half, z_in, thetal_in)
-    T_in = pyinterp(self.Gr.z_half, z_in, T_in)
+    Area_in = pyinterp(self.Gr.zc, z_in, Area_in)
+    thetal_in = pyinterp(self.Gr.zc, z_in, thetal_in)
+    T_in = pyinterp(self.Gr.zc, z_in, T_in)
     @inbounds for i in xrange(self.n_updrafts)
         @inbounds for k in real_face_indices(self.Gr)
-            if minimum(z_in) <= self.Gr.z[k] <= maximum(z_in)
+            if minimum(z_in) <= self.Gr.zf[k] <= maximum(z_in)
                 self.W.values[i, k] = 0.0
             end
         end
 
         @inbounds for k in real_center_indices(self.Gr)
-            if minimum(z_in) <= self.Gr.z_half[k] <= maximum(z_in)
+            if minimum(z_in) <= self.Gr.zc[k] <= maximum(z_in)
                 self.Area.values[i, k] = Area_in[k] #self.updraft_fraction/self.n_updrafts
                 self.H.values[i, k] = thetal_in[k]
                 self.QT.values[i, k] = 0.0
@@ -276,12 +276,12 @@ function upd_cloud_diagnostics(self::UpdraftVariables, Ref::ReferenceState)
 
         @inbounds for k in real_center_indices(self.Gr)
             if self.Area.values[i, k] > 1e-3
-                self.updraft_top[i] = max(self.updraft_top[i], self.Gr.z_half[k])
-                self.lwp += Ref.rho0_half[k] * self.QL.values[i, k] * self.Area.values[i, k] * self.Gr.dz
+                self.updraft_top[i] = max(self.updraft_top[i], self.Gr.zc[k])
+                self.lwp += Ref.rho0_half[k] * self.QL.values[i, k] * self.Area.values[i, k] * self.Gr.Δz
 
                 if self.QL.values[i, k] > 1e-8
-                    self.cloud_base[i] = min(self.cloud_base[i], self.Gr.z_half[k])
-                    self.cloud_top[i] = max(self.cloud_top[i], self.Gr.z_half[k])
+                    self.cloud_base[i] = min(self.cloud_base[i], self.Gr.zc[k])
+                    self.cloud_top[i] = max(self.cloud_top[i], self.Gr.zc[k])
                     self.cloud_cover[i] = max(self.cloud_cover[i], self.Area.values[i, k])
                 end
             end

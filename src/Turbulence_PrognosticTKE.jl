@@ -462,7 +462,7 @@ function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanV
         self.prandtl_nvec[k] = turbulent_Prandtl_number(obukhov_length, ∇_Ri, Pr_n, ω_pr)
 
         ml_model = MinDisspLen(;
-            z = grid.z_half[k],
+            z = grid.zc[k],
             obukhov_length = obukhov_length,
             κ_vk = vkb,
             tke_surf = self.EnvVar.TKE.values[kc_surf],
@@ -510,8 +510,8 @@ function set_updraft_surface_bc(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
     update_inversion(self, GMV, Case.inversion_option)
     self.wstar = get_wstar(Case.Sur.bflux, self.zi)
 
-    dzi = grid.dzi
-    zLL = grid.z_half[kc_surf]
+    Δzi = grid.Δzi
+    zLL = grid.zc[kc_surf]
     ustar = Case.Sur.ustar
     oblength = Case.Sur.obukhov_length
     alpha0LL = reference_state(self).alpha0_half[kc_surf]
@@ -520,13 +520,13 @@ function set_updraft_surface_bc(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
 
     if Case.Sur.bflux > 0.0
         a_total = self.surface_area
-        self.entr_surface_bc = 2.0 * dzi
+        self.entr_surface_bc = 2.0 * Δzi
         self.detr_surface_bc = 0.0
     else
         # a_total = self.surface_area
         a_total = self.minimum_area * 0.9
         self.entr_surface_bc = 0.0
-        self.detr_surface_bc = 2.0 * dzi
+        self.detr_surface_bc = 2.0 * Δzi
     end
 
     a_ = a_total / self.n_updrafts
@@ -546,7 +546,7 @@ function reset_surface_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     grid = get_grid(self)
     kc_surf = kc_surface(grid)
     ref_state = reference_state(self)
-    zLL = grid.z_half[kc_surf]
+    zLL = grid.zc[kc_surf]
     ustar = Case.Sur.ustar
     oblength = Case.Sur.obukhov_length
     alpha0LL = ref_state.alpha0_half[kc_surf]
@@ -555,7 +555,7 @@ function reset_surface_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     up = self.UpdVar
     en = self.EnvVar
 
-    en.TKE.values[kc_surf] = get_surface_tke(Case.Sur.ustar, self.wstar, grid.z_half[kc_surf], Case.Sur.obukhov_length)
+    en.TKE.values[kc_surf] = get_surface_tke(Case.Sur.ustar, self.wstar, grid.zc[kc_surf], Case.Sur.obukhov_length)
     get_GMV_CoVar(self, up.Area, up.W, up.W, en.W, en.W, en.TKE, gm.W.values, gm.W.values, gm.TKE.values)
 
     en.Hvar.values[kc_surf] = get_surface_variance(flux1 * alpha0LL, flux1 * alpha0LL, ustar, zLL, oblength)
@@ -1104,9 +1104,7 @@ end
 # 2nd order finite differences plus implicit time step allows solution with tridiagonal matrix solver
 function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
     grid = get_grid(self)
-    nzg = grid.nzg
-    nz = grid.nz
-    dzi = grid.dzi
+    Δzi = grid.Δzi
     ref_state = reference_state(self)
     a = center_field(grid) # for tridiag solver
     b = center_field(grid) # for tridiag solver
@@ -1134,7 +1132,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     @inbounds for k in real_center_indices(grid)
         x[k] = self.EnvVar.QT.values[k]
         if is_surface_center(grid, k)
-            x[k] = x[k] + TS.dt * Case.Sur.rho_qtflux * dzi * ref_state.alpha0_half[k] / ae[k]
+            x[k] = x[k] + TS.dt * Case.Sur.rho_qtflux * Δzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
     x .= tridiag_solve(x, a, b, c)
@@ -1166,7 +1164,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     @inbounds for k in real_center_indices(grid)
         x[k] = self.EnvVar.H.values[k]
         if is_surface_center(grid, k)
-            x[k] = x[k] + TS.dt * Case.Sur.rho_hflux * dzi * ref_state.alpha0_half[k] / ae[k]
+            x[k] = x[k] + TS.dt * Case.Sur.rho_hflux * Δzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
     x .= tridiag_solve(x, a, b, c)
@@ -1201,7 +1199,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     @inbounds for k in real_center_indices(grid)
         x[k] = GMV.U.values[k]
         if is_surface_center(grid, k)
-            x[k] = x[k] + TS.dt * Case.Sur.rho_uflux * dzi * ref_state.alpha0_half[k] / ae[k]
+            x[k] = x[k] + TS.dt * Case.Sur.rho_uflux * Δzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
     x .= tridiag_solve(x, a, b, c)
@@ -1220,7 +1218,7 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     @inbounds for k in real_center_indices(grid)
         x[k] = GMV.V.values[k]
         if is_surface_center(grid, k)
-            x[k] = x[k] + TS.dt * Case.Sur.rho_vflux * dzi * ref_state.alpha0_half[k] / ae[k]
+            x[k] = x[k] + TS.dt * Case.Sur.rho_vflux * Δzi * ref_state.alpha0_half[k] / ae[k]
         end
     end
     x .= tridiag_solve(x, a, b, c)
@@ -1321,14 +1319,14 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
 
     if ws > 0.0
         @inbounds for k in real_center_indices(grid)
-            z = grid.z_half[k]
+            z = grid.zc[k]
             GMV.TKE.values[k] = tke_gm(z)
         end
     end
     # TKE initialization from Beare et al, 2006
     if Case.casename == "GABLS"
         @inbounds for k in real_center_indices(grid)
-            z = grid.z_half[k]
+            z = grid.zc[k]
             if (z <= 250.0)
                 GMV.TKE.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
             end
@@ -1336,7 +1334,7 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
 
     elseif Case.casename == "Bomex"
         @inbounds for k in real_center_indices(grid)
-            z = grid.z_half[k]
+            z = grid.zc[k]
             if (z <= 2500.0)
                 GMV.TKE.values[k] = 1.0 - z / 3000.0
             end
@@ -1344,7 +1342,7 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
 
     elseif Case.casename == "Soares" || Case.casename == "Nieuwstadt"
         @inbounds for k in real_center_indices(grid)
-            z = grid.z_half[k]
+            z = grid.zc[k]
             if (z <= 1600.0)
                 GMV.TKE.values[k] = 0.1 * 1.46 * 1.46 * (1.0 - z / 1600.0)
             end
@@ -1353,7 +1351,7 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
 
     if ws > 0.0
         @inbounds for k in real_center_indices(grid)
-            z = grid.z_half[k]
+            z = grid.zc[k]
             # need to rethink of how to initilize the covarinace profiles - for now took the TKE profile
             GMV.Hvar.values[k] = GMV.Hvar.values[kc_surf] * tke_gm(z)
             GMV.QTvar.values[k] = GMV.QTvar.values[kc_surf] * tke_gm(z)
@@ -1370,7 +1368,7 @@ function initialize_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables,
     # TKE initialization from Beare et al, 2006
     if Case.casename == "GABLS"
         @inbounds for k in real_center_indices(grid)
-            z = grid.z_half[k]
+            z = grid.zc[k]
             if (z <= 250.0)
                 GMV.Hvar.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
             end
@@ -1606,11 +1604,11 @@ function update_covariance_ED(
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
-    dzi = grid.dzi
+    Δzi = grid.Δzi
     dti = TS.dti
     Ref = reference_state(self)
     alpha0LL = Ref.alpha0_half[kc_surf]
-    zLL = grid.z_half[kc_surf]
+    zLL = grid.zc[kc_surf]
     a = center_field(grid)
     b = center_field(grid)
     c = center_field(grid)
@@ -1660,11 +1658,11 @@ function update_covariance_ED(
             c[k] = 0.0
             x[k] = Covar_surf
         else
-            a[k] = (-rho_ae_K_m[k] * dzi * dzi)
+            a[k] = (-rho_ae_K_m[k] * Δzi * Δzi)
             b[k] = (
-                Ref.rho0_half[k] * ae[k] * dti - Ref.rho0_half[k] * ae[k] * w_en_c[k] * dzi +
-                rho_ae_K_m[k + 1] * dzi * dzi +
-                rho_ae_K_m[k] * dzi * dzi +
+                Ref.rho0_half[k] * ae[k] * dti - Ref.rho0_half[k] * ae[k] * w_en_c[k] * Δzi +
+                rho_ae_K_m[k + 1] * Δzi * Δzi +
+                rho_ae_K_m[k] * Δzi * Δzi +
                 D_env +
                 Ref.rho0_half[k] * ae[k] * c_d * sqrt(max(self.EnvVar.TKE.values[k], 0)) /
                 max(self.mixing_length[k], 1)
@@ -1680,7 +1678,7 @@ function update_covariance_ED(
             if is_toa_center(grid, k)
                 c[k] = 0.0
             else
-                c[k] = (Ref.rho0_half[k + 1] * ae[k + 1] * w_en_c[k + 1] * dzi - rho_ae_K_m[k + 1] * dzi * dzi)
+                c[k] = (Ref.rho0_half[k + 1] * ae[k + 1] * w_en_c[k + 1] * Δzi - rho_ae_K_m[k + 1] * Δzi * Δzi)
             end
         end
     end
@@ -1783,7 +1781,7 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
     if option == "theta_rho"
         @inbounds for k in real_center_indices(grid)
             if theta_rho[k] > theta_rho[kc_surf]
-                self.zi = grid.z_half[k]
+                self.zi = grid.zc[k]
                 break
             end
         end
@@ -1794,7 +1792,7 @@ function update_inversion(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
             ∇θ_liq = c∇_downwind(∇θ_liq_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
             if ∇θ_liq > ∇θ_liq_max
                 ∇θ_liq_max = ∇θ_liq
-                self.zi = grid.z_half[k]
+                self.zi = grid.zc[k]
             end
         end
     elseif option == "critical_Ri"

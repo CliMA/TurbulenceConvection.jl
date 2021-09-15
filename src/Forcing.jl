@@ -23,14 +23,14 @@ function initialize(self::ForcingBase{ForcingLES}, GMV::GridMeanVariables, Gr::G
 
         z_les_half = data.group["profiles"]["z_half"][:, 1]
 
-        self.dtdt_hadv = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "dtdt_hadv", imin, imax))
-        self.dtdt_nudge = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "dtdt_nudge", imin, imax))
-        self.dtdt_fluc = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "dtdt_fluc", imin, imax))
-        self.dqtdt_hadv = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "dqtdt_hadv", imin, imax))
-        self.dqtdt_nudge = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "dqtdt_nudge", imin, imax))
-        self.dqtdt_fluc = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "dqtdt_fluc", imin, imax))
-        self.subsidence = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "ls_subsidence", imin, imax))
-        self.u_nudge = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "u_mean", imin, imax))
-        self.v_nudge = pyinterp(Gr.z_half, z_les_half, get_nc_data(data, "profiles", "v_mean", imin, imax))
+        self.dtdt_hadv = pyinterp(Gr.zc, z_les_half, get_nc_data(data, "profiles", "dtdt_hadv", imin, imax))
+        self.dtdt_nudge = pyinterp(Gr.zc, z_les_half, get_nc_data(data, "profiles", "dtdt_nudge", imin, imax))
+        self.dtdt_fluc = pyinterp(Gr.zc, z_les_half, get_nc_data(data, "profiles", "dtdt_fluc", imin, imax))
+        self.dqtdt_hadv = pyinterp(Gr.zc, z_les_half, get_nc_data(data, "profiles", "dqtdt_hadv", imin, imax))
+        self.dqtdt_nudge = pyinterp(Gr.zc, z_les_half, get_nc_data(data, "profiles", "dqtdt_nudge", imin, imax))
+        self.dqtdt_fluc = pyinterp(Gr.zc, z_les_half, get_nc_data(data, "profiles", "dqtdt_fluc", imin, imax))
+        self.subsidence = pyinterp(Gr.zc, z_les_half, get_nc_data(data, "profiles", "ls_subsidence", imin, imax))
+        self.u_nudge = pyinterp(Gr.zc, z_les_half, get_nc_data(data, "profiles", "u_mean", imin, imax))
+        self.v_nudge = pyinterp(Gr.zc, z_les_half, get_nc_data(data, "profiles", "v_mean", imin, imax))
     end
 end

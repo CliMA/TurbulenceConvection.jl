@@ -78,23 +78,23 @@ mutable struct NetCDFIO_Stats
 
         NC.Dataset(path_plus_file, "c") do root_grp
 
-            zf = Gr.z
-            zc = Gr.z_half
+            zf = vec(Gr.zf)
+            zc = vec(Gr.zc)
 
             # Set profile dimensions
             profile_grp = NC.defGroup(root_grp, "profiles")
-            NC.defDim(profile_grp, "z", Gr.nz + 1)
-            NC.defDim(profile_grp, "z_half", Gr.nz)
+            NC.defDim(profile_grp, "zf", Gr.nz + 1)
+            NC.defDim(profile_grp, "zc", Gr.nz)
             NC.defDim(profile_grp, "t", Inf)
-            NC.defVar(profile_grp, "z", zf, ("z",))
-            NC.defVar(profile_grp, "z_half", zc, ("z_half",))
+            NC.defVar(profile_grp, "zf", zf, ("zf",))
+            NC.defVar(profile_grp, "zc", zc, ("zc",))
             NC.defVar(profile_grp, "t", Float64, ("t",))
 
             reference_grp = NC.defGroup(root_grp, "reference")
-            NC.defDim(reference_grp, "z", Gr.nz + 1)
-            NC.defDim(reference_grp, "z_half", Gr.nz)
-            NC.defVar(reference_grp, "z", zf, ("z",))
-            NC.defVar(reference_grp, "z_half", zc, ("z_half",))
+            NC.defDim(reference_grp, "zf", Gr.nz + 1)
+            NC.defDim(reference_grp, "zc", Gr.nz)
+            NC.defVar(reference_grp, "zf", zf, ("zf",))
+            NC.defVar(reference_grp, "zc", zc, ("zc",))
 
             ts_grp = NC.defGroup(root_grp, "timeseries")
             NC.defDim(ts_grp, "t", Inf)
@@ -139,7 +139,7 @@ function close_files(self::NetCDFIO_Stats)
 end
 
 function add_profile(self::NetCDFIO_Stats, var_name::String)
-    coord = is_face_field(var_name) ? "z" : "z_half"
+    coord = is_face_field(var_name) ? "zf" : "zc"
     NC.Dataset(self.path_plus_file, "a") do root_grp
         profile_grp = root_grp.group["profiles"]
         new_var = NC.defVar(profile_grp, var_name, Float64, (coord, "t"))
@@ -147,7 +147,7 @@ function add_profile(self::NetCDFIO_Stats, var_name::String)
 end
 
 function add_reference_profile(self::NetCDFIO_Stats, var_name::String)
-    coord = is_face_field(var_name) ? "z" : "z_half"
+    coord = is_face_field(var_name) ? "zf" : "zc"
     NC.Dataset(self.path_plus_file, "a") do root_grp
         reference_grp = root_grp.group["reference"]
         new_var = NC.defVar(reference_grp, var_name, Float64, (coord,))

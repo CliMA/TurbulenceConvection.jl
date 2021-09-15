@@ -170,13 +170,13 @@ function initialize_profiles(self::CasesBase{Soares}, Gr::Grid, GMV::GridMeanVar
     qi = 0.0
 
     @inbounds for k in real_center_indices(Gr)
-        if Gr.z_half[k] <= 1350.0
-            GMV.QT.values[k] = 5.0e-3 - 3.7e-4 * Gr.z_half[k] / 1000.0
+        if Gr.zc[k] <= 1350.0
+            GMV.QT.values[k] = 5.0e-3 - 3.7e-4 * Gr.zc[k] / 1000.0
             theta[k] = 300.0
 
         else
-            GMV.QT.values[k] = 5.0e-3 - 3.7e-4 * 1.35 - 9.4e-4 * (Gr.z_half[k] - 1350.0) / 1000.0
-            theta[k] = 300.0 + 2.0 * (Gr.z_half[k] - 1350.0) / 1000.0
+            GMV.QT.values[k] = 5.0e-3 - 3.7e-4 * 1.35 - 9.4e-4 * (Gr.zc[k] - 1350.0) / 1000.0
+            theta[k] = 300.0 + 2.0 * (Gr.zc[k] - 1350.0) / 1000.0
         end
         GMV.U.values[k] = 0.01
     end
@@ -272,13 +272,13 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, Gr::Grid, GMV::GridMea
     qi = 0.0
 
     @inbounds for k in real_center_indices(Gr)
-        if Gr.z_half[k] <= 1350.0
+        if Gr.zc[k] <= 1350.0
             GMV.QT.values[k] = 0.0
             theta[k] = 300.0
 
         else
             GMV.QT.values[k] = 0.0
-            theta[k] = 300.0 + 3.0 * (Gr.z_half[k] - 1350.0) / 1000.0
+            theta[k] = 300.0 + 3.0 * (Gr.zc[k] - 1350.0) / 1000.0
         end
         GMV.U.values[k] = 0.01
     end
@@ -374,40 +374,40 @@ function initialize_profiles(self::CasesBase{Bomex}, Gr::Grid, GMV::GridMeanVari
 
     @inbounds for k in real_center_indices(Gr)
         #Set Thetal profile
-        if Gr.z_half[k] <= 520.0
+        if Gr.zc[k] <= 520.0
             thetal[k] = 298.7
         end
-        if Gr.z_half[k] > 520.0 && Gr.z_half[k] <= 1480.0
-            thetal[k] = 298.7 + (Gr.z_half[k] - 520) * (302.4 - 298.7) / (1480.0 - 520.0)
+        if Gr.zc[k] > 520.0 && Gr.zc[k] <= 1480.0
+            thetal[k] = 298.7 + (Gr.zc[k] - 520) * (302.4 - 298.7) / (1480.0 - 520.0)
         end
-        if Gr.z_half[k] > 1480.0 && Gr.z_half[k] <= 2000
-            thetal[k] = 302.4 + (Gr.z_half[k] - 1480.0) * (308.2 - 302.4) / (2000.0 - 1480.0)
+        if Gr.zc[k] > 1480.0 && Gr.zc[k] <= 2000
+            thetal[k] = 302.4 + (Gr.zc[k] - 1480.0) * (308.2 - 302.4) / (2000.0 - 1480.0)
         end
-        if Gr.z_half[k] > 2000.0
-            thetal[k] = 308.2 + (Gr.z_half[k] - 2000.0) * (311.85 - 308.2) / (3000.0 - 2000.0)
+        if Gr.zc[k] > 2000.0
+            thetal[k] = 308.2 + (Gr.zc[k] - 2000.0) * (311.85 - 308.2) / (3000.0 - 2000.0)
         end
 
         #Set qt profile
-        if Gr.z_half[k] <= 520
-            GMV.QT.values[k] = (17.0 + (Gr.z_half[k]) * (16.3 - 17.0) / 520.0) / 1000.0
+        if Gr.zc[k] <= 520
+            GMV.QT.values[k] = (17.0 + (Gr.zc[k]) * (16.3 - 17.0) / 520.0) / 1000.0
         end
-        if Gr.z_half[k] > 520.0 && Gr.z_half[k] <= 1480.0
-            GMV.QT.values[k] = (16.3 + (Gr.z_half[k] - 520.0) * (10.7 - 16.3) / (1480.0 - 520.0)) / 1000.0
+        if Gr.zc[k] > 520.0 && Gr.zc[k] <= 1480.0
+            GMV.QT.values[k] = (16.3 + (Gr.zc[k] - 520.0) * (10.7 - 16.3) / (1480.0 - 520.0)) / 1000.0
         end
-        if Gr.z_half[k] > 1480.0 && Gr.z_half[k] <= 2000.0
-            GMV.QT.values[k] = (10.7 + (Gr.z_half[k] - 1480.0) * (4.2 - 10.7) / (2000.0 - 1480.0)) / 1000.0
+        if Gr.zc[k] > 1480.0 && Gr.zc[k] <= 2000.0
+            GMV.QT.values[k] = (10.7 + (Gr.zc[k] - 1480.0) * (4.2 - 10.7) / (2000.0 - 1480.0)) / 1000.0
         end
-        if Gr.z_half[k] > 2000.0
-            GMV.QT.values[k] = (4.2 + (Gr.z_half[k] - 2000.0) * (3.0 - 4.2) / (3000.0 - 2000.0)) / 1000.0
+        if Gr.zc[k] > 2000.0
+            GMV.QT.values[k] = (4.2 + (Gr.zc[k] - 2000.0) * (3.0 - 4.2) / (3000.0 - 2000.0)) / 1000.0
         end
 
 
         #Set u profile
-        if Gr.z_half[k] <= 700.0
+        if Gr.zc[k] <= 700.0
             GMV.U.values[k] = -8.75
         end
-        if Gr.z_half[k] > 700.0
-            GMV.U.values[k] = -8.75 + (Gr.z_half[k] - 700.0) * (-4.61 - -8.75) / (3000.0 - 700.0)
+        if Gr.zc[k] > 700.0
+            GMV.U.values[k] = -8.75 + (Gr.zc[k] - 700.0) * (-4.61 - -8.75) / (3000.0 - 700.0)
         end
     end
 
@@ -443,31 +443,31 @@ function initialize_forcing(self::CasesBase{Bomex}, Gr::Grid, Ref::ReferenceStat
     initialize(self.Fo, GMV)
     @inbounds for k in real_center_indices(Gr)
         # Geostrophic velocity profiles. vg = 0
-        self.Fo.ug[k] = -10.0 + (1.8e-3) * Gr.z_half[k]
+        self.Fo.ug[k] = -10.0 + (1.8e-3) * Gr.zc[k]
         ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
         # Set large-scale cooling
-        if Gr.z_half[k] <= 1500.0
+        if Gr.zc[k] <= 1500.0
             self.Fo.dTdt[k] = (-2.0 / (3600 * 24.0)) * Π
         else
             self.Fo.dTdt[k] =
-                (-2.0 / (3600 * 24.0) + (Gr.z_half[k] - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) * Π
+                (-2.0 / (3600 * 24.0) + (Gr.zc[k] - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) * Π
         end
 
         # Set large-scale drying
-        if Gr.z_half[k] <= 300.0
+        if Gr.zc[k] <= 300.0
             self.Fo.dqtdt[k] = -1.2e-8   #kg/(kg * s)
         end
-        if Gr.z_half[k] > 300.0 && Gr.z_half[k] <= 500.0
-            self.Fo.dqtdt[k] = -1.2e-8 + (Gr.z_half[k] - 300.0) * (0.0 - -1.2e-8) / (500.0 - 300.0) #kg/(kg * s)
+        if Gr.zc[k] > 300.0 && Gr.zc[k] <= 500.0
+            self.Fo.dqtdt[k] = -1.2e-8 + (Gr.zc[k] - 300.0) * (0.0 - -1.2e-8) / (500.0 - 300.0) #kg/(kg * s)
         end
 
         #Set large scale subsidence
-        if Gr.z_half[k] <= 1500.0
-            self.Fo.subsidence[k] = 0.0 + Gr.z_half[k] * (-0.65 / 100.0 - 0.0) / (1500.0 - 0.0)
+        if Gr.zc[k] <= 1500.0
+            self.Fo.subsidence[k] = 0.0 + Gr.zc[k] * (-0.65 / 100.0 - 0.0) / (1500.0 - 0.0)
         end
-        if Gr.z_half[k] > 1500.0 && Gr.z_half[k] <= 2100.0
-            self.Fo.subsidence[k] = -0.65 / 100 + (Gr.z_half[k] - 1500.0) * (0.0 - -0.65 / 100.0) / (2100.0 - 1500.0)
+        if Gr.zc[k] > 1500.0 && Gr.zc[k] <= 2100.0
+            self.Fo.subsidence[k] = -0.65 / 100 + (Gr.zc[k] - 1500.0) * (0.0 - -0.65 / 100.0) / (2100.0 - 1500.0)
         end
     end
     return nothing
@@ -513,40 +513,40 @@ function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, GMV:
     qi = 0.0 # IC of Bomex is cloud-free
     @inbounds for k in real_center_indices(Gr)
         #Set Thetal profile
-        if Gr.z_half[k] <= 520.0
+        if Gr.zc[k] <= 520.0
             thetal[k] = 298.7
         end
-        if Gr.z_half[k] > 520.0 && Gr.z_half[k] <= 1480.0
-            thetal[k] = 298.7 + (Gr.z_half[k] - 520) * (302.4 - 298.7) / (1480.0 - 520.0)
+        if Gr.zc[k] > 520.0 && Gr.zc[k] <= 1480.0
+            thetal[k] = 298.7 + (Gr.zc[k] - 520) * (302.4 - 298.7) / (1480.0 - 520.0)
         end
-        if Gr.z_half[k] > 1480.0 && Gr.z_half[k] <= 2000
-            thetal[k] = 302.4 + (Gr.z_half[k] - 1480.0) * (308.2 - 302.4) / (2000.0 - 1480.0)
+        if Gr.zc[k] > 1480.0 && Gr.zc[k] <= 2000
+            thetal[k] = 302.4 + (Gr.zc[k] - 1480.0) * (308.2 - 302.4) / (2000.0 - 1480.0)
         end
-        if Gr.z_half[k] > 2000.0
-            thetal[k] = 308.2 + (Gr.z_half[k] - 2000.0) * (311.85 - 308.2) / (3000.0 - 2000.0)
+        if Gr.zc[k] > 2000.0
+            thetal[k] = 308.2 + (Gr.zc[k] - 2000.0) * (311.85 - 308.2) / (3000.0 - 2000.0)
         end
 
         #Set qt profile
-        if Gr.z_half[k] <= 520
-            GMV.QT.values[k] = (17.0 + (Gr.z_half[k]) * (16.3 - 17.0) / 520.0) / 1000.0
+        if Gr.zc[k] <= 520
+            GMV.QT.values[k] = (17.0 + (Gr.zc[k]) * (16.3 - 17.0) / 520.0) / 1000.0
         end
-        if Gr.z_half[k] > 520.0 && Gr.z_half[k] <= 1480.0
-            GMV.QT.values[k] = (16.3 + (Gr.z_half[k] - 520.0) * (10.7 - 16.3) / (1480.0 - 520.0)) / 1000.0
+        if Gr.zc[k] > 520.0 && Gr.zc[k] <= 1480.0
+            GMV.QT.values[k] = (16.3 + (Gr.zc[k] - 520.0) * (10.7 - 16.3) / (1480.0 - 520.0)) / 1000.0
         end
-        if Gr.z_half[k] > 1480.0 && Gr.z_half[k] <= 2000.0
-            GMV.QT.values[k] = (10.7 + (Gr.z_half[k] - 1480.0) * (4.2 - 10.7) / (2000.0 - 1480.0)) / 1000.0
+        if Gr.zc[k] > 1480.0 && Gr.zc[k] <= 2000.0
+            GMV.QT.values[k] = (10.7 + (Gr.zc[k] - 1480.0) * (4.2 - 10.7) / (2000.0 - 1480.0)) / 1000.0
         end
-        if Gr.z_half[k] > 2000.0
-            GMV.QT.values[k] = (4.2 + (Gr.z_half[k] - 2000.0) * (3.0 - 4.2) / (3000.0 - 2000.0)) / 1000.0
+        if Gr.zc[k] > 2000.0
+            GMV.QT.values[k] = (4.2 + (Gr.zc[k] - 2000.0) * (3.0 - 4.2) / (3000.0 - 2000.0)) / 1000.0
         end
 
 
         #Set u profile
-        if Gr.z_half[k] <= 700.0
+        if Gr.zc[k] <= 700.0
             GMV.U.values[k] = -8.75
         end
-        if Gr.z_half[k] > 700.0
-            GMV.U.values[k] = -8.75 + (Gr.z_half[k] - 700.0) * (-4.61 - -8.75) / (3000.0 - 700.0)
+        if Gr.zc[k] > 700.0
+            GMV.U.values[k] = -8.75 + (Gr.zc[k] - 700.0) * (-4.61 - -8.75) / (3000.0 - 700.0)
         end
     end
 
@@ -592,30 +592,30 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, Gr::Grid, Ref::
     initialize(self.Fo, GMV)
     @inbounds for k in real_center_indices(Gr)
         # Geostrophic velocity profiles. vg = 0
-        self.Fo.ug[k] = -10.0 + (1.8e-3) * Gr.z_half[k]
+        self.Fo.ug[k] = -10.0 + (1.8e-3) * Gr.zc[k]
         ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
         # Set large-scale cooling
-        if Gr.z_half[k] <= 1500.0
+        if Gr.zc[k] <= 1500.0
             self.Fo.dTdt[k] = (-2.0 / (3600 * 24.0)) * Π
         else
             self.Fo.dTdt[k] =
-                (-2.0 / (3600 * 24.0) + (Gr.z_half[k] - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) * Π
+                (-2.0 / (3600 * 24.0) + (Gr.zc[k] - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) * Π
         end
         # Set large-scale drying
-        if Gr.z_half[k] <= 300.0
+        if Gr.zc[k] <= 300.0
             self.Fo.dqtdt[k] = -1.2e-8   #kg/(kg * s)
         end
-        if Gr.z_half[k] > 300.0 && Gr.z_half[k] <= 500.0
-            self.Fo.dqtdt[k] = -1.2e-8 + (Gr.z_half[k] - 300.0) * (0.0 - -1.2e-8) / (500.0 - 300.0) #kg/(kg * s)
+        if Gr.zc[k] > 300.0 && Gr.zc[k] <= 500.0
+            self.Fo.dqtdt[k] = -1.2e-8 + (Gr.zc[k] - 300.0) * (0.0 - -1.2e-8) / (500.0 - 300.0) #kg/(kg * s)
         end
 
         #Set large scale subsidence
-        if Gr.z_half[k] <= 1500.0
-            self.Fo.subsidence[k] = 0.0 + Gr.z_half[k] * (-0.65 / 100.0 - 0.0) / (1500.0 - 0.0)
+        if Gr.zc[k] <= 1500.0
+            self.Fo.subsidence[k] = 0.0 + Gr.zc[k] * (-0.65 / 100.0 - 0.0) / (1500.0 - 0.0)
         end
-        if Gr.z_half[k] > 1500.0 && Gr.z_half[k] <= 2100.0
-            self.Fo.subsidence[k] = -0.65 / 100 + (Gr.z_half[k] - 1500.0) * (0.0 - -0.65 / 100.0) / (2100.0 - 1500.0)
+        if Gr.zc[k] > 1500.0 && Gr.zc[k] <= 2100.0
+            self.Fo.subsidence[k] = -0.65 / 100 + (Gr.zc[k] - 1500.0) * (0.0 - -0.65 / 100.0) / (2100.0 - 1500.0)
         end
     end
     return nothing
@@ -693,22 +693,22 @@ function initialize_profiles(self::CasesBase{Rico}, Gr::Grid, GMV::GridMeanVaria
     qi = 0.0 # IC of Rico is cloud-free
 
     @inbounds for k in real_center_indices(Gr)
-        GMV.U.values[k] = -9.9 + 2.0e-3 * Gr.z_half[k]
+        GMV.U.values[k] = -9.9 + 2.0e-3 * Gr.zc[k]
         GMV.V.values[k] = -3.8
         #Set Thetal profile
-        if Gr.z_half[k] <= 740.0
+        if Gr.zc[k] <= 740.0
             thetal[k] = 297.9
         else
-            thetal[k] = 297.9 + (317.0 - 297.9) / (4000.0 - 740.0) * (Gr.z_half[k] - 740.0)
+            thetal[k] = 297.9 + (317.0 - 297.9) / (4000.0 - 740.0) * (Gr.zc[k] - 740.0)
         end
 
         #Set qt profile
-        if Gr.z_half[k] <= 740.0
-            GMV.QT.values[k] = (16.0 + (13.8 - 16.0) / 740.0 * Gr.z_half[k]) / 1000.0
-        elseif Gr.z_half[k] > 740.0 && Gr.z_half[k] <= 3260.0
-            GMV.QT.values[k] = (13.8 + (2.4 - 13.8) / (3260.0 - 740.0) * (Gr.z_half[k] - 740.0)) / 1000.0
+        if Gr.zc[k] <= 740.0
+            GMV.QT.values[k] = (16.0 + (13.8 - 16.0) / 740.0 * Gr.zc[k]) / 1000.0
+        elseif Gr.zc[k] > 740.0 && Gr.zc[k] <= 3260.0
+            GMV.QT.values[k] = (13.8 + (2.4 - 13.8) / (3260.0 - 740.0) * (Gr.zc[k] - 740.0)) / 1000.0
         else
-            GMV.QT.values[k] = (2.4 + (1.8 - 2.4) / (4000.0 - 3260.0) * (Gr.z_half[k] - 3260.0)) / 1000.0
+            GMV.QT.values[k] = (2.4 + (1.8 - 2.4) / (4000.0 - 3260.0) * (Gr.zc[k] - 3260.0)) / 1000.0
         end
     end
 
@@ -746,21 +746,21 @@ function initialize_forcing(self::CasesBase{Rico}, Gr::Grid, Ref::ReferenceState
         ts = TD.PhaseEquil_pθq(param_set, Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
         # Geostrophic velocity profiles
-        self.Fo.ug[k] = -9.9 + 2.0e-3 * Gr.z_half[k]
+        self.Fo.ug[k] = -9.9 + 2.0e-3 * Gr.zc[k]
         self.Fo.vg[k] = -3.8
         # Set large-scale cooling
         self.Fo.dTdt[k] = (-2.5 / (3600.0 * 24.0)) * Π
 
         # Set large-scale moistening
-        if Gr.z_half[k] <= 2980.0
-            self.Fo.dqtdt[k] = (-1.0 + 1.3456 / 2980.0 * Gr.z_half[k]) / 86400.0 / 1000.0   #kg/(kg * s)
+        if Gr.zc[k] <= 2980.0
+            self.Fo.dqtdt[k] = (-1.0 + 1.3456 / 2980.0 * Gr.zc[k]) / 86400.0 / 1000.0   #kg/(kg * s)
         else
             self.Fo.dqtdt[k] = 0.3456 / 86400.0 / 1000.0
         end
 
         #Set large scale subsidence
-        if Gr.z_half[k] <= 2260.0
-            self.Fo.subsidence[k] = -(0.005 / 2260.0) * Gr.z_half[k]
+        if Gr.zc[k] <= 2260.0
+            self.Fo.subsidence[k] = -(0.005 / 2260.0) * Gr.zc[k]
         else
             self.Fo.subsidence[k] = -0.005
         end
@@ -865,17 +865,17 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, Gr::Grid, GMV::GridMeanV
     #! format: on
     # interpolate to the model grid-points
 
-    p1 = pyinterp(Gr.z_half, z_in, p_in)
-    GMV.U.values .= pyinterp(Gr.z_half, z_in, u_in)
-    GMV.V.values .= pyinterp(Gr.z_half, z_in, v_in)
+    p1 = pyinterp(Gr.zc, z_in, p_in)
+    GMV.U.values .= pyinterp(Gr.zc, z_in, u_in)
+    GMV.V.values .= pyinterp(Gr.zc, z_in, v_in)
 
     # get the entropy from RH, p, T
     RH = TC.center_field(Gr)
-    z_half_in = Gr.z_half
-    RH = pyinterp(z_half_in, z_in, RH_in)
+    zc_in = Gr.zc
+    RH = pyinterp(zc_in, z_in, RH_in)
 
     T = TC.center_field(Gr)
-    T = pyinterp(z_half_in, z_in, T_in)
+    T = pyinterp(zc_in, z_in, T_in)
     GMV.T.values .= T
     theta_rho = RH * 0.0
     epsi = 287.1 / 461.5
@@ -1036,7 +1036,7 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, Ref::Referenc
     # TODO: check translation
     rad_in = reduce(vcat, rad_in')
     A = hcat(map(xrange(0, 36)) do tt
-        a = grid.z_half
+        a = grid.zc
         b = z_in
         c = reshape(rad_in[tt, :], size(rad_in, 2))
         pyinterp(a, b, c)
@@ -1086,7 +1086,7 @@ function TC.update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS
     ind2 = Int(ceil(TS.t / 600.0)) + 1
     ind1 = Int(trunc(TS.t / 600.0)) + 1
     @inbounds for k in real_center_indices(Gr)
-        if Gr.z_half[k] >= 22699.48
+        if Gr.zc[k] >= 22699.48
             self.Fo.dTdt[k] = 0.0
         else
             if TS.t < 600.0 # first 10 min use the radiative forcing of t=10min (as in the paper)
@@ -1148,8 +1148,8 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, Gr::Grid, GMV::GridMeanVa
     qt_in = r_in ./ (1 .+ r_in)
 
     # interpolate to the model grid-points
-    Theta = pyinterp(Gr.z_half, z_in, Theta_in)
-    qt = pyinterp(Gr.z_half, z_in, qt_in)
+    Theta = pyinterp(Gr.zc, z_in, Theta_in)
+    qt = pyinterp(Gr.zc, z_in, qt_in)
 
 
     @inbounds for k in real_center_indices(Gr)
@@ -1235,12 +1235,12 @@ function TC.update_forcing(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS:
     @inbounds for k in real_center_indices(Gr)
         ts = TD.PhaseEquil_pθq(param_set, self.Fo.Ref.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
-        if Gr.z_half[k] <= 1000.0
+        if Gr.zc[k] <= 1000.0
             self.Fo.dTdt[k] = dTdt
             self.Fo.dqtdt[k] = dqtdt * Π
-        elseif Gr.z_half[k] > 1000.0 && Gr.z_half[k] <= 2000.0
-            self.Fo.dTdt[k] = dTdt * (1 - (Gr.z_half[k] - 1000.0) / 1000.0)
-            self.Fo.dqtdt[k] = dqtdt * Π * (1 - (Gr.z_half[k] - 1000.0) / 1000.0)
+        elseif Gr.zc[k] > 1000.0 && Gr.zc[k] <= 2000.0
+            self.Fo.dTdt[k] = dTdt * (1 - (Gr.zc[k] - 1000.0) / 1000.0)
+            self.Fo.dqtdt[k] = dqtdt * Π * (1 - (Gr.zc[k] - 1000.0) / 1000.0)
         end
     end
     update(self.Fo, GMV)
@@ -1300,9 +1300,9 @@ function initialize_profiles(self::CasesBase{GATE_III}, Gr::Grid, GMV::GridMeanV
     #! format: on
 
     # interpolate to the model grid-points
-    T = pyinterp(Gr.z_half, z_T_in, T_in) # interpolate to ref pressure level
-    qt = pyinterp(Gr.z_half, z_in, qt_in)
-    U = pyinterp(Gr.z_half, z_in, U_in)
+    T = pyinterp(Gr.zc, z_T_in, T_in) # interpolate to ref pressure level
+    qt = pyinterp(Gr.zc, z_in, qt_in)
+    U = pyinterp(Gr.zc, z_in, U_in)
 
 
     @inbounds for k in real_center_indices(Gr)
@@ -1357,8 +1357,8 @@ function initialize_forcing(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceS
 
     Qtend_in = r_tend_in ./ (1 .+ r_tend_in) # convert mixing ratio to specific humidity
 
-    self.Fo.dqtdt = pyinterp(Gr.z_half, z_in, Qtend_in)
-    self.Fo.dTdt = pyinterp(Gr.z_half, z_in, Ttend_in) + pyinterp(Gr.z_half, z_in, RAD_in)
+    self.Fo.dqtdt = pyinterp(Gr.zc, z_in, Qtend_in)
+    self.Fo.dTdt = pyinterp(Gr.zc, z_in, Ttend_in) + pyinterp(Gr.zc, z_in, RAD_in)
 end
 
 function initialize_radiation(self::CasesBase{GATE_III}, Gr::Grid, Ref::ReferenceState, GMV::GridMeanVariables)
@@ -1415,18 +1415,18 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, Gr::Grid, GMV::GridMe
 
     @inbounds for k in real_center_indices(Gr)
         # thetal profile as defined in DYCOMS
-        if Gr.z_half[k] <= 840.0
+        if Gr.zc[k] <= 840.0
             thetal[k] = 289.0
         end
-        if Gr.z_half[k] > 840.0
-            thetal[k] = (297.5 + (Gr.z_half[k] - 840.0)^(1.0 / 3.0))
+        if Gr.zc[k] > 840.0
+            thetal[k] = (297.5 + (Gr.zc[k] - 840.0)^(1.0 / 3.0))
         end
 
         # qt profile as defined in DYCOMS
-        if Gr.z_half[k] <= 840.0
+        if Gr.zc[k] <= 840.0
             GMV.QT.values[k] = 9.0 / 1000.0
         end
-        if Gr.z_half[k] > 840.0
+        if Gr.zc[k] > 840.0
             GMV.QT.values[k] = 1.5 / 1000.0
         end
 
@@ -1497,7 +1497,7 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF01}, Gr::Grid, Ref::Referen
     # To be able to have self.Fo.divergence available here,
     # we would have to change the signature of ForcingBase class
     @inbounds for k in real_center_indices(Gr)
-        self.Fo.subsidence[k] = -Gr.z_half[k] * divergence
+        self.Fo.subsidence[k] = -Gr.zc[k] * divergence
     end
 
     # no large-scale drying
@@ -1573,10 +1573,10 @@ function initialize_profiles(self::CasesBase{GABLS}, Gr::Grid, GMV::GridMeanVari
         GMV.V.values[k] = 0.0
 
         #Set Thetal profile
-        if Gr.z_half[k] <= 100.0
+        if Gr.zc[k] <= 100.0
             thetal[k] = 265.0
         else
-            thetal[k] = 265.0 + (Gr.z_half[k] - 100.0) * 0.01
+            thetal[k] = 265.0 + (Gr.zc[k] - 100.0) * 0.01
         end
 
         #Set qt profile
@@ -1671,12 +1671,12 @@ function initialize_profiles(self::CasesBase{SP}, Gr::Grid, GMV::GridMeanVariabl
         GMV.U.values[k] = 1.0
         GMV.V.values[k] = 0.0
         #Set Thetal profile
-        if Gr.z_half[k] <= 974.0
+        if Gr.zc[k] <= 974.0
             thetal[k] = 300.0
-        elseif Gr.z_half[k] < 1074.0
-            thetal[k] = 300.0 + (Gr.z_half[k] - 974.0) * 0.08
+        elseif Gr.zc[k] < 1074.0
+            thetal[k] = 300.0 + (Gr.zc[k] - 974.0) * 0.08
         else
-            thetal[k] = 308.0 + (Gr.z_half[k] - 1074.0) * 0.003
+            thetal[k] = 308.0 + (Gr.zc[k] - 1074.0) * 0.003
         end
 
         #Set qt profile
@@ -1833,8 +1833,8 @@ function initialize_profiles(self::CasesBase{DryBubble}, Gr::Grid, GMV::GridMean
     #! format: on
                        #LES temperature_mean in K
     thetali = TC.center_field(Gr)
-    z_half_in = Gr.z_half
-    thetali = pyinterp(z_half_in, z_in, thetali_in)
+    zc_in = Gr.zc
+    thetali = pyinterp(zc_in, z_in, thetali_in)
     GMV.H.values .= thetali
     @inbounds for k in real_center_indices(Gr)
         GMV.QT.values[k] = 0.0
@@ -1939,10 +1939,10 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, Gr::Grid, GMV::Gri
         imax = time_interval_bool[end]
 
         z_les_half = data.group["profiles"]["z_half"][:, 1]
-        GMV.H.values .= pyinterp(Gr.z_half, z_les_half, TC.get_nc_data(data, "profiles", "thetali_mean", imin, imax))
-        GMV.QT.values .= pyinterp(Gr.z_half, z_les_half, TC.get_nc_data(data, "profiles", "qt_mean", imin, imax))
-        GMV.U.values .= pyinterp(Gr.z_half, z_les_half, TC.get_nc_data(data, "profiles", "u_mean", imin, imax))
-        GMV.V.values .= pyinterp(Gr.z_half, z_les_half, TC.get_nc_data(data, "profiles", "v_mean", imin, imax))
+        GMV.H.values .= pyinterp(Gr.zc, z_les_half, TC.get_nc_data(data, "profiles", "thetali_mean", imin, imax))
+        GMV.QT.values .= pyinterp(Gr.zc, z_les_half, TC.get_nc_data(data, "profiles", "qt_mean", imin, imax))
+        GMV.U.values .= pyinterp(Gr.zc, z_les_half, TC.get_nc_data(data, "profiles", "u_mean", imin, imax))
+        GMV.V.values .= pyinterp(Gr.zc, z_les_half, TC.get_nc_data(data, "profiles", "v_mean", imin, imax))
         satadjust(GMV)
     end
 end

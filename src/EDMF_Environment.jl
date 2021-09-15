@@ -52,11 +52,11 @@ function env_cloud_diagnostics(self::EnvironmentVariables, Ref::ReferenceState)
     self.lwp = 0.0
 
     @inbounds for k in real_center_indices(self.Gr)
-        self.lwp += Ref.rho0_half[k] * self.QL.values[k] * self.Area.values[k] * self.Gr.dz
+        self.lwp += Ref.rho0_half[k] * self.QL.values[k] * self.Area.values[k] * self.Gr.Δz
 
         if self.QL.values[k] > 1e-8 && self.Area.values[k] > 1e-3
-            self.cloud_base = min(self.cloud_base, self.Gr.z_half[k])
-            self.cloud_top = max(self.cloud_top, self.Gr.z_half[k])
+            self.cloud_base = min(self.cloud_base, self.Gr.zc[k])
+            self.cloud_top = max(self.cloud_top, self.Gr.zc[k])
             self.cloud_cover = max(self.cloud_cover, self.Area.values[k] * self.cloud_fraction.values[k])
         end
     end

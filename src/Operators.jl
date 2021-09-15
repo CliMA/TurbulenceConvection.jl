@@ -30,10 +30,10 @@ function ∇f2c(f_dual::SA.SVector, grid::Grid, k::Int, bottom::AbstractBC, top:
     end
 end
 ∇f2c(f::SA.SVector, grid::Grid, ::Int, ::UseBoundaryValue, top::UseBoundaryValue) = ∇f2c(f, grid, InteriorTag())
-∇f2c(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
-∇f2c(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * grid.dzi
+∇f2c(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.Δzi
+∇f2c(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * grid.Δzi
 ∇f2c(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
-∇f2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[2] - bc.value) * grid.dzi
+∇f2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[2] - bc.value) * grid.Δzi
 ∇f2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
 # TODO: this should be changed to `c∇` or `c∇_upwind`
@@ -47,13 +47,13 @@ function c∇_downwind(f_dual::SA.SVector, grid::Grid, k::Int; bottom = NoBCGive
         return c∇_downwind(f_dual, grid, InteriorTag())
     end
 end
-c∇_downwind(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
-c∇_downwind(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.dzi * 2)
+c∇_downwind(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.Δzi
+c∇_downwind(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.Δzi * 2)
 # TODO: this is a crud approximation, as we're specifying what should be the derivative
 # at the boundary, and we're taking this as the derivative at the first interior at the
 # top of the domain.
 c∇_downwind(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
-c∇_downwind(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.dzi # don't use BC info
+c∇_downwind(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.Δzi # don't use BC info
 # TODO: this is a crud approximation, as we're specifying what should be the derivative
 # at the boundary, and we're taking this as the derivative at the first interior at the
 # top of the domain.
@@ -71,10 +71,10 @@ function c∇_upwind(f_dual::SA.SVector, grid::Grid, k::Int; bottom = NoBCGivenE
         return c∇_upwind(f_dual, grid, InteriorTag())
     end
 end
-c∇_upwind(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
-c∇_upwind(f::SA.SVector, grid::Grid, ::TopBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.dzi
+c∇_upwind(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.Δzi
+c∇_upwind(f::SA.SVector, grid::Grid, ::TopBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.Δzi
 c∇_upwind(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
-c∇_upwind(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[1] - bc.value) * (grid.dzi * 2)
+c∇_upwind(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[1] - bc.value) * (grid.Δzi * 2)
 c∇_upwind(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
 function f∇_onesided(f_dual::SA.SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
@@ -86,10 +86,10 @@ function f∇_onesided(f_dual::SA.SVector, grid::Grid, k::Int; bottom = NoBCGive
         return f∇_onesided(f_dual, grid, InteriorTag())
     end
 end
-f∇_onesided(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.dzi
-f∇_onesided(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.dzi * 2)
+f∇_onesided(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.Δzi
+f∇_onesided(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.Δzi * 2)
 f∇_onesided(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
-f∇_onesided(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.dzi # don't use BC info
+f∇_onesided(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.Δzi # don't use BC info
 f∇_onesided(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
 # Used when traversing cell faces
@@ -307,7 +307,7 @@ end
 
 function ∇_staggered(f::SA.SVector, grid::Grid)
     @assert length(f) == 2
-    return (f[2] - f[1]) * grid.dzi
+    return (f[2] - f[1]) * grid.Δzi
 end
 
 """
