@@ -4,7 +4,7 @@
 import TurbulenceConvection
 import Plots
 import NCDatasets
-using CLIMAParameters
+import CLIMAParameters
 tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
 include(joinpath(tc_dir, "integration_tests", "utils", "generate_namelist.jl"))
 include(joinpath(tc_dir, "integration_tests", "utils", "Cases.jl"))

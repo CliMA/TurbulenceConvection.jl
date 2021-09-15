@@ -66,12 +66,12 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
     rz_span = (grid.zmax, grid.zmin)
     params = (; κ = self.kappa)
 
-    rprob = ODEProblem(rintegrand, 0.0, rz_span, params; dt = grid.Δz)
-    rsol = solve(rprob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
+    rprob = ODE.ODEProblem(rintegrand, 0.0, rz_span, params; dt = grid.Δz)
+    rsol = ODE.solve(rprob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
     q_0 = rsol.(vec(grid.zf))
 
-    prob = ODEProblem(integrand, 0.0, z_span, params; dt = grid.Δz)
-    sol = solve(prob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
+    prob = ODE.ODEProblem(integrand, 0.0, z_span, params; dt = grid.Δz)
+    sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
     q_1 = sol.(vec(grid.zf))
     self.f_rad .= self.F0 .* exp.(-q_0)
     self.f_rad .+= self.F1 .* exp.(-q_1)
