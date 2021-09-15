@@ -15,7 +15,9 @@ import Thermodynamics
 import Distributions
 import FastGaussQuadrature
 import CLIMAParameters
+import OrdinaryDiffEq
 
+const ODE = OrdinaryDiffEq
 const CC = ClimaCore
 const NC = NCDatasets
 const SA = StaticArrays

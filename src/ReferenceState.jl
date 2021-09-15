@@ -1,8 +1,5 @@
 #### RefState
 
-using OrdinaryDiffEq
-using UnPack
-
 mutable struct ReferenceState{PS, A1}
     param_set::PS
     p0::A1
@@ -73,8 +70,8 @@ function initialize(self::ReferenceState, grid::Grid, Stats::NetCDFIO_Stats)
     # Perform the integration
     z_span = (grid.zmin, grid.zmax)
     @show z_span
-    prob = ODEProblem(rhs, logp, z_span)
-    sol = solve(prob, Tsit5(), reltol = 1e-12, abstol = 1e-12)
+    prob = ODE.ODEProblem(rhs, logp, z_span)
+    sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
 
     p .= sol.(vec(grid.zf))
     p_half .= sol.(vec(grid.zc))
