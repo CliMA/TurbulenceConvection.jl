@@ -883,7 +883,7 @@ Base.@kwdef mutable struct CasesBase{T}
     LESDat::Union{LESData, Nothing} = nothing
 end
 
-mutable struct EDMF_PrognosticTKE{PS, A1, A2}
+mutable struct EDMF_PrognosticTKE{PS, A1, A2, IE}
     param_set::PS
     turbulence_tendency::A1
     grid::Grid
@@ -923,6 +923,10 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     asp_ratio::A2
     m::A2
     mixing_length::A1
+    implicit_eqs::IE
+    ae::A1
+    rho_ae_KM::A1
+    rho_ae_KH::A1
     horiz_K_eddy::A2
     area_surface_bc::A1
     w_surface_bc::A1
@@ -1041,8 +1045,28 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         m = face_field(grid, n_updrafts)
 
         # mixing length
+        implicit_eqs = (
+            A_θq_gm = LinearAlgebra.Tridiagonal(
+                center_field(grid)[2:end],
+                center_field(grid),
+                center_field(grid)[1:(end - 1)],
+            ),
+            A_uv_gm = LinearAlgebra.Tridiagonal(
+                center_field(grid)[2:end],
+                center_field(grid),
+                center_field(grid)[1:(end - 1)],
+            ),
+            b_θ_liq_ice_gm = center_field(grid),
+            b_q_tot_gm = center_field(grid),
+            b_u_gm = center_field(grid),
+            b_v_gm = center_field(grid),
+        )
         mixing_length = center_field(grid)
         horiz_K_eddy = center_field(grid, n_updrafts)
+
+        ae = center_field(grid)
+        rho_ae_KM = face_field(grid)
+        rho_ae_KH = face_field(grid)
 
         # Near-surface BC of updraft area fraction
         area_surface_bc = zeros(n_updrafts)
@@ -1104,7 +1128,8 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         detr_surface_bc = 0
         A1 = typeof(mixing_length)
         A2 = typeof(horiz_K_eddy)
-        return new{PS, A1, A2}(
+        IE = typeof(implicit_eqs)
+        return new{PS, A1, A2, IE}(
             param_set,
             turbulence_tendency,
             grid,
@@ -1144,6 +1169,10 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
             asp_ratio,
             m,
             mixing_length,
+            implicit_eqs,
+            ae,
+            rho_ae_KM,
+            rho_ae_KH,
             horiz_K_eddy,
             area_surface_bc,
             w_surface_bc,
