@@ -395,8 +395,8 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     # ----------- TODO: move to compute_tendencies
     implicit_eqs = self.implicit_eqs
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
-    implicit_eqs.A_θq_gm .= construct_tridiag_diffusion(grid, TS.dt, self.rho_ae_KH, ref_state.rho0_half, self.ae)
-    implicit_eqs.A_uv_gm .= construct_tridiag_diffusion(grid, TS.dt, self.rho_ae_KM, ref_state.rho0_half, self.ae)
+    implicit_eqs.A_θq_gm .= construct_tridiag_diffusion_gm(grid, TS.dt, self.rho_ae_KH, ref_state.rho0_half, self.ae)
+    implicit_eqs.A_uv_gm .= construct_tridiag_diffusion_gm(grid, TS.dt, self.rho_ae_KM, ref_state.rho0_half, self.ae)
     Δzi = grid.Δzi
     @inbounds for k in real_center_indices(grid)
         implicit_eqs.b_u_gm[k] = GMV.U.values[k]
@@ -410,6 +410,41 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
             implicit_eqs.b_θ_liq_ice_gm[k] += TS.dt * Case.Sur.rho_hflux * Δzi * ref_state.alpha0_half[k] / self.ae[k]
         end
     end
+
+    gm = GMV
+    up = self.UpdVar
+    en = self.EnvVar
+    KM = diffusivity_m(self).values
+    KH = diffusivity_h(self).values
+    common_args = (
+        grid,
+        param_set,
+        ref_state,
+        TS,
+        KM,
+        KH,
+        up.Area.bulkvalues,
+        up.Area.values,
+        up.W.values,
+        en.W.values,
+        en.TKE.values,
+        self.n_updrafts,
+        self.minimum_area,
+        self.pressure_plume_spacing,
+        self.frac_turb_entr,
+        self.entr_sc,
+        self.mixing_length,
+    )
+
+    implicit_eqs.A_TKE .= construct_tridiag_diffusion_en(common_args..., true)
+    implicit_eqs.A_Hvar .= construct_tridiag_diffusion_en(common_args..., false)
+    implicit_eqs.A_QTvar .= construct_tridiag_diffusion_en(common_args..., false)
+    implicit_eqs.A_HQTcov .= construct_tridiag_diffusion_en(common_args..., false)
+
+    implicit_eqs.b_TKE .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.old, en.TKE)
+    implicit_eqs.b_Hvar .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.old, en.Hvar)
+    implicit_eqs.b_QTvar .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.old, en.QTvar)
+    implicit_eqs.b_HQTcov .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.old, en.HQTcov)
     # -----------
 
     update_GMV_ED(self, GMV, Case, TS)
@@ -1279,10 +1314,20 @@ function update_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Cas
     gm = GMV
     up = self.UpdVar
     en = self.EnvVar
-    update_covariance_ED(self, gm, Case, TS, gm.W, gm.W, gm.TKE, en.TKE, en.W, en.W, up.W, up.W)
-    update_covariance_ED(self, gm, Case, TS, gm.H, gm.H, gm.Hvar, en.Hvar, en.H, en.H, up.H, up.H)
-    update_covariance_ED(self, gm, Case, TS, gm.QT, gm.QT, gm.QTvar, en.QTvar, en.QT, en.QT, up.QT, up.QT)
-    update_covariance_ED(self, gm, Case, TS, gm.H, gm.QT, gm.HQTcov, en.HQTcov, en.H, en.QT, up.H, up.QT)
+
+    A_TKE = self.implicit_eqs.A_TKE
+    A_Hvar = self.implicit_eqs.A_Hvar
+    A_QTvar = self.implicit_eqs.A_QTvar
+    A_HQTcov = self.implicit_eqs.A_HQTcov
+    b_TKE = self.implicit_eqs.b_TKE
+    b_Hvar = self.implicit_eqs.b_Hvar
+    b_QTvar = self.implicit_eqs.b_QTvar
+    b_HQTcov = self.implicit_eqs.b_HQTcov
+
+    update_covariance_ED(self, gm.W, gm.W, gm.TKE, en.TKE, en.W, en.W, up.W, up.W, A_TKE, b_TKE)
+    update_covariance_ED(self, gm.H, gm.H, gm.Hvar, en.Hvar, en.H, en.H, up.H, up.H, A_Hvar, b_Hvar)
+    update_covariance_ED(self, gm.QT, gm.QT, gm.QTvar, en.QTvar, en.QT, en.QT, up.QT, up.QT, A_QTvar, b_QTvar)
+    update_covariance_ED(self, gm.H, gm.QT, gm.HQTcov, en.HQTcov, en.H, en.QT, up.H, up.QT, A_HQTcov, b_HQTcov)
     return
 end
 
@@ -1566,11 +1611,37 @@ function compute_covariance_dissipation(self::EDMF_PrognosticTKE, Covar::Environ
     return
 end
 
+function en_diffusion_tendencies(grid::Grid, ref_state::ReferenceState, TS, a_up_old, covar)
+
+    dti = TS.dti
+    b = center_field(grid)
+    ρ0_c = ref_state.rho0_half
+
+    ae_old = 1 .- up_sum(a_up_old)
+
+    kc_surf = kc_surface(grid)
+    covar_surf = covar.values[kc_surf]
+
+    @inbounds for k in real_center_indices(grid)
+        if is_surface_center(grid, k)
+            b[k] = covar_surf
+        else
+            b[k] = (
+                ρ0_c[k] * ae_old[k] * covar.values[k] * dti +
+                covar.press[k] +
+                covar.buoy[k] +
+                covar.shear[k] +
+                covar.entr_gain[k] +
+                covar.rain_src[k]
+            )
+        end
+    end
+
+    return b
+end
+
 function update_covariance_ED(
     self::EDMF_PrognosticTKE,
-    GMV::GridMeanVariables,
-    Case::CasesBase,
-    TS::TimeStepping,
     GmvVar1::VariablePrognostic,
     GmvVar2::VariablePrognostic,
     GmvCovar::VariableDiagnostic,
@@ -1579,96 +1650,12 @@ function update_covariance_ED(
     EnvVar2::EnvironmentVariable,
     UpdVar1::UpdraftVariable,
     UpdVar2::UpdraftVariable,
+    A,
+    b,
 )
-
     grid = get_grid(self)
-    param_set = parameter_set(self)
-    c_d = CPEDMF.c_d(param_set)
-    kc_surf = kc_surface(grid)
-    kf_surf = kf_surface(grid)
-    kc_toa = kc_top_of_atmos(grid)
-    Δzi = grid.Δzi
-    dti = TS.dti
-    ref_state = reference_state(self)
-    alpha0LL = ref_state.alpha0_half[kc_surf]
-    zLL = grid.zc[kc_surf]
-    a = center_field(grid)
-    b = center_field(grid)
-    c = center_field(grid)
     x = center_field(grid)
-    ae = 1 .- self.UpdVar.Area.bulkvalues
-    ae_old = 1 .- up_sum(self.UpdVar.Area.old)
-    rho_ae_K_m = face_field(grid)
-    w_en_c = center_field(grid)
-    D_env = 0.0
-    KM = diffusivity_m(self).values
-    KH = diffusivity_h(self).values
-    is_tke = Covar.name == "tke"
-
-    aeK = is_tke ? ae .* KM : ae .* KH
-    aeK_bcs = (; bottom = SetValue(aeK[kc_surf]), top = SetValue(aeK[kc_toa]))
-
-    @inbounds for k in real_face_indices(grid)
-        rho_ae_K_m[k] = interpc2f(aeK, grid, k; aeK_bcs...) * ref_state.rho0[k]
-    end
-
-    @inbounds for k in real_center_indices(grid)
-        w_en_c[k] = interpf2c(self.EnvVar.W.values, grid, k)
-    end
-
-    Covar_surf = Covar.values[kc_surf]
-
-    @inbounds for k in real_center_indices(grid)
-        D_env = 0.0
-
-        @inbounds for i in xrange(self.n_updrafts)
-            if self.UpdVar.Area.values[i, k] > self.minimum_area
-                turb_entr = self.frac_turb_entr[i, k]
-                R_up = self.pressure_plume_spacing[i]
-                w_up_c = interpf2c(self.UpdVar.W.values, grid, k, i)
-                D_env +=
-                    ref_state.rho0_half[k] * self.UpdVar.Area.values[i, k] * w_up_c * (self.entr_sc[i, k] + turb_entr)
-            else
-                D_env = 0.0
-            end
-        end
-
-        # TODO: this tridiagonal matrix needs to be re-verified, as it's been pragmatically
-        #       modified to not depend on ghost points, and these changes have not been
-        #       carefully verified.
-        if is_surface_center(grid, k)
-            a[k] = 0.0
-            b[k] = 1.0
-            c[k] = 0.0
-            x[k] = Covar_surf
-        else
-            a[k] = (-rho_ae_K_m[k] * Δzi * Δzi)
-            b[k] = (
-                ref_state.rho0_half[k] * ae[k] * dti - ref_state.rho0_half[k] * ae[k] * w_en_c[k] * Δzi +
-                rho_ae_K_m[k + 1] * Δzi * Δzi +
-                rho_ae_K_m[k] * Δzi * Δzi +
-                D_env +
-                ref_state.rho0_half[k] * ae[k] * c_d * sqrt(max(self.EnvVar.TKE.values[k], 0)) /
-                max(self.mixing_length[k], 1)
-            )
-            x[k] = (
-                ref_state.rho0_half[k] * ae_old[k] * Covar.values[k] * dti +
-                Covar.press[k] +
-                Covar.buoy[k] +
-                Covar.shear[k] +
-                Covar.entr_gain[k] +
-                Covar.rain_src[k]
-            )
-            if is_toa_center(grid, k)
-                c[k] = 0.0
-            else
-                c[k] = (ref_state.rho0_half[k + 1] * ae[k + 1] * w_en_c[k + 1] * Δzi - rho_ae_K_m[k + 1] * Δzi * Δzi)
-            end
-        end
-    end
-
-    x .= tridiag_solve(x, a, b, c)
-
+    x .= tridiag_solve(b, A)
     @inbounds for k in real_center_indices(grid)
         if Covar.name == "thetal_qt_covar"
             Covar.values[k] = max(x[k], -sqrt(self.EnvVar.Hvar.values[k] * self.EnvVar.QTvar.values[k]))
@@ -1677,7 +1664,6 @@ function update_covariance_ED(
             Covar.values[k] = max(x[k], 0.0)
         end
     end
-
     get_GMV_CoVar(
         self,
         self.UpdVar.Area,
@@ -1690,7 +1676,6 @@ function update_covariance_ED(
         GmvVar2.values,
         GmvCovar.values,
     )
-
     return
 end
 

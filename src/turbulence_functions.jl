@@ -55,36 +55,6 @@ function get_surface_variance(flux1, flux2, ustar, zLL, oblength)
     end
 end
 
-function construct_tridiag_diffusion(grid, dt, ρ_ae_K_m, ρ_0, ae)
-    a = center_field(grid) # for tridiag solver
-    b = center_field(grid) # for tridiag solver
-    c = center_field(grid) # for tridiag solver
-    Δzi = grid.Δzi
-    @inbounds for k in real_center_indices(grid)
-        X = ρ_0[k] * ae[k] / dt
-        Y = ρ_ae_K_m[k + 1] * Δzi * Δzi
-        Z = ρ_ae_K_m[k] * Δzi * Δzi
-        if is_surface_center(grid, k)
-            Z = 0.0
-        elseif is_toa_center(grid, k)
-            Y = 0.0
-        end
-        a[k] = -Z / X
-        b[k] = 1.0 + Y / X + Z / X
-        c[k] = -Y / X
-    end
-    A = LinearAlgebra.Tridiagonal(a[2:end], vec(b), c[1:(end - 1)])
-    return A
-end
-
-tridiag_solve(b_rhs, A) = A \ b_rhs
-
-# Still need this temporarily
-function tridiag_solve(b_rhs, a, b, c)
-    A = LinearAlgebra.Tridiagonal(a[2:end], parent(b), c[1:(end - 1)])
-    return A \ parent(b_rhs)
-end
-
 # Dustbin
 
 function set_cloudbase_flag(ql, current_flag)

@@ -517,3 +517,123 @@ function dual_centers(f::AbstractMatrix, grid, k::Int, i_up::Int)
         return SA.SVector(f[i_up, k - 1], f[i_up, k])
     end
 end
+
+
+#####
+##### Implicit operators
+#####
+
+
+function construct_tridiag_diffusion_gm(grid::Grid, dt, ρ_ae_K_m, ρ_0, ae)
+    a = center_field(grid) # for tridiag solver
+    b = center_field(grid) # for tridiag solver
+    c = center_field(grid) # for tridiag solver
+    Δzi = grid.Δzi
+    @inbounds for k in real_center_indices(grid)
+        X = ρ_0[k] * ae[k] / dt
+        Y = ρ_ae_K_m[k + 1] * Δzi * Δzi
+        Z = ρ_ae_K_m[k] * Δzi * Δzi
+        if is_surface_center(grid, k)
+            Z = 0.0
+        elseif is_toa_center(grid, k)
+            Y = 0.0
+        end
+        a[k] = -Z / X
+        b[k] = 1.0 + Y / X + Z / X
+        c[k] = -Y / X
+    end
+    A = LinearAlgebra.Tridiagonal(a[2:end], vec(b), c[1:(end - 1)])
+    return A
+end
+
+tridiag_solve(b_rhs, A) = A \ b_rhs
+
+# TODO: clean this up somehow!
+function construct_tridiag_diffusion_en(
+    grid::Grid,
+    param_set::APS,
+    ref_state::ReferenceState,
+    TS,
+    KM,
+    KH,
+    a_up_bulk,
+    a_up,
+    w_up,
+    w_en,
+    tke_en,
+    n_updrafts::Int,
+    minimum_area::Float64,
+    pressure_plume_spacing::Vector,
+    frac_turb_entr,
+    entr_sc,
+    mixing_length,
+    is_tke,
+)
+
+    c_d = CPEDMF.c_d(param_set)
+    kc_surf = kc_surface(grid)
+    kc_toa = kc_top_of_atmos(grid)
+    Δzi = grid.Δzi
+    dti = TS.dti
+    a = center_field(grid)
+    b = center_field(grid)
+    c = center_field(grid)
+    ρ0_c = ref_state.rho0_half
+
+    ae = 1 .- a_up_bulk
+    rho_ae_K_m = face_field(grid)
+    w_en_c = center_field(grid)
+    D_env = 0.0
+
+    aeK = is_tke ? ae .* KM : ae .* KH
+    aeK_bcs = (; bottom = SetValue(aeK[kc_surf]), top = SetValue(aeK[kc_toa]))
+
+    @inbounds for k in real_face_indices(grid)
+        rho_ae_K_m[k] = interpc2f(aeK, grid, k; aeK_bcs...) * ref_state.rho0[k]
+    end
+
+    @inbounds for k in real_center_indices(grid)
+        w_en_c[k] = interpf2c(w_en, grid, k)
+    end
+
+    @inbounds for k in real_center_indices(grid)
+        D_env = 0.0
+
+        @inbounds for i in xrange(n_updrafts)
+            if a_up[i, k] > minimum_area
+                turb_entr = frac_turb_entr[i, k]
+                R_up = pressure_plume_spacing[i]
+                w_up_c = interpf2c(w_up, grid, k, i)
+                D_env += ρ0_c[k] * a_up[i, k] * w_up_c * (entr_sc[i, k] + turb_entr)
+            else
+                D_env = 0.0
+            end
+        end
+
+        # TODO: this tridiagonal matrix needs to be re-verified, as it's been pragmatically
+        #       modified to not depend on ghost points, and these changes have not been
+        #       carefully verified.
+        if is_surface_center(grid, k)
+            a[k] = 0.0
+            b[k] = 1.0
+            c[k] = 0.0
+        else
+            a[k] = (-rho_ae_K_m[k] * Δzi * Δzi)
+            b[k] = (
+                ρ0_c[k] * ae[k] * dti - ρ0_c[k] * ae[k] * w_en_c[k] * Δzi +
+                rho_ae_K_m[k + 1] * Δzi * Δzi +
+                rho_ae_K_m[k] * Δzi * Δzi +
+                D_env +
+                ρ0_c[k] * ae[k] * c_d * sqrt(max(tke_en[k], 0)) / max(mixing_length[k], 1)
+            )
+            if is_toa_center(grid, k)
+                c[k] = 0.0
+            else
+                c[k] = (ρ0_c[k + 1] * ae[k + 1] * w_en_c[k + 1] * Δzi - rho_ae_K_m[k + 1] * Δzi * Δzi)
+            end
+        end
+    end
+
+    A = LinearAlgebra.Tridiagonal(a[2:end], vec(b), c[1:(end - 1)])
+    return A
+end

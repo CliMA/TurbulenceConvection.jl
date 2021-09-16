@@ -883,6 +883,10 @@ Base.@kwdef mutable struct CasesBase{T}
     LESDat::Union{LESData, Nothing} = nothing
 end
 
+function center_field_tridiagonal_matrix(grid::Grid)
+    return LinearAlgebra.Tridiagonal(center_field(grid)[2:end], center_field(grid), center_field(grid)[1:(end - 1)])
+end
+
 mutable struct EDMF_PrognosticTKE{PS, A1, A2, IE}
     param_set::PS
     turbulence_tendency::A1
@@ -1046,20 +1050,20 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2, IE}
 
         # mixing length
         implicit_eqs = (
-            A_θq_gm = LinearAlgebra.Tridiagonal(
-                center_field(grid)[2:end],
-                center_field(grid),
-                center_field(grid)[1:(end - 1)],
-            ),
-            A_uv_gm = LinearAlgebra.Tridiagonal(
-                center_field(grid)[2:end],
-                center_field(grid),
-                center_field(grid)[1:(end - 1)],
-            ),
+            A_θq_gm = center_field_tridiagonal_matrix(grid),
+            A_uv_gm = center_field_tridiagonal_matrix(grid),
+            A_TKE = center_field_tridiagonal_matrix(grid),
+            A_Hvar = center_field_tridiagonal_matrix(grid),
+            A_QTvar = center_field_tridiagonal_matrix(grid),
+            A_HQTcov = center_field_tridiagonal_matrix(grid),
             b_θ_liq_ice_gm = center_field(grid),
             b_q_tot_gm = center_field(grid),
             b_u_gm = center_field(grid),
             b_v_gm = center_field(grid),
+            b_TKE = center_field(grid),
+            b_Hvar = center_field(grid),
+            b_QTvar = center_field(grid),
+            b_HQTcov = center_field(grid),
         )
         mixing_length = center_field(grid)
         horiz_K_eddy = center_field(grid, n_updrafts)
