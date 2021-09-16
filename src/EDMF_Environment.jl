@@ -21,7 +21,7 @@ function initialize_io(self::EnvironmentVariables, Stats::NetCDFIO_Stats)
     return
 end
 
-function io(self::EnvironmentVariables, Stats::NetCDFIO_Stats, Ref::ReferenceState)
+function io(self::EnvironmentVariables, Stats::NetCDFIO_Stats, ref_state::ReferenceState)
     write_profile(Stats, "env_w", self.W.values)
     write_profile(Stats, "env_qt", self.QT.values)
     write_profile(Stats, "env_ql", self.QL.values)
@@ -36,7 +36,7 @@ function io(self::EnvironmentVariables, Stats::NetCDFIO_Stats, Ref::ReferenceSta
 
     write_profile(Stats, "env_cloud_fraction", self.cloud_fraction.values)
 
-    env_cloud_diagnostics(self, Ref)
+    env_cloud_diagnostics(self, ref_state)
     # Assuming amximum overlap in environmental clouds
     write_ts(Stats, "env_cloud_cover", self.cloud_cover)
     write_ts(Stats, "env_cloud_base", self.cloud_base)
@@ -45,18 +45,18 @@ function io(self::EnvironmentVariables, Stats::NetCDFIO_Stats, Ref::ReferenceSta
     return
 end
 
-function env_cloud_diagnostics(self::EnvironmentVariables, Ref::ReferenceState)
+function env_cloud_diagnostics(self::EnvironmentVariables, ref_state::ReferenceState)
     self.cloud_top = 0.0
-    self.cloud_base = zc_toa(self.Gr)
+    self.cloud_base = zc_toa(self.grid)
     self.cloud_cover = 0.0
     self.lwp = 0.0
 
-    @inbounds for k in real_center_indices(self.Gr)
-        self.lwp += Ref.rho0_half[k] * self.QL.values[k] * self.Area.values[k] * self.Gr.Δz
+    @inbounds for k in real_center_indices(self.grid)
+        self.lwp += ref_state.rho0_half[k] * self.QL.values[k] * self.Area.values[k] * self.grid.Δz
 
         if self.QL.values[k] > 1e-8 && self.Area.values[k] > 1e-3
-            self.cloud_base = min(self.cloud_base, self.Gr.zc[k])
-            self.cloud_top = max(self.cloud_top, self.Gr.zc[k])
+            self.cloud_base = min(self.cloud_base, self.grid.zc[k])
+            self.cloud_top = max(self.cloud_top, self.grid.zc[k])
             self.cloud_cover = max(self.cloud_cover, self.Area.values[k] * self.cloud_fraction.values[k])
         end
     end
@@ -67,8 +67,8 @@ function update_EnvVar(self::EnvironmentThermodynamics, k, EnvVar::EnvironmentVa
     param_set = parameter_set(EnvVar)
     EnvVar.T.values[k] = T
     EnvVar.QL.values[k] = ql
-    EnvVar.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
-    ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], H, qt)
+    EnvVar.B.values[k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
+    ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], H, qt)
     EnvVar.RH.values[k] = TD.relative_humidity(ts)
     return
 end
@@ -101,18 +101,18 @@ function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::Environm
     sa = eos_struct()
     mph = mph_struct()
 
-    @inbounds for k in real_center_indices(self.Gr)
-        sa = eos(param_set, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
+    @inbounds for k in real_center_indices(self.grid)
+        sa = eos(param_set, self.ref_state.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
 
         EnvVar.T.values[k] = sa.T
         EnvVar.QL.values[k] = sa.ql
         rho = rho_c(
-            self.Ref.p0_half[k],
+            self.ref_state.p0_half[k],
             EnvVar.T.values[k],
             EnvVar.QT.values[k],
             EnvVar.QT.values[k] - EnvVar.QL.values[k],
         )
-        EnvVar.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
+        EnvVar.B.values[k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
 
         update_cloud_dry(
             self,
@@ -135,9 +135,9 @@ function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables,
     sa = eos_struct()
     mph = mph_struct()
 
-    @inbounds for k in real_center_indices(self.Gr)
+    @inbounds for k in real_center_indices(self.grid)
         # condensation
-        sa = eos(param_set, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
+        sa = eos(param_set, self.ref_state.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
         # autoconversion and accretion
         mph = microphysics_rain_src(
             param_set,
@@ -153,8 +153,8 @@ function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables,
             Rain.Env_QR.values[k],
             EnvVar.Area.values[k],
             sa.T,
-            self.Ref.p0_half[k],
-            self.Ref.rho0_half[k],
+            self.ref_state.p0_half[k],
+            self.ref_state.rho0_half[k],
             dt,
         )
         update_EnvVar(self, k, EnvVar, sa.T, mph.thl, mph.qt, mph.ql, mph.rho)
@@ -197,7 +197,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
     i_ql, i_T, i_thl, i_rho, i_cf, i_qt_cld, i_qt_dry, i_T_cld, i_T_dry, i_rf = xrange(env_len)
     i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH = xrange(src_len)
 
-    @inbounds for k in real_center_indices(self.Gr)
+    @inbounds for k in real_center_indices(self.grid)
         if (
             EnvVar.QTvar.values[k] > epsilon &&
             EnvVar.Hvar.values[k] > epsilon &&
@@ -274,7 +274,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                     end
 
                     # condensation
-                    sa = eos(param_set, self.Ref.p0_half[k], qt_hat, h_hat)
+                    sa = eos(param_set, self.ref_state.p0_half[k], qt_hat, h_hat)
                     # autoconversion and accretion
                     mph = microphysics_rain_src(
                         param_set,
@@ -290,8 +290,8 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                         Rain.Env_QR.values[k],
                         EnvVar.Area.values[k],
                         sa.T,
-                        self.Ref.p0_half[k],
-                        self.Ref.rho0_half[k],
+                        self.ref_state.p0_half[k],
+                        self.ref_state.rho0_half[k],
                         dt,
                     )
 
@@ -349,12 +349,12 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
             # Charlie - this breaks when using PhaseEquil_pTq(...)
             phase_part = TD.PhasePartition(self.qt_dry[k], 0.0, 0.0)
             self.th_dry[k] =
-                TD.dry_pottemp_given_pressure(param_set, outer_env[i_T_dry], self.Ref.p0_half[k], phase_part)
+                TD.dry_pottemp_given_pressure(param_set, outer_env[i_T_dry], self.ref_state.p0_half[k], phase_part)
 
             self.t_cloudy[k] = outer_env[i_T_cld]
             self.qv_cloudy[k] = outer_env[i_qt_cld] - outer_env[i_ql]
             self.qt_cloudy[k] = outer_env[i_qt_cld]
-            ts_cld = TD.PhaseEquil_pTq(param_set, self.Ref.p0_half[k], self.t_cloudy[k], self.qt_cloudy[k])
+            ts_cld = TD.PhaseEquil_pTq(param_set, self.ref_state.p0_half[k], self.t_cloudy[k], self.qt_cloudy[k])
             self.th_cloudy[k] = TD.dry_pottemp(ts_cld)
 
             # update var/covar rain sources
@@ -366,7 +366,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
 
         else
             # if variance and covariance are zero do the same as in SA_mean
-            sa = eos(param_set, self.Ref.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
+            sa = eos(param_set, self.ref_state.p0_half[k], EnvVar.QT.values[k], EnvVar.H.values[k])
             mph = microphysics_rain_src(
                 param_set,
                 Rain.rain_model,
@@ -381,8 +381,8 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                 Rain.Env_QR.values[k],
                 EnvVar.Area.values[k],
                 sa.T,
-                self.Ref.p0_half[k],
-                self.Ref.rho0_half[k],
+                self.ref_state.p0_half[k],
+                self.ref_state.rho0_half[k],
                 dt,
             )
             update_EnvVar(self, k, EnvVar, sa.T, mph.thl, mph.qt, mph.ql, mph.rho)

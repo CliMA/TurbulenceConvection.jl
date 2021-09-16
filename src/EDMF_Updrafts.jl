@@ -1,10 +1,10 @@
 function initialize(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
-    kc_surf = kc_surface(self.Gr)
+    kc_surf = kc_surface(self.grid)
 
     self.W.values .= 0
     self.B.values .= 0
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_center_indices(self.Gr)
+        @inbounds for k in real_center_indices(self.grid)
             # Simple treatment for now, revise when multiple updraft closures
             # become more well defined
             if self.prognostic
@@ -26,8 +26,8 @@ function initialize(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
     return
 end
 
-function initialize_DryBubble(tptke, self::UpdraftVariables, GMV::GridMeanVariables, Ref::ReferenceState)
-    dz = self.Gr.Δz
+function initialize_DryBubble(tptke, self::UpdraftVariables, GMV::GridMeanVariables, ref_state::ReferenceState)
+    dz = self.grid.Δz
 
     # criterion 2: b>1e-4
     #! format: off
@@ -96,18 +96,18 @@ function initialize_DryBubble(tptke, self::UpdraftVariables, GMV::GridMeanVariab
         264.1574, 263.6518, 263.1461, 262.6451, 262.1476, 261.6524]
     #! format: on
 
-    Area_in = pyinterp(self.Gr.zc, z_in, Area_in)
-    thetal_in = pyinterp(self.Gr.zc, z_in, thetal_in)
-    T_in = pyinterp(self.Gr.zc, z_in, T_in)
+    Area_in = pyinterp(self.grid.zc, z_in, Area_in)
+    thetal_in = pyinterp(self.grid.zc, z_in, thetal_in)
+    T_in = pyinterp(self.grid.zc, z_in, T_in)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_face_indices(self.Gr)
-            if minimum(z_in) <= self.Gr.zf[k] <= maximum(z_in)
+        @inbounds for k in real_face_indices(self.grid)
+            if minimum(z_in) <= self.grid.zf[k] <= maximum(z_in)
                 self.W.values[i, k] = 0.0
             end
         end
 
-        @inbounds for k in real_center_indices(self.Gr)
-            if minimum(z_in) <= self.Gr.zc[k] <= maximum(z_in)
+        @inbounds for k in real_center_indices(self.grid)
+            if minimum(z_in) <= self.grid.zc[k] <= maximum(z_in)
                 self.Area.values[i, k] = Area_in[k] #self.updraft_fraction/self.n_updrafts
                 self.H.values[i, k] = thetal_in[k]
                 self.QT.values[i, k] = 0.0
@@ -158,7 +158,7 @@ function set_means(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
     self.RH.bulkvalues .= 0.0
     grid = get_grid(GMV)
 
-    @inbounds for k in real_center_indices(self.Gr)
+    @inbounds for k in real_center_indices(self.grid)
         if self.Area.bulkvalues[k] > 1.0e-20
             @inbounds for i in xrange(self.n_updrafts)
                 self.QT.bulkvalues[k] += self.Area.values[i, k] * self.QT.values[i, k] / self.Area.bulkvalues[k]
@@ -183,7 +183,7 @@ function set_means(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
         end
     end
 
-    @inbounds for k in real_face_indices(self.Gr)
+    @inbounds for k in real_face_indices(self.grid)
         a_bulk_bcs = (; bottom = SetValue(sum(tptke.area_surface_bc)), top = SetZeroGradient())
         a_bulk_f = interpc2f(self.Area.bulkvalues, grid, k; a_bulk_bcs...)
         if a_bulk_f > 1.0e-20
@@ -202,11 +202,11 @@ end
 # quick utility to set "new" arrays with values in the "values" arrays
 function set_new_with_values(self::UpdraftVariables)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_face_indices(self.Gr)
+        @inbounds for k in real_face_indices(self.grid)
             self.W.new[i, k] = self.W.values[i, k]
         end
 
-        @inbounds for k in real_center_indices(self.Gr)
+        @inbounds for k in real_center_indices(self.grid)
             self.Area.new[i, k] = self.Area.values[i, k]
             self.QT.new[i, k] = self.QT.values[i, k]
             self.H.new[i, k] = self.H.values[i, k]
@@ -218,7 +218,7 @@ end
 # quick utility to set "new" arrays with values in the "values" arrays
 function set_old_with_values(self::UpdraftVariables)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_center_indices(self.Gr)
+        @inbounds for k in real_center_indices(self.grid)
             self.Area.old[i, k] = self.Area.values[i, k]
         end
     end
@@ -228,11 +228,11 @@ end
 # quick utility to set "tmp" arrays with values in the "new" arrays
 function set_values_with_new(self::UpdraftVariables)
     @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_face_indices(self.Gr)
+        @inbounds for k in real_face_indices(self.grid)
             self.W.values[i, k] = self.W.new[i, k]
         end
 
-        @inbounds for k in real_center_indices(self.Gr)
+        @inbounds for k in real_center_indices(self.grid)
             self.W.values[i, k] = self.W.new[i, k]
             self.Area.values[i, k] = self.Area.new[i, k]
             self.QT.values[i, k] = self.QT.new[i, k]
@@ -242,7 +242,7 @@ function set_values_with_new(self::UpdraftVariables)
     return
 end
 
-function io(self::UpdraftVariables, Stats::NetCDFIO_Stats, Ref::ReferenceState)
+function io(self::UpdraftVariables, Stats::NetCDFIO_Stats, ref_state::ReferenceState)
     write_profile(Stats, "updraft_area", self.Area.bulkvalues)
     write_profile(Stats, "updraft_w", self.W.bulkvalues)
     write_profile(Stats, "updraft_qt", self.QT.bulkvalues)
@@ -252,7 +252,7 @@ function io(self::UpdraftVariables, Stats::NetCDFIO_Stats, Ref::ReferenceState)
     write_profile(Stats, "updraft_temperature", self.T.bulkvalues)
     write_profile(Stats, "updraft_buoyancy", self.B.bulkvalues)
 
-    upd_cloud_diagnostics(self, Ref)
+    upd_cloud_diagnostics(self, ref_state)
     write_profile(Stats, "updraft_cloud_fraction", self.cloud_fraction)
     # Note definition of cloud cover : each updraft is associated with a cloud cover equal to the maximum
     # area fraction of the updraft where ql > 0. Each updraft is assumed to have maximum overlap with respect to
@@ -265,23 +265,23 @@ function io(self::UpdraftVariables, Stats::NetCDFIO_Stats, Ref::ReferenceState)
     return
 end
 
-function upd_cloud_diagnostics(self::UpdraftVariables, Ref::ReferenceState)
+function upd_cloud_diagnostics(self::UpdraftVariables, ref_state::ReferenceState)
     self.lwp = 0.0
 
     @inbounds for i in xrange(self.n_updrafts)
-        self.cloud_base[i] = zc_toa(self.Gr)
+        self.cloud_base[i] = zc_toa(self.grid)
         self.cloud_top[i] = 0.0
         self.updraft_top[i] = 0.0
         self.cloud_cover[i] = 0.0
 
-        @inbounds for k in real_center_indices(self.Gr)
+        @inbounds for k in real_center_indices(self.grid)
             if self.Area.values[i, k] > 1e-3
-                self.updraft_top[i] = max(self.updraft_top[i], self.Gr.zc[k])
-                self.lwp += Ref.rho0_half[k] * self.QL.values[i, k] * self.Area.values[i, k] * self.Gr.Δz
+                self.updraft_top[i] = max(self.updraft_top[i], self.grid.zc[k])
+                self.lwp += ref_state.rho0_half[k] * self.QL.values[i, k] * self.Area.values[i, k] * self.grid.Δz
 
                 if self.QL.values[i, k] > 1e-8
-                    self.cloud_base[i] = min(self.cloud_base[i], self.Gr.zc[k])
-                    self.cloud_top[i] = max(self.cloud_top[i], self.Gr.zc[k])
+                    self.cloud_base[i] = min(self.cloud_base[i], self.grid.zc[k])
+                    self.cloud_top[i] = max(self.cloud_top[i], self.grid.zc[k])
                     self.cloud_cover[i] = max(self.cloud_cover[i], self.Area.values[i, k])
                 end
             end
@@ -317,7 +317,7 @@ function buoyancy(
     extrap::Bool,
 )
 
-    grid = self.Gr
+    grid = self.grid
     kc_surf = kc_surface(grid)
     param_set = parameter_set(GMV)
 
@@ -328,12 +328,17 @@ function buoyancy(
             @inbounds for k in real_center_indices(grid)
                 if UpdVar.Area.values[i, k] > 0.0
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
-                    rho = rho_c(self.Ref.p0_half[k], UpdVar.T.values[i, k], UpdVar.QT.values[i, k], qv)
-                    UpdVar.B.values[i, k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
+                    rho = rho_c(self.ref_state.p0_half[k], UpdVar.T.values[i, k], UpdVar.QT.values[i, k], qv)
+                    UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
                 else
                     UpdVar.B.values[i, k] = EnvVar.B.values[k]
                 end
-                ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], UpdVar.H.values[i, k], UpdVar.QT.values[i, k])
+                ts = TD.PhaseEquil_pθq(
+                    param_set,
+                    self.ref_state.p0_half[k],
+                    UpdVar.H.values[i, k],
+                    UpdVar.QT.values[i, k],
+                )
                 UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
             end
         end
@@ -345,20 +350,20 @@ function buoyancy(
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
                     h = UpdVar.H.values[i, k]
                     t = UpdVar.T.values[i, k]
-                    rho = rho_c(self.Ref.p0_half[k], t, qt, qv)
-                    UpdVar.B.values[i, k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
-                    ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], h, qt)
+                    rho = rho_c(self.ref_state.p0_half[k], t, qt, qv)
+                    UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
+                    ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], h, qt)
                     UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
                 elseif k > kc_surf
                     if UpdVar.Area.values[i, k - 1] > 0.0
                         qt = UpdVar.QT.values[i, k - 1]
                         h = UpdVar.H.values[i, k - 1]
-                        sa = eos(param_set, self.Ref.p0_half[k], qt, h)
+                        sa = eos(param_set, self.ref_state.p0_half[k], qt, h)
                         qv = qt - sa.ql
                         t = sa.T
-                        rho = rho_c(self.Ref.p0_half[k], t, qt, qv)
-                        UpdVar.B.values[i, k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
-                        ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], h, qt)
+                        rho = rho_c(self.ref_state.p0_half[k], t, qt, qv)
+                        UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
+                        ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], h, qt)
                         UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
                     else
                         UpdVar.B.values[i, k] = EnvVar.B.values[k]
@@ -373,7 +378,7 @@ function buoyancy(
     end
 
 
-    @inbounds for k in real_center_indices(self.Gr)
+    @inbounds for k in real_center_indices(self.grid)
         GMV.B.values[k] = (1.0 - UpdVar.Area.bulkvalues[k]) * EnvVar.B.values[k]
         @inbounds for i in xrange(self.n_updraft)
             GMV.B.values[k] += UpdVar.Area.values[i, k] * UpdVar.B.values[i, k]
@@ -397,7 +402,7 @@ function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rai
     param_set = parameter_set(Rain)
 
     @inbounds for i in xrange(self.n_updraft)
-        @inbounds for k in real_center_indices(self.Gr)
+        @inbounds for k in real_center_indices(self.grid)
 
             # autoconversion and accretion
             mph = microphysics_rain_src(
@@ -414,8 +419,8 @@ function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rai
                 Rain.Upd_QR.values[k],
                 UpdVar.Area.new[i, k],
                 UpdVar.T.values[i, k],
-                self.Ref.p0_half[k],
-                self.Ref.rho0_half[k],
+                self.ref_state.p0_half[k],
+                self.ref_state.rho0_half[k],
                 dt,
             )
 

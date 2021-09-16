@@ -231,7 +231,7 @@ Base.@kwdef mutable struct RainVariables{PS}
     env_rwp::Float64 = 0
     upd_rwp::Float64 = 0
     cutoff_rain_rate::Float64 = 0
-    Gr::Grid
+    grid::Grid
     QR::RainVariable
     RainArea::RainVariable
     Upd_QR::RainVariable
@@ -239,16 +239,16 @@ Base.@kwdef mutable struct RainVariables{PS}
     Env_QR::RainVariable
     Env_RainArea::RainVariable
 end
-function RainVariables(namelist, Gr::Grid, param_set::APS)
+function RainVariables(namelist, grid::Grid, param_set::APS)
 
-    QR = RainVariable(Gr, "qr_mean", "kg/kg")
+    QR = RainVariable(grid, "qr_mean", "kg/kg")
     # temporary variables for diagnostics to know where the rain is coming from
-    Upd_QR = RainVariable(Gr, "upd_qr", "kg/kg")
-    Env_QR = RainVariable(Gr, "env_qr", "kg/kg")
+    Upd_QR = RainVariable(grid, "upd_qr", "kg/kg")
+    Env_QR = RainVariable(grid, "env_qr", "kg/kg")
     # in the future we could test prognostic equations for stratiform and updraft rain
-    RainArea = RainVariable(Gr, "rain_area", "rain_area_fraction [-]")
-    Upd_RainArea = RainVariable(Gr, "upd_rain_area", "updraft_rain_area_fraction [-]")
-    Env_RainArea = RainVariable(Gr, "env_rain_area", "environment_rain_area_fraction [-]")
+    RainArea = RainVariable(grid, "rain_area", "rain_area_fraction [-]")
+    Upd_RainArea = RainVariable(grid, "upd_rain_area", "updraft_rain_area_fraction [-]")
+    Env_RainArea = RainVariable(grid, "env_rain_area", "environment_rain_area_fraction [-]")
 
     mean_rwp = 0.0
     upd_rwp = 0.0
@@ -285,7 +285,7 @@ function RainVariables(namelist, Gr::Grid, param_set::APS)
         mean_rwp,
         env_rwp,
         upd_rwp,
-        Gr,
+        grid,
         QR,
         RainArea,
         Upd_QR,
@@ -363,7 +363,7 @@ struct UpdraftVariable{A1, A2}
 end
 
 mutable struct UpdraftVariables{A1}
-    Gr::Grid
+    grid::Grid
     n_updrafts::Int
     W::UpdraftVariable
     Area::UpdraftVariable
@@ -432,8 +432,8 @@ end
 
 Base.@kwdef mutable struct GridMeanVariables{PS}
     param_set::PS
-    Gr::Grid
-    Ref::ReferenceState
+    grid::Grid
+    ref_state::ReferenceState
     lwp::Float64
     cloud_base::Float64
     cloud_top::Float64
@@ -457,47 +457,47 @@ Base.@kwdef mutable struct GridMeanVariables{PS}
     H_third_m::VariableDiagnostic
     HQTcov::VariableDiagnostic
 end
-function GridMeanVariables(namelist, Gr::Grid, Ref::ReferenceState, param_set::PS) where {PS}
+function GridMeanVariables(namelist, grid::Grid, ref_state::ReferenceState, param_set::PS) where {PS}
     lwp = 0.0
     cloud_base = 0.0
     cloud_top = 0.0
     cloud_cover = 0.0
 
-    U = VariablePrognostic(Gr, "half", "velocity", "sym", "u", "m/s")
-    V = VariablePrognostic(Gr, "half", "velocity", "sym", "v", "m/s")
+    U = VariablePrognostic(grid, "half", "velocity", "sym", "u", "m/s")
+    V = VariablePrognostic(grid, "half", "velocity", "sym", "v", "m/s")
     # Just leave this zero for now!
-    W = VariablePrognostic(Gr, "full", "velocity", "asym", "v", "m/s")
+    W = VariablePrognostic(grid, "full", "velocity", "asym", "v", "m/s")
 
     # Create thermodynamic variables
-    QT = VariablePrognostic(Gr, "half", "scalar", "sym", "qt", "kg/kg")
-    RH = VariablePrognostic(Gr, "half", "scalar", "sym", "RH", "%")
+    QT = VariablePrognostic(grid, "half", "scalar", "sym", "qt", "kg/kg")
+    RH = VariablePrognostic(grid, "half", "scalar", "sym", "RH", "%")
 
-    H = VariablePrognostic(Gr, "half", "scalar", "sym", "thetal", "K")
+    H = VariablePrognostic(grid, "half", "scalar", "sym", "thetal", "K")
 
     # Diagnostic Variables--same class as the prognostic variables, but we append to diagnostics list
-    QL = VariableDiagnostic(Gr, "half", "scalar", "sym", "ql", "kg/kg")
-    T = VariableDiagnostic(Gr, "half", "scalar", "sym", "temperature", "K")
-    B = VariableDiagnostic(Gr, "half", "scalar", "sym", "buoyancy", "m^2/s^3")
+    QL = VariableDiagnostic(grid, "half", "scalar", "sym", "ql", "kg/kg")
+    T = VariableDiagnostic(grid, "half", "scalar", "sym", "temperature", "K")
+    B = VariableDiagnostic(grid, "half", "scalar", "sym", "buoyancy", "m^2/s^3")
 
-    cloud_fraction = VariableDiagnostic(Gr, "half", "scalar", "sym", "cloud fraction", "-")
+    cloud_fraction = VariableDiagnostic(grid, "half", "scalar", "sym", "cloud fraction", "-")
 
     EnvThermo_scheme = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
 
     #Now add the 2nd moment variables
 
-    TKE = VariableDiagnostic(Gr, "half", "scalar", "sym", "tke", "m^2/s^2")
-    W_third_m = VariableDiagnostic(Gr, "half", "scalar", "sym", "W_third_m", "m^3/s^3")
+    TKE = VariableDiagnostic(grid, "half", "scalar", "sym", "tke", "m^2/s^2")
+    W_third_m = VariableDiagnostic(grid, "half", "scalar", "sym", "W_third_m", "m^3/s^3")
 
-    QTvar = VariableDiagnostic(Gr, "half", "scalar", "sym", "qt_var", "kg^2/kg^2")
-    QT_third_m = VariableDiagnostic(Gr, "half", "scalar", "sym", "qt_third_m", "kg^3/kg^3")
-    Hvar = VariableDiagnostic(Gr, "half", "scalar", "sym", "thetal_var", "K^2")
-    H_third_m = VariableDiagnostic(Gr, "half", "scalar", "sym", "thetal_third_m", "-")
-    HQTcov = VariableDiagnostic(Gr, "half", "scalar", "sym", "thetal_qt_covar", "K(kg/kg)")
+    QTvar = VariableDiagnostic(grid, "half", "scalar", "sym", "qt_var", "kg^2/kg^2")
+    QT_third_m = VariableDiagnostic(grid, "half", "scalar", "sym", "qt_third_m", "kg^3/kg^3")
+    Hvar = VariableDiagnostic(grid, "half", "scalar", "sym", "thetal_var", "K^2")
+    H_third_m = VariableDiagnostic(grid, "half", "scalar", "sym", "thetal_third_m", "-")
+    HQTcov = VariableDiagnostic(grid, "half", "scalar", "sym", "thetal_qt_covar", "K(kg/kg)")
 
     return GridMeanVariables(;
         param_set,
-        Gr,
-        Ref,
+        grid,
+        ref_state,
         lwp,
         cloud_base,
         cloud_top,
@@ -525,8 +525,8 @@ end
 
 
 struct UpdraftThermodynamics{A1, A2}
-    Gr::Grid
-    Ref::ReferenceState
+    grid::Grid
+    ref_state::ReferenceState
     n_updraft::Int
     prec_source_h::A2
     prec_source_qt::A2
@@ -534,22 +534,30 @@ struct UpdraftThermodynamics{A1, A2}
     prec_source_qt_tot::A1
     function UpdraftThermodynamics(
         n_updraft::Int,
-        Gr::Grid,
-        Ref::ReferenceState,
+        grid::Grid,
+        ref_state::ReferenceState,
         UpdVar::UpdraftVariables,
         Rain::RainVariables,
     )
 
         # rain source from each updraft from all sub-timesteps
-        prec_source_h = center_field(Gr, n_updraft)
-        prec_source_qt = center_field(Gr, n_updraft)
+        prec_source_h = center_field(grid, n_updraft)
+        prec_source_qt = center_field(grid, n_updraft)
 
         # rain source from all updrafts from all sub-timesteps
-        prec_source_h_tot = center_field(Gr)
-        prec_source_qt_tot = center_field(Gr)
+        prec_source_h_tot = center_field(grid)
+        prec_source_qt_tot = center_field(grid)
         A1 = typeof(prec_source_h_tot)
         A2 = typeof(prec_source_h)
-        return new{A1, A2}(Gr, Ref, n_updraft, prec_source_h, prec_source_qt, prec_source_h_tot, prec_source_qt_tot)
+        return new{A1, A2}(
+            grid,
+            ref_state,
+            n_updraft,
+            prec_source_h,
+            prec_source_qt,
+            prec_source_h_tot,
+            prec_source_qt_tot,
+        )
     end
 
 end
@@ -618,7 +626,7 @@ end
 
 Base.@kwdef mutable struct EnvironmentVariables{PS}
     param_set::PS
-    Gr::Grid
+    grid::Grid
     W::EnvironmentVariable
     Area::EnvironmentVariable
     QT::EnvironmentVariable
@@ -638,27 +646,27 @@ Base.@kwdef mutable struct EnvironmentVariables{PS}
     lwp::Float64 = 0
     EnvThermo_scheme::String = "default_EnvThermo_scheme"
 end
-function EnvironmentVariables(namelist, Gr::Grid, param_set::PS) where {PS}
-    W = EnvironmentVariable(Gr, "full", "velocity", "w", "m/s")
-    QT = EnvironmentVariable(Gr, "half", "scalar", "qt", "kg/kg")
-    QL = EnvironmentVariable(Gr, "half", "scalar", "ql", "kg/kg")
-    RH = EnvironmentVariable(Gr, "half", "scalar", "RH", "%")
-    H = EnvironmentVariable(Gr, "half", "scalar", "thetal", "K")
-    T = EnvironmentVariable(Gr, "half", "scalar", "temperature", "K")
-    B = EnvironmentVariable(Gr, "half", "scalar", "buoyancy", "m^2/s^3")
-    Area = EnvironmentVariable(Gr, "half", "scalar", "env_area", "-")
-    cloud_fraction = EnvironmentVariable(Gr, "half", "scalar", "env_cloud_fraction", "-")
+function EnvironmentVariables(namelist, grid::Grid, param_set::PS) where {PS}
+    W = EnvironmentVariable(grid, "full", "velocity", "w", "m/s")
+    QT = EnvironmentVariable(grid, "half", "scalar", "qt", "kg/kg")
+    QL = EnvironmentVariable(grid, "half", "scalar", "ql", "kg/kg")
+    RH = EnvironmentVariable(grid, "half", "scalar", "RH", "%")
+    H = EnvironmentVariable(grid, "half", "scalar", "thetal", "K")
+    T = EnvironmentVariable(grid, "half", "scalar", "temperature", "K")
+    B = EnvironmentVariable(grid, "half", "scalar", "buoyancy", "m^2/s^3")
+    Area = EnvironmentVariable(grid, "half", "scalar", "env_area", "-")
+    cloud_fraction = EnvironmentVariable(grid, "half", "scalar", "env_cloud_fraction", "-")
 
     # TODO - the flag setting is repeated from Variables.pyx logic
     EnvThermo_scheme = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
-    TKE = EnvironmentVariable_2m(Gr, "half", "scalar", "tke", "m^2/s^2")
-    QTvar = EnvironmentVariable_2m(Gr, "half", "scalar", "qt_var", "kg^2/kg^2")
-    Hvar = EnvironmentVariable_2m(Gr, "half", "scalar", "thetal_var", "K^2")
-    HQTcov = EnvironmentVariable_2m(Gr, "half", "scalar", "thetal_qt_covar", "K(kg/kg)")
+    TKE = EnvironmentVariable_2m(grid, "half", "scalar", "tke", "m^2/s^2")
+    QTvar = EnvironmentVariable_2m(grid, "half", "scalar", "qt_var", "kg^2/kg^2")
+    Hvar = EnvironmentVariable_2m(grid, "half", "scalar", "thetal_var", "K^2")
+    HQTcov = EnvironmentVariable_2m(grid, "half", "scalar", "thetal_qt_covar", "K(kg/kg)")
 
     return EnvironmentVariables{PS}(;
         param_set,
-        Gr,
+        grid,
         W,
         Area,
         QT,
@@ -677,8 +685,8 @@ function EnvironmentVariables(namelist, Gr::Grid, param_set::PS) where {PS}
 end
 
 struct EnvironmentThermodynamics{A1}
-    Gr::Grid
-    Ref::ReferenceState
+    grid::Grid
+    ref_state::ReferenceState
     quadrature_order::Int
     quadrature_type::String
     qt_dry::A1
@@ -694,32 +702,32 @@ struct EnvironmentThermodynamics{A1}
     prec_source_h::A1
     function EnvironmentThermodynamics(
         namelist,
-        Gr::Grid,
-        Ref::ReferenceState,
+        grid::Grid,
+        ref_state::ReferenceState,
         EnvVar::EnvironmentVariables,
         Rain::RainVariables,
     )
         quadrature_order = parse_namelist(namelist, "thermodynamics", "quadrature_order"; default = 3)
         quadrature_type = parse_namelist(namelist, "thermodynamics", "quadrature_type"; default = "gaussian")
 
-        qt_dry = center_field(Gr)
-        th_dry = center_field(Gr)
+        qt_dry = center_field(grid)
+        th_dry = center_field(grid)
 
-        t_cloudy = center_field(Gr)
-        qv_cloudy = center_field(Gr)
-        qt_cloudy = center_field(Gr)
-        th_cloudy = center_field(Gr)
+        t_cloudy = center_field(grid)
+        qv_cloudy = center_field(grid)
+        qt_cloudy = center_field(grid)
+        th_cloudy = center_field(grid)
 
-        Hvar_rain_dt = center_field(Gr)
-        QTvar_rain_dt = center_field(Gr)
-        HQTcov_rain_dt = center_field(Gr)
+        Hvar_rain_dt = center_field(grid)
+        QTvar_rain_dt = center_field(grid)
+        HQTcov_rain_dt = center_field(grid)
 
-        prec_source_qt = center_field(Gr)
-        prec_source_h = center_field(Gr)
+        prec_source_qt = center_field(grid)
+        prec_source_h = center_field(grid)
         A1 = typeof(qt_dry)
         return new{A1}(
-            Gr,
-            Ref,
+            grid,
+            ref_state,
             quadrature_order,
             quadrature_type,
             qt_dry,
@@ -781,25 +789,25 @@ Base.@kwdef mutable struct SurfaceBase{T}
     obukhov_length::Float64 = 0
     Ri_bulk_crit::Float64 = 0
     ustar_fixed::Bool = false
-    Gr::Grid
-    Ref::ReferenceState
+    grid::Grid
+    ref_state::ReferenceState
 end
 
-function SurfaceBase(::Type{T}; Gr::Grid, Ref::ReferenceState, namelist::Dict) where {T}
+function SurfaceBase(::Type{T}; grid::Grid, ref_state::ReferenceState, namelist::Dict) where {T}
     Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
-    return SurfaceBase{T}(; Gr, Ref, Ri_bulk_crit)
+    return SurfaceBase{T}(; grid, ref_state, Ri_bulk_crit)
 end
 
 
 struct RainPhysics{T}
-    Gr::Grid
-    Ref::ReferenceState
+    grid::Grid
+    ref_state::ReferenceState
     rain_evap_source_h::T
     rain_evap_source_qt::T
-    function RainPhysics(Gr::Grid, Ref::ReferenceState)
-        rain_evap_source_h = center_field(Gr)
-        rain_evap_source_qt = center_field(Gr)
-        return new{typeof(rain_evap_source_h)}(Gr, Ref, rain_evap_source_h, rain_evap_source_qt)
+    function RainPhysics(grid::Grid, ref_state::ReferenceState)
+        rain_evap_source_h = center_field(grid)
+        rain_evap_source_qt = center_field(grid)
+        return new{typeof(rain_evap_source_h)}(grid, ref_state, rain_evap_source_h, rain_evap_source_qt)
     end
 end
 
@@ -840,8 +848,8 @@ Base.@kwdef mutable struct ForcingBase{T}
     vg::AbstractArray{Float64, 1} = zeros(1)
     nudge_tau::Float64 = 0.0 # default is set to a value that will break
     convert_forcing_prog_fp::Function = x -> x
-    Gr::Grid
-    Ref::ReferenceState
+    grid::Grid
+    ref_state::ReferenceState
 end
 
 force_type(::ForcingBase{T}) where {T} = T
@@ -849,8 +857,8 @@ force_type(::ForcingBase{T}) where {T} = T
 Base.@kwdef mutable struct RadiationBase{T}
     dTdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection temperature tendency
     dqtdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection moisture tendency
-    Gr::Grid
-    Ref::ReferenceState
+    grid::Grid
+    ref_state::ReferenceState
     divergence::Float64 = 0
     alpha_z::Float64 = 0
     kappa::Float64 = 0
@@ -878,8 +886,8 @@ end
 mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     param_set::PS
     turbulence_tendency::A1
-    Gr::Grid
-    Ref::ReferenceState
+    grid::Grid
+    ref_state::ReferenceState
     KM::VariableDiagnostic
     KH::VariableDiagnostic
     Ri_bulk_crit::Float64
@@ -942,10 +950,10 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
     entr_surface_bc::Float64
     detr_surface_bc::Float64
     sde_model::sde_struct
-    function EDMF_PrognosticTKE(namelist, Gr::Grid, Ref::ReferenceState, param_set::PS) where {PS}
-        turbulence_tendency = center_field(Gr)
-        KM = VariableDiagnostic(Gr, "half", "scalar", "sym", "diffusivity", "m^2/s") # eddy viscosity
-        KH = VariableDiagnostic(Gr, "half", "scalar", "sym", "viscosity", "m^2/s") # eddy diffusivity
+    function EDMF_PrognosticTKE(namelist, grid::Grid, ref_state::ReferenceState, param_set::PS) where {PS}
+        turbulence_tendency = center_field(grid)
+        KM = VariableDiagnostic(grid, "half", "scalar", "sym", "diffusivity", "m^2/s") # eddy viscosity
+        KH = VariableDiagnostic(grid, "half", "scalar", "sym", "viscosity", "m^2/s") # eddy diffusivity
         # get values from namelist
         prandtl_number = namelist["turbulence"]["prandtl_number_0"]
         Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
@@ -997,44 +1005,44 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         minimum_area = 1e-5
 
         # Create the class for rain
-        Rain = RainVariables(namelist, Gr, param_set)
+        Rain = RainVariables(namelist, grid, param_set)
 
         # Create the updraft variable class (major diagnostic and prognostic variables)
-        UpdVar = UpdraftVariables(n_updrafts, namelist, Gr)
+        UpdVar = UpdraftVariables(n_updrafts, namelist, grid)
         # Create the class for updraft thermodynamics
-        UpdThermo = UpdraftThermodynamics(n_updrafts, Gr, Ref, UpdVar, Rain)
+        UpdThermo = UpdraftThermodynamics(n_updrafts, grid, ref_state, UpdVar, Rain)
 
         # Create the environment variable class (major diagnostic and prognostic variables)
-        EnvVar = EnvironmentVariables(namelist, Gr, param_set)
+        EnvVar = EnvironmentVariables(namelist, grid, param_set)
         # Create the class for environment thermodynamics
-        EnvThermo = EnvironmentThermodynamics(namelist, Gr, Ref, EnvVar, Rain)
+        EnvThermo = EnvironmentThermodynamics(namelist, grid, ref_state, EnvVar, Rain)
 
         # Entrainment rates
-        entr_sc = center_field(Gr, n_updrafts)
-        press = center_field(Gr, n_updrafts)
+        entr_sc = center_field(grid, n_updrafts)
+        press = center_field(grid, n_updrafts)
 
         # Detrainment rates
-        detr_sc = center_field(Gr, n_updrafts)
+        detr_sc = center_field(grid, n_updrafts)
 
-        sorting_function = center_field(Gr, n_updrafts)
-        b_mix = center_field(Gr, n_updrafts)
+        sorting_function = center_field(grid, n_updrafts)
+        b_mix = center_field(grid, n_updrafts)
 
         # turbulent entrainment
-        frac_turb_entr = center_field(Gr, n_updrafts)
+        frac_turb_entr = center_field(grid, n_updrafts)
 
         # Pressure term in updraft vertical momentum equation
-        nh_pressure = face_field(Gr, n_updrafts)
-        nh_pressure_b = face_field(Gr, n_updrafts)
-        nh_pressure_adv = face_field(Gr, n_updrafts)
-        nh_pressure_drag = face_field(Gr, n_updrafts)
-        asp_ratio = center_field(Gr, n_updrafts)
+        nh_pressure = face_field(grid, n_updrafts)
+        nh_pressure_b = face_field(grid, n_updrafts)
+        nh_pressure_adv = face_field(grid, n_updrafts)
+        nh_pressure_drag = face_field(grid, n_updrafts)
+        asp_ratio = center_field(grid, n_updrafts)
 
         # Mass flux
-        m = face_field(Gr, n_updrafts)
+        m = face_field(grid, n_updrafts)
 
         # mixing length
-        mixing_length = center_field(Gr)
-        horiz_K_eddy = center_field(Gr, n_updrafts)
+        mixing_length = center_field(grid)
+        horiz_K_eddy = center_field(grid, n_updrafts)
 
         # Near-surface BC of updraft area fraction
         area_surface_bc = zeros(n_updrafts)
@@ -1044,22 +1052,22 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         pressure_plume_spacing = zeros(n_updrafts)
 
         # Mass flux tendencies of mean scalars (for output)
-        massflux_tendency_h = center_field(Gr)
-        massflux_tendency_qt = center_field(Gr)
-        rainphysics = RainPhysics(Gr, Ref)
+        massflux_tendency_h = center_field(grid)
+        massflux_tendency_qt = center_field(grid)
+        rainphysics = RainPhysics(grid, ref_state)
 
         # (Eddy) diffusive tendencies of mean scalars (for output)
-        diffusive_tendency_h = center_field(Gr)
-        diffusive_tendency_qt = center_field(Gr)
+        diffusive_tendency_h = center_field(grid)
+        diffusive_tendency_qt = center_field(grid)
 
         # Vertical fluxes for output
-        massflux_h = face_field(Gr)
-        massflux_qt = face_field(Gr)
-        diffusive_flux_h = center_field(Gr)
-        diffusive_flux_qt = center_field(Gr)
-        diffusive_flux_u = center_field(Gr)
-        diffusive_flux_v = center_field(Gr)
-        massflux_tke = center_field(Gr)
+        massflux_h = face_field(grid)
+        massflux_qt = face_field(grid)
+        diffusive_flux_h = center_field(grid)
+        diffusive_flux_qt = center_field(grid)
+        diffusive_flux_u = center_field(grid)
+        diffusive_flux_v = center_field(grid)
+        massflux_tke = center_field(grid)
 
         # Initialize SDE parameters
         dt = parse_namelist(namelist, "time_stepping", "dt"; default = 1.0)
@@ -1085,12 +1093,12 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
 
         # Added by Ignacio : Length scheme in use (mls), and smooth min effect (ml_ratio)
         # Variable Prandtl number initialized as neutral value.
-        ones_vec = center_field(Gr)
+        ones_vec = center_field(grid)
         prandtl_nvec = prandtl_number .* ones_vec
-        mls = center_field(Gr)
-        ml_ratio = center_field(Gr)
-        l_entdet = center_field(Gr)
-        b = center_field(Gr)
+        mls = center_field(grid)
+        ml_ratio = center_field(grid)
+        l_entdet = center_field(grid)
+        b = center_field(grid)
         wstar = 0
         entr_surface_bc = 0
         detr_surface_bc = 0
@@ -1099,8 +1107,8 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         return new{PS, A1, A2}(
             param_set,
             turbulence_tendency,
-            Gr,
-            Ref,
+            grid,
+            ref_state,
             KM,
             KH,
             Ri_bulk_crit,
@@ -1166,9 +1174,9 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2}
         )
     end
 end
-get_grid(edmf::EDMF_PrognosticTKE) = edmf.Gr
-get_grid(obj) = obj.Gr
-reference_state(edmf::EDMF_PrognosticTKE) = edmf.Ref
+get_grid(edmf::EDMF_PrognosticTKE) = edmf.grid
+get_grid(obj) = obj.grid
+reference_state(edmf::EDMF_PrognosticTKE) = edmf.ref_state
 prandtl_number(edmf::EDMF_PrognosticTKE) = edmf.prandtl_number
 turbulence_tendency(edmf::EDMF_PrognosticTKE) = edmf.turbulence_tendency
 diffusivity_m(edmf::EDMF_PrognosticTKE) = edmf.KM

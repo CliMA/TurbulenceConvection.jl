@@ -1,7 +1,7 @@
 
 function initialize(self::RadiationBase, GMV::GridMeanVariables, ::RadiationBaseType)
-    self.dTdt = center_field(self.Gr)
-    self.dqtdt = center_field(self.Gr)
+    self.dTdt = center_field(self.grid)
+    self.dqtdt = center_field(self.grid)
     return
 end
 
@@ -30,7 +30,7 @@ function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVari
     self.F0 = 70.0
     self.F1 = 22.0
     self.divergence = 3.75e-6
-    self.f_rad = face_field(self.Gr)
+    self.f_rad = face_field(self.grid)
     return
 end
 
@@ -38,7 +38,7 @@ end
 see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
 function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariables)
-    grid = self.Gr
+    grid = self.grid
     # find zi (level of 8.0 g/kg isoline of qt)
     # TODO: report bug: zi and ρ_i are not initialized
     zi = 0
@@ -51,12 +51,12 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
             idx_zi = k
             # will be used at cell faces
             zi = grid.zf[k]
-            ρ_i = self.Ref.rho0[k]
+            ρ_i = self.ref_state.rho0[k]
             break
         end
     end
 
-    ρ_z = Dierckx.Spline1D(vec(grid.zc), vec(self.Ref.rho0_half); k = 1)
+    ρ_z = Dierckx.Spline1D(vec(grid.zc), vec(self.ref_state.rho0_half); k = 1)
     q_liq_z = Dierckx.Spline1D(vec(grid.zc), vec(GMV.QL.values); k = 1)
 
     integrand(ρq_l, params, z) = params.κ * ρ_z(z) * q_liq_z(z)
@@ -87,7 +87,7 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
     @inbounds for k in real_center_indices(grid)
         f_rad_dual = dual_faces(self.f_rad, grid, k)
         ∇f_rad = ∇_staggered(f_rad_dual, grid)
-        self.dTdt[k] = -∇f_rad / self.Ref.rho0_half[k] / cpd
+        self.dTdt[k] = -∇f_rad / self.ref_state.rho0_half[k] / cpd
     end
 
     return
@@ -120,7 +120,7 @@ function initialize(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables, L
 
         # interpolate here
         z_les_half = data.group["profiles"]["z_half"][:, 1]
-        self.dTdt = pyinterp(self.Gr.zc, z_les_half, get_nc_data(data, "profiles", "dtdt_rad", imin, imax))
+        self.dTdt = pyinterp(self.grid.zc, z_les_half, get_nc_data(data, "profiles", "dtdt_rad", imin, imax))
     end
     return
 end

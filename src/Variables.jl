@@ -1,5 +1,5 @@
 function update(self::GridMeanVariables, TS::TimeStepping)
-    grid = self.Gr
+    grid = self.grid
     @inbounds for k in real_center_indices(grid)
         self.U.values[k] += self.U.tendencies[k] * TS.dt
         self.V.values[k] += self.V.tendencies[k] * TS.dt
@@ -66,16 +66,16 @@ end
 
 function mean_cloud_diagnostics(self)
     self.lwp = 0.0
-    kc_toa = kc_top_of_atmos(self.Gr)
-    self.cloud_base = self.Gr.zc[kc_toa]
+    kc_toa = kc_top_of_atmos(self.grid)
+    self.cloud_base = self.grid.zc[kc_toa]
     self.cloud_top = 0.0
 
-    @inbounds for k in real_center_indices(self.Gr)
-        self.lwp += self.Ref.rho0_half[k] * self.QL.values[k] * self.Gr.Δz
+    @inbounds for k in real_center_indices(self.grid)
+        self.lwp += self.ref_state.rho0_half[k] * self.QL.values[k] * self.grid.Δz
 
         if self.QL.values[k] > 1e-8
-            self.cloud_base = min(self.cloud_base, self.Gr.zc[k])
-            self.cloud_top = max(self.cloud_top, self.Gr.zc[k])
+            self.cloud_base = min(self.cloud_base, self.grid.zc[k])
+            self.cloud_top = max(self.cloud_top, self.grid.zc[k])
         end
     end
     return
@@ -84,17 +84,17 @@ end
 function satadjust(self::GridMeanVariables)
     sa = eos_struct()
     param_set = parameter_set(self)
-    @inbounds for k in real_center_indices(self.Gr)
+    @inbounds for k in real_center_indices(self.grid)
         h = self.H.values[k]
         qt = self.QT.values[k]
-        p0 = self.Ref.p0_half[k]
+        p0 = self.ref_state.p0_half[k]
         sa = eos(param_set, p0, qt, h)
         self.QL.values[k] = sa.ql
         self.T.values[k] = sa.T
         qv = qt - sa.ql
         rho = rho_c(p0, sa.T, qt, qv)
-        self.B.values[k] = buoyancy_c(param_set, self.Ref.rho0_half[k], rho)
-        ts = TD.PhaseEquil_pθq(param_set, self.Ref.p0_half[k], h, qt)
+        self.B.values[k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
+        ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], h, qt)
         self.RH.values[k] = TD.relative_humidity(ts)
     end
     return

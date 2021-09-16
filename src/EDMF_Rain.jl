@@ -16,7 +16,7 @@ end
 function io(
     self::RainVariables,
     Stats::NetCDFIO_Stats,
-    Ref::ReferenceState,
+    ref_state::ReferenceState,
     UpdThermo::UpdraftThermodynamics,
     EnvThermo::EnvironmentThermodynamics,
     TS::TimeStepping,
@@ -29,7 +29,7 @@ function io(
     write_profile(Stats, "updraft_rain_area", self.Upd_RainArea.values)
     write_profile(Stats, "env_rain_area", self.Env_RainArea.values)
 
-    rain_diagnostics(self, Ref, UpdThermo, EnvThermo, TS)
+    rain_diagnostics(self, ref_state, UpdThermo, EnvThermo, TS)
     write_ts(Stats, "rwp_mean", self.mean_rwp)
     write_ts(Stats, "updraft_rwp", self.upd_rwp)
     write_ts(Stats, "env_rwp", self.env_rwp)
@@ -40,7 +40,7 @@ end
 
 function rain_diagnostics(
     self::RainVariables,
-    Ref::ReferenceState,
+    ref_state::ReferenceState,
     UpdThermo::UpdraftThermodynamics,
     EnvThermo::EnvironmentThermodynamics,
     TS::TimeStepping,
@@ -49,19 +49,19 @@ function rain_diagnostics(
     self.env_rwp = 0.0
     self.mean_rwp = 0.0
     self.cutoff_rain_rate = 0.0
-    grid = self.Gr
+    grid = self.grid
 
     @inbounds for k in real_center_indices(grid)
-        self.upd_rwp += Ref.rho0_half[k] * self.Upd_QR.values[k] * self.Upd_RainArea.values[k] * grid.Δz
-        self.env_rwp += Ref.rho0_half[k] * self.Env_QR.values[k] * self.Env_RainArea.values[k] * grid.Δz
-        self.mean_rwp += Ref.rho0_half[k] * self.QR.values[k] * self.RainArea.values[k] * grid.Δz
+        self.upd_rwp += ref_state.rho0_half[k] * self.Upd_QR.values[k] * self.Upd_RainArea.values[k] * grid.Δz
+        self.env_rwp += ref_state.rho0_half[k] * self.Env_QR.values[k] * self.Env_RainArea.values[k] * grid.Δz
+        self.mean_rwp += ref_state.rho0_half[k] * self.QR.values[k] * self.RainArea.values[k] * grid.Δz
 
         # rain rate from cutoff microphysics scheme defined as a total amount of removed water
         # per timestep per EDMF surface area [mm/h]
         if (self.rain_model == "cutoff")
             self.cutoff_rain_rate -=
-                (EnvThermo.prec_source_qt[k] + UpdThermo.prec_source_qt_tot[k]) * Ref.rho0_half[k] * grid.Δz / TS.dt /
-                rho_cloud_liq *
+                (EnvThermo.prec_source_qt[k] + UpdThermo.prec_source_qt_tot[k]) * ref_state.rho0_half[k] * grid.Δz /
+                TS.dt / rho_cloud_liq *
                 3.6 *
                 1e6
         end
@@ -74,7 +74,7 @@ function sum_subdomains_rain(
     UpdThermo::UpdraftThermodynamics,
     EnvThermo::EnvironmentThermodynamics,
 )
-    @inbounds for k in real_center_indices(self.Gr)
+    @inbounds for k in real_center_indices(self.grid)
         self.QR.values[k] -= (EnvThermo.prec_source_qt[k] + UpdThermo.prec_source_qt_tot[k])
         self.Upd_QR.values[k] -= UpdThermo.prec_source_qt_tot[k]
         self.Env_QR.values[k] -= EnvThermo.prec_source_qt[k]
@@ -109,13 +109,13 @@ function solve_rain_fall(
 
     term_vel = center_field(grid)
     term_vel_new = center_field(grid)
-    ρ_0_c_field = self.Ref.rho0_half
+    ρ_0_c_field = self.ref_state.rho0_half
 
     # helper to calculate the rain velocity
     # TODO: assuming GMV.W = 0
     # TODO: verify translation
     @inbounds for k in real_center_indices(grid)
-        term_vel[k] = terminal_velocity(param_set, Rain.C_drag, Rain.MP_n_0, QR.values[k], self.Ref.rho0_half[k])
+        term_vel[k] = terminal_velocity(param_set, Rain.C_drag, Rain.MP_n_0, QR.values[k], self.ref_state.rho0_half[k])
     end
 
     # rain falling through the domain
@@ -131,7 +131,7 @@ function solve_rain_fall(
         if max(CFL_in, CFL_out) > CFL_limit
             error("Time step is too large for rain fall velocity!")
         end
-        ρ_0_c = self.Ref.rho0_half[k]
+        ρ_0_c = self.ref_state.rho0_half[k]
 
         ρ_0_cut = ccut_downwind(ρ_0_c_field, grid, k)
         QR_cut = ccut_downwind(QR.values, grid, k)
@@ -168,7 +168,7 @@ function solve_rain_evap(
     Δt = TS.dt
     flag_evaporate_all = false
 
-    @inbounds for k in real_center_indices(self.Gr)
+    @inbounds for k in real_center_indices(self.grid)
         flag_evaporate_all = false
 
         tmp_evap = max(
@@ -183,8 +183,8 @@ function solve_rain_evap(
                 GMV.QT.values[k],
                 GMV.QL.values[k],
                 GMV.T.values[k],
-                self.Ref.p0_half[k],
-                self.Ref.rho0_half[k],
+                self.ref_state.p0_half[k],
+                self.ref_state.rho0_half[k],
             ) * Δt,
         )
 
@@ -198,7 +198,7 @@ function solve_rain_evap(
         # TODO add ice
         rain_source_to_thetal(
             param_set,
-            self.Ref.p0_half[k],
+            self.ref_state.p0_half[k],
             GMV.T.values[k],
             GMV.QT.values[k],
             GMV.QL.values[k],
