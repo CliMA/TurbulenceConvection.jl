@@ -63,16 +63,6 @@ function env_cloud_diagnostics(self::EnvironmentVariables, ref_state::ReferenceS
     return
 end
 
-function update_EnvVar(self::EnvironmentThermodynamics, k, EnvVar::EnvironmentVariables, T, H, qt, ql, rho)
-    param_set = parameter_set(EnvVar)
-    EnvVar.T.values[k] = T
-    EnvVar.QL.values[k] = ql
-    EnvVar.B.values[k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
-    ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], H, qt)
-    EnvVar.RH.values[k] = TD.relative_humidity(ts)
-    return
-end
-
 function update_EnvRain_sources(self::EnvironmentThermodynamics, k, EnvVar::EnvironmentVariables, qr_src, thl_rain_src)
 
     self.prec_source_qt[k] = -qr_src * EnvVar.Area.values[k]
@@ -124,6 +114,8 @@ function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::Environm
             EnvVar.QL.values[k],
             EnvVar.QT.values[k] - EnvVar.QL.values[k],
         )
+        ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], EnvVar.H.values[k], EnvVar.QT.values[k])
+        EnvVar.RH.values[k] = TD.relative_humidity(ts)
     end
     return
 end
@@ -157,7 +149,6 @@ function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables,
             self.ref_state.rho0_half[k],
             dt,
         )
-        update_EnvVar(self, k, EnvVar, sa.T, mph.thl, mph.qt, mph.ql, mph.rho)
         update_cloud_dry(self, k, EnvVar, sa.T, mph.th, mph.qt, mph.ql, mph.qv)
         update_EnvRain_sources(self, k, EnvVar, mph.qr_src, mph.thl_rain_src)
     end
@@ -331,16 +322,6 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
             end
 
             # update environmental variables
-            update_EnvVar(
-                self,
-                k,
-                EnvVar,
-                outer_env[i_T],
-                outer_env[i_thl],
-                outer_env[i_qt_cld] + outer_env[i_qt_dry],
-                outer_env[i_ql],
-                outer_env[i_rho],
-            )
             update_EnvRain_sources(self, k, EnvVar, -outer_src[i_Sqt], outer_src[i_SH])
 
             # update cloudy/dry variables for buoyancy in TKE
@@ -385,7 +366,6 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                 self.ref_state.rho0_half[k],
                 dt,
             )
-            update_EnvVar(self, k, EnvVar, sa.T, mph.thl, mph.qt, mph.ql, mph.rho)
             update_EnvRain_sources(self, k, EnvVar, mph.qr_src, mph.thl_rain_src)
             update_cloud_dry(self, k, EnvVar, sa.T, mph.th, mph.qt, mph.ql, mph.qv)
 
