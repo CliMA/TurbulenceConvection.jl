@@ -323,6 +323,9 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
+    set_old_with_values(self.UpdVar)
+    set_updraft_surface_bc(self, GMV, Case)
+
     update_surface(Case, GMV, TS)
     update_forcing(Case, GMV, TS)
     update_radiation(Case, GMV, TS)
@@ -338,8 +341,6 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
 
     clear_precip_sources(self.UpdThermo)
 
-    set_old_with_values(self.UpdVar)
-    set_updraft_surface_bc(self, GMV, Case)
 
     # update
     solve_updraft(self, GMV, TS)
