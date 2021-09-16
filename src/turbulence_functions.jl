@@ -55,7 +55,10 @@ function get_surface_variance(flux1, flux2, ustar, zLL, oblength)
     end
 end
 
-function construct_tridiag_diffusion(grid, dt, ρ_ae_K_m, ρ_0, ae, a, b, c)
+function construct_tridiag_diffusion(grid, dt, ρ_ae_K_m, ρ_0, ae)
+    a = center_field(grid) # for tridiag solver
+    b = center_field(grid) # for tridiag solver
+    c = center_field(grid) # for tridiag solver
     Δzi = grid.Δzi
     @inbounds for k in real_center_indices(grid)
         X = ρ_0[k] * ae[k] / dt
@@ -70,9 +73,13 @@ function construct_tridiag_diffusion(grid, dt, ρ_ae_K_m, ρ_0, ae, a, b, c)
         b[k] = 1.0 + Y / X + Z / X
         c[k] = -Y / X
     end
-    return
+    A = LinearAlgebra.Tridiagonal(a[2:end], vec(b), c[1:(end - 1)])
+    return A
 end
 
+tridiag_solve(b_rhs, A) = A \ b_rhs
+
+# Still need this temporarily
 function tridiag_solve(b_rhs, a, b, c)
     A = LinearAlgebra.Tridiagonal(a[2:end], parent(b), c[1:(end - 1)])
     return A \ parent(b_rhs)
