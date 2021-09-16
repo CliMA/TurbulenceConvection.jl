@@ -327,6 +327,9 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     set_updraft_surface_bc(self, GMV, Case)
     diagnose_GMV_moments(self, GMV, Case, TS)
 
+    decompose_environment(self, GMV)
+    saturation_adjustment(self.EnvThermo, self.EnvVar)
+    buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
     update_surface(Case, GMV, TS)
     update_forcing(Case, GMV, TS)
     update_radiation(Case, GMV, TS)
@@ -476,9 +479,6 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     # set values
     set_values_with_new(self.UpdVar)
     zero_area_fraction_cleanup(self, GMV)
-    decompose_environment(self, GMV)
-    saturation_adjustment(self.EnvThermo, self.EnvVar)
-    buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
 
     update(GMV, TS)
     return
