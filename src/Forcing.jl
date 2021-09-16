@@ -21,16 +21,16 @@ function initialize(self::ForcingBase{ForcingLES}, GMV::GridMeanVariables, grid:
         imin = LESDat.imin
         imax = LESDat.imax
 
-        z_les_half = data.group["profiles"]["z_half"][:, 1]
+        zc_les = get_nc_data(data, "zc")
 
-        self.dtdt_hadv = pyinterp(grid.zc, z_les_half, get_nc_data(data, "profiles", "dtdt_hadv", imin, imax))
-        self.dtdt_nudge = pyinterp(grid.zc, z_les_half, get_nc_data(data, "profiles", "dtdt_nudge", imin, imax))
-        self.dtdt_fluc = pyinterp(grid.zc, z_les_half, get_nc_data(data, "profiles", "dtdt_fluc", imin, imax))
-        self.dqtdt_hadv = pyinterp(grid.zc, z_les_half, get_nc_data(data, "profiles", "dqtdt_hadv", imin, imax))
-        self.dqtdt_nudge = pyinterp(grid.zc, z_les_half, get_nc_data(data, "profiles", "dqtdt_nudge", imin, imax))
-        self.dqtdt_fluc = pyinterp(grid.zc, z_les_half, get_nc_data(data, "profiles", "dqtdt_fluc", imin, imax))
-        self.subsidence = pyinterp(grid.zc, z_les_half, get_nc_data(data, "profiles", "ls_subsidence", imin, imax))
-        self.u_nudge = pyinterp(grid.zc, z_les_half, get_nc_data(data, "profiles", "u_mean", imin, imax))
-        self.v_nudge = pyinterp(grid.zc, z_les_half, get_nc_data(data, "profiles", "v_mean", imin, imax))
+        self.dtdt_hadv = pyinterp(grid.zc, zc_les, mean_nc_data(data, "profiles", "dtdt_hadv", imin, imax))
+        self.dtdt_nudge = pyinterp(grid.zc, zc_les, mean_nc_data(data, "profiles", "dtdt_nudge", imin, imax))
+        self.dtdt_fluc = pyinterp(grid.zc, zc_les, mean_nc_data(data, "profiles", "dtdt_fluc", imin, imax))
+        self.dqtdt_hadv = pyinterp(grid.zc, zc_les, mean_nc_data(data, "profiles", "dqtdt_hadv", imin, imax))
+        self.dqtdt_nudge = pyinterp(grid.zc, zc_les, mean_nc_data(data, "profiles", "dqtdt_nudge", imin, imax))
+        self.dqtdt_fluc = pyinterp(grid.zc, zc_les, mean_nc_data(data, "profiles", "dqtdt_fluc", imin, imax))
+        self.subsidence = pyinterp(grid.zc, zc_les, mean_nc_data(data, "profiles", "ls_subsidence", imin, imax))
+        self.u_nudge = pyinterp(grid.zc, zc_les, mean_nc_data(data, "profiles", "u_mean", imin, imax))
+        self.v_nudge = pyinterp(grid.zc, zc_les, mean_nc_data(data, "profiles", "v_mean", imin, imax))
     end
 end

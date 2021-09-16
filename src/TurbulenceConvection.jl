@@ -69,6 +69,7 @@ include("Fields.jl")
 include("NetCDFIO.jl")
 include("ReferenceState.jl")
 include("types.jl")
+include("name_aliases.jl")
 include("Operators.jl")
 
 include("thermodynamic_functions.jl")

@@ -119,8 +119,9 @@ function initialize(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables, L
         imax = LESDat.imax
 
         # interpolate here
-        z_les_half = data.group["profiles"]["z_half"][:, 1]
-        self.dTdt = pyinterp(self.grid.zc, z_les_half, get_nc_data(data, "profiles", "dtdt_rad", imin, imax))
+        zc_les = get_nc_data(data, "zc")
+        meandata = mean_nc_data(data, "profiles", "dtdt_rad", imin, imax)
+        self.dTdt = pyinterp(self.grid.zc, zc_les, meandata)
     end
     return
 end

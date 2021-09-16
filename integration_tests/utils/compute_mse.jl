@@ -52,23 +52,6 @@ SCAMPy_output_dataset = ArtifactWrapper(
 SCAMPy_output_dataset_path = get_data_folder(SCAMPy_output_dataset)
 #! format: on
 
-include("variable_map.jl")
-
-function get_data(ds, var, var_option2 = var)
-    if haskey(ds, var)
-        return ds[var][:]
-    elseif haskey(ds.group["profiles"], var)
-        return ds.group["profiles"][var][:]
-    elseif haskey(ds.group["reference"], var)
-        return ds.group["reference"][var][:]
-    elseif haskey(ds.group["profiles"], var_option2)
-        return ds.group["profiles"][var_option2][:]
-    elseif haskey(ds.group["reference"], var_option2)
-        return ds.group["reference"][var_option2][:]
-    end
-    error("No key for $var or $var_option2 found in the nc file.")
-end
-
 function get_time(ds, var)
     if haskey(ds, var)
         return ds[var][:]
@@ -149,6 +132,7 @@ end
 
 function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = true, group_figs = true, t_start, t_stop)
 
+    TC = TurbulenceConvection
     ds_scampy = haskey(ds_dict, :ds_scampy) ? ds_dict[:ds_scampy] : nothing
     ds_tc_main = haskey(ds_dict, :ds_tc_main) ? ds_dict[:ds_tc_main] : nothing
     ds_pycles = haskey(ds_dict, :ds_pycles) ? ds_dict[:ds_pycles] : nothing
@@ -178,12 +162,12 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
 
     mkpath(plot_dir)
     # Ensure domain matches:
-    z_les = get_data(ds_pycles, "z_half", "zc")
-    z_tcc_c = get_data(ds_tc, "zc")
-    z_tcc_f = get_data(ds_tc, "zf")
-    z_tcm_c = get_data(ds_tc_main, "z_half", "zc")
-    z_tcm_f = get_data(ds_tc_main, "z", "zf")
-    z_scm = get_data(ds_scampy, "z_half", "zc")
+    z_les = TC.get_nc_data(ds_pycles, "zc")
+    z_tcc_c = TC.get_nc_data(ds_tc, "zc")
+    z_tcc_f = TC.get_nc_data(ds_tc, "zf")
+    z_tcm_c = TC.get_nc_data(ds_tc_main, "zc")
+    z_tcm_f = TC.get_nc_data(ds_tc_main, "zf")
+    z_scm = TC.get_nc_data(ds_scampy, "zc")
     n_grid_points = length(z_tcc_c)
     @info "z extrema (les,scm,tcm,tcc): $(extrema(z_les)), $(extrema(z_scm)), $(extrema(z_tcm_c)), $(extrema(z_tcc_c))"
     @info "n-grid points (les,scm,tcm,tcc): $(length(z_les)), $(length(z_scm)), $(length(z_tcm_c)), $(length(z_tcc_c))"
@@ -207,7 +191,6 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
     computed_mse = []
     table_best_mse = []
     mse_reductions = []
-    pycles_variables = []
     data_scales_scm = []
     data_scales_les = []
     data_scales_tcc = []
@@ -219,31 +202,34 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
     plot_attr = Dict()
     plot_attr[true] = Dict()
     plot_attr[false] = Dict()
-    last_key = last(collect(keys(best_mse)))
+
     local fig_height
 
     for tc_var in keys(best_mse)
-
-        # Only compare fields defined for var_map_les
-        if have_pycles_ds
-            les_var = var_map_les(tc_var)
-        else
-            les_var = var_map_scampy(tc_var)
-        end
-        scm_var = var_map_scampy(tc_var)
-        les_var == nothing && continue
-        les_var isa String || continue
-        @info "Assembling plots for $tc_var"
+        data_les_arr = TC.get_nc_data(ds_pycles, tc_var)
+        data_tcm_arr = TC.get_nc_data(ds_tc_main, tc_var)
+        data_tcc_arr = TC.get_nc_data(ds_tc, tc_var)
+        data_scm_arr = TC.get_nc_data(ds_scampy, tc_var)
+        # Only compare fields that exist in the nc files
+        data_les_arr == nothing && continue
+        data_tcm_arr == nothing && continue
+        data_tcc_arr == nothing && continue
+        data_scm_arr == nothing && continue
+        data_les_arr = data_les_arr'
+        data_tcm_arr = data_tcm_arr'
+        data_tcc_arr = data_tcc_arr'
+        data_scm_arr = data_scm_arr'
         push!(tcc_variables, tc_var)
-        push!(pycles_variables, les_var)
 
-        if TurbulenceConvection.is_face_field(tc_var)
+        @info "Assembling plots for $tc_var"
+
+        if TC.is_face_field(tc_var)
             z_tcc = z_tcc_f
         else
             z_tcc = z_tcc_c
         end
         if have_tc_main
-            if TurbulenceConvection.is_face_field(tc_var)
+            if TC.is_face_field(tc_var)
                 z_tcm = z_tcm_f
             else
                 z_tcm = z_tcm_c
@@ -258,10 +244,6 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
             z_les = z_tcc
         end
 
-        data_les_arr = get_data(ds_pycles, les_var)'
-        data_tcm_arr = get_data(ds_tc_main, tc_var)'
-        data_tcc_arr = get_data(ds_tc, tc_var)'
-        data_scm_arr = get_data(ds_scampy, scm_var)'
         # @info "     Data sizes (les,scm,tcc,tcm): $(size(data_les_arr)), $(size(data_scm_arr)), $(size(data_tcc_arr)), $(size(data_tcm_arr))"
         # Scale the data for comparison
         push!(pycles_weight, "1")
@@ -446,12 +428,11 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
 
     # Tabulate output
     header = [
-        "Variable" "Variable" "Weight" "Data scale" "Data scale" "MSE" "MSE" "MSE"
-        "TC.jl (EDMF)" "PyCLES" "PyCLES" "tcc" "scm" "Computed" "Best" "Reduction (%)"
+        "Variable" "Weight" "Data scale" "Data scale" "MSE" "MSE" "MSE"
+        "TC.jl (EDMF)" "PyCLES" "tcc" "scm" "Computed" "Best" "Reduction (%)"
     ]
     table_data = hcat(
         tcc_variables,
-        pycles_variables,
         pycles_weight,
         data_scales_tcc,
         data_scales_scm,
@@ -461,14 +442,14 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
     )
 
     @info @sprintf("case_name comparison: %s at time t=%s\n", case_name, t_cmp)
-    hl_worsened_mse = Highlighter((data, i, j) -> !sufficient_mse(data[i, 6], data[i, 7]) && j == 6, crayon"red bold")
+    hl_worsened_mse = Highlighter((data, i, j) -> !sufficient_mse(data[i, 5], data[i, 6]) && j == 5, crayon"red bold")
     hl_worsened_mse_reduction =
-        Highlighter((data, i, j) -> !sufficient_mse(data[i, 6], data[i, 7]) && j == 8, crayon"red bold")
-    hl_improved_mse = Highlighter((data, i, j) -> sufficient_mse(data[i, 6], data[i, 7]) && j == 8, crayon"green bold")
+        Highlighter((data, i, j) -> !sufficient_mse(data[i, 5], data[i, 6]) && j == 7, crayon"red bold")
+    hl_improved_mse = Highlighter((data, i, j) -> sufficient_mse(data[i, 5], data[i, 6]) && j == 7, crayon"green bold")
     pretty_table(
         table_data,
         header,
-        formatters = ft_printf("%.16e", 6:7),
+        formatters = ft_printf("%.16e", 5:6),
         header_crayon = crayon"yellow bold",
         subheader_crayon = crayon"green bold",
         highlighters = (hl_worsened_mse, hl_improved_mse, hl_worsened_mse_reduction),
