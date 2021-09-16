@@ -325,6 +325,7 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
     set_old_with_values(self.UpdVar)
     set_updraft_surface_bc(self, GMV, Case)
+    diagnose_GMV_moments(self, GMV, Case, TS)
 
     update_surface(Case, GMV, TS)
     update_forcing(Case, GMV, TS)
@@ -657,9 +658,6 @@ function reset_surface_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     en.Hvar.values[kc_surf] = get_surface_variance(flux1 * alpha0LL, flux1 * alpha0LL, ustar, zLL, oblength)
     en.QTvar.values[kc_surf] = get_surface_variance(flux2 * alpha0LL, flux2 * alpha0LL, ustar, zLL, oblength)
     en.HQTcov.values[kc_surf] = get_surface_variance(flux1 * alpha0LL, flux2 * alpha0LL, ustar, zLL, oblength)
-    get_GMV_CoVar(self, up.Area, up.H, up.H, en.H, en.H, en.Hvar, gm.H.values, gm.H.values, gm.Hvar.values)
-    get_GMV_CoVar(self, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar, gm.QT.values, gm.QT.values, gm.QTvar.values)
-    get_GMV_CoVar(self, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov, gm.H.values, gm.QT.values, gm.HQTcov.values)
     return
 end
 
@@ -689,12 +687,6 @@ function decompose_environment(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
         a_bulk_f = interpc2f(up.Area.bulkvalues, grid, k; a_bulk_bcs...)
         en.W.values[k] = -a_bulk_f / (1 - a_bulk_f) * up.W.bulkvalues[k]
     end
-
-    get_GMV_CoVar(self, up.Area, up.W, up.W, en.W, en.W, en.TKE, gm.W.values, gm.W.values, gm.TKE.values)
-    get_GMV_CoVar(self, up.Area, up.H, up.H, en.H, en.H, en.Hvar, gm.H.values, gm.H.values, gm.Hvar.values)
-    get_GMV_CoVar(self, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar, gm.QT.values, gm.QT.values, gm.QTvar.values)
-    get_GMV_CoVar(self, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov, gm.H.values, gm.QT.values, gm.HQTcov.values)
-
     return
 end
 
@@ -756,78 +748,6 @@ function get_GMV_CoVar(
             end
         end
     end
-    return
-end
-
-
-function get_env_covar_from_GMV(
-    self::EDMF_PrognosticTKE,
-    au::UpdraftVariable,
-    ϕ_up::UpdraftVariable,
-    ψ_up::UpdraftVariable,
-    ϕ_en::EnvironmentVariable,
-    ψ_en::EnvironmentVariable,
-    covar_e::EnvironmentVariable_2m,
-    ϕ_gm,
-    ψ_gm,
-    gmv_covar,
-)
-
-    grid = get_grid(self)
-    ae = 1 .- au.bulkvalues
-    is_tke = covar_e.name == "tke"
-    tke_factor = is_tke ? 0.5 : 1
-
-    if is_tke
-        @inbounds for k in real_face_indices(grid)
-            if ae[k] > 0.0
-                ϕ_en_dual = dual_faces(ϕ_en.values, grid, k)
-                ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
-                ψ_en_dual = dual_faces(ψ_en.values, grid, k)
-                ψ_gm_dual = dual_faces(ψ_gm, grid, k)
-                Δϕ_dual = ϕ_en_dual .- ϕ_gm_dual
-                Δψ_dual = ψ_en_dual .- ψ_gm_dual
-                Δϕ = interpf2c(Δϕ_dual, grid, k)
-                Δψ = interpf2c(Δψ_dual, grid, k)
-
-                covar_e.values[k] = gmv_covar[k] - tke_factor * ae[k] * Δϕ * Δψ
-                @inbounds for i in xrange(self.n_updrafts)
-                    ϕ_up_dual = dual_faces(ϕ_up.values, grid, k, i)
-                    ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
-                    ψ_up_dual = dual_faces(ψ_up.values, grid, k, i)
-                    ψ_gm_dual = dual_faces(ψ_gm, grid, k)
-                    Δϕ_dual = ϕ_up_dual .- ϕ_gm_dual
-                    Δψ_dual = ψ_up_dual .- ψ_gm_dual
-                    Δϕ = interpf2c(Δϕ_dual, grid, k)
-                    Δψ = interpf2c(Δψ_dual, grid, k)
-
-                    covar_e.values[k] -= tke_factor * au.values[i, k] * Δϕ * Δψ
-                end
-                covar_e.values[k] = covar_e.values[k] / ae[k]
-            else
-                covar_e.values[k] = 0.0
-            end
-        end
-    else
-        @inbounds for k in real_center_indices(grid)
-            if ae[k] > 0.0
-                Δϕ = ϕ_en.values[k] - ϕ_gm[k]
-                Δψ = ψ_en.values[k] - ψ_gm[k]
-
-                covar_e.values[k] = gmv_covar[k] - tke_factor * ae[k] * Δϕ * Δψ
-                @inbounds for i in xrange(self.n_updrafts)
-                    Δϕ = ϕ_up.values[i, k] - ϕ_gm[k]
-                    Δψ = ψ_up.values[i, k] - ψ_gm[k]
-
-                    covar_e.values[k] -= tke_factor * au.values[i, k] * Δϕ * Δψ
-                end
-                covar_e.values[k] = covar_e.values[k] / ae[k]
-            else
-                covar_e.values[k] = 0.0
-            end
-        end
-    end
-
     return
 end
 
@@ -1301,12 +1221,22 @@ function compute_covariance_rhs(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
     compute_covariance_interdomain_src(self, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar)
     compute_covariance_interdomain_src(self, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov)
     compute_covariance_rain(self, TS, gm) # need to update this one
+    reset_surface_covariance(self, gm, Case)
+    return
+end
 
+function diagnose_GMV_moments(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
+
+    gm = GMV
+    up = self.UpdVar
+    en = self.EnvVar
+
+    get_GMV_CoVar(self, up.Area, up.H, up.H, en.H, en.H, en.Hvar, gm.H.values, gm.H.values, gm.Hvar.values)
+    get_GMV_CoVar(self, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar, gm.QT.values, gm.QT.values, gm.QTvar.values)
+    get_GMV_CoVar(self, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov, gm.H.values, gm.QT.values, gm.HQTcov.values)
     GMV_third_m(self, gm.H_third_m, en.Hvar, en.H, up.H)
     GMV_third_m(self, gm.QT_third_m, en.QTvar, en.QT, up.QT)
     GMV_third_m(self, gm.W_third_m, en.TKE, en.W, up.W)
-
-    reset_surface_covariance(self, gm, Case)
     return
 end
 
@@ -1324,10 +1254,10 @@ function update_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Cas
     b_QTvar = self.implicit_eqs.b_QTvar
     b_HQTcov = self.implicit_eqs.b_HQTcov
 
-    update_covariance_ED(self, gm.W, gm.W, gm.TKE, en.TKE, en.W, en.W, up.W, up.W, A_TKE, b_TKE)
-    update_covariance_ED(self, gm.H, gm.H, gm.Hvar, en.Hvar, en.H, en.H, up.H, up.H, A_Hvar, b_Hvar)
-    update_covariance_ED(self, gm.QT, gm.QT, gm.QTvar, en.QTvar, en.QT, en.QT, up.QT, up.QT, A_QTvar, b_QTvar)
-    update_covariance_ED(self, gm.H, gm.QT, gm.HQTcov, en.HQTcov, en.H, en.QT, up.H, up.QT, A_HQTcov, b_HQTcov)
+    update_covariance_ED(self, gm.W, gm.W, en.TKE, en.W, en.W, up.W, up.W, A_TKE, b_TKE)
+    update_covariance_ED(self, gm.H, gm.H, en.Hvar, en.H, en.H, up.H, up.H, A_Hvar, b_Hvar)
+    update_covariance_ED(self, gm.QT, gm.QT, en.QTvar, en.QT, en.QT, up.QT, up.QT, A_QTvar, b_QTvar)
+    update_covariance_ED(self, gm.H, gm.QT, en.HQTcov, en.H, en.QT, up.H, up.QT, A_HQTcov, b_HQTcov)
     return
 end
 
@@ -1612,7 +1542,6 @@ function compute_covariance_dissipation(self::EDMF_PrognosticTKE, Covar::Environ
 end
 
 function en_diffusion_tendencies(grid::Grid, ref_state::ReferenceState, TS, a_up_old, covar)
-
     dti = TS.dti
     b = center_field(grid)
     ρ0_c = ref_state.rho0_half
@@ -1644,7 +1573,6 @@ function update_covariance_ED(
     self::EDMF_PrognosticTKE,
     GmvVar1::VariablePrognostic,
     GmvVar2::VariablePrognostic,
-    GmvCovar::VariableDiagnostic,
     Covar::EnvironmentVariable_2m,
     EnvVar1::EnvironmentVariable,
     EnvVar2::EnvironmentVariable,
@@ -1664,18 +1592,6 @@ function update_covariance_ED(
             Covar.values[k] = max(x[k], 0.0)
         end
     end
-    get_GMV_CoVar(
-        self,
-        self.UpdVar.Area,
-        UpdVar1,
-        UpdVar2,
-        EnvVar1,
-        EnvVar2,
-        Covar,
-        GmvVar1.values,
-        GmvVar2.values,
-        GmvCovar.values,
-    )
     return
 end
 
