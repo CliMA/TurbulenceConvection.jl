@@ -276,7 +276,7 @@ function TRMM_LBA(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 21600.0
-    namelist["time_stepping"]["dt"] = 3.0
+    namelist["time_stepping"]["dt"] = 2.0
 
     namelist["microphysics"]["rain_model"] = "cutoff"
     # namelist["microphysics"]["rain_model"] = "clima_1m"

@@ -131,15 +131,8 @@ function microphysics_rain_src(
 )
 
     # TODO assumes no ice
-    _ret = mph_struct(0, 0, 0, 0, 0, 0, 0, 0, 0)
-    _ret.qv = qt - ql
+    _ret = mph_struct(0, 0)
     qi = 0.0 # TODO ICE
-    # TODO in this place ts = PhaseEquil_pTq(...) did not work
-    # Anna is this a phase equil or nonequil?
-    phase_part = TD.PhasePartition(qt, ql, qi)
-    _ret.thl = TD.liquid_ice_pottemp_given_pressure(param_set, T, p0, phase_part)
-    _ret.th = TD.dry_pottemp_given_pressure(param_set, T, p0, phase_part)
-    _ret.rho = rho_c(p0, T, qt, _ret.qv)
 
     #TODO - temporary way to handle different autoconversion rates
     tmp_clima_acnv_flag = false
@@ -158,11 +151,11 @@ function microphysics_rain_src(
     if area > 0.0
         if tmp_clima_acnv_flag
             _ret.qr_src = min(
-                ql,
+                ql / dt,
                 (
                     conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, ql) +
                     conv_q_liq_to_q_rai_accr(param_set, C_drag, MP_n_0, E_col, ql, qr, rho)
-                ) * dt,
+                ),
             )
         end
 
@@ -181,12 +174,6 @@ function microphysics_rain_src(
         _ret.qr_src = 0.0
         _ret.thl_rain_src = 0.0
     end
-
-    _ret.qt = qt - _ret.qr_src
-    _ret.ql = ql - _ret.qr_src
-
-    _ret.thl += _ret.thl_rain_src
-
     return _ret
 end
 
