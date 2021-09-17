@@ -34,14 +34,14 @@ all_best_mse["Bomex"]["Hvar_mean"] = 378.4166753430273
 all_best_mse["Bomex"]["QTvar_mean"] = 198.30290733642858
 #
 all_best_mse["DryBubble"] = OrderedDict()
-all_best_mse["DryBubble"]["updraft_area"] = 534.9391319514282
-all_best_mse["DryBubble"]["updraft_w"] = 310.85802482462606
-all_best_mse["DryBubble"]["updraft_thetal"] = 5.8869125664949355e-5
-all_best_mse["DryBubble"]["u_mean"] = 1.9437447963728178e-27
-all_best_mse["DryBubble"]["tke_mean"] = 1.076359937560047e6
-all_best_mse["DryBubble"]["temperature_mean"] = 3.552992814002085e-5
-all_best_mse["DryBubble"]["thetal_mean"] = 3.2024851740531156e-5
-all_best_mse["DryBubble"]["Hvar_mean"] = 6.043901003997101e10
+all_best_mse["DryBubble"]["updraft_area"] = 539.6599653144688
+all_best_mse["DryBubble"]["updraft_w"] = 313.4941117619736
+all_best_mse["DryBubble"]["updraft_thetal"] = 5.888391779968829e-5
+all_best_mse["DryBubble"]["u_mean"] = 1.9038118426821637e-27
+all_best_mse["DryBubble"]["tke_mean"] = 1.0669945705975706e6
+all_best_mse["DryBubble"]["temperature_mean"] = 3.5596499005311575e-5
+all_best_mse["DryBubble"]["thetal_mean"] = 3.209056440553477e-5
+all_best_mse["DryBubble"]["Hvar_mean"] = 5.990617624878926e10
 #
 all_best_mse["DYCOMS_RF01"] = OrderedDict()
 all_best_mse["DYCOMS_RF01"]["qt_mean"] = 0.02698668867187041
@@ -107,7 +107,6 @@ all_best_mse["Rico"]["ql_mean"] = 23.332668760534183
 all_best_mse["Rico"]["thetal_mean"] = 0.0005614974919547419
 all_best_mse["Rico"]["Hvar_mean"] = 1919.691177620351
 all_best_mse["Rico"]["QTvar_mean"] = 742.505644180768
-#
 #
 all_best_mse["Soares"] = OrderedDict()
 all_best_mse["Soares"]["qt_mean"] = 0.1457195078633175

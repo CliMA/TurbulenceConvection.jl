@@ -883,6 +883,8 @@ Base.@kwdef mutable struct CasesBase{T}
     LESDat::Union{LESData, Nothing} = nothing
 end
 
+CasesBase(case::T; kwargs...) where {T} = CasesBase{T}(; casename = string(nameof(T)), kwargs...)
+
 function center_field_tridiagonal_matrix(grid::Grid)
     return LinearAlgebra.Tridiagonal(center_field(grid)[2:end], center_field(grid), center_field(grid)[1:(end - 1)])
 end
