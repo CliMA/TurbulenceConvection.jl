@@ -170,7 +170,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
     weights = w
     # arrays for storing quadarature points and ints for labeling items in the arrays
     # a python dict would be nicer, but its 30% slower than this (for python 2.7. It might not be the case for python 3)
-    env_len = 10
+    env_len = 8
     src_len = 6
 
     sqpi_inv = 1.0 / sqrt(π)
@@ -185,7 +185,7 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
     outer_env = zeros(env_len)
     inner_src = zeros(src_len)
     outer_src = zeros(src_len)
-    i_ql, i_T, i_thl, i_rho, i_cf, i_qt_cld, i_qt_dry, i_T_cld, i_T_dry, i_rf = xrange(env_len)
+    i_ql, i_T, i_cf, i_qt_cld, i_qt_dry, i_T_cld, i_T_dry, i_rf = xrange(env_len)
     i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH = xrange(src_len)
 
     @inbounds for k in real_center_indices(self.grid)
@@ -289,8 +289,6 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                     # environmental variables
                     inner_env[i_ql] += mph.ql * weights[m_h] * sqpi_inv
                     inner_env[i_T] += sa.T * weights[m_h] * sqpi_inv
-                    inner_env[i_thl] += mph.thl * weights[m_h] * sqpi_inv
-                    inner_env[i_rho] += mph.rho * weights[m_h] * sqpi_inv
                     # rain area fraction
                     if mph.qr_src > 0.0
                         inner_env[i_rf] += weights[m_h] * sqpi_inv
