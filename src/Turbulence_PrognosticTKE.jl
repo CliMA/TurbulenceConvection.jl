@@ -1058,12 +1058,7 @@ function compute_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Ti
     ref_state = reference_state(self)
     rho0 = ref_state.rho0
     kf_surf = kf_surface(grid)
-    mf_tend_h = 0.0
-    mf_tend_qt = 0.0
     ae = 1 .- self.UpdVar.Area.bulkvalues # area of environment
-
-    self.massflux_h .= 0.0
-    self.massflux_qt .= 0.0
 
     # Compute the mass flux and associated scalar fluxes
     @inbounds for i in xrange(self.n_updrafts)
@@ -1076,9 +1071,8 @@ function compute_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Ti
         end
     end
 
-
-    self.massflux_h[kf_surf] = 0.0
-    self.massflux_qt[kf_surf] = 0.0
+    self.massflux_h .= 0.0
+    self.massflux_qt .= 0.0
 
     @inbounds for k in real_face_indices(grid)
         self.massflux_h[k] = 0.0
@@ -1208,15 +1202,15 @@ function compute_covariance_rhs(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
     up = self.UpdVar
     en = self.EnvVar
     compute_covariance_entr(self, en.TKE, up.W, up.W, en.W, en.W, gm.W, gm.W)
-    compute_covariance_shear(self, gm, en.TKE, up.W.values, up.W.values, en.W.values, en.W.values)
+    compute_covariance_shear(self, gm, en.TKE, en.W.values, en.W.values)
     compute_covariance_interdomain_src(self, up.Area, up.W, up.W, en.W, en.W, en.TKE)
     compute_tke_pressure(self)
     compute_covariance_entr(self, en.Hvar, up.H, up.H, en.H, en.H, gm.H, gm.H)
     compute_covariance_entr(self, en.QTvar, up.QT, up.QT, en.QT, en.QT, gm.QT, gm.QT)
     compute_covariance_entr(self, en.HQTcov, up.H, up.QT, en.H, en.QT, gm.H, gm.QT)
-    compute_covariance_shear(self, gm, en.Hvar, up.H.values, up.H.values, en.H.values, en.H.values)
-    compute_covariance_shear(self, gm, en.QTvar, up.QT.values, up.QT.values, en.QT.values, en.QT.values)
-    compute_covariance_shear(self, gm, en.HQTcov, up.H.values, up.QT.values, en.H.values, en.QT.values)
+    compute_covariance_shear(self, gm, en.Hvar, en.H.values, en.H.values)
+    compute_covariance_shear(self, gm, en.QTvar, en.QT.values, en.QT.values)
+    compute_covariance_shear(self, gm, en.HQTcov, en.H.values, en.QT.values)
     compute_covariance_interdomain_src(self, up.Area, up.H, up.H, en.H, en.H, en.Hvar)
     compute_covariance_interdomain_src(self, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar)
     compute_covariance_interdomain_src(self, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov)
@@ -1348,16 +1342,12 @@ function compute_covariance_shear(
     self::EDMF_PrognosticTKE,
     GMV::GridMeanVariables,
     Covar::EnvironmentVariable_2m,
-    UpdVar1,
-    UpdVar2,
     EnvVar1,
     EnvVar2,
 )
 
     grid = get_grid(self)
     ae = 1 .- self.UpdVar.Area.bulkvalues
-    diff_var1 = 0.0
-    diff_var2 = 0.0
     KH = diffusivity_h(self).values
     rho0_half = reference_state(self).rho0_half
     is_tke = Covar.name == "tke"
