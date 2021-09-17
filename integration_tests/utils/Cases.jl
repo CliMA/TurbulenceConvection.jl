@@ -1988,11 +1988,11 @@ function initialize_profiles(
         imin = time_interval_bool[1]
         imax = time_interval_bool[end]
 
-        z_les_half = data.group["profiles"]["z_half"][:, 1]
-        GMV.H.values .= pyinterp(grid.zc, z_les_half, TC.get_nc_data(data, "profiles", "thetali_mean", imin, imax))
-        GMV.QT.values .= pyinterp(grid.zc, z_les_half, TC.get_nc_data(data, "profiles", "qt_mean", imin, imax))
-        GMV.U.values .= pyinterp(grid.zc, z_les_half, TC.get_nc_data(data, "profiles", "u_mean", imin, imax))
-        GMV.V.values .= pyinterp(grid.zc, z_les_half, TC.get_nc_data(data, "profiles", "v_mean", imin, imax))
+        zc_les = TC.get_nc_data(data, "zc")
+        GMV.H.values .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "thetali_mean", imin, imax))
+        GMV.QT.values .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "qt_mean", imin, imax))
+        GMV.U.values .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "u_mean", imin, imax))
+        GMV.V.values .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "v_mean", imin, imax))
         satadjust(GMV)
     end
 end
