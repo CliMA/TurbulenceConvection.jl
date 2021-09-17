@@ -1,5 +1,6 @@
-initialize(self::SurfaceBase, ::BaseCase) = nothing
-update(self::SurfaceBase, GMV::GridMeanVariables, ::BaseCase) = nothing
+#####
+##### BaseCase methods
+#####
 
 function free_convection_windspeed(self::SurfaceBase, GMV::GridMeanVariables, ::BaseCase)
     theta_rho = center_field(self.grid)
@@ -17,7 +18,17 @@ function free_convection_windspeed(self::SurfaceBase, GMV::GridMeanVariables, ::
     return
 end
 
-initialize(self::SurfaceBase{SurfaceNone}) = nothing
+#####
+##### Default SurfaceBase behavior
+#####
+
+free_convection_windspeed(self::SurfaceBase, GMV::GridMeanVariables) = free_convection_windspeed(self, GMV, BaseCase())
+
+initialize(self::SurfaceBase) = nothing
+
+#####
+##### SurfaceNone
+#####
 
 function update(self::SurfaceBase{SurfaceNone}, GMV::GridMeanVariables)
     # JH: assigning small fluxed so that simulation won"t crash when computing mixing length
@@ -29,8 +40,6 @@ function update(self::SurfaceBase{SurfaceNone}, GMV::GridMeanVariables)
     return
 end
 free_convection_windspeed(self::SurfaceBase{SurfaceNone}, GMV::GridMeanVariables) = nothing
-
-initialize(self::SurfaceBase{SurfaceFixedFlux}) = nothing
 
 function update(self::SurfaceBase{SurfaceFixedFlux}, GMV::GridMeanVariables)
     param_set = parameter_set(GMV)
@@ -79,11 +88,6 @@ function update(self::SurfaceBase{SurfaceFixedFlux}, GMV::GridMeanVariables)
     self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb
     self.rho_uflux = -self.ref_state.rho0[kf_surf] * self.ustar * self.ustar / self.windspeed * GMV.U.values[kc_surf]
     self.rho_vflux = -self.ref_state.rho0[kf_surf] * self.ustar * self.ustar / self.windspeed * GMV.V.values[kc_surf]
-    return
-end
-
-function free_convection_windspeed(self::SurfaceBase{SurfaceFixedFlux}, GMV::GridMeanVariables)
-    free_convection_windspeed(self, GMV, BaseCase())
     return
 end
 
@@ -137,13 +141,6 @@ function update(self::SurfaceBase{SurfaceFixedCoeffs}, GMV::GridMeanVariables)
     self.rho_vflux = -self.ref_state.rho0[kf_surf] * self.ustar * self.ustar / windspeed * GMV.V.values[kc_surf]
     return
 end
-
-function free_convection_windspeed(self::SurfaceBase{SurfaceFixedCoeffs}, GMV::GridMeanVariables)
-    free_convection_windspeed(self, GMV, BaseCase())
-    return
-end
-
-initialize(self::SurfaceBase{SurfaceMoninObukhov}) = nothing
 
 function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
     param_set = parameter_set(GMV)
@@ -202,13 +199,6 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
     return
 end
 
-function free_convection_windspeed(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
-    free_convection_windspeed(self, GMV, BaseCase())
-    return
-end
-
-initialize(self::SurfaceBase{SurfaceMoninObukhovDry}) = nothing
-
 function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariables)
     param_set = parameter_set(GMV)
     g = CPP.grav(param_set)
@@ -258,11 +248,6 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
 
     return
 end
-
-free_convection_windspeed(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariables) =
-    free_convection_windspeed(self, GMV, BaseCase())
-
-initialize(self::SurfaceBase{SurfaceSullivanPatton}) = nothing
 
 function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables)
     param_set = parameter_set(GMV)
@@ -314,6 +299,3 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
     end
     return
 end
-
-free_convection_windspeed(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables) =
-    free_convection_windspeed(self, GMV, BaseCase())
