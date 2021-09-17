@@ -313,51 +313,11 @@ function compute_gm_tendencies!(grid, Case, GMV, ref_state, TS)
     end
 end
 
-# Perform the update of the scheme
-function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
-
+function compute_diffusive_fluxes(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
     grid = get_grid(self)
     ref_state = reference_state(self)
     param_set = parameter_set(self)
 
-    # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
-    # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
-    # treat them as auxiliary variables for now, until we disentangle the tendency computations.
-    set_old_with_values(self.UpdVar)
-    set_updraft_surface_bc(self, GMV, Case)
-    diagnose_GMV_moments(self, GMV, Case, TS)
-
-    decompose_environment(self, GMV)
-    saturation_adjustment(self.EnvThermo, self.EnvVar)
-    buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
-    update_surface(Case, GMV, TS)
-    update_forcing(Case, GMV, TS)
-    update_radiation(Case, GMV, TS)
-    update_GMV_diagnostics(self, GMV)
-    compute_pressure_plume_spacing(self, GMV, Case)
-    compute_updraft_closures(self, GMV, Case)
-    compute_eddy_diffusivities_tke(self, GMV, Case)
-    compute_GMV_MF(self, GMV, TS)
-    compute_covariance_rhs(self, GMV, Case, TS)
-
-    # compute tendencies
-    compute_gm_tendencies!(grid, Case, GMV, self.ref_state, TS)
-
-    clear_precip_sources(self.UpdThermo)
-
-
-    # update
-    solve_updraft(self, GMV, TS)
-    @inbounds for k in real_center_indices(grid)
-        @inbounds for i in xrange(self.n_updrafts)
-            # saturation adjustment
-            sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-            self.UpdVar.QL.values[i, k] = sa.ql
-            self.UpdVar.T.values[i, k] = sa.T
-        end
-    end
-
-    # -------- TODO: move to update_aux section
     self.ae .= 1 .- self.UpdVar.Area.bulkvalues # area of environment
     KM = diffusivity_m(self).values
     KH = diffusivity_h(self).values
@@ -394,7 +354,53 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
         ∇v = c∇(v_cut, grid, k; bottom = SetGradient(v_bc), top = SetGradient(0))
         self.diffusive_flux_v[k] = -0.5 * ref_state.rho0_half[k] * self.ae[k] * KM[k] * ∇v
     end
+    return
+end
 
+# Perform the update of the scheme
+function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
+
+    grid = get_grid(self)
+    ref_state = reference_state(self)
+    param_set = parameter_set(self)
+
+    # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
+    # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
+    # treat them as auxiliary variables for now, until we disentangle the tendency computations.
+    set_old_with_values(self.UpdVar)
+    set_updraft_surface_bc(self, GMV, Case)
+    diagnose_GMV_moments(self, GMV, Case, TS)
+
+    decompose_environment(self, GMV)
+    saturation_adjustment(self.EnvThermo, self.EnvVar)
+    buoyancy(self.UpdThermo, self.UpdVar, self.EnvVar, GMV, self.extrapolate_buoyancy)
+    update_surface(Case, GMV, TS)
+    update_forcing(Case, GMV, TS)
+    update_radiation(Case, GMV, TS)
+    update_GMV_diagnostics(self, GMV)
+    compute_pressure_plume_spacing(self, GMV, Case)
+    compute_updraft_closures(self, GMV, Case)
+    compute_eddy_diffusivities_tke(self, GMV, Case)
+    compute_GMV_MF(self, GMV, TS)
+    compute_covariance_rhs(self, GMV, Case, TS)
+    compute_diffusive_fluxes(self, GMV, Case, TS)
+
+    # compute tendencies
+    compute_gm_tendencies!(grid, Case, GMV, self.ref_state, TS)
+
+    clear_precip_sources(self.UpdThermo)
+
+
+    # update
+    solve_updraft(self, GMV, TS)
+    @inbounds for k in real_center_indices(grid)
+        @inbounds for i in xrange(self.n_updrafts)
+            # saturation adjustment
+            sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
+            self.UpdVar.QL.values[i, k] = sa.ql
+            self.UpdVar.T.values[i, k] = sa.T
+        end
+    end
 
     # ----------- TODO: move to compute_tendencies
     implicit_eqs = self.implicit_eqs
