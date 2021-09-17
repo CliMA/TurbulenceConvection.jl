@@ -120,14 +120,15 @@ function CasesFactory(namelist, grid, ref_state)
     return
 end
 
-initialize_reference(self::CasesBase, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats, ::BaseCase) =
-    nothing
-initialize_profiles(self::CasesBase, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState, ::BaseCase) =
-    nothing
-initialize_surface(self::CasesBase, grid::Grid, ref_state::ReferenceState, ::BaseCase) = nothing
-initialize_forcing(self::CasesBase, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables, ::BaseCase) = nothing
-initialize_radiation(self::CasesBase, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables, ::BaseCase) =
-    nothing
+#####
+##### Default CasesBase behavior:
+#####
+
+initialize_reference(::CasesBase, ::Grid, ::ReferenceState, ::NetCDFIO_Stats, ::BaseCase) = nothing
+initialize_profiles(::CasesBase, ::Grid, ::GridMeanVariables, ::ReferenceState, ::BaseCase) = nothing
+initialize_surface(::CasesBase, ::Grid, ::ReferenceState, ::BaseCase) = nothing
+initialize_forcing(::CasesBase, ::Grid, ::ReferenceState, ::GridMeanVariables, ::BaseCase) = nothing
+initialize_radiation(self::CasesBase, ::Grid, ::ReferenceState, GMV::GridMeanVariables) = initialize(self.Rad, GMV)
 
 function TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
     add_ts(Stats, "Tsurface")
@@ -141,10 +142,11 @@ function TC.io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
     write_ts(Stats, "lhf", self.Sur.lhf)
     write_ts(Stats, "ustar", self.Sur.ustar)
 end
-
-TC.update_surface(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping, ::BaseCase) = nothing
-TC.update_forcing(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping, ::BaseCase) = nothing
-TC.update_radiation(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping, ::BaseCase) = nothing
+TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
+TC.io(self::CasesBase, Stats::NetCDFIO_Stats) = io(self, Stats, BaseCase())
+TC.update_surface(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Sur, GMV)
+TC.update_forcing(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Fo, GMV)
+TC.update_radiation(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Rad, GMV)
 
 #####
 ##### Soares
@@ -224,29 +226,6 @@ function initialize_forcing(self::CasesBase{Soares}, grid::Grid, ref_state::Refe
     initialize(self.Fo, GMV)
 end
 
-function initialize_radiation(self::CasesBase{Soares}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
-    initialize(self.Rad, GMV)
-end
-
-
-
-function TC.initialize_io(self::CasesBase{Soares}, Stats::NetCDFIO_Stats)
-    initialize_io(self, Stats, BaseCase())
-end
-function TC.io(self::CasesBase{Soares}, Stats::NetCDFIO_Stats)
-    io(self, Stats, BaseCase())
-end
-function TC.update_surface(self::CasesBase{Soares}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Sur, GMV)
-end
-function TC.update_forcing(self::CasesBase{Soares}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Fo, GMV)
-end
-
-function TC.update_radiation(self::CasesBase{Soares}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Rad, GMV)
-end
-
 #####
 ##### Nieuwstadt
 #####
@@ -324,31 +303,6 @@ function initialize_forcing(self::CasesBase{Nieuwstadt}, grid::Grid, ref_state::
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
-end
-function initialize_radiation(
-    self::CasesBase{Nieuwstadt},
-    grid::Grid,
-    ref_state::ReferenceState,
-    GMV::GridMeanVariables,
-)
-    initialize(self.Rad, GMV)
-end
-
-function TC.initialize_io(self::CasesBase{Nieuwstadt}, Stats::NetCDFIO_Stats)
-    initialize_io(self, Stats, BaseCase())
-end
-function TC.io(self::CasesBase{Nieuwstadt}, Stats::NetCDFIO_Stats)
-    io(self, Stats, BaseCase())
-end
-
-function TC.update_surface(self::CasesBase{Nieuwstadt}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Sur, GMV)
-end
-function TC.update_forcing(self::CasesBase{Nieuwstadt}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Fo, GMV)
-end
-function TC.update_radiation(self::CasesBase{Nieuwstadt}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Rad, GMV)
 end
 
 #####
@@ -480,18 +434,6 @@ function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, ref_state::Refer
     end
     return nothing
 end
-function initialize_radiation(self::CasesBase{Bomex}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
-    initialize(self.Rad, GMV)
-end
-
-TC.initialize_io(self::CasesBase{Bomex}, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
-
-TC.io(self::CasesBase{Bomex}, Stats::NetCDFIO_Stats) = io(self, Stats, BaseCase())
-
-TC.update_surface(self::CasesBase{Bomex}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Sur, GMV)
-
-TC.update_forcing(self::CasesBase{Bomex}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Fo, GMV)
-TC.update_radiation(self::CasesBase{Bomex}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Rad, GMV)
 
 #####
 ##### life_cycle_Tan2018
@@ -644,22 +586,6 @@ function initialize_forcing(
     return nothing
 end
 
-function initialize_radiation(
-    self::CasesBase{life_cycle_Tan2018},
-    grid::Grid,
-    ref_state::ReferenceState,
-    GMV::GridMeanVariables,
-)
-    initialize(self.Rad, GMV)
-end
-
-
-function TC.initialize_io(self::CasesBase{life_cycle_Tan2018}, Stats::NetCDFIO_Stats)
-    initialize_io(self, Stats, BaseCase())
-end
-function TC.io(self::CasesBase{life_cycle_Tan2018}, Stats::NetCDFIO_Stats)
-    io(self, Stats, BaseCase())
-end
 function TC.update_surface(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVariables, TS::TimeStepping)
     param_set = TC.parameter_set(GMV)
     g = CPP.grav(param_set)
@@ -675,12 +601,6 @@ function TC.update_surface(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVar
         )
     )
     update(self.Sur, GMV)
-end
-function TC.update_forcing(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Fo, GMV)
-end
-function TC.update_radiation(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Rad, GMV)
 end
 
 #####
@@ -789,27 +709,6 @@ function initialize_forcing(self::CasesBase{Rico}, grid::Grid, ref_state::Refere
         end
     end
     return nothing
-end
-
-function initialize_radiation(self::CasesBase{Rico}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
-    initialize(self.Rad, GMV)
-end
-
-function TC.initialize_io(self::CasesBase{Rico}, Stats::NetCDFIO_Stats)
-    initialize_io(self, Stats, BaseCase())
-end
-function TC.io(self::CasesBase{Rico}, Stats::NetCDFIO_Stats)
-    io(self, Stats, BaseCase())
-end
-function TC.update_surface(self::CasesBase{Rico}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Sur, GMV)
-end
-
-function TC.update_forcing(self::CasesBase{Rico}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Fo, GMV)
-end
-function TC.update_radiation(self::CasesBase{Rico}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Rad, GMV)
 end
 
 #####
@@ -1083,18 +982,6 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, ref_state::Re
     return nothing
 end
 
-function initialize_radiation(self::CasesBase{TRMM_LBA}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
-    initialize(self.Rad, GMV)
-end
-
-function TC.initialize_io(self::CasesBase{TRMM_LBA}, Stats::NetCDFIO_Stats)
-    initialize_io(self, Stats, BaseCase())
-end
-
-function TC.io(self::CasesBase{TRMM_LBA}, Stats::NetCDFIO_Stats)
-    io(self, Stats, BaseCase())
-end
-
 function TC.update_surface(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::TimeStepping)
     self.Sur.lhf = 554.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - TS.t) / 5.25 / 3600.0)))^1.3
     self.Sur.shf = 270.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - TS.t) / 5.25 / 3600.0)))^1.5
@@ -1132,10 +1019,6 @@ function TC.update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS
 
     update(self.Fo, GMV)
 
-end
-
-function TC.update_radiation(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Rad, GMV)
 end
 
 #####
@@ -1218,17 +1101,6 @@ function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, ref_state::Ref
     return nothing
 end
 
-function initialize_radiation(self::CasesBase{ARM_SGP}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
-    initialize(self.Rad, GMV)
-end
-
-function TC.initialize_io(self::CasesBase{ARM_SGP}, Stats::NetCDFIO_Stats)
-    initialize_io(self, Stats, BaseCase())
-end
-function TC.io(self::CasesBase{ARM_SGP}, Stats::NetCDFIO_Stats)
-    io(self, Stats, BaseCase())
-end
-
 function TC.update_surface(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::TimeStepping)
     t_Sur_in = off_arr([0.0, 4.0, 6.5, 7.5, 10.0, 12.5, 14.5]) .* 3600 #LES time is in sec
     SH = off_arr([-30.0, 90.0, 140.0, 140.0, 100.0, -10, -10]) # W/m^2
@@ -1269,10 +1141,6 @@ function TC.update_forcing(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS:
         end
     end
     update(self.Fo, GMV)
-end
-
-function TC.update_radiation(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Rad, GMV)
 end
 
 #####
@@ -1384,28 +1252,6 @@ function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, ref_state::Re
 
     self.Fo.dqtdt = pyinterp(grid.zc, z_in, Qtend_in)
     self.Fo.dTdt = pyinterp(grid.zc, z_in, Ttend_in) + pyinterp(grid.zc, z_in, RAD_in)
-end
-
-function initialize_radiation(self::CasesBase{GATE_III}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
-    initialize(self.Rad, GMV)
-end
-
-function TC.initialize_io(self::CasesBase{GATE_III}, Stats::NetCDFIO_Stats)
-    initialize_io(self, Stats, BaseCase())
-end
-function TC.io(self::CasesBase{GATE_III}, Stats::NetCDFIO_Stats)
-    io(self, Stats, BaseCase())
-end
-
-function TC.update_surface(self::CasesBase{GATE_III}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Sur, GMV) # here lhf and shf are needed for calcualtion of bflux in surface and thus u_star
-end
-
-function TC.update_forcing(self::CasesBase{GATE_III}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Fo, GMV)
-end
-function TC.update_radiation(self::CasesBase{GATE_III}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Rad, GMV)
 end
 
 #####
@@ -1565,16 +1411,6 @@ function TC.io(self::CasesBase{DYCOMS_RF01}, Stats::NetCDFIO_Stats)
     io(self, Stats, BaseCase())
     io(self.Fo, Stats)
 end
-function TC.update_surface(self::CasesBase{DYCOMS_RF01}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Sur, GMV)
-end
-function TC.update_forcing(self::CasesBase{DYCOMS_RF01}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Fo, GMV)
-end
-
-function TC.update_radiation(self::CasesBase{DYCOMS_RF01}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Rad, GMV)
-end
 
 #####
 ##### GABLS
@@ -1652,28 +1488,9 @@ function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, ref_state::Refer
     return nothing
 end
 
-function initialize_radiation(self::CasesBase{GABLS}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
-    initialize(self.Rad, GMV)
-end
-
-function TC.initialize_io(self::CasesBase{GABLS}, Stats::NetCDFIO_Stats)
-    initialize_io(self, Stats, BaseCase())
-end
-
-function TC.io(self::CasesBase{GABLS}, Stats::NetCDFIO_Stats)
-    io(self, Stats, BaseCase())
-end
-
 function TC.update_surface(self::CasesBase{GABLS}, GMV::GridMeanVariables, TS::TimeStepping)
     self.Sur.Tsurface = 265.0 - (0.25 / 3600.0) * TS.t
     update(self.Sur, GMV)
-end
-
-function TC.update_forcing(self::CasesBase{GABLS}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Fo, GMV)
-end
-function TC.update_radiation(self::CasesBase{GABLS}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Rad, GMV)
 end
 
 #####
@@ -1758,24 +1575,6 @@ function initialize_forcing(self::CasesBase{SP}, grid::Grid, ref_state::Referenc
         self.Fo.ug[k] = 1.0
         self.Fo.vg[k] = 0.0
     end
-end
-function initialize_radiation(self::CasesBase{SP}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
-    initialize(self.Rad, GMV)
-end
-function TC.initialize_io(self::CasesBase{SP}, Stats::NetCDFIO_Stats)
-    initialize_io(self, Stats, BaseCase())
-end
-function TC.io(self::CasesBase{SP}, Stats::NetCDFIO_Stats)
-    io(self, Stats, BaseCase())
-end
-function TC.update_surface(self::CasesBase{SP}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Sur, GMV)
-end
-function TC.update_forcing(self::CasesBase{SP}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Fo, GMV)
-end
-function TC.update_radiation(self::CasesBase{SP}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Rad, GMV)
 end
 
 #####
@@ -1896,29 +1695,6 @@ function initialize_forcing(self::CasesBase{DryBubble}, grid::Grid, ref_state::R
     initialize(self.Fo, GMV)
 end
 
-function initialize_radiation(self::CasesBase{DryBubble}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
-    initialize(self.Rad, GMV)
-end
-
-function TC.initialize_io(self::CasesBase{DryBubble}, Stats::NetCDFIO_Stats)
-    initialize_io(self, Stats, BaseCase())
-end
-
-function TC.io(self::CasesBase{DryBubble}, Stats::NetCDFIO_Stats)
-    io(self, Stats, BaseCase())
-end
-
-function TC.update_surface(self::CasesBase{DryBubble}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Sur, GMV)
-end
-
-function TC.update_forcing(self::CasesBase{DryBubble}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Fo, GMV)
-end
-function TC.update_radiation(self::CasesBase{DryBubble}, GMV::GridMeanVariables, TS::TimeStepping)
-    update(self.Rad, GMV)
-end
-
 #####
 ##### LES_driven_SCM
 #####
@@ -2037,14 +1813,5 @@ function initialize_radiation(
 )
     initialize(self.Rad, GMV, self.LESDat)
 end
-
-TC.initialize_io(self::CasesBase{LES_driven_SCM}, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
-
-TC.io(self::CasesBase{LES_driven_SCM}, Stats::NetCDFIO_Stats) = io(self, Stats, BaseCase())
-
-TC.update_surface(self::CasesBase{LES_driven_SCM}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Sur, GMV)
-
-TC.update_forcing(self::CasesBase{LES_driven_SCM}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Fo, GMV)
-TC.update_radiation(self::CasesBase{LES_driven_SCM}, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Rad, GMV)
 
 end
