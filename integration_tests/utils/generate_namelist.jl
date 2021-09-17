@@ -128,7 +128,7 @@ function default_namelist(case_name::String)
     namelist_defaults["thermodynamics"]["quadrature_type"] = "log-normal" #"gaussian" or "log-normal"
 
     namelist_defaults["time_stepping"] = Dict()
-    namelist_defaults["time_stepping"]["dt"] = 3.0
+    namelist_defaults["time_stepping"]["dt"] = 10.0
 
     namelist_defaults["microphysics"] = Dict()
     namelist_defaults["microphysics"]["rain_model"] = "None"
@@ -252,10 +252,11 @@ function Rico(namelist_defaults)
 
     namelist["meta"]["casename"] = "Rico"
 
-    namelist["grid"]["nz"] = 120
+    namelist["grid"]["nz"] = 80
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 86400.0
+    namelist["time_stepping"]["dt"] = 8.0
 
     # namelist["microphysics"]["rain_model"] = "cutoff"
     namelist["microphysics"]["rain_model"] = "clima_1m"
@@ -275,6 +276,7 @@ function TRMM_LBA(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 21600.0
+    namelist["time_stepping"]["dt"] = 3.0
 
     namelist["microphysics"]["rain_model"] = "cutoff"
     # namelist["microphysics"]["rain_model"] = "clima_1m"
@@ -307,6 +309,7 @@ function GATE_III(namelist_defaults)
     namelist["grid"]["dz"] = 10
 
     namelist["time_stepping"]["t_max"] = 3600.0 * 24.0
+    namelist["time_stepping"]["dt"] = 3.0
     namelist["meta"]["simname"] = "GATE_III"
     namelist["meta"]["casename"] = "GATE_III"
 
@@ -348,10 +351,12 @@ function SP(namelist_defaults)
     namelist = deepcopy(namelist_defaults)
     namelist["meta"]["casename"] = "SP"
 
+    # this case is resolution dependent, we should check why
     namelist["grid"]["nz"] = 256
     namelist["grid"]["dz"] = 8
 
     namelist["time_stepping"]["t_max"] = 7200.0
+    namelist["time_stepping"]["dt"] = 3.0
     namelist["meta"]["simname"] = "SP"
     namelist["meta"]["casename"] = "SP"
 
@@ -385,7 +390,7 @@ function LES_driven_SCM(namelist_defaults)
     namelist["grid"]["nz"] = 200
 
     namelist["stats_io"]["frequency"] = 10.0
-    namelist["time_stepping"]["dt"] = 3.0 #10.0
+    namelist["time_stepping"]["dt"] = 5.0
     namelist["time_stepping"]["t_max"] = 3600.0 * 12
 
     namelist["meta"]["lesfile"] =
