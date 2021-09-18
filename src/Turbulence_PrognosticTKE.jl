@@ -403,6 +403,65 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     end
 
     # ----------- TODO: move to compute_tendencies
+    compose_time_implicit_terms(self, GMV, Case, TS)
+    # -----------
+
+    update_GMV_ED(self, GMV, Case, TS)
+    update_covariance(self, GMV, Case, TS)
+    update_GMV_turbulence(self, GMV, Case, TS)
+
+    # update microphysics
+    microphysics(self.UpdThermo, self.UpdVar, self.Rain, TS.dt) # causes division error in dry bubble first time step
+    microphysics(self.EnvThermo, self.EnvVar, self.Rain, TS.dt) # saturation adjustment + rain creation
+    update_total_precip_sources(self.UpdThermo)
+
+    if self.Rain.rain_model == "clima_1m"
+        # sum updraft and environment rain into bulk rain
+        sum_subdomains_rain(self.Rain, self.UpdThermo, self.EnvThermo)
+
+        # rain fall (all three categories are assumed to be falling though "grid-mean" conditions
+        solve_rain_fall(self.rainphysics, self.Rain, GMV, TS, self.Rain.QR, self.Rain.RainArea)
+        solve_rain_fall(self.rainphysics, self.Rain, GMV, TS, self.Rain.Upd_QR, self.Rain.Upd_RainArea)
+        solve_rain_fall(self.rainphysics, self.Rain, GMV, TS, self.Rain.Env_QR, self.Rain.Env_RainArea)
+
+        # rain evaporation (all three categories are assumed to be evaporating in "grid-mean" conditions
+        solve_rain_evap(self.rainphysics, self.Rain, GMV, TS, self.Rain.QR, self.Rain.RainArea)
+        solve_rain_evap(self.rainphysics, self.Rain, GMV, TS, self.Rain.Upd_QR, self.Rain.Upd_RainArea)
+        solve_rain_evap(self.rainphysics, self.Rain, GMV, TS, self.Rain.Env_QR, self.Rain.Env_RainArea)
+    end
+    update_cloud_frac(self, GMV)
+
+    # set values
+    set_values_with_new(self.UpdVar)
+    zero_area_fraction_cleanup(self, GMV)
+
+    update(GMV, TS)
+    return
+end
+
+function update_GMV_turbulence(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
+
+    @inbounds for k in real_center_indices(self.grid)
+        GMV.H.tendencies[k] += (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
+        GMV.QT.tendencies[k] += (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
+        GMV.U.tendencies[k] += (GMV.U.new[k] - GMV.U.values[k]) * TS.dti
+        GMV.V.tendencies[k] += (GMV.V.new[k] - GMV.V.values[k]) * TS.dti
+    end
+
+    return
+end
+
+function compose_time_implicit_terms(
+    self::EDMF_PrognosticTKE,
+    GMV::GridMeanVariables,
+    Case::CasesBase,
+    TS::TimeStepping,
+)
+
+    grid = get_grid(self)
+    ref_state = reference_state(self)
+    param_set = parameter_set(self)
+
     implicit_eqs = self.implicit_eqs
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
     implicit_eqs.A_θq_gm .= construct_tridiag_diffusion_gm(grid, TS.dt, self.rho_ae_KH, ref_state.rho0_half, self.ae)
@@ -455,53 +514,8 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     implicit_eqs.b_Hvar .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.old, en.Hvar)
     implicit_eqs.b_QTvar .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.old, en.QTvar)
     implicit_eqs.b_HQTcov .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.old, en.HQTcov)
-    # -----------
-
-    update_GMV_ED(self, GMV, Case, TS)
-    update_covariance(self, GMV, Case, TS)
-    update_GMV_turbulence(self, GMV, Case, TS)
-
-    # update microphysics
-    microphysics(self.UpdThermo, self.UpdVar, self.Rain, TS.dt) # causes division error in dry bubble first time step
-    microphysics(self.EnvThermo, self.EnvVar, self.Rain, TS.dt) # saturation adjustment + rain creation
-    update_total_precip_sources(self.UpdThermo)
-
-    if self.Rain.rain_model == "clima_1m"
-        # sum updraft and environment rain into bulk rain
-        sum_subdomains_rain(self.Rain, self.UpdThermo, self.EnvThermo)
-
-        # rain fall (all three categories are assumed to be falling though "grid-mean" conditions
-        solve_rain_fall(self.rainphysics, self.Rain, GMV, TS, self.Rain.QR, self.Rain.RainArea)
-        solve_rain_fall(self.rainphysics, self.Rain, GMV, TS, self.Rain.Upd_QR, self.Rain.Upd_RainArea)
-        solve_rain_fall(self.rainphysics, self.Rain, GMV, TS, self.Rain.Env_QR, self.Rain.Env_RainArea)
-
-        # rain evaporation (all three categories are assumed to be evaporating in "grid-mean" conditions
-        solve_rain_evap(self.rainphysics, self.Rain, GMV, TS, self.Rain.QR, self.Rain.RainArea)
-        solve_rain_evap(self.rainphysics, self.Rain, GMV, TS, self.Rain.Upd_QR, self.Rain.Upd_RainArea)
-        solve_rain_evap(self.rainphysics, self.Rain, GMV, TS, self.Rain.Env_QR, self.Rain.Env_RainArea)
-    end
-    update_cloud_frac(self, GMV)
-
-    # set values
-    set_values_with_new(self.UpdVar)
-    zero_area_fraction_cleanup(self, GMV)
-
-    update(GMV, TS)
     return
 end
-
-function update_GMV_turbulence(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
-
-    @inbounds for k in real_center_indices(self.grid)
-        GMV.H.tendencies[k] += (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
-        GMV.QT.tendencies[k] += (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
-        GMV.U.tendencies[k] += (GMV.U.new[k] - GMV.U.values[k]) * TS.dti
-        GMV.V.tendencies[k] += (GMV.V.new[k] - GMV.V.values[k]) * TS.dti
-    end
-
-    return
-end
-
 function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
     grid = get_grid(self)
     param_set = parameter_set(GMV)
