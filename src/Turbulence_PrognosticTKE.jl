@@ -66,22 +66,16 @@ function initialize_io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     add_profile(Stats, "ed_length_scheme")
     add_profile(Stats, "mixing_length_ratio")
     add_profile(Stats, "entdet_balance_length")
-    add_profile(Stats, "interdomain_tke_t")
     add_profile(Stats, "tke_buoy")
     add_profile(Stats, "tke_dissipation")
     add_profile(Stats, "tke_entr_gain")
-    add_profile(Stats, "tke_detr_loss")
     add_profile(Stats, "tke_shear")
     add_profile(Stats, "tke_pressure")
-    add_profile(Stats, "tke_interdomain")
     add_profile(Stats, "Hvar_dissipation")
     add_profile(Stats, "QTvar_dissipation")
     add_profile(Stats, "HQTcov_dissipation")
     add_profile(Stats, "Hvar_entr_gain")
     add_profile(Stats, "QTvar_entr_gain")
-    add_profile(Stats, "Hvar_detr_loss")
-    add_profile(Stats, "QTvar_detr_loss")
-    add_profile(Stats, "HQTcov_detr_loss")
     add_profile(Stats, "HQTcov_entr_gain")
     add_profile(Stats, "Hvar_shear")
     add_profile(Stats, "QTvar_shear")
@@ -89,9 +83,6 @@ function initialize_io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     add_profile(Stats, "Hvar_rain")
     add_profile(Stats, "QTvar_rain")
     add_profile(Stats, "HQTcov_rain")
-    add_profile(Stats, "Hvar_interdomain")
-    add_profile(Stats, "QTvar_interdomain")
-    add_profile(Stats, "HQTcov_interdomain")
     return
 end
 
@@ -189,41 +180,20 @@ function io(self::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     write_profile(Stats, "ed_length_scheme", self.mls)
     write_profile(Stats, "mixing_length_ratio", self.ml_ratio)
     write_profile(Stats, "entdet_balance_length", self.l_entdet)
-    write_profile(Stats, "interdomain_tke_t", self.b)
-    compute_covariance_dissipation(self, self.EnvVar.TKE)
-    write_profile(Stats, "tke_dissipation", self.EnvVar.TKE.dissipation)
     write_profile(Stats, "tke_entr_gain", self.EnvVar.TKE.entr_gain)
-    compute_covariance_detr(self, self.EnvVar.TKE)
-    write_profile(Stats, "tke_detr_loss", self.EnvVar.TKE.detr_loss)
     write_profile(Stats, "tke_shear", self.EnvVar.TKE.shear)
     write_profile(Stats, "tke_buoy", self.EnvVar.TKE.buoy)
     write_profile(Stats, "tke_pressure", self.EnvVar.TKE.press)
-    write_profile(Stats, "tke_interdomain", self.EnvVar.TKE.interdomain)
 
-    compute_covariance_dissipation(self, self.EnvVar.Hvar)
-    write_profile(Stats, "Hvar_dissipation", self.EnvVar.Hvar.dissipation)
-    compute_covariance_dissipation(self, self.EnvVar.QTvar)
-    write_profile(Stats, "QTvar_dissipation", self.EnvVar.QTvar.dissipation)
-    compute_covariance_dissipation(self, self.EnvVar.HQTcov)
-    write_profile(Stats, "HQTcov_dissipation", self.EnvVar.HQTcov.dissipation)
     write_profile(Stats, "Hvar_entr_gain", self.EnvVar.Hvar.entr_gain)
     write_profile(Stats, "QTvar_entr_gain", self.EnvVar.QTvar.entr_gain)
     write_profile(Stats, "HQTcov_entr_gain", self.EnvVar.HQTcov.entr_gain)
-    compute_covariance_detr(self, self.EnvVar.Hvar)
-    compute_covariance_detr(self, self.EnvVar.QTvar)
-    compute_covariance_detr(self, self.EnvVar.HQTcov)
-    write_profile(Stats, "Hvar_detr_loss", self.EnvVar.Hvar.detr_loss)
-    write_profile(Stats, "QTvar_detr_loss", self.EnvVar.QTvar.detr_loss)
-    write_profile(Stats, "HQTcov_detr_loss", self.EnvVar.HQTcov.detr_loss)
     write_profile(Stats, "Hvar_shear", self.EnvVar.Hvar.shear)
     write_profile(Stats, "QTvar_shear", self.EnvVar.QTvar.shear)
     write_profile(Stats, "HQTcov_shear", self.EnvVar.HQTcov.shear)
     write_profile(Stats, "Hvar_rain", self.EnvVar.Hvar.rain_src)
     write_profile(Stats, "QTvar_rain", self.EnvVar.QTvar.rain_src)
     write_profile(Stats, "HQTcov_rain", self.EnvVar.HQTcov.rain_src)
-    write_profile(Stats, "Hvar_interdomain", self.EnvVar.Hvar.interdomain)
-    write_profile(Stats, "QTvar_interdomain", self.EnvVar.QTvar.interdomain)
-    write_profile(Stats, "HQTcov_interdomain", self.EnvVar.HQTcov.interdomain)
     return
 end
 
@@ -1209,7 +1179,6 @@ function compute_covariance_rhs(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
     en = self.EnvVar
     compute_covariance_entr(self, en.TKE, up.W, up.W, en.W, en.W, gm.W, gm.W)
     compute_covariance_shear(self, gm, en.TKE, en.W.values, en.W.values)
-    compute_covariance_interdomain_src(self, up.Area, up.W, up.W, en.W, en.W, en.TKE)
     compute_tke_pressure(self)
     compute_covariance_entr(self, en.Hvar, up.H, up.H, en.H, en.H, gm.H, gm.H)
     compute_covariance_entr(self, en.QTvar, up.QT, up.QT, en.QT, en.QT, gm.QT, gm.QT)
@@ -1217,9 +1186,6 @@ function compute_covariance_rhs(self::EDMF_PrognosticTKE, GMV::GridMeanVariables
     compute_covariance_shear(self, gm, en.Hvar, en.H.values, en.H.values)
     compute_covariance_shear(self, gm, en.QTvar, en.QT.values, en.QT.values)
     compute_covariance_shear(self, gm, en.HQTcov, en.H.values, en.QT.values)
-    compute_covariance_interdomain_src(self, up.Area, up.H, up.H, en.H, en.H, en.Hvar)
-    compute_covariance_interdomain_src(self, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar)
-    compute_covariance_interdomain_src(self, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov)
     compute_covariance_rain(self, TS, gm) # need to update this one
     reset_surface_covariance(self, gm, Case)
     return
@@ -1391,42 +1357,6 @@ function compute_covariance_shear(
     return
 end
 
-function compute_covariance_interdomain_src(
-    self::EDMF_PrognosticTKE,
-    au::UpdraftVariable,
-    ϕ_up::UpdraftVariable,
-    ψ_up::UpdraftVariable,
-    ϕ_en::EnvironmentVariable,
-    ψ_en::EnvironmentVariable,
-    Covar::EnvironmentVariable_2m,
-)
-
-    is_tke = Covar.name == "tke"
-    tke_factor = is_tke ? 0.5 : 1
-    grid = get_grid(self)
-    if is_tke
-        @inbounds for k in real_center_indices(grid)
-            Covar.interdomain[k] = 0.0
-            @inbounds for i in xrange(self.n_updrafts)
-                Δϕ = interpf2c(ϕ_up.values, grid, k, i) - interpf2c(ϕ_en.values, grid, k)
-                Δψ = interpf2c(ψ_up.values, grid, k, i) - interpf2c(ψ_en.values, grid, k)
-
-                Covar.interdomain[k] += tke_factor * au.values[i, k] * (1.0 - au.values[i, k]) * Δϕ * Δψ
-            end
-        end
-    else
-        @inbounds for k in real_center_indices(grid)
-            Covar.interdomain[k] = 0.0
-            @inbounds for i in xrange(self.n_updrafts)
-                Δϕ = ϕ_up.values[i, k] - ϕ_en.values[k]
-                Δψ = ψ_up.values[i, k] - ψ_en.values[k]
-                Covar.interdomain[k] += tke_factor * au.values[i, k] * (1.0 - au.values[i, k]) * Δϕ * Δψ
-            end
-        end
-    end
-    return
-end
-
 function compute_covariance_entr(
     self::EDMF_PrognosticTKE,
     Covar::EnvironmentVariable_2m,
@@ -1447,7 +1377,6 @@ function compute_covariance_entr(
 
     @inbounds for k in real_center_indices(grid)
         Covar.entr_gain[k] = 0.0
-        Covar.detr_loss[k] = 0.0
         @inbounds for i in xrange(self.n_updrafts)
             if self.UpdVar.Area.values[i, k] > self.minimum_area
                 R_up = self.pressure_plume_spacing[i]
@@ -1477,31 +1406,10 @@ function compute_covariance_entr(
                     eps_turb *
                     ((envvar1 - gmvvar1) * (updvar2 - envvar2) + (envvar2 - gmvvar2) * (updvar1 - envvar1))
                 Covar.entr_gain[k] += dynamic_entr + turbulent_entr
-                Covar.detr_loss[k] +=
-                    tke_factor *
-                    rho0_half[k] *
-                    a_up[i, k] *
-                    abs(w_u) *
-                    (self.entr_sc[i, k] + eps_turb) *
-                    Covar.values[k]
             end
         end
     end
 
-    return
-end
-
-function compute_covariance_detr(self::EDMF_PrognosticTKE, Covar::EnvironmentVariable_2m)
-    grid = get_grid(self)
-    rho0_half = reference_state(self).rho0_half
-    @inbounds for k in real_center_indices(grid)
-        Covar.detr_loss[k] = 0.0
-        @inbounds for i in xrange(self.n_updrafts)
-            w_up_c = interpf2c(self.UpdVar.W.values, grid, k, i)
-            Covar.detr_loss[k] += self.UpdVar.Area.values[i, k] * abs(w_up_c) * self.entr_sc[i, k]
-        end
-        Covar.detr_loss[k] *= rho0_half[k] * Covar.values[k]
-    end
     return
 end
 
@@ -1518,22 +1426,6 @@ function compute_covariance_rain(self::EDMF_PrognosticTKE, TS::TimeStepping, GMV
         self.EnvVar.HQTcov.rain_src[k] = rho0_half[k] * ae[k] * self.EnvThermo.HQTcov_rain_dt[k] * TS.dti
     end
 
-    return
-end
-
-function compute_covariance_dissipation(self::EDMF_PrognosticTKE, Covar::EnvironmentVariable_2m)
-    grid = get_grid(self)
-    param_set = parameter_set(self)
-    c_d = CPEDMF.c_d(param_set)
-    ae = 1 .- self.UpdVar.Area.bulkvalues
-    rho0_half = reference_state(self).rho0_half
-
-    @inbounds for k in real_center_indices(grid)
-        Covar.dissipation[k] = (
-            rho0_half[k] * ae[k] * Covar.values[k] * max(self.EnvVar.TKE.values[k], 0)^0.5 /
-            max(self.mixing_length[k], 1.0e-3) * c_d
-        )
-    end
     return
 end
 
