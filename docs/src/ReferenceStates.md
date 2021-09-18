@@ -12,14 +12,21 @@ include(joinpath(tc_dir, "integration_tests", "utils", "parameter_set.jl"))
 using .NameList
 import .Cases
 function export_ref_profile(case_name::String)
+    TC = TurbulenceConvection
     namelist = default_namelist(case_name)
     param_set = create_parameter_set(namelist)
     namelist["meta"]["uuid"] = "01"
-    grid = TurbulenceConvection.Grid(namelist)
-    ref_state = TurbulenceConvection.ReferenceState(grid, param_set)
-    Stats = TurbulenceConvection.NetCDFIO_Stats(namelist, grid)
-    case = Cases.CasesFactory(namelist, grid, ref_state)
-    Cases.initialize_reference(case, grid, ref_state, Stats)
+    grid = TC.Grid(namelist)
+    ref_state = TC.ReferenceState(grid, param_set)
+    Stats = TC.NetCDFIO_Stats(namelist, grid)
+
+    case = Cases.get_case(namelist)
+    Sur = TC.SurfaceBase(Cases.get_surface_type(case); grid, ref_state, namelist)
+    Fo = TC.ForcingBase{Cases.get_forcing_type(case)}(; grid, ref_state)
+    Rad = TC.RadiationBase{Cases.get_radiation_type(case)}(; grid, ref_state)
+
+    case_base = Cases.CasesBase(case, namelist, grid, ref_state, Sur, Fo, Rad)
+    Cases.initialize_reference(case_base, grid, ref_state, Stats)
     NCDatasets.Dataset(joinpath(Stats.path_plus_file), "r") do ds
         zc = ds.group["profiles"]["zc"][:]
         zf = ds.group["profiles"]["zf"][:]

@@ -50,75 +50,85 @@ using ..TurbulenceConvection: real_face_indices
 # For dispatching to inherited class
 struct BaseCase end
 
+abstract type AbstractCaseType end
+
 """ [Soares2004](@cite) """
-struct Soares end
+struct Soares <: AbstractCaseType end
 
 """ [Nieuwstadt1993](@cite) """
-struct Nieuwstadt end
+struct Nieuwstadt <: AbstractCaseType end
 
-struct Bomex end
+struct Bomex <: AbstractCaseType end
 
 """ [Tan2018](@cite) """
-struct life_cycle_Tan2018 end
+struct life_cycle_Tan2018 <: AbstractCaseType end
 
-struct Rico end
+struct Rico <: AbstractCaseType end
 
 """ [Grabowski2006](@cite) """
-struct TRMM_LBA end
+struct TRMM_LBA <: AbstractCaseType end
 
 """ [Brown2002](@cite) """
-struct ARM_SGP end
+struct ARM_SGP <: AbstractCaseType end
 
 """ [Khairoutdinov2009](@cite) """
-struct GATE_III end
+struct GATE_III <: AbstractCaseType end
 
 """ [Stevens2005](@cite) """
-struct DYCOMS_RF01 end
+struct DYCOMS_RF01 <: AbstractCaseType end
 
-struct GABLS end
+struct GABLS <: AbstractCaseType end
 
-struct SP end
+struct SP <: AbstractCaseType end
 
-struct DryBubble end
+struct DryBubble <: AbstractCaseType end
 
-struct LES_driven_SCM end
+struct LES_driven_SCM <: AbstractCaseType end
 
 #####
-#####
+##### Case methods
 #####
 
-function CasesFactory(namelist, grid, ref_state)
-    if namelist["meta"]["casename"] == "Soares"
-        return Soares(namelist, grid, ref_state)
-    elseif namelist["meta"]["casename"] == "Nieuwstadt"
-        return Nieuwstadt(namelist, grid, ref_state)
-    elseif namelist["meta"]["casename"] == "Bomex"
-        return Bomex(namelist, grid, ref_state)
-    elseif namelist["meta"]["casename"] == "life_cycle_Tan2018"
-        return life_cycle_Tan2018(namelist, grid, ref_state)
-    elseif namelist["meta"]["casename"] == "Rico"
-        return Rico(namelist, grid, ref_state)
-    elseif namelist["meta"]["casename"] == "TRMM_LBA"
-        return TRMM_LBA(namelist, grid, ref_state)
-    elseif namelist["meta"]["casename"] == "ARM_SGP"
-        return ARM_SGP(namelist, grid, ref_state)
-    elseif namelist["meta"]["casename"] == "GATE_III"
-        return GATE_III(namelist, grid, ref_state)
-    elseif namelist["meta"]["casename"] == "DYCOMS_RF01"
-        return DYCOMS_RF01(namelist, grid, ref_state)
-    elseif namelist["meta"]["casename"] == "GABLS"
-        return GABLS(namelist, grid, ref_state)
-    elseif namelist["meta"]["casename"] == "SP"
-        return SP(namelist, grid, ref_state)
-    elseif namelist["meta"]["casename"] == "DryBubble"
-        return DryBubble(namelist, grid, ref_state)
-    elseif namelist["meta"]["casename"] == "LES_driven_SCM"
-        return LES_driven_SCM(namelist, grid, ref_state)
-    else
-        error("case not recognized")
-    end
-    return
-end
+get_case(namelist::Dict) = get_case(namelist["meta"]["casename"])
+get_case(casename::String) = get_case(Val(Symbol(casename)))
+get_case(::Val{:Soares}) = Soares()
+get_case(::Val{:Nieuwstadt}) = Nieuwstadt()
+get_case(::Val{:Bomex}) = Bomex()
+get_case(::Val{:life_cycle_Tan2018}) = life_cycle_Tan2018()
+get_case(::Val{:Rico}) = Rico()
+get_case(::Val{:TRMM_LBA}) = TRMM_LBA()
+get_case(::Val{:ARM_SGP}) = ARM_SGP()
+get_case(::Val{:GATE_III}) = GATE_III()
+get_case(::Val{:DYCOMS_RF01}) = DYCOMS_RF01()
+get_case(::Val{:GABLS}) = GABLS()
+get_case(::Val{:SP}) = SP()
+get_case(::Val{:DryBubble}) = DryBubble()
+get_case(::Val{:LES_driven_SCM}) = LES_driven_SCM()
+
+get_case_name(case_type::AbstractCaseType) = string(case_type)
+
+#####
+##### Case configurations
+#####
+
+get_surface_type(::AbstractCaseType) = TC.SurfaceFixedFlux # default
+get_surface_type(::Rico) = TC.SurfaceFixedCoeffs
+get_surface_type(::GATE_III) = TC.SurfaceFixedCoeffs
+get_surface_type(::GABLS) = TC.SurfaceMoninObukhovDry
+get_surface_type(::SP) = TC.SurfaceSullivanPatton
+get_surface_type(::DryBubble) = TC.SurfaceNone
+get_surface_type(::LES_driven_SCM) = TC.SurfaceMoninObukhov
+
+get_forcing_type(::AbstractCaseType) = TC.ForcingStandard # default
+get_forcing_type(::Soares) = TC.ForcingNone
+get_forcing_type(::Nieuwstadt) = TC.ForcingNone
+get_forcing_type(::DYCOMS_RF01) = TC.ForcingDYCOMS_RF01
+get_forcing_type(::DryBubble) = TC.ForcingNone
+get_forcing_type(::LES_driven_SCM) = TC.ForcingLES
+
+get_radiation_type(::AbstractCaseType) = TC.RadiationNone # default
+get_radiation_type(::DYCOMS_RF01) = TC.RadiationDYCOMS_RF01
+get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
 
 #####
 ##### Default CasesBase behavior:
@@ -152,15 +162,11 @@ TC.update_radiation(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) =
 ##### Soares
 #####
 
-function Soares(namelist, grid::Grid, ref_state::ReferenceState)
-    casename = "Soares2004"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; grid, ref_state, namelist)
-    Fo = TC.ForcingBase{TC.ForcingNone}(; grid, ref_state)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
+function CasesBase(case::Soares, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
-    return TC.CasesBase{Soares}(; casename = "Soares", inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 function initialize_reference(self::CasesBase{Soares}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
     ref_state.Pg = 1000.0 * 100.0
@@ -230,15 +236,11 @@ end
 ##### Nieuwstadt
 #####
 
-function Nieuwstadt(namelist, grid::Grid, ref_state::ReferenceState)
-    casename = "Nieuwstadt"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; grid, ref_state, namelist)
-    Fo = TC.ForcingBase{TC.ForcingNone}(; grid, ref_state)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
+function CasesBase(case::Nieuwstadt, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
-    return TC.CasesBase{Nieuwstadt}(; casename = "Nieuwstadt", inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{Nieuwstadt}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
@@ -309,16 +311,12 @@ end
 ##### Bomex
 #####
 
-function Bomex(namelist, grid::Grid, ref_state::ReferenceState)
-    casename = "Bomex"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; grid, ref_state, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
+function CasesBase(case::Bomex, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
     Fo.apply_subsidence = true
-    return TC.CasesBase{Bomex}(; casename = "Bomex", inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{Bomex}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
@@ -439,16 +437,12 @@ end
 ##### life_cycle_Tan2018
 #####
 
-function life_cycle_Tan2018(namelist, grid::Grid, ref_state::ReferenceState)
-    casename = "life_cycle_Tan2018"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; grid, ref_state, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
+function CasesBase(case::life_cycle_Tan2018, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
     Fo.apply_subsidence = true
-    return TC.CasesBase{life_cycle_Tan2018}(; casename = "life_cycle_Tan2018", inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 function initialize_reference(
     self::CasesBase{life_cycle_Tan2018},
@@ -607,17 +601,13 @@ end
 ##### Rico
 #####
 
-function Rico(namelist, grid::Grid, ref_state::ReferenceState)
-    casename = "Rico"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedCoeffs; grid, ref_state, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
+function CasesBase(case::Rico, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 18.0
     Fo.coriolis_param = 2.0 * omega * sin(latitude * π / 180.0) # s^{-1}
     Fo.apply_subsidence = true
-    return TC.CasesBase{Rico}(; casename = "Rico", inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{Rico}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
@@ -715,15 +705,11 @@ end
 ##### TRMM_LBA
 #####
 
-function TRMM_LBA(namelist, grid::Grid, ref_state::ReferenceState)
-    casename = "TRMM_LBA"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; grid, ref_state, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
+function CasesBase(case::TRMM_LBA, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
-    return TC.CasesBase{TRMM_LBA}(; casename = "TRMM_LBA", inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 function initialize_reference(self::CasesBase{TRMM_LBA}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
     param_set = TC.parameter_set(ref_state)
@@ -1025,16 +1011,12 @@ end
 ##### ARM_SGP
 #####
 
-function ARM_SGP(namelist, grid::Grid, ref_state::ReferenceState)
-    casename = "ARM_SGP"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; grid, ref_state, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
+function CasesBase(case::ARM_SGP, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 8.5e-5
     Fo.apply_subsidence = false
-    return TC.CasesBase{ARM_SGP}(; casename = "ARM_SGP", inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{ARM_SGP}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1147,15 +1129,11 @@ end
 ##### GATE_III
 #####
 
-function GATE_III(namelist, grid::Grid, ref_state::ReferenceState)
-    casename = "GATE_III"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedCoeffs; grid, ref_state, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
+function CasesBase(case::GATE_III, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     Fo.apply_subsidence = false
     Fo.apply_coriolis = false
-    return TC.CasesBase{GATE_III}(; casename = "GATE_III", inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{GATE_III}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1258,13 +1236,9 @@ end
 ##### DYCOMS_RF01
 #####
 
-function DYCOMS_RF01(namelist, grid::Grid, ref_state::ReferenceState)
-    casename = "DYCOMS_RF01"
-    Sur = TC.SurfaceBase(TC.SurfaceFixedFlux; grid, ref_state, namelist)
-    Fo = TC.ForcingBase{TC.ForcingDYCOMS_RF01}(; grid, ref_state)
-    Rad = TC.RadiationBase{TC.RadiationDYCOMS_RF01}(; grid, ref_state)
+function CasesBase(case::DYCOMS_RF01, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
-    return TC.CasesBase{DYCOMS_RF01}(; casename = "DYCOMS_RF01", inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(
@@ -1416,18 +1390,14 @@ end
 ##### GABLS
 #####
 
-function GABLS(namelist, grid::Grid, ref_state::ReferenceState)
-    casename = "GABLS"
-    Sur = TC.SurfaceBase(TC.SurfaceMoninObukhovDry; grid, ref_state, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
+function CasesBase(case::GABLS, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 73.0
     Fo.coriolis_param = 1.39e-4 # s^{-1}
     # Fo.coriolis_param = 2.0 * omega * np.sin(latitude * π / 180.0 ) # s^{-1}
     Fo.apply_subsidence = false
-    return TC.CasesBase{GABLS}(; casename = "GABLS", inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{GABLS}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1498,17 +1468,13 @@ end
 #####
 
 # Not fully implemented yet - Ignacio
-function SP(namelist, grid::Grid, ref_state::ReferenceState)
-    casename = "SP"
-    Sur = TC.SurfaceBase(TC.SurfaceSullivanPatton; grid, ref_state, namelist)
-    Fo = TC.ForcingBase{TC.ForcingStandard}(; grid, ref_state)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
+function CasesBase(case::SP, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 1.0e-4 # s^{-1}
     # Fo.coriolis_param = 2.0 * omega * np.sin(latitude * π / 180.0 ) # s^{-1}
     Fo.apply_subsidence = false
-    return TC.CasesBase{SP}(; casename = "SP", inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{SP}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1581,15 +1547,11 @@ end
 ##### DryBubble
 #####
 
-function DryBubble(namelist, grid::Grid, ref_state::ReferenceState)
-    casename = "DryBubble"
-    Sur = TC.SurfaceBase(TC.SurfaceNone; grid, ref_state, namelist)
-    Fo = TC.ForcingBase{TC.ForcingNone}(; grid, ref_state)
-    Rad = TC.RadiationBase{TC.RadiationNone}(; grid, ref_state)
+function CasesBase(case::DryBubble, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "theta_rho"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
-    return TC.CasesBase{DryBubble}(; casename = "DryBubble", inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 
 function initialize_reference(self::CasesBase{DryBubble}, grid::Grid, ref_state::ReferenceState, Stats::NetCDFIO_Stats)
@@ -1699,8 +1661,7 @@ end
 ##### LES_driven_SCM
 #####
 
-function LES_driven_SCM(namelist, grid::Grid, ref_state::ReferenceState)
-    casename = "LES_driven_SCM"
+function CasesBase(case::LES_driven_SCM, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
     les_filename = namelist["meta"]["lesfile"]
     # load data here
     LESDat = NC.Dataset(les_filename, "r") do data
@@ -1714,9 +1675,6 @@ function LES_driven_SCM(namelist, grid::Grid, ref_state::ReferenceState)
 
         TC.LESData(imin, imax, les_filename)
     end
-    Sur = TC.SurfaceBase{TC.SurfaceMoninObukhov}(; grid, ref_state)
-    Fo = TC.ForcingBase{TC.ForcingLES}(; grid, ref_state)
-    Rad = TC.RadiationBase{TC.RadiationLES}(; grid, ref_state)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.coriolis_param = 0.376e-4 # s^{-1}
@@ -1724,7 +1682,7 @@ function LES_driven_SCM(namelist, grid::Grid, ref_state::ReferenceState)
     Fo.apply_coriolis = false
     Fo.apply_subsidence = true
     Fo.nudge_tau = namelist["forcing"]["nudging_timescale"]
-    return TC.CasesBase{LES_driven_SCM}(; casename = "LES_driven_SCM", inversion_option, Sur, Fo, Rad, LESDat)
+    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad, LESDat)
 end
 
 function initialize_reference(
