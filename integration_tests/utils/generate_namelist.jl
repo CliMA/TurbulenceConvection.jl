@@ -376,6 +376,7 @@ function DryBubble(namelist_defaults)
 
     namelist["stats_io"]["frequency"] = 10.0
     namelist["time_stepping"]["t_max"] = 1000.0
+    namelist["time_stepping"]["dt"] = 3.0
     namelist["meta"]["simname"] = "DryBubble"
     namelist["meta"]["casename"] = "DryBubble"
 
