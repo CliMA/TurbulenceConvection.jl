@@ -173,29 +173,23 @@ function reference_params(::Soares, grid::Grid, param_set::APS, namelist)
 end
 function initialize_profiles(self::CasesBase{Soares}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
-    theta = TC.center_field(grid)
-    ql = 0.0
-    qi = 0.0
-
     @inbounds for k in real_center_indices(grid)
-        if grid.zc[k] <= 1350.0
-            GMV.QT.values[k] = 5.0e-3 - 3.7e-4 * grid.zc[k] / 1000.0
-            theta[k] = 300.0
+        zc_k = grid.zc[k]
+        p0_half = ref_state.p0_half[k]
+        if zc_k <= 1350.0
+            q_tot_gm = 5.0e-3 - 3.7e-4 * zc_k / 1000.0
+            θ_liq_ice_gm = 300.0
 
         else
-            GMV.QT.values[k] = 5.0e-3 - 3.7e-4 * 1.35 - 9.4e-4 * (grid.zc[k] - 1350.0) / 1000.0
-            theta[k] = 300.0 + 2.0 * (grid.zc[k] - 1350.0) / 1000.0
+            q_tot_gm = 5.0e-3 - 3.7e-4 * 1.35 - 9.4e-4 * (zc_k - 1350.0) / 1000.0
+            θ_liq_ice_gm = 300.0 + 2.0 * (zc_k - 1350.0) / 1000.0
         end
+        GMV.QT.values[k] = q_tot_gm
+        GMV.H.values[k] = θ_liq_ice_gm
         GMV.U.values[k] = 0.01
-    end
-
-
-    @inbounds for k in real_center_indices(grid)
-        GMV.H.values[k] = theta[k]
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_half, θ_liq_ice_gm, q_tot_gm)
         GMV.T.values[k] = TD.air_temperature(ts)
     end
-
     satadjust(GMV)
 end
 
@@ -249,26 +243,20 @@ function reference_params(::Nieuwstadt, grid::Grid, param_set::APS, namelist)
 end
 function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
-    theta = TC.center_field(grid)
-    ql = 0.0
-    qi = 0.0
-
     @inbounds for k in real_center_indices(grid)
-        if grid.zc[k] <= 1350.0
-            GMV.QT.values[k] = 0.0
-            theta[k] = 300.0
-
+        zc_k = grid.zc[k]
+        p0_half = ref_state.p0_half[k]
+        if zc_k <= 1350.0
+            q_tot_gm = 0.0
+            θ_liq_ice_gm = 300.0
         else
-            GMV.QT.values[k] = 0.0
-            theta[k] = 300.0 + 3.0 * (grid.zc[k] - 1350.0) / 1000.0
+            q_tot_gm = 0.0
+            θ_liq_ice_gm = 300.0 + 3.0 * (zc_k - 1350.0) / 1000.0
         end
+        GMV.QT.values[k] = q_tot_gm
         GMV.U.values[k] = 0.01
-    end
-
-
-    @inbounds for k in real_center_indices(grid)
-        GMV.H.values[k] = theta[k]
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        GMV.H.values[k] = θ_liq_ice_gm
+        ts = TD.PhaseEquil_pθq(param_set, p0_half, θ_liq_ice_gm, q_tot_gm)
         GMV.T.values[k] = TD.air_temperature(ts)
     end
     satadjust(GMV)
@@ -327,54 +315,55 @@ end
 
 function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
-    thetal = TC.center_field(grid)
-    ql = 0.0
-    qi = 0.0 # IC of Bomex is cloud-free
 
     @inbounds for k in real_center_indices(grid)
+        zc_k = grid.zc[k]
+        p0_half = ref_state.p0_half[k]
         #Set Thetal profile
-        if grid.zc[k] <= 520.0
-            thetal[k] = 298.7
+        if zc_k <= 520.0
+            θ_liq_ice_gm = 298.7
         end
-        if grid.zc[k] > 520.0 && grid.zc[k] <= 1480.0
-            thetal[k] = 298.7 + (grid.zc[k] - 520) * (302.4 - 298.7) / (1480.0 - 520.0)
+        if zc_k > 520.0 && zc_k <= 1480.0
+            θ_liq_ice_gm = 298.7 + (zc_k - 520) * (302.4 - 298.7) / (1480.0 - 520.0)
         end
-        if grid.zc[k] > 1480.0 && grid.zc[k] <= 2000
-            thetal[k] = 302.4 + (grid.zc[k] - 1480.0) * (308.2 - 302.4) / (2000.0 - 1480.0)
+        if zc_k > 1480.0 && zc_k <= 2000
+            θ_liq_ice_gm = 302.4 + (zc_k - 1480.0) * (308.2 - 302.4) / (2000.0 - 1480.0)
         end
-        if grid.zc[k] > 2000.0
-            thetal[k] = 308.2 + (grid.zc[k] - 2000.0) * (311.85 - 308.2) / (3000.0 - 2000.0)
+        if zc_k > 2000.0
+            θ_liq_ice_gm = 308.2 + (zc_k - 2000.0) * (311.85 - 308.2) / (3000.0 - 2000.0)
         end
 
         #Set qt profile
-        if grid.zc[k] <= 520
-            GMV.QT.values[k] = (17.0 + (grid.zc[k]) * (16.3 - 17.0) / 520.0) / 1000.0
+        if zc_k <= 520
+            q_tot_gm = (17.0 + zc_k * (16.3 - 17.0) / 520.0) / 1000.0
         end
-        if grid.zc[k] > 520.0 && grid.zc[k] <= 1480.0
-            GMV.QT.values[k] = (16.3 + (grid.zc[k] - 520.0) * (10.7 - 16.3) / (1480.0 - 520.0)) / 1000.0
+        if zc_k > 520.0 && zc_k <= 1480.0
+            q_tot_gm = (16.3 + (zc_k - 520.0) * (10.7 - 16.3) / (1480.0 - 520.0)) / 1000.0
         end
-        if grid.zc[k] > 1480.0 && grid.zc[k] <= 2000.0
-            GMV.QT.values[k] = (10.7 + (grid.zc[k] - 1480.0) * (4.2 - 10.7) / (2000.0 - 1480.0)) / 1000.0
+        if zc_k > 1480.0 && zc_k <= 2000.0
+            q_tot_gm = (10.7 + (zc_k - 1480.0) * (4.2 - 10.7) / (2000.0 - 1480.0)) / 1000.0
         end
-        if grid.zc[k] > 2000.0
-            GMV.QT.values[k] = (4.2 + (grid.zc[k] - 2000.0) * (3.0 - 4.2) / (3000.0 - 2000.0)) / 1000.0
+        if zc_k > 2000.0
+            q_tot_gm = (4.2 + (zc_k - 2000.0) * (3.0 - 4.2) / (3000.0 - 2000.0)) / 1000.0
         end
 
 
         #Set u profile
-        if grid.zc[k] <= 700.0
-            GMV.U.values[k] = -8.75
+        if zc_k <= 700.0
+            u_gm = -8.75
         end
-        if grid.zc[k] > 700.0
-            GMV.U.values[k] = -8.75 + (grid.zc[k] - 700.0) * (-4.61 - -8.75) / (3000.0 - 700.0)
+        if zc_k > 700.0
+            u_gm = -8.75 + (zc_k - 700.0) * (-4.61 - -8.75) / (3000.0 - 700.0)
         end
-    end
 
-    @inbounds for k in real_center_indices(grid)
-        GMV.H.values[k] = thetal[k]
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        GMV.H.values[k] = θ_liq_ice_gm
+        GMV.QT.values[k] = q_tot_gm
+        GMV.U.values[k] = u_gm
+
+        ts = TD.PhaseEquil_pθq(param_set, p0_half, θ_liq_ice_gm, q_tot_gm)
         GMV.T.values[k] = TD.air_temperature(ts)
     end
+
     satadjust(GMV)
 end
 
@@ -402,32 +391,42 @@ function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, ref_state::Refer
     initialize(self.Fo, GMV)
     @inbounds for k in real_center_indices(grid)
         # Geostrophic velocity profiles. vg = 0
-        self.Fo.ug[k] = -10.0 + (1.8e-3) * grid.zc[k]
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        zc_k = grid.zc[k]
+        p0_half = ref_state.p0_half[k]
+        θ_liq_ice_gm = GMV.H.values[k]
+        q_tot_gm = GMV.QT.values[k]
+
+        ts = TD.PhaseEquil_pθq(param_set, p0_half, θ_liq_ice_gm, q_tot_gm)
         Π = TD.exner(ts)
         # Set large-scale cooling
-        if grid.zc[k] <= 1500.0
-            self.Fo.dTdt[k] = (-2.0 / (3600 * 24.0)) * Π
+        if zc_k <= 1500.0
+            dTdt = (-2.0 / (3600 * 24.0)) * Π
         else
-            self.Fo.dTdt[k] =
-                (-2.0 / (3600 * 24.0) + (grid.zc[k] - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) * Π
+            dTdt = (-2.0 / (3600 * 24.0) + (zc_k - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) * Π
         end
 
         # Set large-scale drying
-        if grid.zc[k] <= 300.0
-            self.Fo.dqtdt[k] = -1.2e-8   #kg/(kg * s)
-        end
-        if grid.zc[k] > 300.0 && grid.zc[k] <= 500.0
-            self.Fo.dqtdt[k] = -1.2e-8 + (grid.zc[k] - 300.0) * (0.0 - -1.2e-8) / (500.0 - 300.0) #kg/(kg * s)
+        if zc_k <= 300.0
+            dqtdt = -1.2e-8   #kg/(kg * s)
+        elseif zc_k > 300.0 && zc_k <= 500.0
+            dqtdt = -1.2e-8 + (zc_k - 300.0) * (0.0 - -1.2e-8) / (500.0 - 300.0) #kg/(kg * s)
+        else
+            dqtdt = 0.0
         end
 
         #Set large scale subsidence
-        if grid.zc[k] <= 1500.0
-            self.Fo.subsidence[k] = 0.0 + grid.zc[k] * (-0.65 / 100.0 - 0.0) / (1500.0 - 0.0)
+        if zc_k <= 1500.0
+            subsidence = 0.0 + zc_k * (-0.65 / 100.0 - 0.0) / (1500.0 - 0.0)
+        elseif zc_k > 1500.0 && zc_k <= 2100.0
+            subsidence = -0.65 / 100 + (zc_k - 1500.0) * (0.0 - -0.65 / 100.0) / (2100.0 - 1500.0)
+        else
+            subsidence = 0.0
         end
-        if grid.zc[k] > 1500.0 && grid.zc[k] <= 2100.0
-            self.Fo.subsidence[k] = -0.65 / 100 + (grid.zc[k] - 1500.0) * (0.0 - -0.65 / 100.0) / (2100.0 - 1500.0)
-        end
+
+        self.Fo.ug[k] = -10.0 + (1.8e-3) * zc_k
+        self.Fo.dTdt[k] = dTdt
+        self.Fo.dqtdt[k] = dqtdt
+        self.Fo.subsidence[k] = subsidence
     end
     return nothing
 end
