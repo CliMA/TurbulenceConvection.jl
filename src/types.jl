@@ -9,13 +9,6 @@ Base.@kwdef mutable struct rain_struct
 end
 
 Base.@kwdef mutable struct mph_struct
-    T::Float64 = 0
-    thl::Float64 = 0
-    th::Float64 = 0
-    rho::Float64 = 0
-    qt::Float64 = 0
-    qv::Float64 = 0
-    ql::Float64 = 0
     thl_rain_src::Float64 = 0
     qr_src::Float64 = 0
 end

@@ -414,24 +414,19 @@ function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rai
                 Rain.q_liq_threshold,
                 Rain.tau_acnv,
                 Rain.E_col,
-                UpdVar.QT.new[i, k],
+                UpdVar.QT.values[i, k],
                 UpdVar.QL.values[i, k],
                 Rain.Upd_QR.values[k],
-                UpdVar.Area.new[i, k],
+                UpdVar.Area.values[i, k],
                 UpdVar.T.values[i, k],
                 self.ref_state.p0_half[k],
                 self.ref_state.rho0_half[k],
                 dt,
             )
 
-            # update Updraft.new
-            UpdVar.QT.new[i, k] = mph.qt
-            UpdVar.QL.values[i, k] = mph.ql
-            UpdVar.H.new[i, k] = mph.thl
-
             # update rain sources of state variables
-            self.prec_source_qt[i, k] -= mph.qr_src * UpdVar.Area.new[i, k]
-            self.prec_source_h[i, k] += mph.thl_rain_src * UpdVar.Area.new[i, k]
+            self.prec_source_qt[i, k] -= mph.qr_src * UpdVar.Area.values[i, k]
+            self.prec_source_h[i, k] += mph.thl_rain_src * UpdVar.Area.values[i, k]
         end
     end
     return

@@ -29,7 +29,7 @@ function io(
     write_profile(Stats, "updraft_rain_area", self.Upd_RainArea.values)
     write_profile(Stats, "env_rain_area", self.Env_RainArea.values)
 
-    rain_diagnostics(self, ref_state, UpdThermo, EnvThermo, TS)
+    rain_diagnostics(self, ref_state, UpdThermo, EnvThermo)
     write_ts(Stats, "rwp_mean", self.mean_rwp)
     write_ts(Stats, "updraft_rwp", self.upd_rwp)
     write_ts(Stats, "env_rwp", self.env_rwp)
@@ -43,7 +43,6 @@ function rain_diagnostics(
     ref_state::ReferenceState,
     UpdThermo::UpdraftThermodynamics,
     EnvThermo::EnvironmentThermodynamics,
-    TS::TimeStepping,
 )
     self.upd_rwp = 0.0
     self.env_rwp = 0.0
@@ -61,7 +60,7 @@ function rain_diagnostics(
         if (self.rain_model == "cutoff")
             self.cutoff_rain_rate -=
                 (EnvThermo.prec_source_qt[k] + UpdThermo.prec_source_qt_tot[k]) * ref_state.rho0_half[k] * grid.Δz /
-                TS.dt / rho_cloud_liq *
+                rho_cloud_liq *
                 3.6 *
                 1e6
         end
@@ -73,11 +72,12 @@ function sum_subdomains_rain(
     self::RainVariables,
     UpdThermo::UpdraftThermodynamics,
     EnvThermo::EnvironmentThermodynamics,
+    TS::TimeStepping,
 )
     @inbounds for k in real_center_indices(self.grid)
-        self.QR.values[k] -= (EnvThermo.prec_source_qt[k] + UpdThermo.prec_source_qt_tot[k])
-        self.Upd_QR.values[k] -= UpdThermo.prec_source_qt_tot[k]
-        self.Env_QR.values[k] -= EnvThermo.prec_source_qt[k]
+        self.QR.values[k] -= (EnvThermo.prec_source_qt[k] + UpdThermo.prec_source_qt_tot[k]) * TS.dt
+        self.Upd_QR.values[k] -= UpdThermo.prec_source_qt_tot[k] * TS.dt
+        self.Env_QR.values[k] -= EnvThermo.prec_source_qt[k] * TS.dt
 
         # TODO Assuming that updraft and environment rain area fractions are either 1 or 0.
         if self.QR.values[k] > 0.0
