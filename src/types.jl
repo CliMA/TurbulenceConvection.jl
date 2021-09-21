@@ -1,8 +1,3 @@
-Base.@kwdef mutable struct eos_struct
-    T::Float64 = 0
-    ql::Float64 = 0
-end
-
 Base.@kwdef mutable struct rain_struct
     qr::Float64 = 0
     ar::Float64 = 0

@@ -16,17 +16,16 @@ const TD = Thermodynamics
 
 import ..TurbulenceConvection
 const TC = TurbulenceConvection
+const TCTD = TC.TCThermodynamics
 
 using ..TurbulenceConvection: CasesBase
 using ..TurbulenceConvection: off_arr
 using ..TurbulenceConvection: omega
 using ..TurbulenceConvection: pyinterp
 using ..TurbulenceConvection: eps_vi
-using ..TurbulenceConvection: eos
 using ..TurbulenceConvection: eps_v
 using ..TurbulenceConvection: cpd
 using ..TurbulenceConvection: buoyancy_c
-using ..TurbulenceConvection: rho_c
 using ..TurbulenceConvection: add_ts
 using ..TurbulenceConvection: update
 using ..TurbulenceConvection: write_ts
@@ -1273,15 +1272,15 @@ function initialize_profiles(
             GMV.QT.values[k] = 1.5 / 1000.0
         end
 
-        sa = eos(param_set, ref_state.p0_half[k], GMV.QT.values[k], thetal[k])
-        GMV.QL.values[k] = sa.ql
-        GMV.T.values[k] = sa.T
+        ts = TCTD.eos(param_set, ref_state.p0_half[k], thetal[k], GMV.QT.values[k])
+        GMV.QL.values[k] = TCTD.liquid_specific_humidity(ts)
+        GMV.T.values[k] = TCTD.air_temperature(ts)
         ts = TD.PhaseEquil_pTq(param_set, ref_state.p0_half[k], GMV.T.values[k], GMV.QT.values[k])
         GMV.H.values[k] = TD.liquid_ice_pottemp(ts)
 
         # buoyancy profile
         qv = GMV.QT.values[k] - qi - GMV.QL.values[k]
-        rho = rho_c(ref_state.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
+        rho = TCTD.rho_c(ref_state.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
         GMV.B.values[k] = buoyancy_c(param_set, ref_state.rho0_half[k], rho)
 
         # velocity profile (geostrophic)
