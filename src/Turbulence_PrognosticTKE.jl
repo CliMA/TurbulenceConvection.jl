@@ -1120,10 +1120,6 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     x .= tridiag_solve(implicit_eqs.b_q_tot_gm, implicit_eqs.A_θq_gm)
 
     @inbounds for k in real_center_indices(grid)
-        mf_tend_qt_dual = dual_faces(self.massflux_qt, grid, k)
-        ∇mf_tend_qt = ∇f2c(mf_tend_qt_dual, grid, k)
-        mf_tend_qt = -∇mf_tend_qt * ref_state.alpha0_half[k]
-
         GMV.QT.new[k] = max(GMV.QT.values[k] + self.ae[k] * (x[k] - self.EnvVar.QT.values[k]), 0.0)
         # TODO: move to diagnostics (callbacks?)
         self.diffusive_tendency_qt[k] = (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
@@ -1133,10 +1129,6 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
     # Solve H
     x .= tridiag_solve(implicit_eqs.b_θ_liq_ice_gm, implicit_eqs.A_θq_gm)
     @inbounds for k in real_center_indices(grid)
-        mf_tend_h_dual = dual_faces(self.massflux_h, grid, k)
-        ∇mf_tend_h = ∇f2c(mf_tend_h_dual, grid, k)
-        mf_tend_h = -∇mf_tend_h * ref_state.alpha0_half[k]
-
         GMV.H.new[k] = GMV.H.values[k] + self.ae[k] * (x[k] - self.EnvVar.H.values[k])
         # TODO: move to diagnostics (callbacks?)
         self.diffusive_tendency_h[k] = (GMV.H.new[k] - GMV.H.values[k]) * TS.dti

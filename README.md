@@ -110,14 +110,17 @@ Upon running a particular experiment (described above), comparison plots (agains
  - Diagnostic [x]
  - NA [-]
 
-| **Variable** | **Grid-mean** | **Environment** | **Updrafts** |
-| ------------ | ------------- | --------------- | ------------ |
-| `u`          | [✓]           |  [x]            |  [✓]         |
-| `v`          | [✓]           |  [x]            |  [✓]         |
-| `w`          | [-]           |  [x]            |  [✓]         |
-| `θ_liq_ice`  | [✓]           |  [x]            |  [✓]         |
-| `q_tot`      | [✓]           |  [x]            |  [✓]         |
-| `a`          | [-]           |  [x]            |  [✓]         |
-| `tke`        | [x]           |  [✓]            |  [-]         |
+| **Variable**  | **Grid-mean** | **Environment** | **Updrafts** |
+| ------------- | ------------- | --------------- | ------------ |
+| `u`           | [✓]           |  [x]            |  [x]         |
+| `v`           | [✓]           |  [x]            |  [x]         |
+| `w`           | [-]           |  [x]            |  [✓]         |
+| `θ_liq_ice`   | [✓]           |  [x]            |  [✓]         |
+| `q_tot`       | [✓]           |  [x]            |  [✓]         |
+| `a`           | [-]           |  [x]            |  [✓]         |
+| `tke`         | [x]           |  [✓]            |  [-]         |
+| `θ′θ′`        | [x]           |  [✓]            |  [-]         |
+| `q_tot′q_tot′`| [x]           |  [✓]            |  [-]         |
+| `θ′q_tot′`    | [x]           |  [✓]            |  [-]         |
 
 
