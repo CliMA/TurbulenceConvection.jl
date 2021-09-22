@@ -1,4 +1,4 @@
-function mixing_length(param_set, ml_model::MinDisspLen)
+function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
     l = zeros(3)
     c_m = CPEDMF.c_m(param_set)
     c_d = CPEDMF.c_d(param_set)
@@ -7,12 +7,13 @@ function mixing_length(param_set, ml_model::MinDisspLen)
     l_max = ICP.l_max(param_set)
     c_b = ICP.static_stab_coeff(param_set)
     g = CPP.grav(param_set)
+    molmass_ratio = FT(CPP.molmass_ratio(param_set))
 
     # kz scale (surface layer)
     if ml_model.obukhov_length < 0.0 #unstable
         l_W =
             ml_model.κ_vk * ml_model.z / (sqrt(ml_model.tke_surf / ml_model.ustar / ml_model.ustar) * c_m) *
-            min((1.0 - 100.0 * ml_model.z / ml_model.obukhov_length)^0.2, 1.0 / ml_model.κ_vk)
+            min((1 - 100.0 * ml_model.z / ml_model.obukhov_length)^0.2, 1 / ml_model.κ_vk)
     else # neutral or stable
         l_W = ml_model.κ_vk * ml_model.z / (sqrt(ml_model.tke_surf / ml_model.ustar / ml_model.ustar) * c_m)
     end
@@ -29,12 +30,12 @@ function mixing_length(param_set, ml_model::MinDisspLen)
         wc_env = ml_model.wc_en
         b_exch +=
             ml_model.a_up[i] * wc_upd_nn * ml_model.δ_dyn[i] / ml_model.a_en *
-            ((wc_upd_nn - wc_env) * (wc_upd_nn - wc_env) / 2.0 - ml_model.tke) -
+            ((wc_upd_nn - wc_env) * (wc_upd_nn - wc_env) / 2 - ml_model.tke) -
             ml_model.a_up[i] * wc_upd_nn * (wc_upd_nn - wc_env) * ml_model.ε_turb[i] * wc_env / ml_model.a_en
     end
 
     if abs(a_pd) > eps(0.0) && 4.0 * a_pd * c_neg > -b_exch * b_exch
-        l_TKE = max(-b_exch / 2.0 / a_pd + sqrt(b_exch * b_exch + 4.0 * a_pd * c_neg) / 2.0 / a_pd, 0.0)
+        l_TKE = max(-b_exch / 2.0 / a_pd + sqrt(b_exch * b_exch + 4 * a_pd * c_neg) / 2 / a_pd, 0)
     elseif abs(a_pd) < eps(0.0) && abs(b_exch) > eps(0.0)
         l_TKE = c_neg / b_exch
     else
@@ -45,18 +46,18 @@ function mixing_length(param_set, ml_model::MinDisspLen)
     # Set lambda for now to environmental cloud_fraction (TBD: Rain)
     ts_en = TD.PhaseEquil_pθq(param_set, ml_model.p0, ml_model.θ_li_en, ml_model.qt_en)
     N²_eff =
-        (1.0 - ml_model.en_cld_frac) * ml_model.∂θv∂z +
+        (1 - ml_model.en_cld_frac) * ml_model.∂θv∂z +
         ml_model.en_cld_frac * (
-            1.0 /
-            exp(-TD.latent_heat_vapor(param_set, ml_model.T_en) * ml_model.ql_en / TD.cp_m(ts_en) / ml_model.T_en) * (
-                (1.0 + (eps_vi - 1.0) * ml_model.qt_en) * ml_model.∂θl∂z +
-                (eps_vi - 1.0) * ml_model.θ_li_en * ml_model.∂qt∂z
+            1 / exp(-TD.latent_heat_vapor(param_set, ml_model.T_en) * ml_model.ql_en / TD.cp_m(ts_en) / ml_model.T_en) *
+            (
+                (1 + (molmass_ratio - 1) * ml_model.qt_en) * ml_model.∂θl∂z +
+                (molmass_ratio - 1) * ml_model.θ_li_en * ml_model.∂qt∂z
             )
         )
 
-    N² = sqrt(max(g / ml_model.θv * N²_eff, 0.0))
+    N² = sqrt(max(g / ml_model.θv * N²_eff, 0))
     if N² > 0.0
-        l_N² = min(sqrt(max(c_b * ml_model.tke, 0.0)) / N², l_max)
+        l_N² = min(sqrt(max(c_b * ml_model.tke, 0)) / N², l_max)
     else
         l_N² = l_max
     end

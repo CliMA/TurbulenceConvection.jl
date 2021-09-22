@@ -328,7 +328,13 @@ function buoyancy(
             @inbounds for k in real_center_indices(grid)
                 if UpdVar.Area.values[i, k] > 0.0
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
-                    rho = TCTD.rho_c(self.ref_state.p0_half[k], UpdVar.T.values[i, k], UpdVar.QT.values[i, k], qv)
+                    rho = TCTD.rho_c(
+                        param_set,
+                        self.ref_state.p0_half[k],
+                        UpdVar.T.values[i, k],
+                        UpdVar.QT.values[i, k],
+                        qv,
+                    )
                     UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
                 else
                     UpdVar.B.values[i, k] = EnvVar.B.values[k]
@@ -350,7 +356,7 @@ function buoyancy(
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
                     h = UpdVar.H.values[i, k]
                     t = UpdVar.T.values[i, k]
-                    rho = TCTD.rho_c(self.ref_state.p0_half[k], t, qt, qv)
+                    rho = TCTD.rho_c(param_set, self.ref_state.p0_half[k], t, qt, qv)
                     UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
                     ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], h, qt)
                     UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
