@@ -1,15 +1,5 @@
 #Adapated from PyCLES: https://github.com/pressel/pycles
-const Rd = 287.1
-const Rv = 461.5
-const eps_v = 0.62210184182   # Rd / Rv
-const eps_vi = 1.60745384883  # Rv / Rd
-const cpd = 1004.0
-const cpv = 1859.0
 const kappa = 0.285956175299
-const T_tilde = 298.15
-const p_tilde = 100000.0
-const sd_tilde = 6864.8
-const sv_tilde = 10513.6
 const omega = 7.29211514671e-05
 const vkb = 0.4
 const Pr0 = 0.74

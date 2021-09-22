@@ -252,12 +252,13 @@ end
 function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables)
     param_set = parameter_set(GMV)
     g = CPP.grav(param_set)
+    R_d = CPP.R_d(param_set)
     kc_surf = kc_surface(self.grid)
     kf_surf = kf_surface(self.grid)
     zb = self.grid.zc[kc_surf]
     ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0[kc_surf], self.Tsurface, self.qsurface)
     lv = TD.latent_heat_vapor(param_set, GMV.T.values[kc_surf])
-    T0 = self.ref_state.p0_half[kc_surf] * self.ref_state.alpha0_half[kc_surf] / Rd
+    T0 = self.ref_state.p0_half[kc_surf] * self.ref_state.alpha0_half[kc_surf] / R_d
 
     theta_flux = 0.24
     phase_part = TD.PhasePartition(GMV.QT.values[kc_surf], 0.0, 0.0)

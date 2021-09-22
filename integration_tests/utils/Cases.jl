@@ -22,9 +22,6 @@ using ..TurbulenceConvection: CasesBase
 using ..TurbulenceConvection: off_arr
 using ..TurbulenceConvection: omega
 using ..TurbulenceConvection: pyinterp
-using ..TurbulenceConvection: eps_vi
-using ..TurbulenceConvection: eps_v
-using ..TurbulenceConvection: cpd
 using ..TurbulenceConvection: buoyancy_c
 using ..TurbulenceConvection: add_ts
 using ..TurbulenceConvection: update
@@ -205,6 +202,7 @@ end
 function initialize_surface(self::CasesBase{Soares}, grid::Grid, ref_state::ReferenceState)
     param_set = TC.parameter_set(ref_state)
     g = CPP.grav(param_set)
+    molmass_ratio = CPP.molmass_ratio(param_set)
     kf_surf = TC.kf_surface(grid)
     self.Sur.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     self.Sur.Tsurface = 300.0
@@ -221,8 +219,8 @@ function initialize_surface(self::CasesBase{Soares}, grid::Grid, ref_state::Refe
     self.Sur.ref_state = ref_state
     self.Sur.bflux =
         g * (
-            (theta_flux + (eps_vi - 1.0) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
-            (theta_surface * (1.0 + (eps_vi - 1) * self.Sur.qsurface))
+            (theta_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
+            (theta_surface * (1 + (molmass_ratio - 1) * self.Sur.qsurface))
         )
     initialize(self.Sur)
 end
@@ -278,6 +276,7 @@ end
 function initialize_surface(self::CasesBase{Nieuwstadt}, grid::Grid, ref_state::ReferenceState)
     param_set = TC.parameter_set(ref_state)
     g = CPP.grav(param_set)
+    molmass_ratio = CPP.molmass_ratio(param_set)
     kf_surf = TC.kf_surface(grid)
     self.Sur.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     self.Sur.Tsurface = 300.0
@@ -294,8 +293,8 @@ function initialize_surface(self::CasesBase{Nieuwstadt}, grid::Grid, ref_state::
     self.Sur.ref_state = ref_state
     self.Sur.bflux =
         g * (
-            (theta_flux + (eps_vi - 1.0) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
-            (theta_surface * (1.0 + (eps_vi - 1) * self.Sur.qsurface))
+            (theta_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
+            (theta_surface * (1 + (molmass_ratio - 1) * self.Sur.qsurface))
         )
     initialize(self.Sur)
 
@@ -512,6 +511,7 @@ end
 function initialize_surface(self::CasesBase{life_cycle_Tan2018}, grid::Grid, ref_state::ReferenceState)
     param_set = TC.parameter_set(ref_state)
     g = CPP.grav(param_set)
+    molmass_ratio = CPP.molmass_ratio(param_set)
     kf_surf = TC.kf_surface(grid)
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.qsurface = 22.45e-3 # kg/kg
@@ -528,8 +528,8 @@ function initialize_surface(self::CasesBase{life_cycle_Tan2018}, grid::Grid, ref
     self.Sur.ref_state = ref_state
     self.Sur.bflux = (
         g * (
-            (8.0e-3 + (eps_vi - 1.0) * (299.1 * 5.2e-5 + 22.45e-3 * 8.0e-3)) /
-            (299.1 * (1.0 + (eps_vi - 1) * 22.45e-3))
+            (8.0e-3 + (molmass_ratio - 1) * (299.1 * 5.2e-5 + 22.45e-3 * 8.0e-3)) /
+            (299.1 * (1 + (molmass_ratio - 1) * 22.45e-3))
         )
     )
     initialize(self.Sur)
@@ -578,6 +578,7 @@ end
 function TC.update_surface(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVariables, TS::TimeStepping)
     param_set = TC.parameter_set(GMV)
     g = CPP.grav(param_set)
+    molmass_ratio = CPP.molmass_ratio(param_set)
     weight = 1.0
     weight_factor = 0.01 + 0.99 * (cos(2.0 * π * TS.t / 3600.0) + 1.0) / 2.0
     weight = weight * weight_factor
@@ -585,8 +586,8 @@ function TC.update_surface(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVar
     self.Sur.shf = self.shf0 * weight
     self.Sur.bflux = (
         g * (
-            (8.0e-3 * weight + (eps_vi - 1.0) * (299.1 * 5.2e-5 * weight + 22.45e-3 * 8.0e-3 * weight)) /
-            (299.1 * (1.0 + (eps_vi - 1) * 22.45e-3))
+            (8.0e-3 * weight + (molmass_ratio - 1) * (299.1 * 5.2e-5 * weight + 22.45e-3 * 8.0e-3 * weight)) /
+            (299.1 * (1 + (molmass_ratio - 1) * 22.45e-3))
         )
     )
     update(self.Sur, GMV)
@@ -606,11 +607,12 @@ function CasesBase(case::Rico, namelist, grid::Grid, ref_state::ReferenceState, 
 end
 
 function reference_params(::Rico, grid::Grid, param_set::APS, namelist)
+    molmass_ratio = CPP.molmass_ratio(param_set)
     # TODO: think about constractor here
     Pg = 1.0154e5  #Pressure at ground
     Tg = 299.8  #Temperature at ground
     pvg = TD.saturation_vapor_pressure(param_set, Tg, TD.Liquid())
-    qtg = eps_v * pvg / (Pg - pvg)   #Total water mixing ratio at surface
+    qtg = (1 / molmass_ratio) * pvg / (Pg - pvg)   #Total water mixing ratio at surface
     return (; Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{Rico}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
@@ -706,10 +708,11 @@ function CasesBase(case::TRMM_LBA, namelist, grid::Grid, ref_state::ReferenceSta
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
 function reference_params(::TRMM_LBA, grid::Grid, param_set::APS, namelist)
+    molmass_ratio = CPP.molmass_ratio(param_set)
     Pg = 991.3 * 100  #Pressure at ground
     Tg = 296.85   # surface values for reference state (RS) which outputs p0 rho0 alpha0
     pvg = TD.saturation_vapor_pressure(param_set, Tg, TD.Liquid())
-    qtg = eps_v * pvg / (Pg - pvg) #Total water mixing ratio at surface
+    qtg = (1 / molmass_ratio) * pvg / (Pg - pvg) #Total water mixing ratio at surface
     return (; Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
@@ -1237,7 +1240,6 @@ end
 function reference_params(::DYCOMS_RF01, grid::Grid, param_set::APS, namelist)
     Pg = 1017.8 * 100.0
     qtg = 9.0 / 1000.0
-    # Use an exner function with values for Rd, and cp given in Stevens 2005 to compute temperature
     theta_surface = 289.0
     ts = TD.PhaseEquil_pθq(param_set, Pg, theta_surface, qtg)
     Tg = TD.air_temperature(ts)
@@ -1280,7 +1282,7 @@ function initialize_profiles(
 
         # buoyancy profile
         qv = GMV.QT.values[k] - qi - GMV.QL.values[k]
-        rho = TCTD.rho_c(ref_state.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
+        rho = TCTD.rho_c(param_set, ref_state.p0_half[k], GMV.T.values[k], GMV.QT.values[k], qv)
         GMV.B.values[k] = buoyancy_c(param_set, ref_state.rho0_half[k], rho)
 
         # velocity profile (geostrophic)
@@ -1295,6 +1297,7 @@ end
 function initialize_surface(self::CasesBase{DYCOMS_RF01}, grid::Grid, ref_state::ReferenceState)
     param_set = TC.parameter_set(ref_state)
     g = CPP.grav(param_set)
+    molmass_ratio = CPP.molmass_ratio(param_set)
     kf_surf = TC.kf_surface(grid)
     self.Sur.zrough = 1.0e-4
     self.Sur.ustar_fixed = false
@@ -1318,8 +1321,8 @@ function initialize_surface(self::CasesBase{DYCOMS_RF01}, grid::Grid, ref_state:
 
     self.Sur.bflux =
         g * (
-            (theta_flux + (eps_vi - 1.0) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
-            (theta_surface * (1.0 + (eps_vi - 1) * self.Sur.qsurface))
+            (theta_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
+            (theta_surface * (1 + (molmass_ratio - 1) * self.Sur.qsurface))
         )
     self.Sur.grid = grid
     self.Sur.ref_state = ref_state

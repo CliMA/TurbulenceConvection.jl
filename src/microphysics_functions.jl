@@ -3,24 +3,25 @@
 Source term for thetal because of qr transitioning between the working fluid and rain
 (simple version to avoid exponents)
 """
-function rain_source_to_thetal(param_set, p0, T, qt, ql, qi, qr)
+function rain_source_to_thetal(param_set, p0, T, qt, ql, qi, qr::FT) where {FT}
     L = TD.latent_heat_vapor(param_set, T)
     ts = TD.PhaseEquil_pTq(param_set, p0, T, qt)
     Π = TD.exner(ts)
-    return L * qr / Π / cpd
+    return L * qr / Π / FT(CPP.cp_d(param_set))
 end
 
 """
 Source term for thetal because of qr transitioning between the working fluid and rain
 (more detailed version, but still ignoring dqt/dqr)
 """
-function rain_source_to_thetal_detailed(param_set, p0, T, qt, ql, qi, qr)
+function rain_source_to_thetal_detailed(param_set, p0, T, qt, ql, qi, qr::FT) where {FT}
+    cp_d = FT(CPP.cp_d(param_set))
     L = TD.latent_heat_vapor(param_set, T)
     ts = TD.PhaseEquil_pTq(param_set, p0, T, qt)
     Π = TD.exner(ts)
-    old_source = L * qr / Π / cpd
+    old_source = L * qr / Π / cp_d
 
-    new_source = old_source / (1 - qt) * exp(-L * ql / T / cpd / (1 - qt))
+    new_source = old_source / (1 - qt) * exp(-L * ql / T / cp_d / (1 - qt))
 
     return new_source
 end
@@ -81,6 +82,7 @@ end
 function conv_q_rai_to_q_vap(param_set, C_drag, MP_n_0, a_vent, b_vent, q_rai, q_tot, q_liq, T, p, rho)
 
     g = CPP.grav(param_set)
+    R_v = CPP.R_v(param_set)
     L = TD.latent_heat_vapor(param_set, T)
     gamma_11_4 = 1.6083594219855457
     v_c = terminal_velocity_single_drop_coeff(C_drag, rho)
@@ -98,7 +100,7 @@ function conv_q_rai_to_q_vap(param_set, C_drag, MP_n_0, a_vent, b_vent, q_rai, q
     q_v = q_tot - q_liq
     S = q_v / qv_sat - 1
 
-    G_param = 1 / (L / K_therm / T * (L / Rv / T - 1.0) + Rv * T / D_vapor / p_vs)
+    G_param = 1 / (L / K_therm / T * (L / R_v / T - 1) + R_v * T / D_vapor / p_vs)
 
     F_param = av_param * sqrt(q_rai) + bv_param * g^0.25 / MP_n_0^(3 / 16) / sqrt(nu_air) * q_rai^(11 / 16)
 

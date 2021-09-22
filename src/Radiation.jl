@@ -39,6 +39,8 @@ see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
 function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariables)
     grid = self.grid
+    param_set = parameter_set(GMV)
+    cp_d = CPP.cp_d(param_set)
     # find zi (level of 8.0 g/kg isoline of qt)
     # TODO: report bug: zi and ρ_i are not initialized
     zi = 0
@@ -80,14 +82,14 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
     @inbounds for k in real_face_indices(grid)
         if grid.zf[k] > zi
             cbrt_z = cbrt(grid.zf[k] - zi)
-            self.f_rad[k] += ρ_i * cpd * self.divergence * self.alpha_z * (cbrt_z^4 / 4 + zi * cbrt_z)
+            self.f_rad[k] += ρ_i * cp_d * self.divergence * self.alpha_z * (cbrt_z^4 / 4 + zi * cbrt_z)
         end
     end
 
     @inbounds for k in real_center_indices(grid)
         f_rad_dual = dual_faces(self.f_rad, grid, k)
         ∇f_rad = ∇_staggered(f_rad_dual, grid)
-        self.dTdt[k] = -∇f_rad / self.ref_state.rho0_half[k] / cpd
+        self.dTdt[k] = -∇f_rad / self.ref_state.rho0_half[k] / cp_d
     end
 
     return
