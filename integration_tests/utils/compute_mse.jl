@@ -369,7 +369,7 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
             )
             if have_tc_main
                 p2 = Plots.contourf(
-                    time_tcc ./ 3600,
+                    time_tcm ./ 3600,
                     z_tcm ./ 10^3,
                     data_tcm_arr';
                     c = :viridis,
