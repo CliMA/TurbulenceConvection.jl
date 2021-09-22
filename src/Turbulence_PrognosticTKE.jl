@@ -618,7 +618,6 @@ function compute_eddy_diffusivities_tke(self::EDMF_PrognosticTKE, GMV::GridMeanV
         ml_model = MinDisspLen(;
             z = grid.zc[k],
             obukhov_length = obukhov_length,
-            κ_vk = vkb,
             tke_surf = self.EnvVar.TKE.values[kc_surf],
             ustar = Case.Sur.ustar,
             Pr = self.prandtl_nvec[k],

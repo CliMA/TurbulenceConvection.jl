@@ -1,7 +1,4 @@
 #Adapated from PyCLES: https://github.com/pressel/pycles
-const kappa = 0.285956175299
-const omega = 7.29211514671e-05
-const vkb = 0.4
 const Pr0 = 0.74
 const beta_m = 4.8
 const beta_h = 6.5 # beta_h = beta_m / Pr0

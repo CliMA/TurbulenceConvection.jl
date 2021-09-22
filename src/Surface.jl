@@ -32,11 +32,12 @@ initialize(self::SurfaceBase) = nothing
 
 function update(self::SurfaceBase{SurfaceNone}, GMV::GridMeanVariables)
     # JH: assigning small fluxed so that simulation won"t crash when computing mixing length
+    param_set = parameter_set(GMV)
     kc_surf = kc_surface(self.grid)
     self.windspeed = 0.0001
     self.zrough = 1e-4
     self.bflux = 1e-4
-    self.ustar = compute_ustar(self.windspeed, self.bflux, self.zrough, self.grid.zc[kc_surf])
+    self.ustar = compute_ustar(param_set, self.windspeed, self.bflux, self.zrough, self.grid.zc[kc_surf])
     return
 end
 free_convection_windspeed(self::SurfaceBase{SurfaceNone}, GMV::GridMeanVariables) = nothing
@@ -82,10 +83,11 @@ function update(self::SurfaceBase{SurfaceFixedFlux}, GMV::GridMeanVariables)
             end
         end
 
-        self.ustar = compute_ustar(self.windspeed, self.bflux, self.zrough, self.grid.zc[kc_surf])
+        self.ustar = compute_ustar(param_set, self.windspeed, self.bflux, self.zrough, self.grid.zc[kc_surf])
     end
 
-    self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb
+    von_karman_const = CPSGS.von_karman_const(param_set)
+    self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / von_karman_const
     self.rho_uflux = -self.ref_state.rho0[kf_surf] * self.ustar * self.ustar / self.windspeed * GMV.U.values[kc_surf]
     self.rho_vflux = -self.ref_state.rho0[kf_surf] * self.ustar * self.ustar / self.windspeed * GMV.V.values[kc_surf]
     return
@@ -131,10 +133,11 @@ function update(self::SurfaceBase{SurfaceFixedCoeffs}, GMV::GridMeanVariables)
 
     self.ustar = sqrt(self.cm) * windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
+    von_karman_const = CPSGS.von_karman_const(param_set)
     if abs(self.bflux) < 1e-10
         self.obukhov_length = 0.0
     else
-        self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb
+        self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / von_karman_const
     end
 
     self.rho_uflux = -self.ref_state.rho0[kf_surf] * self.ustar * self.ustar / windspeed * GMV.U.values[kc_surf]
@@ -167,7 +170,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
 
     #TODO: make sure pass by reference: &self.cm, &self.ch, &self.obukhov_length
     self.cm, self.ch, self.obukhov_length =
-        exchange_coefficients_byun(Ri, self.grid.zc[kc_surf], self.zrough, self.cm, self.ch, self.obukhov_length)
+        exchange_coefficients_byun(param_set, Ri, zb, self.zrough, self.cm, self.ch, self.obukhov_length)
     self.rho_uflux = -self.cm * self.windspeed * (GMV.U.values[kc_surf]) * self.ref_state.rho0[kf_surf]
     self.rho_vflux = -self.cm * self.windspeed * (GMV.V.values[kc_surf]) * self.ref_state.rho0[kf_surf]
 
@@ -190,10 +193,11 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
     )
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
+    von_karman_const = CPSGS.von_karman_const(param_set)
     if abs(self.bflux) < 1e-10
         self.obukhov_length = 0.0
     else
-        self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb
+        self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / von_karman_const
     end
 
     return
@@ -224,7 +228,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
 
     #TODO: make sure pass by reference: &self.cm, &self.ch, &self.obukhov_length
     self.cm, self.ch, self.obukhov_length =
-        exchange_coefficients_byun(Ri, self.grid.zc[kc_surf], self.zrough, self.cm, self.ch, self.obukhov_length)
+        exchange_coefficients_byun(param_set, Ri, zb, self.zrough, self.cm, self.ch, self.obukhov_length)
     self.rho_uflux = -self.cm * self.windspeed * (GMV.U.values[kc_surf]) * self.ref_state.rho0[kf_surf]
     self.rho_vflux = -self.cm * self.windspeed * (GMV.V.values[kc_surf]) * self.ref_state.rho0[kf_surf]
 
@@ -240,10 +244,11 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
         buoyancy_flux(param_set, self.shf, self.lhf, GMV.T.values[kc_surf], 0.0, self.ref_state.alpha0[kf_surf], ts)
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
+    von_karman_const = CPSGS.von_karman_const(param_set)
     if abs(self.bflux) < 1e-10
         self.obukhov_length = 0.0
     else
-        self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb
+        self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / von_karman_const
     end
 
     return
@@ -281,7 +286,7 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
 
     #TODO: make sure pass by reference: &self.cm, &self.ch, &self.obukhov_length
     self.cm, self.ch, self.obukhov_length =
-        exchange_coefficients_byun(Ri, self.grid.zc[kc_surf], self.zrough, self.cm, self.ch, self.obukhov_length)
+        exchange_coefficients_byun(param_set, Ri, zb, self.zrough, self.cm, self.ch, self.obukhov_length)
     self.rho_uflux = -self.cm * self.windspeed * (GMV.U.values[kc_surf]) * self.ref_state.rho0[kf_surf]
     self.rho_vflux = -self.cm * self.windspeed * (GMV.V.values[kc_surf]) * self.ref_state.rho0[kf_surf]
 
@@ -293,10 +298,11 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
 
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
+    von_karman_const = CPSGS.von_karman_const(param_set)
     if abs(self.bflux) < 1e-10
         self.obukhov_length = 0.0
     else
-        self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / vkb
+        self.obukhov_length = -self.ustar * self.ustar * self.ustar / self.bflux / von_karman_const
     end
     return
 end

@@ -31,7 +31,7 @@ function Simulation1d(namelist)
     Fo = TC.ForcingBase{Cases.get_forcing_type(case)}(; grid, ref_state)
     Rad = TC.RadiationBase{Cases.get_radiation_type(case)}(; grid, ref_state)
 
-    Case = Cases.CasesBase(case, namelist, grid, ref_state, Sur, Fo, Rad)
+    Case = Cases.CasesBase(case, namelist, grid, param_set, ref_state, Sur, Fo, Rad)
     Turb = TC.EDMF_PrognosticTKE(namelist, grid, ref_state, param_set)
     TS = TC.TimeStepping(namelist)
     return Simulation1d(grid, ref_state, GMV, Case, Turb, TS, Stats)
