@@ -328,7 +328,7 @@ function buoyancy(
             @inbounds for k in real_center_indices(grid)
                 if UpdVar.Area.values[i, k] > 0.0
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
-                    rho = rho_c(self.ref_state.p0_half[k], UpdVar.T.values[i, k], UpdVar.QT.values[i, k], qv)
+                    rho = TCTD.rho_c(self.ref_state.p0_half[k], UpdVar.T.values[i, k], UpdVar.QT.values[i, k], qv)
                     UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
                 else
                     UpdVar.B.values[i, k] = EnvVar.B.values[k]
@@ -350,7 +350,7 @@ function buoyancy(
                     qv = UpdVar.QT.values[i, k] - UpdVar.QL.values[i, k]
                     h = UpdVar.H.values[i, k]
                     t = UpdVar.T.values[i, k]
-                    rho = rho_c(self.ref_state.p0_half[k], t, qt, qv)
+                    rho = TCTD.rho_c(self.ref_state.p0_half[k], t, qt, qv)
                     UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
                     ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], h, qt)
                     UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
@@ -358,10 +358,8 @@ function buoyancy(
                     if UpdVar.Area.values[i, k - 1] > 0.0
                         qt = UpdVar.QT.values[i, k - 1]
                         h = UpdVar.H.values[i, k - 1]
-                        sa = eos(param_set, self.ref_state.p0_half[k], qt, h)
-                        qv = qt - sa.ql
-                        t = sa.T
-                        rho = rho_c(self.ref_state.p0_half[k], t, qt, qv)
+                        ts = TCTD.eos(param_set, self.ref_state.p0_half[k], h, qt)
+                        rho = TCTD.air_density(ts)
                         UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
                         ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], h, qt)
                         UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
@@ -398,7 +396,6 @@ compute precipitation source terms
 function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rain::RainVariables, dt)
     rst = rain_struct()
     mph = mph_struct()
-    sa = eos_struct()
     param_set = parameter_set(Rain)
 
     @inbounds for i in xrange(self.n_updraft)

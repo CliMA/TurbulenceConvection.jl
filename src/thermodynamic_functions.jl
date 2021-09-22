@@ -1,17 +1,41 @@
+module TCThermodynamics
 
-function buoyancy_c(param_set, rho0, rho)
-    g = CPP.grav(param_set)
-    return g * (rho0 - rho) / rho0
+# TODO: use CLIMAParameters instead!
+using ..TurbulenceConvection: eps_v
+using ..TurbulenceConvection: cpd
+using ..TurbulenceConvection: cpv
+using ..TurbulenceConvection: eps_vi
+using ..TurbulenceConvection: Rd
+
+import Thermodynamics
+const TD = Thermodynamics
+
+import RootSolvers
+const RS = RootSolvers
+
+import CLIMAParameters
+const CP = CLIMAParameters
+const CPP = CP.Planet
+
+Base.@kwdef mutable struct eos_struct
+    p0::Float64 = 0
+    qt::Float64 = 0
+    T::Float64 = 0
+    ql::Float64 = 0
 end
+
+air_temperature(sa::eos_struct) = sa.T
+liquid_specific_humidity(sa::eos_struct) = sa.ql
+air_density(sa::eos_struct) = rho_c(sa.p0, sa.T, sa.qt, sa.qt - sa.ql)
 
 function rho_c(p0, T, qt, qv)
     return p0 / ((Rd * T) * (1.0 - qt + eps_vi * qv))
 end
 
-function eos(param_set, p0, qt, prog::FT) where {FT}
+function eos(param_set, p0, prog::FT, qt) where {FT}
     ql = 0.0
 
-    _ret = eos_struct()
+    _ret = eos_struct(; p0 = p0, qt = qt)
 
     pv_1 = p0 * eps_vi * qt / (1.0 - qt + eps_vi * qt)
     pd_1 = p0 - pv_1
@@ -69,4 +93,6 @@ function eos(param_set, p0, qt, prog::FT) where {FT}
     end
 
     return _ret
+end
+
 end

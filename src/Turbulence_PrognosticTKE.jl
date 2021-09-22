@@ -409,9 +409,9 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in xrange(self.n_updrafts)
             # saturation adjustment
-            sa = eos(param_set, ref_state.p0_half[k], self.UpdVar.QT.new[i, k], self.UpdVar.H.new[i, k])
-            self.UpdVar.QL.values[i, k] = sa.ql
-            self.UpdVar.T.values[i, k] = sa.T
+            ts = TCTD.eos(param_set, ref_state.p0_half[k], self.UpdVar.H.new[i, k], self.UpdVar.QT.new[i, k])
+            self.UpdVar.QL.values[i, k] = TCTD.liquid_specific_humidity(ts)
+            self.UpdVar.T.values[i, k] = TCTD.air_temperature(ts)
         end
     end
     if self.Rain.rain_model == "clima_1m"
@@ -922,7 +922,6 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     kf_surf = kf_surface(grid)
     dti_ = 1.0 / TS.dt
     Δt = TS.dt
-    sa = eos_struct()
 
     a_up = self.UpdVar.Area.values
     a_up_new = self.UpdVar.Area.new
