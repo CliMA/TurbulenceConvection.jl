@@ -100,7 +100,7 @@ function default_namelist(case_name::String)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"] = 2.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["min_upd_velocity"] = 0.001
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"] = 0.2
-    # pressure 
+    # pressure
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["min_updraft_top"] = 500.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] = 0.12
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff2"] = 0.0
@@ -256,7 +256,7 @@ function Rico(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 86400.0
-    namelist["time_stepping"]["dt"] = 8.0
+    namelist["time_stepping"]["dt"] = 4.0
 
     # namelist["microphysics"]["rain_model"] = "cutoff"
     namelist["microphysics"]["rain_model"] = "clima_1m"
@@ -276,9 +276,10 @@ function TRMM_LBA(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 21600.0
-    namelist["time_stepping"]["dt"] = 2.0
+    namelist["time_stepping"]["dt"] = 1.0
 
     namelist["microphysics"]["rain_model"] = "cutoff"
+    namelist["microphysics"]["τ_precip"] = 1.0
     # namelist["microphysics"]["rain_model"] = "clima_1m"
 
     namelist["meta"]["simname"] = "TRMM_LBA"

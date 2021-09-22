@@ -115,7 +115,7 @@ function solve_rain_fall(
     # TODO: assuming GMV.W = 0
     # TODO: verify translation
     @inbounds for k in real_center_indices(grid)
-        term_vel[k] = terminal_velocity(param_set, Rain.C_drag, Rain.MP_n_0, QR.values[k], self.ref_state.rho0_half[k])
+        term_vel[k] = CM1.terminal_velocity(param_set, rai_type, self.ref_state.rho0_half[k], QR.values[k])
     end
 
     # rain falling through the domain
@@ -146,7 +146,7 @@ function solve_rain_fall(
             RainArea.new[k] = 1.0
         end
 
-        term_vel_new[k] = terminal_velocity(param_set, Rain.C_drag, Rain.MP_n_0, QR.new[k], ρ_0_c)
+        term_vel_new[k] = CM1.terminal_velocity(param_set, rai_type, ρ_0_c, QR.new[k])
     end
 
     QR.values .= QR.new
@@ -171,29 +171,24 @@ function solve_rain_evap(
     @inbounds for k in real_center_indices(self.grid)
         flag_evaporate_all = false
 
-        tmp_evap = max(
-            0,
-            conv_q_rai_to_q_vap(
-                param_set,
-                Rain.C_drag,
-                Rain.MP_n_0,
-                Rain.a_vent,
-                Rain.b_vent,
-                QR.values[k],
-                GMV.QT.values[k],
-                GMV.QL.values[k],
-                GMV.T.values[k],
-                self.ref_state.p0_half[k],
-                self.ref_state.rho0_half[k],
-            ) * Δt,
-        )
+        q = TD.PhasePartition(GMV.QT.values[k], GMV.QL.values[k], 0.0)
 
-        if tmp_evap > QR.values[k]
+        tmp_evap_rate =
+            -CM1.evaporation_sublimation(
+                param_set,
+                rai_type,
+                q,
+                QR.values[k],
+                self.ref_state.rho0_half[k],
+                GMV.T.values[k],
+            )
+
+        if tmp_evap_rate * Δt > QR.values[k]
             flag_evaporate_all = true
-            tmp_evap = QR.values[k]
+            tmp_evap_rate = QR.values[k] / Δt
         end
 
-        self.rain_evap_source_qt[k] = tmp_evap * RainArea.values[k]
+        self.rain_evap_source_qt[k] = tmp_evap_rate * RainArea.values[k]
 
         # TODO add ice
         rain_source_to_thetal(
@@ -202,8 +197,7 @@ function solve_rain_evap(
             GMV.T.values[k],
             GMV.QT.values[k],
             GMV.QL.values[k],
-            0.0,
-            -tmp_evap,
+            -tmp_evap_rate,
         ) * RainArea.values[k]
 
         if flag_evaporate_all
@@ -213,7 +207,8 @@ function solve_rain_evap(
             # TODO: assuming that rain evaporation doesn"t change
             # rain area fraction
             # (should be changed for prognostic rain area fractions)
-            QR.values[k] -= tmp_evap
+            # TODO  - new should be removed
+            QR.values[k] -= tmp_evap_rate * Δt
         end
     end
     return
