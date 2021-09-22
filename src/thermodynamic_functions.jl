@@ -17,11 +17,11 @@ import CLIMAParameters
 const CP = CLIMAParameters
 const CPP = CP.Planet
 
-Base.@kwdef mutable struct eos_struct
-    p0::Float64 = 0
-    qt::Float64 = 0
-    T::Float64 = 0
-    ql::Float64 = 0
+struct eos_struct{FT}
+    p0::FT
+    qt::FT
+    T::FT
+    ql::FT
 end
 
 air_temperature(sa::eos_struct) = sa.T
@@ -35,8 +35,6 @@ end
 function eos(param_set, p0, prog::FT, qt) where {FT}
     ql = 0.0
 
-    _ret = eos_struct(; p0 = p0, qt = qt)
-
     pv_1 = p0 * eps_vi * qt / (1.0 - qt + eps_vi * qt)
     pd_1 = p0 - pv_1
     phase_part = TD.PhasePartition(qt, ql, 0.0)
@@ -47,8 +45,8 @@ function eos(param_set, p0, prog::FT, qt) where {FT}
 
     # If not saturated
     if (qt <= qv_star_1)
-        _ret.T = T_1
-        _ret.ql = 0.0
+        T_sol = T_1
+        ql_sol = 0.0
 
     else
 
@@ -88,11 +86,11 @@ function eos(param_set, p0, prog::FT, qt) where {FT}
             println(", tol=", tol.tol, "\n")
             error("Halting execution")
         end
-        _ret.T = sol.root
-        _ret.ql = compute_q_liq(_ret.T)
+        T_sol = sol.root
+        ql_sol = compute_q_liq(T_sol)
     end
 
-    return _ret
+    return eos_struct(p0, qt, T_sol, ql_sol)
 end
 
 end
