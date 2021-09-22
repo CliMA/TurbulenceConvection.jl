@@ -246,12 +246,15 @@ function update_cloud_frac(self::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     GMV.cloud_cover = min(self.EnvVar.cloud_cover + sum(self.UpdVar.cloud_cover), 1)
 end
 
-function compute_gm_tendencies!(grid, Case, GMV, ref_state, TS)
-    param_set = parameter_set(GMV)
+function compute_gm_tendencies!(self::EDMF_PrognosticTKE, grid, Case, GMV, ref_state, TS)
     GMV.U.tendencies .= 0
     GMV.V.tendencies .= 0
     GMV.QT.tendencies .= 0
     GMV.H.tendencies .= 0
+    param_set = parameter_set(GMV)
+    rho0 = ref_state.rho0
+    kf_surf = kf_surface(grid)
+    ae = 1 .- self.UpdVar.Area.bulkvalues # area of environment
 
     @inbounds for k in real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
@@ -309,7 +312,62 @@ function compute_gm_tendencies!(grid, Case, GMV, ref_state, TS)
             GMV.U.tendencies[k] += GMV_U_nudge_k
             GMV.V.tendencies[k] += GMV_V_nudge_k
         end
+        GMV.QT.tendencies[k] +=
+            self.UpdThermo.prec_source_qt_tot[k] +
+            self.EnvThermo.prec_source_qt[k] +
+            self.rainphysics.rain_evap_source_qt[k]
+        GMV.H.tendencies[k] +=
+            self.UpdThermo.prec_source_h_tot[k] +
+            self.EnvThermo.prec_source_h[k] +
+            self.rainphysics.rain_evap_source_h[k]
+    end
 
+    self.massflux_h .= 0.0
+    self.massflux_qt .= 0.0
+    # Compute the mass flux and associated scalar fluxes
+    @inbounds for i in xrange(self.n_updrafts)
+        self.m[i, kf_surf] = 0.0
+        a_up_bcs = (; bottom = SetValue(self.area_surface_bc[i]), top = SetZeroGradient())
+        @inbounds for k in real_face_indices(grid)
+            a_up = interpc2f(self.UpdVar.Area.values, grid, k, i; a_up_bcs...)
+            a_en = interpc2f(ae, grid, k; a_up_bcs...)
+            self.m[i, k] = rho0[k] * a_up * a_en * (self.UpdVar.W.values[i, k] - self.EnvVar.W.values[k])
+        end
+    end
+
+    @inbounds for k in real_face_indices(grid)
+        self.massflux_h[k] = 0.0
+        self.massflux_qt[k] = 0.0
+        # We know that, since W = 0 at z = 0, m = 0 also, and
+        # therefore θ_liq_ice / q_tot values do not matter
+        m_bcs = (; bottom = SetValue(0), top = SetValue(0))
+        h_en_f = interpc2f(self.EnvVar.H.values, grid, k; m_bcs...)
+        qt_en_f = interpc2f(self.EnvVar.QT.values, grid, k; m_bcs...)
+        @inbounds for i in xrange(self.n_updrafts)
+            h_up_f = interpc2f(self.UpdVar.H.values, grid, k, i; m_bcs...)
+            qt_up_f = interpc2f(self.UpdVar.QT.values, grid, k, i; m_bcs...)
+            self.massflux_h[k] += self.m[i, k] * (h_up_f - h_en_f)
+            self.massflux_qt[k] += self.m[i, k] * (qt_up_f - qt_en_f)
+        end
+    end
+
+    # Compute the  mass flux tendencies
+    # Adjust the values of the grid mean variables
+    @inbounds for k in real_center_indices(grid)
+        mf_tend_h_dual = dual_faces(self.massflux_h, grid, k)
+        mf_tend_qt_dual = dual_faces(self.massflux_qt, grid, k)
+
+        ∇mf_tend_h = ∇f2c(mf_tend_h_dual, grid, k)
+        ∇mf_tend_qt = ∇f2c(mf_tend_qt_dual, grid, k)
+
+        mf_tend_h = -∇mf_tend_h * ref_state.alpha0_half[k]
+        mf_tend_qt = -∇mf_tend_qt * ref_state.alpha0_half[k]
+
+        # Prepare the output
+        self.massflux_tendency_h[k] = mf_tend_h
+        self.massflux_tendency_qt[k] = mf_tend_qt
+        GMV.H.tendencies[k] += mf_tend_h
+        GMV.QT.tendencies[k] += mf_tend_qt
     end
 end
 
@@ -317,7 +375,6 @@ function compute_diffusive_fluxes(self::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     grid = get_grid(self)
     ref_state = reference_state(self)
     param_set = parameter_set(self)
-
     self.ae .= 1 .- self.UpdVar.Area.bulkvalues # area of environment
     KM = diffusivity_m(self).values
     KH = diffusivity_h(self).values
@@ -381,13 +438,8 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     compute_pressure_plume_spacing(self, GMV, Case)
     compute_updraft_closures(self, GMV, Case)
     compute_eddy_diffusivities_tke(self, GMV, Case)
-    compute_GMV_MF(self, GMV, TS)
     compute_covariance_rhs(self, GMV, Case, TS)
     compute_diffusive_fluxes(self, GMV, Case, TS)
-
-
-    # compute tendencies
-    compute_gm_tendencies!(grid, Case, GMV, self.ref_state, TS)
 
     clear_precip_sources(self.UpdThermo)
     microphysics(self.UpdThermo, self.UpdVar, self.Rain, TS.dt) # causes division error in dry bubble first time step
@@ -402,7 +454,7 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
         sum_subdomains_rain(self.Rain, self.UpdThermo, self.EnvThermo, TS)
     end
     # compute tendencies
-    compute_gm_tendencies!(grid, Case, GMV, self.ref_state, TS)
+    compute_gm_tendencies!(self, grid, Case, GMV, self.ref_state, TS)
 
     # update
     solve_updraft(self, GMV, TS)
@@ -1053,68 +1105,6 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     return
 end
 
-# After updating the updraft variables themselves
-# 1. compute the mass fluxes (currently not stored as class members, probably will want to do this
-# for output purposes)
-# 2. Apply mass flux tendencies and updraft microphysical tendencies to GMV.SomeVar.Values (old time step values)
-# mass flux tendency is computed as 1st order upwind
-
-function compute_GMV_MF(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::TimeStepping)
-    grid = get_grid(self)
-    ref_state = reference_state(self)
-    rho0 = ref_state.rho0
-    kf_surf = kf_surface(grid)
-    ae = 1 .- self.UpdVar.Area.bulkvalues # area of environment
-
-    # Compute the mass flux and associated scalar fluxes
-    @inbounds for i in xrange(self.n_updrafts)
-        self.m[i, kf_surf] = 0.0
-        a_up_bcs = (; bottom = SetValue(self.area_surface_bc[i]), top = SetZeroGradient())
-        @inbounds for k in real_face_indices(grid)
-            a_up = interpc2f(self.UpdVar.Area.values, grid, k, i; a_up_bcs...)
-            a_en = interpc2f(ae, grid, k; a_up_bcs...)
-            self.m[i, k] = rho0[k] * a_up * a_en * (self.UpdVar.W.values[i, k] - self.EnvVar.W.values[k])
-        end
-    end
-
-    self.massflux_h .= 0.0
-    self.massflux_qt .= 0.0
-
-    @inbounds for k in real_face_indices(grid)
-        self.massflux_h[k] = 0.0
-        self.massflux_qt[k] = 0.0
-        # We know that, since W = 0 at z = 0, m = 0 also, and
-        # therefore θ_liq_ice / q_tot values do not matter
-        m_bcs = (; bottom = SetValue(0), top = SetValue(0))
-        h_en_f = interpc2f(self.EnvVar.H.values, grid, k; m_bcs...)
-        qt_en_f = interpc2f(self.EnvVar.QT.values, grid, k; m_bcs...)
-        @inbounds for i in xrange(self.n_updrafts)
-            h_up_f = interpc2f(self.UpdVar.H.values, grid, k, i; m_bcs...)
-            qt_up_f = interpc2f(self.UpdVar.QT.values, grid, k, i; m_bcs...)
-            self.massflux_h[k] += self.m[i, k] * (h_up_f - h_en_f)
-            self.massflux_qt[k] += self.m[i, k] * (qt_up_f - qt_en_f)
-        end
-    end
-
-    # Compute the  mass flux tendencies
-    # Adjust the values of the grid mean variables
-    @inbounds for k in real_center_indices(grid)
-        mf_tend_h_dual = dual_faces(self.massflux_h, grid, k)
-        mf_tend_qt_dual = dual_faces(self.massflux_qt, grid, k)
-
-        ∇mf_tend_h = ∇f2c(mf_tend_h_dual, grid, k)
-        ∇mf_tend_qt = ∇f2c(mf_tend_qt_dual, grid, k)
-
-        mf_tend_h = -∇mf_tend_h * ref_state.alpha0_half[k]
-        mf_tend_qt = -∇mf_tend_qt * ref_state.alpha0_half[k]
-
-        # Prepare the output
-        self.massflux_tendency_h[k] = mf_tend_h
-        self.massflux_tendency_qt[k] = mf_tend_qt
-    end
-    return
-end
-
 # Update the grid mean variables with the tendency due to eddy diffusion
 # Km and Kh have already been updated
 # 2nd order finite differences plus implicit time step allows solution with tridiagonal matrix solver
@@ -1134,16 +1124,9 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         ∇mf_tend_qt = ∇f2c(mf_tend_qt_dual, grid, k)
         mf_tend_qt = -∇mf_tend_qt * ref_state.alpha0_half[k]
 
-        GMV.QT.new[k] = max(
-            (GMV.QT.values[k] + TS.dt * mf_tend_qt + TS.dt * self.UpdThermo.prec_source_qt_tot[k]) +
-            self.ae[k] * (x[k] - self.EnvVar.QT.values[k]) +
-            TS.dt * self.EnvThermo.prec_source_qt[k] +
-            self.rainphysics.rain_evap_source_qt[k],
-            0.0,
-        )
+        GMV.QT.new[k] = max(GMV.QT.values[k] + self.ae[k] * (x[k] - self.EnvVar.QT.values[k]), 0.0)
         # TODO: move to diagnostics (callbacks?)
-        self.diffusive_tendency_qt[k] =
-            (GMV.QT.new[k] - (GMV.QT.values[k] + TS.dt * mf_tend_qt + self.UpdThermo.prec_source_qt_tot[k])) * TS.dti
+        self.diffusive_tendency_qt[k] = (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
     end
     # get the diffusive flux
 
@@ -1154,14 +1137,9 @@ function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::C
         ∇mf_tend_h = ∇f2c(mf_tend_h_dual, grid, k)
         mf_tend_h = -∇mf_tend_h * ref_state.alpha0_half[k]
 
-        GMV.H.new[k] =
-            (GMV.H.values[k] + TS.dt * mf_tend_h + TS.dt * self.UpdThermo.prec_source_h_tot[k]) +
-            self.ae[k] * (x[k] - self.EnvVar.H.values[k]) +
-            TS.dt * self.EnvThermo.prec_source_h[k] +
-            self.rainphysics.rain_evap_source_h[k]
+        GMV.H.new[k] = GMV.H.values[k] + self.ae[k] * (x[k] - self.EnvVar.H.values[k])
         # TODO: move to diagnostics (callbacks?)
-        self.diffusive_tendency_h[k] =
-            (GMV.H.new[k] - (GMV.H.values[k] + TS.dt * mf_tend_h + self.UpdThermo.prec_source_h_tot[k])) * TS.dti
+        self.diffusive_tendency_h[k] = (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
     end
     # get the diffusive flux
 
