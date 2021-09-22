@@ -8,14 +8,18 @@ function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
     c_b = ICP.static_stab_coeff(param_set)
     g = CPP.grav(param_set)
     molmass_ratio = FT(CPP.molmass_ratio(param_set))
+    vkc = FT(CPSGS.von_karman_const(param_set))
+    ustar = ml_model.ustar
+    z = ml_model.z
+    tke_surf = ml_model.tke_surf
 
     # kz scale (surface layer)
     if ml_model.obukhov_length < 0.0 #unstable
         l_W =
-            ml_model.κ_vk * ml_model.z / (sqrt(ml_model.tke_surf / ml_model.ustar / ml_model.ustar) * c_m) *
-            min((1 - 100.0 * ml_model.z / ml_model.obukhov_length)^0.2, 1 / ml_model.κ_vk)
+            vkc * z / (sqrt(tke_surf / ustar / ustar) * c_m) *
+            min((1 - 100.0 * z / ml_model.obukhov_length)^0.2, 1 / vkc)
     else # neutral or stable
-        l_W = ml_model.κ_vk * ml_model.z / (sqrt(ml_model.tke_surf / ml_model.ustar / ml_model.ustar) * c_m)
+        l_W = vkc * z / (sqrt(tke_surf / ustar / ustar) * c_m)
     end
 
     # compute l_TKE - the production/destruction term

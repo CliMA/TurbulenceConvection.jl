@@ -88,8 +88,6 @@ Base.@kwdef struct MinDisspLen{FT, T}
     z::FT
     "obukhov length"
     obukhov_length::FT
-    "von karman coefficient"
-    κ_vk::FT
     "surface TKE values"
     tke_surf::FT
     "u star - surface velocity scale"

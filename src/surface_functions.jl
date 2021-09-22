@@ -33,8 +33,9 @@ function psi_h_stable(zeta, zeta0)
     return psi_h
 end
 
-function compute_ustar(windspeed, buoyancy_flux, z0, z1)
+function compute_ustar(param_set, windspeed, buoyancy_flux, z0, z1)
 
+    vkb = CPSGS.von_karman_const(param_set)
     logz = log(z1 / z0)
     #use neutral condition as first guess
     ustar0 = windspeed * vkb / logz
@@ -91,11 +92,12 @@ function compute_ustar(windspeed, buoyancy_flux, z0, z1)
 end
 
 """
-    exchange_coefficients_byun(Ri, zb, z0, cm, ch, lmo)
+    exchange_coefficients_byun(param_set, Ri, zb, z0, cm, ch, lmo)
 
 Ref: [Byun1990](@cite)
 """
-function exchange_coefficients_byun(Ri, zb, z0, cm, ch, lmo)
+function exchange_coefficients_byun(param_set, Ri, zb, z0, cm, ch, lmo)
+    von_karman_const = CPSGS.von_karman_const(param_set)
 
     logz = log(zb / z0)
     zfactor = zb / (zb - z0) * logz
@@ -126,8 +128,8 @@ function exchange_coefficients_byun(Ri, zb, z0, cm, ch, lmo)
         psi_h = psi_h_unstable(zeta, zeta0)
     end
 
-    cu = vkb / (logz - psi_m)
-    cth = vkb / (logz - psi_h) / Pr0
+    cu = von_karman_const / (logz - psi_m)
+    cth = von_karman_const / (logz - psi_h) / Pr0
     cm = cu * cu
     ch = cu * cth
     return cm, ch, lmo

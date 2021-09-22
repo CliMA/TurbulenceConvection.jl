@@ -27,11 +27,11 @@ const RS = RootSolvers
 
 const CP = CLIMAParameters
 const CPP = CP.Planet
+const CPSGS = CP.SubgridScale
 const APS = CP.AbstractEarthParameterSet
 
 const CPMP = CP.Atmos.Microphysics
 const CPEDMF = CP.Atmos.EDMF
-const CPSGS = CP.Atmos.SubgridScale
 
 # For dispatching to inherited class
 struct BaseCase end

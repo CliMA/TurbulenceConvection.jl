@@ -20,7 +20,6 @@ const TCTD = TC.TCThermodynamics
 
 using ..TurbulenceConvection: CasesBase
 using ..TurbulenceConvection: off_arr
-using ..TurbulenceConvection: omega
 using ..TurbulenceConvection: pyinterp
 using ..TurbulenceConvection: buoyancy_c
 using ..TurbulenceConvection: add_ts
@@ -159,7 +158,7 @@ TC.update_radiation(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) =
 ##### Soares
 #####
 
-function CasesBase(case::Soares, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::Soares, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -234,7 +233,7 @@ end
 ##### Nieuwstadt
 #####
 
-function CasesBase(case::Nieuwstadt, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::Nieuwstadt, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -310,7 +309,7 @@ end
 ##### Bomex
 #####
 
-function CasesBase(case::Bomex, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::Bomex, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
@@ -436,7 +435,7 @@ end
 ##### life_cycle_Tan2018
 #####
 
-function CasesBase(case::life_cycle_Tan2018, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::life_cycle_Tan2018, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
@@ -597,11 +596,12 @@ end
 ##### Rico
 #####
 
-function CasesBase(case::Rico, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::Rico, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 18.0
-    Fo.coriolis_param = 2.0 * omega * sin(latitude * π / 180.0) # s^{-1}
+    Omega = CPP.Omega(param_set)
+    Fo.coriolis_param = 2.0 * Omega * sin(latitude * π / 180.0) # s^{-1}
     Fo.apply_subsidence = true
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
@@ -701,7 +701,7 @@ end
 ##### TRMM_LBA
 #####
 
-function CasesBase(case::TRMM_LBA, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::TRMM_LBA, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -1007,7 +1007,7 @@ end
 ##### ARM_SGP
 #####
 
-function CasesBase(case::ARM_SGP, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::ARM_SGP, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 8.5e-5
@@ -1125,7 +1125,7 @@ end
 ##### GATE_III
 #####
 
-function CasesBase(case::GATE_III, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::GATE_III, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     Fo.apply_subsidence = false
     Fo.apply_coriolis = false
@@ -1232,7 +1232,7 @@ end
 ##### DYCOMS_RF01
 #####
 
-function CasesBase(case::DYCOMS_RF01, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::DYCOMS_RF01, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
@@ -1380,12 +1380,13 @@ end
 ##### GABLS
 #####
 
-function CasesBase(case::GABLS, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::GABLS, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 73.0
     Fo.coriolis_param = 1.39e-4 # s^{-1}
-    # Fo.coriolis_param = 2.0 * omega * np.sin(latitude * π / 180.0 ) # s^{-1}
+    # Omega = CPP.Omega(param_set)
+    # Fo.coriolis_param = 2.0 * Omega * np.sin(latitude * π / 180.0 ) # s^{-1}
     Fo.apply_subsidence = false
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
@@ -1458,11 +1459,12 @@ end
 #####
 
 # Not fully implemented yet - Ignacio
-function CasesBase(case::SP, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::SP, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 1.0e-4 # s^{-1}
-    # Fo.coriolis_param = 2.0 * omega * np.sin(latitude * π / 180.0 ) # s^{-1}
+    # Omega = CPP.Omega(param_set)
+    # Fo.coriolis_param = 2.0 * Omega * np.sin(latitude * π / 180.0 ) # s^{-1}
     Fo.apply_subsidence = false
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
@@ -1537,7 +1539,7 @@ end
 ##### DryBubble
 #####
 
-function CasesBase(case::DryBubble, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::DryBubble, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
     inversion_option = "theta_rho"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -1651,7 +1653,7 @@ end
 ##### LES_driven_SCM
 #####
 
-function CasesBase(case::LES_driven_SCM, namelist, grid::Grid, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::LES_driven_SCM, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
     les_filename = namelist["meta"]["lesfile"]
     # load data here
     LESDat = NC.Dataset(les_filename, "r") do data
