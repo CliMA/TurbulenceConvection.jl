@@ -256,7 +256,7 @@ function Rico(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 86400.0
-    namelist["time_stepping"]["dt"] = 4.0
+    namelist["time_stepping"]["dt"] = 8.0
 
     # namelist["microphysics"]["rain_model"] = "cutoff"
     namelist["microphysics"]["rain_model"] = "clima_1m"
