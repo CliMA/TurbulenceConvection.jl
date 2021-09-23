@@ -13,7 +13,8 @@ CLIMAParameters.Planet.cp_v(ps::EarthParameterSet) = ps.nt.cp_v
 CLIMAParameters.Planet.R_d(ps::EarthParameterSet) = ps.nt.R_d
 CLIMAParameters.Planet.R_v(ps::EarthParameterSet) = ps.nt.R_v
 CLIMAParameters.Planet.molmass_ratio(ps::EarthParameterSet) = ps.nt.molmass_ratio
-CLIMAParameters.Atmos.Microphysics.τ_cond_evap(ps::EarthParameterSet) = ps.nt.τ_cond_evap
+# microphysics parameters
+CLIMAParameters.Atmos.Microphysics_0M.τ_precip(ps::EarthParameterSet) = ps.nt.τ_precip
 # entrainment/detrainment parameters
 CLIMAParameters.Atmos.EDMF.c_ε(ps::EarthParameterSet) = ps.nt.c_ε # factor multiplyer for dry term in entrainment/detrainment
 CLIMAParameters.Atmos.EDMF.α_b(ps::EarthParameterSet) = ps.nt.α_b # factor multiplyer for pressure buoyancy terms (effective buoyancy is (1-α_b))
@@ -45,7 +46,7 @@ function create_parameter_set(namelist)
         R_d = 287.1,
         R_v = 461.5,
         molmass_ratio = 461.5/287.1,
-        τ_cond_evap = TC.parse_namelist(namelist, "microphysics", "τ_cond_evap"; default = 10.0),
+        τ_precip = TC.parse_namelist(namelist, "microphysics", "τ_precip"; default = 1000.0),
         c_ε = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_factor"),
         c_div = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_massflux_div_factor"; default = 0.0),
         α_b = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pressure_normalmode_buoy_coeff1"),
@@ -68,7 +69,7 @@ function create_parameter_set(namelist)
         smin_ub = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_ub"),
         smin_rm = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_rm"),
         l_max = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),
-        
+
         ## Stochastic parameters
         # lognormal model
         stoch_ε_lognormal_var = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stochastic", "entr_lognormal_var"; default = 0.0),
