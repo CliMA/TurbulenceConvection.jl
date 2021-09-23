@@ -104,6 +104,7 @@ all_best_mse["Rico"]["u_mean"] = 40.715808132951445
 all_best_mse["Rico"]["tke_mean"] = 91.18862780404072
 all_best_mse["Rico"]["temperature_mean"] = 0.0005500244802796086
 all_best_mse["Rico"]["ql_mean"] = 25.076291215818255
+all_best_mse["Rico"]["qr_mean"] = 7.0788321919750579e+03
 all_best_mse["Rico"]["thetal_mean"] = 0.0005651375069389751
 all_best_mse["Rico"]["Hvar_mean"] = 1984.4786355220601
 all_best_mse["Rico"]["QTvar_mean"] = 765.9743055966613
