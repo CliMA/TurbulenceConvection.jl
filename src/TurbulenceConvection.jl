@@ -16,6 +16,7 @@ import Distributions
 import FastGaussQuadrature
 import CLIMAParameters
 import OrdinaryDiffEq
+import CloudMicrophysics
 
 const ODE = OrdinaryDiffEq
 const CC = ClimaCore
@@ -24,6 +25,9 @@ const SA = StaticArrays
 
 const TD = Thermodynamics
 const RS = RootSolvers
+
+const CM = CloudMicrophysics
+const CM0 = CloudMicrophysics.Microphysics_0M
 
 const CP = CLIMAParameters
 const CPP = CP.Planet

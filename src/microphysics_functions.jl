@@ -10,32 +10,6 @@ function rain_source_to_thetal(param_set, p0, T, qt, ql, qi, qr::FT) where {FT}
     return L * qr / Π / FT(CPP.cp_d(param_set))
 end
 
-"""
-Source term for thetal because of qr transitioning between the working fluid and rain
-(more detailed version, but still ignoring dqt/dqr)
-"""
-function rain_source_to_thetal_detailed(param_set, p0, T, qt, ql, qi, qr::FT) where {FT}
-    cp_d = FT(CPP.cp_d(param_set))
-    L = TD.latent_heat_vapor(param_set, T)
-    ts = TD.PhaseEquil_pTq(param_set, p0, T, qt)
-    Π = TD.exner(ts)
-    old_source = L * qr / Π / cp_d
-
-    new_source = old_source / (1 - qt) * exp(-L * ql / T / cp_d / (1 - qt))
-
-    return new_source
-end
-
-# instantly convert all cloud water exceeding a threshold to rain water
-# the threshold is specified as excess saturation
-# rain water is immediately removed from the domain
-function acnv_instant(param_set, max_supersaturation, ql, qt, T, p0)
-
-    ts = TD.PhaseEquil_pTq(param_set, p0, T, qt)
-    qsat = TD.q_vap_saturation(ts)
-
-    return max(0.0, ql - max_supersaturation * qsat)
-end
 # CLIMA microphysics rates
 function terminal_velocity_single_drop_coeff(C_drag, rho)
 
@@ -128,7 +102,7 @@ function microphysics_rain_src(
     area,
     T,
     p0,
-    rho,
+    ρ0,
     dt,
 )
 
@@ -156,13 +130,19 @@ function microphysics_rain_src(
                 ql / dt,
                 (
                     conv_q_liq_to_q_rai_acnv(q_liq_threshold, tau_acnv, ql) +
-                    conv_q_liq_to_q_rai_accr(param_set, C_drag, MP_n_0, E_col, ql, qr, rho)
+                    conv_q_liq_to_q_rai_accr(param_set, C_drag, MP_n_0, E_col, ql, qr, ρ0)
                 ),
             )
         end
 
         if tmp_cutoff_acnv_flag
-            _ret.qr_src = min(ql, acnv_instant(param_set, max_supersaturation, ql, qt, T, p0)) / dt
+
+            ts = TD.PhaseEquil_pTq(param_set, p0, T, qt)
+            qsat = TD.q_vap_saturation(ts)
+
+            q = TD.PhasePartition(qt, ql, qi)
+
+            _ret.qr_src = min(q.liq / dt, -CM0.remove_precipitation(param_set, q, qsat))
         end
 
         if tmp_no_acnv_flag
