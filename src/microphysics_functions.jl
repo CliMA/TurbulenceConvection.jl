@@ -162,7 +162,7 @@ function microphysics_rain_src(
         end
 
         if tmp_cutoff_acnv_flag
-            _ret.qr_src = min(ql, acnv_instant(param_set, max_supersaturation, ql, qt, T, p0))
+            _ret.qr_src = min(ql, acnv_instant(param_set, max_supersaturation, ql, qt, T, p0)) / dt
         end
 
         if tmp_no_acnv_flag
