@@ -39,7 +39,7 @@ end
 
 function TurbulenceConvection.initialize(self::Simulation1d, namelist)
     TC = TurbulenceConvection
-    Cases.initialize_profiles(self.Case, self.grid, self.GMV, self.ref_state)
+    Cases.initialize_profiles(self.Case.case, self.grid, self.GMV, self.ref_state)
 
     Cases.initialize_surface(self.Case, self.grid, self.ref_state)
     Cases.initialize_forcing(self.Case, self.grid, self.ref_state, self.GMV)

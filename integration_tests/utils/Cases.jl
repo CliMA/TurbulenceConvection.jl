@@ -170,7 +170,7 @@ function reference_params(::Soares, grid::Grid, param_set::APS, namelist)
     Tg = 300.0
     return (; Pg, Tg, qtg)
 end
-function initialize_profiles(self::CasesBase{Soares}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
+function initialize_profiles(::Soares, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
 
     @inbounds for k in real_center_indices(grid)
@@ -245,7 +245,7 @@ function reference_params(::Nieuwstadt, grid::Grid, param_set::APS, namelist)
     qtg = 1.0e-12 # Total water mixing ratio
     return (; Pg, Tg, qtg)
 end
-function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
+function initialize_profiles(::Nieuwstadt, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
@@ -315,9 +315,8 @@ function reference_params(::Bomex, grid::Grid, param_set::APS, namelist)
     return (; Pg, Tg, qtg)
 end
 
-function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
+function initialize_profiles(::Bomex, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
-    thetal = TC.center_field(grid)
 
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
@@ -596,7 +595,7 @@ function reference_params(::Rico, grid::Grid, param_set::APS, namelist)
     qtg = (1 / molmass_ratio) * pvg / (Pg - pvg)   #Total water mixing ratio at surface
     return (; Pg, Tg, qtg)
 end
-function initialize_profiles(self::CasesBase{Rico}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
+function initialize_profiles(::Rico, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(ref_state)
 
     @inbounds for k in real_center_indices(grid)
@@ -694,7 +693,7 @@ function reference_params(::TRMM_LBA, grid::Grid, param_set::APS, namelist)
     qtg = (1 / molmass_ratio) * pvg / (Pg - pvg) #Total water mixing ratio at surface
     return (; Pg, Tg, qtg)
 end
-function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
+function initialize_profiles(::TRMM_LBA, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(ref_state)
     # TRMM_LBA inputs from Grabowski et al. 2006
     #! format: off
@@ -992,7 +991,7 @@ function reference_params(::ARM_SGP, grid::Grid, param_set::APS, namelist)
     return (; Pg, Tg, qtg)
 end
 
-function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
+function initialize_profiles(::ARM_SGP, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     # ARM_SGP inputs
     #! format: off
     param_set = TC.parameter_set(ref_state)
@@ -1118,7 +1117,7 @@ function reference_params(::GATE_III, grid::Grid, param_set::APS, namelist)
     return (; Pg, Tg, qtg)
 end
 
-function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
+function initialize_profiles(::GATE_III, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(ref_state)
     qt = TC.center_field(grid)
     T = TC.center_field(grid)
@@ -1230,7 +1229,6 @@ function initialize_profiles(
     ref_state::ReferenceState,
 )
     param_set = TC.parameter_set(GMV)
-    thetal = TC.center_field(grid) # helper variable to recalculate temperature
     qi = 0.0                                             # no ice
 
     @inbounds for k in real_center_indices(grid)
@@ -1373,7 +1371,7 @@ function reference_params(::GABLS, grid::Grid, param_set::APS, namelist)
     qtg = 1.0e-12 #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN (TBD),
     return (; Pg, Tg, qtg)
 end
-function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
+function initialize_profiles(::GABLS, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
 
     @inbounds for k in real_center_indices(grid)
@@ -1448,7 +1446,7 @@ function reference_params(::SP, grid::Grid, param_set::APS, namelist)
     return (; Pg, Tg, qtg)
 end
 
-function initialize_profiles(self::CasesBase{SP}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
+function initialize_profiles(::SP, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
 
     @inbounds for k in real_center_indices(grid)
@@ -1522,7 +1520,7 @@ function reference_params(::DryBubble, grid::Grid, param_set::APS, namelist)
     return (; Pg, Tg, qtg)
 end
 
-function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
+function initialize_profiles(::DryBubble, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
 
     @inbounds for k in real_center_indices(grid)
         GMV.U.values[k] = 0.01
