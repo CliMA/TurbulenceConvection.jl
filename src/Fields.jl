@@ -35,3 +35,16 @@ function field(grid::Grid, loc::String, nu::Int)
 end
 
 surface_value(f::AbstractVector, grid::Grid) = f[kf_surface(grid)]
+
+Base.length(space::CC.Spaces.FiniteDifferenceSpace) = length(CC.Spaces.coordinates_data(space))
+
+Base.@propagate_inbounds function Base.getindex(field::CC.Fields.FiniteDifferenceField, i::Integer)
+    Base.getindex(CC.Fields.field_values(field), i)
+end
+
+Base.@propagate_inbounds function Base.setindex!(field::CC.Fields.FiniteDifferenceField, v, i::Integer)
+    Base.setindex!(CC.Fields.field_values(field), v, i)
+end
+
+center_fields(state) = state.cent
+face_fields(state) = state.cent

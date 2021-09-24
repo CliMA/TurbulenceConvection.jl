@@ -1,19 +1,66 @@
 import JSON
 using ArgParse
 import TurbulenceConvection
+import ClimaCore
+const CC = ClimaCore
 
 include("parameter_set.jl")
 include("Cases.jl")
 import .Cases
 
-mutable struct Simulation1d
+struct Simulation1d
     grid
+    state
+    tendencies
+    aux
     ref_state
     GMV
     Case
     Turb
     TS
     Stats
+end
+
+# TODO: not quite sure, yet, where this all should live.
+
+#####
+##### Auxiliary fields
+#####
+# Face & Center
+aux_vars_ref_state(FT) = (; ref_state = (ρ0 = FT(0), α0 = FT(0), p0 = FT(0)))
+
+# Center only
+cent_aux_vars_gm(FT) = ()
+cent_aux_vars_edmf(FT, n_up) = ()
+cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., cent_aux_vars_edmf(FT, n_up)...)
+
+# Face only
+face_aux_vars_gm(FT) = ()
+face_aux_vars_edmf(FT, n_up) = ()
+face_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., face_aux_vars_gm(FT)..., face_aux_vars_edmf(FT, n_up)...)
+
+#####
+##### Prognostic fields
+#####
+
+# Center only
+cent_prognostic_vars(FT, n_up) = (; cent_prognostic_vars_gm(FT)..., cent_prognostic_vars_edmf(FT, n_up)...)
+cent_prognostic_vars_gm(FT) = (; U = FT(0), V = FT(0), H = FT(0), QT = FT(0))
+cent_prognostic_vars_up(FT) = (; Area = FT(0), H = FT(0), QT = FT(0))
+cent_prognostic_vars_en(FT) = (; TKE = FT(0), Hvar = FT(0), QTvar = FT(0), HQTcov = FT(0))
+cent_prognostic_vars_edmf(FT, n_up) =
+    (; turbconv = (; en = cent_prognostic_vars_en(FT), up = ntuple(i -> cent_prognostic_vars_up(FT), n_up)))
+# cent_prognostic_vars_edmf(FT, n_up) = (;) # could also use this for empty model
+
+# Face only
+face_prognostic_vars(FT, n_up) = (; face_prognostic_vars_edmf(FT, n_up)...)
+face_prognostic_vars_up(FT) = (; W = FT(0))
+face_prognostic_vars_edmf(FT, n_up) = (; turbconv = (; up = ntuple(i -> face_prognostic_vars_up(FT), n_up)))
+# face_prognostic_vars_edmf(FT, n_up) = (;) # could also use this for empty model
+
+function FieldFromNamedTuple(space, nt::NamedTuple)
+    cmv(z) = nt
+    return cmv.(CC.Fields.coordinate_field(space))
 end
 
 function Simulation1d(namelist)
@@ -34,7 +81,20 @@ function Simulation1d(namelist)
     Case = Cases.CasesBase(case, namelist, grid, param_set, ref_state, Sur, Fo, Rad)
     Turb = TC.EDMF_PrognosticTKE(namelist, grid, ref_state, param_set)
     TS = TC.TimeStepping(namelist)
-    return Simulation1d(grid, ref_state, GMV, Case, Turb, TS, Stats)
+
+    FT = Float64
+    n_updrafts = Turb.n_updrafts
+
+    cent_state_fields = FieldFromNamedTuple(TC.center_space(grid), cent_prognostic_vars(FT, n_updrafts))
+    face_state_fields = FieldFromNamedTuple(TC.face_space(grid), face_prognostic_vars(FT, n_updrafts))
+    aux_cent_fields = FieldFromNamedTuple(TC.center_space(grid), cent_aux_vars(FT, n_updrafts))
+    aux_face_fields = FieldFromNamedTuple(TC.face_space(grid), face_aux_vars(FT, n_updrafts))
+
+    state = CC.Fields.FieldVector(cent = cent_state_fields, face = face_state_fields)
+    tendencies = CC.Fields.FieldVector(cent = cent_state_fields, face = face_state_fields)
+    aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
+
+    return Simulation1d(grid, state, tendencies, aux, ref_state, GMV, Case, Turb, TS, Stats)
 end
 
 function TurbulenceConvection.initialize(self::Simulation1d, namelist)
