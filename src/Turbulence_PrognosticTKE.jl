@@ -255,6 +255,8 @@ function compute_gm_tendencies!(self::EDMF_PrognosticTKE, grid, Case, GMV, ref_s
     rho0 = ref_state.rho0
     kf_surf = kf_surface(grid)
     ae = 1 .- self.UpdVar.Area.bulkvalues # area of environment
+    Δzi = grid.Δzi
+    x = center_field(grid) # for tridiag solver
 
     @inbounds for k in real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
@@ -369,6 +371,54 @@ function compute_gm_tendencies!(self::EDMF_PrognosticTKE, grid, Case, GMV, ref_s
         GMV.H.tendencies[k] += mf_tend_h
         GMV.QT.tendencies[k] += mf_tend_qt
     end
+
+    implicit_eqs = self.implicit_eqs
+    # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
+    implicit_eqs.A_θq_gm .= construct_tridiag_diffusion_gm(grid, TS.dt, self.rho_ae_KH, ref_state.rho0_half, self.ae)
+    implicit_eqs.A_uv_gm .= construct_tridiag_diffusion_gm(grid, TS.dt, self.rho_ae_KM, ref_state.rho0_half, self.ae)
+    Δzi = grid.Δzi
+    @inbounds for k in real_center_indices(grid)
+        implicit_eqs.b_u_gm[k] = GMV.U.values[k]
+        implicit_eqs.b_v_gm[k] = GMV.V.values[k]
+        implicit_eqs.b_q_tot_gm[k] = self.EnvVar.QT.values[k]
+        implicit_eqs.b_θ_liq_ice_gm[k] = self.EnvVar.H.values[k]
+        if is_surface_center(grid, k)
+            implicit_eqs.b_u_gm[k] += TS.dt * Case.Sur.rho_uflux * Δzi * ref_state.alpha0_half[k] / self.ae[k]
+            implicit_eqs.b_v_gm[k] += TS.dt * Case.Sur.rho_vflux * Δzi * ref_state.alpha0_half[k] / self.ae[k]
+            implicit_eqs.b_q_tot_gm[k] += TS.dt * Case.Sur.rho_qtflux * Δzi * ref_state.alpha0_half[k] / self.ae[k]
+            implicit_eqs.b_θ_liq_ice_gm[k] += TS.dt * Case.Sur.rho_hflux * Δzi * ref_state.alpha0_half[k] / self.ae[k]
+        end
+    end
+
+    # Solve QT
+    x .= tridiag_solve(implicit_eqs.b_q_tot_gm, implicit_eqs.A_θq_gm)
+
+    @inbounds for k in real_center_indices(grid)
+        self.diffusive_tendency_qt[k] = self.ae[k] * (x[k] - self.EnvVar.QT.values[k]) * TS.dti
+        GMV.QT.tendencies[k] += self.diffusive_tendency_qt[k]
+        # TODO: move to diagnostics (callbacks?)
+    end
+    # get the diffusive flux
+
+    # Solve H
+    x .= tridiag_solve(implicit_eqs.b_θ_liq_ice_gm, implicit_eqs.A_θq_gm)
+    @inbounds for k in real_center_indices(grid)
+        self.diffusive_tendency_h[k] = self.ae[k] * (x[k] - self.EnvVar.H.values[k]) * TS.dti
+        GMV.H.tendencies[k] += self.diffusive_tendency_h[k]
+        # TODO: move to diagnostics (callbacks?)
+    end
+    # get the diffusive flux
+
+    # Solve U
+    x .= tridiag_solve(implicit_eqs.b_u_gm, implicit_eqs.A_uv_gm)
+    @inbounds for k in real_center_indices(grid)
+        GMV.U.tendencies[k] += self.ae[k] * (x[k] - GMV.U.values[k]) * TS.dti
+    end
+    # Solve V
+    x .= tridiag_solve(implicit_eqs.b_v_gm, implicit_eqs.A_uv_gm)
+    @inbounds for k in real_center_indices(grid)
+        GMV.V.tendencies[k] += self.ae[k] * (x[k] - GMV.V.values[k]) * TS.dti
+    end
 end
 
 function compute_diffusive_fluxes(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
@@ -468,22 +518,6 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
 
     # ----------- TODO: move to compute_tendencies
     implicit_eqs = self.implicit_eqs
-    # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
-    implicit_eqs.A_θq_gm .= construct_tridiag_diffusion_gm(grid, TS.dt, self.rho_ae_KH, ref_state.rho0_half, self.ae)
-    implicit_eqs.A_uv_gm .= construct_tridiag_diffusion_gm(grid, TS.dt, self.rho_ae_KM, ref_state.rho0_half, self.ae)
-    Δzi = grid.Δzi
-    @inbounds for k in real_center_indices(grid)
-        implicit_eqs.b_u_gm[k] = GMV.U.values[k]
-        implicit_eqs.b_v_gm[k] = GMV.V.values[k]
-        implicit_eqs.b_q_tot_gm[k] = self.EnvVar.QT.values[k]
-        implicit_eqs.b_θ_liq_ice_gm[k] = self.EnvVar.H.values[k]
-        if is_surface_center(grid, k)
-            implicit_eqs.b_u_gm[k] += TS.dt * Case.Sur.rho_uflux * Δzi * ref_state.alpha0_half[k] / self.ae[k]
-            implicit_eqs.b_v_gm[k] += TS.dt * Case.Sur.rho_vflux * Δzi * ref_state.alpha0_half[k] / self.ae[k]
-            implicit_eqs.b_q_tot_gm[k] += TS.dt * Case.Sur.rho_qtflux * Δzi * ref_state.alpha0_half[k] / self.ae[k]
-            implicit_eqs.b_θ_liq_ice_gm[k] += TS.dt * Case.Sur.rho_hflux * Δzi * ref_state.alpha0_half[k] / self.ae[k]
-        end
-    end
 
     gm = GMV
     up = self.UpdVar
@@ -521,26 +555,23 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     implicit_eqs.b_HQTcov .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.values, en.HQTcov)
     # -----------
 
-    update_GMV_ED(self, GMV, Case, TS)
     update_covariance(self, GMV, Case, TS)
-    update_GMV_turbulence(self, GMV, Case, TS)
     # set values
     set_values_with_new(self.UpdVar)
     zero_area_fraction_cleanup(self, GMV)
-
-    update(GMV, TS)
+    update_GMV(GMV, TS)
     return
 end
 
-function update_GMV_turbulence(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
 
-    @inbounds for k in real_center_indices(self.grid)
-        GMV.H.tendencies[k] += (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
-        GMV.QT.tendencies[k] += (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
-        GMV.U.tendencies[k] += (GMV.U.new[k] - GMV.U.values[k]) * TS.dti
-        GMV.V.tendencies[k] += (GMV.V.new[k] - GMV.V.values[k]) * TS.dti
+function update_GMV(GMV::GridMeanVariables, TS::TimeStepping)
+    grid = GMV.grid
+    @inbounds for k in real_center_indices(grid)
+        GMV.U.values[k] += GMV.U.tendencies[k] * TS.dt
+        GMV.V.values[k] += GMV.V.tendencies[k] * TS.dt
+        GMV.H.values[k] += GMV.H.tendencies[k] * TS.dt
+        GMV.QT.values[k] += GMV.QT.tendencies[k] * TS.dt
     end
-
     return
 end
 
@@ -1091,44 +1122,6 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
             end
         end
     end
-
-    return
-end
-
-# Update the grid mean variables with the tendency due to eddy diffusion
-# Km and Kh have already been updated
-# 2nd order finite differences plus implicit time step allows solution with tridiagonal matrix solver
-function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
-    grid = get_grid(self)
-    Δzi = grid.Δzi
-    ref_state = reference_state(self)
-    x = center_field(grid) # for tridiag solver
-
-    implicit_eqs = self.implicit_eqs
-
-    # Solve QT
-    x .= tridiag_solve(implicit_eqs.b_q_tot_gm, implicit_eqs.A_θq_gm)
-
-    @inbounds for k in real_center_indices(grid)
-        GMV.QT.new[k] = max(GMV.QT.values[k] + self.ae[k] * (x[k] - self.EnvVar.QT.values[k]), 0.0)
-        # TODO: move to diagnostics (callbacks?)
-        self.diffusive_tendency_qt[k] = (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
-    end
-    # get the diffusive flux
-
-    # Solve H
-    x .= tridiag_solve(implicit_eqs.b_θ_liq_ice_gm, implicit_eqs.A_θq_gm)
-    @inbounds for k in real_center_indices(grid)
-        GMV.H.new[k] = GMV.H.values[k] + self.ae[k] * (x[k] - self.EnvVar.H.values[k])
-        # TODO: move to diagnostics (callbacks?)
-        self.diffusive_tendency_h[k] = (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
-    end
-    # get the diffusive flux
-
-    # Solve U
-    GMV.U.new .= tridiag_solve(implicit_eqs.b_u_gm, implicit_eqs.A_uv_gm)
-    # Solve V
-    GMV.V.new .= tridiag_solve(implicit_eqs.b_v_gm, implicit_eqs.A_uv_gm)
 
     return
 end

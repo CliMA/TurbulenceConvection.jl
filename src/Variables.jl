@@ -1,14 +1,3 @@
-function update(self::GridMeanVariables, TS::TimeStepping)
-    grid = self.grid
-    @inbounds for k in real_center_indices(grid)
-        self.U.values[k] += self.U.tendencies[k] * TS.dt
-        self.V.values[k] += self.V.tendencies[k] * TS.dt
-        self.H.values[k] += self.H.tendencies[k] * TS.dt
-        self.QT.values[k] += self.QT.tendencies[k] * TS.dt
-    end
-    return
-end
-
 function initialize_io(self::GridMeanVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "u_mean")
     add_profile(Stats, "v_mean")
