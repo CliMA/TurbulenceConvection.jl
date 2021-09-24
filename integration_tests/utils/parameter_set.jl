@@ -13,8 +13,10 @@ CLIMAParameters.Planet.cp_v(ps::EarthParameterSet) = ps.nt.cp_v
 CLIMAParameters.Planet.R_d(ps::EarthParameterSet) = ps.nt.R_d
 CLIMAParameters.Planet.R_v(ps::EarthParameterSet) = ps.nt.R_v
 CLIMAParameters.Planet.molmass_ratio(ps::EarthParameterSet) = ps.nt.molmass_ratio
-# microphysics parameters
+# microphysics 0-moment parameters
 CLIMAParameters.Atmos.Microphysics_0M.τ_precip(ps::EarthParameterSet) = ps.nt.τ_precip
+# microphysics 1-moment parameters
+CLIMAParameters.Atmos.Microphysics.τ_acnv(ps::EarthParameterSet) = ps.nt.τ_acnv
 # entrainment/detrainment parameters
 CLIMAParameters.Atmos.EDMF.c_ε(ps::EarthParameterSet) = ps.nt.c_ε # factor multiplyer for dry term in entrainment/detrainment
 CLIMAParameters.Atmos.EDMF.α_b(ps::EarthParameterSet) = ps.nt.α_b # factor multiplyer for pressure buoyancy terms (effective buoyancy is (1-α_b))
@@ -47,6 +49,7 @@ function create_parameter_set(namelist)
         R_v = 461.5,
         molmass_ratio = 461.5/287.1,
         τ_precip = TC.parse_namelist(namelist, "microphysics", "τ_precip"; default = 1000.0),
+        τ_acnv = TC.parse_namelist(namelist, "microphysics", "τ_acnv"; default = 1000.0),
         c_ε = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_factor"),
         c_div = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_massflux_div_factor"; default = 0.0),
         α_b = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pressure_normalmode_buoy_coeff1"),
