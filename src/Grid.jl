@@ -1,15 +1,11 @@
-
-Base.@propagate_inbounds function Base.getindex(field::CC.Fields.FiniteDifferenceField, i::Integer)
-    Base.getindex(CC.Fields.field_values(field), i)
-end
-
-
-struct Grid{FT, SC, SF}
+struct Grid{FT, CS, FS, SC, SF}
     zmin::FT
     zmax::FT
     Δz::FT
     Δzi::FT
     nz::Int
+    cs::CS
+    fs::FS
     zc::SC
     zf::SF
     function Grid(namelist)
@@ -32,10 +28,12 @@ struct Grid{FT, SC, SF}
 
         zmin = minimum(parent(zf))
         zmax = maximum(parent(zf))
+        CS = typeof(cs)
+        FS = typeof(fs)
         SC = typeof(zc)
         SF = typeof(zf)
         FT = typeof(zmax)
-        return new{FT, SC, SF}(zmin, zmax, Δz, Δzi, nz, zc, zf)
+        return new{FT, CS, FS, SC, SF}(zmin, zmax, Δz, Δzi, nz, cs, fs, zc, zf)
     end
 end
 
@@ -57,6 +55,9 @@ zf_toa(grid::Grid) = grid.zf[kf_top_of_atmos(grid)]
 
 real_center_indices(grid::Grid) = kc_surface(grid):kc_top_of_atmos(grid)
 real_face_indices(grid::Grid) = kf_surface(grid):kf_top_of_atmos(grid)
+
+face_space(grid::Grid) = grid.fs
+center_space(grid::Grid) = grid.cs
 
 
 Base.eltype(::Grid{FT}) where {FT} = FT
