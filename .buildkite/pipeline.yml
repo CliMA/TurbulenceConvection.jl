@@ -6,13 +6,15 @@ env:
   CLIMATEMACHINE_SETTINGS_FIX_RNG_SEED: "true"
   BUILDKITE_COMMIT: "${BUILDKITE_COMMIT}"
   BUILDKITE_BRANCH: "${BUILDKITE_BRANCH}"
+  JULIA_DEPOT_PATH: "${BUILDKITE_BUILD_PATH}/${BUILDKITE_PIPELINE_SLUG}/depot/cpu"
 
 steps:
   - label: "init :computer:"
     key: "init_cpu_env"
     command:
+      - "echo $$JULIA_DEPOT_PATH"
       - "julia --project -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=test -e 'using Pkg; Pkg.develop(path=\".\"); Pkg.instantiate(;verbose=true)'"
+      - "julia --project -e 'using Pkg; Pkg.precompile()'"
       - "julia --project -e 'using Pkg; Pkg.status()'"
     agents:
       config: cpu
