@@ -29,25 +29,31 @@ It is particularly designed to support eddy-diffusivity mass-flux modeling frame
 
 Information about the EDMF parameterization implemented in TurbulenceConvection can be found in:
 
-Tan, Z., C. M. Kaul, K. G. Pressel, Y. Cohen, T. Schneider, and J. Teixeira, 2018:
-An extended eddy-diffusivity mass-flux scheme for unified representation of
-subgrid-scale turbulence and convection. Journal of Advances in Modeling Earth Systems, 2018.
-(see [Tan et al., 2018](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1002/2017MS001162)).
+Tan, Z., Kaul, C. M., Pressel, K. G., Cohen, Y., Schneider, T., and Teixeira, J. (2018)
+**An extended eddy-diffusivity mass-flux scheme for unified representation of
+subgrid-scale turbulence and convection.** *Journal of Advances in Modeling Earth Systems*.
+[doi](https://doi.org/10.1002/2017MS001162)
+
+Cohen, Y., Lopez-Gomez, I., Jaruga, A., He, J., Kaul, C., and Schneider, T. (2020) **Unified entrainment and detrainment closures for extended eddy-diffusivity mass-flux schemes.** *Journal of Advances in Modeling Earth Systems*, 12, e2020MS002162. [doi](https://doi.org/10.1029/2020MS002162)
+
+Lopez-Gomez, I., Cohen, Y., He, J., Jaruga, A., Schneider, T. (2020) **A generalized mixing length closure for eddy-diﬀusivity mass-flux schemes of turbulence and convection.** *Journal of Advances in Modeling Earth Systems*, 12, e2020MS002161. [doi](https://doi.org/10.1029/2020MS002161)
+
+He, J., Cohen, Y., Lopez-Gomez, I., Jaruga, A., Schneider, T. (2021) **An improved perturbation pressure closure for eddy-diffusivity mass-flux schemes**, submitted. [preprint](https://doi.org/10.1002/essoar.10505084.2)
 
 The code is written in Julia, and was translated from [SCAMPy](https://github.com/CliMA/SCAMPy) for the commit 496dad0c2438235684823511cacbf5761d6a237c.
 
-Code Contributors:
-	Colleen Kaul (PNNL) --initial/primary developer,
-	Yair Cohen (Caltech),
-        Jia He (Caltech),
-	Anna Jaruga (JPL/Caltech),
-        Ignacio Lopez-Gomez (Caltech),
-	Kyle Pressel (PNNL),
-	Charles Kawczynski (Caltech),
+Code Contributors (alphabetical):
+    Yair Cohen (Caltech),
+    Jia He (Caltech),
+    Anna Jaruga (Caltech),
+    Colleen Kaul (PNNL) --initial/primary developer of SCAMPy,
+    Charles Kawczynski (Caltech),
+    Ignacio Lopez-Gomez (Caltech),
+    Kyle Pressel (PNNL),
 
 Additional Acknowledgements:
-	Tapio Schneider (Caltech),
-	Joao Teixeira (JPL).
+    Tapio Schneider (Caltech),
+    Joao Teixeira (JPL).
 
 # User Installation #
 
