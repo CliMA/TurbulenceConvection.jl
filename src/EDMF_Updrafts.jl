@@ -257,7 +257,7 @@ function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rai
                 Rain.rain_model,
                 UpdVar.QT.values[i, k],
                 UpdVar.QL.values[i, k],
-                Rain.Upd_QR.values[k],
+                Rain.QR.values[k],
                 UpdVar.Area.values[i, k],
                 UpdVar.T.values[i, k],
                 self.ref_state.p0_half[k],
