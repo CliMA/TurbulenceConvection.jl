@@ -258,9 +258,8 @@ function Rico(namelist_defaults)
     namelist["time_stepping"]["t_max"] = 86400.0
     namelist["time_stepping"]["dt"] = 8.0
 
-    # namelist["microphysics"]["rain_model"] = "cutoff"
     namelist["microphysics"]["rain_model"] = "clima_1m"
-    namelist["microphysics"]["tau_acnv"] = 1e4
+    namelist["microphysics"]["τ_acnv"] = 1850.0
 
     namelist["meta"]["simname"] = "Rico"
     namelist["meta"]["casename"] = "Rico"
@@ -280,7 +279,6 @@ function TRMM_LBA(namelist_defaults)
 
     namelist["microphysics"]["rain_model"] = "cutoff"
     namelist["microphysics"]["τ_precip"] = 2.0
-    # namelist["microphysics"]["rain_model"] = "clima_1m"
 
     namelist["meta"]["simname"] = "TRMM_LBA"
     namelist["meta"]["casename"] = "TRMM_LBA"

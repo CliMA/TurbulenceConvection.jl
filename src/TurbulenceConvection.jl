@@ -28,6 +28,11 @@ const RS = RootSolvers
 
 const CM = CloudMicrophysics
 const CM0 = CloudMicrophysics.Microphysics_0M
+const CM1 = CloudMicrophysics.Microphysics_1M
+const liq_type = CM1.LiquidType()
+const ice_type = CM1.IceType()
+const rain_type = CM1.RainType()
+const snow_type = CM1.SnowType()
 
 const CP = CLIMAParameters
 const CPP = CP.Planet

@@ -205,14 +205,6 @@ end
 Base.@kwdef mutable struct RainVariables{PS}
     param_set::PS
     rain_model::String = "default_rain_model"
-    max_supersaturation::Float64
-    C_drag::Float64
-    MP_n_0::Float64
-    q_liq_threshold::Float64
-    tau_acnv::Float64
-    E_col::Float64
-    a_vent::Float64
-    b_vent::Float64
     mean_rwp::Float64 = 0
     env_rwp::Float64 = 0
     upd_rwp::Float64 = 0
@@ -248,26 +240,9 @@ function RainVariables(namelist, grid::Grid, param_set::APS)
         valid_options = ["None", "cutoff", "clima_1m"],
     )
 
-    max_supersaturation = parse_namelist(namelist, "microphysics", "max_supersaturation"; default = 0.02)
-    C_drag = parse_namelist(namelist, "microphysics", "C_drag"; default = 0.55)
-    MP_n_0 = parse_namelist(namelist, "microphysics", "MP_n_0"; default = 16 * 1e6)
-    q_liq_threshold = parse_namelist(namelist, "microphysics", "q_liq_threshold"; default = 5e-4)
-    tau_acnv = parse_namelist(namelist, "microphysics", "tau_acnv"; default = 1e3)
-    E_col = parse_namelist(namelist, "microphysics", "E_col"; default = 0.8)
-    a_vent = parse_namelist(namelist, "microphysics", "a_vent"; default = 1.5)
-    b_vent = parse_namelist(namelist, "microphysics", "b_vent"; default = 0.53)
-
     return RainVariables{typeof(param_set)}(;
         param_set,
         rain_model,
-        max_supersaturation,
-        C_drag,
-        MP_n_0,
-        q_liq_threshold,
-        tau_acnv,
-        E_col,
-        a_vent,
-        b_vent,
         mean_rwp,
         env_rwp,
         upd_rwp,

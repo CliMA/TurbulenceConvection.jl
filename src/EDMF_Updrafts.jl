@@ -411,12 +411,6 @@ function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rai
             mph = microphysics_rain_src(
                 param_set,
                 Rain.rain_model,
-                Rain.max_supersaturation,
-                Rain.C_drag,
-                Rain.MP_n_0,
-                Rain.q_liq_threshold,
-                Rain.tau_acnv,
-                Rain.E_col,
                 UpdVar.QT.values[i, k],
                 UpdVar.QL.values[i, k],
                 Rain.Upd_QR.values[k],
