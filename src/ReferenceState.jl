@@ -84,21 +84,6 @@ function ReferenceState(grid::Grid, param_set::PS, Stats::NetCDFIO_Stats; Pg::FT
     rho0 = 1 ./ alpha0
     rho0_half = 1 ./ alpha0_half
 
-    add_reference_profile(Stats, "alpha0")
-    write_reference_profile(Stats, "alpha0", alpha0)
-    add_reference_profile(Stats, "alpha0_half")
-    write_reference_profile(Stats, "alpha0_half", alpha0_half)
-
-    add_reference_profile(Stats, "p0")
-    write_reference_profile(Stats, "p0", p0)
-    add_reference_profile(Stats, "p0_half")
-    write_reference_profile(Stats, "p0_half", p0_half)
-
-    add_reference_profile(Stats, "rho0")
-    write_reference_profile(Stats, "rho0", rho0)
-    add_reference_profile(Stats, "rho0_half")
-    write_reference_profile(Stats, "rho0_half", rho0_half)
-
     args = (param_set, p0, p0_half, alpha0, alpha0_half, rho0, rho0_half, Pg, Tg, qtg)
     return ReferenceState{PS, typeof(p0)}(args...)
 end
