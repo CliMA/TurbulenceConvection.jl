@@ -130,10 +130,6 @@ get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
 ##### Default CasesBase behavior:
 #####
 
-initialize_reference(::CasesBase, ::Grid, ::ReferenceState, ::NetCDFIO_Stats, ::BaseCase) = nothing
-initialize_profiles(::CasesBase, ::Grid, ::GridMeanVariables, ::ReferenceState, ::BaseCase) = nothing
-initialize_surface(::CasesBase, ::Grid, ::ReferenceState, ::BaseCase) = nothing
-initialize_forcing(::CasesBase, ::Grid, ::ReferenceState, ::GridMeanVariables, ::BaseCase) = nothing
 initialize_radiation(self::CasesBase, ::Grid, ::ReferenceState, GMV::GridMeanVariables) = initialize(self.Rad, GMV)
 
 function TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
@@ -193,8 +189,6 @@ function initialize_profiles(self::CasesBase{Soares}, grid::Grid, GMV::GridMeanV
         ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], θ_liq_ice_gm, q_tot_gm)
         GMV.T.values[k] = TD.air_temperature(ts)
     end
-
-    satadjust(GMV)
 end
 
 function initialize_surface(self::CasesBase{Soares}, grid::Grid, ref_state::ReferenceState)
@@ -261,7 +255,6 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, GMV::GridM
         ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], θ_liq_ice_gm, q_tot_gm)
         GMV.T.values[k] = TD.air_temperature(ts)
     end
-    satadjust(GMV)
 end
 function initialize_surface(self::CasesBase{Nieuwstadt}, grid::Grid, ref_state::ReferenceState)
     param_set = TC.parameter_set(ref_state)
@@ -317,7 +310,6 @@ end
 
 function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(GMV)
-    thetal = TC.center_field(grid)
 
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
@@ -357,7 +349,6 @@ function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, GMV::GridMeanVa
         ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], θ_liq_ice_gm, q_tot_gm)
         GMV.T.values[k] = TD.air_temperature(ts)
     end
-    satadjust(GMV)
 end
 
 function initialize_surface(self::CasesBase{Bomex}, grid::Grid, ref_state::ReferenceState)
@@ -486,8 +477,6 @@ function initialize_profiles(
         ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], θ_liq_ice_gm, q_tot_gm)
         GMV.T.values[k] = TD.air_temperature(ts)
     end
-
-    satadjust(GMV)
 end
 
 function life_cycle_buoyancy_flux(param_set, weight = 1)
@@ -624,8 +613,6 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, GMV::GridMeanVar
         ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], θ_liq_ice_gm, q_tot_gm)
         GMV.T.values[k] = TD.air_temperature(ts)
     end
-
-    satadjust(GMV)
 end
 
 function initialize_surface(self::CasesBase{Rico}, grid::Grid, ref_state::ReferenceState)
@@ -766,8 +753,6 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMea
         GMV.H.values[k] =
             TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], ref_state.p0_half[k], phase_part)
     end
-
-    satadjust(GMV)
 end
 
 function initialize_surface(self::CasesBase{TRMM_LBA}, grid::Grid, ref_state::ReferenceState)
@@ -1017,8 +1002,6 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, GMV::GridMean
         GMV.H.values[k] =
             TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], ref_state.p0_half[k], phase_part)
     end
-
-    satadjust(GMV)
 end
 
 function initialize_surface(self::CasesBase{ARM_SGP}, grid::Grid, ref_state::ReferenceState)
@@ -1120,9 +1103,6 @@ end
 
 function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, GMV::GridMeanVariables, ref_state::ReferenceState)
     param_set = TC.parameter_set(ref_state)
-    qt = TC.center_field(grid)
-    T = TC.center_field(grid)
-    U = TC.center_field(grid)
 
     # GATE_III inputs - I extended them to z=22 km
     #! format: off
@@ -1157,7 +1137,6 @@ function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, GMV::GridMea
         ts = TD.PhaseEquil_pTq(param_set, ref_state.p0_half[k], GMV.T.values[k], GMV.QT.values[k])
         GMV.H.values[k] = TD.liquid_ice_pottemp(ts)
     end
-    satadjust(GMV)
 end
 
 function initialize_surface(self::CasesBase{GATE_III}, grid::Grid, ref_state::ReferenceState)
@@ -1230,7 +1209,6 @@ function initialize_profiles(
     ref_state::ReferenceState,
 )
     param_set = TC.parameter_set(GMV)
-    thetal = TC.center_field(grid) # helper variable to recalculate temperature
     qi = 0.0                                             # no ice
 
     @inbounds for k in real_center_indices(grid)
@@ -1397,8 +1375,6 @@ function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, GMV::GridMeanVa
         ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], θ_liq_ice_gm, q_tot_gm)
         GMV.T.values[k] = TD.air_temperature(ts)
     end
-
-    satadjust(GMV)
 end
 
 function initialize_surface(self::CasesBase{GABLS}, grid::Grid, ref_state::ReferenceState)
@@ -1472,8 +1448,6 @@ function initialize_profiles(self::CasesBase{SP}, grid::Grid, GMV::GridMeanVaria
         ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], θ_liq_ice_gm, q_tot_gm)
         GMV.T.values[k] = TD.air_temperature(ts)
     end
-
-    satadjust(GMV)
 end
 
 function initialize_surface(self::CasesBase{SP}, grid::Grid, ref_state::ReferenceState)
@@ -1594,14 +1568,11 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, GMV::GridMe
     ])
     #! format: on
                        #LES temperature_mean in K
-    thetali = TC.center_field(grid)
     zc_in = grid.zc
-    thetali = pyinterp(zc_in, z_in, thetali_in)
-    GMV.H.values .= thetali
+    GMV.H.values .= pyinterp(zc_in, z_in, thetali_in)
     @inbounds for k in real_center_indices(grid)
         GMV.QT.values[k] = 0.0
     end
-    satadjust(GMV)
 end
 
 function initialize_surface(self::CasesBase{DryBubble}, grid::Grid, ref_state::ReferenceState)
@@ -1685,7 +1656,6 @@ function initialize_profiles(
         GMV.QT.values .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "qt_mean", imin, imax))
         GMV.U.values .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "u_mean", imin, imax))
         GMV.V.values .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "v_mean", imin, imax))
-        satadjust(GMV)
     end
 end
 
