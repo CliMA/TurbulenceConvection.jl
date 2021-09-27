@@ -112,6 +112,7 @@ function update(self::SurfaceBase{SurfaceFixedCoeffs}, GMV::GridMeanVariables)
     p0_f_surf = self.ref_state.p0[kf_surf]
     ρ0_f_surf = self.ref_state.rho0[kf_surf]
     α0_f_surf = self.ref_state.alpha0[kf_surf]
+    α0_c_surf = self.ref_state.alpha0_half[kc_surf]
     u_gm_surf = GMV.U.values[kc_surf]
     v_gm_surf = GMV.V.values[kc_surf]
     T_gm_surf = GMV.T.values[kc_surf]
@@ -131,7 +132,7 @@ function update(self::SurfaceBase{SurfaceFixedCoeffs}, GMV::GridMeanVariables)
     self.rho_hflux = -self.ch * windspeed * (θ_liq_ice_gm_surf - self.Tsurface / Π) * ρ0_f_surf
     self.shf = cp_ * self.rho_hflux
 
-    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, T_gm_surf, q_tot_gm_surf, α0_f_surf, ts)
+    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, T_gm_surf, q_tot_gm_surf, α0_c_surf, ts)
 
     self.ustar = sqrt(self.cm) * windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
@@ -156,6 +157,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
     p0_f_surf = self.ref_state.p0[kf_surf]
     ρ0_f_surf = self.ref_state.rho0[kf_surf]
     α0_f_surf = self.ref_state.alpha0[kf_surf]
+    α0_c_surf = self.ref_state.alpha0_half[kc_surf]
     u_gm_surf = GMV.U.values[kc_surf]
     v_gm_surf = GMV.V.values[kc_surf]
     q_tot_gm_surf = GMV.QT.values[kc_surf]
@@ -172,7 +174,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
     ts_g = TD.PhaseEquil_pθq(param_set, self.ref_state.Pg, h_star, self.qsurface)
     θ_ρ_g = TD.virtual_pottemp(ts_g)
 
-    ts_b = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[kc_surf], θ_liq_ice_gm_surf, self.qsurface)
+    ts_b = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[kc_surf], θ_liq_ice_gm_surf, q_tot_gm_surf)
     θ_ρ_b = TD.virtual_pottemp(ts_b)
 
     self.windspeed = sqrt(u_gm_surf^2 + v_gm_surf^2)
@@ -192,7 +194,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
     ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, self.Tsurface, self.qsurface)
     self.shf = TD.cp_m(ts) * self.rho_hflux
 
-    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, T_gm_surf, q_tot_gm_surf, α0_f_surf, ts)
+    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, T_gm_surf, q_tot_gm_surf, α0_c_surf, ts)
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
     von_karman_const = CPSGS.von_karman_const(param_set)
@@ -213,9 +215,10 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
 
     zb = self.grid.zc[kc_surf]
     p0_f_surf = self.ref_state.p0[kf_surf]
-    p0_c_surf = self.ref_state.p0_half[kf_surf]
+    p0_c_surf = self.ref_state.p0_half[kc_surf]
     ρ0_f_surf = self.ref_state.rho0[kf_surf]
     α0_f_surf = self.ref_state.alpha0[kf_surf]
+    α0_c_surf = self.ref_state.alpha0_half[kc_surf]
     u_gm_surf = GMV.U.values[kc_surf]
     v_gm_surf = GMV.V.values[kc_surf]
     q_tot_gm_surf = GMV.QT.values[kc_surf]
@@ -232,7 +235,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
     ts_g = TD.PhaseEquil_pθq(param_set, self.ref_state.Pg, h_star, self.qsurface)
     θ_ρ_g = TD.virtual_pottemp(ts_g)
 
-    ts_b = TD.PhaseEquil_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, self.qsurface)
+    ts_b = TD.PhaseEquil_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
     θ_ρ_b = TD.virtual_pottemp(ts_b)
 
     self.windspeed = sqrt(u_gm_surf^2 + v_gm_surf^2)
@@ -251,7 +254,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
     ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0[kf_surf], self.Tsurface, self.qsurface)
     self.shf = TD.cp_m(ts) * self.rho_hflux
 
-    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, T_gm_surf, 0.0, α0_f_surf, ts)
+    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, T_gm_surf, q_tot_gm_surf, α0_c_surf, ts)
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
     von_karman_const = CPSGS.von_karman_const(param_set)
@@ -273,8 +276,9 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
 
     zb = self.grid.zc[kc_surf]
     p0_f_surf = self.ref_state.p0[kf_surf]
-    p0_c_surf = self.ref_state.p0_half[kf_surf]
+    p0_c_surf = self.ref_state.p0_half[kc_surf]
     ρ0_f_surf = self.ref_state.rho0[kf_surf]
+    ρ0_c_surf = self.ref_state.rho0_half[kc_surf]
     α0_c_surf = self.ref_state.alpha0_half[kc_surf]
     u_gm_surf = GMV.U.values[kc_surf]
     v_gm_surf = GMV.V.values[kc_surf]
@@ -297,6 +301,7 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
     ts_g = TD.PhaseEquil_pθq(param_set, self.ref_state.Pg, h_star, self.qsurface)
     θ_ρ_g = TD.virtual_pottemp(ts_g)
 
+    @show(q_tot_gm_surf, self.qsurface)
     ts_b = TD.PhaseEquil_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, self.qsurface)
     θ_ρ_b = TD.virtual_pottemp(ts_b)
 
