@@ -716,11 +716,11 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMea
     RH = pyinterp(zc_in, z_in, RH_in)
 
     @inbounds for k in real_center_indices(grid)
-        phase_part = TD.PhasePartition(GMV.QT.values[k], 0.0, 0.0) # initial state is not saturated
         pv_star = TD.saturation_vapor_pressure(param_set, GMV.T.values[k], TD.Liquid())
         qv_star = pv_star * (1 / molmass_ratio) / (p1[k] - pv_star + (1 / molmass_ratio) * pv_star * RH[k] / 100.0) # eq. 37 in pressel et al and the def of RH
         qv = GMV.QT.values[k] - GMV.QL.values[k]
         GMV.QT.values[k] = qv_star * RH[k] / 100.0
+        phase_part = TD.PhasePartition(GMV.QT.values[k], 0.0, 0.0) # initial state is not saturated
         GMV.H.values[k] =
             TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], ref_state.p0_half[k], phase_part)
     end
