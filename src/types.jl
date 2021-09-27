@@ -298,7 +298,6 @@ end
 
 struct UpdraftVariable{A1, A2}
     values::A2
-    old::A2
     new::A2
     tendencies::A2
     flux::A2
@@ -309,7 +308,6 @@ struct UpdraftVariable{A1, A2}
     units::String
     function UpdraftVariable(grid, nu, loc, kind, name, units)
         values = field(grid, loc, nu)
-        old = field(grid, loc, nu)  # needed for prognostic updrafts
         new = field(grid, loc, nu) # needed for prognostic updrafts
         tendencies = field(grid, loc, nu)
         flux = field(grid, loc, nu)
@@ -319,7 +317,7 @@ struct UpdraftVariable{A1, A2}
         end
         A1 = typeof(bulkvalues)
         A2 = typeof(values)
-        return new{A1, A2}(values, old, new, tendencies, flux, bulkvalues, loc, kind, name, units)
+        return new{A1, A2}(values, new, tendencies, flux, bulkvalues, loc, kind, name, units)
     end
 end
 
