@@ -2,6 +2,8 @@ import TurbulenceConvection
 import Plots
 import NCDatasets
 import CLIMAParameters
+import ClimaCore
+const CC = ClimaCore
 tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
 include(joinpath(tc_dir, "integration_tests", "utils", "generate_namelist.jl"))
 include(joinpath(tc_dir, "integration_tests", "utils", "Cases.jl"))
@@ -20,34 +22,43 @@ function export_ref_profile(case_name::String)
     ref_params = Cases.reference_params(case, grid, param_set, namelist)
     ref_state = TC.ReferenceState(grid, param_set, Stats; ref_params...)
 
+    FT = Float64
+    aux_vars(FT) = (; ref_state = (ρ0 = FT(0), α0 = FT(0), p0 = FT(0)))
+    aux_cent_fields = TC.FieldFromNamedTuple(TC.center_space(grid), aux_vars(FT))
+    aux_face_fields = TC.FieldFromNamedTuple(TC.face_space(grid), aux_vars(FT))
+    aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
+    io_nt = TC.io_dictionary_ref_state(aux)
+    TC.initialize_io(io_nt, Stats)
+    TC.io(io_nt, Stats)
+
     NCDatasets.Dataset(joinpath(Stats.path_plus_file), "r") do ds
         zc = ds.group["profiles"]["zc"][:]
         zf = ds.group["profiles"]["zf"][:]
-        ρc_0 = ds.group["reference"]["rho0_half"][:]
-        pc_0 = ds.group["reference"]["p0_half"][:]
-        αc_0 = ds.group["reference"]["alpha0_half"][:]
-        ρf_0 = ds.group["reference"]["rho0"][:]
-        pf_0 = ds.group["reference"]["p0"][:]
-        αf_0 = ds.group["reference"]["alpha0"][:]
+        ρ0_c = ds.group["reference"]["ρ0_c"][:]
+        p0_c = ds.group["reference"]["p0_c"][:]
+        α0_c = ds.group["reference"]["α0_c"][:]
+        ρ0_f = ds.group["reference"]["ρ0_f"][:]
+        p0_f = ds.group["reference"]["p0_f"][:]
+        α0_f = ds.group["reference"]["α0_f"][:]
 
-        p1 = Plots.plot(ρc_0, zc ./ 1000; label = "centers")
-        Plots.plot!(ρf_0, zf ./ 1000; label = "faces")
+        p1 = Plots.plot(ρ0_c, zc ./ 1000; label = "centers")
+        Plots.plot!(ρ0_f, zf ./ 1000; label = "faces")
         Plots.plot!(size = (1000, 400))
         Plots.plot!(margin = 5 * Plots.mm)
         Plots.xlabel!("ρ_0")
         Plots.ylabel!("z (km)")
         Plots.title!("ρ_0")
 
-        p2 = Plots.plot(pc_0 ./ 1000, zc ./ 1000; label = "centers")
-        Plots.plot!(pf_0 ./ 1000, zf ./ 1000; label = "faces")
+        p2 = Plots.plot(p0_c ./ 1000, zc ./ 1000; label = "centers")
+        Plots.plot!(p0_f ./ 1000, zf ./ 1000; label = "faces")
         Plots.plot!(size = (1000, 400))
         Plots.plot!(margin = 5 * Plots.mm)
         Plots.xlabel!("p_0 (kPa)")
         Plots.ylabel!("z (km)")
         Plots.title!("p_0 (kPa)")
 
-        p3 = Plots.plot(αc_0, zc ./ 1000; label = "centers")
-        Plots.plot!(αf_0, zf ./ 1000; label = "faces")
+        p3 = Plots.plot(α0_c, zc ./ 1000; label = "centers")
+        Plots.plot!(α0_f, zf ./ 1000; label = "faces")
         Plots.plot!(size = (1000, 400))
         Plots.plot!(margin = 5 * Plots.mm)
         Plots.xlabel!("α_0")

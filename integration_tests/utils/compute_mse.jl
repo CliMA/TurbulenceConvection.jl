@@ -211,10 +211,17 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         data_tcc_arr = TC.get_nc_data(ds_tc, tc_var)
         data_scm_arr = TC.get_nc_data(ds_scampy, tc_var)
         # Only compare fields that exist in the nc files
-        data_les_arr == nothing && continue
-        data_tcm_arr == nothing && continue
-        data_tcc_arr == nothing && continue
-        data_scm_arr == nothing && continue
+        skip_les = data_les_arr == nothing
+        skip_tcm = data_tcm_arr == nothing
+        skip_tcc = data_tcc_arr == nothing
+        skip_scm = data_scm_arr == nothing
+
+        # For debugging why fields are skipped:
+        @debug "Skipping field $tc_var, skip reason: les=$skip_les, tcm=$skip_tcm, tcc=$skip_tcc, scm=$skip_scm"
+        skip_les && continue
+        skip_tcm && continue
+        skip_tcc && continue
+        skip_scm && continue
         data_les_arr = data_les_arr'
         data_tcm_arr = data_tcm_arr'
         data_tcc_arr = data_tcc_arr'
@@ -244,17 +251,17 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
             z_les = z_tcc
         end
 
-        # @info "     Data sizes (les,scm,tcc,tcm): $(size(data_les_arr)), $(size(data_scm_arr)), $(size(data_tcc_arr)), $(size(data_tcm_arr))"
+        @debug "     Data sizes (les,scm,tcc,tcm): $(size(data_les_arr)), $(size(data_scm_arr)), $(size(data_tcc_arr)), $(size(data_tcm_arr))"
         # Scale the data for comparison
         push!(pycles_weight, "1")
 
         # Interpolate data
-        steady_data = length(size(data_les_arr)) == 1
+        steady_data = size(data_les_arr, 1) == 1
         if steady_data
-            data_les_cont = Spline1D(z_les, data_les_arr)
-            data_tcc_cont = Spline1D(z_tcc, data_tcc_arr)
-            data_tcm_cont = Spline1D(z_tcm, data_tcm_arr)
-            data_scm_cont = Spline1D(z_scm, data_scm_arr)
+            data_les_cont = Spline1D(z_les, vec(data_les_arr))
+            data_tcc_cont = Spline1D(z_tcc, vec(data_tcc_arr))
+            data_tcm_cont = Spline1D(z_tcm, vec(data_tcm_arr))
+            data_scm_cont = Spline1D(z_scm, vec(data_scm_arr))
             data_les_cont_mapped = map(z -> data_les_cont(z), z_tcc)
             data_tcm_cont_mapped = map(z -> data_tcm_cont(z), z_tcc)
             data_tcc_cont_mapped = map(z -> data_tcc_cont(z), z_tcc)

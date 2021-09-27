@@ -79,8 +79,10 @@ import .TCThermodynamics
 const TCTD = TCThermodynamics
 
 include("Grid.jl")
-include("Fields.jl")
+include("dycore_api.jl")
 include("NetCDFIO.jl")
+include("diagnostics.jl")
+include("Fields.jl")
 include("ReferenceState.jl")
 include("types.jl")
 include("name_aliases.jl")

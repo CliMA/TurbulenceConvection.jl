@@ -11,6 +11,8 @@ function name_aliases()
         "zf" => ("z",),
         "α0_c" => ("alpha0_half",),
         "α0_f" => ("alpha0",),
+        "p0_c" => ("p0_half",),
+        "p0_f" => ("p0",),
         "ρ0_c" => ("rho0_half",),
         "ρ0_f" => ("rho0",),
         "updraft_area" => ("updraft_fraction",),
