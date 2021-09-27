@@ -215,16 +215,6 @@ function set_new_with_values(self::UpdraftVariables)
     return
 end
 
-# quick utility to set "new" arrays with values in the "values" arrays
-function set_old_with_values(self::UpdraftVariables)
-    @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_center_indices(self.grid)
-            self.Area.old[i, k] = self.Area.values[i, k]
-        end
-    end
-    return
-end
-
 # quick utility to set "tmp" arrays with values in the "new" arrays
 function set_values_with_new(self::UpdraftVariables)
     @inbounds for i in xrange(self.n_updrafts)
