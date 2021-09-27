@@ -424,7 +424,6 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
-    set_old_with_values(self.UpdVar)
     set_updraft_surface_bc(self, GMV, Case)
     diagnose_GMV_moments(self, GMV, Case, TS)
 
@@ -524,10 +523,10 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     implicit_eqs.A_QTvar .= construct_tridiag_diffusion_en(common_args..., false)
     implicit_eqs.A_HQTcov .= construct_tridiag_diffusion_en(common_args..., false)
 
-    implicit_eqs.b_TKE .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.old, en.TKE)
-    implicit_eqs.b_Hvar .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.old, en.Hvar)
-    implicit_eqs.b_QTvar .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.old, en.QTvar)
-    implicit_eqs.b_HQTcov .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.old, en.HQTcov)
+    implicit_eqs.b_TKE .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.values, en.TKE)
+    implicit_eqs.b_Hvar .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.values, en.Hvar)
+    implicit_eqs.b_QTvar .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.values, en.QTvar)
+    implicit_eqs.b_HQTcov .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.values, en.HQTcov)
     # -----------
 
     update_GMV_ED(self, GMV, Case, TS)
@@ -1506,12 +1505,12 @@ function compute_covariance_dissipation(self::EDMF_PrognosticTKE, Covar::Environ
     return
 end
 
-function en_diffusion_tendencies(grid::Grid, ref_state::ReferenceState, TS, a_up_old, covar)
+function en_diffusion_tendencies(grid::Grid, ref_state::ReferenceState, TS, a_up, covar)
     dti = TS.dti
     b = center_field(grid)
     ρ0_c = ref_state.rho0_half
 
-    ae_old = 1 .- up_sum(a_up_old)
+    ae = 1 .- up_sum(a_up)
 
     kc_surf = kc_surface(grid)
     covar_surf = covar.values[kc_surf]
@@ -1521,7 +1520,7 @@ function en_diffusion_tendencies(grid::Grid, ref_state::ReferenceState, TS, a_up
             b[k] = covar_surf
         else
             b[k] = (
-                ρ0_c[k] * ae_old[k] * covar.values[k] * dti +
+                ρ0_c[k] * ae[k] * covar.values[k] * dti +
                 covar.press[k] +
                 covar.buoy[k] +
                 covar.shear[k] +
