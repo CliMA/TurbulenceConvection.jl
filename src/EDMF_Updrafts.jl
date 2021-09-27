@@ -318,10 +318,16 @@ function buoyancy(
             @inbounds for k in real_center_indices(grid)
                 if UpdVar.Area.values[i, k] > 0.0
                     # saturation adjustment
-                    ts = TCTD.eos(param_set, self.ref_state.p0_half[k], UpdVar.H.values[i, k], UpdVar.QT.values[i, k])
-                    UpdVar.QL.values[i, k] = TCTD.liquid_specific_humidity(ts)
-                    UpdVar.T.values[i, k] = TCTD.air_temperature(ts)
-                    rho = TCTD.air_density(ts)
+                    # TODO: remove this:
+                    ts = TD.PhaseEquil_pθq(
+                        param_set,
+                        self.ref_state.p0_half[k],
+                        UpdVar.H.values[i, k],
+                        UpdVar.QT.values[i, k],
+                    )
+                    UpdVar.QL.values[i, k] = TD.liquid_specific_humidity(ts)
+                    UpdVar.T.values[i, k] = TD.air_temperature(ts)
+                    rho = TD.air_density(ts)
                     UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
                     UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
                 else
@@ -335,10 +341,10 @@ function buoyancy(
             @inbounds for k in real_center_indices(grid)
                 if UpdVar.Area.values[i, k] > 0.0
                     args = (param_set, self.ref_state.p0_half[k], UpdVar.H.values[i, k], UpdVar.QT.values[i, k])
-                    ts = TCTD.eos(args...)
-                    UpdVar.QL.values[i, k] = TCTD.liquid_specific_humidity(ts)
-                    UpdVar.T.values[i, k] = TCTD.air_temperature(ts)
-                    rho = TCTD.air_density(ts)
+                    ts = TD.PhaseEquil_pθq(args...)
+                    UpdVar.QL.values[i, k] = TD.liquid_specific_humidity(ts)
+                    UpdVar.T.values[i, k] = TD.air_temperature(ts)
+                    rho = TD.air_density(ts)
                     UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
                     # this is here just for RH
                     ts = TD.PhaseEquil_pθq(args...)
@@ -347,11 +353,9 @@ function buoyancy(
                     if UpdVar.Area.values[i, k - 1] > 0.0
                         qt = UpdVar.QT.values[i, k - 1]
                         h = UpdVar.H.values[i, k - 1]
-                        ts = TCTD.eos(param_set, self.ref_state.p0_half[k], h, qt)
-                        rho = TCTD.air_density(ts)
-                        UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
-                        # this is here just for RH
                         ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], h, qt)
+                        rho = TD.air_density(ts)
+                        UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
                         UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
                     else
                         UpdVar.B.values[i, k] = EnvVar.B.values[k]
