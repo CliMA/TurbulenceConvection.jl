@@ -457,19 +457,6 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
 
     # update
     solve_updraft(self, GMV, TS)
-    @inbounds for k in real_center_indices(grid)
-        @inbounds for i in xrange(self.n_updrafts)
-            # saturation adjustment
-            ts = TD.PhaseEquil_pθq(
-                param_set,
-                self.ref_state.p0_half[k],
-                self.UpdVar.H.new[i, k],
-                self.UpdVar.QT.new[i, k],
-            )
-            self.UpdVar.T.values[i, k] = TD.air_temperature(ts)
-            self.UpdVar.QL.values[i, k] = TD.liquid_specific_humidity(ts)
-        end
-    end
     if self.Rain.rain_model == "clima_1m"
 
         # rain fall (all three categories are assumed to be falling though "grid-mean" conditions

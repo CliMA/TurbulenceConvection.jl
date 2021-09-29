@@ -138,21 +138,36 @@ function close_files(self::NetCDFIO_Stats)
     close(self.root_grp)
 end
 
-function add_profile(self::NetCDFIO_Stats, var_name::String)
-    coord = is_face_field(var_name) ? "zf" : "zc"
+#####
+##### Profile-specific
+#####
+
+# TODO: depricate
+add_profile(self::NetCDFIO_Stats, var_name::String) =
+    add_field(self, var_name; dims = is_face_field(var_name) ? ("zf", "t") : ("zc", "t"), group = "profiles")
+
+#####
+##### Reference state-specific
+#####
+
+# TODO: depricate
+add_reference_profile(self::NetCDFIO_Stats, var_name::String) =
+    add_field(self, var_name; dims = is_face_field(var_name) ? ("zf",) : ("zc",), group = "reference")
+
+#####
+##### Generic field
+#####
+
+function add_field(self::NetCDFIO_Stats, var_name::String; dims, group)
     NC.Dataset(self.path_plus_file, "a") do root_grp
-        profile_grp = root_grp.group["profiles"]
-        new_var = NC.defVar(profile_grp, var_name, Float64, (coord, "t"))
+        profile_grp = root_grp.group[group]
+        new_var = NC.defVar(profile_grp, var_name, Float64, dims)
     end
 end
 
-function add_reference_profile(self::NetCDFIO_Stats, var_name::String)
-    coord = is_face_field(var_name) ? "zf" : "zc"
-    NC.Dataset(self.path_plus_file, "a") do root_grp
-        reference_grp = root_grp.group["reference"]
-        new_var = NC.defVar(reference_grp, var_name, Float64, (coord,))
-    end
-end
+#####
+##### Time-serios data
+#####
 
 function add_ts(self::NetCDFIO_Stats, var_name::String)
     NC.Dataset(self.path_plus_file, "a") do root_grp
@@ -161,35 +176,38 @@ function add_ts(self::NetCDFIO_Stats, var_name::String)
     end
 end
 
-""" Writes a profile to the reference group NetCDF Stats file.
-The variable must have already been added to the NetCDF file
-using `add_reference_profile`.
-
-Parameters
-----------
-var_name :: name of variables
-data :: data to be written to file
-"""
-function write_reference_profile(self::NetCDFIO_Stats, var_name, data::T) where {T <: AbstractArray{Float64, 1}}
-
-    NC.Dataset(self.path_plus_file, "a") do root_grp
-        reference_grp = root_grp.group["reference"]
-        var = reference_grp[var_name]
-        var .= data::T
-    end
-end
+# TODO: depricate
+write_reference_profile(self::NetCDFIO_Stats, var_name::String, data::T) where {T <: AbstractArray{Float64, 1}} =
+    write_field(self, var_name, data; group = "reference")
 
 #####
 ##### Performance critical IO
 #####
 
-function write_profile(self::NetCDFIO_Stats, var_name::String, data::T) where {T <: AbstractArray{Float64, 1}}
-    # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    @inbounds self.vars["profiles"][var_name][:, end] = data
-    # Ideally, we remove self.vars and use:
-    # var = self.profiles_grp[var_name]
-    # Not sure why `end` instead of `end+1`, but `end+1` produces garbage output
-    # @inbounds var[end, :] = data :: T
+# Field wrapper
+write_field(self::NetCDFIO_Stats, var_name::String, data; group) = write_field(self, var_name, vec(data); group = group)
+
+# TODO: depricate
+write_profile(self::NetCDFIO_Stats, var_name::String, data::T) where {T <: AbstractArray{Float64, 1}} =
+    write_field(self, var_name, data; group = "profiles")
+
+function write_field(self::NetCDFIO_Stats, var_name::String, data::T; group) where {T <: AbstractArray{Float64, 1}}
+    if group == "profiles"
+        # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
+        @inbounds self.vars[group][var_name][:, end] = data
+        # Ideally, we remove self.vars and use:
+        # var = self.profiles_grp[var_name]
+        # Not sure why `end` instead of `end+1`, but `end+1` produces garbage output
+        # @inbounds var[end, :] = data :: T
+    elseif group == "reference"
+        NC.Dataset(self.path_plus_file, "a") do root_grp
+            reference_grp = root_grp.group[group]
+            var = reference_grp[var_name]
+            var .= data::T
+        end
+    else
+        error("Bad group given")
+    end
 end
 
 function write_ts(self::NetCDFIO_Stats, var_name::String, data::Float64)

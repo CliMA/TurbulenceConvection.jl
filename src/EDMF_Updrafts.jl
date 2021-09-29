@@ -325,16 +325,11 @@ function buoyancy(
                     )
                     rho = TD.air_density(ts)
                     UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
+                    UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
                 else
                     UpdVar.B.values[i, k] = EnvVar.B.values[k]
+                    UpdVar.RH.values[i, k] = EnvVar.RH.values[k]
                 end
-                ts = TD.PhaseEquil_pθq(
-                    param_set,
-                    self.ref_state.p0_half[k],
-                    UpdVar.H.values[i, k],
-                    UpdVar.QT.values[i, k],
-                )
-                UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
             end
         end
     else
@@ -344,6 +339,8 @@ function buoyancy(
                     qt = UpdVar.QT.values[i, k]
                     h = UpdVar.H.values[i, k]
                     ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], h, qt)
+                    UpdVar.QL.values[i, k] = TD.liquid_specific_humidity(ts)
+                    UpdVar.T.values[i, k] = TD.air_temperature(ts)
                     rho = TD.air_density(ts)
                     UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
                     UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
@@ -352,7 +349,8 @@ function buoyancy(
                         qt = UpdVar.QT.values[i, k - 1]
                         h = UpdVar.H.values[i, k - 1]
                         ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], h, qt)
-                        t = TD.air_temperature(ts)
+                        UpdVar.QL.values[i, k] = TD.liquid_specific_humidity(ts)
+                        UpdVar.T.values[i, k] = TD.air_temperature(ts)
                         rho = TD.air_density(ts)
                         UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
                         UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
@@ -363,6 +361,8 @@ function buoyancy(
                 else
                     UpdVar.B.values[i, k] = EnvVar.B.values[k]
                     UpdVar.RH.values[i, k] = EnvVar.RH.values[k]
+                    UpdVar.QL.values[i, k] = EnvVar.QL.values[k]
+                    UpdVar.T.values[i, k] = EnvVar.T.values[k]
                 end
             end
         end

@@ -15,6 +15,7 @@ include("Cases.jl")
 import .Cases
 
 struct Simulation1d
+    io_nt::NamedTuple
     grid
     state
     tendencies
@@ -64,11 +65,6 @@ face_prognostic_vars_up(FT) = (; W = FT(0))
 face_prognostic_vars_edmf(FT, n_up) = (; turbconv = (; up = ntuple(i -> face_prognostic_vars_up(FT), n_up)))
 # face_prognostic_vars_edmf(FT, n_up) = (;) # could also use this for empty model
 
-function FieldFromNamedTuple(space, nt::NamedTuple)
-    cmv(z) = nt
-    return cmv.(CC.Fields.coordinate_field(space))
-end
-
 function Simulation1d(namelist)
     TC = TurbulenceConvection
     param_set = create_parameter_set(namelist)
@@ -91,21 +87,34 @@ function Simulation1d(namelist)
     FT = Float64
     n_updrafts = Turb.n_updrafts
 
-    cent_state_fields = FieldFromNamedTuple(TC.center_space(grid), cent_prognostic_vars(FT, n_updrafts))
-    face_state_fields = FieldFromNamedTuple(TC.face_space(grid), face_prognostic_vars(FT, n_updrafts))
-    aux_cent_fields = FieldFromNamedTuple(TC.center_space(grid), cent_aux_vars(FT, n_updrafts))
-    aux_face_fields = FieldFromNamedTuple(TC.face_space(grid), face_aux_vars(FT, n_updrafts))
+    cent_state_fields = TC.FieldFromNamedTuple(TC.center_space(grid), cent_prognostic_vars(FT, n_updrafts))
+    face_state_fields = TC.FieldFromNamedTuple(TC.face_space(grid), face_prognostic_vars(FT, n_updrafts))
+    aux_cent_fields = TC.FieldFromNamedTuple(TC.center_space(grid), cent_aux_vars(FT, n_updrafts))
+    aux_face_fields = TC.FieldFromNamedTuple(TC.face_space(grid), face_aux_vars(FT, n_updrafts))
+
+    parent(aux_face_fields.ref_state.p0) .= ref_state.p0
+    parent(aux_face_fields.ref_state.ρ0) .= ref_state.rho0
+    parent(aux_face_fields.ref_state.α0) .= ref_state.alpha0
+    parent(aux_cent_fields.ref_state.p0) .= ref_state.p0_half
+    parent(aux_cent_fields.ref_state.ρ0) .= ref_state.rho0_half
+    parent(aux_cent_fields.ref_state.α0) .= ref_state.alpha0_half
 
     state = CC.Fields.FieldVector(cent = cent_state_fields, face = face_state_fields)
     tendencies = CC.Fields.FieldVector(cent = cent_state_fields, face = face_state_fields)
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
+    io_nt = (;
+        ref_state = TC.io_dictionary_ref_state(aux),
+        aux = TC.io_dictionary_aux(aux),
+        state = TC.io_dictionary_state(state),
+        tendencies = TC.io_dictionary_tendencies(tendencies),
+    )
 
-    return Simulation1d(grid, state, tendencies, aux, ref_state, GMV, Case, Turb, TS, Stats)
+    return Simulation1d(io_nt, grid, state, tendencies, aux, ref_state, GMV, Case, Turb, TS, Stats)
 end
 
 function TurbulenceConvection.initialize(self::Simulation1d, namelist)
     TC = TurbulenceConvection
-    Cases.initialize_profiles(self.Case, self.grid, self.GMV, self.ref_state)
+    Cases.initialize_profiles(self.Case, self.grid, self.GMV, TC.center_ref_state(self.aux))
     TC.satadjust(self.GMV)
 
     Cases.initialize_surface(self.Case, self.grid, self.ref_state)
@@ -113,9 +122,9 @@ function TurbulenceConvection.initialize(self::Simulation1d, namelist)
     Cases.initialize_radiation(self.Case, self.grid, self.ref_state, self.GMV)
 
     TC.initialize(self.Turb, self.Case, self.GMV, self.ref_state, self.TS)
+
     TC.initialize_io(self)
     TC.io(self)
-
     return
 end
 
@@ -137,6 +146,11 @@ function run(self::Simulation1d)
             # opening/closing files every step should be okay. #removeVarsHack
             # TurbulenceConvection.io(self) # #removeVarsHack
             TC.write_simulation_time(self.Stats, self.TS.t) # #removeVarsHack
+
+            TC.io(self.io_nt.aux, self.Stats)
+            TC.io(self.io_nt.state, self.Stats)
+            TC.io(self.io_nt.tendencies, self.Stats)
+
             TC.io(self.GMV, self.Stats) # #removeVarsHack
             TC.io(self.Case, self.Stats) # #removeVarsHack
             TC.io(self.Turb, self.Stats, self.TS) # #removeVarsHack
@@ -149,6 +163,14 @@ end
 
 function TurbulenceConvection.initialize_io(self::Simulation1d)
     TC = TurbulenceConvection
+    TC.initialize_io(self.io_nt.ref_state, self.Stats)
+    TC.io(self.io_nt.ref_state, self.Stats) # since the reference state is static
+
+    TC.initialize_io(self.io_nt.aux, self.Stats)
+    TC.initialize_io(self.io_nt.state, self.Stats)
+    TC.initialize_io(self.io_nt.tendencies, self.Stats)
+
+    # TODO: depricate
     TC.initialize_io(self.GMV, self.Stats)
     TC.initialize_io(self.Case, self.Stats)
     TC.initialize_io(self.Turb, self.Stats)
@@ -159,6 +181,12 @@ function TurbulenceConvection.io(self::Simulation1d)
     TC = TurbulenceConvection
     TC.open_files(self.Stats)
     TC.write_simulation_time(self.Stats, self.TS.t)
+
+    TC.io(self.io_nt.aux, self.Stats)
+    TC.io(self.io_nt.state, self.Stats)
+    TC.io(self.io_nt.tendencies, self.Stats)
+
+    # TODO: depricate
     TC.io(self.GMV, self.Stats)
     TC.io(self.Case, self.Stats)
     TC.io(self.Turb, self.Stats, self.TS)

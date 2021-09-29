@@ -46,5 +46,7 @@ Base.@propagate_inbounds function Base.setindex!(field::CC.Fields.FiniteDifferen
     Base.setindex!(CC.Fields.field_values(field), v, i)
 end
 
-center_fields(state) = state.cent
-face_fields(state) = state.cent
+function FieldFromNamedTuple(space, nt::NamedTuple)
+    cmv(z) = nt
+    return cmv.(CC.Fields.coordinate_field(space))
+end
