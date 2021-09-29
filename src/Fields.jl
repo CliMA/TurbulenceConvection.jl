@@ -36,8 +36,6 @@ end
 
 surface_value(f::AbstractVector, grid::Grid) = f[kf_surface(grid)]
 
-Base.length(space::CC.Spaces.FiniteDifferenceSpace) = length(CC.Spaces.coordinates_data(space))
-
 Base.@propagate_inbounds function Base.getindex(field::CC.Fields.FiniteDifferenceField, i::Integer)
     Base.getindex(CC.Fields.field_values(field), i)
 end
