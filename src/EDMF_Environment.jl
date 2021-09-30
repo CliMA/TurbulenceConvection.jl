@@ -91,11 +91,11 @@ function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::Environm
     mph = mph_struct()
 
     @inbounds for k in real_center_indices(self.grid)
-        ts = TCTD.eos(param_set, self.ref_state.p0_half[k], EnvVar.H.values[k], EnvVar.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], EnvVar.H.values[k], EnvVar.QT.values[k])
 
-        EnvVar.T.values[k] = TCTD.air_temperature(ts)
-        EnvVar.QL.values[k] = TCTD.liquid_specific_humidity(ts)
-        rho = TCTD.air_density(ts)
+        EnvVar.T.values[k] = TD.air_temperature(ts)
+        EnvVar.QL.values[k] = TD.liquid_specific_humidity(ts)
+        rho = TD.air_density(ts)
         EnvVar.B.values[k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
 
         update_cloud_dry(
@@ -123,9 +123,9 @@ function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables,
     @inbounds for k in real_center_indices(self.grid)
         # condensation
         q_tot_en = EnvVar.QT.values[k]
-        ts = TCTD.eos(param_set, self.ref_state.p0_half[k], EnvVar.H.values[k], q_tot_en)
-        q_liq_en = TCTD.liquid_specific_humidity(ts)
-        T = TCTD.air_temperature(ts)
+        ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], EnvVar.H.values[k], q_tot_en)
+        q_liq_en = TD.liquid_specific_humidity(ts)
+        T = TD.air_temperature(ts)
         # autoconversion and accretion
         mph = microphysics_rain_src(
             param_set,
@@ -257,9 +257,9 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
                     end
 
                     # condensation
-                    ts = TCTD.eos(param_set, self.ref_state.p0_half[k], h_hat, qt_hat)
-                    q_liq_en = TCTD.liquid_specific_humidity(ts)
-                    T = TCTD.air_temperature(ts)
+                    ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], h_hat, qt_hat)
+                    q_liq_en = TD.liquid_specific_humidity(ts)
+                    T = TD.air_temperature(ts)
                     # autoconversion and accretion
                     mph = microphysics_rain_src(
                         param_set,
@@ -333,9 +333,9 @@ function sgs_quadrature(self::EnvironmentThermodynamics, EnvVar::EnvironmentVari
 
         else
             # if variance and covariance are zero do the same as in SA_mean
-            ts = TCTD.eos(param_set, self.ref_state.p0_half[k], EnvVar.H.values[k], EnvVar.QT.values[k])
-            q_liq_en = TCTD.liquid_specific_humidity(ts)
-            T = TCTD.air_temperature(ts)
+            ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], EnvVar.H.values[k], EnvVar.QT.values[k])
+            q_liq_en = TD.liquid_specific_humidity(ts)
+            T = TD.air_temperature(ts)
             mph = microphysics_rain_src(
                 param_set,
                 Rain.rain_model,
