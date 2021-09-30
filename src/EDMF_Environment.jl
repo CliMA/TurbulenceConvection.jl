@@ -86,39 +86,9 @@ function update_cloud_dry(self::EnvironmentThermodynamics, k, EnvVar::Environmen
     return
 end
 
-function saturation_adjustment(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables)
-    param_set = parameter_set(EnvVar)
-    mph = mph_struct()
-
-    @inbounds for k in real_center_indices(self.grid)
-        ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], EnvVar.H.values[k], EnvVar.QT.values[k])
-
-        EnvVar.T.values[k] = TD.air_temperature(ts)
-        EnvVar.QL.values[k] = TD.liquid_specific_humidity(ts)
-        rho = TD.air_density(ts)
-        EnvVar.B.values[k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
-
-        update_cloud_dry(
-            self,
-            k,
-            EnvVar,
-            EnvVar.T.values[k],
-            EnvVar.H.values[k],
-            EnvVar.QT.values[k],
-            EnvVar.QL.values[k],
-            EnvVar.QT.values[k] - EnvVar.QL.values[k],
-        )
-        ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], EnvVar.H.values[k], EnvVar.QT.values[k])
-        EnvVar.RH.values[k] = TD.relative_humidity(ts)
-    end
-    return
-end
-
-
 function sgs_mean(self::EnvironmentThermodynamics, EnvVar::EnvironmentVariables, Rain::RainVariables, dt)
 
     param_set = parameter_set(EnvVar)
-    mph = mph_struct()
 
     @inbounds for k in real_center_indices(self.grid)
         # condensation
