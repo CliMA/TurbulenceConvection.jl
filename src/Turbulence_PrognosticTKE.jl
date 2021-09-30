@@ -521,8 +521,36 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     implicit_eqs.b_HQTcov .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.values, en.HQTcov)
     # -----------
 
-    update_GMV_ED(self, GMV, Case, TS)
-    update_covariance(self, GMV, Case, TS)
+    # Update the grid mean variables with the tendency due to eddy diffusion
+    # Solve tri-diagonal systems
+    x_q_tot_gm = center_field(grid) # for tridiag solver
+    x_θ_liq_ice_gm = center_field(grid) # for tridiag solver
+    x_q_tot_gm .= tridiag_solve(implicit_eqs.b_q_tot_gm, implicit_eqs.A_θq_gm)
+    x_θ_liq_ice_gm .= tridiag_solve(implicit_eqs.b_θ_liq_ice_gm, implicit_eqs.A_θq_gm)
+    GMV.U.new .= tridiag_solve(implicit_eqs.b_u_gm, implicit_eqs.A_uv_gm)
+    GMV.V.new .= tridiag_solve(implicit_eqs.b_v_gm, implicit_eqs.A_uv_gm)
+    en.TKE.values .= tridiag_solve(implicit_eqs.b_TKE, implicit_eqs.A_TKE)
+    en.Hvar.values .= tridiag_solve(implicit_eqs.b_Hvar, implicit_eqs.A_Hvar)
+    en.QTvar.values .= tridiag_solve(implicit_eqs.b_QTvar, implicit_eqs.A_QTvar)
+    en.HQTcov.values .= tridiag_solve(implicit_eqs.b_HQTcov, implicit_eqs.A_HQTcov)
+
+    @inbounds for k in real_center_indices(grid)
+        GMV.QT.new[k] = max(GMV.QT.values[k] + self.ae[k] * (x_q_tot_gm[k] - self.EnvVar.QT.values[k]), 0.0)
+        GMV.H.new[k] = GMV.H.values[k] + self.ae[k] * (x_θ_liq_ice_gm[k] - self.EnvVar.H.values[k])
+        # get the diffusive flux, TODO: move to diagnostics (callbacks?)
+        self.diffusive_tendency_h[k] = (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
+        self.diffusive_tendency_qt[k] = (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
+    end
+
+    # Filter solution, TODO: fuse with `zero_area_fraction_cleanup` and put into `filter_variables!`
+    @inbounds for k in real_center_indices(grid)
+        en.TKE.values[k] = max(en.TKE.values[k], 0.0)
+        en.Hvar.values[k] = max(en.Hvar.values[k], 0.0)
+        en.QTvar.values[k] = max(en.QTvar.values[k], 0.0)
+        en.HQTcov.values[k] = max(en.HQTcov.values[k], -sqrt(en.Hvar.values[k] * en.QTvar.values[k]))
+        en.HQTcov.values[k] = min(en.HQTcov.values[k], sqrt(en.Hvar.values[k] * en.QTvar.values[k]))
+    end
+
     update_GMV_turbulence(self, GMV, Case, TS)
     # set values
     set_values_with_new(self.UpdVar)
@@ -1095,44 +1123,6 @@ function solve_updraft(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     return
 end
 
-# Update the grid mean variables with the tendency due to eddy diffusion
-# Km and Kh have already been updated
-# 2nd order finite differences plus implicit time step allows solution with tridiagonal matrix solver
-function update_GMV_ED(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
-    grid = get_grid(self)
-    Δzi = grid.Δzi
-    ref_state = reference_state(self)
-    x = center_field(grid) # for tridiag solver
-
-    implicit_eqs = self.implicit_eqs
-
-    # Solve QT
-    x .= tridiag_solve(implicit_eqs.b_q_tot_gm, implicit_eqs.A_θq_gm)
-
-    @inbounds for k in real_center_indices(grid)
-        GMV.QT.new[k] = max(GMV.QT.values[k] + self.ae[k] * (x[k] - self.EnvVar.QT.values[k]), 0.0)
-        # TODO: move to diagnostics (callbacks?)
-        self.diffusive_tendency_qt[k] = (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
-    end
-    # get the diffusive flux
-
-    # Solve H
-    x .= tridiag_solve(implicit_eqs.b_θ_liq_ice_gm, implicit_eqs.A_θq_gm)
-    @inbounds for k in real_center_indices(grid)
-        GMV.H.new[k] = GMV.H.values[k] + self.ae[k] * (x[k] - self.EnvVar.H.values[k])
-        # TODO: move to diagnostics (callbacks?)
-        self.diffusive_tendency_h[k] = (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
-    end
-    # get the diffusive flux
-
-    # Solve U
-    GMV.U.new .= tridiag_solve(implicit_eqs.b_u_gm, implicit_eqs.A_uv_gm)
-    # Solve V
-    GMV.V.new .= tridiag_solve(implicit_eqs.b_v_gm, implicit_eqs.A_uv_gm)
-
-    return
-end
-
 function compute_tke_pressure(self::EDMF_PrognosticTKE)
     grid = get_grid(self)
 
@@ -1197,27 +1187,6 @@ function diagnose_GMV_moments(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, 
     GMV_third_m(self, gm.H_third_m, en.Hvar, en.H, up.H)
     GMV_third_m(self, gm.QT_third_m, en.QTvar, en.QT, up.QT)
     GMV_third_m(self, gm.W_third_m, en.TKE, en.W, up.W)
-    return
-end
-
-function update_covariance(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
-    gm = GMV
-    up = self.UpdVar
-    en = self.EnvVar
-
-    A_TKE = self.implicit_eqs.A_TKE
-    A_Hvar = self.implicit_eqs.A_Hvar
-    A_QTvar = self.implicit_eqs.A_QTvar
-    A_HQTcov = self.implicit_eqs.A_HQTcov
-    b_TKE = self.implicit_eqs.b_TKE
-    b_Hvar = self.implicit_eqs.b_Hvar
-    b_QTvar = self.implicit_eqs.b_QTvar
-    b_HQTcov = self.implicit_eqs.b_HQTcov
-
-    update_covariance_ED(self, gm.W, gm.W, en.TKE, en.W, en.W, up.W, up.W, A_TKE, b_TKE)
-    update_covariance_ED(self, gm.H, gm.H, en.Hvar, en.H, en.H, up.H, up.H, A_Hvar, b_Hvar)
-    update_covariance_ED(self, gm.QT, gm.QT, en.QTvar, en.QT, en.QT, up.QT, up.QT, A_QTvar, b_QTvar)
-    update_covariance_ED(self, gm.H, gm.QT, en.HQTcov, en.H, en.QT, up.H, up.QT, A_HQTcov, b_HQTcov)
     return
 end
 
@@ -1523,32 +1492,6 @@ function en_diffusion_tendencies(grid::Grid, ref_state::ReferenceState, TS, a_up
     end
 
     return b
-end
-
-function update_covariance_ED(
-    self::EDMF_PrognosticTKE,
-    GmvVar1::VariablePrognostic,
-    GmvVar2::VariablePrognostic,
-    Covar::EnvironmentVariable_2m,
-    EnvVar1::EnvironmentVariable,
-    EnvVar2::EnvironmentVariable,
-    UpdVar1::UpdraftVariable,
-    UpdVar2::UpdraftVariable,
-    A,
-    b,
-)
-    grid = get_grid(self)
-    x = center_field(grid)
-    x .= tridiag_solve(b, A)
-    @inbounds for k in real_center_indices(grid)
-        if Covar.name == "thetal_qt_covar"
-            Covar.values[k] = max(x[k], -sqrt(self.EnvVar.Hvar.values[k] * self.EnvVar.QTvar.values[k]))
-            Covar.values[k] = min(x[k], sqrt(self.EnvVar.Hvar.values[k] * self.EnvVar.QTvar.values[k]))
-        else
-            Covar.values[k] = max(x[k], 0.0)
-        end
-    end
-    return
 end
 
 function GMV_third_m(
