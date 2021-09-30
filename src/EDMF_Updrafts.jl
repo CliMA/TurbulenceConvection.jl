@@ -20,9 +20,6 @@ function initialize(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
 
         self.Area.values[i, kc_surf] = self.updraft_fraction / self.n_updrafts
     end
-
-    set_means(tptke, self, GMV)
-
     return
 end
 
@@ -122,9 +119,6 @@ function initialize_DryBubble(tptke, self::UpdraftVariables, GMV::GridMeanVariab
             end
         end
     end
-
-    set_means(tptke, self, GMV)
-
     return
 end
 
@@ -143,59 +137,6 @@ function initialize_io(self::UpdraftVariables, Stats::NetCDFIO_Stats)
     add_ts(Stats, "updraft_cloud_base")
     add_ts(Stats, "updraft_cloud_top")
     add_ts(Stats, "updraft_lwp")
-    return
-end
-
-function set_means(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
-
-    self.Area.bulkvalues .= up_sum(self.Area.values)
-    self.W.bulkvalues .= 0.0
-    self.QT.bulkvalues .= 0.0
-    self.QL.bulkvalues .= 0.0
-    self.H.bulkvalues .= 0.0
-    self.T.bulkvalues .= 0.0
-    self.B.bulkvalues .= 0.0
-    self.RH.bulkvalues .= 0.0
-    grid = get_grid(GMV)
-
-    @inbounds for k in real_center_indices(self.grid)
-        if self.Area.bulkvalues[k] > 1.0e-20
-            @inbounds for i in xrange(self.n_updrafts)
-                self.QT.bulkvalues[k] += self.Area.values[i, k] * self.QT.values[i, k] / self.Area.bulkvalues[k]
-                self.QL.bulkvalues[k] += self.Area.values[i, k] * self.QL.values[i, k] / self.Area.bulkvalues[k]
-                self.H.bulkvalues[k] += self.Area.values[i, k] * self.H.values[i, k] / self.Area.bulkvalues[k]
-                self.T.bulkvalues[k] += self.Area.values[i, k] * self.T.values[i, k] / self.Area.bulkvalues[k]
-                self.RH.bulkvalues[k] += self.Area.values[i, k] * self.RH.values[i, k] / self.Area.bulkvalues[k]
-                self.B.bulkvalues[k] += self.Area.values[i, k] * self.B.values[i, k] / self.Area.bulkvalues[k]
-            end
-        else
-            self.QT.bulkvalues[k] = GMV.QT.values[k]
-            self.QL.bulkvalues[k] = 0.0
-            self.H.bulkvalues[k] = GMV.H.values[k]
-            self.RH.bulkvalues[k] = GMV.RH.values[k]
-            self.T.bulkvalues[k] = GMV.T.values[k]
-            self.B.bulkvalues[k] = 0.0
-        end
-        if self.QL.bulkvalues[k] > 1e-8 && self.Area.bulkvalues[k] > 1e-3
-            self.cloud_fraction[k] = 1.0
-        else
-            self.cloud_fraction[k] = 0.0
-        end
-    end
-
-    @inbounds for k in real_face_indices(self.grid)
-        a_bulk_bcs = (; bottom = SetValue(sum(tptke.area_surface_bc)), top = SetZeroGradient())
-        a_bulk_f = interpc2f(self.Area.bulkvalues, grid, k; a_bulk_bcs...)
-        if a_bulk_f > 1.0e-20
-            @inbounds for i in xrange(self.n_updrafts)
-                a_up_bcs = (; bottom = SetValue(tptke.area_surface_bc[i]), top = SetZeroGradient())
-                a_up_f = interpc2f(self.Area.values, grid, k, i; a_up_bcs...)
-                self.W.bulkvalues[k] += a_up_f * self.W.values[i, k] / a_bulk_f
-            end
-        else
-            self.W.bulkvalues[k] = 0.0
-        end
-    end
     return
 end
 
@@ -296,91 +237,6 @@ sum precipitation source terms for QT and H from all sub-timesteps
 function update_total_precip_sources(self::UpdraftThermodynamics)
     self.prec_source_h_tot .= up_sum(self.prec_source_h)
     self.prec_source_qt_tot .= up_sum(self.prec_source_qt)
-    return
-end
-
-function buoyancy(
-    self::UpdraftThermodynamics,
-    UpdVar::UpdraftVariables,
-    EnvVar::EnvironmentVariables,
-    GMV::GridMeanVariables,
-    extrap::Bool,
-)
-
-    grid = self.grid
-    kc_surf = kc_surface(grid)
-    param_set = parameter_set(GMV)
-
-    UpdVar.Area.bulkvalues .= up_sum(UpdVar.Area.values)
-
-    if !extrap
-        @inbounds for i in xrange(self.n_updraft)
-            @inbounds for k in real_center_indices(grid)
-                if UpdVar.Area.values[i, k] > 0.0
-                    # saturation adjustment
-                    # TODO: remove this:
-                    ts = TD.PhaseEquil_pθq(
-                        param_set,
-                        self.ref_state.p0_half[k],
-                        UpdVar.H.values[i, k],
-                        UpdVar.QT.values[i, k],
-                    )
-                    UpdVar.QL.values[i, k] = TD.liquid_specific_humidity(ts)
-                    UpdVar.T.values[i, k] = TD.air_temperature(ts)
-                    rho = TD.air_density(ts)
-                    UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
-                    UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
-                else
-                    UpdVar.B.values[i, k] = EnvVar.B.values[k]
-                    UpdVar.RH.values[i, k] = EnvVar.RH.values[k]
-                end
-            end
-        end
-    else
-        @inbounds for i in xrange(self.n_updraft)
-            @inbounds for k in real_center_indices(grid)
-                if UpdVar.Area.values[i, k] > 0.0
-                    args = (param_set, self.ref_state.p0_half[k], UpdVar.H.values[i, k], UpdVar.QT.values[i, k])
-                    ts = TD.PhaseEquil_pθq(args...)
-                    UpdVar.QL.values[i, k] = TD.liquid_specific_humidity(ts)
-                    UpdVar.T.values[i, k] = TD.air_temperature(ts)
-                    rho = TD.air_density(ts)
-                    UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
-                    # this is here just for RH
-                    ts = TD.PhaseEquil_pθq(args...)
-                    UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
-                elseif k > kc_surf
-                    if UpdVar.Area.values[i, k - 1] > 0.0
-                        qt = UpdVar.QT.values[i, k - 1]
-                        h = UpdVar.H.values[i, k - 1]
-                        ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0_half[k], h, qt)
-                        rho = TD.air_density(ts)
-                        UpdVar.B.values[i, k] = buoyancy_c(param_set, self.ref_state.rho0_half[k], rho)
-                        UpdVar.RH.values[i, k] = TD.relative_humidity(ts)
-                    else
-                        UpdVar.B.values[i, k] = EnvVar.B.values[k]
-                        UpdVar.RH.values[i, k] = EnvVar.RH.values[k]
-                    end
-                else
-                    UpdVar.B.values[i, k] = EnvVar.B.values[k]
-                    UpdVar.RH.values[i, k] = EnvVar.RH.values[k]
-                end
-            end
-        end
-    end
-
-
-    @inbounds for k in real_center_indices(self.grid)
-        GMV.B.values[k] = (1.0 - UpdVar.Area.bulkvalues[k]) * EnvVar.B.values[k]
-        @inbounds for i in xrange(self.n_updraft)
-            GMV.B.values[k] += UpdVar.Area.values[i, k] * UpdVar.B.values[i, k]
-        end
-        @inbounds for i in xrange(self.n_updraft)
-            UpdVar.B.values[i, k] -= GMV.B.values[k]
-        end
-        EnvVar.B.values[k] -= GMV.B.values[k]
-    end
-
     return
 end
 
