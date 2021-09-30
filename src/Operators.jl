@@ -548,7 +548,26 @@ end
 
 tridiag_solve(b_rhs, A) = A \ b_rhs
 
-# TODO: clean this up somehow!
+#= TODO: clean this up somehow!
+
+construct_tridiag_diffusion_en configures the tridiagonal
+matrix for solving 2nd order environment variables where
+some terms are treated implicitly. Here is a list of all
+the terms in the matrix (and the overall equation solved):
+
+    N_a terms = 1 (diffusion)
+    N_diagonal terms = 6 (unsteady+upwind_advection+2diffusion+entr_detr+dissipation)
+    N_c terms = 2 (diffusion+upwind_advection)
+
+    ∂_t ρa*tke                              ✓ unsteady
+      + ∂_z(ρaw*tke) =                      ✓ advection
+      + ρaK*(∂²_z(u)+∂²_z(v)+∂²_z(w̄))
+      + ρawΣᵢ(εᵢ(wⱼ-w₀)²-δ₀*tke)            ✓ entr_detr
+      + ∂_z(ρa₀K ∂_z(tke))                  ✓ diffusion
+      + ρa₀*w̅₀b̅₀
+      - a₀(u⋅∇p)
+      + ρa₀D                                ✓ dissipation
+=#
 function construct_tridiag_diffusion_en(
     grid::Grid,
     param_set::APS,
