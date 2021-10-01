@@ -7,7 +7,6 @@ function initialize(self::ForcingBase, GMV::GridMeanVariables, ::ForcingBaseType
     return
 end
 
-update(self::ForcingBase, GMV::GridMeanVariables) = nothing
 initialize_io(self::ForcingBase, Stats) = nothing
 io(self::ForcingBase, Stats) = nothing
 initialize(self::ForcingBase{ForcingNone}, GMV::GridMeanVariables) = initialize(self, GMV, ForcingBaseType())
