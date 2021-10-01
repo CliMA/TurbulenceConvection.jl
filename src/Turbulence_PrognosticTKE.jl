@@ -575,10 +575,7 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     microphysics(self.EnvThermo, self.EnvVar, self.Rain, TS.dt) # saturation adjustment + rain creation
     update_total_precip_sources(self.UpdThermo)
     if self.Rain.rain_model == "clima_1m"
-        # rain evaporation (all three categories are assumed to be evaporating in "grid-mean" conditions
-        solve_rain_evap(self.rainphysics, self.Rain, GMV, TS, self.Rain.QR, self.Rain.RainArea)
-        solve_rain_evap(self.rainphysics, self.Rain, GMV, TS, self.Rain.Upd_QR, self.Rain.Upd_RainArea)
-        solve_rain_evap(self.rainphysics, self.Rain, GMV, TS, self.Rain.Env_QR, self.Rain.Env_RainArea)
+        solve_rain_evap(self.rainphysics, GMV, TS, self.Rain.QR)
         # sum updraft and environment rain into bulk rain
         sum_subdomains_rain(self.Rain, self.UpdThermo, self.EnvThermo, TS)
     end
@@ -588,11 +585,7 @@ function update(self::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     # update
     solve_updraft(self, GMV, TS)
     if self.Rain.rain_model == "clima_1m"
-
-        # rain fall (all three categories are assumed to be falling though "grid-mean" conditions
-        solve_rain_fall(self.rainphysics, self.Rain, GMV, TS, self.Rain.QR, self.Rain.RainArea)
-        solve_rain_fall(self.rainphysics, self.Rain, GMV, TS, self.Rain.Upd_QR, self.Rain.Upd_RainArea)
-        solve_rain_fall(self.rainphysics, self.Rain, GMV, TS, self.Rain.Env_QR, self.Rain.Env_RainArea)
+        solve_rain_fall(self.rainphysics, GMV, TS, self.Rain.QR)
     end
     update_cloud_frac(self, GMV)
 

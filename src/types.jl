@@ -206,31 +206,13 @@ Base.@kwdef mutable struct RainVariables{PS}
     param_set::PS
     rain_model::String = "default_rain_model"
     mean_rwp::Float64 = 0
-    env_rwp::Float64 = 0
-    upd_rwp::Float64 = 0
     cutoff_rain_rate::Float64 = 0
     grid::Grid
     QR::RainVariable
-    RainArea::RainVariable
-    Upd_QR::RainVariable
-    Upd_RainArea::RainVariable
-    Env_QR::RainVariable
-    Env_RainArea::RainVariable
 end
 function RainVariables(namelist, grid::Grid, param_set::APS)
 
     QR = RainVariable(grid, "qr_mean", "kg/kg")
-    # temporary variables for diagnostics to know where the rain is coming from
-    Upd_QR = RainVariable(grid, "upd_qr", "kg/kg")
-    Env_QR = RainVariable(grid, "env_qr", "kg/kg")
-    # in the future we could test prognostic equations for stratiform and updraft rain
-    RainArea = RainVariable(grid, "rain_area", "rain_area_fraction [-]")
-    Upd_RainArea = RainVariable(grid, "upd_rain_area", "updraft_rain_area_fraction [-]")
-    Env_RainArea = RainVariable(grid, "env_rain_area", "environment_rain_area_fraction [-]")
-
-    mean_rwp = 0.0
-    upd_rwp = 0.0
-    env_rwp = 0.0
 
     rain_model = parse_namelist(
         namelist,
@@ -240,20 +222,7 @@ function RainVariables(namelist, grid::Grid, param_set::APS)
         valid_options = ["None", "cutoff", "clima_1m"],
     )
 
-    return RainVariables{typeof(param_set)}(;
-        param_set,
-        rain_model,
-        mean_rwp,
-        env_rwp,
-        upd_rwp,
-        grid,
-        QR,
-        RainArea,
-        Upd_QR,
-        Upd_RainArea,
-        Env_QR,
-        Env_RainArea,
-    )
+    return RainVariables{typeof(param_set)}(; param_set, rain_model, grid, QR)
 end
 
 struct VariablePrognostic{T}
