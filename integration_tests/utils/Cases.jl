@@ -111,7 +111,7 @@ get_surface_type(::GATE_III) = TC.SurfaceFixedCoeffs
 get_surface_type(::GABLS) = TC.SurfaceMoninObukhovDry
 get_surface_type(::SP) = TC.SurfaceSullivanPatton
 get_surface_type(::DryBubble) = TC.SurfaceNone
-get_surface_type(::LES_driven_SCM) = TC.SurfaceMoninObukhov
+get_surface_type(::LES_driven_SCM) = TC.SurfaceFixedFlux
 
 get_forcing_type(::AbstractCaseType) = TC.ForcingStandard # default
 get_forcing_type(::Soares) = TC.ForcingNone
