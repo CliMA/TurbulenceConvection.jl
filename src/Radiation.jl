@@ -10,14 +10,7 @@ update(self::RadiationBase, GMV::GridMeanVariables) = nothing
 initialize_io(self::RadiationBase, Stats::NetCDFIO_Stats) = nothing
 io(self::RadiationBase, Stats::NetCDFIO_Stats) = nothing
 
-function initialize(self::RadiationBase{RadiationNone}, GMV::GridMeanVariables)
-    initialize(self, GMV, RadiationBaseType())
-end
-
-update(self::RadiationBase{RadiationNone}, GMV::GridMeanVariables) = nothing
-initialize_io(self::RadiationBase{RadiationNone}, Stats::NetCDFIO_Stats) = nothing
-io(self::RadiationBase{RadiationNone}, Stats::NetCDFIO_Stats) = nothing
-
+initialize(self::RadiationBase{RadiationNone}, GMV::GridMeanVariables) = initialize(self, GMV, RadiationBaseType())
 
 function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariables)
     initialize(self, GMV, RadiationBaseType())
@@ -95,11 +88,7 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
     return
 end
 
-function update(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariables)
-
-    calculate_radiation(self, GMV)
-    return
-end
+update(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariables) = calculate_radiation(self, GMV)
 
 function initialize_io(self::RadiationBase{RadiationDYCOMS_RF01}, Stats::NetCDFIO_Stats)
     add_profile(Stats, "rad_dTdt")
@@ -128,7 +117,6 @@ function initialize(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables, L
     return
 end
 
-update(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables) = nothing
 function initialize_io(self::RadiationBase{RadiationLES}, Stats::NetCDFIO_Stats)
     add_profile(Stats, "rad_dTdt")
     add_profile(Stats, "rad_flux")

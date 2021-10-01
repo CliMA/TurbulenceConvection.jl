@@ -145,7 +145,7 @@ end
 TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
 TC.io(self::CasesBase, Stats::NetCDFIO_Stats) = io(self, Stats, BaseCase())
 TC.update_surface(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Sur, GMV)
-TC.update_forcing(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Fo, GMV)
+TC.update_forcing(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) = nothing
 TC.update_radiation(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Rad, GMV)
 
 #####
@@ -916,9 +916,6 @@ function TC.update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS
             end
         end
     end
-
-    update(self.Fo, GMV)
-
 end
 
 #####
@@ -1043,7 +1040,6 @@ function TC.update_forcing(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS:
         end
 
     end
-    update(self.Fo, GMV)
 end
 
 #####
