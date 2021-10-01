@@ -57,27 +57,9 @@ function io(self::GridMeanVariables, Stats::NetCDFIO_Stats)
     write_profile(Stats, "cloud_fraction_mean", self.cloud_fraction.values)
     write_ts(Stats, "cloud_cover_mean", self.cloud_cover)
 
-    mean_cloud_diagnostics(self)
     write_ts(Stats, "lwp_mean", self.lwp)
     write_ts(Stats, "cloud_base_mean", self.cloud_base)
     write_ts(Stats, "cloud_top_mean", self.cloud_top)
-    return
-end
-
-function mean_cloud_diagnostics(self)
-    self.lwp = 0.0
-    kc_toa = kc_top_of_atmos(self.grid)
-    self.cloud_base = self.grid.zc[kc_toa]
-    self.cloud_top = 0.0
-
-    @inbounds for k in real_center_indices(self.grid)
-        self.lwp += self.ref_state.rho0_half[k] * self.QL.values[k] * self.grid.Δz
-
-        if self.QL.values[k] > 1e-8
-            self.cloud_base = min(self.cloud_base, self.grid.zc[k])
-            self.cloud_top = max(self.cloud_top, self.grid.zc[k])
-        end
-    end
     return
 end
 
@@ -93,7 +75,6 @@ function satadjust(self::GridMeanVariables)
         self.T.values[k] = TD.air_temperature(ts)
         ρ = TD.air_density(ts)
         self.B.values[k] = buoyancy_c(param_set, ρ0, ρ)
-        ts = TD.PhaseEquil_pθq(param_set, p0, h, qt)
         self.RH.values[k] = TD.relative_humidity(ts)
     end
     return

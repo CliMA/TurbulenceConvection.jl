@@ -41,6 +41,20 @@ face_aux_vars_edmf(FT, n_up) = ()
 face_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., face_aux_vars_gm(FT)..., face_aux_vars_edmf(FT, n_up)...)
 
 #####
+##### Diagnostic fields
+#####
+
+# Center only
+cent_diagnostic_vars_gm(FT) = ()
+cent_diagnostic_vars_edmf(FT, n_up) = ()
+cent_diagnostic_vars(FT, n_up) = (; cent_diagnostic_vars_gm(FT)..., cent_diagnostic_vars_edmf(FT, n_up)...)
+
+# Face only
+face_diagnostic_vars_gm(FT) = ()
+face_diagnostic_vars_edmf(FT, n_up) = ()
+face_diagnostic_vars(FT, n_up) = (; face_diagnostic_vars_gm(FT)..., face_diagnostic_vars_edmf(FT, n_up)...)
+
+#####
 ##### Prognostic fields
 #####
 
@@ -85,6 +99,8 @@ function Simulation1d(namelist)
     face_state_fields = TC.FieldFromNamedTuple(TC.face_space(grid), face_prognostic_vars(FT, n_updrafts))
     aux_cent_fields = TC.FieldFromNamedTuple(TC.center_space(grid), cent_aux_vars(FT, n_updrafts))
     aux_face_fields = TC.FieldFromNamedTuple(TC.face_space(grid), face_aux_vars(FT, n_updrafts))
+    diagnostic_cent_fields = TC.FieldFromNamedTuple(TC.center_space(grid), cent_diagnostic_vars(FT, n_updrafts))
+    diagnostic_face_fields = TC.FieldFromNamedTuple(TC.face_space(grid), face_diagnostic_vars(FT, n_updrafts))
 
     parent(aux_face_fields.ref_state.p0) .= ref_state.p0
     parent(aux_face_fields.ref_state.ρ0) .= ref_state.rho0
@@ -96,9 +112,11 @@ function Simulation1d(namelist)
     state = CC.Fields.FieldVector(cent = cent_state_fields, face = face_state_fields)
     tendencies = CC.Fields.FieldVector(cent = cent_state_fields, face = face_state_fields)
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
+    diagnostics = CC.Fields.FieldVector(cent = diagnostic_cent_fields, face = diagnostic_face_fields)
     io_nt = (;
         ref_state = TC.io_dictionary_ref_state(aux),
         aux = TC.io_dictionary_aux(aux),
+        diagnostics = TC.io_dictionary_diagnostics(diagnostics),
         state = TC.io_dictionary_state(state),
         tendencies = TC.io_dictionary_tendencies(tendencies),
     )
@@ -134,7 +152,11 @@ function run(self::Simulation1d)
             progress = self.TS.t / self.TS.t_max
             @show progress
         end
+
         if mod(self.TS.t, self.Stats.frequency) == 0
+            # TODO: is this the best location to call diagnostics?
+            TC.compute_diagnostics!(self.Turb, self.GMV, self.grid, self.Case, self.ref_state, self.TS)
+
             # TODO: remove `vars` hack that avoids
             # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
             # opening/closing files every step should be okay. #removeVarsHack
@@ -142,6 +164,7 @@ function run(self::Simulation1d)
             TC.write_simulation_time(self.Stats, self.TS.t) # #removeVarsHack
 
             TC.io(self.io_nt.aux, self.Stats)
+            TC.io(self.io_nt.diagnostics, self.Stats)
             TC.io(self.io_nt.state, self.Stats)
             TC.io(self.io_nt.tendencies, self.Stats)
 
@@ -161,6 +184,7 @@ function TurbulenceConvection.initialize_io(self::Simulation1d)
     TC.io(self.io_nt.ref_state, self.Stats) # since the reference state is static
 
     TC.initialize_io(self.io_nt.aux, self.Stats)
+    TC.initialize_io(self.io_nt.diagnostics, self.Stats)
     TC.initialize_io(self.io_nt.state, self.Stats)
     TC.initialize_io(self.io_nt.tendencies, self.Stats)
 
@@ -177,6 +201,7 @@ function TurbulenceConvection.io(self::Simulation1d)
     TC.write_simulation_time(self.Stats, self.TS.t)
 
     TC.io(self.io_nt.aux, self.Stats)
+    TC.io(self.io_nt.diagnostics, self.Stats)
     TC.io(self.io_nt.state, self.Stats)
     TC.io(self.io_nt.tendencies, self.Stats)
 
