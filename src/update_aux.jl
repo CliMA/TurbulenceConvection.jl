@@ -86,17 +86,7 @@ function update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
         rho = TD.air_density(ts_en)
         en.B.values[k] = buoyancy_c(param_set, ρ0_c, rho)
 
-        # TODO: can we pass `ts_en` here instead?
-        update_cloud_dry(
-            en_thermo,
-            k,
-            en,
-            en.T.values[k],
-            en.H.values[k],
-            en.QT.values[k],
-            en.QL.values[k],
-            en.QT.values[k] - en.QL.values[k],
-        )
+        update_cloud_dry(en_thermo, k, en, ts_en)
         en.RH.values[k] = TD.relative_humidity(ts_en)
 
         #####

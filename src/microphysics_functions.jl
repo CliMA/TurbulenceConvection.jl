@@ -2,11 +2,10 @@
 It computes the tendency term to thetal because of qr transitioning between
 the working fluid and rain
 """
-function rain_source_to_thetal(param_set, p0, T, qt, ql, qi, dqr_dt::FT) where {FT}
-    L = TD.latent_heat_vapor(param_set, T)
-    ts = TD.PhaseEquil_pTq(param_set, p0, T, qt)
+function rain_source_to_thetal(ts, dqr_dt::FT) where {FT}
+    L = TD.latent_heat_vapor(ts)
     Π = TD.exner(ts)
-    return L * dqr_dt / Π / FT(CPP.cp_d(param_set))
+    return L * dqr_dt / Π / FT(CPP.cp_d(ts.param_set))
 end
 
 """
@@ -14,10 +13,7 @@ It computes the tendencies to qr and thetal due to autoconversion and accretion
 
 return: dqr_dt_rain, dthl_dt_rain
 """
-function microphysics_rain_src(param_set::APS, rain_model, qt, ql, qr, area, T, p0, ρ0, dt)
-
-    # TODO assumes no ice
-    qi = 0.0
+function microphysics_rain_src(param_set::APS, rain_model, qr, area, ρ0, dt, ts)
 
     #TODO - temporary way to handle different autoconversion rates
     tmp_clima_acnv_flag = false
@@ -36,7 +32,7 @@ function microphysics_rain_src(param_set::APS, rain_model, qt, ql, qr, area, T, 
     if area > 0.0
         if tmp_clima_acnv_flag
 
-            q = TD.PhasePartition(qt, ql, qi)
+            q = TD.PhasePartition(ts)
 
             qr_src = min(
                 q.liq / dt,
@@ -49,10 +45,9 @@ function microphysics_rain_src(param_set::APS, rain_model, qt, ql, qr, area, T, 
 
         if tmp_cutoff_acnv_flag
 
-            ts = TD.PhaseEquil_pTq(param_set, p0, T, qt)
             qsat = TD.q_vap_saturation(ts)
 
-            q = TD.PhasePartition(qt, ql, qi)
+            q = TD.PhasePartition(ts)
 
             qr_src = min(q.liq / dt, -CM0.remove_precipitation(param_set, q, qsat))
         end
@@ -62,7 +57,7 @@ function microphysics_rain_src(param_set::APS, rain_model, qt, ql, qr, area, T, 
         end
 
         # TODO add ice here
-        thl_rain_src = rain_source_to_thetal(param_set, p0, T, qt, ql, qi, qr_src)
+        thl_rain_src = rain_source_to_thetal(ts, qr_src)
 
     else
         qr_src = 0.0
