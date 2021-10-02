@@ -1,30 +1,30 @@
-function initialize(tptke, self::UpdraftVariables, GMV::GridMeanVariables)
-    kc_surf = kc_surface(self.grid)
+function initialize(edmf, up::UpdraftVariables, gm::GridMeanVariables)
+    kc_surf = kc_surface(up.grid)
 
-    self.W.values .= 0
-    self.B.values .= 0
-    @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_center_indices(self.grid)
+    up.W.values .= 0
+    up.B.values .= 0
+    @inbounds for i in xrange(up.n_updrafts)
+        @inbounds for k in real_center_indices(up.grid)
             # Simple treatment for now, revise when multiple updraft closures
             # become more well defined
-            if self.prognostic
-                self.Area.values[i, k] = 0.0 #self.updraft_fraction/self.n_updrafts
+            if up.prognostic
+                up.Area.values[i, k] = 0.0 #up.updraft_fraction/up.n_updrafts
             else
-                self.Area.values[i, k] = self.updraft_fraction / self.n_updrafts
+                up.Area.values[i, k] = up.updraft_fraction / up.n_updrafts
             end
-            self.QT.values[i, k] = GMV.QT.values[k]
-            self.QL.values[i, k] = GMV.QL.values[k]
-            self.H.values[i, k] = GMV.H.values[k]
-            self.T.values[i, k] = GMV.T.values[k]
+            up.QT.values[i, k] = gm.QT.values[k]
+            up.QL.values[i, k] = gm.QL.values[k]
+            up.H.values[i, k] = gm.H.values[k]
+            up.T.values[i, k] = gm.T.values[k]
         end
 
-        self.Area.values[i, kc_surf] = self.updraft_fraction / self.n_updrafts
+        up.Area.values[i, kc_surf] = up.updraft_fraction / up.n_updrafts
     end
     return
 end
 
-function initialize_DryBubble(tptke, self::UpdraftVariables, GMV::GridMeanVariables, ref_state::ReferenceState)
-    dz = self.grid.Δz
+function initialize_DryBubble(edmf, up::UpdraftVariables, gm::GridMeanVariables, ref_state::ReferenceState)
+    dz = up.grid.Δz
 
     # criterion 2: b>1e-4
     #! format: off
@@ -93,36 +93,36 @@ function initialize_DryBubble(tptke, self::UpdraftVariables, GMV::GridMeanVariab
         264.1574, 263.6518, 263.1461, 262.6451, 262.1476, 261.6524]
     #! format: on
 
-    Area_in = pyinterp(self.grid.zc, z_in, Area_in)
-    thetal_in = pyinterp(self.grid.zc, z_in, thetal_in)
-    T_in = pyinterp(self.grid.zc, z_in, T_in)
-    @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_face_indices(self.grid)
-            if minimum(z_in) <= self.grid.zf[k] <= maximum(z_in)
-                self.W.values[i, k] = 0.0
+    Area_in = pyinterp(up.grid.zc, z_in, Area_in)
+    thetal_in = pyinterp(up.grid.zc, z_in, thetal_in)
+    T_in = pyinterp(up.grid.zc, z_in, T_in)
+    @inbounds for i in xrange(up.n_updrafts)
+        @inbounds for k in real_face_indices(up.grid)
+            if minimum(z_in) <= up.grid.zf[k] <= maximum(z_in)
+                up.W.values[i, k] = 0.0
             end
         end
 
-        @inbounds for k in real_center_indices(self.grid)
-            if minimum(z_in) <= self.grid.zc[k] <= maximum(z_in)
-                self.Area.values[i, k] = Area_in[k] #self.updraft_fraction/self.n_updrafts
-                self.H.values[i, k] = thetal_in[k]
-                self.QT.values[i, k] = 0.0
-                self.QL.values[i, k] = 0.0
+        @inbounds for k in real_center_indices(up.grid)
+            if minimum(z_in) <= up.grid.zc[k] <= maximum(z_in)
+                up.Area.values[i, k] = Area_in[k] #up.updraft_fraction/up.n_updrafts
+                up.H.values[i, k] = thetal_in[k]
+                up.QT.values[i, k] = 0.0
+                up.QL.values[i, k] = 0.0
 
                 # for now temperature is provided as diagnostics from LES
-                self.T.values[i, k] = T_in[k]
+                up.T.values[i, k] = T_in[k]
             else
-                self.Area.values[i, k] = 0.0 #self.updraft_fraction/self.n_updrafts
-                self.H.values[i, k] = GMV.H.values[k]
-                self.T.values[i, k] = GMV.T.values[k]
+                up.Area.values[i, k] = 0.0 #up.updraft_fraction/up.n_updrafts
+                up.H.values[i, k] = gm.H.values[k]
+                up.T.values[i, k] = gm.T.values[k]
             end
         end
     end
     return
 end
 
-function initialize_io(self::UpdraftVariables, Stats::NetCDFIO_Stats)
+function initialize_io(up::UpdraftVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "updraft_area")
     add_profile(Stats, "updraft_w")
     add_profile(Stats, "updraft_qt")
@@ -141,79 +141,79 @@ function initialize_io(self::UpdraftVariables, Stats::NetCDFIO_Stats)
 end
 
 # quick utility to set "new" arrays with values in the "values" arrays
-function set_new_with_values(self::UpdraftVariables)
-    @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_face_indices(self.grid)
-            self.W.new[i, k] = self.W.values[i, k]
+function set_new_with_values(up::UpdraftVariables)
+    @inbounds for i in xrange(up.n_updrafts)
+        @inbounds for k in real_face_indices(up.grid)
+            up.W.new[i, k] = up.W.values[i, k]
         end
 
-        @inbounds for k in real_center_indices(self.grid)
-            self.Area.new[i, k] = self.Area.values[i, k]
-            self.QT.new[i, k] = self.QT.values[i, k]
-            self.H.new[i, k] = self.H.values[i, k]
+        @inbounds for k in real_center_indices(up.grid)
+            up.Area.new[i, k] = up.Area.values[i, k]
+            up.QT.new[i, k] = up.QT.values[i, k]
+            up.H.new[i, k] = up.H.values[i, k]
         end
     end
     return
 end
 
 # quick utility to set "tmp" arrays with values in the "new" arrays
-function set_values_with_new(self::UpdraftVariables)
-    @inbounds for i in xrange(self.n_updrafts)
-        @inbounds for k in real_face_indices(self.grid)
-            self.W.values[i, k] = self.W.new[i, k]
+function set_values_with_new(up::UpdraftVariables)
+    @inbounds for i in xrange(up.n_updrafts)
+        @inbounds for k in real_face_indices(up.grid)
+            up.W.values[i, k] = up.W.new[i, k]
         end
 
-        @inbounds for k in real_center_indices(self.grid)
-            self.W.values[i, k] = self.W.new[i, k]
-            self.Area.values[i, k] = self.Area.new[i, k]
-            self.QT.values[i, k] = self.QT.new[i, k]
-            self.H.values[i, k] = self.H.new[i, k]
+        @inbounds for k in real_center_indices(up.grid)
+            up.W.values[i, k] = up.W.new[i, k]
+            up.Area.values[i, k] = up.Area.new[i, k]
+            up.QT.values[i, k] = up.QT.new[i, k]
+            up.H.values[i, k] = up.H.new[i, k]
         end
     end
     return
 end
 
-function io(self::UpdraftVariables, Stats::NetCDFIO_Stats, ref_state::ReferenceState)
-    write_profile(Stats, "updraft_area", self.Area.bulkvalues)
-    write_profile(Stats, "updraft_w", self.W.bulkvalues)
-    write_profile(Stats, "updraft_qt", self.QT.bulkvalues)
-    write_profile(Stats, "updraft_ql", self.QL.bulkvalues)
-    write_profile(Stats, "updraft_RH", self.RH.bulkvalues)
-    write_profile(Stats, "updraft_thetal", self.H.bulkvalues)
-    write_profile(Stats, "updraft_temperature", self.T.bulkvalues)
-    write_profile(Stats, "updraft_buoyancy", self.B.bulkvalues)
+function io(up::UpdraftVariables, Stats::NetCDFIO_Stats, ref_state::ReferenceState)
+    write_profile(Stats, "updraft_area", up.Area.bulkvalues)
+    write_profile(Stats, "updraft_w", up.W.bulkvalues)
+    write_profile(Stats, "updraft_qt", up.QT.bulkvalues)
+    write_profile(Stats, "updraft_ql", up.QL.bulkvalues)
+    write_profile(Stats, "updraft_RH", up.RH.bulkvalues)
+    write_profile(Stats, "updraft_thetal", up.H.bulkvalues)
+    write_profile(Stats, "updraft_temperature", up.T.bulkvalues)
+    write_profile(Stats, "updraft_buoyancy", up.B.bulkvalues)
 
-    upd_cloud_diagnostics(self, ref_state)
-    write_profile(Stats, "updraft_cloud_fraction", self.cloud_fraction)
+    upd_cloud_diagnostics(up, ref_state)
+    write_profile(Stats, "updraft_cloud_fraction", up.cloud_fraction)
     # Note definition of cloud cover : each updraft is associated with a cloud cover equal to the maximum
     # area fraction of the updraft where ql > 0. Each updraft is assumed to have maximum overlap with respect to
-    # itself (i.e. no consideration of tilting due to shear) while the updraft classes are assumed to have no overlap
+    # itup (i.e. no consideration of tilting due to shear) while the updraft classes are assumed to have no overlap
     # at all. Thus total updraft cover is the sum of each updraft"s cover
-    write_ts(Stats, "updraft_cloud_cover", sum(self.cloud_cover))
-    write_ts(Stats, "updraft_cloud_base", minimum(abs.(self.cloud_base)))
-    write_ts(Stats, "updraft_cloud_top", maximum(abs.(self.cloud_top)))
-    write_ts(Stats, "updraft_lwp", self.lwp)
+    write_ts(Stats, "updraft_cloud_cover", sum(up.cloud_cover))
+    write_ts(Stats, "updraft_cloud_base", minimum(abs.(up.cloud_base)))
+    write_ts(Stats, "updraft_cloud_top", maximum(abs.(up.cloud_top)))
+    write_ts(Stats, "updraft_lwp", up.lwp)
     return
 end
 
-function upd_cloud_diagnostics(self::UpdraftVariables, ref_state::ReferenceState)
-    self.lwp = 0.0
+function upd_cloud_diagnostics(up::UpdraftVariables, ref_state::ReferenceState)
+    up.lwp = 0.0
 
-    @inbounds for i in xrange(self.n_updrafts)
-        self.cloud_base[i] = zc_toa(self.grid)
-        self.cloud_top[i] = 0.0
-        self.updraft_top[i] = 0.0
-        self.cloud_cover[i] = 0.0
+    @inbounds for i in xrange(up.n_updrafts)
+        up.cloud_base[i] = zc_toa(up.grid)
+        up.cloud_top[i] = 0.0
+        up.updraft_top[i] = 0.0
+        up.cloud_cover[i] = 0.0
 
-        @inbounds for k in real_center_indices(self.grid)
-            if self.Area.values[i, k] > 1e-3
-                self.updraft_top[i] = max(self.updraft_top[i], self.grid.zc[k])
-                self.lwp += ref_state.rho0_half[k] * self.QL.values[i, k] * self.Area.values[i, k] * self.grid.Δz
+        @inbounds for k in real_center_indices(up.grid)
+            if up.Area.values[i, k] > 1e-3
+                up.updraft_top[i] = max(up.updraft_top[i], up.grid.zc[k])
+                up.lwp += ref_state.rho0_half[k] * up.QL.values[i, k] * up.Area.values[i, k] * up.grid.Δz
 
-                if self.QL.values[i, k] > 1e-8
-                    self.cloud_base[i] = min(self.cloud_base[i], self.grid.zc[k])
-                    self.cloud_top[i] = max(self.cloud_top[i], self.grid.zc[k])
-                    self.cloud_cover[i] = max(self.cloud_cover[i], self.Area.values[i, k])
+                if up.QL.values[i, k] > 1e-8
+                    up.cloud_base[i] = min(up.cloud_base[i], up.grid.zc[k])
+                    up.cloud_top[i] = max(up.cloud_top[i], up.grid.zc[k])
+                    up.cloud_cover[i] = max(up.cloud_cover[i], up.Area.values[i, k])
                 end
             end
         end
@@ -225,31 +225,31 @@ end
 """
 clear precipitation source terms for QT and H from each updraft
 """
-function clear_precip_sources(self::UpdraftThermodynamics)
-    self.prec_source_qt .= 0
-    self.prec_source_h .= 0
+function clear_precip_sources(up::UpdraftThermodynamics)
+    up.prec_source_qt .= 0
+    up.prec_source_h .= 0
     return
 end
 
 """
 sum precipitation source terms for QT and H from all sub-timesteps
 """
-function update_total_precip_sources(self::UpdraftThermodynamics)
-    self.prec_source_h_tot .= up_sum(self.prec_source_h)
-    self.prec_source_qt_tot .= up_sum(self.prec_source_qt)
+function update_total_precip_sources(up::UpdraftThermodynamics)
+    up.prec_source_h_tot .= up_sum(up.prec_source_h)
+    up.prec_source_qt_tot .= up_sum(up.prec_source_qt)
     return
 end
 
 """
 compute precipitation source terms
 """
-function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rain::RainVariables, dt)
+function microphysics(up::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rain::RainVariables, dt)
     rst = rain_struct()
     mph = mph_struct()
     param_set = parameter_set(Rain)
 
-    @inbounds for i in xrange(self.n_updraft)
-        @inbounds for k in real_center_indices(self.grid)
+    @inbounds for i in xrange(up.n_updraft)
+        @inbounds for k in real_center_indices(up.grid)
 
             # autoconversion and accretion
             mph = microphysics_rain_src(
@@ -260,14 +260,14 @@ function microphysics(self::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rai
                 Rain.QR.values[k],
                 UpdVar.Area.values[i, k],
                 UpdVar.T.values[i, k],
-                self.ref_state.p0_half[k],
-                self.ref_state.rho0_half[k],
+                up.ref_state.p0_half[k],
+                up.ref_state.rho0_half[k],
                 dt,
             )
 
             # update rain sources of state variables
-            self.prec_source_qt[i, k] -= mph.qr_src * UpdVar.Area.values[i, k]
-            self.prec_source_h[i, k] += mph.thl_rain_src * UpdVar.Area.values[i, k]
+            up.prec_source_qt[i, k] -= mph.qr_src * UpdVar.Area.values[i, k]
+            up.prec_source_h[i, k] += mph.thl_rain_src * UpdVar.Area.values[i, k]
         end
     end
     return
