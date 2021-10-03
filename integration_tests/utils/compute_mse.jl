@@ -6,7 +6,7 @@ import JSON
 using NCDatasets
 import StatsBase
 using Dierckx
-using PrettyTables
+import PrettyTables
 using Printf
 using ArtifactWrappers
 
@@ -434,10 +434,10 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
     save_plots(plot_dir, plots_dict; group_figs, have_tc_main, fig_height, case_name)
 
     # Tabulate output
-    header = [
-        "Variable" "Weight" "Data scale" "Data scale" "MSE" "MSE" "MSE"
-        "TC.jl (EDMF)" "PyCLES" "tcc" "scm" "Computed" "Best" "Reduction (%)"
-    ]
+    header = (
+        ["Variable", "Weight", "Data scale", "Data scale", "MSE", "MSE", "MSE"],
+        ["TC.jl (EDMF)", "PyCLES", "tcc", "scm", "Computed", "Best", "Reduction (%)"],
+    )
     table_data = hcat(
         tcc_variables,
         pycles_weight,
@@ -449,16 +449,24 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
     )
 
     @info @sprintf("case_name comparison: %s at time t=%s\n", case_name, t_cmp)
-    hl_worsened_mse = Highlighter((data, i, j) -> !sufficient_mse(data[i, 5], data[i, 6]) && j == 5, crayon"red bold")
-    hl_worsened_mse_reduction =
-        Highlighter((data, i, j) -> !sufficient_mse(data[i, 5], data[i, 6]) && j == 7, crayon"red bold")
-    hl_improved_mse = Highlighter((data, i, j) -> sufficient_mse(data[i, 5], data[i, 6]) && j == 7, crayon"green bold")
-    pretty_table(
-        table_data,
+    hl_worsened_mse = PrettyTables.Highlighter(
+        (data, i, j) -> !sufficient_mse(data[i, 5], data[i, 6]) && j == 5,
+        PrettyTables.crayon"red bold",
+    )
+    hl_worsened_mse_reduction = PrettyTables.Highlighter(
+        (data, i, j) -> !sufficient_mse(data[i, 5], data[i, 6]) && j == 7,
+        PrettyTables.crayon"red bold",
+    )
+    hl_improved_mse = PrettyTables.Highlighter(
+        (data, i, j) -> sufficient_mse(data[i, 5], data[i, 6]) && j == 7,
+        PrettyTables.crayon"green bold",
+    )
+    PrettyTables.pretty_table(
+        table_data;
         header,
-        formatters = ft_printf("%.16e", 5:6),
-        header_crayon = crayon"yellow bold",
-        subheader_crayon = crayon"green bold",
+        formatters = PrettyTables.ft_printf("%.16e", 5:6),
+        header_crayon = PrettyTables.crayon"yellow bold",
+        subheader_crayon = PrettyTables.crayon"green bold",
         highlighters = (hl_worsened_mse, hl_improved_mse, hl_worsened_mse_reduction),
         crop = :none,
     )
