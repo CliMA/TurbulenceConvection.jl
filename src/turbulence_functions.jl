@@ -43,7 +43,7 @@ end
 
 # MO scaling of near surface tke and scalar variance
 
-function get_surface_tke(ustar, wstar, zLL, oblength)
+function get_surface_tke(ustar, zLL, oblength)
     if oblength < 0.0
         return ((3.75 + cbrt(zLL / oblength * zLL / oblength)) * ustar * ustar)
     else
