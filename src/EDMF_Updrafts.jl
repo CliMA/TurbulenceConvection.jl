@@ -225,47 +225,51 @@ end
 """
 clear precipitation source terms for QT and H from each updraft
 """
-function clear_precip_sources(up::UpdraftThermodynamics)
-    up.prec_source_qt .= 0
-    up.prec_source_h .= 0
+function clear_precip_sources(up_thermo::UpdraftThermodynamics)
+    up_thermo.prec_source_qt .= 0
+    up_thermo.prec_source_h .= 0
     return
 end
 
 """
 sum precipitation source terms for QT and H from all sub-timesteps
 """
-function update_total_precip_sources(up::UpdraftThermodynamics)
-    up.prec_source_h_tot .= up_sum(up.prec_source_h)
-    up.prec_source_qt_tot .= up_sum(up.prec_source_qt)
+function update_total_precip_sources(up_thermo::UpdraftThermodynamics)
+    up_thermo.prec_source_h_tot .= up_sum(up_thermo.prec_source_h)
+    up_thermo.prec_source_qt_tot .= up_sum(up_thermo.prec_source_qt)
     return
 end
 
 """
 compute precipitation source terms
 """
-function microphysics(up::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rain::RainVariables, dt)
-    param_set = parameter_set(Rain)
+function microphysics(up_thermo::UpdraftThermodynamics, up::UpdraftVariables, rain::RainVariables, dt)
+    param_set = parameter_set(rain)
+    grid = up.grid
+    ref_state = up_thermo.ref_state
+    p0_c = ref_state.p0_half
+    ρ0_c = ref_state.rho0_half
 
-    @inbounds for i in xrange(up.n_updraft)
-        @inbounds for k in real_center_indices(up.grid)
+    @inbounds for i in xrange(up.n_updrafts)
+        @inbounds for k in real_center_indices(grid)
 
             # autoconversion and accretion
             mph = microphysics_rain_src(
                 param_set,
-                Rain.rain_model,
-                UpdVar.QT.values[i, k],
-                UpdVar.QL.values[i, k],
-                Rain.QR.values[k],
-                UpdVar.Area.values[i, k],
-                UpdVar.T.values[i, k],
-                up.ref_state.p0_half[k],
-                up.ref_state.rho0_half[k],
+                rain.rain_model,
+                up.QT.values[i, k],
+                up.QL.values[i, k],
+                rain.QR.values[k],
+                up.Area.values[i, k],
+                up.T.values[i, k],
+                p0_c[k],
+                ρ0_c[k],
                 dt,
             )
 
             # update rain sources of state variables
-            up.prec_source_qt[i, k] -= mph.qr_src * UpdVar.Area.values[i, k]
-            up.prec_source_h[i, k] += mph.thl_rain_src * UpdVar.Area.values[i, k]
+            up_thermo.prec_source_qt[i, k] -= mph.qr_src * up.Area.values[i, k]
+            up_thermo.prec_source_h[i, k] += mph.thl_rain_src * up.Area.values[i, k]
         end
     end
     return

@@ -246,47 +246,51 @@ function update_cloud_frac(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     GMV.cloud_cover = min(edmf.EnvVar.cloud_cover + sum(edmf.UpdVar.cloud_cover), 1)
 end
 
-function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, Case, GMV, ref_state, TS)
-    GMV.U.tendencies .= 0
-    GMV.V.tendencies .= 0
-    GMV.QT.tendencies .= 0
-    GMV.H.tendencies .= 0
-    param_set = parameter_set(GMV)
-    rho0 = ref_state.rho0
+function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, Case, gm, ref_state, TS)
+    gm.U.tendencies .= 0
+    gm.V.tendencies .= 0
+    gm.QT.tendencies .= 0
+    gm.H.tendencies .= 0
+    param_set = parameter_set(gm)
+    ρ0_f = ref_state.rho0
+    p0_c = ref_state.p0_half
+    α0_c = ref_state.alpha0_half
     kf_surf = kf_surface(grid)
-    ae = 1 .- edmf.UpdVar.Area.bulkvalues # area of environment
+    up = edmf.UpdVar
+    en = edmf.EnvVar
+    ae = 1 .- up.Area.bulkvalues # area of environment
 
     @inbounds for k in real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], gm.H.values[k], gm.QT.values[k])
         Π = TD.exner(ts)
 
         if Case.Fo.apply_coriolis
-            GMV.U.tendencies[k] -= Case.Fo.coriolis_param * (Case.Fo.vg[k] - GMV.V.values[k])
-            GMV.V.tendencies[k] += Case.Fo.coriolis_param * (Case.Fo.ug[k] - GMV.U.values[k])
+            gm.U.tendencies[k] -= Case.Fo.coriolis_param * (Case.Fo.vg[k] - gm.V.values[k])
+            gm.V.tendencies[k] += Case.Fo.coriolis_param * (Case.Fo.ug[k] - gm.U.values[k])
         end
         if rad_type(Case.Rad) <: Union{RadiationDYCOMS_RF01, RadiationLES}
-            GMV.H.tendencies[k] += Case.Rad.dTdt[k] / Π
+            gm.H.tendencies[k] += Case.Rad.dTdt[k] / Π
         end
-        H_cut = ccut_downwind(GMV.H.values, grid, k)
-        q_tot_cut = ccut_downwind(GMV.QT.values, grid, k)
+        H_cut = ccut_downwind(gm.H.values, grid, k)
+        q_tot_cut = ccut_downwind(gm.QT.values, grid, k)
         ∇H = c∇_downwind(H_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
         ∇q_tot = c∇_downwind(q_tot_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
 
         if force_type(Case.Fo) <: ForcingDYCOMS_RF01
-            GMV.QT.tendencies[k] += Case.Fo.dqtdt[k]
+            gm.QT.tendencies[k] += Case.Fo.dqtdt[k]
             # Apply large-scale subsidence tendencies
-            GMV.H.tendencies[k] -= ∇H * Case.Fo.subsidence[k]
-            GMV.QT.tendencies[k] -= ∇q_tot * Case.Fo.subsidence[k]
+            gm.H.tendencies[k] -= ∇H * Case.Fo.subsidence[k]
+            gm.QT.tendencies[k] -= ∇q_tot * Case.Fo.subsidence[k]
         end
 
         if force_type(Case.Fo) <: ForcingStandard
             if Case.Fo.apply_subsidence
-                GMV.H.tendencies[k] -= ∇H * Case.Fo.subsidence[k]
-                GMV.QT.tendencies[k] -= ∇q_tot * Case.Fo.subsidence[k]
+                gm.H.tendencies[k] -= ∇H * Case.Fo.subsidence[k]
+                gm.QT.tendencies[k] -= ∇q_tot * Case.Fo.subsidence[k]
             end
-            GMV.H.tendencies[k] += Case.Fo.dTdt[k] / Π
-            GMV.QT.tendencies[k] += Case.Fo.dqtdt[k]
+            gm.H.tendencies[k] += Case.Fo.dTdt[k] / Π
+            gm.QT.tendencies[k] += Case.Fo.dqtdt[k]
         end
 
         if force_type(Case.Fo) <: ForcingLES
@@ -294,29 +298,29 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, Case, GMV, ref_s
             H_nudge = Case.Fo.dtdt_nudge[k] / Π
             H_fluc = Case.Fo.dtdt_fluc[k] / Π
 
-            GMV_U_nudge_k = (Case.Fo.u_nudge[k] - GMV.U.values[k]) / Case.Fo.nudge_tau
-            GMV_V_nudge_k = (Case.Fo.v_nudge[k] - GMV.V.values[k]) / Case.Fo.nudge_tau
+            gm_U_nudge_k = (Case.Fo.u_nudge[k] - gm.U.values[k]) / Case.Fo.nudge_tau
+            gm_V_nudge_k = (Case.Fo.v_nudge[k] - gm.V.values[k]) / Case.Fo.nudge_tau
             if Case.Fo.apply_subsidence
                 # Apply large-scale subsidence tendencies
-                GMV_H_subsidence_k = -∇H * Case.Fo.subsidence[k]
-                GMV_QT_subsidence_k = -∇q_tot * Case.Fo.subsidence[k]
+                gm_H_subsidence_k = -∇H * Case.Fo.subsidence[k]
+                gm_QT_subsidence_k = -∇q_tot * Case.Fo.subsidence[k]
             else
-                GMV_H_subsidence_k = 0.0
-                GMV_QT_subsidence_k = 0.0
+                gm_H_subsidence_k = 0.0
+                gm_QT_subsidence_k = 0.0
             end
 
-            GMV.H.tendencies[k] += H_horz_adv + H_nudge + H_fluc + GMV_H_subsidence_k
-            GMV.QT.tendencies[k] +=
-                Case.Fo.dqtdt_hadv[k] + Case.Fo.dqtdt_nudge[k] + GMV_QT_subsidence_k + Case.Fo.dqtdt_fluc[k]
+            gm.H.tendencies[k] += H_horz_adv + H_nudge + H_fluc + gm_H_subsidence_k
+            gm.QT.tendencies[k] +=
+                Case.Fo.dqtdt_hadv[k] + Case.Fo.dqtdt_nudge[k] + gm_QT_subsidence_k + Case.Fo.dqtdt_fluc[k]
 
-            GMV.U.tendencies[k] += GMV_U_nudge_k
-            GMV.V.tendencies[k] += GMV_V_nudge_k
+            gm.U.tendencies[k] += gm_U_nudge_k
+            gm.V.tendencies[k] += gm_V_nudge_k
         end
-        GMV.QT.tendencies[k] +=
+        gm.QT.tendencies[k] +=
             edmf.UpdThermo.prec_source_qt_tot[k] +
             edmf.EnvThermo.prec_source_qt[k] +
             edmf.rainphysics.rain_evap_source_qt[k]
-        GMV.H.tendencies[k] +=
+        gm.H.tendencies[k] +=
             edmf.UpdThermo.prec_source_h_tot[k] +
             edmf.EnvThermo.prec_source_h[k] +
             edmf.rainphysics.rain_evap_source_h[k]
@@ -325,13 +329,13 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, Case, GMV, ref_s
     edmf.massflux_h .= 0.0
     edmf.massflux_qt .= 0.0
     # Compute the mass flux and associated scalar fluxes
-    @inbounds for i in xrange(edmf.n_updrafts)
+    @inbounds for i in xrange(up.n_updrafts)
         edmf.m[i, kf_surf] = 0.0
         a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
         @inbounds for k in real_face_indices(grid)
-            a_up = interpc2f(edmf.UpdVar.Area.values, grid, k, i; a_up_bcs...)
+            a_up = interpc2f(up.Area.values, grid, k, i; a_up_bcs...)
             a_en = interpc2f(ae, grid, k; a_up_bcs...)
-            edmf.m[i, k] = rho0[k] * a_up * a_en * (edmf.UpdVar.W.values[i, k] - edmf.EnvVar.W.values[k])
+            edmf.m[i, k] = ρ0_f[k] * a_up * a_en * (up.W.values[i, k] - en.W.values[k])
         end
     end
 
@@ -341,11 +345,11 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, Case, GMV, ref_s
         # We know that, since W = 0 at z = 0, m = 0 also, and
         # therefore θ_liq_ice / q_tot values do not matter
         m_bcs = (; bottom = SetValue(0), top = SetValue(0))
-        h_en_f = interpc2f(edmf.EnvVar.H.values, grid, k; m_bcs...)
-        qt_en_f = interpc2f(edmf.EnvVar.QT.values, grid, k; m_bcs...)
-        @inbounds for i in xrange(edmf.n_updrafts)
-            h_up_f = interpc2f(edmf.UpdVar.H.values, grid, k, i; m_bcs...)
-            qt_up_f = interpc2f(edmf.UpdVar.QT.values, grid, k, i; m_bcs...)
+        h_en_f = interpc2f(en.H.values, grid, k; m_bcs...)
+        qt_en_f = interpc2f(en.QT.values, grid, k; m_bcs...)
+        @inbounds for i in xrange(up.n_updrafts)
+            h_up_f = interpc2f(up.H.values, grid, k, i; m_bcs...)
+            qt_up_f = interpc2f(up.QT.values, grid, k, i; m_bcs...)
             edmf.massflux_h[k] += edmf.m[i, k] * (h_up_f - h_en_f)
             edmf.massflux_qt[k] += edmf.m[i, k] * (qt_up_f - qt_en_f)
         end
@@ -360,14 +364,14 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, Case, GMV, ref_s
         ∇mf_tend_h = ∇f2c(mf_tend_h_dual, grid, k)
         ∇mf_tend_qt = ∇f2c(mf_tend_qt_dual, grid, k)
 
-        mf_tend_h = -∇mf_tend_h * ref_state.alpha0_half[k]
-        mf_tend_qt = -∇mf_tend_qt * ref_state.alpha0_half[k]
+        mf_tend_h = -∇mf_tend_h * α0_c[k]
+        mf_tend_qt = -∇mf_tend_qt * α0_c[k]
 
         # Prepare the output
         edmf.massflux_tendency_h[k] = mf_tend_h
         edmf.massflux_tendency_qt[k] = mf_tend_qt
-        GMV.H.tendencies[k] += mf_tend_h
-        GMV.QT.tendencies[k] += mf_tend_qt
+        gm.H.tendencies[k] += mf_tend_h
+        gm.QT.tendencies[k] += mf_tend_qt
     end
 end
 
@@ -424,7 +428,7 @@ function update_aux!(tptke, gm, grid, Case, ref_state, param_set, TS)
     kc_surf = kc_surface(grid)
     up = tptke.UpdVar
     en = tptke.EnvVar
-    EnvThermo = tptke.EnvThermo
+    en_thermo = tptke.EnvThermo
 
     up.Area.bulkvalues .= up_sum(up.Area.values)
 
@@ -494,7 +498,7 @@ function update_aux!(tptke, gm, grid, Case, ref_state, param_set, TS)
 
         # TODO: can we pass `ts_en` here instead?
         update_cloud_dry(
-            EnvThermo,
+            en_thermo,
             k,
             en,
             en.T.values[k],
@@ -514,16 +518,16 @@ function update_aux!(tptke, gm, grid, Case, ref_state, param_set, TS)
                 ts_up = TD.PhaseEquil_pθq(param_set, p0_c, up.H.values[i, k], up.QT.values[i, k])
                 up.QL.values[i, k] = TD.liquid_specific_humidity(ts_up)
                 up.T.values[i, k] = TD.air_temperature(ts_up)
-                rho = TD.air_density(ts_up)
-                up.B.values[i, k] = buoyancy_c(param_set, ρ0_c, rho)
+                ρ = TD.air_density(ts_up)
+                up.B.values[i, k] = buoyancy_c(param_set, ρ0_c, ρ)
                 up.RH.values[i, k] = TD.relative_humidity(ts_up)
             elseif k > kc_surf
                 if up.Area.values[i, k - 1] > 0.0 && tptke.extrapolate_buoyancy
                     qt = up.QT.values[i, k - 1]
                     h = up.H.values[i, k - 1]
                     ts_up = TD.PhaseEquil_pθq(param_set, p0_c, h, qt)
-                    rho = TD.air_density(ts_up)
-                    up.B.values[i, k] = buoyancy_c(param_set, ρ0_c, rho)
+                    ρ = TD.air_density(ts_up)
+                    up.B.values[i, k] = buoyancy_c(param_set, ρ0_c, ρ)
                     up.RH.values[i, k] = TD.relative_humidity(ts_up)
                 else
                     up.B.values[i, k] = en.B.values[k]
@@ -552,6 +556,8 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     grid = get_grid(edmf)
     ref_state = reference_state(edmf)
     param_set = parameter_set(edmf)
+    up_thermo = edmf.UpdThermo
+    en_thermo = edmf.EnvThermo
 
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
@@ -570,14 +576,14 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     compute_covariance_rhs(edmf, GMV, Case, TS)
     compute_diffusive_fluxes(edmf, GMV, Case, TS)
 
-    clear_precip_sources(edmf.UpdThermo)
-    microphysics(edmf.UpdThermo, edmf.UpdVar, edmf.Rain, TS.dt) # causes division error in dry bubble first time step
-    microphysics(edmf.EnvThermo, edmf.EnvVar, edmf.Rain, TS.dt) # saturation adjustment + rain creation
-    update_total_precip_sources(edmf.UpdThermo)
+    clear_precip_sources(up_thermo)
+    microphysics(up_thermo, edmf.UpdVar, edmf.Rain, TS.dt) # causes division error in dry bubble first time step
+    microphysics(en_thermo, edmf.EnvVar, edmf.Rain, TS.dt) # saturation adjustment + rain creation
+    update_total_precip_sources(up_thermo)
     if edmf.Rain.rain_model == "clima_1m"
         solve_rain_evap(edmf.rainphysics, GMV, TS, edmf.Rain.QR)
         # sum updraft and environment rain into bulk rain
-        sum_subdomains_rain(edmf.Rain, edmf.UpdThermo, edmf.EnvThermo, TS)
+        sum_subdomains_rain(edmf.Rain, up_thermo, en_thermo, TS)
     end
     # compute tendencies
     compute_gm_tendencies!(edmf, grid, Case, GMV, edmf.ref_state, TS)
@@ -695,9 +701,9 @@ function update_GMV_turbulence(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables,
     return
 end
 
-function compute_eddy_diffusivities_tke(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
+function compute_eddy_diffusivities_tke(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, Case::CasesBase)
     grid = get_grid(edmf)
-    param_set = parameter_set(GMV)
+    param_set = parameter_set(gm)
     g = CPP.grav(param_set)
     ref_state = reference_state(edmf)
     kc_surf = kc_surface(grid)
@@ -706,51 +712,57 @@ function compute_eddy_diffusivities_tke(edmf::EDMF_PrognosticTKE, GMV::GridMeanV
     c_m = CPEDMF.c_m(param_set)
     KM = diffusivity_m(edmf)
     KH = diffusivity_h(edmf)
+    en_thermo = edmf.EnvThermo
+    en = edmf.EnvVar
+    up = edmf.UpdVar
+    p0_c = ref_state.p0_half
+    ρ0_c = ref_state.rho0_half
+    α0_c = ref_state.alpha0_half
     obukhov_length = Case.Sur.obukhov_length
 
     @inbounds for k in real_center_indices(grid)
 
         # compute shear
-        U_cut = ccut(GMV.U.values, grid, k)
-        V_cut = ccut(GMV.V.values, grid, k)
-        wc_en = interpf2c(edmf.EnvVar.W.values, grid, k)
-        wc_up = interpf2c.(Ref(edmf.UpdVar.W.values), Ref(grid), k, 1:(edmf.n_updrafts))
-        w_dual = dual_faces(edmf.EnvVar.W.values, grid, k)
+        U_cut = ccut(gm.U.values, grid, k)
+        V_cut = ccut(gm.V.values, grid, k)
+        wc_en = interpf2c(en.W.values, grid, k)
+        wc_up = interpf2c.(Ref(up.W.values), Ref(grid), k, 1:(up.n_updrafts))
+        w_dual = dual_faces(en.W.values, grid, k)
 
         ∇U = c∇(U_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         ∇V = c∇(V_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         ∇w = ∇f2c(w_dual, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         Shear² = ∇U^2 + ∇V^2 + ∇w^2
 
-        QT_cut = ccut(edmf.EnvVar.QT.values, grid, k)
+        QT_cut = ccut(en.QT.values, grid, k)
         ∂qt∂z = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
-        THL_cut = ccut(edmf.EnvVar.H.values, grid, k)
+        THL_cut = ccut(en.H.values, grid, k)
         ∂θl∂z = c∇(THL_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         # buoyancy_gradients
         bg_model = Tan2018(;
-            qt_dry = edmf.EnvThermo.qt_dry[k],
-            th_dry = edmf.EnvThermo.th_dry[k],
-            t_cloudy = edmf.EnvThermo.t_cloudy[k],
-            qv_cloudy = edmf.EnvThermo.qv_cloudy[k],
-            qt_cloudy = edmf.EnvThermo.qt_cloudy[k],
-            th_cloudy = edmf.EnvThermo.th_cloudy[k],
+            qt_dry = en_thermo.qt_dry[k],
+            th_dry = en_thermo.th_dry[k],
+            t_cloudy = en_thermo.t_cloudy[k],
+            qv_cloudy = en_thermo.qv_cloudy[k],
+            qt_cloudy = en_thermo.qt_cloudy[k],
+            th_cloudy = en_thermo.th_cloudy[k],
             ∂qt∂z = ∂qt∂z,
             ∂θl∂z = ∂θl∂z,
-            p0 = ref_state.p0_half[k],
-            en_cld_frac = edmf.EnvVar.cloud_fraction.values[k],
-            alpha0 = ref_state.alpha0_half[k],
+            p0 = p0_c[k],
+            en_cld_frac = en.cloud_fraction.values[k],
+            alpha0 = α0_c[k],
         )
         bg = buoyancy_gradients(param_set, bg_model)
 
         # Limiting stratification scale (Deardorff, 1976)
-        p0_cut = ccut(ref_state.p0_half, grid, k)
-        T_cut = ccut(edmf.EnvVar.T.values, grid, k)
-        QT_cut = ccut(edmf.EnvVar.QT.values, grid, k)
-        QL_cut = ccut(edmf.EnvVar.QL.values, grid, k)
+        p0_cut = ccut(p0_c, grid, k)
+        T_cut = ccut(en.T.values, grid, k)
+        QT_cut = ccut(en.QT.values, grid, k)
+        QL_cut = ccut(en.QL.values, grid, k)
         ts_cut = TD.PhaseEquil_pTq.(param_set, p0_cut, T_cut, QT_cut)
         thv_cut = TD.virtual_pottemp.(ts_cut)
 
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], edmf.EnvVar.H.values[k], edmf.EnvVar.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], en.H.values[k], en.QT.values[k])
         θv = TD.virtual_pottemp(ts)
         ∂θv∂z = c∇(thv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
         # compute ∇Ri and Pr
@@ -760,10 +772,10 @@ function compute_eddy_diffusivities_tke(edmf::EDMF_PrognosticTKE, GMV::GridMeanV
         ml_model = MinDisspLen(;
             z = grid.zc[k].z,
             obukhov_length = obukhov_length,
-            tke_surf = edmf.EnvVar.TKE.values[kc_surf],
+            tke_surf = en.TKE.values[kc_surf],
             ustar = Case.Sur.ustar,
             Pr = edmf.prandtl_nvec[k],
-            p0 = ref_state.p0_half[k],
+            p0 = p0_c[k],
             ∂b∂z_θl = bg.∂b∂z_θl,
             Shear² = Shear²,
             ∂b∂z_qt = bg.∂b∂z_qt,
@@ -771,19 +783,19 @@ function compute_eddy_diffusivities_tke(edmf::EDMF_PrognosticTKE, GMV::GridMeanV
             ∂qt∂z = ∂qt∂z,
             ∂θl∂z = ∂θl∂z,
             θv = θv,
-            tke = edmf.EnvVar.TKE.values[k],
-            a_en = (1 - edmf.UpdVar.Area.bulkvalues[k]),
+            tke = en.TKE.values[k],
+            a_en = (1 - up.Area.bulkvalues[k]),
             wc_en = wc_en,
             wc_up = Tuple(wc_up),
-            a_up = Tuple(edmf.UpdVar.Area.values[:, k]),
+            a_up = Tuple(up.Area.values[:, k]),
             ε_turb = Tuple(edmf.frac_turb_entr[:, k]),
             δ_dyn = Tuple(edmf.detr_sc[:, k]),
-            en_cld_frac = edmf.EnvVar.cloud_fraction.values[k],
-            θ_li_en = edmf.EnvVar.H.values[k],
-            ql_en = edmf.EnvVar.QL.values[k],
-            qt_en = edmf.EnvVar.QT.values[k],
-            T_en = edmf.EnvVar.T.values[k],
-            N_up = edmf.n_updrafts,
+            en_cld_frac = en.cloud_fraction.values[k],
+            θ_li_en = en.H.values[k],
+            ql_en = en.QL.values[k],
+            qt_en = en.QT.values[k],
+            T_en = en.T.values[k],
+            N_up = up.n_updrafts,
         )
 
         ml = mixing_length(param_set, ml_model)
@@ -791,10 +803,10 @@ function compute_eddy_diffusivities_tke(edmf::EDMF_PrognosticTKE, GMV::GridMeanV
         edmf.mixing_length[k] = ml.mixing_length
         edmf.ml_ratio[k] = ml.ml_ratio
 
-        KM.values[k] = c_m * edmf.mixing_length[k] * sqrt(max(edmf.EnvVar.TKE.values[k], 0.0))
+        KM.values[k] = c_m * edmf.mixing_length[k] * sqrt(max(en.TKE.values[k], 0.0))
         KH.values[k] = KM.values[k] / edmf.prandtl_nvec[k]
 
-        edmf.EnvVar.TKE.buoy[k] = -ml_model.a_en * ref_state.rho0_half[k] * KH.values[k] * (bg.∂b∂z_θl + bg.∂b∂z_qt)
+        en.TKE.buoy[k] = -ml_model.a_en * ρ0_c[k] * KH.values[k] * (bg.∂b∂z_θl + bg.∂b∂z_qt)
     end
     return
 end
@@ -1640,23 +1652,24 @@ end
 
 
 # Update the diagnosis of the inversion height, using the maximum temperature gradient method
-function update_inversion(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, option)
+function update_inversion(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, option)
     grid = edmf.grid
-    theta_rho = center_field(grid)
+    θ_ρ = center_field(grid)
     ∇θ_liq_max = 0.0
     kc_surf = kc_surface(grid)
-    param_set = parameter_set(GMV)
+    param_set = parameter_set(gm)
+    ref_state = edmf.ref_state
 
     @inbounds for k in real_center_indices(grid)
-        qv = GMV.QT.values[k] - GMV.QL.values[k]
-        ts = TD.PhaseEquil_pθq(param_set, edmf.ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
-        theta_rho[k] = TD.virtual_pottemp(ts)
+        qv = gm.QT.values[k] - gm.QL.values[k]
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], gm.H.values[k], gm.QT.values[k])
+        θ_ρ[k] = TD.virtual_pottemp(ts)
     end
 
 
     if option == "theta_rho"
         @inbounds for k in real_center_indices(grid)
-            if theta_rho[k] > theta_rho[kc_surf]
+            if θ_ρ[k] > θ_ρ[kc_surf]
                 edmf.zi = grid.zc[k]
                 break
             end
@@ -1664,7 +1677,7 @@ function update_inversion(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
     elseif option == "thetal_maxgrad"
 
         @inbounds for k in real_center_indices(grid)
-            ∇θ_liq_cut = ccut_downwind(GMV.H.values, grid, k)
+            ∇θ_liq_cut = ccut_downwind(gm.H.values, grid, k)
             ∇θ_liq = c∇_downwind(∇θ_liq_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
             if ∇θ_liq > ∇θ_liq_max
                 ∇θ_liq_max = ∇θ_liq
@@ -1672,7 +1685,7 @@ function update_inversion(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, opti
             end
         end
     elseif option == "critical_Ri"
-        edmf.zi = get_inversion(param_set, theta_rho, GMV.U.values, GMV.V.values, grid, Ri_bulk_crit(edmf))
+        edmf.zi = get_inversion(param_set, θ_ρ, gm.U.values, gm.V.values, grid, Ri_bulk_crit(edmf))
 
     else
         error("INVERSION HEIGHT OPTION NOT RECOGNIZED")
