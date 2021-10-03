@@ -802,8 +802,6 @@ end
 function set_updraft_surface_bc(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
     grid = get_grid(edmf)
     kc_surf = kc_surface(grid)
-    update_inversion(edmf, GMV, Case.inversion_option)
-    edmf.wstar = get_wstar(Case.Sur.bflux, edmf.zi)
 
     Δzi = grid.Δzi
     zLL = grid.zc[kc_surf]
@@ -850,7 +848,7 @@ function reset_surface_covariance(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     up = edmf.UpdVar
     en = edmf.EnvVar
 
-    en.TKE.values[kc_surf] = get_surface_tke(Case.Sur.ustar, edmf.wstar, grid.zc[kc_surf], Case.Sur.obukhov_length)
+    en.TKE.values[kc_surf] = get_surface_tke(Case.Sur.ustar, grid.zc[kc_surf], Case.Sur.obukhov_length)
     get_GMV_CoVar(edmf, up.Area, up.W, up.W, en.W, en.W, en.TKE, gm.W.values, gm.W.values, gm.TKE.values)
 
     en.Hvar.values[kc_surf] = get_surface_variance(flux1 * alpha0LL, flux1 * alpha0LL, ustar, zLL, oblength)
