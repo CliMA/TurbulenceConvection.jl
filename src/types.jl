@@ -1,9 +1,9 @@
-Base.@kwdef mutable struct rain_struct
+Base.@kwdef struct rain_struct
     qr::Float64 = 0
     ar::Float64 = 0
 end
 
-Base.@kwdef mutable struct mph_struct
+Base.@kwdef struct mph_struct
     thl_rain_src::Float64 = 0
     qr_src::Float64 = 0
 end
