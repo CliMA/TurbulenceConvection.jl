@@ -435,41 +435,7 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
     set_updraft_surface_bc(edmf, gm, Case)
 
-    #####
-    ##### diagnose_GMV_moments
-    #####
-    get_GMV_CoVar(edmf, up.Area, up.H, up.H, en.H, en.H, en.Hvar, gm.H.values, gm.H.values, gm.Hvar.values)
-    get_GMV_CoVar(edmf, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar, gm.QT.values, gm.QT.values, gm.QTvar.values)
-    get_GMV_CoVar(edmf, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov, gm.H.values, gm.QT.values, gm.HQTcov.values)
-    GMV_third_m(edmf, gm.H_third_m, en.Hvar, en.H, up.H)
-    GMV_third_m(edmf, gm.QT_third_m, en.QTvar, en.QT, up.QT)
-    GMV_third_m(edmf, gm.W_third_m, en.TKE, en.W, up.W)
-
     update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
-    update_GMV_diagnostics(edmf, gm)
-    compute_pressure_plume_spacing(edmf)
-    compute_updraft_closures(edmf, gm, Case)
-    compute_eddy_diffusivities_tke(edmf, gm, Case)
-    #####
-    ##### compute_covariance_rhs
-    #####
-    compute_covariance_entr(edmf, en.TKE, up.W, up.W, en.W, en.W, gm.W, gm.W)
-    compute_covariance_shear(edmf, gm, en.TKE, en.W.values, en.W.values)
-    compute_covariance_interdomain_src(edmf, up.Area, up.W, up.W, en.W, en.W, en.TKE)
-    compute_tke_pressure(edmf)
-    compute_covariance_entr(edmf, en.Hvar, up.H, up.H, en.H, en.H, gm.H, gm.H)
-    compute_covariance_entr(edmf, en.QTvar, up.QT, up.QT, en.QT, en.QT, gm.QT, gm.QT)
-    compute_covariance_entr(edmf, en.HQTcov, up.H, up.QT, en.H, en.QT, gm.H, gm.QT)
-    compute_covariance_shear(edmf, gm, en.Hvar, en.H.values, en.H.values)
-    compute_covariance_shear(edmf, gm, en.QTvar, en.QT.values, en.QT.values)
-    compute_covariance_shear(edmf, gm, en.HQTcov, en.H.values, en.QT.values)
-    compute_covariance_interdomain_src(edmf, up.Area, up.H, up.H, en.H, en.H, en.Hvar)
-    compute_covariance_interdomain_src(edmf, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar)
-    compute_covariance_interdomain_src(edmf, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov)
-    compute_covariance_rain(edmf, TS) # need to update this one
-    reset_surface_covariance(edmf, gm, Case)
-
-    compute_diffusive_fluxes(edmf, gm, Case, TS)
 
     clear_precip_sources(up_thermo)
     microphysics(up_thermo, edmf.UpdVar, edmf.Rain, TS.dt) # causes division error in dry bubble first time step
@@ -703,7 +669,7 @@ function compute_eddy_diffusivities_tke(edmf::EDMF_PrognosticTKE, gm::GridMeanVa
     return
 end
 
-function set_updraft_surface_bc(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
+function set_updraft_surface_bc(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, Case::CasesBase)
     grid = get_grid(edmf)
     kc_surf = kc_surface(grid)
 
@@ -731,8 +697,8 @@ function set_updraft_surface_bc(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables
         surface_scalar_coeff = percentile_bounds_mean_norm(1.0 - a_total + i * a_, 1.0 - a_total + (i + 1) * a_, 1000)
         edmf.area_surface_bc[i] = a_
         edmf.w_surface_bc[i] = 0.0
-        edmf.h_surface_bc[i] = (GMV.H.values[kc_surf] + surface_scalar_coeff * sqrt(h_var))
-        edmf.qt_surface_bc[i] = (GMV.QT.values[kc_surf] + surface_scalar_coeff * sqrt(qt_var))
+        edmf.h_surface_bc[i] = (gm.H.values[kc_surf] + surface_scalar_coeff * sqrt(h_var))
+        edmf.qt_surface_bc[i] = (gm.QT.values[kc_surf] + surface_scalar_coeff * sqrt(qt_var))
     end
     return
 end

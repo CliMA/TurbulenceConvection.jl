@@ -1,14 +1,15 @@
 function update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
+    kc_surf = kc_surface(grid)
+    up = edmf.UpdVar
+    en = edmf.EnvVar
+    en_thermo = edmf.EnvThermo
+
     #####
     ##### decompose_environment
     #####
     # Find values of environmental variables by subtracting updraft values from grid mean values
     # whichvals used to check which substep we are on--correspondingly use "GMV.SomeVar.value" (last timestep value)
     # first make sure the "bulkvalues" of the updraft variables are updated
-    kc_surf = kc_surface(grid)
-    up = edmf.UpdVar
-    en = edmf.EnvVar
-    en_thermo = edmf.EnvThermo
 
     up.Area.bulkvalues .= up_sum(up.Area.values)
 
@@ -143,4 +144,37 @@ function update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
         gm.B.values[k] = (a_up_bulk[k] * up.B.bulkvalues[k] + (1 - a_up_bulk[k]) * en.B.values[k])
     end
 
+    #####
+    ##### diagnose_GMV_moments
+    #####
+    get_GMV_CoVar(edmf, up.Area, up.H, up.H, en.H, en.H, en.Hvar, gm.H.values, gm.H.values, gm.Hvar.values)
+    get_GMV_CoVar(edmf, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar, gm.QT.values, gm.QT.values, gm.QTvar.values)
+    get_GMV_CoVar(edmf, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov, gm.H.values, gm.QT.values, gm.HQTcov.values)
+    GMV_third_m(edmf, gm.H_third_m, en.Hvar, en.H, up.H)
+    GMV_third_m(edmf, gm.QT_third_m, en.QTvar, en.QT, up.QT)
+    GMV_third_m(edmf, gm.W_third_m, en.TKE, en.W, up.W)
+    compute_pressure_plume_spacing(edmf)
+    compute_updraft_closures(edmf, gm, Case)
+    compute_eddy_diffusivities_tke(edmf, gm, Case)
+
+    #####
+    ##### compute_covariance_rhs
+    #####
+    compute_covariance_entr(edmf, en.TKE, up.W, up.W, en.W, en.W, gm.W, gm.W)
+    compute_covariance_shear(edmf, gm, en.TKE, en.W.values, en.W.values)
+    compute_covariance_interdomain_src(edmf, up.Area, up.W, up.W, en.W, en.W, en.TKE)
+    compute_tke_pressure(edmf)
+    compute_covariance_entr(edmf, en.Hvar, up.H, up.H, en.H, en.H, gm.H, gm.H)
+    compute_covariance_entr(edmf, en.QTvar, up.QT, up.QT, en.QT, en.QT, gm.QT, gm.QT)
+    compute_covariance_entr(edmf, en.HQTcov, up.H, up.QT, en.H, en.QT, gm.H, gm.QT)
+    compute_covariance_shear(edmf, gm, en.Hvar, en.H.values, en.H.values)
+    compute_covariance_shear(edmf, gm, en.QTvar, en.QT.values, en.QT.values)
+    compute_covariance_shear(edmf, gm, en.HQTcov, en.H.values, en.QT.values)
+    compute_covariance_interdomain_src(edmf, up.Area, up.H, up.H, en.H, en.H, en.Hvar)
+    compute_covariance_interdomain_src(edmf, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar)
+    compute_covariance_interdomain_src(edmf, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov)
+    compute_covariance_rain(edmf, TS) # need to update this one
+    reset_surface_covariance(edmf, gm, Case)
+
+    compute_diffusive_fluxes(edmf, gm, Case, TS)
 end
