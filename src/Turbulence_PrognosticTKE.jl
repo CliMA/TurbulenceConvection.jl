@@ -2,22 +2,22 @@
 function initialize(
     edmf::EDMF_PrognosticTKE,
     Case::CasesBase,
-    GMV::GridMeanVariables,
+    gm::GridMeanVariables,
     ref_state::ReferenceState,
     TS::TimeStepping,
 )
     if Case.casename == "DryBubble"
-        initialize_DryBubble(edmf, edmf.UpdVar, GMV, ref_state)
+        initialize_DryBubble(edmf, edmf.UpdVar, gm, ref_state)
     else
-        initialize(edmf, edmf.UpdVar, GMV)
+        initialize(edmf, edmf.UpdVar, gm)
     end
     param_set = parameter_set(edmf)
     grid = get_grid(edmf)
-    update_aux!(edmf, GMV, grid, Case, ref_state, param_set, TS)
-    update_inversion(edmf, GMV, Case.inversion_option)
+    update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
+    update_inversion(edmf, gm, Case.inversion_option)
     edmf.wstar = get_wstar(Case.Sur.bflux, edmf.zi)
     microphysics(edmf.EnvThermo, edmf.EnvVar, edmf.Rain, TS.dt)
-    initialize_covariance(edmf, GMV, Case)
+    initialize_covariance(edmf, gm, Case)
     return
 end
 
@@ -418,141 +418,12 @@ function compute_diffusive_fluxes(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariabl
     return
 end
 
-function update_aux!(tptke, gm, grid, Case, ref_state, param_set, TS)
-    #####
-    ##### decompose_environment
-    #####
-    # Find values of environmental variables by subtracting updraft values from grid mean values
-    # whichvals used to check which substep we are on--correspondingly use "GMV.SomeVar.value" (last timestep value)
-    # first make sure the "bulkvalues" of the updraft variables are updated
-    kc_surf = kc_surface(grid)
-    up = tptke.UpdVar
-    en = tptke.EnvVar
-    en_thermo = tptke.EnvThermo
-
-    up.Area.bulkvalues .= up_sum(up.Area.values)
-
-    @inbounds for k in real_face_indices(grid)
-        up.W.bulkvalues[k] = 0
-        a_bulk_bcs = (; bottom = SetValue(sum(tptke.area_surface_bc)), top = SetZeroGradient())
-        a_bulk_f = interpc2f(up.Area.bulkvalues, grid, k; a_bulk_bcs...)
-        if a_bulk_f > 1.0e-20
-            @inbounds for i in xrange(up.n_updrafts)
-                a_up_bcs = (; bottom = SetValue(tptke.area_surface_bc[i]), top = SetZeroGradient())
-                a_up_f = interpc2f(up.Area.values, grid, k, i; a_up_bcs...)
-                up.W.bulkvalues[k] += a_up_f * up.W.values[i, k] / a_bulk_f
-            end
-        end
-        # Assuming gm.W = 0!
-        en.W.values[k] = -a_bulk_f / (1 - a_bulk_f) * up.W.bulkvalues[k]
-    end
-
-    @inbounds for k in real_center_indices(grid)
-        ρ0_c = ref_state.rho0_half[k]
-        p0_c = ref_state.p0_half[k]
-        a_bulk_c = up.Area.bulkvalues[k]
-        up.QT.bulkvalues[k] = 0
-        up.QL.bulkvalues[k] = 0
-        up.H.bulkvalues[k] = 0
-        up.T.bulkvalues[k] = 0
-        up.B.bulkvalues[k] = 0
-        up.RH.bulkvalues[k] = 0
-        if a_bulk_c > 1.0e-20
-            @inbounds for i in xrange(up.n_updrafts)
-                up.QT.bulkvalues[k] += up.Area.values[i, k] * up.QT.values[i, k] / a_bulk_c
-                up.QL.bulkvalues[k] += up.Area.values[i, k] * up.QL.values[i, k] / a_bulk_c
-                up.H.bulkvalues[k] += up.Area.values[i, k] * up.H.values[i, k] / a_bulk_c
-                up.T.bulkvalues[k] += up.Area.values[i, k] * up.T.values[i, k] / a_bulk_c
-                up.RH.bulkvalues[k] += up.Area.values[i, k] * up.RH.values[i, k] / a_bulk_c
-                up.B.bulkvalues[k] += up.Area.values[i, k] * up.B.values[i, k] / a_bulk_c
-            end
-        else
-            up.QT.bulkvalues[k] = gm.QT.values[k]
-            up.H.bulkvalues[k] = gm.H.values[k]
-            up.RH.bulkvalues[k] = gm.RH.values[k]
-            up.T.bulkvalues[k] = gm.T.values[k]
-        end
-        if up.QL.bulkvalues[k] > 1e-8 && a_bulk_c > 1e-3
-            up.cloud_fraction[k] = 1.0
-        else
-            up.cloud_fraction[k] = 0.0
-        end
-
-        val1 = 1 / (1 - a_bulk_c)
-        val2 = a_bulk_c * val1
-
-        en.Area.values[k] = 1 - a_bulk_c
-        en.QT.values[k] = max(val1 * gm.QT.values[k] - val2 * up.QT.bulkvalues[k], 0) #Yair - this is here to prevent negative QT
-        en.H.values[k] = val1 * gm.H.values[k] - val2 * up.H.bulkvalues[k]
-
-        #####
-        ##### saturation_adjustment
-        #####
-
-        ts_en = TD.PhaseEquil_pθq(param_set, p0_c, en.H.values[k], en.QT.values[k])
-
-        en.T.values[k] = TD.air_temperature(ts_en)
-        en.QL.values[k] = TD.liquid_specific_humidity(ts_en)
-        rho = TD.air_density(ts_en)
-        en.B.values[k] = buoyancy_c(param_set, ρ0_c, rho)
-
-        # TODO: can we pass `ts_en` here instead?
-        update_cloud_dry(
-            en_thermo,
-            k,
-            en,
-            en.T.values[k],
-            en.H.values[k],
-            en.QT.values[k],
-            en.QL.values[k],
-            en.QT.values[k] - en.QL.values[k],
-        )
-        en.RH.values[k] = TD.relative_humidity(ts_en)
-
-        #####
-        ##### buoyancy
-        #####
-
-        @inbounds for i in xrange(up.n_updrafts)
-            if up.Area.values[i, k] > 0.0
-                ts_up = TD.PhaseEquil_pθq(param_set, p0_c, up.H.values[i, k], up.QT.values[i, k])
-                up.QL.values[i, k] = TD.liquid_specific_humidity(ts_up)
-                up.T.values[i, k] = TD.air_temperature(ts_up)
-                ρ = TD.air_density(ts_up)
-                up.B.values[i, k] = buoyancy_c(param_set, ρ0_c, ρ)
-                up.RH.values[i, k] = TD.relative_humidity(ts_up)
-            elseif k > kc_surf
-                if up.Area.values[i, k - 1] > 0.0 && tptke.extrapolate_buoyancy
-                    qt = up.QT.values[i, k - 1]
-                    h = up.H.values[i, k - 1]
-                    ts_up = TD.PhaseEquil_pθq(param_set, p0_c, h, qt)
-                    ρ = TD.air_density(ts_up)
-                    up.B.values[i, k] = buoyancy_c(param_set, ρ0_c, ρ)
-                    up.RH.values[i, k] = TD.relative_humidity(ts_up)
-                else
-                    up.B.values[i, k] = en.B.values[k]
-                    up.RH.values[i, k] = en.RH.values[k]
-                end
-            else
-                up.B.values[i, k] = en.B.values[k]
-                up.RH.values[i, k] = en.RH.values[k]
-            end
-        end
-
-        gm.B.values[k] = (1.0 - up.Area.bulkvalues[k]) * en.B.values[k]
-        @inbounds for i in xrange(up.n_updrafts)
-            gm.B.values[k] += up.Area.values[i, k] * up.B.values[i, k]
-        end
-        @inbounds for i in xrange(up.n_updrafts)
-            up.B.values[i, k] -= gm.B.values[k]
-        end
-        en.B.values[k] -= gm.B.values[k]
-    end
-end
-
 # Perform the update of the scheme
 function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
 
+    gm = GMV
+    up = edmf.UpdVar
+    en = edmf.EnvVar
     grid = get_grid(edmf)
     ref_state = reference_state(edmf)
     param_set = parameter_set(edmf)
@@ -562,38 +433,65 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
-    set_updraft_surface_bc(edmf, GMV, Case)
-    diagnose_GMV_moments(edmf, GMV, Case, TS)
+    set_updraft_surface_bc(edmf, gm, Case)
 
-    update_aux!(edmf, GMV, grid, Case, ref_state, param_set, TS)
-    update_surface(Case, GMV, TS)
-    update_forcing(Case, GMV, TS)
-    update_radiation(Case, GMV, TS)
-    update_GMV_diagnostics(edmf, GMV)
-    compute_pressure_plume_spacing(edmf, GMV, Case)
-    compute_updraft_closures(edmf, GMV, Case)
-    compute_eddy_diffusivities_tke(edmf, GMV, Case)
-    compute_covariance_rhs(edmf, GMV, Case, TS)
-    compute_diffusive_fluxes(edmf, GMV, Case, TS)
+    #####
+    ##### diagnose_GMV_moments
+    #####
+    get_GMV_CoVar(edmf, up.Area, up.H, up.H, en.H, en.H, en.Hvar, gm.H.values, gm.H.values, gm.Hvar.values)
+    get_GMV_CoVar(edmf, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar, gm.QT.values, gm.QT.values, gm.QTvar.values)
+    get_GMV_CoVar(edmf, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov, gm.H.values, gm.QT.values, gm.HQTcov.values)
+    GMV_third_m(edmf, gm.H_third_m, en.Hvar, en.H, up.H)
+    GMV_third_m(edmf, gm.QT_third_m, en.QTvar, en.QT, up.QT)
+    GMV_third_m(edmf, gm.W_third_m, en.TKE, en.W, up.W)
+
+    update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
+    update_surface(Case, gm, TS)
+    update_forcing(Case, gm, TS)
+    update_radiation(Case, gm, TS)
+    update_GMV_diagnostics(edmf, gm)
+    compute_pressure_plume_spacing(edmf)
+    compute_updraft_closures(edmf, gm, Case)
+    compute_eddy_diffusivities_tke(edmf, gm, Case)
+    #####
+    ##### compute_covariance_rhs
+    #####
+    compute_covariance_entr(edmf, en.TKE, up.W, up.W, en.W, en.W, gm.W, gm.W)
+    compute_covariance_shear(edmf, gm, en.TKE, en.W.values, en.W.values)
+    compute_covariance_interdomain_src(edmf, up.Area, up.W, up.W, en.W, en.W, en.TKE)
+    compute_tke_pressure(edmf)
+    compute_covariance_entr(edmf, en.Hvar, up.H, up.H, en.H, en.H, gm.H, gm.H)
+    compute_covariance_entr(edmf, en.QTvar, up.QT, up.QT, en.QT, en.QT, gm.QT, gm.QT)
+    compute_covariance_entr(edmf, en.HQTcov, up.H, up.QT, en.H, en.QT, gm.H, gm.QT)
+    compute_covariance_shear(edmf, gm, en.Hvar, en.H.values, en.H.values)
+    compute_covariance_shear(edmf, gm, en.QTvar, en.QT.values, en.QT.values)
+    compute_covariance_shear(edmf, gm, en.HQTcov, en.H.values, en.QT.values)
+    compute_covariance_interdomain_src(edmf, up.Area, up.H, up.H, en.H, en.H, en.Hvar)
+    compute_covariance_interdomain_src(edmf, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar)
+    compute_covariance_interdomain_src(edmf, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov)
+    compute_covariance_rain(edmf, TS) # need to update this one
+    reset_surface_covariance(edmf, gm, Case)
+
+    compute_diffusive_fluxes(edmf, gm, Case, TS)
 
     clear_precip_sources(up_thermo)
     microphysics(up_thermo, edmf.UpdVar, edmf.Rain, TS.dt) # causes division error in dry bubble first time step
     microphysics(en_thermo, edmf.EnvVar, edmf.Rain, TS.dt) # saturation adjustment + rain creation
     update_total_precip_sources(up_thermo)
     if edmf.Rain.rain_model == "clima_1m"
-        solve_rain_evap(edmf.rainphysics, GMV, TS, edmf.Rain.QR)
+        solve_rain_evap(edmf.rainphysics, gm, TS, edmf.Rain.QR)
         # sum updraft and environment rain into bulk rain
         sum_subdomains_rain(edmf.Rain, up_thermo, en_thermo, TS)
     end
     # compute tendencies
-    compute_gm_tendencies!(edmf, grid, Case, GMV, edmf.ref_state, TS)
+    compute_gm_tendencies!(edmf, grid, Case, gm, edmf.ref_state, TS)
 
     # update
-    solve_updraft(edmf, GMV, TS)
+    solve_updraft(edmf, gm, TS)
     if edmf.Rain.rain_model == "clima_1m"
-        solve_rain_fall(edmf.rainphysics, GMV, TS, edmf.Rain.QR)
+        solve_rain_fall(edmf.rainphysics, gm, TS, edmf.Rain.QR)
     end
-    update_cloud_frac(edmf, GMV)
+    update_cloud_frac(edmf, gm)
 
     # ----------- TODO: move to compute_tendencies
     implicit_eqs = edmf.implicit_eqs
@@ -614,9 +512,6 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
         end
     end
 
-    gm = GMV
-    up = edmf.UpdVar
-    en = edmf.EnvVar
     KM = diffusivity_m(edmf).values
     KH = diffusivity_h(edmf).values
     common_args = (
@@ -930,46 +825,50 @@ function get_GMV_CoVar(
     return
 end
 
-function compute_updraft_closures(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
+function compute_updraft_closures(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, Case::CasesBase)
     grid = get_grid(edmf)
     FT = eltype(grid)
     param_set = parameter_set(edmf)
     ref_state = reference_state(edmf)
+    kc_surf = kc_surface(grid)
+    kc_toa = kc_top_of_atmos(grid)
+    up = edmf.UpdVar
+    en = edmf.EnvVar
 
-    upd_cloud_diagnostics(edmf.UpdVar, ref_state)
+    upd_cloud_diagnostics(up, ref_state)
 
     @inbounds for k in real_center_indices(grid)
-        @inbounds for i in xrange(edmf.n_updrafts)
+        @inbounds for i in xrange(up.n_updrafts)
             # entrainment
-            if edmf.UpdVar.Area.values[i, k] > 0.0
+            if up.Area.values[i, k] > 0.0
                 # compute ∇m at cell centers
-                a_up_c = edmf.UpdVar.Area.values[i, k]
-                w_up_c = interpf2c(edmf.UpdVar.W.values, grid, k, i)
-                w_gm_c = interpf2c(GMV.W.values, grid, k)
+                a_up_c = up.Area.values[i, k]
+                w_up_c = interpf2c(up.W.values, grid, k, i)
+                w_gm_c = interpf2c(gm.W.values, grid, k)
                 m = a_up_c * (w_up_c - w_gm_c)
-                a_up_cut = ccut_upwind(edmf.UpdVar.Area.values, grid, k, i)
-                w_up_cut = daul_f2c_upwind(edmf.UpdVar.W.values, grid, k, i)
-                w_gm_cut = daul_f2c_upwind(GMV.W.values, grid, k)
+                a_up_cut = ccut_upwind(up.Area.values, grid, k, i)
+                w_up_cut = daul_f2c_upwind(up.W.values, grid, k, i)
+                w_gm_cut = daul_f2c_upwind(gm.W.values, grid, k)
                 m_cut = a_up_cut .* (w_up_cut .- w_gm_cut)
                 ∇m = FT(c∇_upwind(m_cut, grid, k; bottom = SetValue(0), top = FreeBoundary()))
 
                 w_min = 0.001
 
                 εδ_model = MoistureDeficitEntr(;
-                    q_liq_up = edmf.UpdVar.QL.values[i, k],
-                    q_liq_en = edmf.EnvVar.QL.values[k],
-                    w_up = interpf2c(edmf.UpdVar.W.values, grid, k, i),
-                    w_en = interpf2c(edmf.EnvVar.W.values, grid, k),
-                    b_up = edmf.UpdVar.B.values[i, k],
-                    b_en = edmf.EnvVar.B.values[k],
-                    tke = edmf.EnvVar.TKE.values[k],
+                    q_liq_up = up.QL.values[i, k],
+                    q_liq_en = en.QL.values[k],
+                    w_up = interpf2c(up.W.values, grid, k, i),
+                    w_en = interpf2c(en.W.values, grid, k),
+                    b_up = up.B.values[i, k],
+                    b_en = en.B.values[k],
+                    tke = en.TKE.values[k],
                     dMdz = ∇m,
                     M = m,
-                    a_up = edmf.UpdVar.Area.values[i, k],
-                    a_en = edmf.EnvVar.Area.values[k],
+                    a_up = up.Area.values[i, k],
+                    a_en = en.Area.values[k],
                     R_up = edmf.pressure_plume_spacing[i],
-                    RH_up = edmf.UpdVar.RH.values[i, k],
-                    RH_en = edmf.EnvVar.RH.values[k],
+                    RH_up = up.RH.values[i, k],
+                    RH_en = en.RH.values[k],
                 )
 
                 er = entr_detr(param_set, εδ_model)
@@ -993,45 +892,45 @@ function compute_updraft_closures(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariabl
         end
     end
 
-    kc_surf = kc_surface(grid)
-    kc_toa = kc_top_of_atmos(grid)
     @inbounds for k in real_face_indices(grid)
-        @inbounds for i in xrange(edmf.n_updrafts)
+        @inbounds for i in xrange(up.n_updrafts)
 
             # pressure
             a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
-            a_kfull = interpc2f(edmf.UpdVar.Area.values, grid, k, i; a_bcs...)
+            a_kfull = interpc2f(up.Area.values, grid, k, i; a_bcs...)
             if a_kfull > 0.0
-                B = edmf.UpdVar.B.values
+                B = up.B.values
                 b_bcs = (; bottom = SetValue(B[i, kc_surf]), top = SetValue(B[i, kc_toa]))
-                b_kfull = interpc2f(edmf.UpdVar.B.values, grid, k, i; b_bcs...)
-                w_cut = fcut(edmf.UpdVar.W.values, grid, k, i)
+                b_kfull = interpc2f(up.B.values, grid, k, i; b_bcs...)
+                w_cut = fcut(up.W.values, grid, k, i)
                 ∇w_up = f∇(w_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
                 asp_ratio = 1.0
-                edmf.nh_pressure_b[i, k], edmf.nh_pressure_adv[i, k], edmf.nh_pressure_drag[i, k] =
-                    perturbation_pressure(
-                        param_set,
-                        edmf.UpdVar.updraft_top[i],
-                        a_kfull,
-                        b_kfull,
-                        ref_state.rho0[k],
-                        edmf.UpdVar.W.values[i, k],
-                        ∇w_up,
-                        edmf.EnvVar.W.values[k],
-                        asp_ratio,
-                    )
+                nh_pressure_b, nh_pressure_adv, nh_pressure_drag = perturbation_pressure(
+                    param_set,
+                    up.updraft_top[i],
+                    a_kfull,
+                    b_kfull,
+                    ref_state.rho0[k],
+                    up.W.values[i, k],
+                    ∇w_up,
+                    en.W.values[k],
+                    asp_ratio,
+                )
             else
-                edmf.nh_pressure_b[i, k] = 0.0
-                edmf.nh_pressure_adv[i, k] = 0.0
-                edmf.nh_pressure_drag[i, k] = 0.0
+                nh_pressure_b = 0.0
+                nh_pressure_adv = 0.0
+                nh_pressure_drag = 0.0
             end
-            edmf.nh_pressure[i, k] = edmf.nh_pressure_b[i, k] + edmf.nh_pressure_adv[i, k] + edmf.nh_pressure_drag[i, k]
+            edmf.nh_pressure_b[i, k] = nh_pressure_b
+            edmf.nh_pressure_adv[i, k] = nh_pressure_adv
+            edmf.nh_pressure_drag[i, k] = nh_pressure_drag
+            edmf.nh_pressure[i, k] = nh_pressure_b + nh_pressure_adv + nh_pressure_drag
         end
     end
     return
 end
 
-function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
+function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE)
 
     param_set = parameter_set(edmf)
     H_up_min = CPEDMF.H_up_min(param_set)
@@ -1042,70 +941,75 @@ function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE, GMV::GridMeanV
     return
 end
 
-function zero_area_fraction_cleanup(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables)
+function zero_area_fraction_cleanup(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables)
 
+    up = edmf.UpdVar
+    en = edmf.EnvVar
     grid = get_grid(edmf)
     @inbounds for k in real_center_indices(grid)
-        @inbounds for i in xrange(edmf.n_updrafts)
-            if edmf.UpdVar.Area.values[i, k] < edmf.minimum_area
-                edmf.UpdVar.Area.values[i, k] = 0.0
-                edmf.UpdVar.B.values[i, k] = GMV.B.values[k]
-                edmf.UpdVar.H.values[i, k] = GMV.H.values[k]
-                edmf.UpdVar.QT.values[i, k] = GMV.QT.values[k]
-                edmf.UpdVar.T.values[i, k] = GMV.T.values[k]
-                edmf.UpdVar.QL.values[i, k] = GMV.QL.values[k]
+        @inbounds for i in xrange(up.n_updrafts)
+            if up.Area.values[i, k] < edmf.minimum_area
+                up.Area.values[i, k] = 0.0
+                up.B.values[i, k] = gm.B.values[k]
+                up.H.values[i, k] = gm.H.values[k]
+                up.QT.values[i, k] = gm.QT.values[k]
+                up.T.values[i, k] = gm.T.values[k]
+                up.QL.values[i, k] = gm.QL.values[k]
             end
         end
 
-        if sum(edmf.UpdVar.Area.values[:, k]) == 0.0
-            edmf.EnvVar.B.values[k] = GMV.B.values[k]
-            edmf.EnvVar.H.values[k] = GMV.H.values[k]
-            edmf.EnvVar.QT.values[k] = GMV.QT.values[k]
-            edmf.EnvVar.T.values[k] = GMV.T.values[k]
-            edmf.EnvVar.QL.values[k] = GMV.QL.values[k]
+        if sum(up.Area.values[:, k]) == 0.0
+            en.B.values[k] = gm.B.values[k]
+            en.H.values[k] = gm.H.values[k]
+            en.QT.values[k] = gm.QT.values[k]
+            en.T.values[k] = gm.T.values[k]
+            en.QL.values[k] = gm.QL.values[k]
         end
     end
 
     @inbounds for k in real_face_indices(grid)
-        @inbounds for i in xrange(edmf.n_updrafts)
+        @inbounds for i in xrange(up.n_updrafts)
             a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
-            a_up_f_i = interpc2f(edmf.UpdVar.Area.values, grid, k, i; a_bcs...)
+            a_up_f_i = interpc2f(up.Area.values, grid, k, i; a_bcs...)
             if a_up_f_i < edmf.minimum_area
-                edmf.UpdVar.W.values[i, k] = GMV.W.values[k]
+                up.W.values[i, k] = gm.W.values[k]
             end
         end
 
-        a_up_f = map(1:(edmf.n_updrafts)) do i
+        a_up_f = map(1:(up.n_updrafts)) do i
             a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
-            interpc2f(edmf.UpdVar.Area.values, grid, k, i; a_bcs...)
+            interpc2f(up.Area.values, grid, k, i; a_bcs...)
         end
 
         if sum(a_up_f) == 0.0
-            edmf.EnvVar.W.values[k] = GMV.W.values[k]
+            en.W.values[k] = gm.W.values[k]
         end
     end
 
     return
 end
 
-function solve_updraft(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::TimeStepping)
+function solve_updraft(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, TS::TimeStepping)
     grid = get_grid(edmf)
-    param_set = parameter_set(GMV)
+    param_set = parameter_set(gm)
     ref_state = reference_state(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     dti_ = 1.0 / TS.dt
     Δt = TS.dt
 
-    a_up = edmf.UpdVar.Area.values
-    a_up_new = edmf.UpdVar.Area.new
-    w_up = edmf.UpdVar.W.values
-    w_up_new = edmf.UpdVar.W.new
+    up = edmf.UpdVar
+    up_thermo = edmf.UpdThermo
+    en = edmf.EnvVar
+    a_up = up.Area.values
+    a_up_new = up.Area.new
+    w_up = up.W.values
+    w_up_new = up.W.new
     ρ_0_c = ref_state.rho0_half
     ρ_0_f = ref_state.rho0
     au_lim = edmf.max_area
 
-    @inbounds for i in xrange(edmf.n_updrafts)
+    @inbounds for i in xrange(up.n_updrafts)
         edmf.entr_sc[i, kc_surf] = edmf.entr_surface_bc
         edmf.detr_sc[i, kc_surf] = edmf.detr_surface_bc
         w_up_new[i, kf_surf] = edmf.w_surface_bc[i]
@@ -1114,7 +1018,7 @@ function solve_updraft(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
 
     # Solve for updraft area fraction
     @inbounds for k in real_center_indices(grid)
-        @inbounds for i in xrange(edmf.n_updrafts)
+        @inbounds for i in xrange(up.n_updrafts)
             is_surface_center(grid, k) && continue
             w_up_c = interpf2c(w_up, grid, k, i)
             adv = upwind_advection_area(ρ_0_c, a_up[i, :], w_up[i, :], grid, k)
@@ -1142,7 +1046,7 @@ function solve_updraft(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
     # Solve for updraft velocity
     @inbounds for k in real_face_indices(grid)
         is_surface_face(grid, k) && continue
-        @inbounds for i in xrange(edmf.n_updrafts)
+        @inbounds for i in xrange(up.n_updrafts)
             a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
             anew_k = interpc2f(a_up_new, grid, k, i; a_up_bcs...)
 
@@ -1152,10 +1056,10 @@ function solve_updraft(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 # not matter in the end:
                 entr_w = interpc2f(entr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
                 detr_w = interpc2f(detr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
-                B_k = interpc2f(edmf.UpdVar.B.values, grid, k, i; bottom = SetValue(0), top = SetValue(0))
+                B_k = interpc2f(up.B.values, grid, k, i; bottom = SetValue(0), top = SetValue(0))
 
                 adv = upwind_advection_velocity(ρ_0_f, a_up[i, :], w_up[i, :], grid, k; a_up_bcs)
-                exch = (ρ_0_f[k] * a_k * w_up[i, k] * (entr_w * edmf.EnvVar.W.values[k] - detr_w * w_up[i, k]))
+                exch = (ρ_0_f[k] * a_k * w_up[i, k] * (entr_w * en.W.values[k] - detr_w * w_up[i, k]))
                 buoy = ρ_0_f[k] * a_k * B_k
                 w_tendencies = -adv + exch + buoy + edmf.nh_pressure[i, k]
                 w_up_new[i, k] = (ρ_0_f[k] * a_k * w_up[i, k] + Δt * w_tendencies) / (ρ_0_f[k] * anew_k)
@@ -1178,15 +1082,15 @@ function solve_updraft(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
 
     # Solve for θ_liq_ice & q_tot
     @inbounds for k in real_center_indices(grid)
-        @inbounds for i in xrange(edmf.n_updrafts)
+        @inbounds for i in xrange(up.n_updrafts)
             if is_surface_center(grid, k)
                 # at the surface
                 if a_up_new[i, k] >= edmf.minimum_area
-                    edmf.UpdVar.H.new[i, k] = edmf.h_surface_bc[i]
-                    edmf.UpdVar.QT.new[i, k] = edmf.qt_surface_bc[i]
+                    up.H.new[i, k] = edmf.h_surface_bc[i]
+                    up.QT.new[i, k] = edmf.qt_surface_bc[i]
                 else
-                    edmf.UpdVar.H.new[i, k] = GMV.H.values[k]
-                    edmf.UpdVar.QT.new[i, k] = GMV.QT.values[k]
+                    up.H.new[i, k] = gm.H.values[k]
+                    up.QT.new[i, k] = gm.QT.values[k]
                 end
                 continue
             end
@@ -1197,29 +1101,28 @@ function solve_updraft(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, TS::Tim
                 w_up_c = interpf2c(w_up, grid, k, i)
                 m_k = (ρ_0_c[k] * a_up[i, k] * w_up_c)
 
-                adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], edmf.UpdVar.H.values[i, :], grid, k)
-                entr = entr_w_c[i, k] * edmf.EnvVar.H.values[k]
-                detr = detr_w_c[i, k] * edmf.UpdVar.H.values[i, k]
-                θ_liq_ice_rain = ρ_0_c[k] * edmf.UpdThermo.prec_source_h[i, k]
+                adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], up.H.values[i, :], grid, k)
+                entr = entr_w_c[i, k] * en.H.values[k]
+                detr = detr_w_c[i, k] * up.H.values[i, k]
+                θ_liq_ice_rain = ρ_0_c[k] * up_thermo.prec_source_h[i, k]
                 θ_liq_ice_tendencies = -adv + m_k * (entr - detr) + θ_liq_ice_rain
-                edmf.UpdVar.H.new[i, k] =
-                    (ρ_0_c[k] * a_up[i, k] * edmf.UpdVar.H.values[i, k] + Δt * θ_liq_ice_tendencies) /
+                up.H.new[i, k] =
+                    (ρ_0_c[k] * a_up[i, k] * up.H.values[i, k] + Δt * θ_liq_ice_tendencies) /
                     (ρ_0_c[k] * a_up_new[i, k])
 
-                adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], edmf.UpdVar.QT.values[i, :], grid, k)
-                entr = entr_w_c[i, k] * edmf.EnvVar.QT.values[k]
-                detr = detr_w_c[i, k] * edmf.UpdVar.QT.values[i, k]
-                q_tot_rain = ρ_0_c[k] * edmf.UpdThermo.prec_source_qt[i, k]
+                adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], up.QT.values[i, :], grid, k)
+                entr = entr_w_c[i, k] * en.QT.values[k]
+                detr = detr_w_c[i, k] * up.QT.values[i, k]
+                q_tot_rain = ρ_0_c[k] * up_thermo.prec_source_qt[i, k]
                 q_tot_tendencies = -adv + m_k * (entr - detr) + q_tot_rain
-                edmf.UpdVar.QT.new[i, k] = max(
-                    (ρ_0_c[k] * a_up[i, k] * edmf.UpdVar.QT.values[i, k] + Δt * q_tot_tendencies) /
-                    (ρ_0_c[k] * a_up_new[i, k]),
+                up.QT.new[i, k] = max(
+                    (ρ_0_c[k] * a_up[i, k] * up.QT.values[i, k] + Δt * q_tot_tendencies) / (ρ_0_c[k] * a_up_new[i, k]),
                     0.0,
                 )
 
             else
-                edmf.UpdVar.H.new[i, k] = GMV.H.values[k]
-                edmf.UpdVar.QT.new[i, k] = GMV.QT.values[k]
+                up.H.new[i, k] = gm.H.values[k]
+                up.QT.new[i, k] = gm.QT.values[k]
             end
         end
     end
@@ -1242,67 +1145,31 @@ function compute_tke_pressure(edmf::EDMF_PrognosticTKE)
     return
 end
 
-function update_GMV_diagnostics(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables)
+function update_GMV_diagnostics(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables)
 
     grid = get_grid(edmf)
-    p0_half = reference_state(edmf).p0_half
-    a_up_bulk = edmf.UpdVar.Area.bulkvalues
+    en = edmf.EnvVar
+    up = edmf.UpdVar
+    a_up_bulk = up.Area.bulkvalues
     @inbounds for k in real_center_indices(grid)
-        GMV.QL.values[k] = (a_up_bulk[k] * edmf.UpdVar.QL.bulkvalues[k] + (1 - a_up_bulk[k]) * edmf.EnvVar.QL.values[k])
-        GMV.T.values[k] = (a_up_bulk[k] * edmf.UpdVar.T.bulkvalues[k] + (1 - a_up_bulk[k]) * edmf.EnvVar.T.values[k])
-        GMV.B.values[k] = (a_up_bulk[k] * edmf.UpdVar.B.bulkvalues[k] + (1 - a_up_bulk[k]) * edmf.EnvVar.B.values[k])
+        gm.QL.values[k] = (a_up_bulk[k] * up.QL.bulkvalues[k] + (1 - a_up_bulk[k]) * en.QL.values[k])
+        gm.T.values[k] = (a_up_bulk[k] * up.T.bulkvalues[k] + (1 - a_up_bulk[k]) * en.T.values[k])
+        gm.B.values[k] = (a_up_bulk[k] * up.B.bulkvalues[k] + (1 - a_up_bulk[k]) * en.B.values[k])
     end
 
     return
 end
 
-function compute_covariance_rhs(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
-
-    gm = GMV
-    up = edmf.UpdVar
-    en = edmf.EnvVar
-    compute_covariance_entr(edmf, en.TKE, up.W, up.W, en.W, en.W, gm.W, gm.W)
-    compute_covariance_shear(edmf, gm, en.TKE, en.W.values, en.W.values)
-    compute_covariance_interdomain_src(edmf, up.Area, up.W, up.W, en.W, en.W, en.TKE)
-    compute_tke_pressure(edmf)
-    compute_covariance_entr(edmf, en.Hvar, up.H, up.H, en.H, en.H, gm.H, gm.H)
-    compute_covariance_entr(edmf, en.QTvar, up.QT, up.QT, en.QT, en.QT, gm.QT, gm.QT)
-    compute_covariance_entr(edmf, en.HQTcov, up.H, up.QT, en.H, en.QT, gm.H, gm.QT)
-    compute_covariance_shear(edmf, gm, en.Hvar, en.H.values, en.H.values)
-    compute_covariance_shear(edmf, gm, en.QTvar, en.QT.values, en.QT.values)
-    compute_covariance_shear(edmf, gm, en.HQTcov, en.H.values, en.QT.values)
-    compute_covariance_interdomain_src(edmf, up.Area, up.H, up.H, en.H, en.H, en.Hvar)
-    compute_covariance_interdomain_src(edmf, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar)
-    compute_covariance_interdomain_src(edmf, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov)
-    compute_covariance_rain(edmf, TS, gm) # need to update this one
-    reset_surface_covariance(edmf, gm, Case)
-    return
-end
-
-function diagnose_GMV_moments(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
-
-    gm = GMV
-    up = edmf.UpdVar
-    en = edmf.EnvVar
-
-    get_GMV_CoVar(edmf, up.Area, up.H, up.H, en.H, en.H, en.Hvar, gm.H.values, gm.H.values, gm.Hvar.values)
-    get_GMV_CoVar(edmf, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar, gm.QT.values, gm.QT.values, gm.QTvar.values)
-    get_GMV_CoVar(edmf, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov, gm.H.values, gm.QT.values, gm.HQTcov.values)
-    GMV_third_m(edmf, gm.H_third_m, en.Hvar, en.H, up.H)
-    GMV_third_m(edmf, gm.QT_third_m, en.QTvar, en.QT, up.QT)
-    GMV_third_m(edmf, gm.W_third_m, en.TKE, en.W, up.W)
-    return
-end
-
-function initialize_covariance(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase)
+function initialize_covariance(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, Case::CasesBase)
 
     ws = edmf.wstar
     us = Case.Sur.ustar
     zs = edmf.zi
     grid = get_grid(edmf)
     kc_surf = kc_surface(grid)
+    en = edmf.EnvVar
 
-    reset_surface_covariance(edmf, GMV, Case)
+    reset_surface_covariance(edmf, gm, Case)
 
     # grid-mean tke closure over all but z:
     tke_gm(z) = ws * 1.3 * cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) * sqrt(max(1 - z / zs, 0))
@@ -1311,7 +1178,7 @@ function initialize_covariance(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables,
     if ws > 0.0
         @inbounds for k in real_center_indices(grid)
             z = grid.zc[k]
-            GMV.TKE.values[k] = tke_gm(z)
+            gm.TKE.values[k] = tke_gm(z)
         end
     end
     # TKE initialization from Beare et al, 2006
@@ -1319,7 +1186,7 @@ function initialize_covariance(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables,
         @inbounds for k in real_center_indices(grid)
             z = grid.zc[k]
             if (z <= 250.0)
-                GMV.TKE.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
+                gm.TKE.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
             end
         end
 
@@ -1327,7 +1194,7 @@ function initialize_covariance(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables,
         @inbounds for k in real_center_indices(grid)
             z = grid.zc[k]
             if (z <= 2500.0)
-                GMV.TKE.values[k] = 1.0 - z / 3000.0
+                gm.TKE.values[k] = 1.0 - z / 3000.0
             end
         end
 
@@ -1335,7 +1202,7 @@ function initialize_covariance(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables,
         @inbounds for k in real_center_indices(grid)
             z = grid.zc[k]
             if (z <= 1600.0)
-                GMV.TKE.values[k] = 0.1 * 1.46 * 1.46 * (1.0 - z / 1600.0)
+                gm.TKE.values[k] = 0.1 * 1.46 * 1.46 * (1.0 - z / 1600.0)
             end
         end
     end
@@ -1344,15 +1211,15 @@ function initialize_covariance(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables,
         @inbounds for k in real_center_indices(grid)
             z = grid.zc[k]
             # need to rethink of how to initilize the covarinace profiles - for now took the TKE profile
-            GMV.Hvar.values[k] = GMV.Hvar.values[kc_surf] * tke_gm(z)
-            GMV.QTvar.values[k] = GMV.QTvar.values[kc_surf] * tke_gm(z)
-            GMV.HQTcov.values[k] = GMV.HQTcov.values[kc_surf] * tke_gm(z)
+            gm.Hvar.values[k] = gm.Hvar.values[kc_surf] * tke_gm(z)
+            gm.QTvar.values[k] = gm.QTvar.values[kc_surf] * tke_gm(z)
+            gm.HQTcov.values[k] = gm.HQTcov.values[kc_surf] * tke_gm(z)
         end
     else
         @inbounds for k in real_center_indices(grid)
-            GMV.Hvar.values[k] = 0.0
-            GMV.QTvar.values[k] = 0.0
-            GMV.HQTcov.values[k] = 0.0
+            gm.Hvar.values[k] = 0.0
+            gm.QTvar.values[k] = 0.0
+            gm.HQTcov.values[k] = 0.0
         end
     end
 
@@ -1361,25 +1228,25 @@ function initialize_covariance(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables,
         @inbounds for k in real_center_indices(grid)
             z = grid.zc[k]
             if (z <= 250.0)
-                GMV.Hvar.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
+                gm.Hvar.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
             end
-            GMV.QTvar.values[k] = 0.0
-            GMV.HQTcov.values[k] = 0.0
+            gm.QTvar.values[k] = 0.0
+            gm.HQTcov.values[k] = 0.0
         end
     end
 
     @inbounds for k in real_center_indices(grid)
-        edmf.EnvVar.TKE.values[k] = GMV.TKE.values[k]
-        edmf.EnvVar.Hvar.values[k] = GMV.Hvar.values[k]
-        edmf.EnvVar.QTvar.values[k] = GMV.QTvar.values[k]
-        edmf.EnvVar.HQTcov.values[k] = GMV.HQTcov.values[k]
+        en.TKE.values[k] = gm.TKE.values[k]
+        en.Hvar.values[k] = gm.Hvar.values[k]
+        en.QTvar.values[k] = gm.QTvar.values[k]
+        en.HQTcov.values[k] = gm.HQTcov.values[k]
     end
     return
 end
 
 function compute_covariance_shear(
     edmf::EDMF_PrognosticTKE,
-    GMV::GridMeanVariables,
+    gm::GridMeanVariables,
     Covar::EnvironmentVariable_2m,
     EnvVar1,
     EnvVar2,
@@ -1395,10 +1262,10 @@ function compute_covariance_shear(
 
     if is_tke
         @inbounds for k in real_center_indices(grid)
-            v_cut = ccut(GMV.V.values, grid, k)
+            v_cut = ccut(gm.V.values, grid, k)
             ∇v = c∇(v_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
 
-            u_cut = ccut(GMV.U.values, grid, k)
+            u_cut = ccut(gm.U.values, grid, k)
             ∇u = c∇(u_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
 
             var2_dual = dual_faces(EnvVar2, grid, k)
@@ -1526,29 +1393,33 @@ end
 
 function compute_covariance_detr(edmf::EDMF_PrognosticTKE, Covar::EnvironmentVariable_2m)
     grid = get_grid(edmf)
-    rho0_half = reference_state(edmf).rho0_half
+    up = edmf.UpdVar
+    ρ0_c = reference_state(edmf).rho0_half
     @inbounds for k in real_center_indices(grid)
         Covar.detr_loss[k] = 0.0
-        @inbounds for i in xrange(edmf.n_updrafts)
-            w_up_c = interpf2c(edmf.UpdVar.W.values, grid, k, i)
-            Covar.detr_loss[k] += edmf.UpdVar.Area.values[i, k] * abs(w_up_c) * edmf.entr_sc[i, k]
+        @inbounds for i in xrange(up.n_updrafts)
+            w_up_c = interpf2c(up.W.values, grid, k, i)
+            Covar.detr_loss[k] += up.Area.values[i, k] * abs(w_up_c) * edmf.entr_sc[i, k]
         end
-        Covar.detr_loss[k] *= rho0_half[k] * Covar.values[k]
+        Covar.detr_loss[k] *= ρ0_c[k] * Covar.values[k]
     end
     return
 end
 
-function compute_covariance_rain(edmf::EDMF_PrognosticTKE, TS::TimeStepping, GMV::GridMeanVariables)
+function compute_covariance_rain(edmf::EDMF_PrognosticTKE, TS::TimeStepping)
     # TODO defined again in compute_covariance_shear and compute_covaraince
     grid = get_grid(edmf)
-    ae = 1 .- edmf.UpdVar.Area.bulkvalues # area of environment
-    rho0_half = reference_state(edmf).rho0_half
+    up = edmf.UpdVar
+    en = edmf.EnvVar
+    en_thermo = edmf.EnvThermo
+    ae = 1 .- up.Area.bulkvalues # area of environment
+    ρ0_c = reference_state(edmf).rho0_half
 
     @inbounds for k in real_center_indices(grid)
-        edmf.EnvVar.TKE.rain_src[k] = 0.0
-        edmf.EnvVar.Hvar.rain_src[k] = rho0_half[k] * ae[k] * 2.0 * edmf.EnvThermo.Hvar_rain_dt[k]
-        edmf.EnvVar.QTvar.rain_src[k] = rho0_half[k] * ae[k] * 2.0 * edmf.EnvThermo.QTvar_rain_dt[k]
-        edmf.EnvVar.HQTcov.rain_src[k] = rho0_half[k] * ae[k] * edmf.EnvThermo.HQTcov_rain_dt[k]
+        en.TKE.rain_src[k] = 0.0
+        en.Hvar.rain_src[k] = ρ0_c[k] * ae[k] * 2.0 * en_thermo.Hvar_rain_dt[k]
+        en.QTvar.rain_src[k] = ρ0_c[k] * ae[k] * 2.0 * en_thermo.QTvar_rain_dt[k]
+        en.HQTcov.rain_src[k] = ρ0_c[k] * ae[k] * en_thermo.HQTcov_rain_dt[k]
     end
 
     return
@@ -1557,14 +1428,14 @@ end
 function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, Covar::EnvironmentVariable_2m)
     grid = get_grid(edmf)
     param_set = parameter_set(edmf)
+    en = edmf.EnvVar
     c_d = CPEDMF.c_d(param_set)
     ae = 1 .- edmf.UpdVar.Area.bulkvalues
     rho0_half = reference_state(edmf).rho0_half
 
     @inbounds for k in real_center_indices(grid)
         Covar.dissipation[k] = (
-            rho0_half[k] * ae[k] * Covar.values[k] * max(edmf.EnvVar.TKE.values[k], 0)^0.5 /
-            max(edmf.mixing_length[k], 1.0e-3) * c_d
+            rho0_half[k] * ae[k] * Covar.values[k] * max(en.TKE.values[k], 0)^0.5 / max(edmf.mixing_length[k], 1.0e-3) * c_d
         )
     end
     return
@@ -1607,14 +1478,16 @@ function GMV_third_m(
 )
 
     grid = get_grid(edmf)
-    ae = 1 .- edmf.UpdVar.Area.bulkvalues
-    au = edmf.UpdVar.Area.values
+    up = edmf.UpdVar
+    en = edmf.EnvVar
+    ae = 1 .- up.Area.bulkvalues
+    au = up.Area.values
     is_tke = env_covar.name == "tke"
 
     @inbounds for k in real_center_indices(grid)
         mean_en = is_tke ? interpf2c(env_mean.values, grid, k) : env_mean.values[k]
         GMVv_ = ae[k] * mean_en
-        @inbounds for i in xrange(edmf.n_updrafts)
+        @inbounds for i in xrange(up.n_updrafts)
             mean_up = is_tke ? interpf2c(upd_mean.values, grid, k, i) : upd_mean.values[i, k]
             GMVv_ += au[i, k] * mean_up
         end
@@ -1622,10 +1495,10 @@ function GMV_third_m(
         # TODO: report bug: i used outside of scope.
         # This is only valid (assuming correct) for 1
         # updraft.
-        i_last = last(xrange(edmf.n_updrafts))
+        i_last = last(xrange(up.n_updrafts))
         if is_tke
             w_bcs = (; bottom = SetValue(0), top = SetValue(0))
-            w_en_dual = dual_faces(edmf.EnvVar.W.values, grid, k)
+            w_en_dual = dual_faces(en.W.values, grid, k)
             ∇w_en = ∇f2c(w_en_dual, grid, k; w_bcs...)
             Envcov_ = -edmf.horiz_K_eddy[i_last, k] * ∇w_en
         else
@@ -1634,7 +1507,7 @@ function GMV_third_m(
 
         Upd_cubed = 0.0
         GMVcov_ = ae[k] * (Envcov_ + (mean_en - GMVv_)^2)
-        @inbounds for i in xrange(edmf.n_updrafts)
+        @inbounds for i in xrange(up.n_updrafts)
             mean_up = is_tke ? interpf2c(upd_mean.values, grid, k, i) : upd_mean.values[i, k]
             GMVcov_ += au[i, k] * (mean_up - GMVv_)^2
             Upd_cubed += au[i, k] * mean_up^3
@@ -1659,10 +1532,10 @@ function update_inversion(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, optio
     kc_surf = kc_surface(grid)
     param_set = parameter_set(gm)
     ref_state = edmf.ref_state
+    p0_c = ref_state.p0_half
 
     @inbounds for k in real_center_indices(grid)
-        qv = gm.QT.values[k] - gm.QL.values[k]
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], gm.H.values[k], gm.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], gm.H.values[k], gm.QT.values[k])
         θ_ρ[k] = TD.virtual_pottemp(ts)
     end
 
