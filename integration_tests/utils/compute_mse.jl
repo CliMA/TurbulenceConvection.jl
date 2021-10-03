@@ -287,16 +287,6 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
 
         end
 
-        # Compute data scale
-        data_scale_tcm = sum(abs.(data_tcm_arr)) / length(data_tcm_arr)
-        data_scale_tcc = sum(abs.(data_tcc_arr)) / length(data_tcc_arr)
-        data_scale_scm = sum(abs.(data_scm_arr)) / length(data_scm_arr)
-        data_scale_les = sum(abs.(data_les_arr)) / length(data_les_arr)
-        push!(data_scales_tcm, data_scale_tcm)
-        push!(data_scales_tcc, data_scale_tcc)
-        push!(data_scales_scm, data_scale_scm)
-        push!(data_scales_les, data_scale_les)
-
         # Plot comparison
         if plot_comparison
             p = Plots.plot()
@@ -413,18 +403,31 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
             end
         end
 
+        # Compute data scale
+        data_scale_tcm = sum(abs.(data_tcm_arr)) / length(data_tcm_arr)
+        data_scale_tcc = sum(abs.(data_tcc_arr)) / length(data_tcc_arr)
+        data_scale_scm = sum(abs.(data_scm_arr)) / length(data_scm_arr)
+        data_scale_les = sum(abs.(data_les_arr)) / length(data_les_arr)
+        push!(data_scales_tcm, data_scale_tcm) # TODO: should we add this to the mse table?
+        push!(data_scales_tcc, data_scale_tcc)
+        push!(data_scales_scm, data_scale_scm)
+        push!(data_scales_les, data_scale_les) # TODO: should we add this to the mse table?
+
         # Compute mean squared error (mse)
         if have_pycles_ds # LES takes first precedence
             mse_single_var = sum((data_les_cont_mapped .- data_tcc_cont_mapped) .^ 2)
-        elseif have_scampy_ds # SCAMPy takes second precedence
-            mse_single_var = sum((data_scm_cont_mapped .- data_tcc_cont_mapped) .^ 2)
-        elseif have_tc_main # TC.jl main takes third precedence
+            data_scale_used = data_scale_les
+        elseif have_tc_main # TC.jl main takes second precedence
             mse_single_var = sum((data_tcm_cont_mapped .- data_tcc_cont_mapped) .^ 2)
+            data_scale_used = data_scale_tcm
+        elseif have_scampy_ds # SCAMPy takes third precedence
+            mse_single_var = sum((data_scm_cont_mapped .- data_tcc_cont_mapped) .^ 2)
+            data_scale_used = data_scale_scm
         else
             error("No dataset to compute MSE")
         end
         # Normalize by data scale
-        mse[tc_var] = mse_single_var / data_scale_tcc^2
+        mse[tc_var] = mse_single_var / data_scale_used^2
 
         push!(mse_reductions, (best_mse[tc_var] - mse[tc_var]) / best_mse[tc_var] * 100)
         push!(computed_mse, mse[tc_var])
