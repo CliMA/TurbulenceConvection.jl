@@ -46,17 +46,18 @@ function io(en::EnvironmentVariables, Stats::NetCDFIO_Stats, ref_state::Referenc
 end
 
 function env_cloud_diagnostics(en::EnvironmentVariables, ref_state::ReferenceState)
+    grid = en.grid
     en.cloud_top = 0.0
-    en.cloud_base = zc_toa(en.grid)
+    en.cloud_base = zc_toa(grid)
     en.cloud_cover = 0.0
     en.lwp = 0.0
 
-    @inbounds for k in real_center_indices(en.grid)
-        en.lwp += ref_state.rho0_half[k] * en.QL.values[k] * en.Area.values[k] * en.grid.Δz
+    @inbounds for k in real_center_indices(grid)
+        en.lwp += ref_state.rho0_half[k] * en.QL.values[k] * en.Area.values[k] * grid.Δz
 
         if en.QL.values[k] > 1e-8 && en.Area.values[k] > 1e-3
-            en.cloud_base = min(en.cloud_base, en.grid.zc[k])
-            en.cloud_top = max(en.cloud_top, en.grid.zc[k])
+            en.cloud_base = min(en.cloud_base, grid.zc[k])
+            en.cloud_top = max(en.cloud_top, grid.zc[k])
             en.cloud_cover = max(en.cloud_cover, en.Area.values[k] * en.cloud_fraction.values[k])
         end
     end
@@ -90,11 +91,13 @@ function sgs_mean(en_thermo::EnvironmentThermodynamics, en::EnvironmentVariables
 
     param_set = parameter_set(en)
     ref_state = en_thermo.ref_state
+    p0_c = ref_state.p0_half
+    ρ0_c = ref_state.rho0_half
 
     @inbounds for k in real_center_indices(en_thermo.grid)
         # condensation
         q_tot_en = en.QT.values[k]
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], en.H.values[k], q_tot_en)
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], en.H.values[k], q_tot_en)
         q_liq_en = TD.liquid_specific_humidity(ts)
         T = TD.air_temperature(ts)
         # autoconversion and accretion
@@ -106,12 +109,12 @@ function sgs_mean(en_thermo::EnvironmentThermodynamics, en::EnvironmentVariables
             rain.QR.values[k],
             en.Area.values[k],
             T,
-            ref_state.p0_half[k],
-            ref_state.rho0_half[k],
+            p0_c[k],
+            ρ0_c[k],
             dt,
         )
         phase_part = TD.PhasePartition(q_tot_en, q_liq_en, 0.0)
-        theta = TD.dry_pottemp_given_pressure(param_set, T, ref_state.p0_half[k], phase_part)
+        theta = TD.dry_pottemp_given_pressure(param_set, T, p0_c[k], phase_part)
         qv = TD.vapor_specific_humidity(phase_part)
         update_cloud_dry(en_thermo, k, en, T, theta, q_tot_en, q_liq_en, qv)
         update_EnvRain_sources(en_thermo, k, en, mph.qr_src, mph.thl_rain_src)
@@ -126,6 +129,8 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
     a, w = FastGaussQuadrature.gausshermite(en_thermo.quadrature_order)
     ref_state = en_thermo.ref_state
     grid = en_thermo.grid
+    p0_c = ref_state.p0_half
+    ρ0_c = ref_state.rho0_half
 
     #TODO - remember you output source terms multipierd by dt (bec. of instanteneous autoconcv)
     #TODO - add tendencies for GMV H, QT and QR due to rain
@@ -141,7 +146,6 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
 
     sqpi_inv = 1.0 / sqrt(π)
     sqrt2 = sqrt(2.0)
-    mph = mph_struct()
 
     epsilon = 10e-14 #np.finfo(np.float).eps
 
@@ -223,7 +227,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
                     end
 
                     # condensation
-                    ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], h_hat, qt_hat)
+                    ts = TD.PhaseEquil_pθq(param_set, p0_c[k], h_hat, qt_hat)
                     q_liq_en = TD.liquid_specific_humidity(ts)
                     T = TD.air_temperature(ts)
                     # autoconversion and accretion
@@ -235,8 +239,8 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
                         rain.QR.values[k],
                         en.Area.values[k],
                         T,
-                        ref_state.p0_half[k],
-                        ref_state.rho0_half[k],
+                        p0_c[k],
+                        ρ0_c[k],
                         dt,
                     )
 
@@ -281,13 +285,12 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
             en_thermo.qt_dry[k] = outer_env[i_qt_dry]
             # Charlie - this breaks when using PhaseEquil_pTq(...)
             phase_part = TD.PhasePartition(en_thermo.qt_dry[k], 0.0, 0.0)
-            en_thermo.th_dry[k] =
-                TD.dry_pottemp_given_pressure(param_set, outer_env[i_T_dry], ref_state.p0_half[k], phase_part)
+            en_thermo.th_dry[k] = TD.dry_pottemp_given_pressure(param_set, outer_env[i_T_dry], p0_c[k], phase_part)
 
             en_thermo.t_cloudy[k] = outer_env[i_T_cld]
             en_thermo.qv_cloudy[k] = outer_env[i_qt_cld] - outer_env[i_ql]
             en_thermo.qt_cloudy[k] = outer_env[i_qt_cld]
-            ts_cld = TD.PhaseEquil_pTq(param_set, ref_state.p0_half[k], en_thermo.t_cloudy[k], en_thermo.qt_cloudy[k])
+            ts_cld = TD.PhaseEquil_pTq(param_set, p0_c[k], en_thermo.t_cloudy[k], en_thermo.qt_cloudy[k])
             en_thermo.th_cloudy[k] = TD.dry_pottemp(ts_cld)
 
             # update var/covar rain sources
@@ -299,7 +302,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
 
         else
             # if variance and covariance are zero do the same as in SA_mean
-            ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], en.H.values[k], en.QT.values[k])
+            ts = TD.PhaseEquil_pθq(param_set, p0_c[k], en.H.values[k], en.QT.values[k])
             q_liq_en = TD.liquid_specific_humidity(ts)
             T = TD.air_temperature(ts)
             mph = microphysics_rain_src(
@@ -310,12 +313,12 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
                 rain.QR.values[k],
                 en.Area.values[k],
                 T,
-                ref_state.p0_half[k],
-                ref_state.rho0_half[k],
+                p0_c[k],
+                ρ0_c[k],
                 dt,
             )
             phase_part = TD.PhasePartition(en.QT.values[k], q_liq_en, 0.0)
-            theta = TD.dry_pottemp_given_pressure(param_set, T, ref_state.p0_half[k], phase_part)
+            theta = TD.dry_pottemp_given_pressure(param_set, T, p0_c[k], phase_part)
             qv = en.QT.values[k] - q_liq_en
             update_EnvRain_sources(en_thermo, k, en, mph.qr_src, mph.thl_rain_src)
             update_cloud_dry(en_thermo, k, en, T, theta, en.QT.values[k], q_liq_en, qv)

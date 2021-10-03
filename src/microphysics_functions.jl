@@ -16,7 +16,6 @@ return: dqr_dt_rain, dthl_dt_rain
 """
 function microphysics_rain_src(param_set::APS, rain_model, qt, ql, qr, area, T, p0, ρ0, dt)
 
-    _ret = mph_struct(0, 0)
     # TODO assumes no ice
     qi = 0.0
 
@@ -39,7 +38,7 @@ function microphysics_rain_src(param_set::APS, rain_model, qt, ql, qr, area, T, 
 
             q = TD.PhasePartition(qt, ql, qi)
 
-            _ret.qr_src = min(
+            qr_src = min(
                 q.liq / dt,
                 (
                     CM1.conv_q_liq_to_q_rai(param_set, q.liq) +
@@ -55,21 +54,21 @@ function microphysics_rain_src(param_set::APS, rain_model, qt, ql, qr, area, T, 
 
             q = TD.PhasePartition(qt, ql, qi)
 
-            _ret.qr_src = min(q.liq / dt, -CM0.remove_precipitation(param_set, q, qsat))
+            qr_src = min(q.liq / dt, -CM0.remove_precipitation(param_set, q, qsat))
         end
 
         if tmp_no_acnv_flag
-            _ret.qr_src = 0.0
+            qr_src = 0.0
         end
 
         # TODO add ice here
-        _ret.thl_rain_src = rain_source_to_thetal(param_set, p0, T, qt, ql, qi, _ret.qr_src)
+        thl_rain_src = rain_source_to_thetal(param_set, p0, T, qt, ql, qi, qr_src)
 
     else
-        _ret.qr_src = 0.0
-        _ret.thl_rain_src = 0.0
+        qr_src = 0.0
+        thl_rain_src = 0.0
     end
-    return _ret
+    return mph_struct(thl_rain_src, qr_src)
 end
 
 """
@@ -77,14 +76,12 @@ Source terms for rain and rain area
 assuming constant rain area fraction of 1
 """
 function rain_area(source_area, source_qr, current_area, current_qr)
-    _ret = rain_struct()
-
     if source_qr <= 0.0
-        _ret.qr = current_qr
-        _ret.ar = current_area
+        qr = current_qr
+        ar = current_area
     else
-        _ret.qr = current_qr + source_area * source_qr
-        _ret.ar = 1.0
+        qr = current_qr + source_area * source_qr
+        ar = 1.0
     end
-    return _ret
+    return rain_struct(qr, ar)
 end

@@ -244,8 +244,6 @@ end
 compute precipitation source terms
 """
 function microphysics(up::UpdraftThermodynamics, UpdVar::UpdraftVariables, Rain::RainVariables, dt)
-    rst = rain_struct()
-    mph = mph_struct()
     param_set = parameter_set(Rain)
 
     @inbounds for i in xrange(up.n_updraft)
