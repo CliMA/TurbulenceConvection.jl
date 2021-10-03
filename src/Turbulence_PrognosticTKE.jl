@@ -446,9 +446,6 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     GMV_third_m(edmf, gm.W_third_m, en.TKE, en.W, up.W)
 
     update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
-    update_surface(Case, gm, TS)
-    update_forcing(Case, gm, TS)
-    update_radiation(Case, gm, TS)
     update_GMV_diagnostics(edmf, gm)
     compute_pressure_plume_spacing(edmf)
     compute_updraft_closures(edmf, gm, Case)
@@ -1142,21 +1139,6 @@ function compute_tke_pressure(edmf::EDMF_PrognosticTKE)
             edmf.EnvVar.TKE.press[k] += (w_en_c - w_up_c) * press_c
         end
     end
-    return
-end
-
-function update_GMV_diagnostics(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables)
-
-    grid = get_grid(edmf)
-    en = edmf.EnvVar
-    up = edmf.UpdVar
-    a_up_bulk = up.Area.bulkvalues
-    @inbounds for k in real_center_indices(grid)
-        gm.QL.values[k] = (a_up_bulk[k] * up.QL.bulkvalues[k] + (1 - a_up_bulk[k]) * en.QL.values[k])
-        gm.T.values[k] = (a_up_bulk[k] * up.T.bulkvalues[k] + (1 - a_up_bulk[k]) * en.T.values[k])
-        gm.B.values[k] = (a_up_bulk[k] * up.B.bulkvalues[k] + (1 - a_up_bulk[k]) * en.B.values[k])
-    end
-
     return
 end
 

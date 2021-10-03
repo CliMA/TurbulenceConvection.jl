@@ -128,4 +128,19 @@ function update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
         end
         en.B.values[k] -= gm.B.values[k]
     end
+
+    update_surface(Case, gm, TS)
+    update_forcing(Case, gm, TS)
+    update_radiation(Case, gm, TS)
+
+    #####
+    ##### update_GMV_diagnostics
+    #####
+    a_up_bulk = up.Area.bulkvalues
+    @inbounds for k in real_center_indices(grid)
+        gm.QL.values[k] = (a_up_bulk[k] * up.QL.bulkvalues[k] + (1 - a_up_bulk[k]) * en.QL.values[k])
+        gm.T.values[k] = (a_up_bulk[k] * up.T.bulkvalues[k] + (1 - a_up_bulk[k]) * en.T.values[k])
+        gm.B.values[k] = (a_up_bulk[k] * up.B.bulkvalues[k] + (1 - a_up_bulk[k]) * en.B.values[k])
+    end
+
 end
