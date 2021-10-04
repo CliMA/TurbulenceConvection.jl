@@ -505,10 +505,10 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
         implicit_eqs.b_q_tot_gm[k] = GMV.QT.values[k] + TS.dt * GMV.QT.tendencies[k]
         implicit_eqs.b_θ_liq_ice_gm[k] = GMV.H.values[k] + TS.dt * GMV.H.tendencies[k]
         if is_surface_center(grid, k)
-            implicit_eqs.b_u_gm[k] += TS.dt * Case.Sur.rho_uflux * Δzi * ref_state.alpha0_half[k] / edmf.ae[k]
-            implicit_eqs.b_v_gm[k] += TS.dt * Case.Sur.rho_vflux * Δzi * ref_state.alpha0_half[k] / edmf.ae[k]
-            implicit_eqs.b_q_tot_gm[k] += TS.dt * Case.Sur.rho_qtflux * Δzi * ref_state.alpha0_half[k] / edmf.ae[k]
-            implicit_eqs.b_θ_liq_ice_gm[k] += TS.dt * Case.Sur.rho_hflux * Δzi * ref_state.alpha0_half[k] / edmf.ae[k]
+            implicit_eqs.b_u_gm[k] += TS.dt * Case.Sur.rho_uflux * Δzi * ref_state.alpha0_half[k]
+            implicit_eqs.b_v_gm[k] += TS.dt * Case.Sur.rho_vflux * Δzi * ref_state.alpha0_half[k]
+            implicit_eqs.b_q_tot_gm[k] += TS.dt * Case.Sur.rho_qtflux * Δzi * ref_state.alpha0_half[k]
+            implicit_eqs.b_θ_liq_ice_gm[k] += TS.dt * Case.Sur.rho_hflux * Δzi * ref_state.alpha0_half[k]
         end
     end
 
