@@ -500,10 +500,10 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     implicit_eqs.A_uv_gm .= construct_tridiag_diffusion_gm(grid, TS.dt, edmf.rho_ae_KM, ref_state.rho0_half, edmf.ae)
     Δzi = grid.Δzi
     @inbounds for k in real_center_indices(grid)
-        implicit_eqs.b_u_gm[k] = GMV.U.values[k]
-        implicit_eqs.b_v_gm[k] = GMV.V.values[k]
-        implicit_eqs.b_q_tot_gm[k] = edmf.EnvVar.QT.values[k]
-        implicit_eqs.b_θ_liq_ice_gm[k] = edmf.EnvVar.H.values[k]
+        implicit_eqs.b_u_gm[k] = GMV.U.values[k] + TS.dt * GMV.U.tendencies[k]
+        implicit_eqs.b_v_gm[k] = GMV.V.values[k] + TS.dt * GMV.V.tendencies[k]
+        implicit_eqs.b_q_tot_gm[k] = GMV.QT.values[k] + TS.dt * GMV.QT.tendencies[k]
+        implicit_eqs.b_θ_liq_ice_gm[k] = GMV.H.values[k] + TS.dt * GMV.H.tendencies[k]
         if is_surface_center(grid, k)
             implicit_eqs.b_u_gm[k] += TS.dt * Case.Sur.rho_uflux * Δzi * ref_state.alpha0_half[k] / edmf.ae[k]
             implicit_eqs.b_v_gm[k] += TS.dt * Case.Sur.rho_vflux * Δzi * ref_state.alpha0_half[k] / edmf.ae[k]
@@ -545,29 +545,19 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     implicit_eqs.b_HQTcov .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.values, en.HQTcov)
     # -----------
 
-    # Update the grid mean variables with the tendency due to eddy diffusion
-    # Solve tri-diagonal systems
-    x_q_tot_gm = center_field(grid) # for tridiag solver
-    x_θ_liq_ice_gm = center_field(grid) # for tridiag solver
-    x_q_tot_gm .= tridiag_solve(implicit_eqs.b_q_tot_gm, implicit_eqs.A_θq_gm)
-    x_θ_liq_ice_gm .= tridiag_solve(implicit_eqs.b_θ_liq_ice_gm, implicit_eqs.A_θq_gm)
-    GMV.U.new .= tridiag_solve(implicit_eqs.b_u_gm, implicit_eqs.A_uv_gm)
-    GMV.V.new .= tridiag_solve(implicit_eqs.b_v_gm, implicit_eqs.A_uv_gm)
+    # Solve tri-diagonal systems for the grid mean
     en.TKE.values .= tridiag_solve(implicit_eqs.b_TKE, implicit_eqs.A_TKE)
     en.Hvar.values .= tridiag_solve(implicit_eqs.b_Hvar, implicit_eqs.A_Hvar)
     en.QTvar.values .= tridiag_solve(implicit_eqs.b_QTvar, implicit_eqs.A_QTvar)
     en.HQTcov.values .= tridiag_solve(implicit_eqs.b_HQTcov, implicit_eqs.A_HQTcov)
-
-    @inbounds for k in real_center_indices(grid)
-        GMV.QT.new[k] = max(GMV.QT.values[k] + edmf.ae[k] * (x_q_tot_gm[k] - edmf.EnvVar.QT.values[k]), 0.0)
-        GMV.H.new[k] = GMV.H.values[k] + edmf.ae[k] * (x_θ_liq_ice_gm[k] - edmf.EnvVar.H.values[k])
-        # get the diffusive flux, TODO: move to diagnostics (callbacks?)
-        edmf.diffusive_tendency_h[k] = (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
-        edmf.diffusive_tendency_qt[k] = (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
-    end
+    gm.H.values .= tridiag_solve(implicit_eqs.b_θ_liq_ice_gm, implicit_eqs.A_θq_gm)
+    gm.QT.values .= tridiag_solve(implicit_eqs.b_q_tot_gm, implicit_eqs.A_θq_gm)
+    gm.U.values .= tridiag_solve(implicit_eqs.b_u_gm, implicit_eqs.A_uv_gm)
+    gm.V.values .= tridiag_solve(implicit_eqs.b_v_gm, implicit_eqs.A_uv_gm)
 
     # Filter solution, TODO: fuse with `zero_area_fraction_cleanup` and put into `filter_variables!`
     @inbounds for k in real_center_indices(grid)
+        GMV.QT.values[k] = max(GMV.QT.values[k], 0.0)
         en.TKE.values[k] = max(en.TKE.values[k], 0.0)
         en.Hvar.values[k] = max(en.Hvar.values[k], 0.0)
         en.QTvar.values[k] = max(en.QTvar.values[k], 0.0)
@@ -575,24 +565,48 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
         en.HQTcov.values[k] = min(en.HQTcov.values[k], sqrt(en.Hvar.values[k] * en.QTvar.values[k]))
     end
 
-    update_GMV_turbulence(edmf, GMV, Case, TS)
     # set values
     set_values_with_new(edmf.UpdVar)
-    zero_area_fraction_cleanup(edmf, GMV)
 
-    update(GMV, TS)
-    return
-end
+    #####
+    ##### zero_area_fraction_cleanup
+    #####
 
-function update_GMV_turbulence(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
-
-    @inbounds for k in real_center_indices(edmf.grid)
-        GMV.H.tendencies[k] += (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
-        GMV.QT.tendencies[k] += (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
-        GMV.U.tendencies[k] += (GMV.U.new[k] - GMV.U.values[k]) * TS.dti
-        GMV.V.tendencies[k] += (GMV.V.new[k] - GMV.V.values[k]) * TS.dti
+    @inbounds for k in real_center_indices(grid)
+        @inbounds for i in xrange(up.n_updrafts)
+            if up.Area.values[i, k] < edmf.minimum_area
+                up.Area.values[i, k] = 0.0
+                up.B.values[i, k] = gm.B.values[k]
+                up.H.values[i, k] = gm.H.values[k]
+                up.QT.values[i, k] = gm.QT.values[k]
+                up.T.values[i, k] = gm.T.values[k]
+                up.QL.values[i, k] = gm.QL.values[k]
+            end
+        end
+        if sum(up.Area.values[:, k]) == 0.0
+            en.B.values[k] = gm.B.values[k]
+            en.H.values[k] = gm.H.values[k]
+            en.QT.values[k] = gm.QT.values[k]
+            en.T.values[k] = gm.T.values[k]
+            en.QL.values[k] = gm.QL.values[k]
+        end
     end
-
+    @inbounds for k in real_face_indices(grid)
+        @inbounds for i in xrange(up.n_updrafts)
+            a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
+            a_up_f_i = interpc2f(up.Area.values, grid, k, i; a_bcs...)
+            if a_up_f_i < edmf.minimum_area
+                up.W.values[i, k] = gm.W.values[k]
+            end
+        end
+        a_up_f = map(1:(up.n_updrafts)) do i
+            a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
+            interpc2f(up.Area.values, grid, k, i; a_bcs...)
+        end
+        if sum(a_up_f) == 0.0
+            en.W.values[k] = gm.W.values[k]
+        end
+    end
     return
 end
 
@@ -938,54 +952,6 @@ function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE)
         edmf.pressure_plume_spacing[i] =
             max(edmf.aspect_ratio * edmf.UpdVar.updraft_top[i], H_up_min * edmf.aspect_ratio)
     end
-    return
-end
-
-function zero_area_fraction_cleanup(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables)
-
-    up = edmf.UpdVar
-    en = edmf.EnvVar
-    grid = get_grid(edmf)
-    @inbounds for k in real_center_indices(grid)
-        @inbounds for i in xrange(up.n_updrafts)
-            if up.Area.values[i, k] < edmf.minimum_area
-                up.Area.values[i, k] = 0.0
-                up.B.values[i, k] = gm.B.values[k]
-                up.H.values[i, k] = gm.H.values[k]
-                up.QT.values[i, k] = gm.QT.values[k]
-                up.T.values[i, k] = gm.T.values[k]
-                up.QL.values[i, k] = gm.QL.values[k]
-            end
-        end
-
-        if sum(up.Area.values[:, k]) == 0.0
-            en.B.values[k] = gm.B.values[k]
-            en.H.values[k] = gm.H.values[k]
-            en.QT.values[k] = gm.QT.values[k]
-            en.T.values[k] = gm.T.values[k]
-            en.QL.values[k] = gm.QL.values[k]
-        end
-    end
-
-    @inbounds for k in real_face_indices(grid)
-        @inbounds for i in xrange(up.n_updrafts)
-            a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
-            a_up_f_i = interpc2f(up.Area.values, grid, k, i; a_bcs...)
-            if a_up_f_i < edmf.minimum_area
-                up.W.values[i, k] = gm.W.values[k]
-            end
-        end
-
-        a_up_f = map(1:(up.n_updrafts)) do i
-            a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
-            interpc2f(up.Area.values, grid, k, i; a_bcs...)
-        end
-
-        if sum(a_up_f) == 0.0
-            en.W.values[k] = gm.W.values[k]
-        end
-    end
-
     return
 end
 
