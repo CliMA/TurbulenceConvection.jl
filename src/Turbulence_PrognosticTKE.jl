@@ -6,6 +6,7 @@ function initialize(
     ref_state::ReferenceState,
     TS::TimeStepping,
 )
+    initialize_covariance(edmf, gm, Case)
     if Case.casename == "DryBubble"
         initialize_DryBubble(edmf, edmf.UpdVar, gm, ref_state)
     else
@@ -14,10 +15,7 @@ function initialize(
     param_set = parameter_set(edmf)
     grid = get_grid(edmf)
     update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
-    update_inversion(edmf, gm, Case.inversion_option)
-    edmf.wstar = get_wstar(Case.Sur.bflux, edmf.zi)
     microphysics(edmf.EnvThermo, edmf.EnvVar, edmf.Rain, TS.dt)
-    initialize_covariance(edmf, gm, Case)
     return
 end
 
@@ -1162,85 +1160,20 @@ end
 
 function initialize_covariance(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, Case::CasesBase)
 
-    ws = edmf.wstar
-    us = Case.Sur.ustar
-    zs = edmf.zi
     grid = get_grid(edmf)
     kc_surf = kc_surface(grid)
     en = edmf.EnvVar
 
+    en.TKE.values .= gm.TKE.values
+
     reset_surface_covariance(edmf, gm, Case)
+    gm.Hvar.values .= gm.Hvar.values[kc_surf] .* gm.TKE.values
+    gm.QTvar.values .= gm.QTvar.values[kc_surf] .* gm.TKE.values
+    gm.HQTcov.values .= gm.HQTcov.values[kc_surf] .* gm.TKE.values
 
-    # grid-mean tke closure over all but z:
-    tke_gm(z) = ws * 1.3 * cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) * sqrt(max(1 - z / zs, 0))
-
-
-    if ws > 0.0
-        @inbounds for k in real_center_indices(grid)
-            z = grid.zc[k]
-            gm.TKE.values[k] = tke_gm(z)
-        end
-    end
-    # TKE initialization from Beare et al, 2006
-    if Case.casename == "GABLS"
-        @inbounds for k in real_center_indices(grid)
-            z = grid.zc[k]
-            if (z <= 250.0)
-                gm.TKE.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
-            end
-        end
-
-    elseif Case.casename == "Bomex"
-        @inbounds for k in real_center_indices(grid)
-            z = grid.zc[k]
-            if (z <= 2500.0)
-                gm.TKE.values[k] = 1.0 - z / 3000.0
-            end
-        end
-
-    elseif Case.casename == "Soares" || Case.casename == "Nieuwstadt"
-        @inbounds for k in real_center_indices(grid)
-            z = grid.zc[k]
-            if (z <= 1600.0)
-                gm.TKE.values[k] = 0.1 * 1.46 * 1.46 * (1.0 - z / 1600.0)
-            end
-        end
-    end
-
-    if ws > 0.0
-        @inbounds for k in real_center_indices(grid)
-            z = grid.zc[k]
-            # need to rethink of how to initilize the covarinace profiles - for now took the TKE profile
-            gm.Hvar.values[k] = gm.Hvar.values[kc_surf] * tke_gm(z)
-            gm.QTvar.values[k] = gm.QTvar.values[kc_surf] * tke_gm(z)
-            gm.HQTcov.values[k] = gm.HQTcov.values[kc_surf] * tke_gm(z)
-        end
-    else
-        @inbounds for k in real_center_indices(grid)
-            gm.Hvar.values[k] = 0.0
-            gm.QTvar.values[k] = 0.0
-            gm.HQTcov.values[k] = 0.0
-        end
-    end
-
-    # TKE initialization from Beare et al, 2006
-    if Case.casename == "GABLS"
-        @inbounds for k in real_center_indices(grid)
-            z = grid.zc[k]
-            if (z <= 250.0)
-                gm.Hvar.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
-            end
-            gm.QTvar.values[k] = 0.0
-            gm.HQTcov.values[k] = 0.0
-        end
-    end
-
-    @inbounds for k in real_center_indices(grid)
-        en.TKE.values[k] = gm.TKE.values[k]
-        en.Hvar.values[k] = gm.Hvar.values[k]
-        en.QTvar.values[k] = gm.QTvar.values[k]
-        en.HQTcov.values[k] = gm.HQTcov.values[k]
-    end
+    en.Hvar.values .= gm.Hvar.values
+    en.QTvar.values .= gm.QTvar.values
+    en.HQTcov.values .= gm.HQTcov.values
     return
 end
 
@@ -1520,49 +1453,5 @@ function GMV_third_m(
                 Upd_cubed + ae[k] * (mean_en^3 + 3 * mean_en * Envcov_) - GMVv_^3 - 3 * GMVcov_ * GMVv_
         end
     end
-    return
-end
-
-
-# Update the diagnosis of the inversion height, using the maximum temperature gradient method
-function update_inversion(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, option)
-    grid = edmf.grid
-    θ_ρ = center_field(grid)
-    ∇θ_liq_max = 0.0
-    kc_surf = kc_surface(grid)
-    param_set = parameter_set(gm)
-    ref_state = edmf.ref_state
-    p0_c = ref_state.p0_half
-
-    @inbounds for k in real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], gm.H.values[k], gm.QT.values[k])
-        θ_ρ[k] = TD.virtual_pottemp(ts)
-    end
-
-
-    if option == "theta_rho"
-        @inbounds for k in real_center_indices(grid)
-            if θ_ρ[k] > θ_ρ[kc_surf]
-                edmf.zi = grid.zc[k]
-                break
-            end
-        end
-    elseif option == "thetal_maxgrad"
-
-        @inbounds for k in real_center_indices(grid)
-            ∇θ_liq_cut = ccut_downwind(gm.H.values, grid, k)
-            ∇θ_liq = c∇_downwind(∇θ_liq_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
-            if ∇θ_liq > ∇θ_liq_max
-                ∇θ_liq_max = ∇θ_liq
-                edmf.zi = grid.zc[k]
-            end
-        end
-    elseif option == "critical_Ri"
-        edmf.zi = get_inversion(param_set, θ_ρ, gm.U.values, gm.V.values, grid, Ri_bulk_crit(edmf))
-
-    else
-        error("INVERSION HEIGHT OPTION NOT RECOGNIZED")
-    end
-
     return
 end
