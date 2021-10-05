@@ -181,10 +181,10 @@ function initialize_profiles(self::CasesBase{Soares}, grid::Grid, GMV::GridMeanV
         end
         GMV.U.values[k] = 0.01
 
-        if (z <= 1600.0)
-            GMV.TKE.values[k] = 0.1 * 1.46 * 1.46 * (1.0 - z / 1600.0)
+        GMV.TKE.values[k] = if z <= 1600.0
+            0.1 * 1.46 * 1.46 * (1.0 - z / 1600.0)
         else
-            GMV.TKE.values[k] = 0.0
+            0.0
         end
     end
 end
@@ -248,10 +248,10 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, GMV::GridM
         end
         GMV.U.values[k] = 0.01
 
-        if (z <= 1600.0)
-            GMV.TKE.values[k] = 0.1 * 1.46 * 1.46 * (1.0 - z / 1600.0)
+        GMV.TKE.values[k] = if (z <= 1600.0)
+            0.1 * 1.46 * 1.46 * (1.0 - z / 1600.0)
         else
-            GMV.TKE.values[k] = 0.0
+            0.0
         end
     end
 end
@@ -343,10 +343,10 @@ function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, GMV::GridMeanVa
             -8.75 + (z - 700.0) * (-4.61 - -8.75) / (3000.0 - 700.0)
         end
 
-        if (z <= 2500.0)
-            GMV.TKE.values[k] = 1.0 - z / 3000.0
+        GMV.TKE.values[k] = if (z <= 2500.0)
+            1.0 - z / 3000.0
         else
-            GMV.TKE.values[k] = 0.0
+            0.0
         end
     end
 end
@@ -464,10 +464,10 @@ function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, grid::Grid, GM
         else
             -8.75 + (z - 700.0) * (-4.61 - -8.75) / (3000.0 - 700.0)
         end
-        if (z <= 2500.0)
-            GMV.TKE.values[k] = 1.0 - z / 3000.0
+        GMV.TKE.values[k] = if z <= 2500.0
+            1.0 - z / 3000.0
         else
-            GMV.TKE.values[k] = 0.0
+            0.0
         end
     end
 end
@@ -599,10 +599,10 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, GMV::GridMeanVar
             (2.4 + (1.8 - 2.4) / (4000.0 - 3260.0) * (z - 3260.0)) / 1000.0
         end
 
-        if (z <= 1500.0)
-            GMV.TKE.values[k] = 1.0 - z / 3000.0
+        GMV.TKE.values[k] = if z <= 1500.0
+            1.0 - z / 3000.0
         else
-            GMV.TKE.values[k] = 0.0
+            0.0
         end
     end
 end
@@ -745,10 +745,10 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMea
         phase_part = TD.PhasePartition(GMV.QT.values[k], 0.0, 0.0) # initial state is not saturated
         GMV.H.values[k] = TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], p0[k], phase_part)
         z = grid.zc[k]
-        if (z <= 2500.0)
-            GMV.TKE.values[k] = 1.0 - z / 3000.0
+        GMV.TKE.values[k] = if z <= 2500.0
+            1.0 - z / 3000.0
         else
-            GMV.TKE.values[k] = 0.0
+            0.0
         end
     end
 end
@@ -998,10 +998,10 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, GMV::GridMean
         GMV.H.values[k] = TD.liquid_ice_pottemp_given_pressure(param_set, GMV.T.values[k], p0[k], phase_part)
 
         z = grid.zc[k]
-        if (z <= 2500.0)
-            GMV.TKE.values[k] = 1.0 - z / 3000.0
+        GMV.TKE.values[k] = if z <= 2500.0
+            1.0 - z / 3000.0
         else
-            GMV.TKE.values[k] = 0.0
+            0.0
         end
     end
 end
@@ -1140,10 +1140,10 @@ function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, GMV::GridMea
         GMV.H.values[k] = TD.liquid_ice_pottemp(ts)
 
         z = grid.zc[k]
-        if (z <= 2500.0)
-            GMV.TKE.values[k] = 1.0 - z / 3000.0
+        GMV.TKE.values[k] = if z <= 2500.0
+            1.0 - z / 3000.0
         else
-            GMV.TKE.values[k] = 0.0
+            0.0
         end
     end
 end
@@ -1242,10 +1242,10 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, grid::Grid, GMV::Grid
         GMV.U.values[k] = 7.0
         GMV.V.values[k] = -5.5
 
-        if (z <= 800.0)
-            GMV.TKE.values[k] = 1.0 - z / 1000.0
+        GMV.TKE.values[k] = if (z <= 800.0)
+            1.0 - z / 1000.0
         else
-            GMV.TKE.values[k] = 0.0
+            0.0
         end
     end
 end
@@ -1371,13 +1371,12 @@ function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, GMV::GridMeanVa
 
         #Set qt profile
         GMV.QT.values[k] = 0.0
-        if (z <= 250.0)
-            GMV.TKE.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
-            GMV.Hvar.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
+        GMV.TKE.values[k] = if z <= 250.0
+            0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
         else
-            GMV.TKE.values[k] = 0.0
-            GMV.Hvar.values[k] = 0.0
+            0.0
         end
+        GMV.Hvar.values[k] = GMV.TKE.values[k]
     end
 end
 
@@ -1446,10 +1445,10 @@ function initialize_profiles(self::CasesBase{SP}, grid::Grid, GMV::GridMeanVaria
 
         #Set qt profile
         GMV.QT.values[k] = 0.0
-        if (z <= 1600.0)
-            GMV.TKE.values[k] = 1.0 - z / 2000.0
+        GMV.TKE.values[k] = if z <= 1600.0
+            1.0 - z / 2000.0
         else
-            GMV.TKE.values[k] = 0.0
+            0.0
         end
     end
 end
@@ -1660,10 +1659,10 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, GMV::G
     end
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
-        if (z <= 2500.0)
-            GMV.TKE.values[k] = 1.0 - z / 3000.0
+        GMV.TKE.values[k] = if z <= 2500.0
+            1.0 - z / 3000.0
         else
-            GMV.TKE.values[k] = 0.0
+            0.0
         end
     end
 end
