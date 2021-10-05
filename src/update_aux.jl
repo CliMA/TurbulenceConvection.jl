@@ -128,4 +128,11 @@ function update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
         end
         en.B.values[k] -= gm.B.values[k]
     end
+    # TODO - use this inversion in free_convection_windspeed and not compute zi twice
+    θ_ρ = center_field(grid)
+    @inbounds for k in real_center_indices(grid)
+        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], gm.H.values[k], gm.QT.values[k])
+        θ_ρ[k] = TD.virtual_pottemp(ts)
+    end
+    edmf.zi = get_inversion(param_set, θ_ρ, gm.U.values, gm.V.values, grid, Case.Sur.Ri_bulk_crit)
 end
