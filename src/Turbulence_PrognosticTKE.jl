@@ -1172,7 +1172,7 @@ function initialize_covariance(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, 
     reset_surface_covariance(edmf, gm, Case)
 
     # grid-mean tke closure over all but z:
-    tke_gm(z) = ws * 1.3 * cbrt((us * us * us) / (ws * ws * ws) + 0.6 * z / zs) * sqrt(max(1 - z / zs, 0))
+    tke_gm(z) = 0.0
 
 
     if ws > 0.0
@@ -1186,7 +1186,7 @@ function initialize_covariance(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, 
         @inbounds for k in real_center_indices(grid)
             z = grid.zc[k]
             if (z <= 250.0)
-                gm.TKE.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
+                gm.TKE.values[k] = 0.0
             end
         end
 
@@ -1194,7 +1194,7 @@ function initialize_covariance(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, 
         @inbounds for k in real_center_indices(grid)
             z = grid.zc[k]
             if (z <= 2500.0)
-                gm.TKE.values[k] = 1.0 - z / 3000.0
+                gm.TKE.values[k] = 0.0
             end
         end
 
@@ -1202,7 +1202,7 @@ function initialize_covariance(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, 
         @inbounds for k in real_center_indices(grid)
             z = grid.zc[k]
             if (z <= 1600.0)
-                gm.TKE.values[k] = 0.1 * 1.46 * 1.46 * (1.0 - z / 1600.0)
+                gm.TKE.values[k] = 0.0
             end
         end
     end
@@ -1228,7 +1228,7 @@ function initialize_covariance(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, 
         @inbounds for k in real_center_indices(grid)
             z = grid.zc[k]
             if (z <= 250.0)
-                gm.Hvar.values[k] = 0.4 * (1.0 - z / 250.0) * (1.0 - z / 250.0) * (1.0 - z / 250.0)
+                gm.Hvar.values[k] = 0.0
             end
             gm.QTvar.values[k] = 0.0
             gm.HQTcov.values[k] = 0.0
