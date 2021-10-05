@@ -252,19 +252,19 @@ function microphysics(up_thermo::UpdraftThermodynamics, up::UpdraftVariables, ra
 
     @inbounds for i in xrange(up.n_updrafts)
         @inbounds for k in real_center_indices(grid)
+            T_up = up.T.values[i, k]
+            q_tot_up = up.QT.values[i, k]
+            ts_up = TD.PhaseEquil_pTq(param_set, p0_c[k], T_up, q_tot_up)
 
             # autoconversion and accretion
             mph = microphysics_rain_src(
                 param_set,
                 rain.rain_model,
-                up.QT.values[i, k],
-                up.QL.values[i, k],
                 rain.QR.values[k],
                 up.Area.values[i, k],
-                up.T.values[i, k],
-                p0_c[k],
                 ρ0_c[k],
                 dt,
+                ts_up,
             )
 
             # update rain sources of state variables

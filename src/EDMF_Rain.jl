@@ -124,9 +124,13 @@ function solve_rain_evap(rain::RainPhysics, gm::GridMeanVariables, TS::TimeStepp
     @inbounds for k in real_center_indices(rain.grid)
         flag_evaporate_all = false
 
-        q = TD.PhasePartition(gm.QT.values[k], gm.QL.values[k], 0.0)
+        q_tot_gm = gm.QT.values[k]
+        T_gm = gm.T.values[k]
+        # When we fuse loops, this should hopefully disappear
+        ts = TD.PhaseEquil_pTq(param_set, p0_c[k], T_gm, q_tot_gm)
+        q = TD.PhasePartition(ts)
 
-        tmp_evap_rate = -CM1.evaporation_sublimation(param_set, rain_type, q, QR.values[k], ρ0_c[k], gm.T.values[k])
+        tmp_evap_rate = -CM1.evaporation_sublimation(param_set, rain_type, q, QR.values[k], ρ0_c[k], T_gm)
 
         if tmp_evap_rate * Δt > QR.values[k]
             flag_evaporate_all = true
@@ -135,8 +139,7 @@ function solve_rain_evap(rain::RainPhysics, gm::GridMeanVariables, TS::TimeStepp
 
         rain.rain_evap_source_qt[k] = tmp_evap_rate
 
-        # TODO add ice
-        rain_source_to_thetal(param_set, p0_c[k], gm.T.values[k], gm.QT.values[k], gm.QL.values[k], 0.0, -tmp_evap_rate)
+        rain_source_to_thetal(ts, -tmp_evap_rate)
 
         if flag_evaporate_all
             QR.values[k] = 0.0

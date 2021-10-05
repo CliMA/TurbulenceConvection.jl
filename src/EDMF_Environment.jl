@@ -72,17 +72,18 @@ function update_EnvRain_sources(en_thermo::EnvironmentThermodynamics, k, en::Env
     return
 end
 
-function update_cloud_dry(en_thermo::EnvironmentThermodynamics, k, en::EnvironmentVariables, T, th, qt, ql, qv)
-    if ql > 0.0
+function update_cloud_dry(en_thermo::EnvironmentThermodynamics, k, en::EnvironmentVariables, ts)
+    q_liq = TD.liquid_specific_humidity(ts)
+    if q_liq > 0.0
         en.cloud_fraction.values[k] = 1.0
-        en_thermo.th_cloudy[k] = th
-        en_thermo.t_cloudy[k] = T
-        en_thermo.qt_cloudy[k] = qt
-        en_thermo.qv_cloudy[k] = qv
+        en_thermo.th_cloudy[k] = TD.liquid_ice_pottemp(ts)
+        en_thermo.t_cloudy[k] = TD.air_temperature(ts)
+        en_thermo.qt_cloudy[k] = TD.total_specific_humidity(ts)
+        en_thermo.qv_cloudy[k] = TD.vapor_specific_humidity(ts)
     else
         en.cloud_fraction.values[k] = 0.0
-        en_thermo.th_dry[k] = th
-        en_thermo.qt_dry[k] = qt
+        en_thermo.th_dry[k] = TD.liquid_ice_pottemp(ts)
+        en_thermo.qt_dry[k] = TD.total_specific_humidity(ts)
     end
     return
 end
@@ -98,25 +99,9 @@ function sgs_mean(en_thermo::EnvironmentThermodynamics, en::EnvironmentVariables
         # condensation
         q_tot_en = en.QT.values[k]
         ts = TD.PhaseEquil_pθq(param_set, p0_c[k], en.H.values[k], q_tot_en)
-        q_liq_en = TD.liquid_specific_humidity(ts)
-        T = TD.air_temperature(ts)
         # autoconversion and accretion
-        mph = microphysics_rain_src(
-            param_set,
-            rain.rain_model,
-            en.QT.values[k],
-            q_liq_en,
-            rain.QR.values[k],
-            en.Area.values[k],
-            T,
-            p0_c[k],
-            ρ0_c[k],
-            dt,
-        )
-        phase_part = TD.PhasePartition(q_tot_en, q_liq_en, 0.0)
-        theta = TD.dry_pottemp_given_pressure(param_set, T, p0_c[k], phase_part)
-        qv = TD.vapor_specific_humidity(phase_part)
-        update_cloud_dry(en_thermo, k, en, T, theta, q_tot_en, q_liq_en, qv)
+        mph = microphysics_rain_src(param_set, rain.rain_model, rain.QR.values[k], en.Area.values[k], ρ0_c[k], dt, ts)
+        update_cloud_dry(en_thermo, k, en, ts)
         update_EnvRain_sources(en_thermo, k, en, mph.qr_src, mph.thl_rain_src)
     end
     return
@@ -234,14 +219,11 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
                     mph = microphysics_rain_src(
                         param_set,
                         rain.rain_model,
-                        qt_hat,
-                        q_liq_en,
                         rain.QR.values[k],
                         en.Area.values[k],
-                        T,
-                        p0_c[k],
                         ρ0_c[k],
                         dt,
+                        ts,
                     )
 
                     # environmental variables
@@ -284,6 +266,9 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
             en.cloud_fraction.values[k] = outer_env[i_cf]
             en_thermo.qt_dry[k] = outer_env[i_qt_dry]
             # Charlie - this breaks when using PhaseEquil_pTq(...)
+            # Anna - Why are we assuming zero q_liq here?
+            #        we don't in the call to `PhaseEquil_pTq` below.
+            #        is that what the `dry` indicates?
             phase_part = TD.PhasePartition(en_thermo.qt_dry[k], 0.0, 0.0)
             en_thermo.th_dry[k] = TD.dry_pottemp_given_pressure(param_set, outer_env[i_T_dry], p0_c[k], phase_part)
 
@@ -303,25 +288,10 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
         else
             # if variance and covariance are zero do the same as in SA_mean
             ts = TD.PhaseEquil_pθq(param_set, p0_c[k], en.H.values[k], en.QT.values[k])
-            q_liq_en = TD.liquid_specific_humidity(ts)
-            T = TD.air_temperature(ts)
-            mph = microphysics_rain_src(
-                param_set,
-                rain.rain_model,
-                en.QT.values[k],
-                q_liq_en,
-                rain.QR.values[k],
-                en.Area.values[k],
-                T,
-                p0_c[k],
-                ρ0_c[k],
-                dt,
-            )
-            phase_part = TD.PhasePartition(en.QT.values[k], q_liq_en, 0.0)
-            theta = TD.dry_pottemp_given_pressure(param_set, T, p0_c[k], phase_part)
-            qv = en.QT.values[k] - q_liq_en
+            mph =
+                microphysics_rain_src(param_set, rain.rain_model, rain.QR.values[k], en.Area.values[k], ρ0_c[k], dt, ts)
             update_EnvRain_sources(en_thermo, k, en, mph.qr_src, mph.thl_rain_src)
-            update_cloud_dry(en_thermo, k, en, T, theta, en.QT.values[k], q_liq_en, qv)
+            update_cloud_dry(en_thermo, k, en, ts)
 
             en_thermo.Hvar_rain_dt[k] = 0.0
             en_thermo.QTvar_rain_dt[k] = 0.0
