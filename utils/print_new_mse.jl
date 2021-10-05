@@ -18,6 +18,7 @@ all_cases = [
 ]
 
 filter!(x -> x ≠ "GATE_III", all_cases) # no mse tables for GATE_III
+filter!(x -> x ≠ "SP", all_cases) # not currently running SP
 
 include(joinpath("..", "integration_tests", "utils", "mse_tables.jl"))
 
