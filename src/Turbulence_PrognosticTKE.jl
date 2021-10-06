@@ -442,13 +442,6 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     # compute tendencies
     compute_gm_tendencies!(edmf, grid, Case, gm, edmf.ref_state, TS)
 
-    # update
-    solve_updraft(edmf, gm, TS)
-    if edmf.Rain.rain_model == "clima_1m"
-        solve_rain_fall(edmf.rainphysics, gm, TS, edmf.Rain.QR)
-    end
-    update_cloud_frac(edmf, gm)
-
     # ----------- TODO: move to compute_tendencies
     implicit_eqs = edmf.implicit_eqs
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
@@ -500,19 +493,10 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     implicit_eqs.b_QTvar .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.values, en.QTvar)
     implicit_eqs.b_HQTcov .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.values, en.HQTcov)
     # -----------
-
-    # Update the grid mean variables with the tendency due to eddy diffusion
-    # Solve tri-diagonal systems
     x_q_tot_gm = center_field(grid) # for tridiag solver
     x_θ_liq_ice_gm = center_field(grid) # for tridiag solver
     x_q_tot_gm .= tridiag_solve(implicit_eqs.b_q_tot_gm, implicit_eqs.A_θq_gm)
     x_θ_liq_ice_gm .= tridiag_solve(implicit_eqs.b_θ_liq_ice_gm, implicit_eqs.A_θq_gm)
-    GMV.U.new .= tridiag_solve(implicit_eqs.b_u_gm, implicit_eqs.A_uv_gm)
-    GMV.V.new .= tridiag_solve(implicit_eqs.b_v_gm, implicit_eqs.A_uv_gm)
-    en.TKE.values .= tridiag_solve(implicit_eqs.b_TKE, implicit_eqs.A_TKE)
-    en.Hvar.values .= tridiag_solve(implicit_eqs.b_Hvar, implicit_eqs.A_Hvar)
-    en.QTvar.values .= tridiag_solve(implicit_eqs.b_QTvar, implicit_eqs.A_QTvar)
-    en.HQTcov.values .= tridiag_solve(implicit_eqs.b_HQTcov, implicit_eqs.A_HQTcov)
 
     @inbounds for k in real_center_indices(grid)
         GMV.QT.new[k] = max(GMV.QT.values[k] + edmf.ae[k] * (x_q_tot_gm[k] - edmf.EnvVar.QT.values[k]), 0.0)
@@ -522,6 +506,30 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
         edmf.diffusive_tendency_qt[k] = (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
     end
 
+    ###
+    ### update
+    ###
+    solve_updraft(edmf, gm, TS)
+    if edmf.Rain.rain_model == "clima_1m"
+        solve_rain_fall(edmf.rainphysics, gm, TS, edmf.Rain.QR)
+    end
+
+    GMV.U.new .= tridiag_solve(implicit_eqs.b_u_gm, implicit_eqs.A_uv_gm)
+    GMV.V.new .= tridiag_solve(implicit_eqs.b_v_gm, implicit_eqs.A_uv_gm)
+    en.TKE.values .= tridiag_solve(implicit_eqs.b_TKE, implicit_eqs.A_TKE)
+    en.Hvar.values .= tridiag_solve(implicit_eqs.b_Hvar, implicit_eqs.A_Hvar)
+    en.QTvar.values .= tridiag_solve(implicit_eqs.b_QTvar, implicit_eqs.A_QTvar)
+    en.HQTcov.values .= tridiag_solve(implicit_eqs.b_HQTcov, implicit_eqs.A_HQTcov)
+
+    update_GMV_turbulence(edmf, GMV, Case, TS)
+    update(GMV, TS)
+
+    ###
+    ### set values
+    ###
+    set_values_with_new(edmf.UpdVar)
+    zero_area_fraction_cleanup(edmf, GMV)
+
     # Filter solution, TODO: fuse with `zero_area_fraction_cleanup` and put into `filter_variables!`
     @inbounds for k in real_center_indices(grid)
         en.TKE.values[k] = max(en.TKE.values[k], 0.0)
@@ -530,13 +538,6 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
         en.HQTcov.values[k] = max(en.HQTcov.values[k], -sqrt(en.Hvar.values[k] * en.QTvar.values[k]))
         en.HQTcov.values[k] = min(en.HQTcov.values[k], sqrt(en.Hvar.values[k] * en.QTvar.values[k]))
     end
-
-    update_GMV_turbulence(edmf, GMV, Case, TS)
-    # set values
-    set_values_with_new(edmf.UpdVar)
-    zero_area_fraction_cleanup(edmf, GMV)
-
-    update(GMV, TS)
     return
 end
 
