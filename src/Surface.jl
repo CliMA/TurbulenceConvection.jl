@@ -64,7 +64,7 @@ function update(self::SurfaceBase{SurfaceFixedFlux}, GMV::GridMeanVariables)
     ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
     Π = TD.exner(ts)
     self.rho_hflux = rho_tflux / Π
-    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, T_gm_surf, q_tot_gm_surf, α0_f_surf, ts)
+    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, self.Tsurface, self.qsurface, α0_f_surf, ts)
 
     if !self.ustar_fixed
         # Correction to windspeed for free convective cases (Beljaars, QJRMS (1994), 121, pp. 255-270)
@@ -131,7 +131,7 @@ function update(self::SurfaceBase{SurfaceFixedCoeffs}, GMV::GridMeanVariables)
     self.rho_hflux = -self.ch * windspeed * (θ_liq_ice_gm_surf - self.Tsurface / Π) * ρ0_f_surf
     self.shf = cp_ * self.rho_hflux
 
-    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, T_gm_surf, q_tot_gm_surf, α0_f_surf, ts)
+    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, self.Tsurface, self.qsurface, α0_f_surf, ts)
 
     self.ustar = sqrt(self.cm) * windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
@@ -191,7 +191,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
     ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, self.Tsurface, self.qsurface)
     self.shf = TD.cp_m(ts) * self.rho_hflux
 
-    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, T_gm_surf, q_tot_gm_surf, α0_f_surf, ts)
+    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, self.Tsurface, self.qsurface, α0_f_surf, ts)
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
     von_karman_const = CPSGS.von_karman_const(param_set)
@@ -250,7 +250,7 @@ function update(self::SurfaceBase{SurfaceMoninObukhovDry}, GMV::GridMeanVariable
     ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0[kf_surf], self.Tsurface, self.qsurface)
     self.shf = TD.cp_m(ts) * self.rho_hflux
 
-    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, T_gm_surf, 0.0, α0_f_surf, ts)
+    self.bflux = buoyancy_flux(param_set, self.shf, self.lhf, self.Tsurface, self.qsurface, α0_f_surf, ts)
     self.ustar = sqrt(self.cm) * self.windspeed
     # CK--testing this--EDMF scheme checks greater or less than zero,
     von_karman_const = CPSGS.von_karman_const(param_set)
