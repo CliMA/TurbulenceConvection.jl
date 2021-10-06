@@ -75,12 +75,14 @@ function gradient_Richardson_number(∂b∂θ_l, ∂b∂q_tot, Shear², ϵ)
     return min(∂b∂θ_l / max(Shear², ϵ) + ∂b∂q_tot / max(Shear², ϵ), 0.25)
 end
 
-function turbulent_Prandtl_number(obukhov_length, ∇Ri, Pr, ω_pr)
+function turbulent_Prandtl_number(param_set, obukhov_length, ∇Ri)
+    ω_pr = CPEDMF.ω_pr(param_set)
+    Pr_n = CPEDMF.Pr_n(param_set)
     if obukhov_length > 0.0 && ∇Ri > 0.0 #stable
         # CSB (Dan Li, 2019), with Pr_neutral=0.74 and w1=40.0/13.0
-        prandtl_nvec = Pr * (2 * ∇Ri / (1 + ω_pr * ∇Ri - sqrt((1 + ω_pr * ∇Ri)^2 - 4 * ∇Ri)))
+        prandtl_nvec = Pr_n * (2 * ∇Ri / (1 + ω_pr * ∇Ri - sqrt((1 + ω_pr * ∇Ri)^2 - 4 * ∇Ri)))
     else
-        prandtl_nvec = Pr
+        prandtl_nvec = Pr_n
     end
     return prandtl_nvec
 end
