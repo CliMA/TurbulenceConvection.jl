@@ -16,13 +16,13 @@ function export_ref_profile(case_name::String)
     param_set = create_parameter_set(namelist)
     namelist["meta"]["uuid"] = "01"
 
-    grid = TC.Grid(namelist)
+    FT = Float64
+    grid = TC.Grid(FT(namelist["grid"]["dz"]), namelist["grid"]["nz"])
     Stats = TC.NetCDFIO_Stats(namelist, grid)
     case = Cases.get_case(namelist)
     ref_params = Cases.reference_params(case, grid, param_set, namelist)
     ref_state = TC.ReferenceState(grid, param_set, Stats; ref_params...)
 
-    FT = Float64
     aux_vars(FT) = (; ref_state = (ρ0 = FT(0), α0 = FT(0), p0 = FT(0)))
     aux_cent_fields = TC.FieldFromNamedTuple(TC.center_space(grid), aux_vars(FT))
     aux_face_fields = TC.FieldFromNamedTuple(TC.face_space(grid), aux_vars(FT))
