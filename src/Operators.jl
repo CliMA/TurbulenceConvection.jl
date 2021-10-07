@@ -36,7 +36,6 @@ end
 ∇f2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[2] - bc.value) * grid.Δzi
 ∇f2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
-# TODO: this should be changed to `c∇` or `c∇_upwind`
 # Actually, this method is needed for rain (upwind is in reverse direction due to rain)
 function c∇_downwind(f_dual::SA.SVector, grid::Grid, k::Int; bottom = NoBCGivenError(), top = NoBCGivenError())
     if is_surface_center(grid, k)

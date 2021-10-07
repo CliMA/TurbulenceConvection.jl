@@ -179,7 +179,6 @@ function update(self::SurfaceBase{SurfaceMoninObukhov}, GMV::GridMeanVariables)
     Nb2 = g / θ_ρ_g * (θ_ρ_b - θ_ρ_g) / zb
     Ri = Nb2 * zb * zb / (self.windspeed * self.windspeed)
 
-    #TODO: make sure pass by reference: &self.cm, &self.ch, &self.obukhov_length
     self.cm, self.ch, self.obukhov_length =
         exchange_coefficients_byun(param_set, Ri, zb, self.zrough, self.cm, self.ch, self.obukhov_length)
     self.rho_uflux = -self.cm * self.windspeed * u_gm_surf * ρ0_f_surf
@@ -304,7 +303,6 @@ function update(self::SurfaceBase{SurfaceSullivanPatton}, GMV::GridMeanVariables
     Nb2 = g / θ_ρ_g * (θ_ρ_b - θ_ρ_g) / zb
     Ri = Nb2 * zb * zb / (self.windspeed * self.windspeed)
 
-    #TODO: make sure pass by reference: &self.cm, &self.ch, &self.obukhov_length
     self.cm, self.ch, self.obukhov_length =
         exchange_coefficients_byun(param_set, Ri, zb, self.zrough, self.cm, self.ch, self.obukhov_length)
     self.rho_uflux = -self.cm * self.windspeed * u_gm_surf * ρ0_f_surf
