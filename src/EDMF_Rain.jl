@@ -138,8 +138,7 @@ function solve_rain_evap(rain::RainPhysics, gm::GridMeanVariables, TS::TimeStepp
         end
 
         rain.rain_evap_source_qt[k] = tmp_evap_rate
-
-        rain_source_to_thetal(ts, -tmp_evap_rate)
+        rain.rain_evap_source_h[k] = rain_source_to_thetal(ts, -tmp_evap_rate)
 
         if flag_evaporate_all
             QR.values[k] = 0.0
