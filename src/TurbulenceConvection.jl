@@ -85,7 +85,7 @@ include("types.jl")
 include("name_aliases.jl")
 include("Operators.jl")
 
-include("microphysics_functions.jl")
+include("microphysics_coupling.jl")
 include("turbulence_functions.jl")
 include("utility_functions.jl")
 include("TimeStepping.jl")

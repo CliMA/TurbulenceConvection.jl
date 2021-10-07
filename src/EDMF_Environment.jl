@@ -64,10 +64,16 @@ function env_cloud_diagnostics(en::EnvironmentVariables, ref_state::ReferenceSta
     return
 end
 
-function update_EnvRain_sources(en_thermo::EnvironmentThermodynamics, k, en::EnvironmentVariables, qr_src, thl_rain_src)
+function update_env_precip_tendencies(
+    en_thermo::EnvironmentThermodynamics,
+    k,
+    en::EnvironmentVariables,
+    qt_tendency,
+    θ_liq_ice_tendency,
+)
 
-    en_thermo.prec_source_qt[k] = -qr_src * en.Area.values[k]
-    en_thermo.prec_source_h[k] = thl_rain_src * en.Area.values[k]
+    en_thermo.qt_tendency_rain_formation[k] = qt_tendency * en.Area.values[k]
+    en_thermo.θ_liq_ice_tendency_rain_formation[k] = θ_liq_ice_tendency * en.Area.values[k]
 
     return
 end
@@ -100,9 +106,9 @@ function sgs_mean(en_thermo::EnvironmentThermodynamics, en::EnvironmentVariables
         q_tot_en = en.QT.values[k]
         ts = TD.PhaseEquil_pθq(param_set, p0_c[k], en.H.values[k], q_tot_en)
         # autoconversion and accretion
-        mph = microphysics_rain_src(param_set, rain.rain_model, rain.QR.values[k], en.Area.values[k], ρ0_c[k], dt, ts)
+        mph = precipitation_formation(param_set, rain.rain_model, rain.QR.values[k], en.Area.values[k], ρ0_c[k], dt, ts)
         update_cloud_dry(en_thermo, k, en, ts)
-        update_EnvRain_sources(en_thermo, k, en, mph.qr_src, mph.thl_rain_src)
+        update_env_precip_tendencies(en_thermo, k, en, mph.qt_tendency, mph.θ_liq_ice_tendency)
     end
     return
 end
@@ -216,7 +222,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
                     q_liq_en = TD.liquid_specific_humidity(ts)
                     T = TD.air_temperature(ts)
                     # autoconversion and accretion
-                    mph = microphysics_rain_src(
+                    mph = precipitation_formation(
                         param_set,
                         rain.rain_model,
                         rain.QR.values[k],
@@ -230,7 +236,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
                     inner_env[i_ql] += q_liq_en * weights[m_h] * sqpi_inv
                     inner_env[i_T] += T * weights[m_h] * sqpi_inv
                     # rain area fraction
-                    if mph.qr_src > 0.0
+                    if mph.qr_tendency > 0.0
                         inner_env[i_rf] += weights[m_h] * sqpi_inv
                     end
                     # cloudy/dry categories for buoyancy in TKE
@@ -243,12 +249,12 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
                         inner_env[i_T_dry] += T * weights[m_h] * sqpi_inv
                     end
                     # products for variance and covariance source terms
-                    inner_src[i_Sqt] += -mph.qr_src * weights[m_h] * sqpi_inv
-                    inner_src[i_SH] += mph.thl_rain_src * weights[m_h] * sqpi_inv
-                    inner_src[i_Sqt_H] += -mph.qr_src * h_hat * weights[m_h] * sqpi_inv
-                    inner_src[i_Sqt_qt] += -mph.qr_src * qt_hat * weights[m_h] * sqpi_inv
-                    inner_src[i_SH_H] += mph.thl_rain_src * h_hat * weights[m_h] * sqpi_inv
-                    inner_src[i_SH_qt] += mph.thl_rain_src * qt_hat * weights[m_h] * sqpi_inv
+                    inner_src[i_Sqt] += mph.qt_tendency * weights[m_h] * sqpi_inv
+                    inner_src[i_SH] += mph.θ_liq_ice_tendency * weights[m_h] * sqpi_inv
+                    inner_src[i_Sqt_H] += mph.qt_tendency * h_hat * weights[m_h] * sqpi_inv
+                    inner_src[i_Sqt_qt] += mph.qt_tendency * qt_hat * weights[m_h] * sqpi_inv
+                    inner_src[i_SH_H] += mph.θ_liq_ice_tendency * h_hat * weights[m_h] * sqpi_inv
+                    inner_src[i_SH_qt] += mph.θ_liq_ice_tendency * qt_hat * weights[m_h] * sqpi_inv
                 end
 
                 for idx in xrange(env_len)
@@ -260,7 +266,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
             end
 
             # update environmental variables
-            update_EnvRain_sources(en_thermo, k, en, -outer_src[i_Sqt], outer_src[i_SH])
+            update_env_precip_tendencies(en_thermo, k, en, outer_src[i_Sqt], outer_src[i_SH])
 
             # update cloudy/dry variables for buoyancy in TKE
             en.cloud_fraction.values[k] = outer_env[i_cf]
@@ -288,9 +294,16 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
         else
             # if variance and covariance are zero do the same as in SA_mean
             ts = TD.PhaseEquil_pθq(param_set, p0_c[k], en.H.values[k], en.QT.values[k])
-            mph =
-                microphysics_rain_src(param_set, rain.rain_model, rain.QR.values[k], en.Area.values[k], ρ0_c[k], dt, ts)
-            update_EnvRain_sources(en_thermo, k, en, mph.qr_src, mph.thl_rain_src)
+            mph = precipitation_formation(
+                param_set,
+                rain.rain_model,
+                rain.QR.values[k],
+                en.Area.values[k],
+                ρ0_c[k],
+                dt,
+                ts,
+            )
+            update_env_precip_tendencies(en_thermo, k, en, mph.qt_tendency, mph.θ_liq_ice_tendency)
             update_cloud_dry(en_thermo, k, en, ts)
 
             en_thermo.Hvar_rain_dt[k] = 0.0

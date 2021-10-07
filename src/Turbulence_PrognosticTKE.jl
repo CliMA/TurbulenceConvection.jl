@@ -172,8 +172,8 @@ function io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     write_profile(Stats, "total_flux_h", edmf.massflux_h .+ edmf.diffusive_flux_h)
     write_profile(Stats, "total_flux_qt", edmf.massflux_h .+ edmf.diffusive_flux_qt)
     write_profile(Stats, "mixing_length", edmf.mixing_length)
-    write_profile(Stats, "updraft_qt_precip", edmf.UpdThermo.prec_source_qt_tot)
-    write_profile(Stats, "updraft_thetal_precip", edmf.UpdThermo.prec_source_h_tot)
+    write_profile(Stats, "updraft_qt_precip", edmf.UpdThermo.qt_tendency_rain_formation_tot)
+    write_profile(Stats, "updraft_thetal_precip", edmf.UpdThermo.θ_liq_ice_tendency_rain_formation_tot)
 
     #Different mixing lengths : Ignacio
     write_profile(Stats, "ed_length_scheme", edmf.mls)
@@ -308,13 +308,13 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, Case, gm, ref_st
             gm.V.tendencies[k] += gm_V_nudge_k
         end
         gm.QT.tendencies[k] +=
-            edmf.UpdThermo.prec_source_qt_tot[k] +
-            edmf.EnvThermo.prec_source_qt[k] +
-            edmf.rainphysics.rain_evap_source_qt[k]
+            edmf.UpdThermo.qt_tendency_rain_formation_tot[k] +
+            edmf.EnvThermo.qt_tendency_rain_formation[k] +
+            edmf.RainPhys.qt_tendency_rain_evap[k]
         gm.H.tendencies[k] +=
-            edmf.UpdThermo.prec_source_h_tot[k] +
-            edmf.EnvThermo.prec_source_h[k] +
-            edmf.rainphysics.rain_evap_source_h[k]
+            edmf.UpdThermo.θ_liq_ice_tendency_rain_formation_tot[k] +
+            edmf.EnvThermo.θ_liq_ice_tendency_rain_formation[k] +
+            edmf.RainPhys.θ_liq_ice_tendency_rain_evap[k]
     end
 
     edmf.massflux_h .= 0.0
@@ -451,15 +451,15 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     set_updraft_surface_bc(edmf, gm, Case)
     update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
 
-    clear_precip_sources(up_thermo)
-    microphysics(up_thermo, edmf.UpdVar, edmf.Rain, TS.dt) # causes division error in dry bubble first time step
+    compute_rain_formation_tendencies(up_thermo, edmf.UpdVar, edmf.Rain, TS.dt) # causes division error in dry bubble first time step
     microphysics(en_thermo, edmf.EnvVar, edmf.Rain, TS.dt) # saturation adjustment + rain creation
-    update_total_precip_sources(up_thermo)
     if edmf.Rain.rain_model == "clima_1m"
-        solve_rain_evap(edmf.rainphysics, gm, TS, edmf.Rain.QR)
+        compute_rain_evap_tendencies(edmf.RainPhys, gm, TS, edmf.Rain.QR)
         # sum updraft and environment rain into bulk rain
-        sum_subdomains_rain(edmf.Rain, up_thermo, en_thermo, TS)
+        # TODO - this function should be removed once we move simming the tendencies to one place
+        compute_subdomain_rain_tendency_sum(edmf.Rain, up_thermo, en_thermo, TS)
     end
+
     # compute tendencies
     compute_gm_tendencies!(edmf, grid, Case, gm, edmf.ref_state, TS)
     compute_updraft_tendencies(edmf, gm, TS)
@@ -505,7 +505,7 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     ###
     update_updraft(edmf, gm, TS)
     if edmf.Rain.rain_model == "clima_1m"
-        compute_rain_advection_tendencies(edmf.rainphysics, gm, TS, edmf.Rain.QR)
+        compute_rain_advection_tendencies(edmf.RainPhys, gm, TS, edmf.Rain.QR)
     end
 
     en.TKE.values .= tridiag_solve(implicit_eqs.b_TKE, implicit_eqs.A_TKE)
@@ -730,14 +730,14 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, gm::GridMeanVariab
             adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], up.H.values[i, :], grid, k)
             entr = entr_w_c[i, k] * en.H.values[k]
             detr = detr_w_c[i, k] * up.H.values[i, k]
-            θ_liq_ice_rain = ρ_0_c[k] * up_thermo.prec_source_h[i, k]
-            up.H.tendencies[i, k] = -adv + m_k * (entr - detr) + θ_liq_ice_rain
+            rain = ρ_0_c[k] * up_thermo.θ_liq_ice_tendency_rain_formation[i, k]
+            up.H.tendencies[i, k] = -adv + m_k * (entr - detr) + rain
 
             adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], up.QT.values[i, :], grid, k)
             entr = entr_w_c[i, k] * en.QT.values[k]
             detr = detr_w_c[i, k] * up.QT.values[i, k]
-            q_tot_rain = ρ_0_c[k] * up_thermo.prec_source_qt[i, k]
-            up.QT.tendencies[i, k] = -adv + m_k * (entr - detr) + q_tot_rain
+            rain = ρ_0_c[k] * up_thermo.qt_tendency_rain_formation[i, k]
+            up.QT.tendencies[i, k] = -adv + m_k * (entr - detr) + rain
         end
     end
 
