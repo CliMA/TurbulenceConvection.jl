@@ -306,17 +306,9 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
             plots_dict["profiles"][tc_var] =
                 Plots.plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, title = tc_var, ylabel = "z [km]", label = "TC.jl")
 
-            if tc_var == "updraft_thetal"
-                # TODO: remove this if-else when artifacts are updated
-                #       So that updraft_thetal is initialized before IO
-                clims_min = minimum(data_tcc_arr)
-                clims_max = maximum(data_tcc_arr)
-                clims = (clims_min, clims_max)
-            else
-                clims_min = min(minimum(data_scm_arr), minimum(data_tcc_arr))
-                clims_max = max(maximum(data_scm_arr), maximum(data_tcc_arr))
-                clims = (clims_min, clims_max)
-            end
+            clims_min = min(minimum(data_scm_arr), minimum(data_tcc_arr))
+            clims_max = max(maximum(data_scm_arr), maximum(data_tcc_arr))
+            clims = (clims_min, clims_max)
 
             width_to_height_ratio = have_tc_main ? 15 / 10 : 15 / 10
             fig_height = 1500

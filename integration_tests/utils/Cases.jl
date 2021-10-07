@@ -571,7 +571,6 @@ end
 
 function reference_params(::Rico, grid::Grid, param_set::APS, namelist)
     molmass_ratio = CPP.molmass_ratio(param_set)
-    # TODO: think about constractor here
     Pg = 1.0154e5  #Pressure at ground
     Tg = 299.8  #Temperature at ground
     pvg = TD.saturation_vapor_pressure(param_set, Tg, TD.Liquid())
