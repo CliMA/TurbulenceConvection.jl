@@ -128,7 +128,7 @@ function default_namelist(case_name::String)
     namelist_defaults["thermodynamics"]["quadrature_type"] = "log-normal" #"gaussian" or "log-normal"
 
     namelist_defaults["time_stepping"] = Dict()
-    namelist_defaults["time_stepping"]["dt"] = 10.0
+    namelist_defaults["time_stepping"]["dt"] = 1.0
 
     namelist_defaults["microphysics"] = Dict()
     namelist_defaults["microphysics"]["rain_model"] = "None"

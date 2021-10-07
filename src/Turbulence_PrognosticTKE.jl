@@ -739,6 +739,7 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, gm::GridMeanVariab
     kf_surf = kf_surface(grid)
     dti_ = 1.0 / TS.dt
     Δt = TS.dt
+    Δzi = grid.Δzi
 
     up = edmf.UpdVar
     up_thermo = edmf.UpdThermo
@@ -785,20 +786,25 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, gm::GridMeanVariab
 
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in xrange(up.n_updrafts)
-            w_up_c = interpf2c(w_up, grid, k, i)
-            m_k = (ρ_0_c[k] * a_up[i, k] * w_up_c)
+            if k>1
+                w_up_c = interpf2c(w_up, grid, k, i)
+                adv = w_up_c*(up.H.values[i, k]-up.H.values[i, k-1])*Δzi
+                entr = w_up_c * entr_w_c[i, k] * (en.H.values[k] - up.H.values[i,k])
+                θ_liq_ice_rain = up_thermo.prec_source_h[i, k]/a_up[i, k]
+                up.H.tendencies[i, k] = -adv + entr + θ_liq_ice_rain
+            else
+                up.H.tendencies[i, k] = 0
+            end
 
-            adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], up.H.values[i, :], grid, k)
-            entr = entr_w_c[i, k] * en.H.values[k]
-            detr = detr_w_c[i, k] * up.H.values[i, k]
-            θ_liq_ice_rain = ρ_0_c[k] * up_thermo.prec_source_h[i, k]
-            up.H.tendencies[i, k] = -adv + m_k * (entr - detr) + θ_liq_ice_rain
-
-            adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], up.QT.values[i, :], grid, k)
-            entr = entr_w_c[i, k] * en.QT.values[k]
-            detr = detr_w_c[i, k] * up.QT.values[i, k]
-            q_tot_rain = ρ_0_c[k] * up_thermo.prec_source_qt[i, k]
-            up.QT.tendencies[i, k] = -adv + m_k * (entr - detr) + q_tot_rain
+            # adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], up.QT.values[i, :], grid, k)
+            if k>1
+                adv = w_up_c*(up.QT.values[i, k]-up.QT.values[i, k-1])*Δzi
+            else
+                adv = 0.0
+            end
+            entr = w_up_c * entr_w_c[i, k] * (en.QT.values[k]-up.QT.values[i,k])
+            q_tot_rain = up_thermo.prec_source_qt[i, k]/a_up[i, k]
+            up.QT.tendencies[i, k] = -adv + entr + q_tot_rain
         end
     end
 
@@ -811,13 +817,12 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, gm::GridMeanVariab
             # We know that, since W = 0 at z = 0, these BCs should
             # not matter in the end:
             entr_w = interpc2f(entr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
-            detr_w = interpc2f(detr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
-            B_k = interpc2f(up.B.values, grid, k, i; bottom = SetValue(0), top = SetValue(0))
+            buoy = interpc2f(up.B.values, grid, k, i; bottom = SetValue(0), top = SetValue(0))
 
-            adv = upwind_advection_velocity(ρ_0_f, a_up[i, :], w_up[i, :], grid, k; a_up_bcs)
-            exch = (ρ_0_f[k] * a_k * w_up[i, k] * (entr_w * en.W.values[k] - detr_w * w_up[i, k]))
-            buoy = ρ_0_f[k] * a_k * B_k
-            up.W.tendencies[i, k] = -adv + exch + buoy + edmf.nh_pressure[i, k]
+            # adv = upwind_advection_velocity(ρ_0_f, a_up[i, :], w_up[i, :], grid, k; a_up_bcs)
+            adv = w_up[i, k]*(w_up[i, k]-w_up[i, k-1])*Δzi
+            exch = entr_w * up.W.values[k] * (en.W.values[k]-up.W.values[i,k])
+            up.W.tendencies[i, k] = -adv + exch + buoy + edmf.nh_pressure[i, k]/(ρ_0_f[k] * a_k)
         end
     end
     return
@@ -864,7 +869,7 @@ function update_updraft(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, TS::Tim
             anew_k = interpc2f(a_up_new, grid, k, i; a_up_bcs...)
             if anew_k >= edmf.minimum_area
                 a_k = interpc2f(a_up, grid, k, i; a_up_bcs...)
-                w_up_new[i, k] = (ρ_0_f[k] * a_k * w_up[i, k] + Δt * up.W.tendencies[i, k]) / (ρ_0_f[k] * anew_k)
+                w_up_new[i, k] = (w_up[i, k] + Δt * up.W.tendencies[i, k])
 
                 w_up_new[i, k] = max(w_up_new[i, k], 0)
                 # TODO: remove a_up_new from this loop.
@@ -899,15 +904,8 @@ function update_updraft(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, TS::Tim
             # write the discrete equations in form
             # c1 * phi_new[k] = c2 * phi[k] + c3 * phi[k-1] + c4 * ϕ_enntr
             if a_up_new[i, k] >= edmf.minimum_area
-                up.H.new[i, k] =
-                    (ρ_0_c[k] * a_up[i, k] * up.H.values[i, k] + Δt * up.H.tendencies[i, k]) /
-                    (ρ_0_c[k] * a_up_new[i, k])
-
-                up.QT.new[i, k] = max(
-                    (ρ_0_c[k] * a_up[i, k] * up.QT.values[i, k] + Δt * up.QT.tendencies[i, k]) /
-                    (ρ_0_c[k] * a_up_new[i, k]),
-                    0.0,
-                )
+                up.H.new[i, k] = (up.H.values[i, k] + Δt * up.H.tendencies[i, k])
+                up.QT.new[i, k] = max(up.QT.values[i, k] + Δt * up.QT.tendencies[i, k],0.0)
 
             else
                 up.H.new[i, k] = gm.H.values[k]
