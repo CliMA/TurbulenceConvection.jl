@@ -77,7 +77,8 @@ function Simulation1d(namelist)
     TC = TurbulenceConvection
     param_set = create_parameter_set(namelist)
 
-    grid = TC.Grid(namelist)
+    FT = Float64
+    grid = TC.Grid(FT(namelist["grid"]["dz"]), namelist["grid"]["nz"])
     Stats = TC.NetCDFIO_Stats(namelist, grid)
     case = Cases.get_case(namelist)
     ref_params = Cases.reference_params(case, grid, param_set, namelist)
@@ -92,7 +93,6 @@ function Simulation1d(namelist)
     Turb = TC.EDMF_PrognosticTKE(namelist, grid, ref_state, param_set)
     TS = TC.TimeStepping(namelist)
 
-    FT = Float64
     n_updrafts = Turb.n_updrafts
 
     cent_state_fields = TC.FieldFromNamedTuple(TC.center_space(grid), cent_prognostic_vars(FT, n_updrafts))

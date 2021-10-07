@@ -30,12 +30,7 @@ struct Grid{FT, CS, FS, SC, SF}
     fs::FS
     zc::SC
     zf::SF
-    function Grid(namelist)
-
-        #Get the grid spacing
-        Δz = namelist["grid"]["dz"]
-        nz = namelist["grid"]["nz"]
-        FT = Float64
+    function Grid(Δz::FT, nz::Int) where {FT <: AbstractFloat}
         z₀, z₁ = FT(0), FT(nz * Δz)
 
         domain = CC.Domains.IntervalDomain(
@@ -52,7 +47,7 @@ struct Grid{FT, CS, FS, SC, SF}
         zf = CC.Fields.coordinate_field(fs)
 
         #Set the inverse grid spacing
-        Δzi = 1.0 / Δz
+        Δzi = 1 / Δz
 
         zmin = minimum(parent(zf))
         zmax = maximum(parent(zf))
@@ -60,7 +55,6 @@ struct Grid{FT, CS, FS, SC, SF}
         FS = typeof(fs)
         SC = typeof(zc)
         SF = typeof(zf)
-        FT = typeof(zmax)
         return new{FT, CS, FS, SC, SF}(zmin, zmax, Δz, Δzi, nz, cs, fs, zc, zf)
     end
 end
