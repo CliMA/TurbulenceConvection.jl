@@ -441,7 +441,7 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     end
     # compute tendencies
     compute_gm_tendencies!(edmf, grid, Case, gm, edmf.ref_state, TS)
-
+    compute_updraft_tendencies(edmf, gm, TS)
     # ----------- TODO: move to compute_tendencies
     implicit_eqs = edmf.implicit_eqs
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
@@ -509,7 +509,7 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     ###
     ### update
     ###
-    solve_updraft(edmf, gm, TS)
+    update_updraft(edmf, gm, TS)
     if edmf.Rain.rain_model == "clima_1m"
         solve_rain_fall(edmf.rainphysics, gm, TS, edmf.Rain.QR)
     end
@@ -731,7 +731,100 @@ function zero_area_fraction_cleanup(edmf::EDMF_PrognosticTKE, gm::GridMeanVariab
     return
 end
 
-function solve_updraft(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, TS::TimeStepping)
+function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, TS::TimeStepping)
+    grid = get_grid(edmf)
+    param_set = parameter_set(gm)
+    ref_state = reference_state(edmf)
+    kc_surf = kc_surface(grid)
+    kf_surf = kf_surface(grid)
+    dti_ = 1.0 / TS.dt
+    Δt = TS.dt
+
+    up = edmf.UpdVar
+    up_thermo = edmf.UpdThermo
+    en = edmf.EnvVar
+    a_up = up.Area.values
+    w_up = up.W.values
+    ρ_0_c = ref_state.rho0_half
+    ρ_0_f = ref_state.rho0
+    au_lim = edmf.max_area
+
+    up.Area.tendencies .= 0.0
+    up.W.tendencies .= 0.0
+    up.H.tendencies .= 0.0
+    up.QT.tendencies .= 0.0
+
+    @inbounds for i in xrange(up.n_updrafts)
+        edmf.entr_sc[i, kc_surf] = edmf.entr_surface_bc
+        edmf.detr_sc[i, kc_surf] = edmf.detr_surface_bc
+    end
+
+    # Solve for updraft area fraction
+    @inbounds for k in real_center_indices(grid)
+        @inbounds for i in xrange(up.n_updrafts)
+            is_surface_center(grid, k) && continue
+            w_up_c = interpf2c(w_up, grid, k, i)
+            adv = upwind_advection_area(ρ_0_c, a_up[i, :], w_up[i, :], grid, k)
+
+            a_up_c = a_up[i, k]
+            entr_term = a_up_c * w_up_c * (edmf.entr_sc[i, k])
+            detr_term = a_up_c * w_up_c * (-edmf.detr_sc[i, k])
+            up.Area.tendencies[i, k] = adv + entr_term + detr_term
+            a_up_candidate = a_up_c + Δt * up.Area.tendencies[i, k]
+            if a_up_candidate > au_lim
+                a_up_div = a_up_c > 0.0 ? a_up_c : au_lim
+                a_up_candidate = au_lim
+                edmf.detr_sc[i, k] = (((au_lim - a_up_c) * dti_ - adv - entr_term) / (-a_up_div * w_up_c))
+                up.Area.tendencies[i, k] = (a_up_candidate - a_up_c) * dti_
+            end
+        end
+    end
+
+    entr_w_c = edmf.entr_sc .+ edmf.frac_turb_entr
+    detr_w_c = edmf.detr_sc .+ edmf.frac_turb_entr
+
+    @inbounds for k in real_center_indices(grid)
+        @inbounds for i in xrange(up.n_updrafts)
+            w_up_c = interpf2c(w_up, grid, k, i)
+            m_k = (ρ_0_c[k] * a_up[i, k] * w_up_c)
+
+            adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], up.H.values[i, :], grid, k)
+            entr = entr_w_c[i, k] * en.H.values[k]
+            detr = detr_w_c[i, k] * up.H.values[i, k]
+            θ_liq_ice_rain = ρ_0_c[k] * up_thermo.prec_source_h[i, k]
+            up.H.tendencies[i, k] = -adv + m_k * (entr - detr) + θ_liq_ice_rain
+
+            adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], up.QT.values[i, :], grid, k)
+            entr = entr_w_c[i, k] * en.QT.values[k]
+            detr = detr_w_c[i, k] * up.QT.values[i, k]
+            q_tot_rain = ρ_0_c[k] * up_thermo.prec_source_qt[i, k]
+            up.QT.tendencies[i, k] = -adv + m_k * (entr - detr) + q_tot_rain
+        end
+    end
+
+    # Solve for updraft velocity
+    @inbounds for k in real_face_indices(grid)
+        is_surface_face(grid, k) && continue
+        @inbounds for i in xrange(up.n_updrafts)
+            a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
+            a_k = interpc2f(a_up, grid, k, i; a_up_bcs...)
+            # We know that, since W = 0 at z = 0, these BCs should
+            # not matter in the end:
+            entr_w = interpc2f(entr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
+            detr_w = interpc2f(detr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
+            B_k = interpc2f(up.B.values, grid, k, i; bottom = SetValue(0), top = SetValue(0))
+
+            adv = upwind_advection_velocity(ρ_0_f, a_up[i, :], w_up[i, :], grid, k; a_up_bcs)
+            exch = (ρ_0_f[k] * a_k * w_up[i, k] * (entr_w * en.W.values[k] - detr_w * w_up[i, k]))
+            buoy = ρ_0_f[k] * a_k * B_k
+            up.W.tendencies[i, k] = -adv + exch + buoy + edmf.nh_pressure[i, k]
+        end
+    end
+    return
+end
+
+
+function update_updraft(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, TS::TimeStepping)
     grid = get_grid(edmf)
     param_set = parameter_set(gm)
     ref_state = reference_state(edmf)
@@ -749,62 +842,29 @@ function solve_updraft(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, TS::Time
     w_up_new = up.W.new
     ρ_0_c = ref_state.rho0_half
     ρ_0_f = ref_state.rho0
-    au_lim = edmf.max_area
 
     @inbounds for i in xrange(up.n_updrafts)
-        edmf.entr_sc[i, kc_surf] = edmf.entr_surface_bc
-        edmf.detr_sc[i, kc_surf] = edmf.detr_surface_bc
         w_up_new[i, kf_surf] = edmf.w_surface_bc[i]
         a_up_new[i, kc_surf] = edmf.area_surface_bc[i]
     end
 
-    # Solve for updraft area fraction
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in xrange(up.n_updrafts)
             is_surface_center(grid, k) && continue
-            w_up_c = interpf2c(w_up, grid, k, i)
-            adv = upwind_advection_area(ρ_0_c, a_up[i, :], w_up[i, :], grid, k)
-
             a_up_c = a_up[i, k]
-            entr_term = a_up_c * w_up_c * (edmf.entr_sc[i, k])
-            detr_term = a_up_c * w_up_c * (-edmf.detr_sc[i, k])
-            a_tendencies = adv + entr_term + detr_term
-
-            a_up_candidate = max(a_up_c + Δt * a_tendencies, 0)
-
-            if a_up_candidate > au_lim
-                a_up_candidate = au_lim
-                a_up_div = a_up_c > 0.0 ? a_up_c : au_lim
-                edmf.detr_sc[i, k] = (((au_lim - a_up_c) * dti_ - adv - entr_term) / (-a_up_div * w_up_c))
-            end
+            a_up_candidate = max(a_up_c + Δt * up.Area.tendencies[i, k], 0)
             a_up_new[i, k] = a_up_candidate
         end
     end
 
-    entr_w_c = edmf.entr_sc .+ edmf.frac_turb_entr
-    detr_w_c = edmf.detr_sc .+ edmf.frac_turb_entr
-
-
-    # Solve for updraft velocity
     @inbounds for k in real_face_indices(grid)
         is_surface_face(grid, k) && continue
         @inbounds for i in xrange(up.n_updrafts)
             a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
             anew_k = interpc2f(a_up_new, grid, k, i; a_up_bcs...)
-
             if anew_k >= edmf.minimum_area
                 a_k = interpc2f(a_up, grid, k, i; a_up_bcs...)
-                # We know that, since W = 0 at z = 0, these BCs should
-                # not matter in the end:
-                entr_w = interpc2f(entr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
-                detr_w = interpc2f(detr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
-                B_k = interpc2f(up.B.values, grid, k, i; bottom = SetValue(0), top = SetValue(0))
-
-                adv = upwind_advection_velocity(ρ_0_f, a_up[i, :], w_up[i, :], grid, k; a_up_bcs)
-                exch = (ρ_0_f[k] * a_k * w_up[i, k] * (entr_w * en.W.values[k] - detr_w * w_up[i, k]))
-                buoy = ρ_0_f[k] * a_k * B_k
-                w_tendencies = -adv + exch + buoy + edmf.nh_pressure[i, k]
-                w_up_new[i, k] = (ρ_0_f[k] * a_k * w_up[i, k] + Δt * w_tendencies) / (ρ_0_f[k] * anew_k)
+                w_up_new[i, k] = (ρ_0_f[k] * a_k * w_up[i, k] + Δt * up.W.tendencies[i, k]) / (ρ_0_f[k] * anew_k)
 
                 w_up_new[i, k] = max(w_up_new[i, k], 0)
                 # TODO: remove a_up_new from this loop.
@@ -822,7 +882,6 @@ function solve_updraft(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, TS::Time
         end
     end
 
-    # Solve for θ_liq_ice & q_tot
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in xrange(up.n_updrafts)
             if is_surface_center(grid, k)
@@ -840,25 +899,13 @@ function solve_updraft(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, TS::Time
             # write the discrete equations in form
             # c1 * phi_new[k] = c2 * phi[k] + c3 * phi[k-1] + c4 * ϕ_enntr
             if a_up_new[i, k] >= edmf.minimum_area
-                w_up_c = interpf2c(w_up, grid, k, i)
-                m_k = (ρ_0_c[k] * a_up[i, k] * w_up_c)
-
-                adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], up.H.values[i, :], grid, k)
-                entr = entr_w_c[i, k] * en.H.values[k]
-                detr = detr_w_c[i, k] * up.H.values[i, k]
-                θ_liq_ice_rain = ρ_0_c[k] * up_thermo.prec_source_h[i, k]
-                θ_liq_ice_tendencies = -adv + m_k * (entr - detr) + θ_liq_ice_rain
                 up.H.new[i, k] =
-                    (ρ_0_c[k] * a_up[i, k] * up.H.values[i, k] + Δt * θ_liq_ice_tendencies) /
+                    (ρ_0_c[k] * a_up[i, k] * up.H.values[i, k] + Δt * up.H.tendencies[i, k]) /
                     (ρ_0_c[k] * a_up_new[i, k])
 
-                adv = upwind_advection_scalar(ρ_0_c, a_up[i, :], w_up[i, :], up.QT.values[i, :], grid, k)
-                entr = entr_w_c[i, k] * en.QT.values[k]
-                detr = detr_w_c[i, k] * up.QT.values[i, k]
-                q_tot_rain = ρ_0_c[k] * up_thermo.prec_source_qt[i, k]
-                q_tot_tendencies = -adv + m_k * (entr - detr) + q_tot_rain
                 up.QT.new[i, k] = max(
-                    (ρ_0_c[k] * a_up[i, k] * up.QT.values[i, k] + Δt * q_tot_tendencies) / (ρ_0_c[k] * a_up_new[i, k]),
+                    (ρ_0_c[k] * a_up[i, k] * up.QT.values[i, k] + Δt * up.QT.tendencies[i, k]) /
+                    (ρ_0_c[k] * a_up_new[i, k]),
                     0.0,
                 )
 
