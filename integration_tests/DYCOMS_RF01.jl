@@ -13,7 +13,6 @@ using .NameList
 
 best_mse = all_best_mse["DYCOMS_RF01"]
 
-key = "Hvar_mean"
 @testset "DYCOMS_RF01" begin
     case_name = "DYCOMS_RF01"
     println("Running $case_name...")
