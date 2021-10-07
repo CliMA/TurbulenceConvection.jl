@@ -26,6 +26,14 @@ function export_ref_profile(case_name::String)
     aux_vars(FT) = (; ref_state = (ρ0 = FT(0), α0 = FT(0), p0 = FT(0)))
     aux_cent_fields = TC.FieldFromNamedTuple(TC.center_space(grid), aux_vars(FT))
     aux_face_fields = TC.FieldFromNamedTuple(TC.face_space(grid), aux_vars(FT))
+
+    parent(aux_face_fields.ref_state.p0) .= ref_state.p0
+    parent(aux_face_fields.ref_state.ρ0) .= ref_state.rho0
+    parent(aux_face_fields.ref_state.α0) .= ref_state.alpha0
+    parent(aux_cent_fields.ref_state.p0) .= ref_state.p0_half
+    parent(aux_cent_fields.ref_state.ρ0) .= ref_state.rho0_half
+    parent(aux_cent_fields.ref_state.α0) .= ref_state.alpha0_half
+
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
     io_nt = TC.io_dictionary_ref_state(aux)
     TC.initialize_io(io_nt, Stats)

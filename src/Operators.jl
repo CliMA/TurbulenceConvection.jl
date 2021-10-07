@@ -523,16 +523,44 @@ end
 ##### Implicit operators
 #####
 
+#=
+We consider the time-discretized equation:
 
-function construct_tridiag_diffusion_gm(grid::Grid, dt, ρ_ae_K_m, ρ_0, ae)
+``
+(ρaeϕⁿ⁺¹ - ρaeϕⁿ)/Δt = D ϕⁿ⁺¹ + Sⁿ
+D = ∂_z (ρaeK ∂_z)
+``
+
+Which leads to:
+
+``
+ρaeϕⁿ⁺¹ - ρaeϕⁿ = Δt D ϕⁿ⁺¹ + Δt Sⁿ
+ρaeϕⁿ⁺¹ - Δt D ϕⁿ⁺¹ = (ϕⁿ + Δt Sⁿ)
+``
+
+We relax this to
+
+``
+(I - Δt D/ρaeⁿ) ϕⁿ⁺¹ = (ϕⁿ + Δt Sⁿ)/ρaeⁿ
+``
+
+Let `A = (I - Δt D)` and `b = ϕⁿ + Δt Sⁿ`, and we have
+
+A ϕⁿ⁺¹ = b
+
+This function constructs and returns the matrix `A`,
+where `D = ∂_z (ρaeK ∂_z)`
+
+=#
+function construct_tridiag_diffusion_gm(grid::Grid, dt, ρ_ae_K, ρ_0, ae)
     a = center_field(grid) # for tridiag solver
     b = center_field(grid) # for tridiag solver
     c = center_field(grid) # for tridiag solver
     Δzi = grid.Δzi
     @inbounds for k in real_center_indices(grid)
         X = ρ_0[k] * ae[k] / dt
-        Y = ρ_ae_K_m[k + 1] * Δzi * Δzi
-        Z = ρ_ae_K_m[k] * Δzi * Δzi
+        Y = ρ_ae_K[k + 1] * Δzi * Δzi
+        Z = ρ_ae_K[k] * Δzi * Δzi
         if is_surface_center(grid, k)
             Z = 0.0
         elseif is_toa_center(grid, k)
