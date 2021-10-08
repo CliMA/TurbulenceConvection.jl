@@ -62,38 +62,37 @@ function sum_subdomains_rain(
     return
 end
 
-function solve_rain_fall(rain::RainPhysics, gm::GridMeanVariables, TS::TimeStepping, QR::RainVariable)
+"""
+Computes the qr advection (down) tendency
+"""
+function compute_rain_advection_tendencies(rain::RainPhysics, gm::GridMeanVariables, TS::TimeStepping, QR::RainVariable)
     param_set = parameter_set(gm)
     grid = get_grid(gm)
     Δz = grid.Δz
     Δt = TS.dt
     CFL_limit = 0.5
 
-    term_vel = center_field(grid)
-    term_vel_new = center_field(grid)
     ρ_0_c_field = rain.ref_state.rho0_half
 
     # helper to calculate the rain velocity
     # TODO: assuming gm.W = 0
     # TODO: verify translation
+    term_vel = center_field(grid)
     @inbounds for k in real_center_indices(grid)
         term_vel[k] = CM1.terminal_velocity(param_set, rain_type, rain.ref_state.rho0_half[k], QR.values[k])
     end
 
-    # rain falling through the domain
     @inbounds for k in reverse(real_center_indices(grid))
+        # check stability criterion
         CFL_out = Δt / Δz * term_vel[k]
-
         if is_toa_center(grid, k)
             CFL_in = 0.0
         else
             CFL_in = Δt / Δz * term_vel[k + 1]
         end
-
         if max(CFL_in, CFL_out) > CFL_limit
             error("Time step is too large for rain fall velocity!")
         end
-        ρ_0_c = rain.ref_state.rho0_half[k]
 
         ρ_0_cut = ccut_downwind(ρ_0_c_field, grid, k)
         QR_cut = ccut_downwind(QR.values, grid, k)
@@ -101,16 +100,13 @@ function solve_rain_fall(rain::RainPhysics, gm::GridMeanVariables, TS::TimeStepp
         ρQRw_cut = ρ_0_cut .* QR_cut .* w_cut
         ∇ρQRw = c∇_downwind(ρQRw_cut, grid, k; bottom = FreeBoundary(), top = SetValue(0))
 
-        # TODO: incorporate area fraction into this equation (right now assume a = 1)
-        QR.new[k] = (QR.values[k] * ρ_0_c + Δt * ∇ρQRw) / ρ_0_c
-        QR.new[k] = max(QR.new[k], 0)
+        ρ_0_c = ρ_0_c_field[k]
+        rain.qr_tendency_advection[k] = ∇ρQRw / ρ_0_c
 
-        term_vel_new[k] = CM1.terminal_velocity(param_set, rain_type, ρ_0_c, QR.new[k])
+        # TODO - apply the tendecies elsewhere
+        # TODO - some positivity limiters are needed
+        QR.values[k] += rain.qr_tendency_advection[k] * Δt
     end
-
-    QR.values .= QR.new
-
-    term_vel .= term_vel_new
     return
 end
 
