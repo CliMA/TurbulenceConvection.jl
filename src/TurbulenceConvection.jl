@@ -20,6 +20,7 @@ import CloudMicrophysics
 
 const ODE = OrdinaryDiffEq
 const CC = ClimaCore
+const CCO = CC.Operators
 const NC = NCDatasets
 const SA = StaticArrays
 
