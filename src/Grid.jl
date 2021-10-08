@@ -60,23 +60,23 @@ struct Grid{FT, CS, FS, SC, SF}
 end
 
 # Index of the first interior cell above the surface
-kc_surface(grid::Grid) = 1
-kf_surface(grid::Grid) = 1
-kc_top_of_atmos(grid::Grid) = grid.nz
-kf_top_of_atmos(grid::Grid) = grid.nz + 1
+kc_surface(grid::Grid) = Cent(1)
+kf_surface(grid::Grid) = CCO.PlusHalf(1)
+kc_top_of_atmos(grid::Grid) = Cent(grid.nz)
+kf_top_of_atmos(grid::Grid) = CCO.PlusHalf(grid.nz + 1)
 
-is_surface_center(grid::Grid, k::Int) = k == kc_surface(grid)
-is_toa_center(grid::Grid, k::Int) = k == kc_top_of_atmos(grid)
-is_surface_face(grid::Grid, k::Int) = k == kf_surface(grid)
-is_toa_face(grid::Grid, k::Int) = k == kf_top_of_atmos(grid)
+is_surface_center(grid::Grid, k) = k == kc_surface(grid)
+is_toa_center(grid::Grid, k) = k == kc_top_of_atmos(grid)
+is_surface_face(grid::Grid, k) = k == kf_surface(grid)
+is_toa_face(grid::Grid, k) = k == kf_top_of_atmos(grid)
 
 zc_surface(grid::Grid) = grid.zc[kc_surface(grid)]
 zf_surface(grid::Grid) = grid.zf[kf_surface(grid)]
 zc_toa(grid::Grid) = grid.zc[kc_top_of_atmos(grid)]
 zf_toa(grid::Grid) = grid.zf[kf_top_of_atmos(grid)]
 
-real_center_indices(grid::Grid) = kc_surface(grid):kc_top_of_atmos(grid)
-real_face_indices(grid::Grid) = kf_surface(grid):kf_top_of_atmos(grid)
+real_center_indices(grid::Grid) = Cent.((kc_surface(grid).i):(kc_top_of_atmos(grid).i))
+real_face_indices(grid::Grid) = CCO.PlusHalf.((kf_surface(grid).i):(kf_top_of_atmos(grid).i))
 
 face_space(grid::Grid) = grid.fs
 center_space(grid::Grid) = grid.cs

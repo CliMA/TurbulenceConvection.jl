@@ -700,7 +700,7 @@ function zero_area_fraction_cleanup(edmf::EDMF_PrognosticTKE, gm::GridMeanVariab
             end
         end
 
-        if sum(up.Area.values[:, k]) == 0.0
+        if sum(ntuple(i -> up.Area.values[i, k], up.n_updrafts)) == 0.0
             en.B.values[k] = gm.B.values[k]
             en.H.values[k] = gm.H.values[k]
             en.QT.values[k] = gm.QT.values[k]
@@ -869,13 +869,13 @@ function update_updraft(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, TS::Tim
                 w_up_new[i, k] = max(w_up_new[i, k], 0)
                 # TODO: remove a_up_new from this loop.
                 if w_up_new[i, k] <= 0.0
-                    if !(k > size(a_up_new, 2))
+                    if !(k.i > size(a_up_new, 2))
                         a_up_new[i, k] = 0
                     end
                 end
             else
                 w_up_new[i, k] = 0
-                if !(k > size(a_up_new, 2))
+                if !(k.i > size(a_up_new, 2))
                     a_up_new[i, k] = 0
                 end
             end

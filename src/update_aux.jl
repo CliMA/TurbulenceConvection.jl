@@ -269,7 +269,7 @@ function update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
         U_cut = ccut(gm.U.values, grid, k)
         V_cut = ccut(gm.V.values, grid, k)
         wc_en = interpf2c(en.W.values, grid, k)
-        wc_up = interpf2c.(Ref(up.W.values), Ref(grid), k, 1:(up.n_updrafts))
+        wc_up = interpf2c.(Ref(up.W.values), Ref(grid), Ref(k), 1:(up.n_updrafts))
         w_dual = dual_faces(en.W.values, grid, k)
 
         ∇U = c∇(U_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
@@ -330,9 +330,9 @@ function update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
             a_en = (1 - up.Area.bulkvalues[k]),
             wc_en = wc_en,
             wc_up = Tuple(wc_up),
-            a_up = Tuple(up.Area.values[:, k]),
-            ε_turb = Tuple(edmf.frac_turb_entr[:, k]),
-            δ_dyn = Tuple(edmf.detr_sc[:, k]),
+            a_up = ntuple(i -> up.Area.values[i, k], up.n_updrafts),
+            ε_turb = ntuple(i -> edmf.frac_turb_entr[i, k], up.n_updrafts),
+            δ_dyn = ntuple(i -> edmf.detr_sc[i, k], up.n_updrafts),
             en_cld_frac = en.cloud_fraction.values[k],
             θ_li_en = en.H.values[k],
             ql_en = en.QL.values[k],
