@@ -35,3 +35,7 @@ end
     )
     nothing
 end
+
+@testset "ClimaCore extensions" begin
+    include("clima_core_extensions.jl")
+end
