@@ -196,7 +196,7 @@ function Soares(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 8 * 3600.0
-    namelist["time_stepping"]["dt"] = 2.0
+    namelist["time_stepping"]["dt"] = 1.0
 
     namelist["meta"]["simname"] = "Soares"
     namelist["meta"]["casename"] = "Soares"

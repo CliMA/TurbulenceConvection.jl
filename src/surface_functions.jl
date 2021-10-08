@@ -34,61 +34,26 @@ function psi_h_stable(zeta, zeta0)
 end
 
 function compute_ustar(param_set, windspeed, buoyancy_flux, z0, z1)
-
     vkb = CPSGS.von_karman_const(param_set)
     logz = log(z1 / z0)
-    #use neutral condition as first guess
+    # use neutral condition as first guess
     ustar0 = windspeed * vkb / logz
-    ustar = ustar0
+    monin_obukov(ustar) = -ustar^3 / (buoyancy_flux * vkb)
     if (abs(buoyancy_flux) > 1.0e-20)
-        lmo = -ustar0 * ustar0 * ustar0 / (buoyancy_flux * vkb)
-        zeta = z1 / lmo
-        zeta0 = z0 / lmo
-        if (zeta >= 0.0)
-            f0 = windspeed - ustar0 / vkb * (logz - psi_m_stable(zeta, zeta0))
-            ustar1 = windspeed * vkb / (logz - psi_m_stable(zeta, zeta0))
-            lmo = -ustar1 * ustar1 * ustar1 / (buoyancy_flux * vkb)
+        ζ_1 = z1 / monin_obukov(ustar0)
+        psi_m = ζ_1 >= 0.0 ? psi_m_stable : psi_m_unstable
+        function roots(ustar)
+            lmo = monin_obukov(ustar)
             zeta = z1 / lmo
             zeta0 = z0 / lmo
-            f1 = windspeed - ustar1 / vkb * (logz - psi_m_stable(zeta, zeta0))
-            ustar = ustar1
-            delta_ustar = ustar1 - ustar0
-            while abs(delta_ustar) > 1e-3
-                ustar_new = ustar1 - f1 * delta_ustar / (f1 - f0)
-                f0 = f1
-                ustar0 = ustar1
-                ustar1 = ustar_new
-                lmo = -ustar1 * ustar1 * ustar1 / (buoyancy_flux * vkb)
-                zeta = z1 / lmo
-                zeta0 = z0 / lmo
-                f1 = windspeed - ustar1 / vkb * (logz - psi_m_stable(zeta, zeta0))
-                delta_ustar = ustar1 - ustar0
-            end
-        else # b_flux nonzero, zeta  is negative
-            f0 = windspeed - ustar0 / vkb * (logz - psi_m_unstable(zeta, zeta0))
-            ustar1 = windspeed * vkb / (logz - psi_m_unstable(zeta, zeta0))
-            lmo = -ustar1 * ustar1 * ustar1 / (buoyancy_flux * vkb)
-            zeta = z1 / lmo
-            zeta0 = z0 / lmo
-            f1 = windspeed - ustar1 / vkb * (logz - psi_m_unstable(zeta, zeta0))
-            ustar = ustar1
-            delta_ustar = ustar1 - ustar0
-            while abs(delta_ustar) > 1e-3
-                ustar_new = ustar1 - f1 * delta_ustar / (f1 - f0)
-                f0 = f1
-                ustar0 = ustar1
-                ustar1 = ustar_new
-                lmo = -ustar1 * ustar1 * ustar1 / (buoyancy_flux * vkb)
-                zeta = z1 / lmo
-                zeta0 = z0 / lmo
-                f1 = windspeed - ustar1 / vkb * (logz - psi_m_unstable(zeta, zeta0))
-                delta_ustar = ustar1 - ustar0
-            end
+            return windspeed - ustar / vkb * (logz - psi_m(zeta, zeta0))
         end
+        sol = RS.find_zero(roots, RS.NewtonsMethodAD(ustar0), RS.CompactSolution(), RS.SolutionTolerance(1e-3), 100)
+        sol.converged || error("Unconverged root solve in compute_ustar")
+        return sol.root
+    else
+        return ustar0
     end
-
-
-    return ustar
 end
 
 """
