@@ -1,4 +1,3 @@
-
 function initialize_io(rain::RainVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "qr_mean")
     add_ts(Stats, "rwp_mean")
@@ -41,8 +40,9 @@ function rain_diagnostics(
         # per timestep per EDMF surface area [mm/h]
         if (rain.rain_model == "cutoff")
             rain.cutoff_rain_rate -=
-                (en_thermo.prec_source_qt[k] + up_thermo.prec_source_qt_tot[k]) * ref_state.rho0_half[k] * grid.Δz /
-                rho_cloud_liq *
+                (en_thermo.qt_tendency_rain_formation[k] + up_thermo.qt_tendency_rain_formation_tot[k]) *
+                ref_state.rho0_half[k] *
+                grid.Δz / rho_cloud_liq *
                 3.6 *
                 1e6
         end
@@ -50,14 +50,16 @@ function rain_diagnostics(
     return
 end
 
-function sum_subdomains_rain(
+function compute_subdomain_rain_tendency_sum(
     rain::RainVariables,
     up_thermo::UpdraftThermodynamics,
     en_thermo::EnvironmentThermodynamics,
     TS::TimeStepping,
 )
+    # TODO - just move it to the place where all rain tendecies are summed up
     @inbounds for k in real_center_indices(rain.grid)
-        rain.QR.values[k] -= (en_thermo.prec_source_qt[k] + up_thermo.prec_source_qt_tot[k]) * TS.dt
+        rain.QR.values[k] -=
+            (en_thermo.qt_tendency_rain_formation[k] + up_thermo.qt_tendency_rain_formation_tot[k]) * TS.dt
     end
     return
 end
@@ -110,38 +112,31 @@ function compute_rain_advection_tendencies(rain::RainPhysics, gm::GridMeanVariab
     return
 end
 
-function solve_rain_evap(rain::RainPhysics, gm::GridMeanVariables, TS::TimeStepping, QR::RainVariable)
+"""
+Computes the tendencies to θ_liq_ice, qt and qr due to rain evaporation
+"""
+function compute_rain_evap_tendencies(rain::RainPhysics, gm::GridMeanVariables, TS::TimeStepping, QR::RainVariable)
     param_set = parameter_set(gm)
     Δt = TS.dt
-    flag_evaporate_all = false
     p0_c = rain.ref_state.p0_half
     ρ0_c = rain.ref_state.rho0_half
 
     @inbounds for k in real_center_indices(rain.grid)
-        flag_evaporate_all = false
-
         q_tot_gm = gm.QT.values[k]
         T_gm = gm.T.values[k]
         # When we fuse loops, this should hopefully disappear
         ts = TD.PhaseEquil_pTq(param_set, p0_c[k], T_gm, q_tot_gm)
         q = TD.PhasePartition(ts)
 
-        tmp_evap_rate = -CM1.evaporation_sublimation(param_set, rain_type, q, QR.values[k], ρ0_c[k], T_gm)
+        # TODO - move limiters elsewhere
+        qt_tendency =
+            min(QR.values[k] / Δt, -CM1.evaporation_sublimation(param_set, rain_type, q, QR.values[k], ρ0_c[k], T_gm))
+        rain.qt_tendency_rain_evap[k] = qt_tendency
+        rain.qr_tendency_rain_evap[k] = -qt_tendency
+        rain.θ_liq_ice_tendency_rain_evap[k] = θ_liq_ice_helper(ts, qt_tendency)
 
-        if tmp_evap_rate * Δt > QR.values[k]
-            flag_evaporate_all = true
-            tmp_evap_rate = QR.values[k] / Δt
-        end
-
-        rain.rain_evap_source_qt[k] = tmp_evap_rate
-        rain.rain_evap_source_h[k] = rain_source_to_thetal(ts, -tmp_evap_rate)
-
-        if flag_evaporate_all
-            QR.values[k] = 0.0
-        else
-            QR.values[k] -= tmp_evap_rate * Δt
-        end
-
+        # TODO - apply tendencies elsewhere
+        QR.values[k] += rain.qr_tendency_rain_evap[k] * Δt
     end
     return
 end

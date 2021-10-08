@@ -218,32 +218,18 @@ function upd_cloud_diagnostics(up::UpdraftVariables, ref_state::ReferenceState)
             end
         end
     end
-
     return
 end
 
 """
-clear precipitation source terms for QT and H from each updraft
+Computes tendencies to qt and θ_liq_ice due to precipitation formation
 """
-function clear_precip_sources(up_thermo::UpdraftThermodynamics)
-    up_thermo.prec_source_qt .= 0
-    up_thermo.prec_source_h .= 0
-    return
-end
-
-"""
-sum precipitation source terms for QT and H from all sub-timesteps
-"""
-function update_total_precip_sources(up_thermo::UpdraftThermodynamics)
-    up_thermo.prec_source_h_tot .= up_sum(up_thermo.prec_source_h)
-    up_thermo.prec_source_qt_tot .= up_sum(up_thermo.prec_source_qt)
-    return
-end
-
-"""
-compute precipitation source terms
-"""
-function microphysics(up_thermo::UpdraftThermodynamics, up::UpdraftVariables, rain::RainVariables, dt)
+function compute_rain_formation_tendencies(
+    up_thermo::UpdraftThermodynamics,
+    up::UpdraftVariables,
+    rain::RainVariables,
+    dt,
+)
     param_set = parameter_set(rain)
     grid = up.grid
     ref_state = up_thermo.ref_state
@@ -257,7 +243,7 @@ function microphysics(up_thermo::UpdraftThermodynamics, up::UpdraftVariables, ra
             ts_up = TD.PhaseEquil_pTq(param_set, p0_c[k], T_up, q_tot_up)
 
             # autoconversion and accretion
-            mph = microphysics_rain_src(
+            mph = precipitation_formation(
                 param_set,
                 rain.rain_model,
                 rain.QR.values[k],
@@ -266,11 +252,12 @@ function microphysics(up_thermo::UpdraftThermodynamics, up::UpdraftVariables, ra
                 dt,
                 ts_up,
             )
-
-            # update rain sources of state variables
-            up_thermo.prec_source_qt[i, k] -= mph.qr_src * up.Area.values[i, k]
-            up_thermo.prec_source_h[i, k] += mph.thl_rain_src * up.Area.values[i, k]
+            up_thermo.qt_tendency_rain_formation[i, k] = mph.qt_tendency * up.Area.values[i, k]
+            up_thermo.θ_liq_ice_tendency_rain_formation[i, k] = mph.θ_liq_ice_tendency * up.Area.values[i, k]
         end
     end
+    # TODO - to be deleted once we sum all tendencies elsewhere
+    up_thermo.θ_liq_ice_tendency_rain_formation_tot .= up_sum(up_thermo.θ_liq_ice_tendency_rain_formation)
+    up_thermo.qt_tendency_rain_formation_tot .= up_sum(up_thermo.qt_tendency_rain_formation)
     return
 end

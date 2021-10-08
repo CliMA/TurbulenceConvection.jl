@@ -1,11 +1,14 @@
-Base.@kwdef struct rain_struct
-    qr::Float64 = 0
-    ar::Float64 = 0
-end
+"""
+    PrecipFormation
 
-Base.@kwdef struct mph_struct
-    thl_rain_src::Float64 = 0
-    qr_src::Float64 = 0
+Storage for tendencies due to precipitation formation
+
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct PrecipFormation{FT}
+    θ_liq_ice_tendency::FT
+    qt_tendency::FT
+    qr_tendency::FT
 end
 
 """
@@ -219,7 +222,34 @@ function RainVariables(namelist, grid::Grid, param_set::APS)
         valid_options = ["None", "cutoff", "clima_1m"],
     )
 
+    if !(rain_model in ["None", "cutoff", "clima_1m"])
+        error("rain model not recognized")
+    end
+
     return RainVariables{typeof(param_set)}(; param_set, rain_model, grid, QR)
+end
+
+struct RainPhysics{T}
+    grid::Grid
+    ref_state::ReferenceState
+    θ_liq_ice_tendency_rain_evap::T
+    qt_tendency_rain_evap::T
+    qr_tendency_rain_evap::T
+    qr_tendency_advection::T
+    function RainPhysics(grid::Grid, ref_state::ReferenceState)
+        θ_liq_ice_tendency_rain_evap = center_field(grid)
+        qt_tendency_rain_evap = center_field(grid)
+        qr_tendency_rain_evap = center_field(grid)
+        qr_tendency_advection = center_field(grid)
+        return new{typeof(θ_liq_ice_tendency_rain_evap)}(
+            grid,
+            ref_state,
+            θ_liq_ice_tendency_rain_evap,
+            qt_tendency_rain_evap,
+            qr_tendency_rain_evap,
+            qr_tendency_advection,
+        )
+    end
 end
 
 struct VariablePrognostic{T}
@@ -451,10 +481,10 @@ struct UpdraftThermodynamics{A1, A2}
     grid::Grid
     ref_state::ReferenceState
     n_updraft::Int
-    prec_source_h::A2
-    prec_source_qt::A2
-    prec_source_h_tot::A1
-    prec_source_qt_tot::A1
+    θ_liq_ice_tendency_rain_formation::A2
+    qt_tendency_rain_formation::A2
+    θ_liq_ice_tendency_rain_formation_tot::A1
+    qt_tendency_rain_formation_tot::A1
     function UpdraftThermodynamics(
         n_updraft::Int,
         grid::Grid,
@@ -462,27 +492,25 @@ struct UpdraftThermodynamics{A1, A2}
         UpdVar::UpdraftVariables,
         Rain::RainVariables,
     )
+        # tendencies from each updraft
+        θ_liq_ice_tendency_rain_formation = center_field(grid, n_updraft)
+        qt_tendency_rain_formation = center_field(grid, n_updraft)
+        # tendencies from all updrafts
+        θ_liq_ice_tendency_rain_formation_tot = center_field(grid)
+        qt_tendency_rain_formation_tot = center_field(grid)
 
-        # rain source from each updraft from all sub-timesteps
-        prec_source_h = center_field(grid, n_updraft)
-        prec_source_qt = center_field(grid, n_updraft)
-
-        # rain source from all updrafts from all sub-timesteps
-        prec_source_h_tot = center_field(grid)
-        prec_source_qt_tot = center_field(grid)
-        A1 = typeof(prec_source_h_tot)
-        A2 = typeof(prec_source_h)
+        A1 = typeof(θ_liq_ice_tendency_rain_formation_tot)
+        A2 = typeof(θ_liq_ice_tendency_rain_formation)
         return new{A1, A2}(
             grid,
             ref_state,
             n_updraft,
-            prec_source_h,
-            prec_source_qt,
-            prec_source_h_tot,
-            prec_source_qt_tot,
+            θ_liq_ice_tendency_rain_formation,
+            qt_tendency_rain_formation,
+            θ_liq_ice_tendency_rain_formation_tot,
+            qt_tendency_rain_formation_tot,
         )
     end
-
 end
 
 struct EnvironmentVariable{T}
@@ -621,8 +649,8 @@ struct EnvironmentThermodynamics{A1}
     Hvar_rain_dt::A1
     QTvar_rain_dt::A1
     HQTcov_rain_dt::A1
-    prec_source_qt::A1
-    prec_source_h::A1
+    qt_tendency_rain_formation::A1
+    θ_liq_ice_tendency_rain_formation::A1
     function EnvironmentThermodynamics(
         namelist,
         grid::Grid,
@@ -645,8 +673,8 @@ struct EnvironmentThermodynamics{A1}
         QTvar_rain_dt = center_field(grid)
         HQTcov_rain_dt = center_field(grid)
 
-        prec_source_qt = center_field(grid)
-        prec_source_h = center_field(grid)
+        qt_tendency_rain_formation = center_field(grid)
+        θ_liq_ice_tendency_rain_formation = center_field(grid)
         A1 = typeof(qt_dry)
         return new{A1}(
             grid,
@@ -662,8 +690,8 @@ struct EnvironmentThermodynamics{A1}
             Hvar_rain_dt,
             QTvar_rain_dt,
             HQTcov_rain_dt,
-            prec_source_qt,
-            prec_source_h,
+            qt_tendency_rain_formation,
+            θ_liq_ice_tendency_rain_formation,
         )
     end
 end
@@ -719,27 +747,6 @@ end
 function SurfaceBase(::Type{T}; grid::Grid, ref_state::ReferenceState, namelist::Dict) where {T}
     Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
     return SurfaceBase{T}(; grid, ref_state, Ri_bulk_crit)
-end
-
-
-struct RainPhysics{T}
-    grid::Grid
-    ref_state::ReferenceState
-    rain_evap_source_h::T
-    rain_evap_source_qt::T
-    qr_tendency_advection::T
-    function RainPhysics(grid::Grid, ref_state::ReferenceState)
-        rain_evap_source_h = center_field(grid)
-        rain_evap_source_qt = center_field(grid)
-        qr_tendency_advection = center_field(grid)
-        return new{typeof(rain_evap_source_h)}(
-            grid,
-            ref_state,
-            rain_evap_source_h,
-            rain_evap_source_qt,
-            qr_tendency_advection,
-        )
-    end
 end
 
 struct ForcingBaseType end
@@ -842,7 +849,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2, IE}
     lambda_stab::Float64
     minimum_area::Float64
     Rain::RainVariables
-    rainphysics::RainPhysics
+    RainPhys::RainPhysics
     UpdVar::UpdraftVariables
     UpdThermo::UpdraftThermodynamics
     EnvVar::EnvironmentVariables
@@ -947,6 +954,8 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2, IE}
 
         # Create the class for rain
         Rain = RainVariables(namelist, grid, param_set)
+        # Create the class for rain physics
+        RainPhys = RainPhysics(grid, ref_state)
 
         # Create the updraft variable class (major diagnostic and prognostic variables)
         UpdVar = UpdraftVariables(n_updrafts, namelist, grid)
@@ -1015,7 +1024,6 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2, IE}
         # Mass flux tendencies of mean scalars (for output)
         massflux_tendency_h = center_field(grid)
         massflux_tendency_qt = center_field(grid)
-        rainphysics = RainPhysics(grid, ref_state)
 
         # (Eddy) diffusive tendencies of mean scalars (for output)
         diffusive_tendency_h = center_field(grid)
@@ -1088,7 +1096,7 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2, IE}
             lambda_stab,
             minimum_area,
             Rain,
-            rainphysics,
+            RainPhys,
             UpdVar,
             UpdThermo,
             EnvVar,
