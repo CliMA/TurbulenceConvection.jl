@@ -35,6 +35,7 @@ using ..TurbulenceConvection: GridMeanVariables
 using ..TurbulenceConvection: TimeStepping
 using ..TurbulenceConvection: real_center_indices
 using ..TurbulenceConvection: real_face_indices
+using ..TurbulenceConvection: get_inversion
 
 
 #####
@@ -578,6 +579,9 @@ function reference_params(::Rico, grid::Grid, param_set::APS, namelist)
     return (; Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{Rico}, grid::Grid, GMV::GridMeanVariables, ref_state_centers)
+    param_set = TC.parameter_set(GMV)
+    θ_ρ = TC.center_field(grid)
+    p0 = ref_state_centers.p0
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         GMV.U.values[k] = -9.9 + 2.0e-3 * z
@@ -597,9 +601,19 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, GMV::GridMeanVar
         else
             (2.4 + (1.8 - 2.4) / (4000.0 - 3260.0) * (z - 3260.0)) / 1000.0
         end
+    end
 
-        GMV.TKE.values[k] = if z <= 1500.0
-            1.0 - z / 3000.0
+    # Need to get θ_ρ
+    @inbounds for k in real_center_indices(grid)
+        ts = TD.PhaseEquil_pθq(param_set, p0[k], GMV.H.values[k], GMV.QT.values[k])
+        θ_ρ[k] = TD.virtual_pottemp(ts)
+    end
+    zi = 0.6 * get_inversion(param_set, θ_ρ, GMV.U.values, GMV.V.values, grid, 0.2)
+
+    @inbounds for k in real_center_indices(grid)
+        z = grid.zc[k]
+        GMV.TKE.values[k] = if z <= zi
+            1.0 - z / zi
         else
             0.0
         end
