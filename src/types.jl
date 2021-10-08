@@ -224,7 +224,6 @@ end
 
 struct VariablePrognostic{T}
     values::T
-    new::T
     tendencies::T
     loc::String
     bc::String
@@ -235,12 +234,11 @@ struct VariablePrognostic{T}
         # Value at the current timestep
         values = field(grid, loc)
         # Value at the next timestep, used for calculating turbulence tendencies
-        new = field(grid, loc)
         tendencies = field(grid, loc)
         if kind != "scalar" && kind != "velocity"
             print("Invalid kind setting for variable! Must be scalar or velocity")
         end
-        return new{typeof(values)}(values, new, tendencies, loc, bc, kind, name, units)
+        return new{typeof(values)}(values, tendencies, loc, bc, kind, name, units)
     end
 end
 
@@ -1026,10 +1024,10 @@ mutable struct EDMF_PrognosticTKE{PS, A1, A2, IE}
         # Vertical fluxes for output
         massflux_h = face_field(grid)
         massflux_qt = face_field(grid)
-        diffusive_flux_h = center_field(grid)
-        diffusive_flux_qt = center_field(grid)
-        diffusive_flux_u = center_field(grid)
-        diffusive_flux_v = center_field(grid)
+        diffusive_flux_h = face_field(grid)
+        diffusive_flux_qt = face_field(grid)
+        diffusive_flux_u = face_field(grid)
+        diffusive_flux_v = face_field(grid)
         massflux_tke = center_field(grid)
 
         # Initialize SDE parameters

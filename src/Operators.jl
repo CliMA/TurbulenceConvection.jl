@@ -36,6 +36,25 @@ end
 ∇f2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[2] - bc.value) * grid.Δzi
 ∇f2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
+∇c2f(f_dual::SA.SVector, grid::Grid, k; bottom = UseBoundaryValue(), top = UseBoundaryValue()) =
+    ∇c2f(f_dual, grid, k, bottom, top)
+
+function ∇c2f(f_dual::SA.SVector, grid::Grid, k, bottom::AbstractBC, top::AbstractBC)
+    if is_surface_face(grid, k)
+        return ∇c2f(f_dual, grid, BottomBCTag(), bottom)
+    elseif is_toa_face(grid, k)
+        return ∇c2f(f_dual, grid, TopBCTag(), top)
+    else
+        return ∇c2f(f_dual, grid, InteriorTag())
+    end
+end
+∇c2f(f::SA.SVector, grid::Grid, ::Int, ::UseBoundaryValue, top::UseBoundaryValue) = ∇c2f(f, grid, InteriorTag())
+∇c2f(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.Δzi
+∇c2f(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * grid.Δzi * 2.0
+∇c2f(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
+∇c2f(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[1] - bc.value) * grid.Δzi * 2.0
+∇c2f(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
+
 # Actually, this method is needed for rain (upwind is in reverse direction due to rain)
 function c∇_downwind(f_dual::SA.SVector, grid::Grid, k; bottom = NoBCGivenError(), top = NoBCGivenError())
     if is_surface_center(grid, k)

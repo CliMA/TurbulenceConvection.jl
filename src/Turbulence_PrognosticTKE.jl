@@ -103,8 +103,6 @@ function io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     mean_entr_sc = center_field(grid)
     mean_detr_sc = center_field(grid)
     massflux = center_field(grid)
-    mf_h = center_field(grid)
-    mf_qt = center_field(grid)
     mean_frac_turb_entr = center_field(grid)
     mean_horiz_K_eddy = center_field(grid)
     mean_sorting_function = center_field(grid)
@@ -122,8 +120,6 @@ function io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     write_ts(Stats, "rd", StatsBase.mean(edmf.pressure_plume_spacing))
 
     @inbounds for k in real_center_indices(grid)
-        mf_h[k] = interpf2c(edmf.massflux_h, grid, k)
-        mf_qt[k] = interpf2c(edmf.massflux_qt, grid, k)
         if edmf.UpdVar.Area.bulkvalues[k] > 0.0
             @inbounds for i in xrange(edmf.n_updrafts)
                 massflux[k] += interpf2c(edmf.m, grid, k, i)
@@ -163,8 +159,8 @@ function io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     write_profile(Stats, "nh_pressure_b", mean_nh_pressure_b)
     write_profile(Stats, "asp_ratio", mean_asp_ratio)
     write_profile(Stats, "massflux", massflux)
-    write_profile(Stats, "massflux_h", mf_h)
-    write_profile(Stats, "massflux_qt", mf_qt)
+    write_profile(Stats, "massflux_h", edmf.massflux_h)
+    write_profile(Stats, "massflux_qt", edmf.massflux_qt)
     write_profile(Stats, "massflux_tendency_h", edmf.massflux_tendency_h)
     write_profile(Stats, "massflux_tendency_qt", edmf.massflux_tendency_qt)
     write_profile(Stats, "diffusive_flux_h", edmf.diffusive_flux_h)
@@ -173,8 +169,8 @@ function io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     write_profile(Stats, "diffusive_flux_v", edmf.diffusive_flux_v)
     write_profile(Stats, "diffusive_tendency_h", edmf.diffusive_tendency_h)
     write_profile(Stats, "diffusive_tendency_qt", edmf.diffusive_tendency_qt)
-    write_profile(Stats, "total_flux_h", mf_h .+ edmf.diffusive_flux_h)
-    write_profile(Stats, "total_flux_qt", mf_qt .+ edmf.diffusive_flux_qt)
+    write_profile(Stats, "total_flux_h", edmf.massflux_h .+ edmf.diffusive_flux_h)
+    write_profile(Stats, "total_flux_qt", edmf.massflux_h .+ edmf.diffusive_flux_qt)
     write_profile(Stats, "mixing_length", edmf.mixing_length)
     write_profile(Stats, "updraft_qt_precip", edmf.UpdThermo.prec_source_qt_tot)
     write_profile(Stats, "updraft_thetal_precip", edmf.UpdThermo.prec_source_h_tot)
@@ -250,6 +246,7 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, Case, gm, ref_st
     p0_c = ref_state.p0_half
     α0_c = ref_state.alpha0_half
     kf_surf = kf_surface(grid)
+    kc_surf = kc_surface(grid)
     up = edmf.UpdVar
     en = edmf.EnvVar
     ae = 1 .- up.Area.bulkvalues # area of environment
@@ -367,6 +364,28 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, Case, gm, ref_st
         gm.H.tendencies[k] += mf_tend_h
         gm.QT.tendencies[k] += mf_tend_qt
     end
+
+    aeKHq_tot_bc = Case.Sur.rho_qtflux / edmf.ae[kc_surf]
+    aeKHθ_liq_ice_bc = Case.Sur.rho_hflux / edmf.ae[kc_surf]
+    aeKHu_bc = Case.Sur.rho_uflux / edmf.ae[kc_surf]
+    aeKHv_bc = Case.Sur.rho_vflux / edmf.ae[kc_surf]
+    @inbounds for k in real_center_indices(grid)
+        aeKH_q_tot_cut = dual_faces(edmf.diffusive_flux_qt, grid, k)
+        ∇aeKH_q_tot = ∇f2c(aeKH_q_tot_cut, grid, k; bottom = SetValue(aeKHq_tot_bc), top = SetValue(0))
+        gm.QT.tendencies[k] += -α0_c[k] * ae[k] * ∇aeKH_q_tot
+
+        aeKH_θ_liq_ice_cut = dual_faces(edmf.diffusive_flux_h, grid, k)
+        ∇aeKH_θ_liq_ice = ∇f2c(aeKH_θ_liq_ice_cut, grid, k; bottom = SetValue(aeKHθ_liq_ice_bc), top = SetValue(0))
+        gm.H.tendencies[k] += -α0_c[k] * ae[k] * ∇aeKH_θ_liq_ice
+
+        aeKM_u_cut = dual_faces(edmf.diffusive_flux_u, grid, k)
+        ∇aeKM_u = ∇f2c(aeKM_u_cut, grid, k; bottom = SetValue(aeKHu_bc), top = SetValue(0))
+        gm.U.tendencies[k] += -α0_c[k] * ae[k] * ∇aeKM_u
+
+        aeKM_v_cut = dual_faces(edmf.diffusive_flux_v, grid, k)
+        ∇aeKM_v = ∇f2c(aeKM_v_cut, grid, k; bottom = SetValue(aeKHv_bc), top = SetValue(0))
+        gm.V.tendencies[k] += -α0_c[k] * ae[k] * ∇aeKM_v
+    end
 end
 
 function compute_diffusive_fluxes(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
@@ -388,26 +407,28 @@ function compute_diffusive_fluxes(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariabl
         edmf.rho_ae_KH[k] = interpc2f(aeKH, grid, k; aeKH_bcs...) * ref_state.rho0[k]
         edmf.rho_ae_KM[k] = interpc2f(aeKM, grid, k; aeKM_bcs...) * ref_state.rho0[k]
     end
-    q_bc = -Case.Sur.rho_qtflux / edmf.rho_ae_KH[kf_surf]
-    θ_liq_ice_bc = -Case.Sur.rho_hflux / edmf.rho_ae_KH[kf_surf]
-    u_bc = -Case.Sur.rho_uflux / edmf.rho_ae_KM[kf_surf]
-    v_bc = -Case.Sur.rho_vflux / edmf.rho_ae_KM[kf_surf]
-    @inbounds for k in real_center_indices(grid)
-        q_cut = ccut(edmf.EnvVar.QT.values, grid, k)
-        ∇q_tot = c∇(q_cut, grid, k; bottom = SetGradient(q_bc), top = SetGradient(0))
-        edmf.diffusive_flux_qt[k] = -0.5 * ref_state.rho0_half[k] * edmf.ae[k] * KH[k] * ∇q_tot
 
-        θ_liq_ice_cut = ccut(edmf.EnvVar.H.values, grid, k)
-        ∇θ_liq_ice = c∇(θ_liq_ice_cut, grid, k; bottom = SetGradient(θ_liq_ice_bc), top = SetGradient(0))
-        edmf.diffusive_flux_h[k] = -0.5 * ref_state.rho0_half[k] * edmf.ae[k] * KH[k] * ∇θ_liq_ice
+    aeKHq_tot_bc = -Case.Sur.rho_qtflux / edmf.ae[kc_surf] / edmf.rho_ae_KH[kc_surf]
+    aeKHθ_liq_ice_bc = -Case.Sur.rho_hflux / edmf.ae[kc_surf] / edmf.rho_ae_KH[kc_surf]
+    aeKHu_bc = -Case.Sur.rho_uflux / edmf.ae[kc_surf] / edmf.rho_ae_KM[kc_surf]
+    aeKHv_bc = -Case.Sur.rho_vflux / edmf.ae[kc_surf] / edmf.rho_ae_KM[kc_surf]
 
-        u_cut = ccut(GMV.U.values, grid, k)
-        ∇u = c∇(u_cut, grid, k; bottom = SetGradient(u_bc), top = SetGradient(0))
-        edmf.diffusive_flux_u[k] = -0.5 * ref_state.rho0_half[k] * edmf.ae[k] * KM[k] * ∇u
+    @inbounds for k in real_face_indices(grid)
+        q_dual = dual_centers(edmf.EnvVar.QT.values, grid, k)
+        ∇q_tot_f = ∇c2f(q_dual, grid, k; bottom = SetGradient(aeKHq_tot_bc), top = SetGradient(0))
+        edmf.diffusive_flux_qt[k] = -edmf.rho_ae_KH[k] * ∇q_tot_f
 
-        v_cut = ccut(GMV.V.values, grid, k)
-        ∇v = c∇(v_cut, grid, k; bottom = SetGradient(v_bc), top = SetGradient(0))
-        edmf.diffusive_flux_v[k] = -0.5 * ref_state.rho0_half[k] * edmf.ae[k] * KM[k] * ∇v
+        θ_liq_ice_dual = dual_centers(edmf.EnvVar.H.values, grid, k)
+        ∇θ_liq_ice_f = ∇c2f(θ_liq_ice_dual, grid, k; bottom = SetGradient(aeKHθ_liq_ice_bc), top = SetGradient(0))
+        edmf.diffusive_flux_h[k] = -edmf.rho_ae_KH[k] * ∇θ_liq_ice_f
+
+        u_dual = dual_centers(GMV.U.values, grid, k)
+        ∇u_f = ∇c2f(u_dual, grid, k; bottom = SetGradient(aeKHu_bc), top = SetGradient(0))
+        edmf.diffusive_flux_u[k] = -edmf.rho_ae_KM[k] * ∇u_f
+
+        v_dual = dual_centers(GMV.V.values, grid, k)
+        ∇v_f = ∇c2f(v_dual, grid, k; bottom = SetGradient(aeKHv_bc), top = SetGradient(0))
+        edmf.diffusive_flux_v[k] = -edmf.rho_ae_KM[k] * ∇v_f
     end
     return
 end
@@ -445,21 +466,6 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     # ----------- TODO: move to compute_tendencies
     implicit_eqs = edmf.implicit_eqs
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
-    implicit_eqs.A_θq_gm .= construct_tridiag_diffusion_gm(grid, TS.dt, edmf.rho_ae_KH, ref_state.rho0_half, edmf.ae)
-    implicit_eqs.A_uv_gm .= construct_tridiag_diffusion_gm(grid, TS.dt, edmf.rho_ae_KM, ref_state.rho0_half, edmf.ae)
-    Δzi = grid.Δzi
-    @inbounds for k in real_center_indices(grid)
-        implicit_eqs.b_u_gm[k] = GMV.U.values[k]
-        implicit_eqs.b_v_gm[k] = GMV.V.values[k]
-        implicit_eqs.b_q_tot_gm[k] = edmf.EnvVar.QT.values[k]
-        implicit_eqs.b_θ_liq_ice_gm[k] = edmf.EnvVar.H.values[k]
-        if is_surface_center(grid, k)
-            implicit_eqs.b_u_gm[k] += TS.dt * Case.Sur.rho_uflux * Δzi * ref_state.alpha0_half[k] / edmf.ae[k]
-            implicit_eqs.b_v_gm[k] += TS.dt * Case.Sur.rho_vflux * Δzi * ref_state.alpha0_half[k] / edmf.ae[k]
-            implicit_eqs.b_q_tot_gm[k] += TS.dt * Case.Sur.rho_qtflux * Δzi * ref_state.alpha0_half[k] / edmf.ae[k]
-            implicit_eqs.b_θ_liq_ice_gm[k] += TS.dt * Case.Sur.rho_hflux * Δzi * ref_state.alpha0_half[k] / edmf.ae[k]
-        end
-    end
 
     KM = diffusivity_m(edmf).values
     KH = diffusivity_h(edmf).values
@@ -493,18 +499,6 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     implicit_eqs.b_QTvar .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.values, en.QTvar)
     implicit_eqs.b_HQTcov .= en_diffusion_tendencies(grid, ref_state, TS, up.Area.values, en.HQTcov)
     # -----------
-    x_q_tot_gm = center_field(grid) # for tridiag solver
-    x_θ_liq_ice_gm = center_field(grid) # for tridiag solver
-    x_q_tot_gm .= tridiag_solve(implicit_eqs.b_q_tot_gm, implicit_eqs.A_θq_gm)
-    x_θ_liq_ice_gm .= tridiag_solve(implicit_eqs.b_θ_liq_ice_gm, implicit_eqs.A_θq_gm)
-
-    @inbounds for k in real_center_indices(grid)
-        GMV.QT.new[k] = max(GMV.QT.values[k] + edmf.ae[k] * (x_q_tot_gm[k] - edmf.EnvVar.QT.values[k]), 0.0)
-        GMV.H.new[k] = GMV.H.values[k] + edmf.ae[k] * (x_θ_liq_ice_gm[k] - edmf.EnvVar.H.values[k])
-        # get the diffusive flux, TODO: move to diagnostics (callbacks?)
-        edmf.diffusive_tendency_h[k] = (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
-        edmf.diffusive_tendency_qt[k] = (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
-    end
 
     ###
     ### update
@@ -514,23 +508,14 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
         compute_rain_advection_tendencies(edmf.rainphysics, gm, TS, edmf.Rain.QR)
     end
 
-    GMV.U.new .= tridiag_solve(implicit_eqs.b_u_gm, implicit_eqs.A_uv_gm)
-    GMV.V.new .= tridiag_solve(implicit_eqs.b_v_gm, implicit_eqs.A_uv_gm)
     en.TKE.values .= tridiag_solve(implicit_eqs.b_TKE, implicit_eqs.A_TKE)
     en.Hvar.values .= tridiag_solve(implicit_eqs.b_Hvar, implicit_eqs.A_Hvar)
     en.QTvar.values .= tridiag_solve(implicit_eqs.b_QTvar, implicit_eqs.A_QTvar)
     en.HQTcov.values .= tridiag_solve(implicit_eqs.b_HQTcov, implicit_eqs.A_HQTcov)
 
-    update_GMV_turbulence(edmf, GMV, Case, TS)
-    update(GMV, TS)
-
     ###
     ### set values
     ###
-    set_values_with_new(edmf.UpdVar)
-    zero_area_fraction_cleanup(edmf, GMV)
-
-    # Filter solution, TODO: fuse with `zero_area_fraction_cleanup` and put into `filter_variables!`
     @inbounds for k in real_center_indices(grid)
         en.TKE.values[k] = max(en.TKE.values[k], 0.0)
         en.Hvar.values[k] = max(en.Hvar.values[k], 0.0)
@@ -538,18 +523,20 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
         en.HQTcov.values[k] = max(en.HQTcov.values[k], -sqrt(en.Hvar.values[k] * en.QTvar.values[k]))
         en.HQTcov.values[k] = min(en.HQTcov.values[k], sqrt(en.Hvar.values[k] * en.QTvar.values[k]))
     end
+
+    # set values
+    set_values_with_new(edmf.UpdVar)
+    GMV_update(grid, GMV, TS)
     return
 end
 
-function update_GMV_turbulence(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
-
-    @inbounds for k in real_center_indices(edmf.grid)
-        GMV.H.tendencies[k] += (GMV.H.new[k] - GMV.H.values[k]) * TS.dti
-        GMV.QT.tendencies[k] += (GMV.QT.new[k] - GMV.QT.values[k]) * TS.dti
-        GMV.U.tendencies[k] += (GMV.U.new[k] - GMV.U.values[k]) * TS.dti
-        GMV.V.tendencies[k] += (GMV.V.new[k] - GMV.V.values[k]) * TS.dti
+function GMV_update(grid::Grid, GMV::GridMeanVariables, TS::TimeStepping)
+    @inbounds for k in real_center_indices(grid)
+        GMV.U.values[k] += GMV.U.tendencies[k] * TS.dt
+        GMV.V.values[k] += GMV.V.tendencies[k] * TS.dt
+        GMV.H.values[k] += GMV.H.tendencies[k] * TS.dt
+        GMV.QT.values[k] += GMV.QT.tendencies[k] * TS.dt
     end
-
     return
 end
 
@@ -680,54 +667,6 @@ function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE)
         edmf.pressure_plume_spacing[i] =
             max(edmf.aspect_ratio * edmf.UpdVar.updraft_top[i], H_up_min * edmf.aspect_ratio)
     end
-    return
-end
-
-function zero_area_fraction_cleanup(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables)
-
-    up = edmf.UpdVar
-    en = edmf.EnvVar
-    grid = get_grid(edmf)
-    @inbounds for k in real_center_indices(grid)
-        @inbounds for i in xrange(up.n_updrafts)
-            if up.Area.values[i, k] < edmf.minimum_area
-                up.Area.values[i, k] = 0.0
-                up.B.values[i, k] = gm.B.values[k]
-                up.H.values[i, k] = gm.H.values[k]
-                up.QT.values[i, k] = gm.QT.values[k]
-                up.T.values[i, k] = gm.T.values[k]
-                up.QL.values[i, k] = gm.QL.values[k]
-            end
-        end
-
-        if sum(ntuple(i -> up.Area.values[i, k], up.n_updrafts)) == 0.0
-            en.B.values[k] = gm.B.values[k]
-            en.H.values[k] = gm.H.values[k]
-            en.QT.values[k] = gm.QT.values[k]
-            en.T.values[k] = gm.T.values[k]
-            en.QL.values[k] = gm.QL.values[k]
-        end
-    end
-
-    @inbounds for k in real_face_indices(grid)
-        @inbounds for i in xrange(up.n_updrafts)
-            a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
-            a_up_f_i = interpc2f(up.Area.values, grid, k, i; a_bcs...)
-            if a_up_f_i < edmf.minimum_area
-                up.W.values[i, k] = gm.W.values[k]
-            end
-        end
-
-        a_up_f = map(1:(up.n_updrafts)) do i
-            a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
-            interpc2f(up.Area.values, grid, k, i; a_bcs...)
-        end
-
-        if sum(a_up_f) == 0.0
-            en.W.values[k] = gm.W.values[k]
-        end
-    end
-
     return
 end
 
