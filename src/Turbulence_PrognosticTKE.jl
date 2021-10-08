@@ -511,7 +511,7 @@ function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBas
     ###
     update_updraft(edmf, gm, TS)
     if edmf.Rain.rain_model == "clima_1m"
-        solve_rain_fall(edmf.rainphysics, gm, TS, edmf.Rain.QR)
+        compute_rain_advection_tendencies(edmf.rainphysics, gm, TS, edmf.Rain.QR)
     end
 
     GMV.U.new .= tridiag_solve(implicit_eqs.b_u_gm, implicit_eqs.A_uv_gm)

@@ -189,16 +189,13 @@ struct RainVariable{T}
     name::String
     units::String
     values::T
-    new::T
     flux::T
     function RainVariable(grid, name, units)
         loc = "half"
         kind = "scalar"
-
         values = center_field(grid)
-        new = center_field(grid)
         flux = center_field(grid)
-        return new{typeof(values)}(loc, kind, name, units, values, new, flux)
+        return new{typeof(values)}(loc, kind, name, units, values, flux)
     end
 end
 
@@ -732,10 +729,18 @@ struct RainPhysics{T}
     ref_state::ReferenceState
     rain_evap_source_h::T
     rain_evap_source_qt::T
+    qr_tendency_advection::T
     function RainPhysics(grid::Grid, ref_state::ReferenceState)
         rain_evap_source_h = center_field(grid)
         rain_evap_source_qt = center_field(grid)
-        return new{typeof(rain_evap_source_h)}(grid, ref_state, rain_evap_source_h, rain_evap_source_qt)
+        qr_tendency_advection = center_field(grid)
+        return new{typeof(rain_evap_source_h)}(
+            grid,
+            ref_state,
+            rain_evap_source_h,
+            rain_evap_source_qt,
+            qr_tendency_advection,
+        )
     end
 end
 
