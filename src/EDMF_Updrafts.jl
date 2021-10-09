@@ -3,7 +3,7 @@ function initialize(edmf, up::UpdraftVariables, gm::GridMeanVariables)
 
     up.W.values .= 0
     up.B.values .= 0
-    @inbounds for i in xrange(up.n_updrafts)
+    @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_center_indices(up.grid)
             # Simple treatment for now, revise when multiple updraft closures
             # become more well defined
@@ -96,7 +96,7 @@ function initialize_DryBubble(edmf, up::UpdraftVariables, gm::GridMeanVariables,
     Area_in = pyinterp(up.grid.zc, z_in, Area_in)
     thetal_in = pyinterp(up.grid.zc, z_in, thetal_in)
     T_in = pyinterp(up.grid.zc, z_in, T_in)
-    @inbounds for i in xrange(up.n_updrafts)
+    @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_face_indices(up.grid)
             if minimum(z_in) <= up.grid.zf[k] <= maximum(z_in)
                 up.W.values[i, k] = 0.0
@@ -142,7 +142,7 @@ end
 
 # quick utility to set "new" arrays with values in the "values" arrays
 function set_new_with_values(up::UpdraftVariables)
-    @inbounds for i in xrange(up.n_updrafts)
+    @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_face_indices(up.grid)
             up.W.new[i, k] = up.W.values[i, k]
         end
@@ -158,7 +158,7 @@ end
 
 # quick utility to set "tmp" arrays with values in the "new" arrays
 function set_values_with_new(up::UpdraftVariables)
-    @inbounds for i in xrange(up.n_updrafts)
+    @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_face_indices(up.grid)
             up.W.values[i, k] = up.W.new[i, k]
         end
@@ -199,7 +199,7 @@ end
 function upd_cloud_diagnostics(up::UpdraftVariables, ref_state::ReferenceState)
     up.lwp = 0.0
 
-    @inbounds for i in xrange(up.n_updrafts)
+    @inbounds for i in 1:(up.n_updrafts)
         up.cloud_base[i] = zc_toa(up.grid)
         up.cloud_top[i] = 0.0
         up.updraft_top[i] = 0.0
@@ -236,7 +236,7 @@ function compute_rain_formation_tendencies(
     p0_c = ref_state.p0_half
     ρ0_c = ref_state.rho0_half
 
-    @inbounds for i in xrange(up.n_updrafts)
+    @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_center_indices(grid)
             T_up = up.T.values[i, k]
             q_tot_up = up.QT.values[i, k]

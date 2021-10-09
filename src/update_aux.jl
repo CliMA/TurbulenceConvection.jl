@@ -41,7 +41,7 @@ function update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
         a_bulk_bcs = (; bottom = SetValue(sum(edmf.area_surface_bc)), top = SetZeroGradient())
         a_bulk_f = interpc2f(up.Area.bulkvalues, grid, k; a_bulk_bcs...)
         if a_bulk_f > 1.0e-20
-            @inbounds for i in xrange(up.n_updrafts)
+            @inbounds for i in 1:(up.n_updrafts)
                 a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
                 a_up_f = interpc2f(up.Area.values, grid, k, i; a_up_bcs...)
                 up.W.bulkvalues[k] += a_up_f * up.W.values[i, k] / a_bulk_f
@@ -60,7 +60,7 @@ function update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
         up.B.bulkvalues[k] = 0
         up.RH.bulkvalues[k] = 0
         if a_bulk_c > 1.0e-20
-            @inbounds for i in xrange(up.n_updrafts)
+            @inbounds for i in 1:(up.n_updrafts)
                 up.QT.bulkvalues[k] += up.Area.values[i, k] * up.QT.values[i, k] / a_bulk_c
                 up.QL.bulkvalues[k] += up.Area.values[i, k] * up.QL.values[i, k] / a_bulk_c
                 up.H.bulkvalues[k] += up.Area.values[i, k] * up.H.values[i, k] / a_bulk_c
@@ -105,7 +105,7 @@ function update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
         ##### buoyancy
         #####
 
-        @inbounds for i in xrange(up.n_updrafts)
+        @inbounds for i in 1:(up.n_updrafts)
             if up.Area.values[i, k] > 0.0
                 ts_up = TD.PhaseEquil_pθq(param_set, p0_c[k], up.H.values[i, k], up.QT.values[i, k])
                 up.QL.values[i, k] = TD.liquid_specific_humidity(ts_up)
@@ -132,10 +132,10 @@ function update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
         end
 
         gm.B.values[k] = (1.0 - up.Area.bulkvalues[k]) * en.B.values[k]
-        @inbounds for i in xrange(up.n_updrafts)
+        @inbounds for i in 1:(up.n_updrafts)
             gm.B.values[k] += up.Area.values[i, k] * up.B.values[i, k]
         end
-        @inbounds for i in xrange(up.n_updrafts)
+        @inbounds for i in 1:(up.n_updrafts)
             up.B.values[i, k] -= gm.B.values[k]
         end
         en.B.values[k] -= gm.B.values[k]
@@ -169,7 +169,7 @@ function update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
     upd_cloud_diagnostics(up, ref_state) # TODO: should this be moved to compute_diagnostics! ?
 
     @inbounds for k in real_center_indices(grid)
-        @inbounds for i in xrange(up.n_updrafts)
+        @inbounds for i in 1:(up.n_updrafts)
             # entrainment
             if up.Area.values[i, k] > 0.0
                 # compute ∇m at cell centers
@@ -224,7 +224,7 @@ function update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
     end
 
     @inbounds for k in real_face_indices(grid)
-        @inbounds for i in xrange(up.n_updrafts)
+        @inbounds for i in 1:(up.n_updrafts)
 
             # pressure
             a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
@@ -361,7 +361,7 @@ function update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
     #####
     @inbounds for k in real_center_indices(grid)
         en.TKE.press[k] = 0.0
-        @inbounds for i in xrange(up.n_updrafts)
+        @inbounds for i in 1:(up.n_updrafts)
             w_up_c = interpf2c(up.W.values, grid, k, i)
             w_en_c = interpf2c(en.W.values, grid, k)
             press_c = interpf2c(edmf.nh_pressure, grid, k, i)

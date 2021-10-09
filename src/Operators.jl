@@ -661,7 +661,7 @@ function construct_tridiag_diffusion_en(
     @inbounds for k in real_center_indices(grid)
         D_env = 0.0
 
-        @inbounds for i in xrange(n_updrafts)
+        @inbounds for i in 1:n_updrafts
             if a_up[i, k] > minimum_area
                 turb_entr = frac_turb_entr[i, k]
                 R_up = pressure_plume_spacing[i]
