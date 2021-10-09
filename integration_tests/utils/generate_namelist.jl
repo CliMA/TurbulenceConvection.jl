@@ -128,7 +128,7 @@ function default_namelist(case_name::String)
     namelist_defaults["thermodynamics"]["quadrature_type"] = "log-normal" #"gaussian" or "log-normal"
 
     namelist_defaults["time_stepping"] = Dict()
-    namelist_defaults["time_stepping"]["dt"] = 1.0
+    namelist_defaults["time_stepping"]["dt"] = 6.0
 
     namelist_defaults["microphysics"] = Dict()
     namelist_defaults["microphysics"]["rain_model"] = "None"
@@ -196,6 +196,7 @@ function Soares(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 8 * 3600.0
+    namelist["time_stepping"]["dt"] = 1.0
 
     namelist["meta"]["simname"] = "Soares"
     namelist["meta"]["casename"] = "Soares"
@@ -211,6 +212,7 @@ function Nieuwstadt(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 8 * 3600.0
+    namelist["time_stepping"]["dt"] = 2.0
 
     namelist["meta"]["simname"] = "Nieuwstadt"
     namelist["meta"]["casename"] = "Nieuwstadt"
@@ -294,6 +296,7 @@ function ARM_SGP(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 3600.0 * 14.5
+    namelist["time_stepping"]["dt"] = 5.0
     namelist["meta"]["simname"] = "ARM_SGP"
     namelist["meta"]["casename"] = "ARM_SGP"
 
@@ -324,6 +327,7 @@ function DYCOMS_RF01(namelist_defaults)
     namelist["grid"]["dz"] = 50
 
     namelist["time_stepping"]["t_max"] = 60 * 60 * 16.0
+    namelist["time_stepping"]["dt"] = 6.0
     namelist["meta"]["simname"] = "DYCOMS_RF01"
     namelist["meta"]["casename"] = "DYCOMS_RF01"
 
@@ -351,11 +355,11 @@ function SP(namelist_defaults)
     namelist["meta"]["casename"] = "SP"
 
     # this case is resolution dependent, we should check why
-    namelist["grid"]["nz"] = 256
-    namelist["grid"]["dz"] = 8
+    namelist["grid"]["nz"] = 64
+    namelist["grid"]["dz"] = 32
 
     namelist["time_stepping"]["t_max"] = 7200.0
-    namelist["time_stepping"]["dt"] = 3.0
+    namelist["time_stepping"]["dt"] = 1.0
     namelist["meta"]["simname"] = "SP"
     namelist["meta"]["casename"] = "SP"
 
@@ -375,6 +379,7 @@ function DryBubble(namelist_defaults)
 
     namelist["stats_io"]["frequency"] = 10.0
     namelist["time_stepping"]["t_max"] = 1000.0
+    namelist["time_stepping"]["dt"] = 6.0
     namelist["meta"]["simname"] = "DryBubble"
     namelist["meta"]["casename"] = "DryBubble"
 
@@ -389,7 +394,7 @@ function LES_driven_SCM(namelist_defaults)
     namelist["grid"]["nz"] = 200
 
     namelist["stats_io"]["frequency"] = 10.0
-    namelist["time_stepping"]["dt"] = 5.0
+    namelist["time_stepping"]["dt"] = 3.0
     namelist["time_stepping"]["t_max"] = 3600.0 * 12
 
     namelist["meta"]["lesfile"] =

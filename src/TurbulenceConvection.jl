@@ -20,6 +20,7 @@ import CloudMicrophysics
 
 const ODE = OrdinaryDiffEq
 const CC = ClimaCore
+const CCO = CC.Operators
 const NC = NCDatasets
 const SA = StaticArrays
 
@@ -84,7 +85,7 @@ include("types.jl")
 include("name_aliases.jl")
 include("Operators.jl")
 
-include("microphysics_functions.jl")
+include("microphysics_coupling.jl")
 include("turbulence_functions.jl")
 include("utility_functions.jl")
 include("TimeStepping.jl")

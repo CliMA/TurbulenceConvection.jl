@@ -25,7 +25,7 @@ function get_inversion(param_set, θ_ρ, u, v, grid::Grid, Ri_bulk_crit)
     else
         Ri_bulk_fn(k) = g * (θ_ρ[k] - θ_ρ_b) * z_c[k] / θ_ρ_b / (u[k] * u[k] + v[k] * v[k])
 
-        Ri_bulk[real_center_indices(grid)] .= map(k -> Ri_bulk_fn(k), real_center_indices(grid))
+        Ri_bulk .= map(k -> Ri_bulk_fn(k), real_center_indices(grid))
         kmask = map(k -> (k, Ri_bulk_fn(k) > Ri_bulk_crit), real_center_indices(grid))
         k_star = first(kmask[findlast(km -> km[2], kmask)])
         ∇Ri_bulk = c∇_upwind(Ri_bulk, grid, k_star; bottom = SetGradient(0), top = FreeBoundary())

@@ -10,6 +10,14 @@ face_fields_list() = (
     "nh_pressure_adv",
     "nh_pressure_drag",
     "nh_pressure_b",
+    "total_flux_h",
+    "total_flux_qt",
+    "massflux_h",
+    "massflux_qt",
+    "diffusive_flux_h",
+    "diffusive_flux_qt",
+    "diffusive_flux_u",
+    "diffusive_flux_v",
 )
 
 function is_face_field(var_name)
