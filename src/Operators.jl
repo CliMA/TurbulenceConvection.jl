@@ -152,30 +152,19 @@ function upwind_advection_area(ρ0_half::Vector{Float64}, a_up::Vector{Float64},
     return -∇m / ρ0_half[k]
 end
 
-function upwind_advection_velocity(ρ0::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64}, grid, k; a_up_bcs)
-    a_dual = daul_c2f_upwind(a_up, grid, k; a_up_bcs...)
-    ρ_0_dual = fcut_upwind(ρ0, grid, k)
+function upwind_advection_velocity(w_up::Vector{Float64}, grid, k; a_up_bcs)
     w_up_dual = fcut_upwind(w_up, grid, k)
-    adv_dual = a_dual .* ρ_0_dual .* w_up_dual .* w_up_dual
-    ∇ρaw = f∇_onesided(adv_dual, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
-    return ∇ρaw
+    ∇ρaw = f∇_onesided(w_up_dual, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
+    return w_up[k] .* ∇ρaw
 end
 
-function upwind_advection_scalar(
-    ρ0_half::Vector{Float64},
-    a_up::Vector{Float64},
-    w_up::Vector{Float64},
-    var::Vector{Float64},
-    grid,
-    k,
-)
-    ρ_0_cut = ccut_upwind(ρ0_half, grid, k)
-    a_up_cut = ccut_upwind(a_up, grid, k)
+function upwind_advection_scalar(w_up::Vector{Float64}, var::Vector{Float64}, grid, k)
+    w_up_c = interpf2c(w_up, grid, k)
     w_up_cut = daul_f2c_upwind(w_up, grid, k)
     var_cut = ccut_upwind(var, grid, k)
-    m_cut = ρ_0_cut .* a_up_cut .* w_up_cut .* var_cut
+    m_cut = var_cut
     ∇m = c∇_upwind(m_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
-    return ∇m
+    return w_up_c .* ∇m
 end
 
 #####
