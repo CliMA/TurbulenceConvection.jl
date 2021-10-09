@@ -728,8 +728,8 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, gm::GridMeanVariab
         @inbounds for i in xrange(up.n_updrafts)
             w_up_c = interpf2c(w_up, grid, k, i)
             if a_up[i, k] > 0
-                q_tot_rain = up_thermo.prec_source_qt[i, k] / a_up[i, k]
-                θ_liq_ice_rain = up_thermo.prec_source_h[i, k] / a_up[i, k]
+                q_tot_rain = up_thermo.qt_tendency_rain_formation[i, k] / a_up[i, k]
+                θ_liq_ice_rain = up_thermo.θ_liq_ice_tendency_rain_formation[i, k] / a_up[i, k]
             else
                 q_tot_rain = 0
                 θ_liq_ice_rain = 0
