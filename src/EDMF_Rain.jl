@@ -50,20 +50,6 @@ function rain_diagnostics(
     return
 end
 
-function compute_subdomain_rain_tendency_sum(
-    rain::RainVariables,
-    up_thermo::UpdraftThermodynamics,
-    en_thermo::EnvironmentThermodynamics,
-    TS::TimeStepping,
-)
-    # TODO - just move it to the place where all rain tendecies are summed up
-    @inbounds for k in real_center_indices(rain.grid)
-        rain.QR.values[k] -=
-            (en_thermo.qt_tendency_rain_formation[k] + up_thermo.qt_tendency_rain_formation_tot[k]) * TS.dt
-    end
-    return
-end
-
 """
 Computes the qr advection (down) tendency
 """
@@ -103,11 +89,9 @@ function compute_rain_advection_tendencies(rain::RainPhysics, gm::GridMeanVariab
         ∇ρQRw = c∇_downwind(ρQRw_cut, grid, k; bottom = FreeBoundary(), top = SetValue(0))
 
         ρ_0_c = ρ_0_c_field[k]
-        rain.qr_tendency_advection[k] = ∇ρQRw / ρ_0_c
 
-        # TODO - apply the tendecies elsewhere
         # TODO - some positivity limiters are needed
-        QR.values[k] += rain.qr_tendency_advection[k] * Δt
+        rain.qr_tendency_advection[k] = ∇ρQRw / ρ_0_c
     end
     return
 end
@@ -131,12 +115,30 @@ function compute_rain_evap_tendencies(rain::RainPhysics, gm::GridMeanVariables, 
         # TODO - move limiters elsewhere
         qt_tendency =
             min(QR.values[k] / Δt, -CM1.evaporation_sublimation(param_set, rain_type, q, QR.values[k], ρ0_c[k], T_gm))
+
         rain.qt_tendency_rain_evap[k] = qt_tendency
         rain.qr_tendency_rain_evap[k] = -qt_tendency
         rain.θ_liq_ice_tendency_rain_evap[k] = θ_liq_ice_helper(ts, qt_tendency)
+    end
+    return
+end
 
-        # TODO - apply tendencies elsewhere
-        QR.values[k] += rain.qr_tendency_rain_evap[k] * Δt
+"""
+Updates qr based on all microphysics tendencies
+"""
+function update_rain(
+    rain_var::RainVariables,
+    up_thermo::UpdraftThermodynamics,
+    en_thermo::EnvironmentThermodynamics,
+    rain_phys::RainPhysics,
+    TS::TimeStepping,
+)
+    @inbounds for k in real_center_indices(rain_var.grid)
+        rain_var.QR.values[k] +=
+            (
+                rain_phys.qr_tendency_advection[k] + rain_phys.qr_tendency_rain_evap[k] -
+                en_thermo.qt_tendency_rain_formation[k] - up_thermo.qt_tendency_rain_formation_tot[k]
+            ) * TS.dt
     end
     return
 end

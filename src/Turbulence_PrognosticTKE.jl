@@ -454,9 +454,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, GMV::GridMeanVariables, C
     microphysics(en_thermo, edmf.EnvVar, edmf.Rain, TS.dt) # saturation adjustment + rain creation
     if edmf.Rain.rain_model == "clima_1m"
         compute_rain_evap_tendencies(edmf.RainPhys, gm, TS, edmf.Rain.QR)
-        # sum updraft and environment rain into bulk rain
-        # TODO - this function should be removed once we move simming the tendencies to one place
-        compute_subdomain_rain_tendency_sum(edmf.Rain, up_thermo, en_thermo, TS)
+        compute_rain_advection_tendencies(edmf.RainPhys, gm, TS, edmf.Rain.QR)
     end
 
     # compute tendencies
@@ -504,7 +502,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, GMV::GridMeanVariables, C
     ###
     update_updraft(edmf, gm, TS)
     if edmf.Rain.rain_model == "clima_1m"
-        compute_rain_advection_tendencies(edmf.RainPhys, gm, TS, edmf.Rain.QR)
+        update_rain(edmf.Rain, up_thermo, en_thermo, edmf.RainPhys, TS)
     end
 
     en.TKE.values .= tridiag_solve(implicit_eqs.b_TKE, implicit_eqs.A_TKE)
