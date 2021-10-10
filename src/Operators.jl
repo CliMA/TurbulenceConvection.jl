@@ -178,10 +178,8 @@ end
 
 function upwind_advection_scalar(w_up::Vector{Float64}, var::Vector{Float64}, grid, k)
     w_up_c = interpf2c(w_up, grid, k)
-    w_up_cut = daul_f2c_upwind(w_up, grid, k)
     var_cut = ccut_upwind(var, grid, k)
-    m_cut = var_cut
-    ∇m = c∇_upwind(m_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
+    ∇m = c∇_upwind(var_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
     return w_up_c .* ∇m
 end
 
