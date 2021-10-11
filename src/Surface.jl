@@ -23,8 +23,6 @@ end
 
 free_convection_windspeed(self::SurfaceBase, GMV::GridMeanVariables) = free_convection_windspeed(self, GMV, BaseCase())
 
-initialize(self::SurfaceBase) = nothing
-
 #####
 ##### SurfaceNone
 #####
@@ -92,16 +90,6 @@ function update(self::SurfaceBase{SurfaceFixedFlux}, GMV::GridMeanVariables)
     self.obukhov_length = -self.ustar * self.ustar^2 / self.bflux / von_karman_const
     self.rho_uflux = -ρ0_f_surf * self.ustar^2 / self.windspeed * u_gm_surf
     self.rho_vflux = -ρ0_f_surf * self.ustar^2 / self.windspeed * v_gm_surf
-    return
-end
-
-# Cases such as Rico which provide values of transfer coefficients
-function initialize(self::SurfaceBase{SurfaceFixedCoeffs})
-    param_set = parameter_set(self.ref_state)
-    kf_surf = kf_surface(self.grid)
-    ts = TD.PhaseEquil_pθq(param_set, self.ref_state.p0[kf_surf], self.Tsurface, self.qsurface)
-    pvg = TD.saturation_vapor_pressure(ts, TD.Liquid())
-    self.qsurface = TD.q_vap_saturation(ts)
     return
 end
 
