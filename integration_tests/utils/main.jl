@@ -8,12 +8,17 @@ include("parameter_set.jl")
 include("Cases.jl")
 import .Cases
 
+struct State{P, A, T, D}
+    prog::P
+    aux::A
+    tendencies::T
+    diagnostics::D
+end
+
 struct Simulation1d
     io_nt::NamedTuple
     grid
     state
-    tendencies
-    aux
     ref_state
     GMV
     Case
@@ -95,8 +100,8 @@ function Simulation1d(namelist)
 
     n_updrafts = Turb.n_updrafts
 
-    cent_state_fields = TC.FieldFromNamedTuple(TC.center_space(grid), cent_prognostic_vars(FT, n_updrafts))
-    face_state_fields = TC.FieldFromNamedTuple(TC.face_space(grid), face_prognostic_vars(FT, n_updrafts))
+    cent_prog_fields = TC.FieldFromNamedTuple(TC.center_space(grid), cent_prognostic_vars(FT, n_updrafts))
+    face_prog_fields = TC.FieldFromNamedTuple(TC.face_space(grid), face_prognostic_vars(FT, n_updrafts))
     aux_cent_fields = TC.FieldFromNamedTuple(TC.center_space(grid), cent_aux_vars(FT, n_updrafts))
     aux_face_fields = TC.FieldFromNamedTuple(TC.face_space(grid), face_aux_vars(FT, n_updrafts))
     diagnostic_cent_fields = TC.FieldFromNamedTuple(TC.center_space(grid), cent_diagnostic_vars(FT, n_updrafts))
@@ -109,107 +114,111 @@ function Simulation1d(namelist)
     parent(aux_cent_fields.ref_state.ρ0) .= ref_state.rho0_half
     parent(aux_cent_fields.ref_state.α0) .= ref_state.alpha0_half
 
-    state = CC.Fields.FieldVector(cent = cent_state_fields, face = face_state_fields)
-    tendencies = CC.Fields.FieldVector(cent = cent_state_fields, face = face_state_fields)
+    prog = CC.Fields.FieldVector(cent = cent_prog_fields, face = face_prog_fields)
+    tendencies = CC.Fields.FieldVector(cent = cent_prog_fields, face = face_prog_fields)
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
     diagnostics = CC.Fields.FieldVector(cent = diagnostic_cent_fields, face = diagnostic_face_fields)
+
+    state = State(prog, aux, tendencies, diagnostics)
+
     io_nt = (;
-        ref_state = TC.io_dictionary_ref_state(aux),
-        aux = TC.io_dictionary_aux(aux),
-        diagnostics = TC.io_dictionary_diagnostics(diagnostics),
-        state = TC.io_dictionary_state(state),
-        tendencies = TC.io_dictionary_tendencies(tendencies),
+        ref_state = TC.io_dictionary_ref_state(state),
+        aux = TC.io_dictionary_aux(state),
+        diagnostics = TC.io_dictionary_diagnostics(state),
+        prog = TC.io_dictionary_state(state),
+        tendencies = TC.io_dictionary_tendencies(state),
     )
 
-    return Simulation1d(io_nt, grid, state, tendencies, aux, ref_state, GMV, Case, Turb, TS, Stats)
+    return Simulation1d(io_nt, grid, state, ref_state, GMV, Case, Turb, TS, Stats)
 end
 
-function TurbulenceConvection.initialize(self::Simulation1d, namelist)
+function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     TC = TurbulenceConvection
-    Cases.initialize_profiles(self.Case, self.grid, self.GMV, TC.center_ref_state(self.aux))
-    TC.satadjust(self.GMV)
+    state = sim.state
+    Cases.initialize_profiles(sim.Case, sim.grid, sim.GMV, TC.center_ref_state(state))
+    TC.satadjust(sim.GMV)
 
-    Cases.initialize_surface(self.Case, self.grid, self.ref_state)
-    Cases.initialize_forcing(self.Case, self.grid, self.ref_state, self.GMV)
-    Cases.initialize_radiation(self.Case, self.grid, self.ref_state, self.GMV)
+    Cases.initialize_surface(sim.Case, sim.grid, state, sim.ref_state)
+    Cases.initialize_forcing(sim.Case, sim.grid, state, sim.ref_state, sim.GMV)
+    Cases.initialize_radiation(sim.Case, sim.grid, state, sim.ref_state, sim.GMV)
 
-    TC.initialize(self.Turb, self.Case, self.GMV, self.ref_state, self.TS)
+    TC.initialize(sim.Turb, sim.grid, state, sim.Case, sim.GMV, sim.ref_state, sim.TS)
 
-    TC.initialize_io(self)
-    TC.io(self)
+    TC.initialize_io(sim)
+    TC.io(sim)
     return
 end
 
-function run(self::Simulation1d)
+function run(sim::Simulation1d)
     TC = TurbulenceConvection
     iter = 0
-    TC.open_files(self.Stats) # #removeVarsHack
-    while self.TS.t <= self.TS.t_max
-        TC.update(self.Turb, self.GMV, self.Case, self.TS)
-        TC.update(self.TS)
+    TC.open_files(sim.Stats) # #removeVarsHack
+    while sim.TS.t <= sim.TS.t_max
+        TC.update(sim.Turb, sim.grid, sim.state, sim.GMV, sim.Case, sim.TS)
+        TC.update(sim.TS)
 
         if mod(iter, 100) == 0
-            progress = self.TS.t / self.TS.t_max
+            progress = sim.TS.t / sim.TS.t_max
             @show progress
         end
 
-        if mod(self.TS.t, self.Stats.frequency) == 0
+        if mod(sim.TS.t, sim.Stats.frequency) == 0
             # TODO: is this the best location to call diagnostics?
-            TC.compute_diagnostics!(self.Turb, self.GMV, self.grid, self.Case, self.ref_state, self.TS)
+            TC.compute_diagnostics!(sim.Turb, sim.GMV, sim.grid, sim.state, sim.Case, sim.ref_state, sim.TS)
 
             # TODO: remove `vars` hack that avoids
             # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
             # opening/closing files every step should be okay. #removeVarsHack
-            # TurbulenceConvection.io(self) # #removeVarsHack
-            TC.write_simulation_time(self.Stats, self.TS.t) # #removeVarsHack
+            # TurbulenceConvection.io(sim) # #removeVarsHack
+            TC.write_simulation_time(sim.Stats, sim.TS.t) # #removeVarsHack
 
-            TC.io(self.io_nt.aux, self.Stats)
-            TC.io(self.io_nt.diagnostics, self.Stats)
-            TC.io(self.io_nt.state, self.Stats)
-            TC.io(self.io_nt.tendencies, self.Stats)
+            TC.io(sim.io_nt.aux, sim.Stats)
+            TC.io(sim.io_nt.diagnostics, sim.Stats)
+            TC.io(sim.io_nt.prog, sim.Stats)
+            TC.io(sim.io_nt.tendencies, sim.Stats)
 
-            TC.io(self.GMV, self.Stats) # #removeVarsHack
-            TC.io(self.Case, self.Stats) # #removeVarsHack
-            TC.io(self.Turb, self.Stats, self.TS) # #removeVarsHack
+            TC.io(sim.GMV, sim.Stats) # #removeVarsHack
+            TC.io(sim.Case, sim.Stats) # #removeVarsHack
+            TC.io(sim.Turb, sim.Stats, sim.TS) # #removeVarsHack
         end
         iter += 1
     end
-    TC.close_files(self.Stats) # #removeVarsHack
+    TC.close_files(sim.Stats) # #removeVarsHack
     return
 end
 
-function TurbulenceConvection.initialize_io(self::Simulation1d)
+function TurbulenceConvection.initialize_io(sim::Simulation1d)
     TC = TurbulenceConvection
-    TC.initialize_io(self.io_nt.ref_state, self.Stats)
-    TC.io(self.io_nt.ref_state, self.Stats) # since the reference state is static
+    TC.initialize_io(sim.io_nt.ref_state, sim.Stats)
+    TC.io(sim.io_nt.ref_state, sim.Stats) # since the reference prog is static
 
-    TC.initialize_io(self.io_nt.aux, self.Stats)
-    TC.initialize_io(self.io_nt.diagnostics, self.Stats)
-    TC.initialize_io(self.io_nt.state, self.Stats)
-    TC.initialize_io(self.io_nt.tendencies, self.Stats)
+    TC.initialize_io(sim.io_nt.aux, sim.Stats)
+    TC.initialize_io(sim.io_nt.diagnostics, sim.Stats)
+    TC.initialize_io(sim.io_nt.prog, sim.Stats)
+    TC.initialize_io(sim.io_nt.tendencies, sim.Stats)
 
     # TODO: depricate
-    TC.initialize_io(self.GMV, self.Stats)
-    TC.initialize_io(self.Case, self.Stats)
-    TC.initialize_io(self.Turb, self.Stats)
+    TC.initialize_io(sim.GMV, sim.Stats)
+    TC.initialize_io(sim.Case, sim.Stats)
+    TC.initialize_io(sim.Turb, sim.Stats)
     return
 end
 
-function TurbulenceConvection.io(self::Simulation1d)
+function TurbulenceConvection.io(sim::Simulation1d)
     TC = TurbulenceConvection
-    TC.open_files(self.Stats)
-    TC.write_simulation_time(self.Stats, self.TS.t)
+    TC.open_files(sim.Stats)
+    TC.write_simulation_time(sim.Stats, sim.TS.t)
 
-    TC.io(self.io_nt.aux, self.Stats)
-    TC.io(self.io_nt.diagnostics, self.Stats)
-    TC.io(self.io_nt.state, self.Stats)
-    TC.io(self.io_nt.tendencies, self.Stats)
+    TC.io(sim.io_nt.aux, sim.Stats)
+    TC.io(sim.io_nt.diagnostics, sim.Stats)
+    TC.io(sim.io_nt.prog, sim.Stats)
+    TC.io(sim.io_nt.tendencies, sim.Stats)
 
     # TODO: depricate
-    TC.io(self.GMV, self.Stats)
-    TC.io(self.Case, self.Stats)
-    TC.io(self.Turb, self.Stats, self.TS)
-    TC.close_files(self.Stats)
+    TC.io(sim.GMV, sim.Stats)
+    TC.io(sim.Case, sim.Stats)
+    TC.io(sim.Turb, sim.Stats, sim.TS)
+    TC.close_files(sim.Stats)
     return
 end
 
