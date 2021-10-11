@@ -18,7 +18,6 @@ import ..TurbulenceConvection
 const TC = TurbulenceConvection
 
 using ..TurbulenceConvection: CasesBase
-using ..TurbulenceConvection: off_arr
 using ..TurbulenceConvection: pyinterp
 using ..TurbulenceConvection: buoyancy_c
 using ..TurbulenceConvection: add_ts
@@ -27,7 +26,6 @@ using ..TurbulenceConvection: write_ts
 using ..TurbulenceConvection: initialize
 using ..TurbulenceConvection: initialize_io
 using ..TurbulenceConvection: io
-using ..TurbulenceConvection: xrange
 using ..TurbulenceConvection: Grid
 using ..TurbulenceConvection: ReferenceState
 using ..TurbulenceConvection: NetCDFIO_Stats
@@ -37,6 +35,15 @@ using ..TurbulenceConvection: real_center_indices
 using ..TurbulenceConvection: real_face_indices
 using ..TurbulenceConvection: get_inversion
 
+#=
+    arr_type(x)
+
+We're keeping this around in case we need
+to move some initialized data to the GPU.
+In this case, we may be able to modify this
+function to do this.
+=#
+arr_type(x) = x
 
 #####
 ##### Case types
@@ -691,7 +698,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMea
     p0 = ref_state_centers.p0
     # TRMM_LBA inputs from Grabowski et al. 2006
     #! format: off
-    z_in = off_arr([0.130,  0.464,  0.573,  1.100,  1.653,  2.216,  2.760,
+    z_in = arr_type([0.130,  0.464,  0.573,  1.100,  1.653,  2.216,  2.760,
                      3.297,  3.824,  4.327,  4.787,  5.242,  5.686,  6.131,
                      6.578,  6.996,  7.431,  7.881,  8.300,  8.718,  9.149,
                      9.611, 10.084, 10.573, 11.008, 11.460, 11.966, 12.472,
@@ -699,7 +706,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMea
                     16.491, 16.961, 17.442, 17.934, 18.397, 18.851, 19.331,
                     19.809, 20.321, 20.813, 21.329, 30.000]) .* 1000 .- 130.0 #LES z is in meters
 
-    p_in = off_arr([991.3, 954.2, 942.0, 886.9, 831.5, 778.9, 729.8,
+    p_in = arr_type([991.3, 954.2, 942.0, 886.9, 831.5, 778.9, 729.8,
                      684.0, 641.7, 603.2, 570.1, 538.6, 509.1, 480.4,
                      454.0, 429.6, 405.7, 382.5, 361.1, 340.9, 321.2,
                      301.2, 281.8, 263.1, 246.1, 230.1, 213.2, 197.0,
@@ -707,7 +714,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMea
                      100.1,  92.1,  84.6,  77.5,  71.4,  65.9,  60.7,
                       55.9,  51.3,  47.2,  43.3,  10.3]) .* 100 # LES pres is in pasc
 
-    T_in = off_arr([23.70,  23.30,  22.57,  19.90,  16.91,  14.09,  11.13,
+    T_in = arr_type([23.70,  23.30,  22.57,  19.90,  16.91,  14.09,  11.13,
                       8.29,   5.38,   2.29,  -0.66,  -3.02,  -5.28,  -7.42,
                     -10.34, -12.69, -15.70, -19.21, -21.81, -24.73, -27.76,
                     -30.93, -34.62, -38.58, -42.30, -46.07, -50.03, -54.67,
@@ -715,7 +722,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMea
                     -80.69, -80.00, -81.38, -81.17, -78.32, -74.77, -74.52,
                     -72.62, -70.87, -69.19, -66.90, -66.90]) .+ 273.15 # LES T is in deg K
 
-    RH_in = off_arr([98.00,  86.00,  88.56,  87.44,  86.67,  83.67,  79.56,
+    RH_in = arr_type([98.00,  86.00,  88.56,  87.44,  86.67,  83.67,  79.56,
                       84.78,  84.78,  89.33,  94.33,  92.00,  85.22,  77.33,
                       80.11,  66.11,  72.11,  72.67,  52.22,  54.67,  51.00,
                       43.78,  40.56,  43.11,  54.78,  46.11,  42.33,  43.22,
@@ -723,7 +730,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMea
                       17.11,  16.22,  14.22,  13.00,  13.00,  12.22,   9.56,
                        7.78,   5.89,   4.33,   3.00,   3.00])
 
-    u_in = off_arr([0.00,   0.81,   1.17,   3.44,   3.53,   3.88,   4.09,
+    u_in = arr_type([0.00,   0.81,   1.17,   3.44,   3.53,   3.88,   4.09,
                      3.97,   1.22,   0.16,  -1.22,  -1.72,  -2.77,  -2.65,
                     -0.64,  -0.07,  -1.90,  -2.70,  -2.99,  -3.66,  -5.05,
                     -6.64,  -4.74,  -5.30,  -6.07,  -4.26,  -7.52,  -8.88,
@@ -731,7 +738,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMea
                     -8.01,  -5.68,  -8.83, -14.51, -15.55, -15.36, -17.67,
                    -17.82, -18.94, -15.92, -15.32, -15.32])
 
-    v_in = off_arr([-0.40,  -3.51,  -3.88,  -4.77,  -5.28,  -5.85,  -5.60,
+    v_in = arr_type([-0.40,  -3.51,  -3.88,  -4.77,  -5.28,  -5.85,  -5.60,
                      -2.67,  -1.47,   0.57,   0.89,  -0.08,   1.11,   2.15,
                       3.12,   3.22,   3.34,   1.91,   1.15,   1.01,  -0.57,
                      -0.67,   0.31,   2.97,   2.32,   2.66,   4.79,   3.40,
@@ -790,7 +797,7 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, ref_state::Re
     self.Fo.dTdt = TC.center_field(grid)
     self.rad_time = range(10, 360; length = 36) .* 60
     #! format: off
-    z_in         = off_arr([42.5, 200.92, 456.28, 743, 1061.08, 1410.52, 1791.32, 2203.48, 2647,3121.88, 3628.12,
+    z_in         = arr_type([42.5, 200.92, 456.28, 743, 1061.08, 1410.52, 1791.32, 2203.48, 2647,3121.88, 3628.12,
                              4165.72, 4734.68, 5335, 5966.68, 6629.72, 7324.12,
                              8049.88, 8807, 9595.48, 10415.32, 11266.52, 12149.08, 13063, 14008.28,
                              14984.92, 15992.92, 17032.28, 18103, 19205.08, 20338.52, 21503.32, 22699.48])
@@ -906,7 +913,7 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, ref_state::Re
     #! format: on
     # TODO: check translation
     rad_in = reduce(vcat, rad_in')
-    A = hcat(map(xrange(0, 36)) do tt
+    A = hcat(map(1:36) do tt
         a = grid.zc
         b = z_in
         c = reshape(rad_in[tt, :], size(rad_in, 2))
@@ -990,9 +997,9 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, GMV::GridMean
     p0 = ref_state_centers.p0
     #! format: off
     param_set = TC.parameter_set(GMV)
-    z_in = off_arr([0.0, 50.0, 350.0, 650.0, 700.0, 1300.0, 2500.0, 5500.0 ]) #LES z is in meters
-    Theta_in = off_arr([299.0, 301.5, 302.5, 303.53, 303.7, 307.13, 314.0, 343.2]) # K
-    r_in = off_arr([15.2,15.17,14.98,14.8,14.7,13.5,3.0,3.0])/1000 # qt should be in kg/kg
+    z_in = arr_type([0.0, 50.0, 350.0, 650.0, 700.0, 1300.0, 2500.0, 5500.0 ]) #LES z is in meters
+    Theta_in = arr_type([299.0, 301.5, 302.5, 303.53, 303.7, 307.13, 314.0, 343.2]) # K
+    r_in = arr_type([15.2,15.17,14.98,14.8,14.7,13.5,3.0,3.0])/1000 # qt should be in kg/kg
     #! format: on
     qt_in = r_in ./ (1 .+ r_in)
 
@@ -1048,11 +1055,11 @@ function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, ref_state::Ref
 end
 
 function TC.update_surface(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::TimeStepping)
-    t_Sur_in = off_arr([0.0, 4.0, 6.5, 7.5, 10.0, 12.5, 14.5]) .* 3600 #LES time is in sec
-    SH = off_arr([-30.0, 90.0, 140.0, 140.0, 100.0, -10, -10]) # W/m^2
-    LH = off_arr([5.0, 250.0, 450.0, 500.0, 420.0, 180.0, 0.0]) # W/m^2
-    self.Sur.shf = pyinterp(off_arr([TS.t]), t_Sur_in, SH)[1]
-    self.Sur.lhf = pyinterp(off_arr([TS.t]), t_Sur_in, LH)[1]
+    t_Sur_in = arr_type([0.0, 4.0, 6.5, 7.5, 10.0, 12.5, 14.5]) .* 3600 #LES time is in sec
+    SH = arr_type([-30.0, 90.0, 140.0, 140.0, 100.0, -10, -10]) # W/m^2
+    LH = arr_type([5.0, 250.0, 450.0, 500.0, 420.0, 180.0, 0.0]) # W/m^2
+    self.Sur.shf = pyinterp(arr_type([TS.t]), t_Sur_in, SH)[1]
+    self.Sur.lhf = pyinterp(arr_type([TS.t]), t_Sur_in, LH)[1]
     # if fluxes vanish bflux vanish and wstar and obukov length are NaNs
     ## CK +++ I commented out the lines below as I don"t think this is how we want to fix things!
     # if self.Sur.shf < 1.0
@@ -1068,12 +1075,12 @@ end
 
 function TC.update_forcing(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::TimeStepping)
     param_set = TC.parameter_set(GMV)
-    t_in = off_arr([0.0, 3.0, 6.0, 9.0, 12.0, 14.5]) .* 3600.0 #LES time is in sec
-    AT_in = off_arr([0.0, 0.0, 0.0, -0.08, -0.016, -0.016]) ./ 3600.0 # Advective forcing for theta [K/h] converted to [K/sec]
-    RT_in = off_arr([-0.125, 0.0, 0.0, 0.0, 0.0, -0.1]) ./ 3600.0  # Radiative forcing for theta [K/h] converted to [K/sec]
-    Rqt_in = off_arr([0.08, 0.02, 0.04, -0.1, -0.16, -0.3]) ./ 1000.0 ./ 3600.0 # Radiative forcing for qt converted to [kg/kg/sec]
-    dTdt = pyinterp(off_arr([TS.t]), t_in, AT_in)[1] + pyinterp(off_arr([TS.t]), t_in, RT_in)[1]
-    dqtdt = pyinterp(off_arr([TS.t]), t_in, Rqt_in)[1]
+    t_in = arr_type([0.0, 3.0, 6.0, 9.0, 12.0, 14.5]) .* 3600.0 #LES time is in sec
+    AT_in = arr_type([0.0, 0.0, 0.0, -0.08, -0.016, -0.016]) ./ 3600.0 # Advective forcing for theta [K/h] converted to [K/sec]
+    RT_in = arr_type([-0.125, 0.0, 0.0, 0.0, 0.0, -0.1]) ./ 3600.0  # Radiative forcing for theta [K/h] converted to [K/sec]
+    Rqt_in = arr_type([0.08, 0.02, 0.04, -0.1, -0.16, -0.3]) ./ 1000.0 ./ 3600.0 # Radiative forcing for qt converted to [kg/kg/sec]
+    dTdt = pyinterp(arr_type([TS.t]), t_in, AT_in)[1] + pyinterp(arr_type([TS.t]), t_in, RT_in)[1]
+    dqtdt = pyinterp(arr_type([TS.t]), t_in, Rqt_in)[1]
     grid = self.Fo.grid
     @inbounds for k in real_center_indices(grid)
         ts = TD.PhaseEquil_pθq(param_set, self.Fo.ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
@@ -1121,13 +1128,13 @@ function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, GMV::GridMea
 
     # GATE_III inputs - I extended them to z=22 km
     #! format: off
-    z_in  = off_arr([ 0.0,   0.5,  1.0,  1.5,  2.0,   2.5,    3.0,   3.5,   4.0,   4.5,   5.0,  5.5,  6.0,  6.5,
+    z_in  = arr_type([ 0.0,   0.5,  1.0,  1.5,  2.0,   2.5,    3.0,   3.5,   4.0,   4.5,   5.0,  5.5,  6.0,  6.5,
                        7.0, 7.5, 8.0,  8.5,   9.0,   9.5, 10.0,   10.5,   11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0,
                        14.5, 15.0, 15.5, 16.0, 16.5, 17.0, 17.5, 18.0, 27.0]) * 1000.0 #z is in meters
-    r_in = off_arr([16.5,  16.5, 13.5, 12.0, 10.0,   8.7,    7.1,   6.1,   5.2,   4.5,   3.6,  3.0,  2.3, 1.75, 1.3,
+    r_in = arr_type([16.5,  16.5, 13.5, 12.0, 10.0,   8.7,    7.1,   6.1,   5.2,   4.5,   3.6,  3.0,  2.3, 1.75, 1.3,
                      0.9, 0.5, 0.25, 0.125, 0.065, 0.003, 0.0015, 0.0007,  0.0003,  0.0001,  0.0001,  0.0001,  0.0001,
                      0.0001,  0.0001,  0.0001,  0.0001,  0.0001,  0.0001,  0.0001,  0.0001,  0.0001, 0.0001])/1000 # mixing ratio should be in kg/kg
-    U_in  = off_arr([  -1, -1.75, -2.5, -3.6, -6.0, -8.75, -11.75, -13.0, -13.1, -12.1, -11.0, -8.5, -5.0, -2.6, 0.0,
+    U_in  = arr_type([  -1, -1.75, -2.5, -3.6, -6.0, -8.75, -11.75, -13.0, -13.1, -12.1, -11.0, -8.5, -5.0, -2.6, 0.0,
                         0.5, 0.4,  0.3,   0.0,  -1.0, -2.5,   -3.5,   -4.5, -4.8, -5.0, -3.5, -2.0, -1.0, -1.0, -1.0,
                         -1.5, -2.0, -2.5, -2.6, -2.7, -3.0, -3.0, -3.0])# [m/s]
     #! format: on
@@ -1135,8 +1142,8 @@ function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, GMV::GridMea
 
     # temperature is taken from a different input plot at different z levels
     #! format: off
-    T_in = off_arr([299.184, 294.836, 294.261, 288.773, 276.698, 265.004, 253.930, 243.662, 227.674, 214.266, 207.757, 201.973, 198.278, 197.414, 198.110, 198.110])
-    z_T_in = off_arr([0.0, 0.492, 0.700, 1.698, 3.928, 6.039, 7.795, 9.137, 11.055, 12.645, 13.521, 14.486, 15.448, 16.436, 17.293, 22.0])*1000.0 # for km
+    T_in = arr_type([299.184, 294.836, 294.261, 288.773, 276.698, 265.004, 253.930, 243.662, 227.674, 214.266, 207.757, 201.973, 198.278, 197.414, 198.110, 198.110])
+    z_T_in = arr_type([0.0, 0.492, 0.700, 1.698, 3.928, 6.039, 7.795, 9.137, 11.055, 12.645, 13.521, 14.486, 15.448, 16.436, 17.293, 22.0])*1000.0 # for km
     #! format: on
 
     # interpolate to the model grid-points
@@ -1180,22 +1187,22 @@ function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, ref_state::Re
     initialize(self.Fo, GMV)
     #LES z is in meters
     #! format: off
-    z_in     = off_arr([ 0.0,   0.5,  1.0,  1.5,   2.0,   2.5,    3.0,   3.5,   4.0,   4.5,   5.0,   5.5,   6.0,
+    z_in     = arr_type([ 0.0,   0.5,  1.0,  1.5,   2.0,   2.5,    3.0,   3.5,   4.0,   4.5,   5.0,   5.5,   6.0,
                           6.5,  7.0,  7.5,   8.0,  8.5,   9.0,  9.5,  10.0,  10.5,  11.0,    11.5,   12.0, 12.5,
                           13.0, 13.5, 14.0, 14.5, 15.0, 15.5, 16.0, 16.5, 17.0, 17.5, 18.0]) * 1000.0
-    u_in     = off_arr([  -1, -1.75, -2.5, -3.6,  -6.0, -8.75, -11.75, -12.9, -13.1, -12.1, -11.0,  -8.5,  -5.0,
+    u_in     = arr_type([  -1, -1.75, -2.5, -3.6,  -6.0, -8.75, -11.75, -12.9, -13.1, -12.1, -11.0,  -8.5,  -5.0,
                            -2.6,  0.0,  0.5,   0.4,  0.3,   0.0, -1.0,  -3.0,  -3.5,  -4.5,    -4.6,   -5.0, -3.5,
                            -2.0, -1.0, -1.0, -1.0, -1.5, -2.0, -2.5, -2.6, -2.7, -3.0, -3.0])
     # Radiative forcing for T [K/d] converted to [K/sec]
-    RAD_in   = off_arr([-2.9,  -1.1, -0.8, -1.1, -1.25, -1.35,   -1.4,  -1.4, -1.44, -1.52,  -1.6, -1.54, -1.49,
+    RAD_in   = arr_type([-2.9,  -1.1, -0.8, -1.1, -1.25, -1.35,   -1.4,  -1.4, -1.44, -1.52,  -1.6, -1.54, -1.49,
                          -1.43, -1.36, -1.3, -1.25, -1.2, -1.15, -1.1, -1.05,  -1.0,  -0.95,   -0.9,  -0.85, -0.8,
                          -0.75, -0.7, -0.6, -0.3,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0])/(24.0*3600.0)
     # Advective qt forcing  for theta [g/kg/d] converted to [kg/kg/sec]
-    r_tend_in = off_arr([ 0.0,   1.2,  2.0,  2.3,   2.2,   2.1,    1.9,   1.7,   1.5,  1.35,  1.22,  1.08,  0.95,
+    r_tend_in = arr_type([ 0.0,   1.2,  2.0,  2.3,   2.2,   2.1,    1.9,   1.7,   1.5,  1.35,  1.22,  1.08,  0.95,
                            0.82,  0.7,  0.6,   0.5,  0.4,   0.3,  0.2,   0.1,  0.05, 0.0025, 0.0012, 0.0006,  0.0,
                            0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0])/(24.0*3600.0)/1000.0
     # Radiative T forcing [K/d] converted to [K/sec]
-    Ttend_in = off_arr([ 0.0,  -1.0, -2.2, -3.0,  -3.5,  -3.8,   -4.0,  -4.1,  -4.2,  -4.2,  -4.1,  -4.0, -3.85,
+    Ttend_in = arr_type([ 0.0,  -1.0, -2.2, -3.0,  -3.5,  -3.8,   -4.0,  -4.1,  -4.2,  -4.2,  -4.1,  -4.0, -3.85,
                           -3.7, -3.5, -3.25, -3.0, -2.8,  -2.5, -2.1,  -1.7,  -1.3,   -1.0,   -0.7,   -0.5, -0.4,
                           -0.3, -0.2, -0.1,-0.05,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0])/(24.0*3600.0)
     #! format: on
@@ -1521,7 +1528,7 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, GMV::GridMe
     n_updrafts = 1
     # initialize Grid Mean Profiles of thetali and qt
     #! format: off
-    z_in = off_arr([
+    z_in = arr_type([
                       25.,   75.,  125.,  175.,  225.,  275.,  325.,  375.,  425.,
                      475.,  525.,  575.,  625.,  675.,  725.,  775.,  825.,  875.,
                      925.,  975., 1025., 1075., 1125., 1175., 1225., 1275., 1325.,
@@ -1546,7 +1553,7 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, GMV::GridMe
                     9475., 9525., 9575., 9625., 9675., 9725., 9775., 9825., 9875.,
                     9925., 9975.
     ])
-    thetali_in = off_arr([
+    thetali_in = arr_type([
                     299.9834, 299.9836, 299.9841, 299.985 , 299.9864, 299.9883,
                     299.9907, 299.9936, 299.9972, 300.0012, 300.0058, 300.011 ,
                     300.0166, 300.0228, 300.0293, 300.0363, 300.0436, 300.0512,

@@ -29,7 +29,7 @@ function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
     c_neg = c_d * ml_model.tke * sqrt(ml_model.tke)
     # Subdomain exchange term
     b_exch = 0.0
-    for i in xrange(ml_model.N_up)
+    for i in 1:(ml_model.N_up)
         wc_upd_nn = ml_model.wc_up[i]
         wc_env = ml_model.wc_en
         b_exch +=

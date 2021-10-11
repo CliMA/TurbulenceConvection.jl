@@ -145,8 +145,8 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
     outer_env = zeros(env_len)
     inner_src = zeros(src_len)
     outer_src = zeros(src_len)
-    i_ql, i_T, i_cf, i_qt_cld, i_qt_dry, i_T_cld, i_T_dry, i_rf = xrange(env_len)
-    i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH = xrange(src_len)
+    i_ql, i_T, i_cf, i_qt_cld, i_qt_dry, i_T_cld, i_T_dry, i_rf = 1:env_len
+    i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH = 1:src_len
 
     @inbounds for k in real_center_indices(grid)
         if (
@@ -186,14 +186,14 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
             end
 
             # zero outer quadrature points
-            for idx in xrange(env_len)
+            for idx in 1:env_len
                 outer_env[idx] = 0.0
             end
-            for idx in xrange(src_len)
+            for idx in 1:src_len
                 outer_src[idx] = 0.0
             end
 
-            for m_q in xrange(en_thermo.quadrature_order)
+            for m_q in 1:(en_thermo.quadrature_order)
                 if en_thermo.quadrature_type == "log-normal"
                     qt_hat = exp(mu_q + sqrt2 * sd_q * abscissas[m_q])
                     mu_h_star = mu_h + sd2_hq / sd_q / sd_q * (log(qt_hat) - mu_q)
@@ -203,14 +203,14 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
                 end
 
                 # zero inner quadrature points
-                for idx in xrange(env_len)
+                for idx in 1:env_len
                     inner_env[idx] = 0.0
                 end
-                for idx in xrange(src_len)
+                for idx in 1:src_len
                     inner_src[idx] = 0.0
                 end
 
-                for m_h in xrange(en_thermo.quadrature_order)
+                for m_h in 1:(en_thermo.quadrature_order)
                     if en_thermo.quadrature_type == "log-normal"
                         h_hat = exp(mu_h_star + sqrt2 * sd_cond_h_q * abscissas[m_h])
                     else
@@ -257,10 +257,10 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
                     inner_src[i_SH_qt] += mph.θ_liq_ice_tendency * qt_hat * weights[m_h] * sqpi_inv
                 end
 
-                for idx in xrange(env_len)
+                for idx in 1:env_len
                     outer_env[idx] += inner_env[idx] * weights[m_q] * sqpi_inv
                 end
-                for idx in xrange(src_len)
+                for idx in 1:src_len
                     outer_src[idx] += inner_src[idx] * weights[m_q] * sqpi_inv
                 end
             end
