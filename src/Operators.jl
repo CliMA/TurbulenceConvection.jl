@@ -170,12 +170,18 @@ function upwind_advection_area(ρ0_half::Vector{Float64}, a_up::Vector{Float64},
     return -∇m / ρ0_half[k]
 end
 
+# solving
+# w∂w/∂z = w_k*(w_k-w_k-1)/dz
+# k=1, w=0
 function upwind_advection_velocity(w_up::Vector{Float64}, grid, k; a_up_bcs)
-    w_up_dual = fcut_upwind(w_up, grid, k)
-    ∇ρaw = f∇_onesided(w_up_dual, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
-    return w_up[k] .* ∇ρaw
+    w_up = fcut_upwind(w_up, grid, k)
+    ∇w = f∇_onesided(w_up, grid, k; bottom = SetValue(0), top = SetGradient(0))
+    return w_up[k] .* ∇w
 end
 
+# solving
+# w∂ϕ/∂z = w_c_k*(ϕ_k-ϕ_k-1)/dz
+# k=1, ∂ϕ/∂z=0
 function upwind_advection_scalar(w_up::Vector{Float64}, var::Vector{Float64}, grid, k)
     w_up_c = interpf2c(w_up, grid, k)
     var_cut = ccut_upwind(var, grid, k)
