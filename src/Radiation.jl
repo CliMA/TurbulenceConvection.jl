@@ -1,20 +1,19 @@
 
-function initialize(self::RadiationBase, grid, GMV::GridMeanVariables, ::RadiationBaseType)
+function initialize(self::RadiationBase, grid, ::RadiationBaseType)
     self.dTdt = center_field(grid)
     self.dqtdt = center_field(grid)
     return
 end
 
-update(self::RadiationBase, GMV::GridMeanVariables) = nothing
+update(self::RadiationBase, grid, state, GMV::GridMeanVariables, param_set) = nothing
 
 initialize_io(self::RadiationBase, Stats::NetCDFIO_Stats) = nothing
 io(self::RadiationBase, Stats::NetCDFIO_Stats) = nothing
 
-initialize(self::RadiationBase{RadiationNone}, state, GMV::GridMeanVariables) =
-    initialize(self, self.grid, GMV, RadiationBaseType())
+initialize(self::RadiationBase{RadiationNone}, grid) = initialize(self, grid, RadiationBaseType())
 
-function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, state, GMV::GridMeanVariables)
-    initialize(self, self.grid, GMV, RadiationBaseType())
+function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, grid)
+    initialize(self, grid, RadiationBaseType())
 
 
     self.divergence = 3.75e-6  # divergence is defined twice: here and in initialize_forcing method of DYCOMS_RF01 case class
@@ -24,17 +23,17 @@ function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, state, GMV::GridM
     self.F0 = 70.0
     self.F1 = 22.0
     self.divergence = 3.75e-6
-    self.f_rad = face_field(self.grid)
+    self.f_rad = face_field(grid)
     return
 end
 
 """
 see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
-function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariables)
-    grid = self.grid
-    param_set = parameter_set(GMV)
+function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state, GMV::GridMeanVariables, param_set)
     cp_d = CPP.cp_d(param_set)
+    ρ0_f = face_ref_state(state).ρ0
+    ρ0_c = center_ref_state(state).ρ0
     # find zi (level of 8.0 g/kg isoline of qt)
     # TODO: report bug: zi and ρ_i are not initialized
     zi = 0
@@ -47,12 +46,12 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
             idx_zi = k
             # will be used at cell faces
             zi = grid.zf[k]
-            ρ_i = self.ref_state.rho0[k]
+            ρ_i = ρ0_f[k]
             break
         end
     end
 
-    ρ_z = Dierckx.Spline1D(vec(grid.zc), vec(self.ref_state.rho0_half); k = 1)
+    ρ_z = Dierckx.Spline1D(vec(grid.zc), vec(ρ0_c); k = 1)
     q_liq_z = Dierckx.Spline1D(vec(grid.zc), vec(GMV.QL.values); k = 1)
 
     integrand(ρq_l, params, z) = params.κ * ρ_z(z) * q_liq_z(z)
@@ -83,13 +82,14 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::Gri
     @inbounds for k in real_center_indices(grid)
         f_rad_dual = dual_faces(self.f_rad, grid, k)
         ∇f_rad = ∇_staggered(f_rad_dual, grid)
-        self.dTdt[k] = -∇f_rad / self.ref_state.rho0_half[k] / cp_d
+        self.dTdt[k] = -∇f_rad / ρ0_c[k] / cp_d
     end
 
     return
 end
 
-update(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariables) = calculate_radiation(self, GMV)
+update(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state, GMV::GridMeanVariables, param_set) =
+    calculate_radiation(self, grid, state, GMV, param_set)
 
 function initialize_io(self::RadiationBase{RadiationDYCOMS_RF01}, Stats::NetCDFIO_Stats)
     add_profile(Stats, "rad_dTdt")
@@ -103,8 +103,8 @@ function io(self::RadiationBase{RadiationDYCOMS_RF01}, Stats::NetCDFIO_Stats)
     return
 end
 
-function initialize(self::RadiationBase{RadiationLES}, state, GMV::GridMeanVariables, LESDat::LESData)
-    initialize(self, self.grid, GMV, RadiationBaseType())
+function initialize(self::RadiationBase{RadiationLES}, grid, LESDat::LESData)
+    initialize(self, grid, RadiationBaseType())
     # load from LES
     NC.Dataset(LESDat.les_filename, "r") do data
         imin = LESDat.imin
@@ -113,7 +113,7 @@ function initialize(self::RadiationBase{RadiationLES}, state, GMV::GridMeanVaria
         # interpolate here
         zc_les = get_nc_data(data, "zc")
         meandata = mean_nc_data(data, "profiles", "dtdt_rad", imin, imax)
-        self.dTdt = pyinterp(self.grid.zc, zc_les, meandata)
+        self.dTdt = pyinterp(grid.zc, zc_les, meandata)
     end
     return
 end

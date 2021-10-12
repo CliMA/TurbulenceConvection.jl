@@ -785,8 +785,6 @@ Base.@kwdef mutable struct ForcingBase{T}
     vg::AbstractArray{Float64, 1} = zeros(1)
     nudge_tau::Float64 = 0.0 # default is set to a value that will break
     convert_forcing_prog_fp::Function = x -> x
-    grid::Grid
-    ref_state::ReferenceState
 end
 
 force_type(::ForcingBase{T}) where {T} = T
@@ -794,8 +792,6 @@ force_type(::ForcingBase{T}) where {T} = T
 Base.@kwdef mutable struct RadiationBase{T}
     dTdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection temperature tendency
     dqtdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection moisture tendency
-    grid::Grid
-    ref_state::ReferenceState
     divergence::Float64 = 0
     alpha_z::Float64 = 0
     kappa::Float64 = 0

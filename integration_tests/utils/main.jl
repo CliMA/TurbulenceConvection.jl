@@ -92,10 +92,10 @@ function Simulation1d(namelist)
 
     GMV = TC.GridMeanVariables(namelist, grid, ref_state, param_set)
     Sur = TC.SurfaceBase(Cases.get_surface_type(case); namelist, ref_params)
-    Fo = TC.ForcingBase{Cases.get_forcing_type(case)}(; grid, ref_state)
-    Rad = TC.RadiationBase{Cases.get_radiation_type(case)}(; grid, ref_state)
+    Fo = TC.ForcingBase{Cases.get_forcing_type(case)}()
+    Rad = TC.RadiationBase{Cases.get_radiation_type(case)}()
 
-    Case = Cases.CasesBase(case, namelist, grid, param_set, ref_state, Sur, Fo, Rad)
+    Case = Cases.CasesBase(case, namelist, grid, param_set, Sur, Fo, Rad)
     Turb = TC.EDMF_PrognosticTKE(namelist, grid, ref_state, param_set)
     TS = TC.TimeStepping(namelist)
 
@@ -140,8 +140,8 @@ function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     TC.satadjust(sim.GMV)
 
     Cases.initialize_surface(sim.Case, sim.grid, state, sim.param_set)
-    Cases.initialize_forcing(sim.Case, sim.grid, state, sim.ref_state, sim.GMV)
-    Cases.initialize_radiation(sim.Case, sim.grid, state, sim.ref_state, sim.GMV)
+    Cases.initialize_forcing(sim.Case, sim.grid, state, sim.GMV, sim.param_set)
+    Cases.initialize_radiation(sim.Case, sim.grid, state, sim.GMV, sim.param_set)
 
     TC.initialize(sim.Turb, sim.grid, state, sim.Case, sim.GMV, sim.ref_state, sim.TS)
 
