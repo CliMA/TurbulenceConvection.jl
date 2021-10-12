@@ -1089,7 +1089,7 @@ function reference_params(::GATE_III, grid::Grid, param_set::APS, namelist)
 end
 
 function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, GMV, ref_state_centers)
-    param_set = TC.parameter_set(ref_state)
+    param_set = TC.parameter_set(GMV)
     p0 = ref_state_centers.p0
 
     # GATE_III inputs - I extended them to z=22 km

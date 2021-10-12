@@ -55,7 +55,7 @@ diagnostics and still run, at which point we'll be able to export
 the state, auxiliary fields (which the state does depend on), and
 tendencies.
 =#
-function compute_diagnostics!(edmf, gm, grid, state, Case, ref_state, TS)
+function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
     gm.lwp = 0.0
     ρ0_c = center_ref_state(state).ρ0
     kc_toa = kc_top_of_atmos(grid)

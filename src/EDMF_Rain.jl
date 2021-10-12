@@ -62,14 +62,14 @@ function compute_rain_advection_tendencies(rain::RainPhysics, grid, state, gm, T
     Δt = TS.dt
     CFL_limit = 0.5
 
-    ρ_0_c_field = rain.ref_state.rho0_half
+    ρ_0_c = center_ref_state(state).ρ0
 
     # helper to calculate the rain velocity
     # TODO: assuming gm.W = 0
     # TODO: verify translation
     term_vel = center_field(grid)
     @inbounds for k in real_center_indices(grid)
-        term_vel[k] = CM1.terminal_velocity(param_set, rain_type, rain.ref_state.rho0_half[k], QR.values[k])
+        term_vel[k] = CM1.terminal_velocity(param_set, rain_type, ρ_0_c[k], QR.values[k])
     end
 
     @inbounds for k in reverse(real_center_indices(grid))
@@ -84,16 +84,16 @@ function compute_rain_advection_tendencies(rain::RainPhysics, grid, state, gm, T
             error("Time step is too large for rain fall velocity!")
         end
 
-        ρ_0_cut = ccut_downwind(ρ_0_c_field, grid, k)
+        ρ_0_cut = ccut_downwind(ρ_0_c, grid, k)
         QR_cut = ccut_downwind(QR.values, grid, k)
         w_cut = ccut_downwind(term_vel, grid, k)
         ρQRw_cut = ρ_0_cut .* QR_cut .* w_cut
         ∇ρQRw = c∇_downwind(ρQRw_cut, grid, k; bottom = FreeBoundary(), top = SetValue(0))
 
-        ρ_0_c = ρ_0_c_field[k]
+        ρ_0_c_k = ρ_0_c[k]
 
         # TODO - some positivity limiters are needed
-        rain.qr_tendency_advection[k] = ∇ρQRw / ρ_0_c
+        rain.qr_tendency_advection[k] = ∇ρQRw / ρ_0_c_k
     end
     return
 end
@@ -130,12 +130,14 @@ Updates qr based on all microphysics tendencies
 """
 function update_rain(
     rain_var::RainVariables,
+    grid,
+    state,
     up_thermo::UpdraftThermodynamics,
     en_thermo::EnvironmentThermodynamics,
     rain_phys::RainPhysics,
     TS::TimeStepping,
 )
-    @inbounds for k in real_center_indices(rain_var.grid)
+    @inbounds for k in real_center_indices(grid)
         rain_var.QR.values[k] +=
             (
                 rain_phys.qr_tendency_advection[k] + rain_phys.qr_tendency_rain_evap[k] -

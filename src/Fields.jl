@@ -33,8 +33,6 @@ function field(grid::Grid, loc::String, nu::Int)
     end
 end
 
-surface_value(f::AbstractVector, grid::Grid) = f[kf_surface(grid)]
-
 # A complementary struct to ClimaCore's `PlusHalf` type.
 struct Cent{I <: Integer}
     i::I

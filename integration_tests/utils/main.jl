@@ -167,7 +167,7 @@ function run(sim::Simulation1d)
 
         if mod(sim.TS.t, sim.Stats.frequency) == 0
             # TODO: is this the best location to call diagnostics?
-            TC.compute_diagnostics!(sim.Turb, sim.GMV, grid, state, sim.Case, sim.ref_state, sim.TS)
+            TC.compute_diagnostics!(sim.Turb, sim.GMV, grid, state, sim.Case, sim.TS)
 
             # TODO: remove `vars` hack that avoids
             # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
