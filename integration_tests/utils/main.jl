@@ -25,6 +25,7 @@ struct Simulation1d
     Turb
     TS
     Stats
+    param_set
 end
 
 # TODO: not quite sure, yet, where this all should live.
@@ -90,7 +91,7 @@ function Simulation1d(namelist)
     ref_state = TC.ReferenceState(grid, param_set, Stats; ref_params...)
 
     GMV = TC.GridMeanVariables(namelist, grid, ref_state, param_set)
-    Sur = TC.SurfaceBase(Cases.get_surface_type(case); grid, ref_state, namelist)
+    Sur = TC.SurfaceBase(Cases.get_surface_type(case); namelist, ref_params)
     Fo = TC.ForcingBase{Cases.get_forcing_type(case)}(; grid, ref_state)
     Rad = TC.RadiationBase{Cases.get_radiation_type(case)}(; grid, ref_state)
 
@@ -129,7 +130,7 @@ function Simulation1d(namelist)
         tendencies = TC.io_dictionary_tendencies(state),
     )
 
-    return Simulation1d(io_nt, grid, state, ref_state, GMV, Case, Turb, TS, Stats)
+    return Simulation1d(io_nt, grid, state, ref_state, GMV, Case, Turb, TS, Stats, param_set)
 end
 
 function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
@@ -138,7 +139,7 @@ function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     Cases.initialize_profiles(sim.Case, sim.grid, sim.GMV, TC.center_ref_state(state))
     TC.satadjust(sim.GMV)
 
-    Cases.initialize_surface(sim.Case, sim.grid, state, sim.ref_state)
+    Cases.initialize_surface(sim.Case, sim.grid, state, sim.param_set)
     Cases.initialize_forcing(sim.Case, sim.grid, state, sim.ref_state, sim.GMV)
     Cases.initialize_radiation(sim.Case, sim.grid, state, sim.ref_state, sim.GMV)
 

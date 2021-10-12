@@ -9,10 +9,10 @@ we're not sure how the data structures / flow control will shake out.
 =#
 
 """ The cell center fields of any state vector """
-center_prog(state) = state.cent
+center_prog(state) = state.prog.cent
 
 """ The cell face fields of any state vector """
-face_prog(state) = state.face
+face_prog(state) = state.prog.face
 
 """ The cell center reference state fields """
 center_ref_state(state) = state.aux.cent.ref_state
