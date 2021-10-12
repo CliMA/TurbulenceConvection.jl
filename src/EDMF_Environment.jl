@@ -21,7 +21,7 @@ function initialize_io(en::EnvironmentVariables, Stats::NetCDFIO_Stats)
     return
 end
 
-function io(en::EnvironmentVariables, Stats::NetCDFIO_Stats, ref_state::ReferenceState)
+function io(en::EnvironmentVariables, grid, state, Stats::NetCDFIO_Stats)
     write_profile(Stats, "env_w", en.W.values)
     write_profile(Stats, "env_qt", en.QT.values)
     write_profile(Stats, "env_ql", en.QL.values)
@@ -36,7 +36,7 @@ function io(en::EnvironmentVariables, Stats::NetCDFIO_Stats, ref_state::Referenc
 
     write_profile(Stats, "env_cloud_fraction", en.cloud_fraction.values)
 
-    env_cloud_diagnostics(en, ref_state)
+    env_cloud_diagnostics(en, state)
     # Assuming amximum overlap in environmental clouds
     write_ts(Stats, "env_cloud_cover", en.cloud_cover)
     write_ts(Stats, "env_cloud_base", en.cloud_base)
@@ -45,15 +45,16 @@ function io(en::EnvironmentVariables, Stats::NetCDFIO_Stats, ref_state::Referenc
     return
 end
 
-function env_cloud_diagnostics(en::EnvironmentVariables, ref_state::ReferenceState)
+function env_cloud_diagnostics(en::EnvironmentVariables, state)
     grid = en.grid
     en.cloud_top = 0.0
     en.cloud_base = zc_toa(grid)
     en.cloud_cover = 0.0
     en.lwp = 0.0
+    ρ0_c = center_ref_state(state).ρ0
 
     @inbounds for k in real_center_indices(grid)
-        en.lwp += ref_state.rho0_half[k] * en.QL.values[k] * en.Area.values[k] * grid.Δz
+        en.lwp += ρ0_c[k] * en.QL.values[k] * en.Area.values[k] * grid.Δz
 
         if en.QL.values[k] > 1e-8 && en.Area.values[k] > 1e-3
             en.cloud_base = min(en.cloud_base, grid.zc[k])
@@ -64,13 +65,7 @@ function env_cloud_diagnostics(en::EnvironmentVariables, ref_state::ReferenceSta
     return
 end
 
-function update_env_precip_tendencies(
-    en_thermo::EnvironmentThermodynamics,
-    k,
-    en::EnvironmentVariables,
-    qt_tendency,
-    θ_liq_ice_tendency,
-)
+function update_env_precip_tendencies(en_thermo::EnvironmentThermodynamics, k, en, qt_tendency, θ_liq_ice_tendency)
 
     en_thermo.qt_tendency_rain_formation[k] = qt_tendency * en.Area.values[k]
     en_thermo.θ_liq_ice_tendency_rain_formation[k] = θ_liq_ice_tendency * en.Area.values[k]
@@ -94,14 +89,12 @@ function update_cloud_dry(en_thermo::EnvironmentThermodynamics, k, en::Environme
     return
 end
 
-function sgs_mean(en_thermo::EnvironmentThermodynamics, en::EnvironmentVariables, rain::RainVariables, dt)
+function sgs_mean(en_thermo::EnvironmentThermodynamics, grid, state, en, rain, dt, param_set)
 
-    param_set = parameter_set(en)
-    ref_state = en_thermo.ref_state
-    p0_c = ref_state.p0_half
-    ρ0_c = ref_state.rho0_half
+    p0_c = center_ref_state(state).p0
+    ρ0_c = center_ref_state(state).ρ0
 
-    @inbounds for k in real_center_indices(en_thermo.grid)
+    @inbounds for k in real_center_indices(grid)
         # condensation
         q_tot_en = en.QT.values[k]
         ts = TD.PhaseEquil_pθq(param_set, p0_c[k], en.H.values[k], q_tot_en)
@@ -113,15 +106,12 @@ function sgs_mean(en_thermo::EnvironmentThermodynamics, en::EnvironmentVariables
     return
 end
 
-function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVariables, rain::RainVariables, dt)
-    param_set = parameter_set(en)
+function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, rain, dt, param_set)
     # TODO: double check this python-> julia translation
     # a, w = np.polynomial.hermite.hermgauss(en_thermo.quadrature_order)
     a, w = FastGaussQuadrature.gausshermite(en_thermo.quadrature_order)
-    ref_state = en_thermo.ref_state
-    grid = en_thermo.grid
-    p0_c = ref_state.p0_half
-    ρ0_c = ref_state.rho0_half
+    p0_c = center_ref_state(state).p0
+    ρ0_c = center_ref_state(state).ρ0
 
     #TODO - remember you output source terms multipierd by dt (bec. of instanteneous autoconcv)
     #TODO - add tendencies for GMV H, QT and QR due to rain
@@ -315,13 +305,13 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, en::EnvironmentVar
     return
 end
 
-function microphysics(en_thermo::EnvironmentThermodynamics, en::EnvironmentVariables, rain::RainVariables, dt)
+function microphysics(en_thermo::EnvironmentThermodynamics, grid, state, en, rain, dt, param_set)
 
     if en.EnvThermo_scheme == "mean"
-        sgs_mean(en_thermo, en, rain, dt)
+        sgs_mean(en_thermo, grid, state, en, rain, dt, param_set)
 
     elseif en.EnvThermo_scheme == "quadrature"
-        sgs_quadrature(en_thermo, en, rain, dt)
+        sgs_quadrature(en_thermo, grid, state, en, rain, dt, param_set)
 
     else
         error("EDMF_Environment: Unrecognized EnvThermo_scheme. Possible options: mean, quadrature")

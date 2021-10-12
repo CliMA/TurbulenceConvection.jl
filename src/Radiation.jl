@@ -8,7 +8,7 @@ end
 update(self::RadiationBase, grid, state, GMV::GridMeanVariables, param_set) = nothing
 
 initialize_io(self::RadiationBase, Stats::NetCDFIO_Stats) = nothing
-io(self::RadiationBase, Stats::NetCDFIO_Stats) = nothing
+io(self::RadiationBase, grid, state, Stats::NetCDFIO_Stats) = nothing
 
 initialize(self::RadiationBase{RadiationNone}, grid) = initialize(self, grid, RadiationBaseType())
 

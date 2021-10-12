@@ -90,7 +90,7 @@ function Simulation1d(namelist)
     ref_params = Cases.reference_params(case, grid, param_set, namelist)
     ref_state = TC.ReferenceState(grid, param_set, Stats; ref_params...)
 
-    GMV = TC.GridMeanVariables(namelist, grid, ref_state, param_set)
+    GMV = TC.GridMeanVariables(namelist, grid, param_set)
     Sur = TC.SurfaceBase(Cases.get_surface_type(case); namelist, ref_params)
     Fo = TC.ForcingBase{Cases.get_forcing_type(case)}()
     Rad = TC.RadiationBase{Cases.get_radiation_type(case)}()
@@ -137,13 +137,13 @@ function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     TC = TurbulenceConvection
     state = sim.state
     Cases.initialize_profiles(sim.Case, sim.grid, sim.GMV, TC.center_ref_state(state))
-    TC.satadjust(sim.GMV)
+    TC.satadjust(sim.GMV, sim.grid, sim.state)
 
     Cases.initialize_surface(sim.Case, sim.grid, state, sim.param_set)
     Cases.initialize_forcing(sim.Case, sim.grid, state, sim.GMV, sim.param_set)
     Cases.initialize_radiation(sim.Case, sim.grid, state, sim.GMV, sim.param_set)
 
-    TC.initialize(sim.Turb, sim.grid, state, sim.Case, sim.GMV, sim.ref_state, sim.TS)
+    TC.initialize(sim.Turb, sim.grid, state, sim.Case, sim.GMV, sim.TS)
 
     TC.initialize_io(sim)
     TC.io(sim)
@@ -153,9 +153,11 @@ end
 function run(sim::Simulation1d)
     TC = TurbulenceConvection
     iter = 0
+    grid = sim.grid
+    state = sim.state
     TC.open_files(sim.Stats) # #removeVarsHack
     while sim.TS.t <= sim.TS.t_max
-        TC.update(sim.Turb, sim.grid, sim.state, sim.GMV, sim.Case, sim.TS)
+        TC.update(sim.Turb, grid, state, sim.GMV, sim.Case, sim.TS)
         TC.update(sim.TS)
 
         if mod(iter, 100) == 0
@@ -165,7 +167,7 @@ function run(sim::Simulation1d)
 
         if mod(sim.TS.t, sim.Stats.frequency) == 0
             # TODO: is this the best location to call diagnostics?
-            TC.compute_diagnostics!(sim.Turb, sim.GMV, sim.grid, sim.state, sim.Case, sim.ref_state, sim.TS)
+            TC.compute_diagnostics!(sim.Turb, sim.GMV, grid, state, sim.Case, sim.ref_state, sim.TS)
 
             # TODO: remove `vars` hack that avoids
             # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
@@ -178,9 +180,9 @@ function run(sim::Simulation1d)
             TC.io(sim.io_nt.prog, sim.Stats)
             TC.io(sim.io_nt.tendencies, sim.Stats)
 
-            TC.io(sim.GMV, sim.Stats) # #removeVarsHack
-            TC.io(sim.Case, sim.Stats) # #removeVarsHack
-            TC.io(sim.Turb, sim.Stats, sim.TS) # #removeVarsHack
+            TC.io(sim.GMV, grid, state, sim.Stats) # #removeVarsHack
+            TC.io(sim.Case, grid, state, sim.Stats) # #removeVarsHack
+            TC.io(sim.Turb, grid, state, sim.Stats, sim.TS) # #removeVarsHack
         end
         iter += 1
     end
@@ -216,9 +218,9 @@ function TurbulenceConvection.io(sim::Simulation1d)
     TC.io(sim.io_nt.tendencies, sim.Stats)
 
     # TODO: depricate
-    TC.io(sim.GMV, sim.Stats)
-    TC.io(sim.Case, sim.Stats)
-    TC.io(sim.Turb, sim.Stats, sim.TS)
+    TC.io(sim.GMV, sim.grid, sim.state, sim.Stats)
+    TC.io(sim.Case, sim.grid, sim.state, sim.Stats)
+    TC.io(sim.Turb, sim.grid, sim.state, sim.Stats, sim.TS)
     TC.close_files(sim.Stats)
     return
 end

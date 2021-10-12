@@ -144,14 +144,14 @@ function TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
     add_ts(Stats, "lhf")
     add_ts(Stats, "ustar")
 end
-function TC.io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
+function TC.io(self::CasesBase, grid, state, Stats::NetCDFIO_Stats, ::BaseCase)
     write_ts(Stats, "Tsurface", self.Sur.Tsurface)
     write_ts(Stats, "shf", self.Sur.shf)
     write_ts(Stats, "lhf", self.Sur.lhf)
     write_ts(Stats, "ustar", self.Sur.ustar)
 end
 TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
-TC.io(self::CasesBase, Stats::NetCDFIO_Stats) = io(self, Stats, BaseCase())
+TC.io(self::CasesBase, grid, state, Stats::NetCDFIO_Stats) = io(self, grid, state, Stats, BaseCase())
 TC.update_surface(self::CasesBase, grid, state, GMV, TS::TimeStepping, param_set) =
     update(self.Sur, grid, state, GMV, param_set)
 TC.update_forcing(self::CasesBase, grid, state, GMV, TS::TimeStepping, param_set) = nothing
@@ -1300,10 +1300,6 @@ end
 function TC.initialize_io(self::CasesBase{DYCOMS_RF01}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
     initialize_io(self.Fo, Stats)
-end
-function TC.io(self::CasesBase{DYCOMS_RF01}, Stats::NetCDFIO_Stats)
-    io(self, Stats, BaseCase())
-    io(self.Fo, Stats)
 end
 
 #####
