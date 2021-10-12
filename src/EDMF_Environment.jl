@@ -36,7 +36,7 @@ function io(en::EnvironmentVariables, grid, state, Stats::NetCDFIO_Stats)
 
     write_profile(Stats, "env_cloud_fraction", en.cloud_fraction.values)
 
-    env_cloud_diagnostics(en, state)
+    env_cloud_diagnostics(en, grid, state)
     # Assuming amximum overlap in environmental clouds
     write_ts(Stats, "env_cloud_cover", en.cloud_cover)
     write_ts(Stats, "env_cloud_base", en.cloud_base)
@@ -45,8 +45,7 @@ function io(en::EnvironmentVariables, grid, state, Stats::NetCDFIO_Stats)
     return
 end
 
-function env_cloud_diagnostics(en::EnvironmentVariables, state)
-    grid = en.grid
+function env_cloud_diagnostics(en::EnvironmentVariables, grid, state)
     en.cloud_top = 0.0
     en.cloud_base = zc_toa(grid)
     en.cloud_cover = 0.0
