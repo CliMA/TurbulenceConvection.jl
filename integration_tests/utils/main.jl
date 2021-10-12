@@ -90,7 +90,7 @@ function Simulation1d(namelist)
     ref_params = Cases.reference_params(case, grid, param_set, namelist)
     ref_state = TC.ReferenceState(grid, param_set, Stats; ref_params...)
 
-    GMV = TC.GridMeanVariables(namelist, grid, ref_state, param_set)
+    GMV = TC.GridMeanVariables(namelist, grid)
     Sur = TC.SurfaceBase(Cases.get_surface_type(case); namelist, ref_params)
     Fo = TC.ForcingBase{Cases.get_forcing_type(case)}()
     Rad = TC.RadiationBase{Cases.get_radiation_type(case)}()
@@ -136,8 +136,8 @@ end
 function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     TC = TurbulenceConvection
     state = sim.state
-    Cases.initialize_profiles(sim.Case, sim.grid, sim.GMV, TC.center_ref_state(state))
-    TC.satadjust(sim.GMV)
+    Cases.initialize_profiles(sim.Case, sim.grid, sim.GMV, TC.center_ref_state(state), sim.param_set)
+    TC.satadjust(sim.GMV, sim.grid, sim.state, sim.param_set)
 
     Cases.initialize_surface(sim.Case, sim.grid, state, sim.param_set)
     Cases.initialize_forcing(sim.Case, sim.grid, state, sim.GMV, sim.param_set)

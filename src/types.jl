@@ -383,10 +383,7 @@ mutable struct UpdraftVariables{A1}
     end
 end
 
-Base.@kwdef mutable struct GridMeanVariables{PS}
-    param_set::PS
-    grid::Grid
-    ref_state::ReferenceState
+Base.@kwdef mutable struct GridMeanVariables
     lwp::Float64
     cloud_base::Float64
     cloud_top::Float64
@@ -410,7 +407,7 @@ Base.@kwdef mutable struct GridMeanVariables{PS}
     H_third_m::VariableDiagnostic
     HQTcov::VariableDiagnostic
 end
-function GridMeanVariables(namelist, grid::Grid, ref_state::ReferenceState, param_set::PS) where {PS}
+function GridMeanVariables(namelist, grid::Grid)
     lwp = 0.0
     cloud_base = 0.0
     cloud_top = 0.0
@@ -448,9 +445,6 @@ function GridMeanVariables(namelist, grid::Grid, ref_state::ReferenceState, para
     HQTcov = VariableDiagnostic(grid, "half", "scalar", "sym", "thetal_qt_covar", "K(kg/kg)")
 
     return GridMeanVariables(;
-        param_set,
-        grid,
-        ref_state,
         lwp,
         cloud_base,
         cloud_top,

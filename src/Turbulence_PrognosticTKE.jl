@@ -236,12 +236,11 @@ function update_cloud_frac(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     GMV.cloud_cover = min(edmf.EnvVar.cloud_cover + sum(edmf.UpdVar.cloud_cover), 1)
 end
 
-function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, Case, gm, ref_state, TS)
+function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, Case, gm, ref_state, TS, param_set)
     gm.U.tendencies .= 0
     gm.V.tendencies .= 0
     gm.QT.tendencies .= 0
     gm.H.tendencies .= 0
-    param_set = parameter_set(gm)
     ρ0_f = ref_state.rho0
     p0_c = ref_state.p0_half
     α0_c = ref_state.alpha0_half
@@ -458,8 +457,8 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, GMV::GridMeanVariables, C
     end
 
     # compute tendencies
-    compute_gm_tendencies!(edmf, grid, Case, gm, edmf.ref_state, TS)
-    compute_updraft_tendencies(edmf, gm, TS)
+    compute_gm_tendencies!(edmf, grid, Case, gm, edmf.ref_state, TS, param_set)
+    compute_updraft_tendencies(edmf, grid, state, gm, TS, param_set)
     # ----------- TODO: move to compute_tendencies
     implicit_eqs = edmf.implicit_eqs
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
@@ -500,7 +499,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, GMV::GridMeanVariables, C
     ###
     ### update
     ###
-    update_updraft(edmf, gm, TS)
+    update_updraft(edmf, grid, state, gm, TS, param_set)
     if edmf.Rain.rain_model == "clima_1m"
         update_rain(edmf.Rain, up_thermo, en_thermo, edmf.RainPhys, TS)
     end
@@ -667,9 +666,7 @@ function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE)
     return
 end
 
-function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, TS::TimeStepping)
-    grid = get_grid(edmf)
-    param_set = parameter_set(gm)
+function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm, TS::TimeStepping, param_set)
     ref_state = reference_state(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -760,9 +757,7 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, gm::GridMeanVariab
 end
 
 
-function update_updraft(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, TS::TimeStepping)
-    grid = get_grid(edmf)
-    param_set = parameter_set(gm)
+function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm, TS::TimeStepping, param_set)
     ref_state = reference_state(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
