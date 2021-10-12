@@ -161,7 +161,7 @@ interpf2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (bc.value + 
 ##### advection operators
 #####
 
-function upwind_advection_area(ρ0_half::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64}, grid, k)
+function upwind_advection_area(ρ0_half, a_up, w_up, grid, k)
     ρ_0_cut = ccut_upwind(ρ0_half, grid, k)
     a_up_cut = ccut_upwind(a_up, grid, k)
     w_up_cut = daul_f2c_upwind(w_up, grid, k)
@@ -170,7 +170,7 @@ function upwind_advection_area(ρ0_half::Vector{Float64}, a_up::Vector{Float64},
     return -∇m / ρ0_half[k]
 end
 
-function upwind_advection_velocity(ρ0::Vector{Float64}, a_up::Vector{Float64}, w_up::Vector{Float64}, grid, k; a_up_bcs)
+function upwind_advection_velocity(ρ0, a_up, w_up, grid, k; a_up_bcs)
     a_dual = daul_c2f_upwind(a_up, grid, k; a_up_bcs...)
     ρ_0_dual = fcut_upwind(ρ0, grid, k)
     w_up_dual = fcut_upwind(w_up, grid, k)
@@ -179,14 +179,7 @@ function upwind_advection_velocity(ρ0::Vector{Float64}, a_up::Vector{Float64}, 
     return ∇ρaw
 end
 
-function upwind_advection_scalar(
-    ρ0_half::Vector{Float64},
-    a_up::Vector{Float64},
-    w_up::Vector{Float64},
-    var::Vector{Float64},
-    grid,
-    k,
-)
+function upwind_advection_scalar(ρ0_half, a_up, w_up, var, grid, k)
     ρ_0_cut = ccut_upwind(ρ0_half, grid, k)
     a_up_cut = ccut_upwind(a_up, grid, k)
     w_up_cut = daul_f2c_upwind(w_up, grid, k)
@@ -332,7 +325,7 @@ Used when
      - traversing cell centers
      - grabbing centered center stencils
 """
-function ccut(f::AbstractVector, grid, k)
+function ccut(f, grid, k)
     if is_surface_center(grid, k)
         return SA.SVector(f[k], f[k + 1])
     elseif is_toa_center(grid, k)
@@ -341,7 +334,7 @@ function ccut(f::AbstractVector, grid, k)
         return SA.SVector(f[k - 1], f[k], f[k + 1])
     end
 end
-function ccut(f::AbstractMatrix, grid, k, i_up::Int)
+function ccut(f, grid, k, i_up::Int)
     if is_surface_center(grid, k)
         return SA.SVector(f[i_up, k], f[i_up, k + 1])
     elseif is_toa_center(grid, k)
@@ -358,7 +351,7 @@ Used when
      - traversing cell faces
      - grabbing centered face stencils
 """
-function fcut(f::AbstractVector, grid, k)
+function fcut(f, grid, k)
     if is_surface_face(grid, k)
         return SA.SVector(f[k], f[k + 1])
     elseif is_toa_face(grid, k)
@@ -367,7 +360,7 @@ function fcut(f::AbstractVector, grid, k)
         return SA.SVector(f[k - 1], f[k], f[k + 1])
     end
 end
-function fcut(f::AbstractMatrix, grid, k, i_up::Int)
+function fcut(f, grid, k, i_up::Int)
     if is_surface_face(grid, k)
         return SA.SVector(f[i_up, k], f[i_up, k + 1])
     elseif is_toa_face(grid, k)
@@ -386,14 +379,14 @@ Used when
 
 This is needed for "upwinding" rain, which travels _down_ (hence the direction change).
 """
-function ccut_downwind(f::AbstractVector, grid, k)
+function ccut_downwind(f, grid, k)
     if is_toa_center(grid, k)
         return SA.SVector(f[k])
     else
         return SA.SVector(f[k], f[k + 1])
     end
 end
-function ccut_downwind(f::AbstractMatrix, grid, k, i_up::Int)
+function ccut_downwind(f, grid, k, i_up::Int)
     if is_toa_center(grid, k)
         return SA.SVector(f[i_up, k])
     else
@@ -408,14 +401,14 @@ Used when
      - traversing cell centers
      - grabbing one-sided (upwind) stencil of cell center `k` and cell center `k-1`
 """
-function ccut_upwind(f::AbstractVector, grid, k)
+function ccut_upwind(f, grid, k)
     if is_surface_center(grid, k)
         return SA.SVector(f[k])
     else
         return SA.SVector(f[k - 1], f[k])
     end
 end
-function ccut_upwind(f::AbstractMatrix, grid, k, i_up::Int)
+function ccut_upwind(f, grid, k, i_up::Int)
     if is_surface_center(grid, k)
         return SA.SVector(f[i_up, k])
     else
@@ -430,14 +423,14 @@ Used when
      - traversing cell faces
      - grabbing one-sided (upwind) stencil of cell face `k` and cell face `k-1`
 """
-function fcut_upwind(f::AbstractVector, grid, k)
+function fcut_upwind(f, grid, k)
     if is_surface_face(grid, k)
         return SA.SVector(f[k])
     else
         return SA.SVector(f[k - 1], f[k])
     end
 end
-function fcut_upwind(f::AbstractMatrix, grid, k, i_up::Int)
+function fcut_upwind(f, grid, k, i_up::Int)
     if is_surface_face(grid, k)
         return SA.SVector(f[i_up, k])
     else
@@ -452,7 +445,7 @@ Used when
      - traversing cell faces
      - grabbing _interpolated_ one-sided (upwind) stencil of cell face `k` and cell face `k-1`
 """
-function daul_c2f_upwind(f::AbstractVector, grid, k; bottom::SetValue, top::SetZeroGradient)
+function daul_c2f_upwind(f, grid, k; bottom::SetValue, top::SetZeroGradient)
     if is_toa_face(grid, k)
         return SA.SVector((f[k - 2] + f[k - 1]) / 2, (f[k - 2] + f[k - 1]) / 2)
     elseif is_surface_face(grid, k) # never actually called
@@ -463,7 +456,7 @@ function daul_c2f_upwind(f::AbstractVector, grid, k; bottom::SetValue, top::SetZ
         return SA.SVector((f[k - 2] + f[k - 1]) / 2, (f[k - 1] + f[k]) / 2)
     end
 end
-function daul_c2f_upwind(f::AbstractVector, grid, k, i_up::Int; bottom::SetValue, top::SetZeroGradient)
+function daul_c2f_upwind(f, grid, k, i_up::Int; bottom::SetValue, top::SetZeroGradient)
     if is_toa_face(grid, k)
         return SA.SVector((f[i_up, k - 2] + f[i_up, k - 1]) / 2, (f[i_up, k - 2] + f[i_up, k - 1]) / 2)
     elseif is_surface_face(grid, k) # never actually called
@@ -482,14 +475,14 @@ Used when
      - traversing cell centers
      - grabbing _interpolated_ one-sided (upwind) stencil of cell center `k` and cell center `k-1`
 """
-function daul_f2c_upwind(f::AbstractVector, grid, k)
+function daul_f2c_upwind(f, grid, k)
     if is_surface_center(grid, k)
         return SA.SVector((f[k] + f[k + 1]) / 2)
     else
         return SA.SVector((f[k - 1] + f[k]) / 2, (f[k] + f[k + 1]) / 2)
     end
 end
-function daul_f2c_upwind(f::AbstractMatrix, grid, k, i_up::Int)
+function daul_f2c_upwind(f, grid, k, i_up::Int)
     if is_surface_center(grid, k)
         return SA.SVector((f[i_up, k] + f[i_up, k + 1]) / 2)
     else
@@ -504,8 +497,8 @@ Used when
      - traversing cell centers
      - grabbing stencil of 2 neighboring cell faces
 """
-dual_faces(f::AbstractVector, grid, k) = SA.SVector(f[k], f[k + 1])
-dual_faces(f::AbstractMatrix, grid, k, i_up::Int) = SA.SVector(f[i_up, k], f[i_up, k + 1])
+dual_faces(f, grid, k) = SA.SVector(f[k], f[k + 1])
+dual_faces(f, grid, k, i_up::Int) = SA.SVector(f[i_up, k], f[i_up, k + 1])
 
 """
     dual_centers
@@ -514,7 +507,7 @@ Used when
      - traversing cell faces
      - grabbing stencil of 2 neighboring cell centers
 """
-function dual_centers(f::AbstractVector, grid, k)
+function dual_centers(f, grid, k)
     if is_surface_face(grid, k)
         return SA.SVector(f[k])
     elseif is_toa_face(grid, k)
@@ -523,7 +516,7 @@ function dual_centers(f::AbstractVector, grid, k)
         return SA.SVector(f[k - 1], f[k])
     end
 end
-function dual_centers(f::AbstractMatrix, grid, k, i_up::Int)
+function dual_centers(f, grid, k, i_up::Int)
     if is_surface_face(grid, k)
         return SA.SVector(f[i_up, k])
     elseif is_toa_face(grid, k)
@@ -614,7 +607,7 @@ the terms in the matrix (and the overall equation solved):
 function construct_tridiag_diffusion_en(
     grid::Grid,
     param_set::APS,
-    ref_state::ReferenceState,
+    state,
     TS,
     KM,
     KH,
@@ -640,7 +633,8 @@ function construct_tridiag_diffusion_en(
     a = center_field(grid)
     b = center_field(grid)
     c = center_field(grid)
-    ρ0_c = ref_state.rho0_half
+    ρ0_c = center_ref_state(state).ρ0
+    ρ0_f = face_ref_state(state).ρ0
 
     ae = 1 .- a_up_bulk
     rho_ae_K_m = face_field(grid)
@@ -651,7 +645,7 @@ function construct_tridiag_diffusion_en(
     aeK_bcs = (; bottom = SetValue(aeK[kc_surf]), top = SetValue(aeK[kc_toa]))
 
     @inbounds for k in real_face_indices(grid)
-        rho_ae_K_m[k] = interpc2f(aeK, grid, k; aeK_bcs...) * ref_state.rho0[k]
+        rho_ae_K_m[k] = interpc2f(aeK, grid, k; aeK_bcs...) * ρ0_f[k]
     end
 
     @inbounds for k in real_center_indices(grid)

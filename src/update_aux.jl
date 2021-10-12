@@ -1,4 +1,4 @@
-function update_aux!(edmf, gm, grid, state, Case, ref_state, param_set, TS)
+function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     ##### Unpack common variables
     #####
@@ -7,9 +7,10 @@ function update_aux!(edmf, gm, grid, state, Case, ref_state, param_set, TS)
     up = edmf.UpdVar
     en = edmf.EnvVar
     en_thermo = edmf.EnvThermo
-    p0_c = ref_state.p0_half
-    ρ0_c = ref_state.rho0_half
-    α0_c = ref_state.alpha0_half
+    ρ0_f = face_ref_state(state).ρ0
+    p0_c = center_ref_state(state).p0
+    ρ0_c = center_ref_state(state).ρ0
+    α0_c = center_ref_state(state).α0
     g = CPP.grav(param_set)
     c_m = CPEDMF.c_m(param_set)
     KM = diffusivity_m(edmf).values
@@ -23,12 +24,14 @@ function update_aux!(edmf, gm, grid, state, Case, ref_state, param_set, TS)
     #####
     ##### diagnose_GMV_moments
     #####
-    get_GMV_CoVar(edmf, up.Area, up.H, up.H, en.H, en.H, en.Hvar, gm.H.values, gm.H.values, gm.Hvar.values)
-    get_GMV_CoVar(edmf, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar, gm.QT.values, gm.QT.values, gm.QTvar.values)
-    get_GMV_CoVar(edmf, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov, gm.H.values, gm.QT.values, gm.HQTcov.values)
-    GMV_third_m(edmf, gm.H_third_m, en.Hvar, en.H, up.H)
-    GMV_third_m(edmf, gm.QT_third_m, en.QTvar, en.QT, up.QT)
-    GMV_third_m(edmf, gm.W_third_m, en.TKE, en.W, up.W)
+    #! format: off
+    get_GMV_CoVar(edmf, grid, state, up.Area, up.H, up.H, en.H, en.H, en.Hvar, gm.H.values, gm.H.values, gm.Hvar.values)
+    get_GMV_CoVar(edmf, grid, state, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar, gm.QT.values, gm.QT.values, gm.QTvar.values)
+    get_GMV_CoVar(edmf, grid, state, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov, gm.H.values, gm.QT.values, gm.HQTcov.values)
+    GMV_third_m(edmf, grid, state, gm.H_third_m, en.Hvar, en.H, up.H)
+    GMV_third_m(edmf, grid, state, gm.QT_third_m, en.QTvar, en.QT, up.QT)
+    GMV_third_m(edmf, grid, state, gm.W_third_m, en.TKE, en.W, up.W)
+    #! format: on
 
     #####
     ##### decompose_environment
@@ -143,7 +146,7 @@ function update_aux!(edmf, gm, grid, state, Case, ref_state, param_set, TS)
     # TODO - use this inversion in free_convection_windspeed and not compute zi twice
     θ_ρ = center_field(grid)
     @inbounds for k in real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], gm.H.values[k], gm.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], gm.H.values[k], gm.QT.values[k])
         θ_ρ[k] = TD.virtual_pottemp(ts)
     end
     edmf.zi = get_inversion(param_set, θ_ρ, gm.U.values, gm.V.values, grid, surface.Ri_bulk_crit)
@@ -241,7 +244,7 @@ function update_aux!(edmf, gm, grid, state, Case, ref_state, param_set, TS)
                     up.updraft_top[i],
                     a_kfull,
                     b_kfull,
-                    ref_state.rho0[k],
+                    ρ0_f[k],
                     up.W.values[i, k],
                     ∇w_up,
                     en.W.values[k],
@@ -352,9 +355,9 @@ function update_aux!(edmf, gm, grid, state, Case, ref_state, param_set, TS)
         en.TKE.buoy[k] = -ml_model.a_en * ρ0_c[k] * KH[k] * (bg.∂b∂z_θl + bg.∂b∂z_qt)
     end
 
-    compute_covariance_entr(edmf, en.TKE, up.W, up.W, en.W, en.W, gm.W, gm.W)
-    compute_covariance_shear(edmf, gm, en.TKE, en.W.values, en.W.values)
-    compute_covariance_interdomain_src(edmf, up.Area, up.W, up.W, en.W, en.W, en.TKE)
+    compute_covariance_entr(edmf, grid, state, en.TKE, up.W, up.W, en.W, en.W, gm.W, gm.W)
+    compute_covariance_shear(edmf, grid, state, gm, en.TKE, en.W.values, en.W.values)
+    compute_covariance_interdomain_src(edmf, grid, state, up.Area, up.W, up.W, en.W, en.W, en.TKE)
 
     #####
     ##### compute_tke_pressure
@@ -369,15 +372,15 @@ function update_aux!(edmf, gm, grid, state, Case, ref_state, param_set, TS)
         end
     end
 
-    compute_covariance_entr(edmf, en.Hvar, up.H, up.H, en.H, en.H, gm.H, gm.H)
-    compute_covariance_entr(edmf, en.QTvar, up.QT, up.QT, en.QT, en.QT, gm.QT, gm.QT)
-    compute_covariance_entr(edmf, en.HQTcov, up.H, up.QT, en.H, en.QT, gm.H, gm.QT)
-    compute_covariance_shear(edmf, gm, en.Hvar, en.H.values, en.H.values)
-    compute_covariance_shear(edmf, gm, en.QTvar, en.QT.values, en.QT.values)
-    compute_covariance_shear(edmf, gm, en.HQTcov, en.H.values, en.QT.values)
-    compute_covariance_interdomain_src(edmf, up.Area, up.H, up.H, en.H, en.H, en.Hvar)
-    compute_covariance_interdomain_src(edmf, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar)
-    compute_covariance_interdomain_src(edmf, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov)
+    compute_covariance_entr(edmf, grid, state, en.Hvar, up.H, up.H, en.H, en.H, gm.H, gm.H)
+    compute_covariance_entr(edmf, grid, state, en.QTvar, up.QT, up.QT, en.QT, en.QT, gm.QT, gm.QT)
+    compute_covariance_entr(edmf, grid, state, en.HQTcov, up.H, up.QT, en.H, en.QT, gm.H, gm.QT)
+    compute_covariance_shear(edmf, grid, state, gm, en.Hvar, en.H.values, en.H.values)
+    compute_covariance_shear(edmf, grid, state, gm, en.QTvar, en.QT.values, en.QT.values)
+    compute_covariance_shear(edmf, grid, state, gm, en.HQTcov, en.H.values, en.QT.values)
+    compute_covariance_interdomain_src(edmf, grid, state, up.Area, up.H, up.H, en.H, en.H, en.Hvar)
+    compute_covariance_interdomain_src(edmf, grid, state, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar)
+    compute_covariance_interdomain_src(edmf, grid, state, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov)
 
     #####
     ##### compute_covariance_rain # need to update this one
@@ -392,8 +395,8 @@ function update_aux!(edmf, gm, grid, state, Case, ref_state, param_set, TS)
         en.HQTcov.rain_src[k] = ρ0_c[k] * ae[k] * en_thermo.HQTcov_rain_dt[k]
     end
 
-    reset_surface_covariance(edmf, gm, Case)
+    reset_surface_covariance(edmf, grid, state, gm, Case)
 
-    compute_diffusive_fluxes(edmf, gm, Case, TS)
-    update_cloud_frac(edmf, gm)
+    compute_diffusive_fluxes(edmf, grid, state, gm, Case, TS)
+    update_cloud_frac(edmf, grid, gm)
 end
