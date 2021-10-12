@@ -149,8 +149,8 @@ function update_aux!(edmf, gm, grid, state, Case, ref_state, param_set, TS)
     edmf.zi = get_inversion(param_set, θ_ρ, gm.U.values, gm.V.values, grid, surface.Ri_bulk_crit)
 
     update_surface(Case, grid, state, gm, TS, param_set)
-    update_forcing(Case, gm, TS)
-    update_radiation(Case, gm, TS)
+    update_forcing(Case, grid, state, gm, TS, param_set)
+    update_radiation(Case, grid, state, gm, TS, param_set)
 
     #####
     ##### update_GMV_diagnostics

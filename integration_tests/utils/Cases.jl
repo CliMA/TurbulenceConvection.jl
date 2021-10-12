@@ -136,7 +136,7 @@ get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
 ##### Default CasesBase behavior:
 #####
 
-initialize_radiation(self::CasesBase, ::Grid, state, ref_state, GMV) = initialize(self.Rad, state, GMV)
+initialize_radiation(self::CasesBase, grid, state, GMV, param_set) = initialize(self.Rad, grid)
 
 function TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
     add_ts(Stats, "Tsurface")
@@ -154,14 +154,17 @@ TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats) = initialize_io(self, S
 TC.io(self::CasesBase, Stats::NetCDFIO_Stats) = io(self, Stats, BaseCase())
 TC.update_surface(self::CasesBase, grid, state, GMV, TS::TimeStepping, param_set) =
     update(self.Sur, grid, state, GMV, param_set)
-TC.update_forcing(self::CasesBase, GMV, TS::TimeStepping) = nothing
-TC.update_radiation(self::CasesBase, GMV, TS::TimeStepping) = update(self.Rad, GMV)
+TC.update_forcing(self::CasesBase, grid, state, GMV, TS::TimeStepping, param_set) = nothing
+TC.update_radiation(self::CasesBase, grid, state, GMV, TS::TimeStepping, param_set) =
+    update(self.Rad, grid, state, GMV, param_set)
+
+initialize_forcing(self::CasesBase, grid::Grid, state, GMV, param_set) = initialize(self.Fo, grid)
 
 #####
 ##### Soares
 #####
 
-function CasesBase(case::Soares, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
+function CasesBase(case::Soares, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -221,17 +224,12 @@ function initialize_surface(self::CasesBase{Soares}, grid::Grid, state, param_se
             (theta_surface * (1 + (molmass_ratio - 1) * self.Sur.qsurface))
         )
 end
-function initialize_forcing(self::CasesBase{Soares}, grid::Grid, state, ref_state, GMV)
-    self.Fo.grid = grid
-    self.Fo.ref_state = ref_state
-    initialize(self.Fo, GMV)
-end
 
 #####
 ##### Nieuwstadt
 #####
 
-function CasesBase(case::Nieuwstadt, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
+function CasesBase(case::Nieuwstadt, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -287,17 +285,12 @@ function initialize_surface(self::CasesBase{Nieuwstadt}, grid::Grid, state, para
 
     return
 end
-function initialize_forcing(self::CasesBase{Nieuwstadt}, grid::Grid, state, ref_state, GMV)
-    self.Fo.grid = grid
-    self.Fo.ref_state = ref_state
-    initialize(self.Fo, GMV)
-end
 
 #####
 ##### Bomex
 #####
 
-function CasesBase(case::Bomex, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
+function CasesBase(case::Bomex, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
@@ -371,16 +364,14 @@ function initialize_surface(self::CasesBase{Bomex}, grid::Grid, state, param_set
     self.Sur.ustar = 0.28 # m/s
 end
 
-function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, ref_state, GMV)
-    self.Fo.grid = grid
-    self.Fo.ref_state = ref_state
-    param_set = TC.parameter_set(GMV)
-    initialize(self.Fo, GMV)
+function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, GMV, param_set)
+    initialize(self.Fo, grid)
+    p0_c = TC.center_ref_state(state).p0
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         # Geostrophic velocity profiles. vg = 0
         self.Fo.ug[k] = -10.0 + (1.8e-3) * z
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
         # Set large-scale cooling
         dTdt = if z <= 1500.0
@@ -417,7 +408,7 @@ end
 ##### life_cycle_Tan2018
 #####
 
-function CasesBase(case::life_cycle_Tan2018, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
+function CasesBase(case::life_cycle_Tan2018, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
@@ -501,16 +492,14 @@ function initialize_surface(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
     self.Sur.ustar = 0.28 # m/s
     self.Sur.bflux = life_cycle_buoyancy_flux(param_set)
 end
-function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, state, ref_state, GMV)
-    param_set = TC.parameter_set(GMV)
-    self.Fo.grid = grid
-    self.Fo.ref_state = ref_state
-    initialize(self.Fo, GMV)
+function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, state, GMV, param_set)
+    initialize(self.Fo, grid)
+    p0_c = TC.center_ref_state(state).p0
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         # Geostrophic velocity profiles. vg = 0
         self.Fo.ug[k] = -10.0 + (1.8e-3) * z
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
         # Set large-scale cooling
         self.Fo.dTdt[k] = if z <= 1500.0
@@ -554,7 +543,7 @@ end
 ##### Rico
 #####
 
-function CasesBase(case::Rico, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
+function CasesBase(case::Rico, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 18.0
@@ -633,14 +622,12 @@ function initialize_surface(self::CasesBase{Rico}, grid::Grid, state, param_set)
     self.Sur.qsurface = TD.q_vap_saturation(ts)
 end
 
-function initialize_forcing(self::CasesBase{Rico}, grid::Grid, state, ref_state, GMV)
-    param_set = TC.parameter_set(GMV)
-    self.Fo.grid = grid
-    self.Fo.ref_state = ref_state
-    initialize(self.Fo, GMV)
+function initialize_forcing(self::CasesBase{Rico}, grid::Grid, state, GMV, param_set)
+    initialize(self.Fo, grid)
+    p0_c = TC.center_ref_state(state).p0
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
         # Geostrophic velocity profiles
         self.Fo.ug[k] = -9.9 + 2.0e-3 * z
@@ -669,7 +656,7 @@ end
 ##### TRMM_LBA
 #####
 
-function CasesBase(case::TRMM_LBA, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
+function CasesBase(case::TRMM_LBA, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -778,10 +765,8 @@ function initialize_surface(self::CasesBase{TRMM_LBA}, grid::Grid, state, param_
     self.Sur.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
 end
 
-function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, ref_state, GMV)
-    self.Fo.grid = grid
-    self.Fo.ref_state = ref_state
-    initialize(self.Fo, GMV)
+function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, GMV, param_set)
+    initialize(self.Fo, grid)
     self.Fo.dTdt = TC.center_field(grid)
     self.rad_time = range(10, 360; length = 36) .* 60
     #! format: off
@@ -933,9 +918,8 @@ function TC.update_surface(self::CasesBase{TRMM_LBA}, grid, state, GMV, TS::Time
     self.Sur.rho_vflux = 0.0
 end
 
-function TC.update_forcing(self::CasesBase{TRMM_LBA}, GMV, TS::TimeStepping)
+function TC.update_forcing(self::CasesBase{TRMM_LBA}, grid, state, GMV, TS::TimeStepping, param_set)
 
-    grid = self.Fo.grid
     ind2 = Int(ceil(TS.t / 600.0)) + 1
     ind1 = Int(trunc(TS.t / 600.0)) + 1
     rad_time = self.rad_time
@@ -965,7 +949,7 @@ end
 ##### ARM_SGP
 #####
 
-function CasesBase(case::ARM_SGP, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
+function CasesBase(case::ARM_SGP, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 8.5e-5
@@ -1028,10 +1012,8 @@ function initialize_surface(self::CasesBase{ARM_SGP}, grid::Grid, state, param_s
     self.Sur.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
 end
 
-function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, state, ref_state, GMV)
-    self.Fo.grid = grid
-    self.Fo.ref_state = ref_state
-    initialize(self.Fo, GMV)
+function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, state, GMV, param_set)
+    initialize(self.Fo, grid)
     @inbounds for k in real_center_indices(grid)
         self.Fo.ug[k] = 10.0
         self.Fo.vg[k] = 0.0
@@ -1058,17 +1040,16 @@ function TC.update_surface(self::CasesBase{ARM_SGP}, grid, state, GMV, TS::TimeS
     self.Sur.rho_vflux = 0.0
 end
 
-function TC.update_forcing(self::CasesBase{ARM_SGP}, GMV, TS::TimeStepping)
-    param_set = TC.parameter_set(GMV)
+function TC.update_forcing(self::CasesBase{ARM_SGP}, grid, state, GMV, TS::TimeStepping, param_set)
+    p0_c = TC.center_ref_state(state).p0
     t_in = arr_type([0.0, 3.0, 6.0, 9.0, 12.0, 14.5]) .* 3600.0 #LES time is in sec
     AT_in = arr_type([0.0, 0.0, 0.0, -0.08, -0.016, -0.016]) ./ 3600.0 # Advective forcing for theta [K/h] converted to [K/sec]
     RT_in = arr_type([-0.125, 0.0, 0.0, 0.0, 0.0, -0.1]) ./ 3600.0  # Radiative forcing for theta [K/h] converted to [K/sec]
     Rqt_in = arr_type([0.08, 0.02, 0.04, -0.1, -0.16, -0.3]) ./ 1000.0 ./ 3600.0 # Radiative forcing for qt converted to [kg/kg/sec]
     dTdt = pyinterp(arr_type([TS.t]), t_in, AT_in)[1] + pyinterp(arr_type([TS.t]), t_in, RT_in)[1]
     dqtdt = pyinterp(arr_type([TS.t]), t_in, Rqt_in)[1]
-    grid = self.Fo.grid
     @inbounds for k in real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, self.Fo.ref_state.p0_half[k], GMV.H.values[k], GMV.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], GMV.H.values[k], GMV.QT.values[k])
         Π = TD.exner(ts)
         z = grid.zc[k]
         self.Fo.dTdt[k] = if z <= 1000.0
@@ -1093,7 +1074,7 @@ end
 ##### GATE_III
 #####
 
-function CasesBase(case::GATE_III, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
+function CasesBase(case::GATE_III, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     Fo.apply_subsidence = false
     Fo.apply_coriolis = false
@@ -1167,10 +1148,8 @@ function initialize_surface(self::CasesBase{GATE_III}, grid::Grid, state, param_
     self.Sur.qsurface = TD.q_vap_saturation(ts)
 end
 
-function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, state, ref_state, GMV)
-    self.Fo.grid = grid
-    self.Fo.ref_state = ref_state
-    initialize(self.Fo, GMV)
+function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, state, GMV, param_set)
+    initialize(self.Fo, grid)
     #LES z is in meters
     #! format: off
     z_in     = arr_type([ 0.0,   0.5,  1.0,  1.5,   2.0,   2.5,    3.0,   3.5,   4.0,   4.5,   5.0,   5.5,   6.0,
@@ -1203,7 +1182,7 @@ end
 ##### DYCOMS_RF01
 #####
 
-function CasesBase(case::DYCOMS_RF01, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
+function CasesBase(case::DYCOMS_RF01, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
@@ -1288,10 +1267,8 @@ function initialize_surface(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, par
             (theta_surface * (1 + (molmass_ratio - 1) * self.Sur.qsurface))
         )
 end
-function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, ref_state, GMV)
-    self.Fo.grid = grid
-    self.Fo.ref_state = ref_state
-    initialize(self.Fo, GMV)
+function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, GMV, param_set)
+    initialize(self.Fo, grid)
 
     # geostrophic velocity profiles
     self.Fo.ug .= 7.0
@@ -1309,17 +1286,15 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, ref
     self.Fo.dqtdt .= 0.0 #kg/(kg * s)
 end
 
-function initialize_radiation(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, ref_state, GMV)
-    self.Rad.grid = grid
-    self.Rad.ref_state = ref_state
-    initialize(self.Rad, state, GMV)
+function initialize_radiation(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, GMV, param_set)
+    initialize(self.Rad, grid)
 
     # no large-scale drying
     self.Rad.dqtdt .= 0.0 #kg/(kg * s)
 
     # Radiation based on eq. 3 in Stevens et. al., (2005)
     # cloud-top cooling + cloud-base warming + cooling in free troposphere
-    TC.calculate_radiation(self.Rad, GMV)
+    TC.calculate_radiation(self.Rad, grid, state, GMV, param_set)
 end
 
 function TC.initialize_io(self::CasesBase{DYCOMS_RF01}, Stats::NetCDFIO_Stats)
@@ -1335,7 +1310,7 @@ end
 ##### GABLS
 #####
 
-function CasesBase(case::GABLS, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
+function CasesBase(case::GABLS, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 73.0
@@ -1384,10 +1359,8 @@ function initialize_surface(self::CasesBase{GABLS}, grid::Grid, state, param_set
     self.Sur.Tsurface = 265.0
 end
 
-function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, state, ref_state, GMV)
-    self.Fo.grid = grid
-    self.Fo.ref_state = ref_state
-    initialize(self.Fo, GMV)
+function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, state, GMV, param_set)
+    initialize(self.Fo, grid)
     @inbounds for k in real_center_indices(grid)
         # Geostrophic velocity profiles.
         self.Fo.ug[k] = 8.0
@@ -1406,7 +1379,7 @@ end
 #####
 
 # Not fully implemented yet - Ignacio
-function CasesBase(case::SP, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
+function CasesBase(case::SP, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 1.0e-4 # s^{-1}
@@ -1463,10 +1436,8 @@ function initialize_surface(self::CasesBase{SP}, grid::Grid, state, param_set)
     self.Sur.bflux = g * θ_flux / theta_surface
 end
 
-function initialize_forcing(self::CasesBase{SP}, grid::Grid, state, ref_state, GMV)
-    self.Fo.grid = grid
-    self.Fo.ref_state = ref_state
-    initialize(self.Fo, GMV)
+function initialize_forcing(self::CasesBase{SP}, grid::Grid, state, GMV, param_set)
+    initialize(self.Fo, grid)
     @inbounds for k in real_center_indices(grid)
         # Geostrophic velocity profiles. vg = 0
         self.Fo.ug[k] = 1.0
@@ -1478,7 +1449,7 @@ end
 ##### DryBubble
 #####
 
-function CasesBase(case::DryBubble, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
+function CasesBase(case::DryBubble, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "theta_rho"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -1578,17 +1549,12 @@ function initialize_surface(self::CasesBase{DryBubble}, grid::Grid, state, param
     self.Sur.shf = 0.0
 end
 
-function initialize_forcing(self::CasesBase{DryBubble}, grid::Grid, state, ref_state, GMV)
-    self.Fo.grid = grid
-    self.Fo.ref_state = ref_state
-    initialize(self.Fo, GMV)
-end
 
 #####
 ##### LES_driven_SCM
 #####
 
-function CasesBase(case::LES_driven_SCM, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
+function CasesBase(case::LES_driven_SCM, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     les_filename = namelist["meta"]["lesfile"]
     # load data here
     LESDat = NC.Dataset(les_filename, "r") do data
@@ -1673,14 +1639,10 @@ function initialize_surface(self::CasesBase{LES_driven_SCM}, grid::Grid, state, 
     end
 end
 
-function initialize_forcing(self::CasesBase{LES_driven_SCM}, grid::Grid, state, ref_state, GMV)
-    self.Fo.grid = grid
-    self.Fo.ref_state = ref_state
-    initialize(self.Fo, GMV, grid, self.LESDat)
-    return nothing
-end
-function initialize_radiation(self::CasesBase{LES_driven_SCM}, grid::Grid, state, ref_state, GMV)
-    initialize(self.Rad, state, GMV, self.LESDat)
-end
+initialize_forcing(self::CasesBase{LES_driven_SCM}, grid::Grid, state, GMV, param_set) =
+    initialize(self.Fo, grid, self.LESDat)
+
+initialize_radiation(self::CasesBase{LES_driven_SCM}, grid::Grid, state, GMV, param_set) =
+    initialize(self.Rad, grid, self.LESDat)
 
 end
