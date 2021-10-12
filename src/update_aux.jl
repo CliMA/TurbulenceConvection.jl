@@ -161,12 +161,12 @@ function update_aux!(edmf, gm, grid, state, Case, ref_state, param_set, TS)
         gm.T.values[k] = (a_up_bulk[k] * up.T.bulkvalues[k] + (1 - a_up_bulk[k]) * en.T.values[k])
         gm.B.values[k] = (a_up_bulk[k] * up.B.bulkvalues[k] + (1 - a_up_bulk[k]) * en.B.values[k])
     end
-    compute_pressure_plume_spacing(edmf)
+    compute_pressure_plume_spacing(edmf, param_set)
 
     #####
     ##### compute_updraft_closures
     #####
-    upd_cloud_diagnostics(up, ref_state) # TODO: should this be moved to compute_diagnostics! ?
+    upd_cloud_diagnostics(up, grid, state) # TODO: should this be moved to compute_diagnostics! ?
 
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)

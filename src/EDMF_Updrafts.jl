@@ -23,7 +23,7 @@ function initialize(edmf, up::UpdraftVariables, gm::GridMeanVariables)
     return
 end
 
-function initialize_DryBubble(edmf, up::UpdraftVariables, gm::GridMeanVariables, ref_state::ReferenceState)
+function initialize_DryBubble(edmf, up::UpdraftVariables, gm::GridMeanVariables)
     dz = up.grid.Δz
 
     # criterion 2: b>1e-4
@@ -173,7 +173,7 @@ function set_values_with_new(up::UpdraftVariables)
     return
 end
 
-function io(up::UpdraftVariables, Stats::NetCDFIO_Stats, ref_state::ReferenceState)
+function io(up::UpdraftVariables, grid, state, Stats::NetCDFIO_Stats)
     write_profile(Stats, "updraft_area", up.Area.bulkvalues)
     write_profile(Stats, "updraft_w", up.W.bulkvalues)
     write_profile(Stats, "updraft_qt", up.QT.bulkvalues)
@@ -183,7 +183,7 @@ function io(up::UpdraftVariables, Stats::NetCDFIO_Stats, ref_state::ReferenceSta
     write_profile(Stats, "updraft_temperature", up.T.bulkvalues)
     write_profile(Stats, "updraft_buoyancy", up.B.bulkvalues)
 
-    upd_cloud_diagnostics(up, ref_state)
+    upd_cloud_diagnostics(up, grid, state)
     write_profile(Stats, "updraft_cloud_fraction", up.cloud_fraction)
     # Note definition of cloud cover : each updraft is associated with a cloud cover equal to the maximum
     # area fraction of the updraft where ql > 0. Each updraft is assumed to have maximum overlap with respect to
@@ -196,23 +196,24 @@ function io(up::UpdraftVariables, Stats::NetCDFIO_Stats, ref_state::ReferenceSta
     return
 end
 
-function upd_cloud_diagnostics(up::UpdraftVariables, ref_state::ReferenceState)
+function upd_cloud_diagnostics(up::UpdraftVariables, grid, state)
     up.lwp = 0.0
 
+    ρ0_c = center_ref_state(state).ρ0
     @inbounds for i in 1:(up.n_updrafts)
-        up.cloud_base[i] = zc_toa(up.grid)
+        up.cloud_base[i] = zc_toa(grid)
         up.cloud_top[i] = 0.0
         up.updraft_top[i] = 0.0
         up.cloud_cover[i] = 0.0
 
-        @inbounds for k in real_center_indices(up.grid)
+        @inbounds for k in real_center_indices(grid)
             if up.Area.values[i, k] > 1e-3
-                up.updraft_top[i] = max(up.updraft_top[i], up.grid.zc[k])
-                up.lwp += ref_state.rho0_half[k] * up.QL.values[i, k] * up.Area.values[i, k] * up.grid.Δz
+                up.updraft_top[i] = max(up.updraft_top[i], grid.zc[k])
+                up.lwp += ρ0_c[k] * up.QL.values[i, k] * up.Area.values[i, k] * grid.Δz
 
                 if up.QL.values[i, k] > 1e-8
-                    up.cloud_base[i] = min(up.cloud_base[i], up.grid.zc[k])
-                    up.cloud_top[i] = max(up.cloud_top[i], up.grid.zc[k])
+                    up.cloud_base[i] = min(up.cloud_base[i], grid.zc[k])
+                    up.cloud_top[i] = max(up.cloud_top[i], grid.zc[k])
                     up.cloud_cover[i] = max(up.cloud_cover[i], up.Area.values[i, k])
                 end
             end
@@ -226,15 +227,16 @@ Computes tendencies to qt and θ_liq_ice due to precipitation formation
 """
 function compute_rain_formation_tendencies(
     up_thermo::UpdraftThermodynamics,
+    grid,
+    state,
     up::UpdraftVariables,
     rain::RainVariables,
     dt,
 )
     param_set = parameter_set(rain)
     grid = up.grid
-    ref_state = up_thermo.ref_state
-    p0_c = ref_state.p0_half
-    ρ0_c = ref_state.rho0_half
+    p0_c = center_ref_state(state).p0
+    ρ0_c = center_ref_state(state).ρ0
 
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_center_indices(grid)

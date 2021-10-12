@@ -7,15 +7,16 @@ end
 
 function io(
     rain::RainVariables,
+    grid,
+    state,
     Stats::NetCDFIO_Stats,
-    ref_state::ReferenceState,
     up_thermo::UpdraftThermodynamics,
     en_thermo::EnvironmentThermodynamics,
     TS::TimeStepping,
 )
     write_profile(Stats, "qr_mean", rain.QR.values)
 
-    rain_diagnostics(rain, ref_state, up_thermo, en_thermo)
+    rain_diagnostics(rain, grid, state, up_thermo, en_thermo)
     write_ts(Stats, "rwp_mean", rain.mean_rwp)
 
     #TODO - change to rain rate that depends on rain model choice
@@ -25,23 +26,25 @@ end
 
 function rain_diagnostics(
     rain::RainVariables,
-    ref_state::ReferenceState,
+    grid,
+    state,
     up_thermo::UpdraftThermodynamics,
     en_thermo::EnvironmentThermodynamics,
 )
+    ρ0_c = center_ref_state(state).ρ0
+
     rain.mean_rwp = 0.0
     rain.cutoff_rain_rate = 0.0
-    grid = rain.grid
 
     @inbounds for k in real_center_indices(grid)
-        rain.mean_rwp += ref_state.rho0_half[k] * rain.QR.values[k] * grid.Δz
+        rain.mean_rwp += ρ0_c[k] * rain.QR.values[k] * grid.Δz
 
         # rain rate from cutoff microphysics scheme defined as a total amount of removed water
         # per timestep per EDMF surface area [mm/h]
         if (rain.rain_model == "cutoff")
             rain.cutoff_rain_rate -=
                 (en_thermo.qt_tendency_rain_formation[k] + up_thermo.qt_tendency_rain_formation_tot[k]) *
-                ref_state.rho0_half[k] *
+                ρ0_c[k] *
                 grid.Δz / rho_cloud_liq *
                 3.6 *
                 1e6
@@ -53,9 +56,8 @@ end
 """
 Computes the qr advection (down) tendency
 """
-function compute_rain_advection_tendencies(rain::RainPhysics, gm::GridMeanVariables, TS::TimeStepping, QR::RainVariable)
+function compute_rain_advection_tendencies(rain::RainPhysics, grid, state, gm, TS::TimeStepping, QR::RainVariable)
     param_set = parameter_set(gm)
-    grid = get_grid(gm)
     Δz = grid.Δz
     Δt = TS.dt
     CFL_limit = 0.5
@@ -99,13 +101,13 @@ end
 """
 Computes the tendencies to θ_liq_ice, qt and qr due to rain evaporation
 """
-function compute_rain_evap_tendencies(rain::RainPhysics, gm::GridMeanVariables, TS::TimeStepping, QR::RainVariable)
+function compute_rain_evap_tendencies(rain::RainPhysics, grid, state, gm, TS::TimeStepping, QR::RainVariable)
     param_set = parameter_set(gm)
     Δt = TS.dt
-    p0_c = rain.ref_state.p0_half
-    ρ0_c = rain.ref_state.rho0_half
+    p0_c = center_ref_state(state).p0
+    ρ0_c = center_ref_state(state).ρ0
 
-    @inbounds for k in real_center_indices(rain.grid)
+    @inbounds for k in real_center_indices(grid)
         q_tot_gm = gm.QT.values[k]
         T_gm = gm.T.values[k]
         # When we fuse loops, this should hopefully disappear

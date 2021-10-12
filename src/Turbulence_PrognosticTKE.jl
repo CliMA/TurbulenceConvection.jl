@@ -1,16 +1,8 @@
 
-function initialize(
-    edmf::EDMF_PrognosticTKE,
-    grid,
-    state,
-    Case::CasesBase,
-    gm::GridMeanVariables,
-    ref_state::ReferenceState,
-    TS::TimeStepping,
-)
+function initialize(edmf::EDMF_PrognosticTKE, grid, state, Case::CasesBase, gm::GridMeanVariables, TS::TimeStepping)
     initialize_covariance(edmf, gm, Case)
     if Case.casename == "DryBubble"
-        initialize_DryBubble(edmf, edmf.UpdVar, gm, ref_state)
+        initialize_DryBubble(edmf, edmf.UpdVar, gm)
     else
         initialize(edmf, edmf.UpdVar, gm)
     end
@@ -91,10 +83,9 @@ function initialize_io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     return
 end
 
-function io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
+function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::TimeStepping)
 
     grid = get_grid(edmf)
-    ref_state = reference_state(edmf)
 
     mean_nh_pressure = face_field(grid)
     mean_nh_pressure_adv = face_field(grid)
@@ -110,9 +101,9 @@ function io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     mean_sorting_function = center_field(grid)
     mean_b_mix = center_field(grid)
 
-    io(edmf.UpdVar, Stats, ref_state)
-    io(edmf.EnvVar, Stats, ref_state)
-    io(edmf.Rain, Stats, ref_state, edmf.UpdThermo, edmf.EnvThermo, TS)
+    io(edmf.UpdVar, grid, state, Stats)
+    io(edmf.EnvVar, grid, state, Stats)
+    io(edmf.Rain, grid, state, Stats, edmf.UpdThermo, edmf.EnvThermo, TS)
 
     a_up_bulk = edmf.UpdVar.Area.bulkvalues
     a_up = edmf.UpdVar.Area.values
@@ -236,7 +227,7 @@ function update_cloud_frac(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     GMV.cloud_cover = min(edmf.EnvVar.cloud_cover + sum(edmf.UpdVar.cloud_cover), 1)
 end
 
-function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, Case, gm, ref_state, TS)
+function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm, ref_state, TS)
     gm.U.tendencies .= 0
     gm.V.tendencies .= 0
     gm.QT.tendencies .= 0
@@ -450,16 +441,16 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, GMV::GridMeanVariables, C
     set_updraft_surface_bc(edmf, gm, Case)
     update_aux!(edmf, gm, grid, state, Case, ref_state, param_set, TS)
 
-    compute_rain_formation_tendencies(up_thermo, edmf.UpdVar, edmf.Rain, TS.dt) # causes division error in dry bubble first time step
-    microphysics(en_thermo, edmf.EnvVar, edmf.Rain, TS.dt) # saturation adjustment + rain creation
+    compute_rain_formation_tendencies(up_thermo, grid, state, edmf.UpdVar, edmf.Rain, TS.dt) # causes division error in dry bubble first time step
+    microphysics(en_thermo, grid, state, edmf.EnvVar, edmf.Rain, TS.dt, param_set) # saturation adjustment + rain creation
     if edmf.Rain.rain_model == "clima_1m"
-        compute_rain_evap_tendencies(edmf.RainPhys, gm, TS, edmf.Rain.QR)
-        compute_rain_advection_tendencies(edmf.RainPhys, gm, TS, edmf.Rain.QR)
+        compute_rain_evap_tendencies(edmf.RainPhys, grid, state, gm, TS, edmf.Rain.QR)
+        compute_rain_advection_tendencies(edmf.RainPhys, grid, state, gm, TS, edmf.Rain.QR)
     end
 
     # compute tendencies
-    compute_gm_tendencies!(edmf, grid, Case, gm, edmf.ref_state, TS)
-    compute_updraft_tendencies(edmf, gm, TS)
+    compute_gm_tendencies!(edmf, grid, state, Case, gm, edmf.ref_state, TS)
+    compute_updraft_tendencies(edmf, grid, state, gm, TS)
     # ----------- TODO: move to compute_tendencies
     implicit_eqs = edmf.implicit_eqs
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
@@ -656,9 +647,8 @@ function get_GMV_CoVar(
     return
 end
 
-function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE)
+function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE, param_set)
 
-    param_set = parameter_set(edmf)
     H_up_min = CPEDMF.H_up_min(param_set)
     @inbounds for i in 1:(edmf.n_updrafts)
         edmf.pressure_plume_spacing[i] =
@@ -667,7 +657,7 @@ function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE)
     return
 end
 
-function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, gm::GridMeanVariables, TS::TimeStepping)
+function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, TS::TimeStepping)
     grid = get_grid(edmf)
     param_set = parameter_set(gm)
     ref_state = reference_state(edmf)

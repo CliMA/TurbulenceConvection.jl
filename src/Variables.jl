@@ -25,7 +25,7 @@ function initialize_io(gm::GridMeanVariables, Stats::NetCDFIO_Stats)
     return
 end
 
-function io(gm::GridMeanVariables, Stats::NetCDFIO_Stats)
+function io(gm::GridMeanVariables, grid, state, Stats::NetCDFIO_Stats)
     write_profile(Stats, "u_mean", gm.U.values)
     write_profile(Stats, "v_mean", gm.V.values)
     write_profile(Stats, "qt_mean", gm.QT.values)
@@ -52,18 +52,18 @@ function io(gm::GridMeanVariables, Stats::NetCDFIO_Stats)
     return
 end
 
-function satadjust(gm::GridMeanVariables)
+function satadjust(gm::GridMeanVariables, grid, state)
+    p0_c = center_ref_state(state).p0
+    ρ0_c = center_ref_state(state).ρ0
     param_set = parameter_set(gm)
-    @inbounds for k in real_center_indices(gm.grid)
+    @inbounds for k in real_center_indices(grid)
         h = gm.H.values[k]
         qt = gm.QT.values[k]
-        p0 = gm.ref_state.p0_half[k]
-        ρ0 = gm.ref_state.rho0_half[k]
-        ts = TD.PhaseEquil_pθq(param_set, p0, h, qt)
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], h, qt)
         gm.QL.values[k] = TD.liquid_specific_humidity(ts)
         gm.T.values[k] = TD.air_temperature(ts)
         ρ = TD.air_density(ts)
-        gm.B.values[k] = buoyancy_c(param_set, ρ0, ρ)
+        gm.B.values[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
         gm.RH.values[k] = TD.relative_humidity(ts)
     end
     return
