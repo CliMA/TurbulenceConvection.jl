@@ -35,7 +35,7 @@ function export_ref_profile(case_name::String)
     parent(aux_cent_fields.ref_state.α0) .= ref_state.alpha0_half
 
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
-    io_nt = TC.io_dictionary_ref_state(aux)
+    io_nt = TC.io_dictionary_ref_state((; aux))
     TC.initialize_io(io_nt, Stats)
     TC.io(io_nt, Stats)
 

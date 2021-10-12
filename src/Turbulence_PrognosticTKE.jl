@@ -1,6 +1,8 @@
 
 function initialize(
     edmf::EDMF_PrognosticTKE,
+    grid,
+    state,
     Case::CasesBase,
     gm::GridMeanVariables,
     ref_state::ReferenceState,
@@ -434,12 +436,11 @@ function compute_diffusive_fluxes(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariabl
 end
 
 # Perform the update of the scheme
-function update(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
+function update(edmf::EDMF_PrognosticTKE, grid, state, GMV::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
 
     gm = GMV
     up = edmf.UpdVar
     en = edmf.EnvVar
-    grid = get_grid(edmf)
     ref_state = reference_state(edmf)
     param_set = parameter_set(edmf)
     up_thermo = edmf.UpdThermo

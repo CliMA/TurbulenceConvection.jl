@@ -1,7 +1,7 @@
 
-function initialize(self::RadiationBase, GMV::GridMeanVariables, ::RadiationBaseType)
-    self.dTdt = center_field(self.grid)
-    self.dqtdt = center_field(self.grid)
+function initialize(self::RadiationBase, grid, GMV::GridMeanVariables, ::RadiationBaseType)
+    self.dTdt = center_field(grid)
+    self.dqtdt = center_field(grid)
     return
 end
 
@@ -10,10 +10,11 @@ update(self::RadiationBase, GMV::GridMeanVariables) = nothing
 initialize_io(self::RadiationBase, Stats::NetCDFIO_Stats) = nothing
 io(self::RadiationBase, Stats::NetCDFIO_Stats) = nothing
 
-initialize(self::RadiationBase{RadiationNone}, GMV::GridMeanVariables) = initialize(self, GMV, RadiationBaseType())
+initialize(self::RadiationBase{RadiationNone}, state, GMV::GridMeanVariables) =
+    initialize(self, self.grid, GMV, RadiationBaseType())
 
-function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, GMV::GridMeanVariables)
-    initialize(self, GMV, RadiationBaseType())
+function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, state, GMV::GridMeanVariables)
+    initialize(self, self.grid, GMV, RadiationBaseType())
 
 
     self.divergence = 3.75e-6  # divergence is defined twice: here and in initialize_forcing method of DYCOMS_RF01 case class
@@ -102,8 +103,8 @@ function io(self::RadiationBase{RadiationDYCOMS_RF01}, Stats::NetCDFIO_Stats)
     return
 end
 
-function initialize(self::RadiationBase{RadiationLES}, GMV::GridMeanVariables, LESDat::LESData)
-    initialize(self, GMV, RadiationBaseType())
+function initialize(self::RadiationBase{RadiationLES}, state, GMV::GridMeanVariables, LESDat::LESData)
+    initialize(self, self.grid, GMV, RadiationBaseType())
     # load from LES
     NC.Dataset(LESDat.les_filename, "r") do data
         imin = LESDat.imin

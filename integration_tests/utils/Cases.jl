@@ -136,7 +136,8 @@ get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
 ##### Default CasesBase behavior:
 #####
 
-initialize_radiation(self::CasesBase, ::Grid, ::ReferenceState, GMV::GridMeanVariables) = initialize(self.Rad, GMV)
+initialize_radiation(self::CasesBase, ::Grid, state, ref_state, GMV::GridMeanVariables) =
+    initialize(self.Rad, state, GMV)
 
 function TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
     add_ts(Stats, "Tsurface")
@@ -152,7 +153,12 @@ function TC.io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
 end
 TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
 TC.io(self::CasesBase, Stats::NetCDFIO_Stats) = io(self, Stats, BaseCase())
-TC.update_surface(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Sur, GMV)
+function TC.update_surface(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping)
+    ref_state = self.Sur.ref_state
+    grid = self.Sur.grid
+    param_set = TC.parameter_set(GMV)
+    update(self.Sur, grid, GMV, ref_state, param_set)
+end
 TC.update_forcing(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) = nothing
 TC.update_radiation(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Rad, GMV)
 
@@ -160,7 +166,7 @@ TC.update_radiation(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) =
 ##### Soares
 #####
 
-function CasesBase(case::Soares, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::Soares, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -197,7 +203,7 @@ function initialize_profiles(self::CasesBase{Soares}, grid::Grid, GMV::GridMeanV
     end
 end
 
-function initialize_surface(self::CasesBase{Soares}, grid::Grid, ref_state::ReferenceState)
+function initialize_surface(self::CasesBase{Soares}, grid::Grid, state, ref_state)
     param_set = TC.parameter_set(ref_state)
     g = CPP.grav(param_set)
     molmass_ratio = CPP.molmass_ratio(param_set)
@@ -221,7 +227,7 @@ function initialize_surface(self::CasesBase{Soares}, grid::Grid, ref_state::Refe
             (theta_surface * (1 + (molmass_ratio - 1) * self.Sur.qsurface))
         )
 end
-function initialize_forcing(self::CasesBase{Soares}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{Soares}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -231,7 +237,7 @@ end
 ##### Nieuwstadt
 #####
 
-function CasesBase(case::Nieuwstadt, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::Nieuwstadt, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -262,7 +268,7 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, GMV::GridM
         end
     end
 end
-function initialize_surface(self::CasesBase{Nieuwstadt}, grid::Grid, ref_state::ReferenceState)
+function initialize_surface(self::CasesBase{Nieuwstadt}, grid::Grid, state, ref_state)
     param_set = TC.parameter_set(ref_state)
     g = CPP.grav(param_set)
     molmass_ratio = CPP.molmass_ratio(param_set)
@@ -288,7 +294,7 @@ function initialize_surface(self::CasesBase{Nieuwstadt}, grid::Grid, ref_state::
 
     return
 end
-function initialize_forcing(self::CasesBase{Nieuwstadt}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{Nieuwstadt}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -298,7 +304,7 @@ end
 ##### Bomex
 #####
 
-function CasesBase(case::Bomex, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::Bomex, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
@@ -357,7 +363,7 @@ function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, GMV::GridMeanVa
     end
 end
 
-function initialize_surface(self::CasesBase{Bomex}, grid::Grid, ref_state::ReferenceState)
+function initialize_surface(self::CasesBase{Bomex}, grid::Grid, state, ref_state)
     param_set = TC.parameter_set(ref_state)
     kf_surf = TC.kf_surface(grid)
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
@@ -373,7 +379,7 @@ function initialize_surface(self::CasesBase{Bomex}, grid::Grid, ref_state::Refer
     self.Sur.ref_state = ref_state
 end
 
-function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     param_set = TC.parameter_set(GMV)
@@ -419,7 +425,7 @@ end
 ##### life_cycle_Tan2018
 #####
 
-function CasesBase(case::life_cycle_Tan2018, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::life_cycle_Tan2018, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 0.376e-4 # s^{-1}
@@ -486,7 +492,7 @@ function life_cycle_buoyancy_flux(param_set, weight = 1)
     )
 end
 
-function initialize_surface(self::CasesBase{life_cycle_Tan2018}, grid::Grid, ref_state::ReferenceState)
+function initialize_surface(self::CasesBase{life_cycle_Tan2018}, grid::Grid, state, ref_state)
     param_set = TC.parameter_set(ref_state)
     kf_surf = TC.kf_surface(grid)
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
@@ -504,12 +510,7 @@ function initialize_surface(self::CasesBase{life_cycle_Tan2018}, grid::Grid, ref
     self.Sur.ref_state = ref_state
     self.Sur.bflux = life_cycle_buoyancy_flux(param_set)
 end
-function initialize_forcing(
-    self::CasesBase{life_cycle_Tan2018},
-    grid::Grid,
-    ref_state::ReferenceState,
-    GMV::GridMeanVariables,
-)
+function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
     param_set = TC.parameter_set(GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
@@ -556,14 +557,16 @@ function TC.update_surface(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVar
     self.Sur.lhf = self.lhf0 * weight
     self.Sur.shf = self.shf0 * weight
     self.Sur.bflux = life_cycle_buoyancy_flux(param_set, weight)
-    update(self.Sur, GMV)
+    ref_state = self.Sur.ref_state
+    grid = self.Sur.grid
+    update(self.Sur, grid, GMV, ref_state, param_set)
 end
 
 #####
 ##### Rico
 #####
 
-function CasesBase(case::Rico, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::Rico, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 18.0
@@ -623,7 +626,7 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, GMV::GridMeanVar
     end
 end
 
-function initialize_surface(self::CasesBase{Rico}, grid::Grid, ref_state::ReferenceState)
+function initialize_surface(self::CasesBase{Rico}, grid::Grid, state, ref_state)
     self.Sur.grid = grid
     self.Sur.ref_state = ref_state
     self.Sur.zrough = 0.00015
@@ -644,7 +647,7 @@ function initialize_surface(self::CasesBase{Rico}, grid::Grid, ref_state::Refere
     self.Sur.qsurface = TD.q_vap_saturation(ts)
 end
 
-function initialize_forcing(self::CasesBase{Rico}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{Rico}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
     param_set = TC.parameter_set(GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
@@ -680,7 +683,7 @@ end
 ##### TRMM_LBA
 #####
 
-function CasesBase(case::TRMM_LBA, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::TRMM_LBA, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -774,7 +777,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMea
     end
 end
 
-function initialize_surface(self::CasesBase{TRMM_LBA}, grid::Grid, ref_state::ReferenceState)
+function initialize_surface(self::CasesBase{TRMM_LBA}, grid::Grid, state, ref_state)
     #self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     param_set = TC.parameter_set(ref_state)
     kf_surf = TC.kf_surface(grid)
@@ -790,7 +793,7 @@ function initialize_surface(self::CasesBase{TRMM_LBA}, grid::Grid, ref_state::Re
     self.Sur.ref_state = ref_state
 end
 
-function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -939,7 +942,10 @@ end
 function TC.update_surface(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::TimeStepping)
     self.Sur.lhf = 554.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - TS.t) / 5.25 / 3600.0)))^1.3
     self.Sur.shf = 270.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - TS.t) / 5.25 / 3600.0)))^1.5
-    update(self.Sur, GMV)
+    ref_state = self.Sur.ref_state
+    grid = self.Sur.grid
+    param_set = TC.parameter_set(GMV)
+    update(self.Sur, grid, GMV, ref_state, param_set)
     # fix momentum fluxes to zero as they are not used in the paper
     self.Sur.rho_uflux = 0.0
     self.Sur.rho_vflux = 0.0
@@ -977,7 +983,7 @@ end
 ##### ARM_SGP
 #####
 
-function CasesBase(case::ARM_SGP, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::ARM_SGP, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 8.5e-5
@@ -1026,7 +1032,7 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, GMV::GridMean
     end
 end
 
-function initialize_surface(self::CasesBase{ARM_SGP}, grid::Grid, ref_state::ReferenceState)
+function initialize_surface(self::CasesBase{ARM_SGP}, grid::Grid, state, ref_state)
     param_set = TC.parameter_set(ref_state)
     self.Sur.qsurface = 15.2e-3 # kg/kg
     kc_surf = TC.kc_surface(grid)
@@ -1042,7 +1048,7 @@ function initialize_surface(self::CasesBase{ARM_SGP}, grid::Grid, ref_state::Ref
     self.Sur.ref_state = ref_state
 end
 
-function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -1066,7 +1072,10 @@ function TC.update_surface(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS:
     # if self.Sur.lhf < 1.0
     #     self.Sur.lhf = 1.0
     #+++++++++
-    update(self.Sur, GMV)
+    ref_state = self.Sur.ref_state
+    grid = self.Sur.grid
+    param_set = TC.parameter_set(GMV)
+    update(self.Sur, grid, GMV, ref_state, param_set)
     # fix momentum fluxes to zero as they are not used in the paper
     self.Sur.rho_uflux = 0.0
     self.Sur.rho_vflux = 0.0
@@ -1107,7 +1116,7 @@ end
 ##### GATE_III
 #####
 
-function CasesBase(case::GATE_III, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::GATE_III, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     Fo.apply_subsidence = false
     Fo.apply_coriolis = false
@@ -1167,7 +1176,7 @@ function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, GMV::GridMea
     end
 end
 
-function initialize_surface(self::CasesBase{GATE_III}, grid::Grid, ref_state::ReferenceState)
+function initialize_surface(self::CasesBase{GATE_III}, grid::Grid, state, ref_state)
     self.Sur.grid = grid
     self.Sur.ref_state = ref_state
     self.Sur.qsurface = 16.5 / 1000.0 # kg/kg
@@ -1185,7 +1194,7 @@ function initialize_surface(self::CasesBase{GATE_III}, grid::Grid, ref_state::Re
     self.Sur.qsurface = TD.q_vap_saturation(ts)
 end
 
-function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -1221,7 +1230,7 @@ end
 ##### DYCOMS_RF01
 #####
 
-function CasesBase(case::DYCOMS_RF01, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::DYCOMS_RF01, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
@@ -1274,7 +1283,7 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, grid::Grid, GMV::Grid
     end
 end
 
-function initialize_surface(self::CasesBase{DYCOMS_RF01}, grid::Grid, ref_state::ReferenceState)
+function initialize_surface(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, ref_state)
     param_set = TC.parameter_set(ref_state)
     g = CPP.grav(param_set)
     molmass_ratio = CPP.molmass_ratio(param_set)
@@ -1307,7 +1316,7 @@ function initialize_surface(self::CasesBase{DYCOMS_RF01}, grid::Grid, ref_state:
     self.Sur.grid = grid
     self.Sur.ref_state = ref_state
 end
-function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -1328,15 +1337,10 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, ref_state:
     self.Fo.dqtdt .= 0.0 #kg/(kg * s)
 end
 
-function initialize_radiation(
-    self::CasesBase{DYCOMS_RF01},
-    grid::Grid,
-    ref_state::ReferenceState,
-    GMV::GridMeanVariables,
-)
+function initialize_radiation(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
     self.Rad.grid = grid
     self.Rad.ref_state = ref_state
-    initialize(self.Rad, GMV)
+    initialize(self.Rad, state, GMV)
 
     # no large-scale drying
     self.Rad.dqtdt .= 0.0 #kg/(kg * s)
@@ -1359,7 +1363,7 @@ end
 ##### GABLS
 #####
 
-function CasesBase(case::GABLS, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::GABLS, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     latitude = 73.0
@@ -1403,14 +1407,14 @@ function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, GMV::GridMeanVa
     end
 end
 
-function initialize_surface(self::CasesBase{GABLS}, grid::Grid, ref_state::ReferenceState)
+function initialize_surface(self::CasesBase{GABLS}, grid::Grid, state, ref_state)
     self.Sur.grid = grid
     self.Sur.ref_state = ref_state
     self.Sur.zrough = 0.1
     self.Sur.Tsurface = 265.0
 end
 
-function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -1424,7 +1428,10 @@ end
 
 function TC.update_surface(self::CasesBase{GABLS}, GMV::GridMeanVariables, TS::TimeStepping)
     self.Sur.Tsurface = 265.0 - (0.25 / 3600.0) * TS.t
-    update(self.Sur, GMV)
+    ref_state = self.Sur.ref_state
+    grid = self.Sur.grid
+    param_set = TC.parameter_set(GMV)
+    update(self.Sur, grid, GMV, ref_state, param_set)
 end
 
 #####
@@ -1432,7 +1439,7 @@ end
 #####
 
 # Not fully implemented yet - Ignacio
-function CasesBase(case::SP, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::SP, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = true
     Fo.coriolis_param = 1.0e-4 # s^{-1}
@@ -1475,7 +1482,7 @@ function initialize_profiles(self::CasesBase{SP}, grid::Grid, GMV::GridMeanVaria
     end
 end
 
-function initialize_surface(self::CasesBase{SP}, grid::Grid, ref_state::ReferenceState)
+function initialize_surface(self::CasesBase{SP}, grid::Grid, state, ref_state)
     param_set = TC.parameter_set(ref_state)
     kf_surf = TC.kf_surface(grid)
     g = CPP.grav(param_set)
@@ -1491,7 +1498,7 @@ function initialize_surface(self::CasesBase{SP}, grid::Grid, ref_state::Referenc
     self.Sur.bflux = g * theta_flux / theta_surface
 end
 
-function initialize_forcing(self::CasesBase{SP}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{SP}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -1506,7 +1513,7 @@ end
 ##### DryBubble
 #####
 
-function CasesBase(case::DryBubble, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::DryBubble, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
     inversion_option = "theta_rho"
     Fo.apply_coriolis = false
     Fo.apply_subsidence = false
@@ -1601,14 +1608,14 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, GMV::GridMe
     GMV.HQTcov.values .= 0
 end
 
-function initialize_surface(self::CasesBase{DryBubble}, grid::Grid, ref_state::ReferenceState)
+function initialize_surface(self::CasesBase{DryBubble}, grid::Grid, state, ref_state)
     self.Sur.grid = grid
     self.Sur.ref_state = ref_state
     self.Sur.qsurface = 0.0
     self.Sur.shf = 0.0
 end
 
-function initialize_forcing(self::CasesBase{DryBubble}, grid::Grid, ref_state::ReferenceState, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{DryBubble}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -1618,7 +1625,7 @@ end
 ##### LES_driven_SCM
 #####
 
-function CasesBase(case::LES_driven_SCM, namelist, grid::Grid, param_set, ref_state::ReferenceState, Sur, Fo, Rad)
+function CasesBase(case::LES_driven_SCM, namelist, grid::Grid, param_set, ref_state, Sur, Fo, Rad)
     les_filename = namelist["meta"]["lesfile"]
     # load data here
     LESDat = NC.Dataset(les_filename, "r") do data
@@ -1687,7 +1694,7 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, GMV::G
     end
 end
 
-function initialize_surface(self::CasesBase{LES_driven_SCM}, grid::Grid, ref_state::ReferenceState)
+function initialize_surface(self::CasesBase{LES_driven_SCM}, grid::Grid, state, ref_state)
 
     NC.Dataset(self.LESDat.les_filename, "r") do data
         imin = self.LESDat.imin
@@ -1707,24 +1714,14 @@ function initialize_surface(self::CasesBase{LES_driven_SCM}, grid::Grid, ref_sta
     end
 end
 
-function initialize_forcing(
-    self::CasesBase{LES_driven_SCM},
-    grid::Grid,
-    ref_state::ReferenceState,
-    GMV::GridMeanVariables,
-)
+function initialize_forcing(self::CasesBase{LES_driven_SCM}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV, grid, self.LESDat)
     return nothing
 end
-function initialize_radiation(
-    self::CasesBase{LES_driven_SCM},
-    grid::Grid,
-    ref_state::ReferenceState,
-    GMV::GridMeanVariables,
-)
-    initialize(self.Rad, GMV, self.LESDat)
+function initialize_radiation(self::CasesBase{LES_driven_SCM}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+    initialize(self.Rad, state, GMV, self.LESDat)
 end
 
 end

@@ -8,8 +8,6 @@
         param_set::PS,
         Stats::NetCDFIO_Stats;
         Pg::FT,
-        Tg::FT,
-        qtg::FT
     ) where {FT}
 
 The reference profiles, given
@@ -17,8 +15,6 @@ The reference profiles, given
  - `param_set` the parameter set
  - `Stats` the NC file handler struct
  - `Pg` pressure at the ground
- - `Tg` temperature at the ground
- - `qtg` total specific humidity at the ground
 """
 struct ReferenceState{PS, A1}
     param_set::PS
@@ -29,8 +25,6 @@ struct ReferenceState{PS, A1}
     rho0::A1
     rho0_half::A1
     Pg::Float64
-    Tg::Float64
-    qtg::Float64
 end
 
 function ReferenceState(grid::Grid, param_set::PS, Stats::NetCDFIO_Stats; Pg::FT, Tg::FT, qtg::FT) where {PS, FT}
@@ -84,6 +78,6 @@ function ReferenceState(grid::Grid, param_set::PS, Stats::NetCDFIO_Stats; Pg::FT
     rho0 = 1 ./ alpha0
     rho0_half = 1 ./ alpha0_half
 
-    args = (param_set, p0, p0_half, alpha0, alpha0_half, rho0, rho0_half, Pg, Tg, qtg)
+    args = (param_set, p0, p0_half, alpha0, alpha0_half, rho0, rho0_half, Pg)
     return ReferenceState{PS, typeof(p0)}(args...)
 end
