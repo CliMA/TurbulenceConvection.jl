@@ -397,6 +397,6 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
     reset_surface_covariance(edmf, grid, state, gm, Case)
 
-    compute_diffusive_fluxes(edmf, grid, state, gm, Case, TS)
+    compute_diffusive_fluxes(edmf, grid, state, gm, Case, TS, param_set)
     update_cloud_frac(edmf, grid, gm)
 end

@@ -96,7 +96,7 @@ function Simulation1d(namelist)
     Rad = TC.RadiationBase{Cases.get_radiation_type(case)}()
 
     Case = Cases.CasesBase(case, namelist, grid, param_set, Sur, Fo, Rad)
-    Turb = TC.EDMF_PrognosticTKE(namelist, grid, ref_state, param_set)
+    Turb = TC.EDMF_PrognosticTKE(namelist, grid, param_set)
     TS = TC.TimeStepping(namelist)
 
     n_updrafts = Turb.n_updrafts
@@ -182,7 +182,7 @@ function run(sim::Simulation1d)
 
             TC.io(sim.GMV, grid, state, sim.Stats) # #removeVarsHack
             TC.io(sim.Case, grid, state, sim.Stats) # #removeVarsHack
-            TC.io(sim.Turb, grid, state, sim.Stats, sim.TS) # #removeVarsHack
+            TC.io(sim.Turb, grid, state, sim.Stats, sim.TS, sim.param_set) # #removeVarsHack
         end
         iter += 1
     end
@@ -220,7 +220,7 @@ function TurbulenceConvection.io(sim::Simulation1d)
     # TODO: depricate
     TC.io(sim.GMV, sim.grid, sim.state, sim.Stats)
     TC.io(sim.Case, sim.grid, sim.state, sim.Stats)
-    TC.io(sim.Turb, sim.grid, sim.state, sim.Stats, sim.TS)
+    TC.io(sim.Turb, sim.grid, sim.state, sim.Stats, sim.TS, sim.param_set)
     TC.close_files(sim.Stats)
     return
 end

@@ -2,9 +2,9 @@
 function initialize(edmf::EDMF_PrognosticTKE, grid, state, Case::CasesBase, gm::GridMeanVariables, TS::TimeStepping)
     initialize_covariance(edmf, grid, state, gm, Case)
     if Case.casename == "DryBubble"
-        initialize_DryBubble(edmf, edmf.UpdVar, gm)
+        initialize_DryBubble(edmf, grid, state, edmf.UpdVar, gm)
     else
-        initialize(edmf, edmf.UpdVar, gm)
+        initialize(edmf, grid, state, edmf.UpdVar, gm)
     end
     return
 end
@@ -83,9 +83,7 @@ function initialize_io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     return
 end
 
-function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::TimeStepping)
-
-    grid = get_grid(edmf)
+function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::TimeStepping, param_set)
 
     mean_nh_pressure = face_field(grid)
     mean_nh_pressure_adv = face_field(grid)
@@ -173,7 +171,7 @@ function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::Ti
     write_profile(Stats, "mixing_length_ratio", edmf.ml_ratio)
     write_profile(Stats, "entdet_balance_length", edmf.l_entdet)
     write_profile(Stats, "interdomain_tke_t", edmf.b)
-    compute_covariance_dissipation(edmf, grid, state, edmf.EnvVar.TKE)
+    compute_covariance_dissipation(edmf, grid, state, edmf.EnvVar.TKE, param_set)
     write_profile(Stats, "tke_dissipation", edmf.EnvVar.TKE.dissipation)
     write_profile(Stats, "tke_entr_gain", edmf.EnvVar.TKE.entr_gain)
     compute_covariance_detr(edmf, grid, state, edmf.EnvVar.TKE)
@@ -183,11 +181,11 @@ function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::Ti
     write_profile(Stats, "tke_pressure", edmf.EnvVar.TKE.press)
     write_profile(Stats, "tke_interdomain", edmf.EnvVar.TKE.interdomain)
 
-    compute_covariance_dissipation(edmf, grid, state, edmf.EnvVar.Hvar)
+    compute_covariance_dissipation(edmf, grid, state, edmf.EnvVar.Hvar, param_set)
     write_profile(Stats, "Hvar_dissipation", edmf.EnvVar.Hvar.dissipation)
-    compute_covariance_dissipation(edmf, grid, state, edmf.EnvVar.QTvar)
+    compute_covariance_dissipation(edmf, grid, state, edmf.EnvVar.QTvar, param_set)
     write_profile(Stats, "QTvar_dissipation", edmf.EnvVar.QTvar.dissipation)
-    compute_covariance_dissipation(edmf, grid, state, edmf.EnvVar.HQTcov)
+    compute_covariance_dissipation(edmf, grid, state, edmf.EnvVar.HQTcov, param_set)
     write_profile(Stats, "HQTcov_dissipation", edmf.EnvVar.HQTcov.dissipation)
     write_profile(Stats, "Hvar_entr_gain", edmf.EnvVar.Hvar.entr_gain)
     write_profile(Stats, "QTvar_entr_gain", edmf.EnvVar.QTvar.entr_gain)
@@ -385,9 +383,9 @@ function compute_diffusive_fluxes(
     GMV::GridMeanVariables,
     Case::CasesBase,
     TS::TimeStepping,
+    param_set,
 )
     ρ0_f = face_ref_state(state).ρ0
-    param_set = parameter_set(edmf)
     edmf.ae .= 1 .- edmf.UpdVar.Area.bulkvalues # area of environment
     KM = diffusivity_m(edmf).values
     KH = diffusivity_h(edmf).values
@@ -435,7 +433,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, GMV::GridMeanVariables, C
     gm = GMV
     up = edmf.UpdVar
     en = edmf.EnvVar
-    param_set = parameter_set(edmf)
+    param_set = parameter_set(gm)
     up_thermo = edmf.UpdThermo
     en_thermo = edmf.EnvThermo
 
@@ -445,7 +443,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, GMV::GridMeanVariables, C
     set_updraft_surface_bc(edmf, grid, state, gm, Case)
     update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
-    compute_rain_formation_tendencies(up_thermo, grid, state, edmf.UpdVar, edmf.Rain, TS.dt) # causes division error in dry bubble first time step
+    compute_rain_formation_tendencies(up_thermo, grid, state, edmf.UpdVar, edmf.Rain, TS.dt, param_set) # causes division error in dry bubble first time step
     microphysics(en_thermo, grid, state, edmf.EnvVar, edmf.Rain, TS.dt, param_set) # saturation adjustment + rain creation
     if edmf.Rain.rain_model == "clima_1m"
         compute_rain_evap_tendencies(edmf.RainPhys, grid, state, gm, TS, edmf.Rain.QR)
@@ -523,12 +521,11 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, GMV::GridMeanVariables, C
     end
 
     # set values
-    set_values_with_new(edmf.UpdVar)
+    set_values_with_new(edmf.UpdVar, grid, state)
     return
 end
 
 function set_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, GMV::GridMeanVariables, Case::CasesBase)
-    grid = get_grid(edmf)
     kc_surf = kc_surface(grid)
 
     Δzi = grid.Δzi
@@ -841,7 +838,6 @@ end
 
 function initialize_covariance(edmf::EDMF_PrognosticTKE, grid, state, gm, Case::CasesBase)
 
-    grid = get_grid(edmf)
     kc_surf = kc_surface(grid)
     en = edmf.EnvVar
 
@@ -868,7 +864,6 @@ function compute_covariance_shear(
     EnvVar2,
 )
 
-    grid = get_grid(edmf)
     ae = 1 .- edmf.UpdVar.Area.bulkvalues
     KH = diffusivity_h(edmf).values
     ρ0_c = center_ref_state(state).ρ0
@@ -921,7 +916,6 @@ function compute_covariance_interdomain_src(
 
     is_tke = Covar.name == "tke"
     tke_factor = is_tke ? 0.5 : 1
-    grid = get_grid(edmf)
     if is_tke
         @inbounds for k in real_center_indices(grid)
             Covar.interdomain[k] = 0.0
@@ -1019,8 +1013,7 @@ function compute_covariance_detr(edmf::EDMF_PrognosticTKE, grid, state, Covar::E
     return
 end
 
-function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, Covar::EnvironmentVariable_2m)
-    param_set = parameter_set(edmf)
+function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, Covar::EnvironmentVariable_2m, param_set)
     en = edmf.EnvVar
     c_d = CPEDMF.c_d(param_set)
     ae = 1 .- edmf.UpdVar.Area.bulkvalues

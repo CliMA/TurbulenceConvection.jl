@@ -1,10 +1,10 @@
-function initialize(edmf, up::UpdraftVariables, gm::GridMeanVariables)
-    kc_surf = kc_surface(up.grid)
+function initialize(edmf, grid, state, up::UpdraftVariables, gm::GridMeanVariables)
+    kc_surf = kc_surface(grid)
 
     up.W.values .= 0
     up.B.values .= 0
     @inbounds for i in 1:(up.n_updrafts)
-        @inbounds for k in real_center_indices(up.grid)
+        @inbounds for k in real_center_indices(grid)
             # Simple treatment for now, revise when multiple updraft closures
             # become more well defined
             if up.prognostic
@@ -23,8 +23,8 @@ function initialize(edmf, up::UpdraftVariables, gm::GridMeanVariables)
     return
 end
 
-function initialize_DryBubble(edmf, up::UpdraftVariables, gm::GridMeanVariables)
-    dz = up.grid.Δz
+function initialize_DryBubble(edmf, grid, state, up::UpdraftVariables, gm::GridMeanVariables)
+    dz = grid.Δz
 
     # criterion 2: b>1e-4
     #! format: off
@@ -39,7 +39,7 @@ function initialize_DryBubble(edmf, up::UpdraftVariables, gm::GridMeanVariables)
         3225., 3275., 3325., 3375., 3425., 3475., 3525., 3575., 3625.,
         3675., 3725., 3775., 3825., 3875., 3925.]
 
-    thetal_in = [
+    θ_liq_in = [
         299.9882, 299.996 , 300.0063, 300.0205, 300.04  , 300.0594,
         300.0848, 300.1131, 300.1438, 300.1766, 300.2198, 300.2567,
         300.2946, 300.3452, 300.3849, 300.4245, 300.4791, 300.5182,
@@ -93,20 +93,20 @@ function initialize_DryBubble(edmf, up::UpdraftVariables, gm::GridMeanVariables)
         264.1574, 263.6518, 263.1461, 262.6451, 262.1476, 261.6524]
     #! format: on
 
-    Area_in = pyinterp(up.grid.zc, z_in, Area_in)
-    thetal_in = pyinterp(up.grid.zc, z_in, thetal_in)
-    T_in = pyinterp(up.grid.zc, z_in, T_in)
+    Area_in = pyinterp(grid.zc, z_in, Area_in)
+    θ_liq_in = pyinterp(grid.zc, z_in, θ_liq_in)
+    T_in = pyinterp(grid.zc, z_in, T_in)
     @inbounds for i in 1:(up.n_updrafts)
-        @inbounds for k in real_face_indices(up.grid)
-            if minimum(z_in) <= up.grid.zf[k] <= maximum(z_in)
+        @inbounds for k in real_face_indices(grid)
+            if minimum(z_in) <= grid.zf[k] <= maximum(z_in)
                 up.W.values[i, k] = 0.0
             end
         end
 
-        @inbounds for k in real_center_indices(up.grid)
-            if minimum(z_in) <= up.grid.zc[k] <= maximum(z_in)
+        @inbounds for k in real_center_indices(grid)
+            if minimum(z_in) <= grid.zc[k] <= maximum(z_in)
                 up.Area.values[i, k] = Area_in[k] #up.updraft_fraction/up.n_updrafts
-                up.H.values[i, k] = thetal_in[k]
+                up.H.values[i, k] = θ_liq_in[k]
                 up.QT.values[i, k] = 0.0
                 up.QL.values[i, k] = 0.0
 
@@ -141,13 +141,13 @@ function initialize_io(up::UpdraftVariables, Stats::NetCDFIO_Stats)
 end
 
 # quick utility to set "new" arrays with values in the "values" arrays
-function set_new_with_values(up::UpdraftVariables)
+function set_new_with_values(up::UpdraftVariables, grid, state)
     @inbounds for i in 1:(up.n_updrafts)
-        @inbounds for k in real_face_indices(up.grid)
+        @inbounds for k in real_face_indices(grid)
             up.W.new[i, k] = up.W.values[i, k]
         end
 
-        @inbounds for k in real_center_indices(up.grid)
+        @inbounds for k in real_center_indices(grid)
             up.Area.new[i, k] = up.Area.values[i, k]
             up.QT.new[i, k] = up.QT.values[i, k]
             up.H.new[i, k] = up.H.values[i, k]
@@ -157,13 +157,13 @@ function set_new_with_values(up::UpdraftVariables)
 end
 
 # quick utility to set "tmp" arrays with values in the "new" arrays
-function set_values_with_new(up::UpdraftVariables)
+function set_values_with_new(up::UpdraftVariables, grid, state)
     @inbounds for i in 1:(up.n_updrafts)
-        @inbounds for k in real_face_indices(up.grid)
+        @inbounds for k in real_face_indices(grid)
             up.W.values[i, k] = up.W.new[i, k]
         end
 
-        @inbounds for k in real_center_indices(up.grid)
+        @inbounds for k in real_center_indices(grid)
             up.W.values[i, k] = up.W.new[i, k]
             up.Area.values[i, k] = up.Area.new[i, k]
             up.QT.values[i, k] = up.QT.new[i, k]
@@ -232,9 +232,8 @@ function compute_rain_formation_tendencies(
     up::UpdraftVariables,
     rain::RainVariables,
     dt,
+    param_set,
 )
-    param_set = parameter_set(rain)
-    grid = up.grid
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
 
