@@ -219,12 +219,10 @@ function io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats, TS::TimeStepping)
     return
 end
 
-update_surface(Case::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) =
-    error("update_surface should be overloaded in case-specific methods (in Cases.jl)")
-update_forcing(Case::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) =
-    error("update_forcing should be overloaded in case-specific methods (in Cases.jl)")
-update_radiation(Case::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) =
-    error("update_radiation should be overloaded in case-specific methods (in Cases.jl)")
+#= These methods are to be overloaded by Cases.jl =#
+function update_surface end
+function update_forcing end
+function update_radiation end
 
 function update_cloud_frac(edmf::EDMF_PrognosticTKE, GMV::GridMeanVariables)
     grid = get_grid(edmf)
@@ -450,7 +448,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, GMV::GridMeanVariables, C
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
     set_updraft_surface_bc(edmf, gm, Case)
-    update_aux!(edmf, gm, grid, Case, ref_state, param_set, TS)
+    update_aux!(edmf, gm, grid, state, Case, ref_state, param_set, TS)
 
     compute_rain_formation_tendencies(up_thermo, edmf.UpdVar, edmf.Rain, TS.dt) # causes division error in dry bubble first time step
     microphysics(en_thermo, edmf.EnvVar, edmf.Rain, TS.dt) # saturation adjustment + rain creation

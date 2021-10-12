@@ -740,13 +740,12 @@ Base.@kwdef mutable struct SurfaceBase{T}
     obukhov_length::Float64 = 0
     Ri_bulk_crit::Float64 = 0
     ustar_fixed::Bool = false
-    grid::Grid
-    ref_state::ReferenceState
+    ref_params::NamedTuple = NamedTuple()
 end
 
-function SurfaceBase(::Type{T}; grid::Grid, ref_state::ReferenceState, namelist::Dict) where {T}
+function SurfaceBase(::Type{T}; namelist::Dict, ref_params) where {T}
     Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
-    return SurfaceBase{T}(; grid, ref_state, Ri_bulk_crit)
+    return SurfaceBase{T}(; Ri_bulk_crit, ref_params)
 end
 
 struct ForcingBaseType end

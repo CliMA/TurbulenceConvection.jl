@@ -136,8 +136,7 @@ get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
 ##### Default CasesBase behavior:
 #####
 
-initialize_radiation(self::CasesBase, ::Grid, state, ref_state, GMV::GridMeanVariables) =
-    initialize(self.Rad, state, GMV)
+initialize_radiation(self::CasesBase, ::Grid, state, ref_state, GMV) = initialize(self.Rad, state, GMV)
 
 function TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
     add_ts(Stats, "Tsurface")
@@ -153,14 +152,10 @@ function TC.io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
 end
 TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
 TC.io(self::CasesBase, Stats::NetCDFIO_Stats) = io(self, Stats, BaseCase())
-function TC.update_surface(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping)
-    ref_state = self.Sur.ref_state
-    grid = self.Sur.grid
-    param_set = TC.parameter_set(GMV)
-    update(self.Sur, grid, GMV, ref_state, param_set)
-end
-TC.update_forcing(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) = nothing
-TC.update_radiation(self::CasesBase, GMV::GridMeanVariables, TS::TimeStepping) = update(self.Rad, GMV)
+TC.update_surface(self::CasesBase, grid, state, GMV, TS::TimeStepping, param_set) =
+    update(self.Sur, grid, state, GMV, param_set)
+TC.update_forcing(self::CasesBase, GMV, TS::TimeStepping) = nothing
+TC.update_radiation(self::CasesBase, GMV, TS::TimeStepping) = update(self.Rad, GMV)
 
 #####
 ##### Soares
@@ -178,7 +173,7 @@ function reference_params(::Soares, grid::Grid, param_set::APS, namelist)
     Tg = 300.0
     return (; Pg, Tg, qtg)
 end
-function initialize_profiles(self::CasesBase{Soares}, grid::Grid, GMV::GridMeanVariables, ref_state_centers)
+function initialize_profiles(self::CasesBase{Soares}, grid::Grid, GMV, ref_state_centers)
     param_set = TC.parameter_set(GMV)
 
     @inbounds for k in real_center_indices(grid)
@@ -203,31 +198,30 @@ function initialize_profiles(self::CasesBase{Soares}, grid::Grid, GMV::GridMeanV
     end
 end
 
-function initialize_surface(self::CasesBase{Soares}, grid::Grid, state, ref_state)
-    param_set = TC.parameter_set(ref_state)
+function initialize_surface(self::CasesBase{Soares}, grid::Grid, state, param_set)
     g = CPP.grav(param_set)
     molmass_ratio = CPP.molmass_ratio(param_set)
     kf_surf = TC.kf_surface(grid)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
     self.Sur.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     self.Sur.Tsurface = 300.0
     self.Sur.qsurface = 5.0e-3
-    theta_flux = 6.0e-2
+    θ_flux = 6.0e-2
     qt_flux = 2.5e-5
-    ts = TD.PhaseEquil_pTq(param_set, ref_state.p0[kf_surf], self.Sur.Tsurface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
     theta_surface = TD.liquid_ice_pottemp(ts)
-    self.Sur.lhf = qt_flux * TC.surface_value(ref_state.rho0, grid) * TD.latent_heat_vapor(ts)
-    self.Sur.shf = theta_flux * TD.cp_m(ts) * TC.surface_value(ref_state.rho0, grid)
+    self.Sur.lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(ts)
+    self.Sur.shf = θ_flux * TD.cp_m(ts) * ρ0_f_surf
     self.Sur.ustar_fixed = false
     self.Sur.ustar = 0.28 # just to initilize grid mean covariances
-    self.Sur.grid = grid
-    self.Sur.ref_state = ref_state
     self.Sur.bflux =
         g * (
-            (theta_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
+            (θ_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.Sur.qsurface * θ_flux)) /
             (theta_surface * (1 + (molmass_ratio - 1) * self.Sur.qsurface))
         )
 end
-function initialize_forcing(self::CasesBase{Soares}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{Soares}, grid::Grid, state, ref_state, GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -250,7 +244,7 @@ function reference_params(::Nieuwstadt, grid::Grid, param_set::APS, namelist)
     qtg = 1.0e-12 # Total water mixing ratio
     return (; Pg, Tg, qtg)
 end
-function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, GMV::GridMeanVariables, ref_state_centers)
+function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, GMV, ref_state_centers)
     param_set = TC.parameter_set(GMV)
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
@@ -268,33 +262,32 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, GMV::GridM
         end
     end
 end
-function initialize_surface(self::CasesBase{Nieuwstadt}, grid::Grid, state, ref_state)
-    param_set = TC.parameter_set(ref_state)
+function initialize_surface(self::CasesBase{Nieuwstadt}, grid::Grid, state, param_set)
+    kf_surf = TC.kf_surface(grid)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
     g = CPP.grav(param_set)
     molmass_ratio = CPP.molmass_ratio(param_set)
-    kf_surf = TC.kf_surface(grid)
     self.Sur.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     self.Sur.Tsurface = 300.0
     self.Sur.qsurface = 0.0
-    theta_flux = 6.0e-2
+    θ_flux = 6.0e-2
     qt_flux = 0.0
     self.Sur.lhf = 0.0 # It would be 0.0 if we follow Nieuwstadt.
-    ts = TD.PhaseEquil_pTq(param_set, ref_state.p0[kf_surf], self.Sur.Tsurface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
     theta_surface = TD.liquid_ice_pottemp(ts)
-    self.Sur.shf = theta_flux * TD.cp_m(ts) * TC.surface_value(ref_state.rho0, grid)
+    self.Sur.shf = θ_flux * TD.cp_m(ts) * ρ0_f_surf
     self.Sur.ustar_fixed = false
     self.Sur.ustar = 0.28 # just to initilize grid mean covariances
-    self.Sur.grid = grid
-    self.Sur.ref_state = ref_state
     self.Sur.bflux =
         g * (
-            (theta_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
+            (θ_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.Sur.qsurface * θ_flux)) /
             (theta_surface * (1 + (molmass_ratio - 1) * self.Sur.qsurface))
         )
 
     return
 end
-function initialize_forcing(self::CasesBase{Nieuwstadt}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{Nieuwstadt}, grid::Grid, state, ref_state, GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -319,7 +312,7 @@ function reference_params(::Bomex, grid::Grid, param_set::APS, namelist)
     return (; Pg, Tg, qtg)
 end
 
-function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, GMV::GridMeanVariables, ref_state_centers)
+function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, GMV, ref_state_centers)
     param_set = TC.parameter_set(GMV)
 
     @inbounds for k in real_center_indices(grid)
@@ -363,23 +356,22 @@ function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, GMV::GridMeanVa
     end
 end
 
-function initialize_surface(self::CasesBase{Bomex}, grid::Grid, state, ref_state)
-    param_set = TC.parameter_set(ref_state)
+function initialize_surface(self::CasesBase{Bomex}, grid::Grid, state, param_set)
     kf_surf = TC.kf_surface(grid)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.qsurface = 22.45e-3 # kg/kg
     theta_surface = 299.1
-    ts = TD.PhaseEquil_pθq(param_set, ref_state.p0[kf_surf], theta_surface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, theta_surface, self.Sur.qsurface)
     self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = 5.2e-5 * TC.surface_value(ref_state.rho0, grid) * TD.latent_heat_vapor(ts)
-    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * TC.surface_value(ref_state.rho0, grid)
+    self.Sur.lhf = 5.2e-5 * ρ0_f_surf * TD.latent_heat_vapor(ts)
+    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * ρ0_f_surf
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # m/s
-    self.Sur.grid = grid
-    self.Sur.ref_state = ref_state
 end
 
-function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, ref_state, GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     param_set = TC.parameter_set(GMV)
@@ -438,7 +430,7 @@ function reference_params(::life_cycle_Tan2018, grid::Grid, param_set::APS, name
     qtg = 0.02245   #Total water mixing ratio at surface
     return (; Pg, Tg, qtg)
 end
-function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, grid::Grid, GMV::GridMeanVariables, ref_state_centers)
+function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, grid::Grid, GMV, ref_state_centers)
     param_set = TC.parameter_set(GMV)
 
     @inbounds for k in real_center_indices(grid)
@@ -492,25 +484,24 @@ function life_cycle_buoyancy_flux(param_set, weight = 1)
     )
 end
 
-function initialize_surface(self::CasesBase{life_cycle_Tan2018}, grid::Grid, state, ref_state)
-    param_set = TC.parameter_set(ref_state)
+function initialize_surface(self::CasesBase{life_cycle_Tan2018}, grid::Grid, state, param_set)
     kf_surf = TC.kf_surface(grid)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.qsurface = 22.45e-3 # kg/kg
     theta_surface = 299.1
-    ts = TD.PhaseEquil_pθq(param_set, ref_state.p0[kf_surf], theta_surface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, theta_surface, self.Sur.qsurface)
     self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = 5.2e-5 * TC.surface_value(ref_state.rho0, grid) * TD.latent_heat_vapor(ts)
-    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * TC.surface_value(ref_state.rho0, grid)
+    self.Sur.lhf = 5.2e-5 * ρ0_f_surf * TD.latent_heat_vapor(ts)
+    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * ρ0_f_surf
     self.lhf0 = self.Sur.lhf
     self.shf0 = self.Sur.shf
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # m/s
-    self.Sur.grid = grid
-    self.Sur.ref_state = ref_state
     self.Sur.bflux = life_cycle_buoyancy_flux(param_set)
 end
-function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, state, ref_state, GMV)
     param_set = TC.parameter_set(GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
@@ -549,17 +540,14 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
     return nothing
 end
 
-function TC.update_surface(self::CasesBase{life_cycle_Tan2018}, GMV::GridMeanVariables, TS::TimeStepping)
-    param_set = TC.parameter_set(GMV)
+function TC.update_surface(self::CasesBase{life_cycle_Tan2018}, grid, state, GMV, TS::TimeStepping, param_set)
     weight = 1.0
     weight_factor = 0.01 + 0.99 * (cos(2.0 * π * TS.t / 3600.0) + 1.0) / 2.0
     weight = weight * weight_factor
     self.Sur.lhf = self.lhf0 * weight
     self.Sur.shf = self.shf0 * weight
     self.Sur.bflux = life_cycle_buoyancy_flux(param_set, weight)
-    ref_state = self.Sur.ref_state
-    grid = self.Sur.grid
-    update(self.Sur, grid, GMV, ref_state, param_set)
+    update(self.Sur, grid, state, GMV, param_set)
 end
 
 #####
@@ -584,7 +572,7 @@ function reference_params(::Rico, grid::Grid, param_set::APS, namelist)
     qtg = (1 / molmass_ratio) * pvg / (Pg - pvg)   #Total water mixing ratio at surface
     return (; Pg, Tg, qtg)
 end
-function initialize_profiles(self::CasesBase{Rico}, grid::Grid, GMV::GridMeanVariables, ref_state_centers)
+function initialize_profiles(self::CasesBase{Rico}, grid::Grid, GMV, ref_state_centers)
     param_set = TC.parameter_set(GMV)
     θ_ρ = TC.center_field(grid)
     p0 = ref_state_centers.p0
@@ -626,9 +614,7 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, GMV::GridMeanVar
     end
 end
 
-function initialize_surface(self::CasesBase{Rico}, grid::Grid, state, ref_state)
-    self.Sur.grid = grid
-    self.Sur.ref_state = ref_state
+function initialize_surface(self::CasesBase{Rico}, grid::Grid, state, param_set)
     self.Sur.zrough = 0.00015
     self.Sur.cm = 0.001229
     self.Sur.ch = 0.001094
@@ -641,13 +627,13 @@ function initialize_surface(self::CasesBase{Rico}, grid::Grid, state, ref_state)
     self.Sur.Tsurface = 299.8
 
     # For Rico we provide values of transfer coefficients
-    param_set = TC.parameter_set(ref_state)
     kf_surf = TC.kf_surface(grid)
-    ts = TD.PhaseEquil_pθq(param_set, ref_state.p0[kf_surf], self.Sur.Tsurface, self.Sur.qsurface)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
     self.Sur.qsurface = TD.q_vap_saturation(ts)
 end
 
-function initialize_forcing(self::CasesBase{Rico}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{Rico}, grid::Grid, state, ref_state, GMV)
     param_set = TC.parameter_set(GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
@@ -697,7 +683,7 @@ function reference_params(::TRMM_LBA, grid::Grid, param_set::APS, namelist)
     qtg = (1 / molmass_ratio) * pvg / (Pg - pvg) #Total water mixing ratio at surface
     return (; Pg, Tg, qtg)
 end
-function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMeanVariables, ref_state_centers)
+function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV, ref_state_centers)
     param_set = TC.parameter_set(GMV)
     p0 = ref_state_centers.p0
     # TRMM_LBA inputs from Grabowski et al. 2006
@@ -777,23 +763,22 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, GMV::GridMea
     end
 end
 
-function initialize_surface(self::CasesBase{TRMM_LBA}, grid::Grid, state, ref_state)
+function initialize_surface(self::CasesBase{TRMM_LBA}, grid::Grid, state, param_set)
     #self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
-    param_set = TC.parameter_set(ref_state)
     kf_surf = TC.kf_surface(grid)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
     self.Sur.qsurface = 22.45e-3 # kg/kg
     theta_surface = (273.15 + 23)
-    ts = TD.PhaseEquil_pθq(param_set, ref_state.p0[kf_surf], theta_surface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, theta_surface, self.Sur.qsurface)
     self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = 5.2e-5 * TC.surface_value(ref_state.rho0, grid) * TD.latent_heat_vapor(ts)
-    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * TC.surface_value(ref_state.rho0, grid)
+    self.Sur.lhf = 5.2e-5 * ρ0_f_surf * TD.latent_heat_vapor(ts)
+    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * ρ0_f_surf
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
-    self.Sur.grid = grid
-    self.Sur.ref_state = ref_state
 end
 
-function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, ref_state, GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -939,19 +924,16 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, ref_st
     return nothing
 end
 
-function TC.update_surface(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::TimeStepping)
+function TC.update_surface(self::CasesBase{TRMM_LBA}, grid, state, GMV, TS::TimeStepping, param_set)
     self.Sur.lhf = 554.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - TS.t) / 5.25 / 3600.0)))^1.3
     self.Sur.shf = 270.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - TS.t) / 5.25 / 3600.0)))^1.5
-    ref_state = self.Sur.ref_state
-    grid = self.Sur.grid
-    param_set = TC.parameter_set(GMV)
-    update(self.Sur, grid, GMV, ref_state, param_set)
+    update(self.Sur, grid, state, GMV, param_set)
     # fix momentum fluxes to zero as they are not used in the paper
     self.Sur.rho_uflux = 0.0
     self.Sur.rho_vflux = 0.0
 end
 
-function TC.update_forcing(self::CasesBase{TRMM_LBA}, GMV::GridMeanVariables, TS::TimeStepping)
+function TC.update_forcing(self::CasesBase{TRMM_LBA}, GMV, TS::TimeStepping)
 
     grid = self.Fo.grid
     ind2 = Int(ceil(TS.t / 600.0)) + 1
@@ -998,7 +980,7 @@ function reference_params(::ARM_SGP, grid::Grid, param_set::APS, namelist)
     return (; Pg, Tg, qtg)
 end
 
-function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, GMV::GridMeanVariables, ref_state_centers)
+function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, GMV, ref_state_centers)
     # ARM_SGP inputs
     p0 = ref_state_centers.p0
     #! format: off
@@ -1032,23 +1014,21 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, GMV::GridMean
     end
 end
 
-function initialize_surface(self::CasesBase{ARM_SGP}, grid::Grid, state, ref_state)
-    param_set = TC.parameter_set(ref_state)
+function initialize_surface(self::CasesBase{ARM_SGP}, grid::Grid, state, param_set)
     self.Sur.qsurface = 15.2e-3 # kg/kg
-    kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
-    theta_surface = 299.0
-    ts = TD.PhaseEquil_pθq(param_set, ref_state.p0[kf_surf], theta_surface, self.Sur.qsurface)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
+    θ_surface = 299.0
+    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_surface, self.Sur.qsurface)
     self.Sur.Tsurface = TD.air_temperature(ts)
     self.Sur.lhf = 5.0
     self.Sur.shf = -30.0
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
-    self.Sur.grid = grid
-    self.Sur.ref_state = ref_state
 end
 
-function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, state, ref_state, GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -1059,7 +1039,7 @@ function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, state, ref_sta
     return nothing
 end
 
-function TC.update_surface(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::TimeStepping)
+function TC.update_surface(self::CasesBase{ARM_SGP}, grid, state, GMV, TS::TimeStepping, param_set)
     t_Sur_in = arr_type([0.0, 4.0, 6.5, 7.5, 10.0, 12.5, 14.5]) .* 3600 #LES time is in sec
     SH = arr_type([-30.0, 90.0, 140.0, 140.0, 100.0, -10, -10]) # W/m^2
     LH = arr_type([5.0, 250.0, 450.0, 500.0, 420.0, 180.0, 0.0]) # W/m^2
@@ -1072,16 +1052,13 @@ function TC.update_surface(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS:
     # if self.Sur.lhf < 1.0
     #     self.Sur.lhf = 1.0
     #+++++++++
-    ref_state = self.Sur.ref_state
-    grid = self.Sur.grid
-    param_set = TC.parameter_set(GMV)
-    update(self.Sur, grid, GMV, ref_state, param_set)
+    update(self.Sur, grid, state, GMV, param_set)
     # fix momentum fluxes to zero as they are not used in the paper
     self.Sur.rho_uflux = 0.0
     self.Sur.rho_vflux = 0.0
 end
 
-function TC.update_forcing(self::CasesBase{ARM_SGP}, GMV::GridMeanVariables, TS::TimeStepping)
+function TC.update_forcing(self::CasesBase{ARM_SGP}, GMV, TS::TimeStepping)
     param_set = TC.parameter_set(GMV)
     t_in = arr_type([0.0, 3.0, 6.0, 9.0, 12.0, 14.5]) .* 3600.0 #LES time is in sec
     AT_in = arr_type([0.0, 0.0, 0.0, -0.08, -0.016, -0.016]) ./ 3600.0 # Advective forcing for theta [K/h] converted to [K/sec]
@@ -1130,7 +1107,7 @@ function reference_params(::GATE_III, grid::Grid, param_set::APS, namelist)
     return (; Pg, Tg, qtg)
 end
 
-function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, GMV::GridMeanVariables, ref_state_centers)
+function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, GMV, ref_state_centers)
     param_set = TC.parameter_set(ref_state)
     p0 = ref_state_centers.p0
 
@@ -1176,25 +1153,21 @@ function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, GMV::GridMea
     end
 end
 
-function initialize_surface(self::CasesBase{GATE_III}, grid::Grid, state, ref_state)
-    self.Sur.grid = grid
-    self.Sur.ref_state = ref_state
+function initialize_surface(self::CasesBase{GATE_III}, grid::Grid, state, param_set)
     self.Sur.qsurface = 16.5 / 1000.0 # kg/kg
-    self.Sur.grid = grid
-    self.Sur.ref_state = ref_state
     self.Sur.cm = 0.0012
     self.Sur.ch = 0.0034337
     self.Sur.cq = 0.0034337
     self.Sur.Tsurface = 299.184
 
     # For GATE_III we provide values of transfer coefficients
-    param_set = TC.parameter_set(ref_state)
     kf_surf = TC.kf_surface(grid)
-    ts = TD.PhaseEquil_pθq(param_set, ref_state.p0[kf_surf], self.Sur.Tsurface, self.Sur.qsurface)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
     self.Sur.qsurface = TD.q_vap_saturation(ts)
 end
 
-function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, state, ref_state, GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -1244,7 +1217,7 @@ function reference_params(::DYCOMS_RF01, grid::Grid, param_set::APS, namelist)
     return (; Pg, Tg, qtg)
 end
 
-function initialize_profiles(self::CasesBase{DYCOMS_RF01}, grid::Grid, GMV::GridMeanVariables, ref_state_centers)
+function initialize_profiles(self::CasesBase{DYCOMS_RF01}, grid::Grid, GMV, ref_state_centers)
     param_set = TC.parameter_set(GMV)
     p0 = ref_state_centers.p0
     qi = 0.0                                             # no ice
@@ -1283,11 +1256,12 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, grid::Grid, GMV::Grid
     end
 end
 
-function initialize_surface(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, ref_state)
-    param_set = TC.parameter_set(ref_state)
+function initialize_surface(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, param_set)
     g = CPP.grav(param_set)
     molmass_ratio = CPP.molmass_ratio(param_set)
     kf_surf = TC.kf_surface(grid)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
     self.Sur.zrough = 1.0e-4
     self.Sur.ustar_fixed = false
     self.Sur.ustar = 0.28 # just to initilize grid mean covariances
@@ -1303,20 +1277,18 @@ function initialize_surface(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, ref
     #density_surface  = 1.22     # kg/m^3
 
     # buoyancy flux
-    ts = TD.PhaseEquil_pTq(param_set, ref_state.p0[kf_surf], self.Sur.Tsurface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
     theta_surface = TD.liquid_ice_pottemp(ts)
-    theta_flux = self.Sur.shf / TD.cp_m(ts) / TC.surface_value(ref_state.rho0, grid)
-    qt_flux = self.Sur.lhf / TD.latent_heat_vapor(ts) / TC.surface_value(ref_state.rho0, grid)
+    θ_flux = self.Sur.shf / TD.cp_m(ts) / ρ0_f_surf
+    qt_flux = self.Sur.lhf / TD.latent_heat_vapor(ts) / ρ0_f_surf
 
     self.Sur.bflux =
         g * (
-            (theta_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.Sur.qsurface * theta_flux)) /
+            (θ_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.Sur.qsurface * θ_flux)) /
             (theta_surface * (1 + (molmass_ratio - 1) * self.Sur.qsurface))
         )
-    self.Sur.grid = grid
-    self.Sur.ref_state = ref_state
 end
-function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, ref_state, GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -1337,7 +1309,7 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, ref
     self.Fo.dqtdt .= 0.0 #kg/(kg * s)
 end
 
-function initialize_radiation(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_radiation(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, ref_state, GMV)
     self.Rad.grid = grid
     self.Rad.ref_state = ref_state
     initialize(self.Rad, state, GMV)
@@ -1380,7 +1352,7 @@ function reference_params(::GABLS, grid::Grid, param_set::APS, namelist)
     qtg = 1.0e-12 #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN (TBD),
     return (; Pg, Tg, qtg)
 end
-function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, GMV::GridMeanVariables, ref_state_centers)
+function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, GMV, ref_state_centers)
     param_set = TC.parameter_set(GMV)
 
     @inbounds for k in real_center_indices(grid)
@@ -1407,14 +1379,12 @@ function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, GMV::GridMeanVa
     end
 end
 
-function initialize_surface(self::CasesBase{GABLS}, grid::Grid, state, ref_state)
-    self.Sur.grid = grid
-    self.Sur.ref_state = ref_state
+function initialize_surface(self::CasesBase{GABLS}, grid::Grid, state, param_set)
     self.Sur.zrough = 0.1
     self.Sur.Tsurface = 265.0
 end
 
-function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, state, ref_state, GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -1426,12 +1396,9 @@ function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, state, ref_state
     return nothing
 end
 
-function TC.update_surface(self::CasesBase{GABLS}, GMV::GridMeanVariables, TS::TimeStepping)
+function TC.update_surface(self::CasesBase{GABLS}, grid, state, GMV, TS::TimeStepping, param_set)
     self.Sur.Tsurface = 265.0 - (0.25 / 3600.0) * TS.t
-    ref_state = self.Sur.ref_state
-    grid = self.Sur.grid
-    param_set = TC.parameter_set(GMV)
-    update(self.Sur, grid, GMV, ref_state, param_set)
+    update(self.Sur, grid, state, GMV, param_set)
 end
 
 #####
@@ -1456,7 +1423,7 @@ function reference_params(::SP, grid::Grid, param_set::APS, namelist)
     return (; Pg, Tg, qtg)
 end
 
-function initialize_profiles(self::CasesBase{SP}, grid::Grid, GMV::GridMeanVariables, ref_state_centers)
+function initialize_profiles(self::CasesBase{SP}, grid::Grid, GMV, ref_state_centers)
     param_set = TC.parameter_set(GMV)
 
     @inbounds for k in real_center_indices(grid)
@@ -1482,23 +1449,21 @@ function initialize_profiles(self::CasesBase{SP}, grid::Grid, GMV::GridMeanVaria
     end
 end
 
-function initialize_surface(self::CasesBase{SP}, grid::Grid, state, ref_state)
-    param_set = TC.parameter_set(ref_state)
+function initialize_surface(self::CasesBase{SP}, grid::Grid, state, param_set)
     kf_surf = TC.kf_surface(grid)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     g = CPP.grav(param_set)
-    self.Sur.grid = grid
-    self.Sur.ref_state = ref_state
     self.Sur.zrough = 0.1
     self.Sur.Tsurface = 300.0
     self.Sur.qsurface = 0.0
-    ts = TD.PhaseEquil_pTq(param_set, ref_state.p0[kf_surf], self.Sur.Tsurface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
     theta_surface = TD.liquid_ice_pottemp(ts)
-    theta_flux = 0.24
+    θ_flux = 0.24
     self.Sur.ustar = 0.28 # just to initilize grid mean covariances
-    self.Sur.bflux = g * theta_flux / theta_surface
+    self.Sur.bflux = g * θ_flux / theta_surface
 end
 
-function initialize_forcing(self::CasesBase{SP}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{SP}, grid::Grid, state, ref_state, GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -1527,7 +1492,7 @@ function reference_params(::DryBubble, grid::Grid, param_set::APS, namelist)
     return (; Pg, Tg, qtg)
 end
 
-function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, GMV::GridMeanVariables, ref_state_centers)
+function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, GMV, ref_state_centers)
 
     @inbounds for k in real_center_indices(grid)
         GMV.U.values[k] = 0.01
@@ -1608,14 +1573,12 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, GMV::GridMe
     GMV.HQTcov.values .= 0
 end
 
-function initialize_surface(self::CasesBase{DryBubble}, grid::Grid, state, ref_state)
-    self.Sur.grid = grid
-    self.Sur.ref_state = ref_state
+function initialize_surface(self::CasesBase{DryBubble}, grid::Grid, state, param_set)
     self.Sur.qsurface = 0.0
     self.Sur.shf = 0.0
 end
 
-function initialize_forcing(self::CasesBase{DryBubble}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{DryBubble}, grid::Grid, state, ref_state, GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV)
@@ -1664,7 +1627,7 @@ function reference_params(::LES_driven_SCM, grid::Grid, param_set::APS, namelist
     return (; Pg, Tg, qtg)
 end
 
-function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, GMV::GridMeanVariables, ref_state_centers)
+function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, GMV, ref_state_centers)
 
     NC.Dataset(self.LESDat.les_filename, "r") do data
         imin = self.LESDat.imin
@@ -1694,33 +1657,29 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, GMV::G
     end
 end
 
-function initialize_surface(self::CasesBase{LES_driven_SCM}, grid::Grid, state, ref_state)
+function initialize_surface(self::CasesBase{LES_driven_SCM}, grid::Grid, state, param_set)
 
     NC.Dataset(self.LESDat.les_filename, "r") do data
         imin = self.LESDat.imin
         imax = self.LESDat.imax
 
-        self.Sur.grid = grid
-        self.Sur.ref_state = ref_state
         self.Sur.zrough = 1.0e-4
-        self.Sur.grid = grid
         self.Sur.Tsurface = Statistics.mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims = 1)[1]
         # get surface value of q
         mean_qt_prof = Statistics.mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)[:]
         self.Sur.qsurface = TC.interpf2c(mean_qt_prof, grid, TC.kc_surface(grid))
         self.Sur.lhf = Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1]
         self.Sur.shf = Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1]
-        self.Sur.ref_state = ref_state
     end
 end
 
-function initialize_forcing(self::CasesBase{LES_driven_SCM}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_forcing(self::CasesBase{LES_driven_SCM}, grid::Grid, state, ref_state, GMV)
     self.Fo.grid = grid
     self.Fo.ref_state = ref_state
     initialize(self.Fo, GMV, grid, self.LESDat)
     return nothing
 end
-function initialize_radiation(self::CasesBase{LES_driven_SCM}, grid::Grid, state, ref_state, GMV::GridMeanVariables)
+function initialize_radiation(self::CasesBase{LES_driven_SCM}, grid::Grid, state, ref_state, GMV)
     initialize(self.Rad, state, GMV, self.LESDat)
 end
 

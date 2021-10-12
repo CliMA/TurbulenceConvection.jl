@@ -2,13 +2,13 @@
 ##### BaseCase methods
 #####
 
-function free_convection_windspeed(surf::SurfaceBase, grid, gm::GridMeanVariables, param_set, ::BaseCase)
+function free_convection_windspeed(surf::SurfaceBase, grid, state, gm::GridMeanVariables, param_set, ::BaseCase)
     θ_ρ = center_field(grid)
-    ref_state = surf.ref_state
+    p0_c = center_ref_state(state).p0
 
     # Need to get θ_ρ
     @inbounds for k in real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[k], gm.H.values[k], gm.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], gm.H.values[k], gm.QT.values[k])
         θ_ρ[k] = TD.virtual_pottemp(ts)
     end
     zi = get_inversion(param_set, θ_ρ, gm.U.values, gm.V.values, grid, surf.Ri_bulk_crit)
@@ -21,14 +21,14 @@ end
 ##### Default SurfaceBase behavior
 #####
 
-free_convection_windspeed(surf::SurfaceBase, grid, gm::GridMeanVariables, param_set) =
-    free_convection_windspeed(surf, grid, gm, param_set, BaseCase())
+free_convection_windspeed(surf::SurfaceBase, grid, state, gm::GridMeanVariables, param_set) =
+    free_convection_windspeed(surf, grid, state, gm, param_set, BaseCase())
 
 #####
 ##### SurfaceNone
 #####
 
-function update(surf::SurfaceBase{SurfaceNone}, grid, gm::GridMeanVariables, ref_state, param_set)
+function update(surf::SurfaceBase{SurfaceNone}, grid, state, gm::GridMeanVariables, param_set)
     # JH: assigning small fluxed so that simulation won"t crash when computing mixing length
     kc_surf = kc_surface(grid)
     surf.windspeed = 0.0001
@@ -37,15 +37,15 @@ function update(surf::SurfaceBase{SurfaceNone}, grid, gm::GridMeanVariables, ref
     surf.ustar = compute_ustar(param_set, surf.windspeed, surf.bflux, surf.zrough, grid.zc[kc_surf])
     return
 end
-free_convection_windspeed(surf::SurfaceBase{SurfaceNone}, grid, gm::GridMeanVariables, param_set) = nothing
+free_convection_windspeed(surf::SurfaceBase{SurfaceNone}, grid, state, gm::GridMeanVariables, param_set) = nothing
 
-function update(surf::SurfaceBase{SurfaceFixedFlux}, grid, gm::GridMeanVariables, ref_state, param_set)
+function update(surf::SurfaceBase{SurfaceFixedFlux}, grid, state, gm::GridMeanVariables, param_set)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     zb = grid.zc[kc_surf]
-    p0_f_surf = ref_state.p0[kf_surf]
-    ρ0_f_surf = ref_state.rho0[kf_surf]
-    α0_f_surf = ref_state.alpha0[kf_surf]
+    p0_f_surf = face_ref_state(state).p0[kf_surf]
+    ρ0_f_surf = face_ref_state(state).ρ0[kf_surf]
+    α0_f_surf = face_ref_state(state).α0[kf_surf]
     u_gm_surf = gm.U.values[kc_surf]
     v_gm_surf = gm.V.values[kc_surf]
     q_tot_gm_surf = gm.QT.values[kc_surf]
@@ -68,7 +68,7 @@ function update(surf::SurfaceBase{SurfaceFixedFlux}, grid, gm::GridMeanVariables
         # Value 1.2 is empirical, but should be O(1)
         if surf.windspeed < 0.1  # Limit here is heuristic
             if surf.bflux > 0.0
-                free_convection_windspeed(surf, grid, gm, param_set)
+                free_convection_windspeed(surf, grid, state, gm, param_set)
             else
                 print("WARNING: Low windspeed + stable conditions, need to check ustar computation")
                 print("surf.bflux ==>", surf.bflux)
@@ -92,12 +92,12 @@ function update(surf::SurfaceBase{SurfaceFixedFlux}, grid, gm::GridMeanVariables
     return
 end
 
-function update(surf::SurfaceBase{SurfaceFixedCoeffs}, grid, gm::GridMeanVariables, ref_state, param_set)
+function update(surf::SurfaceBase{SurfaceFixedCoeffs}, grid, state, gm::GridMeanVariables, param_set)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
-    p0_f_surf = ref_state.p0[kf_surf]
-    ρ0_f_surf = ref_state.rho0[kf_surf]
-    α0_f_surf = ref_state.alpha0[kf_surf]
+    p0_f_surf = face_ref_state(state).p0[kf_surf]
+    ρ0_f_surf = face_ref_state(state).ρ0[kf_surf]
+    α0_f_surf = face_ref_state(state).α0[kf_surf]
     u_gm_surf = gm.U.values[kc_surf]
     v_gm_surf = gm.V.values[kc_surf]
     T_gm_surf = gm.T.values[kc_surf]
@@ -133,31 +133,33 @@ function update(surf::SurfaceBase{SurfaceFixedCoeffs}, grid, gm::GridMeanVariabl
     return
 end
 
-function update(surf::SurfaceBase{SurfaceMoninObukhov}, grid, gm::GridMeanVariables, ref_state, param_set)
+function update(surf::SurfaceBase{SurfaceMoninObukhov}, grid, state, gm::GridMeanVariables, param_set)
     g = CPP.grav(param_set)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     zb = grid.zc[kc_surf]
-    p0_f_surf = ref_state.p0[kf_surf]
-    ρ0_f_surf = ref_state.rho0[kf_surf]
-    α0_f_surf = ref_state.alpha0[kf_surf]
+    p0_f_surf = face_ref_state(state).p0[kf_surf]
+    p0_c_surf = center_ref_state(state).p0[kc_surf]
+    ρ0_f_surf = face_ref_state(state).ρ0[kf_surf]
+    α0_f_surf = face_ref_state(state).α0[kf_surf]
     u_gm_surf = gm.U.values[kc_surf]
     v_gm_surf = gm.V.values[kc_surf]
     q_tot_gm_surf = gm.QT.values[kc_surf]
     θ_liq_ice_gm_surf = gm.H.values[kc_surf]
     T_gm_surf = gm.T.values[kc_surf]
+    Pg = surf.ref_params.Pg
 
     pvg = TD.saturation_vapor_pressure(param_set, surf.Tsurface, TD.Liquid())
     surf.qsurface = TD.q_vap_saturation_from_density(param_set, surf.Tsurface, ρ0_f_surf, pvg)
     lv = TD.latent_heat_vapor(param_set, T_gm_surf)
 
     phase_part = TD.PhasePartition(surf.qsurface, 0.0, 0.0)
-    h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, ref_state.Pg, phase_part)
+    h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, Pg, phase_part)
 
-    ts_g = TD.PhaseEquil_pθq(param_set, ref_state.Pg, h_star, surf.qsurface)
+    ts_g = TD.PhaseEquil_pθq(param_set, Pg, h_star, surf.qsurface)
     θ_ρ_g = TD.virtual_pottemp(ts_g)
 
-    ts_b = TD.PhaseEquil_pθq(param_set, ref_state.p0_half[kc_surf], θ_liq_ice_gm_surf, surf.qsurface)
+    ts_b = TD.PhaseEquil_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, surf.qsurface)
     θ_ρ_b = TD.virtual_pottemp(ts_b)
 
     surf.windspeed = sqrt(u_gm_surf^2 + v_gm_surf^2)
@@ -189,30 +191,31 @@ function update(surf::SurfaceBase{SurfaceMoninObukhov}, grid, gm::GridMeanVariab
     return
 end
 
-function update(surf::SurfaceBase{SurfaceMoninObukhovDry}, grid, gm::GridMeanVariables, ref_state, param_set)
+function update(surf::SurfaceBase{SurfaceMoninObukhovDry}, grid, state, gm::GridMeanVariables, param_set)
     g = CPP.grav(param_set)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
 
     zb = grid.zc[kc_surf]
-    p0_f_surf = ref_state.p0[kf_surf]
-    p0_c_surf = ref_state.p0_half[kf_surf]
-    ρ0_f_surf = ref_state.rho0[kf_surf]
-    α0_f_surf = ref_state.alpha0[kf_surf]
+    p0_f_surf = face_ref_state(state).p0[kf_surf]
+    p0_c_surf = center_ref_state(state).p0[kc_surf]
+    ρ0_f_surf = face_ref_state(state).ρ0[kf_surf]
+    α0_f_surf = face_ref_state(state).α0[kf_surf]
     u_gm_surf = gm.U.values[kc_surf]
     v_gm_surf = gm.V.values[kc_surf]
     q_tot_gm_surf = gm.QT.values[kc_surf]
     θ_liq_ice_gm_surf = gm.H.values[kc_surf]
     T_gm_surf = gm.T.values[kc_surf]
+    Pg = surf.ref_params.Pg
 
     pvg = TD.saturation_vapor_pressure(param_set, surf.Tsurface, TD.Liquid())
     surf.qsurface = TD.q_vap_saturation_from_density(param_set, surf.Tsurface, ρ0_f_surf, pvg)
     lv = TD.latent_heat_vapor(param_set, T_gm_surf)
 
     phase_part = TD.PhasePartition(surf.qsurface, 0.0, 0.0)
-    h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, ref_state.Pg, phase_part)
+    h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, Pg, phase_part)
 
-    ts_g = TD.PhaseEquil_pθq(param_set, ref_state.Pg, h_star, surf.qsurface)
+    ts_g = TD.PhaseEquil_pθq(param_set, Pg, h_star, surf.qsurface)
     θ_ρ_g = TD.virtual_pottemp(ts_g)
 
     ts_b = TD.PhaseEquil_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, surf.qsurface)
@@ -231,7 +234,7 @@ function update(surf::SurfaceBase{SurfaceMoninObukhovDry}, grid, gm::GridMeanVar
     surf.rho_qtflux = -surf.ch * surf.windspeed * (q_tot_gm_surf - surf.qsurface) * ρ0_f_surf
     surf.lhf = lv * 0.0
 
-    ts = TD.PhaseEquil_pθq(param_set, ref_state.p0[kf_surf], surf.Tsurface, surf.qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
     surf.shf = TD.cp_m(ts) * surf.rho_hflux
 
     surf.bflux = buoyancy_flux(param_set, surf.shf, surf.lhf, surf.Tsurface, surf.qsurface, α0_f_surf, ts)
@@ -247,22 +250,24 @@ function update(surf::SurfaceBase{SurfaceMoninObukhovDry}, grid, gm::GridMeanVar
     return
 end
 
-function update(surf::SurfaceBase{SurfaceSullivanPatton}, grid, gm::GridMeanVariables, ref_state, param_set)
+function update(surf::SurfaceBase{SurfaceSullivanPatton}, grid, state, gm::GridMeanVariables, param_set)
     g = CPP.grav(param_set)
     R_d = CPP.R_d(param_set)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
 
     zb = grid.zc[kc_surf]
-    p0_f_surf = ref_state.p0[kf_surf]
-    p0_c_surf = ref_state.p0_half[kf_surf]
-    ρ0_f_surf = ref_state.rho0[kf_surf]
-    α0_c_surf = ref_state.alpha0_half[kc_surf]
+
+    p0_f_surf = face_ref_state(state).p0[kf_surf]
+    p0_c_surf = center_ref_state(state).p0[kc_surf]
+    ρ0_f_surf = face_ref_state(state).ρ0[kf_surf]
+    α0_c_surf = center_ref_state(state).α0[kc_surf]
     u_gm_surf = gm.U.values[kc_surf]
     v_gm_surf = gm.V.values[kc_surf]
     q_tot_gm_surf = gm.QT.values[kc_surf]
     θ_liq_ice_gm_surf = gm.H.values[kc_surf]
     T_gm_surf = gm.T.values[kc_surf]
+    Pg = surf.ref_params.Pg
 
     ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
     lv = TD.latent_heat_vapor(param_set, T_gm_surf)
@@ -274,9 +279,9 @@ function update(surf::SurfaceBase{SurfaceSullivanPatton}, grid, gm::GridMeanVari
     surf.bflux = g * θ_flux * Π / T0
     pvg = TD.saturation_vapor_pressure(param_set, surf.Tsurface, TD.Liquid())
     surf.qsurface = TD.q_vap_saturation_from_density(param_set, surf.Tsurface, ρ0_f_surf, pvg)
-    h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, ref_state.Pg, phase_part)
+    h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, Pg, phase_part)
 
-    ts_g = TD.PhaseEquil_pθq(param_set, ref_state.Pg, h_star, surf.qsurface)
+    ts_g = TD.PhaseEquil_pθq(param_set, Pg, h_star, surf.qsurface)
     θ_ρ_g = TD.virtual_pottemp(ts_g)
 
     ts_b = TD.PhaseEquil_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, surf.qsurface)
