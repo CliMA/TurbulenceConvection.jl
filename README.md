@@ -60,10 +60,10 @@ Additional Acknowledgements:
 Installation is easy:
 
 ```julia-repl
-(@v1.x) pkg> add https://github.com/CliMA/TurbulenceConvection.jl
+(@v1.6) pkg> add TurbulenceConvection
 ```
 
-If you plan to develop TurbulenceConvection.jl, you may want to clone it instead:
+TurbulenceConvection.jl requires Julia 1.6 or higher. If you plan to develop TurbulenceConvection.jl, you may want to clone it instead:
 
 
 ```
