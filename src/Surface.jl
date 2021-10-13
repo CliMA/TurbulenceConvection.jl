@@ -166,8 +166,7 @@ function update(surf::SurfaceBase{SurfaceMoninObukhov}, grid, state, gm::GridMea
     Nb2 = g / θ_ρ_g * (θ_ρ_b - θ_ρ_g) / zb
     Ri = Nb2 * zb * zb / (surf.windspeed * surf.windspeed)
 
-    surf.cm, surf.ch, surf.obukhov_length =
-        exchange_coefficients_byun(param_set, Ri, zb, surf.zrough, surf.cm, surf.ch, surf.obukhov_length)
+    surf.cm, surf.ch, surf.obukhov_length = exchange_coefficients_byun(param_set, Ri, zb, surf.zrough)
     surf.rho_uflux = -surf.cm * surf.windspeed * u_gm_surf * ρ0_f_surf
     surf.rho_vflux = -surf.cm * surf.windspeed * v_gm_surf * ρ0_f_surf
 
@@ -225,8 +224,7 @@ function update(surf::SurfaceBase{SurfaceMoninObukhovDry}, grid, state, gm::Grid
     Nb2 = g / θ_ρ_g * (θ_ρ_b - θ_ρ_g) / zb
     Ri = Nb2 * zb * zb / (surf.windspeed * surf.windspeed)
 
-    surf.cm, surf.ch, surf.obukhov_length =
-        exchange_coefficients_byun(param_set, Ri, zb, surf.zrough, surf.cm, surf.ch, surf.obukhov_length)
+    surf.cm, surf.ch, surf.obukhov_length = exchange_coefficients_byun(param_set, Ri, zb, surf.zrough)
     surf.rho_uflux = -surf.cm * surf.windspeed * u_gm_surf * ρ0_f_surf
     surf.rho_vflux = -surf.cm * surf.windspeed * v_gm_surf * ρ0_f_surf
 
@@ -291,8 +289,7 @@ function update(surf::SurfaceBase{SurfaceSullivanPatton}, grid, state, gm::GridM
     Nb2 = g / θ_ρ_g * (θ_ρ_b - θ_ρ_g) / zb
     Ri = Nb2 * zb * zb / (surf.windspeed * surf.windspeed)
 
-    surf.cm, surf.ch, surf.obukhov_length =
-        exchange_coefficients_byun(param_set, Ri, zb, surf.zrough, surf.cm, surf.ch, surf.obukhov_length)
+    surf.cm, surf.ch, surf.obukhov_length = exchange_coefficients_byun(param_set, Ri, zb, surf.zrough)
     surf.rho_uflux = -surf.cm * surf.windspeed * u_gm_surf * ρ0_f_surf
     surf.rho_vflux = -surf.cm * surf.windspeed * v_gm_surf * ρ0_f_surf
 
