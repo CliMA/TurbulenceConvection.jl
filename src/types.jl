@@ -446,7 +446,7 @@ struct UpdraftThermodynamics{A1, A2}
     qt_tendency_rain_formation::A2
     θ_liq_ice_tendency_rain_formation_tot::A1
     qt_tendency_rain_formation_tot::A1
-    function UpdraftThermodynamics(n_updraft::Int, grid::Grid, UpdVar::UpdraftVariables, Rain::RainVariables)
+    function UpdraftThermodynamics(n_updraft::Int, grid::Grid)
         # tendencies from each updraft
         θ_liq_ice_tendency_rain_formation = center_field(grid, n_updraft)
         qt_tendency_rain_formation = center_field(grid, n_updraft)
@@ -584,7 +584,7 @@ struct EnvironmentThermodynamics{A1}
     HQTcov_rain_dt::A1
     qt_tendency_rain_formation::A1
     θ_liq_ice_tendency_rain_formation::A1
-    function EnvironmentThermodynamics(namelist, grid::Grid, EnvVar::EnvironmentVariables, Rain::RainVariables)
+    function EnvironmentThermodynamics(namelist, grid::Grid)
         quadrature_order = parse_namelist(namelist, "thermodynamics", "quadrature_order"; default = 3)
         quadrature_type = parse_namelist(namelist, "thermodynamics", "quadrature_type"; default = "gaussian")
 
@@ -748,7 +748,6 @@ function center_field_tridiagonal_matrix(grid::Grid)
 end
 
 mutable struct EDMF_PrognosticTKE{A1, A2, IE}
-    turbulence_tendency::A1
     KM::VariableDiagnostic
     KH::VariableDiagnostic
     Ri_bulk_crit::Float64
@@ -816,7 +815,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
     detr_surface_bc::Float64
     sde_model::sde_struct
     function EDMF_PrognosticTKE(namelist, grid::Grid, param_set::PS) where {PS}
-        turbulence_tendency = center_field(grid)
         KM = VariableDiagnostic(grid, "half", "diffusivity", "m^2/s") # eddy viscosity
         KH = VariableDiagnostic(grid, "half", "viscosity", "m^2/s") # eddy diffusivity
         # get values from namelist
@@ -877,12 +875,12 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
         # Create the updraft variable class (major diagnostic and prognostic variables)
         UpdVar = UpdraftVariables(n_updrafts, namelist, grid)
         # Create the class for updraft thermodynamics
-        UpdThermo = UpdraftThermodynamics(n_updrafts, grid, UpdVar, Rain)
+        UpdThermo = UpdraftThermodynamics(n_updrafts, grid)
 
         # Create the environment variable class (major diagnostic and prognostic variables)
         EnvVar = EnvironmentVariables(namelist, grid)
         # Create the class for environment thermodynamics
-        EnvThermo = EnvironmentThermodynamics(namelist, grid, EnvVar, Rain)
+        EnvThermo = EnvironmentThermodynamics(namelist, grid)
 
         # Entrainment rates
         entr_sc = center_field(grid, n_updrafts)
@@ -992,7 +990,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
         A2 = typeof(horiz_K_eddy)
         IE = typeof(implicit_eqs)
         return new{A1, A2, IE}(
-            turbulence_tendency,
             KM,
             KH,
             Ri_bulk_crit,
@@ -1063,7 +1060,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
     end
 end
 prandtl_number(edmf::EDMF_PrognosticTKE) = edmf.prandtl_number
-turbulence_tendency(edmf::EDMF_PrognosticTKE) = edmf.turbulence_tendency
 diffusivity_m(edmf::EDMF_PrognosticTKE) = edmf.KM
 diffusivity_h(edmf::EDMF_PrognosticTKE) = edmf.KH
 Ri_bulk_crit(edmf::EDMF_PrognosticTKE) = edmf.Ri_bulk_crit

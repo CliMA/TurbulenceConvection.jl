@@ -19,24 +19,32 @@ we're not sure how the data structures / flow control will shake out.
 ##### Grid mean fields
 #####
 
-""" The cell center fields of any state vector """
+""" Prognostic fields for the host model """
 prognostic(state, fl) = getproperty(state.prog, field_loc(fl))
 
-""" The cell center reference state fields """
+""" Auxiliary fields for the host model """
 aux(state, fl) = getproperty(state.aux, field_loc(fl))
 
-""" The cell center reference state fields """
+""" Reference state fields for the host model """
 ref_state(state, fl) = aux(state, fl).ref_state
 face_ref_state(state) = ref_state(state, FaceField())
 center_ref_state(state) = ref_state(state, CentField())
 
 #####
-##### TC fields
+##### TurbulenceConvection fields
 #####
 
-""" The cell center fields of the edmf updrafts """
+#= Prognostic fields for TurbulenceConvection =#
 prognostic_tc(state, fl) = prognostic(state, fl).turbconv
 center_prog_updrafts(state) = prognostic_tc(state, CentField()).up
 face_prog_updrafts(state) = prognostic_tc(state, FaceField()).up
 center_prog_environment(state) = prognostic_tc(state, CentField()).en
 face_prog_environment(state) = prognostic_tc(state, FaceField()).en
+
+#= Auxiliary fields for TurbulenceConvection =#
+aux_turbconv(state, fl) = aux(state, fl).turbconv
+center_aux_tc(state) = aux_turbconv(state, CentField())
+center_aux_updrafts(state) = aux_turbconv(state, CentField()).up
+face_aux_updrafts(state) = aux_turbconv(state, FaceField()).up
+center_aux_environment(state) = aux_turbconv(state, CentField()).en
+face_aux_environment(state) = aux_turbconv(state, FaceField()).en
