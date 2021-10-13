@@ -3,6 +3,7 @@ function initialize_io(en::EnvironmentVariables, Stats::NetCDFIO_Stats)
     add_ts(Stats, "env_cloud_top")
     add_ts(Stats, "env_cloud_cover")
     add_ts(Stats, "env_lwp")
+    add_ts(Stats, "env_iwp")
     return
 end
 
@@ -13,6 +14,7 @@ function io(en::EnvironmentVariables, grid, state, Stats::NetCDFIO_Stats)
     write_ts(Stats, "env_cloud_base", en.cloud_base)
     write_ts(Stats, "env_cloud_top", en.cloud_top)
     write_ts(Stats, "env_lwp", en.lwp)
+    write_ts(Stats, "env_iwp", en.iwp)
     return
 end
 
@@ -21,13 +23,16 @@ function env_cloud_diagnostics(en::EnvironmentVariables, grid, state)
     en.cloud_base = zc_toa(grid)
     en.cloud_cover = 0.0
     en.lwp = 0.0
+    en.iwp = 0.0
+
     ρ0_c = center_ref_state(state).ρ0
     aux_en = center_aux_environment(state)
 
     @inbounds for k in real_center_indices(grid)
         en.lwp += ρ0_c[k] * aux_en.q_liq[k] * aux_en.area[k] * grid.Δz
+        en.iwp += ρ0_c[k] * aux_en.q_ice[k] * aux_en.area[k] * grid.Δz
 
-        if aux_en.q_liq[k] > 1e-8 && aux_en.area[k] > 1e-3
+        if aux_en.q_liq[k] + aux_en.q_ice[k] > 1e-8 && aux_en.area[k] > 1e-6
             en.cloud_base = min(en.cloud_base, grid.zc[k])
             en.cloud_top = max(en.cloud_top, grid.zc[k])
             en.cloud_cover = max(en.cloud_cover, aux_en.area[k] * aux_en.cloud_fraction[k])
@@ -49,8 +54,9 @@ end
 
 function update_sat_unsat(en_thermo::EnvironmentThermodynamics, state, k, ts)
     q_liq = TD.liquid_specific_humidity(ts)
+    q_ice = TD.ice_specific_humidity(ts)
     aux_en = center_aux_environment(state)
-    if q_liq > 0.0
+    if q_liq + q_ice > 0.0
         aux_en.cloud_fraction[k] = 1.0
         en_thermo.θ_sat[k] = TD.dry_pottemp(ts)
         en_thermo.θ_liq_ice_sat[k] = TD.liquid_ice_pottemp(ts)
@@ -117,7 +123,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
     outer_env = zeros(env_len)
     inner_src = zeros(src_len)
     outer_src = zeros(src_len)
-    i_ql, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat, i_rf = 1:env_len
+    i_ql, i_qi, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat = 1:env_len
     i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH = 1:src_len
 
     @inbounds for k in real_center_indices(grid)
@@ -194,6 +200,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
                     # condensation
                     ts = thermo_state_pθq(param_set, p0_c[k], h_hat, qt_hat)
                     q_liq_en = TD.liquid_specific_humidity(ts)
+                    q_ice_en = TD.ice_specific_humidity(ts)
                     T = TD.air_temperature(ts)
                     # autoconversion and accretion
                     mph = precipitation_formation(
@@ -208,13 +215,10 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
 
                     # environmental variables
                     inner_env[i_ql] += q_liq_en * weights[m_h] * sqpi_inv
+                    inner_env[i_qi] += q_ice_en * weights[m_h] * sqpi_inv
                     inner_env[i_T] += T * weights[m_h] * sqpi_inv
-                    # rain area fraction
-                    if mph.qr_tendency > 0.0
-                        inner_env[i_rf] += weights[m_h] * sqpi_inv
-                    end
                     # cloudy/dry categories for buoyancy in TKE
-                    if q_liq_en > 0.0
+                    if q_liq_en + q_ice_en > 0.0
                         inner_env[i_cf] += weights[m_h] * sqpi_inv
                         inner_env[i_qt_sat] += qt_hat * weights[m_h] * sqpi_inv
                         inner_env[i_T_sat] += T * weights[m_h] * sqpi_inv

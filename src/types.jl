@@ -35,10 +35,10 @@ My entrainment detrainment model
 $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct MoistureDeficitEntr{FT}
-    "updraft liquid water"
-    q_liq_up::FT
-    "environment liquid water"
-    q_liq_en::FT
+    "updraft condensate (liquid water + ice)"
+    q_cond_up::FT
+    "environment condensate (liquid water + ice)"
+    q_cond_en::FT
     "updraft vertical velocity"
     w_up::FT
     "environment vertical velocity"
@@ -226,6 +226,7 @@ mutable struct UpdraftVariables{A1}
     cloud_cover::A1
     updraft_top::A1
     lwp::Float64
+    iwp::Float64
     function UpdraftVariables(nu, namelist, grid::Grid)
         n_updrafts = nu
 
@@ -240,6 +241,8 @@ mutable struct UpdraftVariables{A1}
         updraft_top = zeros(nu)
 
         lwp = 0.0
+        iwp = 0.0
+
         A1 = typeof(cloud_fraction)
         return new{A1}(
             n_updrafts,
@@ -250,6 +253,7 @@ mutable struct UpdraftVariables{A1}
             cloud_cover,
             updraft_top,
             lwp,
+            iwp,
         )
     end
 end
@@ -257,6 +261,7 @@ end
 Base.@kwdef mutable struct GridMeanVariables{PS}
     param_set::PS
     lwp::Float64
+    iwp::Float64
     cloud_base::Float64
     cloud_top::Float64
     cloud_cover::Float64
@@ -264,13 +269,15 @@ Base.@kwdef mutable struct GridMeanVariables{PS}
 end
 function GridMeanVariables(namelist, grid::Grid, param_set::PS) where {PS}
     lwp = 0.0
+    iwp = 0.0
+
     cloud_base = 0.0
     cloud_top = 0.0
     cloud_cover = 0.0
 
     EnvThermo_scheme = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
 
-    return GridMeanVariables(; param_set, lwp, cloud_base, cloud_top, cloud_cover, EnvThermo_scheme)
+    return GridMeanVariables(; param_set, lwp, iwp, cloud_base, cloud_top, cloud_cover, EnvThermo_scheme)
 end
 
 
@@ -305,6 +312,7 @@ Base.@kwdef mutable struct EnvironmentVariables
     cloud_top::Float64 = 0
     cloud_cover::Float64 = 0
     lwp::Float64 = 0
+    iwp::Float64 = 0
     EnvThermo_scheme::String = "default_EnvThermo_scheme"
 end
 function EnvironmentVariables(namelist, grid::Grid)

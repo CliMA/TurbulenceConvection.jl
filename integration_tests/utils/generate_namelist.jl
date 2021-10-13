@@ -277,11 +277,11 @@ function TRMM_LBA(namelist_defaults)
     namelist["grid"]["nz"] = 320
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["t_max"] = 21600.0
+    namelist["time_stepping"]["t_max"] = 60 * 60 * 6.0
     namelist["time_stepping"]["dt"] = 2.0
 
     namelist["microphysics"]["rain_model"] = "cutoff"
-    namelist["microphysics"]["τ_precip"] = 2.0
+    namelist["microphysics"]["τ_precip"] = 50.0
 
     namelist["meta"]["simname"] = "TRMM_LBA"
     namelist["meta"]["casename"] = "TRMM_LBA"

@@ -51,6 +51,7 @@ function io_dictionary_aux(state)
         "temperature_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).T),
         "RH_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).RH),
         "ql_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).q_liq),
+        "qi_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).q_ice),
         "tke_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).tke),
         "Hvar_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).Hvar),
         "QTvar_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).QTvar),
@@ -139,6 +140,7 @@ tendencies.
 =#
 function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
     gm.lwp = 0.0
+    gm.iwp = 0.0
     ρ0_c = center_ref_state(state).ρ0
     aux_gm = center_aux_grid_mean(state)
     kc_toa = kc_top_of_atmos(grid)
@@ -147,7 +149,8 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
 
     @inbounds for k in real_center_indices(grid)
         gm.lwp += ρ0_c[k] * aux_gm.q_liq[k] * grid.Δz
-        if aux_gm.q_liq[k] > 1e-8
+        gm.iwp += ρ0_c[k] * aux_gm.q_ice[k] * grid.Δz
+        if aux_gm.q_liq[k] + aux_gm.q_ice[k] > 1e-8
             gm.cloud_base = min(gm.cloud_base, grid.zc[k])
             gm.cloud_top = max(gm.cloud_top, grid.zc[k])
         end

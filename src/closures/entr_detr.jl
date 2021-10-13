@@ -22,7 +22,7 @@ function entr_detr(param_set, εδ_model::MoistureDeficitEntr)
     c_div = ICP.entrainment_massflux_div_factor(param_set)
 
     # should be: c_δ = sign(condensate(ts_en) + condensate(ts_up[i])) * entr.c_δ
-    if (εδ_model.q_liq_up + εδ_model.q_liq_en) == 0.0
+    if (εδ_model.q_cond_up + εδ_model.q_cond_en) == 0.0
         c_δ = 0.0
     end
 
