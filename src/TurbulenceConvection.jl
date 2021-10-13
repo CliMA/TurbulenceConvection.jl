@@ -17,6 +17,7 @@ import FastGaussQuadrature
 import CLIMAParameters
 import OrdinaryDiffEq
 import CloudMicrophysics
+import SurfaceFluxes
 
 const ODE = OrdinaryDiffEq
 const CC = ClimaCore
@@ -25,6 +26,8 @@ const NC = NCDatasets
 const SA = StaticArrays
 
 const TD = Thermodynamics
+const SF = SurfaceFluxes
+const UF = SF.UniversalFunctions
 const RS = RootSolvers
 
 const CM = CloudMicrophysics
