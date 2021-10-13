@@ -2,32 +2,41 @@
 ##### Dycore API
 #####
 
+abstract type FieldLocation end
+struct CentField <: FieldLocation end
+struct FaceField <: FieldLocation end
+
+field_loc(::CentField) = :cent
+field_loc(::FaceField) = :face
+
 #=
 This file provides a list of methods that TurbulenceConvection.jl
 expects that the host dycore supports. This is experimental, as
 we're not sure how the data structures / flow control will shake out.
 =#
 
+#####
+##### Grid mean fields
+#####
+
 """ The cell center fields of any state vector """
-center_prog(state) = state.prog.cent
-
-""" The cell face fields of any state vector """
-face_prog(state) = state.prog.face
-
-""" The cell center fields of the edmf updrafts """
-center_prog_updrafts(state) = center_prog(state).turbconv.up
-
-""" The cell face fields of the edmf updrafts """
-face_prog_updrafts(state) = face_prog(state).turbconv.up
-
-""" The cell center fields of the edmf environment """
-center_prog_environment(state) = center_prog(state).turbconv.up
-
-""" The cell face fields of the edmf environment """
-face_prog_environment(state) = face_prog(state).turbconv.up
+prognostic(state, fl) = getproperty(state.prog, field_loc(fl))
 
 """ The cell center reference state fields """
-center_ref_state(state) = state.aux.cent.ref_state
+aux(state, fl) = getproperty(state.aux, field_loc(fl))
 
-""" The cell face reference state fields """
-face_ref_state(state) = state.aux.face.ref_state
+""" The cell center reference state fields """
+ref_state(state, fl) = aux(state, fl).ref_state
+face_ref_state(state) = ref_state(state, FaceField())
+center_ref_state(state) = ref_state(state, CentField())
+
+#####
+##### TC fields
+#####
+
+""" The cell center fields of the edmf updrafts """
+prognostic_tc(state, fl) = prognostic(state, fl).turbconv
+center_prog_updrafts(state) = prognostic_tc(state, CentField()).up
+face_prog_updrafts(state) = prognostic_tc(state, FaceField()).up
+center_prog_environment(state) = prognostic_tc(state, CentField()).en
+face_prog_environment(state) = prognostic_tc(state, FaceField()).en
