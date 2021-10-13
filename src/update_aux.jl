@@ -18,8 +18,11 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     surface = Case.Sur
     obukhov_length = surface.obukhov_length
     FT = eltype(grid)
+    up_prog = center_prog_updrafts(state)
 
-    up.Area.bulkvalues .= up_sum(up.Area.values)
+    for k in real_center_indices(grid)
+        up.Area.bulkvalues[k] = sum(ntuple(i -> up_prog[i].area[k], up.n_updrafts))
+    end
 
     #####
     ##### diagnose_GMV_moments
@@ -46,7 +49,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         if a_bulk_f > 1.0e-20
             @inbounds for i in 1:(up.n_updrafts)
                 a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
-                a_up_f = interpc2f(up.Area.values, grid, k, i; a_up_bcs...)
+                a_up_f = interpc2f(up_prog[i].area, grid, k; a_up_bcs...)
                 up.W.bulkvalues[k] += a_up_f * up.W.values[i, k] / a_bulk_f
             end
         end
@@ -64,12 +67,12 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         up.RH.bulkvalues[k] = 0
         if a_bulk_c > 1.0e-20
             @inbounds for i in 1:(up.n_updrafts)
-                up.QT.bulkvalues[k] += up.Area.values[i, k] * up.QT.values[i, k] / a_bulk_c
-                up.QL.bulkvalues[k] += up.Area.values[i, k] * up.QL.values[i, k] / a_bulk_c
-                up.H.bulkvalues[k] += up.Area.values[i, k] * up.H.values[i, k] / a_bulk_c
-                up.T.bulkvalues[k] += up.Area.values[i, k] * up.T.values[i, k] / a_bulk_c
-                up.RH.bulkvalues[k] += up.Area.values[i, k] * up.RH.values[i, k] / a_bulk_c
-                up.B.bulkvalues[k] += up.Area.values[i, k] * up.B.values[i, k] / a_bulk_c
+                up.QT.bulkvalues[k] += up_prog[i].area[k] * up.QT.values[i, k] / a_bulk_c
+                up.QL.bulkvalues[k] += up_prog[i].area[k] * up.QL.values[i, k] / a_bulk_c
+                up.H.bulkvalues[k] += up_prog[i].area[k] * up.H.values[i, k] / a_bulk_c
+                up.T.bulkvalues[k] += up_prog[i].area[k] * up.T.values[i, k] / a_bulk_c
+                up.RH.bulkvalues[k] += up_prog[i].area[k] * up.RH.values[i, k] / a_bulk_c
+                up.B.bulkvalues[k] += up_prog[i].area[k] * up.B.values[i, k] / a_bulk_c
             end
         else
             up.QT.bulkvalues[k] = gm.QT.values[k]
@@ -109,7 +112,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         #####
 
         @inbounds for i in 1:(up.n_updrafts)
-            if up.Area.values[i, k] > 0.0
+            if up_prog[i].area[k] > 0.0
                 ts_up = TD.PhaseEquil_pθq(param_set, p0_c[k], up.H.values[i, k], up.QT.values[i, k])
                 up.QL.values[i, k] = TD.liquid_specific_humidity(ts_up)
                 up.T.values[i, k] = TD.air_temperature(ts_up)
@@ -117,7 +120,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 up.B.values[i, k] = buoyancy_c(param_set, ρ0_c[k], ρ)
                 up.RH.values[i, k] = TD.relative_humidity(ts_up)
             elseif k > kc_surf
-                if up.Area.values[i, k - 1] > 0.0 && edmf.extrapolate_buoyancy
+                if up_prog[i].area[k - 1] > 0.0 && edmf.extrapolate_buoyancy
                     qt = up.QT.values[i, k - 1]
                     h = up.H.values[i, k - 1]
                     ts_up = TD.PhaseEquil_pθq(param_set, p0_c[k], h, qt)
@@ -136,7 +139,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
         gm.B.values[k] = (1.0 - up.Area.bulkvalues[k]) * en.B.values[k]
         @inbounds for i in 1:(up.n_updrafts)
-            gm.B.values[k] += up.Area.values[i, k] * up.B.values[i, k]
+            gm.B.values[k] += up_prog[i].area[k] * up.B.values[i, k]
         end
         @inbounds for i in 1:(up.n_updrafts)
             up.B.values[i, k] -= gm.B.values[k]
@@ -174,13 +177,13 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
             # entrainment
-            if up.Area.values[i, k] > 0.0
+            if up_prog[i].area[k] > 0.0
                 # compute ∇m at cell centers
-                a_up_c = up.Area.values[i, k]
+                a_up_c = up_prog[i].area[k]
                 w_up_c = interpf2c(up.W.values, grid, k, i)
                 w_gm_c = interpf2c(gm.W.values, grid, k)
                 m = a_up_c * (w_up_c - w_gm_c)
-                a_up_cut = ccut_upwind(up.Area.values, grid, k, i)
+                a_up_cut = ccut_upwind(up_prog[i].area, grid, k)
                 w_up_cut = daul_f2c_upwind(up.W.values, grid, k, i)
                 w_gm_cut = daul_f2c_upwind(gm.W.values, grid, k)
                 m_cut = a_up_cut .* (w_up_cut .- w_gm_cut)
@@ -198,7 +201,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                     tke = en.TKE.values[k],
                     dMdz = ∇m,
                     M = m,
-                    a_up = up.Area.values[i, k],
+                    a_up = up_prog[i].area[k],
                     a_en = en.Area.values[k],
                     R_up = edmf.pressure_plume_spacing[i],
                     RH_up = up.RH.values[i, k],
@@ -231,7 +234,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
             # pressure
             a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
-            a_kfull = interpc2f(up.Area.values, grid, k, i; a_bcs...)
+            a_kfull = interpc2f(up_prog[i].area, grid, k; a_bcs...)
             if a_kfull > 0.0
                 B = up.B.values
                 b_bcs = (; bottom = SetValue(B[i, kc_surf]), top = SetValue(B[i, kc_toa]))
@@ -333,7 +336,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             a_en = (1 - up.Area.bulkvalues[k]),
             wc_en = wc_en,
             wc_up = Tuple(wc_up),
-            a_up = ntuple(i -> up.Area.values[i, k], up.n_updrafts),
+            a_up = ntuple(i -> up_prog[i].area[k], up.n_updrafts),
             ε_turb = ntuple(i -> edmf.frac_turb_entr[i, k], up.n_updrafts),
             δ_dyn = ntuple(i -> edmf.detr_sc[i, k], up.n_updrafts),
             en_cld_frac = en.cloud_fraction.values[k],
@@ -398,5 +401,5 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     reset_surface_covariance(edmf, grid, state, gm, Case)
 
     compute_diffusive_fluxes(edmf, grid, state, gm, Case, TS, param_set)
-    update_cloud_frac(edmf, grid, gm)
+    update_cloud_frac(edmf, grid, state, gm)
 end
