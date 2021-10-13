@@ -19,9 +19,10 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     obukhov_length = surface.obukhov_length
     FT = eltype(grid)
     prog_up = center_prog_updrafts(state)
+    aux_tc = center_aux_tc(state)
 
     for k in real_center_indices(grid)
-        up.Area.bulkvalues[k] = sum(ntuple(i -> prog_up[i].area[k], up.n_updrafts))
+        aux_tc.bulk.area[k] = sum(ntuple(i -> prog_up[i].area[k], up.n_updrafts))
     end
 
     #####
@@ -45,7 +46,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     @inbounds for k in real_face_indices(grid)
         up.W.bulkvalues[k] = 0
         a_bulk_bcs = (; bottom = SetValue(sum(edmf.area_surface_bc)), top = SetZeroGradient())
-        a_bulk_f = interpc2f(up.Area.bulkvalues, grid, k; a_bulk_bcs...)
+        a_bulk_f = interpc2f(aux_tc.bulk.area, grid, k; a_bulk_bcs...)
         if a_bulk_f > 1.0e-20
             @inbounds for i in 1:(up.n_updrafts)
                 a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
@@ -58,7 +59,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     end
 
     @inbounds for k in real_center_indices(grid)
-        a_bulk_c = up.Area.bulkvalues[k]
+        a_bulk_c = aux_tc.bulk.area[k]
         up.QT.bulkvalues[k] = 0
         up.QL.bulkvalues[k] = 0
         up.H.bulkvalues[k] = 0
@@ -137,7 +138,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             end
         end
 
-        gm.B.values[k] = (1.0 - up.Area.bulkvalues[k]) * en.B.values[k]
+        gm.B.values[k] = (1.0 - aux_tc.bulk.area[k]) * en.B.values[k]
         @inbounds for i in 1:(up.n_updrafts)
             gm.B.values[k] += prog_up[i].area[k] * up.B.values[i, k]
         end
@@ -161,7 +162,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     ##### update_GMV_diagnostics
     #####
-    a_up_bulk = up.Area.bulkvalues
+    a_up_bulk = aux_tc.bulk.area
     @inbounds for k in real_center_indices(grid)
         gm.QL.values[k] = (a_up_bulk[k] * up.QL.bulkvalues[k] + (1 - a_up_bulk[k]) * en.QL.values[k])
         gm.T.values[k] = (a_up_bulk[k] * up.T.bulkvalues[k] + (1 - a_up_bulk[k]) * en.T.values[k])
@@ -333,7 +334,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             ∂θl∂z = ∂θl∂z,
             θv = θv,
             tke = en.TKE.values[k],
-            a_en = (1 - up.Area.bulkvalues[k]),
+            a_en = (1 - aux_tc.bulk.area[k]),
             wc_en = wc_en,
             wc_up = Tuple(wc_up),
             a_up = ntuple(i -> prog_up[i].area[k], up.n_updrafts),
@@ -390,7 +391,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
 
     # TODO defined again in compute_covariance_shear and compute_covaraince
-    ae = 1 .- up.Area.bulkvalues # area of environment
+    ae = 1 .- aux_tc.bulk.area # area of environment
     @inbounds for k in real_center_indices(grid)
         en.TKE.rain_src[k] = 0
         en.Hvar.rain_src[k] = ρ0_c[k] * ae[k] * 2 * en_thermo.Hvar_rain_dt[k]

@@ -613,7 +613,6 @@ function construct_tridiag_diffusion_en(
     TS,
     KM,
     KH,
-    a_up_bulk,
     prog_up,
     w_up,
     w_en,
@@ -637,8 +636,9 @@ function construct_tridiag_diffusion_en(
     c = center_field(grid)
     ρ0_c = center_ref_state(state).ρ0
     ρ0_f = face_ref_state(state).ρ0
+    aux_tc = center_aux_tc(state)
 
-    ae = 1 .- a_up_bulk
+    ae = vec(1 .- aux_tc.bulk.area)
     rho_ae_K_m = face_field(grid)
     w_en_c = center_field(grid)
     D_env = 0.0

@@ -125,7 +125,6 @@ function initialize_DryBubble(edmf, grid, state, up::UpdraftVariables, gm::GridM
 end
 
 function initialize_io(up::UpdraftVariables, Stats::NetCDFIO_Stats)
-    add_profile(Stats, "updraft_area")
     add_profile(Stats, "updraft_w")
     add_profile(Stats, "updraft_qt")
     add_profile(Stats, "updraft_ql")
@@ -178,7 +177,6 @@ function set_values_with_new(up::UpdraftVariables, grid, state)
 end
 
 function io(up::UpdraftVariables, grid, state, Stats::NetCDFIO_Stats)
-    write_profile(Stats, "updraft_area", up.Area.bulkvalues)
     write_profile(Stats, "updraft_w", up.W.bulkvalues)
     write_profile(Stats, "updraft_qt", up.QT.bulkvalues)
     write_profile(Stats, "updraft_ql", up.QL.bulkvalues)

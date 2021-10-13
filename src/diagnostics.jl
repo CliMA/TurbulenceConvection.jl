@@ -29,7 +29,13 @@ function io_dictionary_ref_state(state)
     )
     return io_dict
 end
-io_dictionary_aux(state) = Dict()
+function io_dictionary_aux(state)
+    DT = NamedTuple{(:dims, :group, :field), Tuple{Tuple{String, String}, String, Any}}
+    io_dict = Dict{String, DT}(
+        "updraft_area" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.area),
+    )
+    return io_dict
+end
 io_dictionary_diagnostics(state) = Dict()
 io_dictionary_state(state) = Dict()
 io_dictionary_tendencies(state) = Dict()
