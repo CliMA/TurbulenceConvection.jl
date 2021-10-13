@@ -57,11 +57,11 @@ function compute_ustar(param_set, windspeed, buoyancy_flux, z0, z1)
 end
 
 """
-    exchange_coefficients_byun(param_set, Ri, zb, z0, cm, ch, lmo)
+    exchange_coefficients_byun(param_set, Ri, zb, z0)
 
 Ref: [Byun1990](@cite)
 """
-function exchange_coefficients_byun(param_set, Ri, zb, z0, cm, ch, lmo)
+function exchange_coefficients_byun(param_set, Ri, zb, z0)
     von_karman_const = CPSGS.von_karman_const(param_set)
 
     logz = log(zb / z0)
