@@ -112,13 +112,13 @@ f∇_onesided(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.va
 
 # Used when traversing cell faces
 
-interpc2f(f, grid::Grid, k; bottom = NoBCGivenError(), top = NoBCGivenError()) =
+interpc2f(f, grid::Grid, k::CCO.PlusHalf; bottom = NoBCGivenError(), top = NoBCGivenError()) =
     interpc2f(dual_centers(f, grid, k), grid, k; bottom, top)
 
-interpc2f(f, grid::Grid, k, i_up::Int; bottom = NoBCGivenError(), top = NoBCGivenError()) =
+interpc2f(f, grid::Grid, k::CCO.PlusHalf, i_up::Int; bottom = NoBCGivenError(), top = NoBCGivenError()) =
     interpc2f(dual_centers(f, grid, k, i_up), grid, k; bottom, top)
 
-function interpc2f(f_dual::SA.SVector, grid::Grid, k; bottom = NoBCGivenError(), top = NoBCGivenError())
+function interpc2f(f_dual::SA.SVector, grid::Grid, k::CCO.PlusHalf; bottom = NoBCGivenError(), top = NoBCGivenError())
     if is_surface_face(grid, k)
         return interpc2f(f_dual, grid, BottomBCTag(), bottom)
     elseif is_toa_face(grid, k)
@@ -445,26 +445,28 @@ Used when
      - traversing cell faces
      - grabbing _interpolated_ one-sided (upwind) stencil of cell face `k` and cell face `k-1`
 """
-function daul_c2f_upwind(f, grid, k; bottom::SetValue, top::SetZeroGradient)
+function daul_c2f_upwind(f, grid, k::CCO.PlusHalf; bottom::SetValue, top::SetZeroGradient)
+    kc = Cent(k.i)
     if is_toa_face(grid, k)
-        return SA.SVector((f[k - 2] + f[k - 1]) / 2, (f[k - 2] + f[k - 1]) / 2)
+        return SA.SVector((f[kc - 2] + f[kc - 1]) / 2, (f[kc - 2] + f[kc - 1]) / 2)
     elseif is_surface_face(grid, k) # never actually called
         error("Uncaught case")
     elseif is_surface_face(grid, k - 1)
-        return SA.SVector(bottom.value, (f[k - 1] + f[k]) / 2)
+        return SA.SVector(bottom.value, (f[kc - 1] + f[kc]) / 2)
     else
-        return SA.SVector((f[k - 2] + f[k - 1]) / 2, (f[k - 1] + f[k]) / 2)
+        return SA.SVector((f[kc - 2] + f[kc - 1]) / 2, (f[kc - 1] + f[kc]) / 2)
     end
 end
-function daul_c2f_upwind(f, grid, k, i_up::Int; bottom::SetValue, top::SetZeroGradient)
+function daul_c2f_upwind(f, grid, k::CCO.PlusHalf, i_up::Int; bottom::SetValue, top::SetZeroGradient)
+    kc = Cent(k.i)
     if is_toa_face(grid, k)
-        return SA.SVector((f[i_up, k - 2] + f[i_up, k - 1]) / 2, (f[i_up, k - 2] + f[i_up, k - 1]) / 2)
+        return SA.SVector((f[i_up, kc - 2] + f[i_up, kc - 1]) / 2, (f[i_up, kc - 2] + f[i_up, kc - 1]) / 2)
     elseif is_surface_face(grid, k) # never actually called
         error("Uncaught case")
-    elseif is_surface_face(grid, k - 1)
-        return SA.SVector(bottom.value, (f[i_up, k - 1] + f[i_up, k]) / 2)
+    elseif is_surface_face(grid, kc - 1)
+        return SA.SVector(bottom.value, (f[i_up, kc - 1] + f[i_up, kc]) / 2)
     else
-        return SA.SVector((f[i_up, k - 2] + f[i_up, k - 1]) / 2, (f[i_up, k - 1] + f[i_up, k]) / 2)
+        return SA.SVector((f[i_up, kc - 2] + f[i_up, kc - 1]) / 2, (f[i_up, kc - 1] + f[i_up, kc]) / 2)
     end
 end
 
@@ -507,22 +509,22 @@ Used when
      - traversing cell faces
      - grabbing stencil of 2 neighboring cell centers
 """
-function dual_centers(f, grid, k)
+function dual_centers(f, grid, k::CCO.PlusHalf)
     if is_surface_face(grid, k)
-        return SA.SVector(f[k])
+        return SA.SVector(f[Cent(k.i)])
     elseif is_toa_face(grid, k)
-        return SA.SVector(f[k - 1])
+        return SA.SVector(f[Cent(k.i - 1)])
     else
-        return SA.SVector(f[k - 1], f[k])
+        return SA.SVector(f[Cent(k.i - 1)], f[Cent(k.i)])
     end
 end
-function dual_centers(f, grid, k, i_up::Int)
+function dual_centers(f, grid, k::CCO.PlusHalf, i_up::Int)
     if is_surface_face(grid, k)
-        return SA.SVector(f[i_up, k])
+        return SA.SVector(f[i_up, Cent(k.i)])
     elseif is_toa_face(grid, k)
-        return SA.SVector(f[i_up, k - 1])
+        return SA.SVector(f[i_up, Cent(k.i - 1)])
     else
-        return SA.SVector(f[i_up, k - 1], f[i_up, k])
+        return SA.SVector(f[i_up, Cent(k.i - 1)], f[i_up, Cent(k.i)])
     end
 end
 
@@ -612,7 +614,7 @@ function construct_tridiag_diffusion_en(
     KM,
     KH,
     a_up_bulk,
-    a_up,
+    up_prog,
     w_up,
     w_en,
     tke_en,
@@ -656,11 +658,11 @@ function construct_tridiag_diffusion_en(
         D_env = 0.0
 
         @inbounds for i in 1:n_updrafts
-            if a_up[i, k] > minimum_area
+            if up_prog[i].area[k] > minimum_area
                 turb_entr = frac_turb_entr[i, k]
                 R_up = pressure_plume_spacing[i]
                 w_up_c = interpf2c(w_up, grid, k, i)
-                D_env += ρ0_c[k] * a_up[i, k] * w_up_c * (entr_sc[i, k] + turb_entr)
+                D_env += ρ0_c[k] * up_prog[i].area[k] * w_up_c * (entr_sc[i, k] + turb_entr)
             else
                 D_env = 0.0
             end
