@@ -190,11 +190,9 @@ struct RainVariable{T}
     name::String
     units::String
     values::T
-    flux::T
     function RainVariable(grid, name, units)
         values = center_field(grid)
-        flux = center_field(grid)
-        return new{typeof(values)}(name, units, values, flux)
+        return new{typeof(values)}(name, units, values)
     end
 end
 
@@ -272,7 +270,6 @@ struct UpdraftVariable{A1, A2}
     values::A2
     new::A2
     tendencies::A2
-    flux::A2
     bulkvalues::A1
     name::String
     units::String
@@ -280,11 +277,10 @@ struct UpdraftVariable{A1, A2}
         values = field(grid, loc, nu)
         new = field(grid, loc, nu) # needed for prognostic updrafts
         tendencies = field(grid, loc, nu)
-        flux = field(grid, loc, nu)
         bulkvalues = field(grid, loc)
         A1 = typeof(bulkvalues)
         A2 = typeof(values)
-        return new{A1, A2}(values, new, tendencies, flux, bulkvalues, name, units)
+        return new{A1, A2}(values, new, tendencies, bulkvalues, name, units)
     end
 end
 
@@ -472,13 +468,11 @@ end
 
 struct EnvironmentVariable{T}
     values::T
-    flux::T
     name::String
     units::String
     function EnvironmentVariable(grid, loc, name, units)
         values = field(grid, loc)
-        flux = field(grid, loc)
-        return new{typeof(values)}(values, flux, name, units)
+        return new{typeof(values)}(values, name, units)
     end
 end
 

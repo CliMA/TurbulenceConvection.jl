@@ -14,7 +14,6 @@ function compute_ustar(param_set, windspeed, buoyancy_flux, z0, z1)
     logz = log(z1 / z0)
     # use neutral condition as first guess
     ustar0 = windspeed * vkb / logz
-    monin_obukov(ustar) = -ustar^3 / (buoyancy_flux * vkb)
     if (abs(buoyancy_flux) > 1.0e-20)
         function roots(ustar)
             lmo = -ustar * ustar * ustar / (buoyancy_flux * vkb)
