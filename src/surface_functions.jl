@@ -7,14 +7,14 @@ function buoyancy_flux(param_set, shf::FT, lhf, T_b, qt_b, α0_b, ts) where {FT}
     return (g * α0_b / cp_m / T_b * (shf + (molmass_ratio - 1) * cp_m * T_b * lhf / lv))
 end
 
-function compute_ustar(param_set, windspeed, buoy_flux, z0, z1)
+function compute_friction_velocity(param_set, windspeed, buoy_flux, z0, z1)
     vkb = CPSGS.von_karman_const(param_set)
     logz = log(z1 / z0)
     # use neutral condition as first guess
     ustar0 = windspeed * vkb / logz
     if (abs(buoy_flux) > 1.0e-20)
         function roots(ustar)
-            lmo = -ustar * ustar * ustar / (buoy_flux * vkb)
+            lmo = obukhov_length(param_set, ustar, buoy_flux)
             uf = SF.Businger(param_set, lmo)
             ζ = z1 / lmo
             ζ_0 = z0 / lmo
@@ -23,7 +23,7 @@ function compute_ustar(param_set, windspeed, buoy_flux, z0, z1)
             return windspeed - ustar / vkb * (logz - Ψ_m_1 + Ψ_m_0)
         end
         sol = RS.find_zero(roots, RS.NewtonsMethodAD(ustar0), RS.CompactSolution(), RS.SolutionTolerance(1e-3), 100)
-        sol.converged || error("Unconverged root solve in compute_ustar")
+        sol.converged || error("Unconverged root solve in compute_friction_velocity")
         return sol.root
     else
         return ustar0
@@ -72,4 +72,18 @@ function exchange_coefficients_byun(param_set, Ri, zb, z0)
     cm = cu * cu
     ch = cu * cth
     return cm, ch, lmo
+end
+
+function obukhov_length(param_set, ustar, buoy_flux)
+    von_karman_const = CPSGS.von_karman_const(param_set)
+    if abs(buoy_flux) > 1e-10
+        lmo = -ustar^3 / buoy_flux / von_karman_const
+    else
+        lmo = 0.0
+    end
+    return lmo
+end
+
+function friction_velocity_given_windspeed(cm, windspeed)
+    return sqrt(cm) * windspeed
 end

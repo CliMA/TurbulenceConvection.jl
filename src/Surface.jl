@@ -34,7 +34,7 @@ function update(surf::SurfaceBase{SurfaceNone}, grid, state, gm::GridMeanVariabl
     surf.windspeed = 0.0001
     surf.zrough = 1e-4
     surf.bflux = 1e-4
-    surf.ustar = compute_ustar(param_set, surf.windspeed, surf.bflux, surf.zrough, grid.zc[kc_surf])
+    surf.ustar = compute_friction_velocity(param_set, surf.windspeed, surf.bflux, surf.zrough, grid.zc[kc_surf])
     return
 end
 free_convection_windspeed(surf::SurfaceBase{SurfaceNone}, grid, state, gm::GridMeanVariables, param_set) = nothing
@@ -82,11 +82,11 @@ function update(surf::SurfaceBase{SurfaceFixedFlux}, grid, state, gm::GridMeanVa
             end
         end
 
-        surf.ustar = compute_ustar(param_set, surf.windspeed, surf.bflux, surf.zrough, zb)
+        surf.ustar = compute_friction_velocity(param_set, surf.windspeed, surf.bflux, surf.zrough, zb)
     end
 
     von_karman_const = CPSGS.von_karman_const(param_set)
-    surf.obukhov_length = -surf.ustar * surf.ustar^2 / surf.bflux / von_karman_const
+    surf.obukhov_length = obukhov_length(param_set, surf.ustar, surf.bflux)
     surf.rho_uflux = -ρ0_f_surf * surf.ustar^2 / surf.windspeed * u_gm_surf
     surf.rho_vflux = -ρ0_f_surf * surf.ustar^2 / surf.windspeed * v_gm_surf
     return
@@ -105,31 +105,25 @@ function update(surf::SurfaceBase{SurfaceFixedCoeffs}, grid, state, gm::GridMean
     θ_liq_ice_gm_surf = gm.H.values[kc_surf]
 
     ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
-    windspeed = max(sqrt(u_gm_surf^2 + v_gm_surf^2), 0.01)
+    surf.windspeed = max(sqrt(u_gm_surf^2 + v_gm_surf^2), 0.01)
     cp_ = TD.cp_m(ts)
     lv = TD.latent_heat_vapor(ts)
 
-    surf.rho_qtflux = -surf.cq * windspeed * (q_tot_gm_surf - surf.qsurface) * ρ0_f_surf
+    surf.rho_qtflux = -surf.cq * surf.windspeed * (q_tot_gm_surf - surf.qsurface) * ρ0_f_surf
     surf.lhf = lv * surf.rho_qtflux
 
     ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
     Π = TD.exner(ts)
-    surf.rho_hflux = -surf.ch * windspeed * (θ_liq_ice_gm_surf - surf.Tsurface / Π) * ρ0_f_surf
+    surf.rho_hflux = -surf.ch * surf.windspeed * (θ_liq_ice_gm_surf - surf.Tsurface / Π) * ρ0_f_surf
     surf.shf = cp_ * surf.rho_hflux
 
     surf.bflux = buoyancy_flux(param_set, surf.shf, surf.lhf, surf.Tsurface, surf.qsurface, α0_f_surf, ts)
 
-    surf.ustar = sqrt(surf.cm) * windspeed
-    # CK--testing this--EDMF scheme checks greater or less than zero,
-    von_karman_const = CPSGS.von_karman_const(param_set)
-    if abs(surf.bflux) < 1e-10
-        surf.obukhov_length = 0.0
-    else
-        surf.obukhov_length = -surf.ustar^3 / surf.bflux / von_karman_const
-    end
+    surf.ustar = friction_velocity_given_windspeed(surf.cm, surf.windspeed)
+    surf.obukhov_length = obukhov_length(param_set, surf.ustar, surf.bflux)
 
-    surf.rho_uflux = -ρ0_f_surf * surf.ustar^2 / windspeed * u_gm_surf
-    surf.rho_vflux = -ρ0_f_surf * surf.ustar^2 / windspeed * v_gm_surf
+    surf.rho_uflux = -ρ0_f_surf * surf.ustar^2 / surf.windspeed * u_gm_surf
+    surf.rho_vflux = -ρ0_f_surf * surf.ustar^2 / surf.windspeed * v_gm_surf
     return
 end
 
@@ -178,14 +172,7 @@ function update(surf::SurfaceBase{SurfaceMoninObukhov}, grid, state, gm::GridMea
     surf.shf = TD.cp_m(ts) * surf.rho_hflux
 
     surf.bflux = buoyancy_flux(param_set, surf.shf, surf.lhf, surf.Tsurface, surf.qsurface, α0_f_surf, ts)
-    surf.ustar = sqrt(surf.cm) * surf.windspeed
-    # CK--testing this--EDMF scheme checks greater or less than zero,
-    von_karman_const = CPSGS.von_karman_const(param_set)
-    if abs(surf.bflux) < 1e-10
-        surf.obukhov_length = 0.0
-    else
-        surf.obukhov_length = -surf.ustar^3 / surf.bflux / von_karman_const
-    end
+    surf.ustar = friction_velocity_given_windspeed(surf.cm, surf.windspeed)
 
     return
 end
@@ -236,14 +223,7 @@ function update(surf::SurfaceBase{SurfaceMoninObukhovDry}, grid, state, gm::Grid
     surf.shf = TD.cp_m(ts) * surf.rho_hflux
 
     surf.bflux = buoyancy_flux(param_set, surf.shf, surf.lhf, surf.Tsurface, surf.qsurface, α0_f_surf, ts)
-    surf.ustar = sqrt(surf.cm) * surf.windspeed
-    # CK--testing this--EDMF scheme checks greater or less than zero,
-    von_karman_const = CPSGS.von_karman_const(param_set)
-    if abs(surf.bflux) < 1e-10
-        surf.obukhov_length = 0.0
-    else
-        surf.obukhov_length = -surf.ustar^3 / surf.bflux / von_karman_const
-    end
+    surf.ustar = friction_velocity_given_windspeed(surf.cm, surf.windspeed)
 
     return
 end
@@ -298,13 +278,6 @@ function update(surf::SurfaceBase{SurfaceSullivanPatton}, grid, state, gm::GridM
     surf.lhf = lv * surf.rho_qtflux
     surf.shf = TD.cp_m(ts) * surf.rho_hflux
 
-    surf.ustar = sqrt(surf.cm) * surf.windspeed
-    # CK--testing this--EDMF scheme checks greater or less than zero,
-    von_karman_const = CPSGS.von_karman_const(param_set)
-    if abs(surf.bflux) < 1e-10
-        surf.obukhov_length = 0.0
-    else
-        surf.obukhov_length = -surf.ustar^3 / surf.bflux / von_karman_const
-    end
+    surf.ustar = friction_velocity_given_windspeed(surf.cm, surf.windspeed)
     return
 end
