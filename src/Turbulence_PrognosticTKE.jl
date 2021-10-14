@@ -103,15 +103,16 @@ function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::Ti
     io(edmf.EnvVar, grid, state, Stats)
     io(edmf.Rain, grid, state, Stats, edmf.UpdThermo, edmf.EnvThermo, TS)
 
-    a_up_bulk = edmf.UpdVar.Area.bulkvalues
     prog_up = center_prog_updrafts(state)
+    aux_tc = center_aux_tc(state)
+    a_up_bulk = aux_tc.bulk.area
 
     write_profile(Stats, "eddy_viscosity", diffusivity_m(edmf).values)
     write_profile(Stats, "eddy_diffusivity", diffusivity_h(edmf).values)
     write_ts(Stats, "rd", StatsBase.mean(edmf.pressure_plume_spacing))
 
     @inbounds for k in real_center_indices(grid)
-        if edmf.UpdVar.Area.bulkvalues[k] > 0.0
+        if a_up_bulk[k] > 0.0
             @inbounds for i in 1:(edmf.n_updrafts)
                 massflux[k] += interpf2c(edmf.m, grid, k, i)
                 mean_entr_sc[k] += prog_up[i].area[k] * edmf.entr_sc[i, k] / a_up_bulk[k]
@@ -221,11 +222,13 @@ function update_radiation end
 function update_cloud_frac(edmf::EDMF_PrognosticTKE, grid, state, GMV::GridMeanVariables)
     # update grid-mean cloud fraction and cloud cover
     prog_up = center_prog_updrafts(state)
+    aux_tc = center_aux_tc(state)
+    a_up_bulk = aux_tc.bulk.area
     @inbounds for k in real_center_indices(grid) # update grid-mean cloud fraction and cloud cover
-        edmf.EnvVar.Area.values[k] = 1 - edmf.UpdVar.Area.bulkvalues[k]
+        edmf.EnvVar.Area.values[k] = 1 - a_up_bulk[k]
         GMV.cloud_fraction.values[k] =
             edmf.EnvVar.Area.values[k] * edmf.EnvVar.cloud_fraction.values[k] +
-            edmf.UpdVar.Area.bulkvalues[k] * edmf.UpdVar.cloud_fraction[k]
+            a_up_bulk[k] * edmf.UpdVar.cloud_fraction[k]
     end
     GMV.cloud_cover = min(edmf.EnvVar.cloud_cover + sum(edmf.UpdVar.cloud_cover), 1)
 end
@@ -243,7 +246,8 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     kc_surf = kc_surface(grid)
     up = edmf.UpdVar
     en = edmf.EnvVar
-    ae = 1 .- up.Area.bulkvalues # area of environment
+    aux_tc = center_aux_tc(state)
+    ae = 1 .- aux_tc.bulk.area # area of environment
 
     @inbounds for k in real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
@@ -393,7 +397,8 @@ function compute_diffusive_fluxes(
     param_set,
 )
     ρ0_f = face_ref_state(state).ρ0
-    edmf.ae .= 1 .- edmf.UpdVar.Area.bulkvalues # area of environment
+    aux_tc = center_aux_tc(state)
+    edmf.ae .= 1 .- vec(aux_tc.bulk.area) # area of environment
     KM = diffusivity_m(edmf).values
     KH = diffusivity_h(edmf).values
     aeKM = edmf.ae .* KM
@@ -475,7 +480,6 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, GMV::GridMeanVariables, C
         TS,
         KM,
         KH,
-        up.Area.bulkvalues,
         prog_up,
         up.W.values,
         en.W.values,
@@ -606,7 +610,8 @@ function get_GMV_CoVar(
     gmv_covar,
 )
 
-    ae = 1 .- au.bulkvalues
+    aux_tc = center_aux_tc(state)
+    ae = 1 .- aux_tc.bulk.area
     is_tke = covar_e.name == "tke"
     tke_factor = is_tke ? 0.5 : 1
     prog_up = center_prog_updrafts(state)
@@ -874,7 +879,8 @@ function compute_covariance_shear(
     EnvVar2,
 )
 
-    ae = 1 .- edmf.UpdVar.Area.bulkvalues
+    aux_tc = center_aux_tc(state)
+    ae = 1 .- aux_tc.bulk.area # area of environment
     KH = diffusivity_h(edmf).values
     ρ0_c = center_ref_state(state).ρ0
     is_tke = Covar.name == "tke"
@@ -1029,7 +1035,8 @@ end
 function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, Covar::EnvironmentVariable_2m, param_set)
     en = edmf.EnvVar
     c_d = CPEDMF.c_d(param_set)
-    ae = 1 .- edmf.UpdVar.Area.bulkvalues
+    aux_tc = center_aux_tc(state)
+    ae = 1 .- aux_tc.bulk.area
     ρ0_c = center_ref_state(state).ρ0
 
     @inbounds for k in real_center_indices(grid)
@@ -1085,7 +1092,8 @@ function GMV_third_m(
 
     up = edmf.UpdVar
     en = edmf.EnvVar
-    ae = 1 .- up.Area.bulkvalues
+    aux_tc = center_aux_tc(state)
+    ae = 1 .- aux_tc.bulk.area
     prog_up = center_prog_updrafts(state)
     is_tke = env_covar.name == "tke"
 
