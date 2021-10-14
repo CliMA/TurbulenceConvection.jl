@@ -1,9 +1,8 @@
 import TurbulenceConvection
 import CLIMAParameters
-using CLIMAParameters: AbstractEarthParameterSet
-using CLIMAParameters.Planet
+const CP = CLIMAParameters
 
-struct EarthParameterSet{NT} <: AbstractEarthParameterSet
+struct EarthParameterSet{NT} <: CP.AbstractEarthParameterSet
     nt::NT
 end
 

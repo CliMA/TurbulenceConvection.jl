@@ -1,55 +1,61 @@
 import Plots
-using OrderedCollections
+import OrderedCollections
 using Test
+
 import Dates
 import JSON
-using NCDatasets
+
+import NCDatasets
+const NC = NCDatasets
+
 import StatsBase
-using Dierckx
+import Dierckx
 import PrettyTables
-using Printf
-using ArtifactWrappers
+import Printf
+
+import ArtifactWrappers
+const AW = ArtifactWrappers
 
 ENV["GKSwstype"] = "nul"
 
 # Get PyCLES_output dataset folder:
 #! format: off
-PyCLES_output_dataset = ArtifactWrapper(
+PyCLES_output_dataset = AW.ArtifactWrapper(
     @__DIR__,
     isempty(get(ENV, "CI", "")),
     "PyCLES_output",
-    ArtifactFile[
-    ArtifactFile(url = "https://caltech.box.com/shared/static/johlutwhohvr66wn38cdo7a6rluvz708.nc", filename = "Rico.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/zraeiftuzlgmykzhppqwrym2upqsiwyb.nc", filename = "Gabls.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/toyvhbwmow3nz5bfa145m5fmcb2qbfuz.nc", filename = "DYCOMS_RF01.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/ivo4751camlph6u3k68ftmb1dl4z7uox.nc", filename = "TRMM_LBA.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/4osqp0jpt4cny8fq2ukimgfnyi787vsy.nc", filename = "ARM_SGP.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/jci8l11qetlioab4cxf5myr1r492prk6.nc", filename = "Bomex.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/pzuu6ii99by2s356ij69v5cb615200jq.nc", filename = "Soares.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/7upt639siyc2umon8gs6qsjiqavof5cq.nc", filename = "Nieuwstadt.nc",),
+    AW.ArtifactFile[
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/johlutwhohvr66wn38cdo7a6rluvz708.nc", filename = "Rico.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/zraeiftuzlgmykzhppqwrym2upqsiwyb.nc", filename = "Gabls.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/toyvhbwmow3nz5bfa145m5fmcb2qbfuz.nc", filename = "DYCOMS_RF01.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/ivo4751camlph6u3k68ftmb1dl4z7uox.nc", filename = "TRMM_LBA.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/4osqp0jpt4cny8fq2ukimgfnyi787vsy.nc", filename = "ARM_SGP.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/jci8l11qetlioab4cxf5myr1r492prk6.nc", filename = "Bomex.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/pzuu6ii99by2s356ij69v5cb615200jq.nc", filename = "Soares.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/7upt639siyc2umon8gs6qsjiqavof5cq.nc", filename = "Nieuwstadt.nc",),
     ],
 )
-PyCLES_output_dataset_path = get_data_folder(PyCLES_output_dataset)
+PyCLES_output_dataset_path = AW.get_data_folder(PyCLES_output_dataset)
 
-SCAMPy_output_dataset = ArtifactWrapper(
+SCAMPy_output_dataset = AW.ArtifactWrapper(
     @__DIR__,
     isempty(get(ENV, "CI", "")),
     "SCAMPy_output",
-    ArtifactFile[
-    ArtifactFile(url = "https://caltech.box.com/shared/static/1dzpydqiagjvzfpyv9lbic3atvca93hl.nc", filename = "Rico.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/agkycoum93bd6xjduyaeo3oqg6asoru5.nc", filename = "GABLS.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/fqpq1q74uxfh1e8018hwhqogw1htn2lq.nc", filename = "DYCOMS_RF01.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/wevi0rqiwo6sgkqdhcddr72u5ylt0tqp.nc", filename = "TRMM_LBA.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/fis6n0g9x9lts70m0zmve5ullqnw0pzq.nc", filename = "ARM_SGP.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/t6qq6plt2oxcmmy40r1szgokahykqggp.nc", filename = "Bomex.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/wp8k4m7ta1hs0c6e4j2fpsp3kj05wdip.nc", filename = "Soares.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/vbuxzg85scwy9mg0ziiuzy6fimo0e389.nc", filename = "Nieuwstadt.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/72t6fr1gq10tg3jjputtp35nfzex0o4k.nc", filename = "DryBubble.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/7axeussneeg8g3k0ndvagsn0pkmbij3e.nc", filename = "life_cycle_Tan2018.nc",),
-    ArtifactFile(url = "https://caltech.box.com/shared/static/r6t7dk6g35bmbvc86h006yusb6rd8vkw.nc", filename = "SP.nc",),
+    AW.ArtifactFile[
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/1dzpydqiagjvzfpyv9lbic3atvca93hl.nc", filename = "Rico.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/agkycoum93bd6xjduyaeo3oqg6asoru5.nc", filename = "GABLS.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/fqpq1q74uxfh1e8018hwhqogw1htn2lq.nc", filename = "DYCOMS_RF01.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/wevi0rqiwo6sgkqdhcddr72u5ylt0tqp.nc", filename = "TRMM_LBA.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/fis6n0g9x9lts70m0zmve5ullqnw0pzq.nc", filename = "ARM_SGP.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/t6qq6plt2oxcmmy40r1szgokahykqggp.nc", filename = "Bomex.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/wp8k4m7ta1hs0c6e4j2fpsp3kj05wdip.nc", filename = "Soares.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/vbuxzg85scwy9mg0ziiuzy6fimo0e389.nc", filename = "Nieuwstadt.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/72t6fr1gq10tg3jjputtp35nfzex0o4k.nc", filename = "DryBubble.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/7axeussneeg8g3k0ndvagsn0pkmbij3e.nc", filename = "life_cycle_Tan2018.nc",),
+    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/r6t7dk6g35bmbvc86h006yusb6rd8vkw.nc", filename = "SP.nc",),
     ],
 )
-SCAMPy_output_dataset_path = get_data_folder(SCAMPy_output_dataset)
+SCAMPy_output_dataset_path = AW.get_data_folder(SCAMPy_output_dataset)
 #! format: on
 
 function get_time(ds, var)
@@ -64,7 +70,7 @@ end
 append_dict(::Nothing, sym::Symbol, dict = Dict()) = dict
 function append_dict(filename::AbstractString, sym::Symbol, dict = Dict())
     if isfile(filename)
-        dict[sym] = Dataset(filename, "r")
+        dict[sym] = NC.Dataset(filename, "r")
     end
     return dict
 end
@@ -153,7 +159,7 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         ds_tc_main = ds_tc
         @warn "No TC.jl main data, using TC.jl instead"
     end
-    mse = OrderedDict()
+    mse = OrderedCollections.OrderedDict()
     time_tcc = get_time(ds_tc, "t")
     time_les = get_time(ds_pycles, "t")
     time_tcm = get_time(ds_tc_main, "t")
@@ -258,19 +264,19 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         # Interpolate data
         steady_data = size(data_les_arr, 1) == 1
         if steady_data
-            data_les_cont = Spline1D(z_les, vec(data_les_arr))
-            data_tcc_cont = Spline1D(z_tcc, vec(data_tcc_arr))
-            data_tcm_cont = Spline1D(z_tcm, vec(data_tcm_arr))
-            data_scm_cont = Spline1D(z_scm, vec(data_scm_arr))
+            data_les_cont = Dierckx.Spline1D(z_les, vec(data_les_arr))
+            data_tcc_cont = Dierckx.Spline1D(z_tcc, vec(data_tcc_arr))
+            data_tcm_cont = Dierckx.Spline1D(z_tcm, vec(data_tcm_arr))
+            data_scm_cont = Dierckx.Spline1D(z_scm, vec(data_scm_arr))
             data_les_cont_mapped = map(z -> data_les_cont(z), z_tcc)
             data_tcm_cont_mapped = map(z -> data_tcm_cont(z), z_tcc)
             data_tcc_cont_mapped = map(z -> data_tcc_cont(z), z_tcc)
             data_scm_cont_mapped = map(z -> data_scm_cont(z), z_tcc)
         else # unsteady data
-            data_les_cont = Spline2D(time_les, z_les, data_les_arr)
-            data_tcm_cont = Spline2D(time_tcm, z_tcm, data_tcm_arr)
-            data_tcc_cont = Spline2D(time_tcc, z_tcc, data_tcc_arr)
-            data_scm_cont = Spline2D(time_scm, z_scm, data_scm_arr)
+            data_les_cont = Dierckx.Spline2D(time_les, z_les, data_les_arr)
+            data_tcm_cont = Dierckx.Spline2D(time_tcm, z_tcm, data_tcm_arr)
+            data_tcc_cont = Dierckx.Spline2D(time_tcc, z_tcc, data_tcc_arr)
+            data_scm_cont = Dierckx.Spline2D(time_scm, z_scm, data_scm_arr)
             R = range(t_start, t_cmp; length = 50)
             data_les_cont_mapped = map(z_tcc) do z
                 StatsBase.mean(map(t -> data_les_cont(t, z), R))
@@ -443,7 +449,7 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         mse_reductions,
     )
 
-    @info @sprintf("case_name comparison: %s at time t=%s\n", case_name, t_cmp)
+    @info Printf.@sprintf("case_name comparison: %s at time t=%s\n", case_name, t_cmp)
     hl_worsened_mse = PrettyTables.Highlighter(
         (data, i, j) -> !sufficient_mse(data[i, 5], data[i, 6]) && j == 5,
         PrettyTables.crayon"red bold",
