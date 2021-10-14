@@ -2,9 +2,9 @@
 ################################# MSE tables
 #################################
 #
-all_best_mse = OrderedDict()
+all_best_mse = OrderedCollections.OrderedDict()
 #
-all_best_mse["ARM_SGP"] = OrderedDict()
+all_best_mse["ARM_SGP"] = OrderedCollections.OrderedDict()
 all_best_mse["ARM_SGP"]["qt_mean"] = 0.26421363773114487
 all_best_mse["ARM_SGP"]["updraft_area"] = 342.0522312617839
 all_best_mse["ARM_SGP"]["updraft_w"] = 148.13571351377792
@@ -18,7 +18,7 @@ all_best_mse["ARM_SGP"]["thetal_mean"] = 0.00011125982667316287
 all_best_mse["ARM_SGP"]["Hvar_mean"] = 2842.0863157999497
 all_best_mse["ARM_SGP"]["QTvar_mean"] = 1642.635677320087
 #
-all_best_mse["Bomex"] = OrderedDict()
+all_best_mse["Bomex"] = OrderedCollections.OrderedDict()
 all_best_mse["Bomex"]["qt_mean"] = 0.11034670891224195
 all_best_mse["Bomex"]["updraft_area"] = 132.0788865649432
 all_best_mse["Bomex"]["updraft_w"] = 18.392509423445038
@@ -33,7 +33,7 @@ all_best_mse["Bomex"]["thetal_mean"] = 4.448304470557014e-5
 all_best_mse["Bomex"]["Hvar_mean"] = 4019.5984832795702
 all_best_mse["Bomex"]["QTvar_mean"] = 1505.300250338699
 #
-all_best_mse["DryBubble"] = OrderedDict()
+all_best_mse["DryBubble"] = OrderedCollections.OrderedDict()
 all_best_mse["DryBubble"]["updraft_area"] = 0.0
 all_best_mse["DryBubble"]["updraft_w"] = 0.0
 all_best_mse["DryBubble"]["updraft_thetal"] = 0.0
@@ -43,7 +43,7 @@ all_best_mse["DryBubble"]["temperature_mean"] = 0.0
 all_best_mse["DryBubble"]["thetal_mean"] = 0.0
 all_best_mse["DryBubble"]["Hvar_mean"] = 0.0
 #
-all_best_mse["DYCOMS_RF01"] = OrderedDict()
+all_best_mse["DYCOMS_RF01"] = OrderedCollections.OrderedDict()
 all_best_mse["DYCOMS_RF01"]["qt_mean"] = 0.04290066515065224
 all_best_mse["DYCOMS_RF01"]["ql_mean"] = 0.8976960436098287
 all_best_mse["DYCOMS_RF01"]["updraft_area"] = 31.57502795434024
@@ -58,7 +58,7 @@ all_best_mse["DYCOMS_RF01"]["thetal_mean"] = 0.00016376758990380806
 all_best_mse["DYCOMS_RF01"]["Hvar_mean"] = 1227.7967628483952
 all_best_mse["DYCOMS_RF01"]["QTvar_mean"] = 478.07194167693547
 #
-all_best_mse["GABLS"] = OrderedDict()
+all_best_mse["GABLS"] = OrderedCollections.OrderedDict()
 all_best_mse["GABLS"]["updraft_thetal"] = 8.668289176727277e-14
 all_best_mse["GABLS"]["v_mean"] = 5.646639639478799e-9
 all_best_mse["GABLS"]["u_mean"] = 3.6124880396691104e-10
@@ -68,7 +68,7 @@ all_best_mse["GABLS"]["thetal_mean"] = 8.636225994162458e-14
 all_best_mse["GABLS"]["Hvar_mean"] = 2.402614518086589e-8
 all_best_mse["GABLS"]["QTvar_mean"] = 5.369845871867885e-9
 #
-all_best_mse["life_cycle_Tan2018"] = OrderedDict()
+all_best_mse["life_cycle_Tan2018"] = OrderedCollections.OrderedDict()
 all_best_mse["life_cycle_Tan2018"]["qt_mean"] = 0.0
 all_best_mse["life_cycle_Tan2018"]["ql_mean"] = 0.0
 all_best_mse["life_cycle_Tan2018"]["updraft_area"] = 0.0
@@ -83,7 +83,7 @@ all_best_mse["life_cycle_Tan2018"]["thetal_mean"] = 0.0
 all_best_mse["life_cycle_Tan2018"]["Hvar_mean"] = 0.0
 all_best_mse["life_cycle_Tan2018"]["QTvar_mean"] = 0.0
 #
-all_best_mse["Nieuwstadt"] = OrderedDict()
+all_best_mse["Nieuwstadt"] = OrderedCollections.OrderedDict()
 all_best_mse["Nieuwstadt"]["updraft_area"] = 110.65702527331422
 all_best_mse["Nieuwstadt"]["updraft_w"] = 12.298314607367429
 all_best_mse["Nieuwstadt"]["updraft_thetal"] = 117.3670456600826
@@ -93,7 +93,7 @@ all_best_mse["Nieuwstadt"]["temperature_mean"] = 9.78812700698016e-6
 all_best_mse["Nieuwstadt"]["thetal_mean"] = 1.0097201478188357e-5
 all_best_mse["Nieuwstadt"]["Hvar_mean"] = 1276.761018651613
 #
-all_best_mse["Rico"] = OrderedDict()
+all_best_mse["Rico"] = OrderedCollections.OrderedDict()
 all_best_mse["Rico"]["qt_mean"] = 1.3555731445935
 all_best_mse["Rico"]["updraft_area"] = 483.32286422287297
 all_best_mse["Rico"]["updraft_w"] = 105.52859763855982
@@ -109,7 +109,7 @@ all_best_mse["Rico"]["thetal_mean"] = 0.000603816336530745
 all_best_mse["Rico"]["Hvar_mean"] = 17628.475057132102
 all_best_mse["Rico"]["QTvar_mean"] = 3811.409153613948
 #
-all_best_mse["Soares"] = OrderedDict()
+all_best_mse["Soares"] = OrderedCollections.OrderedDict()
 all_best_mse["Soares"]["qt_mean"] = 0.12636886303765799
 all_best_mse["Soares"]["updraft_area"] = 112.7273316705158
 all_best_mse["Soares"]["updraft_w"] = 11.265484888980165
@@ -121,7 +121,7 @@ all_best_mse["Soares"]["temperature_mean"] = 1.1014401270120833e-5
 all_best_mse["Soares"]["thetal_mean"] = 1.0453842793106344e-5
 all_best_mse["Soares"]["Hvar_mean"] = 1145.5445941618634
 #
-all_best_mse["TRMM_LBA"] = OrderedDict()
+all_best_mse["TRMM_LBA"] = OrderedCollections.OrderedDict()
 all_best_mse["TRMM_LBA"]["qt_mean"] = 3.696894480356394
 all_best_mse["TRMM_LBA"]["updraft_area"] = 7561.609964448662
 all_best_mse["TRMM_LBA"]["updraft_w"] = 11162.65860693764
@@ -136,7 +136,7 @@ all_best_mse["TRMM_LBA"]["thetal_mean"] = 0.010479008728209362
 all_best_mse["TRMM_LBA"]["Hvar_mean"] = 2511.796313996477
 all_best_mse["TRMM_LBA"]["QTvar_mean"] = 2460.6541168787
 #
-all_best_mse["LES_driven_SCM"] = OrderedDict()
+all_best_mse["LES_driven_SCM"] = OrderedCollections.OrderedDict()
 all_best_mse["LES_driven_SCM"]["qt_mean"] = 6.491835618015334
 all_best_mse["LES_driven_SCM"]["v_mean"] = 3.7057083566611517
 all_best_mse["LES_driven_SCM"]["u_mean"] = 1.235432758754188

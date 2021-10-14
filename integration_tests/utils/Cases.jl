@@ -19,7 +19,6 @@ const TC = TurbulenceConvection
 
 using ..TurbulenceConvection: CasesBase
 using ..TurbulenceConvection: pyinterp
-using ..TurbulenceConvection: buoyancy_c
 using ..TurbulenceConvection: add_ts
 using ..TurbulenceConvection: update
 using ..TurbulenceConvection: write_ts

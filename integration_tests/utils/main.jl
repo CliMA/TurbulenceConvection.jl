@@ -1,5 +1,5 @@
 import JSON
-using ArgParse
+import ArgParse
 import TurbulenceConvection
 import ClimaCore
 const CC = ClimaCore
@@ -243,16 +243,16 @@ end
 
 
 function parse_commandline()
-    s = ArgParseSettings(; description = "Run case input")
+    s = ArgParse.ArgParseSettings(; description = "Run case input")
 
-    @add_arg_table! s begin
+    ArgParse.@add_arg_table! s begin
         "case_name"
         help = "The case name"
         arg_type = String
         required = true
     end
 
-    return parse_args(s)
+    return ArgParse.parse_args(s)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

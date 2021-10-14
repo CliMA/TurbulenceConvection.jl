@@ -1,4 +1,4 @@
-using OrderedCollections
+import OrderedCollections
 import JSON
 
 all_cases = [
@@ -24,7 +24,7 @@ include(joinpath("..", "integration_tests", "utils", "mse_tables.jl"))
 
 percent_reduction_mse = Dict()
 
-computed_mse = OrderedDict()
+computed_mse = OrderedCollections.OrderedDict()
 for case in all_cases
     computed_mse[case] = JSON.parsefile("computed_mse_$case.json"; dicttype = OrderedCollections.OrderedDict)
 end
@@ -34,9 +34,9 @@ println("################################# MSE tables")
 println("#################################")
 println("#")
 
-println("all_best_mse = OrderedDict()\n#")
+println("all_best_mse = OrderedCollections.OrderedDict()\n#")
 for case in keys(computed_mse)
-    println("all_best_mse[\"$case\"] = OrderedDict()")
+    println("all_best_mse[\"$case\"] = OrderedCollections.OrderedDict()")
     percent_reduction_mse[case] = 0
     for var in keys(computed_mse[case])
         println("all_best_mse[\"$case\"][\"$var\"] = $(computed_mse[case][var])")
