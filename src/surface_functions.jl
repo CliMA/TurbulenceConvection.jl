@@ -1,22 +1,20 @@
-import Thermodynamics
-const TD = Thermodynamics
 
 function buoyancy_flux(param_set, shf::FT, lhf, T_b, qt_b, α0_b, ts) where {FT}
     g = FT(CPP.grav(param_set))
-    molmass_ratio = FT(TD.molmass_ratio(param_set))
+    molmass_ratio = FT(CPP.molmass_ratio(param_set))
     lv = TD.latent_heat_vapor(param_set, T_b)
     cp_m = TD.cp_m(ts)
     return (g * α0_b / cp_m / T_b * (shf + (molmass_ratio - 1) * cp_m * T_b * lhf / lv))
 end
 
-function compute_ustar(param_set, windspeed, buoyancy_flux, z0, z1)
+function compute_ustar(param_set, windspeed, buoy_flux, z0, z1)
     vkb = CPSGS.von_karman_const(param_set)
     logz = log(z1 / z0)
     # use neutral condition as first guess
     ustar0 = windspeed * vkb / logz
-    if (abs(buoyancy_flux) > 1.0e-20)
+    if (abs(buoy_flux) > 1.0e-20)
         function roots(ustar)
-            lmo = -ustar * ustar * ustar / (buoyancy_flux * vkb)
+            lmo = -ustar * ustar * ustar / (buoy_flux * vkb)
             uf = SF.Businger(param_set, lmo)
             ζ = z1 / lmo
             ζ_0 = z0 / lmo
