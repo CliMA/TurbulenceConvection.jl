@@ -260,12 +260,13 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
             # update cloudy/dry variables for buoyancy in TKE
             en.cloud_fraction.values[k] = outer_env[i_cf]
             en_thermo.qt_dry[k] = outer_env[i_qt_dry]
-            # Charlie - this breaks when using PhaseEquil_pTq(...)
-            # Anna - Why are we assuming zero q_liq here?
-            #        we don't in the call to `PhaseEquil_pTq` below.
-            #        is that what the `dry` indicates?
-            phase_part = TD.PhasePartition(en_thermo.qt_dry[k], 0.0, 0.0)
-            en_thermo.th_dry[k] = TD.dry_pottemp_given_pressure(param_set, outer_env[i_T_dry], p0_c[k], phase_part)
+            # TD.jl cannot compute θ_dry when T=0
+            en_thermo.th_dry[k] = if outer_env[i_T_dry] > 0
+                ts_dry = TD.PhaseEquil_pTq(param_set, p0_c[k], outer_env[i_T_dry], en_thermo.qt_dry[k])
+                TD.dry_pottemp(ts_dry)
+            else
+                0
+            end
 
             en_thermo.t_cloudy[k] = outer_env[i_T_cld]
             en_thermo.qv_cloudy[k] = outer_env[i_qt_cld] - outer_env[i_ql]
