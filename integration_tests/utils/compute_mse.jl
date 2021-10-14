@@ -211,17 +211,40 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         data_tcc_arr = TC.get_nc_data(ds_tc, tc_var)
         data_scm_arr = TC.get_nc_data(ds_scampy, tc_var)
         # Only compare fields that exist in the nc files
-        skip_les = data_les_arr == nothing
-        skip_tcm = data_tcm_arr == nothing
-        skip_tcc = data_tcc_arr == nothing
-        skip_scm = data_scm_arr == nothing
+        missing_les_var = data_les_arr == nothing
+        missing_tcm_var = data_tcm_arr == nothing
+        missing_tcc_var = data_tcc_arr == nothing
+        missing_scm_var = data_scm_arr == nothing
 
-        # For debugging why fields are skipped:
-        @debug "Skipping field $tc_var, skip reason: les=$skip_les, tcm=$skip_tcm, tcc=$skip_tcc, scm=$skip_scm"
-        skip_les && continue
-        skip_tcm && continue
-        skip_tcc && continue
-        skip_scm && continue
+        if missing_les_var
+            @warn "Missing data for variable $tc_var, filling with zeros"
+            data_les_arr = zeros(length(z_les), length(time_les))
+            warn_msg_les = " Warning: missing data"
+        else
+            warn_msg_les = ""
+        end
+        if missing_tcm_var
+            @warn "Missing data for variable $tc_var, filling with zeros"
+            data_tcm_arr = zeros(length(z_tcm), length(time_tcm))
+            warn_msg_tcm = " Warning: missing data"
+        else
+            warn_msg_tcm = ""
+        end
+        if missing_tcc_var
+            @warn "Missing data for variable $tc_var, filling with zeros"
+            data_tcc_arr = zeros(length(z_tcc), length(time_tcc))
+            warn_msg_tcc = " Warning: missing data"
+        else
+            warn_msg_tcc = ""
+        end
+        if missing_scm_var
+            @warn "Missing data for variable $tc_var, filling with zeros"
+            data_scm_arr = zeros(length(z_scm), length(time_scm))
+            warn_msg_scm = " Warning: missing data"
+        else
+            warn_msg_scm = ""
+        end
+
         data_les_arr = data_les_arr'
         data_tcm_arr = data_tcm_arr'
         data_tcc_arr = data_tcc_arr'
@@ -291,20 +314,37 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         if plot_comparison
             p = Plots.plot()
             if have_pycles_ds
-                Plots.plot!(data_les_cont_mapped, z_tcc ./ 10^3, title = tc_var, ylabel = "z [km]", label = "PyCLES")
+                Plots.plot!(
+                    data_les_cont_mapped,
+                    z_tcc ./ 10^3,
+                    title = "$tc_var$warn_msg_les",
+                    ylabel = "z [km]",
+                    label = "PyCLES",
+                )
             end
-            Plots.plot!(data_scm_cont_mapped, z_tcc ./ 10^3, title = tc_var, ylabel = "z [km]", label = "SCAMPy")
+            Plots.plot!(
+                data_scm_cont_mapped,
+                z_tcc ./ 10^3,
+                title = "$tc_var$warn_msg_scm",
+                ylabel = "z [km]",
+                label = "SCAMPy",
+            )
             if have_tc_main
                 Plots.plot!(
                     data_tcm_cont_mapped,
                     z_tcc ./ 10^3,
-                    title = tc_var,
+                    title = "$tc_var$warn_msg_tcm",
                     ylabel = "z [km]",
                     label = "TC.jl (main)",
                 )
             end
-            plots_dict["profiles"][tc_var] =
-                Plots.plot!(data_tcc_cont_mapped, z_tcc ./ 10^3, title = tc_var, ylabel = "z [km]", label = "TC.jl")
+            plots_dict["profiles"][tc_var] = Plots.plot!(
+                data_tcc_cont_mapped,
+                z_tcc ./ 10^3,
+                title = "$tc_var$warn_msg_tcc",
+                ylabel = "z [km]",
+                label = "TC.jl",
+            )
 
             clims_min = min(minimum(data_scm_arr), minimum(data_tcc_arr))
             clims_max = max(maximum(data_scm_arr), maximum(data_tcc_arr))
@@ -353,7 +393,7 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
                 data_scm_arr';
                 c = :viridis,
                 clims = clims,
-                title = "$tc_var (SCAMPy)",
+                title = "$tc_var (SCAMPy)$warn_msg_scm",
                 plot_attr[group_figs]["contour_1_kwargs"]...,
             )
             if have_tc_main
@@ -363,7 +403,7 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
                     data_tcm_arr';
                     c = :viridis,
                     clims = clims,
-                    title = "$tc_var (TC.jl main)",
+                    title = "$tc_var (TC.jl main)$warn_msg_tcm",
                     plot_attr[group_figs]["contour_2_kwargs"]...,
                 )
             end
@@ -373,7 +413,7 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
                 data_tcc_arr';
                 c = :viridis,
                 clims = clims,
-                title = have_tc_main ? "$tc_var (TC.jl PR)" : "$tc_var (TC.jl)",
+                title = have_tc_main ? "$tc_var (TC.jl PR)$warn_msg_tcc" : "$tc_var (TC.jl)$warn_msg_tcc",
                 plot_attr[group_figs]["contour_3_kwargs"]...,
             )
             if group_figs
