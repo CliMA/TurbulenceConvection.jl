@@ -71,8 +71,8 @@ function set_cloudbase_flag(ql, current_flag)
     return new_flag
 end
 
-function gradient_Richardson_number(∂b∂θ_l, ∂b∂q_tot, Shear², ϵ)
-    return min(∂b∂θ_l / max(Shear², ϵ) + ∂b∂q_tot / max(Shear², ϵ), 0.25)
+function gradient_Richardson_number(∂b∂z, Shear², ϵ)
+    return min(∂b∂z / max(Shear², ϵ), 0.25)
 end
 
 function turbulent_Prandtl_number(param_set, obukhov_length, ∇Ri)

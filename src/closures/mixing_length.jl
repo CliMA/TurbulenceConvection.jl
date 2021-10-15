@@ -23,8 +23,7 @@ function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
     end
 
     # compute l_TKE - the production/destruction term
-    a_pd =
-        c_m * (ml_model.Shear² - ml_model.∂b∂z_θl / ml_model.Pr - ml_model.∂b∂z_qt / ml_model.Pr) * sqrt(ml_model.tke)
+    a_pd = c_m * (ml_model.Shear² - ml_model.∂b∂z / ml_model.Pr) * sqrt(ml_model.tke)
     # Dissipation term
     c_neg = c_d * ml_model.tke * sqrt(ml_model.tke)
     # Subdomain exchange term
