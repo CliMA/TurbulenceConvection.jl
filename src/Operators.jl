@@ -325,7 +325,7 @@ Used when
      - traversing cell centers
      - grabbing centered center stencils
 """
-function ccut(f, grid, k)
+function ccut(f, grid, k::Cent)
     if is_surface_center(grid, k)
         return SA.SVector(f[k], f[k + 1])
     elseif is_toa_center(grid, k)
@@ -334,7 +334,7 @@ function ccut(f, grid, k)
         return SA.SVector(f[k - 1], f[k], f[k + 1])
     end
 end
-function ccut(f, grid, k, i_up::Int)
+function ccut(f, grid, k::Cent, i_up::Int)
     if is_surface_center(grid, k)
         return SA.SVector(f[i_up, k], f[i_up, k + 1])
     elseif is_toa_center(grid, k)
@@ -351,7 +351,7 @@ Used when
      - traversing cell faces
      - grabbing centered face stencils
 """
-function fcut(f, grid, k)
+function fcut(f, grid, k::CCO.PlusHalf)
     if is_surface_face(grid, k)
         return SA.SVector(f[k], f[k + 1])
     elseif is_toa_face(grid, k)
@@ -360,7 +360,7 @@ function fcut(f, grid, k)
         return SA.SVector(f[k - 1], f[k], f[k + 1])
     end
 end
-function fcut(f, grid, k, i_up::Int)
+function fcut(f, grid, k::CCO.PlusHalf, i_up::Int)
     if is_surface_face(grid, k)
         return SA.SVector(f[i_up, k], f[i_up, k + 1])
     elseif is_toa_face(grid, k)
@@ -379,14 +379,14 @@ Used when
 
 This is needed for "upwinding" rain, which travels _down_ (hence the direction change).
 """
-function ccut_downwind(f, grid, k)
+function ccut_downwind(f, grid, k::Cent)
     if is_toa_center(grid, k)
         return SA.SVector(f[k])
     else
         return SA.SVector(f[k], f[k + 1])
     end
 end
-function ccut_downwind(f, grid, k, i_up::Int)
+function ccut_downwind(f, grid, k::Cent, i_up::Int)
     if is_toa_center(grid, k)
         return SA.SVector(f[i_up, k])
     else
@@ -401,14 +401,14 @@ Used when
      - traversing cell centers
      - grabbing one-sided (upwind) stencil of cell center `k` and cell center `k-1`
 """
-function ccut_upwind(f, grid, k)
+function ccut_upwind(f, grid, k::Cent)
     if is_surface_center(grid, k)
         return SA.SVector(f[k])
     else
         return SA.SVector(f[k - 1], f[k])
     end
 end
-function ccut_upwind(f, grid, k, i_up::Int)
+function ccut_upwind(f, grid, k::Cent, i_up::Int)
     if is_surface_center(grid, k)
         return SA.SVector(f[i_up, k])
     else
@@ -477,18 +477,20 @@ Used when
      - traversing cell centers
      - grabbing _interpolated_ one-sided (upwind) stencil of cell center `k` and cell center `k-1`
 """
-function daul_f2c_upwind(f, grid, k)
+function daul_f2c_upwind(f, grid, k::Cent)
+    kf = CCO.PlusHalf(k.i)
     if is_surface_center(grid, k)
-        return SA.SVector((f[k] + f[k + 1]) / 2)
+        return SA.SVector((f[kf] + f[kf + 1]) / 2)
     else
-        return SA.SVector((f[k - 1] + f[k]) / 2, (f[k] + f[k + 1]) / 2)
+        return SA.SVector((f[kf - 1] + f[kf]) / 2, (f[kf] + f[kf + 1]) / 2)
     end
 end
-function daul_f2c_upwind(f, grid, k, i_up::Int)
+function daul_f2c_upwind(f, grid, k::Cent, i_up::Int)
+    kf = CCO.PlusHalf(k.i)
     if is_surface_center(grid, k)
-        return SA.SVector((f[i_up, k] + f[i_up, k + 1]) / 2)
+        return SA.SVector((f[i_up, kf] + f[i_up, kf + 1]) / 2)
     else
-        return SA.SVector((f[i_up, k - 1] + f[i_up, k]) / 2, (f[i_up, k] + f[i_up, k + 1]) / 2)
+        return SA.SVector((f[i_up, kf - 1] + f[i_up, kf]) / 2, (f[i_up, kf] + f[i_up, kf + 1]) / 2)
     end
 end
 
@@ -499,8 +501,14 @@ Used when
      - traversing cell centers
      - grabbing stencil of 2 neighboring cell faces
 """
-dual_faces(f, grid, k) = SA.SVector(f[k], f[k + 1])
-dual_faces(f, grid, k, i_up::Int) = SA.SVector(f[i_up, k], f[i_up, k + 1])
+function dual_faces(f, grid, k::Cent)
+    kf = CCO.PlusHalf(k.i)
+    SA.SVector(f[kf], f[kf + 1])
+end
+function dual_faces(f, grid, k::Cent, i_up::Int)
+    kf = CCO.PlusHalf(k.i)
+    SA.SVector(f[i_up, kf], f[i_up, kf + 1])
+end
 
 """
     dual_centers
@@ -613,8 +621,6 @@ function construct_tridiag_diffusion_en(
     TS,
     KM,
     KH,
-    prog_up,
-    w_up,
     w_en,
     tke_en,
     n_updrafts::Int,
@@ -637,6 +643,8 @@ function construct_tridiag_diffusion_en(
     ρ0_c = center_ref_state(state).ρ0
     ρ0_f = face_ref_state(state).ρ0
     aux_tc = center_aux_tc(state)
+    prog_up = center_prog_updrafts(state)
+    prog_up_f = face_prog_updrafts(state)
 
     ae = vec(1 .- aux_tc.bulk.area)
     rho_ae_K_m = face_field(grid)
@@ -661,7 +669,7 @@ function construct_tridiag_diffusion_en(
             if prog_up[i].area[k] > minimum_area
                 turb_entr = frac_turb_entr[i, k]
                 R_up = pressure_plume_spacing[i]
-                w_up_c = interpf2c(w_up, grid, k, i)
+                w_up_c = interpf2c(prog_up_f[i].w, grid, k)
                 D_env += ρ0_c[k] * prog_up[i].area[k] * w_up_c * (entr_sc[i, k] + turb_entr)
             else
                 D_env = 0.0
