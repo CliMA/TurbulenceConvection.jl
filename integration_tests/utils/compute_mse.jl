@@ -222,6 +222,27 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         missing_tcc_var = data_tcc_arr == nothing
         missing_scm_var = data_scm_arr == nothing
 
+        if TC.is_face_field(tc_var)
+            z_tcc = z_tcc_f
+        else
+            z_tcc = z_tcc_c
+        end
+        if have_tc_main
+            if TC.is_face_field(tc_var)
+                z_tcm = z_tcm_f
+            else
+                z_tcm = z_tcm_c
+            end
+        else
+            z_tcm = z_tcc
+        end
+        if !have_scampy_ds
+            z_scm = z_tcc
+        end
+        if !have_pycles_ds
+            z_les = z_tcc
+        end
+
         if missing_les_var
             @warn "Missing data for variable $tc_var, filling with zeros"
             data_les_arr = zeros(length(z_les), length(time_les))
@@ -258,27 +279,6 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         push!(tcc_variables, tc_var)
 
         @info "Assembling plots for $tc_var"
-
-        if TC.is_face_field(tc_var)
-            z_tcc = z_tcc_f
-        else
-            z_tcc = z_tcc_c
-        end
-        if have_tc_main
-            if TC.is_face_field(tc_var)
-                z_tcm = z_tcm_f
-            else
-                z_tcm = z_tcm_c
-            end
-        else
-            z_tcm = z_tcc
-        end
-        if !have_scampy_ds
-            z_scm = z_tcc
-        end
-        if !have_pycles_ds
-            z_les = z_tcc
-        end
 
         @debug "     Data sizes (les,scm,tcc,tcm): $(size(data_les_arr)), $(size(data_scm_arr)), $(size(data_tcc_arr)), $(size(data_tcm_arr))"
         # Scale the data for comparison
