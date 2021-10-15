@@ -681,6 +681,7 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
     up_thermo = edmf.UpdThermo
     en = edmf.EnvVar
     prog_up = center_prog_updrafts(state)
+    aux_up = center_aux_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
     ρ_0_c = center_ref_state(state).ρ0
     ρ_0_f = face_ref_state(state).ρ0
@@ -749,7 +750,7 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
             # not matter in the end:
             entr_w = interpc2f(entr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
             detr_w = interpc2f(detr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
-            B_k = interpc2f(up.B.values, grid, k, i; bottom = SetValue(0), top = SetValue(0))
+            B_k = interpc2f(aux_up[i].buoy, grid, k; bottom = SetValue(0), top = SetValue(0))
 
             adv = upwind_advection_velocity(ρ_0_f, prog_up[i].area, prog_up_f[i].w, grid, k; a_up_bcs)
             exch = (ρ_0_f[k] * a_k * prog_up_f[i].w[k] * (entr_w * en.W.values[k] - detr_w * prog_up_f[i].w[k]))

@@ -2,14 +2,15 @@ function initialize(edmf, grid, state, up::UpdraftVariables, gm::GridMeanVariabl
     kc_surf = kc_surface(grid)
 
     prog_up = center_prog_updrafts(state)
+    aux_up = center_aux_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
-    up.B.values .= 0
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_face_indices(grid)
             prog_up_f[i].w[k] = 0
         end
 
         @inbounds for k in real_center_indices(grid)
+            aux_up[i].buoy[k] = 0
             # Simple treatment for now, revise when multiple updraft closures
             # become more well defined
             if up.prognostic
@@ -19,8 +20,8 @@ function initialize(edmf, grid, state, up::UpdraftVariables, gm::GridMeanVariabl
             end
             prog_up[i].q_tot[k] = gm.QT.values[k]
             prog_up[i].θ_liq_ice[k] = gm.H.values[k]
-            up.QL.values[i, k] = gm.QL.values[k]
-            up.T.values[i, k] = gm.T.values[k]
+            aux_up[i].q_liq[k] = gm.QL.values[k]
+            aux_up[i].T[k] = gm.T.values[k]
         end
 
         prog_up[i].area[kc_surf] = up.updraft_fraction / up.n_updrafts
@@ -99,6 +100,7 @@ function initialize_DryBubble(edmf, grid, state, up::UpdraftVariables, gm::GridM
     #! format: on
 
     prog_up = center_prog_updrafts(state)
+    aux_up = center_aux_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
     Area_in = pyinterp(grid.zc, z_in, Area_in)
     θ_liq_in = pyinterp(grid.zc, z_in, θ_liq_in)
@@ -115,14 +117,14 @@ function initialize_DryBubble(edmf, grid, state, up::UpdraftVariables, gm::GridM
                 prog_up[i].area[k] = Area_in[k] #up.updraft_fraction/up.n_updrafts
                 prog_up[i].θ_liq_ice[k] = θ_liq_in[k]
                 prog_up[i].q_tot[k] = 0.0
-                up.QL.values[i, k] = 0.0
+                aux_up[i].q_liq[k] = 0.0
 
                 # for now temperature is provided as diagnostics from LES
-                up.T.values[i, k] = T_in[k]
+                aux_up[i].T[k] = T_in[k]
             else
                 prog_up[i].area[k] = 0.0 #up.updraft_fraction/up.n_updrafts
                 prog_up[i].θ_liq_ice[k] = gm.H.values[k]
-                up.T.values[i, k] = gm.T.values[k]
+                aux_up[i].T[k] = gm.T.values[k]
             end
         end
     end
@@ -130,13 +132,6 @@ function initialize_DryBubble(edmf, grid, state, up::UpdraftVariables, gm::GridM
 end
 
 function initialize_io(up::UpdraftVariables, Stats::NetCDFIO_Stats)
-    add_profile(Stats, "updraft_w")
-    add_profile(Stats, "updraft_qt")
-    add_profile(Stats, "updraft_ql")
-    add_profile(Stats, "updraft_RH")
-    add_profile(Stats, "updraft_thetal")
-    add_profile(Stats, "updraft_temperature")
-    add_profile(Stats, "updraft_buoyancy")
     add_profile(Stats, "updraft_cloud_fraction")
 
     add_ts(Stats, "updraft_cloud_cover")
@@ -183,14 +178,6 @@ function set_values_with_new(up::UpdraftVariables, grid, state)
 end
 
 function io(up::UpdraftVariables, grid, state, Stats::NetCDFIO_Stats)
-    write_profile(Stats, "updraft_w", up.W.bulkvalues)
-    write_profile(Stats, "updraft_qt", up.QT.bulkvalues)
-    write_profile(Stats, "updraft_ql", up.QL.bulkvalues)
-    write_profile(Stats, "updraft_RH", up.RH.bulkvalues)
-    write_profile(Stats, "updraft_thetal", up.H.bulkvalues)
-    write_profile(Stats, "updraft_temperature", up.T.bulkvalues)
-    write_profile(Stats, "updraft_buoyancy", up.B.bulkvalues)
-
     upd_cloud_diagnostics(up, grid, state)
     write_profile(Stats, "updraft_cloud_fraction", up.cloud_fraction)
     # Note definition of cloud cover : each updraft is associated with a cloud cover equal to the maximum
@@ -208,6 +195,7 @@ function upd_cloud_diagnostics(up::UpdraftVariables, grid, state)
     up.lwp = 0.0
 
     prog_up = center_prog_updrafts(state)
+    aux_up = center_aux_updrafts(state)
     ρ0_c = center_ref_state(state).ρ0
     @inbounds for i in 1:(up.n_updrafts)
         up.cloud_base[i] = zc_toa(grid)
@@ -218,9 +206,9 @@ function upd_cloud_diagnostics(up::UpdraftVariables, grid, state)
         @inbounds for k in real_center_indices(grid)
             if prog_up[i].area[k] > 1e-3
                 up.updraft_top[i] = max(up.updraft_top[i], grid.zc[k])
-                up.lwp += ρ0_c[k] * up.QL.values[i, k] * prog_up[i].area[k] * grid.Δz
+                up.lwp += ρ0_c[k] * aux_up[i].q_liq[k] * prog_up[i].area[k] * grid.Δz
 
-                if up.QL.values[i, k] > 1e-8
+                if aux_up[i].q_liq[k] > 1e-8
                     up.cloud_base[i] = min(up.cloud_base[i], grid.zc[k])
                     up.cloud_top[i] = max(up.cloud_top[i], grid.zc[k])
                     up.cloud_cover[i] = max(up.cloud_cover[i], prog_up[i].area[k])
@@ -246,10 +234,11 @@ function compute_rain_formation_tendencies(
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     prog_up = center_prog_updrafts(state)
+    aux_up = center_aux_updrafts(state)
 
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_center_indices(grid)
-            T_up = up.T.values[i, k]
+            T_up = aux_up[i].T[k]
             q_tot_up = prog_up[i].q_tot[k]
             ts_up = TD.PhaseEquil_pTq(param_set, p0_c[k], T_up, q_tot_up)
 

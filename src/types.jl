@@ -266,21 +266,18 @@ struct VariableDiagnostic{T}
     end
 end
 
-struct UpdraftVariable{A1, A2}
-    values::A2
-    new::A2
-    tendencies::A2
-    bulkvalues::A1
+struct UpdraftVariable{A}
+    values::A
+    new::A
+    tendencies::A
     name::String
     units::String
     function UpdraftVariable(grid, nu, loc, name, units)
         values = field(grid, loc, nu)
         new = field(grid, loc, nu) # needed for prognostic updrafts
         tendencies = field(grid, loc, nu)
-        bulkvalues = field(grid, loc)
-        A1 = typeof(bulkvalues)
-        A2 = typeof(values)
-        return new{A1, A2}(values, new, tendencies, bulkvalues, name, units)
+        A = typeof(values)
+        return new{A}(values, new, tendencies, name, units)
     end
 end
 
@@ -289,11 +286,7 @@ mutable struct UpdraftVariables{A1}
     W::UpdraftVariable
     Area::UpdraftVariable
     QT::UpdraftVariable
-    QL::UpdraftVariable
-    RH::UpdraftVariable
     H::UpdraftVariable
-    T::UpdraftVariable
-    B::UpdraftVariable
     prognostic::Bool
     updraft_fraction::Float64
     cloud_fraction::A1
@@ -309,11 +302,7 @@ mutable struct UpdraftVariables{A1}
 
         Area = UpdraftVariable(grid, nu, "half", "area_fraction", "[-]")
         QT = UpdraftVariable(grid, nu, "half", "qt", "kg/kg")
-        QL = UpdraftVariable(grid, nu, "half", "ql", "kg/kg")
-        RH = UpdraftVariable(grid, nu, "half", "RH", "%")
         H = UpdraftVariable(grid, nu, "half", "thetal", "K")
-        T = UpdraftVariable(grid, nu, "half", "temperature", "K")
-        B = UpdraftVariable(grid, nu, "half", "buoyancy", "m^2/s^3")
 
         prognostic = true
         updraft_fraction = namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
@@ -333,11 +322,7 @@ mutable struct UpdraftVariables{A1}
             W,
             Area,
             QT,
-            QL,
-            RH,
             H,
-            T,
-            B,
             prognostic,
             updraft_fraction,
             cloud_fraction,

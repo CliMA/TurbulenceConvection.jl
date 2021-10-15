@@ -19,7 +19,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     obukhov_length = surface.obukhov_length
     FT = eltype(grid)
     prog_up = center_prog_updrafts(state)
+    aux_up = center_aux_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_up_f = face_aux_tc(state)
     aux_tc = center_aux_tc(state)
 
     for k in real_center_indices(grid)
@@ -45,44 +47,44 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     # whichvals used to check which substep we are on--correspondingly use "GMV.SomeVar.value" (last timestep value)
     # first make sure the "bulkvalues" of the updraft variables are updated
     @inbounds for k in real_face_indices(grid)
-        up.W.bulkvalues[k] = 0
+        aux_up_f.bulk.w[k] = 0
         a_bulk_bcs = (; bottom = SetValue(sum(edmf.area_surface_bc)), top = SetZeroGradient())
         a_bulk_f = interpc2f(aux_tc.bulk.area, grid, k; a_bulk_bcs...)
         if a_bulk_f > 1.0e-20
             @inbounds for i in 1:(up.n_updrafts)
                 a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
                 a_up_f = interpc2f(prog_up[i].area, grid, k; a_up_bcs...)
-                up.W.bulkvalues[k] += a_up_f * prog_up_f[i].w[k] / a_bulk_f
+                aux_up_f.bulk.w[k] += a_up_f * prog_up_f[i].w[k] / a_bulk_f
             end
         end
         # Assuming gm.W = 0!
-        en.W.values[k] = -a_bulk_f / (1 - a_bulk_f) * up.W.bulkvalues[k]
+        en.W.values[k] = -a_bulk_f / (1 - a_bulk_f) * aux_up_f.bulk.w[k]
     end
 
     @inbounds for k in real_center_indices(grid)
         a_bulk_c = aux_tc.bulk.area[k]
-        up.QT.bulkvalues[k] = 0
-        up.QL.bulkvalues[k] = 0
-        up.H.bulkvalues[k] = 0
-        up.T.bulkvalues[k] = 0
-        up.B.bulkvalues[k] = 0
-        up.RH.bulkvalues[k] = 0
+        aux_tc.bulk.q_tot[k] = 0
+        aux_tc.bulk.q_liq[k] = 0
+        aux_tc.bulk.θ_liq_ice[k] = 0
+        aux_tc.bulk.T[k] = 0
+        aux_tc.bulk.RH[k] = 0
+        aux_tc.bulk.buoy[k] = 0
         if a_bulk_c > 1.0e-20
             @inbounds for i in 1:(up.n_updrafts)
-                up.QT.bulkvalues[k] += prog_up[i].area[k] * prog_up[i].q_tot[k] / a_bulk_c
-                up.QL.bulkvalues[k] += prog_up[i].area[k] * up.QL.values[i, k] / a_bulk_c
-                up.H.bulkvalues[k] += prog_up[i].area[k] * prog_up[i].θ_liq_ice[k] / a_bulk_c
-                up.T.bulkvalues[k] += prog_up[i].area[k] * up.T.values[i, k] / a_bulk_c
-                up.RH.bulkvalues[k] += prog_up[i].area[k] * up.RH.values[i, k] / a_bulk_c
-                up.B.bulkvalues[k] += prog_up[i].area[k] * up.B.values[i, k] / a_bulk_c
+                aux_tc.bulk.q_tot[k] += prog_up[i].area[k] * prog_up[i].q_tot[k] / a_bulk_c
+                aux_tc.bulk.q_liq[k] += prog_up[i].area[k] * aux_up[i].q_liq[k] / a_bulk_c
+                aux_tc.bulk.θ_liq_ice[k] += prog_up[i].area[k] * prog_up[i].θ_liq_ice[k] / a_bulk_c
+                aux_tc.bulk.T[k] += prog_up[i].area[k] * aux_up[i].T[k] / a_bulk_c
+                aux_tc.bulk.RH[k] += prog_up[i].area[k] * aux_up[i].RH[k] / a_bulk_c
+                aux_tc.bulk.buoy[k] += prog_up[i].area[k] * aux_up[i].buoy[k] / a_bulk_c
             end
         else
-            up.QT.bulkvalues[k] = gm.QT.values[k]
-            up.H.bulkvalues[k] = gm.H.values[k]
-            up.RH.bulkvalues[k] = gm.RH.values[k]
-            up.T.bulkvalues[k] = gm.T.values[k]
+            aux_tc.bulk.q_tot[k] = gm.QT.values[k]
+            aux_tc.bulk.θ_liq_ice[k] = gm.H.values[k]
+            aux_tc.bulk.RH[k] = gm.RH.values[k]
+            aux_tc.bulk.T[k] = gm.T.values[k]
         end
-        if up.QL.bulkvalues[k] > 1e-8 && a_bulk_c > 1e-3
+        if aux_tc.bulk.q_liq[k] > 1e-8 && a_bulk_c > 1e-3
             up.cloud_fraction[k] = 1.0
         else
             up.cloud_fraction[k] = 0.0
@@ -92,8 +94,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         val2 = a_bulk_c * val1
 
         en.Area.values[k] = 1 - a_bulk_c
-        en.QT.values[k] = max(val1 * gm.QT.values[k] - val2 * up.QT.bulkvalues[k], 0) #Yair - this is here to prevent negative QT
-        en.H.values[k] = val1 * gm.H.values[k] - val2 * up.H.bulkvalues[k]
+        en.QT.values[k] = max(val1 * gm.QT.values[k] - val2 * aux_tc.bulk.q_tot[k], 0) #Yair - this is here to prevent negative QT
+        en.H.values[k] = val1 * gm.H.values[k] - val2 * aux_tc.bulk.θ_liq_ice[k]
 
         #####
         ##### saturation_adjustment
@@ -116,35 +118,35 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         @inbounds for i in 1:(up.n_updrafts)
             if prog_up[i].area[k] > 0.0
                 ts_up = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_up[i].θ_liq_ice[k], prog_up[i].q_tot[k])
-                up.QL.values[i, k] = TD.liquid_specific_humidity(ts_up)
-                up.T.values[i, k] = TD.air_temperature(ts_up)
+                aux_up[i].q_liq[k] = TD.liquid_specific_humidity(ts_up)
+                aux_up[i].T[k] = TD.air_temperature(ts_up)
                 ρ = TD.air_density(ts_up)
-                up.B.values[i, k] = buoyancy_c(param_set, ρ0_c[k], ρ)
-                up.RH.values[i, k] = TD.relative_humidity(ts_up)
+                aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
+                aux_up[i].RH[k] = TD.relative_humidity(ts_up)
             elseif k > kc_surf
                 if prog_up[i].area[k - 1] > 0.0 && edmf.extrapolate_buoyancy
                     qt = prog_up[i].q_tot[k - 1]
                     h = prog_up[i].θ_liq_ice[k - 1]
                     ts_up = TD.PhaseEquil_pθq(param_set, p0_c[k], h, qt)
                     ρ = TD.air_density(ts_up)
-                    up.B.values[i, k] = buoyancy_c(param_set, ρ0_c[k], ρ)
-                    up.RH.values[i, k] = TD.relative_humidity(ts_up)
+                    aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
+                    aux_up[i].RH[k] = TD.relative_humidity(ts_up)
                 else
-                    up.B.values[i, k] = en.B.values[k]
-                    up.RH.values[i, k] = en.RH.values[k]
+                    aux_up[i].buoy[k] = en.B.values[k]
+                    aux_up[i].RH[k] = en.RH.values[k]
                 end
             else
-                up.B.values[i, k] = en.B.values[k]
-                up.RH.values[i, k] = en.RH.values[k]
+                aux_up[i].buoy[k] = en.B.values[k]
+                aux_up[i].RH[k] = en.RH.values[k]
             end
         end
 
         gm.B.values[k] = (1.0 - aux_tc.bulk.area[k]) * en.B.values[k]
         @inbounds for i in 1:(up.n_updrafts)
-            gm.B.values[k] += prog_up[i].area[k] * up.B.values[i, k]
+            gm.B.values[k] += prog_up[i].area[k] * aux_up[i].buoy[k]
         end
         @inbounds for i in 1:(up.n_updrafts)
-            up.B.values[i, k] -= gm.B.values[k]
+            aux_up[i].buoy[k] -= gm.B.values[k]
         end
         en.B.values[k] -= gm.B.values[k]
     end
@@ -165,9 +167,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     a_up_bulk = aux_tc.bulk.area
     @inbounds for k in real_center_indices(grid)
-        gm.QL.values[k] = (a_up_bulk[k] * up.QL.bulkvalues[k] + (1 - a_up_bulk[k]) * en.QL.values[k])
-        gm.T.values[k] = (a_up_bulk[k] * up.T.bulkvalues[k] + (1 - a_up_bulk[k]) * en.T.values[k])
-        gm.B.values[k] = (a_up_bulk[k] * up.B.bulkvalues[k] + (1 - a_up_bulk[k]) * en.B.values[k])
+        gm.QL.values[k] = (a_up_bulk[k] * aux_tc.bulk.q_liq[k] + (1 - a_up_bulk[k]) * en.QL.values[k])
+        gm.T.values[k] = (a_up_bulk[k] * aux_tc.bulk.T[k] + (1 - a_up_bulk[k]) * en.T.values[k])
+        gm.B.values[k] = (a_up_bulk[k] * aux_tc.bulk.buoy[k] + (1 - a_up_bulk[k]) * en.B.values[k])
     end
     compute_pressure_plume_spacing(edmf, param_set)
 
@@ -194,11 +196,11 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 w_min = 0.001
 
                 εδ_model = MoistureDeficitEntr(;
-                    q_liq_up = up.QL.values[i, k],
+                    q_liq_up = aux_up[i].q_liq[k],
                     q_liq_en = en.QL.values[k],
                     w_up = interpf2c(prog_up_f[i].w, grid, k),
                     w_en = interpf2c(en.W.values, grid, k),
-                    b_up = up.B.values[i, k],
+                    b_up = aux_up[i].buoy[k],
                     b_en = en.B.values[k],
                     tke = en.TKE.values[k],
                     dMdz = ∇m,
@@ -206,7 +208,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                     a_up = prog_up[i].area[k],
                     a_en = en.Area.values[k],
                     R_up = edmf.pressure_plume_spacing[i],
-                    RH_up = up.RH.values[i, k],
+                    RH_up = aux_up[i].RH[k],
                     RH_en = en.RH.values[k],
                 )
 
@@ -238,9 +240,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
             a_kfull = interpc2f(prog_up[i].area, grid, k; a_bcs...)
             if a_kfull > 0.0
-                B = up.B.values
-                b_bcs = (; bottom = SetValue(B[i, kc_surf]), top = SetValue(B[i, kc_toa]))
-                b_kfull = interpc2f(up.B.values, grid, k, i; b_bcs...)
+                B = aux_up[i].buoy
+                b_bcs = (; bottom = SetValue(B[kc_surf]), top = SetValue(B[kc_toa]))
+                b_kfull = interpc2f(aux_up[i].buoy, grid, k; b_bcs...)
                 w_cut = fcut(prog_up_f[i].w, grid, k)
                 ∇w_up = f∇(w_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
                 asp_ratio = 1.0
