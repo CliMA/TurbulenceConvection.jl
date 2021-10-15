@@ -323,33 +323,33 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
                 Plots.plot!(
                     data_les_cont_mapped,
                     z_tcc ./ 10^3,
-                    title = "$tc_var$warn_msg_les",
+                    title = tc_var,
                     ylabel = "z [km]",
-                    label = "PyCLES",
+                    label = "PyCLES$warn_msg_les",
                 )
             end
             Plots.plot!(
                 data_scm_cont_mapped,
                 z_tcc ./ 10^3,
-                title = "$tc_var$warn_msg_scm",
+                title = tc_var,
                 ylabel = "z [km]",
-                label = "SCAMPy",
+                label = "SCAMPy$warn_msg_scm",
             )
             if have_tc_main
                 Plots.plot!(
                     data_tcm_cont_mapped,
                     z_tcc ./ 10^3,
-                    title = "$tc_var$warn_msg_tcm",
+                    title = tc_var,
                     ylabel = "z [km]",
-                    label = "TC.jl (main)",
+                    label = "TC.jl (main)$warn_msg_tcm",
                 )
             end
             plots_dict["profiles"][tc_var] = Plots.plot!(
                 data_tcc_cont_mapped,
                 z_tcc ./ 10^3,
-                title = "$tc_var$warn_msg_tcc",
+                title = tc_var,
                 ylabel = "z [km]",
-                label = "TC.jl",
+                label = "TC.jl$warn_msg_tcc",
             )
 
             clims_min = min(minimum(data_scm_arr), minimum(data_tcc_arr))
