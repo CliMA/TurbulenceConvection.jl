@@ -36,15 +36,10 @@ center_ref_state(state) = ref_state(state, CentField())
 
 #= Prognostic fields for TurbulenceConvection =#
 prognostic_tc(state, fl) = prognostic(state, fl).turbconv
-center_prog_updrafts(state) = prognostic_tc(state, CentField()).up
-face_prog_updrafts(state) = prognostic_tc(state, FaceField()).up
-center_prog_environment(state) = prognostic_tc(state, CentField()).en
-face_prog_environment(state) = prognostic_tc(state, FaceField()).en
+center_prog_tc(state) = prognostic_tc(state, CentField())
+face_prog_tc(state) = prognostic_tc(state, FaceField())
 
 #= Auxiliary fields for TurbulenceConvection =#
 aux_turbconv(state, fl) = aux(state, fl).turbconv
 center_aux_tc(state) = aux_turbconv(state, CentField())
-center_aux_updrafts(state) = aux_turbconv(state, CentField()).up
-face_aux_updrafts(state) = aux_turbconv(state, FaceField()).up
-center_aux_environment(state) = aux_turbconv(state, CentField()).en
-face_aux_environment(state) = aux_turbconv(state, FaceField()).en
+face_aux_tc(state) = aux_turbconv(state, FaceField())

@@ -64,19 +64,23 @@ face_diagnostic_vars(FT, n_up) = (; face_diagnostic_vars_gm(FT)..., face_diagnos
 ##### Prognostic fields
 #####
 
+up_var(FT, n_up) = (; up = ntuple(i -> FT(0), n_up))
+
 # Center only
 cent_prognostic_vars(FT, n_up) = (; cent_prognostic_vars_gm(FT)..., cent_prognostic_vars_edmf(FT, n_up)...)
 cent_prognostic_vars_gm(FT) = (; U = FT(0), V = FT(0), H = FT(0), QT = FT(0))
-cent_prognostic_vars_up(FT) = (; area = FT(0), H = FT(0), QT = FT(0))
-cent_prognostic_vars_en(FT) = (; TKE = FT(0), Hvar = FT(0), QTvar = FT(0), HQTcov = FT(0))
-cent_prognostic_vars_edmf(FT, n_up) =
-    (; turbconv = (; en = cent_prognostic_vars_en(FT), up = ntuple(i -> cent_prognostic_vars_up(FT), n_up)))
+cent_prognostic_vars_edmf(FT, n_up) = (;
+    turbconv = (;
+        area = up_var(FT, n_up), θ_liq_ice = up_var(FT, n_up), q_tot = up_var(FT, n_up), tke = (; en = FT(0)),
+    ),
+)
 # cent_prognostic_vars_edmf(FT, n_up) = (;) # could also use this for empty model
 
 # Face only
 face_prognostic_vars(FT, n_up) = (; face_prognostic_vars_edmf(FT, n_up)...)
 face_prognostic_vars_up(FT) = (; W = FT(0))
-face_prognostic_vars_edmf(FT, n_up) = (; turbconv = (; up = ntuple(i -> face_prognostic_vars_up(FT), n_up)))
+face_prognostic_vars_edmf(FT, n_up) = (; turbconv = (; w = up_var(FT, n_up)))
+
 # face_prognostic_vars_edmf(FT, n_up) = (;) # could also use this for empty model
 
 function Simulation1d(namelist)

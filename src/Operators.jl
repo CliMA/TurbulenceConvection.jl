@@ -613,7 +613,6 @@ function construct_tridiag_diffusion_en(
     TS,
     KM,
     KH,
-    prog_up,
     w_up,
     w_en,
     tke_en,
@@ -637,6 +636,7 @@ function construct_tridiag_diffusion_en(
     ρ0_c = center_ref_state(state).ρ0
     ρ0_f = face_ref_state(state).ρ0
     aux_tc = center_aux_tc(state)
+    prog_tc = center_prog_tc(state)
 
     ae = vec(1 .- aux_tc.bulk.area)
     rho_ae_K_m = face_field(grid)
@@ -658,11 +658,11 @@ function construct_tridiag_diffusion_en(
         D_env = 0.0
 
         @inbounds for i in 1:n_updrafts
-            if prog_up[i].area[k] > minimum_area
+            if prog_tc.area.up[i][k] > minimum_area
                 turb_entr = frac_turb_entr[i, k]
                 R_up = pressure_plume_spacing[i]
                 w_up_c = interpf2c(w_up, grid, k, i)
-                D_env += ρ0_c[k] * prog_up[i].area[k] * w_up_c * (entr_sc[i, k] + turb_entr)
+                D_env += ρ0_c[k] * prog_tc.area.up[i][k] * w_up_c * (entr_sc[i, k] + turb_entr)
             else
                 D_env = 0.0
             end
