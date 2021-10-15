@@ -267,17 +267,13 @@ struct VariableDiagnostic{T}
 end
 
 struct UpdraftVariable{A}
-    values::A
-    new::A
-    tendencies::A
+    new::A # TODO: deprecate this!
     name::String
     units::String
     function UpdraftVariable(grid, nu, loc, name, units)
-        values = field(grid, loc, nu)
         new = field(grid, loc, nu) # needed for prognostic updrafts
-        tendencies = field(grid, loc, nu)
-        A = typeof(values)
-        return new{A}(values, new, tendencies, name, units)
+        A = typeof(new)
+        return new{A}(new, name, units)
     end
 end
 

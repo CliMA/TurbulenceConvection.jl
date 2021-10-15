@@ -94,7 +94,6 @@ function Simulation1d(namelist)
     Stats = TC.NetCDFIO_Stats(namelist, grid)
     case = Cases.get_case(namelist)
     ref_params = Cases.reference_params(case, grid, param_set, namelist)
-    ref_state = TC.ReferenceState(grid, param_set, Stats; ref_params...)
 
     GMV = TC.GridMeanVariables(namelist, grid, param_set)
     Sur = TC.SurfaceBase(Cases.get_surface_type(case); namelist, ref_params)
@@ -114,6 +113,7 @@ function Simulation1d(namelist)
     diagnostic_cent_fields = TC.FieldFromNamedTuple(TC.center_space(grid), cent_diagnostic_vars(FT, n_updrafts))
     diagnostic_face_fields = TC.FieldFromNamedTuple(TC.face_space(grid), face_diagnostic_vars(FT, n_updrafts))
 
+    ref_state = TC.ReferenceState(grid, param_set, Stats; ref_params...)
     parent(aux_face_fields.ref_state.p0) .= ref_state.p0
     parent(aux_face_fields.ref_state.ρ0) .= ref_state.rho0
     parent(aux_face_fields.ref_state.α0) .= ref_state.alpha0
@@ -122,7 +122,7 @@ function Simulation1d(namelist)
     parent(aux_cent_fields.ref_state.α0) .= ref_state.alpha0_half
 
     prog = CC.Fields.FieldVector(cent = cent_prog_fields, face = face_prog_fields)
-    tendencies = CC.Fields.FieldVector(cent = cent_prog_fields, face = face_prog_fields)
+    tendencies = CC.Fields.FieldVector(cent = deepcopy(cent_prog_fields), face = deepcopy(face_prog_fields))
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
     diagnostics = CC.Fields.FieldVector(cent = diagnostic_cent_fields, face = diagnostic_face_fields)
 
