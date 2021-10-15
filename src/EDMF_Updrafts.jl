@@ -2,9 +2,13 @@ function initialize(edmf, grid, state, up::UpdraftVariables, gm::GridMeanVariabl
     kc_surf = kc_surface(grid)
 
     prog_up = center_prog_updrafts(state)
-    up.W.values .= 0
+    prog_up_f = face_prog_updrafts(state)
     up.B.values .= 0
     @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for k in real_face_indices(grid)
+            prog_up_f[i].w[k] = 0
+        end
+
         @inbounds for k in real_center_indices(grid)
             # Simple treatment for now, revise when multiple updraft closures
             # become more well defined
@@ -13,9 +17,9 @@ function initialize(edmf, grid, state, up::UpdraftVariables, gm::GridMeanVariabl
             else
                 prog_up[i].area[k] = up.updraft_fraction / up.n_updrafts
             end
-            up.QT.values[i, k] = gm.QT.values[k]
+            prog_up[i].q_tot[k] = gm.QT.values[k]
+            prog_up[i].θ_liq_ice[k] = gm.H.values[k]
             up.QL.values[i, k] = gm.QL.values[k]
-            up.H.values[i, k] = gm.H.values[k]
             up.T.values[i, k] = gm.T.values[k]
         end
 
@@ -95,28 +99,29 @@ function initialize_DryBubble(edmf, grid, state, up::UpdraftVariables, gm::GridM
     #! format: on
 
     prog_up = center_prog_updrafts(state)
+    prog_up_f = face_prog_updrafts(state)
     Area_in = pyinterp(grid.zc, z_in, Area_in)
     θ_liq_in = pyinterp(grid.zc, z_in, θ_liq_in)
     T_in = pyinterp(grid.zc, z_in, T_in)
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_face_indices(grid)
             if minimum(z_in) <= grid.zf[k] <= maximum(z_in)
-                up.W.values[i, k] = 0.0
+                prog_up_f[i].w[k] = 0.0
             end
         end
 
         @inbounds for k in real_center_indices(grid)
             if minimum(z_in) <= grid.zc[k] <= maximum(z_in)
                 prog_up[i].area[k] = Area_in[k] #up.updraft_fraction/up.n_updrafts
-                up.H.values[i, k] = θ_liq_in[k]
-                up.QT.values[i, k] = 0.0
+                prog_up[i].θ_liq_ice[k] = θ_liq_in[k]
+                prog_up[i].q_tot[k] = 0.0
                 up.QL.values[i, k] = 0.0
 
                 # for now temperature is provided as diagnostics from LES
                 up.T.values[i, k] = T_in[k]
             else
                 prog_up[i].area[k] = 0.0 #up.updraft_fraction/up.n_updrafts
-                up.H.values[i, k] = gm.H.values[k]
+                prog_up[i].θ_liq_ice[k] = gm.H.values[k]
                 up.T.values[i, k] = gm.T.values[k]
             end
         end
@@ -144,15 +149,16 @@ end
 # quick utility to set "new" arrays with values in the "values" arrays
 function set_new_with_values(up::UpdraftVariables, grid, state)
     prog_up = center_prog_updrafts(state)
+    prog_up_f = face_prog_updrafts(state)
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_face_indices(grid)
-            up.W.new[i, k] = up.W.values[i, k]
+            up.W.new[i, k] = prog_up_f[i].w[k]
         end
 
         @inbounds for k in real_center_indices(grid)
             up.Area.new[i, k] = prog_up[i].area[k]
-            up.QT.new[i, k] = up.QT.values[i, k]
-            up.H.new[i, k] = up.H.values[i, k]
+            up.QT.new[i, k] = prog_up[i].q_tot[k]
+            up.H.new[i, k] = prog_up[i].θ_liq_ice[k]
         end
     end
     return
@@ -161,16 +167,16 @@ end
 # quick utility to set "tmp" arrays with values in the "new" arrays
 function set_values_with_new(up::UpdraftVariables, grid, state)
     prog_up = center_prog_updrafts(state)
+    prog_up_f = face_prog_updrafts(state)
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_face_indices(grid)
-            up.W.values[i, k] = up.W.new[i, k]
+            prog_up_f[i].w[k] = up.W.new[i, k]
         end
 
         @inbounds for k in real_center_indices(grid)
-            up.W.values[i, k] = up.W.new[i, k]
             prog_up[i].area[k] = up.Area.new[i, k]
-            up.QT.values[i, k] = up.QT.new[i, k]
-            up.H.values[i, k] = up.H.new[i, k]
+            prog_up[i].q_tot[k] = up.QT.new[i, k]
+            prog_up[i].θ_liq_ice[k] = up.H.new[i, k]
         end
     end
     return
@@ -244,7 +250,7 @@ function compute_rain_formation_tendencies(
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_center_indices(grid)
             T_up = up.T.values[i, k]
-            q_tot_up = up.QT.values[i, k]
+            q_tot_up = prog_up[i].q_tot[k]
             ts_up = TD.PhaseEquil_pTq(param_set, p0_c[k], T_up, q_tot_up)
 
             # autoconversion and accretion

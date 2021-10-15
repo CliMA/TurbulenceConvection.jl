@@ -19,6 +19,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     obukhov_length = surface.obukhov_length
     FT = eltype(grid)
     prog_up = center_prog_updrafts(state)
+    prog_up_f = face_prog_updrafts(state)
     aux_tc = center_aux_tc(state)
 
     for k in real_center_indices(grid)
@@ -29,12 +30,12 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     ##### diagnose_GMV_moments
     #####
     #! format: off
-    get_GMV_CoVar(edmf, grid, state, up.Area, up.H, up.H, en.H, en.H, en.Hvar, gm.H.values, gm.H.values, gm.Hvar.values)
-    get_GMV_CoVar(edmf, grid, state, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar, gm.QT.values, gm.QT.values, gm.QTvar.values)
-    get_GMV_CoVar(edmf, grid, state, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov, gm.H.values, gm.QT.values, gm.HQTcov.values)
-    GMV_third_m(edmf, grid, state, gm.H_third_m, en.Hvar, en.H, up.H)
-    GMV_third_m(edmf, grid, state, gm.QT_third_m, en.QTvar, en.QT, up.QT)
-    GMV_third_m(edmf, grid, state, gm.W_third_m, en.TKE, en.W, up.W)
+    get_GMV_CoVar(edmf, grid, state, en.H, en.H, en.Hvar, gm.H.values, gm.H.values, gm.Hvar.values, :θ_liq_ice)
+    get_GMV_CoVar(edmf, grid, state, en.QT, en.QT, en.QTvar, gm.QT.values, gm.QT.values, gm.QTvar.values, :q_tot)
+    get_GMV_CoVar(edmf, grid, state, en.H, en.QT, en.HQTcov, gm.H.values, gm.QT.values, gm.HQTcov.values, :θ_liq_ice, :q_tot)
+    GMV_third_m(edmf, grid, state, gm.H_third_m, en.Hvar, en.H, :θ_liq_ice)
+    GMV_third_m(edmf, grid, state, gm.QT_third_m, en.QTvar, en.QT, :q_tot)
+    GMV_third_m(edmf, grid, state, gm.W_third_m, en.TKE, en.W, :w)
     #! format: on
 
     #####
@@ -51,7 +52,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             @inbounds for i in 1:(up.n_updrafts)
                 a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
                 a_up_f = interpc2f(prog_up[i].area, grid, k; a_up_bcs...)
-                up.W.bulkvalues[k] += a_up_f * up.W.values[i, k] / a_bulk_f
+                up.W.bulkvalues[k] += a_up_f * prog_up_f[i].w[k] / a_bulk_f
             end
         end
         # Assuming gm.W = 0!
@@ -68,9 +69,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         up.RH.bulkvalues[k] = 0
         if a_bulk_c > 1.0e-20
             @inbounds for i in 1:(up.n_updrafts)
-                up.QT.bulkvalues[k] += prog_up[i].area[k] * up.QT.values[i, k] / a_bulk_c
+                up.QT.bulkvalues[k] += prog_up[i].area[k] * prog_up[i].q_tot[k] / a_bulk_c
                 up.QL.bulkvalues[k] += prog_up[i].area[k] * up.QL.values[i, k] / a_bulk_c
-                up.H.bulkvalues[k] += prog_up[i].area[k] * up.H.values[i, k] / a_bulk_c
+                up.H.bulkvalues[k] += prog_up[i].area[k] * prog_up[i].θ_liq_ice[k] / a_bulk_c
                 up.T.bulkvalues[k] += prog_up[i].area[k] * up.T.values[i, k] / a_bulk_c
                 up.RH.bulkvalues[k] += prog_up[i].area[k] * up.RH.values[i, k] / a_bulk_c
                 up.B.bulkvalues[k] += prog_up[i].area[k] * up.B.values[i, k] / a_bulk_c
@@ -114,7 +115,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
         @inbounds for i in 1:(up.n_updrafts)
             if prog_up[i].area[k] > 0.0
-                ts_up = TD.PhaseEquil_pθq(param_set, p0_c[k], up.H.values[i, k], up.QT.values[i, k])
+                ts_up = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_up[i].θ_liq_ice[k], prog_up[i].q_tot[k])
                 up.QL.values[i, k] = TD.liquid_specific_humidity(ts_up)
                 up.T.values[i, k] = TD.air_temperature(ts_up)
                 ρ = TD.air_density(ts_up)
@@ -122,8 +123,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 up.RH.values[i, k] = TD.relative_humidity(ts_up)
             elseif k > kc_surf
                 if prog_up[i].area[k - 1] > 0.0 && edmf.extrapolate_buoyancy
-                    qt = up.QT.values[i, k - 1]
-                    h = up.H.values[i, k - 1]
+                    qt = prog_up[i].q_tot[k - 1]
+                    h = prog_up[i].θ_liq_ice[k - 1]
                     ts_up = TD.PhaseEquil_pθq(param_set, p0_c[k], h, qt)
                     ρ = TD.air_density(ts_up)
                     up.B.values[i, k] = buoyancy_c(param_set, ρ0_c[k], ρ)
@@ -181,11 +182,11 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             if prog_up[i].area[k] > 0.0
                 # compute ∇m at cell centers
                 a_up_c = prog_up[i].area[k]
-                w_up_c = interpf2c(up.W.values, grid, k, i)
+                w_up_c = interpf2c(prog_up_f[i].w, grid, k)
                 w_gm_c = interpf2c(gm.W.values, grid, k)
                 m = a_up_c * (w_up_c - w_gm_c)
                 a_up_cut = ccut_upwind(prog_up[i].area, grid, k)
-                w_up_cut = daul_f2c_upwind(up.W.values, grid, k, i)
+                w_up_cut = daul_f2c_upwind(prog_up_f[i].w, grid, k)
                 w_gm_cut = daul_f2c_upwind(gm.W.values, grid, k)
                 m_cut = a_up_cut .* (w_up_cut .- w_gm_cut)
                 ∇m = FT(c∇_upwind(m_cut, grid, k; bottom = SetValue(0), top = FreeBoundary()))
@@ -195,7 +196,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 εδ_model = MoistureDeficitEntr(;
                     q_liq_up = up.QL.values[i, k],
                     q_liq_en = en.QL.values[k],
-                    w_up = interpf2c(up.W.values, grid, k, i),
+                    w_up = interpf2c(prog_up_f[i].w, grid, k),
                     w_en = interpf2c(en.W.values, grid, k),
                     b_up = up.B.values[i, k],
                     b_en = en.B.values[k],
@@ -240,7 +241,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 B = up.B.values
                 b_bcs = (; bottom = SetValue(B[i, kc_surf]), top = SetValue(B[i, kc_toa]))
                 b_kfull = interpc2f(up.B.values, grid, k, i; b_bcs...)
-                w_cut = fcut(up.W.values, grid, k, i)
+                w_cut = fcut(prog_up_f[i].w, grid, k)
                 ∇w_up = f∇(w_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
                 asp_ratio = 1.0
                 nh_pressure_b, nh_pressure_adv, nh_pressure_drag = perturbation_pressure(
@@ -249,7 +250,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                     a_kfull,
                     b_kfull,
                     ρ0_f[k],
-                    up.W.values[i, k],
+                    prog_up_f[i].w[k],
                     ∇w_up,
                     en.W.values[k],
                     asp_ratio,
@@ -276,7 +277,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         U_cut = ccut(gm.U.values, grid, k)
         V_cut = ccut(gm.V.values, grid, k)
         wc_en = interpf2c(en.W.values, grid, k)
-        wc_up = interpf2c.(Ref(up.W.values), Ref(grid), Ref(k), 1:(up.n_updrafts))
+        wc_up = ntuple(up.n_updrafts) do i
+            interpf2c(prog_up_f[i].w, grid, k)
+        end
         w_dual = dual_faces(en.W.values, grid, k)
 
         ∇U = c∇(U_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
@@ -359,9 +362,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         en.TKE.buoy[k] = -ml_model.a_en * ρ0_c[k] * KH[k] * (bg.∂b∂z_θl + bg.∂b∂z_qt)
     end
 
-    compute_covariance_entr(edmf, grid, state, en.TKE, up.W, up.W, en.W, en.W, gm.W, gm.W)
+    compute_covariance_entr(edmf, grid, state, en.TKE, en.W, en.W, gm.W, gm.W, :w)
     compute_covariance_shear(edmf, grid, state, gm, en.TKE, en.W.values, en.W.values)
-    compute_covariance_interdomain_src(edmf, grid, state, up.Area, up.W, up.W, en.W, en.W, en.TKE)
+    compute_covariance_interdomain_src(edmf, grid, state, en.W, en.W, en.TKE, :w)
 
     #####
     ##### compute_tke_pressure
@@ -369,22 +372,22 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     @inbounds for k in real_center_indices(grid)
         en.TKE.press[k] = 0.0
         @inbounds for i in 1:(up.n_updrafts)
-            w_up_c = interpf2c(up.W.values, grid, k, i)
+            w_up_c = interpf2c(prog_up_f[i].w, grid, k)
             w_en_c = interpf2c(en.W.values, grid, k)
             press_c = interpf2c(edmf.nh_pressure, grid, k, i)
             en.TKE.press[k] += (w_en_c - w_up_c) * press_c
         end
     end
 
-    compute_covariance_entr(edmf, grid, state, en.Hvar, up.H, up.H, en.H, en.H, gm.H, gm.H)
-    compute_covariance_entr(edmf, grid, state, en.QTvar, up.QT, up.QT, en.QT, en.QT, gm.QT, gm.QT)
-    compute_covariance_entr(edmf, grid, state, en.HQTcov, up.H, up.QT, en.H, en.QT, gm.H, gm.QT)
+    compute_covariance_entr(edmf, grid, state, en.Hvar, en.H, en.H, gm.H, gm.H, :θ_liq_ice)
+    compute_covariance_entr(edmf, grid, state, en.QTvar, en.QT, en.QT, gm.QT, gm.QT, :q_tot)
+    compute_covariance_entr(edmf, grid, state, en.HQTcov, en.H, en.QT, gm.H, gm.QT, :θ_liq_ice, :q_tot)
     compute_covariance_shear(edmf, grid, state, gm, en.Hvar, en.H.values, en.H.values)
     compute_covariance_shear(edmf, grid, state, gm, en.QTvar, en.QT.values, en.QT.values)
     compute_covariance_shear(edmf, grid, state, gm, en.HQTcov, en.H.values, en.QT.values)
-    compute_covariance_interdomain_src(edmf, grid, state, up.Area, up.H, up.H, en.H, en.H, en.Hvar)
-    compute_covariance_interdomain_src(edmf, grid, state, up.Area, up.QT, up.QT, en.QT, en.QT, en.QTvar)
-    compute_covariance_interdomain_src(edmf, grid, state, up.Area, up.H, up.QT, en.H, en.QT, en.HQTcov)
+    compute_covariance_interdomain_src(edmf, grid, state, en.H, en.H, en.Hvar, :θ_liq_ice)
+    compute_covariance_interdomain_src(edmf, grid, state, en.QT, en.QT, en.QTvar, :q_tot)
+    compute_covariance_interdomain_src(edmf, grid, state, en.H, en.QT, en.HQTcov, :θ_liq_ice, :q_tot)
 
     #####
     ##### compute_covariance_rain # need to update this one
