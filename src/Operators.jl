@@ -250,6 +250,54 @@ function c∇(f::SA.SVector, grid::Grid, ::BottomBCTag, ::Extrapolate)
     return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
 end
 
+# ∇(center data) for possibly vanishing subdomains.
+
+"""
+    c∇_vanishing_subdomain
+
+Used when the vertical gradient of a field must be computed over a conditional subdomain which may vanish
+below or above the current cell. If the subdomains vanishes, a default user-defined gradient is returned.
+
+Inputs:
+ - f_cut: Slice of field.
+ - sd_cut: Slice of subdomain volume fraction.
+ - default∇: Gradient used in vanishing subdomains.
+"""
+function c∇_vanishing_subdomain(
+    f_cut::SA.SVector,
+    sd_cut::SA.SVector,
+    default∇::FT,
+    grid::Grid,
+    k;
+    bottom = NoBCGivenError(),
+    top = NoBCGivenError(),
+) where {FT <: Real}
+    if is_surface_center(grid, k)
+        return c∇(f_cut, grid, BottomBCTag(), bottom)
+    elseif is_toa_center(grid, k)
+        return c∇(f_cut, grid, TopBCTag(), top)
+    else
+        return c∇_vanishing_subdomain(f_cut, sd_cut, default∇, grid, InteriorTag())
+    end
+end
+function c∇_vanishing_subdomain(
+    f::SA.SVector,
+    sd::SA.SVector,
+    default∇::FT,
+    grid::Grid,
+    ::InteriorTag,
+) where {FT <: Real}
+    @assert length(f) == 3
+    @assert length(sd) == 3
+    if sd[1] * sd[3] ≈ FT(0)
+        return default∇
+    else
+        f_dual⁺ = SA.SVector(f[2], f[3])
+        f_dual⁻ = SA.SVector(f[1], f[2])
+        return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
+    end
+end
+
 #####
 ##### ∇(face data)
 #####

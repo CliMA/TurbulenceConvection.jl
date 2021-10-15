@@ -142,6 +142,7 @@ function default_namelist(case_name::String)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["constant_area"] = false
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["calculate_tke"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["mixing_length"] = "sbtd_eq"
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["env_buoy_grad"] = "quadratures"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"] = "normalmode"
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"] = "normalmode"
