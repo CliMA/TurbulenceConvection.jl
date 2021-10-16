@@ -19,7 +19,6 @@ struct Simulation1d
     io_nt::NamedTuple
     grid
     state
-    ref_state
     GMV
     Case
     Turb
@@ -113,20 +112,14 @@ function Simulation1d(namelist)
     diagnostic_cent_fields = TC.FieldFromNamedTuple(TC.center_space(grid), cent_diagnostic_vars(FT, n_updrafts))
     diagnostic_face_fields = TC.FieldFromNamedTuple(TC.face_space(grid), face_diagnostic_vars(FT, n_updrafts))
 
-    ref_state = TC.ReferenceState(grid, param_set, Stats; ref_params...)
-    parent(aux_face_fields.ref_state.p0) .= ref_state.p0
-    parent(aux_face_fields.ref_state.ρ0) .= ref_state.rho0
-    parent(aux_face_fields.ref_state.α0) .= ref_state.alpha0
-    parent(aux_cent_fields.ref_state.p0) .= ref_state.p0_half
-    parent(aux_cent_fields.ref_state.ρ0) .= ref_state.rho0_half
-    parent(aux_cent_fields.ref_state.α0) .= ref_state.alpha0_half
-
     prog = CC.Fields.FieldVector(cent = cent_prog_fields, face = face_prog_fields)
     tendencies = CC.Fields.FieldVector(cent = deepcopy(cent_prog_fields), face = deepcopy(face_prog_fields))
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
     diagnostics = CC.Fields.FieldVector(cent = diagnostic_cent_fields, face = diagnostic_face_fields)
 
     state = State(prog, aux, tendencies, diagnostics)
+
+    TC.compute_ref_state!(state, grid, param_set, Stats; ref_params...)
 
     io_nt = (;
         ref_state = TC.io_dictionary_ref_state(state),
@@ -136,7 +129,7 @@ function Simulation1d(namelist)
         tendencies = TC.io_dictionary_tendencies(state),
     )
 
-    return Simulation1d(io_nt, grid, state, ref_state, GMV, Case, Turb, TS, Stats, param_set)
+    return Simulation1d(io_nt, grid, state, GMV, Case, Turb, TS, Stats, param_set)
 end
 
 function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
