@@ -3,28 +3,39 @@
 ####
 
 """
-    ReferenceState(
+    compute_ref_state!(
+        state,
         grid::Grid,
         param_set::PS,
         Stats::NetCDFIO_Stats;
-    ) where {FT}
+        Pg::FT,
+        Tg::FT,
+        qtg::FT,
+    ) where {PS, FT}
+
+TODO: add better docs once the API converges
 
 The reference profiles, given
  - `grid` the grid
  - `param_set` the parameter set
  - `Stats` the NC file handler struct
 """
-struct ReferenceState{PS, A1}
-    param_set::PS
-    p0::A1
-    p0_half::A1
-    alpha0::A1
-    alpha0_half::A1
-    rho0::A1
-    rho0_half::A1
-end
+function compute_ref_state!(
+    state,
+    grid::Grid,
+    param_set::PS,
+    Stats::NetCDFIO_Stats;
+    Pg::FT,
+    Tg::FT,
+    qtg::FT,
+) where {PS, FT}
 
-function ReferenceState(grid::Grid, param_set::PS, Stats::NetCDFIO_Stats; Pg::FT, Tg::FT, qtg::FT) where {PS, FT}
+    p0_c = center_ref_state(state).p0
+    ρ0_c = center_ref_state(state).ρ0
+    α0_c = center_ref_state(state).α0
+    p0_f = face_ref_state(state).p0
+    ρ0_f = face_ref_state(state).ρ0
+    α0_f = face_ref_state(state).α0
 
     q_pt_g = TD.PhasePartition(qtg)
     ts_g = TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
@@ -50,31 +61,23 @@ function ReferenceState(grid::Grid, param_set::PS, Stats::NetCDFIO_Stats; Pg::FT
     prob = ODE.ODEProblem(rhs, logp, z_span)
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
 
-    p0 = face_field(grid)
-    p0_half = center_field(grid)
-    alpha0 = face_field(grid)
-    alpha0_half = center_field(grid)
+    parent(p0_f) .= sol.(vec(grid.zf))
+    parent(p0_c) .= sol.(vec(grid.zc))
 
-    p0 .= sol.(vec(grid.zf))
-    p0_half .= sol.(vec(grid.zc))
-
-    p0 .= exp.(p0)
-    p0_half .= exp.(p0_half)
+    p0_f .= exp.(p0_f)
+    p0_c .= exp.(p0_c)
 
     # Compute reference state thermodynamic profiles
     @inbounds for k in real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p0_half[k], θ_liq_ice_g, qtg)
-        alpha0_half[k] = TD.specific_volume(ts)
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], θ_liq_ice_g, qtg)
+        α0_c[k] = TD.specific_volume(ts)
     end
 
     @inbounds for k in real_face_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p0[k], θ_liq_ice_g, qtg)
-        alpha0[k] = TD.specific_volume(ts)
+        ts = TD.PhaseEquil_pθq(param_set, p0_f[k], θ_liq_ice_g, qtg)
+        α0_f[k] = TD.specific_volume(ts)
     end
 
-    rho0 = 1 ./ alpha0
-    rho0_half = 1 ./ alpha0_half
-
-    args = (param_set, p0, p0_half, alpha0, alpha0_half, rho0, rho0_half)
-    return ReferenceState{PS, typeof(p0)}(args...)
+    ρ0_f .= 1 ./ α0_f
+    ρ0_c .= 1 ./ α0_c
 end
