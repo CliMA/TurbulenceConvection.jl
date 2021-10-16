@@ -106,10 +106,12 @@ function compute_rain_evap_tendencies(rain::RainPhysics, grid, state, gm, TS::Ti
     Δt = TS.dt
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
+    aux_gm = center_aux_grid_mean(state)
+    prog_gm = center_prog_grid_mean(state)
 
     @inbounds for k in real_center_indices(grid)
-        q_tot_gm = gm.QT.values[k]
-        T_gm = gm.T.values[k]
+        q_tot_gm = prog_gm.q_tot[k]
+        T_gm = aux_gm.T[k]
         # When we fuse loops, this should hopefully disappear
         ts = TD.PhaseEquil_pTq(param_set, p0_c[k], T_gm, q_tot_gm)
         q = TD.PhasePartition(ts)

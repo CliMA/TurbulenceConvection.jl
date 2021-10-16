@@ -29,6 +29,8 @@ function io_dictionary_ref_state(state)
     )
     return io_dict
 end
+
+#! format: off
 function io_dictionary_aux(state)
     DT = NamedTuple{(:dims, :group, :field), Tuple{Tuple{String, String}, String, Any}}
     io_dict = Dict{String, DT}(
@@ -40,9 +42,27 @@ function io_dictionary_aux(state)
         "updraft_temperature" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.T),
         "updraft_thetal" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.θ_liq_ice),
         "updraft_buoyancy" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.buoy),
+        "H_third_m" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).H_third_m),
+        "W_third_m" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).W_third_m),
+        "QT_third_m" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).H_third_m),
+        "cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).cloud_fraction), # was this "cloud_fraction_mean"?
+        "buoyancy_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).buoy),
+        "temperature_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).T),
+        "RH_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).RH),
+        "ql_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).q_liq),
+        "tke_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).tke),
+        "Hvar_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).Hvar),
+        "QTvar_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).QTvar),
+        "HQTcov_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).HQTcov),
+        "u_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_grid_mean(state).u),
+        "v_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_grid_mean(state).v),
+        "w_mean" => (; dims = ("zf", "t"), group = "profiles", field = face_prog_grid_mean(state).w),
+        "qt_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_grid_mean(state).q_tot),
+        "thetal_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_grid_mean(state).θ_liq_ice),
     )
     return io_dict
 end
+#! format: on
 io_dictionary_diagnostics(state) = Dict()
 io_dictionary_state(state) = Dict()
 io_dictionary_tendencies(state) = Dict()
@@ -71,13 +91,14 @@ tendencies.
 function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
     gm.lwp = 0.0
     ρ0_c = center_ref_state(state).ρ0
+    aux_gm = center_aux_grid_mean(state)
     kc_toa = kc_top_of_atmos(grid)
     gm.cloud_base = grid.zc[kc_toa]
     gm.cloud_top = 0.0
 
     @inbounds for k in real_center_indices(grid)
-        gm.lwp += ρ0_c[k] * gm.QL.values[k] * grid.Δz
-        if gm.QL.values[k] > 1e-8
+        gm.lwp += ρ0_c[k] * aux_gm.q_liq[k] * grid.Δz
+        if aux_gm.q_liq[k] > 1e-8
             gm.cloud_base = min(gm.cloud_base, grid.zc[k])
             gm.cloud_top = max(gm.cloud_top, grid.zc[k])
         end

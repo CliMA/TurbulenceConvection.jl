@@ -19,7 +19,10 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     obukhov_length = surface.obukhov_length
     FT = eltype(grid)
     prog_up = center_prog_updrafts(state)
+    prog_gm = center_prog_grid_mean(state)
+    prog_gm_f = face_prog_grid_mean(state)
     aux_up = center_aux_updrafts(state)
+    aux_gm = center_aux_grid_mean(state)
     prog_up_f = face_prog_updrafts(state)
     aux_up_f = face_aux_tc(state)
     aux_tc = center_aux_tc(state)
@@ -32,19 +35,19 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     ##### diagnose_GMV_moments
     #####
     #! format: off
-    get_GMV_CoVar(edmf, grid, state, en.H, en.H, en.Hvar, gm.H.values, gm.H.values, gm.Hvar.values, :θ_liq_ice)
-    get_GMV_CoVar(edmf, grid, state, en.QT, en.QT, en.QTvar, gm.QT.values, gm.QT.values, gm.QTvar.values, :q_tot)
-    get_GMV_CoVar(edmf, grid, state, en.H, en.QT, en.HQTcov, gm.H.values, gm.QT.values, gm.HQTcov.values, :θ_liq_ice, :q_tot)
-    GMV_third_m(edmf, grid, state, gm.H_third_m, en.Hvar, en.H, :θ_liq_ice)
-    GMV_third_m(edmf, grid, state, gm.QT_third_m, en.QTvar, en.QT, :q_tot)
-    GMV_third_m(edmf, grid, state, gm.W_third_m, en.TKE, en.W, :w)
+    get_GMV_CoVar(edmf, grid, state, en.H, en.H, en.Hvar, :Hvar, :θ_liq_ice)
+    get_GMV_CoVar(edmf, grid, state, en.QT, en.QT, en.QTvar, :QTvar, :q_tot)
+    get_GMV_CoVar(edmf, grid, state, en.H, en.QT, en.HQTcov, :HQTcov, :θ_liq_ice, :q_tot)
+    GMV_third_m(edmf, grid, state, en.Hvar, en.H, :θ_liq_ice, :H_third_m)
+    GMV_third_m(edmf, grid, state, en.QTvar, en.QT, :q_tot, :QT_third_m)
+    GMV_third_m(edmf, grid, state, en.TKE, en.W, :w, :W_third_m)
     #! format: on
 
     #####
     ##### decompose_environment
     #####
     # Find values of environmental variables by subtracting updraft values from grid mean values
-    # whichvals used to check which substep we are on--correspondingly use "GMV.SomeVar.value" (last timestep value)
+    # whichvals used to check which substep we are on--correspondingly use "gm.SomeVar" (last timestep value)
     # first make sure the "bulkvalues" of the updraft variables are updated
     @inbounds for k in real_face_indices(grid)
         aux_up_f.bulk.w[k] = 0
@@ -79,10 +82,10 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 aux_tc.bulk.buoy[k] += prog_up[i].area[k] * aux_up[i].buoy[k] / a_bulk_c
             end
         else
-            aux_tc.bulk.q_tot[k] = gm.QT.values[k]
-            aux_tc.bulk.θ_liq_ice[k] = gm.H.values[k]
-            aux_tc.bulk.RH[k] = gm.RH.values[k]
-            aux_tc.bulk.T[k] = gm.T.values[k]
+            aux_tc.bulk.q_tot[k] = prog_gm.q_tot[k]
+            aux_tc.bulk.θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
+            aux_tc.bulk.RH[k] = aux_gm.RH[k]
+            aux_tc.bulk.T[k] = aux_gm.T[k]
         end
         if aux_tc.bulk.q_liq[k] > 1e-8 && a_bulk_c > 1e-3
             up.cloud_fraction[k] = 1.0
@@ -94,8 +97,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         val2 = a_bulk_c * val1
 
         en.Area.values[k] = 1 - a_bulk_c
-        en.QT.values[k] = max(val1 * gm.QT.values[k] - val2 * aux_tc.bulk.q_tot[k], 0) #Yair - this is here to prevent negative QT
-        en.H.values[k] = val1 * gm.H.values[k] - val2 * aux_tc.bulk.θ_liq_ice[k]
+        en.QT.values[k] = max(val1 * prog_gm.q_tot[k] - val2 * aux_tc.bulk.q_tot[k], 0) #Yair - this is here to prevent negative QT
+        en.H.values[k] = val1 * prog_gm.θ_liq_ice[k] - val2 * aux_tc.bulk.θ_liq_ice[k]
 
         #####
         ##### saturation_adjustment
@@ -141,22 +144,22 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             end
         end
 
-        gm.B.values[k] = (1.0 - aux_tc.bulk.area[k]) * en.B.values[k]
+        aux_gm.buoy[k] = (1.0 - aux_tc.bulk.area[k]) * en.B.values[k]
         @inbounds for i in 1:(up.n_updrafts)
-            gm.B.values[k] += prog_up[i].area[k] * aux_up[i].buoy[k]
+            aux_gm.buoy[k] += prog_up[i].area[k] * aux_up[i].buoy[k]
         end
         @inbounds for i in 1:(up.n_updrafts)
-            aux_up[i].buoy[k] -= gm.B.values[k]
+            aux_up[i].buoy[k] -= aux_gm.buoy[k]
         end
-        en.B.values[k] -= gm.B.values[k]
+        en.B.values[k] -= aux_gm.buoy[k]
     end
     # TODO - use this inversion in free_convection_windspeed and not compute zi twice
     θ_ρ = center_field(grid)
     @inbounds for k in real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], gm.H.values[k], gm.QT.values[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         θ_ρ[k] = TD.virtual_pottemp(ts)
     end
-    edmf.zi = get_inversion(param_set, θ_ρ, gm.U.values, gm.V.values, grid, surface.Ri_bulk_crit)
+    edmf.zi = get_inversion(param_set, θ_ρ, prog_gm.u, prog_gm.v, grid, surface.Ri_bulk_crit)
 
     update_surface(Case, grid, state, gm, TS, param_set)
     update_forcing(Case, grid, state, gm, TS, param_set)
@@ -167,9 +170,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     a_up_bulk = aux_tc.bulk.area
     @inbounds for k in real_center_indices(grid)
-        gm.QL.values[k] = (a_up_bulk[k] * aux_tc.bulk.q_liq[k] + (1 - a_up_bulk[k]) * en.QL.values[k])
-        gm.T.values[k] = (a_up_bulk[k] * aux_tc.bulk.T[k] + (1 - a_up_bulk[k]) * en.T.values[k])
-        gm.B.values[k] = (a_up_bulk[k] * aux_tc.bulk.buoy[k] + (1 - a_up_bulk[k]) * en.B.values[k])
+        aux_gm.q_liq[k] = (a_up_bulk[k] * aux_tc.bulk.q_liq[k] + (1 - a_up_bulk[k]) * en.QL.values[k])
+        aux_gm.T[k] = (a_up_bulk[k] * aux_tc.bulk.T[k] + (1 - a_up_bulk[k]) * en.T.values[k])
+        aux_gm.buoy[k] = (a_up_bulk[k] * aux_tc.bulk.buoy[k] + (1 - a_up_bulk[k]) * en.B.values[k])
     end
     compute_pressure_plume_spacing(edmf, param_set)
 
@@ -185,11 +188,11 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 # compute ∇m at cell centers
                 a_up_c = prog_up[i].area[k]
                 w_up_c = interpf2c(prog_up_f[i].w, grid, k)
-                w_gm_c = interpf2c(gm.W.values, grid, k)
+                w_gm_c = interpf2c(prog_gm_f.w, grid, k)
                 m = a_up_c * (w_up_c - w_gm_c)
                 a_up_cut = ccut_upwind(prog_up[i].area, grid, k)
                 w_up_cut = daul_f2c_upwind(prog_up_f[i].w, grid, k)
-                w_gm_cut = daul_f2c_upwind(gm.W.values, grid, k)
+                w_gm_cut = daul_f2c_upwind(prog_gm_f.w, grid, k)
                 m_cut = a_up_cut .* (w_up_cut .- w_gm_cut)
                 ∇m = FT(c∇_upwind(m_cut, grid, k; bottom = SetValue(0), top = FreeBoundary()))
 
@@ -276,8 +279,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     @inbounds for k in real_center_indices(grid)
 
         # compute shear
-        U_cut = ccut(gm.U.values, grid, k)
-        V_cut = ccut(gm.V.values, grid, k)
+        U_cut = ccut(prog_gm.u, grid, k)
+        V_cut = ccut(prog_gm.v, grid, k)
         wc_en = interpf2c(en.W.values, grid, k)
         wc_up = ntuple(up.n_updrafts) do i
             interpf2c(prog_up_f[i].w, grid, k)
@@ -364,7 +367,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         en.TKE.buoy[k] = -ml_model.a_en * ρ0_c[k] * KH[k] * (bg.∂b∂z_θl + bg.∂b∂z_qt)
     end
 
-    compute_covariance_entr(edmf, grid, state, en.TKE, en.W, en.W, gm.W, gm.W, :w)
+    compute_covariance_entr(edmf, grid, state, en.TKE, en.W, en.W, :w)
     compute_covariance_shear(edmf, grid, state, gm, en.TKE, en.W.values, en.W.values)
     compute_covariance_interdomain_src(edmf, grid, state, en.W, en.W, en.TKE, :w)
 
@@ -381,9 +384,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         end
     end
 
-    compute_covariance_entr(edmf, grid, state, en.Hvar, en.H, en.H, gm.H, gm.H, :θ_liq_ice)
-    compute_covariance_entr(edmf, grid, state, en.QTvar, en.QT, en.QT, gm.QT, gm.QT, :q_tot)
-    compute_covariance_entr(edmf, grid, state, en.HQTcov, en.H, en.QT, gm.H, gm.QT, :θ_liq_ice, :q_tot)
+    compute_covariance_entr(edmf, grid, state, en.Hvar, en.H, en.H, :θ_liq_ice)
+    compute_covariance_entr(edmf, grid, state, en.QTvar, en.QT, en.QT, :q_tot)
+    compute_covariance_entr(edmf, grid, state, en.HQTcov, en.H, en.QT, :θ_liq_ice, :q_tot)
     compute_covariance_shear(edmf, grid, state, gm, en.Hvar, en.H.values, en.H.values)
     compute_covariance_shear(edmf, grid, state, gm, en.QTvar, en.QT.values, en.QT.values)
     compute_covariance_shear(edmf, grid, state, gm, en.HQTcov, en.H.values, en.QT.values)

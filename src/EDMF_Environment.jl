@@ -113,7 +113,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
     ρ0_c = center_ref_state(state).ρ0
 
     #TODO - remember you output source terms multipierd by dt (bec. of instanteneous autoconcv)
-    #TODO - add tendencies for GMV H, QT and QR due to rain
+    #TODO - add tendencies for gm H, QT and QR due to rain
     #TODO - if we start using eos_smpl for the updrafts calculations
     #       we can get rid of the two categories for outer and inner quad. points
 
