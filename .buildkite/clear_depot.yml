@@ -1,0 +1,8 @@
+env:
+  JULIA_DEPOT_PATH: "${BUILDKITE_BUILD_PATH}/${BUILDKITE_PIPELINE_SLUG}/depot/cpu"
+
+steps:
+  - label: "init :put_litter_in_its_place:"
+    key: "init_cpu_env"
+    command:
+      - "rm -rf $$JULIA_DEPOT_PATH"
