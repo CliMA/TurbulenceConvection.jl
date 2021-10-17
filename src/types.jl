@@ -240,20 +240,6 @@ struct RainPhysics{T}
     end
 end
 
-struct VariablePrognostic{T}
-    values::T
-    tendencies::T
-    name::String
-    units::String
-    function VariablePrognostic(grid, loc, name, units)
-        # Value at the current timestep
-        values = field(grid, loc)
-        # Value at the next timestep, used for calculating turbulence tendencies
-        tendencies = field(grid, loc)
-        return new{typeof(values)}(values, tendencies, name, units)
-    end
-end
-
 struct VariableDiagnostic{T}
     values::T
     name::String
@@ -337,24 +323,7 @@ Base.@kwdef mutable struct GridMeanVariables{PS}
     cloud_base::Float64
     cloud_top::Float64
     cloud_cover::Float64
-    U::VariablePrognostic
-    V::VariablePrognostic
-    W::VariablePrognostic
-    QT::VariablePrognostic
-    RH::VariablePrognostic
-    H::VariablePrognostic
-    QL::VariableDiagnostic
-    T::VariableDiagnostic
-    B::VariableDiagnostic
-    cloud_fraction::VariableDiagnostic
     EnvThermo_scheme::String
-    TKE::VariableDiagnostic
-    W_third_m::VariableDiagnostic
-    QTvar::VariableDiagnostic
-    QT_third_m::VariableDiagnostic
-    Hvar::VariableDiagnostic
-    H_third_m::VariableDiagnostic
-    HQTcov::VariableDiagnostic
 end
 function GridMeanVariables(namelist, grid::Grid, param_set::PS) where {PS}
     lwp = 0.0
@@ -362,62 +331,9 @@ function GridMeanVariables(namelist, grid::Grid, param_set::PS) where {PS}
     cloud_top = 0.0
     cloud_cover = 0.0
 
-    U = VariablePrognostic(grid, "half", "u", "m/s")
-    V = VariablePrognostic(grid, "half", "v", "m/s")
-    # Just leave this zero for now!
-    W = VariablePrognostic(grid, "full", "v", "m/s")
-
-    # Create thermodynamic variables
-    QT = VariablePrognostic(grid, "half", "qt", "kg/kg")
-    RH = VariablePrognostic(grid, "half", "RH", "%")
-
-    H = VariablePrognostic(grid, "half", "thetal", "K")
-
-    # Diagnostic Variables--same class as the prognostic variables, but we append to diagnostics list
-    QL = VariableDiagnostic(grid, "half", "ql", "kg/kg")
-    T = VariableDiagnostic(grid, "half", "temperature", "K")
-    B = VariableDiagnostic(grid, "half", "buoyancy", "m^2/s^3")
-
-    cloud_fraction = VariableDiagnostic(grid, "half", "cloud fraction", "-")
-
     EnvThermo_scheme = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
 
-    #Now add the 2nd moment variables
-
-    TKE = VariableDiagnostic(grid, "half", "tke", "m^2/s^2")
-    W_third_m = VariableDiagnostic(grid, "half", "W_third_m", "m^3/s^3")
-
-    QTvar = VariableDiagnostic(grid, "half", "qt_var", "kg^2/kg^2")
-    QT_third_m = VariableDiagnostic(grid, "half", "qt_third_m", "kg^3/kg^3")
-    Hvar = VariableDiagnostic(grid, "half", "thetal_var", "K^2")
-    H_third_m = VariableDiagnostic(grid, "half", "thetal_third_m", "-")
-    HQTcov = VariableDiagnostic(grid, "half", "thetal_qt_covar", "K(kg/kg)")
-
-    return GridMeanVariables(;
-        param_set,
-        lwp,
-        cloud_base,
-        cloud_top,
-        cloud_cover,
-        U,
-        V,
-        W,
-        QT,
-        RH,
-        H,
-        QL,
-        T,
-        B,
-        cloud_fraction,
-        EnvThermo_scheme,
-        TKE,
-        W_third_m,
-        QTvar,
-        QT_third_m,
-        Hvar,
-        H_third_m,
-        HQTcov,
-    )
+    return GridMeanVariables(; param_set, lwp, cloud_base, cloud_top, cloud_cover, EnvThermo_scheme)
 end
 
 

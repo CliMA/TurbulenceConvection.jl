@@ -2,8 +2,10 @@ function initialize(edmf, grid, state, up::UpdraftVariables, gm::GridMeanVariabl
     kc_surf = kc_surface(grid)
 
     prog_up = center_prog_updrafts(state)
+    prog_gm = center_prog_grid_mean(state)
     aux_up = center_aux_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_gm = center_aux_grid_mean(state)
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_face_indices(grid)
             prog_up_f[i].w[k] = 0
@@ -18,10 +20,10 @@ function initialize(edmf, grid, state, up::UpdraftVariables, gm::GridMeanVariabl
             else
                 prog_up[i].area[k] = up.updraft_fraction / up.n_updrafts
             end
-            prog_up[i].q_tot[k] = gm.QT.values[k]
-            prog_up[i].θ_liq_ice[k] = gm.H.values[k]
-            aux_up[i].q_liq[k] = gm.QL.values[k]
-            aux_up[i].T[k] = gm.T.values[k]
+            prog_up[i].q_tot[k] = prog_gm.q_tot[k]
+            prog_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
+            aux_up[i].q_liq[k] = aux_gm.q_liq[k]
+            aux_up[i].T[k] = aux_gm.T[k]
         end
 
         prog_up[i].area[kc_surf] = up.updraft_fraction / up.n_updrafts
@@ -102,6 +104,8 @@ function initialize_DryBubble(edmf, grid, state, up::UpdraftVariables, gm::GridM
     prog_up = center_prog_updrafts(state)
     aux_up = center_aux_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_gm = center_aux_grid_mean(state)
+    prog_gm = center_prog_grid_mean(state)
     Area_in = pyinterp(grid.zc, z_in, Area_in)
     θ_liq_in = pyinterp(grid.zc, z_in, θ_liq_in)
     T_in = pyinterp(grid.zc, z_in, T_in)
@@ -123,8 +127,8 @@ function initialize_DryBubble(edmf, grid, state, up::UpdraftVariables, gm::GridM
                 aux_up[i].T[k] = T_in[k]
             else
                 prog_up[i].area[k] = 0.0 #up.updraft_fraction/up.n_updrafts
-                prog_up[i].θ_liq_ice[k] = gm.H.values[k]
-                aux_up[i].T[k] = gm.T.values[k]
+                prog_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
+                aux_up[i].T[k] = aux_gm.T[k]
             end
         end
     end

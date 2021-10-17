@@ -5,7 +5,7 @@ function initialize(self::RadiationBase, grid, ::RadiationBaseType)
     return
 end
 
-update(self::RadiationBase, grid, state, GMV::GridMeanVariables, param_set) = nothing
+update(self::RadiationBase, grid, state, gm::GridMeanVariables, param_set) = nothing
 
 initialize_io(self::RadiationBase, Stats::NetCDFIO_Stats) = nothing
 io(self::RadiationBase, grid, state, Stats::NetCDFIO_Stats) = nothing
@@ -30,18 +30,20 @@ end
 """
 see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
-function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state, GMV::GridMeanVariables, param_set)
+function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state, gm::GridMeanVariables, param_set)
     cp_d = CPP.cp_d(param_set)
     ρ0_f = face_ref_state(state).ρ0
     ρ0_c = center_ref_state(state).ρ0
+    aux_gm = center_aux_grid_mean(state)
+    prog_gm = center_prog_grid_mean(state)
     # find zi (level of 8.0 g/kg isoline of qt)
     # TODO: report bug: zi and ρ_i are not initialized
     zi = 0
     ρ_i = 0
     kc_surf = kc_surface(grid)
-    q_tot_surf = GMV.QT.values[kc_surf]
+    q_tot_surf = prog_gm.q_tot[kc_surf]
     @inbounds for k in real_face_indices(grid)
-        q_tot_f = interpc2f(GMV.QT.values, grid, k; bottom = SetValue(q_tot_surf), top = SetGradient(0))
+        q_tot_f = interpc2f(prog_gm.q_tot, grid, k; bottom = SetValue(q_tot_surf), top = SetGradient(0))
         if (q_tot_f < 8.0 / 1000)
             idx_zi = k
             # will be used at cell faces
@@ -52,7 +54,7 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, st
     end
 
     ρ_z = Dierckx.Spline1D(vec(grid.zc), vec(ρ0_c); k = 1)
-    q_liq_z = Dierckx.Spline1D(vec(grid.zc), vec(GMV.QL.values); k = 1)
+    q_liq_z = Dierckx.Spline1D(vec(grid.zc), vec(aux_gm.q_liq); k = 1)
 
     integrand(ρq_l, params, z) = params.κ * ρ_z(z) * q_liq_z(z)
     rintegrand(ρq_l, params, z) = -integrand(ρq_l, params, z)
@@ -88,8 +90,8 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, st
     return
 end
 
-update(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state, GMV::GridMeanVariables, param_set) =
-    calculate_radiation(self, grid, state, GMV, param_set)
+update(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state, gm::GridMeanVariables, param_set) =
+    calculate_radiation(self, grid, state, gm, param_set)
 
 function initialize_io(self::RadiationBase{RadiationDYCOMS_RF01}, Stats::NetCDFIO_Stats)
     add_profile(Stats, "rad_dTdt")

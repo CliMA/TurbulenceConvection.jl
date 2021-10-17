@@ -36,7 +36,20 @@ end
 aux_vars_ref_state(FT) = (; ref_state = (ρ0 = FT(0), α0 = FT(0), p0 = FT(0)))
 
 # Center only
-cent_aux_vars_gm(FT) = ()
+cent_aux_vars_gm(FT) = (;
+    tke = FT(0),
+    Hvar = FT(0),
+    QTvar = FT(0),
+    HQTcov = FT(0),
+    q_liq = FT(0),
+    RH = FT(0),
+    T = FT(0),
+    buoy = FT(0),
+    cloud_fraction = FT(0),
+    H_third_m = FT(0),
+    W_third_m = FT(0),
+    QT_third_m = FT(0),
+)
 cent_aux_vars_up(FT) = (; q_liq = FT(0), T = FT(0), RH = FT(0), buoy = FT(0))
 cent_aux_vars_edmf(FT, n_up) = (;
     turbconv = (;
@@ -71,15 +84,15 @@ face_diagnostic_vars(FT, n_up) = (; face_diagnostic_vars_gm(FT)..., face_diagnos
 
 # Center only
 cent_prognostic_vars(FT, n_up) = (; cent_prognostic_vars_gm(FT)..., cent_prognostic_vars_edmf(FT, n_up)...)
-cent_prognostic_vars_gm(FT) = (; U = FT(0), V = FT(0), H = FT(0), QT = FT(0))
+cent_prognostic_vars_gm(FT) = (; u = FT(0), v = FT(0), θ_liq_ice = FT(0), q_tot = FT(0))
 cent_prognostic_vars_up(FT) = (; area = FT(0), θ_liq_ice = FT(0), q_tot = FT(0))
-cent_prognostic_vars_en(FT) = (; TKE = FT(0), Hvar = FT(0), QTvar = FT(0), HQTcov = FT(0))
+cent_prognostic_vars_en(FT) = ()
 cent_prognostic_vars_edmf(FT, n_up) =
     (; turbconv = (; en = cent_prognostic_vars_en(FT), up = ntuple(i -> cent_prognostic_vars_up(FT), n_up)))
 # cent_prognostic_vars_edmf(FT, n_up) = (;) # could also use this for empty model
 
 # Face only
-face_prognostic_vars(FT, n_up) = (; face_prognostic_vars_edmf(FT, n_up)...)
+face_prognostic_vars(FT, n_up) = (; w = FT(0), face_prognostic_vars_edmf(FT, n_up)...)
 face_prognostic_vars_up(FT) = (; w = FT(0))
 face_prognostic_vars_edmf(FT, n_up) = (; turbconv = (; up = ntuple(i -> face_prognostic_vars_up(FT), n_up)))
 # face_prognostic_vars_edmf(FT, n_up) = (;) # could also use this for empty model
@@ -135,7 +148,7 @@ end
 function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     TC = TurbulenceConvection
     state = sim.state
-    Cases.initialize_profiles(sim.Case, sim.grid, sim.GMV, TC.center_ref_state(state))
+    Cases.initialize_profiles(sim.Case, sim.grid, sim.GMV, state)
     TC.satadjust(sim.GMV, sim.grid, sim.state)
 
     Cases.initialize_surface(sim.Case, sim.grid, state, sim.param_set)

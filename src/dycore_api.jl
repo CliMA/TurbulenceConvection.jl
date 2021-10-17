@@ -21,12 +21,16 @@ we're not sure how the data structures / flow control will shake out.
 
 """ Prognostic fields for the host model """
 prognostic(state, fl) = getproperty(state.prog, field_loc(fl))
+center_prog_grid_mean(state) = prognostic(state, CentField())
+face_prog_grid_mean(state) = prognostic(state, FaceField())
 
 """ Auxiliary fields for the host model """
 aux(state, fl) = getproperty(state.aux, field_loc(fl))
+center_aux_grid_mean(state) = aux(state, CentField())
 
 """ Tendency fields for the host model """
 tendencies(state, fl) = getproperty(state.tendencies, field_loc(fl))
+center_tendencies_grid_mean(state) = tendencies(state, CentField())
 
 """ Reference state fields for the host model """
 ref_state(state, fl) = aux(state, fl).ref_state
