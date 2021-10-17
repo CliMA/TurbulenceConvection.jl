@@ -373,44 +373,6 @@ struct EnvironmentVariable{T}
     end
 end
 
-struct EnvironmentVariable_2m{A1}
-    values::A1
-    dissipation::A1
-    shear::A1
-    entr_gain::A1
-    detr_loss::A1
-    press::A1
-    buoy::A1
-    interdomain::A1
-    rain_src::A1
-    name::String
-    units::String
-    function EnvironmentVariable_2m(grid, name, units)
-        values = center_field(grid)
-        dissipation = center_field(grid)
-        entr_gain = center_field(grid)
-        detr_loss = center_field(grid)
-        buoy = center_field(grid)
-        press = center_field(grid)
-        shear = center_field(grid)
-        interdomain = center_field(grid)
-        rain_src = center_field(grid)
-        return new{typeof(values)}(
-            values,
-            dissipation,
-            shear,
-            entr_gain,
-            detr_loss,
-            press,
-            buoy,
-            interdomain,
-            rain_src,
-            name,
-            units,
-        )
-    end
-end
-
 Base.@kwdef mutable struct EnvironmentVariables
     W::EnvironmentVariable
     Area::EnvironmentVariable
@@ -421,10 +383,6 @@ Base.@kwdef mutable struct EnvironmentVariables
     T::EnvironmentVariable
     B::EnvironmentVariable
     cloud_fraction::EnvironmentVariable
-    TKE::EnvironmentVariable_2m
-    Hvar::EnvironmentVariable_2m
-    QTvar::EnvironmentVariable_2m
-    HQTcov::EnvironmentVariable_2m
     cloud_base::Float64 = 0
     cloud_top::Float64 = 0
     cloud_cover::Float64 = 0
@@ -444,27 +402,8 @@ function EnvironmentVariables(namelist, grid::Grid)
 
     # TODO - the flag setting is repeated from Variables.pyx logic
     EnvThermo_scheme = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
-    TKE = EnvironmentVariable_2m(grid, "tke", "m^2/s^2")
-    QTvar = EnvironmentVariable_2m(grid, "qt_var", "kg^2/kg^2")
-    Hvar = EnvironmentVariable_2m(grid, "thetal_var", "K^2")
-    HQTcov = EnvironmentVariable_2m(grid, "thetal_qt_covar", "K(kg/kg)")
 
-    return EnvironmentVariables(;
-        W,
-        Area,
-        QT,
-        QL,
-        H,
-        RH,
-        T,
-        B,
-        cloud_fraction,
-        TKE,
-        Hvar,
-        QTvar,
-        HQTcov,
-        EnvThermo_scheme,
-    )
+    return EnvironmentVariables(; W, Area, QT, QL, H, RH, T, B, cloud_fraction, EnvThermo_scheme)
 end
 
 struct EnvironmentThermodynamics{A1}
@@ -701,7 +640,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
     mls::A1
     ml_ratio::A1
     l_entdet::A1
-    b::A1
     wstar::Float64
     entr_surface_bc::Float64
     detr_surface_bc::Float64
@@ -868,7 +806,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
         mls = center_field(grid)
         ml_ratio = center_field(grid)
         l_entdet = center_field(grid)
-        b = center_field(grid)
         wstar = 0
         entr_surface_bc = 0
         detr_surface_bc = 0
@@ -932,7 +869,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
             mls,
             ml_ratio,
             l_entdet,
-            b,
             wstar,
             entr_surface_bc,
             detr_surface_bc,

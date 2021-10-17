@@ -620,7 +620,6 @@ function construct_tridiag_diffusion_en(
     state,
     TS,
     w_en,
-    tke_en,
     n_updrafts::Int,
     minimum_area::Float64,
     pressure_plume_spacing::Vector,
@@ -643,6 +642,7 @@ function construct_tridiag_diffusion_en(
     aux_tc = center_aux_tc(state)
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    prog_en = center_prog_environment(state)
 
     ae = 1 .- aux_tc.bulk.area
     rho_ae_K_m = face_field(grid)
@@ -690,7 +690,7 @@ function construct_tridiag_diffusion_en(
                 rho_ae_K_m[k + 1] * Δzi * Δzi +
                 rho_ae_K_m[k] * Δzi * Δzi +
                 D_env +
-                ρ0_c[k] * ae[k] * c_d * sqrt(max(tke_en[k], 0)) / max(mixing_length[k], 1)
+                ρ0_c[k] * ae[k] * c_d * sqrt(max(prog_en.tke[k], 0)) / max(mixing_length[k], 1)
             )
             if is_toa_center(grid, k)
                 c[k] = 0.0

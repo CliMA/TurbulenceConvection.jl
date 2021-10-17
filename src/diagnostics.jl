@@ -31,6 +31,7 @@ function io_dictionary_ref_state(state)
 end
 
 #! format: off
+# TODO: We probably don't need to split the aux/prog dictionaries. Only static vs dynamic.
 function io_dictionary_aux(state)
     DT = NamedTuple{(:dims, :group, :field), Tuple{Tuple{String, String}, String, Any}}
     io_dict = Dict{String, DT}(
@@ -61,6 +62,41 @@ function io_dictionary_aux(state)
         "thetal_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_grid_mean(state).θ_liq_ice),
         "eddy_viscosity" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).KM),
         "eddy_diffusivity" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).KH),
+        "env_tke" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_environment(state).tke),
+        "env_Hvar" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_environment(state).Hvar),
+        "env_QTvar" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_environment(state).QTvar),
+
+        "env_HQTcov" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_environment(state).HQTcov),
+
+        "tke_buoy" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).tke.buoy),
+        "tke_pressure" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).tke.press),
+        "tke_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).tke.dissipation),
+        "tke_entr_gain" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).tke.entr_gain),
+        "tke_detr_loss" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).tke.detr_loss),
+        "tke_shear" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).tke.shear),
+        "tke_interdomain" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).tke.interdomain),
+
+        "Hvar_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).Hvar.dissipation),
+        "Hvar_entr_gain" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).Hvar.entr_gain),
+        "Hvar_detr_loss" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).Hvar.detr_loss),
+        "Hvar_interdomain" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).Hvar.interdomain),
+        "Hvar_rain" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).Hvar.rain_src),
+        "Hvar_shear" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).Hvar.shear),
+
+        "QTvar_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).QTvar.dissipation),
+        "QTvar_entr_gain" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).QTvar.entr_gain),
+        "QTvar_detr_loss" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).QTvar.detr_loss),
+        "QTvar_shear" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).QTvar.shear),
+        "QTvar_rain" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).QTvar.rain_src),
+        "QTvar_interdomain" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).QTvar.interdomain),
+
+        "HQTcov_rain" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).HQTcov.rain_src),
+        "HQTcov_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).HQTcov.dissipation),
+        "HQTcov_entr_gain" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).HQTcov.entr_gain),
+        "HQTcov_detr_loss" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).HQTcov.detr_loss),
+        "HQTcov_shear" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).HQTcov.shear),
+        "HQTcov_interdomain" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).HQTcov.interdomain),
+
     )
     return io_dict
 end

@@ -55,6 +55,7 @@ face_aux_tc(state) = aux_turbconv(state, FaceField())
 center_aux_updrafts(state) = aux_turbconv(state, CentField()).up
 face_aux_updrafts(state) = aux_turbconv(state, FaceField()).up
 center_aux_environment(state) = aux_turbconv(state, CentField()).en
+center_aux_environment_2m(state) = aux_turbconv(state, CentField()).en_2m
 face_aux_environment(state) = aux_turbconv(state, FaceField()).en
 
 #= Tendency fields for TurbulenceConvection =#

@@ -52,32 +52,6 @@ function initialize_io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     add_profile(Stats, "ed_length_scheme")
     add_profile(Stats, "mixing_length_ratio")
     add_profile(Stats, "entdet_balance_length")
-    add_profile(Stats, "interdomain_tke_t")
-    add_profile(Stats, "tke_buoy")
-    add_profile(Stats, "tke_dissipation")
-    add_profile(Stats, "tke_entr_gain")
-    add_profile(Stats, "tke_detr_loss")
-    add_profile(Stats, "tke_shear")
-    add_profile(Stats, "tke_pressure")
-    add_profile(Stats, "tke_interdomain")
-    add_profile(Stats, "Hvar_dissipation")
-    add_profile(Stats, "QTvar_dissipation")
-    add_profile(Stats, "HQTcov_dissipation")
-    add_profile(Stats, "Hvar_entr_gain")
-    add_profile(Stats, "QTvar_entr_gain")
-    add_profile(Stats, "Hvar_detr_loss")
-    add_profile(Stats, "QTvar_detr_loss")
-    add_profile(Stats, "HQTcov_detr_loss")
-    add_profile(Stats, "HQTcov_entr_gain")
-    add_profile(Stats, "Hvar_shear")
-    add_profile(Stats, "QTvar_shear")
-    add_profile(Stats, "HQTcov_shear")
-    add_profile(Stats, "Hvar_rain")
-    add_profile(Stats, "QTvar_rain")
-    add_profile(Stats, "HQTcov_rain")
-    add_profile(Stats, "Hvar_interdomain")
-    add_profile(Stats, "QTvar_interdomain")
-    add_profile(Stats, "HQTcov_interdomain")
     return
 end
 
@@ -172,41 +146,16 @@ function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::Ti
     write_profile(Stats, "ed_length_scheme", edmf.mls)
     write_profile(Stats, "mixing_length_ratio", edmf.ml_ratio)
     write_profile(Stats, "entdet_balance_length", edmf.l_entdet)
-    write_profile(Stats, "interdomain_tke_t", edmf.b)
-    compute_covariance_dissipation(edmf, grid, state, edmf.EnvVar.TKE, param_set)
-    write_profile(Stats, "tke_dissipation", edmf.EnvVar.TKE.dissipation)
-    write_profile(Stats, "tke_entr_gain", edmf.EnvVar.TKE.entr_gain)
-    compute_covariance_detr(edmf, grid, state, edmf.EnvVar.TKE)
-    write_profile(Stats, "tke_detr_loss", edmf.EnvVar.TKE.detr_loss)
-    write_profile(Stats, "tke_shear", edmf.EnvVar.TKE.shear)
-    write_profile(Stats, "tke_buoy", edmf.EnvVar.TKE.buoy)
-    write_profile(Stats, "tke_pressure", edmf.EnvVar.TKE.press)
-    write_profile(Stats, "tke_interdomain", edmf.EnvVar.TKE.interdomain)
 
-    compute_covariance_dissipation(edmf, grid, state, edmf.EnvVar.Hvar, param_set)
-    write_profile(Stats, "Hvar_dissipation", edmf.EnvVar.Hvar.dissipation)
-    compute_covariance_dissipation(edmf, grid, state, edmf.EnvVar.QTvar, param_set)
-    write_profile(Stats, "QTvar_dissipation", edmf.EnvVar.QTvar.dissipation)
-    compute_covariance_dissipation(edmf, grid, state, edmf.EnvVar.HQTcov, param_set)
-    write_profile(Stats, "HQTcov_dissipation", edmf.EnvVar.HQTcov.dissipation)
-    write_profile(Stats, "Hvar_entr_gain", edmf.EnvVar.Hvar.entr_gain)
-    write_profile(Stats, "QTvar_entr_gain", edmf.EnvVar.QTvar.entr_gain)
-    write_profile(Stats, "HQTcov_entr_gain", edmf.EnvVar.HQTcov.entr_gain)
-    compute_covariance_detr(edmf, grid, state, edmf.EnvVar.Hvar)
-    compute_covariance_detr(edmf, grid, state, edmf.EnvVar.QTvar)
-    compute_covariance_detr(edmf, grid, state, edmf.EnvVar.HQTcov)
-    write_profile(Stats, "Hvar_detr_loss", edmf.EnvVar.Hvar.detr_loss)
-    write_profile(Stats, "QTvar_detr_loss", edmf.EnvVar.QTvar.detr_loss)
-    write_profile(Stats, "HQTcov_detr_loss", edmf.EnvVar.HQTcov.detr_loss)
-    write_profile(Stats, "Hvar_shear", edmf.EnvVar.Hvar.shear)
-    write_profile(Stats, "QTvar_shear", edmf.EnvVar.QTvar.shear)
-    write_profile(Stats, "HQTcov_shear", edmf.EnvVar.HQTcov.shear)
-    write_profile(Stats, "Hvar_rain", edmf.EnvVar.Hvar.rain_src)
-    write_profile(Stats, "QTvar_rain", edmf.EnvVar.QTvar.rain_src)
-    write_profile(Stats, "HQTcov_rain", edmf.EnvVar.HQTcov.rain_src)
-    write_profile(Stats, "Hvar_interdomain", edmf.EnvVar.Hvar.interdomain)
-    write_profile(Stats, "QTvar_interdomain", edmf.EnvVar.QTvar.interdomain)
-    write_profile(Stats, "HQTcov_interdomain", edmf.EnvVar.HQTcov.interdomain)
+    compute_covariance_dissipation(edmf, grid, state, :tke, param_set)
+    compute_covariance_detr(edmf, grid, state, :tke)
+
+    compute_covariance_dissipation(edmf, grid, state, :Hvar, param_set)
+    compute_covariance_dissipation(edmf, grid, state, :QTvar, param_set)
+    compute_covariance_dissipation(edmf, grid, state, :HQTcov, param_set)
+    compute_covariance_detr(edmf, grid, state, :Hvar)
+    compute_covariance_detr(edmf, grid, state, :QTvar)
+    compute_covariance_detr(edmf, grid, state, :HQTcov)
     return
 end
 
@@ -455,6 +404,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     n_updrafts = up.n_updrafts
     prog_gm = center_prog_grid_mean(state)
     tendencies_gm = center_tendencies_grid_mean(state)
+    prog_en = center_prog_environment(state)
 
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
@@ -483,7 +433,6 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
         state,
         TS,
         en.W.values,
-        en.TKE.values,
         up.n_updrafts,
         edmf.minimum_area,
         edmf.pressure_plume_spacing,
@@ -497,10 +446,10 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     implicit_eqs.A_QTvar .= construct_tridiag_diffusion_en(common_args..., false)
     implicit_eqs.A_HQTcov .= construct_tridiag_diffusion_en(common_args..., false)
 
-    implicit_eqs.b_TKE .= en_diffusion_tendencies(grid, state, TS, en.TKE, n_updrafts)
-    implicit_eqs.b_Hvar .= en_diffusion_tendencies(grid, state, TS, en.Hvar, n_updrafts)
-    implicit_eqs.b_QTvar .= en_diffusion_tendencies(grid, state, TS, en.QTvar, n_updrafts)
-    implicit_eqs.b_HQTcov .= en_diffusion_tendencies(grid, state, TS, en.HQTcov, n_updrafts)
+    implicit_eqs.b_TKE .= en_diffusion_tendencies(grid, state, TS, :tke, n_updrafts)
+    implicit_eqs.b_Hvar .= en_diffusion_tendencies(grid, state, TS, :Hvar, n_updrafts)
+    implicit_eqs.b_QTvar .= en_diffusion_tendencies(grid, state, TS, :QTvar, n_updrafts)
+    implicit_eqs.b_HQTcov .= en_diffusion_tendencies(grid, state, TS, :HQTcov, n_updrafts)
     # -----------
 
     ###
@@ -511,10 +460,10 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
         update_rain(edmf.Rain, grid, state, up_thermo, en_thermo, edmf.RainPhys, TS)
     end
 
-    en.TKE.values .= tridiag_solve(implicit_eqs.b_TKE, implicit_eqs.A_TKE)
-    en.Hvar.values .= tridiag_solve(implicit_eqs.b_Hvar, implicit_eqs.A_Hvar)
-    en.QTvar.values .= tridiag_solve(implicit_eqs.b_QTvar, implicit_eqs.A_QTvar)
-    en.HQTcov.values .= tridiag_solve(implicit_eqs.b_HQTcov, implicit_eqs.A_HQTcov)
+    parent(prog_en.tke) .= tridiag_solve(implicit_eqs.b_TKE, implicit_eqs.A_TKE)
+    parent(prog_en.Hvar) .= tridiag_solve(implicit_eqs.b_Hvar, implicit_eqs.A_Hvar)
+    parent(prog_en.QTvar) .= tridiag_solve(implicit_eqs.b_QTvar, implicit_eqs.A_QTvar)
+    parent(prog_en.HQTcov) .= tridiag_solve(implicit_eqs.b_HQTcov, implicit_eqs.A_HQTcov)
     @inbounds for k in real_center_indices(grid)
         prog_gm.u[k] += tendencies_gm.u[k] * TS.dt
         prog_gm.v[k] += tendencies_gm.v[k] * TS.dt
@@ -526,11 +475,11 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     ### set values
     ###
     @inbounds for k in real_center_indices(grid)
-        en.TKE.values[k] = max(en.TKE.values[k], 0.0)
-        en.Hvar.values[k] = max(en.Hvar.values[k], 0.0)
-        en.QTvar.values[k] = max(en.QTvar.values[k], 0.0)
-        en.HQTcov.values[k] = max(en.HQTcov.values[k], -sqrt(en.Hvar.values[k] * en.QTvar.values[k]))
-        en.HQTcov.values[k] = min(en.HQTcov.values[k], sqrt(en.Hvar.values[k] * en.QTvar.values[k]))
+        prog_en.tke[k] = max(prog_en.tke[k], 0.0)
+        prog_en.Hvar[k] = max(prog_en.Hvar[k], 0.0)
+        prog_en.QTvar[k] = max(prog_en.QTvar[k], 0.0)
+        prog_en.HQTcov[k] = max(prog_en.HQTcov[k], -sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]))
+        prog_en.HQTcov[k] = min(prog_en.HQTcov[k], sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]))
     end
 
     # set values
@@ -584,13 +533,14 @@ function reset_surface_covariance(edmf::EDMF_PrognosticTKE, grid, state, gm, Cas
     gm = gm
     up = edmf.UpdVar
     en = edmf.EnvVar
+    prog_en = center_prog_environment(state)
 
-    en.TKE.values[kc_surf] = get_surface_tke(Case.Sur.ustar, grid.zc[kc_surf], Case.Sur.obukhov_length)
-    get_GMV_CoVar(edmf, grid, state, en.W, en.W, en.TKE, :tke, :w)
+    prog_en.tke[kc_surf] = get_surface_tke(Case.Sur.ustar, grid.zc[kc_surf], Case.Sur.obukhov_length)
+    get_GMV_CoVar(edmf, grid, state, en.W, en.W, :tke, :w)
 
-    en.Hvar.values[kc_surf] = get_surface_variance(flux1 * α0LL, flux1 * α0LL, ustar, zLL, oblength)
-    en.QTvar.values[kc_surf] = get_surface_variance(flux2 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
-    en.HQTcov.values[kc_surf] = get_surface_variance(flux1 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
+    prog_en.Hvar[kc_surf] = get_surface_variance(flux1 * α0LL, flux1 * α0LL, ustar, zLL, oblength)
+    prog_en.QTvar[kc_surf] = get_surface_variance(flux2 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
+    prog_en.HQTcov[kc_surf] = get_surface_variance(flux1 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
     return
 end
 
@@ -602,21 +552,21 @@ function get_GMV_CoVar(
     state,
     ϕ_en::EnvironmentVariable,
     ψ_en::EnvironmentVariable,
-    covar_e::EnvironmentVariable_2m,
-    gm_covar_sym::Symbol,
+    covar_sym::Symbol,
     ϕ_sym::Symbol,
     ψ_sym::Symbol = ϕ_sym,
 )
 
     aux_tc = center_aux_tc(state)
     ae = 1 .- aux_tc.bulk.area
-    is_tke = covar_e.name == "tke"
+    is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
     prog_gm_c = center_prog_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
-    gmv_covar = getproperty(center_aux_grid_mean(state), gm_covar_sym)
+    gmv_covar = getproperty(center_aux_grid_mean(state), covar_sym)
+    covar_e = getproperty(center_prog_environment(state), covar_sym)
     prog_gm = is_tke ? prog_gm_f : prog_gm_c
     ϕ_gm = getproperty(prog_gm, ϕ_sym)
     ψ_gm = getproperty(prog_gm, ψ_sym)
@@ -632,7 +582,7 @@ function get_GMV_CoVar(
             Δϕ = interpf2c(Δϕ_dual, grid, k)
             Δψ = interpf2c(Δψ_dual, grid, k)
 
-            gmv_covar[k] = tke_factor * ae[k] * Δϕ * Δψ + ae[k] * covar_e.values[k]
+            gmv_covar[k] = tke_factor * ae[k] * Δϕ * Δψ + ae[k] * covar_e[k]
             @inbounds for i in 1:(edmf.n_updrafts)
                 ϕ_up_var = getproperty(prog_up_f[i], ϕ_sym)
                 ψ_up_var = getproperty(prog_up_f[i], ψ_sym)
@@ -653,7 +603,7 @@ function get_GMV_CoVar(
             Δϕ = ϕ_en.values[k] - ϕ_gm[k]
             Δψ = ψ_en.values[k] - ψ_gm[k]
 
-            gmv_covar[k] = tke_factor * ae[k] * Δϕ * Δψ + ae[k] * covar_e.values[k]
+            gmv_covar[k] = tke_factor * ae[k] * Δϕ * Δψ + ae[k] * covar_e[k]
             @inbounds for i in 1:(edmf.n_updrafts)
                 ϕ_up_var = getproperty(prog_up[i], ϕ_sym)
                 ψ_up_var = getproperty(prog_up[i], ψ_sym)
@@ -876,17 +826,18 @@ function initialize_covariance(edmf::EDMF_PrognosticTKE, grid, state, gm, Case::
     kc_surf = kc_surface(grid)
     en = edmf.EnvVar
     aux_gm = center_aux_grid_mean(state)
+    prog_en = center_prog_environment(state)
 
-    en.TKE.values .= vec(aux_gm.tke)
+    prog_en.tke .= aux_gm.tke
 
     reset_surface_covariance(edmf, grid, state, gm, Case)
     aux_gm.Hvar .= aux_gm.Hvar[kc_surf] .* aux_gm.tke
     aux_gm.QTvar .= aux_gm.QTvar[kc_surf] .* aux_gm.tke
     aux_gm.HQTcov .= aux_gm.HQTcov[kc_surf] .* aux_gm.tke
 
-    en.Hvar.values .= vec(aux_gm.Hvar)
-    en.QTvar.values .= vec(aux_gm.QTvar)
-    en.HQTcov.values .= vec(aux_gm.HQTcov)
+    prog_en.Hvar .= aux_gm.Hvar
+    prog_en.QTvar .= aux_gm.QTvar
+    prog_en.HQTcov .= aux_gm.HQTcov
     return
 end
 
@@ -895,7 +846,7 @@ function compute_covariance_shear(
     grid,
     state,
     gm::GridMeanVariables,
-    Covar::EnvironmentVariable_2m,
+    covar_sym::Symbol,
     EnvVar1,
     EnvVar2,
 )
@@ -905,9 +856,11 @@ function compute_covariance_shear(
     aux_tc = center_aux_tc(state)
     ρ0_c = center_ref_state(state).ρ0
     prog_gm = center_prog_grid_mean(state)
-    is_tke = Covar.name == "tke"
+    is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
     k_eddy = is_tke ? aux_tc.KM : aux_tc.KH
+    aux_en_2m = center_aux_environment_2m(state)
+    aux_covar = getproperty(aux_en_2m, covar_sym)
 
     if is_tke
         @inbounds for k in real_center_indices(grid)
@@ -923,7 +876,7 @@ function compute_covariance_shear(
             ∇var2 = ∇f2c(var2_dual, grid, k; bottom = SetValue(0), top = SetGradient(0))
             ∇var1 = ∇f2c(var1_dual, grid, k; bottom = SetValue(0), top = SetGradient(0))
 
-            Covar.shear[k] = tke_factor * 2 * (ρ0_c[k] * ae[k] * k_eddy[k] * (∇var1 * ∇var2 + ∇u^2 + ∇v^2))
+            aux_covar.shear[k] = tke_factor * 2 * (ρ0_c[k] * ae[k] * k_eddy[k] * (∇var1 * ∇var2 + ∇u^2 + ∇v^2))
         end
     else
         @inbounds for k in real_center_indices(grid)
@@ -934,7 +887,7 @@ function compute_covariance_shear(
             var2_cut = ccut(EnvVar2, grid, k)
             ∇var2 = c∇(var2_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
 
-            Covar.shear[k] = tke_factor * 2 * (ρ0_c[k] * ae[k] * k_eddy[k] * (∇var1 * ∇var2))
+            aux_covar.shear[k] = tke_factor * 2 * (ρ0_c[k] * ae[k] * k_eddy[k] * (∇var1 * ∇var2))
         end
     end
     return
@@ -946,37 +899,39 @@ function compute_covariance_interdomain_src(
     state,
     ϕ_en::EnvironmentVariable,
     ψ_en::EnvironmentVariable,
-    Covar::EnvironmentVariable_2m,
+    Covar_sym::Symbol,
     ϕ_var::Symbol,
     ψ_var::Symbol = ϕ_var,
 )
 
-    is_tke = Covar.name == "tke"
+    is_tke = Covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
     prog_up_c = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_en_2m = center_aux_environment_2m(state)
+    aux_covar = getproperty(aux_en_2m, Covar_sym)
     prog_up = is_tke ? prog_up_f : prog_up_c
     if is_tke
         @inbounds for k in real_center_indices(grid)
-            Covar.interdomain[k] = 0.0
+            aux_covar.interdomain[k] = 0.0
             @inbounds for i in 1:(edmf.n_updrafts)
                 ϕ_up = getproperty(prog_up[i], ϕ_var)
                 ψ_up = getproperty(prog_up[i], ψ_var)
                 Δϕ = interpf2c(ϕ_up, grid, k) - interpf2c(ϕ_en.values, grid, k)
                 Δψ = interpf2c(ψ_up, grid, k) - interpf2c(ψ_en.values, grid, k)
 
-                Covar.interdomain[k] += tke_factor * prog_up_c[i].area[k] * (1.0 - prog_up_c[i].area[k]) * Δϕ * Δψ
+                aux_covar.interdomain[k] += tke_factor * prog_up_c[i].area[k] * (1.0 - prog_up_c[i].area[k]) * Δϕ * Δψ
             end
         end
     else
         @inbounds for k in real_center_indices(grid)
-            Covar.interdomain[k] = 0.0
+            aux_covar.interdomain[k] = 0.0
             @inbounds for i in 1:(edmf.n_updrafts)
                 ϕ_up = getproperty(prog_up[i], ϕ_var)
                 ψ_up = getproperty(prog_up[i], ψ_var)
                 Δϕ = ϕ_up[k] - ϕ_en.values[k]
                 Δψ = ψ_up[k] - ψ_en.values[k]
-                Covar.interdomain[k] += tke_factor * prog_up_c[i].area[k] * (1.0 - prog_up_c[i].area[k]) * Δϕ * Δψ
+                aux_covar.interdomain[k] += tke_factor * prog_up_c[i].area[k] * (1.0 - prog_up_c[i].area[k]) * Δϕ * Δψ
             end
         end
     end
@@ -987,7 +942,7 @@ function compute_covariance_entr(
     edmf::EDMF_PrognosticTKE,
     grid,
     state,
-    Covar::EnvironmentVariable_2m,
+    covar_sym::Symbol,
     EnvVar1::EnvironmentVariable,
     EnvVar2::EnvironmentVariable,
     var1::Symbol,
@@ -996,7 +951,7 @@ function compute_covariance_entr(
 
     ρ_0_c = center_ref_state(state).ρ0
 
-    is_tke = Covar.name == "tke"
+    is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
     prog_up_c = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
@@ -1006,10 +961,14 @@ function compute_covariance_entr(
     prog_up = is_tke ? prog_up_f : prog_up_c
     GmvVar1 = getproperty(prog_gm, var1)
     GmvVar2 = getproperty(prog_gm, var2)
+    aux_en_2m = center_aux_environment_2m(state)
+    aux_covar = getproperty(aux_en_2m, covar_sym)
+    prog_en = center_prog_environment(state)
+    prog_covar = getproperty(prog_en, covar_sym)
 
     @inbounds for k in real_center_indices(grid)
-        Covar.entr_gain[k] = 0.0
-        Covar.detr_loss[k] = 0.0
+        aux_covar.entr_gain[k] = 0.0
+        aux_covar.detr_loss[k] = 0.0
         @inbounds for i in 1:(edmf.n_updrafts)
             a_up = prog_up_c[i].area[k]
             if a_up > edmf.minimum_area
@@ -1041,9 +1000,9 @@ function compute_covariance_entr(
                     abs(w_u) *
                     eps_turb *
                     ((envvar1 - gmvvar1) * (updvar2 - envvar2) + (envvar2 - gmvvar2) * (updvar1 - envvar1))
-                Covar.entr_gain[k] += dynamic_entr + turbulent_entr
-                Covar.detr_loss[k] +=
-                    tke_factor * ρ_0_c[k] * a_up * abs(w_u) * (edmf.entr_sc[i, k] + eps_turb) * Covar.values[k]
+                aux_covar.entr_gain[k] += dynamic_entr + turbulent_entr
+                aux_covar.detr_loss[k] +=
+                    tke_factor * ρ_0_c[k] * a_up * abs(w_u) * (edmf.entr_sc[i, k] + eps_turb) * prog_covar[k]
             end
         end
     end
@@ -1051,42 +1010,56 @@ function compute_covariance_entr(
     return
 end
 
-function compute_covariance_detr(edmf::EDMF_PrognosticTKE, grid, state, Covar::EnvironmentVariable_2m)
+function compute_covariance_detr(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol)
     up = edmf.UpdVar
     ρ0_c = center_ref_state(state).ρ0
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+
+    aux_en_2m = center_aux_environment_2m(state)
+    aux_covar = getproperty(aux_en_2m, covar_sym)
+    prog_en = center_prog_environment(state)
+    prog_covar = getproperty(prog_en, covar_sym)
+
     @inbounds for k in real_center_indices(grid)
-        Covar.detr_loss[k] = 0.0
+        aux_covar.detr_loss[k] = 0.0
         @inbounds for i in 1:(up.n_updrafts)
             w_up_c = interpf2c(prog_up_f[i].w, grid, k)
-            Covar.detr_loss[k] += prog_up[i].area[k] * abs(w_up_c) * edmf.entr_sc[i, k]
+            aux_covar.detr_loss[k] += prog_up[i].area[k] * abs(w_up_c) * edmf.entr_sc[i, k]
         end
-        Covar.detr_loss[k] *= ρ0_c[k] * Covar.values[k]
+        aux_covar.detr_loss[k] *= ρ0_c[k] * prog_covar[k]
     end
     return
 end
 
-function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, Covar::EnvironmentVariable_2m, param_set)
+function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol, param_set)
     en = edmf.EnvVar
     c_d = CPEDMF.c_d(param_set)
     aux_tc = center_aux_tc(state)
     ae = 1 .- aux_tc.bulk.area
     ρ0_c = center_ref_state(state).ρ0
+    prog_en = center_prog_environment(state)
+    aux_en_2m = center_aux_environment_2m(state)
+    aux_covar = getproperty(aux_en_2m, covar_sym)
+    prog_covar = getproperty(prog_en, covar_sym)
+    prog_en = center_prog_environment(state)
 
     @inbounds for k in real_center_indices(grid)
-        Covar.dissipation[k] = (
-            ρ0_c[k] * ae[k] * Covar.values[k] * max(en.TKE.values[k], 0)^0.5 / max(edmf.mixing_length[k], 1.0e-3) * c_d
-        )
+        aux_covar.dissipation[k] =
+            (ρ0_c[k] * ae[k] * prog_covar[k] * max(prog_en.tke[k], 0)^0.5 / max(edmf.mixing_length[k], 1.0e-3) * c_d)
     end
     return
 end
 
-function en_diffusion_tendencies(grid::Grid, state, TS, covar, n_updrafts)
+function en_diffusion_tendencies(grid::Grid, state, TS, covar_sym::Symbol, n_updrafts)
     dti = TS.dti
     b = center_field(grid)
     ρ0_c = center_ref_state(state).ρ0
     prog_up = center_prog_updrafts(state)
+    prog_en = center_prog_environment(state)
+    aux_en_2m = center_aux_environment_2m(state)
+    prog_covar = getproperty(prog_en, covar_sym)
+    aux_covar = getproperty(aux_en_2m, covar_sym)
 
     ae = center_field(grid)
 
@@ -1095,19 +1068,19 @@ function en_diffusion_tendencies(grid::Grid, state, TS, covar, n_updrafts)
     end
 
     kc_surf = kc_surface(grid)
-    covar_surf = covar.values[kc_surf]
+    covar_surf = prog_covar[kc_surf]
 
     @inbounds for k in real_center_indices(grid)
         if is_surface_center(grid, k)
             b[k] = covar_surf
         else
             b[k] = (
-                ρ0_c[k] * ae[k] * covar.values[k] * dti +
-                covar.press[k] +
-                covar.buoy[k] +
-                covar.shear[k] +
-                covar.entr_gain[k] +
-                covar.rain_src[k]
+                ρ0_c[k] * ae[k] * prog_covar[k] * dti +
+                aux_covar.press[k] +
+                aux_covar.buoy[k] +
+                aux_covar.shear[k] +
+                aux_covar.entr_gain[k] +
+                aux_covar.rain_src[k]
             )
         end
     end
@@ -1119,7 +1092,7 @@ function GMV_third_m(
     edmf::EDMF_PrognosticTKE,
     grid,
     state,
-    env_covar::EnvironmentVariable_2m,
+    covar_en_sym::Symbol,
     env_mean::EnvironmentVariable,
     up_var::Symbol,
     gm_third_m_sym::Symbol,
@@ -1133,7 +1106,8 @@ function GMV_third_m(
     ae = 1 .- aux_tc.bulk.area
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
-    is_tke = env_covar.name == "tke"
+    is_tke = covar_en_sym == :tke
+    covar_en = getproperty(center_prog_environment(state), covar_en_sym)
 
     @inbounds for k in real_center_indices(grid)
         mean_en = is_tke ? interpf2c(env_mean.values, grid, k) : env_mean.values[k]
@@ -1154,7 +1128,7 @@ function GMV_third_m(
             ∇w_en = ∇f2c(w_en_dual, grid, k; w_bcs...)
             Envcov_ = -edmf.horiz_K_eddy[i_last, k] * ∇w_en
         else
-            Envcov_ = env_covar.values[k]
+            Envcov_ = covar_en[k]
         end
 
         Upd_cubed = 0.0

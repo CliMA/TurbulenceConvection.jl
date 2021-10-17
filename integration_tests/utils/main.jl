@@ -50,12 +50,28 @@ cent_aux_vars_gm(FT) = (;
     W_third_m = FT(0),
     QT_third_m = FT(0),
 )
+cent_aux_vars_en_2m(FT) = (;
+    dissipation = FT(0),
+    shear = FT(0),
+    entr_gain = FT(0),
+    detr_loss = FT(0),
+    press = FT(0),
+    buoy = FT(0),
+    interdomain = FT(0),
+    rain_src = FT(0),
+)
 cent_aux_vars_up(FT) = (; q_liq = FT(0), T = FT(0), RH = FT(0), buoy = FT(0))
 cent_aux_vars_edmf(FT, n_up) = (;
     turbconv = (;
         bulk = (; area = FT(0), θ_liq_ice = FT(0), RH = FT(0), buoy = FT(0), q_tot = FT(0), q_liq = FT(0), T = FT(0)),
         up = ntuple(i -> cent_aux_vars_up(FT), n_up),
         en = (; area = FT(0)),
+        en_2m = (;
+            tke = cent_aux_vars_en_2m(FT),
+            Hvar = cent_aux_vars_en_2m(FT),
+            QTvar = cent_aux_vars_en_2m(FT),
+            HQTcov = cent_aux_vars_en_2m(FT),
+        ),
         KM = FT(0),
         KH = FT(0),
     ),
@@ -89,7 +105,7 @@ face_diagnostic_vars(FT, n_up) = (; face_diagnostic_vars_gm(FT)..., face_diagnos
 cent_prognostic_vars(FT, n_up) = (; cent_prognostic_vars_gm(FT)..., cent_prognostic_vars_edmf(FT, n_up)...)
 cent_prognostic_vars_gm(FT) = (; u = FT(0), v = FT(0), θ_liq_ice = FT(0), q_tot = FT(0))
 cent_prognostic_vars_up(FT) = (; area = FT(0), θ_liq_ice = FT(0), q_tot = FT(0))
-cent_prognostic_vars_en(FT) = ()
+cent_prognostic_vars_en(FT) = (; tke = FT(0), Hvar = FT(0), QTvar = FT(0), HQTcov = FT(0))
 cent_prognostic_vars_edmf(FT, n_up) =
     (; turbconv = (; en = cent_prognostic_vars_en(FT), up = ntuple(i -> cent_prognostic_vars_up(FT), n_up)))
 # cent_prognostic_vars_edmf(FT, n_up) = (;) # could also use this for empty model

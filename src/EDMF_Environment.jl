@@ -6,10 +6,6 @@ function initialize_io(en::EnvironmentVariables, Stats::NetCDFIO_Stats)
     add_profile(Stats, "env_temperature")
     add_profile(Stats, "env_RH")
     add_profile(Stats, "env_thetal")
-    add_profile(Stats, "env_tke")
-    add_profile(Stats, "env_Hvar")
-    add_profile(Stats, "env_QTvar")
-    add_profile(Stats, "env_HQTcov")
 
     add_profile(Stats, "env_cloud_fraction")
 
@@ -29,10 +25,6 @@ function io(en::EnvironmentVariables, grid, state, Stats::NetCDFIO_Stats)
     write_profile(Stats, "env_temperature", en.T.values)
     write_profile(Stats, "env_RH", en.RH.values)
     write_profile(Stats, "env_thetal", en.H.values)
-    write_profile(Stats, "env_tke", en.TKE.values)
-    write_profile(Stats, "env_Hvar", en.Hvar.values)
-    write_profile(Stats, "env_QTvar", en.QTvar.values)
-    write_profile(Stats, "env_HQTcov", en.HQTcov.values)
 
     write_profile(Stats, "env_cloud_fraction", en.cloud_fraction.values)
 
@@ -111,6 +103,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
     a, w = FastGaussQuadrature.gausshermite(en_thermo.quadrature_order)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
+    prog_en = center_prog_environment(state)
 
     #TODO - remember you output source terms multipierd by dt (bec. of instanteneous autoconcv)
     #TODO - add tendencies for gm H, QT and QR due to rain
@@ -139,30 +132,28 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
 
     @inbounds for k in real_center_indices(grid)
         if (
-            en.QTvar.values[k] > epsilon &&
-            en.Hvar.values[k] > epsilon &&
-            abs(en.HQTcov.values[k]) > epsilon &&
+            prog_en.QTvar[k] > epsilon &&
+            prog_en.Hvar[k] > epsilon &&
+            abs(prog_en.HQTcov[k]) > epsilon &&
             en.QT.values[k] > epsilon &&
-            sqrt(en.QTvar.values[k]) < en.QT.values[k]
+            sqrt(prog_en.QTvar[k]) < en.QT.values[k]
         )
 
             if en_thermo.quadrature_type == "log-normal"
                 # Lognormal parameters (mu, sd) from mean and variance
-                sd_q = sqrt(log(en.QTvar.values[k] / en.QT.values[k] / en.QT.values[k] + 1.0))
-                sd_h = sqrt(log(en.Hvar.values[k] / en.H.values[k] / en.H.values[k] + 1.0))
+                sd_q = sqrt(log(prog_en.QTvar[k] / en.QT.values[k] / en.QT.values[k] + 1.0))
+                sd_h = sqrt(log(prog_en.Hvar[k] / en.H.values[k] / en.H.values[k] + 1.0))
                 # Enforce Schwarz"s inequality
-                corr = max(min(en.HQTcov.values[k] / sqrt(en.Hvar.values[k] * en.QTvar.values[k]), 1.0), -1.0)
-                sd2_hq =
-                    log(corr * sqrt(en.Hvar.values[k] * en.QTvar.values[k]) / en.H.values[k] / en.QT.values[k] + 1.0)
+                corr = max(min(prog_en.HQTcov[k] / sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]), 1.0), -1.0)
+                sd2_hq = log(corr * sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]) / en.H.values[k] / en.QT.values[k] + 1.0)
                 sd_cond_h_q = sqrt(max(sd_h * sd_h - sd2_hq * sd2_hq / sd_q / sd_q, 0.0))
-                mu_q = log(
-                    en.QT.values[k] * en.QT.values[k] / sqrt(en.QT.values[k] * en.QT.values[k] + en.QTvar.values[k]),
-                )
-                mu_h = log(en.H.values[k] * en.H.values[k] / sqrt(en.H.values[k] * en.H.values[k] + en.Hvar.values[k]))
+                mu_q =
+                    log(en.QT.values[k] * en.QT.values[k] / sqrt(en.QT.values[k] * en.QT.values[k] + prog_en.QTvar[k]))
+                mu_h = log(en.H.values[k] * en.H.values[k] / sqrt(en.H.values[k] * en.H.values[k] + prog_en.Hvar[k]))
             else
-                sd_q = sqrt(en.QTvar.values[k])
-                sd_h = sqrt(en.Hvar.values[k])
-                corr = max(min(en.HQTcov.values[k] / max(sd_h * sd_q, 1e-13), 1.0), -1.0)
+                sd_q = sqrt(prog_en.QTvar[k])
+                sd_h = sqrt(prog_en.Hvar[k])
+                corr = max(min(prog_en.HQTcov[k] / max(sd_h * sd_q, 1e-13), 1.0), -1.0)
 
                 # limit sd_q to prevent negative qt_hat
                 sd_q_lim = (1e-10 - en.QT.values[k]) / (sqrt2 * abscissas[1])
