@@ -13,8 +13,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     α0_c = center_ref_state(state).α0
     g = CPP.grav(param_set)
     c_m = CPEDMF.c_m(param_set)
-    KM = diffusivity_m(edmf).values
-    KH = diffusivity_h(edmf).values
+    KM = center_aux_tc(state).KM
+    KH = center_aux_tc(state).KH
     surface = Case.Sur
     obukhov_length = surface.obukhov_length
     FT = eltype(grid)
@@ -26,6 +26,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     prog_up_f = face_prog_updrafts(state)
     aux_up_f = face_aux_tc(state)
     aux_tc = center_aux_tc(state)
+    prog_en = center_prog_environment(state)
+    aux_en_2m = center_aux_environment_2m(state)
 
     for k in real_center_indices(grid)
         aux_tc.bulk.area[k] = sum(ntuple(i -> prog_up[i].area[k], up.n_updrafts))
@@ -35,12 +37,12 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     ##### diagnose_GMV_moments
     #####
     #! format: off
-    get_GMV_CoVar(edmf, grid, state, en.H, en.H, en.Hvar, :Hvar, :θ_liq_ice)
-    get_GMV_CoVar(edmf, grid, state, en.QT, en.QT, en.QTvar, :QTvar, :q_tot)
-    get_GMV_CoVar(edmf, grid, state, en.H, en.QT, en.HQTcov, :HQTcov, :θ_liq_ice, :q_tot)
-    GMV_third_m(edmf, grid, state, en.Hvar, en.H, :θ_liq_ice, :H_third_m)
-    GMV_third_m(edmf, grid, state, en.QTvar, en.QT, :q_tot, :QT_third_m)
-    GMV_third_m(edmf, grid, state, en.TKE, en.W, :w, :W_third_m)
+    get_GMV_CoVar(edmf, grid, state, en.H, en.H, :Hvar, :θ_liq_ice)
+    get_GMV_CoVar(edmf, grid, state, en.QT, en.QT, :QTvar, :q_tot)
+    get_GMV_CoVar(edmf, grid, state, en.H, en.QT, :HQTcov, :θ_liq_ice, :q_tot)
+    GMV_third_m(edmf, grid, state, :Hvar, en.H, :θ_liq_ice, :H_third_m)
+    GMV_third_m(edmf, grid, state, :QTvar, en.QT, :q_tot, :QT_third_m)
+    GMV_third_m(edmf, grid, state, :tke, en.W, :w, :W_third_m)
     #! format: on
 
     #####
@@ -205,7 +207,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                     w_en = interpf2c(en.W.values, grid, k),
                     b_up = aux_up[i].buoy[k],
                     b_en = en.B.values[k],
-                    tke = en.TKE.values[k],
+                    tke = prog_en.tke[k],
                     dMdz = ∇m,
                     M = m,
                     a_up = prog_up[i].area[k],
@@ -330,7 +332,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         ml_model = MinDisspLen(;
             z = grid.zc[k].z,
             obukhov_length = obukhov_length,
-            tke_surf = en.TKE.values[kc_surf],
+            tke_surf = prog_en.tke[kc_surf],
             ustar = surface.ustar,
             Pr = edmf.prandtl_nvec[k],
             p0 = p0_c[k],
@@ -341,7 +343,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             ∂qt∂z = ∂qt∂z,
             ∂θl∂z = ∂θl∂z,
             θv = θv,
-            tke = en.TKE.values[k],
+            tke = prog_en.tke[k],
             a_en = (1 - aux_tc.bulk.area[k]),
             wc_en = wc_en,
             wc_up = Tuple(wc_up),
@@ -361,38 +363,38 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         edmf.mixing_length[k] = ml.mixing_length
         edmf.ml_ratio[k] = ml.ml_ratio
 
-        KM[k] = c_m * edmf.mixing_length[k] * sqrt(max(en.TKE.values[k], 0.0))
+        KM[k] = c_m * edmf.mixing_length[k] * sqrt(max(prog_en.tke[k], 0.0))
         KH[k] = KM[k] / edmf.prandtl_nvec[k]
 
-        en.TKE.buoy[k] = -ml_model.a_en * ρ0_c[k] * KH[k] * (bg.∂b∂z_θl + bg.∂b∂z_qt)
+        aux_en_2m.tke.buoy[k] = -ml_model.a_en * ρ0_c[k] * KH[k] * (bg.∂b∂z_θl + bg.∂b∂z_qt)
     end
 
-    compute_covariance_entr(edmf, grid, state, en.TKE, en.W, en.W, :w)
-    compute_covariance_shear(edmf, grid, state, gm, en.TKE, en.W.values, en.W.values)
-    compute_covariance_interdomain_src(edmf, grid, state, en.W, en.W, en.TKE, :w)
+    compute_covariance_entr(edmf, grid, state, :tke, en.W, en.W, :w)
+    compute_covariance_shear(edmf, grid, state, gm, :tke, en.W.values, en.W.values)
+    compute_covariance_interdomain_src(edmf, grid, state, en.W, en.W, :tke, :w)
 
     #####
     ##### compute_tke_pressure
     #####
     @inbounds for k in real_center_indices(grid)
-        en.TKE.press[k] = 0.0
+        aux_en_2m.tke.press[k] = 0.0
         @inbounds for i in 1:(up.n_updrafts)
             w_up_c = interpf2c(prog_up_f[i].w, grid, k)
             w_en_c = interpf2c(en.W.values, grid, k)
             press_c = interpf2c(edmf.nh_pressure, grid, k, i)
-            en.TKE.press[k] += (w_en_c - w_up_c) * press_c
+            aux_en_2m.tke.press[k] += (w_en_c - w_up_c) * press_c
         end
     end
 
-    compute_covariance_entr(edmf, grid, state, en.Hvar, en.H, en.H, :θ_liq_ice)
-    compute_covariance_entr(edmf, grid, state, en.QTvar, en.QT, en.QT, :q_tot)
-    compute_covariance_entr(edmf, grid, state, en.HQTcov, en.H, en.QT, :θ_liq_ice, :q_tot)
-    compute_covariance_shear(edmf, grid, state, gm, en.Hvar, en.H.values, en.H.values)
-    compute_covariance_shear(edmf, grid, state, gm, en.QTvar, en.QT.values, en.QT.values)
-    compute_covariance_shear(edmf, grid, state, gm, en.HQTcov, en.H.values, en.QT.values)
-    compute_covariance_interdomain_src(edmf, grid, state, en.H, en.H, en.Hvar, :θ_liq_ice)
-    compute_covariance_interdomain_src(edmf, grid, state, en.QT, en.QT, en.QTvar, :q_tot)
-    compute_covariance_interdomain_src(edmf, grid, state, en.H, en.QT, en.HQTcov, :θ_liq_ice, :q_tot)
+    compute_covariance_entr(edmf, grid, state, :Hvar, en.H, en.H, :θ_liq_ice)
+    compute_covariance_entr(edmf, grid, state, :QTvar, en.QT, en.QT, :q_tot)
+    compute_covariance_entr(edmf, grid, state, :HQTcov, en.H, en.QT, :θ_liq_ice, :q_tot)
+    compute_covariance_shear(edmf, grid, state, gm, :Hvar, en.H.values, en.H.values)
+    compute_covariance_shear(edmf, grid, state, gm, :QTvar, en.QT.values, en.QT.values)
+    compute_covariance_shear(edmf, grid, state, gm, :HQTcov, en.H.values, en.QT.values)
+    compute_covariance_interdomain_src(edmf, grid, state, en.H, en.H, :Hvar, :θ_liq_ice)
+    compute_covariance_interdomain_src(edmf, grid, state, en.QT, en.QT, :QTvar, :q_tot)
+    compute_covariance_interdomain_src(edmf, grid, state, en.H, en.QT, :HQTcov, :θ_liq_ice, :q_tot)
 
     #####
     ##### compute_covariance_rain # need to update this one
@@ -401,10 +403,10 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     # TODO defined again in compute_covariance_shear and compute_covaraince
     ae = 1 .- aux_tc.bulk.area # area of environment
     @inbounds for k in real_center_indices(grid)
-        en.TKE.rain_src[k] = 0
-        en.Hvar.rain_src[k] = ρ0_c[k] * ae[k] * 2 * en_thermo.Hvar_rain_dt[k]
-        en.QTvar.rain_src[k] = ρ0_c[k] * ae[k] * 2 * en_thermo.QTvar_rain_dt[k]
-        en.HQTcov.rain_src[k] = ρ0_c[k] * ae[k] * en_thermo.HQTcov_rain_dt[k]
+        aux_en_2m.tke.rain_src[k] = 0
+        aux_en_2m.Hvar.rain_src[k] = ρ0_c[k] * ae[k] * 2 * en_thermo.Hvar_rain_dt[k]
+        aux_en_2m.QTvar.rain_src[k] = ρ0_c[k] * ae[k] * 2 * en_thermo.QTvar_rain_dt[k]
+        aux_en_2m.HQTcov.rain_src[k] = ρ0_c[k] * ae[k] * en_thermo.HQTcov_rain_dt[k]
     end
 
     reset_surface_covariance(edmf, grid, state, gm, Case)

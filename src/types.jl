@@ -373,44 +373,6 @@ struct EnvironmentVariable{T}
     end
 end
 
-struct EnvironmentVariable_2m{A1}
-    values::A1
-    dissipation::A1
-    shear::A1
-    entr_gain::A1
-    detr_loss::A1
-    press::A1
-    buoy::A1
-    interdomain::A1
-    rain_src::A1
-    name::String
-    units::String
-    function EnvironmentVariable_2m(grid, name, units)
-        values = center_field(grid)
-        dissipation = center_field(grid)
-        entr_gain = center_field(grid)
-        detr_loss = center_field(grid)
-        buoy = center_field(grid)
-        press = center_field(grid)
-        shear = center_field(grid)
-        interdomain = center_field(grid)
-        rain_src = center_field(grid)
-        return new{typeof(values)}(
-            values,
-            dissipation,
-            shear,
-            entr_gain,
-            detr_loss,
-            press,
-            buoy,
-            interdomain,
-            rain_src,
-            name,
-            units,
-        )
-    end
-end
-
 Base.@kwdef mutable struct EnvironmentVariables
     W::EnvironmentVariable
     Area::EnvironmentVariable
@@ -421,10 +383,6 @@ Base.@kwdef mutable struct EnvironmentVariables
     T::EnvironmentVariable
     B::EnvironmentVariable
     cloud_fraction::EnvironmentVariable
-    TKE::EnvironmentVariable_2m
-    Hvar::EnvironmentVariable_2m
-    QTvar::EnvironmentVariable_2m
-    HQTcov::EnvironmentVariable_2m
     cloud_base::Float64 = 0
     cloud_top::Float64 = 0
     cloud_cover::Float64 = 0
@@ -444,27 +402,8 @@ function EnvironmentVariables(namelist, grid::Grid)
 
     # TODO - the flag setting is repeated from Variables.pyx logic
     EnvThermo_scheme = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
-    TKE = EnvironmentVariable_2m(grid, "tke", "m^2/s^2")
-    QTvar = EnvironmentVariable_2m(grid, "qt_var", "kg^2/kg^2")
-    Hvar = EnvironmentVariable_2m(grid, "thetal_var", "K^2")
-    HQTcov = EnvironmentVariable_2m(grid, "thetal_qt_covar", "K(kg/kg)")
 
-    return EnvironmentVariables(;
-        W,
-        Area,
-        QT,
-        QL,
-        H,
-        RH,
-        T,
-        B,
-        cloud_fraction,
-        TKE,
-        Hvar,
-        QTvar,
-        HQTcov,
-        EnvThermo_scheme,
-    )
+    return EnvironmentVariables(; W, Area, QT, QL, H, RH, T, B, cloud_fraction, EnvThermo_scheme)
 end
 
 struct EnvironmentThermodynamics{A1}
@@ -645,8 +584,6 @@ function center_field_tridiagonal_matrix(grid::Grid)
 end
 
 mutable struct EDMF_PrognosticTKE{A1, A2, IE}
-    KM::VariableDiagnostic
-    KH::VariableDiagnostic
     Ri_bulk_crit::Float64
     zi::Float64
     n_updrafts::Int
@@ -681,9 +618,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
     m::A2
     mixing_length::A1
     implicit_eqs::IE
-    ae::A1
-    rho_ae_KM::A1
-    rho_ae_KH::A1
     horiz_K_eddy::A2
     area_surface_bc::A1
     w_surface_bc::A1
@@ -706,14 +640,11 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
     mls::A1
     ml_ratio::A1
     l_entdet::A1
-    b::A1
     wstar::Float64
     entr_surface_bc::Float64
     detr_surface_bc::Float64
     sde_model::sde_struct
     function EDMF_PrognosticTKE(namelist, grid::Grid, param_set::PS) where {PS}
-        KM = VariableDiagnostic(grid, "half", "diffusivity", "m^2/s") # eddy viscosity
-        KH = VariableDiagnostic(grid, "half", "viscosity", "m^2/s") # eddy diffusivity
         # get values from namelist
         prandtl_number = namelist["turbulence"]["prandtl_number_0"]
         Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
@@ -822,10 +753,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
         mixing_length = center_field(grid)
         horiz_K_eddy = center_field(grid, n_updrafts)
 
-        ae = center_field(grid)
-        rho_ae_KM = face_field(grid)
-        rho_ae_KH = face_field(grid)
-
         # Near-surface BC of updraft area fraction
         area_surface_bc = zeros(n_updrafts)
         w_surface_bc = zeros(n_updrafts)
@@ -879,7 +806,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
         mls = center_field(grid)
         ml_ratio = center_field(grid)
         l_entdet = center_field(grid)
-        b = center_field(grid)
         wstar = 0
         entr_surface_bc = 0
         detr_surface_bc = 0
@@ -887,8 +813,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
         A2 = typeof(horiz_K_eddy)
         IE = typeof(implicit_eqs)
         return new{A1, A2, IE}(
-            KM,
-            KH,
             Ri_bulk_crit,
             zi,
             n_updrafts,
@@ -923,9 +847,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
             m,
             mixing_length,
             implicit_eqs,
-            ae,
-            rho_ae_KM,
-            rho_ae_KH,
             horiz_K_eddy,
             area_surface_bc,
             w_surface_bc,
@@ -948,7 +869,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
             mls,
             ml_ratio,
             l_entdet,
-            b,
             wstar,
             entr_surface_bc,
             detr_surface_bc,

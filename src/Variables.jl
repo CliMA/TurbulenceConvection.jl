@@ -24,9 +24,9 @@ function satadjust(gm::GridMeanVariables, grid, state)
     prog_gm = center_prog_grid_mean(state)
     param_set = parameter_set(gm)
     @inbounds for k in real_center_indices(grid)
-        h = prog_gm.θ_liq_ice[k]
-        qt = prog_gm.q_tot[k]
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], h, qt)
+        θ_liq_ice = prog_gm.θ_liq_ice[k]
+        q_tot = prog_gm.q_tot[k]
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], θ_liq_ice, q_tot)
         aux_gm.q_liq[k] = TD.liquid_specific_humidity(ts)
         aux_gm.T[k] = TD.air_temperature(ts)
         ρ = TD.air_density(ts)

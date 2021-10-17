@@ -619,10 +619,7 @@ function construct_tridiag_diffusion_en(
     param_set::APS,
     state,
     TS,
-    KM,
-    KH,
     w_en,
-    tke_en,
     n_updrafts::Int,
     minimum_area::Float64,
     pressure_plume_spacing::Vector,
@@ -645,11 +642,14 @@ function construct_tridiag_diffusion_en(
     aux_tc = center_aux_tc(state)
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    prog_en = center_prog_environment(state)
 
-    ae = vec(1 .- aux_tc.bulk.area)
+    ae = 1 .- aux_tc.bulk.area
     rho_ae_K_m = face_field(grid)
     w_en_c = center_field(grid)
     D_env = 0.0
+    KM = center_aux_tc(state).KM
+    KH = center_aux_tc(state).KH
 
     aeK = is_tke ? ae .* KM : ae .* KH
     aeK_bcs = (; bottom = SetValue(aeK[kc_surf]), top = SetValue(aeK[kc_toa]))
@@ -690,7 +690,7 @@ function construct_tridiag_diffusion_en(
                 rho_ae_K_m[k + 1] * Δzi * Δzi +
                 rho_ae_K_m[k] * Δzi * Δzi +
                 D_env +
-                ρ0_c[k] * ae[k] * c_d * sqrt(max(tke_en[k], 0)) / max(mixing_length[k], 1)
+                ρ0_c[k] * ae[k] * c_d * sqrt(max(prog_en.tke[k], 0)) / max(mixing_length[k], 1)
             )
             if is_toa_center(grid, k)
                 c[k] = 0.0
