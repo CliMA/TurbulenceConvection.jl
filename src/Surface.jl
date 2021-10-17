@@ -148,7 +148,7 @@ function update(surf::SurfaceBase{SurfaceMoninObukhov}, grid, state, gm::GridMea
     T_gm_surf = aux_gm.T[kc_surf]
     Pg = surf.ref_params.Pg
 
-    pvg = TD.saturation_vapor_pressure(param_set, surf.Tsurface, TD.Liquid())
+    pvg = TD.saturation_vapor_pressure(param_set, TD.PhaseEquil, surf.Tsurface)
     surf.qsurface = TD.q_vap_saturation_from_density(param_set, surf.Tsurface, ρ0_f_surf, pvg)
     lv = TD.latent_heat_vapor(param_set, T_gm_surf)
 
@@ -201,7 +201,7 @@ function update(surf::SurfaceBase{SurfaceMoninObukhovDry}, grid, state, gm::Grid
     T_gm_surf = aux_gm.T[kc_surf]
     Pg = surf.ref_params.Pg
 
-    pvg = TD.saturation_vapor_pressure(param_set, surf.Tsurface, TD.Liquid())
+    pvg = TD.saturation_vapor_pressure(param_set, TD.PhaseEquil, surf.Tsurface)
     surf.qsurface = TD.q_vap_saturation_from_density(param_set, surf.Tsurface, ρ0_f_surf, pvg)
     lv = TD.latent_heat_vapor(param_set, T_gm_surf)
 
@@ -262,7 +262,8 @@ function update(surf::SurfaceBase{SurfaceSullivanPatton}, grid, state, gm::GridM
     phase_part = TD.PhasePartition(q_tot_gm_surf, 0.0, 0.0)
     Π = TD.exner_given_pressure(param_set, p0_f_surf, phase_part)
     surf.bflux = g * θ_flux * Π / T0
-    pvg = TD.saturation_vapor_pressure(param_set, surf.Tsurface, TD.Liquid())
+
+    pvg = TD.saturation_vapor_pressure(param_set, TD.PhaseEquil, surf.Tsurface)
     surf.qsurface = TD.q_vap_saturation_from_density(param_set, surf.Tsurface, ρ0_f_surf, pvg)
     h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, Pg, phase_part)
 
