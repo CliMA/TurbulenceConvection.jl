@@ -97,6 +97,14 @@ function io_dictionary_aux(state)
         "HQTcov_shear" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).HQTcov.shear),
         "HQTcov_interdomain" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).HQTcov.interdomain),
 
+        "env_w" => (; dims = ("zf", "t"), group = "profiles", field = face_aux_environment(state).w),
+        "env_qt" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment(state).q_tot),
+        "env_ql" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment(state).q_liq),
+        "env_area" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment(state).area),
+        "env_temperature" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment(state).T),
+        "env_RH" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment(state).RH),
+        "env_thetal" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment(state).θ_liq_ice),
+        "env_cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment(state).cloud_fraction),
     )
     return io_dict
 end

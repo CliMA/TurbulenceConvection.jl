@@ -619,7 +619,6 @@ function construct_tridiag_diffusion_en(
     param_set::APS,
     state,
     TS,
-    w_en,
     n_updrafts::Int,
     minimum_area::Float64,
     pressure_plume_spacing::Vector,
@@ -640,6 +639,7 @@ function construct_tridiag_diffusion_en(
     ρ0_c = center_ref_state(state).ρ0
     ρ0_f = face_ref_state(state).ρ0
     aux_tc = center_aux_tc(state)
+    w_en = face_aux_environment(state).w
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
     prog_en = center_prog_environment(state)

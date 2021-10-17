@@ -1,33 +1,12 @@
 function initialize_io(en::EnvironmentVariables, Stats::NetCDFIO_Stats)
-    add_profile(Stats, "env_w")
-    add_profile(Stats, "env_qt")
-    add_profile(Stats, "env_ql")
-    add_profile(Stats, "env_area")
-    add_profile(Stats, "env_temperature")
-    add_profile(Stats, "env_RH")
-    add_profile(Stats, "env_thetal")
-
-    add_profile(Stats, "env_cloud_fraction")
-
     add_ts(Stats, "env_cloud_base")
     add_ts(Stats, "env_cloud_top")
     add_ts(Stats, "env_cloud_cover")
     add_ts(Stats, "env_lwp")
-
     return
 end
 
 function io(en::EnvironmentVariables, grid, state, Stats::NetCDFIO_Stats)
-    write_profile(Stats, "env_w", en.W.values)
-    write_profile(Stats, "env_qt", en.QT.values)
-    write_profile(Stats, "env_ql", en.QL.values)
-    write_profile(Stats, "env_area", en.Area.values)
-    write_profile(Stats, "env_temperature", en.T.values)
-    write_profile(Stats, "env_RH", en.RH.values)
-    write_profile(Stats, "env_thetal", en.H.values)
-
-    write_profile(Stats, "env_cloud_fraction", en.cloud_fraction.values)
-
     env_cloud_diagnostics(en, grid, state)
     # Assuming amximum overlap in environmental clouds
     write_ts(Stats, "env_cloud_cover", en.cloud_cover)
@@ -43,37 +22,40 @@ function env_cloud_diagnostics(en::EnvironmentVariables, grid, state)
     en.cloud_cover = 0.0
     en.lwp = 0.0
     ρ0_c = center_ref_state(state).ρ0
+    aux_en = center_aux_environment(state)
 
     @inbounds for k in real_center_indices(grid)
-        en.lwp += ρ0_c[k] * en.QL.values[k] * en.Area.values[k] * grid.Δz
+        en.lwp += ρ0_c[k] * aux_en.q_liq[k] * aux_en.area[k] * grid.Δz
 
-        if en.QL.values[k] > 1e-8 && en.Area.values[k] > 1e-3
+        if aux_en.q_liq[k] > 1e-8 && aux_en.area[k] > 1e-3
             en.cloud_base = min(en.cloud_base, grid.zc[k])
             en.cloud_top = max(en.cloud_top, grid.zc[k])
-            en.cloud_cover = max(en.cloud_cover, en.Area.values[k] * en.cloud_fraction.values[k])
+            en.cloud_cover = max(en.cloud_cover, aux_en.area[k] * aux_en.cloud_fraction[k])
         end
     end
     return
 end
 
-function update_env_precip_tendencies(en_thermo::EnvironmentThermodynamics, k, en, qt_tendency, θ_liq_ice_tendency)
+function update_env_precip_tendencies(en_thermo::EnvironmentThermodynamics, state, k, qt_tendency, θ_liq_ice_tendency)
 
-    en_thermo.qt_tendency_rain_formation[k] = qt_tendency * en.Area.values[k]
-    en_thermo.θ_liq_ice_tendency_rain_formation[k] = θ_liq_ice_tendency * en.Area.values[k]
+    aux_en = center_aux_environment(state)
+    en_thermo.qt_tendency_rain_formation[k] = qt_tendency * aux_en.area[k]
+    en_thermo.θ_liq_ice_tendency_rain_formation[k] = θ_liq_ice_tendency * aux_en.area[k]
 
     return
 end
 
-function update_cloud_dry(en_thermo::EnvironmentThermodynamics, k, en::EnvironmentVariables, ts)
+function update_cloud_dry(en_thermo::EnvironmentThermodynamics, state, k, ts)
     q_liq = TD.liquid_specific_humidity(ts)
+    aux_en = center_aux_environment(state)
     if q_liq > 0.0
-        en.cloud_fraction.values[k] = 1.0
+        aux_en.cloud_fraction[k] = 1.0
         en_thermo.th_cloudy[k] = TD.liquid_ice_pottemp(ts)
         en_thermo.t_cloudy[k] = TD.air_temperature(ts)
         en_thermo.qt_cloudy[k] = TD.total_specific_humidity(ts)
         en_thermo.qv_cloudy[k] = TD.vapor_specific_humidity(ts)
     else
-        en.cloud_fraction.values[k] = 0.0
+        aux_en.cloud_fraction[k] = 0.0
         en_thermo.th_dry[k] = TD.liquid_ice_pottemp(ts)
         en_thermo.qt_dry[k] = TD.total_specific_humidity(ts)
     end
@@ -84,15 +66,16 @@ function sgs_mean(en_thermo::EnvironmentThermodynamics, grid, state, en, rain, d
 
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
+    aux_en = center_aux_environment(state)
 
     @inbounds for k in real_center_indices(grid)
         # condensation
-        q_tot_en = en.QT.values[k]
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], en.H.values[k], q_tot_en)
+        q_tot_en = aux_en.q_tot[k]
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], q_tot_en)
         # autoconversion and accretion
-        mph = precipitation_formation(param_set, rain.rain_model, rain.QR.values[k], en.Area.values[k], ρ0_c[k], dt, ts)
-        update_cloud_dry(en_thermo, k, en, ts)
-        update_env_precip_tendencies(en_thermo, k, en, mph.qt_tendency, mph.θ_liq_ice_tendency)
+        mph = precipitation_formation(param_set, rain.rain_model, rain.QR.values[k], aux_en.area[k], ρ0_c[k], dt, ts)
+        update_cloud_dry(en_thermo, state, k, ts)
+        update_env_precip_tendencies(en_thermo, state, k, mph.qt_tendency, mph.θ_liq_ice_tendency)
     end
     return
 end
@@ -104,6 +87,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     prog_en = center_prog_environment(state)
+    aux_en = center_aux_environment(state)
 
     #TODO - remember you output source terms multipierd by dt (bec. of instanteneous autoconcv)
     #TODO - add tendencies for gm H, QT and QR due to rain
@@ -135,28 +119,32 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
             prog_en.QTvar[k] > epsilon &&
             prog_en.Hvar[k] > epsilon &&
             abs(prog_en.HQTcov[k]) > epsilon &&
-            en.QT.values[k] > epsilon &&
-            sqrt(prog_en.QTvar[k]) < en.QT.values[k]
+            aux_en.q_tot[k] > epsilon &&
+            sqrt(prog_en.QTvar[k]) < aux_en.q_tot[k]
         )
 
             if en_thermo.quadrature_type == "log-normal"
                 # Lognormal parameters (mu, sd) from mean and variance
-                sd_q = sqrt(log(prog_en.QTvar[k] / en.QT.values[k] / en.QT.values[k] + 1.0))
-                sd_h = sqrt(log(prog_en.Hvar[k] / en.H.values[k] / en.H.values[k] + 1.0))
+                sd_q = sqrt(log(prog_en.QTvar[k] / aux_en.q_tot[k] / aux_en.q_tot[k] + 1.0))
+                sd_h = sqrt(log(prog_en.Hvar[k] / aux_en.θ_liq_ice[k] / aux_en.θ_liq_ice[k] + 1.0))
                 # Enforce Schwarz"s inequality
                 corr = max(min(prog_en.HQTcov[k] / sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]), 1.0), -1.0)
-                sd2_hq = log(corr * sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]) / en.H.values[k] / en.QT.values[k] + 1.0)
+                sd2_hq =
+                    log(corr * sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]) / aux_en.θ_liq_ice[k] / aux_en.q_tot[k] + 1.0)
                 sd_cond_h_q = sqrt(max(sd_h * sd_h - sd2_hq * sd2_hq / sd_q / sd_q, 0.0))
                 mu_q =
-                    log(en.QT.values[k] * en.QT.values[k] / sqrt(en.QT.values[k] * en.QT.values[k] + prog_en.QTvar[k]))
-                mu_h = log(en.H.values[k] * en.H.values[k] / sqrt(en.H.values[k] * en.H.values[k] + prog_en.Hvar[k]))
+                    log(aux_en.q_tot[k] * aux_en.q_tot[k] / sqrt(aux_en.q_tot[k] * aux_en.q_tot[k] + prog_en.QTvar[k]))
+                mu_h = log(
+                    aux_en.θ_liq_ice[k] * aux_en.θ_liq_ice[k] /
+                    sqrt(aux_en.θ_liq_ice[k] * aux_en.θ_liq_ice[k] + prog_en.Hvar[k]),
+                )
             else
                 sd_q = sqrt(prog_en.QTvar[k])
                 sd_h = sqrt(prog_en.Hvar[k])
                 corr = max(min(prog_en.HQTcov[k] / max(sd_h * sd_q, 1e-13), 1.0), -1.0)
 
                 # limit sd_q to prevent negative qt_hat
-                sd_q_lim = (1e-10 - en.QT.values[k]) / (sqrt2 * abscissas[1])
+                sd_q_lim = (1e-10 - aux_en.q_tot[k]) / (sqrt2 * abscissas[1])
                 # walking backwards to assure your q_t will not be smaller than 1e-10
                 # TODO - check
                 # TODO - change 1e-13 and 1e-10 to some epislon
@@ -178,8 +166,8 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
                     qt_hat = exp(mu_q + sqrt2 * sd_q * abscissas[m_q])
                     mu_h_star = mu_h + sd2_hq / sd_q / sd_q * (log(qt_hat) - mu_q)
                 else
-                    qt_hat = en.QT.values[k] + sqrt2 * sd_q * abscissas[m_q]
-                    mu_h_star = en.H.values[k] + sqrt2 * corr * sd_h * abscissas[m_q]
+                    qt_hat = aux_en.q_tot[k] + sqrt2 * sd_q * abscissas[m_q]
+                    mu_h_star = aux_en.θ_liq_ice[k] + sqrt2 * corr * sd_h * abscissas[m_q]
                 end
 
                 # zero inner quadrature points
@@ -206,7 +194,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
                         param_set,
                         rain.rain_model,
                         rain.QR.values[k],
-                        en.Area.values[k],
+                        aux_en.area[k],
                         ρ0_c[k],
                         dt,
                         ts,
@@ -246,10 +234,10 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
             end
 
             # update environmental variables
-            update_env_precip_tendencies(en_thermo, k, en, outer_src[i_Sqt], outer_src[i_SH])
+            update_env_precip_tendencies(en_thermo, state, k, outer_src[i_Sqt], outer_src[i_SH])
 
             # update cloudy/dry variables for buoyancy in TKE
-            en.cloud_fraction.values[k] = outer_env[i_cf]
+            aux_en.cloud_fraction[k] = outer_env[i_cf]
             en_thermo.qt_dry[k] = outer_env[i_qt_dry]
             # TD.jl cannot compute θ_dry when T=0
             en_thermo.th_dry[k] = if outer_env[i_T_dry] > 0
@@ -266,26 +254,19 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
             en_thermo.th_cloudy[k] = TD.dry_pottemp(ts_cld)
 
             # update var/covar rain sources
-            en_thermo.Hvar_rain_dt[k] = outer_src[i_SH_H] - outer_src[i_SH] * en.H.values[k]
-            en_thermo.QTvar_rain_dt[k] = outer_src[i_Sqt_qt] - outer_src[i_Sqt] * en.QT.values[k]
+            en_thermo.Hvar_rain_dt[k] = outer_src[i_SH_H] - outer_src[i_SH] * aux_en.θ_liq_ice[k]
+            en_thermo.QTvar_rain_dt[k] = outer_src[i_Sqt_qt] - outer_src[i_Sqt] * aux_en.q_tot[k]
             en_thermo.HQTcov_rain_dt[k] =
-                outer_src[i_SH_qt] - outer_src[i_SH] * en.QT.values[k] + outer_src[i_Sqt_H] -
-                outer_src[i_Sqt] * en.H.values[k]
+                outer_src[i_SH_qt] - outer_src[i_SH] * aux_en.q_tot[k] + outer_src[i_Sqt_H] -
+                outer_src[i_Sqt] * aux_en.θ_liq_ice[k]
 
         else
             # if variance and covariance are zero do the same as in SA_mean
-            ts = TD.PhaseEquil_pθq(param_set, p0_c[k], en.H.values[k], en.QT.values[k])
-            mph = precipitation_formation(
-                param_set,
-                rain.rain_model,
-                rain.QR.values[k],
-                en.Area.values[k],
-                ρ0_c[k],
-                dt,
-                ts,
-            )
-            update_env_precip_tendencies(en_thermo, k, en, mph.qt_tendency, mph.θ_liq_ice_tendency)
-            update_cloud_dry(en_thermo, k, en, ts)
+            ts = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
+            mph =
+                precipitation_formation(param_set, rain.rain_model, rain.QR.values[k], aux_en.area[k], ρ0_c[k], dt, ts)
+            update_env_precip_tendencies(en_thermo, state, k, mph.qt_tendency, mph.θ_liq_ice_tendency)
+            update_cloud_dry(en_thermo, state, k, ts)
 
             en_thermo.Hvar_rain_dt[k] = 0.0
             en_thermo.QTvar_rain_dt[k] = 0.0

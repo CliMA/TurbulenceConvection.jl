@@ -363,26 +363,7 @@ struct UpdraftThermodynamics{A1, A2}
     end
 end
 
-struct EnvironmentVariable{T}
-    values::T
-    name::String
-    units::String
-    function EnvironmentVariable(grid, loc, name, units)
-        values = field(grid, loc)
-        return new{typeof(values)}(values, name, units)
-    end
-end
-
 Base.@kwdef mutable struct EnvironmentVariables
-    W::EnvironmentVariable
-    Area::EnvironmentVariable
-    QT::EnvironmentVariable
-    QL::EnvironmentVariable
-    H::EnvironmentVariable
-    RH::EnvironmentVariable
-    T::EnvironmentVariable
-    B::EnvironmentVariable
-    cloud_fraction::EnvironmentVariable
     cloud_base::Float64 = 0
     cloud_top::Float64 = 0
     cloud_cover::Float64 = 0
@@ -390,20 +371,9 @@ Base.@kwdef mutable struct EnvironmentVariables
     EnvThermo_scheme::String = "default_EnvThermo_scheme"
 end
 function EnvironmentVariables(namelist, grid::Grid)
-    W = EnvironmentVariable(grid, "full", "w", "m/s")
-    QT = EnvironmentVariable(grid, "half", "qt", "kg/kg")
-    QL = EnvironmentVariable(grid, "half", "ql", "kg/kg")
-    RH = EnvironmentVariable(grid, "half", "RH", "%")
-    H = EnvironmentVariable(grid, "half", "thetal", "K")
-    T = EnvironmentVariable(grid, "half", "temperature", "K")
-    B = EnvironmentVariable(grid, "half", "buoyancy", "m^2/s^3")
-    Area = EnvironmentVariable(grid, "half", "env_area", "-")
-    cloud_fraction = EnvironmentVariable(grid, "half", "env_cloud_fraction", "-")
-
     # TODO - the flag setting is repeated from Variables.pyx logic
     EnvThermo_scheme = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
-
-    return EnvironmentVariables(; W, Area, QT, QL, H, RH, T, B, cloud_fraction, EnvThermo_scheme)
+    return EnvironmentVariables(; EnvThermo_scheme)
 end
 
 struct EnvironmentThermodynamics{A1}
