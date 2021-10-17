@@ -96,9 +96,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     ##### decompose_environment
     #####
-    # Find values of environmental variables by subtracting updraft values from grid mean values
-    # whichvals used to check which substep we are on--correspondingly use "gm.SomeVar" (last timestep value)
-    # first make sure the "bulkvalues" of the updraft variables are updated
+    # (Find values of environmental variables by subtracting updraft values from grid mean values.
+    # Make sure the "bulkvalues" of the updraft variables are updated first)
+    # velocity (face indicies)
     @inbounds for k in real_face_indices(grid)
         aux_tc_f.bulk.w[k] = 0
         a_bulk_bcs = (; bottom = SetValue(sum(edmf.area_surface_bc)), top = SetZeroGradient())
@@ -113,7 +113,6 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         # Assuming gm.W = 0!
         aux_en_f.w[k] = -a_bulk_f / (1 - a_bulk_f) * aux_tc_f.bulk.w[k]
     end
-
     @inbounds for k in real_center_indices(grid)
         a_bulk_c = aux_tc.bulk.area[k]
         aux_tc.bulk.q_tot[k] = 0
@@ -123,6 +122,34 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         aux_tc.bulk.T[k] = 0
         aux_tc.bulk.RH[k] = 0
         aux_tc.bulk.buoy[k] = 0
+
+        @inbounds for i in 1:(up.n_updrafts)
+            if aux_up[i].area[k] > 0.0
+                ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
+                aux_up[i].q_liq[k] = TD.liquid_specific_humidity(ts_up)
+                aux_up[i].q_ice[k] = TD.ice_specific_humidity(ts_up)
+                aux_up[i].T[k] = TD.air_temperature(ts_up)
+                ρ = TD.air_density(ts_up)
+                aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
+                aux_up[i].RH[k] = TD.relative_humidity(ts_up)
+            elseif k > kc_surf
+                if aux_up[i].area[k - 1] > 0.0 && edmf.extrapolate_buoyancy
+                    qt = aux_up[i].q_tot[k - 1]
+                    h = aux_up[i].θ_liq_ice[k - 1]
+                    ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
+                    ρ = TD.air_density(ts_up)
+                    aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
+                    aux_up[i].RH[k] = TD.relative_humidity(ts_up)
+                else
+                    aux_up[i].buoy[k] = aux_en.buoy[k]
+                    aux_up[i].RH[k] = aux_en.RH[k]
+                end
+            else
+                aux_up[i].buoy[k] = aux_en.buoy[k]
+                aux_up[i].RH[k] = aux_en.RH[k]
+            end
+        end
+
         if a_bulk_c > 1.0e-20
             @inbounds for i in 1:(up.n_updrafts)
                 aux_tc.bulk.q_tot[k] += aux_up[i].area[k] * aux_up[i].q_tot[k] / a_bulk_c
@@ -136,8 +163,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         else
             aux_tc.bulk.q_tot[k] = prog_gm.q_tot[k]
             aux_tc.bulk.θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
-            aux_tc.bulk.RH[k] = aux_gm.RH[k]
-            aux_tc.bulk.T[k] = aux_gm.T[k]
+            aux_tc.bulk.RH[k] = aux_gm.RH[k]  # TODO - here we are using previous timestep values
+            aux_tc.bulk.T[k] = aux_gm.T[k]    # TODO - here we are using previous timestep values
         end
         if TD.has_condensate(aux_tc.bulk.q_liq[k] + aux_tc.bulk.q_ice[k]) && a_bulk_c > 1e-3
             up.cloud_fraction[k] = 1.0
@@ -169,34 +196,6 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         #####
         ##### buoyancy
         #####
-
-        @inbounds for i in 1:(up.n_updrafts)
-            if aux_up[i].area[k] > 0.0
-                ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
-                aux_up[i].q_liq[k] = TD.liquid_specific_humidity(ts_up)
-                aux_up[i].q_ice[k] = TD.ice_specific_humidity(ts_up)
-                aux_up[i].T[k] = TD.air_temperature(ts_up)
-                ρ = TD.air_density(ts_up)
-                aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
-                aux_up[i].RH[k] = TD.relative_humidity(ts_up)
-            elseif k > kc_surf
-                if aux_up[i].area[k - 1] > 0.0 && edmf.extrapolate_buoyancy
-                    qt = aux_up[i].q_tot[k - 1]
-                    h = aux_up[i].θ_liq_ice[k - 1]
-                    ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
-                    ρ = TD.air_density(ts_up)
-                    aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
-                    aux_up[i].RH[k] = TD.relative_humidity(ts_up)
-                else
-                    aux_up[i].buoy[k] = aux_en.buoy[k]
-                    aux_up[i].RH[k] = aux_en.RH[k]
-                end
-            else
-                aux_up[i].buoy[k] = aux_en.buoy[k]
-                aux_up[i].RH[k] = aux_en.RH[k]
-            end
-        end
-
         aux_gm.buoy[k] = (1.0 - aux_tc.bulk.area[k]) * aux_en.buoy[k]
         @inbounds for i in 1:(up.n_updrafts)
             aux_gm.buoy[k] += aux_up[i].area[k] * aux_up[i].buoy[k]
