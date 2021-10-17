@@ -16,8 +16,6 @@ function initialize_io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     initialize_io(edmf.EnvVar, Stats)
     initialize_io(edmf.Rain, Stats)
 
-    add_profile(Stats, "eddy_viscosity")
-    add_profile(Stats, "eddy_diffusivity")
     add_profile(Stats, "entrainment_sc")
     add_profile(Stats, "detrainment_sc")
     add_profile(Stats, "nh_pressure")
@@ -107,8 +105,6 @@ function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::Ti
     aux_tc = center_aux_tc(state)
     a_up_bulk = aux_tc.bulk.area
 
-    write_profile(Stats, "eddy_viscosity", diffusivity_m(edmf).values)
-    write_profile(Stats, "eddy_diffusivity", diffusivity_h(edmf).values)
     write_ts(Stats, "rd", StatsBase.mean(edmf.pressure_plume_spacing))
 
     @inbounds for k in real_center_indices(grid)
@@ -242,6 +238,7 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     parent(tendencies_gm.θ_liq_ice) .= 0
     param_set = parameter_set(gm)
     prog_gm = center_prog_grid_mean(state)
+    aux_en = center_aux_environment(state)
     ρ0_f = face_ref_state(state).ρ0
     p0_c = center_ref_state(state).p0
     α0_c = center_ref_state(state).α0
@@ -368,10 +365,10 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         tendencies_gm.q_tot[k] += mf_tend_qt
     end
 
-    aeKHq_tot_bc = Case.Sur.rho_qtflux / edmf.ae[kc_surf]
-    aeKHθ_liq_ice_bc = Case.Sur.rho_hflux / edmf.ae[kc_surf]
-    aeKHu_bc = Case.Sur.rho_uflux / edmf.ae[kc_surf]
-    aeKHv_bc = Case.Sur.rho_vflux / edmf.ae[kc_surf]
+    aeKHq_tot_bc = Case.Sur.rho_qtflux / aux_en.area[kc_surf]
+    aeKHθ_liq_ice_bc = Case.Sur.rho_hflux / aux_en.area[kc_surf]
+    aeKHu_bc = Case.Sur.rho_uflux / aux_en.area[kc_surf]
+    aeKHv_bc = Case.Sur.rho_vflux / aux_en.area[kc_surf]
     @inbounds for k in real_center_indices(grid)
         aeKH_q_tot_cut = dual_faces(edmf.diffusive_flux_qt, grid, k)
         ∇aeKH_q_tot = ∇f2c(aeKH_q_tot_cut, grid, k; bottom = SetValue(aeKHq_tot_bc), top = SetValue(0))
@@ -402,11 +399,13 @@ function compute_diffusive_fluxes(
 )
     ρ0_f = face_ref_state(state).ρ0
     aux_tc = center_aux_tc(state)
-    edmf.ae .= 1 .- vec(aux_tc.bulk.area) # area of environment
-    KM = diffusivity_m(edmf).values
-    KH = diffusivity_h(edmf).values
-    aeKM = edmf.ae .* KM
-    aeKH = edmf.ae .* KH
+    aux_tc_f = face_aux_tc(state)
+    aux_en = center_aux_environment(state)
+    aux_en.area .= 1 .- aux_tc.bulk.area # area of environment
+    KM = center_aux_tc(state).KM
+    KH = center_aux_tc(state).KH
+    aeKM = aux_en.area .* KM
+    aeKH = aux_en.area .* KH
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     kf_surf = kf_surface(grid)
@@ -415,31 +414,31 @@ function compute_diffusive_fluxes(
     aeKH_bcs = (; bottom = SetValue(aeKH[kc_surf]), top = SetValue(aeKH[kc_toa]))
 
     @inbounds for k in real_face_indices(grid)
-        edmf.rho_ae_KH[k] = interpc2f(aeKH, grid, k; aeKH_bcs...) * ρ0_f[k]
-        edmf.rho_ae_KM[k] = interpc2f(aeKM, grid, k; aeKM_bcs...) * ρ0_f[k]
+        aux_tc_f.ρ_ae_KH[k] = interpc2f(aeKH, grid, k; aeKH_bcs...) * ρ0_f[k]
+        aux_tc_f.ρ_ae_KM[k] = interpc2f(aeKM, grid, k; aeKM_bcs...) * ρ0_f[k]
     end
 
-    aeKHq_tot_bc = -Case.Sur.rho_qtflux / edmf.ae[kc_surf] / edmf.rho_ae_KH[kc_surf]
-    aeKHθ_liq_ice_bc = -Case.Sur.rho_hflux / edmf.ae[kc_surf] / edmf.rho_ae_KH[kc_surf]
-    aeKHu_bc = -Case.Sur.rho_uflux / edmf.ae[kc_surf] / edmf.rho_ae_KM[kc_surf]
-    aeKHv_bc = -Case.Sur.rho_vflux / edmf.ae[kc_surf] / edmf.rho_ae_KM[kc_surf]
+    aeKHq_tot_bc = -Case.Sur.rho_qtflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    aeKHθ_liq_ice_bc = -Case.Sur.rho_hflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    aeKHu_bc = -Case.Sur.rho_uflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
+    aeKHv_bc = -Case.Sur.rho_vflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
 
     @inbounds for k in real_face_indices(grid)
         q_dual = dual_centers(edmf.EnvVar.QT.values, grid, k)
         ∇q_tot_f = ∇c2f(q_dual, grid, k; bottom = SetGradient(aeKHq_tot_bc), top = SetGradient(0))
-        edmf.diffusive_flux_qt[k] = -edmf.rho_ae_KH[k] * ∇q_tot_f
+        edmf.diffusive_flux_qt[k] = -aux_tc_f.ρ_ae_KH[k] * ∇q_tot_f
 
         θ_liq_ice_dual = dual_centers(edmf.EnvVar.H.values, grid, k)
         ∇θ_liq_ice_f = ∇c2f(θ_liq_ice_dual, grid, k; bottom = SetGradient(aeKHθ_liq_ice_bc), top = SetGradient(0))
-        edmf.diffusive_flux_h[k] = -edmf.rho_ae_KH[k] * ∇θ_liq_ice_f
+        edmf.diffusive_flux_h[k] = -aux_tc_f.ρ_ae_KH[k] * ∇θ_liq_ice_f
 
         u_dual = dual_centers(prog_gm.u, grid, k)
         ∇u_f = ∇c2f(u_dual, grid, k; bottom = SetGradient(aeKHu_bc), top = SetGradient(0))
-        edmf.diffusive_flux_u[k] = -edmf.rho_ae_KM[k] * ∇u_f
+        edmf.diffusive_flux_u[k] = -aux_tc_f.ρ_ae_KM[k] * ∇u_f
 
         v_dual = dual_centers(prog_gm.v, grid, k)
         ∇v_f = ∇c2f(v_dual, grid, k; bottom = SetGradient(aeKHv_bc), top = SetGradient(0))
-        edmf.diffusive_flux_v[k] = -edmf.rho_ae_KM[k] * ∇v_f
+        edmf.diffusive_flux_v[k] = -aux_tc_f.ρ_ae_KM[k] * ∇v_f
     end
     return
 end
@@ -478,15 +477,11 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
     prog_up = center_prog_updrafts(state)
 
-    KM = diffusivity_m(edmf).values
-    KH = diffusivity_h(edmf).values
     common_args = (
         grid,
         param_set,
         state,
         TS,
-        KM,
-        KH,
         en.W.values,
         en.TKE.values,
         up.n_updrafts,
@@ -907,12 +902,12 @@ function compute_covariance_shear(
 
     aux_tc = center_aux_tc(state)
     ae = 1 .- aux_tc.bulk.area # area of environment
-    KH = diffusivity_h(edmf).values
+    aux_tc = center_aux_tc(state)
     ρ0_c = center_ref_state(state).ρ0
     prog_gm = center_prog_grid_mean(state)
     is_tke = Covar.name == "tke"
     tke_factor = is_tke ? 0.5 : 1
-    k_eddy = is_tke ? diffusivity_m(edmf).values : diffusivity_h(edmf).values
+    k_eddy = is_tke ? aux_tc.KM : aux_tc.KH
 
     if is_tke
         @inbounds for k in real_center_indices(grid)

@@ -645,8 +645,6 @@ function center_field_tridiagonal_matrix(grid::Grid)
 end
 
 mutable struct EDMF_PrognosticTKE{A1, A2, IE}
-    KM::VariableDiagnostic
-    KH::VariableDiagnostic
     Ri_bulk_crit::Float64
     zi::Float64
     n_updrafts::Int
@@ -681,9 +679,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
     m::A2
     mixing_length::A1
     implicit_eqs::IE
-    ae::A1
-    rho_ae_KM::A1
-    rho_ae_KH::A1
     horiz_K_eddy::A2
     area_surface_bc::A1
     w_surface_bc::A1
@@ -712,8 +707,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
     detr_surface_bc::Float64
     sde_model::sde_struct
     function EDMF_PrognosticTKE(namelist, grid::Grid, param_set::PS) where {PS}
-        KM = VariableDiagnostic(grid, "half", "diffusivity", "m^2/s") # eddy viscosity
-        KH = VariableDiagnostic(grid, "half", "viscosity", "m^2/s") # eddy diffusivity
         # get values from namelist
         prandtl_number = namelist["turbulence"]["prandtl_number_0"]
         Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
@@ -822,10 +815,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
         mixing_length = center_field(grid)
         horiz_K_eddy = center_field(grid, n_updrafts)
 
-        ae = center_field(grid)
-        rho_ae_KM = face_field(grid)
-        rho_ae_KH = face_field(grid)
-
         # Near-surface BC of updraft area fraction
         area_surface_bc = zeros(n_updrafts)
         w_surface_bc = zeros(n_updrafts)
@@ -887,8 +876,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
         A2 = typeof(horiz_K_eddy)
         IE = typeof(implicit_eqs)
         return new{A1, A2, IE}(
-            KM,
-            KH,
             Ri_bulk_crit,
             zi,
             n_updrafts,
@@ -923,9 +910,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
             m,
             mixing_length,
             implicit_eqs,
-            ae,
-            rho_ae_KM,
-            rho_ae_KH,
             horiz_K_eddy,
             area_surface_bc,
             w_surface_bc,

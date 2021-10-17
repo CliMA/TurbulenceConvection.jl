@@ -619,8 +619,6 @@ function construct_tridiag_diffusion_en(
     param_set::APS,
     state,
     TS,
-    KM,
-    KH,
     w_en,
     tke_en,
     n_updrafts::Int,
@@ -646,10 +644,12 @@ function construct_tridiag_diffusion_en(
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
 
-    ae = vec(1 .- aux_tc.bulk.area)
+    ae = 1 .- aux_tc.bulk.area
     rho_ae_K_m = face_field(grid)
     w_en_c = center_field(grid)
     D_env = 0.0
+    KM = center_aux_tc(state).KM
+    KH = center_aux_tc(state).KH
 
     aeK = is_tke ? ae .* KM : ae .* KH
     aeK_bcs = (; bottom = SetValue(aeK[kc_surf]), top = SetValue(aeK[kc_toa]))

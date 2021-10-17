@@ -59,6 +59,8 @@ function io_dictionary_aux(state)
         "w_mean" => (; dims = ("zf", "t"), group = "profiles", field = face_prog_grid_mean(state).w),
         "qt_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_grid_mean(state).q_tot),
         "thetal_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_grid_mean(state).θ_liq_ice),
+        "eddy_viscosity" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).KM),
+        "eddy_diffusivity" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).KH),
     )
     return io_dict
 end

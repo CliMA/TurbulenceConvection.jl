@@ -55,13 +55,16 @@ cent_aux_vars_edmf(FT, n_up) = (;
     turbconv = (;
         bulk = (; area = FT(0), θ_liq_ice = FT(0), RH = FT(0), buoy = FT(0), q_tot = FT(0), q_liq = FT(0), T = FT(0)),
         up = ntuple(i -> cent_aux_vars_up(FT), n_up),
+        en = (; area = FT(0)),
+        KM = FT(0),
+        KH = FT(0),
     ),
 )
 cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., cent_aux_vars_edmf(FT, n_up)...)
 
 # Face only
 face_aux_vars_gm(FT) = ()
-face_aux_vars_edmf(FT, n_up) = (; turbconv = (; bulk = (; w = FT(0))))
+face_aux_vars_edmf(FT, n_up) = (; turbconv = (; bulk = (; w = FT(0)), ρ_ae_KM = FT(0), ρ_ae_KH = FT(0)))
 face_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., face_aux_vars_gm(FT)..., face_aux_vars_edmf(FT, n_up)...)
 
 #####

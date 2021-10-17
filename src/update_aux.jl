@@ -13,8 +13,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     α0_c = center_ref_state(state).α0
     g = CPP.grav(param_set)
     c_m = CPEDMF.c_m(param_set)
-    KM = diffusivity_m(edmf).values
-    KH = diffusivity_h(edmf).values
+    KM = center_aux_tc(state).KM
+    KH = center_aux_tc(state).KH
     surface = Case.Sur
     obukhov_length = surface.obukhov_length
     FT = eltype(grid)
