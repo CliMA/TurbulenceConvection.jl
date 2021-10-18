@@ -404,7 +404,6 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     en_thermo = edmf.EnvThermo
     n_updrafts = up.n_updrafts
     prog_gm = center_prog_grid_mean(state)
-    tendencies_gm = center_tendencies_grid_mean(state)
     prog_en = center_prog_environment(state)
     prog_up_f = face_prog_updrafts(state)
 
@@ -414,11 +413,19 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     set_updraft_surface_bc(edmf, grid, state, gm, Case)
     update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
+    tendencies_gm = center_tendencies_grid_mean(state)
+    tendencies_up = center_tendencies_updrafts(state)
+    tendencies_en = center_tendencies_environment(state)
+    tendencies_ra = center_tendencies_rain(state)
+    parent(tendencies_gm) .= 0
+    parent(tendencies_up) .= 0
+    parent(tendencies_en) .= 0
+    parent(tendencies_ra) .= 0
     compute_rain_formation_tendencies(up_thermo, grid, state, edmf.UpdVar, edmf.Rain, TS.dt, param_set) # causes division error in dry bubble first time step
     microphysics(en_thermo, grid, state, edmf.EnvVar, edmf.Rain, TS.dt, param_set) # saturation adjustment + rain creation
     if edmf.Rain.rain_model == "clima_1m"
-        compute_rain_evap_tendencies(edmf.RainPhys, grid, state, gm, TS, edmf.Rain.QR)
-        compute_rain_advection_tendencies(edmf.RainPhys, grid, state, gm, TS, edmf.Rain.QR)
+        compute_rain_evap_tendencies(edmf.RainPhys, grid, state, gm, TS)
+        compute_rain_advection_tendencies(edmf.RainPhys, grid, state, gm, TS)
     end
 
     # compute tendencies

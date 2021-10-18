@@ -186,25 +186,12 @@ Base.@kwdef struct Tan2018{FT}
     alpha0::FT
 end
 
-struct RainVariable{T}
-    name::String
-    units::String
-    values::T
-    function RainVariable(grid, name, units)
-        values = center_field(grid)
-        return new{typeof(values)}(name, units, values)
-    end
-end
-
 Base.@kwdef mutable struct RainVariables
     rain_model::String = "default_rain_model"
     mean_rwp::Float64 = 0
     cutoff_rain_rate::Float64 = 0
-    QR::RainVariable
 end
 function RainVariables(namelist, grid::Grid)
-
-    QR = RainVariable(grid, "qr_mean", "kg/kg")
 
     rain_model = parse_namelist(
         namelist,
@@ -218,7 +205,7 @@ function RainVariables(namelist, grid::Grid)
         error("rain model not recognized")
     end
 
-    return RainVariables(; rain_model, QR)
+    return RainVariables(; rain_model)
 end
 
 struct RainPhysics{T}
@@ -237,18 +224,6 @@ struct RainPhysics{T}
             qr_tendency_rain_evap,
             qr_tendency_advection,
         )
-    end
-end
-
-struct VariableDiagnostic{T}
-    values::T
-    name::String
-    units::String
-    function VariableDiagnostic(grid, loc, name, units)
-        # Value at the current timestep
-        values = field(grid, loc)
-        # Placement on staggered grid
-        return new{typeof(values)}(values, name, units)
     end
 end
 
