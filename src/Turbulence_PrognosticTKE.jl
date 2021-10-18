@@ -406,6 +406,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     prog_gm = center_prog_grid_mean(state)
     tendencies_gm = center_tendencies_grid_mean(state)
     prog_en = center_prog_environment(state)
+    prog_up_f = face_prog_updrafts(state)
 
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
@@ -481,9 +482,6 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
         prog_en.HQTcov[k] = max(prog_en.HQTcov[k], -sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]))
         prog_en.HQTcov[k] = min(prog_en.HQTcov[k], sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]))
     end
-
-    # set values
-    set_values_with_new(edmf.UpdVar, grid, state)
     return
 end
 
@@ -815,7 +813,18 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
             end
         end
     end
+    # set values
+    @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for k in real_face_indices(grid)
+            prog_up_f[i].w[k] = up.W.new[i, k]
+        end
 
+        @inbounds for k in real_center_indices(grid)
+            prog_up[i].area[k] = up.Area.new[i, k]
+            prog_up[i].q_tot[k] = up.QT.new[i, k]
+            prog_up[i].θ_liq_ice[k] = up.H.new[i, k]
+        end
+    end
     return
 end
 
