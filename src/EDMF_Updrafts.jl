@@ -239,6 +239,8 @@ function compute_rain_formation_tendencies(
     ρ0_c = center_ref_state(state).ρ0
     prog_up = center_prog_updrafts(state)
     aux_up = center_aux_updrafts(state)
+    prog_ra = center_prog_rain(state)
+    tendencies_ra = center_tendencies_rain(state)
 
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_center_indices(grid)
@@ -250,7 +252,7 @@ function compute_rain_formation_tendencies(
             mph = precipitation_formation(
                 param_set,
                 rain.rain_model,
-                rain.QR.values[k],
+                prog_ra.qr[k],
                 prog_up[i].area[k],
                 ρ0_c[k],
                 dt,
@@ -263,5 +265,6 @@ function compute_rain_formation_tendencies(
     # TODO - to be deleted once we sum all tendencies elsewhere
     up_thermo.θ_liq_ice_tendency_rain_formation_tot .= up_sum(up_thermo.θ_liq_ice_tendency_rain_formation)
     up_thermo.qt_tendency_rain_formation_tot .= up_sum(up_thermo.qt_tendency_rain_formation)
+    parent(tendencies_ra.qr) .+= -up_thermo.qt_tendency_rain_formation_tot
     return
 end

@@ -105,6 +105,9 @@ function io_dictionary_aux(state)
         "env_RH" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment(state).RH),
         "env_thetal" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment(state).θ_liq_ice),
         "env_cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment(state).cloud_fraction),
+
+        "qr_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_rain(state).qr),
+
     )
     return io_dict
 end
