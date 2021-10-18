@@ -145,42 +145,6 @@ function initialize_io(up::UpdraftVariables, Stats::NetCDFIO_Stats)
     return
 end
 
-# quick utility to set "new" arrays with values in the "values" arrays
-function set_new_with_values(up::UpdraftVariables, grid, state)
-    prog_up = center_prog_updrafts(state)
-    prog_up_f = face_prog_updrafts(state)
-    @inbounds for i in 1:(up.n_updrafts)
-        @inbounds for k in real_face_indices(grid)
-            up.W.new[i, k] = prog_up_f[i].w[k]
-        end
-
-        @inbounds for k in real_center_indices(grid)
-            up.Area.new[i, k] = prog_up[i].area[k]
-            up.QT.new[i, k] = prog_up[i].q_tot[k]
-            up.H.new[i, k] = prog_up[i].θ_liq_ice[k]
-        end
-    end
-    return
-end
-
-# quick utility to set "tmp" arrays with values in the "new" arrays
-function set_values_with_new(up::UpdraftVariables, grid, state)
-    prog_up = center_prog_updrafts(state)
-    prog_up_f = face_prog_updrafts(state)
-    @inbounds for i in 1:(up.n_updrafts)
-        @inbounds for k in real_face_indices(grid)
-            prog_up_f[i].w[k] = up.W.new[i, k]
-        end
-
-        @inbounds for k in real_center_indices(grid)
-            prog_up[i].area[k] = up.Area.new[i, k]
-            prog_up[i].q_tot[k] = up.QT.new[i, k]
-            prog_up[i].θ_liq_ice[k] = up.H.new[i, k]
-        end
-    end
-    return
-end
-
 function io(up::UpdraftVariables, grid, state, Stats::NetCDFIO_Stats)
     upd_cloud_diagnostics(up, grid, state)
     write_profile(Stats, "updraft_cloud_fraction", up.cloud_fraction)
