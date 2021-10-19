@@ -1344,7 +1344,7 @@ end
 function reference_params(::GABLS, grid::Grid, param_set::APS, namelist)
     Pg = 1.0e5  #Pressure at ground,
     Tg = 265.0  #Temperature at ground,
-    qtg = 1.0e-12 #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN (TBD),
+    qtg = 0.0
     return (; Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, gm, state)
