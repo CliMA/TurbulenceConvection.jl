@@ -9,14 +9,14 @@ include(joinpath("utils", "main.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
 include(joinpath("utils", "mse_tables.jl"))
-using .NameList
+import .NameList
 
 best_mse = all_best_mse["DYCOMS_RF01"]
 
 @testset "DYCOMS_RF01" begin
     case_name = "DYCOMS_RF01"
     println("Running $case_name...")
-    namelist = default_namelist(case_name)
+    namelist = NameList.default_namelist(case_name)
     namelist["meta"]["uuid"] = "01"
     ds_tc_filename = @time main(namelist)
 

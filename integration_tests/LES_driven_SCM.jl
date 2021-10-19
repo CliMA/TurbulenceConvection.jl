@@ -9,7 +9,7 @@ include(joinpath("utils", "main.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
 include(joinpath("utils", "mse_tables.jl"))
-using .NameList
+import .NameList
 
 best_mse = all_best_mse["LES_driven_SCM"]
 

@@ -8,7 +8,7 @@ using Test
 include(joinpath("utils", "main.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
-using .NameList
+import .NameList
 
 # Note: temperatures in this case become extremely low.
 CLIMAParameters.Planet.T_freeze(::EarthParameterSet) = 100.0

@@ -7,7 +7,7 @@ using Profile
 include(joinpath("integration_tests", "utils", "Cases.jl"))
 include(joinpath("integration_tests", "utils", "generate_namelist.jl"))
 using .Cases
-using .NameList
+import .NameList
 
 include(joinpath("integration_tests", "utils", "main.jl"))
 

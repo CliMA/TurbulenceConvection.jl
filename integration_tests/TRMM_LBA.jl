@@ -9,7 +9,7 @@ include(joinpath("utils", "main.jl"))
 include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
 include(joinpath("utils", "mse_tables.jl"))
-using .NameList
+import .NameList
 
 # Note: temperatures in this case become extremely low.
 CLIMAParameters.Planet.T_freeze(::EarthParameterSet) = 100.0
@@ -19,7 +19,7 @@ best_mse = all_best_mse["TRMM_LBA"]
 @testset "TRMM_LBA" begin
     case_name = "TRMM_LBA"
     println("Running $case_name...")
-    namelist = default_namelist(case_name)
+    namelist = NameList.default_namelist(case_name)
     namelist["meta"]["uuid"] = "01"
     ds_tc_filename = @time main(namelist)
 
