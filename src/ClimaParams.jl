@@ -23,6 +23,8 @@ area_limiter_power(ps::APS) = ps.nt.β_lim
 static_stab_coeff(ps::APS) = ps.nt.c_b
 l_max(ps::APS) = ps.nt.l_max
 
+"""Additional entrainment/detrainment parameters."""
+c_gen(ps::APS) = ps.nt.c_gen
 
 """ stochastic parameters """
 stoch_ε_lognormal_var(ps::APS) = ps.nt.stoch_ε_lognormal_var

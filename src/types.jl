@@ -29,13 +29,13 @@ Base.@kwdef struct EntrDetr{FT}
 end
 
 """
-    MoistureDeficitEntr
+    GeneralizedEntr
 
-Entrainment detrainment model from Cohen et al (2020)
+A general set of variables entrainment might depend on.
 
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct MoistureDeficitEntr{FT}
+Base.@kwdef struct GeneralizedEntr{FT}
     "updraft condensate (liquid water + ice)"
     q_cond_up::FT
     "environment condensate (liquid water + ice)"
@@ -66,7 +66,14 @@ Base.@kwdef struct MoistureDeficitEntr{FT}
     RH_en::FT
     "maximum updraft area"
     max_area::FT
+    "updraft top"
+    updraft_top::FT
+    "Model time step"
+    Δt::FT
 end
+
+struct MDEntr end  # existing model
+struct NNEntr end
 
 """
     GradBuoy
@@ -387,7 +394,7 @@ end
 
 CasesBase(case::T; kwargs...) where {T} = CasesBase{T}(; case = case, casename = string(nameof(T)), kwargs...)
 
-mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC}
+mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC}
     Ri_bulk_crit::Float64
     zi::Float64
     n_updrafts::Int
@@ -416,6 +423,7 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC}
     dt_max::Float64
     sde_model::sde_struct
     bg_closure::EBGC
+    entr_closure::EC
     function EDMF_PrognosticTKE(namelist, grid::Grid, param_set::PS) where {PS}
         # get values from namelist
         prandtl_number = namelist["turbulence"]["prandtl_number_0"]
@@ -516,13 +524,31 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC}
             error("Something went wrong. Invalid environmental buoyancy gradient closure type '$bg_type'")
         end
 
+        # entr closure
+        entr_type = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "entrainment";
+            default = "moisture_deficit",
+            valid_options = ["moisture_deficit", "NN"],
+        )
+        entr_closure = if entr_type == "moisture_deficit"
+            MDEntr()
+        elseif entr_type == "NN"
+            NNEntr()
+        else
+            error("Something went wrong. Invalid entrainment type '$entr_type'")
+        end
+        EC = typeof(entr_closure)
+
         wstar = 0
         entr_surface_bc = 0
         detr_surface_bc = 0
         dt_max = 0
         A1 = typeof(area_surface_bc)
         EBGC = typeof(bg_closure)
-        return new{n_updrafts, A1, EBGC}(
+        return new{n_updrafts, A1, EBGC, EC}(
             Ri_bulk_crit,
             zi,
             n_updrafts,
@@ -551,6 +577,7 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC}
             dt_max,
             sde_model,
             bg_closure,
+            entr_closure,
         )
     end
 end
