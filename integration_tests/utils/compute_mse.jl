@@ -168,12 +168,12 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
 
     mkpath(plot_dir)
     # Ensure domain matches:
-    z_les = TC.get_nc_data(ds_pycles, "zc")
-    z_tcc_c = TC.get_nc_data(ds_tc, "zc")
-    z_tcc_f = TC.get_nc_data(ds_tc, "zf")
-    z_tcm_c = TC.get_nc_data(ds_tc_main, "zc")
-    z_tcm_f = TC.get_nc_data(ds_tc_main, "zf")
-    z_scm = TC.get_nc_data(ds_scampy, "zc")
+    z_les = Array(TC.get_nc_data(ds_pycles, "zc"))
+    z_tcc_c = Array(TC.get_nc_data(ds_tc, "zc"))
+    z_tcc_f = Array(TC.get_nc_data(ds_tc, "zf"))
+    z_tcm_c = Array(TC.get_nc_data(ds_tc_main, "zc"))
+    z_tcm_f = Array(TC.get_nc_data(ds_tc_main, "zf"))
+    z_scm = Array(TC.get_nc_data(ds_scampy, "zc"))
     n_grid_points = length(z_tcc_c)
     @info "z extrema (les,scm,tcm,tcc): $(extrema(z_les)), $(extrema(z_scm)), $(extrema(z_tcm_c)), $(extrema(z_tcc_c))"
     @info "n-grid points (les,scm,tcm,tcc): $(length(z_les)), $(length(z_scm)), $(length(z_tcm_c)), $(length(z_tcc_c))"
@@ -272,10 +272,10 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
             warn_msg_scm = ""
         end
 
-        data_les_arr = data_les_arr'
-        data_tcm_arr = data_tcm_arr'
-        data_tcc_arr = data_tcc_arr'
-        data_scm_arr = data_scm_arr'
+        data_les_arr = Array(data_les_arr)'
+        data_tcm_arr = Array(data_tcm_arr)'
+        data_tcc_arr = Array(data_tcc_arr)'
+        data_scm_arr = Array(data_scm_arr)'
         push!(tcc_variables, tc_var)
 
         @info "Assembling plots for $tc_var"

@@ -113,7 +113,7 @@ function initialize(self::RadiationBase{RadiationLES}, grid, LESDat::LESData)
         imax = LESDat.imax
 
         # interpolate here
-        zc_les = get_nc_data(data, "zc")
+        zc_les = Array(get_nc_data(data, "zc"))
         meandata = mean_nc_data(data, "profiles", "dtdt_rad", imin, imax)
         self.dTdt = pyinterp(grid.zc, zc_les, meandata)
     end
