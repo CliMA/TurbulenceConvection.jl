@@ -244,28 +244,28 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         end
 
         if missing_les_var
-            @warn "Missing data for variable $tc_var, filling with zeros"
+            @warn "les missing data for variable $tc_var, filling with zeros"
             data_les_arr = zeros(length(z_les), length(time_les))
             warn_msg_les = " Warning: missing data"
         else
             warn_msg_les = ""
         end
         if missing_tcm_var
-            @warn "Missing data for variable $tc_var, filling with zeros"
+            @warn "tcm missing data for variable $tc_var, filling with zeros"
             data_tcm_arr = zeros(length(z_tcm), length(time_tcm))
             warn_msg_tcm = " Warning: missing data"
         else
             warn_msg_tcm = ""
         end
         if missing_tcc_var
-            @warn "Missing data for variable $tc_var, filling with zeros"
+            @warn "tcc missing data for variable $tc_var, filling with zeros"
             data_tcc_arr = zeros(length(z_tcc), length(time_tcc))
             warn_msg_tcc = " Warning: missing data"
         else
             warn_msg_tcc = ""
         end
         if missing_scm_var
-            @warn "Missing data for variable $tc_var, filling with zeros"
+            @warn "scm missing data for variable $tc_var, filling with zeros"
             data_scm_arr = zeros(length(z_scm), length(time_scm))
             warn_msg_scm = " Warning: missing data"
         else
