@@ -10,7 +10,7 @@ include(joinpath(tc_dir, "integration_tests", "utils", "main.jl"))
 include(joinpath(tc_dir, "integration_tests", "utils", "generate_namelist.jl"))
 include(joinpath(tc_dir, "integration_tests", "utils", "compute_mse.jl"))
 include(joinpath(tc_dir, "integration_tests", "utils", "mse_tables.jl"))
-using .NameList
+import .NameList
 best_mse = all_best_mse["Bomex"]
 
 @testset "Unit tests" begin
@@ -21,7 +21,7 @@ end
 
     case_name = "Bomex"
     println("Running $case_name...")
-    namelist = default_namelist(case_name)
+    namelist = NameList.default_namelist(case_name)
     namelist["meta"]["uuid"] = "01"
     ds_tc_filename = @time main(namelist)
 
