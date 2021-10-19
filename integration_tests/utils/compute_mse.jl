@@ -222,15 +222,18 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         missing_tcc_var = data_tcc_arr == nothing
         missing_scm_var = data_scm_arr == nothing
 
-        if TC.is_face_field(tc_var)
+        coord_name = first(NC.dimnames(data_tcc_arr))
+        coord_name == "zf" || coord_name == "zc" || error("Bad coord_name")
+
+        if coord_name == "zf"
             z_tcc = z_tcc_f
-        else
+        elseif coord_name == "zc"
             z_tcc = z_tcc_c
         end
         if have_tc_main
-            if TC.is_face_field(tc_var)
+            if coord_name == "zf"
                 z_tcm = z_tcm_f
-            else
+            elseif coord_name == "zc"
                 z_tcm = z_tcm_c
             end
         else
