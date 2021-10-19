@@ -108,6 +108,8 @@ function io_dictionary_aux(state)
 
         "qr_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_rain(state).qr),
 
+        "smooth_top_up_a" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_updrafts(state)[1].smooth_top_up_a),
+        "smooth_top_up_w" => (; dims = ("zf", "t"), group = "profiles", field = face_aux_updrafts(state)[1].smooth_top_up_w),
     )
     return io_dict
 end

@@ -61,7 +61,7 @@ cent_aux_vars_en_2m(FT) = (;
     rain_src = FT(0),
 )
 cent_aux_vars_up(FT) =
-    (; q_liq = FT(0), T = FT(0), RH = FT(0), buoy = FT(0), area_new = FT(0), q_tot_new = FT(0), θ_liq_ice_new = FT(0))
+    (; q_liq = FT(0), T = FT(0), RH = FT(0), buoy = FT(0), area_new = FT(0), q_tot_new = FT(0), θ_liq_ice_new = FT(0), smooth_top_up_a = FT(0))
 cent_aux_vars_edmf(FT, n_up) = (;
     turbconv = (;
         bulk = (; area = FT(0), θ_liq_ice = FT(0), RH = FT(0), buoy = FT(0), q_tot = FT(0), q_liq = FT(0), T = FT(0)),
@@ -90,8 +90,7 @@ cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)...,
 
 # Face only
 face_aux_vars_gm(FT) = ()
-face_aux_vars_up(FT) = (; w_new = FT(0))
-
+face_aux_vars_up(FT) = (; w_new = FT(0), smooth_top_up_w = FT(0))
 face_aux_vars_edmf(FT, n_up) = (;
     turbconv = (;
         bulk = (; w = FT(0)),
@@ -216,7 +215,9 @@ function run(sim::Simulation1d)
 
         if mod(iter, 100) == 0
             progress = sim.TS.t / sim.TS.t_max
-            @show progress
+            t = sim.TS.t
+            t_max = sim.TS.t_max
+            @show progress, t, t_max
         end
 
         if mod(sim.TS.t, sim.Stats.frequency) == 0

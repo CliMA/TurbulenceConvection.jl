@@ -728,6 +728,9 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
     return
 end
 
+heaviside(x) = x > 0 # updrafts shut off
+# heaviside(x) = x > 0 || x ≈ 0
+smoother(x, δ, α = 1) = 1 - 1 / (1 + exp(-α * (x - δ)))
 
 function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, TS::TimeStepping)
     param_set = parameter_set(gm)
@@ -774,20 +777,69 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
                     (ρ_0_f[k] * a_k * prog_up_f[i].w[k] + Δt * tendencies_up_f[i].w[k]) / (ρ_0_f[k] * anew_k)
 
                 aux_up_f[i].w_new[k] = max(aux_up_f[i].w_new[k], 0)
-                # TODO: remove aux_up[i].area_new from this loop.
-                if aux_up_f[i].w_new[k] <= 0.0
-                    if !(k.i > length(vec(aux_up[i].area_new)))
-                        aux_up[i].area_new[Cent(k.i)] = 0
-                    end
-                end
+                # # TODO: remove aux_up[i].area_new from this loop.
+                # if aux_up_f[i].w_new[k] <= 0.0
+                #     if !(k.i > length(vec(aux_up[i].area_new)))
+                #         aux_up[i].area_new[Cent(k.i)] = 0
+                #     end
+                # end
             else
-                aux_up_f[i].w_new[k] = 0
-                if !(k.i > length(vec(aux_up[i].area_new)))
-                    aux_up[i].area_new[Cent(k.i)] = 0
-                end
+                # aux_up_f[i].w_new[k] = 0
+                # if !(k.i > length(vec(aux_up[i].area_new)))
+                #     aux_up[i].area_new[Cent(k.i)] = 0
+                # end
             end
         end
     end
+
+    ka_star_f = map(1:(up.n_updrafts)) do i
+        ka_star_f_i = findlast(real_face_indices(grid)) do k
+            a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
+            anew_k = interpc2f(a_up_new, grid, k, i; a_up_bcs...)
+            anew_k >= edmf.minimum_area
+        end
+        ka_star_f_i = isnothing(ka_star_f_i) ? kf_surf : real_face_indices(grid)[ka_star_f_i]
+        i_lo = clamp(ka_star_f_i.i - 1, real_face_indices(grid)[1].i, real_face_indices(grid)[end].i)
+        i_mi = clamp(ka_star_f_i.i + 0, real_face_indices(grid)[1].i, real_face_indices(grid)[end].i)
+        i_hi = clamp(ka_star_f_i.i + 1, real_face_indices(grid)[1].i, real_face_indices(grid)[end].i)
+        (; lo = CCO.PlusHalf(i_lo), mi = CCO.PlusHalf(i_mi), hi = CCO.PlusHalf(i_hi))
+    end
+    ka_star_c = map(1:(up.n_updrafts)) do i
+        ka_star_c_i = findlast(real_center_indices(grid)) do k
+            a_up_new[i, k] >= edmf.minimum_area
+        end
+        ka_star_c_i = isnothing(ka_star_c_i) ? kc_surf : real_center_indices(grid)[ka_star_c_i]
+        i_lo = clamp(ka_star_c_i.i - 1, real_center_indices(grid)[1].i, real_center_indices(grid)[end].i)
+        i_mi = clamp(ka_star_c_i.i + 0, real_center_indices(grid)[1].i, real_center_indices(grid)[end].i)
+        i_hi = clamp(ka_star_c_i.i + 1, real_center_indices(grid)[1].i, real_center_indices(grid)[end].i)
+        (; lo = Cent(i_lo), mi = Cent(i_mi), hi = Cent(i_hi))
+    end
+
+    aux_up_f = face_aux_updrafts(state)
+    aux_up = center_aux_updrafts(state)
+    for k in real_face_indices(grid)
+        for i in 1:(up.n_updrafts)
+            aux_up_f[i].smooth_top_up_w[k] = smoother(grid.zf[k] - grid.zf[ka_star_f[i].mi], 5 * grid.Δz, 0.04)
+        end
+    end
+    for k in real_center_indices(grid)
+        for i in 1:(up.n_updrafts)
+            aux_up[i].smooth_top_up_a[k] = smoother(grid.zc[k] - grid.zc[ka_star_c[i].mi], 5 * grid.Δz, 0.04)
+        end
+    end
+
+    # Apply smoothing filter
+    @inbounds for k in real_center_indices(grid)
+        @inbounds for i in 1:(up.n_updrafts)
+            a_up_new[i, k] = a_up_new[i, k] * aux_up[i].smooth_top_up_a[k]
+        end
+    end
+    @inbounds for k in real_face_indices(grid)
+        @inbounds for i in 1:(up.n_updrafts)
+            w_up_new[i, k] = w_up_new[i, k] * aux_up_f[i].smooth_top_up_w[k]
+        end
+    end
+
 
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
