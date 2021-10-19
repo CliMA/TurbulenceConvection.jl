@@ -34,12 +34,12 @@ function get_nc_data(ds, var::String)
 
     for key in key_options
         if haskey(ds, key)
-            return Array(ds[key])
+            return ds[key]
         else
             for group_option in ["profiles", "reference", "timeseries"]
                 haskey(ds.group, group_option) || continue
                 if haskey(ds.group[group_option], key)
-                    return Array(ds.group[group_option][key])
+                    return ds.group[group_option][key]
                 end
             end
         end

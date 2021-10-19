@@ -1635,7 +1635,7 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, gm, st
         imin = time_interval_bool[1]
         imax = time_interval_bool[end]
 
-        zc_les = TC.get_nc_data(data, "zc")
+        zc_les = Array(TC.get_nc_data(data, "zc"))
         parent(prog_gm.θ_liq_ice) .=
             pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "thetali_mean", imin, imax))
         parent(prog_gm.q_tot) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "qt_mean", imin, imax))

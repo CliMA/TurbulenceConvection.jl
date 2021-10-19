@@ -18,7 +18,7 @@ function initialize(self::ForcingBase{ForcingLES}, grid, LESDat::LESData)
         imin = LESDat.imin
         imax = LESDat.imax
 
-        zc_les = get_nc_data(data, "zc")
+        zc_les = Array(get_nc_data(data, "zc"))
 
         self.dtdt_hadv = pyinterp(grid.zc, zc_les, mean_nc_data(data, "profiles", "dtdt_hadv", imin, imax))
         self.dtdt_nudge = pyinterp(grid.zc, zc_les, mean_nc_data(data, "profiles", "dtdt_nudge", imin, imax))
