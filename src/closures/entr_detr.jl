@@ -18,6 +18,8 @@ function entr_detr(param_set, εδ_model::MoistureDeficitEntr)
     c_δ = CPEDMF.c_δ(param_set)
     c_t = CPEDMF.c_t(param_set)
     c_λ = CPEDMF.c_λ(param_set)
+    c_gen = ICP.c_gen(param_set)
+
     w_min = CPEDMF.w_min(param_set)
     c_div = ICP.entrainment_massflux_div_factor(param_set)
 
@@ -55,6 +57,10 @@ function entr_detr(param_set, εδ_model::MoistureDeficitEntr)
 
     ε_dyn = λ / Δw * (c_ε * D_ε + c_δ * M_ε) + MdMdz * c_div
     δ_dyn = λ / Δw * (c_ε * D_δ + c_δ * M_δ) + MdMdz * c_div
+
+    # ε_dyn = λ / Δw * ((c_gen[1] + c_gen[2]) * D_ε + c_δ * M_ε) + MdMdz * c_div
+    # δ_dyn = λ / Δw * ((c_gen[1] + c_gen[2]) * D_δ + c_δ * M_δ) + MdMdz * c_div
+
 
     return EntrDetr(ε_dyn, δ_dyn, ε_turb, K_ε)
 end

@@ -91,6 +91,10 @@ function default_namelist(case_name::String)
     # entrainment
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
+
+    # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"] = [0.01, 0.01, 0.01]
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"] = [0.05, 0.05, 0.05]
+
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.015
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
@@ -397,8 +401,9 @@ function LES_driven_SCM(namelist_defaults)
     namelist["time_stepping"]["dt"] = 3.0
     namelist["time_stepping"]["t_max"] = 3600.0 * 12
 
-    namelist["meta"]["lesfile"] =
-        joinpath(LESDrivenSCM_output_dataset_path, "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc")
+    # namelist["meta"]["lesfile"] =
+    #     joinpath(LESDrivenSCM_output_dataset_path, "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc")
+    namelist["meta"]["lesfile"] = "/groups/esm/cchristo/les_stats/Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc"
     namelist["meta"]["simname"] = "LES_driven_SCM"
     namelist["meta"]["casename"] = "LES_driven_SCM"
     namelist["forcing"] = Dict()

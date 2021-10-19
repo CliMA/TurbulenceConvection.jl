@@ -17,11 +17,14 @@ function nondimensional_exchange_functions(param_set, Δw, Δb, εδ_model)
     μ = ICP.entrainment_sigma(param_set)
     β = CPEDMF.β(param_set)
     χ = CPEDMF.χ(param_set)
+    c_gen = ICP.c_gen(param_set)
 
 
     μ_ij = (χ - εδ_model.a_up / (εδ_model.a_up + εδ_model.a_en)) * Δb / Δw
-    D_ε = 1.0 / (1.0 + exp(-μ / μ_0 * μ_ij))
-    D_δ = 1.0 / (1.0 + exp(μ / μ_0 * μ_ij))
+    # exp_arg = μ / μ_0 * μ_ij
+    exp_arg = c_gen[1] + c_gen[2] * μ_ij +  c_gen[3] * μ_ij^2 
+    D_ε = 1.0 / (1.0 + exp(-exp_arg))
+    D_δ = 1.0 / (1.0 + exp(exp_arg))
 
     M_δ = (max((εδ_model.RH_up)^β - (εδ_model.RH_en)^β, 0.0))^(1.0 / β)
     M_ε = (max((εδ_model.RH_en)^β - (εδ_model.RH_up)^β, 0.0))^(1.0 / β)
