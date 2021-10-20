@@ -108,7 +108,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         ##### saturation_adjustment
         #####
 
-        ts_en = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
+        ts_en = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
 
         aux_en.T[k] = TD.air_temperature(ts_en)
         aux_en.q_liq[k] = TD.liquid_specific_humidity(ts_en)
@@ -124,7 +124,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
         @inbounds for i in 1:(up.n_updrafts)
             if prog_up[i].area[k] > 0.0
-                ts_up = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_up[i].θ_liq_ice[k], prog_up[i].q_tot[k])
+                ts_up = thermo_state_pθq(param_set, p0_c[k], prog_up[i].θ_liq_ice[k], prog_up[i].q_tot[k])
                 aux_up[i].q_liq[k] = TD.liquid_specific_humidity(ts_up)
                 aux_up[i].T[k] = TD.air_temperature(ts_up)
                 ρ = TD.air_density(ts_up)
@@ -134,7 +134,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 if prog_up[i].area[k - 1] > 0.0 && edmf.extrapolate_buoyancy
                     qt = prog_up[i].q_tot[k - 1]
                     h = prog_up[i].θ_liq_ice[k - 1]
-                    ts_up = TD.PhaseEquil_pθq(param_set, p0_c[k], h, qt)
+                    ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
                     ρ = TD.air_density(ts_up)
                     aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
                     aux_up[i].RH[k] = TD.relative_humidity(ts_up)
@@ -160,7 +160,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     # TODO - use this inversion in free_convection_windspeed and not compute zi twice
     θ_ρ = center_field(grid)
     @inbounds for k in real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        ts = thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         θ_ρ[k] = TD.virtual_pottemp(ts)
     end
     edmf.zi = get_inversion(param_set, θ_ρ, prog_gm.u, prog_gm.v, grid, surface.Ri_bulk_crit)
@@ -324,7 +324,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         ts_cut = TD.PhaseEquil_pTq.(param_set, p0_cut, T_cut, QT_cut)
         thv_cut = TD.virtual_pottemp.(ts_cut)
 
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
+        ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
         θv = TD.virtual_pottemp(ts)
         ∂θv∂z = c∇(thv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
         # compute ∇Ri and Pr

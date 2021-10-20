@@ -48,7 +48,7 @@ function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
 
     # compute l_N² - the effective static stability using environmental mean.
     # Set lambda for now to environmental cloud_fraction (TBD: Rain)
-    ts_en = TD.PhaseEquil_pθq(param_set, ml_model.p0, ml_model.θ_li_en, ml_model.qt_en)
+    ts_en = thermo_state_pθq(param_set, ml_model.p0, ml_model.θ_li_en, ml_model.qt_en)
     N²_eff =
         (1 - ml_model.en_cld_frac) * ml_model.∂θv∂z +
         ml_model.en_cld_frac * (

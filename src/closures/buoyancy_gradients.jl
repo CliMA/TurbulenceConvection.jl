@@ -14,7 +14,7 @@ function buoyancy_gradients(param_set, bg_model::Tan2018)
     ∂b∂qt_dry = ∂b∂θv * bg_model.th_dry * (molmass_ratio - 1)
 
     if bg_model.en_cld_frac > 0.0
-        ts_cloudy = TD.PhaseEquil_pθq(param_set, bg_model.p0, bg_model.th_cloudy, bg_model.qt_cloudy)
+        ts_cloudy = thermo_state_pθq(param_set, bg_model.p0, bg_model.th_cloudy, bg_model.qt_cloudy)
         lh = TD.latent_heat_vapor(param_set, bg_model.t_cloudy)
         cp_m = TD.cp_m(ts_cloudy)
         ∂b∂θl_cld = (

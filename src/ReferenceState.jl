@@ -49,7 +49,7 @@ function compute_ref_state!(
     # determine the reference pressure
     function rhs(logp, u, z)
         p_ = exp(logp)
-        ts = TD.PhaseEquil_pθq(param_set, p_, θ_liq_ice_g, qtg)
+        ts = thermo_state_pθq(param_set, p_, θ_liq_ice_g, qtg)
         R_m = TD.gas_constant_air(ts)
         T = TD.air_temperature(ts)
         return -FT(CPP.grav(param_set)) / (T * R_m)
@@ -69,12 +69,12 @@ function compute_ref_state!(
 
     # Compute reference state thermodynamic profiles
     @inbounds for k in real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], θ_liq_ice_g, qtg)
+        ts = thermo_state_pθq(param_set, p0_c[k], θ_liq_ice_g, qtg)
         α0_c[k] = TD.specific_volume(ts)
     end
 
     @inbounds for k in real_face_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p0_f[k], θ_liq_ice_g, qtg)
+        ts = thermo_state_pθq(param_set, p0_f[k], θ_liq_ice_g, qtg)
         α0_f[k] = TD.specific_volume(ts)
     end
 
