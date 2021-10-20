@@ -18,6 +18,7 @@ import CLIMAParameters
 import OrdinaryDiffEq
 import CloudMicrophysics
 import SurfaceFluxes
+import DSP
 
 const ODE = OrdinaryDiffEq
 const CC = ClimaCore

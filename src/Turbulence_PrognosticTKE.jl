@@ -731,6 +731,16 @@ end
 heaviside(x) = x > 0 # updrafts shut off
 # heaviside(x) = x > 0 || x ≈ 0
 smoother(x, δ, α = 1) = 1 - 1 / (1 + exp(-α * (x - δ)))
+smooth_region(z, z_star, Δz, n = 4) =  z_star - n*Δz ≤ z ≤ z_star + n*Δz
+
+function smooth(data, z, z_star, Δz)
+    w0 = 1/120 # cutoff frequency
+    filt_data = DSP.filt(DSP.digitalfilter(DSP.Lowpass(w0, fs=1/5), DSP.Butterworth(4)), data)
+    sr = smooth_region(z, z_star, Δz)
+    # filt_data .= DSP.filtfilt(DSP.digitalfilter(DSP.Lowpass(w0, fs=1/5), DSP.Butterworth(4)), data)
+    return filt_data .* sr .+ data .* (1 .- sr)
+end
+
 
 function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, TS::TimeStepping)
     param_set = parameter_set(gm)
@@ -763,32 +773,6 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
             a_up_c = prog_up[i].area[k]
             a_up_candidate = max(a_up_c + Δt * tendencies_up[i].area[k], 0)
             aux_up[i].area_new[k] = a_up_candidate
-        end
-    end
-
-    @inbounds for k in real_face_indices(grid)
-        is_surface_face(grid, k) && continue
-        @inbounds for i in 1:(up.n_updrafts)
-            a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
-            anew_k = interpc2f(aux_up[i].area_new, grid, k; a_up_bcs...)
-            if anew_k >= edmf.minimum_area
-                a_k = interpc2f(prog_up[i].area, grid, k; a_up_bcs...)
-                aux_up_f[i].w_new[k] =
-                    (ρ_0_f[k] * a_k * prog_up_f[i].w[k] + Δt * tendencies_up_f[i].w[k]) / (ρ_0_f[k] * anew_k)
-
-                aux_up_f[i].w_new[k] = max(aux_up_f[i].w_new[k], 0)
-                # # TODO: remove aux_up[i].area_new from this loop.
-                # if aux_up_f[i].w_new[k] <= 0.0
-                #     if !(k.i > length(vec(aux_up[i].area_new)))
-                #         aux_up[i].area_new[Cent(k.i)] = 0
-                #     end
-                # end
-            else
-                # aux_up_f[i].w_new[k] = 0
-                # if !(k.i > length(vec(aux_up[i].area_new)))
-                #     aux_up[i].area_new[Cent(k.i)] = 0
-                # end
-            end
         end
     end
 
@@ -832,8 +816,39 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
             a_up_new[i, k] = a_up_new[i, k] * aux_up[i].smooth_top_up_a[k]
+            a_up_new[i, k] = smooth(data, z, z_star, Δz)
         end
     end
+
+    @inbounds for k in real_face_indices(grid)
+        is_surface_face(grid, k) && continue
+        @inbounds for i in 1:(up.n_updrafts)
+            a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
+            anew_k = interpc2f(a_up_new, grid, k, i; a_up_bcs...)
+            if anew_k >= edmf.minimum_area
+                a_k = interpc2f(prog_up[i].area, grid, k; a_up_bcs...)
+                w_up_new[i, k] =
+                    (ρ_0_f[k] * a_k * prog_up_f[i].w[k] + Δt * tendencies_up_f[i].w[k]) / (ρ_0_f[k] * anew_k)
+
+                # ρaw_up_new[i, k] = prog_up_f[i].ρaw[k] + Δt * tendencies_up_f[i].ρaw[k]
+
+                w_up_new[i, k] = max(w_up_new[i, k], 0)
+                # # TODO: remove a_up_new from this loop.
+                # if w_up_new[i, k] <= 0.0
+                #     if !(k.i > size(a_up_new, 2))
+                #         a_up_new[i, k] = 0
+                #     end
+                # end
+            else
+                # w_up_new[i, k] = 0
+                # if !(k.i > size(a_up_new, 2))
+                #     a_up_new[i, k] = 0
+                # end
+            end
+        end
+    end
+
+    # Apply smoothing filter
     @inbounds for k in real_face_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
             w_up_new[i, k] = w_up_new[i, k] * aux_up_f[i].smooth_top_up_w[k]

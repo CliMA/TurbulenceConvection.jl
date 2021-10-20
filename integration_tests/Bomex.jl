@@ -13,7 +13,7 @@ import .NameList
 
 best_mse = all_best_mse["Bomex"]
 
-@testset "Bomex" begin
+# @testset "Bomex" begin
     case_name = "Bomex"
     println("Running $case_name...")
     namelist = NameList.default_namelist(case_name)
@@ -37,4 +37,4 @@ best_mse = all_best_mse["Bomex"]
         test_mse(computed_mse, best_mse, k)
     end
     nothing
-end
+# end
