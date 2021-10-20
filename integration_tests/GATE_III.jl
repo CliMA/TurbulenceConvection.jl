@@ -10,7 +10,7 @@ include(joinpath("utils", "generate_namelist.jl"))
 include(joinpath("utils", "compute_mse.jl"))
 import .NameList
 
-# Note: temperatures in this case become extremely low.
+# TODO - waiting for a better root solver
 CLIMAParameters.Planet.T_freeze(::EarthParameterSet) = 100.0
 
 @testset "GATE_III" begin
