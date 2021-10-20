@@ -227,23 +227,8 @@ struct RainPhysics{T}
     end
 end
 
-struct UpdraftVariable{A}
-    new::A # TODO: deprecate this!
-    name::String
-    units::String
-    function UpdraftVariable(grid, nu, loc, name, units)
-        new = field(grid, loc, nu) # needed for prognostic updrafts
-        A = typeof(new)
-        return new{A}(new, name, units)
-    end
-end
-
 mutable struct UpdraftVariables{A1}
     n_updrafts::Int
-    W::UpdraftVariable
-    Area::UpdraftVariable
-    QT::UpdraftVariable
-    H::UpdraftVariable
     prognostic::Bool
     updraft_fraction::Float64
     cloud_fraction::A1
@@ -254,12 +239,6 @@ mutable struct UpdraftVariables{A1}
     lwp::Float64
     function UpdraftVariables(nu, namelist, grid::Grid)
         n_updrafts = nu
-
-        W = UpdraftVariable(grid, nu, "full", "w", "m/s")
-
-        Area = UpdraftVariable(grid, nu, "half", "area_fraction", "[-]")
-        QT = UpdraftVariable(grid, nu, "half", "qt", "kg/kg")
-        H = UpdraftVariable(grid, nu, "half", "thetal", "K")
 
         prognostic = true
         updraft_fraction = namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
@@ -276,10 +255,6 @@ mutable struct UpdraftVariables{A1}
         A1 = typeof(cloud_fraction)
         return new{A1}(
             n_updrafts,
-            W,
-            Area,
-            QT,
-            H,
             prognostic,
             updraft_fraction,
             cloud_fraction,

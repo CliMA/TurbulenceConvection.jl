@@ -744,14 +744,14 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
     prog_up = center_prog_updrafts(state)
     prog_gm = center_prog_grid_mean(state)
     prog_up_f = face_prog_updrafts(state)
-    a_up_new = up.Area.new
-    w_up_new = up.W.new
+    aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     ρ_0_c = center_ref_state(state).ρ0
     ρ_0_f = face_ref_state(state).ρ0
 
     @inbounds for i in 1:(up.n_updrafts)
-        w_up_new[i, kf_surf] = edmf.w_surface_bc[i]
-        a_up_new[i, kc_surf] = edmf.area_surface_bc[i]
+        aux_up_f[i].w_new[kf_surf] = edmf.w_surface_bc[i]
+        aux_up[i].area_new[kc_surf] = edmf.area_surface_bc[i]
     end
 
     @inbounds for k in real_center_indices(grid)
@@ -759,7 +759,7 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
             is_surface_center(grid, k) && continue
             a_up_c = prog_up[i].area[k]
             a_up_candidate = max(a_up_c + Δt * tendencies_up[i].area[k], 0)
-            a_up_new[i, k] = a_up_candidate
+            aux_up[i].area_new[k] = a_up_candidate
         end
     end
 
@@ -767,23 +767,23 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
         is_surface_face(grid, k) && continue
         @inbounds for i in 1:(up.n_updrafts)
             a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
-            anew_k = interpc2f(a_up_new, grid, k, i; a_up_bcs...)
+            anew_k = interpc2f(aux_up[i].area_new, grid, k; a_up_bcs...)
             if anew_k >= edmf.minimum_area
                 a_k = interpc2f(prog_up[i].area, grid, k; a_up_bcs...)
-                w_up_new[i, k] =
+                aux_up_f[i].w_new[k] =
                     (ρ_0_f[k] * a_k * prog_up_f[i].w[k] + Δt * tendencies_up_f[i].w[k]) / (ρ_0_f[k] * anew_k)
 
-                w_up_new[i, k] = max(w_up_new[i, k], 0)
-                # TODO: remove a_up_new from this loop.
-                if w_up_new[i, k] <= 0.0
-                    if !(k.i > size(a_up_new, 2))
-                        a_up_new[i, k] = 0
+                aux_up_f[i].w_new[k] = max(aux_up_f[i].w_new[k], 0)
+                # TODO: remove aux_up[i].area_new from this loop.
+                if aux_up_f[i].w_new[k] <= 0.0
+                    if !(k.i > length(vec(aux_up[i].area_new)))
+                        aux_up[i].area_new[Cent(k.i)] = 0
                     end
                 end
             else
-                w_up_new[i, k] = 0
-                if !(k.i > size(a_up_new, 2))
-                    a_up_new[i, k] = 0
+                aux_up_f[i].w_new[k] = 0
+                if !(k.i > length(vec(aux_up[i].area_new)))
+                    aux_up[i].area_new[Cent(k.i)] = 0
                 end
             end
         end
@@ -793,43 +793,43 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
         @inbounds for i in 1:(up.n_updrafts)
             if is_surface_center(grid, k)
                 # at the surface
-                if a_up_new[i, k] >= edmf.minimum_area
-                    up.H.new[i, k] = edmf.h_surface_bc[i]
-                    up.QT.new[i, k] = edmf.qt_surface_bc[i]
+                if aux_up[i].area_new[k] >= edmf.minimum_area
+                    aux_up[i].θ_liq_ice_new[k] = edmf.h_surface_bc[i]
+                    aux_up[i].q_tot_new[k] = edmf.qt_surface_bc[i]
                 else
-                    up.H.new[i, k] = prog_gm.θ_liq_ice[k]
-                    up.QT.new[i, k] = prog_gm.q_tot[k]
+                    aux_up[i].θ_liq_ice_new[k] = prog_gm.θ_liq_ice[k]
+                    aux_up[i].q_tot_new[k] = prog_gm.q_tot[k]
                 end
                 continue
             end
 
-            if a_up_new[i, k] >= edmf.minimum_area
-                up.H.new[i, k] =
+            if aux_up[i].area_new[k] >= edmf.minimum_area
+                aux_up[i].θ_liq_ice_new[k] =
                     (ρ_0_c[k] * prog_up[i].area[k] * prog_up[i].θ_liq_ice[k] + Δt * tendencies_up[i].θ_liq_ice[k]) /
-                    (ρ_0_c[k] * a_up_new[i, k])
+                    (ρ_0_c[k] * aux_up[i].area_new[k])
 
-                up.QT.new[i, k] = max(
+                aux_up[i].q_tot_new[k] = max(
                     (ρ_0_c[k] * prog_up[i].area[k] * prog_up[i].q_tot[k] + Δt * tendencies_up[i].q_tot[k]) /
-                    (ρ_0_c[k] * a_up_new[i, k]),
+                    (ρ_0_c[k] * aux_up[i].area_new[k]),
                     0.0,
                 )
 
             else
-                up.H.new[i, k] = prog_gm.θ_liq_ice[k]
-                up.QT.new[i, k] = prog_gm.q_tot[k]
+                aux_up[i].θ_liq_ice_new[k] = prog_gm.θ_liq_ice[k]
+                aux_up[i].q_tot_new[k] = prog_gm.q_tot[k]
             end
         end
     end
     # set values
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_face_indices(grid)
-            prog_up_f[i].w[k] = up.W.new[i, k]
+            prog_up_f[i].w[k] = aux_up_f[i].w_new[k]
         end
 
         @inbounds for k in real_center_indices(grid)
-            prog_up[i].area[k] = up.Area.new[i, k]
-            prog_up[i].q_tot[k] = up.QT.new[i, k]
-            prog_up[i].θ_liq_ice[k] = up.H.new[i, k]
+            prog_up[i].area[k] = aux_up[i].area_new[k]
+            prog_up[i].q_tot[k] = aux_up[i].q_tot_new[k]
+            prog_up[i].θ_liq_ice[k] = aux_up[i].θ_liq_ice_new[k]
         end
     end
     return
