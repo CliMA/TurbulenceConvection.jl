@@ -229,7 +229,8 @@ function Bomex(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     # namelist["time_stepping"]["t_max"] = 21600.0
-    namelist["time_stepping"]["t_max"] = 15006.0
+    # namelist["time_stepping"]["t_max"] = 15006.0
+    namelist["time_stepping"]["t_max"] = 7806.0
 
     namelist["meta"]["simname"] = "Bomex"
     namelist["meta"]["casename"] = "Bomex"
