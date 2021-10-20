@@ -74,7 +74,7 @@ function sgs_mean(en_thermo::EnvironmentThermodynamics, grid, state, en, rain, d
     @inbounds for k in real_center_indices(grid)
         # condensation
         q_tot_en = aux_en.q_tot[k]
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], q_tot_en)
+        ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], q_tot_en)
         # autoconversion and accretion
         mph = precipitation_formation(param_set, rain.rain_model, prog_ra.qr[k], aux_en.area[k], ρ0_c[k], dt, ts)
         update_cloud_dry(en_thermo, state, k, ts)
@@ -190,7 +190,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
                     end
 
                     # condensation
-                    ts = TD.PhaseEquil_pθq(param_set, p0_c[k], h_hat, qt_hat)
+                    ts = thermo_state_pθq(param_set, p0_c[k], h_hat, qt_hat)
                     q_liq_en = TD.liquid_specific_humidity(ts)
                     T = TD.air_temperature(ts)
                     # autoconversion and accretion
@@ -266,7 +266,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
 
         else
             # if variance and covariance are zero do the same as in SA_mean
-            ts = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
+            ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
             mph = precipitation_formation(param_set, rain.rain_model, prog_ra.qr[k], aux_en.area[k], ρ0_c[k], dt, ts)
             update_env_precip_tendencies(en_thermo, state, k, mph.qt_tendency, mph.θ_liq_ice_tendency)
             update_cloud_dry(en_thermo, state, k, ts)
