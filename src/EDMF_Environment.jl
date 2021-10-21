@@ -52,13 +52,15 @@ function update_cloud_dry(en_thermo::EnvironmentThermodynamics, state, k, ts)
     aux_en = center_aux_environment(state)
     if q_liq > 0.0
         aux_en.cloud_fraction[k] = 1.0
-        en_thermo.th_cloudy[k] = TD.liquid_ice_pottemp(ts)
+        en_thermo.th_cloudy[k] = TD.dry_pottemp(ts)
+        en_thermo.thl_cloudy[k] = TD.liquid_ice_pottemp(ts)
         en_thermo.t_cloudy[k] = TD.air_temperature(ts)
         en_thermo.qt_cloudy[k] = TD.total_specific_humidity(ts)
         en_thermo.qv_cloudy[k] = TD.vapor_specific_humidity(ts)
     else
         aux_en.cloud_fraction[k] = 0.0
-        en_thermo.th_dry[k] = TD.liquid_ice_pottemp(ts)
+        en_thermo.th_dry[k] = TD.dry_pottemp(ts)
+        en_thermo.thv_dry[k] = TD.virtual_pottemp(ts)
         en_thermo.qt_dry[k] = TD.total_specific_humidity(ts)
     end
     return
@@ -256,6 +258,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
             en_thermo.qt_cloudy[k] = outer_env[i_qt_cld]
             ts_cld = TD.PhaseEquil_pTq(param_set, p0_c[k], en_thermo.t_cloudy[k], en_thermo.qt_cloudy[k])
             en_thermo.th_cloudy[k] = TD.dry_pottemp(ts_cld)
+            en_thermo.thl_cloudy[k] = TD.liquid_ice_pottemp(ts_cld)
 
             # update var/covar rain sources
             en_thermo.Hvar_rain_dt[k] = outer_src[i_SH_H] - outer_src[i_SH] * aux_en.θ_liq_ice[k]

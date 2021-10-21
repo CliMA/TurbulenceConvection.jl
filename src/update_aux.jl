@@ -300,23 +300,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         ∂qt∂z = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
         THL_cut = ccut(aux_en.θ_liq_ice, grid, k)
         ∂θl∂z = c∇(THL_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
-        # buoyancy_gradients
-        bg_model = Tan2018(;
-            qt_dry = en_thermo.qt_dry[k],
-            th_dry = en_thermo.th_dry[k],
-            t_cloudy = en_thermo.t_cloudy[k],
-            qv_cloudy = en_thermo.qv_cloudy[k],
-            qt_cloudy = en_thermo.qt_cloudy[k],
-            th_cloudy = en_thermo.th_cloudy[k],
-            ∂qt∂z = ∂qt∂z,
-            ∂θl∂z = ∂θl∂z,
-            p0 = p0_c[k],
-            en_cld_frac = aux_en.cloud_fraction[k],
-            alpha0 = α0_c[k],
-        )
-        bg = buoyancy_gradients(param_set, bg_model)
 
-        # Limiting stratification scale (Deardorff, 1976)
         p0_cut = ccut(p0_c, grid, k)
         T_cut = ccut(aux_en.T, grid, k)
         QT_cut = ccut(aux_en.q_tot, grid, k)
@@ -325,10 +309,83 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         thv_cut = TD.virtual_pottemp.(ts_cut)
 
         ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
+        θ = TD.dry_pottemp(ts)
         θv = TD.virtual_pottemp(ts)
         ∂θv∂z = c∇(thv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
+
+        # buoyancy_gradients
+        if edmf.bg_closure == BuoyGradMean()
+            # First order approximation: Use environmental mean fields.
+            bg_kwargs = (;
+                t_cloudy = aux_en.T[k],
+                # WARNING: ICE MISSING
+                qv_cloudy = (aux_en.q_tot - aux_en.q_liq)[k],
+                qt_cloudy = aux_en.q_tot[k],
+                θ_cloudy = θ,
+                θ_liq_ice_cloudy = aux_en.θ_liq_ice[k],
+                ∂θv∂z_dry = ∂θv∂z,
+                ∂qt∂z_cloudy = ∂qt∂z,
+                ∂θl∂z_cloudy = ∂θl∂z,
+                p0 = p0_c[k],
+                en_cld_frac = aux_en.cloud_fraction[k],
+                alpha0 = α0_c[k],
+            )
+            bg_model = EnvBuoyGrad(edmf.bg_closure; bg_kwargs...)
+
+        elseif edmf.bg_closure == BuoyGradQuadratures()
+            # Second order approximation: Use dry and cloudy environmental fields.
+            cf_cut = ccut(aux_en.cloud_fraction, grid, k)
+            QT_cloudy_cut = ccut(en_thermo.qt_cloudy, grid, k)
+            ∂qt∂z_cloudy = c∇_vanishing_subdomain(
+                QT_cloudy_cut,
+                cf_cut,
+                ∂qt∂z,
+                grid,
+                k;
+                bottom = SetGradient(0),
+                top = SetGradient(0),
+            )
+            THL_cloudy_cut = ccut(en_thermo.thl_cloudy, grid, k)
+            ∂θl∂z_cloudy = c∇_vanishing_subdomain(
+                THL_cloudy_cut,
+                cf_cut,
+                ∂θl∂z,
+                grid,
+                k;
+                bottom = SetGradient(0),
+                top = SetGradient(0),
+            )
+            THV_dry_cut = ccut(en_thermo.thv_dry, grid, k)
+            ∂θv∂z_dry = c∇_vanishing_subdomain(
+                THV_dry_cut,
+                cf_cut,
+                ∂θv∂z,
+                grid,
+                k;
+                bottom = SetGradient(0),
+                top = SetGradient(0),
+            )
+
+            bg_kwargs = (;
+                t_cloudy = en_thermo.t_cloudy[k],
+                qv_cloudy = en_thermo.qv_cloudy[k],
+                qt_cloudy = en_thermo.qt_cloudy[k],
+                θ_cloudy = en_thermo.th_cloudy[k],
+                θ_liq_ice_cloudy = en_thermo.thl_cloudy[k],
+                ∂θv∂z_dry = ∂θv∂z_dry,
+                ∂qt∂z_cloudy = ∂qt∂z_cloudy,
+                ∂θl∂z_cloudy = ∂θl∂z_cloudy,
+                p0 = p0_c[k],
+                en_cld_frac = aux_en.cloud_fraction[k],
+                alpha0 = α0_c[k],
+            )
+            bg_model = EnvBuoyGrad(edmf.bg_closure; bg_kwargs...)
+        end
+        bg = buoyancy_gradients(param_set, bg_model)
+
+        # Limiting stratification scale (Deardorff, 1976)
         # compute ∇Ri and Pr
-        ∇_Ri = gradient_Richardson_number(bg.∂b∂z_θl, bg.∂b∂z_qt, Shear², eps(0.0))
+        ∇_Ri = gradient_Richardson_number(bg.∂b∂z, Shear², eps(0.0))
         edmf.prandtl_nvec[k] = turbulent_Prandtl_number(param_set, obukhov_length, ∇_Ri)
 
         ml_model = MinDisspLen(;
@@ -338,9 +395,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             ustar = surface.ustar,
             Pr = edmf.prandtl_nvec[k],
             p0 = p0_c[k],
-            ∂b∂z_θl = bg.∂b∂z_θl,
+            ∂b∂z = bg.∂b∂z,
             Shear² = Shear²,
-            ∂b∂z_qt = bg.∂b∂z_qt,
             ∂θv∂z = ∂θv∂z,
             ∂qt∂z = ∂qt∂z,
             ∂θl∂z = ∂θl∂z,
@@ -368,7 +424,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         KM[k] = c_m * edmf.mixing_length[k] * sqrt(max(prog_en.tke[k], 0.0))
         KH[k] = KM[k] / edmf.prandtl_nvec[k]
 
-        aux_en_2m.tke.buoy[k] = -ml_model.a_en * ρ0_c[k] * KH[k] * (bg.∂b∂z_θl + bg.∂b∂z_qt)
+        aux_en_2m.tke.buoy[k] = -ml_model.a_en * ρ0_c[k] * KH[k] * bg.∂b∂z
     end
 
     compute_covariance_entr(edmf, grid, state, :tke, :w)

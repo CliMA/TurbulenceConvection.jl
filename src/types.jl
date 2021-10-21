@@ -99,12 +99,10 @@ Base.@kwdef struct MinDisspLen{FT, T}
     Pr::FT
     "reference pressure"
     p0::FT
-    "partial change in buoyancy due to θl changes"
-    ∂b∂z_θl::FT
+    "environmental vertical buoyancy gradient"
+    ∂b∂z::FT
     "env shear"
     Shear²::FT
-    "partial change in buoyancy due to qt changes"
-    ∂b∂z_qt::FT
     "virtual potential temperature gradient"
     ∂θv∂z::FT
     "total specific humidity gradient"
@@ -145,27 +143,31 @@ end
 """
     GradBuoy
 
+Environmental buoyancy gradients.
+
 $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct GradBuoy{FT}
-    ∂b∂θl::FT
-    ∂b∂qt::FT
-    ∂b∂z_qt::FT
-    ∂b∂z_θl::FT
+    "environmental vertical buoyancy gradient"
+    ∂b∂z::FT
+    "vertical buoyancy gradient in the dry part of the environment"
+    ∂b∂z_dry::FT
+    "vertical buoyancy gradient in the cloudy part of the environment"
+    ∂b∂z_cloudy::FT
 end
 
-"""
-    Tan2018
+abstract type EnvBuoyGradClosure end
+struct BuoyGradMean <: EnvBuoyGradClosure end
+struct BuoyGradQuadratures <: EnvBuoyGradClosure end
 
-The buoyancy gradient estimating in Eqs. () - () in Tan2018
+"""
+    EnvBuoyGrad
+
+Variables used in the environmental buoyancy gradient computation.
 
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct Tan2018{FT}
-    "specific humidity in the non cloudy part"
-    qt_dry::FT
-    "potential temperature in the non cloudy part"
-    th_dry::FT
+Base.@kwdef struct EnvBuoyGrad{FT, EBC <: EnvBuoyGradClosure}
     "temperature in the cloudy part"
     t_cloudy::FT
     "vapor specific humidity  in the cloudy part"
@@ -173,17 +175,24 @@ Base.@kwdef struct Tan2018{FT}
     "total specific humidity in the cloudy part"
     qt_cloudy::FT
     "potential temperature in the cloudy part"
-    th_cloudy::FT
-    "total specific humidity gradient"
-    ∂qt∂z::FT
-    "potential temperature gradient"
-    ∂θl∂z::FT
+    θ_cloudy::FT
+    "liquid ice potential temperature in the cloudy part"
+    θ_liq_ice_cloudy::FT
+    "virtual potential temperature gradient in the non cloudy part"
+    ∂θv∂z_dry::FT
+    "total specific humidity gradient in the cloudy part"
+    ∂qt∂z_cloudy::FT
+    "liquid ice potential temperature gradient in the cloudy part"
+    ∂θl∂z_cloudy::FT
     "reference pressure"
     p0::FT
     "cloud fraction"
     en_cld_frac::FT
     "specific volume"
     alpha0::FT
+end
+function EnvBuoyGrad(::EBG; t_cloudy::FT, bg_kwargs...) where {FT <: Real, EBG <: EnvBuoyGradClosure}
+    return EnvBuoyGrad{FT, EBG}(; t_cloudy, bg_kwargs...)
 end
 
 Base.@kwdef mutable struct RainVariables
@@ -331,10 +340,12 @@ struct EnvironmentThermodynamics{A1}
     quadrature_type::String
     qt_dry::A1
     th_dry::A1
+    thv_dry::A1
     t_cloudy::A1
     qv_cloudy::A1
     qt_cloudy::A1
     th_cloudy::A1
+    thl_cloudy::A1
     Hvar_rain_dt::A1
     QTvar_rain_dt::A1
     HQTcov_rain_dt::A1
@@ -346,11 +357,13 @@ struct EnvironmentThermodynamics{A1}
 
         qt_dry = center_field(grid)
         th_dry = center_field(grid)
+        thv_dry = center_field(grid)
 
         t_cloudy = center_field(grid)
         qv_cloudy = center_field(grid)
         qt_cloudy = center_field(grid)
         th_cloudy = center_field(grid)
+        thl_cloudy = center_field(grid)
 
         Hvar_rain_dt = center_field(grid)
         QTvar_rain_dt = center_field(grid)
@@ -364,10 +377,12 @@ struct EnvironmentThermodynamics{A1}
             quadrature_type,
             qt_dry,
             th_dry,
+            thv_dry,
             t_cloudy,
             qv_cloudy,
             qt_cloudy,
             th_cloudy,
+            thl_cloudy,
             Hvar_rain_dt,
             QTvar_rain_dt,
             HQTcov_rain_dt,
@@ -564,6 +579,7 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
     entr_surface_bc::Float64
     detr_surface_bc::Float64
     sde_model::sde_struct
+    bg_closure::EnvBuoyGradClosure
     function EDMF_PrognosticTKE(namelist, grid::Grid, param_set::PS) where {PS}
         # get values from namelist
         prandtl_number = namelist["turbulence"]["prandtl_number_0"]
@@ -719,6 +735,22 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
         end
         sde_model = sde_struct{closure_type}(u0 = 1, dt = dt)
 
+        bg_type = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "env_buoy_grad";
+            default = "mean",
+            valid_options = ["mean", "quadratures"],
+        )
+        bg_closure = if bg_type == "mean"
+            BuoyGradMean()
+        elseif bg_type == "quadratures"
+            BuoyGradQuadratures()
+        else
+            error("Something went wrong. Invalid environmental buoyancy gradient closure type '$bg_type'")
+        end
+
         # Added by Ignacio : Length scheme in use (mls), and smooth min effect (ml_ratio)
         # Variable Prandtl number initialized as neutral value.
         ones_vec = center_field(grid)
@@ -793,6 +825,7 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
             entr_surface_bc,
             detr_surface_bc,
             sde_model,
+            bg_closure,
         )
     end
 end
