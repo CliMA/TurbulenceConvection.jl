@@ -464,7 +464,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     ### update
     ###
     update_updraft(edmf, grid, state, gm, TS)
-    updraft_set_values(edmf, grid, state, gm, TS)
+    updraft_set_values(edmf, grid, state, gm)
     if edmf.Rain.rain_model == "clima_1m"
         update_rain(edmf.Rain, grid, state, up_thermo, en_thermo, edmf.RainPhys, TS)
     end
@@ -787,18 +787,12 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
     return
 end
 
-function updraft_set_values(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, TS::TimeStepping)
+function updraft_set_values(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables)
     param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
-    dti_ = 1.0 / TS.dt
-    Δt = TS.dt
 
     up = edmf.UpdVar
-    up_thermo = edmf.UpdThermo
-    en = edmf.EnvVar
-    tendencies_up = center_tendencies_updrafts(state)
-    tendencies_up_f = face_tendencies_updrafts(state)
     prog_up = center_prog_updrafts(state)
     prog_gm = center_prog_grid_mean(state)
     prog_up_f = face_prog_updrafts(state)
