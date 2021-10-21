@@ -382,15 +382,6 @@ function ccut(f, grid, k::Cent)
         return SA.SVector(f[k - 1], f[k], f[k + 1])
     end
 end
-function ccut(f, grid, k::Cent, i_up::Int)
-    if is_surface_center(grid, k)
-        return SA.SVector(f[i_up, k], f[i_up, k + 1])
-    elseif is_toa_center(grid, k)
-        return SA.SVector(f[i_up, k - 1], f[i_up, k])
-    else
-        return SA.SVector(f[i_up, k - 1], f[i_up, k], f[i_up, k + 1])
-    end
-end
 
 """
     fcut
@@ -406,15 +397,6 @@ function fcut(f, grid, k::CCO.PlusHalf)
         return SA.SVector(f[k - 1], f[k])
     else
         return SA.SVector(f[k - 1], f[k], f[k + 1])
-    end
-end
-function fcut(f, grid, k::CCO.PlusHalf, i_up::Int)
-    if is_surface_face(grid, k)
-        return SA.SVector(f[i_up, k], f[i_up, k + 1])
-    elseif is_toa_face(grid, k)
-        return SA.SVector(f[i_up, k - 1], f[i_up, k])
-    else
-        return SA.SVector(f[i_up, k - 1], f[i_up, k], f[i_up, k + 1])
     end
 end
 
@@ -434,13 +416,6 @@ function ccut_downwind(f, grid, k::Cent)
         return SA.SVector(f[k], f[k + 1])
     end
 end
-function ccut_downwind(f, grid, k::Cent, i_up::Int)
-    if is_toa_center(grid, k)
-        return SA.SVector(f[i_up, k])
-    else
-        return SA.SVector(f[i_up, k], f[i_up, k + 1])
-    end
-end
 
 """
     ccut_upwind
@@ -456,13 +431,6 @@ function ccut_upwind(f, grid, k::Cent)
         return SA.SVector(f[k - 1], f[k])
     end
 end
-function ccut_upwind(f, grid, k::Cent, i_up::Int)
-    if is_surface_center(grid, k)
-        return SA.SVector(f[i_up, k])
-    else
-        return SA.SVector(f[i_up, k - 1], f[i_up, k])
-    end
-end
 
 """
     fcut_upwind
@@ -476,13 +444,6 @@ function fcut_upwind(f, grid, k)
         return SA.SVector(f[k])
     else
         return SA.SVector(f[k - 1], f[k])
-    end
-end
-function fcut_upwind(f, grid, k, i_up::Int)
-    if is_surface_face(grid, k)
-        return SA.SVector(f[i_up, k])
-    else
-        return SA.SVector(f[i_up, k - 1], f[i_up, k])
     end
 end
 
@@ -505,18 +466,6 @@ function daul_c2f_upwind(f, grid, k::CCO.PlusHalf; bottom::SetValue, top::SetZer
         return SA.SVector((f[kc - 2] + f[kc - 1]) / 2, (f[kc - 1] + f[kc]) / 2)
     end
 end
-function daul_c2f_upwind(f, grid, k::CCO.PlusHalf, i_up::Int; bottom::SetValue, top::SetZeroGradient)
-    kc = Cent(k.i)
-    if is_toa_face(grid, k)
-        return SA.SVector((f[i_up, kc - 2] + f[i_up, kc - 1]) / 2, (f[i_up, kc - 2] + f[i_up, kc - 1]) / 2)
-    elseif is_surface_face(grid, k) # never actually called
-        error("Uncaught case")
-    elseif is_surface_face(grid, kc - 1)
-        return SA.SVector(bottom.value, (f[i_up, kc - 1] + f[i_up, kc]) / 2)
-    else
-        return SA.SVector((f[i_up, kc - 2] + f[i_up, kc - 1]) / 2, (f[i_up, kc - 1] + f[i_up, kc]) / 2)
-    end
-end
 
 """
     daul_f2c_upwind
@@ -531,14 +480,6 @@ function daul_f2c_upwind(f, grid, k::Cent)
         return SA.SVector((f[kf] + f[kf + 1]) / 2)
     else
         return SA.SVector((f[kf - 1] + f[kf]) / 2, (f[kf] + f[kf + 1]) / 2)
-    end
-end
-function daul_f2c_upwind(f, grid, k::Cent, i_up::Int)
-    kf = CCO.PlusHalf(k.i)
-    if is_surface_center(grid, k)
-        return SA.SVector((f[i_up, kf] + f[i_up, kf + 1]) / 2)
-    else
-        return SA.SVector((f[i_up, kf - 1] + f[i_up, kf]) / 2, (f[i_up, kf] + f[i_up, kf + 1]) / 2)
     end
 end
 
@@ -588,59 +529,6 @@ end
 #####
 ##### Implicit operators
 #####
-
-#=
-We consider the time-discretized equation:
-
-``
-(ρaeϕⁿ⁺¹ - ρaeϕⁿ)/Δt = D ϕⁿ⁺¹ + Sⁿ
-D = ∂_z (ρaeK ∂_z)
-``
-
-Which leads to:
-
-``
-ρaeϕⁿ⁺¹ - ρaeϕⁿ = Δt D ϕⁿ⁺¹ + Δt Sⁿ
-ρaeϕⁿ⁺¹ - Δt D ϕⁿ⁺¹ = (ϕⁿ + Δt Sⁿ)
-``
-
-We relax this to
-
-``
-(I - Δt D/ρaeⁿ) ϕⁿ⁺¹ = (ϕⁿ + Δt Sⁿ)/ρaeⁿ
-``
-
-Let `A = (I - Δt D)` and `b = ϕⁿ + Δt Sⁿ`, and we have
-
-A ϕⁿ⁺¹ = b
-
-This function constructs and returns the matrix `A`,
-where `D = ∂_z (ρaeK ∂_z)`
-
-=#
-function construct_tridiag_diffusion_gm(grid::Grid, dt, ρ_ae_K, ρ_0, ae)
-    a = center_field(grid) # for tridiag solver
-    b = center_field(grid) # for tridiag solver
-    c = center_field(grid) # for tridiag solver
-    Δzi = grid.Δzi
-    @inbounds for k in real_center_indices(grid)
-        X = ρ_0[k] * ae[k] / dt
-        Y = ρ_ae_K[k + 1] * Δzi * Δzi
-        Z = ρ_ae_K[k] * Δzi * Δzi
-        if is_surface_center(grid, k)
-            Z = 0.0
-        elseif is_toa_center(grid, k)
-            Y = 0.0
-        end
-        a[k] = -Z / X
-        b[k] = 1.0 + Y / X + Z / X
-        c[k] = -Y / X
-    end
-    A = LinearAlgebra.Tridiagonal(a[2:end], vec(b), c[1:(end - 1)])
-    return A
-end
-
-tridiag_solve(b_rhs, A) = A \ b_rhs
 
 #= TODO: clean this up somehow!
 
