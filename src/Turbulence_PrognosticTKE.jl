@@ -411,6 +411,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
     set_updraft_surface_bc(edmf, grid, state, gm, Case)
+    updraft_set_values(edmf, grid, state, gm)
     update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
     tendencies_gm = center_tendencies_grid_mean(state)
@@ -464,7 +465,6 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     ### update
     ###
     update_updraft(edmf, grid, state, gm, TS)
-    updraft_set_values(edmf, grid, state, gm)
     if edmf.Rain.rain_model == "clima_1m"
         update_rain(edmf.Rain, grid, state, up_thermo, en_thermo, edmf.RainPhys, TS)
     end
