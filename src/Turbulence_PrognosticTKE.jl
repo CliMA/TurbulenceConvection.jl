@@ -468,10 +468,10 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
         update_rain(edmf.Rain, grid, state, up_thermo, en_thermo, edmf.RainPhys, TS)
     end
 
-    parent(prog_en.tke) .= tridiag_solve(implicit_eqs.b_TKE, implicit_eqs.A_TKE)
-    parent(prog_en.Hvar) .= tridiag_solve(implicit_eqs.b_Hvar, implicit_eqs.A_Hvar)
-    parent(prog_en.QTvar) .= tridiag_solve(implicit_eqs.b_QTvar, implicit_eqs.A_QTvar)
-    parent(prog_en.HQTcov) .= tridiag_solve(implicit_eqs.b_HQTcov, implicit_eqs.A_HQTcov)
+    parent(prog_en.tke) .= implicit_eqs.A_TKE \ implicit_eqs.b_TKE
+    parent(prog_en.Hvar) .= implicit_eqs.A_Hvar \ implicit_eqs.b_Hvar
+    parent(prog_en.QTvar) .= implicit_eqs.A_QTvar \ implicit_eqs.b_QTvar
+    parent(prog_en.HQTcov) .= implicit_eqs.A_HQTcov \ implicit_eqs.b_HQTcov
     @inbounds for k in real_center_indices(grid)
         prog_gm.u[k] += tendencies_gm.u[k] * TS.dt
         prog_gm.v[k] += tendencies_gm.v[k] * TS.dt
