@@ -65,6 +65,7 @@ function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::Ti
     io(edmf.Rain, grid, state, Stats, edmf.UpdThermo, edmf.EnvThermo, TS)
 
     prog_up = center_prog_updrafts(state)
+    aux_up = center_aux_updrafts(state)
     aux_tc = center_aux_tc(state)
     a_up_bulk = aux_tc.bulk.area
 
@@ -74,13 +75,13 @@ function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::Ti
         if a_up_bulk[k] > 0.0
             @inbounds for i in 1:(edmf.n_updrafts)
                 massflux[k] += interpf2c(edmf.m, grid, k, i)
-                mean_entr_sc[k] += prog_up[i].area[k] * edmf.entr_sc[i, k] / a_up_bulk[k]
-                mean_detr_sc[k] += prog_up[i].area[k] * edmf.detr_sc[i, k] / a_up_bulk[k]
-                mean_asp_ratio[k] += prog_up[i].area[k] * edmf.asp_ratio[i, k] / a_up_bulk[k]
-                mean_frac_turb_entr[k] += prog_up[i].area[k] * edmf.frac_turb_entr[i, k] / a_up_bulk[k]
-                mean_horiz_K_eddy[k] += prog_up[i].area[k] * edmf.horiz_K_eddy[i, k] / a_up_bulk[k]
-                mean_sorting_function[k] += prog_up[i].area[k] * edmf.sorting_function[i, k] / a_up_bulk[k]
-                mean_b_mix[k] += prog_up[i].area[k] * edmf.b_mix[i, k] / a_up_bulk[k]
+                mean_entr_sc[k] += aux_up[i].area[k] * edmf.entr_sc[i, k] / a_up_bulk[k]
+                mean_detr_sc[k] += aux_up[i].area[k] * edmf.detr_sc[i, k] / a_up_bulk[k]
+                mean_asp_ratio[k] += aux_up[i].area[k] * edmf.asp_ratio[i, k] / a_up_bulk[k]
+                mean_frac_turb_entr[k] += aux_up[i].area[k] * edmf.frac_turb_entr[i, k] / a_up_bulk[k]
+                mean_horiz_K_eddy[k] += aux_up[i].area[k] * edmf.horiz_K_eddy[i, k] / a_up_bulk[k]
+                mean_sorting_function[k] += aux_up[i].area[k] * edmf.sorting_function[i, k] / a_up_bulk[k]
+                mean_b_mix[k] += aux_up[i].area[k] * edmf.b_mix[i, k] / a_up_bulk[k]
             end
         end
     end
@@ -91,7 +92,7 @@ function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::Ti
         if a_up_bulk_f > 0.0
             @inbounds for i in 1:(edmf.n_updrafts)
                 a_up_f = interpc2f(
-                    prog_up[i].area,
+                    aux_up[i].area,
                     grid,
                     k;
                     bottom = SetValue(edmf.area_surface_bc[i]),
@@ -177,6 +178,8 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     param_set = parameter_set(gm)
     prog_gm = center_prog_grid_mean(state)
     aux_en = center_aux_environment(state)
+    aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     aux_en_f = face_aux_environment(state)
     ρ0_f = face_ref_state(state).ρ0
     p0_c = center_ref_state(state).p0
@@ -263,9 +266,9 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         edmf.m[i, kf_surf] = 0.0
         a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
         @inbounds for k in real_face_indices(grid)
-            a_up = interpc2f(prog_up[i].area, grid, k; a_up_bcs...)
+            a_up = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
             a_en = interpc2f(ae, grid, k; a_up_bcs...)
-            edmf.m[i, k] = ρ0_f[k] * a_up * a_en * (prog_up_f[i].w[k] - aux_en_f.w[k])
+            edmf.m[i, k] = ρ0_f[k] * a_up * a_en * (aux_up_f[i].w[k] - aux_en_f.w[k])
         end
     end
 
@@ -278,8 +281,8 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         h_en_f = interpc2f(aux_en.θ_liq_ice, grid, k; m_bcs...)
         qt_en_f = interpc2f(aux_en.q_tot, grid, k; m_bcs...)
         @inbounds for i in 1:(up.n_updrafts)
-            h_up_f = interpc2f(prog_up[i].θ_liq_ice, grid, k; m_bcs...)
-            qt_up_f = interpc2f(prog_up[i].q_tot, grid, k; m_bcs...)
+            h_up_f = interpc2f(aux_up[i].θ_liq_ice, grid, k; m_bcs...)
+            qt_up_f = interpc2f(aux_up[i].q_tot, grid, k; m_bcs...)
             edmf.massflux_h[k] += edmf.m[i, k] * (h_up_f - h_en_f)
             edmf.massflux_qt[k] += edmf.m[i, k] * (qt_up_f - qt_en_f)
         end
@@ -550,6 +553,8 @@ function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol,
     prog_gm_f = face_prog_grid_mean(state)
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
+    aux_up = center_aux_updrafts(state)
     aux_en_c = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_en = is_tke ? aux_en_f : aux_en_c
@@ -574,8 +579,8 @@ function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol,
 
             gmv_covar[k] = tke_factor * ae[k] * Δϕ * Δψ + ae[k] * covar_e[k]
             @inbounds for i in 1:(edmf.n_updrafts)
-                ϕ_up_var = getproperty(prog_up_f[i], ϕ_sym)
-                ψ_up_var = getproperty(prog_up_f[i], ψ_sym)
+                ϕ_up_var = getproperty(aux_up_f[i], ϕ_sym)
+                ψ_up_var = getproperty(aux_up_f[i], ψ_sym)
                 ϕ_up_dual = dual_faces(ϕ_up_var, grid, k)
                 ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
                 ψ_up_dual = dual_faces(ψ_up_var, grid, k)
@@ -584,7 +589,7 @@ function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol,
                 Δψ_dual = ψ_up_dual .- ψ_gm_dual
                 Δϕ = interpf2c(Δϕ_dual, grid, k)
                 Δψ = interpf2c(Δψ_dual, grid, k)
-                gmv_covar[k] += tke_factor * prog_up[i].area[k] * Δϕ * Δψ
+                gmv_covar[k] += tke_factor * aux_up[i].area[k] * Δϕ * Δψ
             end
         end
     else
@@ -595,11 +600,11 @@ function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol,
 
             gmv_covar[k] = tke_factor * ae[k] * Δϕ * Δψ + ae[k] * covar_e[k]
             @inbounds for i in 1:(edmf.n_updrafts)
-                ϕ_up_var = getproperty(prog_up[i], ϕ_sym)
-                ψ_up_var = getproperty(prog_up[i], ψ_sym)
+                ϕ_up_var = getproperty(aux_up[i], ϕ_sym)
+                ψ_up_var = getproperty(aux_up[i], ψ_sym)
                 Δϕ = ϕ_up_var[k] - ϕ_gm[k]
                 Δψ = ψ_up_var[k] - ψ_gm[k]
-                gmv_covar[k] += tke_factor * prog_up[i].area[k] * Δϕ * Δψ
+                gmv_covar[k] += tke_factor * aux_up[i].area[k] * Δϕ * Δψ
             end
         end
     end
@@ -631,6 +636,7 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     tendencies_up = center_tendencies_updrafts(state)
     tendencies_up_f = face_tendencies_updrafts(state)
     ρ_0_c = center_ref_state(state).ρ0
@@ -639,12 +645,12 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
 
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_center_indices(grid)
-            tendencies_up[i].area[k] = 0
-            tendencies_up[i].θ_liq_ice[k] = 0
-            tendencies_up[i].q_tot[k] = 0
+            tendencies_up[i].ρarea[k] = 0
+            tendencies_up[i].ρaθ_liq_ice[k] = 0
+            tendencies_up[i].ρaq_tot[k] = 0
         end
         @inbounds for k in real_face_indices(grid)
-            tendencies_up_f[i].w[k] = 0
+            tendencies_up_f[i].ρaw[k] = 0
         end
     end
 
@@ -657,19 +663,19 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
             is_surface_center(grid, k) && continue
-            w_up_c = interpf2c(prog_up_f[i].w, grid, k)
-            adv = upwind_advection_area(ρ_0_c, prog_up[i].area, prog_up_f[i].w, grid, k)
+            w_up_c = interpf2c(aux_up_f[i].w, grid, k)
+            adv = upwind_advection_area(ρ_0_c, aux_up[i].area, aux_up_f[i].w, grid, k)
 
-            a_up_c = prog_up[i].area[k]
+            a_up_c = aux_up[i].area[k]
             entr_term = a_up_c * w_up_c * (edmf.entr_sc[i, k])
             detr_term = a_up_c * w_up_c * (-edmf.detr_sc[i, k])
-            tendencies_up[i].area[k] = adv + entr_term + detr_term
-            a_up_candidate = a_up_c + Δt * tendencies_up[i].area[k]
+            tendencies_up[i].ρarea[k] = adv + entr_term + detr_term
+            a_up_candidate = a_up_c + Δt * tendencies_up[i].ρarea[k]
             if a_up_candidate > au_lim
                 a_up_div = a_up_c > 0.0 ? a_up_c : au_lim
                 a_up_candidate = au_lim
                 edmf.detr_sc[i, k] = (((au_lim - a_up_c) * dti_ - adv - entr_term) / (-a_up_div * w_up_c))
-                tendencies_up[i].area[k] = (a_up_candidate - a_up_c) * dti_
+                tendencies_up[i].ρarea[k] = (a_up_candidate - a_up_c) * dti_
             end
         end
     end
@@ -679,20 +685,20 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
 
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
-            w_up_c = interpf2c(prog_up_f[i].w, grid, k)
-            m_k = (ρ_0_c[k] * prog_up[i].area[k] * w_up_c)
+            w_up_c = interpf2c(aux_up_f[i].w, grid, k)
+            m_k = (ρ_0_c[k] * aux_up[i].area[k] * w_up_c)
 
-            adv = upwind_advection_scalar(ρ_0_c, prog_up[i].area, prog_up_f[i].w, prog_up[i].θ_liq_ice, grid, k)
+            adv = upwind_advection_scalar(ρ_0_c, aux_up[i].area, aux_up_f[i].w, aux_up[i].θ_liq_ice, grid, k)
             entr = entr_w_c[i, k] * aux_en.θ_liq_ice[k]
-            detr = detr_w_c[i, k] * prog_up[i].θ_liq_ice[k]
+            detr = detr_w_c[i, k] * aux_up[i].θ_liq_ice[k]
             rain = ρ_0_c[k] * up_thermo.θ_liq_ice_tendency_rain_formation[i, k]
-            tendencies_up[i].θ_liq_ice[k] = -adv + m_k * (entr - detr) + rain
+            tendencies_up[i].ρaθ_liq_ice[k] = -adv + m_k * (entr - detr) + rain
 
-            adv = upwind_advection_scalar(ρ_0_c, prog_up[i].area, prog_up_f[i].w, prog_up[i].q_tot, grid, k)
+            adv = upwind_advection_scalar(ρ_0_c, aux_up[i].area, aux_up_f[i].w, aux_up[i].q_tot, grid, k)
             entr = entr_w_c[i, k] * aux_en.q_tot[k]
-            detr = detr_w_c[i, k] * prog_up[i].q_tot[k]
+            detr = detr_w_c[i, k] * aux_up[i].q_tot[k]
             rain = ρ_0_c[k] * up_thermo.qt_tendency_rain_formation[i, k]
-            tendencies_up[i].q_tot[k] = -adv + m_k * (entr - detr) + rain
+            tendencies_up[i].ρaq_tot[k] = -adv + m_k * (entr - detr) + rain
         end
     end
 
@@ -701,17 +707,17 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
         is_surface_face(grid, k) && continue
         @inbounds for i in 1:(up.n_updrafts)
             a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
-            a_k = interpc2f(prog_up[i].area, grid, k; a_up_bcs...)
+            a_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
             # We know that, since W = 0 at z = 0, these BCs should
             # not matter in the end:
             entr_w = interpc2f(entr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
             detr_w = interpc2f(detr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
             B_k = interpc2f(aux_up[i].buoy, grid, k; bottom = SetValue(0), top = SetValue(0))
 
-            adv = upwind_advection_velocity(ρ_0_f, prog_up[i].area, prog_up_f[i].w, grid, k; a_up_bcs)
-            exch = (ρ_0_f[k] * a_k * prog_up_f[i].w[k] * (entr_w * aux_en_f.w[k] - detr_w * prog_up_f[i].w[k]))
+            adv = upwind_advection_velocity(ρ_0_f, aux_up[i].area, aux_up_f[i].w, grid, k; a_up_bcs)
+            exch = (ρ_0_f[k] * a_k * aux_up_f[i].w[k] * (entr_w * aux_en_f.w[k] - detr_w * aux_up_f[i].w[k]))
             buoy = ρ_0_f[k] * a_k * B_k
-            tendencies_up_f[i].w[k] = -adv + exch + buoy + edmf.nh_pressure[i, k]
+            tendencies_up_f[i].ρaw[k] = -adv + exch + buoy + edmf.nh_pressure[i, k]
         end
     end
     return
@@ -746,8 +752,8 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
             is_surface_center(grid, k) && continue
-            a_up_c = prog_up[i].area[k]
-            a_up_candidate = max(a_up_c + Δt * tendencies_up[i].area[k], 0)
+            a_up_c = aux_up[i].area[k]
+            a_up_candidate = max(a_up_c + Δt * tendencies_up[i].ρarea[k], 0)
             aux_up[i].area_new[k] = a_up_candidate
         end
     end
@@ -758,9 +764,9 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
             a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
             anew_k = interpc2f(aux_up[i].area_new, grid, k; a_up_bcs...)
             if anew_k >= edmf.minimum_area
-                a_k = interpc2f(prog_up[i].area, grid, k; a_up_bcs...)
+                a_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
                 aux_up_f[i].w_new[k] =
-                    (ρ_0_f[k] * a_k * prog_up_f[i].w[k] + Δt * tendencies_up_f[i].w[k]) / (ρ_0_f[k] * anew_k)
+                    (ρ_0_f[k] * a_k * aux_up_f[i].w[k] + Δt * tendencies_up_f[i].ρaw[k]) / (ρ_0_f[k] * anew_k)
 
                 aux_up_f[i].w_new[k] = max(aux_up_f[i].w_new[k], 0)
                 # TODO: remove aux_up[i].area_new from this loop.
@@ -794,11 +800,11 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
 
             if aux_up[i].area_new[k] >= edmf.minimum_area
                 aux_up[i].θ_liq_ice_new[k] =
-                    (ρ_0_c[k] * prog_up[i].area[k] * prog_up[i].θ_liq_ice[k] + Δt * tendencies_up[i].θ_liq_ice[k]) /
+                    (ρ_0_c[k] * aux_up[i].area[k] * aux_up[i].θ_liq_ice[k] + Δt * tendencies_up[i].ρaθ_liq_ice[k]) /
                     (ρ_0_c[k] * aux_up[i].area_new[k])
 
                 aux_up[i].q_tot_new[k] = max(
-                    (ρ_0_c[k] * prog_up[i].area[k] * prog_up[i].q_tot[k] + Δt * tendencies_up[i].q_tot[k]) /
+                    (ρ_0_c[k] * aux_up[i].area[k] * aux_up[i].q_tot[k] + Δt * tendencies_up[i].ρaq_tot[k]) /
                     (ρ_0_c[k] * aux_up[i].area_new[k]),
                     0.0,
                 )
@@ -812,14 +818,26 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
     # set values
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_face_indices(grid)
-            prog_up_f[i].w[k] = aux_up_f[i].w_new[k]
+            a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
+            anew_k = interpc2f(aux_up[i].area_new, grid, k; a_up_bcs...)
+            prog_up_f[i].ρaw[k] = ρ_0_f[k] * anew_k * aux_up_f[i].w_new[k]
         end
 
         @inbounds for k in real_center_indices(grid)
-            prog_up[i].area[k] = aux_up[i].area_new[k]
-            prog_up[i].q_tot[k] = aux_up[i].q_tot_new[k]
-            prog_up[i].θ_liq_ice[k] = aux_up[i].θ_liq_ice_new[k]
+            prog_up[i].ρarea[k] = aux_up[i].area_new[k] * ρ_0_c[k]
+            prog_up[i].ρaq_tot[k] = aux_up[i].q_tot_new[k] * prog_up[i].ρarea[k]
+            prog_up[i].ρaθ_liq_ice[k] = aux_up[i].θ_liq_ice_new[k] * prog_up[i].ρarea[k]
         end
+        println("*******")
+        @show edmf.area_surface_bc[i]
+        @show vec(prog_up[i].ρarea)[1:6]
+        @show vec(aux_up[i].area_new)[1:6]
+        @show vec(aux_up[i].q_tot_new)[1:6]
+        @show vec(aux_up[i].θ_liq_ice_new)[1:6]
+        @show vec(aux_up_f[i].w_new)[1:6]
+        @show vec(prog_up_f[i].ρaw)[1:6]
+        @show vec(prog_up[i].ρaq_tot)[1:6]
+        @show vec(prog_up[i].ρaθ_liq_ice)[1:6]
     end
     return
 end
@@ -895,9 +913,12 @@ function compute_covariance_interdomain_src(
     tke_factor = is_tke ? 0.5 : 1
     prog_up_c = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_up_c = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     aux_en_2m = center_aux_environment_2m(state)
     aux_covar = getproperty(aux_en_2m, Covar_sym)
     prog_up = is_tke ? prog_up_f : prog_up_c
+    aux_up = is_tke ? aux_up_f : aux_up_c
     aux_en_c = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_en = is_tke ? aux_en_f : aux_en_c
@@ -908,23 +929,23 @@ function compute_covariance_interdomain_src(
         @inbounds for k in real_center_indices(grid)
             aux_covar.interdomain[k] = 0.0
             @inbounds for i in 1:(edmf.n_updrafts)
-                ϕ_up = getproperty(prog_up[i], ϕ_var)
-                ψ_up = getproperty(prog_up[i], ψ_var)
+                ϕ_up = getproperty(aux_up[i], ϕ_var)
+                ψ_up = getproperty(aux_up[i], ψ_var)
                 Δϕ = interpf2c(ϕ_up, grid, k) - interpf2c(ϕ_en, grid, k)
                 Δψ = interpf2c(ψ_up, grid, k) - interpf2c(ψ_en, grid, k)
 
-                aux_covar.interdomain[k] += tke_factor * prog_up_c[i].area[k] * (1.0 - prog_up_c[i].area[k]) * Δϕ * Δψ
+                aux_covar.interdomain[k] += tke_factor * aux_up_c[i].area[k] * (1.0 - aux_up_c[i].area[k]) * Δϕ * Δψ
             end
         end
     else
         @inbounds for k in real_center_indices(grid)
             aux_covar.interdomain[k] = 0.0
             @inbounds for i in 1:(edmf.n_updrafts)
-                ϕ_up = getproperty(prog_up[i], ϕ_var)
-                ψ_up = getproperty(prog_up[i], ψ_var)
+                ϕ_up = getproperty(aux_up[i], ϕ_var)
+                ψ_up = getproperty(aux_up[i], ψ_var)
                 Δϕ = ϕ_up[k] - ϕ_en[k]
                 Δψ = ψ_up[k] - ψ_en[k]
-                aux_covar.interdomain[k] += tke_factor * prog_up_c[i].area[k] * (1.0 - prog_up_c[i].area[k]) * Δϕ * Δψ
+                aux_covar.interdomain[k] += tke_factor * aux_up_c[i].area[k] * (1.0 - aux_up_c[i].area[k]) * Δϕ * Δψ
             end
         end
     end
@@ -945,9 +966,12 @@ function compute_covariance_entr(
     is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
     prog_up_c = center_prog_updrafts(state)
+    aux_up_c = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
     prog_gm_c = center_prog_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
+    aux_up = is_tke ? aux_up_f : aux_up_c
     prog_gm = is_tke ? prog_gm_f : prog_gm_c
     prog_up = is_tke ? prog_up_f : prog_up_c
     GmvVar1 = getproperty(prog_gm, var1)
@@ -966,11 +990,11 @@ function compute_covariance_entr(
         aux_covar.entr_gain[k] = 0.0
         aux_covar.detr_loss[k] = 0.0
         @inbounds for i in 1:(edmf.n_updrafts)
-            a_up = prog_up_c[i].area[k]
+            a_up = aux_up_c[i].area[k]
             if a_up > edmf.minimum_area
                 R_up = edmf.pressure_plume_spacing[i]
-                up_var_1 = getproperty(prog_up[i], var1)
-                up_var_2 = getproperty(prog_up[i], var2)
+                up_var_1 = getproperty(aux_up[i], var1)
+                up_var_2 = getproperty(aux_up[i], var2)
                 updvar1 = is_tke ? interpf2c(up_var_1, grid, k) : up_var_1[k]
                 updvar2 = is_tke ? interpf2c(up_var_2, grid, k) : up_var_2[k]
                 envvar1 = is_tke ? interpf2c(EnvVar1, grid, k) : EnvVar1[k]
@@ -980,7 +1004,7 @@ function compute_covariance_entr(
 
                 eps_turb = edmf.frac_turb_entr[i, k]
 
-                w_u = interpf2c(prog_up_f[i].w, grid, k)
+                w_u = interpf2c(aux_up_f[i].w, grid, k)
                 dynamic_entr =
                     tke_factor *
                     ρ_0_c[k] *
@@ -1011,6 +1035,7 @@ function compute_covariance_detr(edmf::EDMF_PrognosticTKE, grid, state, covar_sy
     ρ0_c = center_ref_state(state).ρ0
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
 
     aux_en_2m = center_aux_environment_2m(state)
     aux_covar = getproperty(aux_en_2m, covar_sym)
@@ -1020,8 +1045,8 @@ function compute_covariance_detr(edmf::EDMF_PrognosticTKE, grid, state, covar_sy
     @inbounds for k in real_center_indices(grid)
         aux_covar.detr_loss[k] = 0.0
         @inbounds for i in 1:(up.n_updrafts)
-            w_up_c = interpf2c(prog_up_f[i].w, grid, k)
-            aux_covar.detr_loss[k] += prog_up[i].area[k] * abs(w_up_c) * edmf.entr_sc[i, k]
+            w_up_c = interpf2c(aux_up_f[i].w, grid, k)
+            aux_covar.detr_loss[k] += prog_up[i].ρarea[k]/ρ0_c[k] * abs(w_up_c) * edmf.entr_sc[i, k]
         end
         aux_covar.detr_loss[k] *= ρ0_c[k] * prog_covar[k]
     end
@@ -1052,6 +1077,7 @@ function en_diffusion_tendencies(grid::Grid, state, TS, covar_sym::Symbol, n_upd
     b = center_field(grid)
     ρ0_c = center_ref_state(state).ρ0
     prog_up = center_prog_updrafts(state)
+    aux_up = center_aux_updrafts(state)
     prog_en = center_prog_environment(state)
     aux_en_2m = center_aux_environment_2m(state)
     prog_covar = getproperty(prog_en, covar_sym)
@@ -1060,7 +1086,7 @@ function en_diffusion_tendencies(grid::Grid, state, TS, covar_sym::Symbol, n_upd
     ae = center_field(grid)
 
     @inbounds for k in real_center_indices(grid)
-        ae[k] = 1 .- sum(ntuple(i -> prog_up[i].area[k], n_updrafts))
+        ae[k] = 1 .- sum(ntuple(i -> aux_up[i].area[k], n_updrafts))
     end
 
     kc_surf = kc_surface(grid)
@@ -1094,6 +1120,8 @@ function GMV_third_m(edmf::EDMF_PrognosticTKE, grid, state, covar_en_sym::Symbol
     ae = 1 .- aux_tc.bulk.area
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     is_tke = covar_en_sym == :tke
     covar_en = getproperty(center_prog_environment(state), covar_en_sym)
     aux_en_c = center_aux_environment(state)
@@ -1105,9 +1133,9 @@ function GMV_third_m(edmf::EDMF_PrognosticTKE, grid, state, covar_en_sym::Symbol
         mean_en = is_tke ? interpf2c(var_en, grid, k) : var_en[k]
         GMVv_ = ae[k] * mean_en
         @inbounds for i in 1:(up.n_updrafts)
-            var_up = is_tke ? getproperty(prog_up_f[i], var) : getproperty(prog_up[i], var)
+            var_up = is_tke ? getproperty(aux_up_f[i], var) : getproperty(aux_up[i], var)
             mean_up = is_tke ? interpf2c(var_up, grid, k) : var_up[k]
-            GMVv_ += prog_up[i].area[k] * mean_up
+            GMVv_ += aux_up[i].area[k] * mean_up
         end
 
         # TODO: report bug: i used outside of scope.
@@ -1126,10 +1154,10 @@ function GMV_third_m(edmf::EDMF_PrognosticTKE, grid, state, covar_en_sym::Symbol
         Upd_cubed = 0.0
         GMVcov_ = ae[k] * (Envcov_ + (mean_en - GMVv_)^2)
         @inbounds for i in 1:(up.n_updrafts)
-            var_up = is_tke ? getproperty(prog_up_f[i], var) : getproperty(prog_up[i], var)
+            var_up = is_tke ? getproperty(aux_up_f[i], var) : getproperty(aux_up[i], var)
             mean_up = is_tke ? interpf2c(var_up, grid, k) : var_up[k]
-            GMVcov_ += prog_up[i].area[k] * (mean_up - GMVv_)^2
-            Upd_cubed += prog_up[i].area[k] * mean_up^3
+            GMVcov_ += aux_up[i].area[k] * (mean_up - GMVv_)^2
+            Upd_cubed += aux_up[i].area[k] * mean_up^3
         end
 
         if is_surface_center(grid, k)

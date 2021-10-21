@@ -40,6 +40,7 @@ function io_dictionary_aux(state)
         "updraft_RH" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.RH),
         "updraft_qt" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.q_tot),
         "updraft_w" => (; dims = ("zf", "t"), group = "profiles", field = face_aux_tc(state).bulk.w),
+        "updraft_w_aux" => (; dims = ("zf", "t"), group = "profiles", field = face_aux_updrafts(state)[1].w),
         "updraft_temperature" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.T),
         "updraft_thetal" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.θ_liq_ice),
         "updraft_buoyancy" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.buoy),

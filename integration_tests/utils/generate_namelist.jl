@@ -153,7 +153,7 @@ function default_namelist(case_name::String)
 
     namelist_defaults["stats_io"] = Dict()
     namelist_defaults["stats_io"]["stats_dir"] = "stats"
-    namelist_defaults["stats_io"]["frequency"] = 60.0
+    namelist_defaults["stats_io"]["frequency"] = 10
 
     if case_name == "Soares"
         namelist = Soares(namelist_defaults)
@@ -228,7 +228,8 @@ function Bomex(namelist_defaults)
     namelist["grid"]["nz"] = 60
     namelist["grid"]["dz"] = 50.0
 
-    namelist["time_stepping"]["t_max"] = 21600.0
+    # namelist["time_stepping"]["t_max"] = 21600.0
+    namelist["time_stepping"]["t_max"] = 500.0
 
     namelist["meta"]["simname"] = "Bomex"
     namelist["meta"]["casename"] = "Bomex"
