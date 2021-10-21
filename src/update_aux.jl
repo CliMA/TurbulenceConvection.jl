@@ -115,7 +115,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         rho = TD.air_density(ts_en)
         aux_en.buoy[k] = buoyancy_c(param_set, ρ0_c[k], rho)
 
-        update_cloud_dry(en_thermo, state, k, ts_en)
+        update_sat_unsat(en_thermo, state, k, ts_en)
         aux_en.RH[k] = TD.relative_humidity(ts_en)
 
         #####
@@ -298,34 +298,34 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
         QT_cut = ccut(aux_en.q_tot, grid, k)
         ∂qt∂z = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
-        THL_cut = ccut(aux_en.θ_liq_ice, grid, k)
-        ∂θl∂z = c∇(THL_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
+        θ_liq_ice_cut = ccut(aux_en.θ_liq_ice, grid, k)
+        ∂θl∂z = c∇(θ_liq_ice_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
 
         p0_cut = ccut(p0_c, grid, k)
         T_cut = ccut(aux_en.T, grid, k)
         QT_cut = ccut(aux_en.q_tot, grid, k)
         QL_cut = ccut(aux_en.q_liq, grid, k)
         ts_cut = TD.PhaseEquil_pTq.(param_set, p0_cut, T_cut, QT_cut)
-        thv_cut = TD.virtual_pottemp.(ts_cut)
+        θv_cut = TD.virtual_pottemp.(ts_cut)
 
         ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
         θ = TD.dry_pottemp(ts)
         θv = TD.virtual_pottemp(ts)
-        ∂θv∂z = c∇(thv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
+        ∂θv∂z = c∇(θv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
 
         # buoyancy_gradients
         if edmf.bg_closure == BuoyGradMean()
             # First order approximation: Use environmental mean fields.
             bg_kwargs = (;
-                t_cloudy = aux_en.T[k],
+                t_sat = aux_en.T[k],
                 # WARNING: ICE MISSING
-                qv_cloudy = (aux_en.q_tot - aux_en.q_liq)[k],
-                qt_cloudy = aux_en.q_tot[k],
-                θ_cloudy = θ,
-                θ_liq_ice_cloudy = aux_en.θ_liq_ice[k],
-                ∂θv∂z_dry = ∂θv∂z,
-                ∂qt∂z_cloudy = ∂qt∂z,
-                ∂θl∂z_cloudy = ∂θl∂z,
+                qv_sat = (aux_en.q_tot - aux_en.q_liq)[k],
+                qt_sat = aux_en.q_tot[k],
+                θ_sat = θ,
+                θ_liq_ice_sat = aux_en.θ_liq_ice[k],
+                ∂θv∂z_unsat = ∂θv∂z,
+                ∂qt∂z_sat = ∂qt∂z,
+                ∂θl∂z_sat = ∂θl∂z,
                 p0 = p0_c[k],
                 en_cld_frac = aux_en.cloud_fraction[k],
                 alpha0 = α0_c[k],
@@ -335,9 +335,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         elseif edmf.bg_closure == BuoyGradQuadratures()
             # Second order approximation: Use dry and cloudy environmental fields.
             cf_cut = ccut(aux_en.cloud_fraction, grid, k)
-            QT_cloudy_cut = ccut(en_thermo.qt_cloudy, grid, k)
-            ∂qt∂z_cloudy = c∇_vanishing_subdomain(
-                QT_cloudy_cut,
+            QT_sat_cut = ccut(en_thermo.qt_sat, grid, k)
+            ∂qt∂z_sat = c∇_vanishing_subdomain(
+                QT_sat_cut,
                 cf_cut,
                 ∂qt∂z,
                 grid,
@@ -345,9 +345,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 bottom = SetGradient(0),
                 top = SetGradient(0),
             )
-            THL_cloudy_cut = ccut(en_thermo.thl_cloudy, grid, k)
-            ∂θl∂z_cloudy = c∇_vanishing_subdomain(
-                THL_cloudy_cut,
+            θ_liq_ice_sat_cut = ccut(en_thermo.θ_liq_ice_sat, grid, k)
+            ∂θl∂z_sat = c∇_vanishing_subdomain(
+                θ_liq_ice_sat_cut,
                 cf_cut,
                 ∂θl∂z,
                 grid,
@@ -355,9 +355,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 bottom = SetGradient(0),
                 top = SetGradient(0),
             )
-            THV_dry_cut = ccut(en_thermo.thv_dry, grid, k)
-            ∂θv∂z_dry = c∇_vanishing_subdomain(
-                THV_dry_cut,
+            θv_unsat_cut = ccut(en_thermo.θv_unsat, grid, k)
+            ∂θv∂z_unsat = c∇_vanishing_subdomain(
+                θv_unsat_cut,
                 cf_cut,
                 ∂θv∂z,
                 grid,
@@ -367,14 +367,14 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             )
 
             bg_kwargs = (;
-                t_cloudy = en_thermo.t_cloudy[k],
-                qv_cloudy = en_thermo.qv_cloudy[k],
-                qt_cloudy = en_thermo.qt_cloudy[k],
-                θ_cloudy = en_thermo.th_cloudy[k],
-                θ_liq_ice_cloudy = en_thermo.thl_cloudy[k],
-                ∂θv∂z_dry = ∂θv∂z_dry,
-                ∂qt∂z_cloudy = ∂qt∂z_cloudy,
-                ∂θl∂z_cloudy = ∂θl∂z_cloudy,
+                t_sat = en_thermo.t_sat[k],
+                qv_sat = en_thermo.qv_sat[k],
+                qt_sat = en_thermo.qt_sat[k],
+                θ_sat = en_thermo.θ_sat[k],
+                θ_liq_ice_sat = en_thermo.θ_liq_ice_sat[k],
+                ∂θv∂z_unsat = ∂θv∂z_unsat,
+                ∂qt∂z_sat = ∂qt∂z_sat,
+                ∂θl∂z_sat = ∂θl∂z_sat,
                 p0 = p0_c[k],
                 en_cld_frac = aux_en.cloud_fraction[k],
                 alpha0 = α0_c[k],

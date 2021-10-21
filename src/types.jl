@@ -150,10 +150,10 @@ $(DocStringExtensions.FIELDS)
 Base.@kwdef struct GradBuoy{FT}
     "environmental vertical buoyancy gradient"
     ∂b∂z::FT
-    "vertical buoyancy gradient in the dry part of the environment"
-    ∂b∂z_dry::FT
-    "vertical buoyancy gradient in the cloudy part of the environment"
-    ∂b∂z_cloudy::FT
+    "vertical buoyancy gradient in the unsaturated part of the environment"
+    ∂b∂z_unsat::FT
+    "vertical buoyancy gradient in the saturated part of the environment"
+    ∂b∂z_sat::FT
 end
 
 abstract type EnvBuoyGradClosure end
@@ -168,22 +168,22 @@ Variables used in the environmental buoyancy gradient computation.
 $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct EnvBuoyGrad{FT, EBC <: EnvBuoyGradClosure}
-    "temperature in the cloudy part"
-    t_cloudy::FT
-    "vapor specific humidity  in the cloudy part"
-    qv_cloudy::FT
-    "total specific humidity in the cloudy part"
-    qt_cloudy::FT
-    "potential temperature in the cloudy part"
-    θ_cloudy::FT
-    "liquid ice potential temperature in the cloudy part"
-    θ_liq_ice_cloudy::FT
-    "virtual potential temperature gradient in the non cloudy part"
-    ∂θv∂z_dry::FT
-    "total specific humidity gradient in the cloudy part"
-    ∂qt∂z_cloudy::FT
-    "liquid ice potential temperature gradient in the cloudy part"
-    ∂θl∂z_cloudy::FT
+    "temperature in the saturated part"
+    t_sat::FT
+    "vapor specific humidity  in the saturated part"
+    qv_sat::FT
+    "total specific humidity in the saturated part"
+    qt_sat::FT
+    "potential temperature in the saturated part"
+    θ_sat::FT
+    "liquid ice potential temperature in the saturated part"
+    θ_liq_ice_sat::FT
+    "virtual potential temperature gradient in the non saturated part"
+    ∂θv∂z_unsat::FT
+    "total specific humidity gradient in the saturated part"
+    ∂qt∂z_sat::FT
+    "liquid ice potential temperature gradient in the saturated part"
+    ∂θl∂z_sat::FT
     "reference pressure"
     p0::FT
     "cloud fraction"
@@ -191,8 +191,8 @@ Base.@kwdef struct EnvBuoyGrad{FT, EBC <: EnvBuoyGradClosure}
     "specific volume"
     alpha0::FT
 end
-function EnvBuoyGrad(::EBG; t_cloudy::FT, bg_kwargs...) where {FT <: Real, EBG <: EnvBuoyGradClosure}
-    return EnvBuoyGrad{FT, EBG}(; t_cloudy, bg_kwargs...)
+function EnvBuoyGrad(::EBG; t_sat::FT, bg_kwargs...) where {FT <: Real, EBG <: EnvBuoyGradClosure}
+    return EnvBuoyGrad{FT, EBG}(; t_sat, bg_kwargs...)
 end
 
 Base.@kwdef mutable struct RainVariables
@@ -338,14 +338,14 @@ end
 struct EnvironmentThermodynamics{A1}
     quadrature_order::Int
     quadrature_type::String
-    qt_dry::A1
-    th_dry::A1
-    thv_dry::A1
-    t_cloudy::A1
-    qv_cloudy::A1
-    qt_cloudy::A1
-    th_cloudy::A1
-    thl_cloudy::A1
+    qt_unsat::A1
+    θ_unsat::A1
+    θv_unsat::A1
+    t_sat::A1
+    qv_sat::A1
+    qt_sat::A1
+    θ_sat::A1
+    θ_liq_ice_sat::A1
     Hvar_rain_dt::A1
     QTvar_rain_dt::A1
     HQTcov_rain_dt::A1
@@ -355,15 +355,15 @@ struct EnvironmentThermodynamics{A1}
         quadrature_order = parse_namelist(namelist, "thermodynamics", "quadrature_order"; default = 3)
         quadrature_type = parse_namelist(namelist, "thermodynamics", "quadrature_type"; default = "gaussian")
 
-        qt_dry = center_field(grid)
-        th_dry = center_field(grid)
-        thv_dry = center_field(grid)
+        qt_unsat = center_field(grid)
+        θ_unsat = center_field(grid)
+        θv_unsat = center_field(grid)
 
-        t_cloudy = center_field(grid)
-        qv_cloudy = center_field(grid)
-        qt_cloudy = center_field(grid)
-        th_cloudy = center_field(grid)
-        thl_cloudy = center_field(grid)
+        t_sat = center_field(grid)
+        qv_sat = center_field(grid)
+        qt_sat = center_field(grid)
+        θ_sat = center_field(grid)
+        θ_liq_ice_sat = center_field(grid)
 
         Hvar_rain_dt = center_field(grid)
         QTvar_rain_dt = center_field(grid)
@@ -371,18 +371,18 @@ struct EnvironmentThermodynamics{A1}
 
         qt_tendency_rain_formation = center_field(grid)
         θ_liq_ice_tendency_rain_formation = center_field(grid)
-        A1 = typeof(qt_dry)
+        A1 = typeof(qt_unsat)
         return new{A1}(
             quadrature_order,
             quadrature_type,
-            qt_dry,
-            th_dry,
-            thv_dry,
-            t_cloudy,
-            qv_cloudy,
-            qt_cloudy,
-            th_cloudy,
-            thl_cloudy,
+            qt_unsat,
+            θ_unsat,
+            θv_unsat,
+            t_sat,
+            qv_sat,
+            qt_sat,
+            θ_sat,
+            θ_liq_ice_sat,
             Hvar_rain_dt,
             QTvar_rain_dt,
             HQTcov_rain_dt,
