@@ -220,7 +220,7 @@ function run(sim::Simulation1d)
             @show progress
         end
 
-        if mod(sim.TS.t, sim.Stats.frequency) == 0
+        if mod(round(Int, sim.TS.t), round(Int, sim.Stats.frequency)) == 0
             # TODO: is this the best location to call diagnostics?
             TC.compute_diagnostics!(sim.Turb, sim.GMV, grid, state, sim.Case, sim.TS)
 
