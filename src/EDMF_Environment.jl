@@ -47,21 +47,21 @@ function update_env_precip_tendencies(en_thermo::EnvironmentThermodynamics, stat
     return
 end
 
-function update_cloud_dry(en_thermo::EnvironmentThermodynamics, state, k, ts)
+function update_sat_unsat(en_thermo::EnvironmentThermodynamics, state, k, ts)
     q_liq = TD.liquid_specific_humidity(ts)
     aux_en = center_aux_environment(state)
     if q_liq > 0.0
         aux_en.cloud_fraction[k] = 1.0
-        en_thermo.th_cloudy[k] = TD.dry_pottemp(ts)
-        en_thermo.thl_cloudy[k] = TD.liquid_ice_pottemp(ts)
-        en_thermo.t_cloudy[k] = TD.air_temperature(ts)
-        en_thermo.qt_cloudy[k] = TD.total_specific_humidity(ts)
-        en_thermo.qv_cloudy[k] = TD.vapor_specific_humidity(ts)
+        en_thermo.θ_sat[k] = TD.dry_pottemp(ts)
+        en_thermo.θ_liq_ice_sat[k] = TD.liquid_ice_pottemp(ts)
+        en_thermo.t_sat[k] = TD.air_temperature(ts)
+        en_thermo.qt_sat[k] = TD.total_specific_humidity(ts)
+        en_thermo.qv_sat[k] = TD.vapor_specific_humidity(ts)
     else
         aux_en.cloud_fraction[k] = 0.0
-        en_thermo.th_dry[k] = TD.dry_pottemp(ts)
-        en_thermo.thv_dry[k] = TD.virtual_pottemp(ts)
-        en_thermo.qt_dry[k] = TD.total_specific_humidity(ts)
+        en_thermo.θ_unsat[k] = TD.dry_pottemp(ts)
+        en_thermo.θv_unsat[k] = TD.virtual_pottemp(ts)
+        en_thermo.qt_unsat[k] = TD.total_specific_humidity(ts)
     end
     return
 end
@@ -79,7 +79,7 @@ function sgs_mean(en_thermo::EnvironmentThermodynamics, grid, state, en, rain, d
         ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], q_tot_en)
         # autoconversion and accretion
         mph = precipitation_formation(param_set, rain.rain_model, prog_ra.qr[k], aux_en.area[k], ρ0_c[k], dt, ts)
-        update_cloud_dry(en_thermo, state, k, ts)
+        update_sat_unsat(en_thermo, state, k, ts)
         update_env_precip_tendencies(en_thermo, state, k, mph.qt_tendency, mph.θ_liq_ice_tendency)
     end
     return
@@ -117,7 +117,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
     outer_env = zeros(env_len)
     inner_src = zeros(src_len)
     outer_src = zeros(src_len)
-    i_ql, i_T, i_cf, i_qt_cld, i_qt_dry, i_T_cld, i_T_dry, i_rf = 1:env_len
+    i_ql, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat, i_rf = 1:env_len
     i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH = 1:src_len
 
     @inbounds for k in real_center_indices(grid)
@@ -216,11 +216,11 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
                     # cloudy/dry categories for buoyancy in TKE
                     if q_liq_en > 0.0
                         inner_env[i_cf] += weights[m_h] * sqpi_inv
-                        inner_env[i_qt_cld] += qt_hat * weights[m_h] * sqpi_inv
-                        inner_env[i_T_cld] += T * weights[m_h] * sqpi_inv
+                        inner_env[i_qt_sat] += qt_hat * weights[m_h] * sqpi_inv
+                        inner_env[i_T_sat] += T * weights[m_h] * sqpi_inv
                     else
-                        inner_env[i_qt_dry] += qt_hat * weights[m_h] * sqpi_inv
-                        inner_env[i_T_dry] += T * weights[m_h] * sqpi_inv
+                        inner_env[i_qt_unsat] += qt_hat * weights[m_h] * sqpi_inv
+                        inner_env[i_T_unsat] += T * weights[m_h] * sqpi_inv
                     end
                     # products for variance and covariance source terms
                     inner_src[i_Sqt] += mph.qt_tendency * weights[m_h] * sqpi_inv
@@ -244,21 +244,21 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
 
             # update cloudy/dry variables for buoyancy in TKE
             aux_en.cloud_fraction[k] = outer_env[i_cf]
-            en_thermo.qt_dry[k] = outer_env[i_qt_dry]
-            # TD.jl cannot compute θ_dry when T=0
-            en_thermo.th_dry[k] = if outer_env[i_T_dry] > 0
-                ts_dry = TD.PhaseEquil_pTq(param_set, p0_c[k], outer_env[i_T_dry], en_thermo.qt_dry[k])
-                TD.dry_pottemp(ts_dry)
+            en_thermo.qt_unsat[k] = outer_env[i_qt_unsat]
+            # TD.jl cannot compute θ_unsat when T=0
+            en_thermo.θ_unsat[k] = if outer_env[i_T_unsat] > 0
+                ts_unsat = TD.PhaseEquil_pTq(param_set, p0_c[k], outer_env[i_T_unsat], en_thermo.qt_unsat[k])
+                TD.dry_pottemp(ts_unsat)
             else
                 0
             end
 
-            en_thermo.t_cloudy[k] = outer_env[i_T_cld]
-            en_thermo.qv_cloudy[k] = outer_env[i_qt_cld] - outer_env[i_ql]
-            en_thermo.qt_cloudy[k] = outer_env[i_qt_cld]
-            ts_cld = TD.PhaseEquil_pTq(param_set, p0_c[k], en_thermo.t_cloudy[k], en_thermo.qt_cloudy[k])
-            en_thermo.th_cloudy[k] = TD.dry_pottemp(ts_cld)
-            en_thermo.thl_cloudy[k] = TD.liquid_ice_pottemp(ts_cld)
+            en_thermo.t_sat[k] = outer_env[i_T_sat]
+            en_thermo.qv_sat[k] = outer_env[i_qt_sat] - outer_env[i_ql]
+            en_thermo.qt_sat[k] = outer_env[i_qt_sat]
+            ts_sat = TD.PhaseEquil_pTq(param_set, p0_c[k], en_thermo.t_sat[k], en_thermo.qt_sat[k])
+            en_thermo.θ_sat[k] = TD.dry_pottemp(ts_sat)
+            en_thermo.θ_liq_ice_sat[k] = TD.liquid_ice_pottemp(ts_sat)
 
             # update var/covar rain sources
             en_thermo.Hvar_rain_dt[k] = outer_src[i_SH_H] - outer_src[i_SH] * aux_en.θ_liq_ice[k]
@@ -272,7 +272,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
             ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
             mph = precipitation_formation(param_set, rain.rain_model, prog_ra.qr[k], aux_en.area[k], ρ0_c[k], dt, ts)
             update_env_precip_tendencies(en_thermo, state, k, mph.qt_tendency, mph.θ_liq_ice_tendency)
-            update_cloud_dry(en_thermo, state, k, ts)
+            update_sat_unsat(en_thermo, state, k, ts)
 
             en_thermo.Hvar_rain_dt[k] = 0.0
             en_thermo.QTvar_rain_dt[k] = 0.0

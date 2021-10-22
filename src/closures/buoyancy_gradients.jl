@@ -19,30 +19,30 @@ function buoyancy_gradients(param_set, bg_model::EnvBuoyGrad{FT, EBG}) where {FT
     ∂b∂θv = g * (R_d / bg_model.alpha0 / bg_model.p0) * Π
 
     if bg_model.en_cld_frac > 0.0
-        ts_cloudy = thermo_state_pθq(param_set, bg_model.p0, bg_model.θ_liq_ice_cloudy, bg_model.qt_cloudy)
-        phase_part = TD.PhasePartition(ts_cloudy)
+        ts_sat = thermo_state_pθq(param_set, bg_model.p0, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
+        phase_part = TD.PhasePartition(ts_sat)
         lh = TD.latent_heat_liq_ice(param_set, phase_part)
-        cp_m = TD.cp_m(ts_cloudy)
-        ∂b∂θl_cld = (
-            ∂b∂θv * (1 + molmass_ratio * (1 + lh / R_v / bg_model.t_cloudy) * bg_model.qv_cloudy - bg_model.qt_cloudy) /
-            (1 + lh * lh / cp_m / R_v / bg_model.t_cloudy / bg_model.t_cloudy * bg_model.qv_cloudy)
+        cp_m = TD.cp_m(ts_sat)
+        ∂b∂θl_sat = (
+            ∂b∂θv * (1 + molmass_ratio * (1 + lh / R_v / bg_model.t_sat) * bg_model.qv_sat - bg_model.qt_sat) /
+            (1 + lh * lh / cp_m / R_v / bg_model.t_sat / bg_model.t_sat * bg_model.qv_sat)
         )
-        ∂b∂qt_cld = (lh / cp_m / bg_model.t_cloudy * ∂b∂θl_cld - ∂b∂θv) * bg_model.θ_cloudy
+        ∂b∂qt_sat = (lh / cp_m / bg_model.t_sat * ∂b∂θl_sat - ∂b∂θv) * bg_model.θ_sat
     else
-        ∂b∂θl_cld = FT(0)
-        ∂b∂qt_cld = FT(0)
+        ∂b∂θl_sat = FT(0)
+        ∂b∂qt_sat = FT(0)
     end
 
-    ∂b∂z, ∂b∂z_dry, ∂b∂z_cloudy = buoyancy_gradient_chain_rule(bg_model, ∂b∂θv, ∂b∂θl_cld, ∂b∂qt_cld)
-    return GradBuoy(∂b∂z, ∂b∂z_dry, ∂b∂z_cloudy)
+    ∂b∂z, ∂b∂z_unsat, ∂b∂z_sat = buoyancy_gradient_chain_rule(bg_model, ∂b∂θv, ∂b∂θl_sat, ∂b∂qt_sat)
+    return GradBuoy(∂b∂z, ∂b∂z_unsat, ∂b∂z_sat)
 end
 
 """
     buoyancy_gradient_chain_rule(
         bg_model::EnvBuoyGrad{FT, EBG},
         ∂b∂θv::FT,
-        ∂b∂θl_cld::FT,
-        ∂b∂qt_cld::FT,
+        ∂b∂θl_sat::FT,
+        ∂b∂qt_sat::FT,
     ) where {FT <: Real, EBG <: EnvBuoyGradClosure}
 
 Returns the vertical buoyancy gradients in the environment, as well as in its dry and cloudy volume fractions,
@@ -51,21 +51,21 @@ from the partial derivatives with respect to thermodynamic variables in dry and 
 function buoyancy_gradient_chain_rule(
     bg_model::EnvBuoyGrad{FT, EBG},
     ∂b∂θv::FT,
-    ∂b∂θl_cld::FT,
-    ∂b∂qt_cld::FT,
+    ∂b∂θl_sat::FT,
+    ∂b∂qt_sat::FT,
 ) where {FT <: Real, EBG <: EnvBuoyGradClosure}
     if bg_model.en_cld_frac > FT(0)
-        ∂b∂z_θl_cld = ∂b∂θl_cld * bg_model.∂θl∂z_cloudy
-        ∂b∂z_qt_cld = ∂b∂qt_cld * bg_model.∂qt∂z_cloudy
+        ∂b∂z_θl_sat = ∂b∂θl_sat * bg_model.∂θl∂z_sat
+        ∂b∂z_qt_sat = ∂b∂qt_sat * bg_model.∂qt∂z_sat
     else
-        ∂b∂z_θl_cld = FT(0)
-        ∂b∂z_qt_cld = FT(0)
+        ∂b∂z_θl_sat = FT(0)
+        ∂b∂z_qt_sat = FT(0)
     end
 
-    ∂b∂z_dry = bg_model.en_cld_frac < FT(1) ? ∂b∂θv * bg_model.∂θv∂z_dry : FT(0)
+    ∂b∂z_unsat = bg_model.en_cld_frac < FT(1) ? ∂b∂θv * bg_model.∂θv∂z_unsat : FT(0)
 
-    ∂b∂z_cloudy = ∂b∂z_θl_cld + ∂b∂z_qt_cld
-    ∂b∂z = (1 - bg_model.en_cld_frac) * ∂b∂z_dry + bg_model.en_cld_frac * ∂b∂z_cloudy
+    ∂b∂z_sat = ∂b∂z_θl_sat + ∂b∂z_qt_sat
+    ∂b∂z = (1 - bg_model.en_cld_frac) * ∂b∂z_unsat + bg_model.en_cld_frac * ∂b∂z_sat
 
-    return ∂b∂z, ∂b∂z_dry, ∂b∂z_cloudy
+    return ∂b∂z, ∂b∂z_unsat, ∂b∂z_sat
 end

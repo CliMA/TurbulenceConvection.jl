@@ -4,6 +4,7 @@ import TurbulenceConvection
 import ClimaCore
 const CC = ClimaCore
 
+include("initial_conditions.jl")
 include("parameter_set.jl")
 include("Cases.jl")
 import .Cases
@@ -197,7 +198,7 @@ function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     Cases.initialize_forcing(sim.Case, sim.grid, state, sim.GMV, sim.param_set)
     Cases.initialize_radiation(sim.Case, sim.grid, state, sim.GMV, sim.param_set)
 
-    TC.initialize(sim.Turb, sim.grid, state, sim.Case, sim.GMV, sim.TS)
+    initialize_edmf(sim.Turb, sim.grid, state, sim.Case, sim.GMV, sim.TS)
 
     TC.initialize_io(sim)
     TC.io(sim)

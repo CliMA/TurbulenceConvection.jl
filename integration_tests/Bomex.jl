@@ -13,26 +13,26 @@ import .NameList
 
 best_mse = all_best_mse["Bomex"]
 
+case_name = "Bomex"
+println("Running $case_name...")
+namelist = NameList.default_namelist(case_name)
+namelist["meta"]["uuid"] = "01"
+ds_tc_filename = @time main(namelist)
+
+computed_mse = compute_mse_wrapper(
+    case_name,
+    best_mse,
+    ds_tc_filename;
+    plot_comparison = true,
+    t_start = 4 * 3600,
+    t_stop = 6 * 3600,
+)
+
+open("computed_mse_$case_name.json", "w") do io
+    JSON.print(io, computed_mse)
+end
+
 @testset "Bomex" begin
-    case_name = "Bomex"
-    println("Running $case_name...")
-    namelist = NameList.default_namelist(case_name)
-    namelist["meta"]["uuid"] = "01"
-    ds_tc_filename = @time main(namelist)
-
-    computed_mse = compute_mse_wrapper(
-        case_name,
-        best_mse,
-        ds_tc_filename;
-        plot_comparison = true,
-        t_start = 4 * 3600,
-        t_stop = 6 * 3600,
-    )
-
-    open("computed_mse_$case_name.json", "w") do io
-        JSON.print(io, computed_mse)
-    end
-
     for k in keys(best_mse)
         test_mse(computed_mse, best_mse, k)
     end
