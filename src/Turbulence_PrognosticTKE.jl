@@ -75,7 +75,6 @@ function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::Ti
     io(edmf.EnvVar, grid, state, Stats)
     io(edmf.Rain, grid, state, Stats, edmf.UpdThermo, edmf.EnvThermo, TS)
 
-    # prog_up = center_prog_updrafts(state)
     aux_tc = center_aux_tc(state)
     aux_up = center_aux_updrafts(state)
     a_up_bulk = aux_tc.bulk.area
@@ -167,7 +166,6 @@ function update_radiation end
 
 function update_cloud_frac(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables)
     # update grid-mean cloud fraction and cloud cover
-    # prog_up = center_prog_updrafts(state)
     aux_tc = center_aux_tc(state)
     aux_gm = center_aux_grid_mean(state)
     aux_en = center_aux_environment(state)
@@ -267,7 +265,6 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
             edmf.RainPhys.θ_liq_ice_tendency_rain_evap[k]
     end
 
-    # prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
     edmf.massflux_h .= 0.0
@@ -437,7 +434,6 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     # ----------- TODO: move to compute_tendencies
     implicit_eqs = edmf.implicit_eqs
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
-    # prog_up = center_prog_updrafts(state)
 
     common_args = (
         grid,
@@ -756,8 +752,9 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
     ρ_0_f = face_ref_state(state).ρ0
 
     @inbounds for i in 1:(up.n_updrafts)
+        prog_up_f[i].ρaw[kf_surf] = edmf.w_surface_bc[i]
+        prog_up[i].ρarea[kc_surf] = ρ_0_c[kc_surf]*edmf.area_surface_bc[i]
         aux_up_f[i].w[kf_surf] = edmf.w_surface_bc[i]
-        prog_up[i].area[kc_surf] = edmf.area_surface_bc[i]
         aux_up[i].area[kc_surf] = edmf.area_surface_bc[i]
     end
 
@@ -810,7 +807,6 @@ function updraft_set_values(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanV
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
             is_surface_center(grid, k) && continue
-            prog_up[i].area[k] = prog_up[i].ρarea[k] / ρ_0_c[k]
             aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ_0_c[k]
         end
     end
@@ -825,14 +821,12 @@ function updraft_set_values(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanV
                 aux_up_f[i].w[k] = max(prog_up_f[i].ρaw[k] / (ρ_0_f[k] * anew_k), 0)
                 if prog_up_f[i].w[k] <= 0.0
                     if !(k.i > length(vec(aux_up[i].area)))
-                        prog_up[i].area[Cent(k.i)] = 0
                         aux_up[i].area[Cent(k.i)] = 0
                     end
                 end
             else
                 prog_up_f[i].w[k] = 0
                 if !(k.i > length(vec(aux_up[i].area)))
-                    prog_up[i].area[Cent(k.i)] = 0
                     aux_up[i].area[Cent(k.i)] = 0
                 end
             end
@@ -844,27 +838,19 @@ function updraft_set_values(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanV
             if is_surface_center(grid, k)
                 # at the surface
                 if aux_up[i].area[k] >= edmf.minimum_area
-                    prog_up[i].θ_liq_ice[k] = edmf.h_surface_bc[i]
                     aux_up[i].θ_liq_ice[k] = edmf.h_surface_bc[i]
-                    prog_up[i].q_tot[k] = edmf.qt_surface_bc[i]
                     aux_up[i].q_tot[k] = edmf.qt_surface_bc[i]
                 else
-                    prog_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
                     aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
-                    prog_up[i].q_tot[k] = prog_gm.q_tot[k]
                     aux_up[i].q_tot[k] = prog_gm.q_tot[k]
                 end
                 continue
             end
             if aux_up[i].area[k] >= edmf.minimum_area
-                prog_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / (ρ_0_c[k] * prog_up[i].area[k])
-                aux_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / (ρ_0_c[k] * prog_up[i].area[k])
-                prog_up[i].q_tot[k] = max(prog_up[i].ρaq_tot[k] / (ρ_0_c[k] * prog_up[i].area[k]), 0.0)
-                aux_up[i].q_tot[k] = max(prog_up[i].ρaq_tot[k] / (ρ_0_c[k] * prog_up[i].area[k]), 0.0)
+                aux_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / (ρ_0_c[k] * aux_up[i].area[k])
+                aux_up[i].q_tot[k] = max(prog_up[i].ρaq_tot[k] / (ρ_0_c[k] * aux_up[i].area[k]), 0.0)
             else
-                prog_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
                 aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
-                prog_up[i].q_tot[k] = prog_gm.q_tot[k]
                 aux_up[i].q_tot[k] = prog_gm.q_tot[k]
             end
         end
@@ -1121,7 +1107,6 @@ function en_diffusion_tendencies(grid::Grid, state, TS, covar_sym::Symbol, n_upd
     dti = TS.dti
     b = center_field(grid)
     ρ0_c = center_ref_state(state).ρ0
-    # prog_up = center_prog_updrafts(state)
     prog_en = center_prog_environment(state)
     aux_en_2m = center_aux_environment_2m(state)
     prog_covar = getproperty(prog_en, covar_sym)
