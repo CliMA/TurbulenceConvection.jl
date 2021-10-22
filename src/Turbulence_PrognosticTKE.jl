@@ -1,14 +1,3 @@
-
-function initialize(edmf::EDMF_PrognosticTKE, grid, state, Case::CasesBase, gm::GridMeanVariables, TS::TimeStepping)
-    initialize_covariance(edmf, grid, state, gm, Case)
-    if Case.casename == "DryBubble"
-        initialize_DryBubble(edmf, grid, state, edmf.UpdVar, gm)
-    else
-        initialize(edmf, grid, state, edmf.UpdVar, gm)
-    end
-    return
-end
-
 # Initialize the IO pertaining to this class
 function initialize_io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
 
@@ -832,26 +821,6 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
             prog_up[i].θ_liq_ice[k] = aux_up[i].θ_liq_ice_new[k]
         end
     end
-    return
-end
-
-function initialize_covariance(edmf::EDMF_PrognosticTKE, grid, state, gm, Case::CasesBase)
-
-    kc_surf = kc_surface(grid)
-    en = edmf.EnvVar
-    aux_gm = center_aux_grid_mean(state)
-    prog_en = center_prog_environment(state)
-
-    prog_en.tke .= aux_gm.tke
-
-    reset_surface_covariance(edmf, grid, state, gm, Case)
-    aux_gm.Hvar .= aux_gm.Hvar[kc_surf] .* aux_gm.tke
-    aux_gm.QTvar .= aux_gm.QTvar[kc_surf] .* aux_gm.tke
-    aux_gm.HQTcov .= aux_gm.HQTcov[kc_surf] .* aux_gm.tke
-
-    prog_en.Hvar .= aux_gm.Hvar
-    prog_en.QTvar .= aux_gm.QTvar
-    prog_en.HQTcov .= aux_gm.HQTcov
     return
 end
 
