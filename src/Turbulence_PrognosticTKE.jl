@@ -463,7 +463,6 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     ### update
     ###
     update_updraft(edmf, grid, state, gm, TS)
-    updraft_set_values(edmf, grid, state, gm)
     if edmf.Rain.rain_model == "clima_1m"
         update_rain(edmf.Rain, grid, state, up_thermo, en_thermo, edmf.RainPhys, TS)
     end
@@ -482,6 +481,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     ###
     ### set values
     ###
+    updraft_set_values(edmf, grid, state, gm)
     @inbounds for k in real_center_indices(grid)
         prog_en.tke[k] = max(prog_en.tke[k], 0.0)
         prog_en.Hvar[k] = max(prog_en.Hvar[k], 0.0)
