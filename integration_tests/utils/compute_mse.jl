@@ -185,6 +185,13 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
     t_cmp = min(time_tcc[end], time_tcm[end], time_les[end], time_scm[end], t_stop)
     @info "time compared: $t_cmp"
 
+    if length(time_tcc) == 1
+        msg = "IO was collected for a single point in time."
+        msg *= "This script (compute_mse) requires comparing "
+        msg *= "space-time fields with multiple timesteps."
+        error(msg)
+    end
+
     # Accidentally running a short simulation
     # could improve MSE. So, let's test that
     # we run for at least t_compare. We should
