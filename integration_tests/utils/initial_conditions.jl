@@ -33,15 +33,14 @@ end
 
 function initialize_updrafts(edmf, grid, state, up::TC.UpdraftVariables, gm::TC.GridMeanVariables)
     kc_surf = TC.kc_surface(grid)
-
-    prog_up = TC.center_prog_updrafts(state)
+    aux_up = TC.center_aux_updrafts(state)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_up = TC.center_aux_updrafts(state)
-    prog_up_f = TC.face_prog_updrafts(state)
+    aux_up_f = TC.face_aux_updrafts(state)
     aux_gm = TC.center_aux_grid_mean(state)
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in TC.real_face_indices(grid)
-            prog_up_f[i].w[k] = 0
+            aux_up_f[i].w[k] = 0
         end
 
         @inbounds for k in TC.real_center_indices(grid)
@@ -49,17 +48,17 @@ function initialize_updrafts(edmf, grid, state, up::TC.UpdraftVariables, gm::TC.
             # Simple treatment for now, revise when multiple updraft closures
             # become more well defined
             if up.prognostic
-                prog_up[i].area[k] = 0.0 #up.updraft_fraction/up.n_updrafts
+                aux_up[i].area[k] = 0.0 #up.updraft_fraction/up.n_updrafts
             else
-                prog_up[i].area[k] = up.updraft_fraction / up.n_updrafts
+                aux_up[i].area[k] = up.updraft_fraction / up.n_updrafts
             end
-            prog_up[i].q_tot[k] = prog_gm.q_tot[k]
-            prog_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
+            aux_up[i].q_tot[k] = prog_gm.q_tot[k]
+            aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
             aux_up[i].q_liq[k] = aux_gm.q_liq[k]
             aux_up[i].T[k] = aux_gm.T[k]
         end
 
-        prog_up[i].area[kc_surf] = up.updraft_fraction / up.n_updrafts
+        aux_up[i].area[kc_surf] = up.updraft_fraction / up.n_updrafts
     end
     return
 end
@@ -134,9 +133,8 @@ function initialize_updrafts_DryBubble(edmf, grid, state, up::TC.UpdraftVariable
         264.1574, 263.6518, 263.1461, 262.6451, 262.1476, 261.6524]
     #! format: on
 
-    prog_up = TC.center_prog_updrafts(state)
     aux_up = TC.center_aux_updrafts(state)
-    prog_up_f = TC.face_prog_updrafts(state)
+    aux_up_f = TC.face_aux_updrafts(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     Area_in = TC.pyinterp(grid.zc, z_in, Area_in)
@@ -145,22 +143,22 @@ function initialize_updrafts_DryBubble(edmf, grid, state, up::TC.UpdraftVariable
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in TC.real_face_indices(grid)
             if minimum(z_in) <= grid.zf[k] <= maximum(z_in)
-                prog_up_f[i].w[k] = 0.0
+                aux_up_f[i].w[k] = 0.0
             end
         end
 
         @inbounds for k in TC.real_center_indices(grid)
             if minimum(z_in) <= grid.zc[k] <= maximum(z_in)
-                prog_up[i].area[k] = Area_in[k] #up.updraft_fraction/up.n_updrafts
-                prog_up[i].θ_liq_ice[k] = θ_liq_in[k]
-                prog_up[i].q_tot[k] = 0.0
+                aux_up[i].area[k] = Area_in[k] #up.updraft_fraction/up.n_updrafts
+                aux_up[i].θ_liq_ice[k] = θ_liq_in[k]
+                aux_up[i].q_tot[k] = 0.0
                 aux_up[i].q_liq[k] = 0.0
 
                 # for now temperature is provided as diagnostics from LES
                 aux_up[i].T[k] = T_in[k]
             else
-                prog_up[i].area[k] = 0.0 #up.updraft_fraction/up.n_updrafts
-                prog_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
+                aux_up[i].area[k] = 0.0 #up.updraft_fraction/up.n_updrafts
+                aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
                 aux_up[i].T[k] = aux_gm.T[k]
             end
         end

@@ -18,21 +18,20 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     surface = Case.Sur
     obukhov_length = surface.obukhov_length
     FT = eltype(grid)
-    prog_up = center_prog_updrafts(state)
     prog_gm = center_prog_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
     aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_gm = center_aux_grid_mean(state)
-    prog_up_f = face_prog_updrafts(state)
     aux_tc_f = face_aux_tc(state)
     aux_tc = center_aux_tc(state)
     prog_en = center_prog_environment(state)
     aux_en_2m = center_aux_environment_2m(state)
 
     for k in real_center_indices(grid)
-        aux_tc.bulk.area[k] = sum(ntuple(i -> prog_up[i].area[k], up.n_updrafts))
+        aux_tc.bulk.area[k] = sum(ntuple(i -> aux_up[i].area[k], up.n_updrafts))
     end
 
     #####
@@ -60,8 +59,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         if a_bulk_f > 1.0e-20
             @inbounds for i in 1:(up.n_updrafts)
                 a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
-                a_up_f = interpc2f(prog_up[i].area, grid, k; a_up_bcs...)
-                aux_tc_f.bulk.w[k] += a_up_f * prog_up_f[i].w[k] / a_bulk_f
+                a_up_f = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
+                aux_tc_f.bulk.w[k] += a_up_f * aux_up_f[i].w[k] / a_bulk_f
             end
         end
         # Assuming gm.W = 0!
@@ -78,12 +77,12 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         aux_tc.bulk.buoy[k] = 0
         if a_bulk_c > 1.0e-20
             @inbounds for i in 1:(up.n_updrafts)
-                aux_tc.bulk.q_tot[k] += prog_up[i].area[k] * prog_up[i].q_tot[k] / a_bulk_c
-                aux_tc.bulk.q_liq[k] += prog_up[i].area[k] * aux_up[i].q_liq[k] / a_bulk_c
-                aux_tc.bulk.θ_liq_ice[k] += prog_up[i].area[k] * prog_up[i].θ_liq_ice[k] / a_bulk_c
-                aux_tc.bulk.T[k] += prog_up[i].area[k] * aux_up[i].T[k] / a_bulk_c
-                aux_tc.bulk.RH[k] += prog_up[i].area[k] * aux_up[i].RH[k] / a_bulk_c
-                aux_tc.bulk.buoy[k] += prog_up[i].area[k] * aux_up[i].buoy[k] / a_bulk_c
+                aux_tc.bulk.q_tot[k] += aux_up[i].area[k] * aux_up[i].q_tot[k] / a_bulk_c
+                aux_tc.bulk.q_liq[k] += aux_up[i].area[k] * aux_up[i].q_liq[k] / a_bulk_c
+                aux_tc.bulk.θ_liq_ice[k] += aux_up[i].area[k] * aux_up[i].θ_liq_ice[k] / a_bulk_c
+                aux_tc.bulk.T[k] += aux_up[i].area[k] * aux_up[i].T[k] / a_bulk_c
+                aux_tc.bulk.RH[k] += aux_up[i].area[k] * aux_up[i].RH[k] / a_bulk_c
+                aux_tc.bulk.buoy[k] += aux_up[i].area[k] * aux_up[i].buoy[k] / a_bulk_c
             end
         else
             aux_tc.bulk.q_tot[k] = prog_gm.q_tot[k]
@@ -123,17 +122,17 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         #####
 
         @inbounds for i in 1:(up.n_updrafts)
-            if prog_up[i].area[k] > 0.0
-                ts_up = thermo_state_pθq(param_set, p0_c[k], prog_up[i].θ_liq_ice[k], prog_up[i].q_tot[k])
+            if aux_up[i].area[k] > 0.0
+                ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
                 aux_up[i].q_liq[k] = TD.liquid_specific_humidity(ts_up)
                 aux_up[i].T[k] = TD.air_temperature(ts_up)
                 ρ = TD.air_density(ts_up)
                 aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
                 aux_up[i].RH[k] = TD.relative_humidity(ts_up)
             elseif k > kc_surf
-                if prog_up[i].area[k - 1] > 0.0 && edmf.extrapolate_buoyancy
-                    qt = prog_up[i].q_tot[k - 1]
-                    h = prog_up[i].θ_liq_ice[k - 1]
+                if aux_up[i].area[k - 1] > 0.0 && edmf.extrapolate_buoyancy
+                    qt = aux_up[i].q_tot[k - 1]
+                    h = aux_up[i].θ_liq_ice[k - 1]
                     ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
                     ρ = TD.air_density(ts_up)
                     aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
@@ -150,7 +149,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
         aux_gm.buoy[k] = (1.0 - aux_tc.bulk.area[k]) * aux_en.buoy[k]
         @inbounds for i in 1:(up.n_updrafts)
-            aux_gm.buoy[k] += prog_up[i].area[k] * aux_up[i].buoy[k]
+            aux_gm.buoy[k] += aux_up[i].area[k] * aux_up[i].buoy[k]
         end
         @inbounds for i in 1:(up.n_updrafts)
             aux_up[i].buoy[k] -= aux_gm.buoy[k]
@@ -188,14 +187,14 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
             # entrainment
-            if prog_up[i].area[k] > 0.0
+            if aux_up[i].area[k] > 0.0
                 # compute ∇m at cell centers
-                a_up_c = prog_up[i].area[k]
-                w_up_c = interpf2c(prog_up_f[i].w, grid, k)
+                a_up_c = aux_up[i].area[k]
+                w_up_c = interpf2c(aux_up_f[i].w, grid, k)
                 w_gm_c = interpf2c(prog_gm_f.w, grid, k)
                 m = a_up_c * (w_up_c - w_gm_c)
-                a_up_cut = ccut_upwind(prog_up[i].area, grid, k)
-                w_up_cut = daul_f2c_upwind(prog_up_f[i].w, grid, k)
+                a_up_cut = ccut_upwind(aux_up[i].area, grid, k)
+                w_up_cut = daul_f2c_upwind(aux_up_f[i].w, grid, k)
                 w_gm_cut = daul_f2c_upwind(prog_gm_f.w, grid, k)
                 m_cut = a_up_cut .* (w_up_cut .- w_gm_cut)
                 ∇m = FT(c∇_upwind(m_cut, grid, k; bottom = SetValue(0), top = FreeBoundary()))
@@ -205,14 +204,14 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 εδ_model = MoistureDeficitEntr(;
                     q_liq_up = aux_up[i].q_liq[k],
                     q_liq_en = aux_en.q_liq[k],
-                    w_up = interpf2c(prog_up_f[i].w, grid, k),
+                    w_up = interpf2c(aux_up_f[i].w, grid, k),
                     w_en = interpf2c(aux_en_f.w, grid, k),
                     b_up = aux_up[i].buoy[k],
                     b_en = aux_en.buoy[k],
                     tke = prog_en.tke[k],
                     dMdz = ∇m,
                     M = m,
-                    a_up = prog_up[i].area[k],
+                    a_up = aux_up[i].area[k],
                     a_en = aux_en.area[k],
                     R_up = edmf.pressure_plume_spacing[i],
                     RH_up = aux_up[i].RH[k],
@@ -245,12 +244,12 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
             # pressure
             a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
-            a_kfull = interpc2f(prog_up[i].area, grid, k; a_bcs...)
+            a_kfull = interpc2f(aux_up[i].area, grid, k; a_bcs...)
             if a_kfull > 0.0
                 B = aux_up[i].buoy
                 b_bcs = (; bottom = SetValue(B[kc_surf]), top = SetValue(B[kc_toa]))
                 b_kfull = interpc2f(aux_up[i].buoy, grid, k; b_bcs...)
-                w_cut = fcut(prog_up_f[i].w, grid, k)
+                w_cut = fcut(aux_up_f[i].w, grid, k)
                 ∇w_up = f∇(w_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
                 asp_ratio = 1.0
                 nh_pressure_b, nh_pressure_adv, nh_pressure_drag = perturbation_pressure(
@@ -259,7 +258,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                     a_kfull,
                     b_kfull,
                     ρ0_f[k],
-                    prog_up_f[i].w[k],
+                    aux_up_f[i].w[k],
                     ∇w_up,
                     aux_en_f.w[k],
                     asp_ratio,
@@ -287,7 +286,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         V_cut = ccut(prog_gm.v, grid, k)
         wc_en = interpf2c(aux_en_f.w, grid, k)
         wc_up = ntuple(up.n_updrafts) do i
-            interpf2c(prog_up_f[i].w, grid, k)
+            interpf2c(aux_up_f[i].w, grid, k)
         end
         w_dual = dual_faces(aux_en_f.w, grid, k)
 
@@ -405,7 +404,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             a_en = (1 - aux_tc.bulk.area[k]),
             wc_en = wc_en,
             wc_up = Tuple(wc_up),
-            a_up = ntuple(i -> prog_up[i].area[k], up.n_updrafts),
+            a_up = ntuple(i -> aux_up[i].area[k], up.n_updrafts),
             ε_turb = ntuple(i -> edmf.frac_turb_entr[i, k], up.n_updrafts),
             δ_dyn = ntuple(i -> edmf.detr_sc[i, k], up.n_updrafts),
             en_cld_frac = aux_en.cloud_fraction[k],
@@ -437,7 +436,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     @inbounds for k in real_center_indices(grid)
         aux_en_2m.tke.press[k] = 0.0
         @inbounds for i in 1:(up.n_updrafts)
-            w_up_c = interpf2c(prog_up_f[i].w, grid, k)
+            w_up_c = interpf2c(aux_up_f[i].w, grid, k)
             w_en_c = interpf2c(aux_en_f.w, grid, k)
             press_c = interpf2c(edmf.nh_pressure, grid, k, i)
             aux_en_2m.tke.press[k] += (w_en_c - w_up_c) * press_c
