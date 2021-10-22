@@ -269,6 +269,7 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
 
     # prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     edmf.massflux_h .= 0.0
     edmf.massflux_qt .= 0.0
     # Compute the mass flux and associated scalar fluxes
@@ -278,7 +279,7 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         @inbounds for k in real_face_indices(grid)
             a_up = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
             a_en = interpc2f(ae, grid, k; a_up_bcs...)
-            edmf.m[i, k] = ρ0_f[k] * a_up * a_en * (prog_up_f[i].w[k] - aux_en_f.w[k])
+            edmf.m[i, k] = ρ0_f[k] * a_up * a_en * (aux_up_f[i].w[k] - aux_en_f.w[k])
         end
     end
 
@@ -564,6 +565,7 @@ function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol,
     prog_gm_f = face_prog_grid_mean(state)
     # prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     aux_en_c = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_en = is_tke ? aux_en_f : aux_en_c
@@ -589,8 +591,8 @@ function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol,
 
             gmv_covar[k] = tke_factor * ae[k] * Δϕ * Δψ + ae[k] * covar_e[k]
             @inbounds for i in 1:(edmf.n_updrafts)
-                ϕ_up_var = getproperty(prog_up_f[i], ϕ_sym)
-                ψ_up_var = getproperty(prog_up_f[i], ψ_sym)
+                ϕ_up_var = getproperty(aux_up_f[i], ϕ_sym)
+                ψ_up_var = getproperty(aux_up_f[i], ψ_sym)
                 ϕ_up_dual = dual_faces(ϕ_up_var, grid, k)
                 ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
                 ψ_up_dual = dual_faces(ψ_up_var, grid, k)
@@ -645,7 +647,8 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
     aux_up = center_aux_updrafts(state)
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
-    prog_up_f = face_prog_updrafts(state)
+    # prog_up_f = face_prog_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     tendencies_up = center_tendencies_updrafts(state)
     tendencies_up_f = face_tendencies_updrafts(state)
     ρ_0_c = center_ref_state(state).ρ0
@@ -673,8 +676,8 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
             is_surface_center(grid, k) && continue
-            w_up_c = interpf2c(prog_up_f[i].w, grid, k)
-            adv = upwind_advection_area(ρ_0_c, aux_up[i].area, prog_up_f[i].w, grid, k)
+            w_up_c = interpf2c(aux_up_f[i].w, grid, k)
+            adv = upwind_advection_area(ρ_0_c, aux_up[i].area, aux_up_f[i].w, grid, k)
 
             ρa_up_c = ρ_0_c[k] * aux_up[i].area[k]
             entr_term = ρa_up_c * w_up_c * (edmf.entr_sc[i, k])
@@ -696,16 +699,16 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
 
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
-            w_up_c = interpf2c(prog_up_f[i].w, grid, k)
+            w_up_c = interpf2c(aux_up_f[i].w, grid, k)
             m_k = (ρ_0_c[k] * aux_up[i].area[k] * w_up_c)
 
-            adv = upwind_advection_scalar(ρ_0_c, aux_up[i].area, prog_up_f[i].w, aux_up[i].θ_liq_ice, grid, k)
+            adv = upwind_advection_scalar(ρ_0_c, aux_up[i].area, aux_up_f[i].w, aux_up[i].θ_liq_ice, grid, k)
             entr = entr_w_c[i, k] * aux_en.θ_liq_ice[k]
             detr = detr_w_c[i, k] * aux_up[i].θ_liq_ice[k]
             rain = ρ_0_c[k] * up_thermo.θ_liq_ice_tendency_rain_formation[i, k]
             tendencies_up[i].θ_liq_ice[k] = -adv + m_k * (entr - detr) + rain
 
-            adv = upwind_advection_scalar(ρ_0_c, aux_up[i].area, prog_up_f[i].w, aux_up[i].q_tot, grid, k)
+            adv = upwind_advection_scalar(ρ_0_c, aux_up[i].area, aux_up_f[i].w, aux_up[i].q_tot, grid, k)
             entr = entr_w_c[i, k] * aux_en.q_tot[k]
             detr = detr_w_c[i, k] * aux_up[i].q_tot[k]
             rain = ρ_0_c[k] * up_thermo.qt_tendency_rain_formation[i, k]
@@ -725,8 +728,8 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
             detr_w = interpc2f(detr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
             B_k = interpc2f(aux_up[i].buoy, grid, k; bottom = SetValue(0), top = SetValue(0))
 
-            adv = upwind_advection_velocity(ρ_0_f, aux_up[i].area, prog_up_f[i].w, grid, k; a_up_bcs)
-            exch = (ρ_0_f[k] * a_k * prog_up_f[i].w[k] * (entr_w * aux_en_f.w[k] - detr_w * prog_up_f[i].w[k]))
+            adv = upwind_advection_velocity(ρ_0_f, aux_up[i].area, aux_up_f[i].w, grid, k; a_up_bcs)
+            exch = (ρ_0_f[k] * a_k * aux_up_f[i].w[k] * (entr_w * aux_en_f.w[k] - detr_w * aux_up_f[i].w[k]))
             buoy = ρ_0_f[k] * a_k * B_k
             tendencies_up_f[i].w[k] = -adv + exch + buoy + edmf.nh_pressure[i, k]
         end
