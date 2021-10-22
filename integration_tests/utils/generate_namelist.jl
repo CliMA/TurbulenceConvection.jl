@@ -262,7 +262,7 @@ function Rico(namelist_defaults)
     namelist["time_stepping"]["dt"] = 7.0
 
     namelist["microphysics"]["rain_model"] = "clima_1m"
-    namelist["microphysics"]["τ_acnv"] = 2000.0
+    namelist["microphysics"]["τ_acnv"] = 2500.0
 
     namelist["meta"]["simname"] = "Rico"
     namelist["meta"]["casename"] = "Rico"
