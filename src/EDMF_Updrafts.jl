@@ -17,16 +17,21 @@ function initialize(edmf, grid, state, up::UpdraftVariables, gm::GridMeanVariabl
             # become more well defined
             if up.prognostic
                 prog_up[i].area[k] = 0.0 #up.updraft_fraction/up.n_updrafts
+                aux_up[i].area[k] = 0.0 #up.updraft_fraction/up.n_updrafts
             else
                 prog_up[i].area[k] = up.updraft_fraction / up.n_updrafts
+                aux_up[i].area[k] = up.updraft_fraction / up.n_updrafts
             end
             prog_up[i].q_tot[k] = prog_gm.q_tot[k]
+            aux_up[i].q_tot[k] = prog_gm.q_tot[k]
             prog_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
+            aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
             aux_up[i].q_liq[k] = aux_gm.q_liq[k]
             aux_up[i].T[k] = aux_gm.T[k]
         end
 
         prog_up[i].area[kc_surf] = up.updraft_fraction / up.n_updrafts
+        aux_up[i].area[kc_surf] = up.updraft_fraction / up.n_updrafts
     end
     return
 end
@@ -121,6 +126,9 @@ function initialize_DryBubble(edmf, grid, state, up::UpdraftVariables, gm::GridM
                 prog_up[i].area[k] = Area_in[k] #up.updraft_fraction/up.n_updrafts
                 prog_up[i].θ_liq_ice[k] = θ_liq_in[k]
                 prog_up[i].q_tot[k] = 0.0
+                aux_up[i].area[k] = Area_in[k] #up.updraft_fraction/up.n_updrafts
+                aux_up[i].θ_liq_ice[k] = θ_liq_in[k]
+                aux_up[i].q_tot[k] = 0.0
                 aux_up[i].q_liq[k] = 0.0
 
                 # for now temperature is provided as diagnostics from LES
@@ -128,6 +136,8 @@ function initialize_DryBubble(edmf, grid, state, up::UpdraftVariables, gm::GridM
             else
                 prog_up[i].area[k] = 0.0 #up.updraft_fraction/up.n_updrafts
                 prog_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
+                aux_up[i].area[k] = 0.0 #up.updraft_fraction/up.n_updrafts
+                aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
                 aux_up[i].T[k] = aux_gm.T[k]
             end
         end
@@ -174,12 +184,12 @@ function upd_cloud_diagnostics(up::UpdraftVariables, grid, state)
         @inbounds for k in real_center_indices(grid)
             if prog_up[i].area[k] > 1e-3
                 up.updraft_top[i] = max(up.updraft_top[i], grid.zc[k])
-                up.lwp += ρ0_c[k] * aux_up[i].q_liq[k] * prog_up[i].area[k] * grid.Δz
+                up.lwp += ρ0_c[k] * aux_up[i].q_liq[k] * aux_up[i].area[k] * grid.Δz
 
                 if aux_up[i].q_liq[k] > 1e-8
                     up.cloud_base[i] = min(up.cloud_base[i], grid.zc[k])
                     up.cloud_top[i] = max(up.cloud_top[i], grid.zc[k])
-                    up.cloud_cover[i] = max(up.cloud_cover[i], prog_up[i].area[k])
+                    up.cloud_cover[i] = max(up.cloud_cover[i], aux_up[i].area[k])
                 end
             end
         end
@@ -209,7 +219,7 @@ function compute_rain_formation_tendencies(
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_center_indices(grid)
             T_up = aux_up[i].T[k]
-            q_tot_up = prog_up[i].q_tot[k]
+            q_tot_up = aux_up[i].q_tot[k]
             ts_up = TD.PhaseEquil_pTq(param_set, p0_c[k], T_up, q_tot_up)
 
             # autoconversion and accretion
@@ -217,13 +227,13 @@ function compute_rain_formation_tendencies(
                 param_set,
                 rain.rain_model,
                 prog_ra.qr[k],
-                prog_up[i].area[k],
+                aux_up[i].area[k],
                 ρ0_c[k],
                 dt,
                 ts_up,
             )
-            up_thermo.qt_tendency_rain_formation[i, k] = mph.qt_tendency * prog_up[i].area[k]
-            up_thermo.θ_liq_ice_tendency_rain_formation[i, k] = mph.θ_liq_ice_tendency * prog_up[i].area[k]
+            up_thermo.qt_tendency_rain_formation[i, k] = mph.qt_tendency * aux_up[i].area[k]
+            up_thermo.θ_liq_ice_tendency_rain_formation[i, k] = mph.θ_liq_ice_tendency * aux_up[i].area[k]
         end
     end
     # TODO - to be deleted once we sum all tendencies elsewhere

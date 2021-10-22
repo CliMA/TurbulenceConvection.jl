@@ -602,11 +602,11 @@ function construct_tridiag_diffusion_en(
         D_env = 0.0
 
         @inbounds for i in 1:n_updrafts
-            if prog_up[i].area[k] > minimum_area
+            if aux_up[i].area[k] > minimum_area
                 turb_entr = frac_turb_entr[i, k]
                 R_up = pressure_plume_spacing[i]
                 w_up_c = interpf2c(prog_up_f[i].w, grid, k)
-                D_env += ρ0_c[k] * prog_up[i].area[k] * w_up_c * (entr_sc[i, k] + turb_entr)
+                D_env += ρ0_c[k] * aux_up[i].area[k] * w_up_c * (entr_sc[i, k] + turb_entr)
             else
                 D_env = 0.0
             end
