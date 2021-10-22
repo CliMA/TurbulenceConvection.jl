@@ -650,13 +650,12 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
 
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_center_indices(grid)
-            # tendencies_up[i].area[k] = 0
             tendencies_up[i].ρarea[k] = 0
-            tendencies_up[i].θ_liq_ice[k] = 0
-            tendencies_up[i].q_tot[k] = 0
+            tendencies_up[i].ρaθ_liq_ice[k] = 0
+            tendencies_up[i].ρaq_tot[k] = 0
         end
         @inbounds for k in real_face_indices(grid)
-            tendencies_up_f[i].w[k] = 0
+            tendencies_up_f[i].ρaw[k] = 0
         end
     end
 
@@ -752,10 +751,11 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
     ρ_0_f = face_ref_state(state).ρ0
 
     @inbounds for i in 1:(up.n_updrafts)
-        prog_up_f[i].ρaw[kf_surf] = edmf.w_surface_bc[i]
         prog_up[i].ρarea[kc_surf] = ρ_0_c[kc_surf]*edmf.area_surface_bc[i]
-        aux_up_f[i].w[kf_surf] = edmf.w_surface_bc[i]
         aux_up[i].area[kc_surf] = edmf.area_surface_bc[i]
+        prog_up_f[i].ρaw[kf_surf] = ρ_0_f[kf_surf]*edmf.w_surface_bc[i]
+        prog_up_f[i].w[kf_surf] = edmf.w_surface_bc[i]
+        aux_up_f[i].w[kf_surf] = edmf.w_surface_bc[i]
     end
 
     @inbounds for k in real_center_indices(grid)
