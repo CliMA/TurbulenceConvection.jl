@@ -13,9 +13,9 @@ import .NameList
 # TODO - waiting for a better root solver
 CLIMAParameters.Planet.T_freeze(::EarthParameterSet) = 100.0
 
-@testset "GATE_III" begin
-    println("Running GATE_III...")
-    namelist = default_namelist("GATE_III")
-    namelist["meta"]["uuid"] = "01"
-    @time main(namelist)
-end
+println("Running GATE_III...")
+namelist = default_namelist("GATE_III")
+namelist["meta"]["uuid"] = "01"
+ds_tc_filename = @time main(namelist)
+
+@testset "GATE_III" begin end
