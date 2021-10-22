@@ -22,11 +22,12 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     prog_gm = center_prog_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
     aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_gm = center_aux_grid_mean(state)
-    prog_up_f = face_prog_updrafts(state)
-    aux_up_f = face_aux_tc(state)
+    # prog_up_f = face_prog_updrafts(state)
+    aux_tc_f = face_aux_tc(state)
     aux_tc = center_aux_tc(state)
     prog_en = center_prog_environment(state)
     aux_en_2m = center_aux_environment_2m(state)
@@ -54,18 +55,18 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     # whichvals used to check which substep we are on--correspondingly use "gm.SomeVar" (last timestep value)
     # first make sure the "bulkvalues" of the updraft variables are updated
     @inbounds for k in real_face_indices(grid)
-        aux_up_f.bulk.w[k] = 0
+        aux_tc_f.bulk.w[k] = 0
         a_bulk_bcs = (; bottom = SetValue(sum(edmf.area_surface_bc)), top = SetZeroGradient())
         a_bulk_f = interpc2f(aux_tc.bulk.area, grid, k; a_bulk_bcs...)
         if a_bulk_f > 1.0e-20
             @inbounds for i in 1:(up.n_updrafts)
                 a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
                 a_up_f = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
-                aux_up_f.bulk.w[k] += a_up_f * prog_up_f[i].w[k] / a_bulk_f
+                aux_tc_f.bulk.w[k] += a_up_f * aux_up_f[i].w[k] / a_bulk_f
             end
         end
         # Assuming gm.W = 0!
-        aux_en_f.w[k] = -a_bulk_f / (1 - a_bulk_f) * aux_up_f.bulk.w[k]
+        aux_en_f.w[k] = -a_bulk_f / (1 - a_bulk_f) * aux_tc_f.bulk.w[k]
     end
 
     @inbounds for k in real_center_indices(grid)
@@ -191,11 +192,11 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             if aux_up[i].area[k] > 0.0
                 # compute ∇m at cell centers
                 a_up_c = aux_up[i].area[k]
-                w_up_c = interpf2c(prog_up_f[i].w, grid, k)
+                w_up_c = interpf2c(aux_up_f[i].w, grid, k)
                 w_gm_c = interpf2c(prog_gm_f.w, grid, k)
                 m = a_up_c * (w_up_c - w_gm_c)
                 a_up_cut = ccut_upwind(aux_up[i].area, grid, k)
-                w_up_cut = daul_f2c_upwind(prog_up_f[i].w, grid, k)
+                w_up_cut = daul_f2c_upwind(aux_up_f[i].w, grid, k)
                 w_gm_cut = daul_f2c_upwind(prog_gm_f.w, grid, k)
                 m_cut = a_up_cut .* (w_up_cut .- w_gm_cut)
                 ∇m = FT(c∇_upwind(m_cut, grid, k; bottom = SetValue(0), top = FreeBoundary()))
@@ -205,7 +206,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 εδ_model = MoistureDeficitEntr(;
                     q_liq_up = aux_up[i].q_liq[k],
                     q_liq_en = aux_en.q_liq[k],
-                    w_up = interpf2c(prog_up_f[i].w, grid, k),
+                    w_up = interpf2c(aux_up_f[i].w, grid, k),
                     w_en = interpf2c(aux_en_f.w, grid, k),
                     b_up = aux_up[i].buoy[k],
                     b_en = aux_en.buoy[k],
@@ -250,7 +251,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 B = aux_up[i].buoy
                 b_bcs = (; bottom = SetValue(B[kc_surf]), top = SetValue(B[kc_toa]))
                 b_kfull = interpc2f(aux_up[i].buoy, grid, k; b_bcs...)
-                w_cut = fcut(prog_up_f[i].w, grid, k)
+                w_cut = fcut(aux_up_f[i].w, grid, k)
                 ∇w_up = f∇(w_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
                 asp_ratio = 1.0
                 nh_pressure_b, nh_pressure_adv, nh_pressure_drag = perturbation_pressure(
@@ -259,7 +260,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                     a_kfull,
                     b_kfull,
                     ρ0_f[k],
-                    prog_up_f[i].w[k],
+                    aux_up_f[i].w[k],
                     ∇w_up,
                     aux_en_f.w[k],
                     asp_ratio,
@@ -287,7 +288,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         V_cut = ccut(prog_gm.v, grid, k)
         wc_en = interpf2c(aux_en_f.w, grid, k)
         wc_up = ntuple(up.n_updrafts) do i
-            interpf2c(prog_up_f[i].w, grid, k)
+            interpf2c(aux_up_f[i].w, grid, k)
         end
         w_dual = dual_faces(aux_en_f.w, grid, k)
 
@@ -437,7 +438,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     @inbounds for k in real_center_indices(grid)
         aux_en_2m.tke.press[k] = 0.0
         @inbounds for i in 1:(up.n_updrafts)
-            w_up_c = interpf2c(prog_up_f[i].w, grid, k)
+            w_up_c = interpf2c(aux_up_f[i].w, grid, k)
             w_en_c = interpf2c(aux_en_f.w, grid, k)
             press_c = interpf2c(edmf.nh_pressure, grid, k, i)
             aux_en_2m.tke.press[k] += (w_en_c - w_up_c) * press_c
