@@ -172,7 +172,7 @@ end
 function upd_cloud_diagnostics(up::UpdraftVariables, grid, state)
     up.lwp = 0.0
 
-    prog_up = center_prog_updrafts(state)
+    aux_up = center_aux_updrafts(state)
     aux_up = center_aux_updrafts(state)
     ρ0_c = center_ref_state(state).ρ0
     @inbounds for i in 1:(up.n_updrafts)
@@ -182,7 +182,7 @@ function upd_cloud_diagnostics(up::UpdraftVariables, grid, state)
         up.cloud_cover[i] = 0.0
 
         @inbounds for k in real_center_indices(grid)
-            if prog_up[i].area[k] > 1e-3
+            if aux_up[i].area[k] > 1e-3
                 up.updraft_top[i] = max(up.updraft_top[i], grid.zc[k])
                 up.lwp += ρ0_c[k] * aux_up[i].q_liq[k] * aux_up[i].area[k] * grid.Δz
 
