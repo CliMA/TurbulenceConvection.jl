@@ -51,8 +51,11 @@ function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
     N²_eff =
         (1 - ml_model.en_cld_frac) * ml_model.∂θv∂z +
         ml_model.en_cld_frac * (
-            1 / exp(-TD.latent_heat_vapor(param_set, ml_model.T_en) * ml_model.ql_en / TD.cp_m(ts_en) / ml_model.T_en) *
-            (
+            # WARNING: ml_model.ql_en should be ml_model.qc_en once we have ice
+            exp(
+                TD.latent_heat_liq_ice(param_set, TD.PhasePartition(ts_en)) * ml_model.ql_en / TD.cp_m(ts_en) /
+                ml_model.T_en,
+            ) * (
                 (1 + (molmass_ratio - 1) * ml_model.qt_en) * ml_model.∂θl∂z +
                 (molmass_ratio - 1) * ml_model.θ_li_en * ml_model.∂qt∂z
             )
