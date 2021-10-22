@@ -962,10 +962,11 @@ function compute_covariance_interdomain_src(
     is_tke = Covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
     aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
     aux_en_2m = center_aux_environment_2m(state)
     aux_covar = getproperty(aux_en_2m, Covar_sym)
-    prog_up = is_tke ? prog_up_f : aux_up
+    prog_up = is_tke ? aux_up_f : aux_up
     aux_en_c = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_en = is_tke ? aux_en_f : aux_en_c
@@ -1014,11 +1015,12 @@ function compute_covariance_entr(
     tke_factor = is_tke ? 0.5 : 1
     # prog_up_c = center_prog_updrafts(state)
     aux_up = center_aux_updrafts(state)
-    prog_up_f = face_prog_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
+    # prog_up_f = face_prog_updrafts(state)
     prog_gm_c = center_prog_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
     prog_gm = is_tke ? prog_gm_f : prog_gm_c
-    prog_up = is_tke ? prog_up_f : aux_up
+    prog_up = is_tke ? aux_up_f : aux_up
     GmvVar1 = getproperty(prog_gm, var1)
     GmvVar2 = getproperty(prog_gm, var2)
     aux_en_2m = center_aux_environment_2m(state)
@@ -1049,7 +1051,7 @@ function compute_covariance_entr(
 
                 eps_turb = edmf.frac_turb_entr[i, k]
 
-                w_u = interpf2c(prog_up_f[i].w, grid, k)
+                w_u = interpf2c(aux_up_f[i].w, grid, k)
                 dynamic_entr =
                     tke_factor *
                     ρ_0_c[k] *
@@ -1080,6 +1082,7 @@ function compute_covariance_detr(edmf::EDMF_PrognosticTKE, grid, state, covar_sy
     ρ0_c = center_ref_state(state).ρ0
     # prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
 
     aux_en_2m = center_aux_environment_2m(state)
     aux_covar = getproperty(aux_en_2m, covar_sym)
@@ -1090,7 +1093,7 @@ function compute_covariance_detr(edmf::EDMF_PrognosticTKE, grid, state, covar_sy
     @inbounds for k in real_center_indices(grid)
         aux_covar.detr_loss[k] = 0.0
         @inbounds for i in 1:(up.n_updrafts)
-            w_up_c = interpf2c(prog_up_f[i].w, grid, k)
+            w_up_c = interpf2c(aux_up_f[i].w, grid, k)
             aux_covar.detr_loss[k] += aux_up[i].area[k] * abs(w_up_c) * edmf.entr_sc[i, k]
         end
         aux_covar.detr_loss[k] *= ρ0_c[k] * prog_covar[k]
@@ -1165,6 +1168,7 @@ function GMV_third_m(edmf::EDMF_PrognosticTKE, grid, state, covar_en_sym::Symbol
     ae = 1 .- aux_tc.bulk.area
     # prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     is_tke = covar_en_sym == :tke
     covar_en = getproperty(center_prog_environment(state), covar_en_sym)
     aux_en_c = center_aux_environment(state)
@@ -1177,7 +1181,7 @@ function GMV_third_m(edmf::EDMF_PrognosticTKE, grid, state, covar_en_sym::Symbol
         mean_en = is_tke ? interpf2c(var_en, grid, k) : var_en[k]
         GMVv_ = ae[k] * mean_en
         @inbounds for i in 1:(up.n_updrafts)
-            var_up = is_tke ? getproperty(prog_up_f[i], var) : getproperty(aux_up[i], var)
+            var_up = is_tke ? getproperty(aux_up_f[i], var) : getproperty(aux_up[i], var)
             mean_up = is_tke ? interpf2c(var_up, grid, k) : var_up[k]
             GMVv_ += aux_up[i].area[k] * mean_up
         end
@@ -1198,7 +1202,7 @@ function GMV_third_m(edmf::EDMF_PrognosticTKE, grid, state, covar_en_sym::Symbol
         Upd_cubed = 0.0
         GMVcov_ = ae[k] * (Envcov_ + (mean_en - GMVv_)^2)
         @inbounds for i in 1:(up.n_updrafts)
-            var_up = is_tke ? getproperty(prog_up_f[i], var) : getproperty(aux_up[i], var)
+            var_up = is_tke ? getproperty(aux_up_f[i], var) : getproperty(aux_up[i], var)
             mean_up = is_tke ? interpf2c(var_up, grid, k) : var_up[k]
             GMVcov_ += aux_up[i].area[k] * (mean_up - GMVv_)^2
             Upd_cubed += aux_up[i].area[k] * mean_up^3
