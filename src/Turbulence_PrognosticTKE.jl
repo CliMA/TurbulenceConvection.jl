@@ -751,10 +751,9 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
     ρ_0_f = face_ref_state(state).ρ0
 
     @inbounds for i in 1:(up.n_updrafts)
-        prog_up[i].ρarea[kc_surf] = ρ_0_c[kc_surf]*edmf.area_surface_bc[i]
+        prog_up[i].ρarea[kc_surf] = ρ_0_c[kc_surf] * edmf.area_surface_bc[i]
         aux_up[i].area[kc_surf] = edmf.area_surface_bc[i]
-        prog_up_f[i].ρaw[kf_surf] = ρ_0_f[kf_surf]*edmf.w_surface_bc[i]
-        prog_up_f[i].w[kf_surf] = edmf.w_surface_bc[i]
+        prog_up_f[i].ρaw[kf_surf] = ρ_0_f[kf_surf] * edmf.w_surface_bc[i]
         aux_up_f[i].w[kf_surf] = edmf.w_surface_bc[i]
     end
 
@@ -817,7 +816,6 @@ function updraft_set_values(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanV
             a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
             anew_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
             if anew_k >= edmf.minimum_area
-                prog_up_f[i].w[k] = max(prog_up_f[i].ρaw[k] / (ρ_0_f[k] * anew_k), 0)
                 aux_up_f[i].w[k] = max(prog_up_f[i].ρaw[k] / (ρ_0_f[k] * anew_k), 0)
                 if aux_up_f[i].w[k] <= 0.0
                     if !(k.i > length(vec(aux_up[i].area)))
@@ -825,7 +823,6 @@ function updraft_set_values(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanV
                     end
                 end
             else
-                prog_up_f[i].w[k] = 0
                 aux_up_f[i].w[k] = 0
                 if !(k.i > length(vec(aux_up[i].area)))
                     aux_up[i].area[Cent(k.i)] = 0

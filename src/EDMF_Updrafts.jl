@@ -9,7 +9,6 @@ function initialize(edmf, grid, state, up::UpdraftVariables, gm::GridMeanVariabl
     aux_gm = center_aux_grid_mean(state)
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_face_indices(grid)
-            prog_up_f[i].w[k] = 0
             aux_up_f[i].w[k] = 0
         end
 
@@ -115,7 +114,6 @@ function initialize_DryBubble(edmf, grid, state, up::UpdraftVariables, gm::GridM
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_face_indices(grid)
             if minimum(z_in) <= grid.zf[k] <= maximum(z_in)
-                prog_up_f[i].w[k] = 0.0
                 aux_up_f[i].w[k] = 0.0
             end
         end

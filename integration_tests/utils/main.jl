@@ -135,7 +135,7 @@ cent_prognostic_vars_edmf(FT, n_up) = (;
 
 # Face only
 face_prognostic_vars(FT, n_up) = (; w = FT(0), face_prognostic_vars_edmf(FT, n_up)...)
-face_prognostic_vars_up(FT) = (; w = FT(0), ρaw = FT(0))
+face_prognostic_vars_up(FT) = (; ρaw = FT(0))
 face_prognostic_vars_edmf(FT, n_up) = (; turbconv = (; up = ntuple(i -> face_prognostic_vars_up(FT), n_up)))
 # face_prognostic_vars_edmf(FT, n_up) = (;) # could also use this for empty model
 
