@@ -26,7 +26,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     aux_en_f = face_aux_environment(state)
     aux_gm = center_aux_grid_mean(state)
     prog_up_f = face_prog_updrafts(state)
-    aux_up_f = face_aux_tc(state)
+    aux_tc_f = face_aux_tc(state)
     aux_tc = center_aux_tc(state)
     prog_en = center_prog_environment(state)
     aux_en_2m = center_aux_environment_2m(state)
@@ -54,18 +54,18 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     # whichvals used to check which substep we are on--correspondingly use "gm.SomeVar" (last timestep value)
     # first make sure the "bulkvalues" of the updraft variables are updated
     @inbounds for k in real_face_indices(grid)
-        aux_up_f.bulk.w[k] = 0
+        aux_tc_f.bulk.w[k] = 0
         a_bulk_bcs = (; bottom = SetValue(sum(edmf.area_surface_bc)), top = SetZeroGradient())
         a_bulk_f = interpc2f(aux_tc.bulk.area, grid, k; a_bulk_bcs...)
         if a_bulk_f > 1.0e-20
             @inbounds for i in 1:(up.n_updrafts)
                 a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
                 a_up_f = interpc2f(prog_up[i].area, grid, k; a_up_bcs...)
-                aux_up_f.bulk.w[k] += a_up_f * prog_up_f[i].w[k] / a_bulk_f
+                aux_tc_f.bulk.w[k] += a_up_f * prog_up_f[i].w[k] / a_bulk_f
             end
         end
         # Assuming gm.W = 0!
-        aux_en_f.w[k] = -a_bulk_f / (1 - a_bulk_f) * aux_up_f.bulk.w[k]
+        aux_en_f.w[k] = -a_bulk_f / (1 - a_bulk_f) * aux_tc_f.bulk.w[k]
     end
 
     @inbounds for k in real_center_indices(grid)
