@@ -579,6 +579,7 @@ function construct_tridiag_diffusion_en(
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
     prog_en = center_prog_environment(state)
+    aux_up = center_aux_updrafts(state)
 
     ae = 1 .- aux_tc.bulk.area
     rho_ae_K_m = face_field(grid)
