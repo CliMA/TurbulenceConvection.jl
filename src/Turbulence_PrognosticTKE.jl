@@ -563,7 +563,6 @@ function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol,
     tke_factor = is_tke ? 0.5 : 1
     prog_gm_c = center_prog_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
-    # prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
     aux_en_c = center_aux_environment(state)
@@ -643,11 +642,9 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
     up = edmf.UpdVar
     up_thermo = edmf.UpdThermo
     en = edmf.EnvVar
-    # prog_up = center_prog_updrafts(state)
     aux_up = center_aux_updrafts(state)
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
-    # prog_up_f = face_prog_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
     tendencies_up = center_tendencies_updrafts(state)
     tendencies_up_f = face_tendencies_updrafts(state)
@@ -754,11 +751,12 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
     prog_up = center_prog_updrafts(state)
     prog_gm = center_prog_grid_mean(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     ρ_0_c = center_ref_state(state).ρ0
     ρ_0_f = face_ref_state(state).ρ0
 
     @inbounds for i in 1:(up.n_updrafts)
-        prog_up_f[i].w[kf_surf] = edmf.w_surface_bc[i]
+        aux_up_f[i].w[kf_surf] = edmf.w_surface_bc[i]
         prog_up[i].area[kc_surf] = edmf.area_surface_bc[i]
         aux_up[i].area[kc_surf] = edmf.area_surface_bc[i]
     end
@@ -767,7 +765,6 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
         @inbounds for i in 1:(up.n_updrafts)
             is_surface_center(grid, k) && continue
             ρa_up_c = ρ_0_c[k] * aux_up[i].area[k]
-            # a_up_candidate = max(a_up_c + Δt * tendencies_up[i].area[k], 0)
             prog_up[i].ρarea[k] = max(ρa_up_c + Δt * tendencies_up[i].ρarea[k], 0)
         end
     end
@@ -777,7 +774,7 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
         @inbounds for i in 1:(up.n_updrafts)
             a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
             a_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
-            prog_up_f[i].ρaw[k] = ρ_0_f[k] * a_k * prog_up_f[i].w[k] + Δt * tendencies_up_f[i].w[k]
+            prog_up_f[i].ρaw[k] = ρ_0_f[k] * a_k * aux_up_f[i].w[k] + Δt * tendencies_up_f[i].w[k]
         end
     end
 
@@ -1016,10 +1013,8 @@ function compute_covariance_entr(
 
     is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
-    # prog_up_c = center_prog_updrafts(state)
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
-    # prog_up_f = face_prog_updrafts(state)
     prog_gm_c = center_prog_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
     prog_gm = is_tke ? prog_gm_f : prog_gm_c
@@ -1083,7 +1078,6 @@ end
 function compute_covariance_detr(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol)
     up = edmf.UpdVar
     ρ0_c = center_ref_state(state).ρ0
-    # prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
 
@@ -1169,7 +1163,6 @@ function GMV_third_m(edmf::EDMF_PrognosticTKE, grid, state, covar_en_sym::Symbol
     en = edmf.EnvVar
     aux_tc = center_aux_tc(state)
     ae = 1 .- aux_tc.bulk.area
-    # prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
     is_tke = covar_en_sym == :tke
