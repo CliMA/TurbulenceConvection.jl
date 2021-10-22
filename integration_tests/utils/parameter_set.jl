@@ -79,8 +79,10 @@ function create_parameter_set(namelist)
         # sde model
         sde_ϵ_θ = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stochastic", "sde_entr_theta"; default = 1.0),
         sde_ϵ_σ = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stochastic", "sde_entr_std"; default = 0.0),
+        sde_ϵ_μ = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stochastic", "sde_entr_mu"; default = 1.0),
         sde_δ_θ = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stochastic", "sde_detr_theta"; default = 1.0),
         sde_δ_σ = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stochastic", "sde_detr_std"; default = 0.0),
+        sde_δ_μ = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stochastic", "sde_detr_mu"; default = 1.0),
     )
     return EarthParameterSet(nt)
 end

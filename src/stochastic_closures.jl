@@ -22,6 +22,15 @@ function stochastic_closure(param_set::APS, sde_model::sde_struct{SDEClosureType
     end
     return u
 end
+"exponential transform sde closure"
+function stochastic_closure(param_set::APS, sde_model::sde_struct{SDEExpTransformedClosureType}, term::AbstractEntDet)
+    u = exp_transform_sde_closure(param_set, sde_model, term)
+    if u < 0
+        @warn("Negative stochastic parameter ⟹ negative $(typeof(term)). Setting to 0")
+        u = 0
+    end
+    return u
+end
 
 #
 ## Lognormal closure functions
@@ -45,8 +54,10 @@ end
 
 sde_θ(param_set, ::Entrainment) = ICP.sde_ϵ_θ(param_set)
 sde_σ(param_set, ::Entrainment) = ICP.sde_ϵ_σ(param_set)
+sde_μ(param_set, ::Entrainment) = ICP.sde_ϵ_μ(param_set)
 sde_θ(param_set, ::Detrainment) = ICP.sde_δ_θ(param_set)
 sde_σ(param_set, ::Detrainment) = ICP.sde_δ_σ(param_set)
+sde_μ(param_set, ::Detrainment) = ICP.sde_δ_μ(param_set)
 
 function sde_closure(param_set::APS, sde_model::sde_struct{SDEClosureType}, term::AbstractEntDet)
     θ = sde_θ(param_set, term)
@@ -56,6 +67,18 @@ function sde_closure(param_set::APS, sde_model::sde_struct{SDEClosureType}, term
     u = sde(θ, σ, u0, dt)
     sde_model.u0 = u
     return u
+end
+
+# Exp transform closure
+function exp_transform_sde_closure(param_set::APS, sde_model::sde_struct{SDEExpTransformedClosureType}, term::AbstractEntDet)
+    μ = sde_μ(param_set, term)
+    θ = sde_θ(param_set, term)
+    σ = sde_σ(param_set, term)
+    u0 = sde_model.u0
+    dt = sde_model.dt
+    log_u = exp_transform_sde(μ, θ, σ, u0, dt) 
+    sde_model.u0 = log_u
+    return exp(log_u)
 end
 
 """ 
@@ -70,11 +93,21 @@ ref: https://en.wikipedia.org/wiki/Cox–Ingersoll–Ross_model
 """
 function sde(θ::FT, σ::FT, u0::FT, dt::FT) where {FT <: Real}
     μ = FT(1)                       # μ :: long-term mean (fixed to 1)
-    u_pos(u) = max(u, FT(0))        # ensure u remains non-negative
+    u_pos(u) = max(u, FT(eps()))    # ensure u remains non-negative
     f(u, p, t) = θ * (μ - u)        # θ :: speed of reversion
     g(u, p, t) = σ * √(u_pos(u))    # σ :: standard deviation
     tspan = (0.0, dt)
     prob = SDEProblem(f, g, u0, tspan)
     sol = solve(prob, SOSRI())
     return u_pos(sol[end])
+end
+
+"Solve exponential transformation of O-U."
+function exp_transform_sde(μ::FT, θ::FT, σ::FT, u0::FT, dt::FT) where {FT <: Real}
+    f(log_u, p, t) = θ * (μ - log_u)    # θ :: speed of reversion
+    g(u, p, t) = σ                      # σ :: standard deviation
+    tspan = (0.0, dt)
+    prob = SDEProblem(f, g, u0, tspan)
+    sol = solve(prob, SOSRI())
+    return sol[end]
 end

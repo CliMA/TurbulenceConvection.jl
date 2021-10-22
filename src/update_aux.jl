@@ -185,6 +185,11 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     upd_cloud_diagnostics(up, grid, state) # TODO: should this be moved to compute_diagnostics! ?
 
+    # stochastic closure -- vertical levels fully correlated
+    sde_model = edmf.sde_model
+    stoch_ε = stochastic_closure(param_set, sde_model, Entrainment())
+    stoch_δ = stochastic_closure(param_set, sde_model, Detrainment())
+
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
             # entrainment
@@ -223,9 +228,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 edmf.entr_sc[i, k] = er.ε_dyn
                 edmf.detr_sc[i, k] = er.δ_dyn
                 # stochastic closure
-                sde_model = edmf.sde_model
-                stoch_ε = stochastic_closure(param_set, sde_model, Entrainment())
-                stoch_δ = stochastic_closure(param_set, sde_model, Detrainment())
+                # sde_model = edmf.sde_model
+                # stoch_ε = stochastic_closure(param_set, sde_model, Entrainment())
+                # stoch_δ = stochastic_closure(param_set, sde_model, Detrainment())
                 edmf.entr_sc[i, k] *= stoch_ε
                 edmf.detr_sc[i, k] *= stoch_δ
 

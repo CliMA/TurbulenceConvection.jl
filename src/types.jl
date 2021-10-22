@@ -406,6 +406,7 @@ end
 struct NoneClosureType end
 struct LogNormalClosureType end
 struct SDEClosureType end
+struct SDEExpTransformedClosureType end
 
 # Stochastic differential equation memory
 Base.@kwdef mutable struct sde_struct{T}
@@ -731,7 +732,7 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
             "stochastic",
             "closure";
             default = "none",
-            valid_options = ["none", "lognormal", "sde"],
+            valid_options = ["none", "lognormal", "sde", "sde_exp_transform",],
         )
         closure_type = if closure == "none"
             NoneClosureType
@@ -739,6 +740,8 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
             LogNormalClosureType
         elseif closure == "sde"
             SDEClosureType
+        elseif closure == "sde_exp_transform"
+            SDEExpTransformedClosureType
         else
             error("Something went wrong. Invalid stochastic closure type '$closure'")
         end
