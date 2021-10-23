@@ -398,6 +398,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
     set_updraft_surface_bc(edmf, grid, state, gm, Case)
+    set_updraft_primitives(edmf, grid, state, gm)
     update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
     tendencies_gm = center_tendencies_grid_mean(state)
@@ -468,7 +469,6 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     ###
     ### set values
     ###
-    updraft_set_values(edmf, grid, state, gm)
     @inbounds for k in real_center_indices(grid)
         prog_en.tke[k] = max(prog_en.tke[k], 0.0)
         prog_en.Hvar[k] = max(prog_en.Hvar[k], 0.0)
@@ -746,35 +746,32 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
             is_surface_center(grid, k) && continue
-            ρa_up_c = ρ_0_c[k] * aux_up[i].area[k]
-            prog_up[i].ρarea[k] = max(ρa_up_c + Δt * tendencies_up[i].ρarea[k], 0)
+            prog_up[i].ρarea[k] += Δt * tendencies_up[i].ρarea[k]
+            prog_up[i].ρarea[k] = max(prog_up[i].ρarea[k], 0)
         end
     end
 
     @inbounds for k in real_face_indices(grid)
         is_surface_face(grid, k) && continue
         @inbounds for i in 1:(up.n_updrafts)
-            a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
-            a_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
-            prog_up_f[i].ρaw[k] = ρ_0_f[k] * a_k * aux_up_f[i].w[k] + Δt * tendencies_up_f[i].ρaw[k]
+            prog_up_f[i].ρaw[k] += Δt * tendencies_up_f[i].ρaw[k]
+            prog_up_f[i].ρaw[k] = max(prog_up_f[i].ρaw[k], 0)
         end
     end
 
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
-            if is_surface_center(grid, k)
-                continue
-            end
-
-            prog_up[i].ρaθ_liq_ice[k] =
-                ρ_0_c[k] * aux_up[i].area[k] * aux_up[i].θ_liq_ice[k] + Δt * tendencies_up[i].ρaθ_liq_ice[k]
-            prog_up[i].ρaq_tot[k] = ρ_0_c[k] * aux_up[i].area[k] * aux_up[i].q_tot[k] + Δt * tendencies_up[i].ρaq_tot[k]
+            is_surface_center(grid, k) && continue
+            prog_up[i].ρaθ_liq_ice[k] += Δt * tendencies_up[i].ρaθ_liq_ice[k]
+            prog_up[i].ρaθ_liq_ice[k] = max(prog_up[i].ρaθ_liq_ice[k], 0)
+            prog_up[i].ρaq_tot[k] += Δt * tendencies_up[i].ρaq_tot[k]
+            prog_up[i].ρaq_tot[k] = max(prog_up[i].ρaq_tot[k], 0)
         end
     end
     return
 end
 
-function updraft_set_values(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables)
+function set_updraft_primitives(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables)
     param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
