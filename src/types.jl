@@ -66,81 +66,6 @@ Base.@kwdef struct MoistureDeficitEntr{FT}
 end
 
 """
-    MixLen
-
-$(DocStringExtensions.FIELDS)
-"""
-Base.@kwdef struct MixLen{FT}
-    "minimum length number"
-    min_len_ind::Int
-    "mixing length"
-    mixing_length::FT
-    "length ratio"
-    ml_ratio::FT
-end
-
-"""
-    MinDisspLen
-
-Minimum dissipation model
-
-$(DocStringExtensions.FIELDS)
-"""
-Base.@kwdef struct MinDisspLen{FT, T}
-    "height"
-    z::FT
-    "obukhov length"
-    obukhov_length::FT
-    "surface TKE values"
-    tke_surf::FT
-    "u star - surface velocity scale"
-    ustar::FT
-    "turbulent Prandtl number"
-    Pr::FT
-    "reference pressure"
-    p0::FT
-    "environmental vertical buoyancy gradient"
-    ∂b∂z::FT
-    "env shear"
-    Shear²::FT
-    "virtual potential temperature gradient"
-    ∂θv∂z::FT
-    "total specific humidity gradient"
-    ∂qt∂z::FT
-    "liquid ice potential temperature gradient"
-    ∂θl∂z::FT
-    "virtual potential temperature"
-    θv::FT
-    "environment turbulent kinetic energy"
-    tke::FT
-    "environment area"
-    a_en::FT
-    "environment velocity at cell center"
-    wc_en::FT
-    "updraft velocity at cell center"
-    wc_up::T
-    "updraft area"
-    a_up::T
-    "up draft turbulent entrainment"
-    ε_turb::T
-    "updraft dynamic detrainment"
-    δ_dyn::T
-    "environment cloud fraction"
-    en_cld_frac::FT
-    "environment liquid-ice potential temperature"
-    θ_li_en::FT
-    "environment liquid water specific humidity"
-    ql_en::FT
-    "environment total specific humidity"
-    qt_en::FT
-    "environment temperature"
-    T_en::FT
-    "number of updraft"
-    N_up::Int
-end
-
-
-"""
     GradBuoy
 
 Environmental buoyancy gradients.
@@ -193,6 +118,62 @@ Base.@kwdef struct EnvBuoyGrad{FT, EBC <: EnvBuoyGradClosure}
 end
 function EnvBuoyGrad(::EBG; t_sat::FT, bg_kwargs...) where {FT <: Real, EBG <: EnvBuoyGradClosure}
     return EnvBuoyGrad{FT, EBG}(; t_sat, bg_kwargs...)
+end
+
+"""
+    MixLen
+
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct MixLen{FT}
+    "minimum length number"
+    min_len_ind::Int
+    "mixing length"
+    mixing_length::FT
+    "length ratio"
+    ml_ratio::FT
+end
+
+"""
+    MinDisspLen
+
+Minimum dissipation model
+
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct MinDisspLen{FT, T}
+    "height"
+    z::FT
+    "obukhov length"
+    obukhov_length::FT
+    "surface TKE values"
+    tke_surf::FT
+    "u star - surface velocity scale"
+    ustar::FT
+    "turbulent Prandtl number"
+    Pr::FT
+    "reference pressure"
+    p0::FT
+    "vertical buoyancy gradient struct"
+    ∇b::GradBuoy{FT}
+    "env shear"
+    Shear²::FT
+    "environment turbulent kinetic energy"
+    tke::FT
+    "environment area"
+    a_en::FT
+    "environment velocity at cell center"
+    wc_en::FT
+    "updraft velocity at cell center"
+    wc_up::T
+    "updraft area"
+    a_up::T
+    "up draft turbulent entrainment"
+    ε_turb::T
+    "updraft dynamic detrainment"
+    δ_dyn::T
+    "number of updraft"
+    N_up::Int
 end
 
 Base.@kwdef mutable struct RainVariables

@@ -22,8 +22,8 @@ function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
         l_W = vkc * z / (sqrt(tke_surf / ustar / ustar) * c_m)
     end
 
-    # compute l_TKE - the production/destruction term
-    a_pd = c_m * (ml_model.Shear² - ml_model.∂b∂z / ml_model.Pr) * sqrt(ml_model.tke)
+    # compute l_TKE - the production-dissipation balanced length scale
+    a_pd = c_m * (ml_model.Shear² - ml_model.∇b.∂b∂z / ml_model.Pr) * sqrt(ml_model.tke)
     # Dissipation term
     c_neg = c_d * ml_model.tke * sqrt(ml_model.tke)
     # Subdomain exchange term
@@ -45,30 +45,15 @@ function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
         l_TKE = 0.0
     end
 
-    # compute l_N² - the effective static stability using environmental mean.
-    # Set lambda for now to environmental cloud_fraction (TBD: Rain)
-    ts_en = thermo_state_pθq(param_set, ml_model.p0, ml_model.θ_li_en, ml_model.qt_en)
-    N²_eff =
-        (1 - ml_model.en_cld_frac) * ml_model.∂θv∂z +
-        ml_model.en_cld_frac * (
-            # WARNING: ml_model.ql_en should be ml_model.qc_en once we have ice
-            exp(
-                TD.latent_heat_liq_ice(param_set, TD.PhasePartition(ts_en)) * ml_model.ql_en / TD.cp_m(ts_en) /
-                ml_model.T_en,
-            ) * (
-                (1 + (molmass_ratio - 1) * ml_model.qt_en) * ml_model.∂θl∂z +
-                (molmass_ratio - 1) * ml_model.θ_li_en * ml_model.∂qt∂z
-            )
-        )
-
-    N² = sqrt(max(g / ml_model.θv * N²_eff, 0))
-    if N² > 0.0
-        l_N² = min(sqrt(max(c_b * ml_model.tke, 0)) / N², l_max)
+    # compute l_N - the effective static stability length scale.
+    N_eff = sqrt(max(ml_model.∇b.∂b∂z, 0))
+    if N_eff > 0.0
+        l_N = min(sqrt(max(c_b * ml_model.tke, 0)) / N_eff, l_max)
     else
-        l_N² = l_max
+        l_N = l_max
     end
 
-    l[1] = l_N²
+    l[1] = l_N
     l[2] = l_TKE
     l[3] = l_W
 
