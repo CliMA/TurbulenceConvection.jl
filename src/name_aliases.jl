@@ -17,7 +17,12 @@ function name_aliases()
         "ρ0_f" => ("rho0",),
         "updraft_area" => ("updraft_fraction",),
         "updraft_thetal" => ("updraft_thetali",),
-        "thetal_mean" => ("thetali_mean",),
+        "thetal_mean" => ("thetali_mean", "theta_mean"),
+        "total_flux_h" => ("resolved_z_flux_thetali", "resolved_z_flux_theta"),
+        "total_flux_qt" => ("resolved_z_flux_qt", "qt_flux_z"),
+        "u_mean" => ("u_translational_mean",),
+        "v_mean" => ("v_translational_mean",),
+        "tke_mean" => ("tke_nd_mean",),
     )
     return dict
 end
@@ -25,12 +30,12 @@ end
 """
     get_nc_data(ds::NCDatasets.Dataset, var::String)
 
-Returns the data for variable `var`, and also tries it's aliases
+Returns the data for variable `var`, trying first its aliases
 defined in `name_aliases`, in the `ds::NCDatasets.Dataset`.
 """
 function get_nc_data(ds, var::String)
     dict = name_aliases()
-    key_options = haskey(dict, var) ? (var, dict[var]...) : (var,)
+    key_options = haskey(dict, var) ? (dict[var]..., var) : (var,)
 
     for key in key_options
         if haskey(ds, key)
