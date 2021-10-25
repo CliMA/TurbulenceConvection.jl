@@ -6,6 +6,3 @@ const gamma_m = 15.0
 const gamma_h = 9.0
 # CLIMA microphysics parameters
 const rho_cloud_liq = 1e3
-const nu_air = 1.6e-5
-const K_therm = 2.4e-2
-const D_vapor = 2.26e-5

@@ -75,7 +75,6 @@ include("ClimaParams.jl")
 import .ClimaParams
 const ICP = ClimaParams # internal clima parameters
 
-include("python_primitives.jl")
 include("parameters.jl")
 
 include("Grid.jl")

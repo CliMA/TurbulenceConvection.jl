@@ -31,3 +31,9 @@ function lamb_smooth_minimum(l, lower_bound, upper_bound)
 end
 
 mean_nc_data(data, group, var, imin, imax) = StatsBase.mean(data.group[group][var][:][:, imin:imax], dims = 2)[:]
+
+#= Simple linear interpolation function, wrapping Dierckx =#
+function pyinterp(x, xp, fp)
+    spl = Dierckx.Spline1D(xp, fp; k = 1)
+    return spl(vec(x))
+end
