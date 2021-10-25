@@ -75,6 +75,53 @@ include("ClimaParams.jl")
 import .ClimaParams
 const ICP = ClimaParams # internal clima parameters
 
+#=
+    debug_state(state, code_location::String)
+
+A simple function for debugging the entire state,
+specifically for when quantities that should remain
+positive-definite become negative.
+
+=#
+function debug_state(state, code_location::String)
+    prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
+    prog_gm_f = face_prog_grid_mean(state)
+    aux_gm_f = face_aux_grid_mean(state)
+
+    prog_up = center_prog_updrafts(state)
+    aux_up = center_aux_updrafts(state)
+    prog_up_f = face_prog_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
+
+    prog_en = center_prog_environment(state)
+    aux_en = center_aux_environment(state)
+    aux_en_f = face_aux_environment(state)
+
+    positive_vars = [
+        vec(prog_gm.θ_liq_ice),
+        vec(prog_gm_f.w),
+        vec(prog_up[1].area),
+        vec(prog_up[1].θ_liq_ice),
+        vec(prog_up_f[1].w),
+        vec(aux_en.area),
+        vec(aux_en.θ_liq_ice),
+    ]
+    positive_vars_conds = map(positive_vars) do pv
+        any(pv .< 0)
+    end
+
+    if any(positive_vars_conds)
+        @show code_location
+        for (i, pvc, pv) in zip(1:length(positive_vars), positive_vars_conds, positive_vars)
+            pvc || continue
+            @show i, pv
+        end
+        @show positive_vars_conds
+        error("Bad state")
+    end
+end
+
 include("parameters.jl")
 
 include("Grid.jl")

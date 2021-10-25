@@ -27,6 +27,7 @@ face_prog_grid_mean(state) = prognostic(state, FaceField())
 """ Auxiliary fields for the host model """
 aux(state, fl) = getproperty(state.aux, field_loc(fl))
 center_aux_grid_mean(state) = aux(state, CentField())
+face_aux_grid_mean(state) = aux(state, FaceField())
 
 """ Tendency fields for the host model """
 tendencies(state, fl) = getproperty(state.tendencies, field_loc(fl))
@@ -47,7 +48,6 @@ center_prog_updrafts(state) = prognostic_tc(state, CentField()).up
 face_prog_updrafts(state) = prognostic_tc(state, FaceField()).up
 center_prog_environment(state) = prognostic_tc(state, CentField()).en
 center_prog_rain(state) = prognostic_tc(state, CentField()).ra
-face_prog_environment(state) = prognostic_tc(state, FaceField()).en
 
 #= Auxiliary fields for TurbulenceConvection =#
 aux_turbconv(state, fl) = aux(state, fl).turbconv
