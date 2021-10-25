@@ -98,7 +98,11 @@ function debug_state(state, code_location::String)
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
 
-    positive_vars = [
+    ######
+    ###### Positive-definite variables
+    ######
+
+    vars_positive = [
         vec(prog_gm.θ_liq_ice),
         vec(prog_gm_f.w),
         vec(prog_up[1].area),
@@ -107,18 +111,33 @@ function debug_state(state, code_location::String)
         vec(aux_en.area),
         vec(aux_en.θ_liq_ice),
     ]
-    positive_vars_conds = map(positive_vars) do pv
-        any(pv .< 0)
+    vars = vars_positive
+    vars_conds = map(v -> any(v .< 0), vars)
+
+    if any(vars_conds)
+        @show code_location
+        for (i, vc, v) in zip(1:length(vars), vars_conds, vars)
+            vc || continue
+            @show i, v
+        end
+        @show vars_conds
+        error("Negative state for positive-definite field(s)")
     end
 
-    if any(positive_vars_conds)
+    ######
+    ###### All listed variables
+    ######
+    vars = vars_positive
+    vars_conds = map(v -> any(isnan.(v)) || any(isinf.(v)), vars)
+
+    if any(vars_conds)
         @show code_location
-        for (i, pvc, pv) in zip(1:length(positive_vars), positive_vars_conds, positive_vars)
-            pvc || continue
-            @show i, pv
+        for (i, vc, v) in zip(1:length(vars), vars_conds, vars)
+            vc || continue
+            @show i, v
         end
-        @show positive_vars_conds
-        error("Bad state")
+        @show vars_conds
+        error("Nan/Inf state for field(s)")
     end
 end
 
