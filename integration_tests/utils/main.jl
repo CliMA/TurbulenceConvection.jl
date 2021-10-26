@@ -1,3 +1,7 @@
+import Logging
+import TerminalLoggers
+Logging.global_logger(TerminalLoggers.TerminalLogger())
+
 import JSON
 import ArgParse
 import TurbulenceConvection

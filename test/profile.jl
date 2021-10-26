@@ -1,5 +1,4 @@
 import TurbulenceConvection
-using TurbulenceConvection
 using Test
 
 using Profile
