@@ -60,17 +60,6 @@ function get_surface_variance(flux1, flux2, ustar, zLL, oblength)
     end
 end
 
-# Dustbin
-
-function set_cloudbase_flag(ql, current_flag)
-    if ql > 1.0e-8
-        new_flag = true
-    else
-        new_flag = current_flag
-    end
-    return new_flag
-end
-
 function gradient_Richardson_number(∂b∂z, Shear², ϵ)
     return min(∂b∂z / max(Shear², ϵ), 0.25)
 end
