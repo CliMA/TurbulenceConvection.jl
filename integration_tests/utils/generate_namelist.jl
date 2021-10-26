@@ -1,5 +1,5 @@
 module NameList
-# See Table ? of Cohen et al, 2020
+# See Table 2 of Cohen et al, 2020
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.0
@@ -11,10 +11,10 @@ module NameList
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"] = 2.0
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"] = 0.2
 
-# See Table ? of Lopez Gomez et al, 2020
+# See Table 1 of Lopez Gomez et al, 2020
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.14
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.22
-# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"] = 0.4
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"] = 0.4 # Square of value in the paper
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["lambda_stab"] = 0.9
 
 # See Table ? of He et al, 2021
