@@ -232,36 +232,121 @@ function run(sim::Simulation1d)
     grid = sim.grid
     state = sim.state
     TC.open_files(sim.Stats) # #removeVarsHack
-    while sim.TS.t <= sim.TS.t_max
-        TC.update(sim.Turb, grid, state, sim.GMV, sim.Case, sim.TS)
-        TC.update(sim.TS)
 
-        if mod(iter, 100) == 0
-            progress = sim.TS.t / sim.TS.t_max
-            @show progress
-        end
+    t_span = (0.0, sim.TS.t_max)
+    params = (;
+        edmf = sim.Turb,
+        grid = grid,
+        state = state,
+        gm = sim.GMV,
+        Case = sim.Case,
+        TS = sim.TS,
+        Stats = sim.Stats,
+        io_nt = sim.io_nt,
+    )
 
-        if mod(round(Int, sim.TS.t), round(Int, sim.Stats.frequency)) == 0
-            # TODO: is this the best location to call diagnostics?
-            TC.compute_diagnostics!(sim.Turb, sim.GMV, grid, state, sim.Case, sim.TS)
+    condition_io(u, t, integrator) = mod(round(Int, t), round(Int, sim.Stats.frequency)) == 0
+    condition_every_iter(u, t, integrator) = true
 
-            # TODO: remove `vars` hack that avoids
-            # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-            # opening/closing files every step should be okay. #removeVarsHack
-            # TurbulenceConvection.io(sim) # #removeVarsHack
-            TC.write_simulation_time(sim.Stats, sim.TS.t) # #removeVarsHack
+    function affect_io!(integrator)
+        UnPack.@unpack edmf, io_nt, grid, state, Case, gm, TS, Stats = integrator.p
+        parent(state.prog) .= integrator.u
+        param_set = TC.parameter_set(gm)
+        # TODO: is this the best location to call diagnostics?
+        TC.compute_diagnostics!(edmf, gm, grid, state, Case, TS)
 
-            TC.io(sim.io_nt.aux, sim.Stats)
-            TC.io(sim.io_nt.diagnostics, sim.Stats)
-            TC.io(sim.io_nt.prog, sim.Stats)
-            TC.io(sim.io_nt.tendencies, sim.Stats)
+        # TODO: remove `vars` hack that avoids
+        # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
+        # opening/closing files every step should be okay. #removeVarsHack
+        # TurbulenceConvection.io(sim) # #removeVarsHack
+        TC.write_simulation_time(Stats, TS.t) # #removeVarsHack
 
-            TC.io(sim.GMV, grid, state, sim.Stats) # #removeVarsHack
-            TC.io(sim.Case, grid, state, sim.Stats) # #removeVarsHack
-            TC.io(sim.Turb, grid, state, sim.Stats, sim.TS, sim.param_set) # #removeVarsHack
-        end
-        iter += 1
+        TC.io(io_nt.aux, Stats)
+        TC.io(io_nt.diagnostics, Stats)
+        TC.io(io_nt.prog, Stats)
+        TC.io(io_nt.tendencies, Stats)
+
+        TC.io(gm, grid, state, Stats) # #removeVarsHack
+        TC.io(Case, grid, state, Stats) # #removeVarsHack
+        TC.io(edmf, grid, state, Stats, TS, param_set) # #removeVarsHack
     end
+
+    function affect_filter!(integrator)
+        UnPack.@unpack edmf, grid, state, gm, Case, TS = integrator.p
+        parent(state.prog) .= parent(integrator.u)
+        prog_en = TC.center_prog_environment(state)
+        up = edmf.UpdVar
+        ###
+        ### Filters
+        ###
+        TC.set_edmf_surface_bc(edmf, grid, state, up, Case.Sur)
+        TC.filter_updraft_vars(edmf, grid, state, gm)
+
+        @inbounds for k in TC.real_center_indices(grid)
+            prog_en.tke[k] = max(prog_en.tke[k], 0.0)
+            prog_en.Hvar[k] = max(prog_en.Hvar[k], 0.0)
+            prog_en.QTvar[k] = max(prog_en.QTvar[k], 0.0)
+            prog_en.HQTcov[k] = max(prog_en.HQTcov[k], -sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]))
+            prog_en.HQTcov[k] = min(prog_en.HQTcov[k], sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]))
+        end
+        parent(integrator.u) .= parent(state.prog)
+    end
+
+    # TODO: this should not be handled via callbacks
+    function affect_implicit!(integrator)
+        UnPack.@unpack edmf, grid, state, gm, TS = integrator.p
+        parent(state.prog) .= parent(integrator.u)
+        implicit_eqs = edmf.implicit_eqs
+        # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
+        param_set = TC.parameter_set(gm)
+        up = edmf.UpdVar
+        prog_en = TC.center_prog_environment(state)
+
+        common_args = (
+            grid,
+            param_set,
+            state,
+            TS,
+            up.n_updrafts,
+            edmf.minimum_area,
+            edmf.pressure_plume_spacing,
+            edmf.frac_turb_entr,
+            edmf.entr_sc,
+            edmf.mixing_length,
+        )
+
+        implicit_eqs.A_TKE .= TC.construct_tridiag_diffusion_en(common_args..., true)
+        implicit_eqs.A_Hvar .= TC.construct_tridiag_diffusion_en(common_args..., false)
+        implicit_eqs.A_QTvar .= TC.construct_tridiag_diffusion_en(common_args..., false)
+        implicit_eqs.A_HQTcov .= TC.construct_tridiag_diffusion_en(common_args..., false)
+
+        implicit_eqs.b_TKE .= TC.en_diffusion_tendencies(grid, state, TS, :tke, up.n_updrafts)
+        implicit_eqs.b_Hvar .= TC.en_diffusion_tendencies(grid, state, TS, :Hvar, up.n_updrafts)
+        implicit_eqs.b_QTvar .= TC.en_diffusion_tendencies(grid, state, TS, :QTvar, up.n_updrafts)
+        implicit_eqs.b_HQTcov .= TC.en_diffusion_tendencies(grid, state, TS, :HQTcov, up.n_updrafts)
+        parent(prog_en.tke) .= implicit_eqs.A_TKE \ implicit_eqs.b_TKE
+        parent(prog_en.Hvar) .= implicit_eqs.A_Hvar \ implicit_eqs.b_Hvar
+        parent(prog_en.QTvar) .= implicit_eqs.A_QTvar \ implicit_eqs.b_QTvar
+        parent(prog_en.HQTcov) .= implicit_eqs.A_HQTcov \ implicit_eqs.b_HQTcov
+
+        parent(integrator.u) .= parent(state.prog)
+
+    end
+    callback_io = ODE.DiscreteCallback(condition_io, affect_io!)
+    callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!)
+    callback_implicit_solve = ODE.DiscreteCallback(condition_every_iter, affect_implicit!)
+
+    prob = ODE.ODEProblem(TC.step!, state.prog, t_span, params; dt = sim.TS.dt)
+    sol = ODE.solve(
+        prob,
+        ODE.Euler(),
+        reltol = 1e-12,
+        abstol = 1e-12,
+        callback = ODE.CallbackSet(callback_implicit_solve, callback_filters, callback_io),
+        progress = true,
+        progress_message = (dt, u, p, t) -> t,
+    )
+
     TC.close_files(sim.Stats) # #removeVarsHack
     return
 end

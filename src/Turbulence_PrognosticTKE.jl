@@ -382,7 +382,12 @@ function compute_diffusive_fluxes(
 end
 
 # Perform the update of the scheme
-function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
+function step!(dY, Y, params, t)
+    UnPack.@unpack edmf, grid, state, gm, Case, TS = params
+    TS.t = t
+    parent(state.prog) .= parent(Y)
+    cprog = deepcopy(Y.cent)
+    fprog = deepcopy(Y.face)
 
     gm = gm
     up = edmf.UpdVar
@@ -424,64 +429,14 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     # compute tendencies
     compute_gm_tendencies!(edmf, grid, state, Case, gm, TS)
     compute_updraft_tendencies(edmf, grid, state, gm)
-    # ----------- TODO: move to compute_tendencies
-    implicit_eqs = edmf.implicit_eqs
-    # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
-
-    common_args = (
-        grid,
-        param_set,
-        state,
-        TS,
-        up.n_updrafts,
-        edmf.minimum_area,
-        edmf.pressure_plume_spacing,
-        edmf.frac_turb_entr,
-        edmf.entr_sc,
-        edmf.mixing_length,
-    )
-
-    implicit_eqs.A_TKE .= construct_tridiag_diffusion_en(common_args..., true)
-    implicit_eqs.A_Hvar .= construct_tridiag_diffusion_en(common_args..., false)
-    implicit_eqs.A_QTvar .= construct_tridiag_diffusion_en(common_args..., false)
-    implicit_eqs.A_HQTcov .= construct_tridiag_diffusion_en(common_args..., false)
-
-    implicit_eqs.b_TKE .= en_diffusion_tendencies(grid, state, TS, :tke, n_updrafts)
-    implicit_eqs.b_Hvar .= en_diffusion_tendencies(grid, state, TS, :Hvar, n_updrafts)
-    implicit_eqs.b_QTvar .= en_diffusion_tendencies(grid, state, TS, :QTvar, n_updrafts)
-    implicit_eqs.b_HQTcov .= en_diffusion_tendencies(grid, state, TS, :HQTcov, n_updrafts)
-    # -----------
 
     ###
     ### update
     ###
-    update_updraft(edmf, grid, state, gm, TS)
     if edmf.Rain.rain_model == "clima_1m"
         update_rain(edmf.Rain, grid, state, up_thermo, en_thermo, edmf.RainPhys, TS)
     end
-    parent(prog_en.tke) .= implicit_eqs.A_TKE \ implicit_eqs.b_TKE
-    parent(prog_en.Hvar) .= implicit_eqs.A_Hvar \ implicit_eqs.b_Hvar
-    parent(prog_en.QTvar) .= implicit_eqs.A_QTvar \ implicit_eqs.b_QTvar
-    parent(prog_en.HQTcov) .= implicit_eqs.A_HQTcov \ implicit_eqs.b_HQTcov
-    @inbounds for k in real_center_indices(grid)
-        prog_gm.u[k] += tendencies_gm.u[k] * TS.dt
-        prog_gm.v[k] += tendencies_gm.v[k] * TS.dt
-        prog_gm.θ_liq_ice[k] += tendencies_gm.θ_liq_ice[k] * TS.dt
-        prog_gm.q_tot[k] += tendencies_gm.q_tot[k] * TS.dt
-    end
-
-    ###
-    ### Filters
-    ###
-    set_edmf_surface_bc(edmf, grid, state, up, Case.Sur)
-    filter_updraft_vars(edmf, grid, state, gm)
-    @inbounds for k in real_center_indices(grid)
-        prog_en.tke[k] = max(prog_en.tke[k], 0.0)
-        prog_en.Hvar[k] = max(prog_en.Hvar[k], 0.0)
-        prog_en.QTvar[k] = max(prog_en.QTvar[k], 0.0)
-        prog_en.HQTcov[k] = max(prog_en.HQTcov[k], -sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]))
-        prog_en.HQTcov[k] = min(prog_en.HQTcov[k], sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]))
-    end
+    parent(dY) .= parent(state.tendencies)
 
     return
 end
