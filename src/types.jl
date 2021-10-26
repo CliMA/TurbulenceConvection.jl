@@ -219,7 +219,6 @@ end
 
 mutable struct UpdraftVariables{A1}
     n_updrafts::Int
-    prognostic::Bool
     updraft_fraction::Float64
     cloud_fraction::A1
     cloud_base::A1
@@ -230,7 +229,6 @@ mutable struct UpdraftVariables{A1}
     function UpdraftVariables(nu, namelist, grid::Grid)
         n_updrafts = nu
 
-        prognostic = true
         updraft_fraction = namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
 
         # cloud and rain diagnostics for output
@@ -245,7 +243,6 @@ mutable struct UpdraftVariables{A1}
         A1 = typeof(cloud_fraction)
         return new{A1}(
             n_updrafts,
-            prognostic,
             updraft_fraction,
             cloud_fraction,
             cloud_base,
