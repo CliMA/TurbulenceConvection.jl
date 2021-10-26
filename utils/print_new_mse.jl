@@ -37,13 +37,8 @@ println("#")
 println("all_best_mse = OrderedCollections.OrderedDict()\n#")
 for case in keys(computed_mse)
     println("all_best_mse[\"$case\"] = OrderedCollections.OrderedDict()")
-    percent_reduction_mse[case] = 0
     for var in keys(computed_mse[case])
         println("all_best_mse[\"$case\"][\"$var\"] = $(computed_mse[case][var])")
-        percent_reduction_mse[case] = min(
-            percent_reduction_mse[case],
-            (all_best_mse[case][var] - computed_mse[case][var]) / all_best_mse[case][var] * 100,
-        )
     end
     println("#")
 end
@@ -57,7 +52,26 @@ for case in all_cases
     rm("computed_mse_$case.json"; force = true)
 end
 
+#####
+##### min percentage reduction of mse across cases
+#####
+
 println("-- DO NOT COPY --")
+
+for case in keys(computed_mse)
+    percent_reduction_mse[case] = 0
+    for var in keys(computed_mse[case])
+        if haskey(all_best_mse[case], var)
+            percent_reduction_mse[case] = min(
+                percent_reduction_mse[case],
+                (all_best_mse[case][var] - computed_mse[case][var]) / all_best_mse[case][var] * 100,
+            )
+        else
+            percent_reduction_mse[case] = "NA"
+        end
+    end
+end
+
 for case in keys(percent_reduction_mse)
     @info "percent_reduction_mse[$case] = $(percent_reduction_mse[case])"
 end
