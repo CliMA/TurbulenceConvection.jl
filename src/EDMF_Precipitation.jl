@@ -1,12 +1,8 @@
 """
 Computes the qr advection (down) tendency
 """
-function compute_precipitation_advection_tendencies(grid, state, gm, TS::TimeStepping)
+function compute_precipitation_advection_tendencies(grid, state, gm)
     param_set = parameter_set(gm)
-    Δz = grid.Δz
-    Δt = TS.dt
-    CFL_limit = 0.5
-
     ρ_0_c = center_ref_state(state).ρ0
     tendencies_pr = center_tendencies_precipitation(state)
     prog_pr = center_prog_precipitation(state)
@@ -24,20 +20,6 @@ function compute_precipitation_advection_tendencies(grid, state, gm, TS::TimeSte
     end
 
     @inbounds for k in reverse(real_center_indices(grid))
-        # check stability criterion
-        CFL_out_rain = Δt / Δz * term_vel_rain[k]
-        CFL_out_snow = Δt / Δz * term_vel_snow[k]
-        if is_toa_center(grid, k)
-            CFL_in_rain = 0.0
-            CFL_in_snow = 0.0
-        else
-            CFL_in_rain = Δt / Δz * term_vel_rain[k + 1]
-            CFL_in_snow = Δt / Δz * term_vel_snow[k + 1]
-        end
-        if max(CFL_in_rain, CFL_in_snow, CFL_out_rain, CFL_out_snow) > CFL_limit
-            error("Time step is too large for rain fall velocity!")
-        end
-
         ρ_0_cut = ccut_downwind(ρ_0_c, grid, k)
 
         QR_cut = ccut_downwind(prog_pr.q_rai, grid, k)

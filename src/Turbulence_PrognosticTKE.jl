@@ -251,8 +251,36 @@ function compute_diffusive_fluxes(
     return
 end
 
+function affect_filter!(u, edmf, grid, state, gm, Case, TS)
+    # TODO: figure out why this filter kills the DryBubble results if called at t = 0.
+    if Case.casename == "DryBubble" && !(TS.t > 0)
+        return nothing
+    end
+    parent(state.prog) .= parent(u)
+    prog_en = center_prog_environment(state)
+    up = edmf.UpdVar
+    ###
+    ### Filters
+    ###
+    set_edmf_surface_bc(edmf, grid, state, up, Case.Sur)
+    filter_updraft_vars(edmf, grid, state, gm)
+
+    @inbounds for k in real_center_indices(grid)
+        prog_en.ρatke[k] = max(prog_en.ρatke[k], 0.0)
+        prog_en.ρaHvar[k] = max(prog_en.ρaHvar[k], 0.0)
+        prog_en.ρaQTvar[k] = max(prog_en.ρaQTvar[k], 0.0)
+        prog_en.ρaHQTcov[k] = max(prog_en.ρaHQTcov[k], -sqrt(prog_en.ρaHvar[k] * prog_en.ρaQTvar[k]))
+        prog_en.ρaHQTcov[k] = min(prog_en.ρaHQTcov[k], sqrt(prog_en.ρaHvar[k] * prog_en.ρaQTvar[k]))
+    end
+    parent(u) .= parent(state.prog)
+end
+
 # Perform the update of the scheme
-function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
+function step!(dY, Y, params, t)
+    UnPack.@unpack edmf, grid, state, gm, Case, TS = params
+    TS.t = t
+    affect_filter!(Y, edmf, grid, state, gm, Case, TS)
+    parent(state.prog) .= parent(Y)
 
     gm = gm
     up = edmf.UpdVar
@@ -276,11 +304,14 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     tendencies_up_f = face_tendencies_updrafts(state)
     tendencies_en = center_tendencies_environment(state)
     tendencies_pr = center_tendencies_precipitation(state)
+
+    parent(state.tendencies) .= 0
+
     compute_precipitation_formation_tendencies(grid, state, edmf.UpdVar, edmf.Precip, TS.dt, param_set) # causes division error in dry bubble first time step
     microphysics(en_thermo, grid, state, en, edmf.Precip, TS.dt, param_set) # saturation adjustment + rain creation
     if edmf.Precip.precipitation_model == "clima_1m"
         compute_precipitation_sink_tendencies(grid, state, gm, TS)
-        compute_precipitation_advection_tendencies(grid, state, gm, TS)
+        compute_precipitation_advection_tendencies(grid, state, gm)
     end
 
     # compute tendencies
@@ -292,54 +323,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:QTvar), Val(:ρaQTvar))
     compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:HQTcov), Val(:ρaHQTcov))
 
-    ###
-    ### update (to be removed)
-    ###
-
-    Δt = TS.dt
-    prog_up = center_prog_updrafts(state)
-    prog_up_f = face_prog_updrafts(state)
-    prog_pr = center_prog_precipitation(state)
-    tendencies_pr = center_tendencies_precipitation(state)
-
-    @inbounds for k in real_center_indices(grid)
-        prog_en.ρatke[k] += TS.dt * tendencies_en.ρatke[k]
-        prog_en.ρaHvar[k] += TS.dt * tendencies_en.ρaHvar[k]
-        prog_en.ρaQTvar[k] += TS.dt * tendencies_en.ρaQTvar[k]
-        prog_en.ρaHQTcov[k] += TS.dt * tendencies_en.ρaHQTcov[k]
-        prog_gm.u[k] += tendencies_gm.u[k] * TS.dt
-        prog_gm.v[k] += tendencies_gm.v[k] * TS.dt
-        prog_gm.θ_liq_ice[k] += tendencies_gm.θ_liq_ice[k] * TS.dt
-        prog_gm.q_tot[k] += tendencies_gm.q_tot[k] * TS.dt
-        @inbounds for i in 1:(up.n_updrafts)
-            prog_up[i].ρarea[k] += Δt * tendencies_up[i].ρarea[k]
-            prog_up[i].ρaθ_liq_ice[k] += Δt * tendencies_up[i].ρaθ_liq_ice[k]
-            prog_up[i].ρaq_tot[k] += Δt * tendencies_up[i].ρaq_tot[k]
-        end
-        if edmf.Precip.precipitation_model == "clima_1m"
-            prog_pr.q_rai[k] += tendencies_pr.q_rai[k] * TS.dt
-            prog_pr.q_sno[k] += tendencies_pr.q_sno[k] * TS.dt
-        end
-    end
-
-    @inbounds for k in real_face_indices(grid)
-        @inbounds for i in 1:(up.n_updrafts)
-            prog_up_f[i].ρaw[k] += Δt * tendencies_up_f[i].ρaw[k]
-        end
-    end
-
-    ###
-    ### Filters
-    ###
-    set_edmf_surface_bc(edmf, grid, state, up, Case.Sur)
-    filter_updraft_vars(edmf, grid, state, gm)
-    @inbounds for k in real_center_indices(grid)
-        prog_en.ρatke[k] = max(prog_en.ρatke[k], 0.0)
-        prog_en.ρaHvar[k] = max(prog_en.ρaHvar[k], 0.0)
-        prog_en.ρaQTvar[k] = max(prog_en.ρaQTvar[k], 0.0)
-        prog_en.ρaHQTcov[k] = max(prog_en.ρaHQTcov[k], -sqrt(prog_en.ρaHvar[k] * prog_en.ρaQTvar[k]))
-        prog_en.ρaHQTcov[k] = min(prog_en.ρaHQTcov[k], sqrt(prog_en.ρaHvar[k] * prog_en.ρaQTvar[k]))
-    end
+    parent(dY) .= parent(state.tendencies)
 
     return
 end

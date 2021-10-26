@@ -8,6 +8,7 @@ import ArgParse
 import TurbulenceConvection
 
 import ClimaCore
+import SciMLBase
 const CC = ClimaCore
 
 import OrdinaryDiffEq
@@ -347,36 +348,96 @@ function run(sim::Simulation1d)
     grid = sim.grid
     state = sim.state
     sim.skip_io || TC.open_files(sim.Stats) # #removeVarsHack
-    while sim.TS.t <= sim.TS.t_max
-        TC.update(sim.Turb, grid, state, sim.GMV, sim.Case, sim.TS)
-        TC.update(sim.TS)
 
-        if mod(iter, 100) == 0
-            progress = sim.TS.t / sim.TS.t_max
-            @show progress
+    t_span = (0.0, sim.TS.t_max)
+    params = (;
+        edmf = sim.Turb,
+        grid = grid,
+        state = state,
+        gm = sim.GMV,
+        Case = sim.Case,
+        TS = sim.TS,
+        Stats = sim.Stats,
+        io_nt = sim.io_nt,
+        skip_io = sim.skip_io,
+    )
+
+    condition_io(u, t, integrator) = mod(round(Int, t), round(Int, sim.Stats.frequency)) == 0
+    condition_every_iter(u, t, integrator) = true
+
+    function adaptive_dt!(integrator)
+        UnPack.@unpack edmf, io_nt, grid, state, Case, gm, TS, Stats, skip_io = integrator.p
+        parent(state.prog) .= integrator.u
+        aux_up_f = TC.face_aux_updrafts(state)
+        aux_en_f = TC.face_aux_environment(state)
+        n_updrafts = edmf.UpdVar.n_updrafts
+        aux_tc = TC.center_aux_turbconv(state)
+        term_vel_rain = aux_tc.term_vel_rain
+        term_vel_snow = aux_tc.term_vel_snow
+        KM = TC.center_aux_turbconv(state).KM
+        KH = TC.center_aux_turbconv(state).KH
+        epsFT = eps(Float64)
+        cfl_limit = 0.95
+        K_max = max(maximum(KH), maximum(KM))
+        w_up_max = 0
+        @inbounds for i in 1:(n_updrafts)
+            w_up_max = max(w_up_max, maximum(abs.(aux_up_f[i].w)))
         end
-
-        if mod(round(Int, sim.TS.t), round(Int, sim.Stats.frequency)) == 0 && (!sim.skip_io)
-            # TODO: is this the best location to call diagnostics?
-            TC.compute_diagnostics!(sim.Turb, sim.GMV, grid, state, sim.Case, sim.TS)
-
-            # TODO: remove `vars` hack that avoids
-            # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-            # opening/closing files every step should be okay. #removeVarsHack
-            # TurbulenceConvection.io(sim) # #removeVarsHack
-            TC.write_simulation_time(sim.Stats, sim.TS.t) # #removeVarsHack
-
-            TC.io(sim.io_nt.aux, sim.Stats)
-            TC.io(sim.io_nt.diagnostics, sim.Stats)
-            TC.io(sim.io_nt.prog, sim.Stats)
-            TC.io(sim.io_nt.tendencies, sim.Stats)
-
-            TC.io(sim.GMV, grid, state, sim.Stats) # #removeVarsHack
-            TC.io(sim.Case, grid, state, sim.Stats) # #removeVarsHack
-            TC.io(sim.Turb, grid, state, sim.Stats, sim.TS, sim.param_set) # #removeVarsHack
-        end
-        iter += 1
+        dt_max_w_up = cfl_limit * grid.Δz / (w_up_max + epsFT)
+        dt_max_w_en = cfl_limit * grid.Δz / (maximum(abs.(aux_en_f.w)) + epsFT)
+        dt_max_w_rain = cfl_limit * grid.Δz / (maximum(term_vel_rain) + epsFT)
+        dt_max_w_rain = cfl_limit * grid.Δz / (maximum(term_vel_snow) + epsFT)
+        dt_max_K = cfl_limit * (grid.Δz / 2)^2 / (K_max + epsFT)
+        dt = min(sim.TS.dt, dt_max_w_up, dt_max_w_en, dt_max_w_rain, dt_max_w_rain, dt_max_K)
+        SciMLBase.set_proposed_dt!(integrator, dt)
     end
+
+    function affect_io!(integrator)
+        UnPack.@unpack edmf, io_nt, grid, state, Case, gm, TS, Stats, skip_io = integrator.p
+        skip_io && return nothing
+        parent(state.prog) .= integrator.u
+        param_set = TC.parameter_set(gm)
+        # TODO: is this the best location to call diagnostics?
+        TC.compute_diagnostics!(edmf, gm, grid, state, Case, TS)
+
+        # TODO: remove `vars` hack that avoids
+        # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
+        # opening/closing files every step should be okay. #removeVarsHack
+        # TurbulenceConvection.io(sim) # #removeVarsHack
+        TC.write_simulation_time(Stats, TS.t) # #removeVarsHack
+
+        TC.io(io_nt.aux, Stats)
+        TC.io(io_nt.diagnostics, Stats)
+        TC.io(io_nt.prog, Stats)
+        TC.io(io_nt.tendencies, Stats)
+
+        TC.io(gm, grid, state, Stats) # #removeVarsHack
+        TC.io(Case, grid, state, Stats) # #removeVarsHack
+        TC.io(edmf, grid, state, Stats, TS, param_set) # #removeVarsHack
+    end
+
+    function affect_filter!(integrator)
+        UnPack.@unpack edmf, grid, state, gm, Case, TS = integrator.p
+        TC.affect_filter!(integrator.u, edmf, grid, state, gm, Case, TS)
+    end
+
+    callback_io = ODE.DiscreteCallback(condition_io, affect_io!)
+    callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!)
+    callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!)
+
+    prob = ODE.ODEProblem(TC.step!, state.prog, t_span, params; dt = sim.TS.dt)
+    sol = ODE.solve(
+        prob,
+        ODE.Euler();
+        # ODE.ImplicitEuler(autodiff=false, diff_type=Val{:central});
+        progress_steps = 100,
+        save_start = false,
+        saveat = last(t_span),
+        callback = ODE.CallbackSet(callback_adapt_dt, callback_filters, callback_io),
+        progress = true,
+        progress_message = (dt, u, p, t) -> t,
+    )
+
     sim.skip_io || TC.close_files(sim.Stats) # #removeVarsHack
     return
 end

@@ -203,7 +203,6 @@ function Soares(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 8 * 3600.0
-    namelist["time_stepping"]["dt"] = 1.0
 
     namelist["meta"]["simname"] = "Soares"
     namelist["meta"]["casename"] = "Soares"
@@ -219,7 +218,6 @@ function Nieuwstadt(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 8 * 3600.0
-    namelist["time_stepping"]["dt"] = 1.2
 
     namelist["meta"]["simname"] = "Nieuwstadt"
     namelist["meta"]["casename"] = "Nieuwstadt"
@@ -265,7 +263,6 @@ function Rico(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 86400.0
-    namelist["time_stepping"]["dt"] = 3.0
 
     namelist["microphysics"]["precipitation_model"] = "clima_1m"
     namelist["microphysics"]["τ_acnv"] = 2500.0
@@ -284,7 +281,6 @@ function TRMM_LBA(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 60 * 60 * 6.0
-    namelist["time_stepping"]["dt"] = 2.0
 
     namelist["microphysics"]["precipitation_model"] = "cutoff"
     namelist["microphysics"]["τ_precip"] = 50.0
@@ -303,7 +299,6 @@ function ARM_SGP(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 3600.0 * 14.5
-    namelist["time_stepping"]["dt"] = 2.0
     namelist["meta"]["simname"] = "ARM_SGP"
     namelist["meta"]["casename"] = "ARM_SGP"
 
@@ -318,7 +313,6 @@ function GATE_III(namelist_defaults)
     namelist["grid"]["dz"] = 10
 
     namelist["time_stepping"]["t_max"] = 3600.0 * 24.0
-    namelist["time_stepping"]["dt"] = 3.0
     namelist["meta"]["simname"] = "GATE_III"
     namelist["meta"]["casename"] = "GATE_III"
 
@@ -334,7 +328,6 @@ function DYCOMS_RF01(namelist_defaults)
     namelist["grid"]["dz"] = 50
 
     namelist["time_stepping"]["t_max"] = 60 * 60 * 16.0
-    namelist["time_stepping"]["dt"] = 6.0
     namelist["meta"]["simname"] = "DYCOMS_RF01"
     namelist["meta"]["casename"] = "DYCOMS_RF01"
 
@@ -366,7 +359,6 @@ function SP(namelist_defaults)
     namelist["grid"]["dz"] = 32
 
     namelist["time_stepping"]["t_max"] = 7200.0
-    namelist["time_stepping"]["dt"] = 1.0
     namelist["meta"]["simname"] = "SP"
     namelist["meta"]["casename"] = "SP"
 
@@ -386,7 +378,6 @@ function DryBubble(namelist_defaults)
 
     namelist["stats_io"]["frequency"] = 10.0
     namelist["time_stepping"]["t_max"] = 1000.0
-    namelist["time_stepping"]["dt"] = 0.5
     namelist["meta"]["simname"] = "DryBubble"
     namelist["meta"]["casename"] = "DryBubble"
 
@@ -401,7 +392,6 @@ function LES_driven_SCM(namelist_defaults)
     namelist["grid"]["nz"] = 200
 
     namelist["stats_io"]["frequency"] = 10.0
-    namelist["time_stepping"]["dt"] = 3.0
     namelist["time_stepping"]["t_max"] = 3600.0 * 6
 
     # use last 6 hours of LES simulation to drive LES
