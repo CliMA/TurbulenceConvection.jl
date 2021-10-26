@@ -63,6 +63,8 @@ Base.@kwdef struct MoistureDeficitEntr{FT}
     RH_up::FT
     "environment relative humidity"
     RH_en::FT
+    "maximum updraft area"
+    max_area::FT
 end
 
 """

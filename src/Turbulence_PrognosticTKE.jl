@@ -418,7 +418,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
 
     # compute tendencies
     compute_gm_tendencies!(edmf, grid, state, Case, gm, TS)
-    compute_updraft_tendencies(edmf, grid, state, gm, TS)
+    compute_updraft_tendencies(edmf, grid, state, gm)
     # ----------- TODO: move to compute_tendencies
     implicit_eqs = edmf.implicit_eqs
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
@@ -615,12 +615,10 @@ function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE, param_set)
     return
 end
 
-function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, TS::TimeStepping)
+function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables)
     param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
-    dti_ = 1.0 / TS.dt
-    Δt = TS.dt
 
     up = edmf.UpdVar
     up_thermo = edmf.UpdThermo
@@ -635,63 +633,33 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
     ρ_0_f = face_ref_state(state).ρ0
     au_lim = edmf.max_area
 
-    @inbounds for i in 1:(up.n_updrafts)
-        @inbounds for k in real_center_indices(grid)
-            tendencies_up[i].ρarea[k] = 0
-            tendencies_up[i].ρaθ_liq_ice[k] = 0
-            tendencies_up[i].ρaq_tot[k] = 0
-        end
-        @inbounds for k in real_face_indices(grid)
-            tendencies_up_f[i].ρaw[k] = 0
-        end
-    end
-
-    @inbounds for i in 1:(up.n_updrafts)
-        edmf.entr_sc[i, kc_surf] = edmf.entr_surface_bc
-        edmf.detr_sc[i, kc_surf] = edmf.detr_surface_bc
-    end
+    parent(tendencies_up) .= 0
+    entr_turb_dyn = edmf.entr_sc .+ edmf.frac_turb_entr
+    detr_turb_dyn = edmf.detr_sc .+ edmf.frac_turb_entr
 
     # Solve for updraft area fraction
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
             is_surface_center(grid, k) && continue
             w_up_c = interpf2c(aux_up_f[i].w, grid, k)
-            adv = upwind_advection_area(ρ_0_c, aux_up[i].area, aux_up_f[i].w, grid, k)
-
-            ρa_up_c = ρ_0_c[k] * aux_up[i].area[k]
-            entr_term = ρa_up_c * w_up_c * (edmf.entr_sc[i, k])
-            detr_term = ρa_up_c * w_up_c * (-edmf.detr_sc[i, k])
-            tendencies_up[i].ρarea[k] = (ρ_0_c[k] * adv + entr_term + detr_term)
-            ρa_up_candidate = ρa_up_c + Δt * tendencies_up[i].ρarea[k]
-            ρau_lim = ρ_0_c[k] * au_lim
-            if ρa_up_candidate > ρau_lim
-                ρa_up_div = ρa_up_c > 0.0 ? ρa_up_c : ρau_lim
-                ρa_up_candidate = ρau_lim
-                edmf.detr_sc[i, k] = (((ρau_lim - ρa_up_c) * dti_ - ρ_0_c[k] * adv - entr_term) / (-ρa_up_div * w_up_c))
-                tendencies_up[i].ρarea[k] = (ρa_up_candidate - ρa_up_c) * dti_
-            end
-        end
-    end
-
-    entr_w_c = edmf.entr_sc .+ edmf.frac_turb_entr
-    detr_w_c = edmf.detr_sc .+ edmf.frac_turb_entr
-
-    @inbounds for k in real_center_indices(grid)
-        @inbounds for i in 1:(up.n_updrafts)
-            w_up_c = interpf2c(aux_up_f[i].w, grid, k)
             m_k = (ρ_0_c[k] * aux_up[i].area[k] * w_up_c)
 
+            adv = upwind_advection_area(ρ_0_c, aux_up[i].area, aux_up_f[i].w, grid, k)
+            entr_term = m_k * entr_turb_dyn[i, k]
+            detr_term = m_k * detr_turb_dyn[i, k]
+            tendencies_up[i].ρarea[k] = (ρ_0_c[k] * adv + entr_term - detr_term)
+
             adv = upwind_advection_scalar(ρ_0_c, aux_up[i].area, aux_up_f[i].w, aux_up[i].θ_liq_ice, grid, k)
-            entr = entr_w_c[i, k] * aux_en.θ_liq_ice[k]
-            detr = detr_w_c[i, k] * aux_up[i].θ_liq_ice[k]
+            entr = entr_term * aux_en.θ_liq_ice[k]
+            detr = detr_term * aux_up[i].θ_liq_ice[k]
             rain = ρ_0_c[k] * up_thermo.θ_liq_ice_tendency_rain_formation[i, k]
-            tendencies_up[i].ρaθ_liq_ice[k] = -adv + m_k * (entr - detr) + rain
+            tendencies_up[i].ρaθ_liq_ice[k] = -adv + entr - detr + rain
 
             adv = upwind_advection_scalar(ρ_0_c, aux_up[i].area, aux_up_f[i].w, aux_up[i].q_tot, grid, k)
-            entr = entr_w_c[i, k] * aux_en.q_tot[k]
-            detr = detr_w_c[i, k] * aux_up[i].q_tot[k]
+            entr = entr_term * aux_en.q_tot[k]
+            detr = detr_term * aux_up[i].q_tot[k]
             rain = ρ_0_c[k] * up_thermo.qt_tendency_rain_formation[i, k]
-            tendencies_up[i].ρaq_tot[k] = -adv + m_k * (entr - detr) + rain
+            tendencies_up[i].ρaq_tot[k] = -adv + entr - detr + rain
         end
     end
 
@@ -703,8 +671,8 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
             a_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
             # We know that, since W = 0 at z = 0, these BCs should
             # not matter in the end:
-            entr_w = interpc2f(entr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
-            detr_w = interpc2f(detr_w_c, grid, k, i; bottom = SetValue(0), top = SetValue(0))
+            entr_w = interpc2f(entr_turb_dyn, grid, k, i; bottom = SetValue(0), top = SetValue(0))
+            detr_w = interpc2f(detr_turb_dyn, grid, k, i; bottom = SetValue(0), top = SetValue(0))
             B_k = interpc2f(aux_up[i].buoy, grid, k; bottom = SetValue(0), top = SetValue(0))
 
             adv = upwind_advection_velocity(ρ_0_f, aux_up[i].area, aux_up_f[i].w, grid, k; a_up_bcs)
@@ -780,6 +748,9 @@ function filter_updraft_vars(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMean
         prog_up[i].ρarea .= max.(prog_up[i].ρarea, 0)
         prog_up[i].ρaθ_liq_ice .= max.(prog_up[i].ρaθ_liq_ice, 0)
         prog_up[i].ρaq_tot .= max.(prog_up[i].ρaq_tot, 0)
+        @inbounds for k in real_center_indices(grid)
+            prog_up[i].ρarea[k] = min(prog_up[i].ρarea[k], ρ_0_c[k] * edmf.max_area)
+        end
     end
 
     @inbounds for k in real_face_indices(grid)

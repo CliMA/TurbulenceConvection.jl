@@ -96,6 +96,8 @@ function default_namelist(case_name::String)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.25
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_sigma"] = 10.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_scale"] = 10.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_power"] = 3.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"] = 0.004
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"] = 2.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["min_upd_velocity"] = 0.001
@@ -259,7 +261,7 @@ function Rico(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 86400.0
-    namelist["time_stepping"]["dt"] = 7.0
+    namelist["time_stepping"]["dt"] = 6.0
 
     namelist["microphysics"]["rain_model"] = "clima_1m"
     namelist["microphysics"]["τ_acnv"] = 2500.0
