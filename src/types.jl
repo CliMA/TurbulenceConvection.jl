@@ -178,34 +178,34 @@ Base.@kwdef struct MinDisspLen{FT, T}
     N_up::Int
 end
 
-Base.@kwdef mutable struct RainVariables
-    rain_model::String = "default_rain_model"
+Base.@kwdef mutable struct PrecipVariables
+    precipitation_model::String = "default_precipitation_model"
     mean_rwp::Float64 = 0
-    cutoff_rain_rate::Float64 = 0
+    cutoff_precipitation_rate::Float64 = 0
 end
-function RainVariables(namelist, grid::Grid)
+function PrecipVariables(namelist, grid::Grid)
 
-    rain_model = parse_namelist(
+    precipitation_model = parse_namelist(
         namelist,
         "microphysics",
-        "rain_model";
+        "precipitation_model";
         default = "None",
         valid_options = ["None", "cutoff", "clima_1m"],
     )
 
-    if !(rain_model in ["None", "cutoff", "clima_1m"])
-        error("rain model not recognized")
+    if !(precipitation_model in ["None", "cutoff", "clima_1m"])
+        error("precipitation model not recognized")
     end
 
-    return RainVariables(; rain_model)
+    return PrecipVariables(; precipitation_model)
 end
 
-struct RainPhysics{T}
+struct PrecipPhysics{T}
     θ_liq_ice_tendency_rain_evap::T
     qt_tendency_rain_evap::T
     qr_tendency_rain_evap::T
     qr_tendency_advection::T
-    function RainPhysics(grid::Grid)
+    function PrecipPhysics(grid::Grid)
         θ_liq_ice_tendency_rain_evap = center_field(grid)
         qt_tendency_rain_evap = center_field(grid)
         qr_tendency_rain_evap = center_field(grid)
@@ -231,7 +231,7 @@ mutable struct UpdraftVariables{A1}
     function UpdraftVariables(nu, namelist, grid::Grid)
         n_updrafts = nu
 
-        # cloud and rain diagnostics for output
+        # cloud and precipitation diagnostics for output
         cloud_fraction = center_field(grid)
 
         cloud_base = zeros(nu)
@@ -508,8 +508,8 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
     static_stab_coeff::Float64
     lambda_stab::Float64
     minimum_area::Float64
-    Rain::RainVariables
-    RainPhys::RainPhysics
+    Precip::PrecipVariables
+    PrecipPhys::PrecipPhysics
     UpdVar::UpdraftVariables
     UpdThermo::UpdraftThermodynamics
     EnvVar::EnvironmentVariables
@@ -606,10 +606,10 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
         # Need to code up as namelist option?
         minimum_area = 1e-5
 
-        # Create the class for rain
-        Rain = RainVariables(namelist, grid)
-        # Create the class for rain physics
-        RainPhys = RainPhysics(grid)
+        # Create the class for precipitation
+        Precip = PrecipVariables(namelist, grid)
+        # Create the class for precipitation physics
+        PrecipPhys = PrecipPhysics(grid)
 
         # Create the updraft variable class (major diagnostic and prognostic variables)
         UpdVar = UpdraftVariables(n_updrafts, namelist, grid)
@@ -754,8 +754,8 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
             static_stab_coeff,
             lambda_stab,
             minimum_area,
-            Rain,
-            RainPhys,
+            Precip,
+            PrecipPhys,
             UpdVar,
             UpdThermo,
             EnvVar,

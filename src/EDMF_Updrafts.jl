@@ -57,20 +57,20 @@ end
 """
 Computes tendencies to qt and θ_liq_ice due to precipitation formation
 """
-function compute_rain_formation_tendencies(
+function compute_precipitation_formation_tendencies(
     up_thermo::UpdraftThermodynamics,
     grid,
     state,
     up::UpdraftVariables,
-    rain::RainVariables,
+    precip::PrecipVariables,
     dt,
     param_set,
 )
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     aux_up = center_aux_updrafts(state)
-    prog_ra = center_prog_rain(state)
-    tendencies_ra = center_tendencies_rain(state)
+    prog_pr = center_prog_precipitation(state)
+    tendencies_pr = center_tendencies_precipitation(state)
 
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in real_center_indices(grid)
@@ -81,8 +81,8 @@ function compute_rain_formation_tendencies(
             # autoconversion and accretion
             mph = precipitation_formation(
                 param_set,
-                rain.rain_model,
-                prog_ra.qr[k],
+                precip.precipitation_model,
+                prog_pr.qr[k],
                 aux_up[i].area[k],
                 ρ0_c[k],
                 dt,
@@ -95,6 +95,6 @@ function compute_rain_formation_tendencies(
     # TODO - to be deleted once we sum all tendencies elsewhere
     up_thermo.θ_liq_ice_tendency_rain_formation_tot .= up_sum(up_thermo.θ_liq_ice_tendency_rain_formation)
     up_thermo.qt_tendency_rain_formation_tot .= up_sum(up_thermo.qt_tendency_rain_formation)
-    parent(tendencies_ra.qr) .+= -up_thermo.qt_tendency_rain_formation_tot
+    parent(tendencies_pr.qr) .+= -up_thermo.qt_tendency_rain_formation_tot
     return
 end

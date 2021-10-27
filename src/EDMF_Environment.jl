@@ -44,9 +44,9 @@ end
 function update_env_precip_tendencies(en_thermo::EnvironmentThermodynamics, state, k, qt_tendency, θ_liq_ice_tendency)
 
     aux_en = center_aux_environment(state)
-    tendencies_ra = center_tendencies_rain(state)
+    tendencies_pr = center_tendencies_precipitation(state)
     en_thermo.qt_tendency_rain_formation[k] = qt_tendency * aux_en.area[k]
-    tendencies_ra.qr[k] += -en_thermo.qt_tendency_rain_formation[k]
+    tendencies_pr.qr[k] += -en_thermo.qt_tendency_rain_formation[k]
     en_thermo.θ_liq_ice_tendency_rain_formation[k] = θ_liq_ice_tendency * aux_en.area[k]
 
     return
@@ -72,26 +72,34 @@ function update_sat_unsat(en_thermo::EnvironmentThermodynamics, state, k, ts)
     return
 end
 
-function sgs_mean(en_thermo::EnvironmentThermodynamics, grid, state, en, rain, dt, param_set)
+function sgs_mean(en_thermo::EnvironmentThermodynamics, grid, state, en, precip, dt, param_set)
 
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     aux_en = center_aux_environment(state)
-    prog_ra = center_prog_rain(state)
+    prog_pr = center_prog_precipitation(state)
 
     @inbounds for k in real_center_indices(grid)
         # condensation
         q_tot_en = aux_en.q_tot[k]
         ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], q_tot_en)
         # autoconversion and accretion
-        mph = precipitation_formation(param_set, rain.rain_model, prog_ra.qr[k], aux_en.area[k], ρ0_c[k], dt, ts)
+        mph = precipitation_formation(
+            param_set,
+            precip.precipitation_model,
+            prog_pr.qr[k],
+            aux_en.area[k],
+            ρ0_c[k],
+            dt,
+            ts,
+        )
         update_sat_unsat(en_thermo, state, k, ts)
         update_env_precip_tendencies(en_thermo, state, k, mph.qt_tendency, mph.θ_liq_ice_tendency)
     end
     return
 end
 
-function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, rain, dt, param_set)
+function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, precip, dt, param_set)
     # TODO: double check this python-> julia translation
     # a, w = np.polynomial.hermite.hermgauss(en_thermo.quadrature_order)
     a, w = FastGaussQuadrature.gausshermite(en_thermo.quadrature_order)
@@ -99,7 +107,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
     ρ0_c = center_ref_state(state).ρ0
     prog_en = center_prog_environment(state)
     aux_en = center_aux_environment(state)
-    prog_ra = center_prog_rain(state)
+    prog_pr = center_prog_precipitation(state)
 
     #TODO - remember you output source terms multipierd by dt (bec. of instanteneous autoconcv)
     #TODO - add tendencies for gm H, QT and QR due to rain
@@ -205,8 +213,8 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
                     # autoconversion and accretion
                     mph = precipitation_formation(
                         param_set,
-                        rain.rain_model,
-                        prog_ra.qr[k],
+                        precip.precipitation_model,
+                        prog_pr.qr[k],
                         aux_en.area[k],
                         ρ0_c[k],
                         dt,
@@ -274,7 +282,15 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
         else
             # if variance and covariance are zero do the same as in SA_mean
             ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
-            mph = precipitation_formation(param_set, rain.rain_model, prog_ra.qr[k], aux_en.area[k], ρ0_c[k], dt, ts)
+            mph = precipitation_formation(
+                param_set,
+                precip.precipitation_model,
+                prog_pr.qr[k],
+                aux_en.area[k],
+                ρ0_c[k],
+                dt,
+                ts,
+            )
             update_env_precip_tendencies(en_thermo, state, k, mph.qt_tendency, mph.θ_liq_ice_tendency)
             update_sat_unsat(en_thermo, state, k, ts)
 
@@ -287,13 +303,13 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
     return
 end
 
-function microphysics(en_thermo::EnvironmentThermodynamics, grid, state, en, rain, dt, param_set)
+function microphysics(en_thermo::EnvironmentThermodynamics, grid, state, en, precip, dt, param_set)
 
     if en.EnvThermo_scheme == "mean"
-        sgs_mean(en_thermo, grid, state, en, rain, dt, param_set)
+        sgs_mean(en_thermo, grid, state, en, precip, dt, param_set)
 
     elseif en.EnvThermo_scheme == "quadrature"
-        sgs_quadrature(en_thermo, grid, state, en, rain, dt, param_set)
+        sgs_quadrature(en_thermo, grid, state, en, precip, dt, param_set)
 
     else
         error("EDMF_Environment: Unrecognized EnvThermo_scheme. Possible options: mean, quadrature")

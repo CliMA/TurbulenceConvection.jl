@@ -160,7 +160,7 @@ cent_prognostic_vars_up(FT) = (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot
 cent_prognostic_vars_en(FT) = (; tke = FT(0), Hvar = FT(0), QTvar = FT(0), HQTcov = FT(0))
 cent_prognostic_vars_edmf(FT, n_up) = (;
     turbconv = (;
-        en = cent_prognostic_vars_en(FT), up = ntuple(i -> cent_prognostic_vars_up(FT), n_up), ra = (; qr = FT(0)),
+        en = cent_prognostic_vars_en(FT), up = ntuple(i -> cent_prognostic_vars_up(FT), n_up), pr = (; qr = FT(0)),
     ),
 )
 # cent_prognostic_vars_edmf(FT, n_up) = (;) # could also use this for empty model
