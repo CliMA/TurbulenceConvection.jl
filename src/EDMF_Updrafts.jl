@@ -43,7 +43,7 @@ function upd_cloud_diagnostics(up::UpdraftVariables, grid, state)
                 up.lwp += ρ0_c[k] * aux_up[i].q_liq[k] * aux_up[i].area[k] * grid.Δz
                 up.iwp += ρ0_c[k] * aux_up[i].q_ice[k] * aux_up[i].area[k] * grid.Δz
 
-                if aux_up[i].q_liq[k] + aux_up[i].q_ice[k] > 1e-8
+                if TD.has_condensate(aux_up[i].q_liq[k] + aux_up[i].q_ice[k])
                     up.cloud_base[i] = min(up.cloud_base[i], grid.zc[k])
                     up.cloud_top[i] = max(up.cloud_top[i], grid.zc[k])
                     up.cloud_cover[i] = max(up.cloud_cover[i], aux_up[i].area[k])

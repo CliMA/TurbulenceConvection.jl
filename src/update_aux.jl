@@ -92,7 +92,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             aux_tc.bulk.RH[k] = aux_gm.RH[k]
             aux_tc.bulk.T[k] = aux_gm.T[k]
         end
-        if aux_tc.bulk.q_liq[k] + aux_tc.bulk.q_ice[k] > 1e-8 && a_bulk_c > 1e-3
+        if TD.has_condensate(aux_tc.bulk.q_liq[k] + aux_tc.bulk.q_ice[k]) && a_bulk_c > 1e-3
             up.cloud_fraction[k] = 1.0
         else
             up.cloud_fraction[k] = 0.0
@@ -206,8 +206,12 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 w_min = 0.001
 
                 εδ_model = MoistureDeficitEntr(;
-                    q_cond_up = aux_up[i].q_liq[k] + aux_up[i].q_ice[k],
-                    q_cond_en = aux_en.q_liq[k] + aux_en.q_ice[k],
+                    q_cond_up = TD.condensate(TD.PhasePartition(
+                        aux_up[i].q_tot[k],
+                        aux_up[i].q_liq[k],
+                        aux_up[i].q_ice[k],
+                    )),
+                    q_cond_en = TD.condensate(TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k])),
                     w_up = interpf2c(aux_up_f[i].w, grid, k),
                     w_en = interpf2c(aux_en_f.w, grid, k),
                     b_up = aux_up[i].buoy[k],
@@ -321,7 +325,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             # First order approximation: Use environmental mean fields.
             bg_kwargs = (;
                 t_sat = aux_en.T[k],
-                qv_sat = (aux_en.q_tot[k] - aux_en.q_liq[k] - aux_en.q_ice[k]),
+                qv_sat = TD.vapor_specific_humidity(ts),
                 qt_sat = aux_en.q_tot[k],
                 θ_sat = θ,
                 θ_liq_ice_sat = aux_en.θ_liq_ice[k],

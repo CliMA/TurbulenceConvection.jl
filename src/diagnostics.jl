@@ -150,7 +150,7 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
     @inbounds for k in real_center_indices(grid)
         gm.lwp += ρ0_c[k] * aux_gm.q_liq[k] * grid.Δz
         gm.iwp += ρ0_c[k] * aux_gm.q_ice[k] * grid.Δz
-        if aux_gm.q_liq[k] + aux_gm.q_ice[k] > 1e-8
+        if TD.has_condensate(aux_gm.q_liq[k] + aux_gm.q_ice[k])
             gm.cloud_base = min(gm.cloud_base, grid.zc[k])
             gm.cloud_top = max(gm.cloud_top, grid.zc[k])
         end

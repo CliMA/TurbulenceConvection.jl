@@ -32,7 +32,7 @@ function env_cloud_diagnostics(en::EnvironmentVariables, grid, state)
         en.lwp += ρ0_c[k] * aux_en.q_liq[k] * aux_en.area[k] * grid.Δz
         en.iwp += ρ0_c[k] * aux_en.q_ice[k] * aux_en.area[k] * grid.Δz
 
-        if aux_en.q_liq[k] + aux_en.q_ice[k] > 1e-8 && aux_en.area[k] > 1e-6
+        if TD.has_condensate(aux_en.q_liq[k] + aux_en.q_ice[k]) && aux_en.area[k] > 1e-6
             en.cloud_base = min(en.cloud_base, grid.zc[k])
             en.cloud_top = max(en.cloud_top, grid.zc[k])
             en.cloud_cover = max(en.cloud_cover, aux_en.area[k] * aux_en.cloud_fraction[k])
@@ -56,7 +56,7 @@ function update_sat_unsat(en_thermo::EnvironmentThermodynamics, state, k, ts)
     q_liq = TD.liquid_specific_humidity(ts)
     q_ice = TD.ice_specific_humidity(ts)
     aux_en = center_aux_environment(state)
-    if q_liq + q_ice > 0.0
+    if TD.has_condensate(q_liq + q_ice)
         aux_en.cloud_fraction[k] = 1.0
         en_thermo.θ_sat[k] = TD.dry_pottemp(ts)
         en_thermo.θ_liq_ice_sat[k] = TD.liquid_ice_pottemp(ts)
@@ -218,7 +218,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, r
                     inner_env[i_qi] += q_ice_en * weights[m_h] * sqpi_inv
                     inner_env[i_T] += T * weights[m_h] * sqpi_inv
                     # cloudy/dry categories for buoyancy in TKE
-                    if q_liq_en + q_ice_en > 0.0
+                    if TD.has_condensate(q_liq_en + q_ice_en)
                         inner_env[i_cf] += weights[m_h] * sqpi_inv
                         inner_env[i_qt_sat] += qt_hat * weights[m_h] * sqpi_inv
                         inner_env[i_T_sat] += T * weights[m_h] * sqpi_inv
