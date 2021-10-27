@@ -475,7 +475,7 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
             error("No dataset to compute MSE")
         end
         # Normalize by data scale
-        if data_scale_used ≈ 0 && mse_single_var ≈ 0
+        if data_scale_used == 0.0 && mse_single_var == 0.0
             mse[tc_var] = 0
             @warn "Zero data scale for variable $tc_var"
         else
