@@ -71,6 +71,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         a_bulk_c = aux_tc.bulk.area[k]
         aux_tc.bulk.q_tot[k] = 0
         aux_tc.bulk.q_liq[k] = 0
+        aux_tc.bulk.q_ice[k] = 0
         aux_tc.bulk.θ_liq_ice[k] = 0
         aux_tc.bulk.T[k] = 0
         aux_tc.bulk.RH[k] = 0
@@ -79,6 +80,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             @inbounds for i in 1:(up.n_updrafts)
                 aux_tc.bulk.q_tot[k] += aux_up[i].area[k] * aux_up[i].q_tot[k] / a_bulk_c
                 aux_tc.bulk.q_liq[k] += aux_up[i].area[k] * aux_up[i].q_liq[k] / a_bulk_c
+                aux_tc.bulk.q_ice[k] += aux_up[i].area[k] * aux_up[i].q_ice[k] / a_bulk_c
                 aux_tc.bulk.θ_liq_ice[k] += aux_up[i].area[k] * aux_up[i].θ_liq_ice[k] / a_bulk_c
                 aux_tc.bulk.T[k] += aux_up[i].area[k] * aux_up[i].T[k] / a_bulk_c
                 aux_tc.bulk.RH[k] += aux_up[i].area[k] * aux_up[i].RH[k] / a_bulk_c
@@ -90,7 +92,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             aux_tc.bulk.RH[k] = aux_gm.RH[k]
             aux_tc.bulk.T[k] = aux_gm.T[k]
         end
-        if aux_tc.bulk.q_liq[k] > 1e-8 && a_bulk_c > 1e-3
+        if aux_tc.bulk.q_liq[k] + aux_tc.bulk.q_ice[k] > 1e-8 && a_bulk_c > 1e-3
             up.cloud_fraction[k] = 1.0
         else
             up.cloud_fraction[k] = 0.0
@@ -106,11 +108,11 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         #####
         ##### saturation_adjustment
         #####
-
         ts_en = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
 
         aux_en.T[k] = TD.air_temperature(ts_en)
         aux_en.q_liq[k] = TD.liquid_specific_humidity(ts_en)
+        aux_en.q_ice[k] = TD.ice_specific_humidity(ts_en)
         rho = TD.air_density(ts_en)
         aux_en.buoy[k] = buoyancy_c(param_set, ρ0_c[k], rho)
 
@@ -125,6 +127,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             if aux_up[i].area[k] > 0.0
                 ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
                 aux_up[i].q_liq[k] = TD.liquid_specific_humidity(ts_up)
+                aux_up[i].q_ice[k] = TD.ice_specific_humidity(ts_up)
                 aux_up[i].T[k] = TD.air_temperature(ts_up)
                 ρ = TD.air_density(ts_up)
                 aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
@@ -174,6 +177,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     a_up_bulk = aux_tc.bulk.area
     @inbounds for k in real_center_indices(grid)
         aux_gm.q_liq[k] = (a_up_bulk[k] * aux_tc.bulk.q_liq[k] + (1 - a_up_bulk[k]) * aux_en.q_liq[k])
+        aux_gm.q_ice[k] = (a_up_bulk[k] * aux_tc.bulk.q_ice[k] + (1 - a_up_bulk[k]) * aux_en.q_ice[k])
         aux_gm.T[k] = (a_up_bulk[k] * aux_tc.bulk.T[k] + (1 - a_up_bulk[k]) * aux_en.T[k])
         aux_gm.buoy[k] = (a_up_bulk[k] * aux_tc.bulk.buoy[k] + (1 - a_up_bulk[k]) * aux_en.buoy[k])
     end
@@ -202,8 +206,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 w_min = 0.001
 
                 εδ_model = MoistureDeficitEntr(;
-                    q_liq_up = aux_up[i].q_liq[k],
-                    q_liq_en = aux_en.q_liq[k],
+                    q_cond_up = aux_up[i].q_liq[k] + aux_up[i].q_ice[k],
+                    q_cond_en = aux_en.q_liq[k] + aux_en.q_ice[k],
                     w_up = interpf2c(aux_up_f[i].w, grid, k),
                     w_en = interpf2c(aux_en_f.w, grid, k),
                     b_up = aux_up[i].buoy[k],
@@ -303,7 +307,6 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         p0_cut = ccut(p0_c, grid, k)
         T_cut = ccut(aux_en.T, grid, k)
         QT_cut = ccut(aux_en.q_tot, grid, k)
-        QL_cut = ccut(aux_en.q_liq, grid, k)
         ts_cut = TD.PhaseEquil_pTq.(param_set, p0_cut, T_cut, QT_cut)
         θv_cut = TD.virtual_pottemp.(ts_cut)
 
@@ -317,8 +320,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             # First order approximation: Use environmental mean fields.
             bg_kwargs = (;
                 t_sat = aux_en.T[k],
-                # WARNING: ICE MISSING
-                qv_sat = (aux_en.q_tot - aux_en.q_liq)[k],
+                qv_sat = (aux_en.q_tot[k] - aux_en.q_liq[k] - aux_en.q_ice[k]),
                 qt_sat = aux_en.q_tot[k],
                 θ_sat = θ,
                 θ_liq_ice_sat = aux_en.θ_liq_ice[k],

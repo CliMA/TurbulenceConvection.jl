@@ -72,11 +72,18 @@ function export_ref_profile(case_name::String)
         Plots.savefig("$case_name.svg")
     end
 end
-for case_name in ("Bomex", "life_cycle_Tan2018", "Soares", "Rico", "ARM_SGP", "DYCOMS_RF01", "GABLS", "SP", "DryBubble")
+for case_name in (
+    "Bomex",
+    "life_cycle_Tan2018",
+    "Soares",
+    "Rico",
+    "ARM_SGP",
+    "DYCOMS_RF01",
+    "GABLS",
+    "SP",
+    "DryBubble",
+    "TRMM_LBA",
+    "GATE_III",
+)
     export_ref_profile(case_name)
 end;
-
-# Note: temperatures in this case become extremely low.
-CLIMAParameters.Planet.T_freeze(::EarthParameterSet) = 100.0
-export_ref_profile("TRMM_LBA")
-export_ref_profile("GATE_III")

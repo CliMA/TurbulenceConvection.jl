@@ -47,6 +47,7 @@ cent_aux_vars_gm(FT) = (;
     QTvar = FT(0),
     HQTcov = FT(0),
     q_liq = FT(0),
+    q_ice = FT(0),
     RH = FT(0),
     T = FT(0),
     buoy = FT(0),
@@ -65,16 +66,27 @@ cent_aux_vars_en_2m(FT) = (;
     interdomain = FT(0),
     rain_src = FT(0),
 )
-cent_aux_vars_up(FT) =
-    (; q_liq = FT(0), T = FT(0), RH = FT(0), buoy = FT(0), area = FT(0), q_tot = FT(0), θ_liq_ice = FT(0))
+cent_aux_vars_up(FT) = (;
+    q_liq = FT(0), q_ice = FT(0), T = FT(0), RH = FT(0), buoy = FT(0), area = FT(0), q_tot = FT(0), θ_liq_ice = FT(0),
+)
 cent_aux_vars_edmf(FT, n_up) = (;
     turbconv = (;
-        bulk = (; area = FT(0), θ_liq_ice = FT(0), RH = FT(0), buoy = FT(0), q_tot = FT(0), q_liq = FT(0), T = FT(0)),
+        bulk = (;
+            area = FT(0),
+            θ_liq_ice = FT(0),
+            RH = FT(0),
+            buoy = FT(0),
+            q_tot = FT(0),
+            q_liq = FT(0),
+            q_ice = FT(0),
+            T = FT(0),
+        ),
         up = ntuple(i -> cent_aux_vars_up(FT), n_up),
         en = (;
             area = FT(0),
             q_tot = FT(0),
             q_liq = FT(0),
+            q_ice = FT(0),
             θ_liq_ice = FT(0),
             RH = FT(0),
             T = FT(0),

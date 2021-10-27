@@ -10,9 +10,6 @@ include(joinpath("utils", "compute_mse.jl"))
 include(joinpath("utils", "mse_tables.jl"))
 import .NameList
 
-# TODO - waiting for a better root solver
-CLIMAParameters.Planet.T_freeze(::EarthParameterSet) = 100.0
-
 best_mse = all_best_mse["TRMM_LBA"]
 
 case_name = "TRMM_LBA"

@@ -5,6 +5,7 @@ function initialize_io(up::UpdraftVariables, Stats::NetCDFIO_Stats)
     add_ts(Stats, "updraft_cloud_base")
     add_ts(Stats, "updraft_cloud_top")
     add_ts(Stats, "updraft_lwp")
+    add_ts(Stats, "updraft_iwp")
     return
 end
 
@@ -19,11 +20,13 @@ function io(up::UpdraftVariables, grid, state, Stats::NetCDFIO_Stats)
     write_ts(Stats, "updraft_cloud_base", minimum(abs.(up.cloud_base)))
     write_ts(Stats, "updraft_cloud_top", maximum(abs.(up.cloud_top)))
     write_ts(Stats, "updraft_lwp", up.lwp)
+    write_ts(Stats, "updraft_iwp", up.iwp)
     return
 end
 
 function upd_cloud_diagnostics(up::UpdraftVariables, grid, state)
     up.lwp = 0.0
+    up.iwp = 0.0
 
     aux_up = center_aux_updrafts(state)
     aux_up = center_aux_updrafts(state)
@@ -38,8 +41,9 @@ function upd_cloud_diagnostics(up::UpdraftVariables, grid, state)
             if aux_up[i].area[k] > 1e-3
                 up.updraft_top[i] = max(up.updraft_top[i], grid.zc[k])
                 up.lwp += ρ0_c[k] * aux_up[i].q_liq[k] * aux_up[i].area[k] * grid.Δz
+                up.iwp += ρ0_c[k] * aux_up[i].q_ice[k] * aux_up[i].area[k] * grid.Δz
 
-                if aux_up[i].q_liq[k] > 1e-8
+                if aux_up[i].q_liq[k] + aux_up[i].q_ice[k] > 1e-8
                     up.cloud_base[i] = min(up.cloud_base[i], grid.zc[k])
                     up.cloud_top[i] = max(up.cloud_top[i], grid.zc[k])
                     up.cloud_cover[i] = max(up.cloud_cover[i], aux_up[i].area[k])

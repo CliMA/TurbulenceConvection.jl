@@ -54,6 +54,7 @@ function initialize_updrafts(edmf, grid, state, up::TC.UpdraftVariables, gm::TC.
             aux_up[i].q_tot[k] = prog_gm.q_tot[k]
             aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
             aux_up[i].q_liq[k] = aux_gm.q_liq[k]
+            aux_up[i].q_ice[k] = aux_gm.q_ice[k]
             aux_up[i].T[k] = aux_gm.T[k]
             prog_up[i].ρarea[k] = 0
             prog_up[i].ρaq_tot[k] = 0
@@ -158,6 +159,7 @@ function initialize_updrafts_DryBubble(edmf, grid, state, up::TC.UpdraftVariable
                 aux_up[i].θ_liq_ice[k] = θ_liq_in[k]
                 aux_up[i].q_tot[k] = 0.0
                 aux_up[i].q_liq[k] = 0.0
+                aux_up[i].q_ice[k] = 0.0
 
                 # for now temperature is provided as diagnostics from LES
                 aux_up[i].T[k] = T_in[k]
