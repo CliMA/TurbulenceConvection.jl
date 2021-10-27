@@ -38,7 +38,11 @@ println("all_best_mse = OrderedCollections.OrderedDict()\n#")
 for case in keys(computed_mse)
     println("all_best_mse[\"$case\"] = OrderedCollections.OrderedDict()")
     for var in keys(computed_mse[case])
-        println("all_best_mse[\"$case\"][\"$var\"] = $(computed_mse[case][var])")
+        if computed_mse[case][var] == "NA"
+            println("all_best_mse[\"$case\"][\"$var\"] = \"$(computed_mse[case][var])\"")
+        else
+            println("all_best_mse[\"$case\"][\"$var\"] = $(computed_mse[case][var])")
+        end
     end
     println("#")
 end
