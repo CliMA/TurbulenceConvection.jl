@@ -18,6 +18,7 @@ import CLIMAParameters
 import OrdinaryDiffEq
 import CloudMicrophysics
 import SurfaceFluxes
+import UnPack
 
 const ODE = OrdinaryDiffEq
 const CC = ClimaCore
@@ -105,9 +106,9 @@ function debug_state(state, code_location::String)
     vars_positive = [
         vec(prog_gm.θ_liq_ice),
         vec(prog_gm_f.w),
-        vec(prog_up[1].area),
-        vec(prog_up[1].θ_liq_ice),
-        vec(prog_up_f[1].w),
+        vec(prog_up[1].ρarea),
+        vec(prog_up[1].ρaθ_liq_ice),
+        vec(prog_up_f[1].ρaw),
         vec(aux_en.area),
         vec(aux_en.θ_liq_ice),
     ]

@@ -3,6 +3,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     ##### Unpack common variables
     #####
     kc_surf = kc_surface(grid)
+    kf_surf = kf_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     up = edmf.UpdVar
     en = edmf.EnvVar
@@ -29,6 +30,52 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     aux_tc = center_aux_tc(state)
     prog_en = center_prog_environment(state)
     aux_en_2m = center_aux_environment_2m(state)
+    prog_up = center_prog_updrafts(state)
+    prog_up_f = face_prog_updrafts(state)
+
+    #####
+    ##### Set primitive variables
+    #####
+
+    @inbounds for i in 1:(up.n_updrafts)
+
+        # at the surface
+        if prog_up[i].ρarea[kc_surf] / ρ0_c[kc_surf] >= edmf.minimum_area
+            aux_up[i].θ_liq_ice[kc_surf] = edmf.h_surface_bc[i]
+            aux_up[i].q_tot[kc_surf] = edmf.qt_surface_bc[i]
+            aux_up[i].area[kc_surf] = edmf.area_surface_bc[i]
+            aux_up_f[i].w[kf_surf] = edmf.w_surface_bc[i]
+        else
+            aux_up[i].θ_liq_ice[kc_surf] = prog_gm.θ_liq_ice[kc_surf]
+            aux_up[i].q_tot[kc_surf] = prog_gm.q_tot[kc_surf]
+        end
+
+        @inbounds for k in real_center_indices(grid)
+            is_surface_center(grid, k) && continue
+            if prog_up[i].ρarea[k] / ρ0_c[k] >= edmf.minimum_area
+                aux_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / prog_up[i].ρarea[k]
+                aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
+                aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ0_c[k]
+            else
+                aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
+                aux_up[i].q_tot[k] = prog_gm.q_tot[k]
+                aux_up[i].area[k] = 0
+            end
+        end
+    end
+
+    @inbounds for k in real_face_indices(grid)
+        is_surface_face(grid, k) && continue
+        @inbounds for i in 1:(up.n_updrafts)
+            a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
+            anew_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
+            if anew_k >= edmf.minimum_area
+                aux_up_f[i].w[k] = max(prog_up_f[i].ρaw[k] / (ρ0_f[k] * anew_k), 0)
+            else
+                aux_up_f[i].w[k] = 0
+            end
+        end
+    end
 
     for k in real_center_indices(grid)
         aux_tc.bulk.area[k] = sum(ntuple(i -> aux_up[i].area[k], up.n_updrafts))
