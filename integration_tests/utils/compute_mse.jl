@@ -482,9 +482,14 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
             mse[tc_var] = mse_single_var / data_scale_used^2
         end
 
-        push!(mse_reductions, (best_mse[tc_var] - mse[tc_var]) / best_mse[tc_var] * 100)
+        if haskey(best_mse, tc_var)
+            push!(mse_reductions, (best_mse[tc_var] - mse[tc_var]) / best_mse[tc_var] * 100)
+            push!(table_best_mse, best_mse[tc_var])
+        else
+            push!(mse_reductions, 0)
+            push!(table_best_mse, Inf)
+        end
         push!(computed_mse, mse[tc_var])
-        push!(table_best_mse, best_mse[tc_var])
     end
 
     save_plots(plot_dir, plots_dict; group_figs, have_tc_main, fig_height, case_name)
