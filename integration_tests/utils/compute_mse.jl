@@ -282,6 +282,13 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
             warn_msg_scm = ""
         end
 
+        # TC and TC main are the same locally
+        if haskey(ENV, "BUILDKITE_COMMIT")
+            new_variable = all((missing_les_var, missing_tcm_var, missing_scm_var))
+        else
+            new_variable = all((missing_les_var, missing_scm_var))
+        end
+
         data_les_arr = Array(data_les_arr)'
         data_tcm_arr = Array(data_tcm_arr)'
         data_tcc_arr = Array(data_tcc_arr)'
@@ -465,31 +472,33 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         if have_pycles_ds # LES takes first precedence
             mse_single_var = sum((data_les_cont_mapped .- data_tcc_cont_mapped) .^ 2)
             data_scale_used = data_scale_les
+            scaled_mse = mse_single_var / data_scale_used^2 # Normalize by data scale
         elseif have_tc_main # TC.jl main takes second precedence
             mse_single_var = sum((data_tcm_cont_mapped .- data_tcc_cont_mapped) .^ 2)
             data_scale_used = data_scale_tcm
+            scaled_mse = mse_single_var / data_scale_used^2 # Normalize by data scale
         elseif have_scampy_ds # SCAMPy takes third precedence
             mse_single_var = sum((data_scm_cont_mapped .- data_tcc_cont_mapped) .^ 2)
             data_scale_used = data_scale_scm
+            scaled_mse = mse_single_var / data_scale_used^2 # Normalize by data scale
         else
             error("No dataset to compute MSE")
         end
-        # Normalize by data scale
-        if data_scale_used == 0.0 && mse_single_var == 0.0
-            mse[tc_var] = 0
-            @warn "Zero data scale for variable $tc_var"
-        else
-            mse[tc_var] = mse_single_var / data_scale_used^2
-        end
 
-        if haskey(best_mse, tc_var)
+        haskey(best_mse, tc_var) || error("No key found in best_mse for variable $tc_var")
+
+        if new_variable
+            mse[tc_var] = "NA"
+            push!(mse_reductions, "NA")
+            push!(table_best_mse, "NA")
+            push!(computed_mse, "NA")
+        else
+            new_variable && @warn "$tc_var must be added to the MSE tables."
+            mse[tc_var] = scaled_mse
             push!(mse_reductions, (best_mse[tc_var] - mse[tc_var]) / best_mse[tc_var] * 100)
             push!(table_best_mse, best_mse[tc_var])
-        else
-            push!(mse_reductions, 0)
-            push!(table_best_mse, Inf)
+            push!(computed_mse, mse[tc_var])
         end
-        push!(computed_mse, mse[tc_var])
     end
 
     save_plots(plot_dir, plots_dict; group_figs, have_tc_main, fig_height, case_name)
@@ -656,7 +665,11 @@ function save_plots(plot_dir, plots_dict; group_figs = true, have_tc_main, fig_h
     end
 end
 
-sufficient_mse(computed_mse, best_mse) = computed_mse <= best_mse + sqrt(eps())
+sufficient_mse(computed_mse::Real, best_mse::Real) = computed_mse <= best_mse + sqrt(eps())
+# New variables report string MSEs (NA), so those should always be sufficient.
+sufficient_mse(computed_mse::String, best_mse::String) = true
+sufficient_mse(computed_mse::Real, best_mse::String) = true
+sufficient_mse(computed_mse::String, best_mse::Real) = true
 
 function test_mse(computed_mse, best_mse, key)
     mse_not_regressed = sufficient_mse(computed_mse[key], best_mse[key])
