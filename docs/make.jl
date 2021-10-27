@@ -40,14 +40,6 @@ makedocs(
     pages = pages,
 )
 
-deploydocs(
-    repo = "github.com/CliMA/TurbulenceConvection.jl.git",
-    target = "build",
-    push_preview = true,
-    devbranch = "main",
-    forcepush = true,
-)
-
 # Clean up
 build_dir = joinpath(@__DIR__, "build")
 if isdir(build_dir)
@@ -60,3 +52,11 @@ if isdir(build_dir)
         end
     end
 end
+
+deploydocs(
+    repo = "github.com/CliMA/TurbulenceConvection.jl.git",
+    target = "build",
+    push_preview = true,
+    devbranch = "main",
+    forcepush = true,
+)
