@@ -64,6 +64,8 @@ function create_parameter_set(namelist)
         w_min = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_upd_velocity"),
         μ_0 = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_scale"),
         μ = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_sigma"),
+        γ_lim = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "area_limiter_scale"),
+        β_lim = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "area_limiter_power"),
         c_m = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_ed_coeff"),
         c_d = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_diss_coeff"),
         c_b = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "static_stab_coeff"; default = 0.4), # this is here due to an value error in CliMAParmaeters.jl

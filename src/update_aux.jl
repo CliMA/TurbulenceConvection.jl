@@ -220,6 +220,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                     R_up = edmf.pressure_plume_spacing[i],
                     RH_up = aux_up[i].RH[k],
                     RH_en = aux_en.RH[k],
+                    max_area = edmf.max_area,
                 )
 
                 er = entr_detr(param_set, εδ_model)

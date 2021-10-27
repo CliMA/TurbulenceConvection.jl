@@ -14,11 +14,14 @@ Cohen et al. (JAMES, 2020), given:
 function entr_detr(param_set, εδ_model::MoistureDeficitEntr)
 
     l = zeros(2)
+    γ_lim = ICP.area_limiter_scale(param_set)
+    β_lim = ICP.area_limiter_power(param_set)
     c_ε = CPEDMF.c_ε(param_set)
     c_δ = CPEDMF.c_δ(param_set)
     c_t = CPEDMF.c_t(param_set)
     c_λ = CPEDMF.c_λ(param_set)
     w_min = CPEDMF.w_min(param_set)
+    c_λ = CPEDMF.c_λ(param_set)
     c_div = ICP.entrainment_massflux_div_factor(param_set)
 
     # should be: c_δ = sign(condensate(ts_en) + condensate(ts_up[i])) * entr.c_δ
@@ -54,7 +57,9 @@ function entr_detr(param_set, εδ_model::MoistureDeficitEntr)
     end
 
     ε_dyn = λ / Δw * (c_ε * D_ε + c_δ * M_ε) + MdMdz * c_div
-    δ_dyn = λ / Δw * (c_ε * D_δ + c_δ * M_δ) + MdMdz * c_div
+    logistic_term = (2.0 - 1.0 / (1 + exp(-γ_lim * (εδ_model.max_area - εδ_model.a_up))))
+    max_area_limiter = λ / Δw * (logistic_term^β_lim - 1.0)
+    δ_dyn = (λ / Δw * (c_ε * D_δ + c_δ * M_δ) + MdMdz * c_div) + max_area_limiter
 
     return EntrDetr(ε_dyn, δ_dyn, ε_turb, K_ε)
 end
