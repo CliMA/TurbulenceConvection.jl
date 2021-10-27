@@ -62,6 +62,8 @@ for case in keys(computed_mse)
     percent_reduction_mse[case] = 0
     for var in keys(computed_mse[case])
         if haskey(all_best_mse[case], var)
+            all_best_mse[case][var] isa Real || continue # skip if "NA"
+            computed_mse[case][var] isa Real || continue # skip if "NA"
             percent_reduction_mse[case] = min(
                 percent_reduction_mse[case],
                 (all_best_mse[case][var] - computed_mse[case][var]) / all_best_mse[case][var] * 100,
