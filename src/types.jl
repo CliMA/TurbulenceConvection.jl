@@ -9,6 +9,7 @@ Base.@kwdef struct PrecipFormation{FT}
     θ_liq_ice_tendency::FT
     qt_tendency::FT
     qr_tendency::FT
+    qs_tendency::FT
 end
 
 """
@@ -181,6 +182,7 @@ end
 Base.@kwdef mutable struct PrecipVariables
     precipitation_model::String = "default_precipitation_model"
     mean_rwp::Float64 = 0
+    mean_swp::Float64 = 0
     cutoff_precipitation_rate::Float64 = 0
 end
 function PrecipVariables(namelist, grid::Grid)
@@ -249,32 +251,7 @@ function GridMeanVariables(namelist, grid::Grid, param_set::PS) where {PS}
     return GridMeanVariables(; param_set, lwp, iwp, cloud_base, cloud_top, cloud_cover, EnvThermo_scheme)
 end
 
-
-struct UpdraftThermodynamics{A1, A2}
-    n_updraft::Int
-    θ_liq_ice_tendency_rain_formation::A2
-    qt_tendency_rain_formation::A2
-    θ_liq_ice_tendency_rain_formation_tot::A1
-    qt_tendency_rain_formation_tot::A1
-    function UpdraftThermodynamics(n_updraft::Int, grid::Grid)
-        # tendencies from each updraft
-        θ_liq_ice_tendency_rain_formation = center_field(grid, n_updraft)
-        qt_tendency_rain_formation = center_field(grid, n_updraft)
-        # tendencies from all updrafts
-        θ_liq_ice_tendency_rain_formation_tot = center_field(grid)
-        qt_tendency_rain_formation_tot = center_field(grid)
-
-        A1 = typeof(θ_liq_ice_tendency_rain_formation_tot)
-        A2 = typeof(θ_liq_ice_tendency_rain_formation)
-        return new{A1, A2}(
-            n_updraft,
-            θ_liq_ice_tendency_rain_formation,
-            qt_tendency_rain_formation,
-            θ_liq_ice_tendency_rain_formation_tot,
-            qt_tendency_rain_formation_tot,
-        )
-    end
-end
+struct UpdraftThermodynamics end
 
 Base.@kwdef mutable struct EnvironmentVariables
     cloud_base::Float64 = 0
@@ -304,8 +281,6 @@ struct EnvironmentThermodynamics{A1}
     Hvar_rain_dt::A1
     QTvar_rain_dt::A1
     HQTcov_rain_dt::A1
-    qt_tendency_rain_formation::A1
-    θ_liq_ice_tendency_rain_formation::A1
     function EnvironmentThermodynamics(namelist, grid::Grid)
         quadrature_order = parse_namelist(namelist, "thermodynamics", "quadrature_order"; default = 3)
         quadrature_type = parse_namelist(namelist, "thermodynamics", "quadrature_type"; default = "gaussian")
@@ -324,8 +299,6 @@ struct EnvironmentThermodynamics{A1}
         QTvar_rain_dt = center_field(grid)
         HQTcov_rain_dt = center_field(grid)
 
-        qt_tendency_rain_formation = center_field(grid)
-        θ_liq_ice_tendency_rain_formation = center_field(grid)
         A1 = typeof(qt_unsat)
         return new{A1}(
             quadrature_order,
@@ -341,8 +314,6 @@ struct EnvironmentThermodynamics{A1}
             Hvar_rain_dt,
             QTvar_rain_dt,
             HQTcov_rain_dt,
-            qt_tendency_rain_formation,
-            θ_liq_ice_tendency_rain_formation,
         )
     end
 end
@@ -588,7 +559,7 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
         # Create the updraft variable class (major diagnostic and prognostic variables)
         UpdVar = UpdraftVariables(n_updrafts, namelist, grid)
         # Create the class for updraft thermodynamics
-        UpdThermo = UpdraftThermodynamics(n_updrafts, grid)
+        UpdThermo = UpdraftThermodynamics()
 
         # Create the environment variable class (major diagnostic and prognostic variables)
         EnvVar = EnvironmentVariables(namelist, grid)
