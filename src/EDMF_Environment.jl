@@ -1,11 +1,12 @@
-function update_env_precip_tendencies(en_thermo::EnvironmentThermodynamics, state, k, qt_tendency, θ_liq_ice_tendency)
-
+function update_env_precip_tendencies(state, k, qt_tendency, θ_liq_ice_tendency, qr_tendency, qs_tendency)
     aux_en = center_aux_environment(state)
     tendencies_pr = center_tendencies_precipitation(state)
-    en_thermo.qt_tendency_rain_formation[k] = qt_tendency * aux_en.area[k]
-    tendencies_pr.qr[k] += -en_thermo.qt_tendency_rain_formation[k]
-    en_thermo.θ_liq_ice_tendency_rain_formation[k] = θ_liq_ice_tendency * aux_en.area[k]
 
+    aux_en.qt_tendency_precip_formation[k] = qt_tendency * aux_en.area[k]
+    aux_en.θ_liq_ice_tendency_precip_formation[k] = θ_liq_ice_tendency * aux_en.area[k]
+
+    tendencies_pr.q_rai[k] += qr_tendency * aux_en.area[k]
+    tendencies_pr.q_sno[k] += qs_tendency * aux_en.area[k]
     return
 end
 
@@ -44,14 +45,22 @@ function sgs_mean(en_thermo::EnvironmentThermodynamics, grid, state, en, precip,
         mph = precipitation_formation(
             param_set,
             precip.precipitation_model,
-            prog_pr.qr[k],
+            prog_pr.q_rai[k],
+            prog_pr.q_sno[k],
             aux_en.area[k],
             ρ0_c[k],
             dt,
             ts,
         )
         update_sat_unsat(en_thermo, state, k, ts)
-        update_env_precip_tendencies(en_thermo, state, k, mph.qt_tendency, mph.θ_liq_ice_tendency)
+        update_env_precip_tendencies(
+            state,
+            k,
+            mph.qt_tendency,
+            mph.θ_liq_ice_tendency,
+            mph.qr_tendency,
+            mph.qs_tendency,
+        )
     end
     return
 end
@@ -75,7 +84,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
     # arrays for storing quadarature points and ints for labeling items in the arrays
     # a python dict would be nicer, but its 30% slower than this (for python 2.7. It might not be the case for python 3)
     env_len = 8
-    src_len = 6
+    src_len = 8
 
     sqpi_inv = 1.0 / sqrt(π)
     sqrt2 = sqrt(2.0)
@@ -88,7 +97,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
     inner_src = zeros(src_len)
     outer_src = zeros(src_len)
     i_ql, i_qi, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat = 1:env_len
-    i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH = 1:src_len
+    i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH, i_Sqr, i_Sqs = 1:src_len
 
     @inbounds for k in real_center_indices(grid)
         if (
@@ -170,7 +179,8 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
                     mph = precipitation_formation(
                         param_set,
                         precip.precipitation_model,
-                        prog_pr.qr[k],
+                        prog_pr.q_rai[k],
+                        prog_pr.q_sno[k],
                         aux_en.area[k],
                         ρ0_c[k],
                         dt,
@@ -192,6 +202,8 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
                     end
                     # products for variance and covariance source terms
                     inner_src[i_Sqt] += mph.qt_tendency * weights[m_h] * sqpi_inv
+                    inner_src[i_Sqr] += mph.qr_tendency * weights[m_h] * sqpi_inv
+                    inner_src[i_Sqs] += mph.qs_tendency * weights[m_h] * sqpi_inv
                     inner_src[i_SH] += mph.θ_liq_ice_tendency * weights[m_h] * sqpi_inv
                     inner_src[i_Sqt_H] += mph.qt_tendency * h_hat * weights[m_h] * sqpi_inv
                     inner_src[i_Sqt_qt] += mph.qt_tendency * qt_hat * weights[m_h] * sqpi_inv
@@ -208,7 +220,14 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
             end
 
             # update environmental variables
-            update_env_precip_tendencies(en_thermo, state, k, outer_src[i_Sqt], outer_src[i_SH])
+            update_env_precip_tendencies(
+                state,
+                k,
+                outer_src[i_Sqt],
+                outer_src[i_SH],
+                outer_src[i_Sqr],
+                outer_src[i_Sqs],
+            )
 
             # update cloudy/dry variables for buoyancy in TKE
             aux_en.cloud_fraction[k] = outer_env[i_cf]
@@ -229,6 +248,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
             en_thermo.θ_liq_ice_sat[k] = TD.liquid_ice_pottemp(ts_sat)
 
             # update var/covar rain sources
+            # TODO - check
             en_thermo.Hvar_rain_dt[k] = outer_src[i_SH_H] - outer_src[i_SH] * aux_en.θ_liq_ice[k]
             en_thermo.QTvar_rain_dt[k] = outer_src[i_Sqt_qt] - outer_src[i_Sqt] * aux_en.q_tot[k]
             en_thermo.HQTcov_rain_dt[k] =
@@ -241,13 +261,21 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
             mph = precipitation_formation(
                 param_set,
                 precip.precipitation_model,
-                prog_pr.qr[k],
+                prog_pr.q_rai[k],
+                prog_pr.q_sno[k],
                 aux_en.area[k],
                 ρ0_c[k],
                 dt,
                 ts,
             )
-            update_env_precip_tendencies(en_thermo, state, k, mph.qt_tendency, mph.θ_liq_ice_tendency)
+            update_env_precip_tendencies(
+                state,
+                k,
+                mph.qt_tendency,
+                mph.θ_liq_ice_tendency,
+                mph.qr_tendency,
+                mph.qs_tendency,
+            )
             update_sat_unsat(en_thermo, state, k, ts)
 
             en_thermo.Hvar_rain_dt[k] = 0.0

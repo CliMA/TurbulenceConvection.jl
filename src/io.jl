@@ -139,6 +139,7 @@ function initialize_io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
 end
 
 function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::TimeStepping, param_set)
+    aux_tc = center_aux_turbconv(state)
     io(edmf.UpdVar, grid, state, Stats)
     io(edmf.EnvVar, grid, state, Stats)
     io(edmf.Precip, grid, state, Stats)
@@ -155,8 +156,8 @@ function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::Ti
     write_profile(Stats, "diffusive_tendency_qt", edmf.diffusive_tendency_qt)
     write_profile(Stats, "total_flux_h", edmf.massflux_h .+ edmf.diffusive_flux_h)
     write_profile(Stats, "total_flux_qt", edmf.massflux_qt .+ edmf.diffusive_flux_qt)
-    write_profile(Stats, "updraft_qt_precip", edmf.UpdThermo.qt_tendency_rain_formation_tot)
-    write_profile(Stats, "updraft_thetal_precip", edmf.UpdThermo.θ_liq_ice_tendency_rain_formation_tot)
+    write_profile(Stats, "updraft_qt_precip", vec(aux_tc.bulk.qt_tendency_precip_formation_tot))
+    write_profile(Stats, "updraft_thetal_precip", vec(aux_tc.bulk.θ_liq_ice_tendency_precip_formation_tot))
 
     #Different mixing lengths : Ignacio
     write_profile(Stats, "ed_length_scheme", edmf.mls)
