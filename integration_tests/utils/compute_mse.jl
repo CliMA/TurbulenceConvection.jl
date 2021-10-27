@@ -487,7 +487,7 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
 
         haskey(best_mse, tc_var) || error("No key found in best_mse for variable $tc_var")
 
-        if new_variable
+        if new_variable || best_mse[tc_var] isa String
             mse[tc_var] = "NA"
             push!(mse_reductions, "NA")
             push!(table_best_mse, "NA")
