@@ -511,7 +511,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         aux_en_2m.HQTcov.rain_src[k] = ρ0_c[k] * ae[k] * en_thermo.HQTcov_rain_dt[k]
     end
 
-    reset_surface_covariance(edmf, grid, state, gm, Case)
+    get_GMV_CoVar(edmf, grid, state, :tke, :w)
 
     compute_diffusive_fluxes(edmf, grid, state, gm, Case, TS, param_set)
     update_cloud_frac(edmf, grid, state, gm)

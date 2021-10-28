@@ -12,7 +12,7 @@ function initialize_edmf(edmf::TC.EDMF_PrognosticTKE, grid, state, Case, gm::TC.
     else
         initialize_updrafts(edmf, grid, state, up, gm)
     end
-    TC.set_updraft_surface_bc(edmf, grid, state, up, Case.Sur)
+    TC.set_edmf_surface_bc(edmf, grid, state, up, Case.Sur)
     return
 end
 
@@ -25,7 +25,7 @@ function initialize_covariance(edmf::TC.EDMF_PrognosticTKE, grid, state, gm, Cas
 
     prog_en.tke .= aux_gm.tke
 
-    TC.reset_surface_covariance(edmf, grid, state, gm, Case)
+    TC.get_GMV_CoVar(edmf, grid, state, :tke, :w)
     aux_gm.Hvar .= aux_gm.Hvar[kc_surf] .* aux_gm.tke
     aux_gm.QTvar .= aux_gm.QTvar[kc_surf] .* aux_gm.tke
     aux_gm.HQTcov .= aux_gm.HQTcov[kc_surf] .* aux_gm.tke
@@ -45,6 +45,7 @@ function initialize_updrafts(edmf, grid, state, up::TC.UpdraftVariables, gm::TC.
     aux_gm = TC.center_aux_grid_mean(state)
     prog_up = TC.center_prog_updrafts(state)
     prog_up_f = TC.face_prog_updrafts(state)
+    ρ0_c = TC.center_ref_state(state).ρ0
     @inbounds for i in 1:(up.n_updrafts)
         @inbounds for k in TC.real_face_indices(grid)
             aux_up_f[i].w[k] = 0
@@ -67,6 +68,7 @@ function initialize_updrafts(edmf, grid, state, up::TC.UpdraftVariables, gm::TC.
         end
 
         aux_up[i].area[kc_surf] = edmf.area_surface_bc[i]
+        prog_up[i].ρarea[kc_surf] = ρ0_c[kc_surf] * aux_up[i].area[kc_surf]
     end
     return
 end
