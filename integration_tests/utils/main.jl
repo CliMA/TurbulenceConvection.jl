@@ -2,11 +2,16 @@ import Logging
 import TerminalLoggers
 Logging.global_logger(TerminalLoggers.TerminalLogger())
 
+import UnPack
 import JSON
 import ArgParse
 import TurbulenceConvection
+
 import ClimaCore
 const CC = ClimaCore
+
+import OrdinaryDiffEq
+const ODE = OrdinaryDiffEq
 
 include("initial_conditions.jl")
 include("parameter_set.jl")

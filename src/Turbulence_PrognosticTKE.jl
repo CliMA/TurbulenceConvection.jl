@@ -393,12 +393,15 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     n_updrafts = up.n_updrafts
     prog_gm = center_prog_grid_mean(state)
     prog_en = center_prog_environment(state)
-    compute_upd_primitives(edmf, grid, state, gm)
 
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
-    set_updraft_surface_bc(edmf, grid, state, gm, Case)
+
+    aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
+
+    compute_updraft_surface_bc(edmf, grid, state, Case)
     update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
     tendencies_gm = center_tendencies_grid_mean(state)
@@ -410,7 +413,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     parent(tendencies_en) .= 0
     parent(tendencies_ra) .= 0
     compute_rain_formation_tendencies(up_thermo, grid, state, edmf.UpdVar, edmf.Rain, TS.dt, param_set) # causes division error in dry bubble first time step
-    microphysics(en_thermo, grid, state, edmf.EnvVar, edmf.Rain, TS.dt, param_set) # saturation adjustment + rain creation
+    microphysics(en_thermo, grid, state, en, edmf.Rain, TS.dt, param_set) # saturation adjustment + rain creation
     if edmf.Rain.rain_model == "clima_1m"
         compute_rain_evap_tendencies(edmf.RainPhys, grid, state, gm, TS)
         compute_rain_advection_tendencies(edmf.RainPhys, grid, state, gm, TS)
@@ -468,6 +471,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     ###
     ### Filters
     ###
+    set_updraft_surface_bc(edmf, grid, state, up, Case.Sur)
     filter_updraft_vars(edmf, grid, state, gm)
     @inbounds for k in real_center_indices(grid)
         prog_en.tke[k] = max(prog_en.tke[k], 0.0)
@@ -480,7 +484,23 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     return
 end
 
-function set_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Case::CasesBase)
+function set_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, up, surface)
+    kc_surf = kc_surface(grid)
+    kf_surf = kf_surface(grid)
+    ρ_0_c = center_ref_state(state).ρ0
+    ρ_0_f = face_ref_state(state).ρ0
+    prog_up = center_prog_updrafts(state)
+    prog_up_f = face_prog_updrafts(state)
+    @inbounds for i in 1:(up.n_updrafts)
+        prog_up[i].ρarea[kc_surf] = ρ_0_c[kc_surf] * edmf.area_surface_bc[i]
+        prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * edmf.h_surface_bc[i]
+        prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * edmf.qt_surface_bc[i]
+        prog_up_f[i].ρaw[kf_surf] = ρ_0_f[kf_surf] * edmf.w_surface_bc[i]
+    end
+end
+
+
+function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, Case::CasesBase)
     kc_surf = kc_surface(grid)
 
     Δzi = grid.Δzi
@@ -496,21 +516,26 @@ function set_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, gm::GridM
         a_total = edmf.surface_area
         edmf.entr_surface_bc = 2.0 * Δzi
         edmf.detr_surface_bc = 0.0
+        a_ = a_total / edmf.n_updrafts
+        @inbounds for i in 1:(edmf.n_updrafts)
+            surface_scalar_coeff =
+                percentile_bounds_mean_norm(1.0 - a_total + i * a_, 1.0 - a_total + (i + 1) * a_, 1000)
+            edmf.area_surface_bc[i] = a_
+            edmf.w_surface_bc[i] = 0.0
+            edmf.h_surface_bc[i] = prog_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var)
+            edmf.qt_surface_bc[i] = prog_gm.q_tot[kc_surf] + surface_scalar_coeff * sqrt(qt_var)
+        end
     else
-        # a_total = edmf.surface_area
-        a_total = edmf.minimum_area * 0.9
         edmf.entr_surface_bc = 0.0
         edmf.detr_surface_bc = 2.0 * Δzi
+        @inbounds for i in 1:(edmf.n_updrafts)
+            edmf.area_surface_bc[i] = 0
+            edmf.w_surface_bc[i] = 0.0
+            edmf.h_surface_bc[i] = prog_gm.θ_liq_ice[kc_surf]
+            edmf.qt_surface_bc[i] = prog_gm.q_tot[kc_surf]
+        end
     end
 
-    a_ = a_total / edmf.n_updrafts
-    @inbounds for i in 1:(edmf.n_updrafts)
-        surface_scalar_coeff = percentile_bounds_mean_norm(1.0 - a_total + i * a_, 1.0 - a_total + (i + 1) * a_, 1000)
-        edmf.area_surface_bc[i] = a_
-        edmf.w_surface_bc[i] = 0.0
-        edmf.h_surface_bc[i] = (prog_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var))
-        edmf.qt_surface_bc[i] = (prog_gm.q_tot[kc_surf] + surface_scalar_coeff * sqrt(qt_var))
-    end
     return
 end
 
@@ -695,22 +720,13 @@ function update_updraft(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVaria
     up = edmf.UpdVar
     up_thermo = edmf.UpdThermo
     en = edmf.EnvVar
-    aux_up = center_aux_updrafts(state)
     tendencies_up = center_tendencies_updrafts(state)
     tendencies_up_f = face_tendencies_updrafts(state)
     prog_up = center_prog_updrafts(state)
     prog_gm = center_prog_grid_mean(state)
     prog_up_f = face_prog_updrafts(state)
-    aux_up_f = face_aux_updrafts(state)
     ρ_0_c = center_ref_state(state).ρ0
     ρ_0_f = face_ref_state(state).ρ0
-
-    @inbounds for i in 1:(up.n_updrafts)
-        prog_up[i].ρarea[kc_surf] = ρ_0_c[kc_surf] * edmf.area_surface_bc[i]
-        aux_up[i].area[kc_surf] = edmf.area_surface_bc[i]
-        prog_up_f[i].ρaw[kf_surf] = ρ_0_f[kf_surf] * edmf.w_surface_bc[i]
-        aux_up_f[i].w[kf_surf] = edmf.w_surface_bc[i]
-    end
 
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
@@ -780,61 +796,6 @@ function filter_updraft_vars(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMean
             # a similar filtering of ρaθ_liq_ice breaks the simulation
             if prog_up[i].ρarea[k] / ρ_0_c[k] < edmf.minimum_area
                 prog_up[i].ρaq_tot[k] = 0
-            end
-        end
-    end
-    return
-end
-
-function compute_upd_primitives(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables)
-    param_set = parameter_set(gm)
-    kc_surf = kc_surface(grid)
-    kf_surf = kf_surface(grid)
-
-    up = edmf.UpdVar
-    prog_up = center_prog_updrafts(state)
-    prog_gm = center_prog_grid_mean(state)
-    aux_up = center_aux_updrafts(state)
-    aux_up_f = face_aux_updrafts(state)
-    prog_up_f = face_prog_updrafts(state)
-    ρ_0_c = center_ref_state(state).ρ0
-    ρ_0_f = face_ref_state(state).ρ0
-
-    # set values
-    @inbounds for k in real_center_indices(grid)
-        @inbounds for i in 1:(up.n_updrafts)
-            if is_surface_center(grid, k)
-                # at the surface
-                if prog_up[i].ρarea[k] / ρ_0_c[k] >= edmf.minimum_area
-                    aux_up[i].θ_liq_ice[k] = edmf.h_surface_bc[i]
-                    aux_up[i].q_tot[k] = edmf.qt_surface_bc[i]
-                else
-                    aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
-                    aux_up[i].q_tot[k] = prog_gm.q_tot[k]
-                end
-                continue
-            end
-            if prog_up[i].ρarea[k] / ρ_0_c[k] >= edmf.minimum_area
-                aux_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / prog_up[i].ρarea[k]
-                aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
-                aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ_0_c[k]
-            else
-                aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
-                aux_up[i].q_tot[k] = prog_gm.q_tot[k]
-                aux_up[i].area[k] = 0
-            end
-        end
-    end
-
-    @inbounds for k in real_face_indices(grid)
-        is_surface_face(grid, k) && continue
-        @inbounds for i in 1:(up.n_updrafts)
-            a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
-            anew_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
-            if anew_k >= edmf.minimum_area
-                aux_up_f[i].w[k] = max(prog_up_f[i].ρaw[k] / (ρ_0_f[k] * anew_k), 0)
-            else
-                aux_up_f[i].w[k] = 0
             end
         end
     end

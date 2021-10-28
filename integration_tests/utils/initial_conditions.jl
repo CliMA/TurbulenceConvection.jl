@@ -3,11 +3,16 @@ const TC = TurbulenceConvection
 
 function initialize_edmf(edmf::TC.EDMF_PrognosticTKE, grid, state, Case, gm::TC.GridMeanVariables, TS::TC.TimeStepping)
     initialize_covariance(edmf, grid, state, gm, Case)
+    up = edmf.UpdVar
+    param_set = TC.parameter_set(gm)
+    TC.update_surface(Case, grid, state, gm, TS, param_set)
+    TC.compute_updraft_surface_bc(edmf, grid, state, Case)
     if Case.casename == "DryBubble"
-        initialize_updrafts_DryBubble(edmf, grid, state, edmf.UpdVar, gm)
+        initialize_updrafts_DryBubble(edmf, grid, state, up, gm)
     else
-        initialize_updrafts(edmf, grid, state, edmf.UpdVar, gm)
+        initialize_updrafts(edmf, grid, state, up, gm)
     end
+    TC.set_updraft_surface_bc(edmf, grid, state, up, Case.Sur)
     return
 end
 
@@ -61,7 +66,7 @@ function initialize_updrafts(edmf, grid, state, up::TC.UpdraftVariables, gm::TC.
             prog_up[i].ρaθ_liq_ice[k] = 0
         end
 
-        aux_up[i].area[kc_surf] = up.updraft_fraction / up.n_updrafts
+        aux_up[i].area[kc_surf] = edmf.area_surface_bc[i]
     end
     return
 end
@@ -155,7 +160,7 @@ function initialize_updrafts_DryBubble(edmf, grid, state, up::TC.UpdraftVariable
 
         @inbounds for k in TC.real_center_indices(grid)
             if minimum(z_in) <= grid.zc[k] <= maximum(z_in)
-                aux_up[i].area[k] = Area_in[k] #up.updraft_fraction/up.n_updrafts
+                aux_up[i].area[k] = Area_in[k]
                 aux_up[i].θ_liq_ice[k] = θ_liq_in[k]
                 aux_up[i].q_tot[k] = 0.0
                 aux_up[i].q_liq[k] = 0.0
@@ -167,7 +172,7 @@ function initialize_updrafts_DryBubble(edmf, grid, state, up::TC.UpdraftVariable
                 prog_up[i].ρaθ_liq_ice[k] = prog_up[i].ρarea[k] * aux_up[i].θ_liq_ice[k]
                 prog_up[i].ρaq_tot[k] = prog_up[i].ρarea[k] * aux_up[i].q_tot[k]
             else
-                aux_up[i].area[k] = 0.0 #up.updraft_fraction/up.n_updrafts
+                aux_up[i].area[k] = 0.0
                 aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
                 aux_up[i].T[k] = aux_gm.T[k]
                 prog_up[i].ρarea[k] = 0.0
