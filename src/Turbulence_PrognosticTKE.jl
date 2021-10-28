@@ -406,10 +406,12 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
 
     tendencies_gm = center_tendencies_grid_mean(state)
     tendencies_up = center_tendencies_updrafts(state)
+    tendencies_up_f = face_tendencies_updrafts(state)
     tendencies_en = center_tendencies_environment(state)
     tendencies_ra = center_tendencies_rain(state)
     parent(tendencies_gm) .= 0
     parent(tendencies_up) .= 0
+    parent(tendencies_up_f) .= 0
     parent(tendencies_en) .= 0
     parent(tendencies_ra) .= 0
     compute_rain_formation_tendencies(up_thermo, grid, state, edmf.UpdVar, edmf.Rain, TS.dt, param_set) # causes division error in dry bubble first time step
@@ -471,7 +473,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     ###
     ### Filters
     ###
-    set_updraft_surface_bc(edmf, grid, state, up, Case.Sur)
+    set_edmf_surface_bc(edmf, grid, state, up, Case.Sur)
     filter_updraft_vars(edmf, grid, state, gm)
     @inbounds for k in real_center_indices(grid)
         prog_en.tke[k] = max(prog_en.tke[k], 0.0)
@@ -484,12 +486,14 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     return
 end
 
-function set_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, up, surface)
+function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, up, surface)
+    en = edmf.EnvVar
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     ρ_0_c = center_ref_state(state).ρ0
     ρ_0_f = face_ref_state(state).ρ0
     prog_up = center_prog_updrafts(state)
+    prog_en = center_prog_environment(state)
     prog_up_f = face_prog_updrafts(state)
     @inbounds for i in 1:(up.n_updrafts)
         prog_up[i].ρarea[kc_surf] = ρ_0_c[kc_surf] * edmf.area_surface_bc[i]
@@ -497,6 +501,18 @@ function set_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, up, surfa
         prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * edmf.qt_surface_bc[i]
         prog_up_f[i].ρaw[kf_surf] = ρ_0_f[kf_surf] * edmf.w_surface_bc[i]
     end
+
+    flux1 = surface.rho_hflux
+    flux2 = surface.rho_qtflux
+    zLL = grid.zc[kc_surf]
+    ustar = surface.ustar
+    oblength = surface.obukhov_length
+    α0LL = center_ref_state(state).α0[kc_surf]
+
+    prog_en.tke[kc_surf] = get_surface_tke(surface.ustar, grid.zc[kc_surf], surface.obukhov_length)
+    prog_en.Hvar[kc_surf] = get_surface_variance(flux1 * α0LL, flux1 * α0LL, ustar, zLL, oblength)
+    prog_en.QTvar[kc_surf] = get_surface_variance(flux2 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
+    prog_en.HQTcov[kc_surf] = get_surface_variance(flux1 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
 end
 
 
@@ -536,29 +552,6 @@ function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, Case:
         end
     end
 
-    return
-end
-
-function reset_surface_covariance(edmf::EDMF_PrognosticTKE, grid, state, gm, Case::CasesBase)
-    flux1 = Case.Sur.rho_hflux
-    flux2 = Case.Sur.rho_qtflux
-    kc_surf = kc_surface(grid)
-    zLL = grid.zc[kc_surf]
-    ustar = Case.Sur.ustar
-    oblength = Case.Sur.obukhov_length
-    α0LL = center_ref_state(state).α0[kc_surf]
-
-    gm = gm
-    up = edmf.UpdVar
-    en = edmf.EnvVar
-    prog_en = center_prog_environment(state)
-
-    prog_en.tke[kc_surf] = get_surface_tke(Case.Sur.ustar, grid.zc[kc_surf], Case.Sur.obukhov_length)
-    get_GMV_CoVar(edmf, grid, state, :tke, :w)
-
-    prog_en.Hvar[kc_surf] = get_surface_variance(flux1 * α0LL, flux1 * α0LL, ustar, zLL, oblength)
-    prog_en.QTvar[kc_surf] = get_surface_variance(flux2 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
-    prog_en.HQTcov[kc_surf] = get_surface_variance(flux1 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
     return
 end
 
