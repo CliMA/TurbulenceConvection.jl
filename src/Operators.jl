@@ -574,7 +574,7 @@ function construct_tridiag_diffusion_en(
     c = center_field(grid)
     ρ0_c = center_ref_state(state).ρ0
     ρ0_f = face_ref_state(state).ρ0
-    aux_tc = center_aux_tc(state)
+    aux_tc = center_aux_turbconv(state)
     w_en = face_aux_environment(state).w
     aux_up_f = face_aux_updrafts(state)
     prog_en = center_prog_environment(state)
@@ -584,8 +584,8 @@ function construct_tridiag_diffusion_en(
     rho_ae_K_m = face_field(grid)
     w_en_c = center_field(grid)
     D_env = 0.0
-    KM = center_aux_tc(state).KM
-    KH = center_aux_tc(state).KH
+    KM = center_aux_turbconv(state).KM
+    KH = center_aux_turbconv(state).KH
 
     aeK = is_tke ? ae .* KM : ae .* KH
     aeK_bcs = (; bottom = SetValue(aeK[kc_surf]), top = SetValue(aeK[kc_toa]))

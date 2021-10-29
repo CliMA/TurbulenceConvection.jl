@@ -14,8 +14,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     α0_c = center_ref_state(state).α0
     g = CPP.grav(param_set)
     c_m = CPEDMF.c_m(param_set)
-    KM = center_aux_tc(state).KM
-    KH = center_aux_tc(state).KH
+    KM = center_aux_turbconv(state).KM
+    KH = center_aux_turbconv(state).KH
     surface = Case.Sur
     obukhov_length = surface.obukhov_length
     FT = eltype(grid)
@@ -26,8 +26,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_gm = center_aux_grid_mean(state)
-    aux_tc_f = face_aux_tc(state)
-    aux_tc = center_aux_tc(state)
+    aux_tc_f = face_aux_turbconv(state)
+    aux_tc = center_aux_turbconv(state)
     prog_en = center_prog_environment(state)
     aux_en_2m = center_aux_environment_2m(state)
     prog_up = center_prog_updrafts(state)
