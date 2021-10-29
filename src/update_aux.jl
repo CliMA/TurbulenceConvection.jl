@@ -84,14 +84,19 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     ##### diagnose_GMV_moments
     #####
-    #! format: off
     get_GMV_CoVar(edmf, grid, state, :Hvar, :θ_liq_ice)
     get_GMV_CoVar(edmf, grid, state, :QTvar, :q_tot)
     get_GMV_CoVar(edmf, grid, state, :HQTcov, :θ_liq_ice, :q_tot)
     GMV_third_m(edmf, grid, state, :Hvar, :θ_liq_ice, :H_third_m)
     GMV_third_m(edmf, grid, state, :QTvar, :q_tot, :QT_third_m)
     GMV_third_m(edmf, grid, state, :tke, :w, :W_third_m)
-    #! format: on
+
+    @inbounds for k in real_center_indices(grid)
+        θ_liq_ice = prog_gm.θ_liq_ice[k]
+        q_tot = prog_gm.q_tot[k]
+        ts = thermo_state_pθq(param_set, p0_c[k], θ_liq_ice, q_tot)
+        aux_gm.RH[k] = TD.relative_humidity(ts)
+    end
 
     #####
     ##### decompose_environment
@@ -222,10 +227,10 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     a_up_bulk = aux_tc.bulk.area
     @inbounds for k in real_center_indices(grid)
+        # TODO: Can we use thermo states here? Is this consistent with one constructed
+        #       from a thermo state?
         aux_gm.q_liq[k] = (a_up_bulk[k] * aux_tc.bulk.q_liq[k] + (1 - a_up_bulk[k]) * aux_en.q_liq[k])
         aux_gm.q_ice[k] = (a_up_bulk[k] * aux_tc.bulk.q_ice[k] + (1 - a_up_bulk[k]) * aux_en.q_ice[k])
-        aux_gm.T[k] = (a_up_bulk[k] * aux_tc.bulk.T[k] + (1 - a_up_bulk[k]) * aux_en.T[k])
-        aux_gm.buoy[k] = (a_up_bulk[k] * aux_tc.bulk.buoy[k] + (1 - a_up_bulk[k]) * aux_en.buoy[k])
     end
     compute_pressure_plume_spacing(edmf, param_set)
 
