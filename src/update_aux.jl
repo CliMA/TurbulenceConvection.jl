@@ -232,7 +232,6 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     ##### compute_updraft_closures
     #####
-    upd_cloud_diagnostics(up, grid, state) # TODO: should this be moved to compute_diagnostics! ?
 
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:(up.n_updrafts)
@@ -514,4 +513,15 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
     compute_diffusive_fluxes(edmf, grid, state, gm, Case, TS, param_set)
     update_cloud_frac(edmf, grid, state, gm)
+
+    compute_covariance_dissipation(edmf, grid, state, :tke, param_set)
+    compute_covariance_detr(edmf, grid, state, :tke)
+
+    compute_covariance_dissipation(edmf, grid, state, :Hvar, param_set)
+    compute_covariance_dissipation(edmf, grid, state, :QTvar, param_set)
+    compute_covariance_dissipation(edmf, grid, state, :HQTcov, param_set)
+    compute_covariance_detr(edmf, grid, state, :Hvar)
+    compute_covariance_detr(edmf, grid, state, :QTvar)
+    compute_covariance_detr(edmf, grid, state, :HQTcov)
+
 end

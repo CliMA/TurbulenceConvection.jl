@@ -7,7 +7,6 @@ function initialize(self::ForcingBase, grid, ::ForcingBaseType)
     return
 end
 
-initialize_io(self::ForcingBase, Stats) = nothing
 initialize(self::ForcingBase{ForcingNone}, grid) = initialize(self, grid, ForcingBaseType())
 initialize(self::ForcingBase{ForcingStandard}, grid) = initialize(self, grid, ForcingBaseType())
 initialize(self::ForcingBase{ForcingDYCOMS_RF01}, grid) = initialize(self, grid, ForcingBaseType())
