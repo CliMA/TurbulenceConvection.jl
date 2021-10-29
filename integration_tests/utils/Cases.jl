@@ -752,7 +752,6 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, gm, state)
     @inbounds for k in real_center_indices(grid)
         pv_star = TD.saturation_vapor_pressure(param_set, aux_gm.T[k], TD.Liquid())
         qv_star = pv_star * (1 / molmass_ratio) / (p1[k] - pv_star + (1 / molmass_ratio) * pv_star * RH[k] / 100.0) # eq. 37 in pressel et al and the def of RH
-        qv = prog_gm.q_tot[k] - aux_gm.q_liq[k]
         prog_gm.q_tot[k] = qv_star * RH[k] / 100.0
         phase_part = TD.PhasePartition(prog_gm.q_tot[k], 0.0, 0.0) # initial state is not saturated
         prog_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], p0[k], phase_part)
@@ -1242,10 +1241,6 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, grid::Grid, gm, state
         end
         prog_gm.q_tot[k] = q_tot_gm
         prog_gm.θ_liq_ice[k] = θ_liq_ice_gm
-
-        ts = TC.thermo_state_pθq(param_set, p0[k], θ_liq_ice_gm, q_tot_gm)
-        aux_gm.q_liq[k] = TD.liquid_specific_humidity(ts)
-        aux_gm.T[k] = TD.air_temperature(ts)
 
         # velocity profile (geostrophic)
         prog_gm.u[k] = 7.0
