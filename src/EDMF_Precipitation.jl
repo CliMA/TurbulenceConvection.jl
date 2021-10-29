@@ -1,26 +1,3 @@
-function initialize_io(precip::PrecipVariables, Stats::NetCDFIO_Stats)
-    add_ts(Stats, "rwp_mean")
-    add_ts(Stats, "cutoff_precipitation_rate")
-    return
-end
-
-function io(
-    precip::PrecipVariables,
-    grid,
-    state,
-    Stats::NetCDFIO_Stats,
-    up_thermo::UpdraftThermodynamics,
-    en_thermo::EnvironmentThermodynamics,
-    TS::TimeStepping,
-)
-    precipitation_diagnostics(precip, grid, state, up_thermo, en_thermo)
-    write_ts(Stats, "rwp_mean", precip.mean_rwp)
-
-    #TODO - change to rain rate that depends on rain model choice
-    write_ts(Stats, "cutoff_precipitation_rate", precip.cutoff_precipitation_rate)
-    return
-end
-
 function precipitation_diagnostics(
     precip::PrecipVariables,
     grid,
@@ -28,26 +5,6 @@ function precipitation_diagnostics(
     up_thermo::UpdraftThermodynamics,
     en_thermo::EnvironmentThermodynamics,
 )
-    ρ0_c = center_ref_state(state).ρ0
-    prog_pr = center_prog_precipitation(state)
-
-    precip.mean_rwp = 0.0
-    precip.cutoff_precipitation_rate = 0.0
-
-    @inbounds for k in real_center_indices(grid)
-        precip.mean_rwp += ρ0_c[k] * prog_pr.qr[k] * grid.Δz
-
-        # precipitation rate from cutoff microphysics scheme defined as a total amount of removed water
-        # per timestep per EDMF surface area [mm/h]
-        if (precip.precipitation_model == "cutoff")
-            precip.cutoff_precipitation_rate -=
-                (en_thermo.qt_tendency_rain_formation[k] + up_thermo.qt_tendency_rain_formation_tot[k]) *
-                ρ0_c[k] *
-                grid.Δz / rho_cloud_liq *
-                3.6 *
-                1e6
-        end
-    end
     return
 end
 

@@ -152,12 +152,18 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
     aux_up = center_aux_updrafts(state)
     aux_tc_f = face_aux_turbconv(state)
     aux_gm_f = face_aux_grid_mean(state)
+    prog_pr = center_prog_precipitation(state)
     kc_toa = kc_top_of_atmos(grid)
     gm.cloud_base = grid.zc[kc_toa]
     gm.cloud_top = 0.0
     param_set = parameter_set(gm)
     prog_gm = center_prog_grid_mean(state)
-    n_updrafts = edmf.UpdVar.n_updrafts
+    up = edmf.UpdVar
+    en = edmf.EnvVar
+    precip = edmf.Precip
+    en_thermo = edmf.EnvThermo
+    up_thermo = edmf.UpdThermo
+    n_updrafts = up.n_updrafts
 
     @inbounds for k in real_center_indices(grid)
         gm.lwp += ρ0_c[k] * aux_gm.q_liq[k] * grid.Δz
@@ -189,5 +195,65 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
             aux_gm_f.massflux_s[k] += edmf.m[i, k] * (s_up_f - s_en_f)
         end
     end
+
+    up.lwp = 0.0
+    up.iwp = 0.0
+
+    @inbounds for i in 1:(up.n_updrafts)
+        up.cloud_base[i] = zc_toa(grid)
+        up.cloud_top[i] = 0.0
+        up.updraft_top[i] = 0.0
+        up.cloud_cover[i] = 0.0
+
+        @inbounds for k in real_center_indices(grid)
+            if aux_up[i].area[k] > 1e-3
+                up.updraft_top[i] = max(up.updraft_top[i], grid.zc[k])
+                up.lwp += ρ0_c[k] * aux_up[i].q_liq[k] * aux_up[i].area[k] * grid.Δz
+                up.iwp += ρ0_c[k] * aux_up[i].q_ice[k] * aux_up[i].area[k] * grid.Δz
+
+                if TD.has_condensate(aux_up[i].q_liq[k] + aux_up[i].q_ice[k])
+                    up.cloud_base[i] = min(up.cloud_base[i], grid.zc[k])
+                    up.cloud_top[i] = max(up.cloud_top[i], grid.zc[k])
+                    up.cloud_cover[i] = max(up.cloud_cover[i], aux_up[i].area[k])
+                end
+            end
+        end
+    end
+
+    en.cloud_top = 0.0
+    en.cloud_base = zc_toa(grid)
+    en.cloud_cover = 0.0
+    en.lwp = 0.0
+    en.iwp = 0.0
+
+    @inbounds for k in real_center_indices(grid)
+        en.lwp += ρ0_c[k] * aux_en.q_liq[k] * aux_en.area[k] * grid.Δz
+        en.iwp += ρ0_c[k] * aux_en.q_ice[k] * aux_en.area[k] * grid.Δz
+
+        if TD.has_condensate(aux_en.q_liq[k] + aux_en.q_ice[k]) && aux_en.area[k] > 1e-6
+            en.cloud_base = min(en.cloud_base, grid.zc[k])
+            en.cloud_top = max(en.cloud_top, grid.zc[k])
+            en.cloud_cover = max(en.cloud_cover, aux_en.area[k] * aux_en.cloud_fraction[k])
+        end
+    end
+
+    precip.mean_rwp = 0.0
+    precip.cutoff_precipitation_rate = 0.0
+
+    @inbounds for k in real_center_indices(grid)
+        precip.mean_rwp += ρ0_c[k] * prog_pr.qr[k] * grid.Δz
+
+        # precipitation rate from cutoff microphysics scheme defined as a total amount of removed water
+        # per timestep per EDMF surface area [mm/h]
+        if (precip.precipitation_model == "cutoff")
+            precip.cutoff_precipitation_rate -=
+                (en_thermo.qt_tendency_rain_formation[k] + up_thermo.qt_tendency_rain_formation_tot[k]) *
+                ρ0_c[k] *
+                grid.Δz / rho_cloud_liq *
+                3.6 *
+                1e6
+        end
+    end
+
     return
 end

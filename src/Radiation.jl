@@ -7,9 +7,6 @@ end
 
 update(self::RadiationBase, grid, state, gm::GridMeanVariables, param_set) = nothing
 
-initialize_io(self::RadiationBase, Stats::NetCDFIO_Stats) = nothing
-io(self::RadiationBase, grid, state, Stats::NetCDFIO_Stats) = nothing
-
 initialize(self::RadiationBase{RadiationNone}, grid) = initialize(self, grid, RadiationBaseType())
 
 function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, grid)
@@ -93,18 +90,6 @@ end
 update(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state, gm::GridMeanVariables, param_set) =
     calculate_radiation(self, grid, state, gm, param_set)
 
-function initialize_io(self::RadiationBase{RadiationDYCOMS_RF01}, Stats::NetCDFIO_Stats)
-    add_profile(Stats, "rad_dTdt")
-    add_profile(Stats, "rad_flux")
-    return
-end
-
-function io(self::RadiationBase{RadiationDYCOMS_RF01}, Stats::NetCDFIO_Stats)
-    write_profile(Stats, "rad_dTdt", self.dTdt)
-    write_profile(Stats, "rad_flux", self.f_rad)
-    return
-end
-
 function initialize(self::RadiationBase{RadiationLES}, grid, LESDat::LESData)
     initialize(self, grid, RadiationBaseType())
     # load from LES
@@ -117,17 +102,5 @@ function initialize(self::RadiationBase{RadiationLES}, grid, LESDat::LESData)
         meandata = mean_nc_data(data, "profiles", "dtdt_rad", imin, imax)
         self.dTdt = pyinterp(grid.zc, zc_les, meandata)
     end
-    return
-end
-
-function initialize_io(self::RadiationBase{RadiationLES}, Stats::NetCDFIO_Stats)
-    add_profile(Stats, "rad_dTdt")
-    add_profile(Stats, "rad_flux")
-    return
-end
-
-function io(self::RadiationBase{RadiationLES}, Stats::NetCDFIO_Stats)
-    write_profile(Stats, "rad_dTdt", self.dTdt)
-    write_profile(Stats, "rad_flux", self.f_rad)
     return
 end
