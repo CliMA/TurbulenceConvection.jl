@@ -54,6 +54,7 @@ cent_aux_vars_gm(FT) = (;
     q_liq = FT(0),
     q_ice = FT(0),
     RH = FT(0),
+    s = FT(0),
     T = FT(0),
     buoy = FT(0),
     cloud_fraction = FT(0),
@@ -72,7 +73,15 @@ cent_aux_vars_en_2m(FT) = (;
     rain_src = FT(0),
 )
 cent_aux_vars_up(FT) = (;
-    q_liq = FT(0), q_ice = FT(0), T = FT(0), RH = FT(0), buoy = FT(0), area = FT(0), q_tot = FT(0), θ_liq_ice = FT(0),
+    q_liq = FT(0),
+    q_ice = FT(0),
+    T = FT(0),
+    RH = FT(0),
+    s = FT(0),
+    buoy = FT(0),
+    area = FT(0),
+    q_tot = FT(0),
+    θ_liq_ice = FT(0),
 )
 cent_aux_vars_edmf(FT, n_up) = (;
     turbconv = (;
@@ -94,6 +103,7 @@ cent_aux_vars_edmf(FT, n_up) = (;
             q_ice = FT(0),
             θ_liq_ice = FT(0),
             RH = FT(0),
+            s = FT(0),
             T = FT(0),
             buoy = FT(0),
             cloud_fraction = FT(0),
@@ -111,7 +121,7 @@ cent_aux_vars_edmf(FT, n_up) = (;
 cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., cent_aux_vars_edmf(FT, n_up)...)
 
 # Face only
-face_aux_vars_gm(FT) = ()
+face_aux_vars_gm(FT) = (; massflux_s = FT(0), diffusive_flux_s = FT(0), total_flux_s = FT(0))
 face_aux_vars_up(FT) = (; w = FT(0))
 
 face_aux_vars_edmf(FT, n_up) = (;
