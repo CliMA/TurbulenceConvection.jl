@@ -35,14 +35,14 @@ end
 function io_dictionary_aux(state)
     DT = NamedTuple{(:dims, :group, :field), Tuple{Tuple{String, String}, String, Any}}
     io_dict = Dict{String, DT}(
-        "updraft_area" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.area),
-        "updraft_ql" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.q_liq),
-        "updraft_RH" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.RH),
-        "updraft_qt" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.q_tot),
-        "updraft_w" => (; dims = ("zf", "t"), group = "profiles", field = face_aux_tc(state).bulk.w),
-        "updraft_temperature" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.T),
-        "updraft_thetal" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.θ_liq_ice),
-        "updraft_buoyancy" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).bulk.buoy),
+        "updraft_area" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).bulk.area),
+        "updraft_ql" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).bulk.q_liq),
+        "updraft_RH" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).bulk.RH),
+        "updraft_qt" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).bulk.q_tot),
+        "updraft_w" => (; dims = ("zf", "t"), group = "profiles", field = face_aux_turbconv(state).bulk.w),
+        "updraft_temperature" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).bulk.T),
+        "updraft_thetal" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).bulk.θ_liq_ice),
+        "updraft_buoyancy" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).bulk.buoy),
         "H_third_m" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).H_third_m),
         "W_third_m" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).W_third_m),
         "QT_third_m" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).H_third_m),
@@ -62,8 +62,8 @@ function io_dictionary_aux(state)
         "w_mean" => (; dims = ("zf", "t"), group = "profiles", field = face_prog_grid_mean(state).w),
         "qt_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_grid_mean(state).q_tot),
         "thetal_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_grid_mean(state).θ_liq_ice),
-        "eddy_viscosity" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).KM),
-        "eddy_diffusivity" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_tc(state).KH),
+        "eddy_viscosity" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).KM),
+        "eddy_diffusivity" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).KH),
         "env_tke" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_environment(state).tke),
         "env_Hvar" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_environment(state).Hvar),
         "env_QTvar" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_environment(state).QTvar),
@@ -150,7 +150,7 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
     aux_gm = center_aux_grid_mean(state)
     aux_en = center_aux_environment(state)
     aux_up = center_aux_updrafts(state)
-    aux_tc_f = face_aux_tc(state)
+    aux_tc_f = face_aux_turbconv(state)
     aux_gm_f = face_aux_grid_mean(state)
     kc_toa = kc_top_of_atmos(grid)
     gm.cloud_base = grid.zc[kc_toa]

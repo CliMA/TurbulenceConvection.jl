@@ -64,7 +64,7 @@ function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::Ti
     io(edmf.EnvVar, grid, state, Stats)
     io(edmf.Precip, grid, state, Stats, edmf.UpdThermo, edmf.EnvThermo, TS)
 
-    aux_tc = center_aux_tc(state)
+    aux_tc = center_aux_turbconv(state)
     aux_up = center_aux_updrafts(state)
     a_up_bulk = aux_tc.bulk.area
 
@@ -155,7 +155,7 @@ function update_radiation end
 
 function update_cloud_frac(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables)
     # update grid-mean cloud fraction and cloud cover
-    aux_tc = center_aux_tc(state)
+    aux_tc = center_aux_turbconv(state)
     aux_gm = center_aux_grid_mean(state)
     aux_en = center_aux_environment(state)
     a_up_bulk = aux_tc.bulk.area
@@ -185,7 +185,7 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     kc_surf = kc_surface(grid)
     up = edmf.UpdVar
     en = edmf.EnvVar
-    aux_tc = center_aux_tc(state)
+    aux_tc = center_aux_turbconv(state)
     ae = 1 .- aux_tc.bulk.area # area of environment
 
     @inbounds for k in real_center_indices(grid)
@@ -336,12 +336,12 @@ function compute_diffusive_fluxes(
     param_set,
 )
     ρ0_f = face_ref_state(state).ρ0
-    aux_tc = center_aux_tc(state)
-    aux_tc_f = face_aux_tc(state)
+    aux_tc = center_aux_turbconv(state)
+    aux_tc_f = face_aux_turbconv(state)
     aux_en = center_aux_environment(state)
     aux_en.area .= 1 .- aux_tc.bulk.area # area of environment
-    KM = center_aux_tc(state).KM
-    KH = center_aux_tc(state).KH
+    KM = center_aux_turbconv(state).KM
+    KH = center_aux_turbconv(state).KH
     aeKM = aux_en.area .* KM
     aeKH = aux_en.area .* KH
     kc_surf = kc_surface(grid)
@@ -559,7 +559,7 @@ end
 # if covar_e.name is not "tke".
 function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol, ϕ_sym::Symbol, ψ_sym::Symbol = ϕ_sym)
 
-    aux_tc = center_aux_tc(state)
+    aux_tc = center_aux_turbconv(state)
     ae = 1 .- aux_tc.bulk.area
     is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
@@ -805,9 +805,9 @@ function compute_covariance_shear(
     en_var2_sym::Symbol = en_var1_sym,
 )
 
-    aux_tc = center_aux_tc(state)
+    aux_tc = center_aux_turbconv(state)
     ae = 1 .- aux_tc.bulk.area # area of environment
-    aux_tc = center_aux_tc(state)
+    aux_tc = center_aux_turbconv(state)
     ρ0_c = center_ref_state(state).ρ0
     prog_gm = center_prog_grid_mean(state)
     is_tke = covar_sym == :tke
@@ -1001,7 +1001,7 @@ end
 function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol, param_set)
     en = edmf.EnvVar
     c_d = CPEDMF.c_d(param_set)
-    aux_tc = center_aux_tc(state)
+    aux_tc = center_aux_turbconv(state)
     ae = 1 .- aux_tc.bulk.area
     ρ0_c = center_ref_state(state).ρ0
     prog_en = center_prog_environment(state)
@@ -1060,7 +1060,7 @@ function GMV_third_m(edmf::EDMF_PrognosticTKE, grid, state, covar_en_sym::Symbol
 
     up = edmf.UpdVar
     en = edmf.EnvVar
-    aux_tc = center_aux_tc(state)
+    aux_tc = center_aux_turbconv(state)
     ae = 1 .- aux_tc.bulk.area
     aux_up_f = face_aux_updrafts(state)
     is_tke = covar_en_sym == :tke
