@@ -47,7 +47,7 @@ prognostic_tc(state, fl) = prognostic(state, fl).turbconv
 center_prog_updrafts(state) = prognostic_tc(state, CentField()).up
 face_prog_updrafts(state) = prognostic_tc(state, FaceField()).up
 center_prog_environment(state) = prognostic_tc(state, CentField()).en
-center_prog_rain(state) = prognostic_tc(state, CentField()).ra
+center_prog_precipitation(state) = prognostic_tc(state, CentField()).pr
 
 #= Auxiliary fields for TurbulenceConvection =#
 aux_turbconv(state, fl) = aux(state, fl).turbconv
@@ -65,5 +65,5 @@ center_tendencies_tc(state) = tendencies_tc(state, CentField())
 face_tendencies_tc(state) = tendencies_tc(state, FaceField())
 center_tendencies_updrafts(state) = tendencies_tc(state, CentField()).up
 center_tendencies_environment(state) = tendencies_tc(state, CentField()).en
-center_tendencies_rain(state) = tendencies_tc(state, CentField()).ra
+center_tendencies_precipitation(state) = tendencies_tc(state, CentField()).pr
 face_tendencies_updrafts(state) = tendencies_tc(state, FaceField()).up

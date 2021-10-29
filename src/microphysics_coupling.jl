@@ -11,7 +11,7 @@ end
 """
 Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 """
-function precipitation_formation(param_set::APS, rain_model, qr, area, ρ0, dt, ts)
+function precipitation_formation(param_set::APS, precipitation_model, qr, area, ρ0, dt, ts)
 
 
     qr_tendency = 0.0
@@ -20,7 +20,7 @@ function precipitation_formation(param_set::APS, rain_model, qr, area, ρ0, dt, 
 
         q = TD.PhasePartition(ts)
 
-        if rain_model == "clima_1m"
+        if precipitation_model == "clima_1m"
             qr_tendency = min(
                 q.liq / dt,
                 (
@@ -29,7 +29,7 @@ function precipitation_formation(param_set::APS, rain_model, qr, area, ρ0, dt, 
                 ),
             )
         end
-        if rain_model == "cutoff"
+        if precipitation_model == "cutoff"
             qsat = TD.q_vap_saturation(ts)
             qr_tendency = min((q.liq + q.ice) / dt, -CM0.remove_precipitation(param_set, q, qsat))
         end

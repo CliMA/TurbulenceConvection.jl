@@ -133,7 +133,7 @@ function default_namelist(case_name::String)
     namelist_defaults["time_stepping"]["dt"] = 6.0
 
     namelist_defaults["microphysics"] = Dict()
-    namelist_defaults["microphysics"]["rain_model"] = "None"
+    namelist_defaults["microphysics"]["precipitation_model"] = "None"
 
     namelist_defaults["turbulence"]["scheme"] = "EDMF_PrognosticTKE"
 
@@ -263,7 +263,7 @@ function Rico(namelist_defaults)
     namelist["time_stepping"]["t_max"] = 86400.0
     namelist["time_stepping"]["dt"] = 6.0
 
-    namelist["microphysics"]["rain_model"] = "clima_1m"
+    namelist["microphysics"]["precipitation_model"] = "clima_1m"
     namelist["microphysics"]["τ_acnv"] = 2500.0
 
     namelist["meta"]["simname"] = "Rico"
@@ -282,7 +282,7 @@ function TRMM_LBA(namelist_defaults)
     namelist["time_stepping"]["t_max"] = 60 * 60 * 6.0
     namelist["time_stepping"]["dt"] = 2.0
 
-    namelist["microphysics"]["rain_model"] = "cutoff"
+    namelist["microphysics"]["precipitation_model"] = "cutoff"
     namelist["microphysics"]["τ_precip"] = 50.0
 
     namelist["meta"]["simname"] = "TRMM_LBA"
