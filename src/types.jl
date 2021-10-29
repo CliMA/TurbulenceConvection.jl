@@ -499,7 +499,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
     n_updrafts::Int
     drag_sign::Int
     asp_label
-    extrapolate_buoyancy::Bool
     surface_area::Float64
     max_area::Float64
     aspect_ratio::Float64
@@ -586,9 +585,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
             "pressure_closure_asp_label";
             default = "const",
         )
-
-        extrapolate_buoyancy =
-            parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "extrapolate_buoyancy"; default = true)
 
         # Get values from namelist
         # set defaults at some point?
@@ -745,7 +741,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
             n_updrafts,
             drag_sign,
             asp_label,
-            extrapolate_buoyancy,
             surface_area,
             max_area,
             aspect_ratio,

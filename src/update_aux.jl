@@ -84,14 +84,15 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     ##### diagnose_GMV_moments
     #####
-    #! format: off
+
     get_GMV_CoVar(edmf, grid, state, :Hvar, :θ_liq_ice)
     get_GMV_CoVar(edmf, grid, state, :QTvar, :q_tot)
     get_GMV_CoVar(edmf, grid, state, :HQTcov, :θ_liq_ice, :q_tot)
     GMV_third_m(edmf, grid, state, :Hvar, :θ_liq_ice, :H_third_m)
     GMV_third_m(edmf, grid, state, :QTvar, :q_tot, :QT_third_m)
     GMV_third_m(edmf, grid, state, :tke, :w, :W_third_m)
-    #! format: on
+
+    satadjust(gm, grid, state)
 
     #####
     ##### decompose_environment
@@ -115,6 +116,26 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     end
 
     @inbounds for k in real_center_indices(grid)
+
+        #####
+        ##### updraft buoyancy
+        #####
+
+        @inbounds for i in 1:(up.n_updrafts)
+            if aux_up[i].area[k] > 0.0
+                ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
+                aux_up[i].q_liq[k] = TD.liquid_specific_humidity(ts_up)
+                aux_up[i].q_ice[k] = TD.ice_specific_humidity(ts_up)
+                aux_up[i].T[k] = TD.air_temperature(ts_up)
+                ρ = TD.air_density(ts_up)
+                aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
+                aux_up[i].RH[k] = TD.relative_humidity(ts_up)
+            else
+                aux_up[i].buoy[k] = aux_en.buoy[k]
+                aux_up[i].RH[k] = aux_en.RH[k]
+            end
+        end
+
         a_bulk_c = aux_tc.bulk.area[k]
         aux_tc.bulk.q_tot[k] = 0
         aux_tc.bulk.q_liq[k] = 0
@@ -167,35 +188,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         aux_en.RH[k] = TD.relative_humidity(ts_en)
 
         #####
-        ##### buoyancy
+        ##### grid mean buoyancy
         #####
-
-        @inbounds for i in 1:(up.n_updrafts)
-            if aux_up[i].area[k] > 0.0
-                ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
-                aux_up[i].q_liq[k] = TD.liquid_specific_humidity(ts_up)
-                aux_up[i].q_ice[k] = TD.ice_specific_humidity(ts_up)
-                aux_up[i].T[k] = TD.air_temperature(ts_up)
-                ρ = TD.air_density(ts_up)
-                aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
-                aux_up[i].RH[k] = TD.relative_humidity(ts_up)
-            elseif k > kc_surf
-                if aux_up[i].area[k - 1] > 0.0 && edmf.extrapolate_buoyancy
-                    qt = aux_up[i].q_tot[k - 1]
-                    h = aux_up[i].θ_liq_ice[k - 1]
-                    ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
-                    ρ = TD.air_density(ts_up)
-                    aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
-                    aux_up[i].RH[k] = TD.relative_humidity(ts_up)
-                else
-                    aux_up[i].buoy[k] = aux_en.buoy[k]
-                    aux_up[i].RH[k] = aux_en.RH[k]
-                end
-            else
-                aux_up[i].buoy[k] = aux_en.buoy[k]
-                aux_up[i].RH[k] = aux_en.RH[k]
-            end
-        end
 
         aux_gm.buoy[k] = (1.0 - aux_tc.bulk.area[k]) * aux_en.buoy[k]
         @inbounds for i in 1:(up.n_updrafts)
@@ -225,7 +219,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     @inbounds for k in real_center_indices(grid)
         aux_gm.q_liq[k] = (a_up_bulk[k] * aux_tc.bulk.q_liq[k] + (1 - a_up_bulk[k]) * aux_en.q_liq[k])
         aux_gm.q_ice[k] = (a_up_bulk[k] * aux_tc.bulk.q_ice[k] + (1 - a_up_bulk[k]) * aux_en.q_ice[k])
-        aux_gm.T[k] = (a_up_bulk[k] * aux_tc.bulk.T[k] + (1 - a_up_bulk[k]) * aux_en.T[k])
+        # aux_gm.T[k] = (a_up_bulk[k] * aux_tc.bulk.T[k] + (1 - a_up_bulk[k]) * aux_en.T[k])
         aux_gm.buoy[k] = (a_up_bulk[k] * aux_tc.bulk.buoy[k] + (1 - a_up_bulk[k]) * aux_en.buoy[k])
     end
     compute_pressure_plume_spacing(edmf, param_set)
