@@ -166,11 +166,6 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             aux_tc.bulk.RH[k] = aux_gm.RH[k]  # TODO - here we are using previous timestep values
             aux_tc.bulk.T[k] = aux_gm.T[k]    # TODO - here we are using previous timestep values
         end
-        if TD.has_condensate(aux_tc.bulk.q_liq[k] + aux_tc.bulk.q_ice[k]) && a_bulk_c > 1e-3
-            up.cloud_fraction[k] = 1.0
-        else
-            up.cloud_fraction[k] = 0.0
-        end
 
         val1 = 1 / (1 - a_bulk_c)
         val2 = a_bulk_c * val1

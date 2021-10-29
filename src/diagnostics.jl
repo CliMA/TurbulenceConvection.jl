@@ -116,8 +116,14 @@ function io_dictionary_aux(state)
     )
     return io_dict
 end
+
+function io_dictionary_diagnostics(state)
+    DT = NamedTuple{(:dims, :group, :field), Tuple{Tuple{String, String}, String, Any}}
+    io_dict = Dict{String, DT}(
+        "updraft_cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = center_diagnostics_tc(state).bulk.cloud_fraction),
+    )
+end
 #! format: on
-io_dictionary_diagnostics(state) = Dict()
 io_dictionary_state(state) = Dict()
 io_dictionary_tendencies(state) = Dict()
 
@@ -150,6 +156,7 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
     aux_gm = center_aux_grid_mean(state)
     aux_en = center_aux_environment(state)
     aux_up = center_aux_updrafts(state)
+    diag_tc = center_diagnostics_tc(state)
     aux_tc_f = face_aux_tc(state)
     aux_gm_f = face_aux_grid_mean(state)
     kc_toa = kc_top_of_atmos(grid)
@@ -189,5 +196,15 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
             aux_gm_f.massflux_s[k] += edmf.m[i, k] * (s_up_f - s_en_f)
         end
     end
+
+    @inbounds for k in real_center_indices(grid)
+        a_bulk_c = aux_tc.bulk.area[k]
+        if TD.has_condensate(aux_tc.bulk.q_liq[k] + aux_tc.bulk.q_ice[k]) && a_bulk_c > 1e-3
+            diag_tc.bulk.cloud_fraction[k] = 1.0
+        else
+            diag_tc.bulk.cloud_fraction[k] = 0.0
+        end
+    end
+
     return
 end

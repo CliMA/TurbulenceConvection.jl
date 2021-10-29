@@ -1,5 +1,4 @@
 function initialize_io(up::UpdraftVariables, Stats::NetCDFIO_Stats)
-    add_profile(Stats, "updraft_cloud_fraction")
 
     add_ts(Stats, "updraft_cloud_cover")
     add_ts(Stats, "updraft_cloud_base")
@@ -11,7 +10,6 @@ end
 
 function io(up::UpdraftVariables, grid, state, Stats::NetCDFIO_Stats)
     upd_cloud_diagnostics(up, grid, state)
-    write_profile(Stats, "updraft_cloud_fraction", up.cloud_fraction)
     # Note definition of cloud cover : each updraft is associated with a cloud cover equal to the maximum
     # area fraction of the updraft where ql > 0. Each updraft is assumed to have maximum overlap with respect to
     # itup (i.e. no consideration of tilting due to shear) while the updraft classes are assumed to have no overlap
