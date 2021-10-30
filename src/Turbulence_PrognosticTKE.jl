@@ -279,28 +279,17 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     implicit_eqs = edmf.implicit_eqs
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
 
-    common_args = (
-        grid,
-        param_set,
-        state,
-        TS,
-        up.n_updrafts,
-        edmf.minimum_area,
-        edmf.pressure_plume_spacing,
-        edmf.frac_turb_entr,
-        edmf.entr_sc,
-        edmf.mixing_length,
-    )
+    common_args = (grid, state, TS, up.n_updrafts)
 
     implicit_eqs.A_TKE .= construct_tridiag_diffusion_en(common_args..., true)
     implicit_eqs.A_Hvar .= construct_tridiag_diffusion_en(common_args..., false)
     implicit_eqs.A_QTvar .= construct_tridiag_diffusion_en(common_args..., false)
     implicit_eqs.A_HQTcov .= construct_tridiag_diffusion_en(common_args..., false)
 
-    implicit_eqs.b_TKE .= en_diffusion_tendencies(grid, state, TS, :tke, n_updrafts)
-    implicit_eqs.b_Hvar .= en_diffusion_tendencies(grid, state, TS, :Hvar, n_updrafts)
-    implicit_eqs.b_QTvar .= en_diffusion_tendencies(grid, state, TS, :QTvar, n_updrafts)
-    implicit_eqs.b_HQTcov .= en_diffusion_tendencies(grid, state, TS, :HQTcov, n_updrafts)
+    implicit_eqs.b_TKE .= en_diffusion_tendencies(edmf, grid, state, param_set, TS, :tke, n_updrafts)
+    implicit_eqs.b_Hvar .= en_diffusion_tendencies(edmf, grid, state, param_set, TS, :Hvar, n_updrafts)
+    implicit_eqs.b_QTvar .= en_diffusion_tendencies(edmf, grid, state, param_set, TS, :QTvar, n_updrafts)
+    implicit_eqs.b_HQTcov .= en_diffusion_tendencies(edmf, grid, state, param_set, TS, :HQTcov, n_updrafts)
     # -----------
 
     ###
@@ -868,17 +857,26 @@ function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, c
     return
 end
 
-function en_diffusion_tendencies(grid::Grid, state, TS, covar_sym::Symbol, n_updrafts)
+function en_diffusion_tendencies(edmf, grid::Grid, state, param_set, TS, covar_sym::Symbol, n_updrafts)
     dti = TS.dti
     b = center_field(grid)
     ρ0_c = center_ref_state(state).ρ0
     prog_en = center_prog_environment(state)
     aux_en_2m = center_aux_environment_2m(state)
+    aux_up_f = face_aux_updrafts(state)
     prog_covar = getproperty(prog_en, covar_sym)
     aux_covar = getproperty(aux_en_2m, covar_sym)
     aux_up = center_aux_updrafts(state)
+    c_d = CPEDMF.c_d(param_set)
+
+    mixing_length = edmf.mixing_length
+    minimum_area = edmf.minimum_area
+    frac_turb_entr = edmf.frac_turb_entr
+    pressure_plume_spacing = edmf.pressure_plume_spacing
+    entr_sc = edmf.entr_sc
 
     ae = center_field(grid)
+    FT = eltype(grid)
 
     @inbounds for k in real_center_indices(grid)
         ae[k] = 1 .- sum(ntuple(i -> aux_up[i].area[k], n_updrafts))
@@ -888,6 +886,18 @@ function en_diffusion_tendencies(grid::Grid, state, TS, covar_sym::Symbol, n_upd
     covar_surf = prog_covar[kc_surf]
 
     @inbounds for k in real_center_indices(grid)
+        D_env = sum(1:n_updrafts) do i
+            if aux_up[i].area[k] > minimum_area
+                turb_entr = frac_turb_entr[i, k]
+                R_up = pressure_plume_spacing[i]
+                w_up_c = interpf2c(aux_up_f[i].w, grid, k)
+                D_env_i = ρ0_c[k] * aux_up[i].area[k] * w_up_c * (entr_sc[i, k] + turb_entr)
+            else
+                D_env_i = FT(0)
+            end
+            D_env_i
+        end
+        dissipation = ρ0_c[k] * ae[k] * c_d * sqrt(max(prog_en.tke[k], 0)) / max(mixing_length[k], 1)
         if is_surface_center(grid, k)
             b[k] = covar_surf
         else
@@ -897,7 +907,7 @@ function en_diffusion_tendencies(grid::Grid, state, TS, covar_sym::Symbol, n_upd
                 aux_covar.buoy[k] +
                 aux_covar.shear[k] +
                 aux_covar.entr_gain[k] +
-                aux_covar.rain_src[k]
+                aux_covar.rain_src[k] - D_env * prog_covar[k] - dissipation * prog_covar[k]
             )
         end
     end
