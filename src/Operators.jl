@@ -538,31 +538,19 @@ some terms are treated implicitly. Here is a list of all
 the terms in the matrix (and the overall equation solved):
 
     N_a terms = 1 (diffusion)
-    N_diagonal terms = 6 (unsteady+upwind_advection+2diffusion+entr_detr+dissipation)
+    N_diagonal terms = 5 (unsteady+upwind_advection+2diffusion+dissipation)
     N_c terms = 2 (diffusion+upwind_advection)
 
     ∂_t ρa*tke                              ✓ unsteady
       + ∂_z(ρaw*tke) =                      ✓ advection
       + ρaK*(∂²_z(u)+∂²_z(v)+∂²_z(w̄))
-      + ρawΣᵢ(εᵢ(wⱼ-w₀)²-δ₀*tke)            ✓ entr_detr
+      + ρawΣᵢ(εᵢ(wⱼ-w₀)²-δ₀*tke)
       + ∂_z(ρa₀K ∂_z(tke))                  ✓ diffusion
       + ρa₀*w̅₀b̅₀
       - a₀(u⋅∇p)
       + ρa₀D                                ✓ dissipation
 =#
-function construct_tridiag_diffusion_en(
-    grid::Grid,
-    param_set::APS,
-    state,
-    TS,
-    n_updrafts::Int,
-    minimum_area::Float64,
-    pressure_plume_spacing::Vector,
-    frac_turb_entr,
-    entr_sc,
-    mixing_length,
-    is_tke,
-)
+function construct_tridiag_diffusion_en(grid::Grid, param_set::APS, state, TS, n_updrafts::Int, mixing_length, is_tke)
 
     c_d = CPEDMF.c_d(param_set)
     kc_surf = kc_surface(grid)
@@ -599,19 +587,6 @@ function construct_tridiag_diffusion_en(
     end
 
     @inbounds for k in real_center_indices(grid)
-        D_env = 0.0
-
-        @inbounds for i in 1:n_updrafts
-            if aux_up[i].area[k] > minimum_area
-                turb_entr = frac_turb_entr[i, k]
-                R_up = pressure_plume_spacing[i]
-                w_up_c = interpf2c(aux_up_f[i].w, grid, k)
-                D_env += ρ0_c[k] * aux_up[i].area[k] * w_up_c * (entr_sc[i, k] + turb_entr)
-            else
-                D_env = 0.0
-            end
-        end
-
         # TODO: this tridiagonal matrix needs to be re-verified, as it's been pragmatically
         #       modified to not depend on ghost points, and these changes have not been
         #       carefully verified.
@@ -625,7 +600,6 @@ function construct_tridiag_diffusion_en(
                 ρ0_c[k] * ae[k] * dti - ρ0_c[k] * ae[k] * w_en_c[k] * Δzi +
                 rho_ae_K_m[k + 1] * Δzi * Δzi +
                 rho_ae_K_m[k] * Δzi * Δzi +
-                D_env +
                 ρ0_c[k] * ae[k] * c_d * sqrt(max(prog_en.tke[k], 0)) / max(mixing_length[k], 1)
             )
             if is_toa_center(grid, k)
