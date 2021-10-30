@@ -156,8 +156,8 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
 
     aeKHq_tot_bc = Case.Sur.rho_qtflux / aux_en.area[kc_surf]
     aeKHθ_liq_ice_bc = Case.Sur.rho_hflux / aux_en.area[kc_surf]
-    aeKHu_bc = Case.Sur.rho_uflux / aux_en.area[kc_surf]
-    aeKHv_bc = Case.Sur.rho_vflux / aux_en.area[kc_surf]
+    aeKMu_bc = Case.Sur.rho_uflux / aux_en.area[kc_surf]
+    aeKMv_bc = Case.Sur.rho_vflux / aux_en.area[kc_surf]
     @inbounds for k in real_center_indices(grid)
         aeKH_q_tot_cut = dual_faces(edmf.diffusive_flux_qt, grid, k)
         ∇aeKH_q_tot = ∇f2c(aeKH_q_tot_cut, grid, k; bottom = SetValue(aeKHq_tot_bc), top = SetValue(0))
@@ -168,11 +168,11 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         tendencies_gm.θ_liq_ice[k] += -α0_c[k] * ae[k] * ∇aeKH_θ_liq_ice
 
         aeKM_u_cut = dual_faces(edmf.diffusive_flux_u, grid, k)
-        ∇aeKM_u = ∇f2c(aeKM_u_cut, grid, k; bottom = SetValue(aeKHu_bc), top = SetValue(0))
+        ∇aeKM_u = ∇f2c(aeKM_u_cut, grid, k; bottom = SetValue(aeKMu_bc), top = SetValue(0))
         tendencies_gm.u[k] += -α0_c[k] * ae[k] * ∇aeKM_u
 
         aeKM_v_cut = dual_faces(edmf.diffusive_flux_v, grid, k)
-        ∇aeKM_v = ∇f2c(aeKM_v_cut, grid, k; bottom = SetValue(aeKHv_bc), top = SetValue(0))
+        ∇aeKM_v = ∇f2c(aeKM_v_cut, grid, k; bottom = SetValue(aeKMv_bc), top = SetValue(0))
         tendencies_gm.v[k] += -α0_c[k] * ae[k] * ∇aeKM_v
     end
 end
@@ -209,8 +209,8 @@ function compute_diffusive_fluxes(
 
     aeKHq_tot_bc = -Case.Sur.rho_qtflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
     aeKHθ_liq_ice_bc = -Case.Sur.rho_hflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
-    aeKHu_bc = -Case.Sur.rho_uflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
-    aeKHv_bc = -Case.Sur.rho_vflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
+    aeKMu_bc = -Case.Sur.rho_uflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
+    aeKMv_bc = -Case.Sur.rho_vflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
 
     @inbounds for k in real_face_indices(grid)
         q_dual = dual_centers(aux_en.q_tot, grid, k)
@@ -222,11 +222,11 @@ function compute_diffusive_fluxes(
         edmf.diffusive_flux_h[k] = -aux_tc_f.ρ_ae_KH[k] * ∇θ_liq_ice_f
 
         u_dual = dual_centers(prog_gm.u, grid, k)
-        ∇u_f = ∇c2f(u_dual, grid, k; bottom = SetGradient(aeKHu_bc), top = SetGradient(0))
+        ∇u_f = ∇c2f(u_dual, grid, k; bottom = SetGradient(aeKMu_bc), top = SetGradient(0))
         edmf.diffusive_flux_u[k] = -aux_tc_f.ρ_ae_KM[k] * ∇u_f
 
         v_dual = dual_centers(prog_gm.v, grid, k)
-        ∇v_f = ∇c2f(v_dual, grid, k; bottom = SetGradient(aeKHv_bc), top = SetGradient(0))
+        ∇v_f = ∇c2f(v_dual, grid, k; bottom = SetGradient(aeKMv_bc), top = SetGradient(0))
         edmf.diffusive_flux_v[k] = -aux_tc_f.ρ_ae_KM[k] * ∇v_f
     end
     return
