@@ -279,7 +279,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     implicit_eqs = edmf.implicit_eqs
     # Matrix is the same for all variables that use the same eddy diffusivity, we can construct once and reuse
 
-    common_args = (grid, state, TS, up.n_updrafts)
+    common_args = (grid, state, TS)
 
     implicit_eqs.A_TKE .= construct_tridiag_diffusion_en(common_args..., true)
     implicit_eqs.A_Hvar .= construct_tridiag_diffusion_en(common_args..., false)
@@ -867,6 +867,8 @@ function en_diffusion_tendencies(edmf, grid::Grid, state, param_set, TS, covar_s
     prog_covar = getproperty(prog_en, covar_sym)
     aux_covar = getproperty(aux_en_2m, covar_sym)
     aux_up = center_aux_updrafts(state)
+    w_en = face_aux_environment(state).w
+    w_en_c = center_field(grid)
     c_d = CPEDMF.c_d(param_set)
 
     mixing_length = edmf.mixing_length
@@ -876,10 +878,16 @@ function en_diffusion_tendencies(edmf, grid::Grid, state, param_set, TS, covar_s
     entr_sc = edmf.entr_sc
 
     ae = center_field(grid)
+    ρaew_en_ϕ = center_field(grid)
     FT = eltype(grid)
 
     @inbounds for k in real_center_indices(grid)
         ae[k] = 1 .- sum(ntuple(i -> aux_up[i].area[k], n_updrafts))
+    end
+
+    @inbounds for k in real_center_indices(grid)
+        w_en_c[k] = interpf2c(w_en, grid, k)
+        ρaew_en_ϕ[k] = ρ0_c[k] * ae[k] * w_en_c[k] * prog_covar[k]
     end
 
     kc_surf = kc_surface(grid)
@@ -898,6 +906,8 @@ function en_diffusion_tendencies(edmf, grid::Grid, state, param_set, TS, covar_s
             D_env_i
         end
         dissipation = ρ0_c[k] * ae[k] * c_d * sqrt(max(prog_en.tke[k], 0)) / max(mixing_length[k], 1)
+        ρaew_en_ϕ_cut = ccut_downwind(ρaew_en_ϕ, grid, k)
+        ∇ρaew_en_ϕ = c∇_downwind(ρaew_en_ϕ_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
         if is_surface_center(grid, k)
             b[k] = covar_surf
         else
@@ -907,7 +917,7 @@ function en_diffusion_tendencies(edmf, grid::Grid, state, param_set, TS, covar_s
                 aux_covar.buoy[k] +
                 aux_covar.shear[k] +
                 aux_covar.entr_gain[k] +
-                aux_covar.rain_src[k] - D_env * prog_covar[k] - dissipation * prog_covar[k]
+                aux_covar.rain_src[k] - D_env * prog_covar[k] - dissipation * prog_covar[k] - ∇ρaew_en_ϕ
             )
         end
     end
