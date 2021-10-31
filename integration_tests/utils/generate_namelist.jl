@@ -215,7 +215,7 @@ function Nieuwstadt(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 8 * 3600.0
-    namelist["time_stepping"]["dt"] = 2.0
+    namelist["time_stepping"]["dt"] = 1.2
 
     namelist["meta"]["simname"] = "Nieuwstadt"
     namelist["meta"]["casename"] = "Nieuwstadt"
@@ -261,7 +261,7 @@ function Rico(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 86400.0
-    namelist["time_stepping"]["dt"] = 6.0
+    namelist["time_stepping"]["dt"] = 3.0
 
     namelist["microphysics"]["precipitation_model"] = "clima_1m"
     namelist["microphysics"]["τ_acnv"] = 2500.0
@@ -299,7 +299,7 @@ function ARM_SGP(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 3600.0 * 14.5
-    namelist["time_stepping"]["dt"] = 5.0
+    namelist["time_stepping"]["dt"] = 2.0
     namelist["meta"]["simname"] = "ARM_SGP"
     namelist["meta"]["casename"] = "ARM_SGP"
 
@@ -382,7 +382,7 @@ function DryBubble(namelist_defaults)
 
     namelist["stats_io"]["frequency"] = 10.0
     namelist["time_stepping"]["t_max"] = 1000.0
-    namelist["time_stepping"]["dt"] = 6.0
+    namelist["time_stepping"]["dt"] = 0.5
     namelist["meta"]["simname"] = "DryBubble"
     namelist["meta"]["casename"] = "DryBubble"
 

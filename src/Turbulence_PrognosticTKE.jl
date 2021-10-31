@@ -281,10 +281,10 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
 
     common_args = (grid, state, TS)
 
-    implicit_eqs.A_TKE .= construct_tridiag_diffusion_en(common_args..., true)
-    implicit_eqs.A_Hvar .= construct_tridiag_diffusion_en(common_args..., false)
-    implicit_eqs.A_QTvar .= construct_tridiag_diffusion_en(common_args..., false)
-    implicit_eqs.A_HQTcov .= construct_tridiag_diffusion_en(common_args..., false)
+    implicit_eqs.A_TKE .= construct_tridiag_diffusion_en(common_args...)
+    implicit_eqs.A_Hvar .= construct_tridiag_diffusion_en(common_args...)
+    implicit_eqs.A_QTvar .= construct_tridiag_diffusion_en(common_args...)
+    implicit_eqs.A_HQTcov .= construct_tridiag_diffusion_en(common_args...)
 
     implicit_eqs.b_TKE .= en_diffusion_tendencies(edmf, grid, state, param_set, TS, :tke, n_updrafts)
     implicit_eqs.b_Hvar .= en_diffusion_tendencies(edmf, grid, state, param_set, TS, :Hvar, n_updrafts)
@@ -859,8 +859,11 @@ end
 
 function en_diffusion_tendencies(edmf, grid::Grid, state, param_set, TS, covar_sym::Symbol, n_updrafts)
     dti = TS.dti
+    kc_surf = kc_surface(grid)
+    kc_toa = kc_top_of_atmos(grid)
     b = center_field(grid)
     ρ0_c = center_ref_state(state).ρ0
+    ρ0_f = face_ref_state(state).ρ0
     prog_en = center_prog_environment(state)
     aux_en_2m = center_aux_environment_2m(state)
     aux_up_f = face_aux_updrafts(state)
@@ -870,6 +873,29 @@ function en_diffusion_tendencies(edmf, grid::Grid, state, param_set, TS, covar_s
     w_en = face_aux_environment(state).w
     w_en_c = center_field(grid)
     c_d = CPEDMF.c_d(param_set)
+    is_tke = covar_sym == :tke
+
+
+    ρ_ae_K = face_field(grid)
+    ρ_ae_K∇ϕ = face_field(grid)
+    ∇ρ_ae_K∇ϕ = center_field(grid)
+    KM = center_aux_turbconv(state).KM
+    KH = center_aux_turbconv(state).KH
+    aux_tc = center_aux_turbconv(state)
+    ae = 1 .- aux_tc.bulk.area
+    aeK = is_tke ? ae .* KM : ae .* KH
+    aeK_bcs = (; bottom = SetValue(aeK[kc_surf]), top = SetValue(aeK[kc_toa]))
+    prog_bcs = (; bottom = SetGradient(0), top = SetGradient(0))
+
+    @inbounds for k in real_face_indices(grid)
+        ρ_ae_K[k] = interpc2f(aeK, grid, k; aeK_bcs...) * ρ0_f[k]
+        ϕ_dual = dual_centers(prog_covar, grid, k)
+        ρ_ae_K∇ϕ[k] = ρ_ae_K[k] * ∇c2f(ϕ_dual, grid, k; prog_bcs...)
+    end
+    @inbounds for k in real_center_indices(grid)
+        ρ_ae_K∇ϕ_dual = dual_faces(ρ_ae_K∇ϕ, grid, k)
+        ∇ρ_ae_K∇ϕ[k] = ∇f2c(ρ_ae_K∇ϕ_dual, grid, k)
+    end
 
     mixing_length = edmf.mixing_length
     minimum_area = edmf.minimum_area
@@ -917,7 +943,8 @@ function en_diffusion_tendencies(edmf, grid::Grid, state, param_set, TS, covar_s
                 aux_covar.buoy[k] +
                 aux_covar.shear[k] +
                 aux_covar.entr_gain[k] +
-                aux_covar.rain_src[k] - D_env * prog_covar[k] - dissipation * prog_covar[k] - ∇ρaew_en_ϕ
+                aux_covar.rain_src[k] - D_env * prog_covar[k] - dissipation * prog_covar[k] - ∇ρaew_en_ϕ +
+                ∇ρ_ae_K∇ϕ[k]
             )
         end
     end
