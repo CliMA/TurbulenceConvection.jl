@@ -537,60 +537,36 @@ matrix for solving 2nd order environment variables where
 some terms are treated implicitly. Here is a list of all
 the terms in the matrix (and the overall equation solved):
 
-    N_a terms = 1 (diffusion)
-    N_diagonal terms = 3 (unsteady+2diffusion)
-    N_c terms = 1 (diffusion)
+    N_a terms = 0 ()
+    N_diagonal terms = 1 (unsteady)
+    N_c terms = 0 ()
 
     ∂_t ρa*tke                              x unsteady
       + ∂_z(ρaw*tke) =                      x advection
       + ρaK*(∂²_z(u)+∂²_z(v)+∂²_z(w̄))       x shear?
       + ρawΣᵢ(εᵢ(wⱼ-w₀)²-δ₀*tke)            x entr-detr
-      + ∂_z(ρa₀K ∂_z(tke))                  ✓ diffusion
+      + ∂_z(ρa₀K ∂_z(tke))                  x diffusion
       + ρa₀*w̅₀b̅₀                            x buoyancy
       - a₀(u⋅∇p)                            x pressure term
       + ρa₀D                                x dissipation
 =#
-function construct_tridiag_diffusion_en(grid::Grid, state, TS, is_tke)
-
-    kc_surf = kc_surface(grid)
-    kc_toa = kc_top_of_atmos(grid)
-    Δzi = grid.Δzi
+function construct_tridiag_diffusion_en(grid::Grid, state, TS)
     dti = TS.dti
     a = center_field(grid)
     b = center_field(grid)
     c = center_field(grid)
     ρ0_c = center_ref_state(state).ρ0
-    ρ0_f = face_ref_state(state).ρ0
     aux_tc = center_aux_turbconv(state)
 
     ae = 1 .- aux_tc.bulk.area
-    ρ_ae_K = face_field(grid)
-    KM = center_aux_turbconv(state).KM
-    KH = center_aux_turbconv(state).KH
-
-    aeK = is_tke ? ae .* KM : ae .* KH
-    aeK_bcs = (; bottom = SetValue(aeK[kc_surf]), top = SetValue(aeK[kc_toa]))
-
-    @inbounds for k in real_face_indices(grid)
-        ρ_ae_K[k] = interpc2f(aeK, grid, k; aeK_bcs...) * ρ0_f[k]
-    end
 
     @inbounds for k in real_center_indices(grid)
-        # TODO: this tridiagonal matrix needs to be re-verified, as it's been pragmatically
-        #       modified to not depend on ghost points, and these changes have not been
-        #       carefully verified.
-        if is_surface_center(grid, k)
-            a[k] = 0.0
-            b[k] = 1.0
-            c[k] = 0.0
+        a[k] = 0
+        c[k] = 0
+        b[k] = if is_surface_center(grid, k)
+            1
         else
-            a[k] = (-ρ_ae_K[k] * Δzi * Δzi)
-            b[k] = (ρ0_c[k] * ae[k] * dti + ρ_ae_K[k + 1] * Δzi * Δzi + ρ_ae_K[k] * Δzi * Δzi)
-            if is_toa_center(grid, k)
-                c[k] = 0.0
-            else
-                c[k] = (-ρ_ae_K[k + 1] * Δzi * Δzi)
-            end
+            ρ0_c[k] * ae[k] * dti
         end
     end
 
