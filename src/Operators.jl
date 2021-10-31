@@ -538,19 +538,19 @@ some terms are treated implicitly. Here is a list of all
 the terms in the matrix (and the overall equation solved):
 
     N_a terms = 1 (diffusion)
-    N_diagonal terms = 5 (unsteady+upwind_advection+2diffusion)
-    N_c terms = 2 (diffusion+upwind_advection)
+    N_diagonal terms = 3 (unsteady+2diffusion)
+    N_c terms = 1 (diffusion)
 
-    ∂_t ρa*tke                              ✓ unsteady
-      + ∂_z(ρaw*tke) =                      ✓ advection
-      + ρaK*(∂²_z(u)+∂²_z(v)+∂²_z(w̄))
-      + ρawΣᵢ(εᵢ(wⱼ-w₀)²-δ₀*tke)
+    ∂_t ρa*tke                              x unsteady
+      + ∂_z(ρaw*tke) =                      x advection
+      + ρaK*(∂²_z(u)+∂²_z(v)+∂²_z(w̄))       x shear?
+      + ρawΣᵢ(εᵢ(wⱼ-w₀)²-δ₀*tke)            x entr-detr
       + ∂_z(ρa₀K ∂_z(tke))                  ✓ diffusion
-      + ρa₀*w̅₀b̅₀
-      - a₀(u⋅∇p)
-      + ρa₀D
+      + ρa₀*w̅₀b̅₀                            x buoyancy
+      - a₀(u⋅∇p)                            x pressure term
+      + ρa₀D                                x dissipation
 =#
-function construct_tridiag_diffusion_en(grid::Grid, state, TS, n_updrafts::Int, is_tke)
+function construct_tridiag_diffusion_en(grid::Grid, state, TS, is_tke)
 
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
@@ -562,14 +562,9 @@ function construct_tridiag_diffusion_en(grid::Grid, state, TS, n_updrafts::Int, 
     ρ0_c = center_ref_state(state).ρ0
     ρ0_f = face_ref_state(state).ρ0
     aux_tc = center_aux_turbconv(state)
-    w_en = face_aux_environment(state).w
-    aux_up_f = face_aux_updrafts(state)
-    prog_en = center_prog_environment(state)
-    aux_up = center_aux_updrafts(state)
 
     ae = 1 .- aux_tc.bulk.area
     ρ_ae_K = face_field(grid)
-    w_en_c = center_field(grid)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
 
@@ -578,10 +573,6 @@ function construct_tridiag_diffusion_en(grid::Grid, state, TS, n_updrafts::Int, 
 
     @inbounds for k in real_face_indices(grid)
         ρ_ae_K[k] = interpc2f(aeK, grid, k; aeK_bcs...) * ρ0_f[k]
-    end
-
-    @inbounds for k in real_center_indices(grid)
-        w_en_c[k] = interpf2c(w_en, grid, k)
     end
 
     @inbounds for k in real_center_indices(grid)
@@ -594,15 +585,11 @@ function construct_tridiag_diffusion_en(grid::Grid, state, TS, n_updrafts::Int, 
             c[k] = 0.0
         else
             a[k] = (-ρ_ae_K[k] * Δzi * Δzi)
-            b[k] = (
-                ρ0_c[k] * ae[k] * dti - ρ0_c[k] * ae[k] * w_en_c[k] * Δzi +
-                ρ_ae_K[k + 1] * Δzi * Δzi +
-                ρ_ae_K[k] * Δzi * Δzi
-            )
+            b[k] = (ρ0_c[k] * ae[k] * dti + ρ_ae_K[k + 1] * Δzi * Δzi + ρ_ae_K[k] * Δzi * Δzi)
             if is_toa_center(grid, k)
                 c[k] = 0.0
             else
-                c[k] = (ρ0_c[k + 1] * ae[k + 1] * w_en_c[k + 1] * Δzi - ρ_ae_K[k + 1] * Δzi * Δzi)
+                c[k] = (-ρ_ae_K[k + 1] * Δzi * Δzi)
             end
         end
     end
