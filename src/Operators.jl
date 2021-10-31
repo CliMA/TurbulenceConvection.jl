@@ -538,33 +538,20 @@ some terms are treated implicitly. Here is a list of all
 the terms in the matrix (and the overall equation solved):
 
     N_a terms = 1 (diffusion)
-    N_diagonal terms = 6 (unsteady+upwind_advection+2diffusion+entr_detr+dissipation)
+    N_diagonal terms = 5 (unsteady+upwind_advection+2diffusion)
     N_c terms = 2 (diffusion+upwind_advection)
 
     ∂_t ρa*tke                              ✓ unsteady
       + ∂_z(ρaw*tke) =                      ✓ advection
       + ρaK*(∂²_z(u)+∂²_z(v)+∂²_z(w̄))
-      + ρawΣᵢ(εᵢ(wⱼ-w₀)²-δ₀*tke)            ✓ entr_detr
+      + ρawΣᵢ(εᵢ(wⱼ-w₀)²-δ₀*tke)
       + ∂_z(ρa₀K ∂_z(tke))                  ✓ diffusion
       + ρa₀*w̅₀b̅₀
       - a₀(u⋅∇p)
-      + ρa₀D                                ✓ dissipation
+      + ρa₀D
 =#
-function construct_tridiag_diffusion_en(
-    grid::Grid,
-    param_set::APS,
-    state,
-    TS,
-    n_updrafts::Int,
-    minimum_area::Float64,
-    pressure_plume_spacing::Vector,
-    frac_turb_entr,
-    entr_sc,
-    mixing_length,
-    is_tke,
-)
+function construct_tridiag_diffusion_en(grid::Grid, state, TS, n_updrafts::Int, is_tke)
 
-    c_d = CPEDMF.c_d(param_set)
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     Δzi = grid.Δzi
@@ -581,9 +568,8 @@ function construct_tridiag_diffusion_en(
     aux_up = center_aux_updrafts(state)
 
     ae = 1 .- aux_tc.bulk.area
-    rho_ae_K_m = face_field(grid)
+    ρ_ae_K = face_field(grid)
     w_en_c = center_field(grid)
-    D_env = 0.0
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
 
@@ -591,7 +577,7 @@ function construct_tridiag_diffusion_en(
     aeK_bcs = (; bottom = SetValue(aeK[kc_surf]), top = SetValue(aeK[kc_toa]))
 
     @inbounds for k in real_face_indices(grid)
-        rho_ae_K_m[k] = interpc2f(aeK, grid, k; aeK_bcs...) * ρ0_f[k]
+        ρ_ae_K[k] = interpc2f(aeK, grid, k; aeK_bcs...) * ρ0_f[k]
     end
 
     @inbounds for k in real_center_indices(grid)
@@ -599,19 +585,6 @@ function construct_tridiag_diffusion_en(
     end
 
     @inbounds for k in real_center_indices(grid)
-        D_env = 0.0
-
-        @inbounds for i in 1:n_updrafts
-            if aux_up[i].area[k] > minimum_area
-                turb_entr = frac_turb_entr[i, k]
-                R_up = pressure_plume_spacing[i]
-                w_up_c = interpf2c(aux_up_f[i].w, grid, k)
-                D_env += ρ0_c[k] * aux_up[i].area[k] * w_up_c * (entr_sc[i, k] + turb_entr)
-            else
-                D_env = 0.0
-            end
-        end
-
         # TODO: this tridiagonal matrix needs to be re-verified, as it's been pragmatically
         #       modified to not depend on ghost points, and these changes have not been
         #       carefully verified.
@@ -620,18 +593,16 @@ function construct_tridiag_diffusion_en(
             b[k] = 1.0
             c[k] = 0.0
         else
-            a[k] = (-rho_ae_K_m[k] * Δzi * Δzi)
+            a[k] = (-ρ_ae_K[k] * Δzi * Δzi)
             b[k] = (
                 ρ0_c[k] * ae[k] * dti - ρ0_c[k] * ae[k] * w_en_c[k] * Δzi +
-                rho_ae_K_m[k + 1] * Δzi * Δzi +
-                rho_ae_K_m[k] * Δzi * Δzi +
-                D_env +
-                ρ0_c[k] * ae[k] * c_d * sqrt(max(prog_en.tke[k], 0)) / max(mixing_length[k], 1)
+                ρ_ae_K[k + 1] * Δzi * Δzi +
+                ρ_ae_K[k] * Δzi * Δzi
             )
             if is_toa_center(grid, k)
                 c[k] = 0.0
             else
-                c[k] = (ρ0_c[k + 1] * ae[k + 1] * w_en_c[k + 1] * Δzi - rho_ae_K_m[k + 1] * Δzi * Δzi)
+                c[k] = (ρ0_c[k + 1] * ae[k + 1] * w_en_c[k + 1] * Δzi - ρ_ae_K[k + 1] * Δzi * Δzi)
             end
         end
     end
