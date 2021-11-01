@@ -489,11 +489,7 @@ end
 
 CasesBase(case::T; kwargs...) where {T} = CasesBase{T}(; casename = string(nameof(T)), kwargs...)
 
-function center_field_tridiagonal_matrix(grid::Grid)
-    return LinearAlgebra.Tridiagonal(center_field(grid)[2:end], center_field(grid), center_field(grid)[1:(end - 1)])
-end
-
-mutable struct EDMF_PrognosticTKE{A1, A2, IE}
+mutable struct EDMF_PrognosticTKE{A1, A2}
     Ri_bulk_crit::Float64
     zi::Float64
     n_updrafts::Int
@@ -527,7 +523,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
     asp_ratio::A2
     m::A2
     mixing_length::A1
-    implicit_eqs::IE
     horiz_K_eddy::A2
     area_surface_bc::A1
     w_surface_bc::A1
@@ -645,22 +640,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
         m = face_field(grid, n_updrafts)
 
         # mixing length
-        implicit_eqs = (
-            A_θq_gm = center_field_tridiagonal_matrix(grid),
-            A_uv_gm = center_field_tridiagonal_matrix(grid),
-            A_TKE = center_field_tridiagonal_matrix(grid),
-            A_Hvar = center_field_tridiagonal_matrix(grid),
-            A_QTvar = center_field_tridiagonal_matrix(grid),
-            A_HQTcov = center_field_tridiagonal_matrix(grid),
-            b_θ_liq_ice_gm = center_field(grid),
-            b_q_tot_gm = center_field(grid),
-            b_u_gm = center_field(grid),
-            b_v_gm = center_field(grid),
-            b_TKE = center_field(grid),
-            b_Hvar = center_field(grid),
-            b_QTvar = center_field(grid),
-            b_HQTcov = center_field(grid),
-        )
         mixing_length = center_field(grid)
         horiz_K_eddy = center_field(grid, n_updrafts)
 
@@ -738,8 +717,7 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
         detr_surface_bc = 0
         A1 = typeof(mixing_length)
         A2 = typeof(horiz_K_eddy)
-        IE = typeof(implicit_eqs)
-        return new{A1, A2, IE}(
+        return new{A1, A2}(
             Ri_bulk_crit,
             zi,
             n_updrafts,
@@ -773,7 +751,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
             asp_ratio,
             m,
             mixing_length,
-            implicit_eqs,
             horiz_K_eddy,
             area_surface_bc,
             w_surface_bc,
