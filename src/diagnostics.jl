@@ -64,11 +64,10 @@ function io_dictionary_aux(state)
         "thetal_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_grid_mean(state).θ_liq_ice),
         "eddy_viscosity" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).KM),
         "eddy_diffusivity" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).KH),
-        "env_tke" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_environment(state).tke),
-        "env_Hvar" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_environment(state).Hvar),
-        "env_QTvar" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_environment(state).QTvar),
-
-        "env_HQTcov" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_environment(state).HQTcov),
+        "env_tke" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment(state).tke),
+        "env_Hvar" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment(state).Hvar),
+        "env_QTvar" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment(state).QTvar),
+        "env_HQTcov" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment(state).HQTcov),
 
         "tke_buoy" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).tke.buoy),
         "tke_pressure" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_environment_2m(state).tke.press),

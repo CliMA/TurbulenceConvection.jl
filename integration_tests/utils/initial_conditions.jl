@@ -22,17 +22,22 @@ function initialize_covariance(edmf::TC.EDMF_PrognosticTKE, grid, state, gm, Cas
     en = edmf.EnvVar
     aux_gm = TC.center_aux_grid_mean(state)
     prog_en = TC.center_prog_environment(state)
+    aux_en = TC.center_aux_environment(state)
+    ρ0_c = TC.center_ref_state(state).ρ0
+    aux_tc = TC.center_aux_turbconv(state)
+    ae = 1 .- aux_tc.bulk.area # area of environment
 
-    prog_en.tke .= aux_gm.tke
+    aux_en.tke .= aux_gm.tke
+    prog_en.ρatke .= aux_en.tke .* ρ0_c .* ae
 
     TC.get_GMV_CoVar(edmf, grid, state, :tke, :w)
     aux_gm.Hvar .= aux_gm.Hvar[kc_surf] .* aux_gm.tke
     aux_gm.QTvar .= aux_gm.QTvar[kc_surf] .* aux_gm.tke
     aux_gm.HQTcov .= aux_gm.HQTcov[kc_surf] .* aux_gm.tke
 
-    prog_en.Hvar .= aux_gm.Hvar
-    prog_en.QTvar .= aux_gm.QTvar
-    prog_en.HQTcov .= aux_gm.HQTcov
+    prog_en.ρaHvar .= aux_gm.Hvar .* ρ0_c .* ae
+    prog_en.ρaQTvar .= aux_gm.QTvar .* ρ0_c .* ae
+    prog_en.ρaHQTcov .= aux_gm.HQTcov .* ρ0_c .* ae
     return
 end
 

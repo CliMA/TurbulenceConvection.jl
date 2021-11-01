@@ -107,6 +107,10 @@ cent_aux_vars_edmf(FT, n_up) = (;
             T = FT(0),
             buoy = FT(0),
             cloud_fraction = FT(0),
+            tke = FT(0),
+            Hvar = FT(0),
+            QTvar = FT(0),
+            HQTcov = FT(0),
         ),
         en_2m = (;
             tke = cent_aux_vars_en_2m(FT),
@@ -157,7 +161,7 @@ face_diagnostic_vars(FT, n_up) = (; face_diagnostic_vars_gm(FT)..., face_diagnos
 cent_prognostic_vars(FT, n_up) = (; cent_prognostic_vars_gm(FT)..., cent_prognostic_vars_edmf(FT, n_up)...)
 cent_prognostic_vars_gm(FT) = (; u = FT(0), v = FT(0), θ_liq_ice = FT(0), q_tot = FT(0))
 cent_prognostic_vars_up(FT) = (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot = FT(0))
-cent_prognostic_vars_en(FT) = (; tke = FT(0), Hvar = FT(0), QTvar = FT(0), HQTcov = FT(0))
+cent_prognostic_vars_en(FT) = (; ρatke = FT(0), ρaHvar = FT(0), ρaQTvar = FT(0), ρaHQTcov = FT(0))
 cent_prognostic_vars_edmf(FT, n_up) = (;
     turbconv = (;
         en = cent_prognostic_vars_en(FT), up = ntuple(i -> cent_prognostic_vars_up(FT), n_up), pr = (; qr = FT(0)),

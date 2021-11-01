@@ -62,7 +62,6 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
     a, w = FastGaussQuadrature.gausshermite(en_thermo.quadrature_order)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
-    prog_en = center_prog_environment(state)
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
 
@@ -93,32 +92,32 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
 
     @inbounds for k in real_center_indices(grid)
         if (
-            prog_en.QTvar[k] > epsilon &&
-            prog_en.Hvar[k] > epsilon &&
-            abs(prog_en.HQTcov[k]) > epsilon &&
+            aux_en.QTvar[k] > epsilon &&
+            aux_en.Hvar[k] > epsilon &&
+            abs(aux_en.HQTcov[k]) > epsilon &&
             aux_en.q_tot[k] > epsilon &&
-            sqrt(prog_en.QTvar[k]) < aux_en.q_tot[k]
+            sqrt(aux_en.QTvar[k]) < aux_en.q_tot[k]
         )
 
             if en_thermo.quadrature_type == "log-normal"
                 # Lognormal parameters (mu, sd) from mean and variance
-                sd_q = sqrt(log(prog_en.QTvar[k] / aux_en.q_tot[k] / aux_en.q_tot[k] + 1.0))
-                sd_h = sqrt(log(prog_en.Hvar[k] / aux_en.θ_liq_ice[k] / aux_en.θ_liq_ice[k] + 1.0))
+                sd_q = sqrt(log(aux_en.QTvar[k] / aux_en.q_tot[k] / aux_en.q_tot[k] + 1.0))
+                sd_h = sqrt(log(aux_en.Hvar[k] / aux_en.θ_liq_ice[k] / aux_en.θ_liq_ice[k] + 1.0))
                 # Enforce Schwarz"s inequality
-                corr = max(min(prog_en.HQTcov[k] / sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]), 1.0), -1.0)
+                corr = max(min(aux_en.HQTcov[k] / sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]), 1.0), -1.0)
                 sd2_hq =
-                    log(corr * sqrt(prog_en.Hvar[k] * prog_en.QTvar[k]) / aux_en.θ_liq_ice[k] / aux_en.q_tot[k] + 1.0)
+                    log(corr * sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]) / aux_en.θ_liq_ice[k] / aux_en.q_tot[k] + 1.0)
                 sd_cond_h_q = sqrt(max(sd_h * sd_h - sd2_hq * sd2_hq / sd_q / sd_q, 0.0))
                 mu_q =
-                    log(aux_en.q_tot[k] * aux_en.q_tot[k] / sqrt(aux_en.q_tot[k] * aux_en.q_tot[k] + prog_en.QTvar[k]))
+                    log(aux_en.q_tot[k] * aux_en.q_tot[k] / sqrt(aux_en.q_tot[k] * aux_en.q_tot[k] + aux_en.QTvar[k]))
                 mu_h = log(
                     aux_en.θ_liq_ice[k] * aux_en.θ_liq_ice[k] /
-                    sqrt(aux_en.θ_liq_ice[k] * aux_en.θ_liq_ice[k] + prog_en.Hvar[k]),
+                    sqrt(aux_en.θ_liq_ice[k] * aux_en.θ_liq_ice[k] + aux_en.Hvar[k]),
                 )
             else
-                sd_q = sqrt(prog_en.QTvar[k])
-                sd_h = sqrt(prog_en.Hvar[k])
-                corr = max(min(prog_en.HQTcov[k] / max(sd_h * sd_q, 1e-13), 1.0), -1.0)
+                sd_q = sqrt(aux_en.QTvar[k])
+                sd_h = sqrt(aux_en.Hvar[k])
+                corr = max(min(aux_en.HQTcov[k] / max(sd_h * sd_q, 1e-13), 1.0), -1.0)
 
                 # limit sd_q to prevent negative qt_hat
                 sd_q_lim = (1e-10 - aux_en.q_tot[k]) / (sqrt2 * abscissas[1])
