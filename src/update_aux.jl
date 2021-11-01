@@ -80,6 +80,14 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     for k in real_center_indices(grid)
         aux_tc.bulk.area[k] = sum(ntuple(i -> aux_up[i].area[k], up.n_updrafts))
     end
+    ae = 1 .- aux_tc.bulk.area # area of environment
+
+    for k in real_center_indices(grid)
+        aux_en.tke[k] = prog_en.ρatke[k] / (ρ0_c[k] * ae[k])
+        aux_en.Hvar[k] = prog_en.ρaHvar[k] / (ρ0_c[k] * ae[k])
+        aux_en.QTvar[k] = prog_en.ρaQTvar[k] / (ρ0_c[k] * ae[k])
+        aux_en.HQTcov[k] = prog_en.ρaHQTcov[k] / (ρ0_c[k] * ae[k])
+    end
 
     #####
     ##### diagnose_GMV_moments
@@ -261,7 +269,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                     w_en = interpf2c(aux_en_f.w, grid, k),
                     b_up = aux_up[i].buoy[k],
                     b_en = aux_en.buoy[k],
-                    tke = prog_en.tke[k],
+                    tke = aux_en.tke[k],
                     dMdz = ∇m,
                     M = m,
                     a_up = aux_up[i].area[k],
@@ -442,13 +450,13 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         ml_model = MinDisspLen(;
             z = grid.zc[k].z,
             obukhov_length = obukhov_length,
-            tke_surf = prog_en.tke[kc_surf],
+            tke_surf = aux_en.tke[kc_surf],
             ustar = surface.ustar,
             Pr = edmf.prandtl_nvec[k],
             p0 = p0_c[k],
             ∇b = bg,
             Shear² = Shear²,
-            tke = prog_en.tke[k],
+            tke = aux_en.tke[k],
             a_en = (1 - aux_tc.bulk.area[k]),
             wc_en = wc_en,
             wc_up = Tuple(wc_up),
@@ -463,7 +471,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         edmf.mixing_length[k] = ml.mixing_length
         edmf.ml_ratio[k] = ml.ml_ratio
 
-        KM[k] = c_m * edmf.mixing_length[k] * sqrt(max(prog_en.tke[k], 0.0))
+        KM[k] = c_m * edmf.mixing_length[k] * sqrt(max(aux_en.tke[k], 0.0))
         KH[k] = KM[k] / edmf.prandtl_nvec[k]
 
         aux_en_2m.tke.buoy[k] = -ml_model.a_en * ρ0_c[k] * KH[k] * bg.∂b∂z
@@ -501,7 +509,6 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
 
     # TODO defined again in compute_covariance_shear and compute_covaraince
-    ae = 1 .- aux_tc.bulk.area # area of environment
     @inbounds for k in real_center_indices(grid)
         aux_en_2m.tke.rain_src[k] = 0
         aux_en_2m.Hvar.rain_src[k] = ρ0_c[k] * ae[k] * 2 * en_thermo.Hvar_rain_dt[k]
