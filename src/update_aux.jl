@@ -132,30 +132,19 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         aux_tc.bulk.buoy[k] = 0
 
         @inbounds for i in 1:(up.n_updrafts)
-            if aux_up[i].area[k] > 0.0
-                ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
-                aux_up[i].q_liq[k] = TD.liquid_specific_humidity(ts_up)
-                aux_up[i].q_ice[k] = TD.ice_specific_humidity(ts_up)
-                aux_up[i].T[k] = TD.air_temperature(ts_up)
-                ρ = TD.air_density(ts_up)
-                aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
-                aux_up[i].RH[k] = TD.relative_humidity(ts_up)
-            elseif k > kc_surf
-                if aux_up[i].area[k - 1] > 0.0 && edmf.extrapolate_buoyancy
-                    qt = aux_up[i].q_tot[k - 1]
-                    h = aux_up[i].θ_liq_ice[k - 1]
-                    ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
-                    ρ = TD.air_density(ts_up)
-                    aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
-                    aux_up[i].RH[k] = TD.relative_humidity(ts_up)
-                else
-                    aux_up[i].buoy[k] = aux_en.buoy[k]
-                    aux_up[i].RH[k] = aux_en.RH[k]
-                end
+            if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
+                qt = aux_up[i].q_tot[k - 1]
+                h = aux_up[i].θ_liq_ice[k - 1]
+                ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
             else
-                aux_up[i].buoy[k] = aux_en.buoy[k]
-                aux_up[i].RH[k] = aux_en.RH[k]
+                ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
             end
+            aux_up[i].q_liq[k] = TD.liquid_specific_humidity(ts_up)
+            aux_up[i].q_ice[k] = TD.ice_specific_humidity(ts_up)
+            aux_up[i].T[k] = TD.air_temperature(ts_up)
+            ρ = TD.air_density(ts_up)
+            aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
+            aux_up[i].RH[k] = TD.relative_humidity(ts_up)
         end
 
         if a_bulk_c > 1.0e-20
