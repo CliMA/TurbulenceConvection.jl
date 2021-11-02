@@ -77,16 +77,16 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         end
     end
 
-    for k in real_center_indices(grid)
+    @inbounds for k in real_center_indices(grid)
         aux_tc.bulk.area[k] = sum(ntuple(i -> aux_up[i].area[k], up.n_updrafts))
     end
-    ae = 1 .- aux_tc.bulk.area # area of environment
+    aux_en.area .= 1 .- aux_tc.bulk.area # area of environment
 
-    for k in real_center_indices(grid)
-        aux_en.tke[k] = prog_en.ρatke[k] / (ρ0_c[k] * ae[k])
-        aux_en.Hvar[k] = prog_en.ρaHvar[k] / (ρ0_c[k] * ae[k])
-        aux_en.QTvar[k] = prog_en.ρaQTvar[k] / (ρ0_c[k] * ae[k])
-        aux_en.HQTcov[k] = prog_en.ρaHQTcov[k] / (ρ0_c[k] * ae[k])
+    @inbounds for k in real_center_indices(grid)
+        aux_en.tke[k] = prog_en.ρatke[k] / (ρ0_c[k] * aux_en.area[k])
+        aux_en.Hvar[k] = prog_en.ρaHvar[k] / (ρ0_c[k] * aux_en.area[k])
+        aux_en.QTvar[k] = prog_en.ρaQTvar[k] / (ρ0_c[k] * aux_en.area[k])
+        aux_en.HQTcov[k] = prog_en.ρaHQTcov[k] / (ρ0_c[k] * aux_en.area[k])
     end
 
     #####
@@ -500,9 +500,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     # TODO defined again in compute_covariance_shear and compute_covaraince
     @inbounds for k in real_center_indices(grid)
         aux_en_2m.tke.rain_src[k] = 0
-        aux_en_2m.Hvar.rain_src[k] = ρ0_c[k] * ae[k] * 2 * en_thermo.Hvar_rain_dt[k]
-        aux_en_2m.QTvar.rain_src[k] = ρ0_c[k] * ae[k] * 2 * en_thermo.QTvar_rain_dt[k]
-        aux_en_2m.HQTcov.rain_src[k] = ρ0_c[k] * ae[k] * en_thermo.HQTcov_rain_dt[k]
+        aux_en_2m.Hvar.rain_src[k] = ρ0_c[k] * aux_en.area[k] * 2 * en_thermo.Hvar_rain_dt[k]
+        aux_en_2m.QTvar.rain_src[k] = ρ0_c[k] * aux_en.area[k] * 2 * en_thermo.QTvar_rain_dt[k]
+        aux_en_2m.HQTcov.rain_src[k] = ρ0_c[k] * aux_en.area[k] * en_thermo.HQTcov_rain_dt[k]
     end
 
     get_GMV_CoVar(edmf, grid, state, :tke, :w)
