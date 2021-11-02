@@ -457,10 +457,10 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
         ml = mixing_length(param_set, ml_model)
         edmf.mls[k] = ml.min_len_ind
-        edmf.mixing_length[k] = ml.mixing_length
+        aux_tc.mixing_length[k] = ml.mixing_length
         edmf.ml_ratio[k] = ml.ml_ratio
 
-        KM[k] = c_m * edmf.mixing_length[k] * sqrt(max(aux_en.tke[k], 0.0))
+        KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0.0))
         KH[k] = KM[k] / edmf.prandtl_nvec[k]
 
         aux_en_2m.tke.buoy[k] = -ml_model.a_en * ρ0_c[k] * KH[k] * bg.∂b∂z

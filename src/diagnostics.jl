@@ -111,6 +111,7 @@ function io_dictionary_aux(state)
         "total_flux_s" => (; dims = ("zf", "t"), group = "profiles", field = face_aux_grid_mean(state).massflux_s .+ face_aux_grid_mean(state).diffusive_flux_s),
 
         "qr_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_precipitation(state).qr),
+        "mixing_length" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).mixing_length),
 
     )
     return io_dict
