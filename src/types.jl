@@ -519,7 +519,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
     nh_pressure_drag::A2
     asp_ratio::A2
     m::A2
-    mixing_length::A1
     horiz_K_eddy::A2
     area_surface_bc::A1
     w_surface_bc::A1
@@ -637,7 +636,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
         m = face_field(grid, n_updrafts)
 
         # mixing length
-        mixing_length = center_field(grid)
         horiz_K_eddy = center_field(grid, n_updrafts)
 
         # Near-surface BC of updraft area fraction
@@ -712,7 +710,7 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
         wstar = 0
         entr_surface_bc = 0
         detr_surface_bc = 0
-        A1 = typeof(mixing_length)
+        A1 = typeof(massflux_tendency_h)
         A2 = typeof(horiz_K_eddy)
         return new{A1, A2}(
             Ri_bulk_crit,
@@ -747,7 +745,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
             nh_pressure_drag,
             asp_ratio,
             m,
-            mixing_length,
             horiz_K_eddy,
             area_surface_bc,
             w_surface_bc,

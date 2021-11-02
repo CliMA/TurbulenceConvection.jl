@@ -818,8 +818,10 @@ function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, c
     covar = getproperty(aux_en, covar_sym)
 
     @inbounds for k in real_center_indices(grid)
-        aux_covar.dissipation[k] =
-            (ρ0_c[k] * aux_en.area[k] * covar[k] * max(aux_en.tke[k], 0)^0.5 / max(edmf.mixing_length[k], 1.0e-3) * c_d)
+        aux_covar.dissipation[k] = (
+            ρ0_c[k] * aux_en.area[k] * covar[k] * max(aux_en.tke[k], 0)^0.5 / max(aux_tc.mixing_length[k], 1.0e-3) *
+            c_d
+        )
     end
     return
 end
@@ -865,7 +867,7 @@ function compute_en_tendencies!(edmf, grid::Grid, state, param_set, TS, covar_sy
         ∇ρ_ae_K∇ϕ[k] = ∇f2c(ρ_ae_K∇ϕ_dual, grid, k)
     end
 
-    mixing_length = edmf.mixing_length
+    mixing_length = aux_tc.mixing_length
     minimum_area = edmf.minimum_area
     frac_turb_entr = edmf.frac_turb_entr
     pressure_plume_spacing = edmf.pressure_plume_spacing
