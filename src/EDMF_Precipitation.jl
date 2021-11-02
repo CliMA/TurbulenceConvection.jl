@@ -1,17 +1,7 @@
-function precipitation_diagnostics(
-    precip::PrecipVariables,
-    grid,
-    state,
-    up_thermo::UpdraftThermodynamics,
-    en_thermo::EnvironmentThermodynamics,
-)
-    return
-end
-
 """
 Computes the qr advection (down) tendency
 """
-function compute_rain_advection_tendencies(precip::PrecipPhysics, grid, state, gm, TS::TimeStepping)
+function compute_rain_advection_tendencies(::PrecipPhysics, grid, state, gm, TS::TimeStepping)
     param_set = parameter_set(gm)
     Δz = grid.Δz
     Δt = TS.dt
@@ -20,6 +10,7 @@ function compute_rain_advection_tendencies(precip::PrecipPhysics, grid, state, g
     ρ_0_c = center_ref_state(state).ρ0
     tendencies_pr = center_tendencies_precipitation(state)
     prog_pr = center_prog_precipitation(state)
+    aux_tc = center_aux_turbconv(state)
 
     # helper to calculate the rain velocity
     # TODO: assuming gm.W = 0
@@ -50,8 +41,8 @@ function compute_rain_advection_tendencies(precip::PrecipPhysics, grid, state, g
         ρ_0_c_k = ρ_0_c[k]
 
         # TODO - some positivity limiters are needed
-        precip.qr_tendency_advection[k] = ∇ρQRw / ρ_0_c_k
-        tendencies_pr.qr[k] += precip.qr_tendency_advection[k]
+        aux_tc.qr_tendency_advection[k] = ∇ρQRw / ρ_0_c_k
+        tendencies_pr.qr[k] += aux_tc.qr_tendency_advection[k]
     end
     return
 end
@@ -59,12 +50,13 @@ end
 """
 Computes the tendencies to θ_liq_ice, qt and qr due to rain evaporation
 """
-function compute_rain_evap_tendencies(precip::PrecipPhysics, grid, state, gm, TS::TimeStepping)
+function compute_rain_evap_tendencies(::PrecipPhysics, grid, state, gm, TS::TimeStepping)
     param_set = parameter_set(gm)
     Δt = TS.dt
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     aux_gm = center_aux_grid_mean(state)
+    aux_tc = center_aux_turbconv(state)
     prog_gm = center_prog_grid_mean(state)
     prog_pr = center_prog_precipitation(state)
     tendencies_pr = center_tendencies_precipitation(state)
@@ -80,30 +72,10 @@ function compute_rain_evap_tendencies(precip::PrecipPhysics, grid, state, gm, TS
         qt_tendency =
             min(prog_pr.qr[k] / Δt, -CM1.evaporation_sublimation(param_set, rain_type, q, prog_pr.qr[k], ρ0_c[k], T_gm))
 
-        precip.qt_tendency_rain_evap[k] = qt_tendency
-        precip.qr_tendency_rain_evap[k] = -qt_tendency
-        tendencies_pr.qr[k] += precip.qr_tendency_rain_evap[k]
-        precip.θ_liq_ice_tendency_rain_evap[k] = θ_liq_ice_helper(ts, qt_tendency)
-    end
-    return
-end
-
-"""
-Updates qr based on all microphysics tendencies
-"""
-function update_precipitation(
-    precip_var::PrecipVariables,
-    grid,
-    state,
-    up_thermo::UpdraftThermodynamics,
-    en_thermo::EnvironmentThermodynamics,
-    precip_phys::PrecipPhysics,
-    TS::TimeStepping,
-)
-    prog_pr = center_prog_precipitation(state)
-    tendencies_pr = center_tendencies_precipitation(state)
-    @inbounds for k in real_center_indices(grid)
-        prog_pr.qr[k] += tendencies_pr.qr[k] * TS.dt
+        aux_tc.qt_tendency_rain_evap[k] = qt_tendency
+        aux_tc.qr_tendency_rain_evap[k] = -qt_tendency
+        tendencies_pr.qr[k] += aux_tc.qr_tendency_rain_evap[k]
+        aux_tc.θ_liq_ice_tendency_rain_evap[k] = θ_liq_ice_helper(ts, qt_tendency)
     end
     return
 end
