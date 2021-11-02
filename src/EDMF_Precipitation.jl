@@ -15,7 +15,7 @@ function compute_rain_advection_tendencies(::PrecipPhysics, grid, state, gm, TS:
     # helper to calculate the rain velocity
     # TODO: assuming gm.W = 0
     # TODO: verify translation
-    term_vel = center_field(grid)
+    term_vel = aux_tc.term_vel
     @inbounds for k in real_center_indices(grid)
         term_vel[k] = CM1.terminal_velocity(param_set, rain_type, ρ_0_c[k], prog_pr.qr[k])
     end
