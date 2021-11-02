@@ -112,6 +112,8 @@ function io_dictionary_aux(state)
 
         "qr_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_precipitation(state).qr),
 
+        "updraft_cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).bulk.cloud_fraction),
+
     )
     return io_dict
 end

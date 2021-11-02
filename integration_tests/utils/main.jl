@@ -94,6 +94,7 @@ cent_aux_vars_edmf(FT, n_up) = (;
             q_liq = FT(0),
             q_ice = FT(0),
             T = FT(0),
+            cloud_fraction = FT(0),
         ),
         up = ntuple(i -> cent_aux_vars_up(FT), n_up),
         en = (;
@@ -210,7 +211,7 @@ function Simulation1d(namelist)
 
     state = State(prog, aux, tendencies, diagnostics)
 
-    TC.compute_ref_state!(state, grid, param_set, Stats; ref_params...)
+    TC.compute_ref_state!(state, grid, param_set; ref_params...)
 
     io_nt = (;
         ref_state = TC.io_dictionary_ref_state(state),

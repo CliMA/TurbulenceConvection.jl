@@ -29,7 +29,7 @@ function export_ref_profile(case_name::String)
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
     state = (; aux)
 
-    TC.compute_ref_state!(state, grid, param_set, Stats; ref_params...)
+    TC.compute_ref_state!(state, grid, param_set; ref_params...)
 
     io_nt = TC.io_dictionary_ref_state(state)
     TC.initialize_io(io_nt, Stats)
