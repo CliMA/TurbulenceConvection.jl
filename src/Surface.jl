@@ -3,16 +3,9 @@
 #####
 
 function free_convection_windspeed(surf::SurfaceBase, grid, state, gm::GridMeanVariables, param_set, ::BaseCase)
-    θ_ρ = center_field(grid)
-    p0_c = center_ref_state(state).p0
     prog_gm = center_prog_grid_mean(state)
-
-    # Need to get θ_ρ
-    @inbounds for k in real_center_indices(grid)
-        ts = thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        θ_ρ[k] = TD.virtual_pottemp(ts)
-    end
-    zi = get_inversion(param_set, θ_ρ, prog_gm.u, prog_gm.v, grid, surf.Ri_bulk_crit)
+    aux_tc = center_aux_turbconv(state)
+    zi = get_inversion(param_set, aux_tc.θ_virt, prog_gm.u, prog_gm.v, grid, surf.Ri_bulk_crit)
     wstar = get_wstar(surf.bflux, zi) # yair here zi in TRMM should be adjusted
     surf.windspeed = sqrt(surf.windspeed * surf.windspeed + (1.2 * wstar) * (1.2 * wstar))
     return
@@ -156,13 +149,13 @@ function update(surf::SurfaceBase{SurfaceMoninObukhov}, grid, state, gm::GridMea
     h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, Pg, phase_part)
 
     ts_g = thermo_state_pθq(param_set, Pg, h_star, surf.qsurface)
-    θ_ρ_g = TD.virtual_pottemp(ts_g)
+    θ_virt_g = TD.virtual_pottemp(ts_g)
 
     ts_b = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, surf.qsurface)
-    θ_ρ_b = TD.virtual_pottemp(ts_b)
+    θ_virt_b = TD.virtual_pottemp(ts_b)
 
     surf.windspeed = sqrt(u_gm_surf^2 + v_gm_surf^2)
-    Nb2 = g / θ_ρ_g * (θ_ρ_b - θ_ρ_g) / zb
+    Nb2 = g / θ_virt_g * (θ_virt_b - θ_virt_g) / zb
     Ri = Nb2 * zb * zb / (surf.windspeed * surf.windspeed)
 
     surf.cm, surf.ch, surf.obukhov_length = exchange_coefficients_byun(param_set, Ri, zb, surf.zrough)
@@ -209,13 +202,13 @@ function update(surf::SurfaceBase{SurfaceMoninObukhovDry}, grid, state, gm::Grid
     h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, Pg, phase_part)
 
     ts_g = thermo_state_pθq(param_set, Pg, h_star, surf.qsurface)
-    θ_ρ_g = TD.virtual_pottemp(ts_g)
+    θ_virt_g = TD.virtual_pottemp(ts_g)
 
     ts_b = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, surf.qsurface)
-    θ_ρ_b = TD.virtual_pottemp(ts_b)
+    θ_virt_b = TD.virtual_pottemp(ts_b)
 
     surf.windspeed = sqrt(u_gm_surf^2 + v_gm_surf^2)
-    Nb2 = g / θ_ρ_g * (θ_ρ_b - θ_ρ_g) / zb
+    Nb2 = g / θ_virt_g * (θ_virt_b - θ_virt_g) / zb
     Ri = Nb2 * zb * zb / (surf.windspeed * surf.windspeed)
 
     surf.cm, surf.ch, surf.obukhov_length = exchange_coefficients_byun(param_set, Ri, zb, surf.zrough)
@@ -268,13 +261,13 @@ function update(surf::SurfaceBase{SurfaceSullivanPatton}, grid, state, gm::GridM
     h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, Pg, phase_part)
 
     ts_g = thermo_state_pθq(param_set, Pg, h_star, surf.qsurface)
-    θ_ρ_g = TD.virtual_pottemp(ts_g)
+    θ_virt_g = TD.virtual_pottemp(ts_g)
 
     ts_b = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, surf.qsurface)
-    θ_ρ_b = TD.virtual_pottemp(ts_b)
+    θ_virt_b = TD.virtual_pottemp(ts_b)
 
     surf.windspeed = sqrt(u_gm_surf^2 + v_gm_surf^2)
-    Nb2 = g / θ_ρ_g * (θ_ρ_b - θ_ρ_g) / zb
+    Nb2 = g / θ_virt_g * (θ_virt_b - θ_virt_g) / zb
     Ri = Nb2 * zb * zb / (surf.windspeed * surf.windspeed)
 
     surf.cm, surf.ch, surf.obukhov_length = exchange_coefficients_byun(param_set, Ri, zb, surf.zrough)

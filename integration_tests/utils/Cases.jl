@@ -117,7 +117,6 @@ get_surface_type(::GATE_III) = TC.SurfaceFixedCoeffs
 get_surface_type(::GABLS) = TC.SurfaceMoninObukhovDry
 get_surface_type(::SP) = TC.SurfaceSullivanPatton
 get_surface_type(::DryBubble) = TC.SurfaceNone
-get_surface_type(::LES_driven_SCM) = TC.SurfaceFixedFlux
 
 get_forcing_type(::AbstractCaseType) = TC.ForcingStandard # default
 get_forcing_type(::Soares) = TC.ForcingNone
@@ -573,7 +572,7 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, gm, state)
     param_set = TC.parameter_set(gm)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    θ_ρ = TC.center_field(grid)
+    aux_tc = TC.center_aux_turbconv(state)
     p0 = TC.center_ref_state(state).p0
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
@@ -596,12 +595,12 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, gm, state)
         end
     end
 
-    # Need to get θ_ρ
+    # Need to get θ_virt
     @inbounds for k in real_center_indices(grid)
         ts = TC.thermo_state_pθq(param_set, p0[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        θ_ρ[k] = TD.virtual_pottemp(ts)
+        aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
     end
-    zi = 0.6 * get_inversion(param_set, θ_ρ, prog_gm.u, prog_gm.v, grid, 0.2)
+    zi = 0.6 * get_inversion(param_set, aux_tc.θ_virt, prog_gm.u, prog_gm.v, grid, 0.2)
 
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]

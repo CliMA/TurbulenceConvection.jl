@@ -204,12 +204,11 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         aux_en.buoy[k] -= aux_gm.buoy[k]
     end
     # TODO - use this inversion in free_convection_windspeed and not compute zi twice
-    θ_ρ = center_field(grid)
     @inbounds for k in real_center_indices(grid)
         ts = thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        θ_ρ[k] = TD.virtual_pottemp(ts)
+        aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
     end
-    edmf.zi = get_inversion(param_set, θ_ρ, prog_gm.u, prog_gm.v, grid, surface.Ri_bulk_crit)
+    edmf.zi = get_inversion(param_set, aux_tc.θ_virt, prog_gm.u, prog_gm.v, grid, surface.Ri_bulk_crit)
 
     update_surface(Case, grid, state, gm, TS, param_set)
     update_forcing(Case, grid, state, gm, TS, param_set)
