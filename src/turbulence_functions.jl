@@ -9,21 +9,21 @@ function buoyancy_c(param_set, ρ0, ρ)
 end
 
 # BL height
-function get_inversion(param_set, θ_ρ, u, v, grid::Grid, Ri_bulk_crit)
+function get_inversion(param_set, θ_virt, u, v, grid::Grid, Ri_bulk_crit)
     g = CPP.grav(param_set)
     kc_surf = kc_surface(grid)
-    θ_ρ_b = θ_ρ[kc_surf]
+    θ_virt_b = θ_virt[kc_surf]
     Ri_bulk = center_field(grid)
     z_c = grid.zc
 
     # test if we need to look at the free convective limit
     if (u[kc_surf]^2 + v[kc_surf]^2) <= 0.01
-        kmask = map(k -> (k, θ_ρ[k] > θ_ρ_b), real_center_indices(grid))
+        kmask = map(k -> (k, θ_virt[k] > θ_virt_b), real_center_indices(grid))
         k_star = first(kmask[findlast(km -> km[2], kmask)])
-        ∇θ_ρ = c∇_upwind(θ_ρ, grid, k_star; bottom = SetGradient(0), top = FreeBoundary())
-        h = (θ_ρ_b - θ_ρ[k_star - 1]) / ∇θ_ρ + z_c[k_star - 1]
+        ∇θ_virt = c∇_upwind(θ_virt, grid, k_star; bottom = SetGradient(0), top = FreeBoundary())
+        h = (θ_virt_b - θ_virt[k_star - 1]) / ∇θ_virt + z_c[k_star - 1]
     else
-        Ri_bulk_fn(k) = g * (θ_ρ[k] - θ_ρ_b) * z_c[k] / θ_ρ_b / (u[k] * u[k] + v[k] * v[k])
+        Ri_bulk_fn(k) = g * (θ_virt[k] - θ_virt_b) * z_c[k] / θ_virt_b / (u[k] * u[k] + v[k] * v[k])
 
         Ri_bulk .= map(k -> Ri_bulk_fn(k), real_center_indices(grid))
         kmask = map(k -> (k, Ri_bulk_fn(k) > Ri_bulk_crit), real_center_indices(grid))

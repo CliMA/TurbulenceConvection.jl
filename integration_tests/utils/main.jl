@@ -126,6 +126,7 @@ cent_aux_vars_edmf(FT, n_up) = (;
         KM = FT(0),
         KH = FT(0),
         mixing_length = FT(0),
+        θ_virt = FT(0),
     ),
 )
 cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., cent_aux_vars_edmf(FT, n_up)...)
