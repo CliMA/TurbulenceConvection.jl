@@ -96,11 +96,11 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         tendencies_gm.q_tot[k] +=
             edmf.UpdThermo.qt_tendency_rain_formation_tot[k] +
             edmf.EnvThermo.qt_tendency_rain_formation[k] +
-            edmf.PrecipPhys.qt_tendency_rain_evap[k]
+            aux_tc.qt_tendency_rain_evap[k]
         tendencies_gm.θ_liq_ice[k] +=
             edmf.UpdThermo.θ_liq_ice_tendency_rain_formation_tot[k] +
             edmf.EnvThermo.θ_liq_ice_tendency_rain_formation[k] +
-            edmf.PrecipPhys.θ_liq_ice_tendency_rain_evap[k]
+            aux_tc.θ_liq_ice_tendency_rain_evap[k]
     end
 
     aux_up_f = face_aux_updrafts(state)

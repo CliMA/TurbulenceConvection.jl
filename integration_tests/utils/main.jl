@@ -112,6 +112,10 @@ cent_aux_vars_edmf(FT, n_up) = (;
             QTvar = FT(0),
             HQTcov = FT(0),
         ),
+        θ_liq_ice_tendency_rain_evap = FT(0),
+        qt_tendency_rain_evap = FT(0),
+        qr_tendency_rain_evap = FT(0),
+        qr_tendency_advection = FT(0),
         en_2m = (;
             tke = cent_aux_vars_en_2m(FT),
             Hvar = cent_aux_vars_en_2m(FT),

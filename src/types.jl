@@ -200,24 +200,7 @@ function PrecipVariables(namelist, grid::Grid)
     return PrecipVariables(; precipitation_model)
 end
 
-struct PrecipPhysics{T}
-    θ_liq_ice_tendency_rain_evap::T
-    qt_tendency_rain_evap::T
-    qr_tendency_rain_evap::T
-    qr_tendency_advection::T
-    function PrecipPhysics(grid::Grid)
-        θ_liq_ice_tendency_rain_evap = center_field(grid)
-        qt_tendency_rain_evap = center_field(grid)
-        qr_tendency_rain_evap = center_field(grid)
-        qr_tendency_advection = center_field(grid)
-        return new{typeof(θ_liq_ice_tendency_rain_evap)}(
-            θ_liq_ice_tendency_rain_evap,
-            qt_tendency_rain_evap,
-            qr_tendency_rain_evap,
-            qr_tendency_advection,
-        )
-    end
-end
+struct PrecipPhysics end
 
 mutable struct UpdraftVariables{A1}
     n_updrafts::Int
@@ -604,7 +587,7 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
         # Create the class for precipitation
         Precip = PrecipVariables(namelist, grid)
         # Create the class for precipitation physics
-        PrecipPhys = PrecipPhysics(grid)
+        PrecipPhys = PrecipPhysics()
 
         # Create the updraft variable class (major diagnostic and prognostic variables)
         UpdVar = UpdraftVariables(n_updrafts, namelist, grid)
