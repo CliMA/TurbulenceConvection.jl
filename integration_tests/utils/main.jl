@@ -123,6 +123,7 @@ cent_aux_vars_edmf(FT, n_up) = (;
             QTvar = cent_aux_vars_en_2m(FT),
             HQTcov = cent_aux_vars_en_2m(FT),
         ),
+        term_vel = FT(0),
         KM = FT(0),
         KH = FT(0),
         mixing_length = FT(0),
