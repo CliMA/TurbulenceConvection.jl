@@ -230,7 +230,7 @@ function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::Ti
     write_profile(Stats, "diffusive_tendency_h", edmf.diffusive_tendency_h)
     write_profile(Stats, "diffusive_tendency_qt", edmf.diffusive_tendency_qt)
     write_profile(Stats, "total_flux_h", edmf.massflux_h .+ edmf.diffusive_flux_h)
-    write_profile(Stats, "total_flux_qt", edmf.massflux_h .+ edmf.diffusive_flux_qt)
+    write_profile(Stats, "total_flux_qt", edmf.massflux_qt .+ edmf.diffusive_flux_qt)
     write_profile(Stats, "updraft_qt_precip", edmf.UpdThermo.qt_tendency_rain_formation_tot)
     write_profile(Stats, "updraft_thetal_precip", edmf.UpdThermo.θ_liq_ice_tendency_rain_formation_tot)
 
