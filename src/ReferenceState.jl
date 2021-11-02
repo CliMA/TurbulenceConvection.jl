@@ -6,8 +6,7 @@
     compute_ref_state!(
         state,
         grid::Grid,
-        param_set::PS,
-        Stats::NetCDFIO_Stats;
+        param_set::PS;
         Pg::FT,
         Tg::FT,
         qtg::FT,
@@ -18,17 +17,8 @@ TODO: add better docs once the API converges
 The reference profiles, given
  - `grid` the grid
  - `param_set` the parameter set
- - `Stats` the NC file handler struct
 """
-function compute_ref_state!(
-    state,
-    grid::Grid,
-    param_set::PS,
-    Stats::NetCDFIO_Stats;
-    Pg::FT,
-    Tg::FT,
-    qtg::FT,
-) where {PS, FT}
+function compute_ref_state!(state, grid::Grid, param_set::PS; Pg::FT, Tg::FT, qtg::FT) where {PS, FT}
 
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0

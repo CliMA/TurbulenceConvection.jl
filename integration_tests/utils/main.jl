@@ -210,7 +210,7 @@ function Simulation1d(namelist)
 
     state = State(prog, aux, tendencies, diagnostics)
 
-    TC.compute_ref_state!(state, grid, param_set, Stats; ref_params...)
+    TC.compute_ref_state!(state, grid, param_set; ref_params...)
 
     io_nt = (;
         ref_state = TC.io_dictionary_ref_state(state),
