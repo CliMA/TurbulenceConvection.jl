@@ -221,7 +221,6 @@ end
 
 mutable struct UpdraftVariables{A1}
     n_updrafts::Int
-    cloud_fraction::A1
     cloud_base::A1
     cloud_top::A1
     cloud_cover::A1
@@ -232,8 +231,6 @@ mutable struct UpdraftVariables{A1}
         n_updrafts = nu
 
         # cloud and precipitation diagnostics for output
-        cloud_fraction = center_field(grid)
-
         cloud_base = zeros(nu)
         cloud_top = zeros(nu)
         cloud_cover = zeros(nu)
@@ -242,8 +239,8 @@ mutable struct UpdraftVariables{A1}
         lwp = 0.0
         iwp = 0.0
 
-        A1 = typeof(cloud_fraction)
-        return new{A1}(n_updrafts, cloud_fraction, cloud_base, cloud_top, cloud_cover, updraft_top, lwp, iwp)
+        A1 = typeof(cloud_base)
+        return new{A1}(n_updrafts, cloud_base, cloud_top, cloud_cover, updraft_top, lwp, iwp)
     end
 end
 

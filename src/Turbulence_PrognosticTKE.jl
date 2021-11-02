@@ -12,7 +12,7 @@ function update_cloud_frac(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVa
     a_up_bulk = aux_tc.bulk.area
     @inbounds for k in real_center_indices(grid) # update grid-mean cloud fraction and cloud cover
         aux_gm.cloud_fraction[k] =
-            aux_en.area[k] * aux_en.cloud_fraction[k] + a_up_bulk[k] * edmf.UpdVar.cloud_fraction[k]
+            aux_en.area[k] * aux_en.cloud_fraction[k] + a_up_bulk[k] * aux_tc.bulk.cloud_fraction[k]
     end
     gm.cloud_cover = min(edmf.EnvVar.cloud_cover + sum(edmf.UpdVar.cloud_cover), 1)
 end
