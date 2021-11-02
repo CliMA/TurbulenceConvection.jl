@@ -36,6 +36,13 @@ tendencies(state, fl) = getproperty(state.tendencies, field_loc(fl))
 
 center_tendencies_grid_mean(state) = tendencies(state, CentField())
 
+""" Purely diagnostic fields for the host model """
+diagnostics(state, fl) = getproperty(state.diagnostics, field_loc(fl))
+
+center_diagnostics_grid_mean(state) = diagnostics(state, CentField())
+center_diagnostics_turbconv(state) = diagnostics(state, CentField()).turbconv
+face_diagnostics_turbconv(state) = diagnostics(state, FaceField()).turbconv
+
 """ Reference state fields for the host model """
 ref_state(state, fl) = aux(state, fl).ref_state
 

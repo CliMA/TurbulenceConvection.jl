@@ -151,12 +151,24 @@ face_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., face_aux_vars_gm(FT)...,
 
 # Center only
 cent_diagnostic_vars_gm(FT) = ()
-cent_diagnostic_vars_edmf(FT, n_up) = ()
+cent_diagnostic_vars_edmf(FT, n_up) = (;
+    turbconv = (;
+        asp_ratio = FT(0),
+        entr_sc = FT(0),
+        detr_sc = FT(0),
+        massflux = FT(0),
+        frac_turb_entr = FT(0),
+        horiz_K_eddy = FT(0),
+        sorting_function = FT(0),
+        b_mix = FT(0),
+    ),
+)
 cent_diagnostic_vars(FT, n_up) = (; cent_diagnostic_vars_gm(FT)..., cent_diagnostic_vars_edmf(FT, n_up)...)
 
 # Face only
 face_diagnostic_vars_gm(FT) = ()
-face_diagnostic_vars_edmf(FT, n_up) = ()
+face_diagnostic_vars_edmf(FT, n_up) =
+    (; turbconv = (; nh_pressure = FT(0), nh_pressure_adv = FT(0), nh_pressure_drag = FT(0), nh_pressure_b = FT(0)))
 face_diagnostic_vars(FT, n_up) = (; face_diagnostic_vars_gm(FT)..., face_diagnostic_vars_edmf(FT, n_up)...)
 
 #####

@@ -113,6 +113,17 @@ function io_dictionary_aux(state)
         "qr_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_precipitation(state).qr),
         "mixing_length" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).mixing_length),
 
+        "nh_pressure" => (; dims = ("zf", "t"), group = "profiles", field = face_diagnostics_turbconv(state).nh_pressure),
+        "nh_pressure_adv" => (; dims = ("zf", "t"), group = "profiles", field = face_diagnostics_turbconv(state).nh_pressure_adv),
+        "nh_pressure_drag" => (; dims = ("zf", "t"), group = "profiles", field = face_diagnostics_turbconv(state).nh_pressure_drag),
+        "nh_pressure_b" => (; dims = ("zf", "t"), group = "profiles", field = face_diagnostics_turbconv(state).nh_pressure_b),
+        "turbulent_entrainment" => (; dims = ("zc", "t"), group = "profiles", field = center_diagnostics_turbconv(state).frac_turb_entr),
+        "horiz_K_eddy" => (; dims = ("zc", "t"), group = "profiles", field = center_diagnostics_turbconv(state).horiz_K_eddy),
+        "entrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = center_diagnostics_turbconv(state).entr_sc),
+        "detrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = center_diagnostics_turbconv(state).detr_sc),
+        "asp_ratio" => (; dims = ("zc", "t"), group = "profiles", field = center_diagnostics_turbconv(state).asp_ratio),
+        "massflux" => (; dims = ("zc", "t"), group = "profiles", field = center_diagnostics_turbconv(state).massflux),
+
         "updraft_cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).bulk.cloud_fraction),
 
     )
@@ -155,6 +166,7 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
     aux_tc_f = face_aux_turbconv(state)
     aux_gm_f = face_aux_grid_mean(state)
     prog_pr = center_prog_precipitation(state)
+    a_up_bulk = center_aux_turbconv(state).bulk.area
     kc_toa = kc_top_of_atmos(grid)
     gm.cloud_base = grid.zc[kc_toa]
     gm.cloud_top = 0.0
@@ -166,6 +178,8 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
     en_thermo = edmf.EnvThermo
     up_thermo = edmf.UpdThermo
     n_updrafts = up.n_updrafts
+    diag_tc = center_diagnostics_turbconv(state)
+    diag_tc_f = face_diagnostics_turbconv(state)
 
     @inbounds for k in real_center_indices(grid)
         gm.lwp += ρ0_c[k] * aux_gm.q_liq[k] * grid.Δz
@@ -256,6 +270,42 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
                 1e6
         end
     end
+
+    @inbounds for k in real_center_indices(grid)
+        if a_up_bulk[k] > 0.0
+            @inbounds for i in 1:(edmf.n_updrafts)
+                diag_tc.massflux[k] += interpf2c(edmf.m, grid, k, i)
+                diag_tc.entr_sc[k] += aux_up[i].area[k] * edmf.entr_sc[i, k] / a_up_bulk[k]
+                diag_tc.detr_sc[k] += aux_up[i].area[k] * edmf.detr_sc[i, k] / a_up_bulk[k]
+                diag_tc.asp_ratio[k] += aux_up[i].area[k] * edmf.asp_ratio[i, k] / a_up_bulk[k]
+                diag_tc.frac_turb_entr[k] += aux_up[i].area[k] * edmf.frac_turb_entr[i, k] / a_up_bulk[k]
+                diag_tc.horiz_K_eddy[k] += aux_up[i].area[k] * edmf.horiz_K_eddy[i, k] / a_up_bulk[k]
+                diag_tc.sorting_function[k] += aux_up[i].area[k] * edmf.sorting_function[i, k] / a_up_bulk[k]
+                diag_tc.b_mix[k] += aux_up[i].area[k] * edmf.b_mix[i, k] / a_up_bulk[k]
+            end
+        end
+    end
+
+    @inbounds for k in real_face_indices(grid)
+        a_up_bulk_f =
+            interpc2f(a_up_bulk, grid, k; bottom = SetValue(sum(edmf.area_surface_bc)), top = SetZeroGradient())
+        if a_up_bulk_f > 0.0
+            @inbounds for i in 1:(edmf.n_updrafts)
+                a_up_f = interpc2f(
+                    aux_up[i].area,
+                    grid,
+                    k;
+                    bottom = SetValue(edmf.area_surface_bc[i]),
+                    top = SetZeroGradient(),
+                )
+                diag_tc_f.nh_pressure[k] += a_up_f * edmf.nh_pressure[i, k] / a_up_bulk_f
+                diag_tc_f.nh_pressure_b[k] += a_up_f * edmf.nh_pressure_b[i, k] / a_up_bulk_f
+                diag_tc_f.nh_pressure_adv[k] += a_up_f * edmf.nh_pressure_adv[i, k] / a_up_bulk_f
+                diag_tc_f.nh_pressure_drag[k] += a_up_f * edmf.nh_pressure_drag[i, k] / a_up_bulk_f
+            end
+        end
+    end
+
 
     return
 end
