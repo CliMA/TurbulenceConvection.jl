@@ -30,7 +30,7 @@ end
 """
     MoistureDeficitEntr
 
-My entrainment detrainment model
+Entrainment detrainment model from Cohen et al (2020)
 
 $(DocStringExtensions.FIELDS)
 """
@@ -417,24 +417,49 @@ Base.@kwdef mutable struct LESData
     les_filename::String = nothing
 end
 
+"""
+    ForcingBase
+
+LES-driven forcing
+
+$(DocStringExtensions.FIELDS)
+"""
 Base.@kwdef mutable struct ForcingBase{T}
+    "Large-scale subsidence"
     subsidence::AbstractArray{Float64, 1} = zeros(1)
-    dTdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection temperature tendency
-    dqtdt::AbstractArray{Float64, 1} = zeros(1) # horizontal advection moisture tendency
-    dtdt_hadv::AbstractArray{Float64, 1} = zeros(1)
-    dtdt_nudge::AbstractArray{Float64, 1} = zeros(1)
-    dtdt_fluc::AbstractArray{Float64, 1} = zeros(1)
+    "Large-scale temperature tendency"
+    dTdt::AbstractArray{Float64, 1} = zeros(1)
+    "Large-scale moisture tendency"
+    dqtdt::AbstractArray{Float64, 1} = zeros(1)
+    "Horizontal advection of temperature"
+    dTdt_hadv::AbstractArray{Float64, 1} = zeros(1)
+    "Temperature tendency due to relaxation to large-scale"
+    dTdt_nudge::AbstractArray{Float64, 1} = zeros(1)
+    "Vertical turbulent advection of temperature"
+    dTdt_fluc::AbstractArray{Float64, 1} = zeros(1)
+    "Horizontal advection of moisture"
     dqtdt_hadv::AbstractArray{Float64, 1} = zeros(1)
+    "Moisture tendency due to relaxation to large-scale"
     dqtdt_nudge::AbstractArray{Float64, 1} = zeros(1)
+    "Vertical turbulent advection of moisture"
     dqtdt_fluc::AbstractArray{Float64, 1} = zeros(1)
+    "Reference u profile for relaxation tendency"
     u_nudge::AbstractArray{Float64, 1} = zeros(1)
+    "Reference v profile for relaxation tendency"
     v_nudge::AbstractArray{Float64, 1} = zeros(1)
+    "Boolean specifying whether Coriolis forcing is applied"
     apply_coriolis::Bool = false
+    "Boolean specifying whether subsidence forcing is applied"
     apply_subsidence::Bool = false
+    "Coriolis parameter"
     coriolis_param::Float64 = 0
+    "Geostrophic u velocity"
     ug::AbstractArray{Float64, 1} = zeros(1)
+    "Geostrophic v velocity"
     vg::AbstractArray{Float64, 1} = zeros(1)
-    nudge_tau::Float64 = 0.0 # default is set to a value that will break
+    "Momentum relaxation timescale"
+    nudge_tau::Float64 = 0.0
+    "Conversion function from forcing to prognostic"
     convert_forcing_prog_fp::Function = x -> x
 end
 
