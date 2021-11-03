@@ -121,6 +121,37 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         # Assuming gm.W = 0!
         aux_en_f.w[k] = -a_bulk_f / (1 - a_bulk_f) * aux_tc_f.bulk.w[k]
     end
+
+    @inbounds for i in 1:(up.n_updrafts)
+        ts_up = thermo_state_pθq(param_set, p0_c[kc_surf], aux_up[i].θ_liq_ice[kc_surf], aux_up[i].q_tot[kc_surf])
+        ρ = TD.air_density(ts_up)
+        q_liq_tmp = TD.liquid_specific_humidity(ts_up)
+        q_ice_tmp = TD.ice_specific_humidity(ts_up)
+        T_tmp = TD.air_temperature(ts_up)
+        buoy_tmp = buoyancy_c(param_set, ρ0_c[kc_surf], ρ)
+        RH_tmp = TD.relative_humidity(ts_up)
+        a_tmp = aux_up[i].area[kc_surf]
+        @inbounds for k in real_center_indices(grid)
+            if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && a_tmp > 0.0
+                nothing
+            else
+                ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
+                ρ = TD.air_density(ts_up)
+                q_liq_tmp = TD.liquid_specific_humidity(ts_up)
+                q_ice_tmp = TD.ice_specific_humidity(ts_up)
+                T_tmp = TD.air_temperature(ts_up)
+                buoy_tmp = buoyancy_c(param_set, ρ0_c[k], ρ)
+                RH_tmp = TD.relative_humidity(ts_up)
+                a_tmp = aux_up[i].area[k]
+            end
+            aux_up[i].q_liq[k] = q_liq_tmp
+            aux_up[i].q_ice[k] = q_ice_tmp
+            aux_up[i].T[k] = T_tmp
+            aux_up[i].buoy[k] = buoy_tmp
+            aux_up[i].RH[k] = RH_tmp
+        end
+    end
+
     @inbounds for k in real_center_indices(grid)
         a_bulk_c = aux_tc.bulk.area[k]
         aux_tc.bulk.q_tot[k] = 0
@@ -130,22 +161,6 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         aux_tc.bulk.T[k] = 0
         aux_tc.bulk.RH[k] = 0
         aux_tc.bulk.buoy[k] = 0
-
-        @inbounds for i in 1:(up.n_updrafts)
-            if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
-                qt = aux_up[i].q_tot[k - 1]
-                h = aux_up[i].θ_liq_ice[k - 1]
-                ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
-            else
-                ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
-            end
-            aux_up[i].q_liq[k] = TD.liquid_specific_humidity(ts_up)
-            aux_up[i].q_ice[k] = TD.ice_specific_humidity(ts_up)
-            aux_up[i].T[k] = TD.air_temperature(ts_up)
-            ρ = TD.air_density(ts_up)
-            aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
-            aux_up[i].RH[k] = TD.relative_humidity(ts_up)
-        end
 
         if a_bulk_c > 1.0e-20
             @inbounds for i in 1:(up.n_updrafts)
