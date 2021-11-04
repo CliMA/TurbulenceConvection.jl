@@ -28,6 +28,7 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_up = center_aux_updrafts(state)
+    aux_bulk = center_aux_bulk(state)
     ρ0_f = face_ref_state(state).ρ0
     p0_c = center_ref_state(state).p0
     α0_c = center_ref_state(state).α0
@@ -94,11 +95,11 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
             tendencies_gm.v[k] += gm_V_nudge_k
         end
         tendencies_gm.q_tot[k] +=
-            edmf.UpdThermo.qt_tendency_rain_formation_tot[k] +
+            aux_bulk.qt_tendency_rain_formation[k] +
             edmf.EnvThermo.qt_tendency_rain_formation[k] +
             aux_tc.qt_tendency_rain_evap[k]
         tendencies_gm.θ_liq_ice[k] +=
-            edmf.UpdThermo.θ_liq_ice_tendency_rain_formation_tot[k] +
+            aux_bulk.θ_liq_ice_tendency_rain_formation[k] +
             edmf.EnvThermo.θ_liq_ice_tendency_rain_formation[k] +
             aux_tc.θ_liq_ice_tendency_rain_evap[k]
     end
@@ -237,7 +238,6 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     up = edmf.UpdVar
     en = edmf.EnvVar
     param_set = parameter_set(gm)
-    up_thermo = edmf.UpdThermo
     en_thermo = edmf.EnvThermo
     n_updrafts = up.n_updrafts
     prog_gm = center_prog_grid_mean(state)
@@ -261,7 +261,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     parent(tendencies_up_f) .= 0
     parent(tendencies_en) .= 0
     parent(tendencies_pr) .= 0
-    compute_precipitation_formation_tendencies(up_thermo, grid, state, edmf.UpdVar, edmf.Precip, TS.dt, param_set) # causes division error in dry bubble first time step
+    compute_precipitation_formation_tendencies(grid, state, edmf.UpdVar, edmf.Precip, TS.dt, param_set) # causes division error in dry bubble first time step
     microphysics(en_thermo, grid, state, en, edmf.Precip, TS.dt, param_set) # saturation adjustment + rain creation
     if edmf.Precip.precipitation_model == "clima_1m"
         compute_rain_evap_tendencies(edmf.PrecipPhys, grid, state, gm, TS)
@@ -485,7 +485,6 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
     kf_surf = kf_surface(grid)
 
     up = edmf.UpdVar
-    up_thermo = edmf.UpdThermo
     en = edmf.EnvVar
     aux_up = center_aux_updrafts(state)
     aux_en = center_aux_environment(state)
@@ -516,13 +515,13 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
             adv = upwind_advection_scalar(ρ0_c, aux_up[i].area, aux_up_f[i].w, aux_up[i].θ_liq_ice, grid, k)
             entr = entr_term * aux_en.θ_liq_ice[k]
             detr = detr_term * aux_up[i].θ_liq_ice[k]
-            rain = ρ0_c[k] * up_thermo.θ_liq_ice_tendency_rain_formation[i, k]
+            rain = ρ0_c[k] * aux_up[i].θ_liq_ice_tendency_rain_formation[k]
             tendencies_up[i].ρaθ_liq_ice[k] = -adv + entr - detr + rain
 
             adv = upwind_advection_scalar(ρ0_c, aux_up[i].area, aux_up_f[i].w, aux_up[i].q_tot, grid, k)
             entr = entr_term * aux_en.q_tot[k]
             detr = detr_term * aux_up[i].q_tot[k]
-            rain = ρ0_c[k] * up_thermo.qt_tendency_rain_formation[i, k]
+            rain = ρ0_c[k] * aux_up[i].qt_tendency_rain_formation[k]
             tendencies_up[i].ρaq_tot[k] = -adv + entr - detr + rain
         end
     end

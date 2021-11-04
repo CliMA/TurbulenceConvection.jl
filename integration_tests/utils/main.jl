@@ -82,6 +82,8 @@ cent_aux_vars_up(FT) = (;
     area = FT(0),
     q_tot = FT(0),
     θ_liq_ice = FT(0),
+    θ_liq_ice_tendency_rain_formation = FT(0),
+    qt_tendency_rain_formation = FT(0),
 )
 cent_aux_vars_edmf(FT, n_up) = (;
     turbconv = (;
@@ -95,6 +97,8 @@ cent_aux_vars_edmf(FT, n_up) = (;
             q_ice = FT(0),
             T = FT(0),
             cloud_fraction = FT(0),
+            θ_liq_ice_tendency_rain_formation = FT(0),
+            qt_tendency_rain_formation = FT(0),
         ),
         up = ntuple(i -> cent_aux_vars_up(FT), n_up),
         en = (;
