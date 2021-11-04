@@ -6,8 +6,8 @@ function update_env_precip_tendencies(state, k, qt_tendency, θ_liq_ice_tendency
     aux_en.qt_tendency_precip_formation[k] = qt_tendency * aux_en.area[k]
     aux_en.θ_liq_ice_tendency_precip_formation[k] = θ_liq_ice_tendency * aux_en.area[k]
 
-    tendencies_pr.qr[k] += qr_tendency * aux_en.area[k]
-    tendencies_pr.qs[k] += qs_tendency * aux_en.area[k]
+    tendencies_pr.q_rai[k] += qr_tendency * aux_en.area[k]
+    tendencies_pr.q_sno[k] += qs_tendency * aux_en.area[k]
     return
 end
 
@@ -46,8 +46,8 @@ function sgs_mean(en_thermo::EnvironmentThermodynamics, grid, state, en, precip,
         mph = precipitation_formation(
             param_set,
             precip.precipitation_model,
-            prog_pr.qr[k],
-            prog_pr.qs[k],
+            prog_pr.q_rai[k],
+            prog_pr.q_sno[k],
             aux_en.area[k],
             ρ0_c[k],
             dt,
@@ -180,8 +180,8 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
                     mph = precipitation_formation(
                         param_set,
                         precip.precipitation_model,
-                        prog_pr.qr[k],
-                        prog_pr.qs[k],
+                        prog_pr.q_rai[k],
+                        prog_pr.q_sno[k],
                         aux_en.area[k],
                         ρ0_c[k],
                         dt,
@@ -261,8 +261,8 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
             mph = precipitation_formation(
                 param_set,
                 precip.precipitation_model,
-                prog_pr.qr[k],
-                prog_pr.qs[k],
+                prog_pr.q_rai[k],
+                prog_pr.q_sno[k],
                 aux_en.area[k],
                 ρ0_c[k],
                 dt,

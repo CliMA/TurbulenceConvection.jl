@@ -110,7 +110,9 @@ function io_dictionary_aux(state)
         "diffusive_flux_s" => (; dims = ("zf", "t"), group = "profiles", field = face_aux_grid_mean(state).diffusive_flux_s),
         "total_flux_s" => (; dims = ("zf", "t"), group = "profiles", field = face_aux_grid_mean(state).massflux_s .+ face_aux_grid_mean(state).diffusive_flux_s),
 
-        "qr_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_precipitation(state).qr),
+        "qr_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_precipitation(state).q_rai),
+        "qs_mean" => (; dims = ("zc", "t"), group = "profiles", field = center_prog_precipitation(state).q_sno),
+
         "mixing_length" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).mixing_length),
 
         "nh_pressure" => (; dims = ("zf", "t"), group = "profiles", field = face_diagnostics_turbconv(state).nh_pressure),
@@ -257,10 +259,12 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
     end
 
     precip.mean_rwp = 0.0
+    precip.mean_swp = 0.0
     precip.cutoff_precipitation_rate = 0.0
 
     @inbounds for k in real_center_indices(grid)
-        precip.mean_rwp += ρ0_c[k] * prog_pr.qr[k] * grid.Δz
+        precip.mean_rwp += ρ0_c[k] * prog_pr.q_rai[k] * grid.Δz
+        precip.mean_swp += ρ0_c[k] * prog_pr.q_sno[k] * grid.Δz
 
         # precipitation rate from cutoff microphysics scheme defined as a total amount of removed water
         # per timestep per EDMF surface area [mm/h]

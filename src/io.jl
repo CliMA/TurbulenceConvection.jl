@@ -50,12 +50,14 @@ end
 
 function initialize_io(precip::PrecipVariables, Stats::NetCDFIO_Stats)
     add_ts(Stats, "rwp_mean")
+    add_ts(Stats, "swp_mean")
     add_ts(Stats, "cutoff_precipitation_rate")
     return
 end
 
 function io(precip::PrecipVariables, grid, state, Stats::NetCDFIO_Stats)
     write_ts(Stats, "rwp_mean", precip.mean_rwp)
+    write_ts(Stats, "swp_mean", precip.mean_rwp)
 
     #TODO - change to rain rate that depends on rain model choice
     write_ts(Stats, "cutoff_precipitation_rate", precip.cutoff_precipitation_rate)

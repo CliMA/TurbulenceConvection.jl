@@ -182,6 +182,7 @@ end
 Base.@kwdef mutable struct PrecipVariables
     precipitation_model::String = "default_precipitation_model"
     mean_rwp::Float64 = 0
+    mean_swp::Float64 = 0
     cutoff_precipitation_rate::Float64 = 0
 end
 function PrecipVariables(namelist, grid::Grid)

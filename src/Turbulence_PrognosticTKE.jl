@@ -97,11 +97,11 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         tendencies_gm.q_tot[k] +=
             aux_bulk.qt_tendency_precip_formation[k] +
             aux_en.qt_tendency_precip_formation[k] +
-            aux_tc.qt_tendency_rain_evap[k]
+            aux_tc.qt_tendency_precip_sinks[k]
         tendencies_gm.θ_liq_ice[k] +=
             aux_bulk.θ_liq_ice_tendency_precip_formation[k] +
             aux_en.θ_liq_ice_tendency_precip_formation[k] +
-            aux_tc.θ_liq_ice_tendency_rain_evap[k]
+            aux_tc.θ_liq_ice_tendency_precip_sinks[k]
     end
 
     aux_up_f = face_aux_updrafts(state)
@@ -242,7 +242,6 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     n_updrafts = up.n_updrafts
     prog_gm = center_prog_grid_mean(state)
     prog_en = center_prog_environment(state)
-    has_precip = edmf.Precip.precipitation_model == "clima_1m"
 
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
@@ -264,8 +263,8 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     compute_precipitation_formation_tendencies(grid, state, edmf.UpdVar, edmf.Precip, TS.dt, param_set) # causes division error in dry bubble first time step
     microphysics(en_thermo, grid, state, en, edmf.Precip, TS.dt, param_set) # saturation adjustment + rain creation
     if edmf.Precip.precipitation_model == "clima_1m"
-        compute_rain_evap_tendencies(edmf.PrecipPhys, grid, state, gm, TS)
-        compute_rain_advection_tendencies(edmf.PrecipPhys, grid, state, gm, TS)
+        compute_precipitation_sink_tendencies(edmf.PrecipPhys, grid, state, gm, TS)
+        compute_precipitation_advection_tendencies(edmf.PrecipPhys, grid, state, gm, TS)
     end
 
     # compute tendencies
@@ -301,8 +300,9 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
             prog_up[i].ρaθ_liq_ice[k] += Δt * tendencies_up[i].ρaθ_liq_ice[k]
             prog_up[i].ρaq_tot[k] += Δt * tendencies_up[i].ρaq_tot[k]
         end
-        if has_precip
-            prog_pr.qr[k] += tendencies_pr.qr[k] * TS.dt
+        if edmf.Precip.precipitation_model == "clima_1m"
+            prog_pr.q_rai[k] += tendencies_pr.q_rai[k] * TS.dt
+            prog_pr.q_sno[k] += tendencies_pr.q_sno[k] * TS.dt
         end
     end
 
