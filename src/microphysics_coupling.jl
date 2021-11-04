@@ -3,7 +3,7 @@ Computes the tendency to θ_liq_ice due to qt moving between
 the working fluid and precipitation
 """
 function θ_liq_ice_helper(ts, qt_tendency::FT) where {FT}
-    L = TD.latent_heat_vapor(ts)
+    L = FT(CPP.LH_v0(ts.param_set))
     Π = TD.exner(ts)
     return -L * qt_tendency / Π / FT(CPP.cp_d(ts.param_set))
 end

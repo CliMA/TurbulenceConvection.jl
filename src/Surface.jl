@@ -52,7 +52,7 @@ function update(surf::SurfaceBase{SurfaceFixedFlux}, grid, state, gm::GridMeanVa
     rho_tflux = surf.shf / TD.cp_m(ts)
 
     surf.windspeed = sqrt(u_gm_surf^2 + v_gm_surf^2)
-    surf.rho_qtflux = surf.lhf / TD.latent_heat_vapor(param_set, surf.Tsurface)
+    surf.rho_qtflux = surf.lhf / CPP.LH_v0(param_set)
 
     ts = thermo_state_pθq(param_set, p0_f_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
     Π = TD.exner(ts)
@@ -105,7 +105,7 @@ function update(surf::SurfaceBase{SurfaceFixedCoeffs}, grid, state, gm::GridMean
     ts = thermo_state_pθq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
     surf.windspeed = max(sqrt(u_gm_surf^2 + v_gm_surf^2), 0.01)
     cp_ = TD.cp_m(ts)
-    lv = TD.latent_heat_vapor(ts)
+    lv = CPP.LH_v0(param_set)
 
     surf.rho_qtflux = -surf.cq * surf.windspeed * (q_tot_gm_surf - surf.qsurface) * ρ0_f_surf
     surf.lhf = lv * surf.rho_qtflux
@@ -143,7 +143,7 @@ function update(surf::SurfaceBase{SurfaceMoninObukhov}, grid, state, gm::GridMea
 
     pvg = TD.saturation_vapor_pressure(param_set, TD.PhaseEquil, surf.Tsurface)
     surf.qsurface = TD.q_vap_saturation_from_density(param_set, surf.Tsurface, ρ0_f_surf, pvg)
-    lv = TD.latent_heat_vapor(param_set, T_gm_surf)
+    lv = CPP.LH_v0(param_set)
 
     phase_part = TD.PhasePartition(surf.qsurface, 0.0, 0.0)
     h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, Pg, phase_part)
@@ -196,7 +196,7 @@ function update(surf::SurfaceBase{SurfaceMoninObukhovDry}, grid, state, gm::Grid
 
     pvg = TD.saturation_vapor_pressure(param_set, TD.PhaseEquil, surf.Tsurface)
     surf.qsurface = TD.q_vap_saturation_from_density(param_set, surf.Tsurface, ρ0_f_surf, pvg)
-    lv = TD.latent_heat_vapor(param_set, T_gm_surf)
+    lv = CPP.LH_v0(param_set)
 
     phase_part = TD.PhasePartition(surf.qsurface, 0.0, 0.0)
     h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, Pg, phase_part)
@@ -248,7 +248,7 @@ function update(surf::SurfaceBase{SurfaceSullivanPatton}, grid, state, gm::GridM
     Pg = surf.ref_params.Pg
 
     ts = thermo_state_pθq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
-    lv = TD.latent_heat_vapor(param_set, T_gm_surf)
+    lv = CPP.LH_v0(param_set)
     T0 = p0_c_surf * α0_c_surf / R_d # TODO: can we use a thermo state here?
 
     θ_flux = 0.24
