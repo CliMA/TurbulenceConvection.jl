@@ -23,6 +23,7 @@ function name_aliases()
         "u_mean" => ("u_translational_mean",),
         "v_mean" => ("v_translational_mean",),
         "tke_mean" => ("tke_nd_mean",),
+        "total_flux_s" => ("s_flux_z",),
     )
     return dict
 end
