@@ -1,7 +1,7 @@
 """
 Computes the qr advection (down) tendency
 """
-function compute_rain_advection_tendencies(::PrecipPhysics, grid, state, gm, TS::TimeStepping)
+function compute_precipitation_advection_tendencies(::PrecipPhysics, grid, state, gm, TS::TimeStepping)
     param_set = parameter_set(gm)
     Δz = grid.Δz
     Δt = TS.dt
@@ -19,8 +19,8 @@ function compute_rain_advection_tendencies(::PrecipPhysics, grid, state, gm, TS:
     term_vel_snow = aux_tc.term_vel_snow
 
     @inbounds for k in real_center_indices(grid)
-        term_vel_rain[k] = CM1.terminal_velocity(param_set, rain_type, ρ_0_c[k], prog_pr.qr[k])
-        term_vel_snow[k] = CM1.terminal_velocity(param_set, snow_type, ρ_0_c[k], prog_pr.qs[k])
+        term_vel_rain[k] = CM1.terminal_velocity(param_set, rain_type, ρ_0_c[k], prog_pr.q_rai[k])
+        term_vel_snow[k] = CM1.terminal_velocity(param_set, snow_type, ρ_0_c[k], prog_pr.q_sno[k])
     end
 
     @inbounds for k in reverse(real_center_indices(grid))
@@ -40,8 +40,8 @@ function compute_rain_advection_tendencies(::PrecipPhysics, grid, state, gm, TS:
 
         ρ_0_cut = ccut_downwind(ρ_0_c, grid, k)
 
-        QR_cut = ccut_downwind(prog_pr.qr, grid, k)
-        QS_cut = ccut_downwind(prog_pr.qs, grid, k)
+        QR_cut = ccut_downwind(prog_pr.q_rai, grid, k)
+        QS_cut = ccut_downwind(prog_pr.q_sno, grid, k)
 
         w_cut_rain = ccut_downwind(term_vel_rain, grid, k)
         w_cut_snow = ccut_downwind(term_vel_snow, grid, k)
@@ -58,8 +58,8 @@ function compute_rain_advection_tendencies(::PrecipPhysics, grid, state, gm, TS:
         aux_tc.qr_tendency_advection[k] = ∇ρQRw / ρ_0_c_k
         aux_tc.qs_tendency_advection[k] = ∇ρQSw / ρ_0_c_k
 
-        tendencies_pr.qr[k] += aux_tc.qr_tendency_advection[k]
-        tendencies_pr.qs[k] += aux_tc.qs_tendency_advection[k]
+        tendencies_pr.q_rai[k] += aux_tc.qr_tendency_advection[k]
+        tendencies_pr.q_sno[k] += aux_tc.qs_tendency_advection[k]
     end
     return
 end
@@ -67,7 +67,7 @@ end
 """
 Computes the tendencies to θ_liq_ice, qt and qr due to rain evaporation
 """
-function compute_rain_evap_tendencies(::PrecipPhysics, grid, state, gm, TS::TimeStepping)
+function compute_precipitation_sink_tendencies(::PrecipPhysics, grid, state, gm, TS::TimeStepping)
     param_set = parameter_set(gm)
     Δt = TS.dt
     p0_c = center_ref_state(state).p0
@@ -86,13 +86,20 @@ function compute_rain_evap_tendencies(::PrecipPhysics, grid, state, gm, TS::Time
         q = TD.PhasePartition(ts)
 
         # TODO - move limiters elsewhere
-        qt_tendency =
-            min(prog_pr.qr[k] / Δt, -CM1.evaporation_sublimation(param_set, rain_type, q, prog_pr.qr[k], ρ0_c[k], T_gm))
+        rain_evap =
+            -min(
+                prog_pr.q_rai[k] / Δt,
+                -CM1.evaporation_sublimation(param_set, rain_type, q, prog_pr.q_rai[k], ρ0_c[k], T_gm),
+            )
 
-        aux_tc.qt_tendency_rain_evap[k] = qt_tendency
-        aux_tc.qr_tendency_rain_evap[k] = -qt_tendency
-        tendencies_pr.qr[k] += aux_tc.qr_tendency_rain_evap[k]
-        aux_tc.θ_liq_ice_tendency_rain_evap[k] = θ_liq_ice_helper(ts, qt_tendency)
+        aux_tc.qr_tendency_evap[k] = rain_evap
+        aux_tc.qs_tendency_melt[k] = 0.0
+        aux_tc.qs_tendency_dep_sub[k] = 0.0
+
+        aux_tc.qt_tendency_precip_sinks[k] = -rain_evap
+        aux_tc.θ_liq_ice_tendency_precip_sinks[k] = θ_liq_ice_helper(ts, -rain_evap)
+
+        tendencies_pr.q_rai[k] += rain_evap
     end
     return
 end
