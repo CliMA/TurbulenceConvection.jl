@@ -95,12 +95,12 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
             tendencies_gm.v[k] += gm_V_nudge_k
         end
         tendencies_gm.q_tot[k] +=
-            aux_bulk.qt_tendency_rain_formation[k] +
-            edmf.EnvThermo.qt_tendency_rain_formation[k] +
+            aux_bulk.qt_tendency_precip_formation[k] +
+            edmf.EnvThermo.qt_tendency_precip_formation[k] +
             aux_tc.qt_tendency_rain_evap[k]
         tendencies_gm.θ_liq_ice[k] +=
-            aux_bulk.θ_liq_ice_tendency_rain_formation[k] +
-            edmf.EnvThermo.θ_liq_ice_tendency_rain_formation[k] +
+            aux_bulk.θ_liq_ice_tendency_precip_formation[k] +
+            edmf.EnvThermo.θ_liq_ice_tendency_precip_formation[k] +
             aux_tc.θ_liq_ice_tendency_rain_evap[k]
     end
 
@@ -515,13 +515,13 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
             adv = upwind_advection_scalar(ρ0_c, aux_up[i].area, aux_up_f[i].w, aux_up[i].θ_liq_ice, grid, k)
             entr = entr_term * aux_en.θ_liq_ice[k]
             detr = detr_term * aux_up[i].θ_liq_ice[k]
-            rain = ρ0_c[k] * aux_up[i].θ_liq_ice_tendency_rain_formation[k]
+            rain = ρ0_c[k] * aux_up[i].θ_liq_ice_tendency_precip_formation[k]
             tendencies_up[i].ρaθ_liq_ice[k] = -adv + entr - detr + rain
 
             adv = upwind_advection_scalar(ρ0_c, aux_up[i].area, aux_up_f[i].w, aux_up[i].q_tot, grid, k)
             entr = entr_term * aux_en.q_tot[k]
             detr = detr_term * aux_up[i].q_tot[k]
-            rain = ρ0_c[k] * aux_up[i].qt_tendency_rain_formation[k]
+            rain = ρ0_c[k] * aux_up[i].qt_tendency_precip_formation[k]
             tendencies_up[i].ρaq_tot[k] = -adv + entr - detr + rain
         end
     end

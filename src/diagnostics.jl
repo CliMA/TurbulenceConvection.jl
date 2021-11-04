@@ -126,8 +126,8 @@ function io_dictionary_aux(state)
 
         "updraft_cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).bulk.cloud_fraction),
 
-        "updraft_qt_precip" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_bulk(state).qt_tendency_rain_formation),
-        "updraft_thetal_precip" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_bulk(state).θ_liq_ice_tendency_rain_formation),
+        "updraft_qt_precip" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_bulk(state).qt_tendency_precip_formation),
+        "updraft_thetal_precip" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_bulk(state).θ_liq_ice_tendency_precip_formation),
 
     )
     return io_dict
@@ -266,8 +266,9 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
         # per timestep per EDMF surface area [mm/h]
         if (precip.precipitation_model == "cutoff")
             precip.cutoff_precipitation_rate -=
-                (en_thermo.qt_tendency_rain_formation[k] + aux_bulk.qt_tendency_rain_formation[k]) * ρ0_c[k] * grid.Δz /
-                rho_cloud_liq *
+                (en_thermo.qt_tendency_precip_formation[k] + aux_bulk.qt_tendency_precip_formation[k]) *
+                ρ0_c[k] *
+                grid.Δz / rho_cloud_liq *
                 3.6 *
                 1e6
         end

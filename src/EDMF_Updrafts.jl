@@ -33,19 +33,19 @@ function compute_precipitation_formation_tendencies(
                 dt,
                 ts_up,
             )
-            aux_up[i].qt_tendency_rain_formation[k] = mph.qt_tendency * aux_up[i].area[k]
-            aux_up[i].θ_liq_ice_tendency_rain_formation[k] = mph.θ_liq_ice_tendency * aux_up[i].area[k]
+            aux_up[i].qt_tendency_precip_formation[k] = mph.qt_tendency * aux_up[i].area[k]
+            aux_up[i].θ_liq_ice_tendency_precip_formation[k] = mph.θ_liq_ice_tendency * aux_up[i].area[k]
         end
     end
     # TODO - to be deleted once we sum all tendencies elsewhere
     for k in real_center_indices(grid)
-        aux_bulk.θ_liq_ice_tendency_rain_formation[k] = 0
-        aux_bulk.qt_tendency_rain_formation[k] = 0
+        aux_bulk.θ_liq_ice_tendency_precip_formation[k] = 0
+        aux_bulk.qt_tendency_precip_formation[k] = 0
         for i in 1:(up.n_updrafts)
-            aux_bulk.θ_liq_ice_tendency_rain_formation[k] += aux_up[i].θ_liq_ice_tendency_rain_formation[k]
-            aux_bulk.qt_tendency_rain_formation[k] += aux_up[i].qt_tendency_rain_formation[k]
+            aux_bulk.θ_liq_ice_tendency_precip_formation[k] += aux_up[i].θ_liq_ice_tendency_precip_formation[k]
+            aux_bulk.qt_tendency_precip_formation[k] += aux_up[i].qt_tendency_precip_formation[k]
         end
-        tendencies_pr.qr[k] += -aux_bulk.qt_tendency_rain_formation[k]
+        tendencies_pr.qr[k] += -aux_bulk.qt_tendency_precip_formation[k]
     end
     return
 end
