@@ -410,12 +410,14 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
             plot_attr[false]["contour_2_kwargs"] = (ylabel = "height (km)",)
             plot_attr[false]["contour_3_kwargs"] = (ylabel = "height (km)",)
 
+            clim_kwarg = clims_min == clims_max ? () : (; clims = clims)
+
             p1 = Plots.contourf(
                 time_scm ./ 3600,
                 z_scm ./ 10^3,
                 data_scm_arr';
                 c = :viridis,
-                clims = clims,
+                clim_kwarg...,
                 title = "$tc_var (SCAMPy)$warn_msg_scm",
                 plot_attr[group_figs]["contour_1_kwargs"]...,
             )
@@ -425,7 +427,7 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
                     z_tcm ./ 10^3,
                     data_tcm_arr';
                     c = :viridis,
-                    clims = clims,
+                    clim_kwarg...,
                     title = "$tc_var (TC.jl main)$warn_msg_tcm",
                     plot_attr[group_figs]["contour_2_kwargs"]...,
                 )
@@ -435,7 +437,7 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
                 z_tcc ./ 10^3,
                 data_tcc_arr';
                 c = :viridis,
-                clims = clims,
+                clim_kwarg...,
                 title = have_tc_main ? "$tc_var (TC.jl PR)$warn_msg_tcc" : "$tc_var (TC.jl)$warn_msg_tcc",
                 plot_attr[group_figs]["contour_3_kwargs"]...,
             )
