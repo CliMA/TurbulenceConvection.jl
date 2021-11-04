@@ -266,7 +266,7 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
         # per timestep per EDMF surface area [mm/h]
         if (precip.precipitation_model == "cutoff")
             precip.cutoff_precipitation_rate -=
-                (en_thermo.qt_tendency_precip_formation[k] + aux_bulk.qt_tendency_precip_formation[k]) *
+                (aux_en.qt_tendency_precip_formation[k] + aux_bulk.qt_tendency_precip_formation[k]) *
                 ρ0_c[k] *
                 grid.Δz / rho_cloud_liq *
                 3.6 *
