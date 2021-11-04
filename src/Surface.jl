@@ -5,7 +5,7 @@
 function free_convection_windspeed(surf::SurfaceBase, grid, state, gm::GridMeanVariables, param_set, ::BaseCase)
     prog_gm = center_prog_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
-    zi = get_inversion(param_set, aux_tc.θ_virt, prog_gm.u, prog_gm.v, grid, surf.Ri_bulk_crit)
+    zi = get_inversion(grid, state, param_set, surf.Ri_bulk_crit)
     wstar = get_wstar(surf.bflux, zi) # yair here zi in TRMM should be adjusted
     surf.windspeed = sqrt(surf.windspeed * surf.windspeed + (1.2 * wstar) * (1.2 * wstar))
     return

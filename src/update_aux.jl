@@ -219,7 +219,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #! format: on
 
     # TODO - use this inversion in free_convection_windspeed and not compute zi twice
-    edmf.zi = get_inversion(param_set, aux_tc.θ_virt, prog_gm.u, prog_gm.v, grid, surface.Ri_bulk_crit)
+    edmf.zi = get_inversion(grid, state, param_set, surface.Ri_bulk_crit)
 
     update_surface(Case, grid, state, gm, TS, param_set)
     update_forcing(Case, grid, state, gm, TS, param_set)

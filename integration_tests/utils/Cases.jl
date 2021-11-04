@@ -600,7 +600,7 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, gm, state)
         ts = TC.thermo_state_pθq(param_set, p0[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
     end
-    zi = 0.6 * get_inversion(param_set, aux_tc.θ_virt, prog_gm.u, prog_gm.v, grid, 0.2)
+    zi = 0.6 * get_inversion(grid, state, param_set, 0.2)
 
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]

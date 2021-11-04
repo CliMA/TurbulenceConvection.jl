@@ -839,15 +839,15 @@ function compute_en_tendencies!(edmf, grid::Grid, state, param_set, TS, covar_sy
     covar = getproperty(aux_en, covar_sym)
     aux_covar = getproperty(aux_en_2m, covar_sym)
     aux_up = center_aux_updrafts(state)
-    w_en = face_aux_environment(state).w
-    w_en_c = center_field(grid)
+    w_en_f = face_aux_environment(state).w
+    w_en = center_aux_environment(state).w
     c_d = CPEDMF.c_d(param_set)
     is_tke = covar_sym == :tke
 
 
-    ρ_ae_K = face_field(grid)
-    ρ_ae_K∇ϕ = face_field(grid)
-    ∇ρ_ae_K∇ϕ = center_field(grid)
+    ρ_ae_K = face_aux_turbconv(state).ρ_ae_K
+    ρ_ae_K∇ϕ = face_aux_turbconv(state).ρ_ae_K∇ϕ
+    ∇ρ_ae_K∇ϕ = center_aux_turbconv(state).∇ρ_ae_K∇ϕ
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
     aux_tc = center_aux_turbconv(state)
@@ -872,12 +872,12 @@ function compute_en_tendencies!(edmf, grid::Grid, state, param_set, TS, covar_sy
     pressure_plume_spacing = edmf.pressure_plume_spacing
     entr_sc = edmf.entr_sc
 
-    ρaew_en_ϕ = center_field(grid)
+    ρaew_en_ϕ = center_aux_turbconv(state).ρaew_en_ϕ
     FT = eltype(grid)
 
     @inbounds for k in real_center_indices(grid)
-        w_en_c[k] = interpf2c(w_en, grid, k)
-        ρaew_en_ϕ[k] = ρ0_c[k] * aux_en.area[k] * w_en_c[k] * covar[k]
+        w_en[k] = interpf2c(w_en_f, grid, k)
+        ρaew_en_ϕ[k] = ρ0_c[k] * aux_en.area[k] * w_en[k] * covar[k]
     end
 
     kc_surf = kc_surface(grid)
