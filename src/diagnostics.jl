@@ -126,6 +126,9 @@ function io_dictionary_aux(state)
 
         "updraft_cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).bulk.cloud_fraction),
 
+        "updraft_qt_precip" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_bulk(state).qt_tendency_precip_formation),
+        "updraft_thetal_precip" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_bulk(state).θ_liq_ice_tendency_precip_formation),
+
     )
     return io_dict
 end
@@ -166,7 +169,8 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
     aux_tc_f = face_aux_turbconv(state)
     aux_gm_f = face_aux_grid_mean(state)
     prog_pr = center_prog_precipitation(state)
-    a_up_bulk = center_aux_turbconv(state).bulk.area
+    aux_bulk = center_aux_bulk(state)
+    a_up_bulk = aux_bulk.area
     kc_toa = kc_top_of_atmos(grid)
     gm.cloud_base = grid.zc[kc_toa]
     gm.cloud_top = 0.0
@@ -176,7 +180,6 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
     en = edmf.EnvVar
     precip = edmf.Precip
     en_thermo = edmf.EnvThermo
-    up_thermo = edmf.UpdThermo
     n_updrafts = up.n_updrafts
     diag_tc = center_diagnostics_turbconv(state)
     diag_tc_f = face_diagnostics_turbconv(state)
@@ -263,7 +266,7 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
         # per timestep per EDMF surface area [mm/h]
         if (precip.precipitation_model == "cutoff")
             precip.cutoff_precipitation_rate -=
-                (en_thermo.qt_tendency_rain_formation[k] + up_thermo.qt_tendency_rain_formation_tot[k]) *
+                (en_thermo.qt_tendency_precip_formation[k] + aux_bulk.qt_tendency_precip_formation[k]) *
                 ρ0_c[k] *
                 grid.Δz / rho_cloud_liq *
                 3.6 *

@@ -2,9 +2,9 @@ function update_env_precip_tendencies(en_thermo::EnvironmentThermodynamics, stat
 
     aux_en = center_aux_environment(state)
     tendencies_pr = center_tendencies_precipitation(state)
-    en_thermo.qt_tendency_rain_formation[k] = qt_tendency * aux_en.area[k]
-    tendencies_pr.qr[k] += -en_thermo.qt_tendency_rain_formation[k]
-    en_thermo.θ_liq_ice_tendency_rain_formation[k] = θ_liq_ice_tendency * aux_en.area[k]
+    en_thermo.qt_tendency_precip_formation[k] = qt_tendency * aux_en.area[k]
+    tendencies_pr.qr[k] += -en_thermo.qt_tendency_precip_formation[k]
+    en_thermo.θ_liq_ice_tendency_precip_formation[k] = θ_liq_ice_tendency * aux_en.area[k]
 
     return
 end
