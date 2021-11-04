@@ -1592,8 +1592,6 @@ function CasesBase(case::LES_driven_SCM, namelist, grid::Grid, param_set, Sur, F
     Fo.apply_coriolis = false
     Fo.coriolis_param = 0.376e-4 # s^{-1}
     Fo.apply_subsidence = true
-    Fo.apply_coriolis = false
-    Fo.apply_subsidence = true
     Fo.nudge_tau = namelist["forcing"]["nudging_timescale"]
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad, LESDat)
 end
@@ -1620,14 +1618,6 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, gm, st
     NC.Dataset(self.LESDat.les_filename, "r") do data
         imin = self.LESDat.imin
         imax = self.LESDat.imax
-        t = data.group["profiles"]["t"][:]
-        # define time interval
-        t_interval_from_end_s = 6 * 3600
-        t_from_end_s = Array(t) .- t[end]
-        # find inds within time interval
-        time_interval_bool = findall(>(-t_interval_from_end_s), t_from_end_s)
-        imin = time_interval_bool[1]
-        imax = time_interval_bool[end]
 
         zc_les = Array(TC.get_nc_data(data, "zc"))
         parent(prog_gm.θ_liq_ice) .=

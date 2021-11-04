@@ -71,9 +71,9 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         end
 
         if force_type(Case.Fo) <: ForcingLES
-            H_horz_adv = Case.Fo.dtdt_hadv[k] / Π
-            H_nudge = Case.Fo.dtdt_nudge[k] / Π
-            H_fluc = Case.Fo.dtdt_fluc[k] / Π
+            H_horz_adv = Case.Fo.dTdt_hadv[k] / Π
+            H_nudge = Case.Fo.dTdt_nudge[k] / Π
+            H_fluc = Case.Fo.dTdt_fluc[k] / Π
 
             gm_U_nudge_k = (Case.Fo.u_nudge[k] - prog_gm.u[k]) / Case.Fo.nudge_tau
             gm_V_nudge_k = (Case.Fo.v_nudge[k] - prog_gm.v[k]) / Case.Fo.nudge_tau
