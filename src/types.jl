@@ -281,8 +281,6 @@ struct EnvironmentThermodynamics{A1}
     Hvar_rain_dt::A1
     QTvar_rain_dt::A1
     HQTcov_rain_dt::A1
-    qt_tendency_precip_formation::A1
-    θ_liq_ice_tendency_precip_formation::A1
     function EnvironmentThermodynamics(namelist, grid::Grid)
         quadrature_order = parse_namelist(namelist, "thermodynamics", "quadrature_order"; default = 3)
         quadrature_type = parse_namelist(namelist, "thermodynamics", "quadrature_type"; default = "gaussian")
@@ -301,8 +299,6 @@ struct EnvironmentThermodynamics{A1}
         QTvar_rain_dt = center_field(grid)
         HQTcov_rain_dt = center_field(grid)
 
-        qt_tendency_precip_formation = center_field(grid)
-        θ_liq_ice_tendency_precip_formation = center_field(grid)
         A1 = typeof(qt_unsat)
         return new{A1}(
             quadrature_order,
@@ -318,8 +314,6 @@ struct EnvironmentThermodynamics{A1}
             Hvar_rain_dt,
             QTvar_rain_dt,
             HQTcov_rain_dt,
-            qt_tendency_precip_formation,
-            θ_liq_ice_tendency_precip_formation,
         )
     end
 end

@@ -116,6 +116,8 @@ cent_aux_vars_edmf(FT, n_up) = (;
             Hvar = FT(0),
             QTvar = FT(0),
             HQTcov = FT(0),
+            qt_tendency_precip_formation = FT(0),
+            θ_liq_ice_tendency_precip_formation = FT(0),
         ),
         θ_liq_ice_tendency_rain_evap = FT(0),
         qt_tendency_rain_evap = FT(0),
