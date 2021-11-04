@@ -1588,14 +1588,14 @@ function CasesBase(case::LES_driven_SCM, namelist, grid::Grid, param_set, Sur, F
     # load data here
     LESDat = NC.Dataset(les_filename, "r") do data
         t = data.group["profiles"]["t"][:]
-        t_interval_from_end_s = 6 * 3600
+        t_interval_from_end_s = namelist["t_interval_from_end_s"]
         t_from_end_s = t .- t[end]
         # find inds within time interval
         time_interval_bool = findall(>(-t_interval_from_end_s), t_from_end_s)
         imin = time_interval_bool[1]
         imax = time_interval_bool[end]
 
-        TC.LESData(imin, imax, les_filename)
+        TC.LESData(imin, imax, les_filename, t_interval_from_end_s, namelist["initial_condition_averaging_window_s"])
     end
     inversion_option = "critical_Ri"
     Fo.apply_coriolis = false
@@ -1625,9 +1625,17 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, gm, st
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     NC.Dataset(self.LESDat.les_filename, "r") do data
-        imin = self.LESDat.imin
-        imax = self.LESDat.imax
-
+        t = data.group["profiles"]["t"][:]
+        # define time interval
+        half_window = self.LESDat.initial_condition_averaging_window_s / 2
+        t_window_start = (self.LESDat.t_interval_from_end_s + half_window)
+        t_window_end = (self.LESDat.t_interval_from_end_s - half_window)
+        t_from_end_s = Array(t) .- t[end]
+        # find inds within time interval
+        in_window(x) = -t_window_start <= x <= -t_window_end
+        time_interval_bool = findall(in_window, t_from_end_s)
+        imin = time_interval_bool[1]
+        imax = time_interval_bool[end]
         zc_les = Array(TC.get_nc_data(data, "zc"))
         parent(prog_gm.θ_liq_ice) .=
             pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "thetali_mean", imin, imax))
