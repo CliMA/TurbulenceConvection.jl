@@ -11,8 +11,7 @@ end
 """
 Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 """
-function precipitation_formation(param_set::APS, precipitation_model, qr, area, ρ0, dt, ts)
-
+function precipitation_formation(param_set::APS, precipitation_model, qr, qs, area, ρ0, dt, ts)
 
     qr_tendency = 0.0
 
@@ -36,7 +35,8 @@ function precipitation_formation(param_set::APS, precipitation_model, qr, area, 
     end
 
     qt_tendency = -qr_tendency
+    qs_tendency = 0.0
     θ_liq_ice_tendency = θ_liq_ice_helper(ts, qt_tendency)
 
-    return PrecipFormation(θ_liq_ice_tendency, qt_tendency, qr_tendency)
+    return PrecipFormation(θ_liq_ice_tendency, qt_tendency, qr_tendency, qs_tendency)
 end

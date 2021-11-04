@@ -9,6 +9,7 @@ Base.@kwdef struct PrecipFormation{FT}
     θ_liq_ice_tendency::FT
     qt_tendency::FT
     qr_tendency::FT
+    qs_tendency::FT
 end
 
 """

@@ -27,6 +27,7 @@ function compute_precipitation_formation_tendencies(
                 param_set,
                 precip.precipitation_model,
                 prog_pr.qr[k],
+                prog_pr.qs[k],
                 aux_up[i].area[k],
                 ρ0_c[k],
                 dt,

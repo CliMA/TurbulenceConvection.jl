@@ -117,13 +117,15 @@ cent_aux_vars_edmf(FT, n_up) = (;
         qt_tendency_rain_evap = FT(0),
         qr_tendency_rain_evap = FT(0),
         qr_tendency_advection = FT(0),
+        qs_tendency_advection = FT(0),
         en_2m = (;
             tke = cent_aux_vars_en_2m(FT),
             Hvar = cent_aux_vars_en_2m(FT),
             QTvar = cent_aux_vars_en_2m(FT),
             HQTcov = cent_aux_vars_en_2m(FT),
         ),
-        term_vel = FT(0),
+        term_vel_rain = FT(0),
+        term_vel_snow = FT(0),
         KM = FT(0),
         KH = FT(0),
         mixing_length = FT(0),
@@ -184,7 +186,9 @@ cent_prognostic_vars_up(FT) = (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot
 cent_prognostic_vars_en(FT) = (; ρatke = FT(0), ρaHvar = FT(0), ρaQTvar = FT(0), ρaHQTcov = FT(0))
 cent_prognostic_vars_edmf(FT, n_up) = (;
     turbconv = (;
-        en = cent_prognostic_vars_en(FT), up = ntuple(i -> cent_prognostic_vars_up(FT), n_up), pr = (; qr = FT(0)),
+        en = cent_prognostic_vars_en(FT),
+        up = ntuple(i -> cent_prognostic_vars_up(FT), n_up),
+        pr = (; qr = FT(0), qs = FT(0)),
     ),
 )
 # cent_prognostic_vars_edmf(FT, n_up) = (;) # could also use this for empty model

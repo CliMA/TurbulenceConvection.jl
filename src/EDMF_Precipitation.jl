@@ -15,34 +15,51 @@ function compute_rain_advection_tendencies(::PrecipPhysics, grid, state, gm, TS:
     # helper to calculate the rain velocity
     # TODO: assuming gm.W = 0
     # TODO: verify translation
-    term_vel = aux_tc.term_vel
+    term_vel_rain = aux_tc.term_vel_rain
+    term_vel_snow = aux_tc.term_vel_snow
+
     @inbounds for k in real_center_indices(grid)
-        term_vel[k] = CM1.terminal_velocity(param_set, rain_type, ρ_0_c[k], prog_pr.qr[k])
+        term_vel_rain[k] = CM1.terminal_velocity(param_set, rain_type, ρ_0_c[k], prog_pr.qr[k])
+        term_vel_snow[k] = CM1.terminal_velocity(param_set, snow_type, ρ_0_c[k], prog_pr.qs[k])
     end
 
     @inbounds for k in reverse(real_center_indices(grid))
         # check stability criterion
-        CFL_out = Δt / Δz * term_vel[k]
+        CFL_out_rain = Δt / Δz * term_vel_rain[k]
+        CFL_out_snow = Δt / Δz * term_vel_snow[k]
         if is_toa_center(grid, k)
-            CFL_in = 0.0
+            CFL_in_rain = 0.0
+            CFL_in_snow = 0.0
         else
-            CFL_in = Δt / Δz * term_vel[k + 1]
+            CFL_in_rain = Δt / Δz * term_vel_rain[k + 1]
+            CFL_in_snow = Δt / Δz * term_vel_snow[k + 1]
         end
-        if max(CFL_in, CFL_out) > CFL_limit
+        if max(CFL_in_rain, CFL_in_snow, CFL_out_rain, CFL_out_snow) > CFL_limit
             error("Time step is too large for rain fall velocity!")
         end
 
         ρ_0_cut = ccut_downwind(ρ_0_c, grid, k)
+
         QR_cut = ccut_downwind(prog_pr.qr, grid, k)
-        w_cut = ccut_downwind(term_vel, grid, k)
-        ρQRw_cut = ρ_0_cut .* QR_cut .* w_cut
+        QS_cut = ccut_downwind(prog_pr.qs, grid, k)
+
+        w_cut_rain = ccut_downwind(term_vel_rain, grid, k)
+        w_cut_snow = ccut_downwind(term_vel_snow, grid, k)
+
+        ρQRw_cut = ρ_0_cut .* QR_cut .* w_cut_rain
+        ρQSw_cut = ρ_0_cut .* QS_cut .* w_cut_snow
+
         ∇ρQRw = c∇_downwind(ρQRw_cut, grid, k; bottom = FreeBoundary(), top = SetValue(0))
+        ∇ρQSw = c∇_downwind(ρQSw_cut, grid, k; bottom = FreeBoundary(), top = SetValue(0))
 
         ρ_0_c_k = ρ_0_c[k]
 
         # TODO - some positivity limiters are needed
         aux_tc.qr_tendency_advection[k] = ∇ρQRw / ρ_0_c_k
+        aux_tc.qs_tendency_advection[k] = ∇ρQSw / ρ_0_c_k
+
         tendencies_pr.qr[k] += aux_tc.qr_tendency_advection[k]
+        tendencies_pr.qs[k] += aux_tc.qs_tendency_advection[k]
     end
     return
 end
