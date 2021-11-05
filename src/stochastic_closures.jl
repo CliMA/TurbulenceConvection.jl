@@ -1,5 +1,5 @@
 import Distributions
-import DifferentialEquations: SOSRI
+import DifferentialEquations: SOSRI, SDEProblem, solve
 
 abstract type AbstractEntDet end
 struct Entrainment <: AbstractEntDet end

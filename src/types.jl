@@ -734,18 +734,18 @@ mutable struct EDMF_PrognosticTKE{A1, A2, IE}
             default = "none",
             valid_options = ["none", "lognormal", "sde", "sde_exp_transform",],
         )
-        closure_type = if closure == "none"
-            NoneClosureType
+        closure_type, u0 = if closure == "none"
+            NoneClosureType, 1
         elseif closure == "lognormal"
-            LogNormalClosureType
+            LogNormalClosureType, 1
         elseif closure == "sde"
-            SDEClosureType
+            SDEClosureType, 1
         elseif closure == "sde_exp_transform"
-            SDEExpTransformedClosureType
+            SDEExpTransformedClosureType, 0  # exp(0) = 1
         else
             error("Something went wrong. Invalid stochastic closure type '$closure'")
         end
-        sde_model = sde_struct{closure_type}(u0 = 1, dt = dt)
+        sde_model = sde_struct{closure_type}(u0 = u0, dt = dt)
 
         # Added by Ignacio : Length scheme in use (mls), and smooth min effect (ml_ratio)
         # Variable Prandtl number initialized as neutral value.
