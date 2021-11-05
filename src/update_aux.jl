@@ -32,6 +32,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     aux_en_2m = center_aux_environment_2m(state)
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_en_unsat = aux_en.unsat
+    aux_en_sat = aux_en.sat
 
     #####
     ##### center variables
@@ -384,7 +386,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         elseif edmf.bg_closure == BuoyGradQuadratures()
             # Second order approximation: Use dry and cloudy environmental fields.
             cf_cut = ccut(aux_en.cloud_fraction, grid, k)
-            QT_sat_cut = ccut(en_thermo.qt_sat, grid, k)
+            QT_sat_cut = ccut(aux_en_sat.q_tot, grid, k)
             ∂qt∂z_sat = c∇_vanishing_subdomain(
                 QT_sat_cut,
                 cf_cut,
@@ -394,7 +396,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 bottom = SetGradient(0),
                 top = SetGradient(0),
             )
-            θ_liq_ice_sat_cut = ccut(en_thermo.θ_liq_ice_sat, grid, k)
+            θ_liq_ice_sat_cut = ccut(aux_en_sat.θ_liq_ice, grid, k)
             ∂θl∂z_sat = c∇_vanishing_subdomain(
                 θ_liq_ice_sat_cut,
                 cf_cut,
@@ -404,7 +406,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 bottom = SetGradient(0),
                 top = SetGradient(0),
             )
-            θv_unsat_cut = ccut(en_thermo.θv_unsat, grid, k)
+            θv_unsat_cut = ccut(aux_en_unsat.θ_virt, grid, k)
             ∂θv∂z_unsat = c∇_vanishing_subdomain(
                 θv_unsat_cut,
                 cf_cut,
@@ -416,11 +418,11 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             )
 
             bg_kwargs = (;
-                t_sat = en_thermo.t_sat[k],
-                qv_sat = en_thermo.qv_sat[k],
-                qt_sat = en_thermo.qt_sat[k],
-                θ_sat = en_thermo.θ_sat[k],
-                θ_liq_ice_sat = en_thermo.θ_liq_ice_sat[k],
+                t_sat = aux_en_sat.T[k],
+                qv_sat = aux_en_sat.q_vap[k],
+                qt_sat = aux_en_sat.q_tot[k],
+                θ_sat = aux_en_sat.θ_dry[k],
+                θ_liq_ice_sat = aux_en_sat.θ_liq_ice[k],
                 ∂θv∂z_unsat = ∂θv∂z_unsat,
                 ∂qt∂z_sat = ∂qt∂z_sat,
                 ∂θl∂z_sat = ∂θl∂z_sat,
@@ -501,9 +503,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     # TODO defined again in compute_covariance_shear and compute_covaraince
     @inbounds for k in real_center_indices(grid)
         aux_en_2m.tke.rain_src[k] = 0
-        aux_en_2m.Hvar.rain_src[k] = ρ0_c[k] * aux_en.area[k] * 2 * en_thermo.Hvar_rain_dt[k]
-        aux_en_2m.QTvar.rain_src[k] = ρ0_c[k] * aux_en.area[k] * 2 * en_thermo.QTvar_rain_dt[k]
-        aux_en_2m.HQTcov.rain_src[k] = ρ0_c[k] * aux_en.area[k] * en_thermo.HQTcov_rain_dt[k]
+        aux_en_2m.Hvar.rain_src[k] = ρ0_c[k] * aux_en.area[k] * 2 * aux_en.Hvar_rain_dt[k]
+        aux_en_2m.QTvar.rain_src[k] = ρ0_c[k] * aux_en.area[k] * 2 * aux_en.QTvar_rain_dt[k]
+        aux_en_2m.HQTcov.rain_src[k] = ρ0_c[k] * aux_en.area[k] * aux_en.HQTcov_rain_dt[k]
     end
 
     get_GMV_CoVar(edmf, grid, state, :tke, :w)

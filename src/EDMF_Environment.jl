@@ -15,18 +15,20 @@ function update_sat_unsat(en_thermo::EnvironmentThermodynamics, state, k, ts)
     q_liq = TD.liquid_specific_humidity(ts)
     q_ice = TD.ice_specific_humidity(ts)
     aux_en = center_aux_environment(state)
+    aux_en_sat = aux_en.sat
+    aux_en_unsat = aux_en.unsat
     if TD.has_condensate(q_liq + q_ice)
         aux_en.cloud_fraction[k] = 1.0
-        en_thermo.θ_sat[k] = TD.dry_pottemp(ts)
-        en_thermo.θ_liq_ice_sat[k] = TD.liquid_ice_pottemp(ts)
-        en_thermo.t_sat[k] = TD.air_temperature(ts)
-        en_thermo.qt_sat[k] = TD.total_specific_humidity(ts)
-        en_thermo.qv_sat[k] = TD.vapor_specific_humidity(ts)
+        aux_en_sat.θ_dry[k] = TD.dry_pottemp(ts)
+        aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(ts)
+        aux_en_sat.T[k] = TD.air_temperature(ts)
+        aux_en_sat.q_tot[k] = TD.total_specific_humidity(ts)
+        aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(ts)
     else
         aux_en.cloud_fraction[k] = 0.0
-        en_thermo.θ_unsat[k] = TD.dry_pottemp(ts)
-        en_thermo.θv_unsat[k] = TD.virtual_pottemp(ts)
-        en_thermo.qt_unsat[k] = TD.total_specific_humidity(ts)
+        aux_en_unsat.θ_dry[k] = TD.dry_pottemp(ts)
+        aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(ts)
+        aux_en_unsat.q_tot[k] = TD.total_specific_humidity(ts)
     end
     return
 end
@@ -74,6 +76,8 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
     ρ0_c = center_ref_state(state).ρ0
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
+    aux_en_unsat = aux_en.unsat
+    aux_en_sat = aux_en.sat
 
     #TODO - remember you output source terms multipierd by dt (bec. of instanteneous autoconcv)
     #TODO - add tendencies for gm H, QT and QR due to rain
@@ -232,26 +236,26 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
 
             # update cloudy/dry variables for buoyancy in TKE
             aux_en.cloud_fraction[k] = outer_env[i_cf]
-            en_thermo.qt_unsat[k] = outer_env[i_qt_unsat]
+            aux_en_unsat.q_tot[k] = outer_env[i_qt_unsat]
             # TD.jl cannot compute θ_unsat when T=0
-            en_thermo.θ_unsat[k] = if outer_env[i_T_unsat] > 0
-                ts_unsat = TD.PhaseEquil_pTq(param_set, p0_c[k], outer_env[i_T_unsat], en_thermo.qt_unsat[k])
+            aux_en_unsat.θ_dry[k] = if outer_env[i_T_unsat] > 0
+                ts_unsat = TD.PhaseEquil_pTq(param_set, p0_c[k], outer_env[i_T_unsat], aux_en_unsat.q_tot[k])
                 TD.dry_pottemp(ts_unsat)
             else
                 0
             end
 
-            en_thermo.t_sat[k] = outer_env[i_T_sat]
-            en_thermo.qv_sat[k] = outer_env[i_qt_sat] - outer_env[i_ql]
-            en_thermo.qt_sat[k] = outer_env[i_qt_sat]
-            ts_sat = TD.PhaseEquil_pTq(param_set, p0_c[k], en_thermo.t_sat[k], en_thermo.qt_sat[k])
-            en_thermo.θ_sat[k] = TD.dry_pottemp(ts_sat)
-            en_thermo.θ_liq_ice_sat[k] = TD.liquid_ice_pottemp(ts_sat)
+            aux_en_sat.T[k] = outer_env[i_T_sat]
+            aux_en_sat.q_vap[k] = outer_env[i_qt_sat] - outer_env[i_ql]
+            aux_en_sat.q_tot[k] = outer_env[i_qt_sat]
+            ts_sat = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_en_sat.T[k], aux_en_sat.q_tot[k])
+            aux_en_sat.θ_dry[k] = TD.dry_pottemp(ts_sat)
+            aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(ts_sat)
 
             # update var/covar rain sources
-            en_thermo.Hvar_rain_dt[k] = outer_src[i_SH_H] - outer_src[i_SH] * aux_en.θ_liq_ice[k]
-            en_thermo.QTvar_rain_dt[k] = outer_src[i_Sqt_qt] - outer_src[i_Sqt] * aux_en.q_tot[k]
-            en_thermo.HQTcov_rain_dt[k] =
+            aux_en.Hvar_rain_dt[k] = outer_src[i_SH_H] - outer_src[i_SH] * aux_en.θ_liq_ice[k]
+            aux_en.QTvar_rain_dt[k] = outer_src[i_Sqt_qt] - outer_src[i_Sqt] * aux_en.q_tot[k]
+            aux_en.HQTcov_rain_dt[k] =
                 outer_src[i_SH_qt] - outer_src[i_SH] * aux_en.q_tot[k] + outer_src[i_Sqt_H] -
                 outer_src[i_Sqt] * aux_en.θ_liq_ice[k]
 
@@ -278,9 +282,9 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
             )
             update_sat_unsat(en_thermo, state, k, ts)
 
-            en_thermo.Hvar_rain_dt[k] = 0.0
-            en_thermo.QTvar_rain_dt[k] = 0.0
-            en_thermo.HQTcov_rain_dt[k] = 0.0
+            aux_en.Hvar_rain_dt[k] = 0.0
+            aux_en.QTvar_rain_dt[k] = 0.0
+            aux_en.HQTcov_rain_dt[k] = 0.0
         end
     end
 
