@@ -19,10 +19,6 @@ end
 
 function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm, TS)
     tendencies_gm = center_tendencies_grid_mean(state)
-    parent(tendencies_gm.u) .= 0
-    parent(tendencies_gm.v) .= 0
-    parent(tendencies_gm.q_tot) .= 0
-    parent(tendencies_gm.θ_liq_ice) .= 0
     param_set = parameter_set(gm)
     prog_gm = center_prog_grid_mean(state)
     aux_en = center_aux_environment(state)
@@ -250,21 +246,17 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     compute_updraft_surface_bc(edmf, grid, state, Case)
     update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
+    parent(state.tendencies) .= 0
     tendencies_gm = center_tendencies_grid_mean(state)
     tendencies_up = center_tendencies_updrafts(state)
     tendencies_up_f = face_tendencies_updrafts(state)
     tendencies_en = center_tendencies_environment(state)
     tendencies_pr = center_tendencies_precipitation(state)
-    parent(tendencies_gm) .= 0
-    parent(tendencies_up) .= 0
-    parent(tendencies_up_f) .= 0
-    parent(tendencies_en) .= 0
-    parent(tendencies_pr) .= 0
     compute_precipitation_formation_tendencies(grid, state, edmf.UpdVar, edmf.Precip, TS.dt, param_set) # causes division error in dry bubble first time step
     microphysics(en_thermo, grid, state, en, edmf.Precip, TS.dt, param_set) # saturation adjustment + rain creation
     if edmf.Precip.precipitation_model == "clima_1m"
-        compute_precipitation_sink_tendencies(edmf.PrecipPhys, grid, state, gm, TS)
-        compute_precipitation_advection_tendencies(edmf.PrecipPhys, grid, state, gm, TS)
+        compute_precipitation_sink_tendencies(grid, state, gm, TS)
+        compute_precipitation_advection_tendencies(grid, state, gm, TS)
     end
 
     # compute tendencies
@@ -472,7 +464,6 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
     ρ0_f = face_ref_state(state).ρ0
     au_lim = edmf.max_area
 
-    parent(tendencies_up) .= 0
     @inbounds for i in 1:(up.n_updrafts)
         aux_up[i].entr_turb_dyn .= aux_up[i].entr_sc .+ aux_up[i].frac_turb_entr
         aux_up[i].detr_turb_dyn .= aux_up[i].detr_sc .+ aux_up[i].frac_turb_entr

@@ -1,7 +1,7 @@
 """
 Computes the qr advection (down) tendency
 """
-function compute_precipitation_advection_tendencies(::PrecipPhysics, grid, state, gm, TS::TimeStepping)
+function compute_precipitation_advection_tendencies(grid, state, gm, TS::TimeStepping)
     param_set = parameter_set(gm)
     Δz = grid.Δz
     Δt = TS.dt
@@ -67,7 +67,7 @@ end
 """
 Computes the tendencies to θ_liq_ice, qt and qr due to rain evaporation
 """
-function compute_precipitation_sink_tendencies(::PrecipPhysics, grid, state, gm, TS::TimeStepping)
+function compute_precipitation_sink_tendencies(grid, state, gm, TS::TimeStepping)
     param_set = parameter_set(gm)
     Δt = TS.dt
     p0_c = center_ref_state(state).p0
