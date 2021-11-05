@@ -25,6 +25,8 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     aux_en_f = face_aux_environment(state)
     aux_up = center_aux_updrafts(state)
     aux_bulk = center_aux_bulk(state)
+    aux_tc_f = face_aux_turbconv(state)
+    aux_up_f = face_aux_updrafts(state)
     ρ0_f = face_ref_state(state).ρ0
     p0_c = center_ref_state(state).p0
     α0_c = center_ref_state(state).α0
@@ -100,9 +102,9 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
             aux_tc.θ_liq_ice_tendency_precip_sinks[k]
     end
 
-    aux_up_f = face_aux_updrafts(state)
-    edmf.massflux_h .= 0.0
-    edmf.massflux_qt .= 0.0
+    # TODO: we shouldn't need to call parent here
+    parent(aux_tc_f.massflux_h) .= 0
+    parent(aux_tc_f.massflux_qt) .= 0
     # Compute the mass flux and associated scalar fluxes
     @inbounds for i in 1:(up.n_updrafts)
         aux_up_f[i].massflux[kf_surf] = 0.0
@@ -115,8 +117,8 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     end
 
     @inbounds for k in real_face_indices(grid)
-        edmf.massflux_h[k] = 0.0
-        edmf.massflux_qt[k] = 0.0
+        aux_tc_f.massflux_h[k] = 0.0
+        aux_tc_f.massflux_qt[k] = 0.0
         # We know that, since W = 0 at z = 0, m = 0 also, and
         # therefore θ_liq_ice / q_tot values do not matter
         m_bcs = (; bottom = SetValue(0), top = SetValue(0))
@@ -125,16 +127,16 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         @inbounds for i in 1:(up.n_updrafts)
             h_up_f = interpc2f(aux_up[i].θ_liq_ice, grid, k; m_bcs...)
             qt_up_f = interpc2f(aux_up[i].q_tot, grid, k; m_bcs...)
-            edmf.massflux_h[k] += aux_up_f[i].massflux[k] * (h_up_f - h_en_f)
-            edmf.massflux_qt[k] += aux_up_f[i].massflux[k] * (qt_up_f - qt_en_f)
+            aux_tc_f.massflux_h[k] += aux_up_f[i].massflux[k] * (h_up_f - h_en_f)
+            aux_tc_f.massflux_qt[k] += aux_up_f[i].massflux[k] * (qt_up_f - qt_en_f)
         end
     end
 
     # Compute the  mass flux tendencies
     # Adjust the values of the grid mean variables
     @inbounds for k in real_center_indices(grid)
-        mf_tend_h_dual = dual_faces(edmf.massflux_h, grid, k)
-        mf_tend_qt_dual = dual_faces(edmf.massflux_qt, grid, k)
+        mf_tend_h_dual = dual_faces(aux_tc_f.massflux_h, grid, k)
+        mf_tend_qt_dual = dual_faces(aux_tc_f.massflux_qt, grid, k)
 
         ∇mf_tend_h = ∇f2c(mf_tend_h_dual, grid, k)
         ∇mf_tend_qt = ∇f2c(mf_tend_qt_dual, grid, k)
@@ -143,8 +145,8 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         mf_tend_qt = -∇mf_tend_qt * α0_c[k]
 
         # Prepare the output
-        edmf.massflux_tendency_h[k] = mf_tend_h
-        edmf.massflux_tendency_qt[k] = mf_tend_qt
+        aux_tc.massflux_tendency_h[k] = mf_tend_h
+        aux_tc.massflux_tendency_qt[k] = mf_tend_qt
         tendencies_gm.θ_liq_ice[k] += mf_tend_h
         tendencies_gm.q_tot[k] += mf_tend_qt
     end
@@ -154,19 +156,19 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     aeKMu_bc = Case.Sur.rho_uflux / aux_en.area[kc_surf]
     aeKMv_bc = Case.Sur.rho_vflux / aux_en.area[kc_surf]
     @inbounds for k in real_center_indices(grid)
-        aeKH_q_tot_cut = dual_faces(edmf.diffusive_flux_qt, grid, k)
+        aeKH_q_tot_cut = dual_faces(aux_tc_f.diffusive_flux_qt, grid, k)
         ∇aeKH_q_tot = ∇f2c(aeKH_q_tot_cut, grid, k; bottom = SetValue(aeKHq_tot_bc), top = SetValue(0))
         tendencies_gm.q_tot[k] += -α0_c[k] * aux_en.area[k] * ∇aeKH_q_tot
 
-        aeKH_θ_liq_ice_cut = dual_faces(edmf.diffusive_flux_h, grid, k)
+        aeKH_θ_liq_ice_cut = dual_faces(aux_tc_f.diffusive_flux_h, grid, k)
         ∇aeKH_θ_liq_ice = ∇f2c(aeKH_θ_liq_ice_cut, grid, k; bottom = SetValue(aeKHθ_liq_ice_bc), top = SetValue(0))
         tendencies_gm.θ_liq_ice[k] += -α0_c[k] * aux_en.area[k] * ∇aeKH_θ_liq_ice
 
-        aeKM_u_cut = dual_faces(edmf.diffusive_flux_u, grid, k)
+        aeKM_u_cut = dual_faces(aux_tc_f.diffusive_flux_u, grid, k)
         ∇aeKM_u = ∇f2c(aeKM_u_cut, grid, k; bottom = SetValue(aeKMu_bc), top = SetValue(0))
         tendencies_gm.u[k] += -α0_c[k] * aux_en.area[k] * ∇aeKM_u
 
-        aeKM_v_cut = dual_faces(edmf.diffusive_flux_v, grid, k)
+        aeKM_v_cut = dual_faces(aux_tc_f.diffusive_flux_v, grid, k)
         ∇aeKM_v = ∇f2c(aeKM_v_cut, grid, k; bottom = SetValue(aeKMv_bc), top = SetValue(0))
         tendencies_gm.v[k] += -α0_c[k] * aux_en.area[k] * ∇aeKM_v
     end
@@ -210,19 +212,19 @@ function compute_diffusive_fluxes(
     @inbounds for k in real_face_indices(grid)
         q_dual = dual_centers(aux_en.q_tot, grid, k)
         ∇q_tot_f = ∇c2f(q_dual, grid, k; bottom = SetGradient(aeKHq_tot_bc), top = SetGradient(0))
-        edmf.diffusive_flux_qt[k] = -aux_tc_f.ρ_ae_KH[k] * ∇q_tot_f
+        aux_tc_f.diffusive_flux_qt[k] = -aux_tc_f.ρ_ae_KH[k] * ∇q_tot_f
 
         θ_liq_ice_dual = dual_centers(aux_en.θ_liq_ice, grid, k)
         ∇θ_liq_ice_f = ∇c2f(θ_liq_ice_dual, grid, k; bottom = SetGradient(aeKHθ_liq_ice_bc), top = SetGradient(0))
-        edmf.diffusive_flux_h[k] = -aux_tc_f.ρ_ae_KH[k] * ∇θ_liq_ice_f
+        aux_tc_f.diffusive_flux_h[k] = -aux_tc_f.ρ_ae_KH[k] * ∇θ_liq_ice_f
 
         u_dual = dual_centers(prog_gm.u, grid, k)
         ∇u_f = ∇c2f(u_dual, grid, k; bottom = SetGradient(aeKMu_bc), top = SetGradient(0))
-        edmf.diffusive_flux_u[k] = -aux_tc_f.ρ_ae_KM[k] * ∇u_f
+        aux_tc_f.diffusive_flux_u[k] = -aux_tc_f.ρ_ae_KM[k] * ∇u_f
 
         v_dual = dual_centers(prog_gm.v, grid, k)
         ∇v_f = ∇c2f(v_dual, grid, k; bottom = SetGradient(aeKMv_bc), top = SetGradient(0))
-        edmf.diffusive_flux_v[k] = -aux_tc_f.ρ_ae_KM[k] * ∇v_f
+        aux_tc_f.diffusive_flux_v[k] = -aux_tc_f.ρ_ae_KM[k] * ∇v_f
     end
     return
 end

@@ -443,17 +443,6 @@ mutable struct EDMF_PrognosticTKE{A1}
     h_surface_bc::A1
     qt_surface_bc::A1
     pressure_plume_spacing::A1
-    massflux_tendency_h::A1
-    massflux_tendency_qt::A1
-    diffusive_tendency_h::A1
-    diffusive_tendency_qt::A1
-    massflux_h::A1
-    massflux_qt::A1
-    diffusive_flux_h::A1
-    diffusive_flux_qt::A1
-    diffusive_flux_u::A1
-    diffusive_flux_v::A1
-    massflux_tke::A1 # remove
     prandtl_nvec::A1
     prandtl_number::Float64 # remove
     mls::A1
@@ -527,23 +516,6 @@ mutable struct EDMF_PrognosticTKE{A1}
         qt_surface_bc = zeros(n_updrafts)
         pressure_plume_spacing = zeros(n_updrafts)
 
-        # Mass flux tendencies of mean scalars (for output)
-        massflux_tendency_h = center_field(grid)
-        massflux_tendency_qt = center_field(grid)
-
-        # (Eddy) diffusive tendencies of mean scalars (for output)
-        diffusive_tendency_h = center_field(grid)
-        diffusive_tendency_qt = center_field(grid)
-
-        # Vertical fluxes for output
-        massflux_h = face_field(grid)
-        massflux_qt = face_field(grid)
-        diffusive_flux_h = face_field(grid)
-        diffusive_flux_qt = face_field(grid)
-        diffusive_flux_u = face_field(grid)
-        diffusive_flux_v = face_field(grid)
-        massflux_tke = center_field(grid)
-
         # Initialize SDE parameters
         dt = parse_namelist(namelist, "time_stepping", "dt"; default = 1.0)
         closure = parse_namelist(
@@ -592,7 +564,7 @@ mutable struct EDMF_PrognosticTKE{A1}
         wstar = 0
         entr_surface_bc = 0
         detr_surface_bc = 0
-        A1 = typeof(massflux_tendency_h)
+        A1 = typeof(area_surface_bc)
         return new{A1}(
             Ri_bulk_crit,
             zi,
@@ -616,17 +588,6 @@ mutable struct EDMF_PrognosticTKE{A1}
             h_surface_bc,
             qt_surface_bc,
             pressure_plume_spacing,
-            massflux_tendency_h,
-            massflux_tendency_qt,
-            diffusive_tendency_h,
-            diffusive_tendency_qt,
-            massflux_h,
-            massflux_qt,
-            diffusive_flux_h,
-            diffusive_flux_qt,
-            diffusive_flux_u,
-            diffusive_flux_v,
-            massflux_tke,
             prandtl_nvec,
             prandtl_number,
             mls,

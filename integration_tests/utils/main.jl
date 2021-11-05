@@ -154,6 +154,10 @@ cent_aux_vars_edmf(FT, n_up) = (;
         θ_virt = FT(0),
         ∇ρ_ae_K∇ϕ = FT(0),
         ρaew_en_ϕ = FT(0),
+        massflux_tendency_h = FT(0),
+        massflux_tendency_qt = FT(0),
+        diffusive_tendency_h = FT(0),
+        diffusive_tendency_qt = FT(0),
     ),
 )
 cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., cent_aux_vars_edmf(FT, n_up)...)
@@ -178,6 +182,12 @@ face_aux_vars_edmf(FT, n_up) = (;
         ρ_ae_K∇ϕ = FT(0),
         en = (; w = FT(0)),
         up = ntuple(i -> face_aux_vars_up(FT), n_up),
+        massflux_h = FT(0),
+        massflux_qt = FT(0),
+        diffusive_flux_h = FT(0),
+        diffusive_flux_qt = FT(0),
+        diffusive_flux_u = FT(0),
+        diffusive_flux_v = FT(0),
     ),
 )
 face_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., face_aux_vars_gm(FT)..., face_aux_vars_edmf(FT, n_up)...)
