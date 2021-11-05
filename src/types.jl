@@ -443,11 +443,7 @@ mutable struct EDMF_PrognosticTKE{A1}
     h_surface_bc::A1
     qt_surface_bc::A1
     pressure_plume_spacing::A1
-    prandtl_nvec::A1
-    prandtl_number::Float64 # remove
-    mls::A1
-    ml_ratio::A1
-    l_entdet::A1
+    prandtl_number::Float64
     wstar::Float64
     entr_surface_bc::Float64
     detr_surface_bc::Float64
@@ -554,13 +550,6 @@ mutable struct EDMF_PrognosticTKE{A1}
             error("Something went wrong. Invalid environmental buoyancy gradient closure type '$bg_type'")
         end
 
-        # Added by Ignacio : Length scheme in use (mls), and smooth min effect (ml_ratio)
-        # Variable Prandtl number initialized as neutral value.
-        ones_vec = center_field(grid)
-        prandtl_nvec = prandtl_number .* ones_vec
-        mls = center_field(grid)
-        ml_ratio = center_field(grid)
-        l_entdet = center_field(grid)
         wstar = 0
         entr_surface_bc = 0
         detr_surface_bc = 0
@@ -588,11 +577,7 @@ mutable struct EDMF_PrognosticTKE{A1}
             h_surface_bc,
             qt_surface_bc,
             pressure_plume_spacing,
-            prandtl_nvec,
             prandtl_number,
-            mls,
-            ml_ratio,
-            l_entdet,
             wstar,
             entr_surface_bc,
             detr_surface_bc,
@@ -601,7 +586,6 @@ mutable struct EDMF_PrognosticTKE{A1}
         )
     end
 end
-prandtl_number(edmf::EDMF_PrognosticTKE) = edmf.prandtl_number
 diffusivity_m(edmf::EDMF_PrognosticTKE) = edmf.KM
 diffusivity_h(edmf::EDMF_PrognosticTKE) = edmf.KH
 Ri_bulk_crit(edmf::EDMF_PrognosticTKE) = edmf.Ri_bulk_crit

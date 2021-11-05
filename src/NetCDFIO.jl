@@ -1,24 +1,5 @@
 
-face_fields_list() = (
-    "W",
-    "alpha0",
-    "rho0",
-    "p0",
-    "updraft_w",
-    "env_w",
-    "nh_pressure",
-    "nh_pressure_adv",
-    "nh_pressure_drag",
-    "nh_pressure_b",
-    "total_flux_h",
-    "total_flux_qt",
-    "massflux_h",
-    "massflux_qt",
-    "diffusive_flux_h",
-    "diffusive_flux_qt",
-    "diffusive_flux_u",
-    "diffusive_flux_v",
-)
+face_fields_list() = ()
 
 function is_face_field(var_name)
     return var_name in face_fields_list()
@@ -155,14 +136,6 @@ add_profile(self::NetCDFIO_Stats, var_name::String) =
     add_field(self, var_name; dims = is_face_field(var_name) ? ("zf", "t") : ("zc", "t"), group = "profiles")
 
 #####
-##### Reference state-specific
-#####
-
-# TODO: depricate
-add_reference_profile(self::NetCDFIO_Stats, var_name::String) =
-    add_field(self, var_name; dims = is_face_field(var_name) ? ("zf",) : ("zc",), group = "reference")
-
-#####
 ##### Generic field
 #####
 
@@ -183,10 +156,6 @@ function add_ts(self::NetCDFIO_Stats, var_name::String)
         new_var = NC.defVar(ts_grp, var_name, Float64, ("t",))
     end
 end
-
-# TODO: depricate
-write_reference_profile(self::NetCDFIO_Stats, var_name::String, data::T) where {T <: AbstractArray{Float64, 1}} =
-    write_field(self, var_name, data; group = "reference")
 
 #####
 ##### Performance critical IO

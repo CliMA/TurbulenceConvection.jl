@@ -114,10 +114,6 @@ function initialize_io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     initialize_io(edmf.Precip, Stats)
 
     add_ts(Stats, "rd")
-    # Diff mixing lengths: Ignacio
-    add_profile(Stats, "ed_length_scheme")
-    add_profile(Stats, "mixing_length_ratio")
-    add_profile(Stats, "entdet_balance_length")
     return
 end
 
@@ -126,9 +122,5 @@ function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::Ti
     io(edmf.EnvVar, grid, state, Stats)
     io(edmf.Precip, grid, state, Stats)
     write_ts(Stats, "rd", StatsBase.mean(edmf.pressure_plume_spacing))
-    #Different mixing lengths : Ignacio
-    write_profile(Stats, "ed_length_scheme", edmf.mls)
-    write_profile(Stats, "mixing_length_ratio", edmf.ml_ratio)
-    write_profile(Stats, "entdet_balance_length", edmf.l_entdet)
     return
 end
