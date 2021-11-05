@@ -105,12 +105,12 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     edmf.massflux_qt .= 0.0
     # Compute the mass flux and associated scalar fluxes
     @inbounds for i in 1:(up.n_updrafts)
-        edmf.m[i, kf_surf] = 0.0
+        aux_up_f[i].massflux[kf_surf] = 0.0
         a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
         @inbounds for k in real_face_indices(grid)
             a_up = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
             a_en = interpc2f(aux_en.area, grid, k; a_up_bcs...)
-            edmf.m[i, k] = ρ0_f[k] * a_up * a_en * (aux_up_f[i].w[k] - aux_en_f.w[k])
+            aux_up_f[i].massflux[k] = ρ0_f[k] * a_up * a_en * (aux_up_f[i].w[k] - aux_en_f.w[k])
         end
     end
 
@@ -125,8 +125,8 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         @inbounds for i in 1:(up.n_updrafts)
             h_up_f = interpc2f(aux_up[i].θ_liq_ice, grid, k; m_bcs...)
             qt_up_f = interpc2f(aux_up[i].q_tot, grid, k; m_bcs...)
-            edmf.massflux_h[k] += edmf.m[i, k] * (h_up_f - h_en_f)
-            edmf.massflux_qt[k] += edmf.m[i, k] * (qt_up_f - qt_en_f)
+            edmf.massflux_h[k] += aux_up_f[i].massflux[k] * (h_up_f - h_en_f)
+            edmf.massflux_qt[k] += aux_up_f[i].massflux[k] * (qt_up_f - qt_en_f)
         end
     end
 
@@ -510,7 +510,7 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
             adv = upwind_advection_velocity(ρ0_f, aux_up[i].area, aux_up_f[i].w, grid, k; a_up_bcs)
             exch = (ρ0_f[k] * a_k * aux_up_f[i].w[k] * (entr_w * aux_en_f.w[k] - detr_w * aux_up_f[i].w[k]))
             buoy = ρ0_f[k] * a_k * B_k
-            tendencies_up_f[i].ρaw[k] = -adv + exch + buoy + edmf.nh_pressure[i, k]
+            tendencies_up_f[i].ρaw[k] = -adv + exch + buoy + aux_up_f[i].nh_pressure[k]
         end
     end
     return
@@ -915,7 +915,7 @@ function GMV_third_m(edmf::EDMF_PrognosticTKE, grid, state, covar_en_sym::Symbol
             w_bcs = (; bottom = SetValue(0), top = SetValue(0))
             w_en_dual = dual_faces(aux_en_f.w, grid, k)
             ∇w_en = ∇f2c(w_en_dual, grid, k; w_bcs...)
-            Envcov_ = -edmf.horiz_K_eddy[i_last, k] * ∇w_en
+            Envcov_ = -aux_up[i_last].horiz_K_eddy[k] * ∇w_en
         else
             Envcov_ = covar_en[k]
         end
