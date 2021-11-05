@@ -1,10 +1,4 @@
 
-face_fields_list() = ()
-
-function is_face_field(var_name)
-    return var_name in face_fields_list()
-end
-
 # TODO: remove `vars` hack that avoids https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
 
 mutable struct NetCDFIO_Stats
@@ -128,14 +122,6 @@ function close_files(self::NetCDFIO_Stats)
 end
 
 #####
-##### Profile-specific
-#####
-
-# TODO: depricate
-add_profile(self::NetCDFIO_Stats, var_name::String) =
-    add_field(self, var_name; dims = is_face_field(var_name) ? ("zf", "t") : ("zc", "t"), group = "profiles")
-
-#####
 ##### Generic field
 #####
 
@@ -163,10 +149,6 @@ end
 
 # Field wrapper
 write_field(self::NetCDFIO_Stats, var_name::String, data; group) = write_field(self, var_name, vec(data); group = group)
-
-# TODO: depricate
-write_profile(self::NetCDFIO_Stats, var_name::String, data::T) where {T <: AbstractArray{Float64, 1}} =
-    write_field(self, var_name, data; group = "profiles")
 
 function write_field(self::NetCDFIO_Stats, var_name::String, data::T; group) where {T <: AbstractArray{Float64, 1}}
     if group == "profiles"

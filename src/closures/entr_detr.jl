@@ -13,7 +13,6 @@ Cohen et al. (JAMES, 2020), given:
 """
 function entr_detr(param_set, εδ_model::MoistureDeficitEntr)
 
-    l = zeros(2)
     γ_lim = ICP.area_limiter_scale(param_set)
     β_lim = ICP.area_limiter_power(param_set)
     c_ε = CPEDMF.c_ε(param_set)

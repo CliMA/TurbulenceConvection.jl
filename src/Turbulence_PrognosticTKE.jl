@@ -21,6 +21,7 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     tendencies_gm = center_tendencies_grid_mean(state)
     param_set = parameter_set(gm)
     prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_up = center_aux_updrafts(state)
@@ -42,11 +43,11 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         Π = TD.exner(ts)
 
         if Case.Fo.apply_coriolis
-            tendencies_gm.u[k] -= Case.Fo.coriolis_param * (Case.Fo.vg[k] - prog_gm.v[k])
-            tendencies_gm.v[k] += Case.Fo.coriolis_param * (Case.Fo.ug[k] - prog_gm.u[k])
+            tendencies_gm.u[k] -= Case.Fo.coriolis_param * (aux_gm.vg[k] - prog_gm.v[k])
+            tendencies_gm.v[k] += Case.Fo.coriolis_param * (aux_gm.ug[k] - prog_gm.u[k])
         end
         if rad_type(Case.Rad) <: Union{RadiationDYCOMS_RF01, RadiationLES}
-            tendencies_gm.θ_liq_ice[k] += Case.Rad.dTdt[k] / Π
+            tendencies_gm.θ_liq_ice[k] += aux_gm.dTdt_rad[k] / Π
         end
         H_cut = ccut_downwind(prog_gm.θ_liq_ice, grid, k)
         q_tot_cut = ccut_downwind(prog_gm.q_tot, grid, k)
@@ -54,32 +55,32 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         ∇q_tot = c∇_downwind(q_tot_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
 
         if force_type(Case.Fo) <: ForcingDYCOMS_RF01
-            tendencies_gm.q_tot[k] += Case.Fo.dqtdt[k]
+            tendencies_gm.q_tot[k] += aux_gm.dqtdt[k]
             # Apply large-scale subsidence tendencies
-            tendencies_gm.θ_liq_ice[k] -= ∇H * Case.Fo.subsidence[k]
-            tendencies_gm.q_tot[k] -= ∇q_tot * Case.Fo.subsidence[k]
+            tendencies_gm.θ_liq_ice[k] -= ∇H * aux_gm.subsidence[k]
+            tendencies_gm.q_tot[k] -= ∇q_tot * aux_gm.subsidence[k]
         end
 
         if force_type(Case.Fo) <: ForcingStandard
             if Case.Fo.apply_subsidence
-                tendencies_gm.θ_liq_ice[k] -= ∇H * Case.Fo.subsidence[k]
-                tendencies_gm.q_tot[k] -= ∇q_tot * Case.Fo.subsidence[k]
+                tendencies_gm.θ_liq_ice[k] -= ∇H * aux_gm.subsidence[k]
+                tendencies_gm.q_tot[k] -= ∇q_tot * aux_gm.subsidence[k]
             end
-            tendencies_gm.θ_liq_ice[k] += Case.Fo.dTdt[k] / Π
-            tendencies_gm.q_tot[k] += Case.Fo.dqtdt[k]
+            tendencies_gm.θ_liq_ice[k] += aux_gm.dTdt[k] / Π
+            tendencies_gm.q_tot[k] += aux_gm.dqtdt[k]
         end
 
         if force_type(Case.Fo) <: ForcingLES
-            H_horz_adv = Case.Fo.dTdt_hadv[k] / Π
-            H_nudge = Case.Fo.dTdt_nudge[k] / Π
-            H_fluc = Case.Fo.dTdt_fluc[k] / Π
+            H_horz_adv = aux_gm.dTdt_hadv[k] / Π
+            H_nudge = aux_gm.dTdt_nudge[k] / Π
+            H_fluc = aux_gm.dTdt_fluc[k] / Π
 
-            gm_U_nudge_k = (Case.Fo.u_nudge[k] - prog_gm.u[k]) / Case.Fo.nudge_tau
-            gm_V_nudge_k = (Case.Fo.v_nudge[k] - prog_gm.v[k]) / Case.Fo.nudge_tau
+            gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm.u[k]) / Case.Fo.nudge_tau
+            gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm.v[k]) / Case.Fo.nudge_tau
             if Case.Fo.apply_subsidence
                 # Apply large-scale subsidence tendencies
-                gm_H_subsidence_k = -∇H * Case.Fo.subsidence[k]
-                gm_QT_subsidence_k = -∇q_tot * Case.Fo.subsidence[k]
+                gm_H_subsidence_k = -∇H * aux_gm.subsidence[k]
+                gm_QT_subsidence_k = -∇q_tot * aux_gm.subsidence[k]
             else
                 gm_H_subsidence_k = 0.0
                 gm_QT_subsidence_k = 0.0
@@ -87,7 +88,7 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
 
             tendencies_gm.θ_liq_ice[k] += H_horz_adv + H_nudge + H_fluc + gm_H_subsidence_k
             tendencies_gm.q_tot[k] +=
-                Case.Fo.dqtdt_hadv[k] + Case.Fo.dqtdt_nudge[k] + gm_QT_subsidence_k + Case.Fo.dqtdt_fluc[k]
+                aux_gm.dqtdt_hadv[k] + aux_gm.dqtdt_nudge[k] + gm_QT_subsidence_k + aux_gm.dqtdt_fluc[k]
 
             tendencies_gm.u[k] += gm_U_nudge_k
             tendencies_gm.v[k] += gm_V_nudge_k
