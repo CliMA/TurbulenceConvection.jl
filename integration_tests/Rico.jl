@@ -16,7 +16,7 @@ case_name = "Rico"
 println("Running $case_name...")
 namelist = NameList.default_namelist(case_name)
 namelist["meta"]["uuid"] = "01"
-ds_tc_filename = @time main(namelist)
+ds_tc_filename = @time main(namelist; time_run = true)
 
 computed_mse = compute_mse_wrapper(
     case_name,
