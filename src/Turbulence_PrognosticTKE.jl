@@ -473,8 +473,10 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
     au_lim = edmf.max_area
 
     parent(tendencies_up) .= 0
-    entr_turb_dyn = edmf.entr_sc .+ edmf.frac_turb_entr
-    detr_turb_dyn = edmf.detr_sc .+ edmf.frac_turb_entr
+    @inbounds for i in 1:(up.n_updrafts)
+        aux_up[i].entr_turb_dyn .= aux_up[i].entr_sc .+ aux_up[i].frac_turb_entr
+        aux_up[i].detr_turb_dyn .= aux_up[i].detr_sc .+ aux_up[i].frac_turb_entr
+    end
 
     # Solve for updraft area fraction
     @inbounds for k in real_center_indices(grid)
@@ -484,8 +486,8 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
             m_k = (ρ0_c[k] * aux_up[i].area[k] * w_up_c)
 
             adv = upwind_advection_area(ρ0_c, aux_up[i].area, aux_up_f[i].w, grid, k)
-            entr_term = m_k * entr_turb_dyn[i, k]
-            detr_term = m_k * detr_turb_dyn[i, k]
+            entr_term = m_k * aux_up[i].entr_turb_dyn[k]
+            detr_term = m_k * aux_up[i].detr_turb_dyn[k]
             tendencies_up[i].ρarea[k] = (ρ0_c[k] * adv + entr_term - detr_term)
 
             adv = upwind_advection_scalar(ρ0_c, aux_up[i].area, aux_up_f[i].w, aux_up[i].θ_liq_ice, grid, k)
@@ -510,8 +512,8 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
             a_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
             # We know that, since W = 0 at z = 0, these BCs should
             # not matter in the end:
-            entr_w = interpc2f(entr_turb_dyn, grid, k, i; bottom = SetValue(0), top = SetValue(0))
-            detr_w = interpc2f(detr_turb_dyn, grid, k, i; bottom = SetValue(0), top = SetValue(0))
+            entr_w = interpc2f(aux_up[i].entr_turb_dyn, grid, k; bottom = SetValue(0), top = SetValue(0))
+            detr_w = interpc2f(aux_up[i].detr_turb_dyn, grid, k; bottom = SetValue(0), top = SetValue(0))
             B_k = interpc2f(aux_up[i].buoy, grid, k; bottom = SetValue(0), top = SetValue(0))
 
             adv = upwind_advection_velocity(ρ0_f, aux_up[i].area, aux_up_f[i].w, grid, k; a_up_bcs)
@@ -732,7 +734,7 @@ function compute_covariance_entr(
                 gmvvar1 = is_tke ? interpf2c(GmvVar1, grid, k) : GmvVar1[k]
                 gmvvar2 = is_tke ? interpf2c(GmvVar2, grid, k) : GmvVar2[k]
 
-                eps_turb = edmf.frac_turb_entr[i, k]
+                eps_turb = aux_up[i].frac_turb_entr[k]
 
                 w_u = interpf2c(aux_up_f[i].w, grid, k)
                 dynamic_entr =
@@ -740,7 +742,7 @@ function compute_covariance_entr(
                     ρ0_c[k] *
                     a_up *
                     abs(w_u) *
-                    edmf.detr_sc[i, k] *
+                    aux_up[i].detr_sc[k] *
                     (updvar1 - envvar1) *
                     (updvar2 - envvar2)
                 turbulent_entr =
@@ -752,7 +754,7 @@ function compute_covariance_entr(
                     ((envvar1 - gmvvar1) * (updvar2 - envvar2) + (envvar2 - gmvvar2) * (updvar1 - envvar1))
                 aux_covar.entr_gain[k] += dynamic_entr + turbulent_entr
                 aux_covar.detr_loss[k] +=
-                    tke_factor * ρ0_c[k] * a_up * abs(w_u) * (edmf.entr_sc[i, k] + eps_turb) * covar[k]
+                    tke_factor * ρ0_c[k] * a_up * abs(w_u) * (aux_up[i].entr_sc[k] + eps_turb) * covar[k]
             end
         end
     end
@@ -774,7 +776,7 @@ function compute_covariance_detr(edmf::EDMF_PrognosticTKE, grid, state, covar_sy
         aux_covar.detr_loss[k] = 0.0
         @inbounds for i in 1:(up.n_updrafts)
             w_up_c = interpf2c(aux_up_f[i].w, grid, k)
-            aux_covar.detr_loss[k] += aux_up[i].area[k] * abs(w_up_c) * edmf.entr_sc[i, k]
+            aux_covar.detr_loss[k] += aux_up[i].area[k] * abs(w_up_c) * aux_up[i].entr_sc[k]
         end
         aux_covar.detr_loss[k] *= ρ0_c[k] * covar[k]
     end
@@ -844,9 +846,7 @@ function compute_en_tendencies!(edmf, grid::Grid, state, param_set, TS, covar_sy
 
     mixing_length = aux_tc.mixing_length
     minimum_area = edmf.minimum_area
-    frac_turb_entr = edmf.frac_turb_entr
     pressure_plume_spacing = edmf.pressure_plume_spacing
-    entr_sc = edmf.entr_sc
 
     ρaew_en_ϕ = center_aux_turbconv(state).ρaew_en_ϕ
     FT = eltype(grid)
@@ -862,10 +862,11 @@ function compute_en_tendencies!(edmf, grid::Grid, state, param_set, TS, covar_sy
     @inbounds for k in real_center_indices(grid)
         D_env = sum(1:n_updrafts) do i
             if aux_up[i].area[k] > minimum_area
-                turb_entr = frac_turb_entr[i, k]
+                turb_entr = aux_up[i].frac_turb_entr[k]
+                entr_sc = aux_up[i].entr_sc[k]
                 R_up = pressure_plume_spacing[i]
                 w_up_c = interpf2c(aux_up_f[i].w, grid, k)
-                D_env_i = ρ0_c[k] * aux_up[i].area[k] * w_up_c * (entr_sc[i, k] + turb_entr)
+                D_env_i = ρ0_c[k] * aux_up[i].area[k] * w_up_c * (entr_sc + turb_entr)
             else
                 D_env_i = FT(0)
             end

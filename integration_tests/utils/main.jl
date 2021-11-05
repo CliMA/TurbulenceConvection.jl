@@ -84,6 +84,11 @@ cent_aux_vars_up(FT) = (;
     θ_liq_ice = FT(0),
     θ_liq_ice_tendency_precip_formation = FT(0),
     qt_tendency_precip_formation = FT(0),
+    entr_sc = FT(0),
+    detr_sc = FT(0),
+    frac_turb_entr = FT(0),
+    entr_turb_dyn = FT(0),
+    detr_turb_dyn = FT(0),
 )
 cent_aux_vars_edmf(FT, n_up) = (;
     turbconv = (;

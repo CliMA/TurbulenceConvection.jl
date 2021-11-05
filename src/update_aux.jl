@@ -271,21 +271,21 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 )
 
                 er = entr_detr(param_set, εδ_model)
-                edmf.entr_sc[i, k] = er.ε_dyn
-                edmf.detr_sc[i, k] = er.δ_dyn
+                aux_up[i].entr_sc[k] = er.ε_dyn
+                aux_up[i].detr_sc[k] = er.δ_dyn
                 # stochastic closure
                 sde_model = edmf.sde_model
                 stoch_ε = stochastic_closure(param_set, sde_model, Entrainment())
                 stoch_δ = stochastic_closure(param_set, sde_model, Detrainment())
-                edmf.entr_sc[i, k] *= stoch_ε
-                edmf.detr_sc[i, k] *= stoch_δ
+                aux_up[i].entr_sc[k] *= stoch_ε
+                aux_up[i].detr_sc[k] *= stoch_δ
 
-                edmf.frac_turb_entr[i, k] = er.ε_turb
+                aux_up[i].frac_turb_entr[k] = er.ε_turb
                 edmf.horiz_K_eddy[i, k] = er.K_ε
             else
-                edmf.entr_sc[i, k] = 0.0
-                edmf.detr_sc[i, k] = 0.0
-                edmf.frac_turb_entr[i, k] = 0.0
+                aux_up[i].entr_sc[k] = 0.0
+                aux_up[i].detr_sc[k] = 0.0
+                aux_up[i].frac_turb_entr[k] = 0.0
                 edmf.horiz_K_eddy[i, k] = 0.0
             end
         end
@@ -451,8 +451,8 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             wc_en = wc_en,
             wc_up = Tuple(wc_up),
             a_up = ntuple(i -> aux_up[i].area[k], up.n_updrafts),
-            ε_turb = ntuple(i -> edmf.frac_turb_entr[i, k], up.n_updrafts),
-            δ_dyn = ntuple(i -> edmf.detr_sc[i, k], up.n_updrafts),
+            ε_turb = ntuple(i -> aux_up[i].frac_turb_entr[k], up.n_updrafts),
+            δ_dyn = ntuple(i -> aux_up[i].detr_sc[k], up.n_updrafts),
             N_up = up.n_updrafts,
         )
 

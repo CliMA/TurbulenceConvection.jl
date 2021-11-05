@@ -282,10 +282,10 @@ function compute_diagnostics!(edmf, gm, grid, state, Case, TS)
         if a_up_bulk[k] > 0.0
             @inbounds for i in 1:(edmf.n_updrafts)
                 diag_tc.massflux[k] += interpf2c(edmf.m, grid, k, i)
-                diag_tc.entr_sc[k] += aux_up[i].area[k] * edmf.entr_sc[i, k] / a_up_bulk[k]
-                diag_tc.detr_sc[k] += aux_up[i].area[k] * edmf.detr_sc[i, k] / a_up_bulk[k]
+                diag_tc.entr_sc[k] += aux_up[i].area[k] * aux_up[i].entr_sc[k] / a_up_bulk[k]
+                diag_tc.detr_sc[k] += aux_up[i].area[k] * aux_up[i].detr_sc[k] / a_up_bulk[k]
                 diag_tc.asp_ratio[k] += aux_up[i].area[k] * edmf.asp_ratio[i, k] / a_up_bulk[k]
-                diag_tc.frac_turb_entr[k] += aux_up[i].area[k] * edmf.frac_turb_entr[i, k] / a_up_bulk[k]
+                diag_tc.frac_turb_entr[k] += aux_up[i].area[k] * aux_up[i].frac_turb_entr[k] / a_up_bulk[k]
                 diag_tc.horiz_K_eddy[k] += aux_up[i].area[k] * edmf.horiz_K_eddy[i, k] / a_up_bulk[k]
                 diag_tc.sorting_function[k] += aux_up[i].area[k] * edmf.sorting_function[i, k] / a_up_bulk[k]
                 diag_tc.b_mix[k] += aux_up[i].area[k] * edmf.b_mix[i, k] / a_up_bulk[k]

@@ -251,9 +251,6 @@ function GridMeanVariables(namelist, grid::Grid, param_set::PS) where {PS}
     return GridMeanVariables(; param_set, lwp, iwp, cloud_base, cloud_top, cloud_cover, EnvThermo_scheme)
 end
 
-
-struct UpdraftThermodynamics end
-
 Base.@kwdef mutable struct EnvironmentVariables
     cloud_base::Float64 = 0
     cloud_top::Float64 = 0
@@ -486,12 +483,9 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
     UpdVar::UpdraftVariables
     EnvVar::EnvironmentVariables
     EnvThermo::EnvironmentThermodynamics
-    entr_sc::A2
     press::A2
-    detr_sc::A2
     sorting_function::A2
     b_mix::A2
-    frac_turb_entr::A2
     nh_pressure::A2
     nh_pressure_b::A2
     nh_pressure_adv::A2
@@ -589,18 +583,11 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
         # Create the class for environment thermodynamics
         EnvThermo = EnvironmentThermodynamics(namelist, grid)
 
-        # Entrainment rates
-        entr_sc = center_field(grid, n_updrafts)
+        # Pressure
         press = center_field(grid, n_updrafts)
-
-        # Detrainment rates
-        detr_sc = center_field(grid, n_updrafts)
 
         sorting_function = center_field(grid, n_updrafts)
         b_mix = center_field(grid, n_updrafts)
-
-        # turbulent entrainment
-        frac_turb_entr = center_field(grid, n_updrafts)
 
         # Pressure term in updraft vertical momentum equation
         nh_pressure = face_field(grid, n_updrafts)
@@ -709,12 +696,9 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
             UpdVar,
             EnvVar,
             EnvThermo,
-            entr_sc,
             press,
-            detr_sc,
             sorting_function,
             b_mix,
-            frac_turb_entr,
             nh_pressure,
             nh_pressure_b,
             nh_pressure_adv,
