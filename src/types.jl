@@ -557,7 +557,4 @@ mutable struct EDMF_PrognosticTKE{A1}
         )
     end
 end
-diffusivity_m(edmf::EDMF_PrognosticTKE) = edmf.KM
-diffusivity_h(edmf::EDMF_PrognosticTKE) = edmf.KH
-Ri_bulk_crit(edmf::EDMF_PrognosticTKE) = edmf.Ri_bulk_crit
 parameter_set(obj) = obj.param_set
