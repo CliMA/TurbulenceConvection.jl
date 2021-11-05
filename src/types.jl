@@ -258,59 +258,18 @@ Base.@kwdef mutable struct EnvironmentVariables
     EnvThermo_scheme::String = "default_EnvThermo_scheme"
 end
 function EnvironmentVariables(namelist, grid::Grid)
-    # TODO - the flag setting is repeated from Variables.pyx logic
+    # TODO: EnvThermo_scheme is repeated in GridMeanVariables
     EnvThermo_scheme = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
     return EnvironmentVariables(; EnvThermo_scheme)
 end
 
-struct EnvironmentThermodynamics{A1}
+struct EnvironmentThermodynamics
     quadrature_order::Int
     quadrature_type::String
-    qt_unsat::A1
-    θ_unsat::A1
-    θv_unsat::A1
-    t_sat::A1
-    qv_sat::A1
-    qt_sat::A1
-    θ_sat::A1
-    θ_liq_ice_sat::A1
-    Hvar_rain_dt::A1
-    QTvar_rain_dt::A1
-    HQTcov_rain_dt::A1
     function EnvironmentThermodynamics(namelist, grid::Grid)
         quadrature_order = parse_namelist(namelist, "thermodynamics", "quadrature_order"; default = 3)
         quadrature_type = parse_namelist(namelist, "thermodynamics", "quadrature_type"; default = "gaussian")
-
-        qt_unsat = center_field(grid)
-        θ_unsat = center_field(grid)
-        θv_unsat = center_field(grid)
-
-        t_sat = center_field(grid)
-        qv_sat = center_field(grid)
-        qt_sat = center_field(grid)
-        θ_sat = center_field(grid)
-        θ_liq_ice_sat = center_field(grid)
-
-        Hvar_rain_dt = center_field(grid)
-        QTvar_rain_dt = center_field(grid)
-        HQTcov_rain_dt = center_field(grid)
-
-        A1 = typeof(qt_unsat)
-        return new{A1}(
-            quadrature_order,
-            quadrature_type,
-            qt_unsat,
-            θ_unsat,
-            θv_unsat,
-            t_sat,
-            qv_sat,
-            qt_sat,
-            θ_sat,
-            θ_liq_ice_sat,
-            Hvar_rain_dt,
-            QTvar_rain_dt,
-            HQTcov_rain_dt,
-        )
+        return new(quadrature_order, quadrature_type)
     end
 end
 
