@@ -400,7 +400,6 @@ end
 # if covar_e.name is not "tke".
 function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol, ϕ_sym::Symbol, ψ_sym::Symbol = ϕ_sym)
 
-    aux_tc = center_aux_turbconv(state)
     is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
     prog_gm_c = center_prog_grid_mean(state)
@@ -417,19 +416,18 @@ function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol,
     ψ_gm = getproperty(prog_gm, ψ_sym)
     ϕ_en = getproperty(aux_en, ϕ_sym)
     ψ_en = getproperty(aux_en, ψ_sym)
+    area_en = aux_en_c.area
 
     if is_tke
-        area_en = aux_en_c.area
         Ic = CCO.InterpolateF2C()
-        @. gmv_covar = tke_factor * area_en * Ic(ϕ_en - ϕ_gm) * Ic(ψ_en - ψ_gm) + aux_en_c.area * covar_e
+        @. gmv_covar = tke_factor * area_en * Ic(ϕ_en - ϕ_gm) * Ic(ψ_en - ψ_gm) + area_en * covar_e
         @inbounds for i in 1:(edmf.n_updrafts)
             ϕ_up = getproperty(aux_up_f[i], ϕ_sym)
             ψ_up = getproperty(aux_up_f[i], ψ_sym)
             @. gmv_covar += tke_factor * aux_up[i].area * Ic(ϕ_up - ϕ_gm) * Ic(ψ_up - ψ_gm)
         end
     else
-
-        @. gmv_covar = tke_factor * aux_en_c.area * (ϕ_en - ϕ_gm) * (ψ_en - ψ_gm) + aux_en_c.area * covar_e
+        @. gmv_covar = tke_factor * area_en * (ϕ_en - ϕ_gm) * (ψ_en - ψ_gm) + area_en * covar_e
         @inbounds for i in 1:(edmf.n_updrafts)
             ϕ_up = getproperty(aux_up[i], ϕ_sym)
             ψ_up = getproperty(aux_up[i], ψ_sym)
@@ -585,7 +583,6 @@ function compute_covariance_shear(
 )
 
     aux_tc = center_aux_turbconv(state)
-    aux_tc = center_aux_turbconv(state)
     ρ0_c = center_ref_state(state).ρ0
     prog_gm = center_prog_grid_mean(state)
     is_tke = covar_sym == :tke
@@ -597,37 +594,29 @@ function compute_covariance_shear(
     aux_en_c = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_en = is_tke ? aux_en_f : aux_en_c
+    cartvec = CC.Geometry.Cartesian3Vector
     EnvVar1 = getproperty(aux_en, en_var1_sym)
     EnvVar2 = getproperty(aux_en, en_var2_sym)
+    FT = eltype(grid)
+
+    bcs = (; bottom = CCO.Extrapolate(), top = CCO.SetGradient(cartvec(zero(FT))))
+    If = CCO.InterpolateC2F(; bcs...)
+    ∇c = CCO.DivergenceF2C()
+    u = prog_gm.u
+    v = prog_gm.v
+    area_en = aux_en_c.area
 
     if is_tke
-        @inbounds for k in real_center_indices(grid)
-            v_cut = ccut(prog_gm.v, grid, k)
-            ∇v = c∇(v_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
-
-            u_cut = ccut(prog_gm.u, grid, k)
-            ∇u = c∇(u_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
-
-            var2_dual = dual_faces(EnvVar2, grid, k)
-            var1_dual = dual_faces(EnvVar1, grid, k)
-
-            ∇var2 = ∇f2c(var2_dual, grid, k; bottom = SetValue(0), top = SetGradient(0))
-            ∇var1 = ∇f2c(var1_dual, grid, k; bottom = SetValue(0), top = SetGradient(0))
-
-            aux_covar.shear[k] =
-                tke_factor * 2 * (ρ0_c[k] * aux_en_c.area[k] * k_eddy[k] * (∇var1 * ∇var2 + ∇u^2 + ∇v^2))
-        end
+        @. aux_covar.shear =
+            tke_factor *
+            2 *
+            ρ0_c *
+            area_en *
+            k_eddy *
+            (∇c(cartvec(EnvVar1)) * ∇c(cartvec(EnvVar2)) + (∇c(cartvec(If(u))))^2 + (∇c(cartvec(If(v))))^2)
     else
-        @inbounds for k in real_center_indices(grid)
-            # Defined correctly only for covariance between half-level variables.
-            var1_cut = ccut(EnvVar1, grid, k)
-            ∇var1 = c∇(var1_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
-
-            var2_cut = ccut(EnvVar2, grid, k)
-            ∇var2 = c∇(var2_cut, grid, k; bottom = Extrapolate(), top = SetGradient(0))
-
-            aux_covar.shear[k] = tke_factor * 2 * (ρ0_c[k] * aux_en_c.area[k] * k_eddy[k] * (∇var1 * ∇var2))
-        end
+        @. aux_covar.shear =
+            tke_factor * 2 * ρ0_c * area_en * k_eddy * ∇c(cartvec(If(EnvVar1))) * ∇c(cartvec(If(EnvVar2)))
     end
     return
 end
