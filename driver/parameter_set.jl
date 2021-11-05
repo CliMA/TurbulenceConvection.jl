@@ -12,10 +12,12 @@ CLIMAParameters.Planet.cp_v(ps::EarthParameterSet) = ps.nt.cp_v
 CLIMAParameters.Planet.R_d(ps::EarthParameterSet) = ps.nt.R_d
 CLIMAParameters.Planet.R_v(ps::EarthParameterSet) = ps.nt.R_v
 CLIMAParameters.Planet.molmass_ratio(ps::EarthParameterSet) = ps.nt.molmass_ratio
-# microphysics 0-moment parameters
+# microphysics parameters
 CLIMAParameters.Atmos.Microphysics_0M.τ_precip(ps::EarthParameterSet) = ps.nt.τ_precip
-# microphysics 1-moment parameters
 CLIMAParameters.Atmos.Microphysics.τ_acnv_rai(ps::EarthParameterSet) = ps.nt.τ_acnv_rai
+CLIMAParameters.Atmos.Microphysics.τ_acnv_sno(ps::EarthParameterSet) = ps.nt.τ_acnv_sno
+CLIMAParameters.Atmos.Microphysics.q_liq_threshold(ps::EarthParameterSet) = ps.nt.q_liq_threshold
+CLIMAParameters.Atmos.Microphysics.q_ice_threshold(ps::EarthParameterSet) = ps.nt.q_ice_threshold
 # entrainment/detrainment parameters
 CLIMAParameters.Atmos.EDMF.c_ε(ps::EarthParameterSet) = ps.nt.c_ε # factor multiplyer for dry term in entrainment/detrainment
 CLIMAParameters.Atmos.EDMF.α_b(ps::EarthParameterSet) = ps.nt.α_b # factor multiplyer for pressure buoyancy terms (effective buoyancy is (1-α_b))
@@ -48,7 +50,10 @@ function create_parameter_set(namelist)
         R_v = 461.5,
         molmass_ratio = 461.5/287.1,
         τ_precip = TC.parse_namelist(namelist, "microphysics", "τ_precip"; default = 1000.0),
-        τ_acnv_rai = TC.parse_namelist(namelist, "microphysics", "τ_acnv_rai"; default = 1000.0),
+        τ_acnv_rai = TC.parse_namelist(namelist, "microphysics", "τ_acnv_rai"; default = 2500.0),
+        τ_acnv_sno = TC.parse_namelist(namelist, "microphysics", "τ_acnv_sno"; default = 100.0),
+        q_liq_threshold = TC.parse_namelist(namelist, "microphysics", "q_liq_threshold"; default = 0.5e-3),
+        q_ice_threshold = TC.parse_namelist(namelist, "microphysics", "q_ice_threshold"; default = 1e-6),
         c_ε = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_factor"),
         c_div = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_massflux_div_factor"; default = 0.0),
         α_b = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pressure_normalmode_buoy_coeff1"),
