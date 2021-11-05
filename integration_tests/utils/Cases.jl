@@ -213,7 +213,7 @@ function initialize_surface(self::CasesBase{Soares}, grid::Grid, state, param_se
     qt_flux = 2.5e-5
     ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
     theta_surface = TD.liquid_ice_pottemp(ts)
-    self.Sur.lhf = qt_flux * ρ0_f_surf * CPP.LH_v0(param_set)
+    self.Sur.lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(ts)
     self.Sur.shf = θ_flux * TD.cp_m(ts) * ρ0_f_surf
     self.Sur.ustar_fixed = false
     self.Sur.ustar = 0.28 # just to initilize grid mean covariances
@@ -361,7 +361,7 @@ function initialize_surface(self::CasesBase{Bomex}, grid::Grid, state, param_set
     theta_surface = 299.1
     ts = TC.thermo_state_pθq(param_set, p0_f_surf, theta_surface, self.Sur.qsurface)
     self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = 5.2e-5 * ρ0_f_surf * CPP.LH_v0(param_set)
+    self.Sur.lhf = 5.2e-5 * ρ0_f_surf * TD.latent_heat_vapor(ts)
     self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * ρ0_f_surf
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # m/s
@@ -490,7 +490,7 @@ function initialize_surface(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
     theta_surface = 299.1
     ts = TC.thermo_state_pθq(param_set, p0_f_surf, theta_surface, self.Sur.qsurface)
     self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = 5.2e-5 * ρ0_f_surf * CPP.LH_v0(param_set)
+    self.Sur.lhf = 5.2e-5 * ρ0_f_surf * TD.latent_heat_vapor(ts)
     self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * ρ0_f_surf
     self.lhf0 = self.Sur.lhf
     self.shf0 = self.Sur.shf
@@ -772,7 +772,7 @@ function initialize_surface(self::CasesBase{TRMM_LBA}, grid::Grid, state, param_
     theta_surface = (273.15 + 23)
     ts = TC.thermo_state_pθq(param_set, p0_f_surf, theta_surface, self.Sur.qsurface)
     self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = 5.2e-5 * ρ0_f_surf * CPP.LH_v0(param_set)
+    self.Sur.lhf = 5.2e-5 * ρ0_f_surf * TD.latent_heat_vapor(ts)
     self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * ρ0_f_surf
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
@@ -1277,7 +1277,7 @@ function initialize_surface(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, par
     ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
     theta_surface = TD.liquid_ice_pottemp(ts)
     θ_flux = self.Sur.shf / TD.cp_m(ts) / ρ0_f_surf
-    qt_flux = self.Sur.lhf / CPP.LH_v0(param_set) / ρ0_f_surf
+    qt_flux = self.Sur.lhf / TD.latent_heat_vapor(ts) / ρ0_f_surf
 
     self.Sur.bflux =
         g * (
