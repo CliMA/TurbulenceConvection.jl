@@ -646,37 +646,21 @@ function compute_covariance_interdomain_src(
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
     aux_en_2m = center_aux_environment_2m(state)
-    aux_covar = getproperty(aux_en_2m, Covar_sym)
+    interdomain = getproperty(aux_en_2m, Covar_sym).interdomain
     prog_up = is_tke ? aux_up_f : aux_up
     aux_en_c = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_en = is_tke ? aux_en_f : aux_en_c
     ϕ_en = getproperty(aux_en, ϕ_var)
     ψ_en = getproperty(aux_en, ψ_var)
+    Ic = is_tke ? CCO.InterpolateF2C() : x -> x
 
-    if is_tke
-        @inbounds for k in real_center_indices(grid)
-            aux_covar.interdomain[k] = 0.0
-            @inbounds for i in 1:(edmf.n_updrafts)
-                ϕ_up = getproperty(prog_up[i], ϕ_var)
-                ψ_up = getproperty(prog_up[i], ψ_var)
-                Δϕ = interpf2c(ϕ_up, grid, k) - interpf2c(ϕ_en, grid, k)
-                Δψ = interpf2c(ψ_up, grid, k) - interpf2c(ψ_en, grid, k)
-
-                aux_covar.interdomain[k] += tke_factor * aux_up[i].area[k] * (1.0 - aux_up[i].area[k]) * Δϕ * Δψ
-            end
-        end
-    else
-        @inbounds for k in real_center_indices(grid)
-            aux_covar.interdomain[k] = 0.0
-            @inbounds for i in 1:(edmf.n_updrafts)
-                ϕ_up = getproperty(prog_up[i], ϕ_var)
-                ψ_up = getproperty(prog_up[i], ψ_var)
-                Δϕ = ϕ_up[k] - ϕ_en[k]
-                Δψ = ψ_up[k] - ψ_en[k]
-                aux_covar.interdomain[k] += tke_factor * aux_up[i].area[k] * (1.0 - aux_up[i].area[k]) * Δϕ * Δψ
-            end
-        end
+    parent(interdomain) .= 0
+    @inbounds for i in 1:(edmf.n_updrafts)
+        ϕ_up = getproperty(prog_up[i], ϕ_var)
+        ψ_up = getproperty(prog_up[i], ψ_var)
+        a_up = aux_up[i].area
+        @. interdomain += tke_factor * a_up * (1 - a_up) * (Ic(ϕ_up) - Ic(ϕ_en)) * (Ic(ψ_up) - Ic(ψ_en))
     end
     return
 end
