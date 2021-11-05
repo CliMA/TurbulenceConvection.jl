@@ -1,12 +1,3 @@
-
-function center_field(grid::Grid)
-    return zeros(grid.nz)
-end
-
-function center_field(grid::Grid, nu::Int)
-    return zeros(nu, grid.nz)
-end
-
 # A complementary struct to ClimaCore's `PlusHalf` type.
 struct Cent{I <: Integer}
     i::I
