@@ -113,7 +113,6 @@ function initialize_io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     initialize_io(edmf.EnvVar, Stats)
     initialize_io(edmf.Precip, Stats)
 
-    add_profile(Stats, "sorting_function")
     add_ts(Stats, "rd")
     add_profile(Stats, "turbulent_entrainment_full")
     add_profile(Stats, "turbulent_entrainment_W")

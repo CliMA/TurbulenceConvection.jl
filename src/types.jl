@@ -420,12 +420,11 @@ end
 
 CasesBase(case::T; kwargs...) where {T} = CasesBase{T}(; casename = string(nameof(T)), kwargs...)
 
-mutable struct EDMF_PrognosticTKE{A1, A2}
+mutable struct EDMF_PrognosticTKE{A1}
     Ri_bulk_crit::Float64
     zi::Float64
     n_updrafts::Int
-    drag_sign::Int
-    asp_label
+    asp_label::String
     extrapolate_buoyancy::Bool
     surface_area::Float64
     max_area::Float64
@@ -439,16 +438,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
     UpdVar::UpdraftVariables
     EnvVar::EnvironmentVariables
     EnvThermo::EnvironmentThermodynamics
-    press::A2
-    sorting_function::A2
-    b_mix::A2
-    nh_pressure::A2
-    nh_pressure_b::A2
-    nh_pressure_adv::A2
-    nh_pressure_drag::A2
-    asp_ratio::A2
-    m::A2
-    horiz_K_eddy::A2
     area_surface_bc::A1
     w_surface_bc::A1
     h_surface_bc::A1
@@ -464,9 +453,9 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
     diffusive_flux_qt::A1
     diffusive_flux_u::A1
     diffusive_flux_v::A1
-    massflux_tke::A1
+    massflux_tke::A1 # remove
     prandtl_nvec::A1
-    prandtl_number::Float64
+    prandtl_number::Float64 # remove
     mls::A1
     ml_ratio::A1
     l_entdet::A1
@@ -492,12 +481,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
             default = "normalmode",
             valid_options = ["normalmode", "normalmode_signdf"],
         )
-
-        if pressure_func_drag_str == "normalmode"
-            drag_sign = false
-        elseif pressure_func_drag_str == "normalmode_signdf"
-            drag_sign = true
-        end
 
         asp_label = parse_namelist(
             namelist,
@@ -536,25 +519,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
         EnvVar = EnvironmentVariables(namelist, grid)
         # Create the class for environment thermodynamics
         EnvThermo = EnvironmentThermodynamics(namelist, grid)
-
-        # Pressure
-        press = center_field(grid, n_updrafts)
-
-        sorting_function = center_field(grid, n_updrafts)
-        b_mix = center_field(grid, n_updrafts)
-
-        # Pressure term in updraft vertical momentum equation
-        nh_pressure = face_field(grid, n_updrafts)
-        nh_pressure_b = face_field(grid, n_updrafts)
-        nh_pressure_adv = face_field(grid, n_updrafts)
-        nh_pressure_drag = face_field(grid, n_updrafts)
-        asp_ratio = center_field(grid, n_updrafts)
-
-        # Mass flux
-        m = face_field(grid, n_updrafts)
-
-        # mixing length
-        horiz_K_eddy = center_field(grid, n_updrafts)
 
         # Near-surface BC of updraft area fraction
         area_surface_bc = zeros(n_updrafts)
@@ -629,12 +593,10 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
         entr_surface_bc = 0
         detr_surface_bc = 0
         A1 = typeof(massflux_tendency_h)
-        A2 = typeof(horiz_K_eddy)
-        return new{A1, A2}(
+        return new{A1}(
             Ri_bulk_crit,
             zi,
             n_updrafts,
-            drag_sign,
             asp_label,
             extrapolate_buoyancy,
             surface_area,
@@ -649,16 +611,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
             UpdVar,
             EnvVar,
             EnvThermo,
-            press,
-            sorting_function,
-            b_mix,
-            nh_pressure,
-            nh_pressure_b,
-            nh_pressure_adv,
-            nh_pressure_drag,
-            asp_ratio,
-            m,
-            horiz_K_eddy,
             area_surface_bc,
             w_surface_bc,
             h_surface_bc,

@@ -283,12 +283,12 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 aux_up[i].detr_sc[k] *= stoch_δ
 
                 aux_up[i].frac_turb_entr[k] = er.ε_turb
-                edmf.horiz_K_eddy[i, k] = er.K_ε
+                aux_up[i].horiz_K_eddy[k] = er.K_ε
             else
                 aux_up[i].entr_sc[k] = 0.0
                 aux_up[i].detr_sc[k] = 0.0
                 aux_up[i].frac_turb_entr[k] = 0.0
-                edmf.horiz_K_eddy[i, k] = 0.0
+                aux_up[i].horiz_K_eddy[k] = 0.0
             end
         end
     end
@@ -322,10 +322,10 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 nh_pressure_adv = 0.0
                 nh_pressure_drag = 0.0
             end
-            edmf.nh_pressure_b[i, k] = nh_pressure_b
-            edmf.nh_pressure_adv[i, k] = nh_pressure_adv
-            edmf.nh_pressure_drag[i, k] = nh_pressure_drag
-            edmf.nh_pressure[i, k] = nh_pressure_b + nh_pressure_adv + nh_pressure_drag
+            aux_up_f[i].nh_pressure_b[k] = nh_pressure_b
+            aux_up_f[i].nh_pressure_adv[k] = nh_pressure_adv
+            aux_up_f[i].nh_pressure_drag[k] = nh_pressure_drag
+            aux_up_f[i].nh_pressure[k] = nh_pressure_b + nh_pressure_adv + nh_pressure_drag
         end
     end
 
@@ -481,7 +481,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         @inbounds for i in 1:(up.n_updrafts)
             w_up_c = interpf2c(aux_up_f[i].w, grid, k)
             w_en_c = interpf2c(aux_en_f.w, grid, k)
-            press_c = interpf2c(edmf.nh_pressure, grid, k, i)
+            press_c = interpf2c(aux_up_f[i].nh_pressure, grid, k)
             aux_en_2m.tke.press[k] += (w_en_c - w_up_c) * press_c
         end
     end

@@ -89,6 +89,8 @@ cent_aux_vars_up(FT) = (;
     frac_turb_entr = FT(0),
     entr_turb_dyn = FT(0),
     detr_turb_dyn = FT(0),
+    asp_ratio = FT(0),
+    horiz_K_eddy = FT(0),
 )
 cent_aux_vars_edmf(FT, n_up) = (;
     turbconv = (;
@@ -158,7 +160,14 @@ cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)...,
 
 # Face only
 face_aux_vars_gm(FT) = (; massflux_s = FT(0), diffusive_flux_s = FT(0), total_flux_s = FT(0))
-face_aux_vars_up(FT) = (; w = FT(0))
+face_aux_vars_up(FT) = (;
+    w = FT(0),
+    nh_pressure = FT(0),
+    nh_pressure_b = FT(0),
+    nh_pressure_adv = FT(0),
+    nh_pressure_drag = FT(0),
+    massflux = FT(0),
+)
 
 face_aux_vars_edmf(FT, n_up) = (;
     turbconv = (;
@@ -187,8 +196,6 @@ cent_diagnostic_vars_edmf(FT, n_up) = (;
         massflux = FT(0),
         frac_turb_entr = FT(0),
         horiz_K_eddy = FT(0),
-        sorting_function = FT(0),
-        b_mix = FT(0),
     ),
 )
 cent_diagnostic_vars(FT, n_up) = (; cent_diagnostic_vars_gm(FT)..., cent_diagnostic_vars_edmf(FT, n_up)...)
