@@ -425,45 +425,21 @@ function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol,
     ψ_en = getproperty(aux_en, ψ_sym)
 
     if is_tke
-        @inbounds for k in real_center_indices(grid)
-            ϕ_en_dual = dual_faces(ϕ_en, grid, k)
-            ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
-            ψ_en_dual = dual_faces(ψ_en, grid, k)
-            ψ_gm_dual = dual_faces(ψ_gm, grid, k)
-            Δϕ_dual = ϕ_en_dual .- ϕ_gm_dual
-            Δψ_dual = ψ_en_dual .- ψ_gm_dual
-            Δϕ = interpf2c(Δϕ_dual, grid, k)
-            Δψ = interpf2c(Δψ_dual, grid, k)
-
-            gmv_covar[k] = tke_factor * aux_en_c.area[k] * Δϕ * Δψ + aux_en_c.area[k] * covar_e[k]
-            @inbounds for i in 1:(edmf.n_updrafts)
-                ϕ_up_var = getproperty(aux_up_f[i], ϕ_sym)
-                ψ_up_var = getproperty(aux_up_f[i], ψ_sym)
-                ϕ_up_dual = dual_faces(ϕ_up_var, grid, k)
-                ϕ_gm_dual = dual_faces(ϕ_gm, grid, k)
-                ψ_up_dual = dual_faces(ψ_up_var, grid, k)
-                ψ_gm_dual = dual_faces(ψ_gm, grid, k)
-                Δϕ_dual = ϕ_up_dual .- ϕ_gm_dual
-                Δψ_dual = ψ_up_dual .- ψ_gm_dual
-                Δϕ = interpf2c(Δϕ_dual, grid, k)
-                Δψ = interpf2c(Δψ_dual, grid, k)
-                gmv_covar[k] += tke_factor * aux_up[i].area[k] * Δϕ * Δψ
-            end
+        area_en = aux_en_c.area
+        Ic = CCO.InterpolateF2C()
+        @. gmv_covar = tke_factor * area_en * Ic(ϕ_en - ϕ_gm) * Ic(ψ_en - ψ_gm) + aux_en_c.area * covar_e
+        @inbounds for i in 1:(edmf.n_updrafts)
+            ϕ_up = getproperty(aux_up_f[i], ϕ_sym)
+            ψ_up = getproperty(aux_up_f[i], ψ_sym)
+            @. gmv_covar += tke_factor * aux_up[i].area * Ic(ϕ_up - ϕ_gm) * Ic(ψ_up - ψ_gm)
         end
     else
 
-        @inbounds for k in real_center_indices(grid)
-            Δϕ = ϕ_en[k] - ϕ_gm[k]
-            Δψ = ψ_en[k] - ψ_gm[k]
-
-            gmv_covar[k] = tke_factor * aux_en_c.area[k] * Δϕ * Δψ + aux_en_c.area[k] * covar_e[k]
-            @inbounds for i in 1:(edmf.n_updrafts)
-                ϕ_up_var = getproperty(aux_up[i], ϕ_sym)
-                ψ_up_var = getproperty(aux_up[i], ψ_sym)
-                Δϕ = ϕ_up_var[k] - ϕ_gm[k]
-                Δψ = ψ_up_var[k] - ψ_gm[k]
-                gmv_covar[k] += tke_factor * aux_up[i].area[k] * Δϕ * Δψ
-            end
+        @. gmv_covar = tke_factor * aux_en_c.area * (ϕ_en - ϕ_gm) * (ψ_en - ψ_gm) + aux_en_c.area * covar_e
+        @inbounds for i in 1:(edmf.n_updrafts)
+            ϕ_up = getproperty(aux_up[i], ϕ_sym)
+            ψ_up = getproperty(aux_up[i], ψ_sym)
+            @. gmv_covar += tke_factor * aux_up[i].area * (ϕ_up - ϕ_gm) * (ψ_up - ψ_gm)
         end
     end
     return
