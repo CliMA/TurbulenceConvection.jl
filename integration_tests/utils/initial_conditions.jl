@@ -10,6 +10,7 @@ function initialize_edmf(edmf::TC.EDMF_PrognosticTKE, grid, state, Case, gm::TC.
     aux_tc = TC.center_aux_turbconv(state)
     prog_gm = TC.center_prog_grid_mean(state)
     p0_c = TC.center_ref_state(state).p0
+    parent(aux_tc.prandtl_nvec) .= edmf.prandtl_number
     @inbounds for k in TC.real_center_indices(grid)
         ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)

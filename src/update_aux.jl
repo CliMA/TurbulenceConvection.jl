@@ -437,14 +437,14 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         # Limiting stratification scale (Deardorff, 1976)
         # compute ∇Ri and Pr
         ∇_Ri = gradient_Richardson_number(bg.∂b∂z, Shear², eps(0.0))
-        edmf.prandtl_nvec[k] = turbulent_Prandtl_number(param_set, obukhov_length, ∇_Ri)
+        aux_tc.prandtl_nvec[k] = turbulent_Prandtl_number(param_set, obukhov_length, ∇_Ri)
 
         ml_model = MinDisspLen(;
             z = grid.zc[k].z,
             obukhov_length = obukhov_length,
             tke_surf = aux_en.tke[kc_surf],
             ustar = surface.ustar,
-            Pr = edmf.prandtl_nvec[k],
+            Pr = aux_tc.prandtl_nvec[k],
             p0 = p0_c[k],
             ∇b = bg,
             Shear² = Shear²,
@@ -459,12 +459,12 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         )
 
         ml = mixing_length(param_set, ml_model)
-        edmf.mls[k] = ml.min_len_ind
+        aux_tc.mls[k] = ml.min_len_ind
         aux_tc.mixing_length[k] = ml.mixing_length
-        edmf.ml_ratio[k] = ml.ml_ratio
+        aux_tc.ml_ratio[k] = ml.ml_ratio
 
         KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0.0))
-        KH[k] = KM[k] / edmf.prandtl_nvec[k]
+        KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
 
         aux_en_2m.tke.buoy[k] = -ml_model.a_en * ρ0_c[k] * KH[k] * bg.∂b∂z
     end

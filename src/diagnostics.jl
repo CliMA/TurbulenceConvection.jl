@@ -139,6 +139,9 @@ function io_dictionary_aux(state)
         "total_flux_h" => (; dims = ("zf", "t"), group = "profiles", field = face_aux_turbconv(state).diffusive_flux_h .+ face_aux_turbconv(state).massflux_h),
         "total_flux_qt" => (; dims = ("zf", "t"), group = "profiles", field = face_aux_turbconv(state).diffusive_flux_qt .+ face_aux_turbconv(state).massflux_qt),
 
+        "ed_length_scheme" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).mls),
+        "mixing_length_ratio" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).ml_ratio),
+        "entdet_balance_length" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).l_entdet),
     )
     return io_dict
 end
