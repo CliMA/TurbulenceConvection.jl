@@ -907,17 +907,16 @@ function GMV_third_m(edmf::EDMF_PrognosticTKE, grid, state, covar_en_sym::Symbol
             GMVv_ += aux_up[i].area[k] * mean_up
         end
 
-        # TODO: report bug: i used outside of scope.
-        # This is only valid (assuming correct) for 1
-        # updraft.
-        i_last = last(1:(up.n_updrafts))
-        if is_tke
-            w_bcs = (; bottom = SetValue(0), top = SetValue(0))
-            w_en_dual = dual_faces(aux_en_f.w, grid, k)
-            ∇w_en = ∇f2c(w_en_dual, grid, k; w_bcs...)
-            Envcov_ = -aux_up[i_last].horiz_K_eddy[k] * ∇w_en
-        else
-            Envcov_ = covar_en[k]
+        Envcov_ = 0
+        @inbounds for i in 1:(edmf.n_updrafts)
+            if is_tke
+                w_bcs = (; bottom = SetValue(0), top = SetValue(0))
+                w_en_dual = dual_faces(aux_en_f.w, grid, k)
+                ∇w_en = ∇f2c(w_en_dual, grid, k; w_bcs...)
+                Envcov_ -= aux_up[i].horiz_K_eddy[k] * ∇w_en * aux_up[i].area[k] / aux_tc.bulk.area[k]
+            else
+                Envcov_ = covar_en[k]
+            end
         end
 
         Upd_cubed = 0.0
