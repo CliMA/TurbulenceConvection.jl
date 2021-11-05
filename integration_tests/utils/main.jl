@@ -99,9 +99,11 @@ cent_aux_vars_edmf(FT, n_up) = (;
             cloud_fraction = FT(0),
             θ_liq_ice_tendency_precip_formation = FT(0),
             qt_tendency_precip_formation = FT(0),
+            Ri = FT(0),
         ),
         up = ntuple(i -> cent_aux_vars_up(FT), n_up),
         en = (;
+            w = FT(0),
             area = FT(0),
             q_tot = FT(0),
             q_liq = FT(0),
@@ -138,6 +140,8 @@ cent_aux_vars_edmf(FT, n_up) = (;
         KH = FT(0),
         mixing_length = FT(0),
         θ_virt = FT(0),
+        ∇ρ_ae_K∇ϕ = FT(0),
+        ρaew_en_ϕ = FT(0),
     ),
 )
 cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., cent_aux_vars_edmf(FT, n_up)...)
@@ -151,6 +155,8 @@ face_aux_vars_edmf(FT, n_up) = (;
         bulk = (; w = FT(0)),
         ρ_ae_KM = FT(0),
         ρ_ae_KH = FT(0),
+        ρ_ae_K = FT(0),
+        ρ_ae_K∇ϕ = FT(0),
         en = (; w = FT(0)),
         up = ntuple(i -> face_aux_vars_up(FT), n_up),
     ),
