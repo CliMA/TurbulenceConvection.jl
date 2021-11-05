@@ -263,8 +263,8 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     compute_precipitation_formation_tendencies(grid, state, edmf.UpdVar, edmf.Precip, TS.dt, param_set) # causes division error in dry bubble first time step
     microphysics(en_thermo, grid, state, en, edmf.Precip, TS.dt, param_set) # saturation adjustment + rain creation
     if edmf.Precip.precipitation_model == "clima_1m"
-        compute_precipitation_sink_tendencies(edmf.PrecipPhys, grid, state, gm, TS)
-        compute_precipitation_advection_tendencies(edmf.PrecipPhys, grid, state, gm, TS)
+        compute_precipitation_sink_tendencies(grid, state, gm, TS)
+        compute_precipitation_advection_tendencies(grid, state, gm, TS)
     end
 
     # compute tendencies

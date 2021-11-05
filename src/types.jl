@@ -202,8 +202,6 @@ function PrecipVariables(namelist, grid::Grid)
     return PrecipVariables(; precipitation_model)
 end
 
-struct PrecipPhysics end
-
 mutable struct UpdraftVariables{A1}
     n_updrafts::Int
     cloud_base::A1
@@ -479,7 +477,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
     lambda_stab::Float64
     minimum_area::Float64
     Precip::PrecipVariables
-    PrecipPhys::PrecipPhysics
     UpdVar::UpdraftVariables
     EnvVar::EnvironmentVariables
     EnvThermo::EnvironmentThermodynamics
@@ -572,8 +569,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
 
         # Create the class for precipitation
         Precip = PrecipVariables(namelist, grid)
-        # Create the class for precipitation physics
-        PrecipPhys = PrecipPhysics()
 
         # Create the updraft variable class (major diagnostic and prognostic variables)
         UpdVar = UpdraftVariables(n_updrafts, namelist, grid)
@@ -692,7 +687,6 @@ mutable struct EDMF_PrognosticTKE{A1, A2}
             lambda_stab,
             minimum_area,
             Precip,
-            PrecipPhys,
             UpdVar,
             EnvVar,
             EnvThermo,
