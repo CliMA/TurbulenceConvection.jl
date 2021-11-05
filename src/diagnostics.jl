@@ -142,6 +142,10 @@ function io_dictionary_aux(state)
         "ed_length_scheme" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).mls),
         "mixing_length_ratio" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).ml_ratio),
         "entdet_balance_length" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_turbconv(state).l_entdet),
+
+        "rad_dTdt" => (; dims = ("zc", "t"), group = "profiles", field = center_aux_grid_mean(state).dTdt_rad),
+        "rad_flux" => (; dims = ("zf", "t"), group = "profiles", field = face_aux_grid_mean(state).f_rad),
+
     )
     return io_dict
 end

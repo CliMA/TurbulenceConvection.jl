@@ -1,18 +1,7 @@
-
-function initialize(self::RadiationBase, grid, ::RadiationBaseType)
-    self.dTdt = center_field(grid)
-    self.dqtdt = center_field(grid)
-    return
-end
-
 update(self::RadiationBase, grid, state, gm::GridMeanVariables, param_set) = nothing
+initialize(self::RadiationBase{RadiationNone}, grid, state) = nothing
 
-initialize(self::RadiationBase{RadiationNone}, grid) = initialize(self, grid, RadiationBaseType())
-
-function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, grid)
-    initialize(self, grid, RadiationBaseType())
-
-
+function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state)
     self.divergence = 3.75e-6  # divergence is defined twice: here and in initialize_forcing method of DYCOMS_RF01 case class
     # where it is used to initialize large scale subsidence
     self.alpha_z = 1.0
@@ -20,7 +9,6 @@ function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, grid)
     self.F0 = 70.0
     self.F1 = 22.0
     self.divergence = 3.75e-6
-    self.f_rad = face_field(grid)
     return
 end
 
@@ -32,6 +20,7 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, st
     ρ0_f = face_ref_state(state).ρ0
     ρ0_c = center_ref_state(state).ρ0
     aux_gm = center_aux_grid_mean(state)
+    aux_gm_f = face_aux_grid_mean(state)
     prog_gm = center_prog_grid_mean(state)
     # find zi (level of 8.0 g/kg isoline of qt)
     # TODO: report bug: zi and ρ_i are not initialized
@@ -67,21 +56,21 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, st
     prob = ODE.ODEProblem(integrand, 0.0, z_span, params; dt = grid.Δz)
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
     q_1 = sol.(vec(grid.zf))
-    self.f_rad .= self.F0 .* exp.(-q_0)
-    self.f_rad .+= self.F1 .* exp.(-q_1)
+    parent(aux_gm_f.f_rad) .= self.F0 .* exp.(-q_0)
+    parent(aux_gm_f.f_rad) .+= self.F1 .* exp.(-q_1)
 
     # cooling in free troposphere
     @inbounds for k in real_face_indices(grid)
         if grid.zf[k] > zi
             cbrt_z = cbrt(grid.zf[k] - zi)
-            self.f_rad[k] += ρ_i * cp_d * self.divergence * self.alpha_z * (cbrt_z^4 / 4 + zi * cbrt_z)
+            aux_gm_f.f_rad[k] += ρ_i * cp_d * self.divergence * self.alpha_z * (cbrt_z^4 / 4 + zi * cbrt_z)
         end
     end
 
     @inbounds for k in real_center_indices(grid)
-        f_rad_dual = dual_faces(self.f_rad, grid, k)
+        f_rad_dual = dual_faces(aux_gm_f.f_rad, grid, k)
         ∇f_rad = ∇_staggered(f_rad_dual, grid)
-        self.dTdt[k] = -∇f_rad / ρ0_c[k] / cp_d
+        aux_gm.dTdt_rad[k] = -∇f_rad / ρ0_c[k] / cp_d
     end
 
     return
@@ -90,17 +79,20 @@ end
 update(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state, gm::GridMeanVariables, param_set) =
     calculate_radiation(self, grid, state, gm, param_set)
 
-function initialize(self::RadiationBase{RadiationLES}, grid, LESDat::LESData)
-    initialize(self, grid, RadiationBaseType())
+function initialize(self::RadiationBase{RadiationLES}, grid, state, LESDat::LESData)
     # load from LES
-    NC.Dataset(LESDat.les_filename, "r") do data
+    aux_gm = center_aux_grid_mean(state)
+    dTdt = NC.Dataset(LESDat.les_filename, "r") do data
         imin = LESDat.imin
         imax = LESDat.imax
 
         # interpolate here
         zc_les = Array(get_nc_data(data, "zc"))
         meandata = mean_nc_data(data, "profiles", "dtdt_rad", imin, imax)
-        self.dTdt = pyinterp(grid.zc, zc_les, meandata)
+        pyinterp(grid.zc, zc_les, meandata)
+    end
+    @inbounds for k in real_center_indices(grid)
+        aux_gm.dTdt_rad[k] = dTdt[k]
     end
     return
 end

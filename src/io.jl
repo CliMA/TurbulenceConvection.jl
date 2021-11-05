@@ -5,30 +5,6 @@ initialize_io(self::ForcingBase, Stats) = nothing
 initialize_io(self::RadiationBase, Stats::NetCDFIO_Stats) = nothing
 io(self::RadiationBase, grid, state, Stats::NetCDFIO_Stats) = nothing
 
-function initialize_io(self::RadiationBase{RadiationLES}, Stats::NetCDFIO_Stats)
-    add_profile(Stats, "rad_dTdt")
-    add_profile(Stats, "rad_flux")
-    return
-end
-
-function io(self::RadiationBase{RadiationLES}, Stats::NetCDFIO_Stats)
-    write_profile(Stats, "rad_dTdt", self.dTdt)
-    write_profile(Stats, "rad_flux", self.f_rad)
-    return
-end
-
-function initialize_io(self::RadiationBase{RadiationDYCOMS_RF01}, Stats::NetCDFIO_Stats)
-    add_profile(Stats, "rad_dTdt")
-    add_profile(Stats, "rad_flux")
-    return
-end
-
-function io(self::RadiationBase{RadiationDYCOMS_RF01}, Stats::NetCDFIO_Stats)
-    write_profile(Stats, "rad_dTdt", self.dTdt)
-    write_profile(Stats, "rad_flux", self.f_rad)
-    return
-end
-
 function initialize_io(en::EnvironmentVariables, Stats::NetCDFIO_Stats)
     add_ts(Stats, "env_cloud_base")
     add_ts(Stats, "env_cloud_top")

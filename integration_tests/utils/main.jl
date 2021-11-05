@@ -61,6 +61,23 @@ cent_aux_vars_gm(FT) = (;
     H_third_m = FT(0),
     W_third_m = FT(0),
     QT_third_m = FT(0),
+    # From RadiationBase
+    dTdt_rad = FT(0), # horizontal advection temperature tendency
+    dqtdt_rad = FT(0), # horizontal advection moisture tendency
+    # From ForcingBase
+    subsidence = FT(0), #Large-scale subsidence
+    dTdt = FT(0), #Large-scale temperature tendency
+    dqtdt = FT(0), #Large-scale moisture tendency
+    dTdt_hadv = FT(0), #Horizontal advection of temperature
+    dTdt_nudge = FT(0), #Temperature tendency due to relaxation to large-scale
+    dTdt_fluc = FT(0), #Vertical turbulent advection of temperature
+    dqtdt_hadv = FT(0), #Horizontal advection of moisture
+    dqtdt_nudge = FT(0), #Moisture tendency due to relaxation to large-scale
+    dqtdt_fluc = FT(0), #Vertical turbulent advection of moisture
+    u_nudge = FT(0), #Reference u profile for relaxation tendency
+    v_nudge = FT(0), #Reference v profile for relaxation tendency
+    ug = FT(0), #Geostrophic u velocity
+    vg = FT(0), #Geostrophic v velocity
 )
 cent_aux_vars_en_2m(FT) = (;
     dissipation = FT(0),
@@ -169,7 +186,7 @@ cent_aux_vars_edmf(FT, n_up) = (;
 cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., cent_aux_vars_edmf(FT, n_up)...)
 
 # Face only
-face_aux_vars_gm(FT) = (; massflux_s = FT(0), diffusive_flux_s = FT(0), total_flux_s = FT(0))
+face_aux_vars_gm(FT) = (; massflux_s = FT(0), diffusive_flux_s = FT(0), total_flux_s = FT(0), f_rad = FT(0))
 face_aux_vars_up(FT) = (;
     w = FT(0),
     nh_pressure = FT(0),

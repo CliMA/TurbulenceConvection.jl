@@ -133,7 +133,7 @@ get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
 ##### Default CasesBase behavior:
 #####
 
-initialize_radiation(self::CasesBase, grid, state, gm, param_set) = initialize(self.Rad, grid)
+initialize_radiation(self::CasesBase, grid, state, gm, param_set) = initialize(self.Rad, grid, state)
 
 function TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
     add_ts(Stats, "Tsurface")
@@ -155,7 +155,7 @@ TC.update_forcing(self::CasesBase, grid, state, gm, TS::TimeStepping, param_set)
 TC.update_radiation(self::CasesBase, grid, state, gm, TS::TimeStepping, param_set) =
     update(self.Rad, grid, state, gm, param_set)
 
-initialize_forcing(self::CasesBase, grid::Grid, state, gm, param_set) = initialize(self.Fo, grid)
+initialize_forcing(self::CasesBase, grid::Grid, state, gm, param_set) = initialize(self.Fo, grid, state)
 
 #####
 ##### Soares
@@ -368,13 +368,14 @@ function initialize_surface(self::CasesBase{Bomex}, grid::Grid, state, param_set
 end
 
 function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, gm, param_set)
-    initialize(self.Fo, grid)
+    initialize(self.Fo, grid, state)
     p0_c = TC.center_ref_state(state).p0
     prog_gm = TC.center_prog_grid_mean(state)
+    aux_gm = TC.center_aux_grid_mean(state)
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         # Geostrophic velocity profiles. vg = 0
-        self.Fo.ug[k] = -10.0 + (1.8e-3) * z
+        aux_gm.ug[k] = -10.0 + (1.8e-3) * z
         ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         Π = TD.exner(ts)
         # Set large-scale cooling
@@ -383,7 +384,7 @@ function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, gm, param
         else
             (-2.0 / (3600 * 24.0) + (z - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) * Π
         end
-        self.Fo.dTdt[k] = dTdt
+        aux_gm.dTdt[k] = dTdt
 
         # Set large-scale drying
         dqtdt = if z <= 300.0
@@ -393,7 +394,7 @@ function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, gm, param
         else
             0
         end
-        self.Fo.dqtdt[k] = dqtdt
+        aux_gm.dqtdt[k] = dqtdt
 
         #Set large scale subsidence
         subsidence = if z <= 1500.0
@@ -403,7 +404,7 @@ function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, gm, param
         else
             0
         end
-        self.Fo.subsidence[k] = subsidence
+        aux_gm.subsidence[k] = subsidence
     end
     return nothing
 end
@@ -499,24 +500,25 @@ function initialize_surface(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
     self.Sur.bflux = life_cycle_buoyancy_flux(param_set)
 end
 function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, state, gm, param_set)
-    initialize(self.Fo, grid)
+    initialize(self.Fo, grid, state)
     p0_c = TC.center_ref_state(state).p0
     prog_gm = TC.center_prog_grid_mean(state)
+    aux_gm = TC.center_aux_grid_mean(state)
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         # Geostrophic velocity profiles. vg = 0
-        self.Fo.ug[k] = -10.0 + (1.8e-3) * z
+        aux_gm.ug[k] = -10.0 + (1.8e-3) * z
         ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         Π = TD.exner(ts)
         # Set large-scale cooling
-        self.Fo.dTdt[k] = if z <= 1500.0
+        aux_gm.dTdt[k] = if z <= 1500.0
             (-2.0 / (3600 * 24.0)) * Π
         else
             (-2.0 / (3600 * 24.0) + (z - 1500.0) * (0.0 - -2.0 / (3600 * 24.0)) / (3000.0 - 1500.0)) * Π
         end
 
         # Set large-scale drying
-        self.Fo.dqtdt[k] = if z <= 300.0
+        aux_gm.dqtdt[k] = if z <= 300.0
             -1.2e-8   #kg/(kg * s)
         elseif z > 300.0 && z <= 500.0
             -1.2e-8 + (z - 300.0) * (0.0 - -1.2e-8) / (500.0 - 300.0) #kg/(kg * s)
@@ -525,7 +527,7 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
         end
 
         #Set large scale subsidence
-        self.Fo.subsidence[k] = if z <= 1500.0
+        aux_gm.subsidence[k] = if z <= 1500.0
             0.0 + z * (-0.65 / 100.0 - 0.0) / (1500.0 - 0.0)
         elseif z > 1500.0 && z <= 2100.0
             -0.65 / 100 + (z - 1500.0) * (0.0 - -0.65 / 100.0) / (2100.0 - 1500.0)
@@ -632,28 +634,29 @@ function initialize_surface(self::CasesBase{Rico}, grid::Grid, state, param_set)
 end
 
 function initialize_forcing(self::CasesBase{Rico}, grid::Grid, state, gm, param_set)
-    initialize(self.Fo, grid)
+    initialize(self.Fo, grid, state)
     p0_c = TC.center_ref_state(state).p0
     prog_gm = TC.center_prog_grid_mean(state)
+    aux_gm = TC.center_aux_grid_mean(state)
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         Π = TD.exner(ts)
         # Geostrophic velocity profiles
-        self.Fo.ug[k] = -9.9 + 2.0e-3 * z
-        self.Fo.vg[k] = -3.8
+        aux_gm.ug[k] = -9.9 + 2.0e-3 * z
+        aux_gm.vg[k] = -3.8
         # Set large-scale cooling
-        self.Fo.dTdt[k] = (-2.5 / (3600.0 * 24.0)) * Π
+        aux_gm.dTdt[k] = (-2.5 / (3600.0 * 24.0)) * Π
 
         # Set large-scale moistening
-        self.Fo.dqtdt[k] = if z <= 2980.0
+        aux_gm.dqtdt[k] = if z <= 2980.0
             (-1.0 + 1.3456 / 2980.0 * z) / 86400.0 / 1000.0   #kg/(kg * s)
         else
             0.3456 / 86400.0 / 1000.0
         end
 
         #Set large scale subsidence
-        self.Fo.subsidence[k] = if z <= 2260.0
+        aux_gm.subsidence[k] = if z <= 2260.0
             -(0.005 / 2260.0) * z
         else
             -0.005
@@ -739,7 +742,6 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, gm, state)
 
     zc_in = grid.zc
     molmass_ratio = CPP.molmass_ratio(param_set)
-    aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
 
     parent(prog_gm.u) .= pyinterp(zc_in, z_in, u_in)
@@ -779,8 +781,7 @@ function initialize_surface(self::CasesBase{TRMM_LBA}, grid::Grid, state, param_
 end
 
 function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, gm, param_set)
-    initialize(self.Fo, grid)
-    self.Fo.dTdt = TC.center_field(grid)
+
     self.rad_time = range(10, 360; length = 36) .* 60
     #! format: off
     z_in         = arr_type([42.5, 200.92, 456.28, 743, 1061.08, 1410.52, 1791.32, 2203.48, 2647,3121.88, 3628.12,
@@ -911,8 +912,9 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, gm, pa
     self.rad .= A # store matrix in self
     ind1 = Int(trunc(10.0 / 600.0)) + 1
     ind2 = Int(ceil(10.0 / 600.0))
+    aux_gm = TC.center_aux_grid_mean(state)
     @inbounds for k in real_center_indices(grid)
-        self.Fo.dTdt[k] = if 10 % 600.0 == 0
+        aux_gm.dTdt[k] = if 10 % 600.0 == 0
             self.rad[ind1, k]
         else
             (self.rad[ind2, k] - self.rad[ind1, k]) / (self.rad_time[ind2] - self.rad_time[ind1]) * (10.0) +
@@ -933,12 +935,13 @@ end
 
 function TC.update_forcing(self::CasesBase{TRMM_LBA}, grid, state, gm, TS::TimeStepping, param_set)
 
+    aux_gm = TC.center_aux_grid_mean(state)
     ind2 = Int(ceil(TS.t / 600.0)) + 1
     ind1 = Int(trunc(TS.t / 600.0)) + 1
     rad_time = self.rad_time
     rad = self.rad
     @inbounds for k in real_center_indices(grid)
-        self.Fo.dTdt[k] = if grid.zc[k] >= 22699.48
+        aux_gm.dTdt[k] = if grid.zc[k] >= 22699.48
             0.0
         else
             if TS.t < 600.0 # first 10 min use the radiative forcing of t=10min (as in the paper)
@@ -980,12 +983,10 @@ end
 function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, gm, state)
     # ARM_SGP inputs
     p0 = TC.center_ref_state(state).p0
-    aux_gm = TC.center_aux_grid_mean(state)
-    prog_gm = TC.center_prog_grid_mean(state)
-    #! format: off
     param_set = TC.parameter_set(gm)
-    aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
+    aux_gm = TC.center_aux_grid_mean(state)
+    #! format: off
     z_in = arr_type([0.0, 50.0, 350.0, 650.0, 700.0, 1300.0, 2500.0, 5500.0 ]) #LES z is in meters
     Theta_in = arr_type([299.0, 301.5, 302.5, 303.53, 303.7, 307.13, 314.0, 343.2]) # K
     r_in = arr_type([15.2,15.17,14.98,14.8,14.7,13.5,3.0,3.0])/1000 # qt should be in kg/kg
@@ -1030,10 +1031,10 @@ function initialize_surface(self::CasesBase{ARM_SGP}, grid::Grid, state, param_s
 end
 
 function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, state, gm, param_set)
-    initialize(self.Fo, grid)
+    aux_gm = TC.center_aux_grid_mean(state)
     @inbounds for k in real_center_indices(grid)
-        self.Fo.ug[k] = 10.0
-        self.Fo.vg[k] = 0.0
+        aux_gm.ug[k] = 10.0
+        aux_gm.vg[k] = 0.0
     end
     return nothing
 end
@@ -1058,6 +1059,7 @@ function TC.update_surface(self::CasesBase{ARM_SGP}, grid, state, gm, TS::TimeSt
 end
 
 function TC.update_forcing(self::CasesBase{ARM_SGP}, grid, state, gm, TS::TimeStepping, param_set)
+    aux_gm = TC.center_aux_grid_mean(state)
     p0_c = TC.center_ref_state(state).p0
     t_in = arr_type([0.0, 3.0, 6.0, 9.0, 12.0, 14.5]) .* 3600.0 #LES time is in sec
     AT_in = arr_type([0.0, 0.0, 0.0, -0.08, -0.016, -0.016]) ./ 3600.0 # Advective forcing for theta [K/h] converted to [K/sec]
@@ -1070,14 +1072,14 @@ function TC.update_forcing(self::CasesBase{ARM_SGP}, grid, state, gm, TS::TimeSt
         ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         Π = TD.exner(ts)
         z = grid.zc[k]
-        self.Fo.dTdt[k] = if z <= 1000.0
+        aux_gm.dTdt[k] = if z <= 1000.0
             dTdt
         elseif z > 1000.0 && z <= 2000.0
             dTdt * (1 - (z - 1000.0) / 1000.0)
         else
             0
         end
-        self.Fo.dqtdt[k] = if z <= 1000.0
+        aux_gm.dqtdt[k] = if z <= 1000.0
             dqtdt * Π
         elseif z > 1000.0 && z <= 2000.0
             dqtdt * Π * (1 - (z - 1000.0) / 1000.0)
@@ -1169,7 +1171,8 @@ function initialize_surface(self::CasesBase{GATE_III}, grid::Grid, state, param_
 end
 
 function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, state, gm, param_set)
-    initialize(self.Fo, grid)
+
+    aux_gm = TC.center_aux_grid_mean(state)
     #LES z is in meters
     #! format: off
     z_in     = arr_type([ 0.0,   0.5,  1.0,  1.5,   2.0,   2.5,    3.0,   3.5,   4.0,   4.5,   5.0,   5.5,   6.0,
@@ -1194,8 +1197,12 @@ function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, state, gm, pa
 
     Qtend_in = r_tend_in ./ (1 .+ r_tend_in) # convert mixing ratio to specific humidity
 
-    self.Fo.dqtdt = pyinterp(grid.zc, z_in, Qtend_in)
-    self.Fo.dTdt = pyinterp(grid.zc, z_in, Ttend_in) + pyinterp(grid.zc, z_in, RAD_in)
+    dqtdt = pyinterp(grid.zc, z_in, Qtend_in)
+    dTdt = pyinterp(grid.zc, z_in, Ttend_in) + pyinterp(grid.zc, z_in, RAD_in)
+    for k in TC.real_center_indices(grid)
+        aux_gm.dqtdt[k] = dqtdt[k]
+        aux_gm.dTdt[k] = dTdt[k]
+    end
 end
 
 #####
@@ -1286,29 +1293,30 @@ function initialize_surface(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, par
         )
 end
 function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, gm, param_set)
-    initialize(self.Fo, grid)
+    aux_gm = TC.center_aux_grid_mean(state)
 
     # geostrophic velocity profiles
-    self.Fo.ug .= 7.0
-    self.Fo.vg .= -5.5
+    parent(aux_gm.ug) .= 7.0
+    parent(aux_gm.vg) .= -5.5
 
     # large scale subsidence
     divergence = 3.75e-6    # divergence is defined twice: here and in __init__ of ForcingDYCOMS_RF01 class
     # To be able to have self.Fo.divergence available here,
     # we would have to change the signature of ForcingBase class
     @inbounds for k in real_center_indices(grid)
-        self.Fo.subsidence[k] = -grid.zc[k] * divergence
+        aux_gm.subsidence[k] = -grid.zc[k] * divergence
     end
 
     # no large-scale drying
-    self.Fo.dqtdt .= 0.0 #kg/(kg * s)
+    parent(aux_gm.dqtdt) .= 0 #kg/(kg * s)
 end
 
 function initialize_radiation(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, gm, param_set)
-    initialize(self.Rad, grid)
+    initialize(self.Rad, grid, state)
+    aux_gm = TC.center_aux_grid_mean(state)
 
     # no large-scale drying
-    self.Rad.dqtdt .= 0.0 #kg/(kg * s)
+    parent(aux_gm.dqtdt_rad) .= 0 #kg/(kg * s)
 
     # Radiation based on eq. 3 in Stevens et. al., (2005)
     # cloud-top cooling + cloud-base warming + cooling in free troposphere
@@ -1376,11 +1384,12 @@ function initialize_surface(self::CasesBase{GABLS}, grid::Grid, state, param_set
 end
 
 function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, state, gm, param_set)
-    initialize(self.Fo, grid)
+    initialize(self.Fo, grid, state)
+    aux_gm = TC.center_aux_grid_mean(state)
     @inbounds for k in real_center_indices(grid)
         # Geostrophic velocity profiles.
-        self.Fo.ug[k] = 8.0
-        self.Fo.vg[k] = 0.0
+        aux_gm.ug[k] = 8.0
+        aux_gm.vg[k] = 0.0
     end
     return nothing
 end
@@ -1455,11 +1464,11 @@ function initialize_surface(self::CasesBase{SP}, grid::Grid, state, param_set)
 end
 
 function initialize_forcing(self::CasesBase{SP}, grid::Grid, state, gm, param_set)
-    initialize(self.Fo, grid)
+    aux_gm = TC.center_aux_grid_mean(state)
     @inbounds for k in real_center_indices(grid)
         # Geostrophic velocity profiles. vg = 0
-        self.Fo.ug[k] = 1.0
-        self.Fo.vg[k] = 0.0
+        aux_gm.ug[k] = 1.0
+        aux_gm.vg[k] = 0.0
     end
 end
 
@@ -1653,9 +1662,9 @@ function initialize_surface(self::CasesBase{LES_driven_SCM}, grid::Grid, state, 
 end
 
 initialize_forcing(self::CasesBase{LES_driven_SCM}, grid::Grid, state, gm, param_set) =
-    initialize(self.Fo, grid, self.LESDat)
+    initialize(self.Fo, grid, state, self.LESDat)
 
 initialize_radiation(self::CasesBase{LES_driven_SCM}, grid::Grid, state, gm, param_set) =
-    initialize(self.Rad, grid, self.LESDat)
+    initialize(self.Rad, grid, state, self.LESDat)
 
 end
