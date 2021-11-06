@@ -812,10 +812,9 @@ function compute_en_tendencies!(edmf, grid::Grid, state, param_set, TS, covar_sy
     aux_covar = getproperty(aux_en_2m, covar_sym)
     aux_up = center_aux_updrafts(state)
     w_en_f = face_aux_environment(state).w
-    w_en = center_aux_environment(state).w
     c_d = CPEDMF.c_d(param_set)
     is_tke = covar_sym == :tke
-
+    FT = eltype(grid)
 
     ρ_ae_K = face_aux_turbconv(state).ρ_ae_K
     ρ_ae_K∇ϕ = face_aux_turbconv(state).ρ_ae_K∇ϕ
@@ -825,30 +824,24 @@ function compute_en_tendencies!(edmf, grid::Grid, state, param_set, TS, covar_sy
     aux_tc = center_aux_turbconv(state)
     ae = 1 .- aux_tc.bulk.area
     aeK = is_tke ? ae .* KM : ae .* KH
-    aeK_bcs = (; bottom = SetValue(aeK[kc_surf]), top = SetValue(aeK[kc_toa]))
-    prog_bcs = (; bottom = SetGradient(0), top = SetGradient(0))
 
-    @inbounds for k in real_face_indices(grid)
-        ρ_ae_K[k] = interpc2f(aeK, grid, k; aeK_bcs...) * ρ0_f[k]
-        ϕ_dual = dual_centers(covar, grid, k)
-        ρ_ae_K∇ϕ[k] = ρ_ae_K[k] * ∇c2f(ϕ_dual, grid, k; prog_bcs...)
-    end
-    @inbounds for k in real_center_indices(grid)
-        ρ_ae_K∇ϕ_dual = dual_faces(ρ_ae_K∇ϕ, grid, k)
-        ∇ρ_ae_K∇ϕ[k] = ∇f2c(ρ_ae_K∇ϕ_dual, grid, k)
-    end
+    cartvec = CC.Geometry.Cartesian3Vector(zero(FT))
+    aeK_bcs = (; bottom = CCO.SetValue(aeK[kc_surf]), top = CCO.SetValue(aeK[kc_toa]))
+    prog_bcs = (; bottom = CCO.SetGradient(cartvec), top = CCO.SetGradient(cartvec))
+
+    If = CCO.InterpolateC2F(; aeK_bcs...)
+    ∇f = CCO.GradientC2F(; prog_bcs...)
+    ∇c = CCO.DivergenceF2C()
+    @. ∇ρ_ae_K∇ϕ = ∇c(ρ0_f * If(aeK) * ∇f(covar))
 
     mixing_length = aux_tc.mixing_length
     minimum_area = edmf.minimum_area
     pressure_plume_spacing = edmf.pressure_plume_spacing
 
     ρaew_en_ϕ = center_aux_turbconv(state).ρaew_en_ϕ
-    FT = eltype(grid)
 
-    @inbounds for k in real_center_indices(grid)
-        w_en[k] = interpf2c(w_en_f, grid, k)
-        ρaew_en_ϕ[k] = ρ0_c[k] * aux_en.area[k] * w_en[k] * covar[k]
-    end
+    Ic = CCO.InterpolateF2C()
+    @. ρaew_en_ϕ = ρ0_c * aux_en.area * Ic(w_en_f) * covar
 
     kc_surf = kc_surface(grid)
     covar_surf = covar[kc_surf]
