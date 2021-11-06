@@ -156,6 +156,7 @@ function default_namelist(case_name::String)
     namelist_defaults["stats_io"] = Dict()
     namelist_defaults["stats_io"]["stats_dir"] = "stats"
     namelist_defaults["stats_io"]["frequency"] = 60.0
+    namelist_defaults["stats_io"]["skip"] = false
 
     if case_name == "Soares"
         namelist = Soares(namelist_defaults)
