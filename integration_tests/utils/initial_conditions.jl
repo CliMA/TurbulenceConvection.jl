@@ -34,8 +34,8 @@ function initialize_covariance(edmf::TC.EDMF_PrognosticTKE, grid, state, gm, Cas
     prog_en = TC.center_prog_environment(state)
     aux_en = TC.center_aux_environment(state)
     ρ0_c = TC.center_ref_state(state).ρ0
-    aux_tc = TC.center_aux_turbconv(state)
-    ae = 1 .- aux_tc.bulk.area # area of environment
+    aux_bulk = TC.center_aux_bulk(state)
+    ae = 1 .- aux_bulk.area # area of environment
 
     aux_en.tke .= aux_gm.tke
     prog_en.ρatke .= aux_en.tke .* ρ0_c .* ae

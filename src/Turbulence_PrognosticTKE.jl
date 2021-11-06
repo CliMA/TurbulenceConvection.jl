@@ -6,13 +6,12 @@ function update_radiation end
 
 function update_cloud_frac(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables)
     # update grid-mean cloud fraction and cloud cover
-    aux_tc = center_aux_turbconv(state)
+    aux_bulk = center_aux_bulk(state)
     aux_gm = center_aux_grid_mean(state)
     aux_en = center_aux_environment(state)
-    a_up_bulk = aux_tc.bulk.area
+    a_up_bulk = aux_bulk.area
     @inbounds for k in real_center_indices(grid) # update grid-mean cloud fraction and cloud cover
-        aux_gm.cloud_fraction[k] =
-            aux_en.area[k] * aux_en.cloud_fraction[k] + a_up_bulk[k] * aux_tc.bulk.cloud_fraction[k]
+        aux_gm.cloud_fraction[k] = aux_en.area[k] * aux_en.cloud_fraction[k] + a_up_bulk[k] * aux_bulk.cloud_fraction[k]
     end
     gm.cloud_cover = min(edmf.EnvVar.cloud_cover + sum(edmf.UpdVar.cloud_cover), 1)
 end
@@ -185,10 +184,10 @@ function compute_diffusive_fluxes(
     param_set,
 )
     ρ0_f = face_ref_state(state).ρ0
-    aux_tc = center_aux_turbconv(state)
+    aux_bulk = center_aux_bulk(state)
     aux_tc_f = face_aux_turbconv(state)
     aux_en = center_aux_environment(state)
-    aux_en.area .= 1 .- aux_tc.bulk.area # area of environment
+    aux_en.area .= 1 .- aux_bulk.area # area of environment
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
     aeKM = aux_en.area .* KM
@@ -332,7 +331,7 @@ function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, up, surface)
     prog_up = center_prog_updrafts(state)
     prog_en = center_prog_environment(state)
     prog_up_f = face_prog_updrafts(state)
-    aux_tc = center_aux_turbconv(state)
+    aux_bulk = center_aux_bulk(state)
     @inbounds for i in 1:(up.n_updrafts)
         prog_up[i].ρarea[kc_surf] = ρ0_c[kc_surf] * edmf.area_surface_bc[i]
         prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * edmf.h_surface_bc[i]
@@ -347,7 +346,7 @@ function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, up, surface)
     oblength = surface.obukhov_length
     α0LL = center_ref_state(state).α0[kc_surf]
     # TODO: is bulk even defined before this is called?
-    ae = 1 .- aux_tc.bulk.area # area of environment
+    ae = 1 .- aux_bulk.area # area of environment
 
     ρ0_ae = ρ0_c[kc_surf] * ae[kc_surf]
 
@@ -823,7 +822,8 @@ function compute_en_tendencies!(edmf, grid::Grid, state, param_set, TS, covar_sy
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
     aux_tc = center_aux_turbconv(state)
-    ae = 1 .- aux_tc.bulk.area
+    aux_bulk = center_aux_bulk(state)
+    ae = 1 .- aux_bulk.area
     aeK = is_tke ? ae .* KM : ae .* KH
     aeK_bcs = (; bottom = SetValue(aeK[kc_surf]), top = SetValue(aeK[kc_toa]))
     prog_bcs = (; bottom = SetGradient(0), top = SetGradient(0))
@@ -891,7 +891,7 @@ function GMV_third_m(edmf::EDMF_PrognosticTKE, grid, state, covar_en_sym::Symbol
 
     up = edmf.UpdVar
     en = edmf.EnvVar
-    aux_tc = center_aux_turbconv(state)
+    aux_bulk = center_aux_bulk(state)
     aux_up_f = face_aux_updrafts(state)
     is_tke = covar_en_sym == :tke
     covar_en = getproperty(center_aux_environment(state), covar_en_sym)
@@ -916,7 +916,7 @@ function GMV_third_m(edmf::EDMF_PrognosticTKE, grid, state, covar_en_sym::Symbol
                 w_bcs = (; bottom = SetValue(0), top = SetValue(0))
                 w_en_dual = dual_faces(aux_en_f.w, grid, k)
                 ∇w_en = ∇f2c(w_en_dual, grid, k; w_bcs...)
-                Envcov_ -= aux_up[i].horiz_K_eddy[k] * ∇w_en * aux_up[i].area[k] / aux_tc.bulk.area[k]
+                Envcov_ -= aux_up[i].horiz_K_eddy[k] * ∇w_en * aux_up[i].area[k] / aux_bulk.area[k]
             else
                 Envcov_ = covar_en[k]
             end
