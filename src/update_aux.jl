@@ -28,6 +28,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     aux_gm = center_aux_grid_mean(state)
     aux_tc_f = face_aux_turbconv(state)
     aux_tc = center_aux_turbconv(state)
+    aux_bulk = center_aux_bulk(state)
     prog_en = center_prog_environment(state)
     aux_en_2m = center_aux_environment_2m(state)
     prog_up = center_prog_updrafts(state)
@@ -69,19 +70,19 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         #####
         ##### compute bulk
         #####
-        aux_tc.bulk.q_tot[k] = 0
-        aux_tc.bulk.θ_liq_ice[k] = 0
-        aux_tc.bulk.area[k] = sum(ntuple(i -> aux_up[i].area[k], up.n_updrafts))
-        if aux_tc.bulk.area[k] > 0
+        aux_bulk.q_tot[k] = 0
+        aux_bulk.θ_liq_ice[k] = 0
+        aux_bulk.area[k] = sum(ntuple(i -> aux_up[i].area[k], up.n_updrafts))
+        if aux_bulk.area[k] > 0
             @inbounds for i in 1:(up.n_updrafts)
-                aux_tc.bulk.q_tot[k] += aux_up[i].area[k] * aux_up[i].q_tot[k] / aux_tc.bulk.area[k]
-                aux_tc.bulk.θ_liq_ice[k] += aux_up[i].area[k] * aux_up[i].θ_liq_ice[k] / aux_tc.bulk.area[k]
+                aux_bulk.q_tot[k] += aux_up[i].area[k] * aux_up[i].q_tot[k] / aux_bulk.area[k]
+                aux_bulk.θ_liq_ice[k] += aux_up[i].area[k] * aux_up[i].θ_liq_ice[k] / aux_bulk.area[k]
             end
         else
-            aux_tc.bulk.q_tot[k] = prog_gm.q_tot[k]
-            aux_tc.bulk.θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
+            aux_bulk.q_tot[k] = prog_gm.q_tot[k]
+            aux_bulk.θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
         end
-        aux_en.area[k] = 1 - aux_tc.bulk.area[k]
+        aux_en.area[k] = 1 - aux_bulk.area[k]
         aux_en.tke[k] = prog_en.ρatke[k] / (ρ0_c[k] * aux_en.area[k])
         aux_en.Hvar[k] = prog_en.ρaHvar[k] / (ρ0_c[k] * aux_en.area[k])
         aux_en.QTvar[k] = prog_en.ρaQTvar[k] / (ρ0_c[k] * aux_en.area[k])
@@ -90,11 +91,11 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         #####
         ##### decompose_environment
         #####
-        a_bulk_c = aux_tc.bulk.area[k]
+        a_bulk_c = aux_bulk.area[k]
         val1 = 1 / (1 - a_bulk_c)
         val2 = a_bulk_c * val1
-        aux_en.q_tot[k] = max(val1 * prog_gm.q_tot[k] - val2 * aux_tc.bulk.q_tot[k], 0) #Yair - this is here to prevent negative QT
-        aux_en.θ_liq_ice[k] = val1 * prog_gm.θ_liq_ice[k] - val2 * aux_tc.bulk.θ_liq_ice[k]
+        aux_en.q_tot[k] = max(val1 * prog_gm.q_tot[k] - val2 * aux_bulk.q_tot[k], 0) #Yair - this is here to prevent negative QT
+        aux_en.θ_liq_ice[k] = val1 * prog_gm.θ_liq_ice[k] - val2 * aux_bulk.θ_liq_ice[k]
 
         #####
         ##### saturation_adjustment and buoyancy
@@ -128,7 +129,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
             aux_up[i].RH[k] = TD.relative_humidity(ts_up)
         end
-        aux_gm.buoy[k] = (1.0 - aux_tc.bulk.area[k]) * aux_en.buoy[k]
+        aux_gm.buoy[k] = (1.0 - aux_bulk.area[k]) * aux_en.buoy[k]
         @inbounds for i in 1:(up.n_updrafts)
             aux_gm.buoy[k] += aux_up[i].area[k] * aux_up[i].buoy[k]
         end
@@ -141,34 +142,34 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         #####
         ##### compute bulk thermodynamics
         #####
-        aux_tc.bulk.q_liq[k] = 0
-        aux_tc.bulk.q_ice[k] = 0
-        aux_tc.bulk.T[k] = 0
-        aux_tc.bulk.RH[k] = 0
-        aux_tc.bulk.buoy[k] = 0
+        aux_bulk.q_liq[k] = 0
+        aux_bulk.q_ice[k] = 0
+        aux_bulk.T[k] = 0
+        aux_bulk.RH[k] = 0
+        aux_bulk.buoy[k] = 0
         if a_bulk_c > 0
             @inbounds for i in 1:(up.n_updrafts)
-                aux_tc.bulk.q_liq[k] += aux_up[i].area[k] * aux_up[i].q_liq[k] / a_bulk_c
-                aux_tc.bulk.q_ice[k] += aux_up[i].area[k] * aux_up[i].q_ice[k] / a_bulk_c
-                aux_tc.bulk.T[k] += aux_up[i].area[k] * aux_up[i].T[k] / a_bulk_c
-                aux_tc.bulk.RH[k] += aux_up[i].area[k] * aux_up[i].RH[k] / a_bulk_c
-                aux_tc.bulk.buoy[k] += aux_up[i].area[k] * aux_up[i].buoy[k] / a_bulk_c
+                aux_bulk.q_liq[k] += aux_up[i].area[k] * aux_up[i].q_liq[k] / a_bulk_c
+                aux_bulk.q_ice[k] += aux_up[i].area[k] * aux_up[i].q_ice[k] / a_bulk_c
+                aux_bulk.T[k] += aux_up[i].area[k] * aux_up[i].T[k] / a_bulk_c
+                aux_bulk.RH[k] += aux_up[i].area[k] * aux_up[i].RH[k] / a_bulk_c
+                aux_bulk.buoy[k] += aux_up[i].area[k] * aux_up[i].buoy[k] / a_bulk_c
             end
         else
-            aux_tc.bulk.RH[k] = aux_en.RH[k]
-            aux_tc.bulk.T[k] = aux_en.T[k]
+            aux_bulk.RH[k] = aux_en.RH[k]
+            aux_bulk.T[k] = aux_en.T[k]
         end
 
         #####
         ##### update_GMV_diagnostics
         #####
-        aux_gm.q_liq[k] = (aux_tc.bulk.area[k] * aux_tc.bulk.q_liq[k] + (1 - aux_tc.bulk.area[k]) * aux_en.q_liq[k])
-        aux_gm.q_ice[k] = (aux_tc.bulk.area[k] * aux_tc.bulk.q_ice[k] + (1 - aux_tc.bulk.area[k]) * aux_en.q_ice[k])
-        aux_gm.T[k] = (aux_tc.bulk.area[k] * aux_tc.bulk.T[k] + (1 - aux_tc.bulk.area[k]) * aux_en.T[k])
-        aux_gm.buoy[k] = (aux_tc.bulk.area[k] * aux_tc.bulk.buoy[k] + (1 - aux_tc.bulk.area[k]) * aux_en.buoy[k])
+        aux_gm.q_liq[k] = (aux_bulk.area[k] * aux_bulk.q_liq[k] + (1 - aux_bulk.area[k]) * aux_en.q_liq[k])
+        aux_gm.q_ice[k] = (aux_bulk.area[k] * aux_bulk.q_ice[k] + (1 - aux_bulk.area[k]) * aux_en.q_ice[k])
+        aux_gm.T[k] = (aux_bulk.area[k] * aux_bulk.T[k] + (1 - aux_bulk.area[k]) * aux_en.T[k])
+        aux_gm.buoy[k] = (aux_bulk.area[k] * aux_bulk.buoy[k] + (1 - aux_bulk.area[k]) * aux_en.buoy[k])
 
-        has_condensate = TD.has_condensate(aux_tc.bulk.q_liq[k] + aux_tc.bulk.q_ice[k])
-        aux_tc.bulk.cloud_fraction[k] = if has_condensate && a_bulk_c > 1e-3
+        has_condensate = TD.has_condensate(aux_bulk.q_liq[k] + aux_bulk.q_ice[k])
+        aux_bulk.cloud_fraction[k] = if has_condensate && a_bulk_c > 1e-3
             1
         else
             0
@@ -196,7 +197,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         end
         aux_tc_f.bulk.w[k] = 0
         a_bulk_bcs = (; bottom = SetValue(sum(edmf.area_surface_bc)), top = SetZeroGradient())
-        a_bulk_f = interpc2f(aux_tc.bulk.area, grid, k; a_bulk_bcs...)
+        a_bulk_f = interpc2f(aux_bulk.area, grid, k; a_bulk_bcs...)
         if a_bulk_f > 0
             @inbounds for i in 1:(up.n_updrafts)
                 a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
@@ -449,7 +450,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             ∇b = bg,
             Shear² = Shear²,
             tke = aux_en.tke[k],
-            a_en = (1 - aux_tc.bulk.area[k]),
+            a_en = (1 - aux_bulk.area[k]),
             wc_en = wc_en,
             wc_up = Tuple(wc_up),
             a_up = ntuple(i -> aux_up[i].area[k], up.n_updrafts),
