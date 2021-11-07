@@ -265,10 +265,10 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     compute_gm_tendencies!(edmf, grid, state, Case, gm, TS)
     compute_updraft_tendencies(edmf, grid, state, gm)
 
-    compute_en_tendencies!(edmf, grid, state, param_set, TS, :tke, :ρatke, n_updrafts)
-    compute_en_tendencies!(edmf, grid, state, param_set, TS, :Hvar, :ρaHvar, n_updrafts)
-    compute_en_tendencies!(edmf, grid, state, param_set, TS, :QTvar, :ρaQTvar, n_updrafts)
-    compute_en_tendencies!(edmf, grid, state, param_set, TS, :HQTcov, :ρaHQTcov, n_updrafts)
+    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:tke), Val(:ρatke))
+    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:Hvar), Val(:ρaHvar))
+    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:QTvar), Val(:ρaQTvar))
+    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:HQTcov), Val(:ρaHQTcov))
 
     ###
     ### update (to be removed)
@@ -655,13 +655,13 @@ function compute_covariance_interdomain_src(
 end
 
 function compute_covariance_entr(
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMF_PrognosticTKE{N_up},
     grid,
     state,
-    covar_sym::Symbol,
-    var1::Symbol,
-    var2::Symbol = var1,
-)
+    ::Val{covar_sym},
+    v1::Val{var1},
+    v2::Val{var2} = v1,
+) where {covar_sym, var1, var2, N_up}
 
     ρ0_c = center_ref_state(state).ρ0
 
@@ -683,16 +683,23 @@ function compute_covariance_entr(
     aux_en = is_tke ? aux_en_f : aux_en_c
     EnvVar1 = getproperty(aux_en, var1)
     EnvVar2 = getproperty(aux_en, var2)
+    entr_gain = aux_covar.entr_gain
+    detr_loss = aux_covar.detr_loss
 
-    @inbounds for k in real_center_indices(grid)
-        aux_covar.entr_gain[k] = 0.0
-        aux_covar.detr_loss[k] = 0.0
-        @inbounds for i in 1:(edmf.n_updrafts)
-            a_up = aux_up[i].area[k]
+    @inbounds for i in 1:N_up
+        aux_up_i = aux_up[i]
+        frac_turb_entr = aux_up_i.frac_turb_entr
+        detr_sc = aux_up_i.detr_sc
+        entr_sc = aux_up_i.entr_sc
+        w_up = aux_up_f[i].w
+        prog_up_i = prog_up[i]
+        @inbounds for k in real_center_indices(grid)
+            entr_gain[k] = 0
+            detr_loss[k] = 0
+            a_up = aux_up_i.area[k]
             if a_up > edmf.minimum_area
-                R_up = edmf.pressure_plume_spacing[i]
-                up_var_1 = getproperty(prog_up[i], var1)
-                up_var_2 = getproperty(prog_up[i], var2)
+                up_var_1 = getproperty(prog_up_i, var1)
+                up_var_2 = getproperty(prog_up_i, var2)
                 updvar1 = is_tke ? interpf2c(up_var_1, grid, k) : up_var_1[k]
                 updvar2 = is_tke ? interpf2c(up_var_2, grid, k) : up_var_2[k]
                 envvar1 = is_tke ? interpf2c(EnvVar1, grid, k) : EnvVar1[k]
@@ -700,17 +707,11 @@ function compute_covariance_entr(
                 gmvvar1 = is_tke ? interpf2c(GmvVar1, grid, k) : GmvVar1[k]
                 gmvvar2 = is_tke ? interpf2c(GmvVar2, grid, k) : GmvVar2[k]
 
-                eps_turb = aux_up[i].frac_turb_entr[k]
+                eps_turb = frac_turb_entr[k]
 
-                w_u = interpf2c(aux_up_f[i].w, grid, k)
+                w_u = interpf2c(w_up, grid, k)
                 dynamic_entr =
-                    tke_factor *
-                    ρ0_c[k] *
-                    a_up *
-                    abs(w_u) *
-                    aux_up[i].detr_sc[k] *
-                    (updvar1 - envvar1) *
-                    (updvar2 - envvar2)
+                    tke_factor * ρ0_c[k] * a_up * abs(w_u) * detr_sc[k] * (updvar1 - envvar1) * (updvar2 - envvar2)
                 turbulent_entr =
                     tke_factor *
                     ρ0_c[k] *
@@ -718,9 +719,8 @@ function compute_covariance_entr(
                     abs(w_u) *
                     eps_turb *
                     ((envvar1 - gmvvar1) * (updvar2 - envvar2) + (envvar2 - gmvvar2) * (updvar1 - envvar1))
-                aux_covar.entr_gain[k] += dynamic_entr + turbulent_entr
-                aux_covar.detr_loss[k] +=
-                    tke_factor * ρ0_c[k] * a_up * abs(w_u) * (aux_up[i].entr_sc[k] + eps_turb) * covar[k]
+                entr_gain[k] += dynamic_entr + turbulent_entr
+                detr_loss[k] += tke_factor * ρ0_c[k] * a_up * abs(w_u) * (entr_sc[k] + eps_turb) * covar[k]
             end
         end
     end
@@ -737,14 +737,16 @@ function compute_covariance_detr(edmf::EDMF_PrognosticTKE, grid, state, covar_sy
     aux_up = center_aux_updrafts(state)
     aux_en = center_aux_environment(state)
     covar = getproperty(aux_en, covar_sym)
+    detr_loss = aux_covar.detr_loss
+    Ic = CCO.InterpolateF2C()
 
-    @inbounds for k in real_center_indices(grid)
-        aux_covar.detr_loss[k] = 0.0
-        @inbounds for i in 1:(up.n_updrafts)
-            w_up_c = interpf2c(aux_up_f[i].w, grid, k)
-            aux_covar.detr_loss[k] += aux_up[i].area[k] * abs(w_up_c) * aux_up[i].entr_sc[k]
-        end
-        aux_covar.detr_loss[k] *= ρ0_c[k] * covar[k]
+    parent(detr_loss) .= 0
+    @inbounds for i in 1:(up.n_updrafts)
+        aux_up_i = aux_up[i]
+        area_up = aux_up_i.area
+        entr_sc = aux_up_i.entr_sc
+        w_up = aux_up_f[i].w
+        @. detr_loss += ρ0_c * covar * area_up * abs(Ic(w_up)) * entr_sc
     end
     return
 end
@@ -759,17 +761,24 @@ function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, c
     aux_en_2m = center_aux_environment_2m(state)
     aux_covar = getproperty(aux_en_2m, covar_sym)
     covar = getproperty(aux_en, covar_sym)
+    dissipation = aux_covar.dissipation
+    area_en = aux_en.area
+    tke_en = aux_en.tke
+    mixing_length = aux_tc.mixing_length
 
-    @inbounds for k in real_center_indices(grid)
-        aux_covar.dissipation[k] = (
-            ρ0_c[k] * aux_en.area[k] * covar[k] * max(aux_en.tke[k], 0)^0.5 / max(aux_tc.mixing_length[k], 1.0e-3) *
-            c_d
-        )
-    end
+    @. dissipation = ρ0_c * area_en * covar * max(tke_en, 0)^0.5 / max(mixing_length, 1.0e-3) * c_d
     return
 end
 
-function compute_en_tendencies!(edmf, grid::Grid, state, param_set, TS, covar_sym::Symbol, prog_sym::Symbol, n_updrafts)
+function compute_en_tendencies!(
+    edmf::EDMF_PrognosticTKE{N_up},
+    grid::Grid,
+    state,
+    param_set,
+    TS,
+    ::Val{covar_sym},
+    ::Val{prog_sym},
+) where {N_up, covar_sym, prog_sym}
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     ρ0_c = center_ref_state(state).ρ0
@@ -798,6 +807,12 @@ function compute_en_tendencies!(edmf, grid::Grid, state, param_set, TS, covar_sy
     ae = 1 .- aux_bulk.area
     aeK = is_tke ? ae .* KM : ae .* KH
 
+    press = aux_covar.press
+    buoy = aux_covar.buoy
+    shear = aux_covar.shear
+    entr_gain = aux_covar.entr_gain
+    rain_src = aux_covar.rain_src
+
     cartvec = CC.Geometry.Cartesian3Vector(zero(FT))
     aeK_bcs = (; bottom = CCO.SetValue(aeK[kc_surf]), top = CCO.SetValue(aeK[kc_toa]))
     prog_bcs = (; bottom = CCO.SetGradient(cartvec), top = CCO.SetGradient(cartvec))
@@ -814,13 +829,15 @@ function compute_en_tendencies!(edmf, grid::Grid, state, param_set, TS, covar_sy
     ρaew_en_ϕ = center_aux_turbconv(state).ρaew_en_ϕ
 
     Ic = CCO.InterpolateF2C()
-    @. ρaew_en_ϕ = ρ0_c * aux_en.area * Ic(w_en_f) * covar
+    area_en = aux_en.area
+    tke_en = aux_en.tke
+    @. ρaew_en_ϕ = ρ0_c * area_en * Ic(w_en_f) * covar
 
-    kc_surf = kc_surface(grid)
-    covar_surf = covar[kc_surf]
+    prog_covar[kc_surf] = covar[kc_surf]
 
     @inbounds for k in real_center_indices(grid)
-        D_env = sum(1:n_updrafts) do i
+        is_surface_center(grid, k) && continue
+        D_env = sum(1:N_up) do i
             if aux_up[i].area[k] > minimum_area
                 turb_entr = aux_up[i].frac_turb_entr[k]
                 entr_sc = aux_up[i].entr_sc[k]
@@ -832,20 +849,12 @@ function compute_en_tendencies!(edmf, grid::Grid, state, param_set, TS, covar_sy
             end
             D_env_i
         end
-        dissipation = ρ0_c[k] * aux_en.area[k] * c_d * sqrt(max(aux_en.tke[k], 0)) / max(mixing_length[k], 1)
+        dissipation = ρ0_c[k] * area_en[k] * c_d * sqrt(max(tke_en[k], 0)) / max(mixing_length[k], 1)
         ρaew_en_ϕ_cut = ccut_downwind(ρaew_en_ϕ, grid, k)
-        ∇ρaew_en_ϕ = c∇_downwind(ρaew_en_ϕ_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
-        if is_surface_center(grid, k)
-            prog_covar[k] = covar_surf
-        else
-            prog_covar[k] = (
-                aux_covar.press[k] +
-                aux_covar.buoy[k] +
-                aux_covar.shear[k] +
-                aux_covar.entr_gain[k] +
-                aux_covar.rain_src[k] - D_env * covar[k] - dissipation * covar[k] - ∇ρaew_en_ϕ + ∇ρ_ae_K∇ϕ[k]
-            )
-        end
+        ∇ρaew_en_ϕ = c∇_downwind(ρaew_en_ϕ_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(FT(0)))
+        prog_covar[k] =
+            press[k] + buoy[k] + shear[k] + entr_gain[k] + rain_src[k] - D_env * covar[k] - dissipation * covar[k] -
+            ∇ρaew_en_ϕ + ∇ρ_ae_K∇ϕ[k]
     end
 
     return nothing

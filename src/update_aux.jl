@@ -470,7 +470,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         aux_en_2m.tke.buoy[k] = -ml_model.a_en * ρ0_c[k] * KH[k] * bg.∂b∂z
     end
 
-    compute_covariance_entr(edmf, grid, state, :tke, :w)
+    compute_covariance_entr(edmf, grid, state, Val(:tke), Val(:w))
     compute_covariance_shear(edmf, grid, state, gm, :tke, :w)
     compute_covariance_interdomain_src(edmf, grid, state, :tke, :w)
 
@@ -487,9 +487,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         end
     end
 
-    compute_covariance_entr(edmf, grid, state, :Hvar, :θ_liq_ice)
-    compute_covariance_entr(edmf, grid, state, :QTvar, :q_tot)
-    compute_covariance_entr(edmf, grid, state, :HQTcov, :θ_liq_ice, :q_tot)
+    compute_covariance_entr(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice))
+    compute_covariance_entr(edmf, grid, state, Val(:QTvar), Val(:q_tot))
+    compute_covariance_entr(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
     compute_covariance_shear(edmf, grid, state, gm, :Hvar, :θ_liq_ice)
     compute_covariance_shear(edmf, grid, state, gm, :QTvar, :q_tot)
     compute_covariance_shear(edmf, grid, state, gm, :HQTcov, :θ_liq_ice, :q_tot)

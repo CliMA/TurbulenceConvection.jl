@@ -166,7 +166,8 @@ function upwind_advection_area(ρ0_half, a_up, w_up, grid, k)
     a_up_cut = ccut_upwind(a_up, grid, k)
     w_up_cut = daul_f2c_upwind(w_up, grid, k)
     m_cut = ρ_0_cut .* a_up_cut .* w_up_cut
-    ∇m = c∇_upwind(m_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
+    FT = eltype(grid)
+    ∇m = c∇_upwind(m_cut, grid, k; bottom = SetValue(FT(0)), top = SetGradient(FT(0)))
     return -∇m / ρ0_half[k]
 end
 
@@ -175,7 +176,8 @@ function upwind_advection_velocity(ρ0, a_up, w_up, grid, k; a_up_bcs)
     ρ_0_dual = fcut_upwind(ρ0, grid, k)
     w_up_dual = fcut_upwind(w_up, grid, k)
     adv_dual = a_dual .* ρ_0_dual .* w_up_dual .* w_up_dual
-    ∇ρaw = f∇_onesided(adv_dual, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
+    FT = eltype(grid)
+    ∇ρaw = f∇_onesided(adv_dual, grid, k; bottom = FreeBoundary(), top = SetGradient(FT(0)))
     return ∇ρaw
 end
 
@@ -185,7 +187,8 @@ function upwind_advection_scalar(ρ0_half, a_up, w_up, var, grid, k)
     w_up_cut = daul_f2c_upwind(w_up, grid, k)
     var_cut = ccut_upwind(var, grid, k)
     m_cut = ρ_0_cut .* a_up_cut .* w_up_cut .* var_cut
-    ∇m = c∇_upwind(m_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
+    FT = eltype(grid)
+    ∇m = c∇_upwind(m_cut, grid, k; bottom = SetValue(FT(0)), top = SetGradient(FT(0)))
     return ∇m
 end
 

@@ -391,7 +391,7 @@ end
 
 CasesBase(case::T; kwargs...) where {T} = CasesBase{T}(; casename = string(nameof(T)), kwargs...)
 
-mutable struct EDMF_PrognosticTKE{A1}
+mutable struct EDMF_PrognosticTKE{N_up, A1}
     Ri_bulk_crit::Float64
     zi::Float64
     n_updrafts::Int
@@ -525,7 +525,7 @@ mutable struct EDMF_PrognosticTKE{A1}
         entr_surface_bc = 0
         detr_surface_bc = 0
         A1 = typeof(area_surface_bc)
-        return new{A1}(
+        return new{n_updrafts, A1}(
             Ri_bulk_crit,
             zi,
             n_updrafts,
