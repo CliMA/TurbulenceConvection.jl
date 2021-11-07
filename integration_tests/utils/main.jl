@@ -35,6 +35,7 @@ struct Simulation1d
     TS
     Stats
     param_set
+    skip_io::Bool
 end
 
 # TODO: not quite sure, yet, where this all should live.
@@ -268,8 +269,9 @@ function Simulation1d(namelist)
     param_set = create_parameter_set(namelist)
 
     FT = Float64
+    skip_io = namelist["stats_io"]["skip"]
     grid = TC.Grid(FT(namelist["grid"]["dz"]), namelist["grid"]["nz"])
-    Stats = TC.NetCDFIO_Stats(namelist, grid)
+    Stats = skip_io ? nothing : TC.NetCDFIO_Stats(namelist, grid)
     case = Cases.get_case(namelist)
     ref_params = Cases.reference_params(case, grid, param_set, namelist)
 
@@ -308,7 +310,7 @@ function Simulation1d(namelist)
         tendencies = TC.io_dictionary_tendencies(state),
     )
 
-    return Simulation1d(io_nt, grid, state, GMV, Case, Turb, TS, Stats, param_set)
+    return Simulation1d(io_nt, grid, state, GMV, Case, Turb, TS, Stats, param_set, skip_io)
 end
 
 function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
@@ -323,8 +325,10 @@ function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
 
     initialize_edmf(sim.Turb, sim.grid, state, sim.Case, sim.GMV, sim.TS)
 
-    TC.initialize_io(sim)
-    TC.io(sim)
+    if !sim.skip_io
+        TC.initialize_io(sim)
+        TC.io(sim)
+    end
     return
 end
 
@@ -333,7 +337,7 @@ function run(sim::Simulation1d)
     iter = 0
     grid = sim.grid
     state = sim.state
-    TC.open_files(sim.Stats) # #removeVarsHack
+    sim.skip_io || TC.open_files(sim.Stats) # #removeVarsHack
     while sim.TS.t <= sim.TS.t_max
         TC.update(sim.Turb, grid, state, sim.GMV, sim.Case, sim.TS)
         TC.update(sim.TS)
@@ -343,7 +347,7 @@ function run(sim::Simulation1d)
             @show progress
         end
 
-        if mod(round(Int, sim.TS.t), round(Int, sim.Stats.frequency)) == 0
+        if mod(round(Int, sim.TS.t), round(Int, sim.Stats.frequency)) == 0 && (!sim.skip_io)
             # TODO: is this the best location to call diagnostics?
             TC.compute_diagnostics!(sim.Turb, sim.GMV, grid, state, sim.Case, sim.TS)
 
@@ -364,11 +368,12 @@ function run(sim::Simulation1d)
         end
         iter += 1
     end
-    TC.close_files(sim.Stats) # #removeVarsHack
+    sim.skip_io || TC.close_files(sim.Stats) # #removeVarsHack
     return
 end
 
 function TurbulenceConvection.initialize_io(sim::Simulation1d)
+    sim.skip_io && return nothing
     TC = TurbulenceConvection
     TC.initialize_io(sim.io_nt.ref_state, sim.Stats)
     TC.io(sim.io_nt.ref_state, sim.Stats) # since the reference prog is static
@@ -386,6 +391,7 @@ function TurbulenceConvection.initialize_io(sim::Simulation1d)
 end
 
 function TurbulenceConvection.io(sim::Simulation1d)
+    sim.skip_io && return nothing
     TC = TurbulenceConvection
     TC.open_files(sim.Stats)
     TC.write_simulation_time(sim.Stats, sim.TS.t)
@@ -407,6 +413,9 @@ function main(namelist; kwargs...)
     main1d(namelist; kwargs...)
 end
 
+nc_results_file(stats::TC.NetCDFIO_Stats) = stats.path_plus_file
+nc_results_file(::Nothing) = @info "The simulation was run without IO, so no nc files were exported"
+
 function main1d(namelist; time_run = false)
     Simulation = Simulation1d(namelist)
     TurbulenceConvection.initialize(Simulation, namelist)
@@ -416,7 +425,7 @@ function main1d(namelist; time_run = false)
         run(Simulation)
     end
     println("The simulation has completed.")
-    return Simulation.Stats.path_plus_file
+    return nc_results_file(Simulation.Stats)
 end
 
 
