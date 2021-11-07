@@ -67,10 +67,11 @@ function default_namelist(::Nothing)
     return default_namelist(case_name)
 end
 
-function default_namelist(case_name::String)
+function default_namelist(case_name::String; root::String = ".", write::Bool = true)
 
     namelist_defaults = Dict()
     namelist_defaults["meta"] = Dict()
+    namelist_defaults["meta"]["uuid"] = basename(tempname())
 
     namelist_defaults["turbulence"] = Dict()
     namelist_defaults["turbulence"]["Ri_bulk_crit"] = 0.2
@@ -187,7 +188,9 @@ function default_namelist(case_name::String)
         error("Not a valid case name")
     end
 
-    write_file(namelist)
+    if write
+        write_file(namelist, root)
+    end
     return namelist
 end
 function Soares(namelist_defaults)
@@ -410,14 +413,14 @@ function LES_driven_SCM(namelist_defaults)
     return namelist
 end
 
-function write_file(namelist)
+function write_file(namelist, root::String = ".")
+    mkpath(root)
 
     @assert haskey(namelist, "meta")
     @assert haskey(namelist["meta"], "simname")
 
-    namelist["meta"]["uuid"] = basename(tempname())
-
-    open("namelist_" * namelist["meta"]["casename"] * ".in", "w") do io
+    casename = namelist["meta"]["casename"]
+    open(joinpath(root, "namelist_$casename.in"), "w") do io
         JSON.print(io, namelist, 4)
     end
 
