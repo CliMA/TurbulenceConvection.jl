@@ -402,7 +402,12 @@ function LES_driven_SCM(namelist_defaults)
 
     namelist["stats_io"]["frequency"] = 10.0
     namelist["time_stepping"]["dt"] = 3.0
-    namelist["time_stepping"]["t_max"] = 3600.0 * 12
+    namelist["time_stepping"]["t_max"] = 3600.0 * 6
+
+    # use last 6 hours of LES simulation to drive LES
+    namelist["t_interval_from_end_s"] = 3600.0 * 6
+    # average in 1 hour interval around `t_interval_from_end_s`
+    namelist["initial_condition_averaging_window_s"] = 3600.0
 
     namelist["meta"]["lesfile"] =
         joinpath(LESDrivenSCM_output_dataset_path, "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc")

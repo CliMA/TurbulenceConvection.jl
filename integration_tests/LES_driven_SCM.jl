@@ -27,8 +27,8 @@ computed_mse = compute_mse_wrapper(
         "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc",
     ),
     plot_comparison = true,
-    t_start = 6 * 3600,
-    t_stop = 12 * 3600,
+    t_start = 3 * 3600,
+    t_stop = 6 * 3600,
 )
 
 open("computed_mse_$case_name.json", "w") do io

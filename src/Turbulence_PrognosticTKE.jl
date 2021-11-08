@@ -16,6 +16,18 @@ function update_cloud_frac(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVa
     gm.cloud_cover = min(edmf.EnvVar.cloud_cover + sum(edmf.UpdVar.cloud_cover), 1)
 end
 
+function compute_les_Γᵣ(z::ClimaCore.Geometry.ZPoint, τᵣ::Real = 24.0 * 3600.0, zᵢ::Real = 3000.0, zᵣ::Real = 3500.0)
+    # returns height-dependent relaxation timescale from eqn. 9 in `Shen et al. 2021`
+    if z < zᵢ
+        return 0.0
+    elseif zᵢ <= z <= zᵣ
+        cos_arg = pi * ((z - zᵢ) / (zᵣ - zᵢ))
+        return (0.5 / τᵣ) * (1 - cos(cos_arg))
+    elseif z > zᵣ
+        return (1 / τᵣ)
+    end
+end
+
 function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm, TS)
     tendencies_gm = center_tendencies_grid_mean(state)
     param_set = parameter_set(gm)
@@ -71,11 +83,21 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
 
         if force_type(Case.Fo) <: ForcingLES
             H_horz_adv = aux_gm.dTdt_hadv[k] / Π
-            H_nudge = aux_gm.dTdt_nudge[k] / Π
             H_fluc = aux_gm.dTdt_fluc[k] / Π
 
             gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm.u[k]) / Case.Fo.nudge_tau
             gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm.v[k]) / Case.Fo.nudge_tau
+
+            Γᵣ = compute_les_Γᵣ(grid.zc[k])
+            if Γᵣ != 0
+                tau_k = 1.0 / Γᵣ
+                gm_H_nudge_k = (aux_gm.H_nudge[k] - prog_gm.θ_liq_ice[k]) / tau_k
+                gm_q_tot_nudge_k = (aux_gm.qt_nudge[k] - prog_gm.q_tot[k]) / tau_k
+            else
+                gm_H_nudge_k = 0.0
+                gm_q_tot_nudge_k = 0.0
+            end
+
             if Case.Fo.apply_subsidence
                 # Apply large-scale subsidence tendencies
                 gm_H_subsidence_k = -∇H * aux_gm.subsidence[k]
@@ -85,9 +107,9 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
                 gm_QT_subsidence_k = 0.0
             end
 
-            tendencies_gm.θ_liq_ice[k] += H_horz_adv + H_nudge + H_fluc + gm_H_subsidence_k
+            tendencies_gm.θ_liq_ice[k] += H_horz_adv + gm_H_nudge_k + H_fluc + gm_H_subsidence_k
             tendencies_gm.q_tot[k] +=
-                aux_gm.dqtdt_hadv[k] + aux_gm.dqtdt_nudge[k] + gm_QT_subsidence_k + aux_gm.dqtdt_fluc[k]
+                aux_gm.dqtdt_hadv[k] + gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k] + gm_QT_subsidence_k
 
             tendencies_gm.u[k] += gm_U_nudge_k
             tendencies_gm.v[k] += gm_V_nudge_k
