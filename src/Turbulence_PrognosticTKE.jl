@@ -860,58 +860,69 @@ function compute_en_tendencies!(
     return nothing
 end
 
-function GMV_third_m(edmf::EDMF_PrognosticTKE, grid, state, covar_en_sym::Symbol, var::Symbol, gm_third_m_sym::Symbol)
+function GMV_third_m(
+    edmf::EDMF_PrognosticTKE{N_up},
+    grid,
+    state,
+    ::Val{covar_en_sym},
+    ::Val{var},
+    ::Val{gm_third_m_sym},
+) where {N_up, covar_en_sym, var, gm_third_m_sym}
 
     gm_third_m = getproperty(center_aux_grid_mean(state), gm_third_m_sym)
+    kc_surf = kc_surface(grid)
 
-    up = edmf.UpdVar
-    en = edmf.EnvVar
     aux_bulk = center_aux_bulk(state)
     aux_up_f = face_aux_updrafts(state)
     is_tke = covar_en_sym == :tke
-    covar_en = getproperty(center_aux_environment(state), covar_en_sym)
     aux_en_c = center_aux_environment(state)
+    covar_en = getproperty(aux_en_c, covar_en_sym)
     aux_en_f = face_aux_environment(state)
     aux_en = is_tke ? aux_en_f : aux_en_c
-    aux_up = center_aux_updrafts(state)
+    aux_up_c = center_aux_updrafts(state)
+    aux_tc = center_aux_turbconv(state)
+    ϕ_gm = aux_tc.ϕ_gm
+    ϕ_gm_cov = aux_tc.ϕ_gm_cov
+    ϕ_en_cov = aux_tc.ϕ_en_cov
+    ϕ_up_cubed = aux_tc.ϕ_up_cubed
+    aux_up = is_tke ? aux_up_f : aux_up_c
     var_en = getproperty(aux_en, var)
+    area_en = aux_en_c.area
+    Ic = is_tke ? CCO.InterpolateF2C() : x -> x
+    cartvec = CC.Geometry.Cartesian3Vector
+    ∇c = CCO.DivergenceF2C()
+    w_en = aux_en_f.w
 
-    @inbounds for k in real_center_indices(grid)
-        mean_en = is_tke ? interpf2c(var_en, grid, k) : var_en[k]
-        GMVv_ = aux_en_c.area[k] * mean_en
-        @inbounds for i in 1:(up.n_updrafts)
-            var_up = is_tke ? getproperty(aux_up_f[i], var) : getproperty(aux_up[i], var)
-            mean_up = is_tke ? interpf2c(var_up, grid, k) : var_up[k]
-            GMVv_ += aux_up[i].area[k] * mean_up
-        end
-
-        Envcov_ = 0
-        @inbounds for i in 1:(edmf.n_updrafts)
-            if is_tke
-                w_bcs = (; bottom = SetValue(0), top = SetValue(0))
-                w_en_dual = dual_faces(aux_en_f.w, grid, k)
-                ∇w_en = ∇f2c(w_en_dual, grid, k; w_bcs...)
-                Envcov_ -= aux_up[i].horiz_K_eddy[k] * ∇w_en * aux_up[i].area[k] / aux_bulk.area[k]
-            else
-                Envcov_ = covar_en[k]
-            end
-        end
-
-        Upd_cubed = 0.0
-        GMVcov_ = aux_en_c.area[k] * (Envcov_ + (mean_en - GMVv_)^2)
-        @inbounds for i in 1:(up.n_updrafts)
-            var_up = is_tke ? getproperty(aux_up_f[i], var) : getproperty(aux_up[i], var)
-            mean_up = is_tke ? interpf2c(var_up, grid, k) : var_up[k]
-            GMVcov_ += aux_up[i].area[k] * (mean_up - GMVv_)^2
-            Upd_cubed += aux_up[i].area[k] * mean_up^3
-        end
-
-        if is_surface_center(grid, k)
-            gm_third_m[k] = 0.0 # this is here as first value is biased with BC area fraction
-        else
-            gm_third_m[k] =
-                Upd_cubed + aux_en_c.area[k] * (mean_en^3 + 3 * mean_en * Envcov_) - GMVv_^3 - 3 * GMVcov_ * GMVv_
-        end
+    @. ϕ_gm = area_en * Ic(var_en)
+    @inbounds for i in 1:N_up
+        a_up = aux_up_c[i].area
+        var_up = getproperty(aux_up[i], var)
+        @. ϕ_gm += a_up * Ic(var_up)
     end
+
+    if is_tke
+        parent(ϕ_en_cov) .= 0
+        for i in 1:N_up
+            horiz_K_eddy = aux_up_c[i].horiz_K_eddy
+            a_up = aux_up_c[i].area
+            a_bulk = aux_bulk.area
+            @. ϕ_en_cov += -horiz_K_eddy * ∇c(cartvec(w_en)) * a_up / a_bulk
+        end
+    else
+        @. ϕ_en_cov = covar_en
+    end
+
+    parent(ϕ_up_cubed) .= 0
+    @. ϕ_gm_cov = area_en * (ϕ_en_cov + (Ic(var_en) - ϕ_gm)^2)
+    @inbounds for i in 1:N_up
+        a_up = aux_up_c[i].area
+        var_up = getproperty(aux_up[i], var)
+        @. ϕ_gm_cov += a_up * (Ic(var_up) - ϕ_gm)^2
+        @. ϕ_up_cubed += a_up * Ic(var_up)^3
+    end
+
+    @. gm_third_m = ϕ_up_cubed + area_en * (Ic(var_en)^3 + 3 * Ic(var_en) * ϕ_en_cov) - ϕ_gm^3 - 3 * ϕ_gm_cov * ϕ_gm
+
+    gm_third_m[kc_surf] = 0
     return
 end
