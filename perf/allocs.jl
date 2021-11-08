@@ -71,9 +71,8 @@ function plot_allocs(case_name, allocs_per_case, n_unique_bytes)
     max_bytes = maximum(all_bytes)
     @info "$case_name: $all_bytes"
     xtick_name(filename, linenumber) = "$filename, line number: $linenumber"
-    markershape = (:circle, :star, :square, :hexagon)
+    markershape = (:square, :hexagon, :circle, :star, :utriangle, :dtriangle)
     for (bytes, filename, linenumber) in zip(all_bytes, filenames, linenumbers)
-        markershape = (markershape[end], markershape[1:(end - 1)]...)
         filename_only = first(split(filename, ".jl")) * ".jl"
         Plots.plot!(
             [0],
@@ -83,8 +82,9 @@ function plot_allocs(case_name, allocs_per_case, n_unique_bytes)
             markershape = markershape[1],
             markersize = 1 + bytes / max_bytes * 10,
         )
+        markershape = (markershape[end], markershape[1:(end - 1)]...)
     end
-    Plots.plot!(ylabel = "Number of allocations (KB)")
+    Plots.plot!(ylabel = "Number of allocations (KB)", title = case_name)
     Plots.savefig(joinpath(folder, "allocations_$case_name.png"))
 end
 
