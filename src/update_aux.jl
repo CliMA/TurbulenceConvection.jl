@@ -100,12 +100,14 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         #####
         ##### saturation_adjustment and buoyancy
         #####
-        ts = thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
+        ts_gm = thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        aux_tc.θ_virt[k] = TD.virtual_pottemp(ts_gm)
 
         ts_en = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
 
         aux_en.T[k] = TD.air_temperature(ts_en)
+        aux_en.θ_virt[k] = TD.virtual_pottemp(ts_en)
+        aux_en.θ_dry[k] = TD.dry_pottemp(ts_en)
         aux_en.q_liq[k] = TD.liquid_specific_humidity(ts_en)
         aux_en.q_ice[k] = TD.ice_specific_humidity(ts_en)
         rho = TD.air_density(ts_en)
@@ -355,15 +357,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         θ_liq_ice_cut = ccut(aux_en.θ_liq_ice, grid, k)
         ∂θl∂z = c∇(θ_liq_ice_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
 
-        p0_cut = ccut(p0_c, grid, k)
-        T_cut = ccut(aux_en.T, grid, k)
-        QT_cut = ccut(aux_en.q_tot, grid, k)
-        ts_cut = TD.PhaseEquil_pTq.(param_set, p0_cut, T_cut, QT_cut)
-        θv_cut = TD.virtual_pottemp.(ts_cut)
+        θv_cut = ccut(aux_en.θ_virt, grid, k)
 
-        ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
-        θ = TD.dry_pottemp(ts)
-        θv = TD.virtual_pottemp(ts)
+        ts_en = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_en.T[k], aux_en.q_tot[k])
         ∂θv∂z = c∇(θv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
 
         # buoyancy_gradients
@@ -371,9 +367,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             # First order approximation: Use environmental mean fields.
             bg_kwargs = (;
                 t_sat = aux_en.T[k],
-                qv_sat = TD.vapor_specific_humidity(ts),
+                qv_sat = TD.vapor_specific_humidity(ts_en),
                 qt_sat = aux_en.q_tot[k],
-                θ_sat = θ,
+                θ_sat = aux_en.θ_dry[k],
                 θ_liq_ice_sat = aux_en.θ_liq_ice[k],
                 ∂θv∂z_unsat = ∂θv∂z,
                 ∂qt∂z_sat = ∂qt∂z,
