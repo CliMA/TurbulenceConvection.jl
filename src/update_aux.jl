@@ -218,9 +218,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     get_GMV_CoVar(edmf, grid, state, :Hvar, :θ_liq_ice)
     get_GMV_CoVar(edmf, grid, state, :QTvar, :q_tot)
     get_GMV_CoVar(edmf, grid, state, :HQTcov, :θ_liq_ice, :q_tot)
-    GMV_third_m(edmf, grid, state, :Hvar, :θ_liq_ice, :H_third_m)
-    GMV_third_m(edmf, grid, state, :QTvar, :q_tot, :QT_third_m)
-    GMV_third_m(edmf, grid, state, :tke, :w, :W_third_m)
+    GMV_third_m(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:H_third_m))
+    GMV_third_m(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:QT_third_m))
+    GMV_third_m(edmf, grid, state, Val(:tke), Val(:w), Val(:W_third_m))
     #! format: on
 
     # TODO - use this inversion in free_convection_windspeed and not compute zi twice
