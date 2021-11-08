@@ -336,13 +336,13 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
 
     cartvec = CC.Geometry.Cartesian3Vector
-    θ_virt_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
-    If = CCO.InterpolateC2F(; θ_virt_bcs...)
-    ∇c = CCO.GradientF2C()
+    θ_virt_bcs = (; bottom = CCO.SetGradient(cartvec(FT(0))), top = CCO.SetGradient(cartvec(FT(0))))
+    Ic = CCO.InterpolateF2C()
+    ∇f = CCO.GradientC2F(; θ_virt_bcs...)
     q_tot_en = aux_en.q_tot
     T_en = aux_en.T
 
-    @. ∂θv∂z = ∇c(If(TD.virtual_pottemp(TD.PhaseEquil_pTq(param_set, p0_c, T_en, q_tot_en))))
+    @. ∂θv∂z = Ic(∇f(TD.virtual_pottemp(TD.PhaseEquil_pTq(param_set, p0_c, T_en, q_tot_en))))
 
     @inbounds for k in real_center_indices(grid)
 
