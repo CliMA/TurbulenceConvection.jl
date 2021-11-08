@@ -161,16 +161,6 @@ interpf2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (bc.value + 
 ##### advection operators
 #####
 
-function upwind_advection_area(ρ0_half, a_up, w_up, grid, k)
-    ρ_0_cut = ccut_upwind(ρ0_half, grid, k)
-    a_up_cut = ccut_upwind(a_up, grid, k)
-    w_up_cut = daul_f2c_upwind(w_up, grid, k)
-    m_cut = ρ_0_cut .* a_up_cut .* w_up_cut
-    FT = eltype(grid)
-    ∇m = c∇_upwind(m_cut, grid, k; bottom = SetValue(FT(0)), top = SetGradient(FT(0)))
-    return -∇m / ρ0_half[k]
-end
-
 function upwind_advection_velocity(ρ0, a_up, w_up, grid, k; a_up_bcs)
     a_dual = daul_c2f_upwind(a_up, grid, k; a_up_bcs...)
     ρ_0_dual = fcut_upwind(ρ0, grid, k)
@@ -179,17 +169,6 @@ function upwind_advection_velocity(ρ0, a_up, w_up, grid, k; a_up_bcs)
     FT = eltype(grid)
     ∇ρaw = f∇_onesided(adv_dual, grid, k; bottom = FreeBoundary(), top = SetGradient(FT(0)))
     return ∇ρaw
-end
-
-function upwind_advection_scalar(ρ0_half, a_up, w_up, var, grid, k)
-    ρ_0_cut = ccut_upwind(ρ0_half, grid, k)
-    a_up_cut = ccut_upwind(a_up, grid, k)
-    w_up_cut = daul_f2c_upwind(w_up, grid, k)
-    var_cut = ccut_upwind(var, grid, k)
-    m_cut = ρ_0_cut .* a_up_cut .* w_up_cut .* var_cut
-    FT = eltype(grid)
-    ∇m = c∇_upwind(m_cut, grid, k; bottom = SetValue(FT(0)), top = SetGradient(FT(0)))
-    return ∇m
 end
 
 #####
