@@ -16,6 +16,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     c_m = CPEDMF.c_m(param_set)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
+    ∂θv∂z = center_aux_turbconv(state).∂θv∂z
     surface = Case.Sur
     obukhov_length = surface.obukhov_length
     FT = eltype(grid)
@@ -334,6 +335,15 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     ##### compute_eddy_diffusivities_tke
     #####
 
+    cartvec = CC.Geometry.Cartesian3Vector
+    θ_virt_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+    If = CCO.InterpolateC2F(; θ_virt_bcs...)
+    ∇c = CCO.GradientF2C()
+    q_tot_en = aux_en.q_tot
+    T_en = aux_en.T
+
+    @. ∂θv∂z = ∇c(If(TD.virtual_pottemp(TD.PhaseEquil_pTq(param_set, p0_c, T_en, q_tot_en))))
+
     @inbounds for k in real_center_indices(grid)
 
         # compute shear
@@ -355,16 +365,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         θ_liq_ice_cut = ccut(aux_en.θ_liq_ice, grid, k)
         ∂θl∂z = c∇(θ_liq_ice_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
 
-        p0_cut = ccut(p0_c, grid, k)
-        T_cut = ccut(aux_en.T, grid, k)
-        QT_cut = ccut(aux_en.q_tot, grid, k)
-        ts_cut = TD.PhaseEquil_pTq.(param_set, p0_cut, T_cut, QT_cut)
-        θv_cut = TD.virtual_pottemp.(ts_cut)
-
         ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
         θ = TD.dry_pottemp(ts)
         θv = TD.virtual_pottemp(ts)
-        ∂θv∂z = c∇(θv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
 
         # buoyancy_gradients
         if edmf.bg_closure == BuoyGradMean()
@@ -375,7 +378,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 qt_sat = aux_en.q_tot[k],
                 θ_sat = θ,
                 θ_liq_ice_sat = aux_en.θ_liq_ice[k],
-                ∂θv∂z_unsat = ∂θv∂z,
+                ∂θv∂z_unsat = ∂θv∂z[k].u₃,
                 ∂qt∂z_sat = ∂qt∂z,
                 ∂θl∂z_sat = ∂θl∂z,
                 p0 = p0_c[k],
@@ -411,7 +414,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             ∂θv∂z_unsat = c∇_vanishing_subdomain(
                 θv_unsat_cut,
                 cf_cut,
-                ∂θv∂z,
+                ∂θv∂z[k].u₃,
                 grid,
                 k;
                 bottom = SetGradient(0),

@@ -166,6 +166,7 @@ cent_aux_vars_edmf(FT, n_up) = (;
         ),
         term_vel_rain = FT(0),
         term_vel_snow = FT(0),
+        ∂θv∂z = CC.Geometry.Covariant3Vector(FT(0)),
         KM = FT(0),
         KH = FT(0),
         mixing_length = FT(0),
