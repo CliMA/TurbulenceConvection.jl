@@ -158,20 +158,6 @@ interpf2c(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (f[1] + bc.valu
 interpf2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (bc.value + f[2]) / 2
 
 #####
-##### advection operators
-#####
-
-function upwind_advection_velocity(ρ0, a_up, w_up, grid, k; a_up_bcs)
-    a_dual = daul_c2f_upwind(a_up, grid, k; a_up_bcs...)
-    ρ_0_dual = fcut_upwind(ρ0, grid, k)
-    w_up_dual = fcut_upwind(w_up, grid, k)
-    adv_dual = a_dual .* ρ_0_dual .* w_up_dual .* w_up_dual
-    FT = eltype(grid)
-    ∇ρaw = f∇_onesided(adv_dual, grid, k; bottom = FreeBoundary(), top = SetGradient(FT(0)))
-    return ∇ρaw
-end
-
-#####
 ##### ∇(center data)
 #####
 

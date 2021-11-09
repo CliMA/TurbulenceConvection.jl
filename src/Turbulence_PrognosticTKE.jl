@@ -508,25 +508,36 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE{N_up}, grid, state,
         tends_ρaq_tot[kc_surf] = 0
     end
 
-
     # Solve for updraft velocity
-    @inbounds for k in real_face_indices(grid)
-        is_surface_face(grid, k) && continue
-        @inbounds for i in 1:N_up
-            a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
-            a_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
-            # We know that, since W = 0 at z = 0, these BCs should
-            # not matter in the end:
-            entr_w = interpc2f(aux_up[i].entr_turb_dyn, grid, k; bottom = SetValue(0), top = SetValue(0))
-            detr_w = interpc2f(aux_up[i].detr_turb_dyn, grid, k; bottom = SetValue(0), top = SetValue(0))
-            B_k = interpc2f(aux_up[i].buoy, grid, k; bottom = SetValue(0), top = SetValue(0))
 
-            adv = upwind_advection_velocity(ρ0_f, aux_up[i].area, aux_up_f[i].w, grid, k; a_up_bcs)
-            exch = (ρ0_f[k] * a_k * aux_up_f[i].w[k] * (entr_w * aux_en_f.w[k] - detr_w * aux_up_f[i].w[k]))
-            buoy = ρ0_f[k] * a_k * B_k
-            tendencies_up_f[i].ρaw[k] = -adv + exch + buoy + aux_up_f[i].nh_pressure[k]
-        end
+    # We know that, since W = 0 at z = 0, BCs for entr, detr,
+    # and buoyancy should not matter in the end
+    zero_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+    I0f = CCO.InterpolateC2F(; zero_bcs...)
+    adv_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
+    LB = CCO.LeftBiasedF2C(; bottom = CCO.SetValue(FT(0)))
+    ∂ = CCO.DivergenceC2F(; adv_bcs...)
+
+    @inbounds for i in 1:N_up
+        a_up_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.SetValue(FT(0)))
+        Iaf = CCO.InterpolateC2F(; a_up_bcs...)
+        tends_ρaw = tendencies_up_f[i].ρaw
+        nh_pressure = aux_up_f[i].nh_pressure
+        a_up = aux_up[i].area
+        w_up = aux_up_f[i].w
+        w_en = aux_en_f.w
+        entr_w = aux_up[i].entr_turb_dyn
+        detr_w = aux_up[i].detr_turb_dyn
+        buoy = aux_up[i].buoy
+
+        @. tends_ρaw =
+            -(∂(wvec(LB(Iaf(a_up) * ρ0_f * w_up * w_up)))) +
+            (ρ0_f * Iaf(a_up) * w_up * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) +
+            (ρ0_f * Iaf(a_up) * I0f(buoy)) +
+            nh_pressure
+        tends_ρaw[kf_surf] = 0
     end
+
     return
 end
 
