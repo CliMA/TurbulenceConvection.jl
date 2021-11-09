@@ -292,15 +292,18 @@ function Simulation1d(namelist)
 
     n_updrafts = Turb.n_updrafts
 
-    cent_prog_fields = TC.FieldFromNamedTuple(TC.center_space(grid), cent_prognostic_vars(FT, n_updrafts))
-    face_prog_fields = TC.FieldFromNamedTuple(TC.face_space(grid), face_prognostic_vars(FT, n_updrafts))
-    aux_cent_fields = TC.FieldFromNamedTuple(TC.center_space(grid), cent_aux_vars(FT, n_updrafts))
-    aux_face_fields = TC.FieldFromNamedTuple(TC.face_space(grid), face_aux_vars(FT, n_updrafts))
-    diagnostic_cent_fields = TC.FieldFromNamedTuple(TC.center_space(grid), cent_diagnostic_vars(FT, n_updrafts))
-    diagnostic_face_fields = TC.FieldFromNamedTuple(TC.face_space(grid), face_diagnostic_vars(FT, n_updrafts))
+    cspace = TC.center_space(grid)
+    fspace = TC.face_space(grid)
 
-    prog = CC.Fields.FieldVector(cent = cent_prog_fields, face = face_prog_fields)
-    tendencies = CC.Fields.FieldVector(cent = deepcopy(cent_prog_fields), face = deepcopy(face_prog_fields))
+    cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, n_updrafts))
+    face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, n_updrafts))
+    aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, n_updrafts))
+    aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, n_updrafts))
+    diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, n_updrafts))
+    diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, n_updrafts))
+
+    prog = CC.Fields.FieldVector(cent = cent_prog_fields(), face = face_prog_fields())
+    tendencies = CC.Fields.FieldVector(cent = cent_prog_fields(), face = face_prog_fields())
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
     diagnostics = CC.Fields.FieldVector(cent = diagnostic_cent_fields, face = diagnostic_face_fields)
 

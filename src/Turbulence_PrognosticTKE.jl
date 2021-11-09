@@ -469,13 +469,12 @@ function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE, param_set)
     return
 end
 
-function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables)
+function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE{N_up}, grid, state, gm::GridMeanVariables) where {N_up}
     param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
+    FT = eltype(grid)
 
-    up = edmf.UpdVar
-    en = edmf.EnvVar
     aux_up = center_aux_updrafts(state)
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
@@ -486,41 +485,59 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::G
     ρ0_f = face_ref_state(state).ρ0
     au_lim = edmf.max_area
 
-    @inbounds for i in 1:(up.n_updrafts)
+    @inbounds for i in 1:N_up
         aux_up[i].entr_turb_dyn .= aux_up[i].entr_sc .+ aux_up[i].frac_turb_entr
         aux_up[i].detr_turb_dyn .= aux_up[i].detr_sc .+ aux_up[i].frac_turb_entr
     end
 
+    UB = CCO.UpwindBiasedProductC2F(bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+    Ic = CCO.InterpolateF2C()
+    cartvec = CC.Geometry.Cartesian3Vector
+    ∂ = CCO.DivergenceF2C()
+    w_bcs = (; bottom = CCO.SetValue(cartvec(FT(0))), top = CCO.SetValue(cartvec(FT(0))))
+    LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
+
     # Solve for updraft area fraction
-    @inbounds for k in real_center_indices(grid)
-        @inbounds for i in 1:(up.n_updrafts)
-            is_surface_center(grid, k) && continue
-            w_up_c = interpf2c(aux_up_f[i].w, grid, k)
-            m_k = (ρ0_c[k] * aux_up[i].area[k] * w_up_c)
+    @inbounds for i in 1:N_up
+        aux_up_i = aux_up[i]
+        w_up = aux_up_f[i].w
+        a_up = aux_up_i.area
+        q_tot_up = aux_up_i.q_tot
+        q_tot_en = aux_en.q_tot
+        θ_liq_ice_en = aux_en.θ_liq_ice
+        θ_liq_ice_up = aux_up_i.θ_liq_ice
+        entr_turb_dyn = aux_up_i.entr_turb_dyn
+        detr_turb_dyn = aux_up_i.detr_turb_dyn
+        θ_liq_ice_tendency_precip_formation = aux_up_i.θ_liq_ice_tendency_precip_formation
+        qt_tendency_precip_formation = aux_up_i.qt_tendency_precip_formation
 
-            adv = upwind_advection_area(ρ0_c, aux_up[i].area, aux_up_f[i].w, grid, k)
-            entr_term = m_k * aux_up[i].entr_turb_dyn[k]
-            detr_term = m_k * aux_up[i].detr_turb_dyn[k]
-            tendencies_up[i].ρarea[k] = (ρ0_c[k] * adv + entr_term - detr_term)
+        tends_ρarea = tendencies_up[i].ρarea
+        tends_ρaθ_liq_ice = tendencies_up[i].ρaθ_liq_ice
+        tends_ρaq_tot = tendencies_up[i].ρaq_tot
 
-            adv = upwind_advection_scalar(ρ0_c, aux_up[i].area, aux_up_f[i].w, aux_up[i].θ_liq_ice, grid, k)
-            entr = entr_term * aux_en.θ_liq_ice[k]
-            detr = detr_term * aux_up[i].θ_liq_ice[k]
-            rain = ρ0_c[k] * aux_up[i].θ_liq_ice_tendency_precip_formation[k]
-            tendencies_up[i].ρaθ_liq_ice[k] = -adv + entr - detr + rain
+        @. tends_ρarea =
+            -∂(cartvec(LB(Ic(w_up) * ρ0_c * a_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn) -
+            (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn)
 
-            adv = upwind_advection_scalar(ρ0_c, aux_up[i].area, aux_up_f[i].w, aux_up[i].q_tot, grid, k)
-            entr = entr_term * aux_en.q_tot[k]
-            detr = detr_term * aux_up[i].q_tot[k]
-            rain = ρ0_c[k] * aux_up[i].qt_tendency_precip_formation[k]
-            tendencies_up[i].ρaq_tot[k] = -adv + entr - detr + rain
-        end
+        @. tends_ρaθ_liq_ice =
+            -∂(cartvec(LB(Ic(w_up) * ρ0_c * a_up * θ_liq_ice_up))) +
+            (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) -
+            (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn * θ_liq_ice_up) + (ρ0_c * θ_liq_ice_tendency_precip_formation)
+
+        @. tends_ρaq_tot =
+            -∂(cartvec(LB(Ic(w_up) * ρ0_c * a_up * q_tot_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * q_tot_en) -
+            (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn * q_tot_up) + (ρ0_c * qt_tendency_precip_formation)
+
+        tends_ρarea[kc_surf] = 0
+        tends_ρaθ_liq_ice[kc_surf] = 0
+        tends_ρaq_tot[kc_surf] = 0
     end
+
 
     # Solve for updraft velocity
     @inbounds for k in real_face_indices(grid)
         is_surface_face(grid, k) && continue
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
             a_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
             # We know that, since W = 0 at z = 0, these BCs should
