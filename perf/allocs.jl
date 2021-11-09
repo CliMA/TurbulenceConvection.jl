@@ -84,7 +84,7 @@ function plot_allocs(case_name, allocs_per_case, n_unique_bytes)
         )
         markershape = (markershape[end], markershape[1:(end - 1)]...)
     end
-    Plots.plot!(ylabel = "Number of allocations (KB)", title = case_name)
+    Plots.plot!(ylabel = "Allocations (KB)", title = case_name)
     Plots.savefig(joinpath(folder, "allocations_$case_name.png"))
 end
 

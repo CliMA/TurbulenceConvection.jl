@@ -1,6 +1,6 @@
 import TurbulenceConvection
 
-tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
+const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
 include(joinpath(tc_dir, "integration_tests", "utils", "generate_namelist.jl"))
 include(joinpath(tc_dir, "integration_tests", "utils", "Cases.jl"))
 include(joinpath(tc_dir, "integration_tests", "utils", "parameter_set.jl"))
