@@ -144,7 +144,7 @@ Minimum dissipation model
 
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct MinDisspLen{FT, T}
+Base.@kwdef struct MinDisspLen{FT, T, N_up}
     "height"
     z::FT
     "obukhov length"
@@ -175,9 +175,8 @@ Base.@kwdef struct MinDisspLen{FT, T}
     ε_turb::T
     "updraft dynamic detrainment"
     δ_dyn::T
-    "number of updraft"
-    N_up::Int
 end
+n_updrafts(::MinDisspLen{FT, T, N_up}) where {FT, T, N_up} = N_up
 
 Base.@kwdef mutable struct PrecipVariables
     precipitation_model::String = "default_precipitation_model"

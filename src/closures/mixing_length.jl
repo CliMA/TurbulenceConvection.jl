@@ -1,4 +1,4 @@
-function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
+function mixing_length(param_set::APS, ml_model::MinDisspLen{FT}) where {FT}
     c_m::FT = CPEDMF.c_m(param_set)
     c_d::FT = CPEDMF.c_d(param_set)
     smin_ub::FT = CPEDMF.smin_ub(param_set)
@@ -13,6 +13,7 @@ function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
     tke_surf = ml_model.tke_surf
     ∂b∂z = ml_model.∇b.∂b∂z
     tke = ml_model.tke
+    N_up = n_updrafts(ml_model)
 
     # kz scale (surface layer)
     if ml_model.obukhov_length < 0.0 #unstable
@@ -28,7 +29,7 @@ function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
     # Dissipation term
     c_neg = c_d * tke * sqrt(tke)
     # Subdomain exchange term
-    b_exch = sum(1:(ml_model.N_up)) do i
+    b_exch = sum(1:N_up) do i
         wc_upd_nn = ml_model.wc_up[i]
         wc_env = ml_model.wc_en
         b_exch_i =

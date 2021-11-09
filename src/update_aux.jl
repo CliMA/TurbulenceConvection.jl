@@ -1,4 +1,4 @@
-function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
+function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, param_set, TS) where {N_up}
     #####
     ##### Unpack common variables
     #####
@@ -44,7 +44,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         #####
         ##### Set primitive variables
         #####
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             if is_surface_center(grid, k)
                 if prog_up[i].ρarea[k] / ρ0_c[k] >= edmf.minimum_area
                     aux_up[i].θ_liq_ice[k] = edmf.h_surface_bc[i]
@@ -72,9 +72,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         #####
         aux_bulk.q_tot[k] = 0
         aux_bulk.θ_liq_ice[k] = 0
-        aux_bulk.area[k] = sum(ntuple(i -> aux_up[i].area[k], up.n_updrafts))
+        aux_bulk.area[k] = sum(ntuple(i -> aux_up[i].area[k], Val(N_up)))
         if aux_bulk.area[k] > 0
-            @inbounds for i in 1:(up.n_updrafts)
+            @inbounds for i in 1:N_up
                 aux_bulk.q_tot[k] += aux_up[i].area[k] * aux_up[i].q_tot[k] / aux_bulk.area[k]
                 aux_bulk.θ_liq_ice[k] += aux_up[i].area[k] * aux_up[i].θ_liq_ice[k] / aux_bulk.area[k]
             end
@@ -116,7 +116,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         update_sat_unsat(en_thermo, state, k, ts_en)
         aux_en.RH[k] = TD.relative_humidity(ts_en)
 
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
                 qt = aux_up[i].q_tot[k - 1]
                 h = aux_up[i].θ_liq_ice[k - 1]
@@ -132,10 +132,10 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             aux_up[i].RH[k] = TD.relative_humidity(ts_up)
         end
         aux_gm.buoy[k] = (1.0 - aux_bulk.area[k]) * aux_en.buoy[k]
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             aux_gm.buoy[k] += aux_up[i].area[k] * aux_up[i].buoy[k]
         end
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             aux_up[i].buoy[k] -= aux_gm.buoy[k]
         end
         aux_en.buoy[k] -= aux_gm.buoy[k]
@@ -150,7 +150,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         aux_bulk.RH[k] = 0
         aux_bulk.buoy[k] = 0
         if a_bulk_c > 0
-            @inbounds for i in 1:(up.n_updrafts)
+            @inbounds for i in 1:N_up
                 aux_bulk.q_liq[k] += aux_up[i].area[k] * aux_up[i].q_liq[k] / a_bulk_c
                 aux_bulk.q_ice[k] += aux_up[i].area[k] * aux_up[i].q_ice[k] / a_bulk_c
                 aux_bulk.T[k] += aux_up[i].area[k] * aux_up[i].T[k] / a_bulk_c
@@ -183,11 +183,11 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     @inbounds for k in real_face_indices(grid)
         if is_surface_face(grid, k)
-            @inbounds for i in 1:(up.n_updrafts)
+            @inbounds for i in 1:N_up
                 aux_up_f[i].w[k] = edmf.w_surface_bc[i]
             end
         else
-            @inbounds for i in 1:(up.n_updrafts)
+            @inbounds for i in 1:N_up
                 a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
                 anew_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
                 if anew_k >= edmf.minimum_area
@@ -201,7 +201,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         a_bulk_bcs = (; bottom = SetValue(sum(edmf.area_surface_bc)), top = SetZeroGradient())
         a_bulk_f = interpc2f(aux_bulk.area, grid, k; a_bulk_bcs...)
         if a_bulk_f > 0
-            @inbounds for i in 1:(up.n_updrafts)
+            @inbounds for i in 1:N_up
                 a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
                 a_up_f = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
                 aux_tc_f.bulk.w[k] += a_up_f * aux_up_f[i].w[k] / a_bulk_f
@@ -237,7 +237,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
 
     @inbounds for k in real_center_indices(grid)
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             # entrainment
             if aux_up[i].area[k] > 0.0
                 # compute ∇m at cell centers
@@ -297,7 +297,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     end
 
     @inbounds for k in real_face_indices(grid)
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
 
             # pressure
             a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
@@ -342,9 +342,6 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         U_cut = ccut(prog_gm.u, grid, k)
         V_cut = ccut(prog_gm.v, grid, k)
         wc_en = interpf2c(aux_en_f.w, grid, k)
-        wc_up = ntuple(up.n_updrafts) do i
-            interpf2c(aux_up_f[i].w, grid, k)
-        end
         w_dual = dual_faces(aux_en_f.w, grid, k)
 
         ∇U = c∇(U_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
@@ -436,7 +433,12 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         ∇_Ri = gradient_Richardson_number(bg.∂b∂z, Shear², eps(0.0))
         aux_tc.prandtl_nvec[k] = turbulent_Prandtl_number(param_set, obukhov_length, ∇_Ri)
 
-        ml_model = MinDisspLen(;
+        wc_up = ntuple(i -> interpf2c(aux_up_f[i].w, grid, k), Val(N_up))
+        a_up = ntuple(i -> aux_up[i].area[k], Val(N_up))
+        ε_turb = ntuple(i -> aux_up[i].frac_turb_entr[k], Val(N_up))
+        δ_dyn = ntuple(i -> aux_up[i].detr_sc[k], Val(N_up))
+
+        ml_model = MinDisspLen{FT, typeof(wc_up), N_up}(;
             z = grid.zc[k].z,
             obukhov_length = obukhov_length,
             tke_surf = aux_en.tke[kc_surf],
@@ -448,11 +450,10 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             tke = aux_en.tke[k],
             a_en = (1 - aux_bulk.area[k]),
             wc_en = wc_en,
-            wc_up = Tuple(wc_up),
-            a_up = ntuple(i -> aux_up[i].area[k], up.n_updrafts),
-            ε_turb = ntuple(i -> aux_up[i].frac_turb_entr[k], up.n_updrafts),
-            δ_dyn = ntuple(i -> aux_up[i].detr_sc[k], up.n_updrafts),
-            N_up = up.n_updrafts,
+            wc_up = wc_up,
+            a_up = a_up,
+            ε_turb = ε_turb,
+            δ_dyn = δ_dyn,
         )
 
         ml = mixing_length(param_set, ml_model)
@@ -475,7 +476,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     @inbounds for k in real_center_indices(grid)
         aux_en_2m.tke.press[k] = 0.0
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             w_up_c = interpf2c(aux_up_f[i].w, grid, k)
             w_en_c = interpf2c(aux_en_f.w, grid, k)
             press_c = interpf2c(aux_up_f[i].nh_pressure, grid, k)
