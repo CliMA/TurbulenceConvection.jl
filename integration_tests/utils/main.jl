@@ -13,16 +13,18 @@ const CC = ClimaCore
 import OrdinaryDiffEq
 const ODE = OrdinaryDiffEq
 
+const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
+
 include("initial_conditions.jl")
+include(joinpath(tc_dir, "diagnostics", "compute_diagnostics.jl"))
 include("parameter_set.jl")
 include("Cases.jl")
 import .Cases
 
-struct State{P, A, T, D}
+struct State{P, A, T}
     prog::P
     aux::A
     tendencies::T
-    diagnostics::D
 end
 
 struct Simulation1d
@@ -32,6 +34,7 @@ struct Simulation1d
     GMV
     Case
     Turb
+    diagnostics
     TS
     Stats
     param_set
@@ -307,19 +310,17 @@ function Simulation1d(namelist)
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
     diagnostics = CC.Fields.FieldVector(cent = diagnostic_cent_fields, face = diagnostic_face_fields)
 
-    state = State(prog, aux, tendencies, diagnostics)
+    state = State(prog, aux, tendencies)
 
     TC.compute_ref_state!(state, grid, param_set; ref_params...)
 
     io_nt = (;
         ref_state = TC.io_dictionary_ref_state(state),
         aux = TC.io_dictionary_aux(state),
-        diagnostics = TC.io_dictionary_diagnostics(state),
-        prog = TC.io_dictionary_state(state),
-        tendencies = TC.io_dictionary_tendencies(state),
+        diagnostics = io_dictionary_diagnostics(diagnostics),
     )
 
-    return Simulation1d(io_nt, grid, state, GMV, Case, Turb, TS, Stats, param_set, skip_io)
+    return Simulation1d(io_nt, grid, state, GMV, Case, Turb, diagnostics, TS, Stats, param_set, skip_io)
 end
 
 function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
@@ -346,6 +347,7 @@ function run(sim::Simulation1d)
     iter = 0
     grid = sim.grid
     state = sim.state
+    diagnostics = sim.diagnostics
     sim.skip_io || TC.open_files(sim.Stats) # #removeVarsHack
     while sim.TS.t <= sim.TS.t_max
         TC.update(sim.Turb, grid, state, sim.GMV, sim.Case, sim.TS)
@@ -358,7 +360,7 @@ function run(sim::Simulation1d)
 
         if mod(round(Int, sim.TS.t), round(Int, sim.Stats.frequency)) == 0 && (!sim.skip_io)
             # TODO: is this the best location to call diagnostics?
-            TC.compute_diagnostics!(sim.Turb, sim.GMV, grid, state, sim.Case, sim.TS)
+            compute_diagnostics!(sim.Turb, sim.GMV, grid, state, diagnostics, sim.Case, sim.TS)
 
             # TODO: remove `vars` hack that avoids
             # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
@@ -366,10 +368,8 @@ function run(sim::Simulation1d)
             # TurbulenceConvection.io(sim) # #removeVarsHack
             TC.write_simulation_time(sim.Stats, sim.TS.t) # #removeVarsHack
 
-            TC.io(sim.io_nt.aux, sim.Stats)
             TC.io(sim.io_nt.diagnostics, sim.Stats)
-            TC.io(sim.io_nt.prog, sim.Stats)
-            TC.io(sim.io_nt.tendencies, sim.Stats)
+            TC.io(sim.io_nt.aux, sim.Stats)
 
             TC.io(sim.GMV, grid, state, sim.Stats) # #removeVarsHack
             TC.io(sim.Case, grid, state, sim.Stats) # #removeVarsHack
@@ -389,8 +389,6 @@ function TurbulenceConvection.initialize_io(sim::Simulation1d)
 
     TC.initialize_io(sim.io_nt.aux, sim.Stats)
     TC.initialize_io(sim.io_nt.diagnostics, sim.Stats)
-    TC.initialize_io(sim.io_nt.prog, sim.Stats)
-    TC.initialize_io(sim.io_nt.tendencies, sim.Stats)
 
     # TODO: depricate
     TC.initialize_io(sim.GMV, sim.Stats)
@@ -407,8 +405,6 @@ function TurbulenceConvection.io(sim::Simulation1d)
 
     TC.io(sim.io_nt.aux, sim.Stats)
     TC.io(sim.io_nt.diagnostics, sim.Stats)
-    TC.io(sim.io_nt.prog, sim.Stats)
-    TC.io(sim.io_nt.tendencies, sim.Stats)
 
     # TODO: depricate
     TC.io(sim.GMV, sim.grid, sim.state, sim.Stats)
