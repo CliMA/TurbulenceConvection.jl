@@ -377,7 +377,7 @@ function run(sim::Simulation1d)
         KM = TC.center_aux_turbconv(state).KM
         KH = TC.center_aux_turbconv(state).KH
         epsFT = eps(Float64)
-        cfl_limit = 0.95
+        cfl_limit = 0.9
         K_max = max(maximum(KH), maximum(KM))
         w_up_max = 0
         @inbounds for i in 1:(n_updrafts)
@@ -386,9 +386,12 @@ function run(sim::Simulation1d)
         dt_max_w_up = cfl_limit * grid.Δz / (w_up_max + epsFT)
         dt_max_w_en = cfl_limit * grid.Δz / (maximum(abs.(aux_en_f.w)) + epsFT)
         dt_max_w_rain = cfl_limit * grid.Δz / (maximum(term_vel_rain) + epsFT)
-        dt_max_w_rain = cfl_limit * grid.Δz / (maximum(term_vel_snow) + epsFT)
-        dt_max_K = cfl_limit * (grid.Δz / 2)^2 / (K_max + epsFT)
-        dt = min(sim.TS.dt, dt_max_w_up, dt_max_w_en, dt_max_w_rain, dt_max_w_rain, dt_max_K)
+        dt_max_w_snow = cfl_limit * grid.Δz / (maximum(term_vel_snow) + epsFT)
+        dt_max_K = cfl_limit / 2 * (grid.Δz)^2 / (K_max + epsFT)
+        dt = max(sim.TS.dt_min ,min(sim.TS.dt, dt_max_w_up, dt_max_w_en, dt_max_w_rain, dt_max_w_snow, dt_max_K))
+        @show dt
+        # dt = min(sim.TS.dt, dt_max_w_up, dt_max_w_en, dt_max_w_rain, dt_max_w_rain, dt_max_K)
+        # @show dt, dt_max_w_up, dt_max_w_en, dt_max_w_rain, dt_max_w_rain, dt_max_K
         SciMLBase.set_proposed_dt!(integrator, dt)
     end
 

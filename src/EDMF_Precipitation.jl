@@ -68,11 +68,12 @@ function compute_precipitation_sink_tendencies(grid, state, gm, TS::TimeStepping
         q = TD.PhasePartition(ts)
 
         # TODO - move limiters elsewhere
-        rain_evap =
-            -min(
-                prog_pr.q_rai[k] / Δt,
-                -CM1.evaporation_sublimation(param_set, rain_type, q, prog_pr.q_rai[k], ρ0_c[k], T_gm),
-            )
+        # rain_evap =
+        #     -min(
+        #         prog_pr.q_rai[k] / Δt,
+        #         -CM1.evaporation_sublimation(param_set, rain_type, q, prog_pr.q_rai[k], ρ0_c[k], T_gm),
+        #     )
+        rain_evap = CM1.evaporation_sublimation(param_set, rain_type, q, prog_pr.q_rai[k], ρ0_c[k], T_gm)
 
         aux_tc.qr_tendency_evap[k] = rain_evap
         aux_tc.qs_tendency_melt[k] = 0.0

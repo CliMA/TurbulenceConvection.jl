@@ -258,6 +258,7 @@ function affect_filter!(u, edmf, grid, state, gm, Case, TS)
     end
     parent(state.prog) .= parent(u)
     prog_en = center_prog_environment(state)
+    prog_pr = center_prog_precipitation(state)
     up = edmf.UpdVar
     ###
     ### Filters
@@ -271,6 +272,8 @@ function affect_filter!(u, edmf, grid, state, gm, Case, TS)
         prog_en.ρaQTvar[k] = max(prog_en.ρaQTvar[k], 0.0)
         prog_en.ρaHQTcov[k] = max(prog_en.ρaHQTcov[k], -sqrt(prog_en.ρaHvar[k] * prog_en.ρaQTvar[k]))
         prog_en.ρaHQTcov[k] = min(prog_en.ρaHQTcov[k], sqrt(prog_en.ρaHvar[k] * prog_en.ρaQTvar[k]))
+        # prog_pr.q_rai[k] = min(prog_pr.q_rai[k], 0)
+        # prog_pr.q_sno[k] = min(prog_pr.q_sno[k], 0)
     end
     parent(u) .= parent(state.prog)
 end
