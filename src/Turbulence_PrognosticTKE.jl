@@ -466,9 +466,10 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE{N_up}, grid, state,
 
     UB = CCO.UpwindBiasedProductC2F(bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
     Ic = CCO.InterpolateF2C()
-    cartvec = CC.Geometry.Cartesian3Vector
+
+    wvec = CC.Geometry.WVector
     ∂ = CCO.DivergenceF2C()
-    w_bcs = (; bottom = CCO.SetValue(cartvec(FT(0))), top = CCO.SetValue(cartvec(FT(0))))
+    w_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
     LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
 
     # Solve for updraft area fraction
@@ -490,16 +491,16 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE{N_up}, grid, state,
         tends_ρaq_tot = tendencies_up[i].ρaq_tot
 
         @. tends_ρarea =
-            -∂(cartvec(LB(Ic(w_up) * ρ0_c * a_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn) -
+            -∂(wvec(LB(Ic(w_up) * ρ0_c * a_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn) -
             (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn)
 
         @. tends_ρaθ_liq_ice =
-            -∂(cartvec(LB(Ic(w_up) * ρ0_c * a_up * θ_liq_ice_up))) +
+            -∂(wvec(LB(Ic(w_up) * ρ0_c * a_up * θ_liq_ice_up))) +
             (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) -
             (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn * θ_liq_ice_up) + (ρ0_c * θ_liq_ice_tendency_precip_formation)
 
         @. tends_ρaq_tot =
-            -∂(cartvec(LB(Ic(w_up) * ρ0_c * a_up * q_tot_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * q_tot_en) -
+            -∂(wvec(LB(Ic(w_up) * ρ0_c * a_up * q_tot_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * q_tot_en) -
             (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn * q_tot_up) + (ρ0_c * qt_tendency_precip_formation)
 
         tends_ρarea[kc_surf] = 0
@@ -607,12 +608,12 @@ function compute_covariance_shear(
     aux_en_c = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_en = is_tke ? aux_en_f : aux_en_c
-    cartvec = CC.Geometry.Cartesian3Vector
+    wvec = CC.Geometry.WVector
     EnvVar1 = getproperty(aux_en, en_var1_sym)
     EnvVar2 = getproperty(aux_en, en_var2_sym)
     FT = eltype(grid)
 
-    bcs = (; bottom = CCO.Extrapolate(), top = CCO.SetGradient(cartvec(zero(FT))))
+    bcs = (; bottom = CCO.Extrapolate(), top = CCO.SetGradient(wvec(zero(FT))))
     If = CCO.InterpolateC2F(; bcs...)
     ∇c = CCO.DivergenceF2C()
     u = prog_gm.u
@@ -626,10 +627,9 @@ function compute_covariance_shear(
             ρ0_c *
             area_en *
             k_eddy *
-            (∇c(cartvec(EnvVar1)) * ∇c(cartvec(EnvVar2)) + (∇c(cartvec(If(u))))^2 + (∇c(cartvec(If(v))))^2)
+            (∇c(wvec(EnvVar1)) * ∇c(wvec(EnvVar2)) + (∇c(wvec(If(u))))^2 + (∇c(wvec(If(v))))^2)
     else
-        @. aux_covar.shear =
-            tke_factor * 2 * ρ0_c * area_en * k_eddy * ∇c(cartvec(If(EnvVar1))) * ∇c(cartvec(If(EnvVar2)))
+        @. aux_covar.shear = tke_factor * 2 * ρ0_c * area_en * k_eddy * ∇c(wvec(If(EnvVar1))) * ∇c(wvec(If(EnvVar2)))
     end
     return
 end
@@ -826,9 +826,9 @@ function compute_en_tendencies!(
     entr_gain = aux_covar.entr_gain
     rain_src = aux_covar.rain_src
 
-    cartvec = CC.Geometry.Cartesian3Vector(zero(FT))
+    wvec = CC.Geometry.WVector(zero(FT))
     aeK_bcs = (; bottom = CCO.SetValue(aeK[kc_surf]), top = CCO.SetValue(aeK[kc_toa]))
-    prog_bcs = (; bottom = CCO.SetGradient(cartvec), top = CCO.SetGradient(cartvec))
+    prog_bcs = (; bottom = CCO.SetGradient(wvec), top = CCO.SetGradient(wvec))
 
     If = CCO.InterpolateC2F(; aeK_bcs...)
     ∇f = CCO.GradientC2F(; prog_bcs...)
@@ -902,7 +902,7 @@ function GMV_third_m(
     var_en = getproperty(aux_en, var)
     area_en = aux_en_c.area
     Ic = is_tke ? CCO.InterpolateF2C() : x -> x
-    cartvec = CC.Geometry.Cartesian3Vector
+    wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
     w_en = aux_en_f.w
 
@@ -919,7 +919,7 @@ function GMV_third_m(
             horiz_K_eddy = aux_up_c[i].horiz_K_eddy
             a_up = aux_up_c[i].area
             a_bulk = aux_bulk.area
-            @. ϕ_en_cov += -horiz_K_eddy * ∇c(cartvec(w_en)) * a_up / a_bulk
+            @. ϕ_en_cov += -horiz_K_eddy * ∇c(wvec(w_en)) * a_up / a_bulk
         end
     else
         @. ϕ_en_cov = covar_en
