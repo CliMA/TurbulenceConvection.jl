@@ -31,9 +31,9 @@ function export_ref_profile(case_name::String)
 
     TC.compute_ref_state!(state, grid, param_set; ref_params...)
 
-    io_nt = TC.io_dictionary_ref_state(state)
+    io_nt = TC.io_dictionary_ref_state()
     TC.initialize_io(io_nt, Stats)
-    TC.io(io_nt, Stats)
+    TC.io(io_nt, Stats, state)
 
     NCDatasets.Dataset(joinpath(Stats.path_plus_file), "r") do ds
         zc = ds.group["profiles"]["zc"][:]

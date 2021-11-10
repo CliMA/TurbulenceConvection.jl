@@ -21,19 +21,19 @@ are not required to compute in order to run a simulation.
 =#
 
 #! format: off
-function io_dictionary_diagnostics(diagnostics)
+function io_dictionary_diagnostics()
     DT = NamedTuple{(:dims, :group, :field), Tuple{Tuple{String, String}, String, Any}}
     io_dict = Dict{String, DT}(
-        "nh_pressure" => (; dims = ("zf", "t"), group = "profiles", field = face_diagnostics_turbconv(diagnostics).nh_pressure),
-        "nh_pressure_adv" => (; dims = ("zf", "t"), group = "profiles", field = face_diagnostics_turbconv(diagnostics).nh_pressure_adv,),
-        "nh_pressure_drag" => (; dims = ("zf", "t"), group = "profiles", field = face_diagnostics_turbconv(diagnostics).nh_pressure_drag,),
-        "nh_pressure_b" => (; dims = ("zf", "t"), group = "profiles", field = face_diagnostics_turbconv(diagnostics).nh_pressure_b,),
-        "turbulent_entrainment" => (; dims = ("zc", "t"), group = "profiles", field = center_diagnostics_turbconv(diagnostics).frac_turb_entr,),
-        "horiz_K_eddy" => (; dims = ("zc", "t"), group = "profiles", field = center_diagnostics_turbconv(diagnostics).horiz_K_eddy,),
-        "entrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = center_diagnostics_turbconv(diagnostics).entr_sc),
-        "detrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = center_diagnostics_turbconv(diagnostics).detr_sc),
-        "asp_ratio" => (; dims = ("zc", "t"), group = "profiles", field = center_diagnostics_turbconv(diagnostics).asp_ratio),
-        "massflux" => (; dims = ("zc", "t"), group = "profiles", field = center_diagnostics_turbconv(diagnostics).massflux),
+        "nh_pressure" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_turbconv(state).nh_pressure),
+        "nh_pressure_adv" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_turbconv(state).nh_pressure_adv,),
+        "nh_pressure_drag" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_turbconv(state).nh_pressure_drag,),
+        "nh_pressure_b" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_turbconv(state).nh_pressure_b,),
+        "turbulent_entrainment" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).frac_turb_entr,),
+        "horiz_K_eddy" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).horiz_K_eddy,),
+        "entrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).entr_sc),
+        "detrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).detr_sc),
+        "asp_ratio" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).asp_ratio),
+        "massflux" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).massflux),
     )
     return io_dict
 end

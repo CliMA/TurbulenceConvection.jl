@@ -309,9 +309,9 @@ function Simulation1d(namelist)
     TC.compute_ref_state!(state, grid, param_set; ref_params...)
 
     io_nt = (;
-        ref_state = TC.io_dictionary_ref_state(state),
-        aux = TC.io_dictionary_aux(state),
-        diagnostics = io_dictionary_diagnostics(diagnostics),
+        ref_state = TC.io_dictionary_ref_state(),
+        aux = TC.io_dictionary_aux(),
+        diagnostics = io_dictionary_diagnostics(),
     )
 
     return Simulation1d(io_nt, grid, state, GMV, Case, Turb, diagnostics, TS, Stats, param_set, skip_io)
@@ -367,8 +367,8 @@ function run(sim::Simulation1d)
             # TurbulenceConvection.io(sim) # #removeVarsHack
             TC.write_simulation_time(sim.Stats, TS.t) # #removeVarsHack
 
-            TC.io(sim.io_nt.diagnostics, sim.Stats)
-            TC.io(sim.io_nt.aux, sim.Stats)
+            TC.io(sim.io_nt.diagnostics, sim.Stats, diagnostics)
+            TC.io(sim.io_nt.aux, sim.Stats, state)
 
             TC.io(sim.GMV, grid, state, sim.Stats) # #removeVarsHack
             TC.io(sim.Case, grid, state, sim.Stats) # #removeVarsHack
@@ -384,7 +384,7 @@ function TurbulenceConvection.initialize_io(sim::Simulation1d)
     sim.skip_io && return nothing
     TC = TurbulenceConvection
     TC.initialize_io(sim.io_nt.ref_state, sim.Stats)
-    TC.io(sim.io_nt.ref_state, sim.Stats) # since the reference prog is static
+    TC.io(sim.io_nt.ref_state, sim.Stats, sim.state) # since the reference prog is static
 
     TC.initialize_io(sim.io_nt.aux, sim.Stats)
     TC.initialize_io(sim.io_nt.diagnostics, sim.Stats)
@@ -402,8 +402,8 @@ function TurbulenceConvection.io(sim::Simulation1d)
     TC.open_files(sim.Stats)
     TC.write_simulation_time(sim.Stats, sim.TS.t)
 
-    TC.io(sim.io_nt.aux, sim.Stats)
-    TC.io(sim.io_nt.diagnostics, sim.Stats)
+    TC.io(sim.io_nt.aux, sim.Stats, sim.state)
+    TC.io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
 
     # TODO: depricate
     TC.io(sim.GMV, sim.grid, sim.state, sim.Stats)
