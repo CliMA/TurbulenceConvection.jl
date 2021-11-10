@@ -1,12 +1,12 @@
 """
 Computes the rain and snow advection (down) tendency
 """
-function compute_precipitation_advection_tendencies(grid, state, gm, TS::TimeStepping)
+function compute_precipitation_advection_tendencies(edmf, grid, state, gm, TS::TimeStepping)
     param_set = parameter_set(gm)
     FT = eltype(grid)
     Δz = grid.Δz
     Δt = TS.dt
-    CFL_limit = 0.5
+    CFL_limit = TS.cfl_limit
 
     ρ0_c = center_ref_state(state).ρ0
     tendencies_pr = center_tendencies_precipitation(state)
@@ -32,6 +32,8 @@ function compute_precipitation_advection_tendencies(grid, state, gm, TS::TimeSte
             CFL_in_rain = 0.0
             CFL_in_snow = 0.0
         else
+            vel_max = max(term_vel_rain[k + 1], term_vel_snow[k + 1])
+            edmf.dt_max = min(edmf.dt_max, CFL_limit * Δz / (vel_max + eps(Float32)))
             CFL_in_rain = Δt / Δz * term_vel_rain[k + 1]
             CFL_in_snow = Δt / Δz * term_vel_snow[k + 1]
         end

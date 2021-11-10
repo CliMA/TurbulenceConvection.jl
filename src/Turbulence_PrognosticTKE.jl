@@ -287,6 +287,7 @@ function step!(tendencies, prog, params, t)
     UnPack.@unpack edmf, grid, gm, case, aux, TS = params
 
     TS.t = t
+    edmf.dt_max = TS.dt_max
     state = State(prog, aux, tendencies)
 
     affect_filter!(edmf, grid, state, gm, case, TS)
@@ -312,7 +313,7 @@ function step!(tendencies, prog, params, t)
     microphysics(en_thermo, grid, state, en, edmf.Precip, TS.dt, param_set) # saturation adjustment + rain creation
     if edmf.Precip.precipitation_model == "clima_1m"
         compute_precipitation_sink_tendencies(grid, state, gm, TS)
-        compute_precipitation_advection_tendencies(grid, state, gm, TS)
+        compute_precipitation_advection_tendencies(edmf, grid, state, gm, TS)
     end
 
     # compute tendencies

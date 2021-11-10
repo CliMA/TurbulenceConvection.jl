@@ -9,6 +9,7 @@ import TurbulenceConvection
 
 import ClimaCore
 const CC = ClimaCore
+import SciMLBase
 
 import OrdinaryDiffEq
 const ODE = OrdinaryDiffEq
@@ -33,6 +34,9 @@ struct Simulation1d
     Stats
     param_set
     skip_io::Bool
+    adapt_dt::Bool
+    cfl_limit::Float64
+    dt_min::Float64
 end
 
 # TODO: not quite sure, yet, where this all should live.
@@ -281,6 +285,10 @@ function Simulation1d(namelist)
 
     FT = Float64
     skip_io = namelist["stats_io"]["skip"]
+    adapt_dt = namelist["time_stepping"]["adapt_dt"]
+    cfl_limit = namelist["time_stepping"]["cfl_limit"]
+    dt_min = namelist["time_stepping"]["dt_min"]
+
     grid = TC.Grid(FT(namelist["grid"]["dz"]), namelist["grid"]["nz"])
     Stats = skip_io ? nothing : TC.NetCDFIO_Stats(namelist, grid)
     case = Cases.get_case(namelist)
@@ -322,7 +330,22 @@ function Simulation1d(namelist)
         diagnostics = io_dictionary_diagnostics(),
     )
 
-    return Simulation1d(io_nt, grid, state, GMV, Case, Turb, diagnostics, TS, Stats, param_set, skip_io)
+    return Simulation1d(
+        io_nt,
+        grid,
+        state,
+        GMV,
+        Case,
+        Turb,
+        diagnostics,
+        TS,
+        Stats,
+        param_set,
+        skip_io,
+        adapt_dt,
+        cfl_limit,
+        dt_min,
+    )
 end
 
 function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
@@ -402,6 +425,14 @@ function affect_filter!(integrator)
     ODE.u_modified!(integrator, false)
 end
 
+function adaptive_dt!(integrator)
+    UnPack.@unpack edmf, TS, dt_min = integrator.p
+    TS.dt = min(TS.dt_max, max(edmf.dt_max, dt_min))
+    SciMLBase.set_proposed_dt!(integrator, TS.dt)
+    ODE.u_modified!(integrator, false)
+end
+
+
 function run(sim::Simulation1d)
     TC = TurbulenceConvection
     iter = 0
@@ -425,13 +456,26 @@ function run(sim::Simulation1d)
         TS = sim.TS,
         Stats = sim.Stats,
         skip_io = sim.skip_io,
+        adapt_dt = sim.adapt_dt,
+        cfl_limit = sim.cfl_limit,
+        dt_min = sim.dt_min,
     )
 
-    condition_io(u, t, integrator) = mod(round(Int, t), round(Int, sim.Stats.frequency)) == 0
+    function condition_io(u, t, integrator)
+        TS.dt_io += TS.dt
+        io_flag = false
+        if TS.dt_io > sim.Stats.frequency
+            TS.dt_io = 0
+            io_flag = true
+        end
+        return io_flag
+    end
     condition_every_iter(u, t, integrator) = true
 
     callback_io = ODE.DiscreteCallback(condition_io, affect_io!; save_positions = (false, false))
     callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
+    callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))
+    callback_adapt_dt = sim.adapt_dt ? (callback_adapt_dt,) : ()
 
     prob = ODE.ODEProblem(TC.step!, state.prog, t_span, params; dt = sim.TS.dt)
 
@@ -447,7 +491,7 @@ function run(sim::Simulation1d)
         progress_steps = 100,
         save_start = false,
         saveat = last(t_span),
-        callback = ODE.CallbackSet(callback_filters, callback_io),
+        callback = ODE.CallbackSet(callback_adapt_dt..., callback_filters, callback_io),
         progress = true,
         unstable_check_kwarg(sim.Case.case)...,
         progress_message = (dt, u, p, t) -> t,
