@@ -944,7 +944,7 @@ function GMV_third_m(
 
     if is_tke
         parent(ϕ_en_cov) .= 0
-        for i in 1:N_up
+        @inbounds for i in 1:N_up
             horiz_K_eddy = aux_up_c[i].horiz_K_eddy
             a_up = aux_up_c[i].area
             a_bulk = aux_bulk.area
