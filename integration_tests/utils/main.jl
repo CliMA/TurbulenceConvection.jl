@@ -21,12 +21,6 @@ include("parameter_set.jl")
 include("Cases.jl")
 import .Cases
 
-struct State{P, A, T}
-    prog::P
-    aux::A
-    tendencies::T
-end
-
 struct Simulation1d
     io_nt::NamedTuple
     grid
@@ -310,7 +304,7 @@ function Simulation1d(namelist)
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
     diagnostics = CC.Fields.FieldVector(cent = diagnostic_cent_fields, face = diagnostic_face_fields)
 
-    state = State(prog, aux, tendencies)
+    state = TC.State(prog, aux, tendencies)
 
     TC.compute_ref_state!(state, grid, param_set; ref_params...)
 
@@ -347,14 +341,19 @@ function run(sim::Simulation1d)
     iter = 0
     grid = sim.grid
     state = sim.state
+    tendencies = state.tendencies
+    prog = state.prog
+    aux = state.aux
+    TS = sim.TS
     diagnostics = sim.diagnostics
     sim.skip_io || TC.open_files(sim.Stats) # #removeVarsHack
-    while sim.TS.t <= sim.TS.t_max
-        TC.update(sim.Turb, grid, state, sim.GMV, sim.Case, sim.TS)
-        TC.update(sim.TS)
+    params = (; edmf = sim.Turb, grid = grid, gm = sim.GMV, case = sim.Case, TS = TS, aux = aux)
+    while TS.t <= TS.t_max
+        TC.step!(tendencies, prog, params, TS.t)
+        TC.update(TS)
 
         if mod(iter, 100) == 0
-            progress = sim.TS.t / sim.TS.t_max
+            progress = TS.t / TS.t_max
             @show progress
         end
 
@@ -366,14 +365,14 @@ function run(sim::Simulation1d)
             # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
             # opening/closing files every step should be okay. #removeVarsHack
             # TurbulenceConvection.io(sim) # #removeVarsHack
-            TC.write_simulation_time(sim.Stats, sim.TS.t) # #removeVarsHack
+            TC.write_simulation_time(sim.Stats, TS.t) # #removeVarsHack
 
             TC.io(sim.io_nt.diagnostics, sim.Stats)
             TC.io(sim.io_nt.aux, sim.Stats)
 
             TC.io(sim.GMV, grid, state, sim.Stats) # #removeVarsHack
             TC.io(sim.Case, grid, state, sim.Stats) # #removeVarsHack
-            TC.io(sim.Turb, grid, state, sim.Stats, sim.TS, sim.param_set) # #removeVarsHack
+            TC.io(sim.Turb, grid, state, sim.Stats, TS, sim.param_set) # #removeVarsHack
         end
         iter += 1
     end

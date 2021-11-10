@@ -565,3 +565,9 @@ mutable struct EDMF_PrognosticTKE{N_up, A1}
     end
 end
 parameter_set(obj) = obj.param_set
+
+struct State{P, A, T}
+    prog::P
+    aux::A
+    tendencies::T
+end
