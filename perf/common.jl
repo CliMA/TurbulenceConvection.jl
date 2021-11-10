@@ -10,14 +10,13 @@ import .NameList
 TurbulenceConvection.initialize_io(sim::Simulation1d) = nothing
 TurbulenceConvection.io(sim::Simulation1d) = nothing
 
-update_n(sim, N::Int) = update_n(sim, Val(N))
+update_n(sim, tendencies, N::Int) = update_n(sim, tendencies, Val(N))
 
-function update_n(sim, ::Val{N}) where {N}
+function update_n(sim, tendencies, ::Val{N}) where {N}
     grid = sim.grid
     TS = sim.TS
     prog = sim.state.prog
     aux = sim.state.aux
-    tendencies = sim.state.tendencies
     params = (; edmf = sim.Turb, grid = grid, gm = sim.GMV, case = sim.Case, TS = TS, aux = aux)
     for i in 1:N
         TC.step!(tendencies, prog, params, TS.t)
@@ -27,7 +26,7 @@ end
 
 function init_sim(case_name)
     @info "Initializing $case_name for single timestep, with no IO."
-    @info "call update_n(sim, n) to run update n-times"
+    @info "call update_n(sim, tendencies, n) to run update n-times"
     namelist = NameList.default_namelist(case_name)
     namelist["time_stepping"]["t_max"] = namelist["time_stepping"]["dt"]
     namelist["stats_io"]["frequency"] = 10.0e10

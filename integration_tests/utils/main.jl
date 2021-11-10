@@ -300,11 +300,11 @@ function Simulation1d(namelist)
     diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, n_updrafts))
 
     prog = CC.Fields.FieldVector(cent = cent_prog_fields(), face = face_prog_fields())
-    tendencies = CC.Fields.FieldVector(cent = cent_prog_fields(), face = face_prog_fields())
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
     diagnostics = CC.Fields.FieldVector(cent = diagnostic_cent_fields, face = diagnostic_face_fields)
 
-    state = TC.State(prog, aux, tendencies)
+    # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
+    state = TC.State(prog, aux, nothing)
 
     TC.compute_ref_state!(state, grid, param_set; ref_params...)
 
@@ -329,62 +329,9 @@ function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
 
     initialize_edmf(sim.Turb, sim.grid, state, sim.Case, sim.GMV, sim.TS)
 
-    if !sim.skip_io
-        TC.initialize_io(sim)
-        TC.io(sim)
-    end
-    return
-end
-
-function run(sim::Simulation1d)
-    TC = TurbulenceConvection
-    iter = 0
-    grid = sim.grid
-    state = sim.state
-    tendencies = state.tendencies
-    prog = state.prog
-    aux = state.aux
-    TS = sim.TS
-    diagnostics = sim.diagnostics
-    sim.skip_io || TC.open_files(sim.Stats) # #removeVarsHack
-    params = (; edmf = sim.Turb, grid = grid, gm = sim.GMV, case = sim.Case, TS = TS, aux = aux)
-    while TS.t <= TS.t_max
-        TC.step!(tendencies, prog, params, TS.t)
-        TC.update(TS)
-
-        if mod(iter, 100) == 0
-            progress = TS.t / TS.t_max
-            @show progress
-        end
-
-        if mod(round(Int, sim.TS.t), round(Int, sim.Stats.frequency)) == 0 && (!sim.skip_io)
-            # TODO: is this the best location to call diagnostics?
-            compute_diagnostics!(sim.Turb, sim.GMV, grid, state, diagnostics, sim.Case, sim.TS)
-
-            # TODO: remove `vars` hack that avoids
-            # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-            # opening/closing files every step should be okay. #removeVarsHack
-            # TurbulenceConvection.io(sim) # #removeVarsHack
-            TC.write_simulation_time(sim.Stats, TS.t) # #removeVarsHack
-
-            TC.io(sim.io_nt.diagnostics, sim.Stats, diagnostics)
-            TC.io(sim.io_nt.aux, sim.Stats, state)
-
-            TC.io(sim.GMV, grid, state, sim.Stats) # #removeVarsHack
-            TC.io(sim.Case, grid, state, sim.Stats) # #removeVarsHack
-            TC.io(sim.Turb, grid, state, sim.Stats, TS, sim.param_set) # #removeVarsHack
-        end
-        iter += 1
-    end
-    sim.skip_io || TC.close_files(sim.Stats) # #removeVarsHack
-    return
-end
-
-function TurbulenceConvection.initialize_io(sim::Simulation1d)
     sim.skip_io && return nothing
-    TC = TurbulenceConvection
     TC.initialize_io(sim.io_nt.ref_state, sim.Stats)
-    TC.io(sim.io_nt.ref_state, sim.Stats, sim.state) # since the reference prog is static
+    TC.io(sim.io_nt.ref_state, sim.Stats, state) # since the reference prog is static
 
     TC.initialize_io(sim.io_nt.aux, sim.Stats)
     TC.initialize_io(sim.io_nt.diagnostics, sim.Stats)
@@ -393,23 +340,104 @@ function TurbulenceConvection.initialize_io(sim::Simulation1d)
     TC.initialize_io(sim.GMV, sim.Stats)
     TC.initialize_io(sim.Case, sim.Stats)
     TC.initialize_io(sim.Turb, sim.Stats)
-    return
-end
 
-function TurbulenceConvection.io(sim::Simulation1d)
-    sim.skip_io && return nothing
-    TC = TurbulenceConvection
     TC.open_files(sim.Stats)
     TC.write_simulation_time(sim.Stats, sim.TS.t)
 
-    TC.io(sim.io_nt.aux, sim.Stats, sim.state)
+    TC.io(sim.io_nt.aux, sim.Stats, state)
     TC.io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
 
     # TODO: depricate
-    TC.io(sim.GMV, sim.grid, sim.state, sim.Stats)
-    TC.io(sim.Case, sim.grid, sim.state, sim.Stats)
-    TC.io(sim.Turb, sim.grid, sim.state, sim.Stats, sim.TS, sim.param_set)
+    TC.io(sim.GMV, sim.grid, state, sim.Stats)
+    TC.io(sim.Case, sim.grid, state, sim.Stats)
+    TC.io(sim.Turb, sim.grid, state, sim.Stats, sim.TS, sim.param_set)
     TC.close_files(sim.Stats)
+
+    return
+end
+
+function affect_io!(integrator)
+    UnPack.@unpack edmf, aux, grid, io_nt, diagnostics, case, gm, TS, Stats, skip_io = integrator.p
+    skip_io && return nothing
+
+    state = TC.State(integrator.u, aux, integrator.du)
+
+    param_set = TC.parameter_set(gm)
+    # TODO: is this the best location to call diagnostics?
+    compute_diagnostics!(edmf, gm, grid, state, diagnostics, case, TS)
+
+    # TODO: remove `vars` hack that avoids
+    # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
+    # opening/closing files every step should be okay. #removeVarsHack
+    # TurbulenceConvection.io(sim) # #removeVarsHack
+    TC.write_simulation_time(Stats, TS.t) # #removeVarsHack
+
+    TC.io(io_nt.aux, Stats, state)
+    TC.io(io_nt.diagnostics, Stats, diagnostics)
+
+    TC.io(gm, grid, state, Stats) # #removeVarsHack
+    TC.io(case, grid, state, Stats) # #removeVarsHack
+    TC.io(edmf, grid, state, Stats, TS, param_set) # #removeVarsHack
+
+    ODE.u_modified!(integrator, false) # We're legitamately not mutating `u` (the state vector)
+end
+
+function affect_filter!(integrator)
+    UnPack.@unpack edmf, grid, gm, aux, case, TS = integrator.p
+    state = TC.State(integrator.u, aux, integrator.du)
+    TC.affect_filter!(edmf, grid, state, gm, case, TS)
+
+    # We're lying to OrdinaryDiffEq.jl, in order to avoid
+    # paying for an additional `step!` call, which is required
+    # to support supplying a continuous representation of the
+    # solution.
+    ODE.u_modified!(integrator, false)
+end
+
+function run(sim::Simulation1d)
+    TC = TurbulenceConvection
+    iter = 0
+    grid = sim.grid
+    state = sim.state
+    prog = state.prog
+    aux = state.aux
+    TS = sim.TS
+    diagnostics = sim.diagnostics
+    sim.skip_io || TC.open_files(sim.Stats) # #removeVarsHack
+
+    t_span = (0.0, sim.TS.t_max)
+    params = (;
+        edmf = sim.Turb,
+        grid = grid,
+        gm = sim.GMV,
+        aux = aux,
+        io_nt = sim.io_nt,
+        case = sim.Case,
+        diagnostics = diagnostics,
+        TS = sim.TS,
+        Stats = sim.Stats,
+        skip_io = sim.skip_io,
+    )
+
+    condition_io(u, t, integrator) = mod(round(Int, t), round(Int, sim.Stats.frequency)) == 0
+    condition_every_iter(u, t, integrator) = true
+
+    callback_io = ODE.DiscreteCallback(condition_io, affect_io!; save_positions = (false, false))
+    callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
+
+    prob = ODE.ODEProblem(TC.step!, state.prog, t_span, params; dt = sim.TS.dt)
+    sol = ODE.solve(
+        prob,
+        ODE.Euler();
+        progress_steps = 100,
+        save_start = false,
+        saveat = last(t_span),
+        callback = ODE.CallbackSet(callback_filters, callback_io),
+        progress = true,
+        progress_message = (dt, u, p, t) -> t,
+    )
+
+    sim.skip_io || TC.close_files(sim.Stats) # #removeVarsHack
     return
 end
 
