@@ -252,7 +252,10 @@ function compute_diffusive_fluxes(
 end
 
 # Perform the update of the scheme
-function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Case::CasesBase, TS::TimeStepping)
+function step!(tendencies, prog, params, t)
+    UnPack.@unpack edmf, grid, gm, case, aux, TS = params
+
+    state = State(prog, aux, tendencies)
 
     gm = gm
     up = edmf.UpdVar
@@ -267,8 +270,8 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
 
-    compute_updraft_surface_bc(edmf, grid, state, Case)
-    update_aux!(edmf, gm, grid, state, Case, param_set, TS)
+    compute_updraft_surface_bc(edmf, grid, state, case)
+    update_aux!(edmf, gm, grid, state, case, param_set, TS)
 
     parent(state.tendencies) .= 0
     tendencies_gm = center_tendencies_grid_mean(state)
@@ -284,7 +287,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     end
 
     # compute tendencies
-    compute_gm_tendencies!(edmf, grid, state, Case, gm, TS)
+    compute_gm_tendencies!(edmf, grid, state, case, gm, TS)
     compute_updraft_tendencies(edmf, grid, state, gm)
 
     compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:tke), Val(:ρatke))
@@ -331,7 +334,7 @@ function update(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables, Ca
     ###
     ### Filters
     ###
-    set_edmf_surface_bc(edmf, grid, state, up, Case.Sur)
+    set_edmf_surface_bc(edmf, grid, state, up, case.Sur)
     filter_updraft_vars(edmf, grid, state, gm)
     @inbounds for k in real_center_indices(grid)
         prog_en.ρatke[k] = max(prog_en.ρatke[k], 0.0)

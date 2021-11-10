@@ -13,8 +13,14 @@ TurbulenceConvection.io(sim::Simulation1d) = nothing
 update_n(sim, N::Int) = update_n(sim, Val(N))
 
 function update_n(sim, ::Val{N}) where {N}
+    grid = sim.grid
+    TS = sim.TS
+    prog = sim.state.prog
+    aux = sim.state.aux
+    tendencies = sim.state.tendencies
+    params = (; edmf = sim.Turb, grid = grid, gm = sim.GMV, case = sim.Case, TS = TS, aux = aux)
     for i in 1:N
-        TC.update(sim.Turb, sim.grid, sim.state, sim.GMV, sim.Case, sim.TS)
+        TC.step!(tendencies, prog, params, TS.t)
     end
     return nothing
 end
