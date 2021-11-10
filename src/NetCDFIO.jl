@@ -133,7 +133,7 @@ function add_field(self::NetCDFIO_Stats, var_name::String; dims, group)
 end
 
 #####
-##### Time-serios data
+##### Time-series data
 #####
 
 function add_ts(self::NetCDFIO_Stats, var_name::String)
