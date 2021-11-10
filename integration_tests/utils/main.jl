@@ -9,6 +9,7 @@ import TurbulenceConvection
 
 import ClimaCore
 const CC = ClimaCore
+import SciMLBase
 
 import OrdinaryDiffEq
 const ODE = OrdinaryDiffEq
@@ -33,6 +34,9 @@ struct Simulation1d
     Stats
     param_set
     skip_io::Bool
+    adapt_dt::Bool
+    cfl_limit::Float64
+    dt_min::Float64
 end
 
 # TODO: not quite sure, yet, where this all should live.
@@ -273,6 +277,9 @@ function Simulation1d(namelist)
 
     FT = Float64
     skip_io = namelist["stats_io"]["skip"]
+    adapt_dt = namelist["time_stepping"]["adapt_dt"]
+    cfl_limit = namelist["time_stepping"]["cfl_limit"]
+    dt_min = namelist["time_stepping"]["dt_min"]
     grid = TC.Grid(FT(namelist["grid"]["dz"]), namelist["grid"]["nz"])
     Stats = skip_io ? nothing : TC.NetCDFIO_Stats(namelist, grid)
     case = Cases.get_case(namelist)
@@ -314,7 +321,22 @@ function Simulation1d(namelist)
         diagnostics = io_dictionary_diagnostics(),
     )
 
-    return Simulation1d(io_nt, grid, state, GMV, Case, Turb, diagnostics, TS, Stats, param_set, skip_io)
+    return Simulation1d(
+        io_nt,
+        grid,
+        state,
+        GMV,
+        Case,
+        Turb,
+        diagnostics,
+        TS,
+        Stats,
+        param_set,
+        skip_io,
+        adapt_dt,
+        cfl_limit,
+        dt_min,
+    )
 end
 
 function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
@@ -394,6 +416,40 @@ function affect_filter!(integrator)
     ODE.u_modified!(integrator, false)
 end
 
+function adaptive_dt!(integrator)
+    UnPack.@unpack edmf, grid, aux, TS, adapt_dt, cfl_limit, dt_min = integrator.p
+    state = TC.State(integrator.u, aux, integrator.du)
+    parent(state.prog) .= integrator.u
+    if adapt_dt
+        aux_up_f = TC.face_aux_updrafts(state)
+        aux_en_f = TC.face_aux_environment(state)
+        n_updrafts = edmf.UpdVar.n_updrafts
+        aux_tc = TC.center_aux_turbconv(state)
+        term_vel_rain = aux_tc.term_vel_rain
+        term_vel_snow = aux_tc.term_vel_snow
+        KM = TC.center_aux_turbconv(state).KM
+        KH = TC.center_aux_turbconv(state).KH
+        ϵ_FT = eps(Float64)
+        K_max = max(maximum(KH), maximum(KM))
+        w_up_max = 0
+        @inbounds for i in 1:(n_updrafts)
+            w_up_max = max(w_up_max, maximum(abs.(aux_up_f[i].w)))
+        end
+        dt_max_w_up = cfl_limit * grid.Δz / (w_up_max + ϵ_FT)
+        dt_max_w_en = cfl_limit * grid.Δz / (maximum(abs.(aux_en_f.w)) + ϵ_FT)
+        dt_max_w_rain = cfl_limit * grid.Δz / (maximum(term_vel_rain) + ϵ_FT)
+        dt_max_w_snow = cfl_limit * grid.Δz / (maximum(term_vel_snow) + ϵ_FT)
+        dt_max_K = cfl_limit / 2 * (grid.Δz)^2 / (K_max + ϵ_FT)
+        dt = max(dt_min, min(dt_max_w_up, dt_max_w_en, dt_max_w_rain, dt_max_w_snow, dt_max_K))
+    else
+        dt = dt_min
+    end
+    TS.dt = dt
+    SciMLBase.set_proposed_dt!(integrator, dt)
+    ODE.u_modified!(integrator, false)
+end
+
+
 function run(sim::Simulation1d)
     TC = TurbulenceConvection
     iter = 0
@@ -417,13 +473,18 @@ function run(sim::Simulation1d)
         TS = sim.TS,
         Stats = sim.Stats,
         skip_io = sim.skip_io,
+        adapt_dt = sim.adapt_dt,
+        cfl_limit = sim.cfl_limit,
+        dt_min = sim.dt_min,
     )
 
     condition_io(u, t, integrator) = mod(round(Int, t), round(Int, sim.Stats.frequency)) == 0
     condition_every_iter(u, t, integrator) = true
+    condition_adaptive_dt(u, t, integrator) = mod(integrator.iter-1, 2) == 0
 
     callback_io = ODE.DiscreteCallback(condition_io, affect_io!; save_positions = (false, false))
     callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
+    callback_adapt_dt = ODE.DiscreteCallback(condition_adaptive_dt, adaptive_dt!; save_positions = (false, false))
 
     prob = ODE.ODEProblem(TC.step!, state.prog, t_span, params; dt = sim.TS.dt)
     sol = ODE.solve(
@@ -432,7 +493,7 @@ function run(sim::Simulation1d)
         progress_steps = 100,
         save_start = false,
         saveat = last(t_span),
-        callback = ODE.CallbackSet(callback_filters, callback_io),
+        callback = ODE.CallbackSet(callback_adapt_dt, callback_filters, callback_io),
         progress = true,
         progress_message = (dt, u, p, t) -> t,
     )
