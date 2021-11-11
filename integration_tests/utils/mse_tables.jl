@@ -36,14 +36,14 @@ all_best_mse["Bomex"]["Hvar_mean"] = 3788.9644749083805
 all_best_mse["Bomex"]["QTvar_mean"] = 1420.5895981298102
 #
 all_best_mse["DryBubble"] = OrderedCollections.OrderedDict()
-all_best_mse["DryBubble"]["updraft_area"] = 8.236447050322791e-22
-all_best_mse["DryBubble"]["updraft_w"] = 3.593517723253957e-22
-all_best_mse["DryBubble"]["updraft_thetal"] = 9.087068404284349e-29
+all_best_mse["DryBubble"]["updraft_area"] = 0.0
+all_best_mse["DryBubble"]["updraft_w"] = 0.0
+all_best_mse["DryBubble"]["updraft_thetal"] = 0.0
 all_best_mse["DryBubble"]["u_mean"] = 0.0
-all_best_mse["DryBubble"]["tke_mean"] = 1.1826684756691888e-20
-all_best_mse["DryBubble"]["temperature_mean"] = 9.345353294764223e-29
-all_best_mse["DryBubble"]["thetal_mean"] = 6.845482742255127e-29
-all_best_mse["DryBubble"]["Hvar_mean"] = 2.7162311926888273e-21
+all_best_mse["DryBubble"]["tke_mean"] = 0.0
+all_best_mse["DryBubble"]["temperature_mean"] = 0.0
+all_best_mse["DryBubble"]["thetal_mean"] = 0.0
+all_best_mse["DryBubble"]["Hvar_mean"] = 0.0
 #
 all_best_mse["DYCOMS_RF01"] = OrderedCollections.OrderedDict()
 all_best_mse["DYCOMS_RF01"]["qt_mean"] = 0.022666124107562857
@@ -61,30 +61,30 @@ all_best_mse["DYCOMS_RF01"]["Hvar_mean"] = 1243.0763870118528
 all_best_mse["DYCOMS_RF01"]["QTvar_mean"] = 483.91315327538
 #
 all_best_mse["GABLS"] = OrderedCollections.OrderedDict()
-all_best_mse["GABLS"]["updraft_thetal"] = 4.5904248400012984e-32
-all_best_mse["GABLS"]["v_mean"] = 2.6359268452688586e-27
-all_best_mse["GABLS"]["u_mean"] = 1.198547053975742e-28
-all_best_mse["GABLS"]["tke_mean"] = 9.181579050875484e-28
-all_best_mse["GABLS"]["temperature_mean"] = 2.3209177991607466e-31
-all_best_mse["GABLS"]["thetal_mean"] = 4.573449792507506e-32
-all_best_mse["GABLS"]["Hvar_mean"] = 3.59502554706638e-26
-all_best_mse["GABLS"]["QTvar_mean"] = 1.622529661562782e-27
-all_best_mse["GABLS"]["qt_mean"] = 9.473731139465189e-28
+all_best_mse["GABLS"]["updraft_thetal"] = 0.0
+all_best_mse["GABLS"]["v_mean"] = 0.0
+all_best_mse["GABLS"]["u_mean"] = 0.0
+all_best_mse["GABLS"]["tke_mean"] = 0.0
+all_best_mse["GABLS"]["temperature_mean"] = 0.0
+all_best_mse["GABLS"]["thetal_mean"] = 0.0
+all_best_mse["GABLS"]["Hvar_mean"] = 0.0
+all_best_mse["GABLS"]["QTvar_mean"] = 0.0
+all_best_mse["GABLS"]["qt_mean"] = 0.0
 #
 all_best_mse["life_cycle_Tan2018"] = OrderedCollections.OrderedDict()
-all_best_mse["life_cycle_Tan2018"]["qt_mean"] = 7.693603518876596e-10
-all_best_mse["life_cycle_Tan2018"]["ql_mean"] = 3.3337750033929823e-7
-all_best_mse["life_cycle_Tan2018"]["updraft_area"] = 1.3980841793578199e-6
-all_best_mse["life_cycle_Tan2018"]["updraft_w"] = 1.1927407353690453e-7
-all_best_mse["life_cycle_Tan2018"]["updraft_qt"] = 7.730459337153677e-11
-all_best_mse["life_cycle_Tan2018"]["updraft_thetal"] = 9.024170617183867e-14
-all_best_mse["life_cycle_Tan2018"]["v_mean"] = 8.072849530742268e-7
-all_best_mse["life_cycle_Tan2018"]["u_mean"] = 9.343224357927847e-9
-all_best_mse["life_cycle_Tan2018"]["tke_mean"] = 8.380547651373768e-7
-all_best_mse["life_cycle_Tan2018"]["temperature_mean"] = 1.9916439700968854e-13
-all_best_mse["life_cycle_Tan2018"]["thetal_mean"] = 1.9408988680052915e-13
-all_best_mse["life_cycle_Tan2018"]["Hvar_mean"] = 1.3207292615820555e-8
-all_best_mse["life_cycle_Tan2018"]["QTvar_mean"] = 7.939340710544937e-7
+all_best_mse["life_cycle_Tan2018"]["qt_mean"] = 0.0
+all_best_mse["life_cycle_Tan2018"]["ql_mean"] = 0.0
+all_best_mse["life_cycle_Tan2018"]["updraft_area"] = 0.0
+all_best_mse["life_cycle_Tan2018"]["updraft_w"] = 0.0
+all_best_mse["life_cycle_Tan2018"]["updraft_qt"] = 0.0
+all_best_mse["life_cycle_Tan2018"]["updraft_thetal"] = 0.0
+all_best_mse["life_cycle_Tan2018"]["v_mean"] = 0.0
+all_best_mse["life_cycle_Tan2018"]["u_mean"] = 0.0
+all_best_mse["life_cycle_Tan2018"]["tke_mean"] = 0.0
+all_best_mse["life_cycle_Tan2018"]["temperature_mean"] = 0.0
+all_best_mse["life_cycle_Tan2018"]["thetal_mean"] = 0.0
+all_best_mse["life_cycle_Tan2018"]["Hvar_mean"] = 0.0
+all_best_mse["life_cycle_Tan2018"]["QTvar_mean"] = 0.0
 #
 all_best_mse["Nieuwstadt"] = OrderedCollections.OrderedDict()
 all_best_mse["Nieuwstadt"]["updraft_area"] = 98.77517014009693
@@ -142,12 +142,12 @@ all_best_mse["TRMM_LBA"]["Hvar_mean"] = 4347.874034179393
 all_best_mse["TRMM_LBA"]["QTvar_mean"] = 2834.63299032306
 #
 all_best_mse["LES_driven_SCM"] = OrderedCollections.OrderedDict()
-all_best_mse["LES_driven_SCM"]["qt_mean"] = 8.423137871562874
-all_best_mse["LES_driven_SCM"]["v_mean"] = 3.1888943663572533
-all_best_mse["LES_driven_SCM"]["u_mean"] = 1.1316645661283322
-all_best_mse["LES_driven_SCM"]["temperature_mean"] = 0.0033574985253948296
-all_best_mse["LES_driven_SCM"]["ql_mean"] = 224.02597360929545
-all_best_mse["LES_driven_SCM"]["thetal_mean"] = 0.003651487528694113
+all_best_mse["LES_driven_SCM"]["qt_mean"] = 8.398966774944043
+all_best_mse["LES_driven_SCM"]["v_mean"] = 3.2126761915549915
+all_best_mse["LES_driven_SCM"]["u_mean"] = 1.1346893323826517
+all_best_mse["LES_driven_SCM"]["temperature_mean"] = 0.003350514968624466
+all_best_mse["LES_driven_SCM"]["ql_mean"] = 258.08240248588
+all_best_mse["LES_driven_SCM"]["thetal_mean"] = 0.0036460773607307224
 #
 #################################
 #################################
