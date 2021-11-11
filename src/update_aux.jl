@@ -335,45 +335,42 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     ##### compute_eddy_diffusivities_tke
     #####
+    Shear² = center_aux_turbconv(state).Shear²
+    ∂qt∂z = center_aux_turbconv(state).∂qt∂z
+    ∂θl∂z = center_aux_turbconv(state).∂θl∂z
+    ∂θv∂z = center_aux_turbconv(state).∂θv∂z
+    wvec = CC.Geometry.WVector
+    ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+    ∇c = CCO.DivergenceF2C()
+    If = CCO.InterpolateC2F(; ∇0_bcs...)
+    u_gm = prog_gm.u
+    v_gm = prog_gm.v
+    w_en = aux_en_f.w
+    # compute shear
+    @. Shear² = (∇c(wvec(If(u_gm))))^2 + (∇c(wvec(If(v_gm))))^2 + (∇c(wvec(w_en)))^2
+
+    q_tot_en = aux_en.q_tot
+    θ_liq_ice_en = aux_en.θ_liq_ice
+    θ_virt_en = aux_en.θ_virt
+    @. ∂qt∂z = ∇c(wvec(If(q_tot_en)))
+    @. ∂θl∂z = ∇c(wvec(If(θ_liq_ice_en)))
+    @. ∂θv∂z = ∇c(wvec(If(θ_virt_en)))
 
     @inbounds for k in real_center_indices(grid)
-
-        # compute shear
-        U_cut = ccut(prog_gm.u, grid, k)
-        V_cut = ccut(prog_gm.v, grid, k)
-        wc_en = interpf2c(aux_en_f.w, grid, k)
-        wc_up = ntuple(up.n_updrafts) do i
-            interpf2c(aux_up_f[i].w, grid, k)
-        end
-        w_dual = dual_faces(aux_en_f.w, grid, k)
-
-        ∇U = c∇(U_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
-        ∇V = c∇(V_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
-        ∇w = ∇f2c(w_dual, grid, k; bottom = SetGradient(0), top = SetGradient(0))
-        Shear² = ∇U^2 + ∇V^2 + ∇w^2
-
-        QT_cut = ccut(aux_en.q_tot, grid, k)
-        ∂qt∂z = c∇(QT_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
-        θ_liq_ice_cut = ccut(aux_en.θ_liq_ice, grid, k)
-        ∂θl∂z = c∇(θ_liq_ice_cut, grid, k; bottom = SetGradient(0), top = SetGradient(0))
-
-        θv_cut = ccut(aux_en.θ_virt, grid, k)
-
-        ts_en = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_en.T[k], aux_en.q_tot[k])
-        ∂θv∂z = c∇(θv_cut, grid, k; bottom = SetGradient(0), top = Extrapolate())
 
         # buoyancy_gradients
         if edmf.bg_closure == BuoyGradMean()
             # First order approximation: Use environmental mean fields.
+            ts_en = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_en.T[k], aux_en.q_tot[k])
             bg_kwargs = (;
                 t_sat = aux_en.T[k],
                 qv_sat = TD.vapor_specific_humidity(ts_en),
                 qt_sat = aux_en.q_tot[k],
                 θ_sat = aux_en.θ_dry[k],
                 θ_liq_ice_sat = aux_en.θ_liq_ice[k],
-                ∂θv∂z_unsat = ∂θv∂z,
-                ∂qt∂z_sat = ∂qt∂z,
-                ∂θl∂z_sat = ∂θl∂z,
+                ∂θv∂z_unsat = ∂θv∂z[k],
+                ∂qt∂z_sat = ∂qt∂z[k],
+                ∂θl∂z_sat = ∂θl∂z[k],
                 p0 = p0_c[k],
                 en_cld_frac = aux_en.cloud_fraction[k],
                 alpha0 = α0_c[k],
@@ -387,7 +384,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             ∂qt∂z_sat = c∇_vanishing_subdomain(
                 QT_sat_cut,
                 cf_cut,
-                ∂qt∂z,
+                ∂qt∂z[k],
                 grid,
                 k;
                 bottom = SetGradient(0),
@@ -397,7 +394,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             ∂θl∂z_sat = c∇_vanishing_subdomain(
                 θ_liq_ice_sat_cut,
                 cf_cut,
-                ∂θl∂z,
+                ∂θl∂z[k],
                 grid,
                 k;
                 bottom = SetGradient(0),
@@ -407,7 +404,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             ∂θv∂z_unsat = c∇_vanishing_subdomain(
                 θv_unsat_cut,
                 cf_cut,
-                ∂θv∂z,
+                ∂θv∂z[k],
                 grid,
                 k;
                 bottom = SetGradient(0),
@@ -433,8 +430,12 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
         # Limiting stratification scale (Deardorff, 1976)
         # compute ∇Ri and Pr
-        ∇_Ri = gradient_Richardson_number(bg.∂b∂z, Shear², eps(0.0))
+        ∇_Ri = gradient_Richardson_number(bg.∂b∂z, Shear²[k], eps(0.0))
         aux_tc.prandtl_nvec[k] = turbulent_Prandtl_number(param_set, obukhov_length, ∇_Ri)
+        wc_en = interpf2c(aux_en_f.w, grid, k)
+        wc_up = ntuple(up.n_updrafts) do i
+            interpf2c(aux_up_f[i].w, grid, k)
+        end
 
         ml_model = MinDisspLen(;
             z = grid.zc[k].z,
@@ -444,7 +445,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             Pr = aux_tc.prandtl_nvec[k],
             p0 = p0_c[k],
             ∇b = bg,
-            Shear² = Shear²,
+            Shear² = Shear²[k],
             tke = aux_en.tke[k],
             a_en = (1 - aux_bulk.area[k]),
             wc_en = wc_en,

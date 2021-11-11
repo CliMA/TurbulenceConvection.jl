@@ -180,6 +180,10 @@ cent_aux_vars_edmf(FT, n_up) = (;
         # Variable Prandtl number initialized as neutral value.
         mls = FT(0),
         ml_ratio = FT(0),
+        Shear² = FT(0),
+        ∂θv∂z = FT(0),
+        ∂qt∂z = FT(0),
+        ∂θl∂z = FT(0),
         l_entdet = FT(0),
         ϕ_gm = FT(0), # temporary for grid-mean variables
         ϕ_gm_cov = FT(0), # temporary for grid-mean covariance variables
