@@ -422,9 +422,7 @@ end
 function adaptive_dt!(integrator)
     UnPack.@unpack edmf, grid, aux, TS, adapt_dt, cfl_limit, dt_min, dt_max = integrator.p
     state = TC.State(integrator.u, aux, integrator.du)
-    parent(state.prog) .= integrator.u
     aux_up_f = TC.face_aux_updrafts(state)
-    aux_en_f = TC.face_aux_environment(state)
     n_updrafts = edmf.UpdVar.n_updrafts
     aux_tc = TC.center_aux_turbconv(state)
     term_vel_rain = aux_tc.term_vel_rain
@@ -432,17 +430,15 @@ function adaptive_dt!(integrator)
     KM = TC.center_aux_turbconv(state).KM
     KH = TC.center_aux_turbconv(state).KH
     ϵ_FT = eps(Float64)
-    K_max = max(maximum(KH), maximum(KM))
     w_up_max = 0
     @inbounds for i in 1:(n_updrafts)
         w_up_max = max(w_up_max, maximum(abs.(aux_up_f[i].w)))
     end
     dt_max_w_up = cfl_limit * grid.Δz / (w_up_max + ϵ_FT)
-    dt_max_w_en = cfl_limit * grid.Δz / (maximum(abs.(aux_en_f.w)) + ϵ_FT)
     dt_max_w_rain = cfl_limit * grid.Δz / (maximum(term_vel_rain) + ϵ_FT)
     dt_max_w_snow = cfl_limit * grid.Δz / (maximum(term_vel_snow) + ϵ_FT)
-    dt_max_K = cfl_limit / 2 * (grid.Δz)^2 / (K_max + ϵ_FT)
-    dt = min(dt_max, max(dt_min, min(dt_max_w_up, dt_max_w_en, dt_max_w_rain, dt_max_w_snow, dt_max_K)))
+    dt_max_K = cfl_limit / 2 * (grid.Δz)^2 / (maximum(KH) + ϵ_FT)
+    dt = min(dt_max, max(dt_min, min(dt_max_w_up, dt_max_w_rain, dt_max_w_snow, dt_max_K)))
     TS.dt = dt
     SciMLBase.set_proposed_dt!(integrator, dt)
     ODE.u_modified!(integrator, false)
