@@ -28,15 +28,7 @@ function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
     # Dissipation term
     c_neg = c_d * tke * sqrt(tke)
     # Subdomain exchange term
-    b_exch = sum(1:(ml_model.N_up)) do i
-        wc_upd_nn = ml_model.wc_up[i]
-        wc_env = ml_model.wc_en
-        b_exch_i =
-            ml_model.a_up[i] * wc_upd_nn * ml_model.δ_dyn[i] / ml_model.a_en *
-            ((wc_upd_nn - wc_env) * (wc_upd_nn - wc_env) / 2 - tke) -
-            ml_model.a_up[i] * wc_upd_nn * (wc_upd_nn - wc_env) * ml_model.ε_turb[i] * wc_env / ml_model.a_en
-        b_exch_i
-    end
+    b_exch = ml_model.b_exch
 
     if abs(a_pd) > eps(FT) && 4 * a_pd * c_neg > -b_exch * b_exch
         l_TKE = max(-b_exch / 2 / a_pd + sqrt(b_exch * b_exch + 4 * a_pd * c_neg) / 2 / a_pd, 0)
