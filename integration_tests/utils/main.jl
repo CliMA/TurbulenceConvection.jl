@@ -480,12 +480,12 @@ function run(sim::Simulation1d)
 
     condition_io(u, t, integrator) = mod(round(Int, t), round(Int, sim.Stats.frequency)) == 0
     condition_every_iter(u, t, integrator) = true
-    condition_adaptive_dt(u, t, integrator) = mod(integrator.iter-1, 2) == 0
+    condition_adaptive_dt(u, t, integrator) = mod(integrator.iter - 1, 2) == 0
 
     callback_io = ODE.DiscreteCallback(condition_io, affect_io!; save_positions = (false, false))
     callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
     callback_adapt_dt = ODE.DiscreteCallback(condition_adaptive_dt, adaptive_dt!; save_positions = (false, false))
-    callback_adapt_dt = sim.adapt_dt ? (callback_adapt_dt, ) : ()
+    callback_adapt_dt = sim.adapt_dt ? (callback_adapt_dt,) : ()
 
     prob = ODE.ODEProblem(TC.step!, state.prog, t_span, params; dt = sim.TS.dt)
     sol = ODE.solve(

@@ -290,7 +290,6 @@ function TRMM_LBA(namelist_defaults)
 
     namelist["time_stepping"]["t_max"] = 60 * 60 * 6.0
     namelist["time_stepping"]["dt_min"] = 2.0
-    namelist["time_stepping"]["dt_max"] = 9.0
 
     namelist["microphysics"]["precipitation_model"] = "cutoff"
     namelist["microphysics"]["τ_precip"] = 50.0
