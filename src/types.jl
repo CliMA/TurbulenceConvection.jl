@@ -491,7 +491,7 @@ mutable struct EDMF_PrognosticTKE{N_up, A1}
         pressure_plume_spacing = zeros(n_updrafts)
 
         # Initialize SDE parameters
-        dt = parse_namelist(namelist, "time_stepping", "dt"; default = 1.0)
+        dt = parse_namelist(namelist, "time_stepping", "dt_min"; default = 1.0)
         closure = parse_namelist(
             namelist,
             "turbulence",

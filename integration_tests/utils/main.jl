@@ -37,6 +37,7 @@ struct Simulation1d
     adapt_dt::Bool
     cfl_limit::Float64
     dt_min::Float64
+    dt_max::Float64
 end
 
 # TODO: not quite sure, yet, where this all should live.
@@ -280,6 +281,7 @@ function Simulation1d(namelist)
     adapt_dt = namelist["time_stepping"]["adapt_dt"]
     cfl_limit = namelist["time_stepping"]["cfl_limit"]
     dt_min = namelist["time_stepping"]["dt_min"]
+    dt_max = namelist["time_stepping"]["dt_max"]
     grid = TC.Grid(FT(namelist["grid"]["dz"]), namelist["grid"]["nz"])
     Stats = skip_io ? nothing : TC.NetCDFIO_Stats(namelist, grid)
     case = Cases.get_case(namelist)
@@ -336,6 +338,7 @@ function Simulation1d(namelist)
         adapt_dt,
         cfl_limit,
         dt_min,
+        dt_max,
     )
 end
 
@@ -417,7 +420,7 @@ function affect_filter!(integrator)
 end
 
 function adaptive_dt!(integrator)
-    UnPack.@unpack edmf, grid, aux, TS, adapt_dt, cfl_limit, dt_min = integrator.p
+    UnPack.@unpack edmf, grid, aux, TS, adapt_dt, cfl_limit, dt_min, dt_max = integrator.p
     state = TC.State(integrator.u, aux, integrator.du)
     parent(state.prog) .= integrator.u
     aux_up_f = TC.face_aux_updrafts(state)
@@ -439,7 +442,7 @@ function adaptive_dt!(integrator)
     dt_max_w_rain = cfl_limit * grid.Δz / (maximum(term_vel_rain) + ϵ_FT)
     dt_max_w_snow = cfl_limit * grid.Δz / (maximum(term_vel_snow) + ϵ_FT)
     dt_max_K = cfl_limit / 2 * (grid.Δz)^2 / (K_max + ϵ_FT)
-    dt = max(dt_min, min(dt_max_w_up, dt_max_w_en, dt_max_w_rain, dt_max_w_snow, dt_max_K))
+    dt = min(dt_max, max(dt_min, min(dt_max_w_up, dt_max_w_en, dt_max_w_rain, dt_max_w_snow, dt_max_K)))
     TS.dt = dt
     SciMLBase.set_proposed_dt!(integrator, dt)
     ODE.u_modified!(integrator, false)
@@ -472,6 +475,7 @@ function run(sim::Simulation1d)
         adapt_dt = sim.adapt_dt,
         cfl_limit = sim.cfl_limit,
         dt_min = sim.dt_min,
+        dt_max = sim.dt_max,
     )
 
     condition_io(u, t, integrator) = mod(round(Int, t), round(Int, sim.Stats.frequency)) == 0

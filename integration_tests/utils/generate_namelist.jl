@@ -131,8 +131,8 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["thermodynamics"]["quadrature_type"] = "log-normal" #"gaussian" or "log-normal"
 
     namelist_defaults["time_stepping"] = Dict()
-    namelist_defaults["time_stepping"]["dt"] = 10.0
-    namelist_defaults["time_stepping"]["dt_min"] = 1.0
+    namelist_defaults["time_stepping"]["dt_max"] = 10.0
+    namelist_defaults["time_stepping"]["dt_min"] = 6.0
     namelist_defaults["time_stepping"]["adapt_dt"] = true
     namelist_defaults["time_stepping"]["cfl_limit"] = 0.5
 
@@ -238,7 +238,7 @@ function Bomex(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 21600.0
-    namelist["time_stepping"]["dt_min"] = 6.0
+    namelist["time_stepping"]["dt_min"] = 10.0
 
     namelist["meta"]["simname"] = "Bomex"
     namelist["meta"]["casename"] = "Bomex"
@@ -254,7 +254,7 @@ function life_cycle_Tan2018(namelist_defaults)
     namelist["grid"]["dz"] = 40.0
 
     namelist["time_stepping"]["t_max"] = 6 * 3600.0
-    namelist["time_stepping"]["dt_min"] = 6.0
+    namelist["time_stepping"]["dt_min"] = 10.0
     namelist["meta"]["simname"] = "life_cycle_Tan2018"
     namelist["meta"]["casename"] = "life_cycle_Tan2018"
 
@@ -289,7 +289,8 @@ function TRMM_LBA(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 60 * 60 * 6.0
-    namelist["time_stepping"]["dt_min"] = 1.0
+    namelist["time_stepping"]["dt_min"] = 2.0
+    namelist["time_stepping"]["dt_max"] = 9.0
 
     namelist["microphysics"]["precipitation_model"] = "cutoff"
     namelist["microphysics"]["τ_precip"] = 50.0
