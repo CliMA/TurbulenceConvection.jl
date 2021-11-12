@@ -363,13 +363,16 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
     # Second order approximation: Use dry and cloudy environmental fields.
     cf = aux_en.cloud_fraction
-    sm = SubMasks(vec(cf))
-    masked_interpolate!(aux_en_sat_f.q_tot, aux_en_sat.q_tot, grid, sm)
-    masked_interpolate!(aux_en_sat_f.θ_liq_ice, aux_en_sat.θ_liq_ice, grid, sm)
-    masked_interpolate!(aux_en_unsat_f.θ_virt, aux_en_unsat.θ_virt, grid, sm)
-    @. ∂qt∂z_sat = ∇c(wvec(aux_en_sat_f.q_tot)) * cf + (1 - cf) * ∂qt∂z
-    @. ∂θl∂z_sat = ∇c(wvec(aux_en_sat_f.θ_liq_ice)) * cf + (1 - cf) * ∂θl∂z
-    @. ∂θv∂z_unsat = ∇c(wvec(aux_en_unsat_f.θ_virt)) * cf + (1 - cf) * ∂θv∂z
+    shm = copy(cf)
+    parent(shm) .= shrink_mask(vec(cf))
+
+    @. aux_en_sat_f.q_tot = If(aux_en_sat.q_tot)
+    @. aux_en_sat_f.θ_liq_ice = If(aux_en_sat.θ_liq_ice)
+    @. aux_en_unsat_f.θ_virt = If(aux_en_unsat.θ_virt)
+
+    @. ∂qt∂z_sat = ∇c(wvec(aux_en_sat_f.q_tot)) * shm + (1 - shm) * ∂qt∂z
+    @. ∂θl∂z_sat = ∇c(wvec(aux_en_sat_f.θ_liq_ice)) * shm + (1 - shm) * ∂θl∂z
+    @. ∂θv∂z_unsat = ∇c(wvec(aux_en_unsat_f.θ_virt)) * shm + (1 - shm) * ∂θv∂z
 
     @inbounds for k in real_center_indices(grid)
 

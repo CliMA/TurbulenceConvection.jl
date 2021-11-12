@@ -465,6 +465,9 @@ struct SubMasks{N, T, M, R <: NTuple{N, T}}
         iter = 0
         mask_offset = 0
         mask_len = length(mask)
+        # TODO: this algorithm can be improved, at least, by
+        # searching through mask_remaining, instead of the
+        # entire mask for every submask.
         while true
             iter > mask_len && break # safety net
             mask_start = findfirst(i -> mask[i] == 1 && i > mask_offset, 1:mask_len)
@@ -491,6 +494,20 @@ struct SubMasks{N, T, M, R <: NTuple{N, T}}
         T = UnitRange{Int64}
         R = typeof(ranges)
         return new{N, T, M, R}(mask, ranges)
+    end
+end
+
+function shrink_mask(mask)
+    return map(enumerate(mask)) do (i, m)
+        if i == 1 || i == length(mask)
+            m
+        elseif m == 1 && mask[i - 1] == 0
+            m = 0
+        elseif m == 1 && mask[i + 1] == 0
+            m = 0
+        else
+            m
+        end
     end
 end
 
@@ -551,5 +568,11 @@ function masked_interpolate!(
     for sm in sub_masks
         sub_field = subdomain_field(center, grid.cs, sm)
         parent(face)[(sm.start):(sm.stop + 1)] .= vec(If.(sub_field))
+
+        # Linearly extrapolate, instead of zero-th order extrapolate:
+        # 2ci = fb+fi, => fb = 2ci - fi
+        # TODO: add linear extrapolation support in ClimaCore
+        parent(face)[sm.start] = 2 * parent(sub_field)[1] - parent(face)[sm.start + 1]
+        parent(face)[sm.stop + 1] = 2 * parent(sub_field)[end] - parent(face)[sm.stop]
     end
 end
