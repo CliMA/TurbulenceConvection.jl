@@ -84,9 +84,9 @@ Base.@kwdef struct GradBuoy{FT}
     ∂b∂z_sat::FT
 end
 
-abstract type EnvBuoyGradClosure end
-struct BuoyGradMean <: EnvBuoyGradClosure end
-struct BuoyGradQuadratures <: EnvBuoyGradClosure end
+abstract type AbstractEnvBuoyGradClosure end
+struct BuoyGradMean <: AbstractEnvBuoyGradClosure end
+struct BuoyGradQuadratures <: AbstractEnvBuoyGradClosure end
 
 """
     EnvBuoyGrad
@@ -95,7 +95,7 @@ Variables used in the environmental buoyancy gradient computation.
 
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct EnvBuoyGrad{FT, EBC <: EnvBuoyGradClosure}
+Base.@kwdef struct EnvBuoyGrad{FT, EBC <: AbstractEnvBuoyGradClosure}
     "temperature in the saturated part"
     t_sat::FT
     "vapor specific humidity  in the saturated part"
@@ -119,7 +119,7 @@ Base.@kwdef struct EnvBuoyGrad{FT, EBC <: EnvBuoyGradClosure}
     "specific volume"
     alpha0::FT
 end
-function EnvBuoyGrad(::EBG; t_sat::FT, bg_kwargs...) where {FT <: Real, EBG <: EnvBuoyGradClosure}
+function EnvBuoyGrad(::EBG; t_sat::FT, bg_kwargs...) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
     return EnvBuoyGrad{FT, EBG}(; t_sat, bg_kwargs...)
 end
 
@@ -398,7 +398,7 @@ end
 
 CasesBase(case::T; kwargs...) where {T} = CasesBase{T}(; casename = string(nameof(T)), kwargs...)
 
-mutable struct EDMF_PrognosticTKE{N_up, A1}
+mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC}
     Ri_bulk_crit::Float64
     zi::Float64
     n_updrafts::Int
@@ -426,7 +426,7 @@ mutable struct EDMF_PrognosticTKE{N_up, A1}
     entr_surface_bc::Float64
     detr_surface_bc::Float64
     sde_model::sde_struct
-    bg_closure::EnvBuoyGradClosure
+    bg_closure::EBGC
     function EDMF_PrognosticTKE(namelist, grid::Grid, param_set::PS) where {PS}
         # get values from namelist
         prandtl_number = namelist["turbulence"]["prandtl_number_0"]
@@ -532,7 +532,8 @@ mutable struct EDMF_PrognosticTKE{N_up, A1}
         entr_surface_bc = 0
         detr_surface_bc = 0
         A1 = typeof(area_surface_bc)
-        return new{n_updrafts, A1}(
+        EBGC = typeof(bg_closure)
+        return new{n_updrafts, A1, EBGC}(
             Ri_bulk_crit,
             zi,
             n_updrafts,
