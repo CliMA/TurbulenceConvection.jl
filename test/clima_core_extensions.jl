@@ -40,3 +40,12 @@ for k in TC.real_face_indices(grid)
         @test_throws ErrorException state.cent.turbconv.up[i].Area[k] = 2
     end
 end
+
+@testset "Submask iterator" begin
+    mask = Bool[0, 0, 0, 1, 1, 1, 0, 0, 1, 1]
+
+    sm = collect(TC.SubMasks(mask))
+
+    @test sm[1] == 4:6
+    @test sm[2] == 9:10
+end

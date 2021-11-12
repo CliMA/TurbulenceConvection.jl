@@ -34,7 +34,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
     aux_en_unsat = aux_en.unsat
+    aux_en_unsat_f = aux_en_f.unsat
     aux_en_sat = aux_en.sat
+    aux_en_sat_f = aux_en_f.sat
 
     #####
     ##### center variables
@@ -339,6 +341,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     ∂qt∂z = center_aux_turbconv(state).∂qt∂z
     ∂θl∂z = center_aux_turbconv(state).∂θl∂z
     ∂θv∂z = center_aux_turbconv(state).∂θv∂z
+    ∂θv∂z_unsat = center_aux_turbconv(state).∂θv∂z_unsat
+    ∂qt∂z_sat = center_aux_turbconv(state).∂qt∂z_sat
+    ∂θl∂z_sat = center_aux_turbconv(state).∂θl∂z_sat
     wvec = CC.Geometry.WVector
     ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
     ∇c = CCO.DivergenceF2C()
@@ -355,6 +360,16 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     @. ∂qt∂z = ∇c(wvec(If(q_tot_en)))
     @. ∂θl∂z = ∇c(wvec(If(θ_liq_ice_en)))
     @. ∂θv∂z = ∇c(wvec(If(θ_virt_en)))
+
+    # Second order approximation: Use dry and cloudy environmental fields.
+    cf = aux_en.cloud_fraction
+    sm = SubMasks(vec(cf))
+    masked_interpolate!(aux_en_sat_f.q_tot, aux_en_sat.q_tot, grid, sm)
+    masked_interpolate!(aux_en_sat_f.θ_liq_ice, aux_en_sat.θ_liq_ice, grid, sm)
+    masked_interpolate!(aux_en_unsat_f.θ_virt, aux_en_unsat.θ_virt, grid, sm)
+    @. ∂qt∂z_sat = ∇c(wvec(aux_en_sat_f.q_tot)) * cf + (1 - cf) * ∂qt∂z
+    @. ∂θl∂z_sat = ∇c(wvec(aux_en_sat_f.θ_liq_ice)) * cf + (1 - cf) * ∂θl∂z
+    @. ∂θv∂z_unsat = ∇c(wvec(aux_en_unsat_f.θ_virt)) * cf + (1 - cf) * ∂θv∂z
 
     @inbounds for k in real_center_indices(grid)
 
@@ -378,38 +393,6 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             bg_model = EnvBuoyGrad(edmf.bg_closure; bg_kwargs...)
 
         elseif edmf.bg_closure == BuoyGradQuadratures()
-            # Second order approximation: Use dry and cloudy environmental fields.
-            cf_cut = ccut(aux_en.cloud_fraction, grid, k)
-            QT_sat_cut = ccut(aux_en_sat.q_tot, grid, k)
-            ∂qt∂z_sat = c∇_vanishing_subdomain(
-                QT_sat_cut,
-                cf_cut,
-                ∂qt∂z[k],
-                grid,
-                k;
-                bottom = SetGradient(0),
-                top = SetGradient(0),
-            )
-            θ_liq_ice_sat_cut = ccut(aux_en_sat.θ_liq_ice, grid, k)
-            ∂θl∂z_sat = c∇_vanishing_subdomain(
-                θ_liq_ice_sat_cut,
-                cf_cut,
-                ∂θl∂z[k],
-                grid,
-                k;
-                bottom = SetGradient(0),
-                top = SetGradient(0),
-            )
-            θv_unsat_cut = ccut(aux_en_unsat.θ_virt, grid, k)
-            ∂θv∂z_unsat = c∇_vanishing_subdomain(
-                θv_unsat_cut,
-                cf_cut,
-                ∂θv∂z[k],
-                grid,
-                k;
-                bottom = SetGradient(0),
-                top = SetGradient(0),
-            )
 
             bg_kwargs = (;
                 t_sat = aux_en_sat.T[k],
@@ -417,9 +400,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
                 qt_sat = aux_en_sat.q_tot[k],
                 θ_sat = aux_en_sat.θ_dry[k],
                 θ_liq_ice_sat = aux_en_sat.θ_liq_ice[k],
-                ∂θv∂z_unsat = ∂θv∂z_unsat,
-                ∂qt∂z_sat = ∂qt∂z_sat,
-                ∂θl∂z_sat = ∂θl∂z_sat,
+                ∂θv∂z_unsat = ∂θv∂z_unsat[k],
+                ∂qt∂z_sat = ∂qt∂z_sat[k],
+                ∂θl∂z_sat = ∂θl∂z_sat[k],
                 p0 = p0_c[k],
                 en_cld_frac = aux_en.cloud_fraction[k],
                 alpha0 = α0_c[k],

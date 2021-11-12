@@ -218,54 +218,6 @@ function c∇(f::SA.SVector, grid::Grid, ::BottomBCTag, ::Extrapolate)
     return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
 end
 
-# ∇(center data) for possibly vanishing subdomains.
-
-"""
-    c∇_vanishing_subdomain
-
-Used when the vertical gradient of a field must be computed over a conditional subdomain which may vanish
-below or above the current cell. If the subdomains vanishes, a default user-defined gradient is returned.
-
-Inputs:
- - f_cut: Slice of field.
- - sd_cut: Slice of subdomain volume fraction.
- - default∇: Gradient used in vanishing subdomains.
-"""
-function c∇_vanishing_subdomain(
-    f_cut::SA.SVector,
-    sd_cut::SA.SVector,
-    default∇::FT,
-    grid::Grid,
-    k;
-    bottom = NoBCGivenError(),
-    top = NoBCGivenError(),
-) where {FT <: Real}
-    if is_surface_center(grid, k)
-        return c∇(f_cut, grid, BottomBCTag(), bottom)
-    elseif is_toa_center(grid, k)
-        return c∇(f_cut, grid, TopBCTag(), top)
-    else
-        return c∇_vanishing_subdomain(f_cut, sd_cut, default∇, grid, InteriorTag())
-    end
-end
-function c∇_vanishing_subdomain(
-    f::SA.SVector,
-    sd::SA.SVector,
-    default∇::FT,
-    grid::Grid,
-    ::InteriorTag,
-) where {FT <: Real}
-    @assert length(f) == 3
-    @assert length(sd) == 3
-    if sd[1] * sd[3] ≈ FT(0)
-        return default∇
-    else
-        f_dual⁺ = SA.SVector(f[2], f[3])
-        f_dual⁻ = SA.SVector(f[1], f[2])
-        return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
-    end
-end
-
 #####
 ##### ∇(face data)
 #####
@@ -490,5 +442,114 @@ function dual_centers(f, grid, k::CCO.PlusHalf, i_up::Int)
         return SA.SVector(f[i_up, Cent(k.i - 1)])
     else
         return SA.SVector(f[i_up, Cent(k.i - 1)], f[i_up, Cent(k.i)])
+    end
+end
+
+
+#####
+##### Masked operators
+#####
+
+"""
+    SubMasks
+
+A container for collecting a tuple of
+index ranges corresponding to a mask
+where `mask == true`.
+"""
+struct SubMasks{N, T, M, R <: NTuple{N, T}}
+    mask::M
+    ranges::R
+    function SubMasks(mask, min_range_len = 2)
+        ranges = UnitRange{Int64}[]
+        iter = 0
+        mask_offset = 0
+        mask_len = length(mask)
+        while true
+            iter > mask_len && break # safety net
+            mask_start = findfirst(i -> mask[i] == 1 && i > mask_offset, 1:mask_len)
+            isnothing(mask_start) && break
+            mask_stop = findfirst(i -> mask[i] == 0 && i > mask_start, 1:mask_len)
+            if isnothing(mask_stop)
+                R = mask_start:mask_len
+                if length(R) >= min_range_len
+                    push!(ranges, R)
+                end
+                break
+            else
+                R = mask_start:(mask_stop - 1)
+                if length(R) >= min_range_len
+                    push!(ranges, R)
+                end
+            end
+            mask_offset = mask_stop
+            iter += 1
+        end
+        ranges = Tuple(ranges)
+        M = typeof(mask)
+        N = length(ranges)
+        T = UnitRange{Int64}
+        R = typeof(ranges)
+        return new{N, T, M, R}(mask, ranges)
+    end
+end
+
+Base.eltype(::Type{SDM}) where {N, T, SDM <: SubMasks{N, T}} = T
+Base.length(sm::SubMasks{N}) where {N} = N
+Base.iterate(sm::SubMasks{N}, state = 1) where {N} = state > N ? nothing : (sm.ranges[state], state + 1)
+
+"""
+    subdomain_field(
+        field_in,
+        space_in::CC.Spaces.CenterFiniteDifferenceSpace,
+        ind
+    )
+
+Allocates and returns a cell-centered field in the
+index range `ind` which is equal to the input field
+`field_in`.
+"""
+function subdomain_field(field_in, space_in::CC.Spaces.CenterFiniteDifferenceSpace, ind)
+    FT = eltype(field_in)
+    fs_in = CC.Spaces.FaceFiniteDifferenceSpace(space_in)
+    zf_in = CC.Fields.coordinate_field(fs_in)
+    zc_in = CC.Fields.coordinate_field(fs_in)
+    nelems = length(vec(zc_in)[ind])
+    zmin = minimum(vec(zf_in)[ind])
+    zmax = maximum(vec(zf_in)[ind])
+    domain = CC.Domains.IntervalDomain(
+        CC.Geometry.ZPoint{FT}(zmin),
+        CC.Geometry.ZPoint{FT}(zmax);
+        boundary_tags = (:bottom, :top),
+    )
+    mesh = CC.Meshes.IntervalMesh(domain; nelems = nelems)
+    cs = CC.Spaces.CenterFiniteDifferenceSpace(mesh)
+    cf = CC.Fields.coordinate_field(cs)
+    sub_field = sin.(cf.z)
+    parent(sub_field) .= parent(field_in)[ind]
+    return sub_field
+end
+
+"""
+    masked_interpolate!(
+        face::CC.Fields.FaceFiniteDifferenceField,
+        center::CC.Fields.CenterFiniteDifferenceField,
+        grid::Grid,
+        sub_masks::SubMasks,
+    )
+
+Interpolate a cell-centered to cell faces, while avoiding
+the use of the cell-centered field where `mask == 0`.
+"""
+function masked_interpolate!(
+    face::CC.Fields.FaceFiniteDifferenceField,
+    center::CC.Fields.CenterFiniteDifferenceField,
+    grid::Grid,
+    sub_masks::SubMasks,
+)
+    If = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+    for sm in sub_masks
+        sub_field = subdomain_field(center, grid.cs, sm)
+        parent(face)[(sm.start):(sm.stop + 1)] .= vec(If.(sub_field))
     end
 end
