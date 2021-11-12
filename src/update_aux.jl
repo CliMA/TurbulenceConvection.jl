@@ -366,14 +366,14 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
 
     # Since NaN*0 ≠ 0, we need to conditionally replace
     # our gradients by their default values.
-    @. ∂qt∂z_sat_new = ∇c(wvec(If(aux_en_sat.q_tot)))
-    @. ∂θl∂z_sat_new = ∇c(wvec(If(aux_en_sat.θ_liq_ice)))
-    @. ∂θv∂z_unsat_new = ∇c(wvec(If(aux_en_unsat.θ_virt)))
+    @. ∂qt∂z_sat = ∇c(wvec(If(aux_en_sat.q_tot)))
+    @. ∂θl∂z_sat = ∇c(wvec(If(aux_en_sat.θ_liq_ice)))
+    @. ∂θv∂z_unsat = ∇c(wvec(If(aux_en_unsat.θ_virt)))
     for k in real_center_indices(grid)
         if shm[k] == 0
-            ∂qt∂z_sat_new[k] = ∂qt∂z[k]
-            ∂θl∂z_sat_new[k] = ∂θl∂z[k]
-            ∂θv∂z_unsat_new[k] = ∂θv∂z[k]
+            ∂qt∂z_sat[k] = ∂qt∂z[k]
+            ∂θl∂z_sat[k] = ∂θl∂z[k]
+            ∂θv∂z_unsat[k] = ∂θv∂z[k]
         end
     end
 

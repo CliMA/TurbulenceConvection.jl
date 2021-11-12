@@ -463,25 +463,6 @@ mask = Bool[0, 0, 0, 1, 1, 1, 0, 0, 1, 1]
 shrunken_mask = Bool[0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
 @test shrink_mask(mask) == shrunken_mask
 ```
-
-Here is some pseudo code to demo how this is intended
-to be used in practice:
-```julia
-# mask ∈ cell center
-# sm ∈ cell center field
-# θc ∈ cell center field
-# θf ∈ cell face field
-# ∇θdefault ∈ cell center field (representing the default gradient outside valid subdomains)
-
-import ClimaCore as CC
-import ClimaCore.Operators as CCO
-If = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
-∇c = CCO.DivergenceF2C()
-wvec = CC.Geometry.WVector
-@. sm .= shrink_mask(vec(mask))
-@. θf = If(θc)
-@. ∇θc = ∇c(θf) * sm + (1 - sm) * ∇θdefault
-```
 """
 function shrink_mask(mask)
     return map(enumerate(mask)) do (i, m)
