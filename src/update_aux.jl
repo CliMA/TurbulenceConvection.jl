@@ -34,9 +34,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
     aux_en_unsat = aux_en.unsat
-    aux_en_unsat_f = aux_en_f.unsat
     aux_en_sat = aux_en.sat
-    aux_en_sat_f = aux_en_f.sat
 
     #####
     ##### center variables
@@ -366,13 +364,18 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     shm = copy(cf)
     parent(shm) .= shrink_mask(vec(cf))
 
-    @. aux_en_sat_f.q_tot = If(aux_en_sat.q_tot)
-    @. aux_en_sat_f.θ_liq_ice = If(aux_en_sat.θ_liq_ice)
-    @. aux_en_unsat_f.θ_virt = If(aux_en_unsat.θ_virt)
-
-    @. ∂qt∂z_sat = ∇c(wvec(aux_en_sat_f.q_tot)) * shm + (1 - shm) * ∂qt∂z
-    @. ∂θl∂z_sat = ∇c(wvec(aux_en_sat_f.θ_liq_ice)) * shm + (1 - shm) * ∂θl∂z
-    @. ∂θv∂z_unsat = ∇c(wvec(aux_en_unsat_f.θ_virt)) * shm + (1 - shm) * ∂θv∂z
+    # Since NaN*0 ≠ 0, we need to conditionally replace
+    # our gradients by their default values.
+    @. ∂qt∂z_sat_new = ∇c(wvec(If(aux_en_sat.q_tot)))
+    @. ∂θl∂z_sat_new = ∇c(wvec(If(aux_en_sat.θ_liq_ice)))
+    @. ∂θv∂z_unsat_new = ∇c(wvec(If(aux_en_unsat.θ_virt)))
+    for k in real_center_indices(grid)
+        if shm[k] == 0
+            ∂qt∂z_sat_new[k] = ∂qt∂z[k]
+            ∂θl∂z_sat_new[k] = ∂θl∂z[k]
+            ∂θv∂z_unsat_new[k] = ∂θv∂z[k]
+        end
+    end
 
     @inbounds for k in real_center_indices(grid)
 

@@ -40,4 +40,3 @@ for k in TC.real_face_indices(grid)
         @test_throws ErrorException state.cent.turbconv.up[i].Area[k] = 2
     end
 end
-
