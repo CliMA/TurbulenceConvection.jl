@@ -184,6 +184,9 @@ cent_aux_vars_edmf(FT, n_up) = (;
         ∂θv∂z = FT(0),
         ∂qt∂z = FT(0),
         ∂θl∂z = FT(0),
+        ∂θv∂z_unsat = FT(0),
+        ∂qt∂z_sat = FT(0),
+        ∂θl∂z_sat = FT(0),
         l_entdet = FT(0),
         ϕ_gm = FT(0), # temporary for grid-mean variables
         ϕ_gm_cov = FT(0), # temporary for grid-mean covariance variables
@@ -211,7 +214,7 @@ face_aux_vars_edmf(FT, n_up) = (;
         ρ_ae_KH = FT(0),
         ρ_ae_K = FT(0),
         ρ_ae_K∇ϕ = FT(0),
-        en = (; w = FT(0)),
+        en = (; w = FT(0), sat = (; θ_liq_ice = FT(0), q_tot = FT(0)), unsat = (; θ_virt = FT(0))),
         up = ntuple(i -> face_aux_vars_up(FT), n_up),
         massflux_h = FT(0),
         massflux_qt = FT(0),
