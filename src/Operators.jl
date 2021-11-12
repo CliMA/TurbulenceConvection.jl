@@ -447,56 +447,42 @@ end
 
 
 #####
-##### Masked operators
+##### Helpers for masked operators
 #####
 
 """
-    SubMasks
+    shrink_mask(mask)
 
-A container for collecting a tuple of
-index ranges corresponding to a mask
-where `mask == true`.
+Shrinks the subdomains where `mask == 1`.
+
+Example:
+
+```julia
+using Test
+mask = Bool[0, 0, 0, 1, 1, 1, 0, 0, 1, 1]
+shrunken_mask = Bool[0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+@test shrink_mask(mask) == shrunken_mask
+```
+
+Here is some pseudo code to demo how this is intended
+to be used in practice:
+```julia
+# mask ∈ cell center
+# sm ∈ cell center field
+# θc ∈ cell center field
+# θf ∈ cell face field
+# ∇θdefault ∈ cell center field (representing the default gradient outside valid subdomains)
+
+import ClimaCore as CC
+import ClimaCore.Operators as CCO
+If = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+∇c = CCO.DivergenceF2C()
+wvec = CC.Geometry.WVector
+@. sm .= shrink_mask(vec(mask))
+@. θf = If(θc)
+@. ∇θc = ∇c(θf) * sm + (1 - sm) * ∇θdefault
+```
 """
-struct SubMasks{N, T, M, R <: NTuple{N, T}}
-    mask::M
-    ranges::R
-    function SubMasks(mask, min_range_len = 2)
-        ranges = UnitRange{Int64}[]
-        iter = 0
-        mask_offset = 0
-        mask_len = length(mask)
-        # TODO: this algorithm can be improved, at least, by
-        # searching through mask_remaining, instead of the
-        # entire mask for every submask.
-        while true
-            iter > mask_len && break # safety net
-            mask_start = findfirst(i -> mask[i] == 1 && i > mask_offset, 1:mask_len)
-            isnothing(mask_start) && break
-            mask_stop = findfirst(i -> mask[i] == 0 && i > mask_start, 1:mask_len)
-            if isnothing(mask_stop)
-                R = mask_start:mask_len
-                if length(R) >= min_range_len
-                    push!(ranges, R)
-                end
-                break
-            else
-                R = mask_start:(mask_stop - 1)
-                if length(R) >= min_range_len
-                    push!(ranges, R)
-                end
-            end
-            mask_offset = mask_stop
-            iter += 1
-        end
-        ranges = Tuple(ranges)
-        M = typeof(mask)
-        N = length(ranges)
-        T = UnitRange{Int64}
-        R = typeof(ranges)
-        return new{N, T, M, R}(mask, ranges)
-    end
-end
-
 function shrink_mask(mask)
     return map(enumerate(mask)) do (i, m)
         if i == 1 || i == length(mask)
@@ -508,71 +494,5 @@ function shrink_mask(mask)
         else
             m
         end
-    end
-end
-
-Base.eltype(::Type{SDM}) where {N, T, SDM <: SubMasks{N, T}} = T
-Base.length(sm::SubMasks{N}) where {N} = N
-Base.iterate(sm::SubMasks{N}, state = 1) where {N} = state > N ? nothing : (sm.ranges[state], state + 1)
-
-"""
-    subdomain_field(
-        field_in,
-        space_in::CC.Spaces.CenterFiniteDifferenceSpace,
-        ind
-    )
-
-Allocates and returns a cell-centered field in the
-index range `ind` which is equal to the input field
-`field_in`.
-"""
-function subdomain_field(field_in, space_in::CC.Spaces.CenterFiniteDifferenceSpace, ind)
-    FT = eltype(field_in)
-    fs_in = CC.Spaces.FaceFiniteDifferenceSpace(space_in)
-    zf_in = CC.Fields.coordinate_field(fs_in)
-    zc_in = CC.Fields.coordinate_field(fs_in)
-    nelems = length(vec(zc_in)[ind])
-    zmin = minimum(vec(zf_in)[ind])
-    zmax = maximum(vec(zf_in)[ind])
-    domain = CC.Domains.IntervalDomain(
-        CC.Geometry.ZPoint{FT}(zmin),
-        CC.Geometry.ZPoint{FT}(zmax);
-        boundary_tags = (:bottom, :top),
-    )
-    mesh = CC.Meshes.IntervalMesh(domain; nelems = nelems)
-    cs = CC.Spaces.CenterFiniteDifferenceSpace(mesh)
-    cf = CC.Fields.coordinate_field(cs)
-    sub_field = sin.(cf.z)
-    parent(sub_field) .= parent(field_in)[ind]
-    return sub_field
-end
-
-"""
-    masked_interpolate!(
-        face::CC.Fields.FaceFiniteDifferenceField,
-        center::CC.Fields.CenterFiniteDifferenceField,
-        grid::Grid,
-        sub_masks::SubMasks,
-    )
-
-Interpolate a cell-centered to cell faces, while avoiding
-the use of the cell-centered field where `mask == 0`.
-"""
-function masked_interpolate!(
-    face::CC.Fields.FaceFiniteDifferenceField,
-    center::CC.Fields.CenterFiniteDifferenceField,
-    grid::Grid,
-    sub_masks::SubMasks,
-)
-    If = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
-    for sm in sub_masks
-        sub_field = subdomain_field(center, grid.cs, sm)
-        parent(face)[(sm.start):(sm.stop + 1)] .= vec(If.(sub_field))
-
-        # Linearly extrapolate, instead of zero-th order extrapolate:
-        # 2ci = fb+fi, => fb = 2ci - fi
-        # TODO: add linear extrapolation support in ClimaCore
-        parent(face)[sm.start] = 2 * parent(sub_field)[1] - parent(face)[sm.start + 1]
-        parent(face)[sm.stop + 1] = 2 * parent(sub_field)[end] - parent(face)[sm.stop]
     end
 end

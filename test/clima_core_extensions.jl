@@ -41,11 +41,3 @@ for k in TC.real_face_indices(grid)
     end
 end
 
-@testset "Submask iterator" begin
-    mask = Bool[0, 0, 0, 1, 1, 1, 0, 0, 1, 1]
-
-    sm = collect(TC.SubMasks(mask))
-
-    @test sm[1] == 4:6
-    @test sm[2] == 9:10
-end
