@@ -144,7 +144,7 @@ Minimum dissipation model
 
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct MinDisspLen{FT, T}
+Base.@kwdef struct MinDisspLen{FT}
     "height"
     z::FT
     "obukhov length"
@@ -163,20 +163,8 @@ Base.@kwdef struct MinDisspLen{FT, T}
     Shear²::FT
     "environment turbulent kinetic energy"
     tke::FT
-    "environment area"
-    a_en::FT
-    "environment velocity at cell center"
-    wc_en::FT
-    "updraft velocity at cell center"
-    wc_up::T
-    "updraft area"
-    a_up::T
-    "up draft turbulent entrainment"
-    ε_turb::T
-    "updraft dynamic detrainment"
-    δ_dyn::T
-    "number of updraft"
-    N_up::Int
+    "Updraft tke source"
+    b_exch::FT
 end
 
 Base.@kwdef mutable struct PrecipVariables

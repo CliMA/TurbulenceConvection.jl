@@ -335,6 +335,24 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     ##### compute_eddy_diffusivities_tke
     #####
+
+    # Subdomain exchange term
+    Ic = CCO.InterpolateF2C()
+    b_exch = center_aux_turbconv(state).b_exch
+    parent(b_exch) .= 0
+    a_en = aux_en.area
+    w_en = aux_en_f.w
+    tke_en = aux_en.tke
+    for i in 1:(up.n_updrafts)
+        a_up = aux_up[i].area
+        w_up = aux_up_f[i].w
+        δ_dyn = aux_up[i].detr_sc
+        ε_turb = aux_up[i].frac_turb_entr
+        @. b_exch +=
+            a_up * Ic(w_up) * δ_dyn / a_en * (1 / 2 * (Ic(w_up) - Ic(w_en))^2 - tke_en) -
+            a_up * Ic(w_up) * (Ic(w_up) - Ic(w_en)) * ε_turb * Ic(w_en) / a_en
+    end
+
     Shear² = center_aux_turbconv(state).Shear²
     ∂qt∂z = center_aux_turbconv(state).∂qt∂z
     ∂θl∂z = center_aux_turbconv(state).∂θl∂z
@@ -422,10 +440,6 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         # compute ∇Ri and Pr
         ∇_Ri = gradient_Richardson_number(bg.∂b∂z, Shear²[k], eps(0.0))
         aux_tc.prandtl_nvec[k] = turbulent_Prandtl_number(param_set, obukhov_length, ∇_Ri)
-        wc_en = interpf2c(aux_en_f.w, grid, k)
-        wc_up = ntuple(up.n_updrafts) do i
-            interpf2c(aux_up_f[i].w, grid, k)
-        end
 
         ml_model = MinDisspLen(;
             z = grid.zc[k].z,
@@ -437,13 +451,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             ∇b = bg,
             Shear² = Shear²[k],
             tke = aux_en.tke[k],
-            a_en = (1 - aux_bulk.area[k]),
-            wc_en = wc_en,
-            wc_up = Tuple(wc_up),
-            a_up = ntuple(i -> aux_up[i].area[k], up.n_updrafts),
-            ε_turb = ntuple(i -> aux_up[i].frac_turb_entr[k], up.n_updrafts),
-            δ_dyn = ntuple(i -> aux_up[i].detr_sc[k], up.n_updrafts),
-            N_up = up.n_updrafts,
+            b_exch = b_exch[k],
         )
 
         ml = mixing_length(param_set, ml_model)
@@ -454,7 +462,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0.0))
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
 
-        aux_en_2m.tke.buoy[k] = -ml_model.a_en * ρ0_c[k] * KH[k] * bg.∂b∂z
+        aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ0_c[k] * KH[k] * bg.∂b∂z
     end
 
     compute_covariance_entr(edmf, grid, state, Val(:tke), Val(:w))
