@@ -75,8 +75,33 @@ zf_surface(grid::Grid) = grid.zf[kf_surface(grid)]
 zc_toa(grid::Grid) = grid.zc[kc_top_of_atmos(grid)]
 zf_toa(grid::Grid) = grid.zf[kf_top_of_atmos(grid)]
 
-real_center_indices(grid::Grid) = Cent.((kc_surface(grid).i):(kc_top_of_atmos(grid).i))
-real_face_indices(grid::Grid) = CCO.PlusHalf.((kf_surface(grid).i):(kf_top_of_atmos(grid).i))
+real_center_indices(grid::Grid) = CenterIndices(grid)
+real_face_indices(grid::Grid) = FaceIndices(grid)
+
+struct FaceIndices{Nstart, Nstop, G}
+    grid::G
+    function FaceIndices(grid::G) where {G <: Grid}
+        Nstart, Nstop = kf_surface(grid).i, kf_top_of_atmos(grid).i
+        new{Nstart, Nstop, G}(grid)
+    end
+end
+
+struct CenterIndices{Nstart, Nstop, G}
+    grid::G
+    function CenterIndices(grid::G) where {G <: Grid}
+        Nstart, Nstop = kc_surface(grid).i, kc_top_of_atmos(grid).i
+        new{Nstart, Nstop, G}(grid)
+    end
+end
+
+Base.length(::FaceIndices{Nstart, Nstop}) where {Nstart, Nstop} = Nstop - Nstart + 1
+Base.length(::CenterIndices{Nstart, Nstop}) where {Nstart, Nstop} = Nstop - Nstart + 1
+
+Base.iterate(fi::CenterIndices{Nstart, Nstop}, state = Nstart) where {Nstart, Nstop} =
+    state > Nstop ? nothing : (Cent(state), state + 1)
+
+Base.iterate(fi::FaceIndices{Nstart, Nstop}, state = Nstart) where {Nstart, Nstop} =
+    state > Nstop ? nothing : (CCO.PlusHalf(state), state + 1)
 
 face_space(grid::Grid) = grid.fs
 center_space(grid::Grid) = grid.cs

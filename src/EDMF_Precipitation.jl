@@ -23,7 +23,7 @@ function compute_precipitation_advection_tendencies(grid, state, gm, TS::TimeSte
         term_vel_snow[k] = CM1.terminal_velocity(param_set, snow_type, ρ_0_c[k], prog_pr.q_sno[k])
     end
 
-    @inbounds for k in reverse(real_center_indices(grid))
+    @inbounds for k in real_center_indices(grid)
         # check stability criterion
         CFL_out_rain = Δt / Δz * term_vel_rain[k]
         CFL_out_snow = Δt / Δz * term_vel_snow[k]
