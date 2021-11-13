@@ -214,7 +214,7 @@ face_aux_vars_edmf(FT, n_up) = (;
         ρ_ae_KH = FT(0),
         ρ_ae_K = FT(0),
         ρ_ae_K∇ϕ = FT(0),
-        en = (; w = FT(0), sat = (; θ_liq_ice = FT(0), q_tot = FT(0)), unsat = (; θ_virt = FT(0))),
+        en = (; w = FT(0)),
         up = ntuple(i -> face_aux_vars_up(FT), n_up),
         massflux_h = FT(0),
         massflux_qt = FT(0),

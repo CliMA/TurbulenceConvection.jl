@@ -218,54 +218,6 @@ function c∇(f::SA.SVector, grid::Grid, ::BottomBCTag, ::Extrapolate)
     return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
 end
 
-# ∇(center data) for possibly vanishing subdomains.
-
-"""
-    c∇_vanishing_subdomain
-
-Used when the vertical gradient of a field must be computed over a conditional subdomain which may vanish
-below or above the current cell. If the subdomains vanishes, a default user-defined gradient is returned.
-
-Inputs:
- - f_cut: Slice of field.
- - sd_cut: Slice of subdomain volume fraction.
- - default∇: Gradient used in vanishing subdomains.
-"""
-function c∇_vanishing_subdomain(
-    f_cut::SA.SVector,
-    sd_cut::SA.SVector,
-    default∇::FT,
-    grid::Grid,
-    k;
-    bottom = NoBCGivenError(),
-    top = NoBCGivenError(),
-) where {FT <: Real}
-    if is_surface_center(grid, k)
-        return c∇(f_cut, grid, BottomBCTag(), bottom)
-    elseif is_toa_center(grid, k)
-        return c∇(f_cut, grid, TopBCTag(), top)
-    else
-        return c∇_vanishing_subdomain(f_cut, sd_cut, default∇, grid, InteriorTag())
-    end
-end
-function c∇_vanishing_subdomain(
-    f::SA.SVector,
-    sd::SA.SVector,
-    default∇::FT,
-    grid::Grid,
-    ::InteriorTag,
-) where {FT <: Real}
-    @assert length(f) == 3
-    @assert length(sd) == 3
-    if sd[1] * sd[3] ≈ FT(0)
-        return default∇
-    else
-        f_dual⁺ = SA.SVector(f[2], f[3])
-        f_dual⁻ = SA.SVector(f[1], f[2])
-        return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
-    end
-end
-
 #####
 ##### ∇(face data)
 #####
@@ -490,5 +442,38 @@ function dual_centers(f, grid, k::CCO.PlusHalf, i_up::Int)
         return SA.SVector(f[i_up, Cent(k.i - 1)])
     else
         return SA.SVector(f[i_up, Cent(k.i - 1)], f[i_up, Cent(k.i)])
+    end
+end
+
+
+#####
+##### Helpers for masked operators
+#####
+
+"""
+    shrink_mask(mask)
+
+Shrinks the subdomains where `mask == 1`.
+
+Example:
+
+```julia
+using Test
+mask = Bool[0, 0, 0, 1, 1, 1, 0, 0, 1, 1]
+shrunken_mask = Bool[0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+@test shrink_mask(mask) == shrunken_mask
+```
+"""
+function shrink_mask(mask)
+    return map(enumerate(mask)) do (i, m)
+        if i == 1 || i == length(mask)
+            m
+        elseif m == 1 && mask[i - 1] == 0
+            m = 0
+        elseif m == 1 && mask[i + 1] == 0
+            m = 0
+        else
+            m
+        end
     end
 end
