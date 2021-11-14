@@ -95,21 +95,6 @@ c∇_upwind(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
 c∇_upwind(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[1] - bc.value) * (grid.Δzi * 2)
 c∇_upwind(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
-function f∇_onesided(f_dual::SA.SVector, grid::Grid, k; bottom = NoBCGivenError(), top = NoBCGivenError())
-    if is_surface_face(grid, k)
-        return f∇_onesided(f_dual, grid, BottomBCTag(), bottom)
-    elseif is_toa_face(grid, k)
-        return f∇_onesided(f_dual, grid, TopBCTag(), top)
-    else
-        return f∇_onesided(f_dual, grid, InteriorTag())
-    end
-end
-f∇_onesided(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.Δzi
-f∇_onesided(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.Δzi * 2)
-f∇_onesided(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
-f∇_onesided(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.Δzi # don't use BC info
-f∇_onesided(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
-
 # Used when traversing cell faces
 
 interpc2f(f, grid::Grid, k::CCO.PlusHalf; bottom = NoBCGivenError(), top = NoBCGivenError()) =
@@ -157,66 +142,6 @@ interpf2c(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[1] + f[2]) / 2
 interpf2c(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (f[1] + bc.value) / 2
 interpf2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (bc.value + f[2]) / 2
 
-#####
-##### ∇(center data)
-#####
-
-c∇(f, grid::Grid, k; bottom = NoBCGivenError(), top = NoBCGivenError()) = c∇(ccut(f, grid, k), grid, k; bottom, top)
-
-function c∇(f_cut::SA.SVector, grid::Grid, k; bottom = NoBCGivenError(), top = NoBCGivenError())
-    if is_surface_center(grid, k)
-        return c∇(f_cut, grid, BottomBCTag(), bottom)
-    elseif is_toa_center(grid, k)
-        return c∇(f_cut, grid, TopBCTag(), top)
-    else
-        return c∇(f_cut, grid, InteriorTag())
-    end
-end
-c∇(f::SA.SVector, grid::Grid, ::AbstractBCTag, ::NoBCGivenError) = error("No BC given")
-function c∇(f::SA.SVector, grid::Grid, ::InteriorTag)
-    @assert length(f) == 3
-    f_dual⁺ = SA.SVector(f[2], f[3])
-    f_dual⁻ = SA.SVector(f[1], f[2])
-    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
-end
-function c∇(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue)
-    @assert length(f) == 2
-    # 2fb = cg+ci => cg = 2fb-ci
-    f_dual⁺ = SA.SVector(f[2], 2 * bc.value - f[2])
-    f_dual⁻ = SA.SVector(f[1], f[2])
-    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
-end
-function c∇(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue)
-    @assert length(f) == 2
-    # 2fb = cg+ci => cg = 2fb-ci
-    f_dual⁺ = SA.SVector(f[1], f[2])
-    f_dual⁻ = SA.SVector(2 * bc.value - f[1], f[1])
-    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
-end
-function c∇(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetGradient)
-    @assert length(f) == 2
-    f_dual⁻ = SA.SVector(f[1], f[2])
-    return (bc.value + ∇_staggered(f_dual⁻, grid)) / 2
-end
-function c∇(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient)
-    @assert length(f) == 2
-    f_dual⁺ = SA.SVector(f[1], f[2])
-    return (∇_staggered(f_dual⁺, grid) + bc.value) / 2
-end
-function c∇(f::SA.SVector, grid::Grid, ::TopBCTag, ::Extrapolate)
-    @assert length(f) == 2
-    # 2ci = cg+cii => cg = 2ci-cii. Note: f[3] not used
-    f_dual⁺ = SA.SVector(f[2], 2 * f[2] - f[1])
-    f_dual⁻ = SA.SVector(f[1], f[2])
-    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
-end
-function c∇(f::SA.SVector, grid::Grid, ::BottomBCTag, ::Extrapolate)
-    @assert length(f) == 2
-    # 2ci = cg+cii => cg = 2ci-cii. Note: f[1] not used
-    f_dual⁺ = SA.SVector(f[1], f[2])
-    f_dual⁻ = SA.SVector(2 * f[1] - f[2], f[1])
-    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
-end
 
 #####
 ##### ∇(face data)
