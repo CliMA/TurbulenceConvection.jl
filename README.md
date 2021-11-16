@@ -31,8 +31,7 @@ Information about the EDMF parameterization implemented in TurbulenceConvection 
 
 Tan, Z., Kaul, C. M., Pressel, K. G., Cohen, Y., Schneider, T., and Teixeira, J. (2018)
 **An extended eddy-diffusivity mass-flux scheme for unified representation of
-subgrid-scale turbulence and convection.** *Journal of Advances in Modeling Earth Systems*.
-[doi](https://doi.org/10.1002/2017MS001162)
+subgrid-scale turbulence and convection.** *Journal of Advances in Modeling Earth Systems*. [doi](https://doi.org/10.1002/2017MS001162)
 
 Cohen, Y., Lopez-Gomez, I., Jaruga, A., He, J., Kaul, C., and Schneider, T. (2020) **Unified entrainment and detrainment closures for extended eddy-diffusivity mass-flux schemes.** *Journal of Advances in Modeling Earth Systems*, 12, e2020MS002162. [doi](https://doi.org/10.1029/2020MS002162)
 
