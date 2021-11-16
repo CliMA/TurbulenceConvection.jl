@@ -184,7 +184,15 @@ cent_aux_vars_edmf(FT, n_up) = (;
         # Added by Ignacio : Length scheme in use (mls), and smooth min effect (ml_ratio)
         # Variable Prandtl number initialized as neutral value.
         mls = FT(0),
+        b_exch = FT(0),
         ml_ratio = FT(0),
+        Shear² = FT(0),
+        ∂θv∂z = FT(0),
+        ∂qt∂z = FT(0),
+        ∂θl∂z = FT(0),
+        ∂θv∂z_unsat = FT(0),
+        ∂qt∂z_sat = FT(0),
+        ∂θl∂z_sat = FT(0),
         l_entdet = FT(0),
         ϕ_gm = FT(0), # temporary for grid-mean variables
         ϕ_gm_cov = FT(0), # temporary for grid-mean covariance variables

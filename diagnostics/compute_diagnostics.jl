@@ -1,5 +1,9 @@
 # TODO: should this live in its own module?
 
+import ClimaCore
+const CC = ClimaCore
+const CCO = CC.Operators
+
 """ Purely diagnostic fields for the host model """
 diagnostics(state, fl) = getproperty(state, TC.field_loc(fl))
 
@@ -49,6 +53,7 @@ the state, auxiliary fields (which the state does depend on), and
 tendencies.
 =#
 function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, TS)
+    FT = eltype(grid)
     gm.lwp = 0.0
     gm.iwp = 0.0
     ρ0_c = TC.center_ref_state(state).ρ0
@@ -93,17 +98,19 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, TS)
             end
         end
     end
-    m_bcs = (; bottom = TC.SetValue(0), top = TC.SetValue(0))
-    @inbounds for k in TC.real_face_indices(grid)
-        s_dual = TC.dual_centers(aux_en.s, grid, k)
-        # TODO(ilopezgp): Fix bottom gradient
-        ∇s_f = TC.∇c2f(s_dual, grid, k; bottom = TC.SetGradient(0), top = TC.SetGradient(0))
-        aux_gm_f.diffusive_flux_s[k] = -aux_tc_f.ρ_ae_KH[k] * ∇s_f
-        s_en_f = TC.interpc2f(aux_en.s, grid, k; m_bcs...)
-        @inbounds for i in 1:n_updrafts
-            s_up_f = TC.interpc2f(aux_up[i].s, grid, k; m_bcs...)
-            aux_gm_f.massflux_s[k] += aux_up_f[i].massflux[k] * (s_up_f - s_en_f)
-        end
+
+    # TODO(ilopezgp): Fix bottom gradient
+    wvec = CC.Geometry.WVector
+    m_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+    # ∇0_bcs = (; bottom = CCO.SetDivergence(wvec(FT(0))), top = CCO.SetDivergence(wvec(FT(0))))
+    ∇0_bcs = (; bottom = CCO.SetDivergence(FT(0)), top = CCO.SetDivergence(FT(0)))
+    If = CCO.InterpolateC2F(; m_bcs...)
+    ∇f = CCO.DivergenceC2F(; ∇0_bcs...)
+    massflux_s = aux_gm_f.massflux_s
+    parent(massflux_s) .= 0
+    @. aux_gm_f.diffusive_flux_s = -aux_tc_f.ρ_ae_KH * ∇f(wvec(aux_en.s))
+    @inbounds for i in 1:n_updrafts
+        @. massflux_s += aux_up_f[i].massflux * (If(aux_up[i].s) - If(aux_en.s))
     end
 
     up.lwp = 0.0
@@ -167,12 +174,17 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, TS)
         end
     end
 
+    If = CCO.InterpolateF2C()
+    parent(diag_tc.massflux) .= 0
+    @inbounds for i in 1:(edmf.n_updrafts)
+        @. diag_tc.massflux += If(aux_up_f[i].massflux)
+    end
+
     @inbounds for k in TC.real_center_indices(grid)
         a_up_bulk_k = a_up_bulk[k]
         if a_up_bulk_k > 0.0
             @inbounds for i in 1:(edmf.n_updrafts)
                 aux_up_i = aux_up[i]
-                diag_tc.massflux[k] += TC.interpf2c(aux_up_f[i].massflux, grid, k)
                 diag_tc.entr_sc[k] += aux_up_i.area[k] * aux_up_i.entr_sc[k] / a_up_bulk_k
                 diag_tc.detr_sc[k] += aux_up_i.area[k] * aux_up_i.detr_sc[k] / a_up_bulk_k
                 diag_tc.asp_ratio[k] += aux_up_i.area[k] * aux_up_i.asp_ratio[k] / a_up_bulk_k
@@ -182,31 +194,29 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, TS)
         end
     end
 
-    @inbounds for k in TC.real_face_indices(grid)
-        a_up_bulk_f = TC.interpc2f(
-            a_up_bulk,
-            grid,
-            k;
-            bottom = TC.SetValue(sum(edmf.area_surface_bc)),
-            top = TC.SetZeroGradient(),
-        )
-        if a_up_bulk_f > 0.0
-            @inbounds for i in 1:(edmf.n_updrafts)
-                a_up_f = TC.interpc2f(
-                    aux_up[i].area,
-                    grid,
-                    k;
-                    bottom = TC.SetValue(edmf.area_surface_bc[i]),
-                    top = TC.SetZeroGradient(),
-                )
-                diag_tc_f.nh_pressure[k] += a_up_f * aux_up_f[i].nh_pressure[k] / a_up_bulk_f
-                diag_tc_f.nh_pressure_b[k] += a_up_f * aux_up_f[i].nh_pressure_b[k] / a_up_bulk_f
-                diag_tc_f.nh_pressure_adv[k] += a_up_f * aux_up_f[i].nh_pressure_adv[k] / a_up_bulk_f
-                diag_tc_f.nh_pressure_drag[k] += a_up_f * aux_up_f[i].nh_pressure_drag[k] / a_up_bulk_f
+    a_up_bulk_f = copy(diag_tc_f.nh_pressure)
+    a_bulk_bcs = (; bottom = CCO.SetValue(sum(edmf.area_surface_bc)), top = CCO.Extrapolate())
+    Ifa = CCO.InterpolateC2F(; a_bulk_bcs...)
+    @. a_up_bulk_f = Ifa(a_up_bulk)
+
+    a_up_bulk_f = copy(diag_tc_f.nh_pressure)
+    a_up_f = copy(a_up_bulk_f)
+    a_bulk_bcs = (; bottom = CCO.SetValue(sum(edmf.area_surface_bc)), top = CCO.Extrapolate())
+    Ifabulk = CCO.InterpolateC2F(; a_bulk_bcs...)
+    @. a_up_bulk_f = Ifabulk(a_up_bulk)
+    @inbounds for i in 1:(edmf.n_updrafts)
+        a_up_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.Extrapolate())
+        Ifaup = CCO.InterpolateC2F(; a_up_bcs...)
+        @. a_up_f = Ifaup(aux_up[i].area)
+        @inbounds for k in TC.real_face_indices(grid)
+            if a_up_bulk_f[k] > 0.0
+                diag_tc_f.nh_pressure[k] += a_up_f[k] * aux_up_f[i].nh_pressure[k] / a_up_bulk_f[k]
+                diag_tc_f.nh_pressure_b[k] += a_up_f[k] * aux_up_f[i].nh_pressure_b[k] / a_up_bulk_f[k]
+                diag_tc_f.nh_pressure_adv[k] += a_up_f[k] * aux_up_f[i].nh_pressure_adv[k] / a_up_bulk_f[k]
+                diag_tc_f.nh_pressure_drag[k] += a_up_f[k] * aux_up_f[i].nh_pressure_drag[k] / a_up_bulk_f[k]
             end
         end
     end
-
 
     return
 end
