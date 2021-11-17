@@ -296,40 +296,30 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
         end
     end
 
-    @inbounds for k in real_face_indices(grid)
-        @inbounds for i in 1:N_up
+    wvec = CC.Geometry.WVector
+    @inbounds for i in 1:N_up
 
-            # pressure
-            a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
-            a_kfull = interpc2f(aux_up[i].area, grid, k; a_bcs...)
-            if a_kfull > 0.0
-                B = aux_up[i].buoy
-                b_bcs = (; bottom = SetValue(B[kc_surf]), top = SetValue(B[kc_toa]))
-                b_kfull = interpc2f(aux_up[i].buoy, grid, k; b_bcs...)
-                w_cut = fcut(aux_up_f[i].w, grid, k)
-                ∇w_up = f∇(w_cut, grid, k; bottom = SetValue(0), top = SetGradient(0))
-                asp_ratio = 1.0
-                nh_pressure_b, nh_pressure_adv, nh_pressure_drag = perturbation_pressure(
-                    param_set,
-                    up.updraft_top[i],
-                    a_kfull,
-                    b_kfull,
-                    ρ0_f[k],
-                    aux_up_f[i].w[k],
-                    ∇w_up,
-                    aux_en_f.w[k],
-                    asp_ratio,
-                )
-            else
-                nh_pressure_b = 0.0
-                nh_pressure_adv = 0.0
-                nh_pressure_drag = 0.0
-            end
-            aux_up_f[i].nh_pressure_b[k] = nh_pressure_b
-            aux_up_f[i].nh_pressure_adv[k] = nh_pressure_adv
-            aux_up_f[i].nh_pressure_drag[k] = nh_pressure_drag
-            aux_up_f[i].nh_pressure[k] = nh_pressure_b + nh_pressure_adv + nh_pressure_drag
-        end
+        # pressure
+        b_up = aux_up[i].buoy
+        a_up = aux_up[i].area
+        w_up = aux_up_f[i].w
+        w_en = aux_en_f.w
+        updraft_top = up.updraft_top[i]
+        asp_ratio = 1.0
+
+        b_bcs = (; bottom = CCO.SetValue(b_up[kc_surf]), top = CCO.SetValue(b_up[kc_toa]))
+        a_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.SetValue(FT(0)))
+        w_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
+        bcs = (; a_up = a_bcs, b_up = b_bcs, w_up = w_bcs)
+
+        nh_press_buoy = aux_up_f[i].nh_pressure_b
+        nh_press_adv = aux_up_f[i].nh_pressure_adv
+        nh_press_drag = aux_up_f[i].nh_pressure_drag
+
+        nh_press_buoy .= nh_pressure_buoy(param_set, a_up, b_up, ρ0_f, asp_ratio, bcs)
+        nh_press_adv .= nh_pressure_adv(param_set, updraft_top, a_up, ρ0_f, w_up, bcs)
+        nh_press_drag .= nh_pressure_drag(param_set, updraft_top, a_up, ρ0_f, w_up, w_en, bcs)
+        @. aux_up_f[i].nh_pressure = nh_press_buoy + nh_press_adv + nh_press_drag
     end
 
     #####
@@ -343,7 +333,7 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     a_en = aux_en.area
     w_en = aux_en_f.w
     tke_en = aux_en.tke
-    for i in 1:(up.n_updrafts)
+    @inbounds for i in 1:N_up
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
         δ_dyn = aux_up[i].detr_sc
