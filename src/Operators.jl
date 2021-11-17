@@ -142,66 +142,6 @@ interpf2c(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[1] + f[2]) / 2
 interpf2c(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (f[1] + bc.value) / 2
 interpf2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (bc.value + f[2]) / 2
 
-
-#####
-##### ∇(face data)
-#####
-
-f∇(f, grid::Grid, k; bottom = NoBCGivenError(), top = NoBCGivenError()) = f∇(fcut(f, grid, k), grid, k; bottom, top)
-
-function f∇(f_cut::SA.SVector, grid::Grid, k; bottom = NoBCGivenError(), top = NoBCGivenError())
-    if is_surface_face(grid, k)
-        return f∇(f_cut, grid, BottomBCTag(), bottom)
-    elseif is_toa_face(grid, k)
-        return f∇(f_cut, grid, TopBCTag(), top)
-    else
-        return f∇(f_cut, grid, InteriorTag())
-    end
-end
-f∇(f::SA.SVector, grid::Grid, ::AbstractBCTag, ::NoBCGivenError) = error("No BC given")
-function f∇(f::SA.SVector, grid::Grid, ::InteriorTag)
-    @assert length(f) == 3
-    f_dual⁺ = SA.SVector(f[2], f[3])
-    f_dual⁻ = SA.SVector(f[1], f[2])
-    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
-end
-function f∇(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue)
-    @assert length(f) == 2
-    # 2fb = fg+fi => fg = 2fb-fi
-    f_dual⁺ = SA.SVector(bc.value, 2 * bc.value - f[1])
-    f_dual⁻ = SA.SVector(f[1], bc.value)
-    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
-end
-function f∇(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue)
-    @assert length(f) == 2
-    # 2fb = fg+fi => fg = 2fb-fi
-    f_dual⁺ = SA.SVector(bc.value, f[2])
-    f_dual⁻ = SA.SVector(2 * bc.value - f[2], bc.value)
-    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
-end
-function f∇(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetGradient)
-    @assert length(f) == 2
-    return bc.value
-end
-function f∇(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient)
-    @assert length(f) == 2
-    return bc.value
-end
-function f∇(f::SA.SVector, grid::Grid, ::TopBCTag, ::Extrapolate)
-    @assert length(f) == 2
-    # 2fb = fg+fi => fg = 2fb-fi
-    f_dual⁺ = SA.SVector(f[2], 2 * f[2] - f[1])
-    f_dual⁻ = SA.SVector(f[1], f[2])
-    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
-end
-function f∇(f::SA.SVector, grid::Grid, ::BottomBCTag, ::Extrapolate)
-    @assert length(f) == 2
-    # 2fb = fg+fi => fg = 2fb-fi
-    f_dual⁺ = SA.SVector(f[1], f[2])
-    f_dual⁻ = SA.SVector(2 * f[1] - f[2], f[1])
-    return (∇_staggered(f_dual⁺, grid) + ∇_staggered(f_dual⁻, grid)) / 2
-end
-
 #####
 ##### Generic functions
 #####
@@ -209,40 +149,6 @@ end
 function ∇_staggered(f::SA.SVector, grid::Grid)
     @assert length(f) == 2
     return (f[2] - f[1]) * grid.Δzi
-end
-
-"""
-    ccut
-
-Used when
-     - traversing cell centers
-     - grabbing centered center stencils
-"""
-function ccut(f, grid, k::Cent)
-    if is_surface_center(grid, k)
-        return SA.SVector(f[k], f[k + 1])
-    elseif is_toa_center(grid, k)
-        return SA.SVector(f[k - 1], f[k])
-    else
-        return SA.SVector(f[k - 1], f[k], f[k + 1])
-    end
-end
-
-"""
-    fcut
-
-Used when
-     - traversing cell faces
-     - grabbing centered face stencils
-"""
-function fcut(f, grid, k::CCO.PlusHalf)
-    if is_surface_face(grid, k)
-        return SA.SVector(f[k], f[k + 1])
-    elseif is_toa_face(grid, k)
-        return SA.SVector(f[k - 1], f[k])
-    else
-        return SA.SVector(f[k - 1], f[k], f[k + 1])
-    end
 end
 
 """
@@ -274,41 +180,6 @@ function ccut_upwind(f, grid, k::Cent)
         return SA.SVector(f[k])
     else
         return SA.SVector(f[k - 1], f[k])
-    end
-end
-
-"""
-    fcut_upwind
-
-Used when
-     - traversing cell faces
-     - grabbing one-sided (upwind) stencil of cell face `k` and cell face `k-1`
-"""
-function fcut_upwind(f, grid, k)
-    if is_surface_face(grid, k)
-        return SA.SVector(f[k])
-    else
-        return SA.SVector(f[k - 1], f[k])
-    end
-end
-
-"""
-    daul_c2f_upwind
-
-Used when
-     - traversing cell faces
-     - grabbing _interpolated_ one-sided (upwind) stencil of cell face `k` and cell face `k-1`
-"""
-function daul_c2f_upwind(f, grid, k::CCO.PlusHalf; bottom::SetValue, top::SetZeroGradient)
-    kc = Cent(k.i)
-    if is_toa_face(grid, k)
-        return SA.SVector((f[kc - 2] + f[kc - 1]) / 2, (f[kc - 2] + f[kc - 1]) / 2)
-    elseif is_surface_face(grid, k) # never actually called
-        error("Uncaught case")
-    elseif is_surface_face(grid, k - 1)
-        return SA.SVector(bottom.value, (f[kc - 1] + f[kc]) / 2)
-    else
-        return SA.SVector((f[kc - 2] + f[kc - 1]) / 2, (f[kc - 1] + f[kc]) / 2)
     end
 end
 
