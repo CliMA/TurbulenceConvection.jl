@@ -122,6 +122,7 @@ cent_aux_vars_edmf(FT, n_up) = (;
             θ_liq_ice_tendency_precip_formation = FT(0),
             qt_tendency_precip_formation = FT(0),
             Ri = FT(0),
+            D_env = FT(0),
         ),
         up = ntuple(i -> cent_aux_vars_up(FT), n_up),
         en = (;

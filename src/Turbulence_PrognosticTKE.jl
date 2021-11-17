@@ -828,6 +828,7 @@ function compute_en_tendencies!(
     KH = center_aux_turbconv(state).KH
     aux_tc = center_aux_turbconv(state)
     aux_bulk = center_aux_bulk(state)
+    D_env = aux_bulk.D_env
     ae = 1 .- aux_bulk.area
     aeK = is_tke ? ae .* KM : ae .* KH
 
@@ -847,7 +848,7 @@ function compute_en_tendencies!(
     @. ∇ρ_ae_K∇ϕ = ∇c(ρ0_f * If(aeK) * ∇f(covar))
 
     mixing_length = aux_tc.mixing_length
-    minimum_area = edmf.minimum_area
+    min_area = edmf.minimum_area
     pressure_plume_spacing = edmf.pressure_plume_spacing
 
     ρaew_en_ϕ = center_aux_turbconv(state).ρaew_en_ϕ
@@ -859,25 +860,23 @@ function compute_en_tendencies!(
 
     prog_covar[kc_surf] = covar[kc_surf]
 
+    parent(D_env) .= 0
+
+    @inbounds for i in 1:N_up
+        turb_entr = aux_up[i].frac_turb_entr
+        entr_sc = aux_up[i].entr_sc
+        w_up = aux_up_f[i].w
+        a_up = aux_up[i].area
+        @. D_env += Int(a_up > min_area) * ρ0_c * a_up * Ic(w_up) * (entr_sc + turb_entr)
+    end
+
     @inbounds for k in real_center_indices(grid)
         is_surface_center(grid, k) && continue
-        D_env = sum(1:N_up) do i
-            if aux_up[i].area[k] > minimum_area
-                turb_entr = aux_up[i].frac_turb_entr[k]
-                entr_sc = aux_up[i].entr_sc[k]
-                R_up = pressure_plume_spacing[i]
-                w_up_c = interpf2c(aux_up_f[i].w, grid, k)
-                D_env_i = ρ0_c[k] * aux_up[i].area[k] * w_up_c * (entr_sc + turb_entr)
-            else
-                D_env_i = FT(0)
-            end
-            D_env_i
-        end
         dissipation = ρ0_c[k] * area_en[k] * c_d * sqrt(max(tke_en[k], 0)) / max(mixing_length[k], 1)
         ρaew_en_ϕ_cut = ccut_downwind(ρaew_en_ϕ, grid, k)
         ∇ρaew_en_ϕ = c∇_downwind(ρaew_en_ϕ_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(FT(0)))
         prog_covar[k] =
-            press[k] + buoy[k] + shear[k] + entr_gain[k] + rain_src[k] - D_env * covar[k] - dissipation * covar[k] -
+            press[k] + buoy[k] + shear[k] + entr_gain[k] + rain_src[k] - D_env[k] * covar[k] - dissipation * covar[k] -
             ∇ρaew_en_ϕ + ∇ρ_ae_K∇ϕ[k]
     end
 
