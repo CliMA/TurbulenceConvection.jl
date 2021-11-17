@@ -1,4 +1,4 @@
-function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
+function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, param_set, TS) where {N_up}
     #####
     ##### Unpack common variables
     #####
@@ -44,7 +44,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         #####
         ##### Set primitive variables
         #####
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             if is_surface_center(grid, k)
                 if prog_up[i].ρarea[k] / ρ0_c[k] >= edmf.minimum_area
                     aux_up[i].θ_liq_ice[k] = edmf.h_surface_bc[i]
@@ -72,9 +72,9 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         #####
         aux_bulk.q_tot[k] = 0
         aux_bulk.θ_liq_ice[k] = 0
-        aux_bulk.area[k] = sum(ntuple(i -> aux_up[i].area[k], up.n_updrafts))
+        aux_bulk.area[k] = sum(i -> aux_up[i].area[k], 1:N_up)
         if aux_bulk.area[k] > 0
-            @inbounds for i in 1:(up.n_updrafts)
+            @inbounds for i in 1:N_up
                 aux_bulk.q_tot[k] += aux_up[i].area[k] * aux_up[i].q_tot[k] / aux_bulk.area[k]
                 aux_bulk.θ_liq_ice[k] += aux_up[i].area[k] * aux_up[i].θ_liq_ice[k] / aux_bulk.area[k]
             end
@@ -116,7 +116,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         update_sat_unsat(en_thermo, state, k, ts_en)
         aux_en.RH[k] = TD.relative_humidity(ts_en)
 
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
                 qt = aux_up[i].q_tot[k - 1]
                 h = aux_up[i].θ_liq_ice[k - 1]
@@ -132,10 +132,10 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
             aux_up[i].RH[k] = TD.relative_humidity(ts_up)
         end
         aux_gm.buoy[k] = (1.0 - aux_bulk.area[k]) * aux_en.buoy[k]
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             aux_gm.buoy[k] += aux_up[i].area[k] * aux_up[i].buoy[k]
         end
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             aux_up[i].buoy[k] -= aux_gm.buoy[k]
         end
         aux_en.buoy[k] -= aux_gm.buoy[k]
@@ -150,7 +150,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         aux_bulk.RH[k] = 0
         aux_bulk.buoy[k] = 0
         if a_bulk_c > 0
-            @inbounds for i in 1:(up.n_updrafts)
+            @inbounds for i in 1:N_up
                 aux_bulk.q_liq[k] += aux_up[i].area[k] * aux_up[i].q_liq[k] / a_bulk_c
                 aux_bulk.q_ice[k] += aux_up[i].area[k] * aux_up[i].q_ice[k] / a_bulk_c
                 aux_bulk.T[k] += aux_up[i].area[k] * aux_up[i].T[k] / a_bulk_c
@@ -183,11 +183,11 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     @inbounds for k in real_face_indices(grid)
         if is_surface_face(grid, k)
-            @inbounds for i in 1:(up.n_updrafts)
+            @inbounds for i in 1:N_up
                 aux_up_f[i].w[k] = edmf.w_surface_bc[i]
             end
         else
-            @inbounds for i in 1:(up.n_updrafts)
+            @inbounds for i in 1:N_up
                 a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
                 anew_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
                 if anew_k >= edmf.minimum_area
@@ -201,7 +201,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
         a_bulk_bcs = (; bottom = SetValue(sum(edmf.area_surface_bc)), top = SetZeroGradient())
         a_bulk_f = interpc2f(aux_bulk.area, grid, k; a_bulk_bcs...)
         if a_bulk_f > 0
-            @inbounds for i in 1:(up.n_updrafts)
+            @inbounds for i in 1:N_up
                 a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
                 a_up_f = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
                 aux_tc_f.bulk.w[k] += a_up_f * aux_up_f[i].w[k] / a_bulk_f
@@ -237,7 +237,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
 
     @inbounds for k in real_center_indices(grid)
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             # entrainment
             if aux_up[i].area[k] > 0.0
                 # compute ∇m at cell centers
@@ -297,7 +297,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     end
 
     @inbounds for k in real_face_indices(grid)
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
 
             # pressure
             a_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetValue(0))
@@ -474,7 +474,7 @@ function update_aux!(edmf, gm, grid, state, Case, param_set, TS)
     #####
     @inbounds for k in real_center_indices(grid)
         aux_en_2m.tke.press[k] = 0.0
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             w_up_c = interpf2c(aux_up_f[i].w, grid, k)
             w_en_c = interpf2c(aux_en_f.w, grid, k)
             press_c = interpf2c(aux_up_f[i].nh_pressure, grid, k)
