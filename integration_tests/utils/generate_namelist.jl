@@ -397,11 +397,11 @@ end
 
 function LES_driven_SCM(namelist_defaults)
     namelist = deepcopy(namelist_defaults)
-    namelist["grid"]["dz"] = 20.0
-    namelist["grid"]["nz"] = 200
+    namelist["grid"]["dz"] = 50.0
+    namelist["grid"]["nz"] = 80
 
     namelist["stats_io"]["frequency"] = 10.0
-    namelist["time_stepping"]["dt"] = 3.0
+    namelist["time_stepping"]["dt"] = 2.0
     namelist["time_stepping"]["t_max"] = 3600.0 * 6
 
     # use last 6 hours of LES simulation to drive LES
