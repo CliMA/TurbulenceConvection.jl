@@ -170,8 +170,6 @@ cent_aux_vars_edmf(FT, n_up) = (;
         KH = FT(0),
         mixing_length = FT(0),
         θ_virt = FT(0),
-        ∇ρ_ae_K∇ϕ = FT(0),
-        ρaew_en_ϕ = FT(0),
         massflux_tendency_h = FT(0),
         massflux_tendency_qt = FT(0),
         diffusive_tendency_h = FT(0),
@@ -215,7 +213,6 @@ face_aux_vars_edmf(FT, n_up) = (;
         ρ_ae_KM = FT(0),
         ρ_ae_KH = FT(0),
         ρ_ae_K = FT(0),
-        ρ_ae_K∇ϕ = FT(0),
         en = (; w = FT(0)),
         up = ntuple(i -> face_aux_vars_up(FT), n_up),
         massflux_h = FT(0),
@@ -435,6 +432,13 @@ function run(sim::Simulation1d)
     callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
 
     prob = ODE.ODEProblem(TC.step!, state.prog, t_span, params; dt = sim.TS.dt)
+
+    # TODO: LES_driven_SCM is currently unstable w.r.t. higher order moments (HOM).
+    # So, we tell OrdinaryDiffEq.jl to not perform NaNs check on the solution
+    # so that it doesn't abort early (as the HOM prognostic variables are 1-way coupled)
+    unstable_check_kwarg(::Cases.LES_driven_SCM) = (; unstable_check = (dt, u, p, t) -> false)
+    unstable_check_kwarg(case) = ()
+
     sol = ODE.solve(
         prob,
         ODE.Euler();
@@ -443,6 +447,7 @@ function run(sim::Simulation1d)
         saveat = last(t_span),
         callback = ODE.CallbackSet(callback_filters, callback_io),
         progress = true,
+        unstable_check_kwarg(sim.Case.case)...,
         progress_message = (dt, u, p, t) -> t,
     )
 
