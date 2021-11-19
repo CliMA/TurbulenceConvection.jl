@@ -35,7 +35,6 @@ end
     for k in keys(best_mse)
         test_mse(computed_mse, best_mse, k)
     end
+    include(joinpath("utils", "post_run_tests.jl"))
     nothing
 end
-
-include(joinpath("utils", "post_run_tests.jl"))
