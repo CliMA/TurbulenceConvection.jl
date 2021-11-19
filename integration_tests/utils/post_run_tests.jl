@@ -20,3 +20,10 @@
     end
     nothing
 end
+
+@testset "Simulation completion" begin
+    # Test that the simulation has actually finished,
+    # and not aborted early.
+    @test !(return_code == :simulation_aborted)
+    @test return_code == :success
+end

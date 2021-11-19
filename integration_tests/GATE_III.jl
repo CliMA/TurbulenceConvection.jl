@@ -12,7 +12,7 @@ import .NameList
 println("Running GATE_III...")
 namelist = default_namelist("GATE_III")
 namelist["meta"]["uuid"] = "01"
-ds_tc_filename = @time main(namelist; time_run = true)
+ds_tc_filename, return_code = @time main(namelist; time_run = true)
 
 @testset "GATE_III" begin end
 

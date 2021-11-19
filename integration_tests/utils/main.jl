@@ -447,8 +447,11 @@ function run(sim::Simulation1d)
     )
 
     sim.skip_io || TC.close_files(sim.Stats) # #removeVarsHack
-    first(sol.t) == sim.TS.t_max || error("Could not run to t_max")
-    return
+    if first(sol.t) == sim.TS.t_max
+        return :success
+    else
+        return :simulation_aborted
+    end
 end
 
 function main(namelist; kwargs...)
@@ -459,15 +462,15 @@ nc_results_file(stats::TC.NetCDFIO_Stats) = stats.path_plus_file
 nc_results_file(::Nothing) = @info "The simulation was run without IO, so no nc files were exported"
 
 function main1d(namelist; time_run = false)
-    Simulation = Simulation1d(namelist)
-    TurbulenceConvection.initialize(Simulation, namelist)
+    sim = Simulation1d(namelist)
+    TurbulenceConvection.initialize(sim, namelist)
     if time_run
-        @time run(Simulation)
+        return_code = @time run(sim)
     else
-        run(Simulation)
+        return_code = run(sim)
     end
-    println("The simulation has completed.")
-    return nc_results_file(Simulation.Stats)
+    return_code == :success && println("The simulation has completed.")
+    return nc_results_file(sim.Stats), return_code
 end
 
 

@@ -16,7 +16,7 @@ case_name = "SP"
 println("Running $case_name...")
 namelist = NameList.default_namelist(case_name)
 namelist["meta"]["uuid"] = "01"
-ds_tc_filename = @time main(namelist; time_run = true)
+ds_tc_filename, return_code = @time main(namelist; time_run = true)
 
 computed_mse =
     compute_mse_wrapper(case_name, best_mse, ds_tc_filename; plot_comparison = true, t_start = 0, t_stop = 2 * 3600)
