@@ -14,6 +14,7 @@ namelist = default_namelist("GATE_III")
 namelist["meta"]["uuid"] = "01"
 ds_tc_filename, return_code = @time main(namelist; time_run = true)
 
-@testset "GATE_III" begin end
-
-include(joinpath("utils", "post_run_tests.jl"))
+@testset "GATE_III" begin
+    include(joinpath("utils", "post_run_tests.jl"))
+    nothing
+end
