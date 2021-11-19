@@ -630,9 +630,10 @@ function compute_covariance_shear(
     u = prog_gm.u
     v = prog_gm.v
     area_en = aux_en_c.area
+    shear = aux_covar.shear
 
     if is_tke
-        @. aux_covar.shear =
+        @. shear =
             tke_factor *
             2 *
             ρ0_c *
@@ -640,7 +641,7 @@ function compute_covariance_shear(
             k_eddy *
             (∇c(wvec(EnvVar1)) * ∇c(wvec(EnvVar2)) + (∇c(wvec(If(u))))^2 + (∇c(wvec(If(v))))^2)
     else
-        @. aux_covar.shear = tke_factor * 2 * ρ0_c * area_en * k_eddy * ∇c(wvec(If(EnvVar1))) * ∇c(wvec(If(EnvVar2)))
+        @. shear = tke_factor * 2 * ρ0_c * area_en * k_eddy * ∇c(wvec(If(EnvVar1))) * ∇c(wvec(If(EnvVar2)))
     end
     return
 end
@@ -752,7 +753,7 @@ function compute_covariance_entr(
     return
 end
 
-function compute_covariance_detr(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol)
+function compute_covariance_detr(edmf::EDMF_PrognosticTKE{N_up}, grid, state, covar_sym::Symbol) where {N_up}
     up = edmf.UpdVar
     ρ0_c = center_ref_state(state).ρ0
     aux_up_f = face_aux_updrafts(state)
@@ -765,7 +766,7 @@ function compute_covariance_detr(edmf::EDMF_PrognosticTKE, grid, state, covar_sy
     Ic = CCO.InterpolateF2C()
 
     parent(detr_loss) .= 0
-    @inbounds for i in 1:(up.n_updrafts)
+    @inbounds for i in 1:N_up
         aux_up_i = aux_up[i]
         area_up = aux_up_i.area
         entr_sc = aux_up_i.entr_sc
