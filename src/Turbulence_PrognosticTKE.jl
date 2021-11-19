@@ -30,9 +30,13 @@ end
 
 function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm, TS)
     tendencies_gm = center_tendencies_grid_mean(state)
+    kc_toa = kc_top_of_atmos(grid)
+    FT = eltype(grid)
     param_set = parameter_set(gm)
     prog_gm = center_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
+    ∇θ_liq_ice_gm = center_aux_grid_mean(state).∇θ_liq_ice_gm
+    ∇q_tot_gm = center_aux_grid_mean(state).∇q_tot_gm
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_up = center_aux_updrafts(state)
@@ -48,6 +52,15 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     en = edmf.EnvVar
     aux_tc = center_aux_turbconv(state)
 
+    θ_liq_ice_gm_toa = prog_gm.θ_liq_ice[kc_toa]
+    q_tot_gm_toa = prog_gm.q_tot[kc_toa]
+    RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_liq_ice_gm_toa))
+    RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa))
+    wvec = CC.Geometry.WVector
+    ∇ = CCO.DivergenceF2C()
+    @. ∇θ_liq_ice_gm = ∇(wvec(RBθ(prog_gm.θ_liq_ice)))
+    @. ∇q_tot_gm = ∇(wvec(RBq(prog_gm.q_tot)))
+
     @inbounds for k in real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
         ts = thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
@@ -60,22 +73,18 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         if rad_type(Case.Rad) <: Union{RadiationDYCOMS_RF01, RadiationLES}
             tendencies_gm.θ_liq_ice[k] += aux_gm.dTdt_rad[k] / Π
         end
-        H_cut = ccut_downwind(prog_gm.θ_liq_ice, grid, k)
-        q_tot_cut = ccut_downwind(prog_gm.q_tot, grid, k)
-        ∇H = c∇_downwind(H_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
-        ∇q_tot = c∇_downwind(q_tot_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(0))
 
         if force_type(Case.Fo) <: ForcingDYCOMS_RF01
             tendencies_gm.q_tot[k] += aux_gm.dqtdt[k]
             # Apply large-scale subsidence tendencies
-            tendencies_gm.θ_liq_ice[k] -= ∇H * aux_gm.subsidence[k]
-            tendencies_gm.q_tot[k] -= ∇q_tot * aux_gm.subsidence[k]
+            tendencies_gm.θ_liq_ice[k] -= ∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
+            tendencies_gm.q_tot[k] -= ∇q_tot_gm[k] * aux_gm.subsidence[k]
         end
 
         if force_type(Case.Fo) <: ForcingStandard
             if Case.Fo.apply_subsidence
-                tendencies_gm.θ_liq_ice[k] -= ∇H * aux_gm.subsidence[k]
-                tendencies_gm.q_tot[k] -= ∇q_tot * aux_gm.subsidence[k]
+                tendencies_gm.θ_liq_ice[k] -= ∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
+                tendencies_gm.q_tot[k] -= ∇q_tot_gm[k] * aux_gm.subsidence[k]
             end
             tendencies_gm.θ_liq_ice[k] += aux_gm.dTdt[k] / Π
             tendencies_gm.q_tot[k] += aux_gm.dqtdt[k]
@@ -100,8 +109,8 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
 
             if Case.Fo.apply_subsidence
                 # Apply large-scale subsidence tendencies
-                gm_H_subsidence_k = -∇H * aux_gm.subsidence[k]
-                gm_QT_subsidence_k = -∇q_tot * aux_gm.subsidence[k]
+                gm_H_subsidence_k = -∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
+                gm_QT_subsidence_k = -∇q_tot_gm[k] * aux_gm.subsidence[k]
             else
                 gm_H_subsidence_k = 0.0
                 gm_QT_subsidence_k = 0.0

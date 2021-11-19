@@ -76,6 +76,8 @@ cent_aux_vars_gm(FT) = (;
     v_nudge = FT(0), #Reference v profile for relaxation tendency
     ug = FT(0), #Geostrophic u velocity
     vg = FT(0), #Geostrophic v velocity
+    ∇θ_liq_ice_gm = FT(0),
+    ∇q_tot_gm = FT(0),
 )
 cent_aux_vars_en_2m(FT) = (;
     dissipation = FT(0),
