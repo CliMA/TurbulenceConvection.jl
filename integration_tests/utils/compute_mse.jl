@@ -304,19 +304,19 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
         # Interpolate data
         steady_data = size(data_les_arr, 1) == 1
         if steady_data
-            data_les_cont = Dierckx.Spline1D(z_les, vec(data_les_arr))
-            data_tcc_cont = Dierckx.Spline1D(z_tcc, vec(data_tcc_arr))
-            data_tcm_cont = Dierckx.Spline1D(z_tcm, vec(data_tcm_arr))
-            data_scm_cont = Dierckx.Spline1D(z_scm, vec(data_scm_arr))
+            data_les_cont = Dierckx.Spline1D(z_les, vec(data_les_arr); k = 1)
+            data_tcc_cont = Dierckx.Spline1D(z_tcc, vec(data_tcc_arr); k = 1)
+            data_tcm_cont = Dierckx.Spline1D(z_tcm, vec(data_tcm_arr); k = 1)
+            data_scm_cont = Dierckx.Spline1D(z_scm, vec(data_scm_arr); k = 1)
             data_les_cont_mapped = map(z -> data_les_cont(z), z_tcc)
             data_tcm_cont_mapped = map(z -> data_tcm_cont(z), z_tcc)
             data_tcc_cont_mapped = map(z -> data_tcc_cont(z), z_tcc)
             data_scm_cont_mapped = map(z -> data_scm_cont(z), z_tcc)
         else # unsteady data
-            data_les_cont = Dierckx.Spline2D(time_les, z_les, data_les_arr)
-            data_tcm_cont = Dierckx.Spline2D(time_tcm, z_tcm, data_tcm_arr)
-            data_tcc_cont = Dierckx.Spline2D(time_tcc, z_tcc, data_tcc_arr)
-            data_scm_cont = Dierckx.Spline2D(time_scm, z_scm, data_scm_arr)
+            data_les_cont = Dierckx.Spline2D(time_les, z_les, data_les_arr; kx = 1, ky = 1)
+            data_tcm_cont = Dierckx.Spline2D(time_tcm, z_tcm, data_tcm_arr; kx = 1, ky = 1)
+            data_tcc_cont = Dierckx.Spline2D(time_tcc, z_tcc, data_tcc_arr; kx = 1, ky = 1)
+            data_scm_cont = Dierckx.Spline2D(time_scm, z_scm, data_scm_arr; kx = 1, ky = 1)
             R = range(t_start, t_cmp; length = 50)
             data_les_cont_mapped = map(z_tcc) do z
                 StatsBase.mean(map(t -> data_les_cont(t, z), R))
