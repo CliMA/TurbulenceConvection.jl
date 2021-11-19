@@ -3,11 +3,12 @@ Computes the qr advection (down) tendency
 """
 function compute_precipitation_advection_tendencies(grid, state, gm, TS::TimeStepping)
     param_set = parameter_set(gm)
+    FT = eltype(grid)
     Δz = grid.Δz
     Δt = TS.dt
     CFL_limit = 0.5
 
-    ρ_0_c = center_ref_state(state).ρ0
+    ρ0_c = center_ref_state(state).ρ0
     tendencies_pr = center_tendencies_precipitation(state)
     prog_pr = center_prog_precipitation(state)
     aux_tc = center_aux_turbconv(state)
@@ -19,8 +20,8 @@ function compute_precipitation_advection_tendencies(grid, state, gm, TS::TimeSte
     term_vel_snow = aux_tc.term_vel_snow
 
     @inbounds for k in real_center_indices(grid)
-        term_vel_rain[k] = CM1.terminal_velocity(param_set, rain_type, ρ_0_c[k], prog_pr.q_rai[k])
-        term_vel_snow[k] = CM1.terminal_velocity(param_set, snow_type, ρ_0_c[k], prog_pr.q_sno[k])
+        term_vel_rain[k] = CM1.terminal_velocity(param_set, rain_type, ρ0_c[k], prog_pr.q_rai[k])
+        term_vel_snow[k] = CM1.terminal_velocity(param_set, snow_type, ρ0_c[k], prog_pr.q_sno[k])
     end
 
     @inbounds for k in real_center_indices(grid)
@@ -37,30 +38,22 @@ function compute_precipitation_advection_tendencies(grid, state, gm, TS::TimeSte
         if max(CFL_in_rain, CFL_in_snow, CFL_out_rain, CFL_out_snow) > CFL_limit
             error("Time step is too large for rain fall velocity!")
         end
-
-        ρ_0_cut = ccut_downwind(ρ_0_c, grid, k)
-
-        QR_cut = ccut_downwind(prog_pr.q_rai, grid, k)
-        QS_cut = ccut_downwind(prog_pr.q_sno, grid, k)
-
-        w_cut_rain = ccut_downwind(term_vel_rain, grid, k)
-        w_cut_snow = ccut_downwind(term_vel_snow, grid, k)
-
-        ρQRw_cut = ρ_0_cut .* QR_cut .* w_cut_rain
-        ρQSw_cut = ρ_0_cut .* QS_cut .* w_cut_snow
-
-        ∇ρQRw = c∇_downwind(ρQRw_cut, grid, k; bottom = FreeBoundary(), top = SetValue(0))
-        ∇ρQSw = c∇_downwind(ρQSw_cut, grid, k; bottom = FreeBoundary(), top = SetValue(0))
-
-        ρ_0_c_k = ρ_0_c[k]
-
-        # TODO - some positivity limiters are needed
-        aux_tc.qr_tendency_advection[k] = ∇ρQRw / ρ_0_c_k
-        aux_tc.qs_tendency_advection[k] = ∇ρQSw / ρ_0_c_k
-
-        tendencies_pr.q_rai[k] += aux_tc.qr_tendency_advection[k]
-        tendencies_pr.q_sno[k] += aux_tc.qs_tendency_advection[k]
     end
+
+    q_rai = prog_pr.q_rai
+    q_sno = prog_pr.q_sno
+
+    If = CCO.DivergenceF2C()
+    RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
+    ∇ = CCO.DivergenceF2C()
+    wvec = CC.Geometry.WVector
+
+    # TODO - some positivity limiters are needed
+    @. aux_tc.qr_tendency_advection = ∇(wvec(RB(ρ0_c * q_rai * term_vel_rain))) / ρ0_c
+    @. aux_tc.qs_tendency_advection = ∇(wvec(RB(ρ0_c * q_sno * term_vel_snow))) / ρ0_c
+
+    @. tendencies_pr.q_rai += aux_tc.qr_tendency_advection
+    @. tendencies_pr.q_sno += aux_tc.qs_tendency_advection
     return
 end
 
