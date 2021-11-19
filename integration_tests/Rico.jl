@@ -37,3 +37,5 @@ end
     end
     nothing
 end
+
+include(joinpath("utils", "post_run_tests.jl"))

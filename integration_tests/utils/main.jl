@@ -447,6 +447,7 @@ function run(sim::Simulation1d)
     )
 
     sim.skip_io || TC.close_files(sim.Stats) # #removeVarsHack
+    first(sol.t) == sim.TS.t_max || error("Could not run to t_max")
     return
 end
 
