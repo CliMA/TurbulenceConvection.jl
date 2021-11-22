@@ -1,5 +1,5 @@
 """
-Computes the qr advection (down) tendency
+Computes the rain and snow advection (down) tendency
 """
 function compute_precipitation_advection_tendencies(grid, state, gm, TS::TimeStepping)
     param_set = parameter_set(gm)
@@ -45,7 +45,7 @@ function compute_precipitation_advection_tendencies(grid, state, gm, TS::TimeSte
 
     If = CCO.DivergenceF2C()
     RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
-    ∇ = CCO.DivergenceF2C()
+    ∇ = CCO.DivergenceF2C(; bottom = CCO.Extrapolate())
     wvec = CC.Geometry.WVector
 
     # TODO - some positivity limiters are needed
