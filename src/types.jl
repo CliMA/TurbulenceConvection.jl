@@ -371,6 +371,7 @@ end
 rad_type(::RadiationBase{T}) where {T} = T
 
 Base.@kwdef mutable struct CasesBase{T}
+    case::T
     casename::String = "default_casename"
     inversion_option::String = "default_inversion_option"
     les_filename::String = "None"
@@ -384,7 +385,7 @@ Base.@kwdef mutable struct CasesBase{T}
     LESDat::Union{LESData, Nothing} = nothing
 end
 
-CasesBase(case::T; kwargs...) where {T} = CasesBase{T}(; casename = string(nameof(T)), kwargs...)
+CasesBase(case::T; kwargs...) where {T} = CasesBase{T}(; case = case, casename = string(nameof(T)), kwargs...)
 
 mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC}
     Ri_bulk_crit::Float64

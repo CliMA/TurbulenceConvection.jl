@@ -823,8 +823,6 @@ function compute_en_tendencies!(
     FT = eltype(grid)
 
     ρ_ae_K = face_aux_turbconv(state).ρ_ae_K
-    ρ_ae_K∇ϕ = face_aux_turbconv(state).ρ_ae_K∇ϕ
-    ∇ρ_ae_K∇ϕ = center_aux_turbconv(state).∇ρ_ae_K∇ϕ
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
     aux_tc = center_aux_turbconv(state)
@@ -839,27 +837,21 @@ function compute_en_tendencies!(
     entr_gain = aux_covar.entr_gain
     rain_src = aux_covar.rain_src
 
-    wvec = CC.Geometry.WVector(zero(FT))
+    wvec = CC.Geometry.WVector
     aeK_bcs = (; bottom = CCO.SetValue(aeK[kc_surf]), top = CCO.SetValue(aeK[kc_toa]))
-    prog_bcs = (; bottom = CCO.SetGradient(wvec), top = CCO.SetGradient(wvec))
+    prog_bcs = (; bottom = CCO.SetGradient(wvec(FT(0))), top = CCO.SetGradient(wvec(FT(0))))
 
     If = CCO.InterpolateC2F(; aeK_bcs...)
     ∇f = CCO.GradientC2F(; prog_bcs...)
     ∇c = CCO.DivergenceF2C()
-    @. ∇ρ_ae_K∇ϕ = ∇c(ρ0_f * If(aeK) * ∇f(covar))
 
     mixing_length = aux_tc.mixing_length
     min_area = edmf.minimum_area
     pressure_plume_spacing = edmf.pressure_plume_spacing
 
-    ρaew_en_ϕ = center_aux_turbconv(state).ρaew_en_ϕ
-
     Ic = CCO.InterpolateF2C()
     area_en = aux_en.area
     tke_en = aux_en.tke
-    @. ρaew_en_ϕ = ρ0_c * area_en * Ic(w_en_f) * covar
-
-    prog_covar[kc_surf] = covar[kc_surf]
 
     parent(D_env) .= 0
 
@@ -868,18 +860,18 @@ function compute_en_tendencies!(
         entr_sc = aux_up[i].entr_sc
         w_up = aux_up_f[i].w
         a_up = aux_up[i].area
+        # TODO: using `Int(bool) *` means that NaNs can propagate
+        # into the solution. Could we somehow call `ifelse` instead?
         @. D_env += Int(a_up > min_area) * ρ0_c * a_up * Ic(w_up) * (entr_sc + turb_entr)
     end
 
-    @inbounds for k in real_center_indices(grid)
-        is_surface_center(grid, k) && continue
-        dissipation = ρ0_c[k] * area_en[k] * c_d * sqrt(max(tke_en[k], 0)) / max(mixing_length[k], 1)
-        ρaew_en_ϕ_cut = ccut_downwind(ρaew_en_ϕ, grid, k)
-        ∇ρaew_en_ϕ = c∇_downwind(ρaew_en_ϕ_cut, grid, k; bottom = FreeBoundary(), top = SetGradient(FT(0)))
-        prog_covar[k] =
-            press[k] + buoy[k] + shear[k] + entr_gain[k] + rain_src[k] - D_env[k] * covar[k] - dissipation * covar[k] -
-            ∇ρaew_en_ϕ + ∇ρ_ae_K∇ϕ[k]
-    end
+    RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
+    @. prog_covar =
+        press + buoy + shear + entr_gain + rain_src - D_env * covar -
+        (ρ0_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * covar -
+        ∇c(wvec(RB(ρ0_c * area_en * Ic(w_en_f) * covar))) + ∇c(ρ0_f * If(aeK) * ∇f(covar))
+
+    prog_covar[kc_surf] = covar[kc_surf]
 
     return nothing
 end
