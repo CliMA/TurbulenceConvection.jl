@@ -34,6 +34,7 @@ function io_dictionary_aux()
     io_dict = Dict{String, DT}(
         "updraft_area" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).area),
         "updraft_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).q_liq),
+        "updraft_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).q_ice),
         "updraft_RH" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).RH),
         "updraft_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).q_tot),
         "updraft_w" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_bulk(state).w),
@@ -98,6 +99,7 @@ function io_dictionary_aux()
         "env_w" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_environment(state).w),
         "env_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_tot),
         "env_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_liq),
+        "env_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_ice),
         "env_area" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).area),
         "env_temperature" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).T),
         "env_RH" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH),
