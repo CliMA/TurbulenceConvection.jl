@@ -55,28 +55,6 @@ end
 ∇c2f(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[1] - bc.value) * grid.Δzi * 2.0
 ∇c2f(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
 
-# Actually, this method is needed for rain (upwind is in reverse direction due to rain)
-function c∇_downwind(f_dual::SA.SVector, grid::Grid, k; bottom = NoBCGivenError(), top = NoBCGivenError())
-    if is_surface_center(grid, k)
-        return c∇_downwind(f_dual, grid, BottomBCTag(), bottom)
-    elseif is_toa_center(grid, k)
-        return c∇_downwind(f_dual, grid, TopBCTag(), top)
-    else
-        return c∇_downwind(f_dual, grid, InteriorTag())
-    end
-end
-c∇_downwind(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.Δzi
-c∇_downwind(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * (grid.Δzi * 2)
-# TODO: this is a crud approximation, as we're specifying what should be the derivative
-# at the boundary, and we're taking this as the derivative at the first interior at the
-# top of the domain.
-c∇_downwind(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
-c∇_downwind(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.Δzi # don't use BC info
-# TODO: this is a crud approximation, as we're specifying what should be the derivative
-# at the boundary, and we're taking this as the derivative at the first interior at the
-# top of the domain.
-c∇_downwind(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
-
 c∇_upwind(f, grid::Grid, k; bottom = NoBCGivenError(), top = NoBCGivenError()) =
     c∇_upwind(ccut_upwind(f, grid, k), grid, k; bottom, top)
 
