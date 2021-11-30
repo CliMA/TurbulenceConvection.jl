@@ -414,6 +414,7 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC}
     wstar::Float64
     entr_surface_bc::Float64
     detr_surface_bc::Float64
+    dt_max::Float64
     sde_model::sde_struct
     bg_closure::EBGC
     function EDMF_PrognosticTKE(namelist, grid::Grid, param_set::PS) where {PS}
@@ -480,7 +481,7 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC}
         pressure_plume_spacing = zeros(n_updrafts)
 
         # Initialize SDE parameters
-        dt = parse_namelist(namelist, "time_stepping", "dt"; default = 1.0)
+        dt = parse_namelist(namelist, "time_stepping", "dt_min"; default = 1.0)
         closure = parse_namelist(
             namelist,
             "turbulence",
@@ -520,6 +521,7 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC}
         wstar = 0
         entr_surface_bc = 0
         detr_surface_bc = 0
+        dt_max = 0
         A1 = typeof(area_surface_bc)
         EBGC = typeof(bg_closure)
         return new{n_updrafts, A1, EBGC}(
@@ -549,6 +551,7 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC}
             wstar,
             entr_surface_bc,
             detr_surface_bc,
+            dt_max,
             sde_model,
             bg_closure,
         )

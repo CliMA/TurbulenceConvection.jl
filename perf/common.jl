@@ -28,7 +28,7 @@ function init_sim(case_name)
     @info "Initializing $case_name for single timestep, with no IO."
     @info "call update_n(sim, tendencies, n) to run update n-times"
     namelist = NameList.default_namelist(case_name)
-    namelist["time_stepping"]["t_max"] = namelist["time_stepping"]["dt"]
+    namelist["time_stepping"]["t_max"] = namelist["time_stepping"]["dt_max"]
     namelist["stats_io"]["frequency"] = 10.0e10
     namelist["stats_io"]["skip"] = true
     namelist["meta"]["uuid"] = "01"
