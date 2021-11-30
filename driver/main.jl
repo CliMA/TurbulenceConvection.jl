@@ -354,19 +354,12 @@ function solve_args(sim::Simulation1d)
         alg = ODE.Euler()
     end
 
-    # TODO: LES_driven_SCM is currently unstable w.r.t. higher order moments (HOM).
-    # So, we tell OrdinaryDiffEq.jl to not perform NaNs check on the solution
-    # so that it doesn't abort early (as the HOM prognostic variables are 1-way coupled)
-    unstable_check_kwarg(::Cases.LES_driven_SCM) = (; unstable_check = (dt, u, p, t) -> false)
-    unstable_check_kwarg(case) = ()
-
     kwargs = (;
         progress_steps = 100,
         save_start = false,
         saveat = last(t_span),
         callback = callbacks,
         progress = true,
-        unstable_check_kwarg(sim.case)...,
         progress_message = (dt, u, p, t) -> t,
     )
     return (prob, alg, kwargs)
