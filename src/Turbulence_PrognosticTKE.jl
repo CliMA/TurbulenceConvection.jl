@@ -694,12 +694,12 @@ function compute_covariance_entr(
     grid,
     state,
     ::Val{covar_sym},
-    v1::Val{var1},
-    v2::Val{var2} = v1,
-) where {covar_sym, var1, var2, N_up}
+    ϕs::Val{ϕ_sym},
+    ψs::Val{ψ_sym} = ϕs,
+) where {covar_sym, ϕ_sym, ψ_sym, N_up}
 
     ρ0_c = center_ref_state(state).ρ0
-
+    FT = eltype(grid)
     is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
     aux_up = center_aux_updrafts(state)
@@ -708,56 +708,55 @@ function compute_covariance_entr(
     prog_gm_f = face_prog_grid_mean(state)
     prog_gm = is_tke ? prog_gm_f : prog_gm_c
     prog_up = is_tke ? aux_up_f : aux_up
-    GmvVar1 = getproperty(prog_gm, var1)
-    GmvVar2 = getproperty(prog_gm, var2)
+    ϕ_gm = getproperty(prog_gm, ϕ_sym)
+    ψ_gm = getproperty(prog_gm, ψ_sym)
     aux_en_2m = center_aux_environment_2m(state)
     aux_covar = getproperty(aux_en_2m, covar_sym)
     aux_en_c = center_aux_environment(state)
     covar = getproperty(aux_en_c, covar_sym)
     aux_en_f = face_aux_environment(state)
     aux_en = is_tke ? aux_en_f : aux_en_c
-    EnvVar1 = getproperty(aux_en, var1)
-    EnvVar2 = getproperty(aux_en, var2)
+    ϕ_en = getproperty(aux_en, ϕ_sym)
+    ψ_en = getproperty(aux_en, ψ_sym)
     entr_gain = aux_covar.entr_gain
     detr_loss = aux_covar.detr_loss
+    Ic = CCO.InterpolateF2C()
+    Idc = is_tke ? Ic : x -> x
 
     @inbounds for i in 1:N_up
         aux_up_i = aux_up[i]
         frac_turb_entr = aux_up_i.frac_turb_entr
+        eps_turb = frac_turb_entr
         detr_sc = aux_up_i.detr_sc
         entr_sc = aux_up_i.entr_sc
         w_up = aux_up_f[i].w
         prog_up_i = prog_up[i]
-        @inbounds for k in real_center_indices(grid)
-            entr_gain[k] = 0
-            detr_loss[k] = 0
-            a_up = aux_up_i.area[k]
-            if a_up > edmf.minimum_area
-                up_var_1 = getproperty(prog_up_i, var1)
-                up_var_2 = getproperty(prog_up_i, var2)
-                updvar1 = is_tke ? interpf2c(up_var_1, grid, k) : up_var_1[k]
-                updvar2 = is_tke ? interpf2c(up_var_2, grid, k) : up_var_2[k]
-                envvar1 = is_tke ? interpf2c(EnvVar1, grid, k) : EnvVar1[k]
-                envvar2 = is_tke ? interpf2c(EnvVar2, grid, k) : EnvVar2[k]
-                gmvvar1 = is_tke ? interpf2c(GmvVar1, grid, k) : GmvVar1[k]
-                gmvvar2 = is_tke ? interpf2c(GmvVar2, grid, k) : GmvVar2[k]
+        ϕ_up = getproperty(prog_up_i, ϕ_sym)
+        ψ_up = getproperty(prog_up_i, ψ_sym)
+        # TODO: we shouldn't need `parent` call here:
+        parent(entr_gain) .= 0
+        parent(detr_loss) .= 0
 
-                eps_turb = frac_turb_entr[k]
+        a_up = aux_up_i.area
 
-                w_u = interpf2c(w_up, grid, k)
-                dynamic_entr =
-                    tke_factor * ρ0_c[k] * a_up * abs(w_u) * detr_sc[k] * (updvar1 - envvar1) * (updvar2 - envvar2)
-                turbulent_entr =
-                    tke_factor *
-                    ρ0_c[k] *
-                    a_up *
-                    abs(w_u) *
-                    eps_turb *
-                    ((envvar1 - gmvvar1) * (updvar2 - envvar2) + (envvar2 - gmvvar2) * (updvar1 - envvar1))
-                entr_gain[k] += dynamic_entr + turbulent_entr
-                detr_loss[k] += tke_factor * ρ0_c[k] * a_up * abs(w_u) * (entr_sc[k] + eps_turb) * covar[k]
-            end
-        end
+        @. entr_gain += ifelse(
+            a_up > edmf.minimum_area,
+            (tke_factor * ρ0_c * a_up * abs(Ic(w_up)) * detr_sc * (Idc(ϕ_up) - Idc(ϕ_en)) * (Idc(ψ_up) - Idc(ψ_en))) + (
+                tke_factor *
+                ρ0_c *
+                a_up *
+                abs(Ic(w_up)) *
+                eps_turb *
+                ((Idc(ϕ_en) - Idc(ϕ_gm)) * (Idc(ψ_up) - Idc(ψ_en)) + (Idc(ψ_en) - Idc(ψ_gm)) * (Idc(ϕ_up) - Idc(ϕ_en)))
+            ),
+            zero(FT),
+        )
+        @. detr_loss += ifelse(
+            a_up > edmf.minimum_area,
+            tke_factor * ρ0_c * a_up * abs(Ic(w_up)) * (entr_sc + eps_turb) * covar,
+            zero(FT),
+        )
+
     end
 
     return
