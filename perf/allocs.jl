@@ -102,6 +102,7 @@ function plot_allocs(case_name, allocs_per_case, n_unique_bytes)
         getproperty.(allocs_per_case, :bytes)[end:-1:1] ./ 1000;
         xlabel = "i-th allocating line (sorted)",
         ylabel = "Allocations (KB)",
+        markershape = :circle,
     )
     Plots.plot(p1, p2, layout = Plots.grid(2, 1))
     Plots.savefig(joinpath(folder, "allocations_$case_name.png"))
