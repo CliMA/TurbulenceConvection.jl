@@ -459,8 +459,8 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     end
 
     compute_covariance_entr(edmf, grid, state, Val(:tke), Val(:w))
-    compute_covariance_shear(edmf, grid, state, gm, :tke, :w)
-    compute_covariance_interdomain_src(edmf, grid, state, :tke, :w)
+    compute_covariance_shear(edmf, grid, state, gm, Val(:tke), Val(:w))
+    compute_covariance_interdomain_src(edmf, grid, state, Val(:tke), Val(:w))
 
     #####
     ##### compute_tke_pressure
@@ -478,12 +478,12 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     compute_covariance_entr(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice))
     compute_covariance_entr(edmf, grid, state, Val(:QTvar), Val(:q_tot))
     compute_covariance_entr(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
-    compute_covariance_shear(edmf, grid, state, gm, :Hvar, :θ_liq_ice)
-    compute_covariance_shear(edmf, grid, state, gm, :QTvar, :q_tot)
-    compute_covariance_shear(edmf, grid, state, gm, :HQTcov, :θ_liq_ice, :q_tot)
-    compute_covariance_interdomain_src(edmf, grid, state, :Hvar, :θ_liq_ice)
-    compute_covariance_interdomain_src(edmf, grid, state, :QTvar, :q_tot)
-    compute_covariance_interdomain_src(edmf, grid, state, :HQTcov, :θ_liq_ice, :q_tot)
+    compute_covariance_shear(edmf, grid, state, gm, Val(:Hvar), Val(:θ_liq_ice))
+    compute_covariance_shear(edmf, grid, state, gm, Val(:QTvar), Val(:q_tot))
+    compute_covariance_shear(edmf, grid, state, gm, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
+    compute_covariance_interdomain_src(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice))
+    compute_covariance_interdomain_src(edmf, grid, state, Val(:QTvar), Val(:q_tot))
+    compute_covariance_interdomain_src(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
 
     #####
     ##### compute_covariance_rain # need to update this one
