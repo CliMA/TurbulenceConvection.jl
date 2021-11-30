@@ -612,10 +612,10 @@ function compute_covariance_shear(
     grid,
     state,
     gm::GridMeanVariables,
-    covar_sym::Symbol,
-    en_var1_sym::Symbol,
-    en_var2_sym::Symbol = en_var1_sym,
-)
+    ::Val{covar_sym},
+    ϕs::Val{ϕ_en_sym},
+    ψs::Val{ψ_en_sym} = ϕs,
+) where {covar_sym, ϕ_en_sym, ψ_en_sym}
 
     aux_tc = center_aux_turbconv(state)
     ρ0_c = center_ref_state(state).ρ0
@@ -630,8 +630,8 @@ function compute_covariance_shear(
     aux_en_f = face_aux_environment(state)
     aux_en = is_tke ? aux_en_f : aux_en_c
     wvec = CC.Geometry.WVector
-    EnvVar1 = getproperty(aux_en, en_var1_sym)
-    EnvVar2 = getproperty(aux_en, en_var2_sym)
+    ϕ_en = getproperty(aux_en, ϕ_en_sym)
+    ψ_en = getproperty(aux_en, ψ_en_sym)
     FT = eltype(grid)
 
     bcs = (; bottom = CCO.Extrapolate(), top = CCO.SetGradient(wvec(zero(FT))))
@@ -649,40 +649,40 @@ function compute_covariance_shear(
             ρ0_c *
             area_en *
             k_eddy *
-            (∇c(wvec(EnvVar1)) * ∇c(wvec(EnvVar2)) + (∇c(wvec(If(u))))^2 + (∇c(wvec(If(v))))^2)
+            (∇c(wvec(ϕ_en)) * ∇c(wvec(ψ_en)) + (∇c(wvec(If(u))))^2 + (∇c(wvec(If(v))))^2)
     else
-        @. shear = tke_factor * 2 * ρ0_c * area_en * k_eddy * ∇c(wvec(If(EnvVar1))) * ∇c(wvec(If(EnvVar2)))
+        @. shear = tke_factor * 2 * ρ0_c * area_en * k_eddy * ∇c(wvec(If(ϕ_en))) * ∇c(wvec(If(ψ_en)))
     end
     return
 end
 
 function compute_covariance_interdomain_src(
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMF_PrognosticTKE{N_up},
     grid,
     state,
-    Covar_sym::Symbol,
-    ϕ_var::Symbol,
-    ψ_var::Symbol = ϕ_var,
-)
+    ::Val{covar_sym},
+    ϕs::Val{ϕ_sym},
+    ψs::Val{ψ_sym} = ϕs,
+) where {N_up, covar_sym, ϕ_sym, ψ_sym}
 
-    is_tke = Covar_sym == :tke
+    is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
     aux_en_2m = center_aux_environment_2m(state)
-    interdomain = getproperty(aux_en_2m, Covar_sym).interdomain
+    interdomain = getproperty(aux_en_2m, covar_sym).interdomain
     prog_up = is_tke ? aux_up_f : aux_up
     aux_en_c = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_en = is_tke ? aux_en_f : aux_en_c
-    ϕ_en = getproperty(aux_en, ϕ_var)
-    ψ_en = getproperty(aux_en, ψ_var)
+    ϕ_en = getproperty(aux_en, ϕ_sym)
+    ψ_en = getproperty(aux_en, ψ_sym)
     Ic = is_tke ? CCO.InterpolateF2C() : x -> x
 
     parent(interdomain) .= 0
-    @inbounds for i in 1:(edmf.n_updrafts)
-        ϕ_up = getproperty(prog_up[i], ϕ_var)
-        ψ_up = getproperty(prog_up[i], ψ_var)
+    @inbounds for i in 1:N_up
+        ϕ_up = getproperty(prog_up[i], ϕ_sym)
+        ψ_up = getproperty(prog_up[i], ψ_sym)
         a_up = aux_up[i].area
         @. interdomain += tke_factor * a_up * (1 - a_up) * (Ic(ϕ_up) - Ic(ϕ_en)) * (Ic(ψ_up) - Ic(ψ_en))
     end
