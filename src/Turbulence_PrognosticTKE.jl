@@ -404,7 +404,14 @@ end
 
 # Note: this assumes all variables are defined on half levels not full levels (i.e. phi, psi are not w)
 # if covar_e.name is not "tke".
-function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol, ϕ_sym::Symbol, ψ_sym::Symbol = ϕ_sym)
+function get_GMV_CoVar(
+    edmf::EDMF_PrognosticTKE{N_up},
+    grid,
+    state,
+    covar_sym::Symbol,
+    ϕ_sym::Symbol,
+    ψ_sym::Symbol = ϕ_sym,
+) where {N_up}
 
     is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
@@ -414,7 +421,8 @@ function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol,
     aux_en_c = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_en = is_tke ? aux_en_f : aux_en_c
-    aux_up = center_aux_updrafts(state)
+    aux_up_c = center_aux_updrafts(state)
+    aux_up = is_tke ? aux_up_f : aux_up_c
     gmv_covar = getproperty(center_aux_grid_mean(state), covar_sym)
     covar_e = getproperty(center_aux_environment(state), covar_sym)
     prog_gm = is_tke ? prog_gm_f : prog_gm_c
@@ -424,21 +432,12 @@ function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol,
     ψ_en = getproperty(aux_en, ψ_sym)
     area_en = aux_en_c.area
 
-    if is_tke
-        Ic = CCO.InterpolateF2C()
-        @. gmv_covar = tke_factor * area_en * Ic(ϕ_en - ϕ_gm) * Ic(ψ_en - ψ_gm) + area_en * covar_e
-        @inbounds for i in 1:(edmf.n_updrafts)
-            ϕ_up = getproperty(aux_up_f[i], ϕ_sym)
-            ψ_up = getproperty(aux_up_f[i], ψ_sym)
-            @. gmv_covar += tke_factor * aux_up[i].area * Ic(ϕ_up - ϕ_gm) * Ic(ψ_up - ψ_gm)
-        end
-    else
-        @. gmv_covar = tke_factor * area_en * (ϕ_en - ϕ_gm) * (ψ_en - ψ_gm) + area_en * covar_e
-        @inbounds for i in 1:(edmf.n_updrafts)
-            ϕ_up = getproperty(aux_up[i], ϕ_sym)
-            ψ_up = getproperty(aux_up[i], ψ_sym)
-            @. gmv_covar += tke_factor * aux_up[i].area * (ϕ_up - ϕ_gm) * (ψ_up - ψ_gm)
-        end
+    Icd = is_tke ? CCO.InterpolateF2C() : x -> x
+    @. gmv_covar = tke_factor * area_en * Icd(ϕ_en - ϕ_gm) * Icd(ψ_en - ψ_gm) + area_en * covar_e
+    @inbounds for i in 1:N_up
+        ϕ_up = getproperty(aux_up[i], ϕ_sym)
+        ψ_up = getproperty(aux_up[i], ψ_sym)
+        @. gmv_covar += tke_factor * aux_up_c[i].area * Icd(ϕ_up - ϕ_gm) * Icd(ψ_up - ψ_gm)
     end
     return
 end
