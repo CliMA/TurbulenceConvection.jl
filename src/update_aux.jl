@@ -465,14 +465,13 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     #####
     ##### compute_tke_pressure
     #####
-    @inbounds for k in real_center_indices(grid)
-        aux_en_2m.tke.press[k] = 0.0
-        @inbounds for i in 1:N_up
-            w_up_c = interpf2c(aux_up_f[i].w, grid, k)
-            w_en_c = interpf2c(aux_en_f.w, grid, k)
-            press_c = interpf2c(aux_up_f[i].nh_pressure, grid, k)
-            aux_en_2m.tke.press[k] += (w_en_c - w_up_c) * press_c
-        end
+    tke_press = aux_en_2m.tke.press
+    w_en = aux_en_f.w
+    parent(tke_press) .= 0
+    @inbounds for i in 1:N_up
+        w_up = aux_up_f[i].w
+        nh_press = aux_up_f[i].nh_pressure
+        @. tke_press += (Ic(w_en) - Ic(w_up)) * Ic(nh_press)
     end
 
     compute_covariance_entr(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice))
