@@ -722,6 +722,10 @@ function compute_covariance_entr(
     detr_loss = aux_covar.detr_loss
     Ic = CCO.InterpolateF2C()
     Idc = is_tke ? Ic : x -> x
+    # TODO: we shouldn't need `parent` call here:
+    parent(entr_gain) .= 0
+    parent(detr_loss) .= 0
+    min_area = edmf.minimum_area
 
     @inbounds for i in 1:N_up
         aux_up_i = aux_up[i]
@@ -733,14 +737,11 @@ function compute_covariance_entr(
         prog_up_i = prog_up[i]
         ϕ_up = getproperty(prog_up_i, ϕ_sym)
         ψ_up = getproperty(prog_up_i, ψ_sym)
-        # TODO: we shouldn't need `parent` call here:
-        parent(entr_gain) .= 0
-        parent(detr_loss) .= 0
 
         a_up = aux_up_i.area
 
-        @. entr_gain += ifelse(
-            a_up > edmf.minimum_area,
+        @. entr_gain +=
+            Int(a_up > min_area) *
             (tke_factor * ρ0_c * a_up * abs(Ic(w_up)) * detr_sc * (Idc(ϕ_up) - Idc(ϕ_en)) * (Idc(ψ_up) - Idc(ψ_en))) + (
                 tke_factor *
                 ρ0_c *
@@ -748,14 +749,9 @@ function compute_covariance_entr(
                 abs(Ic(w_up)) *
                 eps_turb *
                 ((Idc(ϕ_en) - Idc(ϕ_gm)) * (Idc(ψ_up) - Idc(ψ_en)) + (Idc(ψ_en) - Idc(ψ_gm)) * (Idc(ϕ_up) - Idc(ϕ_en)))
-            ),
-            zero(FT),
-        )
-        @. detr_loss += ifelse(
-            a_up > edmf.minimum_area,
-            tke_factor * ρ0_c * a_up * abs(Ic(w_up)) * (entr_sc + eps_turb) * covar,
-            zero(FT),
-        )
+            )
+
+        @. detr_loss += Int(a_up > min_area) * tke_factor * ρ0_c * a_up * abs(Ic(w_up)) * (entr_sc + eps_turb) * covar
 
     end
 
