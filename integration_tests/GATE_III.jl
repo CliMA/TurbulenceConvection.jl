@@ -18,7 +18,7 @@ best_mse = Dict()
 println("Running $case_name...")
 namelist = NameList.default_namelist(case_name)
 namelist["meta"]["uuid"] = "01"
-ds_tc_filename, return_code = @time main(namelist; time_run = true)
+ds_tc_filename, return_code = main(namelist)
 
 @testset "GATE_III" begin
     for k in keys(best_mse)
