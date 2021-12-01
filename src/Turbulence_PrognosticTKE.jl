@@ -281,7 +281,10 @@ function ∑tendencies!(tendencies, prog, params, t)
     compute_updraft_surface_bc(edmf, grid, state, case)
     update_aux!(edmf, gm, grid, state, case, param_set, TS)
 
-    parent(tendencies) .= 0
+    tends_face = tendencies.face
+    tends_cent = tendencies.cent
+    parent(tends_face) .= 0
+    parent(tends_cent) .= 0
 
     # causes division error in dry bubble first time step
     compute_precipitation_formation_tendencies(grid, state, up, edmf.Precip, TS.dt, param_set)
