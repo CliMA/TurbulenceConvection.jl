@@ -50,6 +50,8 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     kc_surf = kc_surface(grid)
     up = edmf.UpdVar
     en = edmf.EnvVar
+    massflux_h = aux_tc_f.massflux_h
+    massflux_qt = aux_tc_f.massflux_qt
     aux_tc = center_aux_turbconv(state)
 
     θ_liq_ice_gm_toa = prog_gm.θ_liq_ice[kc_toa]
@@ -134,8 +136,8 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     end
 
     # TODO: we shouldn't need to call parent here
-    parent(aux_tc_f.massflux_h) .= 0
-    parent(aux_tc_f.massflux_qt) .= 0
+    parent(massflux_h) .= 0
+    parent(massflux_qt) .= 0
     # Compute the mass flux and associated scalar fluxes
     @inbounds for i in 1:(up.n_updrafts)
         aux_up_f[i].massflux[kf_surf] = 0.0
@@ -148,8 +150,8 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     end
 
     @inbounds for k in real_face_indices(grid)
-        aux_tc_f.massflux_h[k] = 0.0
-        aux_tc_f.massflux_qt[k] = 0.0
+        massflux_h[k] = 0.0
+        massflux_qt[k] = 0.0
         # We know that, since W = 0 at z = 0, m = 0 also, and
         # therefore θ_liq_ice / q_tot values do not matter
         m_bcs = (; bottom = SetValue(0), top = SetValue(0))
@@ -158,51 +160,38 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
         @inbounds for i in 1:(up.n_updrafts)
             h_up_f = interpc2f(aux_up[i].θ_liq_ice, grid, k; m_bcs...)
             qt_up_f = interpc2f(aux_up[i].q_tot, grid, k; m_bcs...)
-            aux_tc_f.massflux_h[k] += aux_up_f[i].massflux[k] * (h_up_f - h_en_f)
-            aux_tc_f.massflux_qt[k] += aux_up_f[i].massflux[k] * (qt_up_f - qt_en_f)
+            massflux_h[k] += aux_up_f[i].massflux[k] * (h_up_f - h_en_f)
+            massflux_qt[k] += aux_up_f[i].massflux[k] * (qt_up_f - qt_en_f)
         end
     end
 
+    wvec = CC.Geometry.WVector
+    ∇c = CCO.DivergenceF2C()
     # Compute the  mass flux tendencies
     # Adjust the values of the grid mean variables
-    @inbounds for k in real_center_indices(grid)
-        mf_tend_h_dual = dual_faces(aux_tc_f.massflux_h, grid, k)
-        mf_tend_qt_dual = dual_faces(aux_tc_f.massflux_qt, grid, k)
-
-        ∇mf_tend_h = ∇f2c(mf_tend_h_dual, grid, k)
-        ∇mf_tend_qt = ∇f2c(mf_tend_qt_dual, grid, k)
-
-        mf_tend_h = -∇mf_tend_h * α0_c[k]
-        mf_tend_qt = -∇mf_tend_qt * α0_c[k]
-
-        # Prepare the output
-        aux_tc.massflux_tendency_h[k] = mf_tend_h
-        aux_tc.massflux_tendency_qt[k] = mf_tend_qt
-        tendencies_gm.θ_liq_ice[k] += mf_tend_h
-        tendencies_gm.q_tot[k] += mf_tend_qt
-    end
+    # Prepare the output
+    @. aux_tc.massflux_tendency_h = -∇c(wvec(massflux_h)) * α0_c
+    @. aux_tc.massflux_tendency_qt = ∇c(wvec(massflux_qt))
+    @. tendencies_gm.θ_liq_ice += -∇c(wvec(massflux_h)) * α0_c
+    @. tendencies_gm.q_tot += -∇c(wvec(massflux_qt)) * α0_c
 
     aeKHq_tot_bc = Case.Sur.rho_qtflux / aux_en.area[kc_surf]
     aeKHθ_liq_ice_bc = Case.Sur.rho_hflux / aux_en.area[kc_surf]
     aeKMu_bc = Case.Sur.rho_uflux / aux_en.area[kc_surf]
     aeKMv_bc = Case.Sur.rho_vflux / aux_en.area[kc_surf]
-    @inbounds for k in real_center_indices(grid)
-        aeKH_q_tot_cut = dual_faces(aux_tc_f.diffusive_flux_qt, grid, k)
-        ∇aeKH_q_tot = ∇f2c(aeKH_q_tot_cut, grid, k; bottom = SetValue(aeKHq_tot_bc), top = SetValue(0))
-        tendencies_gm.q_tot[k] += -α0_c[k] * aux_en.area[k] * ∇aeKH_q_tot
 
-        aeKH_θ_liq_ice_cut = dual_faces(aux_tc_f.diffusive_flux_h, grid, k)
-        ∇aeKH_θ_liq_ice = ∇f2c(aeKH_θ_liq_ice_cut, grid, k; bottom = SetValue(aeKHθ_liq_ice_bc), top = SetValue(0))
-        tendencies_gm.θ_liq_ice[k] += -α0_c[k] * aux_en.area[k] * ∇aeKH_θ_liq_ice
+    tbc = (; top = CCO.SetValue(wvec(FT(0))))
+    ∇aeKH_q_tot = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKHq_tot_bc)), tbc...)
+    ∇aeKH_θ_liq_ice = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKHθ_liq_ice_bc)), tbc...)
+    ∇aeKM_u = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKMu_bc)), tbc...)
+    ∇aeKM_v = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKMv_bc)), tbc...)
 
-        aeKM_u_cut = dual_faces(aux_tc_f.diffusive_flux_u, grid, k)
-        ∇aeKM_u = ∇f2c(aeKM_u_cut, grid, k; bottom = SetValue(aeKMu_bc), top = SetValue(0))
-        tendencies_gm.u[k] += -α0_c[k] * aux_en.area[k] * ∇aeKM_u
+    @. tendencies_gm.q_tot += -α0_c * aux_en.area * ∇aeKH_q_tot(wvec(aux_tc_f.diffusive_flux_qt))
+    @. tendencies_gm.θ_liq_ice += -α0_c * aux_en.area * ∇aeKH_θ_liq_ice(wvec(aux_tc_f.diffusive_flux_h))
+    @. tendencies_gm.u += -α0_c * aux_en.area * ∇aeKM_u(wvec(aux_tc_f.diffusive_flux_u))
+    @. tendencies_gm.v += -α0_c * aux_en.area * ∇aeKM_v(wvec(aux_tc_f.diffusive_flux_v))
 
-        aeKM_v_cut = dual_faces(aux_tc_f.diffusive_flux_v, grid, k)
-        ∇aeKM_v = ∇f2c(aeKM_v_cut, grid, k; bottom = SetValue(aeKMv_bc), top = SetValue(0))
-        tendencies_gm.v[k] += -α0_c[k] * aux_en.area[k] * ∇aeKM_v
-    end
+    return nothing
 end
 
 function compute_diffusive_fluxes(

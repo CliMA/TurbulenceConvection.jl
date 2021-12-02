@@ -17,25 +17,6 @@ end
 struct Extrapolate <: AbstractBC end
 struct FreeBoundary <: AbstractBC end # when no BC is used (one-sided derivative at surface that takes first and second interior points)
 
-∇f2c(f_dual::SA.SVector, grid::Grid, k; bottom = UseBoundaryValue(), top = UseBoundaryValue()) =
-    ∇f2c(f_dual, grid, k, bottom, top)
-
-function ∇f2c(f_dual::SA.SVector, grid::Grid, k, bottom::AbstractBC, top::AbstractBC)
-    if is_surface_center(grid, k)
-        return ∇f2c(f_dual, grid, BottomBCTag(), bottom)
-    elseif is_toa_center(grid, k)
-        return ∇f2c(f_dual, grid, TopBCTag(), top)
-    else
-        return ∇f2c(f_dual, grid, InteriorTag())
-    end
-end
-∇f2c(f::SA.SVector, grid::Grid, k, ::UseBoundaryValue, top::UseBoundaryValue) = ∇f2c(f, grid, InteriorTag())
-∇f2c(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.Δzi
-∇f2c(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * grid.Δzi
-∇f2c(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
-∇f2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[2] - bc.value) * grid.Δzi
-∇f2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
-
 ∇c2f(f_dual::SA.SVector, grid::Grid, k; bottom = UseBoundaryValue(), top = UseBoundaryValue()) =
     ∇c2f(f_dual, grid, k, bottom, top)
 
