@@ -35,6 +35,9 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     prog_up_f = face_prog_updrafts(state)
     aux_en_unsat = aux_en.unsat
     aux_en_sat = aux_en.sat
+    m_entr_detr = aux_tc.m_entr_detr
+    ∇m_entr_detr = aux_tc.∇m_entr_detr
+    wvec = CC.Geometry.WVector
 
     #####
     ##### center variables
@@ -238,20 +241,20 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     ##### compute_updraft_closures
     #####
 
-    @inbounds for k in real_center_indices(grid)
-        @inbounds for i in 1:N_up
+    Ic = CCO.InterpolateF2C()
+    ∇c = CCO.DivergenceF2C()
+    LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
+
+    @inbounds for i in 1:N_up
+        # compute ∇m at cell centers
+        a_up = aux_up[i].area
+        w_up = aux_up_f[i].w
+        w_gm = prog_gm_f.w
+        @. m_entr_detr = a_up * (Ic(w_up) - Ic(w_gm))
+        @. ∇m_entr_detr = ∇c(wvec(LB(m_entr_detr)))
+        @inbounds for k in real_center_indices(grid)
             # entrainment
             if aux_up[i].area[k] > 0.0
-                # compute ∇m at cell centers
-                a_up_c = aux_up[i].area[k]
-                w_up_c = interpf2c(aux_up_f[i].w, grid, k)
-                w_gm_c = interpf2c(prog_gm_f.w, grid, k)
-                m = a_up_c * (w_up_c - w_gm_c)
-                a_up_cut = ccut_upwind(aux_up[i].area, grid, k)
-                w_up_cut = daul_f2c_upwind(aux_up_f[i].w, grid, k)
-                w_gm_cut = daul_f2c_upwind(prog_gm_f.w, grid, k)
-                m_cut = a_up_cut .* (w_up_cut .- w_gm_cut)
-                ∇m = FT(c∇_upwind(m_cut, grid, k; bottom = SetValue(0), top = FreeBoundary()))
 
                 w_min = 0.001
 
@@ -267,8 +270,8 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
                     b_up = aux_up[i].buoy[k],
                     b_en = aux_en.buoy[k],
                     tke = aux_en.tke[k],
-                    dMdz = ∇m,
-                    M = m,
+                    dMdz = ∇m_entr_detr[k],
+                    M = m_entr_detr[k],
                     a_up = aux_up[i].area[k],
                     a_en = aux_en.area[k],
                     R_up = edmf.pressure_plume_spacing[i],
@@ -298,7 +301,6 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
         end
     end
 
-    wvec = CC.Geometry.WVector
     @inbounds for i in 1:N_up
 
         # pressure
