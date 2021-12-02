@@ -105,28 +105,6 @@ interpf2c(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (bc.value + 
 ##### Generic functions
 #####
 
-function ∇_staggered(f::SA.SVector, grid::Grid)
-    @assert length(f) == 2
-    return (f[2] - f[1]) * grid.Δzi
-end
-
-"""
-    ccut_downwind
-
-Used when
-     - traversing cell centers
-     - grabbing one-sided (downwind) stencil of cell center `k` and cell center `k+1`
-
-This is needed for "upwinding" rain, which travels _down_ (hence the direction change).
-"""
-function ccut_downwind(f, grid, k::Cent)
-    if is_toa_center(grid, k)
-        return SA.SVector(f[k])
-    else
-        return SA.SVector(f[k], f[k + 1])
-    end
-end
-
 """
     ccut_upwind
 
