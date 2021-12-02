@@ -203,6 +203,7 @@ function compute_diffusive_fluxes(
     TS::TimeStepping,
     param_set,
 )
+    FT = eltype(grid)
     ρ0_f = face_ref_state(state).ρ0
     aux_bulk = center_aux_bulk(state)
     aux_tc_f = face_aux_turbconv(state)
@@ -229,23 +230,17 @@ function compute_diffusive_fluxes(
     aeKMu_bc = -Case.Sur.rho_uflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
     aeKMv_bc = -Case.Sur.rho_vflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
 
-    @inbounds for k in real_face_indices(grid)
-        q_dual = dual_centers(aux_en.q_tot, grid, k)
-        ∇q_tot_f = ∇c2f(q_dual, grid, k; bottom = SetGradient(aeKHq_tot_bc), top = SetGradient(0))
-        aux_tc_f.diffusive_flux_qt[k] = -aux_tc_f.ρ_ae_KH[k] * ∇q_tot_f
+    ∇q_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_tot_bc), top = CCO.SetDivergence(FT(0)))
+    ∇θ_liq_ice_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHθ_liq_ice_bc), top = CCO.SetDivergence(FT(0)))
+    ∇u_gm = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKMu_bc), top = CCO.SetDivergence(FT(0)))
+    ∇v_gm = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKMv_bc), top = CCO.SetDivergence(FT(0)))
 
-        θ_liq_ice_dual = dual_centers(aux_en.θ_liq_ice, grid, k)
-        ∇θ_liq_ice_f = ∇c2f(θ_liq_ice_dual, grid, k; bottom = SetGradient(aeKHθ_liq_ice_bc), top = SetGradient(0))
-        aux_tc_f.diffusive_flux_h[k] = -aux_tc_f.ρ_ae_KH[k] * ∇θ_liq_ice_f
+    wvec = CC.Geometry.WVector
+    @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KH * ∇q_tot_en(wvec(aux_en.q_tot))
+    @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇θ_liq_ice_en(wvec(aux_en.θ_liq_ice))
+    @. aux_tc_f.diffusive_flux_u = -aux_tc_f.ρ_ae_KM * ∇u_gm(wvec(prog_gm.u))
+    @. aux_tc_f.diffusive_flux_v = -aux_tc_f.ρ_ae_KM * ∇v_gm(wvec(prog_gm.v))
 
-        u_dual = dual_centers(prog_gm.u, grid, k)
-        ∇u_f = ∇c2f(u_dual, grid, k; bottom = SetGradient(aeKMu_bc), top = SetGradient(0))
-        aux_tc_f.diffusive_flux_u[k] = -aux_tc_f.ρ_ae_KM[k] * ∇u_f
-
-        v_dual = dual_centers(prog_gm.v, grid, k)
-        ∇v_f = ∇c2f(v_dual, grid, k; bottom = SetGradient(aeKMv_bc), top = SetGradient(0))
-        aux_tc_f.diffusive_flux_v[k] = -aux_tc_f.ρ_ae_KM[k] * ∇v_f
-    end
     return
 end
 
