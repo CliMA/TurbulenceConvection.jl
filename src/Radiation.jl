@@ -67,11 +67,9 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, st
         end
     end
 
-    @inbounds for k in real_center_indices(grid)
-        f_rad_dual = dual_faces(aux_gm_f.f_rad, grid, k)
-        ∇f_rad = ∇_staggered(f_rad_dual, grid)
-        aux_gm.dTdt_rad[k] = -∇f_rad / ρ0_c[k] / cp_d
-    end
+    ∇c = CCO.DivergenceF2C()
+    wvec = CC.Geometry.WVector
+    @. aux_gm.dTdt_rad = -∇c(wvec(aux_gm_f.f_rad)) / ρ0_c / cp_d
 
     return
 end
