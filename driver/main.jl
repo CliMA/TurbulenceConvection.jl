@@ -7,6 +7,11 @@ import JSON
 import ArgParse
 import TurbulenceConvection
 
+import CloudMicrophysics
+const CM = CloudMicrophysics
+const CM0 = CloudMicrophysics.Microphysics_0M
+const CM1 = CloudMicrophysics.Microphysics_1M
+
 import ClimaCore
 const CC = ClimaCore
 import SciMLBase
@@ -432,6 +437,49 @@ function adaptive_dt!(integrator)
     ODE.u_modified!(integrator, false)
 end
 
+function monitor_cfl!(integrator)
+    UnPack.@unpack gm, grid, edmf, aux, TS = integrator.p
+    state = TC.State(integrator.u, aux, integrator.du)
+    param_set = TC.parameter_set(gm)
+    FT = eltype(grid)
+    Δz = grid.Δz
+    Δt = TS.dt
+    CFL_limit = TS.cfl_limit
+
+    ρ0_c = TC.center_ref_state(state).ρ0
+    prog_pr = TC.center_prog_precipitation(state)
+    aux_tc = TC.center_aux_turbconv(state)
+
+    # helper to calculate the rain velocity
+    # TODO: assuming gm.W = 0
+    # TODO: verify translation
+    term_vel_rain = aux_tc.term_vel_rain
+    term_vel_snow = aux_tc.term_vel_snow
+
+    @inbounds for k in TC.real_center_indices(grid)
+        vel_max = max(term_vel_rain[k], term_vel_snow[k])
+        edmf.dt_max = min(edmf.dt_max, CFL_limit * Δz / (vel_max + eps(Float32)))
+    end
+
+    @inbounds for k in TC.real_center_indices(grid)
+        # check stability criterion
+        CFL_out_rain = Δt / Δz * term_vel_rain[k]
+        CFL_out_snow = Δt / Δz * term_vel_snow[k]
+        if TC.is_toa_center(grid, k)
+            CFL_in_rain = 0.0
+            CFL_in_snow = 0.0
+        else
+            CFL_in_rain = Δt / Δz * term_vel_rain[k + 1]
+            CFL_in_snow = Δt / Δz * term_vel_snow[k + 1]
+        end
+        if max(CFL_in_rain, CFL_in_snow, CFL_out_rain, CFL_out_snow) > CFL_limit
+            error("Time step is too large for rain fall velocity!")
+        end
+    end
+
+    ODE.u_modified!(integrator, false)
+end
+
 
 function run(sim::Simulation1d)
     TC = TurbulenceConvection
@@ -474,6 +522,8 @@ function run(sim::Simulation1d)
     condition_every_iter(u, t, integrator) = true
 
     callback_io = ODE.DiscreteCallback(condition_io, affect_io!; save_positions = (false, false))
+    callback_cfl = ODE.DiscreteCallback(condition_every_iter, monitor_cfl!; save_positions = (false, false))
+    callback_cfl = sim.Turb.Precip.precipitation_model == "clima_1m" ? (callback_cfl,) : ()
     callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
     callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))
     callback_adapt_dt = sim.adapt_dt ? (callback_adapt_dt,) : ()
@@ -492,7 +542,7 @@ function run(sim::Simulation1d)
         progress_steps = 100,
         save_start = false,
         saveat = last(t_span),
-        callback = ODE.CallbackSet(callback_adapt_dt..., callback_filters, callback_io),
+        callback = ODE.CallbackSet(callback_adapt_dt..., callback_cfl..., callback_filters, callback_io),
         progress = true,
         unstable_check_kwarg(sim.Case.case)...,
         progress_message = (dt, u, p, t) -> t,

@@ -297,7 +297,7 @@ function step!(tendencies, prog, params, t)
     microphysics(en_thermo, grid, state, en, edmf.Precip, TS.dt, param_set) # saturation adjustment + rain creation
     if edmf.Precip.precipitation_model == "clima_1m"
         compute_precipitation_sink_tendencies(grid, state, gm, TS)
-        compute_precipitation_advection_tendencies(edmf, grid, state, gm, TS)
+        compute_precipitation_advection_tendencies(edmf, grid, state, gm)
     end
 
     # compute tendencies
