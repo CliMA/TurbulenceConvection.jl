@@ -462,13 +462,14 @@ function run(sim::Simulation1d)
     )
 
     function condition_io(u, t, integrator)
+        UnPack.@unpack TS, Stats = integrator.p
         TS.dt_io += TS.dt
         io_flag = false
-        if TS.dt_io > sim.Stats.frequency
+        if TS.dt_io > Stats.frequency
             TS.dt_io = 0
             io_flag = true
         end
-        return io_flag
+        return io_flag || t ≈ 0 || t ≈ TS.t_max
     end
     condition_every_iter(u, t, integrator) = true
 
