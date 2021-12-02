@@ -5,7 +5,6 @@ function compute_precipitation_advection_tendencies(edmf, grid, state, gm, TS::T
     param_set = parameter_set(gm)
     FT = eltype(grid)
     Δz = grid.Δz
-    Δt = TS.dt
     CFL_limit = TS.cfl_limit
 
     ρ0_c = center_ref_state(state).ρ0
@@ -26,6 +25,11 @@ function compute_precipitation_advection_tendencies(edmf, grid, state, gm, TS::T
         edmf.dt_max = min(edmf.dt_max, CFL_limit * Δz / (vel_max + eps(Float32)))
     end
 
+    if TS.adapt_dt
+        Δt = edmf.dt_max
+    else
+        Δt = TS.dt
+    end
     @inbounds for k in real_center_indices(grid)
         # check stability criterion
         CFL_out_rain = Δt / Δz * term_vel_rain[k]
