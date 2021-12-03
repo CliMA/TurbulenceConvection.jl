@@ -272,8 +272,8 @@ function Rico(namelist_defaults)
     # Rico cannot run with adaptive dt for now
     namelist["time_stepping"]["adapt_dt"] = true
     namelist["time_stepping"]["t_max"] = 86400.0
-    namelist["time_stepping"]["dt_max"] = 10.0
-    namelist["time_stepping"]["dt_min"] = 2.0
+    namelist["time_stepping"]["dt_max"] = 9.0
+    namelist["time_stepping"]["dt_min"] = 1.5
 
     namelist["microphysics"]["precipitation_model"] = "clima_1m"
     namelist["microphysics"]["τ_acnv"] = 2500.0
