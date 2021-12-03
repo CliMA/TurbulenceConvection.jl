@@ -399,7 +399,6 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC}
     tke_ed_coeff::Float64
     tke_diss_coeff::Float64
     static_stab_coeff::Float64
-    lambda_stab::Float64
     minimum_area::Float64
     Precip::PrecipVariables
     UpdVar::UpdraftVariables
@@ -458,7 +457,6 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC}
         tke_ed_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
         tke_diss_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"]
         static_stab_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"]
-        lambda_stab = namelist["turbulence"]["EDMF_PrognosticTKE"]["lambda_stab"] # Latent heat stability effect
         # Need to code up as namelist option?
         minimum_area = 1e-5
 
@@ -536,7 +534,6 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC}
             tke_ed_coeff,
             tke_diss_coeff,
             static_stab_coeff,
-            lambda_stab,
             minimum_area,
             Precip,
             UpdVar,
