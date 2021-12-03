@@ -22,15 +22,17 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, st
     aux_gm = center_aux_grid_mean(state)
     aux_gm_f = face_aux_grid_mean(state)
     prog_gm = center_prog_grid_mean(state)
+    q_tot_f = face_aux_turbconv(state).ϕ_temporary
     # find zi (level of 8.0 g/kg isoline of qt)
     # TODO: report bug: zi and ρ_i are not initialized
     zi = 0
     ρ_i = 0
     kc_surf = kc_surface(grid)
     q_tot_surf = prog_gm.q_tot[kc_surf]
+    If = CCO.InterpolateC2F(; bottom = CCO.SetValue(q_tot_surf), top = CCO.Extrapolate())
+    @. q_tot_f .= If(prog_gm.q_tot)
     @inbounds for k in real_face_indices(grid)
-        q_tot_f = interpc2f(prog_gm.q_tot, grid, k; bottom = SetValue(q_tot_surf), top = SetGradient(0))
-        if (q_tot_f < 8.0 / 1000)
+        if (q_tot_f[k] < 8.0 / 1000)
             idx_zi = k
             # will be used at cell faces
             zi = grid.zf[k]

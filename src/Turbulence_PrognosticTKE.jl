@@ -28,7 +28,7 @@ function compute_les_Γᵣ(z::ClimaCore.Geometry.ZPoint, τᵣ::Real = 24.0 * 36
     end
 end
 
-function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm, TS)
+function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE{N_up}, grid, state, Case, gm, TS) where {N_up}
     tendencies_gm = center_tendencies_grid_mean(state)
     kc_toa = kc_top_of_atmos(grid)
     FT = eltype(grid)
@@ -136,33 +136,28 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm,
     end
 
     # TODO: we shouldn't need to call parent here
-    parent(massflux_h) .= 0
-    parent(massflux_qt) .= 0
+    a_en = aux_en.area
+    w_en = aux_en_f.w
+    a_en_bcs = (; bottom = CCO.SetValue(1 - sum(i -> edmf.area_surface_bc[i], 1:N_up)), top = CCO.Extrapolate())
+    Ifae = CCO.InterpolateC2F(; a_en_bcs...)
     # Compute the mass flux and associated scalar fluxes
-    @inbounds for i in 1:(up.n_updrafts)
-        aux_up_f[i].massflux[kf_surf] = 0.0
-        a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
-        @inbounds for k in real_face_indices(grid)
-            a_up = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
-            a_en = interpc2f(aux_en.area, grid, k; a_up_bcs...)
-            aux_up_f[i].massflux[k] = ρ0_f[k] * a_up * a_en * (aux_up_f[i].w[k] - aux_en_f.w[k])
-        end
+    @inbounds for i in 1:N_up
+        a_up_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.Extrapolate())
+        Ifau = CCO.InterpolateC2F(; a_up_bcs...)
+        a_up = aux_up[i].area
+        w_up = aux_up_f[i].w
+        @. aux_up_f[i].massflux = ρ0_f * Ifau(a_up) * Ifae(a_en) * (w_up - w_en)
+        aux_up_f[i].massflux[kf_surf] = 0
     end
 
-    @inbounds for k in real_face_indices(grid)
-        massflux_h[k] = 0.0
-        massflux_qt[k] = 0.0
+    parent(massflux_h) .= 0
+    parent(massflux_qt) .= 0
+    If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+    @inbounds for i in 1:N_up
         # We know that, since W = 0 at z = 0, m = 0 also, and
         # therefore θ_liq_ice / q_tot values do not matter
-        m_bcs = (; bottom = SetValue(0), top = SetValue(0))
-        h_en_f = interpc2f(aux_en.θ_liq_ice, grid, k; m_bcs...)
-        qt_en_f = interpc2f(aux_en.q_tot, grid, k; m_bcs...)
-        @inbounds for i in 1:(up.n_updrafts)
-            h_up_f = interpc2f(aux_up[i].θ_liq_ice, grid, k; m_bcs...)
-            qt_up_f = interpc2f(aux_up[i].q_tot, grid, k; m_bcs...)
-            massflux_h[k] += aux_up_f[i].massflux[k] * (h_up_f - h_en_f)
-            massflux_qt[k] += aux_up_f[i].massflux[k] * (qt_up_f - qt_en_f)
-        end
+        @. massflux_h += aux_up_f[i].massflux * (If(aux_up[i].θ_liq_ice) - If(aux_en.θ_liq_ice))
+        @. massflux_qt += aux_up_f[i].massflux * (If(aux_up[i].q_tot) - If(aux_en.q_tot))
     end
 
     wvec = CC.Geometry.WVector
@@ -217,13 +212,11 @@ function compute_diffusive_fluxes(
     kc_toa = kc_top_of_atmos(grid)
     kf_surf = kf_surface(grid)
     prog_gm = center_prog_grid_mean(state)
-    aeKM_bcs = (; bottom = SetValue(aeKM[kc_surf]), top = SetValue(aeKM[kc_toa]))
-    aeKH_bcs = (; bottom = SetValue(aeKH[kc_surf]), top = SetValue(aeKH[kc_toa]))
+    IfKH = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKH[kc_surf]), top = CCO.SetValue(aeKH[kc_toa]))
+    IfKM = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKM[kc_surf]), top = CCO.SetValue(aeKM[kc_toa]))
 
-    @inbounds for k in real_face_indices(grid)
-        aux_tc_f.ρ_ae_KH[k] = interpc2f(aeKH, grid, k; aeKH_bcs...) * ρ0_f[k]
-        aux_tc_f.ρ_ae_KM[k] = interpc2f(aeKM, grid, k; aeKM_bcs...) * ρ0_f[k]
-    end
+    @. aux_tc_f.ρ_ae_KH = IfKH(aeKH) * ρ0_f
+    @. aux_tc_f.ρ_ae_KM = IfKM(aeKM) * ρ0_f
 
     aeKHq_tot_bc = -Case.Sur.rho_qtflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
     aeKHθ_liq_ice_bc = -Case.Sur.rho_hflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]

@@ -227,6 +227,7 @@ face_aux_vars_edmf(FT, n_up) = (;
         up = ntuple(i -> face_aux_vars_up(FT), n_up),
         massflux_h = FT(0),
         massflux_qt = FT(0),
+        ϕ_temporary = FT(0),
         diffusive_flux_h = FT(0),
         diffusive_flux_qt = FT(0),
         diffusive_flux_u = FT(0),
