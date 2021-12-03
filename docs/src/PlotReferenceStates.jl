@@ -4,10 +4,10 @@ import NCDatasets
 import CLIMAParameters
 import ClimaCore
 const CC = ClimaCore
-tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
-include(joinpath(tc_dir, "integration_tests", "utils", "generate_namelist.jl"))
-include(joinpath(tc_dir, "integration_tests", "utils", "Cases.jl"))
-include(joinpath(tc_dir, "integration_tests", "utils", "parameter_set.jl"))
+const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
+include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
+include(joinpath(tc_dir, "driver", "Cases.jl"))
+include(joinpath(tc_dir, "driver", "parameter_set.jl"))
 import .NameList
 import .Cases
 function export_ref_profile(case_name::String)

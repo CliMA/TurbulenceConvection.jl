@@ -1,10 +1,10 @@
 import TurbulenceConvection
 
 const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
-include(joinpath(tc_dir, "integration_tests", "utils", "generate_namelist.jl"))
-include(joinpath(tc_dir, "integration_tests", "utils", "Cases.jl"))
-include(joinpath(tc_dir, "integration_tests", "utils", "parameter_set.jl"))
-include(joinpath(tc_dir, "integration_tests", "utils", "main.jl"))
+include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
+include(joinpath(tc_dir, "driver", "Cases.jl"))
+include(joinpath(tc_dir, "driver", "parameter_set.jl"))
+include(joinpath(tc_dir, "driver", "main.jl"))
 import .NameList
 
 TurbulenceConvection.initialize_io(sim::Simulation1d) = nothing
