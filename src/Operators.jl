@@ -17,25 +17,6 @@ end
 struct Extrapolate <: AbstractBC end
 struct FreeBoundary <: AbstractBC end # when no BC is used (one-sided derivative at surface that takes first and second interior points)
 
-∇c2f(f_dual::SA.SVector, grid::Grid, k; bottom = UseBoundaryValue(), top = UseBoundaryValue()) =
-    ∇c2f(f_dual, grid, k, bottom, top)
-
-function ∇c2f(f_dual::SA.SVector, grid::Grid, k, bottom::AbstractBC, top::AbstractBC)
-    if is_surface_face(grid, k)
-        return ∇c2f(f_dual, grid, BottomBCTag(), bottom)
-    elseif is_toa_face(grid, k)
-        return ∇c2f(f_dual, grid, TopBCTag(), top)
-    else
-        return ∇c2f(f_dual, grid, InteriorTag())
-    end
-end
-∇c2f(f::SA.SVector, grid::Grid, ::Int, ::UseBoundaryValue, top::UseBoundaryValue) = ∇c2f(f, grid, InteriorTag())
-∇c2f(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.Δzi
-∇c2f(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetValue) = (bc.value - f[1]) * grid.Δzi * 2.0
-∇c2f(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
-∇c2f(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[1] - bc.value) * grid.Δzi * 2.0
-∇c2f(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
-
 c∇_upwind(f, grid::Grid, k; bottom = NoBCGivenError(), top = NoBCGivenError()) =
     c∇_upwind(ccut_upwind(f, grid, k), grid, k; bottom, top)
 
