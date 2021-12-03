@@ -17,24 +17,6 @@ end
 struct Extrapolate <: AbstractBC end
 struct FreeBoundary <: AbstractBC end # when no BC is used (one-sided derivative at surface that takes first and second interior points)
 
-c∇_upwind(f, grid::Grid, k; bottom = NoBCGivenError(), top = NoBCGivenError()) =
-    c∇_upwind(ccut_upwind(f, grid, k), grid, k; bottom, top)
-
-function c∇_upwind(f_dual::SA.SVector, grid::Grid, k; bottom = NoBCGivenError(), top = NoBCGivenError())
-    if is_surface_center(grid, k)
-        return c∇_upwind(f_dual, grid, BottomBCTag(), bottom)
-    elseif is_toa_center(grid, k)
-        return c∇_upwind(f_dual, grid, TopBCTag(), top)
-    else
-        return c∇_upwind(f_dual, grid, InteriorTag())
-    end
-end
-c∇_upwind(f::SA.SVector, grid::Grid, ::InteriorTag) = (f[2] - f[1]) * grid.Δzi
-c∇_upwind(f::SA.SVector, grid::Grid, ::TopBCTag, bc::FreeBoundary) = (f[2] - f[1]) * grid.Δzi
-c∇_upwind(f::SA.SVector, grid::Grid, ::TopBCTag, bc::SetGradient) = bc.value
-c∇_upwind(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetValue) = (f[1] - bc.value) * (grid.Δzi * 2)
-c∇_upwind(f::SA.SVector, grid::Grid, ::BottomBCTag, bc::SetGradient) = bc.value
-
 # Used when traversing cell faces
 
 interpc2f(f, grid::Grid, k::CCO.PlusHalf; bottom = NoBCGivenError(), top = NoBCGivenError()) =
