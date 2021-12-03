@@ -6,10 +6,10 @@ import TurbulenceConvection
 const TC = TurbulenceConvection
 const tc_dir = dirname(dirname(pathof(TC)))
 
-include(joinpath(tc_dir, "integration_tests", "utils", "main.jl"))
-include(joinpath(tc_dir, "integration_tests", "utils", "generate_namelist.jl"))
-include(joinpath(tc_dir, "integration_tests", "utils", "compute_mse.jl"))
-include(joinpath(tc_dir, "integration_tests", "utils", "mse_tables.jl"))
+include(joinpath(tc_dir, "driver", "main.jl"))
+include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
+include(joinpath(tc_dir, "post_processing", "compute_mse.jl"))
+include(joinpath(tc_dir, "post_processing", "mse_tables.jl"))
 import .NameList
 best_mse = all_best_mse["Bomex"]
 
