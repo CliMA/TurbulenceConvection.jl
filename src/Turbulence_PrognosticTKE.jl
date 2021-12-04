@@ -264,7 +264,6 @@ function step!(tendencies, prog, params, t)
     UnPack.@unpack edmf, grid, gm, case, aux, TS = params
 
     TS.t = t
-    edmf.dt_max = TS.dt_max
     state = State(prog, aux, tendencies)
 
     affect_filter!(edmf, grid, state, gm, case, TS)

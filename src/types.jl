@@ -555,6 +555,7 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC}
     end
 end
 parameter_set(obj) = obj.param_set
+n_updrafts(edmf::EDMF_PrognosticTKE{N_up}) where {N_up} = N_up
 
 struct State{P, A, T}
     prog::P
