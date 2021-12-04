@@ -513,4 +513,19 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     compute_covariance_detr(edmf, grid, state, :QTvar)
     compute_covariance_detr(edmf, grid, state, :HQTcov)
 
+    # TODO: use dispatch
+    if edmf.Precip.precipitation_model == "clima_1m"
+        # helper to calculate the rain velocity
+        # TODO: assuming gm.W = 0
+        # TODO: verify translation
+        term_vel_rain = aux_tc.term_vel_rain
+        term_vel_snow = aux_tc.term_vel_snow
+        prog_pr = center_prog_precipitation(state)
+
+        @inbounds for k in real_center_indices(grid)
+            term_vel_rain[k] = CM1.terminal_velocity(param_set, CM1.RainType(), ρ0_c[k], prog_pr.q_rai[k])
+            term_vel_snow[k] = CM1.terminal_velocity(param_set, CM1.SnowType(), ρ0_c[k], prog_pr.q_sno[k])
+        end
+    end
+
 end

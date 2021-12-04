@@ -1,12 +1,8 @@
 """
 Computes the rain and snow advection (down) tendency
 """
-function compute_precipitation_advection_tendencies(edmf, grid, state, gm, TS::TimeStepping)
-    param_set = parameter_set(gm)
+function compute_precipitation_advection_tendencies(edmf, grid, state, gm)
     FT = eltype(grid)
-    Δz = grid.Δz
-    Δt = TS.dt
-    CFL_limit = TS.cfl_limit
 
     ρ0_c = center_ref_state(state).ρ0
     tendencies_pr = center_tendencies_precipitation(state)
@@ -18,29 +14,6 @@ function compute_precipitation_advection_tendencies(edmf, grid, state, gm, TS::T
     # TODO: verify translation
     term_vel_rain = aux_tc.term_vel_rain
     term_vel_snow = aux_tc.term_vel_snow
-
-    @inbounds for k in real_center_indices(grid)
-        term_vel_rain[k] = CM1.terminal_velocity(param_set, rain_type, ρ0_c[k], prog_pr.q_rai[k])
-        term_vel_snow[k] = CM1.terminal_velocity(param_set, snow_type, ρ0_c[k], prog_pr.q_sno[k])
-        vel_max = max(term_vel_rain[k], term_vel_snow[k])
-        edmf.dt_max = min(edmf.dt_max, CFL_limit * Δz / (vel_max + eps(Float32)))
-    end
-
-    @inbounds for k in real_center_indices(grid)
-        # check stability criterion
-        CFL_out_rain = Δt / Δz * term_vel_rain[k]
-        CFL_out_snow = Δt / Δz * term_vel_snow[k]
-        if is_toa_center(grid, k)
-            CFL_in_rain = 0.0
-            CFL_in_snow = 0.0
-        else
-            CFL_in_rain = Δt / Δz * term_vel_rain[k + 1]
-            CFL_in_snow = Δt / Δz * term_vel_snow[k + 1]
-        end
-        if max(CFL_in_rain, CFL_in_snow, CFL_out_rain, CFL_out_snow) > CFL_limit
-            error("Time step is too large for rain fall velocity!")
-        end
-    end
 
     q_rai = prog_pr.q_rai
     q_sno = prog_pr.q_sno

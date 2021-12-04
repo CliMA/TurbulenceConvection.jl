@@ -290,7 +290,7 @@ function step!(tendencies, prog, params, t)
     microphysics(en_thermo, grid, state, en, edmf.Precip, TS.dt, param_set) # saturation adjustment + rain creation
     if edmf.Precip.precipitation_model == "clima_1m"
         compute_precipitation_sink_tendencies(grid, state, gm, TS)
-        compute_precipitation_advection_tendencies(edmf, grid, state, gm, TS)
+        compute_precipitation_advection_tendencies(edmf, grid, state, gm)
     end
 
     # compute tendencies
@@ -527,7 +527,7 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE{N_up}, grid, state,
     return
 end
 
-function filter_updraft_vars(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables)
+function filter_updraft_vars(edmf::EDMF_PrognosticTKE{N_up}, grid, state, gm::GridMeanVariables) where {N_up}
     param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -541,7 +541,7 @@ function filter_updraft_vars(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMean
     ρ0_c = center_ref_state(state).ρ0
     ρ0_f = face_ref_state(state).ρ0
 
-    @inbounds for i in 1:(up.n_updrafts)
+    @inbounds for i in 1:N_up
         prog_up[i].ρarea .= max.(prog_up[i].ρarea, 0)
         prog_up[i].ρaθ_liq_ice .= max.(prog_up[i].ρaθ_liq_ice, 0)
         prog_up[i].ρaq_tot .= max.(prog_up[i].ρaq_tot, 0)
@@ -550,20 +550,16 @@ function filter_updraft_vars(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMean
         end
     end
 
-    @inbounds for k in real_face_indices(grid)
-        is_surface_face(grid, k) && continue
-        @inbounds for i in 1:(up.n_updrafts)
-            prog_up_f[i].ρaw[k] = max(prog_up_f[i].ρaw[k], 0)
-            a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
-            ρa_f = interpc2f(prog_up[i].ρarea, grid, k; a_up_bcs...)
-            if ρa_f < ρ0_f[k] * edmf.minimum_area
-                prog_up_f[i].ρaw[k] = 0
-            end
-        end
+    a_min = edmf.minimum_area
+    @inbounds for i in 1:N_up
+        @. prog_up_f[i].ρaw = max.(prog_up_f[i].ρaw, 0)
+        a_up_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.Extrapolate())
+        If = CCO.InterpolateC2F(; a_up_bcs...)
+        @. prog_up_f[i].ρaw = Int(If(prog_up[i].ρarea) >= ρ0_f * a_min) * prog_up_f[i].ρaw
     end
 
     @inbounds for k in real_center_indices(grid)
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             is_surface_center(grid, k) && continue
             prog_up[i].ρaq_tot[k] = max(prog_up[i].ρaq_tot[k], 0)
             ρaw_up_c = interpf2c(prog_up_f[i].ρaw, grid, k)
