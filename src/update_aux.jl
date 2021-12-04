@@ -195,7 +195,6 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
                 anew_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
                 if anew_k >= edmf.minimum_area
                     aux_up_f[i].w[k] = max(prog_up_f[i].ρaw[k] / (ρ0_f[k] * anew_k), 0)
-                    edmf.dt_max = min(edmf.dt_max, TS.cfl_limit * grid.Δz / (abs(aux_up_f[i].w[k]) + eps(Float32)))
                 else
                     aux_up_f[i].w[k] = 0
                 end
@@ -213,7 +212,6 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
         end
         # Assuming gm.W = 0!
         aux_en_f.w[k] = -a_bulk_f / (1 - a_bulk_f) * aux_tc_f.bulk.w[k]
-        edmf.dt_max = min(edmf.dt_max, TS.cfl_limit * grid.Δz / (abs(aux_en_f.w[k]) + eps(Float32)))
     end
 
     #####
@@ -455,7 +453,6 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
 
         KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0.0))
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
-        edmf.dt_max = min(edmf.dt_max, TS.cfl_limit * grid.Δz^2 / (max(KH[k], KM[k]) + eps(Float32)))
 
         aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ0_c[k] * KH[k] * bg.∂b∂z
     end
