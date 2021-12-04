@@ -429,7 +429,7 @@ function affect_filter!(integrator)
     TC.affect_filter!(edmf, grid, state, gm, case, TS)
 
     # We're lying to OrdinaryDiffEq.jl, in order to avoid
-    # paying for an additional `step!` call, which is required
+    # paying for an additional `∑tendencies!` call, which is required
     # to support supplying a continuous representation of the
     # solution.
     ODE.u_modified!(integrator, false)
@@ -567,7 +567,7 @@ function run(sim::Simulation1d)
 
     callbacks = ODE.CallbackSet(callback_adapt_dt..., callback_dtmax, callback_cfl..., callback_filters, callback_io)
 
-    prob = ODE.ODEProblem(TC.step!, state.prog, t_span, params; dt = sim.TS.dt)
+    prob = ODE.ODEProblem(TC.∑tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
 
     # TODO: LES_driven_SCM is currently unstable w.r.t. higher order moments (HOM).
     # So, we tell OrdinaryDiffEq.jl to not perform NaNs check on the solution
