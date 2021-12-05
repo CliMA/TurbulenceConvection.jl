@@ -184,35 +184,29 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     #####
     ##### face variables: diagnose primitive, diagnose env and compute bulk
     #####
-    @inbounds for k in real_face_indices(grid)
-        if is_surface_face(grid, k)
-            @inbounds for i in 1:N_up
-                aux_up_f[i].w[k] = edmf.w_surface_bc[i]
-            end
-        else
-            @inbounds for i in 1:N_up
-                a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
-                anew_k = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
-                if anew_k >= edmf.minimum_area
-                    aux_up_f[i].w[k] = max(prog_up_f[i].ρaw[k] / (ρ0_f[k] * anew_k), 0)
-                else
-                    aux_up_f[i].w[k] = 0
-                end
-            end
-        end
-        aux_tc_f.bulk.w[k] = 0
-        a_bulk_bcs = (; bottom = SetValue(sum(edmf.area_surface_bc)), top = SetZeroGradient())
-        a_bulk_f = interpc2f(aux_bulk.area, grid, k; a_bulk_bcs...)
-        if a_bulk_f > 0
-            @inbounds for i in 1:N_up
-                a_up_bcs = (; bottom = SetValue(edmf.area_surface_bc[i]), top = SetZeroGradient())
-                a_up_f = interpc2f(aux_up[i].area, grid, k; a_up_bcs...)
-                aux_tc_f.bulk.w[k] += a_up_f * aux_up_f[i].w[k] / a_bulk_f
-            end
-        end
-        # Assuming gm.W = 0!
-        aux_en_f.w[k] = -a_bulk_f / (1 - a_bulk_f) * aux_tc_f.bulk.w[k]
+    # TODO: figure out why `ifelse` is allocating
+    @inbounds for i in 1:N_up
+        a_up_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.Extrapolate())
+        If = CCO.InterpolateC2F(; a_up_bcs...)
+        a_min = edmf.minimum_area
+        a_up = aux_up[i].area
+        @. aux_up_f[i].w = ifelse(If(a_up) >= a_min, max(prog_up_f[i].ρaw / (ρ0_f * If(a_up)), 0), FT(0))
     end
+    @inbounds for i in 1:N_up
+        aux_up_f[i].w[kf_surf] = edmf.w_surface_bc[i]
+    end
+
+    parent(aux_tc_f.bulk.w) .= 0
+    a_bulk_bcs = (; bottom = CCO.SetValue(sum(edmf.area_surface_bc)), top = CCO.Extrapolate())
+    Ifb = CCO.InterpolateC2F(; a_bulk_bcs...)
+    @inbounds for i in 1:N_up
+        a_up = aux_up[i].area
+        a_up_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.Extrapolate())
+        Ifu = CCO.InterpolateC2F(; a_up_bcs...)
+        @. aux_tc_f.bulk.w += ifelse(Ifb(aux_bulk.area) > 0, Ifu(a_up) * aux_up_f[i].w / Ifb(aux_bulk.area), FT(0))
+    end
+    # Assuming gm.W = 0!
+    @. aux_en_f.w = -Ifb(aux_bulk.area) / (1 - Ifb(aux_bulk.area)) * aux_tc_f.bulk.w
 
     #####
     #####  diagnose_GMV_moments
