@@ -519,7 +519,7 @@ function monitor_cfl!(integrator)
 end
 
 
-function run(sim::Simulation1d)
+function run(sim::Simulation1d; time_run = true)
     TC = TurbulenceConvection
     iter = 0
     grid = sim.grid
@@ -577,9 +577,7 @@ function run(sim::Simulation1d)
     unstable_check_kwarg(::Cases.LES_driven_SCM) = (; unstable_check = (dt, u, p, t) -> false)
     unstable_check_kwarg(case) = ()
 
-    sol = ODE.solve(
-        prob,
-        ODE.Euler();
+    kwargs = (;
         progress_steps = 100,
         save_start = false,
         saveat = last(t_span),
@@ -588,6 +586,13 @@ function run(sim::Simulation1d)
         unstable_check_kwarg(sim.Case.case)...,
         progress_message = (dt, u, p, t) -> t,
     )
+    alg = ODE.Euler()
+
+    if time_run
+        sol = @timev ODE.solve(prob, alg; kwargs...)
+    else
+        sol = ODE.solve(prob, alg; kwargs...)
+    end
 
     sim.skip_io || TC.close_files(sim.Stats) # #removeVarsHack
     if first(sol.t) == sim.TS.t_max
@@ -597,18 +602,16 @@ function run(sim::Simulation1d)
     end
 end
 
-function main(namelist; kwargs...)
-    main1d(namelist; kwargs...)
-end
+main(namelist; kwargs...) = @timev main1d(namelist; kwargs...)
 
 nc_results_file(stats::TC.NetCDFIO_Stats) = stats.path_plus_file
 nc_results_file(::Nothing) = @info "The simulation was run without IO, so no nc files were exported"
 
-function main1d(namelist; time_run = false)
+function main1d(namelist; time_run = true)
     sim = Simulation1d(namelist)
     TurbulenceConvection.initialize(sim, namelist)
     if time_run
-        return_code = @time run(sim)
+        return_code = @timev run(sim; time_run)
     else
         return_code = run(sim)
     end
