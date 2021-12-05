@@ -37,6 +37,8 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     aux_en_sat = aux_en.sat
     m_entr_detr = aux_tc.m_entr_detr
     ∇m_entr_detr = aux_tc.∇m_entr_detr
+    w_up_c = aux_tc.w_up_c
+    w_en_c = aux_tc.w_en_c
     wvec = CC.Geometry.WVector
 
     #####
@@ -241,9 +243,12 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
         # compute ∇m at cell centers
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
+        w_en = aux_en_f.w
         w_gm = prog_gm_f.w
         @. m_entr_detr = a_up * (Ic(w_up) - Ic(w_gm))
         @. ∇m_entr_detr = ∇c(wvec(LB(m_entr_detr)))
+        @. w_up_c = Ic(w_up)
+        @. w_en_c = Ic(w_en)
         @inbounds for k in real_center_indices(grid)
             # entrainment
             if aux_up[i].area[k] > 0.0
@@ -257,8 +262,8 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
                         aux_up[i].q_ice[k],
                     )),
                     q_cond_en = TD.condensate(TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k])),
-                    w_up = interpf2c(aux_up_f[i].w, grid, k),
-                    w_en = interpf2c(aux_en_f.w, grid, k),
+                    w_up = w_up_c[k],
+                    w_en = w_en_c[k],
                     b_up = aux_up[i].buoy[k],
                     b_en = aux_en.buoy[k],
                     tke = aux_en.tke[k],

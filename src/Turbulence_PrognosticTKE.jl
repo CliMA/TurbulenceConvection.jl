@@ -530,6 +530,7 @@ function filter_updraft_vars(edmf::EDMF_PrognosticTKE{N_up}, grid, state, gm::Gr
     param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
+    FT = eltype(grid)
 
     up = edmf.UpdVar
     prog_up = center_prog_updrafts(state)
@@ -561,12 +562,6 @@ function filter_updraft_vars(edmf::EDMF_PrognosticTKE{N_up}, grid, state, gm::Gr
         @inbounds for i in 1:N_up
             is_surface_center(grid, k) && continue
             prog_up[i].ρaq_tot[k] = max(prog_up[i].ρaq_tot[k], 0)
-            ρaw_up_c = interpf2c(prog_up_f[i].ρaw, grid, k)
-            if ρaw_up_c <= 0
-                prog_up[i].ρarea[k] = 0
-                prog_up[i].ρaθ_liq_ice[k] = 0
-                prog_up[i].ρaq_tot[k] = 0
-            end
             # this is needed to make sure Rico is unchanged.
             # TODO : look into it further to see why
             # a similar filtering of ρaθ_liq_ice breaks the simulation
@@ -574,6 +569,16 @@ function filter_updraft_vars(edmf::EDMF_PrognosticTKE{N_up}, grid, state, gm::Gr
                 prog_up[i].ρaq_tot[k] = 0
             end
         end
+    end
+
+    Ic = CCO.InterpolateF2C()
+    @inbounds for i in 1:N_up
+        @. prog_up[i].ρarea = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρarea)
+        @. prog_up[i].ρaθ_liq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaθ_liq_ice)
+        @. prog_up[i].ρaq_tot = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_tot)
+        prog_up[i].ρarea[kc_surf] = ρ0_c[kc_surf] * edmf.area_surface_bc[i]
+        prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * edmf.h_surface_bc[i]
+        prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * edmf.qt_surface_bc[i]
     end
     return
 end

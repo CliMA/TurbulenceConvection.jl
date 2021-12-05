@@ -3,6 +3,10 @@ module Cases
 import NCDatasets
 const NC = NCDatasets
 
+import ClimaCore
+const CC = ClimaCore
+const CCO = CC.Operators
+
 import Statistics
 import Random
 
@@ -1654,7 +1658,7 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, gm, st
 end
 
 function initialize_surface(self::CasesBase{LES_driven_SCM}, grid::Grid, state, param_set)
-
+    FT = eltype(grid)
     NC.Dataset(self.LESDat.les_filename, "r") do data
         imin = self.LESDat.imin
         imax = self.LESDat.imax
@@ -1663,7 +1667,10 @@ function initialize_surface(self::CasesBase{LES_driven_SCM}, grid::Grid, state, 
         self.Sur.Tsurface = Statistics.mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims = 1)[1]
         # get surface value of q
         mean_qt_prof = Statistics.mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)[:]
-        self.Sur.qsurface = TC.interpf2c(mean_qt_prof, grid, TC.kc_surface(grid))
+        field = TC.FieldFromNamedTuple(TC.face_space(grid), (; q_tot = FT(0)))
+        Ic = CCO.InterpolateF2C()
+        q_tot_c = Ic.(field.q_tot)
+        self.Sur.qsurface = q_tot_c[TC.kc_surface(grid)]
         self.Sur.lhf = Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1]
         self.Sur.shf = Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1]
     end
