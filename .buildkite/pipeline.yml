@@ -167,6 +167,15 @@ steps:
       queue: central
       slurm_ntasks: 1
 
+  - label: ":rocket: Benchmark tendencies"
+    key: "cpu_tendencies"
+    command:
+      - "julia --color=yes --project=test perf/perf.jl"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
   - wait: ~
     continue_on_failure: true
 
