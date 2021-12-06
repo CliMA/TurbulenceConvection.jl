@@ -246,17 +246,15 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
         @. w_en_c = Ic(w_en)
         @inbounds for k in real_center_indices(grid)
             # entrainment
+
+            q_cond_up = TD.condensate(TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k]))
+            q_cond_en = TD.condensate(TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k]))
+
             if aux_up[i].area[k] > 0.0
 
-                w_min = 0.001
-
-                εδ_model = MoistureDeficitEntr(;
-                    q_cond_up = TD.condensate(TD.PhasePartition(
-                        aux_up[i].q_tot[k],
-                        aux_up[i].q_liq[k],
-                        aux_up[i].q_ice[k],
-                    )),
-                    q_cond_en = TD.condensate(TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k])),
+                εδ_model_vars = GeneralizedEntr(;
+                    q_cond_up = q_cond_up,
+                    q_cond_en = q_cond_en,
                     w_up = w_up_c[k],
                     w_en = w_en_c[k],
                     b_up = aux_up[i].buoy[k],
@@ -270,9 +268,11 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
                     RH_up = aux_up[i].RH[k],
                     RH_en = aux_en.RH[k],
                     max_area = edmf.max_area,
+                    updraft_top = up.updraft_top[i],
+                    Δt = TS.dt,
                 )
 
-                er = entr_detr(param_set, εδ_model)
+                er = entr_detr(param_set, εδ_model_vars, edmf.entr_closure)
                 aux_up[i].entr_sc[k] = er.ε_dyn
                 aux_up[i].detr_sc[k] = er.δ_dyn
                 # stochastic closure
