@@ -119,12 +119,10 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, TS)
     @inbounds for i in 1:(up.n_updrafts)
         up.cloud_base[i] = TC.zc_toa(grid)
         up.cloud_top[i] = 0.0
-        up.updraft_top[i] = 0.0
         up.cloud_cover[i] = 0.0
 
         @inbounds for k in TC.real_center_indices(grid)
             if aux_up[i].area[k] > 1e-3
-                up.updraft_top[i] = max(up.updraft_top[i], grid.zc[k])
                 up.lwp += ρ0_c[k] * aux_up[i].q_liq[k] * aux_up[i].area[k] * grid.Δz
                 up.iwp += ρ0_c[k] * aux_up[i].q_ice[k] * aux_up[i].area[k] * grid.Δz
 
@@ -217,6 +215,10 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, TS)
             end
         end
     end
+
+    TC.GMV_third_m(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:H_third_m))
+    TC.GMV_third_m(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:QT_third_m))
+    TC.GMV_third_m(edmf, grid, state, Val(:tke), Val(:w), Val(:W_third_m))
 
     return
 end
