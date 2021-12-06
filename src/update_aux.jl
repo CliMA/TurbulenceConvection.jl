@@ -213,14 +213,9 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     #####
     #####  diagnose_GMV_moments
     #####
-    #! format: off
     get_GMV_CoVar(edmf, grid, state, :Hvar, :θ_liq_ice)
     get_GMV_CoVar(edmf, grid, state, :QTvar, :q_tot)
     get_GMV_CoVar(edmf, grid, state, :HQTcov, :θ_liq_ice, :q_tot)
-    GMV_third_m(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:H_third_m))
-    GMV_third_m(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:QT_third_m))
-    GMV_third_m(edmf, grid, state, Val(:tke), Val(:w), Val(:W_third_m))
-    #! format: on
 
     # TODO - use this inversion in free_convection_windspeed and not compute zi twice
     edmf.zi = get_inversion(grid, state, param_set, surface.Ri_bulk_crit)
@@ -521,6 +516,16 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
         @inbounds for k in real_center_indices(grid)
             term_vel_rain[k] = CM1.terminal_velocity(param_set, CM1.RainType(), ρ0_c[k], prog_pr.q_rai[k])
             term_vel_snow[k] = CM1.terminal_velocity(param_set, CM1.SnowType(), ρ0_c[k], prog_pr.q_sno[k])
+        end
+    end
+
+    @inbounds for i in 1:N_up
+        up.updraft_top[i] = 0.0
+
+        @inbounds for k in real_center_indices(grid)
+            if aux_up[i].area[k] > 1e-3
+                up.updraft_top[i] = max(up.updraft_top[i], grid.zc[k])
+            end
         end
     end
 
