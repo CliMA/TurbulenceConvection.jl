@@ -1,9 +1,11 @@
 import TurbulenceConvection
+const TC = TurbulenceConvection
 
 const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
 include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
 include(joinpath(tc_dir, "driver", "Cases.jl"))
 include(joinpath(tc_dir, "driver", "parameter_set.jl"))
+include(joinpath(tc_dir, "driver", "dycore.jl"))
 include(joinpath(tc_dir, "driver", "main.jl"))
 import .NameList
 
@@ -35,7 +37,7 @@ function init_sim(case_name)
     sim = Simulation1d(namelist)
 
     Cases.initialize_profiles(sim.Case, sim.grid, sim.GMV, sim.state)
-    TC.satadjust(sim.GMV, sim.grid, sim.state)
+    satadjust(sim.GMV, sim.grid, sim.state)
 
     Cases.initialize_surface(sim.Case, sim.grid, sim.state, sim.param_set)
     Cases.initialize_forcing(sim.Case, sim.grid, sim.state, sim.GMV, sim.param_set)

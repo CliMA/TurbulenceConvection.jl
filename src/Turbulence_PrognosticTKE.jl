@@ -258,7 +258,7 @@ function affect_filter!(edmf, grid, state, gm, Case, TS)
     end
 end
 
-# Perform the update of the scheme
+# Compute the sum of tendencies for the scheme
 function ∑tendencies!(tendencies, prog, params, t)
     UnPack.@unpack edmf, grid, gm, case, aux, TS = params
 
