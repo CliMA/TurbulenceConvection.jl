@@ -248,12 +248,12 @@ face_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., face_aux_vars_gm(FT)...,
 cent_diagnostic_vars_gm(FT) = ()
 cent_diagnostic_vars_edmf(FT, n_up) = (;
     turbconv = (;
-        asp_ratio = FT(0),
-        entr_sc = FT(0),
-        detr_sc = FT(0),
+        # asp_ratio = FT(0),
+        # entr_sc = FT(0),
+        # detr_sc = FT(0),
         massflux = FT(0),
-        frac_turb_entr = FT(0),
-        horiz_K_eddy = FT(0),
+        # frac_turb_entr = FT(0),
+        # horiz_K_eddy = FT(0),
     ),
 )
 cent_diagnostic_vars(FT, n_up) = (; cent_diagnostic_vars_gm(FT)..., cent_diagnostic_vars_edmf(FT, n_up)...)
@@ -375,6 +375,7 @@ function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
 
     TC.initialize_io(sim.io_nt.aux, sim.Stats)
     TC.initialize_io(sim.io_nt.diagnostics, sim.Stats)
+    TC.initialize_io_new(sim.Stats)
 
     # TODO: depricate
     TC.initialize_io(sim.GMV, sim.Stats)
@@ -404,7 +405,7 @@ function affect_io!(integrator)
 
     param_set = TC.parameter_set(gm)
     # TODO: is this the best location to call diagnostics?
-    compute_diagnostics!(edmf, gm, grid, state, diagnostics, case, TS)
+    compute_diagnostics!(edmf, gm, grid, state, diagnostics, case, TS, Stats)
 
     # TODO: remove `vars` hack that avoids
     # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135

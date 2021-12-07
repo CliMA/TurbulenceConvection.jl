@@ -32,11 +32,11 @@ function io_dictionary_diagnostics()
         "nh_pressure_adv" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_turbconv(state).nh_pressure_adv,),
         "nh_pressure_drag" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_turbconv(state).nh_pressure_drag,),
         "nh_pressure_b" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_turbconv(state).nh_pressure_b,),
-        "turbulent_entrainment" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).frac_turb_entr,),
-        "horiz_K_eddy" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).horiz_K_eddy,),
-        "entrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).entr_sc),
-        "detrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).detr_sc),
-        "asp_ratio" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).asp_ratio),
+        # "turbulent_entrainment" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).frac_turb_entr,),
+        # "horiz_K_eddy" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).horiz_K_eddy,),
+        # "entrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).entr_sc),
+        # "detrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).detr_sc),
+        # "asp_ratio" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).asp_ratio),
         "massflux" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).massflux),
     )
     return io_dict
@@ -52,7 +52,7 @@ diagnostics and still run, at which point we'll be able to export
 the state, auxiliary fields (which the state does depend on), and
 tendencies.
 =#
-function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, TS)
+function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, TS, Stats)
     FT = eltype(grid)
     gm.lwp = 0.0
     gm.iwp = 0.0
@@ -178,19 +178,25 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, TS)
         @. diag_tc.massflux += If(aux_up_f[i].massflux)
     end
 
-    @inbounds for k in TC.real_center_indices(grid)
-        a_up_bulk_k = a_up_bulk[k]
-        if a_up_bulk_k > 0.0
-            @inbounds for i in 1:(edmf.n_updrafts)
-                aux_up_i = aux_up[i]
-                diag_tc.entr_sc[k] += aux_up_i.area[k] * aux_up_i.entr_sc[k] / a_up_bulk_k
-                diag_tc.detr_sc[k] += aux_up_i.area[k] * aux_up_i.detr_sc[k] / a_up_bulk_k
-                diag_tc.asp_ratio[k] += aux_up_i.area[k] * aux_up_i.asp_ratio[k] / a_up_bulk_k
-                diag_tc.frac_turb_entr[k] += aux_up_i.area[k] * aux_up_i.frac_turb_entr[k] / a_up_bulk_k
-                diag_tc.horiz_K_eddy[k] += aux_up_i.area[k] * aux_up_i.horiz_K_eddy[k] / a_up_bulk_k
-            end
-        end
-    end
+    TC.compute_export!(TC.BulkEntr(), state, grid, edmf, Stats)
+    TC.compute_export!(TC.BulkDetr(), state, grid, edmf, Stats)
+    TC.compute_export!(TC.BulkAspRatio(), state, grid, edmf, Stats)
+    TC.compute_export!(TC.BulkFracTurbEntr(), state, grid, edmf, Stats)
+    TC.compute_export!(TC.BulkHorizKEddy(), state, grid, edmf, Stats)
+
+    # @inbounds for k in TC.real_center_indices(grid)
+    #     a_up_bulk_k = a_up_bulk[k]
+    #     if a_up_bulk_k > 0.0
+    #         @inbounds for i in 1:(edmf.n_updrafts)
+    #             aux_up_i = aux_up[i]
+    #             diag_tc.entr_sc[k] += aux_up_i.area[k] * aux_up_i.entr_sc[k] / a_up_bulk_k
+    #             diag_tc.detr_sc[k] += aux_up_i.area[k] * aux_up_i.detr_sc[k] / a_up_bulk_k
+    #             diag_tc.asp_ratio[k] += aux_up_i.area[k] * aux_up_i.asp_ratio[k] / a_up_bulk_k
+    #             diag_tc.frac_turb_entr[k] += aux_up_i.area[k] * aux_up_i.frac_turb_entr[k] / a_up_bulk_k
+    #             diag_tc.horiz_K_eddy[k] += aux_up_i.area[k] * aux_up_i.horiz_K_eddy[k] / a_up_bulk_k
+    #         end
+    #     end
+    # end
 
     a_up_bulk_f = copy(diag_tc_f.nh_pressure)
     a_bulk_bcs = (; bottom = CCO.SetValue(sum(edmf.area_surface_bc)), top = CCO.Extrapolate())
