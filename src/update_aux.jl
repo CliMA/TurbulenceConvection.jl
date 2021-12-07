@@ -495,14 +495,14 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     update_cloud_frac(edmf, grid, state, gm)
 
     compute_covariance_dissipation(edmf, grid, state, :tke, param_set)
-    compute_covariance_detr(edmf, grid, state, :tke)
+    compute_covariance_detr(edmf, grid, state, Val(:tke))
 
     compute_covariance_dissipation(edmf, grid, state, :Hvar, param_set)
     compute_covariance_dissipation(edmf, grid, state, :QTvar, param_set)
     compute_covariance_dissipation(edmf, grid, state, :HQTcov, param_set)
-    compute_covariance_detr(edmf, grid, state, :Hvar)
-    compute_covariance_detr(edmf, grid, state, :QTvar)
-    compute_covariance_detr(edmf, grid, state, :HQTcov)
+    compute_covariance_detr(edmf, grid, state, Val(:Hvar))
+    compute_covariance_detr(edmf, grid, state, Val(:QTvar))
+    compute_covariance_detr(edmf, grid, state, Val(:HQTcov))
 
     # TODO: use dispatch
     if edmf.Precip.precipitation_model == "clima_1m"

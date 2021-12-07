@@ -737,8 +737,9 @@ function compute_covariance_entr(
     return
 end
 
-function compute_covariance_detr(edmf::EDMF_PrognosticTKE{N_up}, grid, state, covar_sym::Symbol) where {N_up}
+function compute_covariance_detr(edmf::EDMF_PrognosticTKE, grid, state, ::Val{covar_sym}) where {covar_sym}
     up = edmf.UpdVar
+    N_up = n_updrafts(edmf)
     ρ0_c = center_ref_state(state).ρ0
     aux_up_f = face_aux_updrafts(state)
     aux_en_2m = center_aux_environment_2m(state)
