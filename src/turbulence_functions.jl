@@ -16,8 +16,6 @@ function get_inversion(grid::Grid, state, param_set, Ri_bulk_crit)
     u = center_prog_grid_mean(state).u
     v = center_prog_grid_mean(state).v
     Ri_bulk = center_aux_bulk(state).Ri
-    ∇θ_virt = center_aux_turbconv(state).∇θ_virt
-    ∇Ri_bulk = center_aux_turbconv(state).∇Ri_bulk
     θ_virt_b = θ_virt[kc_surf]
     z_c = grid.zc
     ∇c = CCO.DivergenceF2C()
@@ -25,12 +23,14 @@ function get_inversion(grid::Grid, state, param_set, Ri_bulk_crit)
 
     # test if we need to look at the free convective limit
     if (u[kc_surf]^2 + v[kc_surf]^2) <= 0.01
+        ∇θ_virt = center_aux_turbconv(state).ϕ_temporary
         kmask = map(k -> (k, θ_virt[k] > θ_virt_b), real_center_indices(grid))
         k_star = first(kmask[findlast(km -> km[2], kmask)])
         LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(θ_virt[kc_surf]))
         @. ∇θ_virt = ∇c(wvec(LB(θ_virt)))
         h = (θ_virt_b - θ_virt[k_star - 1]) / ∇θ_virt[k_star] + z_c[k_star - 1]
     else
+        ∇Ri_bulk = center_aux_turbconv(state).ϕ_temporary
         Ri_bulk_fn(k) = g * (θ_virt[k] - θ_virt_b) * z_c[k] / θ_virt_b / (u[k] * u[k] + v[k] * v[k])
 
         @inbounds for k in real_center_indices(grid)

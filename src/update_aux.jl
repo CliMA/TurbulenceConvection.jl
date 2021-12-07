@@ -35,8 +35,8 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     prog_up_f = face_prog_updrafts(state)
     aux_en_unsat = aux_en.unsat
     aux_en_sat = aux_en.sat
-    m_entr_detr = aux_tc.m_entr_detr
-    ∇m_entr_detr = aux_tc.∇m_entr_detr
+    m_entr_detr = aux_tc.ϕ_temporary
+    ∇m_entr_detr = aux_tc.ψ_temporary
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
     wvec = CC.Geometry.WVector
