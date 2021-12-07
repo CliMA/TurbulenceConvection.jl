@@ -9,23 +9,19 @@ function percentile_bounds_mean_norm(low_percentile::FT, high_percentile::FT, n_
     # filter!(y -> xp_low < y < xp_high, x)
     # TODO: undo this, it seems to fix the DYCOMS ql_mean
     pbmn = 1.7074549430665615
-    return pbmn
+    return FT(pbmn)
 end
 
 function logistic(x, slope, mid)
-    return 1.0 / (1.0 + exp(-slope * (x - mid)))
+    return 1 / (1 + exp(-slope * (x - mid)))
 end
 
-function lamb_smooth_minimum(l, lower_bound, upper_bound)
+function lamb_smooth_minimum(l::SA.SVector, lower_bound::FT, upper_bound::FT) where {FT}
     x_min = minimum(l)
-    λ_0 = max(x_min * lower_bound / real(LambertW.lambertw(2.0 / MathConstants.e)), upper_bound)
+    λ_0 = max(x_min * lower_bound / real(LambertW.lambertw(FT(2.0) / FT(MathConstants.e))), upper_bound)
 
-    num = sum(map(1:length(l)) do i
-        l[i] * exp(-(l[i] - x_min) / λ_0)
-    end)
-    den = sum(map(1:length(l)) do i
-        exp(-(l[i] - x_min) / λ_0)
-    end)
+    num = sum(l_i -> l_i * exp(-(l_i - x_min) / λ_0), l)
+    den = sum(l_i -> exp(-(l_i - x_min) / λ_0), l)
     smin = num / den
     return smin
 end

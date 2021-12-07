@@ -14,13 +14,13 @@ function compute_turbulent_entrainment(param_set, εδ_model_vars)
     return (ε_turb, K_ε)
 end
 
-function compute_inverse_timescale(Δb, Δw, param_set, εδ_model_vars)
+function compute_inverse_timescale(Δb::FT, Δw::FT, param_set::APS, εδ_model_vars) where {FT}
 
     c_λ = CPEDMF.c_λ(param_set)
 
     l_1 = c_λ * abs(Δb / sqrt(εδ_model_vars.tke + 1e-8))
     l_2 = abs(Δb / Δw)
-    l = (l_1, l_2)
+    l = SA.SVector(l_1, l_2)
     return lamb_smooth_minimum(l, 0.1, 0.0005)
 
 end
