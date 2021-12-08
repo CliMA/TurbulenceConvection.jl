@@ -85,6 +85,11 @@ function create_parameter_set(namelist)
         sde_δ_θ = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stochastic", "sde_detr_theta"; default = 1.0),
         sde_δ_σ = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stochastic", "sde_detr_std"; default = 0.0),
     )
-    return EarthParameterSet(nt)
+    param_set = EarthParameterSet(nt)
+    if !isbits(param_set)
+        @show param_set
+        error("The parameter set MUST be isbits in order to be stack-allocated.")
+    end
+    return param_set
 end
 #! format: on

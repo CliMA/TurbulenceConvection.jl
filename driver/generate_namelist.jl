@@ -31,6 +31,9 @@ export default_namelist
 using ArgParse
 using ArtifactWrappers
 
+import StaticArrays
+const SA = StaticArrays
+
 #! format: off
 LESDrivenSCM_output_dataset = ArtifactWrapper(
     @__DIR__,
@@ -91,8 +94,13 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
     # 1-layer nn parameters
+    #! format: off
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"] =
-        [0.3038, 0.719, -0.910, -0.483, 0.739, 0.0755, 0.178, 0.521, 0.0, 0.0, 0.843, -0.340, 0.655, 0.113, 0.0, 0.0]
+        SA.SVector(0.3038, 0.719,-0.910,-0.483,
+                   0.739, 0.0755, 0.178, 0.521,
+                   0.0, 0.0, 0.843,-0.340,
+                   0.655, 0.113, 0.0, 0.0)
+    #! format: on
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.015
