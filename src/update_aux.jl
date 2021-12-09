@@ -451,12 +451,9 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
         aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ0_c[k] * KH[k] * bg.∂b∂z
     end
 
-    compute_covariance_entr(edmf, grid, state, Val(:tke), Val(:w))
-    compute_covariance_shear(edmf, grid, state, gm, Val(:tke), Val(:w))
-    compute_covariance_interdomain_src(edmf, grid, state, Val(:tke), Val(:w))
 
     #####
-    ##### compute_tke_pressure
+    ##### compute covarinaces tendendies
     #####
     tke_press = aux_en_2m.tke.press
     w_en = aux_en_f.w
@@ -467,19 +464,18 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
         @. tke_press += (Ic(w_en) - Ic(w_up)) * Ic(nh_press)
     end
 
+    compute_covariance_entr(edmf, grid, state, Val(:tke), Val(:w))
     compute_covariance_entr(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice))
     compute_covariance_entr(edmf, grid, state, Val(:QTvar), Val(:q_tot))
     compute_covariance_entr(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
+    compute_covariance_shear(edmf, grid, state, gm, Val(:tke), Val(:w))
     compute_covariance_shear(edmf, grid, state, gm, Val(:Hvar), Val(:θ_liq_ice))
     compute_covariance_shear(edmf, grid, state, gm, Val(:QTvar), Val(:q_tot))
     compute_covariance_shear(edmf, grid, state, gm, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
-    compute_covariance_interdomain_src(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice))
-    compute_covariance_interdomain_src(edmf, grid, state, Val(:QTvar), Val(:q_tot))
-    compute_covariance_interdomain_src(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
-
-    #####
-    ##### compute_covariance_rain # need to update this one
-    #####
+    compute_covariance_dissipation(edmf, grid, state, :tke, param_set)
+    compute_covariance_dissipation(edmf, grid, state, :Hvar, param_set)
+    compute_covariance_dissipation(edmf, grid, state, :QTvar, param_set)
+    compute_covariance_dissipation(edmf, grid, state, :HQTcov, param_set)
 
     # TODO defined again in compute_covariance_shear and compute_covaraince
     @inbounds for k in real_center_indices(grid)
@@ -492,17 +488,7 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     get_GMV_CoVar(edmf, grid, state, :tke, :w)
 
     compute_diffusive_fluxes(edmf, grid, state, gm, Case, TS, param_set)
-    update_cloud_frac(edmf, grid, state, gm)
 
-    compute_covariance_dissipation(edmf, grid, state, :tke, param_set)
-    compute_covariance_detr(edmf, grid, state, :tke)
-
-    compute_covariance_dissipation(edmf, grid, state, :Hvar, param_set)
-    compute_covariance_dissipation(edmf, grid, state, :QTvar, param_set)
-    compute_covariance_dissipation(edmf, grid, state, :HQTcov, param_set)
-    compute_covariance_detr(edmf, grid, state, :Hvar)
-    compute_covariance_detr(edmf, grid, state, :QTvar)
-    compute_covariance_detr(edmf, grid, state, :HQTcov)
 
     # TODO: use dispatch
     if edmf.Precip.precipitation_model == "clima_1m"

@@ -736,29 +736,6 @@ function compute_covariance_entr(
     return
 end
 
-function compute_covariance_detr(edmf::EDMF_PrognosticTKE{N_up}, grid, state, covar_sym::Symbol) where {N_up}
-    up = edmf.UpdVar
-    ρ0_c = center_ref_state(state).ρ0
-    aux_up_f = face_aux_updrafts(state)
-    aux_en_2m = center_aux_environment_2m(state)
-    aux_covar = getproperty(aux_en_2m, covar_sym)
-    aux_up = center_aux_updrafts(state)
-    aux_en = center_aux_environment(state)
-    covar = getproperty(aux_en, covar_sym)
-    detr_loss = aux_covar.detr_loss
-    Ic = CCO.InterpolateF2C()
-
-    parent(detr_loss) .= 0
-    @inbounds for i in 1:N_up
-        aux_up_i = aux_up[i]
-        area_up = aux_up_i.area
-        entr_sc = aux_up_i.entr_sc
-        w_up = aux_up_f[i].w
-        @. detr_loss += ρ0_c * covar * area_up * abs(Ic(w_up)) * entr_sc
-    end
-    return
-end
-
 function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol, param_set)
     en = edmf.EnvVar
     c_d = CPEDMF.c_d(param_set)
