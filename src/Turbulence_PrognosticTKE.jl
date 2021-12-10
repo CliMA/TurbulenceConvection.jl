@@ -345,7 +345,6 @@ end
 function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, Case::CasesBase)
     kc_surf = kc_surface(grid)
 
-    Δzi = grid.Δzi
     zLL = grid.zc[kc_surf]
     ustar = Case.Sur.ustar
     oblength = Case.Sur.obukhov_length
@@ -356,7 +355,7 @@ function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, Case:
 
     if Case.Sur.bflux > 0.0
         a_total = edmf.surface_area
-        edmf.entr_surface_bc = 2.0 * Δzi
+        edmf.entr_surface_bc = 1 / zLL
         edmf.detr_surface_bc = 0.0
         a_ = a_total / edmf.n_updrafts
         @inbounds for i in 1:(edmf.n_updrafts)
@@ -369,7 +368,7 @@ function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, Case:
         end
     else
         edmf.entr_surface_bc = 0.0
-        edmf.detr_surface_bc = 2.0 * Δzi
+        edmf.detr_surface_bc = 1 / zLL
         @inbounds for i in 1:(edmf.n_updrafts)
             edmf.area_surface_bc[i] = 0
             edmf.w_surface_bc[i] = 0.0

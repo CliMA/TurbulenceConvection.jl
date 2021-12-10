@@ -52,10 +52,9 @@ diagnostics and still run, at which point we'll be able to export
 the state, auxiliary fields (which the state does depend on), and
 tendencies.
 =#
-function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case)
+function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, Stats)
     FT = eltype(grid)
-    gm.lwp = 0.0
-    gm.iwp = 0.0
+    N_up = TC.n_updrafts(edmf)
     ρ0_c = TC.center_ref_state(state).ρ0
     p0_c = TC.center_ref_state(state).p0
     aux_gm = TC.center_aux_grid_mean(state)
@@ -81,8 +80,6 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case)
     diag_tc_f = face_diagnostics_turbconv(diagnostics)
 
     @inbounds for k in TC.real_center_indices(grid)
-        gm.lwp += ρ0_c[k] * aux_gm.q_liq[k] * grid.Δz
-        gm.iwp += ρ0_c[k] * aux_gm.q_ice[k] * grid.Δz
         if TD.has_condensate(aux_gm.q_liq[k] + aux_gm.q_ice[k])
             gm.cloud_base = min(gm.cloud_base, grid.zc[k])
             gm.cloud_top = max(gm.cloud_top, grid.zc[k])
@@ -113,9 +110,6 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case)
         @. massflux_s += aux_up_f[i].massflux * (If(aux_up[i].s) - If(aux_en.s))
     end
 
-    up.lwp = 0.0
-    up.iwp = 0.0
-
     @inbounds for i in 1:(up.n_updrafts)
         up.cloud_base[i] = TC.zc_toa(grid)
         up.cloud_top[i] = 0.0
@@ -123,9 +117,6 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case)
 
         @inbounds for k in TC.real_center_indices(grid)
             if aux_up[i].area[k] > 1e-3
-                up.lwp += ρ0_c[k] * aux_up[i].q_liq[k] * aux_up[i].area[k] * grid.Δz
-                up.iwp += ρ0_c[k] * aux_up[i].q_ice[k] * aux_up[i].area[k] * grid.Δz
-
                 if TD.has_condensate(aux_up[i].q_liq[k] + aux_up[i].q_ice[k])
                     up.cloud_base[i] = min(up.cloud_base[i], grid.zc[k])
                     up.cloud_top[i] = max(up.cloud_top[i], grid.zc[k])
@@ -138,37 +129,12 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case)
     en.cloud_top = 0.0
     en.cloud_base = TC.zc_toa(grid)
     en.cloud_cover = 0.0
-    en.lwp = 0.0
-    en.iwp = 0.0
 
     @inbounds for k in TC.real_center_indices(grid)
-        en.lwp += ρ0_c[k] * aux_en.q_liq[k] * aux_en.area[k] * grid.Δz
-        en.iwp += ρ0_c[k] * aux_en.q_ice[k] * aux_en.area[k] * grid.Δz
-
         if TD.has_condensate(aux_en.q_liq[k] + aux_en.q_ice[k]) && aux_en.area[k] > 1e-6
             en.cloud_base = min(en.cloud_base, grid.zc[k])
             en.cloud_top = max(en.cloud_top, grid.zc[k])
             en.cloud_cover = max(en.cloud_cover, aux_en.area[k] * aux_en.cloud_fraction[k])
-        end
-    end
-
-    precip.mean_rwp = 0.0
-    precip.mean_swp = 0.0
-    precip.cutoff_precipitation_rate = 0.0
-
-    @inbounds for k in TC.real_center_indices(grid)
-        precip.mean_rwp += ρ0_c[k] * prog_pr.q_rai[k] * grid.Δz
-        precip.mean_swp += ρ0_c[k] * prog_pr.q_sno[k] * grid.Δz
-
-        # precipitation rate from cutoff microphysics scheme defined as a total amount of removed water
-        # per timestep per EDMF surface area [mm/h]
-        if (precip.precipitation_model == "cutoff")
-            precip.cutoff_precipitation_rate -=
-                (aux_en.qt_tendency_precip_formation[k] + aux_bulk.qt_tendency_precip_formation[k]) *
-                ρ0_c[k] *
-                grid.Δz / TC.rho_cloud_liq *
-                3.6 *
-                1e6
         end
     end
 
@@ -227,6 +193,28 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case)
 
     TC.update_cloud_frac(edmf, grid, state, gm)
 
+
+    TC.write_ts(Stats, "lwp_mean", sum(ρ0_c .* aux_gm.q_liq))
+    TC.write_ts(Stats, "iwp_mean", sum(ρ0_c .* aux_gm.q_ice))
+    TC.write_ts(Stats, "env_lwp", sum(ρ0_c .* aux_en.q_liq .* aux_en.area))
+    TC.write_ts(Stats, "env_iwp", sum(ρ0_c .* aux_en.q_ice .* aux_en.area))
+
+    TC.write_ts(Stats, "rwp_mean", sum(ρ0_c .* prog_pr.q_rai))
+    TC.write_ts(Stats, "swp_mean", sum(ρ0_c .* prog_pr.q_sno))
+    #TODO - change to rain rate that depends on rain model choice
+
+    # TODO: Move TC.rho_cloud_liq to CLIMAParameters
+    if (precip.precipitation_model == "cutoff")
+        f =
+            (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ0_c ./
+            TC.rho_cloud_liq .* 3.6 .* 1e6
+        TC.write_ts(Stats, "cutoff_precipitation_rate", sum(f))
+    end
+
+    lwp = sum(i -> sum(ρ0_c .* aux_up[i].q_liq .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
+    iwp = sum(i -> sum(ρ0_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
+    TC.write_ts(Stats, "updraft_lwp", lwp)
+    TC.write_ts(Stats, "updraft_iwp", iwp)
 
     return
 end

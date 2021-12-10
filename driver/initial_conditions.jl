@@ -89,7 +89,6 @@ function initialize_updrafts(edmf, grid, state, up::TC.UpdraftVariables, gm::TC.
 end
 
 function initialize_updrafts_DryBubble(edmf, grid, state, up::TC.UpdraftVariables, gm::TC.GridMeanVariables)
-    dz = grid.Δz
 
     # criterion 2: b>1e-4
     #! format: off
