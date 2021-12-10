@@ -192,7 +192,9 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
         If = CCO.InterpolateC2F(; a_up_bcs...)
         a_min = edmf.minimum_area
         a_up = aux_up[i].area
-        @. aux_up_f[i].w = ifelse(If(a_up) >= a_min, max(prog_up_f[i].ρaw / (ρ0_f * If(a_up)), 0), FT(0))
+        w_up = aux_up_f[i].w
+        ρaw_up = prog_up_f[i].ρaw
+        @. w_up = ifelse(If(a_up) >= a_min, max(ρaw_up / (ρ0_f * If(a_up)), 0), FT(0))
     end
     @inbounds for i in 1:N_up
         aux_up_f[i].w[kf_surf] = edmf.w_surface_bc[i]
@@ -200,15 +202,19 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
 
     parent(aux_tc_f.bulk.w) .= 0
     a_bulk_bcs = (; bottom = CCO.SetValue(sum(edmf.area_surface_bc)), top = CCO.Extrapolate())
+    w_bulk = aux_tc_f.bulk.w
+    a_bulk = aux_bulk.area
+    w_en = aux_en_f.w
     Ifb = CCO.InterpolateC2F(; a_bulk_bcs...)
     @inbounds for i in 1:N_up
         a_up = aux_up[i].area
         a_up_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.Extrapolate())
         Ifu = CCO.InterpolateC2F(; a_up_bcs...)
-        @. aux_tc_f.bulk.w += ifelse(Ifb(aux_bulk.area) > 0, Ifu(a_up) * aux_up_f[i].w / Ifb(aux_bulk.area), FT(0))
+        w_up = aux_up_f[i].w
+        @. w_bulk += ifelse(Ifb(a_bulk) > 0, Ifu(a_up) * w_up / Ifb(a_bulk), FT(0))
     end
     # Assuming gm.W = 0!
-    @. aux_en_f.w = -Ifb(aux_bulk.area) / (1 - Ifb(aux_bulk.area)) * aux_tc_f.bulk.w
+    @. w_en = -Ifb(a_bulk) / (1 - Ifb(a_bulk)) * w_bulk
 
     #####
     #####  diagnose_GMV_moments
@@ -315,7 +321,8 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
         nh_press_buoy .= nh_pressure_buoy(param_set, a_up, b_up, ρ0_f, asp_ratio, bcs)
         nh_press_adv .= nh_pressure_adv(param_set, updraft_top, a_up, ρ0_f, w_up, bcs)
         nh_press_drag .= nh_pressure_drag(param_set, updraft_top, a_up, ρ0_f, w_up, w_en, bcs)
-        @. aux_up_f[i].nh_pressure = nh_press_buoy + nh_press_adv + nh_press_drag
+        nh_pressure_up = aux_up_f[i].nh_pressure
+        @. nh_pressure_up = nh_press_buoy + nh_press_adv + nh_press_drag
     end
 
     #####
@@ -371,9 +378,13 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
 
     # Since NaN*0 ≠ 0, we need to conditionally replace
     # our gradients by their default values.
-    @. ∂qt∂z_sat = ∇c(wvec(If(aux_en_sat.q_tot)))
-    @. ∂θl∂z_sat = ∇c(wvec(If(aux_en_sat.θ_liq_ice)))
-    @. ∂θv∂z_unsat = ∇c(wvec(If(aux_en_unsat.θ_virt)))
+
+    q_tot_en_sat = aux_en_sat.q_tot
+    θ_liq_ice_en_sat = aux_en_sat.θ_liq_ice
+    θ_virt_en_sat = aux_en_unsat.θ_virt
+    @. ∂qt∂z_sat = ∇c(wvec(If(q_tot_en_sat)))
+    @. ∂θl∂z_sat = ∇c(wvec(If(θ_liq_ice_en_sat)))
+    @. ∂θv∂z_unsat = ∇c(wvec(If(θ_virt_en_sat)))
     for k in real_center_indices(grid)
         if shm[k] == 0
             ∂qt∂z_sat[k] = ∂qt∂z[k]

@@ -101,16 +101,21 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, TS)
 
     # TODO(ilopezgp): Fix bottom gradient
     wvec = CC.Geometry.WVector
-    m_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+    zero_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
     # ∇0_bcs = (; bottom = CCO.SetDivergence(wvec(FT(0))), top = CCO.SetDivergence(wvec(FT(0))))
     ∇0_bcs = (; bottom = CCO.SetDivergence(FT(0)), top = CCO.SetDivergence(FT(0)))
-    If = CCO.InterpolateC2F(; m_bcs...)
+    If0 = CCO.InterpolateC2F(; zero_bcs...)
     ∇f = CCO.DivergenceC2F(; ∇0_bcs...)
     massflux_s = aux_gm_f.massflux_s
+    s_en = aux_en.s
+    ρ_ae_KH = aux_tc_f.ρ_ae_KH
+    diffusive_flux_s = aux_gm_f.diffusive_flux_s
     parent(massflux_s) .= 0
-    @. aux_gm_f.diffusive_flux_s = -aux_tc_f.ρ_ae_KH * ∇f(wvec(aux_en.s))
+    @. diffusive_flux_s = -ρ_ae_KH * ∇f(wvec(s_en))
     @inbounds for i in 1:n_updrafts
-        @. massflux_s += aux_up_f[i].massflux * (If(aux_up[i].s) - If(aux_en.s))
+        massflux_up = aux_up_f[i].massflux
+        s_up = aux_up[i].s
+        @. massflux_s += massflux_up * (If0(s_up) - If0(s_en))
     end
 
     up.lwp = 0.0
@@ -175,7 +180,9 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, TS)
     If = CCO.InterpolateF2C()
     parent(diag_tc.massflux) .= 0
     @inbounds for i in 1:(edmf.n_updrafts)
-        @. diag_tc.massflux += If(aux_up_f[i].massflux)
+        massflux_up = aux_up_f[i].massflux
+        massflux = diag_tc.massflux
+        @. massflux += If(massflux_up)
     end
 
     @inbounds for k in TC.real_center_indices(grid)
@@ -205,7 +212,8 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, TS)
     @inbounds for i in 1:(edmf.n_updrafts)
         a_up_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.Extrapolate())
         Ifaup = CCO.InterpolateC2F(; a_up_bcs...)
-        @. a_up_f = Ifaup(aux_up[i].area)
+        a_up = aux_up[i].area
+        @. a_up_f = Ifaup(a_up)
         @inbounds for k in TC.real_face_indices(grid)
             if a_up_bulk_f[k] > 0.0
                 diag_tc_f.nh_pressure[k] += a_up_f[k] * aux_up_f[i].nh_pressure[k] / a_up_bulk_f[k]

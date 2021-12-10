@@ -30,7 +30,8 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, st
     kc_surf = kc_surface(grid)
     q_tot_surf = prog_gm.q_tot[kc_surf]
     If = CCO.InterpolateC2F(; bottom = CCO.SetValue(q_tot_surf), top = CCO.Extrapolate())
-    @. q_tot_f .= If(prog_gm.q_tot)
+    q_tot_gm = prog_gm.q_tot
+    @. q_tot_f .= If(q_tot_gm)
     @inbounds for k in real_face_indices(grid)
         if (q_tot_f[k] < 8.0 / 1000)
             idx_zi = k
@@ -58,20 +59,22 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, st
     prob = ODE.ODEProblem(integrand, 0.0, z_span, params; dt = grid.Δz)
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
     q_1 = sol.(vec(grid.zf))
-    parent(aux_gm_f.f_rad) .= self.F0 .* exp.(-q_0)
-    parent(aux_gm_f.f_rad) .+= self.F1 .* exp.(-q_1)
+    f_rad = aux_gm_f.f_rad
+    parent(f_rad) .= self.F0 .* exp.(-q_0)
+    parent(f_rad) .+= self.F1 .* exp.(-q_1)
 
     # cooling in free troposphere
     @inbounds for k in real_face_indices(grid)
         if grid.zf[k] > zi
             cbrt_z = cbrt(grid.zf[k] - zi)
-            aux_gm_f.f_rad[k] += ρ_i * cp_d * self.divergence * self.alpha_z * (cbrt_z^4 / 4 + zi * cbrt_z)
+            f_rad[k] += ρ_i * cp_d * self.divergence * self.alpha_z * (cbrt_z^4 / 4 + zi * cbrt_z)
         end
     end
 
     ∇c = CCO.DivergenceF2C()
     wvec = CC.Geometry.WVector
-    @. aux_gm.dTdt_rad = -∇c(wvec(aux_gm_f.f_rad)) / ρ0_c / cp_d
+    dTdt_rad = aux_gm.dTdt_rad
+    @. dTdt_rad = -∇c(wvec(f_rad)) / ρ0_c / cp_d
 
     return
 end
