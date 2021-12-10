@@ -18,6 +18,7 @@ import SciMLBase
 
 import OrdinaryDiffEq
 const ODE = OrdinaryDiffEq
+import StaticArrays: SVector
 
 const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
 
@@ -232,6 +233,9 @@ nc_results_file(stats::TC.NetCDFIO_Stats) = stats.path_plus_file
 nc_results_file(::Nothing) = @info "The simulation was run without IO, so no nc files were exported"
 
 function main1d(namelist; time_run = true)
+    # TODO: generalize convesion of arrays from namelist to `SVector`s.
+    _p = namelist["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"]
+    namelist["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"] = SVector{length(_p)}(_p)
     sim = Simulation1d(namelist)
     TurbulenceConvection.initialize(sim, namelist)
     if time_run
