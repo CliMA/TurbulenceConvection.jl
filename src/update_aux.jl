@@ -511,6 +511,8 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
         @inbounds for k in real_center_indices(grid)
             if aux_up[i].area[k] > 1e-3
                 up.updraft_top[i] = max(up.updraft_top[i], grid.zc[k])
+            else
+                break
             end
         end
     end
