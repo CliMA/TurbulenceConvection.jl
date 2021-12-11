@@ -268,7 +268,7 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
                     RH_up = aux_up[i].RH[k],
                     RH_en = aux_en.RH[k],
                     max_area = edmf.max_area,
-                    updraft_top = up.updraft_top[i],
+                    zc_i = grid.zc[k].z,
                     Δt = TS.dt,
                 )
 

@@ -152,7 +152,7 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["turbulence"]["scheme"] = "EDMF_PrognosticTKE"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit" # "moisture_deficit" or "NN"
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "NN" # "moisture_deficit" or "NN"
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["extrapolate_buoyancy"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_local_micro"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["constant_area"] = false
@@ -426,7 +426,11 @@ function LES_driven_SCM(namelist_defaults)
 
     namelist["stats_io"]["frequency"] = 10.0
     namelist["time_stepping"]["t_max"] = 3600.0 * 6
-    namelist["time_stepping"]["dt_min"] = 1.0
+
+
+    # namelist["time_stepping"]["dt_min"] = 1.0
+    namelist["time_stepping"]["adapt_dt"] = false
+    namelist["time_stepping"]["dt"] = 2.0
 
     # use last 6 hours of LES simulation to drive LES
     namelist["t_interval_from_end_s"] = 3600.0 * 6

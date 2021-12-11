@@ -66,8 +66,8 @@ Base.@kwdef struct GeneralizedEntr{FT}
     RH_en::FT
     "maximum updraft area"
     max_area::FT
-    "updraft top"
-    updraft_top::FT
+    "vertical coordinate"
+    zc_i::FT
     "Model time step"
     Δt::FT
 end

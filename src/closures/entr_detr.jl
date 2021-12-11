@@ -132,9 +132,9 @@ function entr_detr(param_set, εδ_model_vars, εδ_model_type::NNEntr)
         Dense(reshape(c_gen[11:14], nn_arc[3], nn_arc[2]), c_gen[15:16], sigmoid),
     )
 
-    pi_1 = εδ_model_vars.updraft_top * Δb / Δw^2
-    pi_2 = εδ_model_vars.tke / Δw^2
-    non_dim_functions = nn_model([pi_1, pi_2, εδ_model_vars.a_up, εδ_model_vars.RH_up - εδ_model_vars.RH_en])
+    pi_1 = Δw^2/(εδ_model_vars.zc_i * Δb)
+    pi_2 = Δw^2 / εδ_model_vars.tke
+    non_dim_functions = nn_model([pi_1, pi_2, sqrt(εδ_model_vars.a_up), εδ_model_vars.RH_up - εδ_model_vars.RH_en])
     ε_dyn = (λ / Δw) * non_dim_functions[1]
     δ_dyn = (λ / Δw) * non_dim_functions[2] + max_area_limiter
 
