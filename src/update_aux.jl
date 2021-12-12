@@ -40,6 +40,9 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
     wvec = CC.Geometry.WVector
+    Δt = TS.dt
+    max_area = edmf.max_area
+    sde_model = edmf.sde_model
 
     #####
     ##### center variables
@@ -267,16 +270,15 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
                     R_up = edmf.pressure_plume_spacing[i],
                     RH_up = aux_up[i].RH[k],
                     RH_en = aux_en.RH[k],
-                    max_area = edmf.max_area,
+                    max_area = max_area,
                     updraft_top = up.updraft_top[i],
-                    Δt = TS.dt,
+                    Δt = Δt,
                 )
 
                 er = entr_detr(param_set, εδ_model_vars, edmf.entr_closure)
                 aux_up[i].entr_sc[k] = er.ε_dyn
                 aux_up[i].detr_sc[k] = er.δ_dyn
                 # stochastic closure
-                sde_model = edmf.sde_model
                 stoch_ε = stochastic_closure(param_set, sde_model, Entrainment())
                 stoch_δ = stochastic_closure(param_set, sde_model, Detrainment())
                 aux_up[i].entr_sc[k] *= stoch_ε
