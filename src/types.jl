@@ -394,7 +394,7 @@ end
 
 CasesBase(case::T; kwargs...) where {T} = CasesBase{T}(; case = case, casename = string(nameof(T)), kwargs...)
 
-mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC}
+mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC, SDES}
     Ri_bulk_crit::Float64
     zi::Float64
     n_updrafts::Int
@@ -421,7 +421,7 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC}
     entr_surface_bc::Float64
     detr_surface_bc::Float64
     dt_max::Float64
-    sde_model::sde_struct
+    sde_model::SDES
     bg_closure::EBGC
     entr_closure::EC
     function EDMF_PrognosticTKE(namelist, grid::Grid, param_set::PS) where {PS}
@@ -548,7 +548,8 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC}
         dt_max = 0
         A1 = typeof(area_surface_bc)
         EBGC = typeof(bg_closure)
-        return new{n_updrafts, A1, EBGC, EC}(
+        SDES = typeof(sde_model)
+        return new{n_updrafts, A1, EBGC, EC, SDES}(
             Ri_bulk_crit,
             zi,
             n_updrafts,
