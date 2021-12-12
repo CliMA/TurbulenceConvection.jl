@@ -349,22 +349,20 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     ∂θl∂z_sat = center_aux_turbconv(state).∂θl∂z_sat
     ∂θv∂z_unsat = center_aux_turbconv(state).∂θv∂z_unsat
 
-    wvec = CC.Geometry.WVector
     ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
-    ∇c = CCO.DivergenceF2C()
-    If = CCO.InterpolateC2F(; ∇0_bcs...)
+    If0 = CCO.InterpolateC2F(; ∇0_bcs...)
     u_gm = prog_gm.u
     v_gm = prog_gm.v
     w_en = aux_en_f.w
     # compute shear
-    @. Shear² = (∇c(wvec(If(u_gm))))^2 + (∇c(wvec(If(v_gm))))^2 + (∇c(wvec(w_en)))^2
+    @. Shear² = (∇c(wvec(If0(u_gm))))^2 + (∇c(wvec(If0(v_gm))))^2 + (∇c(wvec(w_en)))^2
 
     q_tot_en = aux_en.q_tot
     θ_liq_ice_en = aux_en.θ_liq_ice
     θ_virt_en = aux_en.θ_virt
-    @. ∂qt∂z = ∇c(wvec(If(q_tot_en)))
-    @. ∂θl∂z = ∇c(wvec(If(θ_liq_ice_en)))
-    @. ∂θv∂z = ∇c(wvec(If(θ_virt_en)))
+    @. ∂qt∂z = ∇c(wvec(If0(q_tot_en)))
+    @. ∂θl∂z = ∇c(wvec(If0(θ_liq_ice_en)))
+    @. ∂θv∂z = ∇c(wvec(If0(θ_virt_en)))
 
     # Second order approximation: Use dry and cloudy environmental fields.
     cf = aux_en.cloud_fraction
@@ -373,9 +371,9 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
 
     # Since NaN*0 ≠ 0, we need to conditionally replace
     # our gradients by their default values.
-    @. ∂qt∂z_sat = ∇c(wvec(If(aux_en_sat.q_tot)))
-    @. ∂θl∂z_sat = ∇c(wvec(If(aux_en_sat.θ_liq_ice)))
-    @. ∂θv∂z_unsat = ∇c(wvec(If(aux_en_unsat.θ_virt)))
+    @. ∂qt∂z_sat = ∇c(wvec(If0(aux_en_sat.q_tot)))
+    @. ∂θl∂z_sat = ∇c(wvec(If0(aux_en_sat.θ_liq_ice)))
+    @. ∂θv∂z_unsat = ∇c(wvec(If0(aux_en_unsat.θ_virt)))
     for k in real_center_indices(grid)
         if shm[k] == 0
             ∂qt∂z_sat[k] = ∂qt∂z[k]
