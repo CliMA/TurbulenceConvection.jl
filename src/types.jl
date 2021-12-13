@@ -361,8 +361,6 @@ Base.@kwdef mutable struct ForcingBase{T}
     coriolis_param::Float64 = 0
     "Momentum relaxation timescale"
     nudge_tau::Float64 = 0.0
-    "Conversion function from forcing to prognostic"
-    convert_forcing_prog_fp::Function = x -> x
 end
 
 force_type(::ForcingBase{T}) where {T} = T
@@ -394,7 +392,7 @@ end
 
 CasesBase(case::T; kwargs...) where {T} = CasesBase{T}(; case = case, casename = string(nameof(T)), kwargs...)
 
-mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC, SDES}
+mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC, SDES, UPVAR}
     Ri_bulk_crit::Float64
     zi::Float64
     n_updrafts::Int
@@ -408,7 +406,7 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC, SDES}
     static_stab_coeff::Float64
     minimum_area::Float64
     Precip::PrecipVariables
-    UpdVar::UpdraftVariables
+    UpdVar::UPVAR
     EnvVar::EnvironmentVariables
     EnvThermo::EnvironmentThermodynamics
     area_surface_bc::A1
@@ -549,7 +547,8 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC, SDES}
         A1 = typeof(area_surface_bc)
         EBGC = typeof(bg_closure)
         SDES = typeof(sde_model)
-        return new{n_updrafts, A1, EBGC, EC, SDES}(
+        UPVAR = typeof(UpdVar)
+        return new{n_updrafts, A1, EBGC, EC, SDES, UPVAR}(
             Ri_bulk_crit,
             zi,
             n_updrafts,
