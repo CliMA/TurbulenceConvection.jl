@@ -12,6 +12,7 @@ pages = Any[
     "Home" => "index.md",
     "Reference states" => "ReferenceStates.md",
     "References" => "References.md",
+    "Closures" => "Closures.md"
 ]
 
 mathengine = MathJax(Dict(
