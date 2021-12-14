@@ -216,14 +216,14 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, TS)
         end
     end
 
-    TC.GMV_third_m(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:H_third_m))
-    TC.GMV_third_m(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:QT_third_m))
-    TC.GMV_third_m(edmf, grid, state, Val(:tke), Val(:w), Val(:W_third_m))
+    TC.GMV_third_m(edmf, grid, state, Val(false), :Hvar, :θ_liq_ice, :H_third_m)
+    TC.GMV_third_m(edmf, grid, state, Val(false), :QTvar, :q_tot, :QT_third_m)
+    TC.GMV_third_m(edmf, grid, state, Val(true), :tke, :w, :W_third_m)
 
-    TC.compute_covariance_interdomain_src(edmf, grid, state, Val(:tke), Val(:w))
-    TC.compute_covariance_interdomain_src(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice))
-    TC.compute_covariance_interdomain_src(edmf, grid, state, Val(:QTvar), Val(:q_tot))
-    TC.compute_covariance_interdomain_src(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
+    TC.compute_covariance_interdomain_src(edmf, grid, state, Val(true), :tke, :w)
+    TC.compute_covariance_interdomain_src(edmf, grid, state, Val(false), :Hvar, :θ_liq_ice)
+    TC.compute_covariance_interdomain_src(edmf, grid, state, Val(false), :QTvar, :q_tot)
+    TC.compute_covariance_interdomain_src(edmf, grid, state, Val(false), :HQTcov, :θ_liq_ice, :q_tot)
 
     TC.update_cloud_frac(edmf, grid, state, gm)
 

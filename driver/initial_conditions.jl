@@ -40,7 +40,7 @@ function initialize_covariance(edmf::TC.EDMF_PrognosticTKE, grid, state, gm, Cas
     aux_en.tke .= aux_gm.tke
     prog_en.ρatke .= aux_en.tke .* ρ0_c .* ae
 
-    TC.get_GMV_CoVar(edmf, grid, state, :tke, :w)
+    TC.get_GMV_CoVar(edmf, grid, state, Val(true), :tke, :w)
     aux_gm.Hvar .= aux_gm.Hvar[kc_surf] .* aux_gm.tke
     aux_gm.QTvar .= aux_gm.QTvar[kc_surf] .* aux_gm.tke
     aux_gm.HQTcov .= aux_gm.HQTcov[kc_surf] .* aux_gm.tke

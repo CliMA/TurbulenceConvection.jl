@@ -298,10 +298,10 @@ function ∑tendencies!(tendencies, prog, params, t)
     compute_gm_tendencies!(edmf, grid, state, case, gm, TS)
     compute_updraft_tendencies(edmf, grid, state, gm)
 
-    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:tke), Val(:ρatke))
-    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:Hvar), Val(:ρaHvar))
-    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:QTvar), Val(:ρaQTvar))
-    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:HQTcov), Val(:ρaHQTcov))
+    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(true), :tke, :ρatke)
+    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(false), :Hvar, :ρaHvar)
+    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(false), :QTvar, :ρaQTvar)
+    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(false), :HQTcov, :ρaHQTcov)
 
     return
 end
@@ -383,15 +383,16 @@ end
 # Note: this assumes all variables are defined on half levels not full levels (i.e. phi, psi are not w)
 # if covar_e.name is not "tke".
 function get_GMV_CoVar(
-    edmf::EDMF_PrognosticTKE{N_up},
+    edmf::EDMF_PrognosticTKE,
     grid,
     state,
+    ::Val{is_tke},
     covar_sym::Symbol,
     ϕ_sym::Symbol,
     ψ_sym::Symbol = ϕ_sym,
-) where {N_up}
+) where {is_tke}
 
-    is_tke = covar_sym == :tke
+    N_up = n_updrafts(edmf)
     tke_factor = is_tke ? 0.5 : 1
     prog_gm_c = center_prog_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
@@ -590,15 +591,15 @@ function compute_covariance_shear(
     grid,
     state,
     gm::GridMeanVariables,
-    ::Val{covar_sym},
-    ϕs::Val{ϕ_en_sym},
-    ψs::Val{ψ_en_sym} = ϕs,
-) where {covar_sym, ϕ_en_sym, ψ_en_sym}
+    ::Val{is_tke},
+    covar_sym::Symbol,
+    ϕ_en_sym::Symbol,
+    ψ_en_sym::Symbol = ϕ_en_sym,
+) where {is_tke}
 
     aux_tc = center_aux_turbconv(state)
     ρ0_c = center_ref_state(state).ρ0
     prog_gm = center_prog_grid_mean(state)
-    is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
     k_eddy = is_tke ? aux_tc.KM : aux_tc.KH
     aux_en_2m = center_aux_environment_2m(state)
@@ -635,15 +636,16 @@ function compute_covariance_shear(
 end
 
 function compute_covariance_interdomain_src(
-    edmf::EDMF_PrognosticTKE{N_up},
+    edmf::EDMF_PrognosticTKE,
     grid,
     state,
-    ::Val{covar_sym},
-    ϕs::Val{ϕ_sym},
-    ψs::Val{ψ_sym} = ϕs,
-) where {N_up, covar_sym, ϕ_sym, ψ_sym}
+    ::Val{is_tke},
+    covar_sym::Symbol,
+    ϕ_sym::Symbol,
+    ψ_sym::Symbol = ϕ_sym,
+) where {is_tke}
 
-    is_tke = covar_sym == :tke
+    N_up = n_updrafts(edmf)
     tke_factor = is_tke ? 0.5 : 1
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
@@ -668,17 +670,18 @@ function compute_covariance_interdomain_src(
 end
 
 function compute_covariance_entr(
-    edmf::EDMF_PrognosticTKE{N_up},
+    edmf::EDMF_PrognosticTKE,
     grid,
     state,
-    ::Val{covar_sym},
-    ϕs::Val{ϕ_sym},
-    ψs::Val{ψ_sym} = ϕs,
-) where {covar_sym, ϕ_sym, ψ_sym, N_up}
+    ::Val{is_tke},
+    covar_sym::Symbol,
+    ϕ_sym::Symbol,
+    ψ_sym::Symbol = ϕ_sym,
+) where {is_tke}
 
     ρ0_c = center_ref_state(state).ρ0
     FT = eltype(grid)
-    is_tke = covar_sym == :tke
+    N_up = n_updrafts(edmf)
     tke_factor = is_tke ? 0.5 : 1
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
@@ -756,14 +759,16 @@ function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, c
 end
 
 function compute_en_tendencies!(
-    edmf::EDMF_PrognosticTKE{N_up},
+    edmf::EDMF_PrognosticTKE,
     grid::Grid,
     state,
     param_set,
     TS,
-    ::Val{covar_sym},
-    ::Val{prog_sym},
-) where {N_up, covar_sym, prog_sym}
+    ::Val{is_tke},
+    covar_sym::Symbol,
+    prog_sym::Symbol,
+) where {is_tke}
+    N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     ρ0_c = center_ref_state(state).ρ0
@@ -779,7 +784,6 @@ function compute_en_tendencies!(
     aux_up = center_aux_updrafts(state)
     w_en_f = face_aux_environment(state).w
     c_d = CPEDMF.c_d(param_set)
-    is_tke = covar_sym == :tke
     FT = eltype(grid)
 
     ρ_ae_K = face_aux_turbconv(state).ρ_ae_K
@@ -837,20 +841,21 @@ function compute_en_tendencies!(
 end
 
 function GMV_third_m(
-    edmf::EDMF_PrognosticTKE{N_up},
+    edmf::EDMF_PrognosticTKE,
     grid,
     state,
-    ::Val{covar_en_sym},
-    ::Val{var},
-    ::Val{gm_third_m_sym},
-) where {N_up, covar_en_sym, var, gm_third_m_sym}
+    ::Val{is_tke},
+    covar_en_sym::Symbol,
+    var::Symbol,
+    gm_third_m_sym::Symbol,
+) where {is_tke}
 
+    N_up = n_updrafts(edmf)
     gm_third_m = getproperty(center_aux_grid_mean(state), gm_third_m_sym)
     kc_surf = kc_surface(grid)
 
     aux_bulk = center_aux_bulk(state)
     aux_up_f = face_aux_updrafts(state)
-    is_tke = covar_en_sym == :tke
     aux_en_c = center_aux_environment(state)
     covar_en = getproperty(aux_en_c, covar_en_sym)
     aux_en_f = face_aux_environment(state)

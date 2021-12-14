@@ -216,9 +216,9 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     #####
     #####  diagnose_GMV_moments
     #####
-    get_GMV_CoVar(edmf, grid, state, :Hvar, :θ_liq_ice)
-    get_GMV_CoVar(edmf, grid, state, :QTvar, :q_tot)
-    get_GMV_CoVar(edmf, grid, state, :HQTcov, :θ_liq_ice, :q_tot)
+    get_GMV_CoVar(edmf, grid, state, Val(false), :Hvar, :θ_liq_ice)
+    get_GMV_CoVar(edmf, grid, state, Val(false), :QTvar, :q_tot)
+    get_GMV_CoVar(edmf, grid, state, Val(false), :HQTcov, :θ_liq_ice, :q_tot)
 
     # TODO - use this inversion in free_convection_windspeed and not compute zi twice
     edmf.zi = get_inversion(grid, state, param_set, surface.Ri_bulk_crit)
@@ -464,14 +464,14 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
         @. tke_press += (Ic(w_en) - Ic(w_up)) * Ic(nh_press)
     end
 
-    compute_covariance_entr(edmf, grid, state, Val(:tke), Val(:w))
-    compute_covariance_entr(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice))
-    compute_covariance_entr(edmf, grid, state, Val(:QTvar), Val(:q_tot))
-    compute_covariance_entr(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
-    compute_covariance_shear(edmf, grid, state, gm, Val(:tke), Val(:w))
-    compute_covariance_shear(edmf, grid, state, gm, Val(:Hvar), Val(:θ_liq_ice))
-    compute_covariance_shear(edmf, grid, state, gm, Val(:QTvar), Val(:q_tot))
-    compute_covariance_shear(edmf, grid, state, gm, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
+    compute_covariance_entr(edmf, grid, state, Val(true), :tke, :w)
+    compute_covariance_entr(edmf, grid, state, Val(false), :Hvar, :θ_liq_ice)
+    compute_covariance_entr(edmf, grid, state, Val(false), :QTvar, :q_tot)
+    compute_covariance_entr(edmf, grid, state, Val(false), :HQTcov, :θ_liq_ice, :q_tot)
+    compute_covariance_shear(edmf, grid, state, gm, Val(true), :tke, :w)
+    compute_covariance_shear(edmf, grid, state, gm, Val(false), :Hvar, :θ_liq_ice)
+    compute_covariance_shear(edmf, grid, state, gm, Val(false), :QTvar, :q_tot)
+    compute_covariance_shear(edmf, grid, state, gm, Val(false), :HQTcov, :θ_liq_ice, :q_tot)
     compute_covariance_dissipation(edmf, grid, state, :tke, param_set)
     compute_covariance_dissipation(edmf, grid, state, :Hvar, param_set)
     compute_covariance_dissipation(edmf, grid, state, :QTvar, param_set)
@@ -485,7 +485,7 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
         aux_en_2m.HQTcov.rain_src[k] = ρ0_c[k] * aux_en.area[k] * aux_en.HQTcov_rain_dt[k]
     end
 
-    get_GMV_CoVar(edmf, grid, state, :tke, :w)
+    get_GMV_CoVar(edmf, grid, state, Val(true), :tke, :w)
 
     compute_diffusive_fluxes(edmf, grid, state, gm, Case, TS, param_set)
 
