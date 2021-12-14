@@ -19,7 +19,7 @@ function update_n(sim, tendencies, ::Val{N}) where {N}
     TS = sim.TS
     prog = sim.state.prog
     aux = sim.state.aux
-    params = (; edmf = sim.Turb, grid = grid, gm = sim.GMV, case = sim.Case, TS = TS, aux = aux)
+    params = (; edmf = sim.edmf, grid = grid, gm = sim.gm, case = sim.Case, TS = TS, aux = aux)
     for i in 1:N
         TC.∑tendencies!(tendencies, prog, params, TS.t)
     end
@@ -36,13 +36,13 @@ function init_sim(case_name)
     namelist["meta"]["uuid"] = "01"
     sim = Simulation1d(namelist)
 
-    Cases.initialize_profiles(sim.Case, sim.grid, sim.GMV, sim.state)
-    satadjust(sim.GMV, sim.grid, sim.state)
+    Cases.initialize_profiles(sim.Case, sim.grid, sim.gm, sim.state)
+    satadjust(sim.gm, sim.grid, sim.state)
 
     Cases.initialize_surface(sim.Case, sim.grid, sim.state, sim.param_set)
-    Cases.initialize_forcing(sim.Case, sim.grid, sim.state, sim.GMV, sim.param_set)
-    Cases.initialize_radiation(sim.Case, sim.grid, sim.state, sim.GMV, sim.param_set)
+    Cases.initialize_forcing(sim.Case, sim.grid, sim.state, sim.gm, sim.param_set)
+    Cases.initialize_radiation(sim.Case, sim.grid, sim.state, sim.gm, sim.param_set)
 
-    initialize_edmf(sim.Turb, sim.grid, sim.state, sim.Case, sim.GMV, sim.TS)
+    initialize_edmf(sim.edmf, sim.grid, sim.state, sim.Case, sim.gm, sim.TS)
     return sim
 end
