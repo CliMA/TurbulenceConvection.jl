@@ -33,9 +33,9 @@ struct Simulation1d
     io_nt::NamedTuple
     grid
     state
-    GMV
+    gm
     Case
-    Turb
+    edmf
     diagnostics
     TS
     Stats
@@ -118,14 +118,14 @@ end
 function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     TC = TurbulenceConvection
     state = sim.state
-    Cases.initialize_profiles(sim.Case, sim.grid, sim.GMV, state)
-    satadjust(sim.GMV, sim.grid, sim.state)
+    Cases.initialize_profiles(sim.Case, sim.grid, sim.gm, state)
+    satadjust(sim.gm, sim.grid, sim.state)
 
     Cases.initialize_surface(sim.Case, sim.grid, state, sim.param_set)
-    Cases.initialize_forcing(sim.Case, sim.grid, state, sim.GMV, sim.param_set)
-    Cases.initialize_radiation(sim.Case, sim.grid, state, sim.GMV, sim.param_set)
+    Cases.initialize_forcing(sim.Case, sim.grid, state, sim.gm, sim.param_set)
+    Cases.initialize_radiation(sim.Case, sim.grid, state, sim.gm, sim.param_set)
 
-    initialize_edmf(sim.Turb, sim.grid, state, sim.Case, sim.GMV, sim.TS)
+    initialize_edmf(sim.edmf, sim.grid, state, sim.Case, sim.gm, sim.TS)
 
     sim.skip_io && return nothing
     TC.initialize_io(sim.io_nt.ref_state, sim.Stats)
@@ -135,9 +135,9 @@ function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     TC.initialize_io(sim.io_nt.diagnostics, sim.Stats)
 
     # TODO: depricate
-    TC.initialize_io(sim.GMV, sim.Stats)
+    TC.initialize_io(sim.gm, sim.Stats)
     TC.initialize_io(sim.Case, sim.Stats)
-    TC.initialize_io(sim.Turb, sim.Stats)
+    TC.initialize_io(sim.edmf, sim.Stats)
 
     TC.open_files(sim.Stats)
     TC.write_simulation_time(sim.Stats, sim.TS.t)
@@ -146,9 +146,9 @@ function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     TC.io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
 
     # TODO: depricate
-    TC.io(sim.GMV, sim.grid, state, sim.Stats)
+    TC.io(sim.gm, sim.grid, state, sim.Stats)
     TC.io(sim.Case, sim.grid, state, sim.Stats)
-    TC.io(sim.Turb, sim.grid, state, sim.Stats, sim.TS, sim.param_set)
+    TC.io(sim.edmf, sim.grid, state, sim.Stats, sim.TS, sim.param_set)
     TC.close_files(sim.Stats)
 
     return
@@ -169,9 +169,9 @@ function run(sim::Simulation1d; time_run = true)
 
     t_span = (0.0, sim.TS.t_max)
     params = (;
-        edmf = sim.Turb,
+        edmf = sim.edmf,
         grid = grid,
-        gm = sim.GMV,
+        gm = sim.gm,
         aux = aux,
         io_nt = sim.io_nt,
         case = sim.Case,
@@ -186,7 +186,7 @@ function run(sim::Simulation1d; time_run = true)
 
     callback_io = ODE.DiscreteCallback(condition_io, affect_io!; save_positions = (false, false))
     callback_cfl = ODE.DiscreteCallback(condition_every_iter, monitor_cfl!; save_positions = (false, false))
-    callback_cfl = sim.Turb.Precip.precipitation_model == "clima_1m" ? (callback_cfl,) : ()
+    callback_cfl = sim.edmf.Precip.precipitation_model == "clima_1m" ? (callback_cfl,) : ()
     callback_dtmax = ODE.DiscreteCallback(condition_every_iter, dt_max!; save_positions = (false, false))
     callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
     callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))
