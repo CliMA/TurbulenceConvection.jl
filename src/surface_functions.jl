@@ -15,11 +15,11 @@ function compute_friction_velocity(param_set, windspeed, buoy_flux, z0, z1)
     if (abs(buoy_flux) > 1.0e-20)
         function roots(ustar)
             lmo = obukhov_length(param_set, ustar, buoy_flux)
-            uf = SF.Businger(param_set, lmo)
+            uf = UF.Businger(param_set, lmo)
             ζ = z1 / lmo
             ζ_0 = z0 / lmo
-            Ψ_m_1 = UF.psi(uf, ζ, SF.MomentumTransport())
-            Ψ_m_0 = UF.psi(uf, ζ_0, SF.MomentumTransport())
+            Ψ_m_1 = UF.psi(uf, ζ, UF.MomentumTransport())
+            Ψ_m_0 = UF.psi(uf, ζ_0, UF.MomentumTransport())
             return windspeed - ustar / vkb * (logz - Ψ_m_1 + Ψ_m_0)
         end
         sol = RS.find_zero(roots, RS.NewtonsMethodAD(ustar0), RS.CompactSolution(), RS.SolutionTolerance(1e-3), 100)
@@ -61,11 +61,11 @@ function exchange_coefficients_byun(param_set, Ri, zb, z0)
     end
     lmo = zb / ζ
     ζ_0 = z0 / lmo
-    uf = SF.Businger(param_set, lmo)
-    Ψ_m_1 = UF.psi(uf, ζ, SF.MomentumTransport())
-    Ψ_m_0 = UF.psi(uf, ζ_0, SF.MomentumTransport())
-    Ψ_h_1 = UF.psi(uf, ζ, SF.HeatTransport())
-    Ψ_h_0 = UF.psi(uf, ζ_0, SF.HeatTransport())
+    uf = UF.Businger(param_set, lmo)
+    Ψ_m_1 = UF.psi(uf, ζ, UF.MomentumTransport())
+    Ψ_m_0 = UF.psi(uf, ζ_0, UF.MomentumTransport())
+    Ψ_h_1 = UF.psi(uf, ζ, UF.HeatTransport())
+    Ψ_h_0 = UF.psi(uf, ζ_0, UF.HeatTransport())
 
     cu = von_karman_const / (logz - Ψ_m_1 + Ψ_m_0)
     cth = von_karman_const / (logz - Ψ_h_1 + Ψ_h_0) / Pr0
