@@ -15,11 +15,11 @@ function compute_friction_velocity(param_set, windspeed, buoy_flux, z0, z1)
     if (abs(buoy_flux) > 1.0e-20)
         function roots(ustar)
             lmo = obukhov_length(param_set, ustar, buoy_flux)
-            uf = SF.Businger(param_set, lmo)
+            uf = UF.Businger(param_set, lmo)
             ζ = z1 / lmo
             ζ_0 = z0 / lmo
-            Ψ_m_1 = UF.psi(uf, ζ, SF.MomentumTransport())
-            Ψ_m_0 = UF.psi(uf, ζ_0, SF.MomentumTransport())
+            Ψ_m_1 = UF.psi(uf, ζ, UF.MomentumTransport())
+            Ψ_m_0 = UF.psi(uf, ζ_0, UF.MomentumTransport())
             return windspeed - ustar / vkb * (logz - Ψ_m_1 + Ψ_m_0)
         end
         sol = RS.find_zero(roots, RS.NewtonsMethodAD(ustar0), RS.CompactSolution(), RS.SolutionTolerance(1e-3), 100)
