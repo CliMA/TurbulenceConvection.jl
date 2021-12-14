@@ -61,16 +61,16 @@ function Simulation1d(namelist)
     case = Cases.get_case(namelist)
     ref_params = Cases.reference_params(case, grid, param_set, namelist)
 
-    GMV = TC.GridMeanVariables(namelist, grid, param_set)
+    gm = TC.GridMeanVariables(namelist, grid, param_set)
     Sur = TC.SurfaceBase(Cases.get_surface_type(case); namelist, ref_params)
     Fo = TC.ForcingBase{Cases.get_forcing_type(case)}()
     Rad = TC.RadiationBase{Cases.get_radiation_type(case)}()
 
     Case = Cases.CasesBase(case, namelist, grid, param_set, Sur, Fo, Rad)
-    Turb = TC.EDMF_PrognosticTKE(namelist, grid, param_set)
+    edmf = TC.EDMF_PrognosticTKE(namelist, grid, param_set)
     TS = TC.TimeStepping(namelist)
 
-    n_updrafts = Turb.n_updrafts
+    n_updrafts = edmf.n_updrafts
 
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
@@ -101,9 +101,9 @@ function Simulation1d(namelist)
         io_nt,
         grid,
         state,
-        GMV,
+        gm,
         Case,
-        Turb,
+        edmf,
         diagnostics,
         TS,
         Stats,
