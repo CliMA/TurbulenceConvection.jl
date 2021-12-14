@@ -129,7 +129,7 @@ function entr_detr(param_set, εδ_model_vars, εδ_model_type::NNEntr)
     nn_arc = (4, 2, 2) # number of inputs, number of neurons, number of outputs
     nn_model = Chain(
         Dense(reshape(c_gen[1:8], nn_arc[2], nn_arc[1]), c_gen[9:10], sigmoid),
-        Dense(reshape(c_gen[11:14], nn_arc[3], nn_arc[2]), c_gen[15:16], sigmoid),
+        Dense(reshape(c_gen[11:14], nn_arc[3], nn_arc[2]), c_gen[15:16], softplus),
     )
 
     pi_1 = Δw^2/(εδ_model_vars.zc_i * Δb)

@@ -426,11 +426,9 @@ function LES_driven_SCM(namelist_defaults)
 
     namelist["stats_io"]["frequency"] = 10.0
     namelist["time_stepping"]["t_max"] = 3600.0 * 6
-
-
-    # namelist["time_stepping"]["dt_min"] = 1.0
-    namelist["time_stepping"]["adapt_dt"] = false
-    namelist["time_stepping"]["dt"] = 2.0
+    namelist["time_stepping"]["adapt_dt"] = true
+    namelist["time_stepping"]["dt_min"] = 1.0
+    namelist["time_stepping"]["dt_max"] = 7.0
 
     # use last 6 hours of LES simulation to drive LES
     namelist["t_interval_from_end_s"] = 3600.0 * 6
