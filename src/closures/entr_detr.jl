@@ -2,58 +2,82 @@
 using Flux
 
 function compute_turbulent_entrainment(param_set, εδ_model_vars)
+    FT = eltype(εδ_model_vars)
+    c_t = FT(CPEDMF.c_t(param_set))
+    K_ε = εδ_model_vars.a_up * c_t * sqrt(max(εδ_model_vars.tke, 0)) * εδ_model_vars.R_up
 
-    c_t = CPEDMF.c_t(param_set)
-    K_ε = εδ_model_vars.a_up * c_t * sqrt(max(εδ_model_vars.tke, 0.0)) * εδ_model_vars.R_up
-    if εδ_model_vars.w_up * εδ_model_vars.a_up > 0.0
-        ε_turb = (2.0 / εδ_model_vars.R_up^2.0) * K_ε / (εδ_model_vars.w_up * εδ_model_vars.a_up)
+    ε_turb = if εδ_model_vars.w_up * εδ_model_vars.a_up > 0
+        (2 / εδ_model_vars.R_up^2) * K_ε / (εδ_model_vars.w_up * εδ_model_vars.a_up)
     else
-        ε_turb = 0.0
+        FT(0)
     end
 
     return (ε_turb, K_ε)
 end
 
-function compute_inverse_timescale(Δb::FT, Δw::FT, param_set::APS, εδ_model_vars) where {FT}
-
-    c_λ = CPEDMF.c_λ(param_set)
+function compute_inverse_timescale(param_set, εδ_model_vars)
+    FT = eltype(εδ_model_vars)
+    Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
+    Δw = get_Δw(param_set, εδ_model_vars)
+    c_λ = FT(CPEDMF.c_λ(param_set))
 
     l_1 = c_λ * abs(Δb / sqrt(εδ_model_vars.tke + 1e-8))
     l_2 = abs(Δb / Δw)
     l = SA.SVector(l_1, l_2)
-    return lamb_smooth_minimum(l, 0.1, 0.0005)
-
+    return lamb_smooth_minimum(l, FT(0.1), FT(0.0005))
 end
 
-function preprocess_inputs(param_set, εδ_model_vars, Δw)
+function get_Δw(param_set, εδ_model_vars)
+    FT = eltype(εδ_model_vars)
+    Δw = εδ_model_vars.w_up - εδ_model_vars.w_en
+    Δw += copysign(FT(CPEDMF.w_min(param_set)), Δw)
+    return Δw
+end
 
-    w_min = CPEDMF.w_min(param_set)
-    c_δ = CPEDMF.c_δ(param_set)
-
-    # should be: c_δ = sign(condensate(ts_en) + condensate(ts_up[i])) * entr.c_δ
-    if !TD.has_condensate(εδ_model_vars.q_cond_up + εδ_model_vars.q_cond_en)
-        c_δ = 0.0
-    end
-
-    # clip vertical velocity
-    if Δw < 0.0
-        Δw -= w_min
+function get_c_δ(param_set, εδ_model_vars)
+    FT = eltype(εδ_model_vars)
+    c_δ = if !TD.has_condensate(εδ_model_vars.q_cond_up + εδ_model_vars.q_cond_en)
+        FT(0)
     else
-        Δw += w_min
+        FT(CPEDMF.c_δ(param_set))
     end
+    return c_δ
+end
 
-    MdMdz = max(εδ_model_vars.dMdz / max(εδ_model_vars.M, 1e-12), 0.0)
-    MdMdz = max(-εδ_model_vars.dMdz / max(εδ_model_vars.M, 1e-12), 0.0)
+function get_MdMdz(εδ_model_vars)
+    FT = eltype(εδ_model_vars)
+    MdMdz = max(εδ_model_vars.dMdz / max(εδ_model_vars.M, eps(FT)), 0)
+    MdMdz = max(-εδ_model_vars.dMdz / max(εδ_model_vars.M, eps(FT)), 0)
+    return MdMdz
+end
 
-    return (Δw, MdMdz, c_δ)
+function dimensional_part(param_set, εδ_model_vars)
+    Δw = get_Δw(param_set, εδ_model_vars)
+    λ = compute_inverse_timescale(param_set, εδ_model_vars)
+    return (λ / Δw)
+end
+
+function max_area_limiter(param_set, εδ_model_vars)
+    FT = eltype(εδ_model_vars)
+    γ_lim = FT(ICP.area_limiter_scale(param_set))
+    β_lim = FT(ICP.area_limiter_power(param_set))
+    logistic_term = (2 - 1 / (1 + exp(-γ_lim * (εδ_model_vars.max_area - εδ_model_vars.a_up))))
+    area_limiter = dimensional_part(param_set, εδ_model_vars) * (logistic_term^β_lim - 1)
+    return area_limiter
+end
+
+function non_dimensional_groups(param_set, εδ_model_vars)
+    Δw = get_Δw(param_set, εδ_model_vars)
+    Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
+    Π_1 = Δw^2 / (εδ_model_vars.zc_i * Δb)
+    Π_2 = Δw^2 / εδ_model_vars.tke
+    Π_3 = √(εδ_model_vars.a_up)
+    Π_4 = εδ_model_vars.RH_up - εδ_model_vars.RH_en
+    return SA.SVector(Π_1, Π_2, Π_3, Π_4)
 end
 
 """
-    entr_detr(
-        param_set,
-        εδ_model_vars,
-        εδ_model_type:MDEntr,
-    )
+    entr_detr(param_set, εδ_model_vars, εδ_model_type::MDEntr)
 
 Returns the dynamic entrainment and detrainment rates,
 as well as the turbulent entrainment rate, following
@@ -63,39 +87,33 @@ Cohen et al. (JAMES, 2020), given:
  - `εδ_model_type`  :: MDEntr - Moisture deficit entrainment closure
 """
 function entr_detr(param_set, εδ_model_vars, εδ_model_type::MDEntr)
+    FT = eltype(εδ_model_vars)
+    dim_scale = dimensional_part(param_set, εδ_model_vars)
+    area_limiter = max_area_limiter(param_set, εδ_model_vars)
 
-    γ_lim = ICP.area_limiter_scale(param_set)
-    β_lim = ICP.area_limiter_power(param_set)
-    c_ε = CPEDMF.c_ε(param_set)
-    c_t = CPEDMF.c_t(param_set)
-    c_div = ICP.entrainment_massflux_div_factor(param_set)
+    # Moisture deficit closure
+    Δw = get_Δw(param_set, εδ_model_vars)
+    D_ε, D_δ, M_δ, M_ε = nondimensional_exchange_functions(param_set, Δw, εδ_model_vars)
+    c_ε = FT(CPEDMF.c_ε(param_set))
+    c_δ = get_c_δ(param_set, εδ_model_vars)
+    nondim_ε = (c_ε * D_ε + c_δ * M_ε)
+    nondim_δ = (c_ε * D_δ + c_δ * M_δ)
+    c_div = FT(ICP.entrainment_massflux_div_factor(param_set))
+    MdMdz = get_MdMdz(εδ_model_vars)
+    drybubble_adj = MdMdz * c_div
 
-    Δw = εδ_model_vars.w_up - εδ_model_vars.w_en
-    Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
-
-    Δw, MdMdz, c_δ = preprocess_inputs(param_set, εδ_model_vars, Δw)
-
-    D_ε, D_δ, M_δ, M_ε = nondimensional_exchange_functions(param_set, Δw, Δb, εδ_model_vars)
-
-    λ = compute_inverse_timescale(Δb, Δw, param_set, εδ_model_vars)
+    # dynamic entrainment / detrainment
+    ε_dyn = dim_scale * nondim_ε + drybubble_adj
+    δ_dyn = dim_scale * nondim_δ + drybubble_adj + area_limiter
 
     # turbulent entrainment
     ε_turb, K_ε = compute_turbulent_entrainment(param_set, εδ_model_vars)
-
-    ε_dyn = λ / Δw * (c_ε * D_ε + c_δ * M_ε) + MdMdz * c_div
-    logistic_term = (2.0 - 1.0 / (1 + exp(-γ_lim * (εδ_model_vars.max_area - εδ_model_vars.a_up))))
-    max_area_limiter = λ / Δw * (logistic_term^β_lim - 1.0)
-    δ_dyn = (λ / Δw * (c_ε * D_δ + c_δ * M_δ) + MdMdz * c_div) + max_area_limiter
 
     return EntrDetr(ε_dyn, δ_dyn, ε_turb, K_ε)
 end
 
 """
-    entr_detr(
-        param_set,
-        εδ_model_vars,
-        εδ_model_type::NNEntr,
-    )
+    entr_detr(param_set, εδ_model_vars, εδ_model_type::NNEntr)
 
 Returns the dynamic entrainment and detrainment rates,
 as well as the turbulent entrainment rate, using a neural
@@ -105,38 +123,26 @@ network to predict the non-dimensional component of dynamical entrainment:
  - `εδ_model_type`  :: NNEntr - Neural network entrainment closure
 """
 function entr_detr(param_set, εδ_model_vars, εδ_model_type::NNEntr)
-
-    γ_lim = ICP.area_limiter_scale(param_set)
-    β_lim = ICP.area_limiter_power(param_set)
-    c_ε = CPEDMF.c_ε(param_set)
-    c_t = CPEDMF.c_t(param_set)
     c_gen = ICP.c_gen(param_set)
-    c_div = ICP.entrainment_massflux_div_factor(param_set)
+    dim_scale = dimensional_part(param_set, εδ_model_vars)
+    area_limiter = max_area_limiter(param_set, εδ_model_vars)
 
-    Δw = εδ_model_vars.w_up - εδ_model_vars.w_en
-    Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
+    # Neural network closure
+    nn_arc = (4, 2, 2)  # (#inputs, #neurons, #outputs)
+    nn_model = Chain(
+        Dense(reshape(c_gen[1:8], nn_arc[2], nn_arc[1]), c_gen[9:10], sigmoid),
+        Dense(reshape(c_gen[11:14], nn_arc[3], nn_arc[2]), c_gen[15:16], softplus),
+    )
 
-    Δw, MdMdz, c_δ = preprocess_inputs(param_set, εδ_model_vars, Δw)
+    nondim_groups = non_dimensional_groups(param_set, εδ_model_vars)
+    nondim_ε, nondim_δ = nn_model(nondim_groups)
 
-    λ = compute_inverse_timescale(Δb, Δw, param_set, εδ_model_vars)
+    # dynamic entrainment / detrainment
+    ε_dyn = dim_scale * nondim_ε
+    δ_dyn = dim_scale * nondim_δ + area_limiter
 
     # turbulent entrainment
     ε_turb, K_ε = compute_turbulent_entrainment(param_set, εδ_model_vars)
-
-    logistic_term = (2.0 - 1.0 / (1 + exp(-γ_lim * (εδ_model_vars.max_area - εδ_model_vars.a_up))))
-    max_area_limiter = λ / Δw * (logistic_term^β_lim - 1.0)
-
-    nn_arc = (4, 2, 2) # number of inputs, number of neurons, number of outputs
-    nn_model = Chain(
-        Dense(reshape(c_gen[1:8], nn_arc[2], nn_arc[1]), c_gen[9:10], sigmoid),
-        Dense(reshape(c_gen[11:14], nn_arc[3], nn_arc[2]), c_gen[15:16], sigmoid),
-    )
-
-    pi_1 = εδ_model_vars.updraft_top * Δb / Δw^2
-    pi_2 = εδ_model_vars.tke / Δw^2
-    non_dim_functions = nn_model([pi_1, pi_2, εδ_model_vars.a_up, εδ_model_vars.RH_up - εδ_model_vars.RH_en])
-    ε_dyn = (λ / Δw) * non_dim_functions[1]
-    δ_dyn = (λ / Δw) * non_dim_functions[2] + max_area_limiter
 
     return EntrDetr(ε_dyn, δ_dyn, ε_turb, K_ε)
 end
