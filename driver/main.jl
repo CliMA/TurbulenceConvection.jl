@@ -29,17 +29,17 @@ include(joinpath(tc_dir, "driver", "Cases.jl"))
 include(joinpath(tc_dir, "driver", "dycore.jl"))
 import .Cases
 
-struct Simulation1d
-    io_nt::NamedTuple
-    grid
-    state
-    gm
-    Case
-    edmf
-    diagnostics
-    TS
-    Stats
-    param_set
+struct Simulation1d{IONT, G, S, GM, C, EDMF, D, TIMESTEPPING, STATS, PS}
+    io_nt::IONT
+    grid::G
+    state::S
+    gm::GM
+    Case::C
+    edmf::EDMF
+    diagnostics::D
+    TS::TIMESTEPPING
+    Stats::STATS
+    param_set::PS
     skip_io::Bool
     adapt_dt::Bool
     cfl_limit::Float64
