@@ -19,7 +19,11 @@ import OrdinaryDiffEq
 import CloudMicrophysics
 import SurfaceFluxes
 import UnPack
+import Distributions
+import StochasticDiffEq
+import Flux
 
+const SDE = StochasticDiffEq
 const ODE = OrdinaryDiffEq
 const CC = ClimaCore
 const CCO = CC.Operators

@@ -1,5 +1,4 @@
 #### Entrainment-Detrainment kernels
-using Flux
 
 function compute_turbulent_entrainment(param_set, εδ_model_vars)
     FT = eltype(εδ_model_vars)
@@ -129,9 +128,9 @@ function entr_detr(param_set, εδ_model_vars, εδ_model_type::NNEntr)
 
     # Neural network closure
     nn_arc = (4, 2, 2)  # (#inputs, #neurons, #outputs)
-    nn_model = Chain(
-        Dense(reshape(c_gen[1:8], nn_arc[2], nn_arc[1]), c_gen[9:10], sigmoid),
-        Dense(reshape(c_gen[11:14], nn_arc[3], nn_arc[2]), c_gen[15:16], softplus),
+    nn_model = Flux.Chain(
+        Flux.Dense(reshape(c_gen[1:8], nn_arc[2], nn_arc[1]), c_gen[9:10], sigmoid),
+        Flux.Dense(reshape(c_gen[11:14], nn_arc[3], nn_arc[2]), c_gen[15:16], softplus),
     )
 
     nondim_groups = non_dimensional_groups(param_set, εδ_model_vars)

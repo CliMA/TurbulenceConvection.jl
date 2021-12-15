@@ -1,5 +1,3 @@
-import Distributions
-import DifferentialEquations: SOSRI
 
 abstract type AbstractEntDet end
 struct Entrainment <: AbstractEntDet end
@@ -58,8 +56,8 @@ function sde_closure(param_set::APS, sde_model::sde_struct{SDEClosureType}, term
     return u
 end
 
-""" 
-    Solve the Ornstein-Uhlenbeck process `du = f(u,p,t)⋅dt + g(u,p,t)⋅dW` numerically 
+"""
+    Solve the Ornstein-Uhlenbeck process `du = f(u,p,t)⋅dt + g(u,p,t)⋅dW` numerically
 
 This formulation solves the Cox-Ingersoll-Ross model, a variant of the Vasicek model
 which ensures that `u` remains positive so long as `θ, μ > 0`,
@@ -74,7 +72,7 @@ function sde(θ::FT, σ::FT, u0::FT, dt::FT) where {FT <: Real}
     f(u, p, t) = θ * (μ - u)        # θ :: speed of reversion
     g(u, p, t) = σ * √(u_pos(u))    # σ :: standard deviation
     tspan = (0.0, dt)
-    prob = SDEProblem(f, g, u0, tspan)
-    sol = solve(prob, SOSRI())
+    prob = SDE.SDEProblem(f, g, u0, tspan)
+    sol = SDE.solve(prob, SDE.SOSRI())
     return u_pos(sol[end])
 end
