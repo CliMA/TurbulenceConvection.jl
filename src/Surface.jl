@@ -1,284 +1,235 @@
-#####
-##### BaseCase methods
-#####
-
-function free_convection_windspeed(surf::SurfaceBase, grid, state, gm::GridMeanVariables, param_set, ::BaseCase)
-    prog_gm = center_prog_grid_mean(state)
-    aux_tc = center_aux_turbconv(state)
-    zi = get_inversion(grid, state, param_set, surf.Ri_bulk_crit)
-    wstar = get_wstar(surf.bflux, zi) # yair here zi in TRMM should be adjusted
-    surf.windspeed = sqrt(surf.windspeed * surf.windspeed + (1.2 * wstar) * (1.2 * wstar))
-    return
-end
-
-#####
-##### Default SurfaceBase behavior
-#####
-
-free_convection_windspeed(surf::SurfaceBase, grid, state, gm::GridMeanVariables, param_set) =
-    free_convection_windspeed(surf, grid, state, gm, param_set, BaseCase())
-
-#####
-##### SurfaceNone
-#####
-
-function update(surf::SurfaceBase{SurfaceNone}, grid, state, gm::GridMeanVariables, param_set)
-    # JH: assigning small fluxed so that simulation won"t crash when computing mixing length
-    kc_surf = kc_surface(grid)
-    surf.windspeed = 0.0001
-    surf.zrough = 1e-4
-    surf.bflux = 1e-4
-    surf.ustar = compute_friction_velocity(param_set, surf.windspeed, surf.bflux, surf.zrough, grid.zc[kc_surf])
-    return
-end
-free_convection_windspeed(surf::SurfaceBase{SurfaceNone}, grid, state, gm::GridMeanVariables, param_set) = nothing
 
 function update(surf::SurfaceBase{SurfaceFixedFlux}, grid, state, gm::GridMeanVariables, param_set)
+    FT = eltype(grid)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
-    zb = grid.zc[kc_surf]
+    z_sfc = FT(0)
+    z_in = grid.zc[kc_surf].z
     aux_gm = center_aux_grid_mean(state)
     prog_gm = center_prog_grid_mean(state)
     p0_f_surf = face_ref_state(state).p0[kf_surf]
-    ρ0_f_surf = face_ref_state(state).ρ0[kf_surf]
-    α0_f_surf = face_ref_state(state).α0[kf_surf]
+    p0_c_surf = center_ref_state(state).p0[kc_surf]
     u_gm_surf = prog_gm.u[kc_surf]
     v_gm_surf = prog_gm.v[kc_surf]
     q_tot_gm_surf = prog_gm.q_tot[kc_surf]
     θ_liq_ice_gm_surf = prog_gm.θ_liq_ice[kc_surf]
-    T_gm_surf = aux_gm.T[kc_surf]
 
-    ts = thermo_state_pθq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
-    rho_tflux = surf.shf / TD.cp_m(ts)
+    ts_sfc = thermo_state_pθq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
+    ts_in = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
+    universal_func = UF.Businger()
+    scheme = SF.FVScheme()
 
-    surf.windspeed = sqrt(u_gm_surf^2 + v_gm_surf^2)
-    surf.rho_qtflux = surf.lhf / TD.latent_heat_vapor(param_set, surf.Tsurface)
+    surf.bflux = SF.compute_buoyancy_flux(param_set, surf.shf, surf.lhf, ts_in, ts_sfc, scheme)
+    zi = get_inversion(grid, state, param_set, surf.Ri_bulk_crit)
+    convective_vel = get_wstar(surf.bflux, zi) # yair here zi in TRMM should be adjusted
 
-    ts = thermo_state_pθq(param_set, p0_f_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
-    Π = TD.exner(ts)
-    surf.rho_hflux = rho_tflux / Π
-    surf.bflux = buoyancy_flux(param_set, surf.shf, surf.lhf, surf.Tsurface, surf.qsurface, α0_f_surf, ts)
-
-    if !surf.ustar_fixed
-        # Correction to windspeed for free convective cases (Beljaars, QJRMS (1994), 121, pp. 255-270)
-        # Value 1.2 is empirical, but should be O(1)
-        if surf.windspeed < 0.1  # Limit here is heuristic
-            if surf.bflux > 0.0
-                free_convection_windspeed(surf, grid, state, gm, param_set)
-            else
-                print("WARNING: Low windspeed + stable conditions, need to check ustar computation")
-                print("surf.bflux ==>", surf.bflux)
-                print("surf.shf ==>", surf.shf)
-                print("surf.lhf ==>", surf.lhf)
-                print("u_gm_surf ==>", u_gm_surf)
-                print("v_gm_surf ==>", v_gm_surf)
-                print("q_tot_gm_surf ==>", q_tot_gm_surf)
-                print("α0_f_surf ==>", α0_f_surf)
-                error("Terminating execution.")
-            end
-        end
-
-        surf.ustar = compute_friction_velocity(param_set, surf.windspeed, surf.bflux, surf.zrough, zb)
+    u_sfc = SA.SVector{2, FT}(0, 0)
+    u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
+    vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
+    vals_int = SF.InteriorValues(z_in, u_in, ts_in)
+    if surf.ustar_fixed
+        sc = SF.FluxesAndFrictionVelocity{FT}(;
+            state_in = vals_int,
+            state_sfc = vals_sfc,
+            shf = surf.shf,
+            lhf = surf.lhf,
+            ustar = surf.ustar,
+            z0m = surf.zrough,
+            z0b = surf.zrough,
+            gustiness = convective_vel,
+        )
+        result = SF.surface_conditions(param_set, sc, universal_func, scheme)
+    else
+        sc = SF.Fluxes{FT}(
+            state_in = vals_int,
+            state_sfc = vals_sfc,
+            shf = surf.shf,
+            lhf = surf.lhf,
+            z0m = surf.zrough,
+            z0b = surf.zrough,
+            gustiness = convective_vel,
+        )
+        result = SF.surface_conditions(param_set, sc, universal_func, scheme)
+        surf.ustar = result.ustar
     end
-
-    von_karman_const = CPSGS.von_karman_const(param_set)
-    surf.obukhov_length = obukhov_length(param_set, surf.ustar, surf.bflux)
-    surf.rho_uflux = -ρ0_f_surf * surf.ustar^2 / surf.windspeed * u_gm_surf
-    surf.rho_vflux = -ρ0_f_surf * surf.ustar^2 / surf.windspeed * v_gm_surf
+    surf.obukhov_length = result.L_MO
+    surf.cm = result.Cd
+    surf.ch = result.Ch
+    surf.rho_uflux = result.ρτxz
+    surf.rho_vflux = result.ρτyz
+    surf.rho_hflux = surf.shf / TD.cp_m(ts_in)
+    surf.rho_qtflux = surf.lhf / TD.latent_heat_vapor(ts_in)
     return
 end
 
 function update(surf::SurfaceBase{SurfaceFixedCoeffs}, grid, state, gm::GridMeanVariables, param_set)
+    FT = eltype(grid)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     p0_f_surf = face_ref_state(state).p0[kf_surf]
-    ρ0_f_surf = face_ref_state(state).ρ0[kf_surf]
-    α0_f_surf = face_ref_state(state).α0[kf_surf]
+    p0_c_surf = center_ref_state(state).p0[kc_surf]
     aux_gm = center_aux_grid_mean(state)
     prog_gm = center_prog_grid_mean(state)
     u_gm_surf = prog_gm.u[kc_surf]
     v_gm_surf = prog_gm.v[kc_surf]
-    T_gm_surf = aux_gm.T[kc_surf]
     q_tot_gm_surf = prog_gm.q_tot[kc_surf]
     θ_liq_ice_gm_surf = prog_gm.θ_liq_ice[kc_surf]
 
-    ts = thermo_state_pθq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
-    surf.windspeed = max(sqrt(u_gm_surf^2 + v_gm_surf^2), 0.01)
-    cp_ = TD.cp_m(ts)
-    lv = TD.latent_heat_vapor(ts)
-
-    surf.rho_qtflux = -surf.cq * surf.windspeed * (q_tot_gm_surf - surf.qsurface) * ρ0_f_surf
-    surf.lhf = lv * surf.rho_qtflux
-
-    ts = thermo_state_pθq(param_set, p0_f_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
-    Π = TD.exner(ts)
-    surf.rho_hflux = -surf.ch * surf.windspeed * (θ_liq_ice_gm_surf - surf.Tsurface / Π) * ρ0_f_surf
-    surf.shf = cp_ * surf.rho_hflux
-
-    surf.bflux = buoyancy_flux(param_set, surf.shf, surf.lhf, surf.Tsurface, surf.qsurface, α0_f_surf, ts)
-
-    surf.ustar = friction_velocity_given_windspeed(surf.cm, surf.windspeed)
-    surf.obukhov_length = obukhov_length(param_set, surf.ustar, surf.bflux)
-
-    surf.rho_uflux = -ρ0_f_surf * surf.ustar^2 / surf.windspeed * u_gm_surf
-    surf.rho_vflux = -ρ0_f_surf * surf.ustar^2 / surf.windspeed * v_gm_surf
+    universal_func = UF.Businger()
+    scheme = SF.FVScheme()
+    z_sfc = FT(0)
+    z_in = grid.zc[kc_surf].z
+    ts_sfc = thermo_state_pθq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
+    ts_in = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
+    u_sfc = SA.SVector{2, FT}(0, 0)
+    u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
+    vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
+    vals_int = SF.InteriorValues(z_in, u_in, ts_in)
+    sc = SF.Coefficients{FT}(
+        state_in = vals_int,
+        state_sfc = vals_sfc,
+        Cd = surf.cm,
+        Ch = surf.ch,
+        z0m = surf.zrough,
+        z0b = surf.zrough,
+    )
+    result = SF.surface_conditions(param_set, sc, universal_func, scheme)
+    surf.cm = result.Cd
+    surf.ch = result.Ch
+    surf.obukhov_length = result.L_MO
+    surf.lhf = result.lhf
+    surf.shf = result.shf
+    surf.ustar = result.ustar
+    surf.rho_uflux = result.ρτxz
+    surf.rho_vflux = result.ρτyz
+    surf.rho_hflux = surf.shf / TD.cp_m(ts_in)
+    surf.rho_qtflux = surf.lhf / TD.latent_heat_vapor(ts_in)
+    surf.bflux = result.buoy_flux
     return
 end
 
 function update(surf::SurfaceBase{SurfaceMoninObukhov}, grid, state, gm::GridMeanVariables, param_set)
-    g = CPP.grav(param_set)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
-    zb = grid.zc[kc_surf]
+    FT = eltype(grid)
+    z_sfc = FT(0)
+    z_in = grid.zc[kc_surf].z
     p0_f_surf = face_ref_state(state).p0[kf_surf]
     p0_c_surf = center_ref_state(state).p0[kc_surf]
-    ρ0_f_surf = face_ref_state(state).ρ0[kf_surf]
-    α0_f_surf = face_ref_state(state).α0[kf_surf]
-    u_gm_surf = prog_gm.u[kc_surf]
-    v_gm_surf = prog_gm.v[kc_surf]
-    q_tot_gm_surf = prog_gm.q_tot[kc_surf]
-    θ_liq_ice_gm_surf = prog_gm.θ_liq_ice[kc_surf]
-    T_gm_surf = aux_gm.T[kc_surf]
-    Pg = surf.ref_params.Pg
-
-    pvg = TD.saturation_vapor_pressure(param_set, TD.PhaseEquil, surf.Tsurface)
-    surf.qsurface = TD.q_vap_saturation_from_density(param_set, surf.Tsurface, ρ0_f_surf, pvg)
-    lv = TD.latent_heat_vapor(param_set, T_gm_surf)
-
-    phase_part = TD.PhasePartition(surf.qsurface, 0.0, 0.0)
-    h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, Pg, phase_part)
-
-    ts_g = thermo_state_pθq(param_set, Pg, h_star, surf.qsurface)
-    θ_virt_g = TD.virtual_pottemp(ts_g)
-
-    ts_b = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, surf.qsurface)
-    θ_virt_b = TD.virtual_pottemp(ts_b)
-
-    surf.windspeed = sqrt(u_gm_surf^2 + v_gm_surf^2)
-    Nb2 = g / θ_virt_g * (θ_virt_b - θ_virt_g) / zb
-    Ri = Nb2 * zb * zb / (surf.windspeed * surf.windspeed)
-
-    surf.cm, surf.ch, surf.obukhov_length = exchange_coefficients_byun(param_set, Ri, zb, surf.zrough)
-    surf.rho_uflux = -surf.cm * surf.windspeed * u_gm_surf * ρ0_f_surf
-    surf.rho_vflux = -surf.cm * surf.windspeed * v_gm_surf * ρ0_f_surf
-
-    surf.rho_hflux = -surf.ch * surf.windspeed * (θ_liq_ice_gm_surf - h_star) * ρ0_f_surf
-    surf.rho_qtflux = -surf.ch * surf.windspeed * (q_tot_gm_surf - surf.qsurface) * ρ0_f_surf
-    surf.lhf = lv * surf.rho_qtflux
-
-    ts = thermo_state_pθq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
-    surf.shf = TD.cp_m(ts) * surf.rho_hflux
-
-    surf.bflux = buoyancy_flux(param_set, surf.shf, surf.lhf, surf.Tsurface, surf.qsurface, α0_f_surf, ts)
-    surf.ustar = friction_velocity_given_windspeed(surf.cm, surf.windspeed)
-
-    return
-end
-
-function update(surf::SurfaceBase{SurfaceMoninObukhovDry}, grid, state, gm::GridMeanVariables, param_set)
-    g = CPP.grav(param_set)
-    kc_surf = kc_surface(grid)
-    kf_surf = kf_surface(grid)
-
-    zb = grid.zc[kc_surf]
-    p0_f_surf = face_ref_state(state).p0[kf_surf]
-    p0_c_surf = center_ref_state(state).p0[kc_surf]
-    ρ0_f_surf = face_ref_state(state).ρ0[kf_surf]
-    α0_f_surf = face_ref_state(state).α0[kf_surf]
     prog_gm = center_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
     u_gm_surf = prog_gm.u[kc_surf]
     v_gm_surf = prog_gm.v[kc_surf]
     q_tot_gm_surf = prog_gm.q_tot[kc_surf]
     θ_liq_ice_gm_surf = prog_gm.θ_liq_ice[kc_surf]
-    T_gm_surf = aux_gm.T[kc_surf]
-    Pg = surf.ref_params.Pg
 
-    pvg = TD.saturation_vapor_pressure(param_set, TD.PhaseEquil, surf.Tsurface)
-    surf.qsurface = TD.q_vap_saturation_from_density(param_set, surf.Tsurface, ρ0_f_surf, pvg)
-    lv = TD.latent_heat_vapor(param_set, T_gm_surf)
+    universal_func = UF.Businger()
+    scheme = SF.FVScheme()
+    ts_sfc = thermo_state_pTq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
+    ts_in = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, surf.qsurface)
 
-    phase_part = TD.PhasePartition(surf.qsurface, 0.0, 0.0)
-    h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, Pg, phase_part)
-
-    ts_g = thermo_state_pθq(param_set, Pg, h_star, surf.qsurface)
-    θ_virt_g = TD.virtual_pottemp(ts_g)
-
-    ts_b = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, surf.qsurface)
-    θ_virt_b = TD.virtual_pottemp(ts_b)
-
-    surf.windspeed = sqrt(u_gm_surf^2 + v_gm_surf^2)
-    Nb2 = g / θ_virt_g * (θ_virt_b - θ_virt_g) / zb
-    Ri = Nb2 * zb * zb / (surf.windspeed * surf.windspeed)
-
-    surf.cm, surf.ch, surf.obukhov_length = exchange_coefficients_byun(param_set, Ri, zb, surf.zrough)
-    surf.rho_uflux = -surf.cm * surf.windspeed * u_gm_surf * ρ0_f_surf
-    surf.rho_vflux = -surf.cm * surf.windspeed * v_gm_surf * ρ0_f_surf
-
-    surf.rho_hflux = -surf.ch * surf.windspeed * (θ_liq_ice_gm_surf - h_star) * ρ0_f_surf
-    surf.rho_qtflux = -surf.ch * surf.windspeed * (q_tot_gm_surf - surf.qsurface) * ρ0_f_surf
-    surf.lhf = lv * 0.0
-
-    ts = thermo_state_pθq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
-    surf.shf = TD.cp_m(ts) * surf.rho_hflux
-
-    surf.bflux = buoyancy_flux(param_set, surf.shf, surf.lhf, surf.Tsurface, surf.qsurface, α0_f_surf, ts)
-    surf.ustar = friction_velocity_given_windspeed(surf.cm, surf.windspeed)
-
+    u_sfc = SA.SVector{2, FT}(0, 0)
+    u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
+    vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
+    vals_int = SF.InteriorValues(z_in, u_in, ts_in)
+    sc = SF.ValuesOnly{FT}(state_in = vals_int, state_sfc = vals_sfc, z0m = surf.zrough, z0b = surf.zrough)
+    result = SF.surface_conditions(param_set, sc, universal_func, scheme)
+    surf.cm = result.Cd
+    surf.ch = result.Ch
+    surf.obukhov_length = result.L_MO
+    surf.lhf = result.lhf
+    surf.shf = result.shf
+    surf.ustar = result.ustar
+    surf.rho_uflux = result.ρτxz
+    surf.rho_vflux = result.ρτyz
+    surf.rho_hflux = surf.shf / TD.cp_m(ts_in)
+    surf.rho_qtflux = surf.lhf / TD.latent_heat_vapor(ts_in)
+    surf.bflux = result.buoy_flux
     return
 end
 
-function update(surf::SurfaceBase{SurfaceSullivanPatton}, grid, state, gm::GridMeanVariables, param_set)
-    g = CPP.grav(param_set)
-    R_d = CPP.R_d(param_set)
+function update(surf::SurfaceBase{SurfaceMoninObukhovDry}, grid, state, gm::GridMeanVariables, param_set)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
-
-    zb = grid.zc[kc_surf]
-
+    FT = eltype(grid)
+    z_sfc = FT(0)
+    z_in = grid.zc[kc_surf].z
     p0_f_surf = face_ref_state(state).p0[kf_surf]
     p0_c_surf = center_ref_state(state).p0[kc_surf]
-    ρ0_f_surf = face_ref_state(state).ρ0[kf_surf]
-    α0_c_surf = center_ref_state(state).α0[kc_surf]
+    prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     u_gm_surf = prog_gm.u[kc_surf]
     v_gm_surf = prog_gm.v[kc_surf]
     q_tot_gm_surf = prog_gm.q_tot[kc_surf]
     θ_liq_ice_gm_surf = prog_gm.θ_liq_ice[kc_surf]
-    T_gm_surf = aux_gm.T[kc_surf]
-    Pg = surf.ref_params.Pg
 
-    ts = thermo_state_pθq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
-    lv = TD.latent_heat_vapor(param_set, T_gm_surf)
-    T0 = p0_c_surf * α0_c_surf / R_d # TODO: can we use a thermo state here?
+    phase_part = TD.PhasePartition(surf.qsurface, 0.0, 0.0)
+    θ_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, p0_f_surf, phase_part)
+    ts_sfc = thermo_state_pθq(param_set, p0_f_surf, θ_star, surf.qsurface)
+    ts_in = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, surf.qsurface)
+    u_sfc = SA.SVector{2, FT}(0, 0)
+    u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
+    vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
+    vals_int = SF.InteriorValues(z_in, u_in, ts_in)
+    sc = SF.ValuesOnly{FT}(state_in = vals_int, state_sfc = vals_sfc, z0m = surf.zrough, z0b = surf.zrough)
+    universal_func = UF.Businger()
+    scheme = SF.FVScheme()
+    result = SF.surface_conditions(param_set, sc, universal_func, scheme)
+    surf.cm = result.Cd
+    surf.ch = result.Ch
+    surf.obukhov_length = result.L_MO
+    surf.lhf = result.lhf * 0.0
+    surf.shf = result.shf
+    surf.ustar = result.ustar
+    surf.rho_uflux = result.ρτxz
+    surf.rho_vflux = result.ρτyz
+    surf.rho_hflux = surf.shf / TD.cp_m(ts_in)
+    surf.rho_qtflux = surf.lhf / TD.latent_heat_vapor(ts_in)
+    surf.bflux = result.buoy_flux
+    return
+end
 
-    θ_flux = 0.24
+function update(surf::SurfaceBase{SurfaceSullivanPatton}, grid, state, gm::GridMeanVariables, param_set)
+    kc_surf = kc_surface(grid)
+    kf_surf = kf_surface(grid)
+    FT = eltype(grid)
+    z_sfc = FT(0)
+    z_in = grid.zc[kc_surf].z
+    p0_f_surf = face_ref_state(state).p0[kf_surf]
+    p0_c_surf = center_ref_state(state).p0[kc_surf]
+    prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
+    u_gm_surf = prog_gm.u[kc_surf]
+    v_gm_surf = prog_gm.v[kc_surf]
+    q_tot_gm_surf = prog_gm.q_tot[kc_surf]
+    θ_liq_ice_gm_surf = prog_gm.θ_liq_ice[kc_surf]
+
     phase_part = TD.PhasePartition(q_tot_gm_surf, 0.0, 0.0)
-    Π = TD.exner_given_pressure(param_set, p0_f_surf, phase_part)
-    surf.bflux = g * θ_flux * Π / T0
-
     pvg = TD.saturation_vapor_pressure(param_set, TD.PhaseEquil, surf.Tsurface)
     surf.qsurface = TD.q_vap_saturation_from_density(param_set, surf.Tsurface, ρ0_f_surf, pvg)
-    h_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, Pg, phase_part)
+    θ_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, p0_f_surf, phase_part)
 
-    ts_g = thermo_state_pθq(param_set, Pg, h_star, surf.qsurface)
-    θ_virt_g = TD.virtual_pottemp(ts_g)
+    universal_func = UF.Businger()
+    scheme = SF.FVScheme()
+    ts_sfc = thermo_state_pθq(param_set, p0_f_surf, θ_star, surf.qsurface)
+    ts_in = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, surf.qsurface)
 
-    ts_b = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, surf.qsurface)
-    θ_virt_b = TD.virtual_pottemp(ts_b)
-
-    surf.windspeed = sqrt(u_gm_surf^2 + v_gm_surf^2)
-    Nb2 = g / θ_virt_g * (θ_virt_b - θ_virt_g) / zb
-    Ri = Nb2 * zb * zb / (surf.windspeed * surf.windspeed)
-
-    surf.cm, surf.ch, surf.obukhov_length = exchange_coefficients_byun(param_set, Ri, zb, surf.zrough)
-    surf.rho_uflux = -surf.cm * surf.windspeed * u_gm_surf * ρ0_f_surf
-    surf.rho_vflux = -surf.cm * surf.windspeed * v_gm_surf * ρ0_f_surf
-
-    surf.rho_hflux = -surf.ch * surf.windspeed * (θ_liq_ice_gm_surf - h_star) * ρ0_f_surf
-    surf.rho_qtflux = -surf.ch * surf.windspeed * (q_tot_gm_surf - surf.qsurface) * ρ0_f_surf
-    surf.lhf = lv * surf.rho_qtflux
-    surf.shf = TD.cp_m(ts) * surf.rho_hflux
-
-    surf.ustar = friction_velocity_given_windspeed(surf.cm, surf.windspeed)
+    u_sfc = SA.SVector{2, FT}(0, 0)
+    u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
+    vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
+    vals_int = SF.InteriorValues(z_in, u_in, ts_in)
+    sc = SF.ValuesOnly{FT}(state_in = vals_int, state_sfc = vals_sfc, z0m = surf.zrough, z0b = surf.zrough)
+    result = SF.surface_conditions(param_set, sc, universal_func, scheme)
+    surf.cm = result.Cd
+    surf.ch = result.Ch
+    surf.obukhov_length = result.L_MO
+    surf.lhf = result.lhf * 0.0
+    surf.shf = result.shf
+    surf.ustar = result.ustar
+    surf.rho_uflux = result.ρτxz
+    surf.rho_vflux = result.ρτyz
+    surf.rho_hflux = surf.shf / TD.cp_m(ts_in)
+    surf.rho_qtflux = surf.lhf / TD.latent_heat_vapor(ts_in)
+    surf.bflux = result.buoy_flux
     return
 end
