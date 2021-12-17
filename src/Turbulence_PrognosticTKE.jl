@@ -28,7 +28,8 @@ function compute_les_Γᵣ(z::ClimaCore.Geometry.ZPoint, τᵣ::Real = 24.0 * 36
     end
 end
 
-function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE{N_up}, grid, state, Case, gm, TS) where {N_up}
+function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm)
+    N_up = n_updrafts(edmf)
     tendencies_gm = center_tendencies_grid_mean(state)
     kc_toa = kc_top_of_atmos(grid)
     FT = eltype(grid)
@@ -195,7 +196,6 @@ function compute_diffusive_fluxes(
     state,
     gm::GridMeanVariables,
     Case::CasesBase,
-    TS::TimeStepping,
     param_set,
 )
     FT = eltype(grid)
@@ -263,6 +263,7 @@ function ∑tendencies!(tendencies, prog, params, t)
     UnPack.@unpack edmf, grid, gm, case, aux, TS = params
 
     TS.t = t
+    Δt = TS.dt
     state = State(prog, aux, tendencies)
 
     affect_filter!(edmf, grid, state, gm, case, TS)
@@ -278,7 +279,7 @@ function ∑tendencies!(tendencies, prog, params, t)
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
 
     compute_updraft_surface_bc(edmf, grid, state, case)
-    update_aux!(edmf, gm, grid, state, case, param_set, TS)
+    update_aux!(edmf, gm, grid, state, case, param_set, t, Δt)
 
     tends_face = tendencies.face
     tends_cent = tendencies.cent
@@ -295,13 +296,13 @@ function ∑tendencies!(tendencies, prog, params, t)
     end
 
     # compute tendencies
-    compute_gm_tendencies!(edmf, grid, state, case, gm, TS)
+    compute_gm_tendencies!(edmf, grid, state, case, gm)
     compute_updraft_tendencies(edmf, grid, state, gm)
 
-    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:tke), Val(:ρatke))
-    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:Hvar), Val(:ρaHvar))
-    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:QTvar), Val(:ρaQTvar))
-    compute_en_tendencies!(edmf, grid, state, param_set, TS, Val(:HQTcov), Val(:ρaHQTcov))
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρaQTvar))
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρaHQTcov))
 
     return
 end
@@ -382,15 +383,8 @@ end
 
 # Note: this assumes all variables are defined on half levels not full levels (i.e. phi, psi are not w)
 # if covar_e.name is not "tke".
-function get_GMV_CoVar(
-    edmf::EDMF_PrognosticTKE{N_up},
-    grid,
-    state,
-    covar_sym::Symbol,
-    ϕ_sym::Symbol,
-    ψ_sym::Symbol = ϕ_sym,
-) where {N_up}
-
+function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol, ϕ_sym::Symbol, ψ_sym::Symbol = ϕ_sym)
+    N_up = n_updrafts(edmf)
     is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
     prog_gm_c = center_prog_grid_mean(state)
@@ -430,7 +424,8 @@ function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE, param_set)
     return
 end
 
-function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE{N_up}, grid, state, gm::GridMeanVariables) where {N_up}
+function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables)
+    N_up = n_updrafts(edmf)
     param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -528,7 +523,8 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE{N_up}, grid, state,
     return
 end
 
-function filter_updraft_vars(edmf::EDMF_PrognosticTKE{N_up}, grid, state, gm::GridMeanVariables) where {N_up}
+function filter_updraft_vars(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables)
+    N_up = n_updrafts(edmf)
     param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -635,14 +631,14 @@ function compute_covariance_shear(
 end
 
 function compute_covariance_interdomain_src(
-    edmf::EDMF_PrognosticTKE{N_up},
+    edmf::EDMF_PrognosticTKE,
     grid,
     state,
     ::Val{covar_sym},
     ϕs::Val{ϕ_sym},
     ψs::Val{ψ_sym} = ϕs,
-) where {N_up, covar_sym, ϕ_sym, ψ_sym}
-
+) where {covar_sym, ϕ_sym, ψ_sym}
+    N_up = n_updrafts(edmf)
     is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
     aux_up = center_aux_updrafts(state)
@@ -668,14 +664,15 @@ function compute_covariance_interdomain_src(
 end
 
 function compute_covariance_entr(
-    edmf::EDMF_PrognosticTKE{N_up},
+    edmf::EDMF_PrognosticTKE,
     grid,
     state,
     ::Val{covar_sym},
     ϕs::Val{ϕ_sym},
     ψs::Val{ψ_sym} = ϕs,
-) where {covar_sym, ϕ_sym, ψ_sym, N_up}
+) where {covar_sym, ϕ_sym, ψ_sym}
 
+    N_up = n_updrafts(edmf)
     ρ0_c = center_ref_state(state).ρ0
     FT = eltype(grid)
     is_tke = covar_sym == :tke
@@ -756,14 +753,14 @@ function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, c
 end
 
 function compute_en_tendencies!(
-    edmf::EDMF_PrognosticTKE{N_up},
+    edmf::EDMF_PrognosticTKE,
     grid::Grid,
     state,
     param_set,
-    TS,
     ::Val{covar_sym},
     ::Val{prog_sym},
-) where {N_up, covar_sym, prog_sym}
+) where {covar_sym, prog_sym}
+    N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     ρ0_c = center_ref_state(state).ρ0
@@ -837,14 +834,15 @@ function compute_en_tendencies!(
 end
 
 function GMV_third_m(
-    edmf::EDMF_PrognosticTKE{N_up},
+    edmf::EDMF_PrognosticTKE,
     grid,
     state,
     ::Val{covar_en_sym},
     ::Val{var},
     ::Val{gm_third_m_sym},
-) where {N_up, covar_en_sym, var, gm_third_m_sym}
+) where {covar_en_sym, var, gm_third_m_sym}
 
+    N_up = n_updrafts(edmf)
     gm_third_m = getproperty(center_aux_grid_mean(state), gm_third_m_sym)
     kc_surf = kc_surface(grid)
 

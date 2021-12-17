@@ -3,7 +3,7 @@ const TC = TurbulenceConvection
 import Thermodynamics
 const TD = Thermodynamics
 
-function initialize_edmf(edmf::TC.EDMF_PrognosticTKE, grid, state, Case, gm::TC.GridMeanVariables, TS::TC.TimeStepping)
+function initialize_edmf(edmf::TC.EDMF_PrognosticTKE, grid, state, Case, gm::TC.GridMeanVariables, t::Real)
     initialize_covariance(edmf, grid, state, gm, Case)
     up = edmf.UpdVar
     param_set = TC.parameter_set(gm)
@@ -15,7 +15,7 @@ function initialize_edmf(edmf::TC.EDMF_PrognosticTKE, grid, state, Case, gm::TC.
         ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
     end
-    TC.update_surface(Case, grid, state, gm, TS, param_set)
+    TC.update_surface(Case, grid, state, gm, t, param_set)
     TC.compute_updraft_surface_bc(edmf, grid, state, Case)
     if Case.casename == "DryBubble"
         initialize_updrafts_DryBubble(edmf, grid, state, up, gm)

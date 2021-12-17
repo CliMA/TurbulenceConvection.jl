@@ -125,7 +125,7 @@ function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     Cases.initialize_forcing(sim.Case, sim.grid, state, sim.gm, sim.param_set)
     Cases.initialize_radiation(sim.Case, sim.grid, state, sim.gm, sim.param_set)
 
-    initialize_edmf(sim.edmf, sim.grid, state, sim.Case, sim.gm, sim.TS)
+    initialize_edmf(sim.edmf, sim.grid, state, sim.Case, sim.gm, sim.TS.t)
 
     sim.skip_io && return nothing
     TC.initialize_io(sim.io_nt.ref_state, sim.Stats)

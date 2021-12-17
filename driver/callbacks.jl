@@ -19,7 +19,7 @@ function affect_io!(integrator)
 
     param_set = TC.parameter_set(gm)
     # TODO: is this the best location to call diagnostics?
-    compute_diagnostics!(edmf, gm, grid, state, diagnostics, case, TS)
+    compute_diagnostics!(edmf, gm, grid, state, diagnostics, case)
 
     # TODO: remove `vars` hack that avoids
     # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
