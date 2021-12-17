@@ -52,7 +52,7 @@ diagnostics and still run, at which point we'll be able to export
 the state, auxiliary fields (which the state does depend on), and
 tendencies.
 =#
-function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, TS)
+function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case)
     FT = eltype(grid)
     gm.lwp = 0.0
     gm.iwp = 0.0

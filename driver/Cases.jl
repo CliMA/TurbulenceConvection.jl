@@ -153,11 +153,9 @@ function TC.io(self::CasesBase, grid, state, Stats::NetCDFIO_Stats, ::BaseCase)
 end
 TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
 TC.io(self::CasesBase, grid, state, Stats::NetCDFIO_Stats) = io(self, grid, state, Stats, BaseCase())
-TC.update_surface(self::CasesBase, grid, state, gm, TS::TimeStepping, param_set) =
-    update(self.Sur, grid, state, gm, param_set)
-TC.update_forcing(self::CasesBase, grid, state, gm, TS::TimeStepping, param_set) = nothing
-TC.update_radiation(self::CasesBase, grid, state, gm, TS::TimeStepping, param_set) =
-    update(self.Rad, grid, state, gm, param_set)
+TC.update_surface(self::CasesBase, grid, state, gm, t::Real, param_set) = update(self.Sur, grid, state, gm, param_set)
+TC.update_forcing(self::CasesBase, grid, state, gm, t::Real, param_set) = nothing
+TC.update_radiation(self::CasesBase, grid, state, gm, t::Real, param_set) = update(self.Rad, grid, state, gm, param_set)
 
 initialize_forcing(self::CasesBase, grid::Grid, state, gm, param_set) = initialize(self.Fo, grid, state)
 
@@ -542,9 +540,9 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
     return nothing
 end
 
-function TC.update_surface(self::CasesBase{life_cycle_Tan2018}, grid, state, gm, TS::TimeStepping, param_set)
+function TC.update_surface(self::CasesBase{life_cycle_Tan2018}, grid, state, gm, t::Real, param_set)
     weight = 1.0
-    weight_factor = 0.01 + 0.99 * (cos(2.0 * π * TS.t / 3600.0) + 1.0) / 2.0
+    weight_factor = 0.01 + 0.99 * (cos(2.0 * π * t / 3600.0) + 1.0) / 2.0
     weight = weight * weight_factor
     self.Sur.lhf = self.lhf0 * weight
     self.Sur.shf = self.shf0 * weight
@@ -928,34 +926,33 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, gm, pa
     return nothing
 end
 
-function TC.update_surface(self::CasesBase{TRMM_LBA}, grid, state, gm, TS::TimeStepping, param_set)
-    self.Sur.lhf = 554.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - TS.t) / 5.25 / 3600.0)))^1.3
-    self.Sur.shf = 270.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - TS.t) / 5.25 / 3600.0)))^1.5
+function TC.update_surface(self::CasesBase{TRMM_LBA}, grid, state, gm, t::Real, param_set)
+    self.Sur.lhf = 554.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - t) / 5.25 / 3600.0)))^1.3
+    self.Sur.shf = 270.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - t) / 5.25 / 3600.0)))^1.5
     update(self.Sur, grid, state, gm, param_set)
     # fix momentum fluxes to zero as they are not used in the paper
     self.Sur.rho_uflux = 0.0
     self.Sur.rho_vflux = 0.0
 end
 
-function TC.update_forcing(self::CasesBase{TRMM_LBA}, grid, state, gm, TS::TimeStepping, param_set)
+function TC.update_forcing(self::CasesBase{TRMM_LBA}, grid, state, gm, t::Real, param_set)
 
     aux_gm = TC.center_aux_grid_mean(state)
-    ind2 = Int(ceil(TS.t / 600.0)) + 1
-    ind1 = Int(trunc(TS.t / 600.0)) + 1
+    ind2 = Int(ceil(t / 600.0)) + 1
+    ind1 = Int(trunc(t / 600.0)) + 1
     rad_time = self.rad_time
     rad = self.rad
     @inbounds for k in real_center_indices(grid)
         aux_gm.dTdt[k] = if grid.zc[k] >= 22699.48
             0.0
         else
-            if TS.t < 600.0 # first 10 min use the radiative forcing of t=10min (as in the paper)
+            if t < 600.0 # first 10 min use the radiative forcing of t=10min (as in the paper)
                 rad[1, k]
-            elseif TS.t < 21600.0 && ind2 < 37
-                if TS.t % 600.0 == 0
+            elseif t < 21600.0 && ind2 < 37
+                if t % 600.0 == 0
                     rad[ind1, k]
                 else
-                    (rad[ind2, k] - rad[ind1, k]) / (rad_time[ind2 - 1] - rad_time[ind1 - 1]) *
-                    (TS.t - rad_time[ind1 - 1]) + rad[ind1, k]
+                    (rad[ind2, k] - rad[ind1, k]) / (rad_time[ind2 - 1] - rad_time[ind1 - 1]) * (t - rad_time[ind1 - 1]) + rad[ind1, k]
                 end
             else
                 # TODO: remove hard-coded index
@@ -1043,12 +1040,12 @@ function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, state, gm, par
     return nothing
 end
 
-function TC.update_surface(self::CasesBase{ARM_SGP}, grid, state, gm, TS::TimeStepping, param_set)
+function TC.update_surface(self::CasesBase{ARM_SGP}, grid, state, gm, t::Real, param_set)
     t_Sur_in = arr_type([0.0, 4.0, 6.5, 7.5, 10.0, 12.5, 14.5]) .* 3600 #LES time is in sec
     SH = arr_type([-30.0, 90.0, 140.0, 140.0, 100.0, -10, -10]) # W/m^2
     LH = arr_type([5.0, 250.0, 450.0, 500.0, 420.0, 180.0, 0.0]) # W/m^2
-    self.Sur.shf = pyinterp(arr_type([TS.t]), t_Sur_in, SH)[1]
-    self.Sur.lhf = pyinterp(arr_type([TS.t]), t_Sur_in, LH)[1]
+    self.Sur.shf = pyinterp(arr_type([t]), t_Sur_in, SH)[1]
+    self.Sur.lhf = pyinterp(arr_type([t]), t_Sur_in, LH)[1]
     # if fluxes vanish bflux vanish and wstar and obukov length are NaNs
     ## CK +++ I commented out the lines below as I don"t think this is how we want to fix things!
     # if self.Sur.shf < 1.0
@@ -1062,15 +1059,15 @@ function TC.update_surface(self::CasesBase{ARM_SGP}, grid, state, gm, TS::TimeSt
     self.Sur.rho_vflux = 0.0
 end
 
-function TC.update_forcing(self::CasesBase{ARM_SGP}, grid, state, gm, TS::TimeStepping, param_set)
+function TC.update_forcing(self::CasesBase{ARM_SGP}, grid, state, gm, t::Real, param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     p0_c = TC.center_ref_state(state).p0
     t_in = arr_type([0.0, 3.0, 6.0, 9.0, 12.0, 14.5]) .* 3600.0 #LES time is in sec
     AT_in = arr_type([0.0, 0.0, 0.0, -0.08, -0.016, -0.016]) ./ 3600.0 # Advective forcing for theta [K/h] converted to [K/sec]
     RT_in = arr_type([-0.125, 0.0, 0.0, 0.0, 0.0, -0.1]) ./ 3600.0  # Radiative forcing for theta [K/h] converted to [K/sec]
     Rqt_in = arr_type([0.08, 0.02, 0.04, -0.1, -0.16, -0.3]) ./ 1000.0 ./ 3600.0 # Radiative forcing for qt converted to [kg/kg/sec]
-    dTdt = pyinterp(arr_type([TS.t]), t_in, AT_in)[1] + pyinterp(arr_type([TS.t]), t_in, RT_in)[1]
-    dqtdt = pyinterp(arr_type([TS.t]), t_in, Rqt_in)[1]
+    dTdt = pyinterp(arr_type([t]), t_in, AT_in)[1] + pyinterp(arr_type([t]), t_in, RT_in)[1]
+    dqtdt = pyinterp(arr_type([t]), t_in, Rqt_in)[1]
     prog_gm = TC.center_prog_grid_mean(state)
     @inbounds for k in real_center_indices(grid)
         ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
@@ -1398,8 +1395,8 @@ function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, state, gm, param
     return nothing
 end
 
-function TC.update_surface(self::CasesBase{GABLS}, grid, state, gm, TS::TimeStepping, param_set)
-    self.Sur.Tsurface = 265.0 - (0.25 / 3600.0) * TS.t
+function TC.update_surface(self::CasesBase{GABLS}, grid, state, gm, t::Real, param_set)
+    self.Sur.Tsurface = 265.0 - (0.25 / 3600.0) * t
     update(self.Sur, grid, state, gm, param_set)
 end
 

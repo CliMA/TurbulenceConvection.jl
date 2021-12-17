@@ -1,7 +1,8 @@
-function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, param_set, TS) where {N_up}
+function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid, state, Case, param_set, t, Δt)
     #####
     ##### Unpack common variables
     #####
+    N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
@@ -40,7 +41,6 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
     wvec = CC.Geometry.WVector
-    Δt = TS.dt
     max_area = edmf.max_area
     sde_model = edmf.sde_model
 
@@ -223,9 +223,9 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
     # TODO - use this inversion in free_convection_windspeed and not compute zi twice
     edmf.zi = get_inversion(grid, state, param_set, surface.Ri_bulk_crit)
 
-    update_surface(Case, grid, state, gm, TS, param_set)
-    update_forcing(Case, grid, state, gm, TS, param_set)
-    update_radiation(Case, grid, state, gm, TS, param_set)
+    update_surface(Case, grid, state, gm, t, param_set)
+    update_forcing(Case, grid, state, gm, t, param_set)
+    update_radiation(Case, grid, state, gm, t, param_set)
 
     compute_pressure_plume_spacing(edmf, param_set)
 
@@ -487,7 +487,7 @@ function update_aux!(edmf::EDMF_PrognosticTKE{N_up}, gm, grid, state, Case, para
 
     get_GMV_CoVar(edmf, grid, state, :tke, :w)
 
-    compute_diffusive_fluxes(edmf, grid, state, gm, Case, TS, param_set)
+    compute_diffusive_fluxes(edmf, grid, state, gm, Case, param_set)
 
 
     # TODO: use dispatch
