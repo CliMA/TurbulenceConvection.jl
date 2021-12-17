@@ -52,7 +52,14 @@ diagnostics and still run, at which point we'll be able to export
 the state, auxiliary fields (which the state does depend on), and
 tendencies.
 =#
-function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Stats)
+function compute_diagnostics!(
+    edmf::TC.EDMF_PrognosticTKE,
+    gm::TC.GridMeanVariables,
+    grid::TC.Grid,
+    state::TC.State,
+    diagnostics::D,
+    Stats::TC.NetCDFIO_Stats,
+) where {D <: CC.Fields.FieldVector}
     FT = eltype(grid)
     N_up = TC.n_updrafts(edmf)
     ρ0_c = TC.center_ref_state(state).ρ0
@@ -166,10 +173,10 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Stats)
     #####
     ##### Fluxes
     #####
-    If = CCO.InterpolateF2C()
+    Ic = CCO.InterpolateF2C()
     parent(diag_tc.massflux) .= 0
     @inbounds for i in 1:N_up
-        @. diag_tc.massflux += If(aux_up_f[i].massflux)
+        @. diag_tc.massflux += Ic(aux_up_f[i].massflux)
     end
 
     @inbounds for k in TC.real_center_indices(grid)
@@ -193,7 +200,6 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Stats)
 
     a_up_bulk_f = copy(diag_tc_f.nh_pressure)
     a_up_f = copy(a_up_bulk_f)
-    a_bulk_bcs = (; bottom = CCO.SetValue(sum(edmf.area_surface_bc)), top = CCO.Extrapolate())
     Ifabulk = CCO.InterpolateC2F(; a_bulk_bcs...)
     @. a_up_bulk_f = Ifabulk(a_up_bulk)
     @inbounds for i in 1:N_up

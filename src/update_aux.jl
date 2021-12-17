@@ -1,4 +1,13 @@
-function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, case, param_set::APS, t::Real, Δt::Real)
+function update_aux!(
+    edmf::EDMF_PrognosticTKE,
+    gm::GridMeanVariables,
+    grid::Grid,
+    state::State,
+    case::CasesBase,
+    param_set::APS,
+    t::Real,
+    Δt::Real,
+)
     #####
     ##### Unpack common variables
     #####
