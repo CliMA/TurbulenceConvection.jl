@@ -68,8 +68,6 @@ all_best_mse["GABLS"]["tke_mean"] = 0.46792438301268435
 all_best_mse["GABLS"]["temperature_mean"] = 3.145627487877158e-7
 all_best_mse["GABLS"]["thetal_mean"] = 3.097353030003511e-7
 all_best_mse["GABLS"]["Hvar_mean"] = 0.24447488986576668
-all_best_mse["GABLS"]["QTvar_mean"] = 0.43996970750097386
-all_best_mse["GABLS"]["qt_mean"] = 25.10716455485132
 #
 all_best_mse["life_cycle_Tan2018"] = OrderedCollections.OrderedDict()
 all_best_mse["life_cycle_Tan2018"]["qt_mean"] = 3.3337065085664366e-6
