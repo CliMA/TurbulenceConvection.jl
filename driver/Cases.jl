@@ -120,7 +120,6 @@ get_surface_type(::Rico) = TC.SurfaceFixedCoeffs
 get_surface_type(::GATE_III) = TC.SurfaceFixedCoeffs
 get_surface_type(::GABLS) = TC.SurfaceMoninObukhovDry
 get_surface_type(::SP) = TC.SurfaceSullivanPatton
-get_surface_type(::DryBubble) = TC.SurfaceNone
 
 get_forcing_type(::AbstractCaseType) = TC.ForcingStandard # default
 get_forcing_type(::Soares) = TC.ForcingNone
@@ -1575,8 +1574,12 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, gm, state)
 end
 
 function initialize_surface(self::CasesBase{DryBubble}, grid::Grid, state, param_set)
+    self.Sur.Tsurface = 300.0
     self.Sur.qsurface = 0.0
-    self.Sur.shf = 0.0
+    self.Sur.shf = 0.0001 # only prevent zero devision in SF.jl lmo
+    self.Sur.lhf = 0.0001 # only prevent zero devision in SF.jl lmo
+    self.Sur.ustar = 0.1
+    self.Sur.ustar_fixed = true
 end
 
 

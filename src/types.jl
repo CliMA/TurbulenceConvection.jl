@@ -287,7 +287,6 @@ end
 #     to prevent errors due to nonzero qtg in vars such as the obukhov_length.
 # SurfaceSullivanPatton
 #     Not fully implemented yet. Maybe not needed - Ignacio
-struct SurfaceNone end
 struct SurfaceFixedFlux end
 struct SurfaceFixedCoeffs end
 struct SurfaceMoninObukhov end
