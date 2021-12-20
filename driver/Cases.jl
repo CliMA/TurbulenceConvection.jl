@@ -357,13 +357,15 @@ function initialize_surface(self::CasesBase{Bomex}, grid::Grid, state, param_set
     kf_surf = TC.kf_surface(grid)
     p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
-    self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
+    self.Sur.zrough = 1.0e-4
     self.Sur.qsurface = 22.45e-3 # kg/kg
     theta_surface = 299.1
+    theta_flux = 8.0e-3
+    qt_flux = 5.2e-5
     ts = TC.thermo_state_pθq(param_set, p0_f_surf, theta_surface, self.Sur.qsurface)
     self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = 5.2e-5 * ρ0_f_surf * TD.latent_heat_vapor(ts)
-    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * ρ0_f_surf
+    self.Sur.lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(ts)
+    self.Sur.shf = theta_flux * TD.cp_m(ts) * ρ0_f_surf
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # m/s
 end
@@ -490,10 +492,12 @@ function initialize_surface(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
     self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     self.Sur.qsurface = 22.45e-3 # kg/kg
     theta_surface = 299.1
+    theta_flux = 8.0e-3
+    qt_flux = 5.2e-5
     ts = TC.thermo_state_pθq(param_set, p0_f_surf, theta_surface, self.Sur.qsurface)
     self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = 5.2e-5 * ρ0_f_surf * TD.latent_heat_vapor(ts)
-    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * ρ0_f_surf
+    self.Sur.lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(ts)
+    self.Sur.shf = theta_flux * TD.cp_m(ts) * ρ0_f_surf
     self.lhf0 = self.Sur.lhf
     self.shf0 = self.Sur.shf
     self.Sur.ustar_fixed = true
@@ -630,7 +634,7 @@ function initialize_surface(self::CasesBase{Rico}, grid::Grid, state, param_set)
     # For Rico we provide values of transfer coefficients
     kf_surf = TC.kf_surface(grid)
     p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
-    ts = TC.thermo_state_pθq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
     self.Sur.qsurface = TD.q_vap_saturation(ts)
 end
 
@@ -775,8 +779,8 @@ function initialize_surface(self::CasesBase{TRMM_LBA}, grid::Grid, state, param_
     theta_surface = (273.15 + 23)
     ts = TC.thermo_state_pθq(param_set, p0_f_surf, theta_surface, self.Sur.qsurface)
     self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = 5.2e-5 * ρ0_f_surf * TD.latent_heat_vapor(ts)
-    self.Sur.shf = 8.0e-3 * TD.cp_m(ts) * ρ0_f_surf
+    self.Sur.lhf = 0.0
+    self.Sur.shf = 0.0
     self.Sur.ustar_fixed = true
     self.Sur.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
 end
@@ -1381,6 +1385,7 @@ end
 function initialize_surface(self::CasesBase{GABLS}, grid::Grid, state, param_set)
     self.Sur.zrough = 0.1
     self.Sur.Tsurface = 265.0
+    self.Sur.qsurface = 0.0
 end
 
 function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, state, gm, param_set)

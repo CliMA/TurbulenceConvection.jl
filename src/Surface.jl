@@ -14,7 +14,7 @@ function update(surf::SurfaceBase{SurfaceFixedFlux}, grid, state, gm::GridMeanVa
     q_tot_gm_surf = prog_gm.q_tot[kc_surf]
     θ_liq_ice_gm_surf = prog_gm.θ_liq_ice[kc_surf]
 
-    ts_sfc = thermo_state_pθq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
+    ts_sfc = TD.PhaseEquil_pTq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
     ts_in = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
@@ -163,9 +163,7 @@ function update(surf::SurfaceBase{SurfaceMoninObukhovDry}, grid, state, gm::Grid
     q_tot_gm_surf = prog_gm.q_tot[kc_surf]
     θ_liq_ice_gm_surf = prog_gm.θ_liq_ice[kc_surf]
 
-    phase_part = TD.PhasePartition(surf.qsurface, 0.0, 0.0)
-    θ_star = TD.liquid_ice_pottemp_given_pressure(param_set, surf.Tsurface, p0_f_surf, phase_part)
-    ts_sfc = thermo_state_pθq(param_set, p0_f_surf, θ_star, surf.qsurface)
+    ts_sfc = TD.PhaseEquil_pTq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
     ts_in = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, surf.qsurface)
     u_sfc = SA.SVector{2, FT}(0, 0)
     u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
