@@ -67,3 +67,10 @@ transform_broadcasted(x, symb, axes) = x
     end
     return dest
 end
+
+function Base.cumsum(field::CC.Fields.FiniteDifferenceField)
+    Base.cumsum(parent(CC.Fields.weighted_jacobian(field)) .* vec(field), dims = 1)
+end
+function Base.cumsum!(fieldout::CC.Fields.FiniteDifferenceField, fieldin::CC.Fields.FiniteDifferenceField)
+    Base.cumsum!(fieldout, parent(CC.Fields.weighted_jacobian(fieldin)) .* vec(fieldin), dims = 1)
+end
