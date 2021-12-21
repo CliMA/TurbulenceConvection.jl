@@ -25,8 +25,17 @@ include(joinpath("..", "post_processing", "mse_tables.jl"))
 percent_reduction_mse = Dict()
 
 computed_mse = OrderedCollections.OrderedDict()
+files_skipped = OrderedCollections.OrderedDict()
 for case in all_cases
-    computed_mse[case] = JSON.parsefile("computed_mse_$case.json"; dicttype = OrderedCollections.OrderedDict)
+    filename = "computed_mse_$case.json"
+    if !isfile(filename)
+        @warn "File $filename skipped"
+        files_skipped[case] = true
+        continue
+    end
+    jsonfile = JSON.parsefile(filename; dicttype = OrderedCollections.OrderedDict)
+    files_skipped[case] = false
+    computed_mse[case] = jsonfile
 end
 
 println("#################################")
@@ -82,3 +91,8 @@ for case in keys(percent_reduction_mse)
     @info "percent_reduction_mse[$case] = $(percent_reduction_mse[case])"
 end
 @info "min mse reduction (%) over all cases = $(min(values(percent_reduction_mse)...))"
+
+if any(values(files_skipped))
+    @show files_skipped
+    error("MSE printing skipped files skipped")
+end
