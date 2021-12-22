@@ -59,7 +59,8 @@ end
 function dt_max!(integrator)
     UnPack.@unpack gm, grid, edmf, aux, TS = integrator.p
     state = TC.State(integrator.u, aux, integrator.du)
-    Δz = grid.Δz
+    prog_gm = TC.center_prog_grid_mean(state)
+    Δz = TC.get_Δz(prog_gm.u)
     CFL_limit = TS.cfl_limit
     N_up = TC.n_updrafts(edmf)
 
@@ -80,16 +81,16 @@ function dt_max!(integrator)
     @inbounds for k in TC.real_face_indices(grid)
         TC.is_surface_face(grid, k) && continue
         @inbounds for i in 1:N_up
-            dt_max = min(dt_max, CFL_limit * Δz / (abs(aux_up_f[i].w[k]) + eps(Float32)))
+            dt_max = min(dt_max, CFL_limit * Δz[k] / (abs(aux_up_f[i].w[k]) + eps(Float32)))
         end
-        dt_max = min(dt_max, CFL_limit * Δz / (abs(aux_en_f.w[k]) + eps(Float32)))
+        dt_max = min(dt_max, CFL_limit * Δz[k] / (abs(aux_en_f.w[k]) + eps(Float32)))
     end
     @inbounds for k in TC.real_center_indices(grid)
         vel_max = max(term_vel_rain[k], term_vel_snow[k])
         # Check terminal rain/snow velocity CFL
-        dt_max = min(dt_max, CFL_limit * Δz / (vel_max + eps(Float32)))
+        dt_max = min(dt_max, CFL_limit * Δz[k] / (vel_max + eps(Float32)))
         # Check diffusion CFL (i.e., Fourier number)
-        dt_max = min(dt_max, CFL_limit * Δz^2 / (max(KH[k], KM[k]) + eps(Float32)))
+        dt_max = min(dt_max, CFL_limit * Δz[k]^2 / (max(KH[k], KM[k]) + eps(Float32)))
     end
     edmf.dt_max = dt_max
 
@@ -99,7 +100,8 @@ end
 function monitor_cfl!(integrator)
     UnPack.@unpack gm, grid, edmf, aux, TS = integrator.p
     state = TC.State(integrator.u, aux, integrator.du)
-    Δz = grid.Δz
+    prog_gm = TC.center_prog_grid_mean(state)
+    Δz = TC.get_Δz(prog_gm.u)
     Δt = TS.dt
     CFL_limit = TS.cfl_limit
 
@@ -113,14 +115,14 @@ function monitor_cfl!(integrator)
 
     @inbounds for k in TC.real_center_indices(grid)
         # check stability criterion
-        CFL_out_rain = Δt / Δz * term_vel_rain[k]
-        CFL_out_snow = Δt / Δz * term_vel_snow[k]
+        CFL_out_rain = Δt / Δz[k] * term_vel_rain[k]
+        CFL_out_snow = Δt / Δz[k] * term_vel_snow[k]
         if TC.is_toa_center(grid, k)
             CFL_in_rain = 0.0
             CFL_in_snow = 0.0
         else
-            CFL_in_rain = Δt / Δz * term_vel_rain[k + 1]
-            CFL_in_snow = Δt / Δz * term_vel_snow[k + 1]
+            CFL_in_rain = Δt / Δz[k] * term_vel_rain[k + 1]
+            CFL_in_snow = Δt / Δz[k] * term_vel_snow[k + 1]
         end
         if max(CFL_in_rain, CFL_in_snow, CFL_out_rain, CFL_out_snow) > CFL_limit
             error("Time step is too large for rain fall velocity!")
