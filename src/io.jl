@@ -19,8 +19,6 @@ function io(en::EnvironmentVariables, grid, state, Stats::NetCDFIO_Stats)
     write_ts(Stats, "env_cloud_cover", en.cloud_cover)
     write_ts(Stats, "env_cloud_base", en.cloud_base)
     write_ts(Stats, "env_cloud_top", en.cloud_top)
-    write_ts(Stats, "env_lwp", en.lwp)
-    write_ts(Stats, "env_iwp", en.iwp)
     return
 end
 
@@ -31,14 +29,7 @@ function initialize_io(precip::PrecipVariables, Stats::NetCDFIO_Stats)
     return
 end
 
-function io(precip::PrecipVariables, grid, state, Stats::NetCDFIO_Stats)
-    write_ts(Stats, "rwp_mean", precip.mean_rwp)
-    write_ts(Stats, "swp_mean", precip.mean_rwp)
-
-    #TODO - change to rain rate that depends on rain model choice
-    write_ts(Stats, "cutoff_precipitation_rate", precip.cutoff_precipitation_rate)
-    return
-end
+io(precip::PrecipVariables, grid, state, Stats::NetCDFIO_Stats) = nothing
 
 function initialize_io(up::UpdraftVariables, Stats::NetCDFIO_Stats)
 
@@ -58,8 +49,6 @@ function io(up::UpdraftVariables, grid, state, Stats::NetCDFIO_Stats)
     write_ts(Stats, "updraft_cloud_cover", sum(up.cloud_cover))
     write_ts(Stats, "updraft_cloud_base", minimum(abs.(up.cloud_base)))
     write_ts(Stats, "updraft_cloud_top", maximum(abs.(up.cloud_top)))
-    write_ts(Stats, "updraft_lwp", up.lwp)
-    write_ts(Stats, "updraft_iwp", up.iwp)
     return
 end
 
@@ -74,9 +63,6 @@ end
 
 function io(gm::GridMeanVariables, grid, state, Stats::NetCDFIO_Stats)
     write_ts(Stats, "cloud_cover_mean", gm.cloud_cover)
-
-    write_ts(Stats, "lwp_mean", gm.lwp)
-    write_ts(Stats, "iwp_mean", gm.iwp)
     write_ts(Stats, "cloud_base_mean", gm.cloud_base)
     write_ts(Stats, "cloud_top_mean", gm.cloud_top)
     return

@@ -176,11 +176,8 @@ Base.@kwdef struct MinDisspLen{FT}
     b_exch::FT
 end
 
-Base.@kwdef mutable struct PrecipVariables
+Base.@kwdef struct PrecipVariables
     precipitation_model::String = "default_precipitation_model"
-    mean_rwp::Float64 = 0
-    mean_swp::Float64 = 0
-    cutoff_precipitation_rate::Float64 = 0
 end
 function PrecipVariables(namelist, grid::Grid)
 
@@ -199,14 +196,12 @@ function PrecipVariables(namelist, grid::Grid)
     return PrecipVariables(; precipitation_model)
 end
 
-mutable struct UpdraftVariables{A1}
+struct UpdraftVariables{A1}
     n_updrafts::Int
     cloud_base::A1
     cloud_top::A1
     cloud_cover::A1
     updraft_top::A1
-    lwp::Float64
-    iwp::Float64
     function UpdraftVariables(nu, namelist, grid::Grid)
         n_updrafts = nu
 
@@ -216,42 +211,32 @@ mutable struct UpdraftVariables{A1}
         cloud_cover = zeros(nu)
         updraft_top = zeros(nu)
 
-        lwp = 0.0
-        iwp = 0.0
-
         A1 = typeof(cloud_base)
-        return new{A1}(n_updrafts, cloud_base, cloud_top, cloud_cover, updraft_top, lwp, iwp)
+        return new{A1}(n_updrafts, cloud_base, cloud_top, cloud_cover, updraft_top)
     end
 end
 
 Base.@kwdef mutable struct GridMeanVariables{PS}
     param_set::PS
-    lwp::Float64
-    iwp::Float64
     cloud_base::Float64
     cloud_top::Float64
     cloud_cover::Float64
     EnvThermo_scheme::String
 end
 function GridMeanVariables(namelist, grid::Grid, param_set::PS) where {PS}
-    lwp = 0.0
-    iwp = 0.0
-
     cloud_base = 0.0
     cloud_top = 0.0
     cloud_cover = 0.0
 
     EnvThermo_scheme = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
 
-    return GridMeanVariables(; param_set, lwp, iwp, cloud_base, cloud_top, cloud_cover, EnvThermo_scheme)
+    return GridMeanVariables(; param_set, cloud_base, cloud_top, cloud_cover, EnvThermo_scheme)
 end
 
 Base.@kwdef mutable struct EnvironmentVariables
     cloud_base::Float64 = 0
     cloud_top::Float64 = 0
     cloud_cover::Float64 = 0
-    lwp::Float64 = 0
-    iwp::Float64 = 0
     EnvThermo_scheme::String = "default_EnvThermo_scheme"
 end
 function EnvironmentVariables(namelist, grid::Grid)
