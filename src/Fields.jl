@@ -74,3 +74,5 @@ end
 function Base.cumsum!(fieldout::CC.Fields.FiniteDifferenceField, fieldin::CC.Fields.FiniteDifferenceField)
     Base.cumsum!(fieldout, parent(CC.Fields.weighted_jacobian(fieldin)) .* vec(fieldin), dims = 1)
 end
+
+get_Δz(field::CC.Fields.FiniteDifferenceField) = parent(CC.Fields.weighted_jacobian(field))
