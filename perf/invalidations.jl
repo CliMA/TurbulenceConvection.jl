@@ -21,7 +21,7 @@ import SnoopCompile
 trees = SnoopCompile.invalidation_trees(invalidations);
 @show length(SnoopCompile.uinvalidated(invalidations))
 
-methinvs = trees[end]
+show(trees[end])
 
 # https://github.com/jheinen/GR.jl/issues/278#issuecomment-587090846
 ENV["GKSwstype"] = "nul"
