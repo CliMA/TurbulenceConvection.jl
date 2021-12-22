@@ -101,8 +101,8 @@ function entr_detr(param_set, εδ_model_vars, εδ_model_type::MDEntr)
     MdMdz_ε, MdMdz_δ = get_MdMdz(εδ_model_vars) .* c_div
 
     # dynamic entrainment / detrainment
-    ε_dyn = dim_scale * nondim_ε
-    δ_dyn = dim_scale * nondim_δ + area_limiter
+    ε_dyn = dim_scale * nondim_ε + MdMdz_ε
+    δ_dyn = dim_scale * nondim_δ + MdMdz_δ + area_limiter
 
     # turbulent entrainment
     ε_turb, K_ε = compute_turbulent_entrainment(param_set, εδ_model_vars)
