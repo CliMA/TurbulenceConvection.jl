@@ -176,6 +176,17 @@ steps:
       queue: central
       slurm_ntasks: 1
 
+  - label: ":mag: Invalidations"
+    key: "cpu_invalidations"
+    command:
+      - "julia --color=yes --project=test perf/invalidations.jl"
+    artifact_paths:
+      - "perf/invalidations_output/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
   - wait: ~
     continue_on_failure: true
 
