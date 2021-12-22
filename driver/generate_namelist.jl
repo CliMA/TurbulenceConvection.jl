@@ -142,6 +142,12 @@ function default_namelist(
     # From namelist
     namelist_defaults["grid"] = Dict()
     namelist_defaults["grid"]["dims"] = 1
+    namelist_defaults["grid"]["stretch"] = Dict()
+    namelist_defaults["grid"]["stretch"]["flag"] = false
+    namelist_defaults["grid"]["stretch"]["nz"] = 55
+    namelist_defaults["grid"]["stretch"]["dz_surf"] = 30.0
+    namelist_defaults["grid"]["stretch"]["dz_toa"] = 8000.0
+    namelist_defaults["grid"]["stretch"]["z_toa"] = 45000.0
 
     namelist_defaults["thermodynamics"] = Dict()
     namelist_defaults["thermodynamics"]["thermal_variable"] = "thetal"

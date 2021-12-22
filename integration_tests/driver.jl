@@ -12,6 +12,7 @@ if run_from_command_line
         "--entr"           # Try other entr-detr models
         "--stoch_entr"     # Choose type of stochastic entr-detr model
         "--calibrate_io"   # Test that calibration IO passes regression tests
+        "--stretch_grid"   # Test stretched grid option
         "--skip_io"        # Test that skipping IO passes regression tests
     end
     parsed_args = ArgParse.parse_args(ARGS, s)
@@ -23,9 +24,11 @@ micro        = run_from_command_line ? parsed_args["micro"] : nothing
 entr         = run_from_command_line ? parsed_args["entr"] : nothing
 stoch_entr   = run_from_command_line ? parsed_args["stoch_entr"] : nothing
 calibrate_io = run_from_command_line ? parsed_args["calibrate_io"] : nothing
+stretch_grid = run_from_command_line ? parsed_args["stretch_grid"] : nothing
 skip_io      = run_from_command_line ? parsed_args["skip_io"] : nothing
 
 calibrate_io ≠ nothing && (calibrate_io = parse(Bool, calibrate_io))
+stretch_grid ≠ nothing && (stretch_grid = parse(Bool, stretch_grid))
 skip_io ≠ nothing      && (skip_io = parse(Bool, skip_io))
 #! format: on
 
@@ -53,6 +56,7 @@ suffix = uuid_suffix(micro)
 suffix *= uuid_suffix(entr)
 suffix *= uuid_suffix(stoch_entr)
 calibrate_io ≠ nothing && (suffix *= "_calibrate_io_$calibrate_io")
+stretch_grid ≠ nothing && (suffix *= "_stretch_grid_$stretch_grid")
 skip_io ≠ nothing && (suffix *= "_skip_io_$skip_io")
 
 namelist["meta"]["uuid"] = "01$suffix"
@@ -62,6 +66,7 @@ micro        ≠ nothing && (namelist["thermodynamics"]["quadrature_type"] = mic
 entr         ≠ nothing && (namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = entr)
 stoch_entr   ≠ nothing && (namelist["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = stoch_entr)
 calibrate_io ≠ nothing && (namelist["stats_io"]["calibrate_io"] = calibrate_io)
+stretch_grid ≠ nothing && (namelist["grid"]["stretch"]["flag"] = stretch_grid)
 skip_io      ≠ nothing && (namelist["stats_io"]["skip"] = skip_io)
 #! format: on
 
