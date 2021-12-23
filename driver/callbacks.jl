@@ -62,7 +62,9 @@ function dt_max!(integrator)
     UnPack.@unpack gm, grid, edmf, aux, TS = integrator.p
     state = TC.State(integrator.u, aux, integrator.du)
     prog_gm = TC.center_prog_grid_mean(state)
-    Δz = TC.get_Δz(prog_gm.u)
+    prog_gm_f = TC.face_prog_grid_mean(state)
+    Δzc = TC.get_Δz(prog_gm.u)
+    Δzf = TC.get_Δz(prog_gm_f.w)
     CFL_limit = TS.cfl_limit
     N_up = TC.n_updrafts(edmf)
 
@@ -83,16 +85,16 @@ function dt_max!(integrator)
     @inbounds for k in TC.real_face_indices(grid)
         TC.is_surface_face(grid, k) && continue
         @inbounds for i in 1:N_up
-            dt_max = min(dt_max, CFL_limit * Δz[k] / (abs(aux_up_f[i].w[k]) + eps(Float32)))
+            dt_max = min(dt_max, CFL_limit * Δzf[k] / (abs(aux_up_f[i].w[k]) + eps(Float32)))
         end
-        dt_max = min(dt_max, CFL_limit * Δz[k] / (abs(aux_en_f.w[k]) + eps(Float32)))
+        dt_max = min(dt_max, CFL_limit * Δzf[k] / (abs(aux_en_f.w[k]) + eps(Float32)))
     end
     @inbounds for k in TC.real_center_indices(grid)
         vel_max = max(term_vel_rain[k], term_vel_snow[k])
         # Check terminal rain/snow velocity CFL
-        dt_max = min(dt_max, CFL_limit * Δz[k] / (vel_max + eps(Float32)))
+        dt_max = min(dt_max, CFL_limit * Δzc[k] / (vel_max + eps(Float32)))
         # Check diffusion CFL (i.e., Fourier number)
-        dt_max = min(dt_max, CFL_limit * Δz[k]^2 / (max(KH[k], KM[k]) + eps(Float32)))
+        dt_max = min(dt_max, CFL_limit * Δzc[k]^2 / (max(KH[k], KM[k]) + eps(Float32)))
     end
     edmf.dt_max = dt_max
 
