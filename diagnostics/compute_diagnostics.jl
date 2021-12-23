@@ -67,28 +67,21 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, Stats)
     aux_bulk = TC.center_aux_bulk(state)
     a_up_bulk = aux_bulk.area
     kc_toa = TC.kc_top_of_atmos(grid)
-    gm.cloud_base = grid.zc[kc_toa]
-    gm.cloud_top = 0.0
     param_set = TC.parameter_set(gm)
     prog_gm = TC.center_prog_grid_mean(state)
     up = edmf.UpdVar
     en = edmf.EnvVar
     precip = edmf.Precip
     en_thermo = edmf.EnvThermo
-    n_updrafts = up.n_updrafts
     diag_tc = center_diagnostics_turbconv(diagnostics)
     diag_tc_f = face_diagnostics_turbconv(diagnostics)
 
     @inbounds for k in TC.real_center_indices(grid)
-        if TD.has_condensate(aux_gm.q_liq[k] + aux_gm.q_ice[k])
-            gm.cloud_base = min(gm.cloud_base, grid.zc[k])
-            gm.cloud_top = max(gm.cloud_top, grid.zc[k])
-        end
         ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         aux_gm.s[k] = TD.specific_entropy(ts)
         ts_en = TC.thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
         aux_en.s[k] = TD.specific_entropy(ts_en)
-        @inbounds for i in 1:n_updrafts
+        @inbounds for i in 1:N_up
             if aux_up[i].area[k] > 0.0
                 ts_up = TC.thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
                 aux_up[i].s[k] = TD.specific_entropy(ts_up)
@@ -106,48 +99,85 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, Stats)
     massflux_s = aux_gm_f.massflux_s
     parent(massflux_s) .= 0
     @. aux_gm_f.diffusive_flux_s = -aux_tc_f.ρ_ae_KH * ∇f(wvec(aux_en.s))
-    @inbounds for i in 1:n_updrafts
+    @inbounds for i in 1:N_up
         @. massflux_s += aux_up_f[i].massflux * (If(aux_up[i].s) - If(aux_en.s))
     end
 
-    @inbounds for i in 1:(up.n_updrafts)
-        up.cloud_base[i] = TC.zc_toa(grid)
-        up.cloud_top[i] = 0.0
-        up.cloud_cover[i] = 0.0
+    #####
+    ##### Cloud base, top and cover
+    #####
+    # TODO: write this in a mutating-free way using findfirst/findlast/map
+
+    cloud_base_up = Vector{FT}(undef, N_up)
+    cloud_top_up = Vector{FT}(undef, N_up)
+    cloud_cover_up = Vector{FT}(undef, N_up)
+
+    @inbounds for i in 1:N_up
+        cloud_base_up[i] = TC.zc_toa(grid).z
+        cloud_top_up[i] = FT(0)
+        cloud_cover_up[i] = FT(0)
 
         @inbounds for k in TC.real_center_indices(grid)
             if aux_up[i].area[k] > 1e-3
                 if TD.has_condensate(aux_up[i].q_liq[k] + aux_up[i].q_ice[k])
-                    up.cloud_base[i] = min(up.cloud_base[i], grid.zc[k])
-                    up.cloud_top[i] = max(up.cloud_top[i], grid.zc[k])
-                    up.cloud_cover[i] = max(up.cloud_cover[i], aux_up[i].area[k])
+                    cloud_base_up[i] = min(cloud_base_up[i], grid.zc[k].z)
+                    cloud_top_up[i] = max(cloud_top_up[i], grid.zc[k].z)
+                    cloud_cover_up[i] = max(cloud_cover_up[i], aux_up[i].area[k])
                 end
             end
         end
     end
+    # Note definition of cloud cover : each updraft is associated with
+    # a cloud cover equal to the maximum area fraction of the updraft
+    # where ql > 0. Each updraft is assumed to have maximum overlap with
+    # respect to itup (i.e. no consideration of tilting due to shear)
+    # while the updraft classes are assumed to have no overlap at all.
+    # Thus total updraft cover is the sum of each updraft's cover
+    TC.write_ts(Stats, "updraft_cloud_cover", sum(cloud_cover_up))
+    TC.write_ts(Stats, "updraft_cloud_base", minimum(abs.(cloud_base_up)))
+    TC.write_ts(Stats, "updraft_cloud_top", maximum(abs.(cloud_top_up)))
 
-    en.cloud_top = 0.0
-    en.cloud_base = TC.zc_toa(grid)
-    en.cloud_cover = 0.0
-
+    cloud_top_en = FT(0)
+    cloud_base_en = TC.zc_toa(grid).z
+    cloud_cover_en = FT(0)
     @inbounds for k in TC.real_center_indices(grid)
         if TD.has_condensate(aux_en.q_liq[k] + aux_en.q_ice[k]) && aux_en.area[k] > 1e-6
-            en.cloud_base = min(en.cloud_base, grid.zc[k])
-            en.cloud_top = max(en.cloud_top, grid.zc[k])
-            en.cloud_cover = max(en.cloud_cover, aux_en.area[k] * aux_en.cloud_fraction[k])
+            cloud_base_en = min(cloud_base_en, grid.zc[k].z)
+            cloud_top_en = max(cloud_top_en, grid.zc[k].z)
+            cloud_cover_en = max(cloud_cover_en, aux_en.area[k] * aux_en.cloud_fraction[k])
         end
     end
+    # Assuming amximum overlap in environmental clouds
+    TC.write_ts(Stats, "env_cloud_cover", cloud_cover_en)
+    TC.write_ts(Stats, "env_cloud_base", cloud_base_en)
+    TC.write_ts(Stats, "env_cloud_top", cloud_top_en)
 
+    cloud_cover_gm = min(cloud_cover_en + sum(cloud_cover_up), 1)
+    cloud_base_gm = grid.zc[kc_toa].z
+    cloud_top_gm = FT(0)
+    @inbounds for k in TC.real_center_indices(grid)
+        if TD.has_condensate(aux_gm.q_liq[k] + aux_gm.q_ice[k])
+            cloud_base_gm = min(cloud_base_gm, grid.zc[k].z)
+            cloud_top_gm = max(cloud_top_gm, grid.zc[k].z)
+        end
+    end
+    TC.write_ts(Stats, "cloud_cover_mean", cloud_cover_gm)
+    TC.write_ts(Stats, "cloud_base_mean", cloud_base_gm)
+    TC.write_ts(Stats, "cloud_top_mean", cloud_top_gm)
+
+    #####
+    ##### Fluxes
+    #####
     If = CCO.InterpolateF2C()
     parent(diag_tc.massflux) .= 0
-    @inbounds for i in 1:(edmf.n_updrafts)
+    @inbounds for i in 1:N_up
         @. diag_tc.massflux += If(aux_up_f[i].massflux)
     end
 
     @inbounds for k in TC.real_center_indices(grid)
         a_up_bulk_k = a_up_bulk[k]
         if a_up_bulk_k > 0.0
-            @inbounds for i in 1:(edmf.n_updrafts)
+            @inbounds for i in 1:N_up
                 aux_up_i = aux_up[i]
                 diag_tc.entr_sc[k] += aux_up_i.area[k] * aux_up_i.entr_sc[k] / a_up_bulk_k
                 diag_tc.detr_sc[k] += aux_up_i.area[k] * aux_up_i.detr_sc[k] / a_up_bulk_k
@@ -168,7 +198,7 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, Stats)
     a_bulk_bcs = (; bottom = CCO.SetValue(sum(edmf.area_surface_bc)), top = CCO.Extrapolate())
     Ifabulk = CCO.InterpolateC2F(; a_bulk_bcs...)
     @. a_up_bulk_f = Ifabulk(a_up_bulk)
-    @inbounds for i in 1:(edmf.n_updrafts)
+    @inbounds for i in 1:N_up
         a_up_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.Extrapolate())
         Ifaup = CCO.InterpolateC2F(; a_up_bcs...)
         @. a_up_f = Ifaup(aux_up[i].area)

@@ -13,7 +13,6 @@ function update_cloud_frac(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVa
     @inbounds for k in real_center_indices(grid) # update grid-mean cloud fraction and cloud cover
         aux_gm.cloud_fraction[k] = aux_en.area[k] * aux_en.cloud_fraction[k] + a_up_bulk[k] * aux_bulk.cloud_fraction[k]
     end
-    gm.cloud_cover = min(edmf.EnvVar.cloud_cover + sum(edmf.UpdVar.cloud_cover), 1)
 end
 
 function compute_les_Γᵣ(z::ClimaCore.Geometry.ZPoint, τᵣ::Real = 24.0 * 3600.0, zᵢ::Real = 3000.0, zᵣ::Real = 3500.0)
@@ -308,6 +307,7 @@ end
 
 function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, up, surface)
     en = edmf.EnvVar
+    N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     ρ0_c = center_ref_state(state).ρ0
@@ -316,7 +316,7 @@ function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, up, surface)
     prog_en = center_prog_environment(state)
     prog_up_f = face_prog_updrafts(state)
     aux_bulk = center_aux_bulk(state)
-    @inbounds for i in 1:(up.n_updrafts)
+    @inbounds for i in 1:N_up
         prog_up[i].ρarea[kc_surf] = ρ0_c[kc_surf] * edmf.area_surface_bc[i]
         prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * edmf.h_surface_bc[i]
         prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * edmf.qt_surface_bc[i]
@@ -344,6 +344,7 @@ end
 function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, Case::CasesBase)
     kc_surf = kc_surface(grid)
 
+    N_up = n_updrafts(edmf)
     zLL = grid.zc[kc_surf]
     ustar = Case.Sur.ustar
     oblength = Case.Sur.obukhov_length
@@ -356,8 +357,8 @@ function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, Case:
         a_total = edmf.surface_area
         edmf.entr_surface_bc = 1 / zLL
         edmf.detr_surface_bc = 0.0
-        a_ = a_total / edmf.n_updrafts
-        @inbounds for i in 1:(edmf.n_updrafts)
+        a_ = a_total / N_up
+        @inbounds for i in 1:N_up
             surface_scalar_coeff =
                 percentile_bounds_mean_norm(1.0 - a_total + i * a_, 1.0 - a_total + (i + 1) * a_, 1000)
             edmf.area_surface_bc[i] = a_
@@ -368,7 +369,7 @@ function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, Case:
     else
         edmf.entr_surface_bc = 0.0
         edmf.detr_surface_bc = 1 / zLL
-        @inbounds for i in 1:(edmf.n_updrafts)
+        @inbounds for i in 1:N_up
             edmf.area_surface_bc[i] = 0
             edmf.w_surface_bc[i] = 0.0
             edmf.h_surface_bc[i] = prog_gm.θ_liq_ice[kc_surf]
@@ -414,8 +415,9 @@ end
 
 function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE, param_set)
 
+    N_up = n_updrafts(edmf)
     H_up_min = CPEDMF.H_up_min(param_set)
-    @inbounds for i in 1:(edmf.n_updrafts)
+    @inbounds for i in 1:N_up
         edmf.pressure_plume_spacing[i] =
             max(edmf.aspect_ratio * edmf.UpdVar.updraft_top[i], H_up_min * edmf.aspect_ratio)
     end
@@ -802,7 +804,6 @@ function compute_en_tendencies!(
 
     mixing_length = aux_tc.mixing_length
     min_area = edmf.minimum_area
-    pressure_plume_spacing = edmf.pressure_plume_spacing
 
     Ic = CCO.InterpolateF2C()
     area_en = aux_en.area
