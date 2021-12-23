@@ -236,9 +236,9 @@ function compute_diffusive_fluxes(
     return
 end
 
-function affect_filter!(edmf, grid, state, gm, Case, TS)
+function affect_filter!(edmf, grid, state, gm, Case, t::Real)
     # TODO: figure out why this filter kills the DryBubble results if called at t = 0.
-    if Case.casename == "DryBubble" && !(TS.t > 0)
+    if Case.casename == "DryBubble" && !(t > 0)
         return nothing
     end
     prog_en = center_prog_environment(state)
@@ -259,14 +259,13 @@ function affect_filter!(edmf, grid, state, gm, Case, TS)
 end
 
 # Compute the sum of tendencies for the scheme
-function ∑tendencies!(tendencies, prog, params, t)
+function ∑tendencies!(tendencies, prog, params, t::Real)
     UnPack.@unpack edmf, grid, gm, case, aux, TS = params
 
-    TS.t = t
     Δt = TS.dt
     state = State(prog, aux, tendencies)
 
-    affect_filter!(edmf, grid, state, gm, case, TS)
+    affect_filter!(edmf, grid, state, gm, case, t)
 
     gm = gm
     up = edmf.UpdVar
@@ -287,11 +286,11 @@ function ∑tendencies!(tendencies, prog, params, t)
     parent(tends_cent) .= 0
 
     # causes division error in dry bubble first time step
-    compute_precipitation_formation_tendencies(grid, state, up, edmf.Precip, TS.dt, param_set)
+    compute_precipitation_formation_tendencies(grid, state, up, edmf.Precip, Δt, param_set)
 
-    microphysics(en_thermo, grid, state, en, edmf.Precip, TS.dt, param_set) # saturation adjustment + rain creation
+    microphysics(en_thermo, grid, state, en, edmf.Precip, Δt, param_set) # saturation adjustment + rain creation
     if edmf.Precip.precipitation_model == "clima_1m"
-        compute_precipitation_sink_tendencies(grid, state, gm, TS)
+        compute_precipitation_sink_tendencies(grid, state, gm, Δt)
         compute_precipitation_advection_tendencies(edmf, grid, state, gm)
     end
 

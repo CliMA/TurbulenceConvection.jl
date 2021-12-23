@@ -118,6 +118,8 @@ end
 function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     TC = TurbulenceConvection
     state = sim.state
+    FT = eltype(sim.grid)
+    t = FT(0)
     Cases.initialize_profiles(sim.Case, sim.grid, sim.gm, state)
     satadjust(sim.gm, sim.grid, sim.state)
 
@@ -125,7 +127,7 @@ function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     Cases.initialize_forcing(sim.Case, sim.grid, state, sim.gm, sim.param_set)
     Cases.initialize_radiation(sim.Case, sim.grid, state, sim.gm, sim.param_set)
 
-    initialize_edmf(sim.edmf, sim.grid, state, sim.Case, sim.gm, sim.TS.t)
+    initialize_edmf(sim.edmf, sim.grid, state, sim.Case, sim.gm, t)
 
     sim.skip_io && return nothing
     TC.initialize_io(sim.io_nt.ref_state, sim.Stats)
@@ -140,7 +142,7 @@ function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     TC.initialize_io(sim.edmf, sim.Stats)
 
     TC.open_files(sim.Stats)
-    TC.write_simulation_time(sim.Stats, sim.TS.t)
+    TC.write_simulation_time(sim.Stats, t)
 
     TC.io(sim.io_nt.aux, sim.Stats, state)
     TC.io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
@@ -148,7 +150,7 @@ function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     # TODO: depricate
     TC.io(sim.gm, sim.grid, state, sim.Stats)
     TC.io(sim.Case, sim.grid, state, sim.Stats)
-    TC.io(sim.edmf, sim.grid, state, sim.Stats, sim.TS, sim.param_set)
+    TC.io(sim.edmf, sim.grid, state, sim.Stats)
     TC.close_files(sim.Stats)
 
     return
