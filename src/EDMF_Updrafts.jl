@@ -9,6 +9,7 @@ function compute_precipitation_formation_tendencies(
     dt,
     param_set,
 )
+    N_up = n_updrafts(up)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     aux_up = center_aux_updrafts(state)
@@ -16,7 +17,7 @@ function compute_precipitation_formation_tendencies(
     prog_pr = center_prog_precipitation(state)
     tendencies_pr = center_tendencies_precipitation(state)
 
-    @inbounds for i in 1:(up.n_updrafts)
+    @inbounds for i in 1:N_up
         @inbounds for k in real_center_indices(grid)
             T_up = aux_up[i].T[k]
             q_tot_up = aux_up[i].q_tot[k]
@@ -44,7 +45,7 @@ function compute_precipitation_formation_tendencies(
     @inbounds for k in real_center_indices(grid)
         aux_bulk.θ_liq_ice_tendency_precip_formation[k] = 0
         aux_bulk.qt_tendency_precip_formation[k] = 0
-        @inbounds for i in 1:(up.n_updrafts)
+        @inbounds for i in 1:N_up
             aux_bulk.θ_liq_ice_tendency_precip_formation[k] += aux_up[i].θ_liq_ice_tendency_precip_formation[k]
             aux_bulk.qt_tendency_precip_formation[k] += aux_up[i].qt_tendency_precip_formation[k]
         end

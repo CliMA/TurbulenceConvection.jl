@@ -31,7 +31,6 @@ function affect_io!(integrator)
     TC.io(io_nt.aux, Stats, state)
     TC.io(io_nt.diagnostics, Stats, diagnostics)
 
-    TC.io(gm, grid, state, Stats) # #removeVarsHack
     TC.io(case, grid, state, Stats) # #removeVarsHack
     TC.io(edmf, grid, state, Stats) # #removeVarsHack
 

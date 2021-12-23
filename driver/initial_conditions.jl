@@ -52,6 +52,7 @@ function initialize_covariance(edmf::TC.EDMF_PrognosticTKE, grid, state, gm, Cas
 end
 
 function initialize_updrafts(edmf, grid, state, up::TC.UpdraftVariables, gm::TC.GridMeanVariables)
+    N_up = TC.n_updrafts(edmf)
     kc_surf = TC.kc_surface(grid)
     aux_up = TC.center_aux_updrafts(state)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -61,7 +62,7 @@ function initialize_updrafts(edmf, grid, state, up::TC.UpdraftVariables, gm::TC.
     prog_up = TC.center_prog_updrafts(state)
     prog_up_f = TC.face_prog_updrafts(state)
     ρ0_c = TC.center_ref_state(state).ρ0
-    @inbounds for i in 1:(up.n_updrafts)
+    @inbounds for i in 1:N_up
         @inbounds for k in TC.real_face_indices(grid)
             aux_up_f[i].w[k] = 0
             prog_up_f[i].ρaw[k] = 0
@@ -167,7 +168,8 @@ function initialize_updrafts_DryBubble(edmf, grid, state, up::TC.UpdraftVariable
     Area_in = TC.pyinterp(grid.zc, z_in, Area_in)
     θ_liq_in = TC.pyinterp(grid.zc, z_in, θ_liq_in)
     T_in = TC.pyinterp(grid.zc, z_in, T_in)
-    @inbounds for i in 1:(up.n_updrafts)
+    N_up = TC.n_updrafts(edmf)
+    @inbounds for i in 1:N_up
         @inbounds for k in TC.real_face_indices(grid)
             if minimum(z_in) <= grid.zf[k] <= maximum(z_in)
                 aux_up_f[i].w[k] = 0.0

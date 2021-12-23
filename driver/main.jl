@@ -70,17 +70,17 @@ function Simulation1d(namelist)
     edmf = TC.EDMF_PrognosticTKE(namelist, grid, param_set)
     TS = TC.TimeStepping(namelist)
 
-    n_updrafts = edmf.n_updrafts
+    N_up = TC.n_updrafts(edmf)
 
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
 
-    cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, n_updrafts))
-    face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, n_updrafts))
-    aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, n_updrafts))
-    aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, n_updrafts))
-    diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, n_updrafts))
-    diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, n_updrafts))
+    cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
+    face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up))
+    aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, N_up))
+    aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up))
+    diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, N_up))
+    diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up))
 
     prog = CC.Fields.FieldVector(cent = cent_prog_fields(), face = face_prog_fields())
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
@@ -148,7 +148,6 @@ function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
     TC.io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
 
     # TODO: depricate
-    TC.io(sim.gm, sim.grid, state, sim.Stats)
     TC.io(sim.Case, sim.grid, state, sim.Stats)
     TC.io(sim.edmf, sim.grid, state, sim.Stats)
     TC.close_files(sim.Stats)
