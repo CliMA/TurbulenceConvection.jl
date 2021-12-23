@@ -36,9 +36,8 @@ end
 Computes the tendencies to θ_liq_ice, q_tot, q_rain and q_snow
 due to rain evaporation, snow deposition and sublimation and snow melt
 """
-function compute_precipitation_sink_tendencies(grid, state, gm, TS::TimeStepping)
+function compute_precipitation_sink_tendencies(grid, state, gm, Δt::Real)
     param_set = parameter_set(gm)
-    Δt = TS.dt
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     aux_gm = center_aux_grid_mean(state)

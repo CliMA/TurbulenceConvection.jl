@@ -79,7 +79,7 @@ function initialize_io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     return
 end
 
-function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats, TS::TimeStepping, param_set)
+function io(edmf::EDMF_PrognosticTKE, grid, state, Stats::NetCDFIO_Stats)
     io(edmf.UpdVar, grid, state, Stats)
     io(edmf.EnvVar, grid, state, Stats)
     io(edmf.Precip, grid, state, Stats)

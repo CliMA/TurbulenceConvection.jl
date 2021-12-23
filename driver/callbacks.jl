@@ -12,8 +12,9 @@ end
 condition_every_iter(u, t, integrator) = true
 
 function affect_io!(integrator)
-    UnPack.@unpack edmf, aux, grid, io_nt, diagnostics, case, gm, TS, Stats, skip_io = integrator.p
+    UnPack.@unpack edmf, aux, grid, io_nt, diagnostics, case, gm, Stats, skip_io = integrator.p
     skip_io && return nothing
+    t = integrator.t
 
     state = TC.State(integrator.u, aux, integrator.du)
 
@@ -25,22 +26,23 @@ function affect_io!(integrator)
     # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
     # opening/closing files every step should be okay. #removeVarsHack
     # TurbulenceConvection.io(sim) # #removeVarsHack
-    TC.write_simulation_time(Stats, TS.t) # #removeVarsHack
+    TC.write_simulation_time(Stats, t) # #removeVarsHack
 
     TC.io(io_nt.aux, Stats, state)
     TC.io(io_nt.diagnostics, Stats, diagnostics)
 
     TC.io(gm, grid, state, Stats) # #removeVarsHack
     TC.io(case, grid, state, Stats) # #removeVarsHack
-    TC.io(edmf, grid, state, Stats, TS, param_set) # #removeVarsHack
+    TC.io(edmf, grid, state, Stats) # #removeVarsHack
 
     ODE.u_modified!(integrator, false) # We're legitamately not mutating `u` (the state vector)
 end
 
 function affect_filter!(integrator)
-    UnPack.@unpack edmf, grid, gm, aux, case, TS = integrator.p
+    UnPack.@unpack edmf, grid, gm, aux, case = integrator.p
+    t = integrator.t
     state = TC.State(integrator.u, aux, integrator.du)
-    TC.affect_filter!(edmf, grid, state, gm, case, TS)
+    TC.affect_filter!(edmf, grid, state, gm, case, t)
 
     # We're lying to OrdinaryDiffEq.jl, in order to avoid
     # paying for an additional `∑tendencies!` call, which is required
