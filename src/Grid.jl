@@ -24,7 +24,6 @@ struct Grid{FT, CS, FS, SC, SF}
     zmin::FT
     zmax::FT
     Δz::FT
-    Δzi::FT
     nz::Int
     cs::CS
     fs::FS
@@ -46,16 +45,13 @@ struct Grid{FT, CS, FS, SC, SF}
         zc = CC.Fields.coordinate_field(cs)
         zf = CC.Fields.coordinate_field(fs)
 
-        #Set the inverse grid spacing
-        Δzi = 1 / Δz
-
         zmin = minimum(parent(zf))
         zmax = maximum(parent(zf))
         CS = typeof(cs)
         FS = typeof(fs)
         SC = typeof(zc)
         SF = typeof(zf)
-        return new{FT, CS, FS, SC, SF}(zmin, zmax, Δz, Δzi, nz, cs, fs, zc, zf)
+        return new{FT, CS, FS, SC, SF}(zmin, zmax, Δz, nz, cs, fs, zc, zf)
     end
 end
 
