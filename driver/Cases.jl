@@ -131,6 +131,8 @@ get_radiation_type(::AbstractCaseType) = TC.RadiationNone # default
 get_radiation_type(::DYCOMS_RF01) = TC.RadiationDYCOMS_RF01
 get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
 
+TC.RadiationBase(case::AbstractCaseType) = TC.RadiationBase{Cases.get_radiation_type(case)}()
+
 forcing_kwargs(::AbstractCaseType, namelist) = ()
 
 TC.ForcingBase(case::AbstractCaseType, param_set::APS; kwargs...) = TC.ForcingBase(get_forcing_type(case); kwargs...)
@@ -139,7 +141,7 @@ TC.ForcingBase(case::AbstractCaseType, param_set::APS; kwargs...) = TC.ForcingBa
 ##### Default CasesBase behavior:
 #####
 
-initialize_radiation(self::CasesBase, grid, state, gm, param_set) = initialize(self.Rad, grid, state)
+initialize_radiation(self::CasesBase, grid, state, gm, param_set) = nothing
 
 function TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
     add_ts(Stats, "Tsurface")
@@ -1315,7 +1317,7 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, gm,
     parent(aux_gm.vg) .= -5.5
 
     # large scale subsidence
-    divergence = 3.75e-6    # divergence is defined twice: here and in ForcingDYCOMS_RF01 struct?
+    divergence = self.Rad.divergence
     @inbounds for k in real_center_indices(grid)
         aux_gm.subsidence[k] = -grid.zc[k] * divergence
     end
@@ -1324,8 +1326,17 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, gm,
     parent(aux_gm.dqtdt) .= 0 #kg/(kg * s)
 end
 
+function TC.RadiationBase(case::DYCOMS_RF01)
+    return TC.RadiationBase{Cases.get_radiation_type(case)}(;
+        divergence = 3.75e-6,
+        alpha_z = 1.0,
+        kappa = 85.0,
+        F0 = 70.0,
+        F1 = 22.0,
+    )
+end
+
 function initialize_radiation(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, gm, param_set)
-    initialize(self.Rad, grid, state)
     aux_gm = TC.center_aux_grid_mean(state)
 
     # no large-scale drying
@@ -1715,4 +1726,4 @@ initialize_forcing(self::CasesBase{LES_driven_SCM}, grid::Grid, state, gm, param
 initialize_radiation(self::CasesBase{LES_driven_SCM}, grid::Grid, state, gm, param_set) =
     initialize(self.Rad, grid, state, self.LESDat)
 
-end
+end # module Cases

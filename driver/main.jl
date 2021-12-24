@@ -64,7 +64,7 @@ function Simulation1d(namelist)
     gm = TC.GridMeanVariables(namelist, grid, param_set)
     Sur = TC.SurfaceBase(Cases.get_surface_type(case); namelist, ref_params)
     Fo = TC.ForcingBase(case, param_set; Cases.forcing_kwargs(case, namelist)...)
-    Rad = TC.RadiationBase{Cases.get_radiation_type(case)}()
+    Rad = TC.RadiationBase(case)
 
     Case = Cases.CasesBase(case, namelist, grid, param_set, Sur, Fo, Rad)
     edmf = TC.EDMF_PrognosticTKE(namelist, grid, param_set)

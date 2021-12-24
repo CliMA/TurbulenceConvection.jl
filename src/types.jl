@@ -331,7 +331,7 @@ ForcingBase(::Type{T}; kwargs...) where {T} = ForcingBase{T}(; kwargs...)
 
 force_type(::ForcingBase{T}) where {T} = T
 
-Base.@kwdef mutable struct RadiationBase{T}
+Base.@kwdef struct RadiationBase{T}
     divergence::Float64 = 0
     alpha_z::Float64 = 0
     kappa::Float64 = 0
