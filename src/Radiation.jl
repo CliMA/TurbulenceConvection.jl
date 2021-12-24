@@ -1,17 +1,6 @@
 update(self::RadiationBase, grid, state, gm::GridMeanVariables, param_set) = nothing
 initialize(self::RadiationBase{RadiationNone}, grid, state) = nothing
 
-function initialize(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state)
-    self.divergence = 3.75e-6  # divergence is defined twice: here and in initialize_forcing method of DYCOMS_RF01 case class
-    # where it is used to initialize large scale subsidence
-    self.alpha_z = 1.0
-    self.kappa = 85.0
-    self.F0 = 70.0
-    self.F1 = 22.0
-    self.divergence = 3.75e-6
-    return
-end
-
 """
 see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
