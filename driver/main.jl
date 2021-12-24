@@ -63,7 +63,7 @@ function Simulation1d(namelist)
 
     gm = TC.GridMeanVariables(namelist, grid, param_set)
     Sur = TC.SurfaceBase(Cases.get_surface_type(case); namelist, ref_params)
-    Fo = TC.ForcingBase{Cases.get_forcing_type(case)}()
+    Fo = TC.ForcingBase(case, param_set; Cases.forcing_kwargs(case, namelist)...)
     Rad = TC.RadiationBase{Cases.get_radiation_type(case)}()
 
     Case = Cases.CasesBase(case, namelist, grid, param_set, Sur, Fo, Rad)

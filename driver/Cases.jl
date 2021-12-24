@@ -131,6 +131,10 @@ get_radiation_type(::AbstractCaseType) = TC.RadiationNone # default
 get_radiation_type(::DYCOMS_RF01) = TC.RadiationDYCOMS_RF01
 get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
 
+forcing_kwargs(::AbstractCaseType, namelist) = ()
+
+TC.ForcingBase(case::AbstractCaseType, param_set::APS; kwargs...) = TC.ForcingBase(get_forcing_type(case); kwargs...)
+
 #####
 ##### Default CasesBase behavior:
 #####
@@ -163,10 +167,12 @@ initialize_forcing(self::CasesBase, grid::Grid, state, gm, param_set) = initiali
 
 function CasesBase(case::Soares, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
-    Fo.apply_coriolis = false
-    Fo.apply_subsidence = false
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
+
+TC.ForcingBase(case::Soares, param_set::APS; kwargs...) =
+    TC.ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
+
 function reference_params(::Soares, grid::Grid, param_set::APS, namelist)
     Pg = 1000.0 * 100.0
     qtg = 5.0e-3
@@ -230,10 +236,11 @@ end
 
 function CasesBase(case::Nieuwstadt, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
-    Fo.apply_coriolis = false
-    Fo.apply_subsidence = false
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
+
+TC.ForcingBase(case::Nieuwstadt, param_set::APS; kwargs...) =
+    TC.ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
 function reference_params(::Nieuwstadt, grid::Grid, param_set::APS, namelist)
     Pg = 1000.0 * 100.0
@@ -293,11 +300,11 @@ end
 
 function CasesBase(case::Bomex, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
-    Fo.apply_coriolis = true
-    Fo.coriolis_param = 0.376e-4 # s^{-1}
-    Fo.apply_subsidence = true
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
+
+TC.ForcingBase(case::Bomex, param_set::APS; kwargs...) =
+    TC.ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
 
 function reference_params(::Bomex, grid::Grid, param_set::APS, namelist)
     Pg = 1.015e5 #Pressure at ground
@@ -417,11 +424,11 @@ end
 
 function CasesBase(case::life_cycle_Tan2018, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
-    Fo.apply_coriolis = true
-    Fo.coriolis_param = 0.376e-4 # s^{-1}
-    Fo.apply_subsidence = true
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
+TC.ForcingBase(case::life_cycle_Tan2018, param_set::APS; kwargs...) =
+    TC.ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
+
 function reference_params(::life_cycle_Tan2018, grid::Grid, param_set::APS, namelist)
     Pg = 1.015e5  #Pressure at ground
     Tg = 300.4  #Temperature at ground
@@ -558,12 +565,17 @@ end
 
 function CasesBase(case::Rico, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
-    Fo.apply_coriolis = true
+    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+end
+function TC.ForcingBase(case::Rico, param_set::APS; kwargs...)
     latitude = 18.0
     Omega = CPP.Omega(param_set)
-    Fo.coriolis_param = 2.0 * Omega * sin(latitude * π / 180.0) # s^{-1}
-    Fo.apply_subsidence = true
-    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+    return TC.ForcingBase(
+        get_forcing_type(case);
+        apply_coriolis = true,
+        apply_subsidence = true,
+        coriolis_param = 2.0 * Omega * sin(latitude * π / 180.0),
+    ) #= s^{-1} =#
 end
 
 function reference_params(::Rico, grid::Grid, param_set::APS, namelist)
@@ -675,10 +687,11 @@ end
 
 function CasesBase(case::TRMM_LBA, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
-    Fo.apply_coriolis = false
-    Fo.apply_subsidence = false
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
+TC.ForcingBase(case::TRMM_LBA, param_set::APS; kwargs...) =
+    TC.ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
+
 function reference_params(::TRMM_LBA, grid::Grid, param_set::APS, namelist)
     molmass_ratio = CPP.molmass_ratio(param_set)
     Pg = 991.3 * 100  #Pressure at ground
@@ -970,11 +983,10 @@ end
 
 function CasesBase(case::ARM_SGP, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
-    Fo.apply_coriolis = true
-    Fo.coriolis_param = 8.5e-5
-    Fo.apply_subsidence = false
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
+TC.ForcingBase(case::ARM_SGP, param_set::APS; kwargs...) =
+    TC.ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = false, coriolis_param = 8.5e-5)
 
 function reference_params(::ARM_SGP, grid::Grid, param_set::APS, namelist)
     Pg = 970.0 * 100 #Pressure at ground
@@ -1099,10 +1111,10 @@ end
 
 function CasesBase(case::GATE_III, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "thetal_maxgrad"
-    Fo.apply_subsidence = false
-    Fo.apply_coriolis = false
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
+TC.ForcingBase(case::GATE_III, param_set::APS; kwargs...) =
+    TC.ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
 function reference_params(::GATE_III, grid::Grid, param_set::APS, namelist)
     Pg = 1013.0 * 100  #Pressure at ground
@@ -1303,9 +1315,7 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, gm,
     parent(aux_gm.vg) .= -5.5
 
     # large scale subsidence
-    divergence = 3.75e-6    # divergence is defined twice: here and in __init__ of ForcingDYCOMS_RF01 class
-    # To be able to have self.Fo.divergence available here,
-    # we would have to change the signature of ForcingBase class
+    divergence = 3.75e-6    # divergence is defined twice: here and in ForcingDYCOMS_RF01 struct?
     @inbounds for k in real_center_indices(grid)
         aux_gm.subsidence[k] = -grid.zc[k] * divergence
     end
@@ -1337,13 +1347,18 @@ end
 
 function CasesBase(case::GABLS, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
-    Fo.apply_coriolis = true
-    latitude = 73.0
-    Fo.coriolis_param = 1.39e-4 # s^{-1}
-    # Omega = CPP.Omega(param_set)
-    # Fo.coriolis_param = 2.0 * Omega * np.sin(latitude * π / 180.0 ) # s^{-1}
-    Fo.apply_subsidence = false
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+end
+function TC.ForcingBase(case::GABLS, param_set::APS; kwargs...)
+    coriolis_param = 1.39e-4 # s^{-1}
+    # Omega = CPP.Omega(param_set)
+    # coriolis_param = 2 * Omega * sin(latitude * π / 180 ) # s^{-1}
+    TC.ForcingBase(
+        get_forcing_type(case);
+        apply_coriolis = true,
+        apply_subsidence = false,
+        coriolis_param = coriolis_param,
+    )
 end
 
 function reference_params(::GABLS, grid::Grid, param_set::APS, namelist)
@@ -1410,12 +1425,18 @@ end
 # Not fully implemented yet - Ignacio
 function CasesBase(case::SP, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "critical_Ri"
-    Fo.apply_coriolis = true
-    Fo.coriolis_param = 1.0e-4 # s^{-1}
-    # Omega = CPP.Omega(param_set)
-    # Fo.coriolis_param = 2.0 * Omega * np.sin(latitude * π / 180.0 ) # s^{-1}
-    Fo.apply_subsidence = false
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+end
+function TC.ForcingBase(case::SP, param_set::APS; kwargs...)
+    coriolis_param = 1.0e-4 # s^{-1}
+    # Omega = CPP.Omega(param_set)
+    # coriolis_param = 2 * Omega * sin(latitude * π / 180 ) # s^{-1}
+    TC.ForcingBase(
+        get_forcing_type(case);
+        apply_coriolis = true,
+        apply_subsidence = false,
+        coriolis_param = coriolis_param,
+    )
 end
 
 function reference_params(::SP, grid::Grid, param_set::APS, namelist)
@@ -1482,10 +1503,10 @@ end
 
 function CasesBase(case::DryBubble, namelist, grid::Grid, param_set, Sur, Fo, Rad)
     inversion_option = "theta_rho"
-    Fo.apply_coriolis = false
-    Fo.apply_subsidence = false
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
 end
+TC.ForcingBase(case::DryBubble, param_set::APS; kwargs...) =
+    TC.ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
 function reference_params(::DryBubble, grid::Grid, param_set::APS, namelist)
     Pg = 1.0e5  #Pressure at ground
@@ -1606,11 +1627,19 @@ function CasesBase(case::LES_driven_SCM, namelist, grid::Grid, param_set, Sur, F
         TC.LESData(imin, imax, les_filename, t_interval_from_end_s, namelist["initial_condition_averaging_window_s"])
     end
     inversion_option = "critical_Ri"
-    Fo.apply_coriolis = false
-    Fo.coriolis_param = 0.376e-4 # s^{-1}
-    Fo.apply_subsidence = true
-    Fo.nudge_tau = namelist["forcing"]["nudging_timescale"]
     return TC.CasesBase(case; inversion_option, Sur, Fo, Rad, LESDat)
+end
+
+forcing_kwargs(::LES_driven_SCM, namelist) = (; nudge_tau = namelist["forcing"]["nudging_timescale"])
+
+function TC.ForcingBase(case::LES_driven_SCM, param_set::APS; nudge_tau)
+    TC.ForcingBase(
+        get_forcing_type(case);
+        apply_coriolis = false,
+        apply_subsidence = true,
+        coriolis_param = 0.376e-4,
+        nudge_tau = nudge_tau,
+    )
 end
 
 function reference_params(::LES_driven_SCM, grid::Grid, param_set::APS, namelist)

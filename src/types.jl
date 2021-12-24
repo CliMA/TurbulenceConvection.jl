@@ -316,7 +316,7 @@ LES-driven forcing
 
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef mutable struct ForcingBase{T}
+Base.@kwdef struct ForcingBase{T}
     "Boolean specifying whether Coriolis forcing is applied"
     apply_coriolis::Bool = false
     "Boolean specifying whether subsidence forcing is applied"
@@ -326,6 +326,8 @@ Base.@kwdef mutable struct ForcingBase{T}
     "Momentum relaxation timescale"
     nudge_tau::Float64 = 0.0
 end
+
+ForcingBase(::Type{T}; kwargs...) where {T} = ForcingBase{T}(; kwargs...)
 
 force_type(::ForcingBase{T}) where {T} = T
 
