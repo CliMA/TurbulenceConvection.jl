@@ -296,7 +296,7 @@ struct RadiationStandard end
 struct RadiationDYCOMS_RF01 end
 struct RadiationLES end
 
-Base.@kwdef mutable struct LESData
+Base.@kwdef struct LESData
     "Start time index of LES"
     imin::Int = 0
     "End time index of LES"
