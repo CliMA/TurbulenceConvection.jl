@@ -52,7 +52,6 @@ function sde_closure(param_set::APS, sde_model::sde_struct{SDEClosureType}, term
     u0 = sde_model.u0
     dt = sde_model.dt
     u = sde(θ, σ, u0, dt)
-    sde_model.u0 = u
     return u
 end
 
