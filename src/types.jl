@@ -256,7 +256,7 @@ struct SurfaceMoninObukhov end
 struct SurfaceMoninObukhovDry end
 struct SurfaceSullivanPatton end
 
-Base.@kwdef mutable struct SurfaceBase{T}
+Base.@kwdef mutable struct SurfaceBase{T, NT}
     zrough::Float64 = 0
     interactive_zrough::Bool = false
     Tsurface::Float64 = 0
@@ -276,12 +276,13 @@ Base.@kwdef mutable struct SurfaceBase{T}
     obukhov_length::Float64 = 0
     Ri_bulk_crit::Float64 = 0
     ustar_fixed::Bool = false
-    ref_params::NamedTuple = NamedTuple()
+    ref_params::NT
 end
 
 function SurfaceBase(::Type{T}; namelist::Dict, ref_params) where {T}
     Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
-    return SurfaceBase{T}(; Ri_bulk_crit, ref_params)
+    NT = typeof(ref_params)
+    return SurfaceBase{T, NT}(; Ri_bulk_crit, ref_params)
 end
 
 struct ForcingBaseType end
@@ -341,22 +342,42 @@ end
 
 rad_type(::RadiationBase{T}) where {T} = T
 
-Base.@kwdef mutable struct CasesBase{T}
+const stepR = range(10, 360; length = 36) .* 60
+
+Base.@kwdef mutable struct CasesBase{T, S, F, R, SR, RMAT, LESDataT}
     case::T
     casename::String = "default_casename"
     inversion_option::String = "default_inversion_option"
     les_filename::String = "None"
-    Sur::SurfaceBase
-    Fo::ForcingBase
-    Rad::RadiationBase
-    rad_time::StepRangeLen = range(10, 360; length = 36) .* 60
-    rad::AbstractMatrix{Float64} = zeros(1, 1)
+    Sur::S
+    Fo::F
+    Rad::R
+    rad_time::SR
+    rad::RMAT
     lhf0::Float64 = 0
     shf0::Float64 = 0
-    LESDat::Union{LESData, Nothing} = nothing
+    LESDat::LESDataT
 end
 
-CasesBase(case::T; kwargs...) where {T} = CasesBase{T}(; case = case, casename = string(nameof(T)), kwargs...)
+function CasesBase(case::T; Sur, Fo, Rad, rad_time = stepR, rad = zeros(1, 1), LESDat = nothing, kwargs...) where {T}
+    S = typeof(Sur)
+    F = typeof(Fo)
+    R = typeof(Rad)
+    SR = typeof(rad_time)
+    RMAT = typeof(rad)
+    LESDataT = typeof(LESDat)
+    CasesBase{T, S, F, R, SR, RMAT, LESDataT}(;
+        case = case,
+        casename = string(nameof(T)),
+        Sur,
+        Fo,
+        Rad,
+        rad_time,
+        rad,
+        LESDat,
+        kwargs...,
+    )
+end
 
 mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC, SDES, UPVAR}
     Ri_bulk_crit::Float64

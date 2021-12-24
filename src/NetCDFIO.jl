@@ -5,7 +5,6 @@ mutable struct NetCDFIO_Stats
     root_grp::NC.NCDataset{Nothing}
     profiles_grp::NC.NCDataset{NC.NCDataset{Nothing}}
     ts_grp::NC.NCDataset{NC.NCDataset{Nothing}}
-    grid::Grid
     last_output_time::Float64
     uuid::String
     frequency::Float64
@@ -84,18 +83,7 @@ mutable struct NetCDFIO_Stats
             NC.defVar(ts_grp, "t", Float64, ("t",))
         end
         vars = Dict{String, Any}()
-        return new(
-            root_grp,
-            profiles_grp,
-            ts_grp,
-            grid,
-            last_output_time,
-            uuid,
-            frequency,
-            stats_path,
-            path_plus_file,
-            vars,
-        )
+        return new(root_grp, profiles_grp, ts_grp, last_output_time, uuid, frequency, stats_path, path_plus_file, vars)
     end
 end
 
