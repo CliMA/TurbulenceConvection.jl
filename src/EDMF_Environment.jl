@@ -69,9 +69,8 @@ function sgs_mean(en_thermo::EnvironmentThermodynamics, grid, state, en, precip,
 end
 
 function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, precip, dt, param_set)
-    # TODO: double check this python-> julia translation
-    # a, w = np.polynomial.hermite.hermgauss(en_thermo.quadrature_order)
-    a, w = FastGaussQuadrature.gausshermite(en_thermo.quadrature_order)
+    a = en_thermo.a
+    w = en_thermo.w
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     aux_en = center_aux_environment(state)
