@@ -2,21 +2,25 @@ if !("." in LOAD_PATH) # for easier local testing
     push!(LOAD_PATH, ".")
 end
 import SnoopCompileCore
+import TurbulenceConvection
+tc_dir_glob = dirname(dirname(pathof(TurbulenceConvection)))
+include(joinpath(tc_dir_glob, "driver", "main.jl"))
+include(joinpath(tc_dir_glob, "perf", "common.jl"))
+include(joinpath(tc_dir_glob, "driver", "generate_namelist.jl"))
+import .NameList
+
+case_name = "Bomex"
+println("Running $case_name...")
+sim = init_sim(case_name)
+sim.skip_io || TC.open_files(sim.Stats) # #removeVarsHack
+(prob, alg, kwargs) = solve_args(sim)
 
 tinf = SnoopCompileCore.@snoopi_deep begin
-    import TurbulenceConvection
-    tc_dir_glob = dirname(dirname(pathof(TurbulenceConvection)))
-    include(joinpath(tc_dir_glob, "driver", "main.jl"))
-    include(joinpath(tc_dir_glob, "driver", "generate_namelist.jl"))
-    import .NameList
-
-    case_name = "Bomex"
-    println("Running $case_name...")
-    namelist = NameList.default_namelist(case_name)
-    namelist["meta"]["uuid"] = "01"
-    namelist["meta"]["simname"] = "flame"
-    ds_tc_filename, return_code = main(namelist)
+    sol = ODE.solve(prob, alg; kwargs...)
+    # ds_tc_filename, return_code = main(namelist)
 end
+
+sim.skip_io || TC.close_files(sim.Stats) # #removeVarsHack
 
 import ProfileView
 import SnoopCompile # need SnoopCompile to iterate over InferenceTimingNode's

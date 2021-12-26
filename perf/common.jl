@@ -35,14 +35,6 @@ function init_sim(case_name)
     namelist["stats_io"]["skip"] = true
     namelist["meta"]["uuid"] = "01"
     sim = Simulation1d(namelist)
-
-    Cases.initialize_profiles(sim.Case, sim.grid, sim.gm, sim.state)
-    satadjust(sim.gm, sim.grid, sim.state)
-
-    Cases.initialize_surface(sim.Case, sim.grid, sim.state, sim.param_set)
-    Cases.initialize_forcing(sim.Case, sim.grid, sim.state, sim.gm, sim.param_set)
-    Cases.initialize_radiation(sim.Case, sim.grid, sim.state, sim.gm, sim.param_set)
-
-    initialize_edmf(sim.edmf, sim.grid, sim.state, sim.Case, sim.gm, sim.TS.t)
+    TC.initialize(sim)
     return sim
 end
