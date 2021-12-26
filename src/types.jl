@@ -223,13 +223,19 @@ function EnvironmentVariables(namelist, grid::Grid)
     return EnvironmentVariables(; EnvThermo_scheme)
 end
 
-struct EnvironmentThermodynamics
+struct EnvironmentThermodynamics{A, W}
     quadrature_order::Int
     quadrature_type::String
+    a::A
+    w::W
     function EnvironmentThermodynamics(namelist, grid::Grid)
         quadrature_order = parse_namelist(namelist, "thermodynamics", "quadrature_order"; default = 3)
         quadrature_type = parse_namelist(namelist, "thermodynamics", "quadrature_type"; default = "gaussian")
-        return new(quadrature_order, quadrature_type)
+        # TODO: double check this python-> julia translation
+        # a, w = np.polynomial.hermite.hermgauss(quadrature_order)
+        a, w = FastGaussQuadrature.gausshermite(quadrature_order)
+        a, w = SA.SVector{quadrature_order}(a), SA.SVector{quadrature_order}(w)
+        return new{typeof(a), typeof(w)}(quadrature_order, quadrature_type, a, w)
     end
 end
 
