@@ -115,7 +115,7 @@ function Simulation1d(namelist)
     )
 end
 
-function TurbulenceConvection.initialize(sim::Simulation1d, namelist)
+function TurbulenceConvection.initialize(sim::Simulation1d)
     TC = TurbulenceConvection
     state = sim.state
     FT = eltype(sim.grid)
@@ -157,16 +157,14 @@ end
 
 include("callbacks.jl")
 
-function run(sim::Simulation1d; time_run = true)
+function solve_args(sim::Simulation1d)
     TC = TurbulenceConvection
-    iter = 0
     grid = sim.grid
     state = sim.state
     prog = state.prog
     aux = state.aux
     TS = sim.TS
     diagnostics = sim.diagnostics
-    sim.skip_io || TC.open_files(sim.Stats) # #removeVarsHack
 
     t_span = (0.0, sim.TS.t_max)
     params = (;
@@ -186,6 +184,7 @@ function run(sim::Simulation1d; time_run = true)
     )
 
     callback_io = ODE.DiscreteCallback(condition_io, affect_io!; save_positions = (false, false))
+    callback_io = sim.skip_io ? () : (callback_io,)
     callback_cfl = ODE.DiscreteCallback(condition_every_iter, monitor_cfl!; save_positions = (false, false))
     callback_cfl = sim.edmf.Precip.precipitation_model == "clima_1m" ? (callback_cfl,) : ()
     callback_dtmax = ODE.DiscreteCallback(condition_every_iter, dt_max!; save_positions = (false, false))
@@ -193,7 +192,7 @@ function run(sim::Simulation1d; time_run = true)
     callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))
     callback_adapt_dt = sim.adapt_dt ? (callback_adapt_dt,) : ()
 
-    callbacks = ODE.CallbackSet(callback_adapt_dt..., callback_dtmax, callback_cfl..., callback_filters, callback_io)
+    callbacks = ODE.CallbackSet(callback_adapt_dt..., callback_dtmax, callback_cfl..., callback_filters, callback_io...)
 
     prob = ODE.ODEProblem(TC.∑tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
 
@@ -213,6 +212,13 @@ function run(sim::Simulation1d; time_run = true)
         progress_message = (dt, u, p, t) -> t,
     )
     alg = ODE.Euler()
+    return (prob, alg, kwargs)
+end
+
+function run(sim::Simulation1d; time_run = true)
+    TC = TurbulenceConvection
+    sim.skip_io || TC.open_files(sim.Stats) # #removeVarsHack
+    (prob, alg, kwargs) = solve_args(sim)
 
     if time_run
         sol = @timev ODE.solve(prob, alg; kwargs...)
@@ -238,7 +244,7 @@ function main1d(namelist; time_run = true)
     _p = namelist["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"]
     namelist["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"] = SVector{length(_p)}(_p)
     sim = Simulation1d(namelist)
-    TurbulenceConvection.initialize(sim, namelist)
+    TurbulenceConvection.initialize(sim)
     if time_run
         return_code = @timev run(sim; time_run)
     else
