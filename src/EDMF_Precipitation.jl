@@ -1,7 +1,9 @@
 """
 Computes the rain and snow advection (down) tendency
 """
-function compute_precipitation_advection_tendencies(edmf, grid, state, gm)
+compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, gm) = nothing
+
+function compute_precipitation_advection_tendencies(::Clima1M, edmf, grid, state, gm)
     FT = eltype(grid)
 
     ρ0_c = center_ref_state(state).ρ0
@@ -36,7 +38,9 @@ end
 Computes the tendencies to θ_liq_ice, q_tot, q_rain and q_snow
 due to rain evaporation, snow deposition and sublimation and snow melt
 """
-function compute_precipitation_sink_tendencies(grid, state, gm, Δt::Real)
+compute_precipitation_sink_tendencies(precip_model, grid, state, gm, Δt) = nothing
+
+function compute_precipitation_sink_tendencies(::Clima1M, grid, state, gm, Δt::Real)
     param_set = parameter_set(gm)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0

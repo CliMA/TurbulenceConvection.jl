@@ -49,7 +49,6 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm)
     kf_surf = kf_surface(grid)
     kc_surf = kc_surface(grid)
     up = edmf.UpdVar
-    en = edmf.EnvVar
     massflux_h = aux_tc_f.massflux_h
     massflux_qt = aux_tc_f.massflux_qt
     aux_tc = center_aux_turbconv(state)
@@ -268,9 +267,9 @@ function ∑tendencies!(tendencies, prog, params, t::Real)
 
     gm = gm
     up = edmf.UpdVar
-    en = edmf.EnvVar
     param_set = parameter_set(gm)
-    en_thermo = edmf.EnvThermo
+    en_thermo = edmf.en_thermo
+    precip_model = edmf.precip_model
 
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
@@ -285,13 +284,11 @@ function ∑tendencies!(tendencies, prog, params, t::Real)
     parent(tends_cent) .= 0
 
     # causes division error in dry bubble first time step
-    compute_precipitation_formation_tendencies(grid, state, up, edmf.Precip, Δt, param_set)
+    compute_precipitation_formation_tendencies(grid, state, up, precip_model, Δt, param_set)
 
-    microphysics(en_thermo, grid, state, en, edmf.Precip, Δt, param_set) # saturation adjustment + rain creation
-    if edmf.Precip.precipitation_model == "clima_1m"
-        compute_precipitation_sink_tendencies(grid, state, gm, Δt)
-        compute_precipitation_advection_tendencies(edmf, grid, state, gm)
-    end
+    microphysics(en_thermo, grid, state, precip_model, Δt, param_set)
+    compute_precipitation_sink_tendencies(precip_model, grid, state, gm, Δt)
+    compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, gm)
 
     # compute tendencies
     compute_gm_tendencies!(edmf, grid, state, case, gm)
@@ -306,7 +303,6 @@ function ∑tendencies!(tendencies, prog, params, t::Real)
 end
 
 function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid, state, up, surface)
-    en = edmf.EnvVar
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -734,7 +730,6 @@ function compute_covariance_entr(
 end
 
 function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol, param_set)
-    en = edmf.EnvVar
     c_d = CPEDMF.c_d(param_set)
     aux_tc = center_aux_turbconv(state)
     ρ0_c = center_ref_state(state).ρ0

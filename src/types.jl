@@ -176,25 +176,10 @@ Base.@kwdef struct MinDisspLen{FT}
     b_exch::FT
 end
 
-Base.@kwdef struct PrecipVariables
-    precipitation_model::String = "default_precipitation_model"
-end
-function PrecipVariables(namelist, grid::Grid)
-
-    precipitation_model = parse_namelist(
-        namelist,
-        "microphysics",
-        "precipitation_model";
-        default = "None",
-        valid_options = ["None", "cutoff", "clima_1m"],
-    )
-
-    if !(precipitation_model in ["None", "cutoff", "clima_1m"])
-        error("precipitation model not recognized")
-    end
-
-    return PrecipVariables(; precipitation_model)
-end
+abstract type AbstractPrecipitationModel end
+struct NoPrecipitation <: AbstractPrecipitationModel end
+struct CutoffPrecipitation <: AbstractPrecipitationModel end
+struct Clima1M <: AbstractPrecipitationModel end
 
 struct UpdraftVariables{A1, N_up}
     updraft_top::A1
@@ -205,39 +190,37 @@ struct UpdraftVariables{A1, N_up}
     end
 end
 
-Base.@kwdef struct GridMeanVariables{PS}
+struct GridMeanVariables{PS}
     param_set::PS
-    EnvThermo_scheme::String
-end
-function GridMeanVariables(namelist, grid::Grid, param_set::PS) where {PS}
-    EnvThermo_scheme = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
-    return GridMeanVariables(; param_set, EnvThermo_scheme)
 end
 
-Base.@kwdef struct EnvironmentVariables
-    EnvThermo_scheme::String = "default_EnvThermo_scheme"
-end
-function EnvironmentVariables(namelist, grid::Grid)
-    # TODO: EnvThermo_scheme is repeated in GridMeanVariables
-    EnvThermo_scheme = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
-    return EnvironmentVariables(; EnvThermo_scheme)
-end
+abstract type AbstractQuadratureType end
+struct LogNormalQuad <: AbstractQuadratureType end
 
-struct EnvironmentThermodynamics{A, W}
-    quadrature_order::Int
-    quadrature_type::String
+abstract type AbstractEnvThermo end
+struct SGSMean <: AbstractEnvThermo end
+struct SGSQuadrature{N, QT, A, W} <: AbstractEnvThermo
+    quadrature_type::QT
     a::A
     w::W
-    function EnvironmentThermodynamics(namelist, grid::Grid)
-        quadrature_order = parse_namelist(namelist, "thermodynamics", "quadrature_order"; default = 3)
-        quadrature_type = parse_namelist(namelist, "thermodynamics", "quadrature_type"; default = "gaussian")
+    function SGSQuadrature(namelist)
+        N = parse_namelist(namelist, "thermodynamics", "quadrature_order"; default = 3)
+        quadrature_name = parse_namelist(namelist, "thermodynamics", "quadrature_type"; default = "gaussian")
+        quadrature_type = if quadrature_name == "log-normal"
+            LogNormalQuad()
+        else
+            error("Invalid thermodynamics quadrature $(quadrature_name)")
+        end
         # TODO: double check this python-> julia translation
-        # a, w = np.polynomial.hermite.hermgauss(quadrature_order)
-        a, w = FastGaussQuadrature.gausshermite(quadrature_order)
-        a, w = SA.SVector{quadrature_order}(a), SA.SVector{quadrature_order}(w)
-        return new{typeof(a), typeof(w)}(quadrature_order, quadrature_type, a, w)
+        # a, w = np.polynomial.hermite.hermgauss(N)
+        a, w = FastGaussQuadrature.gausshermite(N)
+        a, w = SA.SVector{N}(a), SA.SVector{N}(w)
+        QT = typeof(quadrature_type)
+        return new{N, QT, typeof(a), typeof(w)}(quadrature_type, a, w)
     end
 end
+quadrature_order(::SGSQuadrature{N}) where {N} = N
+quad_type(::SGSQuadrature{N}) where {N} = N
 
 # Stochastic entrainment/detrainment closures:
 struct NoneClosureType end
@@ -385,7 +368,7 @@ function CasesBase(case::T; Sur, Fo, Rad, rad_time = stepR, rad = zeros(1, 1), L
     )
 end
 
-mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC, SDES, UPVAR}
+mutable struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
     Ri_bulk_crit::Float64
     zi::Float64
     n_updrafts::Int
@@ -398,10 +381,9 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC, SDES, UPVAR}
     tke_diss_coeff::Float64
     static_stab_coeff::Float64
     minimum_area::Float64
-    Precip::PrecipVariables
+    precip_model::PM
+    en_thermo::ENT
     UpdVar::UPVAR
-    EnvVar::EnvironmentVariables
-    EnvThermo::EnvironmentThermodynamics
     area_surface_bc::A1
     w_surface_bc::A1
     h_surface_bc::A1
@@ -460,15 +442,37 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC, SDES, UPVAR}
         minimum_area = 1e-5
 
         # Create the class for precipitation
-        Precip = PrecipVariables(namelist, grid)
+
+        precip_name = parse_namelist(
+            namelist,
+            "microphysics",
+            "precipitation_model";
+            default = "None",
+            valid_options = ["None", "cutoff", "clima_1m"],
+        )
+
+        precip_model = if precip_name == "None"
+            NoPrecipitation()
+        elseif precip_name == "cutoff"
+            CutoffPrecipitation()
+        elseif precip_name == "clima_1m"
+            Clima1M()
+        else
+            error("Invalid precip_name $(precip_name)")
+        end
 
         # Create the updraft variable class (major diagnostic and prognostic variables)
         UpdVar = UpdraftVariables(n_updrafts, namelist)
 
         # Create the environment variable class (major diagnostic and prognostic variables)
-        EnvVar = EnvironmentVariables(namelist, grid)
+
         # Create the class for environment thermodynamics
-        EnvThermo = EnvironmentThermodynamics(namelist, grid)
+        en_thermo_name = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
+        en_thermo = if en_thermo_name == "mean"
+            SGSMean()
+        elseif en_thermo_name == "quadrature"
+            SGSQuadrature(namelist)
+        end
 
         # Near-surface BC of updraft area fraction
         area_surface_bc = zeros(n_updrafts)
@@ -538,10 +542,12 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC, SDES, UPVAR}
         detr_surface_bc = 0
         dt_max = 0
         A1 = typeof(area_surface_bc)
+        PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
         SDES = typeof(sde_model)
         UPVAR = typeof(UpdVar)
-        return new{n_updrafts, A1, EBGC, EC, SDES, UPVAR}(
+        ENT = typeof(en_thermo)
+        return new{n_updrafts, A1, PM, ENT, EBGC, EC, SDES, UPVAR}(
             Ri_bulk_crit,
             zi,
             n_updrafts,
@@ -554,10 +560,9 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, EBGC, EC, SDES, UPVAR}
             tke_diss_coeff,
             static_stab_coeff,
             minimum_area,
-            Precip,
+            precip_model,
+            en_thermo,
             UpdVar,
-            EnvVar,
-            EnvThermo,
             area_surface_bc,
             w_surface_bc,
             h_surface_bc,
