@@ -1,44 +1,12 @@
-function update_env_precip_tendencies(state, k, qt_tendency, θ_liq_ice_tendency, qr_tendency, qs_tendency)
-
-    aux_en = center_aux_environment(state)
-    tendencies_pr = center_tendencies_precipitation(state)
-
-    aux_en.qt_tendency_precip_formation[k] = qt_tendency * aux_en.area[k]
-    aux_en.θ_liq_ice_tendency_precip_formation[k] = θ_liq_ice_tendency * aux_en.area[k]
-
-    tendencies_pr.q_rai[k] += qr_tendency * aux_en.area[k]
-    tendencies_pr.q_sno[k] += qs_tendency * aux_en.area[k]
-    return
-end
-
-function update_sat_unsat(en_thermo::EnvironmentThermodynamics, state, k, ts)
-    q_liq = TD.liquid_specific_humidity(ts)
-    q_ice = TD.ice_specific_humidity(ts)
-    aux_en = center_aux_environment(state)
-    aux_en_sat = aux_en.sat
-    aux_en_unsat = aux_en.unsat
-    if TD.has_condensate(q_liq + q_ice)
-        aux_en.cloud_fraction[k] = 1.0
-        aux_en_sat.θ_dry[k] = TD.dry_pottemp(ts)
-        aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(ts)
-        aux_en_sat.T[k] = TD.air_temperature(ts)
-        aux_en_sat.q_tot[k] = TD.total_specific_humidity(ts)
-        aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(ts)
-    else
-        aux_en.cloud_fraction[k] = 0.0
-        aux_en_unsat.θ_dry[k] = TD.dry_pottemp(ts)
-        aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(ts)
-        aux_en_unsat.q_tot[k] = TD.total_specific_humidity(ts)
-    end
-    return
-end
-
 function sgs_mean(en_thermo::EnvironmentThermodynamics, grid, state, en, precip, dt, param_set)
 
+    tendencies_pr = center_tendencies_precipitation(state)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
+    aux_en_sat = aux_en.sat
+    aux_en_unsat = aux_en.unsat
 
     @inbounds for k in real_center_indices(grid)
         # condensation
@@ -55,15 +23,29 @@ function sgs_mean(en_thermo::EnvironmentThermodynamics, grid, state, en, precip,
             dt,
             ts,
         )
-        update_sat_unsat(en_thermo, state, k, ts)
-        update_env_precip_tendencies(
-            state,
-            k,
-            mph.qt_tendency,
-            mph.θ_liq_ice_tendency,
-            mph.qr_tendency,
-            mph.qs_tendency,
-        )
+
+        # update_sat_unsat
+        if TD.has_condensate(ts)
+            aux_en.cloud_fraction[k] = 1.0
+            aux_en_sat.θ_dry[k] = TD.dry_pottemp(ts)
+            aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(ts)
+            aux_en_sat.T[k] = TD.air_temperature(ts)
+            aux_en_sat.q_tot[k] = TD.total_specific_humidity(ts)
+            aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(ts)
+        else
+            aux_en.cloud_fraction[k] = 0.0
+            aux_en_unsat.θ_dry[k] = TD.dry_pottemp(ts)
+            aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(ts)
+            aux_en_unsat.q_tot[k] = TD.total_specific_humidity(ts)
+        end
+
+        # update_env_precip_tendencies
+        # TODO: move qt_tendency_precip_formation and θ_liq_ice_tendency_precip_formation
+        # to diagnostics
+        aux_en.qt_tendency_precip_formation[k] = mph.qt_tendency * aux_en.area[k]
+        aux_en.θ_liq_ice_tendency_precip_formation[k] = mph.θ_liq_ice_tendency * aux_en.area[k]
+        tendencies_pr.q_rai[k] += mph.qr_tendency * aux_en.area[k]
+        tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
     end
     return
 end
@@ -77,6 +59,7 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
     prog_pr = center_prog_precipitation(state)
     aux_en_unsat = aux_en.unsat
     aux_en_sat = aux_en.sat
+    tendencies_pr = center_tendencies_precipitation(state)
 
     #TODO - remember you output source terms multipierd by dt (bec. of instanteneous autoconcv)
     #TODO - add tendencies for gm H, QT and QR due to rain
@@ -224,14 +207,19 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
             end
 
             # update environmental variables
-            update_env_precip_tendencies(
-                state,
-                k,
-                outer_src[i_Sqt],
-                outer_src[i_SH],
-                outer_src[i_Sqr],
-                outer_src[i_Sqs],
-            )
+
+            # update_env_precip_tendencies
+            qt_tendency = outer_src[i_Sqt]
+            θ_liq_ice_tendency = outer_src[i_SH]
+            qr_tendency = outer_src[i_Sqr]
+            qs_tendency = outer_src[i_Sqs]
+            # TODO: move qt_tendency_precip_formation and θ_liq_ice_tendency_precip_formation
+            # to diagnostics
+            aux_en.qt_tendency_precip_formation[k] = qt_tendency * aux_en.area[k]
+            aux_en.θ_liq_ice_tendency_precip_formation[k] = θ_liq_ice_tendency * aux_en.area[k]
+
+            tendencies_pr.q_rai[k] += qr_tendency * aux_en.area[k]
+            tendencies_pr.q_sno[k] += qs_tendency * aux_en.area[k]
 
             # update cloudy/dry variables for buoyancy in TKE
             aux_en.cloud_fraction[k] = outer_env[i_cf]
@@ -271,15 +259,29 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
                 dt,
                 ts,
             )
-            update_env_precip_tendencies(
-                state,
-                k,
-                mph.qt_tendency,
-                mph.θ_liq_ice_tendency,
-                mph.qr_tendency,
-                mph.qs_tendency,
-            )
-            update_sat_unsat(en_thermo, state, k, ts)
+
+            # update_env_precip_tendencies
+            # TODO: move qt_tendency_precip_formation and θ_liq_ice_tendency_precip_formation
+            # to diagnostics
+            aux_en.qt_tendency_precip_formation[k] = mph.qt_tendency * aux_en.area[k]
+            aux_en.θ_liq_ice_tendency_precip_formation[k] = mph.θ_liq_ice_tendency * aux_en.area[k]
+            tendencies_pr.q_rai[k] += mph.qr_tendency * aux_en.area[k]
+            tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
+
+            # update_sat_unsat
+            if TD.has_condensate(ts)
+                aux_en.cloud_fraction[k] = 1.0
+                aux_en_sat.θ_dry[k] = TD.dry_pottemp(ts)
+                aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(ts)
+                aux_en_sat.T[k] = TD.air_temperature(ts)
+                aux_en_sat.q_tot[k] = TD.total_specific_humidity(ts)
+                aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(ts)
+            else
+                aux_en.cloud_fraction[k] = 0.0
+                aux_en_unsat.θ_dry[k] = TD.dry_pottemp(ts)
+                aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(ts)
+                aux_en_unsat.q_tot[k] = TD.total_specific_humidity(ts)
+            end
 
             aux_en.Hvar_rain_dt[k] = 0.0
             aux_en.QTvar_rain_dt[k] = 0.0
@@ -290,7 +292,15 @@ function sgs_quadrature(en_thermo::EnvironmentThermodynamics, grid, state, en, p
     return
 end
 
-function microphysics(en_thermo::EnvironmentThermodynamics, grid, state, en, precip, dt, param_set)
+function microphysics(
+    en_thermo::EnvironmentThermodynamics,
+    grid::Grid,
+    state::State,
+    en,
+    precip,
+    dt::Real,
+    param_set::APS,
+)
 
     if en.EnvThermo_scheme == "mean"
         sgs_mean(en_thermo, grid, state, en, precip, dt, param_set)
