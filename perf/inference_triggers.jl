@@ -14,21 +14,29 @@ sim.skip_io || TC.open_files(sim.Stats) # #removeVarsHack
 
 tinf = SnoopCompileCore.@snoopi_deep begin
     sol = ODE.solve(prob, alg; kwargs...)
-    # ds_tc_filename, return_code = main(namelist)
 end
 
 sim.skip_io || TC.close_files(sim.Stats) # #removeVarsHack
 
-import ProfileView
 import SnoopCompile # need SnoopCompile to iterate over InferenceTimingNode's
-import FlameGraphs
-fg = FlameGraphs.flamegraph(tinf)
-ProfileView.view(fg) # looks good, even without initial compiled run
 
-# It would have been nice to auto-generate these flame graphs
-# as a part of CI, but they're really large and slow to load / navigate.
-# ProfileView works much better.
-# import ProfileSVG
-# folder = "perf/flame_output"
-# mkpath(folder)
-# ProfileSVG.save(joinpath(folder, "flame.svg"), fg; maxframes = 40000, maxdepth = 100)
+itrigs = SnoopCompile.inference_triggers(tinf)
+@show length(itrigs)
+mtrigs = SnoopCompile.accumulate_by_source(Method, itrigs)
+pmtrigs = SnoopCompile.parcel(mtrigs)
+# filtered_mods = (
+#     :Base,
+#     :OrdinaryDiffEq,
+#     :Broadcast,
+#     :Printf,
+#     :ProgressMeter,
+#     :TerminalLoggers,
+#     )
+# filter!(x->!any(nameof(x.first) == y for y in filtered_mods), pmtrigs)
+filter!(x -> (x.first == TurbulenceConvection), pmtrigs)
+tc_trigs = first(pmtrigs).second
+@show length(tc_trigs)
+for tc_trig in tc_trigs
+    println("-------------")
+    summary(tc_trig)
+end
