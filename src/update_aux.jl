@@ -121,7 +121,21 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid, state, Case, param_set,
         rho = TD.air_density(ts_en)
         aux_en.buoy[k] = buoyancy_c(param_set, ρ0_c[k], rho)
 
-        update_sat_unsat(en_thermo, state, k, ts_en)
+        # update_sat_unsat
+        if TD.has_condensate(ts_en)
+            aux_en.cloud_fraction[k] = 1.0
+            aux_en_sat.θ_dry[k] = TD.dry_pottemp(ts_en)
+            aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(ts_en)
+            aux_en_sat.T[k] = TD.air_temperature(ts_en)
+            aux_en_sat.q_tot[k] = TD.total_specific_humidity(ts_en)
+            aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(ts_en)
+        else
+            aux_en.cloud_fraction[k] = 0.0
+            aux_en_unsat.θ_dry[k] = TD.dry_pottemp(ts_en)
+            aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(ts_en)
+            aux_en_unsat.q_tot[k] = TD.total_specific_humidity(ts_en)
+        end
+
         aux_en.RH[k] = TD.relative_humidity(ts_en)
 
         @inbounds for i in 1:N_up
