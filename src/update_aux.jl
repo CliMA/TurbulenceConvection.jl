@@ -7,8 +7,6 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid, state, Case, param_set,
     kf_surf = kf_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     up = edmf.UpdVar
-    en = edmf.EnvVar
-    en_thermo = edmf.EnvThermo
     ρ0_f = face_ref_state(state).ρ0
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
@@ -505,7 +503,7 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid, state, Case, param_set,
 
 
     # TODO: use dispatch
-    if edmf.Precip.precipitation_model == "clima_1m"
+    if edmf.precip_model isa Clima1M
         # helper to calculate the rain velocity
         # TODO: assuming gm.W = 0
         # TODO: verify translation

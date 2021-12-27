@@ -4,16 +4,7 @@ initialize_io(self::ForcingBase, Stats) = nothing
 
 initialize_io(self::RadiationBase, Stats::NetCDFIO_Stats) = nothing
 
-function initialize_io(en::EnvironmentVariables, Stats::NetCDFIO_Stats)
-    add_ts(Stats, "env_cloud_base")
-    add_ts(Stats, "env_cloud_top")
-    add_ts(Stats, "env_cloud_cover")
-    add_ts(Stats, "env_lwp")
-    add_ts(Stats, "env_iwp")
-    return
-end
-
-function initialize_io(precip::PrecipVariables, Stats::NetCDFIO_Stats)
+function initialize_io(precip::AbstractPrecipitationModel, Stats::NetCDFIO_Stats)
     add_ts(Stats, "rwp_mean")
     add_ts(Stats, "swp_mean")
     add_ts(Stats, "cutoff_precipitation_rate")
@@ -42,9 +33,13 @@ end
 # Initialize the IO pertaining to this class
 function initialize_io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
 
+    add_ts(Stats, "env_cloud_base")
+    add_ts(Stats, "env_cloud_top")
+    add_ts(Stats, "env_cloud_cover")
+    add_ts(Stats, "env_lwp")
+    add_ts(Stats, "env_iwp")
     initialize_io(edmf.UpdVar, Stats)
-    initialize_io(edmf.EnvVar, Stats)
-    initialize_io(edmf.Precip, Stats)
+    initialize_io(edmf.precip_model, Stats)
 
     add_ts(Stats, "rd")
     return

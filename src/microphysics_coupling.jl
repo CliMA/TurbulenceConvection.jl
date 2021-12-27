@@ -2,7 +2,16 @@
 Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 (autoconversion + accretion)
 """
-function precipitation_formation(param_set::APS, precipitation_model, qr::FT, qs::FT, area, ρ0, dt, ts) where {FT}
+function precipitation_formation(
+    param_set::APS,
+    precip_model::AbstractPrecipitationModel,
+    qr::FT,
+    qs::FT,
+    area,
+    ρ0,
+    dt,
+    ts,
+) where {FT}
 
     # TODO - when using adaptive timestepping we are limiting the source terms
     #        with the previous timestep dt
@@ -20,7 +29,7 @@ function precipitation_formation(param_set::APS, precipitation_model, qr::FT, qs
         L_v0 = CPP.LH_v0(param_set)
         L_s0 = CPP.LH_s0(param_set)
 
-        if precipitation_model == "cutoff"
+        if precip_model isa CutoffPrecipitation
             qsat = TD.q_vap_saturation(ts)
             λ = TD.liquid_fraction(ts)
 
@@ -32,7 +41,7 @@ function precipitation_formation(param_set::APS, precipitation_model, qr::FT, qs
             θ_liq_ice_tendency -= S_qt / Π_m / c_pm * (L_v0 * λ + L_s0 * (1 - λ))
         end
 
-        if precipitation_model == "clima_1m"
+        if precip_model isa Clima1M
             T = TD.air_temperature(ts)
             T_fr = CPP.T_freeze(param_set)
             c_vl = CPP.cv_l(param_set)

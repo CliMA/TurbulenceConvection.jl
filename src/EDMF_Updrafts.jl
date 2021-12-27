@@ -5,7 +5,7 @@ function compute_precipitation_formation_tendencies(
     grid,
     state,
     up::UpdraftVariables,
-    precip::PrecipVariables,
+    precip_model::AbstractPrecipitationModel,
     dt,
     param_set,
 )
@@ -26,7 +26,7 @@ function compute_precipitation_formation_tendencies(
             # autoconversion and accretion
             mph = precipitation_formation(
                 param_set,
-                precip.precipitation_model,
+                precip_model,
                 prog_pr.q_rai[k],
                 prog_pr.q_sno[k],
                 aux_up[i].area[k],

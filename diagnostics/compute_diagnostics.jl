@@ -70,9 +70,7 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, Stats)
     param_set = TC.parameter_set(gm)
     prog_gm = TC.center_prog_grid_mean(state)
     up = edmf.UpdVar
-    en = edmf.EnvVar
-    precip = edmf.Precip
-    en_thermo = edmf.EnvThermo
+    precip_model = edmf.precip_model
     diag_tc = center_diagnostics_turbconv(diagnostics)
     diag_tc_f = face_diagnostics_turbconv(diagnostics)
 
@@ -234,7 +232,7 @@ function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, Stats)
     #TODO - change to rain rate that depends on rain model choice
 
     # TODO: Move TC.rho_cloud_liq to CLIMAParameters
-    if (precip.precipitation_model == "cutoff")
+    if (precip_model isa TC.CutoffPrecipitation)
         f =
             (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ0_c ./
             TC.rho_cloud_liq .* 3.6 .* 1e6

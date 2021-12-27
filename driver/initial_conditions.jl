@@ -29,7 +29,6 @@ end
 function initialize_covariance(edmf::TC.EDMF_PrognosticTKE, grid, state, gm, Case)
 
     kc_surf = TC.kc_surface(grid)
-    en = edmf.EnvVar
     aux_gm = TC.center_aux_grid_mean(state)
     prog_en = TC.center_prog_environment(state)
     aux_en = TC.center_aux_environment(state)
