@@ -159,7 +159,7 @@ steps:
   - label: ":rocket: Allocations analysis"
     key: "cpu_allocations"
     command:
-      - "julia --color=yes --project=test --track-allocation=user perf/allocs.jl"
+      - "julia --color=yes --project=test perf/allocs.jl"
     artifact_paths:
       - "perf/allocations_output/*"
     agents:
@@ -182,6 +182,15 @@ steps:
       - "julia --color=yes --project=test perf/invalidations.jl"
     artifact_paths:
       - "perf/invalidations_output/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":mag: Inference triggers"
+    key: "cpu_inf_trigs"
+    command:
+      - "julia --color=yes --project=test perf/inference_triggers.jl"
     agents:
       config: cpu
       queue: central
