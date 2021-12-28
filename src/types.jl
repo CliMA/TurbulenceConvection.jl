@@ -368,7 +368,7 @@ function CasesBase(case::T; Sur, Fo, Rad, rad_time = stepR, rad = zeros(1, 1), L
     )
 end
 
-mutable struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
+struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
     surface_area::Float64
     max_area::Float64
     aspect_ratio::Float64
@@ -382,7 +382,6 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
     qt_surface_bc::A1
     pressure_plume_spacing::A1
     prandtl_number::Float64
-    dt_max::Float64
     sde_model::SDES
     bg_closure::EBGC
     entr_closure::EC
@@ -509,7 +508,6 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
         end
         EC = typeof(entr_closure)
 
-        dt_max = 0
         A1 = typeof(area_surface_bc)
         PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
@@ -530,7 +528,6 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
             qt_surface_bc,
             pressure_plume_spacing,
             prandtl_number,
-            dt_max,
             sde_model,
             bg_closure,
             entr_closure,
