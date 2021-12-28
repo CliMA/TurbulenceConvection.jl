@@ -50,5 +50,5 @@ function compute_precipitation_formation_tendencies(
             aux_bulk.qt_tendency_precip_formation[k] += aux_up[i].qt_tendency_precip_formation[k]
         end
     end
-    return
+    return nothing
 end

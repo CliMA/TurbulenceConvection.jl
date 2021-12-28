@@ -476,13 +476,13 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, Cas
         @. tke_press += (Ic(w_en) - Ic(w_up)) * Ic(nh_press)
     end
 
-    compute_covariance_entr(edmf, grid, state, Val(:tke), Val(:w))
-    compute_covariance_entr(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice))
-    compute_covariance_entr(edmf, grid, state, Val(:QTvar), Val(:q_tot))
+    compute_covariance_entr(edmf, grid, state, Val(:tke), Val(:w), Val(:w))
+    compute_covariance_entr(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
+    compute_covariance_entr(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
     compute_covariance_entr(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
-    compute_covariance_shear(edmf, grid, state, gm, Val(:tke), Val(:w))
-    compute_covariance_shear(edmf, grid, state, gm, Val(:Hvar), Val(:θ_liq_ice))
-    compute_covariance_shear(edmf, grid, state, gm, Val(:QTvar), Val(:q_tot))
+    compute_covariance_shear(edmf, grid, state, gm, Val(:tke), Val(:w), Val(:w))
+    compute_covariance_shear(edmf, grid, state, gm, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
+    compute_covariance_shear(edmf, grid, state, gm, Val(:QTvar), Val(:q_tot), Val(:q_tot))
     compute_covariance_shear(edmf, grid, state, gm, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
     compute_covariance_dissipation(edmf, grid, state, Val(:tke), param_set)
     compute_covariance_dissipation(edmf, grid, state, Val(:Hvar), param_set)
@@ -527,4 +527,5 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, Cas
         end
     end
 
+    return nothing
 end

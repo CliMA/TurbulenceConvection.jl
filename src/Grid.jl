@@ -20,11 +20,10 @@ Base.:-(zp1::CC.Geometry.ZPoint, zp2::CC.Geometry.ZPoint) = Base.:-(zp1.z, zp2.z
 Base.convert(::Type{Float64}, zp::CC.Geometry.ZPoint) = zp.z
 
 
-struct Grid{FT, CS, FS, SC, SF}
+struct Grid{FT, NZ, CS, FS, SC, SF}
     zmin::FT
     zmax::FT
     Δz::FT
-    nz::Int
     cs::CS
     fs::FS
     zc::SC
@@ -51,15 +50,17 @@ struct Grid{FT, CS, FS, SC, SF}
         FS = typeof(fs)
         SC = typeof(zc)
         SF = typeof(zf)
-        return new{FT, CS, FS, SC, SF}(zmin, zmax, Δz, nz, cs, fs, zc, zf)
+        return new{FT, nz, CS, FS, SC, SF}(zmin, zmax, Δz, cs, fs, zc, zf)
     end
 end
+
+n_cells(::Grid{FT, NZ}) where {FT, NZ} = NZ
 
 # Index of the first interior cell above the surface
 kc_surface(grid::Grid) = Cent(1)
 kf_surface(grid::Grid) = CCO.PlusHalf(1)
-kc_top_of_atmos(grid::Grid) = Cent(grid.nz)
-kf_top_of_atmos(grid::Grid) = CCO.PlusHalf(grid.nz + 1)
+kc_top_of_atmos(grid::Grid) = Cent(n_cells(grid))
+kf_top_of_atmos(grid::Grid) = CCO.PlusHalf(n_cells(grid) + 1)
 
 is_surface_center(grid::Grid, k) = k == kc_surface(grid)
 is_toa_center(grid::Grid, k) = k == kc_top_of_atmos(grid)

@@ -47,7 +47,7 @@ function microphysics(::SGSMean, grid::Grid, state::State, precip_model::Abstrac
         tendencies_pr.q_rai[k] += mph.qr_tendency * aux_en.area[k]
         tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
     end
-    return
+    return nothing
 end
 
 function microphysics(en_thermo::SGSQuadrature, grid, state, precip_model, Δt, param_set)
@@ -291,5 +291,5 @@ function microphysics(en_thermo::SGSQuadrature, grid, state, precip_model, Δt, 
         end
     end
 
-    return
+    return nothing
 end

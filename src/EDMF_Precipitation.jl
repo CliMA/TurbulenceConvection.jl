@@ -31,7 +31,7 @@ function compute_precipitation_advection_tendencies(::Clima1M, edmf, grid, state
 
     @. tendencies_pr.q_rai += aux_tc.qr_tendency_advection
     @. tendencies_pr.q_sno += aux_tc.qs_tendency_advection
-    return
+    return nothing
 end
 
 """
@@ -100,5 +100,5 @@ function compute_precipitation_sink_tendencies(::Clima1M, grid, state, gm, Δt::
                 S_qs_melt * L_f * (1.0 + R_m / c_vm)
             )
     end
-    return
+    return nothing
 end

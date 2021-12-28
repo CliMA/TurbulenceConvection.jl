@@ -927,7 +927,7 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, gm, pa
     end...)
     A = A'
 
-    self.rad = zeros(size(A, 1), grid.nz)
+    self.rad = zeros(size(A, 1), TC.n_cells(grid))
     self.rad .= A # store matrix in self
     ind1 = Int(trunc(10.0 / 600.0)) + 1
     ind2 = Int(ceil(10.0 / 600.0))

@@ -43,5 +43,9 @@ for tc_trig in tc_trigs
 end
 
 @testset "Number of inference triggers" begin
+    # These tests are not strictly needed,
+    # but they will hopefully prevent performance
+    # regressions
     @test length(tc_trigs) ≤ 2
+    @test length(itrigs) ≤ 36
 end
