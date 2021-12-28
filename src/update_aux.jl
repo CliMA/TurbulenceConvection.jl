@@ -232,9 +232,6 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, Cas
     get_GMV_CoVar(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
     get_GMV_CoVar(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
 
-    # TODO - use this inversion in free_convection_windspeed and not compute zi twice
-    edmf.zi = get_inversion(grid, state, param_set, surface.Ri_bulk_crit)
-
     update_surface(Case, grid, state, gm, t, param_set)
     update_forcing(Case, grid, state, gm, t, param_set)
     update_radiation(Case, grid, state, gm, t, param_set)

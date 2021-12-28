@@ -362,8 +362,6 @@ function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state:
 
     if Case.Sur.bflux > 0.0
         a_total = edmf.surface_area
-        edmf.entr_surface_bc = 1 / zLL
-        edmf.detr_surface_bc = 0.0
         a_ = a_total / N_up
         @inbounds for i in 1:N_up
             surface_scalar_coeff =
@@ -374,8 +372,6 @@ function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state:
             edmf.qt_surface_bc[i] = prog_gm.q_tot[kc_surf] + surface_scalar_coeff * sqrt(qt_var)
         end
     else
-        edmf.entr_surface_bc = 0.0
-        edmf.detr_surface_bc = 1 / zLL
         @inbounds for i in 1:N_up
             edmf.area_surface_bc[i] = 0
             edmf.w_surface_bc[i] = 0.0

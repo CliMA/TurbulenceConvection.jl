@@ -369,17 +369,9 @@ function CasesBase(case::T; Sur, Fo, Rad, rad_time = stepR, rad = zeros(1, 1), L
 end
 
 mutable struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
-    Ri_bulk_crit::Float64
-    zi::Float64
-    n_updrafts::Int
-    asp_label::String
-    extrapolate_buoyancy::Bool
     surface_area::Float64
     max_area::Float64
     aspect_ratio::Float64
-    tke_ed_coeff::Float64
-    tke_diss_coeff::Float64
-    static_stab_coeff::Float64
     minimum_area::Float64
     precip_model::PM
     en_thermo::ENT
@@ -390,9 +382,6 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
     qt_surface_bc::A1
     pressure_plume_spacing::A1
     prandtl_number::Float64
-    wstar::Float64
-    entr_surface_bc::Float64
-    detr_surface_bc::Float64
     dt_max::Float64
     sde_model::SDES
     bg_closure::EBGC
@@ -400,8 +389,6 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
     function EDMF_PrognosticTKE(namelist, grid::Grid, param_set::PS) where {PS}
         # get values from namelist
         prandtl_number = namelist["turbulence"]["prandtl_number_0"]
-        Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
-        zi = 0.0
 
         # Set the number of updrafts (1)
         n_updrafts = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_number"; default = 1)
@@ -415,17 +402,6 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
             valid_options = ["normalmode", "normalmode_signdf"],
         )
 
-        asp_label = parse_namelist(
-            namelist,
-            "turbulence",
-            "EDMF_PrognosticTKE",
-            "pressure_closure_asp_label";
-            default = "const",
-        )
-
-        extrapolate_buoyancy =
-            parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "extrapolate_buoyancy"; default = true)
-
         # Get values from namelist
         # set defaults at some point?
         surface_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
@@ -434,10 +410,6 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
         # pressure parameters
         aspect_ratio = namelist["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"]
 
-        # mixing length parameters
-        tke_ed_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
-        tke_diss_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"]
-        static_stab_coeff = namelist["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"]
         # Need to code up as namelist option?
         minimum_area = 1e-5
 
@@ -537,9 +509,6 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
         end
         EC = typeof(entr_closure)
 
-        wstar = 0
-        entr_surface_bc = 0
-        detr_surface_bc = 0
         dt_max = 0
         A1 = typeof(area_surface_bc)
         PM = typeof(precip_model)
@@ -548,17 +517,9 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
         UPVAR = typeof(UpdVar)
         ENT = typeof(en_thermo)
         return new{n_updrafts, A1, PM, ENT, EBGC, EC, SDES, UPVAR}(
-            Ri_bulk_crit,
-            zi,
-            n_updrafts,
-            asp_label,
-            extrapolate_buoyancy,
             surface_area,
             max_area,
             aspect_ratio,
-            tke_ed_coeff,
-            tke_diss_coeff,
-            static_stab_coeff,
             minimum_area,
             precip_model,
             en_thermo,
@@ -569,9 +530,6 @@ mutable struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
             qt_surface_bc,
             pressure_plume_spacing,
             prandtl_number,
-            wstar,
-            entr_surface_bc,
-            detr_surface_bc,
             dt_max,
             sde_model,
             bg_closure,

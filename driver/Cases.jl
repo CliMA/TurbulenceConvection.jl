@@ -1534,7 +1534,6 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, gm, state)
         prog_gm.u[k] = 0.01
     end
 
-    n_updrafts = 1
     # initialize Grid Mean Profiles of thetali and qt
     #! format: off
     z_in = arr_type([
