@@ -52,7 +52,7 @@ end
 
 function adaptive_dt!(integrator)
     UnPack.@unpack edmf, TS, dt_min = integrator.p
-    TS.dt = min(TS.dt_max, max(edmf.dt_max, dt_min))
+    TS.dt = min(TS.dt_max, max(TS.dt_max_edmf, dt_min))
     SciMLBase.set_proposed_dt!(integrator, TS.dt)
     ODE.u_modified!(integrator, false)
 end
@@ -95,7 +95,7 @@ function dt_max!(integrator)
         # Check diffusion CFL (i.e., Fourier number)
         dt_max = min(dt_max, CFL_limit * Δzc[k]^2 / (max(KH[k], KM[k]) + eps(Float32)))
     end
-    edmf.dt_max = dt_max
+    TS.dt_max_edmf = dt_max
 
     ODE.u_modified!(integrator, false)
 end
