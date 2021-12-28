@@ -1,5 +1,12 @@
 
-function update(surf::SurfaceBase{SurfaceFixedFlux}, grid, state, gm::GridMeanVariables, param_set)
+function update(
+    surf::SurfaceBase{SurfaceFixedFlux},
+    surf_params,
+    grid::Grid,
+    state::State,
+    gm::GridMeanVariables,
+    param_set::APS,
+)
     FT = eltype(grid)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -62,7 +69,14 @@ function update(surf::SurfaceBase{SurfaceFixedFlux}, grid, state, gm::GridMeanVa
     return
 end
 
-function update(surf::SurfaceBase{SurfaceFixedCoeffs}, grid, state, gm::GridMeanVariables, param_set)
+function update(
+    surf::SurfaceBase{SurfaceFixedCoeffs},
+    surf_params,
+    grid::Grid,
+    state::State,
+    gm::GridMeanVariables,
+    param_set::APS,
+)
     FT = eltype(grid)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -108,7 +122,14 @@ function update(surf::SurfaceBase{SurfaceFixedCoeffs}, grid, state, gm::GridMean
     return
 end
 
-function update(surf::SurfaceBase{SurfaceMoninObukhov}, grid, state, gm::GridMeanVariables, param_set)
+function update(
+    surf::SurfaceBase{SurfaceMoninObukhov},
+    surf_params,
+    grid::Grid,
+    state::State,
+    gm::GridMeanVariables,
+    param_set::APS,
+)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     FT = eltype(grid)
@@ -148,7 +169,14 @@ function update(surf::SurfaceBase{SurfaceMoninObukhov}, grid, state, gm::GridMea
     return
 end
 
-function update(surf::SurfaceBase{SurfaceMoninObukhovDry}, grid, state, gm::GridMeanVariables, param_set)
+function update(
+    surf::SurfaceBase{SurfaceMoninObukhovDry},
+    surf_params,
+    grid::Grid,
+    state::State,
+    gm::GridMeanVariables,
+    param_set::APS,
+)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     FT = eltype(grid)
@@ -187,7 +215,14 @@ function update(surf::SurfaceBase{SurfaceMoninObukhovDry}, grid, state, gm::Grid
     return
 end
 
-function update(surf::SurfaceBase{SurfaceSullivanPatton}, grid, state, gm::GridMeanVariables, param_set)
+function update(
+    surf::SurfaceBase{SurfaceSullivanPatton},
+    surf_params,
+    grid::Grid,
+    state::State,
+    gm::GridMeanVariables,
+    param_set::APS,
+)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     FT = eltype(grid)

@@ -58,18 +58,16 @@ function Simulation1d(namelist)
 
     grid = TC.Grid(FT(namelist["grid"]["dz"]), namelist["grid"]["nz"])
     Stats = skip_io ? nothing : TC.NetCDFIO_Stats(namelist, grid)
-    case = Cases.get_case(namelist)
-    ref_params = Cases.reference_params(case, grid, param_set, namelist)
+    case_type = Cases.get_case(namelist)
+    ref_params = Cases.reference_params(case_type, grid, param_set, namelist)
 
     gm = TC.GridMeanVariables(param_set)
-    surf = TC.SurfaceBase(Cases.get_surface_type(case); namelist, ref_params)
-    Fo = TC.ForcingBase(case, param_set; Cases.forcing_kwargs(case, namelist)...)
-    Rad = TC.RadiationBase(case)
-
-    case = Cases.CasesBase(case, namelist, grid, param_set, surf, Fo, Rad)
-    edmf = TC.EDMF_PrognosticTKE(namelist, grid, param_set)
+    surf = TC.SurfaceBase(Cases.get_surface_type(case_type); namelist, ref_params)
+    Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
+    Rad = TC.RadiationBase(case_type)
     TS = TC.TimeStepping(namelist)
 
+    edmf = TC.EDMF_PrognosticTKE(namelist, grid, param_set)
     N_up = TC.n_updrafts(edmf)
 
     cspace = TC.center_space(grid)
@@ -88,8 +86,12 @@ function Simulation1d(namelist)
 
     # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
     state = TC.State(prog, aux, nothing)
-
     TC.compute_ref_state!(state, grid, param_set; ref_params...)
+
+    Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
+    spk = Cases.surface_param_kwargs(case_type, namelist)
+    surf_params = Cases.surface_params(case_type, grid, state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
+    case = Cases.CasesBase(case_type, namelist; surf, surf_params, Fo, Rad, spk...)
 
     io_nt = (;
         ref_state = TC.io_dictionary_ref_state(),
