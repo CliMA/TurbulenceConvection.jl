@@ -153,7 +153,6 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit" # "moisture_deficit" or "NN"
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["extrapolate_buoyancy"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_local_micro"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["constant_area"] = false
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["calculate_tke"] = true
@@ -162,7 +161,6 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"] = "normalmode"
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"] = "normalmode"
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_asp_label"] = "const"
 
     namelist_defaults["output"] = Dict()
     namelist_defaults["output"]["output_root"] = "./"
