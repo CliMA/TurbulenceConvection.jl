@@ -1,6 +1,7 @@
 if !("." in LOAD_PATH) # for easier local testing
     push!(LOAD_PATH, ".")
 end
+using Test
 import SnoopCompileCore
 import TurbulenceConvection
 tc_dir_glob = dirname(dirname(pathof(TurbulenceConvection)))
@@ -39,4 +40,8 @@ tc_trigs = first(pmtrigs).second
 for tc_trig in tc_trigs
     println("-------------")
     summary(tc_trig)
+end
+
+@testset "Number of inference triggers" begin
+    @test length(tc_trigs) ≤ 2
 end
