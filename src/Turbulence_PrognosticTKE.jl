@@ -27,7 +27,15 @@ function compute_les_Γᵣ(z::ClimaCore.Geometry.ZPoint, τᵣ::Real = 24.0 * 36
     end
 end
 
-function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, Case, gm)
+function compute_gm_tendencies!(
+    edmf::EDMF_PrognosticTKE,
+    grid::Grid,
+    state::State,
+    surf,
+    radiation,
+    force,
+    gm::GridMeanVariables,
+)
     N_up = n_updrafts(edmf)
     tendencies_gm = center_tendencies_grid_mean(state)
     kc_toa = kc_top_of_atmos(grid)
@@ -68,23 +76,23 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid::Grid, state::Sta
         ts = thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         Π = TD.exner(ts)
 
-        if Case.Fo.apply_coriolis
-            tendencies_gm.u[k] -= Case.Fo.coriolis_param * (aux_gm.vg[k] - prog_gm.v[k])
-            tendencies_gm.v[k] += Case.Fo.coriolis_param * (aux_gm.ug[k] - prog_gm.u[k])
+        if force.apply_coriolis
+            tendencies_gm.u[k] -= force.coriolis_param * (aux_gm.vg[k] - prog_gm.v[k])
+            tendencies_gm.v[k] += force.coriolis_param * (aux_gm.ug[k] - prog_gm.u[k])
         end
-        if rad_type(Case.Rad) <: Union{RadiationDYCOMS_RF01, RadiationLES}
+        if rad_type(radiation) <: Union{RadiationDYCOMS_RF01, RadiationLES}
             tendencies_gm.θ_liq_ice[k] += aux_gm.dTdt_rad[k] / Π
         end
 
-        if force_type(Case.Fo) <: ForcingDYCOMS_RF01
+        if force_type(force) <: ForcingDYCOMS_RF01
             tendencies_gm.q_tot[k] += aux_gm.dqtdt[k]
             # Apply large-scale subsidence tendencies
             tendencies_gm.θ_liq_ice[k] -= ∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
             tendencies_gm.q_tot[k] -= ∇q_tot_gm[k] * aux_gm.subsidence[k]
         end
 
-        if force_type(Case.Fo) <: ForcingStandard
-            if Case.Fo.apply_subsidence
+        if force_type(force) <: ForcingStandard
+            if force.apply_subsidence
                 tendencies_gm.θ_liq_ice[k] -= ∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
                 tendencies_gm.q_tot[k] -= ∇q_tot_gm[k] * aux_gm.subsidence[k]
             end
@@ -92,12 +100,12 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid::Grid, state::Sta
             tendencies_gm.q_tot[k] += aux_gm.dqtdt[k]
         end
 
-        if force_type(Case.Fo) <: ForcingLES
+        if force_type(force) <: ForcingLES
             H_horz_adv = aux_gm.dTdt_hadv[k] / Π
             H_fluc = aux_gm.dTdt_fluc[k] / Π
 
-            gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm.u[k]) / Case.Fo.nudge_tau
-            gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm.v[k]) / Case.Fo.nudge_tau
+            gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm.u[k]) / force.nudge_tau
+            gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm.v[k]) / force.nudge_tau
 
             Γᵣ = compute_les_Γᵣ(grid.zc[k])
             if Γᵣ != 0
@@ -109,7 +117,7 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid::Grid, state::Sta
                 gm_q_tot_nudge_k = 0.0
             end
 
-            if Case.Fo.apply_subsidence
+            if force.apply_subsidence
                 # Apply large-scale subsidence tendencies
                 gm_H_subsidence_k = -∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
                 gm_QT_subsidence_k = -∇q_tot_gm[k] * aux_gm.subsidence[k]
@@ -177,11 +185,10 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid::Grid, state::Sta
     @. tendencies_gm.q_tot += -∇c(wvec(massflux_qt)) * α0_c
 
     a_en = aux_en.area
-
-    aeKHq_tot_bc = Case.Sur.rho_qtflux / a_en[kc_surf]
-    aeKHθ_liq_ice_bc = Case.Sur.rho_hflux / a_en[kc_surf]
-    aeKMu_bc = Case.Sur.rho_uflux / a_en[kc_surf]
-    aeKMv_bc = Case.Sur.rho_vflux / a_en[kc_surf]
+    aeKHq_tot_bc = surf.rho_qtflux / a_en[kc_surf]
+    aeKHθ_liq_ice_bc = surf.rho_hflux / a_en[kc_surf]
+    aeKMu_bc = surf.rho_uflux / a_en[kc_surf]
+    aeKMv_bc = surf.rho_vflux / a_en[kc_surf]
 
     tbc = (; top = CCO.SetValue(wvec(FT(0))))
     ∇aeKH_q_tot = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKHq_tot_bc)), tbc...)
@@ -202,7 +209,7 @@ function compute_diffusive_fluxes(
     grid::Grid,
     state::State,
     gm::GridMeanVariables,
-    Case::CasesBase,
+    surf,
     param_set::APS,
 )
     FT = eltype(grid)
@@ -224,10 +231,10 @@ function compute_diffusive_fluxes(
     @. aux_tc_f.ρ_ae_KH = IfKH(aeKH) * ρ0_f
     @. aux_tc_f.ρ_ae_KM = IfKM(aeKM) * ρ0_f
 
-    aeKHq_tot_bc = -Case.Sur.rho_qtflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
-    aeKHθ_liq_ice_bc = -Case.Sur.rho_hflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
-    aeKMu_bc = -Case.Sur.rho_uflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
-    aeKMv_bc = -Case.Sur.rho_vflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
+    aeKHq_tot_bc = -surf.rho_qtflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    aeKHθ_liq_ice_bc = -surf.rho_hflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    aeKMu_bc = -surf.rho_uflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
+    aeKMv_bc = -surf.rho_vflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
 
     ∇q_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_tot_bc), top = CCO.SetDivergence(FT(0)))
     ∇θ_liq_ice_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHθ_liq_ice_bc), top = CCO.SetDivergence(FT(0)))
@@ -243,9 +250,9 @@ function compute_diffusive_fluxes(
     return nothing
 end
 
-function affect_filter!(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, gm, Case, t::Real)
+function affect_filter!(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, gm, surf, casename, t::Real)
     # TODO: figure out why this filter kills the DryBubble results if called at t = 0.
-    if Case.casename == "DryBubble" && !(t > 0)
+    if casename == "DryBubble" && !(t > 0)
         return nothing
     end
     prog_en = center_prog_environment(state)
@@ -253,7 +260,7 @@ function affect_filter!(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, gm, 
     ###
     ### Filters
     ###
-    set_edmf_surface_bc(edmf, grid, state, up, Case.Sur)
+    set_edmf_surface_bc(edmf, grid, state, up, surf)
     filter_updraft_vars(edmf, grid, state, gm)
 
     @inbounds for k in real_center_indices(grid)
@@ -270,22 +277,25 @@ end
 function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
     UnPack.@unpack edmf, grid, gm, case, aux, TS = params
 
-    Δt = TS.dt
     state = State(prog, aux, tendencies)
 
-    affect_filter!(edmf, grid, state, gm, case, t)
-
+    Δt = TS.dt
+    surf = case.surf
+    force = case.Fo
+    radiation = case.Rad
     gm = gm
     up = edmf.UpdVar
     param_set = parameter_set(gm)
     en_thermo = edmf.en_thermo
     precip_model = edmf.precip_model
 
+    affect_filter!(edmf, grid, state, gm, surf, case.casename, t)
+
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
 
-    compute_updraft_surface_bc(edmf, grid, state, case)
+    compute_updraft_surface_bc(edmf, grid, state, surf)
     update_aux!(edmf, gm, grid, state, case, param_set, t, Δt)
 
     tends_face = tendencies.face
@@ -301,7 +311,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, gm)
 
     # compute tendencies
-    compute_gm_tendencies!(edmf, grid, state, case, gm)
+    compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, gm)
     compute_updraft_tendencies(edmf, grid, state, gm)
 
     compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
@@ -348,19 +358,18 @@ function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State,
 end
 
 
-function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, Case::CasesBase)
+function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, surf)
     kc_surf = kc_surface(grid)
-
     N_up = n_updrafts(edmf)
     zLL = grid.zc[kc_surf]
-    ustar = Case.Sur.ustar
-    oblength = Case.Sur.obukhov_length
+    ustar = surf.ustar
+    oblength = surf.obukhov_length
     α0LL = center_ref_state(state).α0[kc_surf]
     prog_gm = center_prog_grid_mean(state)
-    qt_var = get_surface_variance(Case.Sur.rho_qtflux * α0LL, Case.Sur.rho_qtflux * α0LL, ustar, zLL, oblength)
-    h_var = get_surface_variance(Case.Sur.rho_hflux * α0LL, Case.Sur.rho_hflux * α0LL, ustar, zLL, oblength)
+    qt_var = get_surface_variance(surf.rho_qtflux * α0LL, surf.rho_qtflux * α0LL, ustar, zLL, oblength)
+    h_var = get_surface_variance(surf.rho_hflux * α0LL, surf.rho_hflux * α0LL, ustar, zLL, oblength)
 
-    if Case.Sur.bflux > 0.0
+    if surf.bflux > 0.0
         a_total = edmf.surface_area
         a_ = a_total / N_up
         @inbounds for i in 1:N_up

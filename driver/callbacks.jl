@@ -20,7 +20,7 @@ function affect_io!(integrator)
 
     param_set = TC.parameter_set(gm)
     # TODO: is this the best location to call diagnostics?
-    compute_diagnostics!(edmf, gm, grid, state, diagnostics, case, Stats)
+    compute_diagnostics!(edmf, gm, grid, state, diagnostics, Stats)
 
     # TODO: remove `vars` hack that avoids
     # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
@@ -41,7 +41,7 @@ function affect_filter!(integrator)
     UnPack.@unpack edmf, grid, gm, aux, case = integrator.p
     t = integrator.t
     state = TC.State(integrator.u, aux, integrator.du)
-    TC.affect_filter!(edmf, grid, state, gm, case, t)
+    TC.affect_filter!(edmf, grid, state, gm, case.surf, case.casename, t)
 
     # We're lying to OrdinaryDiffEq.jl, in order to avoid
     # paying for an additional `∑tendencies!` call, which is required

@@ -21,14 +21,20 @@ const TD = Thermodynamics
 import ..TurbulenceConvection
 const TC = TurbulenceConvection
 
+import ..TurbulenceConvection: update_surface
+import ..TurbulenceConvection: update_forcing
+import ..TurbulenceConvection: update_radiation
+import ..TurbulenceConvection: io
+import ..TurbulenceConvection: initialize_io
+import ..TurbulenceConvection: ForcingBase
+import ..TurbulenceConvection: RadiationBase
+
 using ..TurbulenceConvection: CasesBase
 using ..TurbulenceConvection: pyinterp
 using ..TurbulenceConvection: add_ts
 using ..TurbulenceConvection: update
 using ..TurbulenceConvection: write_ts
 using ..TurbulenceConvection: initialize
-using ..TurbulenceConvection: initialize_io
-using ..TurbulenceConvection: io
 using ..TurbulenceConvection: Grid
 using ..TurbulenceConvection: NetCDFIO_Stats
 using ..TurbulenceConvection: GridMeanVariables
@@ -131,11 +137,11 @@ get_radiation_type(::AbstractCaseType) = TC.RadiationNone # default
 get_radiation_type(::DYCOMS_RF01) = TC.RadiationDYCOMS_RF01
 get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
 
-TC.RadiationBase(case::AbstractCaseType) = TC.RadiationBase{Cases.get_radiation_type(case)}()
+RadiationBase(case::AbstractCaseType) = RadiationBase{Cases.get_radiation_type(case)}()
 
 forcing_kwargs(::AbstractCaseType, namelist) = ()
 
-TC.ForcingBase(case::AbstractCaseType, param_set::APS; kwargs...) = TC.ForcingBase(get_forcing_type(case); kwargs...)
+ForcingBase(case::AbstractCaseType, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 #####
 ##### Default CasesBase behavior:
@@ -143,23 +149,23 @@ TC.ForcingBase(case::AbstractCaseType, param_set::APS; kwargs...) = TC.ForcingBa
 
 initialize_radiation(self::CasesBase, grid, state, gm, param_set) = nothing
 
-function TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
+function initialize_io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
     add_ts(Stats, "Tsurface")
     add_ts(Stats, "shf")
     add_ts(Stats, "lhf")
     add_ts(Stats, "ustar")
 end
-function TC.io(self::CasesBase, grid, state, Stats::NetCDFIO_Stats, ::BaseCase)
-    write_ts(Stats, "Tsurface", self.Sur.Tsurface)
-    write_ts(Stats, "shf", self.Sur.shf)
-    write_ts(Stats, "lhf", self.Sur.lhf)
-    write_ts(Stats, "ustar", self.Sur.ustar)
+function io(self::CasesBase, grid, state, Stats::NetCDFIO_Stats, ::BaseCase)
+    write_ts(Stats, "Tsurface", self.surf.Tsurface)
+    write_ts(Stats, "shf", self.surf.shf)
+    write_ts(Stats, "lhf", self.surf.lhf)
+    write_ts(Stats, "ustar", self.surf.ustar)
 end
-TC.initialize_io(self::CasesBase, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
-TC.io(self::CasesBase, grid, state, Stats::NetCDFIO_Stats) = io(self, grid, state, Stats, BaseCase())
-TC.update_surface(self::CasesBase, grid, state, gm, t::Real, param_set) = update(self.Sur, grid, state, gm, param_set)
-TC.update_forcing(self::CasesBase, grid, state, gm, t::Real, param_set) = nothing
-TC.update_radiation(self::CasesBase, grid, state, gm, t::Real, param_set) = update(self.Rad, grid, state, gm, param_set)
+initialize_io(self::CasesBase, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
+io(self::CasesBase, grid, state, Stats::NetCDFIO_Stats) = io(self, grid, state, Stats, BaseCase())
+update_surface(self::CasesBase, grid, state, gm, t::Real, param_set) = update(self.surf, grid, state, gm, param_set)
+update_forcing(self::CasesBase, grid, state, gm, t::Real, param_set) = nothing
+update_radiation(self::CasesBase, grid, state, gm, t::Real, param_set) = update(self.Rad, grid, state, gm, param_set)
 
 initialize_forcing(self::CasesBase, grid::Grid, state, gm, param_set) = initialize(self.Fo, grid, state)
 
@@ -167,13 +173,13 @@ initialize_forcing(self::CasesBase, grid::Grid, state, gm, param_set) = initiali
 ##### Soares
 #####
 
-function CasesBase(case::Soares, namelist, grid::Grid, param_set, Sur, Fo, Rad)
+function CasesBase(case::Soares, namelist, grid::Grid, param_set, surf, Fo, Rad)
     inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, surf, Fo, Rad)
 end
 
-TC.ForcingBase(case::Soares, param_set::APS; kwargs...) =
-    TC.ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
+ForcingBase(case::Soares, param_set::APS; kwargs...) =
+    ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
 function reference_params(::Soares, grid::Grid, param_set::APS, namelist)
     Pg = 1000.0 * 100.0
@@ -214,21 +220,21 @@ function initialize_surface(self::CasesBase{Soares}, grid::Grid, state, param_se
     kf_surf = TC.kf_surface(grid)
     p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
-    self.Sur.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
-    self.Sur.Tsurface = 300.0
-    self.Sur.qsurface = 5.0e-3
+    self.surf.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
+    self.surf.Tsurface = 300.0
+    self.surf.qsurface = 5.0e-3
     θ_flux = 6.0e-2
     qt_flux = 2.5e-5
-    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.surf.Tsurface, self.surf.qsurface)
     theta_surface = TD.liquid_ice_pottemp(ts)
-    self.Sur.lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(ts)
-    self.Sur.shf = θ_flux * TD.cp_m(ts) * ρ0_f_surf
-    self.Sur.ustar_fixed = false
-    self.Sur.ustar = 0.28 # just to initilize grid mean covariances
-    self.Sur.bflux =
+    self.surf.lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(ts)
+    self.surf.shf = θ_flux * TD.cp_m(ts) * ρ0_f_surf
+    self.surf.ustar_fixed = false
+    self.surf.ustar = 0.28 # just to initilize grid mean covariances
+    self.surf.bflux =
         g * (
-            (θ_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.Sur.qsurface * θ_flux)) /
-            (theta_surface * (1 + (molmass_ratio - 1) * self.Sur.qsurface))
+            (θ_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.surf.qsurface * θ_flux)) /
+            (theta_surface * (1 + (molmass_ratio - 1) * self.surf.qsurface))
         )
 end
 
@@ -236,13 +242,13 @@ end
 ##### Nieuwstadt
 #####
 
-function CasesBase(case::Nieuwstadt, namelist, grid::Grid, param_set, Sur, Fo, Rad)
+function CasesBase(case::Nieuwstadt, namelist, grid::Grid, param_set, surf, Fo, Rad)
     inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, surf, Fo, Rad)
 end
 
-TC.ForcingBase(case::Nieuwstadt, param_set::APS; kwargs...) =
-    TC.ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
+ForcingBase(case::Nieuwstadt, param_set::APS; kwargs...) =
+    ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
 function reference_params(::Nieuwstadt, grid::Grid, param_set::APS, namelist)
     Pg = 1000.0 * 100.0
@@ -276,21 +282,21 @@ function initialize_surface(self::CasesBase{Nieuwstadt}, grid::Grid, state, para
     ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
     g = CPP.grav(param_set)
     molmass_ratio = CPP.molmass_ratio(param_set)
-    self.Sur.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
-    self.Sur.Tsurface = 300.0
-    self.Sur.qsurface = 0.0
+    self.surf.zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
+    self.surf.Tsurface = 300.0
+    self.surf.qsurface = 0.0
     θ_flux = 6.0e-2
     qt_flux = 0.0
-    self.Sur.lhf = 0.0 # It would be 0.0 if we follow Nieuwstadt.
-    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
+    self.surf.lhf = 0.0 # It would be 0.0 if we follow Nieuwstadt.
+    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.surf.Tsurface, self.surf.qsurface)
     theta_surface = TD.liquid_ice_pottemp(ts)
-    self.Sur.shf = θ_flux * TD.cp_m(ts) * ρ0_f_surf
-    self.Sur.ustar_fixed = false
-    self.Sur.ustar = 0.28 # just to initilize grid mean covariances
-    self.Sur.bflux =
+    self.surf.shf = θ_flux * TD.cp_m(ts) * ρ0_f_surf
+    self.surf.ustar_fixed = false
+    self.surf.ustar = 0.28 # just to initilize grid mean covariances
+    self.surf.bflux =
         g * (
-            (θ_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.Sur.qsurface * θ_flux)) /
-            (theta_surface * (1 + (molmass_ratio - 1) * self.Sur.qsurface))
+            (θ_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.surf.qsurface * θ_flux)) /
+            (theta_surface * (1 + (molmass_ratio - 1) * self.surf.qsurface))
         )
 
     return
@@ -300,13 +306,13 @@ end
 ##### Bomex
 #####
 
-function CasesBase(case::Bomex, namelist, grid::Grid, param_set, Sur, Fo, Rad)
+function CasesBase(case::Bomex, namelist, grid::Grid, param_set, surf, Fo, Rad)
     inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, surf, Fo, Rad)
 end
 
-TC.ForcingBase(case::Bomex, param_set::APS; kwargs...) =
-    TC.ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
+ForcingBase(case::Bomex, param_set::APS; kwargs...) =
+    ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
 
 function reference_params(::Bomex, grid::Grid, param_set::APS, namelist)
     Pg = 1.015e5 #Pressure at ground
@@ -365,17 +371,17 @@ function initialize_surface(self::CasesBase{Bomex}, grid::Grid, state, param_set
     kf_surf = TC.kf_surface(grid)
     p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
-    self.Sur.zrough = 1.0e-4
-    self.Sur.qsurface = 22.45e-3 # kg/kg
+    self.surf.zrough = 1.0e-4
+    self.surf.qsurface = 22.45e-3 # kg/kg
     theta_surface = 299.1
     theta_flux = 8.0e-3
     qt_flux = 5.2e-5
-    ts = TC.thermo_state_pθq(param_set, p0_f_surf, theta_surface, self.Sur.qsurface)
-    self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(ts)
-    self.Sur.shf = theta_flux * TD.cp_m(ts) * ρ0_f_surf
-    self.Sur.ustar_fixed = true
-    self.Sur.ustar = 0.28 # m/s
+    ts = TC.thermo_state_pθq(param_set, p0_f_surf, theta_surface, self.surf.qsurface)
+    self.surf.Tsurface = TD.air_temperature(ts)
+    self.surf.lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(ts)
+    self.surf.shf = theta_flux * TD.cp_m(ts) * ρ0_f_surf
+    self.surf.ustar_fixed = true
+    self.surf.ustar = 0.28 # m/s
 end
 
 function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, gm, param_set)
@@ -424,12 +430,12 @@ end
 ##### life_cycle_Tan2018
 #####
 
-function CasesBase(case::life_cycle_Tan2018, namelist, grid::Grid, param_set, Sur, Fo, Rad)
+function CasesBase(case::life_cycle_Tan2018, namelist, grid::Grid, param_set, surf, Fo, Rad)
     inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, surf, Fo, Rad)
 end
-TC.ForcingBase(case::life_cycle_Tan2018, param_set::APS; kwargs...) =
-    TC.ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
+ForcingBase(case::life_cycle_Tan2018, param_set::APS; kwargs...) =
+    ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
 
 function reference_params(::life_cycle_Tan2018, grid::Grid, param_set::APS, namelist)
     Pg = 1.015e5  #Pressure at ground
@@ -497,20 +503,20 @@ function initialize_surface(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
     kf_surf = TC.kf_surface(grid)
     p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
-    self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
-    self.Sur.qsurface = 22.45e-3 # kg/kg
+    self.surf.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
+    self.surf.qsurface = 22.45e-3 # kg/kg
     theta_surface = 299.1
     theta_flux = 8.0e-3
     qt_flux = 5.2e-5
-    ts = TC.thermo_state_pθq(param_set, p0_f_surf, theta_surface, self.Sur.qsurface)
-    self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(ts)
-    self.Sur.shf = theta_flux * TD.cp_m(ts) * ρ0_f_surf
-    self.lhf0 = self.Sur.lhf
-    self.shf0 = self.Sur.shf
-    self.Sur.ustar_fixed = true
-    self.Sur.ustar = 0.28 # m/s
-    self.Sur.bflux = life_cycle_buoyancy_flux(param_set)
+    ts = TC.thermo_state_pθq(param_set, p0_f_surf, theta_surface, self.surf.qsurface)
+    self.surf.Tsurface = TD.air_temperature(ts)
+    self.surf.lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(ts)
+    self.surf.shf = theta_flux * TD.cp_m(ts) * ρ0_f_surf
+    self.lhf0 = self.surf.lhf
+    self.shf0 = self.surf.shf
+    self.surf.ustar_fixed = true
+    self.surf.ustar = 0.28 # m/s
+    self.surf.bflux = life_cycle_buoyancy_flux(param_set)
 end
 function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, state, gm, param_set)
     initialize(self.Fo, grid, state)
@@ -551,28 +557,28 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
     return nothing
 end
 
-function TC.update_surface(self::CasesBase{life_cycle_Tan2018}, grid, state, gm, t::Real, param_set)
+function update_surface(self::CasesBase{life_cycle_Tan2018}, grid, state, gm, t::Real, param_set)
     weight = 1.0
     weight_factor = 0.01 + 0.99 * (cos(2.0 * π * t / 3600.0) + 1.0) / 2.0
     weight = weight * weight_factor
-    self.Sur.lhf = self.lhf0 * weight
-    self.Sur.shf = self.shf0 * weight
-    self.Sur.bflux = life_cycle_buoyancy_flux(param_set, weight)
-    update(self.Sur, grid, state, gm, param_set)
+    self.surf.lhf = self.lhf0 * weight
+    self.surf.shf = self.shf0 * weight
+    self.surf.bflux = life_cycle_buoyancy_flux(param_set, weight)
+    update(self.surf, grid, state, gm, param_set)
 end
 
 #####
 ##### Rico
 #####
 
-function CasesBase(case::Rico, namelist, grid::Grid, param_set, Sur, Fo, Rad)
+function CasesBase(case::Rico, namelist, grid::Grid, param_set, surf, Fo, Rad)
     inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, surf, Fo, Rad)
 end
-function TC.ForcingBase(case::Rico, param_set::APS; kwargs...)
+function ForcingBase(case::Rico, param_set::APS; kwargs...)
     latitude = 18.0
     Omega = CPP.Omega(param_set)
-    return TC.ForcingBase(
+    return ForcingBase(
         get_forcing_type(case);
         apply_coriolis = true,
         apply_subsidence = true,
@@ -633,22 +639,22 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, gm, state)
 end
 
 function initialize_surface(self::CasesBase{Rico}, grid::Grid, state, param_set)
-    self.Sur.zrough = 0.00015
-    self.Sur.cm = 0.001229
-    self.Sur.ch = 0.001094
-    self.Sur.cq = 0.001133
+    self.surf.zrough = 0.00015
+    self.surf.cm = 0.001229
+    self.surf.ch = 0.001094
+    self.surf.cq = 0.001133
     # Adjust for non-IC grid spacing
-    grid_adjust = (log(20.0 / self.Sur.zrough) / log(TC.zc_surface(grid) / self.Sur.zrough))^2
-    self.Sur.cm = self.Sur.cm * grid_adjust
-    self.Sur.ch = self.Sur.ch * grid_adjust
-    self.Sur.cq = self.Sur.cq * grid_adjust
-    self.Sur.Tsurface = 299.8
+    grid_adjust = (log(20.0 / self.surf.zrough) / log(TC.zc_surface(grid) / self.surf.zrough))^2
+    self.surf.cm = self.surf.cm * grid_adjust
+    self.surf.ch = self.surf.ch * grid_adjust
+    self.surf.cq = self.surf.cq * grid_adjust
+    self.surf.Tsurface = 299.8
 
     # For Rico we provide values of transfer coefficients
     kf_surf = TC.kf_surface(grid)
     p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
-    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
-    self.Sur.qsurface = TD.q_vap_saturation(ts)
+    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.surf.Tsurface, self.surf.qsurface)
+    self.surf.qsurface = TD.q_vap_saturation(ts)
 end
 
 function initialize_forcing(self::CasesBase{Rico}, grid::Grid, state, gm, param_set)
@@ -687,12 +693,12 @@ end
 ##### TRMM_LBA
 #####
 
-function CasesBase(case::TRMM_LBA, namelist, grid::Grid, param_set, Sur, Fo, Rad)
+function CasesBase(case::TRMM_LBA, namelist, grid::Grid, param_set, surf, Fo, Rad)
     inversion_option = "thetal_maxgrad"
-    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, surf, Fo, Rad)
 end
-TC.ForcingBase(case::TRMM_LBA, param_set::APS; kwargs...) =
-    TC.ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
+ForcingBase(case::TRMM_LBA, param_set::APS; kwargs...) =
+    ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
 function reference_params(::TRMM_LBA, grid::Grid, param_set::APS, namelist)
     molmass_ratio = CPP.molmass_ratio(param_set)
@@ -785,18 +791,18 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, gm, state)
 end
 
 function initialize_surface(self::CasesBase{TRMM_LBA}, grid::Grid, state, param_set)
-    #self.Sur.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
+    #self.surf.zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     kf_surf = TC.kf_surface(grid)
     p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
-    self.Sur.qsurface = 22.45e-3 # kg/kg
+    self.surf.qsurface = 22.45e-3 # kg/kg
     theta_surface = (273.15 + 23)
-    ts = TC.thermo_state_pθq(param_set, p0_f_surf, theta_surface, self.Sur.qsurface)
-    self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = 0.0
-    self.Sur.shf = 0.0
-    self.Sur.ustar_fixed = true
-    self.Sur.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
+    ts = TC.thermo_state_pθq(param_set, p0_f_surf, theta_surface, self.surf.qsurface)
+    self.surf.Tsurface = TD.air_temperature(ts)
+    self.surf.lhf = 0.0
+    self.surf.shf = 0.0
+    self.surf.ustar_fixed = true
+    self.surf.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
 end
 
 function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, gm, param_set)
@@ -943,16 +949,16 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, gm, pa
     return nothing
 end
 
-function TC.update_surface(self::CasesBase{TRMM_LBA}, grid, state, gm, t::Real, param_set)
-    self.Sur.lhf = 554.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - t) / 5.25 / 3600.0)))^1.3
-    self.Sur.shf = 270.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - t) / 5.25 / 3600.0)))^1.5
-    update(self.Sur, grid, state, gm, param_set)
+function update_surface(self::CasesBase{TRMM_LBA}, grid, state, gm, t::Real, param_set)
+    self.surf.lhf = 554.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - t) / 5.25 / 3600.0)))^1.3
+    self.surf.shf = 270.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - t) / 5.25 / 3600.0)))^1.5
+    update(self.surf, grid, state, gm, param_set)
     # fix momentum fluxes to zero as they are not used in the paper
-    self.Sur.rho_uflux = 0.0
-    self.Sur.rho_vflux = 0.0
+    self.surf.rho_uflux = 0.0
+    self.surf.rho_vflux = 0.0
 end
 
-function TC.update_forcing(self::CasesBase{TRMM_LBA}, grid, state, gm, t::Real, param_set)
+function update_forcing(self::CasesBase{TRMM_LBA}, grid, state, gm, t::Real, param_set)
 
     aux_gm = TC.center_aux_grid_mean(state)
     ind2 = Int(ceil(t / 600.0)) + 1
@@ -983,12 +989,12 @@ end
 ##### ARM_SGP
 #####
 
-function CasesBase(case::ARM_SGP, namelist, grid::Grid, param_set, Sur, Fo, Rad)
+function CasesBase(case::ARM_SGP, namelist, grid::Grid, param_set, surf, Fo, Rad)
     inversion_option = "thetal_maxgrad"
-    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, surf, Fo, Rad)
 end
-TC.ForcingBase(case::ARM_SGP, param_set::APS; kwargs...) =
-    TC.ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = false, coriolis_param = 8.5e-5)
+ForcingBase(case::ARM_SGP, param_set::APS; kwargs...) =
+    ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = false, coriolis_param = 8.5e-5)
 
 function reference_params(::ARM_SGP, grid::Grid, param_set::APS, namelist)
     Pg = 970.0 * 100 #Pressure at ground
@@ -1034,17 +1040,17 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, gm, state)
 end
 
 function initialize_surface(self::CasesBase{ARM_SGP}, grid::Grid, state, param_set)
-    self.Sur.qsurface = 15.2e-3 # kg/kg
+    self.surf.qsurface = 15.2e-3 # kg/kg
     kf_surf = TC.kf_surface(grid)
     p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
     θ_surface = 299.0
-    ts = TC.thermo_state_pθq(param_set, p0_f_surf, θ_surface, self.Sur.qsurface)
-    self.Sur.Tsurface = TD.air_temperature(ts)
-    self.Sur.lhf = 5.0
-    self.Sur.shf = -30.0
-    self.Sur.ustar_fixed = true
-    self.Sur.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
+    ts = TC.thermo_state_pθq(param_set, p0_f_surf, θ_surface, self.surf.qsurface)
+    self.surf.Tsurface = TD.air_temperature(ts)
+    self.surf.lhf = 5.0
+    self.surf.shf = -30.0
+    self.surf.ustar_fixed = true
+    self.surf.ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
 end
 
 function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, state, gm, param_set)
@@ -1056,26 +1062,26 @@ function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, state, gm, par
     return nothing
 end
 
-function TC.update_surface(self::CasesBase{ARM_SGP}, grid, state, gm, t::Real, param_set)
+function update_surface(self::CasesBase{ARM_SGP}, grid, state, gm, t::Real, param_set)
     t_Sur_in = arr_type([0.0, 4.0, 6.5, 7.5, 10.0, 12.5, 14.5]) .* 3600 #LES time is in sec
     SH = arr_type([-30.0, 90.0, 140.0, 140.0, 100.0, -10, -10]) # W/m^2
     LH = arr_type([5.0, 250.0, 450.0, 500.0, 420.0, 180.0, 0.0]) # W/m^2
-    self.Sur.shf = pyinterp(arr_type([t]), t_Sur_in, SH)[1]
-    self.Sur.lhf = pyinterp(arr_type([t]), t_Sur_in, LH)[1]
+    self.surf.shf = pyinterp(arr_type([t]), t_Sur_in, SH)[1]
+    self.surf.lhf = pyinterp(arr_type([t]), t_Sur_in, LH)[1]
     # if fluxes vanish bflux vanish and wstar and obukov length are NaNs
     ## CK +++ I commented out the lines below as I don"t think this is how we want to fix things!
-    # if self.Sur.shf < 1.0
-    #     self.Sur.shf = 1.0
-    # if self.Sur.lhf < 1.0
-    #     self.Sur.lhf = 1.0
+    # if self.surf.shf < 1.0
+    #     self.surf.shf = 1.0
+    # if self.surf.lhf < 1.0
+    #     self.surf.lhf = 1.0
     #+++++++++
-    update(self.Sur, grid, state, gm, param_set)
+    update(self.surf, grid, state, gm, param_set)
     # fix momentum fluxes to zero as they are not used in the paper
-    self.Sur.rho_uflux = 0.0
-    self.Sur.rho_vflux = 0.0
+    self.surf.rho_uflux = 0.0
+    self.surf.rho_vflux = 0.0
 end
 
-function TC.update_forcing(self::CasesBase{ARM_SGP}, grid, state, gm, t::Real, param_set)
+function update_forcing(self::CasesBase{ARM_SGP}, grid, state, gm, t::Real, param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     p0_c = TC.center_ref_state(state).p0
     t_in = arr_type([0.0, 3.0, 6.0, 9.0, 12.0, 14.5]) .* 3600.0 #LES time is in sec
@@ -1111,12 +1117,12 @@ end
 ##### GATE_III
 #####
 
-function CasesBase(case::GATE_III, namelist, grid::Grid, param_set, Sur, Fo, Rad)
+function CasesBase(case::GATE_III, namelist, grid::Grid, param_set, surf, Fo, Rad)
     inversion_option = "thetal_maxgrad"
-    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, surf, Fo, Rad)
 end
-TC.ForcingBase(case::GATE_III, param_set::APS; kwargs...) =
-    TC.ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
+ForcingBase(case::GATE_III, param_set::APS; kwargs...) =
+    ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
 function reference_params(::GATE_III, grid::Grid, param_set::APS, namelist)
     Pg = 1013.0 * 100  #Pressure at ground
@@ -1174,17 +1180,17 @@ function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, gm, state)
 end
 
 function initialize_surface(self::CasesBase{GATE_III}, grid::Grid, state, param_set)
-    self.Sur.qsurface = 16.5 / 1000.0 # kg/kg
-    self.Sur.cm = 0.0012
-    self.Sur.ch = 0.0034337
-    self.Sur.cq = 0.0034337
-    self.Sur.Tsurface = 299.184
+    self.surf.qsurface = 16.5 / 1000.0 # kg/kg
+    self.surf.cm = 0.0012
+    self.surf.ch = 0.0034337
+    self.surf.cq = 0.0034337
+    self.surf.Tsurface = 299.184
 
     # For GATE_III we provide values of transfer coefficients
     kf_surf = TC.kf_surface(grid)
     p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
-    ts = TC.thermo_state_pθq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
-    self.Sur.qsurface = TD.q_vap_saturation(ts)
+    ts = TC.thermo_state_pθq(param_set, p0_f_surf, self.surf.Tsurface, self.surf.qsurface)
+    self.surf.qsurface = TD.q_vap_saturation(ts)
 end
 
 function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, state, gm, param_set)
@@ -1226,9 +1232,9 @@ end
 ##### DYCOMS_RF01
 #####
 
-function CasesBase(case::DYCOMS_RF01, namelist, grid::Grid, param_set, Sur, Fo, Rad)
+function CasesBase(case::DYCOMS_RF01, namelist, grid::Grid, param_set, surf, Fo, Rad)
     inversion_option = "thetal_maxgrad"
-    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, surf, Fo, Rad)
 end
 
 function reference_params(::DYCOMS_RF01, grid::Grid, param_set::APS, namelist)
@@ -1283,30 +1289,30 @@ function initialize_surface(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, par
     kf_surf = TC.kf_surface(grid)
     p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
-    self.Sur.zrough = 1.0e-4
-    self.Sur.ustar_fixed = false
-    self.Sur.ustar = 0.28 # just to initilize grid mean covariances
-    self.Sur.cm = 0.0011
+    self.surf.zrough = 1.0e-4
+    self.surf.ustar_fixed = false
+    self.surf.ustar = 0.28 # just to initilize grid mean covariances
+    self.surf.cm = 0.0011
 
     # sensible heat flux
-    self.Sur.shf = 15.0
+    self.surf.shf = 15.0
     # latent heat flux
-    self.Sur.lhf = 115.0
+    self.surf.lhf = 115.0
 
-    self.Sur.Tsurface = 292.5    # K      # i.e. the SST from DYCOMS setup
-    self.Sur.qsurface = 13.84e-3 # kg/kg  # TODO - taken from Pycles, maybe it would be better to calculate the q_star(sst) for TurbulenceConvection?
+    self.surf.Tsurface = 292.5    # K      # i.e. the SST from DYCOMS setup
+    self.surf.qsurface = 13.84e-3 # kg/kg  # TODO - taken from Pycles, maybe it would be better to calculate the q_star(sst) for TurbulenceConvection?
     #density_surface  = 1.22     # kg/m^3
 
     # buoyancy flux
-    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
+    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.surf.Tsurface, self.surf.qsurface)
     theta_surface = TD.liquid_ice_pottemp(ts)
-    θ_flux = self.Sur.shf / TD.cp_m(ts) / ρ0_f_surf
-    qt_flux = self.Sur.lhf / TD.latent_heat_vapor(ts) / ρ0_f_surf
+    θ_flux = self.surf.shf / TD.cp_m(ts) / ρ0_f_surf
+    qt_flux = self.surf.lhf / TD.latent_heat_vapor(ts) / ρ0_f_surf
 
-    self.Sur.bflux =
+    self.surf.bflux =
         g * (
-            (θ_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.Sur.qsurface * θ_flux)) /
-            (theta_surface * (1 + (molmass_ratio - 1) * self.Sur.qsurface))
+            (θ_flux + (molmass_ratio - 1) * (theta_surface * qt_flux + self.surf.qsurface * θ_flux)) /
+            (theta_surface * (1 + (molmass_ratio - 1) * self.surf.qsurface))
         )
 end
 function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, gm, param_set)
@@ -1326,8 +1332,8 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, gm,
     parent(aux_gm.dqtdt) .= 0 #kg/(kg * s)
 end
 
-function TC.RadiationBase(case::DYCOMS_RF01)
-    return TC.RadiationBase{Cases.get_radiation_type(case)}(;
+function RadiationBase(case::DYCOMS_RF01)
+    return RadiationBase{Cases.get_radiation_type(case)}(;
         divergence = 3.75e-6,
         alpha_z = 1.0,
         kappa = 85.0,
@@ -1347,7 +1353,7 @@ function initialize_radiation(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, g
     TC.calculate_radiation(self.Rad, grid, state, gm, param_set)
 end
 
-function TC.initialize_io(self::CasesBase{DYCOMS_RF01}, Stats::NetCDFIO_Stats)
+function initialize_io(self::CasesBase{DYCOMS_RF01}, Stats::NetCDFIO_Stats)
     initialize_io(self, Stats, BaseCase())
     initialize_io(self.Fo, Stats)
 end
@@ -1356,15 +1362,15 @@ end
 ##### GABLS
 #####
 
-function CasesBase(case::GABLS, namelist, grid::Grid, param_set, Sur, Fo, Rad)
+function CasesBase(case::GABLS, namelist, grid::Grid, param_set, surf, Fo, Rad)
     inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, surf, Fo, Rad)
 end
-function TC.ForcingBase(case::GABLS, param_set::APS; kwargs...)
+function ForcingBase(case::GABLS, param_set::APS; kwargs...)
     coriolis_param = 1.39e-4 # s^{-1}
     # Omega = CPP.Omega(param_set)
     # coriolis_param = 2 * Omega * sin(latitude * π / 180 ) # s^{-1}
-    TC.ForcingBase(
+    ForcingBase(
         get_forcing_type(case);
         apply_coriolis = true,
         apply_subsidence = false,
@@ -1408,9 +1414,9 @@ function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, gm, state)
 end
 
 function initialize_surface(self::CasesBase{GABLS}, grid::Grid, state, param_set)
-    self.Sur.zrough = 0.1
-    self.Sur.Tsurface = 265.0
-    self.Sur.qsurface = 0.0
+    self.surf.zrough = 0.1
+    self.surf.Tsurface = 265.0
+    self.surf.qsurface = 0.0
 end
 
 function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, state, gm, param_set)
@@ -1424,9 +1430,9 @@ function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, state, gm, param
     return nothing
 end
 
-function TC.update_surface(self::CasesBase{GABLS}, grid, state, gm, t::Real, param_set)
-    self.Sur.Tsurface = 265.0 - (0.25 / 3600.0) * t
-    update(self.Sur, grid, state, gm, param_set)
+function update_surface(self::CasesBase{GABLS}, grid, state, gm, t::Real, param_set)
+    self.surf.Tsurface = 265.0 - (0.25 / 3600.0) * t
+    update(self.surf, grid, state, gm, param_set)
 end
 
 #####
@@ -1434,15 +1440,15 @@ end
 #####
 
 # Not fully implemented yet - Ignacio
-function CasesBase(case::SP, namelist, grid::Grid, param_set, Sur, Fo, Rad)
+function CasesBase(case::SP, namelist, grid::Grid, param_set, surf, Fo, Rad)
     inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, surf, Fo, Rad)
 end
-function TC.ForcingBase(case::SP, param_set::APS; kwargs...)
+function ForcingBase(case::SP, param_set::APS; kwargs...)
     coriolis_param = 1.0e-4 # s^{-1}
     # Omega = CPP.Omega(param_set)
     # coriolis_param = 2 * Omega * sin(latitude * π / 180 ) # s^{-1}
-    TC.ForcingBase(
+    ForcingBase(
         get_forcing_type(case);
         apply_coriolis = true,
         apply_subsidence = false,
@@ -1489,14 +1495,14 @@ function initialize_surface(self::CasesBase{SP}, grid::Grid, state, param_set)
     kf_surf = TC.kf_surface(grid)
     p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     g = CPP.grav(param_set)
-    self.Sur.zrough = 0.1
-    self.Sur.Tsurface = 300.0
-    self.Sur.qsurface = 0.0
-    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.Sur.Tsurface, self.Sur.qsurface)
+    self.surf.zrough = 0.1
+    self.surf.Tsurface = 300.0
+    self.surf.qsurface = 0.0
+    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, self.surf.Tsurface, self.surf.qsurface)
     theta_surface = TD.liquid_ice_pottemp(ts)
     θ_flux = 0.24
-    self.Sur.ustar = 0.28 # just to initilize grid mean covariances
-    self.Sur.bflux = g * θ_flux / theta_surface
+    self.surf.ustar = 0.28 # just to initilize grid mean covariances
+    self.surf.bflux = g * θ_flux / theta_surface
 end
 
 function initialize_forcing(self::CasesBase{SP}, grid::Grid, state, gm, param_set)
@@ -1512,12 +1518,12 @@ end
 ##### DryBubble
 #####
 
-function CasesBase(case::DryBubble, namelist, grid::Grid, param_set, Sur, Fo, Rad)
+function CasesBase(case::DryBubble, namelist, grid::Grid, param_set, surf, Fo, Rad)
     inversion_option = "theta_rho"
-    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad)
+    return TC.CasesBase(case; inversion_option, surf, Fo, Rad)
 end
-TC.ForcingBase(case::DryBubble, param_set::APS; kwargs...) =
-    TC.ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
+ForcingBase(case::DryBubble, param_set::APS; kwargs...) =
+    ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
 function reference_params(::DryBubble, grid::Grid, param_set::APS, namelist)
     Pg = 1.0e5  #Pressure at ground
@@ -1609,12 +1615,12 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, gm, state)
 end
 
 function initialize_surface(self::CasesBase{DryBubble}, grid::Grid, state, param_set)
-    self.Sur.Tsurface = 300.0
-    self.Sur.qsurface = 0.0
-    self.Sur.shf = 0.0001 # only prevent zero devision in SF.jl lmo
-    self.Sur.lhf = 0.0001 # only prevent zero devision in SF.jl lmo
-    self.Sur.ustar = 0.1
-    self.Sur.ustar_fixed = true
+    self.surf.Tsurface = 300.0
+    self.surf.qsurface = 0.0
+    self.surf.shf = 0.0001 # only prevent zero devision in SF.jl lmo
+    self.surf.lhf = 0.0001 # only prevent zero devision in SF.jl lmo
+    self.surf.ustar = 0.1
+    self.surf.ustar_fixed = true
 end
 
 
@@ -1622,7 +1628,7 @@ end
 ##### LES_driven_SCM
 #####
 
-function CasesBase(case::LES_driven_SCM, namelist, grid::Grid, param_set, Sur, Fo, Rad)
+function CasesBase(case::LES_driven_SCM, namelist, grid::Grid, param_set, surf, Fo, Rad)
     les_filename = namelist["meta"]["lesfile"]
     # load data here
     LESDat = NC.Dataset(les_filename, "r") do data
@@ -1637,13 +1643,13 @@ function CasesBase(case::LES_driven_SCM, namelist, grid::Grid, param_set, Sur, F
         TC.LESData(imin, imax, les_filename, t_interval_from_end_s, namelist["initial_condition_averaging_window_s"])
     end
     inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, Sur, Fo, Rad, LESDat)
+    return TC.CasesBase(case; inversion_option, surf, Fo, Rad, LESDat)
 end
 
 forcing_kwargs(::LES_driven_SCM, namelist) = (; nudge_tau = namelist["forcing"]["nudging_timescale"])
 
-function TC.ForcingBase(case::LES_driven_SCM, param_set::APS; nudge_tau)
-    TC.ForcingBase(
+function ForcingBase(case::LES_driven_SCM, param_set::APS; nudge_tau)
+    ForcingBase(
         get_forcing_type(case);
         apply_coriolis = false,
         apply_subsidence = true,
@@ -1706,16 +1712,16 @@ function initialize_surface(self::CasesBase{LES_driven_SCM}, grid::Grid, state, 
         imin = self.LESDat.imin
         imax = self.LESDat.imax
 
-        self.Sur.zrough = 1.0e-4
-        self.Sur.Tsurface = Statistics.mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims = 1)[1]
+        self.surf.zrough = 1.0e-4
+        self.surf.Tsurface = Statistics.mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims = 1)[1]
         # get surface value of q
         mean_qt_prof = Statistics.mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)[:]
         field = TC.FieldFromNamedTuple(TC.face_space(grid), (; q_tot = FT(0)))
         Ic = CCO.InterpolateF2C()
         q_tot_c = Ic.(field.q_tot)
-        self.Sur.qsurface = q_tot_c[TC.kc_surface(grid)]
-        self.Sur.lhf = Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1]
-        self.Sur.shf = Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1]
+        self.surf.qsurface = q_tot_c[TC.kc_surface(grid)]
+        self.surf.lhf = Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1]
+        self.surf.shf = Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1]
     end
 end
 

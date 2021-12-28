@@ -34,7 +34,7 @@ struct Simulation1d{IONT, G, S, GM, C, EDMF, D, TIMESTEPPING, STATS, PS}
     grid::G
     state::S
     gm::GM
-    Case::C
+    case::C
     edmf::EDMF
     diagnostics::D
     TS::TIMESTEPPING
@@ -62,11 +62,11 @@ function Simulation1d(namelist)
     ref_params = Cases.reference_params(case, grid, param_set, namelist)
 
     gm = TC.GridMeanVariables(param_set)
-    Sur = TC.SurfaceBase(Cases.get_surface_type(case); namelist, ref_params)
+    surf = TC.SurfaceBase(Cases.get_surface_type(case); namelist, ref_params)
     Fo = TC.ForcingBase(case, param_set; Cases.forcing_kwargs(case, namelist)...)
     Rad = TC.RadiationBase(case)
 
-    Case = Cases.CasesBase(case, namelist, grid, param_set, Sur, Fo, Rad)
+    case = Cases.CasesBase(case, namelist, grid, param_set, surf, Fo, Rad)
     edmf = TC.EDMF_PrognosticTKE(namelist, grid, param_set)
     TS = TC.TimeStepping(namelist)
 
@@ -102,7 +102,7 @@ function Simulation1d(namelist)
         grid,
         state,
         gm,
-        Case,
+        case,
         edmf,
         diagnostics,
         TS,
@@ -120,14 +120,14 @@ function TurbulenceConvection.initialize(sim::Simulation1d)
     state = sim.state
     FT = eltype(sim.grid)
     t = FT(0)
-    Cases.initialize_profiles(sim.Case, sim.grid, sim.gm, state)
+    Cases.initialize_profiles(sim.case, sim.grid, sim.gm, state)
     satadjust(sim.gm, sim.grid, sim.state)
 
-    Cases.initialize_surface(sim.Case, sim.grid, state, sim.param_set)
-    Cases.initialize_forcing(sim.Case, sim.grid, state, sim.gm, sim.param_set)
-    Cases.initialize_radiation(sim.Case, sim.grid, state, sim.gm, sim.param_set)
+    Cases.initialize_surface(sim.case, sim.grid, state, sim.param_set)
+    Cases.initialize_forcing(sim.case, sim.grid, state, sim.gm, sim.param_set)
+    Cases.initialize_radiation(sim.case, sim.grid, state, sim.gm, sim.param_set)
 
-    initialize_edmf(sim.edmf, sim.grid, state, sim.Case, sim.gm, t)
+    initialize_edmf(sim.edmf, sim.grid, state, sim.case, sim.gm, t)
 
     sim.skip_io && return nothing
     TC.initialize_io(sim.io_nt.ref_state, sim.Stats)
@@ -138,7 +138,7 @@ function TurbulenceConvection.initialize(sim::Simulation1d)
 
     # TODO: depricate
     TC.initialize_io(sim.gm, sim.Stats)
-    TC.initialize_io(sim.Case, sim.Stats)
+    TC.initialize_io(sim.case, sim.Stats)
     TC.initialize_io(sim.edmf, sim.Stats)
 
     TC.open_files(sim.Stats)
@@ -148,7 +148,7 @@ function TurbulenceConvection.initialize(sim::Simulation1d)
     TC.io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
 
     # TODO: depricate
-    TC.io(sim.Case, sim.grid, state, sim.Stats)
+    TC.io(sim.case, sim.grid, state, sim.Stats)
     TC.io(sim.edmf, sim.grid, state, sim.Stats)
     TC.close_files(sim.Stats)
 
@@ -173,7 +173,7 @@ function solve_args(sim::Simulation1d)
         gm = sim.gm,
         aux = aux,
         io_nt = sim.io_nt,
-        case = sim.Case,
+        case = sim.case,
         diagnostics = diagnostics,
         TS = sim.TS,
         Stats = sim.Stats,
@@ -208,7 +208,7 @@ function solve_args(sim::Simulation1d)
         saveat = last(t_span),
         callback = callbacks,
         progress = true,
-        unstable_check_kwarg(sim.Case.case)...,
+        unstable_check_kwarg(sim.case.case)...,
         progress_message = (dt, u, p, t) -> t,
     )
     alg = ODE.Euler()

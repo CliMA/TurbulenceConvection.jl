@@ -52,7 +52,7 @@ diagnostics and still run, at which point we'll be able to export
 the state, auxiliary fields (which the state does depend on), and
 tendencies.
 =#
-function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Case, Stats)
+function compute_diagnostics!(edmf, gm, grid, state, diagnostics, Stats)
     FT = eltype(grid)
     N_up = TC.n_updrafts(edmf)
     ρ0_c = TC.center_ref_state(state).ρ0
