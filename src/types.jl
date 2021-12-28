@@ -338,7 +338,7 @@ Base.@kwdef mutable struct CasesBase{T, S, F, R, SR, RMAT, LESDataT}
     casename::String = "default_casename"
     inversion_option::String = "default_inversion_option"
     les_filename::String = "None"
-    Sur::S
+    surf::S
     Fo::F
     Rad::R
     rad_time::SR
@@ -348,8 +348,8 @@ Base.@kwdef mutable struct CasesBase{T, S, F, R, SR, RMAT, LESDataT}
     LESDat::LESDataT
 end
 
-function CasesBase(case::T; Sur, Fo, Rad, rad_time = stepR, rad = zeros(1, 1), LESDat = nothing, kwargs...) where {T}
-    S = typeof(Sur)
+function CasesBase(case::T; surf, Fo, Rad, rad_time = stepR, rad = zeros(1, 1), LESDat = nothing, kwargs...) where {T}
+    S = typeof(surf)
     F = typeof(Fo)
     R = typeof(Rad)
     SR = typeof(rad_time)
@@ -358,7 +358,7 @@ function CasesBase(case::T; Sur, Fo, Rad, rad_time = stepR, rad = zeros(1, 1), L
     CasesBase{T, S, F, R, SR, RMAT, LESDataT}(;
         case = case,
         casename = string(nameof(T)),
-        Sur,
+        surf,
         Fo,
         Rad,
         rad_time,

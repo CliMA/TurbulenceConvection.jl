@@ -1,4 +1,4 @@
-function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, Case, param_set::APS, t::Real, Δt::Real)
+function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, case, param_set::APS, t::Real, Δt::Real)
     #####
     ##### Unpack common variables
     #####
@@ -15,8 +15,8 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, Cas
     c_m = CPEDMF.c_m(param_set)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
-    surface = Case.Sur
-    obukhov_length = surface.obukhov_length
+    surf = case.surf
+    obukhov_length = surf.obukhov_length
     FT = eltype(grid)
     prog_gm = center_prog_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
@@ -232,9 +232,9 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, Cas
     get_GMV_CoVar(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
     get_GMV_CoVar(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
 
-    update_surface(Case, grid, state, gm, t, param_set)
-    update_forcing(Case, grid, state, gm, t, param_set)
-    update_radiation(Case, grid, state, gm, t, param_set)
+    update_surface(case, grid, state, gm, t, param_set)
+    update_forcing(case, grid, state, gm, t, param_set)
+    update_radiation(case, grid, state, gm, t, param_set)
 
     compute_pressure_plume_spacing(edmf, param_set)
 
@@ -440,7 +440,7 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, Cas
             z = grid.zc[k].z,
             obukhov_length = obukhov_length,
             tke_surf = aux_en.tke[kc_surf],
-            ustar = surface.ustar,
+            ustar = surf.ustar,
             Pr = aux_tc.prandtl_nvec[k],
             p0 = p0_c[k],
             ∇b = bg,
@@ -496,7 +496,7 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, Cas
 
     get_GMV_CoVar(edmf, grid, state, Val(:tke), Val(:w), Val(:w))
 
-    compute_diffusive_fluxes(edmf, grid, state, gm, Case, param_set)
+    compute_diffusive_fluxes(edmf, grid, state, gm, surf, param_set)
 
 
     # TODO: use dispatch
