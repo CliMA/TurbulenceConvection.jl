@@ -65,16 +65,16 @@ mutable struct NetCDFIO_Stats
 
             # Set profile dimensions
             profile_grp = NC.defGroup(root_grp, "profiles")
-            NC.defDim(profile_grp, "zf", grid.nz + 1)
-            NC.defDim(profile_grp, "zc", grid.nz)
+            NC.defDim(profile_grp, "zf", n_cells(grid) + 1)
+            NC.defDim(profile_grp, "zc", n_cells(grid))
             NC.defDim(profile_grp, "t", Inf)
             NC.defVar(profile_grp, "zf", zf, ("zf",))
             NC.defVar(profile_grp, "zc", zc, ("zc",))
             NC.defVar(profile_grp, "t", Float64, ("t",))
 
             reference_grp = NC.defGroup(root_grp, "reference")
-            NC.defDim(reference_grp, "zf", grid.nz + 1)
-            NC.defDim(reference_grp, "zc", grid.nz)
+            NC.defDim(reference_grp, "zf", n_cells(grid) + 1)
+            NC.defDim(reference_grp, "zc", n_cells(grid))
             NC.defVar(reference_grp, "zf", zf, ("zf",))
             NC.defVar(reference_grp, "zc", zc, ("zc",))
 
