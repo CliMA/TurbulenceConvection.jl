@@ -27,7 +27,7 @@ function compute_les_Γᵣ(z::ClimaCore.Geometry.ZPoint, τᵣ::Real = 24.0 * 36
     end
 end
 
-function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm)
+function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, Case, gm)
     N_up = n_updrafts(edmf)
     tendencies_gm = center_tendencies_grid_mean(state)
     kc_toa = kc_top_of_atmos(grid)
@@ -58,9 +58,9 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm)
     RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_liq_ice_gm_toa))
     RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa))
     wvec = CC.Geometry.WVector
-    ∇ = CCO.DivergenceF2C()
-    @. ∇θ_liq_ice_gm = ∇(wvec(RBθ(prog_gm.θ_liq_ice)))
-    @. ∇q_tot_gm = ∇(wvec(RBq(prog_gm.q_tot)))
+    ∇c = CCO.DivergenceF2C()
+    @. ∇θ_liq_ice_gm = ∇c(wvec(RBθ(prog_gm.θ_liq_ice)))
+    @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.q_tot)))
 
     @inbounds for k in real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
@@ -159,8 +159,6 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm)
         @. massflux_qt += aux_up_f[i].massflux * (If(aux_up[i].q_tot) - If(aux_en.q_tot))
     end
 
-    wvec = CC.Geometry.WVector
-    ∇c = CCO.DivergenceF2C()
     # Compute the  mass flux tendencies
     # Adjust the values of the grid mean variables
     # Prepare the output
@@ -169,10 +167,12 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm)
     @. tendencies_gm.θ_liq_ice += -∇c(wvec(massflux_h)) * α0_c
     @. tendencies_gm.q_tot += -∇c(wvec(massflux_qt)) * α0_c
 
-    aeKHq_tot_bc = Case.Sur.rho_qtflux / aux_en.area[kc_surf]
-    aeKHθ_liq_ice_bc = Case.Sur.rho_hflux / aux_en.area[kc_surf]
-    aeKMu_bc = Case.Sur.rho_uflux / aux_en.area[kc_surf]
-    aeKMv_bc = Case.Sur.rho_vflux / aux_en.area[kc_surf]
+    a_en = aux_en.area
+
+    aeKHq_tot_bc = Case.Sur.rho_qtflux / a_en[kc_surf]
+    aeKHθ_liq_ice_bc = Case.Sur.rho_hflux / a_en[kc_surf]
+    aeKMu_bc = Case.Sur.rho_uflux / a_en[kc_surf]
+    aeKMv_bc = Case.Sur.rho_vflux / a_en[kc_surf]
 
     tbc = (; top = CCO.SetValue(wvec(FT(0))))
     ∇aeKH_q_tot = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKHq_tot_bc)), tbc...)
@@ -180,10 +180,10 @@ function compute_gm_tendencies!(edmf::EDMF_PrognosticTKE, grid, state, Case, gm)
     ∇aeKM_u = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKMu_bc)), tbc...)
     ∇aeKM_v = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKMv_bc)), tbc...)
 
-    @. tendencies_gm.q_tot += -α0_c * aux_en.area * ∇aeKH_q_tot(wvec(aux_tc_f.diffusive_flux_qt))
-    @. tendencies_gm.θ_liq_ice += -α0_c * aux_en.area * ∇aeKH_θ_liq_ice(wvec(aux_tc_f.diffusive_flux_h))
-    @. tendencies_gm.u += -α0_c * aux_en.area * ∇aeKM_u(wvec(aux_tc_f.diffusive_flux_u))
-    @. tendencies_gm.v += -α0_c * aux_en.area * ∇aeKM_v(wvec(aux_tc_f.diffusive_flux_v))
+    @. tendencies_gm.q_tot += -α0_c * a_en * ∇aeKH_q_tot(wvec(aux_tc_f.diffusive_flux_qt))
+    @. tendencies_gm.θ_liq_ice += -α0_c * a_en * ∇aeKH_θ_liq_ice(wvec(aux_tc_f.diffusive_flux_h))
+    @. tendencies_gm.u += -α0_c * a_en * ∇aeKM_u(wvec(aux_tc_f.diffusive_flux_u))
+    @. tendencies_gm.v += -α0_c * a_en * ∇aeKM_v(wvec(aux_tc_f.diffusive_flux_v))
 
     return nothing
 end
@@ -257,7 +257,7 @@ function affect_filter!(edmf, grid, state, gm, Case, t::Real)
 end
 
 # Compute the sum of tendencies for the scheme
-function ∑tendencies!(tendencies, prog, params, t::Real)
+function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
     UnPack.@unpack edmf, grid, gm, case, aux, TS = params
 
     Δt = TS.dt
@@ -378,7 +378,14 @@ end
 
 # Note: this assumes all variables are defined on half levels not full levels (i.e. phi, psi are not w)
 # if covar_e.name is not "tke".
-function get_GMV_CoVar(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol, ϕ_sym::Symbol, ψ_sym::Symbol = ϕ_sym)
+function get_GMV_CoVar(
+    edmf::EDMF_PrognosticTKE,
+    grid::Grid,
+    state::State,
+    ::Val{covar_sym},
+    ::Val{ϕ_sym},
+    ::Val{ψ_sym},
+) where {covar_sym, ϕ_sym, ψ_sym}
     N_up = n_updrafts(edmf)
     is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
@@ -420,7 +427,7 @@ function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE, param_set)
     return
 end
 
-function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid, state, gm::GridMeanVariables)
+function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, gm::GridMeanVariables)
     N_up = n_updrafts(edmf)
     param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
@@ -729,8 +736,15 @@ function compute_covariance_entr(
     return
 end
 
-function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, covar_sym::Symbol, param_set)
-    c_d = CPEDMF.c_d(param_set)
+function compute_covariance_dissipation(
+    edmf::EDMF_PrognosticTKE,
+    grid::Grid,
+    state::State,
+    ::Val{covar_sym},
+    param_set::APS,
+) where {covar_sym}
+    FT = eltype(grid)
+    c_d::FT = CPEDMF.c_d(param_set)
     aux_tc = center_aux_turbconv(state)
     ρ0_c = center_ref_state(state).ρ0
     prog_en = center_prog_environment(state)
@@ -743,7 +757,7 @@ function compute_covariance_dissipation(edmf::EDMF_PrognosticTKE, grid, state, c
     tke_en = aux_en.tke
     mixing_length = aux_tc.mixing_length
 
-    @. dissipation = ρ0_c * area_en * covar * max(tke_en, 0)^0.5 / max(mixing_length, 1.0e-3) * c_d
+    @. dissipation = ρ0_c * area_en * covar * max(tke_en, 0)^FT(0.5) / max(mixing_length, FT(1.0e-3)) * c_d
     return
 end
 

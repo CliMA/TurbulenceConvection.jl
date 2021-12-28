@@ -1,4 +1,4 @@
-function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid, state, Case, param_set, t, Δt)
+function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, Case, param_set::APS, t::Real, Δt::Real)
     #####
     ##### Unpack common variables
     #####
@@ -228,9 +228,9 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid, state, Case, param_set,
     #####
     #####  diagnose_GMV_moments
     #####
-    get_GMV_CoVar(edmf, grid, state, :Hvar, :θ_liq_ice)
-    get_GMV_CoVar(edmf, grid, state, :QTvar, :q_tot)
-    get_GMV_CoVar(edmf, grid, state, :HQTcov, :θ_liq_ice, :q_tot)
+    get_GMV_CoVar(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
+    get_GMV_CoVar(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
+    get_GMV_CoVar(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
 
     # TODO - use this inversion in free_convection_windspeed and not compute zi twice
     edmf.zi = get_inversion(grid, state, param_set, surface.Ri_bulk_crit)
@@ -484,10 +484,10 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid, state, Case, param_set,
     compute_covariance_shear(edmf, grid, state, gm, Val(:Hvar), Val(:θ_liq_ice))
     compute_covariance_shear(edmf, grid, state, gm, Val(:QTvar), Val(:q_tot))
     compute_covariance_shear(edmf, grid, state, gm, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
-    compute_covariance_dissipation(edmf, grid, state, :tke, param_set)
-    compute_covariance_dissipation(edmf, grid, state, :Hvar, param_set)
-    compute_covariance_dissipation(edmf, grid, state, :QTvar, param_set)
-    compute_covariance_dissipation(edmf, grid, state, :HQTcov, param_set)
+    compute_covariance_dissipation(edmf, grid, state, Val(:tke), param_set)
+    compute_covariance_dissipation(edmf, grid, state, Val(:Hvar), param_set)
+    compute_covariance_dissipation(edmf, grid, state, Val(:QTvar), param_set)
+    compute_covariance_dissipation(edmf, grid, state, Val(:HQTcov), param_set)
 
     # TODO defined again in compute_covariance_shear and compute_covaraince
     @inbounds for k in real_center_indices(grid)
@@ -497,7 +497,7 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid, state, Case, param_set,
         aux_en_2m.HQTcov.rain_src[k] = ρ0_c[k] * aux_en.area[k] * aux_en.HQTcov_rain_dt[k]
     end
 
-    get_GMV_CoVar(edmf, grid, state, :tke, :w)
+    get_GMV_CoVar(edmf, grid, state, Val(:tke), Val(:w), Val(:w))
 
     compute_diffusive_fluxes(edmf, grid, state, gm, Case, param_set)
 
