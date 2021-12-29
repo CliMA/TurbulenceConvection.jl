@@ -251,25 +251,49 @@ struct VariableFrictionVelocity <: FrictionVelocityType end
 
 abstract type AbstractSurfaceParameters{FT <: Real} end
 
-Base.@kwdef struct FixedSurfaceFlux{FT, FVT <: FrictionVelocityType} <: AbstractSurfaceParameters{FT}
+Base.@kwdef struct FixedSurfaceFlux{FT, FVT <: FrictionVelocityType, TS, QS, SHF, LHF} <: AbstractSurfaceParameters{FT}
     zrough::FT = FT(0)
-    interactive_zrough::FT = FT(0)
-    Tsurface::FT = FT(0)
-    qsurface::FT = FT(0)
-    shf::FT = FT(0)
-    lhf::FT = FT(0)
+    Tsurface::TS = FT(0)
+    qsurface::QS = FT(0)
+    shf::SHF = FT(0)
+    lhf::LHF = FT(0)
     cq::FT = FT(0)
-    windspeed::FT = FT(0)
     Ri_bulk_crit::FT = FT(0)
     ustar::FT = FT(0)
 end
-FixedSurfaceFlux(::Type{FT}, ::Type{FVT}; kwargs...) where {FT, FVT} = FixedSurfaceFlux{FT, FVT}(; kwargs...)
+
+const FloatOrFunc{FT} = Union{FT, Function, Dierckx.Spline1D}
+
+function FixedSurfaceFlux(
+    ::Type{FT},
+    ::Type{FVT};
+    Tsurface::FloatOrFunc{FT},
+    qsurface::FloatOrFunc{FT},
+    shf::FloatOrFunc{FT},
+    lhf::FloatOrFunc{FT},
+    kwargs...,
+) where {FT, FVT}
+    TS = typeof(Tsurface)
+    QS = typeof(qsurface)
+    SHF = typeof(shf)
+    LHF = typeof(lhf)
+    return FixedSurfaceFlux{FT, FVT, TS, QS, SHF, LHF}(; Tsurface, qsurface, shf, lhf, kwargs...)
+end
+
+float_or_func(s::Function, t::Real) = s(t)
+float_or_func(s::Dierckx.Spline1D, t::Real) = s(t)
+float_or_func(s::Real, t::Real) = s
+
+surface_temperature(s::FixedSurfaceFlux, t::Real = 0) = float_or_func(s.Tsurface, t)
+surface_q_tot(s::FixedSurfaceFlux, t::Real = 0) = float_or_func(s.qsurface, t)
+sensible_heat_flux(s::FixedSurfaceFlux, t::Real = 0) = float_or_func(s.shf, t)
+latent_heat_flux(s::FixedSurfaceFlux, t::Real = 0) = float_or_func(s.lhf, t)
+
 fixed_ustar(::FixedSurfaceFlux{FT, FixedFrictionVelocity}) where {FT} = true
 fixed_ustar(::FixedSurfaceFlux{FT, VariableFrictionVelocity}) where {FT} = false
 
 Base.@kwdef mutable struct SurfaceBase{T, NT}
     zrough::Float64 = 0
-    interactive_zrough::Bool = false
     Tsurface::Float64 = 0
     qsurface::Float64 = 0
     shf::Float64 = 0
@@ -278,7 +302,6 @@ Base.@kwdef mutable struct SurfaceBase{T, NT}
     ch::Float64 = 0
     cq::Float64 = 0
     bflux::Float64 = 0
-    windspeed::Float64 = 0
     ustar::Float64 = 0
     rho_qtflux::Float64 = 0
     rho_hflux::Float64 = 0
