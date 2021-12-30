@@ -5,6 +5,7 @@ function update(
     grid::Grid,
     state::State,
     gm::GridMeanVariables,
+    t::Real,
     param_set::APS,
 )
     FT = eltype(grid)
@@ -20,52 +21,52 @@ function update(
     v_gm_surf = prog_gm.v[kc_surf]
     q_tot_gm_surf = prog_gm.q_tot[kc_surf]
     θ_liq_ice_gm_surf = prog_gm.θ_liq_ice[kc_surf]
+    Tsurface = surface_temperature(surf_params, t)
+    qsurface = surface_q_tot(surf_params, t)
+    shf = sensible_heat_flux(surf_params, t)
+    lhf = latent_heat_flux(surf_params, t)
+    Ri_bulk_crit = surf_params.Ri_bulk_crit
+    zrough = surf_params.zrough
 
-    ts_sfc = TD.PhaseEquil_pTq(param_set, p0_f_surf, surf.Tsurface, surf.qsurface)
+    ts_sfc = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
     ts_in = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
 
-    surf.bflux = SF.compute_buoyancy_flux(param_set, surf.shf, surf.lhf, ts_in, ts_sfc, scheme)
-    zi = get_inversion(grid, state, param_set, surf.Ri_bulk_crit)
-    convective_vel = get_wstar(surf.bflux, zi) # yair here zi in TRMM should be adjusted
+    bflux = SF.compute_buoyancy_flux(param_set, shf, lhf, ts_in, ts_sfc, scheme)
+    zi = get_inversion(grid, state, param_set, Ri_bulk_crit)
+    convective_vel = get_wstar(bflux, zi) # yair here zi in TRMM should be adjusted
 
     u_sfc = SA.SVector{2, FT}(0, 0)
     u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
     vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
     vals_int = SF.InteriorValues(z_in, u_in, ts_in)
-    if surf.ustar_fixed
-        sc = SF.FluxesAndFrictionVelocity{FT}(;
-            state_in = vals_int,
-            state_sfc = vals_sfc,
-            shf = surf.shf,
-            lhf = surf.lhf,
-            ustar = surf.ustar,
-            z0m = surf.zrough,
-            z0b = surf.zrough,
-            gustiness = convective_vel,
-        )
-        result = SF.surface_conditions(param_set, sc, universal_func, scheme)
+    kwargs = (;
+        state_in = vals_int,
+        state_sfc = vals_sfc,
+        shf = shf,
+        lhf = lhf,
+        z0m = zrough,
+        z0b = zrough,
+        gustiness = convective_vel,
+    )
+    sc = if fixed_ustar(surf_params)
+        SF.FluxesAndFrictionVelocity{FT}(; kwargs..., ustar = surf.ustar)
     else
-        sc = SF.Fluxes{FT}(
-            state_in = vals_int,
-            state_sfc = vals_sfc,
-            shf = surf.shf,
-            lhf = surf.lhf,
-            z0m = surf.zrough,
-            z0b = surf.zrough,
-            gustiness = convective_vel,
-        )
-        result = SF.surface_conditions(param_set, sc, universal_func, scheme)
-        surf.ustar = result.ustar
+        SF.Fluxes{FT}(; kwargs...)
     end
+    result = SF.surface_conditions(param_set, sc, universal_func, scheme)
+    surf.shf = shf
+    surf.lhf = lhf
+    surf.ustar = fixed_ustar(surf_params) ? surf.ustar : result.ustar
+    surf.bflux = bflux
     surf.obukhov_length = result.L_MO
     surf.cm = result.Cd
     surf.ch = result.Ch
     surf.rho_uflux = result.ρτxz
     surf.rho_vflux = result.ρτyz
-    surf.rho_hflux = surf.shf / TD.cp_m(ts_in)
-    surf.rho_qtflux = surf.lhf / TD.latent_heat_vapor(ts_in)
+    surf.rho_hflux = shf / TD.cp_m(ts_in)
+    surf.rho_qtflux = lhf / TD.latent_heat_vapor(ts_in)
     return
 end
 
@@ -75,6 +76,7 @@ function update(
     grid::Grid,
     state::State,
     gm::GridMeanVariables,
+    t::Real,
     param_set::APS,
 )
     FT = eltype(grid)
@@ -128,6 +130,7 @@ function update(
     grid::Grid,
     state::State,
     gm::GridMeanVariables,
+    t::Real,
     param_set::APS,
 )
     kc_surf = kc_surface(grid)
@@ -175,6 +178,7 @@ function update(
     grid::Grid,
     state::State,
     gm::GridMeanVariables,
+    t::Real,
     param_set::APS,
 )
     kc_surf = kc_surface(grid)
@@ -221,6 +225,7 @@ function update(
     grid::Grid,
     state::State,
     gm::GridMeanVariables,
+    t::Real,
     param_set::APS,
 )
     kc_surf = kc_surface(grid)

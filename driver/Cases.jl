@@ -7,6 +7,7 @@ import ClimaCore
 const CC = ClimaCore
 const CCO = CC.Operators
 
+import Dierckx
 import Statistics
 import Random
 import UnPack
@@ -166,7 +167,7 @@ end
 initialize_io(self::CasesBase, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
 io(self::CasesBase, grid, state, Stats::NetCDFIO_Stats) = io(self, grid, state, Stats, BaseCase())
 update_surface(self::CasesBase, surf_params, grid, state, gm, t::Real, param_set) =
-    update(self.surf, surf_params, grid, state, gm, param_set)
+    update(self.surf, surf_params, grid, state, gm, t, param_set)
 update_forcing(self::CasesBase, grid, state, gm, t::Real, param_set) = nothing
 update_radiation(self::CasesBase, grid, state, gm, t::Real, param_set) = update(self.Rad, grid, state, gm, param_set)
 surface_params(case, grid::TC.Grid, state::TC.State, param_set; kwargs...) = nothing
@@ -569,8 +570,14 @@ function surface_params(case::life_cycle_Tan2018, grid::TC.Grid, state::TC.State
     qt_flux = 5.2e-5
     ts = TC.thermo_state_pθq(param_set, p0_f_surf, θ_surface, qsurface)
     Tsurface = TD.air_temperature(ts)
-    lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(ts)
-    shf = θ_flux * TD.cp_m(ts) * ρ0_f_surf
+    lhf0 = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(ts)
+    shf0 = θ_flux * TD.cp_m(ts) * ρ0_f_surf
+
+    weight_factor(t) = 0.01 + 0.99 * (cos(2.0 * π * t / 3600.0) + 1.0) / 2.0
+    weight = 1.0
+    lhf = t -> lhf0 * (weight * weight_factor(t))
+    shf = t -> shf0 * (weight * weight_factor(t))
+
     ustar = 0.28 # m/s
     kwargs = (; zrough, Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
     return TC.FixedSurfaceFlux(FT, TC.FixedFrictionVelocity; kwargs...)
@@ -635,13 +642,7 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
 end
 
 function update_surface(self::CasesBase{life_cycle_Tan2018}, surf_params, grid, state, gm, t::Real, param_set)
-    weight = 1.0
-    weight_factor = 0.01 + 0.99 * (cos(2.0 * π * t / 3600.0) + 1.0) / 2.0
-    weight = weight * weight_factor
-    self.surf.lhf = self.lhf0 * weight
-    self.surf.shf = self.shf0 * weight
-    self.surf.bflux = life_cycle_buoyancy_flux(param_set, weight)
-    update(self.surf, surf_params, grid, state, gm, param_set)
+    update(self.surf, surf_params, grid, state, gm, t, param_set)
 end
 
 #####
@@ -876,9 +877,9 @@ function surface_params(case::TRMM_LBA, grid::TC.Grid, state::TC.State, param_se
     θ_surface = (273.15 + 23)
     ts = TC.thermo_state_pθq(param_set, p0_f_surf, θ_surface, qsurface)
     Tsurface = TD.air_temperature(ts)
-    lhf = 0.0
-    shf = 0.0
     ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
+    lhf = t -> 554.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - t) / 5.25 / 3600.0)))^1.3
+    shf = t -> 270.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - t) / 5.25 / 3600.0)))^1.5
     kwargs = (; Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
     return TC.FixedSurfaceFlux(FT, TC.FixedFrictionVelocity; kwargs...)
 end
@@ -1043,9 +1044,7 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, gm, pa
 end
 
 function update_surface(self::CasesBase{TRMM_LBA}, surf_params, grid, state, gm, t::Real, param_set)
-    self.surf.lhf = 554.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - t) / 5.25 / 3600.0)))^1.3
-    self.surf.shf = 270.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - t) / 5.25 / 3600.0)))^1.5
-    update(self.surf, surf_params, grid, state, gm, param_set)
+    update(self.surf, surf_params, grid, state, gm, t, param_set)
     # fix momentum fluxes to zero as they are not used in the paper
     self.surf.rho_uflux = 0.0
     self.surf.rho_vflux = 0.0
@@ -1140,9 +1139,13 @@ function surface_params(case::ARM_SGP, grid::TC.Grid, state::TC.State, param_set
     θ_surface = 299.0
     ts = TC.thermo_state_pθq(param_set, p0_f_surf, θ_surface, qsurface)
     Tsurface = TD.air_temperature(ts)
-    lhf = 5.0
-    shf = -30.0
     ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
+
+    t_Sur_in = arr_type([0.0, 4.0, 6.5, 7.5, 10.0, 12.5, 14.5]) .* 3600 #LES time is in sec
+    SH = arr_type([-30.0, 90.0, 140.0, 140.0, 100.0, -10, -10]) # W/m^2
+    LH = arr_type([5.0, 250.0, 450.0, 500.0, 420.0, 180.0, 0.0]) # W/m^2
+    shf = Dierckx.Spline1D(t_Sur_in, SH; k = 1)
+    lhf = Dierckx.Spline1D(t_Sur_in, LH; k = 1)
 
     kwargs = (; Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
     return TC.FixedSurfaceFlux(FT, TC.FixedFrictionVelocity; kwargs...)
@@ -1172,19 +1175,7 @@ function initialize_forcing(self::CasesBase{ARM_SGP}, grid::Grid, state, gm, par
 end
 
 function update_surface(self::CasesBase{ARM_SGP}, surf_params, grid, state, gm, t::Real, param_set)
-    t_Sur_in = arr_type([0.0, 4.0, 6.5, 7.5, 10.0, 12.5, 14.5]) .* 3600 #LES time is in sec
-    SH = arr_type([-30.0, 90.0, 140.0, 140.0, 100.0, -10, -10]) # W/m^2
-    LH = arr_type([5.0, 250.0, 450.0, 500.0, 420.0, 180.0, 0.0]) # W/m^2
-    self.surf.shf = pyinterp(arr_type([t]), t_Sur_in, SH)[1]
-    self.surf.lhf = pyinterp(arr_type([t]), t_Sur_in, LH)[1]
-    # if fluxes vanish bflux vanish and wstar and obukov length are NaNs
-    ## CK +++ I commented out the lines below as I don"t think this is how we want to fix things!
-    # if self.surf.shf < 1.0
-    #     self.surf.shf = 1.0
-    # if self.surf.lhf < 1.0
-    #     self.surf.lhf = 1.0
-    #+++++++++
-    update(self.surf, surf_params, grid, state, gm, param_set)
+    update(self.surf, surf_params, grid, state, gm, t, param_set)
     # fix momentum fluxes to zero as they are not used in the paper
     self.surf.rho_uflux = 0.0
     self.surf.rho_vflux = 0.0
@@ -1558,7 +1549,7 @@ end
 
 function update_surface(self::CasesBase{GABLS}, surf_params, grid, state, gm, t::Real, param_set)
     self.surf.Tsurface = 265.0 - (0.25 / 3600.0) * t
-    update(self.surf, surf_params, grid, state, gm, param_set)
+    update(self.surf, surf_params, grid, state, gm, t, param_set)
 end
 
 #####
@@ -1740,12 +1731,12 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, gm, state)
     parent(aux_gm.HQTcov) .= 0
 end
 
-function surface_params(case::DYCOMS_RF01, grid::TC.Grid, state::TC.State, param_set; Ri_bulk_crit)
+function surface_params(case::DryBubble, grid::TC.Grid, state::TC.State, param_set; Ri_bulk_crit)
     FT = eltype(grid)
     Tsurface = 300.0
     qsurface = 0.0
-    shf = 0.0001 # only prevent zero devision in SF.jl lmo
-    lhf = 0.0001 # only prevent zero devision in SF.jl lmo
+    shf = 0.0001 # only prevent zero division in SF.jl lmo
+    lhf = 0.0001 # only prevent zero division in SF.jl lmo
     ustar = 0.1
 
     kwargs = (; Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
@@ -1755,8 +1746,8 @@ end
 function initialize_surface(self::CasesBase{DryBubble}, grid::Grid, state, param_set)
     self.surf.Tsurface = 300.0
     self.surf.qsurface = 0.0
-    self.surf.shf = 0.0001 # only prevent zero devision in SF.jl lmo
-    self.surf.lhf = 0.0001 # only prevent zero devision in SF.jl lmo
+    self.surf.shf = 0.0001 # only prevent zero division in SF.jl lmo
+    self.surf.lhf = 0.0001 # only prevent zero division in SF.jl lmo
     self.surf.ustar = 0.1
     self.surf.ustar_fixed = true
 end
