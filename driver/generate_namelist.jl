@@ -29,23 +29,26 @@ module NameList
 export default_namelist
 
 using ArgParse
-using ArtifactWrappers
 
 import StaticArrays
 const SA = StaticArrays
 
-#! format: off
-LESDrivenSCM_output_dataset = ArtifactWrapper(
-    @__DIR__,
-    isempty(get(ENV, "CI", "")),
-    "LESDrivenSCM_output_dataset",
-    ArtifactFile[
-        ArtifactFile(url = "https://caltech.box.com/shared/static/0hnf7nkttueraaqf9tpkqsx38gjqx41p.nc", filename = "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc",),
-    ],
-)
-LESDrivenSCM_output_dataset_path = get_data_folder(LESDrivenSCM_output_dataset)
-#! format: on
+import ArtifactWrappers
+const AW = ArtifactWrappers
 
+function les_driven_scm_data_folder()
+    #! format: off
+    LESDrivenSCM_output_dataset = AW.ArtifactWrapper(
+        @__DIR__,
+        isempty(get(ENV, "CI", "")),
+        "LESDrivenSCM_output_dataset",
+        AW.ArtifactFile[
+            AW.ArtifactFile(url = "https://caltech.box.com/shared/static/0hnf7nkttueraaqf9tpkqsx38gjqx41p.nc", filename = "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc",),
+        ],
+    )
+    return AW.get_data_folder(LESDrivenSCM_output_dataset)
+end
+#! format: on
 
 import JSON
 
@@ -435,7 +438,7 @@ function LES_driven_SCM(namelist_defaults)
     namelist["initial_condition_averaging_window_s"] = 3600.0
 
     namelist["meta"]["lesfile"] =
-        joinpath(LESDrivenSCM_output_dataset_path, "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc")
+        joinpath(les_driven_scm_data_folder(), "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc")
     namelist["meta"]["simname"] = "LES_driven_SCM"
     namelist["meta"]["casename"] = "LES_driven_SCM"
     namelist["forcing"] = Dict()
