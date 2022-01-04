@@ -170,7 +170,6 @@ update_surface(self::CasesBase, surf_params, grid, state, gm, t::Real, param_set
     update(self.surf, surf_params, grid, state, gm, t, param_set)
 update_forcing(self::CasesBase, grid, state, gm, t::Real, param_set) = nothing
 update_radiation(self::CasesBase, grid, state, gm, t::Real, param_set) = update(self.Rad, grid, state, gm, param_set)
-surface_params(case, grid::TC.Grid, state::TC.State, param_set; kwargs...) = nothing
 initialize_forcing(self::CasesBase, grid::Grid, state, gm, param_set) = initialize(self.Fo, grid, state)
 
 #####
@@ -714,6 +713,29 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, gm, state)
             0.0
         end
     end
+end
+
+function surface_params(case::Rico, grid::TC.Grid, state::TC.State, param_set; kwargs...)
+    FT = eltype(grid)
+
+    zrough = 0.00015
+    cm = 0.001229
+    ch = 0.001094
+    cq = 0.001133
+    # Adjust for non-IC grid spacing
+    grid_adjust = (log(20.0 / zrough) / log(TC.zc_surface(grid) / zrough))^2
+    cm = cm * grid_adjust
+    ch = ch * grid_adjust
+    cq = cq * grid_adjust # TODO: not yet used..
+    Tsurface = 299.8
+
+    # For Rico we provide values of transfer coefficients
+    kf_surf = TC.kf_surface(grid)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, FT(0)) # TODO: is this correct?
+    qsurface = TD.q_vap_saturation(ts)
+    kwargs = (; zrough, Tsurface, qsurface, cm, ch)
+    return TC.FixedSurfaceCoeffs(FT; kwargs...)
 end
 
 function initialize_surface(self::CasesBase{Rico}, grid::Grid, state, param_set)
@@ -1279,6 +1301,25 @@ function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, gm, state)
     end
 end
 
+function surface_params(case::GATE_III, grid::TC.Grid, state::TC.State, param_set; kwargs...)
+    FT = eltype(grid)
+
+    qsurface = 16.5 / 1000.0 # kg/kg
+    cm = 0.0012
+    ch = 0.0034337
+    cq = 0.0034337
+    Tsurface = 299.184
+
+    # For GATE_III we provide values of transfer coefficients
+    kf_surf = TC.kf_surface(grid)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    ts = TC.thermo_state_pθq(param_set, p0_f_surf, Tsurface, qsurface)
+    qsurface = TD.q_vap_saturation(ts)
+    kwargs = (; zrough, Tsurface, qsurface, cm, ch)
+    return TC.FixedSurfaceCoeffs(FT; kwargs...)
+end
+
+
 function initialize_surface(self::CasesBase{GATE_III}, grid::Grid, state, param_set)
     self.surf.qsurface = 16.5 / 1000.0 # kg/kg
     self.surf.cm = 0.0012
@@ -1530,6 +1571,20 @@ function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, gm, state)
     end
 end
 
+function surface_params(case::GABLS, grid::TC.Grid, state::TC.State, param_set; kwargs...)
+    FT = eltype(grid)
+    Tsurface = t -> 265.0 - (0.25 / 3600.0) * t
+    qsurface = 0.0
+    shf = 0.0001 # only prevent zero division in SF.jl lmo
+    lhf = 0.0001 # only prevent zero division in SF.jl lmo
+    # ustar = 0.1 # TODO: remove, this isn't actually used
+    zrough = 0.1
+
+    kwargs = (; Tsurface, qsurface, shf, lhf, zrough)
+    return TC.DryMoninObukhovSurface(FT; kwargs...)
+end
+
+
 function initialize_surface(self::CasesBase{GABLS}, grid::Grid, state, param_set)
     self.surf.zrough = 0.1
     self.surf.Tsurface = 265.0
@@ -1548,7 +1603,6 @@ function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, state, gm, param
 end
 
 function update_surface(self::CasesBase{GABLS}, surf_params, grid, state, gm, t::Real, param_set)
-    self.surf.Tsurface = 265.0 - (0.25 / 3600.0) * t
     update(self.surf, surf_params, grid, state, gm, t, param_set)
 end
 

@@ -251,6 +251,8 @@ struct VariableFrictionVelocity <: FrictionVelocityType end
 
 abstract type AbstractSurfaceParameters{FT <: Real} end
 
+const FloatOrFunc{FT} = Union{FT, Function, Dierckx.Spline1D}
+
 Base.@kwdef struct FixedSurfaceFlux{FT, FVT <: FrictionVelocityType, TS, QS, SHF, LHF} <: AbstractSurfaceParameters{FT}
     zrough::FT = FT(0)
     Tsurface::TS = FT(0)
@@ -261,8 +263,6 @@ Base.@kwdef struct FixedSurfaceFlux{FT, FVT <: FrictionVelocityType, TS, QS, SHF
     Ri_bulk_crit::FT = FT(0)
     ustar::FT = FT(0)
 end
-
-const FloatOrFunc{FT} = Union{FT, Function, Dierckx.Spline1D}
 
 function FixedSurfaceFlux(
     ::Type{FT},
@@ -280,14 +280,110 @@ function FixedSurfaceFlux(
     return FixedSurfaceFlux{FT, FVT, TS, QS, SHF, LHF}(; Tsurface, qsurface, shf, lhf, kwargs...)
 end
 
+Base.@kwdef struct FixedSurfaceCoeffs{FT, TS, QS, CH, CM} <: AbstractSurfaceParameters{FT}
+    zrough::FT = FT(0)
+    Tsurface::TS = FT(0)
+    qsurface::QS = FT(0)
+    ch::CH = FT(0)
+    cm::CM = FT(0)
+end
+
+function FixedSurfaceCoeffs(
+    ::Type{FT};
+    Tsurface::FloatOrFunc{FT},
+    qsurface::FloatOrFunc{FT},
+    ch::FloatOrFunc{FT},
+    cm::FloatOrFunc{FT},
+    kwargs...,
+) where {FT, FVT}
+    TS = typeof(Tsurface)
+    QS = typeof(qsurface)
+    CH = typeof(ch)
+    CM = typeof(cm)
+    return FixedSurfaceCoeffs{FT, TS, QS, CH, CM}(; Tsurface, qsurface, ch, cm, kwargs...)
+end
+
+Base.@kwdef struct DryMoninObukhovSurface{FT, TS, QS, SHF, LHF} <: AbstractSurfaceParameters{FT}
+    zrough::FT = FT(0)
+    Tsurface::TS = FT(0)
+    qsurface::QS = FT(0)
+    shf::SHF = FT(0)
+    lhf::LHF = FT(0)
+end
+
+function DryMoninObukhovSurface(
+    ::Type{FT};
+    Tsurface::FloatOrFunc{FT},
+    qsurface::FloatOrFunc{FT},
+    shf::FloatOrFunc{FT},
+    lhf::FloatOrFunc{FT},
+    kwargs...,
+) where {FT, FVT}
+    TS = typeof(Tsurface)
+    QS = typeof(qsurface)
+    SHF = typeof(shf)
+    LHF = typeof(lhf)
+    return DryMoninObukhovSurface{FT, TS, QS, SHF, LHF}(; Tsurface, qsurface, shf, lhf, kwargs...)
+end
+
+Base.@kwdef struct MoninObukhovSurface{FT, TS, QS, SHF, LHF} <: AbstractSurfaceParameters{FT}
+    zrough::FT = FT(0)
+    Tsurface::TS = FT(0)
+    qsurface::QS = FT(0)
+    shf::SHF = FT(0)
+    lhf::LHF = FT(0)
+end
+
+function MoninObukhovSurface(
+    ::Type{FT};
+    Tsurface::FloatOrFunc{FT},
+    qsurface::FloatOrFunc{FT},
+    shf::FloatOrFunc{FT},
+    lhf::FloatOrFunc{FT},
+    kwargs...,
+) where {FT, FVT}
+    TS = typeof(Tsurface)
+    QS = typeof(qsurface)
+    SHF = typeof(shf)
+    LHF = typeof(lhf)
+    return MoninObukhovSurface{FT, TS, QS, SHF, LHF}(; Tsurface, qsurface, shf, lhf, kwargs...)
+end
+
+Base.@kwdef struct SullivanPattonSurface{FT, TS, QS, SHF, LHF} <: AbstractSurfaceParameters{FT}
+    zrough::FT = FT(0)
+    Tsurface::TS = FT(0)
+    qsurface::QS = FT(0)
+    shf::SHF = FT(0)
+    lhf::LHF = FT(0)
+    cq::FT = FT(0)
+    Ri_bulk_crit::FT = FT(0)
+    ustar::FT = FT(0)
+end
+
+function SullivanPattonSurface(
+    ::Type{FT};
+    Tsurface::FloatOrFunc{FT},
+    qsurface::FloatOrFunc{FT},
+    shf::FloatOrFunc{FT},
+    lhf::FloatOrFunc{FT},
+    kwargs...,
+) where {FT}
+    TS = typeof(Tsurface)
+    QS = typeof(qsurface)
+    SHF = typeof(shf)
+    LHF = typeof(lhf)
+    return SullivanPattonSurface{FT, TS, QS, SHF, LHF}(; Tsurface, qsurface, shf, lhf, kwargs...)
+end
+
+
 float_or_func(s::Function, t::Real) = s(t)
 float_or_func(s::Dierckx.Spline1D, t::Real) = s(t)
 float_or_func(s::Real, t::Real) = s
 
-surface_temperature(s::FixedSurfaceFlux, t::Real = 0) = float_or_func(s.Tsurface, t)
-surface_q_tot(s::FixedSurfaceFlux, t::Real = 0) = float_or_func(s.qsurface, t)
-sensible_heat_flux(s::FixedSurfaceFlux, t::Real = 0) = float_or_func(s.shf, t)
-latent_heat_flux(s::FixedSurfaceFlux, t::Real = 0) = float_or_func(s.lhf, t)
+surface_temperature(s::AbstractSurfaceParameters, t::Real = 0) = float_or_func(s.Tsurface, t)
+surface_q_tot(s::AbstractSurfaceParameters, t::Real = 0) = float_or_func(s.qsurface, t)
+sensible_heat_flux(s::AbstractSurfaceParameters, t::Real = 0) = float_or_func(s.shf, t)
+latent_heat_flux(s::AbstractSurfaceParameters, t::Real = 0) = float_or_func(s.lhf, t)
 
 fixed_ustar(::FixedSurfaceFlux{FT, FixedFrictionVelocity}) where {FT} = true
 fixed_ustar(::FixedSurfaceFlux{FT, VariableFrictionVelocity}) where {FT} = false
