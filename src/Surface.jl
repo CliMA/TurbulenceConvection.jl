@@ -63,10 +63,10 @@ function update(
     surf.obukhov_length = result.L_MO
     surf.cm = result.Cd
     surf.ch = result.Ch
-    surf.rho_uflux = result.ρτxz
-    surf.rho_vflux = result.ρτyz
-    surf.rho_hflux = shf / TD.cp_m(ts_in)
-    surf.rho_qtflux = lhf / TD.latent_heat_vapor(ts_in)
+    surf.ρu_flux = result.ρτxz
+    surf.ρv_flux = result.ρτyz
+    surf.ρθ_liq_ice_flux = shf / TD.cp_m(ts_in)
+    surf.ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in)
     return
 end
 
@@ -114,10 +114,10 @@ function update(
     surf.lhf = result.lhf
     surf.shf = result.shf
     surf.ustar = result.ustar
-    surf.rho_uflux = result.ρτxz
-    surf.rho_vflux = result.ρτyz
-    surf.rho_hflux = surf.shf / TD.cp_m(ts_in)
-    surf.rho_qtflux = surf.lhf / TD.latent_heat_vapor(ts_in)
+    surf.ρu_flux = result.ρτxz
+    surf.ρv_flux = result.ρτyz
+    surf.ρθ_liq_ice_flux = surf.shf / TD.cp_m(ts_in)
+    surf.ρq_tot_flux = surf.lhf / TD.latent_heat_vapor(ts_in)
     surf.bflux = result.buoy_flux
     return
 end
@@ -170,10 +170,10 @@ function update(
     surf.lhf = result.lhf
     surf.shf = result.shf
     surf.ustar = result.ustar
-    surf.rho_uflux = result.ρτxz
-    surf.rho_vflux = result.ρτyz
-    surf.rho_hflux = surf.shf / TD.cp_m(ts_in)
-    surf.rho_qtflux = surf.lhf / TD.latent_heat_vapor(ts_in)
+    surf.ρu_flux = result.ρτxz
+    surf.ρv_flux = result.ρτyz
+    surf.ρθ_liq_ice_flux = surf.shf / TD.cp_m(ts_in)
+    surf.ρq_tot_flux = surf.lhf / TD.latent_heat_vapor(ts_in)
     surf.bflux = result.buoy_flux
     return
 end
@@ -220,10 +220,10 @@ function update(
     surf.lhf = result.lhf * 0.0
     surf.shf = result.shf
     surf.ustar = result.ustar
-    surf.rho_uflux = result.ρτxz
-    surf.rho_vflux = result.ρτyz
-    surf.rho_hflux = surf.shf / TD.cp_m(ts_in)
-    surf.rho_qtflux = surf.lhf / TD.latent_heat_vapor(ts_in)
+    surf.ρu_flux = result.ρτxz
+    surf.ρv_flux = result.ρτyz
+    surf.ρθ_liq_ice_flux = surf.shf / TD.cp_m(ts_in)
+    surf.ρq_tot_flux = surf.lhf / TD.latent_heat_vapor(ts_in)
     surf.bflux = result.buoy_flux
     return
 end
@@ -276,10 +276,10 @@ function update(
     surf.lhf = result.lhf * 0.0
     surf.shf = result.shf
     surf.ustar = result.ustar
-    surf.rho_uflux = result.ρτxz
-    surf.rho_vflux = result.ρτyz
-    surf.rho_hflux = surf.shf / TD.cp_m(ts_in)
-    surf.rho_qtflux = surf.lhf / TD.latent_heat_vapor(ts_in)
+    surf.ρu_flux = result.ρτxz
+    surf.ρv_flux = result.ρτyz
+    surf.ρθ_liq_ice_flux = surf.shf / TD.cp_m(ts_in)
+    surf.ρq_tot_flux = surf.lhf / TD.latent_heat_vapor(ts_in)
     surf.bflux = result.buoy_flux
     return
 end

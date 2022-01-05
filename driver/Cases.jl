@@ -1068,8 +1068,8 @@ end
 function update_surface(self::CasesBase{TRMM_LBA}, surf_params, grid, state, gm, t::Real, param_set)
     update(self.surf, surf_params, grid, state, gm, t, param_set)
     # fix momentum fluxes to zero as they are not used in the paper
-    self.surf.rho_uflux = 0.0
-    self.surf.rho_vflux = 0.0
+    self.surf.ρu_flux = 0.0
+    self.surf.ρv_flux = 0.0
 end
 
 function update_forcing(self::CasesBase{TRMM_LBA}, grid, state, gm, t::Real, param_set)
@@ -1199,8 +1199,8 @@ end
 function update_surface(self::CasesBase{ARM_SGP}, surf_params, grid, state, gm, t::Real, param_set)
     update(self.surf, surf_params, grid, state, gm, t, param_set)
     # fix momentum fluxes to zero as they are not used in the paper
-    self.surf.rho_uflux = 0.0
-    self.surf.rho_vflux = 0.0
+    self.surf.ρu_flux = 0.0
+    self.surf.ρv_flux = 0.0
 end
 
 function update_forcing(self::CasesBase{ARM_SGP}, grid, state, gm, t::Real, param_set)
