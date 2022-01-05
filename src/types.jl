@@ -399,10 +399,10 @@ Base.@kwdef mutable struct SurfaceBase{T, NT}
     cq::Float64 = 0
     bflux::Float64 = 0
     ustar::Float64 = 0
-    rho_qtflux::Float64 = 0
-    rho_hflux::Float64 = 0
-    rho_uflux::Float64 = 0
-    rho_vflux::Float64 = 0
+    ρq_tot_flux::Float64 = 0
+    ρθ_liq_ice_flux::Float64 = 0
+    ρu_flux::Float64 = 0
+    ρv_flux::Float64 = 0
     obukhov_length::Float64 = 0
     Ri_bulk_crit::Float64 = 0
     ustar_fixed::Bool = false

@@ -185,10 +185,10 @@ function compute_gm_tendencies!(
     @. tendencies_gm.q_tot += -∇c(wvec(massflux_qt)) * α0_c
 
     a_en = aux_en.area
-    aeKHq_tot_bc = surf.rho_qtflux / a_en[kc_surf]
-    aeKHθ_liq_ice_bc = surf.rho_hflux / a_en[kc_surf]
-    aeKMu_bc = surf.rho_uflux / a_en[kc_surf]
-    aeKMv_bc = surf.rho_vflux / a_en[kc_surf]
+    aeKHq_tot_bc = surf.ρq_tot_flux / a_en[kc_surf]
+    aeKHθ_liq_ice_bc = surf.ρθ_liq_ice_flux / a_en[kc_surf]
+    aeKMu_bc = surf.ρu_flux / a_en[kc_surf]
+    aeKMv_bc = surf.ρv_flux / a_en[kc_surf]
 
     tbc = (; top = CCO.SetValue(wvec(FT(0))))
     ∇aeKH_q_tot = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKHq_tot_bc)), tbc...)
@@ -231,10 +231,10 @@ function compute_diffusive_fluxes(
     @. aux_tc_f.ρ_ae_KH = IfKH(aeKH) * ρ0_f
     @. aux_tc_f.ρ_ae_KM = IfKM(aeKM) * ρ0_f
 
-    aeKHq_tot_bc = -surf.rho_qtflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
-    aeKHθ_liq_ice_bc = -surf.rho_hflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
-    aeKMu_bc = -surf.rho_uflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
-    aeKMv_bc = -surf.rho_vflux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
+    aeKHq_tot_bc = -surf.ρq_tot_flux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    aeKHθ_liq_ice_bc = -surf.ρθ_liq_ice_flux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    aeKMu_bc = -surf.ρu_flux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
+    aeKMv_bc = -surf.ρv_flux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
 
     ∇q_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_tot_bc), top = CCO.SetDivergence(FT(0)))
     ∇θ_liq_ice_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHθ_liq_ice_bc), top = CCO.SetDivergence(FT(0)))
@@ -339,8 +339,8 @@ function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State,
         prog_up_f[i].ρaw[kf_surf] = ρ0_f[kf_surf] * edmf.w_surface_bc[i]
     end
 
-    flux1 = surface.rho_hflux
-    flux2 = surface.rho_qtflux
+    flux1 = surface.ρθ_liq_ice_flux
+    flux2 = surface.ρq_tot_flux
     zLL = grid.zc[kc_surf]
     ustar = surface.ustar
     oblength = surface.obukhov_length
@@ -366,8 +366,8 @@ function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state:
     oblength = surf.obukhov_length
     α0LL = center_ref_state(state).α0[kc_surf]
     prog_gm = center_prog_grid_mean(state)
-    qt_var = get_surface_variance(surf.rho_qtflux * α0LL, surf.rho_qtflux * α0LL, ustar, zLL, oblength)
-    h_var = get_surface_variance(surf.rho_hflux * α0LL, surf.rho_hflux * α0LL, ustar, zLL, oblength)
+    qt_var = get_surface_variance(surf.ρq_tot_flux * α0LL, surf.ρq_tot_flux * α0LL, ustar, zLL, oblength)
+    h_var = get_surface_variance(surf.ρθ_liq_ice_flux * α0LL, surf.ρθ_liq_ice_flux * α0LL, ustar, zLL, oblength)
 
     if surf.bflux > 0.0
         a_total = edmf.surface_area
