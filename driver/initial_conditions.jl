@@ -13,7 +13,6 @@ function initialize_edmf(
 )
     initialize_covariance(edmf, grid, state)
     up = edmf.UpdVar
-    surf = case.surf
     surf_params = case.surf_params
     param_set = TC.parameter_set(gm)
     aux_tc = TC.center_aux_turbconv(state)
@@ -24,7 +23,7 @@ function initialize_edmf(
         ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
     end
-    TC.update_surface(case, surf_params, grid, state, gm, t, param_set)
+    surf = TC.get_surface(surf_params, grid, state, gm, t, param_set)
     TC.compute_updraft_surface_bc(edmf, grid, state, surf)
     if case.casename == "DryBubble"
         initialize_updrafts_DryBubble(edmf, grid, state, up, gm)

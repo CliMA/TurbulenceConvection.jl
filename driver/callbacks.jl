@@ -31,7 +31,8 @@ function affect_io!(integrator)
     TC.io(io_nt.aux, Stats, state)
     TC.io(io_nt.diagnostics, Stats, diagnostics)
 
-    TC.io(case, grid, state, Stats) # #removeVarsHack
+    surf = TC.get_surface(case.surf_params, grid, state, gm, t, param_set)
+    TC.io(surf, grid, state, Stats)
     TC.io(edmf, grid, state, Stats) # #removeVarsHack
 
     ODE.u_modified!(integrator, false) # We're legitamately not mutating `u` (the state vector)
@@ -40,8 +41,10 @@ end
 function affect_filter!(integrator)
     UnPack.@unpack edmf, grid, gm, aux, case = integrator.p
     t = integrator.t
+    param_set = TC.parameter_set(gm)
     state = TC.State(integrator.u, aux, integrator.du)
-    TC.affect_filter!(edmf, grid, state, gm, case.surf, case.casename, t)
+    surf = TC.get_surface(case.surf_params, grid, state, gm, t, param_set)
+    TC.affect_filter!(edmf, grid, state, gm, surf, case.casename, t)
 
     # We're lying to OrdinaryDiffEq.jl, in order to avoid
     # paying for an additional `∑tendencies!` call, which is required

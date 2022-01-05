@@ -280,12 +280,12 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     state = State(prog, aux, tendencies)
 
     Δt = TS.dt
-    surf = case.surf
+    param_set = parameter_set(gm)
+    surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
     force = case.Fo
     radiation = case.Rad
     gm = gm
     up = edmf.UpdVar
-    param_set = parameter_set(gm)
     en_thermo = edmf.en_thermo
     precip_model = edmf.precip_model
 

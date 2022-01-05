@@ -262,6 +262,7 @@ Base.@kwdef struct FixedSurfaceFlux{FT, FVT <: FrictionVelocityType, TS, QS, SHF
     cq::FT = FT(0)
     Ri_bulk_crit::FT = FT(0)
     ustar::FT = FT(0)
+    zero_uv_fluxes::Bool = false
 end
 
 function FixedSurfaceFlux(
@@ -388,7 +389,7 @@ latent_heat_flux(s::AbstractSurfaceParameters, t::Real = 0) = float_or_func(s.lh
 fixed_ustar(::FixedSurfaceFlux{FT, FixedFrictionVelocity}) where {FT} = true
 fixed_ustar(::FixedSurfaceFlux{FT, VariableFrictionVelocity}) where {FT} = false
 
-Base.@kwdef mutable struct SurfaceBase{T, NT}
+Base.@kwdef struct SurfaceBase{T}
     zrough::Float64 = 0
     Tsurface::Float64 = 0
     qsurface::Float64 = 0
@@ -404,15 +405,6 @@ Base.@kwdef mutable struct SurfaceBase{T, NT}
     ρu_flux::Float64 = 0
     ρv_flux::Float64 = 0
     obukhov_length::Float64 = 0
-    Ri_bulk_crit::Float64 = 0
-    ustar_fixed::Bool = false
-    ref_params::NT
-end
-
-function SurfaceBase(::Type{T}; namelist::Dict, ref_params) where {T}
-    Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
-    NT = typeof(ref_params)
-    return SurfaceBase{T, NT}(; Ri_bulk_crit, ref_params)
 end
 
 struct ForcingBaseType end
@@ -474,25 +466,20 @@ rad_type(::RadiationBase{T}) where {T} = T
 
 const stepR = range(10, 360; length = 36) .* 60
 
-Base.@kwdef mutable struct CasesBase{T, S, SURFP, F, R, SR, RMAT, LESDataT}
+Base.@kwdef mutable struct CasesBase{T, SURFP, F, R, SR, RMAT, LESDataT}
     case::T
-    casename::String = "default_casename"
-    inversion_option::String = "default_inversion_option"
-    les_filename::String = "None"
-    surf::S
+    casename::String
+    inversion_option::String
     surf_params::SURFP
     Fo::F
     Rad::R
     rad_time::SR
     rad::RMAT
-    lhf0::Float64 = 0
-    shf0::Float64 = 0
     LESDat::LESDataT
 end
 
 function CasesBase(
     case::T;
-    surf,
     surf_params,
     Fo,
     Rad,
@@ -501,17 +488,15 @@ function CasesBase(
     LESDat = nothing,
     kwargs...,
 ) where {T}
-    S = typeof(surf)
     F = typeof(Fo)
     R = typeof(Rad)
     SR = typeof(rad_time)
     RMAT = typeof(rad)
     SURFP = typeof(surf_params)
     LESDataT = typeof(LESDat)
-    CasesBase{T, S, SURFP, F, R, SR, RMAT, LESDataT}(;
+    CasesBase{T, SURFP, F, R, SR, RMAT, LESDataT}(;
         case = case,
         casename = string(nameof(T)),
-        surf,
         surf_params,
         Fo,
         Rad,
