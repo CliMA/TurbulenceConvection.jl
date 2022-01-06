@@ -62,7 +62,6 @@ function Simulation1d(namelist)
     ref_params = Cases.reference_params(case_type, grid, param_set, namelist)
 
     gm = TC.GridMeanVariables(param_set)
-    surf = TC.SurfaceBase(Cases.get_surface_type(case_type); namelist, ref_params)
     Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
     Rad = TC.RadiationBase(case_type)
     TS = TC.TimeStepping(namelist)
@@ -91,7 +90,7 @@ function Simulation1d(namelist)
     Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)
     surf_params = Cases.surface_params(case_type, grid, state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
-    case = Cases.CasesBase(case_type, namelist; surf, surf_params, Fo, Rad, spk...)
+    case = Cases.CasesBase(case_type, namelist; surf_params, Fo, Rad, spk...)
 
     io_nt = (;
         ref_state = TC.io_dictionary_ref_state(),
@@ -125,7 +124,6 @@ function TurbulenceConvection.initialize(sim::Simulation1d)
     Cases.initialize_profiles(sim.case, sim.grid, sim.gm, state)
     satadjust(sim.gm, sim.grid, sim.state)
 
-    Cases.initialize_surface(sim.case, sim.grid, state, sim.param_set)
     Cases.initialize_forcing(sim.case, sim.grid, state, sim.gm, sim.param_set)
     Cases.initialize_radiation(sim.case, sim.grid, state, sim.gm, sim.param_set)
 
@@ -138,7 +136,7 @@ function TurbulenceConvection.initialize(sim::Simulation1d)
     TC.initialize_io(sim.io_nt.aux, sim.Stats)
     TC.initialize_io(sim.io_nt.diagnostics, sim.Stats)
 
-    # TODO: depricate
+    # TODO: deprecate
     TC.initialize_io(sim.gm, sim.Stats)
     TC.initialize_io(sim.case, sim.Stats)
     TC.initialize_io(sim.edmf, sim.Stats)
@@ -149,8 +147,9 @@ function TurbulenceConvection.initialize(sim::Simulation1d)
     TC.io(sim.io_nt.aux, sim.Stats, state)
     TC.io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
 
-    # TODO: depricate
-    TC.io(sim.case, sim.grid, state, sim.Stats)
+    # TODO: deprecate
+    surf = TC.get_surface(sim.case.surf_params, sim.grid, state, sim.gm, t, sim.param_set)
+    TC.io(surf, sim.grid, state, sim.Stats)
     TC.io(sim.edmf, sim.grid, state, sim.Stats)
     TC.close_files(sim.Stats)
 

@@ -1,6 +1,5 @@
 
-function update(
-    surf::SurfaceBase{SurfaceFixedFlux},
+function get_surface(
     surf_params::FixedSurfaceFlux,
     grid::Grid,
     state::State,
@@ -56,22 +55,22 @@ function update(
         SF.Fluxes{FT}(; kwargs...)
     end
     result = SF.surface_conditions(param_set, sc, universal_func, scheme)
-    surf.shf = shf
-    surf.lhf = lhf
-    surf.ustar = fixed_ustar(surf_params) ? surf_params.ustar : result.ustar
-    surf.bflux = bflux
-    surf.obukhov_length = result.L_MO
-    surf.cm = result.Cd
-    surf.ch = result.Ch
-    surf.ρu_flux = result.ρτxz
-    surf.ρv_flux = result.ρτyz
-    surf.ρθ_liq_ice_flux = shf / TD.cp_m(ts_in)
-    surf.ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in)
-    return
+    return SurfaceBase{SurfaceFixedFlux}(;
+        shf = shf,
+        lhf = lhf,
+        ustar = fixed_ustar(surf_params) ? surf_params.ustar : result.ustar,
+        bflux = bflux,
+        obukhov_length = result.L_MO,
+        cm = result.Cd,
+        ch = result.Ch,
+        ρu_flux = surf_params.zero_uv_fluxes ? 0 : result.ρτxz,
+        ρv_flux = surf_params.zero_uv_fluxes ? 0 : result.ρτyz,
+        ρθ_liq_ice_flux = shf / TD.cp_m(ts_in),
+        ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in),
+    )
 end
 
-function update(
-    surf::SurfaceBase{SurfaceFixedCoeffs},
+function get_surface(
     surf_params::FixedSurfaceCoeffs,
     grid::Grid,
     state::State,
@@ -108,22 +107,25 @@ function update(
     vals_int = SF.InteriorValues(z_in, u_in, ts_in)
     sc = SF.Coefficients{FT}(state_in = vals_int, state_sfc = vals_sfc, Cd = cm, Ch = ch, z0m = zrough, z0b = zrough)
     result = SF.surface_conditions(param_set, sc, universal_func, scheme)
-    surf.cm = result.Cd
-    surf.ch = result.Ch
-    surf.obukhov_length = result.L_MO
-    surf.lhf = result.lhf
-    surf.shf = result.shf
-    surf.ustar = result.ustar
-    surf.ρu_flux = result.ρτxz
-    surf.ρv_flux = result.ρτyz
-    surf.ρθ_liq_ice_flux = surf.shf / TD.cp_m(ts_in)
-    surf.ρq_tot_flux = surf.lhf / TD.latent_heat_vapor(ts_in)
-    surf.bflux = result.buoy_flux
-    return
+    lhf = result.lhf
+    shf = result.shf
+
+    return SurfaceBase{SurfaceFixedCoeffs}(;
+        cm = result.Cd,
+        ch = result.Ch,
+        obukhov_length = result.L_MO,
+        lhf = lhf,
+        shf = shf,
+        ustar = result.ustar,
+        ρu_flux = result.ρτxz,
+        ρv_flux = result.ρτyz,
+        ρθ_liq_ice_flux = shf / TD.cp_m(ts_in),
+        ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in),
+        bflux = result.buoy_flux,
+    )
 end
 
-function update(
-    surf::SurfaceBase{SurfaceMoninObukhov},
+function get_surface(
     surf_params::MoninObukhovSurface,
     grid::Grid,
     state::State,
@@ -161,25 +163,27 @@ function update(
     vals_int = SF.InteriorValues(z_in, u_in, ts_in)
     sc = SF.ValuesOnly{FT}(state_in = vals_int, state_sfc = vals_sfc, z0m = zrough, z0b = zrough)
     result = SF.surface_conditions(param_set, sc, universal_func, scheme)
-    surf.zrough = zrough
-    surf.Tsurface = Tsurface
-    surf.qsurface = qsurface
-    surf.cm = result.Cd
-    surf.ch = result.Ch
-    surf.obukhov_length = result.L_MO
-    surf.lhf = result.lhf
-    surf.shf = result.shf
-    surf.ustar = result.ustar
-    surf.ρu_flux = result.ρτxz
-    surf.ρv_flux = result.ρτyz
-    surf.ρθ_liq_ice_flux = surf.shf / TD.cp_m(ts_in)
-    surf.ρq_tot_flux = surf.lhf / TD.latent_heat_vapor(ts_in)
-    surf.bflux = result.buoy_flux
-    return
+    lhf = result.lhf
+    shf = result.shf
+    return SurfaceBase{SurfaceMoninObukhov}(;
+        zrough = zrough,
+        Tsurface = Tsurface,
+        qsurface = qsurface,
+        cm = result.Cd,
+        ch = result.Ch,
+        obukhov_length = result.L_MO,
+        lhf = lhf,
+        shf = shf,
+        ustar = result.ustar,
+        ρu_flux = result.ρτxz,
+        ρv_flux = result.ρτyz,
+        ρθ_liq_ice_flux = shf / TD.cp_m(ts_in),
+        ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in),
+        bflux = result.buoy_flux,
+    )
 end
 
-function update(
-    surf::SurfaceBase{SurfaceMoninObukhovDry},
+function get_surface(
     surf_params::DryMoninObukhovSurface,
     grid::Grid,
     state::State,
@@ -214,22 +218,24 @@ function update(
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
     result = SF.surface_conditions(param_set, sc, universal_func, scheme)
-    surf.cm = result.Cd
-    surf.ch = result.Ch
-    surf.obukhov_length = result.L_MO
-    surf.lhf = result.lhf * 0.0
-    surf.shf = result.shf
-    surf.ustar = result.ustar
-    surf.ρu_flux = result.ρτxz
-    surf.ρv_flux = result.ρτyz
-    surf.ρθ_liq_ice_flux = surf.shf / TD.cp_m(ts_in)
-    surf.ρq_tot_flux = surf.lhf / TD.latent_heat_vapor(ts_in)
-    surf.bflux = result.buoy_flux
-    return
+    lhf = result.lhf
+    shf = result.shf
+    return SurfaceBase{SurfaceMoninObukhovDry}(;
+        cm = result.Cd,
+        ch = result.Ch,
+        obukhov_length = result.L_MO,
+        lhf = result.lhf * 0.0,
+        shf = result.shf,
+        ustar = result.ustar,
+        ρu_flux = result.ρτxz,
+        ρv_flux = result.ρτyz,
+        ρθ_liq_ice_flux = shf / TD.cp_m(ts_in),
+        ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in),
+        bflux = result.buoy_flux,
+    )
 end
 
-function update(
-    surf::SurfaceBase{SurfaceSullivanPatton},
+function get_surface(
     surf_params::SullivanPattonSurface,
     grid::Grid,
     state::State,
@@ -269,17 +275,20 @@ function update(
     vals_int = SF.InteriorValues(z_in, u_in, ts_in)
     sc = SF.ValuesOnly{FT}(state_in = vals_int, state_sfc = vals_sfc, z0m = zrough, z0b = zrough)
     result = SF.surface_conditions(param_set, sc, universal_func, scheme)
-    surf.qsurface = qsurface
-    surf.cm = result.Cd
-    surf.ch = result.Ch
-    surf.obukhov_length = result.L_MO
-    surf.lhf = result.lhf * 0.0
-    surf.shf = result.shf
-    surf.ustar = result.ustar
-    surf.ρu_flux = result.ρτxz
-    surf.ρv_flux = result.ρτyz
-    surf.ρθ_liq_ice_flux = surf.shf / TD.cp_m(ts_in)
-    surf.ρq_tot_flux = surf.lhf / TD.latent_heat_vapor(ts_in)
-    surf.bflux = result.buoy_flux
-    return
+    lhf = result.lhf
+    shf = result.shf
+    return SurfaceBase{SurfaceSullivanPatton}(;
+        qsurface = qsurface,
+        cm = result.Cd,
+        ch = result.Ch,
+        obukhov_length = result.L_MO,
+        lhf = lhf * 0.0, # TODO: why are we zero-ing this out?
+        shf = shf,
+        ustar = result.ustar,
+        ρu_flux = result.ρτxz,
+        ρv_flux = result.ρτyz,
+        ρθ_liq_ice_flux = shf / TD.cp_m(ts_in),
+        ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in),
+        bflux = result.buoy_flux,
+    )
 end

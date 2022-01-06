@@ -15,8 +15,8 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, cas
     c_m = CPEDMF.c_m(param_set)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
-    surf = case.surf
     surf_params = case.surf_params
+    surf = get_surface(surf_params, grid, state, gm, t, param_set)
     obukhov_length = surf.obukhov_length
     FT = eltype(grid)
     prog_gm = center_prog_grid_mean(state)
@@ -233,7 +233,6 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, cas
     get_GMV_CoVar(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
     get_GMV_CoVar(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
 
-    update_surface(case, surf_params, grid, state, gm, t, param_set)
     update_forcing(case, grid, state, gm, t, param_set)
     update_radiation(case, grid, state, gm, t, param_set)
 
