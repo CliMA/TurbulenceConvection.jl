@@ -686,7 +686,7 @@ function CasesBase(case::TRMM_LBA, namelist; kwargs...)
     return TC.CasesBase(case; inversion_option, kwargs...)
 end
 ForcingBase(case::TRMM_LBA, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
+    ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false, kwargs...)
 
 function reference_params(::TRMM_LBA, grid::Grid, param_set::APS, namelist)
     molmass_ratio = CPP.molmass_ratio(param_set)
@@ -794,9 +794,8 @@ function surface_params(case::TRMM_LBA, grid::TC.Grid, state::TC.State, param_se
     return TC.FixedSurfaceFlux(FT, TC.FixedFrictionVelocity; kwargs...)
 end
 
-function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, gm, param_set)
-
-    self.rad_time = range(10, 360; length = 36) .* 60
+function forcing_kwargs(::TRMM_LBA, namelist)
+    rad_time = range(10, 360; length = 36) .* 60
     #! format: off
     z_in         = arr_type([42.5, 200.92, 456.28, 743, 1061.08, 1410.52, 1791.32, 2203.48, 2647,3121.88, 3628.12,
                              4165.72, 4734.68, 5335, 5966.68, 6629.72, 7324.12,
@@ -912,56 +911,24 @@ function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, gm, pa
                            0.255,   0.21,  0.325,  0.146,      0,      0,      0,      0,      0]] ./ 86400
 
     #! format: on
-    # TODO: check translation
-    rad_in = reduce(vcat, rad_in')
-    A = hcat(map(1:36) do tt
-        a = grid.zc
-        b = z_in
-        c = reshape(rad_in[tt, :], size(rad_in, 2))
-        pyinterp(a, b, c)
-    end...)
-    A = A'
+    rad_in = hcat(rad_in...)'
+    return (; rad = Dierckx.Spline2D(rad_time, z_in, rad_in; kx = 1, ky = 1))
+end
 
-    self.rad = zeros(size(A, 1), TC.n_cells(grid))
-    self.rad .= A # store matrix in self
-    ind1 = Int(trunc(10.0 / 600.0)) + 1
-    ind2 = Int(ceil(10.0 / 600.0))
+function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, gm, param_set)
     aux_gm = TC.center_aux_grid_mean(state)
+    rad = self.Fo.rad
     @inbounds for k in real_center_indices(grid)
-        aux_gm.dTdt[k] = if 10 % 600.0 == 0
-            self.rad[ind1, k]
-        else
-            (self.rad[ind2, k] - self.rad[ind1, k]) / (self.rad_time[ind2] - self.rad_time[ind1]) * (10.0) +
-            self.rad[ind1, k]
-        end
+        aux_gm.dTdt[k] = rad(0, grid.zc[k].z)
     end
     return nothing
 end
 
 function update_forcing(self::CasesBase{TRMM_LBA}, grid, state, gm, t::Real, param_set)
-
     aux_gm = TC.center_aux_grid_mean(state)
-    ind2 = Int(ceil(t / 600.0)) + 1
-    ind1 = Int(trunc(t / 600.0)) + 1
-    rad_time = self.rad_time
-    rad = self.rad
+    rad = self.Fo.rad
     @inbounds for k in real_center_indices(grid)
-        aux_gm.dTdt[k] = if grid.zc[k] >= 22699.48
-            0.0
-        else
-            if t < 600.0 # first 10 min use the radiative forcing of t=10min (as in the paper)
-                rad[1, k]
-            elseif t < 21600.0 && ind2 < 37
-                if t % 600.0 == 0
-                    rad[ind1, k]
-                else
-                    (rad[ind2, k] - rad[ind1, k]) / (rad_time[ind2 - 1] - rad_time[ind1 - 1]) * (t - rad_time[ind1 - 1]) + rad[ind1, k]
-                end
-            else
-                # TODO: remove hard-coded index
-                rad[36, k]
-            end
-        end
+        aux_gm.dTdt[k] = rad(t, grid.zc[k].z)
     end
 end
 

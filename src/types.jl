@@ -439,7 +439,7 @@ LES-driven forcing
 
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct ForcingBase{T}
+Base.@kwdef struct ForcingBase{T, R}
     "Boolean specifying whether Coriolis forcing is applied"
     apply_coriolis::Bool = false
     "Boolean specifying whether subsidence forcing is applied"
@@ -448,9 +448,11 @@ Base.@kwdef struct ForcingBase{T}
     coriolis_param::Float64 = 0
     "Momentum relaxation timescale"
     nudge_tau::Float64 = 0.0
+    "Radiative forcing"
+    rad::R
 end
 
-ForcingBase(::Type{T}; kwargs...) where {T} = ForcingBase{T}(; kwargs...)
+ForcingBase(::Type{T}; rad = nothing, kwargs...) where {T} = ForcingBase{T, typeof(rad)}(; rad, kwargs...)
 
 force_type(::ForcingBase{T}) where {T} = T
 
@@ -464,44 +466,27 @@ end
 
 rad_type(::RadiationBase{T}) where {T} = T
 
-const stepR = range(10, 360; length = 36) .* 60
-
-Base.@kwdef mutable struct CasesBase{T, SURFP, F, R, SR, RMAT, LESDataT}
+Base.@kwdef struct CasesBase{T, SURFP, F, R, LESDataT}
     case::T
     casename::String
     inversion_option::String
     surf_params::SURFP
     Fo::F
     Rad::R
-    rad_time::SR
-    rad::RMAT
     LESDat::LESDataT
 end
 
-function CasesBase(
-    case::T;
-    surf_params,
-    Fo,
-    Rad,
-    rad_time = stepR,
-    rad = zeros(1, 1),
-    LESDat = nothing,
-    kwargs...,
-) where {T}
+function CasesBase(case::T; surf_params, Fo, Rad, LESDat = nothing, kwargs...) where {T}
     F = typeof(Fo)
     R = typeof(Rad)
-    SR = typeof(rad_time)
-    RMAT = typeof(rad)
     SURFP = typeof(surf_params)
     LESDataT = typeof(LESDat)
-    CasesBase{T, SURFP, F, R, SR, RMAT, LESDataT}(;
+    CasesBase{T, SURFP, F, R, LESDataT}(;
         case = case,
         casename = string(nameof(T)),
         surf_params,
         Fo,
         Rad,
-        rad_time,
-        rad,
         LESDat,
         kwargs...,
     )
