@@ -26,14 +26,26 @@ function update_n(sim, tendencies, ::Val{N}) where {N}
     return nothing
 end
 
-function init_sim(case_name)
-    @info "Initializing $case_name for single timestep, with no IO."
+function init_sim(case_name; skip_io = true, single_timestep = true, prefix = "")
+    if single_timestep && skip_io
+        @info "Initializing $case_name for single timestep, with no IO."
+    elseif single_timestep
+        @info "Initializing $case_name for single timestep."
+    elseif skip_io
+        @info "Initializing $case_name with no IO."
+    else
+        @info "Initializing $case_name with IO."
+    end
     @info "call update_n(sim, tendencies, n) to run update n-times"
     namelist = NameList.default_namelist(case_name)
-    namelist["time_stepping"]["t_max"] = namelist["time_stepping"]["dt_max"]
-    namelist["stats_io"]["frequency"] = 10.0e10
-    namelist["stats_io"]["skip"] = true
-    namelist["meta"]["uuid"] = "01"
+    if single_timestep
+        namelist["time_stepping"]["t_max"] = namelist["time_stepping"]["dt_max"]
+    end
+    if skip_io
+        namelist["stats_io"]["frequency"] = 10.0e10
+        namelist["stats_io"]["skip"] = true
+    end
+    namelist["meta"]["uuid"] = "$(prefix)01"
     sim = Simulation1d(namelist)
     TC.initialize(sim)
     return sim
