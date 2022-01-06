@@ -128,6 +128,13 @@ get_surface_type(::GATE_III) = TC.SurfaceFixedCoeffs
 get_surface_type(::GABLS) = TC.SurfaceMoninObukhov
 get_surface_type(::SP) = TC.SurfaceSullivanPatton
 
+inversion_type(::AbstractCaseType) = TC.CriticalRiInversion()
+inversion_type(::TRMM_LBA) = TC.max∇θInversion()
+inversion_type(::ARM_SGP) = TC.max∇θInversion()
+inversion_type(::GATE_III) = TC.max∇θInversion()
+inversion_type(::DYCOMS_RF01) = TC.max∇θInversion()
+inversion_type(::DryBubble) = TC.θρInversion()
+
 get_forcing_type(::AbstractCaseType) = TC.ForcingStandard # default
 get_forcing_type(::Soares) = TC.ForcingNone
 get_forcing_type(::Nieuwstadt) = TC.ForcingNone
@@ -172,11 +179,6 @@ initialize_forcing(self::CasesBase, grid::Grid, state, gm, param_set) = initiali
 #####
 ##### Soares
 #####
-
-function CasesBase(case::Soares, namelist; kwargs...)
-    inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, kwargs...)
-end
 
 ForcingBase(case::Soares, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
@@ -236,11 +238,6 @@ end
 ##### Nieuwstadt
 #####
 
-function CasesBase(case::Nieuwstadt, namelist; kwargs...)
-    inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, kwargs...)
-end
-
 ForcingBase(case::Nieuwstadt, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
@@ -291,11 +288,6 @@ end
 #####
 ##### Bomex
 #####
-
-function CasesBase(case::Bomex, namelist; kwargs...)
-    inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, kwargs...)
-end
 
 ForcingBase(case::Bomex, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
@@ -418,10 +410,6 @@ end
 ##### life_cycle_Tan2018
 #####
 
-function CasesBase(case::life_cycle_Tan2018, namelist; kwargs...)
-    inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, kwargs...)
-end
 ForcingBase(case::life_cycle_Tan2018, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
 
@@ -555,10 +543,6 @@ end
 ##### Rico
 #####
 
-function CasesBase(case::Rico, namelist; kwargs...)
-    inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, kwargs...)
-end
 function ForcingBase(case::Rico, param_set::APS; kwargs...)
     latitude = 18.0
     Omega = CPP.Omega(param_set)
@@ -681,10 +665,6 @@ end
 ##### TRMM_LBA
 #####
 
-function CasesBase(case::TRMM_LBA, namelist; kwargs...)
-    inversion_option = "thetal_maxgrad"
-    return TC.CasesBase(case; inversion_option, kwargs...)
-end
 ForcingBase(case::TRMM_LBA, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false, kwargs...)
 
@@ -936,10 +916,6 @@ end
 ##### ARM_SGP
 #####
 
-function CasesBase(case::ARM_SGP, namelist; kwargs...)
-    inversion_option = "thetal_maxgrad"
-    return TC.CasesBase(case; inversion_option, kwargs...)
-end
 ForcingBase(case::ARM_SGP, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = false, coriolis_param = 8.5e-5)
 
@@ -1051,10 +1027,6 @@ end
 ##### GATE_III
 #####
 
-function CasesBase(case::GATE_III, namelist; kwargs...)
-    inversion_option = "thetal_maxgrad"
-    return TC.CasesBase(case; inversion_option, kwargs...)
-end
 ForcingBase(case::GATE_III, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
@@ -1170,11 +1142,6 @@ end
 ##### DYCOMS_RF01
 #####
 
-function CasesBase(case::DYCOMS_RF01, namelist; kwargs...)
-    inversion_option = "thetal_maxgrad"
-    return TC.CasesBase(case; inversion_option, kwargs...)
-end
-
 function reference_params(::DYCOMS_RF01, grid::Grid, param_set::APS, namelist)
     Pg = 1017.8 * 100.0
     qtg = 9.0 / 1000.0
@@ -1285,10 +1252,6 @@ end
 ##### GABLS
 #####
 
-function CasesBase(case::GABLS, namelist; kwargs...)
-    inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, kwargs...)
-end
 function ForcingBase(case::GABLS, param_set::APS; kwargs...)
     coriolis_param = 1.39e-4 # s^{-1}
     # Omega = CPP.Omega(param_set)
@@ -1365,10 +1328,6 @@ end
 #####
 
 # Not fully implemented yet - Ignacio
-function CasesBase(case::SP, namelist; kwargs...)
-    inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, kwargs...)
-end
 function ForcingBase(case::SP, param_set::APS; kwargs...)
     coriolis_param = 1.0e-4 # s^{-1}
     # Omega = CPP.Omega(param_set)
@@ -1429,10 +1388,6 @@ end
 ##### DryBubble
 #####
 
-function CasesBase(case::DryBubble, namelist; kwargs...)
-    inversion_option = "theta_rho"
-    return TC.CasesBase(case; inversion_option, kwargs...)
-end
 ForcingBase(case::DryBubble, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
@@ -1540,11 +1495,6 @@ end
 #####
 ##### LES_driven_SCM
 #####
-
-function CasesBase(case::LES_driven_SCM, namelist; kwargs...)
-    inversion_option = "critical_Ri"
-    return TC.CasesBase(case; inversion_option, kwargs...)
-end
 
 forcing_kwargs(::LES_driven_SCM, namelist) = (; nudge_tau = namelist["forcing"]["nudging_timescale"])
 
