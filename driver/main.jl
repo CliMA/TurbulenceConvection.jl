@@ -90,7 +90,8 @@ function Simulation1d(namelist)
     Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)
     surf_params = Cases.surface_params(case_type, grid, state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
-    case = Cases.CasesBase(case_type, namelist; surf_params, Fo, Rad, spk...)
+    inversion_type = Cases.inversion_type(case_type)
+    case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad, spk...)
 
     io_nt = (;
         ref_state = TC.io_dictionary_ref_state(),
