@@ -125,7 +125,7 @@ get_case_name(case_type::AbstractCaseType) = string(case_type)
 get_surface_type(::AbstractCaseType) = TC.SurfaceFixedFlux # default
 get_surface_type(::Rico) = TC.SurfaceFixedCoeffs
 get_surface_type(::GATE_III) = TC.SurfaceFixedCoeffs
-get_surface_type(::GABLS) = TC.SurfaceMoninObukhovDry
+get_surface_type(::GABLS) = TC.SurfaceMoninObukhov
 get_surface_type(::SP) = TC.SurfaceSullivanPatton
 
 get_forcing_type(::AbstractCaseType) = TC.ForcingStandard # default
@@ -1346,7 +1346,7 @@ function surface_params(case::GABLS, grid::TC.Grid, state::TC.State, param_set; 
     zrough = 0.1
 
     kwargs = (; Tsurface, qsurface, shf, lhf, zrough)
-    return TC.DryMoninObukhovSurface(FT; kwargs...)
+    return TC.MoninObukhovSurface(FT; kwargs...)
 end
 
 function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, state, gm, param_set)

@@ -154,7 +154,7 @@ function get_surface(
 
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
-    ts_sfc = thermo_state_pTq(param_set, p0_f_surf, Tsurface, qsurface)
+    ts_sfc = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
     ts_in = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, qsurface)
 
     u_sfc = SA.SVector{2, FT}(0, 0)
@@ -184,58 +184,7 @@ function get_surface(
 end
 
 function get_surface(
-    surf_params::DryMoninObukhovSurface,
-    grid::Grid,
-    state::State,
-    gm::GridMeanVariables,
-    t::Real,
-    param_set::APS,
-)
-    kc_surf = kc_surface(grid)
-    kf_surf = kf_surface(grid)
-    FT = eltype(grid)
-    z_sfc = FT(0)
-    z_in = grid.zc[kc_surf].z
-    p0_f_surf = face_ref_state(state).p0[kf_surf]
-    p0_c_surf = center_ref_state(state).p0[kc_surf]
-    prog_gm = center_prog_grid_mean(state)
-    aux_gm = center_aux_grid_mean(state)
-    u_gm_surf = prog_gm.u[kc_surf]
-    v_gm_surf = prog_gm.v[kc_surf]
-    q_tot_gm_surf = prog_gm.q_tot[kc_surf]
-    θ_liq_ice_gm_surf = prog_gm.θ_liq_ice[kc_surf]
-    Tsurface = surface_temperature(surf_params, t)
-    qsurface = surface_q_tot(surf_params, t)
-    zrough = surf_params.zrough
-
-    ts_sfc = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
-    ts_in = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, qsurface)
-    u_sfc = SA.SVector{2, FT}(0, 0)
-    u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
-    vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
-    vals_int = SF.InteriorValues(z_in, u_in, ts_in)
-    sc = SF.ValuesOnly{FT}(state_in = vals_int, state_sfc = vals_sfc, z0m = zrough, z0b = zrough)
-    universal_func = UF.Businger()
-    scheme = SF.FVScheme()
-    result = SF.surface_conditions(param_set, sc, universal_func, scheme)
-    lhf = result.lhf
-    shf = result.shf
-    return SurfaceBase{SurfaceMoninObukhovDry}(;
-        cm = result.Cd,
-        ch = result.Ch,
-        obukhov_length = result.L_MO,
-        lhf = result.lhf * 0.0,
-        shf = result.shf,
-        ustar = result.ustar,
-        ρu_flux = result.ρτxz,
-        ρv_flux = result.ρτyz,
-        ρθ_liq_ice_flux = shf / TD.cp_m(ts_in),
-        ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in),
-        bflux = result.buoy_flux,
-    )
-end
-
-function get_surface(
+    surf::SurfaceBase{SurfaceSullivanPatton},
     surf_params::SullivanPattonSurface,
     grid::Grid,
     state::State,
