@@ -233,16 +233,9 @@ Base.@kwdef struct sde_struct{T}
     dt::Float64
 end
 
-# SurfaceMoninObukhovDry:
-#     Needed for dry cases (qt=0). They have to be initialized with nonzero qtg for the
-#     reference profiles. This surface subroutine sets the latent heat flux to zero
-#     to prevent errors due to nonzero qtg in vars such as the obukhov_length.
-# SurfaceSullivanPatton
-#     Not fully implemented yet. Maybe not needed - Ignacio
 struct SurfaceFixedFlux end
 struct SurfaceFixedCoeffs end
 struct SurfaceMoninObukhov end
-struct SurfaceMoninObukhovDry end
 struct SurfaceSullivanPatton end
 
 abstract type FrictionVelocityType end
@@ -302,29 +295,6 @@ function FixedSurfaceCoeffs(
     CH = typeof(ch)
     CM = typeof(cm)
     return FixedSurfaceCoeffs{FT, TS, QS, CH, CM}(; Tsurface, qsurface, ch, cm, kwargs...)
-end
-
-Base.@kwdef struct DryMoninObukhovSurface{FT, TS, QS, SHF, LHF} <: AbstractSurfaceParameters{FT}
-    zrough::FT = FT(0)
-    Tsurface::TS = FT(0)
-    qsurface::QS = FT(0)
-    shf::SHF = FT(0)
-    lhf::LHF = FT(0)
-end
-
-function DryMoninObukhovSurface(
-    ::Type{FT};
-    Tsurface::FloatOrFunc{FT},
-    qsurface::FloatOrFunc{FT},
-    shf::FloatOrFunc{FT},
-    lhf::FloatOrFunc{FT},
-    kwargs...,
-) where {FT, FVT}
-    TS = typeof(Tsurface)
-    QS = typeof(qsurface)
-    SHF = typeof(shf)
-    LHF = typeof(lhf)
-    return DryMoninObukhovSurface{FT, TS, QS, SHF, LHF}(; Tsurface, qsurface, shf, lhf, kwargs...)
 end
 
 Base.@kwdef struct MoninObukhovSurface{FT, TS, QS, SHF, LHF} <: AbstractSurfaceParameters{FT}
