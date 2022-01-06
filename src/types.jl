@@ -228,7 +228,7 @@ struct LogNormalClosureType end
 struct SDEClosureType end
 
 # Stochastic differential equation memory
-Base.@kwdef mutable struct sde_struct{T}
+Base.@kwdef struct sde_struct{T}
     u0::Float64
     dt::Float64
 end
