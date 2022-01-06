@@ -170,7 +170,43 @@ steps:
   - label: ":rocket: Benchmark tendencies"
     key: "cpu_tendencies"
     command:
-      - "julia --color=yes --project=test perf/perf.jl"
+      - "julia --color=yes --project=test perf/benchmark.jl"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scales: Measure precompilation speedup (all)"
+    key: "cpu_precompilable"
+    command:
+      - "julia --color=yes --project=test perf/precompilable.jl"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scales: Measure precompilation speedup (no init)"
+    key: "cpu_precompilable_no_init"
+    command:
+      - "julia --color=yes --project=test perf/precompilable_no_init.jl"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scales: Measure precompilation speedup (no io)"
+    key: "cpu_precompilable_no_io"
+    command:
+      - "julia --color=yes --project=test perf/precompilable_no_io.jl"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":scales: Measure precompilation speedup (no init, no io)"
+    key: "cpu_precompilable_no_init_io"
+    command:
+      - "julia --color=yes --project=test perf/precompilable_no_init_io.jl"
     agents:
       config: cpu
       queue: central
