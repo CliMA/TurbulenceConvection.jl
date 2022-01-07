@@ -16,11 +16,11 @@ function precipitation_formation(
     # TODO - when using adaptive timestepping we are limiting the source terms
     #        with the previous timestep dt
     qt_tendency = FT(0)
-    qr_tendency = 0.0
-    qs_tendency = 0.0
-    θ_liq_ice_tendency = 0.0
+    qr_tendency = FT(0)
+    qs_tendency = FT(0)
+    θ_liq_ice_tendency = FT(0)
 
-    if area > 0.0
+    if area > 0
 
         q = TD.PhasePartition(ts)
 
@@ -77,13 +77,13 @@ function precipitation_formation(
             if T < T_fr # cloud droplets freeze to become snow)
                 qs_tendency -= S_qt
                 qt_tendency += S_qt
-                θ_liq_ice_tendency -= S_qt / Π_m / c_pm * Lf * (1.0 + Rm / c_vm)
+                θ_liq_ice_tendency -= S_qt / Π_m / c_pm * Lf * (1 + Rm / c_vm)
             else # snow melts, both cloud water and snow become rain
                 α::FT = c_vl / Lf * (T - T_fr)
                 qt_tendency += S_qt
                 qs_tendency += S_qt * α
                 qr_tendency -= S_qt * (1 + α)
-                θ_liq_ice_tendency += S_qt / Π_m / c_pm * (Lf * (1.0 + Rm / c_vm) * α - L_v0)
+                θ_liq_ice_tendency += S_qt / Π_m / c_pm * (Lf * (1 + Rm / c_vm) * α - L_v0)
             end
 
             # sink of cloud ice via accretion cloud ice - rain
@@ -93,7 +93,7 @@ function precipitation_formation(
             qt_tendency += S_qt
             qr_tendency += S_qr
             qs_tendency += -(S_qt + S_qr)
-            θ_liq_ice_tendency -= 1.0 / Π_m / c_pm * (S_qr * Lf * (1.0 + Rm / c_vm) + S_qt * L_s0)
+            θ_liq_ice_tendency -= 1 / Π_m / c_pm * (S_qr * Lf * (1 + Rm / c_vm) + S_qt * L_s0)
 
             # accretion rain - snow
             if T < T_fr

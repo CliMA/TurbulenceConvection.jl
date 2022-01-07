@@ -55,7 +55,7 @@ function get_surface(
         SF.Fluxes{FT}(; kwargs...)
     end
     result = SF.surface_conditions(param_set, sc, universal_func, scheme)
-    return SurfaceBase{SurfaceFixedFlux}(;
+    return SurfaceBase{FT}(;
         shf = shf,
         lhf = lhf,
         ustar = fixed_ustar(surf_params) ? surf_params.ustar : result.ustar,
@@ -110,7 +110,7 @@ function get_surface(
     lhf = result.lhf
     shf = result.shf
 
-    return SurfaceBase{SurfaceFixedCoeffs}(;
+    return SurfaceBase{FT}(;
         cm = result.Cd,
         ch = result.Ch,
         obukhov_length = result.L_MO,
@@ -165,7 +165,7 @@ function get_surface(
     result = SF.surface_conditions(param_set, sc, universal_func, scheme)
     lhf = result.lhf
     shf = result.shf
-    return SurfaceBase{SurfaceMoninObukhov}(;
+    return SurfaceBase{FT}(;
         zrough = zrough,
         Tsurface = Tsurface,
         qsurface = qsurface,
@@ -184,7 +184,6 @@ function get_surface(
 end
 
 function get_surface(
-    surf::SurfaceBase{SurfaceSullivanPatton},
     surf_params::SullivanPattonSurface,
     grid::Grid,
     state::State,
@@ -226,7 +225,7 @@ function get_surface(
     result = SF.surface_conditions(param_set, sc, universal_func, scheme)
     lhf = result.lhf
     shf = result.shf
-    return SurfaceBase{SurfaceSullivanPatton}(;
+    return SurfaceBase{FT}(;
         qsurface = qsurface,
         cm = result.Cd,
         ch = result.Ch,

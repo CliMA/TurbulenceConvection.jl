@@ -70,4 +70,5 @@ function compute_ref_state!(state, grid::Grid, param_set::PS; Pg::FT, Tg::FT, qt
 
     ρ0_f .= 1 ./ α0_f
     ρ0_c .= 1 ./ α0_c
+    return nothing
 end

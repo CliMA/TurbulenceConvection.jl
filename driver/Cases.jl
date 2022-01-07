@@ -122,12 +122,6 @@ get_case_name(case_type::AbstractCaseType) = string(case_type)
 ##### Case configurations
 #####
 
-get_surface_type(::AbstractCaseType) = TC.SurfaceFixedFlux # default
-get_surface_type(::Rico) = TC.SurfaceFixedCoeffs
-get_surface_type(::GATE_III) = TC.SurfaceFixedCoeffs
-get_surface_type(::GABLS) = TC.SurfaceMoninObukhov
-get_surface_type(::SP) = TC.SurfaceSullivanPatton
-
 inversion_type(::AbstractCaseType) = TC.CriticalRiInversion()
 inversion_type(::TRMM_LBA) = TC.max∇θInversion()
 inversion_type(::ARM_SGP) = TC.max∇θInversion()
