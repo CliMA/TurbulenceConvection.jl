@@ -22,5 +22,5 @@ t_precompiled = @elapsed ODE.solve(prob, alg; kwargs...)
 @info "precompiled/precompiling: $(t_precompiled/t_precompile))"
 
 @testset "Test runtime" begin
-    @test t_precompiled / t_precompile < 0.07
+    @test t_precompiled / t_precompile < 0.08
 end

@@ -1,4 +1,13 @@
-function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, case, param_set::APS, t::Real, Δt::Real)
+function update_aux!(
+    edmf::EDMF_PrognosticTKE,
+    gm::GridMeanVariables,
+    grid::Grid,
+    state::State,
+    case::CasesBase,
+    param_set::APS,
+    t::Real,
+    Δt::Real,
+)
     #####
     ##### Unpack common variables
     #####
@@ -42,6 +51,7 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, cas
     wvec = CC.Geometry.WVector
     max_area = edmf.max_area
     sde_model = edmf.sde_model
+    pressure_plume_spacing = edmf.pressure_plume_spacing
 
     #####
     ##### center variables
@@ -236,7 +246,7 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, cas
     update_forcing(case, grid, state, gm, t, param_set)
     update_radiation(case, grid, state, gm, t, param_set)
 
-    compute_pressure_plume_spacing(edmf, param_set)
+    compute_pressure_plume_spacing(edmf, grid, param_set)
 
     #####
     ##### compute_updraft_closures
@@ -264,7 +274,7 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, cas
 
             if aux_up[i].area[k] > 0.0
 
-                εδ_model_vars = GeneralizedEntr(;
+                εδ_model_vars = GeneralizedEntr{FT}(;
                     q_cond_up = q_cond_up,
                     q_cond_en = q_cond_en,
                     w_up = w_up_c[k],
@@ -276,7 +286,7 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, cas
                     M = m_entr_detr[k],
                     a_up = aux_up[i].area[k],
                     a_en = aux_en.area[k],
-                    R_up = edmf.pressure_plume_spacing[i],
+                    R_up = pressure_plume_spacing[i],
                     RH_up = aux_up[i].RH[k],
                     RH_en = aux_en.RH[k],
                     max_area = max_area,
@@ -436,7 +446,7 @@ function update_aux!(edmf::EDMF_PrognosticTKE, gm, grid::Grid, state::State, cas
         ∇_Ri = gradient_Richardson_number(bg.∂b∂z, Shear²[k], eps(0.0))
         aux_tc.prandtl_nvec[k] = turbulent_Prandtl_number(param_set, obukhov_length, ∇_Ri)
 
-        ml_model = MinDisspLen(;
+        ml_model = MinDisspLen{FT}(;
             z = grid.zc[k].z,
             obukhov_length = obukhov_length,
             tke_surf = aux_en.tke[kc_surf],

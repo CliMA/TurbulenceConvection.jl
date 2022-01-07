@@ -31,9 +31,9 @@ function compute_gm_tendencies!(
     edmf::EDMF_PrognosticTKE,
     grid::Grid,
     state::State,
-    surf,
-    radiation,
-    force,
+    surf::SurfaceBase,
+    radiation::RadiationBase,
+    force::ForcingBase,
     gm::GridMeanVariables,
 )
     N_up = n_updrafts(edmf)
@@ -209,7 +209,7 @@ function compute_diffusive_fluxes(
     grid::Grid,
     state::State,
     gm::GridMeanVariables,
-    surf,
+    surf::SurfaceBase,
     param_set::APS,
 )
     FT = eltype(grid)
@@ -250,7 +250,15 @@ function compute_diffusive_fluxes(
     return nothing
 end
 
-function affect_filter!(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, gm, surf, casename, t::Real)
+function affect_filter!(
+    edmf::EDMF_PrognosticTKE,
+    grid::Grid,
+    state::State,
+    gm::GridMeanVariables,
+    surf::SurfaceBase,
+    casename::String,
+    t::Real,
+)
     # TODO: figure out why this filter kills the DryBubble results if called at t = 0.
     if casename == "DryBubble" && !(t > 0)
         return nothing
@@ -322,7 +330,13 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     return nothing
 end
 
-function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, up, surface)
+function set_edmf_surface_bc(
+    edmf::EDMF_PrognosticTKE,
+    grid::Grid,
+    state::State,
+    up::UpdraftVariables,
+    surface::SurfaceBase,
+)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -358,7 +372,7 @@ function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State,
 end
 
 
-function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, surf)
+function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, surf::SurfaceBase)
     kc_surf = kc_surface(grid)
     N_up = n_updrafts(edmf)
     zLL = grid.zc[kc_surf]
@@ -432,10 +446,11 @@ function get_GMV_CoVar(
     return nothing
 end
 
-function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE, param_set::APS)
+function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE, grid::Grid, param_set::APS)
 
+    FT = eltype(grid)
     N_up = n_updrafts(edmf)
-    H_up_min = CPEDMF.H_up_min(param_set)
+    H_up_min::FT = CPEDMF.H_up_min(param_set)
     @inbounds for i in 1:N_up
         edmf.pressure_plume_spacing[i] =
             max(edmf.aspect_ratio * edmf.UpdVar.updraft_top[i], H_up_min * edmf.aspect_ratio)
@@ -549,6 +564,7 @@ function filter_updraft_vars(edmf::EDMF_PrognosticTKE, grid::Grid, state::State,
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     FT = eltype(grid)
+    N_up = n_updrafts(edmf)
 
     up = edmf.UpdVar
     prog_up = center_prog_updrafts(state)
@@ -789,7 +805,7 @@ function compute_en_tendencies!(
     param_set::APS,
     ::Val{covar_sym},
     ::Val{prog_sym},
-) where {covar_sym, prog_sym}
+) where {S, PS, covar_sym, prog_sym}
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
@@ -869,7 +885,7 @@ function GMV_third_m(
     ::Val{covar_en_sym},
     ::Val{var},
     ::Val{gm_third_m_sym},
-) where {covar_en_sym, var, gm_third_m_sym}
+) where {S, covar_en_sym, var, gm_third_m_sym}
 
     N_up = n_updrafts(edmf)
     gm_third_m = getproperty(center_aux_grid_mean(state), gm_third_m_sym)
