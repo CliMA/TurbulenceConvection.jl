@@ -85,7 +85,7 @@ Cohen et al. (JAMES, 2020), given:
  - `εδ_model_vars`  :: structure containing variables
  - `εδ_model_type`  :: MDEntr - Moisture deficit entrainment closure
 """
-function entr_detr(param_set, εδ_model_vars, εδ_model_type::MDEntr)
+function entr_detr(param_set::APS, εδ_model_vars, εδ_model_type::MDEntr)
     FT = eltype(εδ_model_vars)
     dim_scale = dimensional_part(param_set, εδ_model_vars)
     area_limiter = max_area_limiter(param_set, εδ_model_vars)
@@ -107,7 +107,7 @@ function entr_detr(param_set, εδ_model_vars, εδ_model_type::MDEntr)
     # turbulent entrainment
     ε_turb, K_ε = compute_turbulent_entrainment(param_set, εδ_model_vars)
 
-    return EntrDetr(ε_dyn, δ_dyn, ε_turb, K_ε)
+    return EntrDetr{FT}(ε_dyn, δ_dyn, ε_turb, K_ε)
 end
 
 """

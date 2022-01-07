@@ -432,10 +432,11 @@ function get_GMV_CoVar(
     return nothing
 end
 
-function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE, param_set::APS)
+function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE, grid::Grid, param_set::APS)
 
+    FT = eltype(grid)
     N_up = n_updrafts(edmf)
-    H_up_min = CPEDMF.H_up_min(param_set)
+    H_up_min::FT = CPEDMF.H_up_min(param_set)
     @inbounds for i in 1:N_up
         edmf.pressure_plume_spacing[i] =
             max(edmf.aspect_ratio * edmf.UpdVar.updraft_top[i], H_up_min * edmf.aspect_ratio)

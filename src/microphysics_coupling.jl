@@ -106,5 +106,5 @@ function precipitation_formation(
             θ_liq_ice_tendency += S_qs * Lf / Π_m / c_vm
         end
     end
-    return PrecipFormation(θ_liq_ice_tendency, qt_tendency, qr_tendency, qs_tendency)
+    return PrecipFormation{FT}(θ_liq_ice_tendency, qt_tendency, qr_tendency, qs_tendency)
 end

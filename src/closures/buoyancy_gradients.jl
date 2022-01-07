@@ -10,7 +10,7 @@ used here are consistent for both mean fields and conditional fields obtained fr
 over the conserved thermodynamic variables.
 """
 function buoyancy_gradients(
-    param_set,
+    param_set::APS,
     bg_model::EnvBuoyGrad{FT, EBG},
 ) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
 
@@ -40,7 +40,7 @@ function buoyancy_gradients(
     end
 
     ∂b∂z, ∂b∂z_unsat, ∂b∂z_sat = buoyancy_gradient_chain_rule(bg_model, ∂b∂θv, ∂b∂θl_sat, ∂b∂qt_sat)
-    return GradBuoy(∂b∂z, ∂b∂z_unsat, ∂b∂z_sat)
+    return GradBuoy{FT}(∂b∂z, ∂b∂z_unsat, ∂b∂z_sat)
 end
 
 """
