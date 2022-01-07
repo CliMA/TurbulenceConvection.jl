@@ -1,5 +1,7 @@
 # TODO: should this live in its own module?
 
+import StatsBase
+
 import ClimaCore
 const CC = ClimaCore
 const CCO = CC.Operators
@@ -237,7 +239,8 @@ function compute_diagnostics!(
     TC.write_ts(Stats, "swp_mean", sum(ρ0_c .* prog_pr.q_sno))
     #TODO - change to rain rate that depends on rain model choice
 
-    # TODO: Move TC.rho_cloud_liq to CLIMAParameters
+    # TODO: Move rho_cloud_liq to CLIMAParameters
+    rho_cloud_liq = 1e3
     if (precip_model isa TC.CutoffPrecipitation)
         f =
             (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ0_c ./
@@ -249,6 +252,7 @@ function compute_diagnostics!(
     iwp = sum(i -> sum(ρ0_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
     TC.write_ts(Stats, "updraft_lwp", lwp)
     TC.write_ts(Stats, "updraft_iwp", iwp)
+    TC.write_ts(Stats, "rd", StatsBase.mean(edmf.pressure_plume_spacing))
 
     return
 end

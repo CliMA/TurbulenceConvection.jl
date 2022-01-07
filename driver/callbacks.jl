@@ -33,7 +33,6 @@ function affect_io!(integrator)
 
     surf = TC.get_surface(case.surf_params, grid, state, gm, t, param_set)
     TC.io(surf, grid, state, Stats)
-    TC.io(edmf, grid, state, Stats) # #removeVarsHack
 
     ODE.u_modified!(integrator, false) # We're legitamately not mutating `u` (the state vector)
 end

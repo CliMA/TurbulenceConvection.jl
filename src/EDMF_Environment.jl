@@ -1,4 +1,11 @@
-function microphysics(::SGSMean, grid::Grid, state::State, precip_model::AbstractPrecipitationModel, Δt, param_set::APS)
+function microphysics(
+    ::SGSMean,
+    grid::Grid,
+    state::State,
+    precip_model::AbstractPrecipitationModel,
+    Δt::Real,
+    param_set::APS,
+)
 
     tendencies_pr = center_tendencies_precipitation(state)
     p0_c = center_ref_state(state).p0
@@ -26,14 +33,14 @@ function microphysics(::SGSMean, grid::Grid, state::State, precip_model::Abstrac
 
         # update_sat_unsat
         if TD.has_condensate(ts)
-            aux_en.cloud_fraction[k] = 1.0
+            aux_en.cloud_fraction[k] = 1
             aux_en_sat.θ_dry[k] = TD.dry_pottemp(ts)
             aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(ts)
             aux_en_sat.T[k] = TD.air_temperature(ts)
             aux_en_sat.q_tot[k] = TD.total_specific_humidity(ts)
             aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(ts)
         else
-            aux_en.cloud_fraction[k] = 0.0
+            aux_en.cloud_fraction[k] = 0
             aux_en_unsat.θ_dry[k] = TD.dry_pottemp(ts)
             aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(ts)
             aux_en_unsat.q_tot[k] = TD.total_specific_humidity(ts)
@@ -50,7 +57,7 @@ function microphysics(::SGSMean, grid::Grid, state::State, precip_model::Abstrac
     return nothing
 end
 
-function microphysics(en_thermo::SGSQuadrature, grid, state, precip_model, Δt, param_set)
+function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip_model, Δt::Real, param_set::APS)
     a = en_thermo.a
     w = en_thermo.w
     p0_c = center_ref_state(state).p0
@@ -75,8 +82,8 @@ function microphysics(en_thermo::SGSQuadrature, grid, state, precip_model, Δt, 
     env_len = 8
     src_len = 8
 
-    sqpi_inv = 1.0 / sqrt(π)
-    sqrt2 = sqrt(2.0)
+    sqpi_inv = 1 / sqrt(π)
+    sqrt2 = sqrt(2)
 
     epsilon = 10e-14 #np.finfo(np.float).eps
 
@@ -99,13 +106,12 @@ function microphysics(en_thermo::SGSQuadrature, grid, state, precip_model, Δt, 
 
             if quadrature_type isa LogNormalQuad
                 # Lognormal parameters (mu, sd) from mean and variance
-                sd_q = sqrt(log(aux_en.QTvar[k] / aux_en.q_tot[k] / aux_en.q_tot[k] + 1.0))
-                sd_h = sqrt(log(aux_en.Hvar[k] / aux_en.θ_liq_ice[k] / aux_en.θ_liq_ice[k] + 1.0))
+                sd_q = sqrt(log(aux_en.QTvar[k] / aux_en.q_tot[k] / aux_en.q_tot[k] + 1))
+                sd_h = sqrt(log(aux_en.Hvar[k] / aux_en.θ_liq_ice[k] / aux_en.θ_liq_ice[k] + 1))
                 # Enforce Schwarz"s inequality
-                corr = max(min(aux_en.HQTcov[k] / sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]), 1.0), -1.0)
-                sd2_hq =
-                    log(corr * sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]) / aux_en.θ_liq_ice[k] / aux_en.q_tot[k] + 1.0)
-                sd_cond_h_q = sqrt(max(sd_h * sd_h - sd2_hq * sd2_hq / sd_q / sd_q, 0.0))
+                corr = max(min(aux_en.HQTcov[k] / sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]), 1), -1)
+                sd2_hq = log(corr * sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]) / aux_en.θ_liq_ice[k] / aux_en.q_tot[k] + 1)
+                sd_cond_h_q = sqrt(max(sd_h * sd_h - sd2_hq * sd2_hq / sd_q / sd_q, 0))
                 mu_q =
                     log(aux_en.q_tot[k] * aux_en.q_tot[k] / sqrt(aux_en.q_tot[k] * aux_en.q_tot[k] + aux_en.QTvar[k]))
                 mu_h = log(
@@ -115,7 +121,7 @@ function microphysics(en_thermo::SGSQuadrature, grid, state, precip_model, Δt, 
             else
                 sd_q = sqrt(aux_en.QTvar[k])
                 sd_h = sqrt(aux_en.Hvar[k])
-                corr = max(min(aux_en.HQTcov[k] / max(sd_h * sd_q, 1e-13), 1.0), -1.0)
+                corr = max(min(aux_en.HQTcov[k] / max(sd_h * sd_q, 1e-13), 1), -1)
 
                 # limit sd_q to prevent negative qt_hat
                 sd_q_lim = (1e-10 - aux_en.q_tot[k]) / (sqrt2 * abscissas[1])
@@ -124,7 +130,7 @@ function microphysics(en_thermo::SGSQuadrature, grid, state, precip_model, Δt, 
                 # TODO - change 1e-13 and 1e-10 to some epislon
                 sd_q = min(sd_q, sd_q_lim)
                 qt_var = sd_q * sd_q
-                sigma_h_star = sqrt(max(1.0 - corr * corr, 0.0)) * sd_h
+                sigma_h_star = sqrt(max(1 - corr * corr, 0)) * sd_h
             end
 
             # zero outer quadrature points
@@ -272,22 +278,22 @@ function microphysics(en_thermo::SGSQuadrature, grid, state, precip_model, Δt, 
 
             # update_sat_unsat
             if TD.has_condensate(ts)
-                aux_en.cloud_fraction[k] = 1.0
+                aux_en.cloud_fraction[k] = 1
                 aux_en_sat.θ_dry[k] = TD.dry_pottemp(ts)
                 aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(ts)
                 aux_en_sat.T[k] = TD.air_temperature(ts)
                 aux_en_sat.q_tot[k] = TD.total_specific_humidity(ts)
                 aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(ts)
             else
-                aux_en.cloud_fraction[k] = 0.0
+                aux_en.cloud_fraction[k] = 0
                 aux_en_unsat.θ_dry[k] = TD.dry_pottemp(ts)
                 aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(ts)
                 aux_en_unsat.q_tot[k] = TD.total_specific_humidity(ts)
             end
 
-            aux_en.Hvar_rain_dt[k] = 0.0
-            aux_en.QTvar_rain_dt[k] = 0.0
-            aux_en.HQTcov_rain_dt[k] = 0.0
+            aux_en.Hvar_rain_dt[k] = 0
+            aux_en.QTvar_rain_dt[k] = 0
+            aux_en.HQTcov_rain_dt[k] = 0
         end
     end
 

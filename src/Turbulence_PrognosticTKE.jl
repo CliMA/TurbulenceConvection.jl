@@ -56,7 +56,6 @@ function compute_gm_tendencies!(
     α0_c = center_ref_state(state).α0
     kf_surf = kf_surface(grid)
     kc_surf = kc_surface(grid)
-    up = edmf.UpdVar
     massflux_h = aux_tc_f.massflux_h
     massflux_qt = aux_tc_f.massflux_qt
     aux_tc = center_aux_turbconv(state)
@@ -335,7 +334,7 @@ function set_edmf_surface_bc(
     grid::Grid,
     state::State,
     up::UpdraftVariables,
-    surface::SurfaceBase,
+    surf::SurfaceBase,
 )
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
@@ -353,18 +352,18 @@ function set_edmf_surface_bc(
         prog_up_f[i].ρaw[kf_surf] = ρ0_f[kf_surf] * edmf.w_surface_bc[i]
     end
 
-    flux1 = surface.ρθ_liq_ice_flux
-    flux2 = surface.ρq_tot_flux
+    flux1 = surf.ρθ_liq_ice_flux
+    flux2 = surf.ρq_tot_flux
     zLL = grid.zc[kc_surf]
-    ustar = surface.ustar
-    oblength = surface.obukhov_length
+    ustar = surf.ustar
+    oblength = surf.obukhov_length
     α0LL = center_ref_state(state).α0[kc_surf]
     # TODO: is bulk even defined before this is called?
     ae = 1 .- aux_bulk.area # area of environment
 
     ρ0_ae = ρ0_c[kc_surf] * ae[kc_surf]
 
-    prog_en.ρatke[kc_surf] = ρ0_ae * get_surface_tke(surface.ustar, grid.zc[kc_surf], surface.obukhov_length)
+    prog_en.ρatke[kc_surf] = ρ0_ae * get_surface_tke(surf.ustar, grid.zc[kc_surf], surf.obukhov_length)
     prog_en.ρaHvar[kc_surf] = ρ0_ae * get_surface_variance(flux1 * α0LL, flux1 * α0LL, ustar, zLL, oblength)
     prog_en.ρaQTvar[kc_surf] = ρ0_ae * get_surface_variance(flux2 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
     prog_en.ρaHQTcov[kc_surf] = ρ0_ae * get_surface_variance(flux1 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
@@ -566,7 +565,6 @@ function filter_updraft_vars(edmf::EDMF_PrognosticTKE, grid::Grid, state::State,
     FT = eltype(grid)
     N_up = n_updrafts(edmf)
 
-    up = edmf.UpdVar
     prog_up = center_prog_updrafts(state)
     prog_gm = center_prog_grid_mean(state)
     aux_up = center_aux_updrafts(state)

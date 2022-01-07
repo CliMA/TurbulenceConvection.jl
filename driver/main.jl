@@ -23,10 +23,11 @@ import StaticArrays: SVector
 const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
 
 include(joinpath(tc_dir, "driver", "initial_conditions.jl"))
-include(joinpath(tc_dir, "diagnostics", "compute_diagnostics.jl"))
+include(joinpath(tc_dir, "driver", "compute_diagnostics.jl"))
 include(joinpath(tc_dir, "driver", "parameter_set.jl"))
 include(joinpath(tc_dir, "driver", "Cases.jl"))
 include(joinpath(tc_dir, "driver", "dycore.jl"))
+include(joinpath(tc_dir, "driver", "TimeStepping.jl"))
 import .Cases
 
 struct Simulation1d{IONT, G, S, GM, C, EDMF, D, TIMESTEPPING, STATS, PS}
@@ -64,7 +65,7 @@ function Simulation1d(namelist)
     gm = TC.GridMeanVariables(param_set)
     Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
     Rad = TC.RadiationBase(case_type)
-    TS = TC.TimeStepping(namelist)
+    TS = TimeStepping(namelist)
 
     edmf = TC.EDMF_PrognosticTKE(namelist, grid, param_set)
     N_up = TC.n_updrafts(edmf)
@@ -151,7 +152,6 @@ function TurbulenceConvection.initialize(sim::Simulation1d)
     # TODO: deprecate
     surf = TC.get_surface(sim.case.surf_params, sim.grid, state, sim.gm, t, sim.param_set)
     TC.io(surf, sim.grid, state, sim.Stats)
-    TC.io(sim.edmf, sim.grid, state, sim.Stats)
     TC.close_files(sim.Stats)
 
     return

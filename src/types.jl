@@ -233,11 +233,6 @@ Base.@kwdef struct sde_struct{T}
     dt::Float64
 end
 
-struct SurfaceFixedFlux end
-struct SurfaceFixedCoeffs end
-struct SurfaceMoninObukhov end
-struct SurfaceSullivanPatton end
-
 abstract type FrictionVelocityType end
 struct FixedFrictionVelocity <: FrictionVelocityType end
 struct VariableFrictionVelocity <: FrictionVelocityType end
@@ -359,22 +354,22 @@ latent_heat_flux(s::AbstractSurfaceParameters, t::Real = 0) = float_or_func(s.lh
 fixed_ustar(::FixedSurfaceFlux{FT, FixedFrictionVelocity}) where {FT} = true
 fixed_ustar(::FixedSurfaceFlux{FT, VariableFrictionVelocity}) where {FT} = false
 
-Base.@kwdef struct SurfaceBase{T}
-    zrough::Float64 = 0
-    Tsurface::Float64 = 0
-    qsurface::Float64 = 0
-    shf::Float64 = 0
-    lhf::Float64 = 0
-    cm::Float64 = 0
-    ch::Float64 = 0
-    cq::Float64 = 0
-    bflux::Float64 = 0
-    ustar::Float64 = 0
-    ρq_tot_flux::Float64 = 0
-    ρθ_liq_ice_flux::Float64 = 0
-    ρu_flux::Float64 = 0
-    ρv_flux::Float64 = 0
-    obukhov_length::Float64 = 0
+Base.@kwdef struct SurfaceBase{FT}
+    zrough::FT = 0
+    Tsurface::FT = 0
+    qsurface::FT = 0
+    shf::FT = 0
+    lhf::FT = 0
+    cm::FT = 0
+    ch::FT = 0
+    cq::FT = 0
+    bflux::FT = 0
+    ustar::FT = 0
+    ρq_tot_flux::FT = 0
+    ρθ_liq_ice_flux::FT = 0
+    ρu_flux::FT = 0
+    ρv_flux::FT = 0
+    obukhov_length::FT = 0
 end
 
 struct ForcingBaseType end

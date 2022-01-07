@@ -1,9 +1,21 @@
 """
 Computes the rain and snow advection (down) tendency
 """
-compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, gm) = nothing
+compute_precipitation_advection_tendencies(
+    ::AbstractPrecipitationModel,
+    edmf::EDMF_PrognosticTKE,
+    grid::Grid,
+    state::State,
+    gm::GridMeanVariables,
+) = nothing
 
-function compute_precipitation_advection_tendencies(::Clima1M, edmf, grid, state, gm)
+function compute_precipitation_advection_tendencies(
+    ::Clima1M,
+    edmf::EDMF_PrognosticTKE,
+    grid::Grid,
+    state::State,
+    gm::GridMeanVariables,
+)
     FT = eltype(grid)
 
     ρ0_c = center_ref_state(state).ρ0
@@ -38,9 +50,15 @@ end
 Computes the tendencies to θ_liq_ice, q_tot, q_rain and q_snow
 due to rain evaporation, snow deposition and sublimation and snow melt
 """
-compute_precipitation_sink_tendencies(precip_model, grid, state, gm, Δt) = nothing
+compute_precipitation_sink_tendencies(
+    ::AbstractPrecipitationModel,
+    grid::Grid,
+    state::State,
+    gm::GridMeanVariables,
+    Δt::Real,
+) = nothing
 
-function compute_precipitation_sink_tendencies(::Clima1M, grid, state, gm, Δt::Real)
+function compute_precipitation_sink_tendencies(::Clima1M, grid::Grid, state::State, gm::GridMeanVariables, Δt::Real)
     param_set = parameter_set(gm)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
@@ -79,7 +97,7 @@ function compute_precipitation_sink_tendencies(::Clima1M, grid, state, gm, Δt::
         S_qr_evap = -min(qr / Δt, -CM1.evaporation_sublimation(param_set, rain_type, q, qr, ρ0, T_gm))
         S_qs_melt = -min(qs / Δt, CM1.snow_melt(param_set, qs, ρ0, T_gm))
         tmp = CM1.evaporation_sublimation(param_set, snow_type, q, qs, ρ0, T_gm)
-        if tmp > 0.0
+        if tmp > 0
             S_qs_sub_dep = min(qv / Δt, tmp)
         else
             S_qs_sub_dep = -min(qs / Δt, -tmp)
@@ -97,7 +115,7 @@ function compute_precipitation_sink_tendencies(::Clima1M, grid, state, gm, Δt::
             1 / Π_m / c_pm * (
                 S_qr_evap * (L_v - R_v * T_gm) * (1 + R_m / c_vm) +
                 S_qs_sub_dep * (L_s - R_v * T_gm) * (1 + R_m / c_vm) +
-                S_qs_melt * L_f * (1.0 + R_m / c_vm)
+                S_qs_melt * L_f * (1 + R_m / c_vm)
             )
     end
     return nothing
