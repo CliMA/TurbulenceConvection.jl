@@ -211,8 +211,8 @@ function solve_args(sim::Simulation1d)
     callbacks = ODE.CallbackSet(callback_adapt_dt..., callback_dtmax, callback_cfl..., callback_filters, callback_io...)
 
     ode_func = ODE.ODEFunction(∑tendencies!;
-        jac_prototype = DEO.JacVecOperator(∑tendencies!, state.prog, params) # use AD
-        # jac_prototype = DEO.JacVecOperator(∑tendencies!, state.prog, params; autodiff = false)
+        # jac_prototype = DEO.JacVecOperator(∑tendencies!, state.prog, params) # use AD
+        jac_prototype = DEO.JacVecOperator(∑tendencies!, state.prog, params; autodiff = false)
     )
     prob = ODE.ODEProblem(ode_func, state.prog, t_span, params; dt = sim.TS.dt)
     # prob = ODE.ODEProblem(∑tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
@@ -223,10 +223,10 @@ function solve_args(sim::Simulation1d)
     unstable_check_kwarg(::Cases.LES_driven_SCM) = (; unstable_check = (dt, u, p, t) -> false)
     unstable_check_kwarg(case) = ()
 
-    alg = ODE.ImplicitEuler(;linsolve = ODE.LinSolveGMRES(
-        abstol = 1e-3,
-        reltol = 1e-2,
-    ));
+    # alg = ODE.ImplicitEuler(;linsolve = ODE.LinSolveGMRES(
+    #     abstol = 1e-3,
+    #     reltol = 1e-2,
+    # ));
     # alg = ODE.Euler()
     # alg = ODE.Rosenbrock23(;
     # alg = ODE.Rodas5(;
@@ -236,7 +236,7 @@ function solve_args(sim::Simulation1d)
     #         reltol = 1e-4,
     #     )
     # );
-    # alg = ODE.TRBDF2(;linsolve = ODE.LinSolveGMRES());
+    alg = ODE.TRBDF2(;linsolve = ODE.LinSolveGMRES());
 
     kwargs = (;
         abstol = 1e-3,
