@@ -167,6 +167,17 @@ steps:
       queue: central
       slurm_ntasks: 1
 
+  - label: ":rocket: Allocations analysis (exhaustive)"
+    key: "cpu_allocations_exhaustive"
+    command:
+      - "julia --color=yes --project=test perf/allocs.jl exhaustive=true"
+    artifact_paths:
+      - "perf/allocations_output_exhaustive/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
   - label: ":rocket: Benchmark tendencies"
     key: "cpu_tendencies"
     command:
