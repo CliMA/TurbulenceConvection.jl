@@ -461,18 +461,13 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
+struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, SDES}
     surface_area::Float64
     max_area::Float64
     aspect_ratio::Float64
     minimum_area::Float64
     precip_model::PM
     en_thermo::ENT
-    UpdVar::UPVAR
-    area_surface_bc::A1
-    w_surface_bc::A1
-    h_surface_bc::A1
-    qt_surface_bc::A1
     prandtl_number::Float64
     sde_model::SDES
     bg_closure::EBGC
@@ -524,9 +519,6 @@ struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
             error("Invalid precip_name $(precip_name)")
         end
 
-        # Create the updraft variable class (major diagnostic and prognostic variables)
-        UpdVar = UpdraftVariables(n_updrafts, namelist)
-
         # Create the environment variable class (major diagnostic and prognostic variables)
 
         # Create the class for environment thermodynamics
@@ -536,12 +528,6 @@ struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
         elseif en_thermo_name == "quadrature"
             SGSQuadrature(namelist)
         end
-
-        # Near-surface BC of updraft area fraction
-        area_surface_bc = zeros(n_updrafts)
-        w_surface_bc = zeros(n_updrafts)
-        h_surface_bc = zeros(n_updrafts)
-        qt_surface_bc = zeros(n_updrafts)
 
         # Initialize SDE parameters
         dt = parse_namelist(namelist, "time_stepping", "dt_min"; default = 1.0)
@@ -599,24 +585,17 @@ struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
         end
         EC = typeof(entr_closure)
 
-        A1 = typeof(area_surface_bc)
         PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
         SDES = typeof(sde_model)
-        UPVAR = typeof(UpdVar)
         ENT = typeof(en_thermo)
-        return new{n_updrafts, A1, PM, ENT, EBGC, EC, SDES, UPVAR}(
+        return new{n_updrafts, PM, ENT, EBGC, EC, SDES}(
             surface_area,
             max_area,
             aspect_ratio,
             minimum_area,
             precip_model,
             en_thermo,
-            UpdVar,
-            area_surface_bc,
-            w_surface_bc,
-            h_surface_bc,
-            qt_surface_bc,
             prandtl_number,
             sde_model,
             bg_closure,

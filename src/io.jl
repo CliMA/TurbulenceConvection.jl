@@ -11,15 +11,6 @@ function initialize_io(precip::AbstractPrecipitationModel, Stats::NetCDFIO_Stats
     return nothing
 end
 
-function initialize_io(up::UpdraftVariables, Stats::NetCDFIO_Stats)
-    add_ts(Stats, "updraft_cloud_cover")
-    add_ts(Stats, "updraft_cloud_base")
-    add_ts(Stats, "updraft_cloud_top")
-    add_ts(Stats, "updraft_lwp")
-    add_ts(Stats, "updraft_iwp")
-    return nothing
-end
-
 function initialize_io(gm::GridMeanVariables, Stats::NetCDFIO_Stats)
     add_ts(Stats, "lwp_mean")
     add_ts(Stats, "iwp_mean")
@@ -36,7 +27,11 @@ function initialize_io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     add_ts(Stats, "env_cloud_cover")
     add_ts(Stats, "env_lwp")
     add_ts(Stats, "env_iwp")
-    initialize_io(edmf.UpdVar, Stats)
+    add_ts(Stats, "updraft_cloud_cover")
+    add_ts(Stats, "updraft_cloud_base")
+    add_ts(Stats, "updraft_cloud_top")
+    add_ts(Stats, "updraft_lwp")
+    add_ts(Stats, "updraft_iwp")
     initialize_io(edmf.precip_model, Stats)
     add_ts(Stats, "rd")
     return nothing

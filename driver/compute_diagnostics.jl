@@ -61,6 +61,8 @@ function compute_diagnostics!(
     state::TC.State,
     diagnostics::D,
     Stats::TC.NetCDFIO_Stats,
+    case::TC.CasesBase,
+    t::Real,
 ) where {D <: CC.Fields.FieldVector}
     FT = eltype(grid)
     N_up = TC.n_updrafts(edmf)
@@ -81,6 +83,7 @@ function compute_diagnostics!(
     precip_model = edmf.precip_model
     diag_tc = center_diagnostics_turbconv(diagnostics)
     diag_tc_f = face_diagnostics_turbconv(diagnostics)
+    surf = TC.get_surface(case.surf_params, grid, state, gm, t, param_set)
 
     @inbounds for k in TC.real_center_indices(grid)
         ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
@@ -195,7 +198,7 @@ function compute_diagnostics!(
     end
 
     a_up_bulk_f = copy(diag_tc_f.nh_pressure)
-    a_bulk_bcs = (; bottom = CCO.SetValue(sum(edmf.area_surface_bc)), top = CCO.Extrapolate())
+    a_bulk_bcs = TC.a_bulk_boundary_conditions(surf, edmf)
     Ifa = CCO.InterpolateC2F(; a_bulk_bcs...)
     @. a_up_bulk_f = Ifa(a_up_bulk)
 
@@ -204,7 +207,7 @@ function compute_diagnostics!(
     Ifabulk = CCO.InterpolateC2F(; a_bulk_bcs...)
     @. a_up_bulk_f = Ifabulk(a_up_bulk)
     @inbounds for i in 1:N_up
-        a_up_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.Extrapolate())
+        a_up_bcs = TC.a_up_boundary_conditions(surf, edmf, i)
         Ifaup = CCO.InterpolateC2F(; a_up_bcs...)
         @. a_up_f = Ifaup(aux_up[i].area)
         @inbounds for k in TC.real_face_indices(grid)
