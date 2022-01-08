@@ -78,7 +78,6 @@ function compute_diagnostics!(
     kc_toa = TC.kc_top_of_atmos(grid)
     param_set = TC.parameter_set(gm)
     prog_gm = TC.center_prog_grid_mean(state)
-    up = edmf.UpdVar
     precip_model = edmf.precip_model
     diag_tc = center_diagnostics_turbconv(diagnostics)
     diag_tc_f = face_diagnostics_turbconv(diagnostics)

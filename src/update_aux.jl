@@ -15,7 +15,6 @@ function update_aux!(
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
-    up = edmf.UpdVar
     ρ0_f = face_ref_state(state).ρ0
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0

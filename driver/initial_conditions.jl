@@ -12,7 +12,6 @@ function initialize_edmf(
     t::Real,
 )
     initialize_covariance(edmf, grid, state)
-    up = edmf.UpdVar
     surf_params = case.surf_params
     param_set = TC.parameter_set(gm)
     aux_tc = TC.center_aux_turbconv(state)
@@ -26,11 +25,11 @@ function initialize_edmf(
     surf = TC.get_surface(surf_params, grid, state, gm, t, param_set)
     TC.compute_updraft_surface_bc(edmf, grid, state, surf)
     if case.casename == "DryBubble"
-        initialize_updrafts_DryBubble(edmf, grid, state, up, gm)
+        initialize_updrafts_DryBubble(edmf, grid, state, gm)
     else
-        initialize_updrafts(edmf, grid, state, up, gm)
+        initialize_updrafts(edmf, grid, state, gm)
     end
-    TC.set_edmf_surface_bc(edmf, grid, state, up, surf)
+    TC.set_edmf_surface_bc(edmf, grid, state, surf)
     return
 end
 
@@ -58,7 +57,7 @@ function initialize_covariance(edmf::TC.EDMF_PrognosticTKE, grid::TC.Grid, state
     return
 end
 
-function initialize_updrafts(edmf, grid, state, up::TC.UpdraftVariables, gm::TC.GridMeanVariables)
+function initialize_updrafts(edmf, grid, state, gm::TC.GridMeanVariables)
     N_up = TC.n_updrafts(edmf)
     kc_surf = TC.kc_surface(grid)
     aux_up = TC.center_aux_updrafts(state)
@@ -96,7 +95,7 @@ function initialize_updrafts(edmf, grid, state, up::TC.UpdraftVariables, gm::TC.
     return
 end
 
-function initialize_updrafts_DryBubble(edmf, grid, state, up::TC.UpdraftVariables, gm::TC.GridMeanVariables)
+function initialize_updrafts_DryBubble(edmf, grid, state, gm::TC.GridMeanVariables)
 
     # criterion 2: b>1e-4
     #! format: off
