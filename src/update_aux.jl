@@ -246,6 +246,16 @@ function update_aux!(
     update_forcing(case, grid, state, gm, t, param_set)
     update_radiation(case, grid, state, gm, t, param_set)
 
+    @inbounds for i in 1:N_up
+        up.updraft_top[i] = 0.0
+
+        @inbounds for k in real_center_indices(grid)
+            if aux_up[i].area[k] > 1e-3
+                up.updraft_top[i] = max(up.updraft_top[i], grid.zc[k])
+            end
+        end
+    end
+
     compute_pressure_plume_spacing(edmf, grid, param_set)
 
     #####
@@ -521,16 +531,6 @@ function update_aux!(
         @inbounds for k in real_center_indices(grid)
             term_vel_rain[k] = CM1.terminal_velocity(param_set, CM1.RainType(), ρ0_c[k], prog_pr.q_rai[k])
             term_vel_snow[k] = CM1.terminal_velocity(param_set, CM1.SnowType(), ρ0_c[k], prog_pr.q_sno[k])
-        end
-    end
-
-    @inbounds for i in 1:N_up
-        up.updraft_top[i] = 0.0
-
-        @inbounds for k in real_center_indices(grid)
-            if aux_up[i].area[k] > 1e-3
-                up.updraft_top[i] = max(up.updraft_top[i], grid.zc[k])
-            end
         end
     end
 
