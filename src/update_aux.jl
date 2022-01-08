@@ -246,17 +246,7 @@ function update_aux!(
     update_forcing(case, grid, state, gm, t, param_set)
     update_radiation(case, grid, state, gm, t, param_set)
 
-    @inbounds for i in 1:N_up
-        up.updraft_top[i] = 0.0
-
-        @inbounds for k in real_center_indices(grid)
-            if aux_up[i].area[k] > 1e-3
-                up.updraft_top[i] = max(up.updraft_top[i], grid.zc[k])
-            end
-        end
-    end
-
-    compute_pressure_plume_spacing(edmf, grid, param_set)
+    compute_pressure_plume_spacing(edmf, grid, state, param_set)
 
     #####
     ##### compute_updraft_closures
@@ -331,7 +321,6 @@ function update_aux!(
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
         w_en = aux_en_f.w
-        updraft_top = up.updraft_top[i]
         asp_ratio = 1.0
 
         b_bcs = (; bottom = CCO.SetValue(b_up[kc_surf]), top = CCO.SetValue(b_up[kc_toa]))
@@ -343,6 +332,7 @@ function update_aux!(
         nh_press_adv = aux_up_f[i].nh_pressure_adv
         nh_press_drag = aux_up_f[i].nh_pressure_drag
 
+        updraft_top = compute_updraft_top(grid, state, i)
         nh_press_buoy .= nh_pressure_buoy(param_set, a_up, b_up, ρ0_f, asp_ratio, bcs)
         nh_press_adv .= nh_pressure_adv(param_set, updraft_top, a_up, ρ0_f, w_up, bcs)
         nh_press_drag .= nh_pressure_drag(param_set, updraft_top, a_up, ρ0_f, w_up, w_en, bcs)
