@@ -263,11 +263,10 @@ function affect_filter!(
         return nothing
     end
     prog_en = center_prog_environment(state)
-    up = edmf.UpdVar
     ###
     ### Filters
     ###
-    set_edmf_surface_bc(edmf, grid, state, up, surf)
+    set_edmf_surface_bc(edmf, grid, state, surf)
     filter_updraft_vars(edmf, grid, state, gm)
 
     @inbounds for k in real_center_indices(grid)
@@ -292,7 +291,6 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     force = case.Fo
     radiation = case.Rad
     gm = gm
-    up = edmf.UpdVar
     en_thermo = edmf.en_thermo
     precip_model = edmf.precip_model
 
@@ -311,7 +309,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     parent(tends_cent) .= 0
 
     # causes division error in dry bubble first time step
-    compute_precipitation_formation_tendencies(grid, state, up, precip_model, Δt, param_set)
+    compute_precipitation_formation_tendencies(grid, state, edmf, precip_model, Δt, param_set)
 
     microphysics(en_thermo, grid, state, precip_model, Δt, param_set)
     compute_precipitation_sink_tendencies(precip_model, grid, state, gm, Δt)
@@ -329,13 +327,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     return nothing
 end
 
-function set_edmf_surface_bc(
-    edmf::EDMF_PrognosticTKE,
-    grid::Grid,
-    state::State,
-    up::UpdraftVariables,
-    surf::SurfaceBase,
-)
+function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, surf::SurfaceBase)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
