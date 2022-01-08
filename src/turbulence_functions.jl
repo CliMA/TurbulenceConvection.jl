@@ -1,16 +1,14 @@
 # convective velocity scale
-function get_wstar(bflux, zi)
-    return cbrt(max(bflux * zi, 0.0))
-end
+get_wstar(bflux, zi) = cbrt(max(bflux * zi, 0))
 
-function buoyancy_c(param_set, ρ0, ρ)
-    g = CPP.grav(param_set)
+function buoyancy_c(param_set::APS, ρ0::FT, ρ::FT) where {FT}
+    g::FT = CPP.grav(param_set)
     return g * (ρ0 - ρ) / ρ0
 end
 
 # BL height
-function get_inversion(grid::Grid, state, param_set, Ri_bulk_crit)
-    g = CPP.grav(param_set)
+function get_inversion(grid::Grid{FT}, state::State, param_set::APS, Ri_bulk_crit::FT) where {FT}
+    g::FT = CPP.grav(param_set)
     kc_surf = kc_surface(grid)
     θ_virt = center_aux_turbconv(state).θ_virt
     u = center_prog_grid_mean(state).u
@@ -44,39 +42,39 @@ function get_inversion(grid::Grid, state, param_set, Ri_bulk_crit)
     return h
 end
 # Teixiera convective tau
-function get_mixing_tau(zi, wstar)
+function get_mixing_tau(zi::FT, wstar::FT) where {FT}
     # return 0.5 * zi / wstar
-    #return zi / (max(wstar, 1e-5))
-    return zi / (wstar + 0.001)
+    #return zi / (max(wstar, FT(1e-5)))
+    return zi / (wstar + FT(0.001))
 end
 
 # MO scaling of near surface tke and scalar variance
 
-function get_surface_tke(ustar, zLL, oblength)
-    if oblength < 0.0
-        return ((3.75 + cbrt(zLL / oblength * zLL / oblength)) * ustar * ustar)
+function get_surface_tke(ustar::FT, zLL::FT, oblength::FT) where {FT}
+    if oblength < 0
+        return ((FT(3.75) + cbrt(zLL / oblength * zLL / oblength)) * ustar * ustar)
     else
-        return (3.75 * ustar * ustar)
+        return (FT(3.75) * ustar * ustar)
     end
 end
-function get_surface_variance(flux1, flux2, ustar, zLL, oblength)
+function get_surface_variance(flux1::FT, flux2::FT, ustar::FT, zLL::FT, oblength::FT) where {FT}
     c_star1 = -flux1 / ustar
     c_star2 = -flux2 / ustar
-    if oblength < 0.0
-        return 4.0 * c_star1 * c_star2 * (1.0 - 8.3 * zLL / oblength)^(-2.0 / 3.0)
+    if oblength < 0
+        return 4 * c_star1 * c_star2 * (1 - FT(8.3) * zLL / oblength)^(-FT(2 / 3))
     else
-        return 4.0 * c_star1 * c_star2
+        return 4 * c_star1 * c_star2
     end
 end
 
-function gradient_Richardson_number(∂b∂z, Shear², ϵ)
-    return min(∂b∂z / max(Shear², ϵ), 0.25)
+function gradient_Richardson_number(∂b∂z::FT, Shear²::FT, ϵ::FT) where {FT}
+    return min(∂b∂z / max(Shear², ϵ), FT(0.25))
 end
 
 function turbulent_Prandtl_number(param_set::APS, obukhov_length::FT, ∇Ri::FT) where {FT}
     ω_pr::FT = CPEDMF.ω_pr(param_set)
     Pr_n::FT = CPEDMF.Pr_n(param_set)
-    if obukhov_length > 0.0 && ∇Ri > 0.0 #stable
+    if obukhov_length > 0 && ∇Ri > 0 #stable
         # CSB (Dan Li, 2019), with Pr_neutral=0.74 and w1=40.0/13.0
         prandtl_nvec = Pr_n * (2 * ∇Ri / (1 + ω_pr * ∇Ri - sqrt((1 + ω_pr * ∇Ri)^2 - 4 * ∇Ri)))
     else

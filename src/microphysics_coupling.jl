@@ -7,14 +7,14 @@ function precipitation_formation(
     precip_model::AbstractPrecipitationModel,
     qr::FT,
     qs::FT,
-    area,
-    ρ0,
-    dt,
+    area::FT,
+    ρ0::FT,
+    Δt::Real,
     ts,
 ) where {FT}
 
     # TODO - when using adaptive timestepping we are limiting the source terms
-    #        with the previous timestep dt
+    #        with the previous timestep Δt
     qt_tendency = FT(0)
     qr_tendency = FT(0)
     qs_tendency = FT(0)
@@ -33,7 +33,7 @@ function precipitation_formation(
             qsat = TD.q_vap_saturation(ts)
             λ = TD.liquid_fraction(ts)
 
-            S_qt = -min((q.liq + q.ice) / dt, -CM0.remove_precipitation(param_set, q, qsat))
+            S_qt = -min((q.liq + q.ice) / Δt, -CM0.remove_precipitation(param_set, q, qsat))
 
             qr_tendency -= S_qt * λ
             qs_tendency -= S_qt * (1 - λ)
@@ -53,27 +53,27 @@ function precipitation_formation(
             # The saturation adjustment scheme prevents using the
             # 1-moment snow autoconversion rate that assumes
             # that the supersaturation is present in the domain.
-            S_qt_rain = -min(q.liq / dt, CM1.conv_q_liq_to_q_rai(param_set, q.liq))
-            S_qt_snow = -min(q.ice / dt, CM1.conv_q_ice_to_q_sno_no_supersat(param_set, q.ice))
+            S_qt_rain = -min(q.liq / Δt, CM1.conv_q_liq_to_q_rai(param_set, q.liq))
+            S_qt_snow = -min(q.ice / Δt, CM1.conv_q_ice_to_q_sno_no_supersat(param_set, q.ice))
             qr_tendency -= S_qt_rain
             qs_tendency -= S_qt_snow
             qt_tendency += S_qt_rain + S_qt_snow
             θ_liq_ice_tendency -= 1 / Π_m / c_pm * (L_v0 * S_qt_rain + L_s0 * S_qt_snow)
 
             # accretion cloud water + rain
-            S_qr = min(q.liq / dt, CM1.accretion(param_set, liq_type, rain_type, q.liq, qr, ρ0))
+            S_qr = min(q.liq / Δt, CM1.accretion(param_set, liq_type, rain_type, q.liq, qr, ρ0))
             qr_tendency += S_qr
             qt_tendency -= S_qr
             θ_liq_ice_tendency += S_qr / Π_m / c_pm * L_v0
 
             # accretion cloud ice + snow
-            S_qs = min(q.ice / dt, CM1.accretion(param_set, ice_type, snow_type, q.ice, qs, ρ0))
+            S_qs = min(q.ice / Δt, CM1.accretion(param_set, ice_type, snow_type, q.ice, qs, ρ0))
             qs_tendency += S_qs
             qt_tendency -= S_qs
             θ_liq_ice_tendency += S_qs / Π_m / c_pm * L_s0
 
             # sink of cloud water via accretion cloud water + snow
-            S_qt = -min(q.liq / dt, CM1.accretion(param_set, liq_type, snow_type, q.liq, qs, ρ0))
+            S_qt = -min(q.liq / Δt, CM1.accretion(param_set, liq_type, snow_type, q.liq, qs, ρ0))
             if T < T_fr # cloud droplets freeze to become snow)
                 qs_tendency -= S_qt
                 qt_tendency += S_qt
@@ -87,9 +87,9 @@ function precipitation_formation(
             end
 
             # sink of cloud ice via accretion cloud ice - rain
-            S_qt = -min(q.ice / dt, CM1.accretion(param_set, ice_type, rain_type, q.ice, qr, ρ0))
+            S_qt = -min(q.ice / Δt, CM1.accretion(param_set, ice_type, rain_type, q.ice, qr, ρ0))
             # sink of rain via accretion cloud ice - rain
-            S_qr = -min(qr / dt, CM1.accretion_rain_sink(param_set, q.ice, qr, ρ0))
+            S_qr = -min(qr / Δt, CM1.accretion_rain_sink(param_set, q.ice, qr, ρ0))
             qt_tendency += S_qt
             qr_tendency += S_qr
             qs_tendency += -(S_qt + S_qr)
@@ -97,9 +97,9 @@ function precipitation_formation(
 
             # accretion rain - snow
             if T < T_fr
-                S_qs = min(qr / dt, CM1.accretion_snow_rain(param_set, snow_type, rain_type, qs, qr, ρ0))
+                S_qs = min(qr / Δt, CM1.accretion_snow_rain(param_set, snow_type, rain_type, qs, qr, ρ0))
             else
-                S_qs = -min(qs / dt, CM1.accretion_snow_rain(param_set, rain_type, snow_type, qr, qs, ρ0))
+                S_qs = -min(qs / Δt, CM1.accretion_snow_rain(param_set, rain_type, snow_type, qr, qs, ρ0))
             end
             qs_tendency += S_qs
             qr_tendency -= S_qs

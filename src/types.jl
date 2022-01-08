@@ -181,12 +181,6 @@ struct NoPrecipitation <: AbstractPrecipitationModel end
 struct CutoffPrecipitation <: AbstractPrecipitationModel end
 struct Clima1M <: AbstractPrecipitationModel end
 
-struct UpdraftVariables{N_up}
-    function UpdraftVariables(N_up, namelist)
-        return new{N_up}()
-    end
-end
-
 struct GridMeanVariables{PS}
     param_set::PS
 end
@@ -369,15 +363,12 @@ Base.@kwdef struct SurfaceBase{FT}
     obukhov_length::FT = 0
 end
 
-struct ForcingBaseType end
 struct ForcingNone end
 struct ForcingStandard end
 struct ForcingDYCOMS_RF01 end
 struct ForcingLES end
 
-struct RadiationBaseType end
 struct RadiationNone end
-struct RadiationStandard end
 struct RadiationDYCOMS_RF01 end
 struct RadiationLES end
 
@@ -605,7 +596,6 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, SDES}
 end
 parameter_set(obj) = obj.param_set
 n_updrafts(::EDMF_PrognosticTKE{N_up}) where {N_up} = N_up
-n_updrafts(::UpdraftVariables{N_up}) where {N_up} = N_up
 
 struct State{P, A, T}
     prog::P
