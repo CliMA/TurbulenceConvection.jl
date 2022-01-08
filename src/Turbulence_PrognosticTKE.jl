@@ -59,7 +59,6 @@ function compute_gm_tendencies!(
     massflux_h = aux_tc_f.massflux_h
     massflux_qt = aux_tc_f.massflux_qt
     aux_tc = center_aux_turbconv(state)
-    area_surface_bc = edmf.area_surface_bc
 
     θ_liq_ice_gm_toa = prog_gm.θ_liq_ice[kc_toa]
     q_tot_gm_toa = prog_gm.q_tot[kc_toa]
@@ -145,11 +144,11 @@ function compute_gm_tendencies!(
     # TODO: we shouldn't need to call parent here
     a_en = aux_en.area
     w_en = aux_en_f.w
-    a_en_bcs = (; bottom = CCO.SetValue(1 - sum(i -> area_surface_bc[i], 1:N_up)), top = CCO.Extrapolate())
+    a_en_bcs = a_en_boundary_conditions(surf, edmf)
     Ifae = CCO.InterpolateC2F(; a_en_bcs...)
     # Compute the mass flux and associated scalar fluxes
     @inbounds for i in 1:N_up
-        a_up_bcs = (; bottom = CCO.SetValue(area_surface_bc[i]), top = CCO.Extrapolate())
+        a_up_bcs = a_up_boundary_conditions(surf, edmf, i)
         Ifau = CCO.InterpolateC2F(; a_up_bcs...)
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
@@ -267,7 +266,7 @@ function affect_filter!(
     ### Filters
     ###
     set_edmf_surface_bc(edmf, grid, state, surf)
-    filter_updraft_vars(edmf, grid, state, gm)
+    filter_updraft_vars(edmf, grid, state, surf, gm)
 
     @inbounds for k in real_center_indices(grid)
         prog_en.ρatke[k] = max(prog_en.ρatke[k], 0.0)
@@ -290,7 +289,6 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
     force = case.Fo
     radiation = case.Rad
-    gm = gm
     en_thermo = edmf.en_thermo
     precip_model = edmf.precip_model
 
@@ -300,7 +298,6 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
 
-    compute_updraft_surface_bc(edmf, grid, state, surf)
     update_aux!(edmf, gm, grid, state, case, param_set, t, Δt)
 
     tends_face = tendencies.face
@@ -317,7 +314,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
     # compute tendencies
     compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, gm)
-    compute_updraft_tendencies(edmf, grid, state, gm)
+    compute_updraft_tendencies(edmf, grid, state, gm, surf)
 
     compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
     compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
@@ -338,10 +335,13 @@ function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State,
     prog_up_f = face_prog_updrafts(state)
     aux_bulk = center_aux_bulk(state)
     @inbounds for i in 1:N_up
-        prog_up[i].ρarea[kc_surf] = ρ0_c[kc_surf] * edmf.area_surface_bc[i]
-        prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * edmf.h_surface_bc[i]
-        prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * edmf.qt_surface_bc[i]
-        prog_up_f[i].ρaw[kf_surf] = ρ0_f[kf_surf] * edmf.w_surface_bc[i]
+        θ_surf = θ_surface_bc(surf, grid, state, edmf, i)
+        q_surf = q_surface_bc(surf, grid, state, edmf, i)
+        a_surf = area_surface_bc(surf, edmf, i)
+        prog_up[i].ρarea[kc_surf] = ρ0_c[kc_surf] * a_surf
+        prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * θ_surf
+        prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * q_surf
+        prog_up_f[i].ρaw[kf_surf] = ρ0_f[kf_surf] * w_surface_bc(surf)
     end
 
     flux1 = surf.ρθ_liq_ice_flux
@@ -362,40 +362,92 @@ function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State,
     return nothing
 end
 
-
-function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, surf::SurfaceBase)
+function surface_helper(surf::SurfaceBase, grid::Grid, state::State)
     kc_surf = kc_surface(grid)
-    N_up = n_updrafts(edmf)
     zLL = grid.zc[kc_surf]
     ustar = surf.ustar
     oblength = surf.obukhov_length
     α0LL = center_ref_state(state).α0[kc_surf]
-    prog_gm = center_prog_grid_mean(state)
-    qt_var = get_surface_variance(surf.ρq_tot_flux * α0LL, surf.ρq_tot_flux * α0LL, ustar, zLL, oblength)
-    h_var = get_surface_variance(surf.ρθ_liq_ice_flux * α0LL, surf.ρθ_liq_ice_flux * α0LL, ustar, zLL, oblength)
-
-    if surf.bflux > 0.0
-        a_total = edmf.surface_area
-        a_ = a_total / N_up
-        @inbounds for i in 1:N_up
-            surface_scalar_coeff =
-                percentile_bounds_mean_norm(1.0 - a_total + i * a_, 1.0 - a_total + (i + 1) * a_, 1000)
-            edmf.area_surface_bc[i] = a_
-            edmf.w_surface_bc[i] = 0.0
-            edmf.h_surface_bc[i] = prog_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var)
-            edmf.qt_surface_bc[i] = prog_gm.q_tot[kc_surf] + surface_scalar_coeff * sqrt(qt_var)
-        end
-    else
-        @inbounds for i in 1:N_up
-            edmf.area_surface_bc[i] = 0
-            edmf.w_surface_bc[i] = 0.0
-            edmf.h_surface_bc[i] = prog_gm.θ_liq_ice[kc_surf]
-            edmf.qt_surface_bc[i] = prog_gm.q_tot[kc_surf]
-        end
-    end
-
-    return nothing
+    return (; ustar, zLL, oblength, α0LL)
 end
+
+function a_up_boundary_conditions(surf::SurfaceBase, edmf::EDMF_PrognosticTKE, i::Int)
+    a_surf = area_surface_bc(surf, edmf, i)
+    return (; bottom = CCO.SetValue(a_surf), top = CCO.Extrapolate())
+end
+
+function a_bulk_boundary_conditions(surf::SurfaceBase, edmf::EDMF_PrognosticTKE)
+    N_up = n_updrafts(edmf)
+    a_surf = sum(i -> area_surface_bc(surf, edmf, i), 1:N_up)
+    return (; bottom = CCO.SetValue(a_surf), top = CCO.Extrapolate())
+end
+
+function a_en_boundary_conditions(surf::SurfaceBase, edmf::EDMF_PrognosticTKE)
+    N_up = n_updrafts(edmf)
+    a_surf = 1 - sum(i -> area_surface_bc(surf, edmf, i), 1:N_up)
+    return (; bottom = CCO.SetValue(a_surf), top = CCO.Extrapolate())
+end
+
+function area_surface_bc(surf::SurfaceBase{FT}, edmf::EDMF_PrognosticTKE, i::Int)::FT where {FT}
+    N_up = n_updrafts(edmf)
+    return surf.bflux > 0 ? edmf.surface_area / N_up : FT(0)
+end
+
+function w_surface_bc(::SurfaceBase{FT})::FT where {FT}
+    return FT(0)
+end
+function θ_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDMF_PrognosticTKE, i::Int)::FT where {FT}
+    prog_gm = center_prog_grid_mean(state)
+    kc_surf = kc_surface(grid)
+    surf.bflux > 0 || return FT(0)
+    a_total = edmf.surface_area
+    a_ = area_surface_bc(surf, edmf, i)
+    UnPack.@unpack ustar, zLL, oblength, α0LL = surface_helper(surf, grid, state)
+    ρθ_liq_ice_flux = surf.ρθ_liq_ice_flux
+    h_var = get_surface_variance(ρθ_liq_ice_flux * α0LL, ρθ_liq_ice_flux * α0LL, ustar, zLL, oblength)
+    surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + i * a_, 1 - a_total + (i + 1) * a_, 1000)
+    return prog_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var)
+end
+function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDMF_PrognosticTKE, i::Int)::FT where {FT}
+    prog_gm = center_prog_grid_mean(state)
+    kc_surf = kc_surface(grid)
+    surf.bflux > 0 || return prog_gm.q_tot[kc_surf]
+    a_total = edmf.surface_area
+    a_ = area_surface_bc(surf, edmf, i)
+    UnPack.@unpack ustar, zLL, oblength, α0LL = surface_helper(surf, grid, state)
+    ρq_tot_flux = surf.ρq_tot_flux
+    qt_var = get_surface_variance(ρq_tot_flux * α0LL, ρq_tot_flux * α0LL, ustar, zLL, oblength)
+    surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + i * a_, 1 - a_total + (i + 1) * a_, 1000)
+    return prog_gm.q_tot[kc_surf] + surface_scalar_coeff * sqrt(qt_var)
+end
+
+# function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, surf::SurfaceBase)
+#     kc_surf = kc_surface(grid)
+#     N_up = n_updrafts(edmf)
+#     zLL = grid.zc[kc_surf]
+#     ustar = surf.ustar
+#     oblength = surf.obukhov_length
+#     α0LL = center_ref_state(state).α0[kc_surf]
+#     prog_gm = center_prog_grid_mean(state)
+#     qt_var = get_surface_variance(surf.ρq_tot_flux * α0LL, surf.ρq_tot_flux * α0LL, ustar, zLL, oblength)
+#     h_var = get_surface_variance(surf.ρθ_liq_ice_flux * α0LL, surf.ρθ_liq_ice_flux * α0LL, ustar, zLL, oblength)
+
+#     if surf.bflux > 0.0
+#         a_total = edmf.surface_area
+#         a_ = a_total / N_up
+#         @inbounds for i in 1:N_up
+#             surface_scalar_coeff =
+#                 percentile_bounds_mean_norm(1.0 - a_total + i * a_, 1.0 - a_total + (i + 1) * a_, 1000)
+#             edmf.area_surface_bc[i] = a_
+#         end
+#     else
+#         @inbounds for i in 1:N_up
+#             edmf.area_surface_bc[i] = 0
+#         end
+#     end
+
+#     return nothing
+# end
 
 # Note: this assumes all variables are defined on half levels not full levels (i.e. phi, psi are not w)
 # if covar_e.name is not "tke".
@@ -455,7 +507,13 @@ function compute_pressure_plume_spacing(
     return max(aspect_ratio * updraft_top, H_up_min * aspect_ratio)
 end
 
-function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, gm::GridMeanVariables)
+function compute_updraft_tendencies(
+    edmf::EDMF_PrognosticTKE,
+    grid::Grid,
+    state::State,
+    gm::GridMeanVariables,
+    surf::SurfaceBase,
+)
     N_up = n_updrafts(edmf)
     param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
@@ -533,7 +591,7 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid::Grid, state:
     ∇f = CCO.DivergenceC2F(; adv_bcs...)
 
     @inbounds for i in 1:N_up
-        a_up_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.SetValue(FT(0)))
+        a_up_bcs = a_up_boundary_conditions(surf, edmf, i)
         Iaf = CCO.InterpolateC2F(; a_up_bcs...)
         tends_ρaw = tendencies_up_f[i].ρaw
         nh_pressure = aux_up_f[i].nh_pressure
@@ -555,7 +613,13 @@ function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid::Grid, state:
     return nothing
 end
 
-function filter_updraft_vars(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, gm::GridMeanVariables)
+function filter_updraft_vars(
+    edmf::EDMF_PrognosticTKE,
+    grid::Grid,
+    state::State,
+    surf::SurfaceBase,
+    gm::GridMeanVariables,
+)
     N_up = n_updrafts(edmf)
     param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
@@ -572,9 +636,6 @@ function filter_updraft_vars(edmf::EDMF_PrognosticTKE, grid::Grid, state::State,
     ρ0_f = face_ref_state(state).ρ0
     a_min = edmf.minimum_area
     a_max = edmf.max_area
-    area_surface_bc = edmf.area_surface_bc
-    h_surface_bc = edmf.h_surface_bc
-    qt_surface_bc = edmf.qt_surface_bc
 
     @inbounds for i in 1:N_up
         prog_up[i].ρarea .= max.(prog_up[i].ρarea, 0)
@@ -587,7 +648,7 @@ function filter_updraft_vars(edmf::EDMF_PrognosticTKE, grid::Grid, state::State,
 
     @inbounds for i in 1:N_up
         @. prog_up_f[i].ρaw = max.(prog_up_f[i].ρaw, 0)
-        a_up_bcs = (; bottom = CCO.SetValue(area_surface_bc[i]), top = CCO.Extrapolate())
+        a_up_bcs = a_up_boundary_conditions(surf, edmf, i)
         If = CCO.InterpolateC2F(; a_up_bcs...)
         @. prog_up_f[i].ρaw = Int(If(prog_up[i].ρarea) >= ρ0_f * a_min) * prog_up_f[i].ρaw
     end
@@ -610,9 +671,12 @@ function filter_updraft_vars(edmf::EDMF_PrognosticTKE, grid::Grid, state::State,
         @. prog_up[i].ρarea = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρarea)
         @. prog_up[i].ρaθ_liq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaθ_liq_ice)
         @. prog_up[i].ρaq_tot = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_tot)
-        prog_up[i].ρarea[kc_surf] = ρ0_c[kc_surf] * area_surface_bc[i]
-        prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * h_surface_bc[i]
-        prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * qt_surface_bc[i]
+        θ_surf = θ_surface_bc(surf, grid, state, edmf, i)
+        q_surf = q_surface_bc(surf, grid, state, edmf, i)
+        a_surf = area_surface_bc(surf, edmf, i)
+        prog_up[i].ρarea[kc_surf] = ρ0_c[kc_surf] * a_surf
+        prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * θ_surf
+        prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * q_surf
     end
     return nothing
 end

@@ -23,11 +23,10 @@ function initialize_edmf(
         aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
     end
     surf = TC.get_surface(surf_params, grid, state, gm, t, param_set)
-    TC.compute_updraft_surface_bc(edmf, grid, state, surf)
     if case.casename == "DryBubble"
         initialize_updrafts_DryBubble(edmf, grid, state, gm)
     else
-        initialize_updrafts(edmf, grid, state, gm)
+        initialize_updrafts(edmf, grid, state, gm, surf)
     end
     TC.set_edmf_surface_bc(edmf, grid, state, surf)
     return
@@ -57,7 +56,7 @@ function initialize_covariance(edmf::TC.EDMF_PrognosticTKE, grid::TC.Grid, state
     return
 end
 
-function initialize_updrafts(edmf, grid, state, gm::TC.GridMeanVariables)
+function initialize_updrafts(edmf, grid, state, gm::TC.GridMeanVariables, surf)
     N_up = TC.n_updrafts(edmf)
     kc_surf = TC.kc_surface(grid)
     aux_up = TC.center_aux_updrafts(state)
@@ -89,8 +88,9 @@ function initialize_updrafts(edmf, grid, state, gm::TC.GridMeanVariables)
             prog_up[i].ρaθ_liq_ice[k] = 0
         end
 
-        aux_up[i].area[kc_surf] = edmf.area_surface_bc[i]
-        prog_up[i].ρarea[kc_surf] = ρ0_c[kc_surf] * aux_up[i].area[kc_surf]
+        a_surf = TC.area_surface_bc(surf, edmf, i)
+        aux_up[i].area[kc_surf] = a_surf
+        prog_up[i].ρarea[kc_surf] = ρ0_c[kc_surf] * a_surf
     end
     return
 end

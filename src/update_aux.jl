@@ -62,9 +62,12 @@ function update_aux!(
         @inbounds for i in 1:N_up
             if is_surface_center(grid, k)
                 if prog_up[i].ρarea[k] / ρ0_c[k] >= edmf.minimum_area
-                    aux_up[i].θ_liq_ice[k] = edmf.h_surface_bc[i]
-                    aux_up[i].q_tot[k] = edmf.qt_surface_bc[i]
-                    aux_up[i].area[k] = edmf.area_surface_bc[i]
+                    θ_surf = θ_surface_bc(surf, grid, state, edmf, i)
+                    q_surf = q_surface_bc(surf, grid, state, edmf, i)
+                    a_surf = area_surface_bc(surf, edmf, i)
+                    aux_up[i].θ_liq_ice[k] = θ_surf
+                    aux_up[i].q_tot[k] = q_surf
+                    aux_up[i].area[k] = a_surf
                 else
                     aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
                     aux_up[i].q_tot[k] = prog_gm.q_tot[k]
@@ -212,22 +215,23 @@ function update_aux!(
     #####
     # TODO: figure out why `ifelse` is allocating
     @inbounds for i in 1:N_up
-        a_up_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.Extrapolate())
+        a_surf = area_surface_bc(surf, edmf, i)
+        a_up_bcs = a_up_boundary_conditions(surf, edmf, i)
         If = CCO.InterpolateC2F(; a_up_bcs...)
         a_min = edmf.minimum_area
         a_up = aux_up[i].area
         @. aux_up_f[i].w = ifelse(If(a_up) >= a_min, max(prog_up_f[i].ρaw / (ρ0_f * If(a_up)), 0), FT(0))
     end
     @inbounds for i in 1:N_up
-        aux_up_f[i].w[kf_surf] = edmf.w_surface_bc[i]
+        aux_up_f[i].w[kf_surf] = w_surface_bc(surf)
     end
 
     parent(aux_tc_f.bulk.w) .= 0
-    a_bulk_bcs = (; bottom = CCO.SetValue(sum(edmf.area_surface_bc)), top = CCO.Extrapolate())
+    a_bulk_bcs = a_bulk_boundary_conditions(surf, edmf)
     Ifb = CCO.InterpolateC2F(; a_bulk_bcs...)
     @inbounds for i in 1:N_up
         a_up = aux_up[i].area
-        a_up_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.Extrapolate())
+        a_up_bcs = a_up_boundary_conditions(surf, edmf, i)
         Ifu = CCO.InterpolateC2F(; a_up_bcs...)
         @. aux_tc_f.bulk.w += ifelse(Ifb(aux_bulk.area) > 0, Ifu(a_up) * aux_up_f[i].w / Ifb(aux_bulk.area), FT(0))
     end
@@ -324,7 +328,7 @@ function update_aux!(
         asp_ratio = 1.0
 
         b_bcs = (; bottom = CCO.SetValue(b_up[kc_surf]), top = CCO.SetValue(b_up[kc_toa]))
-        a_bcs = (; bottom = CCO.SetValue(edmf.area_surface_bc[i]), top = CCO.SetValue(FT(0)))
+        a_bcs = a_up_boundary_conditions(surf, edmf, i)
         w_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
         bcs = (; a_up = a_bcs, b_up = b_bcs, w_up = w_bcs)
 
