@@ -51,7 +51,6 @@ function update_aux!(
     wvec = CC.Geometry.WVector
     max_area = edmf.max_area
     sde_model = edmf.sde_model
-    pressure_plume_spacing = edmf.pressure_plume_spacing
 
     #####
     ##### center variables
@@ -246,7 +245,9 @@ function update_aux!(
     update_forcing(case, grid, state, gm, t, param_set)
     update_radiation(case, grid, state, gm, t, param_set)
 
-    compute_pressure_plume_spacing(edmf, grid, state, param_set)
+    pressure_plume_spacing = map(1:N_up) do i
+        compute_pressure_plume_spacing(edmf, grid, state, param_set, i)
+    end
 
     #####
     ##### compute_updraft_closures

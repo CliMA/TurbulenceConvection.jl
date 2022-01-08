@@ -450,16 +450,17 @@ function compute_updraft_top(grid::Grid{FT}, state::State, i::Int)::FT where {FT
     return z_findlast_center(k -> aux_up[i].area[k] > 1e-3, grid)
 end
 
-function compute_pressure_plume_spacing(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, param_set::APS)
-
-    FT = eltype(grid)
-    N_up = n_updrafts(edmf)
+function compute_pressure_plume_spacing(
+    edmf::EDMF_PrognosticTKE,
+    grid::Grid{FT},
+    state::State,
+    param_set::APS,
+    i::Int,
+)::FT where {FT}
     H_up_min::FT = CPEDMF.H_up_min(param_set)
-    @inbounds for i in 1:N_up
-        updraft_top = compute_updraft_top(grid, state, i)
-        edmf.pressure_plume_spacing[i] = max(edmf.aspect_ratio * updraft_top, H_up_min * edmf.aspect_ratio)
-    end
-    return nothing
+    updraft_top = compute_updraft_top(grid, state, i)
+    aspect_ratio = edmf.aspect_ratio
+    return max(aspect_ratio * updraft_top, H_up_min * aspect_ratio)
 end
 
 function compute_updraft_tendencies(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, gm::GridMeanVariables)

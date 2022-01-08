@@ -473,7 +473,6 @@ struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
     w_surface_bc::A1
     h_surface_bc::A1
     qt_surface_bc::A1
-    pressure_plume_spacing::A1
     prandtl_number::Float64
     sde_model::SDES
     bg_closure::EBGC
@@ -543,7 +542,6 @@ struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
         w_surface_bc = zeros(n_updrafts)
         h_surface_bc = zeros(n_updrafts)
         qt_surface_bc = zeros(n_updrafts)
-        pressure_plume_spacing = zeros(n_updrafts)
 
         # Initialize SDE parameters
         dt = parse_namelist(namelist, "time_stepping", "dt_min"; default = 1.0)
@@ -619,7 +617,6 @@ struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
             w_surface_bc,
             h_surface_bc,
             qt_surface_bc,
-            pressure_plume_spacing,
             prandtl_number,
             sde_model,
             bg_closure,

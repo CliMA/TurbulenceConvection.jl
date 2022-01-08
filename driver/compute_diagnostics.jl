@@ -252,7 +252,10 @@ function compute_diagnostics!(
     iwp = sum(i -> sum(ρ0_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
     TC.write_ts(Stats, "updraft_lwp", lwp)
     TC.write_ts(Stats, "updraft_iwp", iwp)
-    TC.write_ts(Stats, "rd", StatsBase.mean(edmf.pressure_plume_spacing))
+    pressure_plume_spacing = map(1:N_up) do i
+        TC.compute_pressure_plume_spacing(edmf, grid, state, param_set, i)
+    end
+    TC.write_ts(Stats, "rd", StatsBase.mean(pressure_plume_spacing))
 
     return
 end
