@@ -10,7 +10,7 @@ for updraft i following [He2020](@cite), given:
  - `asp_ratio`: the specific aspect ratio of the updraft
  - `bcs`: a `NamedTuple` of BCs with updraft area fraction and buoyancy entries
 """
-function nh_pressure_buoy(param_set::APS, a_up, b_up, ρ0, asp_ratio::FT, bcs) where {FT}
+function nh_pressure_buoy(param_set::APS, a_up, b_up, ρ0, asp_ratio::FT, bcs) where {FT <: Real}
     Ifb = CCO.InterpolateC2F(; bcs.b_up...)
     Ifa = CCO.InterpolateC2F(; bcs.a_up...)
 
@@ -32,7 +32,7 @@ for updraft i following [He2020](@cite), given:
  - `w_up`: updraft vertical velocity
  - `bcs`: a `NamedTuple` of BCs with updraft velocity and area fraction entries
 """
-function nh_pressure_adv(param_set::APS, updraft_top::FT, a_up, ρ0, w_up, bcs) where {FT}
+function nh_pressure_adv(param_set::APS, updraft_top::FT, a_up, ρ0, w_up, bcs) where {FT <: Real}
 
     Ifa = CCO.InterpolateC2F(; bcs.a_up...)
     Ifc = CCO.InterpolateF2C()
@@ -56,7 +56,7 @@ for updraft i following [He2020](@cite), given:
  - `w_en`: environment vertical velocity
  - `bcs`: a `NamedTuple` of BCs with an updraft area fraction entry
 """
-function nh_pressure_drag(param_set::APS, updraft_top::FT, a_up, ρ0, w_up, w_en, bcs) where {FT}
+function nh_pressure_drag(param_set::APS, updraft_top::FT, a_up, ρ0, w_up, w_en, bcs) where {FT <: Real}
 
     Ifa = CCO.InterpolateC2F(; bcs.a_up...)
     α_d::FT = CPEDMF.α_d(param_set)

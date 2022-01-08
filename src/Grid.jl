@@ -120,5 +120,41 @@ Base.iterate(fi::Base.Iterators.Reverse{T}, state = Nstop) where {Nstart, Nstop,
 face_space(grid::Grid) = grid.fs
 center_space(grid::Grid) = grid.cs
 
+#=
+    findfirst_center
+    findlast_center
+    findfirst_face
+    findlast_face
+
+Grid-aware find-first / find-last indices with
+surface/toa (respectively) as the default index
+=#
+
+function findfirst_center(f::Function, grid::Grid)
+    RI = real_center_indices(grid)
+    k = findfirst(f, RI)
+    return RI[isnothing(k) ? kc_surface(grid).i : k]
+end
+function findlast_center(f::Function, grid::Grid)
+    RI = real_center_indices(grid)
+    k = findlast(f, RI)
+    return RI[isnothing(k) ? kc_top_of_atmos(grid).i : k]
+end
+z_findfirst_center(f::F, grid::Grid) where {F} = grid.zc[findfirst_center(f, grid)].z
+z_findlast_center(f::F, grid::Grid) where {F} = grid.zc[findlast_center(f, grid)].z
+
+function findfirst_face(f::F, grid::Grid) where {F}
+    RI = real_face_indices(grid)
+    k = findfirst(f, RI)
+    return RI[isnothing(k) ? kf_surface(grid).i : k]
+end
+function findlast_face(f::F, grid::Grid) where {F}
+    RI = real_face_indices(grid)
+    k = findlast(f, RI)
+    return RI[isnothing(k) ? kf_top_of_atmos(grid).i : k]
+end
+z_findfirst_face(f::F, grid::Grid) where {F} = grid.zf[findfirst_face(f, grid)].z
+z_findlast_face(f::F, grid::Grid) where {F} = grid.zf[findlast_face(f, grid)].z
+
 
 Base.eltype(::Grid{FT}) where {FT} = FT

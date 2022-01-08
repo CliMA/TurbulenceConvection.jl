@@ -181,12 +181,9 @@ struct NoPrecipitation <: AbstractPrecipitationModel end
 struct CutoffPrecipitation <: AbstractPrecipitationModel end
 struct Clima1M <: AbstractPrecipitationModel end
 
-struct UpdraftVariables{A1, N_up}
-    updraft_top::A1
+struct UpdraftVariables{N_up}
     function UpdraftVariables(N_up, namelist)
-        # cloud and precipitation diagnostics for output
-        updraft_top = zeros(N_up)
-        return new{typeof(updraft_top), N_up}(updraft_top)
+        return new{N_up}()
     end
 end
 
@@ -632,7 +629,7 @@ struct EDMF_PrognosticTKE{N_up, A1, PM, ENT, EBGC, EC, SDES, UPVAR}
 end
 parameter_set(obj) = obj.param_set
 n_updrafts(::EDMF_PrognosticTKE{N_up}) where {N_up} = N_up
-n_updrafts(::UpdraftVariables{A, N_up}) where {A, N_up} = N_up
+n_updrafts(::UpdraftVariables{N_up}) where {N_up} = N_up
 
 struct State{P, A, T}
     prog::P
