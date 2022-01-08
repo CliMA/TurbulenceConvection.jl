@@ -15,13 +15,18 @@ function update_cloud_frac(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, g
     end
 end
 
-function compute_les_Γᵣ(z::ClimaCore.Geometry.ZPoint, τᵣ::Real = 24.0 * 3600.0, zᵢ::Real = 3000.0, zᵣ::Real = 3500.0)
+function compute_les_Γᵣ(
+    z::ClimaCore.Geometry.ZPoint,
+    τᵣ::FT = 24.0 * 3600.0,
+    zᵢ::FT = 3000.0,
+    zᵣ::FT = 3500.0,
+) where {FT <: Real}
     # returns height-dependent relaxation timescale from eqn. 9 in `Shen et al. 2021`
     if z < zᵢ
-        return 0.0
+        return FT(0)
     elseif zᵢ <= z <= zᵣ
         cos_arg = pi * ((z - zᵢ) / (zᵣ - zᵢ))
-        return (0.5 / τᵣ) * (1 - cos(cos_arg))
+        return (FT(0.5) / τᵣ) * (1 - cos(cos_arg))
     elseif z > zᵣ
         return (1 / τᵣ)
     end
@@ -346,7 +351,7 @@ function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State,
 
     flux1 = surf.ρθ_liq_ice_flux
     flux2 = surf.ρq_tot_flux
-    zLL = grid.zc[kc_surf]
+    zLL = grid.zc[kc_surf].z
     ustar = surf.ustar
     oblength = surf.obukhov_length
     α0LL = center_ref_state(state).α0[kc_surf]
@@ -355,7 +360,7 @@ function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State,
 
     ρ0_ae = ρ0_c[kc_surf] * ae[kc_surf]
 
-    prog_en.ρatke[kc_surf] = ρ0_ae * get_surface_tke(surf.ustar, grid.zc[kc_surf], surf.obukhov_length)
+    prog_en.ρatke[kc_surf] = ρ0_ae * get_surface_tke(surf.ustar, zLL, surf.obukhov_length)
     prog_en.ρaHvar[kc_surf] = ρ0_ae * get_surface_variance(flux1 * α0LL, flux1 * α0LL, ustar, zLL, oblength)
     prog_en.ρaQTvar[kc_surf] = ρ0_ae * get_surface_variance(flux2 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
     prog_en.ρaHQTcov[kc_surf] = ρ0_ae * get_surface_variance(flux1 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
@@ -364,7 +369,7 @@ end
 
 function surface_helper(surf::SurfaceBase, grid::Grid, state::State)
     kc_surf = kc_surface(grid)
-    zLL = grid.zc[kc_surf]
+    zLL = grid.zc[kc_surf].z
     ustar = surf.ustar
     oblength = surf.obukhov_length
     α0LL = center_ref_state(state).α0[kc_surf]
@@ -421,36 +426,6 @@ function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDM
     return prog_gm.q_tot[kc_surf] + surface_scalar_coeff * sqrt(qt_var)
 end
 
-# function compute_updraft_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, surf::SurfaceBase)
-#     kc_surf = kc_surface(grid)
-#     N_up = n_updrafts(edmf)
-#     zLL = grid.zc[kc_surf]
-#     ustar = surf.ustar
-#     oblength = surf.obukhov_length
-#     α0LL = center_ref_state(state).α0[kc_surf]
-#     prog_gm = center_prog_grid_mean(state)
-#     qt_var = get_surface_variance(surf.ρq_tot_flux * α0LL, surf.ρq_tot_flux * α0LL, ustar, zLL, oblength)
-#     h_var = get_surface_variance(surf.ρθ_liq_ice_flux * α0LL, surf.ρθ_liq_ice_flux * α0LL, ustar, zLL, oblength)
-
-#     if surf.bflux > 0.0
-#         a_total = edmf.surface_area
-#         a_ = a_total / N_up
-#         @inbounds for i in 1:N_up
-#             surface_scalar_coeff =
-#                 percentile_bounds_mean_norm(1.0 - a_total + i * a_, 1.0 - a_total + (i + 1) * a_, 1000)
-#             edmf.area_surface_bc[i] = a_
-#         end
-#     else
-#         @inbounds for i in 1:N_up
-#             edmf.area_surface_bc[i] = 0
-#         end
-#     end
-
-#     return nothing
-# end
-
-# Note: this assumes all variables are defined on half levels not full levels (i.e. phi, psi are not w)
-# if covar_e.name is not "tke".
 function get_GMV_CoVar(
     edmf::EDMF_PrognosticTKE,
     grid::Grid,

@@ -2,12 +2,12 @@
 Computes tendencies to qt and θ_liq_ice due to precipitation formation
 """
 function compute_precipitation_formation_tendencies(
-    grid,
-    state,
+    grid::Grid,
+    state::State,
     edmf::EDMF_PrognosticTKE,
     precip_model::AbstractPrecipitationModel,
-    dt,
-    param_set,
+    Δt::Real,
+    param_set::APS,
 )
     N_up = n_updrafts(edmf)
     p0_c = center_ref_state(state).p0
@@ -31,7 +31,7 @@ function compute_precipitation_formation_tendencies(
                 prog_pr.q_sno[k],
                 aux_up[i].area[k],
                 ρ0_c[k],
-                dt,
+                Δt,
                 ts_up,
             )
             aux_up[i].qt_tendency_precip_formation[k] = mph.qt_tendency * aux_up[i].area[k]
