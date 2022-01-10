@@ -31,8 +31,8 @@ function affect_io!(integrator)
     TC.io(io_nt.aux, Stats, state)
     TC.io(io_nt.diagnostics, Stats, diagnostics)
 
-    surf = TC.get_surface(case.surf_params, grid, state, gm, t, param_set)
-    TC.io(surf, grid, state, Stats)
+    surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
+    TC.io(surf, case.surf_params, grid, state, Stats, t)
 
     ODE.u_modified!(integrator, false) # We're legitamately not mutating `u` (the state vector)
 end
@@ -42,7 +42,7 @@ function affect_filter!(integrator)
     t = integrator.t
     param_set = TC.parameter_set(gm)
     state = TC.State(integrator.u, aux, integrator.du)
-    surf = TC.get_surface(case.surf_params, grid, state, gm, t, param_set)
+    surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
     TC.affect_filter!(edmf, grid, state, gm, surf, case.casename, t)
 
     # We're lying to OrdinaryDiffEq.jl, in order to avoid

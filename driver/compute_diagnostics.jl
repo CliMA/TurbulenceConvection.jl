@@ -83,7 +83,7 @@ function compute_diagnostics!(
     precip_model = edmf.precip_model
     diag_tc = center_diagnostics_turbconv(diagnostics)
     diag_tc_f = face_diagnostics_turbconv(diagnostics)
-    surf = TC.get_surface(case.surf_params, grid, state, gm, t, param_set)
+    surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
 
     @inbounds for k in TC.real_center_indices(grid)
         ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])

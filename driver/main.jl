@@ -28,6 +28,7 @@ include(joinpath(tc_dir, "driver", "parameter_set.jl"))
 include(joinpath(tc_dir, "driver", "Cases.jl"))
 include(joinpath(tc_dir, "driver", "dycore.jl"))
 include(joinpath(tc_dir, "driver", "TimeStepping.jl"))
+include(joinpath(tc_dir, "driver", "Surface.jl"))
 import .Cases
 
 struct Simulation1d{IONT, G, S, GM, C, EDMF, D, TIMESTEPPING, STATS, PS}
@@ -151,8 +152,8 @@ function TurbulenceConvection.initialize(sim::Simulation1d)
     TC.io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
 
     # TODO: deprecate
-    surf = TC.get_surface(sim.case.surf_params, sim.grid, state, sim.gm, t, sim.param_set)
-    TC.io(surf, sim.grid, state, sim.Stats)
+    surf = get_surface(sim.case.surf_params, sim.grid, state, sim.gm, t, sim.param_set)
+    TC.io(surf, sim.case.surf_params, sim.grid, state, sim.Stats, t)
     TC.close_files(sim.Stats)
 
     return
@@ -197,7 +198,7 @@ function solve_args(sim::Simulation1d)
 
     callbacks = ODE.CallbackSet(callback_adapt_dt..., callback_dtmax, callback_cfl..., callback_filters, callback_io...)
 
-    prob = ODE.ODEProblem(TC.∑tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
+    prob = ODE.ODEProblem(∑tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
 
     # TODO: LES_driven_SCM is currently unstable w.r.t. higher order moments (HOM).
     # So, we tell OrdinaryDiffEq.jl to not perform NaNs check on the solution

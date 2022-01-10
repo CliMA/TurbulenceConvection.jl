@@ -17,7 +17,6 @@ import FastGaussQuadrature
 import CLIMAParameters
 import OrdinaryDiffEq
 import CloudMicrophysics
-import SurfaceFluxes
 import UnPack
 import Distributions
 import StochasticDiffEq
@@ -31,8 +30,6 @@ const NC = NCDatasets
 const SA = StaticArrays
 
 const TD = Thermodynamics
-const SF = SurfaceFluxes
-const UF = SF.UniversalFunctions
 const RS = RootSolvers
 
 const CM = CloudMicrophysics
@@ -168,7 +165,6 @@ include("update_aux.jl")
 include("Turbulence_PrognosticTKE.jl")
 include("Forcing.jl")
 include("Radiation.jl")
-include("Surface.jl")
 include("io.jl")
 include("thermodynamics.jl")
 include("closures/perturbation_pressure.jl")
