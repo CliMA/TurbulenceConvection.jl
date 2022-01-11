@@ -35,17 +35,24 @@ pmtrigs = SnoopCompile.parcel(mtrigs)
 #     )
 # filter!(x->!any(nameof(x.first) == y for y in filtered_mods), pmtrigs)
 filter!(x -> (x.first == TurbulenceConvection), pmtrigs)
-tc_trigs = first(pmtrigs).second
-@show length(tc_trigs)
-for tc_trig in tc_trigs
-    println("-------------")
-    summary(tc_trig)
+
+@testset "Zero inference triggers" begin
+    @test isempty(pmtrigs)
 end
 
-@testset "Number of inference triggers" begin
-    # These tests are not strictly needed,
-    # but they will hopefully prevent performance
-    # regressions
-    @test length(tc_trigs) ≤ 2
-    @test length(itrigs) ≤ 36
-end
+# If we can't help but have inference triggers:
+
+# tc_trigs = first(pmtrigs).second
+# @show length(tc_trigs)
+# for tc_trig in tc_trigs
+#     println("-------------")
+#     summary(tc_trig)
+# end
+
+# @testset "Number of inference triggers" begin
+#     # These tests are not strictly needed,
+#     # but they will hopefully prevent performance
+#     # regressions
+#     @test length(tc_trigs) ≤ 2
+#     @test length(itrigs) ≤ 36
+# end

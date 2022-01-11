@@ -112,7 +112,7 @@ function compute_gm_tendencies!(
 
             Γᵣ = compute_les_Γᵣ(grid.zc[k])
             if Γᵣ != 0
-                tau_k = 1.0 / Γᵣ
+                tau_k = 1 / Γᵣ
                 gm_H_nudge_k = (aux_gm.H_nudge[k] - prog_gm.θ_liq_ice[k]) / tau_k
                 gm_q_tot_nudge_k = (aux_gm.qt_nudge[k] - prog_gm.q_tot[k]) / tau_k
             else
@@ -179,13 +179,20 @@ function compute_gm_tendencies!(
         @. massflux_qt += massflux * (If(q_tot_up) - If(q_tot_en))
     end
 
+    tends_q_tot = tendencies_gm.q_tot
+    tends_θ_liq_ice = tendencies_gm.θ_liq_ice
+    tends_u = tendencies_gm.u
+    tends_v = tendencies_gm.v
+
+    massflux_tendency_h = aux_tc.massflux_tendency_h
+    massflux_tendency_qt = aux_tc.massflux_tendency_qt
     # Compute the  mass flux tendencies
     # Adjust the values of the grid mean variables
     # Prepare the output
-    @. aux_tc.massflux_tendency_h = -∇c(wvec(massflux_h)) * α0_c
-    @. aux_tc.massflux_tendency_qt = ∇c(wvec(massflux_qt))
-    @. tendencies_gm.θ_liq_ice += -∇c(wvec(massflux_h)) * α0_c
-    @. tendencies_gm.q_tot += -∇c(wvec(massflux_qt)) * α0_c
+    @. massflux_tendency_h = -∇c(wvec(massflux_h)) * α0_c
+    @. massflux_tendency_qt = ∇c(wvec(massflux_qt))
+    @. tends_θ_liq_ice += -∇c(wvec(massflux_h)) * α0_c
+    @. tends_q_tot += -∇c(wvec(massflux_qt)) * α0_c
 
     a_en = aux_en.area
     aeKHq_tot_bc = surf.ρq_tot_flux / a_en[kc_surf]
@@ -199,10 +206,15 @@ function compute_gm_tendencies!(
     ∇aeKM_u = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKMu_bc)), tbc...)
     ∇aeKM_v = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKMv_bc)), tbc...)
 
-    @. tendencies_gm.q_tot += -α0_c * a_en * ∇aeKH_q_tot(wvec(aux_tc_f.diffusive_flux_qt))
-    @. tendencies_gm.θ_liq_ice += -α0_c * a_en * ∇aeKH_θ_liq_ice(wvec(aux_tc_f.diffusive_flux_h))
-    @. tendencies_gm.u += -α0_c * a_en * ∇aeKM_u(wvec(aux_tc_f.diffusive_flux_u))
-    @. tendencies_gm.v += -α0_c * a_en * ∇aeKM_v(wvec(aux_tc_f.diffusive_flux_v))
+    diffusive_flux_qt = aux_tc_f.diffusive_flux_qt
+    diffusive_flux_h = aux_tc_f.diffusive_flux_h
+    diffusive_flux_u = aux_tc_f.diffusive_flux_u
+    diffusive_flux_v = aux_tc_f.diffusive_flux_v
+
+    @. tends_q_tot += -α0_c * a_en * ∇aeKH_q_tot(wvec(diffusive_flux_qt))
+    @. tends_θ_liq_ice += -α0_c * a_en * ∇aeKH_θ_liq_ice(wvec(diffusive_flux_h))
+    @. tends_u += -α0_c * a_en * ∇aeKM_u(wvec(diffusive_flux_u))
+    @. tends_v += -α0_c * a_en * ∇aeKM_v(wvec(diffusive_flux_v))
 
     return nothing
 end
@@ -577,8 +589,8 @@ function compute_updraft_tendencies(
         detr_w = aux_up[i].detr_turb_dyn
         buoy = aux_up[i].buoy
 
-        @. tends_ρaw =
-            -(∇f(wvec(LBC(Iaf(a_up) * ρ0_f * w_up * w_up)))) +
+        @. tends_ρaw = -(∇f(wvec(LBC(Iaf(a_up) * ρ0_f * w_up * w_up))))
+        @. tends_ρaw +=
             (ρ0_f * Iaf(a_up) * w_up * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) +
             (ρ0_f * Iaf(a_up) * I0f(buoy)) +
             nh_pressure
@@ -840,7 +852,7 @@ function compute_en_tendencies!(
     param_set::APS,
     ::Val{covar_sym},
     ::Val{prog_sym},
-) where {S, PS, covar_sym, prog_sym}
+) where {covar_sym, prog_sym}
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
@@ -866,8 +878,13 @@ function compute_en_tendencies!(
     aux_tc = center_aux_turbconv(state)
     aux_bulk = center_aux_bulk(state)
     D_env = aux_tc.ϕ_temporary
-    ae = 1 .- aux_bulk.area
-    aeK = is_tke ? ae .* KM : ae .* KH
+    aeK = aux_tc.ψ_temporary
+    a_bulk = aux_bulk.area
+    if is_tke
+        @. aeK = (1 - a_bulk) * KM
+    else
+        @. aeK = (1 - a_bulk) * KH
+    end
 
     press = aux_covar.press
     buoy = aux_covar.buoy
@@ -920,7 +937,7 @@ function GMV_third_m(
     ::Val{covar_en_sym},
     ::Val{var},
     ::Val{gm_third_m_sym},
-) where {S, covar_en_sym, var, gm_third_m_sym}
+) where {covar_en_sym, var, gm_third_m_sym}
 
     N_up = n_updrafts(edmf)
     gm_third_m = getproperty(center_aux_grid_mean(state), gm_third_m_sym)
