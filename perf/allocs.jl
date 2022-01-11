@@ -110,7 +110,7 @@ end
 
 @info "Post-processing allocations"
 
-function plot_allocs(case_name, allocs_per_case, n_unique_bytes)
+function plot_allocs(folder, case_name, allocs_per_case, n_unique_bytes)
     p = Plots.plot()
     @info "Allocations for $case_name"
 
@@ -195,5 +195,5 @@ mkpath(folder)
 
 @info "Allocated bytes for single tendency per case:"
 for case in all_cases
-    plot_allocs(case, allocs[case], 10)
+    plot_allocs(folder, case, allocs[case], 10)
 end
