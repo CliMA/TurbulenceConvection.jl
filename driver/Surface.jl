@@ -1,40 +1,46 @@
+import StaticArrays
+const SA = StaticArrays
+
+import SurfaceFluxes
+const SF = SurfaceFluxes
+const UF = SF.UniversalFunctions
 
 function get_surface(
-    surf_params::FixedSurfaceFlux,
-    grid::Grid,
-    state::State,
-    gm::GridMeanVariables,
+    surf_params::TC.FixedSurfaceFlux,
+    grid::TC.Grid,
+    state::TC.State,
+    gm::TC.GridMeanVariables,
     t::Real,
-    param_set::APS,
+    param_set::CP.AbstractEarthParameterSet,
 )
     FT = eltype(grid)
-    kc_surf = kc_surface(grid)
-    kf_surf = kf_surface(grid)
+    kc_surf = TC.kc_surface(grid)
+    kf_surf = TC.kf_surface(grid)
     z_sfc = FT(0)
     z_in = grid.zc[kc_surf].z
-    aux_gm = center_aux_grid_mean(state)
-    prog_gm = center_prog_grid_mean(state)
-    p0_f_surf = face_ref_state(state).p0[kf_surf]
-    p0_c_surf = center_ref_state(state).p0[kc_surf]
+    aux_gm = TC.center_aux_grid_mean(state)
+    prog_gm = TC.center_prog_grid_mean(state)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    p0_c_surf = TC.center_ref_state(state).p0[kc_surf]
     u_gm_surf = prog_gm.u[kc_surf]
     v_gm_surf = prog_gm.v[kc_surf]
     q_tot_gm_surf = prog_gm.q_tot[kc_surf]
     θ_liq_ice_gm_surf = prog_gm.θ_liq_ice[kc_surf]
-    Tsurface = surface_temperature(surf_params, t)
-    qsurface = surface_q_tot(surf_params, t)
-    shf = sensible_heat_flux(surf_params, t)
-    lhf = latent_heat_flux(surf_params, t)
+    Tsurface = TC.surface_temperature(surf_params, t)
+    qsurface = TC.surface_q_tot(surf_params, t)
+    shf = TC.sensible_heat_flux(surf_params, t)
+    lhf = TC.latent_heat_flux(surf_params, t)
     Ri_bulk_crit = surf_params.Ri_bulk_crit
     zrough = surf_params.zrough
 
     ts_sfc = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
-    ts_in = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
+    ts_in = TC.thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
 
     bflux = SF.compute_buoyancy_flux(param_set, shf, lhf, ts_in, ts_sfc, scheme)
-    zi = get_inversion(grid, state, param_set, Ri_bulk_crit)
-    convective_vel = get_wstar(bflux, zi) # yair here zi in TRMM should be adjusted
+    zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)
+    convective_vel = TC.get_wstar(bflux, zi) # yair here zi in TRMM should be adjusted
 
     u_sfc = SA.SVector{2, FT}(0, 0)
     u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
@@ -49,16 +55,16 @@ function get_surface(
         z0b = zrough,
         gustiness = convective_vel,
     )
-    sc = if fixed_ustar(surf_params)
+    sc = if TC.fixed_ustar(surf_params)
         SF.FluxesAndFrictionVelocity{FT}(; kwargs..., ustar = surf_params.ustar)
     else
         SF.Fluxes{FT}(; kwargs...)
     end
     result = SF.surface_conditions(param_set, sc, universal_func, scheme)
-    return SurfaceBase{FT}(;
+    return TC.SurfaceBase{FT}(;
         shf = shf,
         lhf = lhf,
-        ustar = fixed_ustar(surf_params) ? surf_params.ustar : result.ustar,
+        ustar = TC.fixed_ustar(surf_params) ? surf_params.ustar : result.ustar,
         bflux = bflux,
         obukhov_length = result.L_MO,
         cm = result.Cd,
@@ -71,26 +77,26 @@ function get_surface(
 end
 
 function get_surface(
-    surf_params::FixedSurfaceCoeffs,
-    grid::Grid,
-    state::State,
-    gm::GridMeanVariables,
+    surf_params::TC.FixedSurfaceCoeffs,
+    grid::TC.Grid,
+    state::TC.State,
+    gm::TC.GridMeanVariables,
     t::Real,
-    param_set::APS,
+    param_set::CP.AbstractEarthParameterSet,
 )
     FT = eltype(grid)
-    kc_surf = kc_surface(grid)
-    kf_surf = kf_surface(grid)
-    p0_f_surf = face_ref_state(state).p0[kf_surf]
-    p0_c_surf = center_ref_state(state).p0[kc_surf]
-    aux_gm = center_aux_grid_mean(state)
-    prog_gm = center_prog_grid_mean(state)
+    kc_surf = TC.kc_surface(grid)
+    kf_surf = TC.kf_surface(grid)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    p0_c_surf = TC.center_ref_state(state).p0[kc_surf]
+    aux_gm = TC.center_aux_grid_mean(state)
+    prog_gm = TC.center_prog_grid_mean(state)
     u_gm_surf = prog_gm.u[kc_surf]
     v_gm_surf = prog_gm.v[kc_surf]
     q_tot_gm_surf = prog_gm.q_tot[kc_surf]
     θ_liq_ice_gm_surf = prog_gm.θ_liq_ice[kc_surf]
-    Tsurface = surface_temperature(surf_params, t)
-    qsurface = surface_q_tot(surf_params, t)
+    Tsurface = TC.surface_temperature(surf_params, t)
+    qsurface = TC.surface_q_tot(surf_params, t)
     zrough = surf_params.zrough
     cm = surf_params.cm
     ch = surf_params.ch
@@ -99,8 +105,8 @@ function get_surface(
     scheme = SF.FVScheme()
     z_sfc = FT(0)
     z_in = grid.zc[kc_surf].z
-    ts_sfc = thermo_state_pθq(param_set, p0_f_surf, Tsurface, qsurface)
-    ts_in = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
+    ts_sfc = TC.thermo_state_pθq(param_set, p0_f_surf, Tsurface, qsurface)
+    ts_in = TC.thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
     u_sfc = SA.SVector{2, FT}(0, 0)
     u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
     vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
@@ -110,7 +116,7 @@ function get_surface(
     lhf = result.lhf
     shf = result.shf
 
-    return SurfaceBase{FT}(;
+    return TC.SurfaceBase{FT}(;
         cm = result.Cd,
         ch = result.Ch,
         obukhov_length = result.L_MO,
@@ -126,36 +132,36 @@ function get_surface(
 end
 
 function get_surface(
-    surf_params::MoninObukhovSurface,
-    grid::Grid,
-    state::State,
-    gm::GridMeanVariables,
+    surf_params::TC.MoninObukhovSurface,
+    grid::TC.Grid,
+    state::TC.State,
+    gm::TC.GridMeanVariables,
     t::Real,
-    param_set::APS,
+    param_set::CP.AbstractEarthParameterSet,
 )
-    kc_surf = kc_surface(grid)
-    kf_surf = kf_surface(grid)
+    kc_surf = TC.kc_surface(grid)
+    kf_surf = TC.kf_surface(grid)
     FT = eltype(grid)
     z_sfc = FT(0)
     z_in = grid.zc[kc_surf].z
-    p0_f_surf = face_ref_state(state).p0[kf_surf]
-    p0_c_surf = center_ref_state(state).p0[kc_surf]
-    prog_gm = center_prog_grid_mean(state)
-    aux_gm = center_aux_grid_mean(state)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    p0_c_surf = TC.center_ref_state(state).p0[kc_surf]
+    prog_gm = TC.center_prog_grid_mean(state)
+    aux_gm = TC.center_aux_grid_mean(state)
     u_gm_surf = prog_gm.u[kc_surf]
     v_gm_surf = prog_gm.v[kc_surf]
     q_tot_gm_surf = prog_gm.q_tot[kc_surf]
     θ_liq_ice_gm_surf = prog_gm.θ_liq_ice[kc_surf]
-    Tsurface = surface_temperature(surf_params, t)
-    qsurface = surface_q_tot(surf_params, t)
-    shf = sensible_heat_flux(surf_params, t)
-    lhf = latent_heat_flux(surf_params, t)
+    Tsurface = TC.surface_temperature(surf_params, t)
+    qsurface = TC.surface_q_tot(surf_params, t)
+    shf = TC.sensible_heat_flux(surf_params, t)
+    lhf = TC.latent_heat_flux(surf_params, t)
     zrough = surf_params.zrough
 
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
     ts_sfc = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
-    ts_in = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, qsurface)
+    ts_in = TC.thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, qsurface)
 
     u_sfc = SA.SVector{2, FT}(0, 0)
     u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
@@ -165,10 +171,7 @@ function get_surface(
     result = SF.surface_conditions(param_set, sc, universal_func, scheme)
     lhf = result.lhf
     shf = result.shf
-    return SurfaceBase{FT}(;
-        zrough = zrough,
-        Tsurface = Tsurface,
-        qsurface = qsurface,
+    return TC.SurfaceBase{FT}(;
         cm = result.Cd,
         ch = result.Ch,
         obukhov_length = result.L_MO,
@@ -184,22 +187,22 @@ function get_surface(
 end
 
 function get_surface(
-    surf_params::SullivanPattonSurface,
-    grid::Grid,
-    state::State,
-    gm::GridMeanVariables,
+    surf_params::TC.SullivanPattonSurface,
+    grid::TC.Grid,
+    state::TC.State,
+    gm::TC.GridMeanVariables,
     t::Real,
-    param_set::APS,
+    param_set::CP.AbstractEarthParameterSet,
 )
-    kc_surf = kc_surface(grid)
-    kf_surf = kf_surface(grid)
+    kc_surf = TC.kc_surface(grid)
+    kf_surf = TC.kf_surface(grid)
     FT = eltype(grid)
     z_sfc = FT(0)
     z_in = grid.zc[kc_surf].z
-    p0_f_surf = face_ref_state(state).p0[kf_surf]
-    p0_c_surf = center_ref_state(state).p0[kc_surf]
-    prog_gm = center_prog_grid_mean(state)
-    aux_gm = center_aux_grid_mean(state)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    p0_c_surf = TC.center_ref_state(state).p0[kc_surf]
+    prog_gm = TC.center_prog_grid_mean(state)
+    aux_gm = TC.center_aux_grid_mean(state)
     u_gm_surf = prog_gm.u[kc_surf]
     v_gm_surf = prog_gm.v[kc_surf]
     q_tot_gm_surf = prog_gm.q_tot[kc_surf]
@@ -214,8 +217,8 @@ function get_surface(
 
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
-    ts_sfc = thermo_state_pθq(param_set, p0_f_surf, θ_star, qsurface)
-    ts_in = thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, qsurface)
+    ts_sfc = TC.thermo_state_pθq(param_set, p0_f_surf, θ_star, qsurface)
+    ts_in = TC.thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, qsurface)
 
     u_sfc = SA.SVector{2, FT}(0, 0)
     u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
@@ -225,8 +228,7 @@ function get_surface(
     result = SF.surface_conditions(param_set, sc, universal_func, scheme)
     lhf = result.lhf
     shf = result.shf
-    return SurfaceBase{FT}(;
-        qsurface = qsurface,
+    return TC.SurfaceBase{FT}(;
         cm = result.Cd,
         ch = result.Ch,
         obukhov_length = result.L_MO,

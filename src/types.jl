@@ -346,14 +346,10 @@ fixed_ustar(::FixedSurfaceFlux{FT, FixedFrictionVelocity}) where {FT} = true
 fixed_ustar(::FixedSurfaceFlux{FT, VariableFrictionVelocity}) where {FT} = false
 
 Base.@kwdef struct SurfaceBase{FT}
-    zrough::FT = 0
-    Tsurface::FT = 0
-    qsurface::FT = 0
     shf::FT = 0
     lhf::FT = 0
     cm::FT = 0
     ch::FT = 0
-    cq::FT = 0
     bflux::FT = 0
     ustar::FT = 0
     ρq_tot_flux::FT = 0

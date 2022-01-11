@@ -24,7 +24,7 @@ function update_n(sim, tendencies, ::Val{N}) where {N}
     aux = sim.state.aux
     params = (; edmf = sim.edmf, grid = grid, gm = sim.gm, case = sim.case, TS = TS, aux = aux)
     for i in 1:N
-        TC.∑tendencies!(tendencies, prog, params, TS.t)
+        ∑tendencies!(tendencies, prog, params, TS.t)
     end
     return nothing
 end

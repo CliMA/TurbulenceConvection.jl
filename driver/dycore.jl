@@ -1,3 +1,7 @@
+import UnPack
+import ClimaCore
+const CC = ClimaCore
+
 #####
 ##### Fields
 #####
@@ -92,4 +96,50 @@ function satadjust(gm::TC.GridMeanVariables, grid, state)
         aux_gm.RH[k] = TD.relative_humidity(ts)
     end
     return
+end
+
+# Compute the sum of tendencies for the scheme
+function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
+    UnPack.@unpack edmf, grid, gm, case, aux, TS = params
+
+    state = TC.State(prog, aux, tendencies)
+
+    Δt = TS.dt
+    param_set = TC.parameter_set(gm)
+    surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
+    force = case.Fo
+    radiation = case.Rad
+    en_thermo = edmf.en_thermo
+    precip_model = edmf.precip_model
+
+    TC.affect_filter!(edmf, grid, state, gm, surf, case.casename, t)
+
+    # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
+    # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
+    # treat them as auxiliary variables for now, until we disentangle the tendency computations.
+
+    TC.update_aux!(edmf, gm, grid, state, case, surf, param_set, t, Δt)
+
+    tends_face = tendencies.face
+    tends_cent = tendencies.cent
+    parent(tends_face) .= 0
+    parent(tends_cent) .= 0
+
+    # causes division error in dry bubble first time step
+    TC.compute_precipitation_formation_tendencies(grid, state, edmf, precip_model, Δt, param_set)
+
+    TC.microphysics(en_thermo, grid, state, precip_model, Δt, param_set)
+    TC.compute_precipitation_sink_tendencies(precip_model, grid, state, gm, Δt)
+    TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, gm)
+
+    # compute tendencies
+    TC.compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, gm)
+    TC.compute_up_tendencies!(edmf, grid, state, gm, surf)
+
+    TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
+    TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
+    TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρaQTvar))
+    TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρaHQTcov))
+
+    return nothing
 end

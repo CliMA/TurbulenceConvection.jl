@@ -295,52 +295,6 @@ function affect_filter!(
     return nothing
 end
 
-# Compute the sum of tendencies for the scheme
-function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
-    UnPack.@unpack edmf, grid, gm, case, aux, TS = params
-
-    state = State(prog, aux, tendencies)
-
-    Δt = TS.dt
-    param_set = parameter_set(gm)
-    surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
-    force = case.Fo
-    radiation = case.Rad
-    en_thermo = edmf.en_thermo
-    precip_model = edmf.precip_model
-
-    affect_filter!(edmf, grid, state, gm, surf, case.casename, t)
-
-    # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
-    # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
-    # treat them as auxiliary variables for now, until we disentangle the tendency computations.
-
-    update_aux!(edmf, gm, grid, state, case, param_set, t, Δt)
-
-    tends_face = tendencies.face
-    tends_cent = tendencies.cent
-    parent(tends_face) .= 0
-    parent(tends_cent) .= 0
-
-    # causes division error in dry bubble first time step
-    compute_precipitation_formation_tendencies(grid, state, edmf, precip_model, Δt, param_set)
-
-    microphysics(en_thermo, grid, state, precip_model, Δt, param_set)
-    compute_precipitation_sink_tendencies(precip_model, grid, state, gm, Δt)
-    compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, gm)
-
-    # compute tendencies
-    compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, gm)
-    compute_updraft_tendencies(edmf, grid, state, gm, surf)
-
-    compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
-    compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
-    compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρaQTvar))
-    compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρaHQTcov))
-
-    return nothing
-end
-
 function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, surf::SurfaceBase)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
@@ -494,7 +448,7 @@ function compute_pressure_plume_spacing(
     return max(aspect_ratio * updraft_top, H_up_min * aspect_ratio)
 end
 
-function compute_updraft_tendencies(
+function compute_up_tendencies!(
     edmf::EDMF_PrognosticTKE,
     grid::Grid,
     state::State,

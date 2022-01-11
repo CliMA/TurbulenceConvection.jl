@@ -4,6 +4,7 @@ function update_aux!(
     grid::Grid,
     state::State,
     case::CasesBase,
+    surf::SurfaceBase,
     param_set::APS,
     t::Real,
     Δt::Real,
@@ -24,7 +25,6 @@ function update_aux!(
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
     surf_params = case.surf_params
-    surf = get_surface(surf_params, grid, state, gm, t, param_set)
     obukhov_length = surf.obukhov_length
     FT = eltype(grid)
     prog_gm = center_prog_grid_mean(state)

@@ -22,7 +22,7 @@ function initialize_edmf(
         ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
     end
-    surf = TC.get_surface(surf_params, grid, state, gm, t, param_set)
+    surf = get_surface(surf_params, grid, state, gm, t, param_set)
     if case.casename == "DryBubble"
         initialize_updrafts_DryBubble(edmf, grid, state, gm)
     else
