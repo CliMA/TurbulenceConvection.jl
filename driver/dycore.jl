@@ -1,6 +1,19 @@
 import UnPack
+
+import TurbulenceConvection
+const TC = TurbulenceConvection
+
+import Thermodynamics
+const TD = Thermodynamics
+
 import ClimaCore
 const CC = ClimaCore
+
+import OrdinaryDiffEq
+const ODE = OrdinaryDiffEq
+
+import CLIMAParameters
+const CPP = CLIMAParameters.Planet
 
 #####
 ##### Fields
@@ -78,6 +91,81 @@ face_prognostic_vars(FT, n_up) = (; w = FT(0), TC.face_prognostic_vars_edmf(FT, 
 ##### Methods
 #####
 
+####
+#### Reference state
+####
+
+"""
+    compute_ref_state!(
+        state,
+        grid::Grid,
+        param_set::PS;
+        Pg::FT,
+        Tg::FT,
+        qtg::FT,
+    ) where {PS, FT}
+
+TODO: add better docs once the API converges
+
+The reference profiles, given
+ - `grid` the grid
+ - `param_set` the parameter set
+"""
+function compute_ref_state!(state, grid::TC.Grid, param_set::PS; Pg::FT, Tg::FT, qtg::FT) where {PS, FT}
+
+    p0_c = TC.center_ref_state(state).p0
+    ρ0_c = TC.center_ref_state(state).ρ0
+    α0_c = TC.center_ref_state(state).α0
+    p0_f = TC.face_ref_state(state).p0
+    ρ0_f = TC.face_ref_state(state).ρ0
+    α0_f = TC.face_ref_state(state).α0
+
+    q_pt_g = TD.PhasePartition(qtg)
+    ts_g = TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
+    θ_liq_ice_g = TD.liquid_ice_pottemp(ts_g)
+
+    # We are integrating the log pressure so need to take the log of the
+    # surface pressure
+    logp = log(Pg)
+
+    # Form a right hand side for integrating the hydrostatic equation to
+    # determine the reference pressure
+    function rhs(logp, u, z)
+        p_ = exp(logp)
+        ts = TC.thermo_state_pθq(param_set, p_, θ_liq_ice_g, qtg)
+        R_m = TD.gas_constant_air(ts)
+        T = TD.air_temperature(ts)
+        return -FT(CPP.grav(param_set)) / (T * R_m)
+    end
+
+    # Perform the integration
+    z_span = (grid.zmin, grid.zmax)
+    @show z_span
+    prob = ODE.ODEProblem(rhs, logp, z_span)
+    sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
+
+    parent(p0_f) .= sol.(vec(grid.zf))
+    parent(p0_c) .= sol.(vec(grid.zc))
+
+    p0_f .= exp.(p0_f)
+    p0_c .= exp.(p0_c)
+
+    # Compute reference state thermodynamic profiles
+    @inbounds for k in TC.real_center_indices(grid)
+        ts = TC.thermo_state_pθq(param_set, p0_c[k], θ_liq_ice_g, qtg)
+        α0_c[k] = TD.specific_volume(ts)
+    end
+
+    @inbounds for k in TC.real_face_indices(grid)
+        ts = TC.thermo_state_pθq(param_set, p0_f[k], θ_liq_ice_g, qtg)
+        α0_f[k] = TD.specific_volume(ts)
+    end
+
+    ρ0_f .= 1 ./ α0_f
+    ρ0_c .= 1 ./ α0_c
+    return nothing
+end
+
 function satadjust(gm::TC.GridMeanVariables, grid, state)
     p0_c = TC.center_ref_state(state).p0
     ρ0_c = TC.center_ref_state(state).ρ0
@@ -133,7 +221,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, gm)
 
     # compute tendencies
-    TC.compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, gm)
+    compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, gm)
     TC.compute_up_tendencies!(edmf, grid, state, gm, surf)
 
     TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
@@ -141,5 +229,122 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρaQTvar))
     TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρaHQTcov))
 
+    return nothing
+end
+
+
+function compute_gm_tendencies!(
+    edmf::TC.EDMF_PrognosticTKE,
+    grid::TC.Grid,
+    state::TC.State,
+    surf::TC.SurfaceBase,
+    radiation::TC.RadiationBase,
+    force::TC.ForcingBase,
+    gm::TC.GridMeanVariables,
+)
+    tendencies_gm = TC.center_tendencies_grid_mean(state)
+    kc_toa = TC.kc_top_of_atmos(grid)
+    FT = eltype(grid)
+    param_set = TC.parameter_set(gm)
+    prog_gm = TC.center_prog_grid_mean(state)
+    aux_gm = TC.center_aux_grid_mean(state)
+    ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
+    ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
+    aux_en = TC.center_aux_environment(state)
+    aux_en_f = TC.face_aux_environment(state)
+    aux_up = TC.center_aux_updrafts(state)
+    aux_bulk = TC.center_aux_bulk(state)
+    aux_tc_f = TC.face_aux_turbconv(state)
+    aux_up_f = TC.face_aux_updrafts(state)
+    ρ0_f = TC.face_ref_state(state).ρ0
+    p0_c = TC.center_ref_state(state).p0
+    α0_c = TC.center_ref_state(state).α0
+    kf_surf = TC.kf_surface(grid)
+    kc_surf = TC.kc_surface(grid)
+    massflux_h = aux_tc_f.massflux_h
+    massflux_qt = aux_tc_f.massflux_qt
+    aux_tc = TC.center_aux_turbconv(state)
+
+    θ_liq_ice_gm_toa = prog_gm.θ_liq_ice[kc_toa]
+    q_tot_gm_toa = prog_gm.q_tot[kc_toa]
+    RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_liq_ice_gm_toa))
+    RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa))
+    wvec = CC.Geometry.WVector
+    ∇c = CCO.DivergenceF2C()
+    @. ∇θ_liq_ice_gm = ∇c(wvec(RBθ(prog_gm.θ_liq_ice)))
+    @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.q_tot)))
+
+    @inbounds for k in TC.real_center_indices(grid)
+        # Apply large-scale horizontal advection tendencies
+        ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        Π = TD.exner(ts)
+
+        if force.apply_coriolis
+            tendencies_gm.u[k] -= force.coriolis_param * (aux_gm.vg[k] - prog_gm.v[k])
+            tendencies_gm.v[k] += force.coriolis_param * (aux_gm.ug[k] - prog_gm.u[k])
+        end
+        if TC.rad_type(radiation) <: Union{TC.RadiationDYCOMS_RF01, TC.RadiationLES}
+            tendencies_gm.θ_liq_ice[k] += aux_gm.dTdt_rad[k] / Π
+        end
+
+        if TC.force_type(force) <: TC.ForcingDYCOMS_RF01
+            tendencies_gm.q_tot[k] += aux_gm.dqtdt[k]
+            # Apply large-scale subsidence tendencies
+            tendencies_gm.θ_liq_ice[k] -= ∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
+            tendencies_gm.q_tot[k] -= ∇q_tot_gm[k] * aux_gm.subsidence[k]
+        end
+
+        if TC.force_type(force) <: TC.ForcingStandard
+            if force.apply_subsidence
+                tendencies_gm.θ_liq_ice[k] -= ∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
+                tendencies_gm.q_tot[k] -= ∇q_tot_gm[k] * aux_gm.subsidence[k]
+            end
+            tendencies_gm.θ_liq_ice[k] += aux_gm.dTdt[k] / Π
+            tendencies_gm.q_tot[k] += aux_gm.dqtdt[k]
+        end
+
+        if TC.force_type(force) <: TC.ForcingLES
+            H_horz_adv = aux_gm.dTdt_hadv[k] / Π
+            H_fluc = aux_gm.dTdt_fluc[k] / Π
+
+            gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm.u[k]) / force.nudge_tau
+            gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm.v[k]) / force.nudge_tau
+
+            Γᵣ = TC.compute_les_Γᵣ(grid.zc[k])
+            if Γᵣ != 0
+                tau_k = 1 / Γᵣ
+                gm_H_nudge_k = (aux_gm.H_nudge[k] - prog_gm.θ_liq_ice[k]) / tau_k
+                gm_q_tot_nudge_k = (aux_gm.qt_nudge[k] - prog_gm.q_tot[k]) / tau_k
+            else
+                gm_H_nudge_k = 0.0
+                gm_q_tot_nudge_k = 0.0
+            end
+
+            if force.apply_subsidence
+                # Apply large-scale subsidence tendencies
+                gm_H_subsidence_k = -∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
+                gm_QT_subsidence_k = -∇q_tot_gm[k] * aux_gm.subsidence[k]
+            else
+                gm_H_subsidence_k = 0.0
+                gm_QT_subsidence_k = 0.0
+            end
+
+            tendencies_gm.θ_liq_ice[k] += H_horz_adv + gm_H_nudge_k + H_fluc + gm_H_subsidence_k
+            tendencies_gm.q_tot[k] +=
+                aux_gm.dqtdt_hadv[k] + gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k] + gm_QT_subsidence_k
+
+            tendencies_gm.u[k] += gm_U_nudge_k
+            tendencies_gm.v[k] += gm_V_nudge_k
+        end
+        tendencies_gm.q_tot[k] +=
+            aux_bulk.qt_tendency_precip_formation[k] +
+            aux_en.qt_tendency_precip_formation[k] +
+            aux_tc.qt_tendency_precip_sinks[k]
+        tendencies_gm.θ_liq_ice[k] +=
+            aux_bulk.θ_liq_ice_tendency_precip_formation[k] +
+            aux_en.θ_liq_ice_tendency_precip_formation[k] +
+            aux_tc.θ_liq_ice_tendency_precip_sinks[k]
+    end
+    TC.compute_sgs_tendencies!(edmf, grid, state, surf, radiation, force, gm)
     return nothing
 end

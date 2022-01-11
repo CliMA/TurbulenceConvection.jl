@@ -88,7 +88,7 @@ function Simulation1d(namelist)
 
     # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
     state = TC.State(prog, aux, nothing)
-    TC.compute_ref_state!(state, grid, param_set; ref_params...)
+    compute_ref_state!(state, grid, param_set; ref_params...)
 
     Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)
