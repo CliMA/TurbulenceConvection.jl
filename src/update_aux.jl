@@ -248,8 +248,8 @@ function update_aux!(
     update_forcing(case, grid, state, gm, t, param_set)
     update_radiation(case, grid, state, gm, t, param_set)
 
-    pressure_plume_spacing = map(1:N_up) do i
-        compute_pressure_plume_spacing(edmf, grid, state, param_set, i)
+    plume_scale_height = map(1:N_up) do i
+        compute_plume_scale_height(grid, state, param_set, i)
     end
 
     #####
@@ -290,7 +290,7 @@ function update_aux!(
                     M = m_entr_detr[k],
                     a_up = aux_up[i].area[k],
                     a_en = aux_en.area[k],
-                    R_up = pressure_plume_spacing[i],
+                    H_up = plume_scale_height[i],
                     RH_up = aux_up[i].RH[k],
                     RH_en = aux_en.RH[k],
                     max_area = max_area,
@@ -308,12 +308,10 @@ function update_aux!(
                 aux_up[i].detr_sc[k] *= stoch_δ
 
                 aux_up[i].frac_turb_entr[k] = er.ε_turb
-                aux_up[i].horiz_K_eddy[k] = er.K_ε
             else
                 aux_up[i].entr_sc[k] = 0.0
                 aux_up[i].detr_sc[k] = 0.0
                 aux_up[i].frac_turb_entr[k] = 0.0
-                aux_up[i].horiz_K_eddy[k] = 0.0
             end
         end
     end
@@ -324,8 +322,8 @@ function update_aux!(
         b_up = aux_up[i].buoy
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
+        H_up = plume_scale_height[i]
         w_en = aux_en_f.w
-        asp_ratio = 1.0
 
         b_bcs = (; bottom = CCO.SetValue(b_up[kc_surf]), top = CCO.SetValue(b_up[kc_toa]))
         a_bcs = a_up_boundary_conditions(surf, edmf, i)
@@ -336,10 +334,9 @@ function update_aux!(
         nh_press_adv = aux_up_f[i].nh_pressure_adv
         nh_press_drag = aux_up_f[i].nh_pressure_drag
 
-        updraft_top = compute_updraft_top(grid, state, i)
-        nh_press_buoy .= nh_pressure_buoy(param_set, a_up, b_up, ρ0_f, asp_ratio, bcs)
-        nh_press_adv .= nh_pressure_adv(param_set, updraft_top, a_up, ρ0_f, w_up, bcs)
-        nh_press_drag .= nh_pressure_drag(param_set, updraft_top, a_up, ρ0_f, w_up, w_en, bcs)
+        nh_press_buoy .= nh_pressure_buoy(FT, param_set, a_up, b_up, ρ0_f, bcs)
+        nh_press_adv .= nh_pressure_adv(FT, param_set, a_up, ρ0_f, w_up, bcs)
+        nh_press_drag .= nh_pressure_drag(param_set, H_up, a_up, ρ0_f, w_up, w_en, bcs)
         @. aux_up_f[i].nh_pressure = nh_press_buoy + nh_press_adv + nh_press_drag
     end
 

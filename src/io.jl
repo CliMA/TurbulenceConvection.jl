@@ -33,6 +33,6 @@ function initialize_io(edmf::EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
     add_ts(Stats, "updraft_lwp")
     add_ts(Stats, "updraft_iwp")
     initialize_io(edmf.precip_model, Stats)
-    add_ts(Stats, "rd")
+    add_ts(Stats, "Hd")
     return nothing
 end

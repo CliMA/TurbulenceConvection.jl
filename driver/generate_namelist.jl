@@ -3,13 +3,11 @@ module NameList
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.0
-# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.015
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.075
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.25
-# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_sigma"] = 10.0
-# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"] = 0.004
+# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"] = 0.0004
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"] = 2.0
-# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"] = 0.2
 
 # See Table 1 of Lopez Gomez et al, 2020
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.14
@@ -106,16 +104,14 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     #! format: on
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.015
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.075
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.25
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_sigma"] = 10.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_scale"] = 10.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_power"] = 3.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"] = 0.004
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"] = 0.0004
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"] = 2.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["min_upd_velocity"] = 0.001
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"] = 0.2
     # pressure
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["min_updraft_top"] = 500.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] = 0.12
