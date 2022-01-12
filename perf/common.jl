@@ -50,6 +50,6 @@ function init_sim(case_name; skip_io = true, single_timestep = true, prefix = ""
     end
     namelist["meta"]["uuid"] = "$(prefix)01"
     sim = Simulation1d(namelist)
-    TC.initialize(sim)
+    initialize(sim)
     return sim
 end

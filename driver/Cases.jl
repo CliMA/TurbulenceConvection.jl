@@ -3,6 +3,9 @@ module Cases
 import NCDatasets
 const NC = NCDatasets
 
+import OrdinaryDiffEq
+const ODE = OrdinaryDiffEq
+
 import ClimaCore
 const CC = ClimaCore
 const CCO = CC.Operators
@@ -32,7 +35,6 @@ using ..TurbulenceConvection: CasesBase
 using ..TurbulenceConvection: pyinterp
 using ..TurbulenceConvection: add_ts
 using ..TurbulenceConvection: write_ts
-using ..TurbulenceConvection: initialize
 using ..TurbulenceConvection: Grid
 using ..TurbulenceConvection: NetCDFIO_Stats
 using ..TurbulenceConvection: GridMeanVariables
@@ -95,6 +97,9 @@ struct LES_driven_SCM <: AbstractCaseType end
 #####
 ##### Case methods
 #####
+
+include("Radiation.jl")
+include("Forcing.jl")
 
 get_case(namelist::Dict) = get_case(namelist["meta"]["casename"])
 get_case(casename::String) = get_case(Val(Symbol(casename)))
@@ -1229,7 +1234,7 @@ function initialize_radiation(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, g
 
     # Radiation based on eq. 3 in Stevens et. al., (2005)
     # cloud-top cooling + cloud-base warming + cooling in free troposphere
-    TC.update_radiation(self.Rad, grid, state, gm, param_set)
+    update_radiation(self.Rad, grid, state, gm, param_set)
 end
 
 function initialize_io(self::CasesBase{DYCOMS_RF01}, Stats::NetCDFIO_Stats)
