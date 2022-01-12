@@ -14,13 +14,12 @@ functions following Cohen et al. (JAMES, 2020), given:
 function nondimensional_exchange_functions(param_set, Δw, εδ_model_vars)
 
     μ_0 = CPEDMF.μ_0(param_set)
-    μ = ICP.entrainment_sigma(param_set)
     β = CPEDMF.β(param_set)
     χ = CPEDMF.χ(param_set)
 
     Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
     μ_ij = (χ - εδ_model_vars.a_up / (εδ_model_vars.a_up + εδ_model_vars.a_en)) * Δb / Δw
-    exp_arg = μ / μ_0 * μ_ij
+    exp_arg = μ_ij / μ_0
     D_ε = 1.0 / (1.0 + exp(-exp_arg))
     D_δ = 1.0 / (1.0 + exp(exp_arg))
 

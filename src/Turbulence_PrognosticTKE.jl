@@ -351,17 +351,10 @@ function compute_updraft_top(grid::Grid{FT}, state::State, i::Int)::FT where {FT
     return z_findlast_center(k -> aux_up[i].area[k] > 1e-3, grid)
 end
 
-function compute_pressure_plume_spacing(
-    edmf::EDMF_PrognosticTKE,
-    grid::Grid{FT},
-    state::State,
-    param_set::APS,
-    i::Int,
-)::FT where {FT}
+function compute_plume_scale_height(grid::Grid{FT}, state::State, param_set::APS, i::Int)::FT where {FT}
     H_up_min::FT = CPEDMF.H_up_min(param_set)
     updraft_top = compute_updraft_top(grid, state, i)
-    aspect_ratio = edmf.aspect_ratio
-    return max(aspect_ratio * updraft_top, H_up_min * aspect_ratio)
+    return max(updraft_top, H_up_min)
 end
 
 function compute_up_tendencies!(
@@ -812,6 +805,7 @@ function GMV_third_m(
     N_up = n_updrafts(edmf)
     gm_third_m = getproperty(center_aux_grid_mean(state), gm_third_m_sym)
     kc_surf = kc_surface(grid)
+    FT = eltype(grid)
 
     aux_bulk = center_aux_bulk(state)
     aux_up_f = face_aux_updrafts(state)
@@ -841,14 +835,9 @@ function GMV_third_m(
         @. ϕ_gm += a_up * Ic(var_up)
     end
 
+    # w'w' ≈ 2/3 TKE (isotropic turbulence assumption)
     if is_tke
-        parent(ϕ_en_cov) .= 0
-        @inbounds for i in 1:N_up
-            horiz_K_eddy = aux_up_c[i].horiz_K_eddy
-            a_up = aux_up_c[i].area
-            a_bulk = aux_bulk.area
-            @. ϕ_en_cov += -horiz_K_eddy * ∇c(wvec(w_en)) * a_up / a_bulk
-        end
+        @. ϕ_en_cov = FT(2 / 3) * covar_en
     else
         @. ϕ_en_cov = covar_en
     end

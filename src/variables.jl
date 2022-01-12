@@ -33,7 +33,6 @@ cent_aux_vars_up(FT) = (;
     entr_turb_dyn = FT(0),
     detr_turb_dyn = FT(0),
     asp_ratio = FT(0),
-    horiz_K_eddy = FT(0),
 )
 cent_aux_vars_edmf(FT, n_up) = (;
     turbconv = (;
@@ -157,16 +156,8 @@ face_aux_vars_edmf(FT, n_up) = (;
 ##### Diagnostic fields
 
 # Center only
-cent_diagnostic_vars_edmf(FT, n_up) = (;
-    turbconv = (;
-        asp_ratio = FT(0),
-        entr_sc = FT(0),
-        detr_sc = FT(0),
-        massflux = FT(0),
-        frac_turb_entr = FT(0),
-        horiz_K_eddy = FT(0),
-    ),
-)
+cent_diagnostic_vars_edmf(FT, n_up) =
+    (; turbconv = (; asp_ratio = FT(0), entr_sc = FT(0), detr_sc = FT(0), massflux = FT(0), frac_turb_entr = FT(0)))
 
 # Face only
 face_diagnostic_vars_edmf(FT, n_up) =

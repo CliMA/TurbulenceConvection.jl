@@ -35,7 +35,6 @@ function io_dictionary_diagnostics()
         "nh_pressure_drag" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_turbconv(state).nh_pressure_drag,),
         "nh_pressure_b" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_turbconv(state).nh_pressure_b,),
         "turbulent_entrainment" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).frac_turb_entr,),
-        "horiz_K_eddy" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).horiz_K_eddy,),
         "entrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).entr_sc),
         "detrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).detr_sc),
         "asp_ratio" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).asp_ratio),
@@ -192,7 +191,6 @@ function compute_diagnostics!(
                 diag_tc.detr_sc[k] += aux_up_i.area[k] * aux_up_i.detr_sc[k] / a_up_bulk_k
                 diag_tc.asp_ratio[k] += aux_up_i.area[k] * aux_up_i.asp_ratio[k] / a_up_bulk_k
                 diag_tc.frac_turb_entr[k] += aux_up_i.area[k] * aux_up_i.frac_turb_entr[k] / a_up_bulk_k
-                diag_tc.horiz_K_eddy[k] += aux_up_i.area[k] * aux_up_i.horiz_K_eddy[k] / a_up_bulk_k
             end
         end
     end
@@ -254,10 +252,10 @@ function compute_diagnostics!(
     iwp = sum(i -> sum(ρ0_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
     TC.write_ts(Stats, "updraft_lwp", lwp)
     TC.write_ts(Stats, "updraft_iwp", iwp)
-    pressure_plume_spacing = map(1:N_up) do i
-        TC.compute_pressure_plume_spacing(edmf, grid, state, param_set, i)
+    plume_scale_height = map(1:N_up) do i
+        TC.compute_plume_scale_height(grid, state, param_set, i)
     end
-    TC.write_ts(Stats, "rd", StatsBase.mean(pressure_plume_spacing))
+    TC.write_ts(Stats, "Hd", StatsBase.mean(plume_scale_height))
 
     return
 end

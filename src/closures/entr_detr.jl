@@ -2,16 +2,15 @@
 
 function compute_turbulent_entrainment(param_set, εδ_model_vars)
     FT = eltype(εδ_model_vars)
-    c_t = FT(CPEDMF.c_t(param_set))
-    K_ε = εδ_model_vars.a_up * c_t * sqrt(max(εδ_model_vars.tke, 0)) * εδ_model_vars.R_up
+    c_γ = FT(ICP.turbulent_entrainment_factor(param_set))
 
     ε_turb = if εδ_model_vars.w_up * εδ_model_vars.a_up > 0
-        (2 / εδ_model_vars.R_up^2) * K_ε / (εδ_model_vars.w_up * εδ_model_vars.a_up)
+        2 * c_γ * sqrt(max(εδ_model_vars.tke, 0)) / (εδ_model_vars.w_up * εδ_model_vars.H_up)
     else
         FT(0)
     end
 
-    return (ε_turb, K_ε)
+    return ε_turb
 end
 
 function compute_inverse_timescale(param_set, εδ_model_vars)
@@ -105,9 +104,9 @@ function entr_detr(param_set::APS, εδ_model_vars, εδ_model_type::MDEntr)
     δ_dyn = dim_scale * nondim_δ + MdMdz_δ + area_limiter
 
     # turbulent entrainment
-    ε_turb, K_ε = compute_turbulent_entrainment(param_set, εδ_model_vars)
+    ε_turb = compute_turbulent_entrainment(param_set, εδ_model_vars)
 
-    return EntrDetr{FT}(ε_dyn, δ_dyn, ε_turb, K_ε)
+    return EntrDetr{FT}(ε_dyn, δ_dyn, ε_turb)
 end
 
 """
@@ -140,7 +139,7 @@ function entr_detr(param_set, εδ_model_vars, εδ_model_type::NNEntr)
     δ_dyn = dim_scale * nondim_δ + area_limiter
 
     # turbulent entrainment
-    ε_turb, K_ε = compute_turbulent_entrainment(param_set, εδ_model_vars)
+    ε_turb = compute_turbulent_entrainment(param_set, εδ_model_vars)
 
-    return EntrDetr(ε_dyn, δ_dyn, ε_turb, K_ε)
+    return EntrDetr(ε_dyn, δ_dyn, ε_turb)
 end

@@ -24,8 +24,6 @@ Base.@kwdef struct EntrDetr{FT}
     δ_dyn::FT
     "Turbulent entrainment"
     ε_turb::FT
-    "Horizontal eddy-diffusivity"
-    K_ε::FT
 end
 
 """
@@ -58,8 +56,8 @@ Base.@kwdef struct GeneralizedEntr{FT}
     a_up::FT
     "environment area fraction"
     a_en::FT
-    "pressure plume spacing"
-    R_up::FT
+    "plume scale height"
+    H_up::FT
     "updraft relative humidity"
     RH_up::FT
     "environment relative humidity"
@@ -451,7 +449,6 @@ end
 struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, SDES}
     surface_area::Float64
     max_area::Float64
-    aspect_ratio::Float64
     minimum_area::Float64
     precip_model::PM
     en_thermo::ENT
@@ -480,8 +477,6 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, SDES}
         surface_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
         max_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"]
         # entrainment parameters
-        # pressure parameters
-        aspect_ratio = namelist["turbulence"]["EDMF_PrognosticTKE"]["aspect_ratio"]
 
         # Need to code up as namelist option?
         minimum_area = 1e-5
@@ -579,7 +574,6 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, SDES}
         return new{n_updrafts, PM, ENT, EBGC, EC, SDES}(
             surface_area,
             max_area,
-            aspect_ratio,
             minimum_area,
             precip_model,
             en_thermo,
