@@ -32,7 +32,7 @@ function compute_les_Γᵣ(
     end
 end
 
-function compute_gm_tendencies!(
+function compute_sgs_tendencies!(
     edmf::EDMF_PrognosticTKE,
     grid::Grid,
     state::State,
@@ -43,17 +43,11 @@ function compute_gm_tendencies!(
 )
     N_up = n_updrafts(edmf)
     tendencies_gm = center_tendencies_grid_mean(state)
-    kc_toa = kc_top_of_atmos(grid)
     FT = eltype(grid)
-    param_set = parameter_set(gm)
     prog_gm = center_prog_grid_mean(state)
-    aux_gm = center_aux_grid_mean(state)
-    ∇θ_liq_ice_gm = center_aux_grid_mean(state).∇θ_liq_ice_gm
-    ∇q_tot_gm = center_aux_grid_mean(state).∇q_tot_gm
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_up = center_aux_updrafts(state)
-    aux_bulk = center_aux_bulk(state)
     aux_tc_f = face_aux_turbconv(state)
     aux_up_f = face_aux_updrafts(state)
     ρ0_f = face_ref_state(state).ρ0
@@ -65,86 +59,8 @@ function compute_gm_tendencies!(
     massflux_qt = aux_tc_f.massflux_qt
     aux_tc = center_aux_turbconv(state)
 
-    θ_liq_ice_gm_toa = prog_gm.θ_liq_ice[kc_toa]
-    q_tot_gm_toa = prog_gm.q_tot[kc_toa]
-    RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_liq_ice_gm_toa))
-    RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa))
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
-    @. ∇θ_liq_ice_gm = ∇c(wvec(RBθ(prog_gm.θ_liq_ice)))
-    @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.q_tot)))
-
-    @inbounds for k in real_center_indices(grid)
-        # Apply large-scale horizontal advection tendencies
-        ts = thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        Π = TD.exner(ts)
-
-        if force.apply_coriolis
-            tendencies_gm.u[k] -= force.coriolis_param * (aux_gm.vg[k] - prog_gm.v[k])
-            tendencies_gm.v[k] += force.coriolis_param * (aux_gm.ug[k] - prog_gm.u[k])
-        end
-        if rad_type(radiation) <: Union{RadiationDYCOMS_RF01, RadiationLES}
-            tendencies_gm.θ_liq_ice[k] += aux_gm.dTdt_rad[k] / Π
-        end
-
-        if force_type(force) <: ForcingDYCOMS_RF01
-            tendencies_gm.q_tot[k] += aux_gm.dqtdt[k]
-            # Apply large-scale subsidence tendencies
-            tendencies_gm.θ_liq_ice[k] -= ∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
-            tendencies_gm.q_tot[k] -= ∇q_tot_gm[k] * aux_gm.subsidence[k]
-        end
-
-        if force_type(force) <: ForcingStandard
-            if force.apply_subsidence
-                tendencies_gm.θ_liq_ice[k] -= ∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
-                tendencies_gm.q_tot[k] -= ∇q_tot_gm[k] * aux_gm.subsidence[k]
-            end
-            tendencies_gm.θ_liq_ice[k] += aux_gm.dTdt[k] / Π
-            tendencies_gm.q_tot[k] += aux_gm.dqtdt[k]
-        end
-
-        if force_type(force) <: ForcingLES
-            H_horz_adv = aux_gm.dTdt_hadv[k] / Π
-            H_fluc = aux_gm.dTdt_fluc[k] / Π
-
-            gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm.u[k]) / force.nudge_tau
-            gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm.v[k]) / force.nudge_tau
-
-            Γᵣ = compute_les_Γᵣ(grid.zc[k])
-            if Γᵣ != 0
-                tau_k = 1 / Γᵣ
-                gm_H_nudge_k = (aux_gm.H_nudge[k] - prog_gm.θ_liq_ice[k]) / tau_k
-                gm_q_tot_nudge_k = (aux_gm.qt_nudge[k] - prog_gm.q_tot[k]) / tau_k
-            else
-                gm_H_nudge_k = 0.0
-                gm_q_tot_nudge_k = 0.0
-            end
-
-            if force.apply_subsidence
-                # Apply large-scale subsidence tendencies
-                gm_H_subsidence_k = -∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
-                gm_QT_subsidence_k = -∇q_tot_gm[k] * aux_gm.subsidence[k]
-            else
-                gm_H_subsidence_k = 0.0
-                gm_QT_subsidence_k = 0.0
-            end
-
-            tendencies_gm.θ_liq_ice[k] += H_horz_adv + gm_H_nudge_k + H_fluc + gm_H_subsidence_k
-            tendencies_gm.q_tot[k] +=
-                aux_gm.dqtdt_hadv[k] + gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k] + gm_QT_subsidence_k
-
-            tendencies_gm.u[k] += gm_U_nudge_k
-            tendencies_gm.v[k] += gm_V_nudge_k
-        end
-        tendencies_gm.q_tot[k] +=
-            aux_bulk.qt_tendency_precip_formation[k] +
-            aux_en.qt_tendency_precip_formation[k] +
-            aux_tc.qt_tendency_precip_sinks[k]
-        tendencies_gm.θ_liq_ice[k] +=
-            aux_bulk.θ_liq_ice_tendency_precip_formation[k] +
-            aux_en.θ_liq_ice_tendency_precip_formation[k] +
-            aux_tc.θ_liq_ice_tendency_precip_sinks[k]
-    end
 
     # TODO: we shouldn't need to call parent here
     a_en = aux_en.area

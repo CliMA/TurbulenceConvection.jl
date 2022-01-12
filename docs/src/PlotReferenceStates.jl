@@ -8,6 +8,7 @@ const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
 include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
 include(joinpath(tc_dir, "driver", "Cases.jl"))
 include(joinpath(tc_dir, "driver", "parameter_set.jl"))
+include(joinpath(tc_dir, "driver", "dycore.jl"))
 import .NameList
 import .Cases
 function export_ref_profile(case_name::String)
@@ -29,7 +30,7 @@ function export_ref_profile(case_name::String)
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
     state = (; aux)
 
-    TC.compute_ref_state!(state, grid, param_set; ref_params...)
+    compute_ref_state!(state, grid, param_set; ref_params...)
 
     io_nt = TC.io_dictionary_ref_state()
     TC.initialize_io(io_nt, Stats)
