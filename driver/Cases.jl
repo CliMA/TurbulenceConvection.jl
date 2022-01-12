@@ -23,9 +23,6 @@ const TD = Thermodynamics
 import ..TurbulenceConvection
 const TC = TurbulenceConvection
 
-import ..TurbulenceConvection: update_surface
-import ..TurbulenceConvection: update_forcing
-import ..TurbulenceConvection: update_radiation
 import ..TurbulenceConvection: io
 import ..TurbulenceConvection: initialize_io
 import ..TurbulenceConvection: ForcingBase
@@ -34,7 +31,6 @@ import ..TurbulenceConvection: RadiationBase
 using ..TurbulenceConvection: CasesBase
 using ..TurbulenceConvection: pyinterp
 using ..TurbulenceConvection: add_ts
-using ..TurbulenceConvection: update
 using ..TurbulenceConvection: write_ts
 using ..TurbulenceConvection: initialize
 using ..TurbulenceConvection: Grid
@@ -167,7 +163,6 @@ function io(surf::TC.SurfaceBase, surf_params, grid, state, Stats::NetCDFIO_Stat
 end
 initialize_io(self::CasesBase, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
 update_forcing(self::CasesBase, grid, state, gm, t::Real, param_set) = nothing
-update_radiation(self::CasesBase, grid, state, gm, t::Real, param_set) = update(self.Rad, grid, state, gm, param_set)
 initialize_forcing(self::CasesBase, grid::Grid, state, gm, param_set) = initialize(self.Fo, grid, state)
 
 #####
@@ -1234,7 +1229,7 @@ function initialize_radiation(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, g
 
     # Radiation based on eq. 3 in Stevens et. al., (2005)
     # cloud-top cooling + cloud-base warming + cooling in free troposphere
-    TC.calculate_radiation(self.Rad, grid, state, gm, param_set)
+    TC.update_radiation(self.Rad, grid, state, gm, param_set)
 end
 
 function initialize_io(self::CasesBase{DYCOMS_RF01}, Stats::NetCDFIO_Stats)

@@ -1,10 +1,10 @@
-update(self::RadiationBase, grid, state, gm::GridMeanVariables, param_set) = nothing
+update_radiation(self::RadiationBase, grid, state, gm::GridMeanVariables, param_set) = nothing
 initialize(self::RadiationBase{RadiationNone}, grid, state) = nothing
 
 """
 see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
-function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state, gm::GridMeanVariables, param_set)
+function update_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state, gm::GridMeanVariables, param_set)
     cp_d = CPP.cp_d(param_set)
     ρ0_f = face_ref_state(state).ρ0
     ρ0_c = center_ref_state(state).ρ0
@@ -64,9 +64,6 @@ function calculate_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, st
 
     return
 end
-
-update(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state, gm::GridMeanVariables, param_set) =
-    calculate_radiation(self, grid, state, gm, param_set)
 
 function initialize(self::RadiationBase{RadiationLES}, grid, state, LESDat::LESData)
     # load from LES
