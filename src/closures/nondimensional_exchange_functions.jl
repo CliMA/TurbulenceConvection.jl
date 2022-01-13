@@ -57,9 +57,7 @@ end
 """
     non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
 
-Returns the dynamic entrainment and detrainment rates,
-as well as the turbulent entrainment rate, using a neural
-network to predict the non-dimensional component of dynamical entrainment:
+Uses a fully connected neural network to predict the non-dimensional components of dynamical entrainment/detrainment.
  - `param_set`      :: parameter set
  - `εδ_model_vars`  :: structure containing variables
  - `εδ_model_type`  :: NNEntr - Neural network entrainment closure
@@ -76,5 +74,27 @@ function non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
 
     nondim_groups = non_dimensional_groups(param_set, εδ_model_vars)
     nondim_ε, nondim_δ = nn_model(nondim_groups)
+    return nondim_ε, nondim_δ
+end
+
+"""
+    non_dimensional_function(param_set, εδ_model_vars, ::LinearEntr)
+
+Uses a simple linear model to predict the non-dimensional components of dynamical entrainment/detrainment.
+ - `param_set`      :: parameter set
+ - `εδ_model_vars`  :: structure containing variables
+ - `εδ_model_type`  :: LinearEntr - linear entrainment closure
+"""
+function non_dimensional_function(param_set, εδ_model_vars, ::LinearEntr)
+    c_gen = ICP.c_gen(param_set)
+
+    # Linear closure
+    lin_arc = (4, 1)  # (#weights, #outputs)
+    lin_model_ε = Flux.Dense(reshape(c_gen[1:4], lin_arc[2], lin_arc[1]), [c_gen[5]], Flux.relu)
+    lin_model_δ = Flux.Dense(reshape(c_gen[6:9], lin_arc[2], lin_arc[1]), [c_gen[10]], Flux.relu)
+
+    nondim_groups = non_dimensional_groups(param_set, εδ_model_vars)
+    nondim_ε = lin_model_ε(nondim_groups)[1]
+    nondim_δ = lin_model_δ(nondim_groups)[1]
     return nondim_ε, nondim_δ
 end
