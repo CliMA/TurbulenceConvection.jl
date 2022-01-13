@@ -77,8 +77,6 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["meta"]["uuid"] = basename(tempname())
 
     namelist_defaults["turbulence"] = Dict()
-    namelist_defaults["turbulence"]["Ri_bulk_crit"] = 0.2
-    namelist_defaults["turbulence"]["prandtl_number_0"] = 0.74
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"] = Dict()
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.1
@@ -87,7 +85,10 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.14
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.22
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"] = 0.4
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_surf_scale"] = 3.75
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_scale"] = 53.0 / 13.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"] = 0.74
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"] = 0.25
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["smin_ub"] = 0.1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["smin_rm"] = 1.5
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["l_max"] = 1.0e6

@@ -441,7 +441,7 @@ function update_aux!(
 
         # Limiting stratification scale (Deardorff, 1976)
         # compute ∇Ri and Pr
-        ∇_Ri = gradient_Richardson_number(bg.∂b∂z, Shear²[k], eps(0.0))
+        ∇_Ri = gradient_Richardson_number(param_set, bg.∂b∂z, Shear²[k], eps(0.0))
         aux_tc.prandtl_nvec[k] = turbulent_Prandtl_number(param_set, obukhov_length, ∇_Ri)
 
         ml_model = MinDisspLen{FT}(;

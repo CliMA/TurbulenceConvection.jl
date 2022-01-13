@@ -193,7 +193,7 @@ function affect_filter!(
     ###
     ### Filters
     ###
-    set_edmf_surface_bc(edmf, grid, state, surf)
+    set_edmf_surface_bc(edmf, grid, state, surf, gm)
     filter_updraft_vars(edmf, grid, state, surf, gm)
 
     @inbounds for k in real_center_indices(grid)
@@ -206,7 +206,14 @@ function affect_filter!(
     return nothing
 end
 
-function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, surf::SurfaceBase)
+function set_edmf_surface_bc(
+    edmf::EDMF_PrognosticTKE,
+    grid::Grid,
+    state::State,
+    surf::SurfaceBase,
+    gm::GridMeanVariables,
+)
+    param_set = parameter_set(gm)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -237,7 +244,7 @@ function set_edmf_surface_bc(edmf::EDMF_PrognosticTKE, grid::Grid, state::State,
 
     ρ0_ae = ρ0_c[kc_surf] * ae[kc_surf]
 
-    prog_en.ρatke[kc_surf] = ρ0_ae * get_surface_tke(surf.ustar, zLL, surf.obukhov_length)
+    prog_en.ρatke[kc_surf] = ρ0_ae * get_surface_tke(param_set, surf.ustar, zLL, surf.obukhov_length)
     prog_en.ρaHvar[kc_surf] = ρ0_ae * get_surface_variance(flux1 * α0LL, flux1 * α0LL, ustar, zLL, oblength)
     prog_en.ρaQTvar[kc_surf] = ρ0_ae * get_surface_variance(flux2 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
     prog_en.ρaHQTcov[kc_surf] = ρ0_ae * get_surface_variance(flux1 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
