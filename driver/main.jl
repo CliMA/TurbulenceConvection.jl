@@ -90,7 +90,7 @@ function Simulation1d(namelist)
     state = TC.State(prog, aux, nothing)
     compute_ref_state!(state, grid, param_set; ref_params...)
 
-    Ri_bulk_crit = namelist["turbulence"]["Ri_bulk_crit"]
+    Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)
     surf_params = Cases.surface_params(case_type, grid, state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
     inversion_type = Cases.inversion_type(case_type)

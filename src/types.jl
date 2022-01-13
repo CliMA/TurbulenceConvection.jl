@@ -458,7 +458,7 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, SDES}
     entr_closure::EC
     function EDMF_PrognosticTKE(namelist, grid::Grid, param_set::PS) where {PS}
         # get values from namelist
-        prandtl_number = namelist["turbulence"]["prandtl_number_0"]
+        prandtl_number = namelist["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"]
 
         # Set the number of updrafts (1)
         n_updrafts = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_number"; default = 1)

@@ -24,7 +24,6 @@ CLIMAParameters.Atmos.EDMF.α_b(ps::EarthParameterSet) = ps.nt.α_b # factor mul
 CLIMAParameters.Atmos.EDMF.α_a(ps::EarthParameterSet) = ps.nt.α_a # factor multiplier for pressure advection
 CLIMAParameters.Atmos.EDMF.α_d(ps::EarthParameterSet) = ps.nt.α_d # factor multiplier for pressure drag
 CLIMAParameters.Atmos.EDMF.H_up_min(ps::EarthParameterSet) = ps.nt.H_up_min # minimum updraft top to avoid zero division in pressure drag and turb-entr
-CLIMAParameters.Atmos.EDMF.ω_pr(ps::EarthParameterSet) = ps.nt.ω_pr # experiment scale factor for turbulent Prandtl number
 CLIMAParameters.Atmos.EDMF.c_δ(ps::EarthParameterSet) = ps.nt.c_δ # factor multiplier for moist term in entrainment/detrainment
 CLIMAParameters.Atmos.EDMF.β(ps::EarthParameterSet) = ps.nt.β # sorting power for ad-hoc moisture detrainment function
 CLIMAParameters.Atmos.EDMF.χ(ps::EarthParameterSet) = ps.nt.χ # fraction of updraft air for buoyancy mixing in entrainment/detrainment (0≤χ≤1)
@@ -35,7 +34,11 @@ CLIMAParameters.Atmos.EDMF.μ_0(ps::EarthParameterSet) = ps.nt.μ_0 # dimensiona
 # mixing length parameters
 CLIMAParameters.Atmos.EDMF.c_m(ps::EarthParameterSet) = ps.nt.c_m # tke diffusivity coefficient
 CLIMAParameters.Atmos.EDMF.c_d(ps::EarthParameterSet) = ps.nt.c_d # tke dissipation coefficient
-CLIMAParameters.Atmos.EDMF.Pr_n(ps::EarthParameterSet) = ps.nt.Pr_n # tke dissipation coefficient
+CLIMAParameters.Atmos.EDMF.c_b(ps::EarthParameterSet) = ps.nt.c_b # static stability coefficient
+CLIMAParameters.Atmos.EDMF.κ_star²(ps::EarthParameterSet) = ps.nt.κ_star² # Ratio of TKE to squared friction velocity in surface layer
+CLIMAParameters.Atmos.EDMF.Pr_n(ps::EarthParameterSet) = ps.nt.Pr_n # turbulent Prandtl number in neutral conditions
+CLIMAParameters.Atmos.EDMF.ω_pr(ps::EarthParameterSet) = ps.nt.ω_pr # cospectral budget factor for turbulent Prandtl number
+CLIMAParameters.Atmos.EDMF.Ri_c(ps::EarthParameterSet) = ps.nt.Ri_c # critical Richardson number
 CLIMAParameters.Atmos.EDMF.smin_ub(ps::EarthParameterSet) = ps.nt.smin_ub #  lower limit for smin function
 CLIMAParameters.Atmos.EDMF.smin_rm(ps::EarthParameterSet) = ps.nt.smin_rm #  upper ratio limit for smin function
 
@@ -73,8 +76,10 @@ function create_parameter_set(namelist)
         β_lim = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "area_limiter_power"),
         c_m = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_ed_coeff"),
         c_d = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_diss_coeff"),
-        c_b = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "static_stab_coeff"; default = 0.4), # this is here due to an value error in CliMAParmaeters.jl
-        Pr_n = TC.parse_namelist(namelist, "turbulence", "prandtl_number_0"), # this is here due to an value error in CliMAParmaeters.jl
+        c_b = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "static_stab_coeff"; default = 0.4), # this is here due to a value error in CliMAParmameters.jl
+        κ_star² = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_surf_scale"),
+        Pr_n = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Prandtl_number_0"),
+        Ri_c = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Ri_crit"),
         smin_ub = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_ub"),
         smin_rm = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_rm"),
         l_max = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),

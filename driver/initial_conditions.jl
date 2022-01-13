@@ -28,7 +28,7 @@ function initialize_edmf(
     else
         initialize_updrafts(edmf, grid, state, gm, surf)
     end
-    TC.set_edmf_surface_bc(edmf, grid, state, surf)
+    TC.set_edmf_surface_bc(edmf, grid, state, surf, gm)
     return
 end
 
