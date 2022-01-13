@@ -1,30 +1,80 @@
+#### Non-dimensional Entrainment-Detrainment functions
+
+function max_area_limiter(param_set, εδ_model_vars)
+    FT = eltype(εδ_model_vars)
+    γ_lim = FT(ICP.area_limiter_scale(param_set))
+    β_lim = FT(ICP.area_limiter_power(param_set))
+    logistic_term = (2 - 1 / (1 + exp(-γ_lim * (εδ_model_vars.max_area - εδ_model_vars.a_up))))
+    return logistic_term^β_lim - 1
+end
+
+function non_dimensional_groups(param_set, εδ_model_vars)
+    Δw = get_Δw(param_set, εδ_model_vars)
+    Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
+    Π_1 = Δw^2 / (εδ_model_vars.zc_i * Δb)
+    Π_2 = Δw^2 / εδ_model_vars.tke
+    Π_3 = √(εδ_model_vars.a_up)
+    Π_4 = εδ_model_vars.RH_up - εδ_model_vars.RH_en
+    return SA.SVector(Π_1, Π_2, Π_3, Π_4)
+end
+
 """
-    nondimensional_exchange_functions(
-        Δw,
-        Δb,
-        εδ_model_vars,
-    )
+    non_dimensional_function(param_set, εδ_model_vars, ::MDEntr)
 
 Returns the nondimensional entrainment and detrainment
 functions following Cohen et al. (JAMES, 2020), given:
- - `Δw`, updraft - environment vertical velocity differnce
- - `Δb`, updraft - environment buoynacy differnce
- - `εδ_model_vars`, entrainment detrainment model type
+ - `param_set`      :: parameter set
+ - `εδ_model_vars`  :: structure containing variables
+ - `εδ_model_type`  :: MDEntr - Moisture deficit entrainment closure
 """
-function nondimensional_exchange_functions(param_set, Δw, εδ_model_vars)
-
-    μ_0 = CPEDMF.μ_0(param_set)
-    β = CPEDMF.β(param_set)
-    χ = CPEDMF.χ(param_set)
+function non_dimensional_function(param_set, εδ_model_vars, ::MDEntr)
+    FT = eltype(εδ_model_vars)
+    Δw = get_Δw(param_set, εδ_model_vars)
+    c_ε = FT(CPEDMF.c_ε(param_set))
+    μ_0 = FT(CPEDMF.μ_0(param_set))
+    β = FT(CPEDMF.β(param_set))
+    χ = FT(CPEDMF.χ(param_set))
+    c_δ = if !TD.has_condensate(εδ_model_vars.q_cond_up + εδ_model_vars.q_cond_en)
+        FT(0)
+    else
+        FT(CPEDMF.c_δ(param_set))
+    end
 
     Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
     μ_ij = (χ - εδ_model_vars.a_up / (εδ_model_vars.a_up + εδ_model_vars.a_en)) * Δb / Δw
     exp_arg = μ_ij / μ_0
-    D_ε = 1.0 / (1.0 + exp(-exp_arg))
-    D_δ = 1.0 / (1.0 + exp(exp_arg))
+    D_ε = 1 / (1 + exp(-exp_arg))
+    D_δ = 1 / (1 + exp(exp_arg))
 
-    M_δ = (max((εδ_model_vars.RH_up)^β - (εδ_model_vars.RH_en)^β, 0.0))^(1.0 / β)
-    M_ε = (max((εδ_model_vars.RH_en)^β - (εδ_model_vars.RH_up)^β, 0.0))^(1.0 / β)
+    M_δ = (max((εδ_model_vars.RH_up)^β - (εδ_model_vars.RH_en)^β, 0))^(1 / β)
+    M_ε = (max((εδ_model_vars.RH_en)^β - (εδ_model_vars.RH_up)^β, 0))^(1 / β)
 
-    return D_ε, D_δ, M_δ, M_ε
-end;
+    nondim_ε = (c_ε * D_ε + c_δ * M_ε)
+    nondim_δ = (c_ε * D_δ + c_δ * M_δ)
+    return nondim_ε, nondim_δ
+end
+
+"""
+    non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
+
+Returns the dynamic entrainment and detrainment rates,
+as well as the turbulent entrainment rate, using a neural
+network to predict the non-dimensional component of dynamical entrainment:
+ - `param_set`      :: parameter set
+ - `εδ_model_vars`  :: structure containing variables
+ - `εδ_model_type`  :: NNEntr - Neural network entrainment closure
+"""
+function non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
+    c_gen = ICP.c_gen(param_set)
+
+    # Neural network closure
+    nn_arc = (4, 2, 2)  # (#inputs, #neurons, #outputs)
+    nn_model = Flux.Chain(
+        Flux.Dense(reshape(c_gen[1:8], nn_arc[2], nn_arc[1]), c_gen[9:10], Flux.sigmoid),
+        Flux.Dense(reshape(c_gen[11:14], nn_arc[3], nn_arc[2]), c_gen[15:16], Flux.softplus),
+    )
+
+    nondim_groups = non_dimensional_groups(param_set, εδ_model_vars)
+    nondim_ε, nondim_δ = nn_model(nondim_groups)
+    return nondim_ε, nondim_δ
+end
