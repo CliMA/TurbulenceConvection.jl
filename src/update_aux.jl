@@ -245,9 +245,6 @@ function update_aux!(
     get_GMV_CoVar(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
     get_GMV_CoVar(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
 
-    update_forcing(case, grid, state, gm, t, param_set)
-    update_radiation(case, grid, state, gm, t, param_set)
-
     plume_scale_height = map(1:N_up) do i
         compute_plume_scale_height(grid, state, param_set, i)
     end

@@ -120,7 +120,7 @@ function Simulation1d(namelist)
     )
 end
 
-function TurbulenceConvection.initialize(sim::Simulation1d)
+function initialize(sim::Simulation1d)
     TC = TurbulenceConvection
     state = sim.state
     FT = eltype(sim.grid)
@@ -248,7 +248,7 @@ function main1d(namelist; time_run = true)
     _p = namelist["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"]
     namelist["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"] = SVector{length(_p)}(_p)
     sim = Simulation1d(namelist)
-    TurbulenceConvection.initialize(sim)
+    initialize(sim)
     if time_run
         return_code = @timev run(sim; time_run)
     else

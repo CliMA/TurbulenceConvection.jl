@@ -1,9 +1,4 @@
 
-#= These methods are to be overloaded by Cases.jl =#
-function update_surface end
-function update_forcing end
-function update_radiation end
-
 function update_cloud_frac(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, gm::GridMeanVariables)
     # update grid-mean cloud fraction and cloud cover
     aux_bulk = center_aux_bulk(state)
