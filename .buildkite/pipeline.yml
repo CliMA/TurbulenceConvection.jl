@@ -14,7 +14,8 @@ steps:
     command:
       - "echo $$JULIA_DEPOT_PATH"
       - "julia --project=test -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=test -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"NCDatasets\", rev=\"2747a78377e38316e4660306853418ded4605965\"))'"
+      # - "julia --project=test -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"NCDatasets\", rev=\"2747a78377e38316e4660306853418ded4605965\"))'"
+      - "julia --project=test -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name=\"NCDatasets\", rev=\"master\"))'"
       - "julia --project=test -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=test -e 'using Pkg; Pkg.status()'"
 
