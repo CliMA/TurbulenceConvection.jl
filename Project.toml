@@ -1,7 +1,7 @@
 name = "TurbulenceConvection"
 uuid = "8e072fc4-01f8-44fb-b9dc-f9336c367e6b"
 authors = ["Climate Modeling Alliance"]
-version = "0.10.1"
+version = "0.11.0"
 
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
@@ -39,7 +39,7 @@ UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 [compat]
 ArgParse = "1.1"
 ArtifactWrappers = "0.1"
-CLIMAParameters = "0.3"
+CLIMAParameters = "0.4"
 ClimaCore = "0.2, 0.3, 0.4, 0.5, 0.6"
 CloudMicrophysics = "0.3"
 Debugger = "0.6, 0.7"

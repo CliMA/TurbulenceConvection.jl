@@ -2,7 +2,7 @@
 
 function compute_turbulent_entrainment(param_set, εδ_model_vars)
     FT = eltype(εδ_model_vars)
-    c_γ = FT(ICP.turbulent_entrainment_factor(param_set))
+    c_γ = FT(CPEDMF.c_γ(param_set))
 
     ε_turb = if εδ_model_vars.w_up * εδ_model_vars.a_up > 0
         2 * c_γ * sqrt(max(εδ_model_vars.tke, 0)) / (εδ_model_vars.w_up * εδ_model_vars.H_up)
