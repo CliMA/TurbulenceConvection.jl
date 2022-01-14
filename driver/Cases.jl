@@ -81,6 +81,9 @@ struct GATE_III <: AbstractCaseType end
 """ [Stevens2005](@cite) """
 struct DYCOMS_RF01 <: AbstractCaseType end
 
+""" [Ackerman2009](@cite) """
+struct DYCOMS_RF02 <: AbstractCaseType end
+
 struct GABLS <: AbstractCaseType end
 
 struct SP <: AbstractCaseType end
@@ -107,6 +110,7 @@ get_case(::Val{:TRMM_LBA}) = TRMM_LBA()
 get_case(::Val{:ARM_SGP}) = ARM_SGP()
 get_case(::Val{:GATE_III}) = GATE_III()
 get_case(::Val{:DYCOMS_RF01}) = DYCOMS_RF01()
+get_case(::Val{:DYCOMS_RF02}) = DYCOMS_RF02()
 get_case(::Val{:GABLS}) = GABLS()
 get_case(::Val{:SP}) = SP()
 get_case(::Val{:DryBubble}) = DryBubble()
@@ -123,17 +127,20 @@ inversion_type(::TRMM_LBA) = TC.max∇θInversion()
 inversion_type(::ARM_SGP) = TC.max∇θInversion()
 inversion_type(::GATE_III) = TC.max∇θInversion()
 inversion_type(::DYCOMS_RF01) = TC.max∇θInversion()
+inversion_type(::DYCOMS_RF02) = TC.max∇θInversion()
 inversion_type(::DryBubble) = TC.θρInversion()
 
 get_forcing_type(::AbstractCaseType) = TC.ForcingStandard # default
 get_forcing_type(::Soares) = TC.ForcingNone
 get_forcing_type(::Nieuwstadt) = TC.ForcingNone
 get_forcing_type(::DYCOMS_RF01) = TC.ForcingDYCOMS_RF01
+get_forcing_type(::DYCOMS_RF02) = TC.ForcingDYCOMS_RF01
 get_forcing_type(::DryBubble) = TC.ForcingNone
 get_forcing_type(::LES_driven_SCM) = TC.ForcingLES
 
 get_radiation_type(::AbstractCaseType) = TC.RadiationNone # default
 get_radiation_type(::DYCOMS_RF01) = TC.RadiationDYCOMS_RF01
+get_radiation_type(::DYCOMS_RF02) = TC.RadiationDYCOMS_RF01
 get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
 
 RadiationBase(case::AbstractCaseType) = RadiationBase{Cases.get_radiation_type(case)}()
@@ -1209,6 +1216,113 @@ function RadiationBase(case::DYCOMS_RF01)
 end
 
 function initialize_radiation(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, gm, param_set)
+    aux_gm = TC.center_aux_grid_mean(state)
+
+    # no large-scale drying
+    parent(aux_gm.dqtdt_rad) .= 0 #kg/(kg * s)
+
+    # Radiation based on eq. 3 in Stevens et. al., (2005)
+    # cloud-top cooling + cloud-base warming + cooling in free troposphere
+    update_radiation(self.Rad, grid, state, gm, param_set)
+end
+
+#####
+##### DYCOMS_RF02
+#####
+
+function reference_params(::DYCOMS_RF02, grid::Grid, param_set::APS, namelist)
+    Pg = 1017.8 * 100.0
+    qtg = 9.0 / 1000.0
+    theta_surface = 288.3
+    ts = TC.thermo_state_pθq(param_set, Pg, theta_surface, qtg)
+    Tg = TD.air_temperature(ts)
+    return (; Pg, Tg, qtg)
+end
+
+function initialize_profiles(self::CasesBase{DYCOMS_RF02}, grid::Grid, gm, state)
+    param_set = TC.parameter_set(gm)
+    p0 = TC.center_ref_state(state).p0
+    aux_gm = TC.center_aux_grid_mean(state)
+    prog_gm = TC.center_prog_grid_mean(state)
+    v0 = -5.5
+    u0 = 5.0
+
+    @inbounds for k in real_center_indices(grid)
+        # thetal profile as defined in DYCOM RF02
+        z = grid.zc[k]
+        θ_liq_ice_gm = if z <= 795.0
+            288.3
+        else
+            (295.0 + (z - 795.0)^(1.0 / 3.0))
+        end
+
+        # qt profile as defined in DYCOMS RF02
+        q_tot_gm = if z <= 795.0
+            9.45 / 1000.0
+        else
+            (5.0 - 3.0 * (1.0 - exp(-(z - 795.0) / 500.0))) / 1000.0
+        end
+        prog_gm.q_tot[k] = q_tot_gm
+        prog_gm.θ_liq_ice[k] = θ_liq_ice_gm
+
+        # velocity profile
+        prog_gm.v[k] = -9.0 + 5.6 * z / 1000.0 - v0
+        prog_gm.u[k] = 3.0 + 4.3 * z / 1000.0 - u0
+
+        aux_gm.tke[k] = if (z <= 795.0)
+            1.0 - z / 1000.0
+        else
+            0.0
+        end
+    end
+end
+
+function surface_params(case::DYCOMS_RF02, grid::TC.Grid, state::TC.State, param_set; Ri_bulk_crit)
+    FT = eltype(grid)
+    kf_surf = TC.kf_surface(grid)
+    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
+    zrough = 1.0e-4  #TODO - not needed?
+    ustar = 0.25
+    shf = 16.0 # sensible heat flux
+    lhf = 93.0 # latent heat flux
+    Tsurface = 292.5    # K      # i.e. the SST from DYCOMS setup
+    qsurface = 13.84e-3 # kg/kg  # TODO - taken from Pycles, maybe it would be better to calculate the q_star(sst) for TurbulenceConvection?
+
+    kwargs = (; zrough, Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
+    return TC.FixedSurfaceFlux(FT, TC.FixedFrictionVelocity; kwargs...)
+end
+
+function initialize_forcing(self::CasesBase{DYCOMS_RF02}, grid::Grid, state, gm, param_set)
+    # the same as in DYCOMS_RF01
+    aux_gm = TC.center_aux_grid_mean(state)
+
+    # geostrophic velocity profiles
+    parent(aux_gm.ug) .= 5.0
+    parent(aux_gm.vg) .= -5.5
+
+    # large scale subsidence
+    divergence = self.Rad.divergence
+    @inbounds for k in real_center_indices(grid)
+        aux_gm.subsidence[k] = -grid.zc[k] * divergence
+    end
+
+    # no large-scale drying
+    parent(aux_gm.dqtdt) .= 0 #kg/(kg * s)
+end
+
+function RadiationBase(case::DYCOMS_RF02)
+    return RadiationBase{Cases.get_radiation_type(case)}(;
+        divergence = 3.75e-6,
+        alpha_z = 1.0,
+        kappa = 85.0,
+        F0 = 70.0,
+        F1 = 22.0,
+    )
+end
+
+function initialize_radiation(self::CasesBase{DYCOMS_RF02}, grid::Grid, state, gm, param_set)
+    # the same as in DYCOMS_RF01
     aux_gm = TC.center_aux_grid_mean(state)
 
     # no large-scale drying

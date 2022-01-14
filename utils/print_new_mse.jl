@@ -6,6 +6,7 @@ all_cases = [
     "Bomex",
     "DryBubble",
     "DYCOMS_RF01",
+    "DYCOMS_RF02",
     "GABLS",
     "GATE_III",
     "life_cycle_Tan2018",

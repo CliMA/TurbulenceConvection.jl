@@ -127,6 +127,17 @@ steps:
       queue: central
       slurm_ntasks: 1
 
+  - label: ":partly_sunny: DYCOMS_RF02"
+    key: "cpu_dycoms_rf02"
+    command:
+      - "julia --color=yes --project=test integration_tests/DYCOMS_RF02.jl"
+    artifact_paths:
+      - "Output.DYCOMS_RF02.01/stats/comparison/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
   - label: ":partly_sunny: GABLS"
     key: "cpu_gabls"
     command:
