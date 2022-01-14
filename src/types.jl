@@ -74,6 +74,7 @@ Base.eltype(::GeneralizedEntr{FT}) where {FT} = FT
 
 struct MDEntr end  # existing model
 struct NNEntr end
+struct LinearEntr end
 
 """
     GradBuoy
@@ -556,12 +557,14 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, SDES}
             "EDMF_PrognosticTKE",
             "entrainment";
             default = "moisture_deficit",
-            valid_options = ["moisture_deficit", "NN"],
+            valid_options = ["moisture_deficit", "NN", "Linear"],
         )
         entr_closure = if entr_type == "moisture_deficit"
             MDEntr()
         elseif entr_type == "NN"
             NNEntr()
+        elseif entr_type == "Linear"
+            LinearEntr()
         else
             error("Something went wrong. Invalid entrainment type '$entr_type'")
         end
