@@ -1,6 +1,5 @@
-if !("." in LOAD_PATH) # for easier local testing
-    push!(LOAD_PATH, ".")
-end
+import Pkg
+Pkg.develop(path = ".")
 import SnoopCompileCore
 import Cthulhu
 import TurbulenceConvection

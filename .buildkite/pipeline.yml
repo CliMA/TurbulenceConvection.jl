@@ -9,13 +9,17 @@ env:
   JULIA_DEPOT_PATH: "${BUILDKITE_BUILD_PATH}/${BUILDKITE_PIPELINE_SLUG}/depot/cpu"
 
 steps:
-  - label: "init :computer:"
+  - label: "init environment :computer:"
     key: "init_cpu_env"
     command:
       - "echo $$JULIA_DEPOT_PATH"
       - "julia --project=test -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=test -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=test -e 'using Pkg; Pkg.status()'"
+
+      - "julia --project=perf -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=perf -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=perf -e 'using Pkg; Pkg.status()'"
     agents:
       config: cpu
       queue: central
@@ -159,7 +163,7 @@ steps:
   - label: ":rocket: Allocations analysis"
     key: "cpu_allocations"
     command:
-      - "julia --color=yes --project=test perf/allocs.jl"
+      - "julia --color=yes --project=perf perf/allocs.jl"
     artifact_paths:
       - "perf/allocations_output/*"
     agents:
@@ -170,7 +174,7 @@ steps:
   - label: ":rocket: Allocations analysis (exhaustive)"
     key: "cpu_allocations_exhaustive"
     command:
-      - "julia --color=yes --project=test perf/allocs.jl exhaustive=true"
+      - "julia --color=yes --project=perf perf/allocs.jl exhaustive=true"
     artifact_paths:
       - "perf/allocations_output_exhaustive/*"
     agents:
@@ -181,7 +185,7 @@ steps:
   - label: ":rocket: Benchmark tendencies"
     key: "cpu_tendencies"
     command:
-      - "julia --color=yes --project=test perf/benchmark.jl"
+      - "julia --color=yes --project=perf perf/benchmark.jl"
     agents:
       config: cpu
       queue: central
@@ -190,7 +194,7 @@ steps:
   - label: ":scales: Measure precompilation speedup (all)"
     key: "cpu_precompilable"
     command:
-      - "julia --color=yes --project=test perf/precompilable.jl"
+      - "julia --color=yes --project=perf perf/precompilable.jl"
     agents:
       config: cpu
       queue: central
@@ -199,7 +203,7 @@ steps:
   - label: ":scales: Measure precompilation speedup (no init)"
     key: "cpu_precompilable_no_init"
     command:
-      - "julia --color=yes --project=test perf/precompilable_no_init.jl"
+      - "julia --color=yes --project=perf perf/precompilable_no_init.jl"
     agents:
       config: cpu
       queue: central
@@ -208,7 +212,7 @@ steps:
   - label: ":scales: Measure precompilation speedup (no io)"
     key: "cpu_precompilable_no_io"
     command:
-      - "julia --color=yes --project=test perf/precompilable_no_io.jl"
+      - "julia --color=yes --project=perf perf/precompilable_no_io.jl"
     agents:
       config: cpu
       queue: central
@@ -217,7 +221,7 @@ steps:
   - label: ":scales: Measure precompilation speedup (no init, no io)"
     key: "cpu_precompilable_no_init_io"
     command:
-      - "julia --color=yes --project=test perf/precompilable_no_init_io.jl"
+      - "julia --color=yes --project=perf perf/precompilable_no_init_io.jl"
     agents:
       config: cpu
       queue: central
@@ -226,7 +230,7 @@ steps:
   - label: ":mag: Invalidations"
     key: "cpu_invalidations"
     command:
-      - "julia --color=yes --project=test perf/invalidations.jl"
+      - "julia --color=yes --project=perf perf/invalidations.jl"
     artifact_paths:
       - "perf/invalidations_output/*"
     agents:
@@ -237,7 +241,7 @@ steps:
   - label: ":mag: Inference triggers"
     key: "cpu_inf_trigs"
     command:
-      - "julia --color=yes --project=test perf/inference_triggers.jl"
+      - "julia --color=yes --project=perf perf/inference_triggers.jl"
     agents:
       config: cpu
       queue: central

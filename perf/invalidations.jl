@@ -1,9 +1,8 @@
 # From: https://timholy.github.io/SnoopCompile.jl/stable/snoopr/
 using SnoopCompileCore
 invalidations = @snoopr begin
-    if !("." in LOAD_PATH) # for easier local testing
-        push!(LOAD_PATH, ".")
-    end
+    import Pkg
+    Pkg.develop(path = ".")
     import TurbulenceConvection
 
     const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
