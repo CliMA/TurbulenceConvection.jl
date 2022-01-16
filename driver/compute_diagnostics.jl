@@ -44,6 +44,57 @@ function io_dictionary_diagnostics()
 end
 #! format: on
 
+function io(surf::TC.SurfaceBase, surf_params, grid, state, Stats::NetCDFIO_Stats, t::Real)
+    write_ts(Stats, "Tsurface", TC.surface_temperature(surf_params, t))
+    write_ts(Stats, "shf", surf.shf)
+    write_ts(Stats, "lhf", surf.lhf)
+    write_ts(Stats, "ustar", surf.ustar)
+end
+function io(io_dict::Dict, Stats::NetCDFIO_Stats, state)
+    for var in keys(io_dict)
+        write_field(Stats, var, io_dict[var].field(state); group = io_dict[var].group)
+    end
+end
+
+
+function initialize_io(gm::TC.GridMeanVariables, Stats::NetCDFIO_Stats)
+    add_ts(Stats, "Tsurface")
+    add_ts(Stats, "shf")
+    add_ts(Stats, "lhf")
+    add_ts(Stats, "ustar")
+    add_ts(Stats, "lwp_mean")
+    add_ts(Stats, "iwp_mean")
+    add_ts(Stats, "cloud_base_mean")
+    add_ts(Stats, "cloud_top_mean")
+    add_ts(Stats, "cloud_cover_mean")
+    return nothing
+end
+
+# Initialize the IO pertaining to this class
+function initialize_io(edmf::TC.EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
+    add_ts(Stats, "env_cloud_base")
+    add_ts(Stats, "env_cloud_top")
+    add_ts(Stats, "env_cloud_cover")
+    add_ts(Stats, "env_lwp")
+    add_ts(Stats, "env_iwp")
+    add_ts(Stats, "updraft_cloud_cover")
+    add_ts(Stats, "updraft_cloud_base")
+    add_ts(Stats, "updraft_cloud_top")
+    add_ts(Stats, "updraft_lwp")
+    add_ts(Stats, "updraft_iwp")
+    add_ts(Stats, "rwp_mean")
+    add_ts(Stats, "swp_mean")
+    add_ts(Stats, "cutoff_precipitation_rate")
+    add_ts(Stats, "Hd")
+    return nothing
+end
+
+function initialize_io(io_dict::Dict, Stats::NetCDFIO_Stats)
+    for var_name in keys(io_dict)
+        add_field(Stats, var_name; dims = io_dict[var_name].dims, group = io_dict[var_name].group)
+    end
+end
+
 #=
     compute_diagnostics!
 
@@ -59,7 +110,7 @@ function compute_diagnostics!(
     grid::TC.Grid,
     state::TC.State,
     diagnostics::D,
-    Stats::TC.NetCDFIO_Stats,
+    Stats::NetCDFIO_Stats,
     case::TC.CasesBase,
     t::Real,
 ) where {D <: CC.Fields.FieldVector}
@@ -141,9 +192,9 @@ function compute_diagnostics!(
     # respect to itup (i.e. no consideration of tilting due to shear)
     # while the updraft classes are assumed to have no overlap at all.
     # Thus total updraft cover is the sum of each updraft's cover
-    TC.write_ts(Stats, "updraft_cloud_cover", sum(cloud_cover_up))
-    TC.write_ts(Stats, "updraft_cloud_base", minimum(abs.(cloud_base_up)))
-    TC.write_ts(Stats, "updraft_cloud_top", maximum(abs.(cloud_top_up)))
+    write_ts(Stats, "updraft_cloud_cover", sum(cloud_cover_up))
+    write_ts(Stats, "updraft_cloud_base", minimum(abs.(cloud_base_up)))
+    write_ts(Stats, "updraft_cloud_top", maximum(abs.(cloud_top_up)))
 
     cloud_top_en = FT(0)
     cloud_base_en = TC.zc_toa(grid).z
@@ -156,9 +207,9 @@ function compute_diagnostics!(
         end
     end
     # Assuming amximum overlap in environmental clouds
-    TC.write_ts(Stats, "env_cloud_cover", cloud_cover_en)
-    TC.write_ts(Stats, "env_cloud_base", cloud_base_en)
-    TC.write_ts(Stats, "env_cloud_top", cloud_top_en)
+    write_ts(Stats, "env_cloud_cover", cloud_cover_en)
+    write_ts(Stats, "env_cloud_base", cloud_base_en)
+    write_ts(Stats, "env_cloud_top", cloud_top_en)
 
     cloud_cover_gm = min(cloud_cover_en + sum(cloud_cover_up), 1)
     cloud_base_gm = grid.zc[kc_toa].z
@@ -169,9 +220,9 @@ function compute_diagnostics!(
             cloud_top_gm = max(cloud_top_gm, grid.zc[k].z)
         end
     end
-    TC.write_ts(Stats, "cloud_cover_mean", cloud_cover_gm)
-    TC.write_ts(Stats, "cloud_base_mean", cloud_base_gm)
-    TC.write_ts(Stats, "cloud_top_mean", cloud_top_gm)
+    write_ts(Stats, "cloud_cover_mean", cloud_cover_gm)
+    write_ts(Stats, "cloud_base_mean", cloud_base_gm)
+    write_ts(Stats, "cloud_top_mean", cloud_top_gm)
 
     #####
     ##### Fluxes
@@ -230,13 +281,13 @@ function compute_diagnostics!(
     TC.update_cloud_frac(edmf, grid, state, gm)
 
 
-    TC.write_ts(Stats, "lwp_mean", sum(ρ0_c .* aux_gm.q_liq))
-    TC.write_ts(Stats, "iwp_mean", sum(ρ0_c .* aux_gm.q_ice))
-    TC.write_ts(Stats, "env_lwp", sum(ρ0_c .* aux_en.q_liq .* aux_en.area))
-    TC.write_ts(Stats, "env_iwp", sum(ρ0_c .* aux_en.q_ice .* aux_en.area))
+    write_ts(Stats, "lwp_mean", sum(ρ0_c .* aux_gm.q_liq))
+    write_ts(Stats, "iwp_mean", sum(ρ0_c .* aux_gm.q_ice))
+    write_ts(Stats, "env_lwp", sum(ρ0_c .* aux_en.q_liq .* aux_en.area))
+    write_ts(Stats, "env_iwp", sum(ρ0_c .* aux_en.q_ice .* aux_en.area))
 
-    TC.write_ts(Stats, "rwp_mean", sum(ρ0_c .* prog_pr.q_rai))
-    TC.write_ts(Stats, "swp_mean", sum(ρ0_c .* prog_pr.q_sno))
+    write_ts(Stats, "rwp_mean", sum(ρ0_c .* prog_pr.q_rai))
+    write_ts(Stats, "swp_mean", sum(ρ0_c .* prog_pr.q_sno))
     #TODO - change to rain rate that depends on rain model choice
 
     # TODO: Move rho_cloud_liq to CLIMAParameters
@@ -245,17 +296,17 @@ function compute_diagnostics!(
         f =
             (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ0_c ./
             TC.rho_cloud_liq .* 3.6 .* 1e6
-        TC.write_ts(Stats, "cutoff_precipitation_rate", sum(f))
+        write_ts(Stats, "cutoff_precipitation_rate", sum(f))
     end
 
     lwp = sum(i -> sum(ρ0_c .* aux_up[i].q_liq .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
     iwp = sum(i -> sum(ρ0_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
-    TC.write_ts(Stats, "updraft_lwp", lwp)
-    TC.write_ts(Stats, "updraft_iwp", iwp)
+    write_ts(Stats, "updraft_lwp", lwp)
+    write_ts(Stats, "updraft_iwp", iwp)
     plume_scale_height = map(1:N_up) do i
         TC.compute_plume_scale_height(grid, state, param_set, i)
     end
-    TC.write_ts(Stats, "Hd", StatsBase.mean(plume_scale_height))
+    write_ts(Stats, "Hd", StatsBase.mean(plume_scale_height))
 
     return
 end

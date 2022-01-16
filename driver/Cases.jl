@@ -26,17 +26,12 @@ const TD = Thermodynamics
 import ..TurbulenceConvection
 const TC = TurbulenceConvection
 
-import ..TurbulenceConvection: io
-import ..TurbulenceConvection: initialize_io
 import ..TurbulenceConvection: ForcingBase
 import ..TurbulenceConvection: RadiationBase
 
 using ..TurbulenceConvection: CasesBase
 using ..TurbulenceConvection: pyinterp
-using ..TurbulenceConvection: add_ts
-using ..TurbulenceConvection: write_ts
 using ..TurbulenceConvection: Grid
-using ..TurbulenceConvection: NetCDFIO_Stats
 using ..TurbulenceConvection: GridMeanVariables
 using ..TurbulenceConvection: real_center_indices
 using ..TurbulenceConvection: real_face_indices
@@ -154,19 +149,6 @@ ForcingBase(case::AbstractCaseType, param_set::APS; kwargs...) = ForcingBase(get
 
 initialize_radiation(self::CasesBase, grid, state, gm, param_set) = nothing
 
-function initialize_io(self::CasesBase, Stats::NetCDFIO_Stats, ::BaseCase)
-    add_ts(Stats, "Tsurface")
-    add_ts(Stats, "shf")
-    add_ts(Stats, "lhf")
-    add_ts(Stats, "ustar")
-end
-function io(surf::TC.SurfaceBase, surf_params, grid, state, Stats::NetCDFIO_Stats, t::Real)
-    write_ts(Stats, "Tsurface", TC.surface_temperature(surf_params, t))
-    write_ts(Stats, "shf", surf.shf)
-    write_ts(Stats, "lhf", surf.lhf)
-    write_ts(Stats, "ustar", surf.ustar)
-end
-initialize_io(self::CasesBase, Stats::NetCDFIO_Stats) = initialize_io(self, Stats, BaseCase())
 update_forcing(self::CasesBase, grid, state, gm, t::Real, param_set) = nothing
 initialize_forcing(self::CasesBase, grid::Grid, state, gm, param_set) = initialize(self.Fo, grid, state)
 
@@ -1235,11 +1217,6 @@ function initialize_radiation(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, g
     # Radiation based on eq. 3 in Stevens et. al., (2005)
     # cloud-top cooling + cloud-base warming + cooling in free troposphere
     update_radiation(self.Rad, grid, state, gm, param_set)
-end
-
-function initialize_io(self::CasesBase{DYCOMS_RF01}, Stats::NetCDFIO_Stats)
-    initialize_io(self, Stats, BaseCase())
-    initialize_io(self.Fo, Stats)
 end
 
 #####

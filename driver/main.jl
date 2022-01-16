@@ -22,6 +22,7 @@ import StaticArrays: SVector
 
 const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
 
+include(joinpath(tc_dir, "driver", "NetCDFIO.jl"))
 include(joinpath(tc_dir, "driver", "initial_conditions.jl"))
 include(joinpath(tc_dir, "driver", "compute_diagnostics.jl"))
 include(joinpath(tc_dir, "driver", "parameter_set.jl"))
@@ -59,7 +60,7 @@ function Simulation1d(namelist)
     dt_min = namelist["time_stepping"]["dt_min"]
 
     grid = TC.Grid(FT(namelist["grid"]["dz"]), namelist["grid"]["nz"])
-    Stats = skip_io ? nothing : TC.NetCDFIO_Stats(namelist, grid)
+    Stats = skip_io ? nothing : NetCDFIO_Stats(namelist, grid)
     case_type = Cases.get_case(namelist)
     ref_params = Cases.reference_params(case_type, grid, param_set, namelist)
 
@@ -134,27 +135,26 @@ function initialize(sim::Simulation1d)
     initialize_edmf(sim.edmf, sim.grid, state, sim.case, sim.gm, t)
 
     sim.skip_io && return nothing
-    TC.initialize_io(sim.io_nt.ref_state, sim.Stats)
-    TC.io(sim.io_nt.ref_state, sim.Stats, state) # since the reference prog is static
+    initialize_io(sim.io_nt.ref_state, sim.Stats)
+    io(sim.io_nt.ref_state, sim.Stats, state) # since the reference prog is static
 
-    TC.initialize_io(sim.io_nt.aux, sim.Stats)
-    TC.initialize_io(sim.io_nt.diagnostics, sim.Stats)
+    initialize_io(sim.io_nt.aux, sim.Stats)
+    initialize_io(sim.io_nt.diagnostics, sim.Stats)
 
     # TODO: deprecate
-    TC.initialize_io(sim.gm, sim.Stats)
-    TC.initialize_io(sim.case, sim.Stats)
-    TC.initialize_io(sim.edmf, sim.Stats)
+    initialize_io(sim.gm, sim.Stats)
+    initialize_io(sim.edmf, sim.Stats)
 
-    TC.open_files(sim.Stats)
-    TC.write_simulation_time(sim.Stats, t)
+    open_files(sim.Stats)
+    write_simulation_time(sim.Stats, t)
 
-    TC.io(sim.io_nt.aux, sim.Stats, state)
-    TC.io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
+    io(sim.io_nt.aux, sim.Stats, state)
+    io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
 
     # TODO: deprecate
     surf = get_surface(sim.case.surf_params, sim.grid, state, sim.gm, t, sim.param_set)
-    TC.io(surf, sim.case.surf_params, sim.grid, state, sim.Stats, t)
-    TC.close_files(sim.Stats)
+    io(surf, sim.case.surf_params, sim.grid, state, sim.Stats, t)
+    close_files(sim.Stats)
 
     return
 end
@@ -221,7 +221,7 @@ end
 
 function run(sim::Simulation1d; time_run = true)
     TC = TurbulenceConvection
-    sim.skip_io || TC.open_files(sim.Stats) # #removeVarsHack
+    sim.skip_io || open_files(sim.Stats) # #removeVarsHack
     (prob, alg, kwargs) = solve_args(sim)
 
     if time_run
@@ -230,7 +230,7 @@ function run(sim::Simulation1d; time_run = true)
         sol = ODE.solve(prob, alg; kwargs...)
     end
 
-    sim.skip_io || TC.close_files(sim.Stats) # #removeVarsHack
+    sim.skip_io || close_files(sim.Stats) # #removeVarsHack
     if first(sol.t) == sim.TS.t_max
         return :success
     else
@@ -240,7 +240,7 @@ end
 
 main(namelist; kwargs...) = @timev main1d(namelist; kwargs...)
 
-nc_results_file(stats::TC.NetCDFIO_Stats) = stats.path_plus_file
+nc_results_file(stats::NetCDFIO_Stats) = stats.path_plus_file
 nc_results_file(::Nothing) = @info "The simulation was run without IO, so no nc files were exported"
 
 function main1d(namelist; time_run = true)

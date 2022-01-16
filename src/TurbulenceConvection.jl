@@ -5,7 +5,6 @@ import LinearAlgebra
 import DocStringExtensions
 import StaticArrays
 import StatsBase
-import NCDatasets
 import JSON
 import Dierckx
 import RootSolvers
@@ -26,7 +25,6 @@ const SDE = StochasticDiffEq
 const ODE = OrdinaryDiffEq
 const CC = ClimaCore
 const CCO = CC.Operators
-const NC = NCDatasets
 const SA = StaticArrays
 
 const TD = Thermodynamics
@@ -47,9 +45,6 @@ const APS = CP.AbstractEarthParameterSet
 
 const CPMP = CP.Atmos.Microphysics
 const CPEDMF = CP.Atmos.EDMF
-
-# For dispatching to inherited class
-struct BaseCase end
 
 up_sum(vals::AbstractArray) = reshape(sum(vals; dims = 1), size(vals, 2))
 
@@ -145,7 +140,6 @@ end
 
 include("Grid.jl")
 include("dycore_api.jl")
-include("NetCDFIO.jl")
 include("diagnostics.jl")
 include("Fields.jl")
 include("types.jl")
@@ -162,7 +156,6 @@ include("EDMF_Updrafts.jl")
 include("stochastic_closures.jl")
 include("update_aux.jl")
 include("Turbulence_PrognosticTKE.jl")
-include("io.jl")
 include("thermodynamics.jl")
 include("closures/perturbation_pressure.jl")
 include("closures/entr_detr.jl")

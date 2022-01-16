@@ -1,3 +1,8 @@
+import NCDatasets
+const NC = NCDatasets
+import JSON
+import TurbulenceConvection
+const TC = TurbulenceConvection
 
 # TODO: remove `vars` hack that avoids https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
 
@@ -11,7 +16,7 @@ mutable struct NetCDFIO_Stats
     stats_path::String
     path_plus_file::String
     vars::Dict{String, Any} # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    function NetCDFIO_Stats(namelist, grid::Grid)
+    function NetCDFIO_Stats(namelist, grid::TC.Grid)
 
         # Initialize properties with valid type:
         tmp = tempname()
@@ -65,16 +70,16 @@ mutable struct NetCDFIO_Stats
 
             # Set profile dimensions
             profile_grp = NC.defGroup(root_grp, "profiles")
-            NC.defDim(profile_grp, "zf", n_cells(grid) + 1)
-            NC.defDim(profile_grp, "zc", n_cells(grid))
+            NC.defDim(profile_grp, "zf", TC.n_cells(grid) + 1)
+            NC.defDim(profile_grp, "zc", TC.n_cells(grid))
             NC.defDim(profile_grp, "t", Inf)
             NC.defVar(profile_grp, "zf", zf, ("zf",))
             NC.defVar(profile_grp, "zc", zc, ("zc",))
             NC.defVar(profile_grp, "t", Float64, ("t",))
 
             reference_grp = NC.defGroup(root_grp, "reference")
-            NC.defDim(reference_grp, "zf", n_cells(grid) + 1)
-            NC.defDim(reference_grp, "zc", n_cells(grid))
+            NC.defDim(reference_grp, "zf", TC.n_cells(grid) + 1)
+            NC.defDim(reference_grp, "zc", TC.n_cells(grid))
             NC.defVar(reference_grp, "zf", zf, ("zf",))
             NC.defVar(reference_grp, "zc", zc, ("zc",))
 

@@ -12,9 +12,6 @@ include(joinpath(tc_dir, "driver", "dycore.jl"))
 include(joinpath(tc_dir, "driver", "main.jl"))
 import .NameList
 
-TurbulenceConvection.initialize_io(sim::Simulation1d) = nothing
-TurbulenceConvection.io(sim::Simulation1d) = nothing
-
 update_n(sim, tendencies, N::Int) = update_n(sim, tendencies, Val(N))
 
 function update_n(sim, tendencies, ::Val{N}) where {N}
