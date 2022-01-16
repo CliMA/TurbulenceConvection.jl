@@ -10,16 +10,16 @@ case_name = "Bomex"
 println("Running $case_name...")
 
 sim = init_sim(case_name; single_timestep = false, skip_io = false, prefix = "pc_no_init1")
-TC.open_files(sim.Stats)
+open_files(sim.Stats)
 (prob, alg, kwargs) = solve_args(sim)
 t_precompile = @elapsed ODE.solve(prob, alg; kwargs...)
-TC.close_files(sim.Stats)
+close_files(sim.Stats)
 
 sim = init_sim(case_name; single_timestep = false, skip_io = false, prefix = "pc_no_init2")
-TC.open_files(sim.Stats)
+open_files(sim.Stats)
 (prob, alg, kwargs) = solve_args(sim)
 t_precompiled = @elapsed ODE.solve(prob, alg; kwargs...)
-TC.close_files(sim.Stats)
+close_files(sim.Stats)
 
 @info "Precompiling run: $(t_precompile)"
 @info "Precompiled  run: $(t_precompiled)"

@@ -138,15 +138,3 @@ function io_dictionary_aux()
     return io_dict
 end
 #! format: on
-
-function initialize_io(io_dict::Dict, Stats::NetCDFIO_Stats)
-    for var_name in keys(io_dict)
-        add_field(Stats, var_name; dims = io_dict[var_name].dims, group = io_dict[var_name].group)
-    end
-end
-
-function io(io_dict::Dict, Stats::NetCDFIO_Stats, state)
-    for var in keys(io_dict)
-        write_field(Stats, var, io_dict[var].field(state); group = io_dict[var].group)
-    end
-end

@@ -1,14 +1,17 @@
 import TurbulenceConvection
+const TC = TurbulenceConvection
 import Plots
 import NCDatasets
 import CLIMAParameters
 import ClimaCore
 const CC = ClimaCore
 const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
+include(joinpath(tc_dir, "driver", "NetCDFIO.jl"))
 include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
 include(joinpath(tc_dir, "driver", "Cases.jl"))
 include(joinpath(tc_dir, "driver", "parameter_set.jl"))
 include(joinpath(tc_dir, "driver", "dycore.jl"))
+include(joinpath(tc_dir, "driver", "compute_diagnostics.jl"))
 import .NameList
 import .Cases
 function export_ref_profile(case_name::String)
@@ -19,7 +22,7 @@ function export_ref_profile(case_name::String)
 
     FT = Float64
     grid = TC.Grid(FT(namelist["grid"]["dz"]), namelist["grid"]["nz"])
-    Stats = TC.NetCDFIO_Stats(namelist, grid)
+    Stats = NetCDFIO_Stats(namelist, grid)
     case = Cases.get_case(namelist)
     ref_params = Cases.reference_params(case, grid, param_set, namelist)
 
@@ -33,8 +36,8 @@ function export_ref_profile(case_name::String)
     compute_ref_state!(state, grid, param_set; ref_params...)
 
     io_nt = TC.io_dictionary_ref_state()
-    TC.initialize_io(io_nt, Stats)
-    TC.io(io_nt, Stats, state)
+    initialize_io(io_nt, Stats)
+    io(io_nt, Stats, state)
 
     NCDatasets.Dataset(joinpath(Stats.path_plus_file), "r") do ds
         zc = ds.group["profiles"]["zc"][:]

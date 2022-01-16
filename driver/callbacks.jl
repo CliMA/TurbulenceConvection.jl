@@ -26,13 +26,13 @@ function affect_io!(integrator)
     # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
     # opening/closing files every step should be okay. #removeVarsHack
     # TurbulenceConvection.io(sim) # #removeVarsHack
-    TC.write_simulation_time(Stats, t) # #removeVarsHack
+    write_simulation_time(Stats, t) # #removeVarsHack
 
-    TC.io(io_nt.aux, Stats, state)
-    TC.io(io_nt.diagnostics, Stats, diagnostics)
+    io(io_nt.aux, Stats, state)
+    io(io_nt.diagnostics, Stats, diagnostics)
 
     surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
-    TC.io(surf, case.surf_params, grid, state, Stats, t)
+    io(surf, case.surf_params, grid, state, Stats, t)
 
     ODE.u_modified!(integrator, false) # We're legitamately not mutating `u` (the state vector)
 end

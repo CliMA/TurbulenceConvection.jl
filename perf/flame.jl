@@ -9,7 +9,7 @@ include(joinpath(tc_dir_glob, "perf", "common.jl"))
 case_name = "Bomex"
 println("Running $case_name...")
 sim = init_sim(case_name)
-sim.skip_io || TC.open_files(sim.Stats) # #removeVarsHack
+sim.skip_io || open_files(sim.Stats) # #removeVarsHack
 (prob, alg, kwargs) = solve_args(sim)
 
 tinf = SnoopCompileCore.@snoopi_deep begin
@@ -17,7 +17,7 @@ tinf = SnoopCompileCore.@snoopi_deep begin
     # ds_tc_filename, return_code = main(namelist)
 end
 
-sim.skip_io || TC.close_files(sim.Stats) # #removeVarsHack
+sim.skip_io || close_files(sim.Stats) # #removeVarsHack
 
 import ProfileView
 import SnoopCompile # need SnoopCompile to iterate over InferenceTimingNode's
