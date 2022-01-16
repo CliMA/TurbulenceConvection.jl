@@ -14,7 +14,6 @@ import CLIMAParameters
 import CloudMicrophysics
 import UnPack
 import StochasticDiffEq
-import Flux
 
 const SDE = StochasticDiffEq
 const CC = ClimaCore

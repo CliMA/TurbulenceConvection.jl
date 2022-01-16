@@ -1,6 +1,6 @@
-if !("." in LOAD_PATH) # for easier local testing
-    push!(LOAD_PATH, ".")
-end
+import Pkg
+Pkg.develop(path = "."); # for easier local testing
+
 import TurbulenceConvection
 using Test
 

@@ -30,6 +30,7 @@ include(joinpath(tc_dir, "driver", "Cases.jl"))
 include(joinpath(tc_dir, "driver", "dycore.jl"))
 include(joinpath(tc_dir, "driver", "TimeStepping.jl"))
 include(joinpath(tc_dir, "driver", "Surface.jl"))
+include(joinpath(tc_dir, "closures_sandbox", "closures_entr_detr.jl"))
 import .Cases
 
 struct Simulation1d{IONT, G, S, GM, C, EDMF, D, TIMESTEPPING, STATS, PS}
