@@ -5,30 +5,23 @@ import LinearAlgebra
 import DocStringExtensions
 import StaticArrays
 import StatsBase
-import JSON
 import Dierckx
-import RootSolvers
-import Statistics
 import LambertW
 import Thermodynamics
 import Distributions
 import FastGaussQuadrature
 import CLIMAParameters
-import OrdinaryDiffEq
 import CloudMicrophysics
 import UnPack
-import Distributions
 import StochasticDiffEq
 import Flux
 
 const SDE = StochasticDiffEq
-const ODE = OrdinaryDiffEq
 const CC = ClimaCore
 const CCO = CC.Operators
 const SA = StaticArrays
 
 const TD = Thermodynamics
-const RS = RootSolvers
 
 const CM = CloudMicrophysics
 const CM0 = CloudMicrophysics.Microphysics_0M
