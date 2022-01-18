@@ -1,66 +1,71 @@
 """
-    nh_pressure_buoy(param_set, a_up, b_up, ρ0, asp_ratio, bcs)
+    compute_nh_pressure!(
+        state::State,
+        grid::Grid,
+        edmf::EDMF_PrognosticTKE,
+        param_set::APS
+    )
 
-Returns the value of perturbation pressure gradient
-for updraft i following [He2020](@cite), given:
+Computes the
+    - perturbation pressure gradient
+    - (perturbation?) pressure advection
+    - (perturbation?) pressure drag
 
- - `a_up`: updraft area
- - `b_up`: updraft buoyancy
- - `ρ0`: reference density
- - `asp_ratio`: the specific aspect ratio of the updraft
- - `bcs`: a `NamedTuple` of BCs with updraft area fraction and buoyancy entries
+for all updrafts, following [He2020](@cite), given:
+
+ - `state`: state
+ - `grid`: grid
+ - `edmf`: EDMF model
+ - `param_set`: parameter set, containing CLIMAParameters
 """
-function nh_pressure_buoy(::Type{FT}, param_set::APS, a_up, b_up, ρ0, bcs) where {FT <: Real}
-    Ifb = CCO.InterpolateC2F(; bcs.b_up...)
-    Ifa = CCO.InterpolateC2F(; bcs.a_up...)
+function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMF_PrognosticTKE, param_set::APS, surf)
 
-    α_b::FT = CPEDMF.α_b(param_set)
+    FT = eltype(grid)
+    N_up = n_updrafts(edmf)
+    kc_surf = kc_surface(grid)
+    kc_toa = kc_top_of_atmos(grid)
+
+    Ifc = CCO.InterpolateF2C()
+    wvec = CC.Geometry.WVector
+    w_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
+    ∇ = CCO.DivergenceC2F(; w_bcs...)
+    aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
+    ρ0 = face_ref_state(state).ρ0
+    aux_en_f = face_aux_environment(state)
+    plume_scale_height = map(1:N_up) do i
+        compute_plume_scale_height(grid, state, param_set, i)
+    end
+
     # Note: Independence of aspect ratio hardcoded in implementation.
     α₂_asp_ratio² = FT(0)
-
-    return @. Int(Ifa(a_up) > 0) * -α_b / (1 + α₂_asp_ratio²) * ρ0 * Ifa(a_up) * Ifb(b_up)
-end
-
-"""
-    nh_pressure_adv(param_set, a_up, ρ0, w_up, bcs)
-
-Returns the value of perturbation pressure gradient
-for updraft i following [He2020](@cite), given:
-
- - `a_up`: updraft area
- - `ρ0`: reference density
- - `w_up`: updraft vertical velocity
- - `bcs`: a `NamedTuple` of BCs with updraft velocity and area fraction entries
-"""
-function nh_pressure_adv(::Type{FT}, param_set::APS, a_up, ρ0, w_up, bcs) where {FT <: Real}
-
-    Ifa = CCO.InterpolateC2F(; bcs.a_up...)
-    Ifc = CCO.InterpolateF2C()
-    ∇ = CCO.DivergenceC2F(; bcs.w_up...)
+    α_b::FT = CPEDMF.α_b(param_set)
     α_a::FT = CPEDMF.α_a(param_set)
-    wvec = CC.Geometry.WVector
-
-    return @. Int(Ifa(a_up) > 0) * ρ0 * Ifa(a_up) * α_a * w_up * ∇(wvec(Ifc(w_up)))
-end;
-
-"""
-    nh_pressure_drag(param_set, H_up, a_up, ρ0, w_up, w_en, bcs)
-
-Returns the value of perturbation pressure gradient
-for updraft i following [He2020](@cite), given:
-
- - `H_up`: the updraft scale height
- - `a_up`: updraft area
- - `ρ0`: reference density
- - `w_up`: updraft vertical velocity
- - `w_en`: environment vertical velocity
- - `bcs`: a `NamedTuple` of BCs with an updraft area fraction entry
-"""
-function nh_pressure_drag(param_set::APS, H_up::FT, a_up, ρ0, w_up, w_en, bcs) where {FT <: Real}
-
-    Ifa = CCO.InterpolateC2F(; bcs.a_up...)
     α_d::FT = CPEDMF.α_d(param_set)
 
-    # drag as w_dif and account for downdrafts
-    return @. Int(Ifa(a_up) > 0) * -1 * ρ0 * Ifa(a_up) * α_d * (w_up - w_en) * abs(w_up - w_en) / H_up
-end;
+    @inbounds for i in 1:N_up
+        # pressure
+        b_up = aux_up[i].buoy
+        a_up = aux_up[i].area
+        w_up = aux_up_f[i].w
+        H_up = plume_scale_height[i]
+        w_en = aux_en_f.w
+
+        b_bcs = (; bottom = CCO.SetValue(b_up[kc_surf]), top = CCO.SetValue(b_up[kc_toa]))
+        a_bcs = a_up_boundary_conditions(surf, edmf, i)
+        Ifb = CCO.InterpolateC2F(; b_bcs...)
+        Ifa = CCO.InterpolateC2F(; a_bcs...)
+
+        nh_press_buoy = aux_up_f[i].nh_pressure_b
+        nh_press_adv = aux_up_f[i].nh_pressure_adv
+        nh_press_drag = aux_up_f[i].nh_pressure_drag
+        nh_pressure = aux_up_f[i].nh_pressure
+
+        @. nh_press_buoy = Int(Ifa(a_up) > 0) * -α_b / (1 + α₂_asp_ratio²) * ρ0 * Ifa(a_up) * Ifb(b_up)
+        @. nh_press_adv = Int(Ifa(a_up) > 0) * ρ0 * Ifa(a_up) * α_a * w_up * ∇(wvec(Ifc(w_up)))
+        # drag as w_dif and account for downdrafts
+        @. nh_press_drag = Int(Ifa(a_up) > 0) * -1 * ρ0 * Ifa(a_up) * α_d * (w_up - w_en) * abs(w_up - w_en) / H_up
+        @. nh_pressure = nh_press_buoy + nh_press_adv + nh_press_drag
+    end
+    return nothing
+end

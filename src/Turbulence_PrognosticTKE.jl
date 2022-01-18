@@ -240,9 +240,9 @@ function set_edmf_surface_bc(
     oblength = surf.obukhov_length
     α0LL = center_ref_state(state).α0[kc_surf]
     # TODO: is bulk even defined before this is called?
-    ae = 1 .- aux_bulk.area # area of environment
+    ae_surf = 1 - aux_bulk.area[kc_surf] # area of environment
 
-    ρ0_ae = ρ0_c[kc_surf] * ae[kc_surf]
+    ρ0_ae = ρ0_c[kc_surf] * ae_surf
 
     prog_en.ρatke[kc_surf] = ρ0_ae * get_surface_tke(param_set, surf.ustar, zLL, surf.obukhov_length)
     prog_en.ρaHvar[kc_surf] = ρ0_ae * get_surface_variance(flux1 * α0LL, flux1 * α0LL, ustar, zLL, oblength)

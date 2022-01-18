@@ -313,29 +313,7 @@ function update_aux!(
         end
     end
 
-    @inbounds for i in 1:N_up
-
-        # pressure
-        b_up = aux_up[i].buoy
-        a_up = aux_up[i].area
-        w_up = aux_up_f[i].w
-        H_up = plume_scale_height[i]
-        w_en = aux_en_f.w
-
-        b_bcs = (; bottom = CCO.SetValue(b_up[kc_surf]), top = CCO.SetValue(b_up[kc_toa]))
-        a_bcs = a_up_boundary_conditions(surf, edmf, i)
-        w_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
-        bcs = (; a_up = a_bcs, b_up = b_bcs, w_up = w_bcs)
-
-        nh_press_buoy = aux_up_f[i].nh_pressure_b
-        nh_press_adv = aux_up_f[i].nh_pressure_adv
-        nh_press_drag = aux_up_f[i].nh_pressure_drag
-
-        nh_press_buoy .= nh_pressure_buoy(FT, param_set, a_up, b_up, ρ0_f, bcs)
-        nh_press_adv .= nh_pressure_adv(FT, param_set, a_up, ρ0_f, w_up, bcs)
-        nh_press_drag .= nh_pressure_drag(param_set, H_up, a_up, ρ0_f, w_up, w_en, bcs)
-        @. aux_up_f[i].nh_pressure = nh_press_buoy + nh_press_adv + nh_press_drag
-    end
+    compute_nh_pressure!(state, grid, edmf, param_set, surf)
 
     #####
     ##### compute_eddy_diffusivities_tke
