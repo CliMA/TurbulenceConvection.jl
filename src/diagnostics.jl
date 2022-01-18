@@ -43,7 +43,7 @@ function io_dictionary_aux()
         "updraft_buoyancy" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).buoy),
         "H_third_m" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).H_third_m),
         "W_third_m" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).W_third_m),
-        "QT_third_m" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).H_third_m),
+        "QT_third_m" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).QT_third_m),
         "cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).cloud_fraction), # was this "cloud_fraction_mean"?
         "buoyancy_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).buoy),
         "temperature_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).T),
