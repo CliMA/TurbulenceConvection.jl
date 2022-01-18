@@ -1,6 +1,5 @@
-if !("." in LOAD_PATH) # for easier local testing
-    push!(LOAD_PATH, ".")
-end
+import Pkg
+Pkg.develop(path = ".")
 using Test
 import TurbulenceConvection
 tc_dir_glob = dirname(dirname(pathof(TurbulenceConvection)))

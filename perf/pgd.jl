@@ -1,6 +1,5 @@
-if !("." in LOAD_PATH) # for easier local testing
-    push!(LOAD_PATH, ".")
-end
+import Pkg
+Pkg.develop(path = ".")
 import SnoopCompile
 
 tinf = SnoopCompile.@snoopi_deep begin

@@ -1,7 +1,6 @@
 # Launch with `julia --project --track-allocation=user`
-if !("." in LOAD_PATH)
-    push!(LOAD_PATH, ".")
-end
+import Pkg
+Pkg.develop(path = ".")
 import Profile
 
 include("common.jl")
@@ -13,9 +12,3 @@ namelist["time_stepping"]["t_max"] = 10800.0 # run for shorter time
 main(namelist) # compile first
 Profile.clear_malloc_data()
 main(namelist)
-
-# Quit julia (which generates .mem files), then call
-#=
-import Coverage
-allocs = Coverage.analyze_malloc("src")
-=#

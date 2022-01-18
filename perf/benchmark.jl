@@ -1,6 +1,5 @@
-if !("." in LOAD_PATH)
-    push!(LOAD_PATH, ".")
-end
+import Pkg
+Pkg.develop(path = ".")
 include("common.jl")
 import BenchmarkTools
 
