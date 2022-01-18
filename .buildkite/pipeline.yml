@@ -73,6 +73,17 @@ steps:
       queue: central
       slurm_ntasks: 1
 
+  - label: ":partly_sunny: MWE Rico"
+    key: "cpu_rico"
+    command:
+      - "julia --color=yes --project=test integration_tests/mwe_Rico.jl"
+    artifact_paths:
+      - "Output.mwe_Rico.01/stats/comparison/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
   - label: ":partly_sunny: Nieuwstadt"
     key: "cpu_nieuwstadt"
     command:
