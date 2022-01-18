@@ -256,15 +256,8 @@ function compute_gm_tendencies!(
     aux_en_f = TC.face_aux_environment(state)
     aux_up = TC.center_aux_updrafts(state)
     aux_bulk = TC.center_aux_bulk(state)
-    aux_tc_f = TC.face_aux_turbconv(state)
-    aux_up_f = TC.face_aux_updrafts(state)
     ρ0_f = TC.face_ref_state(state).ρ0
     p0_c = TC.center_ref_state(state).p0
-    α0_c = TC.center_ref_state(state).α0
-    kf_surf = TC.kf_surface(grid)
-    kc_surf = TC.kc_surface(grid)
-    massflux_h = aux_tc_f.massflux_h
-    massflux_qt = aux_tc_f.massflux_qt
     aux_tc = TC.center_aux_turbconv(state)
 
     θ_liq_ice_gm_toa = prog_gm.θ_liq_ice[kc_toa]
