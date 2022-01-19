@@ -81,13 +81,17 @@ end
 
 Base.eltype(::GeneralizedEntr{FT}) where {FT} = FT
 
-struct MDEntr end  # existing model
-struct NNEntr end
-struct LinearEntr end
-Base.@kwdef struct NoisyRelaxationProcess{MT}
+abstract type AbstractEntrDetrModel end
+abstract type AbstractNonLocalEntrDetrModel end
+struct MDEntr <: AbstractEntrDetrModel end  # existing model
+struct NNEntr <: AbstractEntrDetrModel end
+struct LinearEntr <: AbstractEntrDetrModel end
+struct FNNEntr <: AbstractNonLocalEntrDetrModel end
+
+Base.@kwdef struct NoisyRelaxationProcess{MT} <: AbstractEntrDetrModel
     mean_model::MT
 end
-Base.@kwdef struct LogNormalScalingProcess{MT}
+Base.@kwdef struct LogNormalScalingProcess{MT} <: AbstractEntrDetrModel
     mean_model::MT
 end
 
@@ -546,12 +550,14 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC}
             "EDMF_PrognosticTKE",
             "entrainment";
             default = "moisture_deficit",
-            valid_options = ["moisture_deficit", "NN", "Linear"],
+            valid_options = ["moisture_deficit", "NN", "FNN", "Linear"],
         )
         mean_entr_closure = if entr_type == "moisture_deficit"
             MDEntr()
         elseif entr_type == "NN"
             NNEntr()
+        elseif entr_type == "FNN"
+            FNNEntr()
         elseif entr_type == "Linear"
             LinearEntr()
         else

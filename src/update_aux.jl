@@ -45,8 +45,6 @@ function update_aux!(
     aux_en_sat = aux_en.sat
     m_entr_detr = aux_tc.ϕ_temporary
     ∇m_entr_detr = aux_tc.ψ_temporary
-    w_up_c = aux_tc.w_up_c
-    w_en_c = aux_tc.w_en_c
     wvec = CC.Geometry.WVector
     max_area = edmf.max_area
 
@@ -244,77 +242,10 @@ function update_aux!(
     get_GMV_CoVar(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
     get_GMV_CoVar(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
 
-    plume_scale_height = map(1:N_up) do i
-        compute_plume_scale_height(grid, state, param_set, i)
-    end
-
     #####
     ##### compute_updraft_closures
     #####
-
-    Ic = CCO.InterpolateF2C()
-    ∇c = CCO.DivergenceF2C()
-    LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
-
-    @inbounds for i in 1:N_up
-        # compute ∇m at cell centers
-        a_up = aux_up[i].area
-        w_up = aux_up_f[i].w
-        w_en = aux_en_f.w
-        w_gm = prog_gm_f.w
-        @. m_entr_detr = a_up * (Ic(w_up) - Ic(w_gm))
-        @. ∇m_entr_detr = ∇c(wvec(LB(m_entr_detr)))
-        @. w_up_c = Ic(w_up)
-        @. w_en_c = Ic(w_en)
-        @inbounds for k in real_center_indices(grid)
-            # entrainment
-
-            q_cond_up = TD.condensate(TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k]))
-            q_cond_en = TD.condensate(TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k]))
-
-            if aux_up[i].area[k] > 0.0
-
-                εδ_model_vars = GeneralizedEntr{FT}(;
-                    q_cond_up = q_cond_up,
-                    q_cond_en = q_cond_en,
-                    w_up = w_up_c[k],
-                    w_en = w_en_c[k],
-                    b_up = aux_up[i].buoy[k],
-                    b_en = aux_en.buoy[k],
-                    tke = aux_en.tke[k],
-                    dMdz = ∇m_entr_detr[k],
-                    M = m_entr_detr[k],
-                    a_up = aux_up[i].area[k],
-                    a_en = aux_en.area[k],
-                    H_up = plume_scale_height[i],
-                    RH_up = aux_up[i].RH[k],
-                    RH_en = aux_en.RH[k],
-                    max_area = max_area,
-                    zc_i = grid.zc[k].z,
-                    Δt = Δt,
-                    # non-dimensional entr/detr state
-                    nondim_entr_sc = aux_up[i].nondim_entr_sc[k],
-                    nondim_detr_sc = aux_up[i].nondim_detr_sc[k],
-                )
-
-                er = entr_detr(param_set, εδ_model_vars, edmf.entr_closure)
-                aux_up[i].entr_sc[k] = er.ε_dyn
-                aux_up[i].detr_sc[k] = er.δ_dyn
-                aux_up[i].frac_turb_entr[k] = er.ε_turb
-                # nondim entr/detr
-                aux_up[i].nondim_entr_sc[k] = er.ε_dyn_nondim
-                aux_up[i].nondim_detr_sc[k] = er.δ_dyn_nondim
-            else
-                aux_up[i].entr_sc[k] = 0
-                aux_up[i].detr_sc[k] = 0
-                aux_up[i].frac_turb_entr[k] = 0
-                # nondim entr/detr
-                aux_up[i].nondim_entr_sc[k] = 0
-                aux_up[i].nondim_detr_sc[k] = 0
-            end
-        end
-    end
-
+    compute_entr_detr!(state, grid, edmf, param_set, surf, Δt, edmf.entr_closure)
     compute_nh_pressure!(state, grid, edmf, param_set, surf)
 
     #####
@@ -322,6 +253,7 @@ function update_aux!(
     #####
 
     # Subdomain exchange term
+    ∇c = CCO.DivergenceF2C()
     Ic = CCO.InterpolateF2C()
     b_exch = center_aux_turbconv(state).b_exch
     parent(b_exch) .= 0

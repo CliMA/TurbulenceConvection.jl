@@ -35,6 +35,10 @@ cent_aux_vars_up(FT) = (;
     entr_turb_dyn = FT(0),
     detr_turb_dyn = FT(0),
     asp_ratio = FT(0),
+    Π₁ = FT(0),
+    Π₂ = FT(0),
+    Π₃ = FT(0),
+    Π₄ = FT(0),
 )
 cent_aux_vars_edmf(FT, n_up) = (;
     turbconv = (;
