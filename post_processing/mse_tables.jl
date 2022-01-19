@@ -60,6 +60,22 @@ all_best_mse["DYCOMS_RF01"]["thetal_mean"] = 7.642054391010214e-5
 all_best_mse["DYCOMS_RF01"]["Hvar_mean"] = 1288.1546409185898
 all_best_mse["DYCOMS_RF01"]["QTvar_mean"] = 518.833475529373
 #
+all_best_mse["DYCOMS_RF02"] = OrderedCollections.OrderedDict()
+all_best_mse["DYCOMS_RF02"]["qt_mean"] = 0.07061626448507657
+all_best_mse["DYCOMS_RF02"]["ql_mean"] = 3.9702026751687347
+all_best_mse["DYCOMS_RF02"]["qr_mean"] = 3.7535267184726644
+all_best_mse["DYCOMS_RF02"]["updraft_area"] = 28.2466090899223
+all_best_mse["DYCOMS_RF02"]["updraft_w"] = 7.999061662392943
+all_best_mse["DYCOMS_RF02"]["updraft_qt"] = 5.0918816005111545
+all_best_mse["DYCOMS_RF02"]["updraft_thetal"] = 40.54948793296486
+all_best_mse["DYCOMS_RF02"]["v_mean"] = 42.9772055770869
+all_best_mse["DYCOMS_RF02"]["u_mean"] = 20.12106315849818
+all_best_mse["DYCOMS_RF02"]["tke_mean"] = 21.491477409531274
+all_best_mse["DYCOMS_RF02"]["temperature_mean"] = 2.3721074344072174e-5
+all_best_mse["DYCOMS_RF02"]["thetal_mean"] = 2.6849939819093862e-5
+all_best_mse["DYCOMS_RF02"]["Hvar_mean"] = 1464.8702014639657
+all_best_mse["DYCOMS_RF02"]["QTvar_mean"] = 512.8319511829964
+#
 all_best_mse["GABLS"] = OrderedCollections.OrderedDict()
 all_best_mse["GABLS"]["updraft_thetal"] = 0.0
 all_best_mse["GABLS"]["v_mean"] = 0.0

@@ -190,6 +190,8 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
         namelist = GATE_III(namelist_defaults)
     elseif case_name == "DYCOMS_RF01"
         namelist = DYCOMS_RF01(namelist_defaults)
+    elseif case_name == "DYCOMS_RF02"
+        namelist = DYCOMS_RF02(namelist_defaults)
     elseif case_name == "GABLS"
         namelist = GABLS(namelist_defaults)
     elseif case_name == "SP"
@@ -361,6 +363,27 @@ function DYCOMS_RF01(namelist_defaults)
 
     namelist["meta"]["simname"] = "DYCOMS_RF01"
     namelist["meta"]["casename"] = "DYCOMS_RF01"
+
+    return namelist
+end
+function DYCOMS_RF02(namelist_defaults)
+
+    namelist = deepcopy(namelist_defaults)
+
+    namelist["meta"]["casename"] = "DYCOMS_RF02"
+
+    namelist["grid"]["nz"] = 30
+    namelist["grid"]["dz"] = 50
+
+    namelist["time_stepping"]["adapt_dt"] = true
+    namelist["time_stepping"]["t_max"] = 60 * 60 * 6.0
+    namelist["time_stepping"]["dt_max"] = 4.0
+    namelist["time_stepping"]["dt_min"] = 1.0
+
+    namelist["microphysics"]["precipitation_model"] = "clima_1m" #"cutoff"
+
+    namelist["meta"]["simname"] = "DYCOMS_RF02"
+    namelist["meta"]["casename"] = "DYCOMS_RF02"
 
     return namelist
 end
