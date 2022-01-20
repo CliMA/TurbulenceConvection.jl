@@ -1,5 +1,6 @@
-import Pkg
-Pkg.develop(path = ".")
+if !("." in LOAD_PATH) # for ease of include
+    push!(LOAD_PATH, ".")
+end
 using Test
 import TurbulenceConvection
 const TC = TurbulenceConvection
