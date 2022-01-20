@@ -24,6 +24,10 @@ Base.@kwdef struct EntrDetr{FT}
     δ_dyn::FT
     "Turbulent entrainment"
     ε_turb::FT
+    "nondimensional dynamical entrainment"
+    ε_dyn_nondim::FT
+    "nondimensional dynamical detrainment"
+    δ_dyn_nondim::FT
 end
 
 """
@@ -68,6 +72,11 @@ Base.@kwdef struct GeneralizedEntr{FT}
     zc_i::FT
     "Model time step"
     Δt::FT
+    # For stochastic modelling
+    "nondimensional entrainment"
+    nondim_entr_sc::FT
+    "nondimensional detrainment"
+    nondim_detr_sc::FT
 end
 
 Base.eltype(::GeneralizedEntr{FT}) where {FT} = FT
@@ -75,6 +84,12 @@ Base.eltype(::GeneralizedEntr{FT}) where {FT} = FT
 struct MDEntr end  # existing model
 struct NNEntr end
 struct LinearEntr end
+Base.@kwdef struct NoisyRelaxationProcess{MT}
+    mean_model::MT
+end
+Base.@kwdef struct LogNormalScalingProcess{MT}
+    mean_model::MT
+end
 
 """
     GradBuoy
@@ -211,17 +226,6 @@ struct SGSQuadrature{N, QT, A, W} <: AbstractEnvThermo
 end
 quadrature_order(::SGSQuadrature{N}) where {N} = N
 quad_type(::SGSQuadrature{N}) where {N} = N
-
-# Stochastic entrainment/detrainment closures:
-struct NoneClosureType end
-struct LogNormalClosureType end
-struct SDEClosureType end
-
-# Stochastic differential equation memory
-Base.@kwdef struct sde_struct{T}
-    u0::Float64
-    dt::Float64
-end
 
 abstract type FrictionVelocityType end
 struct FixedFrictionVelocity <: FrictionVelocityType end
@@ -447,14 +451,13 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, SDES}
+struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC}
     surface_area::Float64
     max_area::Float64
     minimum_area::Float64
     precip_model::PM
     en_thermo::ENT
     prandtl_number::Float64
-    sde_model::SDES
     bg_closure::EBGC
     entr_closure::EC
     function EDMF_PrognosticTKE(namelist, grid::Grid, param_set::PS) where {PS}
@@ -512,28 +515,6 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, SDES}
             SGSQuadrature(namelist)
         end
 
-        # Initialize SDE parameters
-        dt = parse_namelist(namelist, "time_stepping", "dt_min"; default = 1.0)
-        closure = parse_namelist(
-            namelist,
-            "turbulence",
-            "EDMF_PrognosticTKE",
-            "stochastic",
-            "closure";
-            default = "none",
-            valid_options = ["none", "lognormal", "sde"],
-        )
-        closure_type = if closure == "none"
-            NoneClosureType
-        elseif closure == "lognormal"
-            LogNormalClosureType
-        elseif closure == "sde"
-            SDEClosureType
-        else
-            error("Something went wrong. Invalid stochastic closure type '$closure'")
-        end
-        sde_model = sde_struct{closure_type}(u0 = 1, dt = dt)
-
         bg_type = parse_namelist(
             namelist,
             "turbulence",
@@ -551,6 +532,14 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, SDES}
         end
 
         # entr closure
+        stoch_entr_type = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "stochastic_entrainment";
+            default = "deterministic",
+            valid_options = ["deterministic", "noisy_relaxation_process", "lognormal_scaling"],
+        )
         entr_type = parse_namelist(
             namelist,
             "turbulence",
@@ -559,7 +548,7 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, SDES}
             default = "moisture_deficit",
             valid_options = ["moisture_deficit", "NN", "Linear"],
         )
-        entr_closure = if entr_type == "moisture_deficit"
+        mean_entr_closure = if entr_type == "moisture_deficit"
             MDEntr()
         elseif entr_type == "NN"
             NNEntr()
@@ -568,20 +557,29 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, SDES}
         else
             error("Something went wrong. Invalid entrainment type '$entr_type'")
         end
-        EC = typeof(entr_closure)
 
+        # Overwrite `entr_closure` if a noisy relaxation process is used
+        entr_closure = if stoch_entr_type == "noisy_relaxation_process"
+            NoisyRelaxationProcess(mean_model = mean_entr_closure)
+        elseif stoch_entr_type == "lognormal_scaling"
+            LogNormalScalingProcess(mean_model = mean_entr_closure)
+        elseif stoch_entr_type == "deterministic"
+            mean_entr_closure
+        else
+            error("Something went wrong. Invalid stochastic entrainment type '$stoch_entr_type'")
+        end
+
+        EC = typeof(entr_closure)
         PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
-        SDES = typeof(sde_model)
         ENT = typeof(en_thermo)
-        return new{n_updrafts, PM, ENT, EBGC, EC, SDES}(
+        return new{n_updrafts, PM, ENT, EBGC, EC}(
             surface_area,
             max_area,
             minimum_area,
             precip_model,
             en_thermo,
             prandtl_number,
-            sde_model,
             bg_closure,
             entr_closure,
         )

@@ -104,6 +104,11 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
                    0.739, 0.0755, 0.178, 0.521,
                    0.0, 0.0, 0.843,-0.340,
                    0.655, 0.113, 0.0, 0.0)
+    # General stochastic entrainment/detrainment parameters
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_stochastic_ent_params"] =
+    SA.SVector(
+        0.3, 0.3, 0.05, 0.05
+    )
     #! format: on
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.0
@@ -121,16 +126,6 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff2"] = 0.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = 0.1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = 10.0
-
-    # stochastic closures
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"] = Dict()
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"]["closure"] = "none"
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"]["entr_lognormal_var"] = 0.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"]["detr_lognormal_var"] = 0.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"]["sde_entr_theta"] = 1.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"]["sde_entr_std"] = 0.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"]["sde_detr_theta"] = 1.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic"]["sde_detr_std"] = 0.0
 
     # From namelist
     namelist_defaults["grid"] = Dict()
@@ -154,7 +149,8 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["turbulence"]["scheme"] = "EDMF_PrognosticTKE"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit" #{"moisture_deficit", "NN", "Linear"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "NN", "Linear"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = "deterministic"  # {"deterministic", "noisy_relaxation_process", "lognormal_scaling"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_local_micro"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["constant_area"] = false
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["calculate_tke"] = true

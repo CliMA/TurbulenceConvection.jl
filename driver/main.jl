@@ -244,9 +244,11 @@ nc_results_file(stats::NetCDFIO_Stats) = stats.path_plus_file
 nc_results_file(::Nothing) = @info "The simulation was run without IO, so no nc files were exported"
 
 function main1d(namelist; time_run = true)
-    # TODO: generalize convesion of arrays from namelist to `SVector`s.
-    _p = namelist["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"]
-    namelist["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"] = SVector{length(_p)}(_p)
+    # TODO: generalize conversion of arrays from namelist to `SVector`s.
+    for param_name in ["general_ent_params", "general_stochastic_ent_params"]
+        _p = namelist["turbulence"]["EDMF_PrognosticTKE"][param_name]
+        namelist["turbulence"]["EDMF_PrognosticTKE"][param_name] = SVector{length(_p)}(_p)
+    end
     sim = Simulation1d(namelist)
     initialize(sim)
     if time_run
