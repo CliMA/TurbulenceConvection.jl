@@ -74,3 +74,200 @@ function entr_detr(param_set::APS, εδ_model_vars, εδ_model_type)
 
     return EntrDetr{FT}(ε_dyn, δ_dyn, ε_turb, nondim_ε, nondim_δ)
 end
+
+##### Compute entr detr
+
+function compute_entr_detr!(
+    state::State,
+    grid::Grid,
+    edmf::EDMF_PrognosticTKE,
+    param_set::APS,
+    surf::SurfaceBase,
+    Δt::Real,
+    ::AbstractEntrDetrModel,
+)
+    FT = eltype(grid)
+    N_up = n_updrafts(edmf)
+    aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
+    aux_en = center_aux_environment(state)
+    aux_en_f = face_aux_environment(state)
+    prog_gm_f = face_prog_grid_mean(state)
+    aux_tc = center_aux_turbconv(state)
+    w_up_c = aux_tc.w_up_c
+    w_en_c = aux_tc.w_en_c
+    m_entr_detr = aux_tc.ϕ_temporary
+    ∇m_entr_detr = aux_tc.ψ_temporary
+    wvec = CC.Geometry.WVector
+    max_area = edmf.max_area
+    plume_scale_height = map(1:N_up) do i
+        compute_plume_scale_height(grid, state, param_set, i)
+    end
+
+    Ic = CCO.InterpolateF2C()
+    ∇c = CCO.DivergenceF2C()
+    LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
+    @inbounds for i in 1:N_up
+        # compute ∇m at cell centers
+        a_up = aux_up[i].area
+        w_up = aux_up_f[i].w
+        w_en = aux_en_f.w
+        w_gm = prog_gm_f.w
+        @. m_entr_detr = a_up * (Ic(w_up) - Ic(w_gm))
+        @. ∇m_entr_detr = ∇c(wvec(LB(m_entr_detr)))
+        @. w_up_c = Ic(w_up)
+        @. w_en_c = Ic(w_en)
+        @inbounds for k in real_center_indices(grid)
+            # entrainment
+
+            q_cond_up = TD.condensate(TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k]))
+            q_cond_en = TD.condensate(TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k]))
+
+            if aux_up[i].area[k] > 0.0
+
+                εδ_model_vars = GeneralizedEntr{FT}(;
+                    q_cond_up = q_cond_up,
+                    q_cond_en = q_cond_en,
+                    w_up = w_up_c[k],
+                    w_en = w_en_c[k],
+                    b_up = aux_up[i].buoy[k],
+                    b_en = aux_en.buoy[k],
+                    tke = aux_en.tke[k],
+                    dMdz = ∇m_entr_detr[k],
+                    M = m_entr_detr[k],
+                    a_up = aux_up[i].area[k],
+                    a_en = aux_en.area[k],
+                    H_up = plume_scale_height[i],
+                    RH_up = aux_up[i].RH[k],
+                    RH_en = aux_en.RH[k],
+                    max_area = max_area,
+                    zc_i = grid.zc[k].z,
+                    Δt = Δt,
+                    # non-dimensional entr/detr state
+                    nondim_entr_sc = aux_up[i].nondim_entr_sc[k],
+                    nondim_detr_sc = aux_up[i].nondim_detr_sc[k],
+                )
+
+                er = entr_detr(param_set, εδ_model_vars, edmf.entr_closure)
+                aux_up[i].entr_sc[k] = er.ε_dyn
+                aux_up[i].detr_sc[k] = er.δ_dyn
+                aux_up[i].frac_turb_entr[k] = er.ε_turb
+            else
+                aux_up[i].entr_sc[k] = 0.0
+                aux_up[i].detr_sc[k] = 0.0
+                aux_up[i].frac_turb_entr[k] = 0.0
+            end
+        end
+    end
+end
+
+function compute_entr_detr!(
+    state::State,
+    grid::Grid,
+    edmf::EDMF_PrognosticTKE,
+    param_set::APS,
+    surf::SurfaceBase,
+    Δt::Real,
+    ::AbstractNonLocalEntrDetrModel,
+)
+    FT = eltype(grid)
+    N_up = n_updrafts(edmf)
+    aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
+    aux_en = center_aux_environment(state)
+    aux_en_f = face_aux_environment(state)
+    prog_gm_f = face_prog_grid_mean(state)
+    aux_tc = center_aux_turbconv(state)
+    w_up_c = aux_tc.w_up_c
+    w_en_c = aux_tc.w_en_c
+    m_entr_detr = aux_tc.ϕ_temporary
+    ∇m_entr_detr = aux_tc.ψ_temporary
+    wvec = CC.Geometry.WVector
+    max_area = edmf.max_area
+    plume_scale_height = map(1:N_up) do i
+        compute_plume_scale_height(grid, state, param_set, i)
+    end
+
+    Ic = CCO.InterpolateF2C()
+    ∇c = CCO.DivergenceF2C()
+    LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
+    @inbounds for i in 1:N_up
+        # compute ∇m at cell centers
+        a_up = aux_up[i].area
+        w_up = aux_up_f[i].w
+        w_en = aux_en_f.w
+        w_gm = prog_gm_f.w
+        @. m_entr_detr = a_up * (Ic(w_up) - Ic(w_gm))
+        @. ∇m_entr_detr = ∇c(wvec(LB(m_entr_detr)))
+        @. w_up_c = Ic(w_up)
+        @. w_en_c = Ic(w_en)
+
+        @inbounds for k in real_center_indices(grid)
+            # entrainment
+
+            q_cond_up = TD.condensate(TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k]))
+            q_cond_en = TD.condensate(TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k]))
+
+            if aux_up[i].area[k] > 0.0
+                εδ_model_vars = GeneralizedEntr{FT}(;
+                    q_cond_up = q_cond_up,
+                    q_cond_en = q_cond_en,
+                    w_up = w_up_c[k],
+                    w_en = w_en_c[k],
+                    b_up = aux_up[i].buoy[k],
+                    b_en = aux_en.buoy[k],
+                    tke = aux_en.tke[k],
+                    dMdz = ∇m_entr_detr[k],
+                    M = m_entr_detr[k],
+                    a_up = aux_up[i].area[k],
+                    a_en = aux_en.area[k],
+                    H_up = plume_scale_height[i],
+                    RH_up = aux_up[i].RH[k],
+                    RH_en = aux_en.RH[k],
+                    max_area = max_area,
+                    zc_i = grid.zc[k].z,
+                    Δt = Δt,
+                    # non-dimensional entr/detr state
+                    nondim_entr_sc = aux_up[i].nondim_entr_sc[k],
+                    nondim_detr_sc = aux_up[i].nondim_detr_sc[k],
+                )
+                Π = non_dimensional_groups(param_set, εδ_model_vars)
+                aux_up[i].Π₁[k] = Π[1]
+                aux_up[i].Π₂[k] = Π[2]
+                aux_up[i].Π₃[k] = Π[3]
+                aux_up[i].Π₄[k] = Π[4]
+            else
+                # TODO: is there a better way to do this?
+                aux_up[i].Π₁[k] = 0
+                aux_up[i].Π₂[k] = 0
+                aux_up[i].Π₃[k] = 0
+                aux_up[i].Π₄[k] = 0
+            end
+        end
+
+        Π₁ = parent(aux_up[i].Π₁)
+        Π₂ = parent(aux_up[i].Π₂)
+        Π₃ = parent(aux_up[i].Π₃)
+        Π₄ = parent(aux_up[i].Π₄)
+        entr_sc = parent(aux_up[i].entr_sc)
+        detr_sc = parent(aux_up[i].detr_sc)
+        frac_turb_entr = parent(aux_up[i].frac_turb_entr)
+        fnn!(entr_sc, detr_sc, frac_turb_entr, param_set, Π₁, Π₂, Π₃, Π₄)
+    end
+end
+
+function fnn!(
+    entr_sc::AbstractArray{FT}, # outputs
+    detr_sc::AbstractArray{FT}, # outputs
+    frac_turb_entr::AbstractArray{FT}, # outputs
+    param_set::APS,
+    Π₁::AbstractArray{FT}, # inputs
+    Π₂::AbstractArray{FT}, # inputs
+    Π₃::AbstractArray{FT}, # inputs
+    Π₄::AbstractArray{FT}, # inputs
+) where {FT <: Real}
+    c_gen = ICP.c_gen(param_set) # see non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
+
+    # OperatorFlux.operator(Π₁,Π₂,Π₃,Π₄)
+
+end
