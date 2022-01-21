@@ -75,6 +75,35 @@ function entr_detr(param_set::APS, εδ_model_vars, εδ_model_type)
     return EntrDetr{FT}(ε_dyn, δ_dyn, ε_turb, nondim_ε, nondim_δ)
 end
 
+"""
+    entr_detr_given_scales(param_set, εδ_model_vars, εδ_model_type)
+
+Returns the dynamic entrainment and detrainment rates
+given non dimenational values given by another model,
+as well as the turbulent entrainment rate, following
+Cohen et al. (JAMES, 2020), given:
+ - `param_set`      :: parameter set
+ - `dim_scale`      :: dimensional scale
+ - `nondim_ε,`      :: non dimentional entrainment value
+ - `nondim_δ,`      :: non dimentional detrainment value
+ - `εδ_model_vars`  :: structure containing variables
+"""
+function entr_detr_given_scales(param_set::APS, dim_scale, nondim_ε, nondim_δ, εδ_model_vars)
+    area_limiter = max_area_limiter(param_set, εδ_model_vars)
+
+    c_div = FT(ICP.entrainment_massflux_div_factor(param_set))
+    MdMdz_ε, MdMdz_δ = get_MdMdz(εδ_model_vars) .* c_div
+
+    # dynamic entrainment / detrainment
+    ε_dyn = dim_scale * nondim_ε + MdMdz_ε
+    δ_dyn = dim_scale * (nondim_δ + area_limiter) + MdMdz_δ
+
+    # turbulent entrainment
+    ε_turb = compute_turbulent_entrainment(param_set, εδ_model_vars)
+
+    return EntrDetr{FT}(ε_dyn, δ_dyn, ε_turb)
+end
+
 ##### Compute entr detr
 
 function compute_entr_detr!(
@@ -168,7 +197,7 @@ function compute_entr_detr!(
     param_set::APS,
     surf::SurfaceBase,
     Δt::Real,
-    ::AbstractNonLocalEntrDetrModel,
+    εδ_model_type::AbstractNonLocalEntrDetrModel,
 )
     FT = eltype(grid)
     N_up = n_updrafts(edmf)
@@ -231,6 +260,7 @@ function compute_entr_detr!(
                     nondim_entr_sc = aux_up[i].nondim_entr_sc[k],
                     nondim_detr_sc = aux_up[i].nondim_detr_sc[k],
                 )
+                aux_up[i].ε_dim[k] = entrainment_length_scale(param_set, εδ_model_vars)
                 Π = non_dimensional_groups(param_set, εδ_model_vars)
                 aux_up[i].Π₁[k] = Π[1]
                 aux_up[i].Π₂[k] = Π[2]
@@ -244,30 +274,15 @@ function compute_entr_detr!(
                 aux_up[i].Π₄[k] = 0
             end
         end
-
+        ε_dim = parent(aux_up[i].ε_dim)
         Π₁ = parent(aux_up[i].Π₁)
         Π₂ = parent(aux_up[i].Π₂)
         Π₃ = parent(aux_up[i].Π₃)
         Π₄ = parent(aux_up[i].Π₄)
-        entr_sc = parent(aux_up[i].entr_sc)
-        detr_sc = parent(aux_up[i].detr_sc)
-        frac_turb_entr = parent(aux_up[i].frac_turb_entr)
-        fnn!(entr_sc, detr_sc, frac_turb_entr, param_set, Π₁, Π₂, Π₃, Π₄)
+        nondim_ε, nondim_δ = non_dimensional_function(param_set, Π₁, Π₂, Π₃, Π₄, εδ_model_type)
+        ε_dyn, δ_dyn, ε_turb = entr_detr_given_scales(APS, ε_dim, nondim_ε, nondim_δ, εδ_model_vars)
+        aux_up[i].entr_sc = entr_sc
+        aux_up[i].detr_sc = detr_sc
+        aux_up[i].frac_turb_entr = frac_turb_entr
     end
-end
-
-function fnn!(
-    entr_sc::AbstractArray{FT}, # outputs
-    detr_sc::AbstractArray{FT}, # outputs
-    frac_turb_entr::AbstractArray{FT}, # outputs
-    param_set::APS,
-    Π₁::AbstractArray{FT}, # inputs
-    Π₂::AbstractArray{FT}, # inputs
-    Π₃::AbstractArray{FT}, # inputs
-    Π₄::AbstractArray{FT}, # inputs
-) where {FT <: Real}
-    c_gen = ICP.c_gen(param_set) # see non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
-
-    # OperatorFlux.operator(Π₁,Π₂,Π₃,Π₄)
-
 end

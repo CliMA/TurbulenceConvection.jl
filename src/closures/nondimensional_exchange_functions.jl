@@ -78,6 +78,28 @@ function non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
 end
 
 """
+    non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
+
+Uses a fully connected Fourier neural network to predict the non-dimensional components of dynamical entrainment/detrainment.
+ - `param_set`      :: parameter set
+ - `εδ_model_vars`  :: structure containing variables
+ - `εδ_model_type`  :: NNEntr - Neural network entrainment closure
+"""
+
+function non_dimensional_function(
+    param_set::APS,
+    Π₁::AbstractArray{FT}, # inputs
+    Π₂::AbstractArray{FT}, # inputs
+    Π₃::AbstractArray{FT}, # inputs
+    Π₄::AbstractArray{FT}, # inputs
+    εδ_model_type::FNNEntr,
+) where {FT <: Real}
+    c_gen = ICP.c_gen(param_set) # see non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
+    nondim_ε, nondim_δ = OperatorFlux.operator(Π₁, Π₂, Π₃, Π₄)
+    return nondim_ε, nondim_δ
+end
+
+"""
     non_dimensional_function(param_set, εδ_model_vars, ::LinearEntr)
 
 Uses a simple linear model to predict the non-dimensional components of dynamical entrainment/detrainment.
