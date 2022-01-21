@@ -49,7 +49,6 @@ function update_aux!(
     w_en_c = aux_tc.w_en_c
     wvec = CC.Geometry.WVector
     max_area = edmf.max_area
-    sde_model = edmf.sde_model
 
     #####
     ##### center variables
@@ -293,22 +292,25 @@ function update_aux!(
                     max_area = max_area,
                     zc_i = grid.zc[k].z,
                     Δt = Δt,
+                    # non-dimensional entr/detr state
+                    nondim_entr_sc = aux_up[i].nondim_entr_sc[k],
+                    nondim_detr_sc = aux_up[i].nondim_detr_sc[k],
                 )
 
                 er = entr_detr(param_set, εδ_model_vars, edmf.entr_closure)
                 aux_up[i].entr_sc[k] = er.ε_dyn
                 aux_up[i].detr_sc[k] = er.δ_dyn
-                # stochastic closure
-                stoch_ε = stochastic_closure(param_set, sde_model, Entrainment())
-                stoch_δ = stochastic_closure(param_set, sde_model, Detrainment())
-                aux_up[i].entr_sc[k] *= stoch_ε
-                aux_up[i].detr_sc[k] *= stoch_δ
-
                 aux_up[i].frac_turb_entr[k] = er.ε_turb
+                # nondim entr/detr
+                aux_up[i].nondim_entr_sc[k] = er.ε_dyn_nondim
+                aux_up[i].nondim_detr_sc[k] = er.δ_dyn_nondim
             else
-                aux_up[i].entr_sc[k] = 0.0
-                aux_up[i].detr_sc[k] = 0.0
-                aux_up[i].frac_turb_entr[k] = 0.0
+                aux_up[i].entr_sc[k] = 0
+                aux_up[i].detr_sc[k] = 0
+                aux_up[i].frac_turb_entr[k] = 0
+                # nondim entr/detr
+                aux_up[i].nondim_entr_sc[k] = 0
+                aux_up[i].nondim_detr_sc[k] = 0
             end
         end
     end

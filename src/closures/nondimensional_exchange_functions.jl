@@ -98,3 +98,91 @@ function non_dimensional_function(param_set, εδ_model_vars, ::LinearEntr)
     nondim_δ = lin_model_δ(nondim_groups)[1]
     return nondim_ε, nondim_δ
 end
+
+"""
+    non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::LogNormalScalingProcess)
+
+Uses a LogNormal random variable to scale a deterministic process
+to predict the non-dimensional components of dynamical entrainment/detrainment.
+
+Arguments:
+ - `param_set`      :: parameter set
+ - `εδ_model_vars`  :: structure containing variables
+ - `εδ_model_type`  :: LogNormalScalingProcess - Stochastic lognormal scaling
+"""
+function non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::LogNormalScalingProcess)
+    FT = eltype(εδ_model_vars)
+    # model parameters
+    mean_model = εδ_model_type.mean_model
+    c_gen_stoch = ICP.c_gen_stoch(param_set)
+    ε_σ² = c_gen_stoch[1]
+    δ_σ² = c_gen_stoch[2]
+
+    # Mean model closure
+    ε_mean_nondim, δ_mean_nondim = non_dimensional_function(param_set, εδ_model_vars, mean_model)
+
+    # lognormal scaling
+    nondim_ε = ε_mean_nondim * lognormal_sampler(FT(1), ε_σ²)
+    nondim_δ = δ_mean_nondim * lognormal_sampler(FT(1), δ_σ²)
+
+    return nondim_ε, nondim_δ
+end
+
+function lognormal_sampler(m::FT, var::FT)::FT where {FT}
+    μ = log(m^2 / √(m^2 + var))
+    σ = √(log(1 + var / m^2))
+    return rand(Distributions.LogNormal(μ, σ))
+end
+
+"""
+    non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::NoisyRelaxationProcess)
+
+Uses a noisy relaxation process to predict the non-dimensional components 
+of dynamical entrainment/detrainment. A deterministic closure is used as the
+equilibrium mean function for the relaxation process.
+
+Arguments:
+ - `param_set`      :: parameter set
+ - `εδ_model_vars`  :: structure containing variables
+ - `εδ_model_type`  :: NoisyRelaxationProcess - A noisy relaxation process closure
+"""
+function non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::NoisyRelaxationProcess)
+    # model parameters
+    mean_model = εδ_model_type.mean_model
+    c_gen_stoch = ICP.c_gen_stoch(param_set)
+    ε_σ² = c_gen_stoch[1]
+    δ_σ² = c_gen_stoch[2]
+    ε_λ = c_gen_stoch[3]
+    δ_λ = c_gen_stoch[4]
+
+    # Mean model closure
+    ε_mean_nondim, δ_mean_nondim = non_dimensional_function(param_set, εδ_model_vars, mean_model)
+
+    # noisy relaxation process
+    ε_u0 = εδ_model_vars.nondim_entr_sc
+    δ_u0 = εδ_model_vars.nondim_detr_sc
+    Δt = εδ_model_vars.Δt
+    nondim_ε = noisy_relaxation_process(ε_mean_nondim, ε_λ, ε_σ², ε_u0, Δt)
+    nondim_δ = noisy_relaxation_process(δ_mean_nondim, δ_λ, δ_σ², δ_u0, Δt)
+
+    return nondim_ε, nondim_δ
+end
+
+""" 
+    Solve a noisy relaxation process numerically 
+
+In this formulation, the noise amplitude is scaled by the speed of 
+reversion λ and the long-term mean μ, in addition to the variance σ² as is usual,
+
+    `du = λ(μ - u)⋅dt + √(2λμσ²)⋅dW`
+
+To ensure non-negativity, the solution is passed through a relu filter.
+"""
+function noisy_relaxation_process(μ::FT, λ::FT, σ²::FT, u0::FT, Δt::FT)::FT where {FT}
+    f(u, p, t) = λ * (μ - u)        # mean-reverting process
+    g(u, p, t) = √(2λ * μ * σ²)     # noise fluctuation
+    tspan = (0.0, Δt)
+    prob = SDE.SDEProblem(f, g, u0, tspan; save_start = false, saveat = last(tspan))
+    sol = SDE.solve(prob, SDE.SOSRI())
+    return relu(sol.u[end])
+end

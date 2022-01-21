@@ -72,5 +72,5 @@ function entr_detr(param_set::APS, εδ_model_vars, εδ_model_type)
     # turbulent entrainment
     ε_turb = compute_turbulent_entrainment(param_set, εδ_model_vars)
 
-    return EntrDetr{FT}(ε_dyn, δ_dyn, ε_turb)
+    return EntrDetr{FT}(ε_dyn, δ_dyn, ε_turb, nondim_ε, nondim_δ)
 end

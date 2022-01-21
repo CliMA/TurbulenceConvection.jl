@@ -26,12 +26,6 @@ l_max(ps::APS) = ps.nt.l_max
 c_gen(ps::APS) = ps.nt.c_gen
 
 """ stochastic parameters """
-stoch_ε_lognormal_var(ps::APS) = ps.nt.stoch_ε_lognormal_var
-stoch_δ_lognormal_var(ps::APS) = ps.nt.stoch_δ_lognormal_var
-
-sde_ϵ_θ(ps::APS) = ps.nt.sde_ϵ_θ
-sde_ϵ_σ(ps::APS) = ps.nt.sde_ϵ_σ
-sde_δ_θ(ps::APS) = ps.nt.sde_δ_θ
-sde_δ_σ(ps::APS) = ps.nt.sde_δ_σ
+c_gen_stoch(ps::APS) = ps.nt.c_gen_stoch
 
 end
