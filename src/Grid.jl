@@ -28,22 +28,16 @@ struct Grid{FT, NZ, CS, FS, SC, SF}
     fs::FS
     zc::SC
     zf::SF
-    function Grid(Δz::FT, nz::Int) where {FT <: AbstractFloat}
-        z₀, z₁ = FT(0), FT(nz * Δz)
+    function Grid(mesh)
 
-        domain = CC.Domains.IntervalDomain(
-            CC.Geometry.ZPoint{FT}(z₀),
-            CC.Geometry.ZPoint{FT}(z₁),
-            boundary_tags = (:bottom, :top),
-        )
-
-        mesh = CC.Meshes.IntervalMesh(domain, nelems = nz)
-
+        nz = length(mesh.faces) - 1
         cs = CC.Spaces.CenterFiniteDifferenceSpace(mesh)
         fs = CC.Spaces.FaceFiniteDifferenceSpace(cs)
         zc = CC.Fields.coordinate_field(cs)
         zf = CC.Fields.coordinate_field(fs)
+        Δz = zf[CCO.PlusHalf(2)] - zf[CCO.PlusHalf(1)]
 
+        FT = eltype(parent(zf))
         zmin = minimum(parent(zf))
         zmax = maximum(parent(zf))
         CS = typeof(cs)
@@ -52,6 +46,19 @@ struct Grid{FT, NZ, CS, FS, SC, SF}
         SF = typeof(zf)
         return new{FT, nz, CS, FS, SC, SF}(zmin, zmax, Δz, cs, fs, zc, zf)
     end
+end
+
+function Grid(Δz::FT, nz::Int) where {FT <: AbstractFloat}
+    z₀, z₁ = FT(0), FT(nz * Δz)
+
+    domain = CC.Domains.IntervalDomain(
+        CC.Geometry.ZPoint{FT}(z₀),
+        CC.Geometry.ZPoint{FT}(z₁),
+        boundary_tags = (:bottom, :top),
+    )
+
+    mesh = CC.Meshes.IntervalMesh(domain, nelems = nz)
+    return Grid(mesh)
 end
 
 n_cells(::Grid{FT, NZ}) where {FT, NZ} = NZ

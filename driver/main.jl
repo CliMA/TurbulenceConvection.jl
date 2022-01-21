@@ -59,7 +59,17 @@ function Simulation1d(namelist)
     cfl_limit = namelist["time_stepping"]["cfl_limit"]
     dt_min = namelist["time_stepping"]["dt_min"]
 
-    grid = TC.Grid(FT(namelist["grid"]["dz"]), namelist["grid"]["nz"])
+    Δz = FT(namelist["grid"]["dz"])
+    nz = namelist["grid"]["nz"]
+    z₀, z₁ = FT(0), FT(nz * Δz)
+    domain = CC.Domains.IntervalDomain(
+        CC.Geometry.ZPoint{FT}(z₀),
+        CC.Geometry.ZPoint{FT}(z₁),
+        boundary_tags = (:bottom, :top),
+    )
+    mesh = CC.Meshes.IntervalMesh(domain, nelems = nz)
+    grid = TC.Grid(mesh)
+
     Stats = skip_io ? nothing : NetCDFIO_Stats(namelist, grid)
     case_type = Cases.get_case(namelist)
     ref_params = Cases.reference_params(case_type, grid, param_set, namelist)
