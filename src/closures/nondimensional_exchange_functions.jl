@@ -184,5 +184,5 @@ function noisy_relaxation_process(μ::FT, λ::FT, σ²::FT, u0::FT, Δt::FT)::FT
     tspan = (0.0, Δt)
     prob = SDE.SDEProblem(f, g, u0, tspan; save_start = false, saveat = last(tspan))
     sol = SDE.solve(prob, SDE.SOSRI())
-    return relu(sol.u[end])
+    return Flux.relu(sol.u[end])
 end
