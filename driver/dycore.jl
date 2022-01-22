@@ -59,6 +59,8 @@ cent_aux_vars_gm(FT) = (;
     vg = FT(0), #Geostrophic v velocity
     ∇θ_liq_ice_gm = FT(0),
     ∇q_tot_gm = FT(0),
+    ∇u_gm = FT(0),
+    ∇v_gm = FT(0),
 )
 cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., TC.cent_aux_vars_edmf(FT, n_up)...)
 
@@ -224,12 +226,58 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
     # compute tendencies
     compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, gm)
-    TC.compute_up_tendencies!(edmf, grid, state, gm, surf)
+    compute_turbconv_tendencies!(constant_diffusivity)
 
+    return nothing
+end
+
+abstract type TurbConvModel end
+struct edmf <: TurbConvModel end
+struct constant_diffusivity <: TurbConvModel end
+
+function compute_turbconv_tendencies!(edmf, param_set, grid, state, gm, surf)
+    TC.compute_up_tendencies!(edmf, grid, state, gm, surf)
     TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
     TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
     TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρaQTvar))
     TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρaHQTcov))
+    return nothing
+end
+
+function compute_turbconv_tendencies!(constant_diffusivity)
+    return nothing
+end
+
+
+function compute_sgs_tendencies!(edmf, param_set, grid, state, gm, surf)
+    TC.compute_sgs_tendencies!(edmf, grid, state, surf, radiation, force, gm)
+    return nothing
+end
+
+function compute_sgs_tendencies!(constant_diffusivity, grid, state, surf)
+    FT = eltype(grid)
+    kf_surf = TC.kf_surface(grid)
+    kc_toa = TC.kc_top_of_atmos(grid)
+    ρ0_f = TC.face_ref_state(state).ρ0
+    wvec = CC.Geometry.WVector
+    prog_gm = TC.center_prog_grid_mean(state)
+    tendencies_gm = TC.center_tendencies_grid_mean(state)
+    ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
+    ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
+    ∇u_gm = TC.center_aux_grid_mean(state).∇u_gm
+    ∇v_gm = TC.center_aux_grid_mean(state).∇v_gm
+
+    ν = 0.01
+    grad_θ = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρθ_liq_ice_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
+    grad_q = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρq_tot_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
+    grad_u = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρu_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
+    grad_v = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρv_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
+    ∇c = CCO.DivergenceF2C()
+
+    @. tendencies_gm.θ_liq_ice += ν*∇c(grad_θ(prog_gm.θ_liq_ice))
+    @. tendencies_gm.q_tot += ν*∇c(grad_q(prog_gm.q_tot))
+    @. tendencies_gm.u += ν*∇c(grad_θ(prog_gm.θ_liq_ice))
+    @. tendencies_gm.v += ν*∇c(grad_q(prog_gm.q_tot))
 
     return nothing
 end
@@ -340,6 +388,6 @@ function compute_gm_tendencies!(
             aux_en.θ_liq_ice_tendency_precip_formation[k] +
             aux_tc.θ_liq_ice_tendency_precip_sinks[k]
     end
-    TC.compute_sgs_tendencies!(edmf, grid, state, surf, radiation, force, gm)
+    compute_sgs_tendencies!(constant_diffusivity, grid, state, surf)
     return nothing
 end
