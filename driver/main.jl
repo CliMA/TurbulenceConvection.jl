@@ -32,7 +32,11 @@ include(joinpath(tc_dir, "driver", "TimeStepping.jl"))
 include(joinpath(tc_dir, "driver", "Surface.jl"))
 import .Cases
 
-struct Simulation1d{IONT, G, S, GM, C, EDMF, D, TIMESTEPPING, STATS, PS}
+abstract type TurbConvModel end
+struct edmf <: TurbConvModel end
+struct constant_diffusivity <: TurbConvModel end
+
+struct Simulation1d{IONT, G, S, GM, C, EDMF, D, TIMESTEPPING, STATS, PS, TurbConvModel}
     io_nt::IONT
     grid::G
     state::S
@@ -47,6 +51,7 @@ struct Simulation1d{IONT, G, S, GM, C, EDMF, D, TIMESTEPPING, STATS, PS}
     adapt_dt::Bool
     cfl_limit::Float64
     dt_min::Float64
+    turb_conv::TurbConvModel
 end
 
 function Simulation1d(namelist)
@@ -58,6 +63,7 @@ function Simulation1d(namelist)
     adapt_dt = namelist["time_stepping"]["adapt_dt"]
     cfl_limit = namelist["time_stepping"]["cfl_limit"]
     dt_min = namelist["time_stepping"]["dt_min"]
+    turb_conv = namelist["turbulence"]["turbulence_convection_model"]
 
     Δz = FT(namelist["grid"]["dz"])
     nz = namelist["grid"]["nz"]
@@ -128,6 +134,7 @@ function Simulation1d(namelist)
         adapt_dt,
         cfl_limit,
         dt_min,
+        turb_conv,
     )
 end
 

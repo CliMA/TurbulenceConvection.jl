@@ -231,10 +231,6 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     return nothing
 end
 
-abstract type TurbConvModel end
-struct edmf <: TurbConvModel end
-struct constant_diffusivity <: TurbConvModel end
-
 function compute_turbconv_tendencies!(edmf, param_set, grid, state, gm, surf)
     TC.compute_up_tendencies!(edmf, grid, state, gm, surf)
     TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
@@ -256,6 +252,7 @@ end
 
 function compute_sgs_tendencies!(constant_diffusivity, grid, state, surf)
     FT = eltype(grid)
+    zf = grid.zf
     kf_surf = TC.kf_surface(grid)
     kc_toa = TC.kc_top_of_atmos(grid)
     ρ0_f = TC.face_ref_state(state).ρ0
@@ -274,10 +271,10 @@ function compute_sgs_tendencies!(constant_diffusivity, grid, state, surf)
     grad_v = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρv_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
     ∇c = CCO.DivergenceF2C()
 
-    @. tendencies_gm.θ_liq_ice += ν*∇c(grad_θ(prog_gm.θ_liq_ice))
-    @. tendencies_gm.q_tot += ν*∇c(grad_q(prog_gm.q_tot))
-    @. tendencies_gm.u += ν*∇c(grad_θ(prog_gm.θ_liq_ice))
-    @. tendencies_gm.v += ν*∇c(grad_q(prog_gm.q_tot))
+    @. tendencies_gm.θ_liq_ice += ν*sqrt(∇u_gm^2+∇v_gm^2)*∇c(grad_θ(prog_gm.θ_liq_ice))
+    @. tendencies_gm.q_tot += ν*sqrt(∇u_gm^2+∇v_gm^2)*∇c(grad_q(prog_gm.q_tot))
+    @. tendencies_gm.u += ν*sqrt(∇u_gm^2+∇v_gm^2)*∇c(grad_θ(prog_gm.θ_liq_ice))
+    @. tendencies_gm.v += ν*sqrt(∇u_gm^2+∇v_gm^2)*∇c(grad_q(prog_gm.q_tot))
 
     return nothing
 end
