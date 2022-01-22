@@ -1,11 +1,10 @@
 #### Entrainment-Detrainment kernels
 
-function compute_turbulent_entrainment(param_set, εδ_model_vars)
-    FT = eltype(εδ_model_vars)
+function compute_turbulent_entrainment(param_set, a_up::FT, w_up::FT, tke::FT, H_up::FT) where {FT}
     c_γ = FT(CPEDMF.c_γ(param_set))
 
-    ε_turb = if εδ_model_vars.w_up * εδ_model_vars.a_up > 0
-        2 * c_γ * sqrt(max(εδ_model_vars.tke, 0)) / (εδ_model_vars.w_up * εδ_model_vars.H_up)
+    ε_turb = if w_up * a_up > 0
+        2 * c_γ * sqrt(max(tke, 0)) / (w_up * H_up)
     else
         FT(0)
     end
@@ -13,35 +12,32 @@ function compute_turbulent_entrainment(param_set, εδ_model_vars)
     return ε_turb
 end
 
-function compute_inverse_timescale(param_set, εδ_model_vars)
-    FT = eltype(εδ_model_vars)
-    Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
-    Δw = get_Δw(param_set, εδ_model_vars)
+function compute_inverse_timescale(param_set, b_up::FT, b_en::FT, w_up::FT, w_en::FT, tke::FT) where {FT}
+    Δb = b_up - b_en
+    Δw = get_Δw(param_set, w_up, w_en)
     c_λ = FT(CPEDMF.c_λ(param_set))
 
-    l_1 = c_λ * abs(Δb / sqrt(εδ_model_vars.tke + 1e-8))
+    l_1 = c_λ * abs(Δb / sqrt(tke + 1e-8))
     l_2 = abs(Δb / Δw)
     l = SA.SVector(l_1, l_2)
     return lamb_smooth_minimum(l, FT(0.1), FT(0.0005))
 end
 
-function get_Δw(param_set, εδ_model_vars)
-    FT = eltype(εδ_model_vars)
-    Δw = εδ_model_vars.w_up - εδ_model_vars.w_en
+function get_Δw(param_set, w_up::FT, w_en::FT) where {FT}
+    Δw = w_up - w_en
     Δw += copysign(FT(CPEDMF.w_min(param_set)), Δw)
     return Δw
 end
 
-function get_MdMdz(εδ_model_vars)
-    FT = eltype(εδ_model_vars)
-    MdMdz_ε = max(εδ_model_vars.dMdz / max(εδ_model_vars.M, eps(FT)), 0)
-    MdMdz_δ = max(-εδ_model_vars.dMdz / max(εδ_model_vars.M, eps(FT)), 0)
+function get_MdMdz(M::FT, dMdz::FT) where {FT}
+    MdMdz_ε = max(dMdz / max(M, eps(FT)), 0)
+    MdMdz_δ = max(-dMdz / max(M, eps(FT)), 0)
     return MdMdz_ε, MdMdz_δ
 end
 
-function entrainment_length_scale(param_set, εδ_model_vars)
-    Δw = get_Δw(param_set, εδ_model_vars)
-    λ = compute_inverse_timescale(param_set, εδ_model_vars)
+function entrainment_length_scale(param_set, b_up::FT, b_en::FT, w_up::FT, w_en::FT, tke::FT) where {FT}
+    Δw = get_Δw(param_set, w_up, w_en)
+    λ = compute_inverse_timescale(param_set, b_up, b_en, w_up, w_en, tke)
     return (λ / Δw)
 end
 
@@ -52,25 +48,26 @@ Returns the dynamic entrainment and detrainment rates,
 as well as the turbulent entrainment rate, following
 Cohen et al. (JAMES, 2020), given:
  - `param_set`      :: parameter set
- - `εδ_model_vars`  :: structure containing variables
+ - `εδ_vars`  :: structure containing variables
  - `εδ_model_type`  :: type of non-dimensional model for entrainment/detrainment
 """
-function entr_detr(param_set::APS, εδ_model_vars, εδ_model_type)
-    FT = eltype(εδ_model_vars)
-    dim_scale = entrainment_length_scale(param_set, εδ_model_vars)
-    area_limiter = max_area_limiter(param_set, εδ_model_vars)
+function entr_detr(param_set::APS, εδ_vars, εδ_model_type)
+    FT = eltype(εδ_vars)
+    dim_scale = entrainment_length_scale(param_set, εδ_vars.b_up, εδ_vars.b_en, εδ_vars.w_up, εδ_vars.w_en, εδ_vars.tke)
+
+    area_limiter = max_area_limiter(param_set, εδ_vars.max_area, εδ_vars.a_up)
 
     c_div = FT(ICP.entrainment_massflux_div_factor(param_set))
-    MdMdz_ε, MdMdz_δ = get_MdMdz(εδ_model_vars) .* c_div
+    MdMdz_ε, MdMdz_δ = get_MdMdz(εδ_vars.M, εδ_vars.dMdz) .* c_div
 
-    nondim_ε, nondim_δ = non_dimensional_function(param_set, εδ_model_vars, εδ_model_type)
+    nondim_ε, nondim_δ = non_dimensional_function(param_set, εδ_vars, εδ_model_type)
 
     # dynamic entrainment / detrainment
     ε_dyn = dim_scale * nondim_ε + MdMdz_ε
     δ_dyn = dim_scale * (nondim_δ + area_limiter) + MdMdz_δ
 
     # turbulent entrainment
-    ε_turb = compute_turbulent_entrainment(param_set, εδ_model_vars)
+    ε_turb = compute_turbulent_entrainment(param_set, εδ_vars.a_up, εδ_vars.w_up, εδ_vars.tke, εδ_vars.H_up)
 
     return EntrDetr{FT}(ε_dyn, δ_dyn, ε_turb, nondim_ε, nondim_δ)
 end
@@ -168,7 +165,7 @@ function compute_entr_detr!(
     param_set::APS,
     surf::SurfaceBase,
     Δt::Real,
-    ::AbstractNonLocalEntrDetrModel,
+    εδ_model::AbstractNonLocalEntrDetrModel,
 )
     FT = eltype(grid)
     N_up = n_updrafts(edmf)
@@ -249,25 +246,33 @@ function compute_entr_detr!(
         Π₂ = parent(aux_up[i].Π₂)
         Π₃ = parent(aux_up[i].Π₃)
         Π₄ = parent(aux_up[i].Π₄)
-        entr_sc = parent(aux_up[i].entr_sc)
-        detr_sc = parent(aux_up[i].detr_sc)
-        frac_turb_entr = parent(aux_up[i].frac_turb_entr)
-        fnn!(entr_sc, detr_sc, frac_turb_entr, param_set, Π₁, Π₂, Π₃, Π₄)
+        D = parent(aux_up[i].nondim_entr_sc)
+        M = parent(aux_up[i].nondim_detr_sc)
+
+        non_dimensional_function!(D, M, param_set, Π₁, Π₂, Π₃, Π₄, εδ_model)
+        @inbounds for k in real_center_indices(grid)
+            ε_turb = compute_turbulent_entrainment(
+                param_set,
+                aux_up[i].area[k],
+                w_up_c[k],
+                aux_en.tke[k],
+                plume_scale_height[i],
+            )
+            dim_scale = entrainment_length_scale(
+                param_set,
+                aux_up[i].buoy[k],
+                aux_en.buoy[k],
+                w_up_c[k],
+                w_en_c[k],
+                aux_en.tke[k],
+            )
+            area_limiter = max_area_limiter(param_set, max_area, aux_up[i].area[k])
+            MdMdz_ε, MdMdz_δ = get_MdMdz(m_entr_detr[k], ∇m_entr_detr[k])
+
+            aux_up[i].entr_sc[k] = dim_scale * aux_up[i].nondim_entr_sc[k] + MdMdz_ε
+            aux_up[i].detr_sc[k] = dim_scale * (aux_up[i].nondim_detr_sc[k] + area_limiter) + MdMdz_δ
+            aux_up[i].frac_turb_entr[k] = ε_turb
+        end
+
     end
-end
-
-function fnn!(
-    entr_sc::AbstractArray{FT}, # outputs
-    detr_sc::AbstractArray{FT}, # outputs
-    frac_turb_entr::AbstractArray{FT}, # outputs
-    param_set::APS,
-    Π₁::AbstractArray{FT}, # inputs
-    Π₂::AbstractArray{FT}, # inputs
-    Π₃::AbstractArray{FT}, # inputs
-    Π₄::AbstractArray{FT}, # inputs
-) where {FT <: Real}
-    c_gen = ICP.c_gen(param_set) # see non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
-
-    # OperatorFlux.operator(Π₁,Π₂,Π₃,Π₄)
-
 end

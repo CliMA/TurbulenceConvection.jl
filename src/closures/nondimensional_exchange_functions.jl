@@ -1,15 +1,15 @@
 #### Non-dimensional Entrainment-Detrainment functions
 
-function max_area_limiter(param_set, εδ_model_vars)
-    FT = eltype(εδ_model_vars)
+function max_area_limiter(param_set, max_area, a_up)
+    FT = eltype(a_up)
     γ_lim = FT(ICP.area_limiter_scale(param_set))
     β_lim = FT(ICP.area_limiter_power(param_set))
-    logistic_term = (2 - 1 / (1 + exp(-γ_lim * (εδ_model_vars.max_area - εδ_model_vars.a_up))))
+    logistic_term = (2 - 1 / (1 + exp(-γ_lim * (max_area - a_up))))
     return logistic_term^β_lim - 1
 end
 
 function non_dimensional_groups(param_set, εδ_model_vars)
-    Δw = get_Δw(param_set, εδ_model_vars)
+    Δw = get_Δw(param_set, εδ_model_vars.w_up, εδ_model_vars.w_en)
     Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
     Π_1 = Δw^2 / (εδ_model_vars.zc_i * Δb)
     Π_2 = Δw^2 / εδ_model_vars.tke
@@ -29,7 +29,7 @@ functions following Cohen et al. (JAMES, 2020), given:
 """
 function non_dimensional_function(param_set, εδ_model_vars, ::MDEntr)
     FT = eltype(εδ_model_vars)
-    Δw = get_Δw(param_set, εδ_model_vars)
+    Δw = get_Δw(param_set, εδ_model_vars.w_up, εδ_model_vars.w_en)
     c_ε = FT(CPEDMF.c_ε(param_set))
     μ_0 = FT(CPEDMF.μ_0(param_set))
     β = FT(CPEDMF.β(param_set))
@@ -53,6 +53,33 @@ function non_dimensional_function(param_set, εδ_model_vars, ::MDEntr)
     nondim_δ = (c_ε * D_δ + c_δ * M_δ)
     return nondim_ε, nondim_δ
 end
+
+"""
+    non_dimensional_function!(nondim_ε ,nondim_δ ,param_set ,Π₁ ,Π₂ ,Π₃ ,Π₄, εδ_model)
+
+Uses a non local (Fourier) neural network to predict the fields of
+    non-dimensional components of dynamical entrainment/detrainment.
+ - `nondim_ε`   :: output - non dimensional entr from FNN, as column fields
+ - `nondim_δ`   :: output - non dimensional detr from FNN, as column fields
+ - `param_set`  :: input - parameter set
+ - `Π₁,₂,₃,₄`   :: input - non dimensional groups, as column fields
+ - `::FNNEntr ` a non-local entrainment-detrainment model type
+"""
+function non_dimensional_function!(
+    nondim_ε::AbstractArray{FT}, # output
+    nondim_δ::AbstractArray{FT}, # output
+    param_set::APS,
+    Π₁::AbstractArray{FT}, # input
+    Π₂::AbstractArray{FT}, # input
+    Π₃::AbstractArray{FT}, # input
+    Π₄::AbstractArray{FT}, # input
+    εδ_model::FNNEntr,
+) where {FT <: Real}
+    c_gen = ICP.c_gen(param_set)
+    # see non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
+    # nondim_ε, nondim_δ = OperatorFlux.operator(Π₁,Π₂,Π₃,Π₄)
+end
+
 
 """
     non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
