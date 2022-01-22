@@ -264,7 +264,7 @@ function compute_sgs_tendencies!(constant_diffusivity, grid, state, surf)
     ∇u_gm = TC.center_aux_grid_mean(state).∇u_gm
     ∇v_gm = TC.center_aux_grid_mean(state).∇v_gm
 
-    ν = 0.01
+    ν = 0.1
     grad_θ = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρθ_liq_ice_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
     grad_q = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρq_tot_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
     grad_u = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρu_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
