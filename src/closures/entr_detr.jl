@@ -149,10 +149,14 @@ function compute_entr_detr!(
                 aux_up[i].entr_sc[k] = er.ε_dyn
                 aux_up[i].detr_sc[k] = er.δ_dyn
                 aux_up[i].frac_turb_entr[k] = er.ε_turb
+                aux_up[i].nondim_entr_sc[k] = er.ε_dyn_nondim
+                aux_up[i].nondim_detr_sc[k] = er.δ_dyn_nondim
             else
                 aux_up[i].entr_sc[k] = 0.0
                 aux_up[i].detr_sc[k] = 0.0
                 aux_up[i].frac_turb_entr[k] = 0.0
+                aux_up[i].nondim_entr_sc[k] = 0.0
+                aux_up[i].nondim_detr_sc[k] = 0.0
             end
         end
     end
