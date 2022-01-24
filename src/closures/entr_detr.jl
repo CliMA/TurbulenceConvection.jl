@@ -250,10 +250,10 @@ function compute_entr_detr!(
         Π₂ = parent(aux_up[i].Π₂)
         Π₃ = parent(aux_up[i].Π₃)
         Π₄ = parent(aux_up[i].Π₄)
-        D = parent(aux_up[i].nondim_entr_sc)
-        M = parent(aux_up[i].nondim_detr_sc)
+        nondim_ε = parent(aux_up[i].nondim_entr_sc)
+        nondim_δ = parent(aux_up[i].nondim_detr_sc)
 
-        non_dimensional_function!(D, M, param_set, Π₁, Π₂, Π₃, Π₄, εδ_model)
+        non_dimensional_function!(nondim_ε, nondim_δ, param_set, Π₁, Π₂, Π₃, Π₄, εδ_model)
         @inbounds for k in real_center_indices(grid)
             ε_turb = compute_turbulent_entrainment(
                 param_set,
