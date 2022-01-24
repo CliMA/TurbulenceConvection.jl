@@ -66,14 +66,27 @@ function non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
     c_gen = ICP.c_gen(param_set)
 
     # Neural network closure
-    nn_arc = (4, 2, 2)  # (#inputs, #neurons, #outputs)
-    nn_model = Flux.Chain(
-        Flux.Dense(reshape(c_gen[1:8], nn_arc[2], nn_arc[1]), c_gen[9:10], Flux.sigmoid),
-        Flux.Dense(reshape(c_gen[11:14], nn_arc[3], nn_arc[2]), c_gen[15:16], Flux.softplus),
+    # nn_arc = (4, 2, 2)  # (#inputs, #neurons, #outputs)
+    # nn_model = Flux.Chain(
+    #     Flux.Dense(reshape(c_gen[1:8], nn_arc[2], nn_arc[1]), c_gen[9:10], Flux.sigmoid),
+    #     Flux.Dense(reshape(c_gen[11:14], nn_arc[3], nn_arc[2]), c_gen[15:16], Flux.softplus),
+    # )
+    nn_arc_ε = (4, 2, 1)  # (#inputs, #neurons, #outputs)
+    nn_model_ε = Flux.Chain(
+        Flux.Dense(reshape(c_gen[1:8], nn_arc_ε[2], nn_arc_ε[1]), c_gen[9:10], Flux.sigmoid),
+        Flux.Dense(reshape(c_gen[11:12], nn_arc_ε[3], nn_arc_ε[2]), [c_gen[13]], Flux.relu),
+    )
+    nn_arc_δ = (4, 2, 1)  # (#inputs, #neurons, #outputs)
+    nn_model_δ = Flux.Chain(
+        Flux.Dense(reshape(c_gen[14:21], nn_arc_δ[2], nn_arc_δ[1]), c_gen[22:23], Flux.sigmoid),
+        Flux.Dense(reshape(c_gen[24:25], nn_arc_δ[3], nn_arc_δ[2]), [c_gen[26]], Flux.relu),
     )
 
     nondim_groups = non_dimensional_groups(param_set, εδ_model_vars)
-    nondim_ε, nondim_δ = nn_model(nondim_groups)
+    # nondim_ε, nondim_δ = nn_model(nondim_groups)
+    nondim_ε = nn_model_ε(nondim_groups)[1]
+    nondim_δ = nn_model_δ(nondim_groups)[1]
+
     return nondim_ε, nondim_δ
 end
 
