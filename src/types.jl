@@ -455,7 +455,9 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC}
+abstract type AbstractTurbConvModel end
+
+struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC} <: AbstractTurbConvModel
     surface_area::Float64
     max_area::Float64
     minimum_area::Float64

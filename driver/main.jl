@@ -32,17 +32,13 @@ include(joinpath(tc_dir, "driver", "TimeStepping.jl"))
 include(joinpath(tc_dir, "driver", "Surface.jl"))
 import .Cases
 
-abstract type TurbConvModel end
-struct edmf <: TurbConvModel end
-struct constant_diffusivity <: TurbConvModel end
-
-struct Simulation1d{IONT, G, S, GM, C, EDMF, D, TIMESTEPPING, STATS, PS, TurbConvModel}
+struct Simulation1d{IONT, G, S, GM, C, TCModel, D, TIMESTEPPING, STATS, PS}
     io_nt::IONT
     grid::G
     state::S
     gm::GM
     case::C
-    edmf::EDMF
+    turb_conv::TCModel
     diagnostics::D
     TS::TIMESTEPPING
     Stats::STATS
@@ -51,7 +47,6 @@ struct Simulation1d{IONT, G, S, GM, C, EDMF, D, TIMESTEPPING, STATS, PS, TurbCon
     adapt_dt::Bool
     cfl_limit::Float64
     dt_min::Float64
-    turb_conv::TurbConvModel
 end
 
 function Simulation1d(namelist)
@@ -63,7 +58,7 @@ function Simulation1d(namelist)
     adapt_dt = namelist["time_stepping"]["adapt_dt"]
     cfl_limit = namelist["time_stepping"]["cfl_limit"]
     dt_min = namelist["time_stepping"]["dt_min"]
-    turb_conv = namelist["turbulence"]["turbulence_convection_model"]
+    turb_conv_model = namelist["turbulence"]["turbulence_convection_model"]
 
     Δz = FT(namelist["grid"]["dz"])
     nz = namelist["grid"]["nz"]
@@ -85,19 +80,32 @@ function Simulation1d(namelist)
     Rad = TC.RadiationBase(case_type)
     TS = TimeStepping(namelist)
 
-    edmf = TC.EDMF_PrognosticTKE(namelist, grid, param_set)
-    isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
-    N_up = TC.n_updrafts(edmf)
+    turb_conv = if turb_conv_model == "constant_diffusivity"
+        ConstantDiffusivityModel()
+    elseif precip_name == "edmf"
+        TC.EDMF_PrognosticTKE(namelist, grid, param_set)
+        N_up = TC.n_updrafts(turb_conv)
+        cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
+        face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up))
+        aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, N_up))
+        aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up))
+        diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, N_up))
+        diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up))
+    else
+        error("Invalid  turbulence convection model")
+        cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
+        face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up))
+        aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, N_up))
+        aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up))
+        diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, N_up))
+        diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up))
+        
+    end
+    isbits(turb_conv) || error("Something non-isbits was added to edmf and needs to be fixed.")
 
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
 
-    cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
-    face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up))
-    aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, N_up))
-    aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up))
-    diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, N_up))
-    diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up))
 
     prog = CC.Fields.FieldVector(cent = cent_prog_fields(), face = face_prog_fields())
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
@@ -125,7 +133,7 @@ function Simulation1d(namelist)
         state,
         gm,
         case,
-        edmf,
+        turb_conv,
         diagnostics,
         TS,
         Stats,
@@ -134,7 +142,6 @@ function Simulation1d(namelist)
         adapt_dt,
         cfl_limit,
         dt_min,
-        turb_conv,
     )
 end
 
@@ -149,7 +156,7 @@ function initialize(sim::Simulation1d)
     Cases.initialize_forcing(sim.case, sim.grid, state, sim.gm, sim.param_set)
     Cases.initialize_radiation(sim.case, sim.grid, state, sim.gm, sim.param_set)
 
-    initialize_edmf(sim.edmf, sim.grid, state, sim.case, sim.gm, t)
+    initialize_turb_conv(sim.turb_conv, sim.grid, state, sim.case, sim.gm, t)
 
     sim.skip_io && return nothing
     initialize_io(sim.io_nt.ref_state, sim.Stats)
@@ -160,7 +167,7 @@ function initialize(sim::Simulation1d)
 
     # TODO: deprecate
     initialize_io(sim.gm, sim.Stats)
-    initialize_io(sim.edmf, sim.Stats)
+    initialize_io(sim.turb_conv, sim.Stats)
 
     open_files(sim.Stats)
     write_simulation_time(sim.Stats, t)
@@ -189,7 +196,7 @@ function solve_args(sim::Simulation1d)
 
     t_span = (0.0, sim.TS.t_max)
     params = (;
-        edmf = sim.edmf,
+        turb_conv = sim.turb_conv,
         grid = grid,
         gm = sim.gm,
         aux = aux,
@@ -207,7 +214,7 @@ function solve_args(sim::Simulation1d)
     callback_io = ODE.DiscreteCallback(condition_io, affect_io!; save_positions = (false, false))
     callback_io = sim.skip_io ? () : (callback_io,)
     callback_cfl = ODE.DiscreteCallback(condition_every_iter, monitor_cfl!; save_positions = (false, false))
-    callback_cfl = sim.edmf.precip_model isa TC.Clima1M ? (callback_cfl,) : ()
+    callback_cfl = sim.turb_conv.precip_model isa TC.Clima1M ? (callback_cfl,) : ()
     callback_dtmax = ODE.DiscreteCallback(condition_every_iter, dt_max!; save_positions = (false, false))
     callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
     callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))

@@ -188,9 +188,11 @@ function satadjust(gm::TC.GridMeanVariables, grid, state)
     return
 end
 
+struct ConstantDiffusivityModel <: TC.AbstractTurbConvModel end
+
 # Compute the sum of tendencies for the scheme
 function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
-    UnPack.@unpack edmf, grid, gm, case, aux, TS = params
+    UnPack.@unpack turb_conv, grid, gm, case, aux, TS = params
 
     state = TC.State(prog, aux, tendencies)
 
@@ -199,10 +201,10 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
     force = case.Fo
     radiation = case.Rad
-    en_thermo = edmf.en_thermo
-    precip_model = edmf.precip_model
+    en_thermo = turb_conv.en_thermo
+    precip_model = turb_conv.precip_model
 
-    TC.affect_filter!(edmf, grid, state, gm, surf, case.casename, t)
+    TC.affect_filter!(turb_conv, grid, state, gm, surf, case.casename, t)
 
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
@@ -210,7 +212,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     Cases.update_forcing(case, grid, state, gm, t, param_set)
     Cases.update_radiation(case.Rad, grid, state, gm, param_set)
 
-    TC.update_aux!(edmf, gm, grid, state, case, surf, param_set, t, Δt)
+    TC.update_aux!(turb_conv, gm, grid, state, case, surf, param_set, t, Δt)
 
     tends_face = tendencies.face
     tends_cent = tendencies.cent
@@ -218,39 +220,39 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     parent(tends_cent) .= 0
 
     # causes division error in dry bubble first time step
-    TC.compute_precipitation_formation_tendencies(grid, state, edmf, precip_model, Δt, param_set)
+    TC.compute_precipitation_formation_tendencies(grid, state, turb_conv, precip_model, Δt, param_set)
 
     TC.microphysics(en_thermo, grid, state, precip_model, Δt, param_set)
     TC.compute_precipitation_sink_tendencies(precip_model, grid, state, gm, Δt)
-    TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, gm)
+    TC.compute_precipitation_advection_tendencies(precip_model, turb_conv, grid, state, gm)
 
     # compute tendencies
-    compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, gm)
-    compute_turbconv_tendencies!(constant_diffusivity)
+    compute_gm_tendencies!(turb_conv, grid, state, surf, radiation, force, gm)
+    compute_turbconv_tendencies!(turb_conv, param_set, grid, state, gm, surf)
 
     return nothing
 end
 
-function compute_turbconv_tendencies!(edmf, param_set, grid, state, gm, surf)
-    TC.compute_up_tendencies!(edmf, grid, state, gm, surf)
-    TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
-    TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
-    TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρaQTvar))
-    TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρaHQTcov))
+function compute_turbconv_tendencies!(turb_conv::TC.EDMF_PrognosticTKE, param_set, grid, state, gm, surf)
+    TC.compute_up_tendencies!(turb_conv, grid, state, gm, surf)
+    TC.compute_en_tendencies!(turb_conv, grid, state, param_set, Val(:tke), Val(:ρatke))
+    TC.compute_en_tendencies!(turb_conv, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
+    TC.compute_en_tendencies!(turb_conv, grid, state, param_set, Val(:QTvar), Val(:ρaQTvar))
+    TC.compute_en_tendencies!(turb_conv, grid, state, param_set, Val(:HQTcov), Val(:ρaHQTcov))
     return nothing
 end
 
-function compute_turbconv_tendencies!(constant_diffusivity)
+function compute_turbconv_tendencies!(turb_conv::ConstantDiffusivityModel, param_set, grid, state, gm, surf)
     return nothing
 end
 
 
-function compute_sgs_tendencies!(edmf, param_set, grid, state, gm, surf)
-    TC.compute_sgs_tendencies!(edmf, grid, state, surf, radiation, force, gm)
+function compute_sgs_tendencies!(turb_conv::TC.EDMF_PrognosticTKE, param_set, grid, state, gm, surf)
+    TC.compute_sgs_tendencies!(turb_conv, grid, state, surf, radiation, force, gm)
     return nothing
 end
 
-function compute_sgs_tendencies!(constant_diffusivity, grid, state, surf)
+function compute_sgs_tendencies!(turb_conv::ConstantDiffusivityModel, param_set, grid, state, gm, surf)
     FT = eltype(grid)
     zf = grid.zf
     kf_surf = TC.kf_surface(grid)
@@ -281,7 +283,7 @@ end
 
 
 function compute_gm_tendencies!(
-    edmf::TC.EDMF_PrognosticTKE,
+    turb_conv::TC.AbstractTurbConvModel,
     grid::TC.Grid,
     state::TC.State,
     surf::TC.SurfaceBase,
@@ -385,6 +387,6 @@ function compute_gm_tendencies!(
             aux_en.θ_liq_ice_tendency_precip_formation[k] +
             aux_tc.θ_liq_ice_tendency_precip_sinks[k]
     end
-    compute_sgs_tendencies!(constant_diffusivity, grid, state, surf)
+    compute_sgs_tendencies!(turb_conv, grid, state, surf)
     return nothing
 end
