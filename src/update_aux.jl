@@ -296,7 +296,8 @@ function update_aux!(
     # Second order approximation: Use dry and cloudy environmental fields.
     cf = aux_en.cloud_fraction
     shm = copy(cf)
-    parent(shm) .= shrink_mask(vec(cf))
+    pshm = parent(shm)
+    shrink_mask!(pshm, vec(cf))
 
     # Since NaN*0 ≠ 0, we need to conditionally replace
     # our gradients by their default values.
