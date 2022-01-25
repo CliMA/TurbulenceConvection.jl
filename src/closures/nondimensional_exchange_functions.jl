@@ -59,11 +59,11 @@ end
 
 Uses a non local (Fourier) neural network to predict the fields of
     non-dimensional components of dynamical entrainment/detrainment.
- - `nondim_ε`   :: output - non dimensional entr from FNN, as column fields
- - `nondim_δ`   :: output - non dimensional detr from FNN, as column fields
+ - `nondim_ε`   :: output - non dimensional entr from FNO, as column fields
+ - `nondim_δ`   :: output - non dimensional detr from FNO, as column fields
  - `param_set`  :: input - parameter set
  - `Π₁,₂,₃,₄`   :: input - non dimensional groups, as column fields
- - `::FNNEntr ` a non-local entrainment-detrainment model type
+ - `::FNOEntr ` a non-local entrainment-detrainment model type
 """
 function non_dimensional_function!(
     nondim_ε::AbstractArray{FT}, # output
@@ -73,13 +73,21 @@ function non_dimensional_function!(
     Π₂::AbstractArray{FT}, # input
     Π₃::AbstractArray{FT}, # input
     Π₄::AbstractArray{FT}, # input
-    εδ_model::FNNEntr,
+    εδ_model::FNOEntr,
 ) where {FT <: Real}
-    c_gen = ICP.c_gen(param_set)
-    # see non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
-    # nondim_ε, nondim_δ = OperatorFlux.operator(Π₁,Π₂,Π₃,Π₄)
-end
+    # c_gen_fno = ICP.c_gen_fno(param_set)
 
+    # Π = (Π₁ ,Π₂ ,Π₃ ,Π₄)
+    # trafo = OF.FourierTransform(modes = (8, 8))
+    # model = Chain(
+    #     SpectralKernelOperator(trafo, 4 => 4, gelu),
+    #     SpectralKernelOperator(trafo, 4 => 2, gelu),
+    # )
+    # output = model(Π, c_gen_fno)
+    # nondim_ε .= output[1,:]
+    # nondim_δ .= output[2,:]
+    return nothing
+end
 
 """
     non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
