@@ -17,5 +17,8 @@ prof = Profile.@profile begin
     end
 end
 
-import ProfileView
-ProfileView.view() # looks good, even without initial compiled run
+import PProf
+PProf.pprof()
+# http://localhost:57599/ui/flamegraph?tf
+# import ProfileView
+# ProfileView.view()
