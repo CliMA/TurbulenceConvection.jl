@@ -100,12 +100,15 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     # 1-layer nn parameters
     #! format: off
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"] =
-        SA.SVector(0.3038, 0.719,-0.910,-0.483,
-                   0.739, 0.0755, 0.178, 0.521,
-                   0.0, 0.0, 0.843,-0.340,
-                   0.655, 0.113, 0.0, 0.0,
-                   -0.183, 0.0755, 0.178, 0.521,
-                   -0.183, 0.0755, 0.178, 0.521, -0.183, 0.0)
+        SA.SVector(0.3038, 0.719,-0.910,-0.483, 0.3038,
+                   0.739, 0.0755, 0.178, 0.521, 0.3038,
+                   0.739, 0.0755, 0.178, 0.521, 0.3038,
+                   0.739, 0.0755, 0.178, 0.521, 0.3038,
+                   0.739, 0.0755, 0.178, 0.521, 0.3038,
+                   0.739, 0.0755, 0.178, 0.521, 0.3038,
+                   0.739, 0.0755, 0.178, 0.521, 0.3038,
+                   0.739, 0.0755, 0.178, 0.521, 0.3038,
+                   0.739, 0.0755, 0.0755)
     #! format: on
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.0
