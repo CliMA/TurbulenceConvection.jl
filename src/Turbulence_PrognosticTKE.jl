@@ -101,7 +101,7 @@ function compute_sgs_tendencies!(
     # Adjust the values of the grid mean variables
     # Prepare the output
     @. massflux_tendency_h = -∇c(wvec(massflux_h)) * α0_c
-    @. massflux_tendency_qt = ∇c(wvec(massflux_qt))
+    @. massflux_tendency_qt = -∇c(wvec(massflux_qt)) * α0_c
     @. tends_θ_liq_ice += -∇c(wvec(massflux_h)) * α0_c
     @. tends_q_tot += -∇c(wvec(massflux_qt)) * α0_c
 
@@ -122,10 +122,10 @@ function compute_sgs_tendencies!(
     diffusive_flux_u = aux_tc_f.diffusive_flux_u
     diffusive_flux_v = aux_tc_f.diffusive_flux_v
 
-    @. tends_q_tot += -α0_c * a_en * ∇aeKH_q_tot(wvec(diffusive_flux_qt))
-    @. tends_θ_liq_ice += -α0_c * a_en * ∇aeKH_θ_liq_ice(wvec(diffusive_flux_h))
-    @. tends_u += -α0_c * a_en * ∇aeKM_u(wvec(diffusive_flux_u))
-    @. tends_v += -α0_c * a_en * ∇aeKM_v(wvec(diffusive_flux_v))
+    @. tends_q_tot += -α0_c * ∇aeKH_q_tot(wvec(diffusive_flux_qt))
+    @. tends_θ_liq_ice += -α0_c * ∇aeKH_θ_liq_ice(wvec(diffusive_flux_h))
+    @. tends_u += -α0_c * ∇aeKM_u(wvec(diffusive_flux_u))
+    @. tends_v += -α0_c * ∇aeKM_v(wvec(diffusive_flux_v))
 
     return nothing
 end
