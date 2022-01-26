@@ -5,15 +5,13 @@ import Profile
 include("common.jl")
 case_name = "Bomex"
 sim = init_sim(case_name)
+(prob, alg, kwargs) = solve_args(sim)
+integrator = ODE.init(prob, alg; kwargs...)
 
-prog = sim.state.prog
-tendencies = copy(prog)
-params = (; edmf = sim.edmf, grid = sim.grid, gm = sim.gm, case = sim.case, TS = sim.TS, aux = sim.state.aux)
-
-∑tendencies!(tendencies, prog, params, sim.TS.t) # force compilation
+ODE.step!(integrator) # force compilation
 prof = Profile.@profile begin
     for _ in 1:100_000
-        ∑tendencies!(tendencies, prog, params, sim.TS.t)
+        ODE.step!(integrator)
     end
 end
 
