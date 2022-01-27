@@ -1,5 +1,4 @@
 #### Non-dimensional Entrainment-Detrainment functions
-
 function max_area_limiter(param_set, max_area, a_up)
     FT = eltype(a_up)
     γ_lim = FT(ICP.area_limiter_scale(param_set))
@@ -11,8 +10,9 @@ end
 function non_dimensional_groups(param_set, εδ_model_vars)
     Δw = get_Δw(param_set, εδ_model_vars.w_up, εδ_model_vars.w_en)
     Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
+    FT = eltype(εδ_model_vars.tke)
     Π_1 = Δw^2 / (εδ_model_vars.zc_i * Δb)
-    Π_2 = Δw^2 / εδ_model_vars.tke
+    Π_2 = Δw^2 / (εδ_model_vars.tke + eps(FT)) # prevent division by 0
     Π_3 = √(εδ_model_vars.a_up)
     Π_4 = εδ_model_vars.RH_up - εδ_model_vars.RH_en
     return SA.SVector(Π_1, Π_2, Π_3, Π_4)
@@ -55,7 +55,7 @@ function non_dimensional_function(param_set, εδ_model_vars, ::MDEntr)
 end
 
 """
-    non_dimensional_function!(nondim_ε ,nondim_δ ,param_set ,Π₁ ,Π₂ ,Π₃ ,Π₄, εδ_model)
+    non_dimensional_function!(nondim_ε ,nondim_δ ,param_set ,Π₁ ,Π₂ ,Π₃ ,Π₄, εδ_model::FNOEntr)
 
 Uses a non local (Fourier) neural network to predict the fields of
     non-dimensional components of dynamical entrainment/detrainment.
@@ -105,6 +105,46 @@ function non_dimensional_function!(
     # we need a sigmoid that recieves output and produced non negative nondim_ε, nondim_δ
     nondim_ε .= output[1, :]
     nondim_δ .= output[2, :]
+    return nothing
+end
+
+"""
+    non_dimensional_function!(nondim_ε ,nondim_δ ,param_set ,Π₁ ,Π₂ ,Π₃ ,Π₄, εδ_model::NNEntr)
+
+Uses a fully connected neural network to predict the non-dimensional components of dynamical entrainment/detrainment.
+    non-dimensional components of dynamical entrainment/detrainment.
+ - `nondim_ε`   :: output - non dimensional entr from FNO, as column fields
+ - `nondim_δ`   :: output - non dimensional detr from FNO, as column fields
+ - `param_set`  :: input - parameter set
+ - `Π₁,₂,₃,₄`   :: input - non dimensional groups, as column fields
+ - `::NNEntrNonlocal ` a non-local entrainment-detrainment model type
+"""
+function non_dimensional_function!(
+    nondim_ε::AbstractArray{FT}, # output
+    nondim_δ::AbstractArray{FT}, # output
+    param_set::APS,
+    Π₁::AbstractArray{FT}, # input
+    Π₂::AbstractArray{FT}, # input
+    Π₃::AbstractArray{FT}, # input
+    Π₄::AbstractArray{FT}, # input)
+    εδ_model::NNEntrNonlocal,
+) where {FT <: Real}
+
+    c_gen = ICP.c_gen(param_set)
+    Π = hcat(Π₁, Π₂, Π₃, Π₄)'
+
+    # Neural network closure
+    nn_arc = (4, 2, 2)  # (#inputs, #neurons, #outputs)
+    nn_model = Flux.Chain(
+        Flux.Dense(reshape(c_gen[1:8], nn_arc[2], nn_arc[1]), c_gen[9:10], Flux.sigmoid),
+        Flux.Dense(reshape(c_gen[11:14], nn_arc[3], nn_arc[2]), c_gen[15:16], Flux.softplus),
+    )
+
+    output = nn_model(Π)
+
+    nondim_ε .= output[1, :]
+    nondim_δ .= output[2, :]
+
     return nothing
 end
 

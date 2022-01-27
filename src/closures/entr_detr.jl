@@ -100,7 +100,6 @@ function compute_entr_detr!(
     plume_scale_height = map(1:N_up) do i
         compute_plume_scale_height(grid, state, param_set, i)
     end
-
     Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
     LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
