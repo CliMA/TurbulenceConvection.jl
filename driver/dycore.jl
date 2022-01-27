@@ -63,7 +63,16 @@ cent_aux_vars_gm(FT) = (;
 cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., TC.cent_aux_vars_edmf(FT, n_up)...)
 
 # Face only
-face_aux_vars_gm(FT) = (; massflux_s = FT(0), diffusive_flux_s = FT(0), total_flux_s = FT(0), f_rad = FT(0))
+face_aux_vars_gm(FT) = (;
+    massflux_s = FT(0),
+    diffusive_flux_s = FT(0),
+    total_flux_s = FT(0),
+    f_rad = FT(0),
+    sgs_flux_θ_liq_ice = FT(0),
+    sgs_flux_q_tot = FT(0),
+    sgs_flux_u = FT(0),
+    sgs_flux_v = FT(0),
+)
 face_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., face_aux_vars_gm(FT)..., TC.face_aux_vars_edmf(FT, n_up)...)
 
 ##### Diagnostic fields
@@ -246,10 +255,12 @@ function compute_gm_tendencies!(
 )
     tendencies_gm = TC.center_tendencies_grid_mean(state)
     kc_toa = TC.kc_top_of_atmos(grid)
+    kf_surf = TC.kf_surface(grid)
     FT = eltype(grid)
     param_set = TC.parameter_set(gm)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
+    aux_gm_f = TC.face_aux_grid_mean(state)
     ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
     ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
     aux_en = TC.center_aux_environment(state)
@@ -258,6 +269,7 @@ function compute_gm_tendencies!(
     aux_bulk = TC.center_aux_bulk(state)
     ρ0_f = TC.face_ref_state(state).ρ0
     p0_c = TC.center_ref_state(state).p0
+    α0_c = TC.center_ref_state(state).α0
     aux_tc = TC.center_aux_turbconv(state)
 
     θ_liq_ice_gm_toa = prog_gm.θ_liq_ice[kc_toa]
@@ -340,6 +352,32 @@ function compute_gm_tendencies!(
             aux_en.θ_liq_ice_tendency_precip_formation[k] +
             aux_tc.θ_liq_ice_tendency_precip_sinks[k]
     end
+
     TC.compute_sgs_tendencies!(edmf, grid, state, surf, radiation, force, gm)
+
+    sgs_flux_θ_liq_ice = aux_gm_f.sgs_flux_θ_liq_ice
+    sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot
+    sgs_flux_u = aux_gm_f.sgs_flux_u
+    sgs_flux_v = aux_gm_f.sgs_flux_v
+    # apply surface BC as SGS flux at lowest level
+    sgs_flux_θ_liq_ice[kf_surf] = surf.ρθ_liq_ice_flux
+    sgs_flux_q_tot[kf_surf] = surf.ρq_tot_flux
+    sgs_flux_u[kf_surf] = surf.ρu_flux
+    sgs_flux_v[kf_surf] = surf.ρv_flux
+
+    tends_θ_liq_ice = tendencies_gm.θ_liq_ice
+    tends_q_tot = tendencies_gm.q_tot
+    tends_u = tendencies_gm.u
+    tends_v = tendencies_gm.v
+
+    ∇θ_liq_ice_sgs = CCO.DivergenceF2C()
+    ∇q_tot_sgs = CCO.DivergenceF2C()
+    ∇u_sgs = CCO.DivergenceF2C()
+    ∇v_sgs = CCO.DivergenceF2C()
+
+    @. tends_θ_liq_ice += -α0_c * ∇θ_liq_ice_sgs(wvec(sgs_flux_θ_liq_ice))
+    @. tends_q_tot += -α0_c * ∇q_tot_sgs(wvec(sgs_flux_q_tot))
+    @. tends_u += -α0_c * ∇u_sgs(wvec(sgs_flux_u))
+    @. tends_v += -α0_c * ∇v_sgs(wvec(sgs_flux_v))
     return nothing
 end
