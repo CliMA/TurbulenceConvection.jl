@@ -100,49 +100,49 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     # 1-layer nn parameters
     #! format: off
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"] =
-        SA.SVector(-1.5677051,
-        0.2093861,
-        -0.5706762,
-        0.6057548,
-        0.3367441,
-        -1.042278,
-        -0.1643984,
-        -0.0835569,
-        0.0365369,
-        0.1801135,
-        -0.7343179,
-        -0.2257075,
-        -0.6039322,
-        -0.2735646,
-        0.0167828,
-        0.6011294,
-        -0.9979387,
-        -0.0378384,
-        -0.3124678,
-        -0.4183357,
-        -1.0732722,
-        -0.3958705,
-        0.1692238,
-        -0.5183516,
-        -0.4483777,
-        0.331221,
-        0.5076325,
-        0.5358717,
-        -0.7084507,
-        0.0120543,
-        -0.447092,
-        -0.8261394,
-        -0.2655968,
-        0.1803339,
-        -0.085895,
-        1.3525334,
-        -0.0826668,
-        0.7343717,
-        -0.4394635,
-        0.2075424,
-        0.3985902,
-        0.1696132,
-        0.4680097)
+        SA.SVector(-0.3519463,
+        0.1312677,
+        0.3176951,
+        -0.8808938,
+        0.1364599,
+        -0.5765978,
+        -0.8927858,
+        0.1623529,
+        0.6005083,
+        0.2517399,
+        0.3211059,
+        -0.1355944,
+        0.068525,
+        0.7259922,
+        -0.3093811,
+        0.3976937,
+        -0.2747453,
+        -0.214955,
+        0.089281,
+        -0.8552591,
+        -0.8062217,
+        -0.0940062,
+        -0.0039851,
+        -0.1726447,
+        -0.0688079,
+        -0.1568557,
+        0.365084,
+        -0.191887,
+        -0.704136,
+        -0.4040028,
+        -0.4347235,
+        0.8082846,
+        -0.1257481,
+        0.3348816,
+        0.7482294,
+        0.7452491,
+        -1.1233935,
+        0.2011357,
+        -0.0709502,
+        -0.4705207,
+        0.2889882,
+        0.8722654,
+        0.5054392)
     #! format: on
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.0
@@ -476,8 +476,17 @@ function LES_driven_SCM(namelist_defaults)
     # average in 1 hour interval around `t_interval_from_end_s`
     namelist["initial_condition_averaging_window_s"] = 3600.0
 
-    namelist["meta"]["lesfile"] =
-        joinpath(les_driven_scm_data_folder(), "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc")
+    # namelist["meta"]["lesfile"] =
+    #     joinpath(les_driven_scm_data_folder(), "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc")
+
+    # training
+    # namelist["meta"]["lesfile"] = "/central/groups/esm/zhaoyi/GCMForcedLES/cfsite/07/HadGEM2-A/amip/Output.cfsite19_HadGEM2-A_amip_2004-2008.07.4x/stats/Stats.cfsite19_HadGEM2-A_amip_2004-2008.07.nc"
+    # namelist["meta"]["lesfile"] = "/central/groups/esm/zhaoyi/GCMForcedLES/cfsite/07/HadGEM2-A/amip/Output.cfsite21_HadGEM2-A_amip_2004-2008.07.4x/stats/Stats.cfsite21_HadGEM2-A_amip_2004-2008.07.nc"
+
+    # validation
+    # namelist["meta"]["lesfile"] = "/central/groups/esm/zhaoyi/GCMForcedLES/cfsite/07/HadGEM2-A/amip4K/Output.cfsite20_HadGEM2-A_amip4K_2004-2008.07.4x/stats/Stats.cfsite20_HadGEM2-A_amip4K_2004-2008.07.nc"
+    namelist["meta"]["lesfile"] = "/central/groups/esm/zhaoyi/GCMForcedLES/cfsite/07/HadGEM2-A/amip4K/Output.cfsite22_HadGEM2-A_amip4K_2004-2008.07.4x/stats/Stats.cfsite22_HadGEM2-A_amip4K_2004-2008.07.nc"
+
     namelist["meta"]["simname"] = "LES_driven_SCM"
     namelist["meta"]["casename"] = "LES_driven_SCM"
     namelist["forcing"] = Dict()
