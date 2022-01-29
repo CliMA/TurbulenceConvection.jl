@@ -98,6 +98,8 @@ struct CenterIndices{Nstart, Nstop, G}
     end
 end
 
+Base.firstindex(ci::CenterIndices) = kc_surface(ci.grid).i
+Base.firstindex(ci::FaceIndices) = kf_surface(ci.grid).i
 Base.keys(ci::CenterIndices) = 1:length(ci)
 Base.keys(fi::FaceIndices) = 1:length(fi)
 

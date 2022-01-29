@@ -88,14 +88,16 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
     epsilon = 10e-14 #np.finfo(np.float).eps
 
     # initialize the quadrature points and their labels
-    inner_env = zeros(env_len)
-    outer_env = zeros(env_len)
-    inner_src = zeros(src_len)
-    outer_src = zeros(src_len)
+    nthreads = Threads.nthreads()
+    inner_env = zeros(nthreads, env_len)
+    outer_env = zeros(nthreads, env_len)
+    inner_src = zeros(nthreads, src_len)
+    outer_src = zeros(nthreads, src_len)
     i_ql, i_qi, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat = 1:env_len
     i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH, i_Sqr, i_Sqs = 1:src_len
 
-    @inbounds for k in real_center_indices(grid)
+    Threads.@threads for k in real_center_indices(grid)
+        tid = Threads.threadid()
         if (
             aux_en.QTvar[k] > epsilon &&
             aux_en.Hvar[k] > epsilon &&
@@ -135,10 +137,10 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
 
             # zero outer quadrature points
             for idx in 1:env_len
-                outer_env[idx] = 0.0
+                outer_env[tid, idx] = 0.0
             end
             for idx in 1:src_len
-                outer_src[idx] = 0.0
+                outer_src[tid, idx] = 0.0
             end
 
             for m_q in 1:quad_order
@@ -152,10 +154,10 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
 
                 # zero inner quadrature points
                 for idx in 1:env_len
-                    inner_env[idx] = 0.0
+                    inner_env[tid, idx] = 0.0
                 end
                 for idx in 1:src_len
-                    inner_src[idx] = 0.0
+                    inner_src[tid, idx] = 0.0
                 end
 
                 for m_h in 1:quad_order
@@ -183,44 +185,44 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
                     )
 
                     # environmental variables
-                    inner_env[i_ql] += q_liq_en * weights[m_h] * sqpi_inv
-                    inner_env[i_qi] += q_ice_en * weights[m_h] * sqpi_inv
-                    inner_env[i_T] += T * weights[m_h] * sqpi_inv
+                    inner_env[tid, i_ql] += q_liq_en * weights[m_h] * sqpi_inv
+                    inner_env[tid, i_qi] += q_ice_en * weights[m_h] * sqpi_inv
+                    inner_env[tid, i_T] += T * weights[m_h] * sqpi_inv
                     # cloudy/dry categories for buoyancy in TKE
                     if TD.has_condensate(q_liq_en + q_ice_en)
-                        inner_env[i_cf] += weights[m_h] * sqpi_inv
-                        inner_env[i_qt_sat] += qt_hat * weights[m_h] * sqpi_inv
-                        inner_env[i_T_sat] += T * weights[m_h] * sqpi_inv
+                        inner_env[tid, i_cf] += weights[m_h] * sqpi_inv
+                        inner_env[tid, i_qt_sat] += qt_hat * weights[m_h] * sqpi_inv
+                        inner_env[tid, i_T_sat] += T * weights[m_h] * sqpi_inv
                     else
-                        inner_env[i_qt_unsat] += qt_hat * weights[m_h] * sqpi_inv
-                        inner_env[i_T_unsat] += T * weights[m_h] * sqpi_inv
+                        inner_env[tid, i_qt_unsat] += qt_hat * weights[m_h] * sqpi_inv
+                        inner_env[tid, i_T_unsat] += T * weights[m_h] * sqpi_inv
                     end
                     # products for variance and covariance source terms
-                    inner_src[i_Sqt] += mph.qt_tendency * weights[m_h] * sqpi_inv
-                    inner_src[i_Sqr] += mph.qr_tendency * weights[m_h] * sqpi_inv
-                    inner_src[i_Sqs] += mph.qs_tendency * weights[m_h] * sqpi_inv
-                    inner_src[i_SH] += mph.θ_liq_ice_tendency * weights[m_h] * sqpi_inv
-                    inner_src[i_Sqt_H] += mph.qt_tendency * h_hat * weights[m_h] * sqpi_inv
-                    inner_src[i_Sqt_qt] += mph.qt_tendency * qt_hat * weights[m_h] * sqpi_inv
-                    inner_src[i_SH_H] += mph.θ_liq_ice_tendency * h_hat * weights[m_h] * sqpi_inv
-                    inner_src[i_SH_qt] += mph.θ_liq_ice_tendency * qt_hat * weights[m_h] * sqpi_inv
+                    inner_src[tid, i_Sqt] += mph.qt_tendency * weights[m_h] * sqpi_inv
+                    inner_src[tid, i_Sqr] += mph.qr_tendency * weights[m_h] * sqpi_inv
+                    inner_src[tid, i_Sqs] += mph.qs_tendency * weights[m_h] * sqpi_inv
+                    inner_src[tid, i_SH] += mph.θ_liq_ice_tendency * weights[m_h] * sqpi_inv
+                    inner_src[tid, i_Sqt_H] += mph.qt_tendency * h_hat * weights[m_h] * sqpi_inv
+                    inner_src[tid, i_Sqt_qt] += mph.qt_tendency * qt_hat * weights[m_h] * sqpi_inv
+                    inner_src[tid, i_SH_H] += mph.θ_liq_ice_tendency * h_hat * weights[m_h] * sqpi_inv
+                    inner_src[tid, i_SH_qt] += mph.θ_liq_ice_tendency * qt_hat * weights[m_h] * sqpi_inv
                 end
 
                 for idx in 1:env_len
-                    outer_env[idx] += inner_env[idx] * weights[m_q] * sqpi_inv
+                    outer_env[tid, idx] += inner_env[tid, idx] * weights[m_q] * sqpi_inv
                 end
                 for idx in 1:src_len
-                    outer_src[idx] += inner_src[idx] * weights[m_q] * sqpi_inv
+                    outer_src[tid, idx] += inner_src[tid, idx] * weights[m_q] * sqpi_inv
                 end
             end
 
             # update environmental variables
 
             # update_env_precip_tendencies
-            qt_tendency = outer_src[i_Sqt]
-            θ_liq_ice_tendency = outer_src[i_SH]
-            qr_tendency = outer_src[i_Sqr]
-            qs_tendency = outer_src[i_Sqs]
+            qt_tendency = outer_src[tid, i_Sqt]
+            θ_liq_ice_tendency = outer_src[tid, i_SH]
+            qr_tendency = outer_src[tid, i_Sqr]
+            qs_tendency = outer_src[tid, i_Sqs]
             # TODO: move qt_tendency_precip_formation and θ_liq_ice_tendency_precip_formation
             # to diagnostics
             aux_en.qt_tendency_precip_formation[k] = qt_tendency * aux_en.area[k]
@@ -230,29 +232,29 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
             tendencies_pr.q_sno[k] += qs_tendency * aux_en.area[k]
 
             # update cloudy/dry variables for buoyancy in TKE
-            aux_en.cloud_fraction[k] = outer_env[i_cf]
-            aux_en_unsat.q_tot[k] = outer_env[i_qt_unsat]
+            aux_en.cloud_fraction[k] = outer_env[tid, i_cf]
+            aux_en_unsat.q_tot[k] = outer_env[tid, i_qt_unsat]
             # TD.jl cannot compute θ_unsat when T=0
-            aux_en_unsat.θ_dry[k] = if outer_env[i_T_unsat] > 0
-                ts_unsat = TD.PhaseEquil_pTq(param_set, p0_c[k], outer_env[i_T_unsat], aux_en_unsat.q_tot[k])
+            aux_en_unsat.θ_dry[k] = if outer_env[tid, i_T_unsat] > 0
+                ts_unsat = TD.PhaseEquil_pTq(param_set, p0_c[k], outer_env[tid, i_T_unsat], aux_en_unsat.q_tot[k])
                 TD.dry_pottemp(ts_unsat)
             else
                 0
             end
 
-            aux_en_sat.T[k] = outer_env[i_T_sat]
-            aux_en_sat.q_vap[k] = outer_env[i_qt_sat] - outer_env[i_ql]
-            aux_en_sat.q_tot[k] = outer_env[i_qt_sat]
+            aux_en_sat.T[k] = outer_env[tid, i_T_sat]
+            aux_en_sat.q_vap[k] = outer_env[tid, i_qt_sat] - outer_env[tid, i_ql]
+            aux_en_sat.q_tot[k] = outer_env[tid, i_qt_sat]
             ts_sat = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_en_sat.T[k], aux_en_sat.q_tot[k])
             aux_en_sat.θ_dry[k] = TD.dry_pottemp(ts_sat)
             aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(ts_sat)
 
             # update var/covar rain sources
-            aux_en.Hvar_rain_dt[k] = outer_src[i_SH_H] - outer_src[i_SH] * aux_en.θ_liq_ice[k]
-            aux_en.QTvar_rain_dt[k] = outer_src[i_Sqt_qt] - outer_src[i_Sqt] * aux_en.q_tot[k]
+            aux_en.Hvar_rain_dt[k] = outer_src[tid, i_SH_H] - outer_src[tid, i_SH] * aux_en.θ_liq_ice[k]
+            aux_en.QTvar_rain_dt[k] = outer_src[tid, i_Sqt_qt] - outer_src[tid, i_Sqt] * aux_en.q_tot[k]
             aux_en.HQTcov_rain_dt[k] =
-                outer_src[i_SH_qt] - outer_src[i_SH] * aux_en.q_tot[k] + outer_src[i_Sqt_H] -
-                outer_src[i_Sqt] * aux_en.θ_liq_ice[k]
+                outer_src[tid, i_SH_qt] - outer_src[tid, i_SH] * aux_en.q_tot[k] + outer_src[tid, i_Sqt_H] -
+                outer_src[tid, i_Sqt] * aux_en.θ_liq_ice[k]
 
         else
             # if variance and covariance are zero do the same as in SA_mean

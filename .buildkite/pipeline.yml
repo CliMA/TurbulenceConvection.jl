@@ -30,7 +30,7 @@ steps:
   - label: ":partly_sunny: Bomex"
     key: "cpu_bomex"
     command:
-      - "julia --color=yes --project=test integration_tests/Bomex.jl"
+      - "julia --threads=4 --color=yes --project=test integration_tests/Bomex.jl"
     artifact_paths:
       - "Output.Bomex.01/stats/comparison/*"
     agents:
@@ -41,7 +41,7 @@ steps:
   - label: ":partly_sunny: life_cycle_Tan2018"
     key: "cpu_life_cycle_tan2018"
     command:
-      - "julia --color=yes --project=test integration_tests/life_cycle_Tan2018.jl"
+      - "julia --threads=4 --color=yes --project=test integration_tests/life_cycle_Tan2018.jl"
     artifact_paths:
       - "Output.life_cycle_Tan2018.01/stats/comparison/*"
     agents:
@@ -52,7 +52,7 @@ steps:
   - label: ":partly_sunny: Soares"
     key: "cpu_soares"
     command:
-      - "julia --color=yes --project=test integration_tests/Soares.jl"
+      - "julia --threads=4 --color=yes --project=test integration_tests/Soares.jl"
     artifact_paths:
       - "Output.Soares.01/stats/comparison/*"
     agents:
@@ -63,7 +63,7 @@ steps:
   - label: ":partly_sunny: Rico"
     key: "cpu_rico"
     command:
-      - "julia --color=yes --project=test integration_tests/Rico.jl"
+      - "julia --threads=4 --color=yes --project=test integration_tests/Rico.jl"
     artifact_paths:
       - "Output.Rico.01/stats/comparison/*"
     agents:
@@ -74,7 +74,7 @@ steps:
   - label: ":partly_sunny: Nieuwstadt"
     key: "cpu_nieuwstadt"
     command:
-      - "julia --color=yes --project=test integration_tests/Nieuwstadt.jl"
+      - "julia --threads=4 --color=yes --project=test integration_tests/Nieuwstadt.jl"
     artifact_paths:
       - "Output.Nieuwstadt.01/stats/comparison/*"
     agents:
@@ -85,7 +85,7 @@ steps:
   - label: ":scissors: TRMM_LBA"
     key: "cpu_trmm_lba"
     command:
-      - "julia --color=yes --project=test integration_tests/TRMM_LBA.jl"
+      - "julia --threads=4 --color=yes --project=test integration_tests/TRMM_LBA.jl"
     artifact_paths:
       - "Output.TRMM_LBA.01/stats/comparison/*"
     agents:
@@ -96,7 +96,7 @@ steps:
   - label: ":partly_sunny: ARM_SGP"
     key: "cpu_arm_sgp"
     command:
-      - "julia --color=yes --project=test integration_tests/ARM_SGP.jl"
+      - "julia --threads=4 --color=yes --project=test integration_tests/ARM_SGP.jl"
     artifact_paths:
       - "Output.ARM_SGP.01/stats/comparison/*"
     agents:
@@ -108,7 +108,7 @@ steps:
   # - label: ":partly_sunny: GATE_III"
   #   key: "cpu_gate_iii"
   #   command:
-  #     - "julia --color=yes --project=test integration_tests/GATE_III.jl"
+  #     - "julia --threads=4 --color=yes --project=test integration_tests/GATE_III.jl"
   #   artifact_paths:
   #     - "Output.GATE_III.01/stats/comparison/*"
   #   agents:
@@ -119,7 +119,7 @@ steps:
   - label: ":partly_sunny: DYCOMS_RF01"
     key: "cpu_dycoms_rf01"
     command:
-      - "julia --color=yes --project=test integration_tests/DYCOMS_RF01.jl"
+      - "julia --threads=4 --color=yes --project=test integration_tests/DYCOMS_RF01.jl"
     artifact_paths:
       - "Output.DYCOMS_RF01.01/stats/comparison/*"
     agents:
@@ -130,7 +130,7 @@ steps:
   - label: ":partly_sunny: DYCOMS_RF02"
     key: "cpu_dycoms_rf02"
     command:
-      - "julia --color=yes --project=test integration_tests/DYCOMS_RF02.jl"
+      - "julia --threads=4 --color=yes --project=test integration_tests/DYCOMS_RF02.jl"
     artifact_paths:
       - "Output.DYCOMS_RF02.01/stats/comparison/*"
     agents:
@@ -141,7 +141,7 @@ steps:
   - label: ":partly_sunny: GABLS"
     key: "cpu_gabls"
     command:
-      - "julia --color=yes --project=test integration_tests/GABLS.jl"
+      - "julia --threads=4 --color=yes --project=test integration_tests/GABLS.jl"
     artifact_paths:
       - "Output.GABLS.01/stats/comparison/*"
     agents:
@@ -152,7 +152,7 @@ steps:
   - label: ":thought_balloon: DryBubble"
     key: "cpu_drybubble"
     command:
-      - "julia --color=yes --project=test integration_tests/DryBubble.jl"
+      - "julia --threads=4 --color=yes --project=test integration_tests/DryBubble.jl"
     artifact_paths:
       - "Output.DryBubble.01/stats/comparison/*"
     agents:
@@ -163,7 +163,7 @@ steps:
   - label: ":partly_sunny: LES_driven_SCM"
     key: "cpu_lesdrivenscm"
     command:
-      - "julia --color=yes --project=test integration_tests/LES_driven_SCM.jl"
+      - "julia --threads=4 --color=yes --project=test integration_tests/LES_driven_SCM.jl"
     artifact_paths:
       - "Output.LES_driven_SCM.01/stats/comparison/*"
     agents:
@@ -196,7 +196,7 @@ steps:
   - label: ":rocket: Benchmark tendencies"
     key: "cpu_tendencies"
     command:
-      - "julia --color=yes --project=perf perf/benchmark.jl"
+      - "julia --threads=4 --color=yes --project=perf perf/benchmark.jl"
     agents:
       config: cpu
       queue: central
