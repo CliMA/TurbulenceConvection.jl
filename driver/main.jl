@@ -233,11 +233,11 @@ function run(sim::Simulation1d; time_run = true)
     TC = TurbulenceConvection
     sim.skip_io || open_files(sim.Stats) # #removeVarsHack
     (prob, alg, kwargs) = solve_args(sim)
-
+    integrator = ODE.init(prob, alg; kwargs...)
     if time_run
-        sol = @timev ODE.solve(prob, alg; kwargs...)
+        sol = @timev ODE.solve!(integrator)
     else
-        sol = ODE.solve(prob, alg; kwargs...)
+        sol = ODE.solve!(integrator)
     end
 
     sim.skip_io || close_files(sim.Stats) # #removeVarsHack
