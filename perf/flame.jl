@@ -9,8 +9,9 @@ sim = init_sim(case_name)
 integrator = ODE.init(prob, alg; kwargs...)
 
 ODE.step!(integrator) # force compilation
+Profile.clear_malloc_data()
 prof = Profile.@profile begin
-    for _ in 1:100_000
+    for _ in 1:100
         ODE.step!(integrator)
     end
 end
