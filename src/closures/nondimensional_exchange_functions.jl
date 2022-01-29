@@ -75,17 +75,36 @@ function non_dimensional_function!(
     Π₄::AbstractArray{FT}, # input
     εδ_model::FNOEntr,
 ) where {FT <: Real}
-    # c_gen_fno = ICP.c_gen_fno(param_set)
 
-    # Π = (Π₁ ,Π₂ ,Π₃ ,Π₄)
-    # trafo = OF.FourierTransform(modes = (8, 8))
-    # model = Chain(
-    #     SpectralKernelOperator(trafo, 4 => 4, gelu),
-    #     SpectralKernelOperator(trafo, 4 => 2, gelu),
-    # )
-    # output = model(Π, c_gen_fno)
-    # nondim_ε .= output[1,:]
-    # nondim_δ .= output[2,:]
+    # define the model
+    Π = hcat(Π₁, Π₂, Π₃, Π₄)'
+    Π = reshape(Π, (size(Π)..., 1))
+    trafo = OF.FourierTransform(modes = (2,))
+    model = OF.Chain(OF.SpectralKernelOperator(trafo, 4 => 2, Flux.relu),)
+
+    # set the parameters
+    c_fno = ICP.c_fno(param_set)
+    index = 1
+    for p in Flux.params(model)
+        len_p = length(p)
+        p_slice = p[:]
+        if eltype(p_slice) <: Real
+            p_slice .= c_fno[index:(index + len_p - 1)]
+            index += len_p
+        elseif eltype(p_slice) <: Complex
+            c_fno_slice = c_fno[index:(index + len_p - 1)]
+            p_slice .= c_fno_slice + c_fno[(index + len_p):(index + len_p * 2 - 1)] * im
+            index += len_p * 2
+        else
+            error("Bad eltype in Flux params")
+        end
+    end
+
+    output = model(Π)
+
+    # we need a sigmoid that recieves output and produced non negative nondim_ε, nondim_δ
+    nondim_ε .= output[1, :]
+    nondim_δ .= output[2, :]
     return nothing
 end
 

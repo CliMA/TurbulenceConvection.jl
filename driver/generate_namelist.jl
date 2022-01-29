@@ -105,11 +105,9 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
                    0.0, 0.0, 0.843,-0.340,
                    0.655, 0.113, 0.0, 0.0)
     # For FNO add here
-    # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_FNO_params"] =
-    #     SA.SVector(0.3038, 0.719,-0.910,-0.483,
-    #                0.739, 0.0755, 0.178, 0.521,
-    #                0.0, 0.0, 0.843,-0.340,
-    #                0.655, 0.113, 0.0, 0.0)
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_params"] =
+        SA.SVector{74}(rand(74))
+
     # General stochastic entrainment/detrainment parameters
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_stochastic_ent_params"] =
     SA.SVector(
