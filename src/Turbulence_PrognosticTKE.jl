@@ -132,8 +132,11 @@ function compute_diffusive_fluxes(
     aux_en = center_aux_environment(state)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
-    aeKM = aux_en.area .* KM
-    aeKH = aux_en.area .* KH
+    aeKM = center_aux_turbconv(state).ϕ_temporary
+    aeKH = center_aux_turbconv(state).ψ_temporary
+    a_en = aux_en.area
+    @. aeKM = a_en * KM
+    @. aeKH = a_en * KH
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     kf_surf = kf_surface(grid)
@@ -144,10 +147,10 @@ function compute_diffusive_fluxes(
     @. aux_tc_f.ρ_ae_KH = IfKH(aeKH) * ρ0_f
     @. aux_tc_f.ρ_ae_KM = IfKM(aeKM) * ρ0_f
 
-    aeKHq_tot_bc = -surf.ρq_tot_flux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
-    aeKHθ_liq_ice_bc = -surf.ρθ_liq_ice_flux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
-    aeKMu_bc = -surf.ρu_flux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
-    aeKMv_bc = -surf.ρv_flux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
+    aeKHq_tot_bc = -surf.ρq_tot_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    aeKHθ_liq_ice_bc = -surf.ρθ_liq_ice_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    aeKMu_bc = -surf.ρu_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
+    aeKMv_bc = -surf.ρv_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
 
     ∇q_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_tot_bc), top = CCO.SetDivergence(FT(0)))
     ∇θ_liq_ice_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHθ_liq_ice_bc), top = CCO.SetDivergence(FT(0)))
