@@ -5,9 +5,6 @@ const TC = TurbulenceConvection
 
 const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
 include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
-include(joinpath(tc_dir, "driver", "Cases.jl"))
-include(joinpath(tc_dir, "driver", "parameter_set.jl"))
-include(joinpath(tc_dir, "driver", "dycore.jl"))
 include(joinpath(tc_dir, "driver", "main.jl"))
 import .NameList
 
