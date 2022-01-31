@@ -55,19 +55,6 @@ function FieldFromNamedTuple(space, nt::NamedTuple)
     return cmv.(CC.Fields.coordinate_field(space))
 end
 
-# https://github.com/CliMA/ClimaCore.jl/issues/275
-transform_broadcasted(bc::Base.Broadcast.Broadcasted{CC.Fields.FieldVectorStyle}, symb, axes) =
-    Base.Broadcast.Broadcasted(bc.f, map(arg -> transform_broadcasted(arg, symb, axes), bc.args), axes)
-transform_broadcasted(fv::CC.Fields.FieldVector, symb, axes) = parent(getproperty(fv, symb))
-transform_broadcasted(x, symb, axes) = x
-@inline function Base.copyto!(dest::CC.Fields.FieldVector, bc::Base.Broadcast.Broadcasted{CC.Fields.FieldVectorStyle})
-    for symb in propertynames(dest)
-        p = parent(getproperty(dest, symb))
-        Base.copyto!(p, transform_broadcasted(bc, symb, axes(p)))
-    end
-    return dest
-end
-
 function Base.cumsum(field::CC.Fields.FiniteDifferenceField)
     Base.cumsum(parent(CC.Fields.weighted_jacobian(field)) .* vec(field), dims = 1)
 end
