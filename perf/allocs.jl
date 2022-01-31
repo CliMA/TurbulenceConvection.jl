@@ -1,5 +1,7 @@
-import Pkg
-Pkg.develop(path = ".")
+if !haskey(ENV, "BUILDKITE")
+    import Pkg
+    Pkg.develop(path = ".")
+end
 
 # Track allocations in TC.jl plus all _direct_ dependencies
 exhaustive = "exhaustive=true" in ARGS

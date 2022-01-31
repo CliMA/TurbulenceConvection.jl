@@ -1,8 +1,6 @@
-import Pkg
+include(joinpath(@__DIR__, "common.jl"))
 import JET
-Pkg.develop(path = ".")
 
-include("common.jl")
 case_name = "Bomex"
 sim = init_sim(case_name)
 prog = sim.state.prog

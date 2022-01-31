@@ -1,5 +1,7 @@
-import Pkg
-Pkg.develop(path = ".")
+if !haskey(ENV, "BUILDKITE")
+    import Pkg
+    Pkg.develop(path = ".")
+end
 import SnoopCompile
 
 tinf = SnoopCompile.@snoopi_deep begin

@@ -1,4 +1,4 @@
-include("common.jl")
+include(joinpath(@__DIR__, "common.jl"))
 import ProfileView
 import Profile
 

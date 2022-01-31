@@ -1,10 +1,6 @@
-import Pkg
-Pkg.develop(path = ".")
+include(joinpath(@__DIR__, "common.jl"))
 using Test
 import SnoopCompileCore
-import TurbulenceConvection
-tc_dir_glob = pkgdir(TurbulenceConvection)
-include(joinpath(tc_dir_glob, "perf", "common.jl"))
 
 case_name = "Bomex"
 println("Running $case_name...")

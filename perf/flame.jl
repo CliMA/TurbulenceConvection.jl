@@ -1,8 +1,6 @@
-import Pkg
-Pkg.develop(path = ".")
+include(joinpath(@__DIR__, "common.jl"))
 import Profile
 
-include("common.jl")
 case_name = "Bomex"
 sim = init_sim(case_name)
 (prob, alg, kwargs) = solve_args(sim)
