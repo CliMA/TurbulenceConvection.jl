@@ -3,7 +3,7 @@ Pkg.develop(path = ".")
 using Test
 import SnoopCompileCore
 import TurbulenceConvection
-tc_dir_glob = dirname(dirname(pathof(TurbulenceConvection)))
+tc_dir_glob = pkgdir(TurbulenceConvection)
 include(joinpath(tc_dir_glob, "perf", "common.jl"))
 
 case_name = "Bomex"

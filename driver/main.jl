@@ -20,7 +20,7 @@ import OrdinaryDiffEq
 const ODE = OrdinaryDiffEq
 import StaticArrays: SVector
 
-const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
+const tc_dir = pkgdir(TurbulenceConvection)
 
 include(joinpath(tc_dir, "driver", "NetCDFIO.jl"))
 include(joinpath(tc_dir, "driver", "initial_conditions.jl"))

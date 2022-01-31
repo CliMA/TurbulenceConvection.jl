@@ -5,7 +5,7 @@ invalidations = @snoopr begin
     Pkg.develop(path = ".")
     import TurbulenceConvection
 
-    const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
+    const tc_dir = pkgdir(TurbulenceConvection)
     include(joinpath(tc_dir, "driver", "main.jl"))
     include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
     import .NameList
