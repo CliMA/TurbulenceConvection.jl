@@ -1,6 +1,4 @@
-import Pkg
-Pkg.develop(path = ".")
-include("common.jl")
+include(joinpath(@__DIR__, "common.jl"))
 import BenchmarkTools
 
 sim = init_sim("Bomex")
