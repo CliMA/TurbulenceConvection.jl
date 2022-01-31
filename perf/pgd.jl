@@ -5,7 +5,7 @@ import SnoopCompile
 tinf = SnoopCompile.@snoopi_deep begin
     import TurbulenceConvection
 
-    local_tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
+    local_tc_dir = pkgdir(TurbulenceConvection)
     include(joinpath(local_tc_dir, "driver", "main.jl"))
     include(joinpath(local_tc_dir, "driver", "generate_namelist.jl"))
     import .NameList
@@ -22,7 +22,7 @@ import Profile
 Profile.@profile begin
     import TurbulenceConvection
 
-    local_tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
+    local_tc_dir = pkgdir(TurbulenceConvection)
     include(joinpath(local_tc_dir, "driver", "main.jl"))
     include(joinpath(local_tc_dir, "driver", "generate_namelist.jl"))
     import .NameList

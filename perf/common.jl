@@ -3,7 +3,7 @@ Pkg.develop(path = ".")
 import TurbulenceConvection
 const TC = TurbulenceConvection
 
-const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
+const tc_dir = pkgdir(TurbulenceConvection)
 include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
 include(joinpath(tc_dir, "driver", "main.jl"))
 import .NameList
