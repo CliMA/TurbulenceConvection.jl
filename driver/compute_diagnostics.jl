@@ -136,13 +136,13 @@ function compute_diagnostics!(
     surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
 
     @inbounds for k in TC.real_center_indices(grid)
-        ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         aux_gm.s[k] = TD.specific_entropy(ts)
-        ts_en = TC.thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
+        ts_en = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
         aux_en.s[k] = TD.specific_entropy(ts_en)
         @inbounds for i in 1:N_up
             if aux_up[i].area[k] > 0.0
-                ts_up = TC.thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
+                ts_up = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
                 aux_up[i].s[k] = TD.specific_entropy(ts_up)
             end
         end

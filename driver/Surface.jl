@@ -34,7 +34,7 @@ function get_surface(
     zrough = surf_params.zrough
 
     ts_sfc = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
-    ts_in = TC.thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
+    ts_in = TD.PhaseEquil_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
 
@@ -105,8 +105,8 @@ function get_surface(
     scheme = SF.FVScheme()
     z_sfc = FT(0)
     z_in = grid.zc[kc_surf].z
-    ts_sfc = TC.thermo_state_pθq(param_set, p0_f_surf, Tsurface, qsurface)
-    ts_in = TC.thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
+    ts_sfc = TD.PhaseEquil_pθq(param_set, p0_f_surf, Tsurface, qsurface)
+    ts_in = TD.PhaseEquil_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, q_tot_gm_surf)
     u_sfc = SA.SVector{2, FT}(0, 0)
     u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
     vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
@@ -161,7 +161,7 @@ function get_surface(
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
     ts_sfc = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
-    ts_in = TC.thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, qsurface)
+    ts_in = TD.PhaseEquil_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, qsurface)
 
     u_sfc = SA.SVector{2, FT}(0, 0)
     u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
@@ -217,8 +217,8 @@ function get_surface(
 
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
-    ts_sfc = TC.thermo_state_pθq(param_set, p0_f_surf, θ_star, qsurface)
-    ts_in = TC.thermo_state_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, qsurface)
+    ts_sfc = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_star, qsurface)
+    ts_in = TD.PhaseEquil_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, qsurface)
 
     u_sfc = SA.SVector{2, FT}(0, 0)
     u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)

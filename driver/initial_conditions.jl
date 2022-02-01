@@ -19,7 +19,7 @@ function initialize_edmf(
     p0_c = TC.center_ref_state(state).p0
     parent(aux_tc.prandtl_nvec) .= edmf.prandtl_number
     @inbounds for k in TC.real_center_indices(grid)
-        ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
     end
     surf = get_surface(surf_params, grid, state, gm, t, param_set)
