@@ -142,7 +142,7 @@ function initialize(sim::Simulation1d)
     Cases.initialize_forcing(sim.case, sim.grid, state, sim.gm, sim.param_set)
     Cases.initialize_radiation(sim.case, sim.grid, state, sim.gm, sim.param_set)
 
-    initialize_edmf(sim.edmf, sim.grid, state, sim.case, sim.gm, t)
+    initialize_turbconv(sim.edmf, sim.grid, state, sim.case, sim.gm, t)
 
     sim.skip_io && return nothing
     initialize_io(sim.io_nt.ref_state, sim.Stats)

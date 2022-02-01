@@ -142,6 +142,7 @@ include("name_aliases.jl")
 include("Operators.jl")
 
 include("microphysics_coupling.jl")
+include("initial_conditions.jl")
 include("turbulence_functions.jl")
 include("utility_functions.jl")
 include("variables.jl")
