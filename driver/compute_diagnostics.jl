@@ -36,7 +36,9 @@ function io_dictionary_diagnostics()
         "nh_pressure_b" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_turbconv(state).nh_pressure_b,),
         "turbulent_entrainment" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).frac_turb_entr,),
         "entrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).entr_sc),
+        "nondim_entrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).nondim_entr_sc),
         "detrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).detr_sc),
+        "nondim_detrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).nondim_detr_sc),
         "asp_ratio" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).asp_ratio),
         "massflux" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).massflux),
     )
@@ -235,11 +237,19 @@ function compute_diagnostics!(
 
     @inbounds for k in TC.real_center_indices(grid)
         a_up_bulk_k = a_up_bulk[k]
+        diag_tc.entr_sc[k] = 0.0
+        diag_tc.nondim_entr_sc[k] = 0.0
+        diag_tc.detr_sc[k] = 0.0
+        diag_tc.nondim_detr_sc[k] = 0.0
+        diag_tc.asp_ratio[k] = 0.0
+        diag_tc.frac_turb_entr[k] = 0.0
         if a_up_bulk_k > 0.0
             @inbounds for i in 1:N_up
                 aux_up_i = aux_up[i]
                 diag_tc.entr_sc[k] += aux_up_i.area[k] * aux_up_i.entr_sc[k] / a_up_bulk_k
+                diag_tc.nondim_entr_sc[k] += aux_up_i.area[k] * aux_up_i.nondim_entr_sc[k] / a_up_bulk_k
                 diag_tc.detr_sc[k] += aux_up_i.area[k] * aux_up_i.detr_sc[k] / a_up_bulk_k
+                diag_tc.nondim_detr_sc[k] += aux_up_i.area[k] * aux_up_i.nondim_detr_sc[k] / a_up_bulk_k
                 diag_tc.asp_ratio[k] += aux_up_i.area[k] * aux_up_i.asp_ratio[k] / a_up_bulk_k
                 diag_tc.frac_turb_entr[k] += aux_up_i.area[k] * aux_up_i.frac_turb_entr[k] / a_up_bulk_k
             end
@@ -255,11 +265,16 @@ function compute_diagnostics!(
     a_up_f = copy(a_up_bulk_f)
     Ifabulk = CCO.InterpolateC2F(; a_bulk_bcs...)
     @. a_up_bulk_f = Ifabulk(a_up_bulk)
-    @inbounds for i in 1:N_up
-        a_up_bcs = TC.a_up_boundary_conditions(surf, edmf, i)
-        Ifaup = CCO.InterpolateC2F(; a_up_bcs...)
-        @. a_up_f = Ifaup(aux_up[i].area)
-        @inbounds for k in TC.real_face_indices(grid)
+
+    @inbounds for k in TC.real_face_indices(grid)
+        @inbounds for i in 1:N_up
+            a_up_bcs = TC.a_up_boundary_conditions(surf, edmf, i)
+            Ifaup = CCO.InterpolateC2F(; a_up_bcs...)
+            @. a_up_f = Ifaup(aux_up[i].area)
+            diag_tc_f.nh_pressure[k] = 0.0
+            diag_tc_f.nh_pressure_b[k] = 0.0
+            diag_tc_f.nh_pressure_adv[k] = 0.0
+            diag_tc_f.nh_pressure_drag[k] = 0.0
             if a_up_bulk_f[k] > 0.0
                 diag_tc_f.nh_pressure[k] += a_up_f[k] * aux_up_f[i].nh_pressure[k] / a_up_bulk_f[k]
                 diag_tc_f.nh_pressure_b[k] += a_up_f[k] * aux_up_f[i].nh_pressure_b[k] / a_up_bulk_f[k]
