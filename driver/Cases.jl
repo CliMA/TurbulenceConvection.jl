@@ -338,7 +338,7 @@ function surface_params(case::Bomex, grid::TC.Grid, state::TC.State, param_set; 
     θ_surface = 299.1
     θ_flux = 8.0e-3
     qt_flux = 5.2e-5
-    ts = TC.thermo_state_pθq(param_set, p0_f_surf, θ_surface, qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_surface, qsurface)
     Tsurface = TD.air_temperature(ts)
     lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(ts)
     shf = θ_flux * TD.cp_m(ts) * ρ0_f_surf
@@ -356,7 +356,7 @@ function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, gm, param
         z = grid.zc[k]
         # Geostrophic velocity profiles. vg = 0
         aux_gm.ug[k] = -10.0 + (1.8e-3) * z
-        ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         Π = TD.exner(ts)
         # Set large-scale cooling
         dTdt = if z <= 1500.0
@@ -468,7 +468,7 @@ function surface_params(case::life_cycle_Tan2018, grid::TC.Grid, state::TC.State
     θ_surface = 299.1
     θ_flux = 8.0e-3
     qt_flux = 5.2e-5
-    ts = TC.thermo_state_pθq(param_set, p0_f_surf, θ_surface, qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_surface, qsurface)
     Tsurface = TD.air_temperature(ts)
     lhf0 = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(ts)
     shf0 = θ_flux * TD.cp_m(ts) * ρ0_f_surf
@@ -492,7 +492,7 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
         z = grid.zc[k]
         # Geostrophic velocity profiles. vg = 0
         aux_gm.ug[k] = -10.0 + (1.8e-3) * z
-        ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         Π = TD.exner(ts)
         # Set large-scale cooling
         aux_gm.dTdt[k] = if z <= 1500.0
@@ -574,7 +574,7 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, gm, state)
 
     # Need to get θ_virt
     @inbounds for k in real_center_indices(grid)
-        ts = TC.thermo_state_pθq(param_set, p0[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
     end
     zi = 0.6 * get_inversion(grid, state, param_set, 0.2)
@@ -619,7 +619,7 @@ function initialize_forcing(self::CasesBase{Rico}, grid::Grid, state, gm, param_
     aux_gm = TC.center_aux_grid_mean(state)
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
-        ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         Π = TD.exner(ts)
         # Geostrophic velocity profiles
         aux_gm.ug[k] = -9.9 + 2.0e-3 * z
@@ -748,7 +748,7 @@ function surface_params(case::TRMM_LBA, grid::TC.Grid, state::TC.State, param_se
     p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     qsurface = 22.45e-3 # kg/kg
     θ_surface = (273.15 + 23)
-    ts = TC.thermo_state_pθq(param_set, p0_f_surf, θ_surface, qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_surface, qsurface)
     Tsurface = TD.air_temperature(ts)
     ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
     lhf = t -> 554.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - t) / 5.25 / 3600.0)))^1.3
@@ -951,7 +951,7 @@ function surface_params(case::ARM_SGP, grid::TC.Grid, state::TC.State, param_set
     kf_surf = TC.kf_surface(grid)
     p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     θ_surface = 299.0
-    ts = TC.thermo_state_pθq(param_set, p0_f_surf, θ_surface, qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_surface, qsurface)
     Tsurface = TD.air_temperature(ts)
     ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
 
@@ -985,7 +985,7 @@ function update_forcing(self::CasesBase{ARM_SGP}, grid, state, gm, t::Real, para
     dqtdt = pyinterp(arr_type([t]), t_in, Rqt_in)[1]
     prog_gm = TC.center_prog_grid_mean(state)
     @inbounds for k in real_center_indices(grid)
-        ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         Π = TD.exner(ts)
         z = grid.zc[k]
         aux_gm.dTdt[k] = if z <= 1000.0
@@ -1080,7 +1080,7 @@ function surface_params(case::GATE_III, grid::TC.Grid, state::TC.State, param_se
     # For GATE_III we provide values of transfer coefficients
     kf_surf = TC.kf_surface(grid)
     p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
-    ts = TC.thermo_state_pθq(param_set, p0_f_surf, Tsurface, qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, Tsurface, qsurface)
     qsurface = TD.q_vap_saturation(ts)
     kwargs = (; zrough, Tsurface, qsurface, cm, ch)
     return TC.FixedSurfaceCoeffs(FT; kwargs...)
@@ -1129,7 +1129,7 @@ function reference_params(::DYCOMS_RF01, grid::Grid, param_set::APS, namelist)
     Pg = 1017.8 * 100.0
     qtg = 9.0 / 1000.0
     theta_surface = 289.0
-    ts = TC.thermo_state_pθq(param_set, Pg, theta_surface, qtg)
+    ts = TD.PhaseEquil_pθq(param_set, Pg, theta_surface, qtg)
     Tg = TD.air_temperature(ts)
     return (; Pg, Tg, qtg)
 end
@@ -1234,7 +1234,7 @@ function reference_params(::DYCOMS_RF02, grid::Grid, param_set::APS, namelist)
     Pg = 1017.8 * 100.0
     qtg = 9.0 / 1000.0
     theta_surface = 288.3
-    ts = TC.thermo_state_pθq(param_set, Pg, theta_surface, qtg)
+    ts = TD.PhaseEquil_pθq(param_set, Pg, theta_surface, qtg)
     Tg = TD.air_temperature(ts)
     return (; Pg, Tg, qtg)
 end

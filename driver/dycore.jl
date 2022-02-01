@@ -141,7 +141,7 @@ function compute_ref_state!(state, grid::TC.Grid, param_set::PS; Pg::FT, Tg::FT,
     # determine the reference pressure
     function rhs(logp, u, z)
         p_ = exp(logp)
-        ts = TC.thermo_state_pθq(param_set, p_, θ_liq_ice_g, qtg)
+        ts = TD.PhaseEquil_pθq(param_set, p_, θ_liq_ice_g, qtg)
         R_m = TD.gas_constant_air(ts)
         T = TD.air_temperature(ts)
         return -FT(CPP.grav(param_set)) / (T * R_m)
@@ -161,12 +161,12 @@ function compute_ref_state!(state, grid::TC.Grid, param_set::PS; Pg::FT, Tg::FT,
 
     # Compute reference state thermodynamic profiles
     @inbounds for k in TC.real_center_indices(grid)
-        ts = TC.thermo_state_pθq(param_set, p0_c[k], θ_liq_ice_g, qtg)
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], θ_liq_ice_g, qtg)
         α0_c[k] = TD.specific_volume(ts)
     end
 
     @inbounds for k in TC.real_face_indices(grid)
-        ts = TC.thermo_state_pθq(param_set, p0_f[k], θ_liq_ice_g, qtg)
+        ts = TD.PhaseEquil_pθq(param_set, p0_f[k], θ_liq_ice_g, qtg)
         α0_f[k] = TD.specific_volume(ts)
     end
 
@@ -184,7 +184,7 @@ function satadjust(gm::TC.GridMeanVariables, grid, state)
     @inbounds for k in TC.real_center_indices(grid)
         θ_liq_ice = prog_gm.θ_liq_ice[k]
         q_tot = prog_gm.q_tot[k]
-        ts = TC.thermo_state_pθq(param_set, p0_c[k], θ_liq_ice, q_tot)
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], θ_liq_ice, q_tot)
         aux_gm.q_liq[k] = TD.liquid_specific_humidity(ts)
         aux_gm.q_ice[k] = TD.ice_specific_humidity(ts)
         aux_gm.T[k] = TD.air_temperature(ts)
@@ -283,7 +283,7 @@ function compute_gm_tendencies!(
 
     @inbounds for k in TC.real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
-        ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         Π = TD.exner(ts)
 
         if force.apply_coriolis
