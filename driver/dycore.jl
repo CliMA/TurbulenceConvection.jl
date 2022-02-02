@@ -65,7 +65,16 @@ cent_aux_vars_gm(FT) = (;
 cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., TC.cent_aux_vars_edmf(FT, n_up)...)
 
 # Face only
-face_aux_vars_gm(FT) = (; massflux_s = FT(0), diffusive_flux_s = FT(0), total_flux_s = FT(0), f_rad = FT(0))
+face_aux_vars_gm(FT) = (;
+    massflux_s = FT(0),
+    diffusive_flux_s = FT(0),
+    total_flux_s = FT(0),
+    f_rad = FT(0),
+    sgs_flux_θ_liq_ice = FT(0),
+    sgs_flux_q_tot = FT(0),
+    sgs_flux_u = FT(0),
+    sgs_flux_v = FT(0),
+)
 face_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., face_aux_vars_gm(FT)..., TC.face_aux_vars_edmf(FT, n_up)...)
 
 ##### Diagnostic fields
@@ -134,7 +143,7 @@ function compute_ref_state!(state, grid::TC.Grid, param_set::PS; Pg::FT, Tg::FT,
     # determine the reference pressure
     function rhs(logp, u, z)
         p_ = exp(logp)
-        ts = TC.thermo_state_pθq(param_set, p_, θ_liq_ice_g, qtg)
+        ts = TD.PhaseEquil_pθq(param_set, p_, θ_liq_ice_g, qtg)
         R_m = TD.gas_constant_air(ts)
         T = TD.air_temperature(ts)
         return -FT(CPP.grav(param_set)) / (T * R_m)
@@ -154,12 +163,12 @@ function compute_ref_state!(state, grid::TC.Grid, param_set::PS; Pg::FT, Tg::FT,
 
     # Compute reference state thermodynamic profiles
     @inbounds for k in TC.real_center_indices(grid)
-        ts = TC.thermo_state_pθq(param_set, p0_c[k], θ_liq_ice_g, qtg)
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], θ_liq_ice_g, qtg)
         α0_c[k] = TD.specific_volume(ts)
     end
 
     @inbounds for k in TC.real_face_indices(grid)
-        ts = TC.thermo_state_pθq(param_set, p0_f[k], θ_liq_ice_g, qtg)
+        ts = TD.PhaseEquil_pθq(param_set, p0_f[k], θ_liq_ice_g, qtg)
         α0_f[k] = TD.specific_volume(ts)
     end
 
@@ -177,7 +186,7 @@ function satadjust(gm::TC.GridMeanVariables, grid, state)
     @inbounds for k in TC.real_center_indices(grid)
         θ_liq_ice = prog_gm.θ_liq_ice[k]
         q_tot = prog_gm.q_tot[k]
-        ts = TC.thermo_state_pθq(param_set, p0_c[k], θ_liq_ice, q_tot)
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], θ_liq_ice, q_tot)
         aux_gm.q_liq[k] = TD.liquid_specific_humidity(ts)
         aux_gm.q_ice[k] = TD.ice_specific_humidity(ts)
         aux_gm.T[k] = TD.air_temperature(ts)
@@ -249,7 +258,54 @@ end
 
 function compute_sgs_tendencies!(turb_conv::TC.EDMF_PrognosticTKE, param_set, grid, state, gm, surf)
     TC.compute_sgs_tendencies!(turb_conv, grid, state, surf, radiation, force, gm)
+
+    sgs_flux_θ_liq_ice = aux_gm_f.sgs_flux_θ_liq_ice
+    sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot
+    sgs_flux_u = aux_gm_f.sgs_flux_u
+    sgs_flux_v = aux_gm_f.sgs_flux_v
+    # apply surface BC as SGS flux at lowest level
+    sgs_flux_θ_liq_ice[kf_surf] = surf.ρθ_liq_ice_flux
+    sgs_flux_q_tot[kf_surf] = surf.ρq_tot_flux
+    sgs_flux_u[kf_surf] = surf.ρu_flux
+    sgs_flux_v[kf_surf] = surf.ρv_flux
+
+    tends_θ_liq_ice = tendencies_gm.θ_liq_ice
+    tends_q_tot = tendencies_gm.q_tot
+    tends_u = tendencies_gm.u
+    tends_v = tendencies_gm.v
+
+    ∇θ_liq_ice_sgs = CCO.DivergenceF2C()
+    ∇q_tot_sgs = CCO.DivergenceF2C()
+    ∇u_sgs = CCO.DivergenceF2C()
+    ∇v_sgs = CCO.DivergenceF2C()
+
+    @. tends_θ_liq_ice += -α0_c * ∇θ_liq_ice_sgs(wvec(sgs_flux_θ_liq_ice))
+    @. tends_q_tot += -α0_c * ∇q_tot_sgs(wvec(sgs_flux_q_tot))
+    @. tends_u += -α0_c * ∇u_sgs(wvec(sgs_flux_u))
+    @. tends_v += -α0_c * ∇v_sgs(wvec(sgs_flux_v))
     return nothing
+end
+
+function initialize_turb_conv(
+    turb_conv::ConstantDiffusivityModel,
+    grid::TC.Grid,
+    state::TC.State,
+    case,
+    gm::TC.GridMeanVariables,
+    t::Real,
+)
+    surf_params = case.surf_params
+    param_set = TC.parameter_set(gm)
+    aux_tc = TC.center_aux_turbconv(state)
+    prog_gm = TC.center_prog_grid_mean(state)
+    p0_c = TC.center_ref_state(state).p0
+    parent(aux_tc.prandtl_nvec) .= turb_conv.prandtl_number
+    @inbounds for k in TC.real_center_indices(grid)
+        ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
+    end
+    surf = get_surface(surf_params, grid, state, gm, t, param_set)
+    return
 end
 
 function compute_sgs_tendencies!(turb_conv::ConstantDiffusivityModel, param_set, grid, state, gm, surf)
@@ -293,10 +349,12 @@ function compute_gm_tendencies!(
 )
     tendencies_gm = TC.center_tendencies_grid_mean(state)
     kc_toa = TC.kc_top_of_atmos(grid)
+    kf_surf = TC.kf_surface(grid)
     FT = eltype(grid)
     param_set = TC.parameter_set(gm)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
+    aux_gm_f = TC.face_aux_grid_mean(state)
     ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
     ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
     aux_en = TC.center_aux_environment(state)
@@ -305,6 +363,7 @@ function compute_gm_tendencies!(
     aux_bulk = TC.center_aux_bulk(state)
     ρ0_f = TC.face_ref_state(state).ρ0
     p0_c = TC.center_ref_state(state).p0
+    α0_c = TC.center_ref_state(state).α0
     aux_tc = TC.center_aux_turbconv(state)
 
     θ_liq_ice_gm_toa = prog_gm.θ_liq_ice[kc_toa]
@@ -318,7 +377,7 @@ function compute_gm_tendencies!(
 
     @inbounds for k in TC.real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
-        ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         Π = TD.exner(ts)
 
         if force.apply_coriolis

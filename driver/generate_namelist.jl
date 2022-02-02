@@ -105,6 +105,10 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
                    0.739, 0.0755, 0.178, 0.521,
                    0.0, 0.0, 0.843,-0.340,
                    0.655, 0.113, 0.0, 0.0)
+    # For FNO add here
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_params"] =
+        SA.SVector{74}(rand(74))
+
     # General stochastic entrainment/detrainment parameters
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_stochastic_ent_params"] =
     SA.SVector(
@@ -150,7 +154,7 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["turbulence"]["scheme"] = "EDMF_PrognosticTKE"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "NN", "Linear", "FNN"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "NN", "NN_nonlocal", "Linear", "FNO"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = "deterministic"  # {"deterministic", "noisy_relaxation_process", "lognormal_scaling"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_local_micro"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["constant_area"] = false

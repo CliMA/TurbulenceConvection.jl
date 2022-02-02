@@ -40,6 +40,7 @@ function compute_sgs_tendencies!(
     tendencies_gm = center_tendencies_grid_mean(state)
     FT = eltype(grid)
     prog_gm = center_prog_grid_mean(state)
+    aux_gm_f = face_aux_grid_mean(state)
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_up = center_aux_updrafts(state)
@@ -90,42 +91,28 @@ function compute_sgs_tendencies!(
         @. massflux_qt += massflux * (If(q_tot_up) - If(q_tot_en))
     end
 
-    tends_q_tot = tendencies_gm.q_tot
-    tends_θ_liq_ice = tendencies_gm.θ_liq_ice
-    tends_u = tendencies_gm.u
-    tends_v = tendencies_gm.v
-
     massflux_tendency_h = aux_tc.massflux_tendency_h
     massflux_tendency_qt = aux_tc.massflux_tendency_qt
     # Compute the  mass flux tendencies
     # Adjust the values of the grid mean variables
     # Prepare the output
     @. massflux_tendency_h = -∇c(wvec(massflux_h)) * α0_c
-    @. massflux_tendency_qt = ∇c(wvec(massflux_qt))
-    @. tends_θ_liq_ice += -∇c(wvec(massflux_h)) * α0_c
-    @. tends_q_tot += -∇c(wvec(massflux_qt)) * α0_c
+    @. massflux_tendency_qt = -∇c(wvec(massflux_qt)) * α0_c
 
-    a_en = aux_en.area
-    aeKHq_tot_bc = surf.ρq_tot_flux / a_en[kc_surf]
-    aeKHθ_liq_ice_bc = surf.ρθ_liq_ice_flux / a_en[kc_surf]
-    aeKMu_bc = surf.ρu_flux / a_en[kc_surf]
-    aeKMv_bc = surf.ρv_flux / a_en[kc_surf]
-
-    tbc = (; top = CCO.SetValue(wvec(FT(0))))
-    ∇aeKH_q_tot = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKHq_tot_bc)), tbc...)
-    ∇aeKH_θ_liq_ice = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKHθ_liq_ice_bc)), tbc...)
-    ∇aeKM_u = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKMu_bc)), tbc...)
-    ∇aeKM_v = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(aeKMv_bc)), tbc...)
-
-    diffusive_flux_qt = aux_tc_f.diffusive_flux_qt
     diffusive_flux_h = aux_tc_f.diffusive_flux_h
+    diffusive_flux_qt = aux_tc_f.diffusive_flux_qt
     diffusive_flux_u = aux_tc_f.diffusive_flux_u
     diffusive_flux_v = aux_tc_f.diffusive_flux_v
 
-    @. tends_q_tot += -α0_c * a_en * ∇aeKH_q_tot(wvec(diffusive_flux_qt))
-    @. tends_θ_liq_ice += -α0_c * a_en * ∇aeKH_θ_liq_ice(wvec(diffusive_flux_h))
-    @. tends_u += -α0_c * a_en * ∇aeKM_u(wvec(diffusive_flux_u))
-    @. tends_v += -α0_c * a_en * ∇aeKM_v(wvec(diffusive_flux_v))
+    sgs_flux_θ_liq_ice = aux_gm_f.sgs_flux_θ_liq_ice
+    sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot
+    sgs_flux_u = aux_gm_f.sgs_flux_u
+    sgs_flux_v = aux_gm_f.sgs_flux_v
+
+    @. sgs_flux_θ_liq_ice = diffusive_flux_h + massflux_h
+    @. sgs_flux_q_tot = diffusive_flux_qt + massflux_qt
+    @. sgs_flux_u = diffusive_flux_u # + massflux_u
+    @. sgs_flux_v = diffusive_flux_v # + massflux_v
 
     return nothing
 end
@@ -145,8 +132,11 @@ function compute_diffusive_fluxes(
     aux_en = center_aux_environment(state)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
-    aeKM = aux_en.area .* KM
-    aeKH = aux_en.area .* KH
+    aeKM = center_aux_turbconv(state).ϕ_temporary
+    aeKH = center_aux_turbconv(state).ψ_temporary
+    a_en = aux_en.area
+    @. aeKM = a_en * KM
+    @. aeKH = a_en * KH
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     kf_surf = kf_surface(grid)
@@ -157,10 +147,10 @@ function compute_diffusive_fluxes(
     @. aux_tc_f.ρ_ae_KH = IfKH(aeKH) * ρ0_f
     @. aux_tc_f.ρ_ae_KM = IfKM(aeKM) * ρ0_f
 
-    aeKHq_tot_bc = -surf.ρq_tot_flux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
-    aeKHθ_liq_ice_bc = -surf.ρθ_liq_ice_flux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
-    aeKMu_bc = -surf.ρu_flux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
-    aeKMv_bc = -surf.ρv_flux / aux_en.area[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
+    aeKHq_tot_bc = -surf.ρq_tot_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    aeKHθ_liq_ice_bc = -surf.ρθ_liq_ice_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    aeKMu_bc = -surf.ρu_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
+    aeKMv_bc = -surf.ρv_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
 
     ∇q_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_tot_bc), top = CCO.SetDivergence(FT(0)))
     ∇θ_liq_ice_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHθ_liq_ice_bc), top = CCO.SetDivergence(FT(0)))

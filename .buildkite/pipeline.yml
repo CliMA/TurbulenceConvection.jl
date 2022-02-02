@@ -13,10 +13,12 @@ steps:
     key: "init_cpu_env"
     command:
       - "echo $$JULIA_DEPOT_PATH"
+      - "julia --project=test -e 'using Pkg; Pkg.develop(path = \".\")'"
       - "julia --project=test -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=test -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=test -e 'using Pkg; Pkg.status()'"
 
+      - "julia --project=perf -e 'using Pkg; Pkg.develop(path = \".\")'"
       - "julia --project=perf -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=perf -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=perf -e 'using Pkg; Pkg.status()'"
@@ -194,9 +196,18 @@ steps:
       slurm_ntasks: 1
 
   - label: ":rocket: Benchmark tendencies"
-    key: "cpu_tendencies"
+    key: "cpu_bm_tendencies"
     command:
       - "julia --color=yes --project=perf perf/benchmark.jl"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
+  - label: ":rocket: Benchmark step!"
+    key: "cpu_bm_step"
+    command:
+      - "julia --color=yes --project=perf perf/benchmark_step.jl"
     agents:
       config: cpu
       queue: central

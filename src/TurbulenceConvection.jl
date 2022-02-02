@@ -15,6 +15,8 @@ import CloudMicrophysics
 import UnPack
 import StochasticDiffEq
 import Flux
+import OperatorFlux
+const OF = OperatorFlux
 
 const SDE = StochasticDiffEq
 const CC = ClimaCore

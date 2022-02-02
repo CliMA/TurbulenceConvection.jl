@@ -100,7 +100,6 @@ function compute_entr_detr!(
     plume_scale_height = map(1:N_up) do i
         compute_plume_scale_height(grid, state, param_set, i)
     end
-
     Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
     LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
@@ -149,10 +148,14 @@ function compute_entr_detr!(
                 aux_up[i].entr_sc[k] = er.ε_dyn
                 aux_up[i].detr_sc[k] = er.δ_dyn
                 aux_up[i].frac_turb_entr[k] = er.ε_turb
+                aux_up[i].nondim_entr_sc[k] = er.ε_dyn_nondim
+                aux_up[i].nondim_detr_sc[k] = er.δ_dyn_nondim
             else
                 aux_up[i].entr_sc[k] = 0.0
                 aux_up[i].detr_sc[k] = 0.0
                 aux_up[i].frac_turb_entr[k] = 0.0
+                aux_up[i].nondim_entr_sc[k] = 0.0
+                aux_up[i].nondim_detr_sc[k] = 0.0
             end
         end
     end
@@ -246,10 +249,10 @@ function compute_entr_detr!(
         Π₂ = parent(aux_up[i].Π₂)
         Π₃ = parent(aux_up[i].Π₃)
         Π₄ = parent(aux_up[i].Π₄)
-        D = parent(aux_up[i].nondim_entr_sc)
-        M = parent(aux_up[i].nondim_detr_sc)
+        nondim_ε = parent(aux_up[i].nondim_entr_sc)
+        nondim_δ = parent(aux_up[i].nondim_detr_sc)
 
-        non_dimensional_function!(D, M, param_set, Π₁, Π₂, Π₃, Π₄, εδ_model)
+        non_dimensional_function!(nondim_ε, nondim_δ, param_set, Π₁, Π₂, Π₃, Π₄, εδ_model)
         @inbounds for k in real_center_indices(grid)
             ε_turb = compute_turbulent_entrainment(
                 param_set,

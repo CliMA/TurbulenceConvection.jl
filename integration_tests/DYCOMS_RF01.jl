@@ -1,9 +1,11 @@
-import Pkg
-Pkg.develop(path = ".")
+if !haskey(ENV, "BUILDKITE")
+    import Pkg
+    Pkg.develop(path = ".")
+end
 import TurbulenceConvection
 using Test
 
-const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
+const tc_dir = pkgdir(TurbulenceConvection)
 include(joinpath(tc_dir, "driver", "main.jl"))
 include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
 include(joinpath(tc_dir, "post_processing", "compute_mse.jl"))

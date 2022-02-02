@@ -1,9 +1,7 @@
 # Launch with `julia --project --track-allocation=user`
-import Pkg
-Pkg.develop(path = ".")
+include(joinpath(@__DIR__, "common.jl"))
 import Profile
 
-include("common.jl")
 case_name = ENV["ALLOCATION_CASE_NAME"]
 @info "Recording allocations for $case_name"
 sim = init_sim(case_name)

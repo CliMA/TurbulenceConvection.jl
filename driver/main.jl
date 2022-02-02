@@ -20,7 +20,7 @@ import OrdinaryDiffEq
 const ODE = OrdinaryDiffEq
 import StaticArrays: SVector
 
-const tc_dir = dirname(dirname(pathof(TurbulenceConvection)))
+const tc_dir = pkgdir(TurbulenceConvection)
 
 include(joinpath(tc_dir, "driver", "NetCDFIO.jl"))
 include(joinpath(tc_dir, "driver", "initial_conditions.jl"))
@@ -80,9 +80,17 @@ function Simulation1d(namelist)
     Rad = TC.RadiationBase(case_type)
     TS = TimeStepping(namelist)
 
+    cspace = TC.center_space(grid)
+    fspace = TC.face_space(grid)
     turb_conv = if turb_conv_model == "constant_diffusivity"
-        ConstantDiffusivityModel()
-    elseif precip_name == "edmf"
+        # ConstantDiffusivityModel()
+        cent_prog_fields() = CC.Fields.coordinate_field(cspace)
+        face_prog_fields() = CC.Fields.coordinate_field(fspace)
+        aux_cent_fields = CC.Fields.coordinate_field(cspace)
+        aux_face_fields = CC.Fields.coordinate_field(fspace)
+        diagnostic_cent_fields = CC.Fields.coordinate_field(cspace)
+        diagnostic_face_fields = CC.Fields.coordinate_field(fspace)
+    elseif turb_conv_model == "edmf"
         TC.EDMF_PrognosticTKE(namelist, grid, param_set)
         N_up = TC.n_updrafts(turb_conv)
         cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
@@ -91,20 +99,18 @@ function Simulation1d(namelist)
         aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up))
         diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, N_up))
         diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up))
-    else
-        error("Invalid  turbulence convection model")
-        cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
-        face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up))
-        aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, N_up))
-        aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up))
-        diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, N_up))
-        diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up))
-        
+    # else
+    #     error("Invalid  turbulence convection model")
+    #     cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
+    #     face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up))
+    #     aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, N_up))
+    #     aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up))
+    #     diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, N_up))
+    #     diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up))
     end
-    isbits(turb_conv) || error("Something non-isbits was added to edmf and needs to be fixed.")
+    @show turb_conv_model
+    # isbits(turb_conv) || error("Something non-isbits was added to edmf and needs to be fixed.")
 
-    cspace = TC.center_space(grid)
-    fspace = TC.face_space(grid)
 
 
     prog = CC.Fields.FieldVector(cent = cent_prog_fields(), face = face_prog_fields())
@@ -247,11 +253,11 @@ function run(sim::Simulation1d; time_run = true)
     TC = TurbulenceConvection
     sim.skip_io || open_files(sim.Stats) # #removeVarsHack
     (prob, alg, kwargs) = solve_args(sim)
-
+    integrator = ODE.init(prob, alg; kwargs...)
     if time_run
-        sol = @timev ODE.solve(prob, alg; kwargs...)
+        sol = @timev ODE.solve!(integrator)
     else
-        sol = ODE.solve(prob, alg; kwargs...)
+        sol = ODE.solve!(integrator)
     end
 
     sim.skip_io || close_files(sim.Stats) # #removeVarsHack
@@ -269,7 +275,7 @@ nc_results_file(::Nothing) = @info "The simulation was run without IO, so no nc 
 
 function main1d(namelist; time_run = true)
     # TODO: generalize conversion of arrays from namelist to `SVector`s.
-    for param_name in ["general_ent_params", "general_stochastic_ent_params"]
+    for param_name in ["general_ent_params", "general_stochastic_ent_params", "fno_ent_params"]
         _p = namelist["turbulence"]["EDMF_PrognosticTKE"][param_name]
         namelist["turbulence"]["EDMF_PrognosticTKE"][param_name] = SVector{length(_p)}(_p)
     end
