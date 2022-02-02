@@ -96,6 +96,10 @@ Base.@kwdef struct LogNormalScalingProcess{MT} <: AbstractEntrDetrModel
     mean_model::MT
 end
 
+abstract type EntrDimScale end
+struct BuoyVelEntrDimScale <: EntrDimScale end
+struct InvZEntrDimScale <: EntrDimScale end
+
 """
     GradBuoy
 
@@ -456,7 +460,7 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC}
+struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, EDS}
     surface_area::Float64
     max_area::Float64
     minimum_area::Float64
@@ -465,6 +469,7 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC}
     prandtl_number::Float64
     bg_closure::EBGC
     entr_closure::EC
+    entr_dim_scale::EDS
     function EDMF_PrognosticTKE(namelist, grid::Grid, param_set::PS) where {PS}
         # get values from namelist
         prandtl_number = namelist["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"]
@@ -481,14 +486,9 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC}
             valid_options = ["normalmode", "normalmode_signdf"],
         )
 
-        # Get values from namelist
-        # set defaults at some point?
-        surface_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"]
-        max_area = namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"]
-        # entrainment parameters
-
-        # Need to code up as namelist option?
-        minimum_area = 1e-5
+        surface_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "surface_area"; default = 0.1)
+        max_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "max_area"; default = 0.9)
+        minimum_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_area"; default = 1e-5)
 
         # Create the class for precipitation
 
@@ -553,6 +553,7 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC}
             default = "moisture_deficit",
             valid_options = ["moisture_deficit", "NN", "NN_nonlocal", "FNO", "Linear"],
         )
+
         mean_entr_closure = if entr_type == "moisture_deficit"
             MDEntr()
         elseif entr_type == "NN"
@@ -578,11 +579,30 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC}
             error("Something went wrong. Invalid stochastic entrainment type '$stoch_entr_type'")
         end
 
+        entr_dim_scale = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "entr_dim_scale";
+            default = "buoy_vel",
+            valid_options = ["buoy_vel", "inv_z"],
+        )
+
+        entr_dim_scale = if entr_dim_scale == "buoy_vel"
+            BuoyVelEntrDimScale()
+        elseif entr_dim_scale == "inv_z"
+            InvZEntrDimScale()
+        else
+            error("Something went wrong. Invalid entrainment dimension scale '$entr_dim_scale'")
+        end
+
+
+        EDS = typeof(entr_dim_scale)
         EC = typeof(entr_closure)
         PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
-        return new{n_updrafts, PM, ENT, EBGC, EC}(
+        return new{n_updrafts, PM, ENT, EBGC, EC, EDS}(
             surface_area,
             max_area,
             minimum_area,
@@ -591,6 +611,7 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC}
             prandtl_number,
             bg_closure,
             entr_closure,
+            entr_dim_scale,
         )
     end
 end
