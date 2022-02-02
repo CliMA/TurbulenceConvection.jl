@@ -68,7 +68,7 @@ TurbulenceConvection.jl requires Julia 1.6 or higher. If you plan to develop Tur
 ```
 git clone https://github.com/CliMA/TurbulenceConvection.jl
 cd TurbulenceConvection.jl
-julia --project
+julia --project=test
 julia> ]
 pkg> instantiate
 ```
@@ -95,13 +95,13 @@ TurbulenceConvection.jl can be run in the same way that SCAMPy used to, given on
 with, for example:
 
 ```
-julia --project integration_tests/utils/generate_namelist.jl Soares
-julia --project integration_tests/utils/main.jl Soares
+julia --project=test integration_tests/utils/generate_namelist.jl Soares
+julia --project=test integration_tests/utils/main.jl Soares
 
 ```
 or, interactively, with
 ```julia-repl
-julia --project
+julia --project=test
 julia> include(joinpath("integration_tests", "Soares.jl"))
 ```
 
