@@ -257,7 +257,7 @@ end
 
 
 function compute_sgs_tendencies!(turb_conv::TC.EDMF_PrognosticTKE, param_set, grid, state, gm, surf)
-    TC.compute_sgs_tendencies!(turb_conv, grid, state, surf, radiation, force, gm)
+    TC.compute_sgs_flux!(edmf, grid, state, surf, radiation, force, gm)
 
     sgs_flux_θ_liq_ice = aux_gm_f.sgs_flux_θ_liq_ice
     sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot

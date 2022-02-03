@@ -27,7 +27,7 @@ function compute_les_Γᵣ(
     end
 end
 
-function compute_sgs_tendencies!(
+function compute_sgs_flux!(
     edmf::EDMF_PrognosticTKE,
     grid::Grid,
     state::State,
