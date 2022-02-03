@@ -353,7 +353,7 @@ function compute_gm_tendencies!(
             aux_tc.θ_liq_ice_tendency_precip_sinks[k]
     end
 
-    TC.compute_sgs_flux!(edmf, grid, state, surf, radiation, force, gm)
+    TC.compute_sgs_flux!(edmf, grid, state, surf, gm)
 
     sgs_flux_θ_liq_ice = aux_gm_f.sgs_flux_θ_liq_ice
     sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot

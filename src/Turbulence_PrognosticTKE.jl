@@ -27,15 +27,7 @@ function compute_les_Γᵣ(
     end
 end
 
-function compute_sgs_flux!(
-    edmf::EDMF_PrognosticTKE,
-    grid::Grid,
-    state::State,
-    surf::SurfaceBase,
-    radiation::RadiationBase,
-    force::ForcingBase,
-    gm::GridMeanVariables,
-)
+function compute_sgs_flux!(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, surf::SurfaceBase, gm::GridMeanVariables)
     N_up = n_updrafts(edmf)
     tendencies_gm = center_tendencies_grid_mean(state)
     FT = eltype(grid)
