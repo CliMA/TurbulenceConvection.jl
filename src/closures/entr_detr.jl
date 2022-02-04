@@ -108,7 +108,7 @@ end
 function compute_entr_detr!(
     state::State,
     grid::Grid,
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     param_set::APS,
     surf::SurfaceBase,
     Δt::Real,
@@ -195,7 +195,7 @@ end
 function compute_entr_detr!(
     state::State,
     grid::Grid,
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     param_set::APS,
     surf::SurfaceBase,
     Δt::Real,

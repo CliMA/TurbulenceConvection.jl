@@ -4,7 +4,7 @@ Computes tendencies to qt and θ_liq_ice due to precipitation formation
 function compute_precipitation_formation_tendencies(
     grid::Grid,
     state::State,
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     precip_model::AbstractPrecipitationModel,
     Δt::Real,
     param_set::APS,

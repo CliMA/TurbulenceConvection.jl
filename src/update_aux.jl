@@ -1,5 +1,5 @@
 function update_aux!(
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     gm::GridMeanVariables,
     grid::Grid,
     state::State,

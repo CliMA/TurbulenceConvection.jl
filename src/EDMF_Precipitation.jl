@@ -3,7 +3,7 @@ Computes the rain and snow advection (down) tendency
 """
 compute_precipitation_advection_tendencies(
     ::AbstractPrecipitationModel,
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     grid::Grid,
     state::State,
     gm::GridMeanVariables,
@@ -11,7 +11,7 @@ compute_precipitation_advection_tendencies(
 
 function compute_precipitation_advection_tendencies(
     ::Clima1M,
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     grid::Grid,
     state::State,
     gm::GridMeanVariables,

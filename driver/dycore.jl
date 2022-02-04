@@ -245,7 +245,7 @@ end
 
 
 function compute_gm_tendencies!(
-    edmf::TC.EDMF_PrognosticTKE,
+    edmf::TC.EDMFModel,
     grid::TC.Grid,
     state::TC.State,
     surf::TC.SurfaceBase,

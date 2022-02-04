@@ -460,7 +460,7 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, EDS}
+struct EDMFModel{N_up, PM, ENT, EBGC, EC, EDS}
     surface_area::Float64
     max_area::Float64
     minimum_area::Float64
@@ -470,7 +470,7 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, EDS}
     bg_closure::EBGC
     entr_closure::EC
     entr_dim_scale::EDS
-    function EDMF_PrognosticTKE(namelist, grid::Grid, param_set::PS) where {PS}
+    function EDMFModel(namelist) where {PS}
         # get values from namelist
         prandtl_number = namelist["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"]
 
@@ -616,7 +616,7 @@ struct EDMF_PrognosticTKE{N_up, PM, ENT, EBGC, EC, EDS}
     end
 end
 parameter_set(obj) = obj.param_set
-n_updrafts(::EDMF_PrognosticTKE{N_up}) where {N_up} = N_up
+n_updrafts(::EDMFModel{N_up}) where {N_up} = N_up
 
 struct State{P, A, T}
     prog::P
