@@ -192,7 +192,6 @@ function solve_args(sim::Simulation1d)
         TS = sim.TS,
         Stats = sim.Stats,
         skip_io = sim.skip_io,
-        adapt_dt = sim.adapt_dt,
         cfl_limit = sim.cfl_limit,
         dt_min = sim.dt_min,
     )
