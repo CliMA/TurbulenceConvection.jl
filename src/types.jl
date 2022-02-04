@@ -92,6 +92,7 @@ struct NNEntr <: AbstractEntrDetrModel end
 struct NNEntrNonlocal <: AbstractNonLocalEntrDetrModel end
 struct LinearEntr <: AbstractEntrDetrModel end
 struct FNOEntr <: AbstractNonLocalEntrDetrModel end
+struct RFEntr <: AbstractEntrDetrModel end
 
 Base.@kwdef struct NoisyRelaxationProcess{MT} <: AbstractEntrDetrModel
     mean_model::MT
@@ -535,7 +536,7 @@ struct EDMFModel{N_up, PM, ENT, EBGC, EC, EDS}
             "EDMF_PrognosticTKE",
             "entrainment";
             default = "moisture_deficit",
-            valid_options = ["moisture_deficit", "NN", "NN_nonlocal", "FNO", "Linear"],
+            valid_options = ["moisture_deficit", "NN", "NN_nonlocal", "FNO", "Linear", "RF"],
         )
 
         mean_entr_closure = if entr_type == "moisture_deficit"
@@ -548,6 +549,8 @@ struct EDMFModel{N_up, PM, ENT, EBGC, EC, EDS}
             FNOEntr()
         elseif entr_type == "Linear"
             LinearEntr()
+        elseif entr_type == "RF"
+            RFEntr()
         else
             error("Something went wrong. Invalid entrainment type '$entr_type'")
         end

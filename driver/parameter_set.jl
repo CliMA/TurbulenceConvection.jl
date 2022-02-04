@@ -45,6 +45,18 @@ CLIMAParameters.Atmos.EDMF.smin_rm(ps::EarthParameterSet) = ps.nt.smin_rm #  upp
 #! format: off
 function create_parameter_set(namelist)
     TC = TurbulenceConvection
+
+    ## Random Feature parameters
+    use_ran_features = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "RF"
+    rfp_kwargs = if use_ran_features
+        (;
+        c_rf_fix = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_fix_ent_params"),
+        c_rf_opt = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_opt_ent_params"),
+    )
+    else
+        ()
+    end
+
     nt = (;
         MSLP = 100000.0, # or grab from, e.g., namelist[""][...]
         cp_d = 1004.0,
@@ -84,14 +96,13 @@ function create_parameter_set(namelist)
         smin_ub = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_ub"),
         smin_rm = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_rm"),
         l_max = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),
-
+        rfp_kwargs...,
         ## Stochastic parameters
         c_gen_stoch = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "general_stochastic_ent_params"),
     )
     param_set = EarthParameterSet(nt)
     if !isbits(param_set)
-        @show param_set
-        error("The parameter set MUST be isbits in order to be stack-allocated.")
+        @warn "The parameter set SHOULD be isbits in order to be stack-allocated."
     end
     return param_set
 end
