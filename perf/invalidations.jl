@@ -2,7 +2,7 @@
 using SnoopCompileCore
 invalidations = @snoopr begin
     import Pkg
-    Pkg.develop(path = ".")
+    Pkg.develop(Pkg.PackageSpec(; path = dirname(@__DIR__)))
     import TurbulenceConvection
 
     const tc_dir = pkgdir(TurbulenceConvection)
