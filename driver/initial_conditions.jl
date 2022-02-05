@@ -3,14 +3,7 @@ const TC = TurbulenceConvection
 import Thermodynamics
 const TD = Thermodynamics
 
-function initialize_edmf(
-    edmf::TC.EDMF_PrognosticTKE,
-    grid::TC.Grid,
-    state::TC.State,
-    case,
-    gm::TC.GridMeanVariables,
-    t::Real,
-)
+function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, case, gm::TC.GridMeanVariables, t::Real)
     initialize_covariance(edmf, grid, state)
     surf_params = case.surf_params
     param_set = TC.parameter_set(gm)
@@ -32,7 +25,7 @@ function initialize_edmf(
     return
 end
 
-function initialize_covariance(edmf::TC.EDMF_PrognosticTKE, grid::TC.Grid, state::TC.State)
+function initialize_covariance(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State)
 
     kc_surf = TC.kc_surface(grid)
     aux_gm = TC.center_aux_grid_mean(state)

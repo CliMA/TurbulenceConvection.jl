@@ -2,7 +2,7 @@
     compute_nh_pressure!(
         state::State,
         grid::Grid,
-        edmf::EDMF_PrognosticTKE,
+        edmf::EDMFModel,
         param_set::APS
     )
 
@@ -18,7 +18,7 @@ for all updrafts, following [He2020](@cite), given:
  - `edmf`: EDMF model
  - `param_set`: parameter set, containing CLIMAParameters
 """
-function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMF_PrognosticTKE, param_set::APS, surf)
+function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, param_set::APS, surf)
 
     FT = eltype(grid)
     N_up = n_updrafts(edmf)

@@ -1,5 +1,5 @@
 
-function update_cloud_frac(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, gm::GridMeanVariables)
+function update_cloud_frac(edmf::EDMFModel, grid::Grid, state::State, gm::GridMeanVariables)
     # update grid-mean cloud fraction and cloud cover
     aux_bulk = center_aux_bulk(state)
     aux_gm = center_aux_grid_mean(state)
@@ -27,7 +27,7 @@ function compute_les_Γᵣ(
     end
 end
 
-function compute_sgs_flux!(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, surf::SurfaceBase, gm::GridMeanVariables)
+function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, gm::GridMeanVariables)
     N_up = n_updrafts(edmf)
     tendencies_gm = center_tendencies_grid_mean(state)
     FT = eltype(grid)
@@ -110,7 +110,7 @@ function compute_sgs_flux!(edmf::EDMF_PrognosticTKE, grid::Grid, state::State, s
 end
 
 function compute_diffusive_fluxes(
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     grid::Grid,
     state::State,
     gm::GridMeanVariables,
@@ -159,7 +159,7 @@ function compute_diffusive_fluxes(
 end
 
 function affect_filter!(
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     grid::Grid,
     state::State,
     gm::GridMeanVariables,
@@ -188,13 +188,7 @@ function affect_filter!(
     return nothing
 end
 
-function set_edmf_surface_bc(
-    edmf::EDMF_PrognosticTKE,
-    grid::Grid,
-    state::State,
-    surf::SurfaceBase,
-    gm::GridMeanVariables,
-)
+function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, gm::GridMeanVariables)
     param_set = parameter_set(gm)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
@@ -242,24 +236,24 @@ function surface_helper(surf::SurfaceBase, grid::Grid, state::State)
     return (; ustar, zLL, oblength, α0LL)
 end
 
-function a_up_boundary_conditions(surf::SurfaceBase, edmf::EDMF_PrognosticTKE, i::Int)
+function a_up_boundary_conditions(surf::SurfaceBase, edmf::EDMFModel, i::Int)
     a_surf = area_surface_bc(surf, edmf, i)
     return (; bottom = CCO.SetValue(a_surf), top = CCO.Extrapolate())
 end
 
-function a_bulk_boundary_conditions(surf::SurfaceBase, edmf::EDMF_PrognosticTKE)
+function a_bulk_boundary_conditions(surf::SurfaceBase, edmf::EDMFModel)
     N_up = n_updrafts(edmf)
     a_surf = sum(i -> area_surface_bc(surf, edmf, i), 1:N_up)
     return (; bottom = CCO.SetValue(a_surf), top = CCO.Extrapolate())
 end
 
-function a_en_boundary_conditions(surf::SurfaceBase, edmf::EDMF_PrognosticTKE)
+function a_en_boundary_conditions(surf::SurfaceBase, edmf::EDMFModel)
     N_up = n_updrafts(edmf)
     a_surf = 1 - sum(i -> area_surface_bc(surf, edmf, i), 1:N_up)
     return (; bottom = CCO.SetValue(a_surf), top = CCO.Extrapolate())
 end
 
-function area_surface_bc(surf::SurfaceBase{FT}, edmf::EDMF_PrognosticTKE, i::Int)::FT where {FT}
+function area_surface_bc(surf::SurfaceBase{FT}, edmf::EDMFModel, i::Int)::FT where {FT}
     N_up = n_updrafts(edmf)
     return surf.bflux > 0 ? edmf.surface_area / N_up : FT(0)
 end
@@ -267,7 +261,7 @@ end
 function w_surface_bc(::SurfaceBase{FT})::FT where {FT}
     return FT(0)
 end
-function θ_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDMF_PrognosticTKE, i::Int)::FT where {FT}
+function θ_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDMFModel, i::Int)::FT where {FT}
     prog_gm = center_prog_grid_mean(state)
     kc_surf = kc_surface(grid)
     surf.bflux > 0 || return FT(0)
@@ -279,7 +273,7 @@ function θ_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::ED
     surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + i * a_, 1 - a_total + (i + 1) * a_, 1000)
     return prog_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var)
 end
-function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDMF_PrognosticTKE, i::Int)::FT where {FT}
+function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDMFModel, i::Int)::FT where {FT}
     prog_gm = center_prog_grid_mean(state)
     kc_surf = kc_surface(grid)
     surf.bflux > 0 || return prog_gm.q_tot[kc_surf]
@@ -293,7 +287,7 @@ function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDM
 end
 
 function get_GMV_CoVar(
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     grid::Grid,
     state::State,
     ::Val{covar_sym},
@@ -341,13 +335,7 @@ function compute_plume_scale_height(grid::Grid{FT}, state::State, param_set::APS
     return max(updraft_top, H_up_min)
 end
 
-function compute_up_tendencies!(
-    edmf::EDMF_PrognosticTKE,
-    grid::Grid,
-    state::State,
-    gm::GridMeanVariables,
-    surf::SurfaceBase,
-)
+function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, gm::GridMeanVariables, surf::SurfaceBase)
     N_up = n_updrafts(edmf)
     param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
@@ -447,13 +435,7 @@ function compute_up_tendencies!(
     return nothing
 end
 
-function filter_updraft_vars(
-    edmf::EDMF_PrognosticTKE,
-    grid::Grid,
-    state::State,
-    surf::SurfaceBase,
-    gm::GridMeanVariables,
-)
+function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, gm::GridMeanVariables)
     N_up = n_updrafts(edmf)
     param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
@@ -516,7 +498,7 @@ function filter_updraft_vars(
 end
 
 function compute_covariance_shear(
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     grid::Grid,
     state::State,
     gm::GridMeanVariables,
@@ -565,7 +547,7 @@ function compute_covariance_shear(
 end
 
 function compute_covariance_interdomain_src(
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     grid::Grid,
     state::State,
     ::Val{covar_sym},
@@ -598,7 +580,7 @@ function compute_covariance_interdomain_src(
 end
 
 function compute_covariance_entr(
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     grid::Grid,
     state::State,
     ::Val{covar_sym},
@@ -668,7 +650,7 @@ function compute_covariance_entr(
 end
 
 function compute_covariance_dissipation(
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     grid::Grid,
     state::State,
     ::Val{covar_sym},
@@ -693,7 +675,7 @@ function compute_covariance_dissipation(
 end
 
 function compute_en_tendencies!(
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     grid::Grid,
     state::State,
     param_set::APS,
@@ -778,7 +760,7 @@ function compute_en_tendencies!(
 end
 
 function GMV_third_m(
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     grid::Grid,
     state::State,
     ::Val{covar_en_sym},

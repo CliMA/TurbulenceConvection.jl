@@ -79,7 +79,7 @@ function Simulation1d(namelist)
     Rad = TC.RadiationBase(case_type)
     TS = TimeStepping(namelist)
 
-    edmf = TC.EDMF_PrognosticTKE(namelist, grid, param_set)
+    edmf = TC.EDMFModel(namelist)
     isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
     N_up = TC.n_updrafts(edmf)
 
