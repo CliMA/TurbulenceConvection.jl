@@ -93,7 +93,7 @@ mutable struct NetCDFIO_Stats
 end
 
 
-function open_files(self)
+function open_files(self::NetCDFIO_Stats)
     self.root_grp = NC.Dataset(self.path_plus_file, "a")
     self.profiles_grp = self.root_grp.group["profiles"]
     self.ts_grp = self.root_grp.group["timeseries"]
