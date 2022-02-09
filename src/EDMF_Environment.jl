@@ -70,7 +70,7 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
     quad_order = quadrature_order(en_thermo)
     tendencies_pr = center_tendencies_precipitation(state)
 
-    #TODO - remember you output source terms multipierd by Δt (bec. of instanteneous autoconcv)
+    #TODO - remember you output source terms multiplied by Δt (bec. of instantaneous autoconv)
     #TODO - add tendencies for gm H, QT and QR due to rain
     #TODO - if we start using eos_smpl for the updrafts calculations
     #       we can get rid of the two categories for outer and inner quad. points
@@ -85,7 +85,7 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
     sqpi_inv = 1 / sqrt(π)
     sqrt2 = sqrt(2)
 
-    epsilon = 10e-14 #np.finfo(np.float).eps
+    epsilon = 10e-14 # eps(float)
 
     # initialize the quadrature points and their labels
     inner_env = zeros(env_len)
@@ -231,21 +231,31 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
 
             # update cloudy/dry variables for buoyancy in TKE
             aux_en.cloud_fraction[k] = outer_env[i_cf]
-            aux_en_unsat.q_tot[k] = outer_env[i_qt_unsat]
-            # TD.jl cannot compute θ_unsat when T=0
-            aux_en_unsat.θ_dry[k] = if outer_env[i_T_unsat] > 0
-                ts_unsat = TD.PhaseEquil_pTq(param_set, p0_c[k], outer_env[i_T_unsat], aux_en_unsat.q_tot[k])
-                TD.dry_pottemp(ts_unsat)
+            if aux_en.cloud_fraction[k] < 1
+                aux_en_unsat.q_tot[k] = outer_env[i_qt_unsat] / (1 - aux_en.cloud_fraction[k])
+                T_unsat = outer_env[i_T_unsat] / (1 - aux_en.cloud_fraction[k])
+                ts_unsat = TD.PhaseEquil_pTq(param_set, p0_c[k], T_unsat, aux_en_unsat.q_tot[k])
+                aux_en_unsat.θ_dry[k] = TD.dry_pottemp(ts_unsat)
             else
-                0
+                aux_en_unsat.q_tot[k] = 0
+                aux_en_unsat.θ_dry[k] = 0
             end
 
-            aux_en_sat.T[k] = outer_env[i_T_sat]
-            aux_en_sat.q_vap[k] = outer_env[i_qt_sat] - outer_env[i_ql]
-            aux_en_sat.q_tot[k] = outer_env[i_qt_sat]
-            ts_sat = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_en_sat.T[k], aux_en_sat.q_tot[k])
-            aux_en_sat.θ_dry[k] = TD.dry_pottemp(ts_sat)
-            aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(ts_sat)
+            if aux_en.cloud_fraction[k] > 0
+                aux_en_sat.T[k] = outer_env[i_T_sat] / aux_en.cloud_fraction[k]
+                aux_en_sat.q_tot[k] = outer_env[i_qt_sat] / aux_en.cloud_fraction[k]
+                aux_en_sat.q_vap[k] =
+                    (outer_env[i_qt_sat] - outer_env[i_ql] - outer_env[i_qi]) / aux_en.cloud_fraction[k]
+                ts_sat = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_en_sat.T[k], aux_en_sat.q_tot[k])
+                aux_en_sat.θ_dry[k] = TD.dry_pottemp(ts_sat)
+                aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(ts_sat)
+            else
+                aux_en_sat.T[k] = 0
+                aux_en_sat.q_vap[k] = 0
+                aux_en_sat.q_tot[k] = 0
+                aux_en_sat.θ_dry[k] = 0
+                aux_en_sat.θ_liq_ice[k] = 0
+            end
 
             # update var/covar rain sources
             aux_en.Hvar_rain_dt[k] = outer_src[i_SH_H] - outer_src[i_SH] * aux_en.θ_liq_ice[k]
