@@ -4,15 +4,24 @@ import Thermodynamics
 const TD = Thermodynamics
 
 function initialize_turb_conv(
-    edmf::TC.EDMF_PrognosticTKE,
+    turb_conv::AbstractTurbConvModel,
     grid::TC.Grid,
     state::TC.State,
     case,
     gm::TC.GridMeanVariables,
     t::Real,
 )
-    initialize_covariance(edmf, grid, state)
     surf_params = case.surf_params
+    param_set = TC.parameter_set(gm)
+    surf = get_surface(surf_params, grid, state, gm, t, param_set)
+    return
+end
+
+function initialize_edmf(edmf::ConstantDiffusivityModel, grid::TC.Grid, state::TC.State, case, gm::TC.GridMeanVariables, t::Real)
+    return nothing
+end
+function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, case, gm::TC.GridMeanVariables, t::Real)
+    initialize_covariance(edmf, grid, state)
     param_set = TC.parameter_set(gm)
     aux_tc = TC.center_aux_turbconv(state)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -22,7 +31,6 @@ function initialize_turb_conv(
         ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
     end
-    surf = get_surface(surf_params, grid, state, gm, t, param_set)
     if case.casename == "DryBubble"
         initialize_updrafts_DryBubble(edmf, grid, state, gm)
     else
@@ -32,8 +40,7 @@ function initialize_turb_conv(
     return
 end
 
-
-function initialize_covariance(edmf::TC.EDMF_PrognosticTKE, grid::TC.Grid, state::TC.State)
+function initialize_covariance(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State)
 
     kc_surf = TC.kc_surface(grid)
     aux_gm = TC.center_aux_grid_mean(state)

@@ -35,10 +35,32 @@ function get_MdMdz(M::FT, dMdz::FT) where {FT}
     return MdMdz_ε, MdMdz_δ
 end
 
-function entrainment_length_scale(param_set, b_up::FT, b_en::FT, w_up::FT, w_en::FT, tke::FT) where {FT}
+function entrainment_length_scale(
+    param_set,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ::BuoyVelEntrDimScale,
+) where {FT}
     Δw = get_Δw(param_set, w_up, w_en)
     λ = compute_inverse_timescale(param_set, b_up, b_en, w_up, w_en, tke)
     return (λ / Δw)
+end
+
+function entrainment_length_scale(
+    param_set,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ::InvZEntrDimScale,
+) where {FT}
+    return (1 / zc_i)
 end
 
 """
@@ -51,9 +73,18 @@ Cohen et al. (JAMES, 2020), given:
  - `εδ_vars`  :: structure containing variables
  - `εδ_model_type`  :: type of non-dimensional model for entrainment/detrainment
 """
-function entr_detr(param_set::APS, εδ_vars, εδ_model_type)
+function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, εδ_model_type)
     FT = eltype(εδ_vars)
-    dim_scale = entrainment_length_scale(param_set, εδ_vars.b_up, εδ_vars.b_en, εδ_vars.w_up, εδ_vars.w_en, εδ_vars.tke)
+    dim_scale = entrainment_length_scale(
+        param_set,
+        εδ_vars.b_up,
+        εδ_vars.b_en,
+        εδ_vars.w_up,
+        εδ_vars.w_en,
+        εδ_vars.tke,
+        εδ_vars.zc_i,
+        entr_dim_scale,
+    )
 
     area_limiter = max_area_limiter(param_set, εδ_vars.max_area, εδ_vars.a_up)
 
@@ -77,7 +108,7 @@ end
 function compute_entr_detr!(
     state::State,
     grid::Grid,
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     param_set::APS,
     surf::SurfaceBase,
     Δt::Real,
@@ -144,7 +175,7 @@ function compute_entr_detr!(
                     nondim_detr_sc = aux_up[i].nondim_detr_sc[k],
                 )
 
-                er = entr_detr(param_set, εδ_model_vars, edmf.entr_closure)
+                er = entr_detr(param_set, εδ_model_vars, edmf.entr_dim_scale, edmf.entr_closure)
                 aux_up[i].entr_sc[k] = er.ε_dyn
                 aux_up[i].detr_sc[k] = er.δ_dyn
                 aux_up[i].frac_turb_entr[k] = er.ε_turb
@@ -164,7 +195,7 @@ end
 function compute_entr_detr!(
     state::State,
     grid::Grid,
-    edmf::EDMF_PrognosticTKE,
+    edmf::EDMFModel,
     param_set::APS,
     surf::SurfaceBase,
     Δt::Real,
@@ -268,6 +299,8 @@ function compute_entr_detr!(
                 w_up_c[k],
                 w_en_c[k],
                 aux_en.tke[k],
+                grid.zc[k].z,
+                edmf.entr_dim_scale,
             )
             area_limiter = max_area_limiter(param_set, max_area, aux_up[i].area[k])
             MdMdz_ε, MdMdz_δ = get_MdMdz(m_entr_detr[k], ∇m_entr_detr[k])

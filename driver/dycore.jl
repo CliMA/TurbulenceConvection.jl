@@ -257,7 +257,7 @@ end
 
 
 function compute_sgs_tendencies!(turb_conv::TC.EDMF_PrognosticTKE, param_set, grid, state, gm, surf)
-    TC.compute_sgs_flux!(edmf, grid, state, surf, radiation, force, gm)
+    TC.compute_sgs_flux!(edmf, grid, state, surf, gm)
 
     sgs_flux_θ_liq_ice = aux_gm_f.sgs_flux_θ_liq_ice
     sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot
@@ -284,28 +284,6 @@ function compute_sgs_tendencies!(turb_conv::TC.EDMF_PrognosticTKE, param_set, gr
     @. tends_u += -α0_c * ∇u_sgs(wvec(sgs_flux_u))
     @. tends_v += -α0_c * ∇v_sgs(wvec(sgs_flux_v))
     return nothing
-end
-
-function initialize_turb_conv(
-    turb_conv::ConstantDiffusivityModel,
-    grid::TC.Grid,
-    state::TC.State,
-    case,
-    gm::TC.GridMeanVariables,
-    t::Real,
-)
-    surf_params = case.surf_params
-    param_set = TC.parameter_set(gm)
-    aux_tc = TC.center_aux_turbconv(state)
-    prog_gm = TC.center_prog_grid_mean(state)
-    p0_c = TC.center_ref_state(state).p0
-    parent(aux_tc.prandtl_nvec) .= turb_conv.prandtl_number
-    @inbounds for k in TC.real_center_indices(grid)
-        ts = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
-    end
-    surf = get_surface(surf_params, grid, state, gm, t, param_set)
-    return
 end
 
 function compute_sgs_tendencies!(turb_conv::ConstantDiffusivityModel, param_set, grid, state, gm, surf)

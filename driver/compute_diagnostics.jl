@@ -73,7 +73,7 @@ function initialize_io(gm::TC.GridMeanVariables, Stats::NetCDFIO_Stats)
 end
 
 # Initialize the IO pertaining to this class
-function initialize_io(edmf::TC.EDMF_PrognosticTKE, Stats::NetCDFIO_Stats)
+function initialize_io(edmf::TC.EDMFModel, Stats::NetCDFIO_Stats)
     add_ts(Stats, "env_cloud_base")
     add_ts(Stats, "env_cloud_top")
     add_ts(Stats, "env_cloud_cover")
@@ -107,7 +107,7 @@ the state, auxiliary fields (which the state does depend on), and
 tendencies.
 =#
 function compute_diagnostics!(
-    edmf::TC.EDMF_PrognosticTKE,
+    edmf::TC.EDMFModel,
     gm::TC.GridMeanVariables,
     grid::TC.Grid,
     state::TC.State,

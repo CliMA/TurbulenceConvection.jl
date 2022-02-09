@@ -1,6 +1,6 @@
 if !haskey(ENV, "BUILDKITE")
     import Pkg
-    Pkg.develop(path = ".")
+    Pkg.develop(Pkg.PackageSpec(; path = dirname(@__DIR__)))
 end
 
 # Track allocations in TC.jl plus all _direct_ dependencies

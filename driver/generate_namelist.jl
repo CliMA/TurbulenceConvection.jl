@@ -84,6 +84,8 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"] = Dict()
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = 0.9
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["min_area"] = 1e-5
+
     # mixing_length
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.14
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.22
@@ -155,6 +157,7 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "NN", "NN_nonlocal", "Linear", "FNO"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_z"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = "deterministic"  # {"deterministic", "noisy_relaxation_process", "lognormal_scaling"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_local_micro"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["constant_area"] = false

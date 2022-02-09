@@ -80,6 +80,10 @@ function Simulation1d(namelist)
     Rad = TC.RadiationBase(case_type)
     TS = TimeStepping(namelist)
 
+    edmf = TC.EDMFModel(namelist)
+    isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
+    N_up = TC.n_updrafts(edmf)
+
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
     turb_conv = if turb_conv_model == "constant_diffusivity"
@@ -212,7 +216,6 @@ function solve_args(sim::Simulation1d)
         TS = sim.TS,
         Stats = sim.Stats,
         skip_io = sim.skip_io,
-        adapt_dt = sim.adapt_dt,
         cfl_limit = sim.cfl_limit,
         dt_min = sim.dt_min,
     )
