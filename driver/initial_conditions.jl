@@ -3,29 +3,14 @@ const TC = TurbulenceConvection
 import Thermodynamics
 const TD = Thermodynamics
 
-function initialize_turb_conv(
-    turb_conv::AbstractTurbConvModel,
-    grid::TC.Grid,
-    state::TC.State,
-    case,
-    gm::TC.GridMeanVariables,
-    t::Real,
-)
-    surf_params = case.surf_params
-    param_set = TC.parameter_set(gm)
-    surf = get_surface(surf_params, grid, state, gm, t, param_set)
-    return
-end
-
-function initialize_edmf(edmf::ConstantDiffusivityModel, grid::TC.Grid, state::TC.State, case, gm::TC.GridMeanVariables, t::Real)
-    return nothing
-end
-function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, case, gm::TC.GridMeanVariables, t::Real)
+function initialize_turb_conv(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, case, gm::TC.GridMeanVariables, t::Real)
     initialize_covariance(edmf, grid, state)
     param_set = TC.parameter_set(gm)
     aux_tc = TC.center_aux_turbconv(state)
     prog_gm = TC.center_prog_grid_mean(state)
     p0_c = TC.center_ref_state(state).p0
+    surf_params = case.surf_params
+    surf = get_surface(surf_params, grid, state, gm, t, param_set)
     parent(aux_tc.prandtl_nvec) .= edmf.prandtl_number
     @inbounds for k in TC.real_center_indices(grid)
         ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
@@ -37,6 +22,20 @@ function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, cas
         initialize_updrafts(edmf, grid, state, gm, surf)
     end
     TC.set_edmf_surface_bc(edmf, grid, state, surf, gm)
+    return
+end
+
+function initialize_turb_conv(
+    turb_conv::TC.DiffusivityModel,
+    grid::TC.Grid,
+    state::TC.State,
+    case,
+    gm::TC.GridMeanVariables,
+    t::Real,
+)
+    surf_params = case.surf_params
+    param_set = TC.parameter_set(gm)
+    surf = get_surface(surf_params, grid, state, gm, t, param_set)
     return
 end
 

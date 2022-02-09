@@ -197,7 +197,6 @@ function satadjust(gm::TC.GridMeanVariables, grid, state)
     return
 end
 
-struct ConstantDiffusivityModel <: TC.AbstractTurbConvModel end
 
 # Compute the sum of tendencies for the scheme
 function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
@@ -242,7 +241,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     return nothing
 end
 
-function compute_turbconv_tendencies!(turb_conv::TC.EDMF_PrognosticTKE, param_set, grid, state, gm, surf)
+function compute_turbconv_tendencies!(turb_conv::TC.EDMFModel, param_set, grid, state, gm, surf)
     TC.compute_up_tendencies!(turb_conv, grid, state, gm, surf)
     TC.compute_en_tendencies!(turb_conv, grid, state, param_set, Val(:tke), Val(:ρatke))
     TC.compute_en_tendencies!(turb_conv, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
@@ -251,12 +250,12 @@ function compute_turbconv_tendencies!(turb_conv::TC.EDMF_PrognosticTKE, param_se
     return nothing
 end
 
-function compute_turbconv_tendencies!(turb_conv::ConstantDiffusivityModel, param_set, grid, state, gm, surf)
+function compute_turbconv_tendencies!(turb_conv::TC.DiffusivityModel, param_set, grid, state, gm, surf)
     return nothing
 end
 
 
-function compute_sgs_tendencies!(turb_conv::TC.EDMF_PrognosticTKE, param_set, grid, state, gm, surf)
+function compute_sgs_tendencies!(turb_conv::TC.EDMFModel, param_set, grid, state, gm, surf)
     TC.compute_sgs_flux!(edmf, grid, state, surf, gm)
 
     sgs_flux_θ_liq_ice = aux_gm_f.sgs_flux_θ_liq_ice
@@ -286,7 +285,7 @@ function compute_sgs_tendencies!(turb_conv::TC.EDMF_PrognosticTKE, param_set, gr
     return nothing
 end
 
-function compute_sgs_tendencies!(turb_conv::ConstantDiffusivityModel, param_set, grid, state, gm, surf)
+function compute_sgs_tendencies!(turb_conv::TC.DiffusivityModel, param_set, grid, state, gm, surf)
     FT = eltype(grid)
     zf = grid.zf
     kf_surf = TC.kf_surface(grid)
@@ -300,7 +299,7 @@ function compute_sgs_tendencies!(turb_conv::ConstantDiffusivityModel, param_set,
     ∇u_gm = TC.center_aux_grid_mean(state).∇u_gm
     ∇v_gm = TC.center_aux_grid_mean(state).∇v_gm
 
-    ν = 0.1
+    ν = turb_conv.diff_coeff
     grad_θ = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρθ_liq_ice_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
     grad_q = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρq_tot_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
     grad_u = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρu_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
@@ -317,14 +316,14 @@ end
 
 
 function compute_gm_tendencies!(
-    turb_conv::TC.AbstractTurbConvModel,
+    turb_conv::ATCM,
     grid::TC.Grid,
     state::TC.State,
     surf::TC.SurfaceBase,
     radiation::TC.RadiationBase,
     force::TC.ForcingBase,
     gm::TC.GridMeanVariables,
-)
+) where {ATCM}
     tendencies_gm = TC.center_tendencies_grid_mean(state)
     kc_toa = TC.kc_top_of_atmos(grid)
     kf_surf = TC.kf_surface(grid)

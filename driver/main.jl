@@ -80,22 +80,21 @@ function Simulation1d(namelist)
     Rad = TC.RadiationBase(case_type)
     TS = TimeStepping(namelist)
 
-    edmf = TC.EDMFModel(namelist)
-    isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
-    N_up = TC.n_updrafts(edmf)
+    turb_conv_model = "edmf"
 
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
-    turb_conv = if turb_conv_model == "constant_diffusivity"
-        # ConstantDiffusivityModel()
-        cent_prog_fields() = CC.Fields.coordinate_field(cspace)
-        face_prog_fields() = CC.Fields.coordinate_field(fspace)
-        aux_cent_fields = CC.Fields.coordinate_field(cspace)
-        aux_face_fields = CC.Fields.coordinate_field(fspace)
-        diagnostic_cent_fields = CC.Fields.coordinate_field(cspace)
-        diagnostic_face_fields = CC.Fields.coordinate_field(fspace)
+    cent_prog_fields() = CC.Fields.coordinate_field(cspace)
+    face_prog_fields() = CC.Fields.coordinate_field(fspace)
+    aux_cent_fields = CC.Fields.coordinate_field(cspace)
+    aux_face_fields = CC.Fields.coordinate_field(fspace)
+    diagnostic_cent_fields = CC.Fields.coordinate_field(cspace)
+    diagnostic_face_fields = CC.Fields.coordinate_field(fspace)
+
+    if turb_conv_model == "constant_diffusivity"
+        turb_conv = TC.DiffusivityModel()
     elseif turb_conv_model == "edmf"
-        TC.EDMF_PrognosticTKE(namelist, grid, param_set)
+        turb_conv = TC.EDMFModel(namelist)
         N_up = TC.n_updrafts(turb_conv)
         cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
         face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up))
@@ -103,19 +102,8 @@ function Simulation1d(namelist)
         aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up))
         diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, N_up))
         diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up))
-    # else
-    #     error("Invalid  turbulence convection model")
-    #     cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
-    #     face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up))
-    #     aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, N_up))
-    #     aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up))
-    #     diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, N_up))
-    #     diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up))
     end
-    @show turb_conv_model
     # isbits(turb_conv) || error("Something non-isbits was added to edmf and needs to be fixed.")
-
-
 
     prog = CC.Fields.FieldVector(cent = cent_prog_fields(), face = face_prog_fields())
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
