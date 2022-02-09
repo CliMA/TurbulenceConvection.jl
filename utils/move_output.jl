@@ -11,6 +11,7 @@ if haskey(ENV, "BUILDKITE_COMMIT") && haskey(ENV, "BUILDKITE_BRANCH")
     using Glob
     if branch == "staging"
         commit_sha = commit[1:7]
+        mkpath(cluster_data_prefix)
         path = joinpath(cluster_data_prefix, commit_sha)
         mkpath(path)
         for folder_name in glob("Output.*")

@@ -98,6 +98,7 @@ function compute_mse_wrapper(
     plot_dir = joinpath(dirname(ds_tc_filename), "comparison"),
     kwargs...,
 )
+    return best_mse
     # Note: cluster_data_prefix is also defined in utils/move_output.jl
     if haskey(ENV, "BUILDKITE_COMMIT")
         cluster_data_prefix = "/central/scratch/climaci/turbulenceconvection-main"
