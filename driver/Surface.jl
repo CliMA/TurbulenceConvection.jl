@@ -73,6 +73,7 @@ function get_surface(
         ρv_flux = surf_params.zero_uv_fluxes ? FT(0) : result.ρτyz,
         ρθ_liq_ice_flux = shf / TD.cp_m(ts_in),
         ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in),
+        wstar = convective_vel,
     )
 end
 
@@ -100,6 +101,7 @@ function get_surface(
     zrough = surf_params.zrough
     cm = surf_params.cm
     ch = surf_params.ch
+    Ri_bulk_crit = surf_params.Ri_bulk_crit
 
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
@@ -116,6 +118,8 @@ function get_surface(
     lhf = result.lhf
     shf = result.shf
 
+    zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)
+    convective_vel = TC.get_wstar(result.buoy_flux, zi)
     return TC.SurfaceBase{FT}(;
         cm = result.Cd,
         ch = result.Ch,
@@ -128,6 +132,7 @@ function get_surface(
         ρθ_liq_ice_flux = shf / TD.cp_m(ts_in),
         ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in),
         bflux = result.buoy_flux,
+        wstar = convective_vel,
     )
 end
 
@@ -157,6 +162,7 @@ function get_surface(
     shf = TC.sensible_heat_flux(surf_params, t)
     lhf = TC.latent_heat_flux(surf_params, t)
     zrough = surf_params.zrough
+    Ri_bulk_crit = surf_params.Ri_bulk_crit
 
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
@@ -171,6 +177,8 @@ function get_surface(
     result = SF.surface_conditions(param_set, sc, universal_func, scheme)
     lhf = result.lhf
     shf = result.shf
+    zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)
+    convective_vel = TC.get_wstar(result.buoy_flux, zi)
     return TC.SurfaceBase{FT}(;
         cm = result.Cd,
         ch = result.Ch,
@@ -183,6 +191,7 @@ function get_surface(
         ρθ_liq_ice_flux = shf / TD.cp_m(ts_in),
         ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in),
         bflux = result.buoy_flux,
+        wstar = convective_vel,
     )
 end
 
@@ -209,6 +218,7 @@ function get_surface(
     θ_liq_ice_gm_surf = prog_gm.θ_liq_ice[kc_surf]
     Tsurface = surface_temperature(surf_params, t)
     zrough = surf_params.zrough
+    Ri_bulk_crit = surf_params.Ri_bulk_crit
 
     phase_part = TD.PhasePartition(q_tot_gm_surf, 0.0, 0.0)
     pvg = TD.saturation_vapor_pressure(param_set, TD.PhaseEquil, Tsurface)
@@ -228,6 +238,8 @@ function get_surface(
     result = SF.surface_conditions(param_set, sc, universal_func, scheme)
     lhf = result.lhf
     shf = result.shf
+    zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)
+    convective_vel = TC.get_wstar(result.buoy_flux, zi)
     return TC.SurfaceBase{FT}(;
         cm = result.Cd,
         ch = result.Ch,
@@ -240,5 +252,6 @@ function get_surface(
         ρθ_liq_ice_flux = shf / TD.cp_m(ts_in),
         ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in),
         bflux = result.buoy_flux,
+        wstar = convective_vel,
     )
 end
