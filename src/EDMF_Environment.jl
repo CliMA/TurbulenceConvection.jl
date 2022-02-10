@@ -57,17 +57,15 @@ function microphysics(
     return nothing
 end
 
+include("quad_loop.jl")
+
 function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip_model, Δt::Real, param_set::APS)
-    a = en_thermo.a
-    w = en_thermo.w
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
     aux_en_unsat = aux_en.unsat
     aux_en_sat = aux_en.sat
-    quadrature_type = en_thermo.quadrature_type
-    quad_order = quadrature_order(en_thermo)
     tendencies_pr = center_tendencies_precipitation(state)
 
     #TODO - remember you output source terms multiplied by Δt (bec. of instantaneous autoconv)
@@ -75,25 +73,12 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
     #TODO - if we start using eos_smpl for the updrafts calculations
     #       we can get rid of the two categories for outer and inner quad. points
 
-    abscissas = a
-    weights = w
     # arrays for storing quadarature points and ints for labeling items in the arrays
     # a python dict would be nicer, but its 30% slower than this (for python 2.7. It might not be the case for python 3)
-    env_len = 8
-    src_len = 8
-
-    sqpi_inv = 1 / sqrt(π)
-    sqrt2 = sqrt(2)
 
     epsilon = 10e-14 # eps(float)
 
     # initialize the quadrature points and their labels
-    inner_env = zeros(env_len)
-    outer_env = zeros(env_len)
-    inner_src = zeros(src_len)
-    outer_src = zeros(src_len)
-    i_ql, i_qi, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat = 1:env_len
-    i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH, i_Sqr, i_Sqs = 1:src_len
 
     @inbounds for k in real_center_indices(grid)
         if (
@@ -103,115 +88,19 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
             aux_en.q_tot[k] > epsilon &&
             sqrt(aux_en.QTvar[k]) < aux_en.q_tot[k]
         )
-
-            if quadrature_type isa LogNormalQuad
-                # Lognormal parameters (mu, sd) from mean and variance
-                sd_q = sqrt(log(aux_en.QTvar[k] / aux_en.q_tot[k] / aux_en.q_tot[k] + 1))
-                sd_h = sqrt(log(aux_en.Hvar[k] / aux_en.θ_liq_ice[k] / aux_en.θ_liq_ice[k] + 1))
-                # Enforce Schwarz"s inequality
-                corr = max(min(aux_en.HQTcov[k] / sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]), 1), -1)
-                sd2_hq = log(corr * sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]) / aux_en.θ_liq_ice[k] / aux_en.q_tot[k] + 1)
-                sd_cond_h_q = sqrt(max(sd_h * sd_h - sd2_hq * sd2_hq / sd_q / sd_q, 0))
-                μ_q = log(aux_en.q_tot[k] * aux_en.q_tot[k] / sqrt(aux_en.q_tot[k] * aux_en.q_tot[k] + aux_en.QTvar[k]))
-                μ_h = log(
-                    aux_en.θ_liq_ice[k] * aux_en.θ_liq_ice[k] /
-                    sqrt(aux_en.θ_liq_ice[k] * aux_en.θ_liq_ice[k] + aux_en.Hvar[k]),
-                )
-            else
-                sd_q = sqrt(aux_en.QTvar[k])
-                sd_h = sqrt(aux_en.Hvar[k])
-                corr = max(min(aux_en.HQTcov[k] / max(sd_h * sd_q, 1e-13), 1), -1)
-
-                # limit sd_q to prevent negative qt_hat
-                sd_q_lim = (1e-10 - aux_en.q_tot[k]) / (sqrt2 * abscissas[1])
-                # walking backwards to assure your q_t will not be smaller than 1e-10
-                # TODO - check
-                # TODO - change 1e-13 and 1e-10 to some epislon
-                sd_q = min(sd_q, sd_q_lim)
-                qt_var = sd_q * sd_q
-                σ_h_star = sqrt(max(1 - corr * corr, 0)) * sd_h
-            end
-
-            # zero outer quadrature points
-            for idx in 1:env_len
-                outer_env[idx] = 0.0
-            end
-            for idx in 1:src_len
-                outer_src[idx] = 0.0
-            end
-
-            for m_q in 1:quad_order
-                if quadrature_type isa LogNormalQuad
-                    qt_hat = exp(μ_q + sqrt2 * sd_q * abscissas[m_q])
-                    μ_h_star = μ_h + sd2_hq / sd_q / sd_q * (log(qt_hat) - μ_q)
-                else
-                    qt_hat = aux_en.q_tot[k] + sqrt2 * sd_q * abscissas[m_q]
-                    μ_h_star = aux_en.θ_liq_ice[k] + sqrt2 * corr * sd_h * abscissas[m_q]
-                end
-
-                # zero inner quadrature points
-                for idx in 1:env_len
-                    inner_env[idx] = 0.0
-                end
-                for idx in 1:src_len
-                    inner_src[idx] = 0.0
-                end
-
-                for m_h in 1:quad_order
-                    if quadrature_type isa LogNormalQuad
-                        h_hat = exp(μ_h_star + sqrt2 * sd_cond_h_q * abscissas[m_h])
-                    else
-                        h_hat = sqrt2 * σ_h_star * abscissas[m_h] + μ_h_star
-                    end
-
-                    # condensation
-                    ts = thermo_state_pθq(param_set, p0_c[k], h_hat, qt_hat)
-                    q_liq_en = TD.liquid_specific_humidity(ts)
-                    q_ice_en = TD.ice_specific_humidity(ts)
-                    T = TD.air_temperature(ts)
-                    # autoconversion and accretion
-                    mph = precipitation_formation(
-                        param_set,
-                        precip_model,
-                        prog_pr.q_rai[k],
-                        prog_pr.q_sno[k],
-                        aux_en.area[k],
-                        ρ0_c[k],
-                        Δt,
-                        ts,
-                    )
-
-                    # environmental variables
-                    inner_env[i_ql] += q_liq_en * weights[m_h] * sqpi_inv
-                    inner_env[i_qi] += q_ice_en * weights[m_h] * sqpi_inv
-                    inner_env[i_T] += T * weights[m_h] * sqpi_inv
-                    # cloudy/dry categories for buoyancy in TKE
-                    if TD.has_condensate(q_liq_en + q_ice_en)
-                        inner_env[i_cf] += weights[m_h] * sqpi_inv
-                        inner_env[i_qt_sat] += qt_hat * weights[m_h] * sqpi_inv
-                        inner_env[i_T_sat] += T * weights[m_h] * sqpi_inv
-                    else
-                        inner_env[i_qt_unsat] += qt_hat * weights[m_h] * sqpi_inv
-                        inner_env[i_T_unsat] += T * weights[m_h] * sqpi_inv
-                    end
-                    # products for variance and covariance source terms
-                    inner_src[i_Sqt] += mph.qt_tendency * weights[m_h] * sqpi_inv
-                    inner_src[i_Sqr] += mph.qr_tendency * weights[m_h] * sqpi_inv
-                    inner_src[i_Sqs] += mph.qs_tendency * weights[m_h] * sqpi_inv
-                    inner_src[i_SH] += mph.θ_liq_ice_tendency * weights[m_h] * sqpi_inv
-                    inner_src[i_Sqt_H] += mph.qt_tendency * h_hat * weights[m_h] * sqpi_inv
-                    inner_src[i_Sqt_qt] += mph.qt_tendency * qt_hat * weights[m_h] * sqpi_inv
-                    inner_src[i_SH_H] += mph.θ_liq_ice_tendency * h_hat * weights[m_h] * sqpi_inv
-                    inner_src[i_SH_qt] += mph.θ_liq_ice_tendency * qt_hat * weights[m_h] * sqpi_inv
-                end
-
-                for idx in 1:env_len
-                    outer_env[idx] += inner_env[idx] * weights[m_q] * sqpi_inv
-                end
-                for idx in 1:src_len
-                    outer_src[idx] += inner_src[idx] * weights[m_q] * sqpi_inv
-                end
-            end
+            vars = (;
+                QTvar_en = aux_en.QTvar[k],
+                q_tot_en = aux_en.q_tot[k],
+                Hvar_en = aux_en.Hvar[k],
+                θ_liq_ice_en = aux_en.θ_liq_ice[k],
+                HQTcov_en = aux_en.HQTcov[k],
+                area_en = aux_en.area[k],
+                q_rai = prog_pr.q_rai[k],
+                q_sno = prog_pr.q_sno[k],
+                ρ0_c = ρ0_c[k],
+                p0_c = p0_c[k],
+            )
+            outer_env, outer_src = quad_loop(en_thermo, precip_model, vars, param_set, Δt)
 
             # update environmental variables
 
