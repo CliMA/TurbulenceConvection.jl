@@ -81,7 +81,7 @@ function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, εδ_model_type)
         εδ_vars.b_en,
         εδ_vars.w_up,
         εδ_vars.w_en,
-        εδ_vars.tke,
+        εδ_vars.tke_en,
         εδ_vars.zc_i,
         entr_dim_scale,
     )
@@ -98,7 +98,7 @@ function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, εδ_model_type)
     δ_dyn = dim_scale * (nondim_δ + area_limiter) + MdMdz_δ
 
     # turbulent entrainment
-    ε_turb = compute_turbulent_entrainment(param_set, εδ_vars.a_up, εδ_vars.w_up, εδ_vars.tke, εδ_vars.H_up)
+    ε_turb = compute_turbulent_entrainment(param_set, εδ_vars.a_up, εδ_vars.w_up, εδ_vars.tke_en, εδ_vars.H_up)
 
     return EntrDetr{FT}(ε_dyn, δ_dyn, ε_turb, nondim_ε, nondim_δ)
 end
@@ -121,6 +121,7 @@ function compute_entr_detr!(
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     prog_gm_f = face_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
@@ -159,7 +160,8 @@ function compute_entr_detr!(
                     w_en = w_en_c[k],
                     b_up = aux_up[i].buoy[k],
                     b_en = aux_en.buoy[k],
-                    tke = aux_en.tke[k],
+                    tke_gm = aux_gm.tke[k],
+                    tke_en = aux_en.tke[k],
                     dMdz = ∇m_entr_detr[k],
                     M = m_entr_detr[k],
                     a_up = aux_up[i].area[k],
@@ -173,6 +175,7 @@ function compute_entr_detr!(
                     # non-dimensional entr/detr state
                     nondim_entr_sc = aux_up[i].nondim_entr_sc[k],
                     nondim_detr_sc = aux_up[i].nondim_detr_sc[k],
+                    wstar = surf.wstar,
                 )
 
                 er = entr_detr(param_set, εδ_model_vars, edmf.entr_dim_scale, edmf.entr_closure)
@@ -208,6 +211,7 @@ function compute_entr_detr!(
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     prog_gm_f = face_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
@@ -247,7 +251,8 @@ function compute_entr_detr!(
                     w_en = w_en_c[k],
                     b_up = aux_up[i].buoy[k],
                     b_en = aux_en.buoy[k],
-                    tke = aux_en.tke[k],
+                    tke_gm = aux_gm.tke[k],
+                    tke_en = aux_en.tke[k],
                     dMdz = ∇m_entr_detr[k],
                     M = m_entr_detr[k],
                     a_up = aux_up[i].area[k],
@@ -261,6 +266,7 @@ function compute_entr_detr!(
                     # non-dimensional entr/detr state
                     nondim_entr_sc = aux_up[i].nondim_entr_sc[k],
                     nondim_detr_sc = aux_up[i].nondim_detr_sc[k],
+                    wstar = surf.wstar,
                 )
                 Π = non_dimensional_groups(param_set, εδ_model_vars)
                 aux_up[i].Π₁[k] = Π[1]
