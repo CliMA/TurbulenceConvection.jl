@@ -99,6 +99,9 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     # entrainment
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
+
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_dim_scale"] = 0.001
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_dim_scale"] = 0.001
     # 1-layer nn parameters
     #! format: off
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"] =
@@ -122,7 +125,7 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.25
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_scale"] = 10.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_power"] = 3.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_power"] = 0.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"] = 0.0004
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"] = 2.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["min_upd_velocity"] = 0.001
@@ -155,7 +158,7 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["turbulence"]["scheme"] = "EDMF_PrognosticTKE"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "NN", "NN_nonlocal", "Linear", "FNO"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "NN"  # {"moisture_deficit", "NN", "NN_nonlocal", "Linear", "FNO"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_z"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = "deterministic"  # {"deterministic", "noisy_relaxation_process", "lognormal_scaling"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_local_micro"] = true

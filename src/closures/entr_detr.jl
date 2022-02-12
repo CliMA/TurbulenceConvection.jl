@@ -75,16 +75,18 @@ Cohen et al. (JAMES, 2020), given:
 """
 function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, εδ_model_type)
     FT = eltype(εδ_vars)
-    dim_scale = entrainment_length_scale(
-        param_set,
-        εδ_vars.b_up,
-        εδ_vars.b_en,
-        εδ_vars.w_up,
-        εδ_vars.w_en,
-        εδ_vars.tke_en,
-        εδ_vars.zc_i,
-        entr_dim_scale,
-    )
+    # dim_scale = entrainment_length_scale(
+    #     param_set,
+    #     εδ_vars.b_up,
+    #     εδ_vars.b_en,
+    #     εδ_vars.w_up,
+    #     εδ_vars.w_en,
+    #     εδ_vars.tke_en,
+    #     εδ_vars.zc_i,
+    #     entr_dim_scale,
+    # )
+    entr_dim_scale1 = FT(ICP.entr_dim_scale1(param_set))
+    detr_dim_scale1 = FT(ICP.detr_dim_scale1(param_set))
 
     area_limiter = max_area_limiter(param_set, εδ_vars.max_area, εδ_vars.a_up)
 
@@ -94,8 +96,8 @@ function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, εδ_model_type)
     nondim_ε, nondim_δ = non_dimensional_function(param_set, εδ_vars, εδ_model_type)
 
     # dynamic entrainment / detrainment
-    ε_dyn = dim_scale * nondim_ε + MdMdz_ε
-    δ_dyn = dim_scale * (nondim_δ + area_limiter) + MdMdz_δ
+    ε_dyn = entr_dim_scale1 * nondim_ε + MdMdz_ε
+    δ_dyn = detr_dim_scale1 * (nondim_δ + area_limiter) + MdMdz_δ
 
     # turbulent entrainment
     ε_turb = compute_turbulent_entrainment(param_set, εδ_vars.a_up, εδ_vars.w_up, εδ_vars.tke_en, εδ_vars.H_up)

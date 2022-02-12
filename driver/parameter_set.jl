@@ -66,6 +66,8 @@ function create_parameter_set(namelist)
         ω_pr = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Prandtl_number_scale"),
         c_δ = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "detrainment_factor"),
         c_gen = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "general_ent_params"),
+        entr_dim_scale1 = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_dim_scale"),
+        detr_dim_scale1 = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "detrainment_dim_scale"),
         c_fno = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_params"),
         β = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "sorting_power"),
         χ = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_mixing_frac"),

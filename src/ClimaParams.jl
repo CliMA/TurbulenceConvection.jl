@@ -25,6 +25,8 @@ l_max(ps::APS) = ps.nt.l_max
 """Additional entrainment/detrainment parameters."""
 c_gen(ps::APS) = ps.nt.c_gen
 c_fno(ps::APS) = ps.nt.c_fno
+entr_dim_scale1(ps::APS) = ps.nt.entr_dim_scale1
+detr_dim_scale1(ps::APS) = ps.nt.detr_dim_scale1
 
 """ stochastic parameters """
 c_gen_stoch(ps::APS) = ps.nt.c_gen_stoch
