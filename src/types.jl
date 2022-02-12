@@ -18,16 +18,16 @@ end
 $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct EntrDetr{FT}
-    "Dynamical entrainment"
+    "Fractional dynamical entrainment [1/m]"
     ε_dyn::FT
-    "Dynamical detrainment"
+    "Fractional dynamical detrainment [1/m]"
     δ_dyn::FT
     "Turbulent entrainment"
     ε_turb::FT
-    "nondimensional dynamical entrainment"
-    ε_dyn_nondim::FT
-    "nondimensional dynamical detrainment"
-    δ_dyn_nondim::FT
+    "Nondimensional fractional dynamical entrainment"
+    ε_nondim::FT
+    "Nondimensional fractional dynamical detrainment"
+    δ_nondim::FT
 end
 
 """
@@ -75,10 +75,10 @@ Base.@kwdef struct GeneralizedEntr{FT}
     "Model time step"
     Δt::FT
     # For stochastic modelling
-    "nondimensional entrainment"
-    nondim_entr_sc::FT
-    "nondimensional detrainment"
-    nondim_detr_sc::FT
+    "nondimensional fractional dynamical entrainment"
+    ε_nondim::FT
+    "nondimensional fractional dynamical detrainment"
+    δ_nondim::FT
     "convective velocity"
     wstar::FT
 end
@@ -98,6 +98,10 @@ Base.@kwdef struct NoisyRelaxationProcess{MT} <: AbstractEntrDetrModel
     mean_model::MT
 end
 Base.@kwdef struct LogNormalScalingProcess{MT} <: AbstractEntrDetrModel
+    mean_model::MT
+end
+
+Base.@kwdef struct PrognosticNoisyRelaxationProcess{MT} <: AbstractEntrDetrModel
     mean_model::MT
 end
 
@@ -530,7 +534,12 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
             "EDMF_PrognosticTKE",
             "stochastic_entrainment";
             default = "deterministic",
-            valid_options = ["deterministic", "noisy_relaxation_process", "lognormal_scaling"],
+            valid_options = [
+                "deterministic",
+                "noisy_relaxation_process",
+                "lognormal_scaling",
+                "prognostic_noisy_relaxation_process",
+            ],
         )
         entr_type = parse_namelist(
             namelist,
@@ -564,6 +573,8 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
             LogNormalScalingProcess(mean_model = mean_entr_closure)
         elseif stoch_entr_type == "deterministic"
             mean_entr_closure
+        elseif stoch_entr_type == "prognostic_noisy_relaxation_process"
+            PrognosticNoisyRelaxationProcess(mean_model = mean_entr_closure)
         else
             error("Something went wrong. Invalid stochastic entrainment type '$stoch_entr_type'")
         end

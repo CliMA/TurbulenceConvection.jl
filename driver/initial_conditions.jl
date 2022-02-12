@@ -78,6 +78,10 @@ function initialize_updrafts(edmf, grid, state, surf)
             prog_up[i].ρaq_tot[k] = 0
             prog_up[i].ρaθ_liq_ice[k] = 0
         end
+        if edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess
+            @. prog_up[i].ε_nondim = 0
+            @. prog_up[i].δ_nondim = 0
+        end
 
         a_surf = TC.area_surface_bc(surf, edmf, i)
         aux_up[i].area[kc_surf] = a_surf

@@ -29,8 +29,8 @@ cent_aux_vars_up(FT) = (;
     qt_tendency_precip_formation = FT(0),
     entr_sc = FT(0),
     detr_sc = FT(0),
-    nondim_entr_sc = FT(0),  # nondimensional entrainment
-    nondim_detr_sc = FT(0),  # nondimensional detrainment
+    ε_nondim = FT(0),  # nondimensional entrainment
+    δ_nondim = FT(0),  # nondimensional detrainment
     frac_turb_entr = FT(0),
     entr_turb_dyn = FT(0),
     detr_turb_dyn = FT(0),
@@ -164,9 +164,9 @@ cent_diagnostic_vars_edmf(FT, edmf) = (;
     turbconv = (;
         asp_ratio = FT(0),
         entr_sc = FT(0),
-        nondim_entr_sc = FT(0),
+        ε_nondim = FT(0),
         detr_sc = FT(0),
-        nondim_detr_sc = FT(0),
+        δ_nondim = FT(0),
         massflux = FT(0),
         frac_turb_entr = FT(0),
     ),
@@ -179,12 +179,14 @@ face_diagnostic_vars_edmf(FT, edmf) =
 ##### Prognostic fields
 
 # Center only
-cent_prognostic_vars_up(FT) = (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot = FT(0))
+cent_prognostic_vars_up(FT, _) = (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot = FT(0))
+cent_prognostic_vars_up(FT, ::PrognosticNoisyRelaxationProcess) =
+    (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot = FT(0), ε_nondim = FT(0), δ_nondim = FT(0))
 cent_prognostic_vars_en(FT) = (; ρatke = FT(0), ρaHvar = FT(0), ρaQTvar = FT(0), ρaHQTcov = FT(0))
 cent_prognostic_vars_edmf(FT, edmf) = (;
     turbconv = (;
         en = cent_prognostic_vars_en(FT),
-        up = ntuple(i -> cent_prognostic_vars_up(FT), n_updrafts(edmf)),
+        up = ntuple(i -> cent_prognostic_vars_up(FT, edmf.entr_closure), n_updrafts(edmf)),
         pr = (; q_rai = FT(0), q_sno = FT(0)),
     ),
 )

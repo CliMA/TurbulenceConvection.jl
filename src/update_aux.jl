@@ -77,8 +77,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_bulk.area[k] = sum(i -> aux_up[i].area[k], 1:N_up)
         if aux_bulk.area[k] > 0
             @inbounds for i in 1:N_up
-                aux_bulk.q_tot[k] += aux_up[i].area[k] * aux_up[i].q_tot[k] / aux_bulk.area[k]
-                aux_bulk.θ_liq_ice[k] += aux_up[i].area[k] * aux_up[i].θ_liq_ice[k] / aux_bulk.area[k]
+                a_k = aux_up[i].area[k]
+                a_bulk_k = aux_bulk.area[k]
+                aux_bulk.q_tot[k] += a_k * aux_up[i].q_tot[k] / a_bulk_k
+                aux_bulk.θ_liq_ice[k] += a_k * aux_up[i].θ_liq_ice[k] / a_bulk_k
             end
         else
             aux_bulk.q_tot[k] = prog_gm.q_tot[k]
