@@ -173,6 +173,17 @@ steps:
       queue: central
       slurm_ntasks: 1
 
+  - label: ":earth_americas: 3D sphere bariclinic wave"
+    key: "cpu_3dsphere_baroclinic_wave"
+    command:
+      - "julia --color=yes --project=test integration_tests/baroclinic_wave.jl"
+    artifact_paths:
+      - "integration_tests/output/baroclinic_wave/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
   - label: ":rocket: Allocations analysis"
     key: "cpu_allocations"
     command:
