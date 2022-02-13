@@ -5,5 +5,6 @@ case_name = "Bomex"
 sim = init_sim(case_name)
 prog = sim.state.prog
 tendencies = copy(prog)
-params = (; edmf = sim.edmf, grid = sim.grid, gm = sim.gm, case = sim.case, TS = sim.TS, aux = sim.state.aux)
+params =
+    (; edmf = sim.edmf, grid = sim.grid, param_set = sim.param_set, case = sim.case, TS = sim.TS, aux = sim.state.aux)
 JET.@test_opt ∑tendencies!(tendencies, prog, params, sim.TS.t)

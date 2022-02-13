@@ -12,15 +12,14 @@ end
 condition_every_iter(u, t, integrator) = true
 
 function affect_io!(integrator)
-    UnPack.@unpack edmf, aux, grid, io_nt, diagnostics, case, gm, Stats, skip_io = integrator.p
+    UnPack.@unpack edmf, aux, grid, io_nt, diagnostics, case, param_set, Stats, skip_io = integrator.p
     skip_io && return nothing
     t = integrator.t
 
     state = TC.State(integrator.u, aux, integrator.du)
 
-    param_set = TC.parameter_set(gm)
     # TODO: is this the best location to call diagnostics?
-    compute_diagnostics!(edmf, gm, grid, state, diagnostics, Stats, case, t)
+    compute_diagnostics!(edmf, param_set, grid, state, diagnostics, Stats, case, t)
 
     # TODO: remove `vars` hack that avoids
     # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
@@ -38,12 +37,11 @@ function affect_io!(integrator)
 end
 
 function affect_filter!(integrator)
-    UnPack.@unpack edmf, grid, gm, aux, case = integrator.p
+    UnPack.@unpack edmf, grid, param_set, aux, case = integrator.p
     t = integrator.t
-    param_set = TC.parameter_set(gm)
     state = TC.State(integrator.u, aux, integrator.du)
     surf = get_surface(case.surf_params, grid, state, t, param_set)
-    TC.affect_filter!(edmf, grid, state, gm, surf, case.casename, t)
+    TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
 
     # We're lying to OrdinaryDiffEq.jl, in order to avoid
     # paying for an additional `∑tendencies!` call, which is required
@@ -60,7 +58,7 @@ function adaptive_dt!(integrator)
 end
 
 function dt_max!(integrator)
-    UnPack.@unpack gm, grid, edmf, aux, TS = integrator.p
+    UnPack.@unpack grid, edmf, aux, TS = integrator.p
     state = TC.State(integrator.u, aux, integrator.du)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)
@@ -78,7 +76,7 @@ function dt_max!(integrator)
     KH = aux_tc.KH
 
     # helper to calculate the rain velocity
-    # TODO: assuming gm.W = 0
+    # TODO: assuming w_gm = 0
     # TODO: verify translation
     term_vel_rain = aux_tc.term_vel_rain
     term_vel_snow = aux_tc.term_vel_snow
@@ -103,7 +101,7 @@ function dt_max!(integrator)
 end
 
 function monitor_cfl!(integrator)
-    UnPack.@unpack gm, grid, edmf, aux, TS = integrator.p
+    UnPack.@unpack grid, edmf, aux, TS = integrator.p
     state = TC.State(integrator.u, aux, integrator.du)
     prog_gm = TC.center_prog_grid_mean(state)
     Δz = TC.get_Δz(prog_gm.u)
@@ -113,7 +111,7 @@ function monitor_cfl!(integrator)
     aux_tc = TC.center_aux_turbconv(state)
 
     # helper to calculate the rain velocity
-    # TODO: assuming gm.W = 0
+    # TODO: assuming w_gm = 0
     # TODO: verify translation
     term_vel_rain = aux_tc.term_vel_rain
     term_vel_snow = aux_tc.term_vel_snow

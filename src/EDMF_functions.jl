@@ -155,12 +155,11 @@ function affect_filter!(
     edmf::EDMFModel,
     grid::Grid,
     state::State,
-    gm::GridMeanVariables,
+    param_set::APS,
     surf::SurfaceBase,
     casename::String,
     t::Real,
 )
-    param_set = parameter_set(gm)
     # TODO: figure out why this filter kills the DryBubble results if called at t = 0.
     if casename == "DryBubble" && !(t > 0)
         return nothing
