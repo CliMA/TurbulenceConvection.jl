@@ -208,10 +208,6 @@ struct NoPrecipitation <: AbstractPrecipitationModel end
 struct CutoffPrecipitation <: AbstractPrecipitationModel end
 struct Clima1M <: AbstractPrecipitationModel end
 
-struct GridMeanVariables{PS}
-    param_set::PS
-end
-
 abstract type AbstractQuadratureType end
 struct LogNormalQuad <: AbstractQuadratureType end
 

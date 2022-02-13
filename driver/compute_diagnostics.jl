@@ -6,6 +6,10 @@ import ClimaCore
 const CC = ClimaCore
 const CCO = CC.Operators
 
+import CLIMAParameters
+const CP = CLIMAParameters
+const APS = CP.AbstractEarthParameterSet
+
 """ Purely diagnostic fields for the host model """
 diagnostics(state, fl) = getproperty(state, TC.field_loc(fl))
 
@@ -60,7 +64,7 @@ function io(io_dict::Dict, Stats::NetCDFIO_Stats, state)
 end
 
 
-function initialize_io(gm::TC.GridMeanVariables, Stats::NetCDFIO_Stats)
+function initialize_io(Stats::NetCDFIO_Stats)
     add_ts(Stats, "Tsurface")
     add_ts(Stats, "shf")
     add_ts(Stats, "lhf")
@@ -110,7 +114,7 @@ tendencies.
 =#
 function compute_diagnostics!(
     edmf::TC.EDMFModel,
-    gm::TC.GridMeanVariables,
+    param_set::APS,
     grid::TC.Grid,
     state::TC.State,
     diagnostics::D,
@@ -132,7 +136,6 @@ function compute_diagnostics!(
     aux_bulk = TC.center_aux_bulk(state)
     a_up_bulk = aux_bulk.area
     kc_toa = TC.kc_top_of_atmos(grid)
-    param_set = TC.parameter_set(gm)
     prog_gm = TC.center_prog_grid_mean(state)
     precip_model = edmf.precip_model
     diag_tc = center_diagnostics_turbconv(diagnostics)

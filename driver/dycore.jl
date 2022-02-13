@@ -197,27 +197,26 @@ end
 
 # Compute the sum of tendencies for the scheme
 function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
-    UnPack.@unpack edmf, grid, gm, case, aux, TS = params
+    UnPack.@unpack edmf, grid, param_set, case, aux, TS = params
 
     state = TC.State(prog, aux, tendencies)
 
     Δt = TS.dt
-    param_set = TC.parameter_set(gm)
     surf = get_surface(case.surf_params, grid, state, t, param_set)
     force = case.Fo
     radiation = case.Rad
     en_thermo = edmf.en_thermo
     precip_model = edmf.precip_model
 
-    TC.affect_filter!(edmf, grid, state, gm, surf, case.casename, t)
+    TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
 
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
-    Cases.update_forcing(case, grid, state, gm, t, param_set)
-    Cases.update_radiation(case.Rad, grid, state, gm, param_set)
+    Cases.update_forcing(case, grid, state, t, param_set)
+    Cases.update_radiation(case.Rad, grid, state, param_set)
 
-    TC.update_aux!(edmf, grid, state, case, surf, param_set, t, Δt)
+    TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
 
     tends_face = tendencies.face
     tends_cent = tendencies.cent
@@ -232,7 +231,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set)
 
     # compute tendencies
-    compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, gm)
+    compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, param_set)
     TC.compute_up_tendencies!(edmf, grid, state, param_set, surf)
 
     TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
@@ -251,13 +250,12 @@ function compute_gm_tendencies!(
     surf::TC.SurfaceBase,
     radiation::TC.RadiationBase,
     force::TC.ForcingBase,
-    gm::TC.GridMeanVariables,
+    param_set::APS,
 )
     tendencies_gm = TC.center_tendencies_grid_mean(state)
     kc_toa = TC.kc_top_of_atmos(grid)
     kf_surf = TC.kf_surface(grid)
     FT = eltype(grid)
-    param_set = TC.parameter_set(gm)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)

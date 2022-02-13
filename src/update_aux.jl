@@ -1,13 +1,4 @@
-function update_aux!(
-    edmf::EDMFModel,
-    grid::Grid,
-    state::State,
-    case::CasesBase,
-    surf::SurfaceBase,
-    param_set::APS,
-    t::Real,
-    Δt::Real,
-)
+function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS, t::Real, Δt::Real)
     #####
     ##### Unpack common variables
     #####
@@ -23,7 +14,6 @@ function update_aux!(
     c_m = CPEDMF.c_m(param_set)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
-    surf_params = case.surf_params
     obukhov_length = surf.obukhov_length
     FT = eltype(grid)
     prog_gm = center_prog_grid_mean(state)
