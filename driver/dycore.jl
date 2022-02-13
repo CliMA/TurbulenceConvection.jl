@@ -14,6 +14,7 @@ const ODE = OrdinaryDiffEq
 
 import CLIMAParameters
 const CPP = CLIMAParameters.Planet
+const APS = CLIMAParameters.AbstractEarthParameterSet
 
 #####
 ##### Fields
@@ -175,12 +176,11 @@ function compute_ref_state!(state, grid::TC.Grid, param_set::PS; Pg::FT, Tg::FT,
     return nothing
 end
 
-function satadjust(gm::TC.GridMeanVariables, grid, state)
+function satadjust(param_set::APS, grid, state)
     p0_c = TC.center_ref_state(state).p0
     ρ0_c = TC.center_ref_state(state).ρ0
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    param_set = TC.parameter_set(gm)
     @inbounds for k in TC.real_center_indices(grid)
         θ_liq_ice = prog_gm.θ_liq_ice[k]
         q_tot = prog_gm.q_tot[k]
@@ -203,7 +203,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
     Δt = TS.dt
     param_set = TC.parameter_set(gm)
-    surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
+    surf = get_surface(case.surf_params, grid, state, t, param_set)
     force = case.Fo
     radiation = case.Rad
     en_thermo = edmf.en_thermo
@@ -217,7 +217,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     Cases.update_forcing(case, grid, state, gm, t, param_set)
     Cases.update_radiation(case.Rad, grid, state, gm, param_set)
 
-    TC.update_aux!(edmf, gm, grid, state, case, surf, param_set, t, Δt)
+    TC.update_aux!(edmf, grid, state, case, surf, param_set, t, Δt)
 
     tends_face = tendencies.face
     tends_cent = tendencies.cent
@@ -228,12 +228,12 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     TC.compute_precipitation_formation_tendencies(grid, state, edmf, precip_model, Δt, param_set)
 
     TC.microphysics(en_thermo, grid, state, precip_model, Δt, param_set)
-    TC.compute_precipitation_sink_tendencies(precip_model, grid, state, gm, Δt)
-    TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, gm)
+    TC.compute_precipitation_sink_tendencies(precip_model, grid, state, param_set, Δt)
+    TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set)
 
     # compute tendencies
     compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, gm)
-    TC.compute_up_tendencies!(edmf, grid, state, gm, surf)
+    TC.compute_up_tendencies!(edmf, grid, state, param_set, surf)
 
     TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
     TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
@@ -353,7 +353,7 @@ function compute_gm_tendencies!(
             aux_tc.θ_liq_ice_tendency_precip_sinks[k]
     end
 
-    TC.compute_sgs_flux!(edmf, grid, state, surf, gm)
+    TC.compute_sgs_flux!(edmf, grid, state, surf)
 
     sgs_flux_θ_liq_ice = aux_gm_f.sgs_flux_θ_liq_ice
     sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot

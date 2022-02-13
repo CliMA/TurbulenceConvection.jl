@@ -9,7 +9,6 @@ function get_surface(
     surf_params::TC.FixedSurfaceFlux,
     grid::TC.Grid,
     state::TC.State,
-    gm::TC.GridMeanVariables,
     t::Real,
     param_set::CP.AbstractEarthParameterSet,
 )
@@ -81,7 +80,6 @@ function get_surface(
     surf_params::TC.FixedSurfaceCoeffs,
     grid::TC.Grid,
     state::TC.State,
-    gm::TC.GridMeanVariables,
     t::Real,
     param_set::CP.AbstractEarthParameterSet,
 )
@@ -140,7 +138,6 @@ function get_surface(
     surf_params::TC.MoninObukhovSurface,
     grid::TC.Grid,
     state::TC.State,
-    gm::TC.GridMeanVariables,
     t::Real,
     param_set::CP.AbstractEarthParameterSet,
 )
@@ -199,7 +196,6 @@ function get_surface(
     surf_params::TC.SullivanPattonSurface,
     grid::TC.Grid,
     state::TC.State,
-    gm::TC.GridMeanVariables,
     t::Real,
     param_set::CP.AbstractEarthParameterSet,
 )

@@ -1,12 +1,15 @@
 import TurbulenceConvection
 const TC = TurbulenceConvection
+
+import CLIMAParameters
+const APS = CLIMAParameters.AbstractEarthParameterSet
+
 import Thermodynamics
 const TD = Thermodynamics
 
-function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, case, gm::TC.GridMeanVariables, t::Real)
+function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, case, param_set::APS, t::Real)
     initialize_covariance(edmf, grid, state)
     surf_params = case.surf_params
-    param_set = TC.parameter_set(gm)
     aux_tc = TC.center_aux_turbconv(state)
     prog_gm = TC.center_prog_grid_mean(state)
     p0_c = TC.center_ref_state(state).p0
@@ -15,13 +18,13 @@ function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, cas
         ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
     end
-    surf = get_surface(surf_params, grid, state, gm, t, param_set)
+    surf = get_surface(surf_params, grid, state, t, param_set)
     if case.casename == "DryBubble"
-        initialize_updrafts_DryBubble(edmf, grid, state, gm)
+        initialize_updrafts_DryBubble(edmf, grid, state)
     else
-        initialize_updrafts(edmf, grid, state, gm, surf)
+        initialize_updrafts(edmf, grid, state, surf)
     end
-    TC.set_edmf_surface_bc(edmf, grid, state, surf, gm)
+    TC.set_edmf_surface_bc(edmf, grid, state, surf, param_set)
     return
 end
 
@@ -43,7 +46,7 @@ function initialize_covariance(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.Stat
     return
 end
 
-function initialize_updrafts(edmf, grid, state, gm::TC.GridMeanVariables, surf)
+function initialize_updrafts(edmf, grid, state, surf)
     N_up = TC.n_updrafts(edmf)
     kc_surf = TC.kc_surface(grid)
     aux_up = TC.center_aux_updrafts(state)
@@ -82,7 +85,7 @@ function initialize_updrafts(edmf, grid, state, gm::TC.GridMeanVariables, surf)
     return
 end
 
-function initialize_updrafts_DryBubble(edmf, grid, state, gm::TC.GridMeanVariables)
+function initialize_updrafts_DryBubble(edmf, grid, state)
 
     # criterion 2: b>1e-4
     #! format: off
