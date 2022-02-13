@@ -137,12 +137,12 @@ function initialize(sim::Simulation1d)
     FT = eltype(sim.grid)
     t = FT(0)
     Cases.initialize_profiles(sim.case, sim.grid, sim.gm, state)
-    satadjust(sim.gm, sim.grid, sim.state)
+    satadjust(sim.param_set, sim.grid, sim.state)
 
     Cases.initialize_forcing(sim.case, sim.grid, state, sim.gm, sim.param_set)
     Cases.initialize_radiation(sim.case, sim.grid, state, sim.gm, sim.param_set)
 
-    initialize_edmf(sim.edmf, sim.grid, state, sim.case, sim.gm, t)
+    initialize_edmf(sim.edmf, sim.grid, state, sim.case, sim.param_set, t)
 
     sim.skip_io && return nothing
     initialize_io(sim.io_nt.ref_state, sim.Stats)
@@ -162,7 +162,7 @@ function initialize(sim::Simulation1d)
     io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
 
     # TODO: deprecate
-    surf = get_surface(sim.case.surf_params, sim.grid, state, sim.gm, t, sim.param_set)
+    surf = get_surface(sim.case.surf_params, sim.grid, state, t, sim.param_set)
     io(surf, sim.case.surf_params, sim.grid, state, sim.Stats, t)
     close_files(sim.Stats)
 

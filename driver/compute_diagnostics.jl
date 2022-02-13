@@ -137,7 +137,7 @@ function compute_diagnostics!(
     precip_model = edmf.precip_model
     diag_tc = center_diagnostics_turbconv(diagnostics)
     diag_tc_f = face_diagnostics_turbconv(diagnostics)
-    surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
+    surf = get_surface(case.surf_params, grid, state, t, param_set)
 
     @inbounds for k in TC.real_center_indices(grid)
         ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
@@ -295,7 +295,7 @@ function compute_diagnostics!(
     TC.compute_covariance_interdomain_src(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
     TC.compute_covariance_interdomain_src(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
 
-    TC.update_cloud_frac(edmf, grid, state, gm)
+    TC.update_cloud_frac(edmf, grid, state)
 
 
     write_ts(Stats, "lwp_mean", sum(ρ0_c .* aux_gm.q_liq))

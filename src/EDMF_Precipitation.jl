@@ -6,7 +6,7 @@ compute_precipitation_advection_tendencies(
     edmf::EDMFModel,
     grid::Grid,
     state::State,
-    gm::GridMeanVariables,
+    param_set::APS,
 ) = nothing
 
 function compute_precipitation_advection_tendencies(
@@ -14,7 +14,7 @@ function compute_precipitation_advection_tendencies(
     edmf::EDMFModel,
     grid::Grid,
     state::State,
-    gm::GridMeanVariables,
+    param_set::APS,
 )
     FT = eltype(grid)
 
@@ -24,7 +24,7 @@ function compute_precipitation_advection_tendencies(
     aux_tc = center_aux_turbconv(state)
 
     # helper to calculate the rain velocity
-    # TODO: assuming gm.W = 0
+    # TODO: assuming w_gm = 0
     # TODO: verify translation
     term_vel_rain = aux_tc.term_vel_rain
     term_vel_snow = aux_tc.term_vel_snow
@@ -54,12 +54,11 @@ compute_precipitation_sink_tendencies(
     ::AbstractPrecipitationModel,
     grid::Grid,
     state::State,
-    gm::GridMeanVariables,
+    param_set::APS,
     Δt::Real,
 ) = nothing
 
-function compute_precipitation_sink_tendencies(::Clima1M, grid::Grid, state::State, gm::GridMeanVariables, Δt::Real)
-    param_set = parameter_set(gm)
+function compute_precipitation_sink_tendencies(::Clima1M, grid::Grid, state::State, param_set::APS, Δt::Real)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     aux_gm = center_aux_grid_mean(state)
