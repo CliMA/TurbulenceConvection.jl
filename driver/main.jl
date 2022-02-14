@@ -32,6 +32,16 @@ include(joinpath(tc_dir, "driver", "TimeStepping.jl"))
 include(joinpath(tc_dir, "driver", "Surface.jl"))
 import .Cases
 
+
+
+struct DiffusivityModel{}
+    diffusivity::Float64
+    function DiffusivityModel(namelist)
+        diffusivity = namelist["turbulence"]["eddy_diffusivity"]
+        return new{diffusivity}
+    end
+end
+
 struct Simulation1d{IONT, G, S, GM, C, TCModel, D, TIMESTEPPING, STATS, PS}
     io_nt::IONT
     grid::G
@@ -80,20 +90,19 @@ function Simulation1d(namelist)
     Rad = TC.RadiationBase(case_type)
     TS = TimeStepping(namelist)
 
-    turb_conv_model = "edmf"
-
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
-    cent_prog_fields() = CC.Fields.coordinate_field(cspace)
-    face_prog_fields() = CC.Fields.coordinate_field(fspace)
-    aux_cent_fields = CC.Fields.coordinate_field(cspace)
-    aux_face_fields = CC.Fields.coordinate_field(fspace)
-    diagnostic_cent_fields = CC.Fields.coordinate_field(cspace)
-    diagnostic_face_fields = CC.Fields.coordinate_field(fspace)
 
-    if turb_conv_model == "constant_diffusivity"
-        turb_conv = TC.DiffusivityModel()
-    elseif turb_conv_model == "edmf"
+    if turb_conv_model == "eddy_diffusivity"
+        turb_conv = DiffusivityModel(namelist)
+        # N_up = nothing
+        cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars_gm(FT))
+        face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars_gm(FT))
+        aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars_gm(FT))
+        aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars_gm(FT))
+        diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars_gm(FT))
+        diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars_gm(FT))
+    elseif turb_conv_model == "EDMF"
         turb_conv = TC.EDMFModel(namelist)
         N_up = TC.n_updrafts(turb_conv)
         cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
@@ -104,6 +113,12 @@ function Simulation1d(namelist)
         diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up))
     end
     # isbits(turb_conv) || error("Something non-isbits was added to edmf and needs to be fixed.")
+    # cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up, turb_conv_model))
+    # face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up, turb_conv_model))
+    # aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, N_up, turb_conv_model))
+    # aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up, turb_conv_model))
+    # diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, N_up, turb_conv_model))
+    # diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up, turb_conv_model))
 
     prog = CC.Fields.FieldVector(cent = cent_prog_fields(), face = face_prog_fields())
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)

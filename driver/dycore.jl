@@ -61,6 +61,7 @@ cent_aux_vars_gm(FT) = (;
     ∇q_tot_gm = FT(0),
     ∇u_gm = FT(0),
     ∇v_gm = FT(0),
+    ν = FT(0),
 )
 cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., TC.cent_aux_vars_edmf(FT, n_up)...)
 
@@ -220,7 +221,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     Cases.update_forcing(case, grid, state, gm, t, param_set)
     Cases.update_radiation(case.Rad, grid, state, gm, param_set)
 
-    TC.update_aux!(turb_conv, gm, grid, state, case, surf, param_set, t, Δt)
+    update_aux!(turb_conv, gm, grid, state, case, surf, param_set, t, Δt)
 
     tends_face = tendencies.face
     tends_cent = tendencies.cent
@@ -238,6 +239,19 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     compute_gm_tendencies!(turb_conv, grid, state, surf, radiation, force, gm)
     compute_turbconv_tendencies!(turb_conv, param_set, grid, state, gm, surf)
 
+    return nothing
+end
+
+function update_aux!(turb_conv::DiffusivityModel, gm, grid, state, case, surf, param_set, t, Δt)
+    kc_surf = TC.kc_surface(grid)
+    ∇u_gm = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(FT(0)), top = CCO.SetDivergence(FT(0)))
+    ∇v_gm = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(FT(0)), top = CCO.SetDivergence(FT(0)))
+    aux_gm.ν = turb_conv.diff_coeff*sqrt(∇u_gm^2+∇v_gm^2)
+    return nothing
+end
+
+function update_aux!(turb_conv::TC.EDMFModel, gm, grid, state, case, surf, param_set, t, Δt)
+    TC.update_aux!(turb_conv, gm, grid, state, case, surf, param_set, t, Δt)
     return nothing
 end
 
@@ -299,22 +313,19 @@ function compute_sgs_tendencies!(turb_conv::TC.DiffusivityModel, param_set, grid
     wvec = CC.Geometry.WVector
     prog_gm = TC.center_prog_grid_mean(state)
     tendencies_gm = TC.center_tendencies_grid_mean(state)
-    # ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
-    # ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
-    # ∇u_gm = TC.center_aux_grid_mean(state).∇u_gm
-    # ∇v_gm = TC.center_aux_grid_mean(state).∇v_gm
+    aux_gm = TC.center_aux_grid_mean(state)
 
-    ν = turb_conv.diff_coeff
     grad_θ = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρθ_liq_ice_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
     grad_q = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρq_tot_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
     grad_u = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρu_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
     grad_v = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρv_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
     ∇c = CCO.DivergenceF2C()
 
-    @. tendencies_gm.θ_liq_ice += ν*sqrt(∇u_gm^2+∇v_gm^2)*∇c(grad_θ(prog_gm.θ_liq_ice))
-    @. tendencies_gm.q_tot += ν*sqrt(∇u_gm^2+∇v_gm^2)*∇c(grad_q(prog_gm.q_tot))
-    @. tendencies_gm.u += ν*sqrt(∇u_gm^2+∇v_gm^2)*∇c(grad_θ(prog_gm.θ_liq_ice))
-    @. tendencies_gm.v += ν*sqrt(∇u_gm^2+∇v_gm^2)*∇c(grad_q(prog_gm.q_tot))
+    ν = aux_gm.ν
+    @. tendencies_gm.θ_liq_ice += ∇c(ν*grad_θ(prog_gm.θ_liq_ice))
+    @. tendencies_gm.q_tot += ∇c(ν*grad_q(prog_gm.q_tot))
+    @. tendencies_gm.u += ∇c(ν*grad_θ(prog_gm.u))
+    @. tendencies_gm.v += ∇c(ν*grad_q(prog_gm.v))
 
     return nothing
 end

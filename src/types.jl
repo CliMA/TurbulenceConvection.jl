@@ -460,15 +460,6 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-# abstract type AbstractTurbConvModel end
-struct DiffusivityModel{FT}
-    diff_coeff::FT
-    function DiffusivityModel(::Type{FT}) where {FT}
-        diff_coeff = FT(0.1)
-        return new{FT}(diff_coeff)
-    end
-end
-
 struct EDMFModel{N_up, PM, ENT, EBGC, EC, EDS}
     surface_area::Float64
     max_area::Float64

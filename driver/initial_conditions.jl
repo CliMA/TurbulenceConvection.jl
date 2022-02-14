@@ -26,7 +26,7 @@ function initialize_turb_conv(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State
 end
 
 function initialize_turb_conv(
-    turb_conv::TC.DiffusivityModel,
+    turb_conv::DiffusivityModel,
     grid::TC.Grid,
     state::TC.State,
     case,
@@ -39,7 +39,7 @@ function initialize_turb_conv(
     return
 end
 
-function initialize_covariance(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State)
+function initialize_covariance(edmf, grid::TC.Grid, state::TC.State)
 
     kc_surf = TC.kc_surface(grid)
     aux_gm = TC.center_aux_grid_mean(state)
