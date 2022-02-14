@@ -71,7 +71,7 @@ function Simulation1d(namelist)
 
     Stats = skip_io ? nothing : NetCDFIO_Stats(namelist, grid)
     case_type = Cases.get_case(namelist)
-    ref_params = Cases.reference_params(case_type, grid, param_set, namelist)
+    surf_ref_state = Cases.surface_ref_state(case_type, grid, param_set, namelist)
 
     Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
     Rad = TC.RadiationBase(case_type)
@@ -97,7 +97,7 @@ function Simulation1d(namelist)
 
     # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
     state = TC.State(prog, aux, nothing)
-    compute_ref_state!(state, grid, param_set; ref_params...)
+    compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
 
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)

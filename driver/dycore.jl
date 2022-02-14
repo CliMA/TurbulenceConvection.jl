@@ -110,19 +110,19 @@ face_prognostic_vars(FT, n_up) = (; w = FT(0), TC.face_prognostic_vars_edmf(FT, 
         state,
         grid::Grid,
         param_set::PS;
-        Pg::FT,
-        Tg::FT,
-        qtg::FT,
-    ) where {PS, FT}
+        ts_g,
+    ) where {PS}
 
 TODO: add better docs once the API converges
 
 The reference profiles, given
  - `grid` the grid
  - `param_set` the parameter set
+ - `ts_g` the surface reference state (a thermodynamic state)
 """
-function compute_ref_state!(state, grid::TC.Grid, param_set::PS; Pg::FT, Tg::FT, qtg::FT) where {PS, FT}
+function compute_ref_state!(state, grid::TC.Grid, param_set::PS; ts_g) where {PS}
 
+    FT = eltype(grid)
     p0_c = TC.center_ref_state(state).p0
     ρ0_c = TC.center_ref_state(state).ρ0
     α0_c = TC.center_ref_state(state).α0
@@ -130,9 +130,9 @@ function compute_ref_state!(state, grid::TC.Grid, param_set::PS; Pg::FT, Tg::FT,
     ρ0_f = TC.face_ref_state(state).ρ0
     α0_f = TC.face_ref_state(state).α0
 
-    q_pt_g = TD.PhasePartition(qtg)
-    ts_g = TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
+    qtg = TD.total_specific_humidity(ts_g)
     θ_liq_ice_g = TD.liquid_ice_pottemp(ts_g)
+    Pg = TD.air_pressure(ts_g)
 
     # We are integrating the log pressure so need to take the log of the
     # surface pressure
