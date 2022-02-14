@@ -172,11 +172,11 @@ initialize_forcing(self::CasesBase, grid::Grid, state, param_set) = initialize(s
 ForcingBase(case::Soares, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
-function reference_params(::Soares, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::Soares, grid::Grid, param_set::APS, namelist)
     Pg = 1000.0 * 100.0
     qtg = 5.0e-3
     Tg = 300.0
-    return (; Pg, Tg, qtg)
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{Soares}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -221,11 +221,11 @@ end
 ForcingBase(case::Nieuwstadt, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
-function reference_params(::Nieuwstadt, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::Nieuwstadt, grid::Grid, param_set::APS, namelist)
     Pg = 1000.0 * 100.0
     Tg = 300.0
     qtg = 1.0e-12 # Total water mixing ratio
-    return (; Pg, Tg, qtg)
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -268,11 +268,11 @@ end
 ForcingBase(case::Bomex, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
 
-function reference_params(::Bomex, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::Bomex, grid::Grid, param_set::APS, namelist)
     Pg = 1.015e5 #Pressure at ground
     Tg = 300.4 #Temperature at ground
     qtg = 0.02245#Total water mixing ratio at surface
-    return (; Pg, Tg, qtg)
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, param_set, state)
@@ -348,11 +348,11 @@ end
 ForcingBase(case::life_cycle_Tan2018, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
 
-function reference_params(::life_cycle_Tan2018, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::life_cycle_Tan2018, grid::Grid, param_set::APS, namelist)
     Pg = 1.015e5  #Pressure at ground
     Tg = 300.4  #Temperature at ground
     qtg = 0.02245   #Total water mixing ratio at surface
-    return (; Pg, Tg, qtg)
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -450,13 +450,13 @@ function ForcingBase(case::Rico, param_set::APS; kwargs...)
     ) #= s^{-1} =#
 end
 
-function reference_params(::Rico, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::Rico, grid::Grid, param_set::APS, namelist)
     molmass_ratio = CPP.molmass_ratio(param_set)
     Pg = 1.0154e5  #Pressure at ground
     Tg = 299.8  #Temperature at ground
     pvg = TD.saturation_vapor_pressure(param_set, Tg, TD.Liquid())
     qtg = (1 / molmass_ratio) * pvg / (Pg - pvg)   #Total water mixing ratio at surface
-    return (; Pg, Tg, qtg)
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{Rico}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -552,13 +552,13 @@ end
 ForcingBase(case::TRMM_LBA, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false, kwargs...)
 
-function reference_params(::TRMM_LBA, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::TRMM_LBA, grid::Grid, param_set::APS, namelist)
     molmass_ratio = CPP.molmass_ratio(param_set)
     Pg = 991.3 * 100  #Pressure at ground
     Tg = 296.85   # surface values for reference state (RS) which outputs p0 rho0 alpha0
     pvg = TD.saturation_vapor_pressure(param_set, Tg, TD.Liquid())
     qtg = (1 / molmass_ratio) * pvg / (Pg - pvg) #Total water mixing ratio at surface
-    return (; Pg, Tg, qtg)
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, param_set, state)
     p0 = TC.center_ref_state(state).p0
@@ -640,11 +640,11 @@ end
 ForcingBase(case::ARM_SGP, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = false, coriolis_param = 8.5e-5)
 
-function reference_params(::ARM_SGP, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::ARM_SGP, grid::Grid, param_set::APS, namelist)
     Pg = 970.0 * 100 #Pressure at ground
     Tg = 299.0   # surface values for reference state (RS) which outputs p0 rho0 alpha0
     qtg = 15.2 / 1000 #Total water mixing ratio at surface
-    return (; Pg, Tg, qtg)
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, param_set, state)
@@ -723,11 +723,11 @@ end
 ForcingBase(case::GATE_III, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
-function reference_params(::GATE_III, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::GATE_III, grid::Grid, param_set::APS, namelist)
     Pg = 1013.0 * 100  #Pressure at ground
     Tg = 299.184   # surface values for reference state (RS) which outputs p0 rho0 alpha0
     qtg = 16.5 / 1000 #Total water mixing ratio at surface
-    return (; Pg, Tg, qtg)
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, param_set, state)
@@ -776,13 +776,13 @@ end
 ##### DYCOMS_RF01
 #####
 
-function reference_params(::DYCOMS_RF01, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::DYCOMS_RF01, grid::Grid, param_set::APS, namelist)
     Pg = 1017.8 * 100.0
     qtg = 9.0 / 1000.0
-    theta_surface = 289.0
-    ts = TD.PhaseEquil_pθq(param_set, Pg, theta_surface, qtg)
+    θ_surf = 289.0
+    ts = TD.PhaseEquil_pθq(param_set, Pg, θ_surf, qtg)
     Tg = TD.air_temperature(ts)
-    return (; Pg, Tg, qtg)
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{DYCOMS_RF01}, grid::Grid, param_set, state)
@@ -861,13 +861,13 @@ end
 ##### DYCOMS_RF02
 #####
 
-function reference_params(::DYCOMS_RF02, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::DYCOMS_RF02, grid::Grid, param_set::APS, namelist)
     Pg = 1017.8 * 100.0
     qtg = 9.0 / 1000.0
-    theta_surface = 288.3
-    ts = TD.PhaseEquil_pθq(param_set, Pg, theta_surface, qtg)
+    θ_surf = 288.3
+    ts = TD.PhaseEquil_pθq(param_set, Pg, θ_surf, qtg)
     Tg = TD.air_temperature(ts)
-    return (; Pg, Tg, qtg)
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{DYCOMS_RF02}, grid::Grid, param_set, state)
@@ -959,11 +959,11 @@ function ForcingBase(case::GABLS, param_set::APS; kwargs...)
     )
 end
 
-function reference_params(::GABLS, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::GABLS, grid::Grid, param_set::APS, namelist)
     Pg = 1.0e5  #Pressure at ground,
     Tg = 265.0  #Temperature at ground,
     qtg = 0.0
-    return (; Pg, Tg, qtg)
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -1025,11 +1025,11 @@ function ForcingBase(case::SP, param_set::APS; kwargs...)
     )
 end
 
-function reference_params(::SP, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::SP, grid::Grid, param_set::APS, namelist)
     Pg = 1.0e5  #Pressure at ground
     Tg = 300.0  #Temperature at ground
     qtg = 1.0e-4   #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN.
-    return (; Pg, Tg, qtg)
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{SP}, grid::Grid, param_set, state)
@@ -1062,11 +1062,11 @@ end
 ForcingBase(case::DryBubble, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
-function reference_params(::DryBubble, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::DryBubble, grid::Grid, param_set::APS, namelist)
     Pg = 1.0e5  #Pressure at ground
     Tg = 296.0
     qtg = 1.0e-5
-    return (; Pg, Tg, qtg)
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, param_set, state)
@@ -1131,7 +1131,7 @@ function ForcingBase(case::LES_driven_SCM, param_set::APS; nudge_tau)
     )
 end
 
-function reference_params(::LES_driven_SCM, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::LES_driven_SCM, grid::Grid, param_set::APS, namelist)
     les_filename = namelist["meta"]["lesfile"]
 
     Pg, Tg, qtg = NC.Dataset(les_filename, "r") do data
@@ -1143,7 +1143,7 @@ function reference_params(::LES_driven_SCM, grid::Grid, param_set::APS, namelist
         qtg = ql_ground + qv_ground + qi_ground #Total water mixing ratio at surface
         (Pg, Tg, qtg)
     end
-    return (; Pg, Tg, qtg)
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, param_set, state)
