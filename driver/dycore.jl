@@ -205,8 +205,6 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     surf = get_surface(case.surf_params, grid, state, t, param_set)
     force = case.Fo
     radiation = case.Rad
-    en_thermo = edmf.en_thermo
-    precip_model = edmf.precip_model
 
     TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
 
@@ -222,22 +220,9 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     tends_cent = tendencies.cent
     parent(tends_face) .= 0
     parent(tends_cent) .= 0
-
-    # causes division error in dry bubble first time step
-    TC.compute_precipitation_formation_tendencies(grid, state, edmf, precip_model, Δt, param_set)
-
-    TC.microphysics(en_thermo, grid, state, precip_model, Δt, param_set)
-    TC.compute_precipitation_sink_tendencies(precip_model, grid, state, param_set, Δt)
-    TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set)
-
     # compute tendencies
+    TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt)
     compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, param_set)
-    TC.compute_up_tendencies!(edmf, grid, state, param_set, surf)
-
-    TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
-    TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
-    TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρaQTvar))
-    TC.compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρaHQTcov))
 
     return nothing
 end

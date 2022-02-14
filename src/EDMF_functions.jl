@@ -27,6 +27,32 @@ function compute_les_Γᵣ(
     end
 end
 
+
+function compute_turbconv_tendencies!(
+    edmf::EDMFModel,
+    grid::Grid,
+    state::State,
+    param_set::APS,
+    surf::SurfaceBase,
+    Δt::Real,
+)
+    en_thermo = edmf.en_thermo
+    precip_model = edmf.precip_model
+
+    # compute tendencies
+    # causes division error in dry bubble first time step
+    compute_precipitation_formation_tendencies(grid, state, edmf, precip_model, Δt, param_set)
+    microphysics(en_thermo, grid, state, precip_model, Δt, param_set)
+    compute_precipitation_sink_tendencies(precip_model, grid, state, param_set, Δt)
+    compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set)
+    compute_up_tendencies!(edmf, grid, state, param_set, surf)
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρaQTvar))
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρaHQTcov))
+
+    return nothing
+end
 function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase)
     N_up = n_updrafts(edmf)
     tendencies_gm = center_tendencies_grid_mean(state)
