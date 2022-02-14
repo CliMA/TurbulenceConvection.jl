@@ -172,7 +172,7 @@ initialize_forcing(self::CasesBase, grid::Grid, state, param_set) = initialize(s
 ForcingBase(case::Soares, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
-function surface_ref_state(::Soares, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::Soares, param_set::APS, namelist)
     Pg = 1000.0 * 100.0
     qtg = 5.0e-3
     Tg = 300.0
@@ -196,11 +196,10 @@ function initialize_profiles(self::CasesBase{Soares}, grid::Grid, param_set, sta
     end
 end
 
-function surface_params(case::Soares, grid::TC.Grid, state::TC.State, param_set; Ri_bulk_crit)
-    FT = eltype(grid)
-    kf_surf = TC.kf_surface(grid)
-    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
-    ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
+function surface_params(case::Soares, grid::TC.Grid, surf_ref_state, param_set; Ri_bulk_crit)
+    p0_f_surf = TD.air_pressure(surf_ref_state)
+    ρ0_f_surf = TD.air_density(surf_ref_state)
+    FT = eltype(p0_f_surf)
     zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     Tsurface = 300.0
     qsurface = 5.0e-3
@@ -221,7 +220,7 @@ end
 ForcingBase(case::Nieuwstadt, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
-function surface_ref_state(::Nieuwstadt, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::Nieuwstadt, param_set::APS, namelist)
     Pg = 1000.0 * 100.0
     Tg = 300.0
     qtg = 1.0e-12 # Total water mixing ratio
@@ -244,11 +243,10 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, param_set,
     end
 end
 
-function surface_params(case::Nieuwstadt, grid::TC.Grid, state::TC.State, param_set; Ri_bulk_crit)
-    FT = eltype(grid)
-    kf_surf = TC.kf_surface(grid)
-    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
-    ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
+function surface_params(case::Nieuwstadt, grid::TC.Grid, surf_ref_state, param_set; Ri_bulk_crit)
+    p0_f_surf = TD.air_pressure(surf_ref_state)
+    ρ0_f_surf = TD.air_density(surf_ref_state)
+    FT = eltype(p0_f_surf)
     zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     Tsurface = 300.0
     qsurface = 0.0
@@ -268,7 +266,7 @@ end
 ForcingBase(case::Bomex, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
 
-function surface_ref_state(::Bomex, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::Bomex, param_set::APS, namelist)
     Pg = 1.015e5 #Pressure at ground
     Tg = 300.4 #Temperature at ground
     qtg = 0.02245#Total water mixing ratio at surface
@@ -294,11 +292,10 @@ function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, param_set, stat
     end
 end
 
-function surface_params(case::Bomex, grid::TC.Grid, state::TC.State, param_set; Ri_bulk_crit)
-    FT = eltype(grid)
-    kf_surf = TC.kf_surface(grid)
-    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
-    ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
+function surface_params(case::Bomex, grid::TC.Grid, surf_ref_state, param_set; Ri_bulk_crit)
+    p0_f_surf = TD.air_pressure(surf_ref_state)
+    ρ0_f_surf = TD.air_density(surf_ref_state)
+    FT = eltype(p0_f_surf)
     zrough = 1.0e-4
     qsurface = 22.45e-3 # kg/kg
     θ_surface = 299.1
@@ -348,7 +345,7 @@ end
 ForcingBase(case::life_cycle_Tan2018, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
 
-function surface_ref_state(::life_cycle_Tan2018, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::life_cycle_Tan2018, param_set::APS, namelist)
     Pg = 1.015e5  #Pressure at ground
     Tg = 300.4  #Temperature at ground
     qtg = 0.02245   #Total water mixing ratio at surface
@@ -382,11 +379,10 @@ function life_cycle_buoyancy_flux(param_set, weight = 1)
     )
 end
 
-function surface_params(case::life_cycle_Tan2018, grid::TC.Grid, state::TC.State, param_set; Ri_bulk_crit)
-    FT = eltype(grid)
-    kf_surf = TC.kf_surface(grid)
-    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
-    ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
+function surface_params(case::life_cycle_Tan2018, grid::TC.Grid, surf_ref_state, param_set; Ri_bulk_crit)
+    p0_f_surf = TD.air_pressure(surf_ref_state)
+    ρ0_f_surf = TD.air_density(surf_ref_state)
+    FT = eltype(p0_f_surf)
     zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     qsurface = 22.45e-3 # kg/kg
     θ_surface = 299.1
@@ -450,7 +446,7 @@ function ForcingBase(case::Rico, param_set::APS; kwargs...)
     ) #= s^{-1} =#
 end
 
-function surface_ref_state(::Rico, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::Rico, param_set::APS, namelist)
     molmass_ratio = CPP.molmass_ratio(param_set)
     Pg = 1.0154e5  #Pressure at ground
     Tg = 299.8  #Temperature at ground
@@ -495,8 +491,9 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, param_set, state
     end
 end
 
-function surface_params(case::Rico, grid::TC.Grid, state::TC.State, param_set; kwargs...)
-    FT = eltype(grid)
+function surface_params(case::Rico, grid::TC.Grid, surf_ref_state, param_set; kwargs...)
+    p0_f_surf = TD.air_pressure(surf_ref_state)
+    FT = eltype(p0_f_surf)
 
     zrough = 0.00015
     cm = 0.001229
@@ -510,8 +507,6 @@ function surface_params(case::Rico, grid::TC.Grid, state::TC.State, param_set; k
     Tsurface = 299.8
 
     # For Rico we provide values of transfer coefficients
-    kf_surf = TC.kf_surface(grid)
-    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, FT(0)) # TODO: is this correct?
     qsurface = TD.q_vap_saturation(ts)
     kwargs = (; zrough, Tsurface, qsurface, cm, ch)
@@ -552,7 +547,7 @@ end
 ForcingBase(case::TRMM_LBA, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false, kwargs...)
 
-function surface_ref_state(::TRMM_LBA, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::TRMM_LBA, param_set::APS, namelist)
     molmass_ratio = CPP.molmass_ratio(param_set)
     Pg = 991.3 * 100  #Pressure at ground
     Tg = 296.85   # surface values for reference state (RS) which outputs p0 rho0 alpha0
@@ -596,11 +591,10 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, param_set, s
     end
 end
 
-function surface_params(case::TRMM_LBA, grid::TC.Grid, state::TC.State, param_set; Ri_bulk_crit)
-    FT = eltype(grid)
+function surface_params(case::TRMM_LBA, grid::TC.Grid, surf_ref_state, param_set; Ri_bulk_crit)
+    p0_f_surf = TD.air_pressure(surf_ref_state)
+    FT = eltype(p0_f_surf)
     # zrough = 1.0e-4 # not actually used, but initialized to reasonable value
-    kf_surf = TC.kf_surface(grid)
-    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     qsurface = 22.45e-3 # kg/kg
     θ_surface = (273.15 + 23)
     ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_surface, qsurface)
@@ -640,7 +634,7 @@ end
 ForcingBase(case::ARM_SGP, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = false, coriolis_param = 8.5e-5)
 
-function surface_ref_state(::ARM_SGP, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::ARM_SGP, param_set::APS, namelist)
     Pg = 970.0 * 100 #Pressure at ground
     Tg = 299.0   # surface values for reference state (RS) which outputs p0 rho0 alpha0
     qtg = 15.2 / 1000 #Total water mixing ratio at surface
@@ -672,11 +666,10 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, param_set, st
     end
 end
 
-function surface_params(case::ARM_SGP, grid::TC.Grid, state::TC.State, param_set; Ri_bulk_crit)
-    FT = eltype(grid)
+function surface_params(case::ARM_SGP, grid::TC.Grid, surf_ref_state, param_set; Ri_bulk_crit)
+    p0_f_surf = TD.air_pressure(surf_ref_state)
+    FT = eltype(p0_f_surf)
     qsurface = 15.2e-3 # kg/kg
-    kf_surf = TC.kf_surface(grid)
-    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     θ_surface = 299.0
     ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_surface, qsurface)
     Tsurface = TD.air_temperature(ts)
@@ -723,7 +716,7 @@ end
 ForcingBase(case::GATE_III, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
-function surface_ref_state(::GATE_III, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::GATE_III, param_set::APS, namelist)
     Pg = 1013.0 * 100  #Pressure at ground
     Tg = 299.184   # surface values for reference state (RS) which outputs p0 rho0 alpha0
     qtg = 16.5 / 1000 #Total water mixing ratio at surface
@@ -745,8 +738,9 @@ function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, param_set, s
     end
 end
 
-function surface_params(case::GATE_III, grid::TC.Grid, state::TC.State, param_set; kwargs...)
-    FT = eltype(grid)
+function surface_params(case::GATE_III, grid::TC.Grid, surf_ref_state, param_set; kwargs...)
+    p0_f_surf = TD.air_pressure(surf_ref_state)
+    FT = eltype(p0_f_surf)
 
     qsurface = 16.5 / 1000.0 # kg/kg
     cm = 0.0012
@@ -755,8 +749,6 @@ function surface_params(case::GATE_III, grid::TC.Grid, state::TC.State, param_se
     Tsurface = 299.184
 
     # For GATE_III we provide values of transfer coefficients
-    kf_surf = TC.kf_surface(grid)
-    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, Tsurface, qsurface)
     qsurface = TD.q_vap_saturation(ts)
     kwargs = (; zrough, Tsurface, qsurface, cm, ch)
@@ -776,7 +768,7 @@ end
 ##### DYCOMS_RF01
 #####
 
-function surface_ref_state(::DYCOMS_RF01, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::DYCOMS_RF01, param_set::APS, namelist)
     Pg = 1017.8 * 100.0
     qtg = 9.0 / 1000.0
     θ_surf = 289.0
@@ -802,11 +794,8 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, grid::Grid, param_set
     end
 end
 
-function surface_params(case::DYCOMS_RF01, grid::TC.Grid, state::TC.State, param_set; Ri_bulk_crit)
+function surface_params(case::DYCOMS_RF01, grid::TC.Grid, surf_ref_state, param_set; Ri_bulk_crit)
     FT = eltype(grid)
-    kf_surf = TC.kf_surface(grid)
-    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
-    ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
     zrough = 1.0e-4
     ustar = 0.28 # just to initilize grid mean covariances
     shf = 15.0 # sensible heat flux
@@ -861,7 +850,7 @@ end
 ##### DYCOMS_RF02
 #####
 
-function surface_ref_state(::DYCOMS_RF02, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::DYCOMS_RF02, param_set::APS, namelist)
     Pg = 1017.8 * 100.0
     qtg = 9.0 / 1000.0
     θ_surf = 288.3
@@ -887,11 +876,8 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF02}, grid::Grid, param_set
     end
 end
 
-function surface_params(case::DYCOMS_RF02, grid::TC.Grid, state::TC.State, param_set; Ri_bulk_crit)
+function surface_params(case::DYCOMS_RF02, grid::TC.Grid, surf_ref_state, param_set; Ri_bulk_crit)
     FT = eltype(grid)
-    kf_surf = TC.kf_surface(grid)
-    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
-    ρ0_f_surf = TC.face_ref_state(state).ρ0[kf_surf]
     zrough = 1.0e-4  #TODO - not needed?
     ustar = 0.25
     shf = 16.0 # sensible heat flux
@@ -959,7 +945,7 @@ function ForcingBase(case::GABLS, param_set::APS; kwargs...)
     )
 end
 
-function surface_ref_state(::GABLS, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::GABLS, param_set::APS, namelist)
     Pg = 1.0e5  #Pressure at ground,
     Tg = 265.0  #Temperature at ground,
     qtg = 0.0
@@ -982,7 +968,7 @@ function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, param_set, stat
     end
 end
 
-function surface_params(case::GABLS, grid::TC.Grid, state::TC.State, param_set; kwargs...)
+function surface_params(case::GABLS, grid::TC.Grid, surf_ref_state, param_set; kwargs...)
     FT = eltype(grid)
     Tsurface = t -> 265.0 - (0.25 / 3600.0) * t
     qsurface = 0.0
@@ -1025,7 +1011,7 @@ function ForcingBase(case::SP, param_set::APS; kwargs...)
     )
 end
 
-function surface_ref_state(::SP, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::SP, param_set::APS, namelist)
     Pg = 1.0e5  #Pressure at ground
     Tg = 300.0  #Temperature at ground
     qtg = 1.0e-4   #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN.
@@ -1062,7 +1048,7 @@ end
 ForcingBase(case::DryBubble, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
-function surface_ref_state(::DryBubble, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::DryBubble, param_set::APS, namelist)
     Pg = 1.0e5  #Pressure at ground
     Tg = 296.0
     qtg = 1.0e-5
@@ -1086,7 +1072,7 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, param_set, 
     parent(aux_gm.HQTcov) .= 0
 end
 
-function surface_params(case::DryBubble, grid::TC.Grid, state::TC.State, param_set; Ri_bulk_crit)
+function surface_params(case::DryBubble, grid::TC.Grid, surf_ref_state, param_set; Ri_bulk_crit)
     FT = eltype(grid)
     Tsurface = 300.0
     qsurface = 0.0
@@ -1131,7 +1117,7 @@ function ForcingBase(case::LES_driven_SCM, param_set::APS; nudge_tau)
     )
 end
 
-function surface_ref_state(::LES_driven_SCM, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::LES_driven_SCM, param_set::APS, namelist)
     les_filename = namelist["meta"]["lesfile"]
 
     Pg, Tg, qtg = NC.Dataset(les_filename, "r") do data
@@ -1179,7 +1165,7 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, param_
     end
 end
 
-function surface_params(case::LES_driven_SCM, grid::TC.Grid, state::TC.State, param_set; Ri_bulk_crit, LESDat)
+function surface_params(case::LES_driven_SCM, grid::TC.Grid, surf_ref_state, param_set; Ri_bulk_crit, LESDat)
     FT = eltype(grid)
     nt = NC.Dataset(LESDat.les_filename, "r") do data
         imin = LESDat.imin

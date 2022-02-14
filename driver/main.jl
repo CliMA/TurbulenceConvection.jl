@@ -71,7 +71,7 @@ function Simulation1d(namelist)
 
     Stats = skip_io ? nothing : NetCDFIO_Stats(namelist, grid)
     case_type = Cases.get_case(namelist)
-    surf_ref_state = Cases.surface_ref_state(case_type, grid, param_set, namelist)
+    surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
 
     Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
     Rad = TC.RadiationBase(case_type)
@@ -101,7 +101,7 @@ function Simulation1d(namelist)
 
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)
-    surf_params = Cases.surface_params(case_type, grid, state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
+    surf_params = Cases.surface_params(case_type, grid, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
     inversion_type = Cases.inversion_type(case_type)
     case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad, spk...)
 

@@ -24,7 +24,7 @@ function export_ref_profile(case_name::String)
     grid = TC.Grid(FT(namelist["grid"]["dz"]), namelist["grid"]["nz"])
     Stats = NetCDFIO_Stats(namelist, grid)
     case = Cases.get_case(namelist)
-    surf_ref_state = Cases.surface_ref_state(case, grid, param_set, namelist)
+    surf_ref_state = Cases.surface_ref_state(case, param_set, namelist)
 
     aux_vars(FT) = (; ref_state = (ρ0 = FT(0), α0 = FT(0), p0 = FT(0)))
     aux_cent_fields = TC.FieldFromNamedTuple(TC.center_space(grid), aux_vars(FT))
