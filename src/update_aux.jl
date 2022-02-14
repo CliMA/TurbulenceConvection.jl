@@ -10,14 +10,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     α0_c = center_ref_state(state).α0
-    g = CPP.grav(param_set)
     c_m = CPEDMF.c_m(param_set)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
     obukhov_length = surf.obukhov_length
     FT = eltype(grid)
     prog_gm = center_prog_grid_mean(state)
-    prog_gm_f = face_prog_grid_mean(state)
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
     aux_en = center_aux_environment(state)
