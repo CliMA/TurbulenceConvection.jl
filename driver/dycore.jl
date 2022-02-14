@@ -256,7 +256,13 @@ end
 
 
 function compute_sgs_tendencies!(turb_conv::TC.EDMFModel, param_set, grid, state, gm, surf)
-    TC.compute_sgs_flux!(edmf, grid, state, surf, gm)
+    TC.compute_sgs_flux!(turb_conv, grid, state, surf, gm)
+
+    tendencies_gm = TC.center_tendencies_grid_mean(state)
+    kf_surf = TC.kf_surface(grid)
+    aux_gm_f = TC.face_aux_grid_mean(state)
+    α0_c = TC.center_ref_state(state).α0
+    wvec = CC.Geometry.WVector
 
     sgs_flux_θ_liq_ice = aux_gm_f.sgs_flux_θ_liq_ice
     sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot
@@ -289,15 +295,14 @@ function compute_sgs_tendencies!(turb_conv::TC.DiffusivityModel, param_set, grid
     FT = eltype(grid)
     zf = grid.zf
     kf_surf = TC.kf_surface(grid)
-    kc_toa = TC.kc_top_of_atmos(grid)
     ρ0_f = TC.face_ref_state(state).ρ0
     wvec = CC.Geometry.WVector
     prog_gm = TC.center_prog_grid_mean(state)
     tendencies_gm = TC.center_tendencies_grid_mean(state)
-    ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
-    ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
-    ∇u_gm = TC.center_aux_grid_mean(state).∇u_gm
-    ∇v_gm = TC.center_aux_grid_mean(state).∇v_gm
+    # ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
+    # ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
+    # ∇u_gm = TC.center_aux_grid_mean(state).∇u_gm
+    # ∇v_gm = TC.center_aux_grid_mean(state).∇v_gm
 
     ν = turb_conv.diff_coeff
     grad_θ = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(surf.ρθ_liq_ice_flux/ρ0_f[kf_surf])), top = CCO.SetGradient(wvec(FT(0))))
@@ -326,21 +331,15 @@ function compute_gm_tendencies!(
 ) where {ATCM}
     tendencies_gm = TC.center_tendencies_grid_mean(state)
     kc_toa = TC.kc_top_of_atmos(grid)
-    kf_surf = TC.kf_surface(grid)
     FT = eltype(grid)
     param_set = TC.parameter_set(gm)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
-    aux_gm_f = TC.face_aux_grid_mean(state)
     ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
     ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
     aux_en = TC.center_aux_environment(state)
-    aux_en_f = TC.face_aux_environment(state)
-    aux_up = TC.center_aux_updrafts(state)
     aux_bulk = TC.center_aux_bulk(state)
-    ρ0_f = TC.face_ref_state(state).ρ0
     p0_c = TC.center_ref_state(state).p0
-    α0_c = TC.center_ref_state(state).α0
     aux_tc = TC.center_aux_turbconv(state)
 
     θ_liq_ice_gm_toa = prog_gm.θ_liq_ice[kc_toa]
@@ -423,6 +422,6 @@ function compute_gm_tendencies!(
             aux_en.θ_liq_ice_tendency_precip_formation[k] +
             aux_tc.θ_liq_ice_tendency_precip_sinks[k]
     end
-    compute_sgs_tendencies!(turb_conv, grid, state, surf)
+    compute_sgs_tendencies!(turb_conv, param_set, grid, state, gm, surf)
     return nothing
 end
