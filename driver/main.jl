@@ -71,7 +71,7 @@ function Simulation1d(namelist)
 
     Stats = skip_io ? nothing : NetCDFIO_Stats(namelist, grid)
     case_type = Cases.get_case(namelist)
-    surf_ref_state = Cases.surface_ref_state(case_type, grid, param_set, namelist)
+    surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
 
     Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
     Rad = TC.RadiationBase(case_type)

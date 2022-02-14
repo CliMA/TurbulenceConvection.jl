@@ -172,7 +172,7 @@ initialize_forcing(self::CasesBase, grid::Grid, state, param_set) = initialize(s
 ForcingBase(case::Soares, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
-function surface_ref_state(::Soares, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::Soares, param_set::APS, namelist)
     Pg = 1000.0 * 100.0
     qtg = 5.0e-3
     Tg = 300.0
@@ -220,7 +220,7 @@ end
 ForcingBase(case::Nieuwstadt, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
-function surface_ref_state(::Nieuwstadt, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::Nieuwstadt, param_set::APS, namelist)
     Pg = 1000.0 * 100.0
     Tg = 300.0
     qtg = 1.0e-12 # Total water mixing ratio
@@ -266,7 +266,7 @@ end
 ForcingBase(case::Bomex, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
 
-function surface_ref_state(::Bomex, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::Bomex, param_set::APS, namelist)
     Pg = 1.015e5 #Pressure at ground
     Tg = 300.4 #Temperature at ground
     qtg = 0.02245#Total water mixing ratio at surface
@@ -345,7 +345,7 @@ end
 ForcingBase(case::life_cycle_Tan2018, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
 
-function surface_ref_state(::life_cycle_Tan2018, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::life_cycle_Tan2018, param_set::APS, namelist)
     Pg = 1.015e5  #Pressure at ground
     Tg = 300.4  #Temperature at ground
     qtg = 0.02245   #Total water mixing ratio at surface
@@ -446,7 +446,7 @@ function ForcingBase(case::Rico, param_set::APS; kwargs...)
     ) #= s^{-1} =#
 end
 
-function surface_ref_state(::Rico, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::Rico, param_set::APS, namelist)
     molmass_ratio = CPP.molmass_ratio(param_set)
     Pg = 1.0154e5  #Pressure at ground
     Tg = 299.8  #Temperature at ground
@@ -547,7 +547,7 @@ end
 ForcingBase(case::TRMM_LBA, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false, kwargs...)
 
-function surface_ref_state(::TRMM_LBA, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::TRMM_LBA, param_set::APS, namelist)
     molmass_ratio = CPP.molmass_ratio(param_set)
     Pg = 991.3 * 100  #Pressure at ground
     Tg = 296.85   # surface values for reference state (RS) which outputs p0 rho0 alpha0
@@ -634,7 +634,7 @@ end
 ForcingBase(case::ARM_SGP, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = false, coriolis_param = 8.5e-5)
 
-function surface_ref_state(::ARM_SGP, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::ARM_SGP, param_set::APS, namelist)
     Pg = 970.0 * 100 #Pressure at ground
     Tg = 299.0   # surface values for reference state (RS) which outputs p0 rho0 alpha0
     qtg = 15.2 / 1000 #Total water mixing ratio at surface
@@ -716,7 +716,7 @@ end
 ForcingBase(case::GATE_III, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
-function surface_ref_state(::GATE_III, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::GATE_III, param_set::APS, namelist)
     Pg = 1013.0 * 100  #Pressure at ground
     Tg = 299.184   # surface values for reference state (RS) which outputs p0 rho0 alpha0
     qtg = 16.5 / 1000 #Total water mixing ratio at surface
@@ -768,7 +768,7 @@ end
 ##### DYCOMS_RF01
 #####
 
-function surface_ref_state(::DYCOMS_RF01, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::DYCOMS_RF01, param_set::APS, namelist)
     Pg = 1017.8 * 100.0
     qtg = 9.0 / 1000.0
     θ_surf = 289.0
@@ -850,7 +850,7 @@ end
 ##### DYCOMS_RF02
 #####
 
-function surface_ref_state(::DYCOMS_RF02, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::DYCOMS_RF02, param_set::APS, namelist)
     Pg = 1017.8 * 100.0
     qtg = 9.0 / 1000.0
     θ_surf = 288.3
@@ -945,7 +945,7 @@ function ForcingBase(case::GABLS, param_set::APS; kwargs...)
     )
 end
 
-function surface_ref_state(::GABLS, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::GABLS, param_set::APS, namelist)
     Pg = 1.0e5  #Pressure at ground,
     Tg = 265.0  #Temperature at ground,
     qtg = 0.0
@@ -1011,7 +1011,7 @@ function ForcingBase(case::SP, param_set::APS; kwargs...)
     )
 end
 
-function surface_ref_state(::SP, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::SP, param_set::APS, namelist)
     Pg = 1.0e5  #Pressure at ground
     Tg = 300.0  #Temperature at ground
     qtg = 1.0e-4   #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN.
@@ -1048,7 +1048,7 @@ end
 ForcingBase(case::DryBubble, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
 
-function surface_ref_state(::DryBubble, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::DryBubble, param_set::APS, namelist)
     Pg = 1.0e5  #Pressure at ground
     Tg = 296.0
     qtg = 1.0e-5
@@ -1117,7 +1117,7 @@ function ForcingBase(case::LES_driven_SCM, param_set::APS; nudge_tau)
     )
 end
 
-function surface_ref_state(::LES_driven_SCM, grid::Grid, param_set::APS, namelist)
+function surface_ref_state(::LES_driven_SCM, param_set::APS, namelist)
     les_filename = namelist["meta"]["lesfile"]
 
     Pg, Tg, qtg = NC.Dataset(les_filename, "r") do data
