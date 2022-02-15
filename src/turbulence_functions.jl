@@ -10,10 +10,10 @@ end
 function get_inversion(grid::Grid{FT}, state::State, param_set::APS, Ri_bulk_crit::FT) where {FT}
     g::FT = CPP.grav(param_set)
     kc_surf = kc_surface(grid)
-    θ_virt = center_aux_turbconv(state).θ_virt
+    θ_virt = center_aux_grid_mean(state).θ_virt
     u = center_prog_grid_mean(state).u
     v = center_prog_grid_mean(state).v
-    Ri_bulk = center_aux_bulk(state).Ri
+    Ri_bulk = center_aux_grid_mean(state).Ri
     θ_virt_b = θ_virt[kc_surf]
     z_c = grid.zc
     ∇c = CCO.DivergenceF2C()

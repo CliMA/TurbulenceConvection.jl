@@ -60,6 +60,8 @@ cent_aux_vars_gm(FT) = (;
     vg = FT(0), #Geostrophic v velocity
     ∇θ_liq_ice_gm = FT(0),
     ∇q_tot_gm = FT(0),
+    θ_virt = FT(0),
+    Ri = FT(0),
 )
 cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., TC.cent_aux_vars_edmf(FT, n_up)...)
 
