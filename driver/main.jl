@@ -32,12 +32,13 @@ include(joinpath(tc_dir, "driver", "TimeStepping.jl"))
 include(joinpath(tc_dir, "driver", "Surface.jl"))
 import .Cases
 
-struct Simulation1d{IONT, G, S, C, EDMF, D, TIMESTEPPING, STATS, PS}
+struct Simulation1d{IONT, G, S, C, EDMF, MP, D, TIMESTEPPING, STATS, PS}
     io_nt::IONT
     grid::G
     state::S
     case::C
     edmf::EDMF
+    precip_model::MP
     diagnostics::D
     TS::TIMESTEPPING
     Stats::STATS
@@ -77,7 +78,27 @@ function Simulation1d(namelist)
     Rad = TC.RadiationBase(case_type)
     TS = TimeStepping(namelist)
 
-    edmf = TC.EDMFModel(namelist)
+    # Create the class for precipitation
+
+    precip_name = TC.parse_namelist(
+        namelist,
+        "microphysics",
+        "precipitation_model";
+        default = "None",
+        valid_options = ["None", "cutoff", "clima_1m"],
+    )
+
+    precip_model = if precip_name == "None"
+        TC.NoPrecipitation()
+    elseif precip_name == "cutoff"
+        TC.CutoffPrecipitation()
+    elseif precip_name == "clima_1m"
+        TC.Clima1M()
+    else
+        error("Invalid precip_name $(precip_name)")
+    end
+
+    edmf = TC.EDMFModel(namelist, precip_model)
     isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
     N_up = TC.n_updrafts(edmf)
 
@@ -117,6 +138,7 @@ function Simulation1d(namelist)
         state,
         case,
         edmf,
+        precip_model,
         diagnostics,
         TS,
         Stats,
@@ -180,6 +202,7 @@ function solve_args(sim::Simulation1d)
     t_span = (0.0, sim.TS.t_max)
     params = (;
         edmf = sim.edmf,
+        precip_model = sim.precip_model,
         grid = grid,
         param_set = sim.param_set,
         aux = aux,
@@ -196,7 +219,7 @@ function solve_args(sim::Simulation1d)
     callback_io = ODE.DiscreteCallback(condition_io, affect_io!; save_positions = (false, false))
     callback_io = sim.skip_io ? () : (callback_io,)
     callback_cfl = ODE.DiscreteCallback(condition_every_iter, monitor_cfl!; save_positions = (false, false))
-    callback_cfl = sim.edmf.precip_model isa TC.Clima1M ? (callback_cfl,) : ()
+    callback_cfl = sim.precip_model isa TC.Clima1M ? (callback_cfl,) : ()
     callback_dtmax = ODE.DiscreteCallback(condition_every_iter, dt_max!; save_positions = (false, false))
     callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
     callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))
