@@ -56,7 +56,6 @@ cent_aux_vars_edmf(FT, n_up) = (;
             cloud_fraction = FT(0),
             θ_liq_ice_tendency_precip_formation = FT(0),
             qt_tendency_precip_formation = FT(0),
-            # Ri = FT(0),
         ),
         up = ntuple(i -> cent_aux_vars_up(FT), n_up),
         en = (;
@@ -103,7 +102,6 @@ cent_aux_vars_edmf(FT, n_up) = (;
         KM = FT(0),
         KH = FT(0),
         mixing_length = FT(0),
-        # θ_virt = FT(0),
         massflux_tendency_h = FT(0),
         massflux_tendency_qt = FT(0),
         diffusive_tendency_h = FT(0),
