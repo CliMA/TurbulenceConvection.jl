@@ -116,7 +116,7 @@ function update_aux!(
         ##### saturation_adjustment and buoyancy
         #####
         ts_gm = thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        aux_tc.θ_virt[k] = TD.virtual_pottemp(ts_gm)
+        aux_gm.θ_virt[k] = TD.virtual_pottemp(ts_gm)
 
         ts_en = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
 

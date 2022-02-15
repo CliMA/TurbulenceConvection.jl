@@ -124,8 +124,8 @@ function compute_diffusive_fluxes(
     aux_en = center_aux_environment(state)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
-    aeKM = center_aux_turbconv(state).ϕ_temporary
-    aeKH = center_aux_turbconv(state).ψ_temporary
+    aeKM = center_aux_grid_mean(state).ϕ_temporary
+    aeKH = center_aux_grid_mean(state).ψ_temporary
     a_en = aux_en.area
     @. aeKM = a_en * KM
     @. aeKH = a_en * KH
@@ -705,9 +705,10 @@ function compute_en_tendencies!(
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
     aux_tc = center_aux_turbconv(state)
+    aux_gm = center_aux_grid_mean(state)
     aux_bulk = center_aux_bulk(state)
-    D_env = aux_tc.ϕ_temporary
-    aeK = aux_tc.ψ_temporary
+    D_env = aux_gm.ϕ_temporary
+    aeK = aux_gm.ψ_temporary
     a_bulk = aux_bulk.area
     if is_tke
         @. aeK = (1 - a_bulk) * KM

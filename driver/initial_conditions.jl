@@ -7,6 +7,7 @@ function initialize_turb_conv(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State
     initialize_covariance(edmf, grid, state)
     param_set = TC.parameter_set(gm)
     aux_tc = TC.center_aux_turbconv(state)
+    aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     p0_c = TC.center_ref_state(state).p0
     surf_params = case.surf_params
@@ -14,7 +15,7 @@ function initialize_turb_conv(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State
     parent(aux_tc.prandtl_nvec) .= edmf.prandtl_number
     @inbounds for k in TC.real_center_indices(grid)
         ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
+        aux_gm.θ_virt[k] = TD.virtual_pottemp(ts)
     end
     if case.casename == "DryBubble"
         initialize_updrafts_DryBubble(edmf, grid, state, gm)

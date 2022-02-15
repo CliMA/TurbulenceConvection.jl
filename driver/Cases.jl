@@ -575,7 +575,7 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, gm, state)
     # Need to get θ_virt
     @inbounds for k in real_center_indices(grid)
         ts = TD.PhaseEquil_pθq(param_set, p0[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        aux_tc.θ_virt[k] = TD.virtual_pottemp(ts)
+        aux_gm.θ_virt[k] = TD.virtual_pottemp(ts)
     end
     zi = 0.6 * get_inversion(grid, state, param_set, 0.2)
 

@@ -79,7 +79,7 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["meta"]["uuid"] = basename(tempname())
 
     namelist_defaults["turbulence"] = Dict()
-    namelist_defaults["turbulence"]["turbulence_convection_model"] = "EDMF" # "constant_diffusivity", "EDMF"
+    namelist_defaults["turbulence"]["turbulence_convection_model"] = "eddy_diffusivity" # "constant_diffusivity", "EDMF"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"] = Dict()
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.1
@@ -174,7 +174,7 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["stats_io"] = Dict()
     namelist_defaults["stats_io"]["stats_dir"] = "stats"
     namelist_defaults["stats_io"]["frequency"] = 60.0
-    namelist_defaults["stats_io"]["skip"] = false
+    namelist_defaults["stats_io"]["skip"] = true
 
     if case_name == "Soares"
         namelist = Soares(namelist_defaults)

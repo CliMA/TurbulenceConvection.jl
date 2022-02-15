@@ -460,11 +460,11 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMFModel{N_up, PM, ENT, EBGC, EC, EDS}
+struct EDMFModel{N_up, ENT, EBGC, EC, EDS}
     surface_area::Float64
     max_area::Float64
     minimum_area::Float64
-    precip_model::PM
+    # precip_model::PM
     en_thermo::ENT
     prandtl_number::Float64
     bg_closure::EBGC
@@ -492,23 +492,23 @@ struct EDMFModel{N_up, PM, ENT, EBGC, EC, EDS}
 
         # Create the class for precipitation
 
-        precip_name = parse_namelist(
-            namelist,
-            "microphysics",
-            "precipitation_model";
-            default = "None",
-            valid_options = ["None", "cutoff", "clima_1m"],
-        )
+        # precip_name = parse_namelist(
+        #     namelist,
+        #     "microphysics",
+        #     "precipitation_model";
+        #     default = "None",
+        #     valid_options = ["None", "cutoff", "clima_1m"],
+        # )
 
-        precip_model = if precip_name == "None"
-            NoPrecipitation()
-        elseif precip_name == "cutoff"
-            CutoffPrecipitation()
-        elseif precip_name == "clima_1m"
-            Clima1M()
-        else
-            error("Invalid precip_name $(precip_name)")
-        end
+        # precip_model = if precip_name == "None"
+        #     NoPrecipitation()
+        # elseif precip_name == "cutoff"
+        #     CutoffPrecipitation()
+        # elseif precip_name == "clima_1m"
+        #     Clima1M()
+        # else
+        #     error("Invalid precip_name $(precip_name)")
+        # end
 
         # Create the environment variable class (major diagnostic and prognostic variables)
 
@@ -599,14 +599,14 @@ struct EDMFModel{N_up, PM, ENT, EBGC, EC, EDS}
 
         EDS = typeof(entr_dim_scale)
         EC = typeof(entr_closure)
-        PM = typeof(precip_model)
+        # PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
-        return new{n_updrafts, PM, ENT, EBGC, EC, EDS}(
+        return new{n_updrafts, ENT, EBGC, EC, EDS}(
             surface_area,
             max_area,
             minimum_area,
-            precip_model,
+            # precip_model,
             en_thermo,
             prandtl_number,
             bg_closure,

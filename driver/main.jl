@@ -22,6 +22,14 @@ import StaticArrays: SVector
 
 const tc_dir = pkgdir(TurbulenceConvection)
 
+struct DiffusivityModel{FT}
+    diffusivity::FT
+    function DiffusivityModel(namelist)
+        diffusivity = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
+        return new{typeof(diffusivity)}(diffusivity)
+    end
+end
+
 include(joinpath(tc_dir, "driver", "NetCDFIO.jl"))
 include(joinpath(tc_dir, "driver", "initial_conditions.jl"))
 include(joinpath(tc_dir, "driver", "compute_diagnostics.jl"))
@@ -34,21 +42,15 @@ import .Cases
 
 
 
-struct DiffusivityModel{}
-    diffusivity::Float64
-    function DiffusivityModel(namelist)
-        diffusivity = namelist["turbulence"]["eddy_diffusivity"]
-        return new{diffusivity}
-    end
-end
 
-struct Simulation1d{IONT, G, S, GM, C, TCModel, D, TIMESTEPPING, STATS, PS}
+struct Simulation1d{IONT, G, S, GM, C, TCModel, PM, D, TIMESTEPPING, STATS, PS}
     io_nt::IONT
     grid::G
     state::S
     gm::GM
     case::C
     turb_conv::TCModel
+    precip_model::PM
     diagnostics::D
     TS::TIMESTEPPING
     Stats::STATS
@@ -96,31 +98,41 @@ function Simulation1d(namelist)
     if turb_conv_model == "eddy_diffusivity"
         turb_conv = DiffusivityModel(namelist)
         # N_up = nothing
-        cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars_gm(FT))
-        face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars_gm(FT))
-        aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars_gm(FT))
-        aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars_gm(FT))
+        cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars_gm(FT))
+        face_prog_fields = TC.FieldFromNamedTuple(fspace, face_prognostic_vars_gm(FT))
+        aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT))
+        aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT))
         diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars_gm(FT))
         diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars_gm(FT))
     elseif turb_conv_model == "EDMF"
         turb_conv = TC.EDMFModel(namelist)
         N_up = TC.n_updrafts(turb_conv)
-        cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
-        face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up))
+        cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
+        face_prog_fields = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up))
         aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, N_up))
         aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up))
         diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, N_up))
         diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up))
     end
-    # isbits(turb_conv) || error("Something non-isbits was added to edmf and needs to be fixed.")
-    # cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up, turb_conv_model))
-    # face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up, turb_conv_model))
-    # aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, N_up, turb_conv_model))
-    # aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up, turb_conv_model))
-    # diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, N_up, turb_conv_model))
-    # diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up, turb_conv_model))
+    precip_name = TC.parse_namelist(
+            namelist,
+            "microphysics",
+            "precipitation_model";
+            default = "None",
+            valid_options = ["None", "cutoff", "clima_1m"],
+        )
+    precip_model = if precip_name == "None"
+        NoPrecipitation()
+    elseif precip_name == "cutoff"
+        CutoffPrecipitation()
+    elseif precip_name == "clima_1m"
+        Clima1M()
+    else
+        error("Invalid precip_name $(precip_name)")
+    end
+    isbits(turb_conv) || error("Something non-isbits was added to edmf and needs to be fixed.")
 
-    prog = CC.Fields.FieldVector(cent = cent_prog_fields(), face = face_prog_fields())
+    prog = CC.Fields.FieldVector(cent = cent_prog_fields, face = face_prog_fields)
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
     diagnostics = CC.Fields.FieldVector(cent = diagnostic_cent_fields, face = diagnostic_face_fields)
 
@@ -147,6 +159,7 @@ function Simulation1d(namelist)
         gm,
         case,
         turb_conv,
+        precip_model,
         diagnostics,
         TS,
         Stats,
@@ -227,6 +240,7 @@ function solve_args(sim::Simulation1d)
     callback_io = sim.skip_io ? () : (callback_io,)
     callback_cfl = ODE.DiscreteCallback(condition_every_iter, monitor_cfl!; save_positions = (false, false))
     callback_cfl = sim.turb_conv.precip_model isa TC.Clima1M ? (callback_cfl,) : ()
+    dt_max! = sim.turb_conv isa TC.EDMFModel ? edmf_dt_max! : diffusivity_dt_max!
     callback_dtmax = ODE.DiscreteCallback(condition_every_iter, dt_max!; save_positions = (false, false))
     callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
     callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))

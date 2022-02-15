@@ -62,8 +62,12 @@ cent_aux_vars_gm(FT) = (;
     ∇u_gm = FT(0),
     ∇v_gm = FT(0),
     ν = FT(0),
+    θ_virt = FT(0),
+    Ri = FT(0),
+    ϕ_temporary = FT(0),
 )
 cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., TC.cent_aux_vars_edmf(FT, n_up)...)
+cent_aux_vars(FT) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)...)
 
 # Face only
 face_aux_vars_gm(FT) = (;
@@ -77,15 +81,16 @@ face_aux_vars_gm(FT) = (;
     sgs_flux_v = FT(0),
 )
 face_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., face_aux_vars_gm(FT)..., TC.face_aux_vars_edmf(FT, n_up)...)
+face_aux_vars(FT) = (; aux_vars_ref_state(FT)..., face_aux_vars_gm(FT)...)
 
 ##### Diagnostic fields
 
 # Center only
-cent_diagnostic_vars_gm(FT) = ()
+cent_diagnostic_vars_gm(FT) = NamedTuple()
 cent_diagnostic_vars(FT, n_up) = (; cent_diagnostic_vars_gm(FT)..., TC.cent_diagnostic_vars_edmf(FT, n_up)...)
 
 # Face only
-face_diagnostic_vars_gm(FT) = ()
+face_diagnostic_vars_gm(FT) = NamedTuple()
 face_diagnostic_vars(FT, n_up) = (; face_diagnostic_vars_gm(FT)..., TC.face_diagnostic_vars_edmf(FT, n_up)...)
 
 ##### Prognostic fields
@@ -95,7 +100,8 @@ cent_prognostic_vars(FT, n_up) = (; cent_prognostic_vars_gm(FT)..., TC.cent_prog
 cent_prognostic_vars_gm(FT) = (; u = FT(0), v = FT(0), θ_liq_ice = FT(0), q_tot = FT(0))
 
 # Face only
-face_prognostic_vars(FT, n_up) = (; w = FT(0), TC.face_prognostic_vars_edmf(FT, n_up)...)
+face_prognostic_vars(FT, n_up) = (; face_prognostic_vars_gm(FT)..., TC.face_prognostic_vars_edmf(FT, n_up)...)
+face_prognostic_vars_gm(FT) = (; w = FT(0))
 # TC.face_prognostic_vars_edmf(FT, n_up) = (;) # could also use this for empty model
 
 
@@ -264,7 +270,7 @@ function compute_turbconv_tendencies!(turb_conv::TC.EDMFModel, param_set, grid, 
     return nothing
 end
 
-function compute_turbconv_tendencies!(turb_conv::TC.DiffusivityModel, param_set, grid, state, gm, surf)
+function compute_turbconv_tendencies!(turb_conv::DiffusivityModel, param_set, grid, state, gm, surf)
     return nothing
 end
 
@@ -305,7 +311,7 @@ function compute_sgs_tendencies!(turb_conv::TC.EDMFModel, param_set, grid, state
     return nothing
 end
 
-function compute_sgs_tendencies!(turb_conv::TC.DiffusivityModel, param_set, grid, state, gm, surf)
+function compute_sgs_tendencies!(turb_conv::DiffusivityModel, param_set, grid, state, gm, surf)
     FT = eltype(grid)
     zf = grid.zf
     kf_surf = TC.kf_surface(grid)

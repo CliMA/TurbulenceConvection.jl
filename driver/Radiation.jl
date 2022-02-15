@@ -17,7 +17,7 @@ function update_radiation(
     aux_gm = TC.center_aux_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    q_tot_f = TC.face_aux_turbconv(state).ϕ_temporary
+    q_tot_f = TC.face_aux_grid_mean(state).ϕ_temporary
     # find zi (level of 8.0 g/kg isoline of qt)
     # TODO: report bug: zi and ρ_i are not initialized
     zi = 0
