@@ -585,13 +585,19 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
             error("Something went wrong. Invalid entrainment dimension scale '$entr_dim_scale'")
         end
 
+        entr_pi_groups = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "entr_pi_groups")
 
         EDS = typeof(entr_dim_scale)
         EC = typeof(entr_closure)
         PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
-        return new{n_updrafts, FT, PM, ENT, EBGC, EC, EDS}(
+        EPG = typeof(entr_pi_groups)
+        return new{n_updrafts, FT, PM, ENT, EBGC, EC, EDS, EPG}(
             surface_area,
             max_area,
             minimum_area,
@@ -601,6 +607,7 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
             bg_closure,
             entr_closure,
             entr_dim_scale,
+            entr_pi_groups,
         )
     end
 end

@@ -16,7 +16,8 @@ function non_dimensional_groups(param_set, εδ_model_vars)
     Π_2 = (εδ_model_vars.tke_gm - εδ_model_vars.a_en * εδ_model_vars.tke_en) / (εδ_model_vars.tke_gm + eps(FT))
     Π_3 = √(εδ_model_vars.a_up)
     Π_4 = εδ_model_vars.RH_up - εδ_model_vars.RH_en
-    return SA.SVector(Π_1, Π_2, Π_3, Π_4)
+
+    return SA.SVector(Π_1, Π_2, Π_3, Π_4, Π_5, Π_6)
 end
 
 """
@@ -74,12 +75,15 @@ function non_dimensional_function!(
     Π₂::AbstractArray{FT}, # input
     Π₃::AbstractArray{FT}, # input
     Π₄::AbstractArray{FT}, # input
+    Π₅::AbstractArray{FT}, # input
+    Π₆::AbstractArray{FT}, # input
+    entr_pi_groups::UnitRange{Int},
     εδ_model::FNOEntr,
 ) where {FT <: Real}
 
     # define the model
-    Π = hcat(Π₁, Π₂, Π₃, Π₄)'
-    Π = reshape(Π, (size(Π)..., 1))
+    Π = hcat(Π₁, Π₂, Π₃, Π₄, Π₅, Π₆)'
+    Π = reshape(Π, (size(Π)..., 1))[entr_pi_groups,:,:]
     trafo = OF.FourierTransform(modes = (2,))
     model = OF.Chain(OF.SpectralKernelOperator(trafo, 4 => 2, Flux.relu),)
 
@@ -127,15 +131,18 @@ function non_dimensional_function!(
     Π₁::AbstractArray{FT}, # input
     Π₂::AbstractArray{FT}, # input
     Π₃::AbstractArray{FT}, # input
-    Π₄::AbstractArray{FT}, # input)
+    Π₄::AbstractArray{FT}, # input
+    Π₅::AbstractArray{FT}, # input
+    Π₆::AbstractArray{FT}, # input
+    entr_pi_groups::UnitRange{Int},
     εδ_model::NNEntrNonlocal,
 ) where {FT <: Real}
 
     c_gen = ICP.c_gen(param_set)
-    Π = hcat(Π₁, Π₂, Π₃, Π₄)'
-
+    Π = hcat(Π₁, Π₂, Π₃, Π₄, Π₅, Π₆)'
+    Π = Π[entr_pi_groups, :]
     # Neural network closure
-    nn_arc = (4, 2, 2)  # (#inputs, #neurons, #outputs)
+    nn_arc = (size(Π)[1], 2, 2)  # (#inputs, #neurons, #outputs)
     nn_model = Flux.Chain(
         Flux.Dense(reshape(c_gen[1:8], nn_arc[2], nn_arc[1]), c_gen[9:10], Flux.sigmoid),
         Flux.Dense(reshape(c_gen[11:14], nn_arc[3], nn_arc[2]), c_gen[15:16], Flux.relu),
@@ -157,17 +164,17 @@ Uses a fully connected neural network to predict the non-dimensional components 
  - `εδ_model_vars`  :: structure containing variables
  - `εδ_model_type`  :: NNEntr - Neural network entrainment closure
 """
-function non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
+function non_dimensional_function(param_set, εδ_model_vars, entr_pi_groups, ::NNEntr)
     c_gen = ICP.c_gen(param_set)
 
+    nondim_groups = non_dimensional_groups(param_set, εδ_model_vars)
+    nondim_groups = nondim_groups[entr_pi_groups]
     # Neural network closure
-    nn_arc = (4, 2, 2)  # (#inputs, #neurons, #outputs)
+    nn_arc = (length(nondim_groups), 2, 2)  # (#inputs, #neurons, #outputs)
     nn_model = Flux.Chain(
         Flux.Dense(reshape(c_gen[1:8], nn_arc[2], nn_arc[1]), c_gen[9:10], Flux.sigmoid),
         Flux.Dense(reshape(c_gen[11:14], nn_arc[3], nn_arc[2]), c_gen[15:16], Flux.relu),
     )
-
-    nondim_groups = non_dimensional_groups(param_set, εδ_model_vars)
     nondim_ε, nondim_δ = nn_model(nondim_groups)
     return nondim_ε, nondim_δ
 end
@@ -180,15 +187,16 @@ Uses a simple linear model to predict the non-dimensional components of dynamica
  - `εδ_model_vars`  :: structure containing variables
  - `εδ_model_type`  :: LinearEntr - linear entrainment closure
 """
-function non_dimensional_function(param_set, εδ_model_vars, ::LinearEntr)
+function non_dimensional_function(param_set, εδ_model_vars, entr_pi_groups, ::LinearEntr)
     c_gen = ICP.c_gen(param_set)
 
+    nondim_groups = non_dimensional_groups(param_set, εδ_model_vars)
+    nondim_groups = nondim_groups[entr_pi_groups]
     # Linear closure
-    lin_arc = (4, 1)  # (#weights, #outputs)
+    lin_arc = (length(nondim_groups), 1)  # (#weights, #outputs)
     lin_model_ε = Flux.Dense(reshape(c_gen[1:4], lin_arc[2], lin_arc[1]), [c_gen[5]], Flux.relu)
     lin_model_δ = Flux.Dense(reshape(c_gen[6:9], lin_arc[2], lin_arc[1]), [c_gen[10]], Flux.relu)
 
-    nondim_groups = non_dimensional_groups(param_set, εδ_model_vars)
     nondim_ε = lin_model_ε(nondim_groups)[1]
     nondim_δ = lin_model_δ(nondim_groups)[1]
     return nondim_ε, nondim_δ

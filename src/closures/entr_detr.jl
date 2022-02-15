@@ -71,9 +71,11 @@ as well as the turbulent entrainment rate, following
 Cohen et al. (JAMES, 2020), given:
  - `param_set`      :: parameter set
  - `εδ_vars`  :: structure containing variables
+ - `entr_dim_scale` :: dimensional scale of the entrainment rate
+ - `entr_pi_groups` :: vector specifying which pi groups to use in closure
  - `εδ_model_type`  :: type of non-dimensional model for entrainment/detrainment
 """
-function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, εδ_model_type)
+function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, entr_pi_groups, εδ_model_type)
     FT = eltype(εδ_vars)
     dim_scale = entrainment_length_scale(
         param_set,
@@ -91,7 +93,7 @@ function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, εδ_model_type)
     c_div = FT(ICP.entrainment_massflux_div_factor(param_set))
     MdMdz_ε, MdMdz_δ = get_MdMdz(εδ_vars.M, εδ_vars.dMdz) .* c_div
 
-    nondim_ε, nondim_δ = non_dimensional_function(param_set, εδ_vars, εδ_model_type)
+    nondim_ε, nondim_δ = non_dimensional_function(param_set, εδ_vars, entr_pi_groups, εδ_model_type)
 
     # dynamic entrainment / detrainment
     ε_dyn = dim_scale * nondim_ε + MdMdz_ε
@@ -178,7 +180,7 @@ function compute_entr_detr!(
                     wstar = surf.wstar,
                 )
 
-                er = entr_detr(param_set, εδ_model_vars, edmf.entr_dim_scale, edmf.entr_closure)
+                er = entr_detr(param_set, εδ_model_vars, edmf.entr_dim_scale, edmf.entr_pi_groups, edmf.entr_closure)
                 aux_up[i].entr_sc[k] = er.ε_dyn
                 aux_up[i].detr_sc[k] = er.δ_dyn
                 aux_up[i].frac_turb_entr[k] = er.ε_turb
@@ -274,12 +276,16 @@ function compute_entr_detr!(
                 aux_up[i].Π₂[k] = Π[2]
                 aux_up[i].Π₃[k] = Π[3]
                 aux_up[i].Π₄[k] = Π[4]
+                aux_up[i].Π₅[k] = Π[5]
+                aux_up[i].Π₆[k] = Π[6]
             else
                 # TODO: is there a better way to do this?
                 aux_up[i].Π₁[k] = 0
                 aux_up[i].Π₂[k] = 0
                 aux_up[i].Π₃[k] = 0
                 aux_up[i].Π₄[k] = 0
+                aux_up[i].Π₅[k] = 0
+                aux_up[i].Π₆[k] = 0
             end
         end
 
@@ -287,10 +293,12 @@ function compute_entr_detr!(
         Π₂ = parent(aux_up[i].Π₂)
         Π₃ = parent(aux_up[i].Π₃)
         Π₄ = parent(aux_up[i].Π₄)
+        Π₅ = parent(aux_up[i].Π₅)
+        Π₆ = parent(aux_up[i].Π₆)
         nondim_ε = parent(aux_up[i].nondim_entr_sc)
         nondim_δ = parent(aux_up[i].nondim_detr_sc)
 
-        non_dimensional_function!(nondim_ε, nondim_δ, param_set, Π₁, Π₂, Π₃, Π₄, εδ_model)
+        non_dimensional_function!(nondim_ε, nondim_δ, param_set, Π₁, Π₂, Π₃, Π₄, Π₅, Π₆, entr_pi_groups, εδ_model)
         @inbounds for k in real_center_indices(grid)
             ε_turb = compute_turbulent_entrainment(
                 param_set,
