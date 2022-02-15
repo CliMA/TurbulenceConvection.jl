@@ -182,7 +182,23 @@ function get_edmf_cache(grid, namelist)
     surf_params = Cases.surface_params(case_type, grid, surf_ref_state, param_set; Ri_bulk_crit)
     inversion_type = Cases.inversion_type(case_type)
     case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad)
-    edmf = TC.EDMFModel(namelist)
+    precip_name = TC.parse_namelist(
+        namelist,
+        "microphysics",
+        "precipitation_model";
+        default = "None",
+        valid_options = ["None", "cutoff", "clima_1m"],
+    )
+    precip_model = if precip_name == "None"
+        TC.NoPrecipitation()
+    elseif precip_name == "cutoff"
+        TC.CutoffPrecipitation()
+    elseif precip_name == "clima_1m"
+        TC.Clima1M()
+    else
+        error("Invalid precip_name $(precip_name)")
+    end
+    edmf = TC.EDMFModel(namelist, precip_model)
     return (; edmf, case, grid, param_set, aux = get_aux(grid))
 end
 
