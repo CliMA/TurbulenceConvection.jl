@@ -5,9 +5,8 @@ function update_cloud_frac(edmf::EDMFModel, grid::Grid, state::State)
     aux_gm = center_aux_grid_mean(state)
     aux_en = center_aux_environment(state)
     a_up_bulk = aux_bulk.area
-    @inbounds for k in real_center_indices(grid) # update grid-mean cloud fraction and cloud cover
-        aux_gm.cloud_fraction[k] = aux_en.area[k] * aux_en.cloud_fraction[k] + a_up_bulk[k] * aux_bulk.cloud_fraction[k]
-    end
+    # update grid-mean cloud fraction and cloud cover
+    @. aux_gm.cloud_fraction = aux_en.area * aux_en.cloud_fraction + a_up_bulk * aux_bulk.cloud_fraction
 end
 
 function compute_les_Γᵣ(
@@ -188,13 +187,11 @@ function affect_filter!(
     set_edmf_surface_bc(edmf, grid, state, surf, param_set)
     filter_updraft_vars(edmf, grid, state, surf)
 
-    @inbounds for k in real_center_indices(grid)
-        prog_en.ρatke[k] = max(prog_en.ρatke[k], 0.0)
-        prog_en.ρaHvar[k] = max(prog_en.ρaHvar[k], 0.0)
-        prog_en.ρaQTvar[k] = max(prog_en.ρaQTvar[k], 0.0)
-        prog_en.ρaHQTcov[k] = max(prog_en.ρaHQTcov[k], -sqrt(prog_en.ρaHvar[k] * prog_en.ρaQTvar[k]))
-        prog_en.ρaHQTcov[k] = min(prog_en.ρaHQTcov[k], sqrt(prog_en.ρaHvar[k] * prog_en.ρaQTvar[k]))
-    end
+    @. prog_en.ρatke = max(prog_en.ρatke, 0)
+    @. prog_en.ρaHvar = max(prog_en.ρaHvar, 0)
+    @. prog_en.ρaQTvar = max(prog_en.ρaQTvar, 0)
+    @. prog_en.ρaHQTcov = max(prog_en.ρaHQTcov, -sqrt(prog_en.ρaHvar * prog_en.ρaQTvar))
+    @. prog_en.ρaHQTcov = min(prog_en.ρaHQTcov, sqrt(prog_en.ρaHvar * prog_en.ρaQTvar))
     return nothing
 end
 
@@ -464,9 +461,7 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         prog_up[i].ρarea .= max.(prog_up[i].ρarea, 0)
         prog_up[i].ρaθ_liq_ice .= max.(prog_up[i].ρaθ_liq_ice, 0)
         prog_up[i].ρaq_tot .= max.(prog_up[i].ρaq_tot, 0)
-        @inbounds for k in real_center_indices(grid)
-            prog_up[i].ρarea[k] = min(prog_up[i].ρarea[k], ρ0_c[k] * a_max)
-        end
+        @. prog_up[i].ρarea = min(prog_up[i].ρarea, ρ0_c * a_max)
     end
 
     @inbounds for i in 1:N_up
