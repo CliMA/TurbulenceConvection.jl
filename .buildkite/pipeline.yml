@@ -173,6 +173,17 @@ steps:
       queue: central
       slurm_ntasks: 1
 
+  - label: ":package: 3D Bomex"
+    key: "cpu_3dBomex"
+    command:
+      - "julia --color=yes --project=test integration_tests/3dBomex.jl"
+    artifact_paths:
+      - "integration_tests/output/3dBomex/*"
+    agents:
+      config: cpu
+      queue: central
+      slurm_ntasks: 1
+
   - label: ":earth_americas: 3D sphere bariclinic wave"
     key: "cpu_3dsphere_baroclinic_wave"
     command:
