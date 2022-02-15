@@ -70,7 +70,7 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
     quad_order = quadrature_order(en_thermo)
     tendencies_pr = center_tendencies_precipitation(state)
 
-    #TODO - remember you output source terms multipierd by Δt (bec. of instanteneous autoconcv)
+    #TODO - remember you output source terms multiplied by Δt (bec. of instantaneous autoconv)
     #TODO - add tendencies for gm H, QT and QR due to rain
     #TODO - if we start using eos_smpl for the updrafts calculations
     #       we can get rid of the two categories for outer and inner quad. points
@@ -85,7 +85,7 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
     sqpi_inv = 1 / sqrt(π)
     sqrt2 = sqrt(2)
 
-    epsilon = 10e-14 #np.finfo(np.float).eps
+    epsilon = 10e-14 # eps(float)
 
     # initialize the quadrature points and their labels
     inner_env = zeros(env_len)
@@ -112,9 +112,8 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
                 corr = max(min(aux_en.HQTcov[k] / sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]), 1), -1)
                 sd2_hq = log(corr * sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]) / aux_en.θ_liq_ice[k] / aux_en.q_tot[k] + 1)
                 sd_cond_h_q = sqrt(max(sd_h * sd_h - sd2_hq * sd2_hq / sd_q / sd_q, 0))
-                mu_q =
-                    log(aux_en.q_tot[k] * aux_en.q_tot[k] / sqrt(aux_en.q_tot[k] * aux_en.q_tot[k] + aux_en.QTvar[k]))
-                mu_h = log(
+                μ_q = log(aux_en.q_tot[k] * aux_en.q_tot[k] / sqrt(aux_en.q_tot[k] * aux_en.q_tot[k] + aux_en.QTvar[k]))
+                μ_h = log(
                     aux_en.θ_liq_ice[k] * aux_en.θ_liq_ice[k] /
                     sqrt(aux_en.θ_liq_ice[k] * aux_en.θ_liq_ice[k] + aux_en.Hvar[k]),
                 )
@@ -130,7 +129,7 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
                 # TODO - change 1e-13 and 1e-10 to some epislon
                 sd_q = min(sd_q, sd_q_lim)
                 qt_var = sd_q * sd_q
-                sigma_h_star = sqrt(max(1 - corr * corr, 0)) * sd_h
+                σ_h_star = sqrt(max(1 - corr * corr, 0)) * sd_h
             end
 
             # zero outer quadrature points
@@ -143,11 +142,11 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
 
             for m_q in 1:quad_order
                 if quadrature_type isa LogNormalQuad
-                    qt_hat = exp(mu_q + sqrt2 * sd_q * abscissas[m_q])
-                    mu_h_star = mu_h + sd2_hq / sd_q / sd_q * (log(qt_hat) - mu_q)
+                    qt_hat = exp(μ_q + sqrt2 * sd_q * abscissas[m_q])
+                    μ_h_star = μ_h + sd2_hq / sd_q / sd_q * (log(qt_hat) - μ_q)
                 else
                     qt_hat = aux_en.q_tot[k] + sqrt2 * sd_q * abscissas[m_q]
-                    mu_h_star = aux_en.θ_liq_ice[k] + sqrt2 * corr * sd_h * abscissas[m_q]
+                    μ_h_star = aux_en.θ_liq_ice[k] + sqrt2 * corr * sd_h * abscissas[m_q]
                 end
 
                 # zero inner quadrature points
@@ -160,9 +159,9 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
 
                 for m_h in 1:quad_order
                     if quadrature_type isa LogNormalQuad
-                        h_hat = exp(mu_h_star + sqrt2 * sd_cond_h_q * abscissas[m_h])
+                        h_hat = exp(μ_h_star + sqrt2 * sd_cond_h_q * abscissas[m_h])
                     else
-                        h_hat = sqrt2 * sigma_h_star * abscissas[m_h] + mu_h_star
+                        h_hat = sqrt2 * σ_h_star * abscissas[m_h] + μ_h_star
                     end
 
                     # condensation
@@ -231,21 +230,31 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
 
             # update cloudy/dry variables for buoyancy in TKE
             aux_en.cloud_fraction[k] = outer_env[i_cf]
-            aux_en_unsat.q_tot[k] = outer_env[i_qt_unsat]
-            # TD.jl cannot compute θ_unsat when T=0
-            aux_en_unsat.θ_dry[k] = if outer_env[i_T_unsat] > 0
-                ts_unsat = TD.PhaseEquil_pTq(param_set, p0_c[k], outer_env[i_T_unsat], aux_en_unsat.q_tot[k])
-                TD.dry_pottemp(ts_unsat)
+            if aux_en.cloud_fraction[k] < 1
+                aux_en_unsat.q_tot[k] = outer_env[i_qt_unsat] / (1 - aux_en.cloud_fraction[k])
+                T_unsat = outer_env[i_T_unsat] / (1 - aux_en.cloud_fraction[k])
+                ts_unsat = TD.PhaseEquil_pTq(param_set, p0_c[k], T_unsat, aux_en_unsat.q_tot[k])
+                aux_en_unsat.θ_dry[k] = TD.dry_pottemp(ts_unsat)
             else
-                0
+                aux_en_unsat.q_tot[k] = 0
+                aux_en_unsat.θ_dry[k] = 0
             end
 
-            aux_en_sat.T[k] = outer_env[i_T_sat]
-            aux_en_sat.q_vap[k] = outer_env[i_qt_sat] - outer_env[i_ql]
-            aux_en_sat.q_tot[k] = outer_env[i_qt_sat]
-            ts_sat = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_en_sat.T[k], aux_en_sat.q_tot[k])
-            aux_en_sat.θ_dry[k] = TD.dry_pottemp(ts_sat)
-            aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(ts_sat)
+            if aux_en.cloud_fraction[k] > 0
+                aux_en_sat.T[k] = outer_env[i_T_sat] / aux_en.cloud_fraction[k]
+                aux_en_sat.q_tot[k] = outer_env[i_qt_sat] / aux_en.cloud_fraction[k]
+                aux_en_sat.q_vap[k] =
+                    (outer_env[i_qt_sat] - outer_env[i_ql] - outer_env[i_qi]) / aux_en.cloud_fraction[k]
+                ts_sat = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_en_sat.T[k], aux_en_sat.q_tot[k])
+                aux_en_sat.θ_dry[k] = TD.dry_pottemp(ts_sat)
+                aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(ts_sat)
+            else
+                aux_en_sat.T[k] = 0
+                aux_en_sat.q_vap[k] = 0
+                aux_en_sat.q_tot[k] = 0
+                aux_en_sat.θ_dry[k] = 0
+                aux_en_sat.θ_liq_ice[k] = 0
+            end
 
             # update var/covar rain sources
             aux_en.Hvar_rain_dt[k] = outer_src[i_SH_H] - outer_src[i_SH] * aux_en.θ_liq_ice[k]

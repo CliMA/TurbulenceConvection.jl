@@ -1,8 +1,10 @@
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
 ArtifactWrappers = "a14bc488-3040-4b00-9dc1-f6467924858a"
+AtmosphericProfilesLibrary = "86bc3604-9858-485a-bdbe-831ec50de11d"
 CLIMAParameters = "6eacf6c3-8458-43b9-ae03-caf5306d3d53"
 ClimaCore = "d414da3d-4745-48bb-8d80-42e94e092884"
+ClimaCorePlots = "cf7c7e5a-b407-4c48-9047-11a94a308626"
 CloudMicrophysics = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 Dierckx = "39dd38d3-220a-591b-8e3c-4c3a8c710a94"
@@ -43,6 +45,7 @@ UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 [compat]
 ArgParse = "1.1"
 ArtifactWrappers = "0.1"
+AtmosphericProfilesLibrary = "0.1"
 CLIMAParameters = "0.4"
 ClimaCore = "0.2, 0.3, 0.4, 0.5, 0.6, 0.7"
 CloudMicrophysics = "0.3"

@@ -10,9 +10,10 @@ end
 function non_dimensional_groups(param_set, εδ_model_vars)
     Δw = get_Δw(param_set, εδ_model_vars.w_up, εδ_model_vars.w_en)
     Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
-    FT = eltype(εδ_model_vars.tke)
-    Π_1 = (εδ_model_vars.zc_i * Δb) / Δw^2
-    Π_2 = Δw^2 / (εδ_model_vars.tke + eps(FT)) # prevent division by 0
+    FT = eltype(εδ_model_vars.tke_en)
+    Π_1 = (εδ_model_vars.zc_i * Δb) / (Δw^2 + εδ_model_vars.wstar^2)
+    Π_1 = Π_1 / FT(478.298) # Normalize by max(abs(Π_1)) found in {Bomex, DYCOMS, TRMM}
+    Π_2 = (εδ_model_vars.tke_gm - εδ_model_vars.a_en * εδ_model_vars.tke_en) / (εδ_model_vars.tke_gm + eps(FT))
     Π_3 = √(εδ_model_vars.a_up)
     Π_4 = εδ_model_vars.RH_up - εδ_model_vars.RH_en
     return SA.SVector(Π_1, Π_2, Π_3, Π_4)

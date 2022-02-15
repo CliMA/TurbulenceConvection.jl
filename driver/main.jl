@@ -29,6 +29,11 @@ struct DiffusivityModel{FT}
         return new{typeof(diffusivity)}(diffusivity)
     end
 end
+abstract type AbstractPrecipitationModel end
+struct NoPrecipitation <: AbstractPrecipitationModel end
+struct CutoffPrecipitation <: AbstractPrecipitationModel end
+struct Clima1M <: AbstractPrecipitationModel end
+
 
 include(joinpath(tc_dir, "driver", "NetCDFIO.jl"))
 include(joinpath(tc_dir, "driver", "initial_conditions.jl"))
@@ -40,14 +45,10 @@ include(joinpath(tc_dir, "driver", "TimeStepping.jl"))
 include(joinpath(tc_dir, "driver", "Surface.jl"))
 import .Cases
 
-
-
-
 struct Simulation1d{IONT, G, S, GM, C, TCModel, PM, D, TIMESTEPPING, STATS, PS}
     io_nt::IONT
     grid::G
     state::S
-    gm::GM
     case::C
     turb_conv::TCModel
     precip_model::PM
@@ -85,9 +86,8 @@ function Simulation1d(namelist)
 
     Stats = skip_io ? nothing : NetCDFIO_Stats(namelist, grid)
     case_type = Cases.get_case(namelist)
-    ref_params = Cases.reference_params(case_type, grid, param_set, namelist)
+    surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
 
-    gm = TC.GridMeanVariables(param_set)
     Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
     Rad = TC.RadiationBase(case_type)
     TS = TimeStepping(namelist)
@@ -138,11 +138,11 @@ function Simulation1d(namelist)
 
     # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
     state = TC.State(prog, aux, nothing)
-    compute_ref_state!(state, grid, param_set; ref_params...)
+    compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
 
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)
-    surf_params = Cases.surface_params(case_type, grid, state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
+    surf_params = Cases.surface_params(case_type, grid, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
     inversion_type = Cases.inversion_type(case_type)
     case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad, spk...)
 
@@ -156,7 +156,6 @@ function Simulation1d(namelist)
         io_nt,
         grid,
         state,
-        gm,
         case,
         turb_conv,
         precip_model,
@@ -176,13 +175,13 @@ function initialize(sim::Simulation1d)
     state = sim.state
     FT = eltype(sim.grid)
     t = FT(0)
-    Cases.initialize_profiles(sim.case, sim.grid, sim.gm, state)
-    satadjust(sim.gm, sim.grid, sim.state)
+    Cases.initialize_profiles(sim.case, sim.grid, sim.param_set, state)
+    satadjust(sim.param_set, sim.grid, sim.state)
 
-    Cases.initialize_forcing(sim.case, sim.grid, state, sim.gm, sim.param_set)
-    Cases.initialize_radiation(sim.case, sim.grid, state, sim.gm, sim.param_set)
+    Cases.initialize_forcing(sim.case, sim.grid, state, sim.param_set)
+    Cases.initialize_radiation(sim.case, sim.grid, state, sim.param_set)
 
-    initialize_turb_conv(sim.turb_conv, sim.grid, state, sim.case, sim.gm, t)
+    initialize_turb_conv(sim.turb_conv, sim.grid, state, sim.case, sim.param_set, t)
 
     sim.skip_io && return nothing
     initialize_io(sim.io_nt.ref_state, sim.Stats)
@@ -192,8 +191,8 @@ function initialize(sim::Simulation1d)
     initialize_io(sim.io_nt.diagnostics, sim.Stats)
 
     # TODO: deprecate
-    initialize_io(sim.gm, sim.Stats)
-    initialize_io(sim.turb_conv, sim.Stats)
+    initialize_io(sim.Stats)
+    initialize_io(sim.edmf, sim.Stats)
 
     open_files(sim.Stats)
     write_simulation_time(sim.Stats, t)
@@ -202,7 +201,7 @@ function initialize(sim::Simulation1d)
     io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
 
     # TODO: deprecate
-    surf = get_surface(sim.case.surf_params, sim.grid, state, sim.gm, t, sim.param_set)
+    surf = get_surface(sim.case.surf_params, sim.grid, state, t, sim.param_set)
     io(surf, sim.case.surf_params, sim.grid, state, sim.Stats, t)
     close_files(sim.Stats)
 
@@ -224,7 +223,7 @@ function solve_args(sim::Simulation1d)
     params = (;
         turb_conv = sim.turb_conv,
         grid = grid,
-        gm = sim.gm,
+        param_set = sim.param_set,
         aux = aux,
         io_nt = sim.io_nt,
         case = sim.case,

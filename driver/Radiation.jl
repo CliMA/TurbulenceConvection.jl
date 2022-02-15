@@ -1,16 +1,10 @@
-update_radiation(self::TC.RadiationBase, grid, state, gm::GridMeanVariables, param_set) = nothing
+update_radiation(self::TC.RadiationBase, grid, state, param_set) = nothing
 initialize(self::TC.RadiationBase{TC.RadiationNone}, grid, state) = nothing
 
 """
 see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
-function update_radiation(
-    self::TC.RadiationBase{TC.RadiationDYCOMS_RF01},
-    grid,
-    state,
-    gm::TC.GridMeanVariables,
-    param_set,
-)
+function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid, state, param_set)
     cp_d = CPP.cp_d(param_set)
     ρ0_f = TC.face_ref_state(state).ρ0
     ρ0_c = TC.center_ref_state(state).ρ0

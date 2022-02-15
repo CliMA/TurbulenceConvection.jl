@@ -6,6 +6,10 @@ import ClimaCore
 const CC = ClimaCore
 const CCO = CC.Operators
 
+import CLIMAParameters
+const CP = CLIMAParameters
+const APS = CP.AbstractEarthParameterSet
+
 """ Purely diagnostic fields for the host model """
 diagnostics(state, fl) = getproperty(state, TC.field_loc(fl))
 
@@ -51,6 +55,7 @@ function io(surf::TC.SurfaceBase, surf_params, grid, state, Stats::NetCDFIO_Stat
     write_ts(Stats, "shf", surf.shf)
     write_ts(Stats, "lhf", surf.lhf)
     write_ts(Stats, "ustar", surf.ustar)
+    write_ts(Stats, "wstar", surf.wstar)
 end
 function io(io_dict::Dict, Stats::NetCDFIO_Stats, state)
     for var in keys(io_dict)
@@ -59,11 +64,12 @@ function io(io_dict::Dict, Stats::NetCDFIO_Stats, state)
 end
 
 
-function initialize_io(gm::TC.GridMeanVariables, Stats::NetCDFIO_Stats)
+function initialize_io(Stats::NetCDFIO_Stats)
     add_ts(Stats, "Tsurface")
     add_ts(Stats, "shf")
     add_ts(Stats, "lhf")
     add_ts(Stats, "ustar")
+    add_ts(Stats, "wstar")
     add_ts(Stats, "lwp_mean")
     add_ts(Stats, "iwp_mean")
     add_ts(Stats, "cloud_base_mean")
@@ -108,7 +114,7 @@ tendencies.
 =#
 function compute_diagnostics!(
     edmf::TC.EDMFModel,
-    gm::TC.GridMeanVariables,
+    param_set::APS,
     grid::TC.Grid,
     state::TC.State,
     diagnostics::D,
@@ -130,12 +136,11 @@ function compute_diagnostics!(
     aux_bulk = TC.center_aux_bulk(state)
     a_up_bulk = aux_bulk.area
     kc_toa = TC.kc_top_of_atmos(grid)
-    param_set = TC.parameter_set(gm)
     prog_gm = TC.center_prog_grid_mean(state)
     precip_model = edmf.precip_model
     diag_tc = center_diagnostics_turbconv(diagnostics)
     diag_tc_f = face_diagnostics_turbconv(diagnostics)
-    surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
+    surf = get_surface(case.surf_params, grid, state, t, param_set)
 
     @inbounds for k in TC.real_center_indices(grid)
         ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
@@ -293,7 +298,7 @@ function compute_diagnostics!(
     TC.compute_covariance_interdomain_src(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
     TC.compute_covariance_interdomain_src(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
 
-    TC.update_cloud_frac(edmf, grid, state, gm)
+    TC.update_cloud_frac(edmf, grid, state)
 
 
     write_ts(Stats, "lwp_mean", sum(ρ0_c .* aux_gm.q_liq))

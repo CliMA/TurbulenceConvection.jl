@@ -1,14 +1,4 @@
-function update_aux!(
-    edmf::EDMFModel,
-    gm::GridMeanVariables,
-    grid::Grid,
-    state::State,
-    case::CasesBase,
-    surf::SurfaceBase,
-    param_set::APS,
-    t::Real,
-    Δt::Real,
-)
+function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS, t::Real, Δt::Real)
     #####
     ##### Unpack common variables
     #####
@@ -20,15 +10,12 @@ function update_aux!(
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     α0_c = center_ref_state(state).α0
-    g = CPP.grav(param_set)
     c_m = CPEDMF.c_m(param_set)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
-    surf_params = case.surf_params
     obukhov_length = surf.obukhov_length
     FT = eltype(grid)
     prog_gm = center_prog_grid_mean(state)
-    prog_gm_f = face_prog_grid_mean(state)
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
     aux_en = center_aux_environment(state)
@@ -232,7 +219,7 @@ function update_aux!(
         Ifu = CCO.InterpolateC2F(; a_up_bcs...)
         @. aux_tc_f.bulk.w += ifelse(Ifb(aux_bulk.area) > 0, Ifu(a_up) * aux_up_f[i].w / Ifb(aux_bulk.area), FT(0))
     end
-    # Assuming gm.W = 0!
+    # Assuming w_gm = 0!
     @. aux_en_f.w = -Ifb(aux_bulk.area) / (1 - Ifb(aux_bulk.area)) * aux_tc_f.bulk.w
 
     #####
@@ -398,10 +385,10 @@ function update_aux!(
     compute_covariance_entr(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
     compute_covariance_entr(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
     compute_covariance_entr(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
-    compute_covariance_shear(edmf, grid, state, gm, Val(:tke), Val(:w), Val(:w))
-    compute_covariance_shear(edmf, grid, state, gm, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
-    compute_covariance_shear(edmf, grid, state, gm, Val(:QTvar), Val(:q_tot), Val(:q_tot))
-    compute_covariance_shear(edmf, grid, state, gm, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
+    compute_covariance_shear(edmf, grid, state, Val(:tke), Val(:w), Val(:w))
+    compute_covariance_shear(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
+    compute_covariance_shear(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
+    compute_covariance_shear(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
     compute_covariance_dissipation(edmf, grid, state, Val(:tke), param_set)
     compute_covariance_dissipation(edmf, grid, state, Val(:Hvar), param_set)
     compute_covariance_dissipation(edmf, grid, state, Val(:QTvar), param_set)
@@ -417,13 +404,13 @@ function update_aux!(
 
     get_GMV_CoVar(edmf, grid, state, Val(:tke), Val(:w), Val(:w))
 
-    compute_diffusive_fluxes(edmf, grid, state, gm, surf, param_set)
+    compute_diffusive_fluxes(edmf, grid, state, surf, param_set)
 
 
     # TODO: use dispatch
     if edmf.precip_model isa Clima1M
         # helper to calculate the rain velocity
-        # TODO: assuming gm.W = 0
+        # TODO: assuming w_gm = 0
         # TODO: verify translation
         term_vel_rain = aux_tc.term_vel_rain
         term_vel_snow = aux_tc.term_vel_snow

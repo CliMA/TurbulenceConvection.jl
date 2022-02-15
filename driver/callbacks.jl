@@ -18,9 +18,8 @@ function affect_io!(integrator)
 
     state = TC.State(integrator.u, aux, integrator.du)
 
-    param_set = TC.parameter_set(gm)
     # TODO: is this the best location to call diagnostics?
-    compute_diagnostics!(turb_conv, gm, grid, state, diagnostics, Stats, case, t)
+    compute_diagnostics!(turb_conv, param_set, grid, state, diagnostics, Stats, case, t)
 
     # TODO: remove `vars` hack that avoids
     # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
@@ -31,7 +30,7 @@ function affect_io!(integrator)
     io(io_nt.aux, Stats, state)
     io(io_nt.diagnostics, Stats, diagnostics)
 
-    surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
+    surf = get_surface(case.surf_params, grid, state, t, param_set)
     io(surf, case.surf_params, grid, state, Stats, t)
 
     ODE.u_modified!(integrator, false) # We're legitamately not mutating `u` (the state vector)
@@ -40,9 +39,8 @@ end
 function affect_filter!(integrator)
     UnPack.@unpack turb_conv, grid, gm, aux, case = integrator.p
     t = integrator.t
-    param_set = TC.parameter_set(gm)
     state = TC.State(integrator.u, aux, integrator.du)
-    surf = get_surface(case.surf_params, grid, state, gm, t, param_set)
+    surf = get_surface(case.surf_params, grid, state, t, param_set)
     TC.affect_filter!(turb_conv, grid, state, gm, surf, case.casename, t)
 
     # We're lying to OrdinaryDiffEq.jl, in order to avoid
@@ -78,7 +76,7 @@ function edmf_dt_max!(integrator)
     KH = aux_tc.KH
 
     # helper to calculate the rain velocity
-    # TODO: assuming gm.W = 0
+    # TODO: assuming w_gm = 0
     # TODO: verify translation
     term_vel_rain = aux_tc.term_vel_rain
     term_vel_snow = aux_tc.term_vel_snow
@@ -148,7 +146,7 @@ function monitor_cfl!(integrator)
     aux_tc = TC.center_aux_turbconv(state)
 
     # helper to calculate the rain velocity
-    # TODO: assuming gm.W = 0
+    # TODO: assuming w_gm = 0
     # TODO: verify translation
     term_vel_rain = aux_tc.term_vel_rain
     term_vel_snow = aux_tc.term_vel_snow

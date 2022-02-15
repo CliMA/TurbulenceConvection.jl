@@ -50,8 +50,10 @@ Base.@kwdef struct GeneralizedEntr{FT}
     b_up::FT
     "environment buoyancy"
     b_en::FT
+    "grid mean tke"
+    tke_gm::FT
     "environment tke"
-    tke::FT
+    tke_en::FT
     "updraft momentum divergence"
     dMdz::FT
     "updraft momentum"
@@ -77,6 +79,8 @@ Base.@kwdef struct GeneralizedEntr{FT}
     nondim_entr_sc::FT
     "nondimensional detrainment"
     nondim_detr_sc::FT
+    "convective velocity"
+    wstar::FT
 end
 
 Base.eltype(::GeneralizedEntr{FT}) where {FT} = FT
@@ -204,10 +208,6 @@ struct NoPrecipitation <: AbstractPrecipitationModel end
 struct CutoffPrecipitation <: AbstractPrecipitationModel end
 struct Clima1M <: AbstractPrecipitationModel end
 
-struct GridMeanVariables{PS}
-    param_set::PS
-end
-
 abstract type AbstractQuadratureType end
 struct LogNormalQuad <: AbstractQuadratureType end
 
@@ -278,6 +278,7 @@ Base.@kwdef struct FixedSurfaceCoeffs{FT, TS, QS, CH, CM} <: AbstractSurfacePara
     qsurface::QS = FT(0)
     ch::CH = FT(0)
     cm::CM = FT(0)
+    Ri_bulk_crit::FT = FT(0)
 end
 
 function FixedSurfaceCoeffs(
@@ -301,6 +302,7 @@ Base.@kwdef struct MoninObukhovSurface{FT, TS, QS, SHF, LHF} <: AbstractSurfaceP
     qsurface::QS = FT(0)
     shf::SHF = FT(0)
     lhf::LHF = FT(0)
+    Ri_bulk_crit::FT = FT(0)
 end
 
 function MoninObukhovSurface(
@@ -369,6 +371,7 @@ Base.@kwdef struct SurfaceBase{FT}
     ρu_flux::FT = 0
     ρv_flux::FT = 0
     obukhov_length::FT = 0
+    wstar::FT = 0
 end
 
 struct ForcingNone end

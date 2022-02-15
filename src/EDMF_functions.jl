@@ -1,5 +1,5 @@
 
-function update_cloud_frac(edmf::EDMFModel, grid::Grid, state::State, gm::GridMeanVariables)
+function update_cloud_frac(edmf::EDMFModel, grid::Grid, state::State)
     # update grid-mean cloud fraction and cloud cover
     aux_bulk = center_aux_bulk(state)
     aux_gm = center_aux_grid_mean(state)
@@ -27,7 +27,24 @@ function compute_les_Γᵣ(
     end
 end
 
-function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, gm::GridMeanVariables)
+
+function compute_turbconv_tendencies!(
+    edmf::EDMFModel,
+    grid::Grid,
+    state::State,
+    param_set::APS,
+    surf::SurfaceBase,
+    Δt::Real,
+)
+    compute_up_tendencies!(edmf, grid, state, param_set, surf)
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρaQTvar))
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρaHQTcov))
+
+    return nothing
+end
+function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase)
     N_up = n_updrafts(edmf)
     tendencies_gm = center_tendencies_grid_mean(state)
     FT = eltype(grid)
@@ -109,14 +126,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     return nothing
 end
 
-function compute_diffusive_fluxes(
-    edmf::EDMFModel,
-    grid::Grid,
-    state::State,
-    gm::GridMeanVariables,
-    surf::SurfaceBase,
-    param_set::APS,
-)
+function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS)
     FT = eltype(grid)
     ρ0_f = face_ref_state(state).ρ0
     aux_bulk = center_aux_bulk(state)
@@ -162,7 +172,7 @@ function affect_filter!(
     edmf::EDMFModel,
     grid::Grid,
     state::State,
-    gm::GridMeanVariables,
+    param_set::APS,
     surf::SurfaceBase,
     casename::String,
     t::Real,
@@ -175,8 +185,8 @@ function affect_filter!(
     ###
     ### Filters
     ###
-    set_edmf_surface_bc(edmf, grid, state, surf, gm)
-    filter_updraft_vars(edmf, grid, state, surf, gm)
+    set_edmf_surface_bc(edmf, grid, state, surf, param_set)
+    filter_updraft_vars(edmf, grid, state, surf)
 
     @inbounds for k in real_center_indices(grid)
         prog_en.ρatke[k] = max(prog_en.ρatke[k], 0.0)
@@ -188,8 +198,7 @@ function affect_filter!(
     return nothing
 end
 
-function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, gm::GridMeanVariables)
-    param_set = parameter_set(gm)
+function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -335,9 +344,8 @@ function compute_plume_scale_height(grid::Grid{FT}, state::State, param_set::APS
     return max(updraft_top, H_up_min)
 end
 
-function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, gm::GridMeanVariables, surf::SurfaceBase)
+function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param_set::APS, surf::SurfaceBase)
     N_up = n_updrafts(edmf)
-    param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     FT = eltype(grid)
@@ -435,9 +443,8 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, gm::G
     return nothing
 end
 
-function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, gm::GridMeanVariables)
+function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase)
     N_up = n_updrafts(edmf)
-    param_set = parameter_set(gm)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     FT = eltype(grid)
@@ -501,7 +508,6 @@ function compute_covariance_shear(
     edmf::EDMFModel,
     grid::Grid,
     state::State,
-    gm::GridMeanVariables,
     ::Val{covar_sym},
     ::Val{ϕ_en_sym},
     ::Val{ψ_en_sym},
