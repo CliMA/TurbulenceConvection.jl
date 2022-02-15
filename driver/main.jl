@@ -45,7 +45,7 @@ include(joinpath(tc_dir, "driver", "TimeStepping.jl"))
 include(joinpath(tc_dir, "driver", "Surface.jl"))
 import .Cases
 
-struct Simulation1d{IONT, G, S, GM, C, TCModel, PM, D, TIMESTEPPING, STATS, PS}
+struct Simulation1d{IONT, G, S, C, TCModel, PM, D, TIMESTEPPING, STATS, PS}
     io_nt::IONT
     grid::G
     state::S
@@ -222,6 +222,7 @@ function solve_args(sim::Simulation1d)
     t_span = (0.0, sim.TS.t_max)
     params = (;
         turb_conv = sim.turb_conv,
+        # precip_model = sim.precip_model,
         grid = grid,
         param_set = sim.param_set,
         aux = aux,
@@ -238,7 +239,7 @@ function solve_args(sim::Simulation1d)
     callback_io = ODE.DiscreteCallback(condition_io, affect_io!; save_positions = (false, false))
     callback_io = sim.skip_io ? () : (callback_io,)
     callback_cfl = ODE.DiscreteCallback(condition_every_iter, monitor_cfl!; save_positions = (false, false))
-    callback_cfl = sim.turb_conv.precip_model isa TC.Clima1M ? (callback_cfl,) : ()
+    callback_cfl = sim.precip_model isa TC.Clima1M ? (callback_cfl,) : ()
     dt_max! = sim.turb_conv isa TC.EDMFModel ? edmf_dt_max! : diffusivity_dt_max!
     callback_dtmax = ODE.DiscreteCallback(condition_every_iter, dt_max!; save_positions = (false, false))
     callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))

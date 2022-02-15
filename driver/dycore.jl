@@ -207,7 +207,7 @@ end
 
 # Compute the sum of tendencies for the scheme
 function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
-    UnPack.@unpack turb_conv, grid, gm, param_set, case, aux, TS = params
+    UnPack.@unpack edmf, precip_model, grid, param_set, case, aux, TS = params
 
     state = TC.State(prog, aux, tendencies)
 
@@ -235,7 +235,6 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     # compute tendencies
 
     en_thermo = edmf.en_thermo
-    precip_model = edmf.precip_model
 
     # compute tendencies
     # causes division error in dry bubble first time step

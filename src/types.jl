@@ -473,7 +473,7 @@ struct EDMFModel{N_up, ENT, EBGC, EC, EDS}
     bg_closure::EBGC
     entr_closure::EC
     entr_dim_scale::EDS
-    function EDMFModel(namelist) where {PS}
+    function EDMFModel(namelist, precip_model) where {PS}
         # get values from namelist
         prandtl_number = namelist["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"]
 
@@ -493,26 +493,7 @@ struct EDMFModel{N_up, ENT, EBGC, EC, EDS}
         max_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "max_area"; default = 0.9)
         minimum_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_area"; default = 1e-5)
 
-        # Create the class for precipitation
-
-        # precip_name = parse_namelist(
-        #     namelist,
-        #     "microphysics",
-        #     "precipitation_model";
-        #     default = "None",
-        #     valid_options = ["None", "cutoff", "clima_1m"],
-        # )
-
-        # precip_model = if precip_name == "None"
-        #     NoPrecipitation()
-        # elseif precip_name == "cutoff"
-        #     CutoffPrecipitation()
-        # elseif precip_name == "clima_1m"
-        #     Clima1M()
-        # else
-        #     error("Invalid precip_name $(precip_name)")
-        # end
-
+        precip_model = precip_model
         # Create the environment variable class (major diagnostic and prognostic variables)
 
         # Create the class for environment thermodynamics
