@@ -12,14 +12,14 @@ end
 condition_every_iter(u, t, integrator) = true
 
 function affect_io!(integrator)
-    UnPack.@unpack edmf, aux, grid, io_nt, diagnostics, case, param_set, Stats, skip_io = integrator.p
+    UnPack.@unpack edmf, precip_model, aux, grid, io_nt, diagnostics, case, param_set, Stats, skip_io = integrator.p
     skip_io && return nothing
     t = integrator.t
 
     state = TC.State(integrator.u, aux, integrator.du)
 
     # TODO: is this the best location to call diagnostics?
-    compute_diagnostics!(edmf, param_set, grid, state, diagnostics, Stats, case, t)
+    compute_diagnostics!(edmf, precip_model, param_set, grid, state, diagnostics, Stats, case, t)
 
     # TODO: remove `vars` hack that avoids
     # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135

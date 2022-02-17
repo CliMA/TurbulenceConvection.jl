@@ -114,6 +114,7 @@ tendencies.
 =#
 function compute_diagnostics!(
     edmf::TC.EDMFModel,
+    precip_model::TC.AbstractPrecipitationModel,
     param_set::APS,
     grid::TC.Grid,
     state::TC.State,
@@ -137,7 +138,6 @@ function compute_diagnostics!(
     a_up_bulk = aux_bulk.area
     kc_toa = TC.kc_top_of_atmos(grid)
     prog_gm = TC.center_prog_grid_mean(state)
-    precip_model = edmf.precip_model
     diag_tc = center_diagnostics_turbconv(diagnostics)
     diag_tc_f = face_diagnostics_turbconv(diagnostics)
     surf = get_surface(case.surf_params, grid, state, t, param_set)
