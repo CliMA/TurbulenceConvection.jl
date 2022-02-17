@@ -114,7 +114,7 @@ end
 coords = CC.Fields.coordinate_field(hv_center_space)
 face_coords = CC.Fields.coordinate_field(hv_face_space)
 
-function init_state(grid, coords, face_coords)
+function init_state(coords, face_coords, hv_center_space, hv_face_space)
     Yc = map(coords) do coord
         bubble = init_dry_rising_bubble_3d(coord.x, coord.y, coord.z)
         bubble
@@ -126,17 +126,31 @@ function init_state(grid, coords, face_coords)
 
     FT = Float64
     N_up = 1
-    cspace = TC.center_space(grid)
-    fspace = TC.face_space(grid)
-    cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
-    face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up))
-    Y = CC.Fields.FieldVector(Yc = Yc, ρw = ρw, cent = cent_prog_fields(), face = face_prog_fields())
+    cent_prog_fields() = TC.FieldFromNamedTuple(
+        hv_center_space,
+        (;
+            ρ = FT(0),
+            ρθ = FT(0),
+            ρuₕ = CCG.UVVector(FT(0), FT(0)),
+            u = FT(0),
+            v = FT(0),
+            θ_liq_ice = FT(0),
+            q_tot = FT(0),
+            TC.cent_prognostic_vars_edmf(FT, N_up)...,
+        ),
+    )
+    face_prog_fields() = TC.FieldFromNamedTuple(
+        hv_face_space,
+        (; ρw = CCG.WVector(FT(0)), w = FT(0), TC.face_prognostic_vars_edmf(FT, N_up)...),
+    )
+    Y = CC.Fields.FieldVector(cent = cent_prog_fields(), face = face_prog_fields())
+    @. Y.cent.ρ = Yc.ρ
+    @. Y.cent.ρθ = Yc.ρθ
+    @. Y.cent.ρuₕ = Yc.ρuₕ
     return Y
 end
 
-function energy(Yc, ρu, z)
-    ρ = Yc.ρ
-    ρθ = Yc.ρθ
+function energy(ρ, ρθ, ρu, z)
     u = ρu / ρ
     kinetic = ρ * norm(u)^2 / 2
     potential = z * grav * ρ
@@ -148,20 +162,20 @@ function combine_momentum(ρuₕ, ρw)
 end
 function center_momentum(Y)
     If2c = CCO.InterpolateF2C()
-    combine_momentum.(Y.Yc.ρuₕ, If2c.(Y.ρw))
+    combine_momentum.(Y.cent.ρuₕ, If2c.(Y.face.ρw))
 end
 function total_energy(Y)
-    ρ = Y.Yc.ρ
+    ρ = Y.cent.ρ
     ρu = center_momentum(Y)
-    ρθ = Y.Yc.ρθ
+    ρθ = Y.cent.ρθ
     z = CC.Fields.coordinate_field(axes(ρ)).z
-    sum(energy.(Y.Yc, ρu, z))
+    sum(energy.(Y.cent.ρ, Y.cent.ρθ, ρu, z))
 end
 
 include(joinpath(@__DIR__, "..", "driver", "Cases.jl"))
 import .Cases
 
-function get_edmf_cache(grid, namelist)
+function get_edmf_cache(grid, hv_center_space, hv_face_space, namelist)
     param_set = create_parameter_set(namelist)
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     case_type = Cases.get_case(namelist)
@@ -171,8 +185,25 @@ function get_edmf_cache(grid, namelist)
     surf_params = Cases.surface_params(case_type, grid, surf_ref_state, param_set; Ri_bulk_crit)
     inversion_type = Cases.inversion_type(case_type)
     case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad)
-    edmf = TC.EDMFModel(namelist)
-    return (; edmf, case, grid, param_set, aux = get_aux(grid))
+    precip_name = TC.parse_namelist(
+        namelist,
+        "microphysics",
+        "precipitation_model";
+        default = "None",
+        valid_options = ["None", "cutoff", "clima_1m"],
+    )
+    precip_model = if precip_name == "None"
+        TC.NoPrecipitation()
+    elseif precip_name == "cutoff"
+        TC.CutoffPrecipitation()
+    elseif precip_name == "clima_1m"
+        TC.Clima1M()
+    else
+        error("Invalid precip_name $(precip_name)")
+    end
+    edmf = TC.EDMFModel(namelist, precip_model)
+    FT = eltype(grid)
+    return (; edmf, case, grid, param_set, aux = get_aux(hv_center_space, hv_face_space, FT))
 end
 
 function get_gm_cache(Y, coords)
@@ -180,31 +211,46 @@ function get_gm_cache(Y, coords)
 end
 
 function ∑tendencies_3d_bomex!(tendencies, prog, cache, t)
-    UnPack.@unpack edmf_cache, Δt = cache
+    UnPack.@unpack edmf_cache, hv_center_space, Δt = cache
     UnPack.@unpack edmf, grid, param_set, aux, case = edmf_cache
-
-    state = TC.State(prog, aux, tendencies)
-
-    surf = get_surface(case.surf_params, grid, state, t, param_set)
-    force = case.Fo
-    radiation = case.Rad
-
-    TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
-
-    # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
-    # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
-    # treat them as auxiliary variables for now, until we disentangle the tendency computations.
-    Cases.update_forcing(case, grid, state, t, param_set)
-    Cases.update_radiation(case.Rad, grid, state, param_set)
-
-    TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
 
     tends_face = tendencies.face
     tends_cent = tendencies.cent
     parent(tends_face) .= 0
     parent(tends_cent) .= 0
-    # compute tendencies
-    TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt)
+
+    Ni, Nj, _, _, Nh = size(CC.Spaces.local_geometry_data(hv_center_space))
+    for h in 1:Nh, j in 1:Nj, i in 1:Ni
+        inds = (i, j, h)
+        prog_cent_column = CC.column(prog.cent, inds...)
+        prog_face_column = CC.column(prog.face, inds...)
+        aux_cent_column = CC.column(aux.cent, inds...)
+        aux_face_column = CC.column(aux.face, inds...)
+        tends_cent_column = CC.column(tendencies.cent, inds...)
+        tends_face_column = CC.column(tendencies.face, inds...)
+        prog_column = CC.Fields.FieldVector(cent = prog_cent_column, face = prog_face_column)
+        aux_column = CC.Fields.FieldVector(cent = aux_cent_column, face = aux_face_column)
+        tends_column = CC.Fields.FieldVector(cent = tends_cent_column, face = tends_face_column)
+
+        state = TC.State(prog_column, aux_column, tends_column)
+
+        surf = get_surface(case.surf_params, grid, state, t, param_set)
+        force = case.Fo
+        radiation = case.Rad
+
+        TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
+
+        # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
+        # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
+        # treat them as auxiliary variables for now, until we disentangle the tendency computations.
+        Cases.update_forcing(case, grid, state, t, param_set)
+        Cases.update_radiation(case.Rad, grid, state, param_set)
+
+        TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
+
+        # compute tendencies
+        TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt)
+    end
 
     ∑tendencies_3d_bomex_gm!(tendencies, prog, cache, t)
     return nothing
@@ -212,16 +258,15 @@ end
 
 function ∑tendencies_3d_bomex_gm!(dY, Y, cache, t)
     UnPack.@unpack coords = cache
-    ρw = Y.ρw
-    Yc = Y.Yc
-    dYc = dY.Yc
-    dρw = dY.ρw
-    ρ = Yc.ρ
-    ρuₕ = Yc.ρuₕ
-    ρθ = Yc.ρθ
-    dρθ = dYc.ρθ
-    dρuₕ = dYc.ρuₕ
-    dρ = dYc.ρ
+    ρw = Y.face.ρw
+    dYc = dY.cent
+    dρw = dY.face.ρw
+    ρ = Y.cent.ρ
+    ρuₕ = Y.cent.ρuₕ
+    ρθ = Y.cent.ρθ
+    dρθ = dY.cent.ρθ
+    dρuₕ = dY.cent.ρuₕ
+    dρ = dY.cent.ρ
 
     # spectral horizontal operators
     hdiv = CCO.Divergence()
@@ -305,10 +350,10 @@ function ∑tendencies_3d_bomex_gm!(dY, Y, cache, t)
     #  1c) horizontal div of horizontal grad of vert momentum
     @. dρw += hdiv(κ₂ * (Yfρ * hgrad(ρw / Yfρ)))
     #  1d) vertical div of vertical grad of vert momentun
-    @. dρw += vvdivc2f(κ₂ * (Yc.ρ * ∂c(ρw / Yfρ)))
+    @. dρw += vvdivc2f(κ₂ * (Y.cent.ρ * ∂c(ρw / Yfρ)))
 
     #  2a) horizontal div of horizontal grad of potential temperature
-    @. dρθ += hdiv(κ₂ * (Yc.ρ * hgrad(ρθ / ρ)))
+    @. dρθ += hdiv(κ₂ * (Y.cent.ρ * hgrad(ρθ / ρ)))
     #  2b) vertical div of vertial grad of potential temperature
     @. dρθ += ∂(κ₂ * (Yfρ * ∂f(ρθ / ρ)))
 
@@ -317,26 +362,23 @@ function ∑tendencies_3d_bomex_gm!(dY, Y, cache, t)
     return dY
 end
 
-Y = init_state(grid, coords, face_coords)
+Y = init_state(coords, face_coords, hv_center_space, hv_face_space)
 energy_0 = total_energy(Y)
-mass_0 = sum(Y.Yc.ρ) # Computes ∫ρ∂Ω such that quadrature weighting is accounted for.
-theta_0 = sum(Y.Yc.ρθ)
+mass_0 = sum(Y.cent.ρ) # Computes ∫ρ∂Ω such that quadrature weighting is accounted for.
+theta_0 = sum(Y.cent.ρθ)
 
 # Solve the ODE
 gm_cache = get_gm_cache(Y, coords)
-function get_aux(grid; N_up = 1)
-    FT = eltype(grid)
-    cspace = TC.center_space(grid)
-    fspace = TC.face_space(grid)
-    aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, N_up))
-    aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up))
+function get_aux(hv_center_space, hv_face_space, ::Type{FT}; N_up = 1) where {FT}
+    aux_cent_fields = TC.FieldFromNamedTuple(hv_center_space, cent_aux_vars(FT, N_up))
+    aux_face_fields = TC.FieldFromNamedTuple(hv_face_space, face_aux_vars(FT, N_up))
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
     return aux
 end
-edmf_cache = get_edmf_cache(grid, namelist)
+edmf_cache = get_edmf_cache(grid, hv_center_space, hv_face_space, namelist)
 Δt = 0.05
 time_end = 2 * Δt
-cache = (; gm_cache..., edmf_cache, Δt)
+cache = (; gm_cache..., hv_center_space, edmf_cache, Δt)
 
 prob = ODE.ODEProblem(∑tendencies_3d_bomex!, Y, (0.0, time_end), cache)
 integrator =
@@ -358,8 +400,8 @@ mkpath(path)
 
 # post-processing
 Es = [total_energy(u) for u in sol.u]
-Mass = [sum(u.Yc.ρ) for u in sol.u]
-Theta = [sum(u.Yc.ρθ) for u in sol.u]
+Mass = [sum(u.cent.ρ) for u in sol.u]
+Theta = [sum(u.cent.ρθ) for u in sol.u]
 
 Plots.png(Plots.plot((Es .- energy_0) ./ energy_0), joinpath(path, "energy.png"))
 Plots.png(Plots.plot((Mass .- mass_0) ./ mass_0), joinpath(path, "mass.png"))

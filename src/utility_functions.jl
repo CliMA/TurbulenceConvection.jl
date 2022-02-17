@@ -36,3 +36,40 @@ function pyinterp(x, xp, fp)
     spl = Dierckx.Spline1D(xp, fp; k = 1)
     return spl(vec(x))
 end
+
+"""
+    compare(a::Field, a::Field)
+    compare(a::FieldVector, b::FieldVector)
+
+Recursively compare two identically structured
+`Field`s, or `FieldVector`s, with potentially different
+data. If `!(maximum(abs.(parent(a) .- parent(b))) == 0.0)`
+for any single field, then `compare` will print out the fields
+and `err`. This can be helpful for debugging where and why
+two `Field`/`FieldVector`s are different.
+"""
+function compare(a::FV, b::FV, pn0 = "") where {FV <: CC.Fields.FieldVector}
+    for pn in propertynames(a)
+        pa = getproperty(a, pn)
+        pb = getproperty(b, pn)
+        compare(pa, pb, "$pn0.$pn")
+    end
+end
+
+function compare(a::F, b::F, pn0 = "") where {F <: CC.Fields.Field}
+    if isempty(propertynames(a))
+        err = abs.(parent(a) .- parent(b))
+        if !(maximum(err) == 0.0)
+            println("--- Comparing field $pn0")
+            @show a
+            @show b
+            @show err
+        end
+    else
+        for pn in propertynames(a)
+            pa = getproperty(a, pn)
+            pb = getproperty(b, pn)
+            compare(pa, pb, "$pn0.$pn")
+        end
+    end
+end

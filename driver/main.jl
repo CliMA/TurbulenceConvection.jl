@@ -92,6 +92,30 @@ function Simulation1d(namelist)
     Rad = TC.RadiationBase(case_type)
     TS = TimeStepping(namelist)
 
+    # Create the class for precipitation
+
+    precip_name = TC.parse_namelist(
+        namelist,
+        "microphysics",
+        "precipitation_model";
+        default = "None",
+        valid_options = ["None", "cutoff", "clima_1m"],
+    )
+
+    precip_model = if precip_name == "None"
+        TC.NoPrecipitation()
+    elseif precip_name == "cutoff"
+        TC.CutoffPrecipitation()
+    elseif precip_name == "clima_1m"
+        TC.Clima1M()
+    else
+        error("Invalid precip_name $(precip_name)")
+    end
+
+    edmf = TC.EDMFModel(namelist, precip_model)
+    isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
+    N_up = TC.n_updrafts(edmf)
+
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
 
@@ -113,22 +137,6 @@ function Simulation1d(namelist)
         aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up))
         diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, N_up))
         diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up))
-    end
-    precip_name = TC.parse_namelist(
-            namelist,
-            "microphysics",
-            "precipitation_model";
-            default = "None",
-            valid_options = ["None", "cutoff", "clima_1m"],
-        )
-    precip_model = if precip_name == "None"
-        NoPrecipitation()
-    elseif precip_name == "cutoff"
-        CutoffPrecipitation()
-    elseif precip_name == "clima_1m"
-        Clima1M()
-    else
-        error("Invalid precip_name $(precip_name)")
     end
     isbits(turb_conv) || error("Something non-isbits was added to edmf and needs to be fixed.")
 
@@ -222,7 +230,7 @@ function solve_args(sim::Simulation1d)
     t_span = (0.0, sim.TS.t_max)
     params = (;
         turb_conv = sim.turb_conv,
-        # precip_model = sim.precip_model,
+        precip_model = sim.precip_model,
         grid = grid,
         param_set = sim.param_set,
         aux = aux,

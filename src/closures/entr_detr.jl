@@ -226,6 +226,7 @@ function compute_entr_detr!(
     Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
     LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
+    c_div = FT(ICP.entrainment_massflux_div_factor(param_set))
     @inbounds for i in 1:N_up
         # compute ∇m at cell centers
         a_up = aux_up[i].area
@@ -309,12 +310,18 @@ function compute_entr_detr!(
                 edmf.entr_dim_scale,
             )
             area_limiter = max_area_limiter(param_set, max_area, aux_up[i].area[k])
-            MdMdz_ε, MdMdz_δ = get_MdMdz(m_entr_detr[k], ∇m_entr_detr[k])
+            MdMdz_ε, MdMdz_δ = get_MdMdz(m_entr_detr[k], ∇m_entr_detr[k]) .* c_div
 
             aux_up[i].entr_sc[k] = dim_scale * aux_up[i].nondim_entr_sc[k] + MdMdz_ε
             aux_up[i].detr_sc[k] = dim_scale * (aux_up[i].nondim_detr_sc[k] + area_limiter) + MdMdz_δ
             aux_up[i].frac_turb_entr[k] = ε_turb
         end
+
+        @. aux_up[i].nondim_entr_sc = ifelse(aux_up[i].area > 0, aux_up[i].nondim_entr_sc, 0)
+        @. aux_up[i].nondim_detr_sc = ifelse(aux_up[i].area > 0, aux_up[i].nondim_detr_sc, 0)
+        @. aux_up[i].entr_sc = ifelse(aux_up[i].area > 0, aux_up[i].entr_sc, 0)
+        @. aux_up[i].detr_sc = ifelse(aux_up[i].area > 0, aux_up[i].detr_sc, 0)
+        @. aux_up[i].frac_turb_entr = ifelse(aux_up[i].area > 0, aux_up[i].frac_turb_entr, 0)
 
     end
 end
