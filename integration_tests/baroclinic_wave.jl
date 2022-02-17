@@ -375,21 +375,25 @@ end
 
 sol = @timev ODE.solve!(integrator)
 
-import ClimaCorePlots, Plots
-ENV["GKSwstype"] = "nul"
-# visualization artifacts
+# # The latest ClimaCore has compat issues with ClimaCorePlots
+# # so we've temporarily remove our dependence on ClimaCorePlots
+# # so that we can update the latest ClimaCore version.
 
-@info "Solution L₂ norm at time t = 0: ", norm(Y.Yc.ρe)
-@info "Solution L₂ norm at time t = $(time_end): ", norm(sol.u[end].Yc.ρe)
+# import ClimaCorePlots, Plots
+# ENV["GKSwstype"] = "nul"
+# # visualization artifacts
 
-anim = Plots.@animate for sol1 in sol.u
-    uₕ = sol1.uₕ
-    uₕ_phy = CCG.transform.(Ref(CCG.UVAxis()), uₕ)
-    v = uₕ_phy.components.data.:2
-    Plots.plot(v, level = 3, clim = (-6, 6))
-end
+# @info "Solution L₂ norm at time t = 0: ", norm(Y.Yc.ρe)
+# @info "Solution L₂ norm at time t = $(time_end): ", norm(sol.u[end].Yc.ρe)
 
-dir = "baroclinic_wave"
-path = joinpath(@__DIR__, "output", dir)
-mkpath(path)
-Plots.mp4(anim, joinpath(path, "v.mp4"), fps = 5)
+# anim = Plots.@animate for sol1 in sol.u
+#     uₕ = sol1.uₕ
+#     uₕ_phy = CCG.transform.(Ref(CCG.UVAxis()), uₕ)
+#     v = uₕ_phy.components.data.:2
+#     Plots.plot(v, level = 3, clim = (-6, 6))
+# end
+
+# dir = "baroclinic_wave"
+# path = joinpath(@__DIR__, "output", dir)
+# mkpath(path)
+# Plots.mp4(anim, joinpath(path, "v.mp4"), fps = 5)
