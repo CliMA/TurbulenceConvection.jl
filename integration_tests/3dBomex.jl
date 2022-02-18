@@ -201,9 +201,9 @@ function get_edmf_cache(grid, hv_center_space, hv_face_space, namelist)
     else
         error("Invalid precip_name $(precip_name)")
     end
-    edmf = TC.EDMFModel(namelist, precip_model)
+    turb_conv = TC.EDMFModel(namelist, precip_model)
     FT = eltype(grid)
-    return (; edmf, case, grid, param_set, aux = get_aux(hv_center_space, hv_face_space, FT))
+    return (; turb_conv, case, grid, param_set, aux = get_aux(hv_center_space, hv_face_space, FT))
 end
 
 function get_gm_cache(Y, coords)
@@ -212,7 +212,7 @@ end
 
 function ∑tendencies_3d_bomex!(tendencies, prog, cache, t)
     UnPack.@unpack edmf_cache, hv_center_space, Δt = cache
-    UnPack.@unpack edmf, grid, param_set, aux, case = edmf_cache
+    UnPack.@unpack turb_conv, grid, param_set, aux, case = edmf_cache
 
     tends_face = tendencies.face
     tends_cent = tendencies.cent
@@ -238,7 +238,7 @@ function ∑tendencies_3d_bomex!(tendencies, prog, cache, t)
         force = case.Fo
         radiation = case.Rad
 
-        TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
+        TC.affect_filter!(turb_conv, grid, state, param_set, surf, case.casename, t)
 
         # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
         # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
@@ -246,10 +246,10 @@ function ∑tendencies_3d_bomex!(tendencies, prog, cache, t)
         Cases.update_forcing(case, grid, state, t, param_set)
         Cases.update_radiation(case.Rad, grid, state, param_set)
 
-        TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
+        TC.update_aux!(turb_conv, grid, state, surf, param_set, t, Δt)
 
         # compute tendencies
-        TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt)
+        TC.compute_turbconv_tendencies!(turb_conv, grid, state, param_set, surf, Δt)
     end
 
     ∑tendencies_3d_bomex_gm!(tendencies, prog, cache, t)

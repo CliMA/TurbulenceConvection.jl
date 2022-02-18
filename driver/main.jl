@@ -129,7 +129,7 @@ function Simulation1d(namelist)
         diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars_gm(FT))
         diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars_gm(FT))
     elseif turb_conv_model == "EDMF"
-        turb_conv = TC.EDMFModel(namelist)
+        turb_conv = TC.EDMFModel(namelist, precip_model)
         N_up = TC.n_updrafts(turb_conv)
         cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
         face_prog_fields = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up))

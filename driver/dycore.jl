@@ -207,7 +207,7 @@ end
 
 # Compute the sum of tendencies for the scheme
 function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
-    UnPack.@unpack edmf, precip_model, grid, param_set, case, aux, TS = params
+    UnPack.@unpack turb_conv, precip_model, grid, param_set, case, aux, TS = params
 
     state = TC.State(prog, aux, tendencies)
 
@@ -215,10 +215,12 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     surf = get_surface(case.surf_params, grid, state, t, param_set)
     force = case.Fo
     radiation = case.Rad
-    en_thermo = turb_conv.en_thermo
-    precip_model = turb_conv.precip_model # YAIR
+    if turb_conv isa TC.EDMFModel
+        en_thermo = turb_conv.en_thermo
+        TC.affect_filter!(turb_conv, grid, state, param_set, surf, case.casename, t)
+    end
 
-    TC.affect_filter!(turb_conv, grid, state, gm, param_set, surf, case.casename, t)
+    # precip_model = turb_conv.precip_model
 
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
@@ -232,17 +234,16 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     tends_cent = tendencies.cent
     parent(tends_face) .= 0
     parent(tends_cent) .= 0
-    # compute tendencies
-
-    en_thermo = edmf.en_thermo
 
     # compute tendencies
     # causes division error in dry bubble first time step
-    TC.compute_precipitation_formation_tendencies(grid, state, edmf, precip_model, Δt, param_set)
+    if turb_conv isa TC.EDMFModel
+        TC.compute_precipitation_formation_tendencies(grid, state, turb_conv, precip_model, Δt, param_set)
+        TC.microphysics(en_thermo, grid, state, precip_model, Δt, param_set)
+        TC.compute_precipitation_sink_tendencies(precip_model, grid, state, param_set, Δt)
+        TC.compute_precipitation_advection_tendencies(precip_model, turb_conv, grid, state, param_set)
+    end
 
-    TC.microphysics(en_thermo, grid, state, precip_model, Δt, param_set)
-    TC.compute_precipitation_sink_tendencies(precip_model, grid, state, param_set, Δt)
-    TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set)
 
     # compute tendencies
     compute_gm_tendencies!(turb_conv, grid, state, surf, radiation, force, param_set)
@@ -253,9 +254,14 @@ end
 
 function update_aux!(turb_conv::DiffusivityModel, grid, state, surf, param_set, t, Δt)
     kc_surf = TC.kc_surface(grid)
-    ∇u_gm = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(FT(0)), top = CCO.SetDivergence(FT(0)))
-    ∇v_gm = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(FT(0)), top = CCO.SetDivergence(FT(0)))
-    aux_gm.ν = turb_conv.diff_coeff*sqrt(∇u_gm^2+∇v_gm^2)
+    FT = eltype(grid)
+    aux_gm = TC.center_aux_grid_mean(state)
+    prog_gm = TC.center_prog_grid_mean(state)
+    wvec = CC.Geometry.WVector
+    ∇ = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(FT(0)), top = CCO.SetDivergence(FT(0)))
+    # ∇u = ∇(wvec(prog_gm.u))
+    # ∇v = ∇(wvec(prog_gm.v))
+    @. aux_gm.ν = turb_conv.diffusivity #*sqrt(∇u^2+∇v^2)
     return nothing
 end
 
@@ -356,10 +362,7 @@ function compute_gm_tendencies!(
     aux_gm = TC.center_aux_grid_mean(state)
     ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
     ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
-    aux_en = TC.center_aux_environment(state)
-    aux_bulk = TC.center_aux_bulk(state)
     p0_c = TC.center_ref_state(state).p0
-    aux_tc = TC.center_aux_turbconv(state)
 
     θ_liq_ice_gm_toa = prog_gm.θ_liq_ice[kc_toa]
     q_tot_gm_toa = prog_gm.q_tot[kc_toa]
@@ -432,14 +435,20 @@ function compute_gm_tendencies!(
             tendencies_gm.u[k] += gm_U_nudge_k
             tendencies_gm.v[k] += gm_V_nudge_k
         end
-        tendencies_gm.q_tot[k] +=
-            aux_bulk.qt_tendency_precip_formation[k] +
-            aux_en.qt_tendency_precip_formation[k] +
-            aux_tc.qt_tendency_precip_sinks[k]
-        tendencies_gm.θ_liq_ice[k] +=
-            aux_bulk.θ_liq_ice_tendency_precip_formation[k] +
-            aux_en.θ_liq_ice_tendency_precip_formation[k] +
-            aux_tc.θ_liq_ice_tendency_precip_sinks[k]
+        if turb_conv isa TC.EDMFModel
+            aux_tc = TC.center_aux_turbconv(state)
+            aux_en = TC.center_aux_environment(state)
+            aux_bulk = TC.center_aux_bulk(state)
+
+            tendencies_gm.q_tot[k] +=
+                aux_bulk.qt_tendency_precip_formation[k] +
+                aux_en.qt_tendency_precip_formation[k] +
+                aux_tc.qt_tendency_precip_sinks[k]
+            tendencies_gm.θ_liq_ice[k] +=
+                aux_bulk.θ_liq_ice_tendency_precip_formation[k] +
+                aux_en.θ_liq_ice_tendency_precip_formation[k] +
+                aux_tc.θ_liq_ice_tendency_precip_sinks[k]
+        end
     end
     compute_sgs_tendencies!(turb_conv, param_set, grid, state, surf)
     return nothing

@@ -41,7 +41,7 @@ function initialize_turb_conv(
     t::Real,
 )
     surf_params = case.surf_params
-    surf = get_surface(surf_params, grid, state, gm, t, param_set)
+    surf = get_surface(surf_params, grid, state, t, param_set)
     return
 end
 
