@@ -20,6 +20,9 @@ import OrdinaryDiffEq
 const ODE = OrdinaryDiffEq
 import StaticArrays: SVector
 
+import DiffEqOperators
+const DEO = DiffEqOperators
+
 const tc_dir = pkgdir(TurbulenceConvection)
 
 include(joinpath(tc_dir, "driver", "NetCDFIO.jl"))
@@ -227,7 +230,12 @@ function solve_args(sim::Simulation1d)
 
     callbacks = ODE.CallbackSet(callback_adapt_dt..., callback_dtmax, callback_cfl..., callback_filters, callback_io...)
 
-    prob = ODE.ODEProblem(∑tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
+    ode_func = ODE.ODEFunction(∑tendencies!;
+        # jac_prototype = DEO.JacVecOperator(∑tendencies!, state.prog, params) # use AD
+        jac_prototype = DEO.JacVecOperator(∑tendencies!, state.prog, params; autodiff = false)
+    )
+    prob = ODE.ODEProblem(ode_func, state.prog, t_span, params; dt = sim.TS.dt)
+    # prob = ODE.ODEProblem(∑tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
 
     # TODO: LES_driven_SCM is currently unstable w.r.t. higher order moments (HOM).
     # So, we tell OrdinaryDiffEq.jl to not perform NaNs check on the solution
@@ -235,7 +243,24 @@ function solve_args(sim::Simulation1d)
     unstable_check_kwarg(::Cases.LES_driven_SCM) = (; unstable_check = (dt, u, p, t) -> false)
     unstable_check_kwarg(case) = ()
 
+    # alg = ODE.ImplicitEuler(;linsolve = ODE.LinSolveGMRES(
+    #     abstol = 1e-3,
+    #     reltol = 1e-2,
+    # ));
+    # alg = ODE.Euler()
+    # alg = ODE.Rosenbrock23(;
+    # alg = ODE.Rodas5(;
+    #     autodiff=false,
+    #     linsolve = ODE.LinSolveGMRES(;
+    #         abstol = 1e-7,
+    #         reltol = 1e-4,
+    #     )
+    # );
+    alg = ODE.TRBDF2(;linsolve = ODE.LinSolveGMRES());
+
     kwargs = (;
+        abstol = 1e-3,
+        reltol = 1e-2,
         progress_steps = 100,
         save_start = false,
         saveat = last(t_span),
@@ -244,7 +269,6 @@ function solve_args(sim::Simulation1d)
         unstable_check_kwarg(sim.case.case)...,
         progress_message = (dt, u, p, t) -> t,
     )
-    alg = ODE.Euler()
     return (prob, alg, kwargs)
 end
 
