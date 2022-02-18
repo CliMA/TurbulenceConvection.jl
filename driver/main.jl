@@ -22,11 +22,13 @@ import StaticArrays: SVector
 
 const tc_dir = pkgdir(TurbulenceConvection)
 
-struct DiffusivityModel{FT}
+struct DiffusivityModel{FT, PM}
     diffusivity::FT
-    function DiffusivityModel(namelist)
+    precip_model::PM
+    function DiffusivityModel(namelist, precip_model)
         diffusivity = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
-        return new{typeof(diffusivity)}(diffusivity)
+        precip_model = precip_model
+        return new{typeof(diffusivity)}(diffusivity, precip_model)
     end
 end
 abstract type AbstractPrecipitationModel end
@@ -120,25 +122,17 @@ function Simulation1d(namelist)
     fspace = TC.face_space(grid)
 
     if turb_conv_model == "eddy_diffusivity"
-        turb_conv = DiffusivityModel(namelist)
-        # N_up = nothing
-        cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars_gm(FT))
-        face_prog_fields = TC.FieldFromNamedTuple(fspace, face_prognostic_vars_gm(FT))
-        aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT))
-        aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT))
-        diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars_gm(FT))
-        diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars_gm(FT))
+        turb_conv = DiffusivityModel(namelist, precip_model)
     elseif turb_conv_model == "EDMF"
         turb_conv = TC.EDMFModel(namelist, precip_model)
-        N_up = TC.n_updrafts(turb_conv)
-        cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
-        face_prog_fields = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up))
-        aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, N_up))
-        aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up))
-        diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, N_up))
-        diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, N_up))
     end
-    isbits(turb_conv) || error("Something non-isbits was added to edmf and needs to be fixed.")
+    isbits(turb_conv) || error("Something non-isbits was added to turb_conv and needs to be fixed.")
+    cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, turb_conv))
+    face_prog_fields = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, turb_conv))
+    aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, turb_conv))
+    aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, turb_conv))
+    diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, turb_conv))
+    diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, turb_conv))
 
     prog = CC.Fields.FieldVector(cent = cent_prog_fields, face = face_prog_fields)
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
@@ -303,7 +297,13 @@ nc_results_file(::Nothing) = @info "The simulation was run without IO, so no nc 
 
 function main1d(namelist; time_run = true)
     # TODO: generalize conversion of arrays from namelist to `SVector`s.
-    for param_name in ["general_ent_params", "general_stochastic_ent_params", "fno_ent_params"]
+    for param_name in [
+        "general_ent_params",
+        "general_stochastic_ent_params",
+        "fno_ent_params",
+        "rf_opt_ent_params",
+        "rf_fix_ent_params",
+    ]
         _p = namelist["turbulence"]["EDMF_PrognosticTKE"][param_name]
         namelist["turbulence"]["EDMF_PrognosticTKE"][param_name] = SVector{length(_p)}(_p)
     end

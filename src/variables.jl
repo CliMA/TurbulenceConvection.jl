@@ -40,7 +40,7 @@ cent_aux_vars_up(FT) = (;
     Π₃ = FT(0),
     Π₄ = FT(0),
 )
-cent_aux_vars_edmf(FT, n_up) = (;
+cent_aux_vars_edmf(FT, edmf) = (;
     turbconv = (;
         ϕ_temporary = FT(0),
         ψ_temporary = FT(0),
@@ -57,7 +57,7 @@ cent_aux_vars_edmf(FT, n_up) = (;
             θ_liq_ice_tendency_precip_formation = FT(0),
             qt_tendency_precip_formation = FT(0),
         ),
-        up = ntuple(i -> cent_aux_vars_up(FT), n_up),
+        up = ntuple(i -> cent_aux_vars_up(FT), n_updrafts(edmf)),
         en = (;
             w = FT(0),
             area = FT(0),
@@ -139,14 +139,14 @@ face_aux_vars_up(FT) = (;
     massflux = FT(0),
 )
 
-face_aux_vars_edmf(FT, n_up) = (;
+face_aux_vars_edmf(FT, edmf) = (;
     turbconv = (;
         bulk = (; w = FT(0)),
         ρ_ae_KM = FT(0),
         ρ_ae_KH = FT(0),
         ρ_ae_K = FT(0),
         en = (; w = FT(0)),
-        up = ntuple(i -> face_aux_vars_up(FT), n_up),
+        up = ntuple(i -> face_aux_vars_up(FT), n_updrafts(edmf)),
         massflux_h = FT(0),
         massflux_qt = FT(0),
         ϕ_temporary = FT(0),
@@ -160,7 +160,7 @@ face_aux_vars_edmf(FT, n_up) = (;
 ##### Diagnostic fields
 
 # Center only
-cent_diagnostic_vars_edmf(FT, n_up) = (;
+cent_diagnostic_vars_edmf(FT, edmf) = (;
     turbconv = (;
         asp_ratio = FT(0),
         entr_sc = FT(0),
@@ -173,7 +173,7 @@ cent_diagnostic_vars_edmf(FT, n_up) = (;
 )
 
 # Face only
-face_diagnostic_vars_edmf(FT, n_up) =
+face_diagnostic_vars_edmf(FT, edmf) =
     (; turbconv = (; nh_pressure = FT(0), nh_pressure_adv = FT(0), nh_pressure_drag = FT(0), nh_pressure_b = FT(0)))
 
 ##### Prognostic fields
@@ -181,15 +181,15 @@ face_diagnostic_vars_edmf(FT, n_up) =
 # Center only
 cent_prognostic_vars_up(FT) = (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot = FT(0))
 cent_prognostic_vars_en(FT) = (; ρatke = FT(0), ρaHvar = FT(0), ρaQTvar = FT(0), ρaHQTcov = FT(0))
-cent_prognostic_vars_edmf(FT, n_up) = (;
+cent_prognostic_vars_edmf(FT, edmf) = (;
     turbconv = (;
         en = cent_prognostic_vars_en(FT),
-        up = ntuple(i -> cent_prognostic_vars_up(FT), n_up),
+        up = ntuple(i -> cent_prognostic_vars_up(FT), n_updrafts(edmf)),
         pr = (; q_rai = FT(0), q_sno = FT(0)),
     ),
 )
-# cent_prognostic_vars_edmf(FT, n_up) = (;) # could also use this for empty model
+# cent_prognostic_vars_edmf(FT, edmf) = (;) # could also use this for empty model
 
 # Face only
 face_prognostic_vars_up(FT) = (; ρaw = FT(0))
-face_prognostic_vars_edmf(FT, n_up) = (; turbconv = (; up = ntuple(i -> face_prognostic_vars_up(FT), n_up)))
+face_prognostic_vars_edmf(FT, edmf) = (; turbconv = (; up = ntuple(i -> face_prognostic_vars_up(FT), n_updrafts(edmf))))

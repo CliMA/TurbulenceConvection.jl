@@ -128,14 +128,13 @@ coords = CC.Fields.coordinate_field(hv_center_space)
 local_geometries = CC.Fields.local_geometry_field(hv_center_space)
 face_coords = CC.Fields.coordinate_field(hv_face_space)
 
-function initial_condition(ϕ, λ, z)
+function initial_condition(ϕ, λ, z, edmf)
     ρ = p(ϕ, z) / R_d / T(ϕ, z)
     e = cv_d * (T(ϕ, z) - T_tri) + Φ(z) + (uu(λ, ϕ, z)^2 + uv(λ, ϕ, z)^2) / 2
     ρe = ρ * e
 
-    FT = Float64
-    N_up = 1
-    return (; ρ = ρ, ρe = ρe, cent_prognostic_vars(FT, N_up)...)
+    FT = eltype(edmf)
+    return (; ρ = ρ, ρe = ρe, cent_prognostic_vars(FT, edmf)...)
 end
 
 function initial_condition_velocity(local_geometry)
@@ -150,9 +149,9 @@ const f = @. CCG.Contravariant3Vector(CCG.WVector(2 * Ω * sind(coords.lat)))
 const If2c = CCO.InterpolateF2C()
 const Ic2f = CCO.InterpolateC2F(bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
 
-function init_state(grid, coords, face_coords, local_geometries)
+function init_state(edmf, grid, coords, face_coords, local_geometries)
     Yc = map(coords) do coord
-        initial_condition(coord.lat, coord.long, coord.z)
+        initial_condition(coord.lat, coord.long, coord.z, edmf)
     end
     uₕ = map(local_geometries) do local_geometry
         initial_condition_velocity(local_geometry)
@@ -160,17 +159,26 @@ function init_state(grid, coords, face_coords, local_geometries)
     w = map(_ -> CCG.Covariant3Vector(0.0), face_coords)
 
     FT = Float64
-    N_up = 1
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
-    cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, N_up))
-    face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, N_up))
+    cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, edmf))
+    face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, edmf))
     Y = CC.Fields.FieldVector(Yc = Yc, uₕ = uₕ, w = w, cent = cent_prog_fields(), face = face_prog_fields())
     return Y
 end
 
 include(joinpath(@__DIR__, "..", "driver", "Cases.jl"))
 import .Cases
+
+function get_aux(turb_conv, grid)
+    FT = eltype(grid)
+    cspace = TC.center_space(grid)
+    fspace = TC.face_space(grid)
+    aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, turb_conv))
+    aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, turb_conv))
+    aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
+    return aux
+end
 
 function get_edmf_cache(grid, namelist)
     param_set = create_parameter_set(namelist)
@@ -199,7 +207,7 @@ function get_edmf_cache(grid, namelist)
         error("Invalid precip_name $(precip_name)")
     end
     turb_conv = TC.EDMFModel(namelist, precip_model)
-    return (; turb_conv, case, grid, param_set, aux = get_aux(grid))
+    return (; turb_conv, case, grid, param_set, aux = get_aux(turb_conv, grid))
 end
 
 function get_gm_cache(Y, coords)
@@ -356,20 +364,11 @@ end
 include(joinpath(@__DIR__, "..", "driver", "dycore.jl"))
 include(joinpath(@__DIR__, "..", "driver", "Surface.jl"))
 
-Y = init_state(grid, coords, face_coords, local_geometries)
+edmf_cache = get_edmf_cache(grid, namelist)
+Y = init_state(edmf_cache.edmf, grid, coords, face_coords, local_geometries)
 # Solve the ODE
 gm_cache = get_gm_cache(Y, coords)
-function get_aux(grid; N_up = 1)
-    FT = eltype(grid)
-    cspace = TC.center_space(grid)
-    fspace = TC.face_space(grid)
-    aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, N_up))
-    aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, N_up))
-    aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
-    return aux
-end
 
-edmf_cache = get_edmf_cache(grid, namelist)
 dt = 5
 cache = (; gm_cache..., edmf_cache, Δt = dt)
 time_end = 10.0

@@ -36,6 +36,8 @@ const SA = StaticArrays
 import ArtifactWrappers
 const AW = ArtifactWrappers
 
+import Random
+
 function les_driven_scm_data_folder()
     #! format: off
     LESDrivenSCM_output_dataset = AW.ArtifactWrapper(
@@ -72,7 +74,11 @@ function default_namelist(::Nothing)
     return default_namelist(case_name)
 end
 
-function default_namelist(case_name::String; root::String = ".", write::Bool = true)
+function default_namelist(case_name::String; root::String = ".", write::Bool = true, set_seed::Bool = true)
+
+    if set_seed
+        Random.seed!(2022)
+    end
 
     namelist_defaults = Dict()
     namelist_defaults["meta"] = Dict()
@@ -110,6 +116,17 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     # For FNO add here
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_params"] =
         SA.SVector{74}(rand(74))
+
+    # m=100 random features, d=4 input Pi groups
+    # RF: parameters to optimize, 2 x (m + 1 + d)
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["rf_opt_ent_params"] =
+        vec(cat(sqrt(100) * randn(2,100),
+                    ones(2,5), dims=2))
+
+    # RF: fixed realizations of random variables, 2 x m x (1 + d)
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["rf_fix_ent_params"] =
+        vec(cat(2*pi*rand(2,100,1),
+                    randn(2,100,4), dims=3))
 
     # General stochastic entrainment/detrainment parameters
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_stochastic_ent_params"] =
@@ -156,7 +173,7 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["turbulence"]["scheme"] = "EDMF_PrognosticTKE"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "NN", "NN_nonlocal", "Linear", "FNO"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_z"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = "deterministic"  # {"deterministic", "noisy_relaxation_process", "lognormal_scaling"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_local_micro"] = true

@@ -92,6 +92,7 @@ struct NNEntr <: AbstractEntrDetrModel end
 struct NNEntrNonlocal <: AbstractNonLocalEntrDetrModel end
 struct LinearEntr <: AbstractEntrDetrModel end
 struct FNOEntr <: AbstractNonLocalEntrDetrModel end
+struct RFEntr <: AbstractEntrDetrModel end
 
 Base.@kwdef struct NoisyRelaxationProcess{MT} <: AbstractEntrDetrModel
     mean_model::MT
@@ -463,17 +464,19 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMFModel{N_up, ENT, EBGC, EC, EDS}
-    surface_area::Float64
-    max_area::Float64
-    minimum_area::Float64
-    # precip_model::PM
+struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
+    surface_area::FT
+    max_area::FT
+    minimum_area::FT
+    precip_model::PM
     en_thermo::ENT
-    prandtl_number::Float64
+    prandtl_number::FT
     bg_closure::EBGC
     entr_closure::EC
     entr_dim_scale::EDS
     function EDMFModel(namelist, precip_model) where {PS}
+        # TODO: move this into arg list
+        FT = Float64
         # get values from namelist
         prandtl_number = namelist["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"]
 
@@ -535,7 +538,7 @@ struct EDMFModel{N_up, ENT, EBGC, EC, EDS}
             "EDMF_PrognosticTKE",
             "entrainment";
             default = "moisture_deficit",
-            valid_options = ["moisture_deficit", "NN", "NN_nonlocal", "FNO", "Linear"],
+            valid_options = ["moisture_deficit", "NN", "NN_nonlocal", "FNO", "Linear", "RF"],
         )
 
         mean_entr_closure = if entr_type == "moisture_deficit"
@@ -548,6 +551,8 @@ struct EDMFModel{N_up, ENT, EBGC, EC, EDS}
             FNOEntr()
         elseif entr_type == "Linear"
             LinearEntr()
+        elseif entr_type == "RF"
+            RFEntr()
         else
             error("Something went wrong. Invalid entrainment type '$entr_type'")
         end
@@ -586,11 +591,11 @@ struct EDMFModel{N_up, ENT, EBGC, EC, EDS}
         # PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
-        return new{n_updrafts, ENT, EBGC, EC, EDS}(
+        return new{n_updrafts, FT, PM, ENT, EBGC, EC, EDS}(
             surface_area,
             max_area,
             minimum_area,
-            # precip_model,
+            precip_model,
             en_thermo,
             prandtl_number,
             bg_closure,
@@ -601,6 +606,7 @@ struct EDMFModel{N_up, ENT, EBGC, EC, EDS}
 end
 parameter_set(obj) = obj.param_set
 n_updrafts(::EDMFModel{N_up}) where {N_up} = N_up
+Base.eltype(::EDMFModel{N_up, FT}) where {N_up, FT} = FT
 
 struct State{P, A, T}
     prog::P
