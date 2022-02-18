@@ -70,11 +70,12 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
 
     env_len = 8
     src_len = 8
+    FT = eltype(ρ0_c)
 
-    inner_env = zeros(env_len)
-    outer_env = zeros(env_len)
-    inner_src = zeros(src_len)
-    outer_src = zeros(src_len)
+    inner_env = SA.MVector{env_len, FT}(undef)
+    outer_env = SA.MVector{env_len, FT}(undef)
+    inner_src = SA.MVector{src_len, FT}(undef)
+    outer_src = SA.MVector{src_len, FT}(undef)
 
     abscissas = a
     weights = w
@@ -125,12 +126,8 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
         end
 
         # zero inner quadrature points
-        for idx in 1:env_len
-            inner_env[idx] = 0.0
-        end
-        for idx in 1:src_len
-            inner_src[idx] = 0.0
-        end
+        inner_env .= 0
+        inner_src .= 0
 
         for m_h in 1:quad_order
             if quadrature_type isa LogNormalQuad
