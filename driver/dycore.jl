@@ -63,7 +63,7 @@ cent_aux_vars_gm(FT) = (;
     θ_virt = FT(0),
     Ri = FT(0),
 )
-cent_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., TC.cent_aux_vars_edmf(FT, n_up)...)
+cent_aux_vars(FT, edmf) = (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT)..., TC.cent_aux_vars_edmf(FT, edmf)...)
 
 # Face only
 face_aux_vars_gm(FT) = (;
@@ -76,27 +76,27 @@ face_aux_vars_gm(FT) = (;
     sgs_flux_u = FT(0),
     sgs_flux_v = FT(0),
 )
-face_aux_vars(FT, n_up) = (; aux_vars_ref_state(FT)..., face_aux_vars_gm(FT)..., TC.face_aux_vars_edmf(FT, n_up)...)
+face_aux_vars(FT, edmf) = (; aux_vars_ref_state(FT)..., face_aux_vars_gm(FT)..., TC.face_aux_vars_edmf(FT, edmf)...)
 
 ##### Diagnostic fields
 
 # Center only
 cent_diagnostic_vars_gm(FT) = ()
-cent_diagnostic_vars(FT, n_up) = (; cent_diagnostic_vars_gm(FT)..., TC.cent_diagnostic_vars_edmf(FT, n_up)...)
+cent_diagnostic_vars(FT, edmf) = (; cent_diagnostic_vars_gm(FT)..., TC.cent_diagnostic_vars_edmf(FT, edmf)...)
 
 # Face only
 face_diagnostic_vars_gm(FT) = ()
-face_diagnostic_vars(FT, n_up) = (; face_diagnostic_vars_gm(FT)..., TC.face_diagnostic_vars_edmf(FT, n_up)...)
+face_diagnostic_vars(FT, edmf) = (; face_diagnostic_vars_gm(FT)..., TC.face_diagnostic_vars_edmf(FT, edmf)...)
 
 ##### Prognostic fields
 
 # Center only
-cent_prognostic_vars(FT, n_up) = (; cent_prognostic_vars_gm(FT)..., TC.cent_prognostic_vars_edmf(FT, n_up)...)
+cent_prognostic_vars(FT, edmf) = (; cent_prognostic_vars_gm(FT)..., TC.cent_prognostic_vars_edmf(FT, edmf)...)
 cent_prognostic_vars_gm(FT) = (; u = FT(0), v = FT(0), θ_liq_ice = FT(0), q_tot = FT(0))
 
 # Face only
-face_prognostic_vars(FT, n_up) = (; w = FT(0), TC.face_prognostic_vars_edmf(FT, n_up)...)
-# TC.face_prognostic_vars_edmf(FT, n_up) = (;) # could also use this for empty model
+face_prognostic_vars(FT, edmf) = (; w = FT(0), TC.face_prognostic_vars_edmf(FT, edmf)...)
+# TC.face_prognostic_vars_edmf(FT, edmf) = (;) # could also use this for empty model
 
 
 #####

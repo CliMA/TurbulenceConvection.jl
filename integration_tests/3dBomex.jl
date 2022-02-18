@@ -114,7 +114,7 @@ end
 coords = CC.Fields.coordinate_field(hv_center_space)
 face_coords = CC.Fields.coordinate_field(hv_face_space)
 
-function init_state(coords, face_coords, hv_center_space, hv_face_space)
+function init_state(edmf, coords, face_coords, hv_center_space, hv_face_space)
     Yc = map(coords) do coord
         bubble = init_dry_rising_bubble_3d(coord.x, coord.y, coord.z)
         bubble
@@ -125,8 +125,7 @@ function init_state(coords, face_coords, hv_center_space, hv_face_space)
     end
 
     FT = Float64
-    N_up = 1
-    cent_prog_fields() = TC.FieldFromNamedTuple(
+    cent_prog_fields = TC.FieldFromNamedTuple(
         hv_center_space,
         (;
             ρ = FT(0),
@@ -136,14 +135,14 @@ function init_state(coords, face_coords, hv_center_space, hv_face_space)
             v = FT(0),
             θ_liq_ice = FT(0),
             q_tot = FT(0),
-            TC.cent_prognostic_vars_edmf(FT, N_up)...,
+            TC.cent_prognostic_vars_edmf(FT, edmf)...,
         ),
     )
-    face_prog_fields() = TC.FieldFromNamedTuple(
+    face_prog_fields = TC.FieldFromNamedTuple(
         hv_face_space,
-        (; ρw = CCG.WVector(FT(0)), w = FT(0), TC.face_prognostic_vars_edmf(FT, N_up)...),
+        (; ρw = CCG.WVector(FT(0)), w = FT(0), TC.face_prognostic_vars_edmf(FT, edmf)...),
     )
-    Y = CC.Fields.FieldVector(cent = cent_prog_fields(), face = face_prog_fields())
+    Y = CC.Fields.FieldVector(cent = cent_prog_fields, face = face_prog_fields)
     @. Y.cent.ρ = Yc.ρ
     @. Y.cent.ρθ = Yc.ρθ
     @. Y.cent.ρuₕ = Yc.ρuₕ
@@ -175,6 +174,13 @@ end
 include(joinpath(@__DIR__, "..", "driver", "Cases.jl"))
 import .Cases
 
+function get_aux(edmf, hv_center_space, hv_face_space, ::Type{FT}) where {FT}
+    aux_cent_fields = TC.FieldFromNamedTuple(hv_center_space, cent_aux_vars(FT, edmf))
+    aux_face_fields = TC.FieldFromNamedTuple(hv_face_space, face_aux_vars(FT, edmf))
+    aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
+    return aux
+end
+
 function get_edmf_cache(grid, hv_center_space, hv_face_space, namelist)
     param_set = create_parameter_set(namelist)
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
@@ -203,7 +209,7 @@ function get_edmf_cache(grid, hv_center_space, hv_face_space, namelist)
     end
     edmf = TC.EDMFModel(namelist, precip_model)
     FT = eltype(grid)
-    return (; edmf, case, grid, param_set, aux = get_aux(hv_center_space, hv_face_space, FT))
+    return (; edmf, case, grid, param_set, aux = get_aux(edmf, hv_center_space, hv_face_space, FT))
 end
 
 function get_gm_cache(Y, coords)
@@ -362,20 +368,14 @@ function ∑tendencies_3d_bomex_gm!(dY, Y, cache, t)
     return dY
 end
 
-Y = init_state(coords, face_coords, hv_center_space, hv_face_space)
+edmf_cache = get_edmf_cache(grid, hv_center_space, hv_face_space, namelist)
+Y = init_state(edmf_cache.edmf, coords, face_coords, hv_center_space, hv_face_space)
 energy_0 = total_energy(Y)
 mass_0 = sum(Y.cent.ρ) # Computes ∫ρ∂Ω such that quadrature weighting is accounted for.
 theta_0 = sum(Y.cent.ρθ)
 
 # Solve the ODE
 gm_cache = get_gm_cache(Y, coords)
-function get_aux(hv_center_space, hv_face_space, ::Type{FT}; N_up = 1) where {FT}
-    aux_cent_fields = TC.FieldFromNamedTuple(hv_center_space, cent_aux_vars(FT, N_up))
-    aux_face_fields = TC.FieldFromNamedTuple(hv_face_space, face_aux_vars(FT, N_up))
-    aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
-    return aux
-end
-edmf_cache = get_edmf_cache(grid, hv_center_space, hv_face_space, namelist)
 Δt = 0.05
 time_end = 2 * Δt
 cache = (; gm_cache..., hv_center_space, edmf_cache, Δt)
