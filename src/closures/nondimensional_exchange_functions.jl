@@ -194,6 +194,39 @@ function non_dimensional_function(param_set, εδ_model_vars, ::LinearEntr)
     return nondim_ε, nondim_δ
 end
 
+
+"""
+    non_dimensional_function(param_set, εδ_model_vars, ::RFEntr)
+
+Uses a Random Feature model to predict the non-dimensional components of dynamical entrainment/detrainment.
+ - `param_set`      :: parameter set
+ - `εδ_model_vars`  :: structure containing variables
+ - `εδ_model_type`  :: RFEntr - basic RF entrainment closure
+"""
+function non_dimensional_function(param_set, εδ_model_vars, ::RFEntr)
+    # d=4 inputs, p=2 outputs, m random features
+    nondim_groups = non_dimensional_groups(param_set, εδ_model_vars)
+    d = size(nondim_groups)[1]
+
+    # Learnable and fixed parameters
+    c_rf_fix = ICP.c_rf_fix(param_set)      # 2 x m x (1 + d), fix
+    c_rf_fix = reshape(c_rf_fix, 2, :, 1 + d)
+    m = size(c_rf_fix)[2]
+    c_rf_opt = ICP.c_rf_opt(param_set)      # 2 x (m + 1 + d), learn
+    c_rf_opt = reshape(c_rf_opt, 2, m + 1 + d)
+
+    # Random Features
+    scale_x_entr = (c_rf_opt[1, (m + 2):(m + d + 1)] .^ 2) .* nondim_groups
+    scale_x_detr = (c_rf_opt[2, (m + 2):(m + d + 1)] .^ 2) .* nondim_groups
+    f_entr = c_rf_opt[1, m + 1]^2 * sqrt(2) * cos.(c_rf_fix[1, :, 2:(d + 1)] * scale_x_entr + c_rf_fix[1, :, 1])
+    f_detr = c_rf_opt[2, m + 1]^2 * sqrt(2) * cos.(c_rf_fix[2, :, 2:(d + 1)] * scale_x_detr + c_rf_fix[2, :, 1])
+
+    # Square output for nonnegativity for prediction
+    nondim_ε = sum(c_rf_opt[1, 1:m] .* f_entr) / m
+    nondim_δ = sum(c_rf_opt[2, 1:m] .* f_detr) / m
+    return nondim_ε^2, nondim_δ^2
+end
+
 """
     non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::LogNormalScalingProcess)
 
@@ -232,7 +265,7 @@ end
 """
     non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::NoisyRelaxationProcess)
 
-Uses a noisy relaxation process to predict the non-dimensional components 
+Uses a noisy relaxation process to predict the non-dimensional components
 of dynamical entrainment/detrainment. A deterministic closure is used as the
 equilibrium mean function for the relaxation process.
 
@@ -263,10 +296,10 @@ function non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::N
     return nondim_ε, nondim_δ
 end
 
-""" 
-    Solve a noisy relaxation process numerically 
+"""
+    Solve a noisy relaxation process numerically
 
-In this formulation, the noise amplitude is scaled by the speed of 
+In this formulation, the noise amplitude is scaled by the speed of
 reversion λ and the long-term mean μ, in addition to the variance σ² as is usual,
 
     `du = λ(μ - u)⋅dt + √(2λμσ²)⋅dW`

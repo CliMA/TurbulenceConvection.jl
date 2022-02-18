@@ -274,7 +274,13 @@ nc_results_file(::Nothing) = @info "The simulation was run without IO, so no nc 
 
 function main1d(namelist; time_run = true)
     # TODO: generalize conversion of arrays from namelist to `SVector`s.
-    for param_name in ["general_ent_params", "general_stochastic_ent_params", "fno_ent_params"]
+    for param_name in [
+        "general_ent_params",
+        "general_stochastic_ent_params",
+        "fno_ent_params",
+        "rf_opt_ent_params",
+        "rf_fix_ent_params",
+    ]
         _p = namelist["turbulence"]["EDMF_PrognosticTKE"][param_name]
         namelist["turbulence"]["EDMF_PrognosticTKE"][param_name] = SVector{length(_p)}(_p)
     end
