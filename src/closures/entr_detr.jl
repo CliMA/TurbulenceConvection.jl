@@ -76,7 +76,7 @@ Parameters:
  - `δ_nondim`       :: nondimensional fractional detrainment
 """
 function εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, ε_nondim, δ_nondim)
-    FT = eltype(εδ_vars)
+    FT = eltype(εδ_vars.q_cond_up)
     dim_scale = entrainment_length_scale(
         param_set,
         εδ_vars.b_up,
@@ -113,7 +113,7 @@ Parameters:
  - `εδ_model_type`  :: type of non-dimensional model for entrainment/detrainment
 """
 function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, εδ_model_type)
-    FT = eltype(εδ_vars)
+    FT = eltype(εδ_vars.q_cond_up)
 
     # fractional entrainment / detrainment
     ε_nondim, δ_nondim = non_dimensional_function(param_set, εδ_vars, εδ_model_type)
@@ -145,6 +145,9 @@ function compute_entr_detr!(
     prog_gm_f = face_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
+    p0_c = center_ref_state(state).p0
+    ρ0_c = center_ref_state(state).ρ0
+    g::FT = CPP.grav(param_set)
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
     m_entr_detr = aux_tc.ϕ_temporary
@@ -174,30 +177,30 @@ function compute_entr_detr!(
             q_cond_en = TD.condensate(TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k]))
 
             if aux_up[i].area[k] > 0.0
-
-                εδ_model_vars = GeneralizedEntr{FT}(;
-                    q_cond_up = q_cond_up,
-                    q_cond_en = q_cond_en,
-                    w_up = w_up_c[k],
-                    w_en = w_en_c[k],
-                    b_up = aux_up[i].buoy[k],
-                    b_en = aux_en.buoy[k],
-                    tke_gm = aux_gm.tke[k],
-                    tke_en = aux_en.tke[k],
-                    dMdz = ∇m_entr_detr[k],
-                    M = m_entr_detr[k],
-                    a_up = aux_up[i].area[k],
-                    a_en = aux_en.area[k],
-                    H_up = plume_scale_height[i],
-                    RH_up = aux_up[i].RH[k],
-                    RH_en = aux_en.RH[k],
-                    max_area = max_area,
-                    zc_i = grid.zc[k].z,
-                    Δt = Δt,
-                    # non-dimensional entr/detr state
-                    ε_nondim = aux_up[i].ε_nondim[k],
-                    δ_nondim = aux_up[i].δ_nondim[k],
-                    wstar = surf.wstar,
+                εδ_model_vars = (;
+                    q_cond_up = q_cond_up, # updraft condensate (liquid water + ice)
+                    q_cond_en = q_cond_en, # environment condensate (liquid water + ice)
+                    w_up = w_up_c[k], # updraft vertical velocity
+                    w_en = w_en_c[k], # environment vertical velocity
+                    b_up = aux_up[i].buoy[k], # updraft buoyancy
+                    b_en = aux_en.buoy[k], # environment buoyancy
+                    tke_gm = aux_gm.tke[k], # grid mean tke
+                    tke_en = aux_en.tke[k], # environment tke
+                    dMdz = ∇m_entr_detr[k], # updraft momentum divergence
+                    M = m_entr_detr[k], # updraft momentum
+                    a_up = aux_up[i].area[k], # updraft area fraction
+                    a_en = aux_en.area[k], # environment area fraction
+                    H_up = plume_scale_height[i], # plume scale height
+                    ref_H = p0_c[k] / (ρ0_c[k] * g), # reference state scale height
+                    RH_up = aux_up[i].RH[k], # updraft relative humidity
+                    RH_en = aux_en.RH[k], # environment relative humidity
+                    max_area = max_area, # maximum updraft area
+                    zc_i = grid.zc[k].z, # vertical coordinate
+                    Δt = Δt, # Model time step
+                    ε_nondim = aux_up[i].ε_nondim[k], # nondimensional fractional dynamical entrainment
+                    δ_nondim = aux_up[i].δ_nondim[k], # nondimensional fractional dynamical detrainment
+                    wstar = surf.wstar, # convective velocity
+                    entr_Π_subset = entrainment_Π_subset(edmf), # indices of Pi groups to include
                 )
 
                 # update fractional and turbulent entr/detr
@@ -247,6 +250,9 @@ function compute_entr_detr!(
     prog_gm_f = face_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
+    p0_c = center_ref_state(state).p0
+    ρ0_c = center_ref_state(state).ρ0
+    g::FT = CPP.grav(param_set)
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
     m_entr_detr = aux_tc.ϕ_temporary
@@ -279,52 +285,49 @@ function compute_entr_detr!(
             q_cond_en = TD.condensate(TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k]))
 
             if aux_up[i].area[k] > 0.0
-                εδ_model_vars = GeneralizedEntr{FT}(;
-                    q_cond_up = q_cond_up,
-                    q_cond_en = q_cond_en,
-                    w_up = w_up_c[k],
-                    w_en = w_en_c[k],
-                    b_up = aux_up[i].buoy[k],
-                    b_en = aux_en.buoy[k],
-                    tke_gm = aux_gm.tke[k],
-                    tke_en = aux_en.tke[k],
-                    dMdz = ∇m_entr_detr[k],
-                    M = m_entr_detr[k],
-                    a_up = aux_up[i].area[k],
-                    a_en = aux_en.area[k],
-                    H_up = plume_scale_height[i],
-                    RH_up = aux_up[i].RH[k],
-                    RH_en = aux_en.RH[k],
-                    max_area = max_area,
-                    zc_i = grid.zc[k].z,
-                    Δt = Δt,
-                    # non-dimensional entr/detr state
-                    ε_nondim = aux_up[i].ε_nondim[k],
-                    δ_nondim = aux_up[i].δ_nondim[k],
-                    wstar = surf.wstar,
+                εδ_model_vars = (;
+                    q_cond_up = q_cond_up, # updraft condensate (liquid water + ice)
+                    q_cond_en = q_cond_en, # environment condensate (liquid water + ice)
+                    w_up = w_up_c[k], # updraft vertical velocity
+                    w_en = w_en_c[k], # environment vertical velocity
+                    b_up = aux_up[i].buoy[k], # updraft buoyancy
+                    b_en = aux_en.buoy[k], # environment buoyancy
+                    tke_gm = aux_gm.tke[k], # grid mean tke
+                    tke_en = aux_en.tke[k], # environment tke
+                    dMdz = ∇m_entr_detr[k], # updraft momentum divergence
+                    M = m_entr_detr[k], # updraft momentum
+                    a_up = aux_up[i].area[k], # updraft area fraction
+                    a_en = aux_en.area[k], # environment area fraction
+                    H_up = plume_scale_height[i], # plume scale height
+                    ref_H = p0_c[k] / (ρ0_c[k] * g), # reference state scale height
+                    RH_up = aux_up[i].RH[k], # updraft relative humidity
+                    RH_en = aux_en.RH[k], # environment relative humidity
+                    max_area = max_area, # maximum updraft area
+                    zc_i = grid.zc[k].z, # vertical coordinate
+                    Δt = Δt, # Model time step
+                    ε_nondim = aux_up[i].ε_nondim[k], # nondimensional fractional dynamical entrainment
+                    δ_nondim = aux_up[i].δ_nondim[k], # nondimensional fractional dynamical detrainment
+                    wstar = surf.wstar, # convective velocity
+                    entr_Π_subset = entrainment_Π_subset(edmf), # indices of Pi groups to include
                 )
                 Π = non_dimensional_groups(param_set, εδ_model_vars)
-                aux_up[i].Π₁[k] = Π[1]
-                aux_up[i].Π₂[k] = Π[2]
-                aux_up[i].Π₃[k] = Π[3]
-                aux_up[i].Π₄[k] = Π[4]
+                @assert length(Π) == n_Π_groups(edmf)
+                for Π_i in 1:length(entrainment_Π_subset(edmf))
+                    aux_up[i].Π_groups[Π_i][k] = Π[Π_i]
+                end
+
             else
-                # TODO: is there a better way to do this?
-                aux_up[i].Π₁[k] = 0
-                aux_up[i].Π₂[k] = 0
-                aux_up[i].Π₃[k] = 0
-                aux_up[i].Π₄[k] = 0
+                for Π_i in 1:length(entrainment_Π_subset(edmf))
+                    aux_up[i].Π_groups[Π_i][k] = 0.0
+                end
             end
         end
 
-        Π₁ = parent(aux_up[i].Π₁)
-        Π₂ = parent(aux_up[i].Π₂)
-        Π₃ = parent(aux_up[i].Π₃)
-        Π₄ = parent(aux_up[i].Π₄)
+        Π_groups = parent(aux_up[i].Π_groups)
         ε_nondim = parent(aux_up[i].ε_nondim)
         δ_nondim = parent(aux_up[i].δ_nondim)
+        non_dimensional_function!(ε_nondim, δ_nondim, param_set, Π_groups, εδ_model)
 
-        non_dimensional_function!(ε_nondim, δ_nondim, param_set, Π₁, Π₂, Π₃, Π₄, εδ_model)
         @inbounds for k in real_center_indices(grid)
             ε_turb = compute_turbulent_entrainment(
                 param_set,
@@ -351,8 +354,8 @@ function compute_entr_detr!(
             aux_up[i].frac_turb_entr[k] = ε_turb
         end
 
-        @. aux_up[i].nondim_entr_sc = ifelse(aux_up[i].area > 0, aux_up[i].nondim_entr_sc, 0)
-        @. aux_up[i].nondim_detr_sc = ifelse(aux_up[i].area > 0, aux_up[i].nondim_detr_sc, 0)
+        @. aux_up[i].ε_nondim = ifelse(aux_up[i].area > 0, aux_up[i].ε_nondim, 0)
+        @. aux_up[i].δ_nondim = ifelse(aux_up[i].area > 0, aux_up[i].δ_nondim, 0)
         @. aux_up[i].entr_sc = ifelse(aux_up[i].area > 0, aux_up[i].entr_sc, 0)
         @. aux_up[i].detr_sc = ifelse(aux_up[i].area > 0, aux_up[i].detr_sc, 0)
         @. aux_up[i].frac_turb_entr = ifelse(aux_up[i].area > 0, aux_up[i].frac_turb_entr, 0)
