@@ -39,6 +39,9 @@ cent_aux_vars_up(FT) = (;
     Π₂ = FT(0),
     Π₃ = FT(0),
     Π₄ = FT(0),
+    Π₅ = FT(0),
+    Π₆ = FT(0),
+    Π_groups = FT(0),
 )
 cent_aux_vars_edmf(FT, edmf) = (;
     turbconv = (;

@@ -64,6 +64,8 @@ Base.@kwdef struct GeneralizedEntr{FT}
     a_en::FT
     "plume scale height"
     H_up::FT
+    "reference state scale height"
+    ref_H_up::FT
     "updraft relative humidity"
     RH_up::FT
     "environment relative humidity"
@@ -468,7 +470,7 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
+struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS, EPG}
     surface_area::FT
     max_area::FT
     minimum_area::FT
@@ -478,6 +480,7 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
     bg_closure::EBGC
     entr_closure::EC
     entr_dim_scale::EDS
+    entr_pi_groups::EPG
     function EDMFModel(namelist, precip_model) where {PS}
         # TODO: move this into arg list
         FT = Float64
@@ -596,13 +599,19 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
             error("Something went wrong. Invalid entrainment dimension scale '$entr_dim_scale'")
         end
 
+        entr_pi_groups = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "entr_pi_groups")
 
         EDS = typeof(entr_dim_scale)
         EC = typeof(entr_closure)
         PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
-        return new{n_updrafts, FT, PM, ENT, EBGC, EC, EDS}(
+        EPG = typeof(entr_pi_groups)
+        return new{n_updrafts, FT, PM, ENT, EBGC, EC, EDS, EPG}(
             surface_area,
             max_area,
             minimum_area,
@@ -612,6 +621,7 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
             bg_closure,
             entr_closure,
             entr_dim_scale,
+            entr_pi_groups,
         )
     end
 end
