@@ -28,7 +28,12 @@ struct DiffusivityModel{FT, PM}
     function DiffusivityModel(namelist, precip_model)
         diffusivity = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
         precip_model = precip_model
-        return new{typeof(diffusivity)}(diffusivity, precip_model)
+        FT = typeof(diffusivity)
+        PM = typeof(precip_model)
+        return new{FT, PM}(
+        diffusivity,
+        precip_model,
+        )
     end
 end
 abstract type AbstractPrecipitationModel end

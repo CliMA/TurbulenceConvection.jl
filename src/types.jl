@@ -588,7 +588,7 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
 
         EDS = typeof(entr_dim_scale)
         EC = typeof(entr_closure)
-        # PM = typeof(precip_model)
+        PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
         return new{n_updrafts, FT, PM, ENT, EBGC, EC, EDS}(
@@ -606,6 +606,7 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
 end
 parameter_set(obj) = obj.param_set
 n_updrafts(::EDMFModel{N_up}) where {N_up} = N_up
+n_updrafts(::DiffusivityModel) = Int(0)
 Base.eltype(::EDMFModel{N_up, FT}) where {N_up, FT} = FT
 
 struct State{P, A, T}
