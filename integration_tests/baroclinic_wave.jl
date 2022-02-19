@@ -128,13 +128,12 @@ coords = CC.Fields.coordinate_field(hv_center_space)
 local_geometries = CC.Fields.local_geometry_field(hv_center_space)
 face_coords = CC.Fields.coordinate_field(hv_face_space)
 
-function initial_condition(ϕ, λ, z, edmf)
+function initial_condition(ϕ, λ, z, edmf_vars)
     ρ = p(ϕ, z) / R_d / T(ϕ, z)
     e = cv_d * (T(ϕ, z) - T_tri) + Φ(z) + (uu(λ, ϕ, z)^2 + uv(λ, ϕ, z)^2) / 2
     ρe = ρ * e
 
-    FT = eltype(edmf)
-    return (; ρ = ρ, ρe = ρe, cent_prognostic_vars(FT, edmf)...)
+    return (; ρ = ρ, ρe = ρe, edmf_vars...)
 end
 
 function initial_condition_velocity(local_geometry)
@@ -150,15 +149,16 @@ const If2c = CCO.InterpolateF2C()
 const Ic2f = CCO.InterpolateC2F(bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
 
 function init_state(edmf, grid, coords, face_coords, local_geometries)
+    FT = eltype(edmf)
+    edmf_vars = cent_prognostic_vars(FT, edmf)
     Yc = map(coords) do coord
-        initial_condition(coord.lat, coord.long, coord.z, edmf)
+        initial_condition(coord.lat, coord.long, coord.z, edmf_vars)
     end
     uₕ = map(local_geometries) do local_geometry
         initial_condition_velocity(local_geometry)
     end
     w = map(_ -> CCG.Covariant3Vector(0.0), face_coords)
 
-    FT = Float64
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
     cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, edmf))

@@ -287,8 +287,8 @@ function non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::N
     ε_mean_nondim, δ_mean_nondim = non_dimensional_function(param_set, εδ_model_vars, mean_model)
 
     # noisy relaxation process
-    ε_u0 = εδ_model_vars.nondim_entr_sc
-    δ_u0 = εδ_model_vars.nondim_detr_sc
+    ε_u0 = εδ_model_vars.ε_nondim
+    δ_u0 = εδ_model_vars.δ_nondim
     Δt = εδ_model_vars.Δt
     nondim_ε = noisy_relaxation_process(ε_mean_nondim, ε_λ, ε_σ², ε_u0, Δt)
     nondim_δ = noisy_relaxation_process(δ_mean_nondim, δ_λ, δ_σ², δ_u0, Δt)
