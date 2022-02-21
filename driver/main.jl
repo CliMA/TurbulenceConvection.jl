@@ -105,10 +105,6 @@ function Simulation1d(namelist)
         error("Invalid precip_name $(precip_name)")
     end
 
-    edmf = TC.EDMFModel(namelist, precip_model)
-    isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
-    N_up = TC.n_updrafts(edmf)
-
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
 

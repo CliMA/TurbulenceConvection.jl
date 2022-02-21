@@ -65,7 +65,6 @@ cent_aux_vars_edmf(FT, edmf) = (;
             q_liq = FT(0),
             q_ice = FT(0),
             θ_liq_ice = FT(0),
-            # θ_virt = FT(0),
             θ_dry = FT(0),
             RH = FT(0),
             s = FT(0),
