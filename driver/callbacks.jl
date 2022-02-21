@@ -12,7 +12,8 @@ end
 condition_every_iter(u, t, integrator) = true
 
 function affect_io!(integrator)
-    UnPack.@unpack turb_conv, precip_model, aux, grid, io_nt, diagnostics, case, param_set, Stats, skip_io = integrator.p
+    UnPack.@unpack turb_conv, precip_model, aux, grid, io_nt, diagnostics, case, param_set, Stats, skip_io =
+        integrator.p
     skip_io && return nothing
     t = integrator.t
 
@@ -37,11 +38,13 @@ function affect_io!(integrator)
 end
 
 function affect_filter!(integrator)
-    UnPack.@unpack turb_conv, grid, gm, aux, case = integrator.p
+    UnPack.@unpack turb_conv, grid, param_set, aux, case = integrator.p
     t = integrator.t
-    state = TC.State(integrator.u, aux, integrator.du)
+    state = TC.State(integrator.u, aux, ODE.get_du(integrator))
     surf = get_surface(case.surf_params, grid, state, t, param_set)
-    TC.affect_filter!(turb_conv, grid, state, gm, surf, case.casename, t)
+    if turb_conv isa TC.EDMFModel
+        TC.affect_filter!(turb_conv, grid, state, param_set, surf, case.casename, t)
+    end
 
     # We're lying to OrdinaryDiffEq.jl, in order to avoid
     # paying for an additional `∑tendencies!` call, which is required
@@ -58,7 +61,7 @@ function adaptive_dt!(integrator)
 end
 
 function edmf_dt_max!(integrator)
-    UnPack.@unpack gm, grid, turb_conv, aux, TS = integrator.p
+    UnPack.@unpack grid, turb_conv, aux, TS = integrator.p
     state = TC.State(integrator.u, aux, integrator.du)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)

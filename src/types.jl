@@ -468,14 +468,11 @@ struct DiffusivityModel{FT, PM}
     diffusivity::FT
     precip_model::PM
     function DiffusivityModel(namelist, precip_model)
-        diffusivity = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
+        diffusivity = Float64(10) * namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
         precip_model = precip_model
         FT = typeof(diffusivity)
         PM = typeof(precip_model)
-        return new{FT, PM}(
-        diffusivity,
-        precip_model,
-        )
+        return new{FT, PM}(diffusivity, precip_model)
     end
 end
 
