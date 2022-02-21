@@ -18,6 +18,8 @@ import SciMLBase
 
 import OrdinaryDiffEq
 const ODE = OrdinaryDiffEq
+import StochasticDiffEq
+const SDE = StochasticDiffEq
 import StaticArrays: SVector
 
 const tc_dir = pkgdir(TurbulenceConvection)
@@ -234,10 +236,21 @@ function solve_args(sim::Simulation1d)
     callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
     callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))
     callback_adapt_dt = sim.adapt_dt ? (callback_adapt_dt,) : ()
+    if sim.edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess && sim.adapt_dt
+        @warn( "The prognostic noisy relaxation process currently uses a Euler-Maruyama time stepping method, 
+               which does not support adaptive time stepping. Adaptive time stepping disabled.")
+        callback_adapt_dt = ()
+    end
 
     callbacks = ODE.CallbackSet(callback_adapt_dt..., callback_dtmax, callback_cfl..., callback_filters, callback_io...)
 
-    prob = ODE.ODEProblem(∑tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
+    if sim.edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess
+        prob = SDE.SDEProblem(∑tendencies!, ∑stoch_tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
+        alg = SDE.EM()
+    else
+        prob = ODE.ODEProblem(∑tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
+        alg = ODE.Euler()
+    end
 
     # TODO: LES_driven_SCM is currently unstable w.r.t. higher order moments (HOM).
     # So, we tell OrdinaryDiffEq.jl to not perform NaNs check on the solution
@@ -254,7 +267,6 @@ function solve_args(sim::Simulation1d)
         unstable_check_kwarg(sim.case.case)...,
         progress_message = (dt, u, p, t) -> t,
     )
-    alg = ODE.Euler()
     return (prob, alg, kwargs)
 end
 
@@ -291,8 +303,10 @@ function main1d(namelist; time_run = true)
         "rf_opt_ent_params",
         "rf_fix_ent_params",
     ]
-        _p = namelist["turbulence"]["EDMF_PrognosticTKE"][param_name]
-        namelist["turbulence"]["EDMF_PrognosticTKE"][param_name] = SVector{length(_p)}(_p)
+        if haskey(namelist["turbulence"]["EDMF_PrognosticTKE"], param_name)
+            _p = namelist["turbulence"]["EDMF_PrognosticTKE"][param_name]
+            namelist["turbulence"]["EDMF_PrognosticTKE"][param_name] = SVector{length(_p)}(_p)
+        end
     end
     sim = Simulation1d(namelist)
     initialize(sim)

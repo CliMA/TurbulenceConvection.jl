@@ -17,7 +17,7 @@ function affect_io!(integrator)
     skip_io && return nothing
     t = integrator.t
 
-    state = TC.State(integrator.u, aux, integrator.du)
+    state = TC.State(integrator.u, aux, ODE.get_du(integrator))
 
     # TODO: is this the best location to call diagnostics?
     compute_diagnostics!(turb_conv, precip_model, param_set, grid, state, diagnostics, Stats, case, t)
@@ -62,7 +62,7 @@ end
 
 function edmf_dt_max!(integrator)
     UnPack.@unpack grid, turb_conv, aux, TS = integrator.p
-    state = TC.State(integrator.u, aux, integrator.du)
+    state = TC.State(integrator.u, aux, ODE.get_du(integrator))
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)
     Δzc = TC.get_Δz(prog_gm.u)
@@ -140,7 +140,7 @@ end
 
 function monitor_cfl!(integrator)
     UnPack.@unpack gm, grid, aux, TS = integrator.p
-    state = TC.State(integrator.u, aux, integrator.du)
+    state = TC.State(integrator.u, aux, ODE.get_du(integrator))
     prog_gm = TC.center_prog_grid_mean(state)
     Δz = TC.get_Δz(prog_gm.u)
     Δt = TS.dt

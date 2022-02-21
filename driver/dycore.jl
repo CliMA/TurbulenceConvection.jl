@@ -205,6 +205,21 @@ function satadjust(param_set::APS, grid, state)
     return
 end
 
+function ∑stoch_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
+    UnPack.@unpack edmf, grid, param_set, case, aux, TS = params
+
+    state = TC.State(prog, aux, tendencies)
+    surf = get_surface(case.surf_params, grid, state, t, param_set)
+
+    # set all tendencies to zero
+    tends_face = tendencies.face
+    tends_cent = tendencies.cent
+    parent(tends_face) .= 0
+    parent(tends_cent) .= 0
+
+    # compute updraft stochastic tendencies
+    TC.compute_up_stoch_tendencies!(edmf, grid, state, param_set, surf)
+end
 
 # Compute the sum of tendencies for the scheme
 function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}

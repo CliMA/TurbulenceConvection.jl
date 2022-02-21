@@ -344,6 +344,30 @@ function compute_plume_scale_height(grid::Grid{FT}, state::State, param_set::APS
     return max(updraft_top, H_up_min)
 end
 
+function compute_up_stoch_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param_set::APS, surf::SurfaceBase)
+    N_up = n_updrafts(edmf)
+
+    aux_up = center_aux_updrafts(state)
+    tendencies_up = center_tendencies_updrafts(state)
+
+    @inbounds for i in 1:N_up
+        # prognostic entr/detr
+        tends_ε_nondim = tendencies_up[i].ε_nondim
+        tends_δ_nondim = tendencies_up[i].δ_nondim
+
+        c_gen_stoch = ICP.c_gen_stoch(param_set)
+        mean_entr = aux_up[i].ε_nondim
+        mean_detr = aux_up[i].δ_nondim
+        ε_σ² = c_gen_stoch[1]
+        δ_σ² = c_gen_stoch[2]
+        ε_λ = c_gen_stoch[3]
+        δ_λ = c_gen_stoch[4]
+        @. tends_ε_nondim = √(2ε_λ * mean_entr * ε_σ²)
+        @. tends_δ_nondim = √(2δ_λ * mean_detr * δ_σ²)
+    end
+end
+
+
 function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param_set::APS, surf::SurfaceBase)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
@@ -354,6 +378,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_up_f = face_aux_updrafts(state)
+    prog_up = center_prog_updrafts(state)
     tendencies_up = center_tendencies_updrafts(state)
     tendencies_up_f = face_tendencies_updrafts(state)
     ρ0_c = center_ref_state(state).ρ0
@@ -404,6 +429,22 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         @. tends_ρaq_tot =
             -∇c(wvec(LBF(Ic(w_up) * ρ0_c * a_up * q_tot_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * q_tot_en) -
             (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn * q_tot_up) + (ρ0_c * qt_tendency_precip_formation)
+
+
+        # prognostic entr/detr
+        if edmf.entr_closure isa PrognosticNoisyRelaxationProcess
+            c_gen_stoch = ICP.c_gen_stoch(param_set)
+            mean_entr = aux_up[i].ε_nondim
+            mean_detr = aux_up[i].δ_nondim
+            ε_λ = c_gen_stoch[3]
+            δ_λ = c_gen_stoch[4]
+            tends_ε_nondim = tendencies_up[i].ε_nondim
+            tends_δ_nondim = tendencies_up[i].δ_nondim
+            ε_nondim = prog_up[i].ε_nondim
+            δ_nondim = prog_up[i].δ_nondim
+            @. tends_ε_nondim = ε_λ * (mean_entr - ε_nondim)
+            @. tends_δ_nondim = δ_λ * (mean_detr - δ_nondim)
+        end
 
         tends_ρarea[kc_surf] = 0
         tends_ρaθ_liq_ice[kc_surf] = 0
@@ -464,6 +505,10 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         prog_up[i].ρarea .= max.(prog_up[i].ρarea, 0)
         prog_up[i].ρaθ_liq_ice .= max.(prog_up[i].ρaθ_liq_ice, 0)
         prog_up[i].ρaq_tot .= max.(prog_up[i].ρaq_tot, 0)
+        if edmf.entr_closure isa PrognosticNoisyRelaxationProcess
+            @. prog_up[i].ε_nondim = max(prog_up[i].ε_nondim, 0)
+            @. prog_up[i].δ_nondim = max(prog_up[i].δ_nondim, 0)
+        end
         @inbounds for k in real_center_indices(grid)
             prog_up[i].ρarea[k] = min(prog_up[i].ρarea[k], ρ0_c[k] * a_max)
         end
