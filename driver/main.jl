@@ -183,7 +183,7 @@ function initialize(sim::Simulation1d)
 
     # TODO: deprecate
     initialize_io(sim.Stats)
-    initialize_io(sim.edmf, sim.Stats)
+    initialize_io(sim.turb_conv, sim.Stats)
 
     open_files(sim.Stats)
     write_simulation_time(sim.Stats, t)
@@ -236,21 +236,20 @@ function solve_args(sim::Simulation1d)
     callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
     callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))
     callback_adapt_dt = sim.adapt_dt ? (callback_adapt_dt,) : ()
-    if sim.edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess && sim.adapt_dt
+    if sim.turb_conv isa TC.EDMFModel && sim.turb_conv.entr_closure isa TC.PrognosticNoisyRelaxationProcess && sim.adapt_dt
         @warn( "The prognostic noisy relaxation process currently uses a Euler-Maruyama time stepping method, 
                which does not support adaptive time stepping. Adaptive time stepping disabled.")
         callback_adapt_dt = ()
-    end
-
-    callbacks = ODE.CallbackSet(callback_adapt_dt..., callback_dtmax, callback_cfl..., callback_filters, callback_io...)
-
-    if sim.edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess
+    # end
+    # if sim.turb_conv.entr_closure isa TC.PrognosticNoisyRelaxationProcess
         prob = SDE.SDEProblem(∑tendencies!, ∑stoch_tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
         alg = SDE.EM()
     else
         prob = ODE.ODEProblem(∑tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
         alg = ODE.Euler()
     end
+
+    callbacks = ODE.CallbackSet(callback_adapt_dt..., callback_dtmax, callback_cfl..., callback_filters, callback_io...)
 
     # TODO: LES_driven_SCM is currently unstable w.r.t. higher order moments (HOM).
     # So, we tell OrdinaryDiffEq.jl to not perform NaNs check on the solution
