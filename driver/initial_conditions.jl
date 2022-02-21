@@ -33,7 +33,7 @@ function initialize_turb_conv(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State
 end
 
 function initialize_turb_conv(
-    turb_conv::DiffusivityModel,
+    turb_conv::TC.DiffusivityModel,
     grid::TC.Grid,
     state::TC.State,
     case,

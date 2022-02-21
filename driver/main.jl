@@ -22,20 +22,6 @@ import StaticArrays: SVector
 
 const tc_dir = pkgdir(TurbulenceConvection)
 
-struct DiffusivityModel{FT, PM}
-    diffusivity::FT
-    precip_model::PM
-    function DiffusivityModel(namelist, precip_model)
-        diffusivity = namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"]
-        precip_model = precip_model
-        FT = typeof(diffusivity)
-        PM = typeof(precip_model)
-        return new{FT, PM}(
-        diffusivity,
-        precip_model,
-        )
-    end
-end
 abstract type AbstractPrecipitationModel end
 struct NoPrecipitation <: AbstractPrecipitationModel end
 struct CutoffPrecipitation <: AbstractPrecipitationModel end
@@ -127,7 +113,7 @@ function Simulation1d(namelist)
     fspace = TC.face_space(grid)
 
     if turb_conv_model == "eddy_diffusivity"
-        turb_conv = DiffusivityModel(namelist, precip_model)
+        turb_conv = TC.DiffusivityModel(namelist, precip_model)
     elseif turb_conv_model == "EDMF"
         turb_conv = TC.EDMFModel(namelist, precip_model)
     end

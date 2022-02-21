@@ -252,7 +252,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     return nothing
 end
 
-function update_aux!(turb_conv::DiffusivityModel, grid, state, surf, param_set, t, Δt)
+function update_aux!(turb_conv::TC.DiffusivityModel, grid, state, surf, param_set, t, Δt)
     kc_surf = TC.kc_surface(grid)
     FT = eltype(grid)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -279,7 +279,7 @@ function compute_turbconv_tendencies!(turb_conv::TC.EDMFModel, param_set, grid, 
     return nothing
 end
 
-function compute_turbconv_tendencies!(turb_conv::DiffusivityModel, param_set, grid, state, surf)
+function compute_turbconv_tendencies!(turb_conv::TC.DiffusivityModel, param_set, grid, state, surf)
     return nothing
 end
 
@@ -320,7 +320,7 @@ function compute_sgs_tendencies!(turb_conv::TC.EDMFModel, param_set, grid, state
     return nothing
 end
 
-function compute_sgs_tendencies!(turb_conv::DiffusivityModel, param_set, grid, state, surf)
+function compute_sgs_tendencies!(turb_conv::TC.DiffusivityModel, param_set, grid, state, surf)
     FT = eltype(grid)
     zf = grid.zf
     kf_surf = TC.kf_surface(grid)
