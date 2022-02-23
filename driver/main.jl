@@ -304,7 +304,7 @@ function main1d(namelist; time_run = true)
     if time_run
         return_code = @timev run(sim; time_run)
     else
-        return_code = run(sim)
+        return_code = run(sim; time_run)
     end
     return_code == :success && println("The simulation has completed.")
     return nc_results_file(sim.Stats), return_code
