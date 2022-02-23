@@ -751,7 +751,7 @@ function surface_params(case::GATE_III, grid::TC.Grid, surf_ref_state, param_set
     # For GATE_III we provide values of transfer coefficients
     ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, Tsurface, qsurface)
     qsurface = TD.q_vap_saturation(ts)
-    kwargs = (; zrough, Tsurface, qsurface, cm, ch)
+    kwargs = (; Tsurface, qsurface, cm, ch)
     return TC.FixedSurfaceCoeffs(FT; kwargs...)
 end
 
