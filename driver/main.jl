@@ -284,19 +284,15 @@ main(namelist; kwargs...) = @timev main1d(namelist; kwargs...)
 nc_results_file(stats::NetCDFIO_Stats) = stats.path_plus_file
 nc_results_file(::Nothing) = @info "The simulation was run without IO, so no nc files were exported"
 
+to_svec(x::AbstractArray) = SA.SVector{length(x)}(x)
+to_svec(x::Tuple) = SA.SVector{length(x)}(x)
+
 function main1d(namelist; time_run = true)
-    # TODO: generalize conversion of arrays from namelist to `SVector`s.
-    for param_name in [
-        "general_ent_params",
-        "general_stochastic_ent_params",
-        "fno_ent_params",
-        "rf_opt_ent_params",
-        "rf_fix_ent_params",
-        "pi_norm_consts",
-    ]
-        if haskey(namelist["turbulence"]["EDMF_PrognosticTKE"], param_name)
-            _p = namelist["turbulence"]["EDMF_PrognosticTKE"][param_name]
-            namelist["turbulence"]["EDMF_PrognosticTKE"][param_name] = SVector{length(_p)}(_p)
+    edmf_turb_dict = namelist["turbulence"]["EDMF_PrognosticTKE"]
+    for key in keys(edmf_turb_dict)
+        entry = edmf_turb_dict[key]
+        if entry isa AbstractArray || entry isa Tuple
+            edmf_turb_dict[key] = to_svec(entry)
         end
     end
     sim = Simulation1d(namelist)
