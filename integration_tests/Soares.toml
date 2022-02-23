@@ -1,0 +1,49 @@
+# """ Soares 2004 """
+
+[dummy_param_name_1]
+alias = "Pg"
+value = 1e5
+type = "float"
+
+[dummy_param_name_2]
+alias = "qtg"
+value = 5.0e-3
+type = "float"
+
+[dummy_param_name_3]
+alias = "Tg"
+value = 300.0
+type = "float"
+
+[dummy_param_name_4]
+alias = "zrough"
+value = 0.16
+type = "float"
+description = "1.0e-4 0.16 specified in [Nieuwstadt1993](@cite)"
+
+[dummy_param_name_5]
+alias = "Tsurface"
+value = 300.0
+type = "float"
+
+[dummy_param_name_6]
+alias = "qsurface"
+value = 5.0e-3
+type = "float"
+
+[dummy_param_name_7]
+alias = "θ_flux"
+value = 6.0e-2
+type = "float"
+
+[dummy_param_name_8]
+alias = "qt_flux"
+value = 2.5e-5
+type = "float"
+
+[dummy_param_name_9]
+alias = "ustar"
+value = 0.28
+type = "float"
+description = "to initialize grid mean covariances"
+    

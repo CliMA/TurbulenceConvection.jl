@@ -1,0 +1,30 @@
+# """ TRMM_LBA  Grabowski 2006"""
+
+[dummy_param_name_1]
+alias = "Pg"
+value =  99130.0
+type = "float"
+description = "pressure at the ground"
+
+[dummy_param_name_2]
+alias = "Tg"
+value = 296.85
+type = "float"
+description = "temperature at the ground"
+
+[dummy_param_name_3]
+alias = "qsurface"
+value =  22.45e-3
+type = "float"
+
+[dummy_param_name_4]
+alias = "θ_surface"
+value =  296.15
+type = "float"
+description = "used to be written (273.15 + 23)"
+
+[dummy_param_name_5]
+alias = "ustar"
+value =  0.28
+type = "float"
+description = "currently taken from Bomex - better option is to approximate from LES tke above the surface"

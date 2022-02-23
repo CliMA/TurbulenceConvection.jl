@@ -1,0 +1,76 @@
+# """ DYCOMS_RF01 Ackerman 2009"""
+
+[dummy_param_name_1]
+alias = "Pg"
+value =  101780.0
+type = "float"
+description = "pressure at the ground"
+
+[dummy_param_name_2]
+alias = "θ_surf"
+value = 288.3
+type = "float"
+
+[dummy_param_name_3]
+alias = "qtg"
+value =  0.009 
+type = "float"
+
+[dummy_param_name_4]
+alias = "zrough"
+value =  1.0e-4
+type = "float"
+
+[dummy_param_name_5]
+alias = "ustar"
+value =  0.25
+type = "float"
+
+[dummy_param_name_6]
+alias = "shf"
+value =   16.0
+type = "float"
+description = "sensible heat flux"
+
+[dummy_param_name_7]
+alias = "lhf"
+value = 93.0 
+type = "float"
+description = "latent heat flux"
+
+[dummy_param_name_8]
+alias = "Tsurface"
+value =  292.5
+type = "float"
+
+[dummy_param_name_9]
+alias = "qsurface"
+value =  13.84e-3
+type = "float"
+
+# radiation parameters for Dycoms
+
+[dummy_param_name_10]
+alias = "divergence"
+value =   3.75e-6
+type = "float"
+
+[dummy_param_name_11]
+alias = "alpha_z"
+value =  1.0
+type = "float"
+
+[dummy_param_name_12]
+alias = "kappa"
+value =  85.0
+type = "float"
+
+[dummy_param_name_13]
+alias = "F0"
+value =  70.0
+type = "float"
+
+[dummy_param_name_14]
+alias = "F1"
+value =  22.0
+type = "float"

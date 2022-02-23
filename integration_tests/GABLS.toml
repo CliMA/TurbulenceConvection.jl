@@ -1,0 +1,46 @@
+# """ GABLS """
+
+[dummy_param_name_1]
+alias = "Pg"
+value =  1.0e5
+type = "float"
+description = "pressure at the ground"
+
+[dummy_param_name_2]
+alias = "Tg"
+value = 265.0
+type = "float"
+
+[dummy_param_name_3]
+alias = "qtg"
+value =  0.0
+type = "float"
+
+[dummy_param_name_4]
+alias = "zrough"
+value =  0.1
+type = "float"
+
+[dummy_param_name_6]
+alias = "shf"
+value =  0.0001
+type = "float"
+description = "sensible heat flux, only to prevent 0 division SF.jl lmo"
+
+[dummy_param_name_7]
+alias = "lhf"
+value =  0.0001
+type = "float"
+description = "latent heat flux, only ot prevent 0 division in SF.jl lmo"
+
+[dummy_param_name_9]
+alias = "qsurface"
+value =  0.0
+type = "float"
+
+[dummy_param_name_8]
+alias = "coriolis_param"
+value =  1.39e-4
+type = "float"
+description = "[s^{-1}]"
+

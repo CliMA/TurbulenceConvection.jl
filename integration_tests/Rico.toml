@@ -1,0 +1,44 @@
+# """ Rico """
+
+[dummy_param_name_1]
+alias = "Pg"
+value =  1.0154e5 
+type = "float"
+description = "pressure at the ground"
+
+[dummy_param_name_2]
+alias = "Tg"
+value = 299.8
+type = "float"
+description = "temperature at the ground"
+
+[dummy_param_name_3]
+alias = "zrough"
+value =  0.00015
+type = "float"
+
+[dummy_param_name_4]
+alias = "cm"
+value =  0.001229
+type = "float"
+
+[dummy_param_name_5]
+alias = "ch"
+value =  0.001094
+type = "float"
+
+[dummy_param_name_6]
+alias = "cq"
+value = 0.001133
+type = "float"
+
+[dummy_param_name_7]
+alias = "Tsurface"
+value = 299.8
+type = "float"
+
+[dummy_param_name_8]
+alias = "latitude"
+value = 18.0
+type = "float"
+description = "used to calculate coriolis force"

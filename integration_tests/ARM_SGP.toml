@@ -1,0 +1,35 @@
+# """ ARM_SGP  Brown 2002"""
+
+[dummy_param_name_1]
+alias = "Pg"
+value =  97000.0
+type = "float"
+description = "pressure at the ground"
+
+[dummy_param_name_2]
+alias = "Tg"
+value = 299.0
+type = "float"
+description = "temperature at the ground"
+
+[dummy_param_name_3]
+alias = "qtg"
+value =  0.0152
+type = "float"
+
+[dummy_param_name_4]
+alias = "qsurface"
+value =  15.2e-3
+type = "float"
+
+[dummy_param_name_5]
+alias = "θ_surface"
+value =  299.0
+type = "float"
+description = "used to be written (273.15 + 23)"
+
+[dummy_param_name_6]
+alias = "ustar"
+value =  0.28
+type = "float"
+description = "currently taken from Bomex - better option is to approximate from LES tke above the surface"

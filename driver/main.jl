@@ -77,7 +77,7 @@ function Simulation1d(namelist)
     surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
 
     Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
-    Rad = TC.RadiationBase(case_type)
+    Rad = TC.RadiationBase(case_type, param_set)
     TS = TimeStepping(namelist)
 
     # Create the class for precipitation

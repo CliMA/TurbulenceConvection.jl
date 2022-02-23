@@ -1,0 +1,23 @@
+# """ SP """
+
+[dummy_param_name_1]
+alias = "Pg"
+value =  1.0e5
+type = "float"
+description = "pressure at the ground"
+
+[dummy_param_name_2]
+alias = "Tg"
+value = 300.0
+type = "float"
+
+[dummy_param_name_3]
+alias = "qtg"
+value =  1.0e-4
+type = "float"
+
+[dummy_param_name_8]
+alias = "coriolis_param"
+value =  1.0e-4
+type = "float"
+description = "s^{-1}"
