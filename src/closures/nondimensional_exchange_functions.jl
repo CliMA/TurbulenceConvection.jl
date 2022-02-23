@@ -85,7 +85,11 @@ function non_dimensional_function!(
     Π = Π_groups'
     Π = reshape(Π, (size(Π)..., 1))
     trafo = OF.FourierTransform(modes = (2,))
-    model = OF.Chain(OF.SpectralKernelOperator(trafo, n_input_vars => 2, Flux.relu),)
+    model = OF.Chain(
+        Flux.Dense(n_input_vars, 2, Flux.relu),
+        OF.SpectralKernelOperator(trafo, 2 => 2, Flux.relu),
+        Flux.Dense(2, 2, Flux.relu),
+    )
 
     # set the parameters
     c_fno = ICP.c_fno(param_set)
@@ -94,11 +98,11 @@ function non_dimensional_function!(
         len_p = length(p)
         p_slice = p[:]
         if eltype(p_slice) <: Real
-            p_slice .= c_fno[index:(index + len_p - 1)]
+            p[:] .= c_fno[index:(index + len_p - 1)]
             index += len_p
         elseif eltype(p_slice) <: Complex
             c_fno_slice = c_fno[index:(index + len_p - 1)]
-            p_slice .= c_fno_slice + c_fno[(index + len_p):(index + len_p * 2 - 1)] * im
+            p[:] .= c_fno_slice + c_fno[(index + len_p):(index + len_p * 2 - 1)] * im
             index += len_p * 2
         else
             error("Bad eltype in Flux params")

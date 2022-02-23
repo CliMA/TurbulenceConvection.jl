@@ -111,7 +111,7 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
         SA.SVector{69}(rand(69))
     # For FNO add here
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_params"] =
-        SA.SVector{74}(rand(74))
+        SA.SVector{42}(rand(42))
 
     # m=100 random features, d=6 input Pi groups
     # RF: parameters to optimize, 2 x (m + 1 + d)
