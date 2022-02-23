@@ -160,6 +160,7 @@ struct Clima1M <: AbstractPrecipitationModel end
 
 abstract type AbstractQuadratureType end
 struct LogNormalQuad <: AbstractQuadratureType end
+struct GaussianQuad <: AbstractQuadratureType end
 
 abstract type AbstractEnvThermo end
 struct SGSMean <: AbstractEnvThermo end
@@ -169,9 +170,11 @@ struct SGSQuadrature{N, QT, A, W} <: AbstractEnvThermo
     w::W
     function SGSQuadrature(namelist)
         N = parse_namelist(namelist, "thermodynamics", "quadrature_order"; default = 3)
-        quadrature_name = parse_namelist(namelist, "thermodynamics", "quadrature_type"; default = "gaussian")
+        quadrature_name = parse_namelist(namelist, "thermodynamics", "quadrature_type"; default = "log-normal")
         quadrature_type = if quadrature_name == "log-normal"
             LogNormalQuad()
+        elseif quadrature_name == "gaussian"
+            GaussianQuad()
         else
             error("Invalid thermodynamics quadrature $(quadrature_name)")
         end

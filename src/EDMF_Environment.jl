@@ -93,7 +93,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
         sd_cond_h_q = sqrt(max(sd_h * sd_h - sd2_hq * sd2_hq / sd_q / sd_q, 0))
         mu_q = log(q_tot_en * q_tot_en / sqrt(q_tot_en * q_tot_en + QTvar_en))
         mu_h = log(θ_liq_ice_en * θ_liq_ice_en / sqrt(θ_liq_ice_en * θ_liq_ice_en + Hvar_en))
-    else
+    elseif quadrature_type isa GaussianQuad
         sd_q = sqrt(QTvar_en)
         sd_h = sqrt(Hvar_en)
         corr = max(min(HQTcov_en / max(sd_h * sd_q, 1e-13), 1), -1)
@@ -120,7 +120,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
         if quadrature_type isa LogNormalQuad
             qt_hat = exp(mu_q + sqrt2 * sd_q * abscissas[m_q])
             μ_h_star = mu_h + sd2_hq / sd_q / sd_q * (log(qt_hat) - mu_q)
-        else
+        elseif quadrature_type isa GaussianQuad
             qt_hat = q_tot_en + sqrt2 * sd_q * abscissas[m_q]
             μ_h_star = θ_liq_ice_en + sqrt2 * corr * sd_h * abscissas[m_q]
         end
@@ -132,7 +132,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
         for m_h in 1:quad_order
             if quadrature_type isa LogNormalQuad
                 h_hat = exp(μ_h_star + sqrt2 * sd_cond_h_q * abscissas[m_h])
-            else
+            elseif quadrature_type isa GaussianQuad
                 h_hat = sqrt2 * σ_h_star * abscissas[m_h] + μ_h_star
             end
 
