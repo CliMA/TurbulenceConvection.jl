@@ -116,7 +116,7 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     # m=100 random features, d=6 input Pi groups
     # RF: parameters to optimize, 2 x (m + 1 + d)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["rf_opt_ent_params"] =
-        vec(cat(sqrt(100) * randn(2,100), # vec(cat(sqrt(m) * randn(2, m),
+        vec(cat(randn(2,100), # vec(cat(randn(2, m),
                     ones(2,7), dims=2)) # ones(2, d + 1), dims=2))
 
     # RF: fixed realizations of random variables, 2 x m x (1 + d)

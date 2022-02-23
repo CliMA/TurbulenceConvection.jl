@@ -251,7 +251,7 @@ Uses a Random Feature model to predict the non-dimensional components of dynamic
  - `εδ_model_type`  :: RFEntr - basic RF entrainment closure
 """
 function non_dimensional_function(param_set, εδ_model_vars, ::RFEntr)
-    # d=4 inputs, p=2 outputs, m random features
+    # d inputs, p=2 outputs, m random features
     nondim_groups = collect(non_dimensional_groups(param_set, εδ_model_vars))
     d = size(nondim_groups)[1]
 
@@ -269,8 +269,8 @@ function non_dimensional_function(param_set, εδ_model_vars, ::RFEntr)
     f_detr = c_rf_opt[2, m + 1]^2 * sqrt(2) * cos.(c_rf_fix[2, :, 2:(d + 1)] * scale_x_detr + c_rf_fix[2, :, 1])
 
     # Square output for nonnegativity for prediction
-    nondim_ε = sum(c_rf_opt[1, 1:m] .* f_entr) / m
-    nondim_δ = sum(c_rf_opt[2, 1:m] .* f_detr) / m
+    nondim_ε = sum(c_rf_opt[1, 1:m] .* f_entr) / sqrt(m)
+    nondim_δ = sum(c_rf_opt[2, 1:m] .* f_detr) / sqrt(m)
     return nondim_ε^2, nondim_δ^2
 end
 
