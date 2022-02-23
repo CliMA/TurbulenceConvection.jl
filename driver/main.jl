@@ -292,6 +292,7 @@ function main1d(namelist; time_run = true)
         "fno_ent_params",
         "rf_opt_ent_params",
         "rf_fix_ent_params",
+        "pi_norm_consts",
     ]
         if haskey(namelist["turbulence"]["EDMF_PrognosticTKE"], param_name)
             _p = namelist["turbulence"]["EDMF_PrognosticTKE"][param_name]

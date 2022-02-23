@@ -46,12 +46,28 @@ CLIMAParameters.Atmos.EDMF.smin_rm(ps::EarthParameterSet) = ps.nt.smin_rm #  upp
 function create_parameter_set(namelist)
     TC = TurbulenceConvection
 
-    ## Random Feature parameters
+    # this is needed to avoid slowdown when using large parameter vectors
     use_ran_features = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "RF"
-    rfp_kwargs = if use_ran_features
+    use_nn = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "NN"
+    use_nn_nonlocal = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "NN_nonlocal"
+    use_fno = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "FNO"
+
+    entr_closure_kwargs = if use_ran_features
         (;
         c_rf_fix = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_fix_ent_params"),
         c_rf_opt = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_opt_ent_params"),
+    )
+    elseif use_nn
+        (;
+        c_gen = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "general_ent_params"),
+    )
+    elseif use_nn_nonlocal
+        (;
+        c_gen = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "general_ent_params"),
+    )
+    elseif use_fno
+        (;
+        c_fno = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_params"),
     )
     else
         ()
@@ -77,8 +93,7 @@ function create_parameter_set(namelist)
         H_up_min = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_updraft_top"),
         ω_pr = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Prandtl_number_scale"),
         c_δ = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "detrainment_factor"),
-        c_gen = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "general_ent_params"),
-        c_fno = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_params"),
+        Π_norm = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pi_norm_consts"),
         β = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "sorting_power"),
         χ = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_mixing_frac"),
         c_γ = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "turbulent_entrainment_factor"),
@@ -96,7 +111,7 @@ function create_parameter_set(namelist)
         smin_ub = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_ub"),
         smin_rm = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_rm"),
         l_max = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),
-        rfp_kwargs...,
+        entr_closure_kwargs...,
         ## Stochastic parameters
         c_gen_stoch = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "general_stochastic_ent_params"),
     )

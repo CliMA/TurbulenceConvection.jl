@@ -23,6 +23,7 @@ static_stab_coeff(ps::APS) = ps.nt.c_b
 l_max(ps::APS) = ps.nt.l_max
 
 """Additional entrainment/detrainment parameters."""
+Π_norm(ps::APS) = ps.nt.Π_norm
 c_gen(ps::APS) = ps.nt.c_gen
 c_fno(ps::APS) = ps.nt.c_fno
 c_rf_fix(ps::APS) = ps.nt.c_rf_fix

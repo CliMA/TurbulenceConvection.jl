@@ -30,61 +30,6 @@ Base.@kwdef struct EntrDetr{FT}
     δ_nondim::FT
 end
 
-"""
-    GeneralizedEntr
-
-A general set of variables entrainment might depend on.
-
-$(DocStringExtensions.FIELDS)
-"""
-Base.@kwdef struct GeneralizedEntr{FT}
-    "updraft condensate (liquid water + ice)"
-    q_cond_up::FT
-    "environment condensate (liquid water + ice)"
-    q_cond_en::FT
-    "updraft vertical velocity"
-    w_up::FT
-    "environment vertical velocity"
-    w_en::FT
-    "updraft buoyancy"
-    b_up::FT
-    "environment buoyancy"
-    b_en::FT
-    "grid mean tke"
-    tke_gm::FT
-    "environment tke"
-    tke_en::FT
-    "updraft momentum divergence"
-    dMdz::FT
-    "updraft momentum"
-    M::FT
-    "updraft area fraction"
-    a_up::FT
-    "environment area fraction"
-    a_en::FT
-    "plume scale height"
-    H_up::FT
-    "updraft relative humidity"
-    RH_up::FT
-    "environment relative humidity"
-    RH_en::FT
-    "maximum updraft area"
-    max_area::FT
-    "vertical coordinate"
-    zc_i::FT
-    "Model time step"
-    Δt::FT
-    # For stochastic modelling
-    "nondimensional fractional dynamical entrainment"
-    ε_nondim::FT
-    "nondimensional fractional dynamical detrainment"
-    δ_nondim::FT
-    "convective velocity"
-    wstar::FT
-end
-
-Base.eltype(::GeneralizedEntr{FT}) where {FT} = FT
-
 abstract type AbstractEntrDetrModel end
 abstract type AbstractNonLocalEntrDetrModel end
 struct MDEntr <: AbstractEntrDetrModel end  # existing model
@@ -468,7 +413,7 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
+struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS, EPG}
     surface_area::FT
     max_area::FT
     minimum_area::FT
@@ -478,6 +423,7 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
     bg_closure::EBGC
     entr_closure::EC
     entr_dim_scale::EDS
+    entr_pi_subset::EPG
     function EDMFModel(namelist, precip_model) where {PS}
         # TODO: move this into arg list
         FT = Float64
@@ -596,13 +542,15 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
             error("Something went wrong. Invalid entrainment dimension scale '$entr_dim_scale'")
         end
 
+        entr_pi_subset = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_pi_subset")
 
         EDS = typeof(entr_dim_scale)
         EC = typeof(entr_closure)
         PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
-        return new{n_updrafts, FT, PM, ENT, EBGC, EC, EDS}(
+        EPG = typeof(entr_pi_subset)
+        return new{n_updrafts, FT, PM, ENT, EBGC, EC, EDS, EPG}(
             surface_area,
             max_area,
             minimum_area,
@@ -612,12 +560,15 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
             bg_closure,
             entr_closure,
             entr_dim_scale,
+            entr_pi_subset,
         )
     end
 end
 parameter_set(obj) = obj.param_set
 n_updrafts(::EDMFModel{N_up}) where {N_up} = N_up
 Base.eltype(::EDMFModel{N_up, FT}) where {N_up, FT} = FT
+n_Π_groups(m::EDMFModel) = length(m.entr_pi_subset)
+entrainment_Π_subset(m::EDMFModel) = m.entr_pi_subset
 
 struct State{P, A, T}
     prog::P
