@@ -45,7 +45,7 @@ struct Simulation1d{IONT, G, S, C, TCModel, PM, D, TIMESTEPPING, STATS, PS}
     grid::G
     state::S
     case::C
-    turb_conv::TCModel
+    turbconv::TCModel
     precip_model::PM
     diagnostics::D
     TS::TIMESTEPPING
@@ -66,7 +66,7 @@ function Simulation1d(namelist)
     adapt_dt = namelist["time_stepping"]["adapt_dt"]
     cfl_limit = namelist["time_stepping"]["cfl_limit"]
     dt_min = namelist["time_stepping"]["dt_min"]
-    turb_conv_model = namelist["turbulence"]["turbulence_convection_model"]
+    turbconv_model = namelist["turbulence"]["turbulence_convection_model"]
 
     Δz = FT(namelist["grid"]["dz"])
     nz = namelist["grid"]["nz"]
@@ -110,18 +110,18 @@ function Simulation1d(namelist)
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
 
-    if turb_conv_model == "eddy_diffusivity"
-        turb_conv = TC.DiffusivityModel(namelist, precip_model)
-    elseif turb_conv_model == "EDMF"
-        turb_conv = TC.EDMFModel(namelist, precip_model)
+    if turbconv_model == "eddy_diffusivity"
+        turbconv = TC.DiffusivityModel(namelist, precip_model)
+    elseif turbconv_model == "EDMF"
+        turbconv = TC.EDMFModel(namelist, precip_model)
     end
-    isbits(turb_conv) || error("Something non-isbits was added to turb_conv and needs to be fixed.")
-    cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, turb_conv))
-    face_prog_fields = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, turb_conv))
-    aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, turb_conv))
-    aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, turb_conv))
-    diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, turb_conv))
-    diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, turb_conv))
+    isbits(turbconv) || error("Something non-isbits was added to turbconv and needs to be fixed.")
+    cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, turbconv))
+    face_prog_fields = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, turbconv))
+    aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, turbconv))
+    aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, turbconv))
+    diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, turbconv))
+    diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, turbconv))
 
     prog = CC.Fields.FieldVector(cent = cent_prog_fields, face = face_prog_fields)
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
@@ -148,7 +148,7 @@ function Simulation1d(namelist)
         grid,
         state,
         case,
-        turb_conv,
+        turbconv,
         precip_model,
         diagnostics,
         TS,
@@ -172,7 +172,7 @@ function initialize(sim::Simulation1d)
     Cases.initialize_forcing(sim.case, sim.grid, state, sim.param_set)
     Cases.initialize_radiation(sim.case, sim.grid, state, sim.param_set)
 
-    initialize_turb_conv(sim.turb_conv, sim.grid, state, sim.case, sim.param_set, t)
+    initialize_turbconv(sim.turbconv, sim.grid, state, sim.case, sim.param_set, t)
 
     sim.skip_io && return nothing
     initialize_io(sim.io_nt.ref_state, sim.Stats)
@@ -183,7 +183,7 @@ function initialize(sim::Simulation1d)
 
     # TODO: deprecate
     initialize_io(sim.Stats)
-    initialize_io(sim.turb_conv, sim.Stats)
+    initialize_io(sim.turbconv, sim.Stats)
 
     open_files(sim.Stats)
     write_simulation_time(sim.Stats, t)
@@ -212,7 +212,7 @@ function solve_args(sim::Simulation1d)
 
     t_span = (0.0, sim.TS.t_max)
     params = (;
-        turb_conv = sim.turb_conv,
+        turbconv = sim.turbconv,
         precip_model = sim.precip_model,
         grid = grid,
         param_set = sim.param_set,
@@ -231,17 +231,17 @@ function solve_args(sim::Simulation1d)
     callback_io = sim.skip_io ? () : (callback_io,)
     callback_cfl = ODE.DiscreteCallback(condition_every_iter, monitor_cfl!; save_positions = (false, false))
     callback_cfl = sim.precip_model isa TC.Clima1M ? (callback_cfl,) : ()
-    dt_max! = sim.turb_conv isa TC.EDMFModel ? edmf_dt_max! : diffusivity_dt_max!
+    dt_max! = sim.turbconv isa TC.EDMFModel ? edmf_dt_max! : diffusivity_dt_max!
     callback_dtmax = ODE.DiscreteCallback(condition_every_iter, dt_max!; save_positions = (false, false))
     callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
     callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))
     callback_adapt_dt = sim.adapt_dt ? (callback_adapt_dt,) : ()
-    if sim.turb_conv isa TC.EDMFModel && sim.turb_conv.entr_closure isa TC.PrognosticNoisyRelaxationProcess && sim.adapt_dt
+    if sim.turbconv isa TC.EDMFModel && sim.turbconv.entr_closure isa TC.PrognosticNoisyRelaxationProcess && sim.adapt_dt
         @warn( "The prognostic noisy relaxation process currently uses a Euler-Maruyama time stepping method, 
                which does not support adaptive time stepping. Adaptive time stepping disabled.")
         callback_adapt_dt = ()
     # end
-    # if sim.turb_conv.entr_closure isa TC.PrognosticNoisyRelaxationProcess
+    # if sim.turbconv.entr_closure isa TC.PrognosticNoisyRelaxationProcess
         prob = SDE.SDEProblem(∑tendencies!, ∑stoch_tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
         alg = SDE.EM()
     else

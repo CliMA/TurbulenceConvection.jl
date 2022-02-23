@@ -79,7 +79,7 @@ function initialize_io(Stats::NetCDFIO_Stats)
 end
 
 # Initialize the IO pertaining to this class
-function initialize_io(edmf::TC.EDMFModel, Stats::NetCDFIO_Stats)
+function initialize_io(turbconv::TC.EDMFModel, Stats::NetCDFIO_Stats)
     add_ts(Stats, "env_cloud_base")
     add_ts(Stats, "env_cloud_top")
     add_ts(Stats, "env_cloud_cover")
@@ -94,6 +94,10 @@ function initialize_io(edmf::TC.EDMFModel, Stats::NetCDFIO_Stats)
     add_ts(Stats, "swp_mean")
     add_ts(Stats, "cutoff_precipitation_rate")
     add_ts(Stats, "Hd")
+    return nothing
+end
+
+function initialize_io(turbconv::TC.DiffusivityModel, Stats::NetCDFIO_Stats)
     return nothing
 end
 

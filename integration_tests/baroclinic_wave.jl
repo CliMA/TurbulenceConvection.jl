@@ -170,12 +170,12 @@ end
 include(joinpath(@__DIR__, "..", "driver", "Cases.jl"))
 import .Cases
 
-function get_aux(turb_conv, grid)
+function get_aux(turbconv, grid)
     FT = eltype(grid)
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
-    aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, turb_conv))
-    aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, turb_conv))
+    aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, turbconv))
+    aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, turbconv))
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
     return aux
 end
@@ -206,8 +206,8 @@ function get_edmf_cache(grid, namelist)
     else
         error("Invalid precip_name $(precip_name)")
     end
-    turb_conv = TC.EDMFModel(namelist, precip_model)
-    return (; turb_conv, case, grid, param_set, aux = get_aux(turb_conv, grid))
+    turbconv = TC.EDMFModel(namelist, precip_model)
+    return (; turbconv, case, grid, param_set, aux = get_aux(turbconv, grid))
 end
 
 function get_gm_cache(Y, coords)
@@ -223,7 +223,7 @@ end
 
 function ∑tendencies_bw!(tendencies::FV, prog::FV, cache, t::Real) where {FV <: CC.Fields.FieldVector}
     UnPack.@unpack edmf_cache, Δt = cache
-    UnPack.@unpack turb_conv, grid, param_set, aux, case = edmf_cache
+    UnPack.@unpack turbconv, grid, param_set, aux, case = edmf_cache
 
     state = TC.State(prog, aux, tendencies)
 
@@ -231,7 +231,7 @@ function ∑tendencies_bw!(tendencies::FV, prog::FV, cache, t::Real) where {FV <
     force = case.Fo
     radiation = case.Rad
 
-    TC.affect_filter!(turb_conv, grid, state, param_set, surf, case.casename, t)
+    TC.affect_filter!(turbconv, grid, state, param_set, surf, case.casename, t)
 
     # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
@@ -239,14 +239,14 @@ function ∑tendencies_bw!(tendencies::FV, prog::FV, cache, t::Real) where {FV <
     Cases.update_forcing(case, grid, state, t, param_set)
     Cases.update_radiation(case.Rad, grid, state, param_set)
 
-    TC.update_aux!(turb_conv, grid, state, surf, param_set, t, Δt)
+    TC.update_aux!(turbconv, grid, state, surf, param_set, t, Δt)
 
     tends_face = tendencies.face
     tends_cent = tendencies.cent
     parent(tends_face) .= 0
     parent(tends_cent) .= 0
     # compute tendencies
-    TC.compute_turbconv_tendencies!(turb_conv, grid, state, param_set, surf, Δt)
+    TC.compute_turbconv_tendencies!(turbconv, grid, state, param_set, surf, Δt)
     ∑tendencies_gm!(tendencies, prog, cache, t)
 
     return nothing

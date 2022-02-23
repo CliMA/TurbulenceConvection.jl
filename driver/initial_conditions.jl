@@ -7,7 +7,7 @@ const APS = CLIMAParameters.AbstractEarthParameterSet
 import Thermodynamics
 const TD = Thermodynamics
 
-function initialize_turb_conv(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, case, param_set::APS, t::Real)
+function initialize_turbconv(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, case, param_set::APS, t::Real)
     initialize_covariance(edmf, grid, state)
     surf_params = case.surf_params
     aux_tc = TC.center_aux_turbconv(state)
@@ -32,8 +32,8 @@ function initialize_turb_conv(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State
     return
 end
 
-function initialize_turb_conv(
-    turb_conv::TC.DiffusivityModel,
+function initialize_turbconv(
+    turbconv::TC.DiffusivityModel,
     grid::TC.Grid,
     state::TC.State,
     case,

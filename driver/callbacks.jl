@@ -12,7 +12,7 @@ end
 condition_every_iter(u, t, integrator) = true
 
 function affect_io!(integrator)
-    UnPack.@unpack turb_conv, precip_model, aux, grid, io_nt, diagnostics, case, param_set, Stats, skip_io =
+    UnPack.@unpack turbconv, precip_model, aux, grid, io_nt, diagnostics, case, param_set, Stats, skip_io =
         integrator.p
     skip_io && return nothing
     t = integrator.t
@@ -20,7 +20,7 @@ function affect_io!(integrator)
     state = TC.State(integrator.u, aux, ODE.get_du(integrator))
 
     # TODO: is this the best location to call diagnostics?
-    compute_diagnostics!(turb_conv, precip_model, param_set, grid, state, diagnostics, Stats, case, t)
+    compute_diagnostics!(turbconv, precip_model, param_set, grid, state, diagnostics, Stats, case, t)
 
     # TODO: remove `vars` hack that avoids
     # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
@@ -38,12 +38,12 @@ function affect_io!(integrator)
 end
 
 function affect_filter!(integrator)
-    UnPack.@unpack turb_conv, grid, param_set, aux, case = integrator.p
+    UnPack.@unpack turbconv, grid, param_set, aux, case = integrator.p
     t = integrator.t
     state = TC.State(integrator.u, aux, ODE.get_du(integrator))
     surf = get_surface(case.surf_params, grid, state, t, param_set)
-    if turb_conv isa TC.EDMFModel
-        TC.affect_filter!(turb_conv, grid, state, param_set, surf, case.casename, t)
+    if turbconv isa TC.EDMFModel
+        TC.affect_filter!(turbconv, grid, state, param_set, surf, case.casename, t)
     end
 
     # We're lying to OrdinaryDiffEq.jl, in order to avoid
@@ -61,14 +61,14 @@ function adaptive_dt!(integrator)
 end
 
 function edmf_dt_max!(integrator)
-    UnPack.@unpack grid, turb_conv, aux, TS = integrator.p
+    UnPack.@unpack grid, turbconv, aux, TS = integrator.p
     state = TC.State(integrator.u, aux, ODE.get_du(integrator))
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)
     Δzc = TC.get_Δz(prog_gm.u)
     Δzf = TC.get_Δz(prog_gm_f.w)
     CFL_limit = TS.cfl_limit
-    N_up = TC.n_updrafts(turb_conv)
+    N_up = TC.n_updrafts(turbconv)
 
     dt_max = TS.dt_max # initialize dt_max
 
@@ -104,7 +104,7 @@ function edmf_dt_max!(integrator)
 end
 
 function diffusivity_dt_max!(integrator)
-    UnPack.@unpack grid, turb_conv, aux, TS = integrator.p
+    UnPack.@unpack grid, turbconv, aux, TS = integrator.p
     state = TC.State(integrator.u, aux, ODE.get_du(integrator))
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)
