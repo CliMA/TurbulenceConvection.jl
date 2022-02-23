@@ -3,6 +3,7 @@ if !haskey(ENV, "BUILDKITE")
     Pkg.develop(Pkg.PackageSpec(; path = dirname(@__DIR__)))
 end
 using Test
+using JSON
 import TurbulenceConvection
 const TC = TurbulenceConvection
 const tc_dir = dirname(dirname(pathof(TC)))
@@ -35,6 +36,13 @@ end
         t_stop = 6 * 3600,
     )
     nothing
+
+    # Test running from parsed namelist
+    namelist_filename = "Output.Bomex.01/namelist_Bomex.in"
+    read_namelist = JSON.parsefile(namelist_filename)
+    read_namelist["meta"]["uuid"] = "02"
+    read_namelist["time_stepping"]["t_max"] = read_namelist["time_stepping"]["dt_max"]
+    main(read_namelist)
 end
 
 @testset "ClimaCore extensions" begin
