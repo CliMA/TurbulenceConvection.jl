@@ -265,13 +265,21 @@ function run(sim::Simulation1d; time_run = true)
     sim.skip_io || open_files(sim.Stats) # #removeVarsHack
     (prob, alg, kwargs) = solve_args(sim)
     integrator = ODE.init(prob, alg; kwargs...)
-    if time_run
-        sol = @timev ODE.solve!(integrator)
-    else
-        sol = ODE.solve!(integrator)
+
+    local sol
+    try
+        if time_run
+            sol = @timev ODE.solve!(integrator)
+        else
+            sol = ODE.solve!(integrator)
+        end
+    catch e
+        @warn "TurbulenceConvection simulation crashed."
+        return :simulation_crashed
+    finally
+        sim.skip_io || close_files(sim.Stats) # #removeVarsHack
     end
 
-    sim.skip_io || close_files(sim.Stats) # #removeVarsHack
     if first(sol.t) == sim.TS.t_max
         return :success
     else
