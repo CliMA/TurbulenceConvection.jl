@@ -2,22 +2,22 @@ include(joinpath(@__DIR__, "common.jl"))
 import BenchmarkTools
 
 sim = init_sim("Bomex")
-tendencies = copy(sim.state.prog)
-update_n(sim, tendencies, 1) # compile first
-trial = BenchmarkTools.@benchmark update_n($sim, $tendencies, 1)
+(; tendencies, prog, params, TS) = unpack_params(sim)
+∑tendencies!(tendencies, prog, params, TS.t) # compile first
+trial = BenchmarkTools.@benchmark ∑tendencies!($tendencies, $prog, $params, $(TS.t))
 show(stdout, MIME("text/plain"), trial)
 println()
 
 sim = init_sim("TRMM_LBA")
-tendencies = copy(sim.state.prog)
-update_n(sim, tendencies, 1) # compile first
-trial = BenchmarkTools.@benchmark update_n($sim, $tendencies, 1)
+(; tendencies, prog, params, TS) = unpack_params(sim)
+∑tendencies!(tendencies, prog, params, TS.t) # compile first
+trial = BenchmarkTools.@benchmark ∑tendencies!($tendencies, $prog, $params, $(TS.t))
 show(stdout, MIME("text/plain"), trial)
 println()
 
 sim = init_sim("Rico")
-tendencies = copy(sim.state.prog)
-update_n(sim, tendencies, 1) # compile first
-trial = BenchmarkTools.@benchmark update_n($sim, $tendencies, 1)
+(; tendencies, prog, params, TS) = unpack_params(sim)
+∑tendencies!(tendencies, prog, params, TS.t) # compile first
+trial = BenchmarkTools.@benchmark ∑tendencies!($tendencies, $prog, $params, $(TS.t))
 show(stdout, MIME("text/plain"), trial)
 println()
