@@ -275,7 +275,7 @@ function run(sim::Simulation1d; time_run = true)
             sol = ODE.solve!(integrator)
         end
     catch e
-        @warn "TurbulenceConvection simulation crashed."
+        @warn "TurbulenceConvection simulation crashed. $(e)"
         return :simulation_crashed
     finally
         sim.skip_io || close_files(sim.Stats) # #removeVarsHack
