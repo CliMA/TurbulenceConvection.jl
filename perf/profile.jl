@@ -3,11 +3,17 @@ import ProfileView
 import Profile
 
 sim = init_sim("Bomex")
-tendencies = copy(sim.state.prog)
+(; tendencies, prog, params, TS) = unpack_params(sim)
 
-Profile.@profile update_n(sim, tendencies, 100)
-Profile.print()
-# Profile.print(; format = :flat, sortedby = :count)
-ProfileView.@profview update_n(sim, tendencies, 1000) # compile first
-ProfileView.@profview update_n(sim, tendencies, 1000)
+ProfileView.@profview begin # compile first
+    for i in 1:100
+        ∑tendencies!(tendencies, prog, params, TS.t)
+    end
+end
+
 Profile.clear_malloc_data()
+ProfileView.@profview begin
+    for i in 1:1000
+        ∑tendencies!(tendencies, prog, params, TS.t)
+    end
+end
