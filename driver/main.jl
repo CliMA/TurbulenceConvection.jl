@@ -128,11 +128,12 @@ function Simulation1d(namelist)
     inversion_type = Cases.inversion_type(case_type)
     case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad, spk...)
 
-    io_nt = (;
-        ref_state = TC.io_dictionary_ref_state(),
-        aux = TC.io_dictionary_aux(),
-        diagnostics = io_dictionary_diagnostics(),
-    )
+    calibrate_io = namelist["stats_io"]["calibrate_io"]
+    ref_state_dict = calibrate_io ? Dict() : TC.io_dictionary_ref_state()
+    aux_dict = calibrate_io ? TC.io_dictionary_aux_calibrate() : TC.io_dictionary_aux()
+    diagnostics_dict = calibrate_io ? Dict() : io_dictionary_diagnostics()
+
+    io_nt = (; ref_state = ref_state_dict, aux = aux_dict, diagnostics = diagnostics_dict)
 
     return Simulation1d(
         io_nt,
