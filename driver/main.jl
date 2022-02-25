@@ -291,7 +291,10 @@ end
 main(namelist; kwargs...) = @timev main1d(namelist; kwargs...)
 
 nc_results_file(stats::NetCDFIO_Stats) = stats.path_plus_file
-nc_results_file(::Nothing) = @info "The simulation was run without IO, so no nc files were exported"
+function nc_results_file(::Nothing)
+    @info "The simulation was run without IO, so no nc files were exported"
+    return ""
+end
 
 to_svec(x::AbstractArray) = SA.SVector{length(x)}(x)
 to_svec(x::Tuple) = SA.SVector{length(x)}(x)
