@@ -15,8 +15,10 @@ function unpack_params(sim)
     grid = sim.grid
     TS = sim.TS
     prog = sim.state.prog
+    calibrate_io = sim.calibrate_io
     aux = sim.state.aux
     params = (;
+        calibrate_io,
         edmf = sim.edmf,
         precip_model = sim.precip_model,
         grid = grid,
