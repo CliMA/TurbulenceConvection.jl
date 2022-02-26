@@ -12,14 +12,17 @@ end
 condition_every_iter(u, t, integrator) = true
 
 function affect_io!(integrator)
-    UnPack.@unpack edmf, precip_model, aux, grid, io_nt, diagnostics, case, param_set, Stats, skip_io = integrator.p
+    UnPack.@unpack edmf, calibrate_io, precip_model, aux, grid, io_nt, diagnostics, case, param_set, Stats, skip_io =
+        integrator.p
     skip_io && return nothing
     t = integrator.t
 
     state = TC.State(integrator.u, aux, ODE.get_du(integrator))
 
     # TODO: is this the best location to call diagnostics?
-    compute_diagnostics!(edmf, precip_model, param_set, grid, state, diagnostics, Stats, case, t)
+    if !calibrate_io
+        compute_diagnostics!(edmf, precip_model, param_set, grid, state, diagnostics, Stats, case, t)
+    end
 
     # TODO: remove `vars` hack that avoids
     # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
@@ -30,8 +33,10 @@ function affect_io!(integrator)
     io(io_nt.aux, Stats, state)
     io(io_nt.diagnostics, Stats, diagnostics)
 
-    surf = get_surface(case.surf_params, grid, state, t, param_set)
-    io(surf, case.surf_params, grid, state, Stats, t)
+    if !calibrate_io
+        surf = get_surface(case.surf_params, grid, state, t, param_set)
+        io(surf, case.surf_params, grid, state, Stats, t)
+    end
 
     ODE.u_modified!(integrator, false) # We're legitamately not mutating `u` (the state vector)
 end

@@ -46,6 +46,7 @@ struct Simulation1d{IONT, G, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS}
     Stats::STATS
     param_set::PS
     skip_io::Bool
+    calibrate_io::Bool
     adapt_dt::Bool
     cfl_limit::Float64
     dt_min::Float64
@@ -57,6 +58,7 @@ function Simulation1d(namelist)
 
     FT = Float64
     skip_io = namelist["stats_io"]["skip"]
+    calibrate_io = namelist["stats_io"]["calibrate_io"]
     adapt_dt = namelist["time_stepping"]["adapt_dt"]
     cfl_limit = namelist["time_stepping"]["cfl_limit"]
     dt_min = namelist["time_stepping"]["dt_min"]
@@ -147,6 +149,7 @@ function Simulation1d(namelist)
         Stats,
         param_set,
         skip_io,
+        calibrate_io,
         adapt_dt,
         cfl_limit,
         dt_min,
@@ -174,19 +177,28 @@ function initialize(sim::Simulation1d)
     initialize_io(sim.io_nt.diagnostics, sim.Stats)
 
     # TODO: deprecate
-    initialize_io(sim.Stats)
-    initialize_io(sim.edmf, sim.Stats)
+    if !sim.calibrate_io
+        initialize_io(sim.Stats)
+        initialize_io(sim.edmf, sim.Stats)
+    end
 
     open_files(sim.Stats)
-    write_simulation_time(sim.Stats, t)
+    try
+        write_simulation_time(sim.Stats, t)
 
-    io(sim.io_nt.aux, sim.Stats, state)
-    io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
+        io(sim.io_nt.aux, sim.Stats, state)
+        io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
 
-    # TODO: deprecate
-    surf = get_surface(sim.case.surf_params, sim.grid, state, t, sim.param_set)
-    io(surf, sim.case.surf_params, sim.grid, state, sim.Stats, t)
-    close_files(sim.Stats)
+        if !sim.calibrate_io
+            surf = get_surface(sim.case.surf_params, sim.grid, state, t, sim.param_set)
+            io(surf, sim.case.surf_params, sim.grid, state, sim.Stats, t)
+        end
+    catch e
+        @warn "IO during initialization failed. $(e)"
+        return :simulation_crashed
+    finally
+        close_files(sim.Stats)
+    end
 
     return
 end
@@ -197,6 +209,7 @@ function solve_args(sim::Simulation1d)
     TC = TurbulenceConvection
     grid = sim.grid
     state = sim.state
+    calibrate_io = sim.calibrate_io
     prog = state.prog
     aux = state.aux
     TS = sim.TS
@@ -204,6 +217,7 @@ function solve_args(sim::Simulation1d)
 
     t_span = (0.0, sim.TS.t_max)
     params = (;
+        calibrate_io,
         edmf = sim.edmf,
         precip_model = sim.precip_model,
         grid = grid,
