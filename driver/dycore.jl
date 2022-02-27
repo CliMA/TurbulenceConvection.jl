@@ -160,7 +160,7 @@ function compute_ref_state!(state, grid::TC.Grid, param_set::PS; ts_g) where {PS
 
     # Perform the integration
     z_span = (grid.zmin, grid.zmax)
-    @show z_span
+    @info "z_span = $z_span"
     prob = ODE.ODEProblem(rhs, logp, z_span)
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
 

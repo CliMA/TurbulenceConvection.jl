@@ -52,6 +52,7 @@ struct Simulation1d{IONT, G, S, C, TCModel, PM, D, TIMESTEPPING, STATS, PS}
     Stats::STATS
     param_set::PS
     skip_io::Bool
+    calibrate_io::Bool
     adapt_dt::Bool
     cfl_limit::Float64
     dt_min::Float64
@@ -63,6 +64,7 @@ function Simulation1d(namelist)
 
     FT = Float64
     skip_io = namelist["stats_io"]["skip"]
+    calibrate_io = namelist["stats_io"]["calibrate_io"]
     adapt_dt = namelist["time_stepping"]["adapt_dt"]
     cfl_limit = namelist["time_stepping"]["cfl_limit"]
     dt_min = namelist["time_stepping"]["dt_min"]
@@ -137,11 +139,12 @@ function Simulation1d(namelist)
     inversion_type = Cases.inversion_type(case_type)
     case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad, spk...)
 
-    io_nt = (;
-        ref_state = TC.io_dictionary_ref_state(),
-        aux = TC.io_dictionary_aux(),
-        diagnostics = io_dictionary_diagnostics(),
-    )
+    calibrate_io = namelist["stats_io"]["calibrate_io"]
+    ref_state_dict = calibrate_io ? Dict() : TC.io_dictionary_ref_state()
+    aux_dict = calibrate_io ? TC.io_dictionary_aux_calibrate() : TC.io_dictionary_aux()
+    diagnostics_dict = calibrate_io ? Dict() : io_dictionary_diagnostics()
+
+    io_nt = (; ref_state = ref_state_dict, aux = aux_dict, diagnostics = diagnostics_dict)
 
     return Simulation1d(
         io_nt,
@@ -155,6 +158,7 @@ function Simulation1d(namelist)
         Stats,
         param_set,
         skip_io,
+        calibrate_io,
         adapt_dt,
         cfl_limit,
         dt_min,
@@ -182,19 +186,28 @@ function initialize(sim::Simulation1d)
     initialize_io(sim.io_nt.diagnostics, sim.Stats)
 
     # TODO: deprecate
-    initialize_io(sim.Stats)
-    initialize_io(sim.turbconv, sim.Stats)
+    if !sim.calibrate_io
+        initialize_io(sim.Stats)
+        initialize_io(sim.turbconv, sim.Stats)
+    end
 
     open_files(sim.Stats)
-    write_simulation_time(sim.Stats, t)
+    try
+        write_simulation_time(sim.Stats, t)
 
-    io(sim.io_nt.aux, sim.Stats, state)
-    io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
+        io(sim.io_nt.aux, sim.Stats, state)
+        io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
 
-    # TODO: deprecate
-    surf = get_surface(sim.case.surf_params, sim.grid, state, t, sim.param_set)
-    io(surf, sim.case.surf_params, sim.grid, state, sim.Stats, t)
-    close_files(sim.Stats)
+        if !sim.calibrate_io
+            surf = get_surface(sim.case.surf_params, sim.grid, state, t, sim.param_set)
+            io(surf, sim.case.surf_params, sim.grid, state, sim.Stats, t)
+        end
+    catch e
+        @warn "IO during initialization failed. $(e)"
+        return :simulation_crashed
+    finally
+        close_files(sim.Stats)
+    end
 
     return
 end
@@ -205,6 +218,7 @@ function solve_args(sim::Simulation1d)
     TC = TurbulenceConvection
     grid = sim.grid
     state = sim.state
+    calibrate_io = sim.calibrate_io
     prog = state.prog
     aux = state.aux
     TS = sim.TS
@@ -212,6 +226,7 @@ function solve_args(sim::Simulation1d)
 
     t_span = (0.0, sim.TS.t_max)
     params = (;
+        calibrate_io,
         turbconv = sim.turbconv,
         precip_model = sim.precip_model,
         grid = grid,
@@ -274,13 +289,21 @@ function run(sim::Simulation1d; time_run = true)
     sim.skip_io || open_files(sim.Stats) # #removeVarsHack
     (prob, alg, kwargs) = solve_args(sim)
     integrator = ODE.init(prob, alg; kwargs...)
-    if time_run
-        sol = @timev ODE.solve!(integrator)
-    else
-        sol = ODE.solve!(integrator)
+
+    local sol
+    try
+        if time_run
+            sol = @timev ODE.solve!(integrator)
+        else
+            sol = ODE.solve!(integrator)
+        end
+    catch e
+        @warn "TurbulenceConvection simulation crashed. $(e)"
+        return :simulation_crashed
+    finally
+        sim.skip_io || close_files(sim.Stats) # #removeVarsHack
     end
 
-    sim.skip_io || close_files(sim.Stats) # #removeVarsHack
     if first(sol.t) == sim.TS.t_max
         return :success
     else
@@ -291,20 +314,20 @@ end
 main(namelist; kwargs...) = @timev main1d(namelist; kwargs...)
 
 nc_results_file(stats::NetCDFIO_Stats) = stats.path_plus_file
-nc_results_file(::Nothing) = @info "The simulation was run without IO, so no nc files were exported"
+function nc_results_file(::Nothing)
+    @info "The simulation was run without IO, so no nc files were exported"
+    return ""
+end
+
+to_svec(x::AbstractArray) = SA.SVector{length(x)}(x)
+to_svec(x::Tuple) = SA.SVector{length(x)}(x)
 
 function main1d(namelist; time_run = true)
-    # TODO: generalize conversion of arrays from namelist to `SVector`s.
-    for param_name in [
-        "general_ent_params",
-        "general_stochastic_ent_params",
-        "fno_ent_params",
-        "rf_opt_ent_params",
-        "rf_fix_ent_params",
-    ]
-        if haskey(namelist["turbulence"]["EDMF_PrognosticTKE"], param_name)
-            _p = namelist["turbulence"]["EDMF_PrognosticTKE"][param_name]
-            namelist["turbulence"]["EDMF_PrognosticTKE"][param_name] = SVector{length(_p)}(_p)
+    edmf_turb_dict = namelist["turbulence"]["EDMF_PrognosticTKE"]
+    for key in keys(edmf_turb_dict)
+        entry = edmf_turb_dict[key]
+        if entry isa AbstractArray || entry isa Tuple
+            edmf_turb_dict[key] = to_svec(entry)
         end
     end
     sim = Simulation1d(namelist)
@@ -312,9 +335,9 @@ function main1d(namelist; time_run = true)
     if time_run
         return_code = @timev run(sim; time_run)
     else
-        return_code = run(sim)
+        return_code = run(sim; time_run)
     end
-    return_code == :success && println("The simulation has completed.")
+    return_code == :success && @info "The simulation has completed."
     return nc_results_file(sim.Stats), return_code
 end
 

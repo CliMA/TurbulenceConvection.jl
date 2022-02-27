@@ -10,14 +10,15 @@ include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
 include(joinpath(tc_dir, "driver", "main.jl"))
 import .NameList
 
-update_n(sim, tendencies, N::Int) = update_n(sim, tendencies, Val(N))
-
-function update_n(sim, tendencies, ::Val{N}) where {N}
+function unpack_params(sim)
+    tendencies = copy(sim.state.prog)
     grid = sim.grid
     TS = sim.TS
     prog = sim.state.prog
+    calibrate_io = sim.calibrate_io
     aux = sim.state.aux
     params = (;
+        calibrate_io,
         edmf = sim.edmf,
         precip_model = sim.precip_model,
         grid = grid,
@@ -26,10 +27,7 @@ function update_n(sim, tendencies, ::Val{N}) where {N}
         TS = TS,
         aux = aux,
     )
-    for i in 1:N
-        ∑tendencies!(tendencies, prog, params, TS.t)
-    end
-    return nothing
+    return (; tendencies, prog, params, TS)
 end
 
 function init_sim(case_name; skip_io = true, single_timestep = true, prefix = "")
@@ -42,7 +40,6 @@ function init_sim(case_name; skip_io = true, single_timestep = true, prefix = ""
     else
         @info "Initializing $case_name with IO."
     end
-    @info "call update_n(sim, tendencies, n) to run update n-times"
     namelist = NameList.default_namelist(case_name)
     if single_timestep
         namelist["time_stepping"]["t_max"] = namelist["time_stepping"]["dt_max"]

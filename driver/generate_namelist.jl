@@ -106,27 +106,24 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     # entrainment
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
-    # 1-layer nn parameters
+    # nn parameters
     #! format: off
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"] =
-        SA.SVector(0.3038, 0.719,-0.910,-0.483,
-                   0.739, 0.0755, 0.178, 0.521,
-                   0.0, 0.0, 0.843,-0.340,
-                   0.655, 0.113, 0.0, 0.0)
+        SA.SVector{69}(rand(69))
     # For FNO add here
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_params"] =
         SA.SVector{74}(rand(74))
 
-    # m=100 random features, d=4 input Pi groups
+    # m=100 random features, d=6 input Pi groups
     # RF: parameters to optimize, 2 x (m + 1 + d)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["rf_opt_ent_params"] =
-        vec(cat(sqrt(100) * randn(2,100),
-                    ones(2,5), dims=2))
+        vec(cat(sqrt(100) * randn(2,100), # vec(cat(sqrt(m) * randn(2, m),
+                    ones(2,7), dims=2)) # ones(2, d + 1), dims=2))
 
     # RF: fixed realizations of random variables, 2 x m x (1 + d)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["rf_fix_ent_params"] =
-        vec(cat(2*pi*rand(2,100,1),
-                    randn(2,100,4), dims=3))
+        vec(cat(2*pi*rand(2,100,1), # vec(cat(2*pi*rand(2, m, 1),
+                    randn(2,100,6), dims=3)) # randn(2, m, d), dims=3))
 
     # General stochastic entrainment/detrainment parameters
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_stochastic_ent_params"] =
@@ -176,6 +173,8 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_z"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"] = ntuple(i -> i, 6) # or, e.g., (1, 3, 6)
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pi_norm_consts"] = [478.298, 1.0, 1.0, 1.0, 1.0, 1.0] # normalization constants for Pi groups
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = "deterministic"  # {"deterministic", "noisy_relaxation_process", "lognormal_scaling", "prognostic_noisy_relaxation_process"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_local_micro"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["constant_area"] = false
@@ -193,6 +192,7 @@ function default_namelist(case_name::String; root::String = ".", write::Bool = t
     namelist_defaults["stats_io"]["stats_dir"] = "stats"
     namelist_defaults["stats_io"]["frequency"] = 60.0
     namelist_defaults["stats_io"]["skip"] = false
+    namelist_defaults["stats_io"]["calibrate_io"] = false # limit io for calibration when `true`
 
     if case_name == "Soares"
         namelist = Soares(namelist_defaults)

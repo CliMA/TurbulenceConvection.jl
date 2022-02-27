@@ -15,7 +15,7 @@ cent_aux_vars_en_2m(FT) = (;
     interdomain = FT(0),
     rain_src = FT(0),
 )
-cent_aux_vars_up(FT) = (;
+cent_aux_vars_up(FT, edmf) = (;
     q_liq = FT(0),
     q_ice = FT(0),
     T = FT(0),
@@ -35,10 +35,7 @@ cent_aux_vars_up(FT) = (;
     entr_turb_dyn = FT(0),
     detr_turb_dyn = FT(0),
     asp_ratio = FT(0),
-    Π₁ = FT(0),
-    Π₂ = FT(0),
-    Π₃ = FT(0),
-    Π₄ = FT(0),
+    Π_groups = ntuple(i -> FT(0), n_Π_groups(edmf)),
 )
 cent_aux_vars_edmf(FT, edmf) = (;
     turbconv = (;
@@ -57,7 +54,7 @@ cent_aux_vars_edmf(FT, edmf) = (;
             θ_liq_ice_tendency_precip_formation = FT(0),
             qt_tendency_precip_formation = FT(0),
         ),
-        up = ntuple(i -> cent_aux_vars_up(FT), n_updrafts(edmf)),
+        up = ntuple(i -> cent_aux_vars_up(FT, edmf), n_updrafts(edmf)),
         en = (;
             w = FT(0),
             area = FT(0),

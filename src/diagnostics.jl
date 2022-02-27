@@ -137,4 +137,21 @@ function io_dictionary_aux()
     )
     return io_dict
 end
+
+function io_dictionary_aux_calibrate()
+    DT = NamedTuple{(:dims, :group, :field), Tuple{Tuple{String, String}, String, Any}}
+    io_dict = Dict{String, DT}(
+        "u_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_grid_mean(state).u),
+        "v_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_grid_mean(state).v),
+        "s_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).s),
+        "qt_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_grid_mean(state).q_tot),
+        "ql_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_liq),
+        "total_flux_h" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_h .+ face_aux_turbconv(state).massflux_h),
+        "total_flux_qt" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qt .+ face_aux_turbconv(state).massflux_qt),
+        "total_flux_s" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_grid_mean(state).massflux_s .+ face_aux_grid_mean(state).diffusive_flux_s),
+        "thetal_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_grid_mean(state).θ_liq_ice),
+        "tke_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).tke),
+    )
+    return io_dict
+end
 #! format: on
