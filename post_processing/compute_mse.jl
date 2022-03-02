@@ -99,9 +99,6 @@ function compute_mse_wrapper(
     kwargs...,
 )
 
-    # TODO: THIS WAS USED TO RESTART CI AND SHOULD BE REVERTED IMMEDIATELY
-    return best_mse
-
     # Note: cluster_data_prefix is also defined in utils/move_output.jl
     if haskey(ENV, "BUILDKITE_COMMIT")
         cluster_data_prefix = "/central/scratch/esm/slurm-buildkite/turbulenceconvection-main"
