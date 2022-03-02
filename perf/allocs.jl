@@ -46,7 +46,7 @@ deps_to_monitor = [
     LinearAlgebra,
     NCDatasets,
     OrderedCollections,
-    OrdinaryDiffEq,
+    # OrdinaryDiffEq, # TODO: add back in!
     PoissonRandom,
     Random,
     RootSolvers,
@@ -54,7 +54,7 @@ deps_to_monitor = [
     StaticArrays,
     Statistics,
     StatsBase,
-    StochasticDiffEq,
+    # StochasticDiffEq, # TODO: add back in!
     SurfaceFluxes,
     TerminalLoggers,
     Thermodynamics,
@@ -82,6 +82,7 @@ all_cases = [
 # only one case for exhaustive alloc analysis
 all_cases = exhaustive ? ["Bomex"] : all_cases
 n_unique_allocs = 40
+dirs_to_monitor = [pkgdir(TurbulenceConvection), pkgdir.(deps_to_monitor)...]
 
 for case in all_cases
     ENV["ALLOCATION_CASE_NAME"] = case
@@ -93,7 +94,7 @@ for case in all_cases
     RM.report_allocs(;
         job_name = case,
         run_cmd = run_cmd,
-        dirs_to_monitor = [RM.mod_dir(TurbulenceConvection), RM.mod_dir.(deps_to_monitor)...],
+        dirs_to_monitor = dirs_to_monitor,
         process_filename = function process_fn(fn)
             fn = "TurbulenceConvection.jl/" * last(split(fn, "turbulenceconvection-ci/"))
             fn = last(split(fn, "depot/cpu/packages/"))
