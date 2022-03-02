@@ -35,7 +35,7 @@ function get_MdMdz(M::FT, dMdz::FT) where {FT}
     return MdMdz_ε, MdMdz_δ
 end
 
-function entrainment_length_scale(
+function entrainment_inv_length_scale(
     param_set,
     b_up::FT,
     b_en::FT,
@@ -50,7 +50,7 @@ function entrainment_length_scale(
     return (λ / Δw)
 end
 
-function entrainment_length_scale(
+function entrainment_inv_length_scale(
     param_set,
     b_up::FT,
     b_en::FT,
@@ -61,6 +61,19 @@ function entrainment_length_scale(
     ::InvZEntrDimScale,
 ) where {FT}
     return (1 / zc_i)
+end
+
+function entrainment_inv_length_scale(
+    param_set,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ::InvMeterEntrDimScale,
+) where {FT}
+    return FT(1)
 end
 
 """
@@ -77,7 +90,7 @@ Parameters:
 """
 function εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, ε_nondim, δ_nondim)
     FT = eltype(εδ_vars.q_cond_up)
-    dim_scale = entrainment_length_scale(
+    dim_scale = entrainment_inv_length_scale(
         param_set,
         εδ_vars.b_up,
         εδ_vars.b_en,
@@ -336,7 +349,7 @@ function compute_entr_detr!(
                 aux_en.tke[k],
                 plume_scale_height[i],
             )
-            dim_scale = entrainment_length_scale(
+            dim_scale = entrainment_inv_length_scale(
                 param_set,
                 aux_up[i].buoy[k],
                 aux_en.buoy[k],

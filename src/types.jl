@@ -53,6 +53,7 @@ end
 abstract type EntrDimScale end
 struct BuoyVelEntrDimScale <: EntrDimScale end
 struct InvZEntrDimScale <: EntrDimScale end
+struct InvMeterEntrDimScale <: EntrDimScale end
 
 """
     GradBuoy
@@ -541,6 +542,8 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS, EPG}
             BuoyVelEntrDimScale()
         elseif entr_dim_scale == "inv_z"
             InvZEntrDimScale()
+        elseif entr_dim_scale == "none"
+            InvMeterEntrDimScale()
         else
             error("Something went wrong. Invalid entrainment dimension scale '$entr_dim_scale'")
         end
