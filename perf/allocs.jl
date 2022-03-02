@@ -42,7 +42,7 @@ deps_to_monitor = [
     LinearAlgebra,
     NCDatasets,
     OrderedCollections,
-    # OrdinaryDiffEq, # TODO: add back in!
+    OrdinaryDiffEq,
     PoissonRandom,
     Random,
     RootSolvers,
@@ -50,7 +50,7 @@ deps_to_monitor = [
     StaticArrays,
     Statistics,
     StatsBase,
-    # StochasticDiffEq, # TODO: add back in!
+    StochasticDiffEq,
     SurfaceFluxes,
     TerminalLoggers,
     Thermodynamics,
