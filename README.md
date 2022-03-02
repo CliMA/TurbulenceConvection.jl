@@ -89,15 +89,15 @@ TurbulenceConvection.jl can be run in the same way that SCAMPy used to, given on
  - ARM_SGP
  - GATE_III
  - DYCOMS_RF01
+ - DYCOMS_RF02
  - GABLS
  - SP
 
 with, for example:
 
 ```
-julia --project=test integration_tests/utils/generate_namelist.jl Soares
-julia --project=test integration_tests/utils/main.jl Soares
-
+julia --project=test driver/generate_namelist.jl Soares
+julia --project=test driver/main.jl Soares
 ```
 or, interactively, with
 ```julia-repl
