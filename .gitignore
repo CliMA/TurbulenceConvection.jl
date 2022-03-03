@@ -32,4 +32,9 @@ docs/site/
 # environment.
 Manifest.toml
 
+# Ensure tests and performance analysis are reproduceable
+!test/Manifest.toml
+!perf/Manifest.toml
+!docs/Manifest.toml
+
 integration_tests/utils/Artifacts.toml
