@@ -99,10 +99,15 @@ with, for example:
 julia --project=test driver/generate_namelist.jl Soares
 julia --project=test driver/main.jl Soares
 ```
+or by calling our integraion test driver,
+```
+julia --project=test integration_tests/driver.jl --case Soares
+```
 or, interactively, with
 ```julia-repl
 julia --project=test
-julia> include(joinpath("integration_tests", "Soares.jl"))
+julia> case_name = "Soares" # default is "Bomex"
+julia> include(joinpath("integration_tests", "driver.jl"))
 ```
 
 # Automated plotting  #

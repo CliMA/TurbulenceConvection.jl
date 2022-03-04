@@ -1,3 +1,24 @@
+import ArgParse
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    s = ArgParse.ArgParseSettings()
+    ArgParse.@add_arg_table s begin
+        "--case"
+        help = "Case to run"
+        arg_type = String
+        default = "Bomex"
+    end
+    parsed_args = ArgParse.parse_args(ARGS, s)
+    case_name = parsed_args["case"]
+end
+if @isdefined case_name
+    @info "Running $case_name..."
+else
+    case_name = "Bomex"
+    @info "Running default case ($case_name)."
+    @info "Set `case_name` if you'd like to run a different case"
+end
+
 import TurbulenceConvection
 using Test
 
@@ -8,25 +29,8 @@ include(joinpath(tc_dir, "post_processing", "compute_mse.jl"))
 include(joinpath(tc_dir, "post_processing", "mse_tables.jl"))
 import .NameList
 
-import ArgParse
-
-s = ArgParse.ArgParseSettings()
-ArgParse.@add_arg_table s begin
-    "--case"
-    help = "Case to run"
-    arg_type = String
-    default = "Bomex"
-end
-parsed_args = ArgParse.parse_args(ARGS, s)
-case_name = parsed_args["case"]
-
-# if abspath(PROGRAM_FILE) == @__FILE__
-#     default_namelist(nothing)
-# end
-
 best_mse = all_best_mse[case_name]
 
-println("Running $case_name...")
 namelist = NameList.default_namelist(case_name)
 namelist["meta"]["uuid"] = "01"
 ds_tc_filename, return_code = main(namelist)
