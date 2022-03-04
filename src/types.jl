@@ -94,6 +94,166 @@ struct LinearEntr <: AbstractEntrDetrModel end
 struct FNOEntr <: AbstractNonLocalEntrDetrModel end
 struct RFEntr <: AbstractEntrDetrModel end
 
+# the parameter structs mimic these abstract categories
+abstract type AbstractAbstractEntrainmentClosureParameters end
+abstract type AbstractAbstractEntrainmentClosureNonlocalParameters end
+
+struct MDEntrainmentParameters{FT} <: AbstractEntrainmentClosureParameters
+        w_min::FT
+        c_ε::FT
+        μ_0::FT
+        β::FT
+        χ::FT
+        c_δ::FT
+end
+function MDEntrainmentParameters(
+    param_set)
+
+    aliases = ["w_min","c_ε","μ_0","β","χ","c_δ"]
+    (w_min,c_ε,μ_0,β,χ,c_δ) = CLIMAParameters.get_parameter_values!(
+        param_set,
+        aliases,
+        "MDEntrainment"
+    )
+    
+
+    return MDEntrainmentParameters{CLIMAParameters.get_parametric_type(param_set)}(
+        w_min,
+        c_ε,
+        μ_0,
+        β,
+        χ,
+        c_δ,
+    )
+
+end
+
+struct FNOEntrainmentParameters{FT} <: AbstractEntrainmentClosureNonlocalParameters
+        c_fno::AbstractVector{FT}
+end
+function FNOEntrainmentParameters(
+    param_set)
+
+    aliases = ["c_fno"]
+    (c_fno) = CLIMAParameters.get_parameter_array_values!(
+        param_set,
+        aliases,
+        "FNOEntrainment"
+    )
+    
+
+    return FNOEntrainmentParameters{CLIMAParameters.get_parametric_type(param_set)}(
+        c_fno
+    )
+
+end
+
+struct NNEntrainmentNonlocalParameters{FT} <: AbstractEntrainmentClosureNonlocalParameters
+        c_gen::AbstractVector{FT}
+end
+function NNEntrainmentNonlocalParameters(
+    param_set)
+
+    array_aliases = ["c_gen"]
+    (c_gen) = CLIMAParameters.get_parameter_array_values!(
+        param_set,
+        array_aliases,
+        "NNEntrainmentNonlocal"
+    )
+    
+
+    return NNEntrainmentNonlocalParameters{CLIMAParameters.get_parametric_type(param_set)}(
+        c_gen,
+    )
+
+end
+
+struct NNEntrainmentParameters{FT} <: AbstractEntrainmentClosureParameters
+    w_min::FT
+    c_gen::AbstractVector{FT}
+end
+function NNEntrainmentParameters(
+    param_set)
+    aliases = ["w_min"]
+    (w_min) = CLIMAParameters.get_parameter_values!(
+        param_set,
+        aliases,
+        "NNEntrainment"
+    )
+    array_aliases = ["c_gen"]
+    (c_gen) = CLIMAParameters.get_parameter_values!(
+        param_set,
+        array_aliases,
+        "NNEntrainment"
+    )
+    
+
+    return NNEntrainmentParameters{CLIMAParameters.get_parametric_type(param_set)}(
+        w_min,
+        c_gen,
+    )
+
+end
+
+struct LinearEntrainmentParameters{FT} <: AbstractEntrainmentClosureParameters
+    w_min::FT
+    c_gen::AbstractVector{FT}
+end
+function LinearEntrainmentParameters(
+    param_set)
+    aliases = ["w_min"]
+    (w_min) = CLIMAParameters.get_parameter_values!(
+        param_set,
+        aliases,
+        "LinearEntrainment"
+    )
+    array_aliases = ["c_gen"]
+    (c_gen) = CLIMAParameters.get_parameter_values!(
+        param_set,
+        array_aliases,
+        "LinearEntrainment"
+    )
+    
+
+    return LinearEntrainmentParameters{CLIMAParameters.get_parametric_type(param_set)}(
+        w_min,
+        c_gen,
+    )
+
+end
+
+
+struct RFEntrainmentParameters{FT} <: AbstractEntrainmentClosureParameters
+    w_min::FT
+    c_rf_fix,::AbstractVector{FT}
+    c_rf_opt::AbstractVector{FT}
+end
+function RFEntrainmentParameters(
+    param_set)
+    aliases = ["w_min"]
+    (w_min) = CLIMAParameters.get_parameter_values!(
+        param_set,
+        aliases,
+        "RFEntrainment"
+    )
+    array_aliases = ["c_rf_fix","c_rf_opt"]
+    (c_rf_fix,c_rf_opt) = CLIMAParameters.get_parameter_values!(
+        param_set,
+        array_aliases,
+        "RFEntrainment"
+    )
+    
+
+    return RFEntrainmentParameters{CLIMAParameters.get_parametric_type(param_set)}(
+        w_min,
+        c_rf_fix,
+        c_rf_opt,
+    )
+
+end
+
+
+
 Base.@kwdef struct NoisyRelaxationProcess{MT} <: AbstractEntrDetrModel
     mean_model::MT
 end
@@ -104,6 +264,64 @@ end
 Base.@kwdef struct PrognosticNoisyRelaxationProcess{MT} <: AbstractEntrDetrModel
     mean_model::MT
 end
+
+#parameters for the stochastic types
+abstract type AbstractStochasticEntrainmentClosureParameters
+
+struct LogNormalScalingProcessParameters{FT, AECPS} <: AbstractStochasticEntrainmentClosureParameters
+    c_gen_stoch::AbstractVector{FT}
+    ECPS::AECPS
+end
+function LogNormalScalingProcessParameters(
+    param_set,
+    ECPS::AECPS) where {AECPS <: AbstractEntrainmentClosureParameters}
+    array_aliases = ["c_gen_stoch"]
+    (c_gen_stoch) = CLIMAParameters.get_parameter_values!(
+        param_set,
+        array_aliases,
+        "LogNormalScalingProcess"
+    )
+
+    return LogNormalScalingProcessParameters{CLIMAParameters.get_parametric_type(param_set), AECPS}(
+        c_gen_stoch,
+        ECPS,
+    )
+
+end
+
+struct NoisyRelaxationProcessParameters{FT, AECPS} <: AbstractStochasticEntrainmentClosureParameters
+    c_gen_stoch::AbstractVector{FT}
+    ECPS::AECPS
+end
+function NoisyRelaxationProcessParameters(
+    param_set,
+    ECPS::AECPS) where {AECPS <: AbstractEntrainmentClosureParameters}
+    array_aliases = ["c_gen_stoch"]
+    (c_gen_stoch) = CLIMAParameters.get_parameter_values!(
+        param_set,
+        array_aliases,
+        "NoisyRelaxationProcess"
+    )
+
+    return NoisyRelaxationProcessParameters{CLIMAParameters.get_parametric_type(param_set), AECPS}(
+        c_gen_stoch,
+        ECPS,
+    )
+end
+
+struct PrognosticNoisyRelaxationProcessParameters{FT, AECPS} <: AbstractStochasticEntrainmentClosureParameters
+    ECPS::AECPS
+end
+function PrognosticNoisyRelaxationProcessParameters(
+    param_set,
+    ECPS::AECPS) where {AECPS <: AbstractEntrainmentClosureParameters}
+
+    return PrognosticNoisyRelaxationProcessParameters{CLIMAParameters.get_parametric_type(param_set), AECPS}(
+        ECPS,
+    )
+end
+
+
 
 abstract type EntrDimScale end
 struct BuoyVelEntrDimScale <: EntrDimScale end
@@ -212,6 +430,10 @@ abstract type AbstractPrecipitationModel end
 struct NoPrecipitation <: AbstractPrecipitationModel end
 struct CutoffPrecipitation <: AbstractPrecipitationModel end
 struct Clima1M <: AbstractPrecipitationModel end
+
+
+
+
 
 abstract type AbstractQuadratureType end
 struct LogNormalQuad <: AbstractQuadratureType end
@@ -468,6 +690,26 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
+struct EDMFParameters{FT,AECPS}
+    ECPS::AECPS
+end
+function EDMFParameters(
+    param_set,
+    ECPS::AECPS,
+) where {AECPS <: Union{AbstractEntrainmentClosureParameters,AbstractStochasticEntrainmentClosureParameters}}
+
+    aliases = []
+
+    () = CLIMAParameters.get_parameter_values!(param_set,aliases,"EDMF")
+    
+    return EDMFParameters{get_parametric_type(param_set),AECPS}(
+        ECPS,
+    )
+    
+end
+
+
+
 struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
     surface_area::FT
     max_area::FT
@@ -550,31 +792,34 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
             valid_options = ["moisture_deficit", "NN", "NN_nonlocal", "FNO", "Linear", "RF"],
         )
 
-        mean_entr_closure = if entr_type == "moisture_deficit"
-            MDEntr()
+        (mean_entr_closure, mean_entr_parameters) = if entr_type == "moisture_deficit"
+            (MDEntr(), MDEntrainmentParameters(param_set))
         elseif entr_type == "NN"
-            NNEntr()
+            (NNEntr(), NNEntrainmentParameters(param_set))
         elseif entr_type == "NN_nonlocal"
-            NNEntrNonlocal()
+            (NNEntrNonlocal(), NNEntrainmentNonlocalParameters(param_set))
         elseif entr_type == "FNO"
-            FNOEntr()
+            (FNOEntr(), FNOEntrainmentParameters(param_set))
         elseif entr_type == "Linear"
-            LinearEntr()
+            (LinearEntr(), LinearEntrainmentParameters(param_set))
         elseif entr_type == "RF"
-            RFEntr()
+            (RFEntr(), RFEntrainmentParameters(param_set))
         else
             error("Something went wrong. Invalid entrainment type '$entr_type'")
         end
 
         # Overwrite `entr_closure` if a noisy relaxation process is used
-        entr_closure = if stoch_entr_type == "noisy_relaxation_process"
-            NoisyRelaxationProcess(mean_model = mean_entr_closure)
+        (entr_closure, entr_closure_parameters) = if stoch_entr_type == "noisy_relaxation_process"
+            (NoisyRelaxationProcess(mean_model = mean_entr_closure),
+             NoisyRelaxationProcessParameters(param_set, mean_entr_parameters))
         elseif stoch_entr_type == "lognormal_scaling"
-            LogNormalScalingProcess(mean_model = mean_entr_closure)
-        elseif stoch_entr_type == "deterministic"
-            mean_entr_closure
+            (LogNormalScalingProcess(mean_model = mean_entr_closure),
+             LogNormalScalingProcessParameters(param_set, mean_entr_parameters))
         elseif stoch_entr_type == "prognostic_noisy_relaxation_process"
-            PrognosticNoisyRelaxationProcess(mean_model = mean_entr_closure)
+            (PrognosticNoisyRelaxationProcess(mean_model = mean_entr_closure),
+             PrognosticNoisyRelaxationProcessParameters(param_set, mean_entr_parameters))
+        elseif stoch_entr_type == "deterministic"
+            (mean_entr_closure, mean_entr_parameters)
         else
             error("Something went wrong. Invalid stochastic entrainment type '$stoch_entr_type'")
         end

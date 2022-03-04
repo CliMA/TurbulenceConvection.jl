@@ -28,17 +28,17 @@ functions following Cohen et al. (JAMES, 2020), given:
  - `εδ_model_vars`  :: structure containing variables
  - `εδ_model_type`  :: MDEntr - Moisture deficit entrainment closure
 """
-function non_dimensional_function(param_set, εδ_model_vars, ::MDEntr)
+function non_dimensional_function(param_set::MDEntrainmentParameters, εδ_model_vars, ::MDEntr)
     FT = eltype(εδ_model_vars)
     Δw = get_Δw(param_set, εδ_model_vars.w_up, εδ_model_vars.w_en)
-    c_ε = FT(CPEDMF.c_ε(param_set))
-    μ_0 = FT(CPEDMF.μ_0(param_set))
-    β = FT(CPEDMF.β(param_set))
-    χ = FT(CPEDMF.χ(param_set))
+    c_ε = param_set.c_ε
+    μ_0 = param_set.μ_0
+    β = param_set.β
+    χ = param_set.χ
     c_δ = if !TD.has_condensate(εδ_model_vars.q_cond_up + εδ_model_vars.q_cond_en)
         FT(0)
     else
-        FT(CPEDMF.c_δ(param_set))
+        param_set.c_δ
     end
 
     Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
@@ -55,6 +55,7 @@ function non_dimensional_function(param_set, εδ_model_vars, ::MDEntr)
     return nondim_ε, nondim_δ
 end
 
+
 """
     non_dimensional_function!(nondim_ε ,nondim_δ ,param_set ,Π₁ ,Π₂ ,Π₃ ,Π₄, εδ_model::FNOEntr)
 
@@ -69,7 +70,7 @@ Uses a non local (Fourier) neural network to predict the fields of
 function non_dimensional_function!(
     nondim_ε::AbstractArray{FT}, # output
     nondim_δ::AbstractArray{FT}, # output
-    param_set::APS,
+    param_set::FNOEntrainmentParameters,
     Π₁::AbstractArray{FT}, # input
     Π₂::AbstractArray{FT}, # input
     Π₃::AbstractArray{FT}, # input
@@ -84,7 +85,7 @@ function non_dimensional_function!(
     model = OF.Chain(OF.SpectralKernelOperator(trafo, 4 => 2, Flux.relu),)
 
     # set the parameters
-    c_fno = ICP.c_fno(param_set)
+    c_fno = param_set.c_fno
     index = 1
     for p in Flux.params(model)
         len_p = length(p)
@@ -109,6 +110,11 @@ function non_dimensional_function!(
     return nothing
 end
 
+
+
+
+
+
 """
     non_dimensional_function!(nondim_ε ,nondim_δ ,param_set ,Π₁ ,Π₂ ,Π₃ ,Π₄, εδ_model::NNEntr)
 
@@ -123,7 +129,7 @@ Uses a fully connected neural network to predict the non-dimensional components 
 function non_dimensional_function!(
     nondim_ε::AbstractArray{FT}, # output
     nondim_δ::AbstractArray{FT}, # output
-    param_set::APS,
+    param_set::NNEntrainmentNonlocalParameters,
     Π₁::AbstractArray{FT}, # input
     Π₂::AbstractArray{FT}, # input
     Π₃::AbstractArray{FT}, # input
@@ -131,7 +137,7 @@ function non_dimensional_function!(
     εδ_model::NNEntrNonlocal,
 ) where {FT <: Real}
 
-    c_gen = ICP.c_gen(param_set)
+    c_gen = param_set.c_gen
     Π = hcat(Π₁, Π₂, Π₃, Π₄)'
 
     # Neural network closure
@@ -149,6 +155,9 @@ function non_dimensional_function!(
     return nothing
 end
 
+
+
+
 """
     non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
 
@@ -157,8 +166,12 @@ Uses a fully connected neural network to predict the non-dimensional components 
  - `εδ_model_vars`  :: structure containing variables
  - `εδ_model_type`  :: NNEntr - Neural network entrainment closure
 """
-function non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
-    c_gen = ICP.c_gen(param_set)
+function non_dimensional_function(
+    param_set::NNEntrainmentParameters,
+    εδ_model_vars,
+    ::NNEntr
+)
+    c_gen = param_set.c_gen
 
     # Neural network closure
     nn_arc = (4, 2, 2)  # (#inputs, #neurons, #outputs)
@@ -172,6 +185,8 @@ function non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
     return nondim_ε, nondim_δ
 end
 
+
+
 """
     non_dimensional_function(param_set, εδ_model_vars, ::LinearEntr)
 
@@ -180,8 +195,12 @@ Uses a simple linear model to predict the non-dimensional components of dynamica
  - `εδ_model_vars`  :: structure containing variables
  - `εδ_model_type`  :: LinearEntr - linear entrainment closure
 """
-function non_dimensional_function(param_set, εδ_model_vars, ::LinearEntr)
-    c_gen = ICP.c_gen(param_set)
+function non_dimensional_function(
+    param_set::LinearEntrainmentParameters,
+    εδ_model_vars,
+    ::LinearEntr
+)
+    c_gen = param_set.c_gen
 
     # Linear closure
     lin_arc = (4, 1)  # (#weights, #outputs)
@@ -203,16 +222,20 @@ Uses a Random Feature model to predict the non-dimensional components of dynamic
  - `εδ_model_vars`  :: structure containing variables
  - `εδ_model_type`  :: RFEntr - basic RF entrainment closure
 """
-function non_dimensional_function(param_set, εδ_model_vars, ::RFEntr)
+function non_dimensional_function(
+    param_set::RFEntrainmentParameters,
+    εδ_model_vars,
+    ::RFEntr
+)
     # d=4 inputs, p=2 outputs, m random features
     nondim_groups = non_dimensional_groups(param_set, εδ_model_vars)
     d = size(nondim_groups)[1]
 
     # Learnable and fixed parameters
-    c_rf_fix = ICP.c_rf_fix(param_set)      # 2 x m x (1 + d), fix
+    c_rf_fix = param_set.c_rf_fix      # 2 x m x (1 + d), fix
     c_rf_fix = reshape(c_rf_fix, 2, :, 1 + d)
     m = size(c_rf_fix)[2]
-    c_rf_opt = ICP.c_rf_opt(param_set)      # 2 x (m + 1 + d), learn
+    c_rf_opt = param_set.c_rf_opt      # 2 x (m + 1 + d), learn
     c_rf_opt = reshape(c_rf_opt, 2, m + 1 + d)
 
     # Random Features
@@ -227,6 +250,7 @@ function non_dimensional_function(param_set, εδ_model_vars, ::RFEntr)
     return nondim_ε^2, nondim_δ^2
 end
 
+
 """
     non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::LogNormalScalingProcess)
 
@@ -238,16 +262,19 @@ Arguments:
  - `εδ_model_vars`  :: structure containing variables
  - `εδ_model_type`  :: LogNormalScalingProcess - Stochastic lognormal scaling
 """
-function non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::LogNormalScalingProcess)
+function non_dimensional_function(
+    param_set::LogNormalScalinProcessParameters,
+    εδ_model_vars,
+    εδ_model_type::LogNormalScalingProcess)
     FT = eltype(εδ_model_vars)
     # model parameters
     mean_model = εδ_model_type.mean_model
-    c_gen_stoch = ICP.c_gen_stoch(param_set)
+    c_gen_stoch = param_set.c_gen_stoch
     ε_σ² = c_gen_stoch[1]
     δ_σ² = c_gen_stoch[2]
 
     # Mean model closure
-    ε_mean_nondim, δ_mean_nondim = non_dimensional_function(param_set, εδ_model_vars, mean_model)
+    ε_mean_nondim, δ_mean_nondim = non_dimensional_function(param_set.ECPS, εδ_model_vars, mean_model)
 
     # lognormal scaling
     nondim_ε = ε_mean_nondim * lognormal_sampler(FT(1), ε_σ²)
@@ -274,17 +301,21 @@ Arguments:
  - `εδ_model_vars`  :: structure containing variables
  - `εδ_model_type`  :: NoisyRelaxationProcess - A noisy relaxation process closure
 """
-function non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::NoisyRelaxationProcess)
+function non_dimensional_function(
+    param_set::NoisyRelaxationProcessParameters,
+    εδ_model_vars,
+    εδ_model_type::NoisyRelaxationProcess
+)
     # model parameters
     mean_model = εδ_model_type.mean_model
-    c_gen_stoch = ICP.c_gen_stoch(param_set)
+    c_gen_stoch = param_set.c_gen_stoch
     ε_σ² = c_gen_stoch[1]
     δ_σ² = c_gen_stoch[2]
     ε_λ = c_gen_stoch[3]
     δ_λ = c_gen_stoch[4]
 
     # Mean model closure
-    ε_mean_nondim, δ_mean_nondim = non_dimensional_function(param_set, εδ_model_vars, mean_model)
+    ε_mean_nondim, δ_mean_nondim = non_dimensional_function(param_set.ECPS, εδ_model_vars, mean_model)
 
     # noisy relaxation process
     ε_u0 = εδ_model_vars.ε_nondim
