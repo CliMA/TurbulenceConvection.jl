@@ -1634,7 +1634,7 @@ version = "0.3.3"
 
 [[deps.TurbulenceConvection]]
 deps = ["CLIMAParameters", "ClimaCore", "CloudMicrophysics", "Dierckx", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "Flux", "LambertW", "LinearAlgebra", "OperatorFlux", "StaticArrays", "StatsBase", "StochasticDiffEq", "Thermodynamics", "UnPack"]
-git-tree-sha1 = "68f54ae5c350b87f16f6b0039c880eae22bc5947"
+path = ".."
 uuid = "8e072fc4-01f8-44fb-b9dc-f9336c367e6b"
 version = "0.15.2"
 
