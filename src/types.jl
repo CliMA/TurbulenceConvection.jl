@@ -95,8 +95,8 @@ struct FNOEntr <: AbstractNonLocalEntrDetrModel end
 struct RFEntr <: AbstractEntrDetrModel end
 
 # the parameter structs mimic these abstract categories
-abstract type AbstractAbstractEntrainmentClosureParameters end
-abstract type AbstractAbstractEntrainmentClosureNonlocalParameters end
+abstract type AbstractEntrainmentClosureParameters end
+abstract type AbstractEntrainmentClosureNonlocalParameters end
 
 struct MDEntrainmentParameters{FT} <: AbstractEntrainmentClosureParameters
         w_min::FT
@@ -225,7 +225,7 @@ end
 
 struct RFEntrainmentParameters{FT} <: AbstractEntrainmentClosureParameters
     w_min::FT
-    c_rf_fix,::AbstractVector{FT}
+    c_rf_fix::AbstractVector{FT}
     c_rf_opt::AbstractVector{FT}
 end
 function RFEntrainmentParameters(
@@ -266,7 +266,7 @@ Base.@kwdef struct PrognosticNoisyRelaxationProcess{MT} <: AbstractEntrDetrModel
 end
 
 #parameters for the stochastic types
-abstract type AbstractStochasticEntrainmentClosureParameters
+abstract type AbstractStochasticEntrainmentClosureParameters end
 
 struct LogNormalScalingProcessParameters{FT, AECPS} <: AbstractStochasticEntrainmentClosureParameters
     c_gen_stoch::AbstractVector{FT}
