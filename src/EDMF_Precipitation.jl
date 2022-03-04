@@ -1,3 +1,48 @@
+
+abstract type AbstractPrecipitationParameters end
+struct NoPrecipitationParameters <: AbstractPrecipitationParameters end
+
+struct CutOffPrecipitationParameters <: AbstractPrecipitationParameters end
+
+struct Clima1MParameters{FT} <: AbstractPrecipitationParameters
+    LH_s0::FT
+    LH_v0::FT
+    gas_constant::FT
+    molmass_water::FT
+    R_v::FT
+    TPS::ThermodynamicsParameters
+    MPS::Microphysics_1M_Parameters
+end
+function Clima1MParameters(
+    param_set,
+    TPS::ThermodynamicsParameters{FT}
+    MPS::Microphysics_1M_Parameters
+) where {FT}
+
+    aliases = ["LH_s0", "LH_v0", "gas_constant", "molmass_water"]
+
+    (LH_s0, LH_v0, gas_constant, molmass_water)= CLIMAParameters.get_parameter_values!(
+        param_set,
+        aliases,
+        "Clima1M",
+    )
+
+    #derived parameters
+    R_v = gas_constant / molmass_water
+    
+    return Clima1MParameters{get_parametric_type(param_set)}(
+        LH_s0,
+        LH_v0,
+        gas_constant,
+        molmass_water,
+        R_v,
+        TPS,
+        MPS,
+    )
+end
+    
+
+
 """
 Computes the rain and snow advection (down) tendency
 """
@@ -75,27 +120,27 @@ function compute_precipitation_sink_tendencies(::Clima1M, grid::Grid, state::Sta
         q_tot_gm = prog_gm.q_tot[k]
         T_gm = aux_gm.T[k]
         # When we fuse loops, this should hopefully disappear
-        ts = TD.PhaseEquil_pTq(param_set, p0, T_gm, q_tot_gm)
+        ts = TD.PhaseEquil_pTq(param_set.TPS, p0, T_gm, q_tot_gm)
         q = TD.PhasePartition(ts)
-        qv = TD.vapor_specific_humidity(ts)
+        qv = TD.vapor_specific_humidity(param_set.TPS, ts)
 
-        Π_m = TD.exner(ts)
-        c_pm = TD.cp_m(ts)
-        c_vm = TD.cv_m(ts)
-        R_m = TD.gas_constant_air(ts)
-        R_v = CPP.R_v(param_set)
-        L_v0 = CPP.LH_v0(param_set)
-        L_s0 = CPP.LH_s0(param_set)
-        L_v = TD.latent_heat_vapor(ts)
-        L_s = TD.latent_heat_sublim(ts)
-        L_f = TD.latent_heat_fusion(ts)
+        Π_m = TD.exner(param_set.TPS, ts)
+        c_pm = TD.cp_m(param_set.TPS, ts)
+        c_vm = TD.cv_m(param_set.TPS, ts)
+        R_m = TD.gas_constant_air(param_set.TPS, ts)
+        R_v = param_set.R_v
+        L_v0 = param_set.LH_v0
+        L_s0 = param_set.LH_s0
+        L_v = TD.latent_heat_vapor(param_set.TPS, ts)
+        L_s = TD.latent_heat_sublim(param_set.TPS, ts)
+        L_f = TD.latent_heat_fusion(param_set.TPS, ts)
 
         # TODO - move limiters elsewhere
         # TODO - when using adaptive timestepping we are limiting the source terms
         #        with the previous timestep dt
-        S_qr_evap = -min(qr / Δt, -CM1.evaporation_sublimation(param_set, rain_type, q, qr, ρ0, T_gm))
-        S_qs_melt = -min(qs / Δt, CM1.snow_melt(param_set, qs, ρ0, T_gm))
-        tmp = CM1.evaporation_sublimation(param_set, snow_type, q, qs, ρ0, T_gm)
+        S_qr_evap = -min(qr / Δt, -CM1.evaporation_sublimation(param_set.MPS, rain_type, q, qr, ρ0, T_gm))
+        S_qs_melt = -min(qs / Δt, CM1.snow_melt(param_set.MPS, qs, ρ0, T_gm))
+        tmp = CM1.evaporation_sublimation(param_set.MPS, snow_type, q, qs, ρ0, T_gm)
         if tmp > 0
             S_qs_sub_dep = min(qv / Δt, tmp)
         else
