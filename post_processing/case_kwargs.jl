@@ -54,6 +54,11 @@ case_kwargs["GABLS"] = (;
     t_start = 7 * 3600,
     t_stop = 9 * 3600)
 
+case_kwargs["SP"] = (;
+    plot_comparison = true,
+    t_start = 0,
+    t_stop = 2 * 3600)
+
 case_kwargs["DryBubble"] = (;
     plot_comparison = true,
     t_start = 900,
