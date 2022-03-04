@@ -59,7 +59,7 @@ function compute_precipitation_advection_tendencies(
     edmf::EDMFModel,
     grid::Grid,
     state::State,
-    param_set::APS,
+    param_set::Clima1MParameters,
 )
     FT = eltype(grid)
 
@@ -103,7 +103,7 @@ compute_precipitation_sink_tendencies(
     Δt::Real,
 ) = nothing
 
-function compute_precipitation_sink_tendencies(::Clima1M, grid::Grid, state::State, param_set::APS, Δt::Real)
+function compute_precipitation_sink_tendencies(::Clima1M, grid::Grid, state::State, param_set::Clima1MParameters, Δt::Real)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     aux_gm = center_aux_grid_mean(state)
