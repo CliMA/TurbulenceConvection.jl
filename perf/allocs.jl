@@ -83,9 +83,9 @@ dirs_to_monitor = [pkgdir(TurbulenceConvection), pkgdir.(deps_to_monitor)...]
 for case in all_cases
     ENV["ALLOCATION_CASE_NAME"] = case
     if exhaustive
-        run_cmd = `$(Base.julia_cmd()) --project=test/ --track-allocation=all perf/alloc_per_case_with_init_io.jl`
+        run_cmd = `$(Base.julia_cmd()) --project=integration_tests/ --track-allocation=all perf/alloc_per_case_with_init_io.jl`
     else
-        run_cmd = `$(Base.julia_cmd()) --project=test/ --track-allocation=all perf/alloc_per_case.jl`
+        run_cmd = `$(Base.julia_cmd()) --project=integration_tests/ --track-allocation=all perf/alloc_per_case.jl`
     end
     RM.report_allocs(;
         job_name = case,
