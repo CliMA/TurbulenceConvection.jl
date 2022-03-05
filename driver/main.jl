@@ -131,7 +131,7 @@ function Simulation1d(namelist)
     case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad, spk...)
 
     calibrate_io = namelist["stats_io"]["calibrate_io"]
-    ref_state_dict = calibrate_io ? Dict() : TC.io_dictionary_ref_state()
+    ref_state_dict = TC.io_dictionary_ref_state()
     aux_dict = calibrate_io ? TC.io_dictionary_aux_calibrate() : TC.io_dictionary_aux()
     diagnostics_dict = calibrate_io ? Dict() : io_dictionary_diagnostics()
 

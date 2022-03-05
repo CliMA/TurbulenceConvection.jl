@@ -122,6 +122,7 @@ function compute_diagnostics!(
     Stats::NetCDFIO_Stats,
     case::TC.CasesBase,
     t::Real,
+    calibrate_io::Bool,
 ) where {D <: CC.Fields.FieldVector}
     FT = eltype(grid)
     N_up = TC.n_updrafts(edmf)
@@ -168,6 +169,9 @@ function compute_diagnostics!(
     @inbounds for i in 1:N_up
         @. massflux_s += aux_up_f[i].massflux * (If(aux_up[i].s) - If(aux_en.s))
     end
+
+    # We only need computations above here for calibration io.
+    calibrate_io && return nothing
 
     #####
     ##### Cloud base, top and cover
