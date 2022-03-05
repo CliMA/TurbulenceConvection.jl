@@ -535,7 +535,7 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS, EPG}
             "EDMF_PrognosticTKE",
             "entr_dim_scale";
             default = "buoy_vel",
-            valid_options = ["buoy_vel", "inv_z"],
+            valid_options = ["buoy_vel", "inv_z", "none"],
         )
 
         entr_dim_scale = if entr_dim_scale == "buoy_vel"
