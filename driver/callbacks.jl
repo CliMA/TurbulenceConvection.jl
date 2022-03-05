@@ -20,9 +20,7 @@ function affect_io!(integrator)
     state = TC.State(integrator.u, aux, ODE.get_du(integrator))
 
     # TODO: is this the best location to call diagnostics?
-    if !calibrate_io
-        compute_diagnostics!(edmf, precip_model, param_set, grid, state, diagnostics, Stats, case, t)
-    end
+    compute_diagnostics!(edmf, precip_model, param_set, grid, state, diagnostics, Stats, case, t, calibrate_io)
 
     # TODO: remove `vars` hack that avoids
     # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
