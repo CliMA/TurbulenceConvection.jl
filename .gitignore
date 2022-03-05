@@ -33,7 +33,7 @@ docs/site/
 Manifest.toml
 
 # Ensure tests and performance analysis are reproduceable
-!test/Manifest.toml
+!integration_tests/Manifest.toml
 !perf/Manifest.toml
 !docs/Manifest.toml
 
