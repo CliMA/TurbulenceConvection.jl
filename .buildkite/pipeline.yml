@@ -18,10 +18,10 @@ steps:
     key: "init_cpu_env"
     command:
       - "echo $$JULIA_DEPOT_PATH"
-      - "julia --project=test -e 'using Pkg; Pkg.develop(path = \".\")'"
-      - "julia --project=test -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
-      - "julia --project=test -e 'using Pkg; Pkg.precompile()'"
-      - "julia --project=test -e 'using Pkg; Pkg.status()'"
+      - "julia --project=integration_tests -e 'using Pkg; Pkg.develop(path = \".\")'"
+      - "julia --project=integration_tests -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
+      - "julia --project=integration_tests -e 'using Pkg; Pkg.precompile()'"
+      - "julia --project=integration_tests -e 'using Pkg; Pkg.status()'"
 
       - "julia --project=perf -e 'using Pkg; Pkg.develop(path = \".\")'"
       - "julia --project=perf -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
@@ -34,67 +34,67 @@ steps:
     steps:
 
       - label: ":partly_sunny: Bomex"
-        command: "julia --color=yes --project=test integration_tests/driver.jl --case Bomex"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex"
         artifact_paths: "Output.Bomex.01/stats/comparison/*"
 
       - label: ":partly_sunny: life_cycle_Tan2018"
-        command: "julia --color=yes --project=test integration_tests/driver.jl --case life_cycle_Tan2018"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case life_cycle_Tan2018"
         artifact_paths: "Output.life_cycle_Tan2018.01/stats/comparison/*"
 
       - label: ":partly_sunny: Soares"
-        command: "julia --color=yes --project=test integration_tests/driver.jl --case Soares"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Soares"
         artifact_paths: "Output.Soares.01/stats/comparison/*"
 
       - label: ":partly_sunny: Rico"
-        command: "julia --color=yes --project=test integration_tests/driver.jl --case Rico"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Rico"
         artifact_paths: "Output.Rico.01/stats/comparison/*"
 
       - label: ":partly_sunny: Nieuwstadt"
-        command: "julia --color=yes --project=test integration_tests/driver.jl --case Nieuwstadt"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Nieuwstadt"
         artifact_paths: "Output.Nieuwstadt.01/stats/comparison/*"
 
       - label: ":scissors: TRMM_LBA"
-        command: "julia --color=yes --project=test integration_tests/driver.jl --case TRMM_LBA"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA"
         artifact_paths: "Output.TRMM_LBA.01/stats/comparison/*"
 
       - label: ":partly_sunny: ARM_SGP"
-        command: "julia --color=yes --project=test integration_tests/driver.jl --case ARM_SGP"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case ARM_SGP"
         artifact_paths: "Output.ARM_SGP.01/stats/comparison/*"
 
       # Takes a bit too long...
       # - label: ":partly_sunny: GATE_III"
-      #   command: "julia --color=yes --project=test integration_tests/driver.jl --case GATE_III"
+      #   command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case GATE_III"
       #   artifact_paths: "Output.GATE_III.01/stats/comparison/*"
 
       - label: ":partly_sunny: DYCOMS_RF01"
-        command: "julia --color=yes --project=test integration_tests/driver.jl --case DYCOMS_RF01"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case DYCOMS_RF01"
         artifact_paths: "Output.DYCOMS_RF01.01/stats/comparison/*"
 
       - label: ":partly_sunny: DYCOMS_RF02"
-        command: "julia --color=yes --project=test integration_tests/driver.jl --case DYCOMS_RF02"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case DYCOMS_RF02"
         artifact_paths: "Output.DYCOMS_RF02.01/stats/comparison/*"
 
       - label: ":partly_sunny: GABLS"
-        command: "julia --color=yes --project=test integration_tests/driver.jl --case GABLS"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case GABLS"
         artifact_paths: "Output.GABLS.01/stats/comparison/*"
 
       - label: ":thought_balloon: DryBubble"
-        command: "julia --color=yes --project=test integration_tests/driver.jl --case DryBubble"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case DryBubble"
         artifact_paths: "Output.DryBubble.01/stats/comparison/*"
 
       - label: ":partly_sunny: LES_driven_SCM"
-        command: "julia --color=yes --project=test integration_tests/driver.jl --case LES_driven_SCM"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case LES_driven_SCM"
         artifact_paths: "Output.LES_driven_SCM.01/stats/comparison/*"
 
   - group: "3D Experiments"
     steps:
 
       - label: ":package: 3D Bomex"
-        command: "julia --color=yes --project=test integration_tests/3dBomex.jl"
+        command: "julia --color=yes --project=integration_tests integration_tests/3dBomex.jl"
         artifact_paths: "integration_tests/output/3dBomex/*"
 
       - label: ":earth_americas: 3D sphere bariclinic wave"
-        command: "julia --color=yes --project=test integration_tests/baroclinic_wave.jl"
+        command: "julia --color=yes --project=integration_tests integration_tests/baroclinic_wave.jl"
         artifact_paths: "integration_tests/output/baroclinic_wave/*"
 
   - group: "Performance monitoring"
@@ -135,9 +135,9 @@ steps:
     continue_on_failure: true
 
   - label: ":robot_face: Print new mse tables"
-    command: "julia --color=yes --project=test utils/print_new_mse.jl"
+    command: "julia --color=yes --project=integration_tests utils/print_new_mse.jl"
 
   - wait
 
   - label: ":robot_face: Move main results"
-    command: "julia --color=yes --project=test utils/move_output.jl"
+    command: "julia --color=yes --project=integration_tests utils/move_output.jl"
