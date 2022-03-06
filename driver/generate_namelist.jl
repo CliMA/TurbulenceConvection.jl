@@ -33,24 +33,9 @@ using ArgParse
 import StaticArrays
 const SA = StaticArrays
 
-import ArtifactWrappers
-const AW = ArtifactWrappers
+include(joinpath(@__DIR__, "..", "integration_tests", "artifact_funcs.jl"))
 
 import Random
-
-function les_driven_scm_data_folder()
-    #! format: off
-    LESDrivenSCM_output_dataset = AW.ArtifactWrapper(
-        @__DIR__,
-        isempty(get(ENV, "CI", "")),
-        "LESDrivenSCM_output_dataset",
-        AW.ArtifactFile[
-            AW.ArtifactFile(url = "https://caltech.box.com/shared/static/0hnf7nkttueraaqf9tpkqsx38gjqx41p.nc", filename = "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc",),
-        ],
-    )
-    return AW.get_data_folder(LESDrivenSCM_output_dataset)
-end
-#! format: on
 
 import JSON
 
