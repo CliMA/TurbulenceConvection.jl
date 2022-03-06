@@ -28,6 +28,8 @@ steps:
       - "julia --project=perf -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=perf -e 'using Pkg; Pkg.status()'"
 
+      - "julia --project=integration_tests integration_tests/download_artifacts.jl"
+
   - wait
 
   - group: "Vanilla Experiments"
