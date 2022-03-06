@@ -13,7 +13,7 @@ invalidations = @snoopr begin
     case_name = "Bomex"
     println("Running $case_name...")
     namelist = NameList.default_namelist(case_name)
-    namelist["meta"]["uuid"] = "01"
+    namelist["meta"]["uuid"] = "01_invalidations"
     ds_tc_filename, return_code = main(namelist)
 end;
 import SnoopCompile

@@ -43,11 +43,7 @@ using Test
 const tc_dir = pkgdir(TurbulenceConvection)
 include(joinpath(tc_dir, "driver", "main.jl"))
 include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
-include(joinpath(tc_dir, "post_processing", "compute_mse.jl"))
-include(joinpath(tc_dir, "post_processing", "mse_tables.jl"))
 import .NameList
-
-best_mse = all_best_mse[case_name]
 
 namelist = NameList.default_namelist(case_name)
 
@@ -73,6 +69,9 @@ ds_tc_filename, return_code = main(namelist)
 
 # Post-processing case kwargs
 include(joinpath(tc_dir, "post_processing", "case_kwargs.jl"))
+include(joinpath(tc_dir, "post_processing", "compute_mse.jl"))
+include(joinpath(tc_dir, "post_processing", "mse_tables.jl"))
+best_mse = all_best_mse[case_name]
 
 # TODO: Remove this and compare only the prognostic state
 #       we may need a more generic / flexible version of
