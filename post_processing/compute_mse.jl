@@ -13,51 +13,9 @@ import Dierckx
 import PrettyTables
 import Printf
 
-import ArtifactWrappers
-const AW = ArtifactWrappers
-
 ENV["GKSwstype"] = "nul"
 
-# Get PyCLES_output dataset folder:
-#! format: off
-PyCLES_output_dataset = AW.ArtifactWrapper(
-    @__DIR__,
-    isempty(get(ENV, "CI", "")),
-    "PyCLES_output",
-    AW.ArtifactFile[
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/johlutwhohvr66wn38cdo7a6rluvz708.nc", filename = "Rico.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/zraeiftuzlgmykzhppqwrym2upqsiwyb.nc", filename = "Gabls.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/toyvhbwmow3nz5bfa145m5fmcb2qbfuz.nc", filename = "DYCOMS_RF01.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/dgie1774uw5ot8mmrmp46nauhb3ervgp.nc", filename = "DYCOMS_RF02.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/ivo4751camlph6u3k68ftmb1dl4z7uox.nc", filename = "TRMM_LBA.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/4osqp0jpt4cny8fq2ukimgfnyi787vsy.nc", filename = "ARM_SGP.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/jci8l11qetlioab4cxf5myr1r492prk6.nc", filename = "Bomex.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/pzuu6ii99by2s356ij69v5cb615200jq.nc", filename = "Soares.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/7upt639siyc2umon8gs6qsjiqavof5cq.nc", filename = "Nieuwstadt.nc",),
-    ],
-)
-PyCLES_output_dataset_path = AW.get_data_folder(PyCLES_output_dataset)
-
-SCAMPy_output_dataset = AW.ArtifactWrapper(
-    @__DIR__,
-    isempty(get(ENV, "CI", "")),
-    "SCAMPy_output",
-    AW.ArtifactFile[
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/1dzpydqiagjvzfpyv9lbic3atvca93hl.nc", filename = "Rico.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/agkycoum93bd6xjduyaeo3oqg6asoru5.nc", filename = "GABLS.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/fqpq1q74uxfh1e8018hwhqogw1htn2lq.nc", filename = "DYCOMS_RF01.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/wevi0rqiwo6sgkqdhcddr72u5ylt0tqp.nc", filename = "TRMM_LBA.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/fis6n0g9x9lts70m0zmve5ullqnw0pzq.nc", filename = "ARM_SGP.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/t6qq6plt2oxcmmy40r1szgokahykqggp.nc", filename = "Bomex.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/wp8k4m7ta1hs0c6e4j2fpsp3kj05wdip.nc", filename = "Soares.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/vbuxzg85scwy9mg0ziiuzy6fimo0e389.nc", filename = "Nieuwstadt.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/72t6fr1gq10tg3jjputtp35nfzex0o4k.nc", filename = "DryBubble.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/7axeussneeg8g3k0ndvagsn0pkmbij3e.nc", filename = "life_cycle_Tan2018.nc",),
-    AW.ArtifactFile(url = "https://caltech.box.com/shared/static/r6t7dk6g35bmbvc86h006yusb6rd8vkw.nc", filename = "SP.nc",),
-    ],
-)
-SCAMPy_output_dataset_path = AW.get_data_folder(SCAMPy_output_dataset)
-#! format: on
+include(joinpath(@__DIR__, "..", "integration_tests", "artifact_funcs.jl"))
 
 function get_time(ds, var)
     if haskey(ds, var)
@@ -93,8 +51,8 @@ function compute_mse_wrapper(
     best_mse,
     ds_tc_filename,
     ds_tc_main_filename = nothing;
-    ds_les_filename = joinpath(PyCLES_output_dataset_path, "$case_name.nc"),
-    ds_scm_filename = joinpath(SCAMPy_output_dataset_path, "$case_name.nc"),
+    ds_les_filename = joinpath(pycles_output_dataset_folder(), "$case_name.nc"),
+    ds_scm_filename = joinpath(scampy_output_dataset_folder(), "$case_name.nc"),
     plot_dir = joinpath(dirname(ds_tc_filename), "comparison"),
     kwargs...,
 )
@@ -109,9 +67,6 @@ function compute_mse_wrapper(
         ds_tc_main_filename = joinpath(path, folder_name, "Stats.$case_name.nc")
         @info "TC.jl main dataset: $ds_tc_main_filename"
     end
-    # Note that we're using a closure over
-    #  - PyCLES_output_dataset_path
-    #  - SCAMPy_output_dataset_path
     all_args = (case_name, best_mse, plot_dir)
 
     ds_dict = append_dict(ds_les_filename, :ds_pycles)
