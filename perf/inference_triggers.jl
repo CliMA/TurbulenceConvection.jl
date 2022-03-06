@@ -4,7 +4,7 @@ import SnoopCompileCore
 
 case_name = "Bomex"
 println("Running $case_name...")
-sim = init_sim(case_name)
+sim = init_sim(case_name; prefix = "inf_trig_$case_name")
 sim.skip_io || open_files(sim.Stats) # #removeVarsHack
 (prob, alg, kwargs) = solve_args(sim)
 
