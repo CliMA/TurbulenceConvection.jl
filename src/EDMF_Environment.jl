@@ -83,29 +83,37 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
     sqpi_inv = 1 / sqrt(π)
     sqrt2 = sqrt(2)
 
+    # Epsilon defined per typical variable fluctuation
+    eps_q = q_tot_en ≈ FT(0) ? eps(FT) : eps(FT) * q_tot_en
+    eps_θ = eps(FT)
+
     if quadrature_type isa LogNormalQuad
         # Lognormal parameters (mu, sd) from mean and variance
-        sd_q = sqrt(log(QTvar_en / q_tot_en / q_tot_en + 1))
-        sd_h = sqrt(log(Hvar_en / θ_liq_ice_en / θ_liq_ice_en + 1))
-        # Enforce Schwarz"s inequality
-        corr = max(min(HQTcov_en / sqrt(Hvar_en * QTvar_en), 1), -1)
-        sd2_hq = log(corr * sqrt(Hvar_en * QTvar_en) / θ_liq_ice_en / q_tot_en + 1)
-        sd_cond_h_q = sqrt(max(sd_h * sd_h - sd2_hq * sd2_hq / sd_q / sd_q, 0))
-        mu_q = log(q_tot_en * q_tot_en / sqrt(q_tot_en * q_tot_en + QTvar_en))
+        mu_q = log(q_tot_en * q_tot_en / max(sqrt(q_tot_en * q_tot_en + QTvar_en), eps_q))
         mu_h = log(θ_liq_ice_en * θ_liq_ice_en / sqrt(θ_liq_ice_en * θ_liq_ice_en + Hvar_en))
-    elseif quadrature_type isa GaussianQuad
-        sd_q = sqrt(QTvar_en)
-        sd_h = sqrt(Hvar_en)
-        corr = max(min(HQTcov_en / max(sd_h * sd_q, 1e-13), 1), -1)
+        sd_q = sqrt(log(QTvar_en / max(q_tot_en, eps_q) / max(q_tot_en, eps_q) + 1))
+        sd_h = sqrt(log(Hvar_en / θ_liq_ice_en / θ_liq_ice_en + 1))
 
+        # Enforce Cauchy-Schwarz inequality, numerically stable compute
+        corr = HQTcov_en / max(sqrt(QTvar_en), eps_q)
+        corr = max(min(corr / max(sqrt(Hvar_en), eps_θ), 1), -1)
+
+        # Conditionals
+        sd2_hq = log(corr * sqrt(Hvar_en * QTvar_en) / θ_liq_ice_en / max(q_tot_en, eps_q) + 1)
+        sd_cond_h_q = sqrt(max(sd_h * sd_h - sd2_hq * sd2_hq / max(sd_q, eps_q) / max(sd_q, eps_q), 0))
+
+    elseif quadrature_type isa GaussianQuad
         # limit sd_q to prevent negative qt_hat
-        sd_q_lim = (1e-10 - q_tot_en) / (sqrt2 * abscissas[1])
-        # walking backwards to assure your q_t will not be smaller than 1e-10
-        # TODO - check
-        # TODO - change 1e-13 and 1e-10 to some epislon
-        sd_q = min(sd_q, sd_q_lim)
-        qt_var = sd_q * sd_q
-        σ_h_star = sqrt(max(1 - corr * corr, 0)) * sd_h
+        sd_q_lim = -q_tot_en / (sqrt2 * abscissas[1])
+        sd_q = min(sqrt(QTvar_en), sd_q_lim)
+        sd_h = sqrt(Hvar_en)
+
+        # Enforce Cauchy-Schwarz inequality, numerically stable compute
+        corr = HQTcov_en / max(sd_q, eps_q)
+        corr = max(min(corr / max(sd_h, eps_θ), 1), -1)
+
+        # Conditionals
+        sd_cond_h_q = sqrt(max(1 - corr * corr, 0)) * sd_h
     end
 
     # zero outer quadrature points
@@ -119,7 +127,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
     @inbounds for m_q in 1:quad_order
         if quadrature_type isa LogNormalQuad
             qt_hat = exp(mu_q + sqrt2 * sd_q * abscissas[m_q])
-            μ_h_star = mu_h + sd2_hq / sd_q / sd_q * (log(qt_hat) - mu_q)
+            μ_h_star = mu_h + sd2_hq / max(sd_q, eps_q) / max(sd_q, eps_q) * (log(qt_hat) - mu_q)
         elseif quadrature_type isa GaussianQuad
             qt_hat = q_tot_en + sqrt2 * sd_q * abscissas[m_q]
             μ_h_star = θ_liq_ice_en + sqrt2 * corr * sd_h * abscissas[m_q]
@@ -133,7 +141,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
             if quadrature_type isa LogNormalQuad
                 h_hat = exp(μ_h_star + sqrt2 * sd_cond_h_q * abscissas[m_h])
             elseif quadrature_type isa GaussianQuad
-                h_hat = sqrt2 * σ_h_star * abscissas[m_h] + μ_h_star
+                h_hat = sqrt2 * sd_cond_h_q * abscissas[m_h] + μ_h_star
             end
 
             # condensation
