@@ -10,50 +10,26 @@ mutable struct NetCDFIO_Stats
     root_grp::NC.NCDataset{Nothing}
     profiles_grp::NC.NCDataset{NC.NCDataset{Nothing}}
     ts_grp::NC.NCDataset{NC.NCDataset{Nothing}}
-    last_output_time::Float64
     uuid::String
     frequency::Float64
     stats_path::String
     path_plus_file::String
     vars::Dict{String, Any} # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    function NetCDFIO_Stats(namelist, grid::TC.Grid)
+    function NetCDFIO_Stats(namelist, z_centers::AbstractVector, z_faces::AbstractVector)
 
         # Initialize properties with valid type:
-        tmp = tempname()
-        root_grp = NC.Dataset(tmp, "c")
-        NC.defGroup(root_grp, "profiles")
-        NC.defGroup(root_grp, "timeseries")
-        profiles_grp = root_grp.group["profiles"]
-        ts_grp = root_grp.group["timeseries"]
-        close(root_grp)
-
-        last_output_time = 0.0
         uuid = string(namelist["meta"]["uuid"])
-
         frequency = namelist["stats_io"]["frequency"]
-
         # Setup the statistics output path
         simname = namelist["meta"]["simname"]
         casename = namelist["meta"]["casename"]
         outpath = joinpath(namelist["output"]["output_root"], "Output.$simname.$uuid")
-        mkpath(outpath)
-
         stats_path = joinpath(outpath, namelist["stats_io"]["stats_dir"])
+
+        mkpath(outpath)
         mkpath(stats_path)
 
         path_plus_file = joinpath(stats_path, "Stats.$simname.nc")
-
-        # TODO: uncomment restart
-        # if isfile(path_plus_file)
-        #   @inbounds for i in 1:100
-        #         res_name = "Restart_$i"
-        #         if isfile(path_plus_file)
-        #             path_plus_file = stats_path * "Stats.$simname.$res_name.nc"
-        #         else
-        #             break
-        #         end
-        #     end
-        # end
 
         # Write namelist file to output directory
         open(joinpath(outpath, "namelist_$casename.in"), "w") do io
@@ -63,35 +39,33 @@ mutable struct NetCDFIO_Stats
         # Remove the NC file if it exists, in case it accidentally wasn't closed
         isfile(path_plus_file) && rm(path_plus_file; force = true)
 
-        NC.Dataset(path_plus_file, "c") do root_grp
-
-            zf = vec(grid.zf)
-            zc = vec(grid.zc)
-
+        root_grp = NC.Dataset(path_plus_file, "c") do root_grp
             # Set profile dimensions
             profile_grp = NC.defGroup(root_grp, "profiles")
-            NC.defDim(profile_grp, "zf", TC.n_cells(grid) + 1)
-            NC.defDim(profile_grp, "zc", TC.n_cells(grid))
+            NC.defDim(profile_grp, "zf", length(z_faces))
+            NC.defDim(profile_grp, "zc", length(z_centers))
             NC.defDim(profile_grp, "t", Inf)
-            NC.defVar(profile_grp, "zf", zf, ("zf",))
-            NC.defVar(profile_grp, "zc", zc, ("zc",))
+            NC.defVar(profile_grp, "zf", z_faces, ("zf",))
+            NC.defVar(profile_grp, "zc", z_centers, ("zc",))
             NC.defVar(profile_grp, "t", Float64, ("t",))
 
             reference_grp = NC.defGroup(root_grp, "reference")
-            NC.defDim(reference_grp, "zf", TC.n_cells(grid) + 1)
-            NC.defDim(reference_grp, "zc", TC.n_cells(grid))
-            NC.defVar(reference_grp, "zf", zf, ("zf",))
-            NC.defVar(reference_grp, "zc", zc, ("zc",))
+            NC.defDim(reference_grp, "zf", length(z_faces))
+            NC.defDim(reference_grp, "zc", length(z_centers))
+            NC.defVar(reference_grp, "zf", z_faces, ("zf",))
+            NC.defVar(reference_grp, "zc", z_centers, ("zc",))
 
             ts_grp = NC.defGroup(root_grp, "timeseries")
             NC.defDim(ts_grp, "t", Inf)
             NC.defVar(ts_grp, "t", Float64, ("t",))
+            root_grp
         end
         vars = Dict{String, Any}()
-        return new(root_grp, profiles_grp, ts_grp, last_output_time, uuid, frequency, stats_path, path_plus_file, vars)
+        return new(root_grp, profiles_grp, ts_grp, uuid, frequency, stats_path, path_plus_file, vars)
     end
 end
 
+NetCDFIO_Stats(namelist, grid::TC.Grid) = NetCDFIO_Stats(namelist, vec(grid.zc), vec(grid.zf))
 
 function open_files(self::NetCDFIO_Stats)
     self.root_grp = NC.Dataset(self.path_plus_file, "a")
