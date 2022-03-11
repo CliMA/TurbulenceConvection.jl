@@ -64,42 +64,22 @@ function io(io_dict::Dict, Stats::NetCDFIO_Stats, state)
 end
 
 
-function initialize_io(Stats::NetCDFIO_Stats)
-    add_ts(Stats, "Tsurface")
-    add_ts(Stats, "shf")
-    add_ts(Stats, "lhf")
-    add_ts(Stats, "ustar")
-    add_ts(Stats, "wstar")
-    add_ts(Stats, "lwp_mean")
-    add_ts(Stats, "iwp_mean")
-    add_ts(Stats, "cloud_base_mean")
-    add_ts(Stats, "cloud_top_mean")
-    add_ts(Stats, "cloud_cover_mean")
+function initialize_io(Stats::NetCDFIO_Stats, ts_list)
+    NC.Dataset(Stats.nc_filename, "a") do ds
+        for var_name in ts_list
+            add_ts(ds, var_name)
+        end
+    end
     return nothing
 end
 
-# Initialize the IO pertaining to this class
-function initialize_io(edmf::TC.EDMFModel, Stats::NetCDFIO_Stats)
-    add_ts(Stats, "env_cloud_base")
-    add_ts(Stats, "env_cloud_top")
-    add_ts(Stats, "env_cloud_cover")
-    add_ts(Stats, "env_lwp")
-    add_ts(Stats, "env_iwp")
-    add_ts(Stats, "updraft_cloud_cover")
-    add_ts(Stats, "updraft_cloud_base")
-    add_ts(Stats, "updraft_cloud_top")
-    add_ts(Stats, "updraft_lwp")
-    add_ts(Stats, "updraft_iwp")
-    add_ts(Stats, "rwp_mean")
-    add_ts(Stats, "swp_mean")
-    add_ts(Stats, "cutoff_precipitation_rate")
-    add_ts(Stats, "Hd")
-    return nothing
-end
-
-function initialize_io(io_dict::Dict, Stats::NetCDFIO_Stats)
-    for var_name in keys(io_dict)
-        add_field(Stats, var_name; dims = io_dict[var_name].dims, group = io_dict[var_name].group)
+function initialize_io(Stats::NetCDFIO_Stats, io_dicts::Dict...)
+    NC.Dataset(Stats.nc_filename, "a") do ds
+        for io_dict in io_dicts
+            for var_name in keys(io_dict)
+                add_field(ds, var_name; dims = io_dict[var_name].dims, group = io_dict[var_name].group)
+            end
+        end
     end
 end
 
