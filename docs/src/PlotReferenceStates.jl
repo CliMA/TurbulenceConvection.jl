@@ -39,7 +39,7 @@ function export_ref_profile(case_name::String)
     initialize_io(io_nt, Stats)
     io(io_nt, Stats, state)
 
-    NCDatasets.Dataset(joinpath(Stats.path_plus_file), "r") do ds
+    NCDatasets.Dataset(joinpath(Stats.nc_filename), "r") do ds
         zc = ds.group["profiles"]["zc"][:]
         zf = ds.group["profiles"]["zf"][:]
         ρ0_c = ds.group["reference"]["ρ0_c"][:]

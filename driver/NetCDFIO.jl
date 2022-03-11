@@ -6,95 +6,86 @@ const TC = TurbulenceConvection
 
 # TODO: remove `vars` hack that avoids https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
 
+function nc_fileinfo(namelist)
+
+    uuid = string(namelist["meta"]["uuid"])
+    simname = namelist["meta"]["simname"]
+    outpath = joinpath(namelist["output"]["output_root"], "Output.$simname.$uuid")
+    mkpath(outpath)
+
+    nc_filename = joinpath(outpath, namelist["stats_io"]["stats_dir"])
+    mkpath(nc_filename)
+
+    nc_filename = joinpath(nc_filename, "Stats.$simname.nc")
+    return nc_filename, outpath
+end
+
 mutable struct NetCDFIO_Stats
     root_grp::NC.NCDataset{Nothing}
     profiles_grp::NC.NCDataset{NC.NCDataset{Nothing}}
     ts_grp::NC.NCDataset{NC.NCDataset{Nothing}}
-    last_output_time::Float64
-    uuid::String
     frequency::Float64
-    stats_path::String
-    path_plus_file::String
+    nc_filename::String
     vars::Dict{String, Any} # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    function NetCDFIO_Stats(namelist, grid::TC.Grid)
+end
 
-        # Initialize properties with valid type:
-        tmp = tempname()
-        root_grp = NC.Dataset(tmp, "c")
-        NC.defGroup(root_grp, "profiles")
-        NC.defGroup(root_grp, "timeseries")
-        profiles_grp = root_grp.group["profiles"]
-        ts_grp = root_grp.group["timeseries"]
-        close(root_grp)
+function NetCDFIO_Stats(namelist, grid::TC.Grid)
 
-        last_output_time = 0.0
-        uuid = string(namelist["meta"]["uuid"])
+    # Initialize properties with valid type:
+    tmp = tempname()
+    root_grp = NC.Dataset(tmp, "c")
+    NC.defGroup(root_grp, "profiles")
+    NC.defGroup(root_grp, "timeseries")
+    profiles_grp = root_grp.group["profiles"]
+    ts_grp = root_grp.group["timeseries"]
+    close(root_grp)
 
-        frequency = namelist["stats_io"]["frequency"]
+    frequency = namelist["stats_io"]["frequency"]
 
-        # Setup the statistics output path
-        simname = namelist["meta"]["simname"]
-        casename = namelist["meta"]["casename"]
-        outpath = joinpath(namelist["output"]["output_root"], "Output.$simname.$uuid")
-        mkpath(outpath)
+    # Setup the statistics output path
+    casename = namelist["meta"]["casename"]
 
-        stats_path = joinpath(outpath, namelist["stats_io"]["stats_dir"])
-        mkpath(stats_path)
+    nc_filename, outpath = nc_fileinfo(namelist)
 
-        path_plus_file = joinpath(stats_path, "Stats.$simname.nc")
-
-        # TODO: uncomment restart
-        # if isfile(path_plus_file)
-        #   @inbounds for i in 1:100
-        #         res_name = "Restart_$i"
-        #         if isfile(path_plus_file)
-        #             path_plus_file = stats_path * "Stats.$simname.$res_name.nc"
-        #         else
-        #             break
-        #         end
-        #     end
-        # end
-
-        # Write namelist file to output directory
-        open(joinpath(outpath, "namelist_$casename.in"), "w") do io
-            JSON.print(io, namelist, 4)
-        end
-
-        # Remove the NC file if it exists, in case it accidentally wasn't closed
-        isfile(path_plus_file) && rm(path_plus_file; force = true)
-
-        NC.Dataset(path_plus_file, "c") do root_grp
-
-            zf = vec(grid.zf)
-            zc = vec(grid.zc)
-
-            # Set profile dimensions
-            profile_grp = NC.defGroup(root_grp, "profiles")
-            NC.defDim(profile_grp, "zf", TC.n_cells(grid) + 1)
-            NC.defDim(profile_grp, "zc", TC.n_cells(grid))
-            NC.defDim(profile_grp, "t", Inf)
-            NC.defVar(profile_grp, "zf", zf, ("zf",))
-            NC.defVar(profile_grp, "zc", zc, ("zc",))
-            NC.defVar(profile_grp, "t", Float64, ("t",))
-
-            reference_grp = NC.defGroup(root_grp, "reference")
-            NC.defDim(reference_grp, "zf", TC.n_cells(grid) + 1)
-            NC.defDim(reference_grp, "zc", TC.n_cells(grid))
-            NC.defVar(reference_grp, "zf", zf, ("zf",))
-            NC.defVar(reference_grp, "zc", zc, ("zc",))
-
-            ts_grp = NC.defGroup(root_grp, "timeseries")
-            NC.defDim(ts_grp, "t", Inf)
-            NC.defVar(ts_grp, "t", Float64, ("t",))
-        end
-        vars = Dict{String, Any}()
-        return new(root_grp, profiles_grp, ts_grp, last_output_time, uuid, frequency, stats_path, path_plus_file, vars)
+    # Write namelist file to output directory
+    open(joinpath(outpath, "namelist_$casename.in"), "w") do io
+        JSON.print(io, namelist, 4)
     end
+
+    # Remove the NC file if it exists, in case it accidentally wasn't closed
+    isfile(nc_filename) && rm(nc_filename; force = true)
+
+    NC.Dataset(nc_filename, "c") do root_grp
+
+        zf = vec(grid.zf)
+        zc = vec(grid.zc)
+
+        # Set profile dimensions
+        profile_grp = NC.defGroup(root_grp, "profiles")
+        NC.defDim(profile_grp, "zf", TC.n_cells(grid) + 1)
+        NC.defDim(profile_grp, "zc", TC.n_cells(grid))
+        NC.defDim(profile_grp, "t", Inf)
+        NC.defVar(profile_grp, "zf", zf, ("zf",))
+        NC.defVar(profile_grp, "zc", zc, ("zc",))
+        NC.defVar(profile_grp, "t", Float64, ("t",))
+
+        reference_grp = NC.defGroup(root_grp, "reference")
+        NC.defDim(reference_grp, "zf", TC.n_cells(grid) + 1)
+        NC.defDim(reference_grp, "zc", TC.n_cells(grid))
+        NC.defVar(reference_grp, "zf", zf, ("zf",))
+        NC.defVar(reference_grp, "zc", zc, ("zc",))
+
+        ts_grp = NC.defGroup(root_grp, "timeseries")
+        NC.defDim(ts_grp, "t", Inf)
+        NC.defVar(ts_grp, "t", Float64, ("t",))
+    end
+    vars = Dict{String, Any}()
+    return NetCDFIO_Stats(root_grp, profiles_grp, ts_grp, frequency, nc_filename, vars)
 end
 
 
 function open_files(self::NetCDFIO_Stats)
-    self.root_grp = NC.Dataset(self.path_plus_file, "a")
+    self.root_grp = NC.Dataset(self.nc_filename, "a")
     self.profiles_grp = self.root_grp.group["profiles"]
     self.ts_grp = self.root_grp.group["timeseries"]
     vars = self.vars
@@ -119,7 +110,7 @@ end
 #####
 
 function add_field(self::NetCDFIO_Stats, var_name::String; dims, group)
-    NC.Dataset(self.path_plus_file, "a") do root_grp
+    NC.Dataset(self.nc_filename, "a") do root_grp
         profile_grp = root_grp.group[group]
         new_var = NC.defVar(profile_grp, var_name, Float64, dims)
     end
@@ -130,7 +121,7 @@ end
 #####
 
 function add_ts(self::NetCDFIO_Stats, var_name::String)
-    NC.Dataset(self.path_plus_file, "a") do root_grp
+    NC.Dataset(self.nc_filename, "a") do root_grp
         ts_grp = root_grp.group["timeseries"]
         new_var = NC.defVar(ts_grp, var_name, Float64, ("t",))
     end
@@ -152,7 +143,7 @@ function write_field(self::NetCDFIO_Stats, var_name::String, data::T; group) whe
         # Not sure why `end` instead of `end+1`, but `end+1` produces garbage output
         # @inbounds var[end, :] = data :: T
     elseif group == "reference"
-        NC.Dataset(self.path_plus_file, "a") do root_grp
+        NC.Dataset(self.nc_filename, "a") do root_grp
             reference_grp = root_grp.group[group]
             var = reference_grp[var_name]
             var .= data::T
