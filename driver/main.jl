@@ -170,17 +170,34 @@ function initialize(sim::Simulation1d)
     initialize_edmf(sim.edmf, sim.grid, state, sim.case, sim.param_set, t)
 
     sim.skip_io && return nothing
-    initialize_io(sim.io_nt.ref_state, sim.Stats)
+    initialize_io(sim.Stats, sim.io_nt.ref_state, sim.io_nt.aux, sim.io_nt.diagnostics)
+
     io(sim.io_nt.ref_state, sim.Stats, state) # since the reference prog is static
 
-    initialize_io(sim.io_nt.aux, sim.Stats)
-    initialize_io(sim.io_nt.diagnostics, sim.Stats)
+    ts_gm = ["Tsurface", "shf", "lhf", "ustar", "wstar", "lwp_mean", "iwp_mean"]
+    ts_edmf = [
+        "cloud_base_mean",
+        "cloud_top_mean",
+        "cloud_cover_mean",
+        "env_cloud_base",
+        "env_cloud_top",
+        "env_cloud_cover",
+        "env_lwp",
+        "env_iwp",
+        "updraft_cloud_cover",
+        "updraft_cloud_base",
+        "updraft_cloud_top",
+        "updraft_lwp",
+        "updraft_iwp",
+        "rwp_mean",
+        "swp_mean",
+        "cutoff_precipitation_rate",
+        "Hd",
+    ]
+    ts_list = vcat(ts_gm, ts_edmf)
 
     # TODO: deprecate
-    if !sim.calibrate_io
-        initialize_io(sim.Stats)
-        initialize_io(sim.edmf, sim.Stats)
-    end
+    sim.calibrate_io || initialize_io(sim.Stats, ts_list)
 
     open_files(sim.Stats)
     try
@@ -305,7 +322,7 @@ end
 
 main(namelist; kwargs...) = @timev main1d(namelist; kwargs...)
 
-nc_results_file(stats::NetCDFIO_Stats) = stats.path_plus_file
+nc_results_file(stats::NetCDFIO_Stats) = stats.nc_filename
 function nc_results_file(::Nothing)
     @info "The simulation was run without IO, so no nc files were exported"
     return ""

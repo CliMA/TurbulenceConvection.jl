@@ -36,10 +36,10 @@ function export_ref_profile(case_name::String)
     compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
 
     io_nt = TC.io_dictionary_ref_state()
-    initialize_io(io_nt, Stats)
+    initialize_io(Stats, io_nt)
     io(io_nt, Stats, state)
 
-    NCDatasets.Dataset(joinpath(Stats.path_plus_file), "r") do ds
+    NCDatasets.Dataset(joinpath(Stats.nc_filename), "r") do ds
         zc = ds.group["profiles"]["zc"][:]
         zf = ds.group["profiles"]["zf"][:]
         ρ0_c = ds.group["reference"]["ρ0_c"][:]
