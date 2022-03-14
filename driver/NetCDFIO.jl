@@ -105,7 +105,7 @@ end
 ##### Generic field
 #####
 
-function add_field(ds, var_name::String; dims, group)
+function add_field(ds, var_name::String, dims, group)
     profile_grp = ds.group[group]
     new_var = NC.defVar(profile_grp, var_name, Float64, dims)
     return nothing
@@ -125,26 +125,21 @@ end
 ##### Performance critical IO
 #####
 
-# Field wrapper
-write_field(self::NetCDFIO_Stats, var_name::String, data; group) = write_field(self, var_name, vec(data); group = group)
+function write_field(self::NetCDFIO_Stats, var_name::String, data::T, group) where {T <: AbstractArray{Float64, 1}}
+    # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
+    @inbounds self.vars[group][var_name][:, end] = data
+    # Ideally, we remove self.vars and use:
+    # var = self.profiles_grp[var_name]
+    # Not sure why `end` instead of `end+1`, but `end+1` produces garbage output
+    # @inbounds var[end, :] = data :: T
+end
 
-function write_field(self::NetCDFIO_Stats, var_name::String, data::T; group) where {T <: AbstractArray{Float64, 1}}
-    if group == "profiles"
-        # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-        @inbounds self.vars[group][var_name][:, end] = data
-        # Ideally, we remove self.vars and use:
-        # var = self.profiles_grp[var_name]
-        # Not sure why `end` instead of `end+1`, but `end+1` produces garbage output
-        # @inbounds var[end, :] = data :: T
-    elseif group == "reference"
-        NC.Dataset(self.nc_filename, "a") do root_grp
-            reference_grp = root_grp.group[group]
-            var = reference_grp[var_name]
-            var .= data::T
-        end
-    else
-        error("Bad group given")
-    end
+function add_write_field(ds, var_name::String, data::T, group, dims) where {T <: AbstractArray{Float64, 1}}
+    grp = ds.group[group]
+    NC.defVar(grp, var_name, Float64, dims)
+    var = grp[var_name]
+    var .= data::T
+    return nothing
 end
 
 function write_ts(self::NetCDFIO_Stats, var_name::String, data::Float64)

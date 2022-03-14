@@ -124,6 +124,19 @@ function Simulation1d(namelist)
     state = TC.State(prog, aux, nothing)
     compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
 
+    if !skip_io
+        NC.Dataset(Stats.nc_filename, "a") do ds
+            group = "reference"
+            add_write_field(ds, "ρ0_f", vec(TC.face_ref_state(state).ρ0), group, ("zf",))
+            add_write_field(ds, "ρ0_c", vec(TC.center_ref_state(state).ρ0), group, ("zc",))
+            add_write_field(ds, "p0_f", vec(TC.face_ref_state(state).p0), group, ("zf",))
+            add_write_field(ds, "p0_c", vec(TC.center_ref_state(state).p0), group, ("zc",))
+            add_write_field(ds, "α0_f", vec(TC.face_ref_state(state).α0), group, ("zf",))
+            add_write_field(ds, "α0_c", vec(TC.center_ref_state(state).α0), group, ("zc",))
+        end
+    end
+
+
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)
     surf_params = Cases.surface_params(case_type, grid, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
@@ -131,11 +144,10 @@ function Simulation1d(namelist)
     case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad, spk...)
 
     calibrate_io = namelist["stats_io"]["calibrate_io"]
-    ref_state_dict = TC.io_dictionary_ref_state()
     aux_dict = calibrate_io ? TC.io_dictionary_aux_calibrate() : TC.io_dictionary_aux()
     diagnostics_dict = calibrate_io ? Dict() : io_dictionary_diagnostics()
 
-    io_nt = (; ref_state = ref_state_dict, aux = aux_dict, diagnostics = diagnostics_dict)
+    io_nt = (; aux = aux_dict, diagnostics = diagnostics_dict)
 
     return Simulation1d(
         io_nt,
@@ -170,9 +182,7 @@ function initialize(sim::Simulation1d)
     initialize_edmf(sim.edmf, sim.grid, state, sim.case, sim.param_set, t)
 
     sim.skip_io && return nothing
-    initialize_io(sim.Stats, sim.io_nt.ref_state, sim.io_nt.aux, sim.io_nt.diagnostics)
-
-    io(sim.io_nt.ref_state, sim.Stats, state) # since the reference prog is static
+    initialize_io(sim.Stats, sim.io_nt.aux, sim.io_nt.diagnostics)
 
     ts_gm = ["Tsurface", "shf", "lhf", "ustar", "wstar", "lwp_mean", "iwp_mean"]
     ts_edmf = [
