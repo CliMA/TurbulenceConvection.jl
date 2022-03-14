@@ -116,9 +116,17 @@ function Simulation1d(namelist)
     diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, edmf))
     diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, edmf))
 
+    svpc_space = TC.single_value_per_col_space(grid)
+    diagnostics_single_value_per_col =
+        TC.FieldFromNamedTuple(svpc_space, single_value_per_col_diagnostic_vars(FT, edmf))
+
     prog = CC.Fields.FieldVector(cent = cent_prog_fields, face = face_prog_fields)
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
-    diagnostics = CC.Fields.FieldVector(cent = diagnostic_cent_fields, face = diagnostic_face_fields)
+    diagnostics = CC.Fields.FieldVector(;
+        cent = diagnostic_cent_fields,
+        face = diagnostic_face_fields,
+        svpc = diagnostics_single_value_per_col,
+    )
 
     # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
     state = TC.State(prog, aux, nothing)
@@ -182,7 +190,7 @@ function initialize(sim::Simulation1d)
     initialize_edmf(sim.edmf, sim.grid, state, sim.case, sim.param_set, t)
 
     sim.skip_io && return nothing
-    initialize_io(sim.Stats, sim.io_nt.aux, sim.io_nt.diagnostics)
+    initialize_io(sim.Stats.nc_filename, sim.io_nt.aux, sim.io_nt.diagnostics)
 
     ts_gm = ["Tsurface", "shf", "lhf", "ustar", "wstar", "lwp_mean", "iwp_mean"]
     ts_edmf = [
@@ -207,7 +215,7 @@ function initialize(sim::Simulation1d)
     ts_list = vcat(ts_gm, ts_edmf)
 
     # TODO: deprecate
-    sim.calibrate_io || initialize_io(sim.Stats, ts_list)
+    sim.calibrate_io || initialize_io(sim.Stats.nc_filename, ts_list)
 
     open_files(sim.Stats)
     try

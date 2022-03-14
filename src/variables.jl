@@ -173,6 +173,23 @@ cent_diagnostic_vars_edmf(FT, edmf) = (;
 face_diagnostic_vars_edmf(FT, edmf) =
     (; turbconv = (; nh_pressure = FT(0), nh_pressure_adv = FT(0), nh_pressure_drag = FT(0), nh_pressure_b = FT(0)))
 
+# Single value per column diagnostic variables
+single_value_per_col_diagnostic_vars_edmf(FT, edmf) = (;
+    turbconv = (;
+        env_cloud_base = FT(0),
+        env_cloud_top = FT(0),
+        env_cloud_cover = FT(0),
+        env_lwp = FT(0),
+        env_iwp = FT(0),
+        updraft_cloud_cover = FT(0),
+        updraft_cloud_base = FT(0),
+        updraft_cloud_top = FT(0),
+        updraft_lwp = FT(0),
+        updraft_iwp = FT(0),
+        Hd = FT(0),
+    ),
+)
+
 ##### Prognostic fields
 
 # Center only

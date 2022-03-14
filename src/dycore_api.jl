@@ -5,9 +5,11 @@
 abstract type FieldLocation end
 struct CentField <: FieldLocation end
 struct FaceField <: FieldLocation end
+struct SingleValuePerColumn <: FieldLocation end
 
 field_loc(::CentField) = :cent
 field_loc(::FaceField) = :face
+field_loc(::SingleValuePerColumn) = :svpc
 
 #=
 This file provides a list of methods that TurbulenceConvection.jl
