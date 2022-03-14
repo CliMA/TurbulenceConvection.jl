@@ -3,29 +3,14 @@
 #####
 
 #=
-    io_dictionary_ref_state()
     io_dictionary_aux()
 
 These functions return a dictionary whose
  - `keys` are the nc variable names
  - `values` are NamedTuples corresponding to
     - `dims` (`("z")`  or `("z", "t")`) and
-    - `group` (`"reference"` or `"profiles"`)
+    - `group` (`"reference"` or, e.g., `"profiles"`)
 =#
-
-function io_dictionary_ref_state()
-    DT = NamedTuple{(:dims, :group, :field), Tuple{Tuple{String}, String, Any}}
-    cent_ref_state = center_ref_state # so that things nicely align :)
-    io_dict = Dict{String, DT}(
-        "ρ0_f" => (; dims = ("zf",), group = "reference", field = state -> face_ref_state(state).ρ0),
-        "ρ0_c" => (; dims = ("zc",), group = "reference", field = state -> cent_ref_state(state).ρ0),
-        "p0_f" => (; dims = ("zf",), group = "reference", field = state -> face_ref_state(state).p0),
-        "p0_c" => (; dims = ("zc",), group = "reference", field = state -> cent_ref_state(state).p0),
-        "α0_f" => (; dims = ("zf",), group = "reference", field = state -> face_ref_state(state).α0),
-        "α0_c" => (; dims = ("zc",), group = "reference", field = state -> cent_ref_state(state).α0),
-    )
-    return io_dict
-end
 
 #! format: off
 # TODO: use a better name, this exports fields from the prognostic state, and the aux state.

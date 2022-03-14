@@ -59,7 +59,7 @@ function io(surf::TC.SurfaceBase, surf_params, grid, state, Stats::NetCDFIO_Stat
 end
 function io(io_dict::Dict, Stats::NetCDFIO_Stats, state)
     for var in keys(io_dict)
-        write_field(Stats, var, io_dict[var].field(state); group = io_dict[var].group)
+        write_field(Stats, var, vec(io_dict[var].field(state)), io_dict[var].group)
     end
 end
 
@@ -77,7 +77,7 @@ function initialize_io(Stats::NetCDFIO_Stats, io_dicts::Dict...)
     NC.Dataset(Stats.nc_filename, "a") do ds
         for io_dict in io_dicts
             for var_name in keys(io_dict)
-                add_field(ds, var_name; dims = io_dict[var_name].dims, group = io_dict[var_name].group)
+                add_field(ds, var_name, io_dict[var_name].dims, io_dict[var_name].group)
             end
         end
     end
