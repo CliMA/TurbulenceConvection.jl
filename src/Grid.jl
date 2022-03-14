@@ -20,7 +20,7 @@ Base.:-(zp1::CC.Geometry.ZPoint, zp2::CC.Geometry.ZPoint) = Base.:-(zp1.z, zp2.z
 Base.convert(::Type{Float64}, zp::CC.Geometry.ZPoint) = zp.z
 
 
-struct Grid{FT, NZ, CS, FS, SC, SF}
+struct Grid{FT, NZ, CS, FS, SC, SF, SVPCS}
     zmin::FT
     zmax::FT
     Δz::FT
@@ -28,6 +28,7 @@ struct Grid{FT, NZ, CS, FS, SC, SF}
     fs::FS
     zc::SC
     zf::SF
+    svpc_space::SVPCS
     function Grid(mesh)
 
         nz = length(mesh.faces) - 1
@@ -36,17 +37,29 @@ struct Grid{FT, NZ, CS, FS, SC, SF}
         zc = CC.Fields.coordinate_field(cs)
         zf = CC.Fields.coordinate_field(fs)
         Δz = zf[CCO.PlusHalf(2)] - zf[CCO.PlusHalf(1)]
-
         FT = eltype(parent(zf))
+
+        # Single value per column-space (svpc = single_value_per_col)
+        svpc_domain = CC.Domains.IntervalDomain(
+            CC.Geometry.ZPoint{FT}(0),
+            CC.Geometry.ZPoint{FT}(1),
+            boundary_tags = (:bottom, :top),
+        )
+        svpc_mesh = CC.Meshes.IntervalMesh(svpc_domain, nelems = 1)
+        svpc_space = CC.Spaces.CenterFiniteDifferenceSpace(svpc_mesh)
+
         zmin = minimum(parent(zf))
         zmax = maximum(parent(zf))
         CS = typeof(cs)
         FS = typeof(fs)
         SC = typeof(zc)
         SF = typeof(zf)
-        return new{FT, nz, CS, FS, SC, SF}(zmin, zmax, Δz, cs, fs, zc, zf)
+        SVPCS = typeof(svpc_space)
+        return new{FT, nz, CS, FS, SC, SF, SVPCS}(zmin, zmax, Δz, cs, fs, zc, zf, svpc_space)
     end
 end
+
+single_value_per_col_space(grid::Grid) = grid.svpc_space
 
 function Grid(Δz::FT, nz::Int) where {FT <: AbstractFloat}
     z₀, z₁ = FT(0), FT(nz * Δz)

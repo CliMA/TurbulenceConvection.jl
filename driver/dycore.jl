@@ -88,6 +88,25 @@ cent_diagnostic_vars(FT, edmf) = (; cent_diagnostic_vars_gm(FT)..., TC.cent_diag
 face_diagnostic_vars_gm(FT) = ()
 face_diagnostic_vars(FT, edmf) = (; face_diagnostic_vars_gm(FT)..., TC.face_diagnostic_vars_edmf(FT, edmf)...)
 
+# Single value per column diagnostic variables
+single_value_per_col_diagnostic_vars_gm(FT) = (;
+    Tsurface = FT(0),
+    shf = FT(0),
+    lhf = FT(0),
+    ustar = FT(0),
+    wstar = FT(0),
+    lwp_mean = FT(0),
+    iwp_mean = FT(0),
+    rwp_mean = FT(0),
+    swp_mean = FT(0),
+    cutoff_precipitation_rate = FT(0),
+    cloud_base_mean = FT(0),
+    cloud_top_mean = FT(0),
+    cloud_cover_mean = FT(0),
+)
+single_value_per_col_diagnostic_vars(FT, edmf) =
+    (; single_value_per_col_diagnostic_vars_gm(FT)..., TC.single_value_per_col_diagnostic_vars_edmf(FT, edmf)...)
+
 ##### Prognostic fields
 
 # Center only

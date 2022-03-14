@@ -17,6 +17,9 @@ center_diagnostics_grid_mean(state) = diagnostics(state, TC.CentField())
 center_diagnostics_turbconv(state) = diagnostics(state, TC.CentField()).turbconv
 face_diagnostics_turbconv(state) = diagnostics(state, TC.FaceField()).turbconv
 
+svpc_diagnostics_grid_mean(state) = diagnostics(state, TC.SingleValuePerColumn())
+svpc_diagnostics_turbconv(state) = diagnostics(state, TC.SingleValuePerColumn()).turbconv
+
 #=
     io_dictionary_diagnostics()
 
@@ -64,8 +67,8 @@ function io(io_dict::Dict, Stats::NetCDFIO_Stats, state)
 end
 
 
-function initialize_io(Stats::NetCDFIO_Stats, ts_list)
-    NC.Dataset(Stats.nc_filename, "a") do ds
+function initialize_io(nc_filename, ts_list)
+    NC.Dataset(nc_filename, "a") do ds
         for var_name in ts_list
             add_ts(ds, var_name)
         end
@@ -73,8 +76,8 @@ function initialize_io(Stats::NetCDFIO_Stats, ts_list)
     return nothing
 end
 
-function initialize_io(Stats::NetCDFIO_Stats, io_dicts::Dict...)
-    NC.Dataset(Stats.nc_filename, "a") do ds
+function initialize_io(nc_filename, io_dicts::Dict...)
+    NC.Dataset(nc_filename, "a") do ds
         for io_dict in io_dicts
             for var_name in keys(io_dict)
                 add_field(ds, var_name, io_dict[var_name].dims, io_dict[var_name].group)
@@ -121,6 +124,10 @@ function compute_diagnostics!(
     prog_gm = TC.center_prog_grid_mean(state)
     diag_tc = center_diagnostics_turbconv(diagnostics)
     diag_tc_f = face_diagnostics_turbconv(diagnostics)
+
+    diag_tc_svpc = svpc_diagnostics_turbconv(diagnostics)
+    diag_svpc = svpc_diagnostics_grid_mean(diagnostics)
+
     surf = get_surface(case.surf_params, grid, state, t, param_set)
 
     @inbounds for k in TC.real_center_indices(grid)
@@ -183,9 +190,11 @@ function compute_diagnostics!(
     # respect to itup (i.e. no consideration of tilting due to shear)
     # while the updraft classes are assumed to have no overlap at all.
     # Thus total updraft cover is the sum of each updraft's cover
-    write_ts(Stats, "updraft_cloud_cover", sum(cloud_cover_up))
-    write_ts(Stats, "updraft_cloud_base", minimum(abs.(cloud_base_up)))
-    write_ts(Stats, "updraft_cloud_top", maximum(abs.(cloud_top_up)))
+
+    cent = TC.Cent(1)
+    diag_tc_svpc.updraft_cloud_cover[cent] = sum(cloud_cover_up)
+    diag_tc_svpc.updraft_cloud_base[cent] = minimum(abs.(cloud_base_up))
+    diag_tc_svpc.updraft_cloud_top[cent] = maximum(abs.(cloud_top_up))
 
     cloud_top_en = FT(0)
     cloud_base_en = TC.zc_toa(grid).z
@@ -198,9 +207,9 @@ function compute_diagnostics!(
         end
     end
     # Assuming amximum overlap in environmental clouds
-    write_ts(Stats, "env_cloud_cover", cloud_cover_en)
-    write_ts(Stats, "env_cloud_base", cloud_base_en)
-    write_ts(Stats, "env_cloud_top", cloud_top_en)
+    diag_tc_svpc.env_cloud_cover[cent] = cloud_cover_en
+    diag_tc_svpc.env_cloud_base[cent] = cloud_base_en
+    diag_tc_svpc.env_cloud_top[cent] = cloud_top_en
 
     cloud_cover_gm = min(cloud_cover_en + sum(cloud_cover_up), 1)
     cloud_base_gm = grid.zc[kc_toa].z
@@ -211,9 +220,10 @@ function compute_diagnostics!(
             cloud_top_gm = max(cloud_top_gm, grid.zc[k].z)
         end
     end
-    write_ts(Stats, "cloud_cover_mean", cloud_cover_gm)
-    write_ts(Stats, "cloud_base_mean", cloud_base_gm)
-    write_ts(Stats, "cloud_top_mean", cloud_top_gm)
+
+    diag_svpc.cloud_cover_mean[cent] = cloud_cover_gm
+    diag_svpc.cloud_base_mean[cent] = cloud_base_gm
+    diag_svpc.cloud_top_mean[cent] = cloud_top_gm
 
     #####
     ##### Fluxes
@@ -284,14 +294,14 @@ function compute_diagnostics!(
 
     TC.update_cloud_frac(edmf, grid, state)
 
+    diag_svpc.lwp_mean[cent] = sum(ρ0_c .* aux_gm.q_liq)
+    diag_svpc.iwp_mean[cent] = sum(ρ0_c .* aux_gm.q_ice)
+    diag_svpc.rwp_mean[cent] = sum(ρ0_c .* prog_pr.q_rai)
+    diag_svpc.swp_mean[cent] = sum(ρ0_c .* prog_pr.q_sno)
 
-    write_ts(Stats, "lwp_mean", sum(ρ0_c .* aux_gm.q_liq))
-    write_ts(Stats, "iwp_mean", sum(ρ0_c .* aux_gm.q_ice))
-    write_ts(Stats, "env_lwp", sum(ρ0_c .* aux_en.q_liq .* aux_en.area))
-    write_ts(Stats, "env_iwp", sum(ρ0_c .* aux_en.q_ice .* aux_en.area))
+    diag_tc_svpc.env_lwp[cent] = sum(ρ0_c .* aux_en.q_liq .* aux_en.area)
+    diag_tc_svpc.env_iwp[cent] = sum(ρ0_c .* aux_en.q_ice .* aux_en.area)
 
-    write_ts(Stats, "rwp_mean", sum(ρ0_c .* prog_pr.q_rai))
-    write_ts(Stats, "swp_mean", sum(ρ0_c .* prog_pr.q_sno))
     #TODO - change to rain rate that depends on rain model choice
 
     # TODO: Move rho_cloud_liq to CLIMAParameters
@@ -300,17 +310,42 @@ function compute_diagnostics!(
         f =
             (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ0_c ./
             TC.rho_cloud_liq .* 3.6 .* 1e6
-        write_ts(Stats, "cutoff_precipitation_rate", sum(f))
+        diag_svpc.cutoff_precipitation_rate[cent] = sum(f)
     end
 
     lwp = sum(i -> sum(ρ0_c .* aux_up[i].q_liq .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
     iwp = sum(i -> sum(ρ0_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
-    write_ts(Stats, "updraft_lwp", lwp)
-    write_ts(Stats, "updraft_iwp", iwp)
     plume_scale_height = map(1:N_up) do i
         TC.compute_plume_scale_height(grid, state, param_set, i)
     end
-    write_ts(Stats, "Hd", StatsBase.mean(plume_scale_height))
+
+    diag_tc_svpc.updraft_lwp[cent] = lwp
+    diag_tc_svpc.updraft_iwp[cent] = iwp
+    diag_tc_svpc.Hd[cent] = StatsBase.mean(plume_scale_height)
+
+    # Demonstration of how we can move all of the `write_ts` calls
+    # outside of `compute_diagnostics!`, which currently computes
+    # _and_ exports (some) diagnostics.
+    write_ts(Stats, "updraft_cloud_cover", diag_tc_svpc.updraft_cloud_cover[cent])
+    write_ts(Stats, "updraft_cloud_base", diag_tc_svpc.updraft_cloud_base[cent])
+    write_ts(Stats, "updraft_cloud_top", diag_tc_svpc.updraft_cloud_top[cent])
+    write_ts(Stats, "env_cloud_cover", diag_tc_svpc.env_cloud_cover[cent])
+    write_ts(Stats, "env_cloud_base", diag_tc_svpc.env_cloud_base[cent])
+    write_ts(Stats, "env_cloud_top", diag_tc_svpc.env_cloud_top[cent])
+    write_ts(Stats, "env_lwp", diag_tc_svpc.env_lwp[cent])
+    write_ts(Stats, "env_iwp", diag_tc_svpc.env_iwp[cent])
+    write_ts(Stats, "Hd", diag_tc_svpc.Hd[cent])
+    write_ts(Stats, "updraft_lwp", diag_tc_svpc.updraft_lwp[cent])
+    write_ts(Stats, "updraft_iwp", diag_tc_svpc.updraft_iwp[cent])
+
+    write_ts(Stats, "cutoff_precipitation_rate", diag_svpc.cutoff_precipitation_rate[cent])
+    write_ts(Stats, "cloud_cover_mean", diag_svpc.cloud_cover_mean[cent])
+    write_ts(Stats, "cloud_base_mean", diag_svpc.cloud_base_mean[cent])
+    write_ts(Stats, "cloud_top_mean", diag_svpc.cloud_top_mean[cent])
+    write_ts(Stats, "lwp_mean", diag_svpc.lwp_mean[cent])
+    write_ts(Stats, "iwp_mean", diag_svpc.iwp_mean[cent])
+    write_ts(Stats, "rwp_mean", diag_svpc.rwp_mean[cent])
+    write_ts(Stats, "swp_mean", diag_svpc.swp_mean[cent])
 
     return
 end
