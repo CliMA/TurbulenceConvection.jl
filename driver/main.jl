@@ -134,13 +134,13 @@ function Simulation1d(namelist)
 
     if !skip_io
         NC.Dataset(Stats.nc_filename, "a") do ds
-            group = "reference"
-            add_write_field(ds, "ρ0_f", vec(TC.face_ref_state(state).ρ0), group, ("zf",))
-            add_write_field(ds, "ρ0_c", vec(TC.center_ref_state(state).ρ0), group, ("zc",))
-            add_write_field(ds, "p0_f", vec(TC.face_ref_state(state).p0), group, ("zf",))
-            add_write_field(ds, "p0_c", vec(TC.center_ref_state(state).p0), group, ("zc",))
-            add_write_field(ds, "α0_f", vec(TC.face_ref_state(state).α0), group, ("zf",))
-            add_write_field(ds, "α0_c", vec(TC.center_ref_state(state).α0), group, ("zc",))
+            group = ds.group["reference"]
+            add_write_field(group, "ρ0_f", vec(TC.face_ref_state(state).ρ0), ("zf",))
+            add_write_field(group, "ρ0_c", vec(TC.center_ref_state(state).ρ0), ("zc",))
+            add_write_field(group, "p0_f", vec(TC.face_ref_state(state).p0), ("zf",))
+            add_write_field(group, "p0_c", vec(TC.center_ref_state(state).p0), ("zc",))
+            add_write_field(group, "α0_f", vec(TC.face_ref_state(state).α0), ("zf",))
+            add_write_field(group, "α0_c", vec(TC.center_ref_state(state).α0), ("zc",))
         end
     end
 
@@ -219,7 +219,8 @@ function initialize(sim::Simulation1d)
 
     open_files(sim.Stats)
     try
-        write_simulation_time(sim.Stats, t)
+        write_simulation_time(sim.Stats.profiles_grp["t"], t)
+        write_simulation_time(sim.Stats.ts_grp["t"], t)
 
         io(sim.io_nt.aux, sim.Stats, state)
         io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
