@@ -127,3 +127,7 @@ end
     end
     nothing
 end
+
+# Cleanup
+# https://github.com/JuliaLang/Pkg.jl/issues/3014
+rm("LocalPreferences.toml"; force = true)
