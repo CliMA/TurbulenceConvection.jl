@@ -83,6 +83,29 @@ Base.@kwdef struct GeneralizedEntr{FT}
     wstar::FT
 end
 
+abstract type AbstractEntrainmentDimScaleParameters end
+
+struct BuoyVelScaleParameters{FT} <: AbstractEntrainmentDimScaleParameters
+    w_min::FT
+    c_λ::FT
+end
+function BuoyVelScaleParameters(
+    param_set)
+    aliases = ["w_min", "c_λ",]
+    (w_min, c_λ) = CLIMAParameters.get_parameter_values!(
+        param_set,
+        aliases,
+        "BuoyVelScale"
+    )
+    return BuoyVelScaleParameters{get_parametric_type(param_set)}(
+        w_min,
+        c_λ
+    )
+end
+
+struct InvZScaleParameters{FT} <: AbstractEntrainmentDimScaleParameters end
+
+
 Base.eltype(::GeneralizedEntr{FT}) where {FT} = FT
 
 abstract type AbstractEntrDetrModel end
@@ -690,20 +713,23 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMFParameters{FT,AECPS}
+struct EDMFParameters{FT,AECPS,AEDSPS}
     ECPS::AECPS
+    EDSPS::AEDSPS
 end
 function EDMFParameters(
     param_set,
     ECPS::AECPS,
-) where {AECPS <: Union{AbstractEntrainmentClosureParameters,AbstractStochasticEntrainmentClosureParameters}}
+    EDSPS::AEDSPS
+) where {AECPS <: Union{AbstractEntrainmentClosureParameters,AbstractStochasticEntrainmentClosureParameters}, AEDSPS <: AbstractEntrainmentDimScaleParameters}
 
     aliases = []
 
     () = CLIMAParameters.get_parameter_values!(param_set,aliases,"EDMF")
     
-    return EDMFParameters{get_parametric_type(param_set),AECPS}(
+    return EDMFParameters{get_parametric_type(param_set),AECPS,AEDSPS}(
         ECPS,
+        EDSPS,
     )
     
 end
@@ -833,10 +859,10 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
             valid_options = ["buoy_vel", "inv_z"],
         )
 
-        entr_dim_scale = if entr_dim_scale == "buoy_vel"
-            BuoyVelEntrDimScale()
+        (entr_dim_scale, entr_dim_scale_parameters) = if entr_dim_scale == "buoy_vel"
+            (BuoyVelEntrDimScale(), BuoyVelScaleParameters(param_set))
         elseif entr_dim_scale == "inv_z"
-            InvZEntrDimScale()
+            (InvZEntrDimScale(),  InvZScaleParameters())
         else
             error("Something went wrong. Invalid entrainment dimension scale '$entr_dim_scale'")
         end
