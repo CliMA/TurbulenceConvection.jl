@@ -59,10 +59,16 @@ function default_namelist(::Nothing)
     return default_namelist(case_name)
 end
 
-function default_namelist(case_name::String; root::String = ".", write::Bool = true, set_seed::Bool = true)
+function default_namelist(
+    case_name::String;
+    root::String = ".",
+    write::Bool = true,
+    set_seed::Bool = true,
+    seed::Int = 2022,
+)
 
     if set_seed
-        Random.seed!(2022)
+        Random.seed!(seed)
     end
 
     namelist_defaults = Dict()
