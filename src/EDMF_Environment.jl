@@ -58,18 +58,23 @@ function microphysics(
 end
 
 function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt::Real)
-    i_ql, i_qi, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat = 1:8
-    i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH, i_Sqr, i_Sqs = 1:8
-    a = en_thermo.a
-    w = en_thermo.w
-    quadrature_type = en_thermo.quadrature_type
-    quad_order = quadrature_order(en_thermo)
-
-    UnPack.@unpack QTvar_en, q_tot_en, Hvar_en, θ_liq_ice_en, HQTcov_en, area_en, q_rai, q_sno, area_en, ρ0_c, p0_c =
-        vars
 
     env_len = 8
     src_len = 8
+    i_ql, i_qi, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat = 1:env_len
+    i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH, i_Sqr, i_Sqs = 1:src_len
+
+    quadrature_type = en_thermo.quadrature_type
+    quad_order = quadrature_order(en_thermo)
+    χ = en_thermo.a
+    weights = en_thermo.w
+
+    # qt - total water specific humidity
+    # θl - liquid ice potential temperature
+    # _mean and ′ - subdomain mean and (co)variances
+    # q_rai, q_sno - grid mean precipitation
+    UnPack.@unpack qt′qt′, qt_mean, θl′θl′, θl_mean, θl′qt′, subdomain_area, q_rai, q_sno, ρ0_c, p0_c = vars
+
     FT = eltype(ρ0_c)
 
     inner_env = SA.MVector{env_len, FT}(undef)
@@ -77,43 +82,40 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
     inner_src = SA.MVector{src_len, FT}(undef)
     outer_src = SA.MVector{src_len, FT}(undef)
 
-    abscissas = a
-    weights = w
-
     sqpi_inv = 1 / sqrt(π)
     sqrt2 = sqrt(2)
 
     # Epsilon defined per typical variable fluctuation
-    eps_q = q_tot_en ≈ FT(0) ? eps(FT) : eps(FT) * q_tot_en
+    eps_q = qt_mean ≈ FT(0) ? eps(FT) : eps(FT) * qt_mean
     eps_θ = eps(FT)
 
     if quadrature_type isa LogNormalQuad
-        # Lognormal parameters (mu, sd) from mean and variance
-        mu_q = log(q_tot_en * q_tot_en / max(sqrt(q_tot_en * q_tot_en + QTvar_en), eps_q))
-        mu_h = log(θ_liq_ice_en * θ_liq_ice_en / sqrt(θ_liq_ice_en * θ_liq_ice_en + Hvar_en))
-        sd_q = sqrt(log(QTvar_en / max(q_tot_en, eps_q) / max(q_tot_en, eps_q) + 1))
-        sd_h = sqrt(log(Hvar_en / θ_liq_ice_en / θ_liq_ice_en + 1))
+        # Lognormal parameters (ν, s) from mean and variance
+        ν_q = log(qt_mean^2 / max(sqrt(qt_mean^2 + qt′qt′), eps_q))
+        ν_θ = log(θl_mean^2 / sqrt(θl_mean^2 + θl′θl′))
+        s_q = sqrt(log(qt′qt′ / max(qt_mean, eps_q)^2 + 1))
+        s_θ = sqrt(log(θl′θl′ / θl_mean^2 + 1))
 
         # Enforce Cauchy-Schwarz inequality, numerically stable compute
-        corr = HQTcov_en / max(sqrt(QTvar_en), eps_q)
-        corr = max(min(corr / max(sqrt(Hvar_en), eps_θ), 1), -1)
+        corr = θl′qt′ / max(sqrt(qt′qt′), eps_q)
+        corr = max(min(corr / max(sqrt(θl′θl′), eps_θ), 1), -1)
 
         # Conditionals
-        sd2_hq = log(corr * sqrt(Hvar_en * QTvar_en) / θ_liq_ice_en / max(q_tot_en, eps_q) + 1)
-        sd_cond_h_q = sqrt(max(sd_h * sd_h - sd2_hq * sd2_hq / max(sd_q, eps_q) / max(sd_q, eps_q), 0))
+        s2_θq = log(corr * sqrt(θl′θl′ * qt′qt′) / θl_mean / max(qt_mean, eps_q) + 1)
+        s_c = sqrt(max(s_θ^2 - s2_θq^2 / max(s_q, eps_q)^2, 0))
 
     elseif quadrature_type isa GaussianQuad
-        # limit sd_q to prevent negative qt_hat
-        sd_q_lim = -q_tot_en / (sqrt2 * abscissas[1])
-        sd_q = min(sqrt(QTvar_en), sd_q_lim)
-        sd_h = sqrt(Hvar_en)
+        # limit σ_q to prevent negative qt_hat
+        σ_q_lim = -qt_mean / (sqrt2 * χ[1])
+        σ_q = min(sqrt(qt′qt′), σ_q_lim)
+        σ_θ = sqrt(θl′θl′)
 
         # Enforce Cauchy-Schwarz inequality, numerically stable compute
-        corr = HQTcov_en / max(sd_q, eps_q)
-        corr = max(min(corr / max(sd_h, eps_θ), 1), -1)
+        corr = θl′qt′ / max(σ_q, eps_q)
+        corr = max(min(corr / max(σ_θ, eps_θ), 1), -1)
 
         # Conditionals
-        sd_cond_h_q = sqrt(max(1 - corr * corr, 0)) * sd_h
+        σ_c = sqrt(max(1 - corr * corr, 0)) * σ_θ
     end
 
     # zero outer quadrature points
@@ -126,11 +128,11 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
 
     @inbounds for m_q in 1:quad_order
         if quadrature_type isa LogNormalQuad
-            qt_hat = exp(mu_q + sqrt2 * sd_q * abscissas[m_q])
-            μ_h_star = mu_h + sd2_hq / max(sd_q, eps_q) / max(sd_q, eps_q) * (log(qt_hat) - mu_q)
+            qt_hat = exp(ν_q + sqrt2 * s_q * χ[m_q])
+            ν_c = ν_θ + s2_θq / max(s_q, eps_q)^2 * (log(qt_hat) - ν_q)
         elseif quadrature_type isa GaussianQuad
-            qt_hat = q_tot_en + sqrt2 * sd_q * abscissas[m_q]
-            μ_h_star = θ_liq_ice_en + sqrt2 * corr * sd_h * abscissas[m_q]
+            qt_hat = qt_mean + sqrt2 * σ_q * χ[m_q]
+            μ_c = θl_mean + sqrt2 * corr * σ_θ * χ[m_q]
         end
 
         # zero inner quadrature points
@@ -139,9 +141,9 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
 
         for m_h in 1:quad_order
             if quadrature_type isa LogNormalQuad
-                h_hat = exp(μ_h_star + sqrt2 * sd_cond_h_q * abscissas[m_h])
+                h_hat = exp(ν_c + sqrt2 * s_c * χ[m_h])
             elseif quadrature_type isa GaussianQuad
-                h_hat = sqrt2 * sd_cond_h_q * abscissas[m_h] + μ_h_star
+                h_hat = μ_c + sqrt2 * σ_c * χ[m_h]
             end
 
             # condensation
@@ -150,7 +152,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
             q_ice_en = TD.ice_specific_humidity(ts)
             T = TD.air_temperature(ts)
             # autoconversion and accretion
-            mph = precipitation_formation(param_set, precip_model, q_rai, q_sno, area_en, ρ0_c, Δt, ts)
+            mph = precipitation_formation(param_set, precip_model, q_rai, q_sno, subdomain_area, ρ0_c, Δt, ts)
 
             # environmental variables
             inner_env[i_ql] += q_liq_en * weights[m_h] * sqpi_inv
@@ -215,8 +217,6 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
     aux_en_sat = aux_en.sat
     tendencies_pr = center_tendencies_precipitation(state)
 
-    #TODO - remember you output source terms multiplied by Δt (bec. of instantaneous autoconv)
-    #TODO - add tendencies for gm H, QT and QR due to rain
     #TODO - if we start using eos_smpl for the updrafts calculations
     #       we can get rid of the two categories for outer and inner quad. points
 
@@ -236,12 +236,12 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
             sqrt(aux_en.QTvar[k]) < aux_en.q_tot[k]
         )
             vars = (;
-                QTvar_en = aux_en.QTvar[k],
-                q_tot_en = aux_en.q_tot[k],
-                Hvar_en = aux_en.Hvar[k],
-                θ_liq_ice_en = aux_en.θ_liq_ice[k],
-                HQTcov_en = aux_en.HQTcov[k],
-                area_en = aux_en.area[k],
+                qt′qt′ = aux_en.QTvar[k],
+                qt_mean = aux_en.q_tot[k],
+                θl′θl′ = aux_en.Hvar[k],
+                θl_mean = aux_en.θ_liq_ice[k],
+                θl′qt′ = aux_en.HQTcov[k],
+                subdomain_area = aux_en.area[k],
                 q_rai = prog_pr.q_rai[k],
                 q_sno = prog_pr.q_sno[k],
                 ρ0_c = ρ0_c[k],
