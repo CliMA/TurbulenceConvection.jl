@@ -24,10 +24,12 @@ l_max(ps::APS) = ps.nt.l_max
 
 """Additional entrainment/detrainment parameters."""
 Π_norm(ps::APS) = ps.nt.Π_norm
-c_gen(ps::APS) = ps.nt.c_gen
+c_nn_params(ps::APS) = ps.nt.c_nn_params
+nn_arc(ps::APS) = ps.nt.nn_arc
 c_fno(ps::APS) = ps.nt.c_fno
 c_rf_fix(ps::APS) = ps.nt.c_rf_fix
 c_rf_opt(ps::APS) = ps.nt.c_rf_opt
+c_linear(ps::APS) = ps.nt.c_linear
 
 """ stochastic parameters """
 c_gen_stoch(ps::APS) = ps.nt.c_gen_stoch

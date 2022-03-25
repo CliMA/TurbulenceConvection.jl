@@ -96,10 +96,16 @@ function default_namelist(
     # entrainment
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
+
     # nn parameters
     #! format: off
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_ent_params"] =
-        SA.SVector{69}(rand(69))
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["nn_arc"] = (6, 5, 4, 2) # [#inputs, #neurons in L1, #neurons in L2, ...., #outputs]
+
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["nn_ent_params"] =
+        SA.SVector{58}(rand(58))
+
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["nn_ent_biases"] = false
+
     # For FNO add here
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_params"] =
         SA.SVector{74}(rand(74))
@@ -114,6 +120,9 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["rf_fix_ent_params"] =
         vec(cat(2*pi*rand(2,100,1), # vec(cat(2*pi*rand(2, m, 1),
                     randn(2,100,6), dims=3)) # randn(2, m, d), dims=3))
+
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["linear_ent_params"] =
+        SA.SVector{14}(rand(14))
 
     # General stochastic entrainment/detrainment parameters
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_stochastic_ent_params"] =

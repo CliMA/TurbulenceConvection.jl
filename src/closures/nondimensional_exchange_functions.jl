@@ -114,55 +114,82 @@ function non_dimensional_function!(
 end
 
 """
-    Count number of parameters in fully-connected NN model given tuple specifying architecture following
-         the pattern: (#inputs, #neurons in L1, #neurons in L2, ...., #outputs)
+    Count number of parameters in fully-connected NN model given Array specifying architecture following
+        the pattern: [#inputs, #neurons in L1, #neurons in L2, ...., #outputs]. Equal to the number of weights + biases.
 """
-num_params_from_arc(nn_arc::NTuple) = sum(i -> (nn_arc[i] * nn_arc[i + 1] + nn_arc[i + 1]), 1:(length(nn_arc) - 1))
+num_params_from_arc(nn_arc::AbstractArray{Int}) = num_weights_from_arc(nn_arc) + num_biases_from_arc(nn_arc)
+
+"""
+    Count number of weights in fully-connected NN architecture.
+"""
+num_weights_from_arc(nn_arc::AbstractArray{Int}) = sum(i -> nn_arc[i] * nn_arc[i + 1], 1:(length(nn_arc) - 1))
+
+"""
+    Count number of biases in fully-connected NN architecture.
+"""
+num_biases_from_arc(nn_arc::AbstractArray{Int}) = sum(i -> nn_arc[i + 1], 1:(length(nn_arc) - 1))
+
 
 """
     construct_fully_connected_nn(
-        nn_arc::NTuple,
-        parameters::AbstractArray{FT};
+        arc::AbstractArray{Int},
+        params::AbstractArray{FT};
+        biases_bool::bool = false,
         activation_function::Flux.Function = Flux.sigmoid,
         output_layer_activation_function::Flux.Function = Flux.relu,)
 
-    Given network architecture and parameter vector, construct NN model and unpack parameters as weights and biases.
-    - `nn_arc` :: tuple specifying network architecture
-    - `nn_params` :: parameter vector containing weights and biases
+    Given network architecture and parameter vectors, construct NN model and unpack weights (and biases if `biases_bool` is true).
+    - `arc` :: vector specifying network architecture
+    - `params` :: parameter vector containing weights (and biases if `biases_bool` is true)
+    - `biases_bool` :: bool specifying whether `params` includes biases.
     - `activation_function` :: activation function for hidden layers
     - `output_layer_activation_function` :: activation function for output layer
 """
 function construct_fully_connected_nn(
-    nn_arc::NTuple,
-    parameters::AbstractArray{FT};
+    arc::AbstractArray{Int},
+    params::AbstractArray{FT};
+    biases_bool::Bool = false,
     activation_function::Flux.Function = Flux.sigmoid,
     output_layer_activation_function::Flux.Function = Flux.relu,
 ) where {FT <: Real}
 
-    n_params_nn = num_params_from_arc(nn_arc)
-    n_params_vect = length(parameters)
-    if n_params_vect != n_params_nn
+    # check consistency of architecture and parameters
+    if biases_bool
+        n_params_nn = num_params_from_arc(arc)
+        n_params_vect = length(params)
+    else
+        n_params_nn = num_weights_from_arc(arc)
+        n_params_vect = length(params)
+    end
+    if n_params_nn != n_params_vect
         error("Incorrect number of parameters ($n_params_vect) for requested NN architecture ($n_params_nn)!")
     end
 
     layers = []
     parameters_i = 1
     # unpack parameters in parameter vector into network
-    for layer_i in 1:(length(nn_arc) - 1)
-        if layer_i == length(nn_arc) - 1
+    for layer_i in 1:(length(arc) - 1)
+        if layer_i == length(arc) - 1
             activation_function = output_layer_activation_function
         end
-        layer_num_weights = nn_arc[layer_i] * nn_arc[layer_i + 1]
+        layer_num_weights = arc[layer_i] * arc[layer_i + 1]
+
+        nn_biases = if biases_bool
+            params[(parameters_i + layer_num_weights):(parameters_i + layer_num_weights + arc[layer_i + 1] - 1)]
+        else
+            biases_bool
+        end
+
         layer = Flux.Dense(
-            reshape(
-                parameters[parameters_i:(parameters_i + layer_num_weights - 1)],
-                nn_arc[layer_i + 1],
-                nn_arc[layer_i],
-            ),
-            parameters[(parameters_i + layer_num_weights):(parameters_i + layer_num_weights + nn_arc[layer_i + 1] - 1)],
+            reshape(params[parameters_i:(parameters_i + layer_num_weights - 1)], arc[layer_i + 1], arc[layer_i]),
+            nn_biases,
             activation_function,
         )
-        parameters_i += layer_num_weights + nn_arc[layer_i + 1]
+        parameters_i += layer_num_weights
+
+        if biases_bool
+            parameters_i += arc[layer_i + 1]
+        end
         push!(layers, layer)
     end
 
@@ -188,10 +215,9 @@ function non_dimensional_function!(
     εδ_model::NNEntrNonlocal,
 ) where {FT <: Real}
     # neural network architecture
-    n_input_vars = size(Π_groups)[2]
-    nn_arc = (n_input_vars, 5, 4, 2) # (#inputs, #neurons in L1, #neurons in L2, ...., #outputs)
-    c_gen = ICP.c_gen(param_set)
-    nn_model = construct_fully_connected_nn(nn_arc, c_gen)
+    nn_arc = ICP.nn_arc(param_set)
+    c_nn_params = ICP.c_nn_params(param_set)
+    nn_model = construct_fully_connected_nn(nn_arc, c_nn_params; biases_bool = εδ_model.biases_bool)
     output = nn_model(Π_groups')
     nondim_ε .= output[1, :]
     nondim_δ .= output[2, :]
@@ -207,13 +233,13 @@ Uses a fully connected neural network to predict the non-dimensional components 
  - `εδ_model_vars`  :: structure containing variables
  - `εδ_model_type`  :: NNEntr - Neural network entrainment closure
 """
-function non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
-    c_gen = ICP.c_gen(param_set)
+function non_dimensional_function(param_set, εδ_model_vars, εδ_model::NNEntr)
+    nn_arc = ICP.nn_arc(param_set)
+    c_nn_params = ICP.c_nn_params(param_set)
 
     nondim_groups = collect(non_dimensional_groups(param_set, εδ_model_vars))
     # neural network architecture
-    nn_arc = (length(nondim_groups), 5, 4, 2) # (#inputs, #neurons in L1, #neurons in L2, ...., #outputs)
-    nn_model = construct_fully_connected_nn(nn_arc, c_gen)
+    nn_model = construct_fully_connected_nn(nn_arc, c_nn_params; biases_bool = εδ_model.biases_bool)
 
     nondim_ε, nondim_δ = nn_model(nondim_groups)
     return nondim_ε, nondim_δ
@@ -228,13 +254,13 @@ Uses a simple linear model to predict the non-dimensional components of dynamica
  - `εδ_model_type`  :: LinearEntr - linear entrainment closure
 """
 function non_dimensional_function(param_set, εδ_model_vars, ::LinearEntr)
-    c_gen = ICP.c_gen(param_set)
+    c_linear = ICP.c_linear(param_set)
 
     nondim_groups = collect(non_dimensional_groups(param_set, εδ_model_vars))
     # Linear closure
     lin_arc = (length(nondim_groups), 1)  # (#inputs, #outputs)
-    lin_model_ε = Flux.Dense(reshape(c_gen[1:4], lin_arc[2], lin_arc[1]), [c_gen[5]], Flux.relu)
-    lin_model_δ = Flux.Dense(reshape(c_gen[6:9], lin_arc[2], lin_arc[1]), [c_gen[10]], Flux.relu)
+    lin_model_ε = Flux.Dense(reshape(c_linear[1:6], lin_arc[2], lin_arc[1]), [c_linear[7]], Flux.relu)
+    lin_model_δ = Flux.Dense(reshape(c_linear[8:13], lin_arc[2], lin_arc[1]), [c_linear[14]], Flux.relu)
 
     nondim_ε = lin_model_ε(nondim_groups)[1]
     nondim_δ = lin_model_δ(nondim_groups)[1]

@@ -52,6 +52,7 @@ function create_parameter_set(namelist)
     use_nn = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "NN"
     use_nn_nonlocal = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "NN_nonlocal"
     use_fno = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "FNO"
+    use_linear = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "Linear"
 
     entr_closure_kwargs = if use_ran_features
         (;
@@ -60,15 +61,21 @@ function create_parameter_set(namelist)
     )
     elseif use_nn
         (;
-        c_gen = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "general_ent_params"),
+        c_nn_params = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_ent_params"),
+        nn_arc = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_arc"),
     )
     elseif use_nn_nonlocal
         (;
-        c_gen = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "general_ent_params"),
+        c_nn_params = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_ent_params"),
+        nn_arc = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_arc"),
     )
     elseif use_fno
         (;
         c_fno = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_params"),
+    )
+    elseif use_linear
+        (;
+        c_linear = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "linear_ent_params"),
     )
     else
         ()
