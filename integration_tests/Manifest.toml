@@ -102,9 +102,9 @@ version = "0.1.1"
 
 [[deps.CLIMAParameters]]
 deps = ["Test"]
-git-tree-sha1 = "a9499be8256d2e8ee2c1a25c244ecb41605e34d8"
+git-tree-sha1 = "ffaa9024fcd19cdc64a05dc688477c0daa5ffbb0"
 uuid = "6eacf6c3-8458-43b9-ae03-caf5306d3d53"
-version = "0.4.1"
+version = "0.4.2"
 
 [[deps.CPUSummary]]
 deps = ["Hwloc", "IfElse", "Preferences", "Static"]
