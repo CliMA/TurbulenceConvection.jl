@@ -90,12 +90,14 @@ function compute_precipitation_sink_tendencies(::Clima1M, grid::Grid, state::Sta
         L_s = TD.latent_heat_sublim(ts)
         L_f = TD.latent_heat_fusion(ts)
 
+        α_c = CPMP.microph_scaling(param_set)
+
         # TODO - move limiters elsewhere
         # TODO - when using adaptive timestepping we are limiting the source terms
         #        with the previous timestep dt
-        S_qr_evap = -min(qr / Δt, -CM1.evaporation_sublimation(param_set, rain_type, q, qr, ρ0, T_gm))
-        S_qs_melt = -min(qs / Δt, CM1.snow_melt(param_set, qs, ρ0, T_gm))
-        tmp = CM1.evaporation_sublimation(param_set, snow_type, q, qs, ρ0, T_gm)
+        S_qr_evap = -min(qr / Δt, -α_c * CM1.evaporation_sublimation(param_set, rain_type, q, qr, ρ0, T_gm))
+        S_qs_melt = -min(qs / Δt, α_c * CM1.snow_melt(param_set, qs, ρ0, T_gm))
+        tmp = α_c * CM1.evaporation_sublimation(param_set, snow_type, q, qs, ρ0, T_gm)
         if tmp > 0
             S_qs_sub_dep = min(qv / Δt, tmp)
         else
