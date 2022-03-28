@@ -19,6 +19,34 @@ Base.:-(zp1::CC.Geometry.ZPoint, zp2::CC.Geometry.ZPoint) = Base.:-(zp1.z, zp2.z
 
 Base.convert(::Type{Float64}, zp::CC.Geometry.ZPoint) = zp.z
 
+"""
+    TCMeshFromGCMMesh(gcm_mesh; z_max)
+
+Returns a case-specific subset of the expected GCM mesh between the surface and z_max
+ - `gcm_mesh` :: a ClimaCore mesh for expected GCM grid
+ - `z_max`    :: maximum height for a specific TC case
+"""
+function TCMeshFromGCMMesh(gcm_mesh; z_max::FT) where {FT <: AbstractFloat}
+    gcm_grid = Grid(gcm_mesh)
+    k_star = kf_top_of_atmos(gcm_grid)
+    for k in real_face_indices(gcm_grid)
+        if gcm_grid.zf[k].z > z_max || z_max ≈ gcm_grid.zf[k].z
+            k_star = k
+            break
+        end
+    end
+    z₀ = zf_surface(gcm_grid).z
+    z₁ = gcm_grid.zf[k_star].z
+    domain = CC.Domains.IntervalDomain(
+        CC.Geometry.ZPoint{FT}(z₀),
+        CC.Geometry.ZPoint{FT}(z₁),
+        boundary_tags = (:bottom, :top),
+    )
+    faces = map(1:(k_star.i)) do k
+        CC.Geometry.ZPoint{FT}(gcm_grid.zf[CCO.PlusHalf(k)].z)
+    end
+    return CC.Meshes.IntervalMesh(domain, faces)
+end
 
 struct Grid{FT, NZ, CS, FS, SC, SF, SVPCS}
     zmin::FT
