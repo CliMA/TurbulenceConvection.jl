@@ -34,6 +34,15 @@ include(joinpath(tc_dir, "driver", "TimeStepping.jl"))
 include(joinpath(tc_dir, "driver", "Surface.jl"))
 import .Cases
 
+import DiffEqNoiseProcess
+import Random
+function DiffEqNoiseProcess.wiener_randn!(rng::Random.AbstractRNG, rand_vec::CC.Fields.FieldVector)
+    # TODO: fix this hack. ClimaCore's axes(::FieldVector) cannot
+    #       return a space (since it has multiple spaces)
+    parent(rand_vec.cent) .= Random.randn.()
+    parent(rand_vec.face) .= Random.randn.()
+end
+
 struct Simulation1d{IONT, G, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS}
     io_nt::IONT
     grid::G
