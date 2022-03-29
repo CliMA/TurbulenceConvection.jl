@@ -352,8 +352,8 @@ function run(sim::Simulation1d; time_run = true)
             sol = ODE.solve!(integrator)
         end
     catch e
-        @error "TurbulenceConvection simulation crashed. Stacktrace for failed simulation" exception =
-            (e, catch_backtrace())
+        @error "TurbulenceConvection simulation crashed. $(e)"
+        # "Stacktrace for failed simulation" exception = (e, catch_backtrace())
         return :simulation_crashed
     finally
         sim.skip_io || close_files(sim.Stats) # #removeVarsHack
