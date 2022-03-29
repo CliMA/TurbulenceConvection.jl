@@ -1,7 +1,7 @@
 authors = ["Climate Modeling Alliance"]
 name = "TurbulenceConvection"
 uuid = "8e072fc4-01f8-44fb-b9dc-f9336c367e6b"
-version = "0.17.0"
+version = "0.17.1"
 
 [compat]
 CLIMAParameters = "0.4"
