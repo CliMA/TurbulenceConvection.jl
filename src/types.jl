@@ -33,8 +33,14 @@ end
 abstract type AbstractEntrDetrModel end
 abstract type AbstractNonLocalEntrDetrModel end
 struct MDEntr <: AbstractEntrDetrModel end  # existing model
-struct NNEntr <: AbstractEntrDetrModel end
-struct NNEntrNonlocal <: AbstractNonLocalEntrDetrModel end
+
+Base.@kwdef struct NNEntr <: AbstractEntrDetrModel
+    biases_bool::Bool
+end
+Base.@kwdef struct NNEntrNonlocal <: AbstractNonLocalEntrDetrModel
+    biases_bool::Bool
+end
+
 struct LinearEntr <: AbstractEntrDetrModel end
 struct FNOEntr <: AbstractNonLocalEntrDetrModel end
 struct RFEntr <: AbstractEntrDetrModel end
@@ -500,12 +506,21 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS, EPG}
             valid_options = ["moisture_deficit", "NN", "NN_nonlocal", "FNO", "Linear", "RF"],
         )
 
+        nn_biases = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "nn_ent_biases";
+            default = false,
+            valid_options = [true, false],
+        )
+
         mean_entr_closure = if entr_type == "moisture_deficit"
             MDEntr()
         elseif entr_type == "NN"
-            NNEntr()
+            NNEntr(biases_bool = nn_biases)
         elseif entr_type == "NN_nonlocal"
-            NNEntrNonlocal()
+            NNEntrNonlocal(biases_bool = nn_biases)
         elseif entr_type == "FNO"
             FNOEntr()
         elseif entr_type == "Linear"
