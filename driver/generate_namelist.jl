@@ -160,6 +160,7 @@ function default_namelist(
 
     namelist_defaults["thermodynamics"] = Dict()
     namelist_defaults["thermodynamics"]["thermal_variable"] = "thetal"
+    namelist_defaults["thermodynamics"]["moisture_model"] = "equilibrium" #"nonequilibrium"
     namelist_defaults["thermodynamics"]["sgs"] = "quadrature"
     namelist_defaults["thermodynamics"]["quadrature_order"] = 3
     namelist_defaults["thermodynamics"]["quadrature_type"] = "log-normal" #"gaussian" or "log-normal"

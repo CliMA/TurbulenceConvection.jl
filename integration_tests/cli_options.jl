@@ -39,10 +39,8 @@ function parse_commandline()
         default = ""
         "--n_up"           # Number of updrafts
         arg_type = Int
-        # TODO in 928
-        #"--moisture_model" # Moisture model (equilibrium or non-equilibrium)
-        #arg_type = String
-        #default = "equilibrium"
+        "--moisture_model" # Moisture model (equilibrium or non-equilibrium)
+        arg_type = String
     end
     parsed_args = ArgParse.parse_args(ARGS, s)
     return (s, parsed_args)
