@@ -60,6 +60,8 @@ cent_aux_vars_gm(FT) = (;
     vg = FT(0), #Geostrophic v velocity
     ∇θ_liq_ice_gm = FT(0),
     ∇q_tot_gm = FT(0),
+    ∇q_liq_gm = FT(0),
+    ∇q_ice_gm = FT(0),
     θ_virt = FT(0),
     Ri = FT(0),
 )
@@ -73,6 +75,8 @@ face_aux_vars_gm(FT) = (;
     f_rad = FT(0),
     sgs_flux_θ_liq_ice = FT(0),
     sgs_flux_q_tot = FT(0),
+    sgs_flux_q_liq = FT(0),
+    sgs_flux_q_ice = FT(0),
     sgs_flux_u = FT(0),
     sgs_flux_v = FT(0),
 )
@@ -111,7 +115,7 @@ single_value_per_col_diagnostic_vars(FT, edmf) =
 
 # Center only
 cent_prognostic_vars(FT, edmf) = (; cent_prognostic_vars_gm(FT)..., TC.cent_prognostic_vars_edmf(FT, edmf)...)
-cent_prognostic_vars_gm(FT) = (; u = FT(0), v = FT(0), θ_liq_ice = FT(0), q_tot = FT(0))
+cent_prognostic_vars_gm(FT) = (; u = FT(0), v = FT(0), θ_liq_ice = FT(0), q_tot = FT(0), q_liq = FT(0), q_ice = FT(0))
 
 # Face only
 face_prognostic_vars(FT, edmf) = (; w = FT(0), TC.face_prognostic_vars_edmf(FT, edmf)...)
@@ -261,6 +265,8 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
     en_thermo = edmf.en_thermo
 
+    # TODO - do I need a q_liq and q_ice tendency here?
+
     # compute tendencies
     # causes division error in dry bubble first time step
     TC.compute_precipitation_formation_tendencies(grid, state, edmf, precip_model, Δt, param_set)
@@ -293,6 +299,8 @@ function compute_gm_tendencies!(
     aux_gm_f = TC.face_aux_grid_mean(state)
     ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
     ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
+    ∇q_liq_gm = TC.center_aux_grid_mean(state).∇q_liq_gm
+    ∇q_ice_gm = TC.center_aux_grid_mean(state).∇q_ice_gm
     aux_en = TC.center_aux_environment(state)
     aux_en_f = TC.face_aux_environment(state)
     aux_up = TC.center_aux_updrafts(state)
@@ -304,15 +312,22 @@ function compute_gm_tendencies!(
 
     θ_liq_ice_gm_toa = prog_gm.θ_liq_ice[kc_toa]
     q_tot_gm_toa = prog_gm.q_tot[kc_toa]
+    q_liq_gm_toa = prog_gm.q_liq[kc_toa]
+    q_ice_gm_toa = prog_gm.q_ice[kc_toa]
     RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_liq_ice_gm_toa))
     RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa))
+    RBq_liq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_liq_gm_toa))
+    RBq_ice = CCO.RightBiasedC2F(; top = CCO.SetValue(q_ice_gm_toa))
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
     @. ∇θ_liq_ice_gm = ∇c(wvec(RBθ(prog_gm.θ_liq_ice)))
     @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.q_tot)))
+    @. ∇q_liq_gm = ∇c(wvec(RBq(prog_gm.q_liq)))
+    @. ∇q_ice_gm = ∇c(wvec(RBq(prog_gm.q_ice)))
 
     @inbounds for k in TC.real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
+        # TODO - change to phase non-equil
         ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         Π = TD.exner(ts)
 
@@ -324,6 +339,7 @@ function compute_gm_tendencies!(
             tendencies_gm.θ_liq_ice[k] += aux_gm.dTdt_rad[k] / Π
         end
 
+        # TODO - should any of these forcings be also applied to ql and qi?
         if TC.force_type(force) <: TC.ForcingDYCOMS_RF01
             tendencies_gm.q_tot[k] += aux_gm.dqtdt[k]
             # Apply large-scale subsidence tendencies
@@ -377,6 +393,15 @@ function compute_gm_tendencies!(
             aux_bulk.qt_tendency_precip_formation[k] +
             aux_en.qt_tendency_precip_formation[k] +
             aux_tc.qt_tendency_precip_sinks[k]
+        # TODO - add precipitation sinks
+        #tendencies_gm.q_liq[k] +=
+        #    aux_bulk.ql_tendency_precip_formation[k] +
+        #    aux_en.ql_tendency_precip_formation[k] +
+        #    aux_tc.ql_tendency_precip_sinks[k]
+        #tendencies_gm.q_ice[k] +=
+        #    aux_bulk.qi_tendency_precip_formation[k] +
+        #    aux_en.qi_tendency_precip_formation[k] +
+        #    aux_tc.qi_tendency_precip_sinks[k]
         tendencies_gm.θ_liq_ice[k] +=
             aux_bulk.θ_liq_ice_tendency_precip_formation[k] +
             aux_en.θ_liq_ice_tendency_precip_formation[k] +
@@ -387,26 +412,36 @@ function compute_gm_tendencies!(
 
     sgs_flux_θ_liq_ice = aux_gm_f.sgs_flux_θ_liq_ice
     sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot
+    sgs_flux_q_liq = aux_gm_f.sgs_flux_q_liq
+    sgs_flux_q_ice = aux_gm_f.sgs_flux_q_ice
     sgs_flux_u = aux_gm_f.sgs_flux_u
     sgs_flux_v = aux_gm_f.sgs_flux_v
     # apply surface BC as SGS flux at lowest level
     sgs_flux_θ_liq_ice[kf_surf] = surf.ρθ_liq_ice_flux
     sgs_flux_q_tot[kf_surf] = surf.ρq_tot_flux
+    sgs_flux_q_liq[kf_surf] = surf.ρq_liq_flux
+    sgs_flux_q_ice[kf_surf] = surf.ρq_ice_flux
     sgs_flux_u[kf_surf] = surf.ρu_flux
     sgs_flux_v[kf_surf] = surf.ρv_flux
 
     tends_θ_liq_ice = tendencies_gm.θ_liq_ice
     tends_q_tot = tendencies_gm.q_tot
+    tends_q_liq = tendencies_gm.q_liq
+    tends_q_ice = tendencies_gm.q_ice
     tends_u = tendencies_gm.u
     tends_v = tendencies_gm.v
 
     ∇θ_liq_ice_sgs = CCO.DivergenceF2C()
     ∇q_tot_sgs = CCO.DivergenceF2C()
+    ∇q_liq_sgs = CCO.DivergenceF2C()
+    ∇q_ice_sgs = CCO.DivergenceF2C()
     ∇u_sgs = CCO.DivergenceF2C()
     ∇v_sgs = CCO.DivergenceF2C()
 
     @. tends_θ_liq_ice += -α0_c * ∇θ_liq_ice_sgs(wvec(sgs_flux_θ_liq_ice))
     @. tends_q_tot += -α0_c * ∇q_tot_sgs(wvec(sgs_flux_q_tot))
+    @. tends_q_liq += -α0_c * ∇q_liq_sgs(wvec(sgs_flux_q_liq))
+    @. tends_q_ice += -α0_c * ∇q_ice_sgs(wvec(sgs_flux_q_ice))
     @. tends_u += -α0_c * ∇u_sgs(wvec(sgs_flux_u))
     @. tends_v += -α0_c * ∇v_sgs(wvec(sgs_flux_v))
     return nothing
