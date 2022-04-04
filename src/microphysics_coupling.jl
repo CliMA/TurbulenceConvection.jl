@@ -2,6 +2,46 @@
 Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 (autoconversion + accretion)
 """
+function cloud_formation(
+    param_set::APS,
+    area::FT,
+    q_tot::FT,
+    q_liq::FT,
+    q_ice::FT,
+    ρ0::FT,
+    Δt::Real,
+    ts,
+) where {FT}
+
+    # TODO - when using adaptive timestepping we are limiting the source terms
+    #        with the previous timestep Δt
+    ql_tendency = FT(0)
+    qi_tendency = FT(0)
+    if area > 0
+
+        q = TD.PhasePartition(ts)
+        T = TD.air_temperature(ts)
+
+        q_sat_liquid::FT = q_vap_saturation_generic(param_set, T, ρ0, TD.Liquid())
+        q_sat_ice::FT = q_vap_saturation_generic(param_set, T, ρ0, TD.Ice())
+        q_cond = TD.PhasePartition(FT(0), max(0.0, q_sat_liquid - q.liq), max(0.0, q_sat_ice - q.ice))
+
+        S_ql = CM1.conv_q_vap_to_q_liq_ice(param_set, liquid_type, q_cond, q)
+        S_qi = CM1.conv_q_vap_to_q_liq_ice(param_set, ice_type, q_cond, q)
+
+
+
+
+        ql_tendency += S_ql
+        qi_tendency += S_qi
+    end
+    return CloudFormation{FT}(ql_tendency, qi_tendency)
+end
+
+"""
+Computes the tendencies to qt and θ_liq_ice due to precipitation formation
+(autoconversion + accretion)
+"""
 function precipitation_formation(
     param_set::APS,
     precip_model::AbstractPrecipitationModel,
