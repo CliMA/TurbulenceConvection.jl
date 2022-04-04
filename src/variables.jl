@@ -194,6 +194,7 @@ single_value_per_col_diagnostic_vars_edmf(FT, edmf) = (;
 
 # Center only
 cent_prognostic_vars_up(FT, _) = (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot = FT(0))
+cent_prognostic_vars_up(FT, ::NonequilibriumMoisture) = (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot = FT(0), ρaq_liq = FT(0), ρaq_ice = FT(0))
 cent_prognostic_vars_up(FT, ::PrognosticNoisyRelaxationProcess) =
     (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot = FT(0), ε_nondim = FT(0), δ_nondim = FT(0))
 cent_prognostic_vars_en(FT) = (; ρatke = FT(0), ρaHvar = FT(0), ρaQTvar = FT(0), ρaHQTcov = FT(0))

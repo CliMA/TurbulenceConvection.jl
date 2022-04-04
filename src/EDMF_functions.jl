@@ -62,6 +62,8 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     kc_surf = kc_surface(grid)
     massflux_h = aux_tc_f.massflux_h
     massflux_qt = aux_tc_f.massflux_qt
+    massflux_ql = aux_tc_f.massflux_ql
+    massflux_qi = aux_tc_f.massflux_qi
     aux_tc = center_aux_turbconv(state)
 
     wvec = CC.Geometry.WVector
@@ -85,41 +87,59 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
 
     parent(massflux_h) .= 0
     parent(massflux_qt) .= 0
+    parent(massflux_ql) .= 0
+    parent(massflux_qi) .= 0
     If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
     θ_liq_ice_en = aux_en.θ_liq_ice
     q_tot_en = aux_en.q_tot
+    q_liq_en = aux_en.q_liq
+    q_ice_en = aux_en.q_ice
     @inbounds for i in 1:N_up
         aux_up_f_i = aux_up_f[i]
         aux_up_i = aux_up[i]
         θ_liq_ice_up = aux_up_i.θ_liq_ice
         q_tot_up = aux_up_i.q_tot
+        q_liq_up = aux_up_i.q_liq
+        q_ice_up = aux_up_i.q_ice
         massflux = aux_up_f[i].massflux
         # We know that, since W = 0 at z = 0, m = 0 also, and
         # therefore θ_liq_ice / q_tot values do not matter
         @. massflux_h += massflux * (If(θ_liq_ice_up) - If(θ_liq_ice_en))
         @. massflux_qt += massflux * (If(q_tot_up) - If(q_tot_en))
+        @. massflux_ql += massflux * (If(q_liq_up) - If(q_liq_en))
+        @. massflux_qi += massflux * (If(q_ice_up) - If(q_ice_en))
     end
 
     massflux_tendency_h = aux_tc.massflux_tendency_h
     massflux_tendency_qt = aux_tc.massflux_tendency_qt
+    massflux_tendency_ql = aux_tc.massflux_tendency_ql
+    massflux_tendency_qi = aux_tc.massflux_tendency_qi
     # Compute the  mass flux tendencies
     # Adjust the values of the grid mean variables
     # Prepare the output
     @. massflux_tendency_h = -∇c(wvec(massflux_h)) * α0_c
     @. massflux_tendency_qt = -∇c(wvec(massflux_qt)) * α0_c
+    @. massflux_tendency_ql = -∇c(wvec(massflux_ql)) * α0_c
+    @. massflux_tendency_qi = -∇c(wvec(massflux_qi)) * α0_c
 
     diffusive_flux_h = aux_tc_f.diffusive_flux_h
     diffusive_flux_qt = aux_tc_f.diffusive_flux_qt
+    diffusive_flux_ql = aux_tc_f.diffusive_flux_ql
+    diffusive_flux_qi = aux_tc_f.diffusive_flux_qi
     diffusive_flux_u = aux_tc_f.diffusive_flux_u
     diffusive_flux_v = aux_tc_f.diffusive_flux_v
 
     sgs_flux_θ_liq_ice = aux_gm_f.sgs_flux_θ_liq_ice
     sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot
+    sgs_flux_q_liq = aux_gm_f.sgs_flux_q_liq
+    sgs_flux_q_ice = aux_gm_f.sgs_flux_q_ice
     sgs_flux_u = aux_gm_f.sgs_flux_u
     sgs_flux_v = aux_gm_f.sgs_flux_v
 
     @. sgs_flux_θ_liq_ice = diffusive_flux_h + massflux_h
     @. sgs_flux_q_tot = diffusive_flux_qt + massflux_qt
+    @. sgs_flux_q_liq = diffusive_flux_ql + massflux_ql
+    @. sgs_flux_q_ice = diffusive_flux_qi + massflux_qi
     @. sgs_flux_u = diffusive_flux_u # + massflux_u
     @. sgs_flux_v = diffusive_flux_v # + massflux_v
 
@@ -150,17 +170,24 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     @. aux_tc_f.ρ_ae_KM = IfKM(aeKM) * ρ0_f
 
     aeKHq_tot_bc = -surf.ρq_tot_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    # TODO
+    aeKHq_liq_bc = FT(0)
+    aeKHq_ice_bc = FT(0)
     aeKHθ_liq_ice_bc = -surf.ρθ_liq_ice_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
     aeKMu_bc = -surf.ρu_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
     aeKMv_bc = -surf.ρv_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
 
     ∇q_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_tot_bc), top = CCO.SetDivergence(FT(0)))
+    ∇q_liq_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_liq_bc), top = CCO.SetDivergence(FT(0)))
+    ∇q_ice_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_ice_bc), top = CCO.SetDivergence(FT(0)))
     ∇θ_liq_ice_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHθ_liq_ice_bc), top = CCO.SetDivergence(FT(0)))
     ∇u_gm = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKMu_bc), top = CCO.SetDivergence(FT(0)))
     ∇v_gm = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKMv_bc), top = CCO.SetDivergence(FT(0)))
 
     wvec = CC.Geometry.WVector
     @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KH * ∇q_tot_en(wvec(aux_en.q_tot))
+    @. aux_tc_f.diffusive_flux_ql = -aux_tc_f.ρ_ae_KH * ∇q_liq_en(wvec(aux_en.q_liq))
+    @. aux_tc_f.diffusive_flux_qi = -aux_tc_f.ρ_ae_KH * ∇q_ice_en(wvec(aux_en.q_ice))
     @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇θ_liq_ice_en(wvec(aux_en.θ_liq_ice))
     @. aux_tc_f.diffusive_flux_u = -aux_tc_f.ρ_ae_KM * ∇u_gm(wvec(prog_gm.u))
     @. aux_tc_f.diffusive_flux_v = -aux_tc_f.ρ_ae_KM * ∇v_gm(wvec(prog_gm.v))
@@ -211,10 +238,15 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     @inbounds for i in 1:N_up
         θ_surf = θ_surface_bc(surf, grid, state, edmf, i)
         q_surf = q_surface_bc(surf, grid, state, edmf, i)
+        # TODO
+        q_liq_surf = FT(0)
+        q_ice_surf = FT(0)
         a_surf = area_surface_bc(surf, edmf, i)
         prog_up[i].ρarea[kc_surf] = ρ0_c[kc_surf] * a_surf
         prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * θ_surf
         prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * q_surf
+        prog_up[i].ρaq_liq[kc_surf] = prog_up[i].ρarea[kc_surf] * q_liq_surf
+        prog_up[i].ρaq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * q_ice_surf
         prog_up_f[i].ρaw[kf_surf] = ρ0_f[kf_surf] * w_surface_bc(surf)
     end
 
@@ -405,17 +437,28 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         w_up = aux_up_f[i].w
         a_up = aux_up_i.area
         q_tot_up = aux_up_i.q_tot
+        q_liq_up = aux_up_i.q_liq
+        q_ice_up = aux_up_i.q_ice
         q_tot_en = aux_en.q_tot
+        q_liq_en = aux_en.q_liq
+        q_ice_en = aux_en.q_ice
         θ_liq_ice_en = aux_en.θ_liq_ice
         θ_liq_ice_up = aux_up_i.θ_liq_ice
         entr_turb_dyn = aux_up_i.entr_turb_dyn
         detr_turb_dyn = aux_up_i.detr_turb_dyn
+        ql_tendency_noneq_moisture = aux_up_i.ql_tendency_noneq_moisture
+        qi_tendency_noneq_moisture = aux_up_i.qi_tendency_noneq_moisture
         θ_liq_ice_tendency_precip_formation = aux_up_i.θ_liq_ice_tendency_precip_formation
         qt_tendency_precip_formation = aux_up_i.qt_tendency_precip_formation
+        ql_tendency_precip_formation = aux_up_i.ql_tendency_precip_formation
+        qi_tendency_precip_formation = aux_up_i.qi_tendency_precip_formation
+
 
         tends_ρarea = tendencies_up[i].ρarea
         tends_ρaθ_liq_ice = tendencies_up[i].ρaθ_liq_ice
         tends_ρaq_tot = tendencies_up[i].ρaq_tot
+        tends_ρaq_liq = tendencies_up[i].ρaq_liq
+        tends_ρaq_ice = tendencies_up[i].ρaq_ice
 
         @. tends_ρarea =
             -∇c(wvec(LBF(Ic(w_up) * ρ0_c * a_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn) -
@@ -430,6 +473,21 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
             -∇c(wvec(LBF(Ic(w_up) * ρ0_c * a_up * q_tot_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * q_tot_en) -
             (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn * q_tot_up) + (ρ0_c * qt_tendency_precip_formation)
 
+        @. tends_ρaq_tot =
+            -∇c(wvec(LBF(Ic(w_up) * ρ0_c * a_up * q_tot_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * q_tot_en) -
+            (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn * q_tot_up) + (ρ0_c * qt_tendency_precip_formation)
+
+        #TODO if non_equilibrium
+        @. tends_ρaq_liq =
+            -∇c(wvec(LBF(Ic(w_up) * ρ0_c * a_up * q_liq_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * q_liq_en) -
+            (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn * q_liq_up) +
+            (ρ0_c * (ql_tendency_precip_formation + ql_tendency_noneq_moisture))
+
+        @. tends_ρaq_ice =
+            -∇c(wvec(LBF(Ic(w_up) * ρ0_c * a_up * q_ice_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * q_ice_en) -
+            (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn * q_ice_up) +
+            (ρ0_c * (qi_tendency_precip_formation + qi_tendency_noneq_moisture))
+        # end
 
         # prognostic entr/detr
         if edmf.entr_closure isa PrognosticNoisyRelaxationProcess
@@ -449,6 +507,8 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         tends_ρarea[kc_surf] = 0
         tends_ρaθ_liq_ice[kc_surf] = 0
         tends_ρaq_tot[kc_surf] = 0
+        tends_ρaq_liq[kc_surf] = 0
+        tends_ρaq_ice[kc_surf] = 0
     end
 
     # Solve for updraft velocity
@@ -505,6 +565,8 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         prog_up[i].ρarea .= max.(prog_up[i].ρarea, 0)
         prog_up[i].ρaθ_liq_ice .= max.(prog_up[i].ρaθ_liq_ice, 0)
         prog_up[i].ρaq_tot .= max.(prog_up[i].ρaq_tot, 0)
+        prog_up[i].ρaq_liq .= max.(prog_up[i].ρaq_liq, 0)
+        prog_up[i].ρaq_ice .= max.(prog_up[i].ρaq_ice, 0)
         if edmf.entr_closure isa PrognosticNoisyRelaxationProcess
             @. prog_up[i].ε_nondim = max(prog_up[i].ε_nondim, 0)
             @. prog_up[i].δ_nondim = max(prog_up[i].δ_nondim, 0)
@@ -530,6 +592,8 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
             # a similar filtering of ρaθ_liq_ice breaks the simulation
             if prog_up[i].ρarea[k] / ρ0_c[k] < a_min
                 prog_up[i].ρaq_tot[k] = 0
+                prog_up[i].ρaq_liq[k] = 0
+                prog_up[i].ρaq_ice[k] = 0
             end
         end
     end
@@ -539,6 +603,8 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         @. prog_up[i].ρarea = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρarea)
         @. prog_up[i].ρaθ_liq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaθ_liq_ice)
         @. prog_up[i].ρaq_tot = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_tot)
+        @. prog_up[i].ρaq_liq = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_liq)
+        @. prog_up[i].ρaq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_ice)
         θ_surf = θ_surface_bc(surf, grid, state, edmf, i)
         q_surf = q_surface_bc(surf, grid, state, edmf, i)
         a_surf = area_surface_bc(surf, edmf, i)
