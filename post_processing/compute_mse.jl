@@ -93,7 +93,17 @@ function compute_mse_wrapper(
 end
 
 
-function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = true, group_figs = true, t_start, t_stop)
+function compute_mse(
+    case_name,
+    best_mse,
+    plot_dir;
+    ds_dict,
+    plot_comparison = true,
+    group_figs = true,
+    t_start,
+    t_stop,
+    skip_comparison = false,
+)
 
     TC = TurbulenceConvection
     ds_scampy = haskey(ds_dict, :ds_scampy) ? ds_dict[:ds_scampy] : nothing
@@ -440,6 +450,9 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
             mse_single_var = sum((data_scm_cont_mapped .- data_tcc_cont_mapped) .^ 2)
             data_scale_used = data_scale_scm
             scaled_mse = mse_single_var / data_scale_used^2 # Normalize by data scale
+        elseif skip_comparison
+            mse[tc_var] = "NA"
+            continue
         else
             error("No dataset to compute MSE")
         end
@@ -461,6 +474,10 @@ function compute_mse(case_name, best_mse, plot_dir; ds_dict, plot_comparison = t
     end
 
     save_plots(plot_dir, plots_dict; group_figs, have_tc_main, fig_height, case_name)
+
+    if skip_comparison
+        return mse
+    end
 
     # Tabulate output
     header = (

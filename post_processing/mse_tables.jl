@@ -35,6 +35,24 @@ all_best_mse["Bomex"]["thetal_mean"] = 4.109422617066199e-5
 all_best_mse["Bomex"]["Hvar_mean"] = 3220.9530553700365
 all_best_mse["Bomex"]["QTvar_mean"] = 1135.034207918591
 #
+all_best_mse["GATE_III"] = OrderedCollections.OrderedDict()
+all_best_mse["GATE_III"]["qt_mean"] = 1.0
+all_best_mse["GATE_III"]["updraft_area"] = 1.0
+all_best_mse["GATE_III"]["updraft_w"] = 1.0
+all_best_mse["GATE_III"]["updraft_qt"] = 1.0
+all_best_mse["GATE_III"]["updraft_thetal"] = 1.0
+all_best_mse["GATE_III"]["v_mean"] = 1.0
+all_best_mse["GATE_III"]["u_mean"] = 1.0
+all_best_mse["GATE_III"]["tke_mean"] = 1.0
+all_best_mse["GATE_III"]["temperature_mean"] = 1.0
+all_best_mse["GATE_III"]["ql_mean"] = 1.0
+all_best_mse["GATE_III"]["qi_mean"] = 1.0
+all_best_mse["GATE_III"]["qr_mean"] = 1.0
+all_best_mse["GATE_III"]["qs_mean"] = 1.0
+all_best_mse["GATE_III"]["thetal_mean"] = 1.0
+all_best_mse["GATE_III"]["Hvar_mean"] = 1.0
+all_best_mse["GATE_III"]["QTvar_mean"] = 1.0
+#
 all_best_mse["DryBubble"] = OrderedCollections.OrderedDict()
 all_best_mse["DryBubble"]["updraft_area"] = 0.0
 all_best_mse["DryBubble"]["updraft_w"] = 0.0

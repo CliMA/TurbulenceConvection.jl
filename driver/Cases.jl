@@ -724,6 +724,7 @@ function surface_ref_state(::GATE_III, param_set::APS, namelist)
 end
 
 function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, param_set, state)
+    FT = eltype(grid)
     p0 = TC.center_ref_state(state).p0
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -756,6 +757,7 @@ function surface_params(case::GATE_III, grid::TC.Grid, surf_ref_state, param_set
 end
 
 function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, state, param_set)
+    FT = eltype(grid)
     aux_gm = TC.center_aux_grid_mean(state)
     for k in TC.real_center_indices(grid)
         z = grid.zc[k]
