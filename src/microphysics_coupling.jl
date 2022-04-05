@@ -2,12 +2,9 @@
 Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 (autoconversion + accretion)
 """
-function cloud_formation(
+function noneq_moisture_sources(
     param_set::APS,
     area::FT,
-    q_tot::FT,
-    q_liq::FT,
-    q_ice::FT,
     ρ0::FT,
     Δt::Real,
     ts,
@@ -22,20 +19,31 @@ function cloud_formation(
         q = TD.PhasePartition(ts)
         T = TD.air_temperature(ts)
 
-        q_sat_liquid::FT = q_vap_saturation_generic(param_set, T, ρ0, TD.Liquid())
-        q_sat_ice::FT = q_vap_saturation_generic(param_set, T, ρ0, TD.Ice())
-        q_cond = TD.PhasePartition(FT(0), max(0.0, q_sat_liquid - q.liq), max(0.0, q_sat_ice - q.ice))
+        q_vap = TD.vapour_specific_humidity(ts)
 
-        S_ql = CM1.conv_q_vap_to_q_liq_ice(param_set, liquid_type, q_cond, q)
-        S_qi = CM1.conv_q_vap_to_q_liq_ice(param_set, ice_type, q_cond, q)
+        # TODO - is that the state we want to be relaxing to?
+        ts_eq = TD.PhaseEquil_ρTq(param_set, ρ0, T, q.tot)
+        q_eq = PhasePartition(ts_eq)
 
+        S_ql = CM1.conv_q_vap_to_q_liq_ice(param_set, liquid_type, q_eq, q)
+        S_qi = CM1.conv_q_vap_to_q_liq_ice(param_set, ice_type, q_eq, q)
 
-
+        # TODO - handle limiters elswhere
+        if S_ql >= FT(0)
+            S_ql = min(S_ql, qv / Δt)
+        else
+            S_ql = -min(-S_ql, ql / Δt)
+        end
+        if S_qi >= FT(0)
+            S_qi = min(S_qi, qv / Δt)
+        else
+            S_qi = -min(-S_qi, qi / Δt)
+        end
 
         ql_tendency += S_ql
         qi_tendency += S_qi
     end
-    return CloudFormation{FT}(ql_tendency, qi_tendency)
+    return NoneqMoistureSources{FT}(ql_tendency, qi_tendency)
 end
 
 """

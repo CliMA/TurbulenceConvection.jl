@@ -27,6 +27,10 @@ cent_aux_vars_up(FT, edmf) = (;
     θ_liq_ice = FT(0),
     θ_liq_ice_tendency_precip_formation = FT(0),
     qt_tendency_precip_formation = FT(0),
+    ql_tendency_precip_formation = FT(0),
+    qi_tendency_precip_formation = FT(0),
+    ql_tendency_noneq_moisture = FT(0),
+    qi_tendency_noneq_moisture = FT(0),
     entr_sc = FT(0),
     detr_sc = FT(0),
     ε_nondim = FT(0),  # nondimensional entrainment
@@ -53,6 +57,10 @@ cent_aux_vars_edmf(FT, edmf) = (;
             cloud_fraction = FT(0),
             θ_liq_ice_tendency_precip_formation = FT(0),
             qt_tendency_precip_formation = FT(0),
+            ql_tendency_precip_formation = FT(0),
+            qi_tendency_precip_formation = FT(0),
+            ql_tendency_noneq_moisture = FT(0),
+            qi_tendency_noneq_moisture = FT(0),
         ),
         up = ntuple(i -> cent_aux_vars_up(FT, edmf), n_updrafts(edmf)),
         en = (;
@@ -74,7 +82,11 @@ cent_aux_vars_edmf(FT, edmf) = (;
             QTvar = FT(0),
             HQTcov = FT(0),
             qt_tendency_precip_formation = FT(0),
+            ql_tendency_precip_formation = FT(0),
+            qi_tendency_precip_formation = FT(0),
             θ_liq_ice_tendency_precip_formation = FT(0),
+            ql_tendency_noneq_moisture = FT(0),
+            qi_tendency_noneq_moisture = FT(0),
             unsat = (; q_tot = FT(0), θ_dry = FT(0), θ_virt = FT(0)),
             sat = (; T = FT(0), q_vap = FT(0), q_tot = FT(0), θ_dry = FT(0), θ_liq_ice = FT(0)),
             Hvar_rain_dt = FT(0),
@@ -101,8 +113,12 @@ cent_aux_vars_edmf(FT, edmf) = (;
         mixing_length = FT(0),
         massflux_tendency_h = FT(0),
         massflux_tendency_qt = FT(0),
+        massflux_tendency_ql = FT(0),
+        massflux_tendency_qi = FT(0),
         diffusive_tendency_h = FT(0),
         diffusive_tendency_qt = FT(0),
+        diffusive_tendency_ql = FT(0),
+        diffusive_tendency_qi = FT(0),
         prandtl_nvec = FT(0),
         # Added by Ignacio : Length scheme in use (mls), and smooth min effect (ml_ratio)
         # Variable Prandtl number initialized as neutral value.
@@ -146,9 +162,13 @@ face_aux_vars_edmf(FT, edmf) = (;
         up = ntuple(i -> face_aux_vars_up(FT), n_updrafts(edmf)),
         massflux_h = FT(0),
         massflux_qt = FT(0),
+        massflux_ql = FT(0),
+        massflux_qi = FT(0),
         ϕ_temporary = FT(0),
         diffusive_flux_h = FT(0),
         diffusive_flux_qt = FT(0),
+        diffusive_flux_ql = FT(0),
+        diffusive_flux_qi = FT(0),
         diffusive_flux_u = FT(0),
         diffusive_flux_v = FT(0),
     ),
@@ -193,8 +213,8 @@ single_value_per_col_diagnostic_vars_edmf(FT, edmf) = (;
 ##### Prognostic fields
 
 # Center only
-cent_prognostic_vars_up(FT, _) = (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot = FT(0))
-cent_prognostic_vars_up(FT, ::NonequilibriumMoisture) = (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot = FT(0), ρaq_liq = FT(0), ρaq_ice = FT(0))
+cent_prognostic_vars_up(FT, _) = (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot = FT(0), ρaq_liq = FT(0), ρaq_ice = FT(0))
+#cent_prognostic_vars_up(FT, ::NonequilibriumMoisture) = (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot = FT(0), ρaq_liq = FT(0), ρaq_ice = FT(0))
 cent_prognostic_vars_up(FT, ::PrognosticNoisyRelaxationProcess) =
     (; ρarea = FT(0), ρaθ_liq_ice = FT(0), ρaq_tot = FT(0), ε_nondim = FT(0), δ_nondim = FT(0))
 cent_prognostic_vars_en(FT) = (; ρatke = FT(0), ρaHvar = FT(0), ρaQTvar = FT(0), ρaHQTcov = FT(0))

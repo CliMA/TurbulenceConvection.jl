@@ -226,6 +226,7 @@ function affect_filter!(
 end
 
 function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS)
+    FT = eltype(grid)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -452,7 +453,6 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         qt_tendency_precip_formation = aux_up_i.qt_tendency_precip_formation
         ql_tendency_precip_formation = aux_up_i.ql_tendency_precip_formation
         qi_tendency_precip_formation = aux_up_i.qi_tendency_precip_formation
-
 
         tends_ρarea = tendencies_up[i].ρarea
         tends_ρaθ_liq_ice = tendencies_up[i].ρaθ_liq_ice
