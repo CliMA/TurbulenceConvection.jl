@@ -16,38 +16,10 @@ invalidations = @snoopr begin
     namelist["meta"]["uuid"] = "01_invalidations"
     ds_tc_filename, return_code = main(namelist)
 end;
-import SnoopCompile
-trees = SnoopCompile.invalidation_trees(invalidations);
-@show length(SnoopCompile.uinvalidated(invalidations))
 
-show(trees[end])
-
-# https://github.com/jheinen/GR.jl/issues/278#issuecomment-587090846
-ENV["GKSwstype"] = "nul"
-import Plots
-n_invalidations = map(trees) do methinvs
-    SnoopCompile.countchildren(methinvs)
-end
-p1 = Plots.plot(
-    1:length(trees),
-    n_invalidations;
-    markershape = :circle,
-    xlabel = "i-th method invalidation",
-    label = "Number of children per method invalidations",
+import ReportMetrics
+ReportMetrics.report_invalidations(;
+    job_name = "invalidations",
+    invalidations,
+    process_filename = x -> last(split(x, "packages/")),
 )
-p2 = Plots.plot(
-    1:length(trees),
-    n_invalidations ./ sum(n_invalidations) .* 100;
-    markershape = :circle,
-    xlabel = "i-th method invalidation",
-    label = "Percentage of invalidations",
-)
-Plots.plot(p1, p2; layout = (2, 1))
-folder = "perf/invalidations_output"
-mkpath(folder)
-Plots.savefig(joinpath(folder, "invalidations.png"))
-
-# More detail:
-# root = methinvs.backedges[end]
-# show(root; maxdepth=10)
-# SnoopCompile.ascend(root)
