@@ -596,3 +596,36 @@ struct State{P, A, T}
     aux::A
     tendencies::T
 end
+
+"""
+    column_state(prog, aux, tendencies, inds...)
+
+Create a columnar state given full 3D states
+ - `prog` prognostic state
+ - `aux` auxiliary state
+ - `tendencies` tendencies state
+ - `inds` `i`, `j`, `h` indices
+
+## Example
+```julia
+local_geom = ClimaCore.Spaces.local_geometry_data(space)
+Ni, Nj, _, _, Nh = size(local_geom)
+for h in 1:Nh, j in 1:Nj, i in 1:Ni
+    inds = (i, j, h)
+    state = TC.column_state(prog, aux, tendencies, inds...)
+    ...
+end
+"""
+function column_state(prog, aux, tendencies, inds...)
+    prog_cent_column = CC.column(prog.cent, inds...)
+    prog_face_column = CC.column(prog.face, inds...)
+    aux_cent_column = CC.column(aux.cent, inds...)
+    aux_face_column = CC.column(aux.face, inds...)
+    tends_cent_column = CC.column(tendencies.cent, inds...)
+    tends_face_column = CC.column(tendencies.face, inds...)
+    prog_column = CC.Fields.FieldVector(cent = prog_cent_column, face = prog_face_column)
+    aux_column = CC.Fields.FieldVector(cent = aux_cent_column, face = aux_face_column)
+    tends_column = CC.Fields.FieldVector(cent = tends_cent_column, face = tends_face_column)
+
+    return State(prog_column, aux_column, tends_column)
+end
