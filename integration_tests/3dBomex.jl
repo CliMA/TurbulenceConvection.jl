@@ -223,33 +223,14 @@ function ∑tendencies_3d_bomex!(tendencies, prog, cache, t)
 
     Ni, Nj, _, _, Nh = size(CC.Spaces.local_geometry_data(hv_center_space))
     for h in 1:Nh, j in 1:Nj, i in 1:Ni
-        inds = (i, j, h)
-        prog_cent_column = CC.column(prog.cent, inds...)
-        prog_face_column = CC.column(prog.face, inds...)
-        aux_cent_column = CC.column(aux.cent, inds...)
-        aux_face_column = CC.column(aux.face, inds...)
-        tends_cent_column = CC.column(tendencies.cent, inds...)
-        tends_face_column = CC.column(tendencies.face, inds...)
-        prog_column = CC.Fields.FieldVector(cent = prog_cent_column, face = prog_face_column)
-        aux_column = CC.Fields.FieldVector(cent = aux_cent_column, face = aux_face_column)
-        tends_column = CC.Fields.FieldVector(cent = tends_cent_column, face = tends_face_column)
-
-        state = TC.State(prog_column, aux_column, tends_column)
-
+        state = TC.column_state(prog, aux, tendencies, i, j, h)
         surf = get_surface(case.surf_params, grid, state, t, param_set)
         force = case.Fo
         radiation = case.Rad
-
         TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
-
-        # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
-        # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
-        # treat them as auxiliary variables for now, until we disentangle the tendency computations.
         Cases.update_forcing(case, grid, state, t, param_set)
         Cases.update_radiation(case.Rad, grid, state, param_set)
-
         TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
-
         # compute tendencies
         TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt)
     end
