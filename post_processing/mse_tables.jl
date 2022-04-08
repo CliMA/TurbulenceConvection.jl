@@ -41,7 +41,6 @@ all_best_mse["GATE_III"]["updraft_area"] = 1.0
 all_best_mse["GATE_III"]["updraft_w"] = 1.0
 all_best_mse["GATE_III"]["updraft_qt"] = 1.0
 all_best_mse["GATE_III"]["updraft_thetal"] = 1.0
-all_best_mse["GATE_III"]["v_mean"] = 1.0
 all_best_mse["GATE_III"]["u_mean"] = 1.0
 all_best_mse["GATE_III"]["tke_mean"] = 1.0
 all_best_mse["GATE_III"]["temperature_mean"] = 1.0
