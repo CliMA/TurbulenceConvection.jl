@@ -18,7 +18,6 @@ all_cases = [
     "LES_driven_SCM",
 ]
 
-filter!(x -> x ≠ "GATE_III", all_cases) # no mse tables for GATE_III
 filter!(x -> x ≠ "SP", all_cases) # not currently running SP
 
 include(joinpath("..", "post_processing", "mse_tables.jl"))

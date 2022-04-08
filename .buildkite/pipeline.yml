@@ -63,10 +63,10 @@ steps:
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case ARM_SGP"
         artifact_paths: "Output.ARM_SGP.01/stats/comparison/*"
 
-      # Takes a bit too long...
-      # - label: ":partly_sunny: GATE_III"
-      #   command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case GATE_III"
-      #   artifact_paths: "Output.GATE_III.01/stats/comparison/*"
+      # Run for short time since it's long...
+      - label: ":partly_sunny: GATE_III"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case GATE_III --t_max 86400.0"
+        artifact_paths: "Output.GATE_III.01/stats/comparison/*"
 
       - label: ":partly_sunny: DYCOMS_RF01"
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case DYCOMS_RF01"

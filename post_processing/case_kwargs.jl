@@ -38,7 +38,12 @@ case_kwargs["ARM_SGP"] = (;
     t_start = 8 * 3600,
     t_stop = 11 * 3600)
 
-case_kwargs["GATE_III"] = (;)
+case_kwargs["GATE_III"] = (;
+    plot_comparison = true,
+    t_start = 4 * 3600,
+    t_stop = 6 * 3600,
+    skip_comparison = true # TODO: remove this option
+)
 
 case_kwargs["DYCOMS_RF01"] = (;
     plot_comparison = true,
