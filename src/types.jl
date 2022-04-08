@@ -736,7 +736,7 @@ end
 
 
 
-struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
+struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, ECP, EDS, EDSP}
     surface_area::FT
     max_area::FT
     minimum_area::FT
@@ -745,7 +745,9 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
     prandtl_number::FT
     bg_closure::EBGC
     entr_closure::EC
+    entr_closure_parameters::ECP
     entr_dim_scale::EDS
+    entr_dim_scale_parameters::EDSP
     function EDMFModel(namelist, precip_model) where {PS}
         # TODO: move this into arg list
         FT = Float64
@@ -867,13 +869,14 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
             error("Something went wrong. Invalid entrainment dimension scale '$entr_dim_scale'")
         end
 
-
+        EDSP = typeof(entr_dim_scale_parameters)
         EDS = typeof(entr_dim_scale)
+        ECP = typeof(entr_closure_parameters)
         EC = typeof(entr_closure)
         PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
-        return new{n_updrafts, FT, PM, ENT, EBGC, EC, EDS}(
+        return new{n_updrafts, FT, PM, ENT, EBGC, EC, ECP, EDS, EDSP}(
             surface_area,
             max_area,
             minimum_area,
@@ -882,7 +885,9 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS}
             prandtl_number,
             bg_closure,
             entr_closure,
+            entr_closure_parameters,
             entr_dim_scale,
+            entr_dim_scale_parameters
         )
     end
 end

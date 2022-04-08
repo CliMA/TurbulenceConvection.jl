@@ -1,9 +1,30 @@
+abstract type AbstractPerturbationPressureParameters end
+struct PerturbationPressureParameters{FT} <: AbstractPerturbationPressureParameters
+    α_b::FT
+    α_a::FT
+    α_d::FT
+end
+
+function PerturbationPressureParameters(
+    param_set,
+) where {FT}
+    aliases =["α_b", "α_a",  "α_d"]
+    (α_b, α_a, α_d) =
+        CLIMAParameters.get_parameter_values!(param_set, aliases, "PerturbationPressure")
+
+    return PerturbationPressureParameters{CLIMAParameters.get_parametric_type(param_set)}(
+        α_b,
+        α_a,
+        α_d,
+    )
+end
+
 """
     compute_nh_pressure!(
         state::State,
         grid::Grid,
         edmf::EDMFModel,
-        param_set::APS
+        param_set::PerturbationPressureParameters,
     )
 
 Computes the
@@ -16,9 +37,9 @@ for all updrafts, following [He2020](@cite), given:
  - `state`: state
  - `grid`: grid
  - `edmf`: EDMF model
- - `param_set`: parameter set, containing CLIMAParameters
+ - `param_set`: `PerturbationPressureParameters`` parameter set
 """
-function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, param_set::APS, surf)
+function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, param_set::PerturbationPressureParameters, surf)
 
     FT = eltype(grid)
     N_up = n_updrafts(edmf)
@@ -39,9 +60,9 @@ function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, param_s
 
     # Note: Independence of aspect ratio hardcoded in implementation.
     α₂_asp_ratio² = FT(0)
-    α_b::FT = CPEDMF.α_b(param_set)
-    α_a::FT = CPEDMF.α_a(param_set)
-    α_d::FT = CPEDMF.α_d(param_set)
+    α_b = param_set.α_b
+    α_a = param_set.α_a
+    α_d = param_set.α_d
 
     @inbounds for i in 1:N_up
         # pressure
