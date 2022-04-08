@@ -319,6 +319,13 @@ function Rico(namelist_defaults)
     namelist["microphysics"]["q_liq_threshold"] = 0.5e-3
     namelist["microphysics"]["q_ice_threshold"] = 1e-6
     namelist["microphysics"]["microph_scaling"] = 1.0
+    namelist["microphysics"]["microph_scaling_dep_sub"] = 1.0
+    namelist["microphysics"]["microph_scaling_melt"] = 1.0
+    namelist["microphysics"]["E_liq_rai"] = 0.8
+    namelist["microphysics"]["E_liq_sno"] = 0.1
+    namelist["microphysics"]["E_ice_rai"] = 1.0
+    namelist["microphysics"]["E_ice_sno"] = 0.1
+    namelist["microphysics"]["E_rai_sno"] = 1.0
 
     namelist["meta"]["simname"] = "Rico"
     namelist["meta"]["casename"] = "Rico"
@@ -344,6 +351,13 @@ function TRMM_LBA(namelist_defaults)
     namelist["microphysics"]["q_liq_threshold"] = 0.5e-3
     namelist["microphysics"]["q_ice_threshold"] = 1e-6
     namelist["microphysics"]["microph_scaling"] = 1.0
+    namelist["microphysics"]["microph_scaling_dep_sub"] = 1.0
+    namelist["microphysics"]["microph_scaling_melt"] = 1.0
+    namelist["microphysics"]["E_liq_rai"] = 0.8
+    namelist["microphysics"]["E_liq_sno"] = 0.1
+    namelist["microphysics"]["E_ice_rai"] = 1.0
+    namelist["microphysics"]["E_ice_sno"] = 0.1
+    namelist["microphysics"]["E_rai_sno"] = 1.0
 
     namelist["meta"]["simname"] = "TRMM_LBA"
     namelist["meta"]["casename"] = "TRMM_LBA"
@@ -423,6 +437,13 @@ function DYCOMS_RF02(namelist_defaults)
     namelist["microphysics"]["q_liq_threshold"] = 0.5e-3
     namelist["microphysics"]["q_ice_threshold"] = 1e-6
     namelist["microphysics"]["microph_scaling"] = 1.0
+    namelist["microphysics"]["microph_scaling_dep_sub"] = 1.0
+    namelist["microphysics"]["microph_scaling_melt"] = 1.0
+    namelist["microphysics"]["E_liq_rai"] = 0.8
+    namelist["microphysics"]["E_liq_sno"] = 0.1
+    namelist["microphysics"]["E_ice_rai"] = 1.0
+    namelist["microphysics"]["E_ice_sno"] = 0.1
+    namelist["microphysics"]["E_rai_sno"] = 1.0
 
     namelist["meta"]["simname"] = "DYCOMS_RF02"
     namelist["meta"]["casename"] = "DYCOMS_RF02"
