@@ -147,7 +147,8 @@ get_forcing_type(::LES_driven_SCM) = TC.ForcingLES
 get_radiation_type(::AbstractCaseType) = TC.RadiationNone # default
 get_radiation_type(::DYCOMS_RF01) = TC.RadiationDYCOMS_RF01
 get_radiation_type(::DYCOMS_RF02) = TC.RadiationDYCOMS_RF01
-get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
+# get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
+get_radiation_type(::LES_driven_SCM) = TC.RadiationRRTMGP
 
 RadiationBase(case::AbstractCaseType) = RadiationBase{Cases.get_radiation_type(case)}()
 
@@ -1159,6 +1160,8 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, param_
         parent(prog_gm.q_tot) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "qt_mean", imin, imax))
         parent(prog_gm.u) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "u_mean", imin, imax))
         parent(prog_gm.v) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "v_mean", imin, imax))
+        # for RRTMGP
+        parent(aux_gm.T) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "temperature_mean", imin, imax))
     end
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
@@ -1199,6 +1202,8 @@ initialize_forcing(self::CasesBase{LES_driven_SCM}, grid::Grid, state, param_set
     initialize(self.Fo, grid, state, self.LESDat)
 
 initialize_radiation(self::CasesBase{LES_driven_SCM}, grid::Grid, state, param_set) =
-    initialize(self.Rad, grid, state, self.LESDat)
+    # initialize(self.Rad, grid, state, self.LESDat)
+    initialize_rrtmgp(grid, state, param_set)
+    # initialize(self.Rad, grid, state, param_set)
 
 end # module Cases
