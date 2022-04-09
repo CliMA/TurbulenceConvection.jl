@@ -523,7 +523,7 @@ function LES_driven_SCM(namelist_defaults)
     namelist["initial_condition_averaging_window_s"] = 3600.0
 
     namelist["meta"]["lesfile"] =
-        joinpath(les_driven_scm_data_folder(), "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc")
+        joinpath(les_driven_scm_data_folder(), "Stats.cfsite17_HadGEM2-A_amip_2004-2008.07.nc")
     namelist["meta"]["simname"] = "LES_driven_SCM"
     namelist["meta"]["casename"] = "LES_driven_SCM"
     namelist["forcing"] = Dict()

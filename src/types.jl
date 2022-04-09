@@ -342,6 +342,7 @@ struct ForcingLES end
 struct RadiationNone end
 struct RadiationDYCOMS_RF01 end
 struct RadiationLES end
+struct RadiationRRTMGP end
 
 Base.@kwdef struct LESData
     "Start time index of LES"

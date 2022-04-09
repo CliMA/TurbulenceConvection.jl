@@ -1,10 +1,12 @@
-update_radiation(self::TC.RadiationBase, grid, state, param_set) = nothing
+include("rrtmgp_model.jl")
+
+update_radiation(self::TC.RadiationBase, grid, state, param_set, params) = nothing
 initialize(self::TC.RadiationBase{TC.RadiationNone}, grid, state) = nothing
 
 """
 see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
-function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid, state, param_set)
+function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid, state, param_set, params)
     cp_d = CPP.cp_d(param_set)
     ρ0_f = TC.face_ref_state(state).ρ0
     ρ0_c = TC.center_ref_state(state).ρ0
@@ -81,5 +83,100 @@ function initialize(self::TC.RadiationBase{TC.RadiationLES}, grid, state, LESDat
     @inbounds for k in TC.real_center_indices(grid)
         aux_gm.dTdt_rad[k] = dTdt[k]
     end
+    return
+end
+
+
+function initialize_rrtmgp(grid, state, param_set)
+    FT = eltype(grid)
+    ρ0_c = TC.center_ref_state(state).ρ0
+    p0_c = TC.center_ref_state(state).p0
+    prog_gm = TC.center_prog_grid_mean(state)
+    ds_input = rrtmgp_artifact("atmos_state", "clearsky_as.nc")
+    nlay = ds_input.dim["layer"]
+    nsite = ds_input.dim["site"]
+    nexpt = ds_input.dim["expt"]
+    ncol = nsite * nexpt
+
+    vmrs = map((
+        # ("h2o", "water_vapor"),            # overwritten by vmr_h2o
+        ("co2", "carbon_dioxide_GM"),
+        # ("o3", "ozone"),                   # overwritten by vmr_o3
+        ("n2o", "nitrous_oxide_GM"),
+        ("co", "carbon_monoxide_GM"),
+        ("ch4", "methane_GM"),
+        ("o2", "oxygen_GM"),
+        ("n2", "nitrogen_GM"),
+        ("ccl4", "carbon_tetrachloride_GM"),
+        ("cfc11", "cfc11_GM"),
+        ("cfc12", "cfc12_GM"),
+        ("cfc22", "hcfc22_GM"),
+        ("hfc143a", "hfc143a_GM"),
+        ("hfc125", "hfc125_GM"),
+        ("hfc23", "hfc23_GM"),
+        ("hfc32", "hfc32_GM"),
+        ("hfc134a", "hfc134a_GM"),
+        ("cf4", "cf4_GM"),
+        # ("no2", nothing),                  # not available in input dataset
+    )) do (lookup_gas_name, input_gas_name)
+        (
+            Symbol("volume_mixing_ratio_" * lookup_gas_name),
+            get_var(input_gas_name, ds_input, nsite, nexpt, ncol)'[1] .* parse(FT, ds_input[input_gas_name].attrib["units"]),
+        )
+    end
+
+    # get model shape from model density
+    volume_mixing_ratio_h2o = vec(p0_c)
+    p0_c = vec(p0_c)
+    temperature = vec(ρ0_c)
+    z = vec(grid.zf)
+
+    rrtmgp_model = RRTMGPModel(
+        param_set,
+        z;
+        level_computation = :average,
+        use_ideal_coefs_for_bottom_level = false,
+        add_isothermal_boundary_layer = true,
+        surface_emissivity = get_var("surface_emissivity", ds_input, nsite, nexpt, ncol)'[1],
+        solar_zenith_angle = FT(π) / 2 - eps(FT),
+        weighted_irradiance = FT(CP.Planet.tot_solar_irrad(param_set)),
+        dir_sw_surface_albedo = get_var("surface_albedo", ds_input, nsite, nexpt, ncol)'[1],
+        dif_sw_surface_albedo = get_var("surface_albedo", ds_input, nsite, nexpt, ncol)'[1],
+        pressure = vec(p0_c),
+        temperature = vec(p0_c),
+        surface_temperature = get_var("surface_temperature", ds_input, nsite, nexpt, ncol)[1],
+        latitude = get_var("lat", ds_input, nsite, nexpt, ncol)[1],
+        volume_mixing_ratio_h2o = vec(p0_c),
+        volume_mixing_ratio_o3 = get_var("ozone", ds_input, nsite, nexpt, ncol)[1],
+        vmrs...,
+        volume_mixing_ratio_no2 = 0,
+    )
+    return rrtmgp_model
+end
+
+function update_radiation(self::TC.RadiationBase{TC.RadiationRRTMGP}, grid, state, param_set, params)
+
+    cp_d = CPP.cp_d(param_set)
+    ρ0_c = TC.center_ref_state(state).ρ0
+    p0_c = TC.center_ref_state(state).p0
+    prog_gm = TC.center_prog_grid_mean(state)
+    aux_gm_f = TC.face_aux_grid_mean(state)
+    aux_gm = TC.center_aux_grid_mean(state)
+
+    UnPack.@unpack rrtmgp_model = params
+
+    ϵ_d = CPP.molmass_ratio(param_set)
+
+    rrtmgp_model.temperature .= vec(aux_gm.T)
+    rrtmgp_model.pressure .= vec(p0_c)
+    rrtmgp_model.volume_mixing_ratio_h2o .= vec(@. ϵ_d * prog_gm.q_tot / (1 - prog_gm.q_tot))
+    rrtmgp_flux = vec(grid.zf)
+    vec(rrtmgp_flux) .= compute_fluxes!(rrtmgp_model)
+    @inbounds for k in TC.real_face_indices(grid)
+        aux_gm_f.f_rad[k] = rrtmgp_flux[k]
+    end
+    ∇c = CCO.DivergenceF2C()
+    wvec = CC.Geometry.WVector
+    @. aux_gm.dTdt_rad = -∇c(wvec(aux_gm_f.f_rad)) / ρ0_c / cp_d
     return
 end

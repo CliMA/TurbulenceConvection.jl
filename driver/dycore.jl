@@ -249,7 +249,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
     Cases.update_forcing(case, grid, state, t, param_set)
-    Cases.update_radiation(case.Rad, grid, state, param_set)
+    Cases.update_radiation(case.Rad, grid, state, param_set, params)
 
     TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
 
@@ -320,7 +320,7 @@ function compute_gm_tendencies!(
             tendencies_gm.u[k] -= force.coriolis_param * (aux_gm.vg[k] - prog_gm.v[k])
             tendencies_gm.v[k] += force.coriolis_param * (aux_gm.ug[k] - prog_gm.u[k])
         end
-        if TC.rad_type(radiation) <: Union{TC.RadiationDYCOMS_RF01, TC.RadiationLES}
+        if TC.rad_type(radiation) <: Union{TC.RadiationDYCOMS_RF01, TC.RadiationLES, TC.RadiationRRTMGP}
             tendencies_gm.θ_liq_ice[k] += aux_gm.dTdt_rad[k] / Π
         end
 

@@ -43,7 +43,7 @@ function DiffEqNoiseProcess.wiener_randn!(rng::Random.AbstractRNG, rand_vec::CC.
     parent(rand_vec.face) .= Random.randn.()
 end
 
-struct Simulation1d{IONT, G, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS}
+struct Simulation1d{IONT, G, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS, RRTM}
     io_nt::IONT
     grid::G
     state::S
@@ -59,6 +59,7 @@ struct Simulation1d{IONT, G, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS}
     adapt_dt::Bool
     cfl_limit::Float64
     dt_min::Float64
+    rrtmgp_model::RRTM
 end
 
 function Simulation1d(namelist)
@@ -115,7 +116,6 @@ function Simulation1d(namelist)
     surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
 
     Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
-    Rad = TC.RadiationBase(case_type)
     TS = TimeStepping(namelist)
 
     # Create the class for precipitation
@@ -185,6 +185,13 @@ function Simulation1d(namelist)
     spk = Cases.surface_param_kwargs(case_type, namelist)
     surf_params = Cases.surface_params(case_type, grid, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
     inversion_type = Cases.inversion_type(case_type)
+    Rad = TC.RadiationBase(case_type) #, grid, state, param_set)
+    @show case_type
+    rrtmgp_model = if case_type == Cases.LES_driven_SCM()
+        Cases.initialize_rrtmgp(grid, state, param_set)
+    else
+        nothing
+    end
     case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad, spk...)
 
     calibrate_io = namelist["stats_io"]["calibrate_io"]
@@ -209,6 +216,7 @@ function Simulation1d(namelist)
         adapt_dt,
         cfl_limit,
         dt_min,
+        rrtmgp_model,
     )
 end
 
@@ -302,6 +310,7 @@ function solve_args(sim::Simulation1d)
         skip_io = sim.skip_io,
         cfl_limit = sim.cfl_limit,
         dt_min = sim.dt_min,
+        rrtmgp_model = sim.rrtmgp_model
     )
 
     callback_io = ODE.DiscreteCallback(condition_io, affect_io!; save_positions = (false, false))
