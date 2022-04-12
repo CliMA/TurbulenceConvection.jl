@@ -437,9 +437,9 @@ function compute_gm_tendencies!(
     ∇v_sgs = CCO.DivergenceF2C()
 
     @. tends_θ_liq_ice += -α0_c * ∇θ_liq_ice_sgs(wvec(sgs_flux_θ_liq_ice))
-    @. tends_q_tot += -α0_c * ∇q_tot_sgs(wvec(sgs_flux_q_tot))
-    @. tends_q_liq += -α0_c * ∇q_liq_sgs(wvec(sgs_flux_q_liq))
-    @. tends_q_ice += -α0_c * ∇q_ice_sgs(wvec(sgs_flux_q_ice))
+    @. tends_q_tot += -α0_c * ∇q_sgs(wvec(sgs_flux_q_tot))
+    @. tends_q_liq += -α0_c * ∇q_sgs(wvec(sgs_flux_q_liq))
+    @. tends_q_ice += -α0_c * ∇q_sgs(wvec(sgs_flux_q_ice))
     @. tends_u += -α0_c * ∇u_sgs(wvec(sgs_flux_u))
     @. tends_v += -α0_c * ∇v_sgs(wvec(sgs_flux_v))
     return nothing
