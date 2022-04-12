@@ -432,9 +432,7 @@ function compute_gm_tendencies!(
     tends_v = tendencies_gm.v
 
     ∇θ_liq_ice_sgs = CCO.DivergenceF2C()
-    ∇q_tot_sgs = CCO.DivergenceF2C()
-    ∇q_liq_sgs = CCO.DivergenceF2C()
-    ∇q_ice_sgs = CCO.DivergenceF2C()
+    ∇q_sgs = CCO.DivergenceF2C()
     ∇u_sgs = CCO.DivergenceF2C()
     ∇v_sgs = CCO.DivergenceF2C()
 
