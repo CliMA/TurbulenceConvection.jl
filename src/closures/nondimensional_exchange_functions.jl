@@ -79,16 +79,28 @@ function non_dimensional_function!(
     Π_groups::AbstractArray{FT}, # input
     εδ_model::FNOEntr,
 ) where {FT <: Real}
+    # set the parameters
+    width = ICP.w_fno(param_set)
+    modes = ICP.nm_fno(param_set)
+    c_fno = ICP.c_fno(param_set)
 
-    n_input_vars = size(Π_groups)[2]
     # define the model
+    M = size(Π_groups)[1]
+    z = LinRange(0, 1, M)
+    Π_groups = hcat(Π_groups, z)
     Π = Π_groups'
     Π = reshape(Π, (size(Π)..., 1))
-    trafo = OF.FourierTransform(modes = (2,))
-    model = OF.Chain(OF.SpectralKernelOperator(trafo, n_input_vars => 2, Flux.relu),)
+    even = Bool(mod(M, 2)) ? false : true
+    n_input_vars = size(Π)[2]
 
-    # set the parameters
-    c_fno = ICP.c_fno(param_set)
+    trafo = OF.FourierTransform(modes = (modes,), even=even)
+    model = OF.Chain(
+        Flux.Dense(n_input_vars+1, width, Flux.tanh),
+        OF.SpectralKernelOperator(trafo, width => width, Flux.tanh),
+        Flux.Dense(width, width, Flux.tanh),
+        Flux.Dense(width, 2)
+      )
+
     index = 1
     for p in Flux.params(model)
         len_p = length(p)

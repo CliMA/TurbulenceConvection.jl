@@ -106,10 +106,6 @@ function default_namelist(
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["nn_ent_biases"] = false
 
-    # For FNO add here
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_params"] =
-        SA.SVector{74}(rand(74))
-
     # m=100 random features, d=6 input Pi groups
     # RF: parameters to optimize, 2 x (m + 1 + d)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["rf_opt_ent_params"] =
@@ -176,7 +172,7 @@ function default_namelist(
     namelist_defaults["turbulence"]["scheme"] = "EDMF_PrognosticTKE"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "FNO"  # {"moisture_deficit", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_z", "none"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"] = ntuple(i -> i, 6) # or, e.g., (1, 3, 6)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pi_norm_consts"] = [478.298, 1.0, 1.0, 1.0, 1.0, 1.0] # normalization constants for Pi groups
@@ -198,6 +194,40 @@ function default_namelist(
     namelist_defaults["stats_io"]["frequency"] = 60.0
     namelist_defaults["stats_io"]["skip"] = false
     namelist_defaults["stats_io"]["calibrate_io"] = false # limit io for calibration when `true`
+
+
+    # For FNO add here
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_width"] = 2
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_n_modes"] = 2
+
+    width = Int(namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_width"])
+    n_modes = Int(namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_n_modes"])
+    n_pi_groups = length(namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"])
+
+    n_params =  ((n_pi_groups+1)*width + width # first dense layer
+               +n_modes*width*width*2+width*width + width # 1st fno layer
+               +width*width+width # 2nd dense layer
+               +3*width)# 3rd dense layer
+
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_params"] =
+        SA.SVector{n_params}(rand(n_params))
+        # SA.SVector{n_params}(0.110145964358017, 0.107818471096861, 0.10601484036299,
+        #                      0.115025720895403, 0.110675350985154, 0.107261681423157,
+        #                      0.110513397888031, 0.109936279391796, 0.113103018993964,
+        #                      0.108536898674605, 0.111435730635547, 0.110732213830521,
+        #                      0.110905202263858, 0.11146871963941, 0.113644139357845,
+        #                      0.113214443631892, 0.110378415449802, 0.106304735268437,
+        #                      0.107490361638577, 0.110151707870406, 0.107509717310995,
+        #                      0.108542940199941, 0.110991062457431, 0.111945882018128,
+        #                      0.112601586610626, 0.112377849137892, 0.10703150816194,
+        #                      0.109349775447309, 0.111760860063382, 0.111815485390753,
+        #                      0.109717063915311, 0.111242664661716, 0.109776112785691,
+        #                      0.1100056493443, 0.109693333970362, 0.112414791996112,
+        #                      0.110637396161772, 0.111022910847017, 0.112513156448349,
+        #                      0.10898197049526, 0.109838012783559, 0.111782687206031,
+        #                      0.110149707170393, 0.10804612975131, 0.108037372706544,
+        #                      0.108136132018119, 0.109614705502749, 0.108545975695227,
+        #                      0.110192799547287, 0.110283540222331)
 
     if case_name == "Soares"
         namelist = Soares(namelist_defaults)
