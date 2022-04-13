@@ -10,9 +10,12 @@ bib = CitationBibliography(joinpath(@__DIR__, "bibliography.bib"))
 #! format: off
 pages = Any[
     "Home" => "index.md",
+    "Formulation" => "Formulation.md",
     "Reference states" => "ReferenceStates.md",
-    "References" => "References.md",
     "EDMF equations" => "EDMFEquations.md",
+    "API" => "API.md",
+    "Developer docs" => "dev.md",
+    "References" => "References.md",
 ]
 
 mathengine = MathJax(Dict(

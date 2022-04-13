@@ -1,5 +1,7 @@
 # Reference States
 
+Below are plots of reference profiles vs altitude for all of the vanilla experiments that are routinely run in TurbulenceConvection.jl's integration tests.
+
 ```@example
 include("PlotReferenceStates.jl")
 ```

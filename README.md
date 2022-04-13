@@ -133,4 +133,3 @@ Upon running a particular experiment (described above), comparison plots (agains
 | `q_tot′q_tot′`| [x]           |  [✓]            |  [-]         |
 | `θ′q_tot′`    | [x]           |  [✓]            |  [-]         |
 
-
