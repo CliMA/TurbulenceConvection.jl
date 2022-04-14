@@ -60,8 +60,8 @@ cent_aux_vars_gm(FT) = (;
     vg = FT(0), #Geostrophic v velocity
     ∇θ_liq_ice_gm = FT(0),
     ∇q_tot_gm = FT(0),
-    ∇q_liq_gm = FT(0),
-    ∇q_ice_gm = FT(0),
+    ∇q_liq_gm = FT(0), 
+    ∇q_ice_gm = FT(0), # prognostic liquid and ice addition
     θ_virt = FT(0),
     Ri = FT(0),
 )
@@ -312,23 +312,24 @@ function compute_gm_tendencies!(
 
     θ_liq_ice_gm_toa = prog_gm.θ_liq_ice[kc_toa]
     q_tot_gm_toa = prog_gm.q_tot[kc_toa]
-    q_liq_gm_toa = prog_gm.q_liq[kc_toa]
-    q_ice_gm_toa = prog_gm.q_ice[kc_toa]
+    # q_liq_gm_toa = prog_gm.q_liq[kc_toa]
+    # q_ice_gm_toa = prog_gm.q_ice[kc_toa]
     RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_liq_ice_gm_toa))
-    RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa))
-    RBq_liq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_liq_gm_toa))
+    RBq_tot = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa))
+    RBq_liq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_liq_gm_toa)) 
     RBq_ice = CCO.RightBiasedC2F(; top = CCO.SetValue(q_ice_gm_toa))
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
     @. ∇θ_liq_ice_gm = ∇c(wvec(RBθ(prog_gm.θ_liq_ice)))
-    @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.q_tot)))
-    @. ∇q_liq_gm = ∇c(wvec(RBq(prog_gm.q_liq)))
-    @. ∇q_ice_gm = ∇c(wvec(RBq(prog_gm.q_ice)))
+    @. ∇q_tot_gm = ∇c(wvec(RBq_tot(prog_gm.q_tot)))
+    @. ∇q_liq_gm = ∇c(wvec(RBq_liq(prog_gm.q_liq))) 
+    @. ∇q_ice_gm = ∇c(wvec(RBq_ice(prog_gm.q_ice)))
 
     @inbounds for k in TC.real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
         # TODO - change to phase non-equil
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        q_pt = TD.PhasePartition(prog_gm.q_tot[k], prog_gm.q_liq[k], prog_gm.q_ice[k]) # i think this is the right constructor here? 
+        ts = TD.PhaseNonEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], q_pt)
         Π = TD.exner(ts)
 
         if force.apply_coriolis
@@ -375,7 +376,7 @@ function compute_gm_tendencies!(
 
             if force.apply_subsidence
                 # Apply large-scale subsidence tendencies
-                gm_H_subsidence_k = -∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
+                gm_H_subsidence_k = -∇θ_liq_ice_gm[k] * aux_gm.subsidence[k] 
                 gm_QT_subsidence_k = -∇q_tot_gm[k] * aux_gm.subsidence[k]
             else
                 gm_H_subsidence_k = 0.0
@@ -389,6 +390,11 @@ function compute_gm_tendencies!(
             tendencies_gm.u[k] += gm_U_nudge_k
             tendencies_gm.v[k] += gm_V_nudge_k
         end
+
+        # I think aux_en.q_[]_tendency_precip_formation is in EDMF_Environment.jl
+        # I think aux_bulk.q_[]_tendency_precip_formation is in EDMF_Updrafts.jl
+        # I think aux_tc.q_[]_tendency_precip_formation is in EDMF_Functions.jl
+
         tendencies_gm.q_tot[k] +=
             aux_bulk.qt_tendency_precip_formation[k] +
             aux_en.qt_tendency_precip_formation[k] +

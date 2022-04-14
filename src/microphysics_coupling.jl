@@ -64,6 +64,8 @@ function precipitation_formation(
     # TODO - when using adaptive timestepping we are limiting the source terms
     #        with the previous timestep Δt
     qt_tendency = FT(0)
+    ql_tendency = FT(0)
+    qi_tendency = FT(0)
     qr_tendency = FT(0)
     qs_tendency = FT(0)
     θ_liq_ice_tendency = FT(0)
@@ -86,6 +88,9 @@ function precipitation_formation(
             qr_tendency -= S_qt * λ
             qs_tendency -= S_qt * (1 - λ)
             qt_tendency += S_qt
+            ql_tendency -= S_qt * λ # are these right? I'm assuming this here ignores cross terms....
+            qi_tendency -= S_qt * (1 - λ)
+
             θ_liq_ice_tendency -= S_qt / Π_m / c_pm * (L_v0 * λ + L_s0 * (1 - λ))
         end
 
@@ -106,18 +111,22 @@ function precipitation_formation(
             qr_tendency -= S_qt_rain
             qs_tendency -= S_qt_snow
             qt_tendency += S_qt_rain + S_qt_snow
+            ql_tendency -= S_qt_rain  # same here, are these right? it's just auto conv so i presume
+            qi_tendency -= S_qt_snow
             θ_liq_ice_tendency -= 1 / Π_m / c_pm * (L_v0 * S_qt_rain + L_s0 * S_qt_snow)
 
             # accretion cloud water + rain
             S_qr = min(q.liq / Δt, CM1.accretion(param_set, liq_type, rain_type, q.liq, qr, ρ0))
             qr_tendency += S_qr
             qt_tendency -= S_qr
+            ql_tendency -= S_qr
             θ_liq_ice_tendency += S_qr / Π_m / c_pm * L_v0
 
             # accretion cloud ice + snow
             S_qs = min(q.ice / Δt, CM1.accretion(param_set, ice_type, snow_type, q.ice, qs, ρ0))
             qs_tendency += S_qs
             qt_tendency -= S_qs
+            qi_tendency -= S_qs
             θ_liq_ice_tendency += S_qs / Π_m / c_pm * L_s0
 
             # sink of cloud water via accretion cloud water + snow
@@ -125,10 +134,12 @@ function precipitation_formation(
             if T < T_fr # cloud droplets freeze to become snow)
                 qs_tendency -= S_qt
                 qt_tendency += S_qt
+                ql_tendency += S_qt
                 θ_liq_ice_tendency -= S_qt / Π_m / c_pm * Lf * (1 + Rm / c_vm)
-            else # snow melts, both cloud water and snow become rain
+            else # snow melts, both cloud water and snow become rain (# is this melting then accretion?, if so then the factor is some sort of scavenging factor?)
                 α::FT = c_vl / Lf * (T - T_fr)
                 qt_tendency += S_qt
+                ql_tendency += S_qt # i think then the loss in liquid is just this?
                 qs_tendency += S_qt * α
                 qr_tendency -= S_qt * (1 + α)
                 θ_liq_ice_tendency += S_qt / Π_m / c_pm * (Lf * (1 + Rm / c_vm) * α - L_v0)
@@ -139,7 +150,9 @@ function precipitation_formation(
             # sink of rain via accretion cloud ice - rain
             S_qr = -min(qr / Δt, CM1.accretion_rain_sink(param_set, q.ice, qr, ρ0))
             qt_tendency += S_qt
+            qi_tendency += s_qt # added for sink of cloud ice via accretion cloud ice - rain
             qr_tendency += S_qr
+            qi_tendency += S_qr # added for  # sink of rain via accretion cloud ice - rain (is necessary?)
             qs_tendency += -(S_qt + S_qr)
             θ_liq_ice_tendency -= 1 / Π_m / c_pm * (S_qr * Lf * (1 + Rm / c_vm) + S_qt * L_s0)
 
@@ -154,5 +167,5 @@ function precipitation_formation(
             θ_liq_ice_tendency += S_qs * Lf / Π_m / c_vm
         end
     end
-    return PrecipFormation{FT}(θ_liq_ice_tendency, qt_tendency, qr_tendency, qs_tendency)
+    return PrecipFormation{FT}(θ_liq_ice_tendency, qt_tendency, ql_tendency, qi_tendency qr_tendency, qs_tendency) # to confirm, theres no way to have some sort of vectorized q_pt_tendency?
 end

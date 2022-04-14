@@ -15,6 +15,10 @@ function microphysics(
     aux_en_sat = aux_en.sat
     aux_en_unsat = aux_en.unsat
 
+    # TO-DO tie in environment tendencies from liq/ice? I think that has to happen here... to we need a to use tendencies_en?
+    # maybe see center_tendencies_environment(state) = tendencies_turbconv(state, CentField()).en in dycore_api.jl
+
+
     @inbounds for k in real_center_indices(grid)
         # condensation
         q_tot_en = aux_en.q_tot[k]

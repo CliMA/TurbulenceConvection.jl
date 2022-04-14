@@ -29,17 +29,21 @@ function compute_nonequilibrium_moisture_tendencies(
                 Δt,
                 ts_up,
             )
+
+            # aux_up[i].qt_tendency_noneq_moisture[k] = mph.qt_tendency * aux_up[i].area[k] (why no qt here? or at least anna didn't add it)
             aux_up[i].ql_tendency_noneq_moisture[k] = mph.ql_tendency * aux_up[i].area[k]
             aux_up[i].qi_tendency_noneq_moisture[k] = mph.qi_tendency * aux_up[i].area[k]
         end
     end
-    # TODO - to be deleted once we sum all tendencies elsewhere
+    # TODO - to be deleted once we sum all tendencies elsewhere (what does this mean?)
     @inbounds for k in real_center_indices(grid)
+        aux_bulk.qt_tendency_noneq_moisture[k] = 0
         aux_bulk.ql_tendency_noneq_moisture[k] = 0
         aux_bulk.qi_tendency_noneq_moisture[k] = 0
         @inbounds for i in 1:N_up
-            aux_bulk.ql_tendency_noneq_moisture[k] += aux_up[i].qt_noneq_moisture[k]
-            aux_bulk.qi_tendency_noneq_moisture[k] += aux_up[i].qt_noneq_moisture[k]
+            aux_bulk.qt_tendency_noneq_moisture[k] += aux_up[i].qt_noneq_moisture[k]
+            aux_bulk.ql_tendency_noneq_moisture[k] += aux_up[i].ql_noneq_moisture[k]
+            aux_bulk.qi_tendency_noneq_moisture[k] += aux_up[i].qi_noneq_moisture[k]
         end
     end
     return nothing
@@ -82,6 +86,9 @@ function compute_precipitation_formation_tendencies(
                 ts_up,
             )
             aux_up[i].qt_tendency_precip_formation[k] = mph.qt_tendency * aux_up[i].area[k]
+            aux_up[i].ql_tendency_precip_formation[k] = mph.ql_tendency * aux_up[i].area[k] # added liq and ice
+            aux_up[i].qi_tendency_precip_formation[k] = mph.qi_tendency * aux_up[i].area[k]
+
             aux_up[i].θ_liq_ice_tendency_precip_formation[k] = mph.θ_liq_ice_tendency * aux_up[i].area[k]
 
             tendencies_pr.q_rai[k] += mph.qr_tendency * aux_up[i].area[k]
@@ -92,6 +99,9 @@ function compute_precipitation_formation_tendencies(
     @inbounds for k in real_center_indices(grid)
         aux_bulk.θ_liq_ice_tendency_precip_formation[k] = 0
         aux_bulk.qt_tendency_precip_formation[k] = 0
+        aux_bulk.ql_tendency_precip_formation[k] = 0 # added liq and ice
+        aux_bulk.qi_tendency_precip_formation[k] = 0
+
         @inbounds for i in 1:N_up
             aux_bulk.θ_liq_ice_tendency_precip_formation[k] += aux_up[i].θ_liq_ice_tendency_precip_formation[k]
             aux_bulk.qt_tendency_precip_formation[k] += aux_up[i].qt_tendency_precip_formation[k]
