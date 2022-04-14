@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.7.2"
+julia_version = "1.7.0"
 manifest_format = "2.0"
 
 [[deps.AbstractFFTs]]
@@ -1115,10 +1115,10 @@ uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
 version = "0.5.5+0"
 
 [[deps.OperatorFlux]]
-deps = ["ChainRulesCore", "ChainRulesTestUtils", "Distributions", "FFTW", "Flux", "LinearAlgebra", "Tullio", "Zygote"]
-git-tree-sha1 = "9a3bb211e7f3370961af5349fc7f65c0d1d197ab"
+deps = ["ChainRulesCore", "ChainRulesTestUtils", "Distributions", "FFTW", "Flux", "GaussQuadrature", "LinearAlgebra", "Revise", "Tullio", "Zygote"]
+path = "/central/groups/esm/zongyili/Clima/OperatorFlux.jl/"
 uuid = "47cfafe2-3833-4da3-8183-ce14c2b92cbd"
-version = "0.1.1"
+version = "0.1.2"
 
 [[deps.Optim]]
 deps = ["Compat", "FillArrays", "ForwardDiff", "LineSearches", "LinearAlgebra", "NLSolversBase", "NaNMath", "Parameters", "PositiveFactorizations", "Printf", "SparseArrays", "StatsBase"]
@@ -1636,7 +1636,7 @@ version = "0.3.3"
 deps = ["CLIMAParameters", "ClimaCore", "CloudMicrophysics", "Dierckx", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "Flux", "LambertW", "LinearAlgebra", "OperatorFlux", "StaticArrays", "StatsBase", "StochasticDiffEq", "Thermodynamics", "UnPack"]
 path = ".."
 uuid = "8e072fc4-01f8-44fb-b9dc-f9336c367e6b"
-version = "0.17.4"
+version = "0.18.0"
 
 [[deps.URIs]]
 git-tree-sha1 = "97bbe755a53fe859669cd907f2d96aee8d2c1355"

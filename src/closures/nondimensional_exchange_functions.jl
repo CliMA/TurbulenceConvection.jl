@@ -85,13 +85,13 @@ function non_dimensional_function!(
     c_fno = ICP.c_fno(param_set)
 
     # define the model
+    n_input_vars = size(Π_groups)[2]
     M = size(Π_groups)[1]
     z = LinRange(0, 1, M)
     Π_groups = hcat(Π_groups, z)
     Π = Π_groups'
     Π = reshape(Π, (size(Π)..., 1))
     even = Bool(mod(M, 2)) ? false : true
-    n_input_vars = size(Π)[2]
 
     trafo = OF.FourierTransform(modes = (modes,), even=even)
     model = OF.Chain(

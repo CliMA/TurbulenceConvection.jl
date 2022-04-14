@@ -204,10 +204,11 @@ function default_namelist(
     n_modes = Int(namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_n_modes"])
     n_pi_groups = length(namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"])
 
-    n_params =  ((n_pi_groups+1)*width + width # first dense layer
-               +n_modes*width*width*2+width*width + width # 1st fno layer
-               +width*width+width # 2nd dense layer
-               +3*width)# 3rd dense layer
+    #n_params =  ((n_pi_groups+1)*width + width # first dense layer
+    #           +n_modes*width*width*2+width*width + width # 1st fno layer
+    #           +width*width+width # 2nd dense layer
+    #           +2*width + 2)# 3rd dense layer
+    n_params = Int(50)
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_params"] =
         SA.SVector{n_params}(rand(n_params))
