@@ -2,6 +2,7 @@ import TurbulenceConvection
 const TC = TurbulenceConvection
 import Plots
 import NCDatasets
+import Logging
 import CLIMAParameters
 import ClimaCore
 const CC = ClimaCore
@@ -68,18 +69,21 @@ function export_ref_profile(case_name::String)
     Plots.savefig("$case_name.svg")
 
 end
-for case_name in (
-    "Bomex",
-    "life_cycle_Tan2018",
-    "Soares",
-    "Rico",
-    "ARM_SGP",
-    "DYCOMS_RF01",
-    "GABLS",
-    "SP",
-    "DryBubble",
-    "TRMM_LBA",
-    "GATE_III",
-)
-    export_ref_profile(case_name)
-end;
+
+Logging.with_logger(Logging.NullLogger()) do # silence output
+    for case_name in (
+        "Bomex",
+        "life_cycle_Tan2018",
+        "Soares",
+        "Rico",
+        "ARM_SGP",
+        "DYCOMS_RF01",
+        "GABLS",
+        "SP",
+        "DryBubble",
+        "TRMM_LBA",
+        "GATE_III",
+    )
+        export_ref_profile(case_name)
+    end
+end
