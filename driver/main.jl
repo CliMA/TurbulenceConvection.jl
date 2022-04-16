@@ -75,7 +75,15 @@ function Simulation1d(namelist)
     truncated_gcm_mesh = TC.parse_namelist(namelist, "grid", "stretch", "flag"; default = false)
 
     Δz = FT(namelist["grid"]["dz"])
-    nz = namelist["grid"]["nz"]
+    nz = if Cases.get_case(namelist) == Cases.LES_driven_SCM()
+        les_filename = namelist["meta"]["lesfile"]
+        NC.Dataset(les_filename, "r") do data
+            zmax = Array(TC.get_nc_data(data, "zc"))[end]
+            Int(zmax ÷ Δz)
+        end
+    else
+        namelist["grid"]["nz"]
+    end
     z₀, z₁ = FT(0), FT(nz * Δz)
     if truncated_gcm_mesh
         nzₛ = namelist["grid"]["stretch"]["nz"]
