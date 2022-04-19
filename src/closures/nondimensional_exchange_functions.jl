@@ -104,13 +104,11 @@ function non_dimensional_function!(
     index = 1
     for p in Flux.params(model)
         len_p = length(p)
-        p_slice = p[:]
-        if eltype(p_slice) <: Real
-            p_slice .= c_fno[index:(index + len_p - 1)]
+        if eltype(p) <: Real
+            p[:] .= c_fno[index:(index + len_p - 1)]
             index += len_p
-        elseif eltype(p_slice) <: Complex
-            c_fno_slice = c_fno[index:(index + len_p - 1)]
-            p_slice .= c_fno_slice + c_fno[(index + len_p):(index + len_p * 2 - 1)] * im
+        elseif eltype(p) <: Complex
+            p[:] .= c_fno[index:(index + len_p - 1)] + c_fno[(index + len_p):(index + len_p * 2 - 1)] * im
             index += len_p * 2
         else
             error("Bad eltype in Flux params")
