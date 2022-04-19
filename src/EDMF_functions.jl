@@ -279,7 +279,7 @@ function θ_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::ED
     UnPack.@unpack ustar, zLL, oblength, α0LL = surface_helper(surf, grid, state)
     ρθ_liq_ice_flux = surf.ρθ_liq_ice_flux
     h_var = get_surface_variance(ρθ_liq_ice_flux * α0LL, ρθ_liq_ice_flux * α0LL, ustar, zLL, oblength)
-    surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + i * a_, 1 - a_total + (i + 1) * a_, 1000)
+    surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000)
     return prog_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var)
 end
 function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDMFModel, i::Int)::FT where {FT}
@@ -291,7 +291,7 @@ function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDM
     UnPack.@unpack ustar, zLL, oblength, α0LL = surface_helper(surf, grid, state)
     ρq_tot_flux = surf.ρq_tot_flux
     qt_var = get_surface_variance(ρq_tot_flux * α0LL, ρq_tot_flux * α0LL, ustar, zLL, oblength)
-    surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + i * a_, 1 - a_total + (i + 1) * a_, 1000)
+    surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000)
     return prog_gm.q_tot[kc_surf] + surface_scalar_coeff * sqrt(qt_var)
 end
 
