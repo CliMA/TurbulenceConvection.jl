@@ -1123,7 +1123,8 @@ function surface_ref_state(::LES_driven_SCM, param_set::APS, namelist)
     les_filename = namelist["meta"]["lesfile"]
 
     Pg, Tg, qtg = NC.Dataset(les_filename, "r") do data
-        Pg = data.group["reference"]["p0_full"][1] #Pressure at ground
+        pg_str = haskey(data.group["reference"], "p0_full") ? "p0_full" : "p0"
+        Pg = data.group["reference"][pg_str][1] #Pressure at ground
         Tg = data.group["reference"]["temperature0"][1] #Temperature at ground
         ql_ground = data.group["reference"]["ql0"][1]
         qv_ground = data.group["reference"]["qv0"][1]
