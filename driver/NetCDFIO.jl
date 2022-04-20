@@ -11,12 +11,15 @@ function nc_fileinfo(namelist)
     uuid = string(namelist["meta"]["uuid"])
     simname = namelist["meta"]["simname"]
     outpath = joinpath(namelist["output"]["output_root"], "Output.$simname.$uuid")
+    @info "Output folder: `$outpath`"
     mkpath(outpath)
 
     nc_filename = joinpath(outpath, namelist["stats_io"]["stats_dir"])
     mkpath(nc_filename)
+    @info "NC filename path: `$nc_filename`"
 
     nc_filename = joinpath(nc_filename, "Stats.$simname.nc")
+    @info "NC filename: `$nc_filename`"
     return nc_filename, outpath
 end
 
