@@ -33,6 +33,9 @@ function parse_commandline()
         "--suffix"         # A suffix for the artifact folder
         arg_type = String
         default = ""
+        "--n_up"           # Number of updrafts
+        arg_type = Int
+        default = 1
     end
     parsed_args = ArgParse.parse_args(ARGS, s)
     return (s, parsed_args)
