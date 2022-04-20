@@ -70,8 +70,8 @@ function get_surface(
         ch = result.Ch,
         ρu_flux = surf_params.zero_uv_fluxes ? FT(0) : result.ρτxz,
         ρv_flux = surf_params.zero_uv_fluxes ? FT(0) : result.ρτyz,
-        ρθ_liq_ice_flux = shf / TD.cp_m(ts_in),
-        ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in),
+        ρθ_liq_ice_flux = shf / TD.cp_m(param_set, ts_in),
+        ρq_tot_flux = lhf / TD.latent_heat_vapor(param_set, ts_in),
         wstar = convective_vel,
     )
 end
@@ -127,8 +127,8 @@ function get_surface(
         ustar = result.ustar,
         ρu_flux = result.ρτxz,
         ρv_flux = result.ρτyz,
-        ρθ_liq_ice_flux = shf / TD.cp_m(ts_in),
-        ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in),
+        ρθ_liq_ice_flux = shf / TD.cp_m(param_set, ts_in),
+        ρq_tot_flux = lhf / TD.latent_heat_vapor(param_set, ts_in),
         bflux = result.buoy_flux,
         wstar = convective_vel,
     )
@@ -185,8 +185,8 @@ function get_surface(
         ustar = result.ustar,
         ρu_flux = result.ρτxz,
         ρv_flux = result.ρτyz,
-        ρθ_liq_ice_flux = shf / TD.cp_m(ts_in),
-        ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in),
+        ρθ_liq_ice_flux = shf / TD.cp_m(param_set, ts_in),
+        ρq_tot_flux = lhf / TD.latent_heat_vapor(param_set, ts_in),
         bflux = result.buoy_flux,
         wstar = convective_vel,
     )
@@ -245,8 +245,8 @@ function get_surface(
         ustar = result.ustar,
         ρu_flux = result.ρτxz,
         ρv_flux = result.ρτyz,
-        ρθ_liq_ice_flux = shf / TD.cp_m(ts_in),
-        ρq_tot_flux = lhf / TD.latent_heat_vapor(ts_in),
+        ρθ_liq_ice_flux = shf / TD.cp_m(param_set, ts_in),
+        ρq_tot_flux = lhf / TD.latent_heat_vapor(param_set, ts_in),
         bflux = result.buoy_flux,
         wstar = convective_vel,
     )

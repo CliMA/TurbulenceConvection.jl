@@ -76,19 +76,19 @@ function compute_precipitation_sink_tendencies(::Clima1M, grid::Grid, state::Sta
         T_gm = aux_gm.T[k]
         # When we fuse loops, this should hopefully disappear
         ts = TD.PhaseEquil_pTq(param_set, p0, T_gm, q_tot_gm)
-        q = TD.PhasePartition(ts)
-        qv = TD.vapor_specific_humidity(ts)
+        q = TD.PhasePartition(param_set, ts)
+        qv = TD.vapor_specific_humidity(param_set, ts)
 
-        Π_m = TD.exner(ts)
-        c_pm = TD.cp_m(ts)
-        c_vm = TD.cv_m(ts)
-        R_m = TD.gas_constant_air(ts)
+        Π_m = TD.exner(param_set, ts)
+        c_pm = TD.cp_m(param_set, ts)
+        c_vm = TD.cv_m(param_set, ts)
+        R_m = TD.gas_constant_air(param_set, ts)
         R_v = CPP.R_v(param_set)
         L_v0 = CPP.LH_v0(param_set)
         L_s0 = CPP.LH_s0(param_set)
-        L_v = TD.latent_heat_vapor(ts)
-        L_s = TD.latent_heat_sublim(ts)
-        L_f = TD.latent_heat_fusion(ts)
+        L_v = TD.latent_heat_vapor(param_set, ts)
+        L_s = TD.latent_heat_sublim(param_set, ts)
+        L_f = TD.latent_heat_fusion(param_set, ts)
 
         α_evp = CPMP.microph_scaling(param_set)
         α_dep_sub = CPMP.microph_scaling_dep_sub(param_set)
