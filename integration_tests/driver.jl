@@ -1,47 +1,13 @@
-import ArgParse
+include("cli_options.jl")
 
-run_from_command_line = abspath(PROGRAM_FILE) == @__FILE__
-if run_from_command_line
-    s = ArgParse.ArgParseSettings()
-    ArgParse.@add_arg_table s begin
-        "--case"
-        help = "Case to run"
-        default = "Bomex"
-        # Command-line args to change default namelist params
-        "--micro"          # Try other microphysics quadrature
-        "--entr"           # Try other entr-detr models
-        "--stoch_entr"     # Choose type of stochastic entr-detr model
-        "--t_max"          # Simulation time to run to
-        "--calibrate_io"   # Test that calibration IO passes regression tests
-        "--stretch_grid"   # Test stretched grid option
-        "--skip_io"        # Test that skipping IO passes regression tests
-    end
-    parsed_args = ArgParse.parse_args(ARGS, s)
-    case_name = parsed_args["case"]
-end
+(s, parsed_args) = parse_commandline()
 
-#! format: off
-micro        = run_from_command_line ? parsed_args["micro"] : nothing
-entr         = run_from_command_line ? parsed_args["entr"] : nothing
-stoch_entr   = run_from_command_line ? parsed_args["stoch_entr"] : nothing
-t_max        = run_from_command_line ? parsed_args["t_max"] : nothing
-calibrate_io = run_from_command_line ? parsed_args["calibrate_io"] : nothing
-stretch_grid = run_from_command_line ? parsed_args["stretch_grid"] : nothing
-skip_io      = run_from_command_line ? parsed_args["skip_io"] : nothing
+suffix = parsed_args["suffix"]
+case_name = parsed_args["case"]
 
-t_max ≠ nothing && (t_max = parse(Float64, t_max))
-calibrate_io ≠ nothing && (calibrate_io = parse(Bool, calibrate_io))
-stretch_grid ≠ nothing && (stretch_grid = parse(Bool, stretch_grid))
-skip_io ≠ nothing      && (skip_io = parse(Bool, skip_io))
-#! format: on
-
-if @isdefined case_name
-    @info "Running $case_name..."
-else
-    case_name = "Bomex"
-    @info "Running default case ($case_name)."
-    @info "Set `case_name` if you'd like to run a different case"
-end
+@info "Running $case_name..."
+@info "`suffix`: `$(suffix)`"
+@info "See `cli_options.jl` changing defaults"
 
 import TurbulenceConvection
 using Test
@@ -52,26 +18,16 @@ include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
 import .NameList
 
 namelist = NameList.default_namelist(case_name)
-
-uuid_suffix(s::String) = "_" * s
-uuid_suffix(::Nothing) = ""
-suffix = uuid_suffix(micro)
-suffix *= uuid_suffix(entr)
-suffix *= uuid_suffix(stoch_entr)
-calibrate_io ≠ nothing && (suffix *= "_calibrate_io_$calibrate_io")
-stretch_grid ≠ nothing && (suffix *= "_stretch_grid_$stretch_grid")
-skip_io ≠ nothing && (suffix *= "_skip_io_$skip_io")
-
 namelist["meta"]["uuid"] = "01$suffix"
 
 #! format: off
-micro        ≠ nothing && (namelist["thermodynamics"]["quadrature_type"] = micro)
-entr         ≠ nothing && (namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = entr)
-stoch_entr   ≠ nothing && (namelist["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = stoch_entr)
-t_max        ≠ nothing && (namelist["time_stepping"]["t_max"] = t_max)
-calibrate_io ≠ nothing && (namelist["stats_io"]["calibrate_io"] = calibrate_io)
-stretch_grid ≠ nothing && (namelist["grid"]["stretch"]["flag"] = stretch_grid)
-skip_io      ≠ nothing && (namelist["stats_io"]["skip"] = skip_io)
+isnothing(parsed_args["micro"]) && (parsed_args["micro"] = namelist["thermodynamics"]["quadrature_type"])
+isnothing(parsed_args["entr"]) && (parsed_args["entr"] = namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"])
+isnothing(parsed_args["stoch_entr"]) && (parsed_args["stoch_entr"] = namelist["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"])
+isnothing(parsed_args["t_max"]) && (parsed_args["t_max"] = namelist["time_stepping"]["t_max"])
+isnothing(parsed_args["calibrate_io"]) && (parsed_args["calibrate_io"] = namelist["stats_io"]["calibrate_io"])
+isnothing(parsed_args["stretch_grid"]) && (parsed_args["stretch_grid"] = namelist["grid"]["stretch"]["flag"])
+isnothing(parsed_args["skip_io"]) && (parsed_args["skip_io"] = namelist["stats_io"]["skip"])
 #! format: on
 
 ds_tc_filename, return_code = main(namelist)
@@ -82,20 +38,11 @@ include(joinpath(tc_dir, "post_processing", "compute_mse.jl"))
 include(joinpath(tc_dir, "post_processing", "mse_tables.jl"))
 best_mse = all_best_mse[case_name]
 
-# TODO: Remove this and compare only the prognostic state
-#       we may need a more generic / flexible version of
-#       compute_mse_wrapper.
-calibrate_io ≠ nothing && exit()
-skip_io ≠ nothing && exit()
+parsed_args["skip_post_proc"] && exit()
 
 computed_mse = compute_mse_wrapper(case_name, best_mse, ds_tc_filename; case_kwargs[case_name]...)
 
-# We'll need to add mse tables if we want
-# to use regression tests on experiments
-# that deviate from defaults.
-micro ≠ nothing && exit()
-entr ≠ nothing && exit()
-stoch_entr ≠ nothing && exit()
+parsed_args["skip_tests"] && exit()
 
 open("computed_mse_$case_name.json", "w") do io
     JSON.print(io, computed_mse)

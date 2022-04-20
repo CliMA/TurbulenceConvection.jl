@@ -92,43 +92,43 @@ steps:
     steps:
 
       - label: ":partly_sunny: Bomex with gaussian"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --micro gaussian"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --micro gaussian --skip_tests true --suffix _gaussian"
         artifact_paths: "Output.Bomex.01_gaussian/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with stretched grid"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --stretch_grid true"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --stretch_grid true --suffix _stretch_grid_true"
         artifact_paths: "Output.Bomex.01_stretch_grid_true/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with NN_nonlocal"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr NN_nonlocal"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr NN_nonlocal --skip_tests true --suffix _NN_nonlocal"
         artifact_paths: "Output.Bomex.01_NN_nonlocal/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with NN"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr NN"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr NN --skip_tests true --suffix _NN"
         artifact_paths: "Output.Bomex.01_NN/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with FNO"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr FNO"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr FNO --skip_tests true --suffix _FNO"
         artifact_paths: "Output.Bomex.01_FNO/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with RF"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr RF"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr RF --skip_tests true --suffix _RF"
         artifact_paths: "Output.Bomex.01_RF/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with noisy_relaxation_process"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --stoch_entr noisy_relaxation_process"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --stoch_entr noisy_relaxation_process --skip_tests true --suffix _noisy_relaxation_process"
         artifact_paths: "Output.Bomex.01_noisy_relaxation_process/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with prognostic_noisy_relaxation_process"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --stoch_entr prognostic_noisy_relaxation_process"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --stoch_entr prognostic_noisy_relaxation_process --skip_tests true --suffix _prognostic_noisy_relaxation_process"
         artifact_paths: "Output.Bomex.01_prognostic_noisy_relaxation_process/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with calibrate_io_true"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --calibrate_io true"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --calibrate_io true --skip_post_proc true --suffix _calibrate_io_true"
         artifact_paths: "Output.Bomex.01_calibrate_io_true/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with skip_io_true"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --skip_io true"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --skip_io true --skip_post_proc true --suffix _skip_io_true"
         artifact_paths: "Output.Bomex.01_skip_io_true/stats/comparison/*"
 
 
