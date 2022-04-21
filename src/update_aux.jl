@@ -183,34 +183,26 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.RH[k] = TD.relative_humidity(param_set, ts_en)
 
         @inbounds for i in 1:N_up
-            if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
-                qt = aux_up[i].q_tot[k - 1]
-                h = aux_up[i].θ_liq_ice[k - 1]
-                if edmf.moisture_model isa EquilibriumMoisture
-                    ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
-                elseif edmf.moisture_model isa NonEquilibriumMoisture
-                    ql = aux_up[i].q_liq[k - 1]
-                    qi = aux_up[i].q_ice[k - 1]
-                    ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt, ql, qi)
-                else
-                    error("Something went wrong. emdf.moisture_model options are equilibrium or nonequilibrium")
-                end
+            k_star = if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
+                k - 1
             else
-                if edmf.moisture_model isa EquilibriumMoisture
-                    ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
-                elseif edmf.moisture_model isa NonEquilibriumMoisture
-                    ts_up = thermo_state_pθq(
-                        param_set,
-                        p0_c[k],
-                        aux_up[i].θ_liq_ice[k],
-                        aux_up[i].q_tot[k],
-                        aux_up[i].q_liq[k],
-                        aux_up[i].q_ice[k],
-                    )
-                else
-                    error("Something went wrong. emdf.moisture_model options are equilibrium or nonequilibrium")
-                end
+                k
             end
+            thermo_args = if edmf.moisture_model isa EquilibriumMoisture
+                ()
+            elseif edmf.moisture_model isa NonEquilibriumMoisture
+                (aux_up[i].q_liq[k_star], aux_up[i].q_ice[k_star])
+            else
+                error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
+            end
+            aux_up[i].ts[k] = thermo_state_pθq(
+                param_set,
+                p0_c[k_star],
+                aux_up[i].θ_liq_ice[k_star],
+                aux_up[i].q_tot[k_star],
+                thermo_args...,
+            )
+            ts_up = aux_up[i].ts[k]
             aux_up[i].q_liq[k] = TD.liquid_specific_humidity(param_set, ts_up)
             aux_up[i].q_ice[k] = TD.ice_specific_humidity(param_set, ts_up)
             aux_up[i].T[k] = TD.air_temperature(param_set, ts_up)

@@ -137,25 +137,11 @@ function compute_diagnostics!(
         aux_gm.θ_liq_ice[k] = prog_gm.ρθ_liq_ice[k] / ρ0_c[k]
         aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ0_c[k]
         aux_en.s[k] = TD.specific_entropy(param_set, ts_en[k])
-    end
-    @inbounds for k in TC.real_center_indices(grid)
         @inbounds for i in 1:N_up
             aux_up[i].s[k] = if aux_up[i].area[k] > 0.0
-                thermo_args = if edmf.moisture_model isa TC.EquilibriumMoisture
-                    ()
-                elseif edmf.moisture_model isa TC.NonEquilibriumMoisture
-                    (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
-                end
-                ts_up = TC.thermo_state_pθq(
-                    param_set,
-                    p0_c[k],
-                    aux_up[i].θ_liq_ice[k],
-                    aux_up[i].q_tot[k],
-                    thermo_args...,
-                )
-                TD.specific_entropy(param_set, ts_up)
+                TD.specific_entropy(param_set, aux_up[i].ts[k])
             else
-                FT(0)
+                0
             end
         end
     end

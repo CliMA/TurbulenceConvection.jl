@@ -59,20 +59,7 @@ function compute_precipitation_formation_tendencies(
 
     @inbounds for i in 1:N_up
         @inbounds for k in real_center_indices(grid)
-            T_up = aux_up[i].T[k]
-            q_tot_up = aux_up[i].q_tot[k]
-            if edmf.moisture_model isa EquilibriumMoisture
-                ts_up = TD.PhaseEquil_pTq(param_set, p0_c[k], T_up, q_tot_up)
-            elseif edmf.moisture_model isa NonEquilibriumMoisture
-                q_liq_up = aux_up[i].q_liq[k]
-                q_ice_up = aux_up[i].q_ice[k]
-                q = TD.PhasePartition(q_tot_up, q_liq_up, q_ice_up)
-                ts_up = TD.PhaseNonEquil_pTq(param_set, p0_c[k], T_up, q)
-            else
-                error(
-                    "Something went wrong in EDMF_Updrafts. The expected moisture model is Equilibrium or NonEquilibrium",
-                )
-            end
+            ts_up = aux_up[i].ts[k]
 
             # autoconversion and accretion
             mph = precipitation_formation(
