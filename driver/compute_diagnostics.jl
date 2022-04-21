@@ -132,13 +132,13 @@ function compute_diagnostics!(
 
     @inbounds for k in TC.real_center_indices(grid)
         ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        aux_gm.s[k] = TD.specific_entropy(ts)
+        aux_gm.s[k] = TD.specific_entropy(param_set, ts)
         ts_en = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
-        aux_en.s[k] = TD.specific_entropy(ts_en)
+        aux_en.s[k] = TD.specific_entropy(param_set, ts_en)
         @inbounds for i in 1:N_up
             if aux_up[i].area[k] > 0.0
                 ts_up = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
-                aux_up[i].s[k] = TD.specific_entropy(ts_up)
+                aux_up[i].s[k] = TD.specific_entropy(param_set, ts_up)
             end
         end
     end

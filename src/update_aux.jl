@@ -105,34 +105,34 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         ##### saturation_adjustment and buoyancy
         #####
         ts_gm = thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        aux_gm.θ_virt[k] = TD.virtual_pottemp(ts_gm)
+        aux_gm.θ_virt[k] = TD.virtual_pottemp(param_set, ts_gm)
 
         ts_en = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
 
-        aux_en.T[k] = TD.air_temperature(ts_en)
-        aux_en.θ_virt[k] = TD.virtual_pottemp(ts_en)
-        aux_en.θ_dry[k] = TD.dry_pottemp(ts_en)
-        aux_en.q_liq[k] = TD.liquid_specific_humidity(ts_en)
-        aux_en.q_ice[k] = TD.ice_specific_humidity(ts_en)
-        rho = TD.air_density(ts_en)
+        aux_en.T[k] = TD.air_temperature(param_set, ts_en)
+        aux_en.θ_virt[k] = TD.virtual_pottemp(param_set, ts_en)
+        aux_en.θ_dry[k] = TD.dry_pottemp(param_set, ts_en)
+        aux_en.q_liq[k] = TD.liquid_specific_humidity(param_set, ts_en)
+        aux_en.q_ice[k] = TD.ice_specific_humidity(param_set, ts_en)
+        rho = TD.air_density(param_set, ts_en)
         aux_en.buoy[k] = buoyancy_c(param_set, ρ0_c[k], rho)
 
         # update_sat_unsat
-        if TD.has_condensate(ts_en)
+        if TD.has_condensate(param_set, ts_en)
             aux_en.cloud_fraction[k] = 1.0
-            aux_en_sat.θ_dry[k] = TD.dry_pottemp(ts_en)
-            aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(ts_en)
-            aux_en_sat.T[k] = TD.air_temperature(ts_en)
-            aux_en_sat.q_tot[k] = TD.total_specific_humidity(ts_en)
-            aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(ts_en)
+            aux_en_sat.θ_dry[k] = TD.dry_pottemp(param_set, ts_en)
+            aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_en)
+            aux_en_sat.T[k] = TD.air_temperature(param_set, ts_en)
+            aux_en_sat.q_tot[k] = TD.total_specific_humidity(param_set, ts_en)
+            aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(param_set, ts_en)
         else
             aux_en.cloud_fraction[k] = 0.0
-            aux_en_unsat.θ_dry[k] = TD.dry_pottemp(ts_en)
-            aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(ts_en)
-            aux_en_unsat.q_tot[k] = TD.total_specific_humidity(ts_en)
+            aux_en_unsat.θ_dry[k] = TD.dry_pottemp(param_set, ts_en)
+            aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(param_set, ts_en)
+            aux_en_unsat.q_tot[k] = TD.total_specific_humidity(param_set, ts_en)
         end
 
-        aux_en.RH[k] = TD.relative_humidity(ts_en)
+        aux_en.RH[k] = TD.relative_humidity(param_set, ts_en)
 
         @inbounds for i in 1:N_up
             if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
@@ -142,12 +142,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             else
                 ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
             end
-            aux_up[i].q_liq[k] = TD.liquid_specific_humidity(ts_up)
-            aux_up[i].q_ice[k] = TD.ice_specific_humidity(ts_up)
-            aux_up[i].T[k] = TD.air_temperature(ts_up)
-            ρ = TD.air_density(ts_up)
+            aux_up[i].q_liq[k] = TD.liquid_specific_humidity(param_set, ts_up)
+            aux_up[i].q_ice[k] = TD.ice_specific_humidity(param_set, ts_up)
+            aux_up[i].T[k] = TD.air_temperature(param_set, ts_up)
+            ρ = TD.air_density(param_set, ts_up)
             aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
-            aux_up[i].RH[k] = TD.relative_humidity(ts_up)
+            aux_up[i].RH[k] = TD.relative_humidity(param_set, ts_up)
         end
         aux_gm.buoy[k] = (1.0 - aux_bulk.area[k]) * aux_en.buoy[k]
         @inbounds for i in 1:N_up
@@ -309,7 +309,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             ts_en = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_en.T[k], aux_en.q_tot[k])
             bg_kwargs = (;
                 t_sat = aux_en.T[k],
-                qv_sat = TD.vapor_specific_humidity(ts_en),
+                qv_sat = TD.vapor_specific_humidity(param_set, ts_en),
                 qt_sat = aux_en.q_tot[k],
                 θ_sat = aux_en.θ_dry[k],
                 θ_liq_ice_sat = aux_en.θ_liq_ice[k],

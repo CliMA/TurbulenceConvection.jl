@@ -26,9 +26,9 @@ function buoyancy_gradients(
 
     if bg_model.en_cld_frac > 0.0
         ts_sat = thermo_state_pθq(param_set, bg_model.p0, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
-        phase_part = TD.PhasePartition(ts_sat)
+        phase_part = TD.PhasePartition(param_set, ts_sat)
         lh = TD.latent_heat_liq_ice(param_set, phase_part)
-        cp_m = TD.cp_m(ts_sat)
+        cp_m = TD.cp_m(param_set, ts_sat)
         ∂b∂θl_sat = (
             ∂b∂θv * (1 + molmass_ratio * (1 + lh / R_v / bg_model.t_sat) * bg_model.qv_sat - bg_model.qt_sat) /
             (1 + lh * lh / cp_m / R_v / bg_model.t_sat / bg_model.t_sat * bg_model.qv_sat)

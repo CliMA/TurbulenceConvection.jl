@@ -22,16 +22,16 @@ function precipitation_formation(
 
     if area > 0
 
-        q = TD.PhasePartition(ts)
+        q = TD.PhasePartition(param_set, ts)
 
-        Π_m = TD.exner(ts)
-        c_pm = TD.cp_m(ts)
+        Π_m = TD.exner(param_set, ts)
+        c_pm = TD.cp_m(param_set, ts)
         L_v0 = CPP.LH_v0(param_set)
         L_s0 = CPP.LH_s0(param_set)
 
         if precip_model isa CutoffPrecipitation
-            qsat = TD.q_vap_saturation(ts)
-            λ = TD.liquid_fraction(ts)
+            qsat = TD.q_vap_saturation(param_set, ts)
+            λ = TD.liquid_fraction(param_set, ts)
 
             S_qt = -min((q.liq + q.ice) / Δt, -CM0.remove_precipitation(param_set, q, qsat))
 
@@ -42,12 +42,12 @@ function precipitation_formation(
         end
 
         if precip_model isa Clima1M
-            T = TD.air_temperature(ts)
+            T = TD.air_temperature(param_set, ts)
             T_fr = CPP.T_freeze(param_set)
             c_vl = CPP.cv_l(param_set)
-            c_vm = TD.cv_m(ts)
-            Rm = TD.gas_constant_air(ts)
-            Lf = TD.latent_heat_fusion(ts)
+            c_vm = TD.cv_m(param_set, ts)
+            Rm = TD.gas_constant_air(param_set, ts)
+            Lf = TD.latent_heat_fusion(param_set, ts)
 
             # Autoconversion of cloud ice to snow is done with a simplified rate.
             # The saturation adjustment scheme prevents using the

@@ -151,9 +151,9 @@ function compute_ref_state!(state, grid::TC.Grid, param_set::PS; ts_g) where {PS
     ρ0_f = TC.face_ref_state(state).ρ0
     α0_f = TC.face_ref_state(state).α0
 
-    qtg = TD.total_specific_humidity(ts_g)
-    θ_liq_ice_g = TD.liquid_ice_pottemp(ts_g)
-    Pg = TD.air_pressure(ts_g)
+    qtg = TD.total_specific_humidity(param_set, ts_g)
+    θ_liq_ice_g = TD.liquid_ice_pottemp(param_set, ts_g)
+    Pg = TD.air_pressure(param_set, ts_g)
 
     # We are integrating the log pressure so need to take the log of the
     # surface pressure
@@ -164,8 +164,8 @@ function compute_ref_state!(state, grid::TC.Grid, param_set::PS; ts_g) where {PS
     function rhs(logp, u, z)
         p_ = exp(logp)
         ts = TD.PhaseEquil_pθq(param_set, p_, θ_liq_ice_g, qtg)
-        R_m = TD.gas_constant_air(ts)
-        T = TD.air_temperature(ts)
+        R_m = TD.gas_constant_air(param_set, ts)
+        T = TD.air_temperature(param_set, ts)
         return -FT(CPP.grav(param_set)) / (T * R_m)
     end
 
@@ -184,12 +184,12 @@ function compute_ref_state!(state, grid::TC.Grid, param_set::PS; ts_g) where {PS
     # Compute reference state thermodynamic profiles
     @inbounds for k in TC.real_center_indices(grid)
         ts = TD.PhaseEquil_pθq(param_set, p0_c[k], θ_liq_ice_g, qtg)
-        α0_c[k] = TD.specific_volume(ts)
+        α0_c[k] = TD.specific_volume(param_set, ts)
     end
 
     @inbounds for k in TC.real_face_indices(grid)
         ts = TD.PhaseEquil_pθq(param_set, p0_f[k], θ_liq_ice_g, qtg)
-        α0_f[k] = TD.specific_volume(ts)
+        α0_f[k] = TD.specific_volume(param_set, ts)
     end
 
     ρ0_f .= 1 ./ α0_f
@@ -206,12 +206,12 @@ function satadjust(param_set::APS, grid, state)
         θ_liq_ice = prog_gm.θ_liq_ice[k]
         q_tot = prog_gm.q_tot[k]
         ts = TD.PhaseEquil_pθq(param_set, p0_c[k], θ_liq_ice, q_tot)
-        aux_gm.q_liq[k] = TD.liquid_specific_humidity(ts)
-        aux_gm.q_ice[k] = TD.ice_specific_humidity(ts)
-        aux_gm.T[k] = TD.air_temperature(ts)
-        ρ = TD.air_density(ts)
+        aux_gm.q_liq[k] = TD.liquid_specific_humidity(param_set, ts)
+        aux_gm.q_ice[k] = TD.ice_specific_humidity(param_set, ts)
+        aux_gm.T[k] = TD.air_temperature(param_set, ts)
+        ρ = TD.air_density(param_set, ts)
         aux_gm.buoy[k] = TC.buoyancy_c(param_set, ρ0_c[k], ρ)
-        aux_gm.RH[k] = TD.relative_humidity(ts)
+        aux_gm.RH[k] = TD.relative_humidity(param_set, ts)
     end
     return
 end
@@ -314,7 +314,7 @@ function compute_gm_tendencies!(
     @inbounds for k in TC.real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
         ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        Π = TD.exner(ts)
+        Π = TD.exner(param_set, ts)
 
         if force.apply_coriolis
             tendencies_gm.u[k] -= force.coriolis_param * (aux_gm.vg[k] - prog_gm.v[k])
