@@ -3,7 +3,9 @@ include("cli_options.jl")
 (s, parsed_args) = parse_commandline()
 
 suffix = parsed_args["suffix"]
-case_name = parsed_args["case"]
+if !@isdefined case_name
+    case_name = parsed_args["case"]
+end
 
 @info "Running $case_name..."
 @info "`suffix`: `$(suffix)`"
