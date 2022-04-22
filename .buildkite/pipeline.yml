@@ -92,7 +92,7 @@ steps:
     steps:
 
       - label: ":partly_sunny: Bomex with gaussian"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --micro gaussian --skip_tests true --suffix _gaussian"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --quad_type gaussian --skip_tests true --suffix _gaussian"
         artifact_paths: "Output.Bomex.01_gaussian/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with stretched grid"
