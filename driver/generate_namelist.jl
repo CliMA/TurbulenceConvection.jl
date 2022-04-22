@@ -78,24 +78,24 @@ function default_namelist(
     namelist_defaults["turbulence"] = Dict()
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"] = Dict()
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.096468700340982
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = 0.9
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["min_area"] = 1e-5
 
     # mixing_length
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.121374281238337
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.208975026961133
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"] = 0.309884652487944
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_surf_scale"] = 2.08599639148706
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.14
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.22
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"] = 0.4
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_surf_scale"] = 3.75
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_scale"] = 53.0 / 13.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"] = 0.762218700738236
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"] = 0.74
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"] = 0.25
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["smin_ub"] = 0.1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["smin_rm"] = 1.5
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["l_max"] = 1.0e6
     # entrainment
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.0903186969036183
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.49744319769284
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
 
     # nn parameters
     #! format: off
@@ -132,45 +132,28 @@ function default_namelist(
     )
     #! format: on
 
-#       "entrainment_factor"  = 0.22 --> 0.208975026961133 --> 0.208975026961133
-#       "detrainment_factor"  = 0.12 --> 0.0780295505186482 --> 0.135281910385817
-#       "entrainment_smin_tke_coeff"  = 0.25 --> 0.0919893226142767 --> 0.117146212553695
-#       "updraft_mixing_frac"  = 0.74 --> 0.779340674316188 --> 0.762218700738236
-#       "entrainment_scale"  = 0.001 --> 0.00100537600171082 --> 0.00105669220057681
-#       "sorting_power"  = 0.3 --> 0.319427195422708 --> 0.219050928665251
-#       "turbulent_entrainment_factor"  = 3.75 --> 1.95117605304062 --> 2.08599639148706
-#       "tke_ed_coeff"  = 0.1 --> 0.102733521651462 --> 0.096468700340982
-#       "tke_diss_coeff"  = 0.51 --> 0.645196026110751 --> 0.49744319769284
-#       "static_stab_coeff"  = 0.4 --> 0.446997184257893 --> 0.309884652487944
-#       "tke_surf_scale"  = 2 --> 2.16759938062147 --> 2.14788594858616
-#       "Prandtl_number_0"  = 0.13 --> 0.130107185762712 --> 0.0903186969036183
-#       "pressure_normalmode_adv_coeff"  = 10 --> 8.39853728488939 --> 11.3254419259995
-#       "pressure_normalmode_buoy_coeff1"  = 0.14 --> 0.103098506940995 --> 0.121374281238337
-#       "pressure_normalmode_drag_coeff"  = 0.075 --> 0.0727129096815986 --> 0.0846685402021432
-#       "surface_area"  = 0.0004 --> 0.000869052571814503 --> 0.00102085813028204
-
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.0846685402021432
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.319427195422708
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.117146212553695
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.075
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.25
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_scale"] = 10.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_power"] = 3.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"] = 0.00102085813028204
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"] = 2.14788594858616
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"] = 0.0004
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"] = 2.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["min_upd_velocity"] = 0.001
     # pressure
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["min_updraft_top"] = 500.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] = 0.135281910385817
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] = 0.12
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff2"] = 0.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = 0.00105669220057681
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = 11.3254419259995
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = 0.1
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = 10.0
 
     # From namelist
     namelist_defaults["grid"] = Dict()
     namelist_defaults["grid"]["dims"] = 1
     namelist_defaults["grid"]["stretch"] = Dict()
     namelist_defaults["grid"]["stretch"]["flag"] = true
-    namelist_defaults["grid"]["stretch"]["nz"] = 55
+    namelist_defaults["grid"]["stretch"]["nz"] = 65
     namelist_defaults["grid"]["stretch"]["dz_surf"] = 30.0
     namelist_defaults["grid"]["stretch"]["dz_toa"] = 8000.0
     namelist_defaults["grid"]["stretch"]["z_toa"] = 45000.0
@@ -215,6 +198,25 @@ function default_namelist(
     namelist_defaults["stats_io"]["frequency"] = 60.0
     namelist_defaults["stats_io"]["skip"] = false
     namelist_defaults["stats_io"]["calibrate_io"] = false # limit io for calibration when `true`
+
+    # calibration
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.11117388248826
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.543033753430526
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.328738939149836
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.202829319655682
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"] = 0.000528005875146781
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"] = 2.49829380775515
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.0517714191106733
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.109175314253783
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.122499158461483
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"] = 0.435883368129476
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_surf_scale"] = 3.22640273079967
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"] = 0.762926176491223
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] =  0.115552668786453
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_adv"] = 0.000957505012698146
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = 9.03264958780061
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.0957923176056815
+
 
     if case_name == "Soares"
         namelist = Soares(namelist_defaults)
