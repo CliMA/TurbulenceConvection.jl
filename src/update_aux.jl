@@ -135,12 +135,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.RH[k] = TD.relative_humidity(param_set, ts_en)
 
         @inbounds for i in 1:N_up
-            if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
-                qt = aux_up[i].q_tot[k - 1]
-                h = aux_up[i].θ_liq_ice[k - 1]
-                ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
-            else
+            if aux_up[i].area[k] > 0.0
                 ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
+            else
+                ts_up = thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
             end
             aux_up[i].q_liq[k] = TD.liquid_specific_humidity(param_set, ts_up)
             aux_up[i].q_ice[k] = TD.ice_specific_humidity(param_set, ts_up)
