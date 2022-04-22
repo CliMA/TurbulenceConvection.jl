@@ -459,28 +459,22 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS, EPG}
         precip_model = precip_model
         # Create the environment variable class (major diagnostic and prognostic variables)
 
-        # Create the class for environment thermodynamics
-        en_thermo_name = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
-        en_thermo = if en_thermo_name == "mean"
+        # Create the class for environment thermodynamics and buoyancy gradient computation
+        en_sgs_name =
+            parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean", valid_options = ["mean", "quadrature"])
+        en_thermo = if en_sgs_name == "mean"
             SGSMean()
-        elseif en_thermo_name == "quadrature"
+        elseif en_sgs_name == "quadrature"
             SGSQuadrature(namelist)
+        else
+            error("Something went wrong. Invalid environmental sgs type '$en_sgs_name'")
         end
-
-        bg_type = parse_namelist(
-            namelist,
-            "turbulence",
-            "EDMF_PrognosticTKE",
-            "env_buoy_grad";
-            default = "mean",
-            valid_options = ["mean", "quadratures"],
-        )
-        bg_closure = if bg_type == "mean"
+        bg_closure = if en_sgs_name == "mean"
             BuoyGradMean()
-        elseif bg_type == "quadratures"
+        elseif en_sgs_name == "quadrature"
             BuoyGradQuadratures()
         else
-            error("Something went wrong. Invalid environmental buoyancy gradient closure type '$bg_type'")
+            error("Something went wrong. Invalid environmental buoyancy gradient closure type '$en_sgs_name'")
         end
 
         # entr closure
