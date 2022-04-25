@@ -68,6 +68,29 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 end
             end
         end
+        if edmf.moisture_model isa NonEquilibriumMoisture
+            @inbounds for i in 1:N_up
+                if is_surface_center(grid, k)
+                    if prog_up[i].ρarea[k] / ρ0_c[k] >= edmf.minimum_area
+                        ql_surf = ql_surface_bc(surf)
+                        qi_surf = qi_surface_bc(surf)
+                        aux_up[i].q_liq[k] = ql_surf
+                        aux_up[i].q_ice[k] = qi_surf
+                    else
+                        aux_up[i].q_liq[k] = prog_gm.q_liq[k]
+                        aux_up[i].q_ice[k] = prog_gm.q_ice[k]
+                    end
+                else
+                    if prog_up[i].ρarea[k] / ρ0_c[k] >= edmf.minimum_area
+                        aux_up[i].q_liq[k] = prog_up[i].ρaq_liq[k] / prog_up[i].ρarea[k]
+                        aux_up[i].q_ice[k] = prog_up[i].ρaq_ice[k] / prog_up[i].ρarea[k]
+                    else
+                        aux_up[i].q_liq[k] = prog_gm.q_liq[k]
+                        aux_up[i].q_ice[k] = prog_gm.q_ice[k]
+                    end
+                end
+            end
+        end
 
         #####
         ##### compute bulk
@@ -86,6 +109,21 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             aux_bulk.q_tot[k] = prog_gm.q_tot[k]
             aux_bulk.θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
         end
+        if edmf.moisture_model isa NonEquilibriumMoisture
+            aux_bulk.q_liq[k] = 0
+            aux_bulk.q_ice[k] = 0
+            if aux_bulk.area[k] > 0
+                @inbounds for i in 1:N_up
+                    a_k = aux_up[i].area[k]
+                    a_bulk_k = aux_bulk.area[k]
+                    aux_bulk.q_liq[k] += a_k * aux_up[i].q_liq[k] / a_bulk_k
+                    aux_bulk.q_ice[k] += a_k * aux_up[i].q_ice[k] / a_bulk_k
+                end
+            else
+                aux_bulk.q_liq[k] = prog_gm.q_liq[k]
+                aux_bulk.q_ice[k] = prog_gm.q_ice[k]
+            end
+        end
         aux_en.area[k] = 1 - aux_bulk.area[k]
         aux_en.tke[k] = prog_en.ρatke[k] / (ρ0_c[k] * aux_en.area[k])
         aux_en.Hvar[k] = prog_en.ρaHvar[k] / (ρ0_c[k] * aux_en.area[k])
@@ -99,16 +137,39 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         val1 = 1 / (1 - a_bulk_c)
         val2 = a_bulk_c * val1
         aux_en.q_tot[k] = max(val1 * prog_gm.q_tot[k] - val2 * aux_bulk.q_tot[k], 0) #Yair - this is here to prevent negative QT
+        if edmf.moisture_model isa NonEquilibriumMoisture
+            aux_en.q_liq[k] = max(val1 * prog_gm.q_liq[k] - val2 * aux_bulk.q_liq[k], 0)
+            aux_en.q_ice[k] = max(val1 * prog_gm.q_ice[k] - val2 * aux_bulk.q_ice[k], 0)
+        end
         aux_en.θ_liq_ice[k] = val1 * prog_gm.θ_liq_ice[k] - val2 * aux_bulk.θ_liq_ice[k]
 
         #####
-        ##### saturation_adjustment and buoyancy
+        ##### condensation, etc (done via saturation_adjustment or non-equilibrium) and buoyancy
         #####
-        ts_gm = thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+        if edmf.moisture_model isa EquilibriumMoisture
+            ts_gm = thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+            ts_en = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
+        elseif edmf.moisture_model isa NonEquilibriumMoisture
+            ts_gm = thermo_state_pθq(
+                param_set,
+                p0_c[k],
+                prog_gm.θ_liq_ice[k],
+                prog_gm.q_tot[k],
+                prog_gm.q_liq[k],
+                prog_gm.q_ice[k],
+            )
+            ts_en = thermo_state_pθq(
+                param_set,
+                p0_c[k],
+                aux_en.θ_liq_ice[k],
+                aux_en.q_tot[k],
+                aux_en.q_liq[k],
+                aux_en.q_ice[k],
+            )
+        else
+            error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
+        end
         aux_gm.θ_virt[k] = TD.virtual_pottemp(param_set, ts_gm)
-
-        ts_en = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
-
         aux_en.T[k] = TD.air_temperature(param_set, ts_en)
         aux_en.θ_virt[k] = TD.virtual_pottemp(param_set, ts_en)
         aux_en.θ_dry[k] = TD.dry_pottemp(param_set, ts_en)
@@ -138,9 +199,30 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
                 qt = aux_up[i].q_tot[k - 1]
                 h = aux_up[i].θ_liq_ice[k - 1]
-                ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
+                if edmf.moisture_model isa EquilibriumMoisture
+                    ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
+                elseif edmf.moisture_model isa NonEquilibriumMoisture
+                    ql = aux_up[i].q_liq[k - 1]
+                    qi = aux_up[i].q_ice[k - 1]
+                    ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt, ql, qi)
+                else
+                    error("Something went wrong. emdf.moisture_model options are equilibrium or nonequilibrium")
+                end
             else
-                ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
+                if edmf.moisture_model isa EquilibriumMoisture
+                    ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
+                elseif edmf.moisture_model isa NonEquilibriumMoisture
+                    ts_up = thermo_state_pθq(
+                        param_set,
+                        p0_c[k],
+                        aux_up[i].θ_liq_ice[k],
+                        aux_up[i].q_tot[k],
+                        aux_up[i].q_liq[k],
+                        aux_up[i].q_ice[k],
+                    )
+                else
+                    error("Something went wrong. emdf.moisture_model options are equilibrium or nonequilibrium")
+                end
             end
             aux_up[i].q_liq[k] = TD.liquid_specific_humidity(param_set, ts_up)
             aux_up[i].q_ice[k] = TD.ice_specific_humidity(param_set, ts_up)
@@ -234,6 +316,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     #####
     ##### compute_updraft_closures
     #####
+    #TODO - AJ add the non-equilibrium tendency computation here
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        compute_nonequilibrium_moisture_tendencies!(grid, state, edmf, Δt, param_set)
+    end
     compute_entr_detr!(state, grid, edmf, param_set, surf, Δt, edmf.entr_closure)
     compute_nh_pressure!(state, grid, edmf, param_set, surf)
 
@@ -306,7 +392,14 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         # buoyancy_gradients
         if edmf.bg_closure == BuoyGradMean()
             # First order approximation: Use environmental mean fields.
-            ts_en = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_en.T[k], aux_en.q_tot[k])
+            if edmf.moisture_model isa EquilibriumMoisture
+                ts_en = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_en.T[k], aux_en.q_tot[k])
+            elseif edmf.moisture_model isa NonEquilibriumMoisture
+                q = TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k])
+                ts_en = TD.PhaseNonEquil_pTq(param_set, p0_c[k], aux_en.T[k], q)
+            else
+                error("Something went wrong in aux update. Expected moisture models are equilibrium and non-equilibrium")
+            end
             bg_kwargs = (;
                 t_sat = aux_en.T[k],
                 qv_sat = TD.vapor_specific_humidity(param_set, ts_en),
@@ -338,6 +431,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 alpha0 = α0_c[k],
             )
             bg_model = EnvBuoyGrad(edmf.bg_closure; bg_kwargs...)
+        else
+            error("Something went wrong. The buoyancy gradient model is not specified")
         end
         bg = buoyancy_gradients(param_set, bg_model)
 

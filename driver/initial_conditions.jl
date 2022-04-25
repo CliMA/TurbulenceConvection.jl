@@ -15,9 +15,17 @@ function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, cas
     prog_gm = TC.center_prog_grid_mean(state)
     p0_c = TC.center_ref_state(state).p0
     parent(aux_tc.prandtl_nvec) .= edmf.prandtl_number
-    @inbounds for k in TC.real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        aux_gm.θ_virt[k] = TD.virtual_pottemp(param_set, ts)
+    if edmf.moisture_model isa TC.EquilibriumMoisture
+        @inbounds for k in TC.real_center_indices(grid)
+            ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+            aux_gm.θ_virt[k] = TD.virtual_pottemp(param_set, ts)
+        end
+    elseif edmf.moisture_model isa TC.NonEquilibriumMoisture
+        @inbounds for k in TC.real_center_indices(grid)
+            q = TD.PhasePartition(prog_gm.q_tot[k], prog_gm.q_liq[k], prog_gm.q_ice[k])
+            ts = TD.PhaseNonEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], q)
+            aux_gm.θ_virt[k] = TD.virtual_pottemp(param_set, ts)
+        end
     end
     surf = get_surface(surf_params, grid, state, t, param_set)
     if case.casename == "DryBubble"

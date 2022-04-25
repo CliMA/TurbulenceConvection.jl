@@ -52,13 +52,21 @@ due to rain evaporation, snow deposition and sublimation and snow melt
 """
 compute_precipitation_sink_tendencies(
     ::AbstractPrecipitationModel,
+    edmf::EDMFModel,
     grid::Grid,
     state::State,
     param_set::APS,
     Δt::Real,
 ) = nothing
 
-function compute_precipitation_sink_tendencies(::Clima1M, grid::Grid, state::State, param_set::APS, Δt::Real)
+function compute_precipitation_sink_tendencies(
+    ::Clima1M,
+    edmf::EDMFModel,
+    grid::Grid,
+    state::State,
+    param_set::APS,
+    Δt::Real,
+)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     aux_gm = center_aux_grid_mean(state)
@@ -75,8 +83,17 @@ function compute_precipitation_sink_tendencies(::Clima1M, grid::Grid, state::Sta
         q_tot_gm = prog_gm.q_tot[k]
         T_gm = aux_gm.T[k]
         # When we fuse loops, this should hopefully disappear
-        ts = TD.PhaseEquil_pTq(param_set, p0, T_gm, q_tot_gm)
-        q = TD.PhasePartition(param_set, ts)
+        if edmf.moisture_model isa EquilibriumMoisture
+            ts = TD.PhaseEquil_pTq(param_set, p0, T_gm, q_tot_gm)
+            q = TD.PhasePartition(param_set, ts)
+        elseif edmf.moisture_model isa NonEquilibriumMoisture
+            q_liq_gm = prog_gm.q_liq[k]
+            q_ice_gm = prog_gm.q_ice[k]
+            q = TD.PhasePartition(q_tot_gm, q_liq_gm, q_ice_gm)
+            ts = TD.PhaseNonEquil_pTq(param_set, p0, T_gm, q)
+        else
+            error("Need to specify the moisture_model: EquilibriumMoisture or NonEquilibriumMoisture, not $(edmf.moisture_model)")
+        end
         qv = TD.vapor_specific_humidity(param_set, ts)
 
         Π_m = TD.exner(param_set, ts)

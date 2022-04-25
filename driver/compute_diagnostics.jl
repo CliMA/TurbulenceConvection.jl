@@ -130,17 +130,41 @@ function compute_diagnostics!(
 
     surf = get_surface(case.surf_params, grid, state, t, param_set)
 
-    @inbounds for k in TC.real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        aux_gm.s[k] = TD.specific_entropy(param_set, ts)
-        ts_en = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
-        aux_en.s[k] = TD.specific_entropy(param_set, ts_en)
-        @inbounds for i in 1:N_up
-            if aux_up[i].area[k] > 0.0
-                ts_up = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
-                aux_up[i].s[k] = TD.specific_entropy(param_set, ts_up)
+    if edmf.moisture_model isa TC.EquilibriumMoisture
+        @inbounds for k in TC.real_center_indices(grid)
+            ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+            aux_gm.s[k] = TD.specific_entropy(param_set, ts)
+            ts_en = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
+            aux_en.s[k] = TD.specific_entropy(param_set, ts_en)
+            @inbounds for i in 1:N_up
+                if aux_up[i].area[k] > 0.0
+                    ts_up = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
+                    aux_up[i].s[k] = TD.specific_entropy(param_set, ts_up)
+                else
+                    aux_up[i].s[k] = FT(0)
+                end
             end
         end
+    elseif edmf.moisture_model isa TC.NonEquilibriumMoisture
+        @inbounds for k in TC.real_center_indices(grid)
+            q = TD.PhasePartition(prog_gm.q_tot[k], prog_gm.q_liq[k], prog_gm.q_ice[k])
+            ts = TD.PhaseNonEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], q)
+            aux_gm.s[k] = TD.specific_entropy(param_set, ts)
+            q_en = TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k])
+            ts_en = TD.PhaseNonEquil_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], q_en)
+            aux_en.s[k] = TD.specific_entropy(param_set, ts_en)
+            @inbounds for i in 1:N_up
+                if aux_up[i].area[k] > 0.0
+                    q_up = TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k])
+                    ts_up = TD.PhaseNonEquil_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], q_up)
+                    aux_up[i].s[k] = TD.specific_entropy(param_set, ts_up)
+                else
+                    aux_up[i].s[k] = FT(0)
+                end
+            end
+        end
+    else
+        error("The expected moisture models are EquilibriumMoisture or NonEquilibriumMoisture, not $(edmf.moisture_model)")
     end
 
     # TODO(ilopezgp): Fix bottom gradient
