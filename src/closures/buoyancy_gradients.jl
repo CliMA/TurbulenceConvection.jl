@@ -14,20 +14,20 @@ function buoyancy_gradients(
     bg_model::EnvBuoyGrad{FT, EBG},
 ) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
 
-    g = CPP.grav(param_set)
-    molmass_ratio = CPP.molmass_ratio(param_set)
-    R_d = CPP.R_d(param_set)
-    R_v = CPP.R_v(param_set)
+    g = param_set.grav
+    molmass_ratio = param_set.molmass_ratio
+    R_d = param_set.R_d
+    R_v = param_set.R_v
 
     phase_part = TD.PhasePartition(0.0, 0.0, 0.0) # assuming R_d = R_m
-    Π = TD.exner_given_pressure(param_set, bg_model.p0, phase_part)
+    Π = TD.exner_given_pressure(param_set.TPS, bg_model.p0, phase_part)
 
     ∂b∂θv = g * (R_d / bg_model.alpha0 / bg_model.p0) * Π
 
     if bg_model.en_cld_frac > 0.0
-        ts_sat = thermo_state_pθq(param_set, bg_model.p0, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
+        ts_sat = thermo_state_pθq(param_set.TPS, bg_model.p0, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
         phase_part = TD.PhasePartition(ts_sat)
-        lh = TD.latent_heat_liq_ice(param_set, phase_part)
+        lh = TD.latent_heat_liq_ice(param_set.TPS, phase_part)
         cp_m = TD.cp_m(ts_sat)
         ∂b∂θl_sat = (
             ∂b∂θv * (1 + molmass_ratio * (1 + lh / R_v / bg_model.t_sat) * bg_model.qv_sat - bg_model.qt_sat) /

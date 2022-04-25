@@ -1,24 +1,3 @@
-abstract type AbstractPerturbationPressureParameters end
-struct PerturbationPressureParameters{FT} <: AbstractPerturbationPressureParameters
-    α_b::FT
-    α_a::FT
-    α_d::FT
-end
-
-function PerturbationPressureParameters(
-    param_set,
-) where {FT}
-    aliases =["α_b", "α_a",  "α_d"]
-    (α_b, α_a, α_d) =
-        CLIMAParameters.get_parameter_values!(param_set, aliases, "PerturbationPressure")
-
-    return PerturbationPressureParameters{CLIMAParameters.get_parametric_type(param_set)}(
-        α_b,
-        α_a,
-        α_d,
-    )
-end
-
 """
     compute_nh_pressure!(
         state::State,
@@ -60,9 +39,9 @@ function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, param_s
 
     # Note: Independence of aspect ratio hardcoded in implementation.
     α₂_asp_ratio² = FT(0)
-    α_b = param_set.α_b
-    α_a = param_set.α_a
-    α_d = param_set.α_d
+    α_b = edmf.EDMFParams.α_b
+    α_a = edmf.EDMFParams.α_a
+    α_d = edmf.EDMFParams.α_d
 
     @inbounds for i in 1:N_up
         # pressure
