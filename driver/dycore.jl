@@ -42,6 +42,7 @@ cent_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture) = (;
 )
 cent_aux_vars_gm_moisture(FT, ::TC.EquilibriumMoisture) = ()
 cent_aux_vars_gm(FT, edmf) = (;
+    ts = TC.thermo_state(FT, edmf.moisture_model),
     tke = FT(0),
     Hvar = FT(0),
     QTvar = FT(0),
@@ -266,6 +267,20 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     UnPack.@unpack edmf, precip_model, grid, param_set, case, aux, TS = params
 
     state = TC.State(prog, aux, tendencies)
+
+    ts_gm = TC.center_aux_grid_mean(state).ts
+    prog_gm = TC.center_prog_grid_mean(state)
+    p0_c = TC.center_ref_state(state).p0
+    @inbounds for k in TC.real_center_indices(grid)
+        thermo_args = if edmf.moisture_model isa TC.EquilibriumMoisture
+            ()
+        elseif edmf.moisture_model isa TC.NonEquilibriumMoisture
+            (prog_gm.q_liq[k], prog_gm.q_ice[k])
+        else
+            error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
+        end
+        ts_gm[k] = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k], thermo_args...)
+    end
 
     Δt = TS.dt
     surf = get_surface(case.surf_params, grid, state, t, param_set)

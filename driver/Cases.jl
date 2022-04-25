@@ -697,11 +697,11 @@ end
 function update_forcing(self::CasesBase{ARM_SGP}, grid, state, t::Real, param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     p0_c = TC.center_ref_state(state).p0
+    ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
     FT = eltype(grid)
     @inbounds for k in real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        Π = TD.exner(param_set, ts)
+        Π = TD.exner(param_set, ts_gm[k])
         z = grid.zc[k]
         aux_gm.dTdt[k] = APL.ARM_SGP_dTdt(FT)(t, z)
         aux_gm.dqtdt[k] = APL.ARM_SGP_dqtdt(FT)(Π, t, z)
