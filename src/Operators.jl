@@ -29,3 +29,11 @@ function shrink_mask!(f::AbstractArray, mask::AbstractArray)
         end
     end
 end
+
+function special_interp(var, zc, z_star::FT) where {FT}
+    LBF = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
+    zero_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+    I0f = CCO.InterpolateC2F(; zero_bcs...)
+    is_updraft_top = @. Int(zc.z ≈ z_star) * FT(1)
+    return @. LBF(var*is_updraft_top) + I0f(var*(1-is_updraft_top))
+end

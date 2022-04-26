@@ -183,14 +183,14 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.RH[k] = TD.relative_humidity(param_set, ts_en)
 
         @inbounds for i in 1:N_up
-            if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
-                qt = aux_up[i].q_tot[k - 1]
-                h = aux_up[i].θ_liq_ice[k - 1]
+            if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf
+                qt = aux_up[i].q_tot[k]
+                h = aux_up[i].θ_liq_ice[k]
                 if edmf.moisture_model isa EquilibriumMoisture
                     ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
                 elseif edmf.moisture_model isa NonEquilibriumMoisture
-                    ql = aux_up[i].q_liq[k - 1]
-                    qi = aux_up[i].q_ice[k - 1]
+                    ql = aux_up[i].q_liq[k]
+                    qi = aux_up[i].q_ice[k]
                     ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt, ql, qi)
                 else
                     error("Something went wrong. emdf.moisture_model options are equilibrium or nonequilibrium")

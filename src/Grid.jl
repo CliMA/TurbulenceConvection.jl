@@ -115,6 +115,9 @@ is_toa_center(grid::Grid, k) = k == kc_top_of_atmos(grid)
 is_surface_face(grid::Grid, k) = k == kf_surface(grid)
 is_toa_face(grid::Grid, k) = k == kf_top_of_atmos(grid)
 
+is_surface_center(grid::Grid, z::AbstractFloat) = z == grid.zc[kc_surface(grid)]
+is_toa_center(grid::Grid, z::AbstractFloat) = z == grid.zc[kc_top_of_atmos(grid)]
+
 zc_surface(grid::Grid) = grid.zc[kc_surface(grid)]
 zf_surface(grid::Grid) = grid.zf[kf_surface(grid)]
 zc_toa(grid::Grid) = grid.zc[kc_top_of_atmos(grid)]

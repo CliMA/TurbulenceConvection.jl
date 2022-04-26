@@ -7,6 +7,19 @@ if !@isdefined case_name
     case_name = parsed_args["case"]
 end
 
+import ClimaCore
+# if parsed_args["trunc_stack_traces"]
+    function Base.show(
+        io::IO,
+        ::Type{F},
+    ) where {F <: ClimaCore.Fields.FieldVector}
+        print(io, "FieldVector{...}")
+    end
+    function Base.show(io::IO, ::Type{F}) where {F <: ClimaCore.Fields.Field}
+        print(io, "Field{...}")
+    end
+# end
+
 @info "Running $case_name..."
 @info "`suffix`: `$(suffix)`"
 @info "See `cli_options.jl` changing defaults"

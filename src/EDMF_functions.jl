@@ -561,10 +561,16 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         detr_w = aux_up[i].detr_turb_dyn
         buoy = aux_up[i].buoy
 
+        z_star = compute_updraft_top(grid, state, i)
+        custom_interp(var) = special_interp(var, grid.zc, z_star)
+        buoy_f = custom_interp(buoy)
+        entr_w_f = custom_interp(entr_w)
+        detr_w_f = custom_interp(detr_w)
+
         @. tends_ρaw = -(∇f(wvec(LBC(Iaf(a_up) * ρ0_f * w_up * w_up))))
         @. tends_ρaw +=
-            (ρ0_f * Iaf(a_up) * w_up * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) +
-            (ρ0_f * Iaf(a_up) * I0f(buoy)) +
+            (ρ0_f * Iaf(a_up) * w_up * (entr_w_f * w_en - detr_w_f * w_up)) +
+            (ρ0_f * Iaf(a_up) * buoy_f) +
             nh_pressure
         tends_ρaw[kf_surf] = 0
     end
