@@ -13,20 +13,13 @@ function microphysics(
     ρ0_c = center_ref_state(state).ρ0
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
+    ts_env = center_aux_environment(state).ts
     aux_en_sat = aux_en.sat
     aux_en_unsat = aux_en.unsat
 
     @inbounds for k in real_center_indices(grid)
         # condensation
-        q_tot_en = aux_en.q_tot[k]
-        if edmf.moisture_model isa EquilibriumMoisture
-            ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], q_tot_en)
-        elseif edmf.moisture_model isa NonEquilibriumMoisture
-            q_tot_en = aux_en.q_tot[k]
-            q_liq_en = aux_en.q_liq[k]
-            q_ice_en = aux_en.q_ice[k]
-            ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], q_tot_en, q_liq_en, q_ice_en)
-        end
+        ts = ts_env[k]
         # autoconversion and accretion
         mph = precipitation_formation(
             param_set,
@@ -236,6 +229,7 @@ function microphysics(
     aux_en_unsat = aux_en.unsat
     aux_en_sat = aux_en.sat
     tendencies_pr = center_tendencies_precipitation(state)
+    ts_env = center_aux_environment(state).ts
 
     #TODO - if we start using eos_smpl for the updrafts calculations
     #       we can get rid of the two categories for outer and inner quad. points
@@ -323,7 +317,7 @@ function microphysics(
 
         else
             # if variance and covariance are zero do the same as in SA_mean
-            ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
+            ts = ts_env[k]
             mph = precipitation_formation(
                 param_set,
                 precip_model,

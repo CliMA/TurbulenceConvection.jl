@@ -284,6 +284,13 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
     set_thermo_state!(state, grid, edmf.moisture_model, param_set)
 
+    # TODO: where should this live?
+    aux_gm = TC.center_aux_grid_mean(state)
+    ts_gm = aux_gm.ts
+    @inbounds for k in TC.real_center_indices(grid)
+        aux_gm.θ_virt[k] = TD.virtual_pottemp(param_set, ts_gm[k])
+    end
+
     Δt = TS.dt
     surf = get_surface(case.surf_params, grid, state, t, param_set)
     force = case.Fo

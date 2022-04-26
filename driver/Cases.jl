@@ -315,6 +315,7 @@ function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, param_set
     p0_c = TC.center_ref_state(state).p0
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
+    ts_gm = aux_gm.ts
 
     FT = eltype(grid)
     prof_ug = APL.Bomex_geostrophic_u(FT)
@@ -326,8 +327,7 @@ function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, param_set
         z = grid.zc[k]
         # Geostrophic velocity profiles. vg = 0
         aux_gm.ug[k] = prof_ug(z)
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        Π = TD.exner(param_set, ts)
+        Π = TD.exner(param_set, ts_gm[k])
         # Set large-scale cooling
         aux_gm.dTdt[k] = prof_dTdt(Π, z)
         # Set large-scale drying
@@ -408,6 +408,7 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
     p0_c = TC.center_ref_state(state).p0
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
+    ts_gm = aux_gm.ts
 
     FT = eltype(grid)
     prof_ug = APL.LifeCycleTan2018_geostrophic_u(FT)
@@ -419,8 +420,7 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
         z = grid.zc[k]
         # Geostrophic velocity profiles. vg = 0
         aux_gm.ug[k] = prof_ug(z)
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        Π = TD.exner(param_set, ts)
+        Π = TD.exner(param_set, ts_gm[k])
         # Set large-scale cooling
         aux_gm.dTdt[k] = prof_dTdt(Π, z)
         # Set large-scale drying
@@ -476,6 +476,8 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, param_set, state
 
     # Need to get θ_virt
     @inbounds for k in real_center_indices(grid)
+        # Thermo state field cache is not yet
+        # defined, so we can't use it yet.
         ts = TD.PhaseEquil_pθq(param_set, p0[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
         aux_gm.θ_virt[k] = TD.virtual_pottemp(param_set, ts)
     end
@@ -518,6 +520,7 @@ function initialize_forcing(self::CasesBase{Rico}, grid::Grid, state, param_set)
     p0_c = TC.center_ref_state(state).p0
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
+    ts_gm = aux_gm.ts
 
     FT = eltype(grid)
     prof_ug = APL.Rico_geostrophic_ug(FT)
@@ -528,8 +531,7 @@ function initialize_forcing(self::CasesBase{Rico}, grid::Grid, state, param_set)
 
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        Π = TD.exner(param_set, ts)
+        Π = TD.exner(param_set, ts_gm[k])
         # Geostrophic velocity profiles
         aux_gm.ug[k] = prof_ug(z)
         aux_gm.vg[k] = prof_vg(z)

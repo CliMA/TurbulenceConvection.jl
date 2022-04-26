@@ -119,6 +119,7 @@ function compute_diagnostics!(
     aux_gm_f = TC.face_aux_grid_mean(state)
     prog_pr = TC.center_prog_precipitation(state)
     aux_bulk = TC.center_aux_bulk(state)
+    ts_gm = TC.center_aux_grid_mean(state).ts
     a_up_bulk = aux_bulk.area
     kc_toa = TC.kc_top_of_atmos(grid)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -132,7 +133,7 @@ function compute_diagnostics!(
 
     if edmf.moisture_model isa TC.EquilibriumMoisture
         @inbounds for k in TC.real_center_indices(grid)
-            ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
+            ts = ts_gm[k]
             aux_gm.s[k] = TD.specific_entropy(param_set, ts)
             ts_en = TD.PhaseEquil_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
             aux_en.s[k] = TD.specific_entropy(param_set, ts_en)
