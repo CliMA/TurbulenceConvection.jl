@@ -28,13 +28,13 @@ end
 
 function init_sim(case_name; skip_io = true, single_timestep = true, prefix = "")
     if single_timestep && skip_io
-        @info "Initializing $case_name for single timestep, with no IO."
+        @info "Initializing `$case_name` for single timestep, with no IO."
     elseif single_timestep
-        @info "Initializing $case_name for single timestep."
+        @info "Initializing `$case_name` for single timestep."
     elseif skip_io
-        @info "Initializing $case_name with no IO."
+        @info "Initializing `$case_name` with no IO."
     else
-        @info "Initializing $case_name with IO."
+        @info "Initializing `$case_name` with IO."
     end
     namelist = NameList.default_namelist(case_name)
     if single_timestep

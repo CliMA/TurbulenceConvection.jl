@@ -4,9 +4,9 @@ if haskey(ENV, "BUILDKITE_COMMIT") && haskey(ENV, "BUILDKITE_BRANCH")
     # Note: cluster_data_prefix is also defined in integration_tests/utils/compute_mse.jl
     cluster_data_prefix = "/central/scratch/esm/slurm-buildkite/turbulenceconvection-main"
 
-    @info "pwd() = $(pwd())"
-    @info "branch = $(branch)"
-    @info "commit = $(commit)"
+    @info "pwd() = `$(pwd())`"
+    @info "branch = `$(branch)`"
+    @info "commit = `$(commit)`"
 
     using Glob
     if branch == "staging"
@@ -17,11 +17,11 @@ if haskey(ENV, "BUILDKITE_COMMIT") && haskey(ENV, "BUILDKITE_BRANCH")
         for folder_name in glob("Output.*")
             src = folder_name
             dst = joinpath(path, folder_name)
-            @info "Moving $src to $dst"
+            @info "Moving `$src` to `$dst`"
             mv(src, dst; force = true)
         end
-        @info "readdir(): $(readdir(path))"
+        @info "readdir(): `$(readdir(path))`"
     end
 else
-    @info "ENV keys: $(keys(ENV))"
+    @info "ENV keys: `$(keys(ENV))`"
 end

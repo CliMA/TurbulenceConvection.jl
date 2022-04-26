@@ -65,7 +65,7 @@ function compute_mse_wrapper(
         # TODO: make this more robust in case folder/file changes
         folder_name = joinpath("Output.$case_name.01", "stats")
         ds_tc_main_filename = joinpath(path, folder_name, "Stats.$case_name.nc")
-        @info "TC.jl main dataset: $ds_tc_main_filename"
+        @info "TC.jl main dataset:`$ds_tc_main_filename`"
     end
     all_args = (case_name, best_mse, plot_dir)
 
@@ -262,7 +262,7 @@ function compute_mse(
         data_scm_arr = Array(data_scm_arr)'
         push!(tcc_variables, tc_var)
 
-        @info "Assembling plots for $tc_var"
+        @info "Assembling plots for variable:`$tc_var`"
 
         @debug "     Data sizes (les,scm,tcc,tcm): $(size(data_les_arr)), $(size(data_scm_arr)), $(size(data_tcc_arr)), $(size(data_tcm_arr))"
         # Scale the data for comparison
@@ -543,7 +543,7 @@ function save_plots(plot_dir, plots_dict; group_figs = true, have_tc_main, fig_h
         n_plots = length(all_contours)
         n_cols = 1
         n_rows = ceil(Int, n_plots / n_cols)
-        @info "     Saving $(joinpath(plot_dir, "contours.png"))"
+        @info "     Saving file:`$(joinpath(plot_dir, "contours.png"))`"
         title = Plots.plot(
             title = case_name,
             grid = false,
@@ -569,7 +569,7 @@ function save_plots(plot_dir, plots_dict; group_figs = true, have_tc_main, fig_h
         n_plots = length(all_profiles)
         n_cols = 5
         n_rows = ceil(Int, n_plots / n_cols)
-        @info "     Saving $(joinpath(plot_dir, "profiles.png"))"
+        @info "     Saving file:`$(joinpath(plot_dir, "profiles.png"))`"
         n_empty_plots = n_rows * n_cols - n_plots
         all_profiles =
             [all_profiles..., ntuple(i -> Plots.plot(; framestyle = :none, xticks = false), n_empty_plots)...]
@@ -627,14 +627,14 @@ function save_plots(plot_dir, plots_dict; group_figs = true, have_tc_main, fig_h
         Plots.savefig(joinpath(plot_dir, "profiles.png"))
     else
         for tc_var in keys(all_contours)
-            @info "     Saving $(joinpath(plot_dir, "contours_$tc_var.png"))"
+            @info "     Saving file:`$(joinpath(plot_dir, "contours_$tc_var.png"))`"
             Plots.plot(all_contours[tc_var])
             Plots.savefig(joinpath(plot_dir, "contours_$tc_var.png"))
         end
 
         all_profiles = plots_dict["profiles"]
         for tc_var in keys(all_profiles)
-            @info "     Saving $(joinpath(plot_dir, "profiles_$tc_var.png"))"
+            @info "     Saving file:`$(joinpath(plot_dir, "profiles_$tc_var.png"))`"
             Plots.plot(all_profiles[tc_var])
             Plots.savefig(joinpath(plot_dir, "profiles_$tc_var.png"))
         end
