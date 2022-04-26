@@ -227,15 +227,29 @@ function compute_ref_state!(state, grid::TC.Grid, param_set::PS; ts_g) where {PS
     return nothing
 end
 
-function satadjust(param_set::APS, grid, state)
+function set_thermo_state!(state, grid, moisture_model, param_set)
+    ts_gm = TC.center_aux_grid_mean(state).ts
+    prog_gm = TC.center_prog_grid_mean(state)
     p0_c = TC.center_ref_state(state).p0
+    @inbounds for k in TC.real_center_indices(grid)
+        thermo_args = if moisture_model isa TC.EquilibriumMoisture
+            ()
+        elseif moisture_model isa TC.NonEquilibriumMoisture
+            (prog_gm.q_liq[k], prog_gm.q_ice[k])
+        else
+            error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
+        end
+        ts_gm[k] = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k], thermo_args...)
+    end
+    return nothing
+end
+
+function assign_thermo_aux!(state, grid, moisture_model, param_set)
     ρ0_c = TC.center_ref_state(state).ρ0
     aux_gm = TC.center_aux_grid_mean(state)
-    prog_gm = TC.center_prog_grid_mean(state)
+    ts_gm = TC.center_aux_grid_mean(state).ts
     @inbounds for k in TC.real_center_indices(grid)
-        θ_liq_ice = prog_gm.θ_liq_ice[k]
-        q_tot = prog_gm.q_tot[k]
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], θ_liq_ice, q_tot)
+        ts = ts_gm[k]
         aux_gm.q_liq[k] = TD.liquid_specific_humidity(param_set, ts)
         aux_gm.q_ice[k] = TD.ice_specific_humidity(param_set, ts)
         aux_gm.T[k] = TD.air_temperature(param_set, ts)
@@ -268,19 +282,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
     state = TC.State(prog, aux, tendencies)
 
-    ts_gm = TC.center_aux_grid_mean(state).ts
-    prog_gm = TC.center_prog_grid_mean(state)
-    p0_c = TC.center_ref_state(state).p0
-    @inbounds for k in TC.real_center_indices(grid)
-        thermo_args = if edmf.moisture_model isa TC.EquilibriumMoisture
-            ()
-        elseif edmf.moisture_model isa TC.NonEquilibriumMoisture
-            (prog_gm.q_liq[k], prog_gm.q_ice[k])
-        else
-            error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
-        end
-        ts_gm[k] = TC.thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k], thermo_args...)
-    end
+    set_thermo_state!(state, grid, edmf.moisture_model, param_set)
 
     Δt = TS.dt
     surf = get_surface(case.surf_params, grid, state, t, param_set)
