@@ -2,6 +2,10 @@
 ##### Fields
 #####
 
+# Helpers for adding empty thermodynamic state fields:
+thermo_state(FT, ::EquilibriumMoisture) = TD.PhaseEquil{FT}(0, 0, 0, 0, 0)
+thermo_state(FT, ::NonEquilibriumMoisture) = TD.PhaseEquil{FT}(0, 0, TD.PhasePartition{FT}(0, 0, 0))
+
 ##### Auxiliary fields
 
 # Center only
@@ -23,6 +27,7 @@ cent_aux_vars_up_moisture(FT, ::NonEquilibriumMoisture) = (;
 )
 cent_aux_vars_up_moisture(FT, ::EquilibriumMoisture) = ()
 cent_aux_vars_up(FT, edmf) = (;
+    ts = thermo_state(FT, edmf.moisture_model),
     q_liq = FT(0),
     q_ice = FT(0),
     T = FT(0),
@@ -86,6 +91,7 @@ cent_aux_vars_edmf(FT, edmf) = (;
         ),
         up = ntuple(i -> cent_aux_vars_up(FT, edmf), n_updrafts(edmf)),
         en = (;
+            ts = thermo_state(FT, edmf.moisture_model),
             w = FT(0),
             area = FT(0),
             q_tot = FT(0),
