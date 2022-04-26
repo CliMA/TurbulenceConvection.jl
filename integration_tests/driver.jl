@@ -23,18 +23,26 @@ namelist = NameList.default_namelist(case_name)
 namelist["meta"]["uuid"] = "01$suffix"
 
 #! format: off
-!isnothing(parsed_args["sgs"]) && (namelist["thermodynamics"]["sgs"] = parsed_args["sgs"])
-!isnothing(parsed_args["quad_type"]) && (namelist["thermodynamics"]["quadrature_type"] = parsed_args["quad_type"])
-!isnothing(parsed_args["entr"]) && (namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = parsed_args["entr"])
-!isnothing(parsed_args["stoch_entr"]) && (namelist["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = parsed_args["stoch_entr"])
-!isnothing(parsed_args["t_max"]) && (namelist["time_stepping"]["t_max"] = parsed_args["t_max"])
-!isnothing(parsed_args["adapt_dt"]) && (namelist["time_stepping"]["adapt_dt"] = parsed_args["adapt_dt"])
-!isnothing(parsed_args["dt"]) && (namelist["time_stepping"]["dt_min"] = parsed_args["dt"])
-!isnothing(parsed_args["calibrate_io"]) && (namelist["stats_io"]["calibrate_io"] = parsed_args["calibrate_io"])
-!isnothing(parsed_args["stretch_grid"]) && (namelist["grid"]["stretch"]["flag"] = parsed_args["stretch_grid"])
-!isnothing(parsed_args["skip_io"]) && (namelist["stats_io"]["skip"] = parsed_args["skip_io"])
-!isnothing(parsed_args["n_up"]) && (namelist["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = parsed_args["n_up"])
+overwrite_namelist_map = Dict(
+"sgs"          => (nl, pa, key) -> (nl["thermodynamics"]["sgs"] = pa[key]),
+"quad_type"    => (nl, pa, key) -> (nl["thermodynamics"]["quadrature_type"] = pa[key]),
+"entr"         => (nl, pa, key) -> (nl["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = pa[key]),
+"stoch_entr"   => (nl, pa, key) -> (nl["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = pa[key]),
+"t_max"        => (nl, pa, key) -> (nl["time_stepping"]["t_max"] = pa[key]),
+"adapt_dt"     => (nl, pa, key) -> (nl["time_stepping"]["adapt_dt"] = pa[key]),
+"dt"           => (nl, pa, key) -> (nl["time_stepping"]["dt_min"] = pa[key]),
+"calibrate_io" => (nl, pa, key) -> (nl["stats_io"]["calibrate_io"] = pa[key]),
+"stretch_grid" => (nl, pa, key) -> (nl["grid"]["stretch"]["flag"] = pa[key]),
+"skip_io"      => (nl, pa, key) -> (nl["stats_io"]["skip"] = pa[key]),
+"n_up"         => (nl, pa, key) -> (nl["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = pa[key]),
+)
 #! format: on
+for key in keys(overwrite_namelist_map)
+    if !isnothing(parsed_args[key])
+        @warn "Parameter `$key` overwriting namelist"
+        overwrite_namelist_map[key](namelist, parsed_args, key)
+    end
+end
 
 ds_tc_filename, return_code = main(namelist)
 
