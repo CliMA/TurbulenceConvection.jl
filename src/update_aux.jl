@@ -34,6 +34,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ∇m_entr_detr = aux_tc.ψ_temporary
     wvec = CC.Geometry.WVector
     max_area = edmf.max_area
+    ts_gm = center_aux_grid_mean(state).ts
+    ts_env = center_aux_environment(state).ts
 
     #####
     ##### center variables
@@ -146,30 +148,15 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         #####
         ##### condensation, etc (done via saturation_adjustment or non-equilibrium) and buoyancy
         #####
-        if edmf.moisture_model isa EquilibriumMoisture
-            ts_gm = thermo_state_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-            ts_en = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
+        thermo_args = if edmf.moisture_model isa EquilibriumMoisture
+            ()
         elseif edmf.moisture_model isa NonEquilibriumMoisture
-            ts_gm = thermo_state_pθq(
-                param_set,
-                p0_c[k],
-                prog_gm.θ_liq_ice[k],
-                prog_gm.q_tot[k],
-                prog_gm.q_liq[k],
-                prog_gm.q_ice[k],
-            )
-            ts_en = thermo_state_pθq(
-                param_set,
-                p0_c[k],
-                aux_en.θ_liq_ice[k],
-                aux_en.q_tot[k],
-                aux_en.q_liq[k],
-                aux_en.q_ice[k],
-            )
+            (aux_en.q_liq[k], aux_en.q_ice[k])
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
-        aux_gm.θ_virt[k] = TD.virtual_pottemp(param_set, ts_gm)
+        ts_env[k] = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], thermo_args...)
+        ts_en = ts_env[k]
         aux_en.T[k] = TD.air_temperature(param_set, ts_en)
         aux_en.θ_virt[k] = TD.virtual_pottemp(param_set, ts_en)
         aux_en.θ_dry[k] = TD.dry_pottemp(param_set, ts_en)
