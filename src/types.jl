@@ -443,7 +443,46 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG}
+struct EDMFParameters{FT, AECPS, AEDSPS, APS}
+    a_surf::FT
+    a_min::FT
+    a_max::FT
+    Pr_n::FT
+    α_d::FT
+    α_a::FT
+    α_b::FT
+    ECPS::AECPS
+    EDSPS::AEDSPS
+    PRP::APS
+end
+
+function EDMFParameters(
+    param_set,
+    ECPS::AECPS,
+    EDSPS::AEDSPS
+    PRP::APS
+) where {AECPS <: Union{AbstractEntrainmentClosureParameters,AbstractStochasticEntrainmentClosureParameters}, AEDSPS <: AbstractEntrainmentDimScaleParameters, PRP <: AbstractPrecipitationParameters}
+
+    aliases = ["a_surf","a_min", "a_max", "Prandtl_air", "α_d", "α_a", "α_b"]
+
+    (a_surf, a_min, a_max, Prandtl_air, α_d, α_a, α_b) = CLIMAParameters.get_parameter_values!(param_set,aliases,"EDMF")
+
+    return EDMFParameters{get_parametric_type(param_set),AECPS,AEDSPS,APS}(
+        a_surf,
+        a_min,
+        a_max,
+        Prandtl_air,
+        α_d,
+        α_a,
+        α_b,
+        ECPS,
+        EDSPS,
+        PRP,
+    )
+
+end
+
+struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFP}
     surface_area::FT
     max_area::FT
     minimum_area::FT
@@ -455,6 +494,7 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG}
     entr_closure::EC
     entr_dim_scale::EDS
     entr_pi_subset::EPG
+    EDMFParams::EDMFP
     function EDMFModel(namelist, precip_model) where {PS}
         # TODO: move this into arg list
         FT = Float64
@@ -600,7 +640,7 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG}
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
         EPG = typeof(entr_pi_subset)
-        return new{n_updrafts, FT, MM, PM, ENT, EBGC, EC, EDS, EPG}(
+        return new{n_updrafts, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFP}(
             surface_area,
             max_area,
             minimum_area,
@@ -612,6 +652,7 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG}
             entr_closure,
             entr_dim_scale,
             entr_pi_subset,
+            EDMFParams,
         )
     end
 end
