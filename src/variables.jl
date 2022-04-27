@@ -25,7 +25,7 @@ cent_aux_vars_up_moisture(FT, ::NonEquilibriumMoisture) = (;
     ql_tendency_noneq = FT(0),
     qi_tendency_noneq = FT(0),
 )
-cent_aux_vars_up_moisture(FT, ::EquilibriumMoisture) = ()
+cent_aux_vars_up_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
 cent_aux_vars_up(FT, edmf) = (;
     ts = thermo_state(FT, edmf.moisture_model),
     q_liq = FT(0),
@@ -56,21 +56,21 @@ cent_aux_vars_edmf_bulk_moisture(FT, ::NonEquilibriumMoisture) = (;
     ql_tendency_noneq = FT(0),
     qi_tendency_noneq = FT(0),
 )
-cent_aux_vars_edmf_bulk_moisture(FT, ::EquilibriumMoisture) = ()
+cent_aux_vars_edmf_bulk_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
 cent_aux_vars_edmf_en_moisture(FT, ::NonEquilibriumMoisture) = (;
     ql_tendency_precip_formation = FT(0),
     qi_tendency_precip_formation = FT(0),
     ql_tendency_noneq = FT(0),
     qi_tendency_noneq = FT(0),
 )
-cent_aux_vars_edmf_en_moisture(FT, ::EquilibriumMoisture) = ()
+cent_aux_vars_edmf_en_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
 cent_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
     massflux_tendency_ql = FT(0),
     massflux_tendency_qi = FT(0),
     diffusive_tendency_ql = FT(0),
     diffusive_tendency_qi = FT(0),
 )
-cent_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture) = ()
+cent_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
 cent_aux_vars_edmf(FT, edmf) = (;
     turbconv = (;
         ϕ_temporary = FT(0),
@@ -175,7 +175,7 @@ face_aux_vars_up(FT) = (;
 )
 face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) =
     (; massflux_ql = FT(0), massflux_qi = FT(0), diffusive_flux_ql = FT(0), diffusive_flux_qi = FT(0))
-face_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture) = ()
+face_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
 face_aux_vars_edmf(FT, edmf) = (;
     turbconv = (;
         bulk = (; w = FT(0)),
@@ -234,28 +234,29 @@ single_value_per_col_diagnostic_vars_edmf(FT, edmf) = (;
 ##### Prognostic fields
 
 # Center only
-cent_prognostic_vars_up_noisy_relaxation(FT, ::PrognosticNoisyRelaxationProcess) =
+cent_prognostic_vars_up_noisy_relaxation(::Type{FT}, ::PrognosticNoisyRelaxationProcess) where {FT} =
     (; ε_nondim = FT(0), δ_nondim = FT(0))
-cent_prognostic_vars_up_noisy_relaxation(FT, _) = ()
-cent_prognostic_vars_up_moisture(FT, ::EquilibriumMoisture) = ()
-cent_prognostic_vars_up_moisture(FT, ::NonEquilibriumMoisture) = (; ρaq_liq = FT(0), ρaq_ice = FT(0))
-cent_prognostic_vars_up(FT, edmf) = (;
+cent_prognostic_vars_up_noisy_relaxation(::Type{FT}, _) where {FT} = NamedTuple()
+cent_prognostic_vars_up_moisture(::Type{FT}, ::EquilibriumMoisture) where {FT} = NamedTuple()
+cent_prognostic_vars_up_moisture(::Type{FT}, ::NonEquilibriumMoisture) where {FT} = (; ρaq_liq = FT(0), ρaq_ice = FT(0))
+cent_prognostic_vars_up(::Type{FT}, edmf) where {FT} = (;
     ρarea = FT(0),
     ρaθ_liq_ice = FT(0),
     ρaq_tot = FT(0),
     cent_prognostic_vars_up_noisy_relaxation(FT, edmf.entr_closure)...,
     cent_prognostic_vars_up_moisture(FT, edmf.moisture_model)...,
 )
-cent_prognostic_vars_en(FT) = (; ρatke = FT(0), ρaHvar = FT(0), ρaQTvar = FT(0), ρaHQTcov = FT(0))
-cent_prognostic_vars_edmf(FT, edmf) = (;
+cent_prognostic_vars_en(::Type{FT}) where {FT} = (; ρatke = FT(0), ρaHvar = FT(0), ρaQTvar = FT(0), ρaHQTcov = FT(0))
+cent_prognostic_vars_edmf(::Type{FT}, edmf) where {FT} = (;
     turbconv = (;
         en = cent_prognostic_vars_en(FT),
-        up = ntuple(i -> cent_prognostic_vars_up(FT, edmf), n_updrafts(edmf)),
+        up = ntuple(i -> cent_prognostic_vars_up(FT, edmf), Val(n_updrafts(edmf))),
         pr = (; q_rai = FT(0), q_sno = FT(0)),
     ),
 )
 # cent_prognostic_vars_edmf(FT, edmf) = (;) # could also use this for empty model
 
 # Face only
-face_prognostic_vars_up(FT) = (; ρaw = FT(0))
-face_prognostic_vars_edmf(FT, edmf) = (; turbconv = (; up = ntuple(i -> face_prognostic_vars_up(FT), n_updrafts(edmf))))
+face_prognostic_vars_up(::Type{FT}, local_geometry) where {FT} = (; ρaw = FT(0))
+face_prognostic_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} =
+    (; turbconv = (; up = ntuple(i -> face_prognostic_vars_up(FT, local_geometry), Val(n_updrafts(edmf)))))

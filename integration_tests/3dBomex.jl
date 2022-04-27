@@ -134,9 +134,10 @@ function init_state(edmf, coords, face_coords, hv_center_space, hv_face_space)
             TC.cent_prognostic_vars_edmf(FT, edmf)...,
         ),
     )
+    local_geometry = CC.Fields.local_geometry_field(hv_face_space)
     face_prog_fields = TC.FieldFromNamedTuple(
         hv_face_space,
-        (; ρw = CCG.WVector(FT(0)), w = FT(0), TC.face_prognostic_vars_edmf(FT, edmf)...),
+        (; ρw = CCG.WVector(FT(0)), w = FT(0), TC.face_prognostic_vars_edmf(FT, local_geometry, edmf)...),
     )
     Y = CC.Fields.FieldVector(cent = cent_prog_fields, face = face_prog_fields)
     @. Y.cent.ρ = Yc.ρ

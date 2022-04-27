@@ -8,6 +8,7 @@ const TD = Thermodynamics
 
 import ClimaCore
 const CC = ClimaCore
+const CCG = CC.Geometry
 
 import OrdinaryDiffEq
 const ODE = OrdinaryDiffEq
@@ -40,7 +41,7 @@ cent_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture) = (;
     dqldt_fluc = FT(0),
     dqidt_fluc = FT(0),
 )
-cent_aux_vars_gm_moisture(FT, ::TC.EquilibriumMoisture) = ()
+cent_aux_vars_gm_moisture(FT, ::TC.EquilibriumMoisture) = NamedTuple()
 cent_aux_vars_gm(FT, edmf) = (;
     ts = TC.thermo_state(FT, edmf.moisture_model),
     tke = FT(0),
@@ -85,7 +86,7 @@ cent_aux_vars(FT, edmf) =
 
 # Face only
 face_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture) = (; sgs_flux_q_liq = FT(0), sgs_flux_q_ice = FT(0))
-face_aux_vars_gm_moisture(FT, ::TC.EquilibriumMoisture) = ()
+face_aux_vars_gm_moisture(FT, ::TC.EquilibriumMoisture) = NamedTuple()
 face_aux_vars_gm(FT, edmf) = (;
     massflux_s = FT(0),
     diffusive_flux_s = FT(0),
@@ -103,11 +104,11 @@ face_aux_vars(FT, edmf) =
 ##### Diagnostic fields
 
 # Center only
-cent_diagnostic_vars_gm(FT) = ()
+cent_diagnostic_vars_gm(FT) = NamedTuple()
 cent_diagnostic_vars(FT, edmf) = (; cent_diagnostic_vars_gm(FT)..., TC.cent_diagnostic_vars_edmf(FT, edmf)...)
 
 # Face only
-face_diagnostic_vars_gm(FT) = ()
+face_diagnostic_vars_gm(FT) = NamedTuple()
 face_diagnostic_vars(FT, edmf) = (; face_diagnostic_vars_gm(FT)..., TC.face_diagnostic_vars_edmf(FT, edmf)...)
 
 # Single value per column diagnostic variables
@@ -132,19 +133,29 @@ single_value_per_col_diagnostic_vars(FT, edmf) =
 ##### Prognostic fields
 
 # Center only
-cent_prognostic_vars(FT, edmf) = (; cent_prognostic_vars_gm(FT, edmf)..., TC.cent_prognostic_vars_edmf(FT, edmf)...)
-cent_prognostic_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture) = (; q_liq = FT(0), q_ice = FT(0))
-cent_prognostic_vars_gm_moisture(FT, ::TC.EquilibriumMoisture) = ()
-cent_prognostic_vars_gm(FT, edmf) = (;
+cent_prognostic_vars(::Type{FT}, local_geometry, edmf) where {FT} =
+    (; cent_prognostic_vars_gm(FT, local_geometry, edmf)..., TC.cent_prognostic_vars_edmf(FT, edmf)...)
+cent_prognostic_vars_gm_moisture(::Type{FT}, ::TC.NonEquilibriumMoisture) where {FT} = (; q_liq = FT(0), q_ice = FT(0))
+cent_prognostic_vars_gm_moisture(::Type{FT}, ::TC.EquilibriumMoisture) where {FT} = NamedTuple()
+cent_prognostic_vars_gm(::Type{FT}, local_geometry, edmf) where {FT} = (;
     u = FT(0),
     v = FT(0),
     θ_liq_ice = FT(0),
     q_tot = FT(0),
+    # TODO: Change to:
+    # uₕ = CCG.Covariant12Vector(CCG.UVVector(FT(0), FT(0)), local_geometry),
+    # ρq_tot = FT(0),
+    # ρe = FT(0),
     cent_prognostic_vars_gm_moisture(FT, edmf.moisture_model)...,
 )
 
 # Face only
-face_prognostic_vars(FT, edmf) = (; w = FT(0), TC.face_prognostic_vars_edmf(FT, edmf)...)
+face_prognostic_vars(::Type{FT}, local_geometry, edmf) where {FT} =
+    (; w = FT(0), TC.face_prognostic_vars_edmf(FT, local_geometry, edmf)...)
+# TODO: Change to:
+# face_prognostic_vars(::Type{FT}, local_geometry, edmf) where {FT} =
+#     (; w = CCG.Covariant3Vector(FT(0)), TC.face_prognostic_vars_edmf(FT, local_geometry, edmf)...)
+
 # TC.face_prognostic_vars_edmf(FT, edmf) = (;) # could also use this for empty model
 
 

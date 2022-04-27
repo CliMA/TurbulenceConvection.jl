@@ -144,21 +144,24 @@ const f = @. CCG.Contravariant3Vector(CCG.WVector(2 * Ω * sind(coords.lat)))
 const If2c = CCO.InterpolateF2C()
 const Ic2f = CCO.InterpolateC2F(bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
 
-function init_state(edmf, grid, coords, face_coords, local_geometries)
-    FT = eltype(edmf)
-    edmf_vars = cent_prognostic_vars(FT, edmf)
+init_state(edmf, args...) = init_state(eltype(edmf), edmf, args...)
+function init_state(::Type{FT}, edmf, grid, coords, face_coords, local_geometries) where {FT}
+
     Yc = map(coords) do coord
+        edmf_vars = cent_prognostic_vars(FT, coord, edmf)
         initial_condition(coord.lat, coord.long, coord.z, edmf_vars)
     end
-    uₕ = map(local_geometries) do local_geometry
-        initial_condition_velocity(local_geometry)
+    uₕ = map(local_geometries) do local_geom
+        initial_condition_velocity(local_geom)
     end
     w = map(_ -> CCG.Covariant3Vector(0.0), face_coords)
 
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
-    cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, edmf))
-    face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, edmf))
+    clocal_geometry = CC.Fields.local_geometry_field(cspace)
+    flocal_geometry = CC.Fields.local_geometry_field(fspace)
+    cent_prog_fields() = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, clocal_geometry, edmf))
+    face_prog_fields() = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, flocal_geometry, edmf))
     Y = CC.Fields.FieldVector(Yc = Yc, uₕ = uₕ, w = w, cent = cent_prog_fields(), face = face_prog_fields())
     return Y
 end
