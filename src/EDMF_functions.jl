@@ -561,12 +561,21 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         detr_w = aux_up[i].detr_turb_dyn
         buoy = aux_up[i].buoy
 
+        k_star = findlast_center(k -> aux_up[i].area[k] > edmf.minimum_area, grid)
+        is_updraft_top = copy(buoy)
+        for k in real_center_indices(grid)
+            z = grid.zc[k]
+            is_updraft_top[k] = z == grid.zc[k_star] && !is_surface_center(grid, k)
+        end
+
         @. tends_ρaw = -(∇f(wvec(LBC(Iaf(a_up) * ρ0_f * w_up * w_up))))
         @. tends_ρaw +=
             (ρ0_f * Iaf(a_up) * w_up * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) +
-            (ρ0_f * Iaf(a_up) * I0f(buoy)) +
+            # TODO: should this be right biased?
+            (ρ0_f * Iaf(a_up) * (LBF(buoy*is_updraft_top) + I0f(buoy*(1-is_updraft_top)))) +
             nh_pressure
         tends_ρaw[kf_surf] = 0
+
     end
 
     return nothing

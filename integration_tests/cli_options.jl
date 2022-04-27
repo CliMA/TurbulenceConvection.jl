@@ -5,7 +5,7 @@ function parse_commandline()
     ArgParse.@add_arg_table s begin
         "--case"
         help = "Case to run"
-        default = "Bomex"
+        default = "DYCOMS_RF01"
         "--sgs"            # SGS environmental teratment (mean or quadratures)
         arg_type = String
         "--quad_type"      # SGS quadrature type (lognormal or Gaussian)
