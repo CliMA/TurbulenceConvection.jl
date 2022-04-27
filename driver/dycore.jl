@@ -353,6 +353,7 @@ function compute_gm_tendencies!(
     p0_c = TC.center_ref_state(state).p0
     α0_c = TC.center_ref_state(state).α0
     aux_tc = TC.center_aux_turbconv(state)
+    ts_gm = TC.center_aux_grid_mean(state).ts
 
     θ_liq_ice_gm_toa = prog_gm.θ_liq_ice[kc_toa]
     q_tot_gm_toa = prog_gm.q_tot[kc_toa]
@@ -376,13 +377,7 @@ function compute_gm_tendencies!(
 
     @inbounds for k in TC.real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
-        if edmf.moisture_model isa TC.EquilibriumMoisture
-            ts = TD.PhaseEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], prog_gm.q_tot[k])
-        else
-            q = TD.PhasePartition(prog_gm.q_tot[k], prog_gm.q_liq[k], prog_gm.q_ice[k])
-            ts = TD.PhaseNonEquil_pθq(param_set, p0_c[k], prog_gm.θ_liq_ice[k], q)
-        end
-        Π = TD.exner(param_set, ts)
+        Π = TD.exner(param_set, ts_gm[k])
 
         if force.apply_coriolis
             tendencies_gm.u[k] -= force.coriolis_param * (aux_gm.vg[k] - prog_gm.v[k])

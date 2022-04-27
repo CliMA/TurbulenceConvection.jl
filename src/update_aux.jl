@@ -379,14 +379,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         # buoyancy_gradients
         if edmf.bg_closure == BuoyGradMean()
             # First order approximation: Use environmental mean fields.
-            if edmf.moisture_model isa EquilibriumMoisture
-                ts_en = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_en.T[k], aux_en.q_tot[k])
-            elseif edmf.moisture_model isa NonEquilibriumMoisture
-                q = TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k])
-                ts_en = TD.PhaseNonEquil_pTq(param_set, p0_c[k], aux_en.T[k], q)
-            else
-                error("Something went wrong in aux update. Expected moisture models are equilibrium and non-equilibrium")
-            end
+            ts_en = ts_env[k]
             bg_kwargs = (;
                 t_sat = aux_en.T[k],
                 qv_sat = TD.vapor_specific_humidity(param_set, ts_en),
