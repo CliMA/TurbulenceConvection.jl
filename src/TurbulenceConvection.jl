@@ -95,8 +95,8 @@ function debug_state(state, code_location::String)
     ######
 
     vars_positive = [
-        vec(prog_gm.θ_liq_ice),
-        vec(prog_gm_f.w),
+        vec(prog_gm.ρe_tot),
+        vec(prog_gm_f.ρw),
         vec(prog_up[1].ρarea),
         vec(prog_up[1].ρaθ_liq_ice),
         vec(prog_up_f[1].ρaw),

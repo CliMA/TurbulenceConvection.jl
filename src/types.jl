@@ -347,7 +347,7 @@ Base.@kwdef struct SurfaceBase{FT}
     ρq_tot_flux::FT = 0
     ρq_liq_flux::FT = 0
     ρq_ice_flux::FT = 0
-    ρθ_liq_ice_flux::FT = 0
+    ρe_tot_flux::FT = 0
     ρu_flux::FT = 0
     ρv_flux::FT = 0
     obukhov_length::FT = 0
