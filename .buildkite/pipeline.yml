@@ -154,12 +154,12 @@ steps:
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Rico --thermo_covariance_model prognostic --skip_tests true --suffix _prognostic_covarinaces"
         artifact_paths: "Output.Rico.01_prognostic_covarinaces/stats/comparison/*"
 
-  - group: "3D Experiments"
-    steps:
+  # - group: "3D Experiments"
+  #   steps:
 
-      - label: ":package: 3D Bomex"
-        command: "julia --color=yes --project=integration_tests integration_tests/3dBomex.jl"
-        artifact_paths: "integration_tests/output/3dBomex/*"
+  #     - label: ":package: 3D Bomex"
+  #       command: "julia --color=yes --project=integration_tests integration_tests/3dBomex.jl"
+  #       artifact_paths: "integration_tests/output/3dBomex/*"
 
   - group: "Performance monitoring"
     steps:

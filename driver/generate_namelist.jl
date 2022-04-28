@@ -79,7 +79,6 @@ function default_namelist(
     namelist_defaults["logging"] = Dict()
     namelist_defaults["logging"]["truncate_stack_trace"] = truncate_stack_trace
 
-    namelist_defaults["energy_var"] = "rhotheta"
     namelist_defaults["turbulence"] = Dict()
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"] = Dict()
@@ -351,7 +350,7 @@ function TRMM_LBA(namelist_defaults)
 
     namelist["meta"]["casename"] = "TRMM_LBA"
 
-    namelist["grid"]["nz"] = 80
+    namelist["grid"]["nz"] = 82
     namelist["grid"]["dz"] = 200
 
     namelist["time_stepping"]["adapt_dt"] = true
