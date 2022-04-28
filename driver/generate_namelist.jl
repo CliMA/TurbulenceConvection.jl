@@ -340,7 +340,7 @@ function TRMM_LBA(namelist_defaults)
 
     namelist["meta"]["casename"] = "TRMM_LBA"
 
-    namelist["grid"]["nz"] = 80
+    namelist["grid"]["nz"] = 82
     namelist["grid"]["dz"] = 200
 
     namelist["time_stepping"]["adapt_dt"] = true
