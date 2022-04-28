@@ -183,7 +183,7 @@ function initialize(sim::Simulation1d)
     FT = eltype(sim.grid)
     t = FT(0)
     Cases.initialize_profiles(sim.case, sim.grid, sim.param_set, state)
-    set_thermo_state!(state, sim.grid, sim.edmf.moisture_model, sim.param_set)
+    set_thermo_state_pθq!(state, sim.grid, sim.edmf.moisture_model, sim.param_set)
     assign_thermo_aux!(state, sim.grid, sim.edmf.moisture_model, sim.param_set)
 
     Cases.initialize_forcing(sim.case, sim.grid, state, sim.param_set)
