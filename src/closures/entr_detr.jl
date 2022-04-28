@@ -262,6 +262,7 @@ function compute_entr_detr!(
     aux_en_f = face_aux_environment(state)
     prog_gm_f = face_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
+    aux_en_f = face_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
