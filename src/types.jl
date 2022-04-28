@@ -443,46 +443,8 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMFParameters{FT, AECPS, AEDSPS, APS}
-    a_surf::FT
-    a_min::FT
-    a_max::FT
-    Pr_n::FT
-    α_d::FT
-    α_a::FT
-    α_b::FT
-    ECPS::AECPS
-    EDSPS::AEDSPS
-    PRP::APS
-end
 
-function EDMFParameters(
-    param_set,
-    ECPS::AECPS,
-    EDSPS::AEDSPS
-    PRP::APS
-) where {AECPS <: Union{AbstractEntrainmentClosureParameters,AbstractStochasticEntrainmentClosureParameters}, AEDSPS <: AbstractEntrainmentDimScaleParameters, PRP <: AbstractPrecipitationParameters}
-
-    aliases = ["a_surf","a_min", "a_max", "Prandtl_air", "α_d", "α_a", "α_b"]
-
-    (a_surf, a_min, a_max, Prandtl_air, α_d, α_a, α_b) = CLIMAParameters.get_parameter_values!(param_set,aliases,"EDMF")
-
-    return EDMFParameters{get_parametric_type(param_set),AECPS,AEDSPS,APS}(
-        a_surf,
-        a_min,
-        a_max,
-        Prandtl_air,
-        α_d,
-        α_a,
-        α_b,
-        ECPS,
-        EDSPS,
-        PRP,
-    )
-
-end
-
-struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFP}
+struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFPS}
     surface_area::FT
     max_area::FT
     minimum_area::FT
@@ -494,16 +456,16 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFP}
     entr_closure::EC
     entr_dim_scale::EDS
     entr_pi_subset::EPG
-    EDMFParams::EDMFP
+    EDMFParams::EDMFPS
     function EDMFModel(namelist, precip_model) where {PS}
         # TODO: move this into arg list
         FT = Float64
         # get values from namelist
         prandtl_number = namelist["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"]
-
+        
         # Set the number of updrafts (1)
         n_updrafts = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_number"; default = 1)
-
+        
         pressure_func_drag_str = parse_namelist(
             namelist,
             "turbulence",
@@ -512,13 +474,13 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFP}
             default = "normalmode",
             valid_options = ["normalmode", "normalmode_signdf"],
         )
-
+        
         surface_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "surface_area"; default = 0.1)
         max_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "max_area"; default = 0.9)
         minimum_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_area"; default = 1e-5)
-
+        
         moisture_model_name = parse_namelist(namelist, "thermodynamics", "moisture_model"; default = "equilibrium")
-
+        
         moisture_model = if moisture_model_name == "equilibrium"
             EquilibriumMoisture()
         elseif moisture_model_name == "nonequilibrium"
@@ -639,8 +601,8 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFP}
         PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
-        EPG = typeof(entr_pi_subset)
-        return new{n_updrafts, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFP}(
+EPG = typeof(entr_pi_subset)
+        return new{n_updrafts, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFPS}(
             surface_area,
             max_area,
             minimum_area,

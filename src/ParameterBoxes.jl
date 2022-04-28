@@ -1,3 +1,5 @@
+
+
 ## Precipitation Parameter Boxes
 abstract type AbstractPrecipitationParameters end
 struct NoPrecipitationParameters <: AbstractPrecipitationParameters end
@@ -13,7 +15,7 @@ struct Clima1MParameters{FT} <: AbstractPrecipitationParameters
     TPS::ThermodynamicsParameters
     MPS::Microphysics_1M_Parameters
 end
-function Clima1MParameters(param_set, TPS::ThermodynamicsParameters{FT} * MPS::Microphysics_1M_Parameters) where {FT}
+function Clima1MParameters(param_set, TPS::ThermodynamicsParameters{FT} , MPS::Microphysics_1M_Parameters) where {FT}
 
     aliases = ["LH_s0", "LH_v0", "gas_constant", "molmass_water"]
 
@@ -171,4 +173,68 @@ function PrognosticNoisyRelaxationProcessParameters(
 ) where {AECPS <: AbstractEntrainmentClosureParameters}
 
     return PrognosticNoisyRelaxationProcessParameters{CLIMAParameters.get_parametric_type(param_set), AECPS}(ECPS)
+end
+
+
+
+struct EDMFParameters{FT, AECPS, AEDSPS, APPS}
+    a_surf::FT
+    a_min::FT
+    a_max::FT
+    Pr_n::FT
+    α_d::FT
+    α_a::FT
+    α_b::FT
+    ECPS::AECPS
+    EDSPS::AEDSPS
+    PPS::APPS
+end
+
+
+function EDMFParameters(
+    param_set,
+    ECPS::AECPS,
+    EDSPS::AEDSPS,
+    PPS::APPS,
+) where {AECPS <: Union{AbstractEntrainmentClosureParameters,AbstractStochasticEntrainmentClosureParameters}, AEDSPS <: AbstractEntrainmentDimScaleParameters, APPs <: AbstractPrecipitationParameters}
+
+    aliases = ["a_surf","a_min", "a_max", "Prandtl_air", "α_d", "α_a", "α_b"]
+
+    (a_surf, a_min, a_max, Prandtl_air, α_d, α_a, α_b) = CLIMAParameters.get_parameter_values!(param_set,aliases,"EDMF")
+
+    return EDMFParameters{get_parametric_type(param_set),AECPS,AEDSPS,APPS}(
+        a_surf,
+        a_min,
+        a_max,
+        Prandtl_air,
+        α_d,
+        α_a,
+        α_b,
+        ECPS,
+        EDSPS,
+        PPS,
+    )
+
+end
+
+struct TurbulenceConvectionParameters{FT, APPS}
+    EDMFPS::EDMFParameters
+    PPS::APPS
+end
+
+struct TurbulenceConvectionParameters(
+    param_set,
+    EDMFPS::EDMFParameters,
+    PPS::APPS,
+) where {APPs <: AbstractPrecipitationParameters}
+
+    aliases = []
+
+    () = CLIMAParameters.get_parameter_values!(param_set,aliases,"TurbulenceConvection")
+
+
+    return EDMFParameters{get_parametric_type(param_set),APPS}(
+        EDMFPS,
+        PPS,
+    )
 end

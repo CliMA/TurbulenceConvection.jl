@@ -133,6 +133,7 @@ function debug_state(state, code_location::String)
     end
 end
 
+include("ParameterBoxes.jl")
 include("Grid.jl")
 include("dycore_api.jl")
 include("diagnostics.jl")
