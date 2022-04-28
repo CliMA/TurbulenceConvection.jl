@@ -30,6 +30,7 @@ function microphysics(
             prog_pr.q_sno[k],
             aux_en.area[k],
             ρ_c[k],
+            grid.zc[k].z,
             Δt,
             ts,
         )
@@ -50,10 +51,9 @@ function microphysics(
         end
 
         # update_env_precip_tendencies
-        # TODO: move qt_tendency_precip_formation and θ_liq_ice_tendency_precip_formation
-        # to diagnostics
+        # TODO: move ..._tendency_precip_formation to diagnostics
         aux_en.qt_tendency_precip_formation[k] = mph.qt_tendency * aux_en.area[k]
-        aux_en.θ_liq_ice_tendency_precip_formation[k] = mph.θ_liq_ice_tendency * aux_en.area[k]
+        aux_en.e_tot_tendency_precip_formation[k] = mph.e_tot_tendency * aux_en.area[k]
         if edmf.moisture_model isa NonEquilibriumMoisture
             aux_en.ql_tendency_precip_formation[k] = mph.ql_tendency * aux_en.area[k]
             aux_en.qi_tendency_precip_formation[k] = mph.qi_tendency * aux_en.area[k]
@@ -67,9 +67,9 @@ end
 function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt::Real)
 
     env_len = 8
-    src_len = 8
+    src_len = 9
     i_ql, i_qi, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat = 1:env_len
-    i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH, i_Sqr, i_Sqs = 1:src_len
+    i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH, i_Sqr, i_Sqs, i_Se_tot = 1:src_len
 
     quadrature_type = en_thermo.quadrature_type
     quad_order = quadrature_order(en_thermo)
@@ -80,7 +80,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
     # θl - liquid ice potential temperature
     # _mean and ′ - subdomain mean and (co)variances
     # q_rai, q_sno - grid mean precipitation
-    UnPack.@unpack qt′qt′, qt_mean, θl′θl′, θl_mean, θl′qt′, subdomain_area, q_rai, q_sno, ρ_c, p_c = vars
+    UnPack.@unpack qt′qt′, qt_mean, θl′θl′, θl_mean, θl′qt′, subdomain_area, q_rai, q_sno, ρ_c, p_c, zc = vars
 
     FT = eltype(ρ_c)
 
@@ -159,7 +159,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
             q_ice_en = TD.ice_specific_humidity(param_set, ts)
             T = TD.air_temperature(param_set, ts)
             # autoconversion and accretion
-            mph = precipitation_formation(param_set, precip_model, q_rai, q_sno, subdomain_area, ρ_c, Δt, ts)
+            mph = precipitation_formation(param_set, precip_model, q_rai, q_sno, subdomain_area, ρ_c, zc, Δt, ts)
 
             # environmental variables
             inner_env[i_ql] += q_liq_en * weights[m_h] * sqpi_inv
@@ -179,6 +179,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
             inner_src[i_Sqr] += mph.qr_tendency * weights[m_h] * sqpi_inv
             inner_src[i_Sqs] += mph.qs_tendency * weights[m_h] * sqpi_inv
             inner_src[i_SH] += mph.θ_liq_ice_tendency * weights[m_h] * sqpi_inv
+            inner_src[i_Se_tot] += mph.e_tot_tendency * weights[m_h] * sqpi_inv
             inner_src[i_Sqt_H] += mph.qt_tendency * h_hat * weights[m_h] * sqpi_inv
             inner_src[i_Sqt_qt] += mph.qt_tendency * qt_hat * weights[m_h] * sqpi_inv
             inner_src[i_SH_H] += mph.θ_liq_ice_tendency * h_hat * weights[m_h] * sqpi_inv
@@ -199,6 +200,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
         Sqt_qt = outer_src[i_Sqt_qt],
         Sqt = outer_src[i_Sqt],
         SH = outer_src[i_SH],
+        Se_tot = outer_src[i_Se_tot],
         Sqr = outer_src[i_Sqr],
         Sqs = outer_src[i_Sqs],
     )
@@ -268,6 +270,7 @@ function microphysics(
                 q_sno = prog_pr.q_sno[k],
                 ρ_c = ρ_c[k],
                 p_c = p_c[k],
+                zc = grid.zc[k].z,
             )
             outer_env, outer_src = quad_loop(en_thermo, precip_model, vars, param_set, Δt)
 
@@ -276,12 +279,12 @@ function microphysics(
             # update_env_precip_tendencies
             qt_tendency = outer_src.Sqt
             θ_liq_ice_tendency = outer_src.SH
+            e_tot_tendency = outer_src.Se_tot
             qr_tendency = outer_src.Sqr
             qs_tendency = outer_src.Sqs
-            # TODO: move qt_tendency_precip_formation and θ_liq_ice_tendency_precip_formation
-            # to diagnostics
+            # TODO: move ..._tendency_precip_formation to diagnostics
             aux_en.qt_tendency_precip_formation[k] = qt_tendency * aux_en.area[k]
-            aux_en.θ_liq_ice_tendency_precip_formation[k] = θ_liq_ice_tendency * aux_en.area[k]
+            aux_en.e_tot_tendency_precip_formation[k] = e_tot_tendency * aux_en.area[k]
 
             tendencies_pr.q_rai[k] += qr_tendency * aux_en.area[k]
             tendencies_pr.q_sno[k] += qs_tendency * aux_en.area[k]
@@ -329,15 +332,15 @@ function microphysics(
                 prog_pr.q_sno[k],
                 aux_en.area[k],
                 ρ_c[k],
+                grid.zc[k].z,
                 Δt,
                 ts,
             )
 
             # update_env_precip_tendencies
-            # TODO: move qt_tendency_precip_formation and θ_liq_ice_tendency_precip_formation
-            # to diagnostics
+            # TODO: move ..._tendency_precip_formation to diagnostics
             aux_en.qt_tendency_precip_formation[k] = mph.qt_tendency * aux_en.area[k]
-            aux_en.θ_liq_ice_tendency_precip_formation[k] = mph.θ_liq_ice_tendency * aux_en.area[k]
+            aux_en.e_tot_tendency_precip_formation[k] = mph.e_tot_tendency * aux_en.area[k]
             tendencies_pr.q_rai[k] += mph.qr_tendency * aux_en.area[k]
             tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
 

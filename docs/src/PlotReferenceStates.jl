@@ -47,17 +47,17 @@ function export_ref_profile(case_name::String)
     Plots.plot!(ρ_f, zf ./ 1000; label = "faces")
     Plots.plot!(size = (1000, 400))
     Plots.plot!(margin = 5 * Plots.mm)
-    Plots.xlabel!("ρ_0")
+    Plots.xlabel!("ρ")
     Plots.ylabel!("z (km)")
-    Plots.title!("ρ_0")
+    Plots.title!("ρ")
 
     p2 = Plots.plot(p_c ./ 1000, zc ./ 1000; label = "centers")
     Plots.plot!(p_f ./ 1000, zf ./ 1000; label = "faces")
     Plots.plot!(size = (1000, 400))
     Plots.plot!(margin = 5 * Plots.mm)
-    Plots.xlabel!("p_0 (kPa)")
+    Plots.xlabel!("p (kPa)")
     Plots.ylabel!("z (km)")
-    Plots.title!("p_0 (kPa)")
+    Plots.title!("p (kPa)")
 end
 
 Logging.with_logger(Logging.NullLogger()) do # silence output
