@@ -7,6 +7,7 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct PrecipFormation{FT}
     θ_liq_ice_tendency::FT
+    e_tot_tendency::FT
     qt_tendency::FT
     ql_tendency::FT
     qi_tendency::FT
@@ -349,7 +350,7 @@ Base.@kwdef struct SurfaceBase{FT}
     ρq_tot_flux::FT = 0
     ρq_liq_flux::FT = 0
     ρq_ice_flux::FT = 0
-    ρθ_liq_ice_flux::FT = 0
+    ρe_tot_flux::FT = 0
     ρu_flux::FT = 0
     ρv_flux::FT = 0
     obukhov_length::FT = 0
@@ -450,11 +451,7 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-abstract type AbstractEnergyVariable end
-struct ρeVar <: AbstractEnergyVariable end
-struct ρθVar <: AbstractEnergyVariable end
-
-struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG, EV}
+struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG}
     surface_area::FT
     max_area::FT
     minimum_area::FT
@@ -468,7 +465,6 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG, EV}
     entr_closure::EC
     entr_dim_scale::EDS
     entr_pi_subset::EPG
-    evar::EV
     function EDMFModel(namelist, precip_model) where {PS}
         # TODO: move this into arg list
         FT = Float64
@@ -499,16 +495,6 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG, EV}
             NonEquilibriumMoisture()
         else
             error("Something went wrong. Invalid moisture model: '$moisture_model_name'")
-        end
-
-        evar_name = parse_namelist(namelist, "energy_var"; default = "rhotheta")
-
-        evar = if evar_name == "rhotheta"
-            ρθVar()
-        elseif evar_name == "rhoe"
-            ρeVar()
-        else
-            error("Bad energy variable given")
         end
 
         thermo_covariance_model_name =
@@ -648,8 +634,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG, EV}
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
         EPG = typeof(entr_pi_subset)
-        EV = typeof(evar)
-        return new{n_updrafts, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG, EV}(
+        return new{n_updrafts, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG}(
             surface_area,
             max_area,
             minimum_area,
@@ -663,7 +648,6 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG, EV}
             entr_closure,
             entr_dim_scale,
             entr_pi_subset,
-            evar,
         )
     end
 end
@@ -672,7 +656,6 @@ n_updrafts(::EDMFModel{N_up}) where {N_up} = N_up
 Base.eltype(::EDMFModel{N_up, FT}) where {N_up, FT} = FT
 n_Π_groups(m::EDMFModel) = length(m.entr_pi_subset)
 entrainment_Π_subset(m::EDMFModel) = m.entr_pi_subset
-energy_var(m::EDMFModel) = m.evar
 
 Base.broadcastable(edmf::EDMFModel) = Ref(edmf)
 
