@@ -40,7 +40,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     #####
     ##### center variables
     #####
-
     @inbounds for k in real_center_indices(grid)
         #####
         ##### Set primitive variables
@@ -48,7 +47,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         @inbounds for i in 1:N_up
             if is_surface_center(grid, k)
                 if prog_up[i].ρarea[k] / ρ0_c[k] >= edmf.minimum_area
-                    θ_surf = θ_surface_bc(surf, grid, state, edmf, i)
+                    θ_surf = θ_surface_bc(surf, grid, state, edmf, i, param_set)
                     q_surf = q_surface_bc(surf, grid, state, edmf, i)
                     a_surf = area_surface_bc(surf, edmf, i)
                     aux_up[i].θ_liq_ice[k] = θ_surf
@@ -264,7 +263,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             0
         end
     end
-
     #####
     ##### face variables: diagnose primitive, diagnose env and compute bulk
     #####
@@ -482,7 +480,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     get_GMV_CoVar(edmf, grid, state, Val(:tke), Val(:w), Val(:w))
 
     compute_diffusive_fluxes(edmf, grid, state, surf, param_set)
-
 
     # TODO: use dispatch
     if edmf.precip_model isa Clima1M
