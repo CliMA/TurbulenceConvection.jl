@@ -620,6 +620,7 @@ n_updrafts(::EDMFModel{N_up}) where {N_up} = N_up
 Base.eltype(::EDMFModel{N_up, FT}) where {N_up, FT} = FT
 n_Π_groups(m::EDMFModel) = length(m.entr_pi_subset)
 entrainment_Π_subset(m::EDMFModel) = m.entr_pi_subset
+Base.broadcastable(edmf::EDMFModel) = Ref(edmf)
 
 struct State{P, A, T}
     prog::P

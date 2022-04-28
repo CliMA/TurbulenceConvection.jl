@@ -50,9 +50,15 @@ Base.@propagate_inbounds Base.setindex!(arr::AbstractArray, v, i::Int, j::Cent) 
 Base.@propagate_inbounds Base.getindex(arr::AbstractArray, i::Int, j::CCO.PlusHalf) = Base.getindex(arr, i, j.i)
 Base.@propagate_inbounds Base.setindex!(arr::AbstractArray, v, i::Int, j::CCO.PlusHalf) = Base.setindex!(arr, v, i, j.i)
 
+# Constant field
 function FieldFromNamedTuple(space, nt::NamedTuple)
     cmv(z) = nt
     return cmv.(CC.Fields.coordinate_field(space))
+end
+# Non-constant field
+function FieldFromNamedTuple(space, initial_conditions::Function, ::Type{FT}, params...) where {FT}
+    local_geometry = CC.Fields.local_geometry_field(space)
+    return initial_conditions.(FT, local_geometry, params...)
 end
 
 function Base.cumsum(field::CC.Fields.FiniteDifferenceField)
