@@ -49,6 +49,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     tendencies_gm = center_tendencies_grid_mean(state)
     FT = eltype(grid)
     prog_gm = center_prog_grid_mean(state)
+    prog_gm_f = face_prog_grid_mean(state)
     aux_gm_f = face_aux_grid_mean(state)
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
@@ -60,6 +61,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     α0_c = center_ref_state(state).α0
     kf_surf = kf_surface(grid)
     kc_surf = kc_surface(grid)
+    massflux = aux_tc_f.massflux
     massflux_h = aux_tc_f.massflux_h
     massflux_qt = aux_tc_f.massflux_qt
     aux_tc = center_aux_turbconv(state)
@@ -70,51 +72,58 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     # TODO: we shouldn't need to call parent here
     a_en = aux_en.area
     w_en = aux_en_f.w
+    w_gm = prog_gm_f.w
+    θ_liq_ice_en = aux_en.θ_liq_ice
+    θ_liq_ice_gm = prog_gm.θ_liq_ice
+    q_tot_gm = prog_gm.q_tot
+    q_tot_en = aux_en.q_tot
     a_en_bcs = a_en_boundary_conditions(surf, edmf)
     Ifae = CCO.InterpolateC2F(; a_en_bcs...)
+    If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+
     # Compute the mass flux and associated scalar fluxes
+    @. massflux = ρ0_f * Ifae(a_en) * (w_en - w_gm)
+    @. massflux_h = ρ0_f * Ifae(a_en) * (w_en - w_gm) * (If(θ_liq_ice_en) - If(θ_liq_ice_gm))
+    @. massflux_qt = ρ0_f * Ifae(a_en) * (w_en - w_gm) * (If(q_tot_en) - If(q_tot_gm))
     @inbounds for i in 1:N_up
+        aux_up_f_i = aux_up_f[i]
+        aux_up_i = aux_up[i]
         a_up_bcs = a_up_boundary_conditions(surf, edmf, i)
         Ifau = CCO.InterpolateC2F(; a_up_bcs...)
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
-        massflux = aux_up_f[i].massflux
-        @. massflux = ρ0_f * Ifau(a_up) * Ifae(a_en) * (w_up - w_en)
-        massflux[kf_surf] = 0
-    end
-
-    parent(massflux_h) .= 0
-    parent(massflux_qt) .= 0
-    If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
-    θ_liq_ice_en = aux_en.θ_liq_ice
-    q_tot_en = aux_en.q_tot
-    @inbounds for i in 1:N_up
-        aux_up_f_i = aux_up_f[i]
-        aux_up_i = aux_up[i]
         θ_liq_ice_up = aux_up_i.θ_liq_ice
         q_tot_up = aux_up_i.q_tot
-        massflux = aux_up_f[i].massflux
+        @. aux_up_f[i].massflux = ρ0_f * Ifau(a_up) * (w_up - w_gm)
         # We know that, since W = 0 at z = 0, m = 0 also, and
         # therefore θ_liq_ice / q_tot values do not matter
-        @. massflux_h += massflux * (If(θ_liq_ice_up) - If(θ_liq_ice_en))
-        @. massflux_qt += massflux * (If(q_tot_up) - If(q_tot_en))
+        @. massflux_h += ρ0_f * (Ifau(a_up) * (w_up - w_gm) * (If(θ_liq_ice_up) - If(θ_liq_ice_gm)))
+        @. massflux_qt += ρ0_f * (Ifau(a_up) * (w_up - w_gm) * (If(q_tot_up) - If(q_tot_gm)))
     end
+    massflux[kf_surf] = 0
+    massflux_h[kf_surf] = 0
+
     if edmf.moisture_model isa NonEquilibriumMoisture
         massflux_ql = aux_tc_f.massflux_ql
         massflux_qi = aux_tc_f.massflux_qi
-        parent(massflux_ql) .= 0
-        parent(massflux_qi) .= 0
         q_liq_en = aux_en.q_liq
         q_ice_en = aux_en.q_ice
+        q_liq_gm = prog_gm.q_liq
+        q_ice_gm = prog_gm.q_ice
+        massflux_en = ρ0_f * Ifae(a_en) * (w_en - w_gm)
+        @. massflux_ql = massflux_en * (If(q_liq_en) - If(q_liq_gm))
+        @. massflux_qi = massflux_en * (If(q_ice_en) - If(q_ice_gm))
         @inbounds for i in 1:N_up
             aux_up_f_i = aux_up_f[i]
             aux_up_i = aux_up[i]
             q_liq_up = aux_up_i.q_liq
             q_ice_up = aux_up_i.q_ice
-            massflux = aux_up_f[i].massflux
-            @. massflux_ql += massflux * (If(q_liq_up) - If(q_liq_en))
-            @. massflux_qi += massflux * (If(q_ice_up) - If(q_ice_en))
+            massflux_up_i = aux_up_f[i].massflux
+            @. massflux_ql += massflux_up_i * (If(q_liq_up) - If(q_liq_gm))
+            @. massflux_qi += massflux_up_i * (If(q_ice_up) - If(q_ice_gm))
         end
+        massflux_ql[kf_surf] = 0
+        massflux_qi[kf_surf] = 0
     end
 
     massflux_tendency_h = aux_tc.massflux_tendency_h
