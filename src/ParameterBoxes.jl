@@ -23,16 +23,16 @@ struct Clima1MParameters{FT} <: AbstractPrecipitationParameters
     TPS::TD.ThermodynamicsParameters
     MPS::CM.Microphysics_1M_Parameters
 end
-function Clima1MParameters(param_set, TPS::TD.ThermodynamicsParameters{FT} , MPS::CM.Microphysics_1M_Parameters) where {FT}
+function Clima1MParameters(param_struct, TPS::TD.ThermodynamicsParameters{FT} , MPS::CM.Microphysics_1M_Parameters) where {FT}
 
     aliases = ["LH_s0", "LH_v0", "gas_constant", "molmass_water"]
 
-    (LH_s0, LH_v0, gas_constant, molmass_water) = CLIMAParameters.get_parameter_values!(param_set, aliases, "Clima1M")
+    (LH_s0, LH_v0, gas_constant, molmass_water) = CLIMAParameters.get_parameter_values!(param_struct, aliases, "Clima1M")
 
     #derived parameters
     R_v = gas_constant / molmass_water
 
-    return Clima1MParameters{get_parametric_type(param_set)}(LH_s0, LH_v0, gas_constant, molmass_water, R_v, TPS, MPS)
+    return Clima1MParameters{get_parametric_type(param_struct)}(LH_s0, LH_v0, gas_constant, molmass_water, R_v, TPS, MPS)
 end
 
 ## Entrainment Parameter Boxes
@@ -43,10 +43,10 @@ struct BuoyVelScaleParameters{FT} <: AbstractEntrainmentDimScaleParameters
     w_min::FT
     c_λ::FT
 end
-function BuoyVelScaleParameters(param_set)
+function BuoyVelScaleParameters(param_struct)
     aliases = ["w_min", "c_λ"]
-    (w_min, c_λ) = CLIMAParameters.get_parameter_values!(param_set, aliases, "BuoyVelScale")
-    return BuoyVelScaleParameters{get_parametric_type(param_set)}(w_min, c_λ)
+    (w_min, c_λ) = CLIMAParameters.get_parameter_values!(param_struct, aliases, "BuoyVelScale")
+    return BuoyVelScaleParameters{get_parametric_type(param_struct)}(w_min, c_λ)
 end
 
 struct InvZScaleParameters{FT} <: AbstractEntrainmentDimScaleParameters end
@@ -64,39 +64,39 @@ struct MDEntrainmentParameters{FT} <: AbstractEntrainmentClosureParameters
     χ::FT
     c_δ::FT
 end
-function MDEntrainmentParameters(param_set)
+function MDEntrainmentParameters(param_struct)
 
     aliases = ["w_min", "c_ε", "μ_0", "β", "χ", "c_δ"]
-    (w_min, c_ε, μ_0, β, χ, c_δ) = CLIMAParameters.get_parameter_values!(param_set, aliases, "MDEntrainment")
+    (w_min, c_ε, μ_0, β, χ, c_δ) = CLIMAParameters.get_parameter_values!(param_struct, aliases, "MDEntrainment")
 
 
-    return MDEntrainmentParameters{CLIMAParameters.get_parametric_type(param_set)}(w_min, c_ε, μ_0, β, χ, c_δ)
+    return MDEntrainmentParameters{CLIMAParameters.get_parametric_type(param_struct)}(w_min, c_ε, μ_0, β, χ, c_δ)
 
 end
 
 struct FNOEntrainmentParameters{FT} <: AbstractEntrainmentClosureNonlocalParameters
     c_fno::AbstractVector{FT}
 end
-function FNOEntrainmentParameters(param_set)
+function FNOEntrainmentParameters(param_struct)
 
     aliases = ["c_fno"]
-    (c_fno) = CLIMAParameters.get_parameter_array_values!(param_set, aliases, "FNOEntrainment")
+    (c_fno) = CLIMAParameters.get_parameter_array_values!(param_struct, aliases, "FNOEntrainment")
 
 
-    return FNOEntrainmentParameters{CLIMAParameters.get_parametric_type(param_set)}(c_fno)
+    return FNOEntrainmentParameters{CLIMAParameters.get_parametric_type(param_struct)}(c_fno)
 
 end
 
 struct NNEntrainmentNonlocalParameters{FT} <: AbstractEntrainmentClosureNonlocalParameters
     c_gen::AbstractVector{FT}
 end
-function NNEntrainmentNonlocalParameters(param_set)
+function NNEntrainmentNonlocalParameters(param_struct)
 
     array_aliases = ["c_gen"]
-    (c_gen) = CLIMAParameters.get_parameter_array_values!(param_set, array_aliases, "NNEntrainmentNonlocal")
+    (c_gen) = CLIMAParameters.get_parameter_array_values!(param_struct, array_aliases, "NNEntrainmentNonlocal")
 
 
-    return NNEntrainmentNonlocalParameters{CLIMAParameters.get_parametric_type(param_set)}(c_gen)
+    return NNEntrainmentNonlocalParameters{CLIMAParameters.get_parametric_type(param_struct)}(c_gen)
 
 end
 
@@ -104,14 +104,14 @@ struct NNEntrainmentParameters{FT} <: AbstractEntrainmentClosureParameters
     w_min::FT
     c_gen::AbstractVector{FT}
 end
-function NNEntrainmentParameters(param_set)
+function NNEntrainmentParameters(param_struct)
     aliases = ["w_min"]
-    (w_min) = CLIMAParameters.get_parameter_values!(param_set, aliases, "NNEntrainment")
+    (w_min) = CLIMAParameters.get_parameter_values!(param_struct, aliases, "NNEntrainment")
     array_aliases = ["c_gen"]
-    (c_gen) = CLIMAParameters.get_parameter_values!(param_set, array_aliases, "NNEntrainment")
+    (c_gen) = CLIMAParameters.get_parameter_values!(param_struct, array_aliases, "NNEntrainment")
 
 
-    return NNEntrainmentParameters{CLIMAParameters.get_parametric_type(param_set)}(w_min, c_gen)
+    return NNEntrainmentParameters{CLIMAParameters.get_parametric_type(param_struct)}(w_min, c_gen)
 
 end
 
@@ -119,14 +119,14 @@ struct LinearEntrainmentParameters{FT} <: AbstractEntrainmentClosureParameters
     w_min::FT
     c_gen::AbstractVector{FT}
 end
-function LinearEntrainmentParameters(param_set)
+function LinearEntrainmentParameters(param_struct)
     aliases = ["w_min"]
-    (w_min) = CLIMAParameters.get_parameter_values!(param_set, aliases, "LinearEntrainment")
+    (w_min) = CLIMAParameters.get_parameter_values!(param_struct, aliases, "LinearEntrainment")
     array_aliases = ["c_gen"]
-    (c_gen) = CLIMAParameters.get_parameter_values!(param_set, array_aliases, "LinearEntrainment")
+    (c_gen) = CLIMAParameters.get_parameter_values!(param_struct, array_aliases, "LinearEntrainment")
 
 
-    return LinearEntrainmentParameters{CLIMAParameters.get_parametric_type(param_set)}(w_min, c_gen)
+    return LinearEntrainmentParameters{CLIMAParameters.get_parametric_type(param_struct)}(w_min, c_gen)
 
 end
 
@@ -136,14 +136,14 @@ struct RFEntrainmentParameters{FT} <: AbstractEntrainmentClosureParameters
     c_rf_fix::AbstractVector{FT}
     c_rf_opt::AbstractVector{FT}
 end
-function RFEntrainmentParameters(param_set)
+function RFEntrainmentParameters(param_struct)
     aliases = ["w_min"]
-    (w_min) = CLIMAParameters.get_parameter_values!(param_set, aliases, "RFEntrainment")
+    (w_min) = CLIMAParameters.get_parameter_values!(param_struct, aliases, "RFEntrainment")
     array_aliases = ["c_rf_fix", "c_rf_opt"]
-    (c_rf_fix, c_rf_opt) = CLIMAParameters.get_parameter_values!(param_set, array_aliases, "RFEntrainment")
+    (c_rf_fix, c_rf_opt) = CLIMAParameters.get_parameter_values!(param_struct, array_aliases, "RFEntrainment")
 
 
-    return RFEntrainmentParameters{CLIMAParameters.get_parametric_type(param_set)}(w_min, c_rf_fix, c_rf_opt)
+    return RFEntrainmentParameters{CLIMAParameters.get_parametric_type(param_struct)}(w_min, c_rf_fix, c_rf_opt)
 
 end
 
@@ -154,33 +154,33 @@ struct LogNormalScalingProcessParameters{FT, AECPS} <: AbstractStochasticEntrain
     c_gen_stoch::AbstractVector{FT}
     ECPS::AECPS
 end
-function LogNormalScalingProcessParameters(param_set, ECPS::AECPS) where {AECPS <: AbstractEntrainmentClosureParameters}
+function LogNormalScalingProcessParameters(param_struct, ECPS::AECPS) where {AECPS <: AbstractEntrainmentClosureParameters}
     array_aliases = ["c_gen_stoch"]
-    (c_gen_stoch) = CLIMAParameters.get_parameter_values!(param_set, array_aliases, "LogNormalScalingProcess")
+    (c_gen_stoch) = CLIMAParameters.get_parameter_values!(param_struct, array_aliases, "LogNormalScalingProcess")
 
-    return LogNormalScalingProcessParameters{CLIMAParameters.get_parametric_type(param_set), AECPS}(c_gen_stoch, ECPS)
+    return LogNormalScalingProcessParameters{CLIMAParameters.get_parametric_type(param_struct), AECPS}(c_gen_stoch, ECPS)
 end
 
 struct NoisyRelaxationProcessParameters{FT, AECPS} <: AbstractStochasticEntrainmentClosureParameters
     c_gen_stoch::AbstractVector{FT}
     ECPS::AECPS
 end
-function NoisyRelaxationProcessParameters(param_set, ECPS::AECPS) where {AECPS <: AbstractEntrainmentClosureParameters}
+function NoisyRelaxationProcessParameters(param_struct, ECPS::AECPS) where {AECPS <: AbstractEntrainmentClosureParameters}
     array_aliases = ["c_gen_stoch"]
-    (c_gen_stoch) = CLIMAParameters.get_parameter_values!(param_set, array_aliases, "NoisyRelaxationProcess")
+    (c_gen_stoch) = CLIMAParameters.get_parameter_values!(param_struct, array_aliases, "NoisyRelaxationProcess")
 
-    return NoisyRelaxationProcessParameters{CLIMAParameters.get_parametric_type(param_set), AECPS}(c_gen_stoch, ECPS)
+    return NoisyRelaxationProcessParameters{CLIMAParameters.get_parametric_type(param_struct), AECPS}(c_gen_stoch, ECPS)
 end
 
 struct PrognosticNoisyRelaxationProcessParameters{FT, AECPS} <: AbstractStochasticEntrainmentClosureParameters
     ECPS::AECPS
 end
 function PrognosticNoisyRelaxationProcessParameters(
-    param_set,
+    param_struct,
     ECPS::AECPS,
 ) where {AECPS <: AbstractEntrainmentClosureParameters}
 
-    return PrognosticNoisyRelaxationProcessParameters{CLIMAParameters.get_parametric_type(param_set), AECPS}(ECPS)
+    return PrognosticNoisyRelaxationProcessParameters{CLIMAParameters.get_parametric_type(param_struct), AECPS}(ECPS)
 end
 
 
@@ -200,7 +200,7 @@ end
 
 
 function EDMFParameters(
-    param_set,
+    param_struct,
     ECPS::AECPS,
     EDSPS::AEDSPS,
     PPS::APPS,
@@ -208,9 +208,9 @@ function EDMFParameters(
 
     aliases = ["a_surf","a_min", "a_max", "Prandtl_air", "α_d", "α_a", "α_b"]
 
-    (a_surf, a_min, a_max, Prandtl_air, α_d, α_a, α_b) = CLIMAParameters.get_parameter_values!(param_set,aliases,"EDMF")
+    (a_surf, a_min, a_max, Prandtl_air, α_d, α_a, α_b) = CLIMAParameters.get_parameter_values!(param_struct,aliases,"EDMF")
 
-    return EDMFParameters{get_parametric_type(param_set),AECPS,AEDSPS,APPS}(
+    return EDMFParameters{get_parametric_type(param_struct),AECPS,AEDSPS,APPS}(
         a_surf,
         a_min,
         a_max,
@@ -250,7 +250,7 @@ struct TurbulenceConvectionParameters(
     () = CLIMAParameters.get_parameter_values!(param_struct,aliases,"TurbulenceConvection")
 
 
-    return EDMFParameters{get_parametric_type(param_set),APPS}(
+    return EDMFParameters{get_parametric_type(param_struct),APPS}(
         EDMFPS,
         TPS,
         PPS,
