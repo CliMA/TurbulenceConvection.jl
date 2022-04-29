@@ -1,4 +1,12 @@
+#imports for external package types
+import Thermodynamics
+const TD = Thermodynamics
 
+import CloudMicrophysics
+const CM = CloudMicrophysics
+
+import SurfaceFluxes
+const SF = SurfaceFluxes
 
 ## Precipitation Parameter Boxes
 abstract type AbstractPrecipitationParameters end
@@ -12,10 +20,10 @@ struct Clima1MParameters{FT} <: AbstractPrecipitationParameters
     gas_constant::FT
     molmass_water::FT
     R_v::FT
-    TPS::ThermodynamicsParameters
-    MPS::Microphysics_1M_Parameters
+    TPS::TD.ThermodynamicsParameters
+    MPS::CM.Microphysics_1M_Parameters
 end
-function Clima1MParameters(param_set, TPS::ThermodynamicsParameters{FT} , MPS::Microphysics_1M_Parameters) where {FT}
+function Clima1MParameters(param_set, TPS::TD.ThermodynamicsParameters{FT} , MPS::CM.Microphysics_1M_Parameters) where {FT}
 
     aliases = ["LH_s0", "LH_v0", "gas_constant", "molmass_water"]
 
@@ -219,25 +227,33 @@ end
 
 struct TurbulenceConvectionParameters{FT, APPS}
     EDMFPS::EDMFParameters
-    TPS::ThermodynamicsParameters
+    TPS::TD.ThermodynamicsParameters
     PPS::APPS
+    SFPS::SF.SurfaceFluxesParameters
 end
 
 struct TurbulenceConvectionParameters(
-    param_set,
+    param_struct,
     EDMFPS::EDMFParameters,
-    TPS::ThermodynamicsParameters,
+    TPS::TD.ThermodynamicsParameters,
     PPS::APPS,
+    SFPS::SF.SurfaceFluxesParameters,
 ) where {APPs <: AbstractPrecipitationParameters}
 
+    # Superset of "Cases" clima-parameters
+    # ForcingBase = coriolis_param
+    # RadiationBase (for Dycoms): divergence, alpha_z, kappa, F0, F1
+
+    # 
     aliases = []
 
-    () = CLIMAParameters.get_parameter_values!(param_set,aliases,"TurbulenceConvection")
+    () = CLIMAParameters.get_parameter_values!(param_struct,aliases,"TurbulenceConvection")
 
 
     return EDMFParameters{get_parametric_type(param_set),APPS}(
         EDMFPS,
         TPS,
         PPS,
+        SFPS,
     )
 end

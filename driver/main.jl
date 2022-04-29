@@ -15,6 +15,10 @@ const CM = CloudMicrophysics
 const CM0 = CloudMicrophysics.Microphysics_0M
 const CM1 = CloudMicrophysics.Microphysics_1M
 
+import SurfaceFluxes
+const SF = SurfaceFluxes
+const UF = SF.UniversalFunctions
+
 import ClimaCore
 const CC = ClimaCore
 import SciMLBase
@@ -64,13 +68,13 @@ struct Simulation1d{IONT, G, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS}
     dt_min::Float64
 end
 
-function Simulation1d(namelist)
+function Simulation1d(namelist, parameter_struct)
     TC = TurbulenceConvection
 
     #### SOMEWHERE param_struct is created up here ####
     #### param_set should be replaced with namelist_params: All should be used by the end of build stage.
 
-    param_set = create_parameter_set(namelist)
+    namelist_param_set = create_parameter_set(namelist)
 
     FT = Float64
     skip_io = namelist["stats_io"]["skip"]
@@ -142,8 +146,17 @@ function Simulation1d(namelist)
         error("Invalid precip_name $(precip_name)")
     end
 
+    # Create surface fluxes parameters
+    uf_params = UF.BusingerParameters(param_struct) #all `get_surface` cases use Businger
+
+    surf_params = SF.SurfaceFluxesParameters(
+        param_struct,
+        uf_params,
+        thermo_params,
+    )
+    
     # Create EDMF model and parameters
-    (edmf, edmf_params) = TC.EDMFModel(namelist, precip_model, precip_params)
+    (edmf, edmf_params) = TC.EDMFModel(namelist, param_struct, precip_model, precip_params)
 
     # Create the top level parameter set
     param_set = TC.TurbulenceConvectionParameters(
@@ -151,6 +164,7 @@ function Simulation1d(namelist)
         edmf_params,
         thermo_params,
         precip_params,
+        surf_params,
     )
 
     # create parameter log with the struct
@@ -161,12 +175,10 @@ function Simulation1d(namelist)
     case_type = Cases.get_case(namelist)
 
     Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
-    Rad = TC.RadiationBase(case_type)
+    Rad = TC.RadiationBase(case_type) 
     TS = TimeStepping(namelist)
 
-    surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
-
-
+    surf_ref_state = Cases.surface_ref_state(case_type, namelist_param_set, namelist)
 
     isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
     N_up = TC.n_updrafts(edmf)
@@ -195,7 +207,7 @@ function Simulation1d(namelist)
 
     # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
     state = TC.State(prog, aux, nothing)
-    compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
+    compute_ref_state!(state, grid, namelist_param_set; ts_g = surf_ref_state)
 
     if !skip_io
         NC.Dataset(Stats.nc_filename, "a") do ds
@@ -212,7 +224,7 @@ function Simulation1d(namelist)
 
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)
-    surf_params = Cases.surface_params(case_type, grid, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
+    surf_params = Cases.surface_params(case_type, grid, surf_ref_state, namelist_param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
     inversion_type = Cases.inversion_type(case_type)
     case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad, spk...)
 
@@ -232,7 +244,7 @@ function Simulation1d(namelist)
         diagnostics,
         TS,
         Stats,
-        param_set,
+        namelist_param_set,
         skip_io,
         calibrate_io,
         adapt_dt,
