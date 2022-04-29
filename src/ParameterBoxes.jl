@@ -42,7 +42,7 @@ function BuoyVelScaleParameters(param_set)
 end
 
 struct InvZScaleParameters{FT} <: AbstractEntrainmentDimScaleParameters end
-
+struct InvMeterScaleParameters{FT} <: AbstractEntrainmentDimScaleParameters end
 
 # the parameter structs mimic these abstract categories
 abstract type AbstractEntrainmentClosureParameters end

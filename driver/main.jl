@@ -7,6 +7,9 @@ import JSON
 import ArgParse
 import TurbulenceConvection
 
+import Thermodynamics
+const TD = Thermodynamics
+
 import CloudMicrophysics
 const CM = CloudMicrophysics
 const CM0 = CloudMicrophysics.Microphysics_0M
@@ -63,6 +66,10 @@ end
 
 function Simulation1d(namelist)
     TC = TurbulenceConvection
+
+    #### SOMEWHERE param_struct is created up here ####
+    #### param_set should be replaced with namelist_params: All should be used by the end of build stage.
+
     param_set = create_parameter_set(namelist)
 
     FT = Float64
@@ -114,12 +121,15 @@ function Simulation1d(namelist)
     case_type = Cases.get_case(namelist)
     surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
 
+    
     Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
     Rad = TC.RadiationBase(case_type)
     TS = TimeStepping(namelist)
 
-    # Create the class for precipitation
-
+    #Thermodynamics parameters
+    thermo_params = TD.ThermodynamicsParameters(param_struct)
+    
+    # Create the class and parameters for precipitation
     precip_name = TC.parse_namelist(
         namelist,
         "microphysics",
@@ -128,17 +138,23 @@ function Simulation1d(namelist)
         valid_options = ["None", "cutoff", "clima_1m"],
     )
 
-    precip_model = if precip_name == "None"
-        TC.NoPrecipitation()
+    (precip_model, precip_params) = if precip_name == "None"
+        (TC.NoPrecipitation(), TC.NoPrecipitationParameters())
     elseif precip_name == "cutoff"
-        TC.CutoffPrecipitation()
+        (TC.CutoffPrecipitation(), TC.CutOffPrecipitationParameters())
     elseif precip_name == "clima_1m"
-        TC.Clima1M()
+        micro_params = CM.Microphysics_1M_Parameters(param_struct,thermo_params)
+        (TC.Clima1M(), TC.Clima1MParameters(param_structt,thermo_params,micro_params))
     else
         error("Invalid precip_name $(precip_name)")
     end
 
-    edmf = TC.EDMFModel(namelist, precip_model)
+    #Create EDMF model and parameters
+    (edmf, edmf_params) = TC.EDMFModel(namelist, precip_model, precip_params)
+
+    #Create the top level parameter set
+    param_set = TC.TurbulenceConvectionParameters(param_struct,edmf_params,precip_params)
+    
     isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
     N_up = TC.n_updrafts(edmf)
 
