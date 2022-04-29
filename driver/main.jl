@@ -118,15 +118,8 @@ function Simulation1d(namelist)
 
     Stats = skip_io ? nothing : NetCDFIO_Stats(namelist, grid)
 
-    case_type = Cases.get_case(namelist)
-    surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
 
-    
-    Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
-    Rad = TC.RadiationBase(case_type)
-    TS = TimeStepping(namelist)
-
-    #Thermodynamics parameters
+    # Thermodynamics parameters
     thermo_params = TD.ThermodynamicsParameters(param_struct)
     
     # Create the class and parameters for precipitation
@@ -149,12 +142,32 @@ function Simulation1d(namelist)
         error("Invalid precip_name $(precip_name)")
     end
 
-    #Create EDMF model and parameters
+    # Create EDMF model and parameters
     (edmf, edmf_params) = TC.EDMFModel(namelist, precip_model, precip_params)
 
-    #Create the top level parameter set
-    param_set = TC.TurbulenceConvectionParameters(param_struct,edmf_params,precip_params)
-    
+    # Create the top level parameter set
+    param_set = TC.TurbulenceConvectionParameters(
+        param_struct,
+        edmf_params,
+        thermo_params,
+        precip_params,
+    )
+
+    # create parameter log with the struct
+    CP.log_parameter_information(param_struct, logfilepath)
+
+    # now we can start using the param_set 
+
+    case_type = Cases.get_case(namelist)
+
+    Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
+    Rad = TC.RadiationBase(case_type)
+    TS = TimeStepping(namelist)
+
+    surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
+
+
+
     isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
     N_up = TC.n_updrafts(edmf)
 

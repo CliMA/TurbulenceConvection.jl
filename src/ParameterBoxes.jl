@@ -219,12 +219,14 @@ end
 
 struct TurbulenceConvectionParameters{FT, APPS}
     EDMFPS::EDMFParameters
+    TPS::ThermodynamicsParameters
     PPS::APPS
 end
 
 struct TurbulenceConvectionParameters(
     param_set,
     EDMFPS::EDMFParameters,
+    TPS::ThermodynamicsParameters,
     PPS::APPS,
 ) where {APPs <: AbstractPrecipitationParameters}
 
@@ -235,6 +237,7 @@ struct TurbulenceConvectionParameters(
 
     return EDMFParameters{get_parametric_type(param_set),APPS}(
         EDMFPS,
+        TPS,
         PPS,
     )
 end
