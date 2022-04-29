@@ -664,6 +664,23 @@ r_{con} & = \frac{\qt+\ql}{1 - \qt} \\
 r_{vap} & = \frac{\qt-\ql    - \qi}{1 - \qt} \\
 \end{align}
 ```
+## Moisture model
+
+There are two options for representing moisture (water vapor, cloud liquid water and cloud ice):
+  (i) equilibrium, and (ii) non-equilibrium.
+In the equilibrium approach we are solving prognostic equations for total water specific humidity $q_t$ only.
+The cloud condensate is diagnosed using saturation adjustment algorithm and then
+  partitioned into cloud liquid water $q_l$ and cloud ice $q_i$ using an empirical phase partition function $\lambda(T)$.
+In the non-equilibrium approach we are solving prognostic equations for $q_t$, $q_l$ and $q_i$.
+The source terms for $q_l$ and $q_i$ are parameterized as relaxation terms.
+We don't solve for the additional (co)variances related to $q_l$ and $q_i$ in the environment.
+As a result, the non-equilibrium option is only available when running simulations
+  without using quadratures to sample the sgs variability in the environment.
+
+The relevant namelist options are:
+`namelist["thermodynamics"]["moisture_model"]` set to `"equilibrium"` or `"nonequilibrium"`.
+To switch off using quadratures in the sgs set
+`namelist_defaults["thermodynamics"]["sgs"]` to `"mean"` instead of `"quadrature"`.
 
 ## Potential temperatures
 Fix: which virtual potential temperature is used
