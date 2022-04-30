@@ -74,16 +74,25 @@ function Simulation1d(namelist)
 
     truncated_gcm_mesh = TC.parse_namelist(namelist, "grid", "stretch", "flag"; default = false)
 
-    Δz = FT(namelist["grid"]["dz"])
-    nz = if Cases.get_case(namelist) == Cases.LES_driven_SCM()
+    if Cases.get_case(namelist) == Cases.LES_driven_SCM()
+        Δz = get(namelist["grid"], "dz", nothing)
+        nz = get(namelist["grid"], "nz", nothing)
+        @assert isnothing(Δz) ⊻ isnothing(nz) string(
+            "LES_driven_SCM supports nz or Δz, not both.",
+            "The domain height is enforced to be the same as in LES.",
+        )
+
         les_filename = namelist["meta"]["lesfile"]
-        NC.Dataset(les_filename, "r") do data
-            zmax = Array(TC.get_nc_data(data, "zc"))[end]
-            Int(zmax ÷ Δz)
+        zmax = NC.Dataset(les_filename, "r") do data
+            Array(TC.get_nc_data(data, "zc"))[end]
         end
+        nz = isnothing(nz) ? Int(zmax ÷ Δz) : Int(nz)
+        Δz = isnothing(Δz) ? FT(zmax ÷ nz) : FT(Δz)
     else
-        namelist["grid"]["nz"]
+        Δz = FT(namelist["grid"]["dz"])
+        nz = namelist["grid"]["nz"]
     end
+
     z₀, z₁ = FT(0), FT(nz * Δz)
     if truncated_gcm_mesh
         nzₛ = namelist["grid"]["stretch"]["nz"]

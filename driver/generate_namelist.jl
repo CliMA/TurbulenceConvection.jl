@@ -510,7 +510,8 @@ end
 
 function LES_driven_SCM(namelist_defaults)
     namelist = deepcopy(namelist_defaults)
-    namelist["grid"]["dz"] = 50.0
+    # Only one can be defined by user
+    # namelist["grid"]["dz"] = 50.0
     namelist["grid"]["nz"] = 80
 
     namelist["stats_io"]["frequency"] = 10.0
