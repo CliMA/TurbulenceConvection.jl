@@ -18,7 +18,7 @@ for all updrafts, following [He2020](@cite), given:
  - `edmf`: EDMF model
  - `param_set`: parameter set, containing CLIMAParameters
 """
-function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, param_set::APS, surf)
+function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, param_set::EDMFPS, surf)
 
     FT = eltype(grid)
     N_up = n_updrafts(edmf)
@@ -39,9 +39,9 @@ function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, param_s
 
     # Note: Independence of aspect ratio hardcoded in implementation.
     α₂_asp_ratio² = FT(0)
-    α_b::FT = CPEDMF.α_b(param_set)
-    α_a::FT = CPEDMF.α_a(param_set)
-    α_d::FT = CPEDMF.α_d(param_set)
+    α_b::FT = param_set.α_b
+    α_a::FT = param_set.α_a
+    α_d::FT = param_set.α_d
 
     @inbounds for i in 1:N_up
         # pressure

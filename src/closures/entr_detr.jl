@@ -1,7 +1,7 @@
 #### Entrainment-Detrainment kernels
 
 function compute_turbulent_entrainment(param_set, a_up::FT, w_up::FT, tke::FT, H_up::FT) where {FT}
-    c_γ = FT(CPEDMF.c_γ(param_set))
+    c_γ = FT(param_set.c_γ)
 
     ε_turb = if w_up * a_up > 0
         2 * c_γ * sqrt(max(tke, 0)) / (w_up * H_up)
@@ -15,7 +15,7 @@ end
 function compute_inverse_timescale(param_set, b_up::FT, b_en::FT, w_up::FT, w_en::FT, tke::FT) where {FT}
     Δb = b_up - b_en
     Δw = get_Δw(param_set, w_up, w_en)
-    c_λ = FT(CPEDMF.c_λ(param_set))
+    c_λ = FT(param_set.c_λ)
 
     l_1 = c_λ * abs(Δb / sqrt(tke + 1e-8))
     l_2 = abs(Δb / Δw)
@@ -25,7 +25,8 @@ end
 
 function get_Δw(param_set, w_up::FT, w_en::FT) where {FT}
     Δw = w_up - w_en
-    Δw += copysign(FT(CPEDMF.w_min(param_set)), Δw)
+    w_min = FT(param_set.w_min)
+    Δw += copysign(w_min, Δw)
     return Δw
 end
 
@@ -77,7 +78,7 @@ function entrainment_inv_length_scale(
 end
 
 """
-    εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, ε_nondim, δ_nondim)
+    εδ_dyn(param_set::EDMFPS, εδ_vars, entr_dim_scale, ε_nondim, δ_nondim)
 
 Returns the fractional dynamical entrainment and detrainment rates [1/m] given non-dimensional rates
 
@@ -88,10 +89,10 @@ Parameters:
  - `ε_nondim`       :: nondimensional fractional entrainment
  - `δ_nondim`       :: nondimensional fractional detrainment
 """
-function εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, ε_nondim, δ_nondim)
+function εδ_dyn(param_set::EDMFPS, εδ_vars, entr_dim_scale, ε_nondim, δ_nondim)
     FT = eltype(εδ_vars.q_cond_up)
     dim_scale = entrainment_inv_length_scale(
-        param_set,
+        param_set.EDSPS,
         εδ_vars.b_up,
         εδ_vars.b_en,
         εδ_vars.w_up,
@@ -103,7 +104,7 @@ function εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, ε_nondim, δ_nondi
 
     area_limiter = max_area_limiter(param_set, εδ_vars.max_area, εδ_vars.a_up)
 
-    c_div = FT(ICP.entrainment_massflux_div_factor(param_set))
+    c_div = FT(param_set.entrainment_massflux_div_factor)
     MdMdz_ε, MdMdz_δ = get_MdMdz(εδ_vars.M, εδ_vars.dMdz) .* c_div
 
     # fractional dynamical entrainment / detrainment [1 / m]
@@ -114,7 +115,7 @@ function εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, ε_nondim, δ_nondi
 end
 
 """
-    entr_detr(param_set::APS, εδ_vars, entr_dim_scale, εδ_model_type)
+    entr_detr(param_set::EDMFPS, εδ_vars, entr_dim_scale, εδ_model_type)
 
 Returns the fractional dynamical entrainment and detrainment rates [1/m],
 as well as the turbulent entrainment rate
@@ -125,11 +126,11 @@ Parameters:
  - `entr_dim_scale` :: type of dimensional fractional entrainment scale
  - `εδ_model_type`  :: type of non-dimensional model for entrainment/detrainment
 """
-function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, εδ_model_type)
+function entr_detr(param_set::EDMFPS, εδ_vars, entr_dim_scale, εδ_model_type)
     FT = eltype(εδ_vars.q_cond_up)
 
     # fractional entrainment / detrainment
-    ε_nondim, δ_nondim = non_dimensional_function(param_set, εδ_vars, εδ_model_type)
+    ε_nondim, δ_nondim = non_dimensional_function(param_set.ECPS, εδ_vars, εδ_model_type)
     ε_dyn, δ_dyn = εδ_dyn(param_set, εδ_vars, entr_dim_scale, ε_nondim, δ_nondim)
 
     # turbulent entrainment
@@ -143,7 +144,7 @@ function compute_entr_detr!(
     state::State,
     grid::Grid,
     edmf::EDMFModel,
-    param_set::APS,
+    param_set::EDMFPS,
     surf::SurfaceBase,
     Δt::Real,
     εδ_closure::AbstractEntrDetrModel,
@@ -160,7 +161,7 @@ function compute_entr_detr!(
     aux_tc = center_aux_turbconv(state)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
-    g::FT = CPP.grav(param_set)
+    g::FT = param_set.grav
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
     m_entr_detr = aux_tc.ϕ_temporary
@@ -249,7 +250,7 @@ function compute_entr_detr!(
     state::State,
     grid::Grid,
     edmf::EDMFModel,
-    param_set::APS,
+    param_set::EDMFPS,
     surf::SurfaceBase,
     Δt::Real,
     εδ_model::AbstractNonLocalEntrDetrModel,
@@ -265,7 +266,7 @@ function compute_entr_detr!(
     aux_tc = center_aux_turbconv(state)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
-    g::FT = CPP.grav(param_set)
+    g::FT = param_set.grav
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
     m_entr_detr = aux_tc.ϕ_temporary
@@ -279,7 +280,7 @@ function compute_entr_detr!(
     Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
     LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
-    c_div = FT(ICP.entrainment_massflux_div_factor(param_set))
+    c_div = FT(param_set.entrainment_massflux_div_factor)
     @inbounds for i in 1:N_up
         # compute ∇m at cell centers
         a_up = aux_up[i].area
@@ -323,7 +324,7 @@ function compute_entr_detr!(
                     wstar = surf.wstar, # convective velocity
                     entr_Π_subset = entrainment_Π_subset(edmf), # indices of Pi groups to include
                 )
-                Π = non_dimensional_groups(param_set, εδ_model_vars)
+                Π = non_dimensional_groups(param_set.ECPS, εδ_model_vars)
                 @assert length(Π) == n_Π_groups(edmf)
                 for Π_i in 1:length(entrainment_Π_subset(edmf))
                     aux_up[i].Π_groups[Π_i][k] = Π[Π_i]
@@ -339,7 +340,7 @@ function compute_entr_detr!(
         Π_groups = parent(aux_up[i].Π_groups)
         ε_nondim = parent(aux_up[i].ε_nondim)
         δ_nondim = parent(aux_up[i].δ_nondim)
-        non_dimensional_function!(ε_nondim, δ_nondim, param_set, Π_groups, εδ_model)
+        non_dimensional_function!(ε_nondim, δ_nondim, param_set.ECPS, Π_groups, εδ_model)
 
         @inbounds for k in real_center_indices(grid)
             ε_turb = compute_turbulent_entrainment(
@@ -350,7 +351,7 @@ function compute_entr_detr!(
                 plume_scale_height[i],
             )
             dim_scale = entrainment_inv_length_scale(
-                param_set,
+                param_set.EDSPS,
                 aux_up[i].buoy[k],
                 aux_en.buoy[k],
                 w_up_c[k],

@@ -1,8 +1,8 @@
 # convective velocity scale
 get_wstar(bflux, zi) = cbrt(max(bflux * zi, 0))
 
-function buoyancy_c(param_set::APS, ρ0::FT, ρ::FT) where {FT}
-    g::FT = CPP.grav(param_set)
+function buoyancy_c(param_set::EDMFPS, ρ0::FT, ρ::FT) where {FT}
+    g::FT = param_set.grav
     return g * (ρ0 - ρ) / ρ0
 end
 
@@ -67,15 +67,15 @@ function get_surface_variance(flux1::FT, flux2::FT, ustar::FT, zLL::FT, oblength
     end
 end
 
-function gradient_Richardson_number(param_set::APS, ∂b∂z::FT, Shear²::FT, ϵ::FT) where {FT}
-    Ri_c::FT = CPEDMF.Ri_c(param_set)
+function gradient_Richardson_number(param_set::EDMFPS, ∂b∂z::FT, Shear²::FT, ϵ::FT) where {FT}
+    Ri_c::FT = param_set.Ri_c
     return min(∂b∂z / max(Shear², ϵ), Ri_c)
 end
 
 # Turbulent Prandtl number given the obukhov length sign and the gradient Richardson number
-function turbulent_Prandtl_number(param_set::APS, obukhov_length::FT, ∇Ri::FT) where {FT}
-    ω_pr::FT = CPEDMF.ω_pr(param_set)
-    Pr_n::FT = CPEDMF.Pr_n(param_set)
+function turbulent_Prandtl_number(param_set::EDMFPS, obukhov_length::FT, ∇Ri::FT) where {FT}
+    ω_pr::FT = param_set.ω_pr
+    Pr_n::FT = param_set.Pr_n
     if obukhov_length > 0 && ∇Ri > 0 #stable
         # CSB (Dan Li, 2019, eq. 75), where ω_pr = ω_1 + 1 = 53.0/13.0
         prandtl_nvec = Pr_n * (2 * ∇Ri / (1 + ω_pr * ∇Ri - sqrt((1 + ω_pr * ∇Ri)^2 - 4 * ∇Ri)))

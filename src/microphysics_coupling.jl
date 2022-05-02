@@ -2,7 +2,7 @@
 Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 (autoconversion + accretion)
 """
-function noneq_moisture_sources(param_set::APS, area::FT, ρ0::FT, Δt::Real, ts) where {FT}
+function noneq_moisture_sources(param_set::PPS, area::FT, ρ0::FT, Δt::Real, ts) where {FT}
 
     # TODO - when using adaptive timestepping we are limiting the source terms
     #        with the previous timestep Δt
@@ -10,16 +10,16 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ0::FT, Δt::Real, ts
     qi_tendency = FT(0)
     if area > 0
 
-        q = TD.PhasePartition(param_set, ts)
-        T = TD.air_temperature(param_set, ts)
-        q_vap = TD.vapor_specific_humidity(param_set, ts)
+        q = TD.PhasePartition(param_set.TPS, ts)
+        T = TD.air_temperature(param_set.TPS, ts)
+        q_vap = TD.vapor_specific_humidity(param_set.TPS, ts)
 
         # TODO - is that the state we want to be relaxing to?
-        ts_eq = TD.PhaseEquil_ρTq(param_set, ρ0, T, q.tot)
-        q_eq = TD.PhasePartition(param_set, ts_eq)
+        ts_eq = TD.PhaseEquil_ρTq(param_set.TPS, ρ0, T, q.tot)
+        q_eq = TD.PhasePartition(param_set.TPS, ts_eq)
 
-        S_ql = CM1.conv_q_vap_to_q_liq_ice(param_set, liq_type, q_eq, q)
-        S_qi = CM1.conv_q_vap_to_q_liq_ice(param_set, ice_type, q_eq, q)
+        S_ql = CM1.conv_q_vap_to_q_liq_ice(param_set.MPS, liq_type, q_eq, q)
+        S_qi = CM1.conv_q_vap_to_q_liq_ice(param_set.MPS, ice_type, q_eq, q)
 
         # TODO - handle limiters elswhere
         if S_ql >= FT(0)

@@ -7,7 +7,7 @@ function compute_nonequilibrium_moisture_tendencies!(
     state::State,
     edmf::EDMFModel,
     Δt::Real,
-    param_set::APS,
+    param_set::EDMFPS,
 )
     N_up = n_updrafts(edmf)
     p0_c = center_ref_state(state).p0
@@ -19,10 +19,10 @@ function compute_nonequilibrium_moisture_tendencies!(
         @inbounds for k in real_center_indices(grid)
             T_up = aux_up[i].T[k]
             q_up = TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k])
-            ts_up = TD.PhaseNonEquil_pTq(param_set, p0_c[k], T_up, q_up)
+            ts_up = TD.PhaseNonEquil_pTq(param_set.TPS, p0_c[k], T_up, q_up)
 
             # condensation/evaporation, deposition/sublimation
-            mph = noneq_moisture_sources(param_set, aux_up[i].area[k], ρ0_c[k], Δt, ts_up)
+            mph = noneq_moisture_sources(param_set.PPS, aux_up[i].area[k], ρ0_c[k], Δt, ts_up)
             aux_up[i].ql_tendency_noneq[k] = mph.ql_tendency * aux_up[i].area[k]
             aux_up[i].qi_tendency_noneq[k] = mph.qi_tendency * aux_up[i].area[k]
         end

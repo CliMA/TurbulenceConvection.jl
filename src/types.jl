@@ -462,10 +462,10 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFPS}
         FT = Float64
         # get values from namelist
         prandtl_number = namelist["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"]
-        
+
         # Set the number of updrafts (1)
         n_updrafts = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_number"; default = 1)
-        
+
         pressure_func_drag_str = parse_namelist(
             namelist,
             "turbulence",
@@ -474,13 +474,13 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFPS}
             default = "normalmode",
             valid_options = ["normalmode", "normalmode_signdf"],
         )
-        
+
         surface_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "surface_area"; default = 0.1)
         max_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "max_area"; default = 0.9)
         minimum_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_area"; default = 1e-5)
-        
+
         moisture_model_name = parse_namelist(namelist, "thermodynamics", "moisture_model"; default = "equilibrium")
-        
+
         moisture_model = if moisture_model_name == "equilibrium"
             EquilibriumMoisture()
         elseif moisture_model_name == "nonequilibrium"
@@ -544,7 +544,7 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFPS}
             default = false,
             valid_options = [true, false],
         )
-        
+
         (mean_entr_closure, mean_entr_params) = if entr_type == "moisture_deficit"
             (MDEntr(), MDEntrainmentParameters(param_struct))
         elseif entr_type == "NN"
@@ -559,25 +559,31 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFPS}
             (RFEntr(), RFEntrainmentParameters(param_struct))
         else
             error("Something went wrong. Invalid entrainment type '$entr_type'")
-        end    
-        
+        end
+
         # Overwrite `entr_closure` if a noisy relaxation process is used
         (entr_closure, entr_closure_params) = if stoch_entr_type == "noisy_relaxation_process"
-            (NoisyRelaxationProcess(mean_model = mean_entr_closure),
-             NoisyRelaxationProcessParameters(param_set, mean_entr_params))
+            (
+                NoisyRelaxationProcess(mean_model = mean_entr_closure),
+                NoisyRelaxationProcessParameters(param_set, mean_entr_params),
+            )
         elseif stoch_entr_type == "lognormal_scaling"
-            (LogNormalScalingProcess(mean_model = mean_entr_closure),
-             LogNormalScalingProcessParameters(param_set, mean_entr_params))
+            (
+                LogNormalScalingProcess(mean_model = mean_entr_closure),
+                LogNormalScalingProcessParameters(param_set, mean_entr_params),
+            )
         elseif stoch_entr_type == "prognostic_noisy_relaxation_process"
-            (PrognosticNoisyRelaxationProcess(mean_model = mean_entr_closure),
-             PrognosticNoisyRelaxationProcessParameters(param_set, mean_entr_params))
+            (
+                PrognosticNoisyRelaxationProcess(mean_model = mean_entr_closure),
+                PrognosticNoisyRelaxationProcessParameters(param_set, mean_entr_params),
+            )
         elseif stoch_entr_type == "deterministic"
             (mean_entr_closure, mean_entr_params)
         else
             error("Something went wrong. Invalid stochastic entrainment type '$stoch_entr_type'")
         end
 
-       entr_dim_scale_str = parse_namelist(
+        entr_dim_scale_str = parse_namelist(
             namelist,
             "turbulence",
             "EDMF_PrognosticTKE",
@@ -586,7 +592,7 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFPS}
             valid_options = ["buoy_vel", "inv_z", "none"],
         )
 
-       (entr_dim_scale, entr_dim_scale_params) = if entr_dim_scale_str == "buoy_vel"
+        (entr_dim_scale, entr_dim_scale_params) = if entr_dim_scale_str == "buoy_vel"
             (BuoyVelEntrDimScale(), BuoyVelScaleParameters(param_struct))
         elseif entr_dim_scale_str == "inv_z"
             (InvZEntrDimScale(), InvZScaleParameters())
@@ -598,8 +604,8 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFPS}
 
         entr_pi_subset = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_pi_subset")
 
-#EDMFParameters
-edmf_params = EDMFParameters(param_struct, entr_closure_params, entr_dim_scale_params, precip_params)
+        #EDMFParameters
+        edmf_params = EDMFParameters(param_struct, entr_closure_params, entr_dim_scale_params, precip_params)
 
         EDS = typeof(entr_dim_scale)
         EC = typeof(entr_closure)
@@ -607,21 +613,24 @@ edmf_params = EDMFParameters(param_struct, entr_closure_params, entr_dim_scale_p
         PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
-EPG = typeof(entr_pi_subset)
-        return (new{n_updrafts, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFPS}(
-            surface_area,
-            max_area,
-            minimum_area,
-            moisture_model,
-            precip_model,
-            en_thermo,
-            prandtl_number,
-            bg_closure,
-            entr_closure,
-            entr_dim_scale,
-            entr_pi_subset,
+        EPG = typeof(entr_pi_subset)
+        return (
+            new{n_updrafts, FT, MM, PM, ENT, EBGC, EC, EDS, EPG, EDMFPS}(
+                surface_area,
+                max_area,
+                minimum_area,
+                moisture_model,
+                precip_model,
+                en_thermo,
+                prandtl_number,
+                bg_closure,
+                entr_closure,
+                entr_dim_scale,
+                entr_pi_subset,
+                edmf_params,
+            ),
             edmf_params,
-        ), edmf_params)
+        )
     end
 end
 parameter_set(obj) = obj.param_set

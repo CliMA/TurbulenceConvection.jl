@@ -125,7 +125,7 @@ function Simulation1d(namelist, parameter_struct)
 
     # Thermodynamics parameters
     thermo_params = TD.ThermodynamicsParameters(param_struct)
-    
+
     # Create the class and parameters for precipitation
     precip_name = TC.parse_namelist(
         namelist,
@@ -140,8 +140,8 @@ function Simulation1d(namelist, parameter_struct)
     elseif precip_name == "cutoff"
         (TC.CutoffPrecipitation(), TC.CutOffPrecipitationParameters())
     elseif precip_name == "clima_1m"
-        micro_params = CM.Microphysics_1M_Parameters(param_struct,thermo_params)
-        (TC.Clima1M(), TC.Clima1MParameters(param_structt,thermo_params,micro_params))
+        micro_params = CM.Microphysics_1M_Parameters(param_struct, thermo_params)
+        (TC.Clima1M(), TC.Clima1MParameters(param_struct, thermo_params, micro_params))
     else
         error("Invalid precip_name $(precip_name)")
     end
@@ -149,23 +149,13 @@ function Simulation1d(namelist, parameter_struct)
     # Create surface fluxes parameters
     uf_params = UF.BusingerParameters(param_struct) #all `get_surface` cases use Businger
 
-    surf_params = SF.SurfaceFluxesParameters(
-        param_struct,
-        uf_params,
-        thermo_params,
-    )
-    
+    surf_params = SF.SurfaceFluxesParameters(param_struct, uf_params, thermo_params)
+
     # Create EDMF model and parameters
     (edmf, edmf_params) = TC.EDMFModel(namelist, param_struct, precip_model, precip_params)
 
     # Create the top level parameter set
-    param_set = TC.TurbulenceConvectionParameters(
-        param_struct,
-        edmf_params,
-        thermo_params,
-        precip_params,
-        surf_params,
-    )
+    param_set = TC.TurbulenceConvectionParameters(param_struct, edmf_params, thermo_params, precip_params, surf_params)
 
     # create parameter log with the struct
     CP.log_parameter_information(param_struct, logfilepath)
@@ -175,7 +165,7 @@ function Simulation1d(namelist, parameter_struct)
     case_type = Cases.get_case(namelist)
 
     Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
-    Rad = TC.RadiationBase(case_type) 
+    Rad = TC.RadiationBase(case_type)
     TS = TimeStepping(namelist)
 
     surf_ref_state = Cases.surface_ref_state(case_type, namelist_param_set, namelist)
@@ -224,7 +214,8 @@ function Simulation1d(namelist, parameter_struct)
 
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)
-    surf_params = Cases.surface_params(case_type, grid, surf_ref_state, namelist_param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
+    surf_params =
+        Cases.surface_params(case_type, grid, surf_ref_state, namelist_param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
     inversion_type = Cases.inversion_type(case_type)
     case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad, spk...)
 

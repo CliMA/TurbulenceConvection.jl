@@ -1,13 +1,13 @@
-function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
-    c_m::FT = CPEDMF.c_m(param_set)
-    c_d::FT = CPEDMF.c_d(param_set)
-    smin_ub::FT = CPEDMF.smin_ub(param_set)
-    smin_rm::FT = CPEDMF.smin_rm(param_set)
-    l_max::FT = ICP.l_max(param_set)
-    c_b::FT = ICP.static_stab_coeff(param_set)
-    g::FT = CPP.grav(param_set)
-    molmass_ratio::FT = CPP.molmass_ratio(param_set)
-    vkc::FT = CPSGS.von_karman_const(param_set)
+function mixing_length(param_set::EDMFPS, ml_model::MinDisspLen{FT}) where {FT}
+    c_m::FT = param_set.c_m
+    c_d::FT = param_set.c_d
+    smin_ub::FT = param_set.smin_ub
+    smin_rm::FT = param_set.smin_rm
+    l_max::FT = param_set.l_max
+    c_b::FT = param_set.static_stab_coeff
+    g::FT = param_set.grav
+    molmass_ratio::FT = param_set.molmass_ratio
+    vkc::FT = param_set.von_karman_const
     ustar = ml_model.ustar
     z = ml_model.z
     tke_surf = ml_model.tke_surf
