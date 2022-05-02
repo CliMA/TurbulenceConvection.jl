@@ -85,17 +85,15 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     Ic = CCO.InterpolateF2C()
 
     ts_en = center_aux_environment(state).ts
-    @. h_tot_en = TD.total_energy(param_set,
-                                  ts_en,
-                                  0.5*(prog_gm.u^2 + prog_gm.v^2 + Ic(w_en)^2),
-                                  grid.zc.z*g) + p0_c/ρ0_c
+    @. h_tot_en =
+        TD.total_energy(param_set, ts_en, 0.5 * (prog_gm.u^2 + prog_gm.v^2 + Ic(w_en)^2), grid.zc.z * g) + p0_c / ρ0_c
 
     # Compute the mass flux and associated scalar fluxes
     parent(massflux) .= 0
     parent(massflux_h) .= 0
     parent(massflux_qt) .= 0
     @. massflux = ρ0_f * Ifae(a_en) * (w_en - w_gm)
-    @. massflux_h = ρ0_f * Ifae(a_en) * (w_en - w_gm) * (If(h_tot_en) - If(prog_gm.ρe_tot/ρ0_c + p0_c/ρ0_c))
+    @. massflux_h = ρ0_f * Ifae(a_en) * (w_en - w_gm) * (If(h_tot_en) - If(prog_gm.ρe_tot / ρ0_c + p0_c / ρ0_c))
     @. massflux_qt = ρ0_f * Ifae(a_en) * (w_en - w_gm) * (If(q_tot_en) - If(q_tot_gm))
     @inbounds for i in 1:N_up
         aux_up_f_i = aux_up_f[i]
@@ -112,11 +110,11 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         ts_up_i = copy(ts_en)
         h_tot_up_i = copy(q_tot_up)
         @. ts_up_i = thermo_state_pθq(param_set, p0_c, θ_liq_ice_up, q_tot_up)
-        @. h_tot_up_i = TD.total_energy(param_set,
-                                        ts_up_i,
-                                        0.5*(prog_gm.u^2 + prog_gm.v^2 + Ic(w_up)^2),
-                                        grid.zc.z*g) + p0_c/ρ0_c
-        @. massflux_h += ρ0_f * (Ifau(a_up) * (w_up - w_gm) * (If(h_tot_up_i) - If(prog_gm.ρe_tot/ρ0_c  + p0_c/ρ0_c)))
+        @. h_tot_up_i =
+            TD.total_energy(param_set, ts_up_i, 0.5 * (prog_gm.u^2 + prog_gm.v^2 + Ic(w_up)^2), grid.zc.z * g) +
+            p0_c / ρ0_c
+        @. massflux_h +=
+            ρ0_f * (Ifau(a_up) * (w_up - w_gm) * (If(h_tot_up_i) - If(prog_gm.ρe_tot / ρ0_c + p0_c / ρ0_c)))
         @. massflux_qt += ρ0_f * (Ifau(a_up) * (w_up - w_gm) * (If(q_tot_up) - If(q_tot_gm)))
     end
 
@@ -219,10 +217,9 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
 
     h_tot_en = copy(a_en)
     ts_en = center_aux_environment(state).ts
-    @. h_tot_en = TD.total_energy(param_set,
-                                  ts_en,
-                                  0.5*(prog_gm.u^2 + prog_gm.v^2 + Ic(aux_en_f.w)^2),
-                                  grid.zc.z*g) + p0_c/ρ0_c
+    @. h_tot_en =
+        TD.total_energy(param_set, ts_en, 0.5 * (prog_gm.u^2 + prog_gm.v^2 + Ic(aux_en_f.w)^2), grid.zc.z * g) +
+        p0_c / ρ0_c
 
     @. aux_tc_f.ρ_ae_KH = IfKH(aeKH) * ρ0_f
     @. aux_tc_f.ρ_ae_KM = IfKM(aeKM) * ρ0_f
@@ -292,6 +289,7 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
+    aux_gm = center_aux_grid_mean(state)
     ρ0_c = center_ref_state(state).ρ0
     ρ0_f = face_ref_state(state).ρ0
     prog_up = center_prog_updrafts(state)
@@ -316,8 +314,8 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         prog_up_f[i].ρaw[kf_surf] = ρ0_f[kf_surf] * w_surface_bc(surf)
     end
 
-    flux1 = surf.shf/ρ0_c[kc_surf]/cp
-    flux2 = surf.ρq_tot_flux/ρ0_c[kc_surf]
+    flux1 = surf.shf / ρ0_c[kc_surf] / cp
+    flux2 = surf.ρq_tot_flux / ρ0_c[kc_surf]
     zLL = grid.zc[kc_surf].z
     ustar = surf.ustar
     oblength = surf.obukhov_length
@@ -368,7 +366,14 @@ end
 function w_surface_bc(::SurfaceBase{FT})::FT where {FT}
     return FT(0)
 end
-function θ_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDMFModel, i::Int, param_set::APS)::FT where {FT}
+function θ_surface_bc(
+    surf::SurfaceBase{FT},
+    grid::Grid,
+    state::State,
+    edmf::EDMFModel,
+    i::Int,
+    param_set::APS,
+)::FT where {FT}
     aux_gm = center_aux_grid_mean(state)
     ρ0_c = center_ref_state(state).ρ0
     kc_surf = kc_surface(grid)
@@ -379,7 +384,7 @@ function θ_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::ED
     surf.bflux > 0 || return aux_gm.θ_liq_ice[kc_surf]
     a_total = edmf.surface_area
     a_ = area_surface_bc(surf, edmf, i)
-    θ_liq_ice_flux = surf.shf/ρ0_c[kc_surf]/cp # assuming no ql,qi flux
+    θ_liq_ice_flux = surf.shf / ρ0_c[kc_surf] / cp # assuming no ql,qi flux
     h_var = get_surface_variance(θ_liq_ice_flux * α0LL, θ_liq_ice_flux * α0LL, ustar, zLL, oblength)
     surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000)
     return aux_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var)
@@ -392,7 +397,7 @@ function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDM
     a_total = edmf.surface_area
     a_ = area_surface_bc(surf, edmf, i)
     UnPack.@unpack ustar, zLL, oblength, α0LL = surface_helper(surf, grid, state)
-    q_tot_flux = surf.ρq_tot_flux/ρ0_c[kc_surf]
+    q_tot_flux = surf.ρq_tot_flux / ρ0_c[kc_surf]
     qt_var = get_surface_variance(q_tot_flux * α0LL, q_tot_flux * α0LL, ustar, zLL, oblength)
     surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000)
     return aux_gm.q_tot[kc_surf] + surface_scalar_coeff * sqrt(qt_var)

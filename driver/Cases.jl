@@ -1189,7 +1189,7 @@ function surface_params(case::LES_driven_SCM, grid::TC.Grid, surf_ref_state, par
         mean_qt_prof = Statistics.mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)[:]
         field = TC.FieldFromNamedTuple(TC.face_space(grid), (; ρq_tot = FT(0)))
         Ic = CCO.InterpolateF2C()
-        q_tot_c = Ic.(field.ρq_tot/ρ0_f_surf)
+        q_tot_c = Ic.(field.ρq_tot / ρ0_f_surf)
         qsurface = q_tot_c[TC.kc_surface(grid)]
         lhf = Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1]
         shf = Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1]

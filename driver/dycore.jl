@@ -257,12 +257,12 @@ function set_thermo_state_peq!(state, grid, moisture_model, param_set)
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
-        e_kin = 0.5*(prog_gm.u[k]^2 + prog_gm.v[k]^2) # add w here?
-        e_pot = grid.zc.z[k]*g
-        e_int = prog_gm.ρe_tot[k]/ρ0_c[k] - e_kin - e_pot
+        e_kin = 0.5 * (prog_gm.u[k]^2 + prog_gm.v[k]^2) # add w here?
+        e_pot = grid.zc.z[k] * g
+        e_int = prog_gm.ρe_tot[k] / ρ0_c[k] - e_kin - e_pot
         ts_gm[k] = TC.thermo_state_peq(param_set, p0_c[k], e_int, aux_gm.q_tot[k], thermo_args...)
         aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_gm[k])
-        aux_gm.q_tot[k] = prog_gm.ρq_tot[k]/ρ0_c[k]
+        aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ0_c[k]
     end
     return nothing
 end
@@ -284,10 +284,10 @@ function set_thermo_state_pθq!(state, grid, moisture_model, param_set)
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
         ts_gm[k] = TC.thermo_state_pθq(param_set, p0_c[k], aux_gm.θ_liq_ice[k], aux_gm.q_tot[k], thermo_args...)
-        e_kin = 0.5*(prog_gm.u[k]^2 + prog_gm.v[k]^2) # add w here?
-        e_pot = grid.zc.z[k]*g
-        prog_gm.ρe_tot[k] = ρ0_c[k]*TD.total_energy(param_set, ts_gm[k], e_kin, e_pot)
-        prog_gm.ρq_tot[k] = ρ0_c[k]*aux_gm.q_tot[k]
+        e_kin = 0.5 * (prog_gm.u[k]^2 + prog_gm.v[k]^2) # add w here?
+        e_pot = grid.zc.z[k] * g
+        prog_gm.ρe_tot[k] = ρ0_c[k] * TD.total_energy(param_set, ts_gm[k], e_kin, e_pot)
+        prog_gm.ρq_tot[k] = ρ0_c[k] * aux_gm.q_tot[k]
     end
     return nothing
 end
@@ -434,10 +434,10 @@ function compute_gm_tendencies!(
             tendencies_gm.v[k] += force.coriolis_param * (aux_gm.ug[k] - prog_gm.u[k])
         end
         if TC.rad_type(radiation) <: Union{TC.RadiationDYCOMS_RF01, TC.RadiationLES}
-            tendencies_gm.ρe_tot[k] += ρ0_c[k]*c_pm*aux_gm.dTdt_rad[k]
+            tendencies_gm.ρe_tot[k] += ρ0_c[k] * c_pm * aux_gm.dTdt_rad[k]
         end
         if TC.force_type(force) <: TC.ForcingDYCOMS_RF01
-            tendencies_gm.ρq_tot[k] += ρ0_c[k]*aux_gm.dqtdt[k]
+            tendencies_gm.ρq_tot[k] += ρ0_c[k] * aux_gm.dqtdt[k]
             # Apply large-scale subsidence tendencies
             tendencies_gm.ρe_tot[k] -= ∇h_tot_subsidence_flux[k]
             tendencies_gm.ρq_tot[k] -= ∇q_tot_subsidence_flux[k]
@@ -454,8 +454,8 @@ function compute_gm_tendencies!(
                 tendencies_gm.ρe_tot[k] -= ∇h_tot_subsidence_flux[k]
                 tendencies_gm.ρq_tot[k] -= ∇q_tot_subsidence_flux[k]
             end
-            tendencies_gm.ρe_tot[k] += ρ0_c[k]*c_pm*aux_gm.dTdt[k]
-            tendencies_gm.ρq_tot[k] += ρ0_c[k]*aux_gm.dqtdt[k]
+            tendencies_gm.ρe_tot[k] += ρ0_c[k] * c_pm * aux_gm.dTdt[k]
+            tendencies_gm.ρq_tot[k] += ρ0_c[k] * aux_gm.dqtdt[k]
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
                 if force.apply_subsidence
                     tendencies_gm.q_liq[k] -= ∇q_liq_gm[k] * aux_gm.subsidence[k]
@@ -476,8 +476,8 @@ function compute_gm_tendencies!(
             Γᵣ = TC.compute_les_Γᵣ(grid.zc[k])
             if Γᵣ != 0
                 tau_k = 1 / Γᵣ
-                gm_H_nudge_k = (aux_gm.H_nudge[k] - prog_gm.ρe_tot[k]/ρ0_c[k]) / tau_k
-                gm_q_tot_nudge_k = (aux_gm.qt_nudge[k] - prog_gm.ρq_tot[k]/ρ0_c[k]) / tau_k
+                gm_H_nudge_k = (aux_gm.H_nudge[k] - prog_gm.ρe_tot[k] / ρ0_c[k]) / tau_k
+                gm_q_tot_nudge_k = (aux_gm.qt_nudge[k] - prog_gm.ρq_tot[k] / ρ0_c[k]) / tau_k
             else
                 gm_H_nudge_k = 0.0
                 gm_q_tot_nudge_k = 0.0
@@ -512,9 +512,9 @@ function compute_gm_tendencies!(
                 end
             end
 
-            tendencies_gm.ρe_tot[k] += ρ0_c[k]*(H_horz_adv + gm_H_nudge_k + H_fluc + gm_H_subsidence_k)
+            tendencies_gm.ρe_tot[k] += ρ0_c[k] * (H_horz_adv + gm_H_nudge_k + H_fluc + gm_H_subsidence_k)
             tendencies_gm.ρq_tot[k] +=
-                ρ0_c[k]*(aux_gm.dqtdt_hadv[k] + gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k] + gm_QT_subsidence_k)
+                ρ0_c[k] * (aux_gm.dqtdt_hadv[k] + gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k] + gm_QT_subsidence_k)
             tendencies_gm.u[k] += gm_U_nudge_k
             tendencies_gm.v[k] += gm_V_nudge_k
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
@@ -556,8 +556,8 @@ function compute_gm_tendencies!(
     tends_v = tendencies_gm.v
 
     ∇sgs = CCO.DivergenceF2C()
-    @. tends_ρe_tot += - ∇sgs(wvec(sgs_flux_h_tot))
-    @. tends_ρq_tot += - ∇sgs(wvec(sgs_flux_q_tot))
+    @. tends_ρe_tot += -∇sgs(wvec(sgs_flux_h_tot))
+    @. tends_ρq_tot += -∇sgs(wvec(sgs_flux_q_tot))
     @. tends_u += -α0_c * ∇sgs(wvec(sgs_flux_u))
     @. tends_v += -α0_c * ∇sgs(wvec(sgs_flux_v))
 
