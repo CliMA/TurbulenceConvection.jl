@@ -75,8 +75,8 @@ cent_aux_vars_gm(FT, edmf) = (;
     v_nudge = FT(0), #Reference v profile for relaxation tendency
     ug = FT(0), #Geostrophic u velocity
     vg = FT(0), #Geostrophic v velocity
-    ∇h_tot_subsidence_flux = FT(0),
-    ∇q_tot_subsidence_flux = FT(0),
+    ∇h_tot_gm = FT(0),
+    ∇q_tot_gm = FT(0),
     cent_aux_vars_gm_moisture(FT, edmf.moisture_model)...,
     θ_virt = FT(0),
     Ri = FT(0),
@@ -392,8 +392,8 @@ function compute_gm_tendencies!(
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
-    ∇h_tot_subsidence_flux = TC.center_aux_grid_mean(state).∇h_tot_subsidence_flux
-    ∇q_tot_subsidence_flux = TC.center_aux_grid_mean(state).∇q_tot_subsidence_flux
+    ∇h_tot_gm = TC.center_aux_grid_mean(state).∇h_tot_gm
+    ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
     aux_en = TC.center_aux_environment(state)
     aux_en_f = TC.face_aux_environment(state)
     aux_up = TC.center_aux_updrafts(state)
@@ -405,14 +405,14 @@ function compute_gm_tendencies!(
     aux_tc = TC.center_aux_turbconv(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
 
-    θ_liq_ice_gm_toa = aux_gm.θ_liq_ice[kc_toa]
-    q_tot_gm_toa = aux_gm.q_tot[kc_toa]
-    RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_liq_ice_gm_toa))
+    h_tot_gm_toa = (prog_gm.ρe_tot[kc_toa] + p0_c[kc_toa])/ρ0_c[kc_toa]
+    q_tot_gm_toa = prog_gm.ρq_tot[kc_toa]/ρ0_c[kc_toa]
+    RBe = CCO.RightBiasedC2F(; top = CCO.SetValue(h_tot_gm_toa))
     RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa))
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
-    @. ∇h_tot_subsidence_flux = ∇c(wvec(RBθ(aux_gm.subsidence * (prog_gm.ρe_tot + p0_c))))
-    @. ∇q_tot_subsidence_flux = ∇c(wvec(RBq(aux_gm.subsidence * prog_gm.ρq_tot)))
+    @. ∇h_tot_gm = ∇c(wvec(RBe((prog_gm.ρe_tot + p0_c)/ρ0_c)))
+    @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.ρq_tot/ρ0_c)))
 
     if edmf.moisture_model isa TC.NonEquilibriumMoisture
         ∇q_liq_gm = TC.center_aux_grid_mean(state).∇q_liq_gm
@@ -428,6 +428,8 @@ function compute_gm_tendencies!(
     @inbounds for k in TC.real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
         c_pm = TD.cp_m(param_set, ts_gm[k])
+        Lv = TD.latent_heat_vapor(param_set, ts_gm[k])
+        Π = TD.exner(param_set, ts_gm[k])
 
         if force.apply_coriolis
             tendencies_gm.u[k] -= force.coriolis_param * (aux_gm.vg[k] - prog_gm.v[k])
@@ -438,9 +440,11 @@ function compute_gm_tendencies!(
         end
         if TC.force_type(force) <: TC.ForcingDYCOMS_RF01
             tendencies_gm.ρq_tot[k] += ρ0_c[k] * aux_gm.dqtdt[k]
+            tendencies_gm.ρe_tot[k] += ρ0_c[k] * Lv * aux_gm.dqtdt[k]
+
             # Apply large-scale subsidence tendencies
-            tendencies_gm.ρe_tot[k] -= ∇h_tot_subsidence_flux[k]
-            tendencies_gm.ρq_tot[k] -= ∇q_tot_subsidence_flux[k]
+            tendencies_gm.ρe_tot[k] -= aux_gm.subsidence[k] * ∇h_tot_gm[k]
+            tendencies_gm.ρq_tot[k] -= aux_gm.subsidence[k] * ∇q_tot_gm[k]
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
                 tendencies_gm.q_liq[k] += aux_gm.dqldt[k]
                 tendencies_gm.q_ice[k] += aux_gm.dqidt[k]
@@ -451,11 +455,11 @@ function compute_gm_tendencies!(
 
         if TC.force_type(force) <: TC.ForcingStandard
             if force.apply_subsidence
-                tendencies_gm.ρe_tot[k] -= ∇h_tot_subsidence_flux[k]
-                tendencies_gm.ρq_tot[k] -= ∇q_tot_subsidence_flux[k]
+                tendencies_gm.ρe_tot[k] -= aux_gm.subsidence[k] * ∇h_tot_gm[k]
+                tendencies_gm.ρq_tot[k] -= aux_gm.subsidence[k] * ∇q_tot_gm[k]
             end
-            tendencies_gm.ρe_tot[k] += ρ0_c[k] * c_pm * aux_gm.dTdt[k]
             tendencies_gm.ρq_tot[k] += ρ0_c[k] * aux_gm.dqtdt[k]
+            tendencies_gm.ρe_tot[k] += ρ0_c[k] * (c_pm * aux_gm.dTdt[k] + Lv * aux_gm.dqtdt[k])
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
                 if force.apply_subsidence
                     tendencies_gm.q_liq[k] -= ∇q_liq_gm[k] * aux_gm.subsidence[k]
@@ -467,8 +471,8 @@ function compute_gm_tendencies!(
         end
 
         if TC.force_type(force) <: TC.ForcingLES
-            H_horz_adv = aux_gm.dTdt_hadv[k]
-            H_fluc = aux_gm.dTdt_fluc[k]
+            H_horz_adv = ρ0_c[k] * c_pm * aux_gm.dTdt_hadv[k]
+            H_fluc = ρ0_c[k] * c_pm * aux_gm.dTdt_fluc[k]
 
             gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm.u[k]) / force.nudge_tau
             gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm.v[k]) / force.nudge_tau
@@ -476,7 +480,7 @@ function compute_gm_tendencies!(
             Γᵣ = TC.compute_les_Γᵣ(grid.zc[k])
             if Γᵣ != 0
                 tau_k = 1 / Γᵣ
-                gm_H_nudge_k = (aux_gm.H_nudge[k] - prog_gm.ρe_tot[k] / ρ0_c[k]) / tau_k
+                gm_H_nudge_k = ρ0_c[k] * c_pm * Π * (aux_gm.H_nudge[k] - aux_gm.θ_liq_ice[k]) / tau_k
                 gm_q_tot_nudge_k = (aux_gm.qt_nudge[k] - prog_gm.ρq_tot[k] / ρ0_c[k]) / tau_k
             else
                 gm_H_nudge_k = 0.0
@@ -495,8 +499,8 @@ function compute_gm_tendencies!(
 
             if force.apply_subsidence
                 # Apply large-scale subsidence tendencies
-                gm_H_subsidence_k = -∇h_tot_subsidence_flux[k]
-                gm_QT_subsidence_k = -∇q_tot_subsidence_flux[k]
+                gm_H_subsidence_k  = -aux_gm.subsidence[k] * ∇h_tot_gm[k]
+                gm_QT_subsidence_k = -aux_gm.subsidence[k] * ∇q_tot_gm[k]
             else
                 gm_H_subsidence_k = 0.0
                 gm_QT_subsidence_k = 0.0
@@ -512,9 +516,13 @@ function compute_gm_tendencies!(
                 end
             end
 
-            tendencies_gm.ρe_tot[k] += ρ0_c[k] * (H_horz_adv + gm_H_nudge_k + H_fluc + gm_H_subsidence_k)
             tendencies_gm.ρq_tot[k] +=
                 ρ0_c[k] * (aux_gm.dqtdt_hadv[k] + gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k] + gm_QT_subsidence_k)
+            tendencies_gm.ρe_tot[k] +=
+                ρ0_c[k] * (
+                    cp_m * Π * (H_horz_adv + gm_H_nudge_k + H_fluc + gm_H_subsidence_k) +
+                    Lv * (aux_gm.dqtdt_hadv[k] + gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k] + gm_QT_subsidence_k)
+                )
             tendencies_gm.u[k] += gm_U_nudge_k
             tendencies_gm.v[k] += gm_V_nudge_k
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
@@ -524,22 +532,24 @@ function compute_gm_tendencies!(
                     aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k] + gm_QI_subsidence_k
             end
         end
-        # tendencies_gm.ρq_tot[k] +=
-        #     ρ0_c[k]*(aux_bulk.qt_tendency_precip_formation[k] +
-        #     aux_en.qt_tendency_precip_formation[k] +
-        #     aux_tc.qt_tendency_precip_sinks[k])
-        # tendencies_gm.ρe_tot[k] +=
-        #     ρ0_c[k]*(aux_bulk.θ_liq_ice_tendency_precip_formation[k] +
-        #     aux_en.θ_liq_ice_tendency_precip_formation[k] +
-        #     aux_tc.θ_liq_ice_tendency_precip_sinks[k])
-        # if edmf.moisture_model isa TC.NonEquilibriumMoisture
-        #     tendencies_gm.q_liq[k] += aux_bulk.ql_tendency_precip_formation[k] + aux_en.ql_tendency_precip_formation[k]
-        #     tendencies_gm.q_ice[k] += aux_bulk.qi_tendency_precip_formation[k] + aux_en.qi_tendency_precip_formation[k]
-        # end
+        tendencies_gm.ρq_tot[k] +=
+            ρ0_c[k]*(aux_bulk.qt_tendency_precip_formation[k] +
+            aux_en.qt_tendency_precip_formation[k] +
+            aux_tc.qt_tendency_precip_sinks[k])
+        tendencies_gm.ρe_tot[k] +=
+            ρ0_c[k] * c_pm * Π *(aux_bulk.θ_liq_ice_tendency_precip_formation[k] +
+            aux_en.θ_liq_ice_tendency_precip_formation[k] +
+            aux_tc.θ_liq_ice_tendency_precip_sinks[k]) +
+            ρ0_c[k] * Lv * (aux_bulk.qt_tendency_precip_formation[k] +
+            aux_en.qt_tendency_precip_formation[k] +
+            aux_tc.qt_tendency_precip_sinks[k])
+        if edmf.moisture_model isa TC.NonEquilibriumMoisture
+            tendencies_gm.q_liq[k] += aux_bulk.ql_tendency_precip_formation[k] + aux_en.ql_tendency_precip_formation[k]
+            tendencies_gm.q_ice[k] += aux_bulk.qi_tendency_precip_formation[k] + aux_en.qi_tendency_precip_formation[k]
+        end
     end
 
     TC.compute_sgs_flux!(edmf, grid, state, surf, param_set)
-
     sgs_flux_h_tot = aux_gm_f.sgs_flux_h_tot
     sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot
     sgs_flux_u = aux_gm_f.sgs_flux_u
