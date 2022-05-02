@@ -254,7 +254,7 @@ function construct_grid(namelist; FT = Float64)
 
         les_filename = namelist["meta"]["lesfile"]
         zmax = NC.Dataset(les_filename, "r") do data
-            Array(TC.get_nc_data(data, "zc"))[end]
+            Array(TC.get_nc_data(data, "zf"))[end]
         end
         nz = isnothing(nz) ? Int(zmax ÷ Δz) : Int(nz)
         Δz = isnothing(Δz) ? FT(zmax ÷ nz) : FT(Δz)
