@@ -106,7 +106,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         q_tot_up = aux_up_i.q_tot
         @. aux_up_f[i].massflux = ρ0_f * Ifau(a_up) * (w_up - w_gm)
         # We know that, since W = 0 at z = 0, m = 0 also, and
-        # therefore θ_liq_ice / q_tot values do not matter
+        # therefore h_tot / q_tot values do not matter
         ts_up_i = copy(ts_en)
         h_tot_up_i = copy(q_tot_up)
         @. ts_up_i = thermo_state_pθq(param_set, p0_c, θ_liq_ice_up, q_tot_up)
@@ -160,7 +160,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     sgs_flux_v = aux_gm_f.sgs_flux_v
 
     @. sgs_flux_h_tot = diffusive_flux_h + massflux_h
-    @. sgs_flux_q_tot = diffusive_flux_qt# + massflux_qt
+    @. sgs_flux_q_tot = diffusive_flux_qt + massflux_qt
     @. sgs_flux_u = diffusive_flux_u # + massflux_u
     @. sgs_flux_v = diffusive_flux_v # + massflux_v
 
