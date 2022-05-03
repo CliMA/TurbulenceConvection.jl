@@ -72,7 +72,9 @@ Uses a non local (Fourier) neural network to predict the fields of
  - `Π_groups`   :: input - non dimensional groups, as column fields
  - `::FNOEntr ` a non-local entrainment-detrainment model type
 """
-function non_dimensional_function!(
+
+
+function temp_non_dimensional_function!(
     nondim_ε::AbstractArray{FT}, # output
     nondim_δ::AbstractArray{FT}, # output
     param_set::APS,
@@ -96,7 +98,7 @@ function non_dimensional_function!(
     trafo = OF.FourierTransform(modes = (modes,), even=even)
     model = OF.Chain(
         Flux.Dense(n_input_vars+1, width, Flux.tanh),
-        OF.SpectralKernelOperator(trafo, width => width, Flux.tanh),
+        #OF.SpectralKernelOperator(trafo, width => width, Flux.tanh),
         Flux.Dense(width, width, Flux.tanh),
         Flux.Dense(width, 2)
       )
@@ -117,9 +119,8 @@ function non_dimensional_function!(
 
     output = model(Π)
 
-    # we need a sigmoid that recieves output and produced non negative nondim_ε, nondim_δ
-    nondim_ε .= output[1, :]
-    nondim_δ .= output[2, :]
+    nondim_ε .= Flux.relu.(output[1, :] .+ 0.5)
+    nondim_δ .= Flux.relu.(output[2, :] )    
     return nothing
 end
 
@@ -221,14 +222,49 @@ function non_dimensional_function!(
     nondim_ε::AbstractArray{FT}, # output
     nondim_δ::AbstractArray{FT}, # output
     param_set::APS,
-    Π_groups::AbstractArray{FT}, # input
+    Π_groups::AbstractArray{FT}, # input (65,6)
     εδ_model::NNEntrNonlocal,
 ) where {FT <: Real}
     # neural network architecture
     nn_arc = ICP.nn_arc(param_set)
     c_nn_params = ICP.c_nn_params(param_set)
-    nn_model = construct_fully_connected_nn(nn_arc, c_nn_params; biases_bool = εδ_model.biases_bool)
-    output = nn_model(Π_groups')
+    #nn_model = construct_fully_connected_nn(nn_arc, c_nn_params; biases_bool = εδ_model.biases_bool)
+    #output = nn_model(Π_groups')
+    
+    c_fno = c_nn_params
+    width = 2
+    modes = 2
+    n_input_vars = size(Π_groups)[2]
+    M = size(Π_groups)[1]
+    z = LinRange(0, 1, M)
+    Π_groups = hcat(Π_groups, z)
+    Π = Π_groups'
+    Π = reshape(Π, (size(Π)..., 1)) # (C, X, B)
+    even = Bool(mod(M, 2)) ? false : true
+
+    trafo = OF.FourierTransform(modes = (modes,), even=even)
+    model = OF.Chain(
+        Flux.Dense(n_input_vars+1, width, Flux.relu),
+        #OF.SpectralKernelOperator(trafo, width => width, Flux.relu),
+        Flux.Dense(width, width, Flux.relu),
+        Flux.Dense(width, 2)
+      )
+
+    index = 1
+    for p in Flux.params(model)
+        len_p = length(p)
+        if eltype(p) <: Real
+            p[:] .= c_fno[index:(index + len_p - 1)]
+            index += len_p
+        elseif eltype(p) <: Complex
+            p[:] .= c_fno[index:(index + len_p - 1)] + c_fno[(index + len_p):(index + len_p * 2 - 1)] * im
+            index += len_p * 2
+        else
+            error("Bad eltype in Flux params")
+        end
+    end
+
+    output = nn_model(Π)
     nondim_ε .= output[1, :]
     nondim_δ .= output[2, :]
 
@@ -396,4 +432,72 @@ function noisy_relaxation_process(μ::FT, λ::FT, σ²::FT, u0::FT, Δt::FT)::FT
     prob = SDE.SDEProblem(f, g, u0, tspan; save_start = false, saveat = last(tspan))
     sol = SDE.solve(prob, SDE.SOSRI())
     return Flux.relu(sol.u[end])
+end
+
+# debug fno layer with working code
+function non_dimensional_function!(
+    nondim_ε::AbstractArray{FT}, # output
+    nondim_δ::AbstractArray{FT}, # output
+    param_set::APS,
+    Π_groups::AbstractArray{FT}, # input
+    εδ_model::FNOEntr,
+) where {FT <: Real}
+    
+
+# neural network architecture
+    nn_arc = ICP.nn_arc(param_set)
+    c_nn_params = ICP.c_nn_params(param_set)
+    # nn_model = construct_fully_connected_nn(nn_arc, c_nn_params; biases_bool = εδ_model.biases_boolases_bool)
+    biases_bool = false
+    activation_function = Flux.sigmoid
+    output_layer_activation_function = Flux.relu
+# check consistency of architecture and parameters
+    arc = nn_arc
+    params = c_nn_params
+    if biases_bool
+        n_params_nn = num_params_from_arc(arc)
+        n_params_vect = length(params)
+    else
+        n_params_nn = num_weights_from_arc(arc)
+        n_params_vect = length(params)
+    end
+    if n_params_nn != n_params_vect
+        error("Incorrect number of parameters ($n_params_vect) for requested NN architecture ($n_params_nn)!")
+    end
+
+    layers = []
+    parameters_i = 1
+    # biases_bool = εδ_model.biases_bool
+    # unpack parameters in parameter vector into network
+    for layer_i in 1:(length(arc) - 1)
+        if layer_i == length(arc) - 1
+            activation_function = output_layer_activation_function
+        end
+        layer_num_weights = arc[layer_i] * arc[layer_i + 1]
+
+        nn_biases = if biases_bool
+            params[(parameters_i + layer_num_weights):(parameters_i + layer_num_weights + arc[layer_i + 1] - 1)]
+        else
+            biases_bool
+        end
+
+        layer = Flux.Dense(
+            reshape(params[parameters_i:(parameters_i + layer_num_weights - 1)], arc[layer_i + 1], arc[layer_i]),
+            nn_biases,
+            activation_function,
+        )
+        parameters_i += layer_num_weights
+
+        if biases_bool
+            parameters_i += arc[layer_i + 1]
+        end
+        push!(layers, layer)
+    end
+
+    nn_model = Flux.Chain(layers...)
+    output = nn_model(Π_groups')
+    nondim_ε .= output[1, :]
+    nondim_δ .= output[2, :]
+
+    return nothing
 end
