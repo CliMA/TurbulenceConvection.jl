@@ -85,7 +85,7 @@ function non_dimensional_function!(
     Π = Π_groups'
     Π = reshape(Π, (size(Π)..., 1))
     trafo = OF.FourierTransform(modes = (2,))
-    model = OF.Chain(OF.SpectralKernelOperator(trafo, n_input_vars => 2, Flux.relu),)
+    model = OF.Chain(OF.SpectralKernelOperator(trafo, n_input_vars => 2, Flux.relu))
 
     # set the parameters
     c_fno = ICP.c_fno(param_set)

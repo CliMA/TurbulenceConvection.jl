@@ -161,7 +161,7 @@ cent_aux_vars_edmf(FT, edmf) = (;
         ϕ_gm_cov = FT(0), # temporary for grid-mean covariance variables
         ϕ_en_cov = FT(0), # temporary for environmental covariance variables
         ϕ_up_cubed = FT(0), # temporary for cubed updraft variables in grid mean 3rd moment functions
-    ),
+    )
 )
 
 # Face only
@@ -193,7 +193,7 @@ face_aux_vars_edmf(FT, edmf) = (;
         face_aux_vars_edmf_moisture(FT, edmf.moisture_model)...,
         diffusive_flux_u = FT(0),
         diffusive_flux_v = FT(0),
-    ),
+    )
 )
 
 ##### Diagnostic fields
@@ -208,7 +208,7 @@ cent_diagnostic_vars_edmf(FT, edmf) = (;
         δ_nondim = FT(0),
         massflux = FT(0),
         frac_turb_entr = FT(0),
-    ),
+    )
 )
 
 # Face only
@@ -229,7 +229,7 @@ single_value_per_col_diagnostic_vars_edmf(FT, edmf) = (;
         updraft_lwp = FT(0),
         updraft_iwp = FT(0),
         Hd = FT(0),
-    ),
+    )
 )
 
 ##### Prognostic fields
@@ -253,7 +253,7 @@ cent_prognostic_vars_edmf(::Type{FT}, edmf) where {FT} = (;
         en = cent_prognostic_vars_en(FT),
         up = ntuple(i -> cent_prognostic_vars_up(FT, edmf), Val(n_updrafts(edmf))),
         pr = (; q_rai = FT(0), q_sno = FT(0)),
-    ),
+    )
 )
 # cent_prognostic_vars_edmf(FT, edmf) = (;) # could also use this for empty model
 
