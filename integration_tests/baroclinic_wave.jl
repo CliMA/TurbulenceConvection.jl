@@ -280,14 +280,14 @@ function ∑tendencies_gm!(dY, Y, cache, t)
 
     @. dρe = hwdiv(hgrad(cρe / cρ))
     χe = dρe
-    @. duₕ = hwgrad(hdiv(cuₕ)) - CCG.Covariant12Vector(hwcurl(CCG.Covariant3Vector(hcurl(cuₕ))),)
+    @. duₕ = hwgrad(hdiv(cuₕ)) - CCG.Covariant12Vector(hwcurl(CCG.Covariant3Vector(hcurl(cuₕ))))
     χuₕ = duₕ
 
     CC.Spaces.weighted_dss!(dρe)
     CC.Spaces.weighted_dss!(duₕ)
 
     @. dρe = -κ₄ * hwdiv(cρ * hgrad(χe))
-    @. duₕ = -κ₄ * (hwgrad(hdiv(χuₕ)) - CCG.Covariant12Vector(hwcurl(CCG.Covariant3Vector(hcurl(χuₕ))),))
+    @. duₕ = -κ₄ * (hwgrad(hdiv(χuₕ)) - CCG.Covariant12Vector(hwcurl(CCG.Covariant3Vector(hcurl(χuₕ)))))
 
     # 1) Mass conservation
     @. cuvw = CCG.Covariant123Vector(cuₕ) + CCG.Covariant123Vector(If2c(fw))
