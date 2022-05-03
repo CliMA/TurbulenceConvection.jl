@@ -79,23 +79,18 @@ function compute_precipitation_sink_tendencies(
         qr = prog_pr.q_rai[k]
         qs = prog_pr.q_sno[k]
         ρ0 = ρ0_c[k]
-        q_tot_gm = aux_gm.q_tot[k]
         T_gm = aux_gm.T[k]
         # When we fuse loops, this should hopefully disappear
         ts = ts_gm[k]
         q = TD.PhasePartition(param_set, ts)
         qv = TD.vapor_specific_humidity(param_set, ts)
 
-        Π_m = TD.exner(param_set, ts)
-        c_pm = TD.cp_m(param_set, ts)
-        c_vm = TD.cv_m(param_set, ts)
-        R_m = TD.gas_constant_air(param_set, ts)
-        R_v = CPP.R_v(param_set)
-        L_v0 = CPP.LH_v0(param_set)
-        L_s0 = CPP.LH_s0(param_set)
-        L_v = TD.latent_heat_vapor(param_set, ts)
-        L_s = TD.latent_heat_sublim(param_set, ts)
-        L_f = TD.latent_heat_fusion(param_set, ts)
+        I_l = TD.internal_energy_liquid(ts)
+        I_i = TD.internal_energy_ice(ts)
+        #Φ = gravitational_potential(atmos.orientation, aux) #TODO how to use it here?
+        g = CPP.grav(param_set)
+        Φ = g * grid.zc[k]
+        Lf = TD.latent_heat_fusion(param_set, ts)
 
         α_evp = CPMP.microph_scaling(param_set)
         α_dep_sub = CPMP.microph_scaling_dep_sub(param_set)
@@ -121,12 +116,7 @@ function compute_precipitation_sink_tendencies(
         tendencies_pr.q_sno[k] += S_qs_sub_dep + S_qs_melt
 
         aux_tc.qt_tendency_precip_sinks[k] = -S_qr_evap - S_qs_sub_dep
-        aux_tc.θ_liq_ice_tendency_precip_sinks[k] =
-            1 / Π_m / c_pm * (
-                S_qr_evap * (L_v - R_v * T_gm) * (1 + R_m / c_vm) +
-                S_qs_sub_dep * (L_s - R_v * T_gm) * (1 + R_m / c_vm) +
-                S_qs_melt * L_f * (1 + R_m / c_vm)
-            )
+        aux_tc.e_tot_tendency_precip_sinks[k] = -S_qr_evap * (I_l + Φ) - S_qs_sub_dep * (I_i + Φ) + S_qs_melt * Lf
     end
     return nothing
 end

@@ -526,7 +526,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         θ_liq_ice_up = aux_up_i.θ_liq_ice
         entr_turb_dyn = aux_up_i.entr_turb_dyn
         detr_turb_dyn = aux_up_i.detr_turb_dyn
-        θ_liq_ice_tendency_precip_formation = aux_up_i.θ_liq_ice_tendency_precip_formation
+        e_tot_tendency_precip_formation = aux_up_i.e_tot_tendency_precip_formation
         qt_tendency_precip_formation = aux_up_i.qt_tendency_precip_formation
 
         tends_ρarea = tendencies_up[i].ρarea
@@ -537,10 +537,11 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
             -∇c(wvec(LBF(Ic(w_up) * ρ0_c * a_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn) -
             (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn)
 
-        @. tends_ρaθ_liq_ice =
+        # TODO-var_change - this is not used right now
+        @. tends_ρae_tot =
             -∇c(wvec(LBF(Ic(w_up) * ρ0_c * a_up * θ_liq_ice_up))) +
             (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) -
-            (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn * θ_liq_ice_up) + (ρ0_c * θ_liq_ice_tendency_precip_formation)
+            (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn * θ_liq_ice_up) + (ρ0_c * θ_e_tot_tendency_precip_formation)
 
         @. tends_ρaq_tot =
             -∇c(wvec(LBF(Ic(w_up) * ρ0_c * a_up * q_tot_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * q_tot_en) -
