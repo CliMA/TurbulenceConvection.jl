@@ -314,8 +314,8 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         prog_up_f[i].ρaw[kf_surf] = ρ0_f[kf_surf] * w_surface_bc(surf)
     end
 
-    flux1 = surf.shf / ρ0_c[kc_surf] / cp
-    flux2 = surf.ρq_tot_flux / ρ0_c[kc_surf]
+    flux1 = surf.shf / cp
+    flux2 = surf.ρq_tot_flux
     zLL = grid.zc[kc_surf].z
     ustar = surf.ustar
     oblength = surf.obukhov_length
@@ -381,10 +381,10 @@ function θ_surface_bc(
     cp = TD.cp_m(param_set, ts_gm[kc_surf])
     UnPack.@unpack ustar, zLL, oblength, α0LL = surface_helper(surf, grid, state)
 
-    surf.bflux > 0 || return aux_gm.θ_liq_ice[kc_surf]
+    surf.bflux > 0 || return FT(0)
     a_total = edmf.surface_area
     a_ = area_surface_bc(surf, edmf, i)
-    θ_liq_ice_flux = surf.shf / ρ0_c[kc_surf] / cp # assuming no ql,qi flux
+    θ_liq_ice_flux = surf.shf / cp # assuming no ql,qi flux
     h_var = get_surface_variance(θ_liq_ice_flux * α0LL, θ_liq_ice_flux * α0LL, ustar, zLL, oblength)
     surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000)
     return aux_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var)
@@ -397,7 +397,7 @@ function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDM
     a_total = edmf.surface_area
     a_ = area_surface_bc(surf, edmf, i)
     UnPack.@unpack ustar, zLL, oblength, α0LL = surface_helper(surf, grid, state)
-    q_tot_flux = surf.ρq_tot_flux / ρ0_c[kc_surf]
+    q_tot_flux = surf.ρq_tot_flux
     qt_var = get_surface_variance(q_tot_flux * α0LL, q_tot_flux * α0LL, ustar, zLL, oblength)
     surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000)
     return aux_gm.q_tot[kc_surf] + surface_scalar_coeff * sqrt(qt_var)
