@@ -69,7 +69,9 @@ function compute_precipitation_formation_tendencies(
                 q = TD.PhasePartition(q_tot_up, q_liq_up, q_ice_up)
                 ts_up = TD.PhaseNonEquil_pTq(param_set, p0_c[k], T_up, q)
             else
-                error("Something went wrong in EDMF_Updrafts. The expected moisture model is Equilibrium or NonEquilibrium")
+                error(
+                    "Something went wrong in EDMF_Updrafts. The expected moisture model is Equilibrium or NonEquilibrium",
+                )
             end
 
             # autoconversion and accretion
