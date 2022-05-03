@@ -75,8 +75,8 @@ cent_aux_vars_gm(FT, edmf) = (;
     v_nudge = FT(0), #Reference v profile for relaxation tendency
     ug = FT(0), #Geostrophic u velocity
     vg = FT(0), #Geostrophic v velocity
-    ∇h_tot_subsidence_flux = FT(0),
-    ∇q_tot_subsidence_flux = FT(0),
+    ∇h_tot_gm = FT(0),
+    ∇q_tot_gm = FT(0),
     cent_aux_vars_gm_moisture(FT, edmf.moisture_model)...,
     θ_virt = FT(0),
     Ri = FT(0),
@@ -392,8 +392,8 @@ function compute_gm_tendencies!(
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
-    ∇h_tot_subsidence_flux = TC.center_aux_grid_mean(state).∇h_tot_subsidence_flux
-    ∇q_tot_subsidence_flux = TC.center_aux_grid_mean(state).∇q_tot_subsidence_flux
+    ∇h_tot_gm = TC.center_aux_grid_mean(state).∇h_tot_gm
+    ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
     aux_en = TC.center_aux_environment(state)
     aux_en_f = TC.face_aux_environment(state)
     aux_up = TC.center_aux_updrafts(state)
@@ -405,25 +405,14 @@ function compute_gm_tendencies!(
     aux_tc = TC.center_aux_turbconv(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
 
-    # subsidence as flux diveregce: ∂ρwϕ/∂z, not working
-    # ρh_tot_gm_toa = aux_gm.subsidence[kc_toa] * (prog_gm.ρe_tot[kc_toa] + p0_c[kc_toa])
-    # ρq_tot_gm_toa = aux_gm.subsidence[kc_toa] * prog_gm.ρq_tot[kc_toa]
-    # RBe = CCO.RightBiasedC2F(; top = CCO.SetValue(ρh_tot_gm_toa))
-    # RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(ρq_tot_gm_toa))
-    # wvec = CC.Geometry.WVector
-    # ∇c = CCO.DivergenceF2C()
-    # @. ∇h_tot_subsidence_flux = ∇c(wvec(RBe(aux_gm.subsidence * (prog_gm.ρe_tot + p0_c))))
-    # @. ∇q_tot_subsidence_flux = ∇c(wvec(RBq(aux_gm.subsidence * prog_gm.ρq_tot)))
-
-    # subsidence as advection : w(∂ϕ/∂z), working
-    ρh_tot_gm_toa = (prog_gm.ρe_tot[kc_toa] + p0_c[kc_toa])/ρ0_c[kc_toa]
-    ρq_tot_gm_toa = prog_gm.ρq_tot[kc_toa]/ρ0_c[kc_toa]
-    RBe = CCO.RightBiasedC2F(; top = CCO.SetValue(ρh_tot_gm_toa))
-    RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(ρq_tot_gm_toa))
+    h_tot_gm_toa = (prog_gm.ρe_tot[kc_toa] + p0_c[kc_toa])/ρ0_c[kc_toa]
+    q_tot_gm_toa = prog_gm.ρq_tot[kc_toa]/ρ0_c[kc_toa]
+    RBe = CCO.RightBiasedC2F(; top = CCO.SetValue(h_tot_gm_toa))
+    RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa))
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
-    @. ∇h_tot_subsidence_flux = ∇c(wvec(RBe((prog_gm.ρe_tot + p0_c)/ρ0_c)))
-    @. ∇q_tot_subsidence_flux = ∇c(wvec(RBq(prog_gm.ρq_tot/ρ0_c)))
+    @. ∇h_tot_gm = ∇c(wvec(RBe((prog_gm.ρe_tot + p0_c)/ρ0_c)))
+    @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.ρq_tot/ρ0_c)))
 
     if edmf.moisture_model isa TC.NonEquilibriumMoisture
         ∇q_liq_gm = TC.center_aux_grid_mean(state).∇q_liq_gm
@@ -453,12 +442,9 @@ function compute_gm_tendencies!(
             tendencies_gm.ρq_tot[k] += ρ0_c[k] * aux_gm.dqtdt[k]
             tendencies_gm.ρe_tot[k] += ρ0_c[k] * Lv * aux_gm.dqtdt[k]
 
-            # flux form not working
-            # tendencies_gm.ρe_tot[k] -= ∇h_tot_subsidence_flux[k]
-            # tendencies_gm.ρq_tot[k] -= ∇q_tot_subsidence_flux[k]
             # Apply large-scale subsidence tendencies
-            tendencies_gm.ρe_tot[k] -= aux_gm.subsidence[k] * ∇h_tot_subsidence_flux[k]
-            tendencies_gm.ρq_tot[k] -= aux_gm.subsidence[k] * ∇q_tot_subsidence_flux[k]
+            tendencies_gm.ρe_tot[k] -= aux_gm.subsidence[k] * ∇h_tot_gm[k]
+            tendencies_gm.ρq_tot[k] -= aux_gm.subsidence[k] * ∇q_tot_gm[k]
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
                 tendencies_gm.q_liq[k] += aux_gm.dqldt[k]
                 tendencies_gm.q_ice[k] += aux_gm.dqidt[k]
@@ -469,11 +455,8 @@ function compute_gm_tendencies!(
 
         if TC.force_type(force) <: TC.ForcingStandard
             if force.apply_subsidence
-                tendencies_gm.ρe_tot[k] -= aux_gm.subsidence[k] * ∇h_tot_subsidence_flux[k]
-                tendencies_gm.ρq_tot[k] -= aux_gm.subsidence[k] * ∇q_tot_subsidence_flux[k]
-                # flux form not working
-                # tendencies_gm.ρe_tot[k] -= ∇h_tot_subsidence_flux[k]
-                # tendencies_gm.ρq_tot[k] -= ∇q_tot_subsidence_flux[k]
+                tendencies_gm.ρe_tot[k] -= aux_gm.subsidence[k] * ∇h_tot_gm[k]
+                tendencies_gm.ρq_tot[k] -= aux_gm.subsidence[k] * ∇q_tot_gm[k]
             end
             tendencies_gm.ρq_tot[k] += ρ0_c[k] * aux_gm.dqtdt[k]
             tendencies_gm.ρe_tot[k] += ρ0_c[k] * (c_pm * aux_gm.dTdt[k] + Lv * aux_gm.dqtdt[k])
@@ -515,12 +498,9 @@ function compute_gm_tendencies!(
             end
 
             if force.apply_subsidence
-                # flux form not working
-                # gm_H_subsidence_k  = -∇h_tot_subsidence_flux[k]
-                # gm_QT_subsidence_k = -∇q_tot_subsidence_flux[k]
                 # Apply large-scale subsidence tendencies
-                gm_H_subsidence_k  = -aux_gm.subsidence[k] * ∇h_tot_subsidence_flux[k]
-                gm_QT_subsidence_k = -aux_gm.subsidence[k] * ∇q_tot_subsidence_flux[k]
+                gm_H_subsidence_k  = -aux_gm.subsidence[k] * ∇h_tot_gm[k]
+                gm_QT_subsidence_k = -aux_gm.subsidence[k] * ∇q_tot_gm[k]
             else
                 gm_H_subsidence_k = 0.0
                 gm_QT_subsidence_k = 0.0
