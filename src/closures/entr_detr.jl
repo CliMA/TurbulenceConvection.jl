@@ -157,7 +157,6 @@ function compute_entr_detr!(
     aux_en_f = face_aux_environment(state)
     prog_gm_f = face_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
-    aux_gm_f = face_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
@@ -179,7 +178,7 @@ function compute_entr_detr!(
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
         w_en = aux_en_f.w
-        w_gm = aux_gm_f.w
+        w_gm = prog_gm_f.w
         @. m_entr_detr = a_up * (Ic(w_up) - Ic(w_gm))
         @. ∇m_entr_detr = ∇c(wvec(LB(m_entr_detr)))
         @. w_up_c = Ic(w_up)
@@ -287,7 +286,7 @@ function compute_entr_detr!(
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
         w_en = aux_en_f.w
-        w_gm = aux_en_f.w
+        w_gm = prog_gm_f.w
         @. m_entr_detr = a_up * (Ic(w_up) - Ic(w_gm))
         @. ∇m_entr_detr = ∇c(wvec(LB(m_entr_detr)))
         @. w_up_c = Ic(w_up)

@@ -42,7 +42,7 @@ function io_dictionary_aux()
         "HQTcov_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).HQTcov),
         "u_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_grid_mean(state).u),
         "v_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_grid_mean(state).v),
-        "w_mean" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_grid_mean(state).w),
+        "w_mean" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_prog_grid_mean(state).w),
         "qt_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_tot),
         "thetal_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).θ_liq_ice),
         "eddy_viscosity" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).KM),
@@ -103,7 +103,7 @@ function io_dictionary_aux()
         "updraft_cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).cloud_fraction),
 
         "updraft_qt_precip" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qt_tendency_precip_formation),
-        "updraft_e_tot_precip" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).e_tot_tendency_precip_formation),
+        "updraft_thetal_precip" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).θ_liq_ice_tendency_precip_formation),
 
         "massflux_tendency_h" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_h),
         "massflux_tendency_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_qt),
