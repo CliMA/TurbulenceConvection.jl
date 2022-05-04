@@ -533,16 +533,28 @@ function compute_gm_tendencies!(
             end
         end
         tendencies_gm.ρq_tot[k] +=
-            ρ0_c[k]*(aux_bulk.qt_tendency_precip_formation[k] +
-            aux_en.qt_tendency_precip_formation[k] +
-            aux_tc.qt_tendency_precip_sinks[k])
+            ρ0_c[k] * (
+                aux_bulk.qt_tendency_precip_formation[k] +
+                aux_en.qt_tendency_precip_formation[k] +
+                aux_tc.qt_tendency_precip_sinks[k]
+            )
         tendencies_gm.ρe_tot[k] +=
-            ρ0_c[k] * c_pm * Π *(aux_bulk.θ_liq_ice_tendency_precip_formation[k] +
-            aux_en.θ_liq_ice_tendency_precip_formation[k] +
-            aux_tc.θ_liq_ice_tendency_precip_sinks[k]) +
-            ρ0_c[k] * Lv * (aux_bulk.qt_tendency_precip_formation[k] +
-            aux_en.qt_tendency_precip_formation[k] +
-            aux_tc.qt_tendency_precip_sinks[k])
+            ρ0_c[k] * (
+                aux_bulk.e_tot_tendency_precip_formation[k] +
+                aux_en.e_tot_tendency_precip_formation[k] +
+                aux_tc.e_tot_tendency_precip_sinks[k]
+            )
+        #tendencies_gm.ρe_tot[k] +=
+        #    ρ0_c[k] * c_pm * Π * (
+        #        aux_bulk.θ_liq_ice_tendency_precip_formation[k] +
+        #        aux_en.θ_liq_ice_tendency_precip_formation[k] +
+        #        aux_tc.θ_liq_ice_tendency_precip_sinks[k]
+        #    ) +
+        #    ρ0_c[k] * Lv * (
+        #       aux_bulk.qt_tendency_precip_formation[k] +
+        #       aux_en.qt_tendency_precip_formation[k] +
+        #       aux_tc.qt_tendency_precip_sinks[k]
+        #    )
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
             tendencies_gm.q_liq[k] += aux_bulk.ql_tendency_precip_formation[k] + aux_en.ql_tendency_precip_formation[k]
             tendencies_gm.q_ice[k] += aux_bulk.qi_tendency_precip_formation[k] + aux_en.qi_tendency_precip_formation[k]
