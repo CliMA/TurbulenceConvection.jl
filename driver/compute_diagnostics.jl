@@ -134,6 +134,8 @@ function compute_diagnostics!(
 
     @inbounds for k in TC.real_center_indices(grid)
         aux_gm.s[k] = TD.specific_entropy(param_set, ts_gm[k])
+        aux_gm.θ_liq_ice[k] = prog_gm.ρθ_liq_ice[k] / ρ0_c[k]
+        aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ0_c[k]
         aux_en.s[k] = TD.specific_entropy(param_set, ts_en[k])
     end
     @inbounds for k in TC.real_center_indices(grid)

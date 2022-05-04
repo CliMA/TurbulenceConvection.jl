@@ -55,8 +55,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                     aux_up[i].q_tot[k] = q_surf
                     aux_up[i].area[k] = a_surf
                 else
-                    aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
-                    aux_up[i].q_tot[k] = prog_gm.q_tot[k]
+                    aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
+                    aux_up[i].q_tot[k] = aux_gm.q_tot[k]
                 end
             else
                 if prog_up[i].ρarea[k] / ρ0_c[k] >= edmf.minimum_area
@@ -64,8 +64,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                     aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
                     aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ0_c[k]
                 else
-                    aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
-                    aux_up[i].q_tot[k] = prog_gm.q_tot[k]
+                    aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
+                    aux_up[i].q_tot[k] = aux_gm.q_tot[k]
                     aux_up[i].area[k] = 0
                 end
             end
@@ -108,8 +108,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 aux_bulk.θ_liq_ice[k] += a_k * aux_up[i].θ_liq_ice[k] / a_bulk_k
             end
         else
-            aux_bulk.q_tot[k] = prog_gm.q_tot[k]
-            aux_bulk.θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
+            aux_bulk.q_tot[k] = aux_gm.q_tot[k]
+            aux_bulk.θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
         end
         if edmf.moisture_model isa NonEquilibriumMoisture
             aux_bulk.q_liq[k] = 0
@@ -138,12 +138,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         a_bulk_c = aux_bulk.area[k]
         val1 = 1 / (1 - a_bulk_c)
         val2 = a_bulk_c * val1
-        aux_en.q_tot[k] = max(val1 * prog_gm.q_tot[k] - val2 * aux_bulk.q_tot[k], 0) #Yair - this is here to prevent negative QT
+        aux_en.q_tot[k] = max(val1 * aux_gm.q_tot[k] - val2 * aux_bulk.q_tot[k], 0) #Yair - this is here to prevent negative QT
         if edmf.moisture_model isa NonEquilibriumMoisture
             aux_en.q_liq[k] = max(val1 * prog_gm.q_liq[k] - val2 * aux_bulk.q_liq[k], 0)
             aux_en.q_ice[k] = max(val1 * prog_gm.q_ice[k] - val2 * aux_bulk.q_ice[k], 0)
         end
-        aux_en.θ_liq_ice[k] = val1 * prog_gm.θ_liq_ice[k] - val2 * aux_bulk.θ_liq_ice[k]
+        aux_en.θ_liq_ice[k] = val1 * aux_gm.θ_liq_ice[k] - val2 * aux_bulk.θ_liq_ice[k]
 
         #####
         ##### condensation, etc (done via saturation_adjustment or non-equilibrium) and buoyancy

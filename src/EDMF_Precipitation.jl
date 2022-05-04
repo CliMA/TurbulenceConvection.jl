@@ -79,7 +79,7 @@ function compute_precipitation_sink_tendencies(
         qr = prog_pr.q_rai[k]
         qs = prog_pr.q_sno[k]
         ρ0 = ρ0_c[k]
-        q_tot_gm = prog_gm.q_tot[k]
+        q_tot_gm = aux_gm.q_tot[k]
         T_gm = aux_gm.T[k]
         # When we fuse loops, this should hopefully disappear
         ts = ts_gm[k]

@@ -49,6 +49,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     tendencies_gm = center_tendencies_grid_mean(state)
     FT = eltype(grid)
     prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
     aux_gm_f = face_aux_grid_mean(state)
     aux_en = center_aux_environment(state)
@@ -74,8 +75,8 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     w_en = aux_en_f.w
     w_gm = prog_gm_f.w
     θ_liq_ice_en = aux_en.θ_liq_ice
-    θ_liq_ice_gm = prog_gm.θ_liq_ice
-    q_tot_gm = prog_gm.q_tot
+    θ_liq_ice_gm = aux_gm.θ_liq_ice
+    q_tot_gm = aux_gm.q_tot
     q_tot_en = aux_en.q_tot
     a_en_bcs = a_en_boundary_conditions(surf, edmf)
     Ifae = CCO.InterpolateC2F(; a_en_bcs...)
@@ -333,6 +334,7 @@ function w_surface_bc(::SurfaceBase{FT})::FT where {FT}
 end
 function θ_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDMFModel, i::Int)::FT where {FT}
     prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     kc_surf = kc_surface(grid)
     surf.bflux > 0 || return FT(0)
     a_total = edmf.surface_area
@@ -341,19 +343,20 @@ function θ_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::ED
     ρθ_liq_ice_flux = surf.ρθ_liq_ice_flux
     h_var = get_surface_variance(ρθ_liq_ice_flux * α0LL, ρθ_liq_ice_flux * α0LL, ustar, zLL, oblength)
     surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000)
-    return prog_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var)
+    return aux_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var)
 end
 function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDMFModel, i::Int)::FT where {FT}
     prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     kc_surf = kc_surface(grid)
-    surf.bflux > 0 || return prog_gm.q_tot[kc_surf]
+    surf.bflux > 0 || return aux_gm.q_tot[kc_surf]
     a_total = edmf.surface_area
     a_ = area_surface_bc(surf, edmf, i)
     UnPack.@unpack ustar, zLL, oblength, α0LL = surface_helper(surf, grid, state)
     ρq_tot_flux = surf.ρq_tot_flux
     qt_var = get_surface_variance(ρq_tot_flux * α0LL, ρq_tot_flux * α0LL, ustar, zLL, oblength)
     surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000)
-    return prog_gm.q_tot[kc_surf] + surface_scalar_coeff * sqrt(qt_var)
+    return aux_gm.q_tot[kc_surf] + surface_scalar_coeff * sqrt(qt_var)
 end
 function ql_surface_bc(surf::SurfaceBase{FT})::FT where {FT}
     return FT(0)
@@ -373,6 +376,8 @@ function get_GMV_CoVar(
     N_up = n_updrafts(edmf)
     is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
+    aux_gm_c = center_aux_grid_mean(state)
+    aux_gm_f = face_aux_grid_mean(state)
     prog_gm_c = center_prog_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
     aux_up_f = face_aux_updrafts(state)
@@ -383,9 +388,9 @@ function get_GMV_CoVar(
     aux_up = is_tke ? aux_up_f : aux_up_c
     gmv_covar = getproperty(center_aux_grid_mean(state), covar_sym)
     covar_e = getproperty(center_aux_environment(state), covar_sym)
-    prog_gm = is_tke ? prog_gm_f : prog_gm_c
-    ϕ_gm = getproperty(prog_gm, ϕ_sym)
-    ψ_gm = getproperty(prog_gm, ψ_sym)
+    gm = is_tke ? prog_gm_f : aux_gm_c
+    ϕ_gm = getproperty(gm, ϕ_sym)
+    ψ_gm = getproperty(gm, ψ_sym)
     ϕ_en = getproperty(aux_en, ϕ_sym)
     ψ_en = getproperty(aux_en, ψ_sym)
     area_en = aux_en_c.area
@@ -775,12 +780,12 @@ function compute_covariance_entr(
     tke_factor = is_tke ? 0.5 : 1
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
-    prog_gm_c = center_prog_grid_mean(state)
+    aux_gm_c = center_aux_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
-    prog_gm = is_tke ? prog_gm_f : prog_gm_c
+    gm = is_tke ? prog_gm_f : aux_gm_c
     prog_up = is_tke ? aux_up_f : aux_up
-    ϕ_gm = getproperty(prog_gm, ϕ_sym)
-    ψ_gm = getproperty(prog_gm, ψ_sym)
+    ϕ_gm = getproperty(gm, ϕ_sym)
+    ψ_gm = getproperty(gm, ψ_sym)
     aux_en_2m = center_aux_environment_2m(state)
     aux_covar = getproperty(aux_en_2m, covar_sym)
     aux_en_c = center_aux_environment(state)
