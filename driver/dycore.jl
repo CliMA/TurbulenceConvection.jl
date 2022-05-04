@@ -218,7 +218,6 @@ function compute_ref_state!(state, grid::TC.Grid, param_set::PS; ts_g) where {PS
     @info "z_span = $z_span"
     prob = ODE.ODEProblem(rhs, logp, z_span)
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
-
     parent(p0_f) .= sol.(vec(grid.zf))
     parent(p0_c) .= sol.(vec(grid.zc))
 

@@ -50,6 +50,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     FT = eltype(grid)
     g = CPP.grav(param_set)
     prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
     aux_gm_f = face_aux_grid_mean(state)
@@ -225,18 +226,18 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     @. aux_tc_f.ρ_ae_KM = IfKM(aeKM) * ρ0_f
 
     aeKHq_tot_bc = -surf.ρq_tot_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
-    aeKHe_tot_bc = -surf.ρe_tot_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    aeKHh_tot_bc = -surf.ρe_tot_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
     aeKMu_bc = -surf.ρu_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
     aeKMv_bc = -surf.ρv_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
 
     ∇q_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_tot_bc), top = CCO.SetDivergence(FT(0)))
-    ∇e_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHe_tot_bc), top = CCO.SetDivergence(FT(0)))
+    ∇h_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHh_tot_bc), top = CCO.SetDivergence(FT(0)))
     ∇u_gm = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKMu_bc), top = CCO.SetDivergence(FT(0)))
     ∇v_gm = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKMv_bc), top = CCO.SetDivergence(FT(0)))
 
     wvec = CC.Geometry.WVector
     @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KH * ∇q_tot_en(wvec(aux_en.q_tot))
-    @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇e_tot_en(wvec(h_tot_en))
+    @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇h_tot_en(wvec(h_tot_en))
     @. aux_tc_f.diffusive_flux_u = -aux_tc_f.ρ_ae_KM * ∇u_gm(wvec(prog_gm.u))
     @. aux_tc_f.diffusive_flux_v = -aux_tc_f.ρ_ae_KM * ∇v_gm(wvec(prog_gm.v))
 
