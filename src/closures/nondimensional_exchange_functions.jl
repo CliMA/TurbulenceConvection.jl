@@ -227,6 +227,8 @@ function non_dimensional_function!(
 ) where {FT <: Real}
     # neural network architecture
     nn_arc = ICP.nn_arc(param_set)
+   
+
     c_nn_params = ICP.c_nn_params(param_set)
     #nn_model = construct_fully_connected_nn(nn_arc, c_nn_params; biases_bool = εδ_model.biases_bool)
     #output = nn_model(Π_groups')
@@ -264,7 +266,7 @@ function non_dimensional_function!(
         end
     end
 
-    output = nn_model(Π)
+    output = model(Π)
     nondim_ε .= output[1, :]
     nondim_δ .= output[2, :]
 

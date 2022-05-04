@@ -172,7 +172,7 @@ function default_namelist(
     namelist_defaults["turbulence"]["scheme"] = "EDMF_PrognosticTKE"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "FNO"  # {"moisture_deficit", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "NN_nonlocal"  # {"moisture_deficit", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_z", "none"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"] = ntuple(i -> i, 6) # or, e.g., (1, 3, 6)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pi_norm_consts"] = [478.298, 1.0, 1.0, 1.0, 1.0, 1.0] # normalization constants for Pi groups
