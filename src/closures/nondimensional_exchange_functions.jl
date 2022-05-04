@@ -247,7 +247,7 @@ function non_dimensional_function!(
     trafo = OF.FourierTransform(modes = (modes,), even=even)
     model = OF.Chain(
         Flux.Dense(n_input_vars+1, width, Flux.relu),
-        #OF.SpectralKernelOperator(trafo, width => width, Flux.relu),
+        OF.SpectralKernelOperator(trafo, width => width, Flux.relu),
         Flux.Dense(width, width, Flux.relu),
         Flux.Dense(width, 2)
       )
