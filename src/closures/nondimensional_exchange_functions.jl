@@ -80,25 +80,50 @@ function non_dimensional_function!(
     εδ_model::FNOEntr,
 ) where {FT <: Real}
 
-    n_input_vars = size(Π_groups)[2]
-    # define the model
-    Π = Π_groups'
-    Π = reshape(Π, (size(Π)..., 1))
-    trafo = OF.FourierTransform(modes = (2,))
-    model = OF.Chain(OF.SpectralKernelOperator(trafo, n_input_vars => 2, Flux.relu))
-
-    # set the parameters
+    width = ICP.w_fno(param_set)
+    modes = ICP.nm_fno(param_set)
     c_fno = ICP.c_fno(param_set)
+    n_params = length(c_fno)
+    n_input_vars = size(Π_groups)[2]
+    M = size(Π_groups)[1]
+    z = LinRange(0, 1, M)
+    Π_groups = hcat(Π_groups, z)
+    Π = Π_groups'
+    Π = reshape(Π, (size(Π)..., 1)) # (C, X, B)
+    even = Bool(mod(M, 2)) ? false : true
+
+    expected_n_params = (
+        (n_input_vars + 1) * width +
+        width +
+        modes * width * width * 2 +
+        width * width +
+        width +
+        width * width +
+        width +
+        2 * width +
+        2
+    )# 3rd dense layer
+
+    if expected_n_params != n_params
+        error("Incorrect number of parameters ($n_params) for requested FNO architecture ($expected_n_params)!")
+    end
+
+    trafo = OF.FourierTransform(modes = (modes,), even = even)
+    model = OF.Chain(
+        Flux.Dense(n_input_vars + 1, width, Flux.tanh),
+        OF.SpectralKernelOperator(trafo, width => width, Flux.tanh),
+        Flux.Dense(width, width, Flux.tanh),
+        Flux.Dense(width, 2),
+    )
+
     index = 1
     for p in Flux.params(model)
         len_p = length(p)
-        p_slice = p[:]
-        if eltype(p_slice) <: Real
-            p_slice .= c_fno[index:(index + len_p - 1)]
+        if eltype(p) <: Real
+            p[:] .= c_fno[index:(index + len_p - 1)]
             index += len_p
-        elseif eltype(p_slice) <: Complex
-            c_fno_slice = c_fno[index:(index + len_p - 1)]
-            p_slice .= c_fno_slice + c_fno[(index + len_p):(index + len_p * 2 - 1)] * im
+        elseif eltype(p) <: Complex
+            p[:] .= c_fno[index:(index + len_p - 1)] + c_fno[(index + len_p):(index + len_p * 2 - 1)] * im
             index += len_p * 2
         else
             error("Bad eltype in Flux params")
@@ -106,10 +131,9 @@ function non_dimensional_function!(
     end
 
     output = model(Π)
+    nondim_ε .= Flux.relu.(output[1, :] .+ 0.5)
+    nondim_δ .= Flux.relu.(output[2, :])
 
-    # we need a sigmoid that recieves output and produced non negative nondim_ε, nondim_δ
-    nondim_ε .= output[1, :]
-    nondim_δ .= output[2, :]
     return nothing
 end
 
