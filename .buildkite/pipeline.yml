@@ -18,12 +18,10 @@ steps:
     key: "init_cpu_env"
     command:
       - "echo $$JULIA_DEPOT_PATH"
-      - "julia --project=integration_tests -e 'using Pkg; Pkg.develop(path = \".\")'"
       - "julia --project=integration_tests -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=integration_tests -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=integration_tests -e 'using Pkg; Pkg.status()'"
 
-      - "julia --project=perf -e 'using Pkg; Pkg.develop(path = \".\")'"
       - "julia --project=perf -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=perf -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=perf -e 'using Pkg; Pkg.status()'"
