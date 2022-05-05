@@ -230,9 +230,6 @@ function non_dimensional_function!(
    
 
     c_nn_params = ICP.c_nn_params(param_set)
-    #nn_model = construct_fully_connected_nn(nn_arc, c_nn_params; biases_bool = εδ_model.biases_bool)
-    #output = nn_model(Π_groups')
-    
     c_fno = c_nn_params
     width = 2
     modes = 2
@@ -246,9 +243,9 @@ function non_dimensional_function!(
 
     trafo = OF.FourierTransform(modes = (modes,), even=even)
     model = OF.Chain(
-        Flux.Dense(n_input_vars+1, width, Flux.relu),
-        OF.SpectralKernelOperator(trafo, width => width, Flux.relu),
-        Flux.Dense(width, width, Flux.relu),
+        Flux.Dense(n_input_vars+1, width, Flux.tanh),
+        OF.SpectralKernelOperator(trafo, width => width, Flux.tanh),
+        Flux.Dense(width, width, Flux.tanh),
         Flux.Dense(width, 2)
       )
 
@@ -267,8 +264,8 @@ function non_dimensional_function!(
     end
 
     output = model(Π)
-    nondim_ε .= output[1, :]
-    nondim_δ .= output[2, :]
+    nondim_ε .= Flux.relu.(output[1, :] .+ 0.5)
+    nondim_δ .= Flux.relu.(output[2, :])
 
     return nothing
 end
