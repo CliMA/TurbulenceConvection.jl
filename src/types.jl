@@ -8,8 +8,22 @@ $(DocStringExtensions.FIELDS)
 Base.@kwdef struct PrecipFormation{FT}
     θ_liq_ice_tendency::FT
     qt_tendency::FT
+    ql_tendency::FT
+    qi_tendency::FT
     qr_tendency::FT
     qs_tendency::FT
+end
+
+"""
+    NoneqMoistureSources
+
+Storage for tendencies due to nonequilibrium moisture formation
+
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct NoneqMoistureSources{FT}
+    ql_tendency::FT
+    qi_tendency::FT
 end
 
 """
@@ -159,6 +173,10 @@ Base.@kwdef struct MinDisspLen{FT}
     "Updraft tke source"
     b_exch::FT
 end
+
+abstract type AbstractMoistureModel end
+struct EquilibriumMoisture <: AbstractMoistureModel end
+struct NonEquilibriumMoisture <: AbstractMoistureModel end
 
 abstract type AbstractPrecipitationModel end
 struct NoPrecipitation <: AbstractPrecipitationModel end
@@ -327,6 +345,8 @@ Base.@kwdef struct SurfaceBase{FT}
     bflux::FT = 0
     ustar::FT = 0
     ρq_tot_flux::FT = 0
+    ρq_liq_flux::FT = 0
+    ρq_ice_flux::FT = 0
     ρθ_liq_ice_flux::FT = 0
     ρu_flux::FT = 0
     ρv_flux::FT = 0
@@ -424,10 +444,11 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS, EPG}
+struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG}
     surface_area::FT
     max_area::FT
     minimum_area::FT
+    moisture_model::MM
     precip_model::PM
     en_thermo::ENT
     prandtl_number::FT
@@ -457,31 +478,38 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS, EPG}
         max_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "max_area"; default = 0.9)
         minimum_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_area"; default = 1e-5)
 
+        moisture_model_name = parse_namelist(namelist, "thermodynamics", "moisture_model"; default = "equilibrium")
+
+        moisture_model = if moisture_model_name == "equilibrium"
+            EquilibriumMoisture()
+        elseif moisture_model_name == "nonequilibrium"
+            NonEquilibriumMoisture()
+        else
+            error("Something went wrong. Invalid moisture model: '$moisture_model_name'")
+        end
+
         precip_model = precip_model
         # Create the environment variable class (major diagnostic and prognostic variables)
 
-        # Create the class for environment thermodynamics
-        en_thermo_name = parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean")
-        en_thermo = if en_thermo_name == "mean"
+        # Create the class for environment thermodynamics and buoyancy gradient computation
+        en_sgs_name =
+            parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean", valid_options = ["mean", "quadrature"])
+        en_thermo = if en_sgs_name == "mean"
             SGSMean()
-        elseif en_thermo_name == "quadrature"
+        elseif en_sgs_name == "quadrature"
             SGSQuadrature(namelist)
+        else
+            error("Something went wrong. Invalid environmental sgs type '$en_sgs_name'")
         end
-
-        bg_type = parse_namelist(
-            namelist,
-            "turbulence",
-            "EDMF_PrognosticTKE",
-            "env_buoy_grad";
-            default = "mean",
-            valid_options = ["mean", "quadratures"],
-        )
-        bg_closure = if bg_type == "mean"
+        bg_closure = if en_sgs_name == "mean"
             BuoyGradMean()
-        elseif bg_type == "quadratures"
+        elseif en_sgs_name == "quadrature"
             BuoyGradQuadratures()
         else
-            error("Something went wrong. Invalid environmental buoyancy gradient closure type '$bg_type'")
+            error("Something went wrong. Invalid environmental buoyancy gradient closure type '$en_sgs_name'")
+        end
+        if moisture_model_name == "nonequilibrium" && en_thermo_name == "quadrature"
+            error("SGS quadratures are not yet implemented for non-equilibrium moisture. Please use the option: mean.")
         end
 
         # entr closure
@@ -568,14 +596,16 @@ struct EDMFModel{N_up, FT, PM, ENT, EBGC, EC, EDS, EPG}
 
         EDS = typeof(entr_dim_scale)
         EC = typeof(entr_closure)
+        MM = typeof(moisture_model)
         PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
         EPG = typeof(entr_pi_subset)
-        return new{n_updrafts, FT, PM, ENT, EBGC, EC, EDS, EPG}(
+        return new{n_updrafts, FT, MM, PM, ENT, EBGC, EC, EDS, EPG}(
             surface_area,
             max_area,
             minimum_area,
+            moisture_model,
             precip_model,
             en_thermo,
             prandtl_number,
@@ -591,6 +621,7 @@ n_updrafts(::EDMFModel{N_up}) where {N_up} = N_up
 Base.eltype(::EDMFModel{N_up, FT}) where {N_up, FT} = FT
 n_Π_groups(m::EDMFModel) = length(m.entr_pi_subset)
 entrainment_Π_subset(m::EDMFModel) = m.entr_pi_subset
+Base.broadcastable(edmf::EDMFModel) = Ref(edmf)
 
 struct State{P, A, T}
     prog::P

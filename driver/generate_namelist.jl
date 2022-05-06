@@ -160,6 +160,7 @@ function default_namelist(
 
     namelist_defaults["thermodynamics"] = Dict()
     namelist_defaults["thermodynamics"]["thermal_variable"] = "thetal"
+    namelist_defaults["thermodynamics"]["moisture_model"] = "equilibrium" #"nonequilibrium"
     namelist_defaults["thermodynamics"]["sgs"] = "quadrature"
     namelist_defaults["thermodynamics"]["quadrature_order"] = 3
     namelist_defaults["thermodynamics"]["quadrature_type"] = "log-normal" #"gaussian" or "log-normal"
@@ -185,7 +186,6 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["constant_area"] = false
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["calculate_tke"] = true
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["mixing_length"] = "sbtd_eq"
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["env_buoy_grad"] = "quadratures"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"] = "normalmode"
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"] = "normalmode"
@@ -510,7 +510,8 @@ end
 
 function LES_driven_SCM(namelist_defaults)
     namelist = deepcopy(namelist_defaults)
-    namelist["grid"]["dz"] = 50.0
+    # Only one can be defined by user
+    # namelist["grid"]["dz"] = 50.0
     namelist["grid"]["nz"] = 80
 
     namelist["stats_io"]["frequency"] = 10.0

@@ -6,21 +6,25 @@ function parse_commandline()
         "--case"
         help = "Case to run"
         default = "Bomex"
-        "--micro"          # Try other microphysics quadrature
-        default = "log-normal"
+        "--sgs"            # SGS environmental teratment (mean or quadratures)
+        arg_type = String
+        "--quad_type"      # SGS quadrature type (lognormal or Gaussian)
+        arg_type = String
         "--entr"           # Try other entr-detr models
         arg_type = String
-        default = "moisture_deficit"
         "--stoch_entr"     # Choose type of stochastic entr-detr model
         arg_type = String
         "--t_max"          # Simulation time to run to
+        arg_type = Float64
+        "--adapt_dt"       # use adaptive timestepping
+        arg_type = Bool
+        "--dt"             # Specify model time step (when not using adaptive dt)
         arg_type = Float64
         "--calibrate_io"   # Test that calibration IO passes regression tests
         arg_type = Bool
         default = false
         "--stretch_grid"   # Test stretched grid option
         arg_type = Bool
-        default = false
         "--skip_io"        # Test that skipping IO passes regression tests
         arg_type = Bool
         default = false
@@ -35,7 +39,8 @@ function parse_commandline()
         default = ""
         "--n_up"           # Number of updrafts
         arg_type = Int
-        default = 1
+        "--moisture_model" # Moisture model (equilibrium or non-equilibrium)
+        arg_type = String
     end
     parsed_args = ArgParse.parse_args(ARGS, s)
     return (s, parsed_args)

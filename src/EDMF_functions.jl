@@ -49,6 +49,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     tendencies_gm = center_tendencies_grid_mean(state)
     FT = eltype(grid)
     prog_gm = center_prog_grid_mean(state)
+    prog_gm_f = face_prog_grid_mean(state)
     aux_gm_f = face_aux_grid_mean(state)
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
@@ -60,6 +61,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     α0_c = center_ref_state(state).α0
     kf_surf = kf_surface(grid)
     kc_surf = kc_surface(grid)
+    massflux = aux_tc_f.massflux
     massflux_h = aux_tc_f.massflux_h
     massflux_qt = aux_tc_f.massflux_qt
     aux_tc = center_aux_turbconv(state)
@@ -70,34 +72,58 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     # TODO: we shouldn't need to call parent here
     a_en = aux_en.area
     w_en = aux_en_f.w
+    w_gm = prog_gm_f.w
+    θ_liq_ice_en = aux_en.θ_liq_ice
+    θ_liq_ice_gm = prog_gm.θ_liq_ice
+    q_tot_gm = prog_gm.q_tot
+    q_tot_en = aux_en.q_tot
     a_en_bcs = a_en_boundary_conditions(surf, edmf)
     Ifae = CCO.InterpolateC2F(; a_en_bcs...)
+    If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+
     # Compute the mass flux and associated scalar fluxes
+    @. massflux = ρ0_f * Ifae(a_en) * (w_en - w_gm)
+    @. massflux_h = ρ0_f * Ifae(a_en) * (w_en - w_gm) * (If(θ_liq_ice_en) - If(θ_liq_ice_gm))
+    @. massflux_qt = ρ0_f * Ifae(a_en) * (w_en - w_gm) * (If(q_tot_en) - If(q_tot_gm))
     @inbounds for i in 1:N_up
+        aux_up_f_i = aux_up_f[i]
+        aux_up_i = aux_up[i]
         a_up_bcs = a_up_boundary_conditions(surf, edmf, i)
         Ifau = CCO.InterpolateC2F(; a_up_bcs...)
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
-        massflux = aux_up_f[i].massflux
-        @. massflux = ρ0_f * Ifau(a_up) * Ifae(a_en) * (w_up - w_en)
-        massflux[kf_surf] = 0
-    end
-
-    parent(massflux_h) .= 0
-    parent(massflux_qt) .= 0
-    If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
-    θ_liq_ice_en = aux_en.θ_liq_ice
-    q_tot_en = aux_en.q_tot
-    @inbounds for i in 1:N_up
-        aux_up_f_i = aux_up_f[i]
-        aux_up_i = aux_up[i]
         θ_liq_ice_up = aux_up_i.θ_liq_ice
         q_tot_up = aux_up_i.q_tot
-        massflux = aux_up_f[i].massflux
+        @. aux_up_f[i].massflux = ρ0_f * Ifau(a_up) * (w_up - w_gm)
         # We know that, since W = 0 at z = 0, m = 0 also, and
         # therefore θ_liq_ice / q_tot values do not matter
-        @. massflux_h += massflux * (If(θ_liq_ice_up) - If(θ_liq_ice_en))
-        @. massflux_qt += massflux * (If(q_tot_up) - If(q_tot_en))
+        @. massflux_h += ρ0_f * (Ifau(a_up) * (w_up - w_gm) * (If(θ_liq_ice_up) - If(θ_liq_ice_gm)))
+        @. massflux_qt += ρ0_f * (Ifau(a_up) * (w_up - w_gm) * (If(q_tot_up) - If(q_tot_gm)))
+    end
+    massflux[kf_surf] = 0
+    massflux_h[kf_surf] = 0
+
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        massflux_ql = aux_tc_f.massflux_ql
+        massflux_qi = aux_tc_f.massflux_qi
+        q_liq_en = aux_en.q_liq
+        q_ice_en = aux_en.q_ice
+        q_liq_gm = prog_gm.q_liq
+        q_ice_gm = prog_gm.q_ice
+        massflux_en = ρ0_f * Ifae(a_en) * (w_en - w_gm)
+        @. massflux_ql = massflux_en * (If(q_liq_en) - If(q_liq_gm))
+        @. massflux_qi = massflux_en * (If(q_ice_en) - If(q_ice_gm))
+        @inbounds for i in 1:N_up
+            aux_up_f_i = aux_up_f[i]
+            aux_up_i = aux_up[i]
+            q_liq_up = aux_up_i.q_liq
+            q_ice_up = aux_up_i.q_ice
+            massflux_up_i = aux_up_f[i].massflux
+            @. massflux_ql += massflux_up_i * (If(q_liq_up) - If(q_liq_gm))
+            @. massflux_qi += massflux_up_i * (If(q_ice_up) - If(q_ice_gm))
+        end
+        massflux_ql[kf_surf] = 0
+        massflux_qi[kf_surf] = 0
     end
 
     massflux_tendency_h = aux_tc.massflux_tendency_h
@@ -122,6 +148,23 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     @. sgs_flux_q_tot = diffusive_flux_qt + massflux_qt
     @. sgs_flux_u = diffusive_flux_u # + massflux_u
     @. sgs_flux_v = diffusive_flux_v # + massflux_v
+
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        massflux_tendency_ql = aux_tc.massflux_tendency_ql
+        massflux_tendency_qi = aux_tc.massflux_tendency_qi
+
+        @. massflux_tendency_ql = -∇c(wvec(massflux_ql)) * α0_c
+        @. massflux_tendency_qi = -∇c(wvec(massflux_qi)) * α0_c
+
+        diffusive_flux_ql = aux_tc_f.diffusive_flux_ql
+        diffusive_flux_qi = aux_tc_f.diffusive_flux_qi
+
+        sgs_flux_q_liq = aux_gm_f.sgs_flux_q_liq
+        sgs_flux_q_ice = aux_gm_f.sgs_flux_q_ice
+
+        @. sgs_flux_q_liq = diffusive_flux_ql + massflux_ql
+        @. sgs_flux_q_ice = diffusive_flux_qi + massflux_qi
+    end
 
     return nothing
 end
@@ -165,6 +208,17 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     @. aux_tc_f.diffusive_flux_u = -aux_tc_f.ρ_ae_KM * ∇u_gm(wvec(prog_gm.u))
     @. aux_tc_f.diffusive_flux_v = -aux_tc_f.ρ_ae_KM * ∇v_gm(wvec(prog_gm.v))
 
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        aeKHq_liq_bc = FT(0)
+        aeKHq_ice_bc = FT(0)
+
+        ∇q_liq_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_liq_bc), top = CCO.SetDivergence(FT(0)))
+        ∇q_ice_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_ice_bc), top = CCO.SetDivergence(FT(0)))
+
+        @. aux_tc_f.diffusive_flux_ql = -aux_tc_f.ρ_ae_KH * ∇q_liq_en(wvec(aux_en.q_liq))
+        @. aux_tc_f.diffusive_flux_qi = -aux_tc_f.ρ_ae_KH * ∇q_ice_en(wvec(aux_en.q_ice))
+    end
+
     return nothing
 end
 
@@ -199,6 +253,7 @@ function affect_filter!(
 end
 
 function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS)
+    FT = eltype(grid)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -215,6 +270,12 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         prog_up[i].ρarea[kc_surf] = ρ0_c[kc_surf] * a_surf
         prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * θ_surf
         prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * q_surf
+        if edmf.moisture_model isa NonEquilibriumMoisture
+            q_liq_surf = FT(0)
+            q_ice_surf = FT(0)
+            prog_up[i].ρaq_liq[kc_surf] = prog_up[i].ρarea[kc_surf] * q_liq_surf
+            prog_up[i].ρaq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * q_ice_surf
+        end
         prog_up_f[i].ρaw[kf_surf] = ρ0_f[kf_surf] * w_surface_bc(surf)
     end
 
@@ -293,6 +354,12 @@ function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDM
     qt_var = get_surface_variance(ρq_tot_flux * α0LL, ρq_tot_flux * α0LL, ustar, zLL, oblength)
     surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000)
     return prog_gm.q_tot[kc_surf] + surface_scalar_coeff * sqrt(qt_var)
+end
+function ql_surface_bc(surf::SurfaceBase{FT})::FT where {FT}
+    return FT(0)
+end
+function qi_surface_bc(surf::SurfaceBase{FT})::FT where {FT}
+    return FT(0)
 end
 
 function get_GMV_CoVar(
@@ -430,6 +497,36 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
             -∇c(wvec(LBF(Ic(w_up) * ρ0_c * a_up * q_tot_up))) + (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * q_tot_en) -
             (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn * q_tot_up) + (ρ0_c * qt_tendency_precip_formation)
 
+        if edmf.moisture_model isa NonEquilibriumMoisture
+
+            q_liq_up = aux_up_i.q_liq
+            q_ice_up = aux_up_i.q_ice
+            q_liq_en = aux_en.q_liq
+            q_ice_en = aux_en.q_ice
+
+            ql_tendency_noneq = aux_up_i.ql_tendency_noneq
+            qi_tendency_noneq = aux_up_i.qi_tendency_noneq
+            ql_tendency_precip_formation = aux_up_i.ql_tendency_precip_formation
+            qi_tendency_precip_formation = aux_up_i.qi_tendency_precip_formation
+
+            tends_ρaq_liq = tendencies_up[i].ρaq_liq
+            tends_ρaq_ice = tendencies_up[i].ρaq_ice
+
+            @. tends_ρaq_liq =
+                -∇c(wvec(LBF(Ic(w_up) * ρ0_c * a_up * q_liq_up))) +
+                (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * q_liq_en) -
+                (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn * q_liq_up) +
+                (ρ0_c * (ql_tendency_precip_formation + ql_tendency_noneq))
+
+            @. tends_ρaq_ice =
+                -∇c(wvec(LBF(Ic(w_up) * ρ0_c * a_up * q_ice_up))) +
+                (ρ0_c * a_up * Ic(w_up) * entr_turb_dyn * q_ice_en) -
+                (ρ0_c * a_up * Ic(w_up) * detr_turb_dyn * q_ice_up) +
+                (ρ0_c * (qi_tendency_precip_formation + qi_tendency_noneq))
+
+            tends_ρaq_liq[kc_surf] = 0
+            tends_ρaq_ice[kc_surf] = 0
+        end
 
         # prognostic entr/detr
         if edmf.entr_closure isa PrognosticNoisyRelaxationProcess
@@ -513,6 +610,12 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
             prog_up[i].ρarea[k] = min(prog_up[i].ρarea[k], ρ0_c[k] * a_max)
         end
     end
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        @inbounds for i in 1:N_up
+            prog_up[i].ρaq_liq .= max.(prog_up[i].ρaq_liq, 0)
+            prog_up[i].ρaq_ice .= max.(prog_up[i].ρaq_ice, 0)
+        end
+    end
 
     @inbounds for i in 1:N_up
         @. prog_up_f[i].ρaw = max.(prog_up_f[i].ρaw, 0)
@@ -533,6 +636,22 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
             end
         end
     end
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        @inbounds for k in real_center_indices(grid)
+            @inbounds for i in 1:N_up
+                is_surface_center(grid, k) && continue
+                prog_up[i].ρaq_tot[k] = max(prog_up[i].ρaq_tot[k], 0)
+                # this is needed to make sure Rico is unchanged.
+                # TODO : look into it further to see why
+                # a similar filtering of ρaθ_liq_ice breaks the simulation
+                if prog_up[i].ρarea[k] / ρ0_c[k] < a_min
+                    prog_up[i].ρaq_liq[k] = 0
+                    prog_up[i].ρaq_ice[k] = 0
+                end
+            end
+        end
+    end
+
 
     Ic = CCO.InterpolateF2C()
     @inbounds for i in 1:N_up
@@ -545,6 +664,16 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         prog_up[i].ρarea[kc_surf] = ρ0_c[kc_surf] * a_surf
         prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * θ_surf
         prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * q_surf
+    end
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        @inbounds for i in 1:N_up
+            @. prog_up[i].ρaq_liq = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_liq)
+            @. prog_up[i].ρaq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_ice)
+            ql_surf = ql_surface_bc(surf)
+            qi_surf = qi_surface_bc(surf)
+            prog_up[i].ρaq_liq[kc_surf] = prog_up[i].ρarea[kc_surf] * ql_surf
+            prog_up[i].ρaq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * qi_surf
+        end
     end
     return nothing
 end

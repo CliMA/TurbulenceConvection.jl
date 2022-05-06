@@ -2,6 +2,7 @@ function microphysics(
     ::SGSMean,
     grid::Grid,
     state::State,
+    edmf::EDMFModel,
     precip_model::AbstractPrecipitationModel,
     Δt::Real,
     param_set::APS,
@@ -12,13 +13,13 @@ function microphysics(
     ρ0_c = center_ref_state(state).ρ0
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
+    ts_env = center_aux_environment(state).ts
     aux_en_sat = aux_en.sat
     aux_en_unsat = aux_en.unsat
 
     @inbounds for k in real_center_indices(grid)
         # condensation
-        q_tot_en = aux_en.q_tot[k]
-        ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], q_tot_en)
+        ts = ts_env[k]
         # autoconversion and accretion
         mph = precipitation_formation(
             param_set,
@@ -51,6 +52,10 @@ function microphysics(
         # to diagnostics
         aux_en.qt_tendency_precip_formation[k] = mph.qt_tendency * aux_en.area[k]
         aux_en.θ_liq_ice_tendency_precip_formation[k] = mph.θ_liq_ice_tendency * aux_en.area[k]
+        if edmf.moisture_model isa NonEquilibriumMoisture
+            aux_en.ql_tendency_precip_formation[k] = mph.ql_tendency * aux_en.area[k]
+            aux_en.qi_tendency_precip_formation[k] = mph.qi_tendency * aux_en.area[k]
+        end
         tendencies_pr.q_rai[k] += mph.qr_tendency * aux_en.area[k]
         tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
     end
@@ -208,7 +213,15 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
     return outer_env_nt, outer_src_nt
 end
 
-function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip_model, Δt::Real, param_set::APS)
+function microphysics(
+    en_thermo::SGSQuadrature,
+    grid::Grid,
+    state::State,
+    edmf::EDMFModel,
+    precip_model,
+    Δt::Real,
+    param_set::APS,
+)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     aux_en = center_aux_environment(state)
@@ -216,6 +229,7 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
     aux_en_unsat = aux_en.unsat
     aux_en_sat = aux_en.sat
     tendencies_pr = center_tendencies_precipitation(state)
+    ts_env = center_aux_environment(state).ts
 
     #TODO - if we start using eos_smpl for the updrafts calculations
     #       we can get rid of the two categories for outer and inner quad. points
@@ -224,6 +238,10 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
     # a python dict would be nicer, but its 30% slower than this (for python 2.7. It might not be the case for python 3)
 
     epsilon = 10e-14 # eps(float)
+
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        error("The SGS quadrature microphysics is not compatible with non-equilibrium moisture")
+    end
 
     # initialize the quadrature points and their labels
 
@@ -299,7 +317,7 @@ function microphysics(en_thermo::SGSQuadrature, grid::Grid, state::State, precip
 
         else
             # if variance and covariance are zero do the same as in SA_mean
-            ts = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k])
+            ts = ts_env[k]
             mph = precipitation_formation(
                 param_set,
                 precip_model,

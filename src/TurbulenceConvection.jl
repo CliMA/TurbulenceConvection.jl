@@ -53,9 +53,9 @@ function parse_namelist(namelist, keys...; default = nothing, valid_options = no
             end
         else
             if default == nothing
-                error("No default value given for parameter ($(join(keys, ", "))).")
+                error("No default value given for parameter (`$(join(keys, ", "))`).")
             else
-                @info "Using default value, $default, for parameter ($(join(keys, ", ")))."
+                @info "Using default value, $default, for parameter (`$(join(keys, ", "))`)."
                 return default
             end
         end

@@ -52,30 +52,37 @@ due to rain evaporation, snow deposition and sublimation and snow melt
 """
 compute_precipitation_sink_tendencies(
     ::AbstractPrecipitationModel,
+    edmf::EDMFModel,
     grid::Grid,
     state::State,
     param_set::APS,
     Δt::Real,
 ) = nothing
 
-function compute_precipitation_sink_tendencies(::Clima1M, grid::Grid, state::State, param_set::APS, Δt::Real)
-    p0_c = center_ref_state(state).p0
+function compute_precipitation_sink_tendencies(
+    ::Clima1M,
+    edmf::EDMFModel,
+    grid::Grid,
+    state::State,
+    param_set::APS,
+    Δt::Real,
+)
     ρ0_c = center_ref_state(state).ρ0
     aux_gm = center_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
     prog_gm = center_prog_grid_mean(state)
     prog_pr = center_prog_precipitation(state)
     tendencies_pr = center_tendencies_precipitation(state)
+    ts_gm = aux_gm.ts
 
     @inbounds for k in real_center_indices(grid)
         qr = prog_pr.q_rai[k]
         qs = prog_pr.q_sno[k]
-        p0 = p0_c[k]
         ρ0 = ρ0_c[k]
         q_tot_gm = prog_gm.q_tot[k]
         T_gm = aux_gm.T[k]
         # When we fuse loops, this should hopefully disappear
-        ts = TD.PhaseEquil_pTq(param_set, p0, T_gm, q_tot_gm)
+        ts = ts_gm[k]
         q = TD.PhasePartition(param_set, ts)
         qv = TD.vapor_specific_humidity(param_set, ts)
 

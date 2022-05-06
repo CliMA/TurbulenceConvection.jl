@@ -92,7 +92,7 @@ steps:
     steps:
 
       - label: ":partly_sunny: Bomex with gaussian"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --micro gaussian --skip_tests true --suffix _gaussian"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --quad_type gaussian --skip_tests true --suffix _gaussian"
         artifact_paths: "Output.Bomex.01_gaussian/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with stretched grid"
@@ -126,6 +126,10 @@ steps:
       - label: ":partly_sunny: Bomex with multiple updrafts"
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --n_up 2 --suffix _n_up_2 --skip_tests true"
         artifact_paths: "Output.Bomex.01_n_up_2/stats/comparison/*"
+
+      - label: ":scissors: TRMM_LBA with non-equilibrium moisture"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA --sgs mean --adapt_dt false --dt 1.0 --moisture_model nonequilibrium --skip_tests true --suffix _nonequilibrium_moisture"
+        artifact_paths: "Output.TRMM_LBA.01_nonequilibrium_moisture/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with calibrate_io_true"
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --calibrate_io true --skip_post_proc true --suffix _calibrate_io_true"

@@ -73,42 +73,7 @@ function Simulation1d(namelist)
     cfl_limit = namelist["time_stepping"]["cfl_limit"]
     dt_min = namelist["time_stepping"]["dt_min"]
 
-    truncated_gcm_mesh = TC.parse_namelist(namelist, "grid", "stretch", "flag"; default = false)
-
-    Δz = FT(namelist["grid"]["dz"])
-    nz = if Cases.get_case(namelist) == Cases.LES_driven_SCM()
-        les_filename = namelist["meta"]["lesfile"]
-        NC.Dataset(les_filename, "r") do data
-            zmax = Array(TC.get_nc_data(data, "zc"))[end]
-            Int(zmax ÷ Δz)
-        end
-    else
-        namelist["grid"]["nz"]
-    end
-    z₀, z₁ = FT(0), FT(nz * Δz)
-    if truncated_gcm_mesh
-        nzₛ = namelist["grid"]["stretch"]["nz"]
-        Δzₛ_surf = FT(namelist["grid"]["stretch"]["dz_surf"])
-        Δzₛ_top = FT(namelist["grid"]["stretch"]["dz_toa"])
-        zₛ_toa = FT(namelist["grid"]["stretch"]["z_toa"])
-        stretch = CC.Meshes.GeneralizedExponentialStretching(Δzₛ_surf, Δzₛ_top)
-        domain = CC.Domains.IntervalDomain(
-            CC.Geometry.ZPoint{FT}(z₀),
-            CC.Geometry.ZPoint{FT}(zₛ_toa),
-            boundary_tags = (:bottom, :top),
-        )
-        gcm_mesh = CC.Meshes.IntervalMesh(domain, stretch; nelems = nzₛ)
-        mesh = TC.TCMeshFromGCMMesh(gcm_mesh; z_max = z₁)
-    else
-        CC.Meshes.Uniform()
-        domain = CC.Domains.IntervalDomain(
-            CC.Geometry.ZPoint{FT}(z₀),
-            CC.Geometry.ZPoint{FT}(z₁),
-            boundary_tags = (:bottom, :top),
-        )
-        mesh = CC.Meshes.IntervalMesh(domain, nelems = nz)
-    end
-    grid = TC.Grid(mesh)
+    grid = construct_grid(namelist; FT = FT)
 
     Stats = skip_io ? nothing : NetCDFIO_Stats(namelist, grid)
 
@@ -145,8 +110,8 @@ function Simulation1d(namelist)
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
 
-    cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars(FT, edmf))
-    face_prog_fields = TC.FieldFromNamedTuple(fspace, face_prognostic_vars(FT, edmf))
+    cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars, FT, edmf)
+    face_prog_fields = TC.FieldFromNamedTuple(fspace, face_prognostic_vars, FT, edmf)
     aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, edmf))
     aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, edmf))
     diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, edmf))
@@ -226,7 +191,8 @@ function initialize(sim::Simulation1d)
     FT = eltype(sim.grid)
     t = FT(0)
     Cases.initialize_profiles(sim.case, sim.grid, sim.param_set, state)
-    satadjust(sim.param_set, sim.grid, sim.state)
+    set_thermo_state!(state, sim.grid, sim.edmf.moisture_model, sim.param_set)
+    assign_thermo_aux!(state, sim.grid, sim.edmf.moisture_model, sim.param_set)
 
     Cases.initialize_forcing(sim.case, sim.grid, state, sim.param_set)
     Cases.initialize_radiation(sim.case, sim.grid, state, sim.param_set)
@@ -280,6 +246,55 @@ function initialize(sim::Simulation1d)
     end
 
     return
+end
+
+function construct_grid(namelist; FT = Float64)
+
+    truncated_gcm_mesh = TC.parse_namelist(namelist, "grid", "stretch", "flag"; default = false)
+
+    if Cases.get_case(namelist) == Cases.LES_driven_SCM()
+        Δz = get(namelist["grid"], "dz", nothing)
+        nz = get(namelist["grid"], "nz", nothing)
+        @assert isnothing(Δz) ⊻ isnothing(nz) string(
+            "LES_driven_SCM supports nz or Δz, not both.",
+            "The domain height is enforced to be the same as in LES.",
+        )
+
+        les_filename = namelist["meta"]["lesfile"]
+        zmax = NC.Dataset(les_filename, "r") do data
+            Array(TC.get_nc_data(data, "zf"))[end]
+        end
+        nz = isnothing(nz) ? Int(zmax ÷ Δz) : Int(nz)
+        Δz = isnothing(Δz) ? FT(zmax ÷ nz) : FT(Δz)
+    else
+        Δz = FT(namelist["grid"]["dz"])
+        nz = namelist["grid"]["nz"]
+    end
+
+    z₀, z₁ = FT(0), FT(nz * Δz)
+    if truncated_gcm_mesh
+        nzₛ = namelist["grid"]["stretch"]["nz"]
+        Δzₛ_surf = FT(namelist["grid"]["stretch"]["dz_surf"])
+        Δzₛ_top = FT(namelist["grid"]["stretch"]["dz_toa"])
+        zₛ_toa = FT(namelist["grid"]["stretch"]["z_toa"])
+        stretch = CC.Meshes.GeneralizedExponentialStretching(Δzₛ_surf, Δzₛ_top)
+        domain = CC.Domains.IntervalDomain(
+            CC.Geometry.ZPoint{FT}(z₀),
+            CC.Geometry.ZPoint{FT}(zₛ_toa),
+            boundary_tags = (:bottom, :top),
+        )
+        gcm_mesh = CC.Meshes.IntervalMesh(domain, stretch; nelems = nzₛ)
+        mesh = TC.TCMeshFromGCMMesh(gcm_mesh; z_max = z₁)
+    else
+        CC.Meshes.Uniform()
+        domain = CC.Domains.IntervalDomain(
+            CC.Geometry.ZPoint{FT}(z₀),
+            CC.Geometry.ZPoint{FT}(z₁),
+            boundary_tags = (:bottom, :top),
+        )
+        mesh = CC.Meshes.IntervalMesh(domain, nelems = nz)
+    end
+    return TC.Grid(mesh)
 end
 
 include("callbacks.jl")
