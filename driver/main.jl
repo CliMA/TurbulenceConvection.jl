@@ -337,8 +337,8 @@ function solve_args(sim::Simulation1d)
     callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))
     callback_adapt_dt = sim.adapt_dt ? (callback_adapt_dt,) : ()
     if sim.edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess && sim.adapt_dt
-        @warn( "The prognostic noisy relaxation process currently uses a Euler-Maruyama time stepping method, 
-               which does not support adaptive time stepping. Adaptive time stepping disabled.")
+        @warn("The prognostic noisy relaxation process currently uses a Euler-Maruyama time stepping method, 
+              which does not support adaptive time stepping. Adaptive time stepping disabled.")
         callback_adapt_dt = ()
     end
 

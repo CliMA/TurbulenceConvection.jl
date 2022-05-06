@@ -19,9 +19,9 @@ function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid,
     zi = 0
     ρ_i = 0
     kc_surf = TC.kc_surface(grid)
-    q_tot_surf = prog_gm.q_tot[kc_surf]
+    q_tot_surf = aux_gm.q_tot[kc_surf]
     If = CCO.InterpolateC2F(; bottom = CCO.SetValue(q_tot_surf), top = CCO.Extrapolate())
-    @. q_tot_f .= If(prog_gm.q_tot)
+    @. q_tot_f .= If(aux_gm.q_tot)
     @inbounds for k in TC.real_face_indices(grid)
         if (q_tot_f[k] < 8.0 / 1000)
             idx_zi = k

@@ -69,8 +69,8 @@ function initialize_updrafts(edmf, grid, state, surf)
             # Simple treatment for now, revise when multiple updraft closures
             # become more well defined
             aux_up[i].area[k] = 0
-            aux_up[i].q_tot[k] = prog_gm.q_tot[k]
-            aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
+            aux_up[i].q_tot[k] = aux_gm.q_tot[k]
+            aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
             aux_up[i].q_liq[k] = aux_gm.q_liq[k]
             aux_up[i].q_ice[k] = aux_gm.q_ice[k]
             aux_up[i].T[k] = aux_gm.T[k]
@@ -133,7 +133,7 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
                 prog_up[i].ρaq_tot[k] = prog_up[i].ρarea[k] * aux_up[i].q_tot[k]
             else
                 aux_up[i].area[k] = 0.0
-                aux_up[i].θ_liq_ice[k] = prog_gm.θ_liq_ice[k]
+                aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
                 aux_up[i].T[k] = aux_gm.T[k]
                 prog_up[i].ρarea[k] = 0.0
                 prog_up[i].ρaθ_liq_ice[k] = 0.0

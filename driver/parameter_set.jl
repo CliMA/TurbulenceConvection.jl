@@ -79,6 +79,8 @@ function create_parameter_set(namelist)
     )
     elseif use_fno
         (;
+        w_fno = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_width"),
+        nm_fno = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_n_modes"),
         c_fno = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_params"),
     )
     elseif use_linear
