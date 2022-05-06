@@ -230,6 +230,8 @@ function default_namelist(
         namelist = DryBubble(namelist_defaults)
     elseif case_name == "LES_driven_SCM"
         namelist = LES_driven_SCM(namelist_defaults)
+    elseif case_name == "LES_driven_SCM_RRTMGP"
+        namelist = LES_driven_SCM_RRTMGP(namelist_defaults)
     else
         error("Not a valid case name")
     end
@@ -512,6 +514,34 @@ function DryBubble(namelist_defaults)
 end
 
 function LES_driven_SCM(namelist_defaults)
+    namelist = deepcopy(namelist_defaults)
+    # Only one can be defined by user
+    # namelist["grid"]["dz"] = 50.0
+    namelist["grid"]["nz"] = 80
+
+    namelist["stats_io"]["frequency"] = 10.0
+    namelist["time_stepping"]["t_max"] = 3600.0 * 6
+    namelist["time_stepping"]["dt_min"] = 1.0
+    namelist["forcing"]["forcing_type"] = "forcing_LES"
+    namelist["forcing"]["forcing_type"] = "forcing_LES"
+
+    # use last 6 hours of LES simulation to drive LES
+    namelist["t_interval_from_end_s"] = 3600.0 * 6
+    # average in 1 hour interval around `t_interval_from_end_s`
+    namelist["initial_condition_averaging_window_s"] = 3600.0
+
+    namelist["meta"]["lesfile"] =
+        joinpath(les_driven_scm_data_folder(), "Stats.cfsite17_HadGEM2-A_amip_2004-2008.07.nc")
+    namelist["meta"]["simname"] = "LES_driven_SCM"
+    namelist["meta"]["casename"] = "LES_driven_SCM"
+    namelist["forcing"] = Dict()
+    namelist["forcing"]["nudging_timescale"] = 6.0 * 3600.0
+
+    return namelist
+end
+
+
+function LES_driven_SCM_RRTMGP(namelist_defaults)
     namelist = deepcopy(namelist_defaults)
     # Only one can be defined by user
     # namelist["grid"]["dz"] = 50.0
