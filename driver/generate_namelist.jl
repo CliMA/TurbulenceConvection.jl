@@ -198,9 +198,25 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_width"] = 2
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_n_modes"] = 2
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_params"] =
-        SA.SVector{50}(rand(50))
-
+        SA.SVector{50}(0.3037731078173129,0.21008472182828264,0.2595086416362809,0.6988656712701492,-0.30689902967021865,0.15561003083167277,-0.011321459649512994,0.6349209728161581,0.008224132352869208,-0.6192197113053655,0.02660512053463169,-0.36417694993748645,0.12415498380139771,-0.22357350996341954,-0.43852022920178485,-0.2552143230334736,0.20750141222459936,-0.2842413118213404,
+                0.2508009915905452,0.4625018582319995,0.5100098232389849,-1.281860075815182,0.18643530024978425,0.3604867678604523,0.048650816573643806,0.4159439860770147,0.3113414313293787,-0.08723471357596453,0.43848248455042865,0.12241186746158314,0.2170452722016653,-0.7871117993246314,
+                -0.6473027948738912,0.5895249901359616,-0.022846710508119174,0.5029912017717283,0.2747024479774727,-0.010258914715450677,0.9254738088297958,-0.04244508016197333,0.05943961557385268,0.565240613014238,-0.07912951215115321,0.7379448570898743,0.4569135971308044,0.43866775102754363,0.34426048951692817,-0.12168816922187745,-0.33572022066802487,0.7181297287439226
+                )
     #! format: on
+    #calibrated FNO
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.10792111076880824
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = 12.575744313272015
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.13837656661874118
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "FNO"
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_power"] = 0.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] = 0.10159185420199729
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_surf_scale"] = 3.4239446087216105
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"] = 0.6480824430473078
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = 0.0011136415382985876
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"] = 0.7525697660802193
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.054038647812632
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.12642448611680374
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "inv_z" # {"buoy_vel", "inv_z", "none"}
 
     if case_name == "Soares"
         namelist = Soares(namelist_defaults)
