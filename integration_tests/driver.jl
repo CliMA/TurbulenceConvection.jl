@@ -7,6 +7,8 @@ if !@isdefined case_name
     case_name = parsed_args["case"]
 end
 
+parsed_args["trunc_stack_traces"] && include("truncate_stack_traces.jl")
+
 @info "Running $case_name..."
 @info "`suffix`: `$(suffix)`"
 @info "See `cli_options.jl` changing defaults"
