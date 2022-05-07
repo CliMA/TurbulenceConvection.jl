@@ -100,6 +100,8 @@ struct LES_driven_SCM <: AbstractCaseType end
 
 struct LES_driven_SCM_RRTMGP <: AbstractCaseType end
 
+struct RadiativeConvectiveEquilibrium <: AbstractCaseType end
+
 #####
 ##### Case methods
 #####
@@ -124,6 +126,7 @@ get_case(::Val{:SP}) = SP()
 get_case(::Val{:DryBubble}) = DryBubble()
 get_case(::Val{:LES_driven_SCM}) = LES_driven_SCM()
 get_case(::Val{:LES_driven_SCM_RRTMGP}) = LES_driven_SCM_RRTMGP()
+get_case(::Val{:RadiativeConvectiveEquilibrium}) = RadiativeConvectiveEquilibrium()
 
 get_case_name(case_type::AbstractCaseType) = string(case_type)
 
@@ -147,12 +150,14 @@ get_forcing_type(::DYCOMS_RF02) = TC.ForcingDYCOMS_RF01
 get_forcing_type(::DryBubble) = TC.ForcingNone
 get_forcing_type(::LES_driven_SCM) = TC.ForcingLES
 get_forcing_type(::LES_driven_SCM_RRTMGP) = TC.ForcingLES
+get_forcing_type(::RadiativeConvectiveEquilibrium) = TC.ForcingNone
 
 get_radiation_type(::AbstractCaseType) = TC.RadiationNone # default
 get_radiation_type(::DYCOMS_RF01) = TC.RadiationDYCOMS_RF01
 get_radiation_type(::DYCOMS_RF02) = TC.RadiationDYCOMS_RF01
 get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
 get_radiation_type(::LES_driven_SCM_RRTMGP) = TC.RadiationRRTMGP
+get_radiation_type(::RadiativeConvectiveEquilibrium) = TC.RadiationRRTMGP
 
 RadiationBase(case::AbstractCaseType) = RadiationBase{Cases.get_radiation_type(case)}()
 
@@ -1369,6 +1374,94 @@ initialize_forcing(self::CasesBase{LES_driven_SCM_RRTMGP}, grid::Grid, state, pa
     initialize(self.Fo, grid, state, self.LESDat)
 
 initialize_radiation(self::CasesBase{LES_driven_SCM_RRTMGP}, grid::Grid, state, param_set) =
+    # initialize(self.Rad, grid, state, self.LESDat)
+    initialize_rrtmgp(grid, state, param_set)
+    # initialize(self.Rad, grid, state, param_set)
+
+end # module Cases
+
+
+
+#####
+##### RadiativeConvectiveEquilibrium
+#####
+
+# Based on the setip in:
+# "Radiative–convective equilibrium model intercomparison project"
+# Geosci. Model Dev., 11, 793–813, 2018 https://doi.org/10.5194/gmd-11-793-2018
+ForcingBase(case::RadiativeConvectiveEquilibrium, param_set::APS; kwargs...) =
+    ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
+
+function surface_ref_state(::RadiativeConvectiveEquilibrium, param_set::APS, namelist)
+    Pg = FT(1014.8) #Pressure at ground
+    Tg = FT(295) #Temperature at ground
+    qtg = FT(12/1000) #Total water mixing ratio at surface
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
+end
+
+function initialize_profiles(self::CasesBase{RadiativeConvectiveEquilibrium}, grid::Grid, param_set, state)
+    aux_gm = TC.center_aux_grid_mean(state)
+    prog_gm = TC.center_prog_grid_mean(state)
+    ρ0_c = TC.center_ref_state(state).ρ0
+    p0_c = TC.center_ref_state(state).p0
+    g = CPP.grav(param_set)
+    R_d = CPP.R_d(param_set)
+
+    FT = eltype(grid)
+    prof_q_tot = APL.Bomex_q_tot(FT)
+    prof_θ_liq_ice = APL.Bomex_θ_liq_ice(FT)
+    prof_u = APL.Bomex_u(FT)
+    prof_tke = APL.Bomex_tke(FT)
+
+    zₜ = FT(15000)
+    Γ = 0.0067
+    q₀ = FT(12/1000)
+    q_z₁ = FT(4000)
+    q_z₂ = FT(7500)
+    p₀ = FT(1014.8)
+    Tₛ = FT(295)
+    @inbounds for k in real_center_indices(grid)
+        z = grid.zc[k]
+        if z < zₜ
+            Tv0 = Tₛ*FT(1+0.608*q₀)
+            aux_gm.q_tot[k] =  q₀* exp(-z/q_z₁)*exp(-z^2/q_z₂^2)
+            Tv = Tv0 - Γ*z
+            p0_c[k] = p₀*exp(Tv/Tv0)^(g/R_d/Γ)
+        else
+            pₜ = p₀*(Tv/Tv₀)^(g/R_d/Γ)
+            aux_gm.q_tot[k] = FT(10^-11)
+            Tv = Tv0 - Γ*zₜ
+            p0_c[k] = pₜ*exp(-g*(z-zₜ)/(R_d*Tv))^(g/R_d/Γ)
+        end
+        aux_gm.T[k] = Tv/(FT(1)+FT(0.608)*aux_gm.q_tot[k])
+        aux_gm.ts[k] = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_gm.T[k], aux_gm.q_tot[k])
+        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, aux_gm.ts[k])
+        # compute ref state here
+        prog_gm.ρθ_liq_ice[k] = ρ0_c[k] * aux_gm.θ_liq_ice[k]
+        prog_gm.ρq_tot[k] = ρ0_c[k] * aux_gm.q_tot[k]
+        prog_gm.u[k] = FT(0)
+        aux_gm.tke[k] = FT(0)
+    end
+end
+
+function surface_params(case::RadiativeConvectiveEquilibrium, grid::TC.Grid, surf_ref_state, param_set; kwargs...)
+    FT = eltype(grid)
+    Tsurface = FT(295)
+    qsurface = FT(12/1000)
+    shf = 0.0001 # only prevent zero division in SF.jl lmo
+    lhf = 0.0001 # only prevent zero division in SF.jl lmo
+    zrough = 0.1
+    guistiness = FT(1)
+    # need to pass guistiness from here
+    kwargs = (; Tsurface, qsurface, shf, lhf, zrough, guistiness)
+    return TC.MoninObukhovSurface(FT; kwargs...)
+end
+
+function initialize_forcing(self::CasesBase{RadiativeConvectiveEquilibrium}, grid::Grid, state, param_set)
+    return nothing
+end
+
+initialize_radiation(self::CasesBase{RadiativeConvectiveEquilibrium}, grid::Grid, state, param_set) =
     # initialize(self.Rad, grid, state, self.LESDat)
     initialize_rrtmgp(grid, state, param_set)
     # initialize(self.Rad, grid, state, param_set)

@@ -152,7 +152,8 @@ function Simulation1d(namelist)
     inversion_type = Cases.inversion_type(case_type)
     Rad = TC.RadiationBase(case_type) #, grid, state, param_set)
     @show case_type
-    rrtmgp_model = if case_type == Cases.LES_driven_SCM()
+    rrtmgp_model = if case_type == Cases.LES_driven_SCM_RRTMGP()
+        || case_type == Cases.RadiativeConvectiveEquilibrium()
         Cases.initialize_rrtmgp(grid, state, param_set)
     else
         nothing
@@ -252,7 +253,7 @@ function construct_grid(namelist; FT = Float64)
 
     truncated_gcm_mesh = TC.parse_namelist(namelist, "grid", "stretch", "flag"; default = false)
 
-    if Cases.get_case(namelist) == Cases.LES_driven_SCM()
+    if Cases.get_case(namelist) == Cases.LES_driven_SCM() || Cases.get_case(namelist) == Cases.LES_driven_SCM_RRTMGP()
         Δz = get(namelist["grid"], "dz", nothing)
         nz = get(namelist["grid"], "nz", nothing)
         @assert isnothing(Δz) ⊻ isnothing(nz) string(
@@ -356,6 +357,7 @@ function solve_args(sim::Simulation1d)
     # So, we tell OrdinaryDiffEq.jl to not perform NaNs check on the solution
     # so that it doesn't abort early (as the HOM prognostic variables are 1-way coupled)
     unstable_check_kwarg(::Cases.LES_driven_SCM) = (; unstable_check = (dt, u, p, t) -> false)
+    unstable_check_kwarg(::Cases.LES_driven_SCM_RRTMGP) = (; unstable_check = (dt, u, p, t) -> false)
     unstable_check_kwarg(case) = ()
 
     kwargs = (;

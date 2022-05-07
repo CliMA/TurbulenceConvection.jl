@@ -159,7 +159,6 @@ function update_radiation(self::TC.RadiationBase{TC.RadiationRRTMGP}, grid, stat
     cp_d = CPP.cp_d(param_set)
     ρ0_c = TC.center_ref_state(state).ρ0
     p0_c = TC.center_ref_state(state).p0
-    prog_gm = TC.center_prog_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
 
@@ -169,7 +168,7 @@ function update_radiation(self::TC.RadiationBase{TC.RadiationRRTMGP}, grid, stat
 
     rrtmgp_model.temperature .= vec(aux_gm.T)
     rrtmgp_model.pressure .= vec(p0_c)
-    rrtmgp_model.volume_mixing_ratio_h2o .= vec(@. ϵ_d * prog_gm.q_tot / (1 - prog_gm.q_tot))
+    rrtmgp_model.volume_mixing_ratio_h2o .= vec(@. ϵ_d * aux_gm.q_tot / (1 - aux_gm.q_tot))
     rrtmgp_flux = vec(grid.zf)
     vec(rrtmgp_flux) .= compute_fluxes!(rrtmgp_model)
     @inbounds for k in TC.real_face_indices(grid)
