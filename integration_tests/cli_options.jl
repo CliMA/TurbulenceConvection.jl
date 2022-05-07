@@ -6,7 +6,7 @@ function parse_commandline()
         "--case"
         help = "Case to run"
         default = "Bomex"
-        "--sgs"            # SGS environmental teratment (mean or quadratures)
+        "--sgs"            # SGS environmental treatment (mean or quadratures)
         arg_type = String
         "--quad_type"      # SGS quadrature type (lognormal or Gaussian)
         arg_type = String
