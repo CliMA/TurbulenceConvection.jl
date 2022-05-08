@@ -38,12 +38,39 @@ overwrite_namelist_map = Dict(
 "skip_io"      => (nl, pa, key) -> (nl["stats_io"]["skip"] = pa[key]),
 "n_up"         => (nl, pa, key) -> (nl["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = pa[key]),
 )
+no_overwrites = (
+    "case", # default_namelist already overwrites namelist["meta"]["casename"]
+    "skip_post_proc",
+    "skip_tests",
+    "trunc_stack_traces",
+    "suffix",
+)
 #! format: on
 for key in keys(overwrite_namelist_map)
     if !isnothing(parsed_args[key])
         @warn "Parameter `$key` overwriting namelist"
         overwrite_namelist_map[key](namelist, parsed_args, key)
     end
+end
+
+# Error check overwrites:
+# A tuple of strings for all CL arguments that do _not_
+overwrite_list = map(collect(keys(overwrite_namelist_map))) do key
+    (key, !isnothing(parsed_args[key]))
+end
+filter!(x -> x[2], overwrite_list)
+cl_list = map(collect(keys(parsed_args))) do key
+    (key, !isnothing(parsed_args[key]) && !(key in no_overwrites))
+end
+filter!(x -> x[2], cl_list)
+if length(overwrite_list) ≠ length(cl_list)
+    error(
+        string(
+            "A prescribed CL argument is not overwriting the namelist.",
+            "It seems that a CL argument was added, and the `no_overwrites`",
+            "or `overwrite_namelist_map` must be updated.",
+        ),
+    )
 end
 
 ds_tc_filename, return_code = main(namelist)
