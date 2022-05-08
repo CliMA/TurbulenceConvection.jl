@@ -105,13 +105,14 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     massflux_h[kf_surf] = 0
 
     if edmf.moisture_model isa NonEquilibriumMoisture
+        massflux_en = aux_tc_f.massflux_en
         massflux_ql = aux_tc_f.massflux_ql
         massflux_qi = aux_tc_f.massflux_qi
         q_liq_en = aux_en.q_liq
         q_ice_en = aux_en.q_ice
         q_liq_gm = prog_gm.q_liq
         q_ice_gm = prog_gm.q_ice
-        massflux_en = ρ0_f * Ifae(a_en) * (w_en - w_gm)
+        @. massflux_en = ρ0_f * Ifae(a_en) * (w_en - w_gm)
         @. massflux_ql = massflux_en * (If(q_liq_en) - If(q_liq_gm))
         @. massflux_qi = massflux_en * (If(q_ice_en) - If(q_ice_gm))
         @inbounds for i in 1:N_up
