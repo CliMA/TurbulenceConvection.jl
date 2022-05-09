@@ -410,13 +410,13 @@ function compute_gm_tendencies!(
     aux_tc = TC.center_aux_turbconv(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
 
-    h_tot_gm_toa = (prog_gm.ρe_tot[kc_toa] + p0_c[kc_toa]) / ρ0_c[kc_toa]
+    h_tot_gm_toa = TD.cp_m(param_set, ts_gm[kc_toa])*(aux_gm.T[kc_toa] - T_0) + TC.Φ(grid.zc[kc_toa], param_set)
     q_tot_gm_toa = prog_gm.ρq_tot[kc_toa] / ρ0_c[kc_toa]
     RBe = CCO.RightBiasedC2F(; top = CCO.SetValue(h_tot_gm_toa))
     RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa))
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
-    @. ∇h_tot_gm = ∇c(wvec(RBe((prog_gm.ρe_tot + p0_c) / ρ0_c)))
+    @. ∇h_tot_gm = ∇c(wvec(RBe(TD.cp_m(param_set, ts_gm)*(aux_gm.T - T_0) + TC.Φ(grid.zc, param_set))))
     @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.ρq_tot / ρ0_c)))
 
     if edmf.moisture_model isa TC.NonEquilibriumMoisture
