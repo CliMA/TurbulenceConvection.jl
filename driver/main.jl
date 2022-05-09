@@ -152,11 +152,10 @@ function Simulation1d(namelist)
     inversion_type = Cases.inversion_type(case_type)
     Rad = TC.RadiationBase(case_type) #, grid, state, param_set)
     @show case_type
-    rrtmgp_model = if case_type == Cases.LES_driven_SCM_RRTMGP()
-        || case_type == Cases.RadiativeConvectiveEquilibrium()
-        Cases.initialize_rrtmgp(grid, state, param_set)
+    if case_type == Cases.LES_driven_SCM_RRTMGP() || case_type == Cases.RadiativeConvectiveEquilibrium()
+        rrtmgp_model = Cases.initialize_rrtmgp(grid, state, param_set)
     else
-        nothing
+        rrtmgp_model = nothing
     end
     case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad, spk...)
 
@@ -358,6 +357,7 @@ function solve_args(sim::Simulation1d)
     # so that it doesn't abort early (as the HOM prognostic variables are 1-way coupled)
     unstable_check_kwarg(::Cases.LES_driven_SCM) = (; unstable_check = (dt, u, p, t) -> false)
     unstable_check_kwarg(::Cases.LES_driven_SCM_RRTMGP) = (; unstable_check = (dt, u, p, t) -> false)
+    # unstable_check_kwarg(::Cases.RadiativeConvectiveEquilibrium) = (; unstable_check = (dt, u, p, t) -> false)
     unstable_check_kwarg(case) = ()
 
     kwargs = (;

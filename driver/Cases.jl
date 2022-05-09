@@ -1378,10 +1378,6 @@ initialize_radiation(self::CasesBase{LES_driven_SCM_RRTMGP}, grid::Grid, state, 
     initialize_rrtmgp(grid, state, param_set)
     # initialize(self.Rad, grid, state, param_set)
 
-end # module Cases
-
-
-
 #####
 ##### RadiativeConvectiveEquilibrium
 #####
@@ -1393,9 +1389,9 @@ ForcingBase(case::RadiativeConvectiveEquilibrium, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
 
 function surface_ref_state(::RadiativeConvectiveEquilibrium, param_set::APS, namelist)
-    Pg = FT(1014.8) #Pressure at ground
-    Tg = FT(295) #Temperature at ground
-    qtg = FT(12/1000) #Total water mixing ratio at surface
+    Pg = 1014.8 * 100.0 #Pressure at ground
+    Tg = 295.0 #Temperature at ground
+    qtg = 12.0/1000.0 #Total water mixing ratio at surface
     return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 
@@ -1414,23 +1410,23 @@ function initialize_profiles(self::CasesBase{RadiativeConvectiveEquilibrium}, gr
     prof_tke = APL.Bomex_tke(FT)
 
     zₜ = FT(15000)
-    Γ = 0.0067
-    q₀ = FT(12/1000)
-    q_z₁ = FT(4000)
-    q_z₂ = FT(7500)
     p₀ = FT(1014.8)
     Tₛ = FT(295)
+    q₀ = FT(12/1000)
+    Tv₀ = Tₛ*FT(1+0.608*q₀)
+    q_z₁ = FT(4000)
+    q_z₂ = FT(7500)
+    Γ = 0.0067
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc.z[k]
         if z < zₜ
-            Tv0 = Tₛ*FT(1+0.608*q₀)
             aux_gm.q_tot[k] =  q₀* exp(-z/q_z₁)*exp(-z^2/q_z₂^2)
-            Tv = Tv0 - Γ*z
-            p0_c[k] = p₀*exp(Tv/Tv0)^(g/R_d/Γ)
+            Tv = Tv₀ - Γ*z
+            p0_c[k] = p₀*exp(Tv/Tv₀)^(g/R_d/Γ)
         else
+            Tv = Tv₀ - Γ*zₜ
             pₜ = p₀*(Tv/Tv₀)^(g/R_d/Γ)
             aux_gm.q_tot[k] = FT(10^-11)
-            Tv = Tv0 - Γ*zₜ
             p0_c[k] = pₜ*exp(-g*(z-zₜ)/(R_d*Tv))^(g/R_d/Γ)
         end
         aux_gm.T[k] = Tv/(FT(1)+FT(0.608)*aux_gm.q_tot[k])
@@ -1453,7 +1449,7 @@ function surface_params(case::RadiativeConvectiveEquilibrium, grid::TC.Grid, sur
     zrough = 0.1
     guistiness = FT(1)
     # need to pass guistiness from here
-    kwargs = (; Tsurface, qsurface, shf, lhf, zrough, guistiness)
+    kwargs = (; Tsurface, qsurface, shf, lhf, zrough) #, guistiness
     return TC.MoninObukhovSurface(FT; kwargs...)
 end
 

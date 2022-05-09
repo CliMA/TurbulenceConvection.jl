@@ -575,16 +575,17 @@ function RadiativeConvectiveEquilibrium(namelist_defaults)
     namelist["grid"]["stretch"]["dz_toa"] = 8000.0
     namelist["grid"]["stretch"]["z_toa"] = 45000.0
     # just to compute zmax - strech will overwrite these
-    namelist["grid"]["dz"] = 45000.0/30.0
-    namelist["grid"]["nz"] = 45000.0
+    namelist["grid"]["dz"] = 30.0
+    namelist["grid"]["nz"] = 500
 
     namelist["stats_io"]["frequency"] = 1800.0
-    namelist["time_stepping"]["t_max"] = 3600.0 * 24 * 6
+    namelist["time_stepping"]["t_max"] = 3600.0 * 6 #* 24
     namelist["time_stepping"]["dt_min"] = 1.0
     namelist["time_stepping"]["dt_max"] = 5.0
 
     namelist["meta"]["simname"] = "RadiativeConvectiveEquilibrium"
     namelist["meta"]["casename"] = "RadiativeConvectiveEquilibrium"
+
     return namelist
 end
 

@@ -190,6 +190,14 @@ all_best_mse["LES_driven_SCM_RRTMGP"]["temperature_mean"] = 0.001283098124882301
 all_best_mse["LES_driven_SCM_RRTMGP"]["ql_mean"] = 51738.50247731223
 all_best_mse["LES_driven_SCM_RRTMGP"]["thetal_mean"] = 0.0015164180359003641
 #
+all_best_mse["RadiativeConvectiveEquilibrium"] = OrderedCollections.OrderedDict()
+all_best_mse["RadiativeConvectiveEquilibrium"]["qt_mean"] = 3.565679133346325
+all_best_mse["RadiativeConvectiveEquilibrium"]["v_mean"] = 1.3786051560755312
+all_best_mse["RadiativeConvectiveEquilibrium"]["u_mean"] = 0.4764379333062847
+all_best_mse["RadiativeConvectiveEquilibrium"]["temperature_mean"] = 0.0012830981248823014
+all_best_mse["RadiativeConvectiveEquilibrium"]["ql_mean"] = 51738.50247731223
+all_best_mse["RadiativeConvectiveEquilibrium"]["thetal_mean"] = 0.0015164180359003641
+#
 #################################
 #################################
 #################################
