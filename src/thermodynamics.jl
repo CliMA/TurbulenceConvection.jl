@@ -22,3 +22,8 @@ function thermo_state_peq(param_set::APS, p::FT, e_int::FT, q_tot::FT, q_liq::FT
     q = TD.PhasePartition(q_tot, q_liq, q_ice)
     return TD.PhaseNonEquil_peq(param_set, p, e_int, q, config...)
 end
+
+function Φ(z::FT, param_set)  where {FT}
+    grav = CPP.grav(param_set)
+    return grav * z
+end
