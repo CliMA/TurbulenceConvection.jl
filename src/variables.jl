@@ -4,7 +4,7 @@
 
 # Helpers for adding empty thermodynamic state fields:
 thermo_state(FT, ::EquilibriumMoisture) = TD.PhaseEquil{FT}(0, 0, 0, 0, 0)
-thermo_state(FT, ::NonEquilibriumMoisture) = TD.PhaseEquil{FT}(0, 0, TD.PhasePartition{FT}(0, 0, 0))
+thermo_state(FT, ::NonEquilibriumMoisture) = TD.PhaseNonEquil{FT}(0, 0, TD.PhasePartition(FT(0), FT(0), FT(0)))
 
 ##### Auxiliary fields
 
@@ -173,8 +173,13 @@ face_aux_vars_up(FT) = (;
     nh_pressure_drag = FT(0),
     massflux = FT(0),
 )
-face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) =
-    (; massflux_ql = FT(0), massflux_qi = FT(0), diffusive_flux_ql = FT(0), diffusive_flux_qi = FT(0))
+face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
+    massflux_en = FT(0), # TODO: is this the right place for this?
+    massflux_ql = FT(0),
+    massflux_qi = FT(0),
+    diffusive_flux_ql = FT(0),
+    diffusive_flux_qi = FT(0),
+)
 face_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
 face_aux_vars_edmf(FT, edmf) = (;
     turbconv = (;
