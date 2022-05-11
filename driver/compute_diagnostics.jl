@@ -54,15 +54,17 @@ end
 #! format: on
 
 function io(surf::TC.SurfaceBase, surf_params, grid, state, Stats::NetCDFIO_Stats, t::Real)
-    write_ts(Stats, "Tsurface", TC.surface_temperature(surf_params, t))
-    write_ts(Stats, "shf", surf.shf)
-    write_ts(Stats, "lhf", surf.lhf)
-    write_ts(Stats, "ustar", surf.ustar)
-    write_ts(Stats, "wstar", surf.wstar)
+    group = Stats.vars["timeseries"]
+    write_ts(group, "Tsurface", TC.surface_temperature(surf_params, t))
+    write_ts(group, "shf", surf.shf)
+    write_ts(group, "lhf", surf.lhf)
+    write_ts(group, "ustar", surf.ustar)
+    write_ts(group, "wstar", surf.wstar)
 end
 function io(io_dict::Dict, Stats::NetCDFIO_Stats, state)
+    group = Stats.vars["profiles"]
     for var in keys(io_dict)
-        write_field(Stats, var, vec(io_dict[var].field(state)), io_dict[var].group)
+        write_field(group, var, vec(io_dict[var].field(state)))
     end
 end
 
@@ -343,26 +345,27 @@ function compute_diagnostics!(
     # Demonstration of how we can move all of the `write_ts` calls
     # outside of `compute_diagnostics!`, which currently computes
     # _and_ exports (some) diagnostics.
-    write_ts(Stats, "updraft_cloud_cover", diag_tc_svpc.updraft_cloud_cover[cent])
-    write_ts(Stats, "updraft_cloud_base", diag_tc_svpc.updraft_cloud_base[cent])
-    write_ts(Stats, "updraft_cloud_top", diag_tc_svpc.updraft_cloud_top[cent])
-    write_ts(Stats, "env_cloud_cover", diag_tc_svpc.env_cloud_cover[cent])
-    write_ts(Stats, "env_cloud_base", diag_tc_svpc.env_cloud_base[cent])
-    write_ts(Stats, "env_cloud_top", diag_tc_svpc.env_cloud_top[cent])
-    write_ts(Stats, "env_lwp", diag_tc_svpc.env_lwp[cent])
-    write_ts(Stats, "env_iwp", diag_tc_svpc.env_iwp[cent])
-    write_ts(Stats, "Hd", diag_tc_svpc.Hd[cent])
-    write_ts(Stats, "updraft_lwp", diag_tc_svpc.updraft_lwp[cent])
-    write_ts(Stats, "updraft_iwp", diag_tc_svpc.updraft_iwp[cent])
+    group = Stats.vars["timeseries"]
+    write_ts(group, "updraft_cloud_cover", diag_tc_svpc.updraft_cloud_cover[cent])
+    write_ts(group, "updraft_cloud_base", diag_tc_svpc.updraft_cloud_base[cent])
+    write_ts(group, "updraft_cloud_top", diag_tc_svpc.updraft_cloud_top[cent])
+    write_ts(group, "env_cloud_cover", diag_tc_svpc.env_cloud_cover[cent])
+    write_ts(group, "env_cloud_base", diag_tc_svpc.env_cloud_base[cent])
+    write_ts(group, "env_cloud_top", diag_tc_svpc.env_cloud_top[cent])
+    write_ts(group, "env_lwp", diag_tc_svpc.env_lwp[cent])
+    write_ts(group, "env_iwp", diag_tc_svpc.env_iwp[cent])
+    write_ts(group, "Hd", diag_tc_svpc.Hd[cent])
+    write_ts(group, "updraft_lwp", diag_tc_svpc.updraft_lwp[cent])
+    write_ts(group, "updraft_iwp", diag_tc_svpc.updraft_iwp[cent])
 
-    write_ts(Stats, "cutoff_precipitation_rate", diag_svpc.cutoff_precipitation_rate[cent])
-    write_ts(Stats, "cloud_cover_mean", diag_svpc.cloud_cover_mean[cent])
-    write_ts(Stats, "cloud_base_mean", diag_svpc.cloud_base_mean[cent])
-    write_ts(Stats, "cloud_top_mean", diag_svpc.cloud_top_mean[cent])
-    write_ts(Stats, "lwp_mean", diag_svpc.lwp_mean[cent])
-    write_ts(Stats, "iwp_mean", diag_svpc.iwp_mean[cent])
-    write_ts(Stats, "rwp_mean", diag_svpc.rwp_mean[cent])
-    write_ts(Stats, "swp_mean", diag_svpc.swp_mean[cent])
+    write_ts(group, "cutoff_precipitation_rate", diag_svpc.cutoff_precipitation_rate[cent])
+    write_ts(group, "cloud_cover_mean", diag_svpc.cloud_cover_mean[cent])
+    write_ts(group, "cloud_base_mean", diag_svpc.cloud_base_mean[cent])
+    write_ts(group, "cloud_top_mean", diag_svpc.cloud_top_mean[cent])
+    write_ts(group, "lwp_mean", diag_svpc.lwp_mean[cent])
+    write_ts(group, "iwp_mean", diag_svpc.iwp_mean[cent])
+    write_ts(group, "rwp_mean", diag_svpc.rwp_mean[cent])
+    write_ts(group, "swp_mean", diag_svpc.swp_mean[cent])
 
     return
 end

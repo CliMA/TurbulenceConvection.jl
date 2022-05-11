@@ -110,7 +110,7 @@ end
 
 function add_field(ds, var_name::String, dims, group)
     profile_grp = ds.group[group]
-    new_var = NC.defVar(profile_grp, var_name, Float64, dims)
+    NC.defVar(profile_grp, var_name, Float64, dims)
     return nothing
 end
 
@@ -120,7 +120,7 @@ end
 
 function add_ts(ds, var_name::String)
     ts_grp = ds.group["timeseries"]
-    new_var = NC.defVar(ts_grp, var_name, Float64, ("t",))
+    NC.defVar(ts_grp, var_name, Float64, ("t",))
     return nothing
 end
 
@@ -128,37 +128,26 @@ end
 ##### Performance critical IO
 #####
 
-function write_field(self::NetCDFIO_Stats, var_name::String, data::T, group) where {T <: AbstractArray{Float64, 1}}
-    # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    @inbounds self.vars[group][var_name][:, end] = data
-    # Ideally, we remove self.vars and use:
-    # var = self.profiles_grp[var_name]
+function write_field(group, var_name::String, data::T) where {T <: AbstractArray{Float64, 1}}
+    # @inbounds self.vars[group][var_name][:, end] = data
+    @inbounds group[var_name][:, end] = data
     # Not sure why `end` instead of `end+1`, but `end+1` produces garbage output
     # @inbounds var[end, :] = data :: T
 end
 
-function add_write_field(ds, var_name::String, data::T, group, dims) where {T <: AbstractArray{Float64, 1}}
-    grp = ds.group[group]
-    NC.defVar(grp, var_name, Float64, dims)
-    var = grp[var_name]
+function add_write_field(group, var_name::String, data::T, dims) where {T <: AbstractArray{Float64, 1}}
+    NC.defVar(group, var_name, Float64, dims)
+    var = group[var_name]
     var .= data::T
     return nothing
 end
 
-function write_ts(self::NetCDFIO_Stats, var_name::String, data::Float64)
-    # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    @inbounds self.vars["timeseries"][var_name][end] = data::Float64
-    # Ideally, we remove self.vars and use:
-    # var = self.ts_grp[var_name]
-    # @inbounds var[end+1] = data :: Float64
+function write_ts(group, var_name::String, data::Float64)
+    # TODO: end vs. end+1 ?
+    @inbounds group[var_name][end] = data::Float64
 end
 
-function write_simulation_time(self::NetCDFIO_Stats, t::Float64)
-    # # Write to profiles group
-    profile_t = self.profiles_grp["t"]
-    @inbounds profile_t[end + 1] = t::Float64
-
-    # # Write to timeseries group
-    ts_t = self.ts_grp["t"]
-    @inbounds ts_t[end + 1] = t::Float64
+function write_simulation_time(group, t::Float64)
+    # Write to profiles group
+    @inbounds group[end + 1] = t::Float64
 end

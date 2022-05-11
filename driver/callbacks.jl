@@ -26,7 +26,8 @@ function affect_io!(integrator)
     # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
     # opening/closing files every step should be okay. #removeVarsHack
     # TurbulenceConvection.io(sim) # #removeVarsHack
-    write_simulation_time(Stats, t) # #removeVarsHack
+    write_simulation_time(Stats.profiles_grp["t"], t)
+    write_simulation_time(Stats.ts_grp["t"], t)
 
     io(io_nt.aux, Stats, state)
     io(io_nt.diagnostics, Stats, diagnostics)
