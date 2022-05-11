@@ -78,7 +78,7 @@ function precipitation_formation(
         I = TD.internal_energy(param_set, ts)
         #Φ = gravitational_potential(atmos.orientation, aux) #TODO how to use it here?
         g = CPP.grav(param_set)
-        Φ = geopotential(param_set,z)
+        Φ = geopotential(param_set, z)
 
         if precip_model isa CutoffPrecipitation
             qsat = TD.q_vap_saturation(param_set, ts)

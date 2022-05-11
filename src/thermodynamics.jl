@@ -34,3 +34,7 @@ function anelastic_total_enthalpy(param_set::APS, e_tot, ts_gm) where {FT}
     T_gm = TD.air_temperature(param_set, ts_gm)
     return e_tot + Rm_gm * T_gm
 end
+
+function anelastic_total_enthalpy(param_set::APS, e_tot, p, ρ) where {FT}
+    return e_tot + p / ρ
+end

@@ -88,10 +88,21 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     # compute total enthalpies
     ts_en = center_aux_environment(state).ts
     ts_gm = center_aux_grid_mean(state).ts
-    @. h_tot_gm = prog_gm.ρe_tot / ρ0_c + TD.gas_constant_air(param_set, ts_gm) * aux_gm.T
-    @. h_tot_en = anelastic_total_enthalpy(param_set,
-        TD.total_energy(param_set, ts_en, 0.5 * (prog_gm.u^2 + prog_gm.v^2 + Ic(w_en)^2), geopotential(param_set, grid.zc.z)),
-        ts_gm)
+    @. h_tot_gm = anelastic_total_enthalpy(param_set::APS, prog_gm.ρe_tot / ρ0_c, p0_c, ρ0_c) # anelastic_total_enthalpy(param_set, prog_gm.ρe_tot / ρ0_c , ts_gm)
+    @. h_tot_en = anelastic_total_enthalpy(
+        param_set,
+        TD.total_energy(
+            param_set,
+            ts_en,
+            0.5 * (prog_gm.u^2 + prog_gm.v^2 + Ic(w_en)^2),
+            geopotential(param_set, grid.zc.z),
+        ),
+        p0_c,
+        ρ0_c,
+    )
+    # @. h_tot_en = anelastic_total_enthalpy(param_set,
+    #     TD.total_energy(param_set, ts_en, 0.5 * (prog_gm.u^2 + prog_gm.v^2 + Ic(w_en)^2), geopotential(param_set, grid.zc.z)),
+    #     ts_gm)
     # Compute the mass flux and associated scalar fluxes
     @. massflux = ρ0_f * Ifae(a_en) * (w_en - w_gm)
     @. massflux_h = ρ0_f * Ifae(a_en) * (w_en - w_gm) * (If(h_tot_en) - If(h_tot_gm))
@@ -111,9 +122,20 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         ts_up_i = copy(ts_en)
         h_tot_up_i = copy(q_tot_up)
         @. ts_up_i = thermo_state_pθq(param_set, p0_c, θ_liq_ice_up, q_tot_up)
-        @. h_tot_up_i = anelastic_total_enthalpy(param_set,
-            TD.total_energy(param_set, ts_up_i, 0.5 * (prog_gm.u^2 + prog_gm.v^2 + Ic(w_up)^2), geopotential(param_set, grid.zc.z)),
-            ts_gm)
+        @. h_tot_up_i = anelastic_total_enthalpy(
+            param_set,
+            TD.total_energy(
+                param_set,
+                ts_up_i,
+                0.5 * (prog_gm.u^2 + prog_gm.v^2 + Ic(w_up)^2),
+                geopotential(param_set, grid.zc.z),
+            ),
+            p0_c,
+            ρ0_c,
+        )
+        # @. h_tot_up_i = anelastic_total_enthalpy(param_set,
+        #     TD.total_energy(param_set, ts_up_i, 0.5 * (prog_gm.u^2 + prog_gm.v^2 + Ic(w_up)^2), geopotential(param_set, grid.zc.z)),
+        #     ts_gm)
         @. massflux_h += ρ0_f * (Ifau(a_up) * (w_up - w_gm) * (If(h_tot_up_i) - If(h_tot_gm)))
         @. massflux_qt += ρ0_f * (Ifau(a_up) * (w_up - w_gm) * (If(q_tot_up) - If(q_tot_gm)))
     end
@@ -220,9 +242,16 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     h_tot_en = copy(a_en)
     ts_gm = center_aux_grid_mean(state).ts
     ts_en = center_aux_environment(state).ts
-    @. h_tot_en = anelastic_total_enthalpy(param_set,
-            TD.total_energy(param_set, ts_en, 0.5 * (prog_gm.u^2 + prog_gm.v^2 + Ic(aux_en_f.w)^2), geopotential(param_set, grid.zc.z)),
-            ts_en)
+    @. h_tot_en = anelastic_total_enthalpy(
+        param_set,
+        TD.total_energy(
+            param_set,
+            ts_en,
+            0.5 * (prog_gm.u^2 + prog_gm.v^2 + Ic(aux_en_f.w)^2),
+            geopotential(param_set, grid.zc.z),
+        ),
+        ts_en,
+    )
 
     @. aux_tc_f.ρ_ae_KH = IfKH(aeKH) * ρ0_f
     @. aux_tc_f.ρ_ae_KM = IfKM(aeKM) * ρ0_f
