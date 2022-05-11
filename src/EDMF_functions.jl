@@ -250,7 +250,9 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
             0.5 * (prog_gm.u^2 + prog_gm.v^2 + Ic(aux_en_f.w)^2),
             geopotential(param_set, grid.zc.z),
         ),
-        ts_en,
+        p0_c,
+        ρ0_c,
+        # ts_en,
     )
 
     @. aux_tc_f.ρ_ae_KH = IfKH(aeKH) * ρ0_f
