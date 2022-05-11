@@ -5,7 +5,8 @@
 # Helpers for adding empty thermodynamic state fields:
 thermo_state(FT, ::EquilibriumMoisture) = TD.PhaseEquil{FT}(0, 0, 0, 0, 0)
 # thermo_state(FT, ::NonEquilibriumMoisture) = TD.PhaseNonEquil{FT}(0, 0, TD.PhasePartition{FT}(0, 0, 0)) # maybe this way cause the constructor doesnt exist for this in phaseequil i guess? or maybe the ints are the problem...
-thermo_state(FT, ::NonEquilibriumMoisture) = TD.PhaseNonEquil{FT}(0, 0, TD.PhasePartition(FT(0), FT(0), FT(0))) # removed the {FT} from phase partition (keep in phaseequil?) in case that was the problem, and phasequil to nonquil
+# thermo_state(FT, ::NonEquilibriumMoisture) = TD.PhaseNonEquil{FT}(0, 0, TD.PhasePartition(0,0,0)) # removed the {FT} from phase partition (keep in phaseequil?) in case that was the problem, and phasequil to nonquil
+thermo_state(FT, ::NonEquilibriumMoisture) = TD.PhaseNonEquil{FT}(0, 0, 0) # test if above line is the problem
 # some problem with ints and float64, maybe cast w/ FT? idk...
 
 ##### Auxiliary fields
