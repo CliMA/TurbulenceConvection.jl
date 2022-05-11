@@ -199,7 +199,7 @@ function initialize_profiles(self::CasesBase{Soares}, grid::Grid, param_set, sta
     end
 end
 
-function surface_params(case::Soares, zc_surf, surf_ref_state, param_set; Ri_bulk_crit)
+function surface_params(case::Soares, surf_ref_state, param_set; Ri_bulk_crit)
     p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
     ρ0_f_surf = TD.air_density(param_set, surf_ref_state)
     FT = eltype(p0_f_surf)
@@ -248,7 +248,7 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, param_set,
     end
 end
 
-function surface_params(case::Nieuwstadt, zc_surf, surf_ref_state, param_set; Ri_bulk_crit)
+function surface_params(case::Nieuwstadt, surf_ref_state, param_set; Ri_bulk_crit)
     p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
     ρ0_f_surf = TD.air_density(param_set, surf_ref_state)
     FT = eltype(p0_f_surf)
@@ -300,7 +300,7 @@ function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, param_set, stat
     end
 end
 
-function surface_params(case::Bomex, zc_surf, surf_ref_state, param_set; Ri_bulk_crit)
+function surface_params(case::Bomex, surf_ref_state, param_set; Ri_bulk_crit)
     p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
     ρ0_f_surf = TD.air_density(param_set, surf_ref_state)
     FT = eltype(p0_f_surf)
@@ -390,7 +390,7 @@ function life_cycle_buoyancy_flux(param_set, weight = 1)
     )
 end
 
-function surface_params(case::life_cycle_Tan2018, zc_surf, surf_ref_state, param_set; Ri_bulk_crit)
+function surface_params(case::life_cycle_Tan2018, surf_ref_state, param_set; Ri_bulk_crit)
     p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
     ρ0_f_surf = TD.air_density(param_set, surf_ref_state)
     FT = eltype(p0_f_surf)
@@ -507,19 +507,19 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, param_set, state
     end
 end
 
-function surface_params(case::Rico, zc_surf, surf_ref_state, param_set; kwargs...)
+function surface_params(case::Rico, surf_ref_state, param_set; kwargs...)
     p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
     FT = eltype(p0_f_surf)
 
     zrough = 0.00015
-    cm = 0.001229
-    ch = 0.001094
-    cq = 0.001133
+    cm0 = 0.001229
+    ch0 = 0.001094
+    cq0 = 0.001133
     # Adjust for non-IC grid spacing
-    grid_adjust = (log(20.0 / zrough) / log(zc_surf / zrough))^2
-    cm = cm * grid_adjust
-    ch = ch * grid_adjust
-    cq = cq * grid_adjust # TODO: not yet used..
+    grid_adjust(zc_surf) = (log(20.0 / zrough) / log(zc_surf / zrough))^2
+    cm = zc_surf -> cm0 * grid_adjust(zc_surf)
+    ch = zc_surf -> ch0 * grid_adjust(zc_surf)
+    cq = zc_surf -> cq0 * grid_adjust(zc_surf) # TODO: not yet used..
     Tsurface = 299.8
 
     # For Rico we provide values of transfer coefficients
@@ -610,7 +610,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, param_set, s
     end
 end
 
-function surface_params(case::TRMM_LBA, zc_surf, surf_ref_state, param_set; Ri_bulk_crit)
+function surface_params(case::TRMM_LBA, surf_ref_state, param_set; Ri_bulk_crit)
     p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
     FT = eltype(p0_f_surf)
     # zrough = 1.0e-4 # not actually used, but initialized to reasonable value
@@ -688,7 +688,7 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, param_set, st
     end
 end
 
-function surface_params(case::ARM_SGP, zc_surf, surf_ref_state, param_set; Ri_bulk_crit)
+function surface_params(case::ARM_SGP, surf_ref_state, param_set; Ri_bulk_crit)
     p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
     FT = eltype(p0_f_surf)
     qsurface = 15.2e-3 # kg/kg
@@ -764,14 +764,14 @@ function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, param_set, s
     end
 end
 
-function surface_params(case::GATE_III, zc_surf, surf_ref_state, param_set; kwargs...)
+function surface_params(case::GATE_III, surf_ref_state, param_set; kwargs...)
     p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
     FT = eltype(p0_f_surf)
 
     qsurface = 16.5 / 1000.0 # kg/kg
-    cm = 0.0012
-    ch = 0.0034337
-    cq = 0.0034337
+    cm = zc_surf -> 0.0012
+    ch = zc_surf -> 0.0034337
+    cq = zc_surf -> 0.0034337
     Tsurface = 299.184
 
     # For GATE_III we provide values of transfer coefficients
@@ -824,7 +824,7 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, grid::Grid, param_set
     end
 end
 
-function surface_params(case::DYCOMS_RF01, zc_surf, surf_ref_state, param_set; Ri_bulk_crit)
+function surface_params(case::DYCOMS_RF01, surf_ref_state, param_set; Ri_bulk_crit)
     FT = eltype(surf_ref_state)
     zrough = 1.0e-4
     ustar = 0.28 # just to initilize grid mean covariances
@@ -909,7 +909,7 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF02}, grid::Grid, param_set
     end
 end
 
-function surface_params(case::DYCOMS_RF02, zc_surf, surf_ref_state, param_set; Ri_bulk_crit)
+function surface_params(case::DYCOMS_RF02, surf_ref_state, param_set; Ri_bulk_crit)
     FT = eltype(surf_ref_state)
     zrough = 1.0e-4  #TODO - not needed?
     ustar = 0.25
@@ -1004,7 +1004,7 @@ function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, param_set, stat
     end
 end
 
-function surface_params(case::GABLS, zc_surf, surf_ref_state, param_set; kwargs...)
+function surface_params(case::GABLS, surf_ref_state, param_set; kwargs...)
     FT = eltype(surf_ref_state)
     Tsurface = t -> 265.0 - (0.25 / 3600.0) * t
     qsurface = 0.0
@@ -1114,7 +1114,7 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, param_set, 
     parent(aux_gm.HQTcov) .= 0
 end
 
-function surface_params(case::DryBubble, zc_surf, surf_ref_state, param_set; Ri_bulk_crit)
+function surface_params(case::DryBubble, surf_ref_state, param_set; Ri_bulk_crit)
     FT = eltype(surf_ref_state)
     Tsurface = 300.0
     qsurface = 0.0
@@ -1211,7 +1211,7 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, param_
     end
 end
 
-function surface_params(case::LES_driven_SCM, zc_surf, surf_ref_state, param_set; Ri_bulk_crit, LESDat)
+function surface_params(case::LES_driven_SCM, surf_ref_state, param_set; Ri_bulk_crit, LESDat)
     FT = eltype(surf_ref_state)
     nt = NC.Dataset(LESDat.les_filename, "r") do data
         imin = LESDat.imin
