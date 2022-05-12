@@ -24,12 +24,16 @@ import .NameList
 namelist = NameList.default_namelist(case_name)
 namelist["meta"]["uuid"] = "01$suffix"
 
+parsed_args["τ_sub_dep"]   = parsed_args["tau_sub_dep"] # i think cause the argparser doesnt do greek?....
+parsed_args["τ_cond_evap"] = parsed_args["tau_cond_evap"]
+
 #! format: off
 overwrite_namelist_map = Dict(
 "sgs"            => (nl, pa, key) -> (nl["thermodynamics"]["sgs"] = pa[key]),
 "quad_type"      => (nl, pa, key) -> (nl["thermodynamics"]["quadrature_type"] = pa[key]),
 "entr"           => (nl, pa, key) -> (nl["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = pa[key]),
 "stoch_entr"     => (nl, pa, key) -> (nl["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = pa[key]),
+"output_root"    => (nl, pa, key) -> (nl["output"]["output_root"] = pa[key]),
 "t_max"          => (nl, pa, key) -> (nl["time_stepping"]["t_max"] = pa[key]),
 "adapt_dt"       => (nl, pa, key) -> (nl["time_stepping"]["adapt_dt"] = pa[key]),
 "dt"             => (nl, pa, key) -> (nl["time_stepping"]["dt_min"] = pa[key]),
@@ -38,6 +42,10 @@ overwrite_namelist_map = Dict(
 "skip_io"        => (nl, pa, key) -> (nl["stats_io"]["skip"] = pa[key]),
 "n_up"           => (nl, pa, key) -> (nl["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = pa[key]),
 "moisture_model" => (nl, pa, key) -> (nl["thermodynamics"]["moisture_model"] = pa[key]),
+"τ_sub_dep"      => (nl, pa, key) -> (nl["microphysics"]["τ_sub_dep"] = pa[key]),
+"τ_cond_evap"    => (nl, pa, key) -> (nl["microphysics"]["τ_cond_evap"] = pa[key]),
+"tau_sub_dep"      => (nl, pa, key) -> (nl["microphysics"]["tau_sub_dep"] = pa[key]),
+"tau_cond_evap"    => (nl, pa, key) -> (nl["microphysics"]["tau_cond_evap"] = pa[key]),
 )
 no_overwrites = (
     "case", # default_namelist already overwrites namelist["meta"]["casename"]

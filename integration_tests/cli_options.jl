@@ -14,6 +14,9 @@ function parse_commandline()
         arg_type = String
         "--stoch_entr"     # Choose type of stochastic entr-detr model
         arg_type = String
+        "--output_root"
+        arg_type = String
+        default = "./"
         "--t_max"          # Simulation time to run to
         arg_type = Float64
         "--adapt_dt"       # use adaptive timestepping
@@ -45,6 +48,10 @@ function parse_commandline()
         help = "Set to `true` to truncate printing of ClimaCore `Field`s"
         arg_type = Bool
         default = true
+        "--tau_cond_evap" #Until we figure out how to do it from main file
+        arg_type = Float64
+        "--tau_sub_dep" #Until we figure out how to do it from main file
+        arg_type = Float64
     end
     parsed_args = ArgParse.parse_args(ARGS, s)
     return (s, parsed_args)

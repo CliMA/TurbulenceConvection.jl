@@ -139,6 +139,10 @@ function default_namelist(
     namelist_defaults["microphysics"] = Dict()
     namelist_defaults["microphysics"]["precipitation_model"] = "None"
 
+    namelist_defaults["microphysics"]["τ_sub_dep"]   = 10 # not sure how to default to clima parameter values
+    namelist_defaults["microphysics"]["τ_cond_evap"] = 10
+
+
     namelist_defaults["turbulence"]["scheme"] = "EDMF_PrognosticTKE"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
