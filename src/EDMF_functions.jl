@@ -949,7 +949,7 @@ function compute_en_tendencies!(
     else
         @. covar =
             (shear + entr_gain + rain_src) /
-            (D_env + (ρ0_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)))
+            max(D_env + ρ0_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1), eps(FT))
     end
     return nothing
 end
