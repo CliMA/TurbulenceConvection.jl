@@ -38,9 +38,9 @@ function compute_turbconv_tendencies!(
 )
     compute_up_tendencies!(edmf, grid, state, param_set, surf)
     compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
-    compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
-    compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρaQTvar))
-    compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρaHQTcov))
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρatke)) # TODO - hack!
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρatke))
+    compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρatke))
 
     return nothing
 end
@@ -238,6 +238,7 @@ function affect_filter!(
         return nothing
     end
     prog_en = center_prog_environment(state)
+    aux_en = center_aux_environment(state)
     ###
     ### Filters
     ###
@@ -246,10 +247,10 @@ function affect_filter!(
 
     @inbounds for k in real_center_indices(grid)
         prog_en.ρatke[k] = max(prog_en.ρatke[k], 0.0)
-        prog_en.ρaHvar[k] = max(prog_en.ρaHvar[k], 0.0)
-        prog_en.ρaQTvar[k] = max(prog_en.ρaQTvar[k], 0.0)
-        prog_en.ρaHQTcov[k] = max(prog_en.ρaHQTcov[k], -sqrt(prog_en.ρaHvar[k] * prog_en.ρaQTvar[k]))
-        prog_en.ρaHQTcov[k] = min(prog_en.ρaHQTcov[k], sqrt(prog_en.ρaHvar[k] * prog_en.ρaQTvar[k]))
+        aux_en.Hvar[k] = max(aux_en.Hvar[k], 0.0)
+        aux_en.QTvar[k] = max(aux_en.QTvar[k], 0.0)
+        aux_en.HQTcov[k] = max(aux_en.HQTcov[k], -sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]))
+        aux_en.HQTcov[k] = min(aux_en.HQTcov[k], sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]))
     end
     return nothing
 end
@@ -265,6 +266,7 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     prog_en = center_prog_environment(state)
     prog_up_f = face_prog_updrafts(state)
     aux_bulk = center_aux_bulk(state)
+    aux_en = center_aux_environment(state)
     @inbounds for i in 1:N_up
         θ_surf = θ_surface_bc(surf, grid, state, edmf, i)
         q_surf = q_surface_bc(surf, grid, state, edmf, i)
@@ -293,9 +295,9 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     ρ0_ae = ρ0_c[kc_surf] * ae_surf
 
     prog_en.ρatke[kc_surf] = ρ0_ae * get_surface_tke(param_set, surf.ustar, zLL, surf.obukhov_length)
-    prog_en.ρaHvar[kc_surf] = ρ0_ae * get_surface_variance(flux1 * α0LL, flux1 * α0LL, ustar, zLL, oblength)
-    prog_en.ρaQTvar[kc_surf] = ρ0_ae * get_surface_variance(flux2 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
-    prog_en.ρaHQTcov[kc_surf] = ρ0_ae * get_surface_variance(flux1 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
+    aux_en.Hvar[kc_surf] = get_surface_variance(flux1 * α0LL, flux1 * α0LL, ustar, zLL, oblength)
+    aux_en.QTvar[kc_surf] = get_surface_variance(flux2 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
+    aux_en.HQTcov[kc_surf] = get_surface_variance(flux1 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
     return nothing
 end
 
@@ -935,13 +937,20 @@ function compute_en_tendencies!(
     end
 
     RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
-    @. prog_covar =
-        press + buoy + shear + entr_gain + rain_src - D_env * covar -
-        (ρ0_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * covar -
-        ∇c(wvec(RB(ρ0_c * area_en * Ic(w_en_f) * covar))) + ∇c(ρ0_f * If(aeK) * ∇f(covar))
 
-    prog_covar[kc_surf] = covar[kc_surf]
+    if is_tke
+        @. prog_covar =
+            press + buoy + shear + entr_gain + rain_src - D_env * covar -
+            (ρ0_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * covar -
+            ∇c(wvec(RB(ρ0_c * area_en * Ic(w_en_f) * covar))) + ∇c(ρ0_f * If(aeK) * ∇f(covar))
 
+        prog_covar[kc_surf] = covar[kc_surf]
+
+    else
+        @. covar =
+            (shear + entr_gain + rain_src) /
+            (D_env + (ρ0_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)))
+    end
     return nothing
 end
 

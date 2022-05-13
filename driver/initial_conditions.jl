@@ -41,9 +41,9 @@ function initialize_covariance(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.Stat
 
     aux_en.tke .= aux_gm.tke
     prog_en.ρatke .= aux_en.tke .* ρ0_c .* ae
-    prog_en.ρaHvar .= aux_gm.Hvar .* ρ0_c .* ae
-    prog_en.ρaQTvar .= aux_gm.QTvar .* ρ0_c .* ae
-    prog_en.ρaHQTcov .= aux_gm.HQTcov .* ρ0_c .* ae
+    aux_en.Hvar .= aux_gm.Hvar
+    aux_en.QTvar .= aux_gm.QTvar
+    aux_en.HQTcov .= aux_gm.HQTcov
     return
 end
 
