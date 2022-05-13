@@ -940,8 +940,6 @@ function compute_en_tendencies!(
         (ρ0_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * covar -
         ∇c(wvec(RB(ρ0_c * area_en * Ic(w_en_f) * covar))) + ∇c(ρ0_f * If(aeK) * ∇f(covar))
 
-    prog_covar[kc_surf] = covar[kc_surf]
-
     return nothing
 end
 
