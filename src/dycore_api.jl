@@ -38,12 +38,6 @@ tendencies(state, fl) = getproperty(state.tendencies, field_loc(fl))
 
 center_tendencies_grid_mean(state) = tendencies(state, CentField())
 
-""" Reference state fields for the host model """
-ref_state(state, fl) = aux(state, fl).ref_state
-
-face_ref_state(state) = ref_state(state, FaceField())
-center_ref_state(state) = ref_state(state, CentField())
-
 #####
 ##### TurbulenceConvection fields
 #####

@@ -1,9 +1,9 @@
 # convective velocity scale
 get_wstar(bflux, zi) = cbrt(max(bflux * zi, 0))
 
-function buoyancy_c(param_set::APS, ρ0::FT, ρ::FT) where {FT}
+function buoyancy_c(param_set::APS, ρ::FT, ρ_i::FT) where {FT}
     g::FT = ICP.grav(param_set)
-    return g * (ρ0 - ρ) / ρ0
+    return g * (ρ - ρ_i) / ρ
 end
 
 # BL height
