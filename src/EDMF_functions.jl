@@ -38,9 +38,9 @@ function compute_turbconv_tendencies!(
 )
     compute_up_tendencies!(edmf, grid, state, param_set, surf)
     compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
-    compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρatke)) # TODO - hack!
-    compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρatke))
-    compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρatke))
+    update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρatke)) # TODO - hack!
+    update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρatke))
+    update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρatke))
 
     return nothing
 end
@@ -938,21 +938,84 @@ function compute_en_tendencies!(
 
     RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
 
-    if is_tke
-        @. prog_covar =
-            press + buoy + shear + entr_gain + rain_src - D_env * covar -
-            (ρ0_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * covar -
-            ∇c(wvec(RB(ρ0_c * area_en * Ic(w_en_f) * covar))) + ∇c(ρ0_f * If(aeK) * ∇f(covar))
+    @. prog_covar =
+        press + buoy + shear + entr_gain + rain_src - D_env * covar -
+        (ρ0_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * covar -
+        ∇c(wvec(RB(ρ0_c * area_en * Ic(w_en_f) * covar))) + ∇c(ρ0_f * If(aeK) * ∇f(covar))
 
-        prog_covar[kc_surf] = covar[kc_surf]
-
-    else
-        @. covar =
-            (shear + entr_gain + rain_src) /
-            max(D_env + ρ0_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1), FT(1e-2))
-    end
     return nothing
 end
+
+function update_diagnostic_covariances!(
+    edmf::EDMFModel,
+    grid::Grid,
+    state::State,
+    param_set::APS,
+    ::Val{covar_sym},
+    ::Val{prog_sym},
+) where {covar_sym, prog_sym}
+    FT = eltype(grid)
+    N_up = n_updrafts(edmf)
+    kc_surf = kc_surface(grid)
+    kc_toa = kc_top_of_atmos(grid)
+    ρ0_c = center_ref_state(state).ρ0
+    # prog_en = center_prog_environment(state)
+    aux_en_2m = center_aux_environment_2m(state)
+    # tendencies_en = center_tendencies_environment(state)
+    # prog_covar = getproperty(tendencies_en, prog_sym)
+    aux_up_f = face_aux_updrafts(state)
+    aux_en = center_aux_environment(state)
+    covar = getproperty(aux_en, covar_sym)
+    aux_covar = getproperty(aux_en_2m, covar_sym)
+    aux_up = center_aux_updrafts(state)
+    w_en_f = face_aux_environment(state).w
+    c_d = CPEDMF.c_d(param_set)
+
+    ρ_ae_K = face_aux_turbconv(state).ρ_ae_K
+    KH = center_aux_turbconv(state).KH
+    aux_tc = center_aux_turbconv(state)
+    aux_bulk = center_aux_bulk(state)
+    D_env = aux_tc.ϕ_temporary
+    aeK = aux_tc.ψ_temporary
+    a_bulk = aux_bulk.area
+    @. aeK = (1 - a_bulk) * KH
+
+    shear = aux_covar.shear
+    entr_gain = aux_covar.entr_gain
+    rain_src = aux_covar.rain_src
+
+    wvec = CC.Geometry.WVector
+    aeK_bcs = (; bottom = CCO.SetValue(aeK[kc_surf]), top = CCO.SetValue(aeK[kc_toa]))
+    prog_bcs = (; bottom = CCO.SetGradient(wvec(FT(0))), top = CCO.SetGradient(wvec(FT(0))))
+
+    If = CCO.InterpolateC2F(; aeK_bcs...)
+    ∇f = CCO.GradientC2F(; prog_bcs...)
+    ∇c = CCO.DivergenceF2C()
+
+    mixing_length = aux_tc.mixing_length
+    min_area = edmf.minimum_area
+
+    Ic = CCO.InterpolateF2C()
+    area_en = aux_en.area
+
+    parent(D_env) .= 0
+    @inbounds for i in 1:N_up
+        turb_entr = aux_up[i].frac_turb_entr
+        entr_sc = aux_up[i].entr_sc
+        w_up = aux_up_f[i].w
+        a_up = aux_up[i].area
+        # TODO: using `Int(bool) *` means that NaNs can propagate
+        # into the solution. Could we somehow call `ifelse` instead?
+        @. D_env += Int(a_up > min_area) * ρ0_c * a_up * Ic(w_up) * (entr_sc + turb_entr)
+    end
+
+    RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
+    @. covar =
+        (shear + entr_gain + rain_src) /
+        max(D_env + ρ0_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1), FT(1e-3))
+    return nothing
+end
+
 
 function GMV_third_m(
     edmf::EDMFModel,
