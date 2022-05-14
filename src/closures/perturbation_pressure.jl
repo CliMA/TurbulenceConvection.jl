@@ -31,7 +31,7 @@ function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, param_s
     ∇ = CCO.DivergenceC2F(; w_bcs...)
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
-    ρ0 = face_ref_state(state).ρ0
+    ρ = face_ref_state(state).ρ
     aux_en_f = face_aux_environment(state)
     plume_scale_height = map(1:N_up) do i
         compute_plume_scale_height(grid, state, param_set, i)
@@ -61,10 +61,10 @@ function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, param_s
         nh_press_drag = aux_up_f[i].nh_pressure_drag
         nh_pressure = aux_up_f[i].nh_pressure
 
-        @. nh_press_buoy = Int(Ifa(a_up) > 0) * -α_b / (1 + α₂_asp_ratio²) * ρ0 * Ifa(a_up) * Ifb(b_up)
-        @. nh_press_adv = Int(Ifa(a_up) > 0) * ρ0 * Ifa(a_up) * α_a * w_up * ∇(wvec(Ifc(w_up)))
+        @. nh_press_buoy = Int(Ifa(a_up) > 0) * -α_b / (1 + α₂_asp_ratio²) * ρ * Ifa(a_up) * Ifb(b_up)
+        @. nh_press_adv = Int(Ifa(a_up) > 0) * ρ * Ifa(a_up) * α_a * w_up * ∇(wvec(Ifc(w_up)))
         # drag as w_dif and account for downdrafts
-        @. nh_press_drag = Int(Ifa(a_up) > 0) * -1 * ρ0 * Ifa(a_up) * α_d * (w_up - w_en) * abs(w_up - w_en) / H_up
+        @. nh_press_drag = Int(Ifa(a_up) > 0) * -1 * ρ * Ifa(a_up) * α_d * (w_up - w_en) * abs(w_up - w_en) / H_up
         @. nh_pressure = nh_press_buoy + nh_press_adv + nh_press_drag
     end
     return nothing

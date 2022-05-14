@@ -136,12 +136,12 @@ function Simulation1d(namelist)
     if !skip_io
         NC.Dataset(Stats.nc_filename, "a") do ds
             group = "reference"
-            add_write_field(ds, "ρ0_f", vec(TC.face_ref_state(state).ρ0), group, ("zf",))
-            add_write_field(ds, "ρ0_c", vec(TC.center_ref_state(state).ρ0), group, ("zc",))
-            add_write_field(ds, "p0_f", vec(TC.face_ref_state(state).p0), group, ("zf",))
-            add_write_field(ds, "p0_c", vec(TC.center_ref_state(state).p0), group, ("zc",))
-            add_write_field(ds, "α0_f", vec(TC.face_ref_state(state).α0), group, ("zf",))
-            add_write_field(ds, "α0_c", vec(TC.center_ref_state(state).α0), group, ("zc",))
+            add_write_field(ds, "ρ_f", vec(TC.face_ref_state(state).ρ), group, ("zf",))
+            add_write_field(ds, "ρ_c", vec(TC.center_ref_state(state).ρ), group, ("zc",))
+            add_write_field(ds, "p_f", vec(TC.face_ref_state(state).p), group, ("zf",))
+            add_write_field(ds, "p_c", vec(TC.center_ref_state(state).p), group, ("zc",))
+            add_write_field(ds, "α_f", vec(TC.face_ref_state(state).α), group, ("zf",))
+            add_write_field(ds, "α_c", vec(TC.center_ref_state(state).α), group, ("zc",))
         end
     end
 

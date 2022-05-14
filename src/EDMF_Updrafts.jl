@@ -10,8 +10,8 @@ function compute_nonequilibrium_moisture_tendencies!(
     param_set::APS,
 )
     N_up = n_updrafts(edmf)
-    p0_c = center_ref_state(state).p0
-    ρ0_c = center_ref_state(state).ρ0
+    p_c = center_ref_state(state).p
+    ρ_c = center_ref_state(state).ρ
     aux_up = center_aux_updrafts(state)
     aux_bulk = center_aux_bulk(state)
 
@@ -19,10 +19,10 @@ function compute_nonequilibrium_moisture_tendencies!(
         @inbounds for k in real_center_indices(grid)
             T_up = aux_up[i].T[k]
             q_up = TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k])
-            ts_up = TD.PhaseNonEquil_pTq(param_set, p0_c[k], T_up, q_up)
+            ts_up = TD.PhaseNonEquil_pTq(param_set, p_c[k], T_up, q_up)
 
             # condensation/evaporation, deposition/sublimation
-            mph = noneq_moisture_sources(param_set, aux_up[i].area[k], ρ0_c[k], Δt, ts_up)
+            mph = noneq_moisture_sources(param_set, aux_up[i].area[k], ρ_c[k], Δt, ts_up)
             aux_up[i].ql_tendency_noneq[k] = mph.ql_tendency * aux_up[i].area[k]
             aux_up[i].qi_tendency_noneq[k] = mph.qi_tendency * aux_up[i].area[k]
         end
@@ -50,8 +50,8 @@ function compute_precipitation_formation_tendencies(
     param_set::APS,
 )
     N_up = n_updrafts(edmf)
-    p0_c = center_ref_state(state).p0
-    ρ0_c = center_ref_state(state).ρ0
+    p_c = center_ref_state(state).p
+    ρ_c = center_ref_state(state).ρ
     aux_up = center_aux_updrafts(state)
     aux_bulk = center_aux_bulk(state)
     prog_pr = center_prog_precipitation(state)
@@ -62,12 +62,12 @@ function compute_precipitation_formation_tendencies(
             T_up = aux_up[i].T[k]
             q_tot_up = aux_up[i].q_tot[k]
             if edmf.moisture_model isa EquilibriumMoisture
-                ts_up = TD.PhaseEquil_pTq(param_set, p0_c[k], T_up, q_tot_up)
+                ts_up = TD.PhaseEquil_pTq(param_set, p_c[k], T_up, q_tot_up)
             elseif edmf.moisture_model isa NonEquilibriumMoisture
                 q_liq_up = aux_up[i].q_liq[k]
                 q_ice_up = aux_up[i].q_ice[k]
                 q = TD.PhasePartition(q_tot_up, q_liq_up, q_ice_up)
-                ts_up = TD.PhaseNonEquil_pTq(param_set, p0_c[k], T_up, q)
+                ts_up = TD.PhaseNonEquil_pTq(param_set, p_c[k], T_up, q)
             else
                 error(
                     "Something went wrong in EDMF_Updrafts. The expected moisture model is Equilibrium or NonEquilibrium",
@@ -81,7 +81,7 @@ function compute_precipitation_formation_tendencies(
                 prog_pr.q_rai[k],
                 prog_pr.q_sno[k],
                 aux_up[i].area[k],
-                ρ0_c[k],
+                ρ_c[k],
                 Δt,
                 ts_up,
             )

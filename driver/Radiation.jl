@@ -6,8 +6,8 @@ see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
 function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid, state, param_set)
     cp_d = CPP.cp_d(param_set)
-    ρ0_f = TC.face_ref_state(state).ρ0
-    ρ0_c = TC.center_ref_state(state).ρ0
+    ρ_f = TC.face_ref_state(state).ρ
+    ρ_c = TC.center_ref_state(state).ρ
     aux_gm = TC.center_aux_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -25,12 +25,12 @@ function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid,
             idx_zi = k
             # will be used at cell faces
             zi = grid.zf[k]
-            ρ_i = ρ0_f[k]
+            ρ_i = ρ_f[k]
             break
         end
     end
 
-    ρ_z = Dierckx.Spline1D(vec(grid.zc), vec(ρ0_c); k = 1)
+    ρ_z = Dierckx.Spline1D(vec(grid.zc), vec(ρ_c); k = 1)
     q_liq_z = Dierckx.Spline1D(vec(grid.zc), vec(aux_gm.q_liq); k = 1)
 
     integrand(ρq_l, params, z) = params.κ * ρ_z(z) * q_liq_z(z)
@@ -61,7 +61,7 @@ function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid,
 
     ∇c = CCO.DivergenceF2C()
     wvec = CC.Geometry.WVector
-    @. aux_gm.dTdt_rad = -∇c(wvec(aux_gm_f.f_rad)) / ρ0_c / cp_d
+    @. aux_gm.dTdt_rad = -∇c(wvec(aux_gm_f.f_rad)) / ρ_c / cp_d
 
     return
 end

@@ -158,8 +158,8 @@ function compute_entr_detr!(
     prog_gm_f = face_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
-    p0_c = center_ref_state(state).p0
-    ρ0_c = center_ref_state(state).ρ0
+    p_c = center_ref_state(state).p
+    ρ_c = center_ref_state(state).ρ
     g::FT = CPP.grav(param_set)
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
@@ -204,7 +204,7 @@ function compute_entr_detr!(
                     a_up = aux_up[i].area[k], # updraft area fraction
                     a_en = aux_en.area[k], # environment area fraction
                     H_up = plume_scale_height[i], # plume scale height
-                    ref_H = p0_c[k] / (ρ0_c[k] * g), # reference state scale height
+                    ref_H = p_c[k] / (ρ_c[k] * g), # reference state scale height
                     RH_up = aux_up[i].RH[k], # updraft relative humidity
                     RH_en = aux_en.RH[k], # environment relative humidity
                     max_area = max_area, # maximum updraft area
@@ -263,8 +263,8 @@ function compute_entr_detr!(
     prog_gm_f = face_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
-    p0_c = center_ref_state(state).p0
-    ρ0_c = center_ref_state(state).ρ0
+    p_c = center_ref_state(state).p
+    ρ_c = center_ref_state(state).ρ
     g::FT = CPP.grav(param_set)
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
@@ -312,7 +312,7 @@ function compute_entr_detr!(
                     a_up = aux_up[i].area[k], # updraft area fraction
                     a_en = aux_en.area[k], # environment area fraction
                     H_up = plume_scale_height[i], # plume scale height
-                    ref_H = p0_c[k] / (ρ0_c[k] * g), # reference state scale height
+                    ref_H = p_c[k] / (ρ_c[k] * g), # reference state scale height
                     RH_up = aux_up[i].RH[k], # updraft relative humidity
                     RH_en = aux_en.RH[k], # environment relative humidity
                     max_area = max_area, # maximum updraft area

@@ -18,7 +18,7 @@ function compute_precipitation_advection_tendencies(
 )
     FT = eltype(grid)
 
-    ρ0_c = center_ref_state(state).ρ0
+    ρ_c = center_ref_state(state).ρ
     tendencies_pr = center_tendencies_precipitation(state)
     prog_pr = center_prog_precipitation(state)
     aux_tc = center_aux_turbconv(state)
@@ -38,8 +38,8 @@ function compute_precipitation_advection_tendencies(
     wvec = CC.Geometry.WVector
 
     # TODO - some positivity limiters are needed
-    @. aux_tc.qr_tendency_advection = ∇(wvec(RB(ρ0_c * q_rai * term_vel_rain))) / ρ0_c
-    @. aux_tc.qs_tendency_advection = ∇(wvec(RB(ρ0_c * q_sno * term_vel_snow))) / ρ0_c
+    @. aux_tc.qr_tendency_advection = ∇(wvec(RB(ρ_c * q_rai * term_vel_rain))) / ρ_c
+    @. aux_tc.qs_tendency_advection = ∇(wvec(RB(ρ_c * q_sno * term_vel_snow))) / ρ_c
 
     @. tendencies_pr.q_rai += aux_tc.qr_tendency_advection
     @. tendencies_pr.q_sno += aux_tc.qs_tendency_advection
@@ -67,7 +67,7 @@ function compute_precipitation_sink_tendencies(
     param_set::APS,
     Δt::Real,
 )
-    ρ0_c = center_ref_state(state).ρ0
+    ρ_c = center_ref_state(state).ρ
     aux_gm = center_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
     prog_gm = center_prog_grid_mean(state)
@@ -78,7 +78,7 @@ function compute_precipitation_sink_tendencies(
     @inbounds for k in real_center_indices(grid)
         qr = prog_pr.q_rai[k]
         qs = prog_pr.q_sno[k]
-        ρ0 = ρ0_c[k]
+        ρ = ρ_c[k]
         q_tot_gm = aux_gm.q_tot[k]
         T_gm = aux_gm.T[k]
         # When we fuse loops, this should hopefully disappear
@@ -104,9 +104,9 @@ function compute_precipitation_sink_tendencies(
         # TODO - move limiters elsewhere
         # TODO - when using adaptive timestepping we are limiting the source terms
         #        with the previous timestep dt
-        S_qr_evap = -min(qr / Δt, -α_evp * CM1.evaporation_sublimation(param_set, rain_type, q, qr, ρ0, T_gm))
-        S_qs_melt = -min(qs / Δt, α_melt * CM1.snow_melt(param_set, qs, ρ0, T_gm))
-        tmp = α_dep_sub * CM1.evaporation_sublimation(param_set, snow_type, q, qs, ρ0, T_gm)
+        S_qr_evap = -min(qr / Δt, -α_evp * CM1.evaporation_sublimation(param_set, rain_type, q, qr, ρ, T_gm))
+        S_qs_melt = -min(qs / Δt, α_melt * CM1.snow_melt(param_set, qs, ρ, T_gm))
+        tmp = α_dep_sub * CM1.evaporation_sublimation(param_set, snow_type, q, qs, ρ, T_gm)
         if tmp > 0
             S_qs_sub_dep = min(qv / Δt, tmp)
         else

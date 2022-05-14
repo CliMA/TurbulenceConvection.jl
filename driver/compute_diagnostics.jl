@@ -109,8 +109,8 @@ function compute_diagnostics!(
 ) where {D <: CC.Fields.FieldVector}
     FT = eltype(grid)
     N_up = TC.n_updrafts(edmf)
-    ρ0_c = TC.center_ref_state(state).ρ0
-    p0_c = TC.center_ref_state(state).p0
+    ρ_c = TC.center_ref_state(state).ρ
+    p_c = TC.center_ref_state(state).p
     aux_gm = TC.center_aux_grid_mean(state)
     aux_en = TC.center_aux_environment(state)
     aux_up = TC.center_aux_updrafts(state)
@@ -134,8 +134,8 @@ function compute_diagnostics!(
 
     @inbounds for k in TC.real_center_indices(grid)
         aux_gm.s[k] = TD.specific_entropy(param_set, ts_gm[k])
-        aux_gm.θ_liq_ice[k] = prog_gm.ρθ_liq_ice[k] / ρ0_c[k]
-        aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ0_c[k]
+        aux_gm.θ_liq_ice[k] = prog_gm.ρθ_liq_ice[k] / ρ_c[k]
+        aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
         aux_en.s[k] = TD.specific_entropy(param_set, ts_en[k])
     end
     @inbounds for k in TC.real_center_indices(grid)
@@ -148,7 +148,7 @@ function compute_diagnostics!(
                 end
                 ts_up = TC.thermo_state_pθq(
                     param_set,
-                    p0_c[k],
+                    p_c[k],
                     aux_up[i].θ_liq_ice[k],
                     aux_up[i].q_tot[k],
                     thermo_args...,
@@ -311,13 +311,13 @@ function compute_diagnostics!(
 
     TC.update_cloud_frac(edmf, grid, state)
 
-    diag_svpc.lwp_mean[cent] = sum(ρ0_c .* aux_gm.q_liq)
-    diag_svpc.iwp_mean[cent] = sum(ρ0_c .* aux_gm.q_ice)
-    diag_svpc.rwp_mean[cent] = sum(ρ0_c .* prog_pr.q_rai)
-    diag_svpc.swp_mean[cent] = sum(ρ0_c .* prog_pr.q_sno)
+    diag_svpc.lwp_mean[cent] = sum(ρ_c .* aux_gm.q_liq)
+    diag_svpc.iwp_mean[cent] = sum(ρ_c .* aux_gm.q_ice)
+    diag_svpc.rwp_mean[cent] = sum(ρ_c .* prog_pr.q_rai)
+    diag_svpc.swp_mean[cent] = sum(ρ_c .* prog_pr.q_sno)
 
-    diag_tc_svpc.env_lwp[cent] = sum(ρ0_c .* aux_en.q_liq .* aux_en.area)
-    diag_tc_svpc.env_iwp[cent] = sum(ρ0_c .* aux_en.q_ice .* aux_en.area)
+    diag_tc_svpc.env_lwp[cent] = sum(ρ_c .* aux_en.q_liq .* aux_en.area)
+    diag_tc_svpc.env_iwp[cent] = sum(ρ_c .* aux_en.q_ice .* aux_en.area)
 
     #TODO - change to rain rate that depends on rain model choice
 
@@ -325,13 +325,13 @@ function compute_diagnostics!(
     rho_cloud_liq = 1e3
     if (precip_model isa TC.CutoffPrecipitation)
         f =
-            (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ0_c ./
-            TC.rho_cloud_liq .* 3.6 .* 1e6
+            (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ_c ./ TC.rho_cloud_liq .*
+            3.6 .* 1e6
         diag_svpc.cutoff_precipitation_rate[cent] = sum(f)
     end
 
-    lwp = sum(i -> sum(ρ0_c .* aux_up[i].q_liq .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
-    iwp = sum(i -> sum(ρ0_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
+    lwp = sum(i -> sum(ρ_c .* aux_up[i].q_liq .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
+    iwp = sum(i -> sum(ρ_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
     plume_scale_height = map(1:N_up) do i
         TC.compute_plume_scale_height(grid, state, param_set, i)
     end

@@ -120,7 +120,7 @@ Base.@kwdef struct EnvBuoyGrad{FT, EBC <: AbstractEnvBuoyGradClosure}
     "liquid ice potential temperature gradient in the saturated part"
     ∂θl∂z_sat::FT
     "reference pressure"
-    p0::FT
+    p::FT
     "cloud fraction"
     en_cld_frac::FT
     "specific volume"
@@ -163,7 +163,7 @@ Base.@kwdef struct MinDisspLen{FT}
     "turbulent Prandtl number"
     Pr::FT
     "reference pressure"
-    p0::FT
+    p::FT
     "vertical buoyancy gradient struct"
     ∇b::GradBuoy{FT}
     "env shear"

@@ -6,10 +6,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
-    ρ0_f = face_ref_state(state).ρ0
-    p0_c = center_ref_state(state).p0
-    ρ0_c = center_ref_state(state).ρ0
-    α0_c = center_ref_state(state).α0
+    ρ_f = face_ref_state(state).ρ
+    p_c = center_ref_state(state).p
+    ρ_c = center_ref_state(state).ρ
+    α_c = center_ref_state(state).α
     c_m = CPEDMF.c_m(param_set)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
@@ -47,7 +47,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         #####
         @inbounds for i in 1:N_up
             if is_surface_center(grid, k)
-                if prog_up[i].ρarea[k] / ρ0_c[k] >= edmf.minimum_area
+                if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
                     θ_surf = θ_surface_bc(surf, grid, state, edmf, i)
                     q_surf = q_surface_bc(surf, grid, state, edmf, i)
                     a_surf = area_surface_bc(surf, edmf, i)
@@ -59,10 +59,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                     aux_up[i].q_tot[k] = aux_gm.q_tot[k]
                 end
             else
-                if prog_up[i].ρarea[k] / ρ0_c[k] >= edmf.minimum_area
+                if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
                     aux_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / prog_up[i].ρarea[k]
                     aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
-                    aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ0_c[k]
+                    aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ_c[k]
                 else
                     aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
                     aux_up[i].q_tot[k] = aux_gm.q_tot[k]
@@ -73,7 +73,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         if edmf.moisture_model isa NonEquilibriumMoisture
             @inbounds for i in 1:N_up
                 if is_surface_center(grid, k)
-                    if prog_up[i].ρarea[k] / ρ0_c[k] >= edmf.minimum_area
+                    if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
                         ql_surf = ql_surface_bc(surf)
                         qi_surf = qi_surface_bc(surf)
                         aux_up[i].q_liq[k] = ql_surf
@@ -83,7 +83,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                         aux_up[i].q_ice[k] = prog_gm.q_ice[k]
                     end
                 else
-                    if prog_up[i].ρarea[k] / ρ0_c[k] >= edmf.minimum_area
+                    if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
                         aux_up[i].q_liq[k] = prog_up[i].ρaq_liq[k] / prog_up[i].ρarea[k]
                         aux_up[i].q_ice[k] = prog_up[i].ρaq_ice[k] / prog_up[i].ρarea[k]
                     else
@@ -127,10 +127,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             end
         end
         aux_en.area[k] = 1 - aux_bulk.area[k]
-        aux_en.tke[k] = prog_en.ρatke[k] / (ρ0_c[k] * aux_en.area[k])
-        aux_en.Hvar[k] = prog_en.ρaHvar[k] / (ρ0_c[k] * aux_en.area[k])
-        aux_en.QTvar[k] = prog_en.ρaQTvar[k] / (ρ0_c[k] * aux_en.area[k])
-        aux_en.HQTcov[k] = prog_en.ρaHQTcov[k] / (ρ0_c[k] * aux_en.area[k])
+        aux_en.tke[k] = prog_en.ρatke[k] / (ρ_c[k] * aux_en.area[k])
+        aux_en.Hvar[k] = prog_en.ρaHvar[k] / (ρ_c[k] * aux_en.area[k])
+        aux_en.QTvar[k] = prog_en.ρaQTvar[k] / (ρ_c[k] * aux_en.area[k])
+        aux_en.HQTcov[k] = prog_en.ρaHQTcov[k] / (ρ_c[k] * aux_en.area[k])
 
         #####
         ##### decompose_environment
@@ -155,7 +155,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
-        ts_env[k] = thermo_state_pθq(param_set, p0_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], thermo_args...)
+        ts_env[k] = thermo_state_pθq(param_set, p_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], thermo_args...)
         ts_en = ts_env[k]
         aux_en.T[k] = TD.air_temperature(param_set, ts_en)
         aux_en.θ_virt[k] = TD.virtual_pottemp(param_set, ts_en)
@@ -163,7 +163,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.q_liq[k] = TD.liquid_specific_humidity(param_set, ts_en)
         aux_en.q_ice[k] = TD.ice_specific_humidity(param_set, ts_en)
         rho = TD.air_density(param_set, ts_en)
-        aux_en.buoy[k] = buoyancy_c(param_set, ρ0_c[k], rho)
+        aux_en.buoy[k] = buoyancy_c(param_set, ρ_c[k], rho)
 
         # update_sat_unsat
         if TD.has_condensate(param_set, ts_en)
@@ -187,21 +187,21 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 qt = aux_up[i].q_tot[k - 1]
                 h = aux_up[i].θ_liq_ice[k - 1]
                 if edmf.moisture_model isa EquilibriumMoisture
-                    ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
+                    ts_up = thermo_state_pθq(param_set, p_c[k], h, qt)
                 elseif edmf.moisture_model isa NonEquilibriumMoisture
                     ql = aux_up[i].q_liq[k - 1]
                     qi = aux_up[i].q_ice[k - 1]
-                    ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt, ql, qi)
+                    ts_up = thermo_state_pθq(param_set, p_c[k], h, qt, ql, qi)
                 else
                     error("Something went wrong. emdf.moisture_model options are equilibrium or nonequilibrium")
                 end
             else
                 if edmf.moisture_model isa EquilibriumMoisture
-                    ts_up = thermo_state_pθq(param_set, p0_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
+                    ts_up = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
                 elseif edmf.moisture_model isa NonEquilibriumMoisture
                     ts_up = thermo_state_pθq(
                         param_set,
-                        p0_c[k],
+                        p_c[k],
                         aux_up[i].θ_liq_ice[k],
                         aux_up[i].q_tot[k],
                         aux_up[i].q_liq[k],
@@ -215,7 +215,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             aux_up[i].q_ice[k] = TD.ice_specific_humidity(param_set, ts_up)
             aux_up[i].T[k] = TD.air_temperature(param_set, ts_up)
             ρ = TD.air_density(param_set, ts_up)
-            aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
+            aux_up[i].buoy[k] = buoyancy_c(param_set, ρ_c[k], ρ)
             aux_up[i].RH[k] = TD.relative_humidity(param_set, ts_up)
         end
         aux_gm.buoy[k] = (1.0 - aux_bulk.area[k]) * aux_en.buoy[k]
@@ -275,7 +275,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         If = CCO.InterpolateC2F(; a_up_bcs...)
         a_min = edmf.minimum_area
         a_up = aux_up[i].area
-        @. aux_up_f[i].w = ifelse(If(a_up) >= a_min, max(prog_up_f[i].ρaw / (ρ0_f * If(a_up)), 0), FT(0))
+        @. aux_up_f[i].w = ifelse(If(a_up) >= a_min, max(prog_up_f[i].ρaw / (ρ_f * If(a_up)), 0), FT(0))
     end
     @inbounds for i in 1:N_up
         aux_up_f[i].w[kf_surf] = w_surface_bc(surf)
@@ -389,9 +389,9 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 ∂θv∂z_unsat = ∂θv∂z[k],
                 ∂qt∂z_sat = ∂qt∂z[k],
                 ∂θl∂z_sat = ∂θl∂z[k],
-                p0 = p0_c[k],
+                p = p_c[k],
                 en_cld_frac = aux_en.cloud_fraction[k],
-                alpha0 = α0_c[k],
+                alpha0 = α_c[k],
             )
             bg_model = EnvBuoyGrad(edmf.bg_closure; bg_kwargs...)
 
@@ -406,9 +406,9 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 ∂θv∂z_unsat = ∂θv∂z_unsat[k],
                 ∂qt∂z_sat = ∂qt∂z_sat[k],
                 ∂θl∂z_sat = ∂θl∂z_sat[k],
-                p0 = p0_c[k],
+                p = p_c[k],
                 en_cld_frac = aux_en.cloud_fraction[k],
-                alpha0 = α0_c[k],
+                alpha0 = α_c[k],
             )
             bg_model = EnvBuoyGrad(edmf.bg_closure; bg_kwargs...)
         else
@@ -427,7 +427,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             tke_surf = aux_en.tke[kc_surf],
             ustar = surf.ustar,
             Pr = aux_tc.prandtl_nvec[k],
-            p0 = p0_c[k],
+            p = p_c[k],
             ∇b = bg,
             Shear² = Shear²[k],
             tke = aux_en.tke[k],
@@ -442,7 +442,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0.0))
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
 
-        aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ0_c[k] * KH[k] * bg.∂b∂z
+        aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
     end
 
 
@@ -474,9 +474,9 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     # TODO defined again in compute_covariance_shear and compute_covaraince
     @inbounds for k in real_center_indices(grid)
         aux_en_2m.tke.rain_src[k] = 0
-        aux_en_2m.Hvar.rain_src[k] = ρ0_c[k] * aux_en.area[k] * 2 * aux_en.Hvar_rain_dt[k]
-        aux_en_2m.QTvar.rain_src[k] = ρ0_c[k] * aux_en.area[k] * 2 * aux_en.QTvar_rain_dt[k]
-        aux_en_2m.HQTcov.rain_src[k] = ρ0_c[k] * aux_en.area[k] * aux_en.HQTcov_rain_dt[k]
+        aux_en_2m.Hvar.rain_src[k] = ρ_c[k] * aux_en.area[k] * 2 * aux_en.Hvar_rain_dt[k]
+        aux_en_2m.QTvar.rain_src[k] = ρ_c[k] * aux_en.area[k] * 2 * aux_en.QTvar_rain_dt[k]
+        aux_en_2m.HQTcov.rain_src[k] = ρ_c[k] * aux_en.area[k] * aux_en.HQTcov_rain_dt[k]
     end
 
     get_GMV_CoVar(edmf, grid, state, Val(:tke), Val(:w), Val(:w))
@@ -494,8 +494,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         prog_pr = center_prog_precipitation(state)
 
         @inbounds for k in real_center_indices(grid)
-            term_vel_rain[k] = CM1.terminal_velocity(param_set, CM1.RainType(), ρ0_c[k], prog_pr.q_rai[k])
-            term_vel_snow[k] = CM1.terminal_velocity(param_set, CM1.SnowType(), ρ0_c[k], prog_pr.q_sno[k])
+            term_vel_rain[k] = CM1.terminal_velocity(param_set, CM1.RainType(), ρ_c[k], prog_pr.q_rai[k])
+            term_vel_snow[k] = CM1.terminal_velocity(param_set, CM1.SnowType(), ρ_c[k], prog_pr.q_sno[k])
         end
     end
 
