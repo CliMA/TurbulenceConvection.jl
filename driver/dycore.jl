@@ -53,7 +53,6 @@ cent_aux_vars_gm(FT, edmf) = (;
     RH = FT(0),
     s = FT(0),
     T = FT(0),
-    buoy = FT(0),
     cloud_fraction = FT(0),
     H_third_m = FT(0),
     W_third_m = FT(0),
@@ -264,6 +263,7 @@ end
 function assign_thermo_aux!(state, grid, moisture_model, param_set)
     ρ0_c = TC.center_ref_state(state).ρ0
     aux_gm = TC.center_aux_grid_mean(state)
+    aux_tc = TC.center_aux_turbconv(state)
     prog_gm = TC.center_prog_grid_mean(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
     @inbounds for k in TC.real_center_indices(grid)
@@ -274,7 +274,7 @@ function assign_thermo_aux!(state, grid, moisture_model, param_set)
         aux_gm.q_ice[k] = TD.ice_specific_humidity(param_set, ts)
         aux_gm.T[k] = TD.air_temperature(param_set, ts)
         ρ = TD.air_density(param_set, ts)
-        aux_gm.buoy[k] = TC.buoyancy_c(param_set, ρ0_c[k], ρ)
+        aux_tc.buoy[k] = TC.buoyancy_c(param_set, ρ0_c[k], ρ)
         aux_gm.RH[k] = TD.relative_humidity(param_set, ts)
     end
     return
