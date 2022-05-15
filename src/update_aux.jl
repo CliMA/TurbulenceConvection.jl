@@ -482,22 +482,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     get_GMV_CoVar(edmf, grid, state, Val(:tke), Val(:w), Val(:w))
 
     compute_diffusive_fluxes(edmf, grid, state, surf, param_set)
-
-
-    # TODO: use dispatch
-    if edmf.precip_model isa Clima1M
-        # helper to calculate the rain velocity
-        # TODO: assuming w_gm = 0
-        # TODO: verify translation
-        term_vel_rain = aux_tc.term_vel_rain
-        term_vel_snow = aux_tc.term_vel_snow
-        prog_pr = center_prog_precipitation(state)
-
-        @inbounds for k in real_center_indices(grid)
-            term_vel_rain[k] = CM1.terminal_velocity(param_set, CM1.RainType(), ρ0_c[k], prog_pr.q_rai[k])
-            term_vel_snow[k] = CM1.terminal_velocity(param_set, CM1.SnowType(), ρ0_c[k], prog_pr.q_sno[k])
-        end
-    end
-
+    microphysics(edmf.en_thermo, grid, state, edmf, edmf.precip_model, Δt, param_set)
     return nothing
 end

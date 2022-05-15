@@ -324,26 +324,57 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     Cases.update_forcing(case, grid, state, t, param_set)
     Cases.update_radiation(case.Rad, grid, state, param_set)
 
-    TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
-
     tends_face = tendencies.face
     tends_cent = tendencies.cent
     parent(tends_face) .= 0
     parent(tends_cent) .= 0
-    # compute tendencies
 
-    en_thermo = edmf.en_thermo
+    compute_precip_terminal_velocity!(edmf.precip_model, grid, state, param_set)
+    TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
 
     # compute tendencies
-    # causes division error in dry bubble first time step
+    compute_pr_tendencies!(edmf, grid, state, precip_model, param_set, Δt)
+    compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, param_set)
+    TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt)
+    return nothing
+end
+
+function compute_pr_tendencies!(
+    edmf::TC.EDMFModel,
+    grid::TC.Grid,
+    state::TC.State,
+    precip_model::TC.AbstractPrecipitationModel,
+    param_set::APS,
+    Δt::FT,
+) where {FT}
     TC.compute_precipitation_formation_tendencies(grid, state, edmf, precip_model, Δt, param_set)
-    TC.microphysics(en_thermo, grid, state, edmf, precip_model, Δt, param_set)
     TC.compute_precipitation_sink_tendencies(precip_model, edmf, grid, state, param_set, Δt)
     TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set)
+    return nothing
+end
 
-    TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt)
-    compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, param_set)
+function compute_precip_terminal_velocity!(
+    precip_model::TC.AbstractPrecipitationModel,
+    grid::TC.Grid,
+    state::TC.State,
+    param_set::APS,
+)
 
+    ρ0_c = TC.center_ref_state(state).ρ0
+    aux_tc = TC.center_aux_turbconv(state)
+    if precip_model isa TC.Clima1M
+        # helper to calculate the rain velocity
+        # TODO: assuming w_gm = 0
+        # TODO: verify translation
+        term_vel_rain = aux_tc.term_vel_rain
+        term_vel_snow = aux_tc.term_vel_snow
+        prog_pr = TC.center_prog_precipitation(state)
+
+        @inbounds for k in TC.real_center_indices(grid)
+            term_vel_rain[k] = CM1.terminal_velocity(param_set, CM1.RainType(), ρ0_c[k], prog_pr.q_rai[k])
+            term_vel_snow[k] = CM1.terminal_velocity(param_set, CM1.SnowType(), ρ0_c[k], prog_pr.q_sno[k])
+        end
+    end
     return nothing
 end
 
