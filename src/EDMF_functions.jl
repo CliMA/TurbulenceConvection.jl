@@ -121,7 +121,12 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         # therefore h_tot / q_tot values do not matter
         ts_up_i = copy(ts_en)
         h_tot_up_i = copy(q_tot_up)
-        @. ts_up_i = thermo_state_pθq(param_set, p0_c, θ_liq_ice_up, q_tot_up)
+        thermo_args = if edmf.moisture_model isa TC.EquilibriumMoisture
+                ()
+            elseif edmf.moisture_model isa TC.NonEquilibriumMoisture
+                (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
+            end
+        @. ts_up_i = thermo_state_pθq(param_set, p0_c, θ_liq_ice_up, q_tot_up, thermo_args...,)
         @. h_tot_up_i = anelastic_total_enthalpy(
             param_set,
             TD.total_energy(
