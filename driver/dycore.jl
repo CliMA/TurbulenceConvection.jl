@@ -487,7 +487,7 @@ function compute_gm_tendencies!(
                 tendencies_gm.ρq_tot[k] -= ρ0_c[k] * aux_gm.subsidence[k] * ∇q_tot_gm[k]
             end
             tendencies_gm.ρq_tot[k] += ρ0_c[k] * aux_gm.dqtdt[k]
-            tendencies_gm.ρe_tot[k] += ρ0_c[k] * (cp_m * aux_gm.dTdt[k] + h_v * aux_gm.dqtdt[k])
+            tendencies_gm.ρe_tot[k] += ρ0_c[k] * (cv_m * aux_gm.dTdt[k] + h_v * aux_gm.dqtdt[k])
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
                 if force.apply_subsidence
                     tendencies_gm.q_liq[k] -= ∇q_liq_gm[k] * aux_gm.subsidence[k]
