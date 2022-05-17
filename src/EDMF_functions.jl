@@ -60,9 +60,9 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     aux_up = center_aux_updrafts(state)
     aux_tc_f = face_aux_turbconv(state)
     aux_up_f = face_aux_updrafts(state)
-    ρ_f = face_ref_state(state).ρ
-    ρ_c = center_ref_state(state).ρ
-    p_c = center_ref_state(state).p
+    ρ_f = aux_gm_f.ρ
+    ρ_c = prog_gm.ρ
+    p_c = aux_gm.p
     kf_surf = kf_surface(grid)
     kc_surf = kc_surface(grid)
     massflux = aux_tc_f.massflux
@@ -176,14 +176,15 @@ end
 
 function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS)
     FT = eltype(grid)
-    ρ_f = face_ref_state(state).ρ
     aux_bulk = center_aux_bulk(state)
     aux_tc_f = face_aux_turbconv(state)
     aux_en = center_aux_environment(state)
+    aux_gm_f = face_aux_grid_mean(state)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
     aeKM = center_aux_turbconv(state).ϕ_temporary
     aeKH = center_aux_turbconv(state).ψ_temporary
+    ρ_f = aux_gm_f.ρ
     a_en = aux_en.area
     @. aeKM = a_en * KM
     @. aeKH = a_en * KH
@@ -265,13 +266,15 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
-    ρ_c = center_ref_state(state).ρ
-    ρ_f = face_ref_state(state).ρ
     prog_up = center_prog_updrafts(state)
     prog_en = center_prog_environment(state)
     prog_up_f = face_prog_updrafts(state)
     aux_bulk = center_aux_bulk(state)
     aux_en = center_aux_environment(state)
+    prog_gm = center_prog_grid_mean(state)
+    aux_gm_f = face_aux_grid_mean(state)
+    ρ_c = prog_gm.ρ
+    ρ_f = aux_gm_f.ρ
     @inbounds for i in 1:N_up
         θ_surf = θ_surface_bc(surf, grid, state, edmf, i)
         q_surf = q_surface_bc(surf, grid, state, edmf, i)
@@ -293,7 +296,7 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     zLL = grid.zc[kc_surf].z
     ustar = surf.ustar
     oblength = surf.obukhov_length
-    ρLL = center_ref_state(state).ρ[kc_surf]
+    ρLL = prog_gm.ρ[kc_surf]
     # TODO: is bulk even defined before this is called?
     ae_surf = 1 - aux_bulk.area[kc_surf] # area of environment
 
@@ -310,10 +313,11 @@ end
 
 function surface_helper(surf::SurfaceBase, grid::Grid, state::State)
     kc_surf = kc_surface(grid)
+    prog_gm = center_prog_grid_mean(state)
     zLL = grid.zc[kc_surf].z
     ustar = surf.ustar
     oblength = surf.obukhov_length
-    ρLL = center_ref_state(state).ρ[kc_surf]
+    ρLL = prog_gm.ρ[kc_surf]
     return (; ustar, zLL, oblength, ρLL)
 end
 
@@ -463,8 +467,10 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     prog_up = center_prog_updrafts(state)
     tendencies_up = center_tendencies_updrafts(state)
     tendencies_up_f = face_tendencies_updrafts(state)
-    ρ_c = center_ref_state(state).ρ
-    ρ_f = face_ref_state(state).ρ
+    prog_gm = center_prog_grid_mean(state)
+    aux_gm_f = face_aux_grid_mean(state)
+    ρ_c = prog_gm.ρ
+    ρ_f = aux_gm_f.ρ
     au_lim = edmf.max_area
 
     @inbounds for i in 1:N_up
@@ -603,11 +609,12 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
 
     prog_up = center_prog_updrafts(state)
     prog_gm = center_prog_grid_mean(state)
+    aux_gm_f = face_aux_grid_mean(state)
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
-    ρ_c = center_ref_state(state).ρ
-    ρ_f = face_ref_state(state).ρ
+    ρ_c = prog_gm.ρ
+    ρ_f = aux_gm_f.ρ
     a_min = edmf.minimum_area
     a_max = edmf.max_area
 
@@ -701,8 +708,8 @@ function compute_covariance_shear(
 ) where {covar_sym, ϕ_en_sym, ψ_en_sym}
 
     aux_tc = center_aux_turbconv(state)
-    ρ_c = center_ref_state(state).ρ
     prog_gm = center_prog_grid_mean(state)
+    ρ_c = prog_gm.ρ
     is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
     k_eddy = is_tke ? aux_tc.KM : aux_tc.KH
@@ -782,7 +789,6 @@ function compute_covariance_entr(
 ) where {covar_sym, ϕ_sym, ψ_sym}
 
     N_up = n_updrafts(edmf)
-    ρ_c = center_ref_state(state).ρ
     FT = eltype(grid)
     is_tke = covar_sym == :tke
     tke_factor = is_tke ? 0.5 : 1
@@ -790,6 +796,8 @@ function compute_covariance_entr(
     aux_up_f = face_aux_updrafts(state)
     aux_gm_c = center_aux_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
+    prog_gm = center_prog_grid_mean(state)
+    ρ_c = prog_gm.ρ
     gm = is_tke ? prog_gm_f : aux_gm_c
     prog_up = is_tke ? aux_up_f : aux_up
     ϕ_gm = getproperty(gm, ϕ_sym)
@@ -852,9 +860,10 @@ function compute_covariance_dissipation(
     FT = eltype(grid)
     c_d::FT = CPEDMF.c_d(param_set)
     aux_tc = center_aux_turbconv(state)
-    ρ_c = center_ref_state(state).ρ
     prog_en = center_prog_environment(state)
+    prog_gm = center_prog_grid_mean(state)
     aux_en = center_aux_environment(state)
+    ρ_c = prog_gm.ρ
     aux_en_2m = center_aux_environment_2m(state)
     aux_covar = getproperty(aux_en_2m, covar_sym)
     covar = getproperty(aux_en, covar_sym)
@@ -878,9 +887,9 @@ function compute_en_tendencies!(
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
-    ρ_c = center_ref_state(state).ρ
-    ρ_f = face_ref_state(state).ρ
+    aux_gm_f = face_aux_grid_mean(state)
     prog_en = center_prog_environment(state)
+    prog_gm = center_prog_grid_mean(state)
     aux_en_2m = center_aux_environment_2m(state)
     tendencies_en = center_tendencies_environment(state)
     prog_covar = getproperty(tendencies_en, prog_sym)
@@ -890,6 +899,8 @@ function compute_en_tendencies!(
     aux_covar = getproperty(aux_en_2m, covar_sym)
     aux_up = center_aux_updrafts(state)
     w_en_f = face_aux_environment(state).w
+    ρ_c = prog_gm.ρ
+    ρ_f = aux_gm_f.ρ
     c_d = CPEDMF.c_d(param_set)
     is_tke = covar_sym == :tke
     FT = eltype(grid)
@@ -961,7 +972,8 @@ function update_diagnostic_covariances!(
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
-    ρ_c = center_ref_state(state).ρ
+    prog_gm = center_prog_grid_mean(state)
+    ρ_c = prog_gm.ρ
     aux_en_2m = center_aux_environment_2m(state)
     aux_up_f = face_aux_updrafts(state)
     aux_en = center_aux_environment(state)

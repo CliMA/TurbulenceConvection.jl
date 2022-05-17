@@ -82,6 +82,7 @@ cent_aux_vars_gm(FT, edmf) = (;
     Ri = FT(0),
     θ_liq_ice = FT(0),
     q_tot = FT(0),
+    p = FT(0),
 )
 cent_aux_vars(FT, edmf) =
     (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT, edmf)..., TC.cent_aux_vars_edmf(FT, edmf)...)
@@ -99,6 +100,8 @@ face_aux_vars_gm(FT, edmf) = (;
     face_aux_vars_gm_moisture(FT, edmf.moisture_model)...,
     sgs_flux_u = FT(0),
     sgs_flux_v = FT(0),
+    p = FT(0),
+    ρ = FT(0),
 )
 face_aux_vars(FT, edmf) =
     (; aux_vars_ref_state(FT)..., face_aux_vars_gm(FT, edmf)..., TC.face_aux_vars_edmf(FT, edmf)...)
@@ -140,6 +143,7 @@ cent_prognostic_vars(::Type{FT}, local_geometry, edmf) where {FT} =
 cent_prognostic_vars_gm_moisture(::Type{FT}, ::TC.NonEquilibriumMoisture) where {FT} = (; q_liq = FT(0), q_ice = FT(0))
 cent_prognostic_vars_gm_moisture(::Type{FT}, ::TC.EquilibriumMoisture) where {FT} = NamedTuple()
 cent_prognostic_vars_gm(::Type{FT}, local_geometry, edmf) where {FT} = (;
+    ρ = FT(0),
     u = FT(0),
     v = FT(0),
     ρθ_liq_ice = FT(0),
@@ -187,10 +191,13 @@ The reference profiles, given
 function compute_ref_state!(state, grid::TC.Grid, param_set::PS; ts_g) where {PS}
 
     FT = eltype(grid)
-    p_c = TC.center_ref_state(state).p
-    ρ_c = TC.center_ref_state(state).ρ
-    p_f = TC.face_ref_state(state).p
-    ρ_f = TC.face_ref_state(state).ρ
+    aux_gm = TC.center_aux_grid_mean(state)
+    aux_gm_f = TC.face_aux_grid_mean(state)
+    prog_gm = TC.center_prog_grid_mean(state)
+    p_c = aux_gm.p
+    ρ_c = prog_gm.ρ
+    p_f = aux_gm_f.p
+    ρ_f = aux_gm_f.ρ
 
     qtg = TD.total_specific_humidity(param_set, ts_g)
     θ_liq_ice_g = TD.liquid_ice_pottemp(param_set, ts_g)
@@ -239,8 +246,8 @@ function set_thermo_state!(state, grid, moisture_model, param_set)
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
-    p_c = TC.center_ref_state(state).p
-    ρ_c = TC.center_ref_state(state).ρ
+    p_c = aux_gm.p
+    ρ_c = prog_gm.ρ
     @inbounds for k in TC.real_center_indices(grid)
         aux_gm.θ_liq_ice[k] = prog_gm.ρθ_liq_ice[k] / ρ_c[k]
         aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
@@ -257,10 +264,10 @@ function set_thermo_state!(state, grid, moisture_model, param_set)
 end
 
 function assign_thermo_aux!(state, grid, moisture_model, param_set)
-    ρ_c = TC.center_ref_state(state).ρ
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
+    ρ_c = prog_gm.ρ
     @inbounds for k in TC.real_center_indices(grid)
         aux_gm.θ_liq_ice[k] = prog_gm.ρθ_liq_ice[k] / ρ_c[k]
         aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
@@ -364,9 +371,9 @@ function compute_gm_tendencies!(
     aux_en_f = TC.face_aux_environment(state)
     aux_up = TC.center_aux_updrafts(state)
     aux_bulk = TC.center_aux_bulk(state)
-    ρ_f = TC.face_ref_state(state).ρ
-    p_c = TC.center_ref_state(state).p
-    ρ_c = TC.center_ref_state(state).ρ
+    ρ_f = aux_gm_f.ρ
+    p_c = aux_gm.p
+    ρ_c = prog_gm.ρ
     aux_tc = TC.center_aux_turbconv(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
 

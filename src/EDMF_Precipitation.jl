@@ -18,10 +18,11 @@ function compute_precipitation_advection_tendencies(
 )
     FT = eltype(grid)
 
-    ρ_c = center_ref_state(state).ρ
     tendencies_pr = center_tendencies_precipitation(state)
     prog_pr = center_prog_precipitation(state)
     aux_tc = center_aux_turbconv(state)
+    prog_gm = center_prog_grid_mean(state)
+    ρ_c = prog_gm.ρ
 
     # helper to calculate the rain velocity
     # TODO: assuming w_gm = 0
@@ -67,11 +68,11 @@ function compute_precipitation_sink_tendencies(
     param_set::APS,
     Δt::Real,
 )
-    ρ_c = center_ref_state(state).ρ
     aux_gm = center_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
     prog_gm = center_prog_grid_mean(state)
     prog_pr = center_prog_precipitation(state)
+    ρ_c = prog_gm.ρρ
     tendencies_pr = center_tendencies_precipitation(state)
     ts_gm = aux_gm.ts
 

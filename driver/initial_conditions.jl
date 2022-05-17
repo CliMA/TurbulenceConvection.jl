@@ -14,7 +14,7 @@ function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, cas
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = aux_gm.ts
     prog_gm = TC.center_prog_grid_mean(state)
-    p_c = TC.center_ref_state(state).p
+    p_c = prog_gm.ρ
     parent(aux_tc.prandtl_nvec) .= edmf.prandtl_number
     @inbounds for k in TC.real_center_indices(grid)
         aux_gm.θ_virt[k] = TD.virtual_pottemp(param_set, ts_gm[k])
@@ -35,7 +35,8 @@ function initialize_covariance(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.Stat
     aux_gm = TC.center_aux_grid_mean(state)
     prog_en = TC.center_prog_environment(state)
     aux_en = TC.center_aux_environment(state)
-    ρ_c = TC.center_ref_state(state).ρ
+    prog_gm = TC.center_prog_grid_mean(state)
+    ρ_c = prog_gm.ρ
     aux_bulk = TC.center_aux_bulk(state)
     ae = 1 .- aux_bulk.area # area of environment
 
@@ -63,7 +64,7 @@ function initialize_updrafts(edmf, grid, state, surf)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_up = TC.center_prog_updrafts(state)
     prog_up_f = TC.face_prog_updrafts(state)
-    ρ_c = TC.center_ref_state(state).ρ
+    ρ_c = prog_gm.ρ
     @inbounds for i in 1:N_up
         @inbounds for k in TC.real_face_indices(grid)
             aux_up_f[i].w[k] = 0
@@ -104,10 +105,11 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
     aux_up = TC.center_aux_updrafts(state)
     aux_up_f = TC.face_aux_updrafts(state)
     aux_gm = TC.center_aux_grid_mean(state)
+    aux_gm_f = TC.face_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_up = TC.center_prog_updrafts(state)
-    ρ_0_c = TC.center_ref_state(state).ρ
-    ρ_0_f = TC.face_ref_state(state).ρ
+    ρ_0_c = prog_gm.ρ
+    ρ_0_f = aux_gm_f.ρ
     N_up = TC.n_updrafts(edmf)
     FT = eltype(grid)
     z_in = APL.DryBubble_updrafts_z(FT)

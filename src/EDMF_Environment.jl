@@ -9,11 +9,13 @@ function microphysics(
 )
 
     tendencies_pr = center_tendencies_precipitation(state)
-    p_c = center_ref_state(state).p
-    ρ_c = center_ref_state(state).ρ
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
+    prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     ts_env = center_aux_environment(state).ts
+    p_c = aux_gm.p
+    ρ_c = prog_gm.ρ
     aux_en_sat = aux_en.sat
     aux_en_unsat = aux_en.unsat
 
@@ -222,14 +224,16 @@ function microphysics(
     Δt::Real,
     param_set::APS,
 )
-    p_c = center_ref_state(state).p
-    ρ_c = center_ref_state(state).ρ
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
+    prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     aux_en_unsat = aux_en.unsat
     aux_en_sat = aux_en.sat
     tendencies_pr = center_tendencies_precipitation(state)
     ts_env = center_aux_environment(state).ts
+    p_c = aux_gm.p
+    ρ_c = prog_gm.ρ
 
     #TODO - if we start using eos_smpl for the updrafts calculations
     #       we can get rid of the two categories for outer and inner quad. points

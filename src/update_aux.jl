@@ -6,9 +6,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
-    ρ_f = face_ref_state(state).ρ
-    p_c = center_ref_state(state).p
-    ρ_c = center_ref_state(state).ρ
     c_m = CPEDMF.c_m(param_set)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
@@ -20,6 +17,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_gm = center_aux_grid_mean(state)
+    aux_gm_f = face_aux_grid_mean(state)
     aux_tc_f = face_aux_turbconv(state)
     aux_tc = center_aux_turbconv(state)
     aux_bulk = center_aux_bulk(state)
@@ -27,6 +25,9 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     aux_en_2m = center_aux_environment_2m(state)
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    ρ_f = aux_gm_f.ρ
+    p_c = aux_gm.p
+    ρ_c = prog_gm.ρ
     aux_en_unsat = aux_en.unsat
     aux_en_sat = aux_en.sat
     m_entr_detr = aux_tc.ϕ_temporary
@@ -507,7 +508,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         zLL = grid.zc[kc_surf].z
         ustar = surf.ustar
         oblength = surf.obukhov_length
-        ρLL = center_ref_state(state).ρ[kc_surf]
+        prog_gm = center_prog_grid_mean(state)
+        ρLL = prog_gm.ρ[kc_surf]
         update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:Hvar))
         update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:QTvar))
         update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:HQTcov))

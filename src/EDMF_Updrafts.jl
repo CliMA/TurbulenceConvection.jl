@@ -10,10 +10,12 @@ function compute_nonequilibrium_moisture_tendencies!(
     param_set::APS,
 )
     N_up = n_updrafts(edmf)
-    p_c = center_ref_state(state).p
-    ρ_c = center_ref_state(state).ρ
+    aux_gm = center_aux_grid_mean(state)
     aux_up = center_aux_updrafts(state)
     aux_bulk = center_aux_bulk(state)
+    prog_gm = center_prog_grid_mean(state)
+    p_c = aux_gm.p
+    ρ_c = prog_gm.ρ
 
     @inbounds for i in 1:N_up
         @inbounds for k in real_center_indices(grid)
@@ -50,12 +52,14 @@ function compute_precipitation_formation_tendencies(
     param_set::APS,
 )
     N_up = n_updrafts(edmf)
-    p_c = center_ref_state(state).p
-    ρ_c = center_ref_state(state).ρ
+    prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     aux_up = center_aux_updrafts(state)
     aux_bulk = center_aux_bulk(state)
     prog_pr = center_prog_precipitation(state)
     tendencies_pr = center_tendencies_precipitation(state)
+    p_c = aux_gm.p
+    ρ_c = prog_gm.ρ
 
     @inbounds for i in 1:N_up
         @inbounds for k in real_center_indices(grid)

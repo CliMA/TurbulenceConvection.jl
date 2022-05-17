@@ -6,12 +6,12 @@ see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
 function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid, state, param_set)
     cp_d = CPP.cp_d(param_set)
-    ρ_f = TC.face_ref_state(state).ρ
-    ρ_c = TC.center_ref_state(state).ρ
     aux_gm = TC.center_aux_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     q_tot_f = TC.face_aux_turbconv(state).ϕ_temporary
+    ρ_f = aux_gm_f.ρ
+    ρ_c = prog_gm.ρ
     # find zi (level of 8.0 g/kg isoline of qt)
     # TODO: report bug: zi and ρ_i are not initialized
     zi = 0

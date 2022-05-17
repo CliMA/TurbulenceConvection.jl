@@ -181,7 +181,7 @@ end
 function initialize_profiles(self::CasesBase{Soares}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ_c = TC.center_ref_state(state).ρ
+    ρ_c = prog_gm.ρ
     FT = eltype(grid)
     prof_q_tot = APL.Soares_q_tot(FT)
     prof_θ_liq_ice = APL.Soares_θ_liq_ice(FT)
@@ -232,7 +232,7 @@ end
 function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ_c = TC.center_ref_state(state).ρ
+    ρ_c = prog_gm.ρ
 
     FT = eltype(grid)
     prof_θ_liq_ice = APL.Nieuwstadt_θ_liq_ice(FT)
@@ -281,7 +281,7 @@ end
 function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ_c = TC.center_ref_state(state).ρ
+    ρ_c = prog_gm.ρ
 
     FT = eltype(grid)
     prof_q_tot = APL.Bomex_q_tot(FT)
@@ -320,10 +320,10 @@ end
 
 function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, param_set)
     initialize(self.Fo, grid, state)
-    p_c = TC.center_ref_state(state).p
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = aux_gm.ts
+    p_c = aux_gm.p
 
     FT = eltype(grid)
     prof_ug = APL.Bomex_geostrophic_u(FT)
@@ -362,7 +362,7 @@ end
 function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ_c = TC.center_ref_state(state).ρ
+    ρ_c = prog_gm.ρ
 
     FT = eltype(grid)
     prof_q_tot = APL.LifeCycleTan2018_q_tot(FT)
@@ -416,9 +416,9 @@ end
 
 function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, state, param_set)
     initialize(self.Fo, grid, state)
-    p_c = TC.center_ref_state(state).p
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
+    p_c = aux_gm.p
     ts_gm = aux_gm.ts
 
     FT = eltype(grid)
@@ -469,8 +469,8 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, param_set, state
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_tc = TC.center_aux_turbconv(state)
-    p = TC.center_ref_state(state).p
-    ρ_c = TC.center_ref_state(state).ρ
+    p = aux_gm.p
+    ρ_c = prog_gm.ρ
 
     FT = eltype(grid)
     prof_u = APL.Rico_u(FT)
@@ -531,10 +531,10 @@ end
 
 function initialize_forcing(self::CasesBase{Rico}, grid::Grid, state, param_set)
     initialize(self.Fo, grid, state)
-    p_c = TC.center_ref_state(state).p
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = aux_gm.ts
+    p_c = aux_gm.p
 
     FT = eltype(grid)
     prof_ug = APL.Rico_geostrophic_ug(FT)
@@ -572,10 +572,10 @@ function surface_ref_state(::TRMM_LBA, param_set::APS, namelist)
     return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, param_set, state)
-    p = TC.center_ref_state(state).p
-    ρ_c = TC.center_ref_state(state).ρ
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
+    ρ_c = prog_gm.ρ
+    p = aux_gm.p
 
     FT = eltype(grid)
     # Get profiles from AtmosphericProfilesLibrary.jl
@@ -662,10 +662,10 @@ end
 
 function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, param_set, state)
     # ARM_SGP inputs
-    p = TC.center_ref_state(state).p
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
-    ρ_c = TC.center_ref_state(state).ρ
+    ρ_c = prog_gm.ρ
+    p = aux_gm.p
 
     FT = eltype(grid)
     prof_u = APL.ARM_SGP_u(FT)
@@ -718,9 +718,9 @@ end
 
 function update_forcing(self::CasesBase{ARM_SGP}, grid, state, t::Real, param_set)
     aux_gm = TC.center_aux_grid_mean(state)
-    p_c = TC.center_ref_state(state).p
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
+    p_c = prog_gm.ρ
     FT = eltype(grid)
     @inbounds for k in real_center_indices(grid)
         Π = TD.exner(param_set, ts_gm[k])
@@ -747,10 +747,10 @@ end
 
 function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, param_set, state)
     FT = eltype(grid)
-    p = TC.center_ref_state(state).p
-    ρ_c = TC.center_ref_state(state).ρ
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
+    p = aux_gm.p
+    ρ_c = prog_gm.ρ
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         aux_gm.q_tot[k] = APL.GATE_III_q_tot(FT)(z)
@@ -806,10 +806,10 @@ end
 
 function initialize_profiles(self::CasesBase{DYCOMS_RF01}, grid::Grid, param_set, state)
     FT = eltype(grid)
-    p = TC.center_ref_state(state).p
-    ρ_c = TC.center_ref_state(state).ρ
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
+    ρ_c = prog_gm.ρ
+    p = aux_gm.p
     @inbounds for k in real_center_indices(grid)
         # thetal profile as defined in DYCOMS
         z = grid.zc[k]
@@ -891,10 +891,10 @@ end
 
 function initialize_profiles(self::CasesBase{DYCOMS_RF02}, grid::Grid, param_set, state)
     FT = eltype(grid)
-    p = TC.center_ref_state(state).p
-    ρ_c = TC.center_ref_state(state).ρ
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
+    p = aux_gm.p
+    ρ_c = prog_gm.ρ
     @inbounds for k in real_center_indices(grid)
         # θ_liq_ice profile as defined in DYCOM RF02
         z = grid.zc[k]
@@ -987,7 +987,7 @@ end
 function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ_c = TC.center_ref_state(state).ρ
+    ρ_c = prog_gm.ρ
     FT = eltype(grid)
 
     @inbounds for k in real_center_indices(grid)
@@ -1057,7 +1057,7 @@ end
 function initialize_profiles(self::CasesBase{SP}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ_c = TC.center_ref_state(state).ρ
+    ρ_c = prog_gm.ρ
     FT = eltype(grid)
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
@@ -1098,7 +1098,7 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, param_set, 
 
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ_c = TC.center_ref_state(state).ρ
+    ρ_c = prog_gm.ρ
     # initialize Grid Mean Profiles of thetali and qt
     zc_in = grid.zc
     FT = eltype(grid)
@@ -1179,7 +1179,7 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, param_
 
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ_c = TC.center_ref_state(state).ρ
+    ρ_c = prog_gm.ρ
     NC.Dataset(self.LESDat.les_filename, "r") do data
         t = data.group["profiles"]["t"][:]
         # define time interval

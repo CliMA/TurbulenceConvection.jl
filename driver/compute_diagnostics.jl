@@ -109,8 +109,6 @@ function compute_diagnostics!(
 ) where {D <: CC.Fields.FieldVector}
     FT = eltype(grid)
     N_up = TC.n_updrafts(edmf)
-    ρ_c = TC.center_ref_state(state).ρ
-    p_c = TC.center_ref_state(state).p
     aux_gm = TC.center_aux_grid_mean(state)
     aux_en = TC.center_aux_environment(state)
     aux_up = TC.center_aux_updrafts(state)
@@ -126,6 +124,8 @@ function compute_diagnostics!(
     prog_gm = TC.center_prog_grid_mean(state)
     diag_tc = center_diagnostics_turbconv(diagnostics)
     diag_tc_f = face_diagnostics_turbconv(diagnostics)
+    ρ_c = prog_gm.ρ
+    p_c = aux_gm.p
 
     diag_tc_svpc = svpc_diagnostics_turbconv(diagnostics)
     diag_svpc = svpc_diagnostics_grid_mean(diagnostics)
