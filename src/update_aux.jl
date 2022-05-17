@@ -10,7 +10,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     α0_c = center_ref_state(state).α0
-    c_m = CPEDMF.c_m(param_set)
+    c_m = ICP.c_m(param_set)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
     obukhov_length = surf.obukhov_length
