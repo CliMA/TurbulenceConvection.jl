@@ -367,6 +367,7 @@ struct ForcingLES end
 struct RadiationNone end
 struct RadiationDYCOMS_RF01 end
 struct RadiationLES end
+struct RadiationTRMM_LBA end
 
 Base.@kwdef struct LESData
     "Start time index of LES"
@@ -391,8 +392,6 @@ $(DocStringExtensions.FIELDS)
 Base.@kwdef struct ForcingBase{T, R}
     "Boolean specifying whether Coriolis forcing is applied"
     apply_coriolis::Bool = false
-    "Boolean specifying whether subsidence forcing is applied"
-    apply_subsidence::Bool = false
     "Coriolis parameter"
     coriolis_param::Float64 = 0
     "Momentum relaxation timescale"
