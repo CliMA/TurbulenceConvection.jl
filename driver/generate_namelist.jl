@@ -65,6 +65,7 @@ function default_namelist(
     write::Bool = true,
     set_seed::Bool = true,
     seed::Int = 2022,
+    truncate_stack_trace::Bool = false,
 )
 
     if set_seed
@@ -74,6 +75,9 @@ function default_namelist(
     namelist_defaults = Dict()
     namelist_defaults["meta"] = Dict()
     namelist_defaults["meta"]["uuid"] = basename(tempname())
+
+    namelist_defaults["logging"] = Dict()
+    namelist_defaults["logging"]["truncate_stack_trace"] = truncate_stack_trace
 
     namelist_defaults["turbulence"] = Dict()
 

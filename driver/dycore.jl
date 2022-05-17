@@ -63,8 +63,6 @@ cent_aux_vars_gm(FT, edmf) = (;
     dqtdt_rad = FT(0), # horizontal advection moisture tendency
     # From ForcingBase
     subsidence = FT(0), #Large-scale subsidence
-    dTdt = FT(0), #Large-scale temperature tendency
-    dqtdt = FT(0), #Large-scale moisture tendency
     dTdt_hadv = FT(0), #Horizontal advection of temperature
     dqtdt_hadv = FT(0), #Horizontal advection of moisture
     T_nudge = FT(0), #Reference T profile for relaxation tendency
@@ -367,7 +365,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
     Cases.update_forcing(case, grid, state, t, param_set)
-    Cases.update_radiation(case.Rad, grid, state, param_set)
+    Cases.update_radiation(case.Rad, grid, state, t, param_set)
 
     TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
 
@@ -452,115 +450,68 @@ function compute_gm_tendencies!(
         @. ∇q_ice_gm = ∇c(wvec(RBq(prog_gm.q_ice)))
     end
 
+    # Apply forcing and radiation
     @inbounds for k in TC.real_center_indices(grid)
         # Apply large-scale horizontal advection tendencies
         cp_m = TD.cp_m(param_set, ts_gm[k])
         cp_v = CPP.cp_v(param_set)
         cv_m = TD.cv_m(param_set, ts_gm[k])
         h_v = cp_v * (aux_gm.T[k] - T_0) + Lv_0
+        Π = TD.exner(param_set, ts_gm[k])
 
+        # Coriolis
         if force.apply_coriolis
             tendencies_gm.u[k] -= force.coriolis_param * (aux_gm.vg[k] - prog_gm.v[k])
             tendencies_gm.v[k] += force.coriolis_param * (aux_gm.ug[k] - prog_gm.u[k])
         end
-        if TC.rad_type(radiation) <: Union{TC.RadiationDYCOMS_RF01, TC.RadiationLES}
+        # LS Subsidence
+        tendencies_gm.ρe_tot[k] -= ρ0_c[k] * aux_gm.subsidence[k] * ∇MSE_gm[k]
+        tendencies_gm.ρq_tot[k] -= ρ0_c[k] * aux_gm.subsidence[k] * ∇q_tot_gm[k]
+        if edmf.moisture_model isa TC.NonEquilibriumMoisture
+            tendencies_gm.q_liq[k] -= ∇q_liq_gm[k] * aux_gm.subsidence[k]
+            tendencies_gm.q_ice[k] -= ∇q_ice_gm[k] * aux_gm.subsidence[k]
+        end
+        # Radiation
+        if TC.rad_type(radiation) <: Union{TC.RadiationDYCOMS_RF01, TC.RadiationLES, TC.RadiationTRMM_LBA}
             tendencies_gm.ρe_tot[k] += ρ0_c[k] * cv_m * aux_gm.dTdt_rad[k]
         end
-        if TC.force_type(force) <: TC.ForcingDYCOMS_RF01
-            tendencies_gm.ρq_tot[k] += ρ0_c[k] * aux_gm.dqtdt[k]
-            tendencies_gm.ρe_tot[k] += ρ0_c[k] * h_v * aux_gm.dqtdt[k]
-
-            # Apply large-scale subsidence tendencies
-            tendencies_gm.ρe_tot[k] -= ρ0_c[k] * aux_gm.subsidence[k] * ∇MSE_gm[k]
-            tendencies_gm.ρq_tot[k] -= ρ0_c[k] * aux_gm.subsidence[k] * ∇q_tot_gm[k]
-            if edmf.moisture_model isa TC.NonEquilibriumMoisture
-                tendencies_gm.q_liq[k] += aux_gm.dqldt[k]
-                tendencies_gm.q_ice[k] += aux_gm.dqidt[k]
-                tendencies_gm.q_liq[k] -= ∇q_liq_gm[k] * aux_gm.subsidence[k]
-                tendencies_gm.q_ice[k] -= ∇q_ice_gm[k] * aux_gm.subsidence[k]
-            end
+        # LS advection
+        tendencies_gm.ρq_tot[k] += ρ0_c[k] * aux_gm.dqtdt_hadv[k]
+        if !(TC.force_type(force) <: TC.ForcingDYCOMS_RF01)
+            tendencies_gm.ρe_tot[k] += ρ0_c[k] * cp_m * aux_gm.dTdt_hadv[k]
+        end
+        if edmf.moisture_model isa TC.NonEquilibriumMoisture
+            tendencies_gm.q_liq[k] += aux_gm.dqldt[k]
+            tendencies_gm.q_ice[k] += aux_gm.dqidt[k]
         end
 
-        if TC.force_type(force) <: TC.ForcingStandard
-            if force.apply_subsidence
-                tendencies_gm.ρe_tot[k] -= ρ0_c[k] * aux_gm.subsidence[k] * ∇MSE_gm[k]
-                tendencies_gm.ρq_tot[k] -= ρ0_c[k] * aux_gm.subsidence[k] * ∇q_tot_gm[k]
-            end
-            tendencies_gm.ρq_tot[k] += ρ0_c[k] * aux_gm.dqtdt[k]
-            tendencies_gm.ρe_tot[k] += ρ0_c[k] * (cv_m * aux_gm.dTdt[k] + h_v * aux_gm.dqtdt[k])
-            if edmf.moisture_model isa TC.NonEquilibriumMoisture
-                if force.apply_subsidence
-                    tendencies_gm.q_liq[k] -= ∇q_liq_gm[k] * aux_gm.subsidence[k]
-                    tendencies_gm.q_ice[k] -= ∇q_ice_gm[k] * aux_gm.subsidence[k]
-                end
-                tendencies_gm.q_liq[k] += aux_gm.dqldt[k]
-                tendencies_gm.q_ice[k] += aux_gm.dqidt[k]
-            end
-        end
-
+        # LES specific forcings
         if TC.force_type(force) <: TC.ForcingLES
-            T_horz_adv = aux_gm.dTdt_hadv[k]
             T_fluc = aux_gm.dTdt_fluc[k]
 
             gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm.u[k]) / force.nudge_tau
             gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm.v[k]) / force.nudge_tau
 
             Γᵣ = TC.compute_les_Γᵣ(grid.zc[k])
-            if Γᵣ != 0
-                tau_k = 1 / Γᵣ
-                gm_T_nudge_k = (aux_gm.T_nudge[k] - aux_gm.T[k]) / tau_k
-                gm_q_tot_nudge_k = (aux_gm.qt_nudge[k] - prog_gm.ρq_tot[k] / ρ0_c[k]) / tau_k
-            else
-                gm_T_nudge_k = 0.0
-                gm_q_tot_nudge_k = 0.0
-            end
+            gm_T_nudge_k = Γᵣ * (aux_gm.T_nudge[k] - aux_gm.θ_liq_ice[k])
+            gm_q_tot_nudge_k = Γᵣ * (aux_gm.qt_nudge[k] - aux_gm.q_tot[k])
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
-                if Γᵣ != 0
-                    tau_k = 1 / Γᵣ
-                    gm_q_liq_nudge_k = (aux_gm.ql_nudge[k] - prog_gm.q_liq[k]) / tau_k
-                    gm_q_ice_nudge_k = (aux_gm.qi_nudge[k] - prog_gm.q_ice[k]) / tau_k
-                else
-                    gm_q_liq_nudge_k = 0.0
-                    gm_q_ice_nudge_k = 0.0
-                end
+                gm_q_liq_nudge_k = Γᵣ * (aux_gm.ql_nudge[k] - prog_gm.q_liq[k])
+                gm_q_ice_nudge_k = Γᵣ * (aux_gm.qi_nudge[k] - prog_gm.q_ice[k])
             end
 
-            if force.apply_subsidence
-                # Apply large-scale subsidence tendencies
-                gm_h_tot_subsidence_k = -aux_gm.subsidence[k] * ∇MSE_gm[k]
-                gm_QT_subsidence_k = -aux_gm.subsidence[k] * ∇q_tot_gm[k]
-            else
-                gm_h_tot_subsidence_k = 0.0
-                gm_QT_subsidence_k = 0.0
-            end
-            if edmf.moisture_model isa TC.NonEquilibriumMoisture
-                if force.apply_subsidence
-                    # Apply large-scale subsidence tendencies
-                    gm_QL_subsidence_k = -∇q_liq_gm[k] * aux_gm.subsidence[k]
-                    gm_QI_subsidence_k = -∇q_ice_gm[k] * aux_gm.subsidence[k]
-                else
-                    gm_QL_subsidence_k = 0.0
-                    gm_QI_subsidence_k = 0.0
-                end
-            end
-
-            tendencies_gm.ρq_tot[k] +=
-                ρ0_c[k] * (aux_gm.dqtdt_hadv[k] + gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k] + gm_QT_subsidence_k)
+            tendencies_gm.ρq_tot[k] += ρ0_c[k] * (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k])
             tendencies_gm.ρe_tot[k] +=
-                ρ0_c[k] * (
-                    gm_h_tot_subsidence_k +
-                    cv_m * (T_horz_adv + gm_T_nudge_k + T_fluc) +
-                    h_v * (aux_gm.dqtdt_hadv[k] + gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k] + gm_QT_subsidence_k)
-                )
+                ρ0_c[k] * (cv_m * (gm_T_nudge_k + T_fluc) + h_v * (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k]))
             tendencies_gm.u[k] += gm_U_nudge_k
             tendencies_gm.v[k] += gm_V_nudge_k
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
-                tendencies_gm.q_liq[k] +=
-                    aux_gm.dqldt_hadv[k] + gm_q_liq_nudge_k + aux_gm.dqldt_fluc[k] + gm_QL_subsidence_k
-                tendencies_gm.q_ice[k] +=
-                    aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k] + gm_QI_subsidence_k
+                tendencies_gm.q_liq[k] += aux_gm.dqldt_hadv[k] + gm_q_liq_nudge_k + aux_gm.dqldt_fluc[k]
+                tendencies_gm.q_ice[k] += aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k]
             end
         end
+
+        # Apply precipitation tendencies
         tendencies_gm.ρq_tot[k] +=
             ρ0_c[k] * (
                 aux_bulk.qt_tendency_precip_formation[k] +

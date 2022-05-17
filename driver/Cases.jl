@@ -142,11 +142,13 @@ get_forcing_type(::DYCOMS_RF01) = TC.ForcingDYCOMS_RF01
 get_forcing_type(::DYCOMS_RF02) = TC.ForcingDYCOMS_RF01
 get_forcing_type(::DryBubble) = TC.ForcingNone
 get_forcing_type(::LES_driven_SCM) = TC.ForcingLES
+get_forcing_type(::TRMM_LBA) = TC.ForcingNone
 
 get_radiation_type(::AbstractCaseType) = TC.RadiationNone # default
 get_radiation_type(::DYCOMS_RF01) = TC.RadiationDYCOMS_RF01
 get_radiation_type(::DYCOMS_RF02) = TC.RadiationDYCOMS_RF01
 get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
+get_radiation_type(::TRMM_LBA) = TC.RadiationTRMM_LBA
 
 RadiationBase(case::AbstractCaseType) = RadiationBase{Cases.get_radiation_type(case)}()
 
@@ -168,8 +170,7 @@ initialize_forcing(self::CasesBase, grid::Grid, state, param_set) = initialize(s
 ##### Soares
 #####
 
-ForcingBase(case::Soares, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
+ForcingBase(case::Soares, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); apply_coriolis = false)
 
 function surface_ref_state(::Soares, param_set::APS, namelist)
     Pg = 1000.0 * 100.0
@@ -217,8 +218,7 @@ end
 ##### Nieuwstadt
 #####
 
-ForcingBase(case::Nieuwstadt, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
+ForcingBase(case::Nieuwstadt, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); apply_coriolis = false)
 
 function surface_ref_state(::Nieuwstadt, param_set::APS, namelist)
     Pg = 1000.0 * 100.0
@@ -265,7 +265,7 @@ end
 #####
 
 ForcingBase(case::Bomex, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
+    ForcingBase(get_forcing_type(case); apply_coriolis = true, coriolis_param = 0.376e-4) #= s^{-1} =#
 
 function surface_ref_state(::Bomex, param_set::APS, namelist)
     Pg = 1.015e5 #Pressure at ground
@@ -331,9 +331,9 @@ function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, param_set
         aux_gm.ug[k] = prof_ug(z)
         Π = TD.exner(param_set, ts_gm[k])
         # Set large-scale cooling
-        aux_gm.dTdt[k] = prof_dTdt(Π, z)
+        aux_gm.dTdt_hadv[k] = prof_dTdt(Π, z)
         # Set large-scale drying
-        aux_gm.dqtdt[k] = prof_dqtdt(z)
+        aux_gm.dqtdt_hadv[k] = prof_dqtdt(z)
         #Set large scale subsidence
         aux_gm.subsidence[k] = prof_subsidence(z)
     end
@@ -345,7 +345,7 @@ end
 #####
 
 ForcingBase(case::life_cycle_Tan2018, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = true, coriolis_param = 0.376e-4) #= s^{-1} =#
+    ForcingBase(get_forcing_type(case); apply_coriolis = true, coriolis_param = 0.376e-4) #= s^{-1} =#
 
 function surface_ref_state(::life_cycle_Tan2018, param_set::APS, namelist)
     Pg = 1.015e5  #Pressure at ground
@@ -425,9 +425,9 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
         aux_gm.ug[k] = prof_ug(z)
         Π = TD.exner(param_set, ts_gm[k])
         # Set large-scale cooling
-        aux_gm.dTdt[k] = prof_dTdt(Π, z)
+        aux_gm.dTdt_hadv[k] = prof_dTdt(Π, z)
         # Set large-scale drying
-        aux_gm.dqtdt[k] = prof_dqtdt(z)
+        aux_gm.dqtdt_hadv[k] = prof_dqtdt(z)
         #Set large scale subsidence
         aux_gm.subsidence[k] = prof_subsidence(z)
     end
@@ -444,7 +444,6 @@ function ForcingBase(case::Rico, param_set::APS; kwargs...)
     return ForcingBase(
         get_forcing_type(case);
         apply_coriolis = true,
-        apply_subsidence = true,
         coriolis_param = 2.0 * Omega * sin(latitude * π / 180.0),
     ) #= s^{-1} =#
 end
@@ -539,8 +538,8 @@ function initialize_forcing(self::CasesBase{Rico}, grid::Grid, state, param_set)
         # Geostrophic velocity profiles
         aux_gm.ug[k] = prof_ug(z)
         aux_gm.vg[k] = prof_vg(z)
-        aux_gm.dTdt[k] = prof_dTdt(Π, z) # Set large-scale cooling
-        aux_gm.dqtdt[k] = prof_dqtdt(z) # Set large-scale moistening
+        aux_gm.dTdt_hadv[k] = prof_dTdt(Π, z) # Set large-scale cooling
+        aux_gm.dqtdt_hadv[k] = prof_dqtdt(z) # Set large-scale moistening
         aux_gm.subsidence[k] = prof_subsidence(z) #Set large scale subsidence
     end
     return nothing
@@ -551,7 +550,7 @@ end
 #####
 
 ForcingBase(case::TRMM_LBA, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false, kwargs...)
+    ForcingBase(get_forcing_type(case); apply_coriolis = false, kwargs...)
 
 function surface_ref_state(::TRMM_LBA, param_set::APS, namelist)
     molmass_ratio = CPP.molmass_ratio(param_set)
@@ -613,25 +612,18 @@ function surface_params(case::TRMM_LBA, surf_ref_state, param_set; Ri_bulk_crit)
     return TC.FixedSurfaceFlux(FT, TC.FixedFrictionVelocity; kwargs...)
 end
 
-function forcing_kwargs(::TRMM_LBA, namelist)
-    return (; rad = APL.TRMM_LBA_radiation(Float64))
+function RadiationBase(case::TRMM_LBA)
+    return RadiationBase{Cases.get_radiation_type(case)}()
 end
 
-function initialize_forcing(self::CasesBase{TRMM_LBA}, grid::Grid, state, param_set)
-    aux_gm = TC.center_aux_grid_mean(state)
-    rad = self.Fo.rad
-    @inbounds for k in real_center_indices(grid)
-        aux_gm.dTdt[k] = rad(0, grid.zc[k].z)
-    end
+function initialize_radiation(self::CasesBase{TRMM_LBA}, grid::Grid, state, param_set)
+    initialize(self.Rad, grid, state)
     return nothing
 end
 
-function update_forcing(self::CasesBase{TRMM_LBA}, grid, state, t::Real, param_set)
-    aux_gm = TC.center_aux_grid_mean(state)
-    rad = self.Fo.rad
-    @inbounds for k in real_center_indices(grid)
-        aux_gm.dTdt[k] = rad(t, grid.zc[k].z)
-    end
+function update_radiation(self::CasesBase{TRMM_LBA}, grid::Grid, state, t::Real, param_set)
+    update_radiation(self.Rad, grid, state, t, param_set)
+    return nothing
 end
 
 #####
@@ -639,7 +631,7 @@ end
 #####
 
 ForcingBase(case::ARM_SGP, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); apply_coriolis = true, apply_subsidence = false, coriolis_param = 8.5e-5)
+    ForcingBase(get_forcing_type(case); apply_coriolis = true, coriolis_param = 8.5e-5)
 
 function surface_ref_state(::ARM_SGP, param_set::APS, namelist)
     Pg = 970.0 * 100 #Pressure at ground
@@ -711,8 +703,8 @@ function update_forcing(self::CasesBase{ARM_SGP}, grid, state, t::Real, param_se
     @inbounds for k in real_center_indices(grid)
         Π = TD.exner(param_set, ts_gm[k])
         z = grid.zc[k]
-        aux_gm.dTdt[k] = APL.ARM_SGP_dTdt(FT)(t, z)
-        aux_gm.dqtdt[k] = APL.ARM_SGP_dqtdt(FT)(Π, t, z)
+        aux_gm.dTdt_hadv[k] = APL.ARM_SGP_dTdt(FT)(t, z)
+        aux_gm.dqtdt_hadv[k] = APL.ARM_SGP_dqtdt(FT)(Π, t, z)
 
     end
 end
@@ -721,8 +713,7 @@ end
 ##### GATE_III
 #####
 
-ForcingBase(case::GATE_III, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
+ForcingBase(case::GATE_III, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); apply_coriolis = false)
 
 function surface_ref_state(::GATE_III, param_set::APS, namelist)
     Pg = 1013.0 * 100  #Pressure at ground
@@ -770,8 +761,8 @@ function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, state, param_
     aux_gm = TC.center_aux_grid_mean(state)
     for k in TC.real_center_indices(grid)
         z = grid.zc[k]
-        aux_gm.dqtdt[k] = APL.GATE_III_dqtdt(FT)(z)
-        aux_gm.dTdt[k] = APL.GATE_III_dTdt(FT)(z)
+        aux_gm.dqtdt_hadv[k] = APL.GATE_III_dqtdt(FT)(z)
+        aux_gm.dTdt_hadv[k] = APL.GATE_III_dTdt(FT)(z)
     end
 end
 
@@ -835,7 +826,7 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, par
     end
 
     # no large-scale drying
-    parent(aux_gm.dqtdt) .= 0 #kg/(kg * s)
+    parent(aux_gm.dqtdt_hadv) .= 0 #kg/(kg * s)
 end
 
 function RadiationBase(case::DYCOMS_RF01)
@@ -856,7 +847,7 @@ function initialize_radiation(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, p
 
     # Radiation based on eq. 3 in Stevens et. al., (2005)
     # cloud-top cooling + cloud-base warming + cooling in free troposphere
-    update_radiation(self.Rad, grid, state, param_set)
+    update_radiation(self.Rad, grid, state, 0, param_set)
 end
 
 #####
@@ -919,7 +910,7 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF02}, grid::Grid, state, par
     end
 
     # no large-scale drying
-    parent(aux_gm.dqtdt) .= 0 #kg/(kg * s)
+    parent(aux_gm.dqtdt_hadv) .= 0 #kg/(kg * s)
 end
 
 function RadiationBase(case::DYCOMS_RF02)
@@ -941,7 +932,7 @@ function initialize_radiation(self::CasesBase{DYCOMS_RF02}, grid::Grid, state, p
 
     # Radiation based on eq. 3 in Stevens et. al., (2005)
     # cloud-top cooling + cloud-base warming + cooling in free troposphere
-    update_radiation(self.Rad, grid, state, param_set)
+    update_radiation(self.Rad, grid, state, 0, param_set)
 end
 
 #####
@@ -952,12 +943,7 @@ function ForcingBase(case::GABLS, param_set::APS; kwargs...)
     coriolis_param = 1.39e-4 # s^{-1}
     # Omega = CPP.Omega(param_set)
     # coriolis_param = 2 * Omega * sin(latitude * π / 180 ) # s^{-1}
-    ForcingBase(
-        get_forcing_type(case);
-        apply_coriolis = true,
-        apply_subsidence = false,
-        coriolis_param = coriolis_param,
-    )
+    ForcingBase(get_forcing_type(case); apply_coriolis = true, coriolis_param = coriolis_param)
 end
 
 function surface_ref_state(::GABLS, param_set::APS, namelist)
@@ -1020,12 +1006,7 @@ function ForcingBase(case::SP, param_set::APS; kwargs...)
     coriolis_param = 1.0e-4 # s^{-1}
     # Omega = CPP.Omega(param_set)
     # coriolis_param = 2 * Omega * sin(latitude * π / 180 ) # s^{-1}
-    ForcingBase(
-        get_forcing_type(case);
-        apply_coriolis = true,
-        apply_subsidence = false,
-        coriolis_param = coriolis_param,
-    )
+    ForcingBase(get_forcing_type(case); apply_coriolis = true, coriolis_param = coriolis_param)
 end
 
 function surface_ref_state(::SP, param_set::APS, namelist)
@@ -1064,8 +1045,7 @@ end
 ##### DryBubble
 #####
 
-ForcingBase(case::DryBubble, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); apply_coriolis = false, apply_subsidence = false)
+ForcingBase(case::DryBubble, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); apply_coriolis = false)
 
 function surface_ref_state(::DryBubble, param_set::APS, namelist)
     Pg = 1.0e5  #Pressure at ground
@@ -1130,13 +1110,7 @@ function surface_param_kwargs(::LES_driven_SCM, namelist)
 end
 
 function ForcingBase(case::LES_driven_SCM, param_set::APS; nudge_tau)
-    ForcingBase(
-        get_forcing_type(case);
-        apply_coriolis = false,
-        apply_subsidence = true,
-        coriolis_param = 0.376e-4,
-        nudge_tau = nudge_tau,
-    )
+    ForcingBase(get_forcing_type(case); apply_coriolis = false, coriolis_param = 0.376e-4, nudge_tau = nudge_tau)
 end
 
 function surface_ref_state(::LES_driven_SCM, param_set::APS, namelist)
