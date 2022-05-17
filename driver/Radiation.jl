@@ -1,10 +1,10 @@
-update_radiation(self::TC.RadiationBase, grid, state, param_set) = nothing
+update_radiation(self::TC.RadiationBase, grid, state, t::Real, param_set) = nothing
 initialize(self::TC.RadiationBase{TC.RadiationNone}, grid, state) = nothing
 
 """
 see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
-function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid, state, param_set)
+function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid, state, t::Real, param_set)
     cp_d = CPP.cp_d(param_set)
     ρ0_f = TC.face_ref_state(state).ρ0
     ρ0_c = TC.center_ref_state(state).ρ0
@@ -82,4 +82,23 @@ function initialize(self::TC.RadiationBase{TC.RadiationLES}, grid, state, LESDat
         aux_gm.dTdt_rad[k] = dTdt[k]
     end
     return
+end
+
+
+function initialize(self::TC.RadiationBase{TC.RadiationTRMM_LBA}, grid, state)
+    aux_gm = TC.center_aux_grid_mean(state)
+    rad = APL.TRMM_LBA_radiation(eltype(grid))
+    @inbounds for k in real_center_indices(grid)
+        aux_gm.dTdt_rad[k] = rad(0, grid.zc[k].z)
+    end
+    return nothing
+end
+
+function update_radiation(self::TC.RadiationBase{TC.RadiationTRMM_LBA}, grid, state, t::Real, param_set)
+    aux_gm = TC.center_aux_grid_mean(state)
+    rad = APL.TRMM_LBA_radiation(eltype(grid))
+    @inbounds for k in real_center_indices(grid)
+        aux_gm.dTdt_rad[k] = rad(t, grid.zc[k].z)
+    end
+    return nothing
 end

@@ -230,7 +230,7 @@ function ∑tendencies_3d_bomex!(tendencies, prog, cache, t)
         radiation = case.Rad
         TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
         Cases.update_forcing(case, grid, state, t, param_set)
-        Cases.update_radiation(case.Rad, grid, state, param_set)
+        Cases.update_radiation(case.Rad, grid, state, t, param_set)
         TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
         # compute tendencies
         TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt)
