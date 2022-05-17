@@ -186,8 +186,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
         @inbounds for i in 1:N_up
             if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
-                qt = aux_up[i].q_tot[k - 1]
-                h = aux_up[i].θ_liq_ice[k - 1]
+                qt = aux_up[i].q_tot[k]
+                h = aux_up[i].θ_liq_ice[k]
                 if edmf.moisture_model isa EquilibriumMoisture
                     ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt)
                 elseif edmf.moisture_model isa NonEquilibriumMoisture
@@ -220,14 +220,14 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             aux_up[i].buoy[k] = buoyancy_c(param_set, ρ0_c[k], ρ)
             aux_up[i].RH[k] = TD.relative_humidity(param_set, ts_up)
         end
-        aux_gm.buoy[k] = (1.0 - aux_bulk.area[k]) * aux_en.buoy[k]
+        aux_tc.buoy[k] = (1.0 - aux_bulk.area[k]) * aux_en.buoy[k]
         @inbounds for i in 1:N_up
-            aux_gm.buoy[k] += aux_up[i].area[k] * aux_up[i].buoy[k]
+            aux_tc.buoy[k] += aux_up[i].area[k] * aux_up[i].buoy[k]
         end
         @inbounds for i in 1:N_up
-            aux_up[i].buoy[k] -= aux_gm.buoy[k]
+            aux_up[i].buoy[k] -= aux_tc.buoy[k]
         end
-        aux_en.buoy[k] -= aux_gm.buoy[k]
+        aux_en.buoy[k] -= aux_tc.buoy[k]
 
 
         #####
@@ -257,7 +257,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_gm.q_liq[k] = (aux_bulk.area[k] * aux_bulk.q_liq[k] + (1 - aux_bulk.area[k]) * aux_en.q_liq[k])
         aux_gm.q_ice[k] = (aux_bulk.area[k] * aux_bulk.q_ice[k] + (1 - aux_bulk.area[k]) * aux_en.q_ice[k])
         aux_gm.T[k] = (aux_bulk.area[k] * aux_bulk.T[k] + (1 - aux_bulk.area[k]) * aux_en.T[k])
-        aux_gm.buoy[k] = (aux_bulk.area[k] * aux_bulk.buoy[k] + (1 - aux_bulk.area[k]) * aux_en.buoy[k])
+        aux_tc.buoy[k] = (aux_bulk.area[k] * aux_bulk.buoy[k] + (1 - aux_bulk.area[k]) * aux_en.buoy[k])
 
         has_condensate = TD.has_condensate(aux_bulk.q_liq[k] + aux_bulk.q_ice[k])
         aux_bulk.cloud_fraction[k] = if has_condensate && a_bulk_c > 1e-3

@@ -73,6 +73,7 @@ cent_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
 cent_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
 cent_aux_vars_edmf(FT, edmf) = (;
     turbconv = (;
+        buoy = FT(0),
         ϕ_temporary = FT(0),
         ψ_temporary = FT(0),
         bulk = (;
