@@ -1,5 +1,5 @@
 """
-    ClimaParams
+    ExperimentalClimaParams
 
 This is a module for staging experimental
 clima parameters-- that we are unsure will
@@ -9,7 +9,7 @@ to CLIMAParameters.jl.
 
 TODO: move non-experimental parameters to CLIMAParameters
 """
-module ClimaParams
+module ExperimentalClimaParams
 
 import CLIMAParameters
 const CP = CLIMAParameters

@@ -1,7 +1,7 @@
 #### Entrainment-Detrainment kernels
 
 function compute_turbulent_entrainment(param_set, a_up::FT, w_up::FT, tke::FT, H_up::FT) where {FT}
-    c_γ = FT(CPEDMF.c_γ(param_set))
+    c_γ = FT(ICP.c_γ(param_set))
 
     ε_turb = if w_up * a_up > 0
         2 * c_γ * sqrt(max(tke, 0)) / (w_up * H_up)
@@ -15,7 +15,7 @@ end
 function compute_inverse_timescale(param_set, b_up::FT, b_en::FT, w_up::FT, w_en::FT, tke::FT) where {FT}
     Δb = b_up - b_en
     Δw = get_Δw(param_set, w_up, w_en)
-    c_λ = FT(CPEDMF.c_λ(param_set))
+    c_λ = FT(ICP.c_λ(param_set))
 
     l_1 = c_λ * abs(Δb / sqrt(tke + 1e-8))
     l_2 = abs(Δb / Δw)
@@ -25,7 +25,7 @@ end
 
 function get_Δw(param_set, w_up::FT, w_en::FT) where {FT}
     Δw = w_up - w_en
-    Δw += copysign(FT(CPEDMF.w_min(param_set)), Δw)
+    Δw += copysign(FT(ICP.w_min(param_set)), Δw)
     return Δw
 end
 
@@ -103,7 +103,7 @@ function εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, ε_nondim, δ_nondi
 
     area_limiter = max_area_limiter(param_set, εδ_vars.max_area, εδ_vars.a_up)
 
-    c_div = FT(ICP.entrainment_massflux_div_factor(param_set))
+    c_div = FT(ECP.entrainment_massflux_div_factor(param_set))
     MdMdz_ε, MdMdz_δ = get_MdMdz(εδ_vars.M, εδ_vars.dMdz) .* c_div
 
     # fractional dynamical entrainment / detrainment [1 / m]
@@ -160,7 +160,7 @@ function compute_entr_detr!(
     aux_tc = center_aux_turbconv(state)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
-    g::FT = CPP.grav(param_set)
+    g::FT = ICP.grav(param_set)
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
     m_entr_detr = aux_tc.ϕ_temporary
@@ -265,7 +265,7 @@ function compute_entr_detr!(
     aux_tc = center_aux_turbconv(state)
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
-    g::FT = CPP.grav(param_set)
+    g::FT = ICP.grav(param_set)
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
     m_entr_detr = aux_tc.ϕ_temporary
@@ -279,7 +279,7 @@ function compute_entr_detr!(
     Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
     LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
-    c_div = FT(ICP.entrainment_massflux_div_factor(param_set))
+    c_div = FT(ECP.entrainment_massflux_div_factor(param_set))
     @inbounds for i in 1:N_up
         # compute ∇m at cell centers
         a_up = aux_up[i].area

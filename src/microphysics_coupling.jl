@@ -69,8 +69,8 @@ function precipitation_formation(
 
         Π_m = TD.exner(param_set, ts)
         c_pm = TD.cp_m(param_set, ts)
-        L_v0 = CPP.LH_v0(param_set)
-        L_s0 = CPP.LH_s0(param_set)
+        L_v0 = ICP.LH_v0(param_set)
+        L_s0 = ICP.LH_s0(param_set)
 
         if precip_model isa CutoffPrecipitation
             qsat = TD.q_vap_saturation(param_set, ts)
@@ -88,8 +88,8 @@ function precipitation_formation(
 
         if precip_model isa Clima1M
             T = TD.air_temperature(param_set, ts)
-            T_fr = CPP.T_freeze(param_set)
-            c_vl = CPP.cv_l(param_set)
+            T_fr = ICP.T_freeze(param_set)
+            c_vl = ICP.cv_l(param_set)
             c_vm = TD.cv_m(param_set, ts)
             Rm = TD.gas_constant_air(param_set, ts)
             Lf = TD.latent_heat_fusion(param_set, ts)
