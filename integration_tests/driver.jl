@@ -7,7 +7,7 @@ if !@isdefined case_name
     case_name = parsed_args["case"]
 end
 
-parsed_args["trunc_stack_traces"] && include("truncate_stack_traces.jl")
+parsed_args["trunc_field_type_print"] && include("trunc_field_type_print.jl")
 
 @info "Running $case_name..."
 @info "`suffix`: `$(suffix)`"
@@ -44,7 +44,7 @@ no_overwrites = (
     "case", # default_namelist already overwrites namelist["meta"]["casename"]
     "skip_post_proc",
     "skip_tests",
-    "trunc_stack_traces",
+    "trunc_field_type_print",
     "suffix",
 )
 #! format: on
