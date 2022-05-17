@@ -9,7 +9,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ρ_f = face_ref_state(state).ρ
     p_c = center_ref_state(state).p
     ρ_c = center_ref_state(state).ρ
-    α_c = center_ref_state(state).α
     c_m = CPEDMF.c_m(param_set)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
@@ -391,7 +390,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 ∂θl∂z_sat = ∂θl∂z[k],
                 p = p_c[k],
                 en_cld_frac = aux_en.cloud_fraction[k],
-                alpha0 = α_c[k],
+                alpha0 = 1 / ρ_c[k],
             )
             bg_model = EnvBuoyGrad(edmf.bg_closure; bg_kwargs...)
 
@@ -408,7 +407,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 ∂θl∂z_sat = ∂θl∂z_sat[k],
                 p = p_c[k],
                 en_cld_frac = aux_en.cloud_fraction[k],
-                alpha0 = α_c[k],
+                alpha0 = 1 / ρ_c[k],
             )
             bg_model = EnvBuoyGrad(edmf.bg_closure; bg_kwargs...)
         else

@@ -9,8 +9,6 @@ function name_aliases()
     dict = Dict(
         "zc" => ("z_half",),
         "zf" => ("z",),
-        "α_c" => ("alpha0_half",),
-        "α_f" => ("alpha0",),
         "p_c" => ("p_half",),
         "p_f" => ("p",),
         "ρ_c" => ("rho0_half",),

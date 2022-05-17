@@ -58,8 +58,8 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     aux_tc_f = face_aux_turbconv(state)
     aux_up_f = face_aux_updrafts(state)
     ρ_f = face_ref_state(state).ρ
+    ρ_c = center_ref_state(state).ρ
     p_c = center_ref_state(state).p
-    α_c = center_ref_state(state).α
     kf_surf = kf_surface(grid)
     kc_surf = kc_surface(grid)
     massflux = aux_tc_f.massflux
@@ -133,8 +133,8 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     # Compute the  mass flux tendencies
     # Adjust the values of the grid mean variables
     # Prepare the output
-    @. massflux_tendency_h = -∇c(wvec(massflux_h)) * α_c
-    @. massflux_tendency_qt = -∇c(wvec(massflux_qt)) * α_c
+    @. massflux_tendency_h = -∇c(wvec(massflux_h)) / ρ_c
+    @. massflux_tendency_qt = -∇c(wvec(massflux_qt)) / ρ_c
 
     diffusive_flux_h = aux_tc_f.diffusive_flux_h
     diffusive_flux_qt = aux_tc_f.diffusive_flux_qt
@@ -155,8 +155,8 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         massflux_tendency_ql = aux_tc.massflux_tendency_ql
         massflux_tendency_qi = aux_tc.massflux_tendency_qi
 
-        @. massflux_tendency_ql = -∇c(wvec(massflux_ql)) * α_c
-        @. massflux_tendency_qi = -∇c(wvec(massflux_qi)) * α_c
+        @. massflux_tendency_ql = -∇c(wvec(massflux_ql)) / ρ_c
+        @. massflux_tendency_qi = -∇c(wvec(massflux_qi)) / ρ_c
 
         diffusive_flux_ql = aux_tc_f.diffusive_flux_ql
         diffusive_flux_qi = aux_tc_f.diffusive_flux_qi
@@ -286,16 +286,16 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     zLL = grid.zc[kc_surf].z
     ustar = surf.ustar
     oblength = surf.obukhov_length
-    αLL = center_ref_state(state).α[kc_surf]
+    ρLL = center_ref_state(state).ρ[kc_surf]
     # TODO: is bulk even defined before this is called?
     ae_surf = 1 - aux_bulk.area[kc_surf] # area of environment
 
     ρ_ae = ρ_c[kc_surf] * ae_surf
 
     prog_en.ρatke[kc_surf] = ρ_ae * get_surface_tke(param_set, surf.ustar, zLL, surf.obukhov_length)
-    prog_en.ρaHvar[kc_surf] = ρ_ae * get_surface_variance(flux1 * αLL, flux1 * αLL, ustar, zLL, oblength)
-    prog_en.ρaQTvar[kc_surf] = ρ_ae * get_surface_variance(flux2 * αLL, flux2 * αLL, ustar, zLL, oblength)
-    prog_en.ρaHQTcov[kc_surf] = ρ_ae * get_surface_variance(flux1 * αLL, flux2 * αLL, ustar, zLL, oblength)
+    prog_en.ρaHvar[kc_surf] = ρ_ae * get_surface_variance(flux1 / ρLL, flux1 / ρLL, ustar, zLL, oblength)
+    prog_en.ρaQTvar[kc_surf] = ρ_ae * get_surface_variance(flux2 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
+    prog_en.ρaHQTcov[kc_surf] = ρ_ae * get_surface_variance(flux1 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
     return nothing
 end
 
@@ -304,8 +304,8 @@ function surface_helper(surf::SurfaceBase, grid::Grid, state::State)
     zLL = grid.zc[kc_surf].z
     ustar = surf.ustar
     oblength = surf.obukhov_length
-    αLL = center_ref_state(state).α[kc_surf]
-    return (; ustar, zLL, oblength, αLL)
+    ρLL = center_ref_state(state).ρ[kc_surf]
+    return (; ustar, zLL, oblength, ρLL)
 end
 
 function a_up_boundary_conditions(surf::SurfaceBase, edmf::EDMFModel, i::Int)
@@ -340,9 +340,9 @@ function θ_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::ED
     surf.bflux > 0 || return FT(0)
     a_total = edmf.surface_area
     a_ = area_surface_bc(surf, edmf, i)
-    UnPack.@unpack ustar, zLL, oblength, αLL = surface_helper(surf, grid, state)
+    UnPack.@unpack ustar, zLL, oblength, ρLL = surface_helper(surf, grid, state)
     ρθ_liq_ice_flux = surf.ρθ_liq_ice_flux
-    h_var = get_surface_variance(ρθ_liq_ice_flux * αLL, ρθ_liq_ice_flux * αLL, ustar, zLL, oblength)
+    h_var = get_surface_variance(ρθ_liq_ice_flux / ρLL, ρθ_liq_ice_flux / ρLL, ustar, zLL, oblength)
     surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000)
     return aux_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var)
 end
@@ -353,9 +353,9 @@ function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDM
     surf.bflux > 0 || return aux_gm.q_tot[kc_surf]
     a_total = edmf.surface_area
     a_ = area_surface_bc(surf, edmf, i)
-    UnPack.@unpack ustar, zLL, oblength, αLL = surface_helper(surf, grid, state)
+    UnPack.@unpack ustar, zLL, oblength, ρLL = surface_helper(surf, grid, state)
     ρq_tot_flux = surf.ρq_tot_flux
-    qt_var = get_surface_variance(ρq_tot_flux * αLL, ρq_tot_flux * αLL, ustar, zLL, oblength)
+    qt_var = get_surface_variance(ρq_tot_flux / ρLL, ρq_tot_flux / ρLL, ustar, zLL, oblength)
     surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000)
     return aux_gm.q_tot[kc_surf] + surface_scalar_coeff * sqrt(qt_var)
 end
