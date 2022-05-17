@@ -213,9 +213,9 @@ version = "0.1.7"
 
 [[deps.CloudMicrophysics]]
 deps = ["CLIMAParameters", "DocStringExtensions", "SpecialFunctions", "Thermodynamics"]
-git-tree-sha1 = "25d3f2d97cfae8b2326a7bb2f37fb274d2df0a73"
+git-tree-sha1 = "e8f3bfcbca8369b54fab96991271b35c4d70e94d"
 uuid = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
-version = "0.4.0"
+version = "0.5.0"
 
 [[deps.CodeTracking]]
 deps = ["InteractiveUtils", "UUIDs"]
