@@ -507,7 +507,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         zLL = grid.zc[kc_surf].z
         ustar = surf.ustar
         oblength = surf.obukhov_length
-        α0LL = center_ref_state(state).α0[kc_surf]
+        ρLL = center_ref_state(state).ρ[kc_surf]
         update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:Hvar))
         update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:QTvar))
         update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:HQTcov))
@@ -518,9 +518,9 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             aux_en.HQTcov[k] = min(aux_en.HQTcov[k], sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]))
         end
         ae_surf = 1 - aux_bulk.area[kc_surf]
-        aux_en.Hvar[kc_surf] = ae_surf * get_surface_variance(flux1 * α0LL, flux1 * α0LL, ustar, zLL, oblength)
-        aux_en.QTvar[kc_surf] = ae_surf * get_surface_variance(flux2 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
-        aux_en.HQTcov[kc_surf] = ae_surf * get_surface_variance(flux1 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
+        aux_en.Hvar[kc_surf] = ae_surf * get_surface_variance(flux1 / ρLL, flux1 / ρLL, ustar, zLL, oblength)
+        aux_en.QTvar[kc_surf] = ae_surf * get_surface_variance(flux2 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
+        aux_en.HQTcov[kc_surf] = ae_surf * get_surface_variance(flux1 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
     end
     return nothing
 end

@@ -961,7 +961,7 @@ function update_diagnostic_covariances!(
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
-    ρ0_c = center_ref_state(state).ρ0
+    ρ_c = center_ref_state(state).ρ
     aux_en_2m = center_aux_environment_2m(state)
     aux_up_f = face_aux_updrafts(state)
     aux_en = center_aux_environment(state)
@@ -997,12 +997,12 @@ function update_diagnostic_covariances!(
         a_up = aux_up[i].area
         # TODO: using `Int(bool) *` means that NaNs can propagate
         # into the solution. Could we somehow call `ifelse` instead?
-        @. D_env += Int(a_up > min_area) * ρ0_c * a_up * Ic(w_up) * (entr_sc + turb_entr)
+        @. D_env += Int(a_up > min_area) * ρ_c * a_up * Ic(w_up) * (entr_sc + turb_entr)
     end
 
     @. covar =
         (shear + entr_gain + rain_src) /
-        max(D_env + ρ0_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1), covar_lim)
+        max(D_env + ρ_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1), covar_lim)
     return nothing
 end
 
