@@ -59,6 +59,7 @@ struct Simulation1d{IONT, G, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS}
     adapt_dt::Bool
     cfl_limit::Float64
     dt_min::Float64
+    truncate_stack_trace::Bool
 end
 
 function Simulation1d(namelist)
@@ -71,6 +72,7 @@ function Simulation1d(namelist)
     adapt_dt = namelist["time_stepping"]["adapt_dt"]
     cfl_limit = namelist["time_stepping"]["cfl_limit"]
     dt_min = namelist["time_stepping"]["dt_min"]
+    truncate_stack_trace = namelist["logging"]["truncate_stack_trace"]
 
     grid = construct_grid(namelist; FT = FT)
 
@@ -174,6 +176,7 @@ function Simulation1d(namelist)
         adapt_dt,
         cfl_limit,
         dt_min,
+        truncate_stack_trace,
     )
 end
 
@@ -375,7 +378,12 @@ function run(sim::Simulation1d; time_run = true)
             sol = ODE.solve!(integrator)
         end
     catch e
-        @error "TurbulenceConvection simulation crashed. $(e)"
+        if sim.truncate_stack_trace
+            @error "TurbulenceConvection simulation crashed. $(e)"
+        else
+            @error "TurbulenceConvection simulation crashed. Stacktrace for failed simulation" exception =
+                (e, catch_backtrace())
+        end
         # "Stacktrace for failed simulation" exception = (e, catch_backtrace())
         return :simulation_crashed
     finally
