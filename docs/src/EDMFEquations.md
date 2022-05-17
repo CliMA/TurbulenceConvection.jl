@@ -682,6 +682,9 @@ The relevant namelist options are:
 To switch off using quadratures in the sgs set
 `namelist_defaults["thermodynamics"]["sgs"]` to `"mean"` instead of `"quadrature"`.
 
+To choose between prognostic and diagnostic thermodyanmic covariances in the environment set
+`namelist_defaults["thermodynamics"]["thermo_covariance_model"]` to `"prognostic"` or `"diagnostic"`.
+
 ## Potential temperatures
 Fix: which virtual potential temperature is used
 ```math
