@@ -500,7 +500,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
     ### Diagnostic thermodynamiccovariances
     if edmf.thermo_covariance_model isa DiagnosticThermoCovariances
-        flux1 = surf.ρθ_liq_ice_flux
+        flux1 = surf.shf / cp = TD.cp_m(param_set, ts_gm[kc_surf])
         flux2 = surf.ρq_tot_flux
         zLL = grid.zc[kc_surf].z
         ustar = surf.ustar

@@ -91,11 +91,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     # compute total enthalpies
     ts_en = center_aux_environment(state).ts
     ts_gm = center_aux_grid_mean(state).ts
-    @. h_tot_gm = anelastic_total_enthalpy(
-        param_set,
-        prog_gm.ρe_tot / ρ0_c,
-        ts_gm,
-    )
+    @. h_tot_gm = anelastic_total_enthalpy(param_set, prog_gm.ρe_tot / ρ0_c, ts_gm)
     @. h_tot_en = anelastic_total_enthalpy(
         param_set,
         TD.total_energy(
@@ -125,11 +121,11 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         ts_up_i = copy(ts_en)
         h_tot_up_i = copy(q_tot_up)
         thermo_args = if edmf.moisture_model isa EquilibriumMoisture
-                ()
-            elseif edmf.moisture_model isa NonEquilibriumMoisture
-                (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
-            end
-        @. ts_up_i = thermo_state_pθq(param_set, p0_c, θ_liq_ice_up, q_tot_up, thermo_args...,)
+            ()
+        elseif edmf.moisture_model isa NonEquilibriumMoisture
+            (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
+        end
+        @. ts_up_i = thermo_state_pθq(param_set, p0_c, θ_liq_ice_up, q_tot_up, thermo_args...)
         @. h_tot_up_i = anelastic_total_enthalpy(
             param_set,
             TD.total_energy(
