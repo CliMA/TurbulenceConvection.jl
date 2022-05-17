@@ -452,12 +452,10 @@ function compute_gm_tendencies!(
 
     # Apply forcing and radiation
     @inbounds for k in TC.real_center_indices(grid)
-        # Apply large-scale horizontal advection tendencies
         cp_m = TD.cp_m(param_set, ts_gm[k])
         cp_v = CPP.cp_v(param_set)
         cv_m = TD.cv_m(param_set, ts_gm[k])
         h_v = cp_v * (aux_gm.T[k] - T_0) + Lv_0
-        Π = TD.exner(param_set, ts_gm[k])
 
         # Coriolis
         if force.apply_coriolis
@@ -478,7 +476,7 @@ function compute_gm_tendencies!(
         # LS advection
         tendencies_gm.ρq_tot[k] += ρ0_c[k] * aux_gm.dqtdt_hadv[k]
         if !(TC.force_type(force) <: TC.ForcingDYCOMS_RF01)
-            tendencies_gm.ρe_tot[k] += ρ0_c[k] * cp_m * aux_gm.dTdt_hadv[k]
+            tendencies_gm.ρe_tot[k] += ρ0_c[k] * (cp_m * aux_gm.dTdt_hadv[k] + h_v * aux_gm.dqtdt_hadv[k])
         end
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
             tendencies_gm.q_liq[k] += aux_gm.dqldt[k]

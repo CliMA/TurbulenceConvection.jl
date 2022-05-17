@@ -10,7 +10,6 @@ import LambertW
 import Thermodynamics
 import Distributions
 import FastGaussQuadrature
-import CLIMAParameters
 import CloudMicrophysics
 import UnPack
 import StochasticDiffEq
@@ -33,13 +32,9 @@ const ice_type = CM1.IceType()
 const rain_type = CM1.RainType()
 const snow_type = CM1.SnowType()
 
+import CLIMAParameters
 const CP = CLIMAParameters
-const CPP = CP.Planet
-const CPSGS = CP.SubgridScale
 const APS = CP.AbstractEarthParameterSet
-
-const CPMP = CP.Atmos.Microphysics
-const CPEDMF = CP.Atmos.EDMF
 
 up_sum(vals::AbstractArray) = reshape(sum(vals; dims = 1), size(vals, 2))
 
@@ -63,9 +58,15 @@ function parse_namelist(namelist, keys...; default = nothing, valid_options = no
     return param
 end
 
-include("ClimaParams.jl")
-import .ClimaParams
-const ICP = ClimaParams # internal clima parameters
+include("ExperimentalClimaParams.jl")
+import .ExperimentalClimaParams
+const ECP = ExperimentalClimaParams
+
+include("InternalClimaParams.jl")
+import .InternalClimaParams
+const ICP = InternalClimaParams
+
+Base.broadcastable(param_set::APS) = Ref(param_set)
 
 #=
     debug_state(state, code_location::String)

@@ -90,9 +90,9 @@ function compute_precipitation_sink_tendencies(
         c_pm = TD.cp_m(param_set, ts)
         c_vm = TD.cv_m(param_set, ts)
         R_m = TD.gas_constant_air(param_set, ts)
-        R_v = CPP.R_v(param_set)
-        L_v0 = CPP.LH_v0(param_set)
-        L_s0 = CPP.LH_s0(param_set)
+        R_v = ICP.R_v(param_set)
+        L_v0 = ICP.LH_v0(param_set)
+        L_s0 = ICP.LH_s0(param_set)
         L_v = TD.latent_heat_vapor(param_set, ts)
         L_s = TD.latent_heat_sublim(param_set, ts)
         L_f = TD.latent_heat_fusion(param_set, ts)
@@ -100,12 +100,11 @@ function compute_precipitation_sink_tendencies(
         I_l = TD.internal_energy_liquid(param_set, ts)
         I_i = TD.internal_energy_ice(param_set, ts)
         I = TD.internal_energy(param_set, ts)
-        g = CPP.grav(param_set)
         Φ = geopotential(param_set, grid.zc.z[k])
 
-        α_evp = CPMP.microph_scaling(param_set)
-        α_dep_sub = CPMP.microph_scaling_dep_sub(param_set)
-        α_melt = CPMP.microph_scaling_melt(param_set)
+        α_evp = ICP.microph_scaling(param_set)
+        α_dep_sub = ICP.microph_scaling_dep_sub(param_set)
+        α_melt = ICP.microph_scaling_melt(param_set)
 
         # TODO - move limiters elsewhere
         # TODO - when using adaptive timestepping we are limiting the source terms

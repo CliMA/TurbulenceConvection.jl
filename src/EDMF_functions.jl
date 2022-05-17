@@ -51,7 +51,6 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     N_up = n_updrafts(edmf)
     tendencies_gm = center_tendencies_grid_mean(state)
     FT = eltype(grid)
-    g = CPP.grav(param_set)
     prog_gm = center_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
@@ -123,7 +122,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         thermo_args = if edmf.moisture_model isa EquilibriumMoisture
             ()
         elseif edmf.moisture_model isa NonEquilibriumMoisture
-            (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
+            (aux_up[i].q_liq, aux_up[i].q_ice)
         end
         @. ts_up_i = thermo_state_pθq(param_set, p0_c, θ_liq_ice_up, q_tot_up, thermo_args...)
         @. h_tot_up_i = anelastic_total_enthalpy(
@@ -209,7 +208,6 @@ end
 
 function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS)
     FT = eltype(grid)
-    g = CPP.grav(param_set)
     ρ0_f = face_ref_state(state).ρ0
     ρ0_c = center_ref_state(state).ρ0
     p0_c = center_ref_state(state).p0
@@ -487,7 +485,7 @@ function compute_updraft_top(grid::Grid{FT}, state::State, i::Int)::FT where {FT
 end
 
 function compute_plume_scale_height(grid::Grid{FT}, state::State, param_set::APS, i::Int)::FT where {FT}
-    H_up_min::FT = CPEDMF.H_up_min(param_set)
+    H_up_min::FT = ICP.H_up_min(param_set)
     updraft_top = compute_updraft_top(grid, state, i)
     return max(updraft_top, H_up_min)
 end
@@ -503,7 +501,7 @@ function compute_up_stoch_tendencies!(edmf::EDMFModel, grid::Grid, state::State,
         tends_ε_nondim = tendencies_up[i].ε_nondim
         tends_δ_nondim = tendencies_up[i].δ_nondim
 
-        c_gen_stoch = ICP.c_gen_stoch(param_set)
+        c_gen_stoch = ECP.c_gen_stoch(param_set)
         mean_entr = aux_up[i].ε_nondim
         mean_detr = aux_up[i].δ_nondim
         ε_σ² = c_gen_stoch[1]
@@ -611,7 +609,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
 
         # prognostic entr/detr
         if edmf.entr_closure isa PrognosticNoisyRelaxationProcess
-            c_gen_stoch = ICP.c_gen_stoch(param_set)
+            c_gen_stoch = ECP.c_gen_stoch(param_set)
             mean_entr = aux_up[i].ε_nondim
             mean_detr = aux_up[i].δ_nondim
             ε_λ = c_gen_stoch[3]
@@ -917,7 +915,7 @@ function compute_covariance_dissipation(
     param_set::APS,
 ) where {covar_sym}
     FT = eltype(grid)
-    c_d::FT = CPEDMF.c_d(param_set)
+    c_d::FT = ICP.c_d(param_set)
     aux_tc = center_aux_turbconv(state)
     ρ0_c = center_ref_state(state).ρ0
     prog_en = center_prog_environment(state)
@@ -957,7 +955,7 @@ function compute_en_tendencies!(
     aux_covar = getproperty(aux_en_2m, covar_sym)
     aux_up = center_aux_updrafts(state)
     w_en_f = face_aux_environment(state).w
-    c_d = CPEDMF.c_d(param_set)
+    c_d = ICP.c_d(param_set)
     is_tke = covar_sym == :tke
     FT = eltype(grid)
 
@@ -1036,8 +1034,8 @@ function update_diagnostic_covariances!(
     aux_covar = getproperty(aux_en_2m, covar_sym)
     aux_up = center_aux_updrafts(state)
     w_en_f = face_aux_environment(state).w
-    c_d = CPEDMF.c_d(param_set)
-    covar_lim = ICP.covar_lim(param_set)
+    c_d = ICP.c_d(param_set)
+    covar_lim = ECP.covar_lim(param_set)
 
     ρ_ae_K = face_aux_turbconv(state).ρ_ae_K
     KH = center_aux_turbconv(state).KH
