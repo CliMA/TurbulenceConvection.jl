@@ -528,8 +528,8 @@ function compute_gm_tendencies!(
 
     @. tends_ρθ_liq_ice += -∇sgs(wvec(sgs_flux_θ_liq_ice))
     @. tends_ρq_tot += -∇sgs(wvec(sgs_flux_q_tot))
-    @. tends_u += - ∇sgs(wvec(sgs_flux_u)) / ρ_c
-    @. tends_v += - ∇sgs(wvec(sgs_flux_v)) / ρ_c
+    @. tends_u += -∇sgs(wvec(sgs_flux_u)) / ρ_c
+    @. tends_v += -∇sgs(wvec(sgs_flux_v)) / ρ_c
 
     if edmf.moisture_model isa TC.NonEquilibriumMoisture
         sgs_flux_q_liq = aux_gm_f.sgs_flux_q_liq
@@ -538,8 +538,8 @@ function compute_gm_tendencies!(
         sgs_flux_q_ice[kf_surf] = surf.ρq_ice_flux
         tends_q_liq = tendencies_gm.q_liq
         tends_q_ice = tendencies_gm.q_ice
-        @. tends_q_liq += - ∇sgs(wvec(sgs_flux_q_liq)) / ρ_c
-        @. tends_q_ice += - ∇sgs(wvec(sgs_flux_q_ice)) / ρ_c
+        @. tends_q_liq += -∇sgs(wvec(sgs_flux_q_liq)) / ρ_c
+        @. tends_q_ice += -∇sgs(wvec(sgs_flux_q_ice)) / ρ_c
     end
 
     return nothing
