@@ -255,10 +255,15 @@ cent_prognostic_vars_up(::Type{FT}, edmf) where {FT} = (;
     cent_prognostic_vars_up_noisy_relaxation(FT, edmf.entr_closure)...,
     cent_prognostic_vars_up_moisture(FT, edmf.moisture_model)...,
 )
-cent_prognostic_vars_en(::Type{FT}) where {FT} = (; ρatke = FT(0), ρaHvar = FT(0), ρaQTvar = FT(0), ρaHQTcov = FT(0))
+
+cent_prognostic_vars_en(::Type{FT}, edmf) where {FT} =
+    (; ρatke = FT(0), cent_prognostic_vars_en_thermo(FT, edmf.thermo_covariance_model)...)
+cent_prognostic_vars_en_thermo(::Type{FT}, ::DiagnosticThermoCovariances) where {FT} = NamedTuple()
+cent_prognostic_vars_en_thermo(::Type{FT}, ::PrognosticThermoCovariances) where {FT} =
+    (; ρaHvar = FT(0), ρaQTvar = FT(0), ρaHQTcov = FT(0))
 cent_prognostic_vars_edmf(::Type{FT}, edmf) where {FT} = (;
     turbconv = (;
-        en = cent_prognostic_vars_en(FT),
+        en = cent_prognostic_vars_en(FT, edmf),
         up = ntuple(i -> cent_prognostic_vars_up(FT, edmf), Val(n_updrafts(edmf))),
         pr = (; q_rai = FT(0), q_sno = FT(0)),
     )
