@@ -90,7 +90,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     # compute total enthalpies
     ts_en = center_aux_environment(state).ts
     ts_gm = center_aux_grid_mean(state).ts
-    @. h_tot_gm = anelastic_total_enthalpy(param_set::APS, prog_gm.ρe_tot / ρ0_c, p0_c, ρ0_c) # anelastic_total_enthalpy(param_set, prog_gm.ρe_tot / ρ0_c , ts_gm)
+    @. h_tot_gm = anelastic_total_enthalpy(param_set::APS, prog_gm.ρe_tot / ρ0_c, ts_gm) # anelastic_total_enthalpy(param_set, prog_gm.ρe_tot / ρ0_c , ts_gm)
     @. h_tot_en = anelastic_total_enthalpy(
         param_set,
         TD.total_energy(
@@ -99,8 +99,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
             kinetic_energy(prog_gm.u, prog_gm.v, Ic(w_gm)),
             geopotential(param_set, grid.zc.z),
         ),
-        p0_c,
-        ρ0_c,
+        ts_gm,
     )
     # Compute the mass flux and associated scalar fluxes
     @. massflux = ρ0_f * Ifae(a_en) * (w_en - w_gm)
@@ -134,8 +133,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
                 kinetic_energy(prog_gm.u, prog_gm.v, Ic(w_gm)), # Do not use subdomain KE
                 geopotential(param_set, grid.zc.z),
             ),
-            p0_c,
-            ρ0_c,
+            ts_gm,
         )
         @. massflux_h += ρ0_f * (Ifau(a_up) * (w_up_i - w_gm) * (If(h_tot_up_i) - If(h_tot_gm)))
         @. massflux_qt += ρ0_f * (Ifau(a_up) * (w_up_i - w_gm) * (If(q_tot_up) - If(q_tot_gm)))
@@ -248,8 +246,7 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
             kinetic_energy(prog_gm.u, prog_gm.v, Ic(w_gm)),
             geopotential(param_set, grid.zc.z),
         ),
-        p0_c,
-        ρ0_c,
+        ts_gm,
     )
 
     @. aux_tc_f.ρ_ae_KH = IfKH(aeKH) * ρ0_f
