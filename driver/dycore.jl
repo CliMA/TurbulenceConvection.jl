@@ -491,7 +491,7 @@ function compute_gm_tendencies!(
             gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm.v[k]) / force.nudge_tau
 
             Γᵣ = TC.compute_les_Γᵣ(grid.zc[k])
-            gm_T_nudge_k = Γᵣ * (aux_gm.T_nudge[k] - aux_gm.θ_liq_ice[k])
+            gm_T_nudge_k = Γᵣ * (aux_gm.T_nudge[k] - aux_gm.T[k])
             gm_q_tot_nudge_k = Γᵣ * (aux_gm.qt_nudge[k] - aux_gm.q_tot[k])
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
                 gm_q_liq_nudge_k = Γᵣ * (aux_gm.ql_nudge[k] - prog_gm.q_liq[k])
