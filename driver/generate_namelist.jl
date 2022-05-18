@@ -132,7 +132,7 @@ function default_namelist(
     namelist_defaults["thermodynamics"]["moisture_model"] = "equilibrium" #"nonequilibrium"
     namelist_defaults["thermodynamics"]["thermo_covariance_model"] = "diagnostic" #"prognostic" or "diagnostic"
     namelist_defaults["thermodynamics"]["diagnostic_covar_limiter"] = 1e-3 # this controls the magnitude of the spike in covariance
-    namelist_defaults["thermodynamics"]["sgs"] = "mean" #"quadrature"
+    namelist_defaults["thermodynamics"]["sgs"] = "quadrature"
     namelist_defaults["thermodynamics"]["quadrature_order"] = 3
     namelist_defaults["thermodynamics"]["quadrature_type"] = "log-normal" #"gaussian" or "log-normal"
 
@@ -354,7 +354,7 @@ function TRMM_LBA(namelist_defaults)
     namelist["time_stepping"]["dt_max"] = 5.0
     namelist["time_stepping"]["dt_min"] = 1.0
 
-    namelist["microphysics"]["precipitation_model"] = "clima_1m" #"cutoff"
+    namelist["microphysics"]["precipitation_model"] = "cutoff" #"cutoff"
     namelist["microphysics"]["τ_acnv_rai"] = 2500.0
     namelist["microphysics"]["τ_acnv_sno"] = 100.0
     namelist["microphysics"]["q_liq_threshold"] = 0.5e-3
