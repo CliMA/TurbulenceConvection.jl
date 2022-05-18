@@ -96,7 +96,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         TD.total_energy(
             param_set,
             ts_en,
-            kinetic_energy(prog_gm.u, prog_gm.v, Ic(w_en)),
+            kinetic_energy(prog_gm.u, prog_gm.v, Ic(w_gm)),
             geopotential(param_set, grid.zc.z),
         ),
         p0_c,
@@ -131,7 +131,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
             TD.total_energy(
                 param_set,
                 ts_up_i,
-                kinetic_energy(prog_gm.u, prog_gm.v, Ic(w_up_i)),
+                kinetic_energy(prog_gm.u, prog_gm.v, Ic(w_gm)), # Do not use subdomain KE
                 geopotential(param_set, grid.zc.z),
             ),
             p0_c,
@@ -227,7 +227,6 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     a_en = aux_en.area
     @. aeKM = a_en * KM
     @. aeKH = a_en * KH
-    w_en_c = copy(a_en)
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     kf_surf = kf_surface(grid)
@@ -235,6 +234,8 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     IfKH = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKH[kc_surf]), top = CCO.SetValue(aeKH[kc_toa]))
     IfKM = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKM[kc_surf]), top = CCO.SetValue(aeKM[kc_toa]))
     Ic = CCO.InterpolateF2C()
+    prog_gm_f = face_prog_grid_mean(state)
+    w_gm = prog_gm_f.w
 
     h_tot_en = copy(a_en)
     ts_gm = center_aux_grid_mean(state).ts
@@ -244,7 +245,7 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
         TD.total_energy(
             param_set,
             ts_en,
-            kinetic_energy(prog_gm.u, prog_gm.v, Ic(aux_en_f.w)),
+            kinetic_energy(prog_gm.u, prog_gm.v, Ic(w_gm)),
             geopotential(param_set, grid.zc.z),
         ),
         p0_c,
