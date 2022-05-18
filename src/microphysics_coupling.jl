@@ -72,7 +72,7 @@ function precipitation_formation(
         L_v0 = ICP.LH_v0(param_set)
         L_s0 = ICP.LH_s0(param_set)
 
-        if precip_model isa CutoffPrecipitation
+        if precip_model isa Clima0M
             qsat = TD.q_vap_saturation(param_set, ts)
             λ = TD.liquid_fraction(param_set, ts)
 
