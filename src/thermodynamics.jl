@@ -42,3 +42,7 @@ end
 function kinetic_energy(u::FT, v::FT, w::FT) where {FT}
     return FT(0.5) * (u^2 + v^2 + w^2)
 end
+
+function anelastic_total_enthalpy(param_set::APS, e_tot, p, ρ) where {FT}
+    return e_tot + p / ρ
+end

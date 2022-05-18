@@ -428,7 +428,7 @@ function compute_gm_tendencies!(
     w_c = copy(prog_gm.ρe_tot)
     h_tot_gm = copy(prog_gm.ρe_tot)
     @. w_c = Ic(prog_gm_f.w)
-    @. h_tot_gm = TC.anelastic_total_enthalpy(param_set, prog_gm.ρe_tot / ρ0_c, ts_gm)
+    @. h_tot_gm = TC.anelastic_total_enthalpy(param_set, prog_gm.ρe_tot / ρ0_c, p0_c, ρ0_c) #ts_gm)
     @. e_kin = TC.kinetic_energy(prog_gm.u, prog_gm.v, w_c)
     MSE_gm_toa = h_tot_gm[kc_toa] - e_kin[kc_toa]
     q_tot_gm_toa = prog_gm.ρq_tot[kc_toa] / ρ0_c[kc_toa]
