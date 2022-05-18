@@ -212,7 +212,7 @@ function surface_params(case::Soares, surf_ref_state, param_set; Ri_bulk_crit)
     ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
     lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(param_set, ts)
     shf = θ_flux * TD.cp_m(param_set, ts) * ρ0_f_surf
-    ustar = 0.28 # just to initilize grid mean covariances
+    ustar = 0.28 # just to initialize grid mean covariances
     kwargs = (; zrough, Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
     return TC.FixedSurfaceFlux(FT, TC.VariableFrictionVelocity; kwargs...)
 end
@@ -226,7 +226,7 @@ ForcingBase(case::Nieuwstadt, param_set::APS; kwargs...) = ForcingBase(get_forci
 function surface_ref_state(::Nieuwstadt, param_set::APS, namelist)
     Pg = 1000.0 * 100.0
     Tg = 300.0
-    qtg = 1.0e-12 # Total water mixing ratio
+    qtg = 0.0
     return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, param_set, state)
@@ -259,7 +259,7 @@ function surface_params(case::Nieuwstadt, surf_ref_state, param_set; Ri_bulk_cri
     lhf = 0.0 # It would be 0.0 if we follow Nieuwstadt.
     ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
     shf = θ_flux * TD.cp_m(param_set, ts) * ρ0_f_surf
-    ustar = 0.28 # just to initilize grid mean covariances
+    ustar = 0.28 # just to initialize grid mean covariances
     kwargs = (; zrough, Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
     return TC.FixedSurfaceFlux(FT, TC.VariableFrictionVelocity; kwargs...)
 end
@@ -818,7 +818,7 @@ end
 function surface_params(case::DYCOMS_RF01, surf_ref_state, param_set; Ri_bulk_crit)
     FT = eltype(surf_ref_state)
     zrough = 1.0e-4
-    ustar = 0.28 # just to initilize grid mean covariances
+    ustar = 0.28 # just to initialize grid mean covariances
     shf = 15.0 # sensible heat flux
     lhf = 115.0 # latent heat flux
     Tsurface = 292.5    # K      # i.e. the SST from DYCOMS setup
@@ -994,12 +994,9 @@ function surface_params(case::GABLS, surf_ref_state, param_set; kwargs...)
     FT = eltype(surf_ref_state)
     Tsurface = t -> 265.0 - (0.25 / 3600.0) * t
     qsurface = 0.0
-    shf = 0.0001 # only prevent zero division in SF.jl lmo
-    lhf = 0.0001 # only prevent zero division in SF.jl lmo
-    # ustar = 0.1 # TODO: remove, this isn't actually used
     zrough = 0.1
 
-    kwargs = (; Tsurface, qsurface, shf, lhf, zrough)
+    kwargs = (; Tsurface, qsurface, zrough, kwargs...)
     return TC.MoninObukhovSurface(FT; kwargs...)
 end
 

@@ -118,14 +118,14 @@ all_best_mse["life_cycle_Tan2018"]["Hvar_mean"] = 6517.586756676236
 all_best_mse["life_cycle_Tan2018"]["QTvar_mean"] = 4884.704601518459
 #
 all_best_mse["Nieuwstadt"] = OrderedCollections.OrderedDict()
-all_best_mse["Nieuwstadt"]["updraft_area"] = 99.95518312641288
+all_best_mse["Nieuwstadt"]["updraft_area"] = 9.9955189484216788e+01
 all_best_mse["Nieuwstadt"]["updraft_w"] = 14.234210189622093
 all_best_mse["Nieuwstadt"]["updraft_thetal"] = 117.60593544135058
 all_best_mse["Nieuwstadt"]["u_mean"] = 13.5533124537228
 all_best_mse["Nieuwstadt"]["tke_mean"] = 283.4527945078942
 all_best_mse["Nieuwstadt"]["temperature_mean"] = 1.1069166079595213e-5
 all_best_mse["Nieuwstadt"]["thetal_mean"] = 1.1163599024010392e-5
-all_best_mse["Nieuwstadt"]["Hvar_mean"] = 719.3877989748415
+all_best_mse["Nieuwstadt"]["Hvar_mean"] = 7.1938781325323316e+02
 #
 all_best_mse["Rico"] = OrderedCollections.OrderedDict()
 all_best_mse["Rico"]["qt_mean"] = 0.8722842742643365
