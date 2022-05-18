@@ -128,9 +128,11 @@ function compute_precipitation_sink_tendencies(
         tendencies_pr.q_rai[k] += S_qr_evap - S_qs_melt
         tendencies_pr.q_sno[k] += S_qs_sub_dep + S_qs_melt
 
+        FT = eltype(grid)
+
         aux_tc.qt_tendency_precip_sinks[k] = -S_qr_evap - S_qs_sub_dep
-        aux_tc.e_tot_tendency_precip_sinks[k] =
-            -S_qr_evap * (h_l + Φ) - S_qs_sub_dep * (h_i + Φ)# + S_qs_melt * L_f
+        aux_tc.e_tot_tendency_precip_sinks[k] = FT(0)
+        #    -S_qr_evap * (h_l + Φ) - S_qs_sub_dep * (h_i + Φ) + S_qs_melt * L_f
     end
     return nothing
 end
