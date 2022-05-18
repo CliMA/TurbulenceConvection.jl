@@ -417,7 +417,7 @@ function θ_surface_bc(
     surf.bflux > 0 || return FT(0)
     a_total = edmf.surface_area
     a_ = area_surface_bc(surf, edmf, i)
-    ρθ_liq_ice_flux = surf.shf / cp # assuming no ql,qi flux
+    ρθ_liq_ice_flux = surf.shf / cp / TD.exner(param_set, ts_gm[kc_surf]) # assuming no ql,qi flux
     h_var = get_surface_variance(ρθ_liq_ice_flux * α0LL, ρθ_liq_ice_flux * α0LL, ustar, zLL, oblength)
     surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000)
     return aux_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var)
