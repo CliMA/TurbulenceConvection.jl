@@ -199,7 +199,7 @@ function get_edmf_cache(grid, namelist)
     precip_model = if precip_name == "None"
         TC.NoPrecipitation()
     elseif precip_name == "cutoff"
-        TC.CutoffPrecipitation()
+        TC.Clima0M()
     elseif precip_name == "clima_1m"
         TC.Clima1M()
     else

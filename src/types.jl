@@ -185,7 +185,7 @@ struct DiagnosticThermoCovariances <: AbstractCovarianceModel end
 
 abstract type AbstractPrecipitationModel end
 struct NoPrecipitation <: AbstractPrecipitationModel end
-struct CutoffPrecipitation <: AbstractPrecipitationModel end
+struct Clima0M <: AbstractPrecipitationModel end
 struct Clima1M <: AbstractPrecipitationModel end
 
 abstract type AbstractQuadratureType end
