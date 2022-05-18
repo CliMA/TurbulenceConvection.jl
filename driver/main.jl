@@ -60,6 +60,7 @@ struct Simulation1d{IONT, G, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS, RRTM}
     cfl_limit::Float64
     dt_min::Float64
     rrtmgp_model::RRTM
+    truncate_stack_trace::Bool
 end
 
 function Simulation1d(namelist)
@@ -72,6 +73,7 @@ function Simulation1d(namelist)
     adapt_dt = namelist["time_stepping"]["adapt_dt"]
     cfl_limit = namelist["time_stepping"]["cfl_limit"]
     dt_min = namelist["time_stepping"]["dt_min"]
+    truncate_stack_trace = namelist["logging"]["truncate_stack_trace"]
 
     grid = construct_grid(namelist; FT = FT)
 
@@ -96,7 +98,7 @@ function Simulation1d(namelist)
     precip_model = if precip_name == "None"
         TC.NoPrecipitation()
     elseif precip_name == "cutoff"
-        TC.CutoffPrecipitation()
+        TC.Clima0M()
     elseif precip_name == "clima_1m"
         TC.Clima1M()
     else
@@ -148,7 +150,7 @@ function Simulation1d(namelist)
 
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)
-    surf_params = Cases.surface_params(case_type, grid, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
+    surf_params = Cases.surface_params(case_type, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
     inversion_type = Cases.inversion_type(case_type)
     Rad = TC.RadiationBase(case_type) #, grid, state, param_set)
     @show case_type
@@ -182,6 +184,7 @@ function Simulation1d(namelist)
         cfl_limit,
         dt_min,
         rrtmgp_model,
+        truncate_stack_trace,
     )
 end
 
@@ -337,7 +340,7 @@ function solve_args(sim::Simulation1d)
     callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))
     callback_adapt_dt = sim.adapt_dt ? (callback_adapt_dt,) : ()
     if sim.edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess && sim.adapt_dt
-        @warn("The prognostic noisy relaxation process currently uses a Euler-Maruyama time stepping method, 
+        @warn("The prognostic noisy relaxation process currently uses a Euler-Maruyama time stepping method,
               which does not support adaptive time stepping. Adaptive time stepping disabled.")
         callback_adapt_dt = ()
     end
@@ -386,7 +389,12 @@ function run(sim::Simulation1d; time_run = true)
             sol = ODE.solve!(integrator)
         end
     catch e
-        @error "TurbulenceConvection simulation crashed. $(e)"
+        if sim.truncate_stack_trace
+            @error "TurbulenceConvection simulation crashed. $(e)"
+        else
+            @error "TurbulenceConvection simulation crashed. Stacktrace for failed simulation" exception =
+                (e, catch_backtrace())
+        end
         # "Stacktrace for failed simulation" exception = (e, catch_backtrace())
         return :simulation_crashed
     finally

@@ -4,7 +4,7 @@
 
 # Helpers for adding empty thermodynamic state fields:
 thermo_state(FT, ::EquilibriumMoisture) = TD.PhaseEquil{FT}(0, 0, 0, 0, 0)
-thermo_state(FT, ::NonEquilibriumMoisture) = TD.PhaseEquil{FT}(0, 0, TD.PhasePartition{FT}(0, 0, 0))
+thermo_state(FT, ::NonEquilibriumMoisture) = TD.PhaseNonEquil{FT}(0, 0, TD.PhasePartition(FT(0), FT(0), FT(0)))
 
 ##### Auxiliary fields
 
@@ -173,8 +173,13 @@ face_aux_vars_up(FT) = (;
     nh_pressure_drag = FT(0),
     massflux = FT(0),
 )
-face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) =
-    (; massflux_ql = FT(0), massflux_qi = FT(0), diffusive_flux_ql = FT(0), diffusive_flux_qi = FT(0))
+face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
+    massflux_en = FT(0), # TODO: is this the right place for this?
+    massflux_ql = FT(0),
+    massflux_qi = FT(0),
+    diffusive_flux_ql = FT(0),
+    diffusive_flux_qi = FT(0),
+)
 face_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
 face_aux_vars_edmf(FT, edmf) = (;
     turbconv = (;
@@ -247,10 +252,15 @@ cent_prognostic_vars_up(::Type{FT}, edmf) where {FT} = (;
     cent_prognostic_vars_up_noisy_relaxation(FT, edmf.entr_closure)...,
     cent_prognostic_vars_up_moisture(FT, edmf.moisture_model)...,
 )
-cent_prognostic_vars_en(::Type{FT}) where {FT} = (; ρatke = FT(0), ρaHvar = FT(0), ρaQTvar = FT(0), ρaHQTcov = FT(0))
+
+cent_prognostic_vars_en(::Type{FT}, edmf) where {FT} =
+    (; ρatke = FT(0), cent_prognostic_vars_en_thermo(FT, edmf.thermo_covariance_model)...)
+cent_prognostic_vars_en_thermo(::Type{FT}, ::DiagnosticThermoCovariances) where {FT} = NamedTuple()
+cent_prognostic_vars_en_thermo(::Type{FT}, ::PrognosticThermoCovariances) where {FT} =
+    (; ρaHvar = FT(0), ρaQTvar = FT(0), ρaHQTcov = FT(0))
 cent_prognostic_vars_edmf(::Type{FT}, edmf) where {FT} = (;
     turbconv = (;
-        en = cent_prognostic_vars_en(FT),
+        en = cent_prognostic_vars_en(FT, edmf),
         up = ntuple(i -> cent_prognostic_vars_up(FT, edmf), Val(n_updrafts(edmf))),
         pr = (; q_rai = FT(0), q_sno = FT(0)),
     )

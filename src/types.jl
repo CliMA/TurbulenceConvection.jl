@@ -178,9 +178,14 @@ abstract type AbstractMoistureModel end
 struct EquilibriumMoisture <: AbstractMoistureModel end
 struct NonEquilibriumMoisture <: AbstractMoistureModel end
 
+
+abstract type AbstractCovarianceModel end
+struct PrognosticThermoCovariances <: AbstractCovarianceModel end
+struct DiagnosticThermoCovariances <: AbstractCovarianceModel end
+
 abstract type AbstractPrecipitationModel end
 struct NoPrecipitation <: AbstractPrecipitationModel end
-struct CutoffPrecipitation <: AbstractPrecipitationModel end
+struct Clima0M <: AbstractPrecipitationModel end
 struct Clima1M <: AbstractPrecipitationModel end
 
 abstract type AbstractQuadratureType end
@@ -363,6 +368,7 @@ struct RadiationNone end
 struct RadiationDYCOMS_RF01 end
 struct RadiationLES end
 struct RadiationRRTMGP end
+struct RadiationTRMM_LBA end
 
 Base.@kwdef struct LESData
     "Start time index of LES"
@@ -387,8 +393,6 @@ $(DocStringExtensions.FIELDS)
 Base.@kwdef struct ForcingBase{T, R}
     "Boolean specifying whether Coriolis forcing is applied"
     apply_coriolis::Bool = false
-    "Boolean specifying whether subsidence forcing is applied"
-    apply_subsidence::Bool = false
     "Coriolis parameter"
     coriolis_param::Float64 = 0
     "Momentum relaxation timescale"
@@ -444,11 +448,12 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG}
+struct EDMFModel{N_up, FT, MM, TCM, PM, ENT, EBGC, EC, EDS, EPG}
     surface_area::FT
     max_area::FT
     minimum_area::FT
     moisture_model::MM
+    thermo_covariance_model::TCM
     precip_model::PM
     en_thermo::ENT
     prandtl_number::FT
@@ -488,6 +493,17 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG}
             error("Something went wrong. Invalid moisture model: '$moisture_model_name'")
         end
 
+        thermo_covariance_model_name =
+            parse_namelist(namelist, "thermodynamics", "thermo_covariance_model"; default = "prognostic")
+
+        thermo_covariance_model = if thermo_covariance_model_name == "prognostic"
+            PrognosticThermoCovariances()
+        elseif thermo_covariance_model_name == "diagnostic"
+            DiagnosticThermoCovariances()
+        else
+            error("Something went wrong. Invalid thermo_covariance model: '$thermo_covariance_model_name'")
+        end
+
         precip_model = precip_model
         # Create the environment variable class (major diagnostic and prognostic variables)
 
@@ -508,7 +524,7 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG}
         else
             error("Something went wrong. Invalid environmental buoyancy gradient closure type '$en_sgs_name'")
         end
-        if moisture_model_name == "nonequilibrium" && en_thermo_name == "quadrature"
+        if moisture_model_name == "nonequilibrium" && en_thermo == "quadrature"
             error("SGS quadratures are not yet implemented for non-equilibrium moisture. Please use the option: mean.")
         end
 
@@ -597,15 +613,17 @@ struct EDMFModel{N_up, FT, MM, PM, ENT, EBGC, EC, EDS, EPG}
         EDS = typeof(entr_dim_scale)
         EC = typeof(entr_closure)
         MM = typeof(moisture_model)
+        TCM = typeof(thermo_covariance_model)
         PM = typeof(precip_model)
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
         EPG = typeof(entr_pi_subset)
-        return new{n_updrafts, FT, MM, PM, ENT, EBGC, EC, EDS, EPG}(
+        return new{n_updrafts, FT, MM, TCM, PM, ENT, EBGC, EC, EDS, EPG}(
             surface_area,
             max_area,
             minimum_area,
             moisture_model,
+            thermo_covariance_model,
             precip_model,
             en_thermo,
             prandtl_number,

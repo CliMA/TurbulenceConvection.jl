@@ -41,8 +41,12 @@ function parse_commandline()
         arg_type = Int
         "--moisture_model" # Moisture model (equilibrium or non-equilibrium)
         arg_type = String
-        "--trunc_stack_traces"
-        help = "Set to `true` to truncate printing of ClimaCore `Field`s"
+        "--precipitation_model" # Precipitation model (None, cutoff or clima_1m)
+        arg_type = String
+        "--thermo_covariance_model" # covariance model (prognostic or diagnostic)
+        arg_type = String
+        "--trunc_field_type_print"
+        help = "Set to `true` to truncate printing of ClimaCore `Field` types"
         arg_type = Bool
         default = true
     end

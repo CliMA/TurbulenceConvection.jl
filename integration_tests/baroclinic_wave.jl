@@ -186,7 +186,7 @@ function get_edmf_cache(grid, namelist)
     Fo = TC.ForcingBase(case_type, param_set)
     Rad = TC.RadiationBase(case_type)
     surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
-    surf_params = Cases.surface_params(case_type, grid, surf_ref_state, param_set; Ri_bulk_crit)
+    surf_params = Cases.surface_params(case_type, surf_ref_state, param_set; Ri_bulk_crit)
     inversion_type = Cases.inversion_type(case_type)
     case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad)
     precip_name = TC.parse_namelist(
@@ -199,7 +199,7 @@ function get_edmf_cache(grid, namelist)
     precip_model = if precip_name == "None"
         TC.NoPrecipitation()
     elseif precip_name == "cutoff"
-        TC.CutoffPrecipitation()
+        TC.Clima0M()
     elseif precip_name == "clima_1m"
         TC.Clima1M()
     else
@@ -236,7 +236,7 @@ function ∑tendencies_bw!(tendencies::FV, prog::FV, cache, t::Real) where {FV <
     # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
     # treat them as auxiliary variables for now, until we disentangle the tendency computations.
     Cases.update_forcing(case, grid, state, t, param_set)
-    Cases.update_radiation(case.Rad, grid, state, param_set)
+    Cases.update_radiation(case.Rad, grid, state, t, param_set)
 
     TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
 

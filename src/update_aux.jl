@@ -10,7 +10,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     p0_c = center_ref_state(state).p0
     ρ0_c = center_ref_state(state).ρ0
     α0_c = center_ref_state(state).α0
-    c_m = CPEDMF.c_m(param_set)
+    c_m = ICP.c_m(param_set)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
     obukhov_length = surf.obukhov_length
@@ -128,9 +128,11 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         end
         aux_en.area[k] = 1 - aux_bulk.area[k]
         aux_en.tke[k] = prog_en.ρatke[k] / (ρ0_c[k] * aux_en.area[k])
-        aux_en.Hvar[k] = prog_en.ρaHvar[k] / (ρ0_c[k] * aux_en.area[k])
-        aux_en.QTvar[k] = prog_en.ρaQTvar[k] / (ρ0_c[k] * aux_en.area[k])
-        aux_en.HQTcov[k] = prog_en.ρaHQTcov[k] / (ρ0_c[k] * aux_en.area[k])
+        if edmf.thermo_covariance_model isa PrognosticThermoCovariances
+            aux_en.Hvar[k] = prog_en.ρaHvar[k] / (ρ0_c[k] * aux_en.area[k])
+            aux_en.QTvar[k] = prog_en.ρaQTvar[k] / (ρ0_c[k] * aux_en.area[k])
+            aux_en.HQTcov[k] = prog_en.ρaHQTcov[k] / (ρ0_c[k] * aux_en.area[k])
+        end
 
         #####
         ##### decompose_environment
@@ -499,5 +501,27 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         end
     end
 
+    ### Diagnostic thermodynamiccovariances
+    if edmf.thermo_covariance_model isa DiagnosticThermoCovariances
+        flux1 = surf.ρθ_liq_ice_flux
+        flux2 = surf.ρq_tot_flux
+        zLL = grid.zc[kc_surf].z
+        ustar = surf.ustar
+        oblength = surf.obukhov_length
+        α0LL = center_ref_state(state).α0[kc_surf]
+        update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:Hvar))
+        update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:QTvar))
+        update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:HQTcov))
+        @inbounds for k in real_center_indices(grid)
+            aux_en.Hvar[k] = max(aux_en.Hvar[k], 0.0)
+            aux_en.QTvar[k] = max(aux_en.QTvar[k], 0.0)
+            aux_en.HQTcov[k] = max(aux_en.HQTcov[k], -sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]))
+            aux_en.HQTcov[k] = min(aux_en.HQTcov[k], sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]))
+        end
+        ae_surf = 1 - aux_bulk.area[kc_surf]
+        aux_en.Hvar[kc_surf] = ae_surf * get_surface_variance(flux1 * α0LL, flux1 * α0LL, ustar, zLL, oblength)
+        aux_en.QTvar[kc_surf] = ae_surf * get_surface_variance(flux2 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
+        aux_en.HQTcov[kc_surf] = ae_surf * get_surface_variance(flux1 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
+    end
     return nothing
 end

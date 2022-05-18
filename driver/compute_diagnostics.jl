@@ -320,13 +320,11 @@ function compute_diagnostics!(
     diag_tc_svpc.env_iwp[cent] = sum(ρ0_c .* aux_en.q_ice .* aux_en.area)
 
     #TODO - change to rain rate that depends on rain model choice
-
-    # TODO: Move rho_cloud_liq to CLIMAParameters
-    rho_cloud_liq = 1e3
-    if (precip_model isa TC.CutoffPrecipitation)
+    ρ_cloud_liq = CP.Planet.ρ_cloud_liq(param_set)
+    if (precip_model isa TC.Clima0M)
         f =
-            (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ0_c ./
-            TC.rho_cloud_liq .* 3.6 .* 1e6
+            (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ0_c ./ ρ_cloud_liq .*
+            3.6 .* 1e6
         diag_svpc.cutoff_precipitation_rate[cent] = sum(f)
     end
 

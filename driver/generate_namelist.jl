@@ -65,6 +65,7 @@ function default_namelist(
     write::Bool = true,
     set_seed::Bool = true,
     seed::Int = 2022,
+    truncate_stack_trace::Bool = false,
 )
 
     if set_seed
@@ -74,6 +75,9 @@ function default_namelist(
     namelist_defaults = Dict()
     namelist_defaults["meta"] = Dict()
     namelist_defaults["meta"]["uuid"] = basename(tempname())
+
+    namelist_defaults["logging"] = Dict()
+    namelist_defaults["logging"]["truncate_stack_trace"] = truncate_stack_trace
 
     namelist_defaults["turbulence"] = Dict()
 
@@ -126,6 +130,8 @@ function default_namelist(
     namelist_defaults["thermodynamics"] = Dict()
     namelist_defaults["thermodynamics"]["thermal_variable"] = "thetal"
     namelist_defaults["thermodynamics"]["moisture_model"] = "equilibrium" #"nonequilibrium"
+    namelist_defaults["thermodynamics"]["thermo_covariance_model"] = "diagnostic" #"prognostic" or "diagnostic"
+    namelist_defaults["thermodynamics"]["diagnostic_covar_limiter"] = 1e-3 # this controls the magnitude of the spike in covariance
     namelist_defaults["thermodynamics"]["sgs"] = "quadrature"
     namelist_defaults["thermodynamics"]["quadrature_order"] = 3
     namelist_defaults["thermodynamics"]["quadrature_type"] = "log-normal" #"gaussian" or "log-normal"
@@ -352,7 +358,7 @@ function TRMM_LBA(namelist_defaults)
     namelist["time_stepping"]["dt_max"] = 5.0
     namelist["time_stepping"]["dt_min"] = 1.0
 
-    namelist["microphysics"]["precipitation_model"] = "clima_1m" #"cutoff"
+    namelist["microphysics"]["precipitation_model"] = "clima_1m" # "cutoff"
     namelist["microphysics"]["τ_acnv_rai"] = 2500.0
     namelist["microphysics"]["τ_acnv_sno"] = 100.0
     namelist["microphysics"]["q_liq_threshold"] = 0.5e-3

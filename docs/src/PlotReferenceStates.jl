@@ -23,24 +23,28 @@ function export_ref_profile(case_name::String)
     grid = TC.Grid(FT(namelist["grid"]["dz"]), namelist["grid"]["nz"])
     case = Cases.get_case(namelist)
     surf_ref_state = Cases.surface_ref_state(case, param_set, namelist)
+    ts_g = surf_ref_state
 
-    aux_vars(FT) = (; ref_state = (ρ0 = FT(0), α0 = FT(0), p0 = FT(0)))
-    aux_cent_fields = TC.FieldFromNamedTuple(TC.center_space(grid), aux_vars(FT))
-    aux_face_fields = TC.FieldFromNamedTuple(TC.face_space(grid), aux_vars(FT))
+    aux_vars(FT) = (; ρ0 = FT(0), α0 = FT(0), p0 = FT(0))
+    cent = TC.FieldFromNamedTuple(TC.center_space(grid), aux_vars(FT))
+    face = TC.FieldFromNamedTuple(TC.face_space(grid), aux_vars(FT))
 
-    aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
-    state = (; aux)
-
-    compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
+    p0_c = cent.p0
+    ρ0_c = cent.ρ0
+    α0_c = cent.α0
+    p0_f = face.p0
+    ρ0_f = face.ρ0
+    α0_f = face.α0
+    compute_ref_state!(p0_c, ρ0_c, α0_c, p0_f, ρ0_f, α0_f, grid, param_set; ts_g)
 
     zc = vec(grid.zc)
     zf = vec(grid.zf)
-    ρ0_c = vec(aux.cent.ref_state.ρ0)
-    p0_c = vec(aux.cent.ref_state.p0)
-    α0_c = vec(aux.cent.ref_state.α0)
-    ρ0_f = vec(aux.face.ref_state.ρ0)
-    p0_f = vec(aux.face.ref_state.p0)
-    α0_f = vec(aux.face.ref_state.α0)
+    ρ0_c = vec(cent.ρ0)
+    p0_c = vec(cent.p0)
+    α0_c = vec(cent.α0)
+    ρ0_f = vec(face.ρ0)
+    p0_f = vec(face.p0)
+    α0_f = vec(face.α0)
 
     p1 = Plots.plot(ρ0_c, zc ./ 1000; label = "centers")
     Plots.plot!(ρ0_f, zf ./ 1000; label = "faces")

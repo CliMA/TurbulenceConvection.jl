@@ -38,9 +38,12 @@ function compute_turbconv_tendencies!(
 )
     compute_up_tendencies!(edmf, grid, state, param_set, surf)
     compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
-    compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
-    compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρaQTvar))
-    compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρaHQTcov))
+
+    if edmf.thermo_covariance_model isa PrognosticThermoCovariances
+        compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
+        compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρaQTvar))
+        compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρaHQTcov))
+    end
 
     return nothing
 end
@@ -105,13 +108,14 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     massflux_h[kf_surf] = 0
 
     if edmf.moisture_model isa NonEquilibriumMoisture
+        massflux_en = aux_tc_f.massflux_en
         massflux_ql = aux_tc_f.massflux_ql
         massflux_qi = aux_tc_f.massflux_qi
         q_liq_en = aux_en.q_liq
         q_ice_en = aux_en.q_ice
         q_liq_gm = prog_gm.q_liq
         q_ice_gm = prog_gm.q_ice
-        massflux_en = ρ0_f * Ifae(a_en) * (w_en - w_gm)
+        @. massflux_en = ρ0_f * Ifae(a_en) * (w_en - w_gm)
         @. massflux_ql = massflux_en * (If(q_liq_en) - If(q_liq_gm))
         @. massflux_qi = massflux_en * (If(q_ice_en) - If(q_ice_gm))
         @inbounds for i in 1:N_up
@@ -237,6 +241,7 @@ function affect_filter!(
         return nothing
     end
     prog_en = center_prog_environment(state)
+    aux_en = center_aux_environment(state)
     ###
     ### Filters
     ###
@@ -245,10 +250,12 @@ function affect_filter!(
 
     @inbounds for k in real_center_indices(grid)
         prog_en.ρatke[k] = max(prog_en.ρatke[k], 0.0)
-        prog_en.ρaHvar[k] = max(prog_en.ρaHvar[k], 0.0)
-        prog_en.ρaQTvar[k] = max(prog_en.ρaQTvar[k], 0.0)
-        prog_en.ρaHQTcov[k] = max(prog_en.ρaHQTcov[k], -sqrt(prog_en.ρaHvar[k] * prog_en.ρaQTvar[k]))
-        prog_en.ρaHQTcov[k] = min(prog_en.ρaHQTcov[k], sqrt(prog_en.ρaHvar[k] * prog_en.ρaQTvar[k]))
+        if edmf.thermo_covariance_model isa PrognosticThermoCovariances
+            prog_en.ρaHvar[k] = max(prog_en.ρaHvar[k], 0.0)
+            prog_en.ρaQTvar[k] = max(prog_en.ρaQTvar[k], 0.0)
+            prog_en.ρaHQTcov[k] = max(prog_en.ρaHQTcov[k], -sqrt(prog_en.ρaHvar[k] * prog_en.ρaQTvar[k]))
+            prog_en.ρaHQTcov[k] = min(prog_en.ρaHQTcov[k], sqrt(prog_en.ρaHvar[k] * prog_en.ρaQTvar[k]))
+        end
     end
     return nothing
 end
@@ -264,6 +271,7 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     prog_en = center_prog_environment(state)
     prog_up_f = face_prog_updrafts(state)
     aux_bulk = center_aux_bulk(state)
+    aux_en = center_aux_environment(state)
     @inbounds for i in 1:N_up
         θ_surf = θ_surface_bc(surf, grid, state, edmf, i)
         q_surf = q_surface_bc(surf, grid, state, edmf, i)
@@ -292,9 +300,11 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     ρ0_ae = ρ0_c[kc_surf] * ae_surf
 
     prog_en.ρatke[kc_surf] = ρ0_ae * get_surface_tke(param_set, surf.ustar, zLL, surf.obukhov_length)
-    prog_en.ρaHvar[kc_surf] = ρ0_ae * get_surface_variance(flux1 * α0LL, flux1 * α0LL, ustar, zLL, oblength)
-    prog_en.ρaQTvar[kc_surf] = ρ0_ae * get_surface_variance(flux2 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
-    prog_en.ρaHQTcov[kc_surf] = ρ0_ae * get_surface_variance(flux1 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
+    if edmf.thermo_covariance_model isa PrognosticThermoCovariances
+        prog_en.ρaHvar[kc_surf] = ρ0_ae * get_surface_variance(flux1 * α0LL, flux1 * α0LL, ustar, zLL, oblength)
+        prog_en.ρaQTvar[kc_surf] = ρ0_ae * get_surface_variance(flux2 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
+        prog_en.ρaHQTcov[kc_surf] = ρ0_ae * get_surface_variance(flux1 * α0LL, flux2 * α0LL, ustar, zLL, oblength)
+    end
     return nothing
 end
 
@@ -411,7 +421,7 @@ function compute_updraft_top(grid::Grid{FT}, state::State, i::Int)::FT where {FT
 end
 
 function compute_plume_scale_height(grid::Grid{FT}, state::State, param_set::APS, i::Int)::FT where {FT}
-    H_up_min::FT = CPEDMF.H_up_min(param_set)
+    H_up_min::FT = ICP.H_up_min(param_set)
     updraft_top = compute_updraft_top(grid, state, i)
     return max(updraft_top, H_up_min)
 end
@@ -427,7 +437,7 @@ function compute_up_stoch_tendencies!(edmf::EDMFModel, grid::Grid, state::State,
         tends_ε_nondim = tendencies_up[i].ε_nondim
         tends_δ_nondim = tendencies_up[i].δ_nondim
 
-        c_gen_stoch = ICP.c_gen_stoch(param_set)
+        c_gen_stoch = ECP.c_gen_stoch(param_set)
         mean_entr = aux_up[i].ε_nondim
         mean_detr = aux_up[i].δ_nondim
         ε_σ² = c_gen_stoch[1]
@@ -535,7 +545,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
 
         # prognostic entr/detr
         if edmf.entr_closure isa PrognosticNoisyRelaxationProcess
-            c_gen_stoch = ICP.c_gen_stoch(param_set)
+            c_gen_stoch = ECP.c_gen_stoch(param_set)
             mean_entr = aux_up[i].ε_nondim
             mean_detr = aux_up[i].δ_nondim
             ε_λ = c_gen_stoch[3]
@@ -842,7 +852,7 @@ function compute_covariance_dissipation(
     param_set::APS,
 ) where {covar_sym}
     FT = eltype(grid)
-    c_d::FT = CPEDMF.c_d(param_set)
+    c_d::FT = ICP.c_d(param_set)
     aux_tc = center_aux_turbconv(state)
     ρ0_c = center_ref_state(state).ρ0
     prog_en = center_prog_environment(state)
@@ -882,7 +892,7 @@ function compute_en_tendencies!(
     aux_covar = getproperty(aux_en_2m, covar_sym)
     aux_up = center_aux_updrafts(state)
     w_en_f = face_aux_environment(state).w
-    c_d = CPEDMF.c_d(param_set)
+    c_d = ICP.c_d(param_set)
     is_tke = covar_sym == :tke
     FT = eltype(grid)
 
@@ -939,10 +949,65 @@ function compute_en_tendencies!(
         (ρ0_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * covar -
         ∇c(wvec(RB(ρ0_c * area_en * Ic(w_en_f) * covar))) + ∇c(ρ0_f * If(aeK) * ∇f(covar))
 
-    prog_covar[kc_surf] = covar[kc_surf]
-
     return nothing
 end
+
+function update_diagnostic_covariances!(
+    edmf::EDMFModel,
+    grid::Grid,
+    state::State,
+    param_set::APS,
+    ::Val{covar_sym},
+) where {covar_sym}
+    FT = eltype(grid)
+    N_up = n_updrafts(edmf)
+    kc_surf = kc_surface(grid)
+    kc_toa = kc_top_of_atmos(grid)
+    ρ0_c = center_ref_state(state).ρ0
+    aux_en_2m = center_aux_environment_2m(state)
+    aux_up_f = face_aux_updrafts(state)
+    aux_en = center_aux_environment(state)
+    covar = getproperty(aux_en, covar_sym)
+    aux_covar = getproperty(aux_en_2m, covar_sym)
+    aux_up = center_aux_updrafts(state)
+    w_en_f = face_aux_environment(state).w
+    c_d = ICP.c_d(param_set)
+    covar_lim = ECP.covar_lim(param_set)
+
+    ρ_ae_K = face_aux_turbconv(state).ρ_ae_K
+    KH = center_aux_turbconv(state).KH
+    aux_tc = center_aux_turbconv(state)
+    aux_bulk = center_aux_bulk(state)
+    D_env = aux_tc.ϕ_temporary
+    a_bulk = aux_bulk.area
+    tke_en = aux_en.tke
+
+    shear = aux_covar.shear
+    entr_gain = aux_covar.entr_gain
+    rain_src = aux_covar.rain_src
+    mixing_length = aux_tc.mixing_length
+    min_area = edmf.minimum_area
+
+    Ic = CCO.InterpolateF2C()
+    area_en = aux_en.area
+
+    parent(D_env) .= 0
+    @inbounds for i in 1:N_up
+        turb_entr = aux_up[i].frac_turb_entr
+        entr_sc = aux_up[i].entr_sc
+        w_up = aux_up_f[i].w
+        a_up = aux_up[i].area
+        # TODO: using `Int(bool) *` means that NaNs can propagate
+        # into the solution. Could we somehow call `ifelse` instead?
+        @. D_env += Int(a_up > min_area) * ρ0_c * a_up * Ic(w_up) * (entr_sc + turb_entr)
+    end
+
+    @. covar =
+        (shear + entr_gain + rain_src) /
+        max(D_env + ρ0_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1), covar_lim)
+    return nothing
+end
+
 
 function GMV_third_m(
     edmf::EDMFModel,

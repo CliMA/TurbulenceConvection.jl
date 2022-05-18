@@ -2,13 +2,13 @@
 get_wstar(bflux, zi) = cbrt(max(bflux * zi, 0))
 
 function buoyancy_c(param_set::APS, ρ0::FT, ρ::FT) where {FT}
-    g::FT = CPP.grav(param_set)
+    g::FT = ICP.grav(param_set)
     return g * (ρ0 - ρ) / ρ0
 end
 
 # BL height
 function get_inversion(grid::Grid{FT}, state::State, param_set::APS, Ri_bulk_crit::FT) where {FT}
-    g::FT = CPP.grav(param_set)
+    g::FT = ICP.grav(param_set)
     kc_surf = kc_surface(grid)
     θ_virt = center_aux_grid_mean(state).θ_virt
     u = center_prog_grid_mean(state).u
@@ -50,7 +50,7 @@ end
 
 # MO scaling of near surface tke and scalar variance
 function get_surface_tke(param_set::APS, ustar::FT, zLL::FT, oblength::FT) where {FT}
-    κ_star²::FT = CPEDMF.κ_star²(param_set)
+    κ_star²::FT = ICP.κ_star²(param_set)
     if oblength < 0
         return ((κ_star² + cbrt(zLL / oblength * zLL / oblength)) * ustar * ustar)
     else
@@ -68,14 +68,14 @@ function get_surface_variance(flux1::FT, flux2::FT, ustar::FT, zLL::FT, oblength
 end
 
 function gradient_Richardson_number(param_set::APS, ∂b∂z::FT, Shear²::FT, ϵ::FT) where {FT}
-    Ri_c::FT = CPEDMF.Ri_c(param_set)
+    Ri_c::FT = ICP.Ri_c(param_set)
     return min(∂b∂z / max(Shear², ϵ), Ri_c)
 end
 
 # Turbulent Prandtl number given the obukhov length sign and the gradient Richardson number
 function turbulent_Prandtl_number(param_set::APS, obukhov_length::FT, ∇Ri::FT) where {FT}
-    ω_pr::FT = CPEDMF.ω_pr(param_set)
-    Pr_n::FT = CPEDMF.Pr_n(param_set)
+    ω_pr::FT = ICP.ω_pr(param_set)
+    Pr_n::FT = ICP.Pr_n(param_set)
     if obukhov_length > 0 && ∇Ri > 0 #stable
         # CSB (Dan Li, 2019, eq. 75), where ω_pr = ω_1 + 1 = 53.0/13.0
         prandtl_nvec = Pr_n * (2 * ∇Ri / (1 + ω_pr * ∇Ri - sqrt((1 + ω_pr * ∇Ri)^2 - 4 * ∇Ri)))

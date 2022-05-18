@@ -14,10 +14,10 @@ function buoyancy_gradients(
     bg_model::EnvBuoyGrad{FT, EBG},
 ) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
 
-    g = CPP.grav(param_set)
-    molmass_ratio = CPP.molmass_ratio(param_set)
-    R_d = CPP.R_d(param_set)
-    R_v = CPP.R_v(param_set)
+    g = ICP.grav(param_set)
+    molmass_ratio = ICP.molmass_ratio(param_set)
+    R_d = ICP.R_d(param_set)
+    R_v = ICP.R_v(param_set)
 
     phase_part = TD.PhasePartition(0.0, 0.0, 0.0) # assuming R_d = R_m
     Π = TD.exner_given_pressure(param_set, bg_model.p0, phase_part)

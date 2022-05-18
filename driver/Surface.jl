@@ -93,8 +93,9 @@ function get_surface(
     Tsurface = TC.surface_temperature(surf_params, t)
     qsurface = TC.surface_q_tot(surf_params, t)
     zrough = surf_params.zrough
-    cm = surf_params.cm
-    ch = surf_params.ch
+    zc_surf = grid.zc[kc_surf]
+    cm = surf_params.cm(zc_surf)
+    ch = surf_params.ch(zc_surf)
     Ri_bulk_crit = surf_params.Ri_bulk_crit
 
     universal_func = UF.Businger()

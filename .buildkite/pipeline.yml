@@ -129,6 +129,10 @@ steps:
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA --sgs mean --adapt_dt false --dt 1.0 --moisture_model nonequilibrium --skip_tests true --suffix _nonequilibrium_moisture"
         artifact_paths: "Output.TRMM_LBA.01_nonequilibrium_moisture/stats/comparison/*"
 
+      - label: ":scissors: TRMM_LBA with 0-moment precipitation"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA --sgs mean --adapt_dt false --dt 1.0 --precipitation_model cutoff --skip_tests true --suffix _0moment_precipitation"
+        artifact_paths: "Output.TRMM_LBA.01_0moment_precipitation/stats/comparison/*"
+
       - label: ":partly_sunny: Bomex with calibrate_io_true"
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --calibrate_io true --skip_post_proc true --suffix _calibrate_io_true"
         artifact_paths: "Output.Bomex.01_calibrate_io_true/stats/comparison/*"
@@ -137,6 +141,10 @@ steps:
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --skip_io true --skip_post_proc true --suffix _skip_io_true"
         artifact_paths: "Output.Bomex.01_skip_io_true/stats/comparison/*"
 
+
+      - label: ":partly_sunny: Rico with prognostic covarinaces"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Rico --thermo_covariance_model prognostic --skip_tests true --suffix _prognostic_covarinaces"
+        artifact_paths: "Output.Rico.01_prognostic_covarinaces/stats/comparison/*"
 
   - group: "3D Experiments"
     steps:
