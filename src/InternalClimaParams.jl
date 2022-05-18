@@ -34,6 +34,7 @@ H_up_min(ps::APS) = CP.Atmos.EDMF.H_up_min(ps)
 
 LH_v0(ps::APS) = CP.Planet.LH_v0(ps)
 LH_s0(ps::APS) = CP.Planet.LH_s0(ps)
+LH_f0(ps::APS) = CP.Planet.LH_f0(ps)
 
 microph_scaling(ps::APS) = CP.Atmos.Microphysics.microph_scaling(ps)
 microph_scaling_dep_sub(ps::APS) = CP.Atmos.Microphysics.microph_scaling_dep_sub(ps)

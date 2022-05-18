@@ -93,13 +93,16 @@ function compute_precipitation_sink_tendencies(
         R_v = ICP.R_v(param_set)
         L_v0 = ICP.LH_v0(param_set)
         L_s0 = ICP.LH_s0(param_set)
+        L_f0 = ICP.LH_f0(param_set)
         L_v = TD.latent_heat_vapor(param_set, ts)
         L_s = TD.latent_heat_sublim(param_set, ts)
         L_f = TD.latent_heat_fusion(param_set, ts)
 
         I_l = TD.internal_energy_liquid(param_set, ts)
         I_i = TD.internal_energy_ice(param_set, ts)
-        I = TD.internal_energy(param_set, ts)
+        h_l = I_l
+        h_i = I_i - L_f0
+        #I = TD.internal_energy(param_set, ts)
         Φ = geopotential(param_set, grid.zc.z[k])
 
         α_evp = ICP.microph_scaling(param_set)
@@ -127,7 +130,7 @@ function compute_precipitation_sink_tendencies(
 
         aux_tc.qt_tendency_precip_sinks[k] = -S_qr_evap - S_qs_sub_dep
         aux_tc.e_tot_tendency_precip_sinks[k] =
-            -S_qr_evap * (I_l + Φ - I) - S_qs_sub_dep * (I_i + Φ - I) + S_qs_melt * L_f
+            -S_qr_evap * (h_l + Φ) - S_qs_sub_dep * (h_i + Φ) + S_qs_melt * L_f
     end
     return nothing
 end
