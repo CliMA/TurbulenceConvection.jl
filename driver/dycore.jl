@@ -442,10 +442,10 @@ function compute_gm_tendencies!(
         if TC.force_type(force) <: TC.ForcingLES
             H_fluc = aux_gm.dTdt_fluc[k] / Π
 
-            gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm.u[k]) / force.nudge_tau
-            gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm.v[k]) / force.nudge_tau
+            gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm.u[k]) / force.wind_nudge_τᵣ
+            gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm.v[k]) / force.wind_nudge_τᵣ
 
-            Γᵣ = TC.compute_les_Γᵣ(grid.zc[k])
+            Γᵣ = TC.compute_les_Γᵣ(grid.zc[k], force.scalar_nudge_τᵣ, force.scalar_nudge_zᵢ, force.scalar_nudge_zᵣ)
             gm_H_nudge_k = Γᵣ * (aux_gm.H_nudge[k] - aux_gm.θ_liq_ice[k])
             gm_q_tot_nudge_k = Γᵣ * (aux_gm.qt_nudge[k] - aux_gm.q_tot[k])
             if edmf.moisture_model isa TC.NonEquilibriumMoisture

@@ -388,8 +388,14 @@ Base.@kwdef struct ForcingBase{T, R}
     apply_coriolis::Bool = false
     "Coriolis parameter"
     coriolis_param::Float64 = 0
-    "Momentum relaxation timescale"
-    nudge_tau::Float64 = 0.0
+    "Wind relaxation timescale"
+    wind_nudge_τᵣ::Float64 = 0.0
+    "Scalar relaxation lower z"
+    scalar_nudge_zᵢ::Float64 = 0.0
+    "Scalar relaxation upper z"
+    scalar_nudge_zᵣ::Float64 = 0.0
+    "Scalar maximum relaxation timescale"
+    scalar_nudge_τᵣ::Float64 = 0.0
     "Radiative forcing"
     rad::R
 end

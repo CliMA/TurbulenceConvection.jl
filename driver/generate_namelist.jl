@@ -532,12 +532,12 @@ function LES_driven_SCM(namelist_defaults)
     # average in 1 hour interval around `t_interval_from_end_s`
     namelist["initial_condition_averaging_window_s"] = 3600.0
 
+    # LES filename should follow pattern:
+    # Stats.cfsite<SITE-NUMBER>_<FORCING-MODEL>_<EXPERIMENT>_2004-2008.<MONTH>.nc
     namelist["meta"]["lesfile"] =
         joinpath(les_driven_scm_data_folder(), "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc")
     namelist["meta"]["simname"] = "LES_driven_SCM"
     namelist["meta"]["casename"] = "LES_driven_SCM"
-    namelist["forcing"] = Dict()
-    namelist["forcing"]["nudging_timescale"] = 6.0 * 3600.0
 
     return namelist
 end
