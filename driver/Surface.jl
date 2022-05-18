@@ -173,6 +173,8 @@ function get_surface(
     shf = result.shf
     zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)
     convective_vel = TC.get_wstar(result.buoy_flux, zi)
+    println("Potential temperature at kc_surf is $(θ_liq_ice_gm_surf).")
+    println("Monin Obukhov length is $(result.L_MO).")
     return TC.SurfaceBase{FT}(;
         cm = result.Cd,
         ch = result.Ch,
