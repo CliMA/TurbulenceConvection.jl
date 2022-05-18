@@ -132,7 +132,7 @@ function default_namelist(
     namelist_defaults["thermodynamics"]["moisture_model"] = "equilibrium" #"nonequilibrium"
     namelist_defaults["thermodynamics"]["thermo_covariance_model"] = "diagnostic" #"prognostic" or "diagnostic"
     namelist_defaults["thermodynamics"]["diagnostic_covar_limiter"] = 1e-3 # this controls the magnitude of the spike in covariance
-    namelist_defaults["thermodynamics"]["sgs"] = "quadrature"
+    namelist_defaults["thermodynamics"]["sgs"] = "mean" #"quadrature"
     namelist_defaults["thermodynamics"]["quadrature_order"] = 3
     namelist_defaults["thermodynamics"]["quadrature_type"] = "log-normal" #"gaussian" or "log-normal"
 
