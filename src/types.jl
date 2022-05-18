@@ -279,12 +279,10 @@ function FixedSurfaceCoeffs(
     return FixedSurfaceCoeffs{FT, TS, QS, CH, CM}(; Tsurface, qsurface, ch, cm, kwargs...)
 end
 
-Base.@kwdef struct MoninObukhovSurface{FT, TS, QS, SHF, LHF} <: AbstractSurfaceParameters{FT}
+Base.@kwdef struct MoninObukhovSurface{FT, TS, QS} <: AbstractSurfaceParameters{FT}
     zrough::FT = FT(0)
     Tsurface::TS = FT(0)
     qsurface::QS = FT(0)
-    shf::SHF = FT(0)
-    lhf::LHF = FT(0)
     Ri_bulk_crit::FT = FT(0)
 end
 
@@ -292,15 +290,11 @@ function MoninObukhovSurface(
     ::Type{FT};
     Tsurface::FloatOrFunc{FT},
     qsurface::FloatOrFunc{FT},
-    shf::FloatOrFunc{FT},
-    lhf::FloatOrFunc{FT},
     kwargs...,
 ) where {FT, FVT}
     TS = typeof(Tsurface)
     QS = typeof(qsurface)
-    SHF = typeof(shf)
-    LHF = typeof(lhf)
-    return MoninObukhovSurface{FT, TS, QS, SHF, LHF}(; Tsurface, qsurface, shf, lhf, kwargs...)
+    return MoninObukhovSurface{FT, TS, QS}(; Tsurface, qsurface, kwargs...)
 end
 
 Base.@kwdef struct SullivanPattonSurface{FT, TS, QS, SHF, LHF} <: AbstractSurfaceParameters{FT}
