@@ -27,6 +27,8 @@ function get_surface(
     shf = TC.sensible_heat_flux(surf_params, t)
     lhf = TC.latent_heat_flux(surf_params, t)
     Ri_bulk_crit = surf_params.Ri_bulk_crit
+    println("Critical Ri number used is $(Ri_bulk_crit).")
+
     zrough = surf_params.zrough
 
     ts_sfc = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
@@ -97,7 +99,8 @@ function get_surface(
     cm = surf_params.cm(zc_surf)
     ch = surf_params.ch(zc_surf)
     Ri_bulk_crit = surf_params.Ri_bulk_crit
-
+    println("Critical Ri number used is $(Ri_bulk_crit).")
+    
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
     z_sfc = FT(0)
@@ -217,6 +220,7 @@ function get_surface(
     Tsurface = surface_temperature(surf_params, t)
     zrough = surf_params.zrough
     Ri_bulk_crit = surf_params.Ri_bulk_crit
+    println("Critical Ri number used is $(Ri_bulk_crit).")
 
     phase_part = TD.PhasePartition(q_tot_gm_surf, 0.0, 0.0)
     pvg = TD.saturation_vapor_pressure(param_set, TD.PhaseEquil, Tsurface)
