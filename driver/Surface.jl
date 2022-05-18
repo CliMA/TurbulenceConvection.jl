@@ -159,7 +159,8 @@ function get_surface(
     lhf = TC.latent_heat_flux(surf_params, t)
     zrough = surf_params.zrough
     Ri_bulk_crit = surf_params.Ri_bulk_crit
-
+    println("Critical Ri number used is $(Ri_bulk_crit).")
+    
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
     ts_sfc = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
