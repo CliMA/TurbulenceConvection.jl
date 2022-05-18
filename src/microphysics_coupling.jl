@@ -143,7 +143,8 @@ function precipitation_formation(
                 θ_liq_ice_tendency -= S_qt / Π_m / c_pm * Lf * (1 + Rm / c_vm)
                 e_tot_tendency += S_qt * (h_i + Φ)
             else # snow melts, both cloud water and snow become rain
-                α::FT = c_vl / Lf * (T - T_fr)
+                #α::FT = c_vl / Lf * (T - T_fr)
+                α::FT = FT(0)
                 qt_tendency += S_qt
                 ql_tendency += S_qt
                 qs_tendency += S_qt * α
@@ -162,7 +163,7 @@ function precipitation_formation(
             qs_tendency += -(S_qt + S_qr)
             θ_liq_ice_tendency -= 1 / Π_m / c_pm * (S_qr * Lf * (1 + Rm / c_vm) + S_qt * L_s0)
             e_tot_tendency += S_qt * (h_i + Φ)
-            e_tot_tendency -= S_qr * Lf
+            #e_tot_tendency -= S_qr * Lf
 
             # accretion rain - snow
             if T < T_fr
@@ -173,7 +174,7 @@ function precipitation_formation(
             qs_tendency += S_qs
             qr_tendency -= S_qs
             θ_liq_ice_tendency += S_qs * Lf / Π_m / c_vm
-            e_tot_tendency += S_qs * Lf
+            #e_tot_tendency += S_qs * Lf
         end
     end
     return PrecipFormation{FT}(

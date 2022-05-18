@@ -130,7 +130,7 @@ function compute_precipitation_sink_tendencies(
 
         aux_tc.qt_tendency_precip_sinks[k] = -S_qr_evap - S_qs_sub_dep
         aux_tc.e_tot_tendency_precip_sinks[k] =
-            -S_qr_evap * (h_l + Φ) - S_qs_sub_dep * (h_i + Φ) + S_qs_melt * L_f
+            -S_qr_evap * (h_l + Φ) - S_qs_sub_dep * (h_i + Φ)# + S_qs_melt * L_f
     end
     return nothing
 end
