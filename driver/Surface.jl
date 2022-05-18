@@ -155,8 +155,6 @@ function get_surface(
     θ_liq_ice_gm_surf = aux_gm.θ_liq_ice[kc_surf]
     Tsurface = TC.surface_temperature(surf_params, t)
     qsurface = TC.surface_q_tot(surf_params, t)
-    shf = TC.sensible_heat_flux(surf_params, t)
-    lhf = TC.latent_heat_flux(surf_params, t)
     zrough = surf_params.zrough
     Ri_bulk_crit = surf_params.Ri_bulk_crit
 
