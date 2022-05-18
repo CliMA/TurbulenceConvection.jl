@@ -183,14 +183,28 @@ The reference profiles, given
  - `ts_g` the surface reference state (a thermodynamic state)
 """
 function compute_ref_state!(state, grid::TC.Grid, param_set::PS; ts_g) where {PS}
-
-    FT = eltype(grid)
     p0_c = TC.center_ref_state(state).p0
     ρ0_c = TC.center_ref_state(state).ρ0
     α0_c = TC.center_ref_state(state).α0
     p0_f = TC.face_ref_state(state).p0
     ρ0_f = TC.face_ref_state(state).ρ0
     α0_f = TC.face_ref_state(state).α0
+    compute_ref_state!(p0_c, ρ0_c, α0_c, p0_f, ρ0_f, α0_f, grid, param_set; ts_g)
+end
+
+function compute_ref_state!(
+    p0_c::CC.Fields.Field,
+    ρ0_c::CC.Fields.Field,
+    α0_c::CC.Fields.Field,
+    p0_f::CC.Fields.Field,
+    ρ0_f::CC.Fields.Field,
+    α0_f::CC.Fields.Field,
+    grid::TC.Grid,
+    param_set::PS;
+    ts_g,
+) where {PS}
+
+    FT = eltype(grid)
 
     qtg = TD.total_specific_humidity(param_set, ts_g)
     θ_liq_ice_g = TD.liquid_ice_pottemp(param_set, ts_g)
