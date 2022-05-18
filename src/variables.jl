@@ -71,6 +71,19 @@ cent_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
     diffusive_tendency_qi = FT(0),
 )
 cent_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
+
+cent_aux_vars_edmf_precipitation(FT, ::Union{NoPrecipitation, Clima0M}) = NamedTuple()
+cent_aux_vars_edmf_precipitation(FT, ::Clima1M) = (;
+    θ_liq_ice_tendency_precip_sinks = FT(0),
+    qt_tendency_precip_sinks = FT(0),
+    qr_tendency_evap = FT(0),
+    qs_tendency_melt = FT(0),
+    qs_tendency_dep_sub = FT(0),
+    qr_tendency_advection = FT(0),
+    qs_tendency_advection = FT(0),
+    term_vel_rain = FT(0),
+    term_vel_snow = FT(0),
+)
 cent_aux_vars_edmf(FT, edmf) = (;
     turbconv = (;
         ϕ_temporary = FT(0),
@@ -118,21 +131,12 @@ cent_aux_vars_edmf(FT, edmf) = (;
             QTvar_rain_dt = FT(0),
             HQTcov_rain_dt = FT(0),
         ),
-        θ_liq_ice_tendency_precip_sinks = FT(0),
-        qt_tendency_precip_sinks = FT(0),
-        qr_tendency_evap = FT(0),
-        qs_tendency_melt = FT(0),
-        qs_tendency_dep_sub = FT(0),
-        qr_tendency_advection = FT(0),
-        qs_tendency_advection = FT(0),
         en_2m = (;
             tke = cent_aux_vars_en_2m(FT),
             Hvar = cent_aux_vars_en_2m(FT),
             QTvar = cent_aux_vars_en_2m(FT),
             HQTcov = cent_aux_vars_en_2m(FT),
         ),
-        term_vel_rain = FT(0),
-        term_vel_snow = FT(0),
         KM = FT(0),
         KH = FT(0),
         mixing_length = FT(0),
@@ -141,6 +145,7 @@ cent_aux_vars_edmf(FT, edmf) = (;
         diffusive_tendency_h = FT(0),
         diffusive_tendency_qt = FT(0),
         cent_aux_vars_edmf_moisture(FT, edmf.moisture_model)...,
+        cent_aux_vars_edmf_precipitation(FT, edmf.precip_model)...,
         prandtl_nvec = FT(0),
         # Added by Ignacio : Length scheme in use (mls), and smooth min effect (ml_ratio)
         # Variable Prandtl number initialized as neutral value.
@@ -258,11 +263,13 @@ cent_prognostic_vars_en(::Type{FT}, edmf) where {FT} =
 cent_prognostic_vars_en_thermo(::Type{FT}, ::DiagnosticThermoCovariances) where {FT} = NamedTuple()
 cent_prognostic_vars_en_thermo(::Type{FT}, ::PrognosticThermoCovariances) where {FT} =
     (; ρaHvar = FT(0), ρaQTvar = FT(0), ρaHQTcov = FT(0))
+cent_prognostic_vars_precip(::Type{FT}, ::Union{NoPrecipitation, Clima0M}) where{FT} = NamedTuple()
+cent_prognostic_vars_precip(::Type{FT}, ::Clima1M) where{FT} = (; q_rai = FT(0), q_sno = FT(0))
 cent_prognostic_vars_edmf(::Type{FT}, edmf) where {FT} = (;
     turbconv = (;
         en = cent_prognostic_vars_en(FT, edmf),
         up = ntuple(i -> cent_prognostic_vars_up(FT, edmf), Val(n_updrafts(edmf))),
-        pr = (; q_rai = FT(0), q_sno = FT(0)),
+        pr = cent_prognostic_vars_precip(FT, edmf.precip_model),
     )
 )
 # cent_prognostic_vars_edmf(FT, edmf) = (;) # could also use this for empty model

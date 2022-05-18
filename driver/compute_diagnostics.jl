@@ -313,15 +313,17 @@ function compute_diagnostics!(
 
     diag_svpc.lwp_mean[cent] = sum(ρ0_c .* aux_gm.q_liq)
     diag_svpc.iwp_mean[cent] = sum(ρ0_c .* aux_gm.q_ice)
-    diag_svpc.rwp_mean[cent] = sum(ρ0_c .* prog_pr.q_rai)
-    diag_svpc.swp_mean[cent] = sum(ρ0_c .* prog_pr.q_sno)
+    if precip_model isa TC.Clima1M
+        diag_svpc.rwp_mean[cent] = sum(ρ0_c .* prog_pr.q_rai)
+        diag_svpc.swp_mean[cent] = sum(ρ0_c .* prog_pr.q_sno)
+    end
 
     diag_tc_svpc.env_lwp[cent] = sum(ρ0_c .* aux_en.q_liq .* aux_en.area)
     diag_tc_svpc.env_iwp[cent] = sum(ρ0_c .* aux_en.q_ice .* aux_en.area)
 
     #TODO - change to rain rate that depends on rain model choice
     ρ_cloud_liq = CP.Planet.ρ_cloud_liq(param_set)
-    if (precip_model isa TC.Clima0M)
+    if precip_model isa TC.Clima0M
         f =
             (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ0_c ./ ρ_cloud_liq .*
             3.6 .* 1e6
@@ -353,14 +355,20 @@ function compute_diagnostics!(
     write_ts(Stats, "updraft_lwp", diag_tc_svpc.updraft_lwp[cent])
     write_ts(Stats, "updraft_iwp", diag_tc_svpc.updraft_iwp[cent])
 
-    write_ts(Stats, "cutoff_precipitation_rate", diag_svpc.cutoff_precipitation_rate[cent])
     write_ts(Stats, "cloud_cover_mean", diag_svpc.cloud_cover_mean[cent])
     write_ts(Stats, "cloud_base_mean", diag_svpc.cloud_base_mean[cent])
     write_ts(Stats, "cloud_top_mean", diag_svpc.cloud_top_mean[cent])
     write_ts(Stats, "lwp_mean", diag_svpc.lwp_mean[cent])
     write_ts(Stats, "iwp_mean", diag_svpc.iwp_mean[cent])
-    write_ts(Stats, "rwp_mean", diag_svpc.rwp_mean[cent])
-    write_ts(Stats, "swp_mean", diag_svpc.swp_mean[cent])
+
+    if precip_model isa TC.Clima0M
+        write_ts(Stats, "cutoff_precipitation_rate", diag_svpc.cutoff_precipitation_rate[cent])
+    end
+
+    if precip_model isa TC.Clima1M
+        write_ts(Stats, "rwp_mean", diag_svpc.rwp_mean[cent])
+        write_ts(Stats, "swp_mean", diag_svpc.swp_mean[cent])
+    end
 
     return
 end
