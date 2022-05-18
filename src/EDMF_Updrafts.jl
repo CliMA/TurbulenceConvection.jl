@@ -69,9 +69,7 @@ function compute_precipitation_formation_tendencies(
                 q = TD.PhasePartition(q_tot_up, q_liq_up, q_ice_up)
                 ts_up = TD.PhaseNonEquil_pTq(param_set, p0_c[k], T_up, q)
             else
-                error(
-                    "Something went wrong in EDMF_Updrafts. The expected moisture model is Equilibrium or NonEquilibrium",
-                )
+                error("Something went wrong in EDMF_Updrafts. The expected moisture model is Equilibrium or NonEquilibrium",)
             end
 
             # autoconversion and accretion
@@ -82,11 +80,13 @@ function compute_precipitation_formation_tendencies(
                 prog_pr.q_sno[k],
                 aux_up[i].area[k],
                 ρ0_c[k],
+                grid.zc[k].z,
                 Δt,
                 ts_up,
             )
             aux_up[i].qt_tendency_precip_formation[k] = mph.qt_tendency * aux_up[i].area[k]
             aux_up[i].θ_liq_ice_tendency_precip_formation[k] = mph.θ_liq_ice_tendency * aux_up[i].area[k]
+            aux_up[i].e_tot_tendency_precip_formation[k] = mph.e_tot_tendency * aux_up[i].area[k]
             if edmf.moisture_model isa NonEquilibriumMoisture
                 aux_up[i].ql_tendency_precip_formation[k] = mph.ql_tendency * aux_up[i].area[k]
                 aux_up[i].qi_tendency_precip_formation[k] = mph.qi_tendency * aux_up[i].area[k]
@@ -97,10 +97,10 @@ function compute_precipitation_formation_tendencies(
     end
     # TODO - to be deleted once we sum all tendencies elsewhere
     @inbounds for k in real_center_indices(grid)
-        aux_bulk.θ_liq_ice_tendency_precip_formation[k] = 0
+        aux_bulk.e_tot_tendency_precip_formation[k] = 0
         aux_bulk.qt_tendency_precip_formation[k] = 0
         @inbounds for i in 1:N_up
-            aux_bulk.θ_liq_ice_tendency_precip_formation[k] += aux_up[i].θ_liq_ice_tendency_precip_formation[k]
+            aux_bulk.e_tot_tendency_precip_formation[k] += aux_up[i].e_tot_tendency_precip_formation[k]
             aux_bulk.qt_tendency_precip_formation[k] += aux_up[i].qt_tendency_precip_formation[k]
         end
         if edmf.moisture_model isa NonEquilibriumMoisture

@@ -66,13 +66,11 @@ cl_list = map(collect(keys(parsed_args))) do key
 end
 filter!(x -> x[2], cl_list)
 if length(overwrite_list) ≠ length(cl_list)
-    error(
-        string(
-            "A prescribed CL argument is not overwriting the namelist.",
-            "It seems that a CL argument was added, and the `no_overwrites`",
-            "or `overwrite_namelist_map` must be updated.",
-        ),
-    )
+    error(string(
+        "A prescribed CL argument is not overwriting the namelist.",
+        "It seems that a CL argument was added, and the `no_overwrites`",
+        "or `overwrite_namelist_map` must be updated.",
+    ),)
 end
 
 ds_tc_filename, return_code = main(namelist)

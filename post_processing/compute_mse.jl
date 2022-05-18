@@ -522,7 +522,7 @@ end
 
 function save_plots(plot_dir, plots_dict; group_figs = true, have_tc_main, fig_height, case_name)
     vars_to_skip = [
-        "thetal_mean",
+        # "thetal_mean",
         "updraft_thetal",
         "u_mean",
         "v_mean",
