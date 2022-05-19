@@ -153,10 +153,6 @@ steps:
         command: "julia --color=yes --project=integration_tests integration_tests/3dBomex.jl"
         artifact_paths: "integration_tests/output/3dBomex/*"
 
-      - label: ":earth_americas: 3D sphere bariclinic wave"
-        command: "julia --color=yes --project=integration_tests integration_tests/baroclinic_wave.jl"
-        artifact_paths: "integration_tests/output/baroclinic_wave/*"
-
   - group: "Performance monitoring"
     steps:
 
