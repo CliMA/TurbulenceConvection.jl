@@ -524,7 +524,7 @@ function surface_params(case::Rico, surf_ref_state, param_set; kwargs...)
     # For Rico we provide values of transfer coefficients
     ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, FT(0)) # TODO: is this correct?
     qsurface = TD.q_vap_saturation(param_set, ts)
-    kwargs = (; zrough, Tsurface, qsurface, cm, ch)
+    kwargs = (; zrough, Tsurface, qsurface, cm, ch, kwargs...)
     return TC.FixedSurfaceCoeffs(FT; kwargs...)
 end
 
@@ -768,7 +768,7 @@ function surface_params(case::GATE_III, surf_ref_state, param_set; kwargs...)
     # For GATE_III we provide values of transfer coefficients
     ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, Tsurface, qsurface)
     qsurface = TD.q_vap_saturation(param_set, ts)
-    kwargs = (; Tsurface, qsurface, cm, ch)
+    kwargs = (; Tsurface, qsurface, cm, ch, kwargs...)
     return TC.FixedSurfaceCoeffs(FT; kwargs...)
 end
 
