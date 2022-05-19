@@ -144,17 +144,13 @@ cent_prognostic_vars_gm(::Type{FT}, local_geometry, edmf) where {FT} = (;
     ρq_tot = FT(0),
     # TODO: Change to:
     # uₕ = CCG.Covariant12Vector(CCG.UVVector(FT(0), FT(0)), local_geometry),
-    # ρq_tot = FT(0),
     # ρe = FT(0),
     cent_prognostic_vars_gm_moisture(FT, edmf.moisture_model)...,
 )
 
 # Face only
 face_prognostic_vars(::Type{FT}, local_geometry, edmf) where {FT} =
-    (; w = FT(0), TC.face_prognostic_vars_edmf(FT, local_geometry, edmf)...)
-# TODO: Change to:
-# face_prognostic_vars(::Type{FT}, local_geometry, edmf) where {FT} =
-#     (; w = CCG.Covariant3Vector(FT(0)), TC.face_prognostic_vars_edmf(FT, local_geometry, edmf)...)
+    (; w = CCG.Covariant3Vector(FT(0)), TC.face_prognostic_vars_edmf(FT, local_geometry, edmf)...)
 
 # TC.face_prognostic_vars_edmf(FT, edmf) = (;) # could also use this for empty model
 
