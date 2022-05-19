@@ -19,6 +19,7 @@ const OF = OperatorFlux
 
 const SDE = StochasticDiffEq
 const CC = ClimaCore
+const CCG = CC.Geometry
 const CCO = CC.Operators
 const SA = StaticArrays
 
