@@ -43,17 +43,10 @@ end
 Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 (autoconversion + accretion)
 """
-function precipitation_formation(
-    param_set::APS,
-    precip_model::NoPrecipitation,
+function precipitation_formation( # NoPrecipitation
     area::FT,
-    ρ0::FT,
-    Δt::Real,
-    ts,
 ) where {FT}
 
-    # TODO - when using adaptive timestepping we are limiting the source terms
-    #        with the previous timestep Δt
     qt_tendency = FT(0)
     ql_tendency = FT(0)
     qi_tendency = FT(0)
@@ -63,9 +56,8 @@ function precipitation_formation(
 
     return PrecipFormation{FT}(θ_liq_ice_tendency, qt_tendency, ql_tendency, qi_tendency, qr_tendency, qs_tendency)
 end
-function precipitation_formation(
+function precipitation_formation( #Clima0M
     param_set::APS,
-    precip_model::Clima0M,
     area::FT,
     ρ0::FT,
     Δt::Real,
@@ -105,9 +97,8 @@ function precipitation_formation(
     end
     return PrecipFormation{FT}(θ_liq_ice_tendency, qt_tendency, ql_tendency, qi_tendency, qr_tendency, qs_tendency)
 end
-function precipitation_formation(
+function precipitation_formation( # Clima1M
     param_set::APS,
-    precip_model::Clima1M,
     qr::FT,
     qs::FT,
     area::FT,
