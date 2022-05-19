@@ -193,7 +193,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 elseif edmf.moisture_model isa NonEquilibriumMoisture
                     ql = aux_up[i].q_liq[k - 1]
                     qi = aux_up[i].q_ice[k - 1]
-                    ts_up = thermo_state_pθq(param_set, p0_c[k], h, qt, ql, qi)
+                    ts_up = thermo_state_pθq(param_set, p0_c[k - 1], h, qt, ql, qi)
                 else
                     error("Something went wrong. emdf.moisture_model options are equilibrium or nonequilibrium")
                 end
