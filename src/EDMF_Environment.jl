@@ -268,6 +268,8 @@ function microphysics(
 
     # initialize the quadrature points and their labels
 
+    FT = eltype(grid)
+
     @inbounds for k in real_center_indices(grid)
         if (
             aux_en.QTvar[k] > epsilon &&
@@ -276,18 +278,33 @@ function microphysics(
             aux_en.q_tot[k] > epsilon &&
             sqrt(aux_en.QTvar[k]) < aux_en.q_tot[k]
         )
-            vars = (;
-                qt′qt′ = aux_en.QTvar[k],
-                qt_mean = aux_en.q_tot[k],
-                θl′θl′ = aux_en.Hvar[k],
-                θl_mean = aux_en.θ_liq_ice[k],
-                θl′qt′ = aux_en.HQTcov[k],
-                subdomain_area = aux_en.area[k],
-                q_rai = prog_pr.q_rai[k],
-                q_sno = prog_pr.q_sno[k],
-                ρ0_c = ρ0_c[k],
-                p0_c = p0_c[k],
-            )
+            if precip_model isa Clima1M
+                 vars = (;
+                     qt′qt′ = aux_en.QTvar[k],
+                     qt_mean = aux_en.q_tot[k],
+                     θl′θl′ = aux_en.Hvar[k],
+                     θl_mean = aux_en.θ_liq_ice[k],
+                     θl′qt′ = aux_en.HQTcov[k],
+                     subdomain_area = aux_en.area[k],
+                     q_rai = prog_pr.q_rai[k],
+                     q_sno = prog_pr.q_sno[k],
+                     ρ0_c = ρ0_c[k],
+                     p0_c = p0_c[k],
+                 )
+            else
+                 vars = (;
+                     qt′qt′ = aux_en.QTvar[k],
+                     qt_mean = aux_en.q_tot[k],
+                     θl′θl′ = aux_en.Hvar[k],
+                     θl_mean = aux_en.θ_liq_ice[k],
+                     θl′qt′ = aux_en.HQTcov[k],
+                     subdomain_area = aux_en.area[k],
+                     q_rai = FT(0),
+                     q_sno = FT(0),
+                     ρ0_c = ρ0_c[k],
+                     p0_c = p0_c[k],
+                 )
+            end
             outer_env, outer_src = quad_loop(en_thermo, precip_model, vars, param_set, Δt)
 
             # update environmental variables
@@ -302,8 +319,10 @@ function microphysics(
             aux_en.qt_tendency_precip_formation[k] = qt_tendency * aux_en.area[k]
             aux_en.θ_liq_ice_tendency_precip_formation[k] = θ_liq_ice_tendency * aux_en.area[k]
 
-            tendencies_pr.q_rai[k] += qr_tendency * aux_en.area[k]
-            tendencies_pr.q_sno[k] += qs_tendency * aux_en.area[k]
+            if precip_model isa Clima1M
+                tendencies_pr.q_rai[k] += qr_tendency * aux_en.area[k]
+                tendencies_pr.q_sno[k] += qs_tendency * aux_en.area[k]
+            end
 
             # update cloudy/dry variables for buoyancy in TKE
             aux_en.cloud_fraction[k] = outer_env.cf
@@ -370,8 +389,10 @@ function microphysics(
             # to diagnostics
             aux_en.qt_tendency_precip_formation[k] = mph.qt_tendency * aux_en.area[k]
             aux_en.θ_liq_ice_tendency_precip_formation[k] = mph.θ_liq_ice_tendency * aux_en.area[k]
-            tendencies_pr.q_rai[k] += mph.qr_tendency * aux_en.area[k]
-            tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
+            if precip_model isa Clima1M
+                tendencies_pr.q_rai[k] += mph.qr_tendency * aux_en.area[k]
+                tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
+            end
 
             # update_sat_unsat
             if TD.has_condensate(param_set, ts)

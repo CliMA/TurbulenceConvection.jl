@@ -78,12 +78,6 @@ function dt_max!(integrator)
     KM = aux_tc.KM
     KH = aux_tc.KH
 
-    # helper to calculate the rain velocity
-    # TODO: assuming w_gm = 0
-    # TODO: verify translation
-    term_vel_rain = aux_tc.term_vel_rain
-    term_vel_snow = aux_tc.term_vel_snow
-
     @inbounds for k in TC.real_face_indices(grid)
         TC.is_surface_face(grid, k) && continue
         @inbounds for i in 1:N_up
@@ -91,12 +85,19 @@ function dt_max!(integrator)
         end
         dt_max = min(dt_max, CFL_limit * Δzf[k] / (abs(aux_en_f.w[k]) + eps(Float32)))
     end
-    @inbounds for k in TC.real_center_indices(grid)
-        vel_max = max(term_vel_rain[k], term_vel_snow[k])
-        # Check terminal rain/snow velocity CFL
-        dt_max = min(dt_max, CFL_limit * Δzc[k] / (vel_max + eps(Float32)))
-        # Check diffusion CFL (i.e., Fourier number)
-        dt_max = min(dt_max, CFL_limit * Δzc[k]^2 / (max(KH[k], KM[k]) + eps(Float32)))
+    if edmf.precip_model isa TC.Clima1M
+        # helper to calculate the rain velocity
+        # TODO: assuming w_gm = 0
+        # TODO: verify translation
+        term_vel_rain = aux_tc.term_vel_rain
+        term_vel_snow = aux_tc.term_vel_snow
+        @inbounds for k in TC.real_center_indices(grid)
+            vel_max = max(term_vel_rain[k], term_vel_snow[k])
+            # Check terminal rain/snow velocity CFL
+            dt_max = min(dt_max, CFL_limit * Δzc[k] / (vel_max + eps(Float32)))
+            # Check diffusion CFL (i.e., Fourier number)
+            dt_max = min(dt_max, CFL_limit * Δzc[k]^2 / (max(KH[k], KM[k]) + eps(Float32)))
+        end
     end
     TS.dt_max_edmf = dt_max
 
