@@ -156,7 +156,7 @@ function Simulation1d(namelist)
 
     calibrate_io = namelist["stats_io"]["calibrate_io"]
     aux_dict = calibrate_io ? TC.io_dictionary_aux_calibrate(precip_model) : TC.io_dictionary_aux(precip_model)
-    diagnostics_dict = calibrate_io ? Dict() : io_dictionary_diagnostics(precip_model)
+    diagnostics_dict = calibrate_io ? Dict() : io_dictionary_diagnostics()
 
     io_nt = (; aux = aux_dict, diagnostics = diagnostics_dict)
 

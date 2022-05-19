@@ -75,24 +75,45 @@ function compute_precipitation_formation_tendencies(
             end
 
             # autoconversion and accretion
-            mph = precipitation_formation(
-                param_set,
-                precip_model,
-                prog_pr.q_rai[k],
-                prog_pr.q_sno[k],
-                aux_up[i].area[k],
-                ρ0_c[k],
-                Δt,
-                ts_up,
-            )
+            if precip_model isa NoPrecipitation
+                mph = precipitation_formation(
+                    aux_up[i].area[k],
+                )
+            elseif precip_model isa Clima0M
+                mph = precipitation_formation(
+                    param_set,
+                    aux_up[i].area[k],
+                    ρ0_c[k],
+                    Δt,
+                    ts_up,
+                )
+            elseif precip_model isa Clima1M
+                mph = precipitation_formation(
+                    param_set,
+                    precip_model,
+                    prog_pr.q_rai[k],
+                    prog_pr.q_sno[k],
+                    aux_up[i].area[k],
+                    ρ0_c[k],
+                    Δt,
+                    ts_up,
+                )
+            else
+                error(
+                    "Something went wrong in EDMF_Updrafts. The expected precipitation model is NoPrecipitation, Clima0M or Clima1M",
+                )
+            end
+
             aux_up[i].qt_tendency_precip_formation[k] = mph.qt_tendency * aux_up[i].area[k]
             aux_up[i].θ_liq_ice_tendency_precip_formation[k] = mph.θ_liq_ice_tendency * aux_up[i].area[k]
             if edmf.moisture_model isa NonEquilibriumMoisture
                 aux_up[i].ql_tendency_precip_formation[k] = mph.ql_tendency * aux_up[i].area[k]
                 aux_up[i].qi_tendency_precip_formation[k] = mph.qi_tendency * aux_up[i].area[k]
             end
-            tendencies_pr.q_rai[k] += mph.qr_tendency * aux_up[i].area[k]
-            tendencies_pr.q_sno[k] += mph.qs_tendency * aux_up[i].area[k]
+            if edmf.precip_model isa Clima1M
+                tendencies_pr.q_rai[k] += mph.qr_tendency * aux_up[i].area[k]
+                tendencies_pr.q_sno[k] += mph.qs_tendency * aux_up[i].area[k]
+            end
         end
     end
     # TODO - to be deleted once we sum all tendencies elsewhere

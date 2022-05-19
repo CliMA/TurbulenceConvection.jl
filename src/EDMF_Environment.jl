@@ -21,17 +21,31 @@ function microphysics(
         # condensation
         ts = ts_env[k]
         # autoconversion and accretion
-        mph = precipitation_formation(
-            param_set,
-            precip_model,
-            prog_pr.q_rai[k],
-            prog_pr.q_sno[k],
-            aux_en.area[k],
-            ρ0_c[k],
-            Δt,
-            ts,
-        )
 
+        if precip_model isa NoPrecipitation
+            mph = precipitation_formation(aux_en.area[k])
+        elseif precip_model isa Clima0M
+            mph = precipitation_formation(
+                param_set,
+                aux_en.area[k],
+                ρ0_c[k],
+                Δt,
+                ts,
+            )
+        elseif precip_model isa Clima1M
+            mph = precipitation_formation(
+                param_set,
+                precip_model,
+                prog_pr.q_rai[k],
+                prog_pr.q_sno[k],
+                aux_en.area[k],
+                ρ0_c[k],
+                Δt,
+                ts,
+            )
+        else
+            error("Something went wrong in EDMF_Environment. The expected precip_model is NoPrecipitation, Clima0M or Clima1M")
+        end
         # update_sat_unsat
         if TD.has_condensate(param_set, ts)
             aux_en.cloud_fraction[k] = 1
@@ -56,8 +70,10 @@ function microphysics(
             aux_en.ql_tendency_precip_formation[k] = mph.ql_tendency * aux_en.area[k]
             aux_en.qi_tendency_precip_formation[k] = mph.qi_tendency * aux_en.area[k]
         end
-        tendencies_pr.q_rai[k] += mph.qr_tendency * aux_en.area[k]
-        tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
+        if edmf.precip_model isa Clima1M
+            tendencies_pr.q_rai[k] += mph.qr_tendency * aux_en.area[k]
+            tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
+        end
     end
     return nothing
 end
@@ -157,8 +173,15 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
             q_ice_en = TD.ice_specific_humidity(param_set, ts)
             T = TD.air_temperature(param_set, ts)
             # autoconversion and accretion
-            mph = precipitation_formation(param_set, precip_model, q_rai, q_sno, subdomain_area, ρ0_c, Δt, ts)
-
+            if precip_model isa NoPrecipitation
+                mph = precipitation_formation(subdomain_area)
+            elseif precip_model isa Clima0M
+                mph = precipitation_formation(param_set, subdomain_area, ρ0_c, Δt, ts)
+            elseif precip_model isa Clima1M
+                mph = precipitation_formation(param_set, precip_model, q_rai, q_sno, subdomain_area, ρ0_c, Δt, ts)
+            else
+                error("Something went wrong in EDMF_Environment. The expected precip_model is NoPrecipitation, Clima0M or Clima1M")
+            end
             # environmental variables
             inner_env[i_ql] += q_liq_en * weights[m_h] * sqpi_inv
             inner_env[i_qi] += q_ice_en * weights[m_h] * sqpi_inv
@@ -318,17 +341,30 @@ function microphysics(
         else
             # if variance and covariance are zero do the same as in SA_mean
             ts = ts_env[k]
-            mph = precipitation_formation(
-                param_set,
-                precip_model,
-                prog_pr.q_rai[k],
-                prog_pr.q_sno[k],
-                aux_en.area[k],
-                ρ0_c[k],
-                Δt,
-                ts,
-            )
-
+            if precip_model isa NoPrecipitation
+                mph = precipitation_formation(aux_en.area[k])
+            elseif precip_model isa Clima0M
+                mph = precipitation_formation(
+                    param_set,
+                    aux_en.area[k],
+                    ρ0_c[k],
+                    Δt,
+                    ts,
+                )
+            elseif precip_model isa Clima1M
+                mph = precipitation_formation(
+                    param_set,
+                    precip_model,
+                    prog_pr.q_rai[k],
+                    prog_pr.q_sno[k],
+                    aux_en.area[k],
+                    ρ0_c[k],
+                    Δt,
+                    ts,
+                )
+            else
+                error("Something went wrong in EDMF_Environment. The expected precip_model is NoPrecipitation, Clima0M or Clima1M")
+            end
             # update_env_precip_tendencies
             # TODO: move qt_tendency_precip_formation and θ_liq_ice_tendency_precip_formation
             # to diagnostics

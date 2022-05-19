@@ -116,12 +116,11 @@ function io_dictionary_aux(precip_model)
 
         "rad_dTdt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).dTdt_rad),
         "rad_flux" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_grid_mean(state).f_rad),
-
-        if precip_model isa Clima1M
-            "qr_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_rai),
-            "qs_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno),
-        end
     )
+    if precip_model isa Clima1M
+        io_dict["qr_mean"] = (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_rai)
+        io_dict["qs_mean"] = (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno)
+    end
     return io_dict
 end
 
@@ -142,12 +141,11 @@ function io_dictionary_aux_calibrate(precip_model)
         "cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).cloud_fraction), # was this "cloud_fraction_mean"?
         "RH_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).RH),
         "temperature_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).T),
-
-        if precip_model isa Clima1M
-            "qr_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_rai),
-            "qs_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno),
-        end
     )
+    if precip_model isa Clima1M
+        io_dict["qr_mean"] = (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_rai)
+        io_dict["qs_mean"] = (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno)
+    end
     return io_dict
 end
 #! format: on
