@@ -1107,7 +1107,25 @@ end
 ##### LES_driven_SCM
 #####
 
-forcing_kwargs(::LES_driven_SCM, namelist) = (; nudge_tau = namelist["forcing"]["nudging_timescale"])
+function forcing_kwargs(::LES_driven_SCM, namelist)
+    les_filename = namelist["meta"]["lesfile"]
+    cfsite_number, forcing_model, month, experiment = TC.parse_les_path(les_filename)
+    LES_library = TC.get_LES_library()
+    les_type = LES_library[forcing_model][string(month, pad = 2)]["cfsite_numbers"][string(cfsite_number, pad = 2)]
+    if les_type == "shallow"
+        wind_nudge_τᵣ = 6.0 * 3600.0
+        scalar_nudge_zᵢ = 3000.0
+        scalar_nudge_zᵣ = 3500.0
+        scalar_nudge_τᵣ = 24.0 * 3600.0
+    elseif les_type == "deep"
+        wind_nudge_τᵣ = 3600.0
+        scalar_nudge_zᵢ = 16000.0
+        scalar_nudge_zᵣ = 20000.0
+        scalar_nudge_τᵣ = 2.0 * 3600.0
+    end
+
+    return (; wind_nudge_τᵣ, scalar_nudge_zᵢ, scalar_nudge_zᵣ, scalar_nudge_τᵣ)
+end
 
 function surface_param_kwargs(::LES_driven_SCM, namelist)
     les_filename = namelist["meta"]["lesfile"]
@@ -1126,8 +1144,8 @@ function surface_param_kwargs(::LES_driven_SCM, namelist)
     return (; LESDat)
 end
 
-function ForcingBase(case::LES_driven_SCM, param_set::APS; nudge_tau)
-    ForcingBase(get_forcing_type(case); apply_coriolis = false, coriolis_param = 0.376e-4, nudge_tau = nudge_tau)
+function ForcingBase(case::LES_driven_SCM, param_set::APS; kwargs...)
+    ForcingBase(get_forcing_type(case); apply_coriolis = false, coriolis_param = 0.376e-4, kwargs...)
 end
 
 function surface_ref_state(::LES_driven_SCM, param_set::APS, namelist)

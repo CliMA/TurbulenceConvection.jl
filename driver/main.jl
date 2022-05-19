@@ -256,6 +256,7 @@ function construct_grid(namelist; FT = Float64)
         )
 
         les_filename = namelist["meta"]["lesfile"]
+        TC.valid_lespath(les_filename)
         zmax = NC.Dataset(les_filename, "r") do data
             Array(TC.get_nc_data(data, "zf"))[end]
         end
