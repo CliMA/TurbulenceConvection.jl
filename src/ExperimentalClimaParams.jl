@@ -39,4 +39,8 @@ c_gen_stoch(ps::APS) = ps.nt.c_gen_stoch
 """ diagnostic covariances limiter """
 covar_lim(ps::APS) = ps.nt.covar_lim
 
+""" prescribed precipitation fraction """
+prescribed_precip_frac_value(ps::APS) = ps.nt.prescribed_precip_frac_value
+precip_fraction_limiter(ps::APS) = ps.nt.precip_fraction_limiter
+
 end

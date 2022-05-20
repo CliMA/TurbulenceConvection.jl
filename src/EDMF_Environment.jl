@@ -7,7 +7,6 @@ function microphysics(
     Δt::Real,
     param_set::APS,
 )
-
     tendencies_pr = center_tendencies_precipitation(state)
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
@@ -18,6 +17,7 @@ function microphysics(
     ρ_c = prog_gm.ρ
     aux_en_sat = aux_en.sat
     aux_en_unsat = aux_en.unsat
+    precip_fraction = compute_precip_fraction(edmf, state, param_set)
 
     @inbounds for k in real_center_indices(grid)
         # condensation
@@ -32,6 +32,7 @@ function microphysics(
             ρ_c[k],
             Δt,
             ts,
+            precip_fraction,
         )
 
         # update_sat_unsat
@@ -80,7 +81,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
     # θl - liquid ice potential temperature
     # _mean and ′ - subdomain mean and (co)variances
     # q_rai, q_sno - grid mean precipitation
-    UnPack.@unpack qt′qt′, qt_mean, θl′θl′, θl_mean, θl′qt′, subdomain_area, q_rai, q_sno, ρ_c, p_c = vars
+    UnPack.@unpack qt′qt′, qt_mean, θl′θl′, θl_mean, θl′qt′, subdomain_area, q_rai, q_sno, ρ_c, p_c, precip_frac = vars
 
     FT = eltype(ρ_c)
 
@@ -159,7 +160,8 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
             q_ice_en = TD.ice_specific_humidity(param_set, ts)
             T = TD.air_temperature(param_set, ts)
             # autoconversion and accretion
-            mph = precipitation_formation(param_set, precip_model, q_rai, q_sno, subdomain_area, ρ_c, Δt, ts)
+            mph =
+                precipitation_formation(param_set, precip_model, q_rai, q_sno, subdomain_area, ρ_c, Δt, ts, precip_frac)
 
             # environmental variables
             inner_env[i_ql] += q_liq_en * weights[m_h] * sqpi_inv
@@ -232,6 +234,7 @@ function microphysics(
     aux_en_sat = aux_en.sat
     tendencies_pr = center_tendencies_precipitation(state)
     ts_env = center_aux_environment(state).ts
+    precip_fraction = compute_precip_fraction(edmf, state, param_set)
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
 
@@ -268,6 +271,7 @@ function microphysics(
                 q_sno = prog_pr.q_sno[k],
                 ρ_c = ρ_c[k],
                 p_c = p_c[k],
+                precip_frac = precip_fraction,
             )
             outer_env, outer_src = quad_loop(en_thermo, precip_model, vars, param_set, Δt)
 
@@ -331,6 +335,7 @@ function microphysics(
                 ρ_c[k],
                 Δt,
                 ts,
+                precip_fraction,
             )
 
             # update_env_precip_tendencies
