@@ -9,11 +9,13 @@ function microphysics(
 )
 
     tendencies_pr = center_tendencies_precipitation(state)
-    p0_c = center_ref_state(state).p0
-    ρ0_c = center_ref_state(state).ρ0
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
+    prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     ts_env = center_aux_environment(state).ts
+    p_c = aux_gm.p
+    ρ_c = prog_gm.ρ
     aux_en_sat = aux_en.sat
     aux_en_unsat = aux_en.unsat
 
@@ -27,7 +29,7 @@ function microphysics(
             prog_pr.q_rai[k],
             prog_pr.q_sno[k],
             aux_en.area[k],
-            ρ0_c[k],
+            ρ_c[k],
             Δt,
             ts,
         )
@@ -78,9 +80,9 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
     # θl - liquid ice potential temperature
     # _mean and ′ - subdomain mean and (co)variances
     # q_rai, q_sno - grid mean precipitation
-    UnPack.@unpack qt′qt′, qt_mean, θl′θl′, θl_mean, θl′qt′, subdomain_area, q_rai, q_sno, ρ0_c, p0_c = vars
+    UnPack.@unpack qt′qt′, qt_mean, θl′θl′, θl_mean, θl′qt′, subdomain_area, q_rai, q_sno, ρ_c, p_c = vars
 
-    FT = eltype(ρ0_c)
+    FT = eltype(ρ_c)
 
     inner_env = SA.MVector{env_len, FT}(undef)
     outer_env = SA.MVector{env_len, FT}(undef)
@@ -152,12 +154,12 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
             end
 
             # condensation
-            ts = thermo_state_pθq(param_set, p0_c, h_hat, qt_hat)
+            ts = thermo_state_pθq(param_set, p_c, h_hat, qt_hat)
             q_liq_en = TD.liquid_specific_humidity(param_set, ts)
             q_ice_en = TD.ice_specific_humidity(param_set, ts)
             T = TD.air_temperature(param_set, ts)
             # autoconversion and accretion
-            mph = precipitation_formation(param_set, precip_model, q_rai, q_sno, subdomain_area, ρ0_c, Δt, ts)
+            mph = precipitation_formation(param_set, precip_model, q_rai, q_sno, subdomain_area, ρ_c, Δt, ts)
 
             # environmental variables
             inner_env[i_ql] += q_liq_en * weights[m_h] * sqpi_inv
@@ -222,14 +224,16 @@ function microphysics(
     Δt::Real,
     param_set::APS,
 )
-    p0_c = center_ref_state(state).p0
-    ρ0_c = center_ref_state(state).ρ0
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
+    prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     aux_en_unsat = aux_en.unsat
     aux_en_sat = aux_en.sat
     tendencies_pr = center_tendencies_precipitation(state)
     ts_env = center_aux_environment(state).ts
+    p_c = aux_gm.p
+    ρ_c = prog_gm.ρ
 
     #TODO - if we start using eos_smpl for the updrafts calculations
     #       we can get rid of the two categories for outer and inner quad. points
@@ -262,8 +266,8 @@ function microphysics(
                 subdomain_area = aux_en.area[k],
                 q_rai = prog_pr.q_rai[k],
                 q_sno = prog_pr.q_sno[k],
-                ρ0_c = ρ0_c[k],
-                p0_c = p0_c[k],
+                ρ_c = ρ_c[k],
+                p_c = p_c[k],
             )
             outer_env, outer_src = quad_loop(en_thermo, precip_model, vars, param_set, Δt)
 
@@ -287,7 +291,7 @@ function microphysics(
             if aux_en.cloud_fraction[k] < 1
                 aux_en_unsat.q_tot[k] = outer_env.qt_unsat / (1 - aux_en.cloud_fraction[k])
                 T_unsat = outer_env.T_unsat / (1 - aux_en.cloud_fraction[k])
-                ts_unsat = TD.PhaseEquil_pTq(param_set, p0_c[k], T_unsat, aux_en_unsat.q_tot[k])
+                ts_unsat = TD.PhaseEquil_pTq(param_set, p_c[k], T_unsat, aux_en_unsat.q_tot[k])
                 aux_en_unsat.θ_dry[k] = TD.dry_pottemp(param_set, ts_unsat)
             else
                 aux_en_unsat.q_tot[k] = 0
@@ -298,7 +302,7 @@ function microphysics(
                 aux_en_sat.T[k] = outer_env.T_sat / aux_en.cloud_fraction[k]
                 aux_en_sat.q_tot[k] = outer_env.qt_sat / aux_en.cloud_fraction[k]
                 aux_en_sat.q_vap[k] = (outer_env.qt_sat - outer_env.ql - outer_env.qi) / aux_en.cloud_fraction[k]
-                ts_sat = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_en_sat.T[k], aux_en_sat.q_tot[k])
+                ts_sat = TD.PhaseEquil_pTq(param_set, p_c[k], aux_en_sat.T[k], aux_en_sat.q_tot[k])
                 aux_en_sat.θ_dry[k] = TD.dry_pottemp(param_set, ts_sat)
                 aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_sat)
             else
@@ -324,7 +328,7 @@ function microphysics(
                 prog_pr.q_rai[k],
                 prog_pr.q_sno[k],
                 aux_en.area[k],
-                ρ0_c[k],
+                ρ_c[k],
                 Δt,
                 ts,
             )

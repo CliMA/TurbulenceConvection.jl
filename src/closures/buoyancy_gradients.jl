@@ -20,12 +20,12 @@ function buoyancy_gradients(
     R_v = ICP.R_v(param_set)
 
     phase_part = TD.PhasePartition(0.0, 0.0, 0.0) # assuming R_d = R_m
-    Π = TD.exner_given_pressure(param_set, bg_model.p0, phase_part)
+    Π = TD.exner_given_pressure(param_set, bg_model.p, phase_part)
 
-    ∂b∂θv = g * (R_d / bg_model.alpha0 / bg_model.p0) * Π
+    ∂b∂θv = g * (R_d * bg_model.ρ / bg_model.p) * Π
 
     if bg_model.en_cld_frac > 0.0
-        ts_sat = thermo_state_pθq(param_set, bg_model.p0, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
+        ts_sat = thermo_state_pθq(param_set, bg_model.p, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
         phase_part = TD.PhasePartition(param_set, ts_sat)
         lh = TD.latent_heat_liq_ice(param_set, phase_part)
         cp_m = TD.cp_m(param_set, ts_sat)

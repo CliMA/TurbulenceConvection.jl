@@ -23,9 +23,6 @@ const APS = CLIMAParameters.AbstractEarthParameterSet
 
 ##### Auxiliary fields
 
-# Face & Center
-aux_vars_ref_state(FT) = (; ref_state = (ρ0 = FT(0), α0 = FT(0), p0 = FT(0)))
-
 # Center only
 cent_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture) = (;
     ∇q_liq_gm = FT(0),
@@ -80,9 +77,9 @@ cent_aux_vars_gm(FT, edmf) = (;
     Ri = FT(0),
     θ_liq_ice = FT(0),
     q_tot = FT(0),
+    p = FT(0),
 )
-cent_aux_vars(FT, edmf) =
-    (; aux_vars_ref_state(FT)..., cent_aux_vars_gm(FT, edmf)..., TC.cent_aux_vars_edmf(FT, edmf)...)
+cent_aux_vars(FT, edmf) = (; cent_aux_vars_gm(FT, edmf)..., TC.cent_aux_vars_edmf(FT, edmf)...)
 
 # Face only
 face_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture) = (; sgs_flux_q_liq = FT(0), sgs_flux_q_ice = FT(0))
@@ -97,9 +94,10 @@ face_aux_vars_gm(FT, edmf) = (;
     face_aux_vars_gm_moisture(FT, edmf.moisture_model)...,
     sgs_flux_u = FT(0),
     sgs_flux_v = FT(0),
+    p = FT(0),
+    ρ = FT(0),
 )
-face_aux_vars(FT, edmf) =
-    (; aux_vars_ref_state(FT)..., face_aux_vars_gm(FT, edmf)..., TC.face_aux_vars_edmf(FT, edmf)...)
+face_aux_vars(FT, edmf) = (; face_aux_vars_gm(FT, edmf)..., TC.face_aux_vars_edmf(FT, edmf)...)
 
 ##### Diagnostic fields
 
@@ -138,6 +136,7 @@ cent_prognostic_vars(::Type{FT}, local_geometry, edmf) where {FT} =
 cent_prognostic_vars_gm_moisture(::Type{FT}, ::TC.NonEquilibriumMoisture) where {FT} = (; q_liq = FT(0), q_ice = FT(0))
 cent_prognostic_vars_gm_moisture(::Type{FT}, ::TC.EquilibriumMoisture) where {FT} = NamedTuple()
 cent_prognostic_vars_gm(::Type{FT}, local_geometry, edmf) where {FT} = (;
+    ρ = FT(0),
     u = FT(0),
     v = FT(0),
     ρθ_liq_ice = FT(0),
@@ -179,29 +178,26 @@ The reference profiles, given
  - `ts_g` the surface reference state (a thermodynamic state)
 """
 function compute_ref_state!(state, grid::TC.Grid, param_set::PS; ts_g) where {PS}
-    p0_c = TC.center_ref_state(state).p0
-    ρ0_c = TC.center_ref_state(state).ρ0
-    α0_c = TC.center_ref_state(state).α0
-    p0_f = TC.face_ref_state(state).p0
-    ρ0_f = TC.face_ref_state(state).ρ0
-    α0_f = TC.face_ref_state(state).α0
-    compute_ref_state!(p0_c, ρ0_c, α0_c, p0_f, ρ0_f, α0_f, grid, param_set; ts_g)
+    aux_gm = TC.center_aux_grid_mean(state)
+    aux_gm_f = TC.face_aux_grid_mean(state)
+    prog_gm = TC.center_prog_grid_mean(state)
+    p_c = aux_gm.p
+    ρ_c = prog_gm.ρ
+    p_f = aux_gm_f.p
+    ρ_f = aux_gm_f.ρ
+    compute_ref_state!(p_c, ρ_c, p_f, ρ_f, grid, param_set; ts_g)
 end
 
 function compute_ref_state!(
-    p0_c::CC.Fields.Field,
-    ρ0_c::CC.Fields.Field,
-    α0_c::CC.Fields.Field,
-    p0_f::CC.Fields.Field,
-    ρ0_f::CC.Fields.Field,
-    α0_f::CC.Fields.Field,
+    p_c::CC.Fields.Field,
+    ρ_c::CC.Fields.Field,
+    p_f::CC.Fields.Field,
+    ρ_f::CC.Fields.Field,
     grid::TC.Grid,
     param_set::PS;
     ts_g,
 ) where {PS}
-
     FT = eltype(grid)
-
     qtg = TD.total_specific_humidity(param_set, ts_g)
     θ_liq_ice_g = TD.liquid_ice_pottemp(param_set, ts_g)
     Pg = TD.air_pressure(param_set, ts_g)
@@ -226,25 +222,22 @@ function compute_ref_state!(
     prob = ODE.ODEProblem(rhs, logp, z_span)
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
 
-    parent(p0_f) .= sol.(vec(grid.zf))
-    parent(p0_c) .= sol.(vec(grid.zc))
+    parent(p_f) .= sol.(vec(grid.zf))
+    parent(p_c) .= sol.(vec(grid.zc))
 
-    p0_f .= exp.(p0_f)
-    p0_c .= exp.(p0_c)
+    p_f .= exp.(p_f)
+    p_c .= exp.(p_c)
 
     # Compute reference state thermodynamic profiles
     @inbounds for k in TC.real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p0_c[k], θ_liq_ice_g, qtg)
-        α0_c[k] = TD.specific_volume(param_set, ts)
+        ts = TD.PhaseEquil_pθq(param_set, p_c[k], θ_liq_ice_g, qtg)
+        ρ_c[k] = TD.air_density(param_set, ts)
     end
 
     @inbounds for k in TC.real_face_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p0_f[k], θ_liq_ice_g, qtg)
-        α0_f[k] = TD.specific_volume(param_set, ts)
+        ts = TD.PhaseEquil_pθq(param_set, p_f[k], θ_liq_ice_g, qtg)
+        ρ_f[k] = TD.air_density(param_set, ts)
     end
-
-    ρ0_f .= 1 ./ α0_f
-    ρ0_c .= 1 ./ α0_c
     return nothing
 end
 
@@ -252,11 +245,11 @@ function set_thermo_state!(state, grid, moisture_model, param_set)
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
-    p0_c = TC.center_ref_state(state).p0
-    ρ0_c = TC.center_ref_state(state).ρ0
+    p_c = aux_gm.p
+    ρ_c = prog_gm.ρ
     @inbounds for k in TC.real_center_indices(grid)
-        aux_gm.θ_liq_ice[k] = prog_gm.ρθ_liq_ice[k] / ρ0_c[k]
-        aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ0_c[k]
+        aux_gm.θ_liq_ice[k] = prog_gm.ρθ_liq_ice[k] / ρ_c[k]
+        aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
         thermo_args = if moisture_model isa TC.EquilibriumMoisture
             ()
         elseif moisture_model isa TC.NonEquilibriumMoisture
@@ -264,25 +257,25 @@ function set_thermo_state!(state, grid, moisture_model, param_set)
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
-        ts_gm[k] = TC.thermo_state_pθq(param_set, p0_c[k], aux_gm.θ_liq_ice[k], aux_gm.q_tot[k], thermo_args...)
+        ts_gm[k] = TC.thermo_state_pθq(param_set, p_c[k], aux_gm.θ_liq_ice[k], aux_gm.q_tot[k], thermo_args...)
     end
     return nothing
 end
 
 function assign_thermo_aux!(state, grid, moisture_model, param_set)
-    ρ0_c = TC.center_ref_state(state).ρ0
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
+    ρ_c = prog_gm.ρ
     @inbounds for k in TC.real_center_indices(grid)
-        aux_gm.θ_liq_ice[k] = prog_gm.ρθ_liq_ice[k] / ρ0_c[k]
-        aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ0_c[k]
+        aux_gm.θ_liq_ice[k] = prog_gm.ρθ_liq_ice[k] / ρ_c[k]
+        aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
         ts = ts_gm[k]
         aux_gm.q_liq[k] = TD.liquid_specific_humidity(param_set, ts)
         aux_gm.q_ice[k] = TD.ice_specific_humidity(param_set, ts)
         aux_gm.T[k] = TD.air_temperature(param_set, ts)
         ρ = TD.air_density(param_set, ts)
-        aux_gm.buoy[k] = TC.buoyancy_c(param_set, ρ0_c[k], ρ)
+        aux_gm.buoy[k] = TC.buoyancy_c(param_set, ρ_c[k], ρ)
         aux_gm.RH[k] = TD.relative_humidity(param_set, ts)
     end
     return
@@ -377,10 +370,9 @@ function compute_gm_tendencies!(
     aux_en_f = TC.face_aux_environment(state)
     aux_up = TC.center_aux_updrafts(state)
     aux_bulk = TC.center_aux_bulk(state)
-    ρ0_f = TC.face_ref_state(state).ρ0
-    p0_c = TC.center_ref_state(state).p0
-    α0_c = TC.center_ref_state(state).α0
-    ρ0_c = TC.center_ref_state(state).ρ0
+    ρ_f = aux_gm_f.ρ
+    p_c = aux_gm.p
+    ρ_c = prog_gm.ρ
     aux_tc = TC.center_aux_turbconv(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
 
@@ -414,20 +406,20 @@ function compute_gm_tendencies!(
             tendencies_gm.v[k] += force.coriolis_param * (aux_gm.ug[k] - prog_gm.u[k])
         end
         # LS Subsidence
-        tendencies_gm.ρθ_liq_ice[k] -= ρ0_c[k] * ∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
-        tendencies_gm.ρq_tot[k] -= ρ0_c[k] * ∇q_tot_gm[k] * aux_gm.subsidence[k]
+        tendencies_gm.ρθ_liq_ice[k] -= ρ_c[k] * ∇θ_liq_ice_gm[k] * aux_gm.subsidence[k]
+        tendencies_gm.ρq_tot[k] -= ρ_c[k] * ∇q_tot_gm[k] * aux_gm.subsidence[k]
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
             tendencies_gm.q_liq[k] -= ∇q_liq_gm[k] * aux_gm.subsidence[k]
             tendencies_gm.q_ice[k] -= ∇q_ice_gm[k] * aux_gm.subsidence[k]
         end
         # Radiation
         if TC.rad_type(radiation) <: Union{TC.RadiationDYCOMS_RF01, TC.RadiationLES, TC.RadiationTRMM_LBA}
-            tendencies_gm.ρθ_liq_ice[k] += ρ0_c[k] * aux_gm.dTdt_rad[k] / Π
+            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_rad[k] / Π
         end
         # LS advection
-        tendencies_gm.ρq_tot[k] += ρ0_c[k] * aux_gm.dqtdt_hadv[k]
+        tendencies_gm.ρq_tot[k] += ρ_c[k] * aux_gm.dqtdt_hadv[k]
         if !(TC.force_type(force) <: TC.ForcingDYCOMS_RF01)
-            tendencies_gm.ρθ_liq_ice[k] += ρ0_c[k] * aux_gm.dTdt_hadv[k] / Π
+            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_hadv[k] / Π
         end
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
             tendencies_gm.q_liq[k] += aux_gm.dqldt[k]
@@ -449,8 +441,8 @@ function compute_gm_tendencies!(
                 gm_q_ice_nudge_k = Γᵣ * (aux_gm.qi_nudge[k] - prog_gm.q_ice[k])
             end
 
-            tendencies_gm.ρθ_liq_ice[k] += ρ0_c[k] * (gm_H_nudge_k + H_fluc)
-            tendencies_gm.ρq_tot[k] += ρ0_c[k] * (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k])
+            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * (gm_H_nudge_k + H_fluc)
+            tendencies_gm.ρq_tot[k] += ρ_c[k] * (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k])
             tendencies_gm.u[k] += gm_U_nudge_k
             tendencies_gm.v[k] += gm_V_nudge_k
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
@@ -461,13 +453,13 @@ function compute_gm_tendencies!(
 
         # Apply precipitation tendencies
         tendencies_gm.ρq_tot[k] +=
-            ρ0_c[k] * (
+            ρ_c[k] * (
                 aux_bulk.qt_tendency_precip_formation[k] +
                 aux_en.qt_tendency_precip_formation[k] +
                 aux_tc.qt_tendency_precip_sinks[k]
             )
         tendencies_gm.ρθ_liq_ice[k] +=
-            ρ0_c[k] * (
+            ρ_c[k] * (
                 aux_bulk.θ_liq_ice_tendency_precip_formation[k] +
                 aux_en.θ_liq_ice_tendency_precip_formation[k] +
                 aux_tc.θ_liq_ice_tendency_precip_sinks[k]
@@ -499,8 +491,8 @@ function compute_gm_tendencies!(
 
     @. tends_ρθ_liq_ice += -∇sgs(wvec(sgs_flux_θ_liq_ice))
     @. tends_ρq_tot += -∇sgs(wvec(sgs_flux_q_tot))
-    @. tends_u += -α0_c * ∇sgs(wvec(sgs_flux_u))
-    @. tends_v += -α0_c * ∇sgs(wvec(sgs_flux_v))
+    @. tends_u += -∇sgs(wvec(sgs_flux_u)) / ρ_c
+    @. tends_v += -∇sgs(wvec(sgs_flux_v)) / ρ_c
 
     if edmf.moisture_model isa TC.NonEquilibriumMoisture
         sgs_flux_q_liq = aux_gm_f.sgs_flux_q_liq
@@ -509,8 +501,8 @@ function compute_gm_tendencies!(
         sgs_flux_q_ice[kf_surf] = surf.ρq_ice_flux
         tends_q_liq = tendencies_gm.q_liq
         tends_q_ice = tendencies_gm.q_ice
-        @. tends_q_liq += -α0_c * ∇sgs(wvec(sgs_flux_q_liq))
-        @. tends_q_ice += -α0_c * ∇sgs(wvec(sgs_flux_q_ice))
+        @. tends_q_liq += -∇sgs(wvec(sgs_flux_q_liq)) / ρ_c
+        @. tends_q_ice += -∇sgs(wvec(sgs_flux_q_ice)) / ρ_c
     end
 
     return nothing
