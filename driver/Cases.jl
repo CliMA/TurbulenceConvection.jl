@@ -45,7 +45,6 @@ using ..TurbulenceConvection: get_inversion
 
 #=
     arr_type(x)
-
 We're keeping this around in case we need
 to move some initialized data to the GPU.
 In this case, we may be able to modify this
@@ -192,9 +191,7 @@ function initialize_profiles(self::CasesBase{Soares}, grid::Grid, param_set, sta
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         aux_gm.q_tot[k] = prof_q_tot(z)
-        prog_gm.ρq_tot[k] = ρ_c[k] * aux_gm.q_tot[k]
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        prog_gm.ρθ_liq_ice[k] = ρ_c[k] * aux_gm.θ_liq_ice[k]
         prog_gm.u[k] = prof_u(z)
         aux_gm.tke[k] = prof_tke(z)
     end
@@ -242,7 +239,6 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, param_set,
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        prog_gm.ρθ_liq_ice[k] = ρ_c[k] * aux_gm.θ_liq_ice[k]
         prog_gm.u[k] = prof_u(z)
         aux_gm.tke[k] = prof_tke(z)
     end
@@ -292,9 +288,7 @@ function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, param_set, stat
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        prog_gm.ρθ_liq_ice[k] = ρ_c[k] * aux_gm.θ_liq_ice[k]
         aux_gm.q_tot[k] = prof_q_tot(z)
-        prog_gm.ρq_tot[k] = ρ_c[k] * aux_gm.q_tot[k]
         prog_gm.u[k] = prof_u(z)
         aux_gm.tke[k] = prof_tke(z)
     end
@@ -373,9 +367,7 @@ function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, grid::Grid, pa
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        prog_gm.ρθ_liq_ice[k] = ρ_c[k] * aux_gm.θ_liq_ice[k]
         aux_gm.q_tot[k] = prof_q_tot(z)
-        prog_gm.ρq_tot[k] = ρ_c[k] * aux_gm.q_tot[k]
         prog_gm.u[k] = prof_u(z)
         aux_gm.tke[k] = prof_tke(z)
     end
@@ -482,9 +474,7 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, param_set, state
         prog_gm.u[k] = prof_u(z)
         prog_gm.v[k] = prof_v(z)
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        prog_gm.ρθ_liq_ice[k] = ρ_c[k] * aux_gm.θ_liq_ice[k]
         aux_gm.q_tot[k] = prof_q_tot(z)
-        prog_gm.ρq_tot[k] = ρ_c[k] * aux_gm.q_tot[k]
     end
 
     # Need to get θ_virt
@@ -601,10 +591,8 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, param_set, s
         denom = (prof_p(z) - pv_star + (1 / molmass_ratio) * pv_star * RH / 100.0)
         qv_star = pv_star * (1 / molmass_ratio) / denom
         aux_gm.q_tot[k] = qv_star * RH / 100
-        prog_gm.ρq_tot[k] = ρ_c[k] * aux_gm.q_tot[k]
         phase_part = TD.PhasePartition(aux_gm.q_tot[k], 0.0, 0.0) # initial state is not saturated
         aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], p[k], phase_part)
-        prog_gm.ρθ_liq_ice[k] = ρ_c[k] * aux_gm.θ_liq_ice[k]
         aux_gm.tke[k] = prof_tke(z)
     end
 end
@@ -672,10 +660,8 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, param_set, st
         Π = TD.exner_given_pressure(param_set, p[k], phase_part)
         prog_gm.u[k] = prof_u(z)
         aux_gm.q_tot[k] = prof_q_tot(z)
-        prog_gm.ρq_tot[k] = ρ_c[k] * aux_gm.q_tot[k]
         aux_gm.T[k] = prof_θ_liq_ice(z) * Π
         aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], p[k], phase_part)
-        prog_gm.ρθ_liq_ice[k] = ρ_c[k] * aux_gm.θ_liq_ice[k]
         aux_gm.tke[k] = prof_tke(z)
     end
 end
@@ -745,12 +731,10 @@ function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, param_set, s
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         aux_gm.q_tot[k] = APL.GATE_III_q_tot(FT)(z)
-        prog_gm.ρq_tot[k] = ρ_c[k] * aux_gm.q_tot[k]
         aux_gm.T[k] = APL.GATE_III_T(FT)(z)
         prog_gm.u[k] = APL.GATE_III_u(FT)(z)
         ts = TD.PhaseEquil_pTq(param_set, p[k], aux_gm.T[k], aux_gm.q_tot[k])
         aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts)
-        prog_gm.ρθ_liq_ice[k] = ρ_c[k] * aux_gm.θ_liq_ice[k]
         aux_gm.tke[k] = APL.GATE_III_tke(FT)(z)
     end
 end
@@ -805,9 +789,8 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, grid::Grid, param_set
         # thetal profile as defined in DYCOMS
         z = grid.zc[k]
         aux_gm.q_tot[k] = APL.Dycoms_RF01_q_tot(FT)(z)
-        prog_gm.ρq_tot[k] = ρ_c[k] * aux_gm.q_tot[k]
         aux_gm.θ_liq_ice[k] = APL.Dycoms_RF01_θ_liq_ice(FT)(z)
-        prog_gm.ρθ_liq_ice[k] = ρ_c[k] * aux_gm.θ_liq_ice[k]
+
         # velocity profile (geostrophic)
         prog_gm.u[k] = APL.Dycoms_RF01_u0(FT)(z)
         prog_gm.v[k] = APL.Dycoms_RF01_v0(FT)(z)
@@ -890,9 +873,8 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF02}, grid::Grid, param_set
         # θ_liq_ice profile as defined in DYCOM RF02
         z = grid.zc[k]
         aux_gm.q_tot[k] = APL.Dycoms_RF02_q_tot(FT)(z)
-        prog_gm.ρq_tot[k] = ρ_c[k] * aux_gm.q_tot[k]
         aux_gm.θ_liq_ice[k] = APL.Dycoms_RF02_θ_liq_ice(FT)(z)
-        prog_gm.ρθ_liq_ice[k] = ρ_c[k] * aux_gm.θ_liq_ice[k]
+
         # velocity profile
         prog_gm.v[k] = APL.Dycoms_RF02_v(FT)(z)
         prog_gm.u[k] = APL.Dycoms_RF02_u(FT)(z)
@@ -982,9 +964,7 @@ function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, param_set, stat
         prog_gm.u[k] = APL.GABLS_u(FT)(z)
         prog_gm.v[k] = APL.GABLS_v(FT)(z)
         aux_gm.θ_liq_ice[k] = APL.GABLS_θ_liq_ice(FT)(z)
-        prog_gm.ρθ_liq_ice[k] = ρ_c[k] * aux_gm.θ_liq_ice[k]
         aux_gm.q_tot[k] = APL.GABLS_q_tot(FT)(z)
-        prog_gm.ρq_tot[k] = ρ_c[k] * aux_gm.q_tot[k]
         aux_gm.tke[k] = APL.GABLS_tke(FT)(z)
         aux_gm.Hvar[k] = aux_gm.tke[k]
     end
@@ -1042,9 +1022,7 @@ function initialize_profiles(self::CasesBase{SP}, grid::Grid, param_set, state)
         prog_gm.u[k] = APL.SP_u(FT)(z)
         prog_gm.v[k] = APL.SP_v(FT)(z)
         aux_gm.θ_liq_ice[k] = APL.SP_θ_liq_ice(FT)(z)
-        prog_gm.ρθ_liq_ice[k] = ρ_c[k] * aux_gm.θ_liq_ice[k]
         aux_gm.q_tot[k] = APL.SP_q_tot(FT)(z)
-        prog_gm.ρq_tot[k] = ρ_c[k] * aux_gm.q_tot[k]
         aux_gm.tke[k] = APL.SP_tke(FT)(z)
     end
 end
@@ -1081,7 +1059,6 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, param_set, 
     FT = eltype(grid)
     prof_θ_liq_ice = APL.DryBubble_θ_liq_ice(FT)
     aux_gm.θ_liq_ice .= prof_θ_liq_ice.(zc_in)
-    @. prog_gm.ρθ_liq_ice = ρ_c * aux_gm.θ_liq_ice
     parent(prog_gm.u) .= 0.01
     parent(prog_gm.ρq_tot) .= 0
     parent(aux_gm.q_tot) .= 0
@@ -1187,8 +1164,6 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, param_
         parent(aux_gm.q_tot) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "qt_mean", imin, imax))
         parent(prog_gm.u) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "u_mean", imin, imax))
         parent(prog_gm.v) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "v_mean", imin, imax))
-        @. prog_gm.ρθ_liq_ice = ρ_c * aux_gm.θ_liq_ice
-        @. prog_gm.ρq_tot .= ρ_c * aux_gm.q_tot
     end
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
