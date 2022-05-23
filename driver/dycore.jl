@@ -241,7 +241,7 @@ function compute_ref_state!(
     return nothing
 end
 
-function set_prog_from_aux!(state)
+function set_prog_from_aux!(state, ::TC.ρθVar)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
     @. prog_gm.ρθ_liq_ice = prog_gm.ρ * aux_gm.θ_liq_ice

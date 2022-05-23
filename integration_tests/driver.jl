@@ -40,6 +40,7 @@ overwrite_namelist_map = Dict(
 "moisture_model"          => (nl, pa, key) -> (nl["thermodynamics"]["moisture_model"] = pa[key]),
 "precipitation_model"     => (nl, pa, key) -> (nl["microphysics"]["precipitation_model"] = pa[key]),
 "thermo_covariance_model" => (nl, pa, key) -> (nl["thermodynamics"]["thermo_covariance_model"] = pa[key]),
+"energy_var"              => (nl, pa, key) -> (nl["energy_var"] = pa[key]),
 )
 no_overwrites = (
     "case", # default_namelist already overwrites namelist["meta"]["casename"]

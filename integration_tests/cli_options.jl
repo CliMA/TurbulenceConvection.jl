@@ -41,6 +41,9 @@ function parse_commandline()
         arg_type = Int
         "--moisture_model" # Moisture model (equilibrium or non-equilibrium)
         arg_type = String
+        "--energy_var" # Energy variable [rho-theta]
+        arg_type = String
+        default = "rhotheta"
         "--precipitation_model" # Precipitation model (None, cutoff or clima_1m)
         arg_type = String
         "--thermo_covariance_model" # covariance model (prognostic or diagnostic)
