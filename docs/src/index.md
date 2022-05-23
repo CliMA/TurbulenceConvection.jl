@@ -15,9 +15,6 @@ The Extended EDMF model can be run with several specifications such as:
 
 The package depndends on the following clima packages: [ClimaCore.jl](https://github.com/CliMA/ClimaCore.jl), [Thermodyanmics.jl](https://github.com/CliMA/Thermodynamics.jl), [SurfaceFlux.jl](https://github.com/CliMA/SurfaceFluxes.jl), [OperatorFlux.jl](https://github.com/CliMA/OperatorFlux.jl)
 
-The package depndends on the following clima packages: [ClimaCore.jl](https://github.com/CliMA/ClimaCore.jl), [Thermodyanmics.jl](https://github.com/CliMA/Thermodynamics.jl), [SurfaceFlux.jl](https://github.com/CliMA/SurfaceFluxes.jl), [OperatorFlux.jl](https://github.com/CliMA/OperatorFlux.jl)
-
-
 
 
 ## Authors
