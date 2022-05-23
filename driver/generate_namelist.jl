@@ -354,6 +354,8 @@ function TRMM_LBA(namelist_defaults)
     namelist["time_stepping"]["dt_max"] = 5.0
     namelist["time_stepping"]["dt_min"] = 1.0
 
+    namelist_defaults["thermodynamics"]["sgs"] = "mean"
+
     namelist["microphysics"]["precipitation_model"] = "clima_1m" # "cutoff"
     namelist["microphysics"]["τ_acnv_rai"] = 2500.0
     namelist["microphysics"]["τ_acnv_sno"] = 100.0
