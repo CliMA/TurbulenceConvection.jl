@@ -32,7 +32,8 @@ function buoyancy_gradients(
         ∂b∂θl_sat = (
             ∂b∂θv * (1 + molmass_ratio * (1 + lh / R_v / bg_model.t_sat) * bg_model.qv_sat - bg_model.qt_sat) /
             (1 + lh * lh / cp_m / R_v / bg_model.t_sat / bg_model.t_sat * bg_model.qv_sat)
-        )
+        ) * exp(lh * (bg_model.qt_sat - bg_model.qv_sat) / cp_m / bg_model.t_sat)
+
         ∂b∂qt_sat = (lh / cp_m / bg_model.t_sat * ∂b∂θl_sat - ∂b∂θv) * bg_model.θ_sat
     else
         ∂b∂θl_sat = FT(0)
