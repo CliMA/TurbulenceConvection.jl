@@ -79,6 +79,7 @@ function default_namelist(
     namelist_defaults["logging"] = Dict()
     namelist_defaults["logging"]["truncate_stack_trace"] = truncate_stack_trace
 
+    namelist_defaults["energy_var"] = "rhotheta"
     namelist_defaults["turbulence"] = Dict()
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"] = Dict()
