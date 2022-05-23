@@ -35,6 +35,26 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts)
 
         ql_tendency += S_ql
         qi_tendency += S_qi
+
+        # ## add liq <--> ice transition (could also be a partition on the sources above based on the relative amounts of q.liq, q.ice, q_vap)
+        # # τ_frz_mlt = ICP.τ_frz_mlt(param_set)
+        # # τ_frz_mlt = param_set.τ_frz_mlt
+        # τ_frz_mlt = 1e-5
+
+        # # split into liq/ice separately, keep only liq to ice at first and use 2 timescales, ensure conservation
+        # # @info("limiting") # doesnt work in repl? idk works in jobs
+        # S_ql_to_qi = (q.liq - q_eq.liq)/τ_frz_mlt - (q.ice - q_eq.ice)/τ_frz_mlt # remove excess liquid and gain liq from excess ice
+    
+        # # TODO - handle limiters elswhere
+        # if S_ql_to_qi >= FT(0)
+        #     S_ql_to_qi =  min( S_ql_to_qi, q.liq / Δt + ql_tendency) # a positive flux from liq to ice is limited by liq, and we gotta include the tendency we already utilized
+        # else
+        #     S_ql_to_qi = -min(-S_ql_to_qi, q.ice / Δt + qi_tendency) # a negative flux to liq is limitied by ice
+        # end
+
+        # ql_tendency -= S_ql_to_qi # these must be equal and opposite for conservation
+        # qi_tendency += S_ql_to_qi
+
     end
     return NoneqMoistureSources{FT}(ql_tendency, qi_tendency)
 end

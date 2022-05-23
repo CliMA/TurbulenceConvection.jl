@@ -16,6 +16,7 @@ CLIMAParameters.Planet.molmass_ratio(ps::EarthParameterSet) = ps.nt.molmass_rati
 CLIMAParameters.Atmos.Microphysics_0M.τ_precip(ps::EarthParameterSet) = ps.nt.τ_precip
 CLIMAParameters.Atmos.Microphysics.τ_cond_evap(ps::EarthParameterSet) = ps.nt.τ_cond_evap
 CLIMAParameters.Atmos.Microphysics.τ_sub_dep(ps::EarthParameterSet) = ps.nt.τ_sub_dep
+# CLIMAParameters.Atmos.Microphysics.τ_frz_mlt(ps::EarthParameterSet) = ps.nt.τ_frz_mlt # pray this jaunt works lmao (it doesnt)
 CLIMAParameters.Atmos.Microphysics.τ_acnv_rai(ps::EarthParameterSet) = ps.nt.τ_acnv_rai
 CLIMAParameters.Atmos.Microphysics.τ_acnv_sno(ps::EarthParameterSet) = ps.nt.τ_acnv_sno
 CLIMAParameters.Atmos.Microphysics.q_liq_threshold(ps::EarthParameterSet) = ps.nt.q_liq_threshold
@@ -103,6 +104,7 @@ function create_parameter_set(namelist)
         τ_precip = TC.parse_namelist(namelist, "microphysics", "τ_precip"; default = 1000.0),
         τ_cond_evap = TC.parse_namelist(namelist, "microphysics", "τ_cond_evap"; default = 10.0),
         τ_sub_dep = TC.parse_namelist(namelist, "microphysics", "τ_sub_dep"; default = 10.0),
+        τ_frz_mlt = TC.parse_namelist(namelist, "microphysics", "τ_frz_mlt"; default = 1e-5), # not sure if need to add above...
         τ_acnv_rai = TC.parse_namelist(namelist, "microphysics", "τ_acnv_rai"; default = 2500.0),
         τ_acnv_sno = TC.parse_namelist(namelist, "microphysics", "τ_acnv_sno"; default = 100.0),
         q_liq_threshold = TC.parse_namelist(namelist, "microphysics", "q_liq_threshold"; default = 0.5e-3),
