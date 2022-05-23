@@ -39,6 +39,7 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts)
         # ## add liq <--> ice transition (could also be a partition on the sources above based on the relative amounts of q.liq, q.ice, q_vap)
         # # τ_frz_mlt = ICP.τ_frz_mlt(param_set)
         # # τ_frz_mlt = param_set.τ_frz_mlt
+        # τ_frz_mlt(params_set) # right way to call this.
         # τ_frz_mlt = 1e-5
 
         # # split into liq/ice separately, keep only liq to ice at first and use 2 timescales, ensure conservation

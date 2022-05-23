@@ -43,4 +43,6 @@ covar_lim(ps::APS) = ps.nt.covar_lim
 prescribed_precip_frac_value(ps::APS) = ps.nt.prescribed_precip_frac_value
 precip_fraction_limiter(ps::APS) = ps.nt.precip_fraction_limiter
 
+# add tau_mlt_frz etc here like this
+
 end
