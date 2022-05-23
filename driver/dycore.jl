@@ -17,6 +17,9 @@ import CLIMAParameters
 const CPP = CLIMAParameters.Planet
 const APS = CLIMAParameters.AbstractEarthParameterSet
 
+tc_ = pkgdir(TurbulenceConvection)
+include(joinpath(tc_, "src", "thermodynamics.jl"))
+
 #####
 ##### Fields
 #####
@@ -199,7 +202,7 @@ function compute_ref_state!(
 ) where {PS}
     FT = eltype(grid)
     qtg = TD.total_specific_humidity(param_set, ts_g)
-    θ_liq_ice_g = TD.liquid_ice_pottemp(param_set, ts_g)
+    θ_liq_ice_g = liquid_ice_pottemp(param_set, ts_g)
     Pg = TD.air_pressure(param_set, ts_g)
 
     # We are integrating the log pressure so need to take the log of the
@@ -271,7 +274,7 @@ function set_thermo_state_peq!(state, grid, moisture_model, param_set)
         e_pot = TC.geopotential(param_set, grid.zc.z[k])
         e_int = prog_gm.ρe_tot[k] / ρ_c[k] - e_kin - e_pot
         ts_gm[k] = TC.thermo_state_peq(param_set, p_c[k], e_int, aux_gm.q_tot[k], thermo_args...)
-        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_gm[k])
+        aux_gm.θ_liq_ice[k] = liquid_ice_pottemp(param_set, ts_gm[k])
         aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
     end
     return nothing

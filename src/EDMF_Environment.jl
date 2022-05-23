@@ -39,7 +39,7 @@ function microphysics(
         if TD.has_condensate(param_set, ts)
             aux_en.cloud_fraction[k] = 1
             aux_en_sat.θ_dry[k] = TD.dry_pottemp(param_set, ts)
-            aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts)
+            aux_en_sat.θ_liq_ice[k] = liquid_ice_pottemp(param_set, ts)
             aux_en_sat.T[k] = TD.air_temperature(param_set, ts)
             aux_en_sat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
             aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(param_set, ts)
@@ -307,7 +307,7 @@ function microphysics(
                 aux_en_sat.q_vap[k] = (outer_env.qt_sat - outer_env.ql - outer_env.qi) / aux_en.cloud_fraction[k]
                 ts_sat = TD.PhaseEquil_pTq(param_set, p_c[k], aux_en_sat.T[k], aux_en_sat.q_tot[k])
                 aux_en_sat.θ_dry[k] = TD.dry_pottemp(param_set, ts_sat)
-                aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_sat)
+                aux_en_sat.θ_liq_ice[k] = liquid_ice_pottemp(param_set, ts_sat)
             else
                 aux_en_sat.T[k] = 0
                 aux_en_sat.q_vap[k] = 0
@@ -348,7 +348,7 @@ function microphysics(
             if TD.has_condensate(param_set, ts)
                 aux_en.cloud_fraction[k] = 1
                 aux_en_sat.θ_dry[k] = TD.dry_pottemp(param_set, ts)
-                aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts)
+                aux_en_sat.θ_liq_ice[k] = liquid_ice_pottemp(param_set, ts)
                 aux_en_sat.T[k] = TD.air_temperature(param_set, ts)
                 aux_en_sat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
                 aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(param_set, ts)

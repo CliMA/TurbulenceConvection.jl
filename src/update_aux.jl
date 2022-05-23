@@ -170,7 +170,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         if TD.has_condensate(param_set, ts_en)
             aux_en.cloud_fraction[k] = 1.0
             aux_en_sat.θ_dry[k] = TD.dry_pottemp(param_set, ts_en)
-            aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_en)
+            aux_en_sat.θ_liq_ice[k] = liquid_ice_pottemp(param_set, ts_en)
             aux_en_sat.T[k] = TD.air_temperature(param_set, ts_en)
             aux_en_sat.q_tot[k] = TD.total_specific_humidity(param_set, ts_en)
             aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(param_set, ts_en)

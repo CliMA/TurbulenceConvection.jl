@@ -42,3 +42,38 @@ end
 function kinetic_energy(u::FT, v::FT, w::FT) where {FT}
     return FT(0.5) * (u^2 + v^2 + w^2)
 end
+
+
+function liquid_ice_pottemp_given_pressure(
+    param_set::APS,
+    T::FT,
+    p::FT,
+    q::TD.PhasePartition{FT} = TD.q_pt_0(FT),
+) where {FT <: Real}
+    # liquid-ice potential temperature, approximating latent heats
+    # of phase transitions as constants
+    return TD.dry_pottemp_given_pressure(param_set, T, p, q) *
+           exp(- TD.latent_heat_liq_ice(param_set, q) / (TD.cp_m(param_set, q) * T))
+end
+
+function liquid_ice_pottemp(
+    param_set::APS,
+    T::FT,
+    ρ::FT,
+    q::TD.PhasePartition{FT} = TD.q_pt_0(FT),
+) where {FT <: Real}
+    return liquid_ice_pottemp_given_pressure(
+        param_set,
+        T,
+        TD.air_pressure(param_set, T, ρ, q),
+        q,
+    )
+end
+
+liquid_ice_pottemp(param_set::APS, ts) = liquid_ice_pottemp(
+    param_set,
+    TD.air_temperature(param_set, ts),
+    TD.air_density(param_set, ts),
+    TD.PhasePartition(param_set, ts),
+)
+

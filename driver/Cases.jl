@@ -39,6 +39,9 @@ using ..TurbulenceConvection: real_center_indices
 using ..TurbulenceConvection: real_face_indices
 using ..TurbulenceConvection: get_inversion
 
+tc_ = pkgdir(TurbulenceConvection)
+include(joinpath(tc_, "src", "thermodynamics.jl"))
+
 # Support interpolating with z-points
 (prof::Dierckx.Spline1D)(z::CC.Geometry.ZPoint{FT}) where {FT} = prof(z.z)
 (prof::Dierckx.Spline2D)(t, z::CC.Geometry.ZPoint{FT}) where {FT} = prof(t, z.z)
@@ -592,7 +595,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, param_set, s
         qv_star = pv_star * (1 / molmass_ratio) / denom
         aux_gm.q_tot[k] = qv_star * RH / 100
         phase_part = TD.PhasePartition(aux_gm.q_tot[k], 0.0, 0.0) # initial state is not saturated
-        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], p[k], phase_part)
+        aux_gm.θ_liq_ice[k] = liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], p[k], phase_part)
         aux_gm.tke[k] = prof_tke(z)
     end
 end
@@ -661,7 +664,7 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, param_set, st
         prog_gm.u[k] = prof_u(z)
         aux_gm.q_tot[k] = prof_q_tot(z)
         aux_gm.T[k] = prof_θ_liq_ice(z) * Π
-        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], p[k], phase_part)
+        aux_gm.θ_liq_ice[k] = liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], p[k], phase_part)
         aux_gm.tke[k] = prof_tke(z)
     end
 end
@@ -734,7 +737,7 @@ function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, param_set, s
         aux_gm.T[k] = APL.GATE_III_T(FT)(z)
         prog_gm.u[k] = APL.GATE_III_u(FT)(z)
         ts = TD.PhaseEquil_pTq(param_set, p[k], aux_gm.T[k], aux_gm.q_tot[k])
-        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts)
+        aux_gm.θ_liq_ice[k] = liquid_ice_pottemp(param_set, ts)
         aux_gm.tke[k] = APL.GATE_III_tke(FT)(z)
     end
 end
