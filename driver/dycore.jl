@@ -241,6 +241,14 @@ function compute_ref_state!(
     return nothing
 end
 
+function set_prog_from_aux!(state)
+    prog_gm = TC.center_prog_grid_mean(state)
+    aux_gm = TC.center_aux_grid_mean(state)
+    @. prog_gm.ρθ_liq_ice = prog_gm.ρ * aux_gm.θ_liq_ice
+    @. prog_gm.ρq_tot .= prog_gm.ρ * aux_gm.q_tot
+    return nothing
+end
+
 function set_thermo_state!(state, grid, moisture_model, param_set)
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
