@@ -178,7 +178,6 @@ abstract type AbstractMoistureModel end
 struct EquilibriumMoisture <: AbstractMoistureModel end
 struct NonEquilibriumMoisture <: AbstractMoistureModel end
 
-
 abstract type AbstractCovarianceModel end
 struct PrognosticThermoCovariances <: AbstractCovarianceModel end
 struct DiagnosticThermoCovariances <: AbstractCovarianceModel end
@@ -187,6 +186,10 @@ abstract type AbstractPrecipitationModel end
 struct NoPrecipitation <: AbstractPrecipitationModel end
 struct Clima0M <: AbstractPrecipitationModel end
 struct Clima1M <: AbstractPrecipitationModel end
+
+abstract type AbstractPrecipFractionModel end
+struct PrescribedPrecipFraction <: AbstractPrecipFractionModel end
+struct DiagnosticPrecipFraction <: AbstractPrecipFractionModel end
 
 abstract type AbstractQuadratureType end
 struct LogNormalQuad <: AbstractQuadratureType end
@@ -451,13 +454,14 @@ abstract type AbstractEnergyVariable end
 struct ρeVar <: AbstractEnergyVariable end
 struct ρθVar <: AbstractEnergyVariable end
 
-struct EDMFModel{N_up, FT, MM, TCM, PM, ENT, EBGC, EC, EDS, EPG, EV}
+struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG, EV}
     surface_area::FT
     max_area::FT
     minimum_area::FT
     moisture_model::MM
     thermo_covariance_model::TCM
     precip_model::PM
+    precip_fraction_model::PFM
     en_thermo::ENT
     prandtl_number::FT
     bg_closure::EBGC
@@ -519,6 +523,17 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, ENT, EBGC, EC, EDS, EPG, EV}
         end
 
         precip_model = precip_model
+
+        precip_fraction_model_name =
+            parse_namelist(namelist, "microphysics", "precip_fraction_model"; default = "prescribed")
+        precip_fraction_model = if precip_fraction_model_name == "prescribed"
+            PrescribedPrecipFraction()
+        elseif precip_fraction_model_name == "cloud_cover"
+            DiagnosticPrecipFraction()
+        else
+            error("Something went wrong. Invalid `precip_fraction` model: `$precip_fraction_model_name`")
+        end
+
         # Create the environment variable class (major diagnostic and prognostic variables)
 
         # Create the class for environment thermodynamics and buoyancy gradient computation
@@ -629,17 +644,19 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, ENT, EBGC, EC, EDS, EPG, EV}
         MM = typeof(moisture_model)
         TCM = typeof(thermo_covariance_model)
         PM = typeof(precip_model)
+        PFM = typeof(precip_fraction_model)
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
         EPG = typeof(entr_pi_subset)
         EV = typeof(evar)
-        return new{n_updrafts, FT, MM, TCM, PM, ENT, EBGC, EC, EDS, EPG, EV}(
+        return new{n_updrafts, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG, EV}(
             surface_area,
             max_area,
             minimum_area,
             moisture_model,
             thermo_covariance_model,
             precip_model,
+            precip_fraction_model,
             en_thermo,
             prandtl_number,
             bg_closure,

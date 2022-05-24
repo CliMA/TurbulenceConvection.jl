@@ -61,6 +61,8 @@ function compute_precipitation_formation_tendencies(
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
 
+    precip_fraction = compute_precip_fraction(edmf, state, param_set)
+
     @inbounds for i in 1:N_up
         @inbounds for k in real_center_indices(grid)
             T_up = aux_up[i].T[k]
@@ -88,6 +90,7 @@ function compute_precipitation_formation_tendencies(
                 ρ_c[k],
                 Δt,
                 ts_up,
+                precip_fraction,
             )
             aux_up[i].qt_tendency_precip_formation[k] = mph.qt_tendency * aux_up[i].area[k]
             aux_up[i].θ_liq_ice_tendency_precip_formation[k] = mph.θ_liq_ice_tendency * aux_up[i].area[k]
