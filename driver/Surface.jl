@@ -21,8 +21,8 @@ function get_surface(
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     p_f_surf = aux_gm_f.p[kf_surf]
-    u_gm_surf = prog_gm.u[kc_surf]
-    v_gm_surf = prog_gm.v[kc_surf]
+    u_gm_surf = TC.grid_mean_u(state)[kc_surf]
+    v_gm_surf = TC.grid_mean_v(state)[kc_surf]
     Tsurface = TC.surface_temperature(surf_params, t)
     qsurface = TC.surface_q_tot(surf_params, t)
     shf = TC.sensible_heat_flux(surf_params, t)
@@ -92,8 +92,8 @@ function get_surface(
     Tsurface = TC.surface_temperature(surf_params, t)
     qsurface = TC.surface_q_tot(surf_params, t)
     p_f_surf = aux_gm_f.p[kf_surf]
-    u_gm_surf = prog_gm.u[kc_surf]
-    v_gm_surf = prog_gm.v[kc_surf]
+    u_gm_surf = TC.grid_mean_u(state)[kc_surf]
+    v_gm_surf = TC.grid_mean_v(state)[kc_surf]
     zrough = surf_params.zrough
     zc_surf = grid.zc[kc_surf]
     cm = surf_params.cm(zc_surf)
@@ -152,8 +152,8 @@ function get_surface(
     aux_gm_f = TC.face_aux_grid_mean(state)
     p_f_surf = aux_gm_f.p[kf_surf]
     ts_gm = aux_gm.ts
-    u_gm_surf = prog_gm.u[kc_surf]
-    v_gm_surf = prog_gm.v[kc_surf]
+    u_gm_surf = TC.grid_mean_u(state)[kc_surf]
+    v_gm_surf = TC.grid_mean_v(state)[kc_surf]
     Tsurface = TC.surface_temperature(surf_params, t)
     qsurface = TC.surface_q_tot(surf_params, t)
     zrough = surf_params.zrough
@@ -208,8 +208,8 @@ function get_surface(
     aux_gm = TC.center_aux_grid_mean(state)
     p_c_surf = aux_gm.p[kc_surf]
     p_f_surf = aux_gm_f.p[kf_surf]
-    u_gm_surf = prog_gm.u[kc_surf]
-    v_gm_surf = prog_gm.v[kc_surf]
+    u_gm_surf = TC.grid_mean_u(state)[kc_surf]
+    v_gm_surf = TC.grid_mean_v(state)[kc_surf]
     q_tot_gm_surf = aux_gm.q_tot[kc_surf]
     θ_liq_ice_gm_surf = aux_gm.θ_liq_ice[kc_surf]
     Tsurface = surface_temperature(surf_params, t)

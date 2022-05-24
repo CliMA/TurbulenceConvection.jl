@@ -69,6 +69,8 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     massflux_h = aux_tc_f.massflux_h
     massflux_qt = aux_tc_f.massflux_qt
     aux_tc = center_aux_turbconv(state)
+    prog_gm_u = grid_mean_u(state)
+    prog_gm_v = grid_mean_v(state)
 
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
@@ -95,7 +97,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         TD.total_energy(
             param_set,
             ts_en,
-            kinetic_energy(prog_gm.u, prog_gm.v, Ic(FT(0) + w_en)),
+            kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + w_en)),
             geopotential(param_set, grid.zc.z),
         ),
         ts_en,
@@ -129,7 +131,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
             TD.total_energy(
                 param_set,
                 ts_up_i,
-                kinetic_energy(prog_gm.u, prog_gm.v, Ic(FT(0) + w_up_i)),
+                kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + w_up_i)),
                 geopotential(param_set, grid.zc.z),
             ),
             ts_up_i,
@@ -220,6 +222,9 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     KH = center_aux_turbconv(state).KH
     aeKM = center_aux_turbconv(state).ϕ_temporary
     aeKH = center_aux_turbconv(state).ψ_temporary
+    prog_gm_u = grid_mean_u(state)
+    prog_gm_v = grid_mean_v(state)
+
     ρ_f = aux_gm_f.ρ
     a_en = aux_en.area
     @. aeKM = a_en * KM
@@ -241,7 +246,7 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
         TD.total_energy(
             param_set,
             ts_en,
-            kinetic_energy(prog_gm.u, prog_gm.v, Ic(FT(0) + aux_en_f.w)),
+            kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + aux_en_f.w)),
             geopotential(param_set, grid.zc.z),
         ),
         ts_en,
@@ -263,8 +268,8 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     wvec = CC.Geometry.WVector
     @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KH * ∇q_tot_en(wvec(aux_en.q_tot))
     @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇h_tot_en(wvec(h_tot_en))
-    @. aux_tc_f.diffusive_flux_u = -aux_tc_f.ρ_ae_KM * ∇u_gm(wvec(prog_gm.u))
-    @. aux_tc_f.diffusive_flux_v = -aux_tc_f.ρ_ae_KM * ∇v_gm(wvec(prog_gm.v))
+    @. aux_tc_f.diffusive_flux_u = -aux_tc_f.ρ_ae_KM * ∇u_gm(wvec(prog_gm_u))
+    @. aux_tc_f.diffusive_flux_v = -aux_tc_f.ρ_ae_KM * ∇v_gm(wvec(prog_gm_v))
 
     if edmf.moisture_model isa NonEquilibriumMoisture
         aeKHq_liq_bc = FT(0)
@@ -781,6 +786,8 @@ function compute_covariance_shear(
     k_eddy = is_tke ? aux_tc.KM : aux_tc.KH
     aux_en_2m = center_aux_environment_2m(state)
     aux_covar = getproperty(aux_en_2m, covar_sym)
+    prog_gm_u = grid_mean_u(state)
+    prog_gm_v = grid_mean_v(state)
 
     aux_en_c = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
@@ -793,8 +800,8 @@ function compute_covariance_shear(
     bcs = (; bottom = CCO.Extrapolate(), top = CCO.SetGradient(wvec(zero(FT))))
     If = CCO.InterpolateC2F(; bcs...)
     ∇c = CCO.DivergenceF2C()
-    u = prog_gm.u
-    v = prog_gm.v
+    u = prog_gm_u
+    v = prog_gm_v
     area_en = aux_en_c.area
     shear = aux_covar.shear
 

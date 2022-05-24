@@ -40,7 +40,7 @@ function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid,
     rz_span = (grid.zmax, grid.zmin)
     params = (; κ = self.kappa)
 
-    Δz = TC.get_Δz(prog_gm.u)[1]
+    Δz = TC.get_Δz(prog_gm.ρ)[1]
     rprob = ODE.ODEProblem(rintegrand, 0.0, rz_span, params; dt = Δz)
     rsol = ODE.solve(rprob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
     q_0 = rsol.(vec(grid.zf))
