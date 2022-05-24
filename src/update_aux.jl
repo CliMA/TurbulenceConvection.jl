@@ -59,6 +59,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 end
             else
                 if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
+                    # thermostate here YAIR-YAIR
                     aux_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / prog_up[i].ρarea[k]
                     aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
                     aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ_c[k]
