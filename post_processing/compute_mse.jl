@@ -188,6 +188,9 @@ function compute_mse(
     for tc_var in keys(best_mse)
         
         data_les_arr = TC.get_nc_data(ds_pycles, tc_var)
+        if tc_var == "updraft_thetal"
+            upd_area_les = TC.get_nc_data(ds_pycles, "updraft_area")
+        end
         data_tcm_arr = TC.get_nc_data(ds_tc_main, tc_var)
         data_tcc_arr = TC.get_nc_data(ds_tc, tc_var)
         data_scm_arr = TC.get_nc_data(ds_scampy, tc_var)
@@ -263,6 +266,9 @@ function compute_mse(
         data_tcc_arr = Array(data_tcc_arr)'
         data_scm_arr = Array(data_scm_arr)'
         push!(tcc_variables, tc_var)
+        if tc_var == "updraft_thetal"
+            upd_area_les = Array(upd_area_les)'
+        end
 
         @info "Assembling plots for variable:`$tc_var`"
 
@@ -281,6 +287,10 @@ function compute_mse(
             data_tcm_cont_mapped = map(z -> data_tcm_cont(z), z_tcc)
             data_tcc_cont_mapped = map(z -> data_tcc_cont(z), z_tcc)
             data_scm_cont_mapped = map(z -> data_scm_cont(z), z_tcc)
+            if tc_var == "updraft_thetal"
+                upd_area_les_cont = Dierckx.Spline1D(z_les, vec(upd_area_les); k = 1)
+                upd_area_les_cont_mapped = map(z -> upd_area_les_cont(z), z_tcc)
+            end
         else # unsteady data
             data_les_cont = Dierckx.Spline2D(time_les, z_les, data_les_arr; kx = 1, ky = 1)
             data_tcm_cont = Dierckx.Spline2D(time_tcm, z_tcm, data_tcm_arr; kx = 1, ky = 1)
@@ -299,7 +309,12 @@ function compute_mse(
             data_scm_cont_mapped = map(z_tcc) do z
                 StatsBase.mean(map(t -> data_scm_cont(t, z), R))
             end
-
+            if tc_var == "updraft_thetal"
+                upd_area_les_cont = Dierckx.Spline2D(time_les, z_les, upd_area_les; kx = 1, ky = 1)
+                upd_area_les_cont_mapped = map(z_tcc) do z
+                    StatsBase.mean(map(t -> upd_area_les_cont(t, z), R))
+                end
+            end
         end
 
         # Plot comparison
@@ -309,7 +324,8 @@ function compute_mse(
                 if tc_var == "updraft_thetal"
                     data_les_cont_mapped_orig = deepcopy(data_les_cont_mapped)
                     # Filter 0 K temperatures
-                    data_les_cont_mapped[data_les_cont_mapped .< 1.0] .= NaN
+                    eps = sqrt(eps(eltype(data_les_cont_mapped_orig)))
+                    data_les_cont_mapped[upd_area_les_cont_mapped .< eps] .= NaN
                 end
                 Plots.plot!(
                     data_les_cont_mapped,
