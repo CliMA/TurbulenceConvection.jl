@@ -454,7 +454,7 @@ abstract type AbstractEnergyVariable end
 struct ρeVar <: AbstractEnergyVariable end
 struct ρθVar <: AbstractEnergyVariable end
 
-struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG, EV}
+struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG, EV}
     surface_area::FT
     max_area::FT
     minimum_area::FT
@@ -467,6 +467,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG, EV}
     bg_closure::EBGC
     entr_closure::EC
     entr_dim_scale::EDS
+    detr_dim_scale::DDS
     entr_pi_subset::EPG
     evar::EV
     function EDMFModel(namelist, precip_model) where {PS}
@@ -637,9 +638,29 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG, EV}
             error("Something went wrong. Invalid entrainment dimension scale '$entr_dim_scale'")
         end
 
+        detr_dim_scale = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "detr_dim_scale";
+            default = "buoy_vel",
+            valid_options = ["buoy_vel", "inv_z", "none"],
+        )
+
+        detr_dim_scale = if detr_dim_scale == "buoy_vel"
+            BuoyVelEntrDimScale()
+        elseif detr_dim_scale == "inv_z"
+            InvZEntrDimScale()
+        elseif detr_dim_scale == "none"
+            InvMeterEntrDimScale()
+        else
+            error("Something went wrong. Invalid entrainment dimension scale '$detr_dim_scale'")
+        end
+
         entr_pi_subset = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_pi_subset")
 
         EDS = typeof(entr_dim_scale)
+        DDS = typeof(detr_dim_scale)
         EC = typeof(entr_closure)
         MM = typeof(moisture_model)
         TCM = typeof(thermo_covariance_model)
@@ -649,7 +670,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG, EV}
         ENT = typeof(en_thermo)
         EPG = typeof(entr_pi_subset)
         EV = typeof(evar)
-        return new{n_updrafts, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG, EV}(
+        return new{n_updrafts, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG, EV}(
             surface_area,
             max_area,
             minimum_area,
@@ -662,6 +683,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, EPG, EV}
             bg_closure,
             entr_closure,
             entr_dim_scale,
+            detr_dim_scale,
             entr_pi_subset,
             evar,
         )

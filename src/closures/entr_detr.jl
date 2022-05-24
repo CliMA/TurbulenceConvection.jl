@@ -76,21 +76,9 @@ function entrainment_inv_length_scale(
     return FT(1)
 end
 
-"""
-    εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, ε_nondim, δ_nondim)
-
-Returns the fractional dynamical entrainment and detrainment rates [1/m] given non-dimensional rates
-
-Parameters:
- - `param_set`      :: parameter set
- - `εδ_vars`        :: structure containing variables
- - `entr_dim_scale` :: type of dimensional fractional entrainment scale
- - `ε_nondim`       :: nondimensional fractional entrainment
- - `δ_nondim`       :: nondimensional fractional detrainment
-"""
-function εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, ε_nondim, δ_nondim)
-    FT = eltype(εδ_vars.q_cond_up)
-    dim_scale = entrainment_inv_length_scale(
+"""A convenience wrapper for entrainment_inv_length_scale"""
+function entrainment_inv_length_scale(param_set, εδ_vars, dim_scale)
+    return entrainment_inv_length_scale(
         param_set,
         εδ_vars.b_up,
         εδ_vars.b_en,
@@ -98,8 +86,27 @@ function εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, ε_nondim, δ_nondi
         εδ_vars.w_en,
         εδ_vars.tke_en,
         εδ_vars.zc_i,
-        entr_dim_scale,
+        dim_scale,
     )
+end
+
+"""
+    εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nondim, δ_nondim)
+
+Returns the fractional dynamical entrainment and detrainment rates [1/m] given non-dimensional rates
+
+Parameters:
+ - `param_set`      :: parameter set
+ - `εδ_vars`        :: structure containing variables
+ - `entr_dim_scale` :: type of dimensional fractional entrainment scale
+ - `detr_dim_scale` :: type of dimensional fractional detrainment scale
+ - `ε_nondim`       :: nondimensional fractional entrainment
+ - `δ_nondim`       :: nondimensional fractional detrainment
+"""
+function εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nondim, δ_nondim)
+    FT = eltype(εδ_vars.q_cond_up)
+    ε_dim_scale = entrainment_inv_length_scale(param_set, εδ_vars, entr_dim_scale)
+    δ_dim_scale = entrainment_inv_length_scale(param_set, εδ_vars, detr_dim_scale)
 
     area_limiter = max_area_limiter(param_set, εδ_vars.max_area, εδ_vars.a_up)
 
@@ -107,14 +114,14 @@ function εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, ε_nondim, δ_nondi
     MdMdz_ε, MdMdz_δ = get_MdMdz(εδ_vars.M, εδ_vars.dMdz) .* c_div
 
     # fractional dynamical entrainment / detrainment [1 / m]
-    ε_dyn = dim_scale * ε_nondim + MdMdz_ε
-    δ_dyn = dim_scale * (δ_nondim + area_limiter) + MdMdz_δ
+    ε_dyn = ε_dim_scale * ε_nondim + MdMdz_ε
+    δ_dyn = δ_dim_scale * (δ_nondim + area_limiter) + MdMdz_δ
 
     return ε_dyn, δ_dyn
 end
 
 """
-    entr_detr(param_set::APS, εδ_vars, entr_dim_scale, εδ_model_type)
+    entr_detr(param_set::APS, εδ_vars, entr_dim_scale, detr_dim_scale, εδ_model_type)
 
 Returns the fractional dynamical entrainment and detrainment rates [1/m],
 as well as the turbulent entrainment rate
@@ -123,14 +130,15 @@ Parameters:
  - `param_set`      :: parameter set
  - `εδ_vars`        :: structure containing variables
  - `entr_dim_scale` :: type of dimensional fractional entrainment scale
+ - `detr_dim_scale` :: type of dimensional fractional detrainment scale
  - `εδ_model_type`  :: type of non-dimensional model for entrainment/detrainment
 """
-function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, εδ_model_type)
+function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, detr_dim_scale, εδ_model_type)
     FT = eltype(εδ_vars.q_cond_up)
 
     # fractional entrainment / detrainment
     ε_nondim, δ_nondim = non_dimensional_function(param_set, εδ_vars, εδ_model_type)
-    ε_dyn, δ_dyn = εδ_dyn(param_set, εδ_vars, entr_dim_scale, ε_nondim, δ_nondim)
+    ε_dyn, δ_dyn = εδ_dyn(param_set, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nondim, δ_nondim)
 
     # turbulent entrainment
     ε_turb = compute_turbulent_entrainment(param_set, εδ_vars.a_up, εδ_vars.w_up, εδ_vars.tke_en, εδ_vars.H_up)
@@ -221,12 +229,19 @@ function compute_entr_detr!(
                 if εδ_closure isa PrognosticNoisyRelaxationProcess
                     # fractional dynamical entrainment from prognostic state
                     ε_nondim, δ_nondim = prog_up[i].ε_nondim[k], prog_up[i].δ_nondim[k]
-                    ε_dyn, δ_dyn = εδ_dyn(param_set, εδ_model_vars, edmf.entr_dim_scale, ε_nondim, δ_nondim)
+                    ε_dyn, δ_dyn =
+                        εδ_dyn(param_set, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, ε_nondim, δ_nondim)
                     # turbulent & mean nondimensional entrainment
-                    er = entr_detr(param_set, εδ_model_vars, edmf.entr_dim_scale, εδ_closure.mean_model)
+                    er = entr_detr(
+                        param_set,
+                        εδ_model_vars,
+                        edmf.entr_dim_scale,
+                        edmf.detr_dim_scale,
+                        εδ_closure.mean_model,
+                    )
                 else
                     # fractional, turbulent & nondimensional entrainment
-                    er = entr_detr(param_set, εδ_model_vars, edmf.entr_dim_scale, εδ_closure)
+                    er = entr_detr(param_set, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, εδ_closure)
                     ε_dyn, δ_dyn = er.ε_dyn, er.δ_dyn
                 end
                 aux_up[i].entr_sc[k] = ε_dyn
@@ -351,7 +366,7 @@ function compute_entr_detr!(
                 aux_en.tke[k],
                 plume_scale_height[i],
             )
-            dim_scale = entrainment_inv_length_scale(
+            ε_dim_scale = entrainment_inv_length_scale(
                 param_set,
                 aux_up[i].buoy[k],
                 aux_en.buoy[k],
@@ -361,11 +376,21 @@ function compute_entr_detr!(
                 grid.zc[k].z,
                 edmf.entr_dim_scale,
             )
+            δ_dim_scale = entrainment_inv_length_scale(
+                param_set,
+                aux_up[i].buoy[k],
+                aux_en.buoy[k],
+                w_up_c[k],
+                w_en_c[k],
+                aux_en.tke[k],
+                grid.zc[k].z,
+                edmf.detr_dim_scale,
+            )
             area_limiter = max_area_limiter(param_set, max_area, aux_up[i].area[k])
             MdMdz_ε, MdMdz_δ = get_MdMdz(m_entr_detr[k], ∇m_entr_detr[k]) .* c_div
 
-            aux_up[i].entr_sc[k] = dim_scale * aux_up[i].ε_nondim[k] + MdMdz_ε
-            aux_up[i].detr_sc[k] = dim_scale * (aux_up[i].δ_nondim[k] + area_limiter) + MdMdz_δ
+            aux_up[i].entr_sc[k] = ε_dim_scale * aux_up[i].ε_nondim[k] + MdMdz_ε
+            aux_up[i].detr_sc[k] = δ_dim_scale * (aux_up[i].δ_nondim[k] + area_limiter) + MdMdz_δ
             aux_up[i].frac_turb_entr[k] = ε_turb
         end
 
