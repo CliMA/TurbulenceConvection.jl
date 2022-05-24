@@ -496,8 +496,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         #precip_fraction = compute_precip_fraction(edmf, state, param_set)
 
         @inbounds for k in real_center_indices(grid)
-            term_vel_rain[k] = CM1.terminal_velocity(param_set, CM1.RainType(), ρ_c[k], prog_pr.q_rai[k])# / precip_fraction)
-            term_vel_snow[k] = CM1.terminal_velocity(param_set, CM1.SnowType(), ρ_c[k], prog_pr.q_sno[k])# / precip_fraction)
+            term_vel_rain[k] = CM1.terminal_velocity(param_set, CM.CommonTypes.RainType(), ρ_c[k], prog_pr.q_rai[k])# / precip_fraction)
+            term_vel_snow[k] = CM1.terminal_velocity(param_set, CM.CommonTypes.SnowType(), ρ_c[k], prog_pr.q_sno[k])# / precip_fraction)
         end
     end
 

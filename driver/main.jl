@@ -9,8 +9,9 @@ import TurbulenceConvection
 
 import CloudMicrophysics
 const CM = CloudMicrophysics
-const CM0 = CloudMicrophysics.Microphysics_0M
-const CM1 = CloudMicrophysics.Microphysics_1M
+const CMNe = CloudMicrophysics.MicrophysicsNonEq
+const CM0 = CloudMicrophysics.Microphysics0M
+const CM1 = CloudMicrophysics.Microphysics1M
 
 import ClimaCore
 const CC = ClimaCore

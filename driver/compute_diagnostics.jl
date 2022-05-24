@@ -172,6 +172,18 @@ function compute_diagnostics!(
         @. massflux_s += aux_up_f[i].massflux * (If(aux_up[i].s) - If(aux_en.s))
     end
 
+    # Mean water paths for calibration
+    cent = TC.Cent(1)
+    diag_svpc.lwp_mean[cent] = sum(ρ_c .* aux_gm.q_liq)
+    diag_svpc.iwp_mean[cent] = sum(ρ_c .* aux_gm.q_ice)
+    diag_svpc.rwp_mean[cent] = sum(ρ_c .* prog_pr.q_rai)
+    diag_svpc.swp_mean[cent] = sum(ρ_c .* prog_pr.q_sno)
+
+    write_ts(Stats, "lwp_mean", diag_svpc.lwp_mean[cent])
+    write_ts(Stats, "iwp_mean", diag_svpc.iwp_mean[cent])
+    write_ts(Stats, "rwp_mean", diag_svpc.rwp_mean[cent])
+    write_ts(Stats, "swp_mean", diag_svpc.swp_mean[cent])
+
     # We only need computations above here for calibration io.
     calibrate_io && return nothing
 
@@ -206,7 +218,6 @@ function compute_diagnostics!(
     # while the updraft classes are assumed to have no overlap at all.
     # Thus total updraft cover is the sum of each updraft's cover
 
-    cent = TC.Cent(1)
     diag_tc_svpc.updraft_cloud_cover[cent] = sum(cloud_cover_up)
     diag_tc_svpc.updraft_cloud_base[cent] = minimum(abs.(cloud_base_up))
     diag_tc_svpc.updraft_cloud_top[cent] = maximum(abs.(cloud_top_up))
@@ -309,11 +320,6 @@ function compute_diagnostics!(
 
     TC.update_cloud_frac(edmf, grid, state)
 
-    diag_svpc.lwp_mean[cent] = sum(ρ_c .* aux_gm.q_liq)
-    diag_svpc.iwp_mean[cent] = sum(ρ_c .* aux_gm.q_ice)
-    diag_svpc.rwp_mean[cent] = sum(ρ_c .* prog_pr.q_rai)
-    diag_svpc.swp_mean[cent] = sum(ρ_c .* prog_pr.q_sno)
-
     diag_tc_svpc.env_lwp[cent] = sum(ρ_c .* aux_en.q_liq .* aux_en.area)
     diag_tc_svpc.env_iwp[cent] = sum(ρ_c .* aux_en.q_ice .* aux_en.area)
 
@@ -355,10 +361,6 @@ function compute_diagnostics!(
     write_ts(Stats, "cloud_cover_mean", diag_svpc.cloud_cover_mean[cent])
     write_ts(Stats, "cloud_base_mean", diag_svpc.cloud_base_mean[cent])
     write_ts(Stats, "cloud_top_mean", diag_svpc.cloud_top_mean[cent])
-    write_ts(Stats, "lwp_mean", diag_svpc.lwp_mean[cent])
-    write_ts(Stats, "iwp_mean", diag_svpc.iwp_mean[cent])
-    write_ts(Stats, "rwp_mean", diag_svpc.rwp_mean[cent])
-    write_ts(Stats, "swp_mean", diag_svpc.swp_mean[cent])
 
     return
 end

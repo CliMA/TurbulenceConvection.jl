@@ -26,12 +26,13 @@ const SA = StaticArrays
 const TD = Thermodynamics
 
 const CM = CloudMicrophysics
-const CM0 = CloudMicrophysics.Microphysics_0M
-const CM1 = CloudMicrophysics.Microphysics_1M
-const liq_type = CM1.LiquidType()
-const ice_type = CM1.IceType()
-const rain_type = CM1.RainType()
-const snow_type = CM1.SnowType()
+const CMNe = CloudMicrophysics.MicrophysicsNonEq
+const CM0 = CloudMicrophysics.Microphysics0M
+const CM1 = CloudMicrophysics.Microphysics1M
+const liq_type = CM.CommonTypes.LiquidType()
+const ice_type = CM.CommonTypes.IceType()
+const rain_type = CM.CommonTypes.RainType()
+const snow_type = CM.CommonTypes.SnowType()
 
 import CLIMAParameters
 const CP = CLIMAParameters
