@@ -18,8 +18,8 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts)
         ts_eq = TD.PhaseEquil_ρTq(param_set, ρ, T, q.tot)
         q_eq = TD.PhasePartition(param_set, ts_eq)
 
-        S_ql = CM1.conv_q_vap_to_q_liq_ice(param_set, liq_type, q_eq, q)
-        S_qi = CM1.conv_q_vap_to_q_liq_ice(param_set, ice_type, q_eq, q)
+        S_ql = CMNe.conv_q_vap_to_q_liq_ice(param_set, liq_type, q_eq, q)
+        S_qi = CMNe.conv_q_vap_to_q_liq_ice(param_set, ice_type, q_eq, q)
 
         # TODO - handle limiters elswhere
         if S_ql >= FT(0)
