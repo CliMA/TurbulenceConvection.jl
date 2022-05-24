@@ -76,4 +76,3 @@ liquid_ice_pottemp(param_set::APS, ts) = liquid_ice_pottemp(
     TD.air_density(param_set, ts),
     TD.PhasePartition(param_set, ts),
 )
-
