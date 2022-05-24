@@ -186,10 +186,12 @@ function compute_mse(
     local fig_height
 
     for tc_var in keys(best_mse)
+        
         data_les_arr = TC.get_nc_data(ds_pycles, tc_var)
         data_tcm_arr = TC.get_nc_data(ds_tc_main, tc_var)
         data_tcc_arr = TC.get_nc_data(ds_tc, tc_var)
         data_scm_arr = TC.get_nc_data(ds_scampy, tc_var)
+
         # Only compare fields that exist in the nc files
         missing_les_var = data_les_arr == nothing
         missing_tcm_var = data_tcm_arr == nothing
@@ -304,6 +306,11 @@ function compute_mse(
         if plot_comparison
             p = Plots.plot()
             if have_pycles_ds
+                if tc_var == "updraft_thetal"
+                    data_les_cont_mapped_orig = deepcopy(data_les_cont_mapped)
+                    # Filter 0 K temperatures
+                    data_les_cont_mapped[data_les_cont_mapped .< 1.0] .= NaN
+                end
                 Plots.plot!(
                     data_les_cont_mapped,
                     z_tcc ./ 10^3,
@@ -311,6 +318,9 @@ function compute_mse(
                     ylabel = "z [km]",
                     label = "PyCLES$warn_msg_les",
                 )
+                if tc_var == "updraft_thetal"
+                    data_les_cont_mapped = data_les_cont_mapped_orig
+                end
             end
             Plots.plot!(
                 data_scm_cont_mapped,
