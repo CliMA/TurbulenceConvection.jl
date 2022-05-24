@@ -67,7 +67,6 @@ StochasticDiffEq = "6.41"
 SurfaceFluxes = "0.3"
 TerminalLoggers = "0.1"
 Thermodynamics = "0.7.1"
-TurbulenceConvection = "0.23"
 UnPack = "1.0"
 
 [extras]
