@@ -171,6 +171,7 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["nn_ent_params"] =
         SA.SVector{58}(rand(58))
 
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["foo_bar"] = rand(50)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["nn_ent_biases"] = false
 
     # m=100 random features, d=6 input Pi groups
