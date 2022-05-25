@@ -48,6 +48,7 @@ no_overwrites = (
     "case", # default_namelist already overwrites namelist["meta"]["casename"]
     "skip_post_proc",
     "skip_tests",
+    "broken_tests",
     "trunc_field_type_print",
     "suffix",
 )
@@ -80,6 +81,15 @@ if length(overwrite_list) ≠ length(cl_list)
 end
 
 ds_tc_filename, return_code = main(namelist)
+
+parsed_args["broken_tests"] && exit()
+
+@testset "Simulation completion" begin
+    # Test that the simulation has actually finished,
+    # and not aborted early.
+    @test !(return_code == :simulation_aborted)
+    @test return_code == :success
+end
 
 # Post-processing case kwargs
 include(joinpath(tc_dir, "post_processing", "case_kwargs.jl"))
@@ -122,13 +132,6 @@ end
             @test !any(isnan_or_inf.(Array(profile["qr_mean"])))
         end
         nothing
-    end
-
-    @testset "Simulation completion" begin
-        # Test that the simulation has actually finished,
-        # and not aborted early.
-        @test !(return_code == :simulation_aborted)
-        @test return_code == :success
     end
     nothing
 end
