@@ -81,7 +81,8 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
     # θl - liquid ice potential temperature
     # _mean and ′ - subdomain mean and (co)variances
     # q_rai, q_sno - grid mean precipitation
-    UnPack.@unpack qt′qt′, qt_mean, θl′θl′, θl_mean, θl′qt′, subdomain_area, q_rai, q_sno, ρ_c, p_c, zc, precip_frac = vars
+    UnPack.@unpack qt′qt′, qt_mean, θl′θl′, θl_mean, θl′qt′, subdomain_area, q_rai, q_sno, ρ_c, p_c, zc, precip_frac =
+        vars
 
     FT = eltype(ρ_c)
 
@@ -160,8 +161,18 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
             q_ice_en = TD.ice_specific_humidity(param_set, ts)
             T = TD.air_temperature(param_set, ts)
             # autoconversion and accretion
-            mph =
-                precipitation_formation(param_set, precip_model, q_rai, q_sno, subdomain_area, ρ_c, zc, Δt, ts, precip_frac)
+            mph = precipitation_formation(
+                param_set,
+                precip_model,
+                q_rai,
+                q_sno,
+                subdomain_area,
+                ρ_c,
+                zc,
+                Δt,
+                ts,
+                precip_frac,
+            )
 
             # environmental variables
             inner_env[i_ql] += q_liq_en * weights[m_h] * sqpi_inv
