@@ -334,8 +334,16 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         q_surf = q_surface_bc(surf, grid, state, edmf, i)
         a_surf = area_surface_bc(surf, edmf, i)
         prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_surf
-        # thermostate here YAIR-YAIR
-        prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * θ_surf
+        e_tot_surf = total_energy(param_set,
+                                  grid.zc[kc_surf].z,
+                                  prog_gm.u[kc_surf],
+                                  prog_gm.v[kc_surf],
+                                  prog_gm.w[kc_surf],
+                                  aux_gm.p[kc_surf],
+                                  θ_surf,
+                                  q_surf)
+
+        prog_up[i].ρae_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * e_tot_surf
         prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * q_surf
         if edmf.moisture_model isa NonEquilibriumMoisture
             q_liq_surf = FT(0)
@@ -750,9 +758,16 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         q_surf = q_surface_bc(surf, grid, state, edmf, i)
         a_surf = area_surface_bc(surf, edmf, i)
         prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_surf
-        # thermostate here YAIR-YAIR
-        prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * θ_surf
         prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * q_surf
+        e_tot_surf = total_energy(param_set,
+                                  grid.zc[kc_surf].z,
+                                  prog_gm.u[kc_surf],
+                                  prog_gm.v[kc_surf],
+                                  prog_gm.w[kc_surf],
+                                  aux_gm.p[kc_surf],
+                                  θ_surf,
+                                  q_surf)
+        prog_up[i].ρae_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * e_tot_surf
     end
     if edmf.moisture_model isa NonEquilibriumMoisture
         @inbounds for i in 1:N_up

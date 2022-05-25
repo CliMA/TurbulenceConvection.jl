@@ -59,9 +59,13 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 end
             else
                 if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
-                    # thermostate here YAIR-YAIR
-                    aux_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / prog_up[i].ρarea[k]
+                    e_tot = prog_up[i].ρae_tot[k] / prog_up[i].ρarea[k]
                     aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
+                    e_kin = kinetic_energy(prog_gm.u[k], prog_gm.v[k], prog_up[i].w[k])
+                    e_pot = geopotential(param_set, grid.zc[k].z)
+                    e_int = e_tot - e_kin - e_pot
+                    ts_up_i = TD.PhaseEquil_peq(p_c[k], e_int, aux_up[i].q_tot[k])
+                    aux_up[i].θ_liq_ice[k] = TD.liquid_ice_pottemp(ts_up_i)
                     aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ_c[k]
                 else
                     aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]

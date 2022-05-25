@@ -147,7 +147,7 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
                                      aux_gm.p[k],
                                      aux_up[i].θ_liq_ice[k],
                                      aux_up[i].q_tot[k])
-                prog_up[i].ρaθ_liq_ice[k] = prog_up[i].ρarea[k] * e_tot
+                prog_up[i].ρae_tot[k] = prog_up[i].ρarea[k] * e_tot
             else
                 aux_up[i].area[k] = 0.0
                 aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
