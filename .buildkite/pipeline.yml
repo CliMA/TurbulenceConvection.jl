@@ -94,7 +94,7 @@ steps:
         artifact_paths: "Output.Bomex.01_gaussian/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with stretched grid"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --stretch_grid true --suffix _stretch_grid_true"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --stretch_grid true --skip_tests true --suffix _stretch_grid_true"
         artifact_paths: "Output.Bomex.01_stretch_grid_true/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with NN_nonlocal"
