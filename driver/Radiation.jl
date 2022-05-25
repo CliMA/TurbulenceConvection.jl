@@ -90,9 +90,10 @@ end
 
 function initialize_rrtmgp(grid, state, param_set)
     FT = eltype(grid)
-    ρ0_c = TC.center_ref_state(state).ρ0
-    p0_c = TC.center_ref_state(state).p0
     prog_gm = TC.center_prog_grid_mean(state)
+    aux_gm = TC.center_aux_grid_mean(state)
+    ρ_c = prog_gm.ρ
+    p_c = aux_gm.p
     ds_input = rrtmgp_artifact("atmos_state", "clearsky_as.nc")
     nlay = ds_input.dim["layer"]
     nsite = ds_input.dim["site"]
@@ -127,9 +128,9 @@ function initialize_rrtmgp(grid, state, param_set)
     end
 
     # get model shape from model density
-    volume_mixing_ratio_h2o = vec(p0_c)
-    p0_c = vec(p0_c)
-    temperature = vec(ρ0_c)
+    volume_mixing_ratio_h2o = vec(p_c)
+    p_c = vec(p_c)
+    temperature = vec(ρ_c)
     z = vec(grid.zf)
 
     rrtmgp_model = RRTMGPModel(
@@ -143,11 +144,11 @@ function initialize_rrtmgp(grid, state, param_set)
         weighted_irradiance = FT(CP.Planet.tot_solar_irrad(param_set)),
         dir_sw_surface_albedo = get_var("surface_albedo", ds_input, nsite, nexpt, ncol)'[1],
         dif_sw_surface_albedo = get_var("surface_albedo", ds_input, nsite, nexpt, ncol)'[1],
-        pressure = vec(p0_c),
-        temperature = vec(p0_c),
+        pressure = vec(p_c),
+        temperature = vec(p_c),
         surface_temperature = get_var("surface_temperature", ds_input, nsite, nexpt, ncol)[1],
         latitude = get_var("lat", ds_input, nsite, nexpt, ncol)[1],
-        volume_mixing_ratio_h2o = vec(p0_c),
+        volume_mixing_ratio_h2o = vec(p_c),
         volume_mixing_ratio_o3 = get_var("ozone", ds_input, nsite, nexpt, ncol)[1],
         vmrs...,
         volume_mixing_ratio_no2 = 0,
@@ -158,17 +159,18 @@ end
 function update_radiation(self::TC.RadiationBase{TC.RadiationRRTMGP}, grid, state, param_set)
 
     cp_d = CPP.cp_d(param_set)
-    ρ0_c = TC.center_ref_state(state).ρ0
-    p0_c = TC.center_ref_state(state).p0
-    aux_gm_f = TC.face_aux_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
+    prog_gm = TC.center_prog_grid_mean(state)
+    aux_gm_f = TC.face_aux_grid_mean(state)
+    ρ_c = prog_gm.ρ
+    p_c = aux_gm.p
 
     UnPack.@unpack rrtmgp_model = params
 
     ϵ_d = CPP.molmass_ratio(param_set)
 
     rrtmgp_model.temperature .= vec(aux_gm.T)
-    rrtmgp_model.pressure .= vec(p0_c)
+    rrtmgp_model.pressure .= vec(p_c)
     rrtmgp_model.volume_mixing_ratio_h2o .= vec(@. ϵ_d * aux_gm.q_tot / (1 - aux_gm.q_tot))
     rrtmgp_flux = vec(grid.zf)
     vec(rrtmgp_flux) .= compute_fluxes!(rrtmgp_model)
@@ -177,7 +179,7 @@ function update_radiation(self::TC.RadiationBase{TC.RadiationRRTMGP}, grid, stat
     end
     ∇c = CCO.DivergenceF2C()
     wvec = CC.Geometry.WVector
-    @. aux_gm.dTdt_rad = -∇c(wvec(aux_gm_f.f_rad)) / ρ0_c / cp_d
+    @. aux_gm.dTdt_rad = -∇c(wvec(aux_gm_f.f_rad)) / ρ_c / cp_d
     return
 end
 

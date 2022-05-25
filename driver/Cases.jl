@@ -1294,8 +1294,6 @@ end
 function initialize_profiles(self::CasesBase{LES_driven_SCM_RRTMGP}, grid::Grid, param_set, state)
 
     aux_gm = TC.center_aux_grid_mean(state)
-    prog_gm = TC.center_prog_grid_mean(state)
-    ρ0_c = TC.center_ref_state(state).ρ0
     NC.Dataset(self.LESDat.les_filename, "r") do data
         t = data.group["profiles"]["t"][:]
         # define time interval
@@ -1312,12 +1310,10 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM_RRTMGP}, grid::Grid,
         parent(aux_gm.θ_liq_ice) .=
             pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "thetali_mean", imin, imax))
         parent(aux_gm.q_tot) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "qt_mean", imin, imax))
-        parent(prog_gm.u) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "u_mean", imin, imax))
-        parent(prog_gm.v) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "v_mean", imin, imax))
+        parent(aux_gm.u) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "u_mean", imin, imax))
+        parent(aux_gm.v) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "v_mean", imin, imax))
         # for RRTMGP
         parent(aux_gm.T) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "temperature_mean", imin, imax))
-        @. prog_gm.ρθ_liq_ice = ρ0_c * aux_gm.θ_liq_ice
-        @. prog_gm.ρq_tot .= ρ0_c * aux_gm.q_tot
     end
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
@@ -1380,8 +1376,10 @@ end
 function initialize_profiles(self::CasesBase{RadiativeConvectiveEquilibrium}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ0_c = TC.center_ref_state(state).ρ0
-    p0_c = TC.center_ref_state(state).p0
+    prog_gm_u = TC.grid_mean_u(state)
+    prog_gm_v = TC.grid_mean_v(state)
+    ρ_c = prog_gm.ρ
+    p_c = aux_gm.p
     g = CPP.grav(param_set)
     R_d = CPP.R_d(param_set)
 
@@ -1404,20 +1402,19 @@ function initialize_profiles(self::CasesBase{RadiativeConvectiveEquilibrium}, gr
         if z < zₜ
             aux_gm.q_tot[k] =  q₀* exp(-z/q_z₁)*exp(-z^2/q_z₂^2)
             Tv = Tv₀ - Γ*z
-            p0_c[k] = p₀*exp(Tv/Tv₀)^(g/R_d/Γ)
+            p_c[k] = p₀*exp(Tv/Tv₀)^(g/R_d/Γ)
         else
             Tv = Tv₀ - Γ*zₜ
             pₜ = p₀*(Tv/Tv₀)^(g/R_d/Γ)
             aux_gm.q_tot[k] = FT(10^-11)
-            p0_c[k] = pₜ*exp(-g*(z-zₜ)/(R_d*Tv))^(g/R_d/Γ)
+            p_c[k] = pₜ*exp(-g*(z-zₜ)/(R_d*Tv))^(g/R_d/Γ)
         end
         aux_gm.T[k] = Tv/(FT(1)+FT(0.608)*aux_gm.q_tot[k])
-        aux_gm.ts[k] = TD.PhaseEquil_pTq(param_set, p0_c[k], aux_gm.T[k], aux_gm.q_tot[k])
+        aux_gm.ts[k] = TD.PhaseEquil_pTq(param_set, p_c[k], aux_gm.T[k], aux_gm.q_tot[k])
         aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, aux_gm.ts[k])
         # compute ref state here
-        prog_gm.ρθ_liq_ice[k] = ρ0_c[k] * aux_gm.θ_liq_ice[k]
-        prog_gm.ρq_tot[k] = ρ0_c[k] * aux_gm.q_tot[k]
-        prog_gm.u[k] = FT(0)
+        prog_gm_u[k] = FT(0)
+        prog_gm_v[k] = FT(0)
         aux_gm.tke[k] = FT(0)
     end
 end
@@ -1431,7 +1428,7 @@ function surface_params(case::RadiativeConvectiveEquilibrium, surf_ref_state, pa
     zrough = 0.1
     guistiness = FT(1)
     # need to pass guistiness from here
-    kwargs = (; Tsurface, qsurface, shf, lhf, zrough) #, guistiness
+    kwargs = (; Tsurface, qsurface, zrough) #, guistiness
     return TC.MoninObukhovSurface(FT; kwargs...)
 end
 

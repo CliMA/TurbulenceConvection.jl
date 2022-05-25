@@ -174,7 +174,6 @@ function get_surface(
     shf = result.shf
     zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)
     convective_vel = TC.get_wstar(result.buoy_flux, zi)
-    @show(lhf, shf, Tsurface, qsurface, q_tot_gm_surf, θ_liq_ice_gm_surf)
     return TC.SurfaceBase{FT}(;
         cm = result.Cd,
         ch = result.Ch,
