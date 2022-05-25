@@ -225,9 +225,9 @@ version = "3.18.0"
 
 [[deps.ColorTypes]]
 deps = ["FixedPointNumbers", "Random"]
-git-tree-sha1 = "a985dc37e357a3b22b260a5def99f3530fb415d3"
+git-tree-sha1 = "0f4e115f6f34bbe43c19751c90a38b2f380637b9"
 uuid = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
-version = "0.11.2"
+version = "0.11.3"
 
 [[deps.ColorVectorSpace]]
 deps = ["ColorTypes", "FixedPointNumbers", "LinearAlgebra", "SpecialFunctions", "Statistics", "TensorCore"]
@@ -287,9 +287,9 @@ version = "0.5.7"
 
 [[deps.Coverage]]
 deps = ["CoverageTools", "HTTP", "JSON", "LibGit2", "MbedTLS"]
-git-tree-sha1 = "991f606da16a3ab900d5cad64e90cede27678ab2"
+git-tree-sha1 = "f8bd48b6a157c9d05f5662b28db7a4717537d9e0"
 uuid = "a2441757-f6aa-5fb2-8edb-039e3f45d037"
-version = "1.4.0"
+version = "1.5.0"
 
 [[deps.CoverageTools]]
 git-tree-sha1 = "cc5595feb314d3b226ed765a001a40ca451ad687"
@@ -1506,9 +1506,9 @@ version = "0.6.32"
 
 [[deps.SciMLBase]]
 deps = ["ArrayInterfaceCore", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "RecipesBase", "RecursiveArrayTools", "StaticArrays", "Statistics", "Tables", "TreeViews"]
-git-tree-sha1 = "27f34ad5c6d4a55a304248d1b0e6f0b3aa7f9cdf"
+git-tree-sha1 = "83fbb7ed368d4a76e15f752c6a51db851782f0d5"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "1.33.0"
+version = "1.34.0"
 
 [[deps.Scratch]]
 deps = ["Dates"]
@@ -1754,7 +1754,7 @@ version = "0.3.4"
 deps = ["CLIMAParameters", "ClimaCore", "CloudMicrophysics", "Dierckx", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "Flux", "LambertW", "LinearAlgebra", "OperatorFlux", "StaticArrays", "StatsBase", "StochasticDiffEq", "Thermodynamics", "UnPack"]
 path = ".."
 uuid = "8e072fc4-01f8-44fb-b9dc-f9336c367e6b"
-version = "0.25.0"
+version = "0.26.0"
 
 [[deps.URIs]]
 git-tree-sha1 = "97bbe755a53fe859669cd907f2d96aee8d2c1355"
