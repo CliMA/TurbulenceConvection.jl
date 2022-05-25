@@ -98,15 +98,15 @@ steps:
         artifact_paths: "Output.Bomex.01_stretch_grid_true/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with NN_nonlocal"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr NN_nonlocal --skip_tests true --suffix _NN_nonlocal"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr NN_nonlocal --skip_tests true --broken_tests true --suffix _NN_nonlocal"
         artifact_paths: "Output.Bomex.01_NN_nonlocal/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with NN"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr NN --skip_tests true --suffix _NN"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr NN --skip_tests true  --broken_tests true --suffix _NN"
         artifact_paths: "Output.Bomex.01_NN/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with FNO"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr FNO --skip_tests true --suffix _FNO"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr FNO --skip_tests true --broken_tests true --suffix _FNO"
         artifact_paths: "Output.Bomex.01_FNO/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with RF"
