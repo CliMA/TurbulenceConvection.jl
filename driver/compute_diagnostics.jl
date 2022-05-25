@@ -16,6 +16,7 @@ diagnostics(state, fl) = getproperty(state, TC.field_loc(fl))
 center_diagnostics_grid_mean(state) = diagnostics(state, TC.CentField())
 center_diagnostics_turbconv(state) = diagnostics(state, TC.CentField()).turbconv
 face_diagnostics_turbconv(state) = diagnostics(state, TC.FaceField()).turbconv
+face_diagnostics_precip(state) = diagnostics(state, TC.FaceField()).precip
 
 svpc_diagnostics_grid_mean(state) = diagnostics(state, TC.SingleValuePerColumn())
 svpc_diagnostics_turbconv(state) = diagnostics(state, TC.SingleValuePerColumn()).turbconv
@@ -48,6 +49,8 @@ function io_dictionary_diagnostics()
         "nondim_detrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).δ_nondim),
         "asp_ratio" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).asp_ratio),
         "massflux" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).massflux),
+        "rain_flux" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_precip(state).rain_flux),
+        "snow_flux" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_precip(state).snow_flux,),
     )
     return io_dict
 end
@@ -114,6 +117,7 @@ function compute_diagnostics!(
     aux_up = TC.center_aux_updrafts(state)
     aux_up_f = TC.face_aux_updrafts(state)
     aux_tc_f = TC.face_aux_turbconv(state)
+    aux_tc = TC.center_aux_turbconv(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     prog_pr = TC.center_prog_precipitation(state)
     aux_bulk = TC.center_aux_bulk(state)
@@ -124,6 +128,7 @@ function compute_diagnostics!(
     prog_gm = TC.center_prog_grid_mean(state)
     diag_tc = center_diagnostics_turbconv(diagnostics)
     diag_tc_f = face_diagnostics_turbconv(diagnostics)
+    diag_tc_f_precip = face_diagnostics_precip(diagnostics)
     ρ_c = prog_gm.ρ
     p_c = aux_gm.p
 
@@ -291,6 +296,8 @@ function compute_diagnostics!(
     Ifabulk = CCO.InterpolateC2F(; a_bulk_bcs...)
     @. a_up_bulk_f = Ifabulk(a_up_bulk)
 
+    RB_precip = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
+
     @inbounds for k in TC.real_face_indices(grid)
         @inbounds for i in 1:N_up
             a_up_bcs = TC.a_up_boundary_conditions(surf, edmf, i)
@@ -308,6 +315,8 @@ function compute_diagnostics!(
             end
         end
     end
+    @. diag_tc_f_precip.rain_flux = RB_precip(ρ_c * prog_pr.q_rai * aux_tc.term_vel_rain)
+    @. diag_tc_f_precip.snow_flux = RB_precip(ρ_c * prog_pr.q_sno * aux_tc.term_vel_snow)
 
     TC.GMV_third_m(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:H_third_m))
     TC.GMV_third_m(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:QT_third_m))

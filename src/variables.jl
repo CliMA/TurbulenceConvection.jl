@@ -220,8 +220,10 @@ cent_diagnostic_vars_edmf(FT, edmf) = (;
 )
 
 # Face only
-face_diagnostic_vars_edmf(FT, edmf) =
-    (; turbconv = (; nh_pressure = FT(0), nh_pressure_adv = FT(0), nh_pressure_drag = FT(0), nh_pressure_b = FT(0)))
+face_diagnostic_vars_edmf(FT, edmf) = (;
+    turbconv = (; nh_pressure = FT(0), nh_pressure_adv = FT(0), nh_pressure_drag = FT(0), nh_pressure_b = FT(0)),
+    precip = (; rain_flux = FT(0), snow_flux = FT(0)),
+)
 
 # Single value per column diagnostic variables
 single_value_per_col_diagnostic_vars_edmf(FT, edmf) = (;
