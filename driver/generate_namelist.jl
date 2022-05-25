@@ -128,7 +128,6 @@ function default_namelist(
     namelist_defaults["grid"]["stretch"]["z_toa"] = 45000.0
 
     namelist_defaults["thermodynamics"] = Dict()
-    namelist_defaults["thermodynamics"]["thermal_variable"] = "thetal"
     namelist_defaults["thermodynamics"]["moisture_model"] = "equilibrium" #"nonequilibrium"
     namelist_defaults["thermodynamics"]["thermo_covariance_model"] = "diagnostic" #"prognostic" or "diagnostic"
     namelist_defaults["thermodynamics"]["diagnostic_covar_limiter"] = 1e-3 # this controls the magnitude of the spike in covariance
@@ -145,8 +144,6 @@ function default_namelist(
     namelist_defaults["microphysics"] = Dict()
     namelist_defaults["microphysics"]["precipitation_model"] = "None"
 
-    namelist_defaults["turbulence"]["scheme"] = "EDMF_PrognosticTKE"
-
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_z", "none"}
@@ -154,10 +151,6 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"] = ntuple(i -> i, 6) # or, e.g., (1, 3, 6)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pi_norm_consts"] = [478.298, 1.0, 1.0, 1.0, 1.0, 1.0] # normalization constants for Pi groups
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = "deterministic"  # {"deterministic", "noisy_relaxation_process", "lognormal_scaling", "prognostic_noisy_relaxation_process"}
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["use_local_micro"] = true
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["constant_area"] = false
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["calculate_tke"] = true
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["mixing_length"] = "sbtd_eq"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"] = "normalmode"
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_drag"] = "normalmode"
