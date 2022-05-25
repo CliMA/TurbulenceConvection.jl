@@ -38,6 +38,7 @@ cent_aux_vars_up(FT, edmf) = (;
     q_tot = FT(0),
     θ_liq_ice = FT(0),
     θ_liq_ice_tendency_precip_formation = FT(0),
+    e_tot_tendency_precip_formation = FT(0),
     qt_tendency_precip_formation = FT(0),
     cent_aux_vars_up_moisture(FT, edmf.moisture_model)...,
     entr_sc = FT(0),
@@ -85,7 +86,7 @@ cent_aux_vars_edmf(FT, edmf) = (;
             q_ice = FT(0),
             T = FT(0),
             cloud_fraction = FT(0),
-            θ_liq_ice_tendency_precip_formation = FT(0),
+            e_tot_tendency_precip_formation = FT(0),
             qt_tendency_precip_formation = FT(0),
             cent_aux_vars_edmf_bulk_moisture(FT, edmf.moisture_model)...,
         ),
@@ -109,7 +110,8 @@ cent_aux_vars_edmf(FT, edmf) = (;
             Hvar = FT(0),
             QTvar = FT(0),
             HQTcov = FT(0),
-            θ_liq_ice_tendency_precip_formation = FT(0),
+            #θ_liq_ice_tendency_precip_formation = FT(0),
+            e_tot_tendency_precip_formation = FT(0),
             qt_tendency_precip_formation = FT(0),
             cent_aux_vars_edmf_en_moisture(FT, edmf.moisture_model)...,
             unsat = (; q_tot = FT(0), θ_dry = FT(0), θ_virt = FT(0)),
@@ -119,6 +121,7 @@ cent_aux_vars_edmf(FT, edmf) = (;
             HQTcov_rain_dt = FT(0),
         ),
         θ_liq_ice_tendency_precip_sinks = FT(0),
+        e_tot_tendency_precip_sinks = FT(0),
         qt_tendency_precip_sinks = FT(0),
         qr_tendency_evap = FT(0),
         qs_tendency_melt = FT(0),
@@ -217,8 +220,10 @@ cent_diagnostic_vars_edmf(FT, edmf) = (;
 )
 
 # Face only
-face_diagnostic_vars_edmf(FT, edmf) =
-    (; turbconv = (; nh_pressure = FT(0), nh_pressure_adv = FT(0), nh_pressure_drag = FT(0), nh_pressure_b = FT(0)))
+face_diagnostic_vars_edmf(FT, edmf) = (;
+    turbconv = (; nh_pressure = FT(0), nh_pressure_adv = FT(0), nh_pressure_drag = FT(0), nh_pressure_b = FT(0)),
+    precip = (; rain_flux = FT(0), snow_flux = FT(0)),
+)
 
 # Single value per column diagnostic variables
 single_value_per_col_diagnostic_vars_edmf(FT, edmf) = (;

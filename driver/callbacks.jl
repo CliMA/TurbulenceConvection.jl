@@ -65,7 +65,7 @@ function dt_max!(integrator)
     state = TC.State(integrator.u, aux, ODE.get_du(integrator))
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)
-    Δzc = TC.get_Δz(prog_gm.u)
+    Δzc = TC.get_Δz(prog_gm.ρ)
     Δzf = TC.get_Δz(prog_gm_f.w)
     CFL_limit = TS.cfl_limit
     N_up = TC.n_updrafts(edmf)
@@ -107,7 +107,7 @@ function monitor_cfl!(integrator)
     UnPack.@unpack grid, edmf, aux, TS = integrator.p
     state = TC.State(integrator.u, aux, ODE.get_du(integrator))
     prog_gm = TC.center_prog_grid_mean(state)
-    Δz = TC.get_Δz(prog_gm.u)
+    Δz = TC.get_Δz(prog_gm.ρ)
     Δt = TS.dt
     CFL_limit = TS.cfl_limit
 

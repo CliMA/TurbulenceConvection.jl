@@ -19,9 +19,10 @@ function get_surface(
     z_in = grid.zc[kc_surf].z
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
-    u_gm_surf = prog_gm.u[kc_surf]
-    v_gm_surf = prog_gm.v[kc_surf]
+    aux_gm_f = TC.face_aux_grid_mean(state)
+    p_f_surf = aux_gm_f.p[kf_surf]
+    u_gm_surf = TC.grid_mean_u(state)[kc_surf]
+    v_gm_surf = TC.grid_mean_v(state)[kc_surf]
     Tsurface = TC.surface_temperature(surf_params, t)
     qsurface = TC.surface_q_tot(surf_params, t)
     shf = TC.sensible_heat_flux(surf_params, t)
@@ -29,7 +30,7 @@ function get_surface(
     Ri_bulk_crit = surf_params.Ri_bulk_crit
     zrough = surf_params.zrough
 
-    ts_sfc = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
+    ts_sfc = TD.PhaseEquil_pTq(param_set, p_f_surf, Tsurface, qsurface)
     ts_in = aux_gm.ts[kc_surf]
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
@@ -67,7 +68,7 @@ function get_surface(
         ch = result.Ch,
         ρu_flux = surf_params.zero_uv_fluxes ? FT(0) : result.ρτxz,
         ρv_flux = surf_params.zero_uv_fluxes ? FT(0) : result.ρτyz,
-        ρθ_liq_ice_flux = shf / TD.cp_m(param_set, ts_in),
+        ρe_tot_flux = shf + lhf,
         ρq_tot_flux = lhf / TD.latent_heat_vapor(param_set, ts_in),
         wstar = convective_vel,
         ρq_liq_flux = FT(0),
@@ -85,13 +86,14 @@ function get_surface(
     FT = eltype(grid)
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
-    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
+    aux_gm_f = TC.face_aux_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    u_gm_surf = prog_gm.u[kc_surf]
-    v_gm_surf = prog_gm.v[kc_surf]
     Tsurface = TC.surface_temperature(surf_params, t)
     qsurface = TC.surface_q_tot(surf_params, t)
+    p_f_surf = aux_gm_f.p[kf_surf]
+    u_gm_surf = TC.grid_mean_u(state)[kc_surf]
+    v_gm_surf = TC.grid_mean_v(state)[kc_surf]
     zrough = surf_params.zrough
     zc_surf = grid.zc[kc_surf]
     cm = surf_params.cm(zc_surf)
@@ -102,7 +104,7 @@ function get_surface(
     scheme = SF.FVScheme()
     z_sfc = FT(0)
     z_in = grid.zc[kc_surf].z
-    ts_sfc = TD.PhaseEquil_pθq(param_set, p0_f_surf, Tsurface, qsurface)
+    ts_sfc = TD.PhaseEquil_pθq(param_set, p_f_surf, Tsurface, qsurface)
     ts_in = aux_gm.ts[kc_surf]
     u_sfc = SA.SVector{2, FT}(0, 0)
     u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
@@ -124,7 +126,7 @@ function get_surface(
         ustar = result.ustar,
         ρu_flux = result.ρτxz,
         ρv_flux = result.ρτyz,
-        ρθ_liq_ice_flux = shf / TD.cp_m(param_set, ts_in),
+        ρe_tot_flux = shf + lhf,
         ρq_tot_flux = lhf / TD.latent_heat_vapor(param_set, ts_in),
         bflux = result.buoy_flux,
         wstar = convective_vel,
@@ -145,12 +147,13 @@ function get_surface(
     FT = eltype(grid)
     z_sfc = FT(0)
     z_in = grid.zc[kc_surf].z
-    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
+    aux_gm_f = TC.face_aux_grid_mean(state)
+    p_f_surf = aux_gm_f.p[kf_surf]
     ts_gm = aux_gm.ts
-    u_gm_surf = prog_gm.u[kc_surf]
-    v_gm_surf = prog_gm.v[kc_surf]
+    u_gm_surf = TC.grid_mean_u(state)[kc_surf]
+    v_gm_surf = TC.grid_mean_v(state)[kc_surf]
     Tsurface = TC.surface_temperature(surf_params, t)
     qsurface = TC.surface_q_tot(surf_params, t)
     zrough = surf_params.zrough
@@ -158,7 +161,7 @@ function get_surface(
 
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
-    ts_sfc = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
+    ts_sfc = TD.PhaseEquil_pTq(param_set, p_f_surf, Tsurface, qsurface)
     ts_in = ts_gm[kc_surf]
 
     u_sfc = SA.SVector{2, FT}(0, 0)
@@ -181,7 +184,7 @@ function get_surface(
         ustar = result.ustar,
         ρu_flux = result.ρτxz,
         ρv_flux = result.ρτyz,
-        ρθ_liq_ice_flux = shf / TD.cp_m(param_set, ts_in),
+        ρe_tot_flux = shf + lhf,
         ρq_tot_flux = lhf / TD.latent_heat_vapor(param_set, ts_in),
         bflux = result.buoy_flux,
         wstar = convective_vel,
@@ -202,12 +205,12 @@ function get_surface(
     FT = eltype(grid)
     z_sfc = FT(0)
     z_in = grid.zc[kc_surf].z
-    p0_f_surf = TC.face_ref_state(state).p0[kf_surf]
-    p0_c_surf = TC.center_ref_state(state).p0[kc_surf]
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
-    u_gm_surf = prog_gm.u[kc_surf]
-    v_gm_surf = prog_gm.v[kc_surf]
+    p_c_surf = aux_gm.p[kc_surf]
+    p_f_surf = aux_gm_f.p[kf_surf]
+    u_gm_surf = TC.grid_mean_u(state)[kc_surf]
+    v_gm_surf = TC.grid_mean_v(state)[kc_surf]
     q_tot_gm_surf = aux_gm.q_tot[kc_surf]
     θ_liq_ice_gm_surf = aux_gm.θ_liq_ice[kc_surf]
     Tsurface = surface_temperature(surf_params, t)
@@ -216,13 +219,13 @@ function get_surface(
 
     phase_part = TD.PhasePartition(q_tot_gm_surf, 0.0, 0.0)
     pvg = TD.saturation_vapor_pressure(param_set, TD.PhaseEquil, Tsurface)
-    qsurface = TD.q_vap_saturation_from_density(param_set, Tsurface, ρ0_f_surf, pvg)
-    θ_star = TD.liquid_ice_pottemp_given_pressure(param_set, Tsurface, p0_f_surf, phase_part)
+    qsurface = TD.q_vap_saturation_from_density(param_set, Tsurface, ρ_f_surf, pvg)
+    θ_star = TD.liquid_ice_pottemp_given_pressure(param_set, Tsurface, p_f_surf, phase_part)
 
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
-    ts_sfc = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_star, qsurface)
-    ts_in = TD.PhaseEquil_pθq(param_set, p0_c_surf, θ_liq_ice_gm_surf, qsurface)
+    ts_sfc = TD.PhaseEquil_pθq(param_set, p_f_surf, θ_star, qsurface)
+    ts_in = TD.PhaseEquil_pθq(param_set, p_c_surf, θ_liq_ice_gm_surf, qsurface)
 
     u_sfc = SA.SVector{2, FT}(0, 0)
     u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
@@ -243,7 +246,7 @@ function get_surface(
         ustar = result.ustar,
         ρu_flux = result.ρτxz,
         ρv_flux = result.ρτyz,
-        ρθ_liq_ice_flux = shf / TD.cp_m(param_set, ts_in),
+        ρe_tot_flux = shf + lhf,
         ρq_tot_flux = lhf / TD.latent_heat_vapor(param_set, ts_in),
         bflux = result.buoy_flux,
         wstar = convective_vel,

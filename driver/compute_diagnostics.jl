@@ -16,6 +16,7 @@ diagnostics(state, fl) = getproperty(state, TC.field_loc(fl))
 center_diagnostics_grid_mean(state) = diagnostics(state, TC.CentField())
 center_diagnostics_turbconv(state) = diagnostics(state, TC.CentField()).turbconv
 face_diagnostics_turbconv(state) = diagnostics(state, TC.FaceField()).turbconv
+face_diagnostics_precip(state) = diagnostics(state, TC.FaceField()).precip
 
 svpc_diagnostics_grid_mean(state) = diagnostics(state, TC.SingleValuePerColumn())
 svpc_diagnostics_turbconv(state) = diagnostics(state, TC.SingleValuePerColumn()).turbconv
@@ -48,6 +49,8 @@ function io_dictionary_diagnostics()
         "nondim_detrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).δ_nondim),
         "asp_ratio" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).asp_ratio),
         "massflux" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).massflux),
+        "rain_flux" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_precip(state).rain_flux),
+        "snow_flux" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_precip(state).snow_flux,),
     )
     return io_dict
 end
@@ -109,13 +112,12 @@ function compute_diagnostics!(
 ) where {D <: CC.Fields.FieldVector}
     FT = eltype(grid)
     N_up = TC.n_updrafts(edmf)
-    ρ0_c = TC.center_ref_state(state).ρ0
-    p0_c = TC.center_ref_state(state).p0
     aux_gm = TC.center_aux_grid_mean(state)
     aux_en = TC.center_aux_environment(state)
     aux_up = TC.center_aux_updrafts(state)
     aux_up_f = TC.face_aux_updrafts(state)
     aux_tc_f = TC.face_aux_turbconv(state)
+    aux_tc = TC.center_aux_turbconv(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     prog_pr = TC.center_prog_precipitation(state)
     aux_bulk = TC.center_aux_bulk(state)
@@ -126,6 +128,9 @@ function compute_diagnostics!(
     prog_gm = TC.center_prog_grid_mean(state)
     diag_tc = center_diagnostics_turbconv(diagnostics)
     diag_tc_f = face_diagnostics_turbconv(diagnostics)
+    diag_tc_f_precip = face_diagnostics_precip(diagnostics)
+    ρ_c = prog_gm.ρ
+    p_c = aux_gm.p
 
     diag_tc_svpc = svpc_diagnostics_turbconv(diagnostics)
     diag_svpc = svpc_diagnostics_grid_mean(diagnostics)
@@ -134,8 +139,6 @@ function compute_diagnostics!(
 
     @inbounds for k in TC.real_center_indices(grid)
         aux_gm.s[k] = TD.specific_entropy(param_set, ts_gm[k])
-        aux_gm.θ_liq_ice[k] = prog_gm.ρθ_liq_ice[k] / ρ0_c[k]
-        aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ0_c[k]
         aux_en.s[k] = TD.specific_entropy(param_set, ts_en[k])
     end
     @inbounds for k in TC.real_center_indices(grid)
@@ -148,7 +151,7 @@ function compute_diagnostics!(
                 end
                 ts_up = TC.thermo_state_pθq(
                     param_set,
-                    p0_c[k],
+                    p_c[k],
                     aux_up[i].θ_liq_ice[k],
                     aux_up[i].q_tot[k],
                     thermo_args...,
@@ -173,6 +176,18 @@ function compute_diagnostics!(
     @inbounds for i in 1:N_up
         @. massflux_s += aux_up_f[i].massflux * (If(aux_up[i].s) - If(aux_en.s))
     end
+
+    # Mean water paths for calibration
+    cent = TC.Cent(1)
+    diag_svpc.lwp_mean[cent] = sum(ρ_c .* aux_gm.q_liq)
+    diag_svpc.iwp_mean[cent] = sum(ρ_c .* aux_gm.q_ice)
+    diag_svpc.rwp_mean[cent] = sum(ρ_c .* prog_pr.q_rai)
+    diag_svpc.swp_mean[cent] = sum(ρ_c .* prog_pr.q_sno)
+
+    write_ts(Stats, "lwp_mean", diag_svpc.lwp_mean[cent])
+    write_ts(Stats, "iwp_mean", diag_svpc.iwp_mean[cent])
+    write_ts(Stats, "rwp_mean", diag_svpc.rwp_mean[cent])
+    write_ts(Stats, "swp_mean", diag_svpc.swp_mean[cent])
 
     # We only need computations above here for calibration io.
     calibrate_io && return nothing
@@ -208,7 +223,6 @@ function compute_diagnostics!(
     # while the updraft classes are assumed to have no overlap at all.
     # Thus total updraft cover is the sum of each updraft's cover
 
-    cent = TC.Cent(1)
     diag_tc_svpc.updraft_cloud_cover[cent] = sum(cloud_cover_up)
     diag_tc_svpc.updraft_cloud_base[cent] = minimum(abs.(cloud_base_up))
     diag_tc_svpc.updraft_cloud_top[cent] = maximum(abs.(cloud_top_up))
@@ -282,6 +296,8 @@ function compute_diagnostics!(
     Ifabulk = CCO.InterpolateC2F(; a_bulk_bcs...)
     @. a_up_bulk_f = Ifabulk(a_up_bulk)
 
+    RB_precip = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
+
     @inbounds for k in TC.real_face_indices(grid)
         @inbounds for i in 1:N_up
             a_up_bcs = TC.a_up_boundary_conditions(surf, edmf, i)
@@ -299,6 +315,8 @@ function compute_diagnostics!(
             end
         end
     end
+    @. diag_tc_f_precip.rain_flux = RB_precip(ρ_c * prog_pr.q_rai * aux_tc.term_vel_rain)
+    @. diag_tc_f_precip.snow_flux = RB_precip(ρ_c * prog_pr.q_sno * aux_tc.term_vel_snow)
 
     TC.GMV_third_m(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:H_third_m))
     TC.GMV_third_m(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:QT_third_m))
@@ -311,25 +329,20 @@ function compute_diagnostics!(
 
     TC.update_cloud_frac(edmf, grid, state)
 
-    diag_svpc.lwp_mean[cent] = sum(ρ0_c .* aux_gm.q_liq)
-    diag_svpc.iwp_mean[cent] = sum(ρ0_c .* aux_gm.q_ice)
-    diag_svpc.rwp_mean[cent] = sum(ρ0_c .* prog_pr.q_rai)
-    diag_svpc.swp_mean[cent] = sum(ρ0_c .* prog_pr.q_sno)
-
-    diag_tc_svpc.env_lwp[cent] = sum(ρ0_c .* aux_en.q_liq .* aux_en.area)
-    diag_tc_svpc.env_iwp[cent] = sum(ρ0_c .* aux_en.q_ice .* aux_en.area)
+    diag_tc_svpc.env_lwp[cent] = sum(ρ_c .* aux_en.q_liq .* aux_en.area)
+    diag_tc_svpc.env_iwp[cent] = sum(ρ_c .* aux_en.q_ice .* aux_en.area)
 
     #TODO - change to rain rate that depends on rain model choice
     ρ_cloud_liq = CP.Planet.ρ_cloud_liq(param_set)
     if (precip_model isa TC.Clima0M)
         f =
-            (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ0_c ./ ρ_cloud_liq .*
+            (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ_c ./ ρ_cloud_liq .*
             3.6 .* 1e6
         diag_svpc.cutoff_precipitation_rate[cent] = sum(f)
     end
 
-    lwp = sum(i -> sum(ρ0_c .* aux_up[i].q_liq .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
-    iwp = sum(i -> sum(ρ0_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
+    lwp = sum(i -> sum(ρ_c .* aux_up[i].q_liq .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
+    iwp = sum(i -> sum(ρ_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
     plume_scale_height = map(1:N_up) do i
         TC.compute_plume_scale_height(grid, state, param_set, i)
     end
@@ -357,10 +370,6 @@ function compute_diagnostics!(
     write_ts(Stats, "cloud_cover_mean", diag_svpc.cloud_cover_mean[cent])
     write_ts(Stats, "cloud_base_mean", diag_svpc.cloud_base_mean[cent])
     write_ts(Stats, "cloud_top_mean", diag_svpc.cloud_top_mean[cent])
-    write_ts(Stats, "lwp_mean", diag_svpc.lwp_mean[cent])
-    write_ts(Stats, "iwp_mean", diag_svpc.iwp_mean[cent])
-    write_ts(Stats, "rwp_mean", diag_svpc.rwp_mean[cent])
-    write_ts(Stats, "swp_mean", diag_svpc.swp_mean[cent])
 
     return
 end

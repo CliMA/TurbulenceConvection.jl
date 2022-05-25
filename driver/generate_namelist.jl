@@ -150,6 +150,7 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_z", "none"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_z", "none"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"] = ntuple(i -> i, 6) # or, e.g., (1, 3, 6)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pi_norm_consts"] = [478.298, 1.0, 1.0, 1.0, 1.0, 1.0] # normalization constants for Pi groups
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = "deterministic"  # {"deterministic", "noisy_relaxation_process", "lognormal_scaling", "prognostic_noisy_relaxation_process"}
@@ -327,6 +328,9 @@ function Rico(namelist_defaults)
     namelist["time_stepping"]["dt_min"] = 1.5
 
     namelist["microphysics"]["precipitation_model"] = "clima_1m"
+    namelist["microphysics"]["precip_fraction_model"] = "prescribed" # "prescribed" or "cloud_cover"
+    namelist["microphysics"]["prescribed_precip_frac_value"] = 1.0
+    namelist["microphysics"]["precip_fraction_limiter"] = 0.3
     namelist["microphysics"]["τ_acnv_rai"] = 2500.0
     namelist["microphysics"]["τ_acnv_sno"] = 100.0
     namelist["microphysics"]["q_liq_threshold"] = 0.5e-3
@@ -350,7 +354,7 @@ function TRMM_LBA(namelist_defaults)
 
     namelist["meta"]["casename"] = "TRMM_LBA"
 
-    namelist["grid"]["nz"] = 80
+    namelist["grid"]["nz"] = 82
     namelist["grid"]["dz"] = 200
 
     namelist["time_stepping"]["adapt_dt"] = true
@@ -359,6 +363,9 @@ function TRMM_LBA(namelist_defaults)
     namelist["time_stepping"]["dt_min"] = 1.0
 
     namelist["microphysics"]["precipitation_model"] = "clima_1m" # "cutoff"
+    namelist["microphysics"]["precip_fraction_model"] = "prescribed" # "prescribed" or "cloud_cover"
+    namelist["microphysics"]["prescribed_precip_frac_value"] = 1.0
+    namelist["microphysics"]["precip_fraction_limiter"] = 0.3
     namelist["microphysics"]["τ_acnv_rai"] = 2500.0
     namelist["microphysics"]["τ_acnv_sno"] = 100.0
     namelist["microphysics"]["q_liq_threshold"] = 0.5e-3
@@ -445,6 +452,9 @@ function DYCOMS_RF02(namelist_defaults)
     namelist["time_stepping"]["dt_min"] = 1.0
 
     namelist["microphysics"]["precipitation_model"] = "clima_1m" #"cutoff"
+    namelist["microphysics"]["precip_fraction_model"] = "prescribed" # "prescribed" or "cloud_cover"
+    namelist["microphysics"]["prescribed_precip_frac_value"] = 1.0
+    namelist["microphysics"]["precip_fraction_limiter"] = 0.3
     namelist["microphysics"]["τ_acnv_rai"] = 2500.0
     namelist["microphysics"]["τ_acnv_sno"] = 100.0
     namelist["microphysics"]["q_liq_threshold"] = 0.5e-3
@@ -536,12 +546,12 @@ function LES_driven_SCM(namelist_defaults)
     # average in 1 hour interval around `t_interval_from_end_s`
     namelist["initial_condition_averaging_window_s"] = 3600.0
 
+    # LES filename should follow pattern:
+    # Stats.cfsite<SITE-NUMBER>_<FORCING-MODEL>_<EXPERIMENT>_2004-2008.<MONTH>.nc
     namelist["meta"]["lesfile"] =
         joinpath(les_driven_scm_data_folder(), "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc")
     namelist["meta"]["simname"] = "LES_driven_SCM"
     namelist["meta"]["casename"] = "LES_driven_SCM"
-    namelist["forcing"] = Dict()
-    namelist["forcing"]["nudging_timescale"] = 6.0 * 3600.0
 
     return namelist
 end

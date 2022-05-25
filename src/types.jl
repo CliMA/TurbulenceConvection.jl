@@ -7,6 +7,7 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct PrecipFormation{FT}
     θ_liq_ice_tendency::FT
+    e_tot_tendency::FT
     qt_tendency::FT
     ql_tendency::FT
     qi_tendency::FT
@@ -120,11 +121,11 @@ Base.@kwdef struct EnvBuoyGrad{FT, EBC <: AbstractEnvBuoyGradClosure}
     "liquid ice potential temperature gradient in the saturated part"
     ∂θl∂z_sat::FT
     "reference pressure"
-    p0::FT
+    p::FT
     "cloud fraction"
     en_cld_frac::FT
-    "specific volume"
-    alpha0::FT
+    "density"
+    ρ::FT
 end
 function EnvBuoyGrad(::EBG; t_sat::FT, bg_kwargs...) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
     return EnvBuoyGrad{FT, EBG}(; t_sat, bg_kwargs...)
@@ -163,7 +164,7 @@ Base.@kwdef struct MinDisspLen{FT}
     "turbulent Prandtl number"
     Pr::FT
     "reference pressure"
-    p0::FT
+    p::FT
     "vertical buoyancy gradient struct"
     ∇b::GradBuoy{FT}
     "env shear"
@@ -178,7 +179,6 @@ abstract type AbstractMoistureModel end
 struct EquilibriumMoisture <: AbstractMoistureModel end
 struct NonEquilibriumMoisture <: AbstractMoistureModel end
 
-
 abstract type AbstractCovarianceModel end
 struct PrognosticThermoCovariances <: AbstractCovarianceModel end
 struct DiagnosticThermoCovariances <: AbstractCovarianceModel end
@@ -187,6 +187,10 @@ abstract type AbstractPrecipitationModel end
 struct NoPrecipitation <: AbstractPrecipitationModel end
 struct Clima0M <: AbstractPrecipitationModel end
 struct Clima1M <: AbstractPrecipitationModel end
+
+abstract type AbstractPrecipFractionModel end
+struct PrescribedPrecipFraction <: AbstractPrecipFractionModel end
+struct DiagnosticPrecipFraction <: AbstractPrecipFractionModel end
 
 abstract type AbstractQuadratureType end
 struct LogNormalQuad <: AbstractQuadratureType end
@@ -346,7 +350,7 @@ Base.@kwdef struct SurfaceBase{FT}
     ρq_tot_flux::FT = 0
     ρq_liq_flux::FT = 0
     ρq_ice_flux::FT = 0
-    ρθ_liq_ice_flux::FT = 0
+    ρe_tot_flux::FT = 0
     ρu_flux::FT = 0
     ρv_flux::FT = 0
     obukhov_length::FT = 0
@@ -389,8 +393,14 @@ Base.@kwdef struct ForcingBase{T, R}
     apply_coriolis::Bool = false
     "Coriolis parameter"
     coriolis_param::Float64 = 0
-    "Momentum relaxation timescale"
-    nudge_tau::Float64 = 0.0
+    "Wind relaxation timescale"
+    wind_nudge_τᵣ::Float64 = 0.0
+    "Scalar relaxation lower z"
+    scalar_nudge_zᵢ::Float64 = 0.0
+    "Scalar relaxation upper z"
+    scalar_nudge_zᵣ::Float64 = 0.0
+    "Scalar maximum relaxation timescale"
+    scalar_nudge_τᵣ::Float64 = 0.0
     "Radiative forcing"
     rad::R
 end
@@ -442,18 +452,20 @@ function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothi
     )
 end
 
-struct EDMFModel{N_up, FT, MM, TCM, PM, ENT, EBGC, EC, EDS, EPG}
+struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
     surface_area::FT
     max_area::FT
     minimum_area::FT
     moisture_model::MM
     thermo_covariance_model::TCM
     precip_model::PM
+    precip_fraction_model::PFM
     en_thermo::ENT
     prandtl_number::FT
     bg_closure::EBGC
     entr_closure::EC
     entr_dim_scale::EDS
+    detr_dim_scale::DDS
     entr_pi_subset::EPG
     function EDMFModel(namelist, precip_model) where {PS}
         # TODO: move this into arg list
@@ -499,6 +511,17 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, ENT, EBGC, EC, EDS, EPG}
         end
 
         precip_model = precip_model
+
+        precip_fraction_model_name =
+            parse_namelist(namelist, "microphysics", "precip_fraction_model"; default = "prescribed")
+        precip_fraction_model = if precip_fraction_model_name == "prescribed"
+            PrescribedPrecipFraction()
+        elseif precip_fraction_model_name == "cloud_cover"
+            DiagnosticPrecipFraction()
+        else
+            error("Something went wrong. Invalid `precip_fraction` model: `$precip_fraction_model_name`")
+        end
+
         # Create the environment variable class (major diagnostic and prognostic variables)
 
         # Create the class for environment thermodynamics and buoyancy gradient computation
@@ -602,28 +625,51 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, ENT, EBGC, EC, EDS, EPG}
             error("Something went wrong. Invalid entrainment dimension scale '$entr_dim_scale'")
         end
 
+        detr_dim_scale = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "detr_dim_scale";
+            default = "buoy_vel",
+            valid_options = ["buoy_vel", "inv_z", "none"],
+        )
+
+        detr_dim_scale = if detr_dim_scale == "buoy_vel"
+            BuoyVelEntrDimScale()
+        elseif detr_dim_scale == "inv_z"
+            InvZEntrDimScale()
+        elseif detr_dim_scale == "none"
+            InvMeterEntrDimScale()
+        else
+            error("Something went wrong. Invalid entrainment dimension scale '$detr_dim_scale'")
+        end
+
         entr_pi_subset = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_pi_subset")
 
         EDS = typeof(entr_dim_scale)
+        DDS = typeof(detr_dim_scale)
         EC = typeof(entr_closure)
         MM = typeof(moisture_model)
         TCM = typeof(thermo_covariance_model)
         PM = typeof(precip_model)
+        PFM = typeof(precip_fraction_model)
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
         EPG = typeof(entr_pi_subset)
-        return new{n_updrafts, FT, MM, TCM, PM, ENT, EBGC, EC, EDS, EPG}(
+        return new{n_updrafts, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}(
             surface_area,
             max_area,
             minimum_area,
             moisture_model,
             thermo_covariance_model,
             precip_model,
+            precip_fraction_model,
             en_thermo,
             prandtl_number,
             bg_closure,
             entr_closure,
             entr_dim_scale,
+            detr_dim_scale,
             entr_pi_subset,
         )
     end
@@ -633,6 +679,7 @@ n_updrafts(::EDMFModel{N_up}) where {N_up} = N_up
 Base.eltype(::EDMFModel{N_up, FT}) where {N_up, FT} = FT
 n_Π_groups(m::EDMFModel) = length(m.entr_pi_subset)
 entrainment_Π_subset(m::EDMFModel) = m.entr_pi_subset
+
 Base.broadcastable(edmf::EDMFModel) = Ref(edmf)
 
 struct State{P, A, T}

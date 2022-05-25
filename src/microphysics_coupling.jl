@@ -2,7 +2,7 @@
 Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 (autoconversion + accretion)
 """
-function noneq_moisture_sources(param_set::APS, area::FT, ρ0::FT, Δt::Real, ts) where {FT}
+function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts) where {FT}
 
     # TODO - when using adaptive timestepping we are limiting the source terms
     #        with the previous timestep Δt
@@ -15,11 +15,11 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ0::FT, Δt::Real, ts
         q_vap = TD.vapor_specific_humidity(param_set, ts)
 
         # TODO - is that the state we want to be relaxing to?
-        ts_eq = TD.PhaseEquil_ρTq(param_set, ρ0, T, q.tot)
+        ts_eq = TD.PhaseEquil_ρTq(param_set, ρ, T, q.tot)
         q_eq = TD.PhasePartition(param_set, ts_eq)
 
-        S_ql = CM1.conv_q_vap_to_q_liq_ice(param_set, liq_type, q_eq, q)
-        S_qi = CM1.conv_q_vap_to_q_liq_ice(param_set, ice_type, q_eq, q)
+        S_ql = CMNe.conv_q_vap_to_q_liq_ice(param_set, liq_type, q_eq, q)
+        S_qi = CMNe.conv_q_vap_to_q_liq_ice(param_set, ice_type, q_eq, q)
 
         # TODO - handle limiters elswhere
         if S_ql >= FT(0)
@@ -49,9 +49,11 @@ function precipitation_formation(
     qr::FT,
     qs::FT,
     area::FT,
-    ρ0::FT,
+    ρ::FT,
+    z::FT,
     Δt::Real,
     ts,
+    precip_fraction,
 ) where {FT}
 
     # TODO - when using adaptive timestepping we are limiting the source terms
@@ -62,6 +64,7 @@ function precipitation_formation(
     qr_tendency = FT(0)
     qs_tendency = FT(0)
     θ_liq_ice_tendency = FT(0)
+    e_tot_tendency = FT(0)
 
     if area > 0
 
@@ -71,6 +74,10 @@ function precipitation_formation(
         c_pm = TD.cp_m(param_set, ts)
         L_v0 = ICP.LH_v0(param_set)
         L_s0 = ICP.LH_s0(param_set)
+        I_l = TD.internal_energy_liquid(param_set, ts)
+        I_i = TD.internal_energy_ice(param_set, ts)
+        I = TD.internal_energy(param_set, ts)
+        Φ = geopotential(param_set, z)
 
         if precip_model isa Clima0M
             qsat = TD.q_vap_saturation(param_set, ts)
@@ -84,6 +91,7 @@ function precipitation_formation(
             ql_tendency += S_qt * λ
             qi_tendency += S_qt * (1 - λ)
             θ_liq_ice_tendency -= S_qt / Π_m / c_pm * (L_v0 * λ + L_s0 * (1 - λ))
+            e_tot_tendency += (λ * I_l + (1 - λ) * I_i + Φ - I) * S_qt
         end
 
         if precip_model isa Clima1M
@@ -93,6 +101,9 @@ function precipitation_formation(
             c_vm = TD.cv_m(param_set, ts)
             Rm = TD.gas_constant_air(param_set, ts)
             Lf = TD.latent_heat_fusion(param_set, ts)
+
+            qr = qr / precip_fraction
+            qs = qs / precip_fraction
 
             # Autoconversion of cloud ice to snow is done with a simplified rate.
             # The saturation adjustment scheme prevents using the
@@ -106,28 +117,32 @@ function precipitation_formation(
             ql_tendency += S_qt_rain
             qi_tendency += S_qt_snow
             θ_liq_ice_tendency -= 1 / Π_m / c_pm * (L_v0 * S_qt_rain + L_s0 * S_qt_snow)
+            e_tot_tendency += S_qt_rain * (I_l + Φ - I) + S_qt_snow * (I_i + Φ - I)
 
             # accretion cloud water + rain
-            S_qr = min(q.liq / Δt, CM1.accretion(param_set, liq_type, rain_type, q.liq, qr, ρ0))
+            S_qr = min(q.liq / Δt, CM1.accretion(param_set, liq_type, rain_type, q.liq, qr, ρ)) * precip_fraction
             qr_tendency += S_qr
             qt_tendency -= S_qr
             ql_tendency -= S_qr
             θ_liq_ice_tendency += S_qr / Π_m / c_pm * L_v0
+            e_tot_tendency -= S_qr * (I_l + Φ - I)
 
             # accretion cloud ice + snow
-            S_qs = min(q.ice / Δt, CM1.accretion(param_set, ice_type, snow_type, q.ice, qs, ρ0))
+            S_qs = min(q.ice / Δt, CM1.accretion(param_set, ice_type, snow_type, q.ice, qs, ρ)) * precip_fraction
             qs_tendency += S_qs
             qt_tendency -= S_qs
             qi_tendency -= S_qs
             θ_liq_ice_tendency += S_qs / Π_m / c_pm * L_s0
+            e_tot_tendency -= S_qs * (I_i + Φ - I)
 
             # sink of cloud water via accretion cloud water + snow
-            S_qt = -min(q.liq / Δt, CM1.accretion(param_set, liq_type, snow_type, q.liq, qs, ρ0))
+            S_qt = -min(q.liq / Δt, CM1.accretion(param_set, liq_type, snow_type, q.liq, qs, ρ)) * precip_fraction
             if T < T_fr # cloud droplets freeze to become snow)
                 qs_tendency -= S_qt
                 qt_tendency += S_qt
                 ql_tendency += S_qt
                 θ_liq_ice_tendency -= S_qt / Π_m / c_pm * Lf * (1 + Rm / c_vm)
+                e_tot_tendency += S_qt * (I_i + Φ - I)
             else # snow melts, both cloud water and snow become rain
                 α::FT = c_vl / Lf * (T - T_fr)
                 qt_tendency += S_qt
@@ -135,28 +150,46 @@ function precipitation_formation(
                 qs_tendency += S_qt * α
                 qr_tendency -= S_qt * (1 + α)
                 θ_liq_ice_tendency += S_qt / Π_m / c_pm * (Lf * (1 + Rm / c_vm) * α - L_v0)
+                e_tot_tendency += S_qt * ((1 + α) * I_l - α * I_i + Φ - I)
             end
 
             # sink of cloud ice via accretion cloud ice - rain
-            S_qt = -min(q.ice / Δt, CM1.accretion(param_set, ice_type, rain_type, q.ice, qr, ρ0))
+            S_qt = -min(q.ice / Δt, CM1.accretion(param_set, ice_type, rain_type, q.ice, qr, ρ)) * precip_fraction
             # sink of rain via accretion cloud ice - rain
-            S_qr = -min(qr / Δt, CM1.accretion_rain_sink(param_set, q.ice, qr, ρ0))
+            S_qr = -min(qr / Δt, CM1.accretion_rain_sink(param_set, q.ice, qr, ρ)) * precip_fraction
             qt_tendency += S_qt
             qi_tendency += S_qt
             qr_tendency += S_qr
             qs_tendency += -(S_qt + S_qr)
             θ_liq_ice_tendency -= 1 / Π_m / c_pm * (S_qr * Lf * (1 + Rm / c_vm) + S_qt * L_s0)
+            e_tot_tendency += S_qt * (I_i + Φ - I)
+            e_tot_tendency -= S_qr * Lf
 
             # accretion rain - snow
             if T < T_fr
-                S_qs = min(qr / Δt, CM1.accretion_snow_rain(param_set, snow_type, rain_type, qs, qr, ρ0))
+                S_qs =
+                    min(qr / Δt, CM1.accretion_snow_rain(param_set, snow_type, rain_type, qs, qr, ρ)) *
+                    precip_fraction *
+                    precip_fraction
             else
-                S_qs = -min(qs / Δt, CM1.accretion_snow_rain(param_set, rain_type, snow_type, qr, qs, ρ0))
+                S_qs =
+                    -min(qs / Δt, CM1.accretion_snow_rain(param_set, rain_type, snow_type, qr, qs, ρ)) *
+                    precip_fraction *
+                    precip_fraction
             end
             qs_tendency += S_qs
             qr_tendency -= S_qs
             θ_liq_ice_tendency += S_qs * Lf / Π_m / c_vm
+            e_tot_tendency += S_qs * Lf
         end
     end
-    return PrecipFormation{FT}(θ_liq_ice_tendency, qt_tendency, ql_tendency, qi_tendency, qr_tendency, qs_tendency)
+    return PrecipFormation{FT}(
+        θ_liq_ice_tendency,
+        e_tot_tendency,
+        qt_tendency,
+        ql_tendency,
+        qi_tendency,
+        qr_tendency,
+        qs_tendency,
+    )
 end

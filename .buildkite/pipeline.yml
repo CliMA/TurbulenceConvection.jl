@@ -1,5 +1,5 @@
 env:
-  JULIA_VERSION: "1.7.0"
+  JULIA_VERSION: "1.7.2"
   OPENMPI_VERSION: "4.0.4"
   CUDA_VERSION: "11.2"
   OPENBLAS_NUM_THREADS: 1
@@ -94,7 +94,7 @@ steps:
         artifact_paths: "Output.Bomex.01_gaussian/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with stretched grid"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --stretch_grid true --suffix _stretch_grid_true"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --stretch_grid true --skip_tests true --suffix _stretch_grid_true"
         artifact_paths: "Output.Bomex.01_stretch_grid_true/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with NN_nonlocal"
@@ -133,6 +133,14 @@ steps:
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA --sgs mean --adapt_dt false --dt 1.0 --precipitation_model cutoff --skip_tests true --suffix _0moment_precipitation"
         artifact_paths: "Output.TRMM_LBA.01_0moment_precipitation/stats/comparison/*"
 
+      - label: ":scissors: TRMM_LBA with prescribed precipitation fraction"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA --sgs mean --adapt_dt false --dt 1.0 --precipitation_model clima_1m --precip_fraction_model prescribed --prescribed_precip_frac_value 0.42 --skip_tests true --suffix _prescribed_precipitation_fraction"
+        artifact_paths: "Output.TRMM_LBA.01_prescribed_precipitation_fraction/stats/comparison/*"
+
+      - label: ":scissors: TRMM_LBA with diagnostic precipitation fraction"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA --sgs mean --adapt_dt false --dt 1.0 --precipitation_model clima_1m --precip_fraction_model cloud_cover --precip_fraction_limiter 0.42 --skip_tests true --suffix _diagnostic_precipitation_fraction"
+        artifact_paths: "Output.TRMM_LBA.01_diagnostic_precipitation_fraction/stats/comparison/*"
+
       - label: ":partly_sunny: Bomex with calibrate_io_true"
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --calibrate_io true --skip_post_proc true --suffix _calibrate_io_true"
         artifact_paths: "Output.Bomex.01_calibrate_io_true/stats/comparison/*"
@@ -146,16 +154,12 @@ steps:
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Rico --thermo_covariance_model prognostic --skip_tests true --suffix _prognostic_covarinaces"
         artifact_paths: "Output.Rico.01_prognostic_covarinaces/stats/comparison/*"
 
-  - group: "3D Experiments"
-    steps:
+  # - group: "3D Experiments"
+  #   steps:
 
-      - label: ":package: 3D Bomex"
-        command: "julia --color=yes --project=integration_tests integration_tests/3dBomex.jl"
-        artifact_paths: "integration_tests/output/3dBomex/*"
-
-      - label: ":earth_americas: 3D sphere bariclinic wave"
-        command: "julia --color=yes --project=integration_tests integration_tests/baroclinic_wave.jl"
-        artifact_paths: "integration_tests/output/baroclinic_wave/*"
+  #     - label: ":package: 3D Bomex"
+  #       command: "julia --color=yes --project=integration_tests integration_tests/3dBomex.jl"
+  #       artifact_paths: "integration_tests/output/3dBomex/*"
 
   - group: "Performance monitoring"
     steps:

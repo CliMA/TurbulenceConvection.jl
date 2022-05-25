@@ -19,18 +19,20 @@ const OF = OperatorFlux
 
 const SDE = StochasticDiffEq
 const CC = ClimaCore
+const CCG = CC.Geometry
 const CCO = CC.Operators
 const SA = StaticArrays
 
 const TD = Thermodynamics
 
 const CM = CloudMicrophysics
-const CM0 = CloudMicrophysics.Microphysics_0M
-const CM1 = CloudMicrophysics.Microphysics_1M
-const liq_type = CM1.LiquidType()
-const ice_type = CM1.IceType()
-const rain_type = CM1.RainType()
-const snow_type = CM1.SnowType()
+const CMNe = CloudMicrophysics.MicrophysicsNonEq
+const CM0 = CloudMicrophysics.Microphysics0M
+const CM1 = CloudMicrophysics.Microphysics1M
+const liq_type = CM.CommonTypes.LiquidType()
+const ice_type = CM.CommonTypes.IceType()
+const rain_type = CM.CommonTypes.RainType()
+const snow_type = CM.CommonTypes.SnowType()
 
 import CLIMAParameters
 const CP = CLIMAParameters
@@ -96,7 +98,7 @@ function debug_state(state, code_location::String)
     ######
 
     vars_positive = [
-        vec(prog_gm.ρθ_liq_ice),
+        vec(prog_gm.ρe_tot),
         vec(prog_gm_f.w),
         vec(prog_up[1].ρarea),
         vec(prog_up[1].ρaθ_liq_ice),

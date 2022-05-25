@@ -1,9 +1,9 @@
 # convective velocity scale
 get_wstar(bflux, zi) = cbrt(max(bflux * zi, 0))
 
-function buoyancy_c(param_set::APS, ρ0::FT, ρ::FT) where {FT}
+function buoyancy_c(param_set::APS, ρ::FT, ρ_i::FT) where {FT}
     g::FT = ICP.grav(param_set)
-    return g * (ρ0 - ρ) / ρ0
+    return g * (ρ - ρ_i) / ρ
 end
 
 # BL height
@@ -11,8 +11,8 @@ function get_inversion(grid::Grid{FT}, state::State, param_set::APS, Ri_bulk_cri
     g::FT = ICP.grav(param_set)
     kc_surf = kc_surface(grid)
     θ_virt = center_aux_grid_mean(state).θ_virt
-    u = center_prog_grid_mean(state).u
-    v = center_prog_grid_mean(state).v
+    u = grid_mean_u(state)
+    v = grid_mean_v(state)
     Ri_bulk = center_aux_grid_mean(state).Ri
     θ_virt_b = θ_virt[kc_surf]
     z_c = grid.zc

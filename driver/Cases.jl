@@ -45,7 +45,6 @@ using ..TurbulenceConvection: get_inversion
 
 #=
     arr_type(x)
-
 We're keeping this around in case we need
 to move some initialized data to the GPU.
 In this case, we may be able to modify this
@@ -192,37 +191,36 @@ end
 function initialize_profiles(self::CasesBase{Soares}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ0_c = TC.center_ref_state(state).ρ0
+    ρ_c = prog_gm.ρ
     FT = eltype(grid)
     prof_q_tot = APL.Soares_q_tot(FT)
     prof_θ_liq_ice = APL.Soares_θ_liq_ice(FT)
     prof_u = APL.Soares_u(FT)
     prof_tke = APL.Soares_tke(FT)
+    prog_gm_u = TC.grid_mean_u(state)
 
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         aux_gm.q_tot[k] = prof_q_tot(z)
-        prog_gm.ρq_tot[k] = ρ0_c[k] * aux_gm.q_tot[k]
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        prog_gm.ρθ_liq_ice[k] = ρ0_c[k] * aux_gm.θ_liq_ice[k]
-        prog_gm.u[k] = prof_u(z)
+        prog_gm_u[k] = prof_u(z)
         aux_gm.tke[k] = prof_tke(z)
     end
 end
 
 function surface_params(case::Soares, surf_ref_state, param_set; Ri_bulk_crit)
-    p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
-    ρ0_f_surf = TD.air_density(param_set, surf_ref_state)
-    FT = eltype(p0_f_surf)
+    p_f_surf = TD.air_pressure(param_set, surf_ref_state)
+    ρ_f_surf = TD.air_density(param_set, surf_ref_state)
+    FT = eltype(p_f_surf)
     zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     Tsurface = 300.0
     qsurface = 5.0e-3
     θ_flux = 6.0e-2
     qt_flux = 2.5e-5
-    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
-    lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(param_set, ts)
-    shf = θ_flux * TD.cp_m(param_set, ts) * ρ0_f_surf
-    ustar = 0.28 # just to initialize grid mean covariances
+    ts = TD.PhaseEquil_pTq(param_set, p_f_surf, Tsurface, qsurface)
+    lhf = qt_flux * ρ_f_surf * TD.latent_heat_vapor(param_set, ts)
+    shf = θ_flux * TD.cp_m(param_set, ts) * ρ_f_surf
+    ustar = 0.28 # just to initilize grid mean covariances
     kwargs = (; zrough, Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
     return TC.FixedSurfaceFlux(FT, TC.VariableFrictionVelocity; kwargs...)
 end
@@ -242,34 +240,34 @@ end
 function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ0_c = TC.center_ref_state(state).ρ0
+    ρ_c = prog_gm.ρ
 
     FT = eltype(grid)
     prof_θ_liq_ice = APL.Nieuwstadt_θ_liq_ice(FT)
     prof_u = APL.Nieuwstadt_u(FT)
     prof_tke = APL.Nieuwstadt_tke(FT)
+    prog_gm_u = TC.grid_mean_u(state)
 
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        prog_gm.ρθ_liq_ice[k] = ρ0_c[k] * aux_gm.θ_liq_ice[k]
-        prog_gm.u[k] = prof_u(z)
+        prog_gm_u[k] = prof_u(z)
         aux_gm.tke[k] = prof_tke(z)
     end
 end
 
 function surface_params(case::Nieuwstadt, surf_ref_state, param_set; Ri_bulk_crit)
-    p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
-    ρ0_f_surf = TD.air_density(param_set, surf_ref_state)
-    FT = eltype(p0_f_surf)
+    p_f_surf = TD.air_pressure(param_set, surf_ref_state)
+    ρ_f_surf = TD.air_density(param_set, surf_ref_state)
+    FT = eltype(p_f_surf)
     zrough = 0.16 #1.0e-4 0.16 is the value specified in the Nieuwstadt paper.
     Tsurface = 300.0
     qsurface = 0.0
     θ_flux = 6.0e-2
     lhf = 0.0 # It would be 0.0 if we follow Nieuwstadt.
-    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, qsurface)
-    shf = θ_flux * TD.cp_m(param_set, ts) * ρ0_f_surf
-    ustar = 0.28 # just to initialize grid mean covariances
+    ts = TD.PhaseEquil_pTq(param_set, p_f_surf, Tsurface, qsurface)
+    shf = θ_flux * TD.cp_m(param_set, ts) * ρ_f_surf
+    ustar = 0.28 # just to initilize grid mean covariances
     kwargs = (; zrough, Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
     return TC.FixedSurfaceFlux(FT, TC.VariableFrictionVelocity; kwargs...)
 end
@@ -291,38 +289,37 @@ end
 function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ0_c = TC.center_ref_state(state).ρ0
+    ρ_c = prog_gm.ρ
 
     FT = eltype(grid)
     prof_q_tot = APL.Bomex_q_tot(FT)
     prof_θ_liq_ice = APL.Bomex_θ_liq_ice(FT)
     prof_u = APL.Bomex_u(FT)
     prof_tke = APL.Bomex_tke(FT)
+    prog_gm_u = TC.grid_mean_u(state)
 
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        prog_gm.ρθ_liq_ice[k] = ρ0_c[k] * aux_gm.θ_liq_ice[k]
         aux_gm.q_tot[k] = prof_q_tot(z)
-        prog_gm.ρq_tot[k] = ρ0_c[k] * aux_gm.q_tot[k]
-        prog_gm.u[k] = prof_u(z)
+        prog_gm_u[k] = prof_u(z)
         aux_gm.tke[k] = prof_tke(z)
     end
 end
 
 function surface_params(case::Bomex, surf_ref_state, param_set; Ri_bulk_crit)
-    p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
-    ρ0_f_surf = TD.air_density(param_set, surf_ref_state)
-    FT = eltype(p0_f_surf)
+    p_f_surf = TD.air_pressure(param_set, surf_ref_state)
+    ρ_f_surf = TD.air_density(param_set, surf_ref_state)
+    FT = eltype(p_f_surf)
     zrough = 1.0e-4
     qsurface = 22.45e-3 # kg/kg
     θ_surface = 299.1
     θ_flux = 8.0e-3
     qt_flux = 5.2e-5
-    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_surface, qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, p_f_surf, θ_surface, qsurface)
     Tsurface = TD.air_temperature(param_set, ts)
-    lhf = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(param_set, ts)
-    shf = θ_flux * TD.cp_m(param_set, ts) * ρ0_f_surf
+    lhf = qt_flux * ρ_f_surf * TD.latent_heat_vapor(param_set, ts)
+    shf = θ_flux * TD.cp_m(param_set, ts) * ρ_f_surf
     ustar = 0.28 # m/s
     kwargs = (; zrough, Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
     return TC.FixedSurfaceFlux(FT, TC.FixedFrictionVelocity; kwargs...)
@@ -330,10 +327,10 @@ end
 
 function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, param_set)
     initialize(self.Fo, grid, state)
-    p0_c = TC.center_ref_state(state).p0
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = aux_gm.ts
+    p_c = aux_gm.p
 
     FT = eltype(grid)
     prof_ug = APL.Bomex_geostrophic_u(FT)
@@ -372,21 +369,20 @@ end
 function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ0_c = TC.center_ref_state(state).ρ0
+    ρ_c = prog_gm.ρ
 
     FT = eltype(grid)
     prof_q_tot = APL.LifeCycleTan2018_q_tot(FT)
     prof_θ_liq_ice = APL.LifeCycleTan2018_θ_liq_ice(FT)
     prof_u = APL.LifeCycleTan2018_u(FT)
     prof_tke = APL.LifeCycleTan2018_tke(FT)
+    prog_gm_u = TC.grid_mean_u(state)
 
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        prog_gm.ρθ_liq_ice[k] = ρ0_c[k] * aux_gm.θ_liq_ice[k]
         aux_gm.q_tot[k] = prof_q_tot(z)
-        prog_gm.ρq_tot[k] = ρ0_c[k] * aux_gm.q_tot[k]
-        prog_gm.u[k] = prof_u(z)
+        prog_gm_u[k] = prof_u(z)
         aux_gm.tke[k] = prof_tke(z)
     end
 end
@@ -401,18 +397,18 @@ function life_cycle_buoyancy_flux(param_set, weight = 1)
 end
 
 function surface_params(case::life_cycle_Tan2018, surf_ref_state, param_set; Ri_bulk_crit)
-    p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
-    ρ0_f_surf = TD.air_density(param_set, surf_ref_state)
-    FT = eltype(p0_f_surf)
+    p_f_surf = TD.air_pressure(param_set, surf_ref_state)
+    ρ_f_surf = TD.air_density(param_set, surf_ref_state)
+    FT = eltype(p_f_surf)
     zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     qsurface = 22.45e-3 # kg/kg
     θ_surface = 299.1
     θ_flux = 8.0e-3
     qt_flux = 5.2e-5
-    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_surface, qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, p_f_surf, θ_surface, qsurface)
     Tsurface = TD.air_temperature(param_set, ts)
-    lhf0 = qt_flux * ρ0_f_surf * TD.latent_heat_vapor(param_set, ts)
-    shf0 = θ_flux * TD.cp_m(param_set, ts) * ρ0_f_surf
+    lhf0 = qt_flux * ρ_f_surf * TD.latent_heat_vapor(param_set, ts)
+    shf0 = θ_flux * TD.cp_m(param_set, ts) * ρ_f_surf
 
     weight_factor(t) = 0.01 + 0.99 * (cos(2.0 * π * t / 3600.0) + 1.0) / 2.0
     weight = 1.0
@@ -426,9 +422,9 @@ end
 
 function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, state, param_set)
     initialize(self.Fo, grid, state)
-    p0_c = TC.center_ref_state(state).p0
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
+    p_c = aux_gm.p
     ts_gm = aux_gm.ts
 
     FT = eltype(grid)
@@ -478,30 +474,30 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, param_set, state
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_tc = TC.center_aux_turbconv(state)
-    p0 = TC.center_ref_state(state).p0
-    ρ0_c = TC.center_ref_state(state).ρ0
+    p = aux_gm.p
+    ρ_c = prog_gm.ρ
 
     FT = eltype(grid)
     prof_u = APL.Rico_u(FT)
     prof_v = APL.Rico_v(FT)
     prof_q_tot = APL.Rico_q_tot(FT)
     prof_θ_liq_ice = APL.Rico_θ_liq_ice(FT)
+    prog_gm_u = TC.grid_mean_u(state)
+    prog_gm_v = TC.grid_mean_v(state)
 
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
-        prog_gm.u[k] = prof_u(z)
-        prog_gm.v[k] = prof_v(z)
+        prog_gm_u[k] = prof_u(z)
+        prog_gm_v[k] = prof_v(z)
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        prog_gm.ρθ_liq_ice[k] = ρ0_c[k] * aux_gm.θ_liq_ice[k]
         aux_gm.q_tot[k] = prof_q_tot(z)
-        prog_gm.ρq_tot[k] = ρ0_c[k] * aux_gm.q_tot[k]
     end
 
     # Need to get θ_virt
     @inbounds for k in real_center_indices(grid)
         # Thermo state field cache is not yet
         # defined, so we can't use it yet.
-        ts = TD.PhaseEquil_pθq(param_set, p0[k], aux_gm.θ_liq_ice[k], aux_gm.q_tot[k])
+        ts = TD.PhaseEquil_pθq(param_set, p[k], aux_gm.θ_liq_ice[k], aux_gm.q_tot[k])
         aux_gm.θ_virt[k] = TD.virtual_pottemp(param_set, ts)
     end
     zi = 0.6 * get_inversion(grid, state, param_set, 0.2)
@@ -517,8 +513,8 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, param_set, state
 end
 
 function surface_params(case::Rico, surf_ref_state, param_set; kwargs...)
-    p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
-    FT = eltype(p0_f_surf)
+    p_f_surf = TD.air_pressure(param_set, surf_ref_state)
+    FT = eltype(p_f_surf)
 
     zrough = 0.00015
     cm0 = 0.001229
@@ -532,18 +528,18 @@ function surface_params(case::Rico, surf_ref_state, param_set; kwargs...)
     Tsurface = 299.8
 
     # For Rico we provide values of transfer coefficients
-    ts = TD.PhaseEquil_pTq(param_set, p0_f_surf, Tsurface, FT(0)) # TODO: is this correct?
+    ts = TD.PhaseEquil_pTq(param_set, p_f_surf, Tsurface, FT(0)) # TODO: is this correct?
     qsurface = TD.q_vap_saturation(param_set, ts)
-    kwargs = (; zrough, Tsurface, qsurface, cm, ch)
+    kwargs = (; zrough, Tsurface, qsurface, cm, ch, kwargs...)
     return TC.FixedSurfaceCoeffs(FT; kwargs...)
 end
 
 function initialize_forcing(self::CasesBase{Rico}, grid::Grid, state, param_set)
     initialize(self.Fo, grid, state)
-    p0_c = TC.center_ref_state(state).p0
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = aux_gm.ts
+    p_c = aux_gm.p
 
     FT = eltype(grid)
     prof_ug = APL.Rico_geostrophic_ug(FT)
@@ -575,16 +571,16 @@ ForcingBase(case::TRMM_LBA, param_set::APS; kwargs...) =
 function surface_ref_state(::TRMM_LBA, param_set::APS, namelist)
     molmass_ratio = CPP.molmass_ratio(param_set)
     Pg = 991.3 * 100  #Pressure at ground
-    Tg = 296.85   # surface values for reference state (RS) which outputs p0 rho0 alpha0
+    Tg = 296.85   # surface values for reference state (RS) which outputs p, ρ
     pvg = TD.saturation_vapor_pressure(param_set, Tg, TD.Liquid())
     qtg = (1 / molmass_ratio) * pvg / (Pg - pvg) #Total water mixing ratio at surface
     return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, param_set, state)
-    p0 = TC.center_ref_state(state).p0
-    ρ0_c = TC.center_ref_state(state).ρ0
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
+    ρ_c = prog_gm.ρ
+    p = aux_gm.p
 
     FT = eltype(grid)
     # Get profiles from AtmosphericProfilesLibrary.jl
@@ -598,9 +594,11 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, param_set, s
     zc = grid.zc
     molmass_ratio = CPP.molmass_ratio(param_set)
     prog_gm = TC.center_prog_grid_mean(state)
+    prog_gm_u = TC.grid_mean_u(state)
+    prog_gm_v = TC.grid_mean_v(state)
 
-    prog_gm.u .= prof_u.(zc)
-    prog_gm.v .= prof_v.(zc)
+    prog_gm_u .= prof_u.(zc)
+    prog_gm_v .= prof_v.(zc)
     aux_gm.T .= prof_T.(zc)
 
     @inbounds for k in real_center_indices(grid)
@@ -611,21 +609,19 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, param_set, s
         denom = (prof_p(z) - pv_star + (1 / molmass_ratio) * pv_star * RH / 100.0)
         qv_star = pv_star * (1 / molmass_ratio) / denom
         aux_gm.q_tot[k] = qv_star * RH / 100
-        prog_gm.ρq_tot[k] = ρ0_c[k] * aux_gm.q_tot[k]
         phase_part = TD.PhasePartition(aux_gm.q_tot[k], 0.0, 0.0) # initial state is not saturated
-        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], p0[k], phase_part)
-        prog_gm.ρθ_liq_ice[k] = ρ0_c[k] * aux_gm.θ_liq_ice[k]
+        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], p[k], phase_part)
         aux_gm.tke[k] = prof_tke(z)
     end
 end
 
 function surface_params(case::TRMM_LBA, surf_ref_state, param_set; Ri_bulk_crit)
-    p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
-    FT = eltype(p0_f_surf)
+    p_f_surf = TD.air_pressure(param_set, surf_ref_state)
+    FT = eltype(p_f_surf)
     # zrough = 1.0e-4 # not actually used, but initialized to reasonable value
     qsurface = 22.45e-3 # kg/kg
     θ_surface = (273.15 + 23)
-    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_surface, qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, p_f_surf, θ_surface, qsurface)
     Tsurface = TD.air_temperature(param_set, ts)
     ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
     lhf = t -> 554.0 * max(0, cos(π / 2 * ((5.25 * 3600.0 - t) / 5.25 / 3600.0)))^1.3
@@ -657,45 +653,44 @@ ForcingBase(case::ARM_SGP, param_set::APS; kwargs...) =
 
 function surface_ref_state(::ARM_SGP, param_set::APS, namelist)
     Pg = 970.0 * 100 #Pressure at ground
-    Tg = 299.0   # surface values for reference state (RS) which outputs p0 rho0 alpha0
+    Tg = 299.0   # surface values for reference state (RS) which outputs  p, ρ
     qtg = 15.2 / 1000 #Total water mixing ratio at surface
     return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, param_set, state)
     # ARM_SGP inputs
-    p0 = TC.center_ref_state(state).p0
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
-    ρ0_c = TC.center_ref_state(state).ρ0
+    ρ_c = prog_gm.ρ
+    p = aux_gm.p
 
     FT = eltype(grid)
     prof_u = APL.ARM_SGP_u(FT)
     prof_q_tot = APL.ARM_SGP_q_tot(FT)
     prof_θ_liq_ice = APL.ARM_SGP_θ_liq_ice(FT)
     prof_tke = APL.ARM_SGP_tke(FT)
+    prog_gm_u = TC.grid_mean_u(state)
 
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         # TODO figure out how to use ts here
         phase_part = TD.PhasePartition(aux_gm.q_tot[k], aux_gm.q_liq[k], 0.0)
-        Π = TD.exner_given_pressure(param_set, p0[k], phase_part)
-        prog_gm.u[k] = prof_u(z)
+        Π = TD.exner_given_pressure(param_set, p[k], phase_part)
+        prog_gm_u[k] = prof_u(z)
         aux_gm.q_tot[k] = prof_q_tot(z)
-        prog_gm.ρq_tot[k] = ρ0_c[k] * aux_gm.q_tot[k]
         aux_gm.T[k] = prof_θ_liq_ice(z) * Π
-        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], p0[k], phase_part)
-        prog_gm.ρθ_liq_ice[k] = ρ0_c[k] * aux_gm.θ_liq_ice[k]
+        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], p[k], phase_part)
         aux_gm.tke[k] = prof_tke(z)
     end
 end
 
 function surface_params(case::ARM_SGP, surf_ref_state, param_set; Ri_bulk_crit)
-    p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
-    FT = eltype(p0_f_surf)
+    p_f_surf = TD.air_pressure(param_set, surf_ref_state)
+    FT = eltype(p_f_surf)
     qsurface = 15.2e-3 # kg/kg
     θ_surface = 299.0
-    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, θ_surface, qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, p_f_surf, θ_surface, qsurface)
     Tsurface = TD.air_temperature(param_set, ts)
     ustar = 0.28 # this is taken from Bomex -- better option is to approximate from LES tke above the surface
 
@@ -720,9 +715,9 @@ end
 
 function update_forcing(self::CasesBase{ARM_SGP}, grid, state, t::Real, param_set)
     aux_gm = TC.center_aux_grid_mean(state)
-    p0_c = TC.center_ref_state(state).p0
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
+    p_c = prog_gm.ρ
     FT = eltype(grid)
     @inbounds for k in real_center_indices(grid)
         Π = TD.exner(param_set, ts_gm[k])
@@ -741,33 +736,32 @@ ForcingBase(case::GATE_III, param_set::APS; kwargs...) = ForcingBase(get_forcing
 
 function surface_ref_state(::GATE_III, param_set::APS, namelist)
     Pg = 1013.0 * 100  #Pressure at ground
-    Tg = 299.184   # surface values for reference state (RS) which outputs p0 rho0 alpha0
+    Tg = 299.184   # surface values for reference state (RS) which outputs p, ρ
     qtg = 16.5 / 1000 #Total water mixing ratio at surface
     return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, param_set, state)
     FT = eltype(grid)
-    p0 = TC.center_ref_state(state).p0
-    ρ0_c = TC.center_ref_state(state).ρ0
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
+    prog_gm_u = TC.grid_mean_u(state)
+    p = aux_gm.p
+    ρ_c = prog_gm.ρ
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         aux_gm.q_tot[k] = APL.GATE_III_q_tot(FT)(z)
-        prog_gm.ρq_tot[k] = ρ0_c[k] * aux_gm.q_tot[k]
         aux_gm.T[k] = APL.GATE_III_T(FT)(z)
-        prog_gm.u[k] = APL.GATE_III_u(FT)(z)
-        ts = TD.PhaseEquil_pTq(param_set, p0[k], aux_gm.T[k], aux_gm.q_tot[k])
+        prog_gm_u[k] = APL.GATE_III_u(FT)(z)
+        ts = TD.PhaseEquil_pTq(param_set, p[k], aux_gm.T[k], aux_gm.q_tot[k])
         aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts)
-        prog_gm.ρθ_liq_ice[k] = ρ0_c[k] * aux_gm.θ_liq_ice[k]
         aux_gm.tke[k] = APL.GATE_III_tke(FT)(z)
     end
 end
 
 function surface_params(case::GATE_III, surf_ref_state, param_set; kwargs...)
-    p0_f_surf = TD.air_pressure(param_set, surf_ref_state)
-    FT = eltype(p0_f_surf)
+    p_f_surf = TD.air_pressure(param_set, surf_ref_state)
+    FT = eltype(p_f_surf)
 
     qsurface = 16.5 / 1000.0 # kg/kg
     cm = zc_surf -> 0.0012
@@ -776,9 +770,9 @@ function surface_params(case::GATE_III, surf_ref_state, param_set; kwargs...)
     Tsurface = 299.184
 
     # For GATE_III we provide values of transfer coefficients
-    ts = TD.PhaseEquil_pθq(param_set, p0_f_surf, Tsurface, qsurface)
+    ts = TD.PhaseEquil_pθq(param_set, p_f_surf, Tsurface, qsurface)
     qsurface = TD.q_vap_saturation(param_set, ts)
-    kwargs = (; Tsurface, qsurface, cm, ch)
+    kwargs = (; Tsurface, qsurface, cm, ch, kwargs...)
     return TC.FixedSurfaceCoeffs(FT; kwargs...)
 end
 
@@ -807,20 +801,21 @@ end
 
 function initialize_profiles(self::CasesBase{DYCOMS_RF01}, grid::Grid, param_set, state)
     FT = eltype(grid)
-    p0 = TC.center_ref_state(state).p0
-    ρ0_c = TC.center_ref_state(state).ρ0
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
+    prog_gm_u = TC.grid_mean_u(state)
+    prog_gm_v = TC.grid_mean_v(state)
+    ρ_c = prog_gm.ρ
+    p = aux_gm.p
     @inbounds for k in real_center_indices(grid)
         # thetal profile as defined in DYCOMS
         z = grid.zc[k]
         aux_gm.q_tot[k] = APL.Dycoms_RF01_q_tot(FT)(z)
-        prog_gm.ρq_tot[k] = ρ0_c[k] * aux_gm.q_tot[k]
         aux_gm.θ_liq_ice[k] = APL.Dycoms_RF01_θ_liq_ice(FT)(z)
-        prog_gm.ρθ_liq_ice[k] = ρ0_c[k] * aux_gm.θ_liq_ice[k]
+
         # velocity profile (geostrophic)
-        prog_gm.u[k] = APL.Dycoms_RF01_u0(FT)(z)
-        prog_gm.v[k] = APL.Dycoms_RF01_v0(FT)(z)
+        prog_gm_u[k] = APL.Dycoms_RF01_u0(FT)(z)
+        prog_gm_v[k] = APL.Dycoms_RF01_v0(FT)(z)
         aux_gm.tke[k] = APL.Dycoms_RF01_tke(FT)(z)
     end
 end
@@ -892,20 +887,21 @@ end
 
 function initialize_profiles(self::CasesBase{DYCOMS_RF02}, grid::Grid, param_set, state)
     FT = eltype(grid)
-    p0 = TC.center_ref_state(state).p0
-    ρ0_c = TC.center_ref_state(state).ρ0
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
+    prog_gm_u = TC.grid_mean_u(state)
+    prog_gm_v = TC.grid_mean_v(state)
+    p = aux_gm.p
+    ρ_c = prog_gm.ρ
     @inbounds for k in real_center_indices(grid)
         # θ_liq_ice profile as defined in DYCOM RF02
         z = grid.zc[k]
         aux_gm.q_tot[k] = APL.Dycoms_RF02_q_tot(FT)(z)
-        prog_gm.ρq_tot[k] = ρ0_c[k] * aux_gm.q_tot[k]
         aux_gm.θ_liq_ice[k] = APL.Dycoms_RF02_θ_liq_ice(FT)(z)
-        prog_gm.ρθ_liq_ice[k] = ρ0_c[k] * aux_gm.θ_liq_ice[k]
+
         # velocity profile
-        prog_gm.v[k] = APL.Dycoms_RF02_v(FT)(z)
-        prog_gm.u[k] = APL.Dycoms_RF02_u(FT)(z)
+        prog_gm_v[k] = APL.Dycoms_RF02_v(FT)(z)
+        prog_gm_u[k] = APL.Dycoms_RF02_u(FT)(z)
         aux_gm.tke[k] = APL.Dycoms_RF02_tke(FT)(z)
     end
 end
@@ -983,18 +979,18 @@ end
 function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ0_c = TC.center_ref_state(state).ρ0
+    ρ_c = prog_gm.ρ
     FT = eltype(grid)
+    prog_gm_u = TC.grid_mean_u(state)
+    prog_gm_v = TC.grid_mean_v(state)
 
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
         #Set wind velocity profile
-        prog_gm.u[k] = APL.GABLS_u(FT)(z)
-        prog_gm.v[k] = APL.GABLS_v(FT)(z)
+        prog_gm_u[k] = APL.GABLS_u(FT)(z)
+        prog_gm_v[k] = APL.GABLS_v(FT)(z)
         aux_gm.θ_liq_ice[k] = APL.GABLS_θ_liq_ice(FT)(z)
-        prog_gm.ρθ_liq_ice[k] = ρ0_c[k] * aux_gm.θ_liq_ice[k]
         aux_gm.q_tot[k] = APL.GABLS_q_tot(FT)(z)
-        prog_gm.ρq_tot[k] = ρ0_c[k] * aux_gm.q_tot[k]
         aux_gm.tke[k] = APL.GABLS_tke(FT)(z)
         aux_gm.Hvar[k] = aux_gm.tke[k]
     end
@@ -1038,23 +1034,23 @@ end
 function surface_ref_state(::SP, param_set::APS, namelist)
     Pg = 1.0e5  #Pressure at ground
     Tg = 300.0  #Temperature at ground
-    qtg = 1.0e-4   #Total water mixing ratio at TC. if set to 0, alpha0, rho0, p0 are NaN.
+    qtg = 1.0e-4   #Total water mixing ratio at TC. if set to 0, p, ρ are NaN.
     return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
 end
 
 function initialize_profiles(self::CasesBase{SP}, grid::Grid, param_set, state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ0_c = TC.center_ref_state(state).ρ0
+    prog_gm_u = TC.grid_mean_u(state)
+    prog_gm_v = TC.grid_mean_v(state)
+    ρ_c = prog_gm.ρ
     FT = eltype(grid)
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]
-        prog_gm.u[k] = APL.SP_u(FT)(z)
-        prog_gm.v[k] = APL.SP_v(FT)(z)
+        prog_gm_u[k] = APL.SP_u(FT)(z)
+        prog_gm_v[k] = APL.SP_v(FT)(z)
         aux_gm.θ_liq_ice[k] = APL.SP_θ_liq_ice(FT)(z)
-        prog_gm.ρθ_liq_ice[k] = ρ0_c[k] * aux_gm.θ_liq_ice[k]
         aux_gm.q_tot[k] = APL.SP_q_tot(FT)(z)
-        prog_gm.ρq_tot[k] = ρ0_c[k] * aux_gm.q_tot[k]
         aux_gm.tke[k] = APL.SP_tke(FT)(z)
     end
 end
@@ -1085,14 +1081,15 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, param_set, 
 
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ0_c = TC.center_ref_state(state).ρ0
+    ρ_c = prog_gm.ρ
+    prog_gm_u = TC.grid_mean_u(state)
+
     # initialize Grid Mean Profiles of thetali and qt
     zc_in = grid.zc
     FT = eltype(grid)
     prof_θ_liq_ice = APL.DryBubble_θ_liq_ice(FT)
     aux_gm.θ_liq_ice .= prof_θ_liq_ice.(zc_in)
-    @. prog_gm.ρθ_liq_ice = ρ0_c * aux_gm.θ_liq_ice
-    parent(prog_gm.u) .= 0.01
+    parent(prog_gm_u) .= 0.01
     parent(prog_gm.ρq_tot) .= 0
     parent(aux_gm.q_tot) .= 0
     parent(aux_gm.tke) .= 0
@@ -1117,7 +1114,25 @@ end
 ##### LES_driven_SCM
 #####
 
-forcing_kwargs(::LES_driven_SCM, namelist) = (; nudge_tau = namelist["forcing"]["nudging_timescale"])
+function forcing_kwargs(::LES_driven_SCM, namelist)
+    les_filename = namelist["meta"]["lesfile"]
+    cfsite_number, forcing_model, month, experiment = TC.parse_les_path(les_filename)
+    LES_library = TC.get_LES_library()
+    les_type = LES_library[forcing_model][string(month, pad = 2)]["cfsite_numbers"][string(cfsite_number, pad = 2)]
+    if les_type == "shallow"
+        wind_nudge_τᵣ = 6.0 * 3600.0
+        scalar_nudge_zᵢ = 3000.0
+        scalar_nudge_zᵣ = 3500.0
+        scalar_nudge_τᵣ = 24.0 * 3600.0
+    elseif les_type == "deep"
+        wind_nudge_τᵣ = 3600.0
+        scalar_nudge_zᵢ = 16000.0
+        scalar_nudge_zᵣ = 20000.0
+        scalar_nudge_τᵣ = 2.0 * 3600.0
+    end
+
+    return (; wind_nudge_τᵣ, scalar_nudge_zᵢ, scalar_nudge_zᵣ, scalar_nudge_τᵣ)
+end
 
 function surface_param_kwargs(::LES_driven_SCM, namelist)
     les_filename = namelist["meta"]["lesfile"]
@@ -1136,8 +1151,8 @@ function surface_param_kwargs(::LES_driven_SCM, namelist)
     return (; LESDat)
 end
 
-function ForcingBase(case::LES_driven_SCM, param_set::APS; nudge_tau)
-    ForcingBase(get_forcing_type(case); apply_coriolis = false, coriolis_param = 0.376e-4, nudge_tau = nudge_tau)
+function ForcingBase(case::LES_driven_SCM, param_set::APS; kwargs...)
+    ForcingBase(get_forcing_type(case); apply_coriolis = false, coriolis_param = 0.376e-4, kwargs...)
 end
 
 function surface_ref_state(::LES_driven_SCM, param_set::APS, namelist)
@@ -1160,7 +1175,10 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, param_
 
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    ρ0_c = TC.center_ref_state(state).ρ0
+    prog_gm_u = TC.grid_mean_u(state)
+    prog_gm_v = TC.grid_mean_v(state)
+
+    ρ_c = prog_gm.ρ
     NC.Dataset(self.LESDat.les_filename, "r") do data
         t = data.group["profiles"]["t"][:]
         # define time interval
@@ -1177,12 +1195,10 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, param_
         parent(aux_gm.θ_liq_ice) .=
             pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "thetali_mean", imin, imax))
         parent(aux_gm.q_tot) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "qt_mean", imin, imax))
-        parent(prog_gm.u) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "u_mean", imin, imax))
-        parent(prog_gm.v) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "v_mean", imin, imax))
         # for RRTMGP
         parent(aux_gm.T) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "temperature_mean", imin, imax))
-        @. prog_gm.ρθ_liq_ice = ρ0_c * aux_gm.θ_liq_ice
-        @. prog_gm.ρq_tot .= ρ0_c * aux_gm.q_tot
+        parent(prog_gm_u) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "u_mean", imin, imax))
+        parent(prog_gm_v) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "v_mean", imin, imax))
     end
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k]

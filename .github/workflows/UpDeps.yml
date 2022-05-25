@@ -20,10 +20,10 @@ jobs:
         access_token: ${{ github.token }}
 
     - uses: actions/checkout@v2.2.0
- 
+
     - uses: julia-actions/setup-julia@latest
       with:
-        version: 1.7.0
+        version: 1.7.2
 
     - name: Apply UpDeps
       run: |

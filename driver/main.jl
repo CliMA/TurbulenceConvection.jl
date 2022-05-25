@@ -9,8 +9,9 @@ import TurbulenceConvection
 
 import CloudMicrophysics
 const CM = CloudMicrophysics
-const CM0 = CloudMicrophysics.Microphysics_0M
-const CM1 = CloudMicrophysics.Microphysics_1M
+const CMNe = CloudMicrophysics.MicrophysicsNonEq
+const CM0 = CloudMicrophysics.Microphysics0M
+const CM1 = CloudMicrophysics.Microphysics1M
 
 import ClimaCore
 const CC = ClimaCore
@@ -138,12 +139,10 @@ function Simulation1d(namelist)
     if !skip_io
         NC.Dataset(Stats.nc_filename, "a") do ds
             group = "reference"
-            add_write_field(ds, "ρ0_f", vec(TC.face_ref_state(state).ρ0), group, ("zf",))
-            add_write_field(ds, "ρ0_c", vec(TC.center_ref_state(state).ρ0), group, ("zc",))
-            add_write_field(ds, "p0_f", vec(TC.face_ref_state(state).p0), group, ("zf",))
-            add_write_field(ds, "p0_c", vec(TC.center_ref_state(state).p0), group, ("zc",))
-            add_write_field(ds, "α0_f", vec(TC.face_ref_state(state).α0), group, ("zf",))
-            add_write_field(ds, "α0_c", vec(TC.center_ref_state(state).α0), group, ("zc",))
+            add_write_field(ds, "ρ_f", vec(TC.face_aux_grid_mean(state).ρ), group, ("zf",))
+            add_write_field(ds, "ρ_c", vec(TC.center_prog_grid_mean(state).ρ), group, ("zc",))
+            add_write_field(ds, "p_f", vec(TC.face_aux_grid_mean(state).p), group, ("zf",))
+            add_write_field(ds, "p_c", vec(TC.center_aux_grid_mean(state).p), group, ("zc",))
         end
     end
 
@@ -194,7 +193,8 @@ function initialize(sim::Simulation1d)
     FT = eltype(sim.grid)
     t = FT(0)
     Cases.initialize_profiles(sim.case, sim.grid, sim.param_set, state)
-    set_thermo_state!(state, sim.grid, sim.edmf.moisture_model, sim.param_set)
+    set_thermo_state_pθq!(state, sim.grid, sim.edmf.moisture_model, sim.param_set)
+    set_grid_mean_from_thermo_state!(sim.param_set, sim.state, sim.grid)
     assign_thermo_aux!(state, sim.grid, sim.edmf.moisture_model, sim.param_set)
 
     Cases.initialize_forcing(sim.case, sim.grid, state, sim.param_set)
@@ -264,6 +264,7 @@ function construct_grid(namelist; FT = Float64)
         )
 
         les_filename = namelist["meta"]["lesfile"]
+        TC.valid_lespath(les_filename)
         zmax = NC.Dataset(les_filename, "r") do data
             Array(TC.get_nc_data(data, "zf"))[end]
         end

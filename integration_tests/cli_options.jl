@@ -43,6 +43,12 @@ function parse_commandline()
         arg_type = String
         "--precipitation_model" # Precipitation model (None, cutoff or clima_1m)
         arg_type = String
+        "--precip_fraction_model" # Precipitation model (prescribed or cloud_cover)
+        arg_type = String
+        "--prescribed_precip_frac_value" # Value of the precipitation fraction, if prescribed
+        arg_type = Float64
+        "--precip_fraction_limiter" # Minimum precipitation fraction, if diagnostic
+        arg_type = Float64
         "--thermo_covariance_model" # covariance model (prognostic or diagnostic)
         arg_type = String
         "--trunc_field_type_print"
