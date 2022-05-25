@@ -129,8 +129,8 @@ function init_state(edmf, coords, face_coords, hv_center_space, hv_face_space)
             ρuₕ = CCG.UVVector(FT(0), FT(0)),
             u = FT(0),
             v = FT(0),
-            θ_liq_ice = FT(0),
-            q_tot = FT(0),
+            ρe_tot = FT(0),
+            ρq_tot = FT(0),
             TC.cent_prognostic_vars_edmf(FT, edmf)...,
         ),
     )
