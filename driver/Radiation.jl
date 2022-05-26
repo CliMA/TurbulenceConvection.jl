@@ -14,8 +14,9 @@ function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid,
     ρ_c = prog_gm.ρ
     # find zi (level of 8.0 g/kg isoline of qt)
     # TODO: report bug: zi and ρ_i are not initialized
-    zi = 0
-    ρ_i = 0
+    FT = eltype(grid)
+    zi = FT(0)
+    ρ_i = FT(0)
     kc_surf = TC.kc_surface(grid)
     q_tot_surf = aux_gm.q_tot[kc_surf]
     If = CCO.InterpolateC2F(; bottom = CCO.SetValue(q_tot_surf), top = CCO.Extrapolate())
@@ -24,14 +25,14 @@ function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid,
         if (q_tot_f[k] < 8.0 / 1000)
             idx_zi = k
             # will be used at cell faces
-            zi = grid.zf[k]
+            zi = grid.zf[k].z
             ρ_i = ρ_f[k]
             break
         end
     end
 
-    ρ_z = Dierckx.Spline1D(vec(grid.zc), vec(ρ_c); k = 1)
-    q_liq_z = Dierckx.Spline1D(vec(grid.zc), vec(aux_gm.q_liq); k = 1)
+    ρ_z = Dierckx.Spline1D(vec(grid.zc.z), vec(ρ_c); k = 1)
+    q_liq_z = Dierckx.Spline1D(vec(grid.zc.z), vec(aux_gm.q_liq); k = 1)
 
     integrand(ρq_l, params, z) = params.κ * ρ_z(z) * q_liq_z(z)
     rintegrand(ρq_l, params, z) = -integrand(ρq_l, params, z)
@@ -43,18 +44,18 @@ function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid,
     Δz = TC.get_Δz(prog_gm.ρ)[1]
     rprob = ODE.ODEProblem(rintegrand, 0.0, rz_span, params; dt = Δz)
     rsol = ODE.solve(rprob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    q_0 = rsol.(vec(grid.zf))
+    q_0 = rsol.(vec(grid.zf.z))
 
     prob = ODE.ODEProblem(integrand, 0.0, z_span, params; dt = Δz)
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    q_1 = sol.(vec(grid.zf))
+    q_1 = sol.(vec(grid.zf.z))
     parent(aux_gm_f.f_rad) .= self.F0 .* exp.(-q_0)
     parent(aux_gm_f.f_rad) .+= self.F1 .* exp.(-q_1)
 
     # cooling in free troposphere
     @inbounds for k in TC.real_face_indices(grid)
-        if grid.zf[k] > zi
-            cbrt_z = cbrt(grid.zf[k] - zi)
+        if grid.zf[k].z > zi
+            cbrt_z = cbrt(grid.zf[k].z - zi)
             aux_gm_f.f_rad[k] += ρ_i * cp_d * self.divergence * self.alpha_z * (cbrt_z^4 / 4 + zi * cbrt_z)
         end
     end

@@ -1,24 +1,4 @@
 
-# ClimaCore hacks
-Base.isless(zp1::CC.Geometry.ZPoint, zp2::CC.Geometry.ZPoint) = Base.isless(zp1.z, zp2.z)
-Base.isless(zp::CC.Geometry.ZPoint, val::Number) = Base.isless(zp.z, val)
-Base.isless(val::Number, zp::CC.Geometry.ZPoint) = Base.isless(val, zp.z)
-
-Base.:+(zp::CC.Geometry.ZPoint, val) = Base.:+(zp.z, val)
-Base.:+(val, zp::CC.Geometry.ZPoint) = Base.:+(val, zp.z)
-Base.:/(val, zp::CC.Geometry.ZPoint) = Base.:/(val, zp.z)
-Base.:+(zp1::CC.Geometry.ZPoint, zp2::CC.Geometry.ZPoint) = Base.:+(zp1.z, zp2.z)
-
-Base.:*(zp1::CC.Geometry.ZPoint, zp2::CC.Geometry.ZPoint) = Base.:*(zp1.z, zp2.z)
-
-Base.log(zp::CC.Geometry.ZPoint) = Base.log(zp.z)
-Base.:-(zp::CC.Geometry.ZPoint) = Base.:-(zp.z)
-Base.:-(zp::CC.Geometry.ZPoint, val) = Base.:-(zp.z, val)
-Base.:-(val, zp::CC.Geometry.ZPoint) = Base.:-(val, zp.z)
-Base.:-(zp1::CC.Geometry.ZPoint, zp2::CC.Geometry.ZPoint) = Base.:-(zp1.z, zp2.z)
-
-Base.convert(::Type{Float64}, zp::CC.Geometry.ZPoint) = zp.z
-
 """
     TCMeshFromGCMMesh(gcm_mesh; z_max)
 
@@ -64,7 +44,7 @@ struct Grid{FT, NZ, CS, FS, SC, SF, SVPCS}
         fs = CC.Spaces.FaceFiniteDifferenceSpace(cs)
         zc = CC.Fields.coordinate_field(cs)
         zf = CC.Fields.coordinate_field(fs)
-        Δz = zf[CCO.PlusHalf(2)] - zf[CCO.PlusHalf(1)]
+        Δz = zf[CCO.PlusHalf(2)].z - zf[CCO.PlusHalf(1)].z
         FT = eltype(parent(zf))
 
         # Single value per column-space (svpc = single_value_per_col)

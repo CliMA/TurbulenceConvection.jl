@@ -10,12 +10,7 @@ function update_cloud_frac(edmf::EDMFModel, grid::Grid, state::State)
     end
 end
 
-function compute_les_Γᵣ(
-    z::ClimaCore.Geometry.ZPoint,
-    τᵣ::FT = 24.0 * 3600.0,
-    zᵢ::FT = 3000.0,
-    zᵣ::FT = 3500.0,
-) where {FT <: Real}
+function compute_les_Γᵣ(z::FT, τᵣ::FT = 24.0 * 3600.0, zᵢ::FT = 3000.0, zᵣ::FT = 3500.0) where {FT <: Real}
     # returns height-dependent relaxation timescale from eqn. 9 in `Shen et al. 2021`
     if z < zᵢ
         return FT(0)

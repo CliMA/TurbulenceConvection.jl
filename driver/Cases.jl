@@ -9,6 +9,7 @@ const ODE = OrdinaryDiffEq
 import ClimaCore
 const CC = ClimaCore
 const CCO = CC.Operators
+const CCG = CC.Geometry
 
 import AtmosphericProfilesLibrary
 const APL = AtmosphericProfilesLibrary
@@ -38,10 +39,6 @@ using ..TurbulenceConvection: Grid
 using ..TurbulenceConvection: real_center_indices
 using ..TurbulenceConvection: real_face_indices
 using ..TurbulenceConvection: get_inversion
-
-# Support interpolating with z-points
-(prof::Dierckx.Spline1D)(z::CC.Geometry.ZPoint{FT}) where {FT} = prof(z.z)
-(prof::Dierckx.Spline2D)(t, z::CC.Geometry.ZPoint{FT}) where {FT} = prof(t, z.z)
 
 #=
     arr_type(x)
@@ -190,7 +187,7 @@ function initialize_profiles(self::CasesBase{Soares}, grid::Grid, param_set, sta
     prog_gm_u = TC.grid_mean_u(state)
 
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         aux_gm.q_tot[k] = prof_q_tot(z)
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
         prog_gm_u[k] = prof_u(z)
@@ -239,7 +236,7 @@ function initialize_profiles(self::CasesBase{Nieuwstadt}, grid::Grid, param_set,
     prog_gm_u = TC.grid_mean_u(state)
 
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
         prog_gm_u[k] = prof_u(z)
         aux_gm.tke[k] = prof_tke(z)
@@ -289,7 +286,7 @@ function initialize_profiles(self::CasesBase{Bomex}, grid::Grid, param_set, stat
     prog_gm_u = TC.grid_mean_u(state)
 
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
         aux_gm.q_tot[k] = prof_q_tot(z)
         prog_gm_u[k] = prof_u(z)
@@ -329,7 +326,7 @@ function initialize_forcing(self::CasesBase{Bomex}, grid::Grid, state, param_set
     prof_subsidence = APL.Bomex_subsidence(FT)
 
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         # Geostrophic velocity profiles. vg = 0
         aux_gm.ug[k] = prof_ug(z)
         Π = TD.exner(param_set, ts_gm[k])
@@ -369,7 +366,7 @@ function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, grid::Grid, pa
     prog_gm_u = TC.grid_mean_u(state)
 
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
         aux_gm.q_tot[k] = prof_q_tot(z)
         prog_gm_u[k] = prof_u(z)
@@ -424,7 +421,7 @@ function initialize_forcing(self::CasesBase{life_cycle_Tan2018}, grid::Grid, sta
     prof_subsidence = APL.LifeCycleTan2018_subsidence(FT)
 
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         # Geostrophic velocity profiles. vg = 0
         aux_gm.ug[k] = prof_ug(z)
         Π = TD.exner(param_set, ts_gm[k])
@@ -476,7 +473,7 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, param_set, state
     prog_gm_v = TC.grid_mean_v(state)
 
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         prog_gm_u[k] = prof_u(z)
         prog_gm_v[k] = prof_v(z)
         aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
@@ -493,7 +490,7 @@ function initialize_profiles(self::CasesBase{Rico}, grid::Grid, param_set, state
     zi = 0.6 * get_inversion(grid, state, param_set, 0.2)
 
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         aux_gm.tke[k] = if z <= zi
             1 - z / zi
         else
@@ -539,7 +536,7 @@ function initialize_forcing(self::CasesBase{Rico}, grid::Grid, state, param_set)
     prof_subsidence = APL.Rico_subsidence(FT)
 
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         Π = TD.exner(param_set, ts_gm[k])
         # Geostrophic velocity profiles
         aux_gm.ug[k] = prof_ug(z)
@@ -581,7 +578,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, param_set, s
     prof_v = APL.TRMM_LBA_v(FT)
     prof_tke = APL.TRMM_LBA_tke(FT)
 
-    zc = grid.zc
+    zc = grid.zc.z
     molmass_ratio = CPP.molmass_ratio(param_set)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_u = TC.grid_mean_u(state)
@@ -592,7 +589,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, param_set, s
     aux_gm.T .= prof_T.(zc)
 
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         pv_star = TD.saturation_vapor_pressure(param_set, aux_gm.T[k], TD.Liquid())
         # eq. 37 in pressel et al and the def of RH
         RH = prof_RH(z)
@@ -663,7 +660,7 @@ function initialize_profiles(self::CasesBase{ARM_SGP}, grid::Grid, param_set, st
     prog_gm_u = TC.grid_mean_u(state)
 
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         # TODO figure out how to use ts here
         phase_part = TD.PhasePartition(aux_gm.q_tot[k], aux_gm.q_liq[k], 0.0)
         Π = TD.exner_given_pressure(param_set, p[k], phase_part)
@@ -711,7 +708,7 @@ function update_forcing(self::CasesBase{ARM_SGP}, grid, state, t::Real, param_se
     FT = eltype(grid)
     @inbounds for k in real_center_indices(grid)
         Π = TD.exner(param_set, ts_gm[k])
-        z = grid.zc[k]
+        z = grid.zc[k].z
         aux_gm.dTdt_hadv[k] = APL.ARM_SGP_dTdt(FT)(t, z)
         aux_gm.dqtdt_hadv[k] = APL.ARM_SGP_dqtdt(FT)(Π, t, z)
 
@@ -739,7 +736,7 @@ function initialize_profiles(self::CasesBase{GATE_III}, grid::Grid, param_set, s
     p = aux_gm.p
     ρ_c = prog_gm.ρ
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         aux_gm.q_tot[k] = APL.GATE_III_q_tot(FT)(z)
         aux_gm.T[k] = APL.GATE_III_T(FT)(z)
         prog_gm_u[k] = APL.GATE_III_u(FT)(z)
@@ -770,7 +767,7 @@ function initialize_forcing(self::CasesBase{GATE_III}, grid::Grid, state, param_
     FT = eltype(grid)
     aux_gm = TC.center_aux_grid_mean(state)
     for k in TC.real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         aux_gm.dqtdt_hadv[k] = APL.GATE_III_dqtdt(FT)(z)
         aux_gm.dTdt_hadv[k] = APL.GATE_III_dTdt(FT)(z)
     end
@@ -799,7 +796,7 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF01}, grid::Grid, param_set
     p = aux_gm.p
     @inbounds for k in real_center_indices(grid)
         # thetal profile as defined in DYCOMS
-        z = grid.zc[k]
+        z = grid.zc[k].z
         aux_gm.q_tot[k] = APL.Dycoms_RF01_q_tot(FT)(z)
         aux_gm.θ_liq_ice[k] = APL.Dycoms_RF01_θ_liq_ice(FT)(z)
 
@@ -834,7 +831,7 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF01}, grid::Grid, state, par
     # large scale subsidence
     divergence = self.Rad.divergence
     @inbounds for k in real_center_indices(grid)
-        aux_gm.subsidence[k] = -grid.zc[k] * divergence
+        aux_gm.subsidence[k] = -grid.zc[k].z * divergence
     end
 
     # no large-scale drying
@@ -885,7 +882,7 @@ function initialize_profiles(self::CasesBase{DYCOMS_RF02}, grid::Grid, param_set
     ρ_c = prog_gm.ρ
     @inbounds for k in real_center_indices(grid)
         # θ_liq_ice profile as defined in DYCOM RF02
-        z = grid.zc[k]
+        z = grid.zc[k].z
         aux_gm.q_tot[k] = APL.Dycoms_RF02_q_tot(FT)(z)
         aux_gm.θ_liq_ice[k] = APL.Dycoms_RF02_θ_liq_ice(FT)(z)
 
@@ -920,7 +917,7 @@ function initialize_forcing(self::CasesBase{DYCOMS_RF02}, grid::Grid, state, par
     # large scale subsidence
     divergence = self.Rad.divergence
     @inbounds for k in real_center_indices(grid)
-        aux_gm.subsidence[k] = -grid.zc[k] * divergence
+        aux_gm.subsidence[k] = -grid.zc[k].z * divergence
     end
 
     # no large-scale drying
@@ -975,7 +972,7 @@ function initialize_profiles(self::CasesBase{GABLS}, grid::Grid, param_set, stat
     prog_gm_v = TC.grid_mean_v(state)
 
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         #Set wind velocity profile
         prog_gm_u[k] = APL.GABLS_u(FT)(z)
         prog_gm_v[k] = APL.GABLS_v(FT)(z)
@@ -1002,7 +999,7 @@ function initialize_forcing(self::CasesBase{GABLS}, grid::Grid, state, param_set
     aux_gm = TC.center_aux_grid_mean(state)
     @inbounds for k in real_center_indices(grid)
         # Geostrophic velocity profiles.
-        z = grid.zc[k]
+        z = grid.zc[k].z
         aux_gm.ug[k] = APL.GABLS_geostrophic_ug(FT)(z)
         aux_gm.vg[k] = APL.GABLS_geostrophic_vg(FT)(z)
     end
@@ -1036,7 +1033,7 @@ function initialize_profiles(self::CasesBase{SP}, grid::Grid, param_set, state)
     ρ_c = prog_gm.ρ
     FT = eltype(grid)
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         prog_gm_u[k] = APL.SP_u(FT)(z)
         prog_gm_v[k] = APL.SP_v(FT)(z)
         aux_gm.θ_liq_ice[k] = APL.SP_θ_liq_ice(FT)(z)
@@ -1048,7 +1045,7 @@ end
 function initialize_forcing(self::CasesBase{SP}, grid::Grid, state, param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         aux_gm.ug[k] = APL.SP_geostrophic_u(FT)(z)
         aux_gm.vg[k] = APL.SP_geostrophic_v(FT)(z)
     end
@@ -1075,7 +1072,7 @@ function initialize_profiles(self::CasesBase{DryBubble}, grid::Grid, param_set, 
     prog_gm_u = TC.grid_mean_u(state)
 
     # initialize Grid Mean Profiles of thetali and qt
-    zc_in = grid.zc
+    zc_in = grid.zc.z
     FT = eltype(grid)
     prof_θ_liq_ice = APL.DryBubble_θ_liq_ice(FT)
     aux_gm.θ_liq_ice .= prof_θ_liq_ice.(zc_in)
@@ -1189,7 +1186,7 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, param_
         parent(prog_gm_v) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "v_mean", imin, imax))
     end
     @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k]
+        z = grid.zc[k].z
         aux_gm.tke[k] = if z <= 2500.0
             1.0 - z / 3000.0
         else

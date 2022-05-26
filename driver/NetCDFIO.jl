@@ -42,7 +42,7 @@ function NetCDFIO_Stats(namelist, grid::TC.Grid)
     open(joinpath(outpath, "namelist_$casename.in"), "w") do io
         JSON.print(io, namelist, 4)
     end
-    NetCDFIO_Stats(; nc_filename, frequency, z_faces = vec(grid.zf), z_centers = vec(grid.zc))
+    NetCDFIO_Stats(; nc_filename, frequency, z_faces = vec(grid.zf.z), z_centers = vec(grid.zc.z))
 end
 
 function NetCDFIO_Stats(; nc_filename, frequency, z_faces, z_centers)

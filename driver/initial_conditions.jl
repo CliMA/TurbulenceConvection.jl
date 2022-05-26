@@ -120,13 +120,13 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
     prof_T = APL.DryBubble_updrafts_T(FT)
     @inbounds for i in 1:N_up
         @inbounds for k in TC.real_face_indices(grid)
-            if z_min <= grid.zf[k] <= z_max
+            if z_min <= grid.zf[k].z <= z_max
                 aux_up_f[i].w[k] = 0.0
             end
         end
 
         @inbounds for k in TC.real_center_indices(grid)
-            z = grid.zc[k]
+            z = grid.zc[k].z
             if z_min <= z <= z_max
                 aux_up[i].area[k] = prof_area(z)
                 aux_up[i].θ_liq_ice[k] = prof_θ_liq_ice(z)
