@@ -34,6 +34,9 @@ function parse_commandline()
         "--skip_tests"     # Skip regression tests
         arg_type = Bool
         default = false
+        "--broken_tests"     # Tests are broken, skip tests
+        arg_type = Bool
+        default = false
         "--suffix"         # A suffix for the artifact folder
         arg_type = String
         default = ""

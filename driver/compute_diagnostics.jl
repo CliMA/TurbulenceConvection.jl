@@ -186,11 +186,6 @@ function compute_diagnostics!(
     diag_svpc.rwp_mean[cent] = sum(ρ_c .* prog_pr.q_rai)
     diag_svpc.swp_mean[cent] = sum(ρ_c .* prog_pr.q_sno)
 
-    write_ts(Stats, "lwp_mean", diag_svpc.lwp_mean[cent])
-    write_ts(Stats, "iwp_mean", diag_svpc.iwp_mean[cent])
-    write_ts(Stats, "rwp_mean", diag_svpc.rwp_mean[cent])
-    write_ts(Stats, "swp_mean", diag_svpc.swp_mean[cent])
-
     # We only need computations above here for calibration io.
     calibrate_io && return nothing
 
@@ -352,26 +347,6 @@ function compute_diagnostics!(
     diag_tc_svpc.updraft_lwp[cent] = lwp
     diag_tc_svpc.updraft_iwp[cent] = iwp
     diag_tc_svpc.Hd[cent] = StatsBase.mean(plume_scale_height)
-
-    # Demonstration of how we can move all of the `write_ts` calls
-    # outside of `compute_diagnostics!`, which currently computes
-    # _and_ exports (some) diagnostics.
-    write_ts(Stats, "updraft_cloud_cover", diag_tc_svpc.updraft_cloud_cover[cent])
-    write_ts(Stats, "updraft_cloud_base", diag_tc_svpc.updraft_cloud_base[cent])
-    write_ts(Stats, "updraft_cloud_top", diag_tc_svpc.updraft_cloud_top[cent])
-    write_ts(Stats, "env_cloud_cover", diag_tc_svpc.env_cloud_cover[cent])
-    write_ts(Stats, "env_cloud_base", diag_tc_svpc.env_cloud_base[cent])
-    write_ts(Stats, "env_cloud_top", diag_tc_svpc.env_cloud_top[cent])
-    write_ts(Stats, "env_lwp", diag_tc_svpc.env_lwp[cent])
-    write_ts(Stats, "env_iwp", diag_tc_svpc.env_iwp[cent])
-    write_ts(Stats, "Hd", diag_tc_svpc.Hd[cent])
-    write_ts(Stats, "updraft_lwp", diag_tc_svpc.updraft_lwp[cent])
-    write_ts(Stats, "updraft_iwp", diag_tc_svpc.updraft_iwp[cent])
-
-    write_ts(Stats, "cutoff_precipitation_rate", diag_svpc.cutoff_precipitation_rate[cent])
-    write_ts(Stats, "cloud_cover_mean", diag_svpc.cloud_cover_mean[cent])
-    write_ts(Stats, "cloud_base_mean", diag_svpc.cloud_base_mean[cent])
-    write_ts(Stats, "cloud_top_mean", diag_svpc.cloud_top_mean[cent])
 
     return
 end
