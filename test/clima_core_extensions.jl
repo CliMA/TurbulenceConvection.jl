@@ -66,6 +66,21 @@ function ∫field(field::CC.Fields.FiniteDifferenceField, field_zmin = 0)
     return sol
 end
 
+@testset "Grid space view" begin
+    FT = Float64
+    nz, Δz = 10, FT(0.1)
+    domain = CC.Domains.IntervalDomain(
+        CC.Geometry.ZPoint{FT}(0),
+        CC.Geometry.ZPoint{FT}(nz * Δz),
+        boundary_tags = (:bottom, :top),
+    )
+    mesh = CC.Meshes.IntervalMesh(domain, nelems = nz)
+    grid = TC.Grid(mesh)
+    grid1 = TC.Grid(axes(grid.zc))
+    grid2 = TC.Grid(axes(grid.zc))
+    @test axes(grid1.zc) === axes(grid2.zc)
+    @test axes(grid1.zf) === axes(grid2.zf)
+end
 
 @testset "Vertical integrals" begin
     cent_state = TC.FieldFromNamedTuple(center_space(grid), (; y = FT(0)))
