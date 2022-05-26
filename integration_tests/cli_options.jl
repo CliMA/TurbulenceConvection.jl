@@ -12,6 +12,14 @@ function parse_commandline()
         arg_type = String
         "--entr"           # Try other entr-detr models
         arg_type = String
+        "--entr_dim_scale" # Specify dimensional scale for entrainment
+        arg_type = String
+        "--detr_dim_scale" # Specify dimensional scale for detrainment
+        arg_type = String
+        "--area_limiter_power" # Specify area limiter power
+        arg_type = Float64
+        "--nn_ent_biases" # Specify whether NN parameter vector contains biases
+        arg_type = Bool
         "--stoch_entr"     # Choose type of stochastic entr-detr model
         arg_type = String
         "--t_max"          # Simulation time to run to
@@ -19,6 +27,8 @@ function parse_commandline()
         "--adapt_dt"       # use adaptive timestepping
         arg_type = Bool
         "--dt"             # Specify model time step (when not using adaptive dt)
+        arg_type = Float64
+        "--dt_max"         # Specify maximum model time step (when using adaptive dt)
         arg_type = Float64
         "--calibrate_io"   # Test that calibration IO passes regression tests
         arg_type = Bool
