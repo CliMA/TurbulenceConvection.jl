@@ -219,8 +219,9 @@ function initialize(sim::Simulation1d)
     ]
     ts_list = vcat(ts_gm, ts_edmf)
 
-    # TODO: deprecate
-    sim.calibrate_io || initialize_io(sim.Stats.nc_filename, ts_list)
+    initialize_io(sim.Stats.nc_filename, ts_list)
+
+    surf = get_surface(sim.case.surf_params, sim.grid, state, t, sim.param_set)
 
     open_files(sim.Stats)
     try
@@ -228,11 +229,8 @@ function initialize(sim::Simulation1d)
 
         io(sim.io_nt.aux, sim.Stats, state)
         io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
+        io(surf, sim.case.surf_params, sim.grid, state, sim.Stats, t)
 
-        if !sim.calibrate_io
-            surf = get_surface(sim.case.surf_params, sim.grid, state, t, sim.param_set)
-            io(surf, sim.case.surf_params, sim.grid, state, sim.Stats, t)
-        end
     catch e
         @warn "IO during initialization failed. $(e)"
         return :simulation_crashed
