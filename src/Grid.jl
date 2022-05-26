@@ -57,10 +57,10 @@ struct Grid{FT, NZ, CS, FS, SC, SF, SVPCS}
     zc::SC
     zf::SF
     svpc_space::SVPCS
-    function Grid(mesh)
+    function Grid(space::CC.Spaces.CenterFiniteDifferenceSpace)
 
-        nz = length(mesh.faces) - 1
-        cs = CC.Spaces.CenterFiniteDifferenceSpace(mesh)
+        nz = length(space)
+        cs = space
         fs = CC.Spaces.FaceFiniteDifferenceSpace(cs)
         zc = CC.Fields.coordinate_field(cs)
         zf = CC.Fields.coordinate_field(fs)
@@ -88,6 +88,8 @@ struct Grid{FT, NZ, CS, FS, SC, SF, SVPCS}
 end
 
 single_value_per_col_space(grid::Grid) = grid.svpc_space
+
+Grid(mesh::CC.Meshes.IntervalMesh) = Grid(CC.Spaces.CenterFiniteDifferenceSpace(mesh))
 
 function Grid(Δz::FT, nz::Int) where {FT <: AbstractFloat}
     z₀, z₁ = FT(0), FT(nz * Δz)
