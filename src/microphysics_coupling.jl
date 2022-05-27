@@ -91,7 +91,7 @@ function precipitation_formation(
             ql_tendency += S_qt * λ
             qi_tendency += S_qt * (1 - λ)
             θ_liq_ice_tendency -= S_qt / Π_m / c_pm * (L_v0 * λ + L_s0 * (1 - λ))
-            e_tot_tendency += (λ * I_l + (1 - λ) * I_i + Φ - I) * S_qt
+            e_tot_tendency += (λ * I_l + (1 - λ) * I_i + Φ) * S_qt
         end
 
         if precip_model isa Clima1M
@@ -117,7 +117,7 @@ function precipitation_formation(
             ql_tendency += S_qt_rain
             qi_tendency += S_qt_snow
             θ_liq_ice_tendency -= 1 / Π_m / c_pm * (L_v0 * S_qt_rain + L_s0 * S_qt_snow)
-            e_tot_tendency += S_qt_rain * (I_l + Φ - I) + S_qt_snow * (I_i + Φ - I)
+            e_tot_tendency += S_qt_rain * (I_l + Φ) + S_qt_snow * (I_i + Φ)
 
             # accretion cloud water + rain
             S_qr = min(q.liq / Δt, CM1.accretion(param_set, liq_type, rain_type, q.liq, qr, ρ)) * precip_fraction
@@ -125,7 +125,7 @@ function precipitation_formation(
             qt_tendency -= S_qr
             ql_tendency -= S_qr
             θ_liq_ice_tendency += S_qr / Π_m / c_pm * L_v0
-            e_tot_tendency -= S_qr * (I_l + Φ - I)
+            e_tot_tendency -= S_qr * (I_l + Φ)
 
             # accretion cloud ice + snow
             S_qs = min(q.ice / Δt, CM1.accretion(param_set, ice_type, snow_type, q.ice, qs, ρ)) * precip_fraction
@@ -133,7 +133,7 @@ function precipitation_formation(
             qt_tendency -= S_qs
             qi_tendency -= S_qs
             θ_liq_ice_tendency += S_qs / Π_m / c_pm * L_s0
-            e_tot_tendency -= S_qs * (I_i + Φ - I)
+            e_tot_tendency -= S_qs * (I_i + Φ)
 
             # sink of cloud water via accretion cloud water + snow
             S_qt = -min(q.liq / Δt, CM1.accretion(param_set, liq_type, snow_type, q.liq, qs, ρ)) * precip_fraction
@@ -142,7 +142,7 @@ function precipitation_formation(
                 qt_tendency += S_qt
                 ql_tendency += S_qt
                 θ_liq_ice_tendency -= S_qt / Π_m / c_pm * Lf * (1 + Rm / c_vm)
-                e_tot_tendency += S_qt * (I_i + Φ - I)
+                e_tot_tendency += S_qt * (I_i + Φ)
             else # snow melts, both cloud water and snow become rain
                 α::FT = c_vl / Lf * (T - T_fr)
                 qt_tendency += S_qt
@@ -150,7 +150,7 @@ function precipitation_formation(
                 qs_tendency += S_qt * α
                 qr_tendency -= S_qt * (1 + α)
                 θ_liq_ice_tendency += S_qt / Π_m / c_pm * (Lf * (1 + Rm / c_vm) * α - L_v0)
-                e_tot_tendency += S_qt * ((1 + α) * I_l - α * I_i + Φ - I)
+                e_tot_tendency += S_qt * ((1 + α) * I_l - α * I_i + Φ)
             end
 
             # sink of cloud ice via accretion cloud ice - rain
@@ -162,7 +162,7 @@ function precipitation_formation(
             qr_tendency += S_qr
             qs_tendency += -(S_qt + S_qr)
             θ_liq_ice_tendency -= 1 / Π_m / c_pm * (S_qr * Lf * (1 + Rm / c_vm) + S_qt * L_s0)
-            e_tot_tendency += S_qt * (I_i + Φ - I)
+            e_tot_tendency += S_qt * (I_i + Φ)
             e_tot_tendency -= S_qr * Lf
 
             # accretion rain - snow
