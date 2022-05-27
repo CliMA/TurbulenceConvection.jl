@@ -7,11 +7,6 @@ struct EarthParameterSet{NT} <: CP.AbstractEarthParameterSet
 end
 
 CLIMAParameters.Planet.MSLP(ps::EarthParameterSet) = ps.nt.MSLP
-CLIMAParameters.Planet.cp_d(ps::EarthParameterSet) = ps.nt.cp_d
-CLIMAParameters.Planet.cp_v(ps::EarthParameterSet) = ps.nt.cp_v
-CLIMAParameters.Planet.R_d(ps::EarthParameterSet) = ps.nt.R_d
-CLIMAParameters.Planet.R_v(ps::EarthParameterSet) = ps.nt.R_v
-CLIMAParameters.Planet.molmass_ratio(ps::EarthParameterSet) = ps.nt.molmass_ratio
 # microphysics parameters
 CLIMAParameters.Atmos.Microphysics_0M.τ_precip(ps::EarthParameterSet) = ps.nt.τ_precip
 CLIMAParameters.Atmos.Microphysics.τ_cond_evap(ps::EarthParameterSet) = ps.nt.τ_cond_evap
@@ -95,11 +90,6 @@ function create_parameter_set(namelist)
 
     nt = (;
         MSLP = 100000.0, # or grab from, e.g., namelist[""][...]
-        cp_d = 1004.0,
-        cp_v = 1859.0,
-        R_d = 287.1,
-        R_v = 461.5,
-        molmass_ratio = 461.5/287.1,
         τ_precip = TC.parse_namelist(namelist, "microphysics", "τ_precip"; default = 1000.0),
         τ_cond_evap = TC.parse_namelist(namelist, "microphysics", "τ_cond_evap"; default = 10.0),
         τ_sub_dep = TC.parse_namelist(namelist, "microphysics", "τ_sub_dep"; default = 10.0),
