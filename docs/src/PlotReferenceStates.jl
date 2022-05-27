@@ -35,8 +35,8 @@ function export_ref_profile(case_name::String)
     ρ_f = face.ρ
     compute_ref_state!(p_c, ρ_c, p_f, ρ_f, grid, param_set; ts_g)
 
-    zc = vec(grid.zc)
-    zf = vec(grid.zf)
+    zc = vec(grid.zc.z)
+    zf = vec(grid.zf.z)
 
     ρ_c = vec(cent.ρ)
     p_c = vec(cent.p)

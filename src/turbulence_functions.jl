@@ -25,10 +25,10 @@ function get_inversion(grid::Grid{FT}, state::State, param_set::APS, Ri_bulk_cri
         k_star = findlast_center(k -> θ_virt[k] > θ_virt_b, grid)
         LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(θ_virt[kc_surf]))
         @. ∇θ_virt = ∇c(wvec(LB(θ_virt)))
-        h = (θ_virt_b - θ_virt[k_star - 1]) / ∇θ_virt[k_star] + z_c[k_star - 1]
+        h = (θ_virt_b - θ_virt[k_star - 1]) / ∇θ_virt[k_star] + z_c[k_star - 1].z
     else
         ∇Ri_bulk = center_aux_turbconv(state).ϕ_temporary
-        Ri_bulk_fn(k) = g * (θ_virt[k] - θ_virt_b) * z_c[k] / θ_virt_b / (u[k] * u[k] + v[k] * v[k])
+        Ri_bulk_fn(k) = g * (θ_virt[k] - θ_virt_b) * z_c[k].z / θ_virt_b / (u[k] * u[k] + v[k] * v[k])
 
         @inbounds for k in real_center_indices(grid)
             Ri_bulk[k] = Ri_bulk_fn(k)
@@ -36,7 +36,7 @@ function get_inversion(grid::Grid{FT}, state::State, param_set::APS, Ri_bulk_cri
         k_star = findlast_center(k -> Ri_bulk_fn(k) > Ri_bulk_crit, grid)
         LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(Ri_bulk[kc_surf]))
         @. ∇Ri_bulk = ∇c(wvec(LB(Ri_bulk)))
-        h = (Ri_bulk_crit - Ri_bulk[k_star - 1]) / ∇Ri_bulk[k_star] + z_c[k_star - 1]
+        h = (Ri_bulk_crit - Ri_bulk[k_star - 1]) / ∇Ri_bulk[k_star] + z_c[k_star - 1].z
     end
 
     return h

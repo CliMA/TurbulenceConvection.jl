@@ -217,8 +217,8 @@ function compute_ref_state!(
     @info "z_span = $z_span"
     prob = ODE.ODEProblem(rhs, logp, z_span)
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
-    parent(p_f) .= sol.(vec(grid.zf))
-    parent(p_c) .= sol.(vec(grid.zc))
+    parent(p_f) .= sol.(vec(grid.zf.z))
+    parent(p_c) .= sol.(vec(grid.zc.z))
 
     p_f .= exp.(p_f)
     p_c .= exp.(p_c)
@@ -499,7 +499,7 @@ function compute_gm_tendencies!(
             gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm_u[k]) / force.wind_nudge_τᵣ
             gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm_v[k]) / force.wind_nudge_τᵣ
 
-            Γᵣ = TC.compute_les_Γᵣ(grid.zc[k], force.scalar_nudge_τᵣ, force.scalar_nudge_zᵢ, force.scalar_nudge_zᵣ)
+            Γᵣ = TC.compute_les_Γᵣ(grid.zc[k].z, force.scalar_nudge_τᵣ, force.scalar_nudge_zᵢ, force.scalar_nudge_zᵣ)
             gm_T_nudge_k = Γᵣ * (aux_gm.T_nudge[k] - aux_gm.T[k])
             gm_q_tot_nudge_k = Γᵣ * (aux_gm.qt_nudge[k] - aux_gm.q_tot[k])
             if edmf.moisture_model isa TC.NonEquilibriumMoisture

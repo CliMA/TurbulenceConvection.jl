@@ -95,7 +95,7 @@ function get_surface(
     u_gm_surf = TC.grid_mean_u(state)[kc_surf]
     v_gm_surf = TC.grid_mean_v(state)[kc_surf]
     zrough = surf_params.zrough
-    zc_surf = grid.zc[kc_surf]
+    zc_surf = grid.zc[kc_surf].z
     cm = surf_params.cm(zc_surf)
     ch = surf_params.ch(zc_surf)
     Ri_bulk_crit = surf_params.Ri_bulk_crit
