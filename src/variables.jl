@@ -37,6 +37,9 @@ cent_aux_vars_up(FT, edmf) = (;
     area = FT(0),
     q_tot = FT(0),
     θ_liq_ice = FT(0),
+    e_tot = FT(0),
+    e_kin = FT(0),
+    h_tot = FT(0),
     θ_liq_ice_tendency_precip_formation = FT(0),
     e_tot_tendency_precip_formation = FT(0),
     qt_tendency_precip_formation = FT(0),
@@ -79,6 +82,8 @@ cent_aux_vars_edmf(FT, edmf) = (;
         bulk = (;
             area = FT(0),
             θ_liq_ice = FT(0),
+            e_tot = FT(0),
+            h_tot = FT(0),
             RH = FT(0),
             buoy = FT(0),
             q_tot = FT(0),
@@ -99,6 +104,9 @@ cent_aux_vars_edmf(FT, edmf) = (;
             q_liq = FT(0),
             q_ice = FT(0),
             θ_liq_ice = FT(0),
+            e_tot = FT(0),
+            e_kin = FT(0),
+            h_tot = FT(0),
             θ_virt = FT(0),
             θ_dry = FT(0),
             RH = FT(0),
@@ -252,7 +260,7 @@ cent_prognostic_vars_up_moisture(::Type{FT}, ::EquilibriumMoisture) where {FT} =
 cent_prognostic_vars_up_moisture(::Type{FT}, ::NonEquilibriumMoisture) where {FT} = (; ρaq_liq = FT(0), ρaq_ice = FT(0))
 cent_prognostic_vars_up(::Type{FT}, edmf) where {FT} = (;
     ρarea = FT(0),
-    ρaθ_liq_ice = FT(0),
+    ρae_tot = FT(0),
     ρaq_tot = FT(0),
     cent_prognostic_vars_up_noisy_relaxation(FT, edmf.entr_closure)...,
     cent_prognostic_vars_up_moisture(FT, edmf.moisture_model)...,
