@@ -8,7 +8,7 @@ all_cases = [
     "DYCOMS_RF01",
     "DYCOMS_RF02",
     "GABLS",
-    "GATE_III",
+    #"GATE_III",
     "life_cycle_Tan2018",
     "Nieuwstadt",
     "Rico",
