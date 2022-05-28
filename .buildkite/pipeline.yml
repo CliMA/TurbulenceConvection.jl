@@ -171,6 +171,10 @@ steps:
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --test_duals true --suffix _duals"
         artifact_paths: "Output.Bomex.01_duals/stats/comparison/*"
 
+      - label: ":partly_sunny: Bomex with Float32"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --float_type Float32 --skip_tests true --suffix _float32"
+        artifact_paths: "Output.Bomex.01_float32/stats/comparison/*"
+
   - group: "Performance monitoring"
     steps:
 

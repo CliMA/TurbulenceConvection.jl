@@ -64,6 +64,9 @@ function parse_commandline()
         arg_type = Float64
         "--thermo_covariance_model" # covariance model (prognostic or diagnostic)
         arg_type = String
+        "--float_type"
+        arg_type = String
+        default = "Float64"
         "--config"
         help = "Spatial configuration [`sphere` (default), `column`]"
         arg_type = String
