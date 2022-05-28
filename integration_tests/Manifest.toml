@@ -125,10 +125,10 @@ uuid = "179af706-886a-5703-950a-314cd64e0468"
 version = "0.1.2"
 
 [[deps.CLIMAParameters]]
-deps = ["Test"]
-git-tree-sha1 = "17ece0add9940728f8120a1561fc3361be6a6f26"
+deps = ["DocStringExtensions", "TOML", "Test"]
+git-tree-sha1 = "68c17232bb2aeabd71b3a90cc8662908c975310e"
 uuid = "6eacf6c3-8458-43b9-ae03-caf5306d3d53"
-version = "0.4.3"
+version = "0.6.0"
 
 [[deps.CPUSummary]]
 deps = ["CpuId", "IfElse", "Static"]
@@ -1299,9 +1299,9 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[deps.RRTMGP]]
 deps = ["Adapt", "CLIMAParameters", "CUDA", "Compat", "Coverage", "DocStringExtensions", "GaussQuadrature", "NCDatasets", "Pkg", "Profile", "StaticArrays", "Test"]
-git-tree-sha1 = "1f21a2708f5fdecaa9fd2efe4cebc0cdb1d2b173"
+git-tree-sha1 = "e4a0e82f4ba27864a0d1bca3cf816cb5a5c74d2d"
 uuid = "a01a1ee8-cea4-48fc-987c-fc7878d79da1"
-version = "0.3.1"
+version = "0.3.2"
 
 [[deps.Random]]
 deps = ["SHA", "Serialization"]
@@ -1633,9 +1633,9 @@ version = "1.0.1"
 
 [[deps.Thermodynamics]]
 deps = ["CLIMAParameters", "DocStringExtensions", "KernelAbstractions", "Random", "RootSolvers"]
-git-tree-sha1 = "44f5a700a6b60b97663b2467f0c7b62dfe15e983"
+git-tree-sha1 = "8053195dcd09d699e38ec45f2fac65993a2371ea"
 uuid = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
-version = "0.7.1"
+version = "0.8.0"
 
 [[deps.ThreadingUtilities]]
 deps = ["ManualMemory"]
@@ -1671,7 +1671,7 @@ version = "0.3.4"
 deps = ["CLIMAParameters", "ClimaCore", "CloudMicrophysics", "Dierckx", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "Flux", "LambertW", "LinearAlgebra", "OperatorFlux", "StaticArrays", "StatsBase", "StochasticDiffEq", "Thermodynamics", "UnPack"]
 path = ".."
 uuid = "8e072fc4-01f8-44fb-b9dc-f9336c367e6b"
-version = "0.29.0"
+version = "0.29.1"
 
 [[deps.URIs]]
 git-tree-sha1 = "97bbe755a53fe859669cd907f2d96aee8d2c1355"
