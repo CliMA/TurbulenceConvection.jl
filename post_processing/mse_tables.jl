@@ -182,6 +182,22 @@ all_best_mse["LES_driven_SCM"]["temperature_mean"] = 0.0014753334208350026
 all_best_mse["LES_driven_SCM"]["ql_mean"] = 32731.466530736114
 all_best_mse["LES_driven_SCM"]["thetal_mean"] = 0.0017173498707916857
 #
+all_best_mse["LES_driven_SCM_RRTMGP"] = OrderedCollections.OrderedDict()
+all_best_mse["LES_driven_SCM_RRTMGP"]["qt_mean"] = 3.565679133346325
+all_best_mse["LES_driven_SCM_RRTMGP"]["v_mean"] = 1.3786051560755312
+all_best_mse["LES_driven_SCM_RRTMGP"]["u_mean"] = 0.4764379333062847
+all_best_mse["LES_driven_SCM_RRTMGP"]["temperature_mean"] = 0.0012830981248823014
+all_best_mse["LES_driven_SCM_RRTMGP"]["ql_mean"] = 51738.50247731223
+all_best_mse["LES_driven_SCM_RRTMGP"]["thetal_mean"] = 0.0015164180359003641
+#
+all_best_mse["RadiativeConvectiveEquilibrium"] = OrderedCollections.OrderedDict()
+all_best_mse["RadiativeConvectiveEquilibrium"]["qt_mean"] = 3.565679133346325
+all_best_mse["RadiativeConvectiveEquilibrium"]["v_mean"] = 1.3786051560755312
+all_best_mse["RadiativeConvectiveEquilibrium"]["u_mean"] = 0.4764379333062847
+all_best_mse["RadiativeConvectiveEquilibrium"]["temperature_mean"] = 0.0012830981248823014
+all_best_mse["RadiativeConvectiveEquilibrium"]["ql_mean"] = 51738.50247731223
+all_best_mse["RadiativeConvectiveEquilibrium"]["thetal_mean"] = 0.0015164180359003641
+#
 #################################
 #################################
 #################################

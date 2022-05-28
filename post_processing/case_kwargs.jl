@@ -77,4 +77,11 @@ case_kwargs["LES_driven_SCM"] = (;
     t_stop = 6 * 3600,
 )
 
+case_kwargs["LES_driven_SCM_RRTMGP"] = (;
+    ds_les_filename = joinpath(NameList.les_driven_scm_data_folder(), "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc"),
+    plot_comparison = true,
+    t_start = 3 * 3600,
+    t_stop = 6 * 3600,
+)
+
 #! format: on

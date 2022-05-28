@@ -168,7 +168,7 @@ function get_surface(
     u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
     vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
     vals_int = SF.InteriorValues(z_in, u_in, ts_in)
-    sc = SF.ValuesOnly{FT}(state_in = vals_int, state_sfc = vals_sfc, z0m = zrough, z0b = zrough)
+    sc = SF.ValuesOnly{FT}(state_in = vals_int, state_sfc = vals_sfc, z0m = zrough, z0b = zrough, gustiness = FT(1))
     result = SF.surface_conditions(param_set, sc, universal_func, scheme)
     lhf = result.lhf
     shf = result.shf

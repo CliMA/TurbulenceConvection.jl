@@ -298,6 +298,10 @@ function default_namelist(
         namelist = DryBubble(namelist_defaults)
     elseif case_name == "LES_driven_SCM"
         namelist = LES_driven_SCM(namelist_defaults)
+    elseif case_name == "LES_driven_SCM_RRTMGP"
+        namelist = LES_driven_SCM_RRTMGP(namelist_defaults)
+    elseif case_name == "RadiativeConvectiveEquilibrium"
+        namelist = RadiativeConvectiveEquilibrium(namelist_defaults)
     else
         error("Not a valid case name")
     end
@@ -612,6 +616,56 @@ function LES_driven_SCM(namelist_defaults)
 
     return namelist
 end
+
+
+function LES_driven_SCM_RRTMGP(namelist_defaults)
+    namelist = deepcopy(namelist_defaults)
+    # Only one can be defined by user
+    # namelist["grid"]["dz"] = 50.0
+    namelist["grid"]["nz"] = 80
+
+    namelist["stats_io"]["frequency"] = 10.0
+    namelist["time_stepping"]["t_max"] = 3600.0 * 6
+    namelist["time_stepping"]["dt_min"] = 1.0
+
+    # use last 6 hours of LES simulation to drive LES
+    namelist["t_interval_from_end_s"] = 3600.0 * 6
+    # average in 1 hour interval around `t_interval_from_end_s`
+    namelist["initial_condition_averaging_window_s"] = 3600.0
+
+    namelist["meta"]["lesfile"] =
+        joinpath(les_driven_scm_data_folder(), "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc")
+    namelist["meta"]["simname"] = "LES_driven_SCM_RRTMGP"
+    namelist["meta"]["casename"] = "LES_driven_SCM_RRTMGP"
+    namelist["forcing"] = Dict()
+    namelist["forcing"]["nudging_timescale"] = 6.0 * 3600.0
+
+    return namelist
+end
+
+function RadiativeConvectiveEquilibrium(namelist_defaults)
+    namelist = deepcopy(namelist_defaults)
+    # Only one can be defined by user
+    namelist["grid"]["stretch"]["flag"] = true
+    namelist["grid"]["stretch"]["nz"] = 55
+    namelist["grid"]["stretch"]["dz_surf"] = 30.0
+    namelist["grid"]["stretch"]["dz_toa"] = 8000.0
+    namelist["grid"]["stretch"]["z_toa"] = 45000.0
+    # just to compute zmax - strech will overwrite these
+    namelist["grid"]["dz"] = 30.0
+    namelist["grid"]["nz"] = 500
+
+    namelist["stats_io"]["frequency"] = 1800.0
+    namelist["time_stepping"]["t_max"] = 3600.0 * 6 #* 24
+    namelist["time_stepping"]["dt_min"] = 1.0
+    namelist["time_stepping"]["dt_max"] = 5.0
+
+    namelist["meta"]["simname"] = "RadiativeConvectiveEquilibrium"
+    namelist["meta"]["casename"] = "RadiativeConvectiveEquilibrium"
+
+    return namelist
+end
+
 
 function write_file(namelist, root::String = ".")
     mkpath(root)

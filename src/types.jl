@@ -365,6 +365,7 @@ struct ForcingLES end
 struct RadiationNone end
 struct RadiationDYCOMS_RF01 end
 struct RadiationLES end
+struct RadiationRRTMGP end
 struct RadiationTRMM_LBA end
 
 Base.@kwdef struct LESData

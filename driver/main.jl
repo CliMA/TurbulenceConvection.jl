@@ -44,7 +44,7 @@ function DiffEqNoiseProcess.wiener_randn!(rng::Random.AbstractRNG, rand_vec::CC.
     parent(rand_vec.face) .= Random.randn.()
 end
 
-struct Simulation1d{IONT, G, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS}
+struct Simulation1d{IONT, G, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS, RRTM}
     io_nt::IONT
     grid::G
     state::S
@@ -60,6 +60,7 @@ struct Simulation1d{IONT, G, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS}
     adapt_dt::Bool
     cfl_limit::Float64
     dt_min::Float64
+    rrtmgp_model::RRTM
     truncate_stack_trace::Bool
 end
 
@@ -83,7 +84,6 @@ function Simulation1d(namelist)
     surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
 
     Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
-    Rad = TC.RadiationBase(case_type)
     TS = TimeStepping(namelist)
 
     # Create the class for precipitation
@@ -151,6 +151,13 @@ function Simulation1d(namelist)
     spk = Cases.surface_param_kwargs(case_type, namelist)
     surf_params = Cases.surface_params(case_type, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
     inversion_type = Cases.inversion_type(case_type)
+    Rad = TC.RadiationBase(case_type) #, grid, state, param_set)
+    @show case_type
+    if case_type == Cases.LES_driven_SCM_RRTMGP() || case_type == Cases.RadiativeConvectiveEquilibrium()
+        rrtmgp_model = Cases.initialize_rrtmgp(grid, state, param_set)
+    else
+        rrtmgp_model = nothing
+    end
     case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad, spk...)
 
     calibrate_io = namelist["stats_io"]["calibrate_io"]
@@ -175,6 +182,7 @@ function Simulation1d(namelist)
         adapt_dt,
         cfl_limit,
         dt_min,
+        rrtmgp_model,
         truncate_stack_trace,
     )
 end
@@ -247,7 +255,7 @@ function construct_grid(namelist; FT = Float64)
 
     truncated_gcm_mesh = TC.parse_namelist(namelist, "grid", "stretch", "flag"; default = false)
 
-    if Cases.get_case(namelist) == Cases.LES_driven_SCM()
+    if Cases.get_case(namelist) == Cases.LES_driven_SCM() || Cases.get_case(namelist) == Cases.LES_driven_SCM_RRTMGP()
         Δz = get(namelist["grid"], "dz", nothing)
         nz = get(namelist["grid"], "nz", nothing)
         @assert isnothing(Δz) ⊻ isnothing(nz) string(
@@ -321,6 +329,7 @@ function solve_args(sim::Simulation1d)
         skip_io = sim.skip_io,
         cfl_limit = sim.cfl_limit,
         dt_min = sim.dt_min,
+        rrtmgp_model = sim.rrtmgp_model
     )
 
     callback_io = ODE.DiscreteCallback(condition_io, affect_io!; save_positions = (false, false))
@@ -351,6 +360,8 @@ function solve_args(sim::Simulation1d)
     # So, we tell OrdinaryDiffEq.jl to not perform NaNs check on the solution
     # so that it doesn't abort early (as the HOM prognostic variables are 1-way coupled)
     unstable_check_kwarg(::Cases.LES_driven_SCM) = (; unstable_check = (dt, u, p, t) -> false)
+    unstable_check_kwarg(::Cases.LES_driven_SCM_RRTMGP) = (; unstable_check = (dt, u, p, t) -> false)
+    # unstable_check_kwarg(::Cases.RadiativeConvectiveEquilibrium) = (; unstable_check = (dt, u, p, t) -> false)
     unstable_check_kwarg(case) = ()
 
     kwargs = (;

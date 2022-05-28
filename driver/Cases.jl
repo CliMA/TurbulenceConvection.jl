@@ -94,6 +94,10 @@ struct DryBubble <: AbstractCaseType end
 
 struct LES_driven_SCM <: AbstractCaseType end
 
+struct LES_driven_SCM_RRTMGP <: AbstractCaseType end
+
+struct RadiativeConvectiveEquilibrium <: AbstractCaseType end
+
 #####
 ##### Case methods
 #####
@@ -117,6 +121,8 @@ get_case(::Val{:GABLS}) = GABLS()
 get_case(::Val{:SP}) = SP()
 get_case(::Val{:DryBubble}) = DryBubble()
 get_case(::Val{:LES_driven_SCM}) = LES_driven_SCM()
+get_case(::Val{:LES_driven_SCM_RRTMGP}) = LES_driven_SCM_RRTMGP()
+get_case(::Val{:RadiativeConvectiveEquilibrium}) = RadiativeConvectiveEquilibrium()
 
 get_case_name(case_type::AbstractCaseType) = string(case_type)
 
@@ -139,13 +145,17 @@ get_forcing_type(::DYCOMS_RF01) = TC.ForcingDYCOMS_RF01
 get_forcing_type(::DYCOMS_RF02) = TC.ForcingDYCOMS_RF01
 get_forcing_type(::DryBubble) = TC.ForcingNone
 get_forcing_type(::LES_driven_SCM) = TC.ForcingLES
+get_forcing_type(::LES_driven_SCM_RRTMGP) = TC.ForcingLES
+get_forcing_type(::RadiativeConvectiveEquilibrium) = TC.ForcingNone
 get_forcing_type(::TRMM_LBA) = TC.ForcingNone
 
 get_radiation_type(::AbstractCaseType) = TC.RadiationNone # default
 get_radiation_type(::DYCOMS_RF01) = TC.RadiationDYCOMS_RF01
 get_radiation_type(::DYCOMS_RF02) = TC.RadiationDYCOMS_RF01
-get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
 get_radiation_type(::TRMM_LBA) = TC.RadiationTRMM_LBA
+get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
+get_radiation_type(::LES_driven_SCM_RRTMGP) = TC.RadiationRRTMGP
+get_radiation_type(::RadiativeConvectiveEquilibrium) = TC.RadiationRRTMGP
 
 RadiationBase(case::AbstractCaseType) = RadiationBase{Cases.get_radiation_type(case)}()
 
@@ -1182,6 +1192,8 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, param_
         parent(aux_gm.θ_liq_ice) .=
             pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "thetali_mean", imin, imax))
         parent(aux_gm.q_tot) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "qt_mean", imin, imax))
+        # for RRTMGP
+        parent(aux_gm.T) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "temperature_mean", imin, imax))
         parent(prog_gm_u) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "u_mean", imin, imax))
         parent(prog_gm_v) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "v_mean", imin, imax))
     end
@@ -1222,6 +1234,208 @@ initialize_forcing(self::CasesBase{LES_driven_SCM}, grid::Grid, state, param_set
     initialize(self.Fo, grid, state, self.LESDat)
 
 initialize_radiation(self::CasesBase{LES_driven_SCM}, grid::Grid, state, param_set) =
-    initialize(self.Rad, grid, state, self.LESDat)
+    # initialize(self.Rad, grid, state, self.LESDat)
+    initialize_rrtmgp(grid, state, param_set)
+    # initialize(self.Rad, grid, state, param_set)
+
+
+
+#####
+##### LES_driven_SCM_RRTMGP
+#####
+
+forcing_kwargs(::LES_driven_SCM_RRTMGP, namelist) = (; nudge_tau = namelist["forcing"]["nudging_timescale"])
+
+function surface_param_kwargs(::LES_driven_SCM_RRTMGP, namelist)
+    les_filename = namelist["meta"]["lesfile"]
+    # load data here
+    LESDat = NC.Dataset(les_filename, "r") do data
+        t = data.group["profiles"]["t"][:]
+        t_interval_from_end_s = namelist["t_interval_from_end_s"]
+        t_from_end_s = t .- t[end]
+        # find inds within time interval
+        time_interval_bool = findall(>(-t_interval_from_end_s), t_from_end_s)
+        imin = time_interval_bool[1]
+        imax = time_interval_bool[end]
+
+        TC.LESData(imin, imax, les_filename, t_interval_from_end_s, namelist["initial_condition_averaging_window_s"])
+    end
+    return (; LESDat)
+end
+
+function ForcingBase(case::LES_driven_SCM_RRTMGP, param_set::APS; nudge_tau)
+    ForcingBase(
+        get_forcing_type(case);
+        apply_coriolis = false,
+        coriolis_param = 0.376e-4,
+        nudge_tau = nudge_tau,
+    )
+end
+
+function surface_ref_state(::LES_driven_SCM_RRTMGP, param_set::APS, namelist)
+    les_filename = namelist["meta"]["lesfile"]
+
+    Pg, Tg, qtg = NC.Dataset(les_filename, "r") do data
+        pg_str = haskey(data.group["reference"], "p0_full") ? "p0_full" : "p0"
+        Pg = data.group["reference"][pg_str][1] #Pressure at ground
+        Tg = data.group["reference"]["temperature0"][1] #Temperature at ground
+        ql_ground = data.group["reference"]["ql0"][1]
+        qv_ground = data.group["reference"]["qv0"][1]
+        qi_ground = data.group["reference"]["qi0"][1]
+        qtg = ql_ground + qv_ground + qi_ground #Total water mixing ratio at surface
+        (Pg, Tg, qtg)
+    end
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
+end
+
+function initialize_profiles(self::CasesBase{LES_driven_SCM_RRTMGP}, grid::Grid, param_set, state)
+
+    aux_gm = TC.center_aux_grid_mean(state)
+    NC.Dataset(self.LESDat.les_filename, "r") do data
+        t = data.group["profiles"]["t"][:]
+        # define time interval
+        half_window = self.LESDat.initial_condition_averaging_window_s / 2
+        t_window_start = (self.LESDat.t_interval_from_end_s + half_window)
+        t_window_end = (self.LESDat.t_interval_from_end_s - half_window)
+        t_from_end_s = Array(t) .- t[end]
+        # find inds within time interval
+        in_window(x) = -t_window_start <= x <= -t_window_end
+        time_interval_bool = findall(in_window, t_from_end_s)
+        imin = time_interval_bool[1]
+        imax = time_interval_bool[end]
+        zc_les = Array(TC.get_nc_data(data, "zc"))
+        parent(aux_gm.θ_liq_ice) .=
+            pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "thetali_mean", imin, imax))
+        parent(aux_gm.q_tot) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "qt_mean", imin, imax))
+        parent(aux_gm.u) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "u_mean", imin, imax))
+        parent(aux_gm.v) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "v_mean", imin, imax))
+        # for RRTMGP
+        parent(aux_gm.T) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "temperature_mean", imin, imax))
+    end
+    @inbounds for k in real_center_indices(grid)
+        z = grid.zc[k]
+        aux_gm.tke[k] = if z <= 2500.0
+            1.0 - z / 3000.0
+        else
+            0.0
+        end
+    end
+end
+
+function surface_params(case::LES_driven_SCM, surf_ref_state, param_set; Ri_bulk_crit, LESDat)
+    FT = eltype(surf_ref_state)
+    nt = NC.Dataset(LESDat.les_filename, "r") do data
+        imin = LESDat.imin
+        imax = LESDat.imax
+
+        zrough = 1.0e-4
+        Tsurface = Statistics.mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims = 1)[1]
+        # get surface value of q
+        mean_qt_prof = Statistics.mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)[:]
+        # TODO: this will need to be changed if/when we don't prescribe surface fluxes
+        qsurface = FT(0)
+        lhf = Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1]
+        shf = Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1]
+        (; zrough, Tsurface, qsurface, lhf, shf)
+    end
+    UnPack.@unpack zrough, Tsurface, qsurface, lhf, shf = nt
+
+    ustar = FT(0) # TODO: why is initialization missing?
+    kwargs = (; zrough, Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
+    return TC.FixedSurfaceFlux(FT, TC.VariableFrictionVelocity; kwargs...)
+end
+
+initialize_forcing(self::CasesBase{LES_driven_SCM_RRTMGP}, grid::Grid, state, param_set) =
+    initialize(self.Fo, grid, state, self.LESDat)
+
+initialize_radiation(self::CasesBase{LES_driven_SCM_RRTMGP}, grid::Grid, state, param_set) =
+    # initialize(self.Rad, grid, state, self.LESDat)
+    initialize_rrtmgp(grid, state, param_set)
+    # initialize(self.Rad, grid, state, param_set)
+
+#####
+##### RadiativeConvectiveEquilibrium
+#####
+
+# Based on the setip in:
+# "Radiative–convective equilibrium model intercomparison project"
+# Geosci. Model Dev., 11, 793–813, 2018 https://doi.org/10.5194/gmd-11-793-2018
+ForcingBase(case::RadiativeConvectiveEquilibrium, param_set::APS; kwargs...) =
+    ForcingBase(get_forcing_type(case); apply_coriolis = true, coriolis_param = 0.376e-4) #= s^{-1} =#
+
+function surface_ref_state(::RadiativeConvectiveEquilibrium, param_set::APS, namelist)
+    Pg = 1014.8 * 100.0 #Pressure at ground
+    Tg = 295.0 #Temperature at ground
+    qtg = 12.0/1000.0 #Total water mixing ratio at surface
+    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
+end
+
+function initialize_profiles(self::CasesBase{RadiativeConvectiveEquilibrium}, grid::Grid, param_set, state)
+    aux_gm = TC.center_aux_grid_mean(state)
+    prog_gm = TC.center_prog_grid_mean(state)
+    prog_gm_u = TC.grid_mean_u(state)
+    prog_gm_v = TC.grid_mean_v(state)
+    ρ_c = prog_gm.ρ
+    p_c = aux_gm.p
+    g = CPP.grav(param_set)
+    R_d = CPP.R_d(param_set)
+
+    FT = eltype(grid)
+    prof_q_tot = APL.Bomex_q_tot(FT)
+    prof_θ_liq_ice = APL.Bomex_θ_liq_ice(FT)
+    prof_u = APL.Bomex_u(FT)
+    prof_tke = APL.Bomex_tke(FT)
+
+    zₜ = FT(15000)
+    p₀ = FT(1014.8)
+    Tₛ = FT(295)
+    q₀ = FT(12/1000)
+    Tv₀ = Tₛ*FT(1+0.608*q₀)
+    q_z₁ = FT(4000)
+    q_z₂ = FT(7500)
+    Γ = 0.0067
+    @inbounds for k in real_center_indices(grid)
+        z = grid.zc.z[k]
+        if z < zₜ
+            aux_gm.q_tot[k] =  q₀* exp(-z/q_z₁)*exp(-z^2/q_z₂^2)
+            Tv = Tv₀ - Γ*z
+            p_c[k] = p₀*exp(Tv/Tv₀)^(g/R_d/Γ)
+        else
+            Tv = Tv₀ - Γ*zₜ
+            pₜ = p₀*(Tv/Tv₀)^(g/R_d/Γ)
+            aux_gm.q_tot[k] = FT(10^-11)
+            p_c[k] = pₜ*exp(-g*(z-zₜ)/(R_d*Tv))^(g/R_d/Γ)
+        end
+        aux_gm.T[k] = Tv/(FT(1)+FT(0.608)*aux_gm.q_tot[k])
+        aux_gm.ts[k] = TD.PhaseEquil_pTq(param_set, p_c[k], aux_gm.T[k], aux_gm.q_tot[k])
+        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, aux_gm.ts[k])
+        # compute ref state here
+        prog_gm_u[k] = FT(0)
+        prog_gm_v[k] = FT(0)
+        aux_gm.tke[k] = FT(0)
+    end
+end
+
+function surface_params(case::RadiativeConvectiveEquilibrium, surf_ref_state, param_set; kwargs...)
+    FT = eltype(surf_ref_state)
+    Tsurface = FT(295)
+    qsurface = FT(12/1000)
+    shf = 0.0001 # only prevent zero division in SF.jl lmo
+    lhf = 0.0001 # only prevent zero division in SF.jl lmo
+    zrough = 0.1
+    guistiness = FT(1)
+    # need to pass guistiness from here
+    kwargs = (; Tsurface, qsurface, zrough) #, guistiness
+    return TC.MoninObukhovSurface(FT; kwargs...)
+end
+
+function initialize_forcing(self::CasesBase{RadiativeConvectiveEquilibrium}, grid::Grid, state, param_set)
+    return nothing
+end
+
+initialize_radiation(self::CasesBase{RadiativeConvectiveEquilibrium}, grid::Grid, state, param_set) =
+    # initialize(self.Rad, grid, state, self.LESDat)
+    initialize_rrtmgp(grid, state, param_set)
+    # initialize(self.Rad, grid, state, param_set)
 
 end # module Cases

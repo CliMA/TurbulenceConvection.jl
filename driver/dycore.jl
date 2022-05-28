@@ -204,6 +204,7 @@ function compute_ref_state!(
 
     # Form a right hand side for integrating the hydrostatic equation to
     # determine the reference pressure
+
     function rhs(logp, u, z)
         p_ = exp(logp)
         ts = TD.PhaseEquil_pθq(param_set, p_, θ_liq_ice_g, qtg)
