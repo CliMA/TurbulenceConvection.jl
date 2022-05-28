@@ -374,15 +374,6 @@ function initialize_profiles(self::CasesBase{life_cycle_Tan2018}, grid::Grid, pa
     end
 end
 
-function life_cycle_buoyancy_flux(param_set, weight = 1)
-    g = CPP.grav(param_set)
-    molmass_ratio = CPP.molmass_ratio(param_set)
-    return g * (
-        (8.0e-3 * weight + (molmass_ratio - 1) * (299.1 * 5.2e-5 * weight + 22.45e-3 * 8.0e-3 * weight)) /
-        (299.1 * (1 + (molmass_ratio - 1) * 22.45e-3))
-    )
-end
-
 function surface_params(case::life_cycle_Tan2018, surf_ref_state, param_set; Ri_bulk_crit)
     p_f_surf = TD.air_pressure(param_set, surf_ref_state)
     ρ_f_surf = TD.air_density(param_set, surf_ref_state)
