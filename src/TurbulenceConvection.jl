@@ -60,13 +60,9 @@ function parse_namelist(namelist, keys...; default = nothing, valid_options = no
     return param
 end
 
-include("ExperimentalClimaParams.jl")
-import .ExperimentalClimaParams
-const ECP = ExperimentalClimaParams
-
-include("InternalClimaParams.jl")
-import .InternalClimaParams
-const ICP = InternalClimaParams
+include("TurbulenceConvectionParameters.jl")
+import .TurbulenceConvectionParameters
+const TCP = TurbulenceConvectionParameters
 
 Base.broadcastable(param_set::APS) = Ref(param_set)
 

@@ -5,7 +5,7 @@ initialize(self::TC.RadiationBase{TC.RadiationNone}, grid, state) = nothing
 see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
 function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid, state, t::Real, param_set)
-    cp_d = CPP.cp_d(param_set)
+    cp_d = TCP.cp_d(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)

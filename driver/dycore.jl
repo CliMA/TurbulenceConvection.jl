@@ -2,6 +2,7 @@ import UnPack
 
 import TurbulenceConvection
 const TC = TurbulenceConvection
+const TCP = TC.TurbulenceConvectionParameters
 
 import Thermodynamics
 const TD = Thermodynamics
@@ -14,7 +15,6 @@ import OrdinaryDiffEq
 const ODE = OrdinaryDiffEq
 
 import CLIMAParameters
-const CPP = CLIMAParameters.Planet
 const APS = CLIMAParameters.AbstractEarthParameterSet
 
 #####
@@ -209,7 +209,7 @@ function compute_ref_state!(
         ts = TD.PhaseEquil_pθq(param_set, p_, θ_liq_ice_g, qtg)
         R_m = TD.gas_constant_air(param_set, ts)
         T = TD.air_temperature(param_set, ts)
-        return -FT(CPP.grav(param_set)) / (T * R_m)
+        return -FT(TCP.grav(param_set)) / (T * R_m)
     end
 
     # Perform the integration
@@ -402,9 +402,9 @@ function compute_gm_tendencies!(
     param_set::APS,
 )
     Ic = CCO.InterpolateF2C()
-    R_d = CPP.R_d(param_set)
-    T_0 = CPP.T_0(param_set)
-    Lv_0 = CPP.LH_v0(param_set)
+    R_d = TCP.R_d(param_set)
+    T_0 = TCP.T_0(param_set)
+    Lv_0 = TCP.LH_v0(param_set)
     tendencies_gm = TC.center_tendencies_grid_mean(state)
     kc_toa = TC.kc_top_of_atmos(grid)
     kf_surf = TC.kf_surface(grid)
@@ -460,9 +460,9 @@ function compute_gm_tendencies!(
     tendencies_gm_v = TC.tendencies_grid_mean_v(state)
     @inbounds for k in TC.real_center_indices(grid)
         cp_m = TD.cp_m(param_set, ts_gm[k])
-        cp_v = CPP.cp_v(param_set)
-        cv_v = CPP.cv_v(param_set)
-        R_v = CPP.R_v(param_set)
+        cp_v = TCP.cp_v(param_set)
+        cv_v = TCP.cv_v(param_set)
+        R_v = TCP.R_v(param_set)
         cv_m = TD.cv_m(param_set, ts_gm[k])
         h_v = cv_v * (aux_gm.T[k] - T_0) + Lv_0 - R_v * T_0
 

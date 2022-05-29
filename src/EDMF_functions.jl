@@ -491,7 +491,7 @@ function compute_updraft_top(grid::Grid{FT}, state::State, i::Int)::FT where {FT
 end
 
 function compute_plume_scale_height(grid::Grid{FT}, state::State, param_set::APS, i::Int)::FT where {FT}
-    H_up_min::FT = ICP.H_up_min(param_set)
+    H_up_min::FT = TCP.H_up_min(param_set)
     updraft_top = compute_updraft_top(grid, state, i)
     return max(updraft_top, H_up_min)
 end
@@ -507,7 +507,7 @@ function compute_up_stoch_tendencies!(edmf::EDMFModel, grid::Grid, state::State,
         tends_ε_nondim = tendencies_up[i].ε_nondim
         tends_δ_nondim = tendencies_up[i].δ_nondim
 
-        c_gen_stoch = ECP.c_gen_stoch(param_set)
+        c_gen_stoch = TCP.c_gen_stoch(param_set)
         mean_entr = aux_up[i].ε_nondim
         mean_detr = aux_up[i].δ_nondim
         ε_σ² = c_gen_stoch[1]
@@ -615,7 +615,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
 
         # prognostic entr/detr
         if edmf.entr_closure isa PrognosticNoisyRelaxationProcess
-            c_gen_stoch = ECP.c_gen_stoch(param_set)
+            c_gen_stoch = TCP.c_gen_stoch(param_set)
             mean_entr = aux_up[i].ε_nondim
             mean_detr = aux_up[i].δ_nondim
             ε_λ = c_gen_stoch[3]
@@ -926,7 +926,7 @@ function compute_covariance_dissipation(
     param_set::APS,
 ) where {covar_sym}
     FT = eltype(grid)
-    c_d::FT = ICP.c_d(param_set)
+    c_d::FT = TCP.c_d(param_set)
     aux_tc = center_aux_turbconv(state)
     prog_en = center_prog_environment(state)
     prog_gm = center_prog_grid_mean(state)
@@ -969,7 +969,7 @@ function compute_en_tendencies!(
     w_en_f = face_aux_environment(state).w
     ρ_c = prog_gm.ρ
     ρ_f = aux_gm_f.ρ
-    c_d = ICP.c_d(param_set)
+    c_d = TCP.c_d(param_set)
     is_tke = covar_sym == :tke
     FT = eltype(grid)
 
@@ -1049,8 +1049,8 @@ function update_diagnostic_covariances!(
     aux_covar = getproperty(aux_en_2m, covar_sym)
     aux_up = center_aux_updrafts(state)
     w_en_f = face_aux_environment(state).w
-    c_d = ICP.c_d(param_set)
-    covar_lim = ECP.covar_lim(param_set)
+    c_d = TCP.c_d(param_set)
+    covar_lim = TCP.covar_lim(param_set)
 
     ρ_ae_K = face_aux_turbconv(state).ρ_ae_K
     KH = center_aux_turbconv(state).KH

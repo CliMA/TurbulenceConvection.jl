@@ -1,8 +1,8 @@
 #### Non-dimensional Entrainment-Detrainment functions
 function max_area_limiter(param_set, max_area, a_up)
     FT = eltype(a_up)
-    γ_lim = FT(ECP.area_limiter_scale(param_set))
-    β_lim = FT(ECP.area_limiter_power(param_set))
+    γ_lim = FT(TCP.area_limiter_scale(param_set))
+    β_lim = FT(TCP.area_limiter_power(param_set))
     logistic_term = (2 - 1 / (1 + exp(-γ_lim * (max_area - a_up))))
     return (logistic_term)^β_lim - 1
 end
@@ -11,7 +11,7 @@ function non_dimensional_groups(param_set, εδ_model_vars)
     FT = eltype(εδ_model_vars.tke_en)
     Δw = get_Δw(param_set, εδ_model_vars.w_up, εδ_model_vars.w_en)
     Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
-    Π_norm = ECP.Π_norm(param_set)
+    Π_norm = TCP.Π_norm(param_set)
     Π₁ = (εδ_model_vars.zc_i * Δb) / (Δw^2 + εδ_model_vars.wstar^2) / Π_norm[1]
     Π₂ =
         (εδ_model_vars.tke_gm - εδ_model_vars.a_en * εδ_model_vars.tke_en) / (εδ_model_vars.tke_gm + eps(FT)) /
@@ -37,14 +37,14 @@ functions following Cohen et al. (JAMES, 2020), given:
 function non_dimensional_function(param_set, εδ_model_vars, ::MDEntr)
     FT = eltype(εδ_model_vars.q_cond_up)
     Δw = get_Δw(param_set, εδ_model_vars.w_up, εδ_model_vars.w_en)
-    c_ε = FT(ICP.c_ε(param_set))
-    μ_0 = FT(ICP.μ_0(param_set))
-    β = FT(ICP.β(param_set))
-    χ = FT(ICP.χ(param_set))
+    c_ε = FT(TCP.c_ε(param_set))
+    μ_0 = FT(TCP.μ_0(param_set))
+    β = FT(TCP.β(param_set))
+    χ = FT(TCP.χ(param_set))
     c_δ = if !TD.has_condensate(εδ_model_vars.q_cond_up + εδ_model_vars.q_cond_en)
         FT(0)
     else
-        FT(ICP.c_δ(param_set))
+        FT(TCP.c_δ(param_set))
     end
 
     Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
@@ -80,9 +80,9 @@ function non_dimensional_function!(
     εδ_model::FNOEntr,
 ) where {FT <: Real}
 
-    width = ECP.w_fno(param_set)
-    modes = ECP.nm_fno(param_set)
-    c_fno = ECP.c_fno(param_set)
+    width = TCP.w_fno(param_set)
+    modes = TCP.nm_fno(param_set)
+    c_fno = TCP.c_fno(param_set)
     n_params = length(c_fno)
     n_input_vars = size(Π_groups)[2]
     M = size(Π_groups)[1]
@@ -239,8 +239,8 @@ function non_dimensional_function!(
     εδ_model::NNEntrNonlocal,
 ) where {FT <: Real}
     # neural network architecture
-    nn_arc = ECP.nn_arc(param_set)
-    c_nn_params = ECP.c_nn_params(param_set)
+    nn_arc = TCP.nn_arc(param_set)
+    c_nn_params = TCP.c_nn_params(param_set)
     nn_model = construct_fully_connected_nn(nn_arc, c_nn_params; biases_bool = εδ_model.biases_bool)
     output = nn_model(Π_groups')
     nondim_ε .= output[1, :]
@@ -258,8 +258,8 @@ Uses a fully connected neural network to predict the non-dimensional components 
  - `εδ_model_type`  :: NNEntr - Neural network entrainment closure
 """
 function non_dimensional_function(param_set, εδ_model_vars, εδ_model::NNEntr)
-    nn_arc = ECP.nn_arc(param_set)
-    c_nn_params = ECP.c_nn_params(param_set)
+    nn_arc = TCP.nn_arc(param_set)
+    c_nn_params = TCP.c_nn_params(param_set)
 
     nondim_groups = collect(non_dimensional_groups(param_set, εδ_model_vars))
     # neural network architecture
@@ -278,7 +278,7 @@ Uses a simple linear model to predict the non-dimensional components of dynamica
  - `εδ_model_type`  :: LinearEntr - linear entrainment closure
 """
 function non_dimensional_function(param_set, εδ_model_vars, ::LinearEntr)
-    c_linear = ECP.c_linear(param_set)
+    c_linear = TCP.c_linear(param_set)
 
     nondim_groups = collect(non_dimensional_groups(param_set, εδ_model_vars))
     # Linear closure
@@ -306,10 +306,10 @@ function non_dimensional_function(param_set, εδ_model_vars, ::RFEntr)
     d = size(nondim_groups)[1]
 
     # Learnable and fixed parameters
-    c_rf_fix = ECP.c_rf_fix(param_set)      # 2 x m x (1 + d), fix
+    c_rf_fix = TCP.c_rf_fix(param_set)      # 2 x m x (1 + d), fix
     c_rf_fix = reshape(c_rf_fix, 2, :, 1 + d)
     m = size(c_rf_fix)[2]
-    c_rf_opt = ECP.c_rf_opt(param_set)      # 2 x (m + 1 + d), learn
+    c_rf_opt = TCP.c_rf_opt(param_set)      # 2 x (m + 1 + d), learn
     c_rf_opt = reshape(c_rf_opt, 2, m + 1 + d)
 
     # Random Features
@@ -339,7 +339,7 @@ function non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::L
     FT = eltype(εδ_model_vars.q_cond_up)
     # model parameters
     mean_model = εδ_model_type.mean_model
-    c_gen_stoch = ECP.c_gen_stoch(param_set)
+    c_gen_stoch = TCP.c_gen_stoch(param_set)
     ε_σ² = c_gen_stoch[1]
     δ_σ² = c_gen_stoch[2]
 
@@ -374,7 +374,7 @@ Arguments:
 function non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::NoisyRelaxationProcess)
     # model parameters
     mean_model = εδ_model_type.mean_model
-    c_gen_stoch = ECP.c_gen_stoch(param_set)
+    c_gen_stoch = TCP.c_gen_stoch(param_set)
     ε_σ² = c_gen_stoch[1]
     δ_σ² = c_gen_stoch[2]
     ε_λ = c_gen_stoch[3]

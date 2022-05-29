@@ -1,13 +1,13 @@
 function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
-    c_m::FT = ICP.c_m(param_set)
-    c_d::FT = ICP.c_d(param_set)
-    smin_ub::FT = ICP.smin_ub(param_set)
-    smin_rm::FT = ICP.smin_rm(param_set)
-    l_max::FT = ECP.l_max(param_set)
-    c_b::FT = ECP.static_stab_coeff(param_set)
-    g::FT = ICP.grav(param_set)
-    molmass_ratio::FT = ICP.molmass_ratio(param_set)
-    vkc::FT = ICP.von_karman_const(param_set)
+    c_m::FT = TCP.c_m(param_set)
+    c_d::FT = TCP.c_d(param_set)
+    smin_ub::FT = TCP.smin_ub(param_set)
+    smin_rm::FT = TCP.smin_rm(param_set)
+    l_max::FT = TCP.l_max(param_set)
+    c_b::FT = TCP.static_stab_coeff(param_set)
+    g::FT = TCP.grav(param_set)
+    molmass_ratio::FT = TCP.molmass_ratio(param_set)
+    vkc::FT = TCP.von_karman_const(param_set)
     ustar = ml_model.ustar
     z = ml_model.z
     tke_surf = ml_model.tke_surf
