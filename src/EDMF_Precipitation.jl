@@ -6,11 +6,11 @@ Computes diagnostic precipitation fraction
 function compute_precip_fraction(edmf::EDMFModel, state::State, param_set::APS)
 
     pf = if edmf.precip_fraction_model isa PrescribedPrecipFraction
-        ECP.prescribed_precip_frac_value(param_set)
+        TCP.prescribed_precip_frac_value(param_set)
     elseif edmf.precip_fraction_model isa DiagnosticPrecipFraction
         aux_gm = center_aux_grid_mean(state)
         maxcf = maximum(aux_gm.cloud_fraction)
-        max(maxcf, ECP.precip_fraction_limiter(param_set))
+        max(maxcf, TCP.precip_fraction_limiter(param_set))
     else
         error("Failed to compute precipitation fraction.")
     end
@@ -114,9 +114,9 @@ function compute_precipitation_sink_tendencies(
         c_pm = TD.cp_m(param_set, ts)
         c_vm = TD.cv_m(param_set, ts)
         R_m = TD.gas_constant_air(param_set, ts)
-        R_v = ICP.R_v(param_set)
-        L_v0 = ICP.LH_v0(param_set)
-        L_s0 = ICP.LH_s0(param_set)
+        R_v = TCP.R_v(param_set)
+        L_v0 = TCP.LH_v0(param_set)
+        L_s0 = TCP.LH_s0(param_set)
         L_v = TD.latent_heat_vapor(param_set, ts)
         L_s = TD.latent_heat_sublim(param_set, ts)
         L_f = TD.latent_heat_fusion(param_set, ts)
@@ -126,9 +126,9 @@ function compute_precipitation_sink_tendencies(
         I = TD.internal_energy(param_set, ts)
         Φ = geopotential(param_set, grid.zc.z[k])
 
-        α_evp = ICP.microph_scaling(param_set)
-        α_dep_sub = ICP.microph_scaling_dep_sub(param_set)
-        α_melt = ICP.microph_scaling_melt(param_set)
+        α_evp = TCP.microph_scaling(param_set)
+        α_dep_sub = TCP.microph_scaling_dep_sub(param_set)
+        α_melt = TCP.microph_scaling_melt(param_set)
 
         # TODO - move limiters elsewhere
         # TODO - when using adaptive timestepping we are limiting the source terms

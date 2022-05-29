@@ -72,8 +72,8 @@ function precipitation_formation(
 
         Π_m = TD.exner(param_set, ts)
         c_pm = TD.cp_m(param_set, ts)
-        L_v0 = ICP.LH_v0(param_set)
-        L_s0 = ICP.LH_s0(param_set)
+        L_v0 = TCP.LH_v0(param_set)
+        L_s0 = TCP.LH_s0(param_set)
         I_l = TD.internal_energy_liquid(param_set, ts)
         I_i = TD.internal_energy_ice(param_set, ts)
         I = TD.internal_energy(param_set, ts)
@@ -96,8 +96,8 @@ function precipitation_formation(
 
         if precip_model isa Clima1M
             T = TD.air_temperature(param_set, ts)
-            T_fr = ICP.T_freeze(param_set)
-            c_vl = ICP.cv_l(param_set)
+            T_fr = TCP.T_freeze(param_set)
+            c_vl = TCP.cv_l(param_set)
             c_vm = TD.cv_m(param_set, ts)
             Rm = TD.gas_constant_air(param_set, ts)
             Lf = TD.latent_heat_fusion(param_set, ts)

@@ -21,7 +21,6 @@ import UnPack
 
 import CLIMAParameters
 const CP = CLIMAParameters
-const CPP = CP.Planet
 const APS = CP.AbstractEarthParameterSet
 
 import Thermodynamics
@@ -29,6 +28,7 @@ const TD = Thermodynamics
 
 import ..TurbulenceConvection
 const TC = TurbulenceConvection
+const TCP = TC.TurbulenceConvectionParameters
 
 import ..TurbulenceConvection: ForcingBase
 import ..TurbulenceConvection: RadiationBase
@@ -432,7 +432,7 @@ end
 
 function ForcingBase(case::Rico, param_set::APS; kwargs...)
     latitude = 18.0
-    Omega = CPP.Omega(param_set)
+    Omega = TCP.Omega(param_set)
     return ForcingBase(
         get_forcing_type(case);
         apply_coriolis = true,
@@ -441,7 +441,7 @@ function ForcingBase(case::Rico, param_set::APS; kwargs...)
 end
 
 function surface_ref_state(::Rico, param_set::APS, namelist)
-    molmass_ratio = CPP.molmass_ratio(param_set)
+    molmass_ratio = TCP.molmass_ratio(param_set)
     Pg = 1.0154e5  #Pressure at ground
     Tg = 299.8  #Temperature at ground
     pvg = TD.saturation_vapor_pressure(param_set, Tg, TD.Liquid())
@@ -547,7 +547,7 @@ ForcingBase(case::TRMM_LBA, param_set::APS; kwargs...) =
     ForcingBase(get_forcing_type(case); apply_coriolis = false, kwargs...)
 
 function surface_ref_state(::TRMM_LBA, param_set::APS, namelist)
-    molmass_ratio = CPP.molmass_ratio(param_set)
+    molmass_ratio = TCP.molmass_ratio(param_set)
     Pg = 991.3 * 100  #Pressure at ground
     Tg = 296.85   # surface values for reference state (RS) which outputs p, ρ
     pvg = TD.saturation_vapor_pressure(param_set, Tg, TD.Liquid())
@@ -570,7 +570,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, param_set, s
     prof_tke = APL.TRMM_LBA_tke(FT)
 
     zc = grid.zc.z
-    molmass_ratio = CPP.molmass_ratio(param_set)
+    molmass_ratio = TCP.molmass_ratio(param_set)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_u = TC.grid_mean_u(state)
     prog_gm_v = TC.grid_mean_v(state)
@@ -943,7 +943,7 @@ end
 
 function ForcingBase(case::GABLS, param_set::APS; kwargs...)
     coriolis_param = 1.39e-4 # s^{-1}
-    # Omega = CPP.Omega(param_set)
+    # Omega = TCP.Omega(param_set)
     # coriolis_param = 2 * Omega * sin(latitude * π / 180 ) # s^{-1}
     ForcingBase(get_forcing_type(case); apply_coriolis = true, coriolis_param = coriolis_param)
 end
@@ -1004,7 +1004,7 @@ end
 # Not fully implemented yet - Ignacio
 function ForcingBase(case::SP, param_set::APS; kwargs...)
     coriolis_param = 1.0e-4 # s^{-1}
-    # Omega = CPP.Omega(param_set)
+    # Omega = TCP.Omega(param_set)
     # coriolis_param = 2 * Omega * sin(latitude * π / 180 ) # s^{-1}
     ForcingBase(get_forcing_type(case); apply_coriolis = true, coriolis_param = coriolis_param)
 end

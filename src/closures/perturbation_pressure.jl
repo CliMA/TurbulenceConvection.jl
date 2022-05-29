@@ -40,9 +40,9 @@ function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, param_s
 
     # Note: Independence of aspect ratio hardcoded in implementation.
     α₂_asp_ratio² = FT(0)
-    α_b::FT = ICP.α_b(param_set)
-    α_a::FT = ICP.α_a(param_set)
-    α_d::FT = ICP.α_d(param_set)
+    α_b::FT = TCP.α_b(param_set)
+    α_a::FT = TCP.α_a(param_set)
+    α_d::FT = TCP.α_d(param_set)
 
     @inbounds for i in 1:N_up
         # pressure
