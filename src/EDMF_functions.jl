@@ -86,20 +86,10 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     # compute total enthalpies
     ts_en = center_aux_environment(state).ts
     ts_gm = center_aux_grid_mean(state).ts
-    @. h_tot_gm = anelastic_total_enthalpy(param_set, prog_gm.ρe_tot / ρ_c, ts_gm)
-    @. h_tot_en = anelastic_total_enthalpy(
-        param_set,
-        TD.total_energy(
-            param_set,
-            ts_en,
-            kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + w_en)),
-            geopotential(param_set, grid.zc.z),
-        ),
-        ts_en,
-    )
+    @. h_tot_gm = total_enthalpy(param_set, prog_gm.ρe_tot / ρ_c, ts_gm)
     # Compute the mass flux and associated scalar fluxes
     @. massflux = ρ_f * Ifae(a_en) * (w_en - w_gm)
-    @. massflux_h = ρ_f * Ifae(a_en) * (w_en - w_gm) * (If(h_tot_en) - If(h_tot_gm))
+    @. massflux_h = ρ_f * Ifae(a_en) * (w_en - w_gm) * (If(aux_en.h_tot) - If(h_tot_gm))
     @. massflux_qt = ρ_f * Ifae(a_en) * (w_en - w_gm) * (If(q_tot_en) - If(q_tot_gm))
     @inbounds for i in 1:N_up
         aux_up_f_i = aux_up_f[i]
@@ -108,30 +98,10 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         Ifau = CCO.InterpolateC2F(; a_up_bcs...)
         a_up = aux_up[i].area
         w_up_i = aux_up_f[i].w
-        θ_liq_ice_up = aux_up_i.θ_liq_ice
         q_tot_up = aux_up_i.q_tot
+        h_tot_up = aux_up_i.h_tot
         @. aux_up_f[i].massflux = ρ_f * Ifau(a_up) * (w_up_i - w_gm)
-        # We know that, since W = 0 at z = 0, m = 0 also, and
-        # therefore h_tot / q_tot values do not matter
-        ts_up_i = copy(ts_en)
-        h_tot_up_i = copy(q_tot_up)
-        thermo_args = if edmf.moisture_model isa EquilibriumMoisture
-            ()
-        elseif edmf.moisture_model isa NonEquilibriumMoisture
-            (aux_up[i].q_liq, aux_up[i].q_ice)
-        end
-        @. ts_up_i = thermo_state_pθq(param_set, p_c, θ_liq_ice_up, q_tot_up, thermo_args...)
-        @. h_tot_up_i = anelastic_total_enthalpy(
-            param_set,
-            TD.total_energy(
-                param_set,
-                ts_up_i,
-                kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + w_up_i)),
-                geopotential(param_set, grid.zc.z),
-            ),
-            ts_up_i,
-        )
-        @. massflux_h += ρ_f * (Ifau(a_up) * (w_up_i - w_gm) * (If(h_tot_up_i) - If(h_tot_gm)))
+        @. massflux_h += ρ_f * (Ifau(a_up) * (w_up_i - w_gm) * (If(h_tot_up) - If(h_tot_gm)))
         @. massflux_qt += ρ_f * (Ifau(a_up) * (w_up_i - w_gm) * (If(q_tot_up) - If(q_tot_gm)))
     end
 
@@ -233,20 +203,6 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     IfKM = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKM[kc_surf]), top = CCO.SetValue(aeKM[kc_toa]))
     Ic = CCO.InterpolateF2C()
 
-    h_tot_en = copy(a_en)
-    ts_gm = center_aux_grid_mean(state).ts
-    ts_en = center_aux_environment(state).ts
-    @. h_tot_en = anelastic_total_enthalpy(
-        param_set,
-        TD.total_energy(
-            param_set,
-            ts_en,
-            kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + aux_en_f.w)),
-            geopotential(param_set, grid.zc.z),
-        ),
-        ts_en,
-    )
-
     @. aux_tc_f.ρ_ae_KH = IfKH(aeKH) * ρ_f
     @. aux_tc_f.ρ_ae_KM = IfKM(aeKM) * ρ_f
 
@@ -262,7 +218,7 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
 
     wvec = CC.Geometry.WVector
     @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KH * ∇q_tot_en(wvec(aux_en.q_tot))
-    @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇h_tot_en(wvec(h_tot_en))
+    @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇h_tot_en(wvec(aux_en.h_tot))
     @. aux_tc_f.diffusive_flux_u = -aux_tc_f.ρ_ae_KM * ∇u_gm(wvec(prog_gm_u))
     @. aux_tc_f.diffusive_flux_v = -aux_tc_f.ρ_ae_KM * ∇v_gm(wvec(prog_gm_v))
 
