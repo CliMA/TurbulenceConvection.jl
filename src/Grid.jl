@@ -188,3 +188,30 @@ z_findlast_face(f::F, grid::Grid) where {F} = grid.zf[findlast_face(f, grid)].z
 
 
 Base.eltype(::Grid{FT}) where {FT} = FT
+
+
+"""
+    ColumnIterator(::Field)
+
+Iterates over columns given a field (or space)
+
+```julia
+for (h,j,i) in iterate_columns(field)
+    ...
+end
+```
+"""
+struct ColumnIterator{Nh, Nj, Ni}
+    function ColumnIterator(space::CC.Spaces.ExtrudedFiniteDifferenceSpace)
+        Ni, Nj, _, _, Nh = size(CC.Spaces.local_geometry_data(space))
+        return new{Nh, Nj, Ni}()
+    end
+end
+ColumnIterator(field::CC.Fields.ExtrudedFiniteDifferenceField) = ColumnIterator(axes(field))
+
+Base.size(::ColumnIterator{Nh, Nj, Ni}) where {Nh, Nj, Ni} = (Nh, Nj, Ni)
+
+function iterate_columns(field)
+    (Nh, Nj, Ni) = size(ColumnIterator(field))
+    return Iterators.product(1:Nh, 1:Nj, 1:Ni)
+end

@@ -19,10 +19,15 @@ function affect_io!(integrator)
     prog = integrator.u
     tendencies = ODE.get_du(integrator)
 
-    begin
-        state = TC.State(integrator.u, aux, tendencies)
+    for inds in TC.iterate_columns(prog.cent)
+        state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
         diag_col = diagnostics
+
+        diag_cent_column = CC.column(diagnostics.cent, inds...)
+        diag_face_column = CC.column(diagnostics.face, inds...)
+        diag_svpc_column = CC.column(diagnostics.svpc, inds...)
+        diag_col = CC.Fields.FieldVector(cent = diag_cent_column, face = diag_face_column, svpc = diag_svpc_column)
 
         # TODO: is this the best location to call diagnostics?
         compute_diagnostics!(edmf, precip_model, param_set, grid, state, diag_col, Stats, case, t, calibrate_io)
@@ -75,9 +80,10 @@ function affect_filter!(integrator)
     t = integrator.t
     prog = integrator.u
     tendencies = ODE.get_du(integrator)
+    prog = integrator.u
 
-    begin
-        state = TC.State(integrator.u, aux, tendencies)
+    for inds in TC.iterate_columns(prog.cent)
+        state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
         surf = get_surface(case.surf_params, grid, state, t, param_set)
         TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
@@ -101,9 +107,10 @@ function dt_max!(integrator)
     UnPack.@unpack edmf, aux, TS = integrator.p
     prog = integrator.u
     tendencies = ODE.get_du(integrator)
+    prog = integrator.u
 
-    begin
-        state = TC.State(integrator.u, aux, tendencies)
+    for inds in TC.iterate_columns(prog.cent)
+        state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
         prog_gm = TC.center_prog_grid_mean(state)
         prog_gm_f = TC.face_prog_grid_mean(state)
@@ -151,8 +158,8 @@ function monitor_cfl!(integrator)
     prog = integrator.u
     tendencies = ODE.get_du(integrator)
 
-    begin
-        state = TC.State(integrator.u, aux, tendencies)
+    for inds in TC.iterate_columns(prog.cent)
+        state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
         prog_gm = TC.center_prog_grid_mean(state)
         Δz = TC.get_Δz(prog_gm.ρ)
