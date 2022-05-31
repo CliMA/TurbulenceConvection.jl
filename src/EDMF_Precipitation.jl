@@ -3,18 +3,15 @@
 
 Computes diagnostic precipitation fraction
 """
-function compute_precip_fraction(edmf::EDMFModel, state::State, param_set::APS)
+compute_precip_fraction(edmf::EDMFModel, state::State) = compute_precip_fraction(edmf.precip_fraction_model, state)
 
-    pf = if edmf.precip_fraction_model isa PrescribedPrecipFraction
-        TCP.prescribed_precip_frac_value(param_set)
-    elseif edmf.precip_fraction_model isa DiagnosticPrecipFraction
-        aux_gm = center_aux_grid_mean(state)
-        maxcf = maximum(aux_gm.cloud_fraction)
-        max(maxcf, TCP.precip_fraction_limiter(param_set))
-    else
-        error("Failed to compute precipitation fraction.")
-    end
-    return pf
+compute_precip_fraction(precip_fraction_model::PrescribedPrecipFraction, ::State) =
+    precip_fraction_model.prescribed_precip_frac_value
+
+function compute_precip_fraction(precip_fraction_model::DiagnosticPrecipFraction, state::State)
+    aux_gm = center_aux_grid_mean(state)
+    maxcf = maximum(aux_gm.cloud_fraction)
+    return max(maxcf, precip_fraction_model.precip_fraction_limiter)
 end
 
 """
@@ -49,7 +46,7 @@ function compute_precipitation_advection_tendencies(
     term_vel_rain = aux_tc.term_vel_rain
     term_vel_snow = aux_tc.term_vel_snow
 
-    precip_fraction = compute_precip_fraction(edmf, state, param_set)
+    precip_fraction = compute_precip_fraction(edmf, state)
 
     q_rai = prog_pr.q_rai #./ precip_fraction
     q_sno = prog_pr.q_sno #./ precip_fraction
@@ -97,7 +94,7 @@ function compute_precipitation_sink_tendencies(
     tendencies_pr = center_tendencies_precipitation(state)
     ts_gm = aux_gm.ts
 
-    precip_fraction = compute_precip_fraction(edmf, state, param_set)
+    precip_fraction = compute_precip_fraction(edmf, state)
 
     @inbounds for k in real_center_indices(grid)
         qr = prog_pr.q_rai[k] / precip_fraction

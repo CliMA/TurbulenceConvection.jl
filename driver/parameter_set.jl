@@ -132,8 +132,6 @@ function create_parameter_set(namelist)
         smin_rm = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_rm"),
         l_max = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),
         covar_lim = TC.parse_namelist(namelist, "thermodynamics", "diagnostic_covar_limiter"),
-        prescribed_precip_frac_value = TC.parse_namelist(namelist, "microphysics", "prescribed_precip_frac_value"; default = 1.0),
-        precip_fraction_limiter = TC.parse_namelist(namelist, "microphysics", "precip_fraction_limiter"; default = 0.3),
         entr_closure_kwargs...,
         ## Stochastic parameters
         c_gen_stoch = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "general_stochastic_ent_params"),

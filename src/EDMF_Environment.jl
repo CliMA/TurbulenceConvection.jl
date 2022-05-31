@@ -17,7 +17,7 @@ function microphysics(
     ρ_c = prog_gm.ρ
     aux_en_sat = aux_en.sat
     aux_en_unsat = aux_en.unsat
-    precip_fraction = compute_precip_fraction(edmf, state, param_set)
+    precip_fraction = compute_precip_fraction(edmf, state)
 
     @inbounds for k in real_center_indices(grid)
         # condensation
@@ -247,7 +247,7 @@ function microphysics(
     aux_en_sat = aux_en.sat
     tendencies_pr = center_tendencies_precipitation(state)
     ts_env = center_aux_environment(state).ts
-    precip_fraction = compute_precip_fraction(edmf, state, param_set)
+    precip_fraction = compute_precip_fraction(edmf, state)
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
 
