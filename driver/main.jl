@@ -77,14 +77,21 @@ function Simulation1d(namelist)
 
     grid = construct_grid(namelist; FT = FT)
 
-    Stats = skip_io ? nothing : NetCDFIO_Stats(namelist, grid)
+    frequency = namelist["stats_io"]["frequency"]
+    nc_filename, outpath = nc_fileinfo(namelist)
 
-    case_type = Cases.get_case(namelist)
-    surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
+    Stats = if skip_io
+        nothing
+    else
+        # Setup the statistics output path
+        NetCDFIO_Stats(nc_filename, frequency, grid)
+    end
 
-    Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
-    Rad = TC.RadiationBase(case_type)
-    TS = TimeStepping(namelist)
+    casename = namelist["meta"]["casename"]
+    # Write namelist file to output directory
+    open(joinpath(outpath, "namelist_$casename.in"), "w") do io
+        JSON.print(io, namelist, 4)
+    end
 
     # Create the class for precipitation
 
@@ -131,6 +138,13 @@ function Simulation1d(namelist)
         face = diagnostic_face_fields,
         svpc = diagnostics_single_value_per_col,
     )
+
+    case_type = Cases.get_case(namelist)
+    surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
+
+    Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
+    Rad = TC.RadiationBase(case_type)
+    TS = TimeStepping(namelist)
 
     # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
     state = TC.State(prog, aux, nothing)

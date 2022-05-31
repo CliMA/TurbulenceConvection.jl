@@ -20,26 +20,31 @@ Base.min(h1::Cent, h2::Cent) = Cent(min(h1.i, h2.i))
 Base.:-(a::FT, b::CCG.Covariant3Vector{FT}) where {FT} = a .- b.u₃
 Base.:+(a::FT, b::CCG.Covariant3Vector{FT}) where {FT} = a .+ b.u₃
 
-Base.@propagate_inbounds Base.getindex(field::CC.Fields.FiniteDifferenceField, i::Integer) = Base.getproperty(field, i)
+const FDFields = Union{CC.Fields.ExtrudedFiniteDifferenceField, CC.Fields.FiniteDifferenceField}
 
-Base.@propagate_inbounds Base.getindex(field::CC.Fields.CenterFiniteDifferenceField, i::Cent) =
-    Base.getindex(CC.Fields.field_values(field), i.i)
-Base.@propagate_inbounds Base.setindex!(field::CC.Fields.CenterFiniteDifferenceField, v, i::Cent) =
+const FaceFields = Union{CC.Fields.FaceExtrudedFiniteDifferenceField, CC.Fields.FaceFiniteDifferenceField}
+
+const CenterFields = Union{CC.Fields.CenterExtrudedFiniteDifferenceField, CC.Fields.CenterFiniteDifferenceField}
+
+Base.@propagate_inbounds Base.getindex(field::FDFields, i::Integer) = Base.getproperty(field, i)
+
+Base.@propagate_inbounds Base.getindex(field::CenterFields, i::Cent) = Base.getindex(CC.Fields.field_values(field), i.i)
+Base.@propagate_inbounds Base.setindex!(field::CenterFields, v, i::Cent) =
     Base.setindex!(CC.Fields.field_values(field), v, i.i)
 
-Base.@propagate_inbounds Base.getindex(field::CC.Fields.FaceFiniteDifferenceField, i::CCO.PlusHalf) =
+Base.@propagate_inbounds Base.getindex(field::FaceFields, i::CCO.PlusHalf) =
     Base.getindex(CC.Fields.field_values(field), i.i)
-Base.@propagate_inbounds Base.setindex!(field::CC.Fields.FaceFiniteDifferenceField, v, i::CCO.PlusHalf) =
+Base.@propagate_inbounds Base.setindex!(field::FaceFields, v, i::CCO.PlusHalf) =
     Base.setindex!(CC.Fields.field_values(field), v, i.i)
 
-Base.@propagate_inbounds Base.getindex(field::CC.Fields.FaceFiniteDifferenceField, ::Cent) =
+Base.@propagate_inbounds Base.getindex(field::FaceFields, ::Cent) =
     error("Attempting to getindex with a center index (Cent) into a Face field")
-Base.@propagate_inbounds Base.getindex(field::CC.Fields.CenterFiniteDifferenceField, ::CCO.PlusHalf) =
+Base.@propagate_inbounds Base.getindex(field::CenterFields, ::CCO.PlusHalf) =
     error("Attempting to getindex with a face index (PlusHalf) into a Center field")
 
-Base.@propagate_inbounds Base.setindex!(field::CC.Fields.FaceFiniteDifferenceField, v, ::Cent) =
+Base.@propagate_inbounds Base.setindex!(field::FaceFields, v, ::Cent) =
     error("Attempting to setindex with a center index (Cent) into a Face field")
-Base.@propagate_inbounds Base.setindex!(field::CC.Fields.CenterFiniteDifferenceField, v, ::CCO.PlusHalf) =
+Base.@propagate_inbounds Base.setindex!(field::CenterFields, v, ::CCO.PlusHalf) =
     error("Attempting to setindex with a face index (PlusHalf) into a Center field")
 
 # TODO: deprecate, we should not overload getindex/setindex for ordinary arrays.

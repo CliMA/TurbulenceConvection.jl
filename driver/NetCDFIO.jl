@@ -33,15 +33,7 @@ mutable struct NetCDFIO_Stats
 end
 
 # Convenience backward compatible outer constructor
-function NetCDFIO_Stats(namelist, grid::TC.Grid)
-    frequency = namelist["stats_io"]["frequency"]
-    # Setup the statistics output path
-    casename = namelist["meta"]["casename"]
-    nc_filename, outpath = nc_fileinfo(namelist)
-    # Write namelist file to output directory
-    open(joinpath(outpath, "namelist_$casename.in"), "w") do io
-        JSON.print(io, namelist, 4)
-    end
+function NetCDFIO_Stats(nc_filename, frequency, grid::TC.Grid)
     NetCDFIO_Stats(; nc_filename, frequency, z_faces = vec(grid.zf.z), z_centers = vec(grid.zc.z))
 end
 
