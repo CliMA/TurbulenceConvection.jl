@@ -44,9 +44,10 @@ function DiffEqNoiseProcess.wiener_randn!(rng::Random.AbstractRNG, rand_vec::CC.
     parent(rand_vec.face) .= Random.randn.()
 end
 
-struct Simulation1d{IONT, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS}
+struct Simulation1d{IONT, P, A, C, EDMF, PM, D, TIMESTEPPING, STATS, PS, SRS}
     io_nt::IONT
-    state::S
+    prog::P
+    aux::A
     case::C
     edmf::EDMF
     precip_model::PM
@@ -60,6 +61,7 @@ struct Simulation1d{IONT, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS}
     cfl_limit::Float64
     dt_min::Float64
     truncate_stack_trace::Bool
+    surf_ref_state::SRS
 end
 
 function Simulation1d(namelist)
@@ -145,21 +147,6 @@ function Simulation1d(namelist)
     Rad = TC.RadiationBase(case_type)
     TS = TimeStepping(namelist)
 
-    # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
-    state = TC.State(prog, aux, nothing)
-    compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
-
-    if !skip_io
-        NC.Dataset(Stats.nc_filename, "a") do ds
-            group = "reference"
-            add_write_field(ds, "ρ_f", vec(TC.face_aux_grid_mean(state).ρ), group, ("zf",))
-            add_write_field(ds, "ρ_c", vec(TC.center_prog_grid_mean(state).ρ), group, ("zc",))
-            add_write_field(ds, "p_f", vec(TC.face_aux_grid_mean(state).p), group, ("zf",))
-            add_write_field(ds, "p_c", vec(TC.center_aux_grid_mean(state).p), group, ("zc",))
-        end
-    end
-
-
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)
     surf_params = Cases.surface_params(case_type, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
@@ -174,7 +161,8 @@ function Simulation1d(namelist)
 
     return Simulation1d(
         io_nt,
-        state,
+        prog,
+        aux,
         case,
         edmf,
         precip_model,
@@ -188,28 +176,46 @@ function Simulation1d(namelist)
         cfl_limit,
         dt_min,
         truncate_stack_trace,
+        surf_ref_state,
     )
 end
 
 function initialize(sim::Simulation1d)
     TC = TurbulenceConvection
-    state = sim.state
-    FT = eltype(sim.edmf)
+
+    (; prog, aux, edmf, case, param_set, skip_io, Stats, io_nt, diagnostics, truncate_stack_trace, surf_ref_state) = sim
+    prog = prog
+    FT = eltype(edmf)
     t = FT(0)
 
-    grid = TC.Grid(axes(sim.state.prog.cent))
-    Cases.initialize_profiles(sim.case, grid, sim.param_set, state)
-    set_thermo_state_pθq!(state, grid, sim.edmf.moisture_model, sim.param_set)
-    set_grid_mean_from_thermo_state!(sim.param_set, sim.state, grid)
-    assign_thermo_aux!(state, grid, sim.edmf.moisture_model, sim.param_set)
+    grid = TC.Grid(axes(prog.cent))
 
-    Cases.initialize_forcing(sim.case, grid, state, sim.param_set)
-    Cases.initialize_radiation(sim.case, grid, state, sim.param_set)
+    # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
+    state = TC.State(prog, aux, nothing)
+    compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
 
-    initialize_edmf(sim.edmf, grid, state, sim.case, sim.param_set, t)
+    if !skip_io
+        NC.Dataset(Stats.nc_filename, "a") do ds
+            group = "reference"
+            add_write_field(ds, "ρ_f", vec(TC.face_aux_grid_mean(state).ρ), group, ("zf",))
+            add_write_field(ds, "ρ_c", vec(TC.center_prog_grid_mean(state).ρ), group, ("zc",))
+            add_write_field(ds, "p_f", vec(TC.face_aux_grid_mean(state).p), group, ("zf",))
+            add_write_field(ds, "p_c", vec(TC.center_aux_grid_mean(state).p), group, ("zc",))
+        end
+    end
 
-    sim.skip_io && return nothing
-    initialize_io(sim.Stats.nc_filename, sim.io_nt.aux, sim.io_nt.diagnostics)
+    Cases.initialize_profiles(case, grid, param_set, state)
+    set_thermo_state_pθq!(state, grid, edmf.moisture_model, param_set)
+    set_grid_mean_from_thermo_state!(param_set, state, grid)
+    assign_thermo_aux!(state, grid, edmf.moisture_model, param_set)
+
+    Cases.initialize_forcing(case, grid, state, param_set)
+    Cases.initialize_radiation(case, grid, state, param_set)
+
+    initialize_edmf(edmf, grid, state, case, param_set, t)
+
+    skip_io && return nothing
+    initialize_io(Stats.nc_filename, io_nt.aux, io_nt.diagnostics)
 
     ts_gm = ["Tsurface", "shf", "lhf", "ustar", "wstar", "lwp_mean", "iwp_mean"]
     ts_edmf = [
@@ -233,25 +239,25 @@ function initialize(sim::Simulation1d)
     ]
     ts_list = vcat(ts_gm, ts_edmf)
 
-    initialize_io(sim.Stats.nc_filename, ts_list)
+    initialize_io(Stats.nc_filename, ts_list)
 
-    surf = get_surface(sim.case.surf_params, grid, state, t, sim.param_set)
+    surf = get_surface(case.surf_params, grid, state, t, param_set)
 
-    open_files(sim.Stats)
+    open_files(Stats)
     try
-        write_simulation_time(sim.Stats, t)
-        io(sim.io_nt.aux, sim.Stats, state)
-        io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
-        io(surf, sim.case.surf_params, grid, state, sim.Stats, t)
+        write_simulation_time(Stats, t)
+        io(io_nt.aux, Stats, state)
+        io(io_nt.diagnostics, Stats, diagnostics)
+        io(surf, case.surf_params, grid, state, Stats, t)
     catch e
-        if sim.truncate_stack_trace
+        if truncate_stack_trace
             @warn "IO during initialization failed."
         else
             @warn "IO during initialization failed." exception = (e, catch_backtrace())
         end
         return :simulation_crashed
     finally
-        close_files(sim.Stats)
+        close_files(Stats)
     end
 
     return
@@ -311,10 +317,9 @@ include("callbacks.jl")
 
 function solve_args(sim::Simulation1d)
     TC = TurbulenceConvection
-    state = sim.state
     calibrate_io = sim.calibrate_io
-    prog = state.prog
-    aux = state.aux
+    prog = sim.prog
+    aux = sim.aux
     TS = sim.TS
     diagnostics = sim.diagnostics
 
@@ -352,10 +357,10 @@ function solve_args(sim::Simulation1d)
     callbacks = ODE.CallbackSet(callback_adapt_dt..., callback_dtmax, callback_cfl..., callback_filters, callback_io...)
 
     if sim.edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess
-        prob = SDE.SDEProblem(∑tendencies!, ∑stoch_tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
+        prob = SDE.SDEProblem(∑tendencies!, ∑stoch_tendencies!, prog, t_span, params; dt = sim.TS.dt)
         alg = SDE.EM()
     else
-        prob = ODE.ODEProblem(∑tendencies!, state.prog, t_span, params; dt = sim.TS.dt)
+        prob = ODE.ODEProblem(∑tendencies!, prog, t_span, params; dt = sim.TS.dt)
         alg = ODE.Euler()
     end
 

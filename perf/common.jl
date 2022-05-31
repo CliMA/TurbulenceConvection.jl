@@ -7,11 +7,11 @@ include(joinpath(tc_dir, "driver", "main.jl"))
 import .NameList
 
 function unpack_params(sim)
-    tendencies = copy(sim.state.prog)
+    tendencies = copy(sim.prog)
     TS = sim.TS
-    prog = sim.state.prog
+    prog = sim.prog
     calibrate_io = sim.calibrate_io
-    aux = sim.state.aux
+    aux = sim.aux
     params = (;
         calibrate_io,
         edmf = sim.edmf,
