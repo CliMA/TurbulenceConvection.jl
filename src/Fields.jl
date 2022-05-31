@@ -76,3 +76,26 @@ function Base.cumsum!(fieldout::CC.Fields.FiniteDifferenceField, fieldin::CC.Fie
 end
 
 get_Δz(field::CC.Fields.FiniteDifferenceField) = parent(CC.Fields.weighted_jacobian(field))
+
+
+function first_center_space(fv::CC.Fields.FieldVector)
+    for prop_chain in CC.Fields.property_chains(fv)
+        f = CC.Fields.single_field(fv, prop_chain)
+        space = axes(f)
+        if space isa CC.Spaces.CenterFiniteDifferenceSpace
+            return space
+        end
+    end
+    error("Unfound space")
+end
+
+function first_face_space(fv::CC.Fields.FieldVector)
+    for prop_chain in CC.Fields.property_chains(fv)
+        f = CC.Fields.single_field(fv, prop_chain)
+        space = axes(f)
+        if space isa CC.Spaces.FaceFiniteDifferenceSpace
+            return space
+        end
+    end
+    error("Unfound space")
+end

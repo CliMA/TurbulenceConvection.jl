@@ -76,24 +76,6 @@ function Simulation1d(namelist)
     dt_min = namelist["time_stepping"]["dt_min"]
     truncate_stack_trace = namelist["logging"]["truncate_stack_trace"]
 
-    grid = construct_grid(namelist; FT = FT)
-
-    frequency = namelist["stats_io"]["frequency"]
-    nc_filename, outpath = nc_fileinfo(namelist)
-
-    Stats = if skip_io
-        nothing
-    else
-        # Setup the statistics output path
-        NetCDFIO_Stats(nc_filename, frequency, grid)
-    end
-
-    casename = namelist["meta"]["casename"]
-    # Write namelist file to output directory
-    open(joinpath(outpath, "namelist_$casename.in"), "w") do io
-        JSON.print(io, namelist, 4)
-    end
-
     # Create the class for precipitation
 
     precip_name = TC.parse_namelist(
@@ -118,6 +100,8 @@ function Simulation1d(namelist)
     isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
     N_up = TC.n_updrafts(edmf)
 
+    grid = construct_grid(namelist; FT = FT)
+
     cspace = TC.center_space(grid)
     fspace = TC.face_space(grid)
 
@@ -139,6 +123,22 @@ function Simulation1d(namelist)
         face = diagnostic_face_fields,
         svpc = diagnostics_single_value_per_col,
     )
+
+    frequency = namelist["stats_io"]["frequency"]
+    nc_filename, outpath = nc_fileinfo(namelist)
+
+    Stats = if skip_io
+        nothing
+    else
+        # Setup the statistics output path
+        NetCDFIO_Stats(nc_filename, frequency, grid)
+    end
+
+    casename = namelist["meta"]["casename"]
+    # Write namelist file to output directory
+    open(joinpath(outpath, "namelist_$casename.in"), "w") do io
+        JSON.print(io, namelist, 4)
+    end
 
     case_type = Cases.get_case(namelist)
     surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
@@ -188,35 +188,6 @@ function initialize(sim::Simulation1d)
     FT = eltype(edmf)
     t = FT(0)
 
-    grid = TC.Grid(axes(prog.cent))
-
-    # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
-    state = TC.State(prog, aux, nothing)
-    compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
-
-    if !skip_io
-        NC.Dataset(Stats.nc_filename, "a") do ds
-            group = "reference"
-            add_write_field(ds, "ρ_f", vec(TC.face_aux_grid_mean(state).ρ), group, ("zf",))
-            add_write_field(ds, "ρ_c", vec(TC.center_prog_grid_mean(state).ρ), group, ("zc",))
-            add_write_field(ds, "p_f", vec(TC.face_aux_grid_mean(state).p), group, ("zf",))
-            add_write_field(ds, "p_c", vec(TC.center_aux_grid_mean(state).p), group, ("zc",))
-        end
-    end
-
-    Cases.initialize_profiles(case, grid, param_set, state)
-    set_thermo_state_pθq!(state, grid, edmf.moisture_model, param_set)
-    set_grid_mean_from_thermo_state!(param_set, state, grid)
-    assign_thermo_aux!(state, grid, edmf.moisture_model, param_set)
-
-    Cases.initialize_forcing(case, grid, state, param_set)
-    Cases.initialize_radiation(case, grid, state, param_set)
-
-    initialize_edmf(edmf, grid, state, case, param_set, t)
-
-    skip_io && return nothing
-    initialize_io(Stats.nc_filename, io_nt.aux, io_nt.diagnostics)
-
     ts_gm = ["Tsurface", "shf", "lhf", "ustar", "wstar", "lwp_mean", "iwp_mean"]
     ts_edmf = [
         "cloud_base_mean",
@@ -239,25 +210,47 @@ function initialize(sim::Simulation1d)
     ]
     ts_list = vcat(ts_gm, ts_edmf)
 
-    initialize_io(Stats.nc_filename, ts_list)
-
-    surf = get_surface(case.surf_params, grid, state, t, param_set)
-
-    open_files(Stats)
-    try
-        write_simulation_time(Stats, t)
-        io(io_nt.aux, Stats, state)
-        io(io_nt.diagnostics, Stats, diagnostics)
-        io(surf, case.surf_params, grid, state, Stats, t)
-    catch e
-        if truncate_stack_trace
-            @warn "IO during initialization failed."
-        else
-            @warn "IO during initialization failed." exception = (e, catch_backtrace())
+    begin
+        # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
+        state = TC.State(prog, aux, nothing)
+        grid = TC.Grid(state)
+        compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
+        if !skip_io
+            NC.Dataset(Stats.nc_filename, "a") do ds
+                group = "reference"
+                add_write_field(ds, "ρ_f", vec(TC.face_aux_grid_mean(state).ρ), group, ("zf",))
+                add_write_field(ds, "ρ_c", vec(TC.center_prog_grid_mean(state).ρ), group, ("zc",))
+                add_write_field(ds, "p_f", vec(TC.face_aux_grid_mean(state).p), group, ("zf",))
+                add_write_field(ds, "p_c", vec(TC.center_aux_grid_mean(state).p), group, ("zc",))
+            end
         end
-        return :simulation_crashed
-    finally
-        close_files(Stats)
+        Cases.initialize_profiles(case, grid, param_set, state)
+        set_thermo_state_pθq!(state, grid, edmf.moisture_model, param_set)
+        set_grid_mean_from_thermo_state!(param_set, state, grid)
+        assign_thermo_aux!(state, grid, edmf.moisture_model, param_set)
+        Cases.initialize_forcing(case, grid, state, param_set)
+        Cases.initialize_radiation(case, grid, state, param_set)
+        initialize_edmf(edmf, grid, state, case, param_set, t)
+        skip_io && return nothing
+        initialize_io(Stats.nc_filename, io_nt.aux, io_nt.diagnostics)
+        initialize_io(Stats.nc_filename, ts_list)
+        surf = get_surface(case.surf_params, grid, state, t, param_set)
+        open_files(Stats)
+        try
+            write_simulation_time(Stats, t)
+            io(io_nt.aux, Stats, state)
+            io(io_nt.diagnostics, Stats, diagnostics)
+            io(surf, case.surf_params, grid, state, Stats, t)
+        catch e
+            if truncate_stack_trace
+                @warn "IO during initialization failed."
+            else
+                @warn "IO during initialization failed." exception = (e, catch_backtrace())
+            end
+            return :simulation_crashed
+        finally
+            close_files(Stats)
+        end
     end
 
     return

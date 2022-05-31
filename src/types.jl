@@ -730,3 +730,5 @@ function column_prog_aux(prog, aux, inds...)
 
     return State(prog_column, aux_column, nothing)
 end
+
+Grid(state::State) = Grid(first_center_space(state.prog))
