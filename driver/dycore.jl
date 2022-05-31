@@ -328,65 +328,68 @@ end
 function ∑stoch_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
     UnPack.@unpack edmf, param_set, case, aux, TS = params
 
-    state = TC.State(prog, aux, tendencies)
-    grid = TC.Grid(axes(state.prog.cent))
-    surf = get_surface(case.surf_params, grid, state, t, param_set)
-
     # set all tendencies to zero
     tends_face = tendencies.face
     tends_cent = tendencies.cent
     parent(tends_face) .= 0
     parent(tends_cent) .= 0
 
-    # compute updraft stochastic tendencies
-    TC.compute_up_stoch_tendencies!(edmf, grid, state, param_set, surf)
+    begin
+        state = TC.State(prog, aux, tendencies)
+        grid = TC.Grid(state)
+        surf = get_surface(case.surf_params, grid, state, t, param_set)
+
+        # compute updraft stochastic tendencies
+        TC.compute_up_stoch_tendencies!(edmf, grid, state, param_set, surf)
+    end
 end
 
 # Compute the sum of tendencies for the scheme
 function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
     UnPack.@unpack edmf, precip_model, param_set, case, aux, TS = params
 
-    state = TC.State(prog, aux, tendencies)
-    grid = TC.Grid(axes(state.prog.cent))
-
-    set_thermo_state_peq!(state, grid, edmf.moisture_model, param_set)
-
-    aux_gm = TC.center_aux_grid_mean(state)
-
-    @. aux_gm.θ_virt = TD.virtual_pottemp(param_set, aux_gm.ts)
-
-    Δt = TS.dt
-    surf = get_surface(case.surf_params, grid, state, t, param_set)
-    force = case.Fo
-    radiation = case.Rad
-
-    TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
-
-    # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
-    # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
-    # treat them as auxiliary variables for now, until we disentangle the tendency computations.
-    Cases.update_forcing(case, grid, state, t, param_set)
-    Cases.update_radiation(case.Rad, grid, state, t, param_set)
-
-    TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
-
     tends_face = tendencies.face
     tends_cent = tendencies.cent
     parent(tends_face) .= 0
     parent(tends_cent) .= 0
-    # compute tendencies
 
-    en_thermo = edmf.en_thermo
+    begin
+        state = TC.State(prog, aux, tendencies)
+        grid = TC.Grid(state)
 
-    # compute tendencies
-    # causes division error in dry bubble first time step
-    TC.compute_precipitation_formation_tendencies(grid, state, edmf, precip_model, Δt, param_set)
-    TC.microphysics(en_thermo, grid, state, edmf, precip_model, Δt, param_set)
-    TC.compute_precipitation_sink_tendencies(precip_model, edmf, grid, state, param_set, Δt)
-    TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set)
+        set_thermo_state_peq!(state, grid, edmf.moisture_model, param_set)
 
-    TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt)
-    compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, param_set)
+        aux_gm = TC.center_aux_grid_mean(state)
+
+        @. aux_gm.θ_virt = TD.virtual_pottemp(param_set, aux_gm.ts)
+
+        Δt = TS.dt
+        surf = get_surface(case.surf_params, grid, state, t, param_set)
+        force = case.Fo
+        radiation = case.Rad
+
+        TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
+
+        # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
+        # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
+        # treat them as auxiliary variables for now, until we disentangle the tendency computations.
+        Cases.update_forcing(case, grid, state, t, param_set)
+        Cases.update_radiation(case.Rad, grid, state, t, param_set)
+
+        TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
+
+        en_thermo = edmf.en_thermo
+
+        # compute tendencies
+        # causes division error in dry bubble first time step
+        TC.compute_precipitation_formation_tendencies(grid, state, edmf, precip_model, Δt, param_set)
+        TC.microphysics(en_thermo, grid, state, edmf, precip_model, Δt, param_set)
+        TC.compute_precipitation_sink_tendencies(precip_model, edmf, grid, state, param_set, Δt)
+        TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set)
+
+        TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt)
+        compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, param_set)
+    end
 
     return nothing
 end
