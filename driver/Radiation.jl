@@ -77,7 +77,7 @@ function initialize(self::TC.RadiationBase{TC.RadiationLES}, grid, state, LESDat
         # interpolate here
         zc_les = Array(TC.get_nc_data(data, "zc"))
         meandata = TC.mean_nc_data(data, "profiles", "dtdt_rad", imin, imax)
-        pyinterp(grid.zc, zc_les, meandata)
+        pyinterp(vec(grid.zc.z), zc_les, meandata)
     end
     @inbounds for k in TC.real_center_indices(grid)
         aux_gm.dTdt_rad[k] = dTdt[k]
