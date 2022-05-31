@@ -12,12 +12,13 @@ end
 condition_every_iter(u, t, integrator) = true
 
 function affect_io!(integrator)
-    UnPack.@unpack edmf, calibrate_io, precip_model, aux, grid, io_nt, diagnostics, case, param_set, Stats, skip_io =
+    UnPack.@unpack edmf, calibrate_io, precip_model, aux, io_nt, diagnostics, case, param_set, Stats, skip_io =
         integrator.p
     skip_io && return nothing
     t = integrator.t
 
     state = TC.State(integrator.u, aux, ODE.get_du(integrator))
+    grid = TC.Grid(axes(state.prog.cent))
 
     # TODO: is this the best location to call diagnostics?
     compute_diagnostics!(edmf, precip_model, param_set, grid, state, diagnostics, Stats, case, t, calibrate_io)
@@ -65,9 +66,10 @@ function affect_io!(integrator)
 end
 
 function affect_filter!(integrator)
-    UnPack.@unpack edmf, grid, param_set, aux, case = integrator.p
+    UnPack.@unpack edmf, param_set, aux, case = integrator.p
     t = integrator.t
     state = TC.State(integrator.u, aux, ODE.get_du(integrator))
+    grid = TC.Grid(axes(state.prog.cent))
     surf = get_surface(case.surf_params, grid, state, t, param_set)
     TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
 
@@ -86,8 +88,9 @@ function adaptive_dt!(integrator)
 end
 
 function dt_max!(integrator)
-    UnPack.@unpack grid, edmf, aux, TS = integrator.p
+    UnPack.@unpack edmf, aux, TS = integrator.p
     state = TC.State(integrator.u, aux, ODE.get_du(integrator))
+    grid = TC.Grid(axes(state.prog.cent))
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)
     Δzc = TC.get_Δz(prog_gm.ρ)
@@ -129,8 +132,9 @@ function dt_max!(integrator)
 end
 
 function monitor_cfl!(integrator)
-    UnPack.@unpack grid, edmf, aux, TS = integrator.p
+    UnPack.@unpack edmf, aux, TS = integrator.p
     state = TC.State(integrator.u, aux, ODE.get_du(integrator))
+    grid = TC.Grid(axes(state.prog.cent))
     prog_gm = TC.center_prog_grid_mean(state)
     Δz = TC.get_Δz(prog_gm.ρ)
     Δt = TS.dt

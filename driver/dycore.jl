@@ -326,9 +326,10 @@ function assign_thermo_aux!(state, grid, moisture_model, param_set)
 end
 
 function ∑stoch_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
-    UnPack.@unpack edmf, grid, param_set, case, aux, TS = params
+    UnPack.@unpack edmf, param_set, case, aux, TS = params
 
     state = TC.State(prog, aux, tendencies)
+    grid = TC.Grid(axes(state.prog.cent))
     surf = get_surface(case.surf_params, grid, state, t, param_set)
 
     # set all tendencies to zero
@@ -343,18 +344,16 @@ end
 
 # Compute the sum of tendencies for the scheme
 function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
-    UnPack.@unpack edmf, precip_model, grid, param_set, case, aux, TS = params
+    UnPack.@unpack edmf, precip_model, param_set, case, aux, TS = params
 
     state = TC.State(prog, aux, tendencies)
+    grid = TC.Grid(axes(state.prog.cent))
 
     set_thermo_state_peq!(state, grid, edmf.moisture_model, param_set)
 
-    # TODO: where should this live?
     aux_gm = TC.center_aux_grid_mean(state)
-    ts_gm = aux_gm.ts
-    @inbounds for k in TC.real_center_indices(grid)
-        aux_gm.θ_virt[k] = TD.virtual_pottemp(param_set, ts_gm[k])
-    end
+
+    @. aux_gm.θ_virt = TD.virtual_pottemp(param_set, aux_gm.ts)
 
     Δt = TS.dt
     surf = get_surface(case.surf_params, grid, state, t, param_set)
