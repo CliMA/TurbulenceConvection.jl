@@ -189,8 +189,12 @@ struct Clima0M <: AbstractPrecipitationModel end
 struct Clima1M <: AbstractPrecipitationModel end
 
 abstract type AbstractPrecipFractionModel end
-struct PrescribedPrecipFraction <: AbstractPrecipFractionModel end
-struct DiagnosticPrecipFraction <: AbstractPrecipFractionModel end
+struct PrescribedPrecipFraction{FT} <: AbstractPrecipFractionModel
+    prescribed_precip_frac_value::FT
+end
+struct DiagnosticPrecipFraction{FT} <: AbstractPrecipFractionModel
+    precip_fraction_limiter::FT
+end
 
 abstract type AbstractQuadratureType end
 struct LogNormalQuad <: AbstractQuadratureType end
@@ -513,13 +517,18 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
 
         precip_fraction_model_name =
             parse_namelist(namelist, "microphysics", "precip_fraction_model"; default = "prescribed")
+
         precip_fraction_model = if precip_fraction_model_name == "prescribed"
-            PrescribedPrecipFraction()
+            prescribed_precip_frac_value =
+                parse_namelist(namelist, "microphysics", "prescribed_precip_frac_value"; default = 1.0)
+            PrescribedPrecipFraction(prescribed_precip_frac_value)
         elseif precip_fraction_model_name == "cloud_cover"
-            DiagnosticPrecipFraction()
+            precip_fraction_limiter = parse_namelist(namelist, "microphysics", "precip_fraction_limiter"; default = 0.3)
+            DiagnosticPrecipFraction(precip_fraction_limiter)
         else
             error("Something went wrong. Invalid `precip_fraction` model: `$precip_fraction_model_name`")
         end
+
 
         # Create the environment variable class (major diagnostic and prognostic variables)
 

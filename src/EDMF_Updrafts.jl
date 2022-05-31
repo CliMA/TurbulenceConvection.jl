@@ -61,7 +61,7 @@ function compute_precipitation_formation_tendencies(
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
 
-    precip_fraction = compute_precip_fraction(edmf, state, param_set)
+    precip_fraction = compute_precip_fraction(edmf, state)
 
     @inbounds for i in 1:N_up
         @inbounds for k in real_center_indices(grid)
