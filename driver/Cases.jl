@@ -1156,8 +1156,7 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, param_
     prog_gm_u = TC.grid_mean_u(state)
     prog_gm_v = TC.grid_mean_v(state)
 
-    ρ_c = prog_gm.ρ
-    NC.Dataset(self.LESDat.les_filename, "r") do data
+    nt = NC.Dataset(self.LESDat.les_filename, "r") do data
         t = data.group["profiles"]["t"][:]
         # define time interval
         half_window = self.LESDat.initial_condition_averaging_window_s / 2
@@ -1170,12 +1169,20 @@ function initialize_profiles(self::CasesBase{LES_driven_SCM}, grid::Grid, param_
         imin = time_interval_bool[1]
         imax = time_interval_bool[end]
         zc_les = Array(TC.get_nc_data(data, "zc"))
-        parent(aux_gm.θ_liq_ice) .=
-            pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "thetali_mean", imin, imax))
-        parent(aux_gm.q_tot) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "qt_mean", imin, imax))
-        parent(prog_gm_u) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "u_mean", imin, imax))
-        parent(prog_gm_v) .= pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "v_mean", imin, imax))
+        θ_liq_ice_gm = pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "thetali_mean", imin, imax))
+        q_tot_gm = pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "qt_mean", imin, imax))
+        prog_gm_u_gm = pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "u_mean", imin, imax))
+        prog_gm_v_gm = pyinterp(grid.zc, zc_les, TC.mean_nc_data(data, "profiles", "v_mean", imin, imax))
+        (; zc_les, θ_liq_ice_gm, q_tot_gm, prog_gm_u_gm, prog_gm_v_gm)
     end
+
+    @inbounds for k in real_center_indices(grid)
+        aux_gm.θ_liq_ice[k] = nt.θ_liq_ice_gm[k.i]
+        aux_gm.q_tot[k] = nt.q_tot_gm[k.i]
+        prog_gm_u[k] = nt.prog_gm_u_gm[k.i]
+        prog_gm_v[k] = nt.prog_gm_v_gm[k.i]
+    end
+
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k].z
         aux_gm.tke[k] = if z <= 2500.0
