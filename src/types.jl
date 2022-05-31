@@ -703,14 +703,11 @@ Create a columnar state given full 3D states
  - `prog` prognostic state
  - `aux` auxiliary state
  - `tendencies` tendencies state
- - `inds` `i`, `j`, `h` indices
+ - `inds` indices
 
 ## Example
 ```julia
-local_geom = ClimaCore.Spaces.local_geometry_data(space)
-Ni, Nj, _, _, Nh = size(local_geom)
-for h in 1:Nh, j in 1:Nj, i in 1:Ni
-    inds = (i, j, h)
+for inds in TC.iterate_columns(prog.cent)
     state = TC.column_state(prog, aux, tendencies, inds...)
     ...
 end

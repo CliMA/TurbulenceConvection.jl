@@ -16,18 +16,20 @@ function affect_io!(integrator)
         integrator.p
     skip_io && return nothing
     t = integrator.t
+    prog = integrator.u
     tendencies = ODE.get_du(integrator)
 
     begin
         state = TC.State(integrator.u, aux, tendencies)
         grid = TC.Grid(state)
+        diag_col = diagnostics
 
         # TODO: is this the best location to call diagnostics?
-        compute_diagnostics!(edmf, precip_model, param_set, grid, state, diagnostics, Stats, case, t, calibrate_io)
+        compute_diagnostics!(edmf, precip_model, param_set, grid, state, diag_col, Stats, case, t, calibrate_io)
 
         cent = TC.Cent(1)
-        diag_svpc = svpc_diagnostics_grid_mean(diagnostics)
-        diag_tc_svpc = svpc_diagnostics_turbconv(diagnostics)
+        diag_svpc = svpc_diagnostics_grid_mean(diag_col)
+        diag_tc_svpc = svpc_diagnostics_turbconv(diag_col)
         write_ts(Stats, "lwp_mean", diag_svpc.lwp_mean[cent])
         write_ts(Stats, "iwp_mean", diag_svpc.iwp_mean[cent])
         write_ts(Stats, "rwp_mean", diag_svpc.rwp_mean[cent])
@@ -59,7 +61,7 @@ function affect_io!(integrator)
         write_simulation_time(Stats, t) # #removeVarsHack
 
         io(io_nt.aux, Stats, state)
-        io(io_nt.diagnostics, Stats, diagnostics)
+        io(io_nt.diagnostics, Stats, diag_col)
 
         surf = get_surface(case.surf_params, grid, state, t, param_set)
         io(surf, case.surf_params, grid, state, Stats, t)
@@ -71,6 +73,7 @@ end
 function affect_filter!(integrator)
     UnPack.@unpack edmf, param_set, aux, case = integrator.p
     t = integrator.t
+    prog = integrator.u
     tendencies = ODE.get_du(integrator)
 
     begin
@@ -96,6 +99,7 @@ end
 
 function dt_max!(integrator)
     UnPack.@unpack edmf, aux, TS = integrator.p
+    prog = integrator.u
     tendencies = ODE.get_du(integrator)
 
     begin
@@ -144,6 +148,7 @@ end
 
 function monitor_cfl!(integrator)
     UnPack.@unpack edmf, aux, TS = integrator.p
+    prog = integrator.u
     tendencies = ODE.get_du(integrator)
 
     begin

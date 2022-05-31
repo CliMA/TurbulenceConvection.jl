@@ -214,7 +214,6 @@ function compute_ref_state!(
 
     # Perform the integration
     z_span = (grid.zmin, grid.zmax)
-    @info "z_span = $z_span"
     prob = ODE.ODEProblem(rhs, logp, z_span)
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
     parent(p_f) .= sol.(vec(grid.zf.z))
