@@ -56,8 +56,8 @@ struct Grid{FT, NZ, CS, FS, SC, SF, SVPCS}
         svpc_mesh = CC.Meshes.IntervalMesh(svpc_domain, nelems = 1)
         svpc_space = CC.Spaces.CenterFiniteDifferenceSpace(svpc_mesh)
 
-        zmin = minimum(parent(zf))
-        zmax = maximum(parent(zf))
+        zmin = zf.z[CCO.PlusHalf(1)]
+        zmax = zf.z[CCO.PlusHalf(nz + 1)]
         CS = typeof(cs)
         FS = typeof(fs)
         SC = typeof(zc)

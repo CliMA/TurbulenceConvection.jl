@@ -719,3 +719,14 @@ function column_state(prog, aux, tendencies, inds...)
 
     return State(prog_column, aux_column, tends_column)
 end
+
+function column_prog_aux(prog, aux, inds...)
+    prog_cent_column = CC.column(prog.cent, inds...)
+    prog_face_column = CC.column(prog.face, inds...)
+    aux_cent_column = CC.column(aux.cent, inds...)
+    aux_face_column = CC.column(aux.face, inds...)
+    prog_column = CC.Fields.FieldVector(cent = prog_cent_column, face = prog_face_column)
+    aux_column = CC.Fields.FieldVector(cent = aux_cent_column, face = aux_face_column)
+
+    return State(prog_column, aux_column, nothing)
+end
