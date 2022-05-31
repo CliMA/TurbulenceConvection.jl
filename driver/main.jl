@@ -78,6 +78,8 @@ function Simulation1d(namelist)
     dt_min = namelist["time_stepping"]["dt_min"]
     truncate_stack_trace = namelist["logging"]["truncate_stack_trace"]
 
+    cspace, fspace, svpc_space = get_spaces(namelist, FT)
+
     # Create the class for precipitation
 
     precip_name = TC.parse_namelist(
@@ -102,19 +104,12 @@ function Simulation1d(namelist)
     isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
     N_up = TC.n_updrafts(edmf)
 
-    grid = construct_grid(namelist; FT = FT)
-
-    cspace = TC.center_space(grid)
-    fspace = TC.face_space(grid)
-
     cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars, FT, edmf)
     face_prog_fields = TC.FieldFromNamedTuple(fspace, face_prognostic_vars, FT, edmf)
     aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, edmf))
     aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, edmf))
     diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, edmf))
     diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, edmf))
-
-    svpc_space = TC.single_value_per_col_space(grid)
     diagnostics_single_value_per_col =
         TC.FieldFromNamedTuple(svpc_space, single_value_per_col_diagnostic_vars(FT, edmf))
 
@@ -126,18 +121,32 @@ function Simulation1d(namelist)
         svpc = diagnostics_single_value_per_col,
     )
 
+    # TODO: clean up
     frequency = namelist["stats_io"]["frequency"]
     nc_filename, outpath = nc_fileinfo(namelist)
+    nc_filename_suffix = if namelist["config"] == "column"
+        (fn, inds) -> fn
+    elseif namelist["config"] == "sphere"
+        (fn, inds) -> fn -> first(split(fn, ".nc")) * "_inds=$(inds).nc"
+    end
 
     Stats = if skip_io
         nothing
-    else
-        # Setup the statistics output path
-        NetCDFIO_Stats(nc_filename, frequency, grid)
-    end
+    elseif namelist["config"] == "sphere"
+        map(TC.iterate_columns(prog.cent)) do inds
 
+            col_state = TC.column_prog_aux(prog, aux, inds...)
+            grid = TC.Grid(col_state)
+
+            NetCDFIO_Stats(; nc_filename = nc_filename_suffix(nc_filename, inds), frequency, grid)
+        end
+    elseif namelist["config"] == "column"
+        col_state = TC.column_prog_aux(prog, aux, 1, 1, 1)
+        grid = TC.Grid(col_state)
+
+        NetCDFIO_Stats(nc_filename_suffix(nc_filename, (1, 1, 1)), frequency, grid)
+    end
     casename = namelist["meta"]["casename"]
-    # Write namelist file to output directory
     open(joinpath(outpath, "namelist_$casename.in"), "w") do io
         JSON.print(io, namelist, 4)
     end
@@ -211,9 +220,9 @@ function initialize(sim::Simulation1d)
     ]
     ts_list = vcat(ts_gm, ts_edmf)
 
-    begin
-        # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
-        state = TC.State(prog, aux, nothing)
+    # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
+    for inds in TC.iterate_columns(prog.cent)
+        state = TC.column_prog_aux(prog, aux, inds...)
         grid = TC.Grid(state)
         compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
         if !skip_io
