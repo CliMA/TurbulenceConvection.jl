@@ -44,9 +44,8 @@ function DiffEqNoiseProcess.wiener_randn!(rng::Random.AbstractRNG, rand_vec::CC.
     parent(rand_vec.face) .= Random.randn.()
 end
 
-struct Simulation1d{IONT, G, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS}
+struct Simulation1d{IONT, S, C, EDMF, PM, D, TIMESTEPPING, STATS, PS}
     io_nt::IONT
-    grid::G
     state::S
     case::C
     edmf::EDMF
@@ -175,7 +174,6 @@ function Simulation1d(namelist)
 
     return Simulation1d(
         io_nt,
-        grid,
         state,
         case,
         edmf,
@@ -196,17 +194,19 @@ end
 function initialize(sim::Simulation1d)
     TC = TurbulenceConvection
     state = sim.state
-    FT = eltype(sim.grid)
+    FT = eltype(sim.edmf)
     t = FT(0)
-    Cases.initialize_profiles(sim.case, sim.grid, sim.param_set, state)
-    set_thermo_state_pθq!(state, sim.grid, sim.edmf.moisture_model, sim.param_set)
-    set_grid_mean_from_thermo_state!(sim.param_set, sim.state, sim.grid)
-    assign_thermo_aux!(state, sim.grid, sim.edmf.moisture_model, sim.param_set)
 
-    Cases.initialize_forcing(sim.case, sim.grid, state, sim.param_set)
-    Cases.initialize_radiation(sim.case, sim.grid, state, sim.param_set)
+    grid = TC.Grid(axes(sim.state.prog.cent))
+    Cases.initialize_profiles(sim.case, grid, sim.param_set, state)
+    set_thermo_state_pθq!(state, grid, sim.edmf.moisture_model, sim.param_set)
+    set_grid_mean_from_thermo_state!(sim.param_set, sim.state, grid)
+    assign_thermo_aux!(state, grid, sim.edmf.moisture_model, sim.param_set)
 
-    initialize_edmf(sim.edmf, sim.grid, state, sim.case, sim.param_set, t)
+    Cases.initialize_forcing(sim.case, grid, state, sim.param_set)
+    Cases.initialize_radiation(sim.case, grid, state, sim.param_set)
+
+    initialize_edmf(sim.edmf, grid, state, sim.case, sim.param_set, t)
 
     sim.skip_io && return nothing
     initialize_io(sim.Stats.nc_filename, sim.io_nt.aux, sim.io_nt.diagnostics)
@@ -235,14 +235,14 @@ function initialize(sim::Simulation1d)
 
     initialize_io(sim.Stats.nc_filename, ts_list)
 
-    surf = get_surface(sim.case.surf_params, sim.grid, state, t, sim.param_set)
+    surf = get_surface(sim.case.surf_params, grid, state, t, sim.param_set)
 
     open_files(sim.Stats)
     try
         write_simulation_time(sim.Stats, t)
         io(sim.io_nt.aux, sim.Stats, state)
         io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
-        io(surf, sim.case.surf_params, sim.grid, state, sim.Stats, t)
+        io(surf, sim.case.surf_params, grid, state, sim.Stats, t)
     catch e
         if sim.truncate_stack_trace
             @warn "IO during initialization failed."
@@ -311,7 +311,6 @@ include("callbacks.jl")
 
 function solve_args(sim::Simulation1d)
     TC = TurbulenceConvection
-    grid = sim.grid
     state = sim.state
     calibrate_io = sim.calibrate_io
     prog = state.prog
@@ -324,7 +323,6 @@ function solve_args(sim::Simulation1d)
         calibrate_io,
         edmf = sim.edmf,
         precip_model = sim.precip_model,
-        grid = grid,
         param_set = sim.param_set,
         aux = aux,
         io_nt = sim.io_nt,

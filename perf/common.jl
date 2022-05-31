@@ -8,7 +8,6 @@ import .NameList
 
 function unpack_params(sim)
     tendencies = copy(sim.state.prog)
-    grid = sim.grid
     TS = sim.TS
     prog = sim.state.prog
     calibrate_io = sim.calibrate_io
@@ -17,7 +16,6 @@ function unpack_params(sim)
         calibrate_io,
         edmf = sim.edmf,
         precip_model = sim.precip_model,
-        grid = grid,
         param_set = sim.param_set,
         case = sim.case,
         TS = TS,
