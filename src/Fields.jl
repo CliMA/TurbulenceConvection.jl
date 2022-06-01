@@ -17,6 +17,7 @@ Base.:<(h1::Cent, h2::Cent) = h1.i < h2.i
 Base.max(h1::Cent, h2::Cent) = Cent(max(h1.i, h2.i))
 Base.min(h1::Cent, h2::Cent) = Cent(min(h1.i, h2.i))
 
+# TODO: remove this:
 Base.:-(a::FT, b::CCG.Covariant3Vector{FT}) where {FT} = a .- b.u₃
 Base.:+(a::FT, b::CCG.Covariant3Vector{FT}) where {FT} = a .+ b.u₃
 

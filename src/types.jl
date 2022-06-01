@@ -737,4 +737,12 @@ function column_prog_aux(prog, aux, inds...)
     return State(prog_column, aux_column, nothing)
 end
 
+function column_diagnostics(diagnostics, inds...)
+    diag_cent_column = CC.column(diagnostics.cent, inds...)
+    diag_face_column = CC.column(diagnostics.face, inds...)
+    diag_svpc_column = CC.column(diagnostics.svpc, inds...)
+    return CC.Fields.FieldVector(cent = diag_cent_column, face = diag_face_column, svpc = diag_svpc_column)
+end
+
+
 Grid(state::State) = Grid(first_center_space(state.prog))
