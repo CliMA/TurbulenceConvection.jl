@@ -148,10 +148,10 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     sgs_flux_u = aux_gm_f.sgs_flux_u
     sgs_flux_v = aux_gm_f.sgs_flux_v
 
-    @. sgs_flux_h_tot = diffusive_flux_h + massflux_h
-    @. sgs_flux_q_tot = diffusive_flux_qt + massflux_qt
-    @. sgs_flux_u = diffusive_flux_u # + massflux_u
-    @. sgs_flux_v = diffusive_flux_v # + massflux_v
+    # @. sgs_flux_h_tot = massflux_h #diffusive_flux_h 
+    # @. sgs_flux_q_tot =  massflux_qt #diffusive_flux_qt
+    # @. sgs_flux_u = diffusive_flux_u # + massflux_u
+    # @. sgs_flux_v = diffusive_flux_v # + massflux_v
 
     if edmf.moisture_model isa NonEquilibriumMoisture
         massflux_tendency_ql = aux_tc.massflux_tendency_ql

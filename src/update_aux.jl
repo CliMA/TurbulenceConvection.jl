@@ -237,7 +237,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 end
             else
                 if edmf.moisture_model isa EquilibriumMoisture
-                    @show(k, grid.zc[k].z, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
                     ts_up = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
                 elseif edmf.moisture_model isa NonEquilibriumMoisture
                     ts_up = thermo_state_pθq(

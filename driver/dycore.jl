@@ -262,6 +262,7 @@ function set_thermo_state_peq!(state, grid, moisture_model, param_set)
         aux_gm.e_kin[k] = TC.kinetic_energy(prog_gm_u[k], prog_gm_v[k], w_c[k])
         e_pot = TC.geopotential(param_set, grid.zc.z[k])
         e_int = prog_gm.ρe_tot[k] / ρ_c[k] - aux_gm.e_kin[k] - e_pot
+        @show(k, ρ_c[k], e_int, e_pot, prog_gm.ρe_tot[k] / ρ_c[k] , aux_gm.e_kin[k])
         ts_gm[k] = TC.thermo_state_peq(param_set, p_c[k], e_int, aux_gm.q_tot[k], thermo_args...)
         aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_gm[k])
         aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
