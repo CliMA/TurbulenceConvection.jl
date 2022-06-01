@@ -686,6 +686,7 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         @inbounds for i in 1:N_up
             is_surface_center(grid, k) && continue
             prog_up[i].ρaq_tot[k] = max(prog_up[i].ρaq_tot[k], 0)
+            prog_up[i].ρae_tot[k] = max(prog_up[i].ρae_tot[k], 0)
             # this is needed to make sure Rico is unchanged.
             # TODO : look into it further to see why
             # a similar filtering of ρaθ_liq_ice breaks the simulation
@@ -699,6 +700,7 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
             @inbounds for i in 1:N_up
                 is_surface_center(grid, k) && continue
                 prog_up[i].ρaq_tot[k] = max(prog_up[i].ρaq_tot[k], 0)
+                prog_up[i].ρae_tot[k] = max(prog_up[i].ρae_tot[k], 0)
                 # this is needed to make sure Rico is unchanged.
                 # TODO : look into it further to see why
                 # a similar filtering of ρaθ_liq_ice breaks the simulation
