@@ -77,14 +77,21 @@ end
 
 get_Δz(field::CC.Fields.FiniteDifferenceField) = parent(CC.Fields.weighted_jacobian(field))
 
+# TODO: move these things into ClimaCore
+
+isa_center_space(space) = false
+isa_center_space(::CC.Spaces.CenterFiniteDifferenceSpace) = true
+isa_center_space(::CC.Spaces.CenterExtrudedFiniteDifferenceSpace) = true
+
+isa_face_space(space) = false
+isa_face_space(::CC.Spaces.FaceFiniteDifferenceSpace) = true
+isa_face_space(::CC.Spaces.FaceExtrudedFiniteDifferenceSpace) = true
 
 function first_center_space(fv::CC.Fields.FieldVector)
     for prop_chain in CC.Fields.property_chains(fv)
         f = CC.Fields.single_field(fv, prop_chain)
         space = axes(f)
-        if space isa CC.Spaces.CenterFiniteDifferenceSpace
-            return space
-        end
+        isa_center_space(space) && return space
     end
     error("Unfound space")
 end
@@ -93,9 +100,7 @@ function first_face_space(fv::CC.Fields.FieldVector)
     for prop_chain in CC.Fields.property_chains(fv)
         f = CC.Fields.single_field(fv, prop_chain)
         space = axes(f)
-        if space isa CC.Spaces.FaceFiniteDifferenceSpace
-            return space
-        end
+        isa_face_space(space) && return space
     end
     error("Unfound space")
 end

@@ -64,6 +64,9 @@ struct Simulation1d{IONT, P, A, C, EDMF, PM, D, TIMESTEPPING, STATS, PS, SRS}
     surf_ref_state::SRS
 end
 
+open_files(sim::Simulation1d) = open_files(sim.Stats)
+close_files(sim::Simulation1d) = close_files(sim.Stats)
+
 include("common_spaces.jl")
 
 function Simulation1d(namelist)
@@ -78,7 +81,7 @@ function Simulation1d(namelist)
     dt_min = namelist["time_stepping"]["dt_min"]
     truncate_stack_trace = namelist["logging"]["truncate_stack_trace"]
 
-    cspace, fspace, svpc_space = get_spaces(namelist, FT)
+    cspace, fspace, svpc_space = get_spaces(namelist, param_set, FT)
 
     # Create the class for precipitation
 
@@ -127,7 +130,7 @@ function Simulation1d(namelist)
     nc_filename_suffix = if namelist["config"] == "column"
         (fn, inds) -> fn
     elseif namelist["config"] == "sphere"
-        (fn, inds) -> fn -> first(split(fn, ".nc")) * "_inds=$(inds).nc"
+        (fn, inds) -> first(split(fn, ".nc")) * "_col=$(inds).nc"
     end
 
     Stats = if skip_io
@@ -137,8 +140,8 @@ function Simulation1d(namelist)
 
             col_state = TC.column_prog_aux(prog, aux, inds...)
             grid = TC.Grid(col_state)
-
-            NetCDFIO_Stats(; nc_filename = nc_filename_suffix(nc_filename, inds), frequency, grid)
+            ncfn = nc_filename_suffix(nc_filename, inds)
+            NetCDFIO_Stats(ncfn, frequency, grid)
         end
     elseif namelist["config"] == "column"
         col_state = TC.column_prog_aux(prog, aux, 1, 1, 1)

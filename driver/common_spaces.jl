@@ -74,17 +74,17 @@ function construct_mesh(namelist; FT = Float64)
 
     z₀, z₁ = FT(0), FT(nz * Δz)
     z_stretch = CC.Meshes.Uniform()
-    return z_stretch, z₁, nz
+    return (; z_stretch, z_max = z₁, z_elem = nz)
 end
 
 
-function get_spaces(namelist, FT)
+function get_spaces(namelist, param_set, FT)
     center_space, face_space, svpc_space = if namelist["config"] == "sphere"
-        h_elem = 4
-        quad = CC.Spaces.Quadratures.GLL{5}()
+        h_elem = 1
+        quad = CC.Spaces.Quadratures.GLL{2}()
         horizontal_mesh = cubed_sphere_mesh(; radius = FT(CP.Planet.planet_radius(param_set)), h_elem)
         h_space = make_horizontal_space(horizontal_mesh, quad)
-        z_stretch = Meshes.Uniform()
+        (; z_stretch, z_max, z_elem) = construct_mesh(namelist; FT = FT)
         center_space, face_space, svpc_space = make_hybrid_spaces(h_space, z_max, z_elem, z_stretch)
         center_space, face_space, svpc_space
     elseif namelist["config"] == "column" # single column (default)
@@ -92,7 +92,7 @@ function get_spaces(namelist, FT)
         quad = CC.Spaces.Quadratures.GL{1}()
         horizontal_mesh = periodic_rectangle_mesh(; x_max = Δx, y_max = Δx, x_elem = 1, y_elem = 1)
         h_space = make_horizontal_space(horizontal_mesh, quad)
-        z_stretch, z_max, z_elem = construct_mesh(namelist; FT = Float64)
+        (; z_stretch, z_max, z_elem) = construct_mesh(namelist; FT = FT)
         center_space, face_space, svpc_space = make_hybrid_spaces(h_space, z_max, z_elem, z_stretch)
         center_space, face_space, svpc_space
     end
