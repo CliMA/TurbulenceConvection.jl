@@ -39,17 +39,19 @@ function microphysics(
         # update_sat_unsat
         if TD.has_condensate(param_set, ts)
             aux_en.cloud_fraction[k] = 1
-            aux_en_sat.θ_dry[k] = TD.dry_pottemp(param_set, ts)
-            aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts)
-            aux_en_sat.T[k] = TD.air_temperature(param_set, ts)
-            aux_en_sat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
-            aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(param_set, ts)
+            # aux_en_sat.θ_dry[k] = TD.dry_pottemp(param_set, ts)
+            # aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts)
+            # aux_en_sat.T[k] = TD.air_temperature(param_set, ts)
+            # aux_en_sat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
+            # aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(param_set, ts)
         else
             aux_en.cloud_fraction[k] = 0
-            aux_en_unsat.θ_dry[k] = TD.dry_pottemp(param_set, ts)
-            aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(param_set, ts)
-            aux_en_unsat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
+            # aux_en_unsat.θ_dry[k] = TD.dry_pottemp(param_set, ts)
+            # aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(param_set, ts)
+            # aux_en_unsat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
         end
+        rho = TD.air_density(param_set, ts)
+        aux_en.b_quad[k] = buoyancy_c(param_set, ρ_c[k], rho)
 
         # update_env_precip_tendencies
         # TODO: move ..._tendency_precip_formation to diagnostics
@@ -67,9 +69,9 @@ end
 
 function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt::Real)
 
-    env_len = 10
+    env_len = 9
     src_len = 9
-    i_ql, i_qi, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat, i_b_sat, i_b_unsat = 1:env_len
+    i_ql, i_qi, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat, i_b = 1:env_len
     i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH, i_Sqr, i_Sqs, i_Se_tot = 1:src_len
 
     quadrature_type = en_thermo.quadrature_type
@@ -180,16 +182,15 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
             inner_env[i_ql] += q_liq_en * weights[m_h] * sqpi_inv
             inner_env[i_qi] += q_ice_en * weights[m_h] * sqpi_inv
             inner_env[i_T] += T * weights[m_h] * sqpi_inv
+            inner_env[i_b] += b * weights[m_h] * sqpi_inv
             # cloudy/dry categories for buoyancy in TKE
             if TD.has_condensate(q_liq_en + q_ice_en)
                 inner_env[i_cf] += weights[m_h] * sqpi_inv
                 inner_env[i_qt_sat] += qt_hat * weights[m_h] * sqpi_inv
                 inner_env[i_T_sat] += T * weights[m_h] * sqpi_inv
-                inner_env[i_b_sat] += b * weights[m_h] * sqpi_inv
             else
                 inner_env[i_qt_unsat] += qt_hat * weights[m_h] * sqpi_inv
                 inner_env[i_T_unsat] += T * weights[m_h] * sqpi_inv
-                inner_env[i_b_unsat] += b * weights[m_h] * sqpi_inv
             end
             # products for variance and covariance source terms
             inner_src[i_Sqt] += mph.qt_tendency * weights[m_h] * sqpi_inv
@@ -225,13 +226,12 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
         ql = outer_env[i_ql],
         qi = outer_env[i_qi],
         T = outer_env[i_T],
+        b_quad = outer_env[i_b],
         cf = outer_env[i_cf],
         qt_sat = outer_env[i_qt_sat],
         qt_unsat = outer_env[i_qt_unsat],
         T_sat = outer_env[i_T_sat],
         T_unsat = outer_env[i_T_unsat],
-        b_sat = outer_env[i_b_sat],
-        b_unsat = outer_env[i_b_unsat],
     )
     return outer_env_nt, outer_src_nt
 end
@@ -312,34 +312,31 @@ function microphysics(
 
             # update cloudy/dry variables for buoyancy in TKE
             aux_en.cloud_fraction[k] = outer_env.cf
-            if aux_en.cloud_fraction[k] < 1
-                aux_en_unsat.q_tot[k] = outer_env.qt_unsat / (1 - aux_en.cloud_fraction[k])
-                T_unsat = outer_env.T_unsat / (1 - aux_en.cloud_fraction[k])
-                ts_unsat = TD.PhaseEquil_pTq(param_set, p_c[k], T_unsat, aux_en_unsat.q_tot[k])
-                aux_en_unsat.θ_dry[k] = TD.dry_pottemp(param_set, ts_unsat)
-                aux_en_unsat.b[k] = outer_env.b_unsat / (1 - aux_en.cloud_fraction[k])
-            else
-                aux_en_unsat.q_tot[k] = 0
-                aux_en_unsat.θ_dry[k] = 0
-                aux_en_unsat.b[k] = 0
-            end
+            aux_en.b_quad[k] = outer_env.b_quad
+            # if aux_en.cloud_fraction[k] < 1
+            #     aux_en_unsat.q_tot[k] = outer_env.qt_unsat / (1 - aux_en.cloud_fraction[k])
+            #     T_unsat = outer_env.T_unsat / (1 - aux_en.cloud_fraction[k])
+            #     ts_unsat = TD.PhaseEquil_pTq(param_set, p_c[k], T_unsat, aux_en_unsat.q_tot[k])
+            #     aux_en_unsat.θ_dry[k] = TD.dry_pottemp(param_set, ts_unsat)
+            # else
+            #     aux_en_unsat.q_tot[k] = 0
+            #     aux_en_unsat.θ_dry[k] = 0
+            # end
 
-            if aux_en.cloud_fraction[k] > 0
-                # aux_en_sat.T[k] = outer_env.T_sat / aux_en.cloud_fraction[k]
-                aux_en_sat.b[k] = outer_env.b_sat / aux_en.cloud_fraction[k]
-                aux_en_sat.q_tot[k] = outer_env.qt_sat / aux_en.cloud_fraction[k]
-                aux_en_sat.q_vap[k] = (outer_env.qt_sat - outer_env.ql - outer_env.qi) / aux_en.cloud_fraction[k]
-                ts_sat = TD.PhaseEquil_pTq(param_set, p_c[k], aux_en_sat.T[k], aux_en_sat.q_tot[k])
-                aux_en_sat.θ_dry[k] = TD.dry_pottemp(param_set, ts_sat)
-                aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_sat)
-            else
-                aux_en_sat.b[k] = 0
-                aux_en_sat.T[k] = 0
-                aux_en_sat.q_vap[k] = 0
-                aux_en_sat.q_tot[k] = 0
-                aux_en_sat.θ_dry[k] = 0
-                aux_en_sat.θ_liq_ice[k] = 0
-            end
+            # if aux_en.cloud_fraction[k] > 0
+            #     # aux_en_sat.T[k] = outer_env.T_sat / aux_en.cloud_fraction[k]
+            #     aux_en_sat.q_tot[k] = outer_env.qt_sat / aux_en.cloud_fraction[k]
+            #     aux_en_sat.q_vap[k] = (outer_env.qt_sat - outer_env.ql - outer_env.qi) / aux_en.cloud_fraction[k]
+            #     ts_sat = TD.PhaseEquil_pTq(param_set, p_c[k], aux_en_sat.T[k], aux_en_sat.q_tot[k])
+            #     aux_en_sat.θ_dry[k] = TD.dry_pottemp(param_set, ts_sat)
+            #     aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_sat)
+            # else
+            #     aux_en_sat.T[k] = 0
+            #     aux_en_sat.q_vap[k] = 0
+            #     aux_en_sat.q_tot[k] = 0
+            #     aux_en_sat.θ_dry[k] = 0
+            #     aux_en_sat.θ_liq_ice[k] = 0
+            # end
 
             # update var/covar rain sources
             aux_en.Hvar_rain_dt[k] = outer_src.SH_H - outer_src.SH * aux_en.θ_liq_ice[k]
@@ -369,21 +366,23 @@ function microphysics(
             aux_en.e_tot_tendency_precip_formation[k] = mph.e_tot_tendency * aux_en.area[k]
             tendencies_pr.q_rai[k] += mph.qr_tendency * aux_en.area[k]
             tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
+            rho = TD.air_density(param_set, ts)
+            aux_en.b_quad = buoyancy_c(param_set, ρ_c, rho)
 
             # update_sat_unsat
-            if TD.has_condensate(param_set, ts)
-                aux_en.cloud_fraction[k] = 1
-                aux_en_sat.θ_dry[k] = TD.dry_pottemp(param_set, ts)
-                aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts)
-                aux_en_sat.T[k] = TD.air_temperature(param_set, ts)
-                aux_en_sat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
-                aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(param_set, ts)
-            else
-                aux_en.cloud_fraction[k] = 0
-                aux_en_unsat.θ_dry[k] = TD.dry_pottemp(param_set, ts)
-                aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(param_set, ts)
-                aux_en_unsat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
-            end
+            # if TD.has_condensate(param_set, ts)
+            #     aux_en.cloud_fraction[k] = 1
+            #     aux_en_sat.θ_dry[k] = TD.dry_pottemp(param_set, ts)
+            #     aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts)
+            #     aux_en_sat.T[k] = TD.air_temperature(param_set, ts)
+            #     aux_en_sat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
+            #     aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(param_set, ts)
+            # else
+            #     aux_en.cloud_fraction[k] = 0
+            #     aux_en_unsat.θ_dry[k] = TD.dry_pottemp(param_set, ts)
+            #     aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(param_set, ts)
+            #     aux_en_unsat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
+            # end
 
             aux_en.Hvar_rain_dt[k] = 0
             aux_en.QTvar_rain_dt[k] = 0
