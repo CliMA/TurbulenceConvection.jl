@@ -55,44 +55,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         ##### Set primitive variables
         #####
         e_pot = geopotential(param_set, grid.zc.z[k])
-        @inbounds for i in 1:N_up
-            if is_surface_center(grid, k)
-                if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
-                    θ_surf = θ_surface_bc(surf, grid, state, edmf, i, param_set)
-                    q_surf = q_surface_bc(surf, grid, state, edmf, i)
-                    a_surf = area_surface_bc(surf, edmf, i)
-                    aux_up[i].θ_liq_ice[k] = θ_surf
-                    aux_up[i].q_tot[k] = q_surf
-                    aux_up[i].area[k] = a_surf
-                    thermo_args = if edmf.moisture_model isa EquilibriumMoisture
-                        ()
-                    elseif edmf.moisture_model isa NonEquilibriumMoisture
-                        (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
-                    end
-                else
-                    aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
-                    aux_up[i].q_tot[k] = aux_gm.q_tot[k]
-                    aux_up[i].e_kin[k] = aux_gm.e_kin[k]
-                end
-            else
-                if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
-                    e_tot = prog_up[i].ρae_tot[k] / prog_up[i].ρarea[k]
-                    aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
-                    aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ_c[k]
-                    e_int = e_tot - aux_up[i].e_kin[k] - e_pot
-                    ts_up = thermo_state_peq(param_set, p_c[k], e_int, aux_up[i].q_tot[k])
-                    aux_up[i].θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_up)
-                else
-                    aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
-                    aux_up[i].q_tot[k] = aux_gm.q_tot[k]
-                    aux_up[i].area[k] = 0
-                    aux_up[i].e_kin[k] = aux_gm.e_kin[k]
-                end
-            end
-            ts_up_i = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
-            aux_up[i].e_tot[k] = TD.total_energy(param_set, ts_up_i, aux_up[i].e_kin[k], e_pot)
-            aux_up[i].h_tot[k] = total_enthalpy(param_set, aux_up[i].e_tot[k], ts_up_i)
-        end
         if edmf.moisture_model isa NonEquilibriumMoisture
             @inbounds for i in 1:N_up
                 if is_surface_center(grid, k)
@@ -114,6 +76,45 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                         aux_up[i].q_ice[k] = prog_gm.q_ice[k]
                     end
                 end
+            end
+        end
+        @inbounds for i in 1:N_up
+            thermo_args = if edmf.moisture_model isa EquilibriumMoisture
+                ()
+            elseif edmf.moisture_model isa NonEquilibriumMoisture
+                (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
+            end
+            if is_surface_center(grid, k)
+                if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
+                    θ_surf = θ_surface_bc(surf, grid, state, edmf, i, param_set)
+                    q_surf = q_surface_bc(surf, grid, state, edmf, i)
+                    a_surf = area_surface_bc(surf, edmf, i)
+                    aux_up[i].θ_liq_ice[k] = θ_surf
+                    aux_up[i].q_tot[k] = q_surf
+                    aux_up[i].area[k] = a_surf
+                else
+                    aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
+                    aux_up[i].q_tot[k] = aux_gm.q_tot[k]
+                    aux_up[i].e_kin[k] = aux_gm.e_kin[k]
+                end
+                ts_up = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k], thermo_args...)
+                aux_up[i].e_tot[k] = TD.total_energy(param_set, ts_up, aux_up[i].e_kin[k], e_pot)
+                aux_up[i].h_tot[k] = total_enthalpy(param_set, aux_up[i].e_tot[k], ts_up)
+            else
+                if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
+                    aux_up[i].e_tot[k] = prog_up[i].ρae_tot[k] / prog_up[i].ρarea[k]
+                    aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
+                    aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ_c[k]
+                else
+                    aux_up[i].e_tot[k] = aux_gm.e_tot[k]
+                    aux_up[i].q_tot[k] = aux_gm.q_tot[k]
+                    aux_up[i].area[k] = 0
+                    aux_up[i].e_kin[k] = aux_gm.e_kin[k]
+                end
+                e_int = aux_up[i].e_tot[k] - aux_up[i].e_kin[k] - e_pot
+                ts_up = thermo_state_peq(param_set, p_c[k], e_int, aux_up[i].q_tot[k])
+                aux_up[i].θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_up)
+                aux_up[i].h_tot[k] = total_enthalpy(param_set, aux_up[i].e_tot[k], ts_up)
             end
         end
 
