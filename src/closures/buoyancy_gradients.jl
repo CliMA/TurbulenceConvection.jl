@@ -14,33 +14,34 @@ function buoyancy_gradients(
     bg_model::EnvBuoyGrad{FT, EBG},
 ) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
 
-    g = TCP.grav(param_set)
-    molmass_ratio = TCP.molmass_ratio(param_set)
-    R_d = TCP.R_d(param_set)
-    R_v = TCP.R_v(param_set)
+    # g = TCP.grav(param_set)
+    # molmass_ratio = TCP.molmass_ratio(param_set)
+    # R_d = TCP.R_d(param_set)
+    # R_v = TCP.R_v(param_set)
 
-    phase_part = TD.PhasePartition(0.0, 0.0, 0.0) # assuming R_d = R_m
-    Π = TD.exner_given_pressure(param_set, bg_model.p, phase_part)
+    # phase_part = TD.PhasePartition(0.0, 0.0, 0.0) # assuming R_d = R_m
+    # Π = TD.exner_given_pressure(param_set, bg_model.p, phase_part)
 
-    ∂b∂θv = g * (R_d * bg_model.ρ / bg_model.p) * Π
+    # ∂b∂θv = g * (R_d * bg_model.ρ / bg_model.p) * Π
 
-    if bg_model.en_cld_frac > 0.0
-        ts_sat = thermo_state_pθq(param_set, bg_model.p, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
-        phase_part = TD.PhasePartition(param_set, ts_sat)
-        lh = TD.latent_heat_liq_ice(param_set, phase_part)
-        cp_m = TD.cp_m(param_set, ts_sat)
-        ∂b∂θl_sat = (
-            ∂b∂θv * (1 + molmass_ratio * (1 + lh / R_v / bg_model.t_sat) * bg_model.qv_sat - bg_model.qt_sat) /
-            (1 + lh * lh / cp_m / R_v / bg_model.t_sat / bg_model.t_sat * bg_model.qv_sat)
-        )
-        ∂b∂qt_sat = (lh / cp_m / bg_model.t_sat * ∂b∂θl_sat - ∂b∂θv) * bg_model.θ_sat
-    else
-        ∂b∂θl_sat = FT(0)
-        ∂b∂qt_sat = FT(0)
-    end
+    # if bg_model.en_cld_frac > 0.0
+    #     ts_sat = thermo_state_pθq(param_set, bg_model.p, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
+    #     phase_part = TD.PhasePartition(param_set, ts_sat)
+    #     lh = TD.latent_heat_liq_ice(param_set, phase_part)
+    #     cp_m = TD.cp_m(param_set, ts_sat)
+    #     ∂b∂θl_sat = (
+    #         ∂b∂θv * (1 + molmass_ratio * (1 + lh / R_v / bg_model.t_sat) * bg_model.qv_sat - bg_model.qt_sat) /
+    #         (1 + lh * lh / cp_m / R_v / bg_model.t_sat / bg_model.t_sat * bg_model.qv_sat)
+    #     )
+    #     ∂b∂qt_sat = (lh / cp_m / bg_model.t_sat * ∂b∂θl_sat - ∂b∂θv) * bg_model.θ_sat
+    # else
+    #     ∂b∂θl_sat = FT(0)
+    #     ∂b∂qt_sat = FT(0)
+    # end
 
-    ∂b∂z, ∂b∂z_unsat, ∂b∂z_sat = buoyancy_gradient_chain_rule(bg_model, ∂b∂θv, ∂b∂θl_sat, ∂b∂qt_sat)
-    return GradBuoy{FT}(∂b∂z, ∂b∂z_unsat, ∂b∂z_sat)
+    # ∂b∂z, ∂b∂z_unsat, ∂b∂z_sat = buoyancy_gradient_chain_rule(bg_model, ∂b∂θv, ∂b∂θl_sat, ∂b∂qt_sat)
+    ∂b∂z = (1 - bg_model.en_cld_frac) * bg_model.∂b∂z_unsat + bg_model.en_cld_frac * bg_model.∂b∂z_sat
+    return GradBuoy{FT}(∂b∂z, bg_model.∂b∂z_unsat, bg_model.∂b∂z_sat)
 end
 
 """

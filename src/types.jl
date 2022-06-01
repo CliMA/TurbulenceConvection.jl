@@ -104,28 +104,32 @@ Variables used in the environmental buoyancy gradient computation.
 $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct EnvBuoyGrad{FT, EBC <: AbstractEnvBuoyGradClosure}
-    "temperature in the saturated part"
-    t_sat::FT
-    "vapor specific humidity  in the saturated part"
-    qv_sat::FT
-    "total specific humidity in the saturated part"
-    qt_sat::FT
-    "potential temperature in the saturated part"
-    θ_sat::FT
-    "liquid ice potential temperature in the saturated part"
-    θ_liq_ice_sat::FT
-    "virtual potential temperature gradient in the non saturated part"
-    ∂θv∂z_unsat::FT
-    "total specific humidity gradient in the saturated part"
-    ∂qt∂z_sat::FT
-    "liquid ice potential temperature gradient in the saturated part"
-    ∂θl∂z_sat::FT
-    "reference pressure"
-    p::FT
+    # "temperature in the saturated part"
+    # t_sat::FT
+    # "vapor specific humidity  in the saturated part"
+    # qv_sat::FT
+    # "total specific humidity in the saturated part"
+    # qt_sat::FT
+    # "potential temperature in the saturated part"
+    # θ_sat::FT
+    # "liquid ice potential temperature in the saturated part"
+    # θ_liq_ice_sat::FT
+    # "virtual potential temperature gradient in the non saturated part"
+    # ∂θv∂z_unsat::FT
+    # "total specific humidity gradient in the saturated part"
+    # ∂qt∂z_sat::FT
+    # "liquid ice potential temperature gradient in the saturated part"
+    # ∂θl∂z_sat::FT
+    # "reference pressure"
+    # p::FT
     "cloud fraction"
     en_cld_frac::FT
-    "density"
-    ρ::FT
+    # "density"
+    # ρ::FT
+    "∂b∂z_unsat"
+    ∂b∂z_unsat::FT
+    "∂b∂z_sat"
+    ∂b∂z_sat::FT
 end
 function EnvBuoyGrad(::EBG; t_sat::FT, bg_kwargs...) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
     return EnvBuoyGrad{FT, EBG}(; t_sat, bg_kwargs...)
