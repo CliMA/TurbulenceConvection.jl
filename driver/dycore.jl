@@ -216,7 +216,6 @@ function compute_ref_state!(
 
     # Perform the integration
     z_span = (grid.zmin, grid.zmax)
-    @info "z_span = $z_span"
     prob = ODE.ODEProblem(rhs, logp, z_span)
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
     parent(p_f) .= sol.(vec(grid.zf.z))
@@ -329,7 +328,7 @@ function assign_thermo_aux!(state, grid, moisture_model, param_set)
 end
 
 function ∑stoch_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
-    UnPack.@unpack edmf, param_set, case, aux, TS = params
+    UnPack.@unpack edmf, param_set, case, aux = params
 
     # set all tendencies to zero
     tends_face = tendencies.face
@@ -337,8 +336,9 @@ function ∑stoch_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) whe
     parent(tends_face) .= 0
     parent(tends_cent) .= 0
 
-    begin
-        state = TC.State(prog, aux, tendencies)
+    for inds in TC.iterate_columns(prog.cent)
+
+        state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
         surf = get_surface(case.surf_params, grid, state, t, param_set)
 
@@ -356,8 +356,8 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     parent(tends_face) .= 0
     parent(tends_cent) .= 0
 
-    begin
-        state = TC.State(prog, aux, tendencies)
+    for inds in TC.iterate_columns(prog.cent)
+        state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
 
         set_thermo_state_peq!(state, grid, edmf.moisture_model, param_set)

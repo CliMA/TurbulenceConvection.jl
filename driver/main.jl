@@ -64,6 +64,8 @@ struct Simulation1d{IONT, P, A, C, EDMF, PM, D, TIMESTEPPING, STATS, PS, SRS}
     surf_ref_state::SRS
 end
 
+include("common_spaces.jl")
+
 function Simulation1d(namelist)
     TC = TurbulenceConvection
     param_set = create_parameter_set(namelist)
@@ -75,6 +77,8 @@ function Simulation1d(namelist)
     cfl_limit = namelist["time_stepping"]["cfl_limit"]
     dt_min = namelist["time_stepping"]["dt_min"]
     truncate_stack_trace = namelist["logging"]["truncate_stack_trace"]
+
+    cspace, fspace, svpc_space = get_spaces(namelist, FT)
 
     # Create the class for precipitation
 
@@ -100,19 +104,12 @@ function Simulation1d(namelist)
     isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
     N_up = TC.n_updrafts(edmf)
 
-    grid = construct_grid(namelist; FT = FT)
-
-    cspace = TC.center_space(grid)
-    fspace = TC.face_space(grid)
-
     cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars, FT, edmf)
     face_prog_fields = TC.FieldFromNamedTuple(fspace, face_prognostic_vars, FT, edmf)
     aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars(FT, edmf))
     aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars(FT, edmf))
     diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars(FT, edmf))
     diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars(FT, edmf))
-
-    svpc_space = TC.single_value_per_col_space(grid)
     diagnostics_single_value_per_col =
         TC.FieldFromNamedTuple(svpc_space, single_value_per_col_diagnostic_vars(FT, edmf))
 
@@ -124,18 +121,32 @@ function Simulation1d(namelist)
         svpc = diagnostics_single_value_per_col,
     )
 
+    # TODO: clean up
     frequency = namelist["stats_io"]["frequency"]
     nc_filename, outpath = nc_fileinfo(namelist)
+    nc_filename_suffix = if namelist["config"] == "column"
+        (fn, inds) -> fn
+    elseif namelist["config"] == "sphere"
+        (fn, inds) -> fn -> first(split(fn, ".nc")) * "_inds=$(inds).nc"
+    end
 
     Stats = if skip_io
         nothing
-    else
-        # Setup the statistics output path
-        NetCDFIO_Stats(nc_filename, frequency, grid)
-    end
+    elseif namelist["config"] == "sphere"
+        map(TC.iterate_columns(prog.cent)) do inds
 
+            col_state = TC.column_prog_aux(prog, aux, inds...)
+            grid = TC.Grid(col_state)
+
+            NetCDFIO_Stats(; nc_filename = nc_filename_suffix(nc_filename, inds), frequency, grid)
+        end
+    elseif namelist["config"] == "column"
+        col_state = TC.column_prog_aux(prog, aux, 1, 1, 1)
+        grid = TC.Grid(col_state)
+
+        NetCDFIO_Stats(nc_filename_suffix(nc_filename, (1, 1, 1)), frequency, grid)
+    end
     casename = namelist["meta"]["casename"]
-    # Write namelist file to output directory
     open(joinpath(outpath, "namelist_$casename.in"), "w") do io
         JSON.print(io, namelist, 4)
     end
@@ -184,7 +195,6 @@ function initialize(sim::Simulation1d)
     TC = TurbulenceConvection
 
     (; prog, aux, edmf, case, param_set, skip_io, Stats, io_nt, diagnostics, truncate_stack_trace, surf_ref_state) = sim
-    prog = prog
     FT = eltype(edmf)
     t = FT(0)
 
@@ -210,9 +220,9 @@ function initialize(sim::Simulation1d)
     ]
     ts_list = vcat(ts_gm, ts_edmf)
 
-    begin
-        # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
-        state = TC.State(prog, aux, nothing)
+    # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
+    for inds in TC.iterate_columns(prog.cent)
+        state = TC.column_prog_aux(prog, aux, inds...)
         grid = TC.Grid(state)
         compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
         if !skip_io
@@ -254,56 +264,6 @@ function initialize(sim::Simulation1d)
     end
 
     return
-end
-
-function construct_grid(namelist; FT = Float64)
-
-    truncated_gcm_mesh = TC.parse_namelist(namelist, "grid", "stretch", "flag"; default = false)
-
-    if Cases.get_case(namelist) == Cases.LES_driven_SCM()
-        Δz = get(namelist["grid"], "dz", nothing)
-        nz = get(namelist["grid"], "nz", nothing)
-        @assert isnothing(Δz) ⊻ isnothing(nz) string(
-            "LES_driven_SCM supports nz or Δz, not both.",
-            "The domain height is enforced to be the same as in LES.",
-        )
-
-        les_filename = namelist["meta"]["lesfile"]
-        TC.valid_lespath(les_filename)
-        zmax = NC.Dataset(les_filename, "r") do data
-            Array(TC.get_nc_data(data, "zf"))[end]
-        end
-        nz = isnothing(nz) ? Int(zmax ÷ Δz) : Int(nz)
-        Δz = isnothing(Δz) ? FT(zmax ÷ nz) : FT(Δz)
-    else
-        Δz = FT(namelist["grid"]["dz"])
-        nz = namelist["grid"]["nz"]
-    end
-
-    z₀, z₁ = FT(0), FT(nz * Δz)
-    if truncated_gcm_mesh
-        nzₛ = namelist["grid"]["stretch"]["nz"]
-        Δzₛ_surf = FT(namelist["grid"]["stretch"]["dz_surf"])
-        Δzₛ_top = FT(namelist["grid"]["stretch"]["dz_toa"])
-        zₛ_toa = FT(namelist["grid"]["stretch"]["z_toa"])
-        stretch = CC.Meshes.GeneralizedExponentialStretching(Δzₛ_surf, Δzₛ_top)
-        domain = CC.Domains.IntervalDomain(
-            CC.Geometry.ZPoint{FT}(z₀),
-            CC.Geometry.ZPoint{FT}(zₛ_toa),
-            boundary_tags = (:bottom, :top),
-        )
-        gcm_mesh = CC.Meshes.IntervalMesh(domain, stretch; nelems = nzₛ)
-        mesh = TC.TCMeshFromGCMMesh(gcm_mesh; z_max = z₁)
-    else
-        CC.Meshes.Uniform()
-        domain = CC.Domains.IntervalDomain(
-            CC.Geometry.ZPoint{FT}(z₀),
-            CC.Geometry.ZPoint{FT}(z₁),
-            boundary_tags = (:bottom, :top),
-        )
-        mesh = CC.Meshes.IntervalMesh(domain, nelems = nz)
-    end
-    return TC.Grid(mesh)
 end
 
 include("callbacks.jl")
