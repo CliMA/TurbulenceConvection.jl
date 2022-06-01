@@ -201,7 +201,7 @@ steps:
   - label: ":robot_face: Print new mse tables"
     command: "julia --color=yes --project=integration_tests utils/print_new_mse.jl"
 
-  - wait
+  # - wait
 
-  - label: ":robot_face: Move main results"
-    command: "julia --color=yes --project=integration_tests utils/move_output.jl"
+  # - label: ":robot_face: Move main results"
+  #   command: "julia --color=yes --project=integration_tests utils/move_output.jl"
