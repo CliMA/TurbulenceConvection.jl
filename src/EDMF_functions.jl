@@ -96,7 +96,6 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         Ifau = CCO.InterpolateC2F(; a_up_bcs...)
         a_up = aux_up[i].area
         w_up_i = aux_up_f[i].w
-        h_tot_up = aux_up_i.h_tot
         q_tot_up = aux_up_i.q_tot
         h_tot_up = aux_up_i.h_tot
         @. aux_up_f[i].massflux = ρ_f * Ifau(a_up) * (w_up_i - w_gm)

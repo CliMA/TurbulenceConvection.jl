@@ -50,6 +50,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @inbounds for i in 1:N_up
         @. aux_up[i].e_kin = kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + aux_up_f[i].w))
     end
+
     @inbounds for k in real_center_indices(grid)
         #####
         ##### Set primitive variables
@@ -76,7 +77,11 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                         aux_up[i].q_ice[k] = prog_gm.q_ice[k]
                     end
                 end
+                thermo_args = (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
             end
+            ts_up_i = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k], thermo_args...)
+            aux_up[i].e_tot[k] = TD.total_energy(param_set, ts_up_i, aux_up[i].e_kin[k], e_pot)
+            aux_up[i].h_tot[k] = total_enthalpy(param_set, aux_up[i].e_tot[k], ts_up_i)
         end
         @inbounds for i in 1:N_up
             thermo_args = if edmf.moisture_model isa EquilibriumMoisture
@@ -173,8 +178,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             aux_en.q_liq[k] = max(val1 * prog_gm.q_liq[k] - val2 * aux_bulk.q_liq[k], 0)
             aux_en.q_ice[k] = max(val1 * prog_gm.q_ice[k] - val2 * aux_bulk.q_ice[k], 0)
         end
-        aux_en.θ_liq_ice[k] = val1 * aux_gm.θ_liq_ice[k] - val2 * aux_bulk.θ_liq_ice[k]
-        aux_en.e_tot[k] = TD.total_energy(param_set, ts_env[k], aux_en.e_kin[k], e_pot)
 
         #####
         ##### condensation, etc (done via saturation_adjustment or non-equilibrium) and buoyancy
@@ -186,9 +189,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
+
         h_en = enthalpy(aux_en.h_tot[k], e_pot, aux_en.e_kin[k])
         ts_env[k] = thermo_state_phq(param_set, p_c[k], h_en, aux_en.q_tot[k], thermo_args...)
         ts_en = ts_env[k]
+        aux_en.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_en)
+        aux_en.e_tot[k] = TD.total_energy(param_set, ts_en, aux_en.e_kin[k], e_pot)
         aux_en.T[k] = TD.air_temperature(param_set, ts_en)
         aux_en.θ_virt[k] = TD.virtual_pottemp(param_set, ts_en)
         aux_en.θ_dry[k] = TD.dry_pottemp(param_set, ts_en)
@@ -196,7 +202,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.q_ice[k] = TD.ice_specific_humidity(param_set, ts_en)
         rho = TD.air_density(param_set, ts_en)
         aux_en.buoy[k] = buoyancy_c(param_set, ρ_c[k], rho)
-        aux_en.h_tot[k] = total_enthalpy(param_set, aux_en.e_tot[k], ts_en)
 
         # update_sat_unsat
         if TD.has_condensate(param_set, ts_en)

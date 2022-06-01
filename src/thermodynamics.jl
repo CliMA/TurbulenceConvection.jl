@@ -60,33 +60,33 @@ function kinetic_energy(u::FT, v::FT, w::FT) where {FT}
     return FT(0.5) * (u^2 + v^2 + w^2)
 end
 
-function total_energy(param_set::APS, z::FT, u::FT, v::FT, w::FT, p::FT, θ_liq_ice::FT, q_tot::FT) where {FT}
-    config = ()
-    e_kin = kinetic_energy(u::FT, v::FT, w::FT)
-    e_pot = geopotential(param_set, z::FT)
-    e_int = TD.internal_energy(param_set, thermo_state_pθq(param_set, p, θ_liq_ice, q_tot, config...))
-    return e_kin + e_pot + e_int
-end
+# function total_energy(param_set::APS, z::FT, u::FT, v::FT, w::FT, p::FT, θ_liq_ice::FT, q_tot::FT) where {FT}
+#     config = ()
+#     e_kin = kinetic_energy(u::FT, v::FT, w::FT)
+#     e_pot = geopotential(param_set, z::FT)
+#     e_int = TD.internal_energy(param_set, thermo_state_pθq(param_set, p, θ_liq_ice, q_tot, config...))
+#     return e_kin + e_pot + e_int
+# end
 
-function total_energy(
-    param_set::APS,
-    z::FT,
-    u::FT,
-    v::FT,
-    w::FT,
-    p::FT,
-    θ_liq_ice::FT,
-    q_tot::FT,
-    q_liq::FT,
-    q_ice::FT,
-) where {FT}
-    config = ()
-    q = TD.PhasePartition(q_tot, q_liq, q_ice)
-    e_kin = kinetic_energy(u::FT, v::FT, w::FT)
-    e_pot = geopotential(param_set, z::FT)
-    e_int = TD.internal_energy(param_set, thermo_state_pθq(param_set, p, θ_liq_ice, q, config...))
-    return e_kin + e_pot + e_int
-end
+# function total_energy(
+#     param_set::APS,
+#     z::FT,
+#     u::FT,
+#     v::FT,
+#     w::FT,
+#     p::FT,
+#     θ_liq_ice::FT,
+#     q_tot::FT,
+#     q_liq::FT,
+#     q_ice::FT,
+# ) where {FT}
+#     config = ()
+#     q = TD.PhasePartition(q_tot, q_liq, q_ice)
+#     e_kin = kinetic_energy(u::FT, v::FT, w::FT)
+#     e_pot = geopotential(param_set, z::FT)
+#     e_int = TD.internal_energy(param_set, thermo_state_pθq(param_set, p, θ_liq_ice, q, config...))
+#     return e_kin + e_pot + e_int
+# end
 
 function enthalpy(h_tot::FT, e_kin::FT, e_pot::FT) where {FT}
     return h_tot - e_kin - e_pot
