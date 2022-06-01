@@ -8,9 +8,9 @@ namelist["stats_io"]["frequency"] = 0 # io at every step
 namelist["meta"]["uuid"] = "01_flame_io"
 sim = Simulation1d(namelist)
 initialize(sim)
-open_files(sim.Stats) # force compilation
-close_files(sim.Stats) # force compilation
-open_files(sim.Stats)
+open_files(sim) # force compilation
+close_files(sim) # force compilation
+open_files(sim)
 (prob, alg, kwargs) = solve_args(sim)
 integrator = ODE.init(prob, alg; kwargs...)
 
@@ -25,7 +25,7 @@ prof = Profile.@profile begin
         ODE.step!(integrator)
     end
 end
-close_files(sim.Stats)
+close_files(sim)
 ∑tendencies!
 import PProf
 PProf.pprof()
