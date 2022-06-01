@@ -129,7 +129,7 @@ Upon running a particular experiment (described above), comparison plots (agains
 | `u`           | [✓]           |  [x]            |  [x]         |
 | `v`           | [✓]           |  [x]            |  [x]         |
 | `w`           | [-]           |  [x]            |  [✓]         |
-| `θ_liq_ice`   | [✓]           |  [x]            |  [✓]         |
+| `e_tot`       | [✓]           |  [x]            |  [✓]         |
 | `q_tot`       | [✓]           |  [x]            |  [✓]         |
 | `a`           | [-]           |  [x]            |  [✓]         |
 | `tke`         | [x]           |  [✓]            |  [-]         |

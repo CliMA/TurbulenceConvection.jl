@@ -78,6 +78,8 @@ cent_aux_vars_gm(FT, edmf) = (;
     θ_liq_ice = FT(0),
     q_tot = FT(0),
     p = FT(0),
+    e_kin = FT(0),
+    h_tot = FT(0),
 )
 cent_aux_vars(FT, edmf) = (; cent_aux_vars_gm(FT, edmf)..., TC.cent_aux_vars_edmf(FT, edmf)...)
 
@@ -257,12 +259,13 @@ function set_thermo_state_peq!(state, grid, moisture_model, param_set)
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
-        e_kin = TC.kinetic_energy(prog_gm_u[k], prog_gm_v[k], w_c[k])
+        aux_gm.e_kin[k] = TC.kinetic_energy(prog_gm_u[k], prog_gm_v[k], w_c[k])
         e_pot = TC.geopotential(param_set, grid.zc.z[k])
-        e_int = prog_gm.ρe_tot[k] / ρ_c[k] - e_kin - e_pot
+        e_int = prog_gm.ρe_tot[k] / ρ_c[k] - aux_gm.e_kin[k] - e_pot
         ts_gm[k] = TC.thermo_state_peq(param_set, p_c[k], e_int, aux_gm.q_tot[k], thermo_args...)
         aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_gm[k])
         aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
+        aux_gm.h_tot[k] = TC.total_enthalpy(param_set, prog_gm.ρe_tot[k] / ρ_c[k], ts_gm[k])
     end
     return nothing
 end
@@ -429,19 +432,13 @@ function compute_gm_tendencies!(
     aux_tc = TC.center_aux_turbconv(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
 
-    e_kin = copy(prog_gm.ρe_tot)
-    w_c = copy(prog_gm.ρe_tot)
-    h_tot_gm = copy(prog_gm.ρe_tot)
-    @. w_c = Ic(FT(0) + prog_gm_f.w)
-    @. h_tot_gm = TC.anelastic_total_enthalpy(param_set, prog_gm.ρe_tot / ρ_c, ts_gm)
-    @. e_kin = TC.kinetic_energy(prog_gm_u, prog_gm_v, w_c)
-    MSE_gm_toa = h_tot_gm[kc_toa] - e_kin[kc_toa]
+    MSE_gm_toa = aux_gm.h_tot[kc_toa] - aux_gm.e_kin[kc_toa]
     q_tot_gm_toa = prog_gm.ρq_tot[kc_toa] / ρ_c[kc_toa]
     RBe = CCO.RightBiasedC2F(; top = CCO.SetValue(MSE_gm_toa))
     RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa))
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
-    @. ∇MSE_gm = ∇c(wvec(RBe(h_tot_gm - e_kin)))
+    @. ∇MSE_gm = ∇c(wvec(RBe(aux_gm.h_tot - aux_gm.e_kin)))
     @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.ρq_tot / ρ_c)))
 
     if edmf.moisture_model isa TC.NonEquilibriumMoisture

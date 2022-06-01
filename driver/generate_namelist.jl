@@ -108,7 +108,7 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.25
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_scale"] = 10.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_power"] = 3.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_power"] = 4.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"] = 0.0004
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"] = 2.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["min_upd_velocity"] = 0.001

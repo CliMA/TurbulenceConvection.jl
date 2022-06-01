@@ -37,13 +37,22 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ts_gm = center_aux_grid_mean(state).ts
     ts_env = center_aux_environment(state).ts
 
+    prog_gm_u = grid_mean_u(state)
+    prog_gm_v = grid_mean_v(state)
+    Ic = CCO.InterpolateF2C()
     #####
     ##### center variables
     #####
+    @. aux_en.e_kin = kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + aux_en_f.w))
+    @inbounds for i in 1:N_up
+        @. aux_up[i].e_kin = kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + aux_up_f[i].w))
+    end
+
     @inbounds for k in real_center_indices(grid)
         #####
         ##### Set primitive variables
         #####
+        e_pot = geopotential(param_set, grid.zc.z[k])
         @inbounds for i in 1:N_up
             if is_surface_center(grid, k)
                 if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
@@ -56,6 +65,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 else
                     aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
                     aux_up[i].q_tot[k] = aux_gm.q_tot[k]
+                    aux_up[i].e_kin[k] = aux_gm.e_kin[k]
                 end
             else
                 if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
@@ -66,11 +76,11 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                     aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
                     aux_up[i].q_tot[k] = aux_gm.q_tot[k]
                     aux_up[i].area[k] = 0
+                    aux_up[i].e_kin[k] = aux_gm.e_kin[k]
                 end
             end
-        end
-        if edmf.moisture_model isa NonEquilibriumMoisture
-            @inbounds for i in 1:N_up
+            thermo_args = ()
+            if edmf.moisture_model isa NonEquilibriumMoisture
                 if is_surface_center(grid, k)
                     if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
                         ql_surf = ql_surface_bc(surf)
@@ -90,13 +100,18 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                         aux_up[i].q_ice[k] = prog_gm.q_ice[k]
                     end
                 end
+                thermo_args = (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
             end
+            ts_up_i = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k], thermo_args...)
+            aux_up[i].e_tot[k] = TD.total_energy(param_set, ts_up_i, aux_up[i].e_kin[k], e_pot)
+            aux_up[i].h_tot[k] = total_enthalpy(param_set, aux_up[i].e_tot[k], ts_up_i)
         end
 
         #####
         ##### compute bulk
         #####
         aux_bulk.q_tot[k] = 0
+        aux_bulk.h_tot[k] = 0
         aux_bulk.θ_liq_ice[k] = 0
         aux_bulk.area[k] = sum(i -> aux_up[i].area[k], 1:N_up)
         if aux_bulk.area[k] > 0
@@ -105,10 +120,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 a_bulk_k = aux_bulk.area[k]
                 aux_bulk.q_tot[k] += a_k * aux_up[i].q_tot[k] / a_bulk_k
                 aux_bulk.θ_liq_ice[k] += a_k * aux_up[i].θ_liq_ice[k] / a_bulk_k
+                aux_bulk.h_tot[k] += a_k * aux_up[i].h_tot[k] / a_bulk_k
             end
         else
             aux_bulk.q_tot[k] = aux_gm.q_tot[k]
             aux_bulk.θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
+            aux_bulk.h_tot[k] = aux_gm.h_tot[k]
         end
         if edmf.moisture_model isa NonEquilibriumMoisture
             aux_bulk.q_liq[k] = 0
@@ -140,11 +157,11 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         val1 = 1 / (1 - a_bulk_c)
         val2 = a_bulk_c * val1
         aux_en.q_tot[k] = max(val1 * aux_gm.q_tot[k] - val2 * aux_bulk.q_tot[k], 0) #Yair - this is here to prevent negative QT
+        aux_en.h_tot[k] = val1 * aux_gm.h_tot[k] - val2 * aux_bulk.h_tot[k]
         if edmf.moisture_model isa NonEquilibriumMoisture
             aux_en.q_liq[k] = max(val1 * prog_gm.q_liq[k] - val2 * aux_bulk.q_liq[k], 0)
             aux_en.q_ice[k] = max(val1 * prog_gm.q_ice[k] - val2 * aux_bulk.q_ice[k], 0)
         end
-        aux_en.θ_liq_ice[k] = val1 * aux_gm.θ_liq_ice[k] - val2 * aux_bulk.θ_liq_ice[k]
 
         #####
         ##### condensation, etc (done via saturation_adjustment or non-equilibrium) and buoyancy
@@ -156,8 +173,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
-        ts_env[k] = thermo_state_pθq(param_set, p_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], thermo_args...)
+
+        h_en = enthalpy(aux_en.h_tot[k], e_pot, aux_en.e_kin[k])
+        ts_env[k] = thermo_state_phq(param_set, p_c[k], h_en, aux_en.q_tot[k], thermo_args...)
         ts_en = ts_env[k]
+        aux_en.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_en)
+        aux_en.e_tot[k] = TD.total_energy(param_set, ts_en, aux_en.e_kin[k], e_pot)
         aux_en.T[k] = TD.air_temperature(param_set, ts_en)
         aux_en.θ_virt[k] = TD.virtual_pottemp(param_set, ts_en)
         aux_en.θ_dry[k] = TD.dry_pottemp(param_set, ts_en)
