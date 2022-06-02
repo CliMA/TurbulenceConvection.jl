@@ -13,7 +13,7 @@ invalidations = @snoopr begin
     println("Running $case_name...")
     namelist = NameList.default_namelist(case_name)
     namelist["meta"]["uuid"] = "01_invalidations"
-    ds_tc_filename, return_code = main(namelist)
+    integrator, ds_tc_filenames, return_code = main(namelist)
 end;
 
 import ReportMetrics

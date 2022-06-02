@@ -12,7 +12,7 @@ tinf = SnoopCompile.@snoopi_deep begin
     println("Running $case_name...")
     namelist = NameList.default_namelist(case_name)
     namelist["meta"]["uuid"] = "01"
-    ds_tc_filename, return_code = main(namelist)
+    integrator, ds_tc_filenames, return_code = main(namelist)
 end
 
 import Profile
@@ -30,7 +30,7 @@ Profile.@profile begin
     println("Running $case_name...")
     namelist = NameList.default_namelist(case_name)
     namelist["meta"]["uuid"] = "01"
-    ds_tc_filename, return_code = main(namelist)
+    integrator, ds_tc_filenames, return_code = main(namelist)
 end
 
 import PyPlot # the GUI is dependent on PyPlot, must load it before the next line

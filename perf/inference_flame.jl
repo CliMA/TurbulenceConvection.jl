@@ -9,7 +9,7 @@ sim.skip_io || open_files(sim) # #removeVarsHack
 
 tinf = SnoopCompileCore.@snoopi_deep begin
     sol = ODE.solve(prob, alg; kwargs...)
-    # ds_tc_filename, return_code = main(namelist)
+    # integrator, ds_tc_filenames, return_code = main(namelist)
 end
 
 sim.skip_io || close_files(sim) # #removeVarsHack

@@ -88,7 +88,7 @@ if length(overwrite_list) ≠ length(cl_list)
     )
 end
 
-ds_tc_filename, return_code = main(namelist)
+integrator, ds_tc_filenames, return_code = main(namelist);
 
 parsed_args["broken_tests"] && exit()
 
@@ -100,6 +100,7 @@ parsed_args["broken_tests"] && exit()
 end
 
 # Post-processing case kwargs
+include(joinpath(tc_dir, "integration_tests", "sphere_utils.jl"))
 include(joinpath(tc_dir, "post_processing", "case_kwargs.jl"))
 include(joinpath(tc_dir, "post_processing", "compute_mse.jl"))
 include(joinpath(tc_dir, "post_processing", "mse_tables.jl"))
@@ -107,43 +108,52 @@ best_mse = all_best_mse[case_name]
 
 parsed_args["skip_post_proc"] && exit()
 
-computed_mse = compute_mse_wrapper(case_name, best_mse, ds_tc_filename; case_kwargs[case_name]...)
-
-parsed_args["skip_tests"] && exit()
-
-open("computed_mse_$case_name.json", "w") do io
-    JSON.print(io, computed_mse)
+plot_dir = joinpath(dirname(first(ds_tc_filenames)), "comparison")
+if parsed_args["config"] == "sphere"
+    plot_profiles(integrator.sol.u[end], plot_dir)
+    test_zero_horizontal_variance(integrator.sol.u[end])
 end
 
-@testset "$case_name" begin
-    for k in keys(best_mse)
-        test_mse(computed_mse, best_mse, k)
+for ds_tc_filename in ds_tc_filenames
+    computed_mse = compute_mse_wrapper(case_name, best_mse, ds_tc_filename; case_kwargs[case_name]..., plot_dir)
+
+    parsed_args["skip_tests"] && exit()
+
+    if parsed_args["config"] == "column"
+        open("computed_mse_$case_name.json", "w") do io
+            JSON.print(io, computed_mse)
+        end
     end
-    @testset "Post-run tests" begin
-        isnan_or_inf(x) = isnan(x) || isinf(x)
-        NC.Dataset(ds_tc_filename, "r") do ds
-            profile = ds.group["profiles"]
-            @test !any(isnan_or_inf.(Array(profile["qt_mean"])))
-            @test !any(isnan_or_inf.(Array(profile["updraft_area"])))
-            @test !any(isnan_or_inf.(Array(profile["updraft_w"])))
-            @test !any(isnan_or_inf.(Array(profile["updraft_qt"])))
-            @test !any(isnan_or_inf.(Array(profile["updraft_thetal"])))
-            @test !any(isnan_or_inf.(Array(profile["u_mean"])))
-            @test !any(isnan_or_inf.(Array(profile["tke_mean"])))
-            @test !any(isnan_or_inf.(Array(profile["temperature_mean"])))
-            @test !any(isnan_or_inf.(Array(profile["ql_mean"])))
-            @test !any(isnan_or_inf.(Array(profile["qi_mean"])))
-            @test !any(isnan_or_inf.(Array(profile["thetal_mean"])))
-            @test !any(isnan_or_inf.(Array(profile["Hvar_mean"])))
-            @test !any(isnan_or_inf.(Array(profile["QTvar_mean"])))
-            @test !any(isnan_or_inf.(Array(profile["v_mean"])))
-            @test !any(isnan_or_inf.(Array(profile["qr_mean"])))
+
+    @testset "$case_name" begin
+        for k in keys(best_mse)
+            test_mse(computed_mse, best_mse, k)
+        end
+        @testset "Post-run tests" begin
+            isnan_or_inf(x) = isnan(x) || isinf(x)
+            NC.Dataset(ds_tc_filename, "r") do ds
+                profile = ds.group["profiles"]
+                @test !any(isnan_or_inf.(Array(profile["qt_mean"])))
+                @test !any(isnan_or_inf.(Array(profile["updraft_area"])))
+                @test !any(isnan_or_inf.(Array(profile["updraft_w"])))
+                @test !any(isnan_or_inf.(Array(profile["updraft_qt"])))
+                @test !any(isnan_or_inf.(Array(profile["updraft_thetal"])))
+                @test !any(isnan_or_inf.(Array(profile["u_mean"])))
+                @test !any(isnan_or_inf.(Array(profile["tke_mean"])))
+                @test !any(isnan_or_inf.(Array(profile["temperature_mean"])))
+                @test !any(isnan_or_inf.(Array(profile["ql_mean"])))
+                @test !any(isnan_or_inf.(Array(profile["qi_mean"])))
+                @test !any(isnan_or_inf.(Array(profile["thetal_mean"])))
+                @test !any(isnan_or_inf.(Array(profile["Hvar_mean"])))
+                @test !any(isnan_or_inf.(Array(profile["QTvar_mean"])))
+                @test !any(isnan_or_inf.(Array(profile["v_mean"])))
+                @test !any(isnan_or_inf.(Array(profile["qr_mean"])))
+            end
+            nothing
         end
         nothing
     end
-    nothing
 end
-
 # Cleanup
 # https://github.com/JuliaLang/Pkg.jl/issues/3014
 rm("LocalPreferences.toml"; force = true)

@@ -21,16 +21,18 @@ end
     println("Running $case_name...")
     namelist = NameList.default_namelist(case_name)
     namelist["meta"]["uuid"] = "01"
-    ds_tc_filename, return_code = main(namelist)
+    integrator, ds_tc_filenames, return_code = main(namelist)
 
-    computed_mse = compute_mse_wrapper(
-        case_name,
-        best_mse,
-        ds_tc_filename;
-        plot_comparison = true,
-        t_start = 4 * 3600,
-        t_stop = 6 * 3600,
-    )
+    for ds_tc_filename in ds_tc_filenames
+        computed_mse = compute_mse_wrapper(
+            case_name,
+            best_mse,
+            ds_tc_filename;
+            plot_comparison = true,
+            t_start = 4 * 3600,
+            t_stop = 6 * 3600,
+        )
+    end
     nothing
 
     # Test running from parsed namelist
