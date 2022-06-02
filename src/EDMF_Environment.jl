@@ -35,7 +35,7 @@ function microphysics(
             ts,
             precip_fraction,
         )
-        aux_en.ρ_sgs[k] = TD.air_density(param_set, ts)
+        aux_en.ρ_sgs[k] = TD.virtual_pottemp(param_set, ts)
 
         # update_sat_unsat
         if TD.has_condensate(param_set, ts)
@@ -68,7 +68,7 @@ end
 
 function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt::Real)
 
-    env_len = 9
+    env_len = 10
     src_len = 9
     i_ql, i_qi, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat, i_ρ_sat, i_ρ_unsat = 1:env_len
     i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH, i_Sqr, i_Sqs, i_Se_tot = 1:src_len
@@ -161,7 +161,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
             q_liq_en = TD.liquid_specific_humidity(param_set, ts)
             q_ice_en = TD.ice_specific_humidity(param_set, ts)
             T = TD.air_temperature(param_set, ts)
-            ρ = TD.air_density(param_set, ts)
+            ρ = TD.virtual_pottemp(param_set, ts)
             # autoconversion and accretion
             mph = precipitation_formation(
                 param_set,
@@ -378,13 +378,13 @@ function microphysics(
                 aux_en_sat.T[k] = TD.air_temperature(param_set, ts)
                 aux_en_sat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
                 aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(param_set, ts)
-                aux_en_sat.ρ_sgs[k] = TD.air_density(param_set, ts)
+                aux_en_sat.ρ_sgs[k] = TD.virtual_pottemp(param_set, ts)
             else
                 aux_en.cloud_fraction[k] = 0
                 aux_en_unsat.θ_dry[k] = TD.dry_pottemp(param_set, ts)
                 aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(param_set, ts)
                 aux_en_unsat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
-                aux_en_unsat.ρ_sgs[k] = TD.air_density(param_set, ts)
+                aux_en_unsat.ρ_sgs[k] = TD.virtual_pottemp(param_set, ts)
             end
 
             aux_en.Hvar_rain_dt[k] = 0

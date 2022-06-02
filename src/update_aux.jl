@@ -376,7 +376,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
     # Second order approximation: Use dry and cloudy environmental fields.
     cf = aux_en.cloud_fraction
-    @. ∂b∂z = - (g / ρ_c) * ((1-cf)*∇c(wvec(If0(aux_en_unsat.ρ_sgs))) + cf*∇c(wvec(If0(aux_en_sat.ρ_sgs))))
+    @. ∂b∂z = ((1-cf)*∇c(wvec(If0((g / θ_virt_en) * aux_en_unsat.ρ_sgs))) + cf*∇c(wvec(If0((g / θ_virt_en) * aux_en_sat.ρ_sgs))))
 
     shm = copy(cf)
     pshm = parent(shm)
@@ -467,8 +467,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0.0))
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
 
-        aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
-        @show(bg.∂b∂z, ∂b∂z[k])
+        aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * ∂b∂z[k]
     end
 
     #####
