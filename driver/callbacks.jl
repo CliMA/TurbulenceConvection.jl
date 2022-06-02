@@ -99,6 +99,16 @@ function adaptive_dt!(integrator)
     ODE.u_modified!(integrator, false)
 end
 
+function init_dt!(integrator)
+    UnPack.@unpack edmf, TS, dt_min = integrator.p
+    if !TS.initialized
+        dt_zero = 0.0
+        SciMLBase.set_proposed_dt!(integrator, dt_zero)
+        ODE.u_modified!(integrator, false)
+        TS.initialized = true
+    end
+end
+
 function dt_max!(integrator)
     UnPack.@unpack edmf, aux, TS = integrator.p
     prog = integrator.u
