@@ -253,22 +253,6 @@ function initialize(sim::Simulation1d)
         initialize_io(stats.nc_filename, io_nt.aux, io_nt.diagnostics)
         initialize_io(stats.nc_filename, ts_list)
         surf = get_surface(case.surf_params, grid, state, t, param_set)
-        open_files(stats)
-        try
-            write_simulation_time(stats, t)
-            io(io_nt.aux, stats, state)
-            io(io_nt.diagnostics, stats, diagnostics_col)
-            io(surf, case.surf_params, grid, state, stats, t)
-        catch e
-            if truncate_stack_trace
-                @warn "IO during initialization failed."
-            else
-                @warn "IO during initialization failed." exception = (e, catch_backtrace())
-            end
-            return :simulation_crashed
-        finally
-            close_files(stats)
-        end
     end
 
     return
