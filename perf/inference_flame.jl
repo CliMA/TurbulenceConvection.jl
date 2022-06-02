@@ -4,15 +4,15 @@ import SnoopCompileCore
 case_name = "Bomex"
 println("Running $case_name...")
 sim = init_sim(case_name)
-sim.skip_io || open_files(sim.Stats) # #removeVarsHack
+sim.skip_io || open_files(sim) # #removeVarsHack
 (prob, alg, kwargs) = solve_args(sim)
 
 tinf = SnoopCompileCore.@snoopi_deep begin
     sol = ODE.solve(prob, alg; kwargs...)
-    # ds_tc_filename, return_code = main(namelist)
+    # integrator, ds_tc_filenames, return_code = main(namelist)
 end
 
-sim.skip_io || close_files(sim.Stats) # #removeVarsHack
+sim.skip_io || close_files(sim) # #removeVarsHack
 
 import ProfileView
 import SnoopCompile # need SnoopCompile to iterate over InferenceTimingNode's

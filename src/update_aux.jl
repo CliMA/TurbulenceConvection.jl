@@ -77,11 +77,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                         aux_up[i].q_ice[k] = prog_gm.q_ice[k]
                     end
                 end
-                thermo_args = (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
             end
-            ts_up_i = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k], thermo_args...)
-            aux_up[i].e_tot[k] = TD.total_energy(param_set, ts_up_i, aux_up[i].e_kin[k], e_pot)
-            aux_up[i].h_tot[k] = total_enthalpy(param_set, aux_up[i].e_tot[k], ts_up_i)
         end
         @inbounds for i in 1:N_up
             thermo_args = if edmf.moisture_model isa EquilibriumMoisture
@@ -226,23 +222,26 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
                 qt = aux_up[i].q_tot[k - 1]
                 h = aux_up[i].θ_liq_ice[k - 1]
+                e = aux_up[i].e_tot[k - 1] - aux_up[i].e_kin[k - 1] - e_pot
                 if edmf.moisture_model isa EquilibriumMoisture
-                    ts_up = thermo_state_pθq(param_set, p_c[k], h, qt)
+                    ts_up = thermo_state_peq(param_set, p_c[k], e, qt)
                 elseif edmf.moisture_model isa NonEquilibriumMoisture
                     ql = aux_up[i].q_liq[k - 1]
                     qi = aux_up[i].q_ice[k - 1]
-                    ts_up = thermo_state_pθq(param_set, p_c[k], h, qt, ql, qi)
+                    e = aux_up[i].e_tot[k - 1] - aux_up[i].e_kin[k - 1] - e_pot
+                    ts_up = thermo_state_peq(param_set, p_c[k], e, qt, ql, qi)
                 else
                     error("Something went wrong. emdf.moisture_model options are equilibrium or nonequilibrium")
                 end
             else
+                e = aux_up[i].e_tot[k] - aux_up[i].e_kin[k] - e_pot
                 if edmf.moisture_model isa EquilibriumMoisture
-                    ts_up = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
+                    ts_up = thermo_state_peq(param_set, p_c[k], e, aux_up[i].q_tot[k])
                 elseif edmf.moisture_model isa NonEquilibriumMoisture
-                    ts_up = thermo_state_pθq(
+                    ts_up = thermo_state_peq(
                         param_set,
                         p_c[k],
-                        aux_up[i].θ_liq_ice[k],
+                        e,
                         aux_up[i].q_tot[k],
                         aux_up[i].q_liq[k],
                         aux_up[i].q_ice[k],
@@ -257,12 +256,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             ρ = TD.air_density(param_set, ts_up)
             aux_up[i].buoy[k] = buoyancy_c(param_set, ρ_c[k], ρ)
             aux_up[i].RH[k] = TD.relative_humidity(param_set, ts_up)
-            e_tot = (
-                    aux_up[i].e_kin[k]
-                  + geopotential(param_set, grid.zc[k].z)
-                  + TD.internal_energy(param_set, ts_up)
-                  )
-            aux_up[i].h_tot[k] = total_enthalpy(param_set, e_tot, ts_up)
         end
         aux_gm.buoy[k] = (1.0 - aux_bulk.area[k]) * aux_en.buoy[k]
         @inbounds for i in 1:N_up

@@ -17,6 +17,7 @@ Base.:<(h1::Cent, h2::Cent) = h1.i < h2.i
 Base.max(h1::Cent, h2::Cent) = Cent(max(h1.i, h2.i))
 Base.min(h1::Cent, h2::Cent) = Cent(min(h1.i, h2.i))
 
+# TODO: remove this:
 Base.:-(a::FT, b::CCG.Covariant3Vector{FT}) where {FT} = a .- b.u₃
 Base.:+(a::FT, b::CCG.Covariant3Vector{FT}) where {FT} = a .+ b.u₃
 
@@ -77,14 +78,21 @@ end
 
 get_Δz(field::CC.Fields.FiniteDifferenceField) = parent(CC.Fields.weighted_jacobian(field))
 
+# TODO: move these things into ClimaCore
+
+isa_center_space(space) = false
+isa_center_space(::CC.Spaces.CenterFiniteDifferenceSpace) = true
+isa_center_space(::CC.Spaces.CenterExtrudedFiniteDifferenceSpace) = true
+
+isa_face_space(space) = false
+isa_face_space(::CC.Spaces.FaceFiniteDifferenceSpace) = true
+isa_face_space(::CC.Spaces.FaceExtrudedFiniteDifferenceSpace) = true
 
 function first_center_space(fv::CC.Fields.FieldVector)
     for prop_chain in CC.Fields.property_chains(fv)
         f = CC.Fields.single_field(fv, prop_chain)
         space = axes(f)
-        if space isa CC.Spaces.CenterFiniteDifferenceSpace
-            return space
-        end
+        isa_center_space(space) && return space
     end
     error("Unfound space")
 end
@@ -93,9 +101,7 @@ function first_face_space(fv::CC.Fields.FieldVector)
     for prop_chain in CC.Fields.property_chains(fv)
         f = CC.Fields.single_field(fv, prop_chain)
         space = axes(f)
-        if space isa CC.Spaces.FaceFiniteDifferenceSpace
-            return space
-        end
+        isa_face_space(space) && return space
     end
     error("Unfound space")
 end

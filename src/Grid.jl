@@ -190,6 +190,8 @@ z_findlast_face(f::F, grid::Grid) where {F} = grid.zf[findlast_face(f, grid)].z
 Base.eltype(::Grid{FT}) where {FT} = FT
 
 
+# TODO: Move these things into ClimaCore
+
 """
     ColumnIterator(::Field)
 
@@ -211,7 +213,15 @@ ColumnIterator(field::CC.Fields.ExtrudedFiniteDifferenceField) = ColumnIterator(
 
 Base.size(::ColumnIterator{Nh, Nj, Ni}) where {Nh, Nj, Ni} = (Nh, Nj, Ni)
 
-function iterate_columns(field)
+function iterate_columns(field::CC.Fields.ExtrudedFiniteDifferenceField)
     (Nh, Nj, Ni) = size(ColumnIterator(field))
-    return Iterators.product(1:Nh, 1:Nj, 1:Ni)
+    return Iterators.product(1:Ni, 1:Nj, 1:Nh)
 end
+
+function iterate_columns(fv::CC.Fields.FieldVector)
+    space = first_center_space(fv)
+    (Nh, Nj, Ni) = size(ColumnIterator(space))
+    return Iterators.product(1:Ni, 1:Nj, 1:Nh)
+end
+
+number_of_columns(fv::CC.Fields.FieldVector) = prod(size(ColumnIterator(first_center_space(fv))))

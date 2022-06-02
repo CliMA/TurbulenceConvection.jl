@@ -149,10 +149,13 @@ steps:
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --skip_io true --skip_post_proc true --suffix _skip_io_true"
         artifact_paths: "Output.Bomex.01_skip_io_true/stats/comparison/*"
 
-
       - label: ":partly_sunny: Rico with prognostic covarinaces"
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Rico --thermo_covariance_model prognostic --skip_tests true --suffix _prognostic_covarinaces"
         artifact_paths: "Output.Rico.01_prognostic_covarinaces/stats/comparison/*"
+
+      - label: ":partly_sunny: Bomex on sphere"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --config sphere --skip_tests true --suffix _sphere"
+        artifact_paths: "Output.Bomex.01_sphere/stats/comparison/*"
 
   - group: "Performance monitoring"
     steps:

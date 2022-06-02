@@ -2,7 +2,7 @@ function condition_io(u, t, integrator)
     UnPack.@unpack TS, Stats = integrator.p
     TS.dt_io += TS.dt
     io_flag = false
-    if TS.dt_io > Stats.frequency
+    if TS.dt_io > Stats[1].frequency
         TS.dt_io = 0
         io_flag = true
     end
@@ -20,56 +20,52 @@ function affect_io!(integrator)
     tendencies = ODE.get_du(integrator)
 
     for inds in TC.iterate_columns(prog.cent)
+        stats = Stats[inds...]
         state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
-        diag_col = diagnostics
-
-        diag_cent_column = CC.column(diagnostics.cent, inds...)
-        diag_face_column = CC.column(diagnostics.face, inds...)
-        diag_svpc_column = CC.column(diagnostics.svpc, inds...)
-        diag_col = CC.Fields.FieldVector(cent = diag_cent_column, face = diag_face_column, svpc = diag_svpc_column)
+        diag_col = TC.column_diagnostics(diagnostics, inds...)
 
         # TODO: is this the best location to call diagnostics?
-        compute_diagnostics!(edmf, precip_model, param_set, grid, state, diag_col, Stats, case, t, calibrate_io)
+        compute_diagnostics!(edmf, precip_model, param_set, grid, state, diag_col, stats, case, t, calibrate_io)
 
         cent = TC.Cent(1)
         diag_svpc = svpc_diagnostics_grid_mean(diag_col)
         diag_tc_svpc = svpc_diagnostics_turbconv(diag_col)
-        write_ts(Stats, "lwp_mean", diag_svpc.lwp_mean[cent])
-        write_ts(Stats, "iwp_mean", diag_svpc.iwp_mean[cent])
-        write_ts(Stats, "rwp_mean", diag_svpc.rwp_mean[cent])
-        write_ts(Stats, "swp_mean", diag_svpc.swp_mean[cent])
+        write_ts(stats, "lwp_mean", diag_svpc.lwp_mean[cent])
+        write_ts(stats, "iwp_mean", diag_svpc.iwp_mean[cent])
+        write_ts(stats, "rwp_mean", diag_svpc.rwp_mean[cent])
+        write_ts(stats, "swp_mean", diag_svpc.swp_mean[cent])
 
         if !calibrate_io
-            write_ts(Stats, "updraft_cloud_cover", diag_tc_svpc.updraft_cloud_cover[cent])
-            write_ts(Stats, "updraft_cloud_base", diag_tc_svpc.updraft_cloud_base[cent])
-            write_ts(Stats, "updraft_cloud_top", diag_tc_svpc.updraft_cloud_top[cent])
-            write_ts(Stats, "env_cloud_cover", diag_tc_svpc.env_cloud_cover[cent])
-            write_ts(Stats, "env_cloud_base", diag_tc_svpc.env_cloud_base[cent])
-            write_ts(Stats, "env_cloud_top", diag_tc_svpc.env_cloud_top[cent])
-            write_ts(Stats, "env_lwp", diag_tc_svpc.env_lwp[cent])
-            write_ts(Stats, "env_iwp", diag_tc_svpc.env_iwp[cent])
-            write_ts(Stats, "Hd", diag_tc_svpc.Hd[cent])
-            write_ts(Stats, "updraft_lwp", diag_tc_svpc.updraft_lwp[cent])
-            write_ts(Stats, "updraft_iwp", diag_tc_svpc.updraft_iwp[cent])
+            write_ts(stats, "updraft_cloud_cover", diag_tc_svpc.updraft_cloud_cover[cent])
+            write_ts(stats, "updraft_cloud_base", diag_tc_svpc.updraft_cloud_base[cent])
+            write_ts(stats, "updraft_cloud_top", diag_tc_svpc.updraft_cloud_top[cent])
+            write_ts(stats, "env_cloud_cover", diag_tc_svpc.env_cloud_cover[cent])
+            write_ts(stats, "env_cloud_base", diag_tc_svpc.env_cloud_base[cent])
+            write_ts(stats, "env_cloud_top", diag_tc_svpc.env_cloud_top[cent])
+            write_ts(stats, "env_lwp", diag_tc_svpc.env_lwp[cent])
+            write_ts(stats, "env_iwp", diag_tc_svpc.env_iwp[cent])
+            write_ts(stats, "Hd", diag_tc_svpc.Hd[cent])
+            write_ts(stats, "updraft_lwp", diag_tc_svpc.updraft_lwp[cent])
+            write_ts(stats, "updraft_iwp", diag_tc_svpc.updraft_iwp[cent])
 
-            write_ts(Stats, "cutoff_precipitation_rate", diag_svpc.cutoff_precipitation_rate[cent])
-            write_ts(Stats, "cloud_cover_mean", diag_svpc.cloud_cover_mean[cent])
-            write_ts(Stats, "cloud_base_mean", diag_svpc.cloud_base_mean[cent])
-            write_ts(Stats, "cloud_top_mean", diag_svpc.cloud_top_mean[cent])
+            write_ts(stats, "cutoff_precipitation_rate", diag_svpc.cutoff_precipitation_rate[cent])
+            write_ts(stats, "cloud_cover_mean", diag_svpc.cloud_cover_mean[cent])
+            write_ts(stats, "cloud_base_mean", diag_svpc.cloud_base_mean[cent])
+            write_ts(stats, "cloud_top_mean", diag_svpc.cloud_top_mean[cent])
         end
 
         # TODO: remove `vars` hack that avoids
         # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
         # opening/closing files every step should be okay. #removeVarsHack
         # TurbulenceConvection.io(sim) # #removeVarsHack
-        write_simulation_time(Stats, t) # #removeVarsHack
+        write_simulation_time(stats, t) # #removeVarsHack
 
-        io(io_nt.aux, Stats, state)
-        io(io_nt.diagnostics, Stats, diag_col)
+        io(io_nt.aux, stats, state)
+        io(io_nt.diagnostics, stats, diag_col)
 
         surf = get_surface(case.surf_params, grid, state, t, param_set)
-        io(surf, case.surf_params, grid, state, Stats, t)
+        io(surf, case.surf_params, grid, state, stats, t)
     end
 
     ODE.u_modified!(integrator, false) # We're legitamately not mutating `u` (the state vector)

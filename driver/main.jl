@@ -64,6 +64,17 @@ struct Simulation1d{IONT, P, A, C, EDMF, PM, D, TIMESTEPPING, STATS, PS, SRS}
     surf_ref_state::SRS
 end
 
+function open_files(sim::Simulation1d)
+    for inds in TC.iterate_columns(sim.prog.cent)
+        open_files(sim.Stats[inds...])
+    end
+end
+function close_files(sim::Simulation1d)
+    for inds in TC.iterate_columns(sim.prog.cent)
+        close_files(sim.Stats[inds...])
+    end
+end
+
 include("common_spaces.jl")
 
 function Simulation1d(namelist)
@@ -78,7 +89,7 @@ function Simulation1d(namelist)
     dt_min = namelist["time_stepping"]["dt_min"]
     truncate_stack_trace = namelist["logging"]["truncate_stack_trace"]
 
-    cspace, fspace, svpc_space = get_spaces(namelist, FT)
+    cspace, fspace, svpc_space = get_spaces(namelist, param_set, FT)
 
     # Create the class for precipitation
 
@@ -127,24 +138,18 @@ function Simulation1d(namelist)
     nc_filename_suffix = if namelist["config"] == "column"
         (fn, inds) -> fn
     elseif namelist["config"] == "sphere"
-        (fn, inds) -> fn -> first(split(fn, ".nc")) * "_inds=$(inds).nc"
+        (fn, inds) -> first(split(fn, ".nc")) * "_col=$(inds).nc"
     end
 
     Stats = if skip_io
         nothing
-    elseif namelist["config"] == "sphere"
+    else
         map(TC.iterate_columns(prog.cent)) do inds
-
             col_state = TC.column_prog_aux(prog, aux, inds...)
             grid = TC.Grid(col_state)
-
-            NetCDFIO_Stats(; nc_filename = nc_filename_suffix(nc_filename, inds), frequency, grid)
+            ncfn = nc_filename_suffix(nc_filename, inds)
+            NetCDFIO_Stats(ncfn, frequency, grid)
         end
-    elseif namelist["config"] == "column"
-        col_state = TC.column_prog_aux(prog, aux, 1, 1, 1)
-        grid = TC.Grid(col_state)
-
-        NetCDFIO_Stats(nc_filename_suffix(nc_filename, (1, 1, 1)), frequency, grid)
     end
     casename = namelist["meta"]["casename"]
     open(joinpath(outpath, "namelist_$casename.in"), "w") do io
@@ -223,10 +228,12 @@ function initialize(sim::Simulation1d)
     # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
     for inds in TC.iterate_columns(prog.cent)
         state = TC.column_prog_aux(prog, aux, inds...)
+        diagnostics_col = TC.column_diagnostics(diagnostics, inds...)
         grid = TC.Grid(state)
         compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
         if !skip_io
-            NC.Dataset(Stats.nc_filename, "a") do ds
+            stats = Stats[inds...]
+            NC.Dataset(stats.nc_filename, "a") do ds
                 group = "reference"
                 add_write_field(ds, "ρ_f", vec(TC.face_aux_grid_mean(state).ρ), group, ("zf",))
                 add_write_field(ds, "ρ_c", vec(TC.center_prog_grid_mean(state).ρ), group, ("zc",))
@@ -242,15 +249,16 @@ function initialize(sim::Simulation1d)
         Cases.initialize_radiation(case, grid, state, param_set)
         initialize_edmf(edmf, grid, state, case, param_set, t)
         skip_io && return nothing
-        initialize_io(Stats.nc_filename, io_nt.aux, io_nt.diagnostics)
-        initialize_io(Stats.nc_filename, ts_list)
+        stats = Stats[inds...]
+        initialize_io(stats.nc_filename, io_nt.aux, io_nt.diagnostics)
+        initialize_io(stats.nc_filename, ts_list)
         surf = get_surface(case.surf_params, grid, state, t, param_set)
-        open_files(Stats)
+        open_files(stats)
         try
-            write_simulation_time(Stats, t)
-            io(io_nt.aux, Stats, state)
-            io(io_nt.diagnostics, Stats, diagnostics)
-            io(surf, case.surf_params, grid, state, Stats, t)
+            write_simulation_time(stats, t)
+            io(io_nt.aux, stats, state)
+            io(io_nt.diagnostics, stats, diagnostics_col)
+            io(surf, case.surf_params, grid, state, stats, t)
         catch e
             if truncate_stack_trace
                 @warn "IO during initialization failed."
@@ -259,7 +267,7 @@ function initialize(sim::Simulation1d)
             end
             return :simulation_crashed
         finally
-            close_files(Stats)
+            close_files(stats)
         end
     end
 
@@ -337,7 +345,7 @@ end
 
 function run(sim::Simulation1d; time_run = true)
     TC = TurbulenceConvection
-    sim.skip_io || open_files(sim.Stats) # #removeVarsHack
+    sim.skip_io || open_files(sim)
     (prob, alg, kwargs) = solve_args(sim)
     integrator = ODE.init(prob, alg; kwargs...)
 
@@ -356,20 +364,21 @@ function run(sim::Simulation1d; time_run = true)
                 (e, catch_backtrace())
         end
         # "Stacktrace for failed simulation" exception = (e, catch_backtrace())
-        return :simulation_crashed
+        return (integrator, :simulation_crashed)
     finally
-        sim.skip_io || close_files(sim.Stats) # #removeVarsHack
+        sim.skip_io || close_files(sim)
     end
 
     if first(sol.t) == sim.TS.t_max
-        return :success
+        return (integrator, :success)
     else
-        return :simulation_aborted
+        return (integrator, :simulation_aborted)
     end
 end
 
 main(namelist; kwargs...) = @timev main1d(namelist; kwargs...)
 
+nc_results_file(stats) = map(x -> x.nc_filename, stats)
 nc_results_file(stats::NetCDFIO_Stats) = stats.nc_filename
 function nc_results_file(::Nothing)
     @info "The simulation was run without IO, so no nc files were exported"
@@ -390,12 +399,12 @@ function main1d(namelist; time_run = true)
     sim = Simulation1d(namelist)
     initialize(sim)
     if time_run
-        return_code = @timev run(sim; time_run)
+        (Y, return_code) = @timev run(sim; time_run)
     else
-        return_code = run(sim; time_run)
+        (Y, return_code) = run(sim; time_run)
     end
     return_code == :success && @info "The simulation has completed."
-    return nc_results_file(sim.Stats), return_code
+    return Y, nc_results_file(sim.Stats), return_code
 end
 
 
