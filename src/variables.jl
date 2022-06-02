@@ -98,7 +98,7 @@ cent_aux_vars_edmf(FT, edmf) = (;
         up = ntuple(i -> cent_aux_vars_up(FT, edmf), n_updrafts(edmf)),
         en = (;
             ts = thermo_state(FT, edmf.moisture_model),
-            w = FT(0),
+            w = CCG.Covariant3Vector(FT(0)),
             area = FT(0),
             q_tot = FT(0),
             q_liq = FT(0),
@@ -177,35 +177,35 @@ cent_aux_vars_edmf(FT, edmf) = (;
 
 # Face only
 face_aux_vars_up(FT) = (;
-    w = FT(0),
+    w = CCG.Covariant3Vector(FT(0)),
     nh_pressure = FT(0),
     nh_pressure_b = FT(0),
     nh_pressure_adv = FT(0),
     nh_pressure_drag = FT(0),
-    massflux = FT(0),
+    massflux = CCG.Covariant3Vector(FT(0)),
 )
 face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
-    massflux_en = FT(0), # TODO: is this the right place for this?
-    massflux_ql = FT(0),
-    massflux_qi = FT(0),
+    massflux_en = CCG.Covariant3Vector(FT(0)), # TODO: is this the right place for this?
+    massflux_ql = CCG.Covariant3Vector(FT(0)),
+    massflux_qi = CCG.Covariant3Vector(FT(0)),
     diffusive_flux_ql = FT(0),
     diffusive_flux_qi = FT(0),
 )
 face_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
 face_aux_vars_edmf(FT, edmf) = (;
     turbconv = (;
-        bulk = (; w = FT(0)),
+        bulk = (; w = CCG.Covariant3Vector(FT(0))),
         ρ_ae_KM = FT(0),
         ρ_ae_KH = FT(0),
         ρ_ae_K = FT(0),
-        en = (; w = FT(0)),
+        en = (; w = CCG.Covariant3Vector(FT(0))),
         up = ntuple(i -> face_aux_vars_up(FT), n_updrafts(edmf)),
-        massflux = FT(0),
-        massflux_h = FT(0),
-        massflux_qt = FT(0),
+        massflux = CCG.Covariant3Vector(FT(0)),
+        massflux_h = CCG.Covariant3Vector(FT(0)),
+        massflux_qt = CCG.Covariant3Vector(FT(0)),
         ϕ_temporary = FT(0),
-        diffusive_flux_h = FT(0),
-        diffusive_flux_qt = FT(0),
+        diffusive_flux_h = CCG.Covariant3Vector(FT(0)),
+        diffusive_flux_qt = CCG.Covariant3Vector(FT(0)),
         face_aux_vars_edmf_moisture(FT, edmf.moisture_model)...,
         diffusive_flux_u = FT(0),
         diffusive_flux_v = FT(0),
@@ -281,6 +281,6 @@ cent_prognostic_vars_edmf(::Type{FT}, edmf) where {FT} = (;
 # cent_prognostic_vars_edmf(FT, edmf) = (;) # could also use this for empty model
 
 # Face only
-face_prognostic_vars_up(::Type{FT}, local_geometry) where {FT} = (; ρaw = FT(0))
+face_prognostic_vars_up(::Type{FT}, local_geometry) where {FT} = (; ρaw = CCG.Covariant3Vector(FT(0)))
 face_prognostic_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} =
     (; turbconv = (; up = ntuple(i -> face_prognostic_vars_up(FT, local_geometry), Val(n_updrafts(edmf)))))

@@ -64,12 +64,11 @@ function initialize_updrafts(edmf, grid, state, surf)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_up = TC.center_prog_updrafts(state)
     prog_up_f = TC.face_prog_updrafts(state)
+    FT = eltype(edmf)
     ρ_c = prog_gm.ρ
     @inbounds for i in 1:N_up
-        @inbounds for k in TC.real_face_indices(grid)
-            aux_up_f[i].w[k] = 0
-            prog_up_f[i].ρaw[k] = 0
-        end
+        @. aux_up_f[i].w = CCG.Covariant3Vector(FT(0))
+        @. prog_up_f[i].ρaw = CCG.Covariant3Vector(FT(0))
 
         @inbounds for k in TC.real_center_indices(grid)
             aux_up[i].buoy[k] = 0

@@ -61,8 +61,7 @@ function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid,
     end
 
     ∇c = CCO.DivergenceF2C()
-    wvec = CC.Geometry.WVector
-    @. aux_gm.dTdt_rad = -∇c(wvec(aux_gm_f.f_rad)) / ρ_c / cp_d
+    @. aux_gm.dTdt_rad = -∇c(aux_gm_f.f_rad) / ρ_c / cp_d
 
     return
 end

@@ -172,7 +172,7 @@ function compute_diagnostics!(
     ∇f = CCO.DivergenceC2F(; ∇0_bcs...)
     massflux_s = aux_gm_f.massflux_s
     parent(massflux_s) .= 0
-    @. aux_gm_f.diffusive_flux_s = -aux_tc_f.ρ_ae_KH * ∇f(wvec(aux_en.s))
+    @. aux_gm_f.diffusive_flux_s = -aux_tc_f.ρ_ae_KH * ∇f(aux_en.s)
     @inbounds for i in 1:N_up
         @. massflux_s += aux_up_f[i].massflux * (If(aux_up[i].s) - If(aux_en.s))
     end

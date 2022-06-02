@@ -25,8 +25,8 @@ const APS = CLIMAParameters.AbstractEarthParameterSet
 
 # Center only
 cent_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture) = (;
-    ∇q_liq_gm = FT(0),
-    ∇q_ice_gm = FT(0),
+    ∇q_liq_gm = CCG.Covariant3Vector(FT(0)),
+    ∇q_ice_gm = CCG.Covariant3Vector(FT(0)),
     dqldt_rad = FT(0),
     dqidt_rad = FT(0),
     dqldt = FT(0),
@@ -70,8 +70,8 @@ cent_aux_vars_gm(FT, edmf) = (;
     v_nudge = FT(0), #Reference v profile for relaxation tendency
     ug = FT(0), #Geostrophic u velocity
     vg = FT(0), #Geostrophic v velocity
-    ∇MSE_gm = FT(0),
-    ∇q_tot_gm = FT(0),
+    ∇MSE_gm = CCG.Covariant3Vector(FT(0)),
+    ∇q_tot_gm = CCG.Covariant3Vector(FT(0)),
     cent_aux_vars_gm_moisture(FT, edmf.moisture_model)...,
     θ_virt = FT(0),
     Ri = FT(0),
@@ -84,15 +84,15 @@ cent_aux_vars_gm(FT, edmf) = (;
 cent_aux_vars(FT, edmf) = (; cent_aux_vars_gm(FT, edmf)..., TC.cent_aux_vars_edmf(FT, edmf)...)
 
 # Face only
-face_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture) = (; sgs_flux_q_liq = FT(0), sgs_flux_q_ice = FT(0))
+face_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture) = (; sgs_flux_q_liq = CCG.Covariant3Vector(FT(0)), sgs_flux_q_ice = CCG.Covariant3Vector(FT(0)))
 face_aux_vars_gm_moisture(FT, ::TC.EquilibriumMoisture) = NamedTuple()
 face_aux_vars_gm(FT, edmf) = (;
-    massflux_s = FT(0),
-    diffusive_flux_s = FT(0),
-    total_flux_s = FT(0),
-    f_rad = FT(0),
-    sgs_flux_h_tot = FT(0),
-    sgs_flux_q_tot = FT(0),
+    massflux_s = CCG.Covariant3Vector(FT(0)),
+    diffusive_flux_s = CCG.Covariant3Vector(FT(0)),
+    total_flux_s = CCG.Covariant3Vector(FT(0)),
+    f_rad = CCG.Covariant3Vector(FT(0)),
+    sgs_flux_h_tot = CCG.Covariant3Vector(FT(0)),
+    sgs_flux_q_tot = CCG.Covariant3Vector(FT(0)),
     face_aux_vars_gm_moisture(FT, edmf.moisture_model)...,
     sgs_flux_u = FT(0),
     sgs_flux_v = FT(0),
@@ -434,8 +434,9 @@ function compute_gm_tendencies!(
     RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa))
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
-    @. ∇MSE_gm = ∇c(wvec(RBe(aux_gm.h_tot - aux_gm.e_kin)))
-    @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.ρq_tot / ρ_c)))
+    c∇ = CCO.GradientF2C()
+    @. ∇MSE_gm = c∇(RBe(aux_gm.h_tot - aux_gm.e_kin))
+    @. ∇q_tot_gm = c∇(RBq(prog_gm.ρq_tot / ρ_c))
 
     if edmf.moisture_model isa TC.NonEquilibriumMoisture
         ∇q_liq_gm = TC.center_aux_grid_mean(state).∇q_liq_gm
@@ -444,8 +445,8 @@ function compute_gm_tendencies!(
         q_ice_gm_toa = prog_gm.q_ice[kc_toa]
         RBq_liq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_liq_gm_toa))
         RBq_ice = CCO.RightBiasedC2F(; top = CCO.SetValue(q_ice_gm_toa))
-        @. ∇q_liq_gm = ∇c(wvec(RBq(prog_gm.q_liq)))
-        @. ∇q_ice_gm = ∇c(wvec(RBq(prog_gm.q_ice)))
+        @. ∇q_liq_gm = c∇(RBq(prog_gm.q_liq))
+        @. ∇q_ice_gm = c∇(RBq(prog_gm.q_ice))
     end
 
     # Apply forcing and radiation
@@ -551,10 +552,10 @@ function compute_gm_tendencies!(
     tends_v = TC.tendencies_grid_mean_v(state)
 
     ∇sgs = CCO.DivergenceF2C()
-    @. tends_ρe_tot += -∇sgs(wvec(sgs_flux_h_tot))
-    @. tends_ρq_tot += -∇sgs(wvec(sgs_flux_q_tot))
-    @. tends_u += -∇sgs(wvec(sgs_flux_u)) / ρ_c
-    @. tends_v += -∇sgs(wvec(sgs_flux_v)) / ρ_c
+    @. tends_ρe_tot += -∇sgs(sgs_flux_h_tot)
+    @. tends_ρq_tot += -∇sgs(sgs_flux_q_tot)
+    @. tends_u += -∇sgs(sgs_flux_u) / ρ_c
+    @. tends_v += -∇sgs(sgs_flux_v) / ρ_c
 
     if edmf.moisture_model isa TC.NonEquilibriumMoisture
         sgs_flux_q_liq = aux_gm_f.sgs_flux_q_liq
@@ -563,8 +564,8 @@ function compute_gm_tendencies!(
         sgs_flux_q_ice[kf_surf] = surf.ρq_ice_flux
         tends_q_liq = tendencies_gm.q_liq
         tends_q_ice = tendencies_gm.q_ice
-        @. tends_q_liq += -∇sgs(wvec(sgs_flux_q_liq)) / ρ_c
-        @. tends_q_ice += -∇sgs(wvec(sgs_flux_q_ice)) / ρ_c
+        @. tends_q_liq += -∇sgs(sgs_flux_q_liq) / ρ_c
+        @. tends_q_ice += -∇sgs(sgs_flux_q_ice) / ρ_c
     end
 
     return nothing

@@ -298,7 +298,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         a_up = aux_up[i].area
         a_up_bcs = a_up_boundary_conditions(surf, edmf, i)
         Ifu = CCO.InterpolateC2F(; a_up_bcs...)
-        @. aux_tc_f.bulk.w += ifelse(Ifb(aux_bulk.area) > 0, Ifu(a_up) * aux_up_f[i].w / Ifb(aux_bulk.area), FT(0))
+        @. aux_tc_f.bulk.w += ifelse(Ifb(aux_bulk.area) > 0, Ifu(a_up) * aux_up_f[i].w / Ifb(aux_bulk.area), wvec(FT(0)))
     end
     # Assuming w_gm = 0!
     @. aux_en_f.w = -Ifb(aux_bulk.area) / (1 - Ifb(aux_bulk.area)) * aux_tc_f.bulk.w

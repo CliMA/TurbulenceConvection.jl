@@ -137,8 +137,8 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     # Compute the  mass flux tendencies
     # Adjust the values of the grid mean variables
     # Prepare the output
-    @. massflux_tendency_h = -∇c(wvec(massflux_h)) / ρ_c
-    @. massflux_tendency_qt = -∇c(wvec(massflux_qt)) / ρ_c
+    @. massflux_tendency_h = -∇c(massflux_h) / ρ_c
+    @. massflux_tendency_qt = -∇c(massflux_qt) / ρ_c
 
     diffusive_flux_h = aux_tc_f.diffusive_flux_h
     diffusive_flux_qt = aux_tc_f.diffusive_flux_qt
@@ -211,14 +211,14 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     aeKMu_bc = -surf.ρu_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
     aeKMv_bc = -surf.ρv_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
 
-    ∇q_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_tot_bc), top = CCO.SetDivergence(FT(0)))
-    ∇h_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHh_tot_bc), top = CCO.SetDivergence(FT(0)))
+    wvec = CC.Geometry.WVector
+    ∇q_tot_en = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(aeKHq_tot_bc)), top = CCO.SetGradient(wvec(FT(0))))
+    ∇h_tot_en = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(aeKHh_tot_bc)), top = CCO.SetGradient(wvec(FT(0))))
     ∇u_gm = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKMu_bc), top = CCO.SetDivergence(FT(0)))
     ∇v_gm = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKMv_bc), top = CCO.SetDivergence(FT(0)))
 
-    wvec = CC.Geometry.WVector
-    @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KH * ∇q_tot_en(wvec(aux_en.q_tot))
-    @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇h_tot_en(wvec(aux_en.h_tot))
+    @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KH * ∇q_tot_en(aux_en.q_tot)
+    @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇h_tot_en(aux_en.h_tot)
     @. aux_tc_f.diffusive_flux_u = -aux_tc_f.ρ_ae_KM * ∇u_gm(wvec(prog_gm_u))
     @. aux_tc_f.diffusive_flux_v = -aux_tc_f.ρ_ae_KM * ∇v_gm(wvec(prog_gm_v))
 
@@ -226,11 +226,11 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
         aeKHq_liq_bc = FT(0)
         aeKHq_ice_bc = FT(0)
 
-        ∇q_liq_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_liq_bc), top = CCO.SetDivergence(FT(0)))
-        ∇q_ice_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_ice_bc), top = CCO.SetDivergence(FT(0)))
+        ∇q_liq_en = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(aeKHq_liq_bc)), top = CCO.SetGradient(wvec(FT(0))))
+        ∇q_ice_en = CCO.GradientC2F(; bottom = CCO.SetGradient(wvec(aeKHq_ice_bc)), top = CCO.SetGradient(wvec(FT(0))))
 
-        @. aux_tc_f.diffusive_flux_ql = -aux_tc_f.ρ_ae_KH * ∇q_liq_en(wvec(aux_en.q_liq))
-        @. aux_tc_f.diffusive_flux_qi = -aux_tc_f.ρ_ae_KH * ∇q_ice_en(wvec(aux_en.q_ice))
+        @. aux_tc_f.diffusive_flux_ql = -aux_tc_f.ρ_ae_KH * ∇q_liq_en(aux_en.q_liq)
+        @. aux_tc_f.diffusive_flux_qi = -aux_tc_f.ρ_ae_KH * ∇q_ice_en(aux_en.q_ice)
     end
 
     return nothing
@@ -285,6 +285,9 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     cp = TD.cp_m(param_set, ts_gm[kc_surf])
     ρ_c = prog_gm.ρ
     ρ_f = aux_gm_f.ρ
+    Cov3 = CCG.Covariant3Vector
+    wvec = CCG.WVector
+    local_geometry = CC.Fields.local_geometry_field(axes(state.prog.cent))
     @inbounds for i in 1:N_up
         θ_surf = θ_surface_bc(surf, grid, state, edmf, i, param_set)
         q_surf = q_surface_bc(surf, grid, state, edmf, i)
@@ -298,7 +301,7 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
             prog_up[i].ρaq_liq[kc_surf] = prog_up[i].ρarea[kc_surf] * q_liq_surf
             prog_up[i].ρaq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * q_ice_surf
         end
-        prog_up_f[i].ρaw[kf_surf] = ρ_f[kf_surf] * w_surface_bc(surf)
+        prog_up_f[i].ρaw[kf_surf] = ρ_f[kf_surf] * Cov3(w_surface_bc(surf))
     end
 
     flux1 = surf.shf / cp
@@ -659,8 +662,9 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         end
     end
 
+    local_geometry = CC.Fields.local_geometry_field(prog_up_f[1].ρaw)
     @inbounds for i in 1:N_up
-        @. prog_up_f[i].ρaw = max.(prog_up_f[i].ρaw, 0)
+        @. prog_up_f[i].ρaw = max.(CCG.covariant3(prog_up_f[i].ρaw, local_geometry), 0)
         a_up_bcs = a_up_boundary_conditions(surf, edmf, i)
         If = CCO.InterpolateC2F(; a_up_bcs...)
         @. prog_up_f[i].ρaw = Int(If(prog_up[i].ρarea) >= ρ_f * a_min) * prog_up_f[i].ρaw
