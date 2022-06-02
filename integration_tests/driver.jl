@@ -1,6 +1,8 @@
 include("cli_options.jl")
 
-(s, parsed_args) = parse_commandline()
+if !@isdefined parsed_args
+    (s, parsed_args) = parse_commandline()
+end
 
 suffix = parsed_args["suffix"]
 if !@isdefined case_name
