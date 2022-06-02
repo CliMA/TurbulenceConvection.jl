@@ -166,24 +166,15 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.q_ice[k] = TD.ice_specific_humidity(param_set, ts_en)
         rho = TD.air_density(param_set, ts_en)
         aux_en.buoy[k] = buoyancy_c(param_set, ρ_c[k], rho)
-
-        # update_sat_unsat
-        if TD.has_condensate(param_set, ts_en)
-            aux_en.cloud_fraction[k] = 1.0
-            aux_en_sat.θ_dry[k] = TD.dry_pottemp(param_set, ts_en)
-            aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_en)
-            aux_en_sat.T[k] = TD.air_temperature(param_set, ts_en)
-            aux_en_sat.q_tot[k] = TD.total_specific_humidity(param_set, ts_en)
-            aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(param_set, ts_en)
-        else
-            aux_en.cloud_fraction[k] = 0.0
-            aux_en_unsat.θ_dry[k] = TD.dry_pottemp(param_set, ts_en)
-            aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(param_set, ts_en)
-            aux_en_unsat.q_tot[k] = TD.total_specific_humidity(param_set, ts_en)
-        end
-
         aux_en.RH[k] = TD.relative_humidity(param_set, ts_en)
 
+    end
+
+    # SGS sampling (quadratures)
+    microphysics(edmf.en_thermo, grid, state, edmf, edmf.precip_model, Δt, param_set)
+
+    @inbounds for k in real_center_indices(grid)
+        a_bulk_c = aux_bulk.area[k]
         @inbounds for i in 1:N_up
             if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
                 qt = aux_up[i].q_tot[k - 1]
@@ -525,5 +516,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.QTvar[kc_surf] = ae_surf * get_surface_variance(flux2 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
         aux_en.HQTcov[kc_surf] = ae_surf * get_surface_variance(flux1 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
     end
+    compute_precipitation_formation_tendencies(grid, state, edmf, edmf.precip_model, Δt, param_set)
     return nothing
 end

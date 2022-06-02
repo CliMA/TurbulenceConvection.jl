@@ -110,7 +110,7 @@ steps:
         artifact_paths: "Output.Bomex.01_FNO/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with RF"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr RF --skip_tests true --suffix _RF"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr RF --broken_tests true --suffix _RF"
         artifact_paths: "Output.Bomex.01_RF/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with noisy_relaxation_process"

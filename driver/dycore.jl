@@ -339,14 +339,9 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     tends_cent = tendencies.cent
     parent(tends_face) .= 0
     parent(tends_cent) .= 0
-    # compute tendencies
-
-    en_thermo = edmf.en_thermo
 
     # compute tendencies
     # causes division error in dry bubble first time step
-    TC.compute_precipitation_formation_tendencies(grid, state, edmf, precip_model, Δt, param_set)
-    TC.microphysics(en_thermo, grid, state, edmf, precip_model, Δt, param_set)
     TC.compute_precipitation_sink_tendencies(precip_model, edmf, grid, state, param_set, Δt)
     TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set)
 
