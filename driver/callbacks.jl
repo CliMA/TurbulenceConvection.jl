@@ -26,7 +26,7 @@ function affect_io!(integrator)
         # opening/closing files every step should be okay. #removeVarsHack
         # TurbulenceConvection.io(sim) # #removeVarsHack
         write_simulation_time(stats, t) # #removeVarsHack
-
+        println("IO at time $t.")
         state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
         diag_col = TC.column_diagnostics(diagnostics, inds...)

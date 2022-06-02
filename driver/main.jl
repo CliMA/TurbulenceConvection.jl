@@ -317,7 +317,7 @@ function solve_args(sim::Simulation1d)
 
     kwargs = (;
         progress_steps = 100,
-        save_start = false,
+        save_start = true,
         saveat = last(t_span),
         callback = callbacks,
         progress = true,
