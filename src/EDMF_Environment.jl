@@ -35,6 +35,7 @@ function microphysics(
             ts,
             precip_fraction,
         )
+        aux_en.ρ_sgs[k] = TD.air_density(param_set, ts)
 
         # update_sat_unsat
         if TD.has_condensate(param_set, ts)
@@ -67,9 +68,9 @@ end
 
 function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt::Real)
 
-    env_len = 8
+    env_len = 9
     src_len = 9
-    i_ql, i_qi, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat = 1:env_len
+    i_ql, i_qi, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat, i_ρ = 1:env_len
     i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH, i_Sqr, i_Sqs, i_Se_tot = 1:src_len
 
     quadrature_type = en_thermo.quadrature_type
@@ -160,6 +161,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
             q_liq_en = TD.liquid_specific_humidity(param_set, ts)
             q_ice_en = TD.ice_specific_humidity(param_set, ts)
             T = TD.air_temperature(param_set, ts)
+            ρ = TD.air_density(param_set, ts)
             # autoconversion and accretion
             mph = precipitation_formation(
                 param_set,
@@ -178,6 +180,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
             inner_env[i_ql] += q_liq_en * weights[m_h] * sqpi_inv
             inner_env[i_qi] += q_ice_en * weights[m_h] * sqpi_inv
             inner_env[i_T] += T * weights[m_h] * sqpi_inv
+            inner_env[i_ρ] += ρ * weights[m_h] * sqpi_inv
             # cloudy/dry categories for buoyancy in TKE
             if TD.has_condensate(q_liq_en + q_ice_en)
                 inner_env[i_cf] += weights[m_h] * sqpi_inv
@@ -222,6 +225,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
         qi = outer_env[i_qi],
         T = outer_env[i_T],
         cf = outer_env[i_cf],
+        ρ_sgs = outer_env[i_ρ],
         qt_sat = outer_env[i_qt_sat],
         qt_unsat = outer_env[i_qt_unsat],
         T_sat = outer_env[i_T_sat],
@@ -359,6 +363,7 @@ function microphysics(
             aux_en.e_tot_tendency_precip_formation[k] = mph.e_tot_tendency * aux_en.area[k]
             tendencies_pr.q_rai[k] += mph.qr_tendency * aux_en.area[k]
             tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
+            aux_en.ρ_sgs[k] = TD.air_density(param_set, ts)
 
             # update_sat_unsat
             if TD.has_condensate(param_set, ts)

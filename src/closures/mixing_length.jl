@@ -11,7 +11,8 @@ function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
     ustar = ml_model.ustar
     z = ml_model.z
     tke_surf = ml_model.tke_surf
-    ∂b∂z = ml_model.∇b.∂b∂z
+    ∂b∂z = ml_model.∂b∂z
+    # ∂b∂z = ml_model.∇b.∂b∂z
     tke = ml_model.tke
 
     # kz scale (surface layer)

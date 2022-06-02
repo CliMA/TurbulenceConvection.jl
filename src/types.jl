@@ -173,6 +173,8 @@ Base.@kwdef struct MinDisspLen{FT}
     tke::FT
     "Updraft tke source"
     b_exch::FT
+    "direct ∂b∂z"
+    ∂b∂z::FT
 end
 
 abstract type AbstractMoistureModel end

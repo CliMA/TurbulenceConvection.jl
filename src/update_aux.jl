@@ -331,6 +331,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     compute_entr_detr!(state, grid, edmf, param_set, surf, Δt, edmf.entr_closure)
     compute_nh_pressure!(state, grid, edmf, param_set, surf)
 
+    microphysics(edmf.en_thermo, grid, state, edmf, edmf.precip_model, Δt, param_set)
     #####
     ##### compute_eddy_diffusivities_tke
     #####
@@ -357,6 +358,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ∂qt∂z = center_aux_turbconv(state).∂qt∂z
     ∂θl∂z = center_aux_turbconv(state).∂θl∂z
     ∂θv∂z = center_aux_turbconv(state).∂θv∂z
+    ∂b∂z = center_aux_turbconv(state).∂b∂z
     ∂qt∂z_sat = center_aux_turbconv(state).∂qt∂z_sat
     ∂θl∂z_sat = center_aux_turbconv(state).∂θl∂z_sat
     ∂θv∂z_unsat = center_aux_turbconv(state).∂θv∂z_unsat
@@ -370,12 +372,17 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     # compute shear
     @. Shear² = (∇c(wvec(If0(u_gm))))^2 + (∇c(wvec(If0(v_gm))))^2 + (∇c(wvec(w_en)))^2
 
+    g = TCP.grav(param_set)
+    # @show(aux_en.ρ_sgs)
+    # @show(aux_en.ρ_sgs - aux_gm.buoy)
+    # @. aux_en.ρ_sgs -= aux_gm.buoy
     q_tot_en = aux_en.q_tot
     θ_liq_ice_en = aux_en.θ_liq_ice
     θ_virt_en = aux_en.θ_virt
     @. ∂qt∂z = ∇c(wvec(If0(q_tot_en)))
     @. ∂θl∂z = ∇c(wvec(If0(θ_liq_ice_en)))
     @. ∂θv∂z = ∇c(wvec(If0(θ_virt_en)))
+    @. ∂b∂z = -g/ρ_c * ∇c(wvec(If0(aux_en.ρ_sgs)))
 
     # Second order approximation: Use dry and cloudy environmental fields.
     cf = aux_en.cloud_fraction
@@ -451,6 +458,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             Pr = aux_tc.prandtl_nvec[k],
             p = p_c[k],
             ∇b = bg,
+            ∂b∂z = ∂b∂z[k],
             Shear² = Shear²[k],
             tke = aux_en.tke[k],
             b_exch = b_exch[k],
@@ -464,7 +472,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0.0))
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
 
-        aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
+        aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * ∂b∂z[k]
+        @show(bg.∂b∂z, ∂b∂z[k])
     end
 
 
