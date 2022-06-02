@@ -371,7 +371,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @. ∂qt∂z = ∇c(wvec(If0(q_tot_en)))
     @. ∂θl∂z = ∇c(wvec(If0(θ_liq_ice_en)))
     @. ∂θv∂z = ∇c(wvec(If0(θ_virt_en)))
-    @. ∂b∂z = -g/ρ_c * ∇c(wvec(If0(aux_en.ρ_sgs)))
+    @. ∂b∂z = - (g / ρ_c) * ∇c(wvec(If0(aux_en.ρ_sgs)))
 
     # Second order approximation: Use dry and cloudy environmental fields.
     cf = aux_en.cloud_fraction
@@ -461,7 +461,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0.0))
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
 
-        aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * ∂b∂z[k]
+        aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
         @show(bg.∂b∂z, ∂b∂z[k])
     end
 
