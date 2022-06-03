@@ -7,7 +7,7 @@ namelist["time_stepping"]["t_max"] = 15 * namelist["time_stepping"]["dt_max"]
 namelist["stats_io"]["frequency"] = 0 # io at every step
 namelist["meta"]["uuid"] = "01_flame_io"
 sim = Simulation1d(namelist)
-initialize(sim)
+integrator, ret_code = initialize(sim)
 open_files(sim) # force compilation
 close_files(sim) # force compilation
 open_files(sim)

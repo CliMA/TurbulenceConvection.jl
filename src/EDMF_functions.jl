@@ -285,7 +285,6 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     cp = TD.cp_m(param_set, ts_gm[kc_surf])
     ρ_c = prog_gm.ρ
     ρ_f = aux_gm_f.ρ
-    Cov3 = CCG.Covariant3Vector
     wvec = CCG.WVector
     local_geometry = CC.Fields.local_geometry_field(axes(state.prog.cent))
     @inbounds for i in 1:N_up
@@ -662,9 +661,8 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         end
     end
 
-    local_geometry = CC.Fields.local_geometry_field(prog_up_f[1].ρaw)
     @inbounds for i in 1:N_up
-        @. prog_up_f[i].ρaw = max.(CCG.covariant3(prog_up_f[i].ρaw, local_geometry), 0)
+        @. prog_up_f[i].ρaw = max_vec.(prog_up_f[i].ρaw, 0)
         a_up_bcs = a_up_boundary_conditions(surf, edmf, i)
         If = CCO.InterpolateC2F(; a_up_bcs...)
         @. prog_up_f[i].ρaw = Int(If(prog_up[i].ρarea) >= ρ_f * a_min) * prog_up_f[i].ρaw
@@ -701,9 +699,9 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
 
     Ic = CCO.InterpolateF2C()
     @inbounds for i in 1:N_up
-        @. prog_up[i].ρarea = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρarea)
-        @. prog_up[i].ρaθ_liq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaθ_liq_ice)
-        @. prog_up[i].ρaq_tot = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_tot)
+        @. prog_up[i].ρarea = ifelse(lessequal_vec(Ic(prog_up_f[i].ρaw)), FT(0), prog_up[i].ρarea)
+        @. prog_up[i].ρaθ_liq_ice = ifelse(lessequal_vec(Ic(prog_up_f[i].ρaw)), FT(0), prog_up[i].ρaθ_liq_ice)
+        @. prog_up[i].ρaq_tot = ifelse(lessequal_vec(Ic(prog_up_f[i].ρaw)), FT(0), prog_up[i].ρaq_tot)
         θ_surf = θ_surface_bc(surf, grid, state, edmf, i, param_set)
         q_surf = q_surface_bc(surf, grid, state, edmf, i)
         a_surf = area_surface_bc(surf, edmf, i)

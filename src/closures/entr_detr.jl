@@ -25,7 +25,7 @@ end
 
 function get_Δw(param_set, w_up::FT, w_en::FT) where {FT}
     Δw = w_up - w_en
-    Δw += copysign(FT(TCP.w_min(param_set)), Δw)
+    Δw += copysign_vec(Cov3(TCP.w_min(param_set)), Δw)
     return Δw
 end
 
@@ -172,7 +172,7 @@ function compute_entr_detr!(
     g::FT = TCP.grav(param_set)
     w_up_c = aux_tc.w_up_c
     w_en_c = aux_tc.w_en_c
-    m_entr_detr = aux_tc.ϕ_temporary
+    m_entr_detr = aux_tc.m_entr_detr
     ∇m_entr_detr = aux_tc.ψ_temporary
     wvec = CC.Geometry.WVector
     max_area = edmf.max_area

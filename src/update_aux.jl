@@ -30,22 +30,22 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ρ_c = prog_gm.ρ
     aux_en_unsat = aux_en.unsat
     aux_en_sat = aux_en.sat
-    m_entr_detr = aux_tc.ϕ_temporary
-    ∇m_entr_detr = aux_tc.ψ_temporary
     wvec = CC.Geometry.WVector
     max_area = edmf.max_area
     ts_gm = center_aux_grid_mean(state).ts
     ts_env = center_aux_environment(state).ts
 
+    C123 = CCG.Covariant123Vector
+    uₕ_gm = grid_mean_uₕ(state)
     prog_gm_u = grid_mean_u(state)
     prog_gm_v = grid_mean_v(state)
     Ic = CCO.InterpolateF2C()
     #####
     ##### center variables
     #####
-    @. aux_en.e_kin = kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + aux_en_f.w))
+    @. aux_en.e_kin = LinearAlgebra.norm_sqr(C123(uₕ_gm) + C123(Ic(aux_en_f.w))) / 2
     @inbounds for i in 1:N_up
-        @. aux_up[i].e_kin = kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + aux_up_f[i].w))
+        @. aux_up[i].e_kin = LinearAlgebra.norm_sqr(C123(uₕ_gm) + C123(Ic(aux_up_f[i].w))) / 2
     end
 
     @inbounds for k in real_center_indices(grid)
@@ -285,10 +285,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         If = CCO.InterpolateC2F(; a_up_bcs...)
         a_min = edmf.minimum_area
         a_up = aux_up[i].area
-        @. aux_up_f[i].w = ifelse(If(a_up) >= a_min, max(prog_up_f[i].ρaw / (ρ_f * If(a_up)), 0), FT(0))
+        @. aux_up_f[i].w = ifelse_vec(If(a_up) >= a_min, max_vec(prog_up_f[i].ρaw / (ρ_f * If(a_up)), 0), FT(0))
     end
     @inbounds for i in 1:N_up
-        aux_up_f[i].w[kf_surf] = w_surface_bc(surf)
+        aux_up_f[i].w[kf_surf] = Cov3(w_surface_bc(surf))
     end
 
     parent(aux_tc_f.bulk.w) .= 0
@@ -298,7 +298,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         a_up = aux_up[i].area
         a_up_bcs = a_up_boundary_conditions(surf, edmf, i)
         Ifu = CCO.InterpolateC2F(; a_up_bcs...)
-        @. aux_tc_f.bulk.w += ifelse(Ifb(aux_bulk.area) > 0, Ifu(a_up) * aux_up_f[i].w / Ifb(aux_bulk.area), wvec(FT(0)))
+        @. aux_tc_f.bulk.w += ifelse_vec(Ifb(aux_bulk.area) > 0, Ifu(a_up) * aux_up_f[i].w / Ifb(aux_bulk.area), FT(0))
     end
     # Assuming w_gm = 0!
     @. aux_en_f.w = -Ifb(aux_bulk.area) / (1 - Ifb(aux_bulk.area)) * aux_tc_f.bulk.w

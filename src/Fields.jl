@@ -3,6 +3,13 @@ struct Cent{I <: Integer}
     i::I
 end
 
+const Cov3 = CCG.Covariant3Vector
+max_vec(x::CCG.Covariant3Vector, y::Real) = CCG.Covariant3Vector(max(x.u₃, y))
+ifelse_vec(c, x::CCG.Covariant3Vector, y::Real) = CCG.Covariant3Vector(ifelse(c, x.u₃, y))
+lessequal_vec(x::CCG.Covariant3Vector) = x.u₃ <= 0
+isless_vec(x::Real, y::CCG.Covariant3Vector) = isless(x, y.u₃)
+copysign_vec(x::CCG.Covariant3Vector, y::CCG.Covariant3Vector) = CCG.Covariant3Vector(copysign(x.u₃, y.u₃))
+
 Base.:+(h::Cent) = h
 Base.:-(h::Cent) = Cent(-h.i - one(h.i))
 Base.:+(i::Integer, h::Cent) = Cent(i + h.i)

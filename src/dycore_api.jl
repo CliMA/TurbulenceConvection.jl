@@ -74,6 +74,7 @@ center_tendencies_precipitation(state) = tendencies_turbconv(state, CentField())
 face_tendencies_updrafts(state) = tendencies_turbconv(state, FaceField()).up
 
 
+grid_mean_uₕ(state) = center_prog_grid_mean(state).uₕ
 grid_mean_u(state) = center_prog_grid_mean(state).uₕ.components.data.:1
 grid_mean_v(state) = center_prog_grid_mean(state).uₕ.components.data.:2
 
