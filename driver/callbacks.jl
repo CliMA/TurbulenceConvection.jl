@@ -6,7 +6,7 @@ function condition_io(u, t, integrator)
         TS.dt_io = 0
         io_flag = true
     end
-    return io_flag || t ≈ 0 || t ≈ TS.t_max
+    return io_flag || t < 1e-4 || t ≈ TS.t_max
 end
 
 condition_every_iter(u, t, integrator) = true
@@ -104,14 +104,14 @@ end
 function init_dt!(integrator)
     UnPack.@unpack edmf, TS, dt_min = integrator.p
     if !TS.initialized
-        TS.dt = 1.0e-6
-        SciMLBase.set_proposed_dt!(integrator, TS.dt)
+        dt_zero = 1.0e-6
+        SciMLBase.set_proposed_dt!(integrator, dt_zero)
         ODE.u_modified!(integrator, false)
         TS.initialized = true
-    else
-        TS.dt = dt_min
-        SciMLBase.set_proposed_dt!(integrator, TS.dt)
-        ODE.u_modified!(integrator, false)
+    # else
+    #     TS.dt = dt_min
+    #     SciMLBase.set_proposed_dt!(integrator, TS.dt)
+    #     ODE.u_modified!(integrator, false)
     end
 end
 
