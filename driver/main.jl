@@ -248,30 +248,32 @@ function initialize(sim::Simulation1d)
         Cases.initialize_forcing(case, grid, state, param_set)
         Cases.initialize_radiation(case, grid, state, param_set)
         initialize_edmf(edmf, grid, state, case, param_set, t)
-        skip_io && return nothing
-        stats = Stats[inds...]
-        initialize_io(stats.nc_filename, io_nt.aux, io_nt.diagnostics)
-        initialize_io(stats.nc_filename, ts_list)
-        surf = get_surface(case.surf_params, grid, state, t, param_set)
-        open_files(stats)
-        try
-            write_simulation_time(stats, t)
-            io(io_nt.aux, stats, state)
-            io(io_nt.diagnostics, stats, diagnostics_col)
-            io(surf, case.surf_params, grid, state, stats, t)
-        catch e
-            if truncate_stack_trace
-                @warn "IO during initialization failed."
-            else
-                @warn "IO during initialization failed." exception = (e, catch_backtrace())
-            end
-            return :simulation_crashed
-        finally
-            close_files(stats)
+        if !skip_io
+            stats = Stats[inds...]
+            initialize_io(stats.nc_filename, io_nt.aux, io_nt.diagnostics)
+            initialize_io(stats.nc_filename, ts_list)
         end
     end
 
-    return
+    (prob, alg, kwargs) = solve_args(sim)
+    integrator = ODE.init(prob, alg; kwargs...)
+    skip_io && return (integrator, :success)
+
+    open_files(sim)
+    try
+        affect_io!(integrator)
+    catch e
+        if truncate_stack_trace
+            @warn "IO during initialization failed."
+        else
+            @warn "IO during initialization failed." exception = (e, catch_backtrace())
+        end
+        return (integrator, :simulation_crashed)
+    finally
+        close_files(sim)
+    end
+
+    return (integrator, :success)
 end
 
 include("callbacks.jl")
@@ -343,11 +345,9 @@ function solve_args(sim::Simulation1d)
     return (prob, alg, kwargs)
 end
 
-function run(sim::Simulation1d; time_run = true)
+function run(sim::Simulation1d, integrator; time_run = true)
     TC = TurbulenceConvection
     sim.skip_io || open_files(sim)
-    (prob, alg, kwargs) = solve_args(sim)
-    integrator = ODE.init(prob, alg; kwargs...)
 
     local sol
     try
@@ -397,11 +397,12 @@ function main1d(namelist; time_run = true)
         end
     end
     sim = Simulation1d(namelist)
-    initialize(sim)
+    (integrator, return_init) = initialize(sim)
+    return_init == :success && @info "The initialization has completed."
     if time_run
-        (Y, return_code) = @timev run(sim; time_run)
+        (Y, return_code) = @timev run(sim, integrator; time_run)
     else
-        (Y, return_code) = run(sim; time_run)
+        (Y, return_code) = run(sim, integrator; time_run)
     end
     return_code == :success && @info "The simulation has completed."
     return Y, nc_results_file(sim.Stats), return_code
