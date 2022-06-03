@@ -249,8 +249,7 @@ function set_thermo_state_peq!(state, grid, moisture_model, param_set)
     prog_gm_v = TC.grid_mean_v(state)
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
-    w_c = copy(prog_gm.ρe_tot)
-    @. w_c = Ic(FT(0) + prog_gm_f.w)
+    w_c = @. Ic(prog_gm_f.w)
     @inbounds for k in TC.real_center_indices(grid)
         thermo_args = if moisture_model isa TC.EquilibriumMoisture
             ()
@@ -259,7 +258,7 @@ function set_thermo_state_peq!(state, grid, moisture_model, param_set)
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
-        aux_gm.e_kin[k] = TC.kinetic_energy(prog_gm_u[k], prog_gm_v[k], w_c[k])
+        aux_gm.e_kin[k] = TC.kinetic_energy(prog_gm_u[k], prog_gm_v[k], w_c[k].u₃)
         e_pot = TC.geopotential(param_set, grid.zc.z[k])
         e_int = prog_gm.ρe_tot[k] / ρ_c[k] - aux_gm.e_kin[k] - e_pot
         ts_gm[k] = TC.thermo_state_peq(param_set, p_c[k], e_int, aux_gm.q_tot[k], thermo_args...)
@@ -299,10 +298,9 @@ function set_grid_mean_from_thermo_state!(param_set, state, grid)
     prog_gm_v = TC.grid_mean_v(state)
     ρ_c = prog_gm.ρ
     FT = eltype(grid)
-    w_c = copy(prog_gm.ρe_tot)
-    @. w_c = Ic(FT(0) + prog_gm_f.w)
+    w_c = @. Ic(prog_gm_f.w)
     @inbounds for k in TC.real_center_indices(grid)
-        e_kin = TC.kinetic_energy(prog_gm_u[k], prog_gm_v[k], w_c[k])
+        e_kin = TC.kinetic_energy(prog_gm_u[k], prog_gm_v[k], w_c[k].u₃)
         e_pot = TC.geopotential(param_set, grid.zc.z[k])
         prog_gm.ρe_tot[k] = ρ_c[k] * TD.total_energy(param_set, ts_gm[k], e_kin, e_pot)
         prog_gm.ρq_tot[k] = ρ_c[k] * aux_gm.q_tot[k]
