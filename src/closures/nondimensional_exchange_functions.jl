@@ -406,7 +406,7 @@ To ensure non-negativity, the solution is passed through a relu filter.
 function noisy_relaxation_process(μ::FT, λ::FT, σ²::FT, u0::FT, Δt::FT)::FT where {FT}
     f(u, p, t) = λ * (μ - u)        # mean-reverting process
     g(u, p, t) = √(2λ * μ * σ²)     # noise fluctuation
-    tspan = (0.0, Δt)
+    tspan = (FT(0), Δt)
     prob = SDE.SDEProblem(f, g, u0, tspan; save_start = false, saveat = last(tspan))
     sol = SDE.solve(prob, SDE.SOSRI())
     return Flux.relu(sol.u[end])

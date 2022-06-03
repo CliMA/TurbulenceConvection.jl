@@ -429,7 +429,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
         # Limiting stratification scale (Deardorff, 1976)
         # compute ∇Ri and Pr
-        ∇_Ri = gradient_Richardson_number(param_set, bg.∂b∂z, Shear²[k], eps(0.0))
+        ∇_Ri = gradient_Richardson_number(param_set, bg.∂b∂z, Shear²[k], eps(FT))
         aux_tc.prandtl_nvec[k] = turbulent_Prandtl_number(param_set, obukhov_length, ∇_Ri)
 
         ml_model = MinDisspLen{FT}(;
@@ -450,7 +450,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_tc.mixing_length[k] = ml.mixing_length
         aux_tc.ml_ratio[k] = ml.ml_ratio
 
-        KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0.0))
+        KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0))
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
 
         aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
@@ -523,8 +523,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:QTvar))
         update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:HQTcov))
         @inbounds for k in real_center_indices(grid)
-            aux_en.Hvar[k] = max(aux_en.Hvar[k], 0.0)
-            aux_en.QTvar[k] = max(aux_en.QTvar[k], 0.0)
+            aux_en.Hvar[k] = max(aux_en.Hvar[k], 0)
+            aux_en.QTvar[k] = max(aux_en.QTvar[k], 0)
             aux_en.HQTcov[k] = max(aux_en.HQTcov[k], -sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]))
             aux_en.HQTcov[k] = min(aux_en.HQTcov[k], sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]))
         end
