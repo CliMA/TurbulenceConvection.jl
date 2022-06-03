@@ -37,15 +37,16 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ts_gm = center_aux_grid_mean(state).ts
     ts_env = center_aux_environment(state).ts
 
-    prog_gm_u = grid_mean_u(state)
-    prog_gm_v = grid_mean_v(state)
+    prog_gm_uₕ = grid_mean_uₕ(state)
     Ic = CCO.InterpolateF2C()
     #####
     ##### center variables
     #####
-    @. aux_en.e_kin = kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + aux_en_f.w))
+    C123 = CCG.Covariant123Vector
+    @. aux_en.e_kin = LinearAlgebra.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(wvec(aux_en_f.w)))) / 2
+
     @inbounds for i in 1:N_up
-        @. aux_up[i].e_kin = kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + aux_up_f[i].w))
+        @. aux_up[i].e_kin = LinearAlgebra.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(wvec(aux_up_f[i].w)))) / 2
     end
 
     @inbounds for k in real_center_indices(grid)
