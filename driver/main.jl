@@ -194,7 +194,11 @@ function initialize(sim::Simulation1d)
 
     initialize_edmf(sim.edmf, sim.grid, state, sim.case, sim.param_set, t)
 
-    sim.skip_io && return nothing
+    (prob, alg, kwargs) = solve_args(sim)
+    integrator = ODE.init(prob, alg; kwargs...)
+
+    sim.skip_io && return (integrator, :success)
+
     initialize_io(sim.Stats.nc_filename, sim.io_nt.aux, sim.io_nt.diagnostics)
 
     ts_gm = ["Tsurface", "shf", "lhf", "ustar", "wstar", "lwp_mean", "iwp_mean"]
@@ -221,24 +225,20 @@ function initialize(sim::Simulation1d)
 
     initialize_io(sim.Stats.nc_filename, ts_list)
 
-    surf = get_surface(sim.case.surf_params, sim.grid, state, t, sim.param_set)
-
     open_files(sim.Stats)
     try
-        write_simulation_time(sim.Stats, t)
-
-        io(sim.io_nt.aux, sim.Stats, state)
-        io(sim.io_nt.diagnostics, sim.Stats, sim.diagnostics)
-        io(surf, sim.case.surf_params, sim.grid, state, sim.Stats, t)
-
+        affect_io!(integrator)
     catch e
-        @warn "IO during initialization failed. $(e)"
-        return :simulation_crashed
+        if sim.truncate_stack_trace
+            @warn "IO during initialization failed."
+        else
+            @warn "IO during initialization failed." exception = (e, catch_backtrace())
+        end
+        return (integrator, :simulation_crashed)
     finally
         close_files(sim.Stats)
     end
-
-    return
+    return (integrator, :success)
 end
 
 function construct_grid(namelist; FT = Float64)
@@ -363,11 +363,9 @@ function solve_args(sim::Simulation1d)
     return (prob, alg, kwargs)
 end
 
-function run(sim::Simulation1d; time_run = true)
+function run(sim::Simulation1d, integrator; time_run = true)
     TC = TurbulenceConvection
     sim.skip_io || open_files(sim.Stats) # #removeVarsHack
-    (prob, alg, kwargs) = solve_args(sim)
-    integrator = ODE.init(prob, alg; kwargs...)
 
     local sol
     try
@@ -416,11 +414,12 @@ function main1d(namelist; time_run = true)
         end
     end
     sim = Simulation1d(namelist)
-    initialize(sim)
+    (integrator, return_init) = initialize(sim)
+    return_init == :success && @info "The initialization has completed."
     if time_run
-        return_code = @timev run(sim; time_run)
+        return_code = @timev run(sim, integrator; time_run)
     else
-        return_code = run(sim; time_run)
+        return_code = run(sim, integrator; time_run)
     end
     return_code == :success && @info "The simulation has completed."
     return nc_results_file(sim.Stats), return_code

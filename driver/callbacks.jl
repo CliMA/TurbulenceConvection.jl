@@ -17,6 +17,12 @@ function affect_io!(integrator)
     skip_io && return nothing
     t = integrator.t
 
+    # TODO: remove `vars` hack that avoids
+    # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
+    # opening/closing files every step should be okay. #removeVarsHack
+    # TurbulenceConvection.io(sim) # #removeVarsHack
+    write_simulation_time(Stats, t) # #removeVarsHack
+
     state = TC.State(integrator.u, aux, ODE.get_du(integrator))
 
     # TODO: is this the best location to call diagnostics?
@@ -48,12 +54,6 @@ function affect_io!(integrator)
         write_ts(Stats, "cloud_base_mean", diag_svpc.cloud_base_mean[cent])
         write_ts(Stats, "cloud_top_mean", diag_svpc.cloud_top_mean[cent])
     end
-
-    # TODO: remove `vars` hack that avoids
-    # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    # opening/closing files every step should be okay. #removeVarsHack
-    # TurbulenceConvection.io(sim) # #removeVarsHack
-    write_simulation_time(Stats, t) # #removeVarsHack
 
     io(io_nt.aux, Stats, state)
     io(io_nt.diagnostics, Stats, diagnostics)
