@@ -104,7 +104,7 @@ end
 function init_dt!(integrator)
     UnPack.@unpack edmf, TS, dt_min = integrator.p
     if !TS.initialized
-        TS.dt = 0.0
+        TS.dt = 1.0e-6
         SciMLBase.set_proposed_dt!(integrator, TS.dt)
         ODE.u_modified!(integrator, false)
         TS.initialized = true
