@@ -23,5 +23,5 @@ close_files(sim)
 @info "precompiled/precompiling: $(t_precompiled/t_precompile))"
 
 @testset "Test runtime" begin
-    @test t_precompiled / t_precompile < 0.5
+    @test t_precompiled / t_precompile < 0.51
 end

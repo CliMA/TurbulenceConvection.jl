@@ -206,7 +206,7 @@ struct SGSQuadrature{N, QT, A, W} <: AbstractEnvThermo
     quadrature_type::QT
     a::A
     w::W
-    function SGSQuadrature(namelist)
+    function SGSQuadrature(::Type{FT}, namelist) where {FT}
         N = parse_namelist(namelist, "thermodynamics", "quadrature_order"; default = 3)
         quadrature_name = parse_namelist(namelist, "thermodynamics", "quadrature_type"; default = "log-normal")
         quadrature_type = if quadrature_name == "log-normal"
@@ -219,7 +219,7 @@ struct SGSQuadrature{N, QT, A, W} <: AbstractEnvThermo
         # TODO: double check this python-> julia translation
         # a, w = np.polynomial.hermite.hermgauss(N)
         a, w = FastGaussQuadrature.gausshermite(N)
-        a, w = SA.SVector{N}(a), SA.SVector{N}(w)
+        a, w = SA.SVector{N, FT}(a), SA.SVector{N, FT}(w)
         QT = typeof(quadrature_type)
         return new{N, QT, typeof(a), typeof(w)}(quadrature_type, a, w)
     end
@@ -471,9 +471,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
     detr_dim_scale::DDS
     entr_pi_subset::EPG
     set_src_seed::Bool
-    function EDMFModel(namelist, precip_model) where {PS}
-        # TODO: move this into arg list
-        FT = Float64
+    function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
         # get values from namelist
         prandtl_number = namelist["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"]
 
@@ -540,7 +538,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
         en_thermo = if en_sgs_name == "mean"
             SGSMean()
         elseif en_sgs_name == "quadrature"
-            SGSQuadrature(namelist)
+            SGSQuadrature(FT, namelist)
         else
             error("Something went wrong. Invalid environmental sgs type '$en_sgs_name'")
         end
