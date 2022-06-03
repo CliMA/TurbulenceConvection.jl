@@ -51,6 +51,7 @@ overwrite_namelist_map = Dict(
 "precip_fraction_limiter" => (nl, pa, key) -> (nl["microphysics"]["precip_fraction_limiter"] = pa[key]),
 "thermo_covariance_model" => (nl, pa, key) -> (nl["thermodynamics"]["thermo_covariance_model"] = pa[key]),
 "config"                  => (nl, pa, key) -> (nl["config"] = pa[key]),
+"set_src_seed"            => (nl, pa, key) -> (nl["set_src_seed"] = pa[key]),
 )
 no_overwrites = (
     "case", # default_namelist already overwrites namelist["meta"]["casename"]

@@ -1,7 +1,13 @@
 # compute the mean of the values between two percentiles (0 to 1) for a standard normal distribution
 # this gives the surface scalar coefficients for 1 to n-1 updrafts when using n updrafts
-function percentile_bounds_mean_norm(low_percentile::FT, high_percentile::FT, n_samples::I) where {FT <: Real, I}
+function percentile_bounds_mean_norm(
+    low_percentile::FT,
+    high_percentile::FT,
+    n_samples::I,
+    set_src_seed,
+) where {FT <: Real, I}
     D = Distributions
+    set_src_seed && Random.seed!(123)
     x = rand(D.Normal(), n_samples)
     xp_low = D.quantile(D.Normal(), low_percentile)
     xp_high = D.quantile(D.Normal(), high_percentile)
