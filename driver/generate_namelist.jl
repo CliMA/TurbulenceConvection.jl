@@ -77,6 +77,7 @@ function default_namelist(
     namelist_defaults["meta"]["uuid"] = basename(tempname())
 
     namelist_defaults["config"] = "column"
+    namelist_defaults["set_src_seed"] = false
 
     namelist_defaults["logging"] = Dict()
     namelist_defaults["logging"]["truncate_stack_trace"] = truncate_stack_trace

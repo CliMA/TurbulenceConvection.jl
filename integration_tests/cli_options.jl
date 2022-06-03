@@ -68,6 +68,10 @@ function parse_commandline()
         help = "Spatial configuration [`sphere` (default), `column`]"
         arg_type = String
         default = "column"
+        "--set_src_seed"
+        help = "Set random seeds for reproducible results per column"
+        arg_type = Bool
+        default = false
         "--trunc_field_type_print"
         help = "Set to `true` to truncate printing of ClimaCore `Field` types"
         arg_type = Bool

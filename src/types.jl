@@ -470,6 +470,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
     entr_dim_scale::EDS
     detr_dim_scale::DDS
     entr_pi_subset::EPG
+    set_src_seed::Bool
     function EDMFModel(namelist, precip_model) where {PS}
         # TODO: move this into arg list
         FT = Float64
@@ -478,6 +479,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
 
         # Set the number of updrafts (1)
         n_updrafts = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_number"; default = 1)
+        set_src_seed::Bool = namelist["set_src_seed"]
 
         pressure_func_drag_str = parse_namelist(
             namelist,
@@ -679,6 +681,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
             entr_dim_scale,
             detr_dim_scale,
             entr_pi_subset,
+            set_src_seed,
         )
     end
 end

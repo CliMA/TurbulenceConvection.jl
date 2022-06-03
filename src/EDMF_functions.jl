@@ -373,11 +373,13 @@ function θ_surface_bc(
     UnPack.@unpack ustar, zLL, oblength, ρLL = surface_helper(surf, grid, state)
 
     surf.bflux > 0 || return FT(0)
+    set_src_seed = edmf.set_src_seed
     a_total = edmf.surface_area
     a_ = area_surface_bc(surf, edmf, i)
     ρθ_liq_ice_flux = surf.shf / c_p # assuming no ql,qi flux
     h_var = get_surface_variance(ρθ_liq_ice_flux / ρLL, ρθ_liq_ice_flux / ρLL, ustar, zLL, oblength)
-    surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000)
+    surface_scalar_coeff =
+        percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000, set_src_seed)
     return aux_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var)
 end
 function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDMFModel, i::Int)::FT where {FT}
@@ -387,11 +389,13 @@ function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDM
     kc_surf = kc_surface(grid)
     surf.bflux > 0 || return aux_gm.q_tot[kc_surf]
     a_total = edmf.surface_area
+    set_src_seed = edmf.set_src_seed
     a_ = area_surface_bc(surf, edmf, i)
     UnPack.@unpack ustar, zLL, oblength, ρLL = surface_helper(surf, grid, state)
     ρq_tot_flux = surf.ρq_tot_flux
     qt_var = get_surface_variance(ρq_tot_flux / ρLL, ρq_tot_flux / ρLL, ustar, zLL, oblength)
-    surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000)
+    surface_scalar_coeff =
+        percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000, set_src_seed)
     return aux_gm.q_tot[kc_surf] + surface_scalar_coeff * sqrt(qt_var)
 end
 function ql_surface_bc(surf::SurfaceBase{FT})::FT where {FT}
