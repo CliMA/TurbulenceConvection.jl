@@ -11,6 +11,8 @@ end
 
 condition_every_iter(u, t, integrator) = true
 
+condition_init(u, t, integrator) = t ≈ 0
+
 function affect_io!(integrator)
     UnPack.@unpack edmf, calibrate_io, precip_model, aux, io_nt, diagnostics, case, param_set, Stats, skip_io =
         integrator.p
@@ -102,10 +104,14 @@ end
 function init_dt!(integrator)
     UnPack.@unpack edmf, TS, dt_min = integrator.p
     if !TS.initialized
-        dt_zero = 0.0
-        SciMLBase.set_proposed_dt!(integrator, dt_zero)
+        TS.dt = 0.0
+        SciMLBase.set_proposed_dt!(integrator, TS.dt)
         ODE.u_modified!(integrator, false)
         TS.initialized = true
+    else
+        TS.dt = dt_min
+        SciMLBase.set_proposed_dt!(integrator, TS.dt)
+        ODE.u_modified!(integrator, false)
     end
 end
 
