@@ -46,7 +46,7 @@ function buoyancy_gradients(
         cp_m = TD.cp_m(param_set, ts_sat)
         qv_star = TD.vapor_specific_humidity(param_set, ts_sat)
 
-        ∂b∂M_sat = (g / Tv_gm) * (R_m / cp_m - L_v * qv_star / (cp_m * T)) / (1 - L_v^2 * qv_star / (R_v * T^2))
+        ∂b∂M_sat = (g / Tv_gm) / R_d * (R_m / cp_m + L_v * qv_star / (cp_m * T)) / (1 + L_v^2 * qv_star / (R_v * T^2))
         ∂b∂qt_sat = (g / Tv_gm) * ((R_m / cp_m - L_v * qv_star / (cp_m * T)) * (R_d * T_0 - L_v0) + R_d * T)
     else
         ∂b∂M_sat = FT(0)
