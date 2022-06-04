@@ -98,8 +98,6 @@ nn_arc(ps::APS) = ps.nt.nn_arc
 w_fno(ps::APS) = ps.nt.w_fno
 nm_fno(ps::APS) = ps.nt.nm_fno
 c_fno(ps::APS) = ps.nt.c_fno
-c_rf_fix(ps::APS) = ps.nt.c_rf_fix
-c_rf_opt(ps::APS) = ps.nt.c_rf_opt
 c_linear(ps::APS) = ps.nt.c_linear
 
 #= stochastic parameters =#

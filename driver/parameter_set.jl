@@ -59,12 +59,7 @@ function create_parameter_set(namelist)
     use_fno = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "FNO"
     use_linear = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "Linear"
 
-    entr_closure_kwargs = if use_ran_features
-        (;
-        c_rf_fix = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_fix_ent_params"),
-        c_rf_opt = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_opt_ent_params"),
-    )
-    elseif use_nn
+    entr_closure_kwargs = if use_nn
         (;
         c_nn_params = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_ent_params"),
         nn_arc = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_arc"),
