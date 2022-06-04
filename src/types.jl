@@ -58,7 +58,10 @@ end
 
 struct LinearEntr <: AbstractEntrDetrModel end
 struct FNOEntr <: AbstractNonLocalEntrDetrModel end
-struct RFEntr <: AbstractEntrDetrModel end
+struct RFEntr{A, B} <: AbstractEntrDetrModel
+    c_rf_fix::A
+    c_rf_opt::B
+end
 
 Base.@kwdef struct NoisyRelaxationProcess{MT} <: AbstractEntrDetrModel
     mean_model::MT
@@ -596,7 +599,9 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
         elseif entr_type == "Linear"
             LinearEntr()
         elseif entr_type == "RF"
-            RFEntr()
+            c_rf_fix = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_fix_ent_params")
+            c_rf_opt = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_opt_ent_params")
+            RFEntr(c_rf_fix, c_rf_opt)
         else
             error("Something went wrong. Invalid entrainment type '$entr_type'")
         end
