@@ -277,8 +277,8 @@ Uses a simple linear model to predict the non-dimensional components of dynamica
  - `εδ_model_vars`  :: structure containing variables
  - `εδ_model_type`  :: LinearEntr - linear entrainment closure
 """
-function non_dimensional_function(param_set, εδ_model_vars, ::LinearEntr)
-    c_linear = TCP.c_linear(param_set)
+function non_dimensional_function(param_set, εδ_model_vars, linear::LinearEntr)
+    c_linear = linear.c_linear
 
     nondim_groups = collect(non_dimensional_groups(param_set, εδ_model_vars))
     # Linear closure
