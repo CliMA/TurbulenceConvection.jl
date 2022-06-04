@@ -1017,7 +1017,7 @@ function update_diagnostic_covariances!(
     aux_up = center_aux_updrafts(state)
     w_en_f = face_aux_environment(state).w
     c_d = TCP.c_d(param_set)
-    covar_lim = TCP.covar_lim(param_set)
+    covar_lim = edmf.thermo_covariance_model.covar_lim
 
     ρ_ae_K = face_aux_turbconv(state).ρ_ae_K
     KH = center_aux_turbconv(state).KH
