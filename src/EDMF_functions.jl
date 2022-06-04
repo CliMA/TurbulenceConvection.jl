@@ -415,7 +415,8 @@ function get_GMV_CoVar(
 ) where {covar_sym, ϕ_sym, ψ_sym}
     N_up = n_updrafts(edmf)
     is_tke = covar_sym == :tke
-    tke_factor = is_tke ? 0.5 : 1
+    FT = eltype(edmf)
+    tke_factor = is_tke ? FT(0.5) : 1
     aux_gm_c = center_aux_grid_mean(state)
     aux_gm_f = face_aux_grid_mean(state)
     prog_gm_c = center_prog_grid_mean(state)
@@ -738,7 +739,8 @@ function compute_covariance_shear(
     prog_gm = center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
     is_tke = covar_sym == :tke
-    tke_factor = is_tke ? 0.5 : 1
+    FT = eltype(edmf)
+    tke_factor = is_tke ? FT(0.5) : 1
     k_eddy = is_tke ? aux_tc.KM : aux_tc.KH
     aux_en_2m = center_aux_environment_2m(state)
     aux_covar = getproperty(aux_en_2m, covar_sym)
@@ -751,7 +753,6 @@ function compute_covariance_shear(
     wvec = CC.Geometry.WVector
     ϕ_en = getproperty(aux_en, ϕ_en_sym)
     ψ_en = getproperty(aux_en, ψ_en_sym)
-    FT = eltype(grid)
 
     bcs = (; bottom = CCO.Extrapolate(), top = CCO.SetGradient(wvec(zero(FT))))
     If = CCO.InterpolateC2F(; bcs...)
@@ -785,7 +786,8 @@ function compute_covariance_interdomain_src(
 ) where {covar_sym, ϕ_sym, ψ_sym}
     N_up = n_updrafts(edmf)
     is_tke = covar_sym == :tke
-    tke_factor = is_tke ? 0.5 : 1
+    FT = eltype(edmf)
+    tke_factor = is_tke ? FT(0.5) : 1
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
     aux_en_2m = center_aux_environment_2m(state)
@@ -820,7 +822,7 @@ function compute_covariance_entr(
     N_up = n_updrafts(edmf)
     FT = eltype(grid)
     is_tke = covar_sym == :tke
-    tke_factor = is_tke ? 0.5 : 1
+    tke_factor = is_tke ? FT(0.5) : 1
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
     aux_gm_c = center_aux_grid_mean(state)
