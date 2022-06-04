@@ -1,25 +1,25 @@
-mutable struct TimeStepping
-    dt::Float64
-    t_max::Float64
-    t::Float64
+mutable struct TimeStepping{FT}
+    dt::FT
+    t_max::FT
+    t::FT
     nstep::Int
-    cfl_limit::Float64
-    dt_max::Float64
-    dt_max_edmf::Float64
-    dt_io::Float64
+    cfl_limit::FT
+    dt_max::FT
+    dt_max_edmf::FT
+    dt_io::FT
 end
 
-function TimeStepping(namelist)
-    dt = TC.parse_namelist(namelist, "time_stepping", "dt_min"; default = 1.0)
-    t_max = TC.parse_namelist(namelist, "time_stepping", "t_max"; default = 7200.0)
-    cfl_limit = TC.parse_namelist(namelist, "time_stepping", "cfl_limit"; default = 0.5)
-    dt_max = TC.parse_namelist(namelist, "time_stepping", "dt_max"; default = 10.0)
-    dt_max_edmf = 0.0
+function TimeStepping(::Type{FT}, namelist) where {FT}
+    dt = TC.parse_namelist(namelist, "time_stepping", "dt_min"; default = FT(1.0))
+    t_max = TC.parse_namelist(namelist, "time_stepping", "t_max"; default = FT(7200.0))
+    cfl_limit = TC.parse_namelist(namelist, "time_stepping", "cfl_limit"; default = FT(0.5))
+    dt_max = TC.parse_namelist(namelist, "time_stepping", "dt_max"; default = FT(10.0))
+    dt_max_edmf = FT(0)
 
     # set time
-    t = 0.0
-    dt_io = 0.0
+    t = FT(0)
+    dt_io = FT(0)
     nstep = 0
 
-    return TimeStepping(dt, t_max, t, nstep, cfl_limit, dt_max, dt_max_edmf, dt_io)
+    return TimeStepping{FT}(dt, t_max, t, nstep, cfl_limit, dt_max, dt_max_edmf, dt_io)
 end

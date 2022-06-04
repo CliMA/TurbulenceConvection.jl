@@ -70,20 +70,20 @@ function io(io_dict::Dict, Stats::NetCDFIO_Stats, state)
 end
 
 
-function initialize_io(nc_filename, ts_list)
+function initialize_io(nc_filename, FT, ts_list)
     NC.Dataset(nc_filename, "a") do ds
         for var_name in ts_list
-            add_ts(ds, var_name)
+            add_ts(ds, var_name, FT)
         end
     end
     return nothing
 end
 
-function initialize_io(nc_filename, io_dicts::Dict...)
+function initialize_io(nc_filename, FT, io_dicts::Dict...)
     NC.Dataset(nc_filename, "a") do ds
         for io_dict in io_dicts
             for var_name in keys(io_dict)
-                add_field(ds, var_name, io_dict[var_name].dims, io_dict[var_name].group)
+                add_field(ds, var_name, io_dict[var_name].dims, io_dict[var_name].group, FT)
             end
         end
     end

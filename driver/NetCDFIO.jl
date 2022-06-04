@@ -101,9 +101,9 @@ end
 ##### Generic field
 #####
 
-function add_field(ds, var_name::String, dims, group)
+function add_field(ds, var_name::String, dims, group, ::Type{FT}) where {FT <: AbstractFloat}
     profile_grp = ds.group[group]
-    new_var = NC.defVar(profile_grp, var_name, Float64, dims)
+    new_var = NC.defVar(profile_grp, var_name, FT, dims)
     return nothing
 end
 
@@ -111,9 +111,9 @@ end
 ##### Time-series data
 #####
 
-function add_ts(ds, var_name::String)
+function add_ts(ds, var_name::String, ::Type{FT}) where {FT <: AbstractFloat}
     ts_grp = ds.group["timeseries"]
-    new_var = NC.defVar(ts_grp, var_name, Float64, ("t",))
+    new_var = NC.defVar(ts_grp, var_name, FT, ("t",))
     return nothing
 end
 
