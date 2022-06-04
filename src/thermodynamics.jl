@@ -63,3 +63,11 @@ end
 function enthalpy(h_tot::FT, e_kin::FT, e_pot::FT) where {FT}
     return h_tot - e_kin - e_pot
 end
+
+function moist_static_energy(param_set::APS, z::FT, ts) where {FT}
+    Φ = geopotential(param_set, z)
+    e_int = TD.internal_energy(param_set, ts)
+    Rm = TD.gas_constant_air(param_set, ts)
+    T = TD.air_temperature(param_set, ts)
+    return e_int + Rm * T + Φ
+end

@@ -13,42 +13,57 @@ function buoyancy_gradients(
     param_set::APS,
     bg_model::EnvBuoyGrad{FT, EBG},
 ) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
-
     g = TCP.grav(param_set)
-    molmass_ratio = TCP.molmass_ratio(param_set)
     R_d = TCP.R_d(param_set)
     R_v = TCP.R_v(param_set)
+    T_0 = TCP.T_0(param_set)
+    L_v0 = TCP.LH_v0(param_set)
+    L_s0 = TCP.LH_s0(param_set)
 
-    phase_part = TD.PhasePartition(FT(0), FT(0), FT(0)) # assuming R_d = R_m
-    Π = TD.exner_given_pressure(param_set, bg_model.p, phase_part)
+    if bg_model.en_cld_frac < FT(1)
+        T = bg_model.T_unsat
+        Tv_gm = bg_model.Tv_gm
+        ts_unsat = TD.PhaseEquil_pTq(param_set, bg_model.p, T, bg_model.qt_unsat)
+        R_m = TD.gas_constant_air(param_set, ts_unsat)
+        cp_m = TD.cp_m(param_set, ts_unsat)
 
-    ∂b∂θv = g * (R_d * bg_model.ρ / bg_model.p) * Π
-
-    if bg_model.en_cld_frac > 0.0
-        ts_sat = thermo_state_pθq(param_set, bg_model.p, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
-        phase_part = TD.PhasePartition(param_set, ts_sat)
-        lh = TD.latent_heat_liq_ice(param_set, phase_part)
-        cp_m = TD.cp_m(param_set, ts_sat)
-        ∂b∂θl_sat = (
-            ∂b∂θv * (1 + molmass_ratio * (1 + lh / R_v / bg_model.t_sat) * bg_model.qv_sat - bg_model.qt_sat) /
-            (1 + lh * lh / cp_m / R_v / bg_model.t_sat / bg_model.t_sat * bg_model.qv_sat)
-        )
-        ∂b∂qt_sat = (lh / cp_m / bg_model.t_sat * ∂b∂θl_sat - ∂b∂θv) * bg_model.θ_sat
+        ∂b∂M_unsat = (g / Tv_gm) * (R_m / R_d / cp_m)
+        ∂b∂qt_unsat = (g / Tv_gm) * (R_m / cp_m * (R_d * T_0 - L_v0) + T / R_d * (R_v - R_d))
     else
-        ∂b∂θl_sat = FT(0)
+        ∂b∂M_unsat = FT(0)
+        ∂b∂qt_unsat = FT(0)
+
+    end
+
+    if bg_model.en_cld_frac > FT(0)
+        T = bg_model.T_sat
+        Tv_gm = bg_model.Tv_gm
+        ts_sat = TD.PhaseEquil_pTq(param_set, bg_model.p, T, bg_model.qt_sat)
+        L_v = TD.latent_heat_vapor(param_set, ts_sat)
+        L_s = TD.latent_heat_sublim(param_set, ts_sat)
+        L_f = TD.latent_heat_fusion(param_set, ts_sat)
+        R_m = TD.gas_constant_air(param_set, ts_sat)
+        cp_m = TD.cp_m(param_set, ts_sat)
+        qv_star = TD.vapor_specific_humidity(param_set, ts_sat)
+
+        ∂b∂M_sat = (g / Tv_gm) * (R_m / cp_m - L_v * qv_star / (cp_m * T)) / (1 - L_v^2 * qv_star / (R_v * T^2))
+        ∂b∂qt_sat = (g / Tv_gm) * ((R_m / cp_m - L_v * qv_star / (cp_m * T)) * (R_d * T_0 - L_v0) + R_d * T)
+    else
+        ∂b∂M_sat = FT(0)
         ∂b∂qt_sat = FT(0)
     end
 
-    ∂b∂z, ∂b∂z_unsat, ∂b∂z_sat = buoyancy_gradient_chain_rule(bg_model, ∂b∂θv, ∂b∂θl_sat, ∂b∂qt_sat)
+    ∂b∂z, ∂b∂z_unsat, ∂b∂z_sat = buoyancy_gradient_chain_rule(bg_model, ∂b∂M_sat, ∂b∂qt_sat, ∂b∂M_unsat, ∂b∂qt_unsat)
     return GradBuoy{FT}(∂b∂z, ∂b∂z_unsat, ∂b∂z_sat)
 end
 
 """
     buoyancy_gradient_chain_rule(
         bg_model::EnvBuoyGrad{FT, EBG},
-        ∂b∂θv::FT,
-        ∂b∂θl_sat::FT,
+        ∂b∂M_sat::FT,
         ∂b∂qt_sat::FT,
+        ∂b∂M_unsat::FT,
+        ∂b∂qt_unsat::FT,
     ) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
 
 Returns the vertical buoyancy gradients in the environment, as well as in its dry and cloudy volume fractions,
@@ -56,21 +71,29 @@ from the partial derivatives with respect to thermodynamic variables in dry and 
 """
 function buoyancy_gradient_chain_rule(
     bg_model::EnvBuoyGrad{FT, EBG},
-    ∂b∂θv::FT,
-    ∂b∂θl_sat::FT,
+    ∂b∂M_sat::FT,
     ∂b∂qt_sat::FT,
+    ∂b∂M_unsat::FT,
+    ∂b∂qt_unsat::FT,
 ) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
     if bg_model.en_cld_frac > FT(0)
-        ∂b∂z_θl_sat = ∂b∂θl_sat * bg_model.∂θl∂z_sat
+        ∂b∂z_M_sat = ∂b∂M_sat * bg_model.∂M∂z_sat
         ∂b∂z_qt_sat = ∂b∂qt_sat * bg_model.∂qt∂z_sat
     else
-        ∂b∂z_θl_sat = FT(0)
+        ∂b∂z_M_sat = FT(0)
         ∂b∂z_qt_sat = FT(0)
     end
 
-    ∂b∂z_unsat = bg_model.en_cld_frac < FT(1) ? ∂b∂θv * bg_model.∂θv∂z_unsat : FT(0)
+    if bg_model.en_cld_frac < FT(1)
+        ∂b∂z_M_unsat = ∂b∂M_unsat * bg_model.∂M∂z_unsat
+        ∂b∂z_qt_unsat = ∂b∂qt_unsat * bg_model.∂qt∂z_unsat
+    else
+        ∂b∂z_M_unsat = FT(0)
+        ∂b∂z_qt_unsat = FT(0)
+    end
 
-    ∂b∂z_sat = ∂b∂z_θl_sat + ∂b∂z_qt_sat
+    ∂b∂z_sat = ∂b∂z_M_sat + ∂b∂z_qt_sat
+    ∂b∂z_unsat = ∂b∂z_M_unsat + ∂b∂z_qt_unsat
     ∂b∂z = (1 - bg_model.en_cld_frac) * ∂b∂z_unsat + bg_model.en_cld_frac * ∂b∂z_sat
 
     return ∂b∂z, ∂b∂z_unsat, ∂b∂z_sat
