@@ -179,8 +179,8 @@ steps:
       - label: ":scales: Measure precompilation speedup (all)"
         command: "julia --color=yes --project=perf perf/precompilable.jl"
 
-      - label: ":scales: Measure precompilation speedup (no init)"
-        command: "julia --color=yes --project=perf perf/precompilable_no_init.jl"
+      # - label: ":scales: Measure precompilation speedup (no init)"
+      #   command: "julia --color=yes --project=perf perf/precompilable_no_init.jl"
 
       - label: ":scales: Measure precompilation speedup (no io)"
         command: "julia --color=yes --project=perf perf/precompilable_no_io.jl"

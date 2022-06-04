@@ -4,12 +4,12 @@ using Test
 case_name = "Bomex"
 println("Running $case_name...")
 
-sim = init_sim(case_name; single_timestep = false, prefix = "pc_no_init_io1")
+sim = init_sim(case_name; single_timestep = true, prefix = "pc_no_init_io1")
 (prob, alg, kwargs) = solve_args(sim)
 integrator = ODE.init(prob, alg; kwargs...)
 t_precompile = @elapsed ODE.solve!(integrator)
 
-sim = init_sim(case_name; single_timestep = false, prefix = "pc_no_init_io2")
+sim = init_sim(case_name; single_timestep = true, prefix = "pc_no_init_io2")
 (prob, alg, kwargs) = solve_args(sim)
 integrator = ODE.init(prob, alg; kwargs...)
 t_precompiled = @elapsed ODE.solve!(integrator)
