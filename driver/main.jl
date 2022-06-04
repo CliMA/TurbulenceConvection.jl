@@ -166,8 +166,7 @@ function Simulation1d(namelist)
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)
     surf_params = Cases.surface_params(case_type, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
-    inversion_type = Cases.inversion_type(case_type)
-    case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad, spk...)
+    case = Cases.CasesBase(case_type; surf_params, Fo, Rad, spk...)
 
     calibrate_io = namelist["stats_io"]["calibrate_io"]
     aux_dict = calibrate_io ? TC.io_dictionary_aux_calibrate() : TC.io_dictionary_aux()

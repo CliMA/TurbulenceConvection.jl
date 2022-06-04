@@ -422,31 +422,23 @@ end
 
 rad_type(::RadiationBase{T}) where {T} = T
 
-abstract type AbstractInversion end
-struct CriticalRiInversion <: AbstractInversion end
-struct max∇θInversion <: AbstractInversion end
-struct θρInversion <: AbstractInversion end
-
-Base.@kwdef struct CasesBase{T, IT, SURFP, F, R, LESDataT}
+Base.@kwdef struct CasesBase{T, SURFP, F, R, LESDataT}
     case::T
     casename::String
-    inversion_type::IT
     surf_params::SURFP
     Fo::F
     Rad::R
     LESDat::LESDataT
 end
 
-function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothing, kwargs...) where {T}
+function CasesBase(case::T; surf_params, Fo, Rad, LESDat = nothing, kwargs...) where {T}
     F = typeof(Fo)
     R = typeof(Rad)
-    IT = typeof(inversion_type)
     SURFP = typeof(surf_params)
     LESDataT = typeof(LESDat)
-    CasesBase{T, IT, SURFP, F, R, LESDataT}(;
+    CasesBase{T, SURFP, F, R, LESDataT}(;
         case = case,
         casename = string(nameof(T)),
-        inversion_type,
         surf_params,
         Fo,
         Rad,
