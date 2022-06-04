@@ -161,7 +161,7 @@ function Simulation1d(namelist)
 
     Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
     Rad = TC.RadiationBase(case_type)
-    TS = TimeStepping(namelist)
+    TS = TimeStepping(FT, namelist)
 
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)
@@ -250,8 +250,8 @@ function initialize(sim::Simulation1d)
         initialize_edmf(edmf, grid, state, case, param_set, t)
         if !skip_io
             stats = Stats[inds...]
-            initialize_io(stats.nc_filename, io_nt.aux, io_nt.diagnostics)
-            initialize_io(stats.nc_filename, ts_list)
+            initialize_io(stats.nc_filename, FT, io_nt.aux, io_nt.diagnostics)
+            initialize_io(stats.nc_filename, FT, ts_list)
         end
     end
 
