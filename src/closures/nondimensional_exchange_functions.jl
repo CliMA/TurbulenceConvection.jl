@@ -80,9 +80,9 @@ function non_dimensional_function!(
     εδ_model::FNOEntr,
 ) where {FT <: Real}
 
-    width = TCP.w_fno(param_set)
-    modes = TCP.nm_fno(param_set)
-    c_fno = TCP.c_fno(param_set)
+    width = εδ_model.w_fno
+    modes = εδ_model.nm_fno
+    c_fno = εδ_model.c_fno
     n_params = length(c_fno)
     n_input_vars = size(Π_groups)[2]
     M = size(Π_groups)[1]
