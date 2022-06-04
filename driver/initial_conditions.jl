@@ -10,15 +10,9 @@ const TD = Thermodynamics
 function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, case, param_set::APS, t::Real)
     initialize_covariance(edmf, grid, state)
     surf_params = case.surf_params
-    aux_tc = TC.center_aux_turbconv(state)
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = aux_gm.ts
-    prog_gm = TC.center_prog_grid_mean(state)
-    p_c = prog_gm.ρ
-    parent(aux_tc.prandtl_nvec) .= edmf.prandtl_number
-    @inbounds for k in TC.real_center_indices(grid)
-        aux_gm.θ_virt[k] = TD.virtual_pottemp(param_set, ts_gm[k])
-    end
+    @. aux_gm.θ_virt = TD.virtual_pottemp(param_set, ts_gm)
     surf = get_surface(surf_params, grid, state, t, param_set)
     if case.casename == "DryBubble"
         initialize_updrafts_DryBubble(edmf, grid, state)

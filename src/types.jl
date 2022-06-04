@@ -464,7 +464,6 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
     precip_model::PM
     precip_fraction_model::PFM
     en_thermo::ENT
-    prandtl_number::FT
     bg_closure::EBGC
     entr_closure::EC
     entr_dim_scale::EDS
@@ -472,8 +471,6 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
     entr_pi_subset::EPG
     set_src_seed::Bool
     function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
-        # get values from namelist
-        prandtl_number = namelist["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"]
 
         # Set the number of updrafts (1)
         n_updrafts = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_number"; default = 1)
@@ -673,7 +670,6 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
             precip_model,
             precip_fraction_model,
             en_thermo,
-            prandtl_number,
             bg_closure,
             entr_closure,
             entr_dim_scale,
