@@ -216,7 +216,7 @@ function get_surface(
     zrough = surf_params.zrough
     Ri_bulk_crit = surf_params.Ri_bulk_crit
 
-    phase_part = TD.PhasePartition(q_tot_gm_surf, 0.0, 0.0)
+    phase_part = TD.PhasePartition(q_tot_gm_surf, FT(0), FT(0))
     pvg = TD.saturation_vapor_pressure(param_set, TD.PhaseEquil, Tsurface)
     qsurface = TD.q_vap_saturation_from_density(param_set, Tsurface, ρ_f_surf, pvg)
     θ_star = TD.liquid_ice_pottemp_given_pressure(param_set, Tsurface, p_f_surf, phase_part)
@@ -240,7 +240,7 @@ function get_surface(
         cm = result.Cd,
         ch = result.Ch,
         obukhov_length = result.L_MO,
-        lhf = lhf * 0.0, # TODO: why are we zero-ing this out?
+        lhf = lhf * FT(0), # TODO: why are we zero-ing this out?
         shf = shf,
         ustar = result.ustar,
         ρu_flux = result.ρτxz,
