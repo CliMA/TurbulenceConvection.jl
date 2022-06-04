@@ -181,7 +181,9 @@ struct NonEquilibriumMoisture <: AbstractMoistureModel end
 
 abstract type AbstractCovarianceModel end
 struct PrognosticThermoCovariances <: AbstractCovarianceModel end
-struct DiagnosticThermoCovariances <: AbstractCovarianceModel end
+struct DiagnosticThermoCovariances{FT} <: AbstractCovarianceModel
+    covar_lim::FT
+end
 
 abstract type AbstractPrecipitationModel end
 struct NoPrecipitation <: AbstractPrecipitationModel end
@@ -508,12 +510,11 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
         thermo_covariance_model = if thermo_covariance_model_name == "prognostic"
             PrognosticThermoCovariances()
         elseif thermo_covariance_model_name == "diagnostic"
-            DiagnosticThermoCovariances()
+            covar_lim = parse_namelist(namelist, "thermodynamics", "diagnostic_covar_limiter")
+            DiagnosticThermoCovariances(covar_lim)
         else
             error("Something went wrong. Invalid thermo_covariance model: '$thermo_covariance_model_name'")
         end
-
-        precip_model = precip_model
 
         precip_fraction_model_name =
             parse_namelist(namelist, "microphysics", "precip_fraction_model"; default = "prescribed")
@@ -528,7 +529,6 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
         else
             error("Something went wrong. Invalid `precip_fraction` model: `$precip_fraction_model_name`")
         end
-
 
         # Create the environment variable class (major diagnostic and prognostic variables)
 

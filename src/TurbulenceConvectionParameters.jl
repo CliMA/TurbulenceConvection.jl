@@ -105,7 +105,4 @@ c_linear(ps::APS) = ps.nt.c_linear
 #= stochastic parameters =#
 c_gen_stoch(ps::APS) = ps.nt.c_gen_stoch
 
-#= diagnostic covariances limiter =#
-covar_lim(ps::APS) = ps.nt.covar_lim
-
 end
