@@ -28,7 +28,7 @@ function buoyancy_gradients(
         cp_m = TD.cp_m(param_set, ts_unsat)
 
         ∂b∂M_unsat = (g / Tv_gm) * (R_m / R_d / cp_m)
-        ∂b∂qt_unsat = (g / Tv_gm) * (R_m / cp_m * (R_d * T_0 - L_v0) + T / R_d * (R_v - R_d))
+        ∂b∂qt_unsat = (g / Tv_gm / R_d) * (R_m / cp_m * (R_d * T_0 - L_v0) + T * (R_v - R_d))
     else
         ∂b∂M_unsat = FT(0)
         ∂b∂qt_unsat = FT(0)
