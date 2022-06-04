@@ -95,9 +95,6 @@ l_max(ps::APS) = ps.nt.l_max
 Π_norm(ps::APS) = ps.nt.Π_norm
 c_nn_params(ps::APS) = ps.nt.c_nn_params
 nn_arc(ps::APS) = ps.nt.nn_arc
-w_fno(ps::APS) = ps.nt.w_fno
-nm_fno(ps::APS) = ps.nt.nm_fno
-c_fno(ps::APS) = ps.nt.c_fno
 c_linear(ps::APS) = ps.nt.c_linear
 
 #= stochastic parameters =#
