@@ -28,7 +28,7 @@ function buoyancy_gradients(
         cp_m = TD.cp_m(param_set, ts_unsat)
 
         ∂b∂M_unsat = (g / Tv_gm) * (R_m / R_d / cp_m)
-        ∂b∂qt_unsat = (g / Tv_gm) * (R_m / cp_m * (R_d * T_0 - L_v0) + T / R_d * (R_v - R_d))
+        ∂b∂qt_unsat = (g / Tv_gm / R_d) * (R_m / cp_m * (R_d * T_0 - L_v0) + T * (R_v - R_d))
     else
         ∂b∂M_unsat = FT(0)
         ∂b∂qt_unsat = FT(0)
@@ -45,10 +45,10 @@ function buoyancy_gradients(
         R_m = TD.gas_constant_air(param_set, ts_sat)
         cp_m = TD.cp_m(param_set, ts_sat)
         qv_star = TD.vapor_specific_humidity(param_set, ts_sat)
-        λ  = TD.liquid_fraction(param_set, ts_sat)
-        L = λ*L_v + (1-λ)*L_s
+        λ = TD.liquid_fraction(param_set, ts_sat)
+        L = λ * L_v + (1 - λ) * L_s
 
-        ∂b∂M_sat = (g / Tv_gm) * (R_m / cp_m - L * qv_star / (cp_m * T)) / (1 - L^2 * qv_star / (R_v * T^2))
+        ∂b∂M_sat = (g / Tv_gm) / R_d * (R_m / cp_m + L * qv_star / (cp_m * T)) / (1 + L^2 * qv_star / (R_v * T^2))
         ∂b∂qt_sat = (g / Tv_gm) * ((R_m / cp_m - L * qv_star / (cp_m * T)) * (R_d * T_0 - L_v0) + R_d * T)
     else
         ∂b∂M_sat = FT(0)
