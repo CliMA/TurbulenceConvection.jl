@@ -3,7 +3,7 @@
         state::State,
         grid::Grid,
         edmf::EDMFModel,
-        param_set::APS
+        surf::SurfaceBase,
     )
 
 Computes the
@@ -16,9 +16,9 @@ for all updrafts, following [He2020](@cite), given:
  - `state`: state
  - `grid`: grid
  - `edmf`: EDMF model
- - `param_set`: parameter set, containing CLIMAParameters
+ - `surf`: surface model
 """
-function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, param_set::APS, surf)
+function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, surf)
 
     FT = eltype(grid)
     N_up = n_updrafts(edmf)
@@ -40,9 +40,10 @@ function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, param_s
 
     # Note: Independence of aspect ratio hardcoded in implementation.
     α₂_asp_ratio² = FT(0)
-    α_b::FT = TCP.α_b(param_set)
-    α_a::FT = TCP.α_a(param_set)
-    α_d::FT = TCP.α_d(param_set)
+    press_model_params = pressure_model_params(edmf)
+    α_b = press_model_params.α_b
+    α_a = press_model_params.α_a
+    α_d = press_model_params.α_d
 
     @inbounds for i in 1:N_up
         # pressure

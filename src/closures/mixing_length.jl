@@ -1,10 +1,10 @@
-function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
-    c_m::FT = TCP.c_m(param_set)
-    c_d::FT = TCP.c_d(param_set)
-    smin_ub::FT = TCP.smin_ub(param_set)
-    smin_rm::FT = TCP.smin_rm(param_set)
-    l_max::FT = TCP.l_max(param_set)
-    c_b::FT = TCP.static_stab_coeff(param_set)
+function mixing_length(mix_len_params, param_set, ml_model::MinDisspLen{FT}) where {FT}
+    c_m = mix_len_params.c_m
+    c_d = mix_len_params.c_d
+    smin_ub = mix_len_params.smin_ub
+    smin_rm = mix_len_params.smin_rm
+    l_max = mix_len_params.l_max
+    c_b = mix_len_params.c_b
     g::FT = TCP.grav(param_set)
     molmass_ratio::FT = TCP.molmass_ratio(param_set)
     vkc::FT = TCP.von_karman_const(param_set)
@@ -18,7 +18,7 @@ function mixing_length(param_set, ml_model::MinDisspLen{FT}) where {FT}
     if ml_model.obukhov_length < 0.0 #unstable
         l_W =
             vkc * z / (sqrt(tke_surf / ustar / ustar) * c_m) *
-            min((1 - 100.0 * z / ml_model.obukhov_length)^0.2, 1 / vkc)
+            min((1 - 100 * z / ml_model.obukhov_length)^FT(0.2), 1 / vkc)
     else # neutral or stable
         l_W = vkc * z / (sqrt(tke_surf / ustar / ustar) * c_m)
     end

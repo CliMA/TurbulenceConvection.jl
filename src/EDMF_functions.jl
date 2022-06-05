@@ -311,8 +311,8 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     ae_surf = 1 - aux_bulk.area[kc_surf] # area of environment
 
     ρ_ae = ρ_c[kc_surf] * ae_surf
-
-    prog_en.ρatke[kc_surf] = ρ_ae * get_surface_tke(param_set, surf.ustar, zLL, surf.obukhov_length)
+    mix_len_params = mixing_length_params(edmf)
+    prog_en.ρatke[kc_surf] = ρ_ae * get_surface_tke(mix_len_params, surf.ustar, zLL, surf.obukhov_length)
     if edmf.thermo_covariance_model isa PrognosticThermoCovariances
         prog_en.ρaHvar[kc_surf] = ρ_ae * get_surface_variance(flux1 / ρLL, flux1 / ρLL, ustar, zLL, oblength)
         prog_en.ρaQTvar[kc_surf] = ρ_ae * get_surface_variance(flux2 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
@@ -892,7 +892,7 @@ function compute_covariance_dissipation(
     param_set::APS,
 ) where {covar_sym}
     FT = eltype(grid)
-    c_d::FT = TCP.c_d(param_set)
+    c_d = mixing_length_params(edmf).c_d
     aux_tc = center_aux_turbconv(state)
     prog_en = center_prog_environment(state)
     prog_gm = center_prog_grid_mean(state)
@@ -935,7 +935,7 @@ function compute_en_tendencies!(
     w_en_f = face_aux_environment(state).w
     ρ_c = prog_gm.ρ
     ρ_f = aux_gm_f.ρ
-    c_d = TCP.c_d(param_set)
+    c_d = mixing_length_params(edmf).c_d
     is_tke = covar_sym == :tke
     FT = eltype(grid)
 
@@ -1015,7 +1015,7 @@ function update_diagnostic_covariances!(
     aux_covar = getproperty(aux_en_2m, covar_sym)
     aux_up = center_aux_updrafts(state)
     w_en_f = face_aux_environment(state).w
-    c_d = TCP.c_d(param_set)
+    c_d = mixing_length_params(edmf).c_d
     covar_lim = edmf.thermo_covariance_model.covar_lim
 
     ρ_ae_K = face_aux_turbconv(state).ρ_ae_K

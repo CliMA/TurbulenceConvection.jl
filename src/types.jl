@@ -45,6 +45,21 @@ Base.@kwdef struct EntrDetr{FT}
     δ_nondim::FT
 end
 
+Base.@kwdef struct εδModelParams{FT, AFT}
+    c_div::FT
+    w_min::FT # minimum updraft velocity to avoid zero division in b/w²
+    c_ε::FT # factor multiplier for dry term in entrainment/detrainment
+    μ_0::FT # dimensional scale logistic function in the dry term in entrainment/detrainment
+    β::FT # sorting power for ad-hoc moisture detrainment function
+    χ::FT # fraction of updraft air for buoyancy mixing in entrainment/detrainment (0≤χ≤1)
+    c_λ::FT # scaling factor for TKE in entrainment scale calculations
+    γ_lim::FT
+    β_lim::FT
+    c_γ::FT # scaling factor for turbulent entrainment rate
+    c_δ::FT # factor multiplier for moist term in entrainment/detrainment
+    Π_norm::AFT
+end
+
 abstract type AbstractEntrDetrModel end
 abstract type AbstractNonLocalEntrDetrModel <: AbstractEntrDetrModel end
 abstract type AbstractNoisyEntrDetrModel <: AbstractEntrDetrModel end
@@ -171,6 +186,19 @@ Base.@kwdef struct MixLen{FT}
     ml_ratio::FT
 end
 
+Base.@kwdef struct MixingLengthParams{FT}
+    ω_pr::FT # cospectral budget factor for turbulent Prandtl number
+    c_m::FT # tke diffusivity coefficient
+    c_d::FT # tke dissipation coefficient
+    c_b::FT # static stability coefficient
+    κ_star²::FT # Ratio of TKE to squared friction velocity in surface layer
+    Pr_n::FT # turbulent Prandtl number in neutral conditions
+    Ri_c::FT # critical Richardson number
+    smin_ub::FT # lower limit for smin function
+    smin_rm::FT # upper ratio limit for smin function
+    l_max::FT
+end
+
 """
     MinDisspLen
 
@@ -199,6 +227,12 @@ Base.@kwdef struct MinDisspLen{FT}
     tke::FT
     "Updraft tke source"
     b_exch::FT
+end
+
+Base.@kwdef struct PressureModelParams{FT}
+    α_b::FT # factor multiplier for pressure buoyancy terms (effective buoyancy is (1-α_b))
+    α_a::FT # factor multiplier for pressure advection
+    α_d::FT # factor multiplier for pressure drag
 end
 
 abstract type AbstractMoistureModel end
@@ -475,7 +509,7 @@ function CasesBase(case::T; surf_params, Fo, Rad, LESDat = nothing, kwargs...) w
     )
 end
 
-struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
+struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}
     surface_area::FT
     max_area::FT
     minimum_area::FT
@@ -485,12 +519,14 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
     precip_fraction_model::PFM
     en_thermo::ENT
     bg_closure::EBGC
+    mixing_length_params::MLP
+    pressure_model_params::PMP
     entr_closure::EC
     entr_dim_scale::EDS
     detr_dim_scale::DDS
     entr_pi_subset::EPG
     set_src_seed::Bool
-    H_up_min::FT
+    H_up_min::FT # minimum updraft top to avoid zero division in pressure drag and turb-entr
     function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
 
         # Set the number of updrafts (1)
@@ -610,28 +646,20 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
         )
         w_min = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_upd_velocity")
         c_ε = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_factor")
-        # dimensional scale logistic function in the dry term in entrainment/detrainment
         μ_0 = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_scale")
-        # sorting power for ad-hoc moisture detrainment function
         β = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "sorting_power")
-        # fraction of updraft air for buoyancy mixing in entrainment/detrainment (0≤χ≤1)
         χ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_mixing_frac")
-
-        # scaling factor for TKE in entrainment scale calculations
         c_λ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_smin_tke_coeff")
         γ_lim = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "area_limiter_scale")
         β_lim = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "area_limiter_power")
-
-        # scaling factor for turbulent entrainment rate
         c_γ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "turbulent_entrainment_factor")
-
-        # factor multiplier for moist term in entrainment/detrainment
         c_δ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "detrainment_factor")
-
         Π_norm = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pi_norm_consts")
         Π_norm = SA.SVector{length(Π_norm), FT}(Π_norm)
 
-        εδ_params = (; c_div, w_min, c_ε, μ_0, β, χ, c_λ, γ_lim, β_lim, c_γ, c_δ, Π_norm)
+        εδ_params =
+            εδModelParams{FT, typeof(Π_norm)}(; c_div, w_min, c_ε, μ_0, β, χ, c_λ, γ_lim, β_lim, c_γ, c_δ, Π_norm)
+
         mean_entr_closure = if entr_type == "moisture_deficit"
             MDEntr(; params = εδ_params)
         elseif entr_type == "NN"
@@ -686,6 +714,25 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
             valid_options = ["buoy_vel", "inv_z", "none"],
         )
 
+        pressure_model_params = PressureModelParams{FT}(;
+            α_b = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pressure_normalmode_buoy_coeff1"),
+            α_a = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pressure_normalmode_adv_coeff"),
+            α_d = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pressure_normalmode_drag_coeff"),
+        )
+
+        mixing_length_params = MixingLengthParams{FT}(;
+            ω_pr = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Prandtl_number_scale"),
+            c_m = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_ed_coeff"),
+            c_d = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_diss_coeff"),
+            c_b = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "static_stab_coeff"; default = 0.4), # this is here due to a value error in CliMAParmameters.j,
+            κ_star² = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_surf_scale"),
+            Pr_n = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Prandtl_number_0"),
+            Ri_c = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Ri_crit"),
+            smin_ub = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_ub"),
+            smin_rm = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_rm"),
+            l_max = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),
+        )
+
         entr_dim_scale = if entr_dim_scale == "buoy_vel"
             BuoyVelEntrDimScale()
         elseif entr_dim_scale == "inv_z"
@@ -727,7 +774,9 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
         EBGC = typeof(bg_closure)
         ENT = typeof(en_thermo)
         EPG = typeof(entr_pi_subset)
-        return new{n_updrafts, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}(
+        MLP = typeof(mixing_length_params)
+        PMP = typeof(pressure_model_params)
+        return new{n_updrafts, FT, MM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}(
             surface_area,
             max_area,
             minimum_area,
@@ -737,6 +786,8 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
             precip_fraction_model,
             en_thermo,
             bg_closure,
+            mixing_length_params,
+            pressure_model_params,
             entr_closure,
             entr_dim_scale,
             detr_dim_scale,
@@ -751,6 +802,8 @@ n_updrafts(::EDMFModel{N_up}) where {N_up} = N_up
 Base.eltype(::EDMFModel{N_up, FT}) where {N_up, FT} = FT
 n_Π_groups(m::EDMFModel) = length(m.entr_pi_subset)
 entrainment_Π_subset(m::EDMFModel) = m.entr_pi_subset
+pressure_model_params(m::EDMFModel) = m.pressure_model_params
+mixing_length_params(m::EDMFModel) = m.mixing_length_params
 
 Base.broadcastable(edmf::EDMFModel) = Ref(edmf)
 
