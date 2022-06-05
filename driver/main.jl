@@ -112,8 +112,12 @@ function Simulation1d(namelist)
     end
 
     edmf = TC.EDMFModel(FT, namelist, precip_model)
-    @info "edmf = \n$(summary(edmf))"
-    isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
+    if isbits(edmf)
+        @info "edmf = \n$(summary(edmf))"
+    else
+        @show edmf
+        error("Something non-isbits was added to edmf and needs to be fixed.")
+    end
     N_up = TC.n_updrafts(edmf)
 
     cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars, FT, edmf)

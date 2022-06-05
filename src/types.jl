@@ -46,45 +46,56 @@ Base.@kwdef struct EntrDetr{FT}
 end
 
 abstract type AbstractEntrDetrModel end
-abstract type AbstractNonLocalEntrDetrModel end
-struct MDEntr <: AbstractEntrDetrModel end  # existing model
+abstract type AbstractNonLocalEntrDetrModel <: AbstractEntrDetrModel end
+abstract type AbstractNoisyEntrDetrModel <: AbstractEntrDetrModel end
+Base.@kwdef struct MDEntr{P} <: AbstractEntrDetrModel
+    params::P
+end  # existing model
 
-Base.@kwdef struct NNEntr{AFT, T} <: AbstractEntrDetrModel
+Base.@kwdef struct NNEntr{P, AFT, T} <: AbstractEntrDetrModel
+    params::P
     c_nn_params::AFT
     nn_arc::T
     biases_bool::Bool
 end
-Base.@kwdef struct NNEntrNonlocal{AFT, T} <: AbstractNonLocalEntrDetrModel
+Base.@kwdef struct NNEntrNonlocal{P, AFT, T} <: AbstractNonLocalEntrDetrModel
+    params::P
     c_nn_params::AFT
     nn_arc::T
     biases_bool::Bool
 end
-struct LinearEntr{T} <: AbstractEntrDetrModel
+Base.@kwdef struct LinearEntr{P, T} <: AbstractEntrDetrModel
+    params::P
     c_linear::T
 end
-Base.@kwdef struct FNOEntr{T} <: AbstractNonLocalEntrDetrModel
+Base.@kwdef struct FNOEntr{P, T} <: AbstractNonLocalEntrDetrModel
+    params::P
     w_fno::Int
     nm_fno::Int
     c_fno::T
 end
-struct RFEntr{A, B} <: AbstractEntrDetrModel
+Base.@kwdef struct RFEntr{P, A, B} <: AbstractEntrDetrModel
+    params::P
     c_rf_fix::A
     c_rf_opt::B
 end
 
-Base.@kwdef struct NoisyRelaxationProcess{MT, T} <: AbstractEntrDetrModel
+Base.@kwdef struct NoisyRelaxationProcess{MT, T} <: AbstractNoisyEntrDetrModel
     mean_model::MT
     c_gen_stoch::T
 end
-Base.@kwdef struct LogNormalScalingProcess{MT, T} <: AbstractEntrDetrModel
+Base.@kwdef struct LogNormalScalingProcess{MT, T} <: AbstractNoisyEntrDetrModel
     mean_model::MT
     c_gen_stoch::T
 end
 
-Base.@kwdef struct PrognosticNoisyRelaxationProcess{MT, T} <: AbstractEntrDetrModel
+Base.@kwdef struct PrognosticNoisyRelaxationProcess{MT, T} <: AbstractNoisyEntrDetrModel
     mean_model::MT
     c_gen_stoch::T
 end
+
+εδ_params(m::AbstractEntrDetrModel) = m.params
+εδ_params(m::AbstractNoisyEntrDetrModel) = m.mean_model.params
 
 abstract type EntrDimScale end
 struct BuoyVelEntrDimScale <: EntrDimScale end
@@ -479,6 +490,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
     detr_dim_scale::DDS
     entr_pi_subset::EPG
     set_src_seed::Bool
+    H_up_min::FT
     function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
 
         # Set the number of updrafts (1)
@@ -589,28 +601,59 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
             valid_options = [true, false],
         )
 
+        c_div = parse_namelist(
+            namelist,
+            "turbulence",
+            "EDMF_PrognosticTKE",
+            "entrainment_massflux_div_factor";
+            default = 0.0,
+        )
+        w_min = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_upd_velocity")
+        c_ε = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_factor")
+        # dimensional scale logistic function in the dry term in entrainment/detrainment
+        μ_0 = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_scale")
+        # sorting power for ad-hoc moisture detrainment function
+        β = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "sorting_power")
+        # fraction of updraft air for buoyancy mixing in entrainment/detrainment (0≤χ≤1)
+        χ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_mixing_frac")
+
+        # scaling factor for TKE in entrainment scale calculations
+        c_λ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_smin_tke_coeff")
+        γ_lim = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "area_limiter_scale")
+        β_lim = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "area_limiter_power")
+
+        # scaling factor for turbulent entrainment rate
+        c_γ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "turbulent_entrainment_factor")
+
+        # factor multiplier for moist term in entrainment/detrainment
+        c_δ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "detrainment_factor")
+
+        Π_norm = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pi_norm_consts")
+        Π_norm = SA.SVector{length(Π_norm), FT}(Π_norm)
+
+        εδ_params = (; c_div, w_min, c_ε, μ_0, β, χ, c_λ, γ_lim, β_lim, c_γ, c_δ, Π_norm)
         mean_entr_closure = if entr_type == "moisture_deficit"
-            MDEntr()
+            MDEntr(; params = εδ_params)
         elseif entr_type == "NN"
             c_nn_params = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_ent_params")
             nn_arc = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_arc")
-            NNEntr(; biases_bool = nn_biases, c_nn_params, nn_arc)
+            NNEntr(; params = εδ_params, biases_bool = nn_biases, c_nn_params, nn_arc)
         elseif entr_type == "NN_nonlocal"
             c_nn_params = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_ent_params")
             nn_arc = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_arc")
-            NNEntrNonlocal(; biases_bool = nn_biases, c_nn_params, nn_arc)
+            NNEntrNonlocal(; params = εδ_params, biases_bool = nn_biases, c_nn_params, nn_arc)
         elseif entr_type == "FNO"
             w_fno = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_width")
             nm_fno = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_n_modes")
             c_fno = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_params")
-            FNOEntr(; w_fno, nm_fno, c_fno)
+            FNOEntr(; params = εδ_params, w_fno, nm_fno, c_fno)
         elseif entr_type == "Linear"
             c_linear = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "linear_ent_params")
-            LinearEntr(c_linear)
+            LinearEntr(; params = εδ_params, c_linear)
         elseif entr_type == "RF"
             c_rf_fix = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_fix_ent_params")
             c_rf_opt = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_opt_ent_params")
-            RFEntr(c_rf_fix, c_rf_opt)
+            RFEntr(; params = εδ_params, c_rf_fix, c_rf_opt)
         else
             error("Something went wrong. Invalid entrainment type '$entr_type'")
         end
@@ -630,6 +673,9 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
         else
             error("Something went wrong. Invalid stochastic entrainment type '$stoch_entr_type'")
         end
+
+        # minimum updraft top to avoid zero division in pressure drag and turb-entr
+        H_up_min = FT(parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_updraft_top"))
 
         entr_dim_scale = parse_namelist(
             namelist,
@@ -696,6 +742,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
             detr_dim_scale,
             entr_pi_subset,
             set_src_seed,
+            H_up_min,
         )
     end
 end

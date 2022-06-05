@@ -35,7 +35,7 @@ function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, param_s
     aux_en_f = face_aux_environment(state)
     ρ_f = aux_gm_f.ρ
     plume_scale_height = map(1:N_up) do i
-        compute_plume_scale_height(grid, state, param_set, i)
+        compute_plume_scale_height(grid, state, edmf.H_up_min, i)
     end
 
     # Note: Independence of aspect ratio hardcoded in implementation.
