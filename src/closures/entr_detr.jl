@@ -1,7 +1,6 @@
 #### Entrainment-Detrainment kernels
 
-function compute_turbulent_entrainment(param_set, a_up::FT, w_up::FT, tke::FT, H_up::FT) where {FT}
-    c_γ = FT(TCP.c_γ(param_set))
+function compute_turbulent_entrainment(c_γ::FT, a_up::FT, w_up::FT, tke::FT, H_up::FT) where {FT}
 
     ε_turb = if w_up * a_up > 0
         2 * c_γ * sqrt(max(tke, 0)) / (w_up * H_up)
@@ -12,10 +11,10 @@ function compute_turbulent_entrainment(param_set, a_up::FT, w_up::FT, tke::FT, H
     return ε_turb
 end
 
-function compute_inverse_timescale(param_set, b_up::FT, b_en::FT, w_up::FT, w_en::FT, tke::FT) where {FT}
+function compute_inverse_timescale(εδ_model, b_up::FT, b_en::FT, w_up::FT, w_en::FT, tke::FT) where {FT}
     Δb = b_up - b_en
-    Δw = get_Δw(param_set, w_up, w_en)
-    c_λ = FT(TCP.c_λ(param_set))
+    Δw = get_Δw(εδ_model, w_up, w_en)
+    c_λ = εδ_params(εδ_model).c_λ
 
     l_1 = c_λ * abs(Δb / sqrt(tke + 1e-8))
     l_2 = abs(Δb / Δw)
@@ -23,9 +22,9 @@ function compute_inverse_timescale(param_set, b_up::FT, b_en::FT, w_up::FT, w_en
     return lamb_smooth_minimum(l, FT(0.1), FT(0.0005))
 end
 
-function get_Δw(param_set, w_up::FT, w_en::FT) where {FT}
+function get_Δw(εδ_model, w_up::FT, w_en::FT) where {FT}
     Δw = w_up - w_en
-    Δw += copysign(FT(TCP.w_min(param_set)), Δw)
+    Δw += copysign(εδ_params(εδ_model).w_min, Δw)
     return Δw
 end
 
@@ -36,7 +35,7 @@ function get_MdMdz(M::FT, dMdz::FT) where {FT}
 end
 
 function entrainment_inv_length_scale(
-    param_set,
+    εδ_model,
     b_up::FT,
     b_en::FT,
     w_up::FT,
@@ -45,13 +44,13 @@ function entrainment_inv_length_scale(
     zc_i::FT,
     ::BuoyVelEntrDimScale,
 ) where {FT}
-    Δw = get_Δw(param_set, w_up, w_en)
-    λ = compute_inverse_timescale(param_set, b_up, b_en, w_up, w_en, tke)
+    Δw = get_Δw(εδ_model, w_up, w_en)
+    λ = compute_inverse_timescale(εδ_model, b_up, b_en, w_up, w_en, tke)
     return (λ / Δw)
 end
 
 function entrainment_inv_length_scale(
-    param_set,
+    εδ_model,
     b_up::FT,
     b_en::FT,
     w_up::FT,
@@ -64,7 +63,7 @@ function entrainment_inv_length_scale(
 end
 
 function entrainment_inv_length_scale(
-    param_set,
+    εδ_model,
     b_up::FT,
     b_en::FT,
     w_up::FT,
@@ -77,9 +76,9 @@ function entrainment_inv_length_scale(
 end
 
 """A convenience wrapper for entrainment_inv_length_scale"""
-function entrainment_inv_length_scale(param_set, εδ_vars, dim_scale)
+function entrainment_inv_length_scale(εδ_model, εδ_vars, dim_scale)
     return entrainment_inv_length_scale(
-        param_set,
+        εδ_model,
         εδ_vars.b_up,
         εδ_vars.b_en,
         εδ_vars.w_up,
@@ -91,26 +90,26 @@ function entrainment_inv_length_scale(param_set, εδ_vars, dim_scale)
 end
 
 """
-    εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nondim, δ_nondim)
+    εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nondim, δ_nondim)
 
 Returns the fractional dynamical entrainment and detrainment rates [1/m] given non-dimensional rates
 
 Parameters:
- - `param_set`      :: parameter set
+ - `εδ_model`       :: entrainment-detrainment model
  - `εδ_vars`        :: structure containing variables
  - `entr_dim_scale` :: type of dimensional fractional entrainment scale
  - `detr_dim_scale` :: type of dimensional fractional detrainment scale
  - `ε_nondim`       :: nondimensional fractional entrainment
  - `δ_nondim`       :: nondimensional fractional detrainment
 """
-function εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nondim, δ_nondim)
+function εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nondim, δ_nondim)
     FT = eltype(εδ_vars.q_cond_up)
-    ε_dim_scale = entrainment_inv_length_scale(param_set, εδ_vars, entr_dim_scale)
-    δ_dim_scale = entrainment_inv_length_scale(param_set, εδ_vars, detr_dim_scale)
+    ε_dim_scale = entrainment_inv_length_scale(εδ_model, εδ_vars, entr_dim_scale)
+    δ_dim_scale = entrainment_inv_length_scale(εδ_model, εδ_vars, detr_dim_scale)
 
-    area_limiter = max_area_limiter(param_set, εδ_vars.max_area, εδ_vars.a_up)
+    area_limiter = max_area_limiter(εδ_model, εδ_vars.max_area, εδ_vars.a_up)
 
-    c_div = FT(TCP.entrainment_massflux_div_factor(param_set))
+    c_div = εδ_params(εδ_model).c_div
     MdMdz_ε, MdMdz_δ = get_MdMdz(εδ_vars.M, εδ_vars.dMdz) .* c_div
 
     # fractional dynamical entrainment / detrainment [1 / m]
@@ -121,27 +120,27 @@ function εδ_dyn(param_set::APS, εδ_vars, entr_dim_scale, detr_dim_scale, ε_
 end
 
 """
-    entr_detr(param_set::APS, εδ_vars, entr_dim_scale, detr_dim_scale, εδ_model_type)
+    entr_detr(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale)
 
 Returns the fractional dynamical entrainment and detrainment rates [1/m],
 as well as the turbulent entrainment rate
 
 Parameters:
- - `param_set`      :: parameter set
+ - `εδ_model`       :: type of non-dimensional model for entrainment/detrainment
  - `εδ_vars`        :: structure containing variables
  - `entr_dim_scale` :: type of dimensional fractional entrainment scale
  - `detr_dim_scale` :: type of dimensional fractional detrainment scale
- - `εδ_model_type`  :: type of non-dimensional model for entrainment/detrainment
 """
-function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, detr_dim_scale, εδ_model_type)
+function entr_detr(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale)
     FT = eltype(εδ_vars.q_cond_up)
 
     # fractional entrainment / detrainment
-    ε_nondim, δ_nondim = non_dimensional_function(param_set, εδ_vars, εδ_model_type)
-    ε_dyn, δ_dyn = εδ_dyn(param_set, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nondim, δ_nondim)
+    ε_nondim, δ_nondim = non_dimensional_function(εδ_model, εδ_vars)
+    ε_dyn, δ_dyn = εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nondim, δ_nondim)
 
     # turbulent entrainment
-    ε_turb = compute_turbulent_entrainment(param_set, εδ_vars.a_up, εδ_vars.w_up, εδ_vars.tke_en, εδ_vars.H_up)
+    ε_turb =
+        compute_turbulent_entrainment(εδ_params(εδ_model).c_γ, εδ_vars.a_up, εδ_vars.w_up, εδ_vars.tke_en, εδ_vars.H_up)
 
     return EntrDetr{FT}(ε_dyn, δ_dyn, ε_turb, ε_nondim, δ_nondim)
 end
@@ -177,7 +176,7 @@ function compute_entr_detr!(
     wvec = CC.Geometry.WVector
     max_area = edmf.max_area
     plume_scale_height = map(1:N_up) do i
-        compute_plume_scale_height(grid, state, param_set, i)
+        compute_plume_scale_height(grid, state, edmf.H_up_min, i)
     end
     Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
@@ -229,19 +228,14 @@ function compute_entr_detr!(
                 if εδ_closure isa PrognosticNoisyRelaxationProcess
                     # fractional dynamical entrainment from prognostic state
                     ε_nondim, δ_nondim = prog_up[i].ε_nondim[k], prog_up[i].δ_nondim[k]
+                    mean_model = εδ_closure.mean_model
                     ε_dyn, δ_dyn =
-                        εδ_dyn(param_set, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, ε_nondim, δ_nondim)
+                        εδ_dyn(mean_model, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, ε_nondim, δ_nondim)
                     # turbulent & mean nondimensional entrainment
-                    er = entr_detr(
-                        param_set,
-                        εδ_model_vars,
-                        edmf.entr_dim_scale,
-                        edmf.detr_dim_scale,
-                        εδ_closure.mean_model,
-                    )
+                    er = entr_detr(mean_model, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale)
                 else
                     # fractional, turbulent & nondimensional entrainment
-                    er = entr_detr(param_set, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, εδ_closure)
+                    er = entr_detr(εδ_closure, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale)
                     ε_dyn, δ_dyn = er.ε_dyn, er.δ_dyn
                 end
                 aux_up[i].entr_sc[k] = ε_dyn
@@ -290,13 +284,13 @@ function compute_entr_detr!(
     wvec = CC.Geometry.WVector
     max_area = edmf.max_area
     plume_scale_height = map(1:N_up) do i
-        compute_plume_scale_height(grid, state, param_set, i)
+        compute_plume_scale_height(grid, state, edmf.H_up_min, i)
     end
 
     Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
     LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
-    c_div = FT(TCP.entrainment_massflux_div_factor(param_set))
+    c_div = εδ_params(εδ_model).c_div
     @inbounds for i in 1:N_up
         # compute ∇m at cell centers
         a_up = aux_up[i].area
@@ -340,7 +334,7 @@ function compute_entr_detr!(
                     wstar = surf.wstar, # convective velocity
                     entr_Π_subset = entrainment_Π_subset(edmf), # indices of Pi groups to include
                 )
-                Π = non_dimensional_groups(param_set, εδ_model_vars)
+                Π = non_dimensional_groups(εδ_model, εδ_model_vars)
                 @assert length(Π) == n_Π_groups(edmf)
                 for Π_i in 1:length(entrainment_Π_subset(edmf))
                     aux_up[i].Π_groups[Π_i][k] = Π[Π_i]
@@ -360,14 +354,14 @@ function compute_entr_detr!(
 
         @inbounds for k in real_center_indices(grid)
             ε_turb = compute_turbulent_entrainment(
-                param_set,
+                εδ_params(εδ_model).c_γ,
                 aux_up[i].area[k],
                 w_up_c[k],
                 aux_en.tke[k],
                 plume_scale_height[i],
             )
             ε_dim_scale = entrainment_inv_length_scale(
-                param_set,
+                εδ_model,
                 aux_up[i].buoy[k],
                 aux_en.buoy[k],
                 w_up_c[k],
@@ -377,7 +371,7 @@ function compute_entr_detr!(
                 edmf.entr_dim_scale,
             )
             δ_dim_scale = entrainment_inv_length_scale(
-                param_set,
+                εδ_model,
                 aux_up[i].buoy[k],
                 aux_en.buoy[k],
                 w_up_c[k],
@@ -386,7 +380,7 @@ function compute_entr_detr!(
                 grid.zc[k].z,
                 edmf.detr_dim_scale,
             )
-            area_limiter = max_area_limiter(param_set, max_area, aux_up[i].area[k])
+            area_limiter = max_area_limiter(εδ_model, max_area, aux_up[i].area[k])
             MdMdz_ε, MdMdz_δ = get_MdMdz(m_entr_detr[k], ∇m_entr_detr[k]) .* c_div
 
             aux_up[i].entr_sc[k] = ε_dim_scale * aux_up[i].ε_nondim[k] + MdMdz_ε
