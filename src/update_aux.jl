@@ -6,7 +6,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
-    c_m = TCP.c_m(param_set)
+    c_m = mixing_length_params(edmf).c_m
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
     obukhov_length = surf.obukhov_length
@@ -319,7 +319,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         compute_nonequilibrium_moisture_tendencies!(grid, state, edmf, Δt, param_set)
     end
     compute_entr_detr!(state, grid, edmf, param_set, surf, Δt, edmf.entr_closure)
-    compute_nh_pressure!(state, grid, edmf, param_set, surf)
+    compute_nh_pressure!(state, grid, edmf, surf)
 
     #####
     ##### compute_eddy_diffusivities_tke
@@ -372,6 +372,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     shm = copy(cf)
     pshm = parent(shm)
     shrink_mask!(pshm, vec(cf))
+    mix_len_params = mixing_length_params(edmf)
 
     # Since NaN*0 ≠ 0, we need to conditionally replace
     # our gradients by their default values.
@@ -430,8 +431,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
         # Limiting stratification scale (Deardorff, 1976)
         # compute ∇Ri and Pr
-        ∇_Ri = gradient_Richardson_number(param_set, bg.∂b∂z, Shear²[k], eps(FT))
-        aux_tc.prandtl_nvec[k] = turbulent_Prandtl_number(param_set, obukhov_length, ∇_Ri)
+        ∇_Ri = gradient_Richardson_number(mix_len_params, bg.∂b∂z, Shear²[k], eps(FT))
+        aux_tc.prandtl_nvec[k] = turbulent_Prandtl_number(mix_len_params, obukhov_length, ∇_Ri)
 
         ml_model = MinDisspLen{FT}(;
             z = grid.zc[k].z,
@@ -446,7 +447,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             b_exch = b_exch[k],
         )
 
-        ml = mixing_length(param_set, ml_model)
+        ml = mixing_length(mix_len_params, param_set, ml_model)
         aux_tc.mls[k] = ml.min_len_ind
         aux_tc.mixing_length[k] = ml.mixing_length
         aux_tc.ml_ratio[k] = ml.ml_ratio

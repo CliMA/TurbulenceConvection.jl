@@ -37,39 +37,4 @@ cp_v(ps::APS) = CP.Planet.cp_v(ps)
 cv_v(ps::APS) = CP.Planet.cv_v(ps)
 cp_d(ps::APS) = CP.Planet.cp_d(ps)
 
-α_a(ps::APS) = CP.Atmos.EDMF.α_a(ps)
-α_b(ps::APS) = CP.Atmos.EDMF.α_b(ps)
-α_d(ps::APS) = CP.Atmos.EDMF.α_d(ps)
-β(ps::APS) = CP.Atmos.EDMF.β(ps)
-c_d(ps::APS) = CP.Atmos.EDMF.c_d(ps)
-c_m(ps::APS) = CP.Atmos.EDMF.c_m(ps)
-c_λ(ps::APS) = CP.Atmos.EDMF.c_λ(ps)
-χ(ps::APS) = CP.Atmos.EDMF.χ(ps)
-κ_star²(ps::APS) = CP.Atmos.EDMF.κ_star²(ps)
-Pr_n(ps::APS) = CP.Atmos.EDMF.Pr_n(ps)
-Ri_c(ps::APS) = CP.Atmos.EDMF.Ri_c(ps)
-smin_ub(ps::APS) = CP.Atmos.EDMF.smin_ub(ps)
-smin_rm(ps::APS) = CP.Atmos.EDMF.smin_rm(ps)
-ω_pr(ps::APS) = CP.Atmos.EDMF.ω_pr(ps)
-
-#####
-##### Experimental parameters
-#####
-
-#=
-    ExperimentalClimaParams
-
-This is a module for staging experimental
-clima parameters-- that we are unsure will
-be used in the final model. Once they are
-no longer experimental, they should be moved
-to CLIMAParameters.jl.
-
-TODO: move non-experimental parameters to CLIMAParameters
-=#
-
-#= divergence factor for bubble case (zero otherwise) =#
-static_stab_coeff(ps::APS) = ps.nt.c_b
-l_max(ps::APS) = ps.nt.l_max
-
 end
