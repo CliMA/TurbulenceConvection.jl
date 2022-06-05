@@ -124,14 +124,6 @@ get_case_name(case_type::AbstractCaseType) = string(case_type)
 ##### Case configurations
 #####
 
-inversion_type(::AbstractCaseType) = TC.CriticalRiInversion()
-inversion_type(::TRMM_LBA) = TC.max∇θInversion()
-inversion_type(::ARM_SGP) = TC.max∇θInversion()
-inversion_type(::GATE_III) = TC.max∇θInversion()
-inversion_type(::DYCOMS_RF01) = TC.max∇θInversion()
-inversion_type(::DYCOMS_RF02) = TC.max∇θInversion()
-inversion_type(::DryBubble) = TC.θρInversion()
-
 get_forcing_type(::AbstractCaseType) = TC.ForcingStandard # default
 get_forcing_type(::Soares) = TC.ForcingNone
 get_forcing_type(::Nieuwstadt) = TC.ForcingNone

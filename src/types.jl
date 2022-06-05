@@ -432,31 +432,23 @@ end
 
 rad_type(::RadiationBase{T}) where {T} = T
 
-abstract type AbstractInversion end
-struct CriticalRiInversion <: AbstractInversion end
-struct max∇θInversion <: AbstractInversion end
-struct θρInversion <: AbstractInversion end
-
-Base.@kwdef struct CasesBase{T, IT, SURFP, F, R, LESDataT}
+Base.@kwdef struct CasesBase{T, SURFP, F, R, LESDataT}
     case::T
     casename::String
-    inversion_type::IT
     surf_params::SURFP
     Fo::F
     Rad::R
     LESDat::LESDataT
 end
 
-function CasesBase(case::T; inversion_type, surf_params, Fo, Rad, LESDat = nothing, kwargs...) where {T}
+function CasesBase(case::T; surf_params, Fo, Rad, LESDat = nothing, kwargs...) where {T}
     F = typeof(Fo)
     R = typeof(Rad)
-    IT = typeof(inversion_type)
     SURFP = typeof(surf_params)
     LESDataT = typeof(LESDat)
-    CasesBase{T, IT, SURFP, F, R, LESDataT}(;
+    CasesBase{T, SURFP, F, R, LESDataT}(;
         case = case,
         casename = string(nameof(T)),
-        inversion_type,
         surf_params,
         Fo,
         Rad,
@@ -474,7 +466,6 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
     precip_model::PM
     precip_fraction_model::PFM
     en_thermo::ENT
-    prandtl_number::FT
     bg_closure::EBGC
     entr_closure::EC
     entr_dim_scale::EDS
@@ -482,8 +473,6 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
     entr_pi_subset::EPG
     set_src_seed::Bool
     function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
-        # get values from namelist
-        prandtl_number = namelist["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"]
 
         # Set the number of updrafts (1)
         n_updrafts = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_number"; default = 1)
@@ -687,7 +676,6 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
             precip_model,
             precip_fraction_model,
             en_thermo,
-            prandtl_number,
             bg_closure,
             entr_closure,
             entr_dim_scale,
