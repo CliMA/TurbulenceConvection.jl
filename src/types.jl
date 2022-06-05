@@ -666,7 +666,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
             error("Something went wrong. Invalid entrainment dimension scale '$detr_dim_scale'")
         end
 
-        entr_pi_subset = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_pi_subset")
+        entr_pi_subset = Tuple(parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_pi_subset"))
 
         EDS = typeof(entr_dim_scale)
         DDS = typeof(detr_dim_scale)
