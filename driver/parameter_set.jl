@@ -69,10 +69,6 @@ function create_parameter_set(namelist)
         c_nn_params = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_ent_params"),
         nn_arc = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_arc"),
     )
-    elseif use_linear
-        (;
-        c_linear = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "linear_ent_params"),
-    )
     else
         ()
     end

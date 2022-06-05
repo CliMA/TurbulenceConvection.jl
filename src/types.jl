@@ -55,8 +55,9 @@ end
 Base.@kwdef struct NNEntrNonlocal <: AbstractNonLocalEntrDetrModel
     biases_bool::Bool
 end
-
-struct LinearEntr <: AbstractEntrDetrModel end
+struct LinearEntr{T} <: AbstractEntrDetrModel
+    c_linear::T
+end
 Base.@kwdef struct FNOEntr{T} <: AbstractNonLocalEntrDetrModel
     w_fno::Int
     nm_fno::Int
@@ -604,7 +605,8 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
             c_fno = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_params")
             FNOEntr(; w_fno, nm_fno, c_fno)
         elseif entr_type == "Linear"
-            LinearEntr()
+            c_linear = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "linear_ent_params")
+            LinearEntr(c_linear)
         elseif entr_type == "RF"
             c_rf_fix = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_fix_ent_params")
             c_rf_opt = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_opt_ent_params")
