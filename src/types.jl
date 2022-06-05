@@ -72,15 +72,18 @@ struct RFEntr{A, B} <: AbstractEntrDetrModel
     c_rf_opt::B
 end
 
-Base.@kwdef struct NoisyRelaxationProcess{MT} <: AbstractEntrDetrModel
+Base.@kwdef struct NoisyRelaxationProcess{MT, T} <: AbstractEntrDetrModel
     mean_model::MT
+    c_gen_stoch::T
 end
-Base.@kwdef struct LogNormalScalingProcess{MT} <: AbstractEntrDetrModel
+Base.@kwdef struct LogNormalScalingProcess{MT, T} <: AbstractEntrDetrModel
     mean_model::MT
+    c_gen_stoch::T
 end
 
-Base.@kwdef struct PrognosticNoisyRelaxationProcess{MT} <: AbstractEntrDetrModel
+Base.@kwdef struct PrognosticNoisyRelaxationProcess{MT, T} <: AbstractEntrDetrModel
     mean_model::MT
+    c_gen_stoch::T
 end
 
 abstract type EntrDimScale end
@@ -614,13 +617,16 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
 
         # Overwrite `entr_closure` if a noisy relaxation process is used
         entr_closure = if stoch_entr_type == "noisy_relaxation_process"
-            NoisyRelaxationProcess(mean_model = mean_entr_closure)
+            c_gen_stoch = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "general_stochastic_ent_params")
+            NoisyRelaxationProcess(; mean_model = mean_entr_closure, c_gen_stoch)
         elseif stoch_entr_type == "lognormal_scaling"
-            LogNormalScalingProcess(mean_model = mean_entr_closure)
+            c_gen_stoch = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "general_stochastic_ent_params")
+            LogNormalScalingProcess(; mean_model = mean_entr_closure, c_gen_stoch)
         elseif stoch_entr_type == "deterministic"
             mean_entr_closure
         elseif stoch_entr_type == "prognostic_noisy_relaxation_process"
-            PrognosticNoisyRelaxationProcess(mean_model = mean_entr_closure)
+            c_gen_stoch = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "general_stochastic_ent_params")
+            PrognosticNoisyRelaxationProcess(; mean_model = mean_entr_closure, c_gen_stoch)
         else
             error("Something went wrong. Invalid stochastic entrainment type '$stoch_entr_type'")
         end

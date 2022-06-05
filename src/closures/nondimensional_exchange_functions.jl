@@ -62,20 +62,18 @@ function non_dimensional_function(param_set, εδ_model_vars, ::MDEntr)
 end
 
 """
-    non_dimensional_function!(nondim_ε, nondim_δ, param_set, Π_groups, εδ_model::FNOEntr)
+    non_dimensional_function!(nondim_ε, nondim_δ, Π_groups, εδ_model::FNOEntr)
 
 Uses a non local (Fourier) neural network to predict the fields of
     non-dimensional components of dynamical entrainment/detrainment.
  - `nondim_ε`   :: output - non dimensional entr from FNO, as column fields
  - `nondim_δ`   :: output - non dimensional detr from FNO, as column fields
- - `param_set`  :: input - parameter set
  - `Π_groups`   :: input - non dimensional groups, as column fields
  - `::FNOEntr ` a non-local entrainment-detrainment model type
 """
 function non_dimensional_function!(
     nondim_ε::AbstractArray{FT}, # output
     nondim_δ::AbstractArray{FT}, # output
-    param_set::APS,
     Π_groups::AbstractArray{FT}, # input
     εδ_model::FNOEntr,
 ) where {FT <: Real}
@@ -221,20 +219,18 @@ function construct_fully_connected_nn(
 end
 
 """
-    non_dimensional_function!(nondim_ε, nondim_δ, param_set, Π_groups, εδ_model::NNEntrNonlocal)
+    non_dimensional_function!(nondim_ε, nondim_δ, Π_groups, εδ_model::NNEntrNonlocal)
 
 Uses a fully connected neural network to predict the non-dimensional components of dynamical entrainment/detrainment.
     non-dimensional components of dynamical entrainment/detrainment.
  - `nondim_ε`   :: output - non dimensional entr from FNO, as column fields
  - `nondim_δ`   :: output - non dimensional detr from FNO, as column fields
- - `param_set`  :: input - parameter set
  - `Π_groups`   :: input - non dimensional groups, as column fields
  - `::NNEntrNonlocal ` a non-local entrainment-detrainment model type
 """
 function non_dimensional_function!(
     nondim_ε::AbstractArray{FT}, # output
     nondim_δ::AbstractArray{FT}, # output
-    param_set::APS,
     Π_groups::AbstractArray{FT}, # input
     εδ_model::NNEntrNonlocal,
 ) where {FT <: Real}
@@ -339,7 +335,7 @@ function non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::L
     FT = eltype(εδ_model_vars.q_cond_up)
     # model parameters
     mean_model = εδ_model_type.mean_model
-    c_gen_stoch = TCP.c_gen_stoch(param_set)
+    c_gen_stoch = εδ_model_type.c_gen_stoch
     ε_σ² = c_gen_stoch[1]
     δ_σ² = c_gen_stoch[2]
 
@@ -374,7 +370,7 @@ Arguments:
 function non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::NoisyRelaxationProcess)
     # model parameters
     mean_model = εδ_model_type.mean_model
-    c_gen_stoch = TCP.c_gen_stoch(param_set)
+    c_gen_stoch = εδ_model_type.c_gen_stoch
     ε_σ² = c_gen_stoch[1]
     δ_σ² = c_gen_stoch[2]
     ε_λ = c_gen_stoch[3]

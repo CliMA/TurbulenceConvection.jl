@@ -95,8 +95,6 @@ function create_parameter_set(namelist)
         smin_ub = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_ub"),
         smin_rm = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_rm"),
         l_max = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),
-        ## Stochastic parameters
-        c_gen_stoch = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "general_stochastic_ent_params"),
     )
     param_set = EarthParameterSet(nt)
     if !isbits(param_set)
