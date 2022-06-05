@@ -469,7 +469,7 @@ function compute_up_stoch_tendencies!(edmf::EDMFModel, grid::Grid, state::State,
         tends_ε_nondim = tendencies_up[i].ε_nondim
         tends_δ_nondim = tendencies_up[i].δ_nondim
 
-        c_gen_stoch = TCP.c_gen_stoch(param_set)
+        c_gen_stoch = edmf.entr_closure.c_gen_stoch
         mean_entr = aux_up[i].ε_nondim
         mean_detr = aux_up[i].δ_nondim
         ε_σ² = c_gen_stoch[1]
@@ -577,7 +577,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
 
         # prognostic entr/detr
         if edmf.entr_closure isa PrognosticNoisyRelaxationProcess
-            c_gen_stoch = TCP.c_gen_stoch(param_set)
+            c_gen_stoch = edmf.entr_closure.c_gen_stoch
             mean_entr = aux_up[i].ε_nondim
             mean_detr = aux_up[i].δ_nondim
             ε_λ = c_gen_stoch[3]

@@ -94,7 +94,4 @@ l_max(ps::APS) = ps.nt.l_max
 #= Additional entrainment/detrainment parameters=#
 Π_norm(ps::APS) = ps.nt.Π_norm
 
-#= stochastic parameters =#
-c_gen_stoch(ps::APS) = ps.nt.c_gen_stoch
-
 end

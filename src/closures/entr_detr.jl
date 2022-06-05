@@ -356,7 +356,7 @@ function compute_entr_detr!(
         Π_groups = parent(aux_up[i].Π_groups)
         ε_nondim = parent(aux_up[i].ε_nondim)
         δ_nondim = parent(aux_up[i].δ_nondim)
-        non_dimensional_function!(ε_nondim, δ_nondim, param_set, Π_groups, εδ_model)
+        non_dimensional_function!(ε_nondim, δ_nondim, Π_groups, εδ_model)
 
         @inbounds for k in real_center_indices(grid)
             ε_turb = compute_turbulent_entrainment(
