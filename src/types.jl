@@ -707,6 +707,38 @@ entrainment_Π_subset(m::EDMFModel) = m.entr_pi_subset
 
 Base.broadcastable(edmf::EDMFModel) = Ref(edmf)
 
+function Base.summary(io::IO, edmf::EDMFModel)
+    pns = string.(propertynames(edmf))
+    buf = maximum(length.(pns))
+    keys = propertynames(edmf)
+    vals = repeat.(" ", map(s -> buf - length(s) + 2, pns))
+    bufs = (; zip(keys, vals)...)
+    print(io, '\n')
+    for pn in propertynames(edmf)
+        prop = getproperty(edmf, pn)
+        # Skip some data:
+        prop isa Bool && continue
+        prop isa NTuple && continue
+        prop isa Int && continue
+        prop isa Float64 && continue
+        prop isa Float32 && continue
+        s = string(
+            "  ", # needed for some reason
+            getproperty(bufs, pn),
+            '`',
+            string(pn),
+            '`',
+            "::",
+            '`',
+            typeof(prop),
+            '`',
+            '\n',
+        )
+        print(io, s)
+    end
+end
+
+
 struct State{P, A, T}
     prog::P
     aux::A

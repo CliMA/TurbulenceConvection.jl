@@ -112,6 +112,7 @@ function Simulation1d(namelist)
     end
 
     edmf = TC.EDMFModel(FT, namelist, precip_model)
+    @info "edmf = \n$(summary(edmf))"
     isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
     N_up = TC.n_updrafts(edmf)
 
