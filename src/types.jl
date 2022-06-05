@@ -49,10 +49,14 @@ abstract type AbstractEntrDetrModel end
 abstract type AbstractNonLocalEntrDetrModel end
 struct MDEntr <: AbstractEntrDetrModel end  # existing model
 
-Base.@kwdef struct NNEntr <: AbstractEntrDetrModel
+Base.@kwdef struct NNEntr{AFT, T} <: AbstractEntrDetrModel
+    c_nn_params::AFT
+    nn_arc::T
     biases_bool::Bool
 end
-Base.@kwdef struct NNEntrNonlocal <: AbstractNonLocalEntrDetrModel
+Base.@kwdef struct NNEntrNonlocal{AFT, T} <: AbstractNonLocalEntrDetrModel
+    c_nn_params::AFT
+    nn_arc::T
     biases_bool::Bool
 end
 struct LinearEntr{T} <: AbstractEntrDetrModel
@@ -596,9 +600,13 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, EC, EDS, DDS, EPG}
         mean_entr_closure = if entr_type == "moisture_deficit"
             MDEntr()
         elseif entr_type == "NN"
-            NNEntr(biases_bool = nn_biases)
+            c_nn_params = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_ent_params")
+            nn_arc = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_arc")
+            NNEntr(; biases_bool = nn_biases, c_nn_params, nn_arc)
         elseif entr_type == "NN_nonlocal"
-            NNEntrNonlocal(biases_bool = nn_biases)
+            c_nn_params = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_ent_params")
+            nn_arc = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_arc")
+            NNEntrNonlocal(; biases_bool = nn_biases, c_nn_params, nn_arc)
         elseif entr_type == "FNO"
             w_fno = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_width")
             nm_fno = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_n_modes")

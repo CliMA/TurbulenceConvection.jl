@@ -52,27 +52,6 @@ CLIMAParameters.Atmos.EDMF.smin_rm(ps::EarthParameterSet) = ps.nt.smin_rm #  upp
 function create_parameter_set(namelist)
     TC = TurbulenceConvection
 
-    # this is needed to avoid slowdown when using large parameter vectors
-    use_ran_features = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "RF"
-    use_nn = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "NN"
-    use_nn_nonlocal = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "NN_nonlocal"
-    use_fno = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "FNO"
-    use_linear = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "Linear"
-
-    entr_closure_kwargs = if use_nn
-        (;
-        c_nn_params = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_ent_params"),
-        nn_arc = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_arc"),
-    )
-    elseif use_nn_nonlocal
-        (;
-        c_nn_params = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_ent_params"),
-        nn_arc = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_arc"),
-    )
-    else
-        ()
-    end
-
     nt = (;
         MSLP = 100000.0, # or grab from, e.g., namelist[""][...]
         τ_precip = TC.parse_namelist(namelist, "microphysics", "τ_precip"; default = 1000.0),
@@ -116,7 +95,6 @@ function create_parameter_set(namelist)
         smin_ub = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_ub"),
         smin_rm = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_rm"),
         l_max = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),
-        entr_closure_kwargs...,
         ## Stochastic parameters
         c_gen_stoch = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "general_stochastic_ent_params"),
     )

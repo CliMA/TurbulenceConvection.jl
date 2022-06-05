@@ -239,8 +239,8 @@ function non_dimensional_function!(
     εδ_model::NNEntrNonlocal,
 ) where {FT <: Real}
     # neural network architecture
-    nn_arc = TCP.nn_arc(param_set)
-    c_nn_params = TCP.c_nn_params(param_set)
+    nn_arc = εδ_model.nn_arc
+    c_nn_params = εδ_model.c_nn_params
     nn_model = construct_fully_connected_nn(nn_arc, c_nn_params; biases_bool = εδ_model.biases_bool)
     output = nn_model(Π_groups')
     nondim_ε .= output[1, :]
@@ -258,8 +258,8 @@ Uses a fully connected neural network to predict the non-dimensional components 
  - `εδ_model_type`  :: NNEntr - Neural network entrainment closure
 """
 function non_dimensional_function(param_set, εδ_model_vars, εδ_model::NNEntr)
-    nn_arc = TCP.nn_arc(param_set)
-    c_nn_params = TCP.c_nn_params(param_set)
+    nn_arc = εδ_model.nn_arc
+    c_nn_params = εδ_model.c_nn_params
 
     nondim_groups = collect(non_dimensional_groups(param_set, εδ_model_vars))
     # neural network architecture
