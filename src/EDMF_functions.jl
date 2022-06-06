@@ -243,7 +243,6 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
 end
 
 function affect_filter!(edmf::EDMFModel, grid::Grid, state::State, param_set::APS, surf::SurfaceBase, t::Real)
-    # TODO: figure out why this filter kills the DryBubble results if called at t = 0.
     prog_en = center_prog_environment(state)
     aux_en = center_aux_environment(state)
     ###

@@ -18,6 +18,9 @@ function unpack_params(sim)
         precip_model = sim.precip_model,
         param_set = sim.param_set,
         case = sim.case,
+        radiation = sim.radiation,
+        forcing = sim.forcing,
+        surf_params = sim.surf_params,
         TS = TS,
         aux = aux,
     )

@@ -485,31 +485,6 @@ end
 
 rad_type(::RadiationBase{T}) where {T} = T
 
-Base.@kwdef struct CasesBase{T, SURFP, F, R, LESDataT}
-    case::T
-    casename::String
-    surf_params::SURFP
-    Fo::F
-    Rad::R
-    LESDat::LESDataT
-end
-
-function CasesBase(case::T; surf_params, Fo, Rad, LESDat = nothing, kwargs...) where {T}
-    F = typeof(Fo)
-    R = typeof(Rad)
-    SURFP = typeof(surf_params)
-    LESDataT = typeof(LESDat)
-    CasesBase{T, SURFP, F, R, LESDataT}(;
-        case = case,
-        casename = string(nameof(T)),
-        surf_params,
-        Fo,
-        Rad,
-        LESDat,
-        kwargs...,
-    )
-end
-
 struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}
     surface_area::FT
     max_area::FT
