@@ -414,8 +414,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             bg_kwargs = (;
                 qt_sat = aux_en_sat.q_tot[k],
                 qt_unsat = aux_en_unsat.q_tot[k],
-                T_sat = aux_en_sat.θ_liq_ice[k],
-                T_unsat = aux_en_unsat.θ_liq_ice[k],
+                T_sat = aux_en_sat.T[k],
+                T_unsat = aux_en_unsat.T[k],
                 ∂M∂z_sat = ∂M∂z_sat[k],
                 ∂qt∂z_sat = ∂qt∂z_sat[k],
                 ∂M∂z_unsat = ∂M∂z_unsat[k],
