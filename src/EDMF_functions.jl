@@ -311,8 +311,8 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     ae_surf = 1 - aux_bulk.area[kc_surf] # area of environment
 
     ρ_ae = ρ_c[kc_surf] * ae_surf
-
-    prog_en.ρatke[kc_surf] = ρ_ae * get_surface_tke(param_set, surf.ustar, zLL, surf.obukhov_length)
+    mix_len_params = mixing_length_params(edmf)
+    prog_en.ρatke[kc_surf] = ρ_ae * get_surface_tke(mix_len_params, surf.ustar, zLL, surf.obukhov_length)
     if edmf.thermo_covariance_model isa PrognosticThermoCovariances
         prog_en.ρaHvar[kc_surf] = ρ_ae * get_surface_variance(flux1 / ρLL, flux1 / ρLL, ustar, zLL, oblength)
         prog_en.ρaQTvar[kc_surf] = ρ_ae * get_surface_variance(flux2 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
@@ -415,7 +415,8 @@ function get_GMV_CoVar(
 ) where {covar_sym, ϕ_sym, ψ_sym}
     N_up = n_updrafts(edmf)
     is_tke = covar_sym == :tke
-    tke_factor = is_tke ? 0.5 : 1
+    FT = eltype(edmf)
+    tke_factor = is_tke ? FT(0.5) : 1
     aux_gm_c = center_aux_grid_mean(state)
     aux_gm_f = face_aux_grid_mean(state)
     prog_gm_c = center_prog_grid_mean(state)
@@ -451,8 +452,7 @@ function compute_updraft_top(grid::Grid{FT}, state::State, i::Int)::FT where {FT
     return z_findlast_center(k -> aux_up[i].area[k] > 1e-3, grid)
 end
 
-function compute_plume_scale_height(grid::Grid{FT}, state::State, param_set::APS, i::Int)::FT where {FT}
-    H_up_min::FT = TCP.H_up_min(param_set)
+function compute_plume_scale_height(grid::Grid{FT}, state::State, H_up_min::FT, i::Int)::FT where {FT}
     updraft_top = compute_updraft_top(grid, state, i)
     return max(updraft_top, H_up_min)
 end
@@ -468,7 +468,7 @@ function compute_up_stoch_tendencies!(edmf::EDMFModel, grid::Grid, state::State,
         tends_ε_nondim = tendencies_up[i].ε_nondim
         tends_δ_nondim = tendencies_up[i].δ_nondim
 
-        c_gen_stoch = TCP.c_gen_stoch(param_set)
+        c_gen_stoch = edmf.entr_closure.c_gen_stoch
         mean_entr = aux_up[i].ε_nondim
         mean_detr = aux_up[i].δ_nondim
         ε_σ² = c_gen_stoch[1]
@@ -576,7 +576,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
 
         # prognostic entr/detr
         if edmf.entr_closure isa PrognosticNoisyRelaxationProcess
-            c_gen_stoch = TCP.c_gen_stoch(param_set)
+            c_gen_stoch = edmf.entr_closure.c_gen_stoch
             mean_entr = aux_up[i].ε_nondim
             mean_detr = aux_up[i].δ_nondim
             ε_λ = c_gen_stoch[3]
@@ -738,7 +738,8 @@ function compute_covariance_shear(
     prog_gm = center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
     is_tke = covar_sym == :tke
-    tke_factor = is_tke ? 0.5 : 1
+    FT = eltype(edmf)
+    tke_factor = is_tke ? FT(0.5) : 1
     k_eddy = is_tke ? aux_tc.KM : aux_tc.KH
     aux_en_2m = center_aux_environment_2m(state)
     aux_covar = getproperty(aux_en_2m, covar_sym)
@@ -751,7 +752,6 @@ function compute_covariance_shear(
     wvec = CC.Geometry.WVector
     ϕ_en = getproperty(aux_en, ϕ_en_sym)
     ψ_en = getproperty(aux_en, ψ_en_sym)
-    FT = eltype(grid)
 
     bcs = (; bottom = CCO.Extrapolate(), top = CCO.SetGradient(wvec(zero(FT))))
     If = CCO.InterpolateC2F(; bcs...)
@@ -785,7 +785,8 @@ function compute_covariance_interdomain_src(
 ) where {covar_sym, ϕ_sym, ψ_sym}
     N_up = n_updrafts(edmf)
     is_tke = covar_sym == :tke
-    tke_factor = is_tke ? 0.5 : 1
+    FT = eltype(edmf)
+    tke_factor = is_tke ? FT(0.5) : 1
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
     aux_en_2m = center_aux_environment_2m(state)
@@ -820,7 +821,7 @@ function compute_covariance_entr(
     N_up = n_updrafts(edmf)
     FT = eltype(grid)
     is_tke = covar_sym == :tke
-    tke_factor = is_tke ? 0.5 : 1
+    tke_factor = is_tke ? FT(0.5) : 1
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
     aux_gm_c = center_aux_grid_mean(state)
@@ -891,7 +892,7 @@ function compute_covariance_dissipation(
     param_set::APS,
 ) where {covar_sym}
     FT = eltype(grid)
-    c_d::FT = TCP.c_d(param_set)
+    c_d = mixing_length_params(edmf).c_d
     aux_tc = center_aux_turbconv(state)
     prog_en = center_prog_environment(state)
     prog_gm = center_prog_grid_mean(state)
@@ -934,7 +935,7 @@ function compute_en_tendencies!(
     w_en_f = face_aux_environment(state).w
     ρ_c = prog_gm.ρ
     ρ_f = aux_gm_f.ρ
-    c_d = TCP.c_d(param_set)
+    c_d = mixing_length_params(edmf).c_d
     is_tke = covar_sym == :tke
     FT = eltype(grid)
 
@@ -1014,8 +1015,8 @@ function update_diagnostic_covariances!(
     aux_covar = getproperty(aux_en_2m, covar_sym)
     aux_up = center_aux_updrafts(state)
     w_en_f = face_aux_environment(state).w
-    c_d = TCP.c_d(param_set)
-    covar_lim = TCP.covar_lim(param_set)
+    c_d = mixing_length_params(edmf).c_d
+    covar_lim = edmf.thermo_covariance_model.covar_lim
 
     ρ_ae_K = face_aux_turbconv(state).ρ_ae_K
     KH = center_aux_turbconv(state).KH

@@ -124,14 +124,6 @@ get_case_name(case_type::AbstractCaseType) = string(case_type)
 ##### Case configurations
 #####
 
-inversion_type(::AbstractCaseType) = TC.CriticalRiInversion()
-inversion_type(::TRMM_LBA) = TC.max∇θInversion()
-inversion_type(::ARM_SGP) = TC.max∇θInversion()
-inversion_type(::GATE_III) = TC.max∇θInversion()
-inversion_type(::DYCOMS_RF01) = TC.max∇θInversion()
-inversion_type(::DYCOMS_RF02) = TC.max∇θInversion()
-inversion_type(::DryBubble) = TC.θρInversion()
-
 get_forcing_type(::AbstractCaseType) = TC.ForcingStandard # default
 get_forcing_type(::Soares) = TC.ForcingNone
 get_forcing_type(::Nieuwstadt) = TC.ForcingNone
@@ -588,7 +580,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, param_set, s
         qv_star = pv_star * (1 / molmass_ratio) / denom
         aux_gm.q_tot[k] = qv_star * RH / 100
         phase_part = TD.PhasePartition(aux_gm.q_tot[k], FT(0), FT(0)) # initial state is not saturated
-        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], p[k], phase_part)
+        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], prof_p(z), phase_part)
         aux_gm.tke[k] = prof_tke(z)
     end
 end

@@ -112,7 +112,12 @@ function Simulation1d(namelist)
     end
 
     edmf = TC.EDMFModel(FT, namelist, precip_model)
-    isbits(edmf) || error("Something non-isbits was added to edmf and needs to be fixed.")
+    if isbits(edmf)
+        @info "edmf = \n$(summary(edmf))"
+    else
+        @show edmf
+        error("Something non-isbits was added to edmf and needs to be fixed.")
+    end
     N_up = TC.n_updrafts(edmf)
 
     cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars, FT, edmf)
@@ -161,13 +166,12 @@ function Simulation1d(namelist)
 
     Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
     Rad = TC.RadiationBase(case_type)
-    TS = TimeStepping(namelist)
+    TS = TimeStepping(FT, namelist)
 
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     spk = Cases.surface_param_kwargs(case_type, namelist)
     surf_params = Cases.surface_params(case_type, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
-    inversion_type = Cases.inversion_type(case_type)
-    case = Cases.CasesBase(case_type; inversion_type, surf_params, Fo, Rad, spk...)
+    case = Cases.CasesBase(case_type; surf_params, Fo, Rad, spk...)
 
     calibrate_io = namelist["stats_io"]["calibrate_io"]
     aux_dict = calibrate_io ? TC.io_dictionary_aux_calibrate() : TC.io_dictionary_aux()
@@ -250,8 +254,8 @@ function initialize(sim::Simulation1d)
         initialize_edmf(edmf, grid, state, case, param_set, t)
         if !skip_io
             stats = Stats[inds...]
-            initialize_io(stats.nc_filename, io_nt.aux, io_nt.diagnostics)
-            initialize_io(stats.nc_filename, ts_list)
+            initialize_io(stats.nc_filename, FT, io_nt.aux, io_nt.diagnostics)
+            initialize_io(stats.nc_filename, FT, ts_list)
         end
     end
 
