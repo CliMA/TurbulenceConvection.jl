@@ -384,7 +384,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
         # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
         # treat them as auxiliary variables for now, until we disentangle the tendency computations.
-        Cases.update_forcing(case, grid, state, t, param_set)
+        Cases.update_forcing(case.case, grid, state, t, param_set)
         Cases.update_radiation(case.Rad, grid, state, t, param_set)
 
         TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
