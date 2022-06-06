@@ -44,7 +44,7 @@ function DiffEqNoiseProcess.wiener_randn!(rng::Random.AbstractRNG, rand_vec::CC.
     parent(rand_vec.face) .= Random.randn.()
 end
 
-struct Simulation1d{IONT, P, A, C, EDMF, PM, D, TIMESTEPPING, STATS, PS, SRS}
+struct Simulation1d{IONT, P, A, C, EDMF, PM, D, TIMESTEPPING, STATS, PS, SRS, LESDK}
     io_nt::IONT
     prog::P
     aux::A
@@ -62,6 +62,7 @@ struct Simulation1d{IONT, P, A, C, EDMF, PM, D, TIMESTEPPING, STATS, PS, SRS}
     dt_min::Float64
     truncate_stack_trace::Bool
     surf_ref_state::SRS
+    les_data_kwarg::LESDK
 end
 
 function open_files(sim::Simulation1d)
@@ -169,9 +170,10 @@ function Simulation1d(namelist)
     TS = TimeStepping(FT, namelist)
 
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
-    spk = Cases.surface_param_kwargs(case_type, namelist)
-    surf_params = Cases.surface_params(case_type, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, spk...)
-    case = Cases.CasesBase(case_type; surf_params, Fo, Rad, spk...)
+    les_data_kwarg = Cases.les_data_kwarg(case_type, namelist)
+    surf_params =
+        Cases.surface_params(case_type, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, les_data_kwarg...)
+    case = TC.CasesBase(case_type; surf_params, Fo, Rad, les_data_kwarg...)
 
     calibrate_io = namelist["stats_io"]["calibrate_io"]
     aux_dict = calibrate_io ? TC.io_dictionary_aux_calibrate() : TC.io_dictionary_aux()
@@ -197,13 +199,15 @@ function Simulation1d(namelist)
         dt_min,
         truncate_stack_trace,
         surf_ref_state,
+        les_data_kwarg,
     )
 end
 
 function initialize(sim::Simulation1d)
     TC = TurbulenceConvection
 
-    (; prog, aux, edmf, case, param_set, skip_io, Stats, io_nt, diagnostics, truncate_stack_trace, surf_ref_state) = sim
+    (; prog, aux, edmf, case, param_set, surf_ref_state, les_data_kwarg) = sim
+    (; skip_io, Stats, io_nt, diagnostics, truncate_stack_trace) = sim
     FT = eltype(edmf)
     t = FT(0)
 
@@ -245,13 +249,13 @@ function initialize(sim::Simulation1d)
                 add_write_field(ds, "p_c", vec(TC.center_aux_grid_mean(state).p), group, ("zc",))
             end
         end
-        Cases.initialize_profiles(case, grid, param_set, state)
+        Cases.initialize_profiles(case.case, grid, param_set, state; les_data_kwarg...)
         set_thermo_state_pθq!(state, grid, edmf.moisture_model, param_set)
         set_grid_mean_from_thermo_state!(param_set, state, grid)
         assign_thermo_aux!(state, grid, edmf.moisture_model, param_set)
-        Cases.initialize_forcing(case, grid, state, param_set)
-        Cases.initialize_radiation(case, grid, state, param_set)
-        initialize_edmf(edmf, grid, state, case, param_set, t)
+        Cases.initialize_forcing(case.case, case.Fo, grid, state, param_set; les_data_kwarg...)
+        Cases.initialize_radiation(case.case, case.Rad, grid, state, param_set; les_data_kwarg...)
+        initialize_edmf(edmf, grid, state, case.surf_params, param_set, t, case.case)
         if !skip_io
             stats = Stats[inds...]
             initialize_io(stats.nc_filename, FT, io_nt.aux, io_nt.diagnostics)
