@@ -197,8 +197,10 @@ function compute_ref_state!(
     ts_g,
 ) where {PS}
     FT = eltype(grid)
+    kf_surf = TC.kf_surface(grid)
     qtg = TD.total_specific_humidity(param_set, ts_g)
-    θ_liq_ice_g = TD.liquid_ice_pottemp(param_set, ts_g)
+    Φ = TC.geopotential(param_set, grid.zf[kf_surf].z)
+    mse_g = TD.moist_static_energy(param_set, ts_g, Φ)
     Pg = TD.air_pressure(param_set, ts_g)
 
     # We are integrating the log pressure so need to take the log of the
@@ -207,9 +209,12 @@ function compute_ref_state!(
 
     # Form a right hand side for integrating the hydrostatic equation to
     # determine the reference pressure
-    function rhs(logp, u, z)
+    function minus_inv_scale_height(logp, u, z)
         p_ = exp(logp)
-        ts = TD.PhaseEquil_pθq(param_set, p_, θ_liq_ice_g, qtg)
+        grav = FT(TCP.grav(param_set))
+        Φ = TC.geopotential(param_set, z)
+        h = TC.enthalpy(mse_g, Φ)
+        ts = TD.PhaseEquil_phq(param_set, p_, h, qtg)
         R_m = TD.gas_constant_air(param_set, ts)
         T = TD.air_temperature(param_set, ts)
         return -FT(TCP.grav(param_set)) / (T * R_m)
@@ -217,7 +222,7 @@ function compute_ref_state!(
 
     # Perform the integration
     z_span = (grid.zmin, grid.zmax)
-    prob = ODE.ODEProblem(rhs, logp, z_span)
+    prob = ODE.ODEProblem(minus_inv_scale_height, logp, z_span)
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
     parent(p_f) .= sol.(vec(grid.zf.z))
     parent(p_c) .= sol.(vec(grid.zc.z))
@@ -227,12 +232,16 @@ function compute_ref_state!(
 
     # Compute reference state thermodynamic profiles
     @inbounds for k in TC.real_center_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p_c[k], θ_liq_ice_g, qtg)
+        Φ = TC.geopotential(param_set, grid.zc[k].z)
+        h = TC.enthalpy(mse_g, Φ)
+        ts = TD.PhaseEquil_phq(param_set, p_c[k], h, qtg)
         ρ_c[k] = TD.air_density(param_set, ts)
     end
 
     @inbounds for k in TC.real_face_indices(grid)
-        ts = TD.PhaseEquil_pθq(param_set, p_f[k], θ_liq_ice_g, qtg)
+        Φ = TC.geopotential(param_set, grid.zf[k].z)
+        h = TC.enthalpy(mse_g, Φ)
+        ts = TD.PhaseEquil_phq(param_set, p_f[k], h, qtg)
         ρ_f[k] = TD.air_density(param_set, ts)
     end
     return nothing

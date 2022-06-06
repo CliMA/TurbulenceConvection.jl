@@ -91,3 +91,7 @@ end
 function enthalpy(h_tot::FT, e_kin::FT, e_pot::FT) where {FT}
     return h_tot - e_kin - e_pot
 end
+
+function enthalpy(mse::FT, e_pot::FT) where {FT}
+    return mse - e_pot
+end
