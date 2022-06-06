@@ -70,20 +70,20 @@ function io(io_dict::Dict, Stats::NetCDFIO_Stats, state)
 end
 
 
-function initialize_io(nc_filename, ts_list)
+function initialize_io(nc_filename, FT, ts_list)
     NC.Dataset(nc_filename, "a") do ds
         for var_name in ts_list
-            add_ts(ds, var_name)
+            add_ts(ds, var_name, FT)
         end
     end
     return nothing
 end
 
-function initialize_io(nc_filename, io_dicts::Dict...)
+function initialize_io(nc_filename, FT, io_dicts::Dict...)
     NC.Dataset(nc_filename, "a") do ds
         for io_dict in io_dicts
             for var_name in keys(io_dict)
-                add_field(ds, var_name, io_dict[var_name].dims, io_dict[var_name].group)
+                add_field(ds, var_name, io_dict[var_name].dims, io_dict[var_name].group, FT)
             end
         end
     end
@@ -137,10 +137,9 @@ function compute_diagnostics!(
 
     surf = get_surface(case.surf_params, grid, state, t, param_set)
 
-    @inbounds for k in TC.real_center_indices(grid)
-        aux_gm.s[k] = TD.specific_entropy(param_set, ts_gm[k])
-        aux_en.s[k] = TD.specific_entropy(param_set, ts_en[k])
-    end
+    @. aux_gm.s = TD.specific_entropy(param_set, ts_gm)
+    @. aux_en.s = TD.specific_entropy(param_set, ts_en)
+
     @inbounds for k in TC.real_center_indices(grid)
         @inbounds for i in 1:N_up
             aux_up[i].s[k] = if aux_up[i].area[k] > 0.0
@@ -259,12 +258,12 @@ function compute_diagnostics!(
 
     @inbounds for k in TC.real_center_indices(grid)
         a_up_bulk_k = a_up_bulk[k]
-        diag_tc.entr_sc[k] = 0.0
-        diag_tc.ε_nondim[k] = 0.0
-        diag_tc.detr_sc[k] = 0.0
-        diag_tc.δ_nondim[k] = 0.0
-        diag_tc.asp_ratio[k] = 0.0
-        diag_tc.frac_turb_entr[k] = 0.0
+        diag_tc.entr_sc[k] = 0
+        diag_tc.ε_nondim[k] = 0
+        diag_tc.detr_sc[k] = 0
+        diag_tc.δ_nondim[k] = 0
+        diag_tc.asp_ratio[k] = 0
+        diag_tc.frac_turb_entr[k] = 0
         if a_up_bulk_k > 0.0
             @inbounds for i in 1:N_up
                 aux_up_i = aux_up[i]
@@ -278,27 +277,21 @@ function compute_diagnostics!(
         end
     end
 
-    a_up_bulk_f = copy(diag_tc_f.nh_pressure)
     a_bulk_bcs = TC.a_bulk_boundary_conditions(surf, edmf)
-    Ifa = CCO.InterpolateC2F(; a_bulk_bcs...)
-    @. a_up_bulk_f = Ifa(a_up_bulk)
-
-    a_up_bulk_f = copy(diag_tc_f.nh_pressure)
-    a_up_f = copy(a_up_bulk_f)
     Ifabulk = CCO.InterpolateC2F(; a_bulk_bcs...)
-    @. a_up_bulk_f = Ifabulk(a_up_bulk)
+    a_up_bulk_f = @. Ifabulk(a_up_bulk)
 
     RB_precip = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
 
-    @inbounds for k in TC.real_face_indices(grid)
-        @inbounds for i in 1:N_up
-            a_up_bcs = TC.a_up_boundary_conditions(surf, edmf, i)
-            Ifaup = CCO.InterpolateC2F(; a_up_bcs...)
-            @. a_up_f = Ifaup(aux_up[i].area)
-            diag_tc_f.nh_pressure[k] = 0.0
-            diag_tc_f.nh_pressure_b[k] = 0.0
-            diag_tc_f.nh_pressure_adv[k] = 0.0
-            diag_tc_f.nh_pressure_drag[k] = 0.0
+    @inbounds for i in 1:N_up
+        a_up_bcs = TC.a_up_boundary_conditions(surf, edmf, i)
+        Ifaup = CCO.InterpolateC2F(; a_up_bcs...)
+        a_up_f = @. Ifaup(aux_up[i].area)
+        @inbounds for k in TC.real_face_indices(grid)
+            diag_tc_f.nh_pressure[k] = 0
+            diag_tc_f.nh_pressure_b[k] = 0
+            diag_tc_f.nh_pressure_adv[k] = 0
+            diag_tc_f.nh_pressure_drag[k] = 0
             if a_up_bulk_f[k] > 0.0
                 diag_tc_f.nh_pressure[k] += a_up_f[k] * aux_up_f[i].nh_pressure[k] / a_up_bulk_f[k]
                 diag_tc_f.nh_pressure_b[k] += a_up_f[k] * aux_up_f[i].nh_pressure_b[k] / a_up_bulk_f[k]
@@ -329,14 +322,15 @@ function compute_diagnostics!(
     if (precip_model isa TC.Clima0M)
         f =
             (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ_c ./ ρ_cloud_liq .*
-            3.6 .* 1e6
+            FT(3.6) .* 1e6
         diag_svpc.cutoff_precipitation_rate[cent] = sum(f)
     end
 
     lwp = sum(i -> sum(ρ_c .* aux_up[i].q_liq .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
     iwp = sum(i -> sum(ρ_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
+
     plume_scale_height = map(1:N_up) do i
-        TC.compute_plume_scale_height(grid, state, param_set, i)
+        TC.compute_plume_scale_height(grid, state, edmf.H_up_min, i)
     end
 
     diag_tc_svpc.updraft_lwp[cent] = lwp

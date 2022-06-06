@@ -49,8 +49,8 @@ function get_mixing_tau(zi::FT, wstar::FT) where {FT}
 end
 
 # MO scaling of near surface tke and scalar variance
-function get_surface_tke(param_set::APS, ustar::FT, zLL::FT, oblength::FT) where {FT}
-    κ_star²::FT = TCP.κ_star²(param_set)
+function get_surface_tke(mixing_length_params, ustar::FT, zLL::FT, oblength::FT) where {FT}
+    κ_star² = mixing_length_params.κ_star²
     if oblength < 0
         return ((κ_star² + cbrt(zLL / oblength * zLL / oblength)) * ustar * ustar)
     else
@@ -67,15 +67,15 @@ function get_surface_variance(flux1::FT, flux2::FT, ustar::FT, zLL::FT, oblength
     end
 end
 
-function gradient_Richardson_number(param_set::APS, ∂b∂z::FT, Shear²::FT, ϵ::FT) where {FT}
-    Ri_c::FT = TCP.Ri_c(param_set)
+function gradient_Richardson_number(mixing_length_params, ∂b∂z::FT, Shear²::FT, ϵ::FT) where {FT}
+    Ri_c::FT = mixing_length_params.Ri_c
     return min(∂b∂z / max(Shear², ϵ), Ri_c)
 end
 
 # Turbulent Prandtl number given the obukhov length sign and the gradient Richardson number
-function turbulent_Prandtl_number(param_set::APS, obukhov_length::FT, ∇Ri::FT) where {FT}
-    ω_pr::FT = TCP.ω_pr(param_set)
-    Pr_n::FT = TCP.Pr_n(param_set)
+function turbulent_Prandtl_number(mixing_length_params, obukhov_length::FT, ∇Ri::FT) where {FT}
+    ω_pr = mixing_length_params.ω_pr
+    Pr_n = mixing_length_params.Pr_n
     if obukhov_length > 0 && ∇Ri > 0 #stable
         # CSB (Dan Li, 2019, eq. 75), where ω_pr = ω_1 + 1 = 53.0/13.0
         prandtl_nvec = Pr_n * (2 * ∇Ri / (1 + ω_pr * ∇Ri - sqrt((1 + ω_pr * ∇Ri)^2 - 4 * ∇Ri)))

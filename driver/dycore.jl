@@ -1,4 +1,5 @@
 import UnPack
+import LinearAlgebra
 
 import TurbulenceConvection
 const TC = TurbulenceConvection
@@ -240,17 +241,16 @@ end
 
 function set_thermo_state_peq!(state, grid, moisture_model, param_set)
     Ic = CCO.InterpolateF2C()
-    FT = eltype(grid)
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
-    prog_gm_u = TC.grid_mean_u(state)
-    prog_gm_v = TC.grid_mean_v(state)
+    prog_gm_uₕ = TC.grid_mean_uₕ(state)
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
-    w_c = copy(prog_gm.ρe_tot)
-    @. w_c = Ic(FT(0) + prog_gm_f.w)
+    C123 = CCG.Covariant123Vector
+    @. aux_gm.e_kin = LinearAlgebra.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(prog_gm_f.w))) / 2
+
     @inbounds for k in TC.real_center_indices(grid)
         thermo_args = if moisture_model isa TC.EquilibriumMoisture
             ()
@@ -259,7 +259,6 @@ function set_thermo_state_peq!(state, grid, moisture_model, param_set)
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
-        aux_gm.e_kin[k] = TC.kinetic_energy(prog_gm_u[k], prog_gm_v[k], w_c[k])
         e_pot = TC.geopotential(param_set, grid.zc.z[k])
         e_int = prog_gm.ρe_tot[k] / ρ_c[k] - aux_gm.e_kin[k] - e_pot
         @show(k, ρ_c[k], e_int, e_pot, prog_gm.ρe_tot[k] / ρ_c[k] , aux_gm.e_kin[k])
@@ -296,18 +295,18 @@ function set_grid_mean_from_thermo_state!(param_set, state, grid)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
-    prog_gm_u = TC.grid_mean_u(state)
-    prog_gm_v = TC.grid_mean_v(state)
+    prog_gm_uₕ = TC.grid_mean_uₕ(state)
     ρ_c = prog_gm.ρ
-    FT = eltype(grid)
-    w_c = copy(prog_gm.ρe_tot)
-    @. w_c = Ic(FT(0) + prog_gm_f.w)
-    @inbounds for k in TC.real_center_indices(grid)
-        e_kin = TC.kinetic_energy(prog_gm_u[k], prog_gm_v[k], w_c[k])
-        e_pot = TC.geopotential(param_set, grid.zc.z[k])
-        prog_gm.ρe_tot[k] = ρ_c[k] * TD.total_energy(param_set, ts_gm[k], e_kin, e_pot)
-        prog_gm.ρq_tot[k] = ρ_c[k] * aux_gm.q_tot[k]
-    end
+    C123 = CCG.Covariant123Vector
+    @. prog_gm.ρe_tot =
+        ρ_c * TD.total_energy(
+            param_set,
+            ts_gm,
+            LinearAlgebra.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(prog_gm_f.w))) / 2,
+            TC.geopotential(param_set, grid.zc.z),
+        )
+    @. prog_gm.ρq_tot = ρ_c * aux_gm.q_tot
+
     return nothing
 end
 
@@ -382,12 +381,8 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
         TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
 
-        en_thermo = edmf.en_thermo
-
         # compute tendencies
         # causes division error in dry bubble first time step
-        TC.compute_precipitation_formation_tendencies(grid, state, edmf, precip_model, Δt, param_set)
-        TC.microphysics(en_thermo, grid, state, edmf, precip_model, Δt, param_set)
         TC.compute_precipitation_sink_tendencies(precip_model, edmf, grid, state, param_set, Δt)
         TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set)
 
@@ -425,8 +420,6 @@ function compute_gm_tendencies!(
     aux_en_f = TC.face_aux_environment(state)
     aux_up = TC.center_aux_updrafts(state)
     aux_bulk = TC.center_aux_bulk(state)
-    prog_gm_u = TC.grid_mean_u(state)
-    prog_gm_v = TC.grid_mean_v(state)
     ρ_f = aux_gm_f.ρ
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ

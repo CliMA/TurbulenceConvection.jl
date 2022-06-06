@@ -1,17 +1,17 @@
 #### Non-dimensional Entrainment-Detrainment functions
-function max_area_limiter(param_set, max_area, a_up)
+function max_area_limiter(εδ_model, max_area, a_up)
     FT = eltype(a_up)
-    γ_lim = FT(TCP.area_limiter_scale(param_set))
-    β_lim = FT(TCP.area_limiter_power(param_set))
+    γ_lim = εδ_params(εδ_model).γ_lim
+    β_lim = εδ_params(εδ_model).β_lim
     logistic_term = (2 - 1 / (1 + exp(-γ_lim * (max_area - a_up))))
     return (logistic_term)^β_lim - 1
 end
 
-function non_dimensional_groups(param_set, εδ_model_vars)
+function non_dimensional_groups(εδ_model, εδ_model_vars)
     FT = eltype(εδ_model_vars.tke_en)
-    Δw = get_Δw(param_set, εδ_model_vars.w_up, εδ_model_vars.w_en)
+    Δw = get_Δw(εδ_model, εδ_model_vars.w_up, εδ_model_vars.w_en)
     Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
-    Π_norm = TCP.Π_norm(param_set)
+    Π_norm = εδ_params(εδ_model).Π_norm
     Π₁ = (εδ_model_vars.zc_i * Δb) / (Δw^2 + εδ_model_vars.wstar^2) / Π_norm[1]
     Π₂ =
         (εδ_model_vars.tke_gm - εδ_model_vars.a_en * εδ_model_vars.tke_en) / (εδ_model_vars.tke_gm + eps(FT)) /
@@ -26,25 +26,24 @@ function non_dimensional_groups(param_set, εδ_model_vars)
 end
 
 """
-    non_dimensional_function(param_set, εδ_model_vars, ::MDEntr)
+    non_dimensional_function(εδ_model::MDEntr, εδ_model_vars)
 
 Returns the nondimensional entrainment and detrainment
 functions following Cohen et al. (JAMES, 2020), given:
- - `param_set`      :: parameter set
+ - `εδ_model`       :: MDEntr - Moisture deficit entrainment closure
  - `εδ_model_vars`  :: structure containing variables
- - `εδ_model_type`  :: MDEntr - Moisture deficit entrainment closure
 """
-function non_dimensional_function(param_set, εδ_model_vars, ::MDEntr)
+function non_dimensional_function(εδ_model::MDEntr, εδ_model_vars)
     FT = eltype(εδ_model_vars.q_cond_up)
-    Δw = get_Δw(param_set, εδ_model_vars.w_up, εδ_model_vars.w_en)
-    c_ε = FT(TCP.c_ε(param_set))
-    μ_0 = FT(TCP.μ_0(param_set))
-    β = FT(TCP.β(param_set))
-    χ = FT(TCP.χ(param_set))
+    Δw = get_Δw(εδ_model, εδ_model_vars.w_up, εδ_model_vars.w_en)
+    c_ε = εδ_params(εδ_model).c_ε
+    μ_0 = εδ_params(εδ_model).μ_0
+    β = εδ_params(εδ_model).β
+    χ = εδ_params(εδ_model).χ
     c_δ = if !TD.has_condensate(εδ_model_vars.q_cond_up + εδ_model_vars.q_cond_en)
         FT(0)
     else
-        FT(TCP.c_δ(param_set))
+        εδ_model.params.c_δ
     end
 
     Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
@@ -62,27 +61,25 @@ function non_dimensional_function(param_set, εδ_model_vars, ::MDEntr)
 end
 
 """
-    non_dimensional_function!(nondim_ε, nondim_δ, param_set, Π_groups, εδ_model::FNOEntr)
+    non_dimensional_function!(nondim_ε, nondim_δ, Π_groups, εδ_model::FNOEntr)
 
 Uses a non local (Fourier) neural network to predict the fields of
     non-dimensional components of dynamical entrainment/detrainment.
  - `nondim_ε`   :: output - non dimensional entr from FNO, as column fields
  - `nondim_δ`   :: output - non dimensional detr from FNO, as column fields
- - `param_set`  :: input - parameter set
  - `Π_groups`   :: input - non dimensional groups, as column fields
  - `::FNOEntr ` a non-local entrainment-detrainment model type
 """
 function non_dimensional_function!(
     nondim_ε::AbstractArray{FT}, # output
     nondim_δ::AbstractArray{FT}, # output
-    param_set::APS,
     Π_groups::AbstractArray{FT}, # input
     εδ_model::FNOEntr,
 ) where {FT <: Real}
 
-    width = TCP.w_fno(param_set)
-    modes = TCP.nm_fno(param_set)
-    c_fno = TCP.c_fno(param_set)
+    width = εδ_model.w_fno
+    modes = εδ_model.nm_fno
+    c_fno = εδ_model.c_fno
     n_params = length(c_fno)
     n_input_vars = size(Π_groups)[2]
     M = size(Π_groups)[1]
@@ -221,26 +218,24 @@ function construct_fully_connected_nn(
 end
 
 """
-    non_dimensional_function!(nondim_ε, nondim_δ, param_set, Π_groups, εδ_model::NNEntrNonlocal)
+    non_dimensional_function!(nondim_ε, nondim_δ, Π_groups, εδ_model::NNEntrNonlocal)
 
 Uses a fully connected neural network to predict the non-dimensional components of dynamical entrainment/detrainment.
     non-dimensional components of dynamical entrainment/detrainment.
  - `nondim_ε`   :: output - non dimensional entr from FNO, as column fields
  - `nondim_δ`   :: output - non dimensional detr from FNO, as column fields
- - `param_set`  :: input - parameter set
  - `Π_groups`   :: input - non dimensional groups, as column fields
  - `::NNEntrNonlocal ` a non-local entrainment-detrainment model type
 """
 function non_dimensional_function!(
     nondim_ε::AbstractArray{FT}, # output
     nondim_δ::AbstractArray{FT}, # output
-    param_set::APS,
     Π_groups::AbstractArray{FT}, # input
     εδ_model::NNEntrNonlocal,
 ) where {FT <: Real}
     # neural network architecture
-    nn_arc = TCP.nn_arc(param_set)
-    c_nn_params = TCP.c_nn_params(param_set)
+    nn_arc = εδ_model.nn_arc
+    c_nn_params = εδ_model.c_nn_params
     nn_model = construct_fully_connected_nn(nn_arc, c_nn_params; biases_bool = εδ_model.biases_bool)
     output = nn_model(Π_groups')
     nondim_ε .= output[1, :]
@@ -250,18 +245,17 @@ function non_dimensional_function!(
 end
 
 """
-    non_dimensional_function(param_set, εδ_model_vars, ::NNEntr)
+    non_dimensional_function(εδ_model::NNEntr, εδ_model_vars)
 
 Uses a fully connected neural network to predict the non-dimensional components of dynamical entrainment/detrainment.
- - `param_set`      :: parameter set
+ - `εδ_model`       :: NNEntr - Neural network entrainment closure
  - `εδ_model_vars`  :: structure containing variables
- - `εδ_model_type`  :: NNEntr - Neural network entrainment closure
 """
-function non_dimensional_function(param_set, εδ_model_vars, εδ_model::NNEntr)
-    nn_arc = TCP.nn_arc(param_set)
-    c_nn_params = TCP.c_nn_params(param_set)
+function non_dimensional_function(εδ_model::NNEntr, εδ_model_vars)
+    nn_arc = εδ_model.nn_arc
+    c_nn_params = εδ_model.c_nn_params
 
-    nondim_groups = collect(non_dimensional_groups(param_set, εδ_model_vars))
+    nondim_groups = collect(non_dimensional_groups(εδ_model, εδ_model_vars))
     # neural network architecture
     nn_model = construct_fully_connected_nn(nn_arc, c_nn_params; biases_bool = εδ_model.biases_bool)
 
@@ -270,17 +264,16 @@ function non_dimensional_function(param_set, εδ_model_vars, εδ_model::NNEntr
 end
 
 """
-    non_dimensional_function(param_set, εδ_model_vars, ::LinearEntr)
+    non_dimensional_function(εδ_model::LinearEntr, εδ_model_vars)
 
 Uses a simple linear model to predict the non-dimensional components of dynamical entrainment/detrainment.
- - `param_set`      :: parameter set
+ - `εδ_model`       :: LinearEntr - linear entrainment closure
  - `εδ_model_vars`  :: structure containing variables
- - `εδ_model_type`  :: LinearEntr - linear entrainment closure
 """
-function non_dimensional_function(param_set, εδ_model_vars, ::LinearEntr)
-    c_linear = TCP.c_linear(param_set)
+function non_dimensional_function(εδ_model::LinearEntr, εδ_model_vars)
+    c_linear = εδ_model.c_linear
 
-    nondim_groups = collect(non_dimensional_groups(param_set, εδ_model_vars))
+    nondim_groups = collect(non_dimensional_groups(εδ_model, εδ_model_vars))
     # Linear closure
     lin_arc = (length(nondim_groups), 1)  # (#inputs, #outputs)
     lin_model_ε = Flux.Dense(reshape(c_linear[1:6], lin_arc[2], lin_arc[1]), [c_linear[7]], Flux.relu)
@@ -293,23 +286,22 @@ end
 
 
 """
-    non_dimensional_function(param_set, εδ_model_vars, ::RFEntr)
+    non_dimensional_function(εδ_model::RFEntr, εδ_model_vars)
 
 Uses a Random Feature model to predict the non-dimensional components of dynamical entrainment/detrainment.
- - `param_set`      :: parameter set
+ - `εδ_model`       :: RFEntr - basic RF entrainment closure
  - `εδ_model_vars`  :: structure containing variables
- - `εδ_model_type`  :: RFEntr - basic RF entrainment closure
 """
-function non_dimensional_function(param_set, εδ_model_vars, ::RFEntr)
+function non_dimensional_function(εδ_model::RFEntr, εδ_model_vars)
     # d inputs, p=2 outputs, m random features
-    nondim_groups = collect(non_dimensional_groups(param_set, εδ_model_vars))
+    nondim_groups = collect(non_dimensional_groups(εδ_model, εδ_model_vars))
     d = size(nondim_groups)[1]
 
     # Learnable and fixed parameters
-    c_rf_fix = TCP.c_rf_fix(param_set)      # 2 x m x (1 + d), fix
+    c_rf_fix = εδ_model.c_rf_fix      # 2 x m x (1 + d), fix
     c_rf_fix = reshape(c_rf_fix, 2, :, 1 + d)
     m = size(c_rf_fix)[2]
-    c_rf_opt = TCP.c_rf_opt(param_set)      # 2 x (m + 1 + d), learn
+    c_rf_opt = εδ_model.c_rf_opt      # 2 x (m + 1 + d), learn
     c_rf_opt = reshape(c_rf_opt, 2, m + 1 + d)
 
     # Random Features
@@ -325,26 +317,25 @@ function non_dimensional_function(param_set, εδ_model_vars, ::RFEntr)
 end
 
 """
-    non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::LogNormalScalingProcess)
+    non_dimensional_function(εδ_model::LogNormalScalingProcess, εδ_model_vars)
 
 Uses a LogNormal random variable to scale a deterministic process
 to predict the non-dimensional components of dynamical entrainment/detrainment.
 
 Arguments:
- - `param_set`      :: parameter set
  - `εδ_model_vars`  :: structure containing variables
- - `εδ_model_type`  :: LogNormalScalingProcess - Stochastic lognormal scaling
+ - `εδ_model`       :: LogNormalScalingProcess - Stochastic lognormal scaling
 """
-function non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::LogNormalScalingProcess)
+function non_dimensional_function(εδ_model::LogNormalScalingProcess, εδ_model_vars)
     FT = eltype(εδ_model_vars.q_cond_up)
     # model parameters
-    mean_model = εδ_model_type.mean_model
-    c_gen_stoch = TCP.c_gen_stoch(param_set)
+    mean_model = εδ_model.mean_model
+    c_gen_stoch = εδ_model.c_gen_stoch
     ε_σ² = c_gen_stoch[1]
     δ_σ² = c_gen_stoch[2]
 
     # Mean model closure
-    ε_mean_nondim, δ_mean_nondim = non_dimensional_function(param_set, εδ_model_vars, mean_model)
+    ε_mean_nondim, δ_mean_nondim = non_dimensional_function(εδ_model, εδ_model_vars, mean_model)
 
     # lognormal scaling
     nondim_ε = ε_mean_nondim * lognormal_sampler(FT(1), ε_σ²)
@@ -360,28 +351,27 @@ function lognormal_sampler(m::FT, var::FT)::FT where {FT}
 end
 
 """
-    non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::NoisyRelaxationProcess)
+    non_dimensional_function(εδ_model::NoisyRelaxationProcess, εδ_model_vars)
 
 Uses a noisy relaxation process to predict the non-dimensional components
 of dynamical entrainment/detrainment. A deterministic closure is used as the
 equilibrium mean function for the relaxation process.
 
 Arguments:
- - `param_set`      :: parameter set
  - `εδ_model_vars`  :: structure containing variables
- - `εδ_model_type`  :: NoisyRelaxationProcess - A noisy relaxation process closure
+ - `εδ_model`       :: NoisyRelaxationProcess - A noisy relaxation process closure
 """
-function non_dimensional_function(param_set, εδ_model_vars, εδ_model_type::NoisyRelaxationProcess)
+function non_dimensional_function(εδ_model::NoisyRelaxationProcess, εδ_model_vars)
     # model parameters
-    mean_model = εδ_model_type.mean_model
-    c_gen_stoch = TCP.c_gen_stoch(param_set)
+    mean_model = εδ_model.mean_model
+    c_gen_stoch = εδ_model.c_gen_stoch
     ε_σ² = c_gen_stoch[1]
     δ_σ² = c_gen_stoch[2]
     ε_λ = c_gen_stoch[3]
     δ_λ = c_gen_stoch[4]
 
     # Mean model closure
-    ε_mean_nondim, δ_mean_nondim = non_dimensional_function(param_set, εδ_model_vars, mean_model)
+    ε_mean_nondim, δ_mean_nondim = non_dimensional_function(mean_model, εδ_model_vars)
 
     # noisy relaxation process
     ε_u0 = εδ_model_vars.ε_nondim
@@ -406,7 +396,7 @@ To ensure non-negativity, the solution is passed through a relu filter.
 function noisy_relaxation_process(μ::FT, λ::FT, σ²::FT, u0::FT, Δt::FT)::FT where {FT}
     f(u, p, t) = λ * (μ - u)        # mean-reverting process
     g(u, p, t) = √(2λ * μ * σ²)     # noise fluctuation
-    tspan = (0.0, Δt)
+    tspan = (FT(0), Δt)
     prob = SDE.SDEProblem(f, g, u0, tspan; save_start = false, saveat = last(tspan))
     sol = SDE.solve(prob, SDE.SOSRI())
     return Flux.relu(sol.u[end])

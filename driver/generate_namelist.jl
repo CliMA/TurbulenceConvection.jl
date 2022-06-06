@@ -77,6 +77,7 @@ function default_namelist(
     namelist_defaults["meta"]["uuid"] = basename(tempname())
 
     namelist_defaults["config"] = "column"
+    namelist_defaults["set_src_seed"] = false
 
     namelist_defaults["logging"] = Dict()
     namelist_defaults["logging"]["truncate_stack_trace"] = truncate_stack_trace
@@ -133,7 +134,7 @@ function default_namelist(
     namelist_defaults["thermodynamics"]["moisture_model"] = "equilibrium" #"nonequilibrium"
     namelist_defaults["thermodynamics"]["thermo_covariance_model"] = "diagnostic" #"prognostic" or "diagnostic"
     namelist_defaults["thermodynamics"]["diagnostic_covar_limiter"] = 1e-3 # this controls the magnitude of the spike in covariance
-    namelist_defaults["thermodynamics"]["sgs"] = "mean"
+    namelist_defaults["thermodynamics"]["sgs"] = "mean" # "quadrature" or "mean"
     namelist_defaults["thermodynamics"]["quadrature_order"] = 3
     namelist_defaults["thermodynamics"]["quadrature_type"] = "log-normal" #"gaussian" or "log-normal"
 

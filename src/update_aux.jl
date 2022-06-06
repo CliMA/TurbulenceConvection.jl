@@ -6,7 +6,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
-    c_m = TCP.c_m(param_set)
+    c_m = mixing_length_params(edmf).c_m
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
     obukhov_length = surf.obukhov_length
@@ -40,15 +40,16 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     prog_gm_v = grid_mean_v(state)
     Ic = CCO.InterpolateF2C()
 
-    prog_gm_u = grid_mean_u(state)
-    prog_gm_v = grid_mean_v(state)
+    prog_gm_uₕ = grid_mean_uₕ(state)
     Ic = CCO.InterpolateF2C()
     #####
     ##### center variables
     #####
-    @. aux_en.e_kin = kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + aux_en_f.w))
+    C123 = CCG.Covariant123Vector
+    @. aux_en.e_kin = LinearAlgebra.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(wvec(aux_en_f.w)))) / 2
+
     @inbounds for i in 1:N_up
-        @. aux_up[i].e_kin = kinetic_energy(prog_gm_u, prog_gm_v, Ic(FT(0) + aux_up_f[i].w))
+        @. aux_up[i].e_kin = LinearAlgebra.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(wvec(aux_up_f[i].w)))) / 2
     end
 
     @inbounds for k in real_center_indices(grid)
@@ -198,24 +199,13 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.q_ice[k] = TD.ice_specific_humidity(param_set, ts_en)
         rho = TD.air_density(param_set, ts_en)
         aux_en.buoy[k] = buoyancy_c(param_set, ρ_c[k], rho)
-
-        # update_sat_unsat
-        if TD.has_condensate(param_set, ts_en)
-            aux_en.cloud_fraction[k] = 1.0
-            aux_en_sat.θ_dry[k] = TD.dry_pottemp(param_set, ts_en)
-            aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_en)
-            aux_en_sat.T[k] = TD.air_temperature(param_set, ts_en)
-            aux_en_sat.q_tot[k] = TD.total_specific_humidity(param_set, ts_en)
-            aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(param_set, ts_en)
-        else
-            aux_en.cloud_fraction[k] = 0.0
-            aux_en_unsat.θ_dry[k] = TD.dry_pottemp(param_set, ts_en)
-            aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(param_set, ts_en)
-            aux_en_unsat.q_tot[k] = TD.total_specific_humidity(param_set, ts_en)
-        end
-
         aux_en.RH[k] = TD.relative_humidity(param_set, ts_en)
+    end
 
+    microphysics(edmf.en_thermo, grid, state, edmf, edmf.precip_model, Δt, param_set)
+
+    @inbounds for k in real_center_indices(grid)
+        a_bulk_c = aux_bulk.area[k]
         @inbounds for i in 1:N_up
             w_up_c = copy(prog_up[i].ρarea)
             @. w_up_c = Ic(FT(0) + aux_up_f[i].w)
@@ -346,7 +336,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         compute_nonequilibrium_moisture_tendencies!(grid, state, edmf, Δt, param_set)
     end
     compute_entr_detr!(state, grid, edmf, param_set, surf, Δt, edmf.entr_closure)
-    compute_nh_pressure!(state, grid, edmf, param_set, surf)
+    compute_nh_pressure!(state, grid, edmf, surf)
 
     #####
     ##### compute_eddy_diffusivities_tke
@@ -399,6 +389,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     shm = copy(cf)
     pshm = parent(shm)
     shrink_mask!(pshm, vec(cf))
+    mix_len_params = mixing_length_params(edmf)
 
     # Since NaN*0 ≠ 0, we need to conditionally replace
     # our gradients by their default values.
@@ -457,8 +448,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
         # Limiting stratification scale (Deardorff, 1976)
         # compute ∇Ri and Pr
-        ∇_Ri = gradient_Richardson_number(param_set, bg.∂b∂z, Shear²[k], eps(0.0))
-        aux_tc.prandtl_nvec[k] = turbulent_Prandtl_number(param_set, obukhov_length, ∇_Ri)
+        ∇_Ri = gradient_Richardson_number(mix_len_params, bg.∂b∂z, Shear²[k], eps(FT))
+        aux_tc.prandtl_nvec[k] = turbulent_Prandtl_number(mix_len_params, obukhov_length, ∇_Ri)
 
         ml_model = MinDisspLen{FT}(;
             z = grid.zc[k].z,
@@ -473,17 +464,16 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             b_exch = b_exch[k],
         )
 
-        ml = mixing_length(param_set, ml_model)
+        ml = mixing_length(mix_len_params, param_set, ml_model)
         aux_tc.mls[k] = ml.min_len_ind
         aux_tc.mixing_length[k] = ml.mixing_length
         aux_tc.ml_ratio[k] = ml.ml_ratio
 
-        KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0.0))
+        KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0))
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
 
         aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
     end
-
 
     #####
     ##### compute covarinaces tendendies
@@ -552,8 +542,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:QTvar))
         update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:HQTcov))
         @inbounds for k in real_center_indices(grid)
-            aux_en.Hvar[k] = max(aux_en.Hvar[k], 0.0)
-            aux_en.QTvar[k] = max(aux_en.QTvar[k], 0.0)
+            aux_en.Hvar[k] = max(aux_en.Hvar[k], 0)
+            aux_en.QTvar[k] = max(aux_en.QTvar[k], 0)
             aux_en.HQTcov[k] = max(aux_en.HQTcov[k], -sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]))
             aux_en.HQTcov[k] = min(aux_en.HQTcov[k], sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]))
         end
@@ -562,5 +552,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.QTvar[kc_surf] = ae_surf * get_surface_variance(flux2 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
         aux_en.HQTcov[kc_surf] = ae_surf * get_surface_variance(flux1 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
     end
+    compute_precipitation_formation_tendencies(grid, state, edmf, edmf.precip_model, Δt, param_set)
     return nothing
 end

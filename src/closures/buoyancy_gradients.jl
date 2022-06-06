@@ -19,7 +19,7 @@ function buoyancy_gradients(
     R_d = TCP.R_d(param_set)
     R_v = TCP.R_v(param_set)
 
-    phase_part = TD.PhasePartition(0.0, 0.0, 0.0) # assuming R_d = R_m
+    phase_part = TD.PhasePartition(FT(0), FT(0), FT(0)) # assuming R_d = R_m
     Π = TD.exner_given_pressure(param_set, bg_model.p, phase_part)
 
     ∂b∂θv = g * (R_d * bg_model.ρ / bg_model.p) * Π

@@ -51,6 +51,7 @@ overwrite_namelist_map = Dict(
 "precip_fraction_limiter" => (nl, pa, key) -> (nl["microphysics"]["precip_fraction_limiter"] = pa[key]),
 "thermo_covariance_model" => (nl, pa, key) -> (nl["thermodynamics"]["thermo_covariance_model"] = pa[key]),
 "config"                  => (nl, pa, key) -> (nl["config"] = pa[key]),
+"set_src_seed"            => (nl, pa, key) -> (nl["set_src_seed"] = pa[key]),
 )
 no_overwrites = (
     "case", # default_namelist already overwrites namelist["meta"]["casename"]
@@ -130,24 +131,26 @@ for ds_tc_filename in ds_tc_filenames
             test_mse(computed_mse, best_mse, k)
         end
         @testset "Post-run tests" begin
-            isnan_or_inf(x) = isnan(x) || isinf(x)
+            isnan_inf_or_filled(x) = isnan(x) || isinf(x) || x ≈ NC.fillvalue(typeof(x))
             NC.Dataset(ds_tc_filename, "r") do ds
                 profile = ds.group["profiles"]
-                @test !any(isnan_or_inf.(Array(profile["qt_mean"])))
-                @test !any(isnan_or_inf.(Array(profile["updraft_area"])))
-                @test !any(isnan_or_inf.(Array(profile["updraft_w"])))
-                @test !any(isnan_or_inf.(Array(profile["updraft_qt"])))
-                @test !any(isnan_or_inf.(Array(profile["updraft_thetal"])))
-                @test !any(isnan_or_inf.(Array(profile["u_mean"])))
-                @test !any(isnan_or_inf.(Array(profile["tke_mean"])))
-                @test !any(isnan_or_inf.(Array(profile["temperature_mean"])))
-                @test !any(isnan_or_inf.(Array(profile["ql_mean"])))
-                @test !any(isnan_or_inf.(Array(profile["qi_mean"])))
-                @test !any(isnan_or_inf.(Array(profile["thetal_mean"])))
-                @test !any(isnan_or_inf.(Array(profile["Hvar_mean"])))
-                @test !any(isnan_or_inf.(Array(profile["QTvar_mean"])))
-                @test !any(isnan_or_inf.(Array(profile["v_mean"])))
-                @test !any(isnan_or_inf.(Array(profile["qr_mean"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["qt_mean"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["updraft_area"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["updraft_w"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["updraft_qt"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["updraft_thetal"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["u_mean"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["tke_mean"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["temperature_mean"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["ql_mean"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["qi_mean"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["thetal_mean"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["Hvar_mean"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["QTvar_mean"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["v_mean"])))
+                @test !any(isnan_inf_or_filled.(Array(profile["qr_mean"])))
+                timeseries = ds.group["timeseries"]
+                @test !any(isnan_inf_or_filled.(Array(timeseries["lwp_mean"])))
             end
             nothing
         end

@@ -21,6 +21,12 @@ function affect_io!(integrator)
 
     for inds in TC.iterate_columns(prog.cent)
         stats = Stats[inds...]
+        # TODO: remove `vars` hack that avoids
+        # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
+        # opening/closing files every step should be okay. #removeVarsHack
+        # TurbulenceConvection.io(sim) # #removeVarsHack
+        write_simulation_time(stats, t) # #removeVarsHack
+
         state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
         diag_col = TC.column_diagnostics(diagnostics, inds...)
@@ -54,12 +60,6 @@ function affect_io!(integrator)
             write_ts(stats, "cloud_base_mean", diag_svpc.cloud_base_mean[cent])
             write_ts(stats, "cloud_top_mean", diag_svpc.cloud_top_mean[cent])
         end
-
-        # TODO: remove `vars` hack that avoids
-        # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-        # opening/closing files every step should be okay. #removeVarsHack
-        # TurbulenceConvection.io(sim) # #removeVarsHack
-        write_simulation_time(stats, t) # #removeVarsHack
 
         io(io_nt.aux, stats, state)
         io(io_nt.diagnostics, stats, diag_col)

@@ -91,8 +91,8 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
     inner_src = SA.MVector{src_len, FT}(undef)
     outer_src = SA.MVector{src_len, FT}(undef)
 
-    sqpi_inv = 1 / sqrt(π)
-    sqrt2 = sqrt(2)
+    sqpi_inv = FT(1 / sqrt(π))
+    sqrt2 = FT(sqrt(2))
 
     # Epsilon defined per typical variable fluctuation
     eps_q = qt_mean ≈ FT(0) ? eps(FT) : eps(FT) * qt_mean
@@ -129,10 +129,10 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
 
     # zero outer quadrature points
     @inbounds for idx in 1:env_len
-        outer_env[idx] = 0.0
+        outer_env[idx] = 0
     end
     @inbounds for idx in 1:src_len
-        outer_src[idx] = 0.0
+        outer_src[idx] = 0
     end
 
     @inbounds for m_q in 1:quad_order

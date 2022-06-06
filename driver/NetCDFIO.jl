@@ -23,11 +23,11 @@ function nc_fileinfo(namelist)
     return nc_filename, outpath
 end
 
-mutable struct NetCDFIO_Stats
+mutable struct NetCDFIO_Stats{FT}
     root_grp::NC.NCDataset{Nothing}
     profiles_grp::NC.NCDataset{NC.NCDataset{Nothing}}
     ts_grp::NC.NCDataset{NC.NCDataset{Nothing}}
-    frequency::Float64
+    frequency::FT
     nc_filename::String
     vars::Dict{String, Any} # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
 end
@@ -46,6 +46,7 @@ function NetCDFIO_Stats(; nc_filename, frequency, z_faces, z_centers)
     profiles_grp = root_grp.group["profiles"]
     ts_grp = root_grp.group["timeseries"]
     close(root_grp)
+    FT = eltype(z_faces)
 
     # Remove the NC file if it exists, in case it accidentally wasn't closed
     isfile(nc_filename) && rm(nc_filename; force = true)
@@ -58,7 +59,7 @@ function NetCDFIO_Stats(; nc_filename, frequency, z_faces, z_centers)
         NC.defDim(profile_grp, "t", Inf)
         NC.defVar(profile_grp, "zf", z_faces, ("zf",))
         NC.defVar(profile_grp, "zc", z_centers, ("zc",))
-        NC.defVar(profile_grp, "t", Float64, ("t",))
+        NC.defVar(profile_grp, "t", FT, ("t",))
 
         reference_grp = NC.defGroup(root_grp, "reference")
         NC.defDim(reference_grp, "zf", length(z_faces))
@@ -68,10 +69,10 @@ function NetCDFIO_Stats(; nc_filename, frequency, z_faces, z_centers)
 
         ts_grp = NC.defGroup(root_grp, "timeseries")
         NC.defDim(ts_grp, "t", Inf)
-        NC.defVar(ts_grp, "t", Float64, ("t",))
+        NC.defVar(ts_grp, "t", FT, ("t",))
     end
     vars = Dict{String, Any}()
-    return NetCDFIO_Stats(root_grp, profiles_grp, ts_grp, frequency, nc_filename, vars)
+    return NetCDFIO_Stats{FT}(root_grp, profiles_grp, ts_grp, frequency, nc_filename, vars)
 end
 
 
@@ -100,9 +101,9 @@ end
 ##### Generic field
 #####
 
-function add_field(ds, var_name::String, dims, group)
+function add_field(ds, var_name::String, dims, group, ::Type{FT}) where {FT <: AbstractFloat}
     profile_grp = ds.group[group]
-    new_var = NC.defVar(profile_grp, var_name, Float64, dims)
+    new_var = NC.defVar(profile_grp, var_name, FT, dims)
     return nothing
 end
 
@@ -110,9 +111,9 @@ end
 ##### Time-series data
 #####
 
-function add_ts(ds, var_name::String)
+function add_ts(ds, var_name::String, ::Type{FT}) where {FT <: AbstractFloat}
     ts_grp = ds.group["timeseries"]
-    new_var = NC.defVar(ts_grp, var_name, Float64, ("t",))
+    new_var = NC.defVar(ts_grp, var_name, FT, ("t",))
     return nothing
 end
 
@@ -120,7 +121,12 @@ end
 ##### Performance critical IO
 #####
 
-function write_field(self::NetCDFIO_Stats, var_name::String, data::T, group) where {T <: AbstractArray{Float64, 1}}
+function write_field(
+    self::NetCDFIO_Stats,
+    var_name::String,
+    data::T,
+    group,
+) where {FT <: AbstractFloat, T <: AbstractArray{FT, 1}}
     # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
     @inbounds self.vars[group][var_name][:, end] = data
     # Ideally, we remove self.vars and use:
@@ -129,28 +135,34 @@ function write_field(self::NetCDFIO_Stats, var_name::String, data::T, group) whe
     # @inbounds var[end, :] = data :: T
 end
 
-function add_write_field(ds, var_name::String, data::T, group, dims) where {T <: AbstractArray{Float64, 1}}
+function add_write_field(
+    ds,
+    var_name::String,
+    data::T,
+    group,
+    dims,
+) where {FT <: AbstractFloat, T <: AbstractArray{FT, 1}}
     grp = ds.group[group]
-    NC.defVar(grp, var_name, Float64, dims)
+    NC.defVar(grp, var_name, FT, dims)
     var = grp[var_name]
     var .= data::T
     return nothing
 end
 
-function write_ts(self::NetCDFIO_Stats, var_name::String, data::Float64)
+function write_ts(self::NetCDFIO_Stats, var_name::String, data::FT) where {FT <: AbstractFloat}
     # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
-    @inbounds self.vars["timeseries"][var_name][end] = data::Float64
+    @inbounds self.vars["timeseries"][var_name][end] = data::FT
     # Ideally, we remove self.vars and use:
     # var = self.ts_grp[var_name]
-    # @inbounds var[end+1] = data :: Float64
+    # @inbounds var[end+1] = data :: FT
 end
 
-function write_simulation_time(self::NetCDFIO_Stats, t::Float64)
+function write_simulation_time(self::NetCDFIO_Stats, t::FT) where {FT <: AbstractFloat}
     # # Write to profiles group
     profile_t = self.profiles_grp["t"]
-    @inbounds profile_t[end + 1] = t::Float64
+    @inbounds profile_t[end + 1] = t::FT
 
     # # Write to timeseries group
     ts_t = self.ts_grp["t"]
-    @inbounds ts_t[end + 1] = t::Float64
+    @inbounds ts_t[end + 1] = t::FT
 end
