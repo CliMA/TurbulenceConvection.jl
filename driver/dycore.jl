@@ -216,7 +216,6 @@ function compute_ref_state!(
 
     # Perform the integration
     z_span = (grid.zmin, grid.zmax)
-    @info "z_span = $z_span"
     prob = ODE.ODEProblem(rhs, logp, z_span)
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
     parent(p_f) .= sol.(vec(grid.zf.z))
@@ -263,6 +262,7 @@ function set_thermo_state_peq!(state, grid, moisture_model, param_set)
         aux_gm.e_kin[k] = TC.kinetic_energy(prog_gm_u[k], prog_gm_v[k], w_c[k])
         e_pot = TC.geopotential(param_set, grid.zc.z[k])
         e_int = prog_gm.ρe_tot[k] / ρ_c[k] - aux_gm.e_kin[k] - e_pot
+        @show(k, ρ_c[k], e_int, e_pot, prog_gm.ρe_tot[k] / ρ_c[k] , aux_gm.e_kin[k])
         ts_gm[k] = TC.thermo_state_peq(param_set, p_c[k], e_int, aux_gm.q_tot[k], thermo_args...)
         aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_gm[k])
         aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
@@ -329,7 +329,7 @@ function assign_thermo_aux!(state, grid, moisture_model, param_set)
 end
 
 function ∑stoch_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
-    UnPack.@unpack edmf, param_set, case, aux, TS = params
+    UnPack.@unpack edmf, param_set, case, aux = params
 
     # set all tendencies to zero
     tends_face = tendencies.face
@@ -337,8 +337,9 @@ function ∑stoch_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) whe
     parent(tends_face) .= 0
     parent(tends_cent) .= 0
 
-    begin
-        state = TC.State(prog, aux, tendencies)
+    for inds in TC.iterate_columns(prog.cent)
+
+        state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
         surf = get_surface(case.surf_params, grid, state, t, param_set)
 
@@ -356,8 +357,8 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     parent(tends_face) .= 0
     parent(tends_cent) .= 0
 
-    begin
-        state = TC.State(prog, aux, tendencies)
+    for inds in TC.iterate_columns(prog.cent)
+        state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
 
         set_thermo_state_peq!(state, grid, edmf.moisture_model, param_set)
