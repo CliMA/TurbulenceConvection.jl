@@ -362,7 +362,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @. Shear² = (∇c(wvec(If0(u_gm))))^2 + (∇c(wvec(If0(v_gm))))^2 + (∇c(wvec(w_en)))^2
 
     q_tot_en = aux_en.q_tot
-    @. M = moist_static_energy(param_set, grid.zc.z, ts_env)
+    @. M = TD.moist_static_energy(param_set, ts, e_pot)
     @. ∂M∂z = ∇c(wvec(If0(M)))
     @. ∂qt∂z = ∇c(wvec(If0(q_tot_en)))
 

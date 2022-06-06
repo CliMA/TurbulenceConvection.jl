@@ -37,14 +37,15 @@ function microphysics(
         )
 
         # update_sat_unsat
+        Φ = geopotential(param_set, grid.zc[k].z)
         if TD.has_condensate(param_set, ts)
             aux_en.cloud_fraction[k] = 1
-            aux_en_sat.M[k] = moist_static_energy(param_set, grid.zc[k].z, ts)
+            aux_en_sat.M[k] = TD.moist_static_energy(param_set, ts, Φ)
             aux_en_sat.T[k] = TD.air_temperature(param_set, ts)
             aux_en_sat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
         else
             aux_en.cloud_fraction[k] = 0
-            aux_en_unsat.M[k] = moist_static_energy(param_set, grid.zc[k].z, ts)
+            aux_en_unsat.M[k] = TD.moist_static_energy(param_set, ts, Φ)
             aux_en_unsat.T[k] = TD.air_temperature(param_set, ts)
             aux_en_unsat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
         end
@@ -158,7 +159,8 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
             q_liq_en = TD.liquid_specific_humidity(param_set, ts)
             q_ice_en = TD.ice_specific_humidity(param_set, ts)
             T = TD.air_temperature(param_set, ts)
-            M = moist_static_energy(param_set, zc, ts)
+            Φ = geopotential(param_set, zc)
+            M = TD.moist_static_energy(param_set, ts, Φ)
 
             # autoconversion and accretion
             mph = precipitation_formation(
@@ -360,16 +362,17 @@ function microphysics(
             tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
 
             # update_sat_unsat
+            Φ = geopotential(param_set, grid.zc[k].z)
             if TD.has_condensate(param_set, ts)
                 aux_en.cloud_fraction[k] = 1
                 aux_en_sat.T[k] = TD.air_temperature(param_set, ts)
                 aux_en_sat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
-                aux_en_sat.M[k] = moist_static_energy(param_set, grid.zc[k].z, ts)
+                aux_en_sat.M[k] = TD.moist_static_energy(param_set, ts, Φ)
             else
                 aux_en.cloud_fraction[k] = 0
                 aux_en_unsat.T[k] = TD.air_temperature(param_set, ts)
                 aux_en_unsat.q_tot[k] = TD.total_specific_humidity(param_set, ts)
-                aux_en_unsat.M[k] = moist_static_energy(param_set, grid.zc[k].z, ts)
+                aux_en_unsat.M[k] = TD.moist_static_energy(param_set, ts, Φ)
             end
 
             aux_en.Hvar_rain_dt[k] = 0
