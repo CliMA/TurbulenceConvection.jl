@@ -404,13 +404,25 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     return nothing
 end
 
+function compute_les_Γᵣ(z::FT, τᵣ::FT = 24.0 * 3600.0, zᵢ::FT = 3000.0, zᵣ::FT = 3500.0) where {FT <: Real}
+    # returns height-dependent relaxation timescale from eqn. 9 in `Shen et al. 2021`
+    if z < zᵢ
+        return FT(0)
+    elseif zᵢ <= z <= zᵣ
+        cos_arg = pi * ((z - zᵢ) / (zᵣ - zᵢ))
+        return (FT(0.5) / τᵣ) * (1 - cos(cos_arg))
+    elseif z > zᵣ
+        return (1 / τᵣ)
+    end
+end
+
 function compute_gm_tendencies!(
     edmf::TC.EDMFModel,
     grid::TC.Grid,
     state::TC.State,
     surf::TC.SurfaceBase,
-    radiation::TC.RadiationBase,
-    force::TC.ForcingBase,
+    radiation::Cases.RadiationBase,
+    force::Cases.ForcingBase,
     param_set::APS,
 )
     Ic = CCO.InterpolateF2C()
@@ -483,12 +495,12 @@ function compute_gm_tendencies!(
             tendencies_gm.q_ice[k] -= ∇q_ice_gm[k] * aux_gm.subsidence[k]
         end
         # Radiation
-        if TC.rad_type(radiation) <: Union{TC.RadiationDYCOMS_RF01, TC.RadiationLES, TC.RadiationTRMM_LBA}
+        if Cases.rad_type(radiation) <: Union{Cases.RadiationDYCOMS_RF01, Cases.RadiationLES, Cases.RadiationTRMM_LBA}
             tendencies_gm.ρe_tot[k] += ρ_c[k] * cv_m * aux_gm.dTdt_rad[k]
         end
         # LS advection
         tendencies_gm.ρq_tot[k] += ρ_c[k] * aux_gm.dqtdt_hadv[k]
-        if !(TC.force_type(force) <: TC.ForcingDYCOMS_RF01)
+        if !(Cases.force_type(force) <: Cases.ForcingDYCOMS_RF01)
             tendencies_gm.ρe_tot[k] += ρ_c[k] * (cp_m * aux_gm.dTdt_hadv[k] + h_v * aux_gm.dqtdt_hadv[k])
         end
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
@@ -497,13 +509,13 @@ function compute_gm_tendencies!(
         end
 
         # LES specific forcings
-        if TC.force_type(force) <: TC.ForcingLES
+        if Cases.force_type(force) <: Cases.ForcingLES
             T_fluc = aux_gm.dTdt_fluc[k]
 
             gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm_u[k]) / force.wind_nudge_τᵣ
             gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm_v[k]) / force.wind_nudge_τᵣ
 
-            Γᵣ = TC.compute_les_Γᵣ(grid.zc[k].z, force.scalar_nudge_τᵣ, force.scalar_nudge_zᵢ, force.scalar_nudge_zᵣ)
+            Γᵣ = compute_les_Γᵣ(grid.zc[k].z, force.scalar_nudge_τᵣ, force.scalar_nudge_zᵢ, force.scalar_nudge_zᵣ)
             gm_T_nudge_k = Γᵣ * (aux_gm.T_nudge[k] - aux_gm.T[k])
             gm_q_tot_nudge_k = Γᵣ * (aux_gm.qt_nudge[k] - aux_gm.q_tot[k])
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
