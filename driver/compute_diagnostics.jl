@@ -106,7 +106,7 @@ function compute_diagnostics!(
     state::TC.State,
     diagnostics::D,
     Stats::NetCDFIO_Stats,
-    case::TC.CasesBase,
+    surf_params,
     t::Real,
     calibrate_io::Bool,
 ) where {D <: CC.Fields.FieldVector}
@@ -135,7 +135,7 @@ function compute_diagnostics!(
     diag_tc_svpc = svpc_diagnostics_turbconv(diagnostics)
     diag_svpc = svpc_diagnostics_grid_mean(diagnostics)
 
-    surf = get_surface(case.surf_params, grid, state, t, param_set)
+    surf = get_surface(surf_params, grid, state, t, param_set)
 
     @. aux_gm.s = TD.specific_entropy(param_set, ts_gm)
     @. aux_en.s = TD.specific_entropy(param_set, ts_en)

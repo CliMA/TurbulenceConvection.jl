@@ -44,11 +44,14 @@ function DiffEqNoiseProcess.wiener_randn!(rng::Random.AbstractRNG, rand_vec::CC.
     parent(rand_vec.face) .= Random.randn.()
 end
 
-struct Simulation1d{IONT, P, A, C, EDMF, PM, D, TIMESTEPPING, STATS, PS, SRS, LESDK}
+struct Simulation1d{IONT, P, A, C, F, R, SM, EDMF, PM, D, TIMESTEPPING, STATS, PS, SRS, LESDK}
     io_nt::IONT
     prog::P
     aux::A
     case::C
+    forcing::F
+    radiation::R
+    surf_params::SM
     edmf::EDMF
     precip_model::PM
     diagnostics::D
@@ -162,18 +165,16 @@ function Simulation1d(namelist)
         JSON.print(io, namelist, 4)
     end
 
-    case_type = Cases.get_case(namelist)
-    surf_ref_state = Cases.surface_ref_state(case_type, param_set, namelist)
+    case = Cases.get_case(namelist)
+    surf_ref_state = Cases.surface_ref_state(case, param_set, namelist)
 
-    Fo = TC.ForcingBase(case_type, param_set; Cases.forcing_kwargs(case_type, namelist)...)
-    Rad = TC.RadiationBase(case_type)
+    forcing = TC.ForcingBase(case, param_set; Cases.forcing_kwargs(case, namelist)...)
+    radiation = TC.RadiationBase(case)
     TS = TimeStepping(FT, namelist)
 
     Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
-    les_data_kwarg = Cases.les_data_kwarg(case_type, namelist)
-    surf_params =
-        Cases.surface_params(case_type, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, les_data_kwarg...)
-    case = TC.CasesBase(case_type; surf_params, Fo, Rad, les_data_kwarg...)
+    les_data_kwarg = Cases.les_data_kwarg(case, namelist)
+    surf_params = Cases.surface_params(case, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, les_data_kwarg...)
 
     calibrate_io = namelist["stats_io"]["calibrate_io"]
     aux_dict = calibrate_io ? TC.io_dictionary_aux_calibrate() : TC.io_dictionary_aux()
@@ -186,6 +187,9 @@ function Simulation1d(namelist)
         prog,
         aux,
         case,
+        forcing,
+        radiation,
+        surf_params,
         edmf,
         precip_model,
         diagnostics,
@@ -206,8 +210,8 @@ end
 function initialize(sim::Simulation1d)
     TC = TurbulenceConvection
 
-    (; prog, aux, edmf, case, param_set, surf_ref_state, les_data_kwarg) = sim
-    (; skip_io, Stats, io_nt, diagnostics, truncate_stack_trace) = sim
+    (; prog, aux, edmf, case, forcing, radiation, surf_params, param_set, surf_ref_state) = sim
+    (; les_data_kwarg, skip_io, Stats, io_nt, diagnostics, truncate_stack_trace) = sim
     FT = eltype(edmf)
     t = FT(0)
 
@@ -249,13 +253,13 @@ function initialize(sim::Simulation1d)
                 add_write_field(ds, "p_c", vec(TC.center_aux_grid_mean(state).p), group, ("zc",))
             end
         end
-        Cases.initialize_profiles(case.case, grid, param_set, state; les_data_kwarg...)
+        Cases.initialize_profiles(case, grid, param_set, state; les_data_kwarg...)
         set_thermo_state_pθq!(state, grid, edmf.moisture_model, param_set)
         set_grid_mean_from_thermo_state!(param_set, state, grid)
         assign_thermo_aux!(state, grid, edmf.moisture_model, param_set)
-        Cases.initialize_forcing(case.case, case.Fo, grid, state, param_set; les_data_kwarg...)
-        Cases.initialize_radiation(case.case, case.Rad, grid, state, param_set; les_data_kwarg...)
-        initialize_edmf(edmf, grid, state, case.surf_params, param_set, t, case.case)
+        Cases.initialize_forcing(case, forcing, grid, state, param_set; les_data_kwarg...)
+        Cases.initialize_radiation(case, radiation, grid, state, param_set; les_data_kwarg...)
+        initialize_edmf(edmf, grid, state, surf_params, param_set, t, case)
         if !skip_io
             stats = Stats[inds...]
             initialize_io(stats.nc_filename, FT, io_nt.aux, io_nt.diagnostics)
@@ -303,6 +307,9 @@ function solve_args(sim::Simulation1d)
         aux = aux,
         io_nt = sim.io_nt,
         case = sim.case,
+        forcing = sim.forcing,
+        surf_params = sim.surf_params,
+        radiation = sim.radiation,
         diagnostics = diagnostics,
         TS = sim.TS,
         Stats = sim.Stats,
@@ -347,7 +354,7 @@ function solve_args(sim::Simulation1d)
         saveat = last(t_span),
         callback = callbacks,
         progress = true,
-        unstable_check_kwarg(sim.case.case)...,
+        unstable_check_kwarg(sim.case)...,
         progress_message = (dt, u, p, t) -> t,
     )
     return (prob, alg, kwargs)
