@@ -592,7 +592,7 @@ function initialize_profiles(self::CasesBase{TRMM_LBA}, grid::Grid, param_set, s
         qv_star = pv_star * (1 / molmass_ratio) / denom
         aux_gm.q_tot[k] = qv_star * RH / 100
         phase_part = TD.PhasePartition(aux_gm.q_tot[k], 0.0, 0.0) # initial state is not saturated
-        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], p[k], phase_part)
+        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], prof_p(z), phase_part)
         aux_gm.tke[k] = prof_tke(z)
     end
 end
