@@ -294,8 +294,8 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_surf
         prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * θ_surf
         prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * q_surf
-        e_kin = kinetic_energy(prog_gm_u[kc_surf], prog_gm_v[kc_surf], w_up_c[kc_surf])
         ts_up_i = thermo_state_pθq(param_set, p_c[kc_surf], θ_surf, q_surf)
+        e_kin = kinetic_energy(prog_gm_u[kc_surf], prog_gm_v[kc_surf], w_up_c[kc_surf])
         e_pot = geopotential(param_set, grid.zc.z[kc_surf])
         e_tot_surf = TD.total_energy(param_set, ts_up_i, e_kin, e_pot)
         prog_up[i].ρae_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * e_tot_surf

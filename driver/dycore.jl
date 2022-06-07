@@ -80,6 +80,7 @@ cent_aux_vars_gm(FT, edmf) = (;
     q_tot = FT(0),
     p = FT(0),
     e_kin = FT(0),
+    e_tot = FT(0),
     h_tot = FT(0),
 )
 cent_aux_vars(FT, edmf) = (; cent_aux_vars_gm(FT, edmf)..., TC.cent_aux_vars_edmf(FT, edmf)...)
@@ -269,10 +270,11 @@ function set_thermo_state_peq!(state, grid, moisture_model, param_set)
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
         e_pot = TC.geopotential(param_set, grid.zc.z[k])
-        e_int = prog_gm.ρe_tot[k] / ρ_c[k] - aux_gm.e_kin[k] - e_pot
+        aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
+        aux_gm.e_tot[k] = prog_gm.ρe_tot[k] / ρ_c[k]
+        e_int = aux_gm.e_tot[k] - aux_gm.e_kin[k] - e_pot
         ts_gm[k] = TC.thermo_state_peq(param_set, p_c[k], e_int, aux_gm.q_tot[k], thermo_args...)
         aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_gm[k])
-        aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
         aux_gm.h_tot[k] = TC.total_enthalpy(param_set, prog_gm.ρe_tot[k] / ρ_c[k], ts_gm[k])
     end
     return nothing
