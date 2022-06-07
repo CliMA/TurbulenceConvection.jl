@@ -101,6 +101,7 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_up = TC.center_prog_updrafts(state)
+    prog_up_f = TC.face_prog_updrafts(state)
     ρ_0_c = prog_gm.ρ
     ρ_0_f = aux_gm_f.ρ
     N_up = TC.n_updrafts(edmf)
@@ -111,10 +112,12 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
     prof_area = APL.DryBubble_updrafts_area(FT)
     prof_w = APL.DryBubble_updrafts_w(FT)
     prof_T = APL.DryBubble_updrafts_T(FT)
+    face_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+    If = CCO.InterpolateC2F(; face_bcs...)
     @inbounds for i in 1:N_up
         @inbounds for k in TC.real_face_indices(grid)
             if z_min <= grid.zf[k].z <= z_max
-                aux_up_f[i].w[k] = 0.0
+                aux_up_f[i].w[k] = eps(FT) # non zero value to aviod zeroing out fields in the filter
             end
         end
 
@@ -141,6 +144,7 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
                 prog_up[i].ρaq_tot[k] = 0.0
             end
         end
+        @. prog_up_f[i].ρaw = If(prog_up[i].ρarea) * aux_up_f[i].w
     end
     return nothing
 end

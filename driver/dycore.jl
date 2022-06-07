@@ -379,7 +379,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         force = case.Fo
         radiation = case.Rad
 
-        TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
+        TC.affect_filter!(edmf, grid, state, param_set, surf, t)
 
         # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
         # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
