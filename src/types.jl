@@ -454,7 +454,7 @@ LES-driven forcing
 
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct ForcingBase{T, R}
+Base.@kwdef struct ForcingBase{T}
     "Boolean specifying whether Coriolis forcing is applied"
     apply_coriolis::Bool = false
     "Coriolis parameter"
@@ -467,15 +467,16 @@ Base.@kwdef struct ForcingBase{T, R}
     scalar_nudge_zᵣ::Float64 = 0.0
     "Scalar maximum relaxation timescale"
     scalar_nudge_τᵣ::Float64 = 0.0
-    "Radiative forcing"
-    rad::R
+    "Large-scale divergence (same as in RadiationBase)"
+    divergence::Float64 = 0
 end
 
-ForcingBase(::Type{T}; rad = nothing, kwargs...) where {T} = ForcingBase{T, typeof(rad)}(; rad, kwargs...)
+ForcingBase(::Type{T}; kwargs...) where {T} = ForcingBase{T}(; kwargs...)
 
 force_type(::ForcingBase{T}) where {T} = T
 
 Base.@kwdef struct RadiationBase{T}
+    "Large-scale divergence (same as in ForcingBase)"
     divergence::Float64 = 0
     alpha_z::Float64 = 0
     kappa::Float64 = 0
