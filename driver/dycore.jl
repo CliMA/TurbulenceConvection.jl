@@ -385,7 +385,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
         # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
         # treat them as auxiliary variables for now, until we disentangle the tendency computations.
-        Cases.update_forcing(case, grid, state, t, param_set)
+        Cases.update_forcing(case.case, grid, state, t, param_set)
         Cases.update_radiation(case.Rad, grid, state, t, param_set)
 
         TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
@@ -540,18 +540,11 @@ function compute_gm_tendencies!(
             tendencies_gm.q_ice[k] += aux_bulk.qi_tendency_precip_formation[k] + aux_en.qi_tendency_precip_formation[k]
         end
     end
-
     TC.compute_sgs_flux!(edmf, grid, state, surf, param_set)
     sgs_flux_h_tot = aux_gm_f.sgs_flux_h_tot
     sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot
     sgs_flux_u = aux_gm_f.sgs_flux_u
     sgs_flux_v = aux_gm_f.sgs_flux_v
-    # apply surface BC as SGS flux at lowest level
-    sgs_flux_h_tot[kf_surf] = surf.ρe_tot_flux
-    sgs_flux_q_tot[kf_surf] = surf.ρq_tot_flux
-    sgs_flux_u[kf_surf] = surf.ρu_flux
-    sgs_flux_v[kf_surf] = surf.ρv_flux
-
     tends_ρe_tot = tendencies_gm.ρe_tot
     tends_ρq_tot = tendencies_gm.ρq_tot
     tends_u = TC.tendencies_grid_mean_u(state)

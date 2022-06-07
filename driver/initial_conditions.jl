@@ -7,14 +7,13 @@ const APS = CLIMAParameters.AbstractEarthParameterSet
 import Thermodynamics
 const TD = Thermodynamics
 
-function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, case, param_set::APS, t::Real)
+function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, surf_params, param_set::APS, t::Real, case)
     initialize_covariance(edmf, grid, state)
-    surf_params = case.surf_params
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = aux_gm.ts
     @. aux_gm.θ_virt = TD.virtual_pottemp(param_set, ts_gm)
     surf = get_surface(surf_params, grid, state, t, param_set)
-    if case.casename == "DryBubble"
+    if case isa Cases.DryBubble
         initialize_updrafts_DryBubble(edmf, grid, state)
     else
         initialize_updrafts(edmf, grid, state, surf)
