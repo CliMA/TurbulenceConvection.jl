@@ -82,7 +82,7 @@ function affect_filter!(integrator)
         state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
         surf = get_surface(case.surf_params, grid, state, t, param_set)
-        TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
+        TC.affect_filter!(edmf, grid, state, param_set, surf, t)
     end
 
     # We're lying to OrdinaryDiffEq.jl, in order to avoid
