@@ -336,7 +336,7 @@ function assign_thermo_aux!(state, grid, moisture_model, param_set)
 end
 
 function ∑stoch_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
-    UnPack.@unpack edmf, param_set, case, aux = params
+    UnPack.@unpack edmf, param_set, surf_params, aux = params
 
     # set all tendencies to zero
     tends_face = tendencies.face
@@ -348,7 +348,7 @@ function ∑stoch_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) whe
 
         state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
-        surf = get_surface(case.surf_params, grid, state, t, param_set)
+        surf = get_surface(surf_params, grid, state, t, param_set)
 
         # compute updraft stochastic tendencies
         TC.compute_up_stoch_tendencies!(edmf, grid, state, param_set, surf)
@@ -357,7 +357,8 @@ end
 
 # Compute the sum of tendencies for the scheme
 function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
-    UnPack.@unpack edmf, precip_model, param_set, case, aux, TS = params
+    UnPack.@unpack edmf, precip_model, param_set, case = params
+    UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
 
     tends_face = tendencies.face
     tends_cent = tendencies.cent
@@ -375,17 +376,15 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         @. aux_gm.θ_virt = TD.virtual_pottemp(param_set, aux_gm.ts)
 
         Δt = TS.dt
-        surf = get_surface(case.surf_params, grid, state, t, param_set)
-        force = case.Fo
-        radiation = case.Rad
+        surf = get_surface(surf_params, grid, state, t, param_set)
 
         TC.affect_filter!(edmf, grid, state, param_set, surf, t)
 
         # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
         # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
         # treat them as auxiliary variables for now, until we disentangle the tendency computations.
-        Cases.update_forcing(case.case, grid, state, t, param_set)
-        Cases.update_radiation(case.Rad, grid, state, t, param_set)
+        Cases.update_forcing(case, grid, state, t, param_set)
+        Cases.update_radiation(radiation, grid, state, t, param_set)
 
         TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
 
@@ -395,7 +394,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set)
 
         TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt)
-        compute_gm_tendencies!(edmf, grid, state, surf, radiation, force, param_set)
+        compute_gm_tendencies!(edmf, grid, state, surf, radiation, forcing, param_set)
     end
 
     return nothing
