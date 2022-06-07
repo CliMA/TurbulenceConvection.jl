@@ -1,10 +1,10 @@
-update_radiation(self::TC.RadiationBase, grid, state, t::Real, param_set) = nothing
-initialize(self::TC.RadiationBase{TC.RadiationNone}, grid, state) = nothing
+update_radiation(self::RadiationBase, grid, state, t::Real, param_set) = nothing
+initialize(self::RadiationBase{RadiationNone}, grid, state) = nothing
 
 """
 see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
-function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid, state, t::Real, param_set)
+function update_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state, t::Real, param_set)
     cp_d = TCP.cp_d(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
@@ -67,7 +67,7 @@ function update_radiation(self::TC.RadiationBase{TC.RadiationDYCOMS_RF01}, grid,
     return
 end
 
-function initialize(self::TC.RadiationBase{TC.RadiationLES}, grid, state, LESDat::TC.LESData)
+function initialize(self::RadiationBase{RadiationLES}, grid, state, LESDat::LESData)
     # load from LES
     aux_gm = TC.center_aux_grid_mean(state)
     dTdt = NC.Dataset(LESDat.les_filename, "r") do data
@@ -86,7 +86,7 @@ function initialize(self::TC.RadiationBase{TC.RadiationLES}, grid, state, LESDat
 end
 
 
-function initialize(self::TC.RadiationBase{TC.RadiationTRMM_LBA}, grid, state)
+function initialize(self::RadiationBase{RadiationTRMM_LBA}, grid, state)
     aux_gm = TC.center_aux_grid_mean(state)
     rad = APL.TRMM_LBA_radiation(eltype(grid))
     @inbounds for k in real_center_indices(grid)
@@ -95,7 +95,7 @@ function initialize(self::TC.RadiationBase{TC.RadiationTRMM_LBA}, grid, state)
     return nothing
 end
 
-function update_radiation(self::TC.RadiationBase{TC.RadiationTRMM_LBA}, grid, state, t::Real, param_set)
+function update_radiation(self::RadiationBase{RadiationTRMM_LBA}, grid, state, t::Real, param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     rad = APL.TRMM_LBA_radiation(eltype(grid))
     @inbounds for k in real_center_indices(grid)

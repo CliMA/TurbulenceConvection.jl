@@ -1,6 +1,6 @@
-initialize(::TC.ForcingBase, grid, state) = nothing
+initialize(::ForcingBase, grid, state) = nothing
 
-function initialize(::TC.ForcingBase{TC.ForcingLES}, grid, state, LESDat::TC.LESData)
+function initialize(::ForcingBase{ForcingLES}, grid, state, LESDat::LESData)
     aux_gm = TC.center_aux_grid_mean(state)
     nt = NC.Dataset(LESDat.les_filename, "r") do data
         imin = LESDat.imin
