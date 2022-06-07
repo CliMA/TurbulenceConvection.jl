@@ -265,6 +265,7 @@ end
 
 function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS)
     FT = eltype(grid)
+    Ic = CCO.InterpolateF2C()
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -272,20 +273,32 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     aux_gm_f = face_aux_grid_mean(state)
     prog_gm = center_prog_grid_mean(state)
     prog_up = center_prog_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
     prog_en = center_prog_environment(state)
     prog_up_f = face_prog_updrafts(state)
     aux_bulk = center_aux_bulk(state)
+    aux_tc = center_aux_turbconv(state)
+    prog_gm_u = grid_mean_u(state)
+    prog_gm_v = grid_mean_v(state)
     ts_gm = aux_gm.ts
     cp = TD.cp_m(param_set, ts_gm[kc_surf])
+    p_c = aux_gm.p
     ρ_c = prog_gm.ρ
     ρ_f = aux_gm_f.ρ
+    w_up_c = aux_tc.w_up_c
     @inbounds for i in 1:N_up
+        @. w_up_c = Ic(aux_up_f[i].w)
         θ_surf = θ_surface_bc(surf, grid, state, edmf, i, param_set)
         q_surf = q_surface_bc(surf, grid, state, edmf, i)
         a_surf = area_surface_bc(surf, edmf, i)
         prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_surf
         prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * θ_surf
         prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * q_surf
+        e_kin = kinetic_energy(prog_gm_u[kc_surf], prog_gm_v[kc_surf], w_up_c[kc_surf])
+        ts_up_i = thermo_state_pθq(param_set, p_c[kc_surf], θ_surf, q_surf)
+        e_pot = geopotential(param_set, grid.zc.z[kc_surf])
+        e_tot_surf = TD.total_energy(param_set, ts_up_i, e_kin, e_pot)
+        prog_up[i].ρae_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * e_tot_surf
         if edmf.moisture_model isa NonEquilibriumMoisture
             q_liq_surf = FT(0)
             q_ice_surf = FT(0)
