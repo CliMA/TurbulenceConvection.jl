@@ -283,23 +283,17 @@ function compute_diagnostics!(
         end
     end
 
-    a_up_bulk_f = copy(diag_tc_f.nh_pressure)
     a_bulk_bcs = TC.a_bulk_boundary_conditions(surf, edmf)
-    Ifa = CCO.InterpolateC2F(; a_bulk_bcs...)
-    @. a_up_bulk_f = Ifa(a_up_bulk)
-
-    a_up_bulk_f = copy(diag_tc_f.nh_pressure)
-    a_up_f = copy(a_up_bulk_f)
     Ifabulk = CCO.InterpolateC2F(; a_bulk_bcs...)
-    @. a_up_bulk_f = Ifabulk(a_up_bulk)
+    a_up_bulk_f = @. Ifabulk(a_up_bulk)
 
     RB_precip = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
 
-    @inbounds for k in TC.real_face_indices(grid)
-        @inbounds for i in 1:N_up
-            a_up_bcs = TC.a_up_boundary_conditions(surf, edmf, i)
-            Ifaup = CCO.InterpolateC2F(; a_up_bcs...)
-            @. a_up_f = Ifaup(aux_up[i].area)
+    @inbounds for i in 1:N_up
+        a_up_bcs = TC.a_up_boundary_conditions(surf, edmf, i)
+        Ifaup = CCO.InterpolateC2F(; a_up_bcs...)
+        a_up_f = @. Ifaup(aux_up[i].area)
+        @inbounds for k in TC.real_face_indices(grid)
             diag_tc_f.nh_pressure[k] = 0.0
             diag_tc_f.nh_pressure_b[k] = 0.0
             diag_tc_f.nh_pressure_adv[k] = 0.0
