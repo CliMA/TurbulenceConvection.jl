@@ -176,6 +176,9 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
 
         @. sgs_flux_q_liq = diffusive_flux_ql + massflux_ql
         @. sgs_flux_q_ice = diffusive_flux_qi + massflux_qi
+
+        sgs_flux_q_liq[kf_surf] = surf.ρq_liq_flux
+        sgs_flux_q_ice[kf_surf] = surf.ρq_ice_flux
     end
 
     return nothing

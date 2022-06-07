@@ -557,8 +557,7 @@ function compute_gm_tendencies!(
     if edmf.moisture_model isa TC.NonEquilibriumMoisture
         sgs_flux_q_liq = aux_gm_f.sgs_flux_q_liq
         sgs_flux_q_ice = aux_gm_f.sgs_flux_q_ice
-        sgs_flux_q_liq[kf_surf] = surf.ρq_liq_flux
-        sgs_flux_q_ice[kf_surf] = surf.ρq_ice_flux
+
         tends_q_liq = tendencies_gm.q_liq
         tends_q_ice = tendencies_gm.q_ice
         @. tends_q_liq += -∇sgs(wvec(sgs_flux_q_liq)) / ρ_c
