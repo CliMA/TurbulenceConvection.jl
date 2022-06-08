@@ -511,44 +511,18 @@ function surface_ref_state(::Rico, param_set::APS, namelist)
 end
 function initialize_profiles(::Rico, grid::Grid, param_set, state; kwargs...)
     aux_gm = TC.center_aux_grid_mean(state)
-    prog_gm = TC.center_prog_grid_mean(state)
-    aux_tc = TC.center_aux_turbconv(state)
-    p = aux_gm.p
-    ρ_c = prog_gm.ρ
-
     FT = eltype(grid)
-    prof_u = APL.Rico_u(FT)
-    prof_v = APL.Rico_v(FT)
-    prof_q_tot = APL.Rico_q_tot(FT)
-    prof_θ_liq_ice = APL.Rico_θ_liq_ice(FT)
-    prog_gm_u = TC.grid_mean_u(state)
-    prog_gm_v = TC.grid_mean_v(state)
-
-    @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k].z
-        prog_gm_u[k] = prof_u(z)
-        prog_gm_v[k] = prof_v(z)
-        aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        aux_gm.q_tot[k] = prof_q_tot(z)
-    end
-
+    TC.set_z!(TC.grid_mean_u(state), APL.Rico_u(FT))
+    TC.set_z!(TC.grid_mean_v(state), APL.Rico_v(FT))
+    TC.set_z!(aux_gm.q_tot, APL.Rico_q_tot(FT))
+    TC.set_z!(aux_gm.θ_liq_ice, APL.Rico_θ_liq_ice(FT))
     # Need to get θ_virt
-    @inbounds for k in real_center_indices(grid)
-        # Thermo state field cache is not yet
-        # defined, so we can't use it yet.
-        ts = TD.PhaseEquil_pθq(param_set, p[k], aux_gm.θ_liq_ice[k], aux_gm.q_tot[k])
-        aux_gm.θ_virt[k] = TD.virtual_pottemp(param_set, ts)
-    end
+    # Thermo state field cache is not yet
+    # defined, so we can't use it yet.
+    @. aux_gm.θ_virt =
+        TD.virtual_pottemp(param_set, TD.PhaseEquil_pθq(param_set, aux_gm.p, aux_gm.θ_liq_ice, aux_gm.q_tot))
     zi = FT(0.6) * get_inversion(grid, state, param_set, FT(0.2))
-
-    @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k].z
-        aux_gm.tke[k] = if z <= zi
-            1 - z / zi
-        else
-            FT(0)
-        end
-    end
+    TC.set_z!(aux_gm.tke, z -> z <= zi ? 1 - z / zi : FT(0))
 end
 
 function surface_params(case::Rico, surf_ref_state, param_set; kwargs...)

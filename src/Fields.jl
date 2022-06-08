@@ -103,3 +103,31 @@ function first_face_space(fv::CC.Fields.FieldVector)
     end
     error("Unfound space")
 end
+
+"""
+    set_z!(field, f::Function)
+
+Populate field `field` with values computed
+from function `f(z)`
+"""
+function set_z!(field::CC.Fields.Field, f::F) where {F}
+    space = axes(field)
+    z = CC.Fields.coordinate_field(space).z
+    lg = CC.Fields.local_geometry_field(space)
+    @. field = f(z)
+    return nothing
+end
+
+"""
+    set_z!(field, u::Function, v::Function)
+
+Populate field `field` with values computed
+from function `Covariant12Vector(UVVector(u(z), v(z)))`
+"""
+function set_z!(field::CC.Fields.Field, u::U, v::V) where {U, V}
+    space = axes(field)
+    z = CC.Fields.coordinate_field(space).z
+    lg = CC.Fields.local_geometry_field(space)
+    @. field = CCO.Covariant12Vector(CCG.UVVector(u(z), v(z)), lg)
+    return nothing
+end
