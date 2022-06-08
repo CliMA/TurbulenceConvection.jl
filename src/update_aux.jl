@@ -55,51 +55,24 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         #####
         e_pot = geopotential(param_set, grid.zc.z[k])
         @inbounds for i in 1:N_up
-            if is_surface_center(grid, k)
-                if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
-                    θ_surf = θ_surface_bc(surf, grid, state, edmf, i, param_set)
-                    q_surf = q_surface_bc(surf, grid, state, edmf, i)
-                    a_surf = area_surface_bc(surf, edmf, i)
-                    aux_up[i].θ_liq_ice[k] = θ_surf
-                    aux_up[i].q_tot[k] = q_surf
-                    aux_up[i].area[k] = a_surf
-                else
-                    aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
-                    aux_up[i].q_tot[k] = aux_gm.q_tot[k]
-                    aux_up[i].e_kin[k] = aux_gm.e_kin[k]
-                end
+            if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
+                aux_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / prog_up[i].ρarea[k]
+                aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
+                aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ_c[k]
             else
-                if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
-                    aux_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / prog_up[i].ρarea[k]
-                    aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
-                    aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ_c[k]
-                else
-                    aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
-                    aux_up[i].q_tot[k] = aux_gm.q_tot[k]
-                    aux_up[i].area[k] = 0
-                    aux_up[i].e_kin[k] = aux_gm.e_kin[k]
-                end
+                aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
+                aux_up[i].q_tot[k] = aux_gm.q_tot[k]
+                aux_up[i].area[k] = 0
+                aux_up[i].e_kin[k] = aux_gm.e_kin[k]
             end
             thermo_args = ()
             if edmf.moisture_model isa NonEquilibriumMoisture
-                if is_surface_center(grid, k)
-                    if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
-                        ql_surf = ql_surface_bc(surf)
-                        qi_surf = qi_surface_bc(surf)
-                        aux_up[i].q_liq[k] = ql_surf
-                        aux_up[i].q_ice[k] = qi_surf
-                    else
-                        aux_up[i].q_liq[k] = prog_gm.q_liq[k]
-                        aux_up[i].q_ice[k] = prog_gm.q_ice[k]
-                    end
+                if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
+                    aux_up[i].q_liq[k] = prog_up[i].ρaq_liq[k] / prog_up[i].ρarea[k]
+                    aux_up[i].q_ice[k] = prog_up[i].ρaq_ice[k] / prog_up[i].ρarea[k]
                 else
-                    if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
-                        aux_up[i].q_liq[k] = prog_up[i].ρaq_liq[k] / prog_up[i].ρarea[k]
-                        aux_up[i].q_ice[k] = prog_up[i].ρaq_ice[k] / prog_up[i].ρarea[k]
-                    else
-                        aux_up[i].q_liq[k] = prog_gm.q_liq[k]
-                        aux_up[i].q_ice[k] = prog_gm.q_ice[k]
-                    end
+                    aux_up[i].q_liq[k] = prog_gm.q_liq[k]
+                    aux_up[i].q_ice[k] = prog_gm.q_ice[k]
                 end
                 thermo_args = (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
             end
