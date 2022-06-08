@@ -2,7 +2,7 @@
 Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 (autoconversion + accretion)
 """
-function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts) where {FT}
+function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts, p::FT) where {FT}
 
     # TODO - when using adaptive timestepping we are limiting the source terms
     #        with the previous timestep Δt
@@ -12,11 +12,31 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts)
 
         q = TD.PhasePartition(param_set, ts)
         T = TD.air_temperature(param_set, ts)
-        q_vap = TD.vapor_specific_humidity(param_set, ts)
+        q_vap = TD.vapor_specific_humidity(param_set, ts) 
 
         # TODO - is that the state we want to be relaxing to?
         ts_eq = TD.PhaseEquil_ρTq(param_set, ρ, T, q.tot)
         q_eq = TD.PhasePartition(param_set, ts_eq)
+        #alt
+        ts_eq_alt = TD.PhaseEquil_pTq(param_set, p, T, q.tot)
+        q_eq_alt = TD.PhasePartition(param_set, ts_eq_alt)
+        # calculate the saturation adustment state here... and print both out (and maybe diff?)
+        θ_liq_ice = TD.liquid_ice_pottemp(param_set, ts) 
+        ts_eq_sat_adj = TD.PhaseEquil_ρθq(param_set, ρ, θ_liq_ice, q.tot) # true eq is sat adjustmen phaseequil rho theta q (rho, theta_liq_ice, rhoq_ot/rho)
+        q_eq_sat_adj = TD.PhasePartition(param_set, ts_eq_sat_adj)
+
+        # println("==================================================================")
+        # @info "q_eq noneq `$(q_eq)`"
+        # @info "q_eq noneq alt `$(q_eq_alt)`"
+        # @info "q_eq sat adjust `$(q_eq_sat_adj)`"
+        # @info "q existing `$(q)`"
+        # println("-----------------")
+        # @info "T noneq `$(TD.air_temperature(param_set, ts_eq))` | T noneq alt p `$(TD.air_temperature(param_set, ts_eq_alt))` | T sat adjust `$(TD.air_temperature(param_set, ts_eq_sat_adj))` | T existing `$(T)`"
+        # println("-----------------")
+        # @info "θ\\_liq\\_ice noneq `$(TD.liquid_ice_pottemp(param_set, ts_eq))` | θ\\_liq\\_ice noneq alt p `$(TD.liquid_ice_pottemp(param_set, ts_eq_alt))` | θ\\_liq\\_ice sat adjust `$(TD.liquid_ice_pottemp(param_set, ts_eq_sat_adj))` | θ\\_liq\\_ice existing `$(TD.liquid_ice_pottemp(param_set, ts))`"
+
+        ts_eq = ts_eq_alt # use the alt formluation to run
+        q_eq  = q_eq_alt
 
         S_ql = CMNe.conv_q_vap_to_q_liq_ice(param_set, liq_type, q_eq, q)
         S_qi = CMNe.conv_q_vap_to_q_liq_ice(param_set, ice_type, q_eq, q)
