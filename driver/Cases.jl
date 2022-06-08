@@ -238,22 +238,11 @@ function surface_ref_state(::Soares, param_set::APS, namelist)
 end
 function initialize_profiles(::Soares, grid::Grid, param_set, state; kwargs...)
     aux_gm = TC.center_aux_grid_mean(state)
-    prog_gm = TC.center_prog_grid_mean(state)
-    ρ_c = prog_gm.ρ
     FT = eltype(grid)
-    prof_q_tot = APL.Soares_q_tot(FT)
-    prof_θ_liq_ice = APL.Soares_θ_liq_ice(FT)
-    prof_u = APL.Soares_u(FT)
-    prof_tke = APL.Soares_tke(FT)
-    prog_gm_u = TC.grid_mean_u(state)
-
-    @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k].z
-        aux_gm.q_tot[k] = prof_q_tot(z)
-        aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        prog_gm_u[k] = prof_u(z)
-        aux_gm.tke[k] = prof_tke(z)
-    end
+    TC.set_z!(TC.grid_mean_u(state), APL.Soares_u(FT))
+    TC.set_z!(aux_gm.tke, APL.Soares_tke(FT))
+    TC.set_z!(aux_gm.θ_liq_ice, APL.Soares_θ_liq_ice(FT))
+    TC.set_z!(aux_gm.q_tot, APL.Soares_q_tot(FT))
 end
 
 function surface_params(case::Soares, surf_ref_state, param_set; Ri_bulk_crit)
@@ -287,21 +276,10 @@ function surface_ref_state(::Nieuwstadt, param_set::APS, namelist)
 end
 function initialize_profiles(::Nieuwstadt, grid::Grid, param_set, state; kwargs...)
     aux_gm = TC.center_aux_grid_mean(state)
-    prog_gm = TC.center_prog_grid_mean(state)
-    ρ_c = prog_gm.ρ
-
     FT = eltype(grid)
-    prof_θ_liq_ice = APL.Nieuwstadt_θ_liq_ice(FT)
-    prof_u = APL.Nieuwstadt_u(FT)
-    prof_tke = APL.Nieuwstadt_tke(FT)
-    prog_gm_u = TC.grid_mean_u(state)
-
-    @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k].z
-        aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        prog_gm_u[k] = prof_u(z)
-        aux_gm.tke[k] = prof_tke(z)
-    end
+    TC.set_z!(TC.grid_mean_u(state), APL.Nieuwstadt_u(FT))
+    TC.set_z!(aux_gm.θ_liq_ice, APL.Nieuwstadt_θ_liq_ice(FT))
+    TC.set_z!(aux_gm.tke, APL.Nieuwstadt_tke(FT))
 end
 
 function surface_params(case::Nieuwstadt, surf_ref_state, param_set; Ri_bulk_crit)
@@ -336,23 +314,11 @@ end
 
 function initialize_profiles(::Bomex, grid::Grid, param_set, state; kwargs...)
     aux_gm = TC.center_aux_grid_mean(state)
-    prog_gm = TC.center_prog_grid_mean(state)
-    ρ_c = prog_gm.ρ
-
     FT = eltype(grid)
-    prof_q_tot = APL.Bomex_q_tot(FT)
-    prof_θ_liq_ice = APL.Bomex_θ_liq_ice(FT)
-    prof_u = APL.Bomex_u(FT)
-    prof_tke = APL.Bomex_tke(FT)
-    prog_gm_u = TC.grid_mean_u(state)
-
-    @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k].z
-        aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        aux_gm.q_tot[k] = prof_q_tot(z)
-        prog_gm_u[k] = prof_u(z)
-        aux_gm.tke[k] = prof_tke(z)
-    end
+    TC.set_z!(aux_gm.θ_liq_ice, APL.Bomex_θ_liq_ice(FT))
+    TC.set_z!(aux_gm.q_tot, APL.Bomex_q_tot(FT))
+    TC.set_z!(aux_gm.tke, APL.Bomex_tke(FT))
+    TC.set_z!(TC.grid_mean_u(state), APL.Bomex_u(FT))
 end
 
 function surface_params(case::Bomex, surf_ref_state, param_set; Ri_bulk_crit)
@@ -375,29 +341,13 @@ end
 
 function initialize_forcing(::Bomex, forcing, grid::Grid, state, param_set)
     initialize(forcing, grid, state)
-    prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
-    ts_gm = aux_gm.ts
-    p_c = aux_gm.p
-
     FT = eltype(grid)
-    prof_ug = APL.Bomex_geostrophic_u(FT)
-    prof_dTdt = APL.Bomex_dTdt(FT)
-    prof_dqtdt = APL.Bomex_dqtdt(FT)
-    prof_subsidence = APL.Bomex_subsidence(FT)
-
-    @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k].z
-        # Geostrophic velocity profiles. vg = 0
-        aux_gm.ug[k] = prof_ug(z)
-        Π = TD.exner(param_set, ts_gm[k])
-        # Set large-scale cooling
-        aux_gm.dTdt_hadv[k] = prof_dTdt(Π, z)
-        # Set large-scale drying
-        aux_gm.dqtdt_hadv[k] = prof_dqtdt(z)
-        #Set large scale subsidence
-        aux_gm.subsidence[k] = prof_subsidence(z)
-    end
+    Π = TC.z_function(@. TD.exner(param_set, aux_gm.ts))
+    TC.set_z!(aux_gm.dTdt_hadv, z -> APL.Bomex_dTdt(FT)(Π(z), z))
+    TC.set_z!(aux_gm.dqtdt_hadv, APL.Bomex_dqtdt(FT))
+    TC.set_z!(aux_gm.subsidence, APL.Bomex_subsidence(FT))
+    TC.set_z!(aux_gm.ug, APL.Bomex_geostrophic_u(FT))
     return nothing
 end
 
@@ -416,23 +366,10 @@ function surface_ref_state(::life_cycle_Tan2018, param_set::APS, namelist)
 end
 function initialize_profiles(::life_cycle_Tan2018, grid::Grid, param_set, state; kwargs...)
     aux_gm = TC.center_aux_grid_mean(state)
-    prog_gm = TC.center_prog_grid_mean(state)
-    ρ_c = prog_gm.ρ
-
     FT = eltype(grid)
-    prof_q_tot = APL.LifeCycleTan2018_q_tot(FT)
-    prof_θ_liq_ice = APL.LifeCycleTan2018_θ_liq_ice(FT)
-    prof_u = APL.LifeCycleTan2018_u(FT)
-    prof_tke = APL.LifeCycleTan2018_tke(FT)
-    prog_gm_u = TC.grid_mean_u(state)
-
-    @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k].z
-        aux_gm.θ_liq_ice[k] = prof_θ_liq_ice(z)
-        aux_gm.q_tot[k] = prof_q_tot(z)
-        prog_gm_u[k] = prof_u(z)
-        aux_gm.tke[k] = prof_tke(z)
-    end
+    TC.zet_z!(aux_gm.θ_liq_ice, APL.LifeCycleTan2018_θ_liq_ice(FT))
+    TC.zet_z!(aux_gm.q_tot, APL.LifeCycleTan2018_q_tot(FT))
+    TC.zet_z!(aux_gm.tke, APL.LifeCycleTan2018_tke(FT))
 end
 
 function surface_params(case::life_cycle_Tan2018, surf_ref_state, param_set; Ri_bulk_crit)
@@ -461,29 +398,14 @@ end
 
 function initialize_forcing(::life_cycle_Tan2018, forcing, grid::Grid, state, param_set)
     initialize(forcing, grid, state)
-    prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
-    p_c = aux_gm.p
-    ts_gm = aux_gm.ts
-
     FT = eltype(grid)
-    prof_ug = APL.LifeCycleTan2018_geostrophic_u(FT)
-    prof_dTdt = APL.LifeCycleTan2018_dTdt(FT)
-    prof_dqtdt = APL.LifeCycleTan2018_dqtdt(FT)
-    prof_subsidence = APL.LifeCycleTan2018_subsidence(FT)
-
-    @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k].z
-        # Geostrophic velocity profiles. vg = 0
-        aux_gm.ug[k] = prof_ug(z)
-        Π = TD.exner(param_set, ts_gm[k])
-        # Set large-scale cooling
-        aux_gm.dTdt_hadv[k] = prof_dTdt(Π, z)
-        # Set large-scale drying
-        aux_gm.dqtdt_hadv[k] = prof_dqtdt(z)
-        #Set large scale subsidence
-        aux_gm.subsidence[k] = prof_subsidence(z)
-    end
+    Π = TC.z_function(@. TD.exner(param_set, aux_gm.ts))
+    TC.set_z!(aux_gm.ug, APL.LifeCycleTan2018_geostrophic_u(FT))
+    # Set large-scale cooling, drying and subsidence
+    TC.set_z!(aux_gm.dTdt_hadv, z -> APL.LifeCycleTan2018_dTdt(FT)(Π(z), z))
+    TC.set_z!(aux_gm.dqtdt_hadv, APL.LifeCycleTan2018_dqtdt(FT))
+    TC.set_z!(aux_gm.subsidence, APL.LifeCycleTan2018_subsidence(FT))
     return nothing
 end
 
@@ -516,9 +438,8 @@ function initialize_profiles(::Rico, grid::Grid, param_set, state; kwargs...)
     TC.set_z!(TC.grid_mean_v(state), APL.Rico_v(FT))
     TC.set_z!(aux_gm.q_tot, APL.Rico_q_tot(FT))
     TC.set_z!(aux_gm.θ_liq_ice, APL.Rico_θ_liq_ice(FT))
-    # Need to get θ_virt
-    # Thermo state field cache is not yet
-    # defined, so we can't use it yet.
+    # Need to get θ_virt: Thermo state field cache
+    # is not yet defined, so we can't use it yet.
     @. aux_gm.θ_virt =
         TD.virtual_pottemp(param_set, TD.PhaseEquil_pθq(param_set, aux_gm.p, aux_gm.θ_liq_ice, aux_gm.q_tot))
     zi = FT(0.6) * get_inversion(grid, state, param_set, FT(0.2))
@@ -549,28 +470,16 @@ end
 
 function initialize_forcing(::Rico, forcing, grid::Grid, state, param_set)
     initialize(forcing, grid, state)
-    prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
-    ts_gm = aux_gm.ts
-    p_c = aux_gm.p
 
     FT = eltype(grid)
-    prof_ug = APL.Rico_geostrophic_ug(FT)
-    prof_vg = APL.Rico_geostrophic_vg(FT)
-    prof_dTdt = APL.Rico_dTdt(FT)
-    prof_dqtdt = APL.Rico_dqtdt(FT)
-    prof_subsidence = APL.Rico_subsidence(FT)
-
-    @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k].z
-        Π = TD.exner(param_set, ts_gm[k])
-        # Geostrophic velocity profiles
-        aux_gm.ug[k] = prof_ug(z)
-        aux_gm.vg[k] = prof_vg(z)
-        aux_gm.dTdt_hadv[k] = prof_dTdt(Π, z) # Set large-scale cooling
-        aux_gm.dqtdt_hadv[k] = prof_dqtdt(z) # Set large-scale moistening
-        aux_gm.subsidence[k] = prof_subsidence(z) #Set large scale subsidence
-    end
+    # Set large-scale moistening, subsidence, cooling and Geostrophic velocity profiles
+    Π = TC.z_function(@. TD.exner(param_set, aux_gm.ts))
+    TC.set_z!(aux_gm.dqtdt_hadv, APL.Rico_dqtdt(FT))
+    TC.set_z!(aux_gm.subsidence, APL.Rico_subsidence(FT))
+    TC.set_z!(aux_gm.ug, APL.Rico_geostrophic_ug(FT))
+    TC.set_z!(aux_gm.vg, APL.Rico_geostrophic_vg(FT))
+    TC.set_z!(aux_gm.dTdt_hadv, APL.Rico_dTdt(FT)(Π(z), z))
     return nothing
 end
 
@@ -591,41 +500,35 @@ function surface_ref_state(::TRMM_LBA, param_set::APS, namelist)
 end
 function initialize_profiles(::TRMM_LBA, grid::Grid, param_set, state; kwargs...)
     aux_gm = TC.center_aux_grid_mean(state)
-    prog_gm = TC.center_prog_grid_mean(state)
-    ρ_c = prog_gm.ρ
     p = aux_gm.p
 
     FT = eltype(grid)
     # Get profiles from AtmosphericProfilesLibrary.jl
     prof_p = APL.TRMM_LBA_p(FT)
-    prof_T = APL.TRMM_LBA_T(FT)
     prof_RH = APL.TRMM_LBA_RH(FT)
-    prof_u = APL.TRMM_LBA_u(FT)
-    prof_v = APL.TRMM_LBA_v(FT)
-    prof_tke = APL.TRMM_LBA_tke(FT)
+    TC.set_z!(aux_gm.tke, APL.TRMM_LBA_tke(FT))
+    TC.set_z!(aux_gm.T, APL.TRMM_LBA_T(FT))
 
-    zc = grid.zc.z
+    TC.set_z!(TC.grid_mean_u(state), APL.TRMM_LBA_u(FT))
+    TC.set_z!(TC.grid_mean_v(state), APL.TRMM_LBA_v(FT))
+
     molmass_ratio = TCP.molmass_ratio(param_set)
-    prog_gm = TC.center_prog_grid_mean(state)
-    prog_gm_u = TC.grid_mean_u(state)
-    prog_gm_v = TC.grid_mean_v(state)
 
-    prog_gm_u .= prof_u.(zc)
-    prog_gm_v .= prof_v.(zc)
-    aux_gm.T .= prof_T.(zc)
+    pv_star = @. TD.saturation_vapor_pressure(param_set, aux_gm.T, TD.Liquid())
+    # eq. 37 in pressel et al and the def of RH
+    z = CC.Fields.coordinate_field(axes(p)).z
 
-    @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k].z
-        pv_star = TD.saturation_vapor_pressure(param_set, aux_gm.T[k], TD.Liquid())
-        # eq. 37 in pressel et al and the def of RH
-        RH = prof_RH(z)
-        denom = (prof_p(z) - pv_star + (1 / molmass_ratio) * pv_star * RH / 100)
-        qv_star = pv_star * (1 / molmass_ratio) / denom
-        aux_gm.q_tot[k] = qv_star * RH / 100
-        phase_part = TD.PhasePartition(aux_gm.q_tot[k], FT(0), FT(0)) # initial state is not saturated
-        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp_given_pressure(param_set, aux_gm.T[k], p[k], phase_part)
-        aux_gm.tke[k] = prof_tke(z)
-    end
+    RH = @. prof_RH(z)
+    denom = @. (prof_p(z) - pv_star + (1 / molmass_ratio) * pv_star * RH / 100)
+    qv_star = @. pv_star * (1 / molmass_ratio) / denom
+    @. aux_gm.q_tot = qv_star * RH / 100
+    @. aux_gm.θ_liq_ice = TD.liquid_ice_pottemp_given_pressure(
+        param_set,
+        aux_gm.T,
+        p,
+        TD.PhasePartition(aux_gm.q_tot, FT(0), FT(0)) # initial state is not saturated
+    )
+
 end
 
 function surface_params(case::TRMM_LBA, surf_ref_state, param_set; Ri_bulk_crit)
