@@ -168,7 +168,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         val2 = a_bulk_c * val1
         aux_en.q_tot[k] = max(val1 * aux_gm.q_tot[k] - val2 * aux_bulk.q_tot[k], 0) #Yair - this is here to prevent negative QT
         aux_en.h_tot[k] = val1 * aux_gm.h_tot[k] - val2 * aux_bulk.h_tot[k]
-        # aux_en.θ_liq_ice[k] = val1 * aux_gm.θ_liq_ice[k] - val2 * aux_bulk.θ_liq_ice[k]
         if edmf.moisture_model isa NonEquilibriumMoisture
             aux_en.q_liq[k] = max(val1 * prog_gm.q_liq[k] - val2 * aux_bulk.q_liq[k], 0)
             aux_en.q_ice[k] = max(val1 * prog_gm.q_ice[k] - val2 * aux_bulk.q_ice[k], 0)
@@ -190,12 +189,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         ts_en = ts_env[k]
         aux_en.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_en)
         aux_en.e_tot[k] = TD.total_energy(param_set, ts_en, aux_en.e_kin[k], e_pot)
-
-        # ts_env[k] = thermo_state_pθq(param_set, p_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], thermo_args...)
-        # ts_en = ts_env[k]
-        # aux_en.e_tot[k] = TD.total_energy(param_set, ts_en, aux_en.e_kin[k], e_pot)
-        # aux_en.h_tot[k] = total_enthalpy(param_set, aux_en.e_tot[k], ts_en)
-
         aux_en.T[k] = TD.air_temperature(param_set, ts_en)
         aux_en.θ_virt[k] = TD.virtual_pottemp(param_set, ts_en)
         aux_en.θ_dry[k] = TD.dry_pottemp(param_set, ts_en)
