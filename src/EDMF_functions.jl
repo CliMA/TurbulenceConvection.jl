@@ -61,8 +61,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     a_en = aux_en.area
     w_en = aux_en_f.w
     w_gm = prog_gm_f.w
-    h_tot_en = copy(a_en)
-    h_tot_gm = copy(a_en)
+    h_tot_gm = aux_gm.h_tot
     q_tot_gm = aux_gm.q_tot
     q_tot_en = aux_en.q_tot
     a_en_bcs = a_en_boundary_conditions(surf, edmf)
@@ -190,7 +189,6 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     a_en = aux_en.area
     @. aeKM = a_en * KM
     @. aeKH = a_en * KH
-    w_en_c = copy(a_en)
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     kf_surf = kf_surface(grid)

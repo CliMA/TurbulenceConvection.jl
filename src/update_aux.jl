@@ -352,13 +352,9 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @. ∂qt∂z_sat = ∇c(wvec(If0(aux_en_sat.q_tot)))
     @. ∂θl∂z_sat = ∇c(wvec(If0(aux_en_sat.θ_liq_ice)))
     @. ∂θv∂z_unsat = ∇c(wvec(If0(aux_en_unsat.θ_virt)))
-    for k in real_center_indices(grid)
-        if shm[k] == 0
-            ∂qt∂z_sat[k] = ∂qt∂z[k]
-            ∂θl∂z_sat[k] = ∂θl∂z[k]
-            ∂θv∂z_unsat[k] = ∂θv∂z[k]
-        end
-    end
+    @. ∂qt∂z_sat = ifelse(shm == 0, ∂qt∂z, ∂qt∂z_sat)
+    @. ∂θl∂z_sat = ifelse(shm == 0, ∂θl∂z, ∂θl∂z_sat)
+    @. ∂θv∂z_unsat = ifelse(shm == 0, ∂θv∂z, ∂θv∂z_unsat)
 
     @inbounds for k in real_center_indices(grid)
 
