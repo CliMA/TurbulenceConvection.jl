@@ -76,7 +76,6 @@ function initialize_updrafts(edmf, grid, state, surf)
             aux_up[i].T[k] = aux_gm.T[k]
             prog_up[i].ρarea[k] = 0
             prog_up[i].ρaq_tot[k] = 0
-            prog_up[i].ρaθ_liq_ice[k] = 0
             prog_up[i].ρae_tot[k] = 0
         end
         if edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess
@@ -139,7 +138,6 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
                 # for now temperature is provided as diagnostics from LES
                 aux_up[i].T[k] = prof_T(z)
                 prog_up[i].ρarea[k] = ρ_0_c[k] * aux_up[i].area[k]
-                prog_up[i].ρaθ_liq_ice[k] = prog_up[i].ρarea[k] * aux_up[i].θ_liq_ice[k]
                 prog_up[i].ρaq_tot[k] = prog_up[i].ρarea[k] * aux_up[i].q_tot[k]
                 aux_up[i].e_kin[k] = kinetic_energy(prog_gm_u[k], prog_gm_v[k], w_up_c[k])
                 ts_up_i = thermo_state_pθq(p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
@@ -151,7 +149,6 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
                 aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
                 aux_up[i].T[k] = aux_gm.T[k]
                 prog_up[i].ρarea[k] = 0.0
-                prog_up[i].ρaθ_liq_ice[k] = 0.0
                 prog_up[i].ρae_tot[k] = 0.0
                 prog_up[i].ρaq_tot[k] = 0.0
             end
