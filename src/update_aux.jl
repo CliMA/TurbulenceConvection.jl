@@ -2,6 +2,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     #####
     ##### Unpack common variables
     #####
+    thermo_params = thermodynamics_params(param_set)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -77,7 +78,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 thermo_args = (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
             end
             ts_up_i = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k], thermo_args...)
-            aux_up[i].e_tot[k] = TD.total_energy(param_set, ts_up_i, aux_up[i].e_kin[k], e_pot)
+            aux_up[i].e_tot[k] = TD.total_energy(thermo_params, ts_up_i, aux_up[i].e_kin[k], e_pot)
             aux_up[i].h_tot[k] = total_enthalpy(param_set, aux_up[i].e_tot[k], ts_up_i)
         end
 
@@ -151,16 +152,16 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         h_en = enthalpy(aux_en.h_tot[k], e_pot, aux_en.e_kin[k])
         ts_env[k] = thermo_state_phq(param_set, p_c[k], h_en, aux_en.q_tot[k], thermo_args...)
         ts_en = ts_env[k]
-        aux_en.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_en)
-        aux_en.e_tot[k] = TD.total_energy(param_set, ts_en, aux_en.e_kin[k], e_pot)
-        aux_en.T[k] = TD.air_temperature(param_set, ts_en)
-        aux_en.θ_virt[k] = TD.virtual_pottemp(param_set, ts_en)
-        aux_en.θ_dry[k] = TD.dry_pottemp(param_set, ts_en)
-        aux_en.q_liq[k] = TD.liquid_specific_humidity(param_set, ts_en)
-        aux_en.q_ice[k] = TD.ice_specific_humidity(param_set, ts_en)
-        rho = TD.air_density(param_set, ts_en)
+        aux_en.θ_liq_ice[k] = TD.liquid_ice_pottemp(thermo_params, ts_en)
+        aux_en.e_tot[k] = TD.total_energy(thermo_params, ts_en, aux_en.e_kin[k], e_pot)
+        aux_en.T[k] = TD.air_temperature(thermo_params, ts_en)
+        aux_en.θ_virt[k] = TD.virtual_pottemp(thermo_params, ts_en)
+        aux_en.θ_dry[k] = TD.dry_pottemp(thermo_params, ts_en)
+        aux_en.q_liq[k] = TD.liquid_specific_humidity(thermo_params, ts_en)
+        aux_en.q_ice[k] = TD.ice_specific_humidity(thermo_params, ts_en)
+        rho = TD.air_density(thermo_params, ts_en)
         aux_en.buoy[k] = buoyancy_c(param_set, ρ_c[k], rho)
-        aux_en.RH[k] = TD.relative_humidity(param_set, ts_en)
+        aux_en.RH[k] = TD.relative_humidity(thermo_params, ts_en)
     end
 
     microphysics(edmf.en_thermo, grid, state, edmf, edmf.precip_model, Δt, param_set)
@@ -196,12 +197,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                     error("Something went wrong. emdf.moisture_model options are equilibrium or nonequilibrium")
                 end
             end
-            aux_up[i].q_liq[k] = TD.liquid_specific_humidity(param_set, ts_up)
-            aux_up[i].q_ice[k] = TD.ice_specific_humidity(param_set, ts_up)
-            aux_up[i].T[k] = TD.air_temperature(param_set, ts_up)
-            ρ = TD.air_density(param_set, ts_up)
+            aux_up[i].q_liq[k] = TD.liquid_specific_humidity(thermo_params, ts_up)
+            aux_up[i].q_ice[k] = TD.ice_specific_humidity(thermo_params, ts_up)
+            aux_up[i].T[k] = TD.air_temperature(thermo_params, ts_up)
+            ρ = TD.air_density(thermo_params, ts_up)
             aux_up[i].buoy[k] = buoyancy_c(param_set, ρ_c[k], ρ)
-            aux_up[i].RH[k] = TD.relative_humidity(param_set, ts_up)
+            aux_up[i].RH[k] = TD.relative_humidity(thermo_params, ts_up)
         end
         aux_gm.buoy[k] = (1.0 - aux_bulk.area[k]) * aux_en.buoy[k]
         @inbounds for i in 1:N_up
@@ -364,7 +365,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             ts_en = ts_env[k]
             bg_kwargs = (;
                 t_sat = aux_en.T[k],
-                qv_sat = TD.vapor_specific_humidity(param_set, ts_en),
+                qv_sat = TD.vapor_specific_humidity(thermo_params, ts_en),
                 qt_sat = aux_en.q_tot[k],
                 θ_sat = aux_en.θ_dry[k],
                 θ_liq_ice_sat = aux_en.θ_liq_ice[k],
@@ -483,7 +484,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
     ### Diagnostic thermodynamiccovariances
     if edmf.thermo_covariance_model isa DiagnosticThermoCovariances
-        flux1 = surf.shf / TD.cp_m(param_set, ts_gm[kc_surf])
+        flux1 = surf.shf / TD.cp_m(thermo_params, ts_gm[kc_surf])
         flux2 = surf.ρq_tot_flux
         zLL = grid.zc[kc_surf].z
         ustar = surf.ustar
