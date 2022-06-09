@@ -19,7 +19,7 @@ The package depndends on the following clima packages: [ClimaCore.jl](https://gi
 
 ## Authors
 
-CalibrateEDMF.jl is being developed by the [Climate Modeling Alliance](https://clima.caltech.edu). The main developers are Charles Kawczynski, Yair Cohen, Anna Jaruga, Ignacio Lopez-Gomez, Haakon Ludvig Langeland Ervik, Costa Christopoulos.
+TurbulenceConvection.jl is being developed by the [Climate Modeling Alliance](https://clima.caltech.edu). The main developers are Charles Kawczynski, Yair Cohen, Anna Jaruga, Ignacio Lopez-Gomez, Haakon Ludvig Langeland Ervik, Costa Christopoulos.
 
 ## References
 
