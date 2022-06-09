@@ -138,9 +138,6 @@ function set_thermo_state_peq!(state, grid, moisture_model, param_set)
         e_pot = TC.geopotential(param_set, grid.zc.z[k])
         e_int = prog_gm.ρe_tot[k] / ρ_c[k] - aux_gm.e_kin[k] - e_pot
         ts_gm[k] = TC.thermo_state_peq(param_set, p_c[k], e_int, aux_gm.q_tot[k], thermo_args...)
-        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts_gm[k])
-        aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
-        aux_gm.h_tot[k] = TC.total_enthalpy(param_set, prog_gm.ρe_tot[k] / ρ_c[k], ts_gm[k])
     end
     return nothing
 end
@@ -192,12 +189,13 @@ function assign_thermo_aux!(state, grid, moisture_model, param_set)
     ρ_c = prog_gm.ρ
     @inbounds for k in TC.real_center_indices(grid)
         ts = ts_gm[k]
+        aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
         aux_gm.q_liq[k] = TD.liquid_specific_humidity(param_set, ts)
         aux_gm.q_ice[k] = TD.ice_specific_humidity(param_set, ts)
         aux_gm.T[k] = TD.air_temperature(param_set, ts)
-        ρ = TD.air_density(param_set, ts)
-        aux_gm.buoy[k] = TC.buoyancy_c(param_set, ρ_c[k], ρ)
         aux_gm.RH[k] = TD.relative_humidity(param_set, ts)
+        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts)
+        aux_gm.h_tot[k] = TC.total_enthalpy(param_set, prog_gm.ρe_tot[k] / ρ_c[k], ts)
     end
     return
 end
@@ -237,6 +235,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         grid = TC.Grid(state)
 
         set_thermo_state_peq!(state, grid, edmf.moisture_model, param_set)
+        assign_thermo_aux!(state, grid, edmf.moisture_model, param_set)
 
         aux_gm = TC.center_aux_grid_mean(state)
 
