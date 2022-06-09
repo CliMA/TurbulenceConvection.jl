@@ -275,6 +275,7 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     ρ_c = prog_gm.ρ
     ρ_f = aux_gm_f.ρ
     w_up_c = aux_tc.w_up_c
+    ae_surf::FT = 1
     @inbounds for i in 1:N_up
         @. w_up_c = Ic(aux_up_f[i].w)
         θ_surf = θ_surface_bc(surf, grid, state, edmf, i, param_set)
@@ -294,6 +295,7 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
             prog_up[i].ρaq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * q_ice_surf
         end
         prog_up_f[i].ρaw[kf_surf] = ρ_f[kf_surf] * w_surface_bc(surf)
+        ae_surf -= a_surf
     end
 
     flux1 = surf.shf / cp
@@ -302,9 +304,6 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     ustar = surf.ustar
     oblength = surf.obukhov_length
     ρLL = prog_gm.ρ[kc_surf]
-    # TODO: is bulk even defined before this is called?
-    ae_surf = 1 - aux_bulk.area[kc_surf] # area of environment
-
     ρ_ae = ρ_c[kc_surf] * ae_surf
     mix_len_params = mixing_length_params(edmf)
     prog_en.ρatke[kc_surf] = ρ_ae * get_surface_tke(mix_len_params, surf.ustar, zLL, surf.obukhov_length)
