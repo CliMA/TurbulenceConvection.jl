@@ -9,3 +9,12 @@ function thermo_state_pθq(param_set::APS, p::FT, θ_liq_ice::FT, q_tot::FT, q_l
     q = TD.PhasePartition(q_tot, q_liq, q_ice)
     return TD.PhaseNonEquil_pθq(param_set, p, θ_liq_ice, q, config...)
 end
+
+function geopotential(param_set, z::FT) where {FT}
+    grav = FT(CP.Planet.grav(param_set))
+    return grav * z
+end
+
+function enthalpy(mse::FT, e_pot::FT) where {FT}
+    return mse - e_pot
+end
