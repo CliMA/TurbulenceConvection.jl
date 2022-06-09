@@ -33,9 +33,6 @@ include("PlotReferenceStates.jl")
 ## GABLS
 ![](GABLS.svg)
 
-## SP
-![](SP.svg)
-
 ## DryBubble
 ![](DryBubble.svg)
 

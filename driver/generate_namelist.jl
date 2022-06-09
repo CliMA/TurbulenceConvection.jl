@@ -295,8 +295,6 @@ function default_namelist(
         namelist = DYCOMS_RF02(namelist_defaults)
     elseif case_name == "GABLS"
         namelist = GABLS(namelist_defaults)
-    elseif case_name == "SP"
-        namelist = SP(namelist_defaults)
     elseif case_name == "DryBubble"
         namelist = DryBubble(namelist_defaults)
     elseif case_name == "LES_driven_SCM"
@@ -550,23 +548,7 @@ function GABLS(namelist_defaults)
 
     return namelist
 end
-# Not fully implemented yet - Ignacio
-function SP(namelist_defaults)
 
-    namelist = deepcopy(namelist_defaults)
-    namelist["meta"]["casename"] = "SP"
-
-    # this case is resolution dependent, we should check why
-    namelist["grid"]["nz"] = 64
-    namelist["grid"]["dz"] = 32
-
-    namelist["time_stepping"]["t_max"] = 7200.0
-    namelist["time_stepping"]["dt_min"] = 1.0
-    namelist["meta"]["simname"] = "SP"
-    namelist["meta"]["casename"] = "SP"
-
-    return namelist
-end
 function DryBubble(namelist_defaults)
     namelist = deepcopy(namelist_defaults)
     namelist["meta"]["casename"] = "DryBubble"

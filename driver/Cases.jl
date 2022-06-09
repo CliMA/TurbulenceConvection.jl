@@ -85,8 +85,6 @@ struct DYCOMS_RF02 <: AbstractCaseType end
 
 struct GABLS <: AbstractCaseType end
 
-struct SP <: AbstractCaseType end
-
 struct DryBubble <: AbstractCaseType end
 
 struct LES_driven_SCM <: AbstractCaseType end
@@ -181,7 +179,6 @@ get_case(::Val{:GATE_III}) = GATE_III()
 get_case(::Val{:DYCOMS_RF01}) = DYCOMS_RF01()
 get_case(::Val{:DYCOMS_RF02}) = DYCOMS_RF02()
 get_case(::Val{:GABLS}) = GABLS()
-get_case(::Val{:SP}) = SP()
 get_case(::Val{:DryBubble}) = DryBubble()
 get_case(::Val{:LES_driven_SCM}) = LES_driven_SCM()
 
@@ -1051,51 +1048,6 @@ function initialize_forcing(::GABLS, forcing, grid::Grid, state, param_set)
         aux_gm.vg[k] = APL.GABLS_geostrophic_vg(FT)(z)
     end
     return nothing
-end
-
-#####
-##### SP
-#####
-
-# Not fully implemented yet - Ignacio
-function ForcingBase(case::SP, param_set::APS; kwargs...)
-    coriolis_param = 1.0e-4 # s^{-1}
-    # Omega = TCP.Omega(param_set)
-    # coriolis_param = 2 * Omega * sin(latitude * π / 180 ) # s^{-1}
-    ForcingBase(get_forcing_type(case); apply_coriolis = true, coriolis_param = coriolis_param)
-end
-
-function surface_ref_state(::SP, param_set::APS, namelist)
-    Pg = 1.0e5  #Pressure at ground
-    Tg = 300.0  #Temperature at ground
-    qtg = 1.0e-4   #Total water mixing ratio at TC. if set to 0, p, ρ are NaN.
-    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
-end
-
-function initialize_profiles(::SP, grid::Grid, param_set, state; kwargs...)
-    aux_gm = TC.center_aux_grid_mean(state)
-    prog_gm = TC.center_prog_grid_mean(state)
-    prog_gm_u = TC.grid_mean_u(state)
-    prog_gm_v = TC.grid_mean_v(state)
-    ρ_c = prog_gm.ρ
-    FT = eltype(grid)
-    @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k].z
-        prog_gm_u[k] = APL.SP_u(FT)(z)
-        prog_gm_v[k] = APL.SP_v(FT)(z)
-        aux_gm.θ_liq_ice[k] = APL.SP_θ_liq_ice(FT)(z)
-        aux_gm.q_tot[k] = APL.SP_q_tot(FT)(z)
-        aux_gm.tke[k] = APL.SP_tke(FT)(z)
-    end
-end
-
-function initialize_forcing(::SP, forcing, grid::Grid, state, param_set)
-    aux_gm = TC.center_aux_grid_mean(state)
-    @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k].z
-        aux_gm.ug[k] = APL.SP_geostrophic_u(FT)(z)
-        aux_gm.vg[k] = APL.SP_geostrophic_v(FT)(z)
-    end
 end
 
 #####
