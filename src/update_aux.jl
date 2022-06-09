@@ -55,51 +55,24 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         #####
         e_pot = geopotential(param_set, grid.zc.z[k])
         @inbounds for i in 1:N_up
-            if is_surface_center(grid, k)
-                if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
-                    θ_surf = θ_surface_bc(surf, grid, state, edmf, i, param_set)
-                    q_surf = q_surface_bc(surf, grid, state, edmf, i)
-                    a_surf = area_surface_bc(surf, edmf, i)
-                    aux_up[i].θ_liq_ice[k] = θ_surf
-                    aux_up[i].q_tot[k] = q_surf
-                    aux_up[i].area[k] = a_surf
-                else
-                    aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
-                    aux_up[i].q_tot[k] = aux_gm.q_tot[k]
-                    aux_up[i].e_kin[k] = aux_gm.e_kin[k]
-                end
+            if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
+                aux_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / prog_up[i].ρarea[k]
+                aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
+                aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ_c[k]
             else
-                if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
-                    aux_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / prog_up[i].ρarea[k]
-                    aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
-                    aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ_c[k]
-                else
-                    aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
-                    aux_up[i].q_tot[k] = aux_gm.q_tot[k]
-                    aux_up[i].area[k] = 0
-                    aux_up[i].e_kin[k] = aux_gm.e_kin[k]
-                end
+                aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
+                aux_up[i].q_tot[k] = aux_gm.q_tot[k]
+                aux_up[i].area[k] = 0
+                aux_up[i].e_kin[k] = aux_gm.e_kin[k]
             end
             thermo_args = ()
             if edmf.moisture_model isa NonEquilibriumMoisture
-                if is_surface_center(grid, k)
-                    if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
-                        ql_surf = ql_surface_bc(surf)
-                        qi_surf = qi_surface_bc(surf)
-                        aux_up[i].q_liq[k] = ql_surf
-                        aux_up[i].q_ice[k] = qi_surf
-                    else
-                        aux_up[i].q_liq[k] = prog_gm.q_liq[k]
-                        aux_up[i].q_ice[k] = prog_gm.q_ice[k]
-                    end
+                if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
+                    aux_up[i].q_liq[k] = prog_up[i].ρaq_liq[k] / prog_up[i].ρarea[k]
+                    aux_up[i].q_ice[k] = prog_up[i].ρaq_ice[k] / prog_up[i].ρarea[k]
                 else
-                    if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
-                        aux_up[i].q_liq[k] = prog_up[i].ρaq_liq[k] / prog_up[i].ρarea[k]
-                        aux_up[i].q_ice[k] = prog_up[i].ρaq_ice[k] / prog_up[i].ρarea[k]
-                    else
-                        aux_up[i].q_liq[k] = prog_gm.q_liq[k]
-                        aux_up[i].q_ice[k] = prog_gm.q_ice[k]
-                    end
+                    aux_up[i].q_liq[k] = prog_gm.q_liq[k]
+                    aux_up[i].q_ice[k] = prog_gm.q_ice[k]
                 end
                 thermo_args = (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
             end
@@ -379,14 +352,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @. ∂qt∂z_sat = ∇c(wvec(If0(aux_en_sat.q_tot)))
     @. ∂M∂z_unsat = ∇c(wvec(If0(aux_en_unsat.M)))
     @. ∂qt∂z_unsat = ∇c(wvec(If0(aux_en_unsat.q_tot)))
-    for k in real_center_indices(grid)
-        if shm[k] == 0
-            ∂M∂z_sat[k] = ∂M∂z[k]
-            ∂qt∂z_sat[k] = ∂qt∂z[k]
-            ∂M∂z_unsat[k] = ∂M∂z[k]
-            ∂qt∂z_unsat[k] = ∂qt∂z[k]
-        end
-    end
+    @. ∂M∂z_sat= ifelse(shm == 0, ∂M∂z, ∂M∂z_sat)
+    @. ∂qt∂z_sat= ifelse(shm == 0, ∂qt∂z, ∂qt∂z_sat)
+    @. ∂M∂z_unsat= ifelse(shm == 0, ∂M∂z, ∂M∂z_unsat)
+    @. ∂qt∂z_unsat= ifelse(shm == 0, ∂qt∂z, ∂qt∂z_unsat)
 
     @inbounds for k in real_center_indices(grid)
 

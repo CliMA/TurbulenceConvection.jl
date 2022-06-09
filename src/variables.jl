@@ -26,7 +26,7 @@ cent_aux_vars_up_moisture(FT, ::NonEquilibriumMoisture) = (;
     qi_tendency_noneq = FT(0),
 )
 cent_aux_vars_up_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
-cent_aux_vars_up(FT, edmf) = (;
+cent_aux_vars_up(FT, local_geometry, edmf) = (;
     ts = thermo_state(FT, edmf.moisture_model),
     q_liq = FT(0),
     q_ice = FT(0),
@@ -75,7 +75,7 @@ cent_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
     diffusive_tendency_qi = FT(0),
 )
 cent_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
-cent_aux_vars_edmf(FT, edmf) = (;
+cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
     turbconv = (;
         ϕ_temporary = FT(0),
         ψ_temporary = FT(0),
@@ -95,7 +95,7 @@ cent_aux_vars_edmf(FT, edmf) = (;
             qt_tendency_precip_formation = FT(0),
             cent_aux_vars_edmf_bulk_moisture(FT, edmf.moisture_model)...,
         ),
-        up = ntuple(i -> cent_aux_vars_up(FT, edmf), n_updrafts(edmf)),
+        up = ntuple(i -> cent_aux_vars_up(FT, local_geometry, edmf), Val(n_updrafts(edmf))),
         en = (;
             ts = thermo_state(FT, edmf.moisture_model),
             w = FT(0),
@@ -177,7 +177,7 @@ cent_aux_vars_edmf(FT, edmf) = (;
 )
 
 # Face only
-face_aux_vars_up(FT) = (;
+face_aux_vars_up(FT, local_geometry) = (;
     w = FT(0),
     nh_pressure = FT(0),
     nh_pressure_b = FT(0),
@@ -193,14 +193,14 @@ face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
     diffusive_flux_qi = FT(0),
 )
 face_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
-face_aux_vars_edmf(FT, edmf) = (;
+face_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
     turbconv = (;
         bulk = (; w = FT(0)),
         ρ_ae_KM = FT(0),
         ρ_ae_KH = FT(0),
         ρ_ae_K = FT(0),
         en = (; w = FT(0)),
-        up = ntuple(i -> face_aux_vars_up(FT), n_updrafts(edmf)),
+        up = ntuple(i -> face_aux_vars_up(FT, local_geometry), Val(n_updrafts(edmf))),
         massflux = FT(0),
         massflux_h = FT(0),
         massflux_qt = FT(0),
@@ -216,7 +216,7 @@ face_aux_vars_edmf(FT, edmf) = (;
 ##### Diagnostic fields
 
 # Center only
-cent_diagnostic_vars_edmf(FT, edmf) = (;
+cent_diagnostic_vars_edmf(FT, local_geometry, edmf) = (;
     turbconv = (;
         asp_ratio = FT(0),
         entr_sc = FT(0),
@@ -229,7 +229,7 @@ cent_diagnostic_vars_edmf(FT, edmf) = (;
 )
 
 # Face only
-face_diagnostic_vars_edmf(FT, edmf) = (;
+face_diagnostic_vars_edmf(FT, local_geometry, edmf) = (;
     turbconv = (; nh_pressure = FT(0), nh_pressure_adv = FT(0), nh_pressure_drag = FT(0), nh_pressure_b = FT(0)),
     precip = (; rain_flux = FT(0), snow_flux = FT(0)),
 )

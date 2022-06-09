@@ -12,7 +12,7 @@ end
 condition_every_iter(u, t, integrator) = true
 
 function affect_io!(integrator)
-    UnPack.@unpack edmf, calibrate_io, precip_model, aux, io_nt, diagnostics, case, param_set, Stats, skip_io =
+    UnPack.@unpack edmf, calibrate_io, precip_model, aux, io_nt, diagnostics, surf_params, param_set, Stats, skip_io =
         integrator.p
     skip_io && return nothing
     t = integrator.t
@@ -32,7 +32,7 @@ function affect_io!(integrator)
         diag_col = TC.column_diagnostics(diagnostics, inds...)
 
         # TODO: is this the best location to call diagnostics?
-        compute_diagnostics!(edmf, precip_model, param_set, grid, state, diag_col, stats, case, t, calibrate_io)
+        compute_diagnostics!(edmf, precip_model, param_set, grid, state, diag_col, stats, surf_params, t, calibrate_io)
 
         cent = TC.Cent(1)
         diag_svpc = svpc_diagnostics_grid_mean(diag_col)
@@ -64,15 +64,15 @@ function affect_io!(integrator)
         io(io_nt.aux, stats, state)
         io(io_nt.diagnostics, stats, diag_col)
 
-        surf = get_surface(case.surf_params, grid, state, t, param_set)
-        io(surf, case.surf_params, grid, state, stats, t)
+        surf = get_surface(surf_params, grid, state, t, param_set)
+        io(surf, surf_params, grid, state, stats, t)
     end
 
     ODE.u_modified!(integrator, false) # We're legitamately not mutating `u` (the state vector)
 end
 
 function affect_filter!(integrator)
-    UnPack.@unpack edmf, param_set, aux, case = integrator.p
+    UnPack.@unpack edmf, param_set, aux, case, surf_params = integrator.p
     t = integrator.t
     prog = integrator.u
     tendencies = ODE.get_du(integrator)
@@ -81,8 +81,8 @@ function affect_filter!(integrator)
     for inds in TC.iterate_columns(prog.cent)
         state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
-        surf = get_surface(case.surf_params, grid, state, t, param_set)
-        TC.affect_filter!(edmf, grid, state, param_set, surf, case.casename, t)
+        surf = get_surface(surf_params, grid, state, t, param_set)
+        TC.affect_filter!(edmf, grid, state, param_set, surf, t)
     end
 
     # We're lying to OrdinaryDiffEq.jl, in order to avoid

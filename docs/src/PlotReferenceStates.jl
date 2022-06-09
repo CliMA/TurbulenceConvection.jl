@@ -71,7 +71,6 @@ Logging.with_logger(Logging.NullLogger()) do # silence output
         "ARM_SGP",
         "DYCOMS_RF01",
         "GABLS",
-        "SP",
         "DryBubble",
         "TRMM_LBA",
         "GATE_III",

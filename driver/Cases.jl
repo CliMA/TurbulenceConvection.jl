@@ -7,6 +7,7 @@ import OrdinaryDiffEq
 const ODE = OrdinaryDiffEq
 
 import ClimaCore
+import DocStringExtensions
 const CC = ClimaCore
 const CCO = CC.Operators
 const CCG = CC.Geometry
@@ -29,9 +30,6 @@ const TD = Thermodynamics
 import ..TurbulenceConvection
 const TC = TurbulenceConvection
 const TCP = TC.TurbulenceConvectionParameters
-
-import ..TurbulenceConvection: ForcingBase
-import ..TurbulenceConvection: RadiationBase
 
 using ..TurbulenceConvection: pyinterp
 using ..TurbulenceConvection: Grid
@@ -87,18 +85,86 @@ struct DYCOMS_RF02 <: AbstractCaseType end
 
 struct GABLS <: AbstractCaseType end
 
-struct SP <: AbstractCaseType end
-
 struct DryBubble <: AbstractCaseType end
 
 struct LES_driven_SCM <: AbstractCaseType end
 
 #####
-##### Case methods
+##### Radiation and forcing types
+#####
+
+struct ForcingNone end
+struct ForcingStandard end
+struct ForcingDYCOMS_RF01 end
+struct ForcingLES end
+
+struct RadiationNone end
+struct RadiationDYCOMS_RF01 end
+struct RadiationLES end
+struct RadiationTRMM_LBA end
+
+"""
+    ForcingBase
+
+LES-driven forcing
+
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct ForcingBase{T}
+    "Boolean specifying whether Coriolis forcing is applied"
+    apply_coriolis::Bool = false
+    "Coriolis parameter"
+    coriolis_param::Float64 = 0
+    "Wind relaxation timescale"
+    wind_nudge_τᵣ::Float64 = 0.0
+    "Scalar relaxation lower z"
+    scalar_nudge_zᵢ::Float64 = 0.0
+    "Scalar relaxation upper z"
+    scalar_nudge_zᵣ::Float64 = 0.0
+    "Scalar maximum relaxation timescale"
+    scalar_nudge_τᵣ::Float64 = 0.0
+    "Large-scale divergence (same as in RadiationBase)"
+    divergence::Float64 = 0
+end
+
+ForcingBase(::Type{T}; kwargs...) where {T} = ForcingBase{T}(; kwargs...)
+
+force_type(::ForcingBase{T}) where {T} = T
+
+Base.@kwdef struct RadiationBase{T}
+    "Large-scale divergence (same as in ForcingBase)"
+    divergence::Float64 = 0
+    alpha_z::Float64 = 0
+    kappa::Float64 = 0
+    F0::Float64 = 0
+    F1::Float64 = 0
+end
+
+rad_type(::RadiationBase{T}) where {T} = T
+
+Base.@kwdef struct LESData
+    "Start time index of LES"
+    imin::Int = 0
+    "End time index of LES"
+    imax::Int = 0
+    "Path to LES stats file used to drive SCM"
+    les_filename::String = nothing
+    "Drive SCM with LES data from t = [end - t_interval_from_end_s, end]"
+    t_interval_from_end_s::Float64 = 6 * 3600.0
+    "Length of time to average over for SCM initialization"
+    initial_condition_averaging_window_s::Float64 = 3600.0
+end
+
+#####
+##### Radiation and forcing functions
 #####
 
 include("Radiation.jl")
 include("Forcing.jl")
+
+#####
+##### Case methods
+#####
 
 get_case(namelist::Dict) = get_case(namelist["meta"]["casename"])
 get_case(casename::String) = get_case(Val(Symbol(casename)))
@@ -113,7 +179,6 @@ get_case(::Val{:GATE_III}) = GATE_III()
 get_case(::Val{:DYCOMS_RF01}) = DYCOMS_RF01()
 get_case(::Val{:DYCOMS_RF02}) = DYCOMS_RF02()
 get_case(::Val{:GABLS}) = GABLS()
-get_case(::Val{:SP}) = SP()
 get_case(::Val{:DryBubble}) = DryBubble()
 get_case(::Val{:LES_driven_SCM}) = LES_driven_SCM()
 
@@ -123,20 +188,20 @@ get_case_name(case_type::AbstractCaseType) = string(case_type)
 ##### Case configurations
 #####
 
-get_forcing_type(::AbstractCaseType) = TC.ForcingStandard # default
-get_forcing_type(::Soares) = TC.ForcingNone
-get_forcing_type(::Nieuwstadt) = TC.ForcingNone
-get_forcing_type(::DYCOMS_RF01) = TC.ForcingDYCOMS_RF01
-get_forcing_type(::DYCOMS_RF02) = TC.ForcingDYCOMS_RF01
-get_forcing_type(::DryBubble) = TC.ForcingNone
-get_forcing_type(::LES_driven_SCM) = TC.ForcingLES
-get_forcing_type(::TRMM_LBA) = TC.ForcingNone
+get_forcing_type(::AbstractCaseType) = ForcingStandard # default
+get_forcing_type(::Soares) = ForcingNone
+get_forcing_type(::Nieuwstadt) = ForcingNone
+get_forcing_type(::DYCOMS_RF01) = ForcingDYCOMS_RF01
+get_forcing_type(::DYCOMS_RF02) = ForcingDYCOMS_RF01
+get_forcing_type(::DryBubble) = ForcingNone
+get_forcing_type(::LES_driven_SCM) = ForcingLES
+get_forcing_type(::TRMM_LBA) = ForcingNone
 
-get_radiation_type(::AbstractCaseType) = TC.RadiationNone # default
-get_radiation_type(::DYCOMS_RF01) = TC.RadiationDYCOMS_RF01
-get_radiation_type(::DYCOMS_RF02) = TC.RadiationDYCOMS_RF01
-get_radiation_type(::LES_driven_SCM) = TC.RadiationLES
-get_radiation_type(::TRMM_LBA) = TC.RadiationTRMM_LBA
+get_radiation_type(::AbstractCaseType) = RadiationNone # default
+get_radiation_type(::DYCOMS_RF01) = RadiationDYCOMS_RF01
+get_radiation_type(::DYCOMS_RF02) = RadiationDYCOMS_RF01
+get_radiation_type(::LES_driven_SCM) = RadiationLES
+get_radiation_type(::TRMM_LBA) = RadiationTRMM_LBA
 
 large_scale_divergence(::Union{DYCOMS_RF01, DYCOMS_RF02}) = 3.75e-6
 
@@ -986,51 +1051,6 @@ function initialize_forcing(::GABLS, forcing, grid::Grid, state, param_set)
 end
 
 #####
-##### SP
-#####
-
-# Not fully implemented yet - Ignacio
-function ForcingBase(case::SP, param_set::APS; kwargs...)
-    coriolis_param = 1.0e-4 # s^{-1}
-    # Omega = TCP.Omega(param_set)
-    # coriolis_param = 2 * Omega * sin(latitude * π / 180 ) # s^{-1}
-    ForcingBase(get_forcing_type(case); apply_coriolis = true, coriolis_param = coriolis_param)
-end
-
-function surface_ref_state(::SP, param_set::APS, namelist)
-    Pg = 1.0e5  #Pressure at ground
-    Tg = 300.0  #Temperature at ground
-    qtg = 1.0e-4   #Total water mixing ratio at TC. if set to 0, p, ρ are NaN.
-    return TD.PhaseEquil_pTq(param_set, Pg, Tg, qtg)
-end
-
-function initialize_profiles(::SP, grid::Grid, param_set, state; kwargs...)
-    aux_gm = TC.center_aux_grid_mean(state)
-    prog_gm = TC.center_prog_grid_mean(state)
-    prog_gm_u = TC.grid_mean_u(state)
-    prog_gm_v = TC.grid_mean_v(state)
-    ρ_c = prog_gm.ρ
-    FT = eltype(grid)
-    @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k].z
-        prog_gm_u[k] = APL.SP_u(FT)(z)
-        prog_gm_v[k] = APL.SP_v(FT)(z)
-        aux_gm.θ_liq_ice[k] = APL.SP_θ_liq_ice(FT)(z)
-        aux_gm.q_tot[k] = APL.SP_q_tot(FT)(z)
-        aux_gm.tke[k] = APL.SP_tke(FT)(z)
-    end
-end
-
-function initialize_forcing(::SP, forcing, grid::Grid, state, param_set)
-    aux_gm = TC.center_aux_grid_mean(state)
-    @inbounds for k in real_center_indices(grid)
-        z = grid.zc[k].z
-        aux_gm.ug[k] = APL.SP_geostrophic_u(FT)(z)
-        aux_gm.vg[k] = APL.SP_geostrophic_v(FT)(z)
-    end
-end
-
-#####
 ##### DryBubble
 #####
 
@@ -1112,7 +1132,7 @@ function les_data_kwarg(::LES_driven_SCM, namelist)
         imin = time_interval_bool[1]
         imax = time_interval_bool[end]
 
-        TC.LESData(imin, imax, les_filename, t_interval_from_end_s, namelist["initial_condition_averaging_window_s"])
+        LESData(imin, imax, les_filename, t_interval_from_end_s, namelist["initial_condition_averaging_window_s"])
     end
     return (; LESDat)
 end

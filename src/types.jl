@@ -368,33 +368,6 @@ function MoninObukhovSurface(
     return MoninObukhovSurface{FT, TS, QS}(; Tsurface, qsurface, kwargs...)
 end
 
-Base.@kwdef struct SullivanPattonSurface{FT, TS, QS, SHF, LHF} <: AbstractSurfaceParameters{FT}
-    zrough::FT = FT(0)
-    Tsurface::TS = FT(0)
-    qsurface::QS = FT(0)
-    shf::SHF = FT(0)
-    lhf::LHF = FT(0)
-    cq::FT = FT(0)
-    Ri_bulk_crit::FT = FT(0)
-    ustar::FT = FT(0)
-end
-
-function SullivanPattonSurface(
-    ::Type{FT};
-    Tsurface::FloatOrFunc{FT},
-    qsurface::FloatOrFunc{FT},
-    shf::FloatOrFunc{FT},
-    lhf::FloatOrFunc{FT},
-    kwargs...,
-) where {FT}
-    TS = typeof(Tsurface)
-    QS = typeof(qsurface)
-    SHF = typeof(shf)
-    LHF = typeof(lhf)
-    return SullivanPattonSurface{FT, TS, QS, SHF, LHF}(; Tsurface, qsurface, shf, lhf, kwargs...)
-end
-
-
 float_or_func(s::Function, t::Real) = s(t)
 float_or_func(s::Dierckx.Spline1D, t::Real) = s(t)
 float_or_func(s::Real, t::Real) = s
@@ -422,93 +395,6 @@ Base.@kwdef struct SurfaceBase{FT}
     ρv_flux::FT = 0
     obukhov_length::FT = 0
     wstar::FT = 0
-end
-
-struct ForcingNone end
-struct ForcingStandard end
-struct ForcingDYCOMS_RF01 end
-struct ForcingLES end
-
-struct RadiationNone end
-struct RadiationDYCOMS_RF01 end
-struct RadiationLES end
-struct RadiationTRMM_LBA end
-
-Base.@kwdef struct LESData
-    "Start time index of LES"
-    imin::Int = 0
-    "End time index of LES"
-    imax::Int = 0
-    "Path to LES stats file used to drive SCM"
-    les_filename::String = nothing
-    "Drive SCM with LES data from t = [end - t_interval_from_end_s, end]"
-    t_interval_from_end_s::Float64 = 6 * 3600.0
-    "Length of time to average over for SCM initialization"
-    initial_condition_averaging_window_s::Float64 = 3600.0
-end
-
-"""
-    ForcingBase
-
-LES-driven forcing
-
-$(DocStringExtensions.FIELDS)
-"""
-Base.@kwdef struct ForcingBase{T}
-    "Boolean specifying whether Coriolis forcing is applied"
-    apply_coriolis::Bool = false
-    "Coriolis parameter"
-    coriolis_param::Float64 = 0
-    "Wind relaxation timescale"
-    wind_nudge_τᵣ::Float64 = 0.0
-    "Scalar relaxation lower z"
-    scalar_nudge_zᵢ::Float64 = 0.0
-    "Scalar relaxation upper z"
-    scalar_nudge_zᵣ::Float64 = 0.0
-    "Scalar maximum relaxation timescale"
-    scalar_nudge_τᵣ::Float64 = 0.0
-    "Large-scale divergence (same as in RadiationBase)"
-    divergence::Float64 = 0
-end
-
-ForcingBase(::Type{T}; kwargs...) where {T} = ForcingBase{T}(; kwargs...)
-
-force_type(::ForcingBase{T}) where {T} = T
-
-Base.@kwdef struct RadiationBase{T}
-    "Large-scale divergence (same as in ForcingBase)"
-    divergence::Float64 = 0
-    alpha_z::Float64 = 0
-    kappa::Float64 = 0
-    F0::Float64 = 0
-    F1::Float64 = 0
-end
-
-rad_type(::RadiationBase{T}) where {T} = T
-
-Base.@kwdef struct CasesBase{T, SURFP, F, R, LESDataT}
-    case::T
-    casename::String
-    surf_params::SURFP
-    Fo::F
-    Rad::R
-    LESDat::LESDataT
-end
-
-function CasesBase(case::T; surf_params, Fo, Rad, LESDat = nothing, kwargs...) where {T}
-    F = typeof(Fo)
-    R = typeof(Rad)
-    SURFP = typeof(surf_params)
-    LESDataT = typeof(LESDat)
-    CasesBase{T, SURFP, F, R, LESDataT}(;
-        case = case,
-        casename = string(nameof(T)),
-        surf_params,
-        Fo,
-        Rad,
-        LESDat,
-        kwargs...,
-    )
 end
 
 struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}
