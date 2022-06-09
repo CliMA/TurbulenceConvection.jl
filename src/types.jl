@@ -367,33 +367,6 @@ function MoninObukhovSurface(
     return MoninObukhovSurface{FT, TS, QS}(; Tsurface, qsurface, kwargs...)
 end
 
-Base.@kwdef struct SullivanPattonSurface{FT, TS, QS, SHF, LHF} <: AbstractSurfaceParameters{FT}
-    zrough::FT = FT(0)
-    Tsurface::TS = FT(0)
-    qsurface::QS = FT(0)
-    shf::SHF = FT(0)
-    lhf::LHF = FT(0)
-    cq::FT = FT(0)
-    Ri_bulk_crit::FT = FT(0)
-    ustar::FT = FT(0)
-end
-
-function SullivanPattonSurface(
-    ::Type{FT};
-    Tsurface::FloatOrFunc{FT},
-    qsurface::FloatOrFunc{FT},
-    shf::FloatOrFunc{FT},
-    lhf::FloatOrFunc{FT},
-    kwargs...,
-) where {FT}
-    TS = typeof(Tsurface)
-    QS = typeof(qsurface)
-    SHF = typeof(shf)
-    LHF = typeof(lhf)
-    return SullivanPattonSurface{FT, TS, QS, SHF, LHF}(; Tsurface, qsurface, shf, lhf, kwargs...)
-end
-
-
 float_or_func(s::Function, t::Real) = s(t)
 float_or_func(s::Dierckx.Spline1D, t::Real) = s(t)
 float_or_func(s::Real, t::Real) = s

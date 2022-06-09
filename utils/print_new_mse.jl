@@ -13,12 +13,9 @@ all_cases = [
     "Nieuwstadt",
     "Rico",
     "Soares",
-    "SP",
     "TRMM_LBA",
     "LES_driven_SCM",
 ]
-
-filter!(x -> x ≠ "SP", all_cases) # not currently running SP
 
 include(joinpath("..", "post_processing", "mse_tables.jl"))
 
