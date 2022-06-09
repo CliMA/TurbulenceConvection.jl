@@ -10,7 +10,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
     obukhov_length = surf.obukhov_length
-    FT = eltype(grid)
+    FT = float_type(state)
     prog_gm = center_prog_grid_mean(state)
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)

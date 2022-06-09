@@ -237,7 +237,7 @@ function initialize_profiles(::Soares, grid::Grid, param_set, state; kwargs...)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     prof_q_tot = APL.Soares_q_tot(FT)
     prof_θ_liq_ice = APL.Soares_θ_liq_ice(FT)
     prof_u = APL.Soares_u(FT)
@@ -287,7 +287,7 @@ function initialize_profiles(::Nieuwstadt, grid::Grid, param_set, state; kwargs.
     prog_gm = TC.center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
 
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     prof_θ_liq_ice = APL.Nieuwstadt_θ_liq_ice(FT)
     prof_u = APL.Nieuwstadt_u(FT)
     prof_tke = APL.Nieuwstadt_tke(FT)
@@ -336,7 +336,7 @@ function initialize_profiles(::Bomex, grid::Grid, param_set, state; kwargs...)
     prog_gm = TC.center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
 
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     prof_q_tot = APL.Bomex_q_tot(FT)
     prof_θ_liq_ice = APL.Bomex_θ_liq_ice(FT)
     prof_u = APL.Bomex_u(FT)
@@ -377,7 +377,7 @@ function initialize_forcing(::Bomex, forcing, grid::Grid, state, param_set)
     ts_gm = aux_gm.ts
     p_c = aux_gm.p
 
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     prof_ug = APL.Bomex_geostrophic_u(FT)
     prof_dTdt = APL.Bomex_dTdt(FT)
     prof_dqtdt = APL.Bomex_dqtdt(FT)
@@ -416,7 +416,7 @@ function initialize_profiles(::life_cycle_Tan2018, grid::Grid, param_set, state;
     prog_gm = TC.center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
 
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     prof_q_tot = APL.LifeCycleTan2018_q_tot(FT)
     prof_θ_liq_ice = APL.LifeCycleTan2018_θ_liq_ice(FT)
     prof_u = APL.LifeCycleTan2018_u(FT)
@@ -463,7 +463,7 @@ function initialize_forcing(::life_cycle_Tan2018, forcing, grid::Grid, state, pa
     p_c = aux_gm.p
     ts_gm = aux_gm.ts
 
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     prof_ug = APL.LifeCycleTan2018_geostrophic_u(FT)
     prof_dTdt = APL.LifeCycleTan2018_dTdt(FT)
     prof_dqtdt = APL.LifeCycleTan2018_dqtdt(FT)
@@ -513,7 +513,7 @@ function initialize_profiles(::Rico, grid::Grid, param_set, state; kwargs...)
     p = aux_gm.p
     ρ_c = prog_gm.ρ
 
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     prof_u = APL.Rico_u(FT)
     prof_v = APL.Rico_v(FT)
     prof_q_tot = APL.Rico_q_tot(FT)
@@ -577,7 +577,7 @@ function initialize_forcing(::Rico, forcing, grid::Grid, state, param_set)
     ts_gm = aux_gm.ts
     p_c = aux_gm.p
 
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     prof_ug = APL.Rico_geostrophic_ug(FT)
     prof_vg = APL.Rico_geostrophic_vg(FT)
     prof_dTdt = APL.Rico_dTdt(FT)
@@ -618,7 +618,7 @@ function initialize_profiles(::TRMM_LBA, grid::Grid, param_set, state; kwargs...
     ρ_c = prog_gm.ρ
     p = aux_gm.p
 
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     # Get profiles from AtmosphericProfilesLibrary.jl
     prof_p = APL.TRMM_LBA_p(FT)
     prof_T = APL.TRMM_LBA_T(FT)
@@ -691,7 +691,7 @@ function initialize_profiles(::ARM_SGP, grid::Grid, param_set, state; kwargs...)
     ρ_c = prog_gm.ρ
     p = aux_gm.p
 
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     prof_u = APL.ARM_SGP_u(FT)
     prof_q_tot = APL.ARM_SGP_q_tot(FT)
     prof_θ_liq_ice = APL.ARM_SGP_θ_liq_ice(FT)
@@ -744,7 +744,7 @@ function update_forcing(::ARM_SGP, grid, state, t::Real, param_set)
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
     p_c = prog_gm.ρ
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     @inbounds for k in real_center_indices(grid)
         Π = TD.exner(param_set, ts_gm[k])
         z = grid.zc[k].z
@@ -768,7 +768,7 @@ function surface_ref_state(::GATE_III, param_set::APS, namelist)
 end
 
 function initialize_profiles(::GATE_III, grid::Grid, param_set, state; kwargs...)
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_u = TC.grid_mean_u(state)
@@ -803,7 +803,7 @@ function surface_params(case::GATE_III, surf_ref_state, param_set; kwargs...)
 end
 
 function initialize_forcing(::GATE_III, forcing, grid::Grid, state, param_set)
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
     for k in TC.real_center_indices(grid)
         z = grid.zc[k].z
@@ -826,7 +826,7 @@ function surface_ref_state(::DYCOMS_RF01, param_set::APS, namelist)
 end
 
 function initialize_profiles(::DYCOMS_RF01, grid::Grid, param_set, state; kwargs...)
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_u = TC.grid_mean_u(state)
@@ -915,7 +915,7 @@ function surface_ref_state(::DYCOMS_RF02, param_set::APS, namelist)
 end
 
 function initialize_profiles(::DYCOMS_RF02, grid::Grid, param_set, state; kwargs...)
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_u = TC.grid_mean_u(state)
@@ -1011,7 +1011,7 @@ function initialize_profiles(::GABLS, grid::Grid, param_set, state; kwargs...)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     prog_gm_u = TC.grid_mean_u(state)
     prog_gm_v = TC.grid_mean_v(state)
 
@@ -1038,7 +1038,7 @@ function surface_params(case::GABLS, surf_ref_state, param_set; kwargs...)
 end
 
 function initialize_forcing(::GABLS, forcing, grid::Grid, state, param_set)
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     initialize(forcing, grid, state)
     aux_gm = TC.center_aux_grid_mean(state)
     @inbounds for k in real_center_indices(grid)
@@ -1072,7 +1072,7 @@ function initialize_profiles(::DryBubble, grid::Grid, param_set, state; kwargs..
 
     # initialize Grid Mean Profiles of thetali and qt
     zc_in = grid.zc.z
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     prof_θ_liq_ice = APL.DryBubble_θ_liq_ice(FT)
     aux_gm.θ_liq_ice .= prof_θ_liq_ice.(zc_in)
     parent(prog_gm_u) .= 0.01
@@ -1159,7 +1159,7 @@ end
 
 function initialize_profiles(::LES_driven_SCM, grid::Grid, param_set, state; LESDat)
 
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_u = TC.grid_mean_u(state)

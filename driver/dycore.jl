@@ -63,7 +63,7 @@ function compute_ref_state!(
     param_set::PS;
     ts_g,
 ) where {PS}
-    FT = eltype(grid)
+    FT = TC.float_type(p_c)
     kf_surf = TC.kf_surface(grid)
     qtg = TD.total_specific_humidity(param_set, ts_g)
     Φ = TC.geopotential(param_set, grid.zf[kf_surf].z)
@@ -214,7 +214,7 @@ function ∑stoch_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) whe
     for inds in TC.iterate_columns(prog.cent)
 
         state = TC.column_state(prog, aux, tendencies, inds...)
-        grid = TC.Grid(state)
+        grid = TC.Grid(axes(state.prog.cent))
         surf = get_surface(surf_params, grid, state, t, param_set)
 
         # compute updraft stochastic tendencies
@@ -234,7 +234,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
     for inds in TC.iterate_columns(prog.cent)
         state = TC.column_state(prog, aux, tendencies, inds...)
-        grid = TC.Grid(state)
+        grid = TC.Grid(axes(state.prog.cent))
 
         set_thermo_state_peq!(state, grid, edmf.moisture_model, param_set)
 
@@ -295,7 +295,7 @@ function compute_gm_tendencies!(
     tendencies_gm = TC.center_tendencies_grid_mean(state)
     kc_toa = TC.kc_top_of_atmos(grid)
     kf_surf = TC.kf_surface(grid)
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)

@@ -110,7 +110,7 @@ function compute_diagnostics!(
     t::Real,
     calibrate_io::Bool,
 ) where {D <: CC.Fields.FieldVector}
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     N_up = TC.n_updrafts(edmf)
     aux_gm = TC.center_aux_grid_mean(state)
     aux_en = TC.center_aux_environment(state)
