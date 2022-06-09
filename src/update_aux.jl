@@ -317,12 +317,13 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     end
 
     Shear² = center_aux_turbconv(state).Shear²
+    M = center_aux_turbconv(state).M
+    ∂M∂z = center_aux_turbconv(state).∂M∂z
     ∂qt∂z = center_aux_turbconv(state).∂qt∂z
-    ∂θl∂z = center_aux_turbconv(state).∂θl∂z
-    ∂θv∂z = center_aux_turbconv(state).∂θv∂z
+    ∂M∂z_sat = center_aux_turbconv(state).∂M∂z_sat
     ∂qt∂z_sat = center_aux_turbconv(state).∂qt∂z_sat
-    ∂θl∂z_sat = center_aux_turbconv(state).∂θl∂z_sat
-    ∂θv∂z_unsat = center_aux_turbconv(state).∂θv∂z_unsat
+    ∂M∂z_unsat = center_aux_turbconv(state).∂M∂z_unsat
+    ∂qt∂z_unsat = center_aux_turbconv(state).∂qt∂z_unsat
 
     ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
     If0 = CCO.InterpolateC2F(; ∇0_bcs...)
@@ -334,11 +335,9 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @. Shear² = (∇c(wvec(If0(u_gm))))^2 + (∇c(wvec(If0(v_gm))))^2 + (∇c(wvec(w_en)))^2
 
     q_tot_en = aux_en.q_tot
-    θ_liq_ice_en = aux_en.θ_liq_ice
-    θ_virt_en = aux_en.θ_virt
+    @. M = TD.moist_static_energy(param_set, ts, e_pot)
+    @. ∂M∂z = ∇c(wvec(If0(M)))
     @. ∂qt∂z = ∇c(wvec(If0(q_tot_en)))
-    @. ∂θl∂z = ∇c(wvec(If0(θ_liq_ice_en)))
-    @. ∂θv∂z = ∇c(wvec(If0(θ_virt_en)))
 
     # Second order approximation: Use dry and cloudy environmental fields.
     cf = aux_en.cloud_fraction
@@ -349,12 +348,14 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
     # Since NaN*0 ≠ 0, we need to conditionally replace
     # our gradients by their default values.
+    @. ∂M∂z_sat = ∇c(wvec(If0(aux_en_sat.M)))
     @. ∂qt∂z_sat = ∇c(wvec(If0(aux_en_sat.q_tot)))
-    @. ∂θl∂z_sat = ∇c(wvec(If0(aux_en_sat.θ_liq_ice)))
-    @. ∂θv∂z_unsat = ∇c(wvec(If0(aux_en_unsat.θ_virt)))
-    @. ∂qt∂z_sat = ifelse(shm == 0, ∂qt∂z, ∂qt∂z_sat)
-    @. ∂θl∂z_sat = ifelse(shm == 0, ∂θl∂z, ∂θl∂z_sat)
-    @. ∂θv∂z_unsat = ifelse(shm == 0, ∂θv∂z, ∂θv∂z_unsat)
+    @. ∂M∂z_unsat = ∇c(wvec(If0(aux_en_unsat.M)))
+    @. ∂qt∂z_unsat = ∇c(wvec(If0(aux_en_unsat.q_tot)))
+    @. ∂M∂z_sat= ifelse(shm == 0, ∂M∂z, ∂M∂z_sat)
+    @. ∂qt∂z_sat= ifelse(shm == 0, ∂qt∂z, ∂qt∂z_sat)
+    @. ∂M∂z_unsat= ifelse(shm == 0, ∂M∂z, ∂M∂z_unsat)
+    @. ∂qt∂z_unsat= ifelse(shm == 0, ∂qt∂z, ∂qt∂z_unsat)
 
     @inbounds for k in real_center_indices(grid)
 
@@ -363,34 +364,34 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             # First order approximation: Use environmental mean fields.
             ts_en = ts_env[k]
             bg_kwargs = (;
-                t_sat = aux_en.T[k],
-                qv_sat = TD.vapor_specific_humidity(param_set, ts_en),
-                qt_sat = aux_en.q_tot[k],
-                θ_sat = aux_en.θ_dry[k],
-                θ_liq_ice_sat = aux_en.θ_liq_ice[k],
-                ∂θv∂z_unsat = ∂θv∂z[k],
-                ∂qt∂z_sat = ∂qt∂z[k],
-                ∂θl∂z_sat = ∂θl∂z[k],
+                qt_sat = aux_en_sat.q_tot[k],
+                qt_unsat = aux_en_unsat.q_tot[k],
+                T_sat = aux_en_sat.T[k],
+                T_unsat = aux_en_unsat.T[k],
+                ∂M∂z_sat = ∂M∂z_sat[k],
+                ∂qt∂z_sat = ∂qt∂z_sat[k],
+                ∂M∂z_unsat = ∂M∂z_unsat[k],
+                ∂qt∂z_unsat = ∂qt∂z_unsat[k],
                 p = p_c[k],
                 en_cld_frac = aux_en.cloud_fraction[k],
-                ρ = ρ_c[k],
+                Tv_gm = TD.virtual_temperature(param_set, ts_gm[k]),
             )
             bg_model = EnvBuoyGrad(edmf.bg_closure; bg_kwargs...)
 
         elseif edmf.bg_closure == BuoyGradQuadratures()
 
             bg_kwargs = (;
-                t_sat = aux_en_sat.T[k],
-                qv_sat = aux_en_sat.q_vap[k],
                 qt_sat = aux_en_sat.q_tot[k],
-                θ_sat = aux_en_sat.θ_dry[k],
-                θ_liq_ice_sat = aux_en_sat.θ_liq_ice[k],
-                ∂θv∂z_unsat = ∂θv∂z_unsat[k],
+                qt_unsat = aux_en_unsat.q_tot[k],
+                T_sat = aux_en_sat.T[k],
+                T_unsat = aux_en_unsat.T[k],
+                ∂M∂z_sat = ∂M∂z_sat[k],
                 ∂qt∂z_sat = ∂qt∂z_sat[k],
-                ∂θl∂z_sat = ∂θl∂z_sat[k],
+                ∂M∂z_unsat = ∂M∂z_unsat[k],
+                ∂qt∂z_unsat = ∂qt∂z_unsat[k],
                 p = p_c[k],
                 en_cld_frac = aux_en.cloud_fraction[k],
-                ρ = ρ_c[k],
+                Tv_gm = TD.virtual_temperature(param_set, ts_gm[k]),
             )
             bg_model = EnvBuoyGrad(edmf.bg_closure; bg_kwargs...)
         else
