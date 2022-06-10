@@ -155,7 +155,7 @@ function compute_entr_detr!(
     Δt::Real,
     εδ_closure::AbstractEntrDetrModel,
 )
-    FT = eltype(grid)
+    FT = float_type(state)
     N_up = n_updrafts(edmf)
     aux_up = center_aux_updrafts(state)
     prog_up = center_prog_updrafts(state)
@@ -264,7 +264,7 @@ function compute_entr_detr!(
     Δt::Real,
     εδ_model::AbstractNonLocalEntrDetrModel,
 )
-    FT = eltype(grid)
+    FT = float_type(state)
     N_up = n_updrafts(edmf)
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)

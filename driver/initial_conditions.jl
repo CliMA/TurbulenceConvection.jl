@@ -105,7 +105,7 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
     ρ_0_c = prog_gm.ρ
     ρ_0_f = aux_gm_f.ρ
     N_up = TC.n_updrafts(edmf)
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     z_in = APL.DryBubble_updrafts_z(FT)
     z_min, z_max = first(z_in), last(z_in)
     prof_θ_liq_ice = APL.DryBubble_updrafts_θ_liq_ice(FT)

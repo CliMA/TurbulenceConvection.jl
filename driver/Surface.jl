@@ -12,7 +12,7 @@ function get_surface(
     t::Real,
     param_set::CP.AbstractEarthParameterSet,
 )
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
     z_sfc = FT(0)
@@ -83,7 +83,7 @@ function get_surface(
     t::Real,
     param_set::CP.AbstractEarthParameterSet,
 )
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
     aux_gm_f = TC.face_aux_grid_mean(state)
@@ -144,7 +144,7 @@ function get_surface(
 )
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     z_sfc = FT(0)
     z_in = grid.zc[kc_surf].z
     prog_gm = TC.center_prog_grid_mean(state)

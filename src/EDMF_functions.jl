@@ -32,7 +32,7 @@ end
 function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS)
     N_up = n_updrafts(edmf)
     tendencies_gm = center_tendencies_grid_mean(state)
-    FT = eltype(grid)
+    FT = float_type(state)
     prog_gm = center_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
@@ -171,7 +171,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
 end
 
 function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS)
-    FT = eltype(grid)
+    FT = float_type(state)
     aux_bulk = center_aux_bulk(state)
     aux_tc_f = face_aux_turbconv(state)
     aux_en_f = face_aux_environment(state)
@@ -252,7 +252,7 @@ function affect_filter!(edmf::EDMFModel, grid::Grid, state::State, param_set::AP
 end
 
 function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS)
-    FT = eltype(grid)
+    FT = float_type(state)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -396,7 +396,7 @@ function get_GMV_CoVar(
 ) where {covar_sym, ϕ_sym, ψ_sym}
     N_up = n_updrafts(edmf)
     is_tke = covar_sym == :tke
-    FT = eltype(edmf)
+    FT = float_type(state)
     tke_factor = is_tke ? FT(0.5) : 1
     aux_gm_c = center_aux_grid_mean(state)
     aux_gm_f = face_aux_grid_mean(state)
@@ -466,7 +466,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
-    FT = eltype(grid)
+    FT = float_type(state)
 
     aux_up = center_aux_updrafts(state)
     aux_en = center_aux_environment(state)
@@ -614,7 +614,7 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
-    FT = eltype(grid)
+    FT = float_type(state)
     N_up = n_updrafts(edmf)
 
     prog_up = center_prog_updrafts(state)
@@ -721,7 +721,7 @@ function compute_covariance_shear(
     prog_gm = center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
     is_tke = covar_sym == :tke
-    FT = eltype(edmf)
+    FT = float_type(state)
     tke_factor = is_tke ? FT(0.5) : 1
     k_eddy = is_tke ? aux_tc.KM : aux_tc.KH
     aux_en_2m = center_aux_environment_2m(state)
@@ -768,7 +768,7 @@ function compute_covariance_interdomain_src(
 ) where {covar_sym, ϕ_sym, ψ_sym}
     N_up = n_updrafts(edmf)
     is_tke = covar_sym == :tke
-    FT = eltype(edmf)
+    FT = float_type(state)
     tke_factor = is_tke ? FT(0.5) : 1
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
@@ -802,7 +802,7 @@ function compute_covariance_entr(
 ) where {covar_sym, ϕ_sym, ψ_sym}
 
     N_up = n_updrafts(edmf)
-    FT = eltype(grid)
+    FT = float_type(state)
     is_tke = covar_sym == :tke
     tke_factor = is_tke ? FT(0.5) : 1
     aux_up = center_aux_updrafts(state)
@@ -874,7 +874,7 @@ function compute_covariance_dissipation(
     ::Val{covar_sym},
     param_set::APS,
 ) where {covar_sym}
-    FT = eltype(grid)
+    FT = float_type(state)
     c_d = mixing_length_params(edmf).c_d
     aux_tc = center_aux_turbconv(state)
     prog_en = center_prog_environment(state)
@@ -921,7 +921,7 @@ function compute_en_tendencies!(
     ρ_f = aux_gm_f.ρ
     c_d = mixing_length_params(edmf).c_d
     is_tke = covar_sym == :tke
-    FT = eltype(grid)
+    FT = float_type(state)
 
     ρ_ae_K = face_aux_turbconv(state).ρ_ae_K
     KM = center_aux_turbconv(state).KM
@@ -986,7 +986,7 @@ function update_diagnostic_covariances!(
     param_set::APS,
     ::Val{covar_sym},
 ) where {covar_sym}
-    FT = eltype(grid)
+    FT = float_type(state)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
@@ -1049,7 +1049,7 @@ function GMV_third_m(
     N_up = n_updrafts(edmf)
     gm_third_m = getproperty(center_aux_grid_mean(state), gm_third_m_sym)
     kc_surf = kc_surface(grid)
-    FT = eltype(grid)
+    FT = float_type(state)
 
     aux_bulk = center_aux_bulk(state)
     aux_up_f = face_aux_updrafts(state)

@@ -32,7 +32,7 @@ function compute_precipitation_advection_tendencies(
     state::State,
     param_set::APS,
 )
-    FT = eltype(grid)
+    FT = float_type(state)
 
     tendencies_pr = center_tendencies_precipitation(state)
     prog_pr = center_prog_precipitation(state)

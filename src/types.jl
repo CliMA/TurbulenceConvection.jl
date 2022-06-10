@@ -782,3 +782,6 @@ end
 
 
 Grid(state::State) = Grid(first_center_space(state.prog))
+
+float_type(state::State) = eltype(state.prog)
+float_type(field::CC.Fields.Field) = CC.Spaces.undertype(axes(field))
