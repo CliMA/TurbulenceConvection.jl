@@ -377,6 +377,7 @@ function surface_params(case::Bomex, surf_ref_state, param_set; Ri_bulk_crit)
 end
 
 function initialize_forcing(::Bomex, forcing, grid::Grid, state, param_set)
+    thermo_params = TC.thermodynamics_params(param_set)
     initialize(forcing, grid, state)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -393,7 +394,7 @@ function initialize_forcing(::Bomex, forcing, grid::Grid, state, param_set)
         z = grid.zc[k].z
         # Geostrophic velocity profiles. vg = 0
         aux_gm.ug[k] = prof_ug(z)
-        Π = TD.exner(param_set, ts_gm[k])
+        Π = TD.exner(thermo_params, ts_gm[k])
         # Set large-scale cooling
         aux_gm.dTdt_hadv[k] = prof_dTdt(Π, z)
         # Set large-scale drying
