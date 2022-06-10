@@ -20,7 +20,7 @@ for all updrafts, following [He2020](@cite), given:
 """
 function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, surf)
 
-    FT = eltype(grid)
+    FT = float_type(state)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)

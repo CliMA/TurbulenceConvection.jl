@@ -169,6 +169,7 @@ function Simulation1d(namelist)
     surf_ref_state = Cases.surface_ref_state(case, param_set, namelist)
 
     forcing = Cases.ForcingBase(case, param_set; Cases.forcing_kwargs(case, namelist)...)
+
     radiation = Cases.RadiationBase(case)
     TS = TimeStepping(FT, namelist)
 
@@ -212,8 +213,6 @@ function initialize(sim::Simulation1d)
 
     (; prog, aux, edmf, case, forcing, radiation, surf_params, param_set, surf_ref_state) = sim
     (; les_data_kwarg, skip_io, Stats, io_nt, diagnostics, truncate_stack_trace) = sim
-    FT = eltype(edmf)
-    t = FT(0)
 
     ts_gm = ["Tsurface", "shf", "lhf", "ustar", "wstar", "lwp_mean", "iwp_mean"]
     ts_edmf = [
@@ -241,7 +240,9 @@ function initialize(sim::Simulation1d)
     for inds in TC.iterate_columns(prog.cent)
         state = TC.column_prog_aux(prog, aux, inds...)
         diagnostics_col = TC.column_diagnostics(diagnostics, inds...)
-        grid = TC.Grid(state)
+        grid = TC.Grid(axes(state.prog.cent))
+        FT = TC.float_type(state)
+        t = FT(0)
         compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
         if !skip_io
             stats = Stats[inds...]

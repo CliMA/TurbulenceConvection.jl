@@ -110,7 +110,8 @@ function compute_diagnostics!(
     t::Real,
     calibrate_io::Bool,
 ) where {D <: CC.Fields.FieldVector}
-    FT = eltype(grid)
+    thermo_params = TC.thermodynamics_params(param_set)
+    FT = TC.float_type(state)
     N_up = TC.n_updrafts(edmf)
     aux_gm = TC.center_aux_grid_mean(state)
     aux_en = TC.center_aux_environment(state)
@@ -137,8 +138,8 @@ function compute_diagnostics!(
 
     surf = get_surface(surf_params, grid, state, t, param_set)
 
-    @. aux_gm.s = TD.specific_entropy(param_set, ts_gm)
-    @. aux_en.s = TD.specific_entropy(param_set, ts_en)
+    @. aux_gm.s = TD.specific_entropy(thermo_params, ts_gm)
+    @. aux_en.s = TD.specific_entropy(thermo_params, ts_en)
 
     @inbounds for k in TC.real_center_indices(grid)
         @inbounds for i in 1:N_up
@@ -155,7 +156,7 @@ function compute_diagnostics!(
                     aux_up[i].q_tot[k],
                     thermo_args...,
                 )
-                TD.specific_entropy(param_set, ts_up)
+                TD.specific_entropy(thermo_params, ts_up)
             else
                 FT(0)
             end

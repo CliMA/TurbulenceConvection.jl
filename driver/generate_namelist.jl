@@ -130,6 +130,9 @@ function default_namelist(
     namelist_defaults["grid"]["stretch"]["dz_toa"] = 8000.0
     namelist_defaults["grid"]["stretch"]["z_toa"] = 45000.0
 
+    namelist_defaults["forcing"] = Dict()
+    namelist_defaults["forcing"]["coriolis"] = 0.0
+
     namelist_defaults["thermodynamics"] = Dict()
     namelist_defaults["thermodynamics"]["moisture_model"] = "equilibrium" #"nonequilibrium"
     namelist_defaults["thermodynamics"]["thermo_covariance_model"] = "diagnostic" #"prognostic" or "diagnostic"
@@ -348,6 +351,8 @@ function Bomex(namelist_defaults)
     namelist["grid"]["nz"] = 60
     namelist["grid"]["dz"] = 50.0
 
+    namelist["forcing"]["coriolis"] = 0.376e-4
+
     namelist["time_stepping"]["t_max"] = 21600.0
     namelist["time_stepping"]["dt_min"] = 6.0
 
@@ -363,6 +368,8 @@ function life_cycle_Tan2018(namelist_defaults)
 
     namelist["grid"]["nz"] = 75
     namelist["grid"]["dz"] = 40.0
+
+    namelist["forcing"]["coriolis"] = 0.376e-4
 
     namelist["time_stepping"]["t_max"] = 6 * 3600.0
     namelist["time_stepping"]["dt_min"] = 10.0
@@ -384,6 +391,9 @@ function Rico(namelist_defaults)
     namelist["time_stepping"]["t_max"] = 86400.0
     #namelist["time_stepping"]["dt_max"] = 5.0
     namelist["time_stepping"]["dt_min"] = 1.5
+
+    namelist["forcing"]["latitude"] = 18.0
+    namelist["forcing"]["coriolis"] = 4.5e-5
 
     namelist["microphysics"]["precipitation_model"] = "clima_1m"
     namelist["microphysics"]["precip_fraction_model"] = "prescribed" # "prescribed" or "cloud_cover"
@@ -449,6 +459,8 @@ function ARM_SGP(namelist_defaults)
 
     namelist["grid"]["nz"] = 88
     namelist["grid"]["dz"] = 50.0
+
+    namelist["forcing"]["coriolis"] = 8.5e-5
 
     namelist["time_stepping"]["t_max"] = 3600.0 * 14.5
     namelist["time_stepping"]["dt_min"] = 2.0
@@ -539,6 +551,8 @@ function GABLS(namelist_defaults)
 
     namelist["grid"]["nz"] = 8
     namelist["grid"]["dz"] = 50.0
+
+    namelist["forcing"]["coriolis"] = 1.39e-4
 
     namelist["time_stepping"]["t_max"] = 9 * 3600.0
     namelist["time_stepping"]["dt_min"] = 4.0

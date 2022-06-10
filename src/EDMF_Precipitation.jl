@@ -32,7 +32,7 @@ function compute_precipitation_advection_tendencies(
     state::State,
     param_set::APS,
 )
-    FT = eltype(grid)
+    FT = float_type(state)
 
     tendencies_pr = center_tendencies_precipitation(state)
     prog_pr = center_prog_precipitation(state)
@@ -86,6 +86,8 @@ function compute_precipitation_sink_tendencies(
     param_set::APS,
     Δt::Real,
 )
+    thermo_params = thermodynamics_params(param_set)
+    microphys_params = microphysics_params(param_set)
     aux_gm = center_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
     prog_gm = center_prog_grid_mean(state)
@@ -104,23 +106,23 @@ function compute_precipitation_sink_tendencies(
         T_gm = aux_gm.T[k]
         # When we fuse loops, this should hopefully disappear
         ts = ts_gm[k]
-        q = TD.PhasePartition(param_set, ts)
-        qv = TD.vapor_specific_humidity(param_set, ts)
+        q = TD.PhasePartition(thermo_params, ts)
+        qv = TD.vapor_specific_humidity(thermo_params, ts)
 
-        Π_m = TD.exner(param_set, ts)
-        c_pm = TD.cp_m(param_set, ts)
-        c_vm = TD.cv_m(param_set, ts)
-        R_m = TD.gas_constant_air(param_set, ts)
+        Π_m = TD.exner(thermo_params, ts)
+        c_pm = TD.cp_m(thermo_params, ts)
+        c_vm = TD.cv_m(thermo_params, ts)
+        R_m = TD.gas_constant_air(thermo_params, ts)
         R_v = TCP.R_v(param_set)
         L_v0 = TCP.LH_v0(param_set)
         L_s0 = TCP.LH_s0(param_set)
-        L_v = TD.latent_heat_vapor(param_set, ts)
-        L_s = TD.latent_heat_sublim(param_set, ts)
-        L_f = TD.latent_heat_fusion(param_set, ts)
+        L_v = TD.latent_heat_vapor(thermo_params, ts)
+        L_s = TD.latent_heat_sublim(thermo_params, ts)
+        L_f = TD.latent_heat_fusion(thermo_params, ts)
 
-        I_l = TD.internal_energy_liquid(param_set, ts)
-        I_i = TD.internal_energy_ice(param_set, ts)
-        I = TD.internal_energy(param_set, ts)
+        I_l = TD.internal_energy_liquid(thermo_params, ts)
+        I_i = TD.internal_energy_ice(thermo_params, ts)
+        I = TD.internal_energy(thermo_params, ts)
         Φ = geopotential(param_set, grid.zc.z[k])
 
         α_evp = TCP.microph_scaling(param_set)
@@ -131,9 +133,10 @@ function compute_precipitation_sink_tendencies(
         # TODO - when using adaptive timestepping we are limiting the source terms
         #        with the previous timestep dt
         S_qr_evap =
-            -min(qr / Δt, -α_evp * CM1.evaporation_sublimation(param_set, rain_type, q, qr, ρ, T_gm)) * precip_fraction
-        S_qs_melt = -min(qs / Δt, α_melt * CM1.snow_melt(param_set, qs, ρ, T_gm)) * precip_fraction
-        tmp = α_dep_sub * CM1.evaporation_sublimation(param_set, snow_type, q, qs, ρ, T_gm) * precip_fraction
+            -min(qr / Δt, -α_evp * CM1.evaporation_sublimation(microphys_params, rain_type, q, qr, ρ, T_gm)) *
+            precip_fraction
+        S_qs_melt = -min(qs / Δt, α_melt * CM1.snow_melt(microphys_params, qs, ρ, T_gm)) * precip_fraction
+        tmp = α_dep_sub * CM1.evaporation_sublimation(microphys_params, snow_type, q, qs, ρ, T_gm) * precip_fraction
         if tmp > 0
             S_qs_sub_dep = min(qv / Δt, tmp)
         else

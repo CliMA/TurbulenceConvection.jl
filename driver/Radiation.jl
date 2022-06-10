@@ -14,7 +14,7 @@ function update_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state
     ρ_c = prog_gm.ρ
     # find zi (level of 8.0 g/kg isoline of qt)
     # TODO: report bug: zi and ρ_i are not initialized
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     zi = FT(0)
     ρ_i = FT(0)
     kc_surf = TC.kc_surface(grid)

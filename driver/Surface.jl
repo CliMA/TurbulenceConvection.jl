@@ -12,7 +12,7 @@ function get_surface(
     t::Real,
     param_set::CP.AbstractEarthParameterSet,
 )
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
     z_sfc = FT(0)
@@ -29,8 +29,9 @@ function get_surface(
     lhf = TC.latent_heat_flux(surf_params, t)
     Ri_bulk_crit = surf_params.Ri_bulk_crit
     zrough = surf_params.zrough
+    thermo_params = TC.thermodynamics_params(param_set)
 
-    ts_sfc = TD.PhaseEquil_pTq(param_set, p_f_surf, Tsurface, qsurface)
+    ts_sfc = TD.PhaseEquil_pTq(thermo_params, p_f_surf, Tsurface, qsurface)
     ts_in = aux_gm.ts[kc_surf]
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
@@ -69,7 +70,7 @@ function get_surface(
         ρu_flux = surf_params.zero_uv_fluxes ? FT(0) : result.ρτxz,
         ρv_flux = surf_params.zero_uv_fluxes ? FT(0) : result.ρτyz,
         ρe_tot_flux = shf + lhf,
-        ρq_tot_flux = lhf / TD.latent_heat_vapor(param_set, ts_in),
+        ρq_tot_flux = lhf / TD.latent_heat_vapor(thermo_params, ts_in),
         wstar = convective_vel,
         ρq_liq_flux = FT(0),
         ρq_ice_flux = FT(0),
@@ -83,7 +84,7 @@ function get_surface(
     t::Real,
     param_set::CP.AbstractEarthParameterSet,
 )
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
     aux_gm_f = TC.face_aux_grid_mean(state)
@@ -99,12 +100,13 @@ function get_surface(
     cm = surf_params.cm(zc_surf)
     ch = surf_params.ch(zc_surf)
     Ri_bulk_crit = surf_params.Ri_bulk_crit
+    thermo_params = TC.thermodynamics_params(param_set)
 
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
     z_sfc = FT(0)
     z_in = grid.zc[kc_surf].z
-    ts_sfc = TD.PhaseEquil_pθq(param_set, p_f_surf, Tsurface, qsurface)
+    ts_sfc = TD.PhaseEquil_pθq(thermo_params, p_f_surf, Tsurface, qsurface)
     ts_in = aux_gm.ts[kc_surf]
     u_sfc = SA.SVector{2, FT}(0, 0)
     u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
@@ -127,7 +129,7 @@ function get_surface(
         ρu_flux = result.ρτxz,
         ρv_flux = result.ρτyz,
         ρe_tot_flux = shf + lhf,
-        ρq_tot_flux = lhf / TD.latent_heat_vapor(param_set, ts_in),
+        ρq_tot_flux = lhf / TD.latent_heat_vapor(thermo_params, ts_in),
         bflux = result.buoy_flux,
         wstar = convective_vel,
         ρq_liq_flux = FT(0),
@@ -144,7 +146,7 @@ function get_surface(
 )
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
-    FT = eltype(grid)
+    FT = TC.float_type(state)
     z_sfc = FT(0)
     z_in = grid.zc[kc_surf].z
     prog_gm = TC.center_prog_grid_mean(state)
@@ -158,10 +160,11 @@ function get_surface(
     qsurface = TC.surface_q_tot(surf_params, t)
     zrough = surf_params.zrough
     Ri_bulk_crit = surf_params.Ri_bulk_crit
+    thermo_params = TC.thermodynamics_params(param_set)
 
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
-    ts_sfc = TD.PhaseEquil_pTq(param_set, p_f_surf, Tsurface, qsurface)
+    ts_sfc = TD.PhaseEquil_pTq(thermo_params, p_f_surf, Tsurface, qsurface)
     ts_in = ts_gm[kc_surf]
 
     u_sfc = SA.SVector{2, FT}(0, 0)
@@ -184,7 +187,7 @@ function get_surface(
         ρu_flux = result.ρτxz,
         ρv_flux = result.ρτyz,
         ρe_tot_flux = shf + lhf,
-        ρq_tot_flux = lhf / TD.latent_heat_vapor(param_set, ts_in),
+        ρq_tot_flux = lhf / TD.latent_heat_vapor(thermo_params, ts_in),
         bflux = result.buoy_flux,
         wstar = convective_vel,
         ρq_liq_flux = FT(0),
