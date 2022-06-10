@@ -53,6 +53,7 @@ function compute_precipitation_formation_tendencies(
     param_set::APS,
 )
     thermo_params = thermodynamics_params(param_set)
+    FT = float_type(state)
     N_up = n_updrafts(edmf)
     prog_gm = center_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
@@ -90,7 +91,7 @@ function compute_precipitation_formation_tendencies(
                 prog_pr.q_sno[k],
                 aux_up[i].area[k],
                 ρ_c[k],
-                grid.zc[k].z,
+                FT(grid.zc[k].z),
                 Δt,
                 ts_up,
                 precip_fraction,

@@ -402,11 +402,11 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
         # Limiting stratification scale (Deardorff, 1976)
         # compute ∇Ri and Pr
-        ∇_Ri = gradient_Richardson_number(mix_len_params, bg.∂b∂z, Shear²[k], eps(FT))
+        ∇_Ri = gradient_Richardson_number(mix_len_params, bg.∂b∂z, Shear²[k], FT(eps(FT)))
         aux_tc.prandtl_nvec[k] = turbulent_Prandtl_number(mix_len_params, obukhov_length, ∇_Ri)
 
         ml_model = MinDisspLen{FT}(;
-            z = grid.zc[k].z,
+            z = FT(grid.zc[k].z),
             obukhov_length = obukhov_length,
             tke_surf = aux_en.tke[kc_surf],
             ustar = surf.ustar,
@@ -487,7 +487,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     if edmf.thermo_covariance_model isa DiagnosticThermoCovariances
         flux1 = surf.shf / TD.cp_m(thermo_params, ts_gm[kc_surf])
         flux2 = surf.ρq_tot_flux
-        zLL = grid.zc[kc_surf].z
+        zLL::FT = grid.zc[kc_surf].z
         ustar = surf.ustar
         oblength = surf.obukhov_length
         prog_gm = center_prog_grid_mean(state)

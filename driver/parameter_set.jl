@@ -10,11 +10,15 @@ struct MicrophysicsParameters{NT} <: CP.AbstractEarthParameterSet
 end
 CLIMAParameters.Planet.MSLP(ps::ThermodynamicsParameters) = ps.nt.MSLP
 
-struct EarthParameterSet{TP, MP, NT} <: CP.AbstractEarthParameterSet
+struct EarthParameterSet{FT, TP, MP, NT} <: CP.AbstractEarthParameterSet
     thermo_params::TP
     microphys_params::MP
     nt::NT
 end
+
+EarthParameterSet{FT}(args...) where {FT} = EarthParameterSet{FT, typeof.(args)...}(args...)
+
+Base.eltype(::EarthParameterSet{FT}) where {FT} = FT
 
 CLIMAParameters.Planet.MSLP(ps::EarthParameterSet) = ps.nt.MSLP
 # microphysics parameters
@@ -35,7 +39,8 @@ CP.Atmos.Microphysics.E_ice_sno(ps::MicrophysicsParameters) = ps.nt.E_ice_sno
 CP.Atmos.Microphysics.E_rai_sno(ps::MicrophysicsParameters) = ps.nt.E_rai_sno
 
 #! format: off
-function create_parameter_set(namelist)
+function create_parameter_set(::Type{FT}, namelist) where {FT}
+
     TC = TurbulenceConvection
     MSLP_kwarg = (;
         MSLP = 100000.0, # or grab from, e.g., namelist[""][...]
@@ -58,7 +63,7 @@ function create_parameter_set(namelist)
         E_ice_sno = TC.parse_namelist(namelist, "microphysics", "E_ice_sno"; default = 0.1),
         E_rai_sno = TC.parse_namelist(namelist, "microphysics", "E_rai_sno"; default = 1.0),
     )
-    param_set = EarthParameterSet(
+    param_set = EarthParameterSet{FT}(
         ThermodynamicsParameters((;MSLP_kwarg...)),
         MicrophysicsParameters((;nt...)),
         nt

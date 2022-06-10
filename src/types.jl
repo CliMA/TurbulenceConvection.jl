@@ -781,7 +781,8 @@ function column_diagnostics(diagnostics, inds...)
 end
 
 
-Grid(state::State) = Grid(first_center_space(state.prog))
+Grid(state::State) = Grid(axes(state.prog.cent))
 
 float_type(state::State) = eltype(state.prog)
-float_type(field::CC.Fields.Field) = CC.Spaces.undertype(axes(field))
+# float_type(field::CC.Fields.Field) = CC.Spaces.undertype(axes(field))
+float_type(field::CC.Fields.Field) = eltype(parent(field))

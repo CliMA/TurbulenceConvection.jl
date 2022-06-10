@@ -16,10 +16,10 @@ import .Cases
 function export_ref_profile(case_name::String)
     TC = TurbulenceConvection
     namelist = NameList.default_namelist(case_name)
-    param_set = create_parameter_set(namelist)
+    FT = Float64
+    param_set = create_parameter_set(FT, namelist)
     namelist["meta"]["uuid"] = "01"
 
-    FT = Float64
     grid = TC.Grid(FT(namelist["grid"]["dz"]), namelist["grid"]["nz"])
     case = Cases.get_case(namelist)
     surf_ref_state = Cases.surface_ref_state(case, param_set, namelist)
