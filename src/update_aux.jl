@@ -3,6 +3,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ##### Unpack common variables
     #####
     thermo_params = thermodynamics_params(param_set)
+    microphys_params = microphysics_params(param_set)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -477,8 +478,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         #precip_fraction = compute_precip_fraction(edmf, state)
 
         @inbounds for k in real_center_indices(grid)
-            term_vel_rain[k] = CM1.terminal_velocity(param_set, CM.CommonTypes.RainType(), ρ_c[k], prog_pr.q_rai[k])# / precip_fraction)
-            term_vel_snow[k] = CM1.terminal_velocity(param_set, CM.CommonTypes.SnowType(), ρ_c[k], prog_pr.q_sno[k])# / precip_fraction)
+            term_vel_rain[k] = CM1.terminal_velocity(microphys_params, rain_type, ρ_c[k], prog_pr.q_rai[k])# / precip_fraction)
+            term_vel_snow[k] = CM1.terminal_velocity(microphys_params, snow_type, ρ_c[k], prog_pr.q_sno[k])# / precip_fraction)
         end
     end
 
