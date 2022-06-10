@@ -87,6 +87,7 @@ function compute_precipitation_sink_tendencies(
     Δt::Real,
 )
     thermo_params = thermodynamics_params(param_set)
+    microphys_params = microphysics_params(param_set)
     aux_gm = center_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
     prog_gm = center_prog_grid_mean(state)
@@ -132,9 +133,10 @@ function compute_precipitation_sink_tendencies(
         # TODO - when using adaptive timestepping we are limiting the source terms
         #        with the previous timestep dt
         S_qr_evap =
-            -min(qr / Δt, -α_evp * CM1.evaporation_sublimation(param_set, rain_type, q, qr, ρ, T_gm)) * precip_fraction
-        S_qs_melt = -min(qs / Δt, α_melt * CM1.snow_melt(param_set, qs, ρ, T_gm)) * precip_fraction
-        tmp = α_dep_sub * CM1.evaporation_sublimation(param_set, snow_type, q, qs, ρ, T_gm) * precip_fraction
+            -min(qr / Δt, -α_evp * CM1.evaporation_sublimation(microphys_params, rain_type, q, qr, ρ, T_gm)) *
+            precip_fraction
+        S_qs_melt = -min(qs / Δt, α_melt * CM1.snow_melt(microphys_params, qs, ρ, T_gm)) * precip_fraction
+        tmp = α_dep_sub * CM1.evaporation_sublimation(microphys_params, snow_type, q, qs, ρ, T_gm) * precip_fraction
         if tmp > 0
             S_qs_sub_dep = min(qv / Δt, tmp)
         else
