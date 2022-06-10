@@ -15,6 +15,8 @@ pages = Any[
     "Reference states" => "ReferenceStates.md",
     "API" => "API.md",
     "Developer docs" => "dev.md",
+    "Command line arguments" => "cl_args.md",
+    "REPL scripts" => "repl_scripts.md",
     "References" => "References.md",
 ]
 
