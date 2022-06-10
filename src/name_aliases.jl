@@ -26,6 +26,8 @@ function name_aliases()
         "iwp_mean" => ("iwp",),
         "rwp_mean" => ("rwp",),
         "swp_mean" => ("swp",),
+        "cloud_base_mean" => ("cloud_base",),
+        "cloud_top_mean" => ("cloud_top",),
     )
     return dict
 end
