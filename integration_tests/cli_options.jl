@@ -72,6 +72,10 @@ function parse_commandline()
         help = "Set random seeds for reproducible results per column"
         arg_type = Bool
         default = false
+        "--test_duals"
+        help = "Test that we can use Duals through ∑tendencies to ForwardDiff through the model"
+        arg_type = Bool
+        default = false
         "--trunc_field_type_print"
         help = "Set to `true` to truncate printing of ClimaCore `Field` types"
         arg_type = Bool

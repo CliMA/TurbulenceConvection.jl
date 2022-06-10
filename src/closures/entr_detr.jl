@@ -24,7 +24,7 @@ end
 
 function get_Δw(εδ_model, w_up::FT, w_en::FT) where {FT}
     Δw = w_up - w_en
-    Δw += copysign(εδ_params(εδ_model).w_min, Δw)
+    Δw += copysign(FT(εδ_params(εδ_model).w_min), Δw)
     return Δw
 end
 
@@ -216,7 +216,7 @@ function compute_entr_detr!(
                     RH_up = aux_up[i].RH[k], # updraft relative humidity
                     RH_en = aux_en.RH[k], # environment relative humidity
                     max_area = max_area, # maximum updraft area
-                    zc_i = grid.zc[k].z, # vertical coordinate
+                    zc_i = FT(grid.zc[k].z), # vertical coordinate
                     Δt = Δt, # Model time step
                     ε_nondim = aux_up[i].ε_nondim[k], # nondimensional fractional dynamical entrainment
                     δ_nondim = aux_up[i].δ_nondim[k], # nondimensional fractional dynamical detrainment
@@ -327,7 +327,7 @@ function compute_entr_detr!(
                     RH_up = aux_up[i].RH[k], # updraft relative humidity
                     RH_en = aux_en.RH[k], # environment relative humidity
                     max_area = max_area, # maximum updraft area
-                    zc_i = grid.zc[k].z, # vertical coordinate
+                    zc_i = FT(grid.zc[k].z), # vertical coordinate
                     Δt = Δt, # Model time step
                     ε_nondim = aux_up[i].ε_nondim[k], # nondimensional fractional dynamical entrainment
                     δ_nondim = aux_up[i].δ_nondim[k], # nondimensional fractional dynamical detrainment
@@ -354,11 +354,11 @@ function compute_entr_detr!(
 
         @inbounds for k in real_center_indices(grid)
             ε_turb = compute_turbulent_entrainment(
-                εδ_params(εδ_model).c_γ,
+                FT(εδ_params(εδ_model).c_γ),
                 aux_up[i].area[k],
                 w_up_c[k],
                 aux_en.tke[k],
-                plume_scale_height[i],
+                FT(plume_scale_height[i]),
             )
             ε_dim_scale = entrainment_inv_length_scale(
                 εδ_model,
@@ -367,7 +367,7 @@ function compute_entr_detr!(
                 w_up_c[k],
                 w_en_c[k],
                 aux_en.tke[k],
-                grid.zc[k].z,
+                FT(grid.zc[k].z),
                 edmf.entr_dim_scale,
             )
             δ_dim_scale = entrainment_inv_length_scale(
@@ -377,7 +377,7 @@ function compute_entr_detr!(
                 w_up_c[k],
                 w_en_c[k],
                 aux_en.tke[k],
-                grid.zc[k].z,
+                FT(grid.zc[k].z),
                 edmf.detr_dim_scale,
             )
             area_limiter = max_area_limiter(εδ_model, max_area, aux_up[i].area[k])

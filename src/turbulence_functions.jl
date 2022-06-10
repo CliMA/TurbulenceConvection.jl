@@ -7,7 +7,8 @@ function buoyancy_c(param_set::APS, ρ::FT, ρ_i::FT) where {FT}
 end
 
 # BL height
-function get_inversion(grid::Grid{FT}, state::State, param_set::APS, Ri_bulk_crit::FT) where {FT}
+function get_inversion(grid::Grid, state::State, param_set::APS, Ri_bulk_crit)
+    FT = float_type(state)
     g::FT = TCP.grav(param_set)
     kc_surf = kc_surface(grid)
     θ_virt = center_aux_grid_mean(state).θ_virt

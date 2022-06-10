@@ -325,10 +325,11 @@ end
 ForcingBase(case::Bomex, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::Bomex, param_set::APS, namelist)
+    FT = eltype(param_set)
     thermo_params = TC.thermodynamics_params(param_set)
-    Pg = 1.015e5 #Pressure at ground
-    Tg = 300.4 #Temperature at ground
-    qtg = 0.02245#Total water mixing ratio at surface
+    Pg::FT = 1.015e5 #Pressure at ground
+    Tg::FT = 300.4 #Temperature at ground
+    qtg::FT = 0.02245#Total water mixing ratio at surface
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 

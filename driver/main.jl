@@ -1,4 +1,5 @@
 import Logging
+import ForwardDiff
 import TerminalLoggers
 Logging.global_logger(TerminalLoggers.TerminalLogger())
 
@@ -83,9 +84,13 @@ include("common_spaces.jl")
 
 function Simulation1d(namelist)
     TC = TurbulenceConvection
-    param_set = create_parameter_set(namelist)
 
     FT = Float64
+    # This is used for testing Duals
+    FTD = namelist["test_duals"] ? typeof(ForwardDiff.Dual{Nothing}(1.0, 0.0)) : Float64
+
+    param_set = create_parameter_set(FTD, namelist)
+
     skip_io = namelist["stats_io"]["skip"]
     calibrate_io = namelist["stats_io"]["calibrate_io"]
     adapt_dt = namelist["time_stepping"]["adapt_dt"]
@@ -115,7 +120,7 @@ function Simulation1d(namelist)
         error("Invalid precip_name $(precip_name)")
     end
 
-    edmf = TC.EDMFModel(FT, namelist, precip_model)
+    edmf = TC.EDMFModel(FTD, namelist, precip_model)
     if isbits(edmf)
         @info "edmf = \n$(summary(edmf))"
     else
@@ -140,6 +145,12 @@ function Simulation1d(namelist)
         face = diagnostic_face_fields,
         svpc = diagnostics_single_value_per_col,
     )
+
+    if namelist["test_duals"]
+        prog = ForwardDiff.Dual{Nothing}.(prog, 1.0)
+        aux = ForwardDiff.Dual{Nothing}.(aux, 1.0)
+        diagnostics = ForwardDiff.Dual{Nothing}.(diagnostics, 1.0)
+    end
 
     # TODO: clean up
     frequency = namelist["stats_io"]["frequency"]
@@ -171,9 +182,9 @@ function Simulation1d(namelist)
     forcing = Cases.ForcingBase(case, param_set; Cases.forcing_kwargs(case, namelist)...)
 
     radiation = Cases.RadiationBase(case)
-    TS = TimeStepping(FT, namelist)
+    TS = TimeStepping(FTD, namelist)
 
-    Ri_bulk_crit = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
+    Ri_bulk_crit::FTD = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     les_data_kwarg = Cases.les_data_kwarg(case, namelist)
     surf_params = Cases.surface_params(case, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, les_data_kwarg...)
 
@@ -240,7 +251,7 @@ function initialize(sim::Simulation1d)
     for inds in TC.iterate_columns(prog.cent)
         state = TC.column_prog_aux(prog, aux, inds...)
         diagnostics_col = TC.column_diagnostics(diagnostics, inds...)
-        grid = TC.Grid(axes(state.prog.cent))
+        grid = TC.Grid(state)
         FT = TC.float_type(state)
         t = FT(0)
         compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)

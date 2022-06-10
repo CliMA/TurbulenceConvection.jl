@@ -41,7 +41,8 @@ function thermo_state_phq(param_set::APS, p::FT, h::FT, q_tot::FT, q_liq::FT, q_
     return TD.PhaseNonEquil_phq(thermo_params, p, h, q, config...)
 end
 
-function geopotential(param_set, z::FT) where {FT}
+function geopotential(param_set, z::Real)
+    FT = eltype(param_set)
     grav = FT(TCP.grav(param_set))
     return grav * z
 end

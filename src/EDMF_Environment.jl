@@ -7,6 +7,7 @@ function microphysics(
     Δt::Real,
     param_set::APS,
 )
+    FT = float_type(state)
     thermo_params = thermodynamics_params(param_set)
     tendencies_pr = center_tendencies_precipitation(state)
     aux_en = center_aux_environment(state)
@@ -31,7 +32,7 @@ function microphysics(
             prog_pr.q_sno[k],
             aux_en.area[k],
             ρ_c[k],
-            grid.zc[k].z,
+            FT(grid.zc[k].z),
             Δt,
             ts,
             precip_fraction,
@@ -241,6 +242,7 @@ function microphysics(
     Δt::Real,
     param_set::APS,
 )
+    FT = float_type(state)
     thermo_params = thermodynamics_params(param_set)
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
@@ -288,7 +290,7 @@ function microphysics(
                 ρ_c = ρ_c[k],
                 p_c = p_c[k],
                 precip_frac = precip_fraction,
-                zc = grid.zc[k].z,
+                zc = FT(grid.zc[k].z),
             )
             outer_env, outer_src = quad_loop(en_thermo, precip_model, vars, param_set, Δt)
 
@@ -350,7 +352,7 @@ function microphysics(
                 prog_pr.q_sno[k],
                 aux_en.area[k],
                 ρ_c[k],
-                grid.zc[k].z,
+                FT(grid.zc[k].z),
                 Δt,
                 ts,
                 precip_fraction,

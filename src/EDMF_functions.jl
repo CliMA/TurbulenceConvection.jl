@@ -288,7 +288,7 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
 
     flux1 = surf.shf / cp
     flux2 = surf.ρq_tot_flux
-    zLL = grid.zc[kc_surf].z
+    zLL::FT = grid.zc[kc_surf].z
     ustar = surf.ustar
     oblength = surf.obukhov_length
     ρLL = prog_gm.ρ[kc_surf]
@@ -304,9 +304,10 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
 end
 
 function surface_helper(surf::SurfaceBase, grid::Grid, state::State)
+    FT = float_type(state)
     kc_surf = kc_surface(grid)
     prog_gm = center_prog_grid_mean(state)
-    zLL = grid.zc[kc_surf].z
+    zLL::FT = grid.zc[kc_surf].z
     ustar = surf.ustar
     oblength = surf.obukhov_length
     ρLL = prog_gm.ρ[kc_surf]
@@ -435,8 +436,8 @@ function compute_updraft_top(grid::Grid{FT}, state::State, i::Int)::FT where {FT
     return z_findlast_center(k -> aux_up[i].area[k] > 1e-3, grid)
 end
 
-function compute_plume_scale_height(grid::Grid{FT}, state::State, H_up_min::FT, i::Int)::FT where {FT}
-    updraft_top = compute_updraft_top(grid, state, i)
+function compute_plume_scale_height(grid::Grid, state::State, H_up_min::FT, i::Int)::FT where {FT}
+    updraft_top::FT = compute_updraft_top(grid, state, i)
     return max(updraft_top, H_up_min)
 end
 

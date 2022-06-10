@@ -216,7 +216,7 @@ function ∑stoch_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) whe
     for inds in TC.iterate_columns(prog.cent)
 
         state = TC.column_state(prog, aux, tendencies, inds...)
-        grid = TC.Grid(axes(state.prog.cent))
+        grid = TC.Grid(state)
         surf = get_surface(surf_params, grid, state, t, param_set)
 
         # compute updraft stochastic tendencies
@@ -237,7 +237,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
     for inds in TC.iterate_columns(prog.cent)
         state = TC.column_state(prog, aux, tendencies, inds...)
-        grid = TC.Grid(axes(state.prog.cent))
+        grid = TC.Grid(state)
 
         set_thermo_state_peq!(state, grid, edmf.moisture_model, param_set)
         assign_thermo_aux!(state, grid, edmf.moisture_model, param_set)
