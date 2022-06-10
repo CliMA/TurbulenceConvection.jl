@@ -10,9 +10,14 @@ struct MicrophysicsParameters{NT} <: CP.AbstractEarthParameterSet
 end
 CLIMAParameters.Planet.MSLP(ps::ThermodynamicsParameters) = ps.nt.MSLP
 
-struct EarthParameterSet{FT, TP, MP, NT} <: CP.AbstractEarthParameterSet
+struct SurfaceFluxesParameters{NT} <: CP.AbstractEarthParameterSet
+    nt::NT
+end
+
+struct EarthParameterSet{FT, TP, MP, SFP, NT} <: CP.AbstractEarthParameterSet
     thermo_params::TP
     microphys_params::MP
+    surf_flux_params::SFP
     nt::NT
 end
 
@@ -66,6 +71,7 @@ function create_parameter_set(::Type{FT}, namelist) where {FT}
     param_set = EarthParameterSet{FT}(
         ThermodynamicsParameters((;MSLP_kwarg...)),
         MicrophysicsParameters((;nt...)),
+        SurfaceFluxesParameters((;MSLP_kwarg...)),
         nt
     )
     if !isbits(param_set)

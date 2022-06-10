@@ -13,6 +13,7 @@ function get_surface(
     param_set::CP.AbstractEarthParameterSet,
 )
     FT = TC.float_type(state)
+    surf_flux_params = TC.surface_fluxes_params(param_set)
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
     z_sfc = FT(0)
@@ -36,7 +37,7 @@ function get_surface(
     universal_func = UF.Businger()
     scheme = SF.FVScheme()
 
-    bflux = SF.compute_buoyancy_flux(param_set, shf, lhf, ts_in, ts_sfc, scheme)
+    bflux = SF.compute_buoyancy_flux(surf_flux_params, shf, lhf, ts_in, ts_sfc, scheme)
     zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)
     convective_vel = TC.get_wstar(bflux, zi) # yair here zi in TRMM should be adjusted
 
@@ -58,7 +59,7 @@ function get_surface(
     else
         SF.Fluxes{FT}(; kwargs...)
     end
-    result = SF.surface_conditions(param_set, sc, universal_func, scheme)
+    result = SF.surface_conditions(surf_flux_params, sc, universal_func, scheme)
     return TC.SurfaceBase{FT}(;
         shf = shf,
         lhf = lhf,
@@ -85,6 +86,7 @@ function get_surface(
     param_set::CP.AbstractEarthParameterSet,
 )
     FT = TC.float_type(state)
+    surf_flux_params = TC.surface_fluxes_params(param_set)
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
     aux_gm_f = TC.face_aux_grid_mean(state)
@@ -113,7 +115,7 @@ function get_surface(
     vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
     vals_int = SF.InteriorValues(z_in, u_in, ts_in)
     sc = SF.Coefficients{FT}(state_in = vals_int, state_sfc = vals_sfc, Cd = cm, Ch = ch, z0m = zrough, z0b = zrough)
-    result = SF.surface_conditions(param_set, sc, universal_func, scheme)
+    result = SF.surface_conditions(surf_flux_params, sc, universal_func, scheme)
     lhf = result.lhf
     shf = result.shf
 
@@ -144,6 +146,7 @@ function get_surface(
     t::Real,
     param_set::CP.AbstractEarthParameterSet,
 )
+    surf_flux_params = TC.surface_fluxes_params(param_set)
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
     FT = TC.float_type(state)
@@ -172,7 +175,7 @@ function get_surface(
     vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
     vals_int = SF.InteriorValues(z_in, u_in, ts_in)
     sc = SF.ValuesOnly{FT}(state_in = vals_int, state_sfc = vals_sfc, z0m = zrough, z0b = zrough)
-    result = SF.surface_conditions(param_set, sc, universal_func, scheme)
+    result = SF.surface_conditions(surf_flux_params, sc, universal_func, scheme)
     lhf = result.lhf
     shf = result.shf
     zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)

@@ -158,6 +158,7 @@ include("closures/mixing_length.jl")
 include("closures/buoyancy_gradients.jl")
 
 thermodynamics_params(ps::APS) = ps.thermo_params
+surface_fluxes_params(ps::APS) = ps.surf_flux_params
 microphysics_params(ps::APS) = ps.microphys_params
 
 end
