@@ -4,19 +4,20 @@ Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 """
 function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts) where {FT}
 
+    thermo_params = thermodynamics_params(param_set)
     # TODO - when using adaptive timestepping we are limiting the source terms
     #        with the previous timestep Δt
     ql_tendency = FT(0)
     qi_tendency = FT(0)
     if area > 0
 
-        q = TD.PhasePartition(param_set, ts)
-        T = TD.air_temperature(param_set, ts)
-        q_vap = TD.vapor_specific_humidity(param_set, ts)
+        q = TD.PhasePartition(thermo_params, ts)
+        T = TD.air_temperature(thermo_params, ts)
+        q_vap = TD.vapor_specific_humidity(thermo_params, ts)
 
         # TODO - is that the state we want to be relaxing to?
-        ts_eq = TD.PhaseEquil_ρTq(param_set, ρ, T, q.tot)
-        q_eq = TD.PhasePartition(param_set, ts_eq)
+        ts_eq = TD.PhaseEquil_ρTq(thermo_params, ρ, T, q.tot)
+        q_eq = TD.PhasePartition(thermo_params, ts_eq)
 
         S_ql = CMNe.conv_q_vap_to_q_liq_ice(param_set, liq_type, q_eq, q)
         S_qi = CMNe.conv_q_vap_to_q_liq_ice(param_set, ice_type, q_eq, q)
@@ -55,6 +56,7 @@ function precipitation_formation(
     ts,
     precip_fraction,
 ) where {FT}
+    thermo_params = thermodynamics_params(param_set)
 
     # TODO - when using adaptive timestepping we are limiting the source terms
     #        with the previous timestep Δt
@@ -68,20 +70,20 @@ function precipitation_formation(
 
     if area > 0
 
-        q = TD.PhasePartition(param_set, ts)
+        q = TD.PhasePartition(thermo_params, ts)
 
-        Π_m = TD.exner(param_set, ts)
-        c_pm = TD.cp_m(param_set, ts)
+        Π_m = TD.exner(thermo_params, ts)
+        c_pm = TD.cp_m(thermo_params, ts)
         L_v0 = TCP.LH_v0(param_set)
         L_s0 = TCP.LH_s0(param_set)
-        I_l = TD.internal_energy_liquid(param_set, ts)
-        I_i = TD.internal_energy_ice(param_set, ts)
-        I = TD.internal_energy(param_set, ts)
+        I_l = TD.internal_energy_liquid(thermo_params, ts)
+        I_i = TD.internal_energy_ice(thermo_params, ts)
+        I = TD.internal_energy(thermo_params, ts)
         Φ = geopotential(param_set, z)
 
         if precip_model isa Clima0M
-            qsat = TD.q_vap_saturation(param_set, ts)
-            λ = TD.liquid_fraction(param_set, ts)
+            qsat = TD.q_vap_saturation(thermo_params, ts)
+            λ = TD.liquid_fraction(thermo_params, ts)
 
             S_qt = -min((q.liq + q.ice) / Δt, -CM0.remove_precipitation(param_set, q, qsat))
 
@@ -95,12 +97,12 @@ function precipitation_formation(
         end
 
         if precip_model isa Clima1M
-            T = TD.air_temperature(param_set, ts)
+            T = TD.air_temperature(thermo_params, ts)
             T_fr = TCP.T_freeze(param_set)
             c_vl = TCP.cv_l(param_set)
-            c_vm = TD.cv_m(param_set, ts)
-            Rm = TD.gas_constant_air(param_set, ts)
-            Lf = TD.latent_heat_fusion(param_set, ts)
+            c_vm = TD.cv_m(thermo_params, ts)
+            Rm = TD.gas_constant_air(thermo_params, ts)
+            Lf = TD.latent_heat_fusion(thermo_params, ts)
 
             qr = qr / precip_fraction
             qs = qs / precip_fraction

@@ -9,6 +9,7 @@ function compute_nonequilibrium_moisture_tendencies!(
     Δt::Real,
     param_set::APS,
 )
+    thermo_params = thermodynamics_params(param_set)
     N_up = n_updrafts(edmf)
     aux_gm = center_aux_grid_mean(state)
     aux_up = center_aux_updrafts(state)
@@ -21,7 +22,7 @@ function compute_nonequilibrium_moisture_tendencies!(
         @inbounds for k in real_center_indices(grid)
             T_up = aux_up[i].T[k]
             q_up = TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k])
-            ts_up = TD.PhaseNonEquil_pTq(param_set, p_c[k], T_up, q_up)
+            ts_up = TD.PhaseNonEquil_pTq(thermo_params, p_c[k], T_up, q_up)
 
             # condensation/evaporation, deposition/sublimation
             mph = noneq_moisture_sources(param_set, aux_up[i].area[k], ρ_c[k], Δt, ts_up)
@@ -51,6 +52,7 @@ function compute_precipitation_formation_tendencies(
     Δt::Real,
     param_set::APS,
 )
+    thermo_params = thermodynamics_params(param_set)
     N_up = n_updrafts(edmf)
     prog_gm = center_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
@@ -68,12 +70,12 @@ function compute_precipitation_formation_tendencies(
             T_up = aux_up[i].T[k]
             q_tot_up = aux_up[i].q_tot[k]
             if edmf.moisture_model isa EquilibriumMoisture
-                ts_up = TD.PhaseEquil_pTq(param_set, p_c[k], T_up, q_tot_up)
+                ts_up = TD.PhaseEquil_pTq(thermo_params, p_c[k], T_up, q_tot_up)
             elseif edmf.moisture_model isa NonEquilibriumMoisture
                 q_liq_up = aux_up[i].q_liq[k]
                 q_ice_up = aux_up[i].q_ice[k]
                 q = TD.PhasePartition(q_tot_up, q_liq_up, q_ice_up)
-                ts_up = TD.PhaseNonEquil_pTq(param_set, p_c[k], T_up, q)
+                ts_up = TD.PhaseNonEquil_pTq(thermo_params, p_c[k], T_up, q)
             else
                 error(
                     "Something went wrong in EDMF_Updrafts. The expected moisture model is Equilibrium or NonEquilibrium",
