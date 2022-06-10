@@ -14,21 +14,22 @@ function buoyancy_gradients(
     bg_model::EnvBuoyGrad{FT, EBG},
 ) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
 
+    thermo_params = thermodynamics_params(param_set)
     g = TCP.grav(param_set)
     molmass_ratio = TCP.molmass_ratio(param_set)
     R_d = TCP.R_d(param_set)
     R_v = TCP.R_v(param_set)
 
     phase_part = TD.PhasePartition(FT(0), FT(0), FT(0)) # assuming R_d = R_m
-    Π = TD.exner_given_pressure(param_set, bg_model.p, phase_part)
+    Π = TD.exner_given_pressure(thermo_params, bg_model.p, phase_part)
 
     ∂b∂θv = g * (R_d * bg_model.ρ / bg_model.p) * Π
 
     if bg_model.en_cld_frac > 0.0
         ts_sat = thermo_state_pθq(param_set, bg_model.p, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
-        phase_part = TD.PhasePartition(param_set, ts_sat)
-        lh = TD.latent_heat_liq_ice(param_set, phase_part)
-        cp_m = TD.cp_m(param_set, ts_sat)
+        phase_part = TD.PhasePartition(thermo_params, ts_sat)
+        lh = TD.latent_heat_liq_ice(thermo_params, phase_part)
+        cp_m = TD.cp_m(thermo_params, ts_sat)
         ∂b∂θl_sat = (
             ∂b∂θv * (1 + molmass_ratio * (1 + lh / R_v / bg_model.t_sat) * bg_model.qv_sat - bg_model.qt_sat) /
             (1 + lh * lh / cp_m / R_v / bg_model.t_sat / bg_model.t_sat * bg_model.qv_sat)

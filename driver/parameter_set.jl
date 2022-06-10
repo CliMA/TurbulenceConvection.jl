@@ -2,7 +2,13 @@ import TurbulenceConvection
 import CLIMAParameters
 const CP = CLIMAParameters
 
-struct EarthParameterSet{NT} <: CP.AbstractEarthParameterSet
+struct ThermodynamicsParameters{NT} <: CP.AbstractEarthParameterSet
+    nt::NT
+end
+CLIMAParameters.Planet.MSLP(ps::ThermodynamicsParameters) = ps.nt.MSLP
+
+struct EarthParameterSet{TP, NT} <: CP.AbstractEarthParameterSet
+    thermo_params::TP
     nt::NT
 end
 
@@ -27,9 +33,11 @@ CLIMAParameters.Atmos.Microphysics.E_rai_sno(ps::EarthParameterSet) = ps.nt.E_ra
 #! format: off
 function create_parameter_set(namelist)
     TC = TurbulenceConvection
-
-    nt = (;
+    MSLP_kwarg = (;
         MSLP = 100000.0, # or grab from, e.g., namelist[""][...]
+        )
+    nt = (;
+        MSLP_kwarg...,
         τ_precip = TC.parse_namelist(namelist, "microphysics", "τ_precip"; default = 1000.0),
         τ_cond_evap = TC.parse_namelist(namelist, "microphysics", "τ_cond_evap"; default = 10.0),
         τ_sub_dep = TC.parse_namelist(namelist, "microphysics", "τ_sub_dep"; default = 10.0),
@@ -46,7 +54,7 @@ function create_parameter_set(namelist)
         E_ice_sno = TC.parse_namelist(namelist, "microphysics", "E_ice_sno"; default = 0.1),
         E_rai_sno = TC.parse_namelist(namelist, "microphysics", "E_rai_sno"; default = 1.0),
     )
-    param_set = EarthParameterSet(nt)
+    param_set = EarthParameterSet(ThermodynamicsParameters((;MSLP_kwarg...)),nt)
     if !isbits(param_set)
         @warn "The parameter set SHOULD be isbits in order to be stack-allocated."
     end

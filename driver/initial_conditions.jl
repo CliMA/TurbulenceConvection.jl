@@ -8,10 +8,11 @@ import Thermodynamics
 const TD = Thermodynamics
 
 function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, surf_params, param_set::APS, t::Real, case)
+    thermo_params = TC.thermodynamics_params(param_set)
     initialize_covariance(edmf, grid, state)
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = aux_gm.ts
-    @. aux_gm.θ_virt = TD.virtual_pottemp(param_set, ts_gm)
+    @. aux_gm.θ_virt = TD.virtual_pottemp(thermo_params, ts_gm)
     surf = get_surface(surf_params, grid, state, t, param_set)
     if case isa Cases.DryBubble
         initialize_updrafts_DryBubble(edmf, grid, state)

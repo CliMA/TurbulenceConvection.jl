@@ -252,6 +252,7 @@ function affect_filter!(edmf::EDMFModel, grid::Grid, state::State, param_set::AP
 end
 
 function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS)
+    thermo_params = thermodynamics_params(param_set)
     FT = float_type(state)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
@@ -264,7 +265,7 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     prog_up_f = face_prog_updrafts(state)
     aux_bulk = center_aux_bulk(state)
     ts_gm = aux_gm.ts
-    cp = TD.cp_m(param_set, ts_gm[kc_surf])
+    cp = TD.cp_m(thermo_params, ts_gm[kc_surf])
     ρ_c = prog_gm.ρ
     ρ_f = aux_gm_f.ρ
     ae_surf::FT = 1
@@ -345,12 +346,13 @@ function θ_surface_bc(
     i::Int,
     param_set::APS,
 )::FT where {FT}
+    thermo_params = thermodynamics_params(param_set)
     aux_gm = center_aux_grid_mean(state)
     prog_gm = center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
     kc_surf = kc_surface(grid)
     ts_gm = aux_gm.ts
-    c_p = TD.cp_m(param_set, ts_gm[kc_surf])
+    c_p = TD.cp_m(thermo_params, ts_gm[kc_surf])
     UnPack.@unpack ustar, zLL, oblength, ρLL = surface_helper(surf, grid, state)
 
     surf.bflux > 0 || return FT(0)

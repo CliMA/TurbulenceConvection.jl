@@ -2,12 +2,14 @@ function thermo_state_pθq(param_set::APS, p::FT, θ_liq_ice::FT, q_tot::FT) whe
     # config = (50, 1e-3, RootSolvers.RegulaFalsiMethod)
     # config = (50, 1e-3, RootSolvers.NewtonMethodAD)
     config = ()
-    return TD.PhaseEquil_pθq(param_set, p, θ_liq_ice, q_tot, config...)
+    thermo_params = thermodynamics_params(param_set)
+    return TD.PhaseEquil_pθq(thermo_params, p, θ_liq_ice, q_tot, config...)
 end
 function thermo_state_pθq(param_set::APS, p::FT, θ_liq_ice::FT, q_tot::FT, q_liq::FT, q_ice::FT) where {FT}
     config = ()
     q = TD.PhasePartition(q_tot, q_liq, q_ice)
-    return TD.PhaseNonEquil_pθq(param_set, p, θ_liq_ice, q, config...)
+    thermo_params = thermodynamics_params(param_set)
+    return TD.PhaseNonEquil_pθq(thermo_params, p, θ_liq_ice, q, config...)
 end
 
 
@@ -15,26 +17,28 @@ function thermo_state_peq(param_set::APS, p::FT, e_int::FT, q_tot::FT) where {FT
     # config = (50, 1e-3, RootSolvers.RegulaFalsiMethod)
     # config = (50, 1e-3, RootSolvers.NewtonMethodAD)
     config = ()
-    return TD.PhaseEquil_peq(param_set, p, e_int, q_tot, config...)
+    thermo_params = thermodynamics_params(param_set)
+    return TD.PhaseEquil_peq(thermo_params, p, e_int, q_tot, config...)
 end
 
 function thermo_state_peq(param_set::APS, p::FT, e_int::FT, q_tot::FT, q_liq::FT, q_ice::FT) where {FT}
     config = ()
     q = TD.PhasePartition(q_tot, q_liq, q_ice)
-    return TD.PhaseNonEquil_peq(param_set, p, e_int, q, config...)
+    thermo_params = thermodynamics_params(param_set)
+    return TD.PhaseNonEquil_peq(thermo_params, p, e_int, q, config...)
 end
 
 function thermo_state_phq(param_set::APS, p::FT, h::FT, q_tot::FT) where {FT}
-    # config = (50, 1e-3, RootSolvers.RegulaFalsiMethod)
-    # config = (50, 1e-3, RootSolvers.NewtonMethodAD)
     config = ()
-    return TD.PhaseEquil_phq(param_set, p, h, q_tot, config...)
+    thermo_params = thermodynamics_params(param_set)
+    return TD.PhaseEquil_phq(thermo_params, p, h, q_tot, config...)
 end
 
 function thermo_state_phq(param_set::APS, p::FT, h::FT, q_tot::FT, q_liq::FT, q_ice::FT) where {FT}
     config = ()
     q = TD.PhasePartition(q_tot, q_liq, q_ice)
-    return TD.PhaseNonEquil_phq(param_set, p, h, q, config...)
+    thermo_params = thermodynamics_params(param_set)
+    return TD.PhaseNonEquil_phq(thermo_params, p, h, q, config...)
 end
 
 function geopotential(param_set, z::FT) where {FT}
@@ -44,8 +48,9 @@ end
 
 # TODO: move to Thermodynamics.jl
 function total_enthalpy(param_set::APS, e_tot::FT, ts) where {FT}
-    Rm = TD.gas_constant_air(param_set, ts)
-    T = TD.air_temperature(param_set, ts)
+    thermo_params = thermodynamics_params(param_set)
+    Rm = TD.gas_constant_air(thermo_params, ts)
+    T = TD.air_temperature(thermo_params, ts)
     return e_tot + Rm * T
 end
 

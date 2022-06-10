@@ -63,12 +63,13 @@ function compute_ref_state!(
     param_set::PS;
     ts_g,
 ) where {PS}
+    thermo_params = TC.thermodynamics_params(param_set)
     FT = TC.float_type(p_c)
     kf_surf = TC.kf_surface(grid)
-    qtg = TD.total_specific_humidity(param_set, ts_g)
+    qtg = TD.total_specific_humidity(thermo_params, ts_g)
     Φ = TC.geopotential(param_set, grid.zf[kf_surf].z)
-    mse_g = TD.moist_static_energy(param_set, ts_g, Φ)
-    Pg = TD.air_pressure(param_set, ts_g)
+    mse_g = TD.moist_static_energy(thermo_params, ts_g, Φ)
+    Pg = TD.air_pressure(thermo_params, ts_g)
 
     # We are integrating the log pressure so need to take the log of the
     # surface pressure
@@ -81,10 +82,10 @@ function compute_ref_state!(
         grav = FT(TCP.grav(param_set))
         Φ = TC.geopotential(param_set, z)
         h = TC.enthalpy(mse_g, Φ)
-        ts = TD.PhaseEquil_phq(param_set, p_, h, qtg)
-        R_m = TD.gas_constant_air(param_set, ts)
-        T = TD.air_temperature(param_set, ts)
-        return -FT(TCP.grav(param_set)) / (T * R_m)
+        ts = TD.PhaseEquil_phq(thermo_params, p_, h, qtg)
+        R_m = TD.gas_constant_air(thermo_params, ts)
+        T = TD.air_temperature(thermo_params, ts)
+        return -FT(TCP.grav(thermo_params)) / (T * R_m)
     end
 
     # Perform the integration
@@ -101,15 +102,15 @@ function compute_ref_state!(
     @inbounds for k in TC.real_center_indices(grid)
         Φ = TC.geopotential(param_set, grid.zc[k].z)
         h = TC.enthalpy(mse_g, Φ)
-        ts = TD.PhaseEquil_phq(param_set, p_c[k], h, qtg)
-        ρ_c[k] = TD.air_density(param_set, ts)
+        ts = TD.PhaseEquil_phq(thermo_params, p_c[k], h, qtg)
+        ρ_c[k] = TD.air_density(thermo_params, ts)
     end
 
     @inbounds for k in TC.real_face_indices(grid)
         Φ = TC.geopotential(param_set, grid.zf[k].z)
         h = TC.enthalpy(mse_g, Φ)
-        ts = TD.PhaseEquil_phq(param_set, p_f[k], h, qtg)
-        ρ_f[k] = TD.air_density(param_set, ts)
+        ts = TD.PhaseEquil_phq(thermo_params, p_f[k], h, qtg)
+        ρ_f[k] = TD.air_density(thermo_params, ts)
     end
     return nothing
 end
@@ -117,6 +118,7 @@ end
 
 function set_thermo_state_peq!(state, grid, moisture_model, param_set)
     Ic = CCO.InterpolateF2C()
+    thermo_params = TC.thermodynamics_params(param_set)
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)
@@ -162,6 +164,7 @@ function set_thermo_state_pθq!(state, grid, moisture_model, param_set)
 end
 
 function set_grid_mean_from_thermo_state!(param_set, state, grid)
+    thermo_params = TC.thermodynamics_params(param_set)
     Ic = CCO.InterpolateF2C()
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
@@ -172,7 +175,7 @@ function set_grid_mean_from_thermo_state!(param_set, state, grid)
     C123 = CCG.Covariant123Vector
     @. prog_gm.ρe_tot =
         ρ_c * TD.total_energy(
-            param_set,
+            thermo_params,
             ts_gm,
             LinearAlgebra.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(prog_gm_f.w))) / 2,
             TC.geopotential(param_set, grid.zc.z),
@@ -183,6 +186,7 @@ function set_grid_mean_from_thermo_state!(param_set, state, grid)
 end
 
 function assign_thermo_aux!(state, grid, moisture_model, param_set)
+    thermo_params = TC.thermodynamics_params(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
@@ -190,11 +194,11 @@ function assign_thermo_aux!(state, grid, moisture_model, param_set)
     @inbounds for k in TC.real_center_indices(grid)
         ts = ts_gm[k]
         aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
-        aux_gm.q_liq[k] = TD.liquid_specific_humidity(param_set, ts)
-        aux_gm.q_ice[k] = TD.ice_specific_humidity(param_set, ts)
-        aux_gm.T[k] = TD.air_temperature(param_set, ts)
-        aux_gm.RH[k] = TD.relative_humidity(param_set, ts)
-        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(param_set, ts)
+        aux_gm.q_liq[k] = TD.liquid_specific_humidity(thermo_params, ts)
+        aux_gm.q_ice[k] = TD.ice_specific_humidity(thermo_params, ts)
+        aux_gm.T[k] = TD.air_temperature(thermo_params, ts)
+        aux_gm.RH[k] = TD.relative_humidity(thermo_params, ts)
+        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(thermo_params, ts)
         aux_gm.h_tot[k] = TC.total_enthalpy(param_set, prog_gm.ρe_tot[k] / ρ_c[k], ts)
     end
     return
@@ -225,6 +229,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     UnPack.@unpack edmf, precip_model, param_set, case = params
     UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
 
+    thermo_params = TC.thermodynamics_params(param_set)
     tends_face = tendencies.face
     tends_cent = tendencies.cent
     parent(tends_face) .= 0
@@ -239,7 +244,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
         aux_gm = TC.center_aux_grid_mean(state)
 
-        @. aux_gm.θ_virt = TD.virtual_pottemp(param_set, aux_gm.ts)
+        @. aux_gm.θ_virt = TD.virtual_pottemp(thermo_params, aux_gm.ts)
 
         Δt = TS.dt
         surf = get_surface(surf_params, grid, state, t, param_set)
@@ -287,6 +292,7 @@ function compute_gm_tendencies!(
     force::Cases.ForcingBase,
     param_set::APS,
 )
+    thermo_params = TC.thermodynamics_params(param_set)
     Ic = CCO.InterpolateF2C()
     R_d = TCP.R_d(param_set)
     T_0 = TCP.T_0(param_set)
@@ -337,11 +343,11 @@ function compute_gm_tendencies!(
     tendencies_gm_u = TC.tendencies_grid_mean_u(state)
     tendencies_gm_v = TC.tendencies_grid_mean_v(state)
     @inbounds for k in TC.real_center_indices(grid)
-        cp_m = TD.cp_m(param_set, ts_gm[k])
+        cp_m = TD.cp_m(thermo_params, ts_gm[k])
         cp_v = TCP.cp_v(param_set)
         cv_v = TCP.cv_v(param_set)
         R_v = TCP.R_v(param_set)
-        cv_m = TD.cv_m(param_set, ts_gm[k])
+        cv_m = TD.cv_m(thermo_params, ts_gm[k])
         h_v = cv_v * (aux_gm.T[k] - T_0) + Lv_0 - R_v * T_0
 
         # Coriolis
