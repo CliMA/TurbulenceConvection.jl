@@ -111,8 +111,6 @@ LES-driven forcing
 $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct ForcingBase{T}
-    "Boolean specifying whether Coriolis forcing is applied"
-    apply_coriolis::Bool = false
     "Coriolis parameter"
     coriolis_param::Float64 = 0
     "Wind relaxation timescale"
@@ -207,7 +205,7 @@ large_scale_divergence(::Union{DYCOMS_RF01, DYCOMS_RF02}) = 3.75e-6
 
 RadiationBase(case::AbstractCaseType) = RadiationBase{Cases.get_radiation_type(case)}()
 
-forcing_kwargs(::AbstractCaseType, namelist) = ()
+forcing_kwargs(::AbstractCaseType, namelist) = (; coriolis_param = namelist["forcing"]["coriolis"])
 les_data_kwarg(::AbstractCaseType, namelist) = ()
 
 ForcingBase(case::AbstractCaseType, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
@@ -225,7 +223,7 @@ initialize_forcing(::AbstractCaseType, forcing, grid::Grid, state, param_set) = 
 ##### Soares
 #####
 
-ForcingBase(case::Soares, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); apply_coriolis = false)
+ForcingBase(case::Soares, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::Soares, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -276,7 +274,7 @@ end
 ##### Nieuwstadt
 #####
 
-ForcingBase(case::Nieuwstadt, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); apply_coriolis = false)
+ForcingBase(case::Nieuwstadt, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::Nieuwstadt, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -324,9 +322,7 @@ end
 #####
 ##### Bomex
 #####
-
-ForcingBase(case::Bomex, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); apply_coriolis = true, coriolis_param = 0.376e-4) #= s^{-1} =#
+ForcingBase(case::Bomex, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::Bomex, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -408,9 +404,7 @@ end
 #####
 ##### life_cycle_Tan2018
 #####
-
-ForcingBase(case::life_cycle_Tan2018, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); apply_coriolis = true, coriolis_param = 0.376e-4) #= s^{-1} =#
+ForcingBase(case::life_cycle_Tan2018, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::life_cycle_Tan2018, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -498,15 +492,7 @@ end
 ##### Rico
 #####
 
-function ForcingBase(case::Rico, param_set::APS; kwargs...)
-    latitude = 18.0
-    Omega = TCP.Omega(param_set)
-    return ForcingBase(
-        get_forcing_type(case);
-        apply_coriolis = true,
-        coriolis_param = 2.0 * Omega * sin(latitude * π / 180.0),
-    ) #= s^{-1} =#
-end
+ForcingBase(case::Rico, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::Rico, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -614,9 +600,7 @@ end
 #####
 ##### TRMM_LBA
 #####
-
-ForcingBase(case::TRMM_LBA, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); apply_coriolis = false, kwargs...)
+ForcingBase(case::TRMM_LBA, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::TRMM_LBA, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -690,9 +674,7 @@ initialize_radiation(::TRMM_LBA, radiation, grid::Grid, state, param_set) = init
 #####
 ##### ARM_SGP
 #####
-
-ForcingBase(case::ARM_SGP, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); apply_coriolis = true, coriolis_param = 8.5e-5)
+ForcingBase(case::ARM_SGP, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::ARM_SGP, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -778,8 +760,7 @@ end
 #####
 ##### GATE_III
 #####
-
-ForcingBase(case::GATE_III, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); apply_coriolis = false)
+ForcingBase(case::GATE_III, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::GATE_III, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -913,7 +894,7 @@ function RadiationBase(case::DYCOMS_RF01)
 end
 
 ForcingBase(case::DYCOMS_RF01, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); divergence = large_scale_divergence(case))
+    ForcingBase(get_forcing_type(case); divergence = large_scale_divergence(case), kwargs...)
 
 function initialize_radiation(::DYCOMS_RF01, radiation, grid::Grid, state, param_set)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -1002,7 +983,7 @@ function RadiationBase(case::DYCOMS_RF02)
     )
 end
 ForcingBase(case::DYCOMS_RF02, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); divergence = large_scale_divergence(case))
+    ForcingBase(get_forcing_type(case); divergence = large_scale_divergence(case), kwargs...)
 
 function initialize_radiation(::DYCOMS_RF02, radiation, grid::Grid, state, param_set)
     # the same as in DYCOMS_RF01
@@ -1020,12 +1001,7 @@ end
 ##### GABLS
 #####
 
-function ForcingBase(case::GABLS, param_set::APS; kwargs...)
-    coriolis_param = 1.39e-4 # s^{-1}
-    # Omega = TCP.Omega(param_set)
-    # coriolis_param = 2 * Omega * sin(latitude * π / 180 ) # s^{-1}
-    ForcingBase(get_forcing_type(case); apply_coriolis = true, coriolis_param = coriolis_param)
-end
+ForcingBase(case::GABLS, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::GABLS, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -1081,7 +1057,7 @@ end
 ##### DryBubble
 #####
 
-ForcingBase(case::DryBubble, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); apply_coriolis = false)
+ForcingBase(case::DryBubble, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::DryBubble, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -1129,6 +1105,7 @@ end
 #####
 
 function forcing_kwargs(::LES_driven_SCM, namelist)
+    coriolis_param = namelist["forcing"]["coriolis"]
     les_filename = namelist["meta"]["lesfile"]
     cfsite_number, forcing_model, month, experiment = TC.parse_les_path(les_filename)
     LES_library = TC.get_LES_library()
@@ -1145,7 +1122,7 @@ function forcing_kwargs(::LES_driven_SCM, namelist)
         scalar_nudge_τᵣ = 2.0 * 3600.0
     end
 
-    return (; wind_nudge_τᵣ, scalar_nudge_zᵢ, scalar_nudge_zᵣ, scalar_nudge_τᵣ)
+    return (; wind_nudge_τᵣ, scalar_nudge_zᵢ, scalar_nudge_zᵣ, scalar_nudge_τᵣ, coriolis_param)
 end
 
 function les_data_kwarg(::LES_driven_SCM, namelist)
@@ -1165,9 +1142,7 @@ function les_data_kwarg(::LES_driven_SCM, namelist)
     return (; LESDat)
 end
 
-function ForcingBase(case::LES_driven_SCM, param_set::APS; kwargs...)
-    ForcingBase(get_forcing_type(case); apply_coriolis = false, coriolis_param = 0.376e-4, kwargs...)
-end
+ForcingBase(case::LES_driven_SCM, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::LES_driven_SCM, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)

@@ -169,6 +169,7 @@ function Simulation1d(namelist)
     surf_ref_state = Cases.surface_ref_state(case, param_set, namelist)
 
     forcing = Cases.ForcingBase(case, param_set; Cases.forcing_kwargs(case, namelist)...)
+
     radiation = Cases.RadiationBase(case)
     TS = TimeStepping(FT, namelist)
 

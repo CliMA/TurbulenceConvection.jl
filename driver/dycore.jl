@@ -351,10 +351,8 @@ function compute_gm_tendencies!(
         h_v = cv_v * (aux_gm.T[k] - T_0) + Lv_0 - R_v * T_0
 
         # Coriolis
-        if force.apply_coriolis
-            tendencies_gm_u[k] -= force.coriolis_param * (aux_gm.vg[k] - prog_gm_v[k])
-            tendencies_gm_v[k] += force.coriolis_param * (aux_gm.ug[k] - prog_gm_u[k])
-        end
+        tendencies_gm_u[k] -= force.coriolis_param * (aux_gm.vg[k] - prog_gm_v[k])
+        tendencies_gm_v[k] += force.coriolis_param * (aux_gm.ug[k] - prog_gm_u[k])
         # LS Subsidence
         tendencies_gm.ρe_tot[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇MSE_gm[k]
         tendencies_gm.ρq_tot[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇q_tot_gm[k]
