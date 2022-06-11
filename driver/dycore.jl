@@ -309,6 +309,11 @@ end
 function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
     UnPack.@unpack edmf, precip_model, grid, param_set, case, aux, TS = params
 
+    tends_face = tendencies.face
+    tends_cent = tendencies.cent
+    parent(tends_face) .= 0
+    parent(tends_cent) .= 0
+
     state = TC.State(prog, aux, tendencies)
 
     set_thermo_state!(state, grid, edmf.moisture_model, param_set)
@@ -334,11 +339,6 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     Cases.update_radiation(case.Rad, grid, state, t, param_set)
 
     TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
-
-    tends_face = tendencies.face
-    tends_cent = tendencies.cent
-    parent(tends_face) .= 0
-    parent(tends_cent) .= 0
 
     # compute tendencies
     # causes division error in dry bubble first time step
