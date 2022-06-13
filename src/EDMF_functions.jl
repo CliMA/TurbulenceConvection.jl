@@ -51,8 +51,6 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     massflux_h = aux_tc_f.massflux_h
     massflux_qt = aux_tc_f.massflux_qt
     aux_tc = center_aux_turbconv(state)
-    prog_gm_u = grid_mean_u(state)
-    prog_gm_v = grid_mean_v(state)
 
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
@@ -128,24 +126,23 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
 
     diffusive_flux_h = aux_tc_f.diffusive_flux_h
     diffusive_flux_qt = aux_tc_f.diffusive_flux_qt
-    diffusive_flux_u = aux_tc_f.diffusive_flux_u
-    diffusive_flux_v = aux_tc_f.diffusive_flux_v
+    diffusive_flux_uₕ = aux_tc_f.diffusive_flux_uₕ
 
     sgs_flux_h_tot = aux_gm_f.sgs_flux_h_tot
     sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot
-    sgs_flux_u = aux_gm_f.sgs_flux_u
-    sgs_flux_v = aux_gm_f.sgs_flux_v
+    sgs_flux_uₕ = aux_gm_f.sgs_flux_uₕ
 
     @. sgs_flux_h_tot = diffusive_flux_h + massflux_h
     @. sgs_flux_q_tot = diffusive_flux_qt + massflux_qt
-    @. sgs_flux_u = diffusive_flux_u # + massflux_u
-    @. sgs_flux_v = diffusive_flux_v # + massflux_v
+    @. sgs_flux_uₕ = diffusive_flux_uₕ # + massflux_u
 
     # apply surface BC as SGS flux at lowest level
+    lg_surf = CC.Fields.local_geometry_field(axes(ρ_f))[kf_surf]
     sgs_flux_h_tot[kf_surf] = surf.ρe_tot_flux
     sgs_flux_q_tot[kf_surf] = surf.ρq_tot_flux
-    sgs_flux_u[kf_surf] = surf.ρu_flux
-    sgs_flux_v[kf_surf] = surf.ρv_flux
+    sgs_flux_uₕ[kf_surf] =
+        CCG.Covariant3Vector(wvec(FT(1)), lg_surf) ⊗
+        CCG.Covariant12Vector(CCG.UVVector(surf.ρu_flux, surf.ρv_flux), lg_surf)
 
     if edmf.moisture_model isa NonEquilibriumMoisture
         massflux_tendency_ql = aux_tc.massflux_tendency_ql
@@ -182,8 +179,7 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     KH = center_aux_turbconv(state).KH
     aeKM = center_aux_turbconv(state).ϕ_temporary
     aeKH = center_aux_turbconv(state).ψ_temporary
-    prog_gm_u = grid_mean_u(state)
-    prog_gm_v = grid_mean_v(state)
+    prog_gm_uₕ = grid_mean_uₕ(state)
 
     ρ_f = aux_gm_f.ρ
     a_en = aux_en.area
@@ -205,16 +201,26 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     aeKMu_bc = -surf.ρu_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
     aeKMv_bc = -surf.ρv_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
 
+    aeKMuₕ_bc = CCG.UVVector(aeKMu_bc, aeKMv_bc)
+
     ∇q_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_tot_bc), top = CCO.SetDivergence(FT(0)))
     ∇h_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHh_tot_bc), top = CCO.SetDivergence(FT(0)))
-    ∇u_gm = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKMu_bc), top = CCO.SetDivergence(FT(0)))
-    ∇v_gm = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKMv_bc), top = CCO.SetDivergence(FT(0)))
-
+    # CCG.Covariant3Vector(FT(1)) ⊗ CCG.Covariant12Vector(FT(aeKMu_bc),FT(aeKMv_bc))
+    local_geometry_surf = CC.Fields.local_geometry_field(axes(ρ_f))[kf_surf]
     wvec = CC.Geometry.WVector
+    ∇uₕ_gm = CCO.GradientC2F(;
+        bottom = CCO.SetGradient(
+            CCG.Covariant3Vector(wvec(FT(1)), local_geometry_surf) ⊗
+            CCG.Covariant12Vector(aeKMuₕ_bc, local_geometry_surf),
+        ),
+        top = CCO.SetGradient(
+            CCG.Covariant3Vector(wvec(FT(0)), local_geometry_surf) ⊗ CCG.Covariant12Vector(FT(0), FT(0)),
+        ),
+    )
+
     @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KH * ∇q_tot_en(wvec(aux_en.q_tot))
     @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇h_tot_en(wvec(aux_en.h_tot))
-    @. aux_tc_f.diffusive_flux_u = -aux_tc_f.ρ_ae_KM * ∇u_gm(wvec(prog_gm_u))
-    @. aux_tc_f.diffusive_flux_v = -aux_tc_f.ρ_ae_KM * ∇v_gm(wvec(prog_gm_v))
+    @. aux_tc_f.diffusive_flux_uₕ = -aux_tc_f.ρ_ae_KM * ∇uₕ_gm(prog_gm_uₕ)
 
     if edmf.moisture_model isa NonEquilibriumMoisture
         aeKHq_liq_bc = FT(0)
@@ -338,6 +344,9 @@ end
 
 function w_surface_bc(::SurfaceBase{FT})::FT where {FT}
     return FT(0)
+end
+function uₕ_bcs()
+    return CCO.InterpolateC2F(bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
 end
 function θ_surface_bc(
     surf::SurfaceBase{FT},
@@ -725,12 +734,10 @@ function compute_covariance_shear(
     ρ_c = prog_gm.ρ
     is_tke = covar_sym == :tke
     FT = float_type(state)
-    tke_factor = is_tke ? FT(0.5) : 1
     k_eddy = is_tke ? aux_tc.KM : aux_tc.KH
     aux_en_2m = center_aux_environment_2m(state)
     aux_covar = getproperty(aux_en_2m, covar_sym)
-    prog_gm_u = grid_mean_u(state)
-    prog_gm_v = grid_mean_v(state)
+    uₕ_gm = grid_mean_uₕ(state)
 
     aux_en_c = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
@@ -741,22 +748,23 @@ function compute_covariance_shear(
 
     bcs = (; bottom = CCO.Extrapolate(), top = CCO.SetGradient(wvec(zero(FT))))
     If = CCO.InterpolateC2F(; bcs...)
-    ∇c = CCO.DivergenceF2C()
-    u = prog_gm_u
-    v = prog_gm_v
     area_en = aux_en_c.area
     shear = aux_covar.shear
 
+    C123 = CCG.Covariant123Vector
+    local_geometry = CC.Fields.local_geometry_field(axes(ρ_c))
+    k̂ = @. CCG.Contravariant3Vector(CCG.WVector(FT(1)), local_geometry)
+    Ifuₕ = uₕ_bcs()
+    ∇uvw = CCO.GradientF2C()
+    # TODO: k_eddy and Shear² should probably be tensors (Contravariant3 tensor),
+    #       so that the result (a contraction) is a scalar.
     if is_tke
-        @. shear =
-            tke_factor *
-            2 *
-            ρ_c *
-            area_en *
-            k_eddy *
-            (∇c(wvec(ϕ_en)) * ∇c(wvec(ψ_en)) + (∇c(wvec(If(u))))^2 + (∇c(wvec(If(v))))^2)
+        uvw = @. C123(Ifuₕ(uₕ_gm)) + C123(wvec(ϕ_en)) # ϕ_en === ψ_en
+        Shear² = @. LA.norm_sqr(adjoint(∇uvw(uvw)) * k̂)
+        @. shear = ρ_c * area_en * k_eddy * Shear²
     else
-        @. shear = tke_factor * 2 * ρ_c * area_en * k_eddy * ∇c(wvec(If(ϕ_en))) * ∇c(wvec(If(ψ_en)))
+        ∇c = CCO.GradientF2C()
+        @. shear = 2 * ρ_c * area_en * k_eddy * LA.dot(∇c(If(ϕ_en)), k̂) * LA.dot(∇c(If(ψ_en)), k̂)
     end
     return nothing
 end

@@ -6,6 +6,7 @@ import TurbulenceConvection
 const TC = TurbulenceConvection
 
 import ClimaCore
+import ClimaCore.Geometry: ⊗
 const CC = ClimaCore
 const CCG = CC.Geometry
 
@@ -56,8 +57,7 @@ cent_aux_vars_gm(FT, local_geometry, edmf) = (;
     dqtdt_fluc = FT(0), #Vertical turbulent advection of moisture
     u_nudge = FT(0), #Reference u profile for relaxation tendency
     v_nudge = FT(0), #Reference v profile for relaxation tendency
-    ug = FT(0), #Geostrophic u velocity
-    vg = FT(0), #Geostrophic v velocity
+    uₕ_g = CCG.Covariant12Vector(CCG.UVVector(FT(0), FT(0)), local_geometry), #Geostrophic u velocity
     ∇MSE_gm = FT(0),
     ∇q_tot_gm = FT(0),
     cent_aux_vars_gm_moisture(FT, edmf.moisture_model)...,
@@ -83,8 +83,7 @@ face_aux_vars_gm(FT, local_geometry, edmf) = (;
     sgs_flux_h_tot = FT(0),
     sgs_flux_q_tot = FT(0),
     face_aux_vars_gm_moisture(FT, edmf.moisture_model)...,
-    sgs_flux_u = FT(0),
-    sgs_flux_v = FT(0),
+    sgs_flux_uₕ = CCG.Covariant3Vector(FT(0)) ⊗ CCG.Covariant12Vector(FT(0), FT(0)),
     p = FT(0),
     ρ = FT(0),
 )

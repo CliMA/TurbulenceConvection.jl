@@ -1,5 +1,6 @@
 import UnPack
 import LinearAlgebra
+import LinearAlgebra: ×
 
 import TurbulenceConvection
 const TC = TurbulenceConvection
@@ -338,10 +339,28 @@ function compute_gm_tendencies!(
     end
 
     # Apply forcing and radiation
-    prog_gm_u = TC.grid_mean_u(state)
-    prog_gm_v = TC.grid_mean_v(state)
-    tendencies_gm_u = TC.tendencies_grid_mean_u(state)
-    tendencies_gm_v = TC.tendencies_grid_mean_v(state)
+    prog_gm_uₕ = TC.grid_mean_uₕ(state)
+    aux_gm_uₕ_g = TC.grid_mean_uₕ_g(state)
+    # prog_gm_v = TC.grid_mean_v(state)
+    tendencies_gm_uₕ = TC.tendencies_grid_mean_uₕ(state)
+    # tendencies_gm_v = TC.tendencies_grid_mean_v(state)
+    prog_gm_u = TC.physical_grid_mean_u(state)
+    prog_gm_v = TC.physical_grid_mean_v(state)
+
+    # Coriolis
+    coriolis_param = force.coriolis_param
+    # TODO: union split over sphere or box
+    # lat = CC.Fields.coordinate_field(axes(ρ_c)).lat
+    coords = CC.Fields.coordinate_field(axes(ρ_c))
+    coriolis_fn(coord) = CCG.WVector(coriolis_param)
+    f = @. CCG.Contravariant3Vector(coriolis_fn(coords))
+
+    C123 = CCG.Covariant123Vector
+    C12 = CCG.Contravariant12Vector
+    lg = CC.Fields.local_geometry_field(axes(ρ_c))
+    @. tendencies_gm_uₕ -= f × (C12(C123(prog_gm_uₕ)) - C12(C123(aux_gm_uₕ_g)))
+
+
     @inbounds for k in TC.real_center_indices(grid)
         cp_m = TD.cp_m(thermo_params, ts_gm[k])
         cp_v = TCP.cp_v(param_set)
@@ -350,9 +369,6 @@ function compute_gm_tendencies!(
         cv_m = TD.cv_m(thermo_params, ts_gm[k])
         h_v = cv_v * (aux_gm.T[k] - T_0) + Lv_0 - R_v * T_0
 
-        # Coriolis
-        tendencies_gm_u[k] -= force.coriolis_param * (aux_gm.vg[k] - prog_gm_v[k])
-        tendencies_gm_v[k] += force.coriolis_param * (aux_gm.ug[k] - prog_gm_u[k])
         # LS Subsidence
         tendencies_gm.ρe_tot[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇MSE_gm[k]
         tendencies_gm.ρq_tot[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇q_tot_gm[k]
@@ -392,8 +408,7 @@ function compute_gm_tendencies!(
             tendencies_gm.ρq_tot[k] += ρ_c[k] * (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k])
             tendencies_gm.ρe_tot[k] +=
                 ρ_c[k] * (cv_m * (gm_T_nudge_k + T_fluc) + h_v * (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k]))
-            tendencies_gm_u[k] += gm_U_nudge_k
-            tendencies_gm_v[k] += gm_V_nudge_k
+            tendencies_gm_uₕ[k] += CCG.Covariant12Vector(CCG.UVVector(gm_U_nudge_k, gm_V_nudge_k), lg[k])
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
                 tendencies_gm.q_liq[k] += aux_gm.dqldt_hadv[k] + gm_q_liq_nudge_k + aux_gm.dqldt_fluc[k]
                 tendencies_gm.q_ice[k] += aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k]
@@ -423,18 +438,15 @@ function compute_gm_tendencies!(
     TC.compute_sgs_flux!(edmf, grid, state, surf, param_set)
     sgs_flux_h_tot = aux_gm_f.sgs_flux_h_tot
     sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot
-    sgs_flux_u = aux_gm_f.sgs_flux_u
-    sgs_flux_v = aux_gm_f.sgs_flux_v
+    sgs_flux_uₕ = aux_gm_f.sgs_flux_uₕ
     tends_ρe_tot = tendencies_gm.ρe_tot
     tends_ρq_tot = tendencies_gm.ρq_tot
-    tends_u = TC.tendencies_grid_mean_u(state)
-    tends_v = TC.tendencies_grid_mean_v(state)
+    tends_uₕ = TC.tendencies_grid_mean_uₕ(state)
 
     ∇sgs = CCO.DivergenceF2C()
     @. tends_ρe_tot += -∇sgs(wvec(sgs_flux_h_tot))
     @. tends_ρq_tot += -∇sgs(wvec(sgs_flux_q_tot))
-    @. tends_u += -∇sgs(wvec(sgs_flux_u)) / ρ_c
-    @. tends_v += -∇sgs(wvec(sgs_flux_v)) / ρ_c
+    @. tends_uₕ += -∇sgs(sgs_flux_uₕ) / ρ_c
 
     if edmf.moisture_model isa TC.NonEquilibriumMoisture
         sgs_flux_q_liq = aux_gm_f.sgs_flux_q_liq

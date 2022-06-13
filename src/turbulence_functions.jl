@@ -12,8 +12,8 @@ function get_inversion(grid::Grid, state::State, param_set::APS, Ri_bulk_crit)
     g::FT = TCP.grav(param_set)
     kc_surf = kc_surface(grid)
     θ_virt = center_aux_grid_mean(state).θ_virt
-    u = grid_mean_u(state)
-    v = grid_mean_v(state)
+    u = physical_grid_mean_u(state)
+    v = physical_grid_mean_v(state)
     Ri_bulk = center_aux_grid_mean(state).Ri
     θ_virt_b = θ_virt[kc_surf]
     z_c = grid.zc

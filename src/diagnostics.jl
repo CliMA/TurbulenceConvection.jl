@@ -40,8 +40,8 @@ function io_dictionary_aux()
         "Hvar_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).Hvar),
         "QTvar_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).QTvar),
         "HQTcov_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).HQTcov),
-        "u_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> grid_mean_u(state)),
-        "v_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> grid_mean_v(state)),
+        "u_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> physical_grid_mean_u(state)),
+        "v_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> physical_grid_mean_v(state)),
         "w_mean" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_prog_grid_mean(state).w),
         "qt_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_tot),
         "thetal_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).θ_liq_ice),
@@ -126,8 +126,8 @@ end
 function io_dictionary_aux_calibrate()
     DT = NamedTuple{(:dims, :group, :field), Tuple{Tuple{String, String}, String, Any}}
     io_dict = Dict{String, DT}(
-        "u_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> grid_mean_u(state)),
-        "v_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> grid_mean_v(state)),
+        "u_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> physical_grid_mean_u(state)),
+        "v_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> physical_grid_mean_v(state)),
         "s_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).s),
         "qt_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_tot),
         "ql_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_liq),
