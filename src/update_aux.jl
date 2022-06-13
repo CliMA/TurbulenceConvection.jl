@@ -328,12 +328,14 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
     ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
     If0 = CCO.InterpolateC2F(; ∇0_bcs...)
+    ∇u_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.Extrapolate())
+    Ifu = CCO.InterpolateC2F(; ∇u_bcs...)
 
     u_gm = grid_mean_u(state)
     v_gm = grid_mean_v(state)
     w_en = aux_en_f.w
     # compute shear
-    @. Shear² = (∇c(wvec(If0(u_gm))))^2 + (∇c(wvec(If0(v_gm))))^2 + (∇c(wvec(w_en)))^2
+    @. Shear² = (∇c(wvec(Ifu(u_gm))))^2 + (∇c(wvec(Ifu(v_gm))))^2 + (∇c(wvec(w_en)))^2
 
     q_tot_en = aux_en.q_tot
     θ_liq_ice_en = aux_en.θ_liq_ice
