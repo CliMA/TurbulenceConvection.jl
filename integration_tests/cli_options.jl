@@ -103,7 +103,7 @@ function print_repl_script(str)
     ib *= """(s, parsed_args) = parse_commandline();\n"""
     parsed_args = parsed_args_from_command_line_flags(str)
     for (flag, val) in parsed_args
-        if val isa String
+        if val isa AbstractString
             ib *= "parsed_args[\"$flag\"] = \"$val\";\n"
         else
             ib *= "parsed_args[\"$flag\"] = $val;\n"

@@ -104,11 +104,6 @@ function first_face_space(fv::CC.Fields.FieldVector)
     error("Unfound space")
 end
 
-function set_z!(field::CC.Fields.Field)
-    z = CC.Fields.coordinate_field(axes(field)).z
-    @. field = CCG.Covariant12Vector(CCG.UVVector(u(z), v(z)))
-end
-
 const CallableZType = Union{Function, Dierckx.Spline1D}
 
 function set_z!(field::CC.Fields.Field, u::CallableZType = x -> x, v::CallableZType = y -> y)
