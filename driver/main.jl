@@ -412,15 +412,15 @@ function nc_results_file(::Nothing)
     return ""
 end
 
-to_svec(x::AbstractArray) = SA.SVector{length(x)}(x)
-to_svec(x::Tuple) = SA.SVector{length(x)}(x)
+to_ntuple(x::AbstractArray) = ntuple(i -> x[i], length(x))
+to_ntuple(x::Tuple) = ntuple(i -> x[i], length(x))
 
 function main1d(namelist; time_run = true)
     edmf_turb_dict = namelist["turbulence"]["EDMF_PrognosticTKE"]
     for key in keys(edmf_turb_dict)
         entry = edmf_turb_dict[key]
         if entry isa AbstractArray || entry isa Tuple
-            edmf_turb_dict[key] = to_svec(entry)
+            edmf_turb_dict[key] = to_ntuple(entry)
         end
     end
     sim = Simulation1d(namelist)
