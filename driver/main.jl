@@ -179,9 +179,9 @@ function Simulation1d(namelist)
     case = Cases.get_case(namelist)
     surf_ref_state = Cases.surface_ref_state(case, param_set, namelist)
 
-    forcing = Cases.ForcingBase(case, param_set; Cases.forcing_kwargs(case, namelist)...)
+    forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
 
-    radiation = Cases.RadiationBase(case)
+    radiation = Cases.RadiationBase(case, FT)
     TS = TimeStepping(FTD, namelist)
 
     Ri_bulk_crit::FTD = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
