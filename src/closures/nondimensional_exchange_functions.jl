@@ -292,17 +292,13 @@ Uses a Random Feature model to predict the non-dimensional components of dynamic
  - `εδ_model`       :: RFEntr - basic RF entrainment closure
  - `εδ_model_vars`  :: structure containing variables
 """
-function non_dimensional_function(εδ_model::RFEntr, εδ_model_vars)
+function non_dimensional_function(εδ_model::RFEntr{d, m}, εδ_model_vars) where {d, m}
     # d inputs, p=2 outputs, m random features
-    nondim_groups = collect(non_dimensional_groups(εδ_model, εδ_model_vars))
-    d = size(nondim_groups)[1]
+    nondim_groups = non_dimensional_groups(εδ_model, εδ_model_vars)
 
     # Learnable and fixed parameters
-    c_rf_fix = εδ_model.c_rf_fix      # 2 x m x (1 + d), fix
-    c_rf_fix = reshape(c_rf_fix, 2, :, 1 + d)
-    m = size(c_rf_fix)[2]
-    c_rf_opt = εδ_model.c_rf_opt      # 2 x (m + 1 + d), learn
-    c_rf_opt = reshape(c_rf_opt, 2, m + 1 + d)
+    c_rf_fix = εδ_model.c_rf_fix # 2 x m x (1 + d), fix
+    c_rf_opt = εδ_model.c_rf_opt # 2 x (m + 1 + d), learn
 
     # Random Features
     scale_x_entr = (c_rf_opt[1, (m + 2):(m + d + 1)] .^ 2) .* nondim_groups

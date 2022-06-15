@@ -89,10 +89,18 @@ Base.@kwdef struct FNOEntr{P, T} <: AbstractNonLocalEntrDetrModel
     nm_fno::Int
     c_fno::T
 end
-Base.@kwdef struct RFEntr{P, A, B} <: AbstractEntrDetrModel
+struct RFEntr{d, m, P, A, B} <: AbstractEntrDetrModel
     params::P
     c_rf_fix::A
     c_rf_opt::B
+    function RFEntr(params::P, c_rf_fix::A, c_rf_opt::B, d::Int) where {P, A, B}
+        c_rf_fix = reshape(c_rf_fix, 2, :, 1 + d) # 2 x m x (1 + d), fix
+        c_rf_fix = SA.SArray{Tuple{size(c_rf_fix)...}}(c_rf_fix)
+        m = size(c_rf_fix, 2)
+        c_rf_opt = reshape(c_rf_opt, 2, m + 1 + d) # 2 x (m + 1 + d), learn
+        c_rf_opt = SA.SArray{Tuple{size(c_rf_opt)...}}(c_rf_opt)
+        return new{d, m, P, typeof(c_rf_fix), typeof(c_rf_opt)}(params, c_rf_fix, c_rf_opt)
+    end
 end
 
 Base.@kwdef struct NoisyRelaxationProcess{MT, T} <: AbstractNoisyEntrDetrModel
@@ -542,6 +550,8 @@ function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
 
     εδ_params = εδModelParams{FT, typeof(Π_norm)}(; c_div, w_min, c_ε, μ_0, β, χ, c_λ, γ_lim, β_lim, c_γ, c_δ, Π_norm)
 
+    entr_pi_subset = Tuple(parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_pi_subset"))
+
     mean_entr_closure = if entr_type == "moisture_deficit"
         MDEntr(; params = εδ_params)
     elseif entr_type == "NN"
@@ -563,7 +573,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
     elseif entr_type == "RF"
         c_rf_fix = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_fix_ent_params")
         c_rf_opt = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_opt_ent_params")
-        RFEntr(; params = εδ_params, c_rf_fix, c_rf_opt)
+        RFEntr(εδ_params, c_rf_fix, c_rf_opt, length(entr_pi_subset))
     else
         error("Something went wrong. Invalid entrainment type '$entr_type'")
     end
@@ -643,8 +653,6 @@ function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
     else
         error("Something went wrong. Invalid entrainment dimension scale '$detr_dim_scale'")
     end
-
-    entr_pi_subset = Tuple(parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_pi_subset"))
 
     EDS = typeof(entr_dim_scale)
     DDS = typeof(detr_dim_scale)
