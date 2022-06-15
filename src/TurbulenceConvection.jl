@@ -2,6 +2,8 @@ module TurbulenceConvection
 
 import ClimaCore
 import LinearAlgebra
+import ClimaCore.Geometry: ⊗
+import LinearAlgebra: ×
 import DocStringExtensions
 import StaticArrays
 import StatsBase
@@ -25,6 +27,7 @@ const CCO = CC.Operators
 const SA = StaticArrays
 
 const TD = Thermodynamics
+const LA = LinearAlgebra
 
 const CM = CloudMicrophysics
 const CMNe = CloudMicrophysics.MicrophysicsNonEq

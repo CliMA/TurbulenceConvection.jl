@@ -329,11 +329,17 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
     If0 = CCO.InterpolateC2F(; ∇0_bcs...)
 
-    u_gm = grid_mean_u(state)
-    v_gm = grid_mean_v(state)
+    uₕ_gm = grid_mean_uₕ(state)
     w_en = aux_en_f.w
     # compute shear
-    @. Shear² = (∇c(wvec(If0(u_gm))))^2 + (∇c(wvec(If0(v_gm))))^2 + (∇c(wvec(w_en)))^2
+
+    # TODO: Will need to be changed with topography
+    local_geometry = CC.Fields.local_geometry_field(axes(ρ_c))
+    k̂ = @. CCG.Contravariant3Vector(CCG.WVector(FT(1)), local_geometry)
+    Ifuₕ = uₕ_bcs()
+    ∇uvw = CCO.GradientF2C()
+    uvw = @. C123(Ifuₕ(uₕ_gm)) + C123(wvec(w_en))
+    @. Shear² = LinearAlgebra.norm_sqr(adjoint(∇uvw(uvw)) * k̂)
 
     q_tot_en = aux_en.q_tot
     θ_liq_ice_en = aux_en.θ_liq_ice

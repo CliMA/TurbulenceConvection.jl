@@ -22,8 +22,6 @@ function get_surface(
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     p_f_surf = aux_gm_f.p[kf_surf]
-    u_gm_surf = TC.grid_mean_u(state)[kc_surf]
-    v_gm_surf = TC.grid_mean_v(state)[kc_surf]
     Tsurface = TC.surface_temperature(surf_params, t)
     qsurface = TC.surface_q_tot(surf_params, t)
     shf = TC.sensible_heat_flux(surf_params, t)
@@ -42,7 +40,9 @@ function get_surface(
     convective_vel = TC.get_wstar(bflux, zi) # yair here zi in TRMM should be adjusted
 
     u_sfc = SA.SVector{2, FT}(0, 0)
-    u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
+    # TODO: make correct with topography
+    uₕ_gm_surf = TC.physical_grid_mean_uₕ(state)[kc_surf]
+    u_in = SA.SVector{2, FT}(uₕ_gm_surf.u, uₕ_gm_surf.v)
     vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
     vals_int = SF.InteriorValues(z_in, u_in, ts_in)
     kwargs = (;
@@ -95,8 +95,6 @@ function get_surface(
     Tsurface = TC.surface_temperature(surf_params, t)
     qsurface = TC.surface_q_tot(surf_params, t)
     p_f_surf = aux_gm_f.p[kf_surf]
-    u_gm_surf = TC.grid_mean_u(state)[kc_surf]
-    v_gm_surf = TC.grid_mean_v(state)[kc_surf]
     zrough = surf_params.zrough
     zc_surf = grid.zc[kc_surf].z
     cm = surf_params.cm(zc_surf)
@@ -111,7 +109,9 @@ function get_surface(
     ts_sfc = TD.PhaseEquil_pθq(thermo_params, p_f_surf, Tsurface, qsurface)
     ts_in = aux_gm.ts[kc_surf]
     u_sfc = SA.SVector{2, FT}(0, 0)
-    u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
+    # TODO: make correct with topography
+    uₕ_gm_surf = TC.physical_grid_mean_uₕ(state)[kc_surf]
+    u_in = SA.SVector{2, FT}(uₕ_gm_surf.u, uₕ_gm_surf.v)
     vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
     vals_int = SF.InteriorValues(z_in, u_in, ts_in)
     sc = SF.Coefficients{FT}(state_in = vals_int, state_sfc = vals_sfc, Cd = cm, Ch = ch, z0m = zrough, z0b = zrough)
@@ -157,8 +157,6 @@ function get_surface(
     aux_gm_f = TC.face_aux_grid_mean(state)
     p_f_surf = aux_gm_f.p[kf_surf]
     ts_gm = aux_gm.ts
-    u_gm_surf = TC.grid_mean_u(state)[kc_surf]
-    v_gm_surf = TC.grid_mean_v(state)[kc_surf]
     Tsurface = TC.surface_temperature(surf_params, t)
     qsurface = TC.surface_q_tot(surf_params, t)
     zrough = surf_params.zrough
@@ -171,7 +169,9 @@ function get_surface(
     ts_in = ts_gm[kc_surf]
 
     u_sfc = SA.SVector{2, FT}(0, 0)
-    u_in = SA.SVector{2, FT}(u_gm_surf, v_gm_surf)
+    # TODO: make correct with topography
+    uₕ_gm_surf = TC.physical_grid_mean_uₕ(state)[kc_surf]
+    u_in = SA.SVector{2, FT}(uₕ_gm_surf.u, uₕ_gm_surf.v)
     vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
     vals_int = SF.InteriorValues(z_in, u_in, ts_in)
     sc = SF.ValuesOnly{FT}(state_in = vals_int, state_sfc = vals_sfc, z0m = zrough, z0b = zrough)

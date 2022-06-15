@@ -1,6 +1,7 @@
 #####
 ##### Fields
 #####
+import ClimaCore.Geometry: ⊗
 
 # Helpers for adding empty thermodynamic state fields:
 thermo_state(FT, ::EquilibriumMoisture) = TD.PhaseEquil{FT}(0, 0, 0, 0, 0)
@@ -207,8 +208,7 @@ face_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
         diffusive_flux_h = FT(0),
         diffusive_flux_qt = FT(0),
         face_aux_vars_edmf_moisture(FT, edmf.moisture_model)...,
-        diffusive_flux_u = FT(0),
-        diffusive_flux_v = FT(0),
+        diffusive_flux_uₕ = CCG.Covariant3Vector(FT(0)) ⊗ CCG.Covariant12Vector(FT(0), FT(0)),
     )
 )
 

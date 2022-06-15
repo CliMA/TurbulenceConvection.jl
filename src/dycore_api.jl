@@ -73,10 +73,10 @@ center_tendencies_environment(state) = tendencies_turbconv(state, CentField()).e
 center_tendencies_precipitation(state) = tendencies_turbconv(state, CentField()).pr
 face_tendencies_updrafts(state) = tendencies_turbconv(state, FaceField()).up
 
-
+physical_grid_mean_uₕ(state) = CCG.UVVector.(grid_mean_uₕ(state))
+physical_grid_mean_u(state) = map(x -> x.u, physical_grid_mean_uₕ(state))
+physical_grid_mean_v(state) = map(x -> x.v, physical_grid_mean_uₕ(state))
 grid_mean_uₕ(state) = center_prog_grid_mean(state).uₕ
-grid_mean_u(state) = center_prog_grid_mean(state).uₕ.components.data.:1
-grid_mean_v(state) = center_prog_grid_mean(state).uₕ.components.data.:2
+grid_mean_uₕ_g(state) = center_aux_grid_mean(state).uₕ_g
 
-tendencies_grid_mean_u(state) = center_tendencies_grid_mean(state).uₕ.components.data.:1
-tendencies_grid_mean_v(state) = center_tendencies_grid_mean(state).uₕ.components.data.:2
+tendencies_grid_mean_uₕ(state) = center_tendencies_grid_mean(state).uₕ
