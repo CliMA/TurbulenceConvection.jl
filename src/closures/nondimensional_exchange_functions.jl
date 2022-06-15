@@ -138,22 +138,22 @@ end
     Count number of parameters in fully-connected NN model given Array specifying architecture following
         the pattern: [#inputs, #neurons in L1, #neurons in L2, ...., #outputs]. Equal to the number of weights + biases.
 """
-num_params_from_arc(nn_arc::AbstractArray{Int}) = num_weights_from_arc(nn_arc) + num_biases_from_arc(nn_arc)
+num_params_from_arc(nn_arc) = num_weights_from_arc(nn_arc) + num_biases_from_arc(nn_arc)
 
 """
     Count number of weights in fully-connected NN architecture.
 """
-num_weights_from_arc(nn_arc::AbstractArray{Int}) = sum(i -> nn_arc[i] * nn_arc[i + 1], 1:(length(nn_arc) - 1))
+num_weights_from_arc(nn_arc) = sum(i -> nn_arc[i] * nn_arc[i + 1], 1:(length(nn_arc) - 1))
 
 """
     Count number of biases in fully-connected NN architecture.
 """
-num_biases_from_arc(nn_arc::AbstractArray{Int}) = sum(i -> nn_arc[i + 1], 1:(length(nn_arc) - 1))
+num_biases_from_arc(nn_arc) = sum(i -> nn_arc[i + 1], 1:(length(nn_arc) - 1))
 
 
 """
     construct_fully_connected_nn(
-        arc::AbstractArray{Int},
+        arc::Union{AbstractArray{Int},Tuple},
         params::AbstractArray{FT};
         biases_bool::bool = false,
         activation_function::Flux.Function = Flux.sigmoid,
@@ -167,7 +167,7 @@ num_biases_from_arc(nn_arc::AbstractArray{Int}) = sum(i -> nn_arc[i + 1], 1:(len
     - `output_layer_activation_function` :: activation function for output layer
 """
 function construct_fully_connected_nn(
-    arc::AbstractArray{Int},
+    arc::Union{AbstractArray{Int}, Tuple},
     params::AbstractArray{FT};
     biases_bool::Bool = false,
     activation_function::Flux.Function = Flux.sigmoid,
@@ -298,10 +298,10 @@ function non_dimensional_function(εδ_model::RFEntr, εδ_model_vars)
     d = size(nondim_groups)[1]
 
     # Learnable and fixed parameters
-    c_rf_fix = εδ_model.c_rf_fix      # 2 x m x (1 + d), fix
+    c_rf_fix = SA.SVector{length(εδ_model.c_rf_fix)}(εδ_model.c_rf_fix)      # 2 x m x (1 + d), fix
     c_rf_fix = reshape(c_rf_fix, 2, :, 1 + d)
     m = size(c_rf_fix)[2]
-    c_rf_opt = εδ_model.c_rf_opt      # 2 x (m + 1 + d), learn
+    c_rf_opt = SA.SVector{length(εδ_model.c_rf_opt)}(εδ_model.c_rf_opt)      # 2 x (m + 1 + d), learn
     c_rf_opt = reshape(c_rf_opt, 2, m + 1 + d)
 
     # Random Features
