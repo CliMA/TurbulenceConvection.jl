@@ -204,8 +204,8 @@ large_scale_divergence(::Union{DYCOMS_RF01, DYCOMS_RF02}) = 3.75e-6
 RadiationBase(case::AbstractCaseType, FT) = RadiationBase{Cases.get_radiation_type(case), FT}()
 
 forcing_kwargs(::AbstractCaseType, namelist) = (; coriolis_param = namelist["forcing"]["coriolis"])
-forcing_kwargs(::DYCOMS_RF01, namelist) = (; divergence = large_scale_divergence(case))
-forcing_kwargs(::DYCOMS_RF02, namelist) = (; divergence = large_scale_divergence(case))
+forcing_kwargs(case::DYCOMS_RF01, namelist) = (; divergence = large_scale_divergence(case))
+forcing_kwargs(case::DYCOMS_RF02, namelist) = (; divergence = large_scale_divergence(case))
 les_data_kwarg(::AbstractCaseType, namelist) = ()
 
 ForcingBase(case::AbstractCaseType, FT; kwargs...) = ForcingBase{get_forcing_type(case), FT}(; kwargs...)
