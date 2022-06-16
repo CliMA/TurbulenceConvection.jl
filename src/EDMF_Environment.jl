@@ -7,6 +7,7 @@ function microphysics(
     Δt::Real,
     param_set::APS,
 )
+
     tendencies_pr = center_tendencies_precipitation(state)
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
@@ -58,10 +59,29 @@ function microphysics(
         if edmf.moisture_model isa NonEquilibriumMoisture
             aux_en.ql_tendency_precip_formation[k] = mph.ql_tendency * aux_en.area[k]
             aux_en.qi_tendency_precip_formation[k] = mph.qi_tendency * aux_en.area[k]
+
+            ###-###-### TRYNA DO SOME JAWN WIT NONEQ MICRO HERE, BUT ON EN NOT BULK/UP (move into loop if works)
+            # tendencies_en = center_tendencies_environment(state) # do we need this? 
+            # do we also need to update the gm tendencies in dycore?
+            T_en = aux_en.T[k]
+            q_en = TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k])
+            ts_en= TD.PhaseNonEquil_pTq(param_set, p_c[k], T_en, q_en)
+            # condensation/evaporation, deposition/sublimation
+            mph_neq = noneq_moisture_sources(param_set, aux_en.area[k], ρ_c[k], Δt, ts_en, p_c[k])
+            aux_en.ql_tendency_noneq[k] = mph_neq.ql_tendency * aux_en.area[k] # How do I know these get used? gotta check in sum tendencies I guess? Is this even an existing tendency? And do we need to calculate the corresponding grid mean tendency?
+            aux_en.qi_tendency_noneq[k] = mph_neq.qi_tendency * aux_en.area[k]
+            ###-###-###-###-###-###-###-###-###-###
+
         end
         tendencies_pr.q_rai[k] += mph.qr_tendency * aux_en.area[k]
         tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
+
+
     end
+
+
+
+
     return nothing
 end
 
