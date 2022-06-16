@@ -28,7 +28,7 @@ function TCMeshFromGCMMesh(gcm_mesh; z_max::FT) where {FT <: AbstractFloat}
     return CC.Meshes.IntervalMesh(domain, faces)
 end
 
-struct Grid{FT, NZ, CS, FS, SC, SF, SVPCS}
+struct Grid{FT, NZ, CS, FS, SC, SF}
     zmin::FT
     zmax::FT
     Δz::FT
@@ -36,7 +36,6 @@ struct Grid{FT, NZ, CS, FS, SC, SF, SVPCS}
     fs::FS
     zc::SC
     zf::SF
-    svpc_space::SVPCS
     function Grid(space::CC.Spaces.CenterFiniteDifferenceSpace)
 
         nz = length(space)
@@ -47,27 +46,15 @@ struct Grid{FT, NZ, CS, FS, SC, SF, SVPCS}
         Δz = zf[CCO.PlusHalf(2)].z - zf[CCO.PlusHalf(1)].z
         FT = eltype(parent(zf))
 
-        # Single value per column-space (svpc = single_value_per_col)
-        svpc_domain = CC.Domains.IntervalDomain(
-            CC.Geometry.ZPoint{FT}(0),
-            CC.Geometry.ZPoint{FT}(1),
-            boundary_tags = (:bottom, :top),
-        )
-        svpc_mesh = CC.Meshes.IntervalMesh(svpc_domain, nelems = 1)
-        svpc_space = CC.Spaces.CenterFiniteDifferenceSpace(svpc_mesh)
-
         zmin = zf.z[CCO.PlusHalf(1)]
         zmax = zf.z[CCO.PlusHalf(nz + 1)]
         CS = typeof(cs)
         FS = typeof(fs)
         SC = typeof(zc)
         SF = typeof(zf)
-        SVPCS = typeof(svpc_space)
-        return new{FT, nz, CS, FS, SC, SF, SVPCS}(zmin, zmax, Δz, cs, fs, zc, zf, svpc_space)
+        return new{FT, nz, CS, FS, SC, SF}(zmin, zmax, Δz, cs, fs, zc, zf)
     end
 end
-
-single_value_per_col_space(grid::Grid) = grid.svpc_space
 
 Grid(mesh::CC.Meshes.IntervalMesh) = Grid(CC.Spaces.CenterFiniteDifferenceSpace(mesh))
 
