@@ -17,7 +17,6 @@ function affect_io!(integrator)
     skip_io && return nothing
     t = integrator.t
     prog = integrator.u
-    tendencies = ODE.get_du(integrator)
 
     for inds in TC.iterate_columns(prog.cent)
         stats = Stats[inds...]
@@ -27,7 +26,7 @@ function affect_io!(integrator)
         # TurbulenceConvection.io(sim) # #removeVarsHack
         write_simulation_time(stats, t) # #removeVarsHack
 
-        state = TC.column_state(prog, aux, tendencies, inds...)
+        state = TC.column_prog_aux(prog, aux, inds...)
         grid = TC.Grid(state)
         diag_col = TC.column_diagnostics(diagnostics, inds...)
 
@@ -75,11 +74,10 @@ function affect_filter!(integrator)
     UnPack.@unpack edmf, param_set, aux, case, surf_params = integrator.p
     t = integrator.t
     prog = integrator.u
-    tendencies = ODE.get_du(integrator)
     prog = integrator.u
 
     for inds in TC.iterate_columns(prog.cent)
-        state = TC.column_state(prog, aux, tendencies, inds...)
+        state = TC.column_prog_aux(prog, aux, inds...)
         grid = TC.Grid(state)
         surf = get_surface(surf_params, grid, state, t, param_set)
         TC.affect_filter!(edmf, grid, state, param_set, surf, t)
@@ -99,54 +97,56 @@ function adaptive_dt!(integrator)
     ODE.u_modified!(integrator, false)
 end
 
+function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_limit::FT) where {FT <: Real}
+    grid = TC.Grid(state)
+
+    prog_gm = TC.center_prog_grid_mean(state)
+    prog_gm_f = TC.face_prog_grid_mean(state)
+    Δzc = TC.get_Δz(prog_gm.ρ)
+    Δzf = TC.get_Δz(prog_gm_f.w)
+    N_up = TC.n_updrafts(edmf)
+
+    aux_tc = TC.center_aux_turbconv(state)
+    aux_up_f = TC.face_aux_updrafts(state)
+    aux_en_f = TC.face_aux_environment(state)
+    KM = aux_tc.KM
+    KH = aux_tc.KH
+
+    # helper to calculate the rain velocity
+    # TODO: assuming w_gm = 0
+    # TODO: verify translation
+    term_vel_rain = aux_tc.term_vel_rain
+    term_vel_snow = aux_tc.term_vel_snow
+    ε = FT(eps(FT))
+
+    @inbounds for k in TC.real_face_indices(grid)
+        TC.is_surface_face(grid, k) && continue
+        @inbounds for i in 1:N_up
+            dt_max = min(dt_max, CFL_limit * Δzf[k] / (abs(aux_up_f[i].w[k]) + ε))
+        end
+        dt_max = min(dt_max, CFL_limit * Δzf[k] / (abs(aux_en_f.w[k]) + ε))
+    end
+    @inbounds for k in TC.real_center_indices(grid)
+        vel_max = max(term_vel_rain[k], term_vel_snow[k])
+        # Check terminal rain/snow velocity CFL
+        dt_max = min(dt_max, CFL_limit * Δzc[k] / (vel_max + ε))
+        # Check diffusion CFL (i.e., Fourier number)
+        dt_max = min(dt_max, CFL_limit * Δzc[k]^2 / (max(KH[k], KM[k]) + ε))
+    end
+    return dt_max
+end
+
 function dt_max!(integrator)
     UnPack.@unpack edmf, aux, TS = integrator.p
     prog = integrator.u
-    tendencies = ODE.get_du(integrator)
-    prog = integrator.u
 
-    to_float(f) = f isa ForwardDiff.Dual ? ForwardDiff.value(f) : f
-
+    dt_max = TS.dt_max # initialize dt_max
     for inds in TC.iterate_columns(prog.cent)
-        state = TC.column_state(prog, aux, tendencies, inds...)
-        grid = TC.Grid(state)
-        prog_gm = TC.center_prog_grid_mean(state)
-        prog_gm_f = TC.face_prog_grid_mean(state)
-        Δzc = TC.get_Δz(prog_gm.ρ)
-        Δzf = TC.get_Δz(prog_gm_f.w)
-        CFL_limit = TS.cfl_limit
-        N_up = TC.n_updrafts(edmf)
-
-        dt_max = TS.dt_max # initialize dt_max
-
-        aux_tc = TC.center_aux_turbconv(state)
-        aux_up_f = TC.face_aux_updrafts(state)
-        aux_en_f = TC.face_aux_environment(state)
-        KM = aux_tc.KM
-        KH = aux_tc.KH
-
-        # helper to calculate the rain velocity
-        # TODO: assuming w_gm = 0
-        # TODO: verify translation
-        term_vel_rain = aux_tc.term_vel_rain
-        term_vel_snow = aux_tc.term_vel_snow
-
-        @inbounds for k in TC.real_face_indices(grid)
-            TC.is_surface_face(grid, k) && continue
-            @inbounds for i in 1:N_up
-                dt_max = min(dt_max, CFL_limit * Δzf[k] / (abs(aux_up_f[i].w[k]) + eps(Float32)))
-            end
-            dt_max = min(dt_max, CFL_limit * Δzf[k] / (abs(aux_en_f.w[k]) + eps(Float32)))
-        end
-        @inbounds for k in TC.real_center_indices(grid)
-            vel_max = max(term_vel_rain[k], term_vel_snow[k])
-            # Check terminal rain/snow velocity CFL
-            dt_max = min(dt_max, CFL_limit * Δzc[k] / (vel_max + eps(Float32)))
-            # Check diffusion CFL (i.e., Fourier number)
-            dt_max = min(dt_max, CFL_limit * Δzc[k]^2 / (max(KH[k], KM[k]) + eps(Float32)))
-        end
-        TS.dt_max_edmf = to_float(dt_max)
+        state = TC.column_prog_aux(prog, aux, inds...)
+        dt_max = compute_dt_max(state, edmf, dt_max, TS.cfl_limit)
     end
+    to_float(f) = f isa ForwardDiff.Dual ? ForwardDiff.value(f) : f
+    TS.dt_max_edmf = to_float(dt_max)
 
     ODE.u_modified!(integrator, false)
 end
@@ -154,10 +154,9 @@ end
 function monitor_cfl!(integrator)
     UnPack.@unpack edmf, aux, TS = integrator.p
     prog = integrator.u
-    tendencies = ODE.get_du(integrator)
 
     for inds in TC.iterate_columns(prog.cent)
-        state = TC.column_state(prog, aux, tendencies, inds...)
+        state = TC.column_prog_aux(prog, aux, inds...)
         grid = TC.Grid(state)
         prog_gm = TC.center_prog_grid_mean(state)
         Δz = TC.get_Δz(prog_gm.ρ)
