@@ -176,39 +176,41 @@ z_findlast_face(f::F, grid::Grid) where {F} = grid.zf[findlast_face(f, grid)].z
 
 Base.eltype(::Grid{FT}) where {FT} = FT
 
+#####
+##### Column iterator # TODO: Move these things into ClimaCore
+#####
 
-# TODO: Move these things into ClimaCore
-
-"""
-    ColumnIterator(::Field)
-
-Iterates over columns given a field (or space)
-
-```julia
-for (h,j,i) in iterate_columns(field)
-    ...
-end
-```
-"""
 struct ColumnIterator{Nh, Nj, Ni}
-    function ColumnIterator(space::CC.Spaces.ExtrudedFiniteDifferenceSpace)
+    function ColumnIterator(space::CC.Spaces.AbstractSpace)
+        lgd = CC.Spaces.local_geometry_data(space)
         Ni, Nj, _, _, Nh = size(CC.Spaces.local_geometry_data(space))
         return new{Nh, Nj, Ni}()
     end
 end
-ColumnIterator(field::CC.Fields.ExtrudedFiniteDifferenceField) = ColumnIterator(axes(field))
 
-Base.size(::ColumnIterator{Nh, Nj, Ni}) where {Nh, Nj, Ni} = (Nh, Nj, Ni)
+Base.iterate(iter::ColumnIterator{Nh, Nj, Ni}, state = (1, 1, 1)) where {Nh, Nj, Ni} =
+    Iterators.product(1:Ni, 1:Nj, 1:Nh)
 
-function iterate_columns(field::CC.Fields.ExtrudedFiniteDifferenceField)
-    (Nh, Nj, Ni) = size(ColumnIterator(field))
-    return Iterators.product(1:Ni, 1:Nj, 1:Nh)
+iterate_columns(space::CC.Spaces.AbstractSpace) = Base.iterate(ColumnIterator(space))
+
+Base.length(::ColumnIterator{Nh, Nj, Ni}) where {Nh, Nj, Ni} = prod((Nh, Nj, Ni))
+
+
+const ColumnIteratorTypes = Union{CC.Fields.ExtrudedFiniteDifferenceField, CC.Fields.FiniteDifferenceField}
+
+"""
+    iterate_columns(::ExtrudedFiniteDifferenceField)
+    iterate_columns(::FiniteDifferenceField)
+
+Iterates over columns given a field (or space)
+
+```julia
+for inds in Spaces.iterate_columns(field)
+    column_field = Fields.column(field, inds...)
 end
+```
+"""
+iterate_columns(field::ColumnIteratorTypes) = iterate_columns(axes(field))
 
-function iterate_columns(fv::CC.Fields.FieldVector)
-    space = first_center_space(fv)
-    (Nh, Nj, Ni) = size(ColumnIterator(space))
-    return Iterators.product(1:Ni, 1:Nj, 1:Nh)
-end
-
-number_of_columns(fv::CC.Fields.FieldVector) = prod(size(ColumnIterator(first_center_space(fv))))
+number_of_columns(field::ColumnIteratorTypes) = number_of_columns(axes(field))
+number_of_columns(space::CC.Spaces.AbstractSpace) = length(ColumnIterator(space))
