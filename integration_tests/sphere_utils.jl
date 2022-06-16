@@ -15,7 +15,7 @@ processed_varname(pc::Tuple) = process_name(join(pc, "_"))
 function plot_profiles(Y, output_dir; filter_prop_chain = pc -> true)
     # Column animations
     mkpath(output_dir)
-    n_columns = TC.number_of_columns(Y)
+    n_columns = TC.number_of_columns(Y.cent)
     @info "Creating profiles with `n_columns` = $n_columns"
     prop_chains = filter(filter_prop_chain, CC.Fields.property_chains(Y))
     for prop_chain in prop_chains
@@ -32,11 +32,11 @@ function plot_profiles(Y, output_dir; filter_prop_chain = pc -> true)
         z_f = ClimaCore.column(local_geom, 1, 1, 1)
         z_f = z_f.coordinates.z
         z = vec(z_f)
-        for inds in TC.iterate_columns(Y)
+        for inds in TC.iterate_columns(Y.cent)
             ϕ_col = ClimaCore.column(var, inds...)
             ϕ_col_ave .+= vec(ϕ_col) ./ n_columns
         end
-        for inds in TC.iterate_columns(Y)
+        for inds in TC.iterate_columns(Y.cent)
             ϕ_col = ClimaCore.column(var, inds...)
             ϕ_col_std .+= sqrt.((vec(ϕ_col) .- ϕ_col_ave) .^ 2 ./ n_columns)
         end
@@ -50,7 +50,7 @@ end
 
 function test_zero_horizontal_variance(Y; filter_prop_chain = pc -> true)
     # Column animations
-    n_columns = TC.number_of_columns(Y)
+    n_columns = TC.number_of_columns(Y.cent)
     prop_chains = filter(filter_prop_chain, CC.Fields.property_chains(Y))
     std_per_var = map(CC.Fields.property_chains(Y)) do prop_chain
         var_name = processed_varname(prop_chain)
@@ -65,11 +65,11 @@ function test_zero_horizontal_variance(Y; filter_prop_chain = pc -> true)
         z_f = ClimaCore.column(local_geom, 1, 1, 1)
         z_f = z_f.coordinates.z
         z = vec(z_f)
-        for inds in TC.iterate_columns(Y)
+        for inds in TC.iterate_columns(Y.cent)
             ϕ_col = ClimaCore.column(var, inds...)
             ϕ_col_ave .+= vec(ϕ_col) ./ n_columns
         end
-        for inds in TC.iterate_columns(Y)
+        for inds in TC.iterate_columns(Y.cent)
             ϕ_col = ClimaCore.column(var, inds...)
             ϕ_col_std .+= sqrt.((vec(ϕ_col) .- ϕ_col_ave) .^ 2 ./ n_columns)
         end

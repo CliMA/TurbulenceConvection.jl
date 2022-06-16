@@ -86,24 +86,6 @@ isa_face_space(space) = false
 isa_face_space(::CC.Spaces.FaceFiniteDifferenceSpace) = true
 isa_face_space(::CC.Spaces.FaceExtrudedFiniteDifferenceSpace) = true
 
-function first_center_space(fv::CC.Fields.FieldVector)
-    for prop_chain in CC.Fields.property_chains(fv)
-        f = CC.Fields.single_field(fv, prop_chain)
-        space = axes(f)
-        isa_center_space(space) && return space
-    end
-    error("Unfound space")
-end
-
-function first_face_space(fv::CC.Fields.FieldVector)
-    for prop_chain in CC.Fields.property_chains(fv)
-        f = CC.Fields.single_field(fv, prop_chain)
-        space = axes(f)
-        isa_face_space(space) && return space
-    end
-    error("Unfound space")
-end
-
 const CallableZType = Union{Function, Dierckx.Spline1D}
 
 function set_z!(field::CC.Fields.Field, u::CallableZType = x -> x, v::CallableZType = y -> y)

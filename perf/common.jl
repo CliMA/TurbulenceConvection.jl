@@ -2,28 +2,17 @@ import TurbulenceConvection
 const TC = TurbulenceConvection
 
 const tc_dir = pkgdir(TurbulenceConvection)
+include(joinpath(tc_dir, "integration_tests", "cli_options.jl"))
+include(joinpath(tc_dir, "integration_tests", "overwrite_namelist.jl"))
 include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
 include(joinpath(tc_dir, "driver", "main.jl"))
 import .NameList
 
 function unpack_params(sim)
-    tendencies = copy(sim.prog)
-    TS = sim.TS
-    prog = sim.prog
-    calibrate_io = sim.calibrate_io
-    aux = sim.aux
-    params = (;
-        calibrate_io,
-        edmf = sim.edmf,
-        precip_model = sim.precip_model,
-        param_set = sim.param_set,
-        case = sim.case,
-        radiation = sim.radiation,
-        forcing = sim.forcing,
-        surf_params = sim.surf_params,
-        TS = TS,
-        aux = aux,
-    )
+    (; aux, calibrate_io, TS, prog, edmf, precip_model, param_set, case, radiation, forcing, surf_params, aux) = sim
+    tendencies = similar(prog)
+    parent(tendencies) .= 0
+    params = (; calibrate_io, edmf, precip_model, param_set, case, radiation, forcing, surf_params, TS, aux)
     return (; tendencies, prog, params, TS)
 end
 

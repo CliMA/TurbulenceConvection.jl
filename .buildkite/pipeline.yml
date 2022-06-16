@@ -201,6 +201,9 @@ steps:
       - label: ":mag: Inference triggers"
         command: "julia --color=yes --project=perf perf/inference_triggers.jl"
 
+      - label: ":mag: Jet test"
+        command: "julia --color=yes --project=perf perf/jet.jl"
+
   - wait: ~
     continue_on_failure: true
 
