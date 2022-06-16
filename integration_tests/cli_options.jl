@@ -114,7 +114,7 @@ function print_repl_script(str)
     println(ib)
 end
 
-function parsed_args_from_command_line_flags(str)
+function parsed_args_from_command_line_flags(str, parsed_args = Dict())
     s = str
     s = last(split(s, ".jl"))
     s = strip(s)
@@ -132,8 +132,8 @@ function parsed_args_from_command_line_flags(str)
         end
         return val # string
     end
-    parsed_args = Dict(map(parsed_arg_pairs) do (flag, val)
-        Pair(replace(flag, "--" => ""), parse_arg(val))
-    end)
+    for (flag, val) in parsed_arg_pairs
+        parsed_args[replace(flag, "--" => "")] = parse_arg(val)
+    end
     return parsed_args
 end
