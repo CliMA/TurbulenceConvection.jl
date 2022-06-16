@@ -105,6 +105,8 @@ function dt_max!(integrator)
     tendencies = ODE.get_du(integrator)
     prog = integrator.u
 
+    to_float(f) = f isa ForwardDiff.Dual ? ForwardDiff.value(f) : f
+
     for inds in TC.iterate_columns(prog.cent)
         state = TC.column_state(prog, aux, tendencies, inds...)
         grid = TC.Grid(state)
@@ -143,7 +145,7 @@ function dt_max!(integrator)
             # Check diffusion CFL (i.e., Fourier number)
             dt_max = min(dt_max, CFL_limit * Δzc[k]^2 / (max(KH[k], KM[k]) + eps(Float32)))
         end
-        TS.dt_max_edmf = dt_max
+        TS.dt_max_edmf = to_float(dt_max)
     end
 
     ODE.u_modified!(integrator, false)

@@ -164,7 +164,7 @@ steps:
     steps:
 
       - label: ":partly_sunny: Bomex duals"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --test_duals true --skip_tests true --skip_io true --skip_post_proc true --dt 1.0 --t_max 2.0 --suffix _duals"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --test_duals true --suffix _duals"
         artifact_paths: "Output.Bomex.01_duals/stats/comparison/*"
 
   - group: "Performance monitoring"

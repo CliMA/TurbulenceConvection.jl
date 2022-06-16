@@ -121,6 +121,12 @@ end
 ##### Performance critical IO
 #####
 
+write_field(
+    self::NetCDFIO_Stats,
+    var_name::String,
+    data::T,
+    group,
+) where {FT <: ForwardDiff.Dual, T <: AbstractArray{FT}} = write_field(self, var_name, ForwardDiff.value.(data), group)
 function write_field(
     self::NetCDFIO_Stats,
     var_name::String,
@@ -135,6 +141,8 @@ function write_field(
     # @inbounds var[end, :] = data :: T
 end
 
+add_write_field(ds, var_name::String, data::T, args...) where {FT <: ForwardDiff.Dual, T <: AbstractArray{FT}} =
+    add_write_field(ds, var_name, ForwardDiff.value.(data), args...)
 function add_write_field(
     ds,
     var_name::String,
@@ -149,6 +157,7 @@ function add_write_field(
     return nothing
 end
 
+write_ts(self, var_name, data::ForwardDiff.Dual) = write_ts(self, var_name, ForwardDiff.value(data))
 function write_ts(self::NetCDFIO_Stats, var_name::String, data::FT) where {FT <: AbstractFloat}
     # Hack to avoid https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
     @inbounds self.vars["timeseries"][var_name][end] = data::FT
@@ -157,6 +166,7 @@ function write_ts(self::NetCDFIO_Stats, var_name::String, data::FT) where {FT <:
     # @inbounds var[end+1] = data :: FT
 end
 
+write_simulation_time(self, t::ForwardDiff.Dual) = write_simulation_time(self, ForwardDiff.value(t))
 function write_simulation_time(self::NetCDFIO_Stats, t::FT) where {FT <: AbstractFloat}
     # # Write to profiles group
     profile_t = self.profiles_grp["t"]
