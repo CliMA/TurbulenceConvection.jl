@@ -110,32 +110,30 @@ LES-driven forcing
 
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct ForcingBase{T}
+Base.@kwdef struct ForcingBase{T, FT}
     "Coriolis parameter"
-    coriolis_param::Float64 = 0
+    coriolis_param::FT = 0
     "Wind relaxation timescale"
-    wind_nudge_τᵣ::Float64 = 0.0
+    wind_nudge_τᵣ::FT = 0.0
     "Scalar relaxation lower z"
-    scalar_nudge_zᵢ::Float64 = 0.0
+    scalar_nudge_zᵢ::FT = 0.0
     "Scalar relaxation upper z"
-    scalar_nudge_zᵣ::Float64 = 0.0
+    scalar_nudge_zᵣ::FT = 0.0
     "Scalar maximum relaxation timescale"
-    scalar_nudge_τᵣ::Float64 = 0.0
+    scalar_nudge_τᵣ::FT = 0.0
     "Large-scale divergence (same as in RadiationBase)"
-    divergence::Float64 = 0
+    divergence::FT = 0
 end
-
-ForcingBase(::Type{T}; kwargs...) where {T} = ForcingBase{T}(; kwargs...)
 
 force_type(::ForcingBase{T}) where {T} = T
 
-Base.@kwdef struct RadiationBase{T}
+Base.@kwdef struct RadiationBase{T, FT}
     "Large-scale divergence (same as in ForcingBase)"
-    divergence::Float64 = 0
-    alpha_z::Float64 = 0
-    kappa::Float64 = 0
-    F0::Float64 = 0
-    F1::Float64 = 0
+    divergence::FT = 0
+    alpha_z::FT = 0
+    kappa::FT = 0
+    F0::FT = 0
+    F1::FT = 0
 end
 
 rad_type(::RadiationBase{T}) where {T} = T
@@ -203,12 +201,14 @@ get_radiation_type(::TRMM_LBA) = RadiationTRMM_LBA
 
 large_scale_divergence(::Union{DYCOMS_RF01, DYCOMS_RF02}) = 3.75e-6
 
-RadiationBase(case::AbstractCaseType) = RadiationBase{Cases.get_radiation_type(case)}()
+RadiationBase(case::AbstractCaseType, FT) = RadiationBase{Cases.get_radiation_type(case), FT}()
 
 forcing_kwargs(::AbstractCaseType, namelist) = (; coriolis_param = namelist["forcing"]["coriolis"])
+forcing_kwargs(case::DYCOMS_RF01, namelist) = (; divergence = large_scale_divergence(case))
+forcing_kwargs(case::DYCOMS_RF02, namelist) = (; divergence = large_scale_divergence(case))
 les_data_kwarg(::AbstractCaseType, namelist) = ()
 
-ForcingBase(case::AbstractCaseType, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
+ForcingBase(case::AbstractCaseType, FT; kwargs...) = ForcingBase{get_forcing_type(case), FT}(; kwargs...)
 
 #####
 ##### Default case behavior:
@@ -222,8 +222,6 @@ initialize_forcing(::AbstractCaseType, forcing, grid::Grid, state, param_set) = 
 #####
 ##### Soares
 #####
-
-ForcingBase(case::Soares, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::Soares, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -275,8 +273,6 @@ end
 ##### Nieuwstadt
 #####
 
-ForcingBase(case::Nieuwstadt, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
-
 function surface_ref_state(::Nieuwstadt, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
     Pg = 1000.0 * 100.0
@@ -324,7 +320,6 @@ end
 #####
 ##### Bomex
 #####
-ForcingBase(case::Bomex, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::Bomex, param_set::APS, namelist)
     FT = eltype(param_set)
@@ -409,7 +404,6 @@ end
 #####
 ##### life_cycle_Tan2018
 #####
-ForcingBase(case::life_cycle_Tan2018, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::life_cycle_Tan2018, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -499,8 +493,6 @@ end
 #####
 ##### Rico
 #####
-
-ForcingBase(case::Rico, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::Rico, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -607,7 +599,6 @@ end
 #####
 ##### TRMM_LBA
 #####
-ForcingBase(case::TRMM_LBA, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::TRMM_LBA, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -673,14 +664,13 @@ function surface_params(case::TRMM_LBA, surf_ref_state, param_set; Ri_bulk_crit)
     return TC.FixedSurfaceFlux(FT, TC.FixedFrictionVelocity; kwargs...)
 end
 
-RadiationBase(case::TRMM_LBA) = RadiationBase{Cases.get_radiation_type(case)}()
+RadiationBase(case::TRMM_LBA, FT) = RadiationBase{Cases.get_radiation_type(case), FT}()
 
 initialize_radiation(::TRMM_LBA, radiation, grid::Grid, state, param_set) = initialize(radiation, grid, state)
 
 #####
 ##### ARM_SGP
 #####
-ForcingBase(case::ARM_SGP, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::ARM_SGP, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -765,7 +755,6 @@ end
 #####
 ##### GATE_III
 #####
-ForcingBase(case::GATE_III, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::GATE_III, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -894,8 +883,8 @@ function initialize_forcing(::DYCOMS_RF01, forcing, grid::Grid, state, param_set
     parent(aux_gm.dqtdt_hadv) .= 0 #kg/(kg * s)
 end
 
-function RadiationBase(case::DYCOMS_RF01)
-    return RadiationBase{Cases.get_radiation_type(case)}(;
+function RadiationBase(case::DYCOMS_RF01, FT)
+    return RadiationBase{Cases.get_radiation_type(case), FT}(;
         divergence = large_scale_divergence(case),
         alpha_z = 1.0,
         kappa = 85.0,
@@ -903,9 +892,6 @@ function RadiationBase(case::DYCOMS_RF01)
         F1 = 22.0,
     )
 end
-
-ForcingBase(case::DYCOMS_RF01, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); divergence = large_scale_divergence(case), kwargs...)
 
 function initialize_radiation(::DYCOMS_RF01, radiation, grid::Grid, state, param_set)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -987,8 +973,8 @@ function initialize_forcing(::DYCOMS_RF02, forcing, grid::Grid, state, param_set
     parent(aux_gm.dqtdt_hadv) .= 0 #kg/(kg * s)
 end
 
-function RadiationBase(case::DYCOMS_RF02)
-    return RadiationBase{Cases.get_radiation_type(case)}(;
+function RadiationBase(case::DYCOMS_RF02, FT)
+    return RadiationBase{Cases.get_radiation_type(case), FT}(;
         divergence = large_scale_divergence(case),
         alpha_z = 1.0,
         kappa = 85.0,
@@ -996,8 +982,6 @@ function RadiationBase(case::DYCOMS_RF02)
         F1 = 22.0,
     )
 end
-ForcingBase(case::DYCOMS_RF02, param_set::APS; kwargs...) =
-    ForcingBase(get_forcing_type(case); divergence = large_scale_divergence(case), kwargs...)
 
 function initialize_radiation(::DYCOMS_RF02, radiation, grid::Grid, state, param_set)
     # the same as in DYCOMS_RF01
@@ -1014,8 +998,6 @@ end
 #####
 ##### GABLS
 #####
-
-ForcingBase(case::GABLS, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::GABLS, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -1072,8 +1054,6 @@ end
 #####
 ##### DryBubble
 #####
-
-ForcingBase(case::DryBubble, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::DryBubble, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
@@ -1157,8 +1137,6 @@ function les_data_kwarg(::LES_driven_SCM, namelist)
     end
     return (; LESDat)
 end
-
-ForcingBase(case::LES_driven_SCM, param_set::APS; kwargs...) = ForcingBase(get_forcing_type(case); kwargs...)
 
 function surface_ref_state(::LES_driven_SCM, param_set::APS, namelist)
     thermo_params = TC.thermodynamics_params(param_set)
