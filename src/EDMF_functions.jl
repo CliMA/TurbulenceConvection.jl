@@ -18,7 +18,9 @@ function compute_turbconv_tendencies!(
     surf::SurfaceBase,
     Δt::Real,
 )
-    compute_up_tendencies!(edmf, grid, state, param_set, surf)
+    if edmf.updraft_model isa PrognosticUpdrafts
+        compute_up_tendencies!(edmf, grid, state, param_set, surf)
+    end
     compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
 
     if edmf.thermo_covariance_model isa PrognosticThermoCovariances

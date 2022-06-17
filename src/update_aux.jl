@@ -489,7 +489,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         end
     end
 
-    ### Diagnostic thermodynamiccovariances
+    ### Diagnostic updrafts
+    if edmf.updraft_model isa DiagnosticUpdrafts
+        #update_diagnostic_updrafts!(edmf, grid, state, param_set, surf)
+        nothing
+    end
+    ### Diagnostic thermodynamic covariances
     if edmf.thermo_covariance_model isa DiagnosticThermoCovariances
         flux1 = surf.shf / TD.cp_m(thermo_params, ts_gm[kc_surf])
         flux2 = surf.ρq_tot_flux

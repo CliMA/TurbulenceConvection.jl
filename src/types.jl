@@ -247,6 +247,10 @@ abstract type AbstractMoistureModel end
 struct EquilibriumMoisture <: AbstractMoistureModel end
 struct NonEquilibriumMoisture <: AbstractMoistureModel end
 
+abstract type AbstractUpdraftModel end
+struct PrognosticUpdrafts <: AbstractUpdraftModel end
+struct DiagnosticUpdrafts <: AbstractUpdraftModel end
+
 abstract type AbstractCovarianceModel end
 struct PrognosticThermoCovariances <: AbstractCovarianceModel end
 struct DiagnosticThermoCovariances{FT} <: AbstractCovarianceModel
@@ -404,11 +408,12 @@ Base.@kwdef struct SurfaceBase{FT}
     wstar::FT = 0
 end
 
-struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}
+struct EDMFModel{N_up, FT, MM, UM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}
     surface_area::FT
     max_area::FT
     minimum_area::FT
     moisture_model::MM
+    updraft_model::UM
     thermo_covariance_model::TCM
     precip_model::PM
     precip_fraction_model::PFM
@@ -441,6 +446,15 @@ function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
     surface_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "surface_area"; default = 0.1)
     max_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "max_area"; default = 0.9)
     minimum_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_area"; default = 1e-5)
+
+    updraft_model_name = parse_namelist(namelist, "thermodynamics", "updraft_model"; default = "prognostic")
+    updraft_model = if updraft_model_name == "prognostic"
+        PrognosticUpdrafts()
+    elseif updraft_model_name == "diagnostic"
+        DiagnosticUpdrafts()
+    else
+        error("Something went wrong. Invalid moisture model: '$updraft_model_name'")
+    end
 
     moisture_model_name = parse_namelist(namelist, "thermodynamics", "moisture_model"; default = "equilibrium")
 
@@ -658,6 +672,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
     DDS = typeof(detr_dim_scale)
     EC = typeof(entr_closure)
     MM = typeof(moisture_model)
+    UM = typeof(updraft_model)
     TCM = typeof(thermo_covariance_model)
     PM = typeof(precip_model)
     PFM = typeof(precip_fraction_model)
@@ -666,11 +681,12 @@ function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
     EPG = typeof(entr_pi_subset)
     MLP = typeof(mixing_length_params)
     PMP = typeof(pressure_model_params)
-    return EDMFModel{n_updrafts, FT, MM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}(
+    return EDMFModel{n_updrafts, FT, MM, UM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}(
         surface_area,
         max_area,
         minimum_area,
         moisture_model,
+        updraft_model,
         thermo_covariance_model,
         precip_model,
         precip_fraction_model,

@@ -258,13 +258,16 @@ cent_prognostic_vars_up_noisy_relaxation(::Type{FT}, ::PrognosticNoisyRelaxation
 cent_prognostic_vars_up_noisy_relaxation(::Type{FT}, _) where {FT} = NamedTuple()
 cent_prognostic_vars_up_moisture(::Type{FT}, ::EquilibriumMoisture) where {FT} = NamedTuple()
 cent_prognostic_vars_up_moisture(::Type{FT}, ::NonEquilibriumMoisture) where {FT} = (; ρaq_liq = FT(0), ρaq_ice = FT(0))
-cent_prognostic_vars_up(::Type{FT}, edmf) where {FT} = (;
+cent_prognostic_vars_up(::Type{FT}, edmf, ::PrognosticUpdrafts) where {FT} = (;
     ρarea = FT(0),
     ρaθ_liq_ice = FT(0),
     ρaq_tot = FT(0),
     cent_prognostic_vars_up_noisy_relaxation(FT, edmf.entr_closure)...,
     cent_prognostic_vars_up_moisture(FT, edmf.moisture_model)...,
 )
+cent_prognostic_vars_up(::Type{FT}, edmf, ::DiagnosticUpdrafts) where {FT} = NamedTuple()
+
+cent_vars_up(::Type{FT}, edmf) where {FT} = (;cent_prognostic_vars_up(FT, edmf, edmf.updraft_model)...,)
 
 cent_prognostic_vars_en(::Type{FT}, edmf) where {FT} =
     (; ρatke = FT(0), cent_prognostic_vars_en_thermo(FT, edmf.thermo_covariance_model)...)
@@ -274,7 +277,7 @@ cent_prognostic_vars_en_thermo(::Type{FT}, ::PrognosticThermoCovariances) where 
 cent_prognostic_vars_edmf(::Type{FT}, edmf) where {FT} = (;
     turbconv = (;
         en = cent_prognostic_vars_en(FT, edmf),
-        up = ntuple(i -> cent_prognostic_vars_up(FT, edmf), Val(n_updrafts(edmf))),
+        up = ntuple(i -> cent_vars_up(FT, edmf), Val(n_updrafts(edmf))),
         pr = (; q_rai = FT(0), q_sno = FT(0)),
     )
 )
