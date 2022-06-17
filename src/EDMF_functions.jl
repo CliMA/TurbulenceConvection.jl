@@ -19,6 +19,7 @@ function compute_turbconv_tendencies!(
     Δt::Real,
 )
     if edmf.updraft_model isa PrognosticUpdrafts
+        @show(edmf.updraft_model)
         compute_up_tendencies!(edmf, grid, state, param_set, surf)
     end
     compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
@@ -475,13 +476,95 @@ function compute_up_stoch_tendencies!(edmf::EDMFModel, grid::Grid, state::State,
     end
 end
 
+function update_diagnostic_updrafts!(edmf::EDMFModel, grid::Grid, state::State, param_set::APS, surf::SurfaceBase)
+    println("update_diagnostic_updrafts")
+    N_up = n_updrafts(edmf)
+    kc_surf = kc_surface(grid)
+    kf_surf = kf_surface(grid)
+    FT = float_type(state)
+    aux_up = center_aux_updrafts(state)
+    aux_en = center_aux_environment(state)
+    aux_en_f = face_aux_environment(state)
+    aux_up_f = face_aux_updrafts(state)
+    prog_gm = center_prog_grid_mean(state)
+    aux_gm_f = face_aux_grid_mean(state)
+    ρ_c = prog_gm.ρ
+    ρ_f = aux_gm_f.ρ
+    au_lim = edmf.max_area
+    @inbounds for i in 1:N_up
+        aux_up_i = aux_up[i]
+        @. aux_up_i.entr_turb_dyn = aux_up_i.entr_sc + aux_up_i.frac_turb_entr
+        @. aux_up_i.detr_turb_dyn = aux_up_i.detr_sc + aux_up_i.frac_turb_entr
+    end
 
+    UB = CCO.UpwindBiasedProductC2F(bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+    Ic = CCO.InterpolateF2C()
+
+    wvec = CC.Geometry.WVector
+    ∇c = CCO.DivergenceF2C()
+    w_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
+    LBF = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
+
+    @inbounds for i in 1:N_up
+        aux_up_i = aux_up[i]
+        w_up = aux_up_f[i].w
+        a_up = aux_up_i.area
+        q_tot = aux_up_i.q_tot
+        q_tot_en = aux_en.q_tot
+        θ_liq_ice = aux_up_i.θ_liq_ice
+        θ_liq_ice_en = aux_en.θ_liq_ice
+        entr_turb_dyn = aux_up_i.entr_turb_dyn
+        detr_turb_dyn = aux_up_i.detr_turb_dyn
+        qt_tendency_precip_formation = aux_up_i.qt_tendency_precip_formation
+        θ_liq_ice_tendency_precip_formation = aux_up_i.θ_liq_ice_tendency_precip_formation
+
+        @inbounds for k in real_center_indices(grid)
+            # aₖ := aₖ - (dz/ρwₖ)*∂(ρaw)/∂z + dz*a(ϵ - δ)
+            @. area = area
+                - dz * ∇c(wvec(LBF(Ic(w_up) * ρ_c * area)))/(ρ_c * Ic(w_up)) + dz * area * (entr_turb_dyn - detr_turb_dyn)
+
+            # ϕₖ += - (dz/ρaₖwₖ)*∂(ρaϕw)/∂z + dz*(ϵϕ - δϕ₀ + S(ϕ)/wₖ)
+            @. θ_liq_ice =
+                - dz * ∇c(wvec(LBF(Ic(w_up) * ρ_c * area * θ_liq_ice)))/(ρ_c * area * Ic(w_up))
+                + dz * (entr_turb_dyn * θ_liq_ice_en - detr_turb_dyn * θ_liq_ice + θ_liq_ice_tendency_precip_formation / Ic(w_up))
+
+            # ϕₖ += - (dz/ρaₖwₖ)*∂(ρaϕw)/∂z + dz*(ϵϕ - δϕ₀ + S(ϕ)/wₖ)
+            @. q_tot =
+                - dz * ∇c(wvec(LBF(Ic(w_up) * ρ_c * area * q_tot)))/(ρ_c * area * Ic(w_up))
+                + dz * (entr_turb_dyn * q_tot_en - detr_turb_dyn * q_tot + qt_tendency_precip_formation / Ic(w_up))
+
+            if edmf.moisture_model isa NonEquilibriumMoisture
+
+                q_liq = aux_up_i.q_liq
+                q_ice = aux_up_i.q_ice
+                q_liq_en = aux_en.q_liq
+                q_ice_en = aux_en.q_ice
+
+                ql_tendency_noneq = aux_up_i.ql_tendency_noneq
+                qi_tendency_noneq = aux_up_i.qi_tendency_noneq
+                ql_tendency_precip_formation = aux_up_i.ql_tendency_precip_formation
+                qi_tendency_precip_formation = aux_up_i.qi_tendency_precip_formation
+
+                # ϕₖ += - (dz/ρaₖwₖ)*∂(ρaϕw)/∂z + dz*(ϵϕ - δϕ₀ + S(ϕ)/wₖ)
+                @. q_liq =
+                    - dz * ∇c(wvec(LBF(Ic(w_up) * ρ_c * area * q_liq)))/(ρ_c * area * Ic(w_up))
+                    + dz * (entr_turb_dyn * q_liq_en - detr_turb_dyn * q_liq + (ql_tendency_precip_formation + ql_tendency_noneq) / Ic(w_up))
+
+                @. q_ice =
+                    - dz * ∇c(wvec(LBF(Ic(w_up) * ρ_c * area * q_ice)))/(ρ_c * area * Ic(w_up))
+                    + dz * (entr_turb_dyn * q_ice_en - detr_turb_dyn * q_ice + (qi_tendency_precip_formation + qi_tendency_noneq) / Ic(w_up))
+            end
+        end
+    end
+
+end
 function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param_set::APS, surf::SurfaceBase)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
     FT = float_type(state)
 
+    println("compute_up_tendencies")
     aux_up = center_aux_updrafts(state)
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)

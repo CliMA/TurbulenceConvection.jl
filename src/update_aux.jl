@@ -491,8 +491,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
     ### Diagnostic updrafts
     if edmf.updraft_model isa DiagnosticUpdrafts
-        #update_diagnostic_updrafts!(edmf, grid, state, param_set, surf)
-        nothing
+        update_diagnostic_updrafts!(edmf, grid, state, param_set, surf)
     end
     ### Diagnostic thermodynamic covariances
     if edmf.thermo_covariance_model isa DiagnosticThermoCovariances
