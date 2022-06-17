@@ -35,6 +35,7 @@ function init_sim(case_name; skip_io = true, single_timestep = true, prefix = ""
         namelist["stats_io"]["skip"] = true
     end
     namelist["meta"]["uuid"] = "$(prefix)01"
+    namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "RF"
     sim = Simulation1d(namelist)
     initialize(sim)
     return sim

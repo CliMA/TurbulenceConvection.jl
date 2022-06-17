@@ -61,17 +61,17 @@ deps_to_monitor = exhaustive ? deps_to_monitor : Module[]
 
 all_cases = [
     # "ARM_SGP",
-    # "Bomex",
+    "Bomex",
     # "DryBubble",
     # "DYCOMS_RF01",
     # "GABLS",
     # "GATE_III",
     # "life_cycle_Tan2018",
     # "Nieuwstadt",
-    "Rico",
+    # "Rico",
     # "Soares",
-    "TRMM_LBA",
-    "LES_driven_SCM",
+    # "TRMM_LBA",
+    # "LES_driven_SCM",
 ]
 
 # only one case for exhaustive alloc analysis
@@ -83,9 +83,9 @@ for case in all_cases
     ENV["ALLOCATION_CASE_NAME"] = case
     if exhaustive
         run_cmd =
-            `$(Base.julia_cmd()) --project=integration_tests/ --track-allocation=all perf/alloc_per_case_with_init_io.jl`
+            `$(Base.julia_cmd()) --project=integration_tests/ --track-allocation=all perf/alloc_per_case_with_init_io.jl --entr RF`
     else
-        run_cmd = `$(Base.julia_cmd()) --project=integration_tests/ --track-allocation=all perf/alloc_per_case.jl`
+        run_cmd = `$(Base.julia_cmd()) --project=integration_tests/ --track-allocation=all perf/alloc_per_case.jl --entr RF`
     end
     RM.report_allocs(;
         job_name = case,
