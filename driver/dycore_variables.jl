@@ -2,13 +2,10 @@
 ##### Fields
 #####
 
-import TurbulenceConvection
-const TC = TurbulenceConvection
-
-import ClimaCore
+import TurbulenceConvection as TC
+import ClimaCore as CC
+import ClimaCore.Geometry as CCG
 import ClimaCore.Geometry: ⊗
-const CC = ClimaCore
-const CCG = CC.Geometry
 
 ##### Auxiliary fields
 

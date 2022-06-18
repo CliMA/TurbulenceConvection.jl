@@ -8,20 +8,16 @@ import JSON
 import ArgParse
 import TurbulenceConvection
 
-import CloudMicrophysics
-const CM = CloudMicrophysics
-const CMNe = CloudMicrophysics.MicrophysicsNonEq
-const CM0 = CloudMicrophysics.Microphysics0M
-const CM1 = CloudMicrophysics.Microphysics1M
+import CloudMicrophysics as CM
+import CloudMicrophysics.MicrophysicsNonEq as CMNe
+import CloudMicrophysics.Microphysics0M as CM0
+import CloudMicrophysics.Microphysics1M as CM1
 
-import ClimaCore
-const CC = ClimaCore
+import ClimaCore as CC
 import SciMLBase
 
-import OrdinaryDiffEq
-const ODE = OrdinaryDiffEq
-import StochasticDiffEq
-const SDE = StochasticDiffEq
+import OrdinaryDiffEq as ODE
+import StochasticDiffEq as SDE
 import StaticArrays: SVector
 
 const tc_dir = pkgdir(TurbulenceConvection)
@@ -89,7 +85,11 @@ function Simulation1d(namelist)
     # This is used for testing Duals
     FTD = namelist["test_duals"] ? typeof(ForwardDiff.Dual{Nothing}(1.0, 0.0)) : Float64
 
-    param_set = create_parameter_set(FTD, namelist)
+    toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
+    # TODO: the namelist should override whatever
+    # we need to override for calibration
+
+    param_set = create_parameter_set(namelist, toml_dict, FTD)
 
     skip_io = namelist["stats_io"]["skip"]
     calibrate_io = namelist["stats_io"]["calibrate_io"]

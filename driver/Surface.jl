@@ -1,19 +1,16 @@
-import StaticArrays
-const SA = StaticArrays
-
-import SurfaceFluxes
-const SF = SurfaceFluxes
-const UF = SF.UniversalFunctions
+import StaticArrays as SA
+import SurfaceFluxes as SF
+import SurfaceFluxes.UniversalFunctions as UF
 
 function get_surface(
     surf_params::TC.FixedSurfaceFlux,
     grid::TC.Grid,
     state::TC.State,
     t::Real,
-    param_set::CP.AbstractEarthParameterSet,
+    param_set::TCP.AbstractTurbulenceConvectionParameters,
 )
     FT = TC.float_type(state)
-    surf_flux_params = TC.surface_fluxes_params(param_set)
+    surf_flux_params = TCP.surface_fluxes_params(param_set)
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
     z_sfc = FT(0)
@@ -28,11 +25,10 @@ function get_surface(
     lhf = TC.latent_heat_flux(surf_params, t)
     Ri_bulk_crit = surf_params.Ri_bulk_crit
     zrough = surf_params.zrough
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
 
     ts_sfc = TD.PhaseEquil_pTq(thermo_params, p_f_surf, Tsurface, qsurface)
     ts_in = aux_gm.ts[kc_surf]
-    universal_func = UF.Businger()
     scheme = SF.FVScheme()
 
     bflux = SF.compute_buoyancy_flux(surf_flux_params, shf, lhf, ts_in, ts_sfc, scheme)
@@ -59,7 +55,7 @@ function get_surface(
     else
         SF.Fluxes{FT}(; kwargs...)
     end
-    result = SF.surface_conditions(surf_flux_params, sc, universal_func, scheme)
+    result = SF.surface_conditions(surf_flux_params, sc, scheme)
     return TC.SurfaceBase{FT}(;
         shf = shf,
         lhf = lhf,
@@ -83,10 +79,10 @@ function get_surface(
     grid::TC.Grid,
     state::TC.State,
     t::Real,
-    param_set::CP.AbstractEarthParameterSet,
+    param_set::TCP.AbstractTurbulenceConvectionParameters,
 )
     FT = TC.float_type(state)
-    surf_flux_params = TC.surface_fluxes_params(param_set)
+    surf_flux_params = TCP.surface_fluxes_params(param_set)
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
     aux_gm_f = TC.face_aux_grid_mean(state)
@@ -100,9 +96,8 @@ function get_surface(
     cm = surf_params.cm(zc_surf)
     ch = surf_params.ch(zc_surf)
     Ri_bulk_crit = surf_params.Ri_bulk_crit
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
 
-    universal_func = UF.Businger()
     scheme = SF.FVScheme()
     z_sfc = FT(0)
     z_in = grid.zc[kc_surf].z
@@ -115,7 +110,7 @@ function get_surface(
     vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
     vals_int = SF.InteriorValues(z_in, u_in, ts_in)
     sc = SF.Coefficients{FT}(state_in = vals_int, state_sfc = vals_sfc, Cd = cm, Ch = ch, z0m = zrough, z0b = zrough)
-    result = SF.surface_conditions(surf_flux_params, sc, universal_func, scheme)
+    result = SF.surface_conditions(surf_flux_params, sc, scheme)
     lhf = result.lhf
     shf = result.shf
 
@@ -144,9 +139,9 @@ function get_surface(
     grid::TC.Grid,
     state::TC.State,
     t::Real,
-    param_set::CP.AbstractEarthParameterSet,
+    param_set::TCP.AbstractTurbulenceConvectionParameters,
 )
-    surf_flux_params = TC.surface_fluxes_params(param_set)
+    surf_flux_params = TCP.surface_fluxes_params(param_set)
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
     FT = TC.float_type(state)
@@ -161,9 +156,8 @@ function get_surface(
     qsurface = TC.surface_q_tot(surf_params, t)
     zrough = surf_params.zrough
     Ri_bulk_crit = surf_params.Ri_bulk_crit
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
 
-    universal_func = UF.Businger()
     scheme = SF.FVScheme()
     ts_sfc = TD.PhaseEquil_pTq(thermo_params, p_f_surf, Tsurface, qsurface)
     ts_in = ts_gm[kc_surf]
@@ -175,7 +169,7 @@ function get_surface(
     vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
     vals_int = SF.InteriorValues(z_in, u_in, ts_in)
     sc = SF.ValuesOnly{FT}(state_in = vals_int, state_sfc = vals_sfc, z0m = zrough, z0b = zrough)
-    result = SF.surface_conditions(surf_flux_params, sc, universal_func, scheme)
+    result = SF.surface_conditions(surf_flux_params, sc, scheme)
     lhf = result.lhf
     shf = result.shf
     zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)

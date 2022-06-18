@@ -3,8 +3,8 @@ Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 (autoconversion + accretion)
 """
 function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts) where {FT}
-    thermo_params = thermodynamics_params(param_set)
-    microphys_params = microphysics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
+    microphys_params = TCP.microphysics_params(param_set)
     # TODO - when using adaptive timestepping we are limiting the source terms
     #        with the previous timestep Δt
     ql_tendency = FT(0)
@@ -56,9 +56,9 @@ function precipitation_formation(
     ts,
     precip_fraction,
 ) where {FT}
-    thermo_params = thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
 
-    microphys_params = microphysics_params(param_set)
+    microphys_params = TCP.microphysics_params(param_set)
     # TODO - when using adaptive timestepping we are limiting the source terms
     #        with the previous timestep Δt
     qt_tendency = FT(0)

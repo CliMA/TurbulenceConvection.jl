@@ -4,7 +4,6 @@ authors = ["Climate Modeling Alliance"]
 version = "0.32.0"
 
 [deps]
-CLIMAParameters = "6eacf6c3-8458-43b9-ae03-caf5306d3d53"
 ClimaCore = "d414da3d-4745-48bb-8d80-42e94e092884"
 CloudMicrophysics = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
 Dierckx = "39dd38d3-220a-591b-8e3c-4c3a8c710a94"
@@ -19,13 +18,13 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 StochasticDiffEq = "789caeaf-c7a9-5a7d-9973-96adeb23e2a0"
+SurfaceFluxes = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
 Thermodynamics = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [compat]
-CLIMAParameters = "0.4, 0.5, 0.6"
 ClimaCore = "0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.10"
-CloudMicrophysics = "0.5"
+CloudMicrophysics = "0.6"
 Dierckx = "0.5"
 Distributions = "0.25"
 DocStringExtensions = "0.8, 0.9"
@@ -36,7 +35,8 @@ OperatorFlux = "0.1"
 StaticArrays = "1.2"
 StatsBase = "0.33"
 StochasticDiffEq = "6.41"
-Thermodynamics = "0.7.1, 0.8"
+SurfaceFluxes = "0.4"
+Thermodynamics = "0.9"
 UnPack = "1.0"
 julia = "1.5"
 

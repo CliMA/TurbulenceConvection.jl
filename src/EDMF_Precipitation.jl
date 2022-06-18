@@ -86,8 +86,8 @@ function compute_precipitation_sink_tendencies(
     param_set::APS,
     Δt::Real,
 )
-    thermo_params = thermodynamics_params(param_set)
-    microphys_params = microphysics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
+    microphys_params = TCP.microphysics_params(param_set)
     aux_gm = center_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
     prog_gm = center_prog_grid_mean(state)

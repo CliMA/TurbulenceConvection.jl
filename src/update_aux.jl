@@ -2,8 +2,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     #####
     ##### Unpack common variables
     #####
-    thermo_params = thermodynamics_params(param_set)
-    microphys_params = microphysics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
+    microphys_params = TCP.microphysics_params(param_set)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -45,10 +45,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ##### center variables
     #####
     C123 = CCG.Covariant123Vector
-    @. aux_en.e_kin = LinearAlgebra.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(wvec(aux_en_f.w)))) / 2
+    @. aux_en.e_kin = LA.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(wvec(aux_en_f.w)))) / 2
 
     @inbounds for i in 1:N_up
-        @. aux_up[i].e_kin = LinearAlgebra.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(wvec(aux_up_f[i].w)))) / 2
+        @. aux_up[i].e_kin = LA.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(wvec(aux_up_f[i].w)))) / 2
     end
 
     @inbounds for k in real_center_indices(grid)
@@ -339,7 +339,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     Ifuₕ = uₕ_bcs()
     ∇uvw = CCO.GradientF2C()
     uvw = @. C123(Ifuₕ(uₕ_gm)) + C123(wvec(w_en))
-    @. Shear² = LinearAlgebra.norm_sqr(adjoint(∇uvw(uvw)) * k̂)
+    @. Shear² = LA.norm_sqr(adjoint(∇uvw(uvw)) * k̂)
 
     q_tot_en = aux_en.q_tot
     θ_liq_ice_en = aux_en.θ_liq_ice

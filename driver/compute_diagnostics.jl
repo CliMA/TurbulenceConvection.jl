@@ -6,9 +6,9 @@ import ClimaCore
 const CC = ClimaCore
 const CCO = CC.Operators
 
-import CLIMAParameters
-const CP = CLIMAParameters
-const APS = CP.AbstractEarthParameterSet
+import CLIMAParameters as CP
+import TurbulenceConvection.Parameters as TCP
+const APS = TCP.AbstractTurbulenceConvectionParameters
 
 """ Purely diagnostic fields for the host model """
 diagnostics(state, fl) = getproperty(state, TC.field_loc(fl))
@@ -110,7 +110,7 @@ function compute_diagnostics!(
     t::Real,
     calibrate_io::Bool,
 ) where {D <: CC.Fields.FieldVector}
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     FT = TC.float_type(state)
     N_up = TC.n_updrafts(edmf)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -319,7 +319,7 @@ function compute_diagnostics!(
     diag_tc_svpc.env_iwp[cent] = sum(ρ_c .* aux_en.q_ice .* aux_en.area)
 
     #TODO - change to rain rate that depends on rain model choice
-    ρ_cloud_liq = CP.Planet.ρ_cloud_liq(param_set)
+    ρ_cloud_liq = TCP.ρ_cloud_liq(param_set)
     if (precip_model isa TC.Clima0M)
         f =
             (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ_c ./ ρ_cloud_liq .*

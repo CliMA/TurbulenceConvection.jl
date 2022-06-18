@@ -1,23 +1,16 @@
 import UnPack
-import LinearAlgebra
+import LinearAlgebra as LA
 import LinearAlgebra: ×
 
-import TurbulenceConvection
-const TC = TurbulenceConvection
-const TCP = TC.TurbulenceConvectionParameters
+import TurbulenceConvection as TC
+import TurbulenceConvection.Parameters as TCP
+const APS = TCP.AbstractTurbulenceConvectionParameters
+import Thermodynamics as TD
+import ClimaCore as CC
+import ClimaCore.Geometry as CCG
+import OrdinaryDiffEq as ODE
 
-import Thermodynamics
-const TD = Thermodynamics
-
-import ClimaCore
-const CC = ClimaCore
-const CCG = CC.Geometry
-
-import OrdinaryDiffEq
-const ODE = OrdinaryDiffEq
-
-import CLIMAParameters
-const APS = CLIMAParameters.AbstractEarthParameterSet
+import CLIMAParameters as CP
 
 include(joinpath(@__DIR__, "dycore_variables.jl"))
 
@@ -64,7 +57,7 @@ function compute_ref_state!(
     param_set::PS;
     ts_g,
 ) where {PS}
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     FT = TC.float_type(p_c)
     kf_surf = TC.kf_surface(grid)
     qtg = TD.total_specific_humidity(thermo_params, ts_g)
@@ -86,7 +79,7 @@ function compute_ref_state!(
         ts = TD.PhaseEquil_phq(thermo_params, p_, h, qtg)
         R_m = TD.gas_constant_air(thermo_params, ts)
         T = TD.air_temperature(thermo_params, ts)
-        return -FT(TCP.grav(thermo_params)) / (T * R_m)
+        return -FT(TCP.grav(param_set)) / (T * R_m)
     end
 
     # Perform the integration
@@ -119,7 +112,7 @@ end
 
 function set_thermo_state_peq!(state, grid, moisture_model, param_set)
     Ic = CCO.InterpolateF2C()
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)
@@ -128,7 +121,7 @@ function set_thermo_state_peq!(state, grid, moisture_model, param_set)
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
     C123 = CCG.Covariant123Vector
-    @. aux_gm.e_kin = LinearAlgebra.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(prog_gm_f.w))) / 2
+    @. aux_gm.e_kin = LA.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(prog_gm_f.w))) / 2
 
     @inbounds for k in TC.real_center_indices(grid)
         thermo_args = if moisture_model isa TC.EquilibriumMoisture
@@ -165,7 +158,7 @@ function set_thermo_state_pθq!(state, grid, moisture_model, param_set)
 end
 
 function set_grid_mean_from_thermo_state!(param_set, state, grid)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     Ic = CCO.InterpolateF2C()
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
@@ -178,7 +171,7 @@ function set_grid_mean_from_thermo_state!(param_set, state, grid)
         ρ_c * TD.total_energy(
             thermo_params,
             ts_gm,
-            LinearAlgebra.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(prog_gm_f.w))) / 2,
+            LA.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(prog_gm_f.w))) / 2,
             TC.geopotential(param_set, grid.zc.z),
         )
     @. prog_gm.ρq_tot = ρ_c * aux_gm.q_tot
@@ -187,7 +180,7 @@ function set_grid_mean_from_thermo_state!(param_set, state, grid)
 end
 
 function assign_thermo_aux!(state, grid, moisture_model, param_set)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
@@ -230,7 +223,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     UnPack.@unpack edmf, precip_model, param_set, case = params
     UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
 
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     tends_face = tendencies.face
     tends_cent = tendencies.cent
     parent(tends_face) .= 0
@@ -293,7 +286,7 @@ function compute_gm_tendencies!(
     force::Cases.ForcingBase,
     param_set::APS,
 )
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     Ic = CCO.InterpolateF2C()
     R_d = TCP.R_d(param_set)
     T_0 = TCP.T_0(param_set)
