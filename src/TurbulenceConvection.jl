@@ -1,46 +1,37 @@
 module TurbulenceConvection
 
-import ClimaCore
-import LinearAlgebra
+import ClimaCore as CC
+import ClimaCore.Geometry as CCG
 import ClimaCore.Geometry: ⊗
+import ClimaCore.Operators as CCO
+import LinearAlgebra as LA
 import LinearAlgebra: ×
 import DocStringExtensions
-import StaticArrays
+import StaticArrays as SA
 import StatsBase
 import Dierckx
 import LambertW
-import Thermodynamics
+import Thermodynamics as TD
 import Distributions
 import FastGaussQuadrature
-import CloudMicrophysics
+import CloudMicrophysics as CM
+import CloudMicrophysics.MicrophysicsNonEq as CMNe
+import CloudMicrophysics.Microphysics0M as CM0
+import CloudMicrophysics.Microphysics1M as CM1
 import UnPack
 import Random
-import StochasticDiffEq
+import StochasticDiffEq as SDE
 import Flux
-import OperatorFlux
-const OF = OperatorFlux
+import OperatorFlux as OF
 
-const SDE = StochasticDiffEq
-const CC = ClimaCore
-const CCG = CC.Geometry
-const CCO = CC.Operators
-const SA = StaticArrays
-
-const TD = Thermodynamics
-const LA = LinearAlgebra
-
-const CM = CloudMicrophysics
-const CMNe = CloudMicrophysics.MicrophysicsNonEq
-const CM0 = CloudMicrophysics.Microphysics0M
-const CM1 = CloudMicrophysics.Microphysics1M
 const liq_type = CM.CommonTypes.LiquidType()
 const ice_type = CM.CommonTypes.IceType()
 const rain_type = CM.CommonTypes.RainType()
 const snow_type = CM.CommonTypes.SnowType()
 
-import CLIMAParameters
-const CP = CLIMAParameters
-const APS = CP.AbstractEarthParameterSet
+include("Parameters.jl")
+import .Parameters as TCP
+const APS = TCP.AbstractTurbulenceConvectionParameters
 
 up_sum(vals::AbstractArray) = reshape(sum(vals; dims = 1), size(vals, 2))
 
@@ -63,10 +54,6 @@ function parse_namelist(namelist, keys...; default = nothing, valid_options = no
     end
     return param
 end
-
-include("TurbulenceConvectionParameters.jl")
-import .TurbulenceConvectionParameters
-const TCP = TurbulenceConvectionParameters
 
 Base.broadcastable(param_set::APS) = Ref(param_set)
 
@@ -159,9 +146,5 @@ include("closures/entr_detr.jl")
 include("closures/nondimensional_exchange_functions.jl")
 include("closures/mixing_length.jl")
 include("closures/buoyancy_gradients.jl")
-
-thermodynamics_params(ps::APS) = ps.thermo_params
-surface_fluxes_params(ps::APS) = ps.surf_flux_params
-microphysics_params(ps::APS) = ps.microphys_params
 
 end

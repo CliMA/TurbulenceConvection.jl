@@ -18,14 +18,18 @@ steps:
     key: "init_cpu_env"
     command:
       - "echo $$JULIA_DEPOT_PATH"
+
+      - echo "--- Instantiate integration_tests"
       - "julia --project=integration_tests -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=integration_tests -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=integration_tests -e 'using Pkg; Pkg.status()'"
 
+      - echo "--- Instantiate perf"
       - "julia --project=perf -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
       - "julia --project=perf -e 'using Pkg; Pkg.precompile()'"
       - "julia --project=perf -e 'using Pkg; Pkg.status()'"
 
+      - echo "--- Download artifacts"
       - "julia --project=integration_tests integration_tests/download_artifacts.jl"
 
   - wait

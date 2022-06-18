@@ -5,5 +5,5 @@ CurrentModule = TurbulenceConvection
 ```
 
 ```@docs
-TurbulenceConvection.TurbulenceConvectionParameters
+TurbulenceConvection.Parameters
 ```

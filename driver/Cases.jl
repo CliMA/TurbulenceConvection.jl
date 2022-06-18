@@ -1,35 +1,24 @@
 module Cases
 
-import NCDatasets
-const NC = NCDatasets
+import NCDatasets as NC
+import OrdinaryDiffEq as ODE
+import Thermodynamics as TD
 
-import OrdinaryDiffEq
-const ODE = OrdinaryDiffEq
-
-import ClimaCore
+import ClimaCore as CC
+import ClimaCore.Operators as CCO
+import ClimaCore.Geometry as CCG
 import DocStringExtensions
-const CC = ClimaCore
-const CCO = CC.Operators
-const CCG = CC.Geometry
 
-import AtmosphericProfilesLibrary
-const APL = AtmosphericProfilesLibrary
+import AtmosphericProfilesLibrary as APL
 
 import Dierckx
 import Statistics
 import Random
 import UnPack
 
-import CLIMAParameters
-const CP = CLIMAParameters
-const APS = CP.AbstractEarthParameterSet
-
-import Thermodynamics
-const TD = Thermodynamics
-
-import ..TurbulenceConvection
-const TC = TurbulenceConvection
-const TCP = TC.TurbulenceConvectionParameters
+import ..TurbulenceConvection as TC
+import ..TurbulenceConvection.Parameters as TCP
+const APS = TCP.AbstractTurbulenceConvectionParameters
 
 using ..TurbulenceConvection: pyinterp
 using ..TurbulenceConvection: Grid
@@ -224,7 +213,7 @@ initialize_forcing(::AbstractCaseType, forcing, grid::Grid, state, param_set) = 
 #####
 
 function surface_ref_state(::Soares, param_set::APS, namelist)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     Pg = 1000.0 * 100.0
     qtg = 5.0e-3
     Tg = 300.0
@@ -252,7 +241,7 @@ function initialize_profiles(::Soares, grid::Grid, param_set, state; kwargs...)
 end
 
 function surface_params(case::Soares, surf_ref_state, param_set; Ri_bulk_crit)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     p_f_surf = TD.air_pressure(thermo_params, surf_ref_state)
     ρ_f_surf = TD.air_density(thermo_params, surf_ref_state)
     FT = eltype(p_f_surf)
@@ -274,7 +263,7 @@ end
 #####
 
 function surface_ref_state(::Nieuwstadt, param_set::APS, namelist)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     Pg = 1000.0 * 100.0
     Tg = 300.0
     qtg = 0.0
@@ -301,7 +290,7 @@ function initialize_profiles(::Nieuwstadt, grid::Grid, param_set, state; kwargs.
 end
 
 function surface_params(case::Nieuwstadt, surf_ref_state, param_set; Ri_bulk_crit)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     p_f_surf = TD.air_pressure(thermo_params, surf_ref_state)
     ρ_f_surf = TD.air_density(thermo_params, surf_ref_state)
     FT = eltype(p_f_surf)
@@ -323,7 +312,7 @@ end
 
 function surface_ref_state(::Bomex, param_set::APS, namelist)
     FT = eltype(param_set)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     Pg::FT = 1.015e5 #Pressure at ground
     Tg::FT = 300.4 #Temperature at ground
     qtg::FT = 0.02245#Total water mixing ratio at surface
@@ -352,7 +341,7 @@ function initialize_profiles(::Bomex, grid::Grid, param_set, state; kwargs...)
 end
 
 function surface_params(case::Bomex, surf_ref_state, param_set; Ri_bulk_crit)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     p_f_surf = TD.air_pressure(thermo_params, surf_ref_state)
     ρ_f_surf = TD.air_density(thermo_params, surf_ref_state)
     FT = eltype(p_f_surf)
@@ -371,7 +360,7 @@ function surface_params(case::Bomex, surf_ref_state, param_set; Ri_bulk_crit)
 end
 
 function initialize_forcing(::Bomex, forcing, grid::Grid, state, param_set)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     initialize(forcing, grid, state)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -406,7 +395,7 @@ end
 #####
 
 function surface_ref_state(::life_cycle_Tan2018, param_set::APS, namelist)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     Pg = 1.015e5  #Pressure at ground
     Tg = 300.4  #Temperature at ground
     qtg = 0.02245   #Total water mixing ratio at surface
@@ -435,7 +424,7 @@ function initialize_profiles(::life_cycle_Tan2018, grid::Grid, param_set, state;
 end
 
 function surface_params(case::life_cycle_Tan2018, surf_ref_state, param_set; Ri_bulk_crit)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     p_f_surf = TD.air_pressure(thermo_params, surf_ref_state)
     ρ_f_surf = TD.air_density(thermo_params, surf_ref_state)
     FT = eltype(p_f_surf)
@@ -460,7 +449,7 @@ function surface_params(case::life_cycle_Tan2018, surf_ref_state, param_set; Ri_
 end
 
 function initialize_forcing(::life_cycle_Tan2018, forcing, grid::Grid, state, param_set)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     initialize(forcing, grid, state)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -495,7 +484,7 @@ end
 #####
 
 function surface_ref_state(::Rico, param_set::APS, namelist)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     molmass_ratio = TCP.molmass_ratio(param_set)
     Pg = 1.0154e5  #Pressure at ground
     Tg = 299.8  #Temperature at ground
@@ -504,7 +493,7 @@ function surface_ref_state(::Rico, param_set::APS, namelist)
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 function initialize_profiles(::Rico, grid::Grid, param_set, state; kwargs...)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_tc = TC.center_aux_turbconv(state)
@@ -546,7 +535,7 @@ function initialize_profiles(::Rico, grid::Grid, param_set, state; kwargs...)
 end
 
 function surface_params(case::Rico, surf_ref_state, param_set; kwargs...)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     p_f_surf = TD.air_pressure(thermo_params, surf_ref_state)
     FT = eltype(p_f_surf)
 
@@ -569,7 +558,7 @@ function surface_params(case::Rico, surf_ref_state, param_set; kwargs...)
 end
 
 function initialize_forcing(::Rico, forcing, grid::Grid, state, param_set)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     initialize(forcing, grid, state)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -601,7 +590,7 @@ end
 #####
 
 function surface_ref_state(::TRMM_LBA, param_set::APS, namelist)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     molmass_ratio = TCP.molmass_ratio(param_set)
     Pg = 991.3 * 100  #Pressure at ground
     Tg = 296.85   # surface values for reference state (RS) which outputs p, ρ
@@ -610,7 +599,7 @@ function surface_ref_state(::TRMM_LBA, param_set::APS, namelist)
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 function initialize_profiles(::TRMM_LBA, grid::Grid, param_set, state; kwargs...)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
@@ -649,7 +638,7 @@ function initialize_profiles(::TRMM_LBA, grid::Grid, param_set, state; kwargs...
 end
 
 function surface_params(case::TRMM_LBA, surf_ref_state, param_set; Ri_bulk_crit)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     p_f_surf = TD.air_pressure(thermo_params, surf_ref_state)
     FT = eltype(p_f_surf)
     # zrough = 1.0e-4 # not actually used, but initialized to reasonable value
@@ -673,7 +662,7 @@ initialize_radiation(::TRMM_LBA, radiation, grid::Grid, state, param_set) = init
 #####
 
 function surface_ref_state(::ARM_SGP, param_set::APS, namelist)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     Pg = 970.0 * 100 #Pressure at ground
     Tg = 299.0   # surface values for reference state (RS) which outputs  p, ρ
     qtg = 15.2 / 1000 #Total water mixing ratio at surface
@@ -681,7 +670,7 @@ function surface_ref_state(::ARM_SGP, param_set::APS, namelist)
 end
 
 function initialize_profiles(::ARM_SGP, grid::Grid, param_set, state; kwargs...)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     # ARM_SGP inputs
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -710,7 +699,7 @@ function initialize_profiles(::ARM_SGP, grid::Grid, param_set, state; kwargs...)
 end
 
 function surface_params(case::ARM_SGP, surf_ref_state, param_set; Ri_bulk_crit)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     p_f_surf = TD.air_pressure(thermo_params, surf_ref_state)
     FT = eltype(p_f_surf)
     qsurface::FT = 15.2e-3 # kg/kg
@@ -737,7 +726,7 @@ function initialize_forcing(::ARM_SGP, forcing, grid::Grid, state, param_set)
 end
 
 function update_forcing(::ARM_SGP, grid, state, t::Real, param_set)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
@@ -757,7 +746,7 @@ end
 #####
 
 function surface_ref_state(::GATE_III, param_set::APS, namelist)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     Pg = 1013.0 * 100  #Pressure at ground
     Tg = 299.184   # surface values for reference state (RS) which outputs p, ρ
     qtg = 16.5 / 1000 #Total water mixing ratio at surface
@@ -765,7 +754,7 @@ function surface_ref_state(::GATE_III, param_set::APS, namelist)
 end
 
 function initialize_profiles(::GATE_III, grid::Grid, param_set, state; kwargs...)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -787,7 +776,7 @@ function initialize_profiles(::GATE_III, grid::Grid, param_set, state; kwargs...
 end
 
 function surface_params(case::GATE_III, surf_ref_state, param_set; kwargs...)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     p_f_surf = TD.air_pressure(thermo_params, surf_ref_state)
     FT = eltype(p_f_surf)
 
@@ -819,7 +808,7 @@ end
 #####
 
 function surface_ref_state(::DYCOMS_RF01, param_set::APS, namelist)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     Pg = 1017.8 * 100.0
     qtg = 9.0 / 1000.0
     θ_surf = 289.0
@@ -909,7 +898,7 @@ end
 #####
 
 function surface_ref_state(::DYCOMS_RF02, param_set::APS, namelist)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     Pg = 1017.8 * 100.0
     qtg = 9.0 / 1000.0
     θ_surf = 288.3
@@ -1000,7 +989,7 @@ end
 #####
 
 function surface_ref_state(::GABLS, param_set::APS, namelist)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     Pg = 1.0e5  #Pressure at ground,
     Tg = 265.0  #Temperature at ground,
     qtg = 0.0
@@ -1056,7 +1045,7 @@ end
 #####
 
 function surface_ref_state(::DryBubble, param_set::APS, namelist)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     Pg = 1.0e5  #Pressure at ground
     Tg = 296.0
     qtg = 1.0e-5
@@ -1139,7 +1128,7 @@ function les_data_kwarg(::LES_driven_SCM, namelist)
 end
 
 function surface_ref_state(::LES_driven_SCM, param_set::APS, namelist)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     les_filename = namelist["meta"]["lesfile"]
 
     Pg, Tg, qtg = NC.Dataset(les_filename, "r") do data

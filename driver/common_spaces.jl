@@ -82,7 +82,7 @@ function get_spaces(namelist, param_set, FT)
     center_space, face_space, svpc_space = if namelist["config"] == "sphere"
         h_elem = 1
         quad = CC.Spaces.Quadratures.GLL{2}()
-        horizontal_mesh = cubed_sphere_mesh(; radius = FT(CP.Planet.planet_radius(param_set)), h_elem)
+        horizontal_mesh = cubed_sphere_mesh(; radius = FT(TCP.planet_radius(param_set)), h_elem)
         h_space = make_horizontal_space(horizontal_mesh, quad)
         (; z_stretch, z_max, z_elem) = construct_mesh(namelist; FT = FT)
         center_space, face_space, svpc_space = make_hybrid_spaces(h_space, z_max, z_elem, z_stretch)
