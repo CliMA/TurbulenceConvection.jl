@@ -447,7 +447,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
     max_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "max_area"; default = 0.9)
     minimum_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_area"; default = 1e-5)
 
-    updraft_model_name = parse_namelist(namelist, "thermodynamics", "updraft_model"; default = "prognostic")
+    updraft_model_name = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_model"; default = "prognostic")
     updraft_model = if updraft_model_name == "prognostic"
         PrognosticUpdrafts()
     elseif updraft_model_name == "diagnostic"
