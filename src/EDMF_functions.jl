@@ -498,6 +498,7 @@ function update_diagnostic_updrafts!(edmf::EDMFModel, grid::Grid, state::State, 
     FT = float_type(state)
     aux_up = center_aux_updrafts(state)
     aux_en = center_aux_environment(state)
+    aux_tc = center_aux_turbconv(state)
     aux_en_f = face_aux_environment(state)
     aux_up_f = face_aux_updrafts(state)
     prog_gm = center_prog_grid_mean(state)
