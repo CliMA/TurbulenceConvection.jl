@@ -146,6 +146,24 @@ function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, detr_dim_scale, ε
     return EntrDetr{FT}(ε_dyn, δ_dyn, ε_turb, ε_nondim, δ_nondim)
 end
 
+"""
+    entr_detr(param_set::APS, εδ_vars, entr_dim_scale, detr_dim_scale, ::EntrNone)
+
+Returns zeros for fractional dynamical entrainment and detrainment rates [1/m],
+as well as the turbulent entrainment rate
+
+Parameters:
+ - `param_set`      :: parameter set
+ - `εδ_vars`        :: structure containing variables
+ - `entr_dim_scale` :: type of dimensional fractional entrainment scale
+ - `detr_dim_scale` :: type of dimensional fractional detrainment scale
+ - `εδ_model_type`  :: type of non-dimensional model for entrainment/detrainment
+"""
+function entr_detr(param_set::APS, εδ_vars, entr_dim_scale, detr_dim_scale, ::EntrNone)
+    FT = eltype(εδ_vars.q_cond_up)
+    return EntrDetr{FT}(0, 0, 0, 0, 0)
+end
+
 ##### Compute entr detr
 function compute_entr_detr!(
     state::State,
@@ -155,6 +173,7 @@ function compute_entr_detr!(
     surf::SurfaceBase,
     Δt::Real,
     εδ_closure::AbstractEntrDetrModel,
+    added_εδ_closure::AbstractEntrDetrModel,
 )
     FT = eltype(grid)
     N_up = n_updrafts(edmf)
@@ -242,7 +261,10 @@ function compute_entr_detr!(
                 else
                     # fractional, turbulent & nondimensional entrainment
                     er = entr_detr(param_set, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, εδ_closure)
-                    ε_dyn, δ_dyn = er.ε_dyn, er.δ_dyn
+                    added_er =
+                        entr_detr(param_set, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, added_εδ_closure)
+                    ε_dyn = er.ε_dyn + added_er.ε_dyn
+                    δ_dyn = er.δ_dyn + added_er.δ_dyn
                 end
                 aux_up[i].entr_sc[k] = ε_dyn
                 aux_up[i].detr_sc[k] = δ_dyn
@@ -269,6 +291,7 @@ function compute_entr_detr!(
     surf::SurfaceBase,
     Δt::Real,
     εδ_model::AbstractNonLocalEntrDetrModel,
+    added_εδ_closure::AbstractEntrDetrModel,
 )
     FT = eltype(grid)
     N_up = n_updrafts(edmf)

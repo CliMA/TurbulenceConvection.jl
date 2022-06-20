@@ -58,11 +58,16 @@ function create_parameter_set(namelist)
     TC = TurbulenceConvection
 
     # this is needed to avoid slowdown when using large parameter vectors
-    use_ran_features = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "RF"
-    use_nn = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "NN"
-    use_nn_nonlocal = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "NN_nonlocal"
-    use_fno = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "FNO"
-    use_linear = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "Linear"
+    use_ran_features = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "RF" ||
+                       TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "additional_entrainment") == "RF"
+    use_nn = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "NN" ||
+             TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "additional_entrainment") == "NN"
+    use_nn_nonlocal = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "NN_nonlocal" ||
+                      TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "additional_entrainment") == "NN_nonlocal"
+    use_fno = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "FNO" ||
+              TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "additional_entrainment") == "FNO"
+    use_linear = TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment") == "Linear" ||
+                 TC.parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "additional_entrainment") == "Linear"
 
     entr_closure_kwargs = if use_ran_features
         (;
