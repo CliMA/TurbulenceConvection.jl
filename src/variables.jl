@@ -260,7 +260,7 @@ cent_prognostic_vars_up_moisture(::Type{FT}, ::EquilibriumMoisture) where {FT} =
 cent_prognostic_vars_up_moisture(::Type{FT}, ::NonEquilibriumMoisture) where {FT} = (; ρaq_liq = FT(0), ρaq_ice = FT(0))
 cent_prognostic_vars_up(::Type{FT}, edmf) where {FT} = (;
     ρarea = FT(0),
-    ρaθ_liq_ice = FT(0),
+    ρae_tot = FT(0),
     ρaq_tot = FT(0),
     cent_prognostic_vars_up_noisy_relaxation(FT, edmf.entr_closure)...,
     cent_prognostic_vars_up_moisture(FT, edmf.moisture_model)...,

@@ -12,7 +12,7 @@ function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, sur
     @. aux_gm.θ_virt = TD.virtual_pottemp(thermo_params, ts_gm)
     surf = get_surface(surf_params, grid, state, t, param_set)
     if case isa Cases.DryBubble
-        initialize_updrafts_DryBubble(edmf, grid, state)
+        initialize_updrafts_DryBubble(edmf, grid, state, param_set)
     else
         initialize_updrafts(edmf, grid, state, surf)
     end
@@ -74,7 +74,7 @@ function initialize_updrafts(edmf, grid, state, surf)
             aux_up[i].T[k] = aux_gm.T[k]
             prog_up[i].ρarea[k] = 0
             prog_up[i].ρaq_tot[k] = 0
-            prog_up[i].ρaθ_liq_ice[k] = 0
+            prog_up[i].ρae_tot[k] = 0
         end
         if edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess
             @. prog_up[i].ε_nondim = 0
@@ -90,14 +90,17 @@ end
 
 import AtmosphericProfilesLibrary
 const APL = AtmosphericProfilesLibrary
-function initialize_updrafts_DryBubble(edmf, grid, state)
+function initialize_updrafts_DryBubble(edmf, grid, state, param_set)
 
     # criterion 2: b>1e-4
+    thermo_params = TCP.thermodynamics_params(param_set)
+    Ic = CCO.InterpolateF2C()
     aux_up = TC.center_aux_updrafts(state)
     aux_up_f = TC.face_aux_updrafts(state)
     aux_gm = TC.center_aux_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
+    prog_gm_f = TC.face_prog_grid_mean(state)
     prog_up = TC.center_prog_updrafts(state)
     prog_up_f = TC.face_prog_updrafts(state)
     ρ_0_c = prog_gm.ρ
@@ -112,6 +115,8 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
     prof_T = APL.DryBubble_updrafts_T(FT)
     face_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
     If = CCO.InterpolateC2F(; face_bcs...)
+    w_up_c = aux_tc.w_up_c
+    prog_gm_uₕ = grid_mean_uₕ(state)
     @inbounds for i in 1:N_up
         @inbounds for k in TC.real_face_indices(grid)
             if z_min <= grid.zf[k].z <= z_max
@@ -119,6 +124,7 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
             end
         end
 
+        @. w_up_c = Ic(aux_up_f[i].w)
         @inbounds for k in TC.real_center_indices(grid)
             z = grid.zc[k].z
             if z_min <= z <= z_max
@@ -131,14 +137,18 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
                 # for now temperature is provided as diagnostics from LES
                 aux_up[i].T[k] = prof_T(z)
                 prog_up[i].ρarea[k] = ρ_0_c[k] * aux_up[i].area[k]
-                prog_up[i].ρaθ_liq_ice[k] = prog_up[i].ρarea[k] * aux_up[i].θ_liq_ice[k]
                 prog_up[i].ρaq_tot[k] = prog_up[i].ρarea[k] * aux_up[i].q_tot[k]
+                aux_up[i].e_kin[k] = kinetic_energy(prog_gm_u[k], prog_gm_v[k], w_up_c[k])
+                ts_up_i = thermo_state_pθq(p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
+                e_pot = geopotential(param_set, grid.zc[k].z)
+                e_tot = TD.total_energy(thermo_params, ts_up_i, aux_up[i].e_kin[k], e_pot)
+                prog_up[i].ρae_tot[k] = prog_up[i].ρarea[k] * e_tot
             else
                 aux_up[i].area[k] = 0.0
                 aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
                 aux_up[i].T[k] = aux_gm.T[k]
                 prog_up[i].ρarea[k] = 0.0
-                prog_up[i].ρaθ_liq_ice[k] = 0.0
+                prog_up[i].ρae_tot[k] = 0.0
                 prog_up[i].ρaq_tot[k] = 0.0
             end
         end
