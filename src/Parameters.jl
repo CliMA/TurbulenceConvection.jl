@@ -18,7 +18,7 @@ const ATCP = AbstractTurbulenceConvectionParameters
 Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP} <: ATCP
     Omega::FT
     planet_radius::FT
-    microph_scaling::FT # TODO: add to CLIMAParameters toml and move to microphysics parameter set? or Clima1M?
+    microph_scaling::FT # TODO: move to microphysics parameter set? or Clima1M?
     microph_scaling_dep_sub::FT # TODO: move to microphysics parameter set? or Clima1M?
     microph_scaling_melt::FT # TODO: move to microphysics parameter set? or Clima1M?
     microphys_params::MP
