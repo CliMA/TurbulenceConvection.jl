@@ -95,7 +95,6 @@ TurbulenceConvection.jl can be run in the same way that SCAMPy used to, given on
  - DYCOMS_RF01
  - DYCOMS_RF02
  - GABLS
- - SP
 
 with, for example:
 
