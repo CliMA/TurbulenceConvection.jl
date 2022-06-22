@@ -303,12 +303,27 @@ function non_dimensional_function(εδ_model::RFEntr{d, m}, εδ_model_vars) whe
     # Random Features
     scale_x_entr = (c_rf_opt[1, (m + 2):(m + d + 1)] .^ 2) .* nondim_groups
     scale_x_detr = (c_rf_opt[2, (m + 2):(m + d + 1)] .^ 2) .* nondim_groups
-    f_entr = c_rf_opt[1, m + 1]^2 * sqrt(2) * cos.(c_rf_fix[1, :, 2:(d + 1)] * scale_x_entr + c_rf_fix[1, :, 1])
-    f_detr = c_rf_opt[2, m + 1]^2 * sqrt(2) * cos.(c_rf_fix[2, :, 2:(d + 1)] * scale_x_detr + c_rf_fix[2, :, 1])
+    FT = eltype(εδ_model)
 
     # Square output for nonnegativity for prediction
-    nondim_ε = sum(c_rf_opt[1, 1:m] .* f_entr) / sqrt(m)
-    nondim_δ = sum(c_rf_opt[2, 1:m] .* f_detr) / sqrt(m)
+    sqrtm = sqrt(m)
+    sqrt2 = FT(sqrt(2))
+    nondim_ε =
+        sum(1:m) do i
+            f_entr_i =
+                c_rf_opt[1, m + 1]^2 *
+                sqrt2 *
+                cos(LA.dot(c_rf_fix[1, i, 2:(d + 1)], scale_x_entr) + c_rf_fix[1, i, 1])
+            c_rf_opt[1, i] * f_entr_i
+        end / sqrtm
+    nondim_δ =
+        sum(1:m) do i
+            f_detr_i =
+                c_rf_opt[2, m + 1]^2 *
+                sqrt2 *
+                cos(LA.dot(c_rf_fix[2, i, 2:(d + 1)], scale_x_detr) + c_rf_fix[2, i, 1])
+            c_rf_opt[2, i] * f_detr_i
+        end / sqrtm
     return nondim_ε^2, nondim_δ^2
 end
 

@@ -89,19 +89,21 @@ Base.@kwdef struct FNOEntr{P, T} <: AbstractNonLocalEntrDetrModel
     nm_fno::Int
     c_fno::T
 end
-struct RFEntr{d, m, P, A, B} <: AbstractEntrDetrModel
+struct RFEntr{d, m, FT, P, A, B} <: AbstractEntrDetrModel
     params::P
     c_rf_fix::A
     c_rf_opt::B
     function RFEntr(params::P, c_rf_fix::A, c_rf_opt::B, d::Int) where {P, A, B}
+        FT = eltype(c_rf_fix)
         c_rf_fix = reshape(c_rf_fix, 2, :, 1 + d) # 2 x m x (1 + d), fix
         c_rf_fix = SA.SArray{Tuple{size(c_rf_fix)...}}(c_rf_fix)
         m = size(c_rf_fix, 2)
         c_rf_opt = reshape(c_rf_opt, 2, m + 1 + d) # 2 x (m + 1 + d), learn
         c_rf_opt = SA.SArray{Tuple{size(c_rf_opt)...}}(c_rf_opt)
-        return new{d, m, P, typeof(c_rf_fix), typeof(c_rf_opt)}(params, c_rf_fix, c_rf_opt)
+        return new{d, m, FT, P, typeof(c_rf_fix), typeof(c_rf_opt)}(params, c_rf_fix, c_rf_opt)
     end
 end
+Base.eltype(::RFEntr{d, m, FT}) where {d, m, FT} = FT
 
 Base.@kwdef struct NoisyRelaxationProcess{MT, T} <: AbstractNoisyEntrDetrModel
     mean_model::MT
