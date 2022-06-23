@@ -61,6 +61,16 @@ function parse_commandline()
         help = "Set to `true` to truncate printing of ClimaCore `Field` types"
         arg_type = Bool
         default = true
+        "--autocon_rate" # Value of the autoconversion rate, if prescribed
+        arg_type = Float64
+        "--accretion_rate" # Value of the accretion rate, if prescribed
+        arg_type = Float64
+        "--evap_rate" # Value of the evapapotation rate, if prescribed
+        arg_type = Float64
+        "--depsub_rate" # Value of the deposition/sublimation rate, if prescribed
+        arg_type = Float64
+        "--melt_rate" # Value of the melt rate, if prescribed
+        arg_type = Float64       
     end
     parsed_args = ArgParse.parse_args(ARGS, s)
     return (s, parsed_args)

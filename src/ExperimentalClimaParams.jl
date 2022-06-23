@@ -43,4 +43,7 @@ covar_lim(ps::APS) = ps.nt.covar_lim
 prescribed_precip_frac_value(ps::APS) = ps.nt.prescribed_precip_frac_value
 precip_fraction_limiter(ps::APS) = ps.nt.precip_fraction_limiter
 
+"""parameters related to autoconversion and accretion intensity"""
+α_autocon(ps::APS) = ps.nt.α_autocon
+α_accretion(ps::APS) = ps.nt.α_accretion
 end
