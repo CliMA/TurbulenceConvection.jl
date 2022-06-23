@@ -95,6 +95,7 @@ function initialize_updrafts_DryBubble(edmf, grid, state, param_set)
     # criterion 2: b>1e-4
     thermo_params = TCP.thermodynamics_params(param_set)
     Ic = CCO.InterpolateF2C()
+    wvec = CC.Geometry.WVector
     aux_up = TC.center_aux_updrafts(state)
     aux_up_f = TC.face_aux_updrafts(state)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -115,7 +116,6 @@ function initialize_updrafts_DryBubble(edmf, grid, state, param_set)
     prof_T = APL.DryBubble_updrafts_T(FT)
     face_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
     If = CCO.InterpolateC2F(; face_bcs...)
-    w_up_c = aux_tc.w_up_c
     prog_gm_uₕ = grid_mean_uₕ(state)
     @inbounds for i in 1:N_up
         @inbounds for k in TC.real_face_indices(grid)
@@ -124,7 +124,6 @@ function initialize_updrafts_DryBubble(edmf, grid, state, param_set)
             end
         end
 
-        @. w_up_c = Ic(aux_up_f[i].w)
         @inbounds for k in TC.real_center_indices(grid)
             z = grid.zc[k].z
             if z_min <= z <= z_max
@@ -138,7 +137,7 @@ function initialize_updrafts_DryBubble(edmf, grid, state, param_set)
                 aux_up[i].T[k] = prof_T(z)
                 prog_up[i].ρarea[k] = ρ_0_c[k] * aux_up[i].area[k]
                 prog_up[i].ρaq_tot[k] = prog_up[i].ρarea[k] * aux_up[i].q_tot[k]
-                aux_up[i].e_kin[k] = kinetic_energy(prog_gm_u[k], prog_gm_v[k], w_up_c[k])
+                aux_up[i].e_kin[k] = LA.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(wvec(aux_up_f[i].w)))) / 2
                 ts_up_i = thermo_state_pθq(p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
                 e_pot = geopotential(param_set, grid.zc[k].z)
                 e_tot = TD.total_energy(thermo_params, ts_up_i, aux_up[i].e_kin[k], e_pot)
