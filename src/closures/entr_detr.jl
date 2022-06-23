@@ -154,6 +154,7 @@ function compute_entr_detr!(
     surf::SurfaceBase,
     Δt::Real,
     εδ_closure::AbstractEntrDetrModel,
+    added_εδ_closure::AbstractEntrDetrModel,
 )
     FT = float_type(state)
     N_up = n_updrafts(edmf)
@@ -236,7 +237,9 @@ function compute_entr_detr!(
                 else
                     # fractional, turbulent & nondimensional entrainment
                     er = entr_detr(εδ_closure, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale)
-                    ε_dyn, δ_dyn = er.ε_dyn, er.δ_dyn
+                    added_er = entr_detr(added_εδ_closure, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale)
+                    ε_dyn = er.ε_dyn + added_er.ε_dyn
+                    δ_dyn = er.δ_dyn + added_er.δ_dyn
                 end
                 aux_up[i].entr_sc[k] = ε_dyn
                 aux_up[i].detr_sc[k] = δ_dyn
@@ -263,6 +266,7 @@ function compute_entr_detr!(
     surf::SurfaceBase,
     Δt::Real,
     εδ_model::AbstractNonLocalEntrDetrModel,
+    added_εδ_closure::AbstractEntrDetrModel,
 )
     FT = float_type(state)
     N_up = n_updrafts(edmf)

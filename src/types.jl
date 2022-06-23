@@ -62,7 +62,12 @@ end
 abstract type AbstractEntrDetrModel end
 abstract type AbstractNonLocalEntrDetrModel <: AbstractEntrDetrModel end
 abstract type AbstractNoisyEntrDetrModel <: AbstractEntrDetrModel end
+
 Base.@kwdef struct MDEntr{P} <: AbstractEntrDetrModel
+    params::P
+end  # existing model
+
+Base.@kwdef struct EntrNone{P} <: AbstractEntrDetrModel
     params::P
 end  # existing model
 
@@ -403,7 +408,7 @@ Base.@kwdef struct SurfaceBase{FT}
     wstar::FT = 0
 end
 
-struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}
+struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, AEC, EDS, DDS, EPG}
     surface_area::FT
     max_area::FT
     minimum_area::FT
@@ -416,6 +421,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, 
     mixing_length_params::MLP
     pressure_model_params::PMP
     entr_closure::EC
+    added_entr_closure::AEC
     entr_dim_scale::EDS
     detr_dim_scale::DDS
     entr_pi_subset::EPG
@@ -523,6 +529,15 @@ function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
         valid_options = ["moisture_deficit", "NN", "NN_nonlocal", "FNO", "Linear", "RF"],
     )
 
+    added_entr_type = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "additional_entrainment";
+        default = "None",
+        valid_options = ["moisture_deficit", "None"],
+    )
+
     nn_biases = parse_namelist(
         namelist,
         "turbulence",
@@ -575,6 +590,14 @@ function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
         RFEntr(εδ_params, c_rf_fix, c_rf_opt, length(entr_pi_subset))
     else
         error("Something went wrong. Invalid entrainment type '$entr_type'")
+    end
+
+    added_entr_closure = if added_entr_type == "moisture_deficit"
+        MDEntr(; params = εδ_params)
+    elseif added_entr_type == "None"
+        EntrNone(; params = εδ_params)
+    else
+        error("Something went wrong. Invalid entrainment type '$added_entr_type'")
     end
 
     # Overwrite `entr_closure` if a noisy relaxation process is used
@@ -656,6 +679,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
     EDS = typeof(entr_dim_scale)
     DDS = typeof(detr_dim_scale)
     EC = typeof(entr_closure)
+    AEC = typeof(added_entr_closure)
     MM = typeof(moisture_model)
     TCM = typeof(thermo_covariance_model)
     PM = typeof(precip_model)
@@ -665,7 +689,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
     EPG = typeof(entr_pi_subset)
     MLP = typeof(mixing_length_params)
     PMP = typeof(pressure_model_params)
-    return EDMFModel{n_updrafts, FT, MM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}(
+    return EDMFModel{n_updrafts, FT, MM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, AEC, EDS, DDS, EPG}(
         surface_area,
         max_area,
         minimum_area,
@@ -678,6 +702,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
         mixing_length_params,
         pressure_model_params,
         entr_closure,
+        added_entr_closure,
         entr_dim_scale,
         detr_dim_scale,
         entr_pi_subset,

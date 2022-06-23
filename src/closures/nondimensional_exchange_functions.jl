@@ -61,6 +61,18 @@ function non_dimensional_function(εδ_model::MDEntr, εδ_model_vars)
 end
 
 """
+    non_dimensional_function(εδ_model::EntrNone, εδ_model_vars)
+
+Returns the zero nondimensional entrainment and detrainment.
+ - `εδ_model`       :: MDEntr - Moisture deficit entrainment closure
+ - `εδ_model_vars`  :: structure containing variables
+"""
+function non_dimensional_function(εδ_model::EntrNone, εδ_model_vars)
+    FT = eltype(εδ_model_vars.q_cond_up)
+    return FT(0), FT(0)
+end
+
+"""
     non_dimensional_function!(nondim_ε, nondim_δ, Π_groups, εδ_model::FNOEntr)
 
 Uses a non local (Fourier) neural network to predict the fields of
