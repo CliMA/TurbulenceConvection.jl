@@ -49,13 +49,10 @@ function create_parameter_set(namelist, toml_dict_default::CP.AbstractTOMLDict, 
     aliases = [
     "microph_scaling_dep_sub",
     "microph_scaling_melt",
+    "microph_scaling",
     "Omega",
     "planet_radius"]
     pairs = CP.get_parameter_values!(toml_dict, aliases, "TurbulenceConvection")
-
-    # TODO: add microph_scaling to toml_dict
-    microph_scaling = TC.parse_namelist(namelist, "microphysics", "microph_scaling"; default = 1.0)
-    push!(pairs, Pair(:microph_scaling, microph_scaling))
 
     SFP = typeof(surf_flux_params)
     param_set = TCP.TurbulenceConvectionParameters{FTD, MP, SFP}(; pairs..., microphys_params, surf_flux_params)

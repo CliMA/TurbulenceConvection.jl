@@ -81,9 +81,9 @@ include("common_spaces.jl")
 function Simulation1d(namelist)
     TC = TurbulenceConvection
 
-    FT = Float64
+    FT = namelist["float_type"] == "Float32" ? Float32 : Float64
     # This is used for testing Duals
-    FTD = namelist["test_duals"] ? typeof(ForwardDiff.Dual{Nothing}(1.0, 0.0)) : Float64
+    FTD = namelist["test_duals"] ? typeof(ForwardDiff.Dual{Nothing}(FT(1), FT(0))) : FT
 
     toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
     # TODO: the namelist should override whatever

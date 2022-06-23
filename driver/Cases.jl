@@ -214,9 +214,10 @@ initialize_forcing(::AbstractCaseType, forcing, grid::Grid, state, param_set) = 
 
 function surface_ref_state(::Soares, param_set::APS, namelist)
     thermo_params = TCP.thermodynamics_params(param_set)
-    Pg = 1000.0 * 100.0
-    qtg = 5.0e-3
-    Tg = 300.0
+    FT = eltype(param_set)
+    Pg::FT = 1000.0 * 100.0
+    qtg::FT = 5.0e-3
+    Tg::FT = 300.0
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 function initialize_profiles(::Soares, grid::Grid, param_set, state; kwargs...)
@@ -264,9 +265,10 @@ end
 
 function surface_ref_state(::Nieuwstadt, param_set::APS, namelist)
     thermo_params = TCP.thermodynamics_params(param_set)
-    Pg = 1000.0 * 100.0
-    Tg = 300.0
-    qtg = 0.0
+    FT = eltype(param_set)
+    Pg::FT = 1000.0 * 100.0
+    Tg::FT = 300.0
+    qtg::FT = 0.0
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 function initialize_profiles(::Nieuwstadt, grid::Grid, param_set, state; kwargs...)
@@ -396,9 +398,10 @@ end
 
 function surface_ref_state(::life_cycle_Tan2018, param_set::APS, namelist)
     thermo_params = TCP.thermodynamics_params(param_set)
-    Pg = 1.015e5  #Pressure at ground
-    Tg = 300.4  #Temperature at ground
-    qtg = 0.02245   #Total water mixing ratio at surface
+    FT = eltype(param_set)
+    Pg::FT = 1.015e5  #Pressure at ground
+    Tg::FT = 300.4  #Temperature at ground
+    qtg::FT = 0.02245   #Total water mixing ratio at surface
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 function initialize_profiles(::life_cycle_Tan2018, grid::Grid, param_set, state; kwargs...)
@@ -486,8 +489,9 @@ end
 function surface_ref_state(::Rico, param_set::APS, namelist)
     thermo_params = TCP.thermodynamics_params(param_set)
     molmass_ratio = TCP.molmass_ratio(param_set)
-    Pg = 1.0154e5  #Pressure at ground
-    Tg = 299.8  #Temperature at ground
+    FT = eltype(param_set)
+    Pg::FT = 1.0154e5  #Pressure at ground
+    Tg::FT = 299.8  #Temperature at ground
     pvg = TD.saturation_vapor_pressure(thermo_params, Tg, TD.Liquid())
     qtg = (1 / molmass_ratio) * pvg / (Pg - pvg)   #Total water mixing ratio at surface
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
@@ -592,8 +596,9 @@ end
 function surface_ref_state(::TRMM_LBA, param_set::APS, namelist)
     thermo_params = TCP.thermodynamics_params(param_set)
     molmass_ratio = TCP.molmass_ratio(param_set)
-    Pg = 991.3 * 100  #Pressure at ground
-    Tg = 296.85   # surface values for reference state (RS) which outputs p, ρ
+    FT = eltype(param_set)
+    Pg::FT = 991.3 * 100  #Pressure at ground
+    Tg::FT = 296.85   # surface values for reference state (RS) which outputs p, ρ
     pvg = TD.saturation_vapor_pressure(thermo_params, Tg, TD.Liquid())
     qtg = (1 / molmass_ratio) * pvg / (Pg - pvg) #Total water mixing ratio at surface
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
@@ -663,9 +668,10 @@ initialize_radiation(::TRMM_LBA, radiation, grid::Grid, state, param_set) = init
 
 function surface_ref_state(::ARM_SGP, param_set::APS, namelist)
     thermo_params = TCP.thermodynamics_params(param_set)
-    Pg = 970.0 * 100 #Pressure at ground
-    Tg = 299.0   # surface values for reference state (RS) which outputs  p, ρ
-    qtg = 15.2 / 1000 #Total water mixing ratio at surface
+    FT = eltype(param_set)
+    Pg::FT = 970.0 * 100 #Pressure at ground
+    Tg::FT = 299.0   # surface values for reference state (RS) which outputs  p, ρ
+    qtg::FT = 15.2 / 1000 #Total water mixing ratio at surface
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 
@@ -747,9 +753,10 @@ end
 
 function surface_ref_state(::GATE_III, param_set::APS, namelist)
     thermo_params = TCP.thermodynamics_params(param_set)
-    Pg = 1013.0 * 100  #Pressure at ground
-    Tg = 299.184   # surface values for reference state (RS) which outputs p, ρ
-    qtg = 16.5 / 1000 #Total water mixing ratio at surface
+    FT = eltype(param_set)
+    Pg::FT = 1013.0 * 100  #Pressure at ground
+    Tg::FT = 299.184   # surface values for reference state (RS) which outputs p, ρ
+    qtg::FT = 16.5 / 1000 #Total water mixing ratio at surface
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 
@@ -809,9 +816,10 @@ end
 
 function surface_ref_state(::DYCOMS_RF01, param_set::APS, namelist)
     thermo_params = TCP.thermodynamics_params(param_set)
-    Pg = 1017.8 * 100.0
-    qtg = 9.0 / 1000.0
-    θ_surf = 289.0
+    FT = eltype(param_set)
+    Pg::FT = 1017.8 * 100.0
+    qtg::FT = 9.0 / 1000.0
+    θ_surf::FT = 289.0
     ts = TD.PhaseEquil_pθq(thermo_params, Pg, θ_surf, qtg)
     Tg = TD.air_temperature(thermo_params, ts)
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
@@ -899,9 +907,10 @@ end
 
 function surface_ref_state(::DYCOMS_RF02, param_set::APS, namelist)
     thermo_params = TCP.thermodynamics_params(param_set)
-    Pg = 1017.8 * 100.0
-    qtg = 9.0 / 1000.0
-    θ_surf = 288.3
+    FT = eltype(param_set)
+    Pg::FT = 1017.8 * 100.0
+    qtg::FT = 9.0 / 1000.0
+    θ_surf::FT = 288.3
     ts = TD.PhaseEquil_pθq(thermo_params, Pg, θ_surf, qtg)
     Tg = TD.air_temperature(thermo_params, ts)
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
@@ -990,9 +999,10 @@ end
 
 function surface_ref_state(::GABLS, param_set::APS, namelist)
     thermo_params = TCP.thermodynamics_params(param_set)
-    Pg = 1.0e5  #Pressure at ground,
-    Tg = 265.0  #Temperature at ground,
-    qtg = 0.0
+    FT = eltype(param_set)
+    Pg::FT = 1.0e5  #Pressure at ground,
+    Tg::FT = 265.0  #Temperature at ground,
+    qtg::FT = 0.0
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 function initialize_profiles(::GABLS, grid::Grid, param_set, state; kwargs...)
@@ -1046,9 +1056,10 @@ end
 
 function surface_ref_state(::DryBubble, param_set::APS, namelist)
     thermo_params = TCP.thermodynamics_params(param_set)
-    Pg = 1.0e5  #Pressure at ground
-    Tg = 296.0
-    qtg = 1.0e-5
+    FT = eltype(param_set)
+    Pg::FT = 1.0e5  #Pressure at ground
+    Tg::FT = 296.0
+    qtg::FT = 1.0e-5
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 
@@ -1129,6 +1140,7 @@ end
 
 function surface_ref_state(::LES_driven_SCM, param_set::APS, namelist)
     thermo_params = TCP.thermodynamics_params(param_set)
+    FT = eltype(param_set)
     les_filename = namelist["meta"]["lesfile"]
 
     Pg, Tg, qtg = NC.Dataset(les_filename, "r") do data
@@ -1139,7 +1151,7 @@ function surface_ref_state(::LES_driven_SCM, param_set::APS, namelist)
         qv_ground = data.group["reference"]["qv0"][1]
         qi_ground = data.group["reference"]["qi0"][1]
         qtg = ql_ground + qv_ground + qi_ground #Total water mixing ratio at surface
-        (Pg, Tg, qtg)
+        (FT(Pg), FT(Tg), FT(qtg))
     end
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
@@ -1207,8 +1219,8 @@ function surface_params(case::LES_driven_SCM, surf_ref_state, param_set; Ri_bulk
         mean_qt_prof = Statistics.mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)[:]
         # TODO: this will need to be changed if/when we don't prescribe surface fluxes
         qsurface = FT(0)
-        lhf = Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1]
-        shf = Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1]
+        lhf = FT(Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1])
+        shf = FT(Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1])
         (; zrough, Tsurface, qsurface, lhf, shf)
     end
     UnPack.@unpack zrough, Tsurface, qsurface, lhf, shf = nt
