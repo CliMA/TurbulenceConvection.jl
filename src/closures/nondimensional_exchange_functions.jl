@@ -299,16 +299,19 @@ function non_dimensional_function(εδ_model::RFEntr{d, m}, εδ_model_vars) whe
     # Learnable and fixed parameters
     c_rf_fix = εδ_model.c_rf_fix # 2 x m x (1 + d), fix
     c_rf_opt = εδ_model.c_rf_opt # 2 x (m + 1 + d), learn
+    FT = eltype(εδ_model)
+    sqrt2 = FT(sqrt(2))
+    sqrtm = FT(sqrt(m))
 
     # Random Features
     scale_x_entr = (c_rf_opt[1, (m + 2):(m + d + 1)] .^ 2) .* nondim_groups
     scale_x_detr = (c_rf_opt[2, (m + 2):(m + d + 1)] .^ 2) .* nondim_groups
-    f_entr = c_rf_opt[1, m + 1]^2 * sqrt(2) * cos.(c_rf_fix[1, :, 2:(d + 1)] * scale_x_entr + c_rf_fix[1, :, 1])
-    f_detr = c_rf_opt[2, m + 1]^2 * sqrt(2) * cos.(c_rf_fix[2, :, 2:(d + 1)] * scale_x_detr + c_rf_fix[2, :, 1])
+    f_entr = c_rf_opt[1, m + 1]^2 * sqrt2 * cos.(c_rf_fix[1, :, 2:(d + 1)] * scale_x_entr + c_rf_fix[1, :, 1])
+    f_detr = c_rf_opt[2, m + 1]^2 * sqrt2 * cos.(c_rf_fix[2, :, 2:(d + 1)] * scale_x_detr + c_rf_fix[2, :, 1])
 
     # Square output for nonnegativity for prediction
-    nondim_ε = sum(c_rf_opt[1, 1:m] .* f_entr) / sqrt(m)
-    nondim_δ = sum(c_rf_opt[2, 1:m] .* f_detr) / sqrt(m)
+    nondim_ε = sum(c_rf_opt[1, 1:m] .* f_entr) / sqrtm
+    nondim_δ = sum(c_rf_opt[2, 1:m] .* f_detr) / sqrtm
     return Flux.relu(nondim_ε), Flux.relu(nondim_δ)
 end
 
