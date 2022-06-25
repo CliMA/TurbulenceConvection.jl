@@ -61,6 +61,8 @@ function export_ref_profile(case_name::String)
     Plots.xlabel!("p (kPa)")
     Plots.ylabel!("z (km)")
     Plots.title!("p (kPa)")
+
+    Plots.plot(p1, p2)
     Plots.savefig("$case_name.svg")
 
 end
