@@ -2,9 +2,8 @@
 
 import StatsBase
 
-import ClimaCore
-const CC = ClimaCore
-const CCO = CC.Operators
+import ClimaCore as CC
+import ClimaCore.Operators as CCO
 
 import CLIMAParameters as CP
 import TurbulenceConvection.Parameters as TCP
@@ -56,37 +55,95 @@ function io_dictionary_diagnostics()
 end
 #! format: on
 
-function io(surf::TC.SurfaceBase, surf_params, grid, state, Stats::NetCDFIO_Stats, t::Real)
-    write_ts(Stats, "Tsurface", TC.surface_temperature(surf_params, t))
-    write_ts(Stats, "shf", surf.shf)
-    write_ts(Stats, "lhf", surf.lhf)
-    write_ts(Stats, "ustar", surf.ustar)
-    write_ts(Stats, "wstar", surf.wstar)
-end
-function io(io_dict::Dict, Stats::NetCDFIO_Stats, state)
-    for var in keys(io_dict)
-        write_field(Stats, var, vec(io_dict[var].field(state)), io_dict[var].group)
+function export_diagnostic_timeseries!(ds, grid, state, surf, diag_col, surf_params, t, calibrate_io)
+    to_float(f) = f isa ForwardDiff.Dual ? ForwardDiff.value(f) : f
+    cent = TC.Cent(1)
+    FT = eltype(grid)
+    diag_svpc = svpc_diagnostics_grid_mean(diag_col)
+    diag_tc_svpc = svpc_diagnostics_turbconv(diag_col)
+
+    prof_group = ds.group["profiles"]
+    # Write to profiles group
+    profile_t = get_var(prof_group, "t")
+    @inbounds profile_t[end + 1] = t::FT
+    # Write to timeseries group
+    ts_group = ds.group["timeseries"]
+    ts_t = get_var(ts_group, "t")
+    @inbounds ts_t[end + 1] = t::FT
+
+    li = lastindex(get_var(ts_group, "lwp_mean")) # last index
+
+    get_var(ts_group, "lwp_mean")[li] = to_float(diag_svpc.lwp_mean[cent])
+    get_var(ts_group, "iwp_mean")[li] = to_float(diag_svpc.iwp_mean[cent])
+    get_var(ts_group, "rwp_mean")[li] = to_float(diag_svpc.rwp_mean[cent])
+    get_var(ts_group, "swp_mean")[li] = to_float(diag_svpc.swp_mean[cent])
+
+    if !calibrate_io
+        get_var(ts_group, "updraft_cloud_cover")[li] = to_float(diag_tc_svpc.updraft_cloud_cover[cent])
+        get_var(ts_group, "updraft_cloud_base")[li] = to_float(diag_tc_svpc.updraft_cloud_base[cent])
+        get_var(ts_group, "updraft_cloud_top")[li] = to_float(diag_tc_svpc.updraft_cloud_top[cent])
+        get_var(ts_group, "env_cloud_cover")[li] = to_float(diag_tc_svpc.env_cloud_cover[cent])
+        get_var(ts_group, "env_cloud_base")[li] = to_float(diag_tc_svpc.env_cloud_base[cent])
+        get_var(ts_group, "env_cloud_top")[li] = to_float(diag_tc_svpc.env_cloud_top[cent])
+        get_var(ts_group, "env_lwp")[li] = to_float(diag_tc_svpc.env_lwp[cent])
+        get_var(ts_group, "env_iwp")[li] = to_float(diag_tc_svpc.env_iwp[cent])
+        get_var(ts_group, "Hd")[li] = to_float(diag_tc_svpc.Hd[cent])
+        get_var(ts_group, "updraft_lwp")[li] = to_float(diag_tc_svpc.updraft_lwp[cent])
+        get_var(ts_group, "updraft_iwp")[li] = to_float(diag_tc_svpc.updraft_iwp[cent])
+        get_var(ts_group, "cutoff_precipitation_rate")[li] = to_float(diag_svpc.cutoff_precipitation_rate[cent])
+        get_var(ts_group, "cloud_cover_mean")[li] = to_float(diag_svpc.cloud_cover_mean[cent])
+        get_var(ts_group, "cloud_base_mean")[li] = to_float(diag_svpc.cloud_base_mean[cent])
+        get_var(ts_group, "cloud_top_mean")[li] = to_float(diag_svpc.cloud_top_mean[cent])
     end
+
+    get_var(ts_group, "Tsurface")[li] = to_float(TC.surface_temperature(surf_params, t))
+    get_var(ts_group, "shf")[li] = to_float(surf.shf)
+    get_var(ts_group, "lhf")[li] = to_float(surf.lhf)
+    get_var(ts_group, "ustar")[li] = to_float(surf.ustar)
+    get_var(ts_group, "wstar")[li] = to_float(surf.wstar)
+    return nothing
 end
 
+function export_diagnostic_fields!(ds, state::S, io_dict::Dict) where {S}
+    isempty(io_dict) && return nothing
+    first_name = first(keys(io_dict))
+    first_var = get_var(ds.group[io_dict[first_name].group], first_name)
+    li = lastindex(first_var, 2)
 
-function initialize_io(nc_filename, FT, ts_list)
+    for var_name in keys(io_dict)
+        group = io_dict[var_name].group
+        data = vec(io_dict[var_name].field(state))
+        if eltype(data) <: ForwardDiff.Dual
+            data = ForwardDiff.value.(data)
+        end
+        var = get_var(ds.group[group], var_name)
+        var[:, li] = data
+    end
+    return nothing
+end
+
+# TODO: combine timeseries and profiles IO?
+function initialize_io(nc_filename::String, FT, ts_list)
+    @assert isfile(nc_filename)
     NC.Dataset(nc_filename, "a") do ds
         for var_name in ts_list
-            add_ts(ds, var_name, FT)
+            group = ds.group["timeseries"] # hard-coded time series group
+            NC.defVar(group, var_name, FT, ("t",)) # hard-code time series dims
         end
     end
     return nothing
 end
 
-function initialize_io(nc_filename, FT, io_dicts::Dict...)
+function initialize_io(nc_filename::String, FT, io_dicts::Dict...)
     NC.Dataset(nc_filename, "a") do ds
         for io_dict in io_dicts
             for var_name in keys(io_dict)
-                add_field(ds, var_name, io_dict[var_name].dims, io_dict[var_name].group, FT)
+                group = ds.group[io_dict[var_name].group]
+                NC.defVar(group, var_name, FT, io_dict[var_name].dims)
             end
         end
     end
+    return nothing
 end
 
 #=
@@ -105,8 +162,7 @@ function compute_diagnostics!(
     grid::TC.Grid,
     state::TC.State,
     diagnostics::D,
-    Stats::NetCDFIO_Stats,
-    surf_params,
+    surf,
     t::Real,
     calibrate_io::Bool,
 ) where {D <: CC.Fields.FieldVector}
@@ -135,8 +191,6 @@ function compute_diagnostics!(
 
     diag_tc_svpc = svpc_diagnostics_turbconv(diagnostics)
     diag_svpc = svpc_diagnostics_grid_mean(diagnostics)
-
-    surf = get_surface(surf_params, grid, state, t, param_set)
 
     @. aux_gm.s = TD.specific_entropy(thermo_params, ts_gm)
     @. aux_gm.θ_liq_ice = prog_gm.ρθ_liq_ice / ρ_c

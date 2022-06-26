@@ -67,17 +67,6 @@ struct Simulation1d{IONT, P, A, C, F, R, SM, EDMF, PM, RFM, D, TIMESTEPPING, STA
     les_data_kwarg::LESDK
 end
 
-function open_files(sim::Simulation1d)
-    for inds in TC.iterate_columns(sim.prog.cent)
-        open_files(sim.Stats[inds...])
-    end
-end
-function close_files(sim::Simulation1d)
-    for inds in TC.iterate_columns(sim.prog.cent)
-        close_files(sim.Stats[inds...])
-    end
-end
-
 include("common_spaces.jl")
 
 function Simulation1d(namelist)
@@ -286,13 +275,7 @@ function initialize(sim::Simulation1d)
         compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
         if !skip_io
             stats = Stats[inds...]
-            NC.Dataset(stats.nc_filename, "a") do ds
-                group = "reference"
-                add_write_field(ds, "ρ_f", vec(TC.face_aux_grid_mean(state).ρ), group, ("zf",))
-                add_write_field(ds, "ρ_c", vec(TC.center_prog_grid_mean(state).ρ), group, ("zc",))
-                add_write_field(ds, "p_f", vec(TC.face_aux_grid_mean(state).p), group, ("zf",))
-                add_write_field(ds, "p_c", vec(TC.center_aux_grid_mean(state).p), group, ("zc",))
-            end
+            export_ref_state!(state, stats.nc_filename)
         end
         Cases.initialize_profiles(case, grid, param_set, state; les_data_kwarg...)
         set_thermo_state_from_aux!(state, grid, edmf.moisture_model, param_set)
@@ -312,19 +295,7 @@ function initialize(sim::Simulation1d)
     integrator = ODE.init(prob, alg; kwargs...)
     skip_io && return (integrator, :success)
 
-    open_files(sim)
-    try
-        affect_io!(integrator)
-    catch e
-        if truncate_stack_trace
-            @warn "IO during initialization failed."
-        else
-            @warn "IO during initialization failed." exception = (e, catch_backtrace())
-        end
-        return (integrator, :simulation_crashed)
-    finally
-        close_files(sim)
-    end
+    affect_io!(integrator)
 
     return (integrator, :success)
 end
@@ -338,8 +309,7 @@ function solve_args(sim::Simulation1d)
     aux = sim.aux
     TS = sim.TS
     diagnostics = sim.diagnostics
-
-    t_span = (0.0, sim.TS.t_max)
+    t_span = (typeof(TS.t_max)(0), TS.t_max)
     params = (;
         calibrate_io,
         edmf = sim.edmf,
@@ -397,7 +367,6 @@ end
 
 function run(sim::Simulation1d, integrator; time_run = true)
     TC = TurbulenceConvection
-    sim.skip_io || open_files(sim)
 
     local sol
     try
@@ -415,8 +384,6 @@ function run(sim::Simulation1d, integrator; time_run = true)
         end
         # "Stacktrace for failed simulation" exception = (e, catch_backtrace())
         return (integrator, :simulation_crashed)
-    finally
-        sim.skip_io || close_files(sim)
     end
 
     if first(sol.t) == sim.TS.t_max
