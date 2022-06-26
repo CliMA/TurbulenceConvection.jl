@@ -3,14 +3,17 @@ import Profile
 
 case_name = "Bomex"
 sim = init_sim(case_name)
+# sim = init_sim(case_name; skip_io = false)
 (prob, alg, kwargs) = solve_args(sim)
 integrator = ODE.init(prob, alg; kwargs...)
 
 ODE.step!(integrator) # force compilation
+# affect_io!(integrator) # force compilation
 Profile.clear_malloc_data()
 prof = Profile.@profile begin
     for _ in 1:100
         ODE.step!(integrator)
+        # affect_io!(integrator)
     end
 end
 
