@@ -132,8 +132,8 @@ function set_thermo_state_peq!(state, grid, moisture_model, param_set)
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
         e_pot = TC.geopotential(param_set, grid.zc.z[k])
-        e_int = prog_gm.ρe_tot[k] / ρ_c[k] - aux_gm.e_kin[k] - e_pot
-        ts_gm[k] = TC.thermo_state_peq(param_set, p_c[k], e_int, prog_gm.ρq_tot[k] / ρ_c[k], thermo_args...)
+        aux_gm.e_int[k] = prog_gm.ρe_tot[k] / ρ_c[k] - aux_gm.e_kin[k] - e_pot
+        ts_gm[k] = TC.thermo_state_peq(param_set, p_c[k], aux_gm.e_int[k], prog_gm.ρq_tot[k] / ρ_c[k], thermo_args...)
     end
     return nothing
 end
