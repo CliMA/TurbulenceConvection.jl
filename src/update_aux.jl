@@ -78,8 +78,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 end
                 thermo_args = (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
             end
-            aux_up[i].e_int[k] = aux_up[i].e_tot[k] - aux_up[i].e_kin[k] - e_pot
-            ts_up_i = thermo_state_peq(param_set, p_c[k], aux_up[i].e_int[k], aux_up[i].q_tot[k], thermo_args...)
+            e_int = aux_up[i].e_tot[k] - aux_up[i].e_kin[k] - e_pot
+            ts_up_i = thermo_state_peq(param_set, p_c[k], e_int, aux_up[i].q_tot[k], thermo_args...)
             aux_up[i].θ_liq_ice[k] = TD.liquid_ice_pottemp(thermo_params, ts_up_i)
             aux_up[i].h_tot[k] = total_enthalpy(param_set, aux_up[i].e_tot[k], ts_up_i)
         end
@@ -90,8 +90,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_bulk.q_tot[k] = 0
         aux_bulk.h_tot[k] = 0
         aux_bulk.e_tot[k] = 0
-        aux_bulk.e_kin[k] = 0
-        aux_bulk.e_int[k] = 0
         aux_bulk.θ_liq_ice[k] = 0
         aux_bulk.area[k] = sum(i -> aux_up[i].area[k], 1:N_up)
         if aux_bulk.area[k] > 0
@@ -102,16 +100,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 aux_bulk.θ_liq_ice[k] += a_k * aux_up[i].θ_liq_ice[k] / a_bulk_k
                 aux_bulk.h_tot[k] += a_k * aux_up[i].h_tot[k] / a_bulk_k
                 aux_bulk.e_tot[k] += a_k * aux_up[i].e_tot[k] / a_bulk_k
-                aux_bulk.e_kin[k] += a_k * aux_up[i].e_kin[k] / a_bulk_k
-                aux_bulk.e_int[k] += a_k * aux_up[i].e_int[k] / a_bulk_k
             end
         else
             aux_bulk.q_tot[k] = aux_gm.q_tot[k]
             aux_bulk.θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
             aux_bulk.h_tot[k] = aux_gm.h_tot[k]
             aux_bulk.e_tot[k] = aux_gm.e_tot[k]
-            aux_bulk.e_kin[k] = aux_gm.e_kin[k]
-            aux_bulk.e_int[k] = aux_bulk.e_tot[k] - aux_gm.e_kin[k] - e_pot
         end
         if edmf.moisture_model isa NonEquilibriumMoisture
             aux_bulk.q_liq[k] = 0

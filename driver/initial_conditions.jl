@@ -117,6 +117,7 @@ function initialize_updrafts_DryBubble(edmf, grid, state, param_set)
     face_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
     If = CCO.InterpolateC2F(; face_bcs...)
     prog_gm_uₕ = grid_mean_uₕ(state)
+    @. aux_up[i].e_kin = LA.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(wvec(aux_up_f[i].w)))) / 2
     @inbounds for i in 1:N_up
         @inbounds for k in TC.real_face_indices(grid)
             if z_min <= grid.zf[k].z <= z_max
@@ -137,7 +138,6 @@ function initialize_updrafts_DryBubble(edmf, grid, state, param_set)
                 aux_up[i].T[k] = prof_T(z)
                 prog_up[i].ρarea[k] = ρ_0_c[k] * aux_up[i].area[k]
                 prog_up[i].ρaq_tot[k] = prog_up[i].ρarea[k] * aux_up[i].q_tot[k]
-                aux_up[i].e_kin[k] = LA.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(wvec(aux_up_f[i].w)))) / 2
                 ts_up_i = thermo_state_pθq(p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
                 e_pot = geopotential(param_set, grid.zc[k].z)
                 e_tot = TD.total_energy(thermo_params, ts_up_i, aux_up[i].e_kin[k], e_pot)
