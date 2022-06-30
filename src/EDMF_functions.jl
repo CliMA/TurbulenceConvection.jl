@@ -286,12 +286,16 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     @inbounds for i in 1:N_up
         @. w_up_c = Ic(aux_up_f[i].w)
         θ_surf = θ_surface_bc(surf, grid, state, edmf, i, param_set)
+        h_surf = h_surface_bc(surf, grid, state, edmf, i, param_set)
+        e_surf = e_surface_bc(surf, grid, state, edmf, i, param_set)
         q_surf = q_surface_bc(surf, grid, state, edmf, i)
         a_surf = area_surface_bc(surf, edmf, i)
         prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_surf
-        ts_up_i = thermo_state_pθq(param_set, p_c[kc_surf], θ_surf, q_surf)
         e_kin = @. LA.norm_sqr(C123(prog_gm_uₕ) + C123(wvec(w_up_c))) / 2
         e_pot = geopotential(param_set, grid.zc.z[kc_surf])
+        h = enthalpy(h_surf, e_pot, e_kin[kc_surf])
+        ts_up_i = thermo_state_phq(param_set, p_c[kc_surf], h, q_surf)
+        # ts_up_i = thermo_state_pθq(param_set, p_c[kc_surf], θ_surf, aux_gm.q_tot[kc_surf])
         e_tot_surf = TD.total_energy(thermo_params, ts_up_i, e_kin[kc_surf], e_pot)
         prog_up[i].ρae_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * e_tot_surf
         prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * q_surf
@@ -387,6 +391,56 @@ function θ_surface_bc(
     surface_scalar_coeff =
         percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000, set_src_seed)
     return aux_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var)
+end
+function h_surface_bc(
+    surf::SurfaceBase{FT},
+    grid::Grid,
+    state::State,
+    edmf::EDMFModel,
+    i::Int,
+    param_set::APS,
+)::FT where {FT}
+    thermo_params = TCP.thermodynamics_params(param_set)
+    aux_gm = center_aux_grid_mean(state)
+    prog_gm = center_prog_grid_mean(state)
+    kc_surf = kc_surface(grid)
+    ts_gm = aux_gm.ts
+    UnPack.@unpack ustar, zLL, oblength, ρLL = surface_helper(surf, grid, state)
+
+    surf.bflux > 0 || return FT(0)
+    set_src_seed = edmf.set_src_seed
+    a_total = edmf.surface_area
+    a_ = area_surface_bc(surf, edmf, i)
+    ρh_tot_flux = surf.shf + surf.lhf
+    h_var = get_surface_variance(ρh_tot_flux / ρLL, ρh_tot_flux / ρLL, ustar, zLL, oblength)
+    surface_scalar_coeff =
+        percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000, set_src_seed)
+    return aux_gm.h_tot[kc_surf] + surface_scalar_coeff * sqrt(h_var)
+end
+
+function e_surface_bc(
+    surf::SurfaceBase{FT},
+    grid::Grid,
+    state::State,
+    edmf::EDMFModel,
+    i::Int,
+    param_set::APS,
+)::FT where {FT}
+    thermo_params = TCP.thermodynamics_params(param_set)
+    aux_gm = center_aux_grid_mean(state)
+    prog_gm = center_prog_grid_mean(state)
+    kc_surf = kc_surface(grid)
+    ts_gm = aux_gm.ts
+    UnPack.@unpack ustar, zLL, oblength, ρLL = surface_helper(surf, grid, state)
+
+    surf.bflux > 0 || return FT(0)
+    set_src_seed = edmf.set_src_seed
+    a_total = edmf.surface_area
+    a_ = area_surface_bc(surf, edmf, i)
+    e_var = get_surface_variance(surf.ρe_tot_flux / ρLL, surf.ρe_tot_flux / ρLL, ustar, zLL, oblength)
+    surface_scalar_coeff =
+        percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_, 1000, set_src_seed)
+    return aux_gm.e_tot[kc_surf] + surface_scalar_coeff * sqrt(e_var)
 end
 function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDMFModel, i::Int)::FT where {FT}
     aux_gm = center_aux_grid_mean(state)
@@ -551,9 +605,8 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
             -∇c(wvec(LBF(Ic(w_up) * ρarea))) + (ρarea * Ic(w_up) * entr_turb_dyn) - (ρarea * Ic(w_up) * detr_turb_dyn)
 
         @. tends_ρae_tot =
-            -∇c(wvec(LBF(Ic(w_up) * ρarea * h_tot_up)))
-            #  + (ρarea * Ic(w_up) * entr_turb_dyn * h_tot_en) -
-            # (ρarea * h_tot_up * Ic(w_up) * detr_turb_dyn) + (ρ_c * e_tot_tendency_precip_formation)
+            -∇c(wvec(LBF(Ic(w_up) * ρarea * h_tot_up))) + (ρarea * Ic(w_up) * entr_turb_dyn * h_tot_en) -
+            (ρarea * h_tot_up * Ic(w_up) * detr_turb_dyn) + (ρ_c * e_tot_tendency_precip_formation)
 
         @. tends_ρaq_tot =
             -∇c(wvec(LBF(Ic(w_up) * ρaq_tot))) + (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en) -
@@ -728,12 +781,16 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         @. prog_up[i].ρae_tot = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρae_tot)
         @. prog_up[i].ρaq_tot = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_tot)
         θ_surf = θ_surface_bc(surf, grid, state, edmf, i, param_set)
+        h_surf = h_surface_bc(surf, grid, state, edmf, i, param_set)
+        e_surf = e_surface_bc(surf, grid, state, edmf, i, param_set)
         q_surf = q_surface_bc(surf, grid, state, edmf, i)
         a_surf = area_surface_bc(surf, edmf, i)
         prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_surf
-        ts_up_i = thermo_state_pθq(param_set, p_c[kc_surf], θ_surf, q_surf)
         e_kin = @. LA.norm_sqr(C123(prog_gm_uₕ) + C123(wvec(w_up_c))) / 2
         e_pot = geopotential(param_set, grid.zc.z[kc_surf])
+        h = enthalpy(h_surf, e_pot, e_kin[kc_surf])
+        ts_up_i = thermo_state_phq(param_set, p_c[kc_surf], h, q_surf)
+        # ts_up_i = thermo_state_pθq(param_set, p_c[kc_surf], θ_surf, aux_gm.q_tot[kc_surf])
         e_tot_surf = TD.total_energy(thermo_params, ts_up_i, e_kin[kc_surf], e_pot)
         prog_up[i].ρae_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * e_tot_surf
         prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * q_surf
