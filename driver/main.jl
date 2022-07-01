@@ -66,13 +66,13 @@ struct Simulation1d{IONT, P, A, C, F, R, SM, EDMF, PM, D, TIMESTEPPING, STATS, P
 end
 
 function open_files(sim::Simulation1d)
-    for inds in TC.iterate_columns(sim.prog.cent)
-        open_files(sim.Stats[inds...])
+    CC.Fields.bycolumn(axes(sim.prog.cent)) do colidx
+        open_files(sim.Stats[colidx])
     end
 end
 function close_files(sim::Simulation1d)
-    for inds in TC.iterate_columns(sim.prog.cent)
-        close_files(sim.Stats[inds...])
+    CC.Fields.bycolumn(axes(sim.prog.cent)) do colidx
+        close_files(sim.Stats[colidx])
     end
 end
 
@@ -164,7 +164,7 @@ function Simulation1d(namelist)
     Stats = if skip_io
         nothing
     else
-        map(TC.iterate_columns(prog.cent)) do inds
+        map(CC.Fields.bycolumn(axes(prog.cent))) do colidx
             col_state = TC.column_prog_aux(prog, aux, inds...)
             grid = TC.Grid(col_state)
             ncfn = nc_filename_suffix(nc_filename, inds)
@@ -248,9 +248,9 @@ function initialize(sim::Simulation1d)
     ts_list = vcat(ts_gm, ts_edmf)
 
     # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
-    for inds in TC.iterate_columns(prog.cent)
-        state = TC.column_prog_aux(prog, aux, inds...)
-        diagnostics_col = TC.column_diagnostics(diagnostics, inds...)
+    CC.Fields.bycolumn(axes(prog.cent)) do colidx
+        state = TC.column_prog_aux(prog, aux, colidx)
+        diagnostics_col = TC.column_diagnostics(diagnostics, colidx)
         grid = TC.Grid(state)
         FT = TC.float_type(state)
         t = FT(0)
