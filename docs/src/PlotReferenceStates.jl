@@ -1,12 +1,14 @@
 import TurbulenceConvection
-const TC = TurbulenceConvection
+import TurbulenceConvection as TC
+import TurbulenceConvection.Parameters as TCP
 import Plots
+import ForwardDiff
 import NCDatasets
 import Logging
-import CLIMAParameters
-import ClimaCore
-const CC = ClimaCore
+import CLIMAParameters as CP
+import ClimaCore as CC
 const tc_dir = pkgdir(TurbulenceConvection)
+include(joinpath(tc_dir, "driver", "NetCDFIO.jl"))
 include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
 include(joinpath(tc_dir, "driver", "Cases.jl"))
 include(joinpath(tc_dir, "driver", "parameter_set.jl"))
@@ -17,7 +19,8 @@ function export_ref_profile(case_name::String)
     TC = TurbulenceConvection
     namelist = NameList.default_namelist(case_name)
     FT = Float64
-    param_set = create_parameter_set(FT, namelist)
+    toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
+    param_set = create_parameter_set(namelist, toml_dict)
     namelist["meta"]["uuid"] = "01"
 
     grid = TC.Grid(FT(namelist["grid"]["dz"]), namelist["grid"]["nz"])
@@ -58,6 +61,8 @@ function export_ref_profile(case_name::String)
     Plots.xlabel!("p (kPa)")
     Plots.ylabel!("z (km)")
     Plots.title!("p (kPa)")
+
+    Plots.plot(p1, p2)
     Plots.savefig("$case_name.svg")
 
 end

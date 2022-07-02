@@ -263,7 +263,7 @@ function affect_filter!(edmf::EDMFModel, grid::Grid, state::State, param_set::AP
 end
 
 function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS)
-    thermo_params = thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     FT = float_type(state)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
@@ -373,7 +373,7 @@ function θ_surface_bc(
     i::Int,
     param_set::APS,
 )::FT where {FT}
-    thermo_params = thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     aux_gm = center_aux_grid_mean(state)
     prog_gm = center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ

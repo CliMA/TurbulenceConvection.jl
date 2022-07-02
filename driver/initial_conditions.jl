@@ -1,14 +1,11 @@
-import TurbulenceConvection
-const TC = TurbulenceConvection
+import TurbulenceConvection as TC
+import TurbulenceConvection.Parameters as TCP
+const APS = TCP.AbstractTurbulenceConvectionParameters
 
-import CLIMAParameters
-const APS = CLIMAParameters.AbstractEarthParameterSet
-
-import Thermodynamics
-const TD = Thermodynamics
+import Thermodynamics as TD
 
 function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, surf_params, param_set::APS, t::Real, case)
-    thermo_params = TC.thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     initialize_covariance(edmf, grid, state)
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = aux_gm.ts

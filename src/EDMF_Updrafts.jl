@@ -9,7 +9,7 @@ function compute_nonequilibrium_moisture_tendencies!(
     Δt::Real,
     param_set::APS,
 )
-    thermo_params = thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     N_up = n_updrafts(edmf)
     aux_gm = center_aux_grid_mean(state)
     aux_up = center_aux_updrafts(state)
@@ -52,7 +52,7 @@ function compute_precipitation_formation_tendencies(
     Δt::Real,
     param_set::APS,
 )
-    thermo_params = thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     FT = float_type(state)
     N_up = n_updrafts(edmf)
     prog_gm = center_prog_grid_mean(state)

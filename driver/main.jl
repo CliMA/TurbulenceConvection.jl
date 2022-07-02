@@ -8,20 +8,16 @@ import JSON
 import ArgParse
 import TurbulenceConvection
 
-import CloudMicrophysics
-const CM = CloudMicrophysics
-const CMNe = CloudMicrophysics.MicrophysicsNonEq
-const CM0 = CloudMicrophysics.Microphysics0M
-const CM1 = CloudMicrophysics.Microphysics1M
+import CloudMicrophysics as CM
+import CloudMicrophysics.MicrophysicsNonEq as CMNe
+import CloudMicrophysics.Microphysics0M as CM0
+import CloudMicrophysics.Microphysics1M as CM1
 
-import ClimaCore
-const CC = ClimaCore
+import ClimaCore as CC
 import SciMLBase
 
-import OrdinaryDiffEq
-const ODE = OrdinaryDiffEq
-import StochasticDiffEq
-const SDE = StochasticDiffEq
+import OrdinaryDiffEq as ODE
+import StochasticDiffEq as SDE
 import StaticArrays: SVector
 
 const tc_dir = pkgdir(TurbulenceConvection)
@@ -85,11 +81,15 @@ include("common_spaces.jl")
 function Simulation1d(namelist)
     TC = TurbulenceConvection
 
-    FT = Float64
+    FT = namelist["float_type"] == "Float32" ? Float32 : Float64
     # This is used for testing Duals
-    FTD = namelist["test_duals"] ? typeof(ForwardDiff.Dual{Nothing}(1.0, 0.0)) : Float64
+    FTD = namelist["test_duals"] ? typeof(ForwardDiff.Dual{Nothing}(FT(1), FT(0))) : FT
 
-    param_set = create_parameter_set(FTD, namelist)
+    toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
+    # TODO: the namelist should override whatever
+    # we need to override for calibration
+
+    param_set = create_parameter_set(namelist, toml_dict, FTD)
 
     skip_io = namelist["stats_io"]["skip"]
     calibrate_io = namelist["stats_io"]["calibrate_io"]
@@ -354,19 +354,12 @@ function solve_args(sim::Simulation1d)
         alg = ODE.Euler()
     end
 
-    # TODO: LES_driven_SCM is currently unstable w.r.t. higher order moments (HOM).
-    # So, we tell OrdinaryDiffEq.jl to not perform NaNs check on the solution
-    # so that it doesn't abort early (as the HOM prognostic variables are 1-way coupled)
-    unstable_check_kwarg(::Cases.LES_driven_SCM) = (; unstable_check = (dt, u, p, t) -> false)
-    unstable_check_kwarg(case) = ()
-
     kwargs = (;
         progress_steps = 100,
         save_start = false,
         saveat = last(t_span),
         callback = callbacks,
         progress = true,
-        unstable_check_kwarg(sim.case)...,
         progress_message = (dt, u, p, t) -> t,
     )
     return (prob, alg, kwargs)

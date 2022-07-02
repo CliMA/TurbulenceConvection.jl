@@ -8,7 +8,7 @@ function microphysics(
     param_set::APS,
 )
     FT = float_type(state)
-    thermo_params = thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     tendencies_pr = center_tendencies_precipitation(state)
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
@@ -74,7 +74,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
     i_ql, i_qi, i_T, i_cf, i_qt_sat, i_qt_unsat, i_T_sat, i_T_unsat = 1:env_len
     i_SH_qt, i_Sqt_H, i_SH_H, i_Sqt_qt, i_Sqt, i_SH, i_Sqr, i_Sqs, i_Se_tot = 1:src_len
 
-    thermo_params = thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     quadrature_type = en_thermo.quadrature_type
     quad_order = quadrature_order(en_thermo)
     χ = en_thermo.a
@@ -243,7 +243,7 @@ function microphysics(
     param_set::APS,
 )
     FT = float_type(state)
-    thermo_params = thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     aux_en = center_aux_environment(state)
     prog_pr = center_prog_precipitation(state)
     prog_gm = center_prog_grid_mean(state)

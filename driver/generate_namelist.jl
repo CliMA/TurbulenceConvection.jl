@@ -83,6 +83,8 @@ function default_namelist(
     namelist_defaults["logging"] = Dict()
     namelist_defaults["logging"]["truncate_stack_trace"] = truncate_stack_trace
 
+    namelist_defaults["float_type"] = "Float64"
+
     namelist_defaults["turbulence"] = Dict()
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"] = Dict()

@@ -14,7 +14,7 @@ function buoyancy_gradients(
     bg_model::EnvBuoyGrad{FT, EBG},
 ) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
 
-    thermo_params = thermodynamics_params(param_set)
+    thermo_params = TCP.thermodynamics_params(param_set)
     g = TCP.grav(param_set)
     molmass_ratio = TCP.molmass_ratio(param_set)
     R_d = TCP.R_d(param_set)
