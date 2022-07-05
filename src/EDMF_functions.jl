@@ -491,7 +491,6 @@ function compute_up_stoch_tendencies!(edmf::EDMFModel, grid::Grid, state::State,
 end
 
 function update_diagnostic_updrafts!(edmf::EDMFModel, grid::Grid, state::State, param_set::APS, surf::SurfaceBase)
-    println("update_diagnostic_updrafts")
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -502,14 +501,33 @@ function update_diagnostic_updrafts!(edmf::EDMFModel, grid::Grid, state::State, 
     aux_en_f = face_aux_environment(state)
     aux_up_f = face_aux_updrafts(state)
     prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     aux_gm_f = face_aux_grid_mean(state)
     ρ_c = prog_gm.ρ
     ρ_f = aux_gm_f.ρ
+    set_edmf_surface_bc(edmf, grid, state, surf, param_set)
     au_lim = edmf.max_area
     @inbounds for i in 1:N_up
         aux_up_i = aux_up[i]
         @. aux_up_i.entr_turb_dyn = aux_up_i.entr_sc + aux_up_i.frac_turb_entr
         @. aux_up_i.detr_turb_dyn = aux_up_i.detr_sc + aux_up_i.frac_turb_entr
+
+        @inbounds for k in real_center_indices(grid)
+            if aux_up[i].area[k] < FT(0.000001)
+                aux_up[i].area[k] = FT(0.000001)
+                aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
+                aux_up[i].q_tot[k] = aux_gm.q_tot[k]
+            end
+        end
+        @inbounds for k in real_face_indices(grid)
+            if aux_up_f[i].w[k] < FT(0.000001)
+                aux_up_f[i].w[k] = FT(0.000001)
+            end
+        end
+        aux_up[i].area[kc_surf] = area_surface_bc(surf, edmf, i)
+        aux_up[i].θ_liq_ice[kc_surf] = θ_surface_bc(surf, grid, state, edmf, i, param_set)
+        aux_up[i].q_tot[kc_surf] = q_surface_bc(surf, grid, state, edmf, i)
+        aux_up_f[i].w[kf_surf] = FT(0)
     end
 
     UB = CCO.UpwindBiasedProductC2F(bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
@@ -529,16 +547,16 @@ function update_diagnostic_updrafts!(edmf::EDMFModel, grid::Grid, state::State, 
     ∇f = CCO.DivergenceC2F(; adv_bcs...)
 
     w_up_c = aux_tc.w_up_c
+    dz = FT(50)
     @inbounds for i in 1:N_up
-        dz = FT(50)
 
         aux_up_i = aux_up[i]
         w_up = aux_up_f[i].w
         a_up = aux_up_i.area
-        q_tot = aux_up_i.q_tot
+        q_tot_up = aux_up_i.q_tot
         q_tot_en = aux_en.q_tot
-        θ_liq_ice = aux_up_i.θ_liq_ice
         θ_liq_ice_en = aux_en.θ_liq_ice
+        θ_liq_ice_up = aux_up_i.θ_liq_ice
         entr_turb_dyn = aux_up_i.entr_turb_dyn
         detr_turb_dyn = aux_up_i.detr_turb_dyn
         qt_tendency_precip_formation = aux_up_i.qt_tendency_precip_formation
@@ -547,23 +565,26 @@ function update_diagnostic_updrafts!(edmf::EDMFModel, grid::Grid, state::State, 
         a_up_bcs = a_up_boundary_conditions(surf, edmf, i)
         Iaf = CCO.InterpolateC2F(; a_up_bcs...)
         nh_pressure = aux_up_f[i].nh_pressure
-        a_up = aux_up[i].area
-        w_up = aux_up_f[i].w
         w_en = aux_en_f.w
         entr_w = aux_up[i].entr_turb_dyn
         detr_w = aux_up[i].detr_turb_dyn
         buoy = aux_up[i].buoy
-        @. w_up_c = Ic(w_up)
+        w_up2 = copy(w_up)
 
         # ϕₖ += - (dz/ρaₖwₖ)*∂(ρaϕw)/∂z + dz*(ϵϕ - δϕ₀ + S(ϕ)/wₖ)
-        @. θ_liq_ice = θ_liq_ice
-            - dz * ∇c(wvec(LBF(w_up_c * ρ_c * a_up * θ_liq_ice)))/(ρ_c * a_up * w_up_c)
-            + dz * (entr_turb_dyn * θ_liq_ice_en - detr_turb_dyn * θ_liq_ice + θ_liq_ice_tendency_precip_formation / w_up_c)
+        # @. θ_liq_ice_up +=
+        #     - dz * ∇c(wvec(LBF(w_up_c * ρ_c * a_up * θ_liq_ice_up)))/(ρ_c * a_up * w_up_c) + dz * (entr_turb_dyn * θ_liq_ice_en - detr_turb_dyn * θ_liq_ice_up + θ_liq_ice_tendency_precip_formation / w_up_c)
+        # wₖ∂(ϕ)/∂z = ϵwₖ(ϕ - ϕ₀) + S(ϕ)
+        # ϕₖ = ϕₖ - dz*(∂ϕ/∂z) + dz * (ϵ(ϕ₀ - ϕ) + S(ϕ)/wₖ)
+        @. aux_up[i].θ_liq_ice +=
+            - dz * ∇c(wvec(LBF(θ_liq_ice_up))) + dz * (entr_turb_dyn * (θ_liq_ice_en - θ_liq_ice_up) + θ_liq_ice_tendency_precip_formation / w_up_c)
 
-        # ϕₖ += - (dz/ρaₖwₖ)*∂(ρaϕw)/∂z + dz*(ϵϕ - δϕ₀ + S(ϕ)/wₖ)
-        @. q_tot = q_tot
-            - dz * ∇c(wvec(LBF(Ic(w_up) * ρ_c * a_up * q_tot)))/(ρ_c * a_up * w_up_c)
-            + dz * (entr_turb_dyn * q_tot_en - detr_turb_dyn * q_tot + qt_tendency_precip_formation / w_up_c)
+        # ϕₖ = ϕₖ - dz*(∂ϕ/∂z) + dz * (ϵ(ϕ₀ - ϕ) + S(ϕ)/wₖ)
+        # @. q_tot_up +=
+        #     - dz * ∇c(wvec(LBF(w_up_c * ρ_c * a_up * q_tot_up)))/(ρ_c * a_up * w_up_c) + dz * (entr_turb_dyn * q_tot_en - detr_turb_dyn * q_tot_up + qt_tendency_precip_formation / w_up_c)
+
+        @. aux_up[i].q_tot +=
+            - dz * ∇c(wvec(LBF(q_tot_up))) + dz * (entr_turb_dyn * (q_tot_en - q_tot_up) + qt_tendency_precip_formation / w_up_c)
 
         if edmf.moisture_model isa NonEquilibriumMoisture
 
@@ -587,16 +608,46 @@ function update_diagnostic_updrafts!(edmf::EDMFModel, grid::Grid, state::State, 
                 + dz * (entr_turb_dyn * q_ice_en - detr_turb_dyn * q_ice + (qi_tendency_precip_formation + qi_tendency_noneq) / w_up_c)
         end
 
-        # wₖ := √(abs[wₖ² - (dz/ρaₖ)*∂(ρaw²)/∂z + dz*(w(ϵw - δw₀) + [b + P])])
-        @. w_up = sqrt(abs(w_up - dz * (∇f(wvec(LBC(ρ_f * Iaf(a_up) * w_up^2)))) / (ρ_f * Iaf(a_up))
-        + dz * (w_up * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + I0f(buoy) + nh_pressure / (ρ_f * Iaf(a_up))))
+        # wₖ² += - (dz/ρaₖ)*∂(ρaw²)/∂z + dz*(wₖ(ϵw - δw₀) + b + P/ρaₖ)
+        # @. w_up2 =
+        #     w_up - dz * (∇f(wvec(LBC(ρ_f * Iaf(a_up) * w_up^2)))) / (ρ_f * Iaf(a_up)) + dz * (w_up * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + dz *I0f(buoy) + dz * nh_pressure / (ρ_f * Iaf(a_up))
+        # wₖ += - dz*(∂w/∂z) + dz*((ϵw - δw₀) + b/wₖ + P/ρaₖwₖ)
+        @. aux_up_f[i].w +=
+            - dz * (∇f(wvec(LBC(w_up)))) + dz * I0f(entr_w) * (w_en - w_up) + dz * I0f(buoy) / w_up + dz * nh_pressure / (ρ_f * Iaf(a_up) * w_up)
 
 
-        # aₖ := aₖ - (dz/ρwₖ)*∂(ρaw)/∂z + dz*a(ϵ - δ)
-        @. a_up = a_up
-            - dz * ∇c(wvec(LBF(w_up_c * ρ_c * a_up)))/(ρ_c * w_up_c) + dz * a_up * (entr_turb_dyn - detr_turb_dyn)
+        # aₖ += - (dz/ρwₖ)*∂(ρaw)/∂z + dz*a(ϵ - δ)
+        @. aux_up[i].area +=
+            # - dz * ∇c(wvec(LBF(w_up_c * ρ_c * a_up)))/(ρ_c * (w_up_c + FT(0.001)))
+             + dz * a_up * (entr_turb_dyn - detr_turb_dyn)
 
+        @show(aux_up[i].area)
+        @inbounds for k in real_center_indices(grid)
+            if aux_up[i].area[k] < FT(0.0001)
+                aux_up[i].area[k] = FT(0.0001)
+                aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
+                aux_up[i].q_tot[k] = aux_gm.q_tot[k]
+            end
+            # if w_up_c[k] < FT(0.0001)
+            #     w_up_c[k] = FT(0.0001)
+            #     θ_liq_ice_up[k] = aux_gm.θ_liq_ice[k]
+            #     q_tot_up[k] = aux_gm.q_tot[k]
+            # end
+        end
+        @inbounds for k in real_face_indices(grid)
+            if w_up[k] < FT(0.0001)
+                aux_up_f[i].w[k] = FT(0.0001)
+            end
+        end
 
+        aux_up[i].area[kc_surf] = area_surface_bc(surf, edmf, i)
+        aux_up[i].θ_liq_ice[kc_surf] = θ_surface_bc(surf, grid, state, edmf, i, param_set)
+        aux_up[i].q_tot[kc_surf] = q_surface_bc(surf, grid, state, edmf, i)
+        aux_up_f[i].w[kf_surf] = FT(0)
+        # @show(aux_up[i].area)
+        # @show(aux_up[i].θ_liq_ice)
+        # @show(aux_up[i].q_tot)
+        # @show(aux_up_f[i].w)
     end
 
 end
@@ -606,13 +657,13 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     kf_surf = kf_surface(grid)
     FT = float_type(state)
 
-    println("compute_up_tendencies")
     aux_up = center_aux_updrafts(state)
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_up_f = face_aux_updrafts(state)
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    aux_tc = center_aux_turbconv(state)
     tendencies_up = center_tendencies_updrafts(state)
     tendencies_up_f = face_tendencies_updrafts(state)
     prog_gm = center_prog_grid_mean(state)
@@ -636,6 +687,8 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     LBF = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
 
     # Solve for updraft area fraction
+    dz = FT(50)
+    w_up_c = aux_tc.w_up_c
     @inbounds for i in 1:N_up
         aux_up_i = aux_up[i]
         w_up = aux_up_f[i].w
@@ -648,6 +701,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         detr_turb_dyn = aux_up_i.detr_turb_dyn
         θ_liq_ice_tendency_precip_formation = aux_up_i.θ_liq_ice_tendency_precip_formation
         qt_tendency_precip_formation = aux_up_i.qt_tendency_precip_formation
+        @. w_up_c = Ic(w_up)
 
         ρarea = prog_up[i].ρarea
         ρaθ_liq_ice = prog_up[i].ρaθ_liq_ice
@@ -656,6 +710,11 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         tends_ρarea = tendencies_up[i].ρarea
         tends_ρaθ_liq_ice = tendencies_up[i].ρaθ_liq_ice
         tends_ρaq_tot = tendencies_up[i].ρaq_tot
+
+        # @show(dz * ∇c(wvec(LBF(w_up_c * ρaθ_liq_ice)))/(ρ_c * a_up * w_up_c))
+        @. θ_liq_ice_up = -dz * ∇c(wvec(LBF(w_up_c * ρ_c * a_up * θ_liq_ice_up)))/(ρ_c * a_up * w_up_c)
+        @show(tends_ρarea)
+        @show(-dz * ∇c(wvec(LBF(w_up_c * ρaθ_liq_ice)))/(ρ_c * a_up * w_up_c))
 
         @. tends_ρarea =
             -∇c(wvec(LBF(Ic(w_up) * ρarea))) + (ρarea * Ic(w_up) * entr_turb_dyn) - (ρarea * Ic(w_up) * detr_turb_dyn)
