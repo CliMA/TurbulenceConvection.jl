@@ -552,7 +552,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
             -∇c(wvec(LBF(Ic(w_up) * ρarea))) + (ρarea * Ic(w_up) * entr_turb_dyn) - (ρarea * Ic(w_up) * detr_turb_dyn)
 
         @. tends_ρae_tot =
-            -∇c(wvec(LBF(Ic(w_up) * ρarea * h_tot_up))) + (ρarea * Ic(w_up) * entr_turb_dyn * h_tot_en) -
+            -∇c(wvec(LBF(Ic(w_up) * ρarea * h_tot_up))) +  ρarea * Ic(w_up) * (entr_turb_dyn * h_tot_en - detr_turb_dyn * h_tot_up)
             (ρarea * h_tot_up * Ic(w_up) * detr_turb_dyn) + (ρ_c * e_tot_tendency_precip_formation)
 
         @. tends_ρaq_tot =
