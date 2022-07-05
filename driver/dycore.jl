@@ -188,6 +188,7 @@ function assign_thermo_aux!(state, grid, moisture_model, param_set)
     @inbounds for k in TC.real_center_indices(grid)
         ts = ts_gm[k]
         aux_gm.q_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k]
+        aux_gm.e_tot[k] = prog_gm.ρe_tot[k] / ρ_c[k]
         aux_gm.q_liq[k] = TD.liquid_specific_humidity(thermo_params, ts)
         aux_gm.q_ice[k] = TD.ice_specific_humidity(thermo_params, ts)
         aux_gm.T[k] = TD.air_temperature(thermo_params, ts)

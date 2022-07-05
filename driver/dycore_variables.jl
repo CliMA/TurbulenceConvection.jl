@@ -65,6 +65,7 @@ cent_aux_vars_gm(FT, local_geometry, edmf) = (;
     p = FT(0),
     e_kin = FT(0),
     h_tot = FT(0),
+    e_tot = FT(0),
 )
 cent_aux_vars(FT, local_geometry, edmf) =
     (; cent_aux_vars_gm(FT, local_geometry, edmf)..., TC.cent_aux_vars_edmf(FT, local_geometry, edmf)...)
