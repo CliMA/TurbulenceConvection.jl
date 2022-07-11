@@ -86,14 +86,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         else
             thermo_args = ()
             @inbounds for i in 1:N_up
-                if aux_up[i].area[k] >= edmf.minimum_area
-                    update_diagnostic_updraft_scalars!(edmf, grid, state, param_set, surf)
-                else
-                    aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
-                    aux_up[i].q_tot[k] = aux_gm.q_tot[k]
-                    aux_up[i].area[k] = 0
-                    aux_up[i].e_kin[k] = aux_gm.e_kin[k]
-                end
+                update_diagnostic_updraft_scalars!(edmf, grid, state, param_set, surf)
                 ts_up_i = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k], thermo_args...)
                 aux_up[i].e_tot[k] = TD.total_energy(thermo_params, ts_up_i, aux_up[i].e_kin[k], e_pot)
                 aux_up[i].h_tot[k] = total_enthalpy(param_set, aux_up[i].e_tot[k], ts_up_i)

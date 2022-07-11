@@ -593,11 +593,17 @@ function update_diagnostic_updraft_mass_velocity!(edmf::EDMFModel, grid::Grid, s
             qi_tendency_precip_formation = aux_up_i.qi_tendency_precip_formation
         end
         # solve w:
-        # wₖ² = √( |(wₖ₋₁)² + dz*( wₖϵ(wₖ₀ - wₖ) + b + P/ρaₖ)| )
+        # wₖ = √( max( (wₖ₋₁)² + dz*( wₖϵ(wₖ₀ - wₖ) + b + P/ρaₖ),0) )
+        # wₖ² = (wₖ₋₁)² + dz*( wₖϵ(wₖ₀ - wₖ) + b + P/ρaₖ)
         @inbounds for k in real_face_indices(grid)
             if a_up_f[k] >= edmf.minimum_area
                 aux_up_f[i].w[k] =
-                    sqrt(max( w_up_m[k]^2 + dz * aux_up_f[i].w[k] * entr_turb_dyn_f[k] * aux_en_f.w[k] + dz * buoy_f[k] + dz * nh_pressure[k] / (ρ_f[k] * a_up_f[k]), FT(0) ) / (FT(1) + entr_turb_dyn_f[k] * dz))
+                    sqrt(max(
+                        w_up_m[k]^2 + FT(2) * dz * aux_up_f[i].w[k] * entr_turb_dyn_f[k] * (aux_en_f.w[k] - aux_up_f[i].w[k])
+                         + FT(2) * dz * buoy_f[k] + FT(2) * dz * nh_pressure[k] / (ρ_f[k] * a_up_f[k]),
+                        FT(0) ) /
+                        (FT(1) + entr_turb_dyn_f[k] * dz))
+                @show(k, buoy_f[k])
             else
                 aux_up_f[i].w[k] = FT(0)
             end
@@ -625,10 +631,6 @@ function update_diagnostic_updraft_mass_velocity!(edmf::EDMFModel, grid::Grid, s
         aux_up[i].q_tot[kc_surf] = q_surface_bc(surf, grid, state, edmf, i)
         aux_up[i].θ_liq_ice[kc_surf] = θ_surface_bc(surf, grid, state, edmf, i, param_set)
         aux_up_f[i].w[kf_surf] = FT(0)
-        @show(aux_up[i].area)
-        @show(aux_up[i].θ_liq_ice)
-        @show(aux_up[i].q_tot)
-        @show(aux_up_f[i].w)
     end
 
 end
