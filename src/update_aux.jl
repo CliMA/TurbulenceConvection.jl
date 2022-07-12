@@ -44,12 +44,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     #####
     ##### center variables
     #####
-    C123 = CCG.Covariant123Vector
-    @. aux_en.e_kin = LA.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(wvec(aux_en_f.w)))) / 2
-
-    @inbounds for i in 1:N_up
-        @. aux_up[i].e_kin = LA.norm_sqr(C123(prog_gm_uₕ) + C123(Ic(wvec(aux_up_f[i].w)))) / 2
-    end
 
     @inbounds for k in real_center_indices(grid)
         #####
@@ -65,7 +59,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
                 aux_up[i].q_tot[k] = aux_gm.q_tot[k]
                 aux_up[i].area[k] = 0
-                aux_up[i].e_kin[k] = aux_gm.e_kin[k]
             end
             thermo_args = ()
             if edmf.moisture_model isa NonEquilibriumMoisture
@@ -79,15 +72,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 thermo_args = (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
             end
             ts_up_i = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k], thermo_args...)
-            aux_up[i].e_tot[k] = TD.total_energy(thermo_params, ts_up_i, aux_up[i].e_kin[k], e_pot)
-            aux_up[i].h_tot[k] = total_enthalpy(param_set, aux_up[i].e_tot[k], ts_up_i)
         end
 
         #####
         ##### compute bulk
         #####
         aux_bulk.q_tot[k] = 0
-        aux_bulk.h_tot[k] = 0
         aux_bulk.θ_liq_ice[k] = 0
         aux_bulk.area[k] = sum(i -> aux_up[i].area[k], 1:N_up)
         if aux_bulk.area[k] > 0
@@ -96,12 +86,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 a_bulk_k = aux_bulk.area[k]
                 aux_bulk.q_tot[k] += a_k * aux_up[i].q_tot[k] / a_bulk_k
                 aux_bulk.θ_liq_ice[k] += a_k * aux_up[i].θ_liq_ice[k] / a_bulk_k
-                aux_bulk.h_tot[k] += a_k * aux_up[i].h_tot[k] / a_bulk_k
             end
         else
             aux_bulk.q_tot[k] = aux_gm.q_tot[k]
             aux_bulk.θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
-            aux_bulk.h_tot[k] = aux_gm.h_tot[k]
         end
         if edmf.moisture_model isa NonEquilibriumMoisture
             aux_bulk.q_liq[k] = 0
@@ -133,7 +121,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         val1 = 1 / (1 - a_bulk_c)
         val2 = a_bulk_c * val1
         aux_en.q_tot[k] = max(val1 * aux_gm.q_tot[k] - val2 * aux_bulk.q_tot[k], 0) #Yair - this is here to prevent negative QT
-        aux_en.h_tot[k] = val1 * aux_gm.h_tot[k] - val2 * aux_bulk.h_tot[k]
+        aux_en.θ_liq_ice[k] = val1 * aux_gm.θ_liq_ice[k] - val2 * aux_bulk.θ_liq_ice[k]
         if edmf.moisture_model isa NonEquilibriumMoisture
             aux_en.q_liq[k] = max(val1 * prog_gm.q_liq[k] - val2 * aux_bulk.q_liq[k], 0)
             aux_en.q_ice[k] = max(val1 * prog_gm.q_ice[k] - val2 * aux_bulk.q_ice[k], 0)
@@ -150,11 +138,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
 
-        h_en = enthalpy(aux_en.h_tot[k], e_pot, aux_en.e_kin[k])
-        ts_env[k] = thermo_state_phq(param_set, p_c[k], h_en, aux_en.q_tot[k], thermo_args...)
+        ts_env[k] = thermo_state_pθq(param_set, p_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], thermo_args...)
         ts_en = ts_env[k]
-        aux_en.θ_liq_ice[k] = TD.liquid_ice_pottemp(thermo_params, ts_en)
-        aux_en.e_tot[k] = TD.total_energy(thermo_params, ts_en, aux_en.e_kin[k], e_pot)
         aux_en.T[k] = TD.air_temperature(thermo_params, ts_en)
         aux_en.θ_virt[k] = TD.virtual_pottemp(thermo_params, ts_en)
         aux_en.θ_dry[k] = TD.dry_pottemp(thermo_params, ts_en)
@@ -328,6 +313,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
     ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
     If0 = CCO.InterpolateC2F(; ∇0_bcs...)
+    C123 = CCG.Covariant123Vector
 
     uₕ_gm = grid_mean_uₕ(state)
     w_en = aux_en_f.w

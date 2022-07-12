@@ -139,6 +139,8 @@ function compute_diagnostics!(
     surf = get_surface(surf_params, grid, state, t, param_set)
 
     @. aux_gm.s = TD.specific_entropy(thermo_params, ts_gm)
+    @. aux_gm.θ_liq_ice = prog_gm.ρθ_liq_ice / ρ_c
+    @. aux_gm.q_tot = prog_gm.ρq_tot / ρ_c
     @. aux_en.s = TD.specific_entropy(thermo_params, ts_en)
 
     @inbounds for k in TC.real_center_indices(grid)

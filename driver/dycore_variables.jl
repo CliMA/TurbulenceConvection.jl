@@ -48,14 +48,14 @@ cent_aux_vars_gm(FT, local_geometry, edmf) = (;
     subsidence = FT(0), #Large-scale subsidence
     dTdt_hadv = FT(0), #Horizontal advection of temperature
     dqtdt_hadv = FT(0), #Horizontal advection of moisture
-    T_nudge = FT(0), #Reference T profile for relaxation tendency
+    H_nudge = FT(0), #Reference thetali profile for relaxation tendency
     qt_nudge = FT(0), #Reference qt profile for relaxation tendency
     dTdt_fluc = FT(0), #Vertical turbulent advection of temperature
     dqtdt_fluc = FT(0), #Vertical turbulent advection of moisture
     u_nudge = FT(0), #Reference u profile for relaxation tendency
     v_nudge = FT(0), #Reference v profile for relaxation tendency
     uₕ_g = CCG.Covariant12Vector(CCG.UVVector(FT(0), FT(0)), local_geometry), #Geostrophic u velocity
-    ∇MSE_gm = FT(0),
+    ∇θ_liq_ice_gm = FT(0),
     ∇q_tot_gm = FT(0),
     cent_aux_vars_gm_moisture(FT, edmf.moisture_model)...,
     θ_virt = FT(0),
@@ -63,8 +63,6 @@ cent_aux_vars_gm(FT, local_geometry, edmf) = (;
     θ_liq_ice = FT(0),
     q_tot = FT(0),
     p = FT(0),
-    e_kin = FT(0),
-    h_tot = FT(0),
 )
 cent_aux_vars(FT, local_geometry, edmf) =
     (; cent_aux_vars_gm(FT, local_geometry, edmf)..., TC.cent_aux_vars_edmf(FT, local_geometry, edmf)...)
@@ -77,7 +75,7 @@ face_aux_vars_gm(FT, local_geometry, edmf) = (;
     diffusive_flux_s = FT(0),
     total_flux_s = FT(0),
     f_rad = FT(0),
-    sgs_flux_h_tot = FT(0),
+    sgs_flux_θ_liq_ice = FT(0),
     sgs_flux_q_tot = FT(0),
     face_aux_vars_gm_moisture(FT, edmf.moisture_model)...,
     sgs_flux_uₕ = CCG.Covariant3Vector(FT(0)) ⊗ CCG.Covariant12Vector(FT(0), FT(0)),
@@ -128,7 +126,7 @@ cent_prognostic_vars_gm_moisture(::Type{FT}, ::TC.EquilibriumMoisture) where {FT
 cent_prognostic_vars_gm(::Type{FT}, local_geometry, edmf) where {FT} = (;
     ρ = FT(0),
     uₕ = CCG.Covariant12Vector(CCG.UVVector(FT(0), FT(0)), local_geometry),
-    ρe_tot = FT(0),
+    ρθ_liq_ice = FT(0),
     ρq_tot = FT(0),
     cent_prognostic_vars_gm_moisture(FT, edmf.moisture_model)...,
 )

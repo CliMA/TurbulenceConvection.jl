@@ -266,7 +266,7 @@ function initialize(sim::Simulation1d)
             end
         end
         Cases.initialize_profiles(case, grid, param_set, state; les_data_kwarg...)
-        set_thermo_state_pθq!(state, grid, edmf.moisture_model, param_set)
+        set_thermo_state_from_aux!(state, grid, edmf.moisture_model, param_set)
         set_grid_mean_from_thermo_state!(param_set, state, grid)
         assign_thermo_aux!(state, grid, edmf.moisture_model, param_set)
         Cases.initialize_forcing(case, forcing, grid, state, param_set; les_data_kwarg...)
