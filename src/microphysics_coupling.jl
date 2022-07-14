@@ -100,7 +100,6 @@ function precipitation_formation(
 
             # Autoconversion rate variable
             α_autocon = ECP.α_autocon(param_set)
-            print(α_autocon)
 
             # Autoconversion of cloud ice to snow is done with a simplified rate.
             # The saturation adjustment scheme prevents using the
@@ -117,7 +116,6 @@ function precipitation_formation(
 
             # accretion rate variable
             α_accretion = ECP.α_accretion(param_set)
-            print(α_accretion)
 
             # accretion cloud water + rain
             S_qr = min(q.liq / Δt, α_accretion * CM1.accretion(param_set, liq_type, rain_type, q.liq, qr, ρ)) * precip_fraction

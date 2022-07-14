@@ -44,7 +44,7 @@ overwrite_namelist_map = Dict(
 "precip_fraction_limiter" => (nl, pa, key) -> (nl["microphysics"]["precip_fraction_limiter"] = pa[key]),
 "thermo_covariance_model" => (nl, pa, key) -> (nl["thermodynamics"]["thermo_covariance_model"] = pa[key]),
 "energy_var"              => (nl, pa, key) -> (nl["energy_var"] = pa[key]),
-"autocon_rate"            => (nl, pa, key) -> (nl["microphysics"]["α_autcon"] = pa[key]),
+"autocon_rate"            => (nl, pa, key) -> (nl["microphysics"]["α_autocon"] = pa[key]),
 "accretion_rate"          => (nl, pa, key) -> (nl["microphysics"]["α_accretion"] = pa[key]),
 "evap_rate"               => (nl, pa, key) -> (nl["microphysics"]["microph_scaling"] = pa[key]),
 "depsub_rate"             => (nl, pa, key) -> (nl["microphysics"]["microph_scaling_dep_sub"] = pa[key]),
