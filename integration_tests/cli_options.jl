@@ -53,23 +53,35 @@ function parse_commandline()
         default = ""
         "--n_up"           # Number of updrafts
         arg_type = Int
-        "--moisture_model" # Moisture model (equilibrium or nonequilibrium)
+        "--moisture_model"
+        help = "Cloud condensate formation model [`equilibrium` (default), `nonequilibrium`]"
         arg_type = String
-        "--precipitation_model" # Precipitation model (None, cutoff or clima_1m)
+        "--precipitation_model"
+        help = "Precipitation model [`None` (default), `cutoff` or `clima_1m`]"
         arg_type = String
-        "--precip_fraction_model" # Precipitation model (prescribed or cloud_cover)
+        "--rain_formation_scheme"
+        help = "Rain autoconversion and accretion scheme [`clima_1m_default` (default) , `KK2000`, `B1994`, `TC1980`, `LD2004`]"
         arg_type = String
-        "--prescribed_precip_frac_value" # Value of the precipitation fraction, if prescribed
+        "--prescribed_Nd"
+        help = "Prescribed cloud droplet number concentration. Valid when rain_formation_scheme is `KK2000`, `B1994`, `TC1980` or `LD2004`]"
         arg_type = Float64
-        "--precip_fraction_limiter" # Minimum precipitation fraction, if diagnostic
+        "--precip_fraction_model"
+        help = "Assumed (constant with height) precipitation fraction [`prescribed` (default), `cloud_cover`]"
+        arg_type = String
+        "--prescribed_precip_frac_value"
+        help = "Value of the precipitation fraction, if prescribed."
         arg_type = Float64
-        "--thermo_covariance_model" # covariance model (prognostic or diagnostic)
+        "--precip_fraction_limiter"
+        help = "Minimum precipitation fraction, if diagnostic."
+        arg_type = Float64
+        "--thermo_covariance_model"
+        help = "The type of equation for the sgs covariance [`prognostic`, `diagnostic` (default)]"
         arg_type = String
         "--float_type"
         arg_type = String
         default = "Float64"
         "--config"
-        help = "Spatial configuration [`sphere` (default), `column`]"
+        help = "Spatial configuration [`sphere`, `column` (default)]"
         arg_type = String
         default = "column"
         "--set_src_seed"

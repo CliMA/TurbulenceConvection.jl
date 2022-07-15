@@ -47,6 +47,7 @@ Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 function precipitation_formation(
     param_set::APS,
     precip_model::AbstractPrecipitationModel,
+    rain_formation_model::AbstractRainFormationModel,
     qr::FT,
     qs::FT,
     area::FT,
@@ -111,19 +112,82 @@ function precipitation_formation(
             # The saturation adjustment scheme prevents using the
             # 1-moment snow autoconversion rate that assumes
             # that the supersaturation is present in the domain.
-            S_qt_rain = -min(q.liq / Δt, α_acnv * CM1.conv_q_liq_to_q_rai(microphys_params, q.liq))
+            if rain_formation_model isa Clima1M_default
+                S_qt_rain = -min(q.liq / Δt, α_acnv * CM1.conv_q_liq_to_q_rai(microphys_params, q.liq))
+            elseif rain_formation_model isa KK2000
+                S_qt_rain =
+                    -min(
+                        q.liq / Δt,
+                        α_acnv * CM2.conv_q_liq_to_q_rai_KK2000(
+                            microphys_params,
+                            q.liq,
+                            ρ,
+                            N_d = rain_formation_model.prescribed_Nd,
+                        ),
+                    )
+            elseif rain_formation_model isa B1994
+                S_qt_rain =
+                    -min(
+                        q.liq / Δt,
+                        α_acnv * CM2.conv_q_liq_to_q_rai_B1994(
+                            microphys_params,
+                            q.liq,
+                            ρ,
+                            N_d = rain_formation_model.prescribed_Nd,
+                        ),
+                    )
+            elseif rain_formation_model isa TC1980
+                S_qt_rain =
+                    -min(
+                        q.liq / Δt,
+                        α_acnv * CM2.conv_q_liq_to_q_rai_TC1980(
+                            microphys_params,
+                            q.liq,
+                            ρ,
+                            N_d = rain_formation_model.prescribed_Nd,
+                        ),
+                    )
+            elseif rain_formation_model isa LD2004
+                S_qt_rain =
+                    -min(
+                        q.liq / Δt,
+                        α_acnv * CM2.conv_q_liq_to_q_rai_LD2004(
+                            microphys_params,
+                            q.liq,
+                            ρ,
+                            N_d = rain_formation_model.prescribed_Nd,
+                        ),
+                    )
+            else
+                error("Unrecognized rain formation model")
+            end
             S_qt_snow = -min(q.ice / Δt, α_acnv * CM1.conv_q_ice_to_q_sno_no_supersat(microphys_params, q.ice))
             qr_tendency -= S_qt_rain
             qs_tendency -= S_qt_snow
             qt_tendency += S_qt_rain + S_qt_snow
             ql_tendency += S_qt_rain
             qi_tendency += S_qt_snow
+
             θ_liq_ice_tendency -= 1 / Π_m / c_pm * (L_v0 * S_qt_rain + L_s0 * S_qt_snow)
 
             # accretion cloud water + rain
-            S_qr =
-                min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ)) *
-                precip_fraction
+            if rain_formation_model isa Clima1M_default
+                S_qr =
+                    min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ)) *
+                    precip_fraction
+            elseif rain_formation_model isa KK2000
+                S_qr = min(q.liq / Δt, α_accr * CM2.accretion_KK2000(microphys_params, q.liq, qr, ρ)) * precip_fraction
+            elseif rain_formation_model isa B1994
+                S_qr = min(q.liq / Δt, α_accr * CM2.accretion_B1994(microphys_params, q.liq, qr, ρ)) * precip_fraction
+            elseif rain_formation_model isa TC1980
+                S_qr = min(q.liq / Δt, α_accr * CM2.accretion_TC1980(microphys_params, q.liq, qr)) * precip_fraction
+            elseif rain_formation_model isa LD2004
+                S_qr =
+                    min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ)) *
+                    precip_fraction
+            else
+                error("Unrecognized rain formation model")
+            end
             qr_tendency += S_qr
             qt_tendency -= S_qr
             ql_tendency -= S_qr

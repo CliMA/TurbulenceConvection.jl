@@ -12,6 +12,7 @@ import CloudMicrophysics as CM
 import CloudMicrophysics.MicrophysicsNonEq as CMNe
 import CloudMicrophysics.Microphysics0M as CM0
 import CloudMicrophysics.Microphysics1M as CM1
+import CloudMicrophysics.Microphysics2M as CM2
 
 import ClimaCore as CC
 import SciMLBase
@@ -41,7 +42,7 @@ function DiffEqNoiseProcess.wiener_randn!(rng::Random.AbstractRNG, rand_vec::CC.
     parent(rand_vec.face) .= Random.randn.()
 end
 
-struct Simulation1d{IONT, P, A, C, F, R, SM, EDMF, PM, D, TIMESTEPPING, STATS, PS, SRS, LESDK}
+struct Simulation1d{IONT, P, A, C, F, R, SM, EDMF, PM, RFM, D, TIMESTEPPING, STATS, PS, SRS, LESDK}
     io_nt::IONT
     prog::P
     aux::A
@@ -51,6 +52,7 @@ struct Simulation1d{IONT, P, A, C, F, R, SM, EDMF, PM, D, TIMESTEPPING, STATS, P
     surf_params::SM
     edmf::EDMF
     precip_model::PM
+    rain_formation_model::RFM
     diagnostics::D
     TS::TIMESTEPPING
     Stats::STATS
@@ -120,7 +122,29 @@ function Simulation1d(namelist)
         error("Invalid precip_name $(precip_name)")
     end
 
-    edmf = TC.EDMFModel(FTD, namelist, precip_model)
+    if precip_name == "clima_1m"
+        rain_formation_name =
+            TC.parse_namelist(namelist, "microphysics", "rain_formation_scheme"; default = "clima_1m_default")
+        prescribed_Nd = TC.parse_namelist(namelist, "microphysics", "prescribed_Nd"; default = 1e8)
+
+        rain_formation_model = if rain_formation_name == "clima_1m_default"
+            TC.Clima1M_default()
+        elseif rain_formation_name == "KK2000"
+            TC.KK2000(prescribed_Nd)
+        elseif rain_formation_name == "B1994"
+            TC.B1994(prescribed_Nd)
+        elseif rain_formation_name == "TC1980"
+            TC.TC1980(prescribed_Nd)
+        elseif rain_formation_name == "LD2004"
+            TC.LD2004(prescribed_Nd)
+        else
+            error("Invalid rain_formation_name $(rain_formation_name)")
+        end
+    else
+        rain_formation_model = TC.NoRainFormation()
+    end
+
+    edmf = TC.EDMFModel(FTD, namelist, precip_model, rain_formation_model)
     if isbits(edmf)
         @info "edmf = \n$(summary(edmf))"
     else
@@ -204,6 +228,7 @@ function Simulation1d(namelist)
         surf_params,
         edmf,
         precip_model,
+        rain_formation_model,
         diagnostics,
         TS,
         Stats,
@@ -317,6 +342,7 @@ function solve_args(sim::Simulation1d)
         calibrate_io,
         edmf = sim.edmf,
         precip_model = sim.precip_model,
+        rain_formation_model = sim.rain_formation_model,
         param_set = sim.param_set,
         aux = aux,
         io_nt = sim.io_nt,

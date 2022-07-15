@@ -257,6 +257,29 @@ struct NoPrecipitation <: AbstractPrecipitationModel end
 struct Clima0M <: AbstractPrecipitationModel end
 struct Clima1M <: AbstractPrecipitationModel end
 
+"""
+   AbstractRainFormationModel
+
+A type to switch between different autoconversion and accretion options.
+See the CloudMicrophysics.jl documentation for the Clima1M_default version
+and the additional options with prescribed cloud droplet number concentration.
+"""
+abstract type AbstractRainFormationModel end
+struct NoRainFormation <: AbstractRainFormationModel end
+struct Clima1M_default <: AbstractRainFormationModel end
+struct KK2000{FT} <: AbstractRainFormationModel
+    prescribed_Nd::FT
+end
+struct B1994{FT} <: AbstractRainFormationModel
+    prescribed_Nd::FT
+end
+struct TC1980{FT} <: AbstractRainFormationModel
+    prescribed_Nd::FT
+end
+struct LD2004{FT} <: AbstractRainFormationModel
+    prescribed_Nd::FT
+end
+
 abstract type AbstractPrecipFractionModel end
 struct PrescribedPrecipFraction{FT} <: AbstractPrecipFractionModel
     prescribed_precip_frac_value::FT
@@ -403,13 +426,14 @@ Base.@kwdef struct SurfaceBase{FT}
     wstar::FT = 0
 end
 
-struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}
+struct EDMFModel{N_up, FT, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}
     surface_area::FT
     max_area::FT
     minimum_area::FT
     moisture_model::MM
     thermo_covariance_model::TCM
     precip_model::PM
+    rain_formation_model::RFM
     precip_fraction_model::PFM
     en_thermo::ENT
     bg_closure::EBGC
@@ -422,7 +446,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, 
     set_src_seed::Bool
     H_up_min::FT # minimum updraft top to avoid zero division in pressure drag and turb-entr
 end
-function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
+function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) where {FT}
 
     # Set the number of updrafts (1)
     n_updrafts = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "updraft_number"; default = 1)
@@ -659,19 +683,21 @@ function EDMFModel(::Type{FT}, namelist, precip_model) where {FT}
     MM = typeof(moisture_model)
     TCM = typeof(thermo_covariance_model)
     PM = typeof(precip_model)
+    RFM = typeof(rain_formation_model)
     PFM = typeof(precip_fraction_model)
     EBGC = typeof(bg_closure)
     ENT = typeof(en_thermo)
     EPG = typeof(entr_pi_subset)
     MLP = typeof(mixing_length_params)
     PMP = typeof(pressure_model_params)
-    return EDMFModel{n_updrafts, FT, MM, TCM, PM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}(
+    return EDMFModel{n_updrafts, FT, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}(
         surface_area,
         max_area,
         minimum_area,
         moisture_model,
         thermo_covariance_model,
         precip_model,
+        rain_formation_model,
         precip_fraction_model,
         en_thermo,
         bg_closure,
