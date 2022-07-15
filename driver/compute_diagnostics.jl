@@ -180,6 +180,9 @@ function compute_diagnostics!(
     end
 
     # Mean water paths for calibration
+    # A sum over a ClimaCore Field is defined as the vertical integral,
+    # correctly weighted by the weighted Jacobian of the grid.
+    # See https://github.com/CliMA/ClimaCore.jl/blob/main/src/Fields/mapreduce.jl#L24.
     cent = TC.Cent(1)
     diag_svpc.lwp_mean[cent] = sum(ρ_c .* aux_gm.q_liq)
     diag_svpc.iwp_mean[cent] = sum(ρ_c .* aux_gm.q_ice)
