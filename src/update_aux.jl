@@ -150,7 +150,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.RH[k] = TD.relative_humidity(thermo_params, ts_en)
     end
 
-    microphysics(edmf.en_thermo, grid, state, edmf, edmf.precip_model, Δt, param_set)
+    microphysics(edmf.en_thermo, grid, state, edmf, edmf.precip_model, edmf.rain_formation_model, Δt, param_set)
 
     @inbounds for k in real_center_indices(grid)
         a_bulk_c = aux_bulk.area[k]
@@ -498,6 +498,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.QTvar[kc_surf] = ae_surf * get_surface_variance(flux2 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
         aux_en.HQTcov[kc_surf] = ae_surf * get_surface_variance(flux1 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
     end
-    compute_precipitation_formation_tendencies(grid, state, edmf, edmf.precip_model, Δt, param_set)
+    compute_precipitation_formation_tendencies(grid, state, edmf, edmf.precip_model, edmf.rain_formation_model, Δt, param_set)
     return nothing
 end

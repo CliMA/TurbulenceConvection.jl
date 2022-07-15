@@ -4,6 +4,7 @@ function microphysics(
     state::State,
     edmf::EDMFModel,
     precip_model::AbstractPrecipitationModel,
+    rain_formation_model::AbstractRainFormationModel,
     Δt::Real,
     param_set::APS,
 )
@@ -28,6 +29,7 @@ function microphysics(
         mph = precipitation_formation(
             param_set,
             precip_model,
+            rain_formation_model,
             prog_pr.q_rai[k],
             prog_pr.q_sno[k],
             aux_en.area[k],
@@ -66,7 +68,7 @@ function microphysics(
     return nothing
 end
 
-function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt::Real)
+function quad_loop(en_thermo::SGSQuadrature, precip_model, rain_formation_model, vars, param_set, Δt::Real)
 
     env_len = 8
     src_len = 8
@@ -163,7 +165,7 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, vars, param_set, Δt:
             T = TD.air_temperature(thermo_params, ts)
             # autoconversion and accretion
             mph =
-                precipitation_formation(param_set, precip_model, q_rai, q_sno, subdomain_area, ρ_c, Δt, ts, precip_frac)
+                precipitation_formation(param_set, precip_model, rain_formation_model, q_rai, q_sno, subdomain_area, ρ_c, Δt, ts, precip_frac)
 
             # environmental variables
             inner_env[i_ql] += q_liq_en * weights[m_h] * sqpi_inv
@@ -225,6 +227,7 @@ function microphysics(
     state::State,
     edmf::EDMFModel,
     precip_model,
+    rain_formation_model,
     Δt::Real,
     param_set::APS,
 )
@@ -278,7 +281,7 @@ function microphysics(
                 precip_frac = precip_fraction,
                 zc = FT(grid.zc[k].z),
             )
-            outer_env, outer_src = quad_loop(en_thermo, precip_model, vars, param_set, Δt)
+            outer_env, outer_src = quad_loop(en_thermo, precip_model, rain_formation_model, vars, param_set, Δt)
 
             # update environmental variables
 
@@ -333,6 +336,7 @@ function microphysics(
             mph = precipitation_formation(
                 param_set,
                 precip_model,
+                rain_formation_model,
                 prog_pr.q_rai[k],
                 prog_pr.q_sno[k],
                 aux_en.area[k],

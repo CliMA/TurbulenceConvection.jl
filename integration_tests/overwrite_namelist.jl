@@ -19,6 +19,8 @@ function overwrite_namelist!(namelist, parsed_args)
     "n_up"                         => (nl, pa, key) -> (nl["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = pa[key]),
     "moisture_model"               => (nl, pa, key) -> (nl["thermodynamics"]["moisture_model"] = pa[key]),
     "precipitation_model"          => (nl, pa, key) -> (nl["microphysics"]["precipitation_model"] = pa[key]),
+    "rain_formation_scheme"        => (nl, pa, key) -> (nl["microphysics"]["rain_formation_scheme"] = pa[key]),
+    "prescribed_Nd"                => (nl, pa, key) -> (nl["microphysics"]["prescribed_Nd"] = pa[key]),
     "precip_fraction_model"        => (nl, pa, key) -> (nl["microphysics"]["precip_fraction_model"] = pa[key]),
     "prescribed_precip_frac_value" => (nl, pa, key) -> (nl["microphysics"]["prescribed_precip_frac_value"] = pa[key]),
     "precip_fraction_limiter"      => (nl, pa, key) -> (nl["microphysics"]["precip_fraction_limiter"] = pa[key]),

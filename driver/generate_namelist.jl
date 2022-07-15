@@ -399,6 +399,8 @@ function Rico(namelist_defaults)
     namelist["forcing"]["coriolis"] = 4.5e-5
 
     namelist["microphysics"]["precipitation_model"] = "clima_1m"
+    namelist["microphysics"]["rain_formation_scheme"] = "clima_1m_default"
+    namelist["microphysics"]["prescribed_Nd"] = 1e8
     namelist["microphysics"]["precip_fraction_model"] = "prescribed" # "prescribed" or "cloud_cover"
     namelist["microphysics"]["prescribed_precip_frac_value"] = 1.0
     namelist["microphysics"]["precip_fraction_limiter"] = 0.3
@@ -434,6 +436,8 @@ function TRMM_LBA(namelist_defaults)
     namelist["time_stepping"]["dt_min"] = 1.0
 
     namelist["microphysics"]["precipitation_model"] = "clima_1m" # "cutoff"
+    namelist["microphysics"]["rain_formation_scheme"] = "clima_1m_default"
+    namelist["microphysics"]["prescribed_Nd"] = 1e8
     namelist["microphysics"]["precip_fraction_model"] = "prescribed" # "prescribed" or "cloud_cover"
     namelist["microphysics"]["prescribed_precip_frac_value"] = 1.0
     namelist["microphysics"]["precip_fraction_limiter"] = 0.3
@@ -525,6 +529,8 @@ function DYCOMS_RF02(namelist_defaults)
     namelist["time_stepping"]["dt_min"] = 1.0
 
     namelist["microphysics"]["precipitation_model"] = "clima_1m" #"cutoff"
+    namelist["microphysics"]["rain_formation_scheme"] = "clima_1m_default"
+    namelist["microphysics"]["prescribed_Nd"] = 1e8
     namelist["microphysics"]["precip_fraction_model"] = "prescribed" # "prescribed" or "cloud_cover"
     namelist["microphysics"]["prescribed_precip_frac_value"] = 1.0
     namelist["microphysics"]["precip_fraction_limiter"] = 0.3

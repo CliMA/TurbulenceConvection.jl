@@ -49,6 +49,7 @@ function compute_precipitation_formation_tendencies(
     state::State,
     edmf::EDMFModel,
     precip_model::AbstractPrecipitationModel,
+    rain_formation_model::AbstractRainFormationModel,
     Δt::Real,
     param_set::APS,
 )
@@ -87,6 +88,7 @@ function compute_precipitation_formation_tendencies(
             mph = precipitation_formation(
                 param_set,
                 precip_model,
+                rain_formation_model,
                 prog_pr.q_rai[k],
                 prog_pr.q_sno[k],
                 aux_up[i].area[k],

@@ -56,6 +56,10 @@ function parse_commandline()
         arg_type = String
         "--precipitation_model" # Precipitation model (None, cutoff or clima_1m)
         arg_type = String
+        "--rain_formation_scheme" # Precipitation model (clima_1m_default or KK2000)
+        arg_type = String
+        "--prescribed_Nd"
+        arg_type = Float64
         "--precip_fraction_model" # Precipitation model (prescribed or cloud_cover)
         arg_type = String
         "--prescribed_precip_frac_value" # Value of the precipitation fraction, if prescribed
