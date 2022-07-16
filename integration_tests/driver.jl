@@ -9,7 +9,10 @@ if !@isdefined case_name
     case_name = parsed_args["case"]
 end
 
-parsed_args["trunc_field_type_print"] && include("trunc_field_type_print.jl")
+import ClimaCore
+if parsed_args["trunc_field_type_print"]
+    ClimaCore.Fields.truncate_printing_field_types() = true
+end
 
 @info "Running $case_name..."
 @info "`suffix`: `$(suffix)`"
