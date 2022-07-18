@@ -109,6 +109,30 @@ function compute_ref_state!(
     return nothing
 end
 
+function export_ref_state!(state::TC.State, nc_filename::String)
+    FT = eltype(TC.Grid(state))
+    to_float(f) = f isa ForwardDiff.Dual ? ForwardDiff.value(f) : f
+    NC.Dataset(nc_filename, "a") do ds
+        group = ds.group["reference"]
+
+        NC.defVar(group, "ρ_f", FT, ("zf",))
+        var = get_var(group, "ρ_f")
+        var .= to_float.(vec(TC.face_aux_grid_mean(state).ρ))
+
+        NC.defVar(group, "ρ_c", FT, ("zc",))
+        var = get_var(group, "ρ_c")
+        var .= to_float.(vec(TC.center_prog_grid_mean(state).ρ))
+
+        NC.defVar(group, "p_f", FT, ("zf",))
+        var = get_var(group, "p_f")
+        var .= to_float.(vec(TC.face_aux_grid_mean(state).p))
+
+        NC.defVar(group, "p_c", FT, ("zc",))
+        var = get_var(group, "p_c")
+        var .= to_float.(vec(TC.center_aux_grid_mean(state).p))
+    end
+    return nothing
+end
 
 function set_thermo_state_from_prog!(state, grid, moisture_model, param_set)
     Ic = CCO.InterpolateF2C()

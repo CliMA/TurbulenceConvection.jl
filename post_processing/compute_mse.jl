@@ -5,9 +5,7 @@ using Test
 import Dates
 import JSON
 
-import NCDatasets
-const NC = NCDatasets
-
+import NCDatasets as NC
 import StatsBase
 import Dierckx
 import PrettyTables
