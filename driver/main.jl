@@ -121,9 +121,12 @@ function Simulation1d(namelist)
     end
 
     edmf = TC.EDMFModel(FTD, namelist, precip_model)
-    if isbits(edmf)
-        @info "edmf = \n$(summary(edmf))"
-    else
+    @info "edmf = \n$(summary(edmf))"
+
+    # RF contains a very large number of parameters,
+    # using SVectors / Tuples for this is very expensive
+    # for the compiler, so we'll just accept Arrays for now.
+    if !isbits(edmf) && !(edmf.entr_closure isa TC.RFEntr)
         @show edmf
         error("Something non-isbits was added to edmf and needs to be fixed.")
     end
