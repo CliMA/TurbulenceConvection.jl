@@ -124,6 +124,8 @@ single_value_per_col_diagnostic_vars_gm(FT) = (;
     cloud_base_mean = FT(0),
     cloud_top_mean = FT(0),
     cloud_cover_mean = FT(0),
+    integ_total_flux_qt = FT(0),
+    integ_total_flux_s = FT(0),
 )
 single_value_per_col_diagnostic_vars(FT, edmf) =
     (; single_value_per_col_diagnostic_vars_gm(FT)..., TC.single_value_per_col_diagnostic_vars_edmf(FT, edmf)...)

@@ -53,6 +53,9 @@ function affect_io!(integrator)
         write_ts(Stats, "cloud_cover_mean", diag_svpc.cloud_cover_mean[cent])
         write_ts(Stats, "cloud_base_mean", diag_svpc.cloud_base_mean[cent])
         write_ts(Stats, "cloud_top_mean", diag_svpc.cloud_top_mean[cent])
+
+        write_ts(Stats, "integ_total_flux_qt", diag_svpc.integ_total_flux_qt[cent])
+        write_ts(Stats, "integ_total_flux_s", diag_svpc.integ_total_flux_s[cent])
     end
 
     io(io_nt.aux, Stats, state)
