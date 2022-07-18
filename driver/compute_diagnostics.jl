@@ -189,6 +189,10 @@ function compute_diagnostics!(
     # We only need computations above here for calibration io.
     calibrate_io && return nothing
 
+    # Integrated vertical subgrid-scale fluxes (already multiplied by density)
+    diag_svpc.integ_total_flux_qt[cent] = sum(aux_tc_f.massflux_qt .+ aux_tc_f.diffusive_flux_qt)
+    diag_svpc.integ_total_flux_s[cent] = sum(aux_gm_f.massflux_s .+ aux_gm_f.diffusive_flux_s)
+
     #####
     ##### Cloud base, top and cover
     #####
