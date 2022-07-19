@@ -14,61 +14,73 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
         T = TD.air_temperature(param_set, ts)
         q_vap = TD.vapor_specific_humidity(param_set, ts) 
 
-        # This seems to match the sat adjust one the best
-        ts_eq = TD.PhaseEquil_pTq(param_set, p, T, q.tot) # pressure not density
-        q_eq = TD.PhasePartition(param_set, ts_eq)
-        # # alt
-        # ts_eq_alt = TD.PhaseEquil_ρTq(param_set, ρ, T, q.tot)
-        # q_eq_alt  = TD.PhasePartition(param_set, ts_eq_alt)
+        supersat_formulation = true
+        # supersat_formulation = false
 
-        # calculate the saturation adustment state here... and print both out (and maybe diff?)
-        θ_liq_ice = TD.liquid_ice_pottemp(param_set, ts) 
-        ts_eq_sat_adj = TD.PhaseEquil_pθq(param_set, p, θ_liq_ice, q.tot) # true eq is sat adjustmen phaseequil p theta q (rho, theta_liq_ice, rho q_tot/rho)
-        q_eq_sat_adj  = TD.PhasePartition(param_set, ts_eq_sat_adj)
-        # # alt
-        # ts_eq_sat_adj_alt = TD.PhaseEquil_ρθq(param_set, ρ, θ_liq_ice, q.tot) 
-        # q_eq_sat_adj_alt  = TD.PhasePartition(param_set, ts_eq_sat_adj_alt)
+        if ! supersat_formulation
+            # This seems to match the sat adjust one the best (ρTq not as good)
+            ts_eq = TD.PhaseEquil_pTq(param_set, p, T, q.tot) # pressure not density
+            q_eq  = TD.PhasePartition(param_set, ts_eq)
+
+            # calculate the saturation adustment state here... and print both out (and maybe diff?)
+            # θ_liq_ice = TD.liquid_ice_pottemp(param_set, ts) 
+            # ts_eq_sat_adj = TD.PhaseEquil_pθq(param_set, p, θ_liq_ice, q.tot) # true eq is sat adjustmen phaseequil p theta q (rho, theta_liq_ice, rho q_tot/rho)
+            # q_eq_sat_adj  = TD.PhasePartition(param_set, ts_eq_sat_adj)
+            # ts_eq = ts_eq_sat_adj # test if this is the issue between them... ( matches very well w/ this one from testing so far )
+            # q_eq  = q_eq_sat_adj
+
+            # This is from CloudMicrophysics.jl::MicrophysicsNonEq.jl
+            S_ql = CMNe.conv_q_vap_to_q_liq_ice(param_set, liq_type, q_eq, q)
+            S_qi = CMNe.conv_q_vap_to_q_liq_ice(param_set, ice_type, q_eq, q)
+
+        else #if supersat_formulation:
+            _T_freeze =    ICP.T_freeze(param_set) # this one defined locally, do we need some sort of lower bound different rate once we get down to ice_nuc temperature? Forming a lot of liquid instead of ice up high rn...
+            _T_icenuc = TD.ICP.T_icenuc(param_set) # this one currently only exists in TD, should be 233K
+            # test here a native supersat formulation? then eq would be... somehow need to partition the source additions based on the relative supersats and taus? kind of a roundabout way to do that... but timestepping is elsewhere so..        
+            q_vap_sat_liq = TD.q_vap_saturation_liquid( param_set, ts )
+            q_vap_sat_ice = TD.q_vap_saturation_ice(param_set, ts )
+
+            τ_liq = CMNe.τ_relax(param_set, liq_type) #  τ_cond_evap(params_set)
+            τ_ice = CMNe.τ_relax(param_set, ice_type) #  we also would have our turbulence adjusted tau, q_liq from field, like zhang 2019, but also are there vertical velocity distributions at which sublimation vs evap happens as in Storelvmo 2010, re Korolev 2003?
+            # I think this is susceptible to, because we're not using a state w/ consistent energy/ theta_liq_ice, problems w/ stability...
+            S_ql = (q_vap - q_vap_sat_liq) / τ_liq # should we add the 'psychrometric correction to account for the release of latent heat'?
+            S_qi = (q_vap - q_vap_sat_ice) / τ_ice
+            if (T > _T_freeze) && (S_qi > 0) # not sure if this is necessary but i saw some small amounts of ice above 0 and ion think this function is range limited so i'ma test that jawn out
+                # @info "limiting the ice source: `S\_i: $(S_qi)` | T: `$(T)`"
+                S_qi = 0 # no gaining of ice, allows loss though I feel like there should be melting above freezing not just sub... should the timescale also be T dependent? idk.
+            end
+            if T < _T_icenuc
+                if S_ql > 0 # T < T_icenuc and T > T_freeze should be mutually exclusive but break up if loop just incase rather than use elseif
+                    @info "limiting liquid formation: S\\_l: `$(S_ql)` | T: `$(T)`"
+                    # stop liquid formation
+                    S_qi += S_ql # not sure if just to get rid of it or add it to ice and presumably this shouldn't be an absolute heaviside since it's not a phase transition value? idk... seems to end up in liquid still idk why
+                    S_ql = 0 # do existing liquid drops autoconvert to ice as well? WBF here should sweep them up but idk if they should autoconvert faster if they're mixed/transported above that level....
+                end
+                if q.liq > 0
+                    # do we need homogenous freezing? this works but then the rates look all weird in the cloud w/ jumps in ice...
+                    S_ql = -q.liq/Δt - S_ql # limit it so if we already have some negative liquid they add up 
+                    S_qi =  q.liq/Δt
+                end
+            end
+
+            # liquid being transported by the updraft seems to be the main problem, w/ no freezing mech besides WBF, idk why env liquid has a spike tho...
 
 
+            # proportionally, these can't add up to more than q_vap, we should probably limit one but for now let's just rescale
+            S = S_ql + S_qi
+            S_max = q_vap / Δt 
+            # If S > 0, this will have the effect of limiting vapor depletion
+            # If S < 0, i.e. we are getting vapor from our condensates, the limiters below should still hold fine and this won't get triggered because the ratio will be negative.
+            if S > S_max
+                S_scale = S_max/S # If this works we'll move the scaling below up to here and clean this jawn up, still never gets triggered but at least it's not setting things to 1 that should be neg etc...
+            else
+                S_scale = 1
+            end
+            
+            S_ql = S_ql * S_scale
+            S_qi = S_qi * S_scale
 
-
-
-
-        ts_eq = ts_eq_sat_adj # test if this is the issue between them...
-        q_eq  = q_eq_sat_adj
-
-
-
-
-
-
-        # println("==================================================================")
-        # @info "q_eq noneq `$(q_eq)`"
-        # @info "q_eq sat adjust `$(q_eq_sat_adj)`"
-
-        # # println("-----------------")
-        # # @info "q_eq noneq alt `$(q_eq_alt)`"
-        # # @info "q_eq sat adjust alt`$(q_eq_sat_adj_alt)`"
-
-        # println("-----------------")
-        # @info "q existing `$(q)`"
-
-        # println("-----------------")
-        # @info "T noneq `$(TD.air_temperature(param_set, ts_eq))` | T sat adjust `$(TD.air_temperature(param_set, ts_eq_sat_adj))`"
-        # # @info "T noneq alt `$(TD.air_temperature(param_set, ts_eq_alt))` | T sat adjust alt `$(TD.air_temperature(param_set, ts_eq_sat_adj_alt))`"
-        # @info "T existing `$(T)`"
-
-        # println("-----------------")
-        # @info "θ\\_liq\\_ice noneq `$(TD.liquid_ice_pottemp(param_set, ts_eq))` | θ\\_liq\\_ice sat adjust `$(TD.liquid_ice_pottemp(param_set, ts_eq_sat_adj)) `"
-        # # @info "θ\\_liq\\_ice noneq alt `$(TD.liquid_ice_pottemp(param_set, ts_eq_alt))` | θ\\_liq\\_ice sat adjust alt `$(TD.liquid_ice_pottemp(param_set, ts_eq_sat_adj_alt))`"
-        # @info "θ\\_liq\\_ice existing `$(TD.liquid_ice_pottemp(param_set, ts))`"
-
-        S_ql = CMNe.conv_q_vap_to_q_liq_ice(param_set, liq_type, q_eq, q)
-        S_qi = CMNe.conv_q_vap_to_q_liq_ice(param_set, ice_type, q_eq, q)
-
-        # println("-----------------")
-        # @info "S_ql noneq  `$(S_ql)`"
-        # @info "s_qi noneq  `$(S_qi)`"
+        end
 
         # TODO - handle limiters elswhere
         if S_ql >= FT(0)
@@ -81,11 +93,6 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
         else
             S_qi = -min(-S_qi, q.ice / Δt)
         end
-
-        # println("-----------------")
-        # @info "S_ql noneq limited `$(S_ql)`"
-        # @info "s_qi noneq limited `$(S_qi)`"
-
 
         ql_tendency += S_ql
         qi_tendency += S_qi

@@ -1627,7 +1627,7 @@ version = "1.0.1"
 
 [[deps.Thermodynamics]]
 deps = ["CLIMAParameters", "DocStringExtensions", "KernelAbstractions", "Random", "RootSolvers"]
-git-tree-sha1 = "44f5a700a6b60b97663b2467f0c7b62dfe15e983"
+path = "/home/jbenjami/Research_Schneider/CliMa/Thermodynamics.jl"
 uuid = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 version = "0.7.1"
 
