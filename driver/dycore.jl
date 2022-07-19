@@ -404,6 +404,9 @@ function compute_gm_tendencies!(
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
             tendencies_gm.q_liq[k] += aux_bulk.ql_tendency_precip_formation[k] + aux_en.ql_tendency_precip_formation[k]
             tendencies_gm.q_ice[k] += aux_bulk.qi_tendency_precip_formation[k] + aux_en.qi_tendency_precip_formation[k]
+
+            tendencies_gm.q_liq[k] += aux_bulk.ql_tendency_noneq[k] + aux_en.ql_tendency_noneq[k]
+            tendencies_gm.q_ice[k] += aux_bulk.qi_tendency_noneq[k] + aux_en.qi_tendency_noneq[k]
         end
     end
     TC.compute_sgs_flux!(edmf, grid, state, surf)
