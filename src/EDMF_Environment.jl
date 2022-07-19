@@ -65,7 +65,7 @@ function microphysics(
             q_en = TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k])
             ts_en= TD.PhaseNonEquil_pTq(param_set, p_c[k], T_en, q_en)
             # condensation/evaporation, deposition/sublimation
-            mph_neq = noneq_moisture_sources(param_set, aux_en.area[k], ρ_c[k], Δt, ts_en, p_c[k])
+            mph_neq = noneq_moisture_sources(param_set, aux_en.area[k], ρ_c[k], Δt, ts_en)
             aux_en.ql_tendency_noneq[k] = mph_neq.ql_tendency * aux_en.area[k] 
             aux_en.qi_tendency_noneq[k] = mph_neq.qi_tendency * aux_en.area[k]
         end
