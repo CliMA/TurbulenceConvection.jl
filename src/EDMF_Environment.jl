@@ -21,6 +21,7 @@ function microphysics(
     aux_en_unsat = aux_en.unsat
     precip_fraction = compute_precip_fraction(edmf, state)
 
+
     @inbounds for k in real_center_indices(grid)
         # condensation
         ts = ts_env[k]
@@ -61,10 +62,8 @@ function microphysics(
             aux_en.qi_tendency_precip_formation[k] = mph.qi_tendency * aux_en.area[k]
 
             # keep track of non_eq_microphysics tendency part....
-            ts_env = center_aux_environment(state).ts
-            ts_en = ts_env[k]
             # condensation/evaporation, deposition/sublimation
-            mph_neq = noneq_moisture_sources(param_set, aux_en.area[k], ρ_c[k], Δt, ts_en)
+            mph_neq = noneq_moisture_sources(param_set, aux_en.area[k], ρ_c[k], Δt, ts)
             aux_en.ql_tendency_noneq[k] = mph_neq.ql_tendency * aux_en.area[k] 
             aux_en.qi_tendency_noneq[k] = mph_neq.qi_tendency * aux_en.area[k]
         end
