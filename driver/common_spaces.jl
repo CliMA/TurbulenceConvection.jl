@@ -94,7 +94,7 @@ function construct_mesh(namelist; FT = Float64)
             CCG.ZPoint{FT}(z₁),
             boundary_tags = (:bottom, :top)
         )
-        z_mesh = CC.Meshes.IntervalMesh(z_domain, z_stretch; nelems = z_elem)
+        z_mesh = CC.Meshes.IntervalMesh(z_domain, z_stretch; nelems = nz)
     end
 
     return (; z_mesh = z_mesh, z_max = z₁)
