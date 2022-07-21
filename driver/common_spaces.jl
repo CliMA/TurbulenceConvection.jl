@@ -33,7 +33,7 @@ end
 function make_hybrid_spaces(h_space, z_max, z_mesh)
     FT = eltype(z_max)
 
-    @info "z heights" z_mesh.faces
+    #@info "z heights" z_mesh.faces
     z_topology = CC.Topologies.IntervalTopology(z_mesh)
     z_space = CC.Spaces.CenterFiniteDifferenceSpace(z_topology)
     center_space = CC.Spaces.ExtrudedFiniteDifferenceSpace(h_space, z_space)
@@ -82,8 +82,11 @@ function construct_mesh(namelist; FT = Float64)
         z_stretch = CC.Meshes.GeneralizedExponentialStretching(Δz_s_surf, Δz_s_top)
         z_domain =
             CC.Domains.IntervalDomain(CCG.ZPoint(zero(z_s_toa)), CCG.ZPoint(z_s_toa); boundary_tags = (:bottom, :top))
+
         gcm_mesh = CC.Meshes.IntervalMesh(z_domain, z_stretch; nelems = nz_s)
+        @info "z heights" gcm_mesh.faces
         z_mesh = TC.TCMeshFromGCMMesh(gcm_mesh; z_max = z_max)
+        @info "z heights" z_mesh.faces
     else
         z_stretch = CC.Meshes.Uniform()
         z_domain =
