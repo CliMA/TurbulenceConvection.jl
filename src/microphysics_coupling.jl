@@ -100,8 +100,9 @@ function precipitation_formation(
             Rm = TD.gas_constant_air(thermo_params, ts)
             Lf = TD.latent_heat_fusion(thermo_params, ts)
 
-            qr = qr / precip_fraction
-            qs = qs / precip_fraction
+            # TODO - limiters and positivity checks should be done elsewhere
+            qr = max(qr, FT(0)) / precip_fraction
+            qs = max(qs, FT(0)) / precip_fraction
 
             # Autoconversion of cloud ice to snow is done with a simplified rate.
             # The saturation adjustment scheme prevents using the
