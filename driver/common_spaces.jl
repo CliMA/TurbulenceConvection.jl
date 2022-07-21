@@ -74,26 +74,20 @@ function construct_mesh(namelist; FT = Float64)
     z_max = FT(nz * Δz)
 
     if truncated_gcm_mesh
-        nz_s= namelist["grid"]["stretch"]["nz"]
+        nz_s = namelist["grid"]["stretch"]["nz"]
         Δz_s_surf = FT(namelist["grid"]["stretch"]["dz_surf"])
         Δz_s_top = FT(namelist["grid"]["stretch"]["dz_toa"])
         z_s_toa = FT(namelist["grid"]["stretch"]["z_toa"])
 
         z_stretch = CC.Meshes.GeneralizedExponentialStretching(Δz_s_surf, Δz_s_top)
-        z_domain = CC.Domains.IntervalDomain(
-            CCG.ZPoint(zero(z_s_toa)),
-            CCG.ZPoint(z_s_toa);
-            boundary_tags = (:bottom, :top),
-        )
+        z_domain =
+            CC.Domains.IntervalDomain(CCG.ZPoint(zero(z_s_toa)), CCG.ZPoint(z_s_toa); boundary_tags = (:bottom, :top))
         gcm_mesh = CC.Meshes.IntervalMesh(z_domain, z_stretch; nelems = nz_s)
         z_mesh = TC.TCMeshFromGCMMesh(gcm_mesh; z_max = z_max)
     else
         z_stretch = CC.Meshes.Uniform()
-        z_domain = CC.Domains.IntervalDomain(
-            CCG.ZPoint(zero(z_max)),
-            CCG.ZPoint(z_max);
-            boundary_tags = (:bottom, :top)
-        )
+        z_domain =
+            CC.Domains.IntervalDomain(CCG.ZPoint(zero(z_max)), CCG.ZPoint(z_max); boundary_tags = (:bottom, :top))
         z_mesh = CC.Meshes.IntervalMesh(z_domain, z_stretch; nelems = nz)
     end
 
