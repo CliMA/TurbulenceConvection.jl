@@ -71,39 +71,33 @@ function construct_mesh(namelist; FT = Float64)
         nz = namelist["grid"]["nz"]
     end
 
-    z₀, z₁ = FT(0), FT(nz * Δz)
+    z_max = FT(nz * Δz)
 
-    #if truncated_gcm_mesh
-    #    nzₛ = namelist["grid"]["stretch"]["nz"]
-    #    Δzₛ_surf = FT(namelist["grid"]["stretch"]["dz_surf"])
-    #    Δzₛ_top = FT(namelist["grid"]["stretch"]["dz_toa"])
-    #    zₛ_toa = FT(namelist["grid"]["stretch"]["z_toa"])
+    if truncated_gcm_mesh
+        nz_s= namelist["grid"]["stretch"]["nz"]
+        Δz_s_surf = FT(namelist["grid"]["stretch"]["dz_surf"])
+        Δz_s_top = FT(namelist["grid"]["stretch"]["dz_toa"])
+        z_s_toa = FT(namelist["grid"]["stretch"]["z_toa"])
 
-    #    z_stretch = CC.Meshes.GeneralizedExponentialStretching(Δzₛ_surf, Δzₛ_top)
-    #    z_domain = CC.Domains.IntervalDomain(
-    #        CCG.ZPoint{FT}(z₀),
-    #        CCG.ZPoint{FT}(zₛ_toa),
-    #        boundary_tags = (:bottom, :top),
-    #    )
-    #    gcm_mesh = CC.Meshes.IntervalMesh(z_domain, z_stretch; nelems = nzₛ)
-    #    z_mesh = TC.TCMeshFromGCMMesh(gcm_mesh; z_max = z₁)
-    #else
-    z_stretch = CC.Meshes.Uniform()
-    #z_domain = CC.Domains.IntervalDomain(
-    #        CCG.ZPoint{FT}(z₀),
-    #        CCG.ZPoint{FT}(z₁),
-    #        boundary_tags = (:bottom, :top)
-    #)
-    z_domain = CC.Domains.IntervalDomain(
+        z_stretch = CC.Meshes.GeneralizedExponentialStretching(Δz_s_surf, Δz_s_top)
+        z_domain = CC.Domains.IntervalDomain(
+            CCG.ZPoint(zero(z_s_toa)),
+            CCG.ZPoint(z_s_toa);
+            boundary_tags = (:bottom, :top),
+        )
+        gcm_mesh = CC.Meshes.IntervalMesh(z_domain, z_stretch; nelems = nz_s)
+        z_mesh = TC.TCMeshFromGCMMesh(gcm_mesh; z_max = z_max)
+    else
+        z_stretch = CC.Meshes.Uniform()
+        z_domain = CC.Domains.IntervalDomain(
             CCG.ZPoint(zero(z_max)),
             CCG.ZPoint(z_max);
             boundary_tags = (:bottom, :top)
-    )
-    z_mesh = CC.Meshes.IntervalMesh(z_domain, z_stretch; nelems = nz)
-    #z_mesh = CC.Meshes.IntervalMesh(z_domain, z_stretch; nelems = z_elem)
-    #end
+        )
+        z_mesh = CC.Meshes.IntervalMesh(z_domain, z_stretch; nelems = nz)
+    end
 
-    return (; z_mesh = z_mesh, z_max = z₁)
+    return (; z_mesh = z_mesh, z_max = z_max)
 end
 
 function get_spaces(namelist, param_set, FT)
