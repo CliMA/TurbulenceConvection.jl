@@ -97,9 +97,9 @@ steps:
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --sgs quadrature --quad_type gaussian --skip_tests true --suffix _gaussian"
         artifact_paths: "Output.Bomex.01_gaussian/stats/comparison/*"
 
-      - label: ":partly_sunny: Bomex with stretched grid"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --stretch_grid true --skip_tests true --suffix _stretch_grid_true"
-        artifact_paths: "Output.Bomex.01_stretch_grid_true/stats/comparison/*"
+      - label: ":partly_sunny: LES_driven_SCM with stretched grid"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case LES_driven_SCM --stretch_grid true --skip_tests true --suffix _stretch_grid_true"
+        artifact_paths: "Output.LES_driven_SCM.01_stretch_grid_true/stats/comparison/*"
 
       - label: ":partly_sunny: Bomex with NN_nonlocal"
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr NN_nonlocal --entr_dim_scale inv_z --detr_dim_scale inv_z --area_limiter_power 0.0 --dt_max 2.0 --nn_ent_biases true --skip_tests true --suffix _NN_nonlocal"
