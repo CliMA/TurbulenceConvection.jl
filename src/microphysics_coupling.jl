@@ -115,6 +115,21 @@ function precipitation_formation(
                     q.liq / Δt,
                     CM2.conv_q_liq_to_q_rai_KK2000(microphys_params, q.liq, ρ, N_d = rain_formation_model.prescribed_Nd)
                 )
+            elseif rain_formation_model isa B1994
+                S_qt_rain = -min(
+                    q.liq / Δt,
+                    CM2.conv_q_liq_to_q_rai_B1994(microphys_params, q.liq, ρ, N_d = rain_formation_model.prescribed_Nd)
+                )
+            elseif rain_formation_model isa TC1980
+                S_qt_rain = -min(
+                    q.liq / Δt,
+                    CM2.conv_q_liq_to_q_rai_TC1980(microphys_params, q.liq, ρ, N_d = rain_formation_model.prescribed_Nd)
+                )
+            elseif rain_formation_model isa LD2004
+                S_qt_rain = -min(
+                    q.liq / Δt,
+                    CM2.conv_q_liq_to_q_rai_LD2004(microphys_params, q.liq, ρ, N_d = rain_formation_model.prescribed_Nd)
+                )
             else
                 error("Unrecognized rain formation model")
             end
@@ -135,6 +150,18 @@ function precipitation_formation(
                     q.liq / Δt,
                     CM2.accretion_KK2000(microphys_params, q.liq, qr, ρ)
                 ) * precip_fraction
+            elseif rain_formation_model isa B1994
+                S_qr = min(
+                    q.liq / Δt,
+                    CM2.accretion_B1994(microphys_params, q.liq, qr, ρ)
+                ) * precip_fraction
+            elseif rain_formation_model isa TC1980
+                S_qr = min(
+                    q.liq / Δt,
+                    CM2.accretion_B1994(microphys_params, q.liq, qr, ρ)
+                ) * precip_fraction
+            elseif rain_formation_model isa LD2004
+                S_qr = min(q.liq / Δt, CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ)) * precip_fraction
             else
                 error("Unrecognized rain formation model")
             end

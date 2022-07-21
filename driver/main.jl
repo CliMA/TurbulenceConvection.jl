@@ -130,6 +130,12 @@ function Simulation1d(namelist)
             TC.Clima1M_default()
         elseif rain_formation_name == "KK2000"
             TC.KK2000(prescribed_Nd)
+        elseif rain_formation_name == "B1994"
+            TC.B1994(prescribed_Nd)
+        elseif rain_formation_name == "TC1980"
+            TC.TC1980(prescribed_Nd)
+        elseif rain_formation_name == "LD2004"
+            TC.LD2004(prescribed_Nd)
         else
             error("Invalid rain_formation_name $(rain_formation_name)")
         end

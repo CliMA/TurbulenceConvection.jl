@@ -262,6 +262,15 @@ struct Clima1M_default <: AbstractRainFormationModel end
 struct KK2000{FT} <: AbstractRainFormationModel
     prescribed_Nd::FT
 end
+struct B1994{FT} <: AbstractRainFormationModel
+    prescribed_Nd::FT
+end
+struct TC1980{FT} <: AbstractRainFormationModel
+    prescribed_Nd::FT
+end
+struct LD2004{FT} <: AbstractRainFormationModel
+    prescribed_Nd::FT
+end
 
 abstract type AbstractPrecipFractionModel end
 struct PrescribedPrecipFraction{FT} <: AbstractPrecipFractionModel
