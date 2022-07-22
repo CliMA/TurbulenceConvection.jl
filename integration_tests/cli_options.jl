@@ -33,6 +33,7 @@ function parse_commandline()
         "--calibrate_io"   # Test that calibration IO passes regression tests
         arg_type = Bool
         default = false
+        # TODO: Improve this name, it's confusing!!
         "--stretch_grid"   # Test stretched grid option
         arg_type = Bool
         "--skip_io"        # Test that skipping IO passes regression tests
@@ -96,7 +97,10 @@ Generate a block of code to run a particular
 buildkite job given the `command:` string.
 
 Example:
-
+```julia
+include("integration_tests/cli_options.jl")
+print_repl_script("...")
+```
 """
 function print_repl_script(str)
     ib = """"""
