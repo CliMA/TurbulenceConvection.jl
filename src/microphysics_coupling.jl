@@ -95,8 +95,8 @@ function precipitation_formation(
             Rm = TD.gas_constant_air(param_set, ts)
             Lf = TD.latent_heat_fusion(param_set, ts)
 
-            qr = qr / precip_fraction
-            qs = qs / precip_fraction
+            qr = max(0.0, qr) / precip_fraction
+            qs = max(0.0, qs) / precip_fraction
 
             # Autoconversion rate variable
             α_autocon = ECP.α_autocon(param_set)
