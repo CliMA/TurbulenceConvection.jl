@@ -25,7 +25,26 @@ function TCMeshFromGCMMesh(gcm_mesh; z_max::FT) where {FT <: AbstractFloat}
     faces = map(1:(k_star.i)) do k
         CC.Geometry.ZPoint{FT}(gcm_grid.zf[CCO.PlusHalf(k)].z)
     end
-    return CC.Meshes.IntervalMesh(domain, faces)
+    truncated_mesh = CC.Meshes.IntervalMesh(domain, faces)
+    # Adjust mesh, same degrees of freedom
+    return adjust_mesh(truncated_mesh, z_max)
+end
+
+"Adjusts a stretched mesh to reach an exact domain top, retaining surface Δz and nz"
+function adjust_mesh(mesh, z_top::FT) where {FT <: AbstractFloat}
+    grid = Grid(mesh)
+    zf_vec = vec(grid.zf.z)
+    nz = length(zf_vec)
+    Δz_top = zf_vec[end] - zf_vec[end - 1]
+    Δz_surf = zf_vec[2] - zf_vec[1]
+    z0 = zf_vec[1]
+    new_stretch = CC.Meshes.GeneralizedExponentialStretching(Δz_surf, Δz_top)
+    new_domain = CC.Domains.IntervalDomain(
+        CC.Geometry.ZPoint{FT}(z0),
+        CC.Geometry.ZPoint{FT}(z_top),
+        boundary_tags = (:bottom, :top),
+    )
+    return CC.Meshes.IntervalMesh(new_domain, new_stretch; nelems = nz)
 end
 
 struct Grid{FT, NZ, CS, FS, SC, SF}

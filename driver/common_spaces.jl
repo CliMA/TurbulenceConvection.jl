@@ -71,7 +71,6 @@ function construct_mesh(namelist; FT = Float64)
     end
 
     z₀, z₁ = FT(0), FT(nz * Δz)
-    z_stretch = CC.Meshes.Uniform()
 
     z_mesh = if truncated_gcm_mesh
         nzₛ = namelist["grid"]["stretch"]["nz"]
