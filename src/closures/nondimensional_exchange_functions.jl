@@ -309,7 +309,7 @@ function non_dimensional_function(εδ_model::RFEntr{d, m}, εδ_model_vars) whe
     # Square output for nonnegativity for prediction
     nondim_ε = sum(c_rf_opt[1, 1:m] .* f_entr) / sqrt(m)
     nondim_δ = sum(c_rf_opt[2, 1:m] .* f_detr) / sqrt(m)
-    return nondim_ε^2, nondim_δ^2
+    return Flux.relu(nondim_ε), Flux.relu(nondim_δ)
 end
 
 """

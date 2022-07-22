@@ -41,6 +41,9 @@ function affect_io!(integrator)
         write_ts(stats, "rwp_mean", diag_svpc.rwp_mean[cent])
         write_ts(stats, "swp_mean", diag_svpc.swp_mean[cent])
 
+        write_ts(stats, "integ_total_flux_qt", diag_svpc.integ_total_flux_qt[cent])
+        write_ts(stats, "integ_total_flux_s", diag_svpc.integ_total_flux_s[cent])
+
         if !calibrate_io
             write_ts(stats, "updraft_cloud_cover", diag_tc_svpc.updraft_cloud_cover[cent])
             write_ts(stats, "updraft_cloud_base", diag_tc_svpc.updraft_cloud_base[cent])

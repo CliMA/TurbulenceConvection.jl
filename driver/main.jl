@@ -244,6 +244,8 @@ function initialize(sim::Simulation1d)
         "swp_mean",
         "cutoff_precipitation_rate",
         "Hd",
+        "integ_total_flux_qt",
+        "integ_total_flux_s",
     ]
     ts_list = vcat(ts_gm, ts_edmf)
 
