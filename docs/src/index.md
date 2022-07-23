@@ -13,7 +13,7 @@ The Extended EDMF model can be run with several specifications such as:
 - Model specifications: such as forcing properties, domain and grid etc.
 - Parameters: Such as the physical parameters listed in Table 2 in [^2] and Table 1 in [^3] as well as parameters relating to machine learning models (Fourier Neural Operators, Neural Networks etc.)
 
-The package depndends on the following clima packages: [ClimaCore.jl](https://github.com/CliMA/ClimaCore.jl), [Thermodyanmics.jl](https://github.com/CliMA/Thermodynamics.jl), [SurfaceFlux.jl](https://github.com/CliMA/SurfaceFluxes.jl), [OperatorFlux.jl](https://github.com/CliMA/OperatorFlux.jl)
+The package depends on the following clima packages: [ClimaCore.jl](https://github.com/CliMA/ClimaCore.jl), [Thermodyanmics.jl](https://github.com/CliMA/Thermodynamics.jl), [SurfaceFlux.jl](https://github.com/CliMA/SurfaceFluxes.jl), [OperatorFlux.jl](https://github.com/CliMA/OperatorFlux.jl)
 
 
 
