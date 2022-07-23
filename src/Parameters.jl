@@ -18,9 +18,11 @@ const ATCP = AbstractTurbulenceConvectionParameters
 Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP} <: ATCP
     Omega::FT
     planet_radius::FT
-    microph_scaling::FT # TODO: move to microphysics parameter set? or Clima1M?
-    microph_scaling_dep_sub::FT # TODO: move to microphysics parameter set? or Clima1M?
-    microph_scaling_melt::FT # TODO: move to microphysics parameter set? or Clima1M?
+    microph_scaling::FT
+    microph_scaling_dep_sub::FT
+    microph_scaling_melt::FT
+    microph_scaling_acnv::FT
+    microph_scaling_accr::FT
     microphys_params::MP
     surf_flux_params::SFP
 end
@@ -32,9 +34,13 @@ microphysics_params(ps::ATCP) = ps.microphys_params
 Base.eltype(::TurbulenceConvectionParameters{FT}) where {FT} = FT
 Omega(ps::ATCP) = ps.Omega
 planet_radius(ps::ATCP) = ps.planet_radius
+# TODO - microph_scaling is the factor for adjusting evapoartion.
+# The name will be fixed in CLIMAParameters first.
 microph_scaling(ps::ATCP) = ps.microph_scaling
 microph_scaling_dep_sub(ps::ATCP) = ps.microph_scaling_dep_sub
 microph_scaling_melt(ps::ATCP) = ps.microph_scaling_melt
+microph_scaling_acnv(ps::ATCP) = ps.microph_scaling_acnv
+microph_scaling_accr(ps::ATCP) = ps.microph_scaling_accr
 
 #####
 ##### Forwarding parameters
