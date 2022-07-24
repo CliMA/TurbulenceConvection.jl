@@ -53,7 +53,7 @@ function parse_commandline()
         default = ""
         "--n_up"           # Number of updrafts
         arg_type = Int
-        "--moisture_model" # Moisture model (equilibrium or non-equilibrium)
+        "--moisture_model" # Moisture model (equilibrium or nonequilibrium)
         arg_type = String
         "--precipitation_model" # Precipitation model (None, cutoff or clima_1m)
         arg_type = String
