@@ -346,7 +346,7 @@ function solve_args(sim::Simulation1d)
         callback_adapt_dt = ()
     end
 
-    callbacks = ODE.CallbackSet(callback_adapt_dt..., callback_dtmax, callback_cfl..., callback_filters, callback_io...)
+    callbacks = ODE.CallbackSet(callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_filters, callback_io...)
 
     if sim.edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess
         prob = SDE.SDEProblem(∑tendencies!, ∑stoch_tendencies!, prog, t_span, params; dt = sim.TS.dt)
