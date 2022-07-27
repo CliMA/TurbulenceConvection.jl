@@ -145,6 +145,10 @@ steps:
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA --sgs mean --adapt_dt false --dt 1.0 --precipitation_model clima_1m --precip_fraction_model cloud_cover --precip_fraction_limiter 0.42 --skip_tests true --suffix _diagnostic_precipitation_fraction"
         artifact_paths: "Output.TRMM_LBA.01_diagnostic_precipitation_fraction/stats/comparison/*"
 
+      - label: ":scissors: TRMM_LBA with changed microphysics process rates"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA --precipitation_model clima_1m --acnv_scaling 0.44 --accr_scaling 0.44 --evap_scaling 0.44 --depsub_scaling 0.44 --melt_scaling 0.42 --skip_tests true --suffix _microph_scaling"
+        artifact_paths: "Output.TRMM_LBA.01_diagnostic_precipitation_fraction/stats/comparison/*"
+
       - label: ":partly_sunny: Bomex with calibrate_io_true"
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --calibrate_io true --skip_post_proc true --suffix _calibrate_io_true"
         artifact_paths: "Output.Bomex.01_calibrate_io_true/stats/comparison/*"

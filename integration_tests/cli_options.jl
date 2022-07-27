@@ -84,6 +84,21 @@ function parse_commandline()
         help = "Set to `true` to truncate printing of ClimaCore `Field` types"
         arg_type = Bool
         default = true
+        "--acnv_scaling"
+        help = "Coefficient multiplying the autoconversion rate. Default = 1"
+        arg_type = Float64
+        "--accr_scaling"
+        help = "Coefficient multiplying the accretion rate. Default = 1"
+        arg_type = Float64
+        "--evap_scaling"
+        help = "Coefficient multiplying the evaporation rate. Default = 1"
+        arg_type = Float64
+        "--depsub_scaling"
+        help = "Coefficient multiplying the deposition sublimation rate. Default = 1"
+        arg_type = Float64
+        "--melt_scaling"
+        help = "Coefficient multiplying the melting rate. Default = 1"
+        arg_type = Float64
     end
     parsed_args = ArgParse.parse_args(ARGS, s)
     return (s, parsed_args)

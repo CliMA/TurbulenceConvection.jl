@@ -24,16 +24,16 @@ function create_parameter_set(
     τ_acnv_sno = TC.parse_namelist(namelist, "microphysics", "τ_acnv_sno"; default = 100.0)
     q_liq_threshold = TC.parse_namelist(namelist, "microphysics", "q_liq_threshold"; default = 0.5e-3)
     q_ice_threshold = TC.parse_namelist(namelist, "microphysics", "q_ice_threshold"; default = 1e-6)
-    microph_scaling =         TC.parse_namelist(namelist, "microphysics", "microph_scaling"; default = 1.0)
+    microph_scaling_acnv = TC.parse_namelist(namelist, "microphysics", "microph_scaling_acnv"; default = 1.0)
+    microph_scaling_accr = TC.parse_namelist(namelist, "microphysics", "microph_scaling_accr"; default = 1.0)
+    microph_scaling = TC.parse_namelist(namelist, "microphysics", "microph_scaling"; default = 1.0)
     microph_scaling_dep_sub = TC.parse_namelist(namelist, "microphysics", "microph_scaling_dep_sub"; default = 1.0)
-    microph_scaling_melt =    TC.parse_namelist(namelist, "microphysics", "microph_scaling_melt"; default = 1.0)
+    microph_scaling_melt = TC.parse_namelist(namelist, "microphysics", "microph_scaling_melt"; default = 1.0)
     E_liq_rai = TC.parse_namelist(namelist, "microphysics", "E_liq_rai"; default = 0.8)
     E_liq_sno = TC.parse_namelist(namelist, "microphysics", "E_liq_sno"; default = 0.1)
     E_ice_rai = TC.parse_namelist(namelist, "microphysics", "E_ice_rai"; default = 1.0)
     E_ice_sno = TC.parse_namelist(namelist, "microphysics", "E_ice_sno"; default = 0.1)
     E_rai_sno = TC.parse_namelist(namelist, "microphysics", "E_rai_sno"; default = 1.0)
-
-    # TODO - additionally read in commad line options to overwrite parameters
 
     # Override the default files in the toml file
     open(override_file, "w") do io
@@ -68,6 +68,14 @@ function create_parameter_set(
         println(io, "[cloud_ice_specific_humidity_autoconversion_threshold]")
         println(io, "alias = \"q_ice_threshold\"")
         println(io, "value = " * string(q_ice_threshold))
+        println(io, "type = \"float\"")
+        println(io, "[microph_scaling_acnv]")
+        println(io, "alias = \"microph_scaling_acnv\"")
+        println(io, "value = " * string(microph_scaling_acnv))
+        println(io, "type = \"float\"")
+        println(io, "[microph_scaling_accr]")
+        println(io, "alias = \"microph_scaling_accr\"")
+        println(io, "value = " * string(microph_scaling_accr))
         println(io, "type = \"float\"")
         println(io, "[microph_scaling]")
         println(io, "alias = \"microph_scaling\"")
@@ -136,6 +144,8 @@ function create_parameter_set(
     "microph_scaling_dep_sub",
     "microph_scaling_melt",
     "microph_scaling",
+    "microph_scaling_acnv",
+    "microph_scaling_accr",
     "Omega",
     "planet_radius"]
     pairs = CP.get_parameter_values!(toml_dict, aliases, "TurbulenceConvection")
