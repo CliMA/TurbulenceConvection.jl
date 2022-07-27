@@ -157,6 +157,7 @@ end
 function monitor_cfl!(integrator)
     UnPack.@unpack edmf, aux, TS = integrator.p
     prog = integrator.u
+    frac_tol = 0.05
 
     for inds in TC.iterate_columns(prog.cent)
         state = TC.column_prog_aux(prog, aux, inds...)
@@ -185,8 +186,11 @@ function monitor_cfl!(integrator)
                 CFL_in_rain = Δt / Δz[k] * term_vel_rain[k + 1]
                 CFL_in_snow = Δt / Δz[k] * term_vel_snow[k + 1]
             end
-            if max(CFL_in_rain, CFL_in_snow, CFL_out_rain, CFL_out_snow) > CFL_limit
-                error("Time step is too large for rain fall velocity!")
+            CFL_meteor = max(CFL_in_rain, CFL_in_snow, CFL_out_rain, CFL_out_snow)
+            if CFL_meteor > CFL_limit * (1.0 + frac_tol)
+                error(
+                    "Time step is too large for hydrometeor fall velocity! Hydrometeor CFL is $(CFL_meteor) > $(CFL_limit).",
+                )
             end
         end
     end
