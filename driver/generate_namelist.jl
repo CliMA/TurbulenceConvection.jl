@@ -616,12 +616,38 @@ function LES_driven_SCM(namelist_defaults)
 
     namelist["stats_io"]["frequency"] = 10.0
     namelist["time_stepping"]["t_max"] = 3600.0 * 6
-    namelist["time_stepping"]["dt_min"] = 1.0
+    namelist_defaults["time_stepping"]["dt_max"] = 5.0
+    namelist_defaults["time_stepping"]["dt_min"] = 0.5
 
     # use last 6 hours of LES simulation to drive LES
     namelist["t_interval_from_end_s"] = 3600.0 * 6
     # average in 1 hour interval around `t_interval_from_end_s`
     namelist["initial_condition_averaging_window_s"] = 3600.0
+
+    namelist["microphysics"]["precipitation_model"] = "clima_1m"
+    namelist["microphysics"]["precip_fraction_model"] = "prescribed" # "prescribed" or "cloud_cover"
+    namelist["microphysics"]["prescribed_precip_frac_value"] = 1.0
+    namelist["microphysics"]["precip_fraction_limiter"] = 0.3
+
+    #TODO - all those are part of toml file
+    namelist["microphysics"]["τ_acnv_rai"] = 1000.0 # https://github.com/szy21/pycles_GCM/blob/v1.0/Csrc/microphysics_CLIMA.h#L13
+    namelist["microphysics"]["q_liq_threshold"] = 0.5e-3 # https://github.com/szy21/pycles_GCM/blob/v1.0/Csrc/microphysics_CLIMA.h#L12
+
+    # Defaults from RICO
+    namelist["microphysics"]["τ_acnv_sno"] = 100.0
+    namelist["microphysics"]["q_ice_threshold"] = 1e-6
+    namelist["microphysics"]["E_liq_rai"] = 0.8
+    namelist["microphysics"]["E_liq_sno"] = 0.1
+    namelist["microphysics"]["E_ice_rai"] = 1.0
+    namelist["microphysics"]["E_ice_sno"] = 0.1
+    namelist["microphysics"]["E_rai_sno"] = 1.0
+    # TODO microph_scaling adjusts evaporation process.
+    # The name will be first fixed in CLIMAParameters.
+    namelist["microphysics"]["microph_scaling"] = 1.0
+    namelist["microphysics"]["microph_scaling_dep_sub"] = 1.0
+    namelist["microphysics"]["microph_scaling_melt"] = 1.0
+    namelist["microphysics"]["microph_scaling_acnv"] = 1.0
+    namelist["microphysics"]["microph_scaling_accr"] = 1.0
 
     # LES filename should follow pattern:
     # Stats.cfsite<SITE-NUMBER>_<FORCING-MODEL>_<EXPERIMENT>_2004-2008.<MONTH>.nc
