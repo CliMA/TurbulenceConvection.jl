@@ -1,7 +1,7 @@
 name = "TurbulenceConvection"
 uuid = "8e072fc4-01f8-44fb-b9dc-f9336c367e6b"
 authors = ["Climate Modeling Alliance"]
-version = "0.34.3"
+version = "0.34.4"
 
 [deps]
 ClimaCore = "d414da3d-4745-48bb-8d80-42e94e092884"
