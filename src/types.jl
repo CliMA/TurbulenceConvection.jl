@@ -36,8 +36,6 @@ Base.@kwdef struct EntrDetr{FT}
     ε_dyn::FT
     "Fractional dynamical detrainment [1/m]"
     δ_dyn::FT
-    "Turbulent entrainment"
-    ε_turb::FT
     "Nondimensional fractional dynamical entrainment"
     ε_nondim::FT
     "Nondimensional fractional dynamical detrainment"
