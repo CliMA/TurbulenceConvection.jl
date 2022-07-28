@@ -77,46 +77,83 @@ function compare(a::F, b::F, pn0 = "") where {F <: CC.Fields.Field}
     end
 end
 ### Utility functions for LES_driven_SCM cases
+
 """
     get_LES_library
-Hierarchical dictionary of available LES simulations described in [Shen2022](@cite).
+
+Hierarchical dictionary of available cfSite LES simulations, following similar
+forcing to that described in [Shen2022](@cite), but including additional sites.
 The following cfsites are available across listed models, months,
 and experiments.
 """
 function get_LES_library()
-    LES_library = Dict("HadGEM2-A" => Dict(), "CNRM-CM5" => Dict(), "CNRM-CM6-1" => Dict())
-    Shen_et_al_sites = collect(2:15)
-    append!(Shen_et_al_sites, collect(17:23))
-    Shen_et_al_deep_convection_sites = (collect(30:33)..., collect(66:70)..., 82, 92, 94, 96, 99, 100)
-    append!(Shen_et_al_sites, Shen_et_al_deep_convection_sites)
+    LES_library = get_shallow_LES_library()
+    deep_sites = (collect(30:33)..., collect(66:70)..., 82, 92, 94, 96, 99, 100)
 
-    LES_library["HadGEM2-A"]["10"] = Dict()
-    LES_library["HadGEM2-A"]["10"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [94, 100])
-    LES_library["HadGEM2-A"]["07"] = Dict()
-    LES_library["HadGEM2-A"]["07"]["cfsite_numbers"] = Shen_et_al_sites
-    LES_library["HadGEM2-A"]["04"] = Dict()
-    LES_library["HadGEM2-A"]["04"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [15, 17, 18, 32, 92, 94])
-    LES_library["HadGEM2-A"]["01"] = Dict()
-    LES_library["HadGEM2-A"]["01"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [15, 17, 18, 19, 20])
-
-    for month in ["01", "04", "07", "10"]
-        LES_library["HadGEM2-A"][month]["experiments"] = ["amip", "amip4K"]
-    end
+    append!(LES_library["HadGEM2-A"]["07"]["cfsite_numbers"], deep_sites)
+    append!(LES_library["HadGEM2-A"]["01"]["cfsite_numbers"], deep_sites)
+    sites_04 = deepcopy(setdiff(deep_sites, [32, 92, 94]))
+    append!(LES_library["HadGEM2-A"]["04"]["cfsite_numbers"], sites_04)
+    sites_10 = deepcopy(setdiff(deep_sites, [94, 100]))
+    append!(LES_library["HadGEM2-A"]["10"]["cfsite_numbers"], sites_10)
 
     LES_library_full = deepcopy(LES_library)
     for month in ["01", "04", "07", "10"]
-        LES_library_full["HadGEM2-A"][month]["cfsite_numbers"] = Dict()
-        for cfsite_number in LES_library["HadGEM2-A"][month]["cfsite_numbers"]
-            cfsite_number_str = string(cfsite_number, pad = 2)
-            LES_library_full["HadGEM2-A"][month]["cfsite_numbers"][cfsite_number_str] = if cfsite_number >= 30
-                "deep"
-            else
-                "shallow"
+        for model in ["HadGEM2-A", "CNRM-CM5"]
+            LES_library_full[model][month]["cfsite_numbers"] = Dict()
+            for cfsite_number in LES_library[model][month]["cfsite_numbers"]
+                cfsite_number_str = string(cfsite_number, pad = 2)
+                LES_library_full[model][month]["cfsite_numbers"][cfsite_number_str] = if cfsite_number >= 30
+                    "deep"
+                else
+                    "shallow"
+                end
             end
         end
     end
     return LES_library_full
 end
+
+"""
+    get_shallow_LES_library
+
+Hierarchical dictionary of available LES simulations described in [Shen2022](@cite).
+The following cfsites are available across listed models, months,
+and experiments.
+"""
+function get_shallow_LES_library()
+    LES_library = Dict("HadGEM2-A" => Dict(), "CNRM-CM5" => Dict(), "CNRM-CM6-1" => Dict())
+    Shen_et_al_sites = collect(2:15)
+    append!(Shen_et_al_sites, collect(17:23))
+
+    # HadGEM2-A model (76 AMIP-AMIP4K pairs)
+    LES_library["HadGEM2-A"]["10"] = Dict()
+    LES_library["HadGEM2-A"]["10"]["cfsite_numbers"] = Shen_et_al_sites
+    LES_library["HadGEM2-A"]["07"] = Dict()
+    LES_library["HadGEM2-A"]["07"]["cfsite_numbers"] = deepcopy(Shen_et_al_sites)
+    LES_library["HadGEM2-A"]["04"] = Dict()
+    LES_library["HadGEM2-A"]["04"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [15, 17, 18])
+    LES_library["HadGEM2-A"]["01"] = Dict()
+    LES_library["HadGEM2-A"]["01"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [15, 17, 18, 19, 20])
+
+    # CNRM-CM5 model (59 AMIP-AMIP4K pairs)
+    LES_library["CNRM-CM5"]["10"] = Dict()
+    LES_library["CNRM-CM5"]["10"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [15, 22, 23])
+    LES_library["CNRM-CM5"]["07"] = Dict()
+    LES_library["CNRM-CM5"]["07"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [13, 14, 15])
+    LES_library["CNRM-CM5"]["04"] = Dict()
+    LES_library["CNRM-CM5"]["04"]["cfsite_numbers"] =
+        setdiff(Shen_et_al_sites, [11, 12, 13, 14, 15, 17, 18, 21, 22, 23])
+    LES_library["CNRM-CM5"]["01"] = Dict()
+    LES_library["CNRM-CM5"]["01"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [14, 15, 17, 18, 19, 20, 21, 22, 23])
+
+    for month in ["01", "04", "07", "10"]
+        LES_library["HadGEM2-A"][month]["experiments"] = ["amip", "amip4K"]
+        LES_library["CNRM-CM5"][month]["experiments"] = ["amip", "amip4K"]
+    end
+    return LES_library
+end
+
 
 """
     parse_les_path(les_path)
@@ -145,8 +182,8 @@ function valid_lespath(les_path)
     month = string(month, pad = 2)
     cfsite_number = string(cfsite_number, pad = 2)
     LES_library = get_LES_library()
-    @assert forcing_model in keys(LES_library)
-    @assert month in keys(LES_library[forcing_model])
-    @assert cfsite_number in keys(LES_library[forcing_model][month]["cfsite_numbers"])
+    @assert forcing_model in keys(LES_library) "Forcing model $(forcing_model) not valid."
+    @assert month in keys(LES_library[forcing_model]) "Month $(month) not available for $(forcing_model)."
+    @assert cfsite_number in keys(LES_library[forcing_model][month]["cfsite_numbers"]) "cfSite $(cfsite_number) not found for $(forcing_model), month $(month)."
     @assert experiment in LES_library[forcing_model][month]["experiments"]
 end
