@@ -161,6 +161,11 @@ steps:
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Rico --thermo_covariance_model prognostic --skip_tests true --suffix _prognostic_covarinaces"
         artifact_paths: "Output.Rico.01_prognostic_covarinaces/stats/comparison/*"
 
+      - label: ":partly_sunny: Rico with KK2000 microphysics"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Rico --skip_tests true --precipitation_model clima_1m --rain_formation_scheme KK2000 --prescribed_Nd 2e8 --suffix _two_moment_micro_KK2000"
+        artifact_paths: "Output.Rico.01_prognostic_covarinaces/stats/comparison/*"
+
+
   - group: "Sphere cases"
     steps:
 
