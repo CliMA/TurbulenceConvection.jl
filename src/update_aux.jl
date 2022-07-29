@@ -32,8 +32,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ρ_c = prog_gm.ρ
     aux_en_unsat = aux_en.unsat
     aux_en_sat = aux_en.sat
-    m_entr_detr = aux_tc.ϕ_temporary
-    ∇m_entr_detr = aux_tc.ψ_temporary
     wvec = CC.Geometry.WVector
     max_area = edmf.max_area
     ts_gm = center_aux_grid_mean(state).ts
@@ -279,7 +277,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         compute_nonequilibrium_moisture_tendencies!(grid, state, edmf, Δt, param_set)
     end
     compute_turb_entr!(state, grid, edmf)
-    compute_entr_detr!(state, grid, edmf, param_set, surf, Δt, edmf.entr_closure)
+    compute_phys_entr_detr!(state, grid, edmf, param_set, surf, Δt, edmf.entr_closure)
+    compute_ml_entr_detr!(state, grid, edmf, param_set, surf, Δt, edmf.ml_entr_closure)
     compute_nh_pressure!(state, grid, edmf, surf)
 
     #####
@@ -298,9 +297,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
         δ_dyn = aux_up[i].detr_sc
+        δ_ml = aux_up[i].detr_ml
         ε_turb = aux_up[i].frac_turb_entr
         @. b_exch +=
-            a_up * Ic(w_up) * δ_dyn / a_en * (1 / 2 * (Ic(w_up) - Ic(w_en))^2 - tke_en) -
+            a_up * Ic(w_up) * (δ_dyn + δ_ml) / a_en * (1 / 2 * (Ic(w_up) - Ic(w_en))^2 - tke_en) -
             a_up * Ic(w_up) * (Ic(w_up) - Ic(w_en)) * ε_turb * Ic(w_en) / a_en
     end
 

@@ -10,7 +10,9 @@ function parse_commandline()
         arg_type = String
         "--quad_type"      # SGS quadrature type (lognormal or Gaussian)
         arg_type = String
-        "--entr"           # Try other entr-detr models
+        "--entr"           # Try other phys entr-detr models
+        arg_type = String
+        "--ml_entr"          # Try machine learning entr-detr models
         arg_type = String
         "--entr_dim_scale" # Specify dimensional scale for entrainment
         arg_type = String

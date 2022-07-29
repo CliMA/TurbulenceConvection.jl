@@ -43,8 +43,12 @@ cent_aux_vars_up(FT, local_geometry, edmf) = (;
     cent_aux_vars_up_moisture(FT, edmf.moisture_model)...,
     entr_sc = FT(0),
     detr_sc = FT(0),
+    entr_ml = FT(0),
+    detr_ml = FT(0),
     ε_nondim = FT(0),  # nondimensional entrainment
     δ_nondim = FT(0),  # nondimensional detrainment
+    ε_ml_nondim = FT(0),  # nondimensional entrainment
+    δ_ml_nondim = FT(0),  # nondimensional detrainment
     frac_turb_entr = FT(0),
     entr_turb_dyn = FT(0),
     detr_turb_dyn = FT(0),
@@ -211,6 +215,10 @@ cent_diagnostic_vars_edmf(FT, local_geometry, edmf) = (;
         ε_nondim = FT(0),
         detr_sc = FT(0),
         δ_nondim = FT(0),
+        entr_ml = FT(0),
+        ε_ml_nondim = FT(0),
+        detr_ml = FT(0),
+        δ_ml_nondim = FT(0),
         massflux = FT(0),
         frac_turb_entr = FT(0),
     )
