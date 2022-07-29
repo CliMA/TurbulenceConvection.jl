@@ -138,11 +138,41 @@ function entr_detr(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale)
     ε_nondim, δ_nondim = non_dimensional_function(εδ_model, εδ_vars)
     ε_dyn, δ_dyn = εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nondim, δ_nondim)
 
-    # turbulent entrainment
-    ε_turb =
-        compute_turbulent_entrainment(εδ_params(εδ_model).c_γ, εδ_vars.a_up, εδ_vars.w_up, εδ_vars.tke_en, εδ_vars.H_up)
+    return EntrDetr{FT}(ε_dyn, δ_dyn, ε_nondim, δ_nondim)
+end
 
-    return EntrDetr{FT}(ε_dyn, δ_dyn, ε_turb, ε_nondim, δ_nondim)
+##### Compute entr detr
+function compute_turb_entr!(state::State, grid::Grid, edmf::EDMFModel)
+    FT = float_type(state)
+    N_up = n_updrafts(edmf)
+    aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
+    aux_en = center_aux_environment(state)
+    aux_tc = center_aux_turbconv(state)
+    w_up_c = aux_tc.w_up_c
+    plume_scale_height = map(1:N_up) do i
+        compute_plume_scale_height(grid, state, edmf.H_up_min, i)
+    end
+    Ic = CCO.InterpolateF2C()
+    ∇c = CCO.DivergenceF2C()
+    LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
+    @inbounds for i in 1:N_up
+        w_up = aux_up_f[i].w
+        @. w_up_c = Ic(w_up)
+        @inbounds for k in real_center_indices(grid)
+            if aux_up[i].area[k] > 0.0
+                aux_up[i].frac_turb_entr[k] = compute_turbulent_entrainment(
+                    εδ_params(edmf.entr_closure).c_γ,
+                    aux_up[i].area[k],
+                    w_up_c[k],
+                    aux_en.tke[k],
+                    plume_scale_height[i],
+                )
+            else
+                aux_up[i].frac_turb_entr[k] = 0.0
+            end
+        end
+    end
 end
 
 ##### Compute entr detr
@@ -240,14 +270,12 @@ function compute_entr_detr!(
                 end
                 aux_up[i].entr_sc[k] = ε_dyn
                 aux_up[i].detr_sc[k] = δ_dyn
-                aux_up[i].frac_turb_entr[k] = er.ε_turb
                 # update nondimensional entr/detr
                 aux_up[i].ε_nondim[k] = er.ε_nondim
                 aux_up[i].δ_nondim[k] = er.δ_nondim
             else
                 aux_up[i].entr_sc[k] = 0.0
                 aux_up[i].detr_sc[k] = 0.0
-                aux_up[i].frac_turb_entr[k] = 0.0
                 aux_up[i].ε_nondim[k] = 0.0
                 aux_up[i].δ_nondim[k] = 0.0
             end
@@ -353,13 +381,6 @@ function compute_entr_detr!(
         non_dimensional_function!(ε_nondim, δ_nondim, Π_groups, εδ_model)
 
         @inbounds for k in real_center_indices(grid)
-            ε_turb = compute_turbulent_entrainment(
-                FT(εδ_params(εδ_model).c_γ),
-                aux_up[i].area[k],
-                w_up_c[k],
-                aux_en.tke[k],
-                FT(plume_scale_height[i]),
-            )
             ε_dim_scale = entrainment_inv_length_scale(
                 εδ_model,
                 aux_up[i].buoy[k],
@@ -385,14 +406,12 @@ function compute_entr_detr!(
 
             aux_up[i].entr_sc[k] = ε_dim_scale * aux_up[i].ε_nondim[k] + MdMdz_ε
             aux_up[i].detr_sc[k] = δ_dim_scale * (aux_up[i].δ_nondim[k] + area_limiter) + MdMdz_δ
-            aux_up[i].frac_turb_entr[k] = ε_turb
         end
 
         @. aux_up[i].ε_nondim = ifelse(aux_up[i].area > 0, aux_up[i].ε_nondim, 0)
         @. aux_up[i].δ_nondim = ifelse(aux_up[i].area > 0, aux_up[i].δ_nondim, 0)
         @. aux_up[i].entr_sc = ifelse(aux_up[i].area > 0, aux_up[i].entr_sc, 0)
         @. aux_up[i].detr_sc = ifelse(aux_up[i].area > 0, aux_up[i].detr_sc, 0)
-        @. aux_up[i].frac_turb_entr = ifelse(aux_up[i].area > 0, aux_up[i].frac_turb_entr, 0)
 
     end
 end

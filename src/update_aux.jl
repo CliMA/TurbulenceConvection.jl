@@ -278,6 +278,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     if edmf.moisture_model isa NonEquilibriumMoisture
         compute_nonequilibrium_moisture_tendencies!(grid, state, edmf, Δt, param_set)
     end
+    compute_turb_entr!(state, grid, edmf)
     compute_entr_detr!(state, grid, edmf, param_set, surf, Δt, edmf.entr_closure)
     compute_nh_pressure!(state, grid, edmf, surf)
 
