@@ -2,7 +2,6 @@ module NameList
 # See Table 2 of Cohen et al, 2020
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
-# namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.0
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.075
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
 # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.25
@@ -107,7 +106,6 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
 
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.075
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.25
@@ -154,7 +152,8 @@ function default_namelist(
     namelist_defaults["microphysics"]["precipitation_model"] = "None"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "None"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["ml_entrainment"] = "None"  # {"None", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_z", "none"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_z", "none"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"] = ntuple(i -> i, 6) # or, e.g., (1, 3, 6)
@@ -625,8 +624,6 @@ function DryBubble(namelist_defaults)
 
     namelist["meta"]["simname"] = "DryBubble"
     namelist["meta"]["casename"] = "DryBubble"
-
-    namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_massflux_div_factor"] = 0.4
 
     return namelist
 end

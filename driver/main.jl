@@ -150,7 +150,7 @@ function Simulation1d(namelist)
     # using SVectors / Tuples for this is very expensive
     # for the compiler, so we'll just accept Arrays for now.
     @info "edmf = \n$(summary(edmf))"
-    if !isbits(edmf) && !(edmf.entr_closure isa TC.RFEntr)
+    if !isbits(edmf) && !(edmf.ml_entr_closure isa TC.RFEntr)
         @show edmf
         error("Something non-isbits was added to edmf and needs to be fixed.")
     end

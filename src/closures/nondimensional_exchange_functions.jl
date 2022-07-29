@@ -46,6 +46,7 @@ function non_dimensional_function(εδ_model::MDEntr, εδ_model_vars)
         εδ_model.params.c_δ
     end
 
+    area_limiter = max_area_limiter(εδ_model, εδ_model_vars.max_area, εδ_model_vars.a_up)
     Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
     μ_ij = (χ - εδ_model_vars.a_up / (εδ_model_vars.a_up + εδ_model_vars.a_en)) * Δb / Δw
     exp_arg = μ_ij / μ_0
@@ -56,7 +57,7 @@ function non_dimensional_function(εδ_model::MDEntr, εδ_model_vars)
     M_ε = (max((εδ_model_vars.RH_en)^β - (εδ_model_vars.RH_up)^β, 0))^(1 / β)
 
     nondim_ε = (c_ε * D_ε + c_δ * M_ε)
-    nondim_δ = (c_ε * D_δ + c_δ * M_δ)
+    nondim_δ = (c_ε * D_δ + c_δ * M_δ) + area_limiter
     return nondim_ε, nondim_δ
 end
 
