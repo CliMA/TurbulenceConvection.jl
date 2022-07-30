@@ -28,12 +28,6 @@ function get_Δw(εδ_model, w_up::FT, w_en::FT) where {FT}
     return Δw
 end
 
-function get_MdMdz(M::FT, dMdz::FT) where {FT}
-    MdMdz_ε = max(dMdz / max(M, eps(FT)), 0)
-    MdMdz_δ = max(-dMdz / max(M, eps(FT)), 0)
-    return MdMdz_ε, MdMdz_δ
-end
-
 function entrainment_inv_length_scale(
     εδ_model,
     b_up::FT,
@@ -109,12 +103,9 @@ function εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nond
 
     area_limiter = max_area_limiter(εδ_model, εδ_vars.max_area, εδ_vars.a_up)
 
-    c_div = εδ_params(εδ_model).c_div
-    MdMdz_ε, MdMdz_δ = get_MdMdz(εδ_vars.M, εδ_vars.dMdz) .* c_div
-
     # fractional dynamical entrainment / detrainment [1 / m]
-    ε_dyn = ε_dim_scale * ε_nondim + MdMdz_ε
-    δ_dyn = δ_dim_scale * (δ_nondim + area_limiter) + MdMdz_δ
+    ε_dyn = ε_dim_scale * ε_nondim
+    δ_dyn = δ_dim_scale * (δ_nondim + area_limiter)
 
     return ε_dyn, δ_dyn
 end
@@ -318,7 +309,6 @@ function compute_entr_detr!(
     Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
     LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
-    c_div = εδ_params(εδ_model).c_div
     @inbounds for i in 1:N_up
         # compute ∇m at cell centers
         a_up = aux_up[i].area
@@ -402,10 +392,9 @@ function compute_entr_detr!(
                 edmf.detr_dim_scale,
             )
             area_limiter = max_area_limiter(εδ_model, max_area, aux_up[i].area[k])
-            MdMdz_ε, MdMdz_δ = get_MdMdz(m_entr_detr[k], ∇m_entr_detr[k]) .* c_div
 
-            aux_up[i].entr_sc[k] = ε_dim_scale * aux_up[i].ε_nondim[k] + MdMdz_ε
-            aux_up[i].detr_sc[k] = δ_dim_scale * (aux_up[i].δ_nondim[k] + area_limiter) + MdMdz_δ
+            aux_up[i].entr_sc[k] = ε_dim_scale * aux_up[i].ε_nondim[k]
+            aux_up[i].detr_sc[k] = δ_dim_scale * (aux_up[i].δ_nondim[k] + area_limiter)
         end
 
         @. aux_up[i].ε_nondim = ifelse(aux_up[i].area > 0, aux_up[i].ε_nondim, 0)

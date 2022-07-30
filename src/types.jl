@@ -43,7 +43,6 @@ Base.@kwdef struct EntrDetr{FT}
 end
 
 Base.@kwdef struct εδModelParams{FT, AFT}
-    c_div::FT
     w_min::FT # minimum updraft velocity to avoid zero division in b/w²
     c_ε::FT # factor multiplier for dry term in entrainment/detrainment
     μ_0::FT # dimensional scale logistic function in the dry term in entrainment/detrainment
@@ -554,8 +553,6 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         valid_options = [true, false],
     )
 
-    c_div =
-        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_massflux_div_factor"; default = 0.0)
     w_min = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_upd_velocity")
     c_ε = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_factor")
     μ_0 = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_scale")
@@ -569,7 +566,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     Π_norm = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pi_norm_consts")
     Π_norm = SA.SVector{length(Π_norm), FT}(Π_norm)
 
-    εδ_params = εδModelParams{FT, typeof(Π_norm)}(; c_div, w_min, c_ε, μ_0, β, χ, c_λ, γ_lim, β_lim, c_γ, c_δ, Π_norm)
+    εδ_params = εδModelParams{FT, typeof(Π_norm)}(; w_min, c_ε, μ_0, β, χ, c_λ, γ_lim, β_lim, c_γ, c_δ, Π_norm)
 
     entr_pi_subset = Tuple(parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_pi_subset"))
 
