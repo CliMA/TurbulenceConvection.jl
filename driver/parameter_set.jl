@@ -34,6 +34,10 @@ function create_parameter_set(
     E_ice_rai = TC.parse_namelist(namelist, "microphysics", "E_ice_rai"; default = 1.0)
     E_ice_sno = TC.parse_namelist(namelist, "microphysics", "E_ice_sno"; default = 0.1)
     E_rai_sno = TC.parse_namelist(namelist, "microphysics", "E_rai_sno"; default = 1.0)
+    A_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "A_acnv_KK2000"; default = 7.42e13)
+    a_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "a_acnv_KK2000"; default = 2.47)
+    b_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "b_acnv_KK2000"; default = -1.79)
+    c_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "c_acnv_KK2000"; default = -1.47)
 
     # Override the default files in the toml file
     open(override_file, "w") do io
@@ -108,6 +112,22 @@ function create_parameter_set(
         println(io, "[rain_snow_collision_efficiency]")
         println(io, "alias = \"E_rai_sno\"")
         println(io, "value = " * string(E_rai_sno))
+        println(io, "type = \"float\"")
+        println(io, "[KK2000_auctoconversion_coeff_A]")
+        println(io, "alias = \"A_acnv_KK2000\"")
+        println(io, "value = " * string(A_acnv_KK2000))
+        println(io, "type = \"float\"")
+        println(io, "[KK2000_auctoconversion_coeff_a]")
+        println(io, "alias = \"a_acnv_KK2000\"")
+        println(io, "value = " * string(a_acnv_KK2000))
+        println(io, "type = \"float\"")
+        println(io, "[KK2000_auctoconversion_coeff_b]")
+        println(io, "alias = \"b_acnv_KK2000\"")
+        println(io, "value = " * string(b_acnv_KK2000))
+        println(io, "type = \"float\"")
+        println(io, "[KK2000_auctoconversion_coeff_c]")
+        println(io, "alias = \"c_acnv_KK2000\"")
+        println(io, "value = " * string(c_acnv_KK2000))
         println(io, "type = \"float\"")
     end
 
