@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Reference states · TurbulenceConvection.jl</title><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.039/juliamono-regular.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">TurbulenceConvection.jl</a></span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Reference states</a><ul class="internal"><li><a class="tocitem" href="#Bomex"><span>Bomex</span></a></li><li><a class="tocitem" href="#life_cycle_Tan2018"><span>life_cycle_Tan2018</span></a></li><li><a class="tocitem" href="#Soares"><span>Soares</span></a></li><li><a class="tocitem" href="#Rico"><span>Rico</span></a></li><li><a class="tocitem" href="#TRMM_LBA"><span>TRMM_LBA</span></a></li><li><a class="tocitem" href="#ARM_SGP"><span>ARM_SGP</span></a></li><li><a class="tocitem" href="#GATE_III"><span>GATE_III</span></a></li><li><a class="tocitem" href="#DYCOMS_RF01"><span>DYCOMS_RF01</span></a></li><li><a class="tocitem" href="#GABLS"><span>GABLS</span></a></li><li><a class="tocitem" href="#SP"><span>SP</span></a></li><li><a class="tocitem" href="#DryBubble"><span>DryBubble</span></a></li></ul></li><li><a class="tocitem" href="../References/">References</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Reference states</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Reference states</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/CliMA/TurbulenceConvection.jl/blob/master/docs/src/ReferenceStates.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Reference-States"><a class="docs-heading-anchor" href="#Reference-States">Reference States</a><a id="Reference-States-1"></a><a class="docs-heading-anchor-permalink" href="#Reference-States" title="Permalink"></a></h1><pre><code class="language-julia hljs">include(&quot;PlotReferenceStates.jl&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">[ Info: Using default value, 1000.0, for parameter (microphysics, τ_precip).
+[ Info: Using default value, 2500.0, for parameter (microphysics, τ_acnv_rai).
+[ Info: Using default value, 100.0, for parameter (microphysics, τ_acnv_sno).
+[ Info: Using default value, 0.0005, for parameter (microphysics, q_liq_threshold).
+[ Info: Using default value, 1.0e-6, for parameter (microphysics, q_ice_threshold).
+z_span = (0.0, 3000.0)
+[ Info: Using default value, 1000.0, for parameter (microphysics, τ_precip).
+[ Info: Using default value, 2500.0, for parameter (microphysics, τ_acnv_rai).
+[ Info: Using default value, 100.0, for parameter (microphysics, τ_acnv_sno).
+[ Info: Using default value, 0.0005, for parameter (microphysics, q_liq_threshold).
+[ Info: Using default value, 1.0e-6, for parameter (microphysics, q_ice_threshold).
+z_span = (0.0, 3000.0)
+[ Info: Using default value, 1000.0, for parameter (microphysics, τ_precip).
+[ Info: Using default value, 2500.0, for parameter (microphysics, τ_acnv_rai).
+[ Info: Using default value, 100.0, for parameter (microphysics, τ_acnv_sno).
+[ Info: Using default value, 0.0005, for parameter (microphysics, q_liq_threshold).
+[ Info: Using default value, 1.0e-6, for parameter (microphysics, q_ice_threshold).
+z_span = (0.0, 3750.0)
+[ Info: Using default value, 1000.0, for parameter (microphysics, τ_precip).
+[ Info: Using default value, 2500.0, for parameter (microphysics, τ_acnv_rai).
+[ Info: Using default value, 100.0, for parameter (microphysics, τ_acnv_sno).
+[ Info: Using default value, 0.0005, for parameter (microphysics, q_liq_threshold).
+[ Info: Using default value, 1.0e-6, for parameter (microphysics, q_ice_threshold).
+z_span = (0.0, 4000.0)
+[ Info: Using default value, 1000.0, for parameter (microphysics, τ_precip).
+[ Info: Using default value, 2500.0, for parameter (microphysics, τ_acnv_rai).
+[ Info: Using default value, 100.0, for parameter (microphysics, τ_acnv_sno).
+[ Info: Using default value, 0.0005, for parameter (microphysics, q_liq_threshold).
+[ Info: Using default value, 1.0e-6, for parameter (microphysics, q_ice_threshold).
+z_span = (0.0, 4400.0)
+[ Info: Using default value, 1000.0, for parameter (microphysics, τ_precip).
+[ Info: Using default value, 2500.0, for parameter (microphysics, τ_acnv_rai).
+[ Info: Using default value, 100.0, for parameter (microphysics, τ_acnv_sno).
+[ Info: Using default value, 0.0005, for parameter (microphysics, q_liq_threshold).
+[ Info: Using default value, 1.0e-6, for parameter (microphysics, q_ice_threshold).
+z_span = (0.0, 1500.0)
+[ Info: Using default value, 1000.0, for parameter (microphysics, τ_precip).
+[ Info: Using default value, 2500.0, for parameter (microphysics, τ_acnv_rai).
+[ Info: Using default value, 100.0, for parameter (microphysics, τ_acnv_sno).
+[ Info: Using default value, 0.0005, for parameter (microphysics, q_liq_threshold).
+[ Info: Using default value, 1.0e-6, for parameter (microphysics, q_ice_threshold).
+z_span = (0.0, 400.0)
+[ Info: Using default value, 1000.0, for parameter (microphysics, τ_precip).
+[ Info: Using default value, 2500.0, for parameter (microphysics, τ_acnv_rai).
+[ Info: Using default value, 100.0, for parameter (microphysics, τ_acnv_sno).
+[ Info: Using default value, 0.0005, for parameter (microphysics, q_liq_threshold).
+[ Info: Using default value, 1.0e-6, for parameter (microphysics, q_ice_threshold).
+z_span = (0.0, 2048.0)
+[ Info: Using default value, 1000.0, for parameter (microphysics, τ_precip).
+[ Info: Using default value, 2500.0, for parameter (microphysics, τ_acnv_rai).
+[ Info: Using default value, 100.0, for parameter (microphysics, τ_acnv_sno).
+[ Info: Using default value, 0.0005, for parameter (microphysics, q_liq_threshold).
+[ Info: Using default value, 1.0e-6, for parameter (microphysics, q_ice_threshold).
+z_span = (0.0, 10000.0)
+[ Info: Using default value, 1000.0, for parameter (microphysics, τ_precip).
+[ Info: Using default value, 2500.0, for parameter (microphysics, τ_acnv_rai).
+[ Info: Using default value, 100.0, for parameter (microphysics, τ_acnv_sno).
+[ Info: Using default value, 0.0005, for parameter (microphysics, q_liq_threshold).
+[ Info: Using default value, 1.0e-6, for parameter (microphysics, q_ice_threshold).
+z_span = (0.0, 16000.0)
+[ Info: Using default value, 1000.0, for parameter (microphysics, τ_precip).
+[ Info: Using default value, 2500.0, for parameter (microphysics, τ_acnv_rai).
+[ Info: Using default value, 100.0, for parameter (microphysics, τ_acnv_sno).
+[ Info: Using default value, 0.0005, for parameter (microphysics, q_liq_threshold).
+[ Info: Using default value, 1.0e-6, for parameter (microphysics, q_ice_threshold).
+z_span = (0.0, 17000.0)</code></pre><h2 id="Bomex"><a class="docs-heading-anchor" href="#Bomex">Bomex</a><a id="Bomex-1"></a><a class="docs-heading-anchor-permalink" href="#Bomex" title="Permalink"></a></h2><p><img src="../Bomex.svg" alt/></p><h2 id="life_cycle_Tan2018"><a class="docs-heading-anchor" href="#life_cycle_Tan2018">life_cycle_Tan2018</a><a id="life_cycle_Tan2018-1"></a><a class="docs-heading-anchor-permalink" href="#life_cycle_Tan2018" title="Permalink"></a></h2><p><img src="../life_cycle_Tan2018.svg" alt/></p><h2 id="Soares"><a class="docs-heading-anchor" href="#Soares">Soares</a><a id="Soares-1"></a><a class="docs-heading-anchor-permalink" href="#Soares" title="Permalink"></a></h2><p><img src="../Soares.svg" alt/></p><h2 id="Rico"><a class="docs-heading-anchor" href="#Rico">Rico</a><a id="Rico-1"></a><a class="docs-heading-anchor-permalink" href="#Rico" title="Permalink"></a></h2><p><img src="../Rico.svg" alt/></p><h2 id="TRMM_LBA"><a class="docs-heading-anchor" href="#TRMM_LBA">TRMM_LBA</a><a id="TRMM_LBA-1"></a><a class="docs-heading-anchor-permalink" href="#TRMM_LBA" title="Permalink"></a></h2><p><img src="../TRMM_LBA.svg" alt/></p><h2 id="ARM_SGP"><a class="docs-heading-anchor" href="#ARM_SGP">ARM_SGP</a><a id="ARM_SGP-1"></a><a class="docs-heading-anchor-permalink" href="#ARM_SGP" title="Permalink"></a></h2><p><img src="../ARM_SGP.svg" alt/></p><h2 id="GATE_III"><a class="docs-heading-anchor" href="#GATE_III">GATE_III</a><a id="GATE_III-1"></a><a class="docs-heading-anchor-permalink" href="#GATE_III" title="Permalink"></a></h2><p><img src="../GATE_III.svg" alt/></p><h2 id="DYCOMS_RF01"><a class="docs-heading-anchor" href="#DYCOMS_RF01">DYCOMS_RF01</a><a id="DYCOMS_RF01-1"></a><a class="docs-heading-anchor-permalink" href="#DYCOMS_RF01" title="Permalink"></a></h2><p><img src="../DYCOMS_RF01.svg" alt/></p><h2 id="GABLS"><a class="docs-heading-anchor" href="#GABLS">GABLS</a><a id="GABLS-1"></a><a class="docs-heading-anchor-permalink" href="#GABLS" title="Permalink"></a></h2><p><img src="../GABLS.svg" alt/></p><h2 id="SP"><a class="docs-heading-anchor" href="#SP">SP</a><a id="SP-1"></a><a class="docs-heading-anchor-permalink" href="#SP" title="Permalink"></a></h2><p><img src="../SP.svg" alt/></p><h2 id="DryBubble"><a class="docs-heading-anchor" href="#DryBubble">DryBubble</a><a id="DryBubble-1"></a><a class="docs-heading-anchor-permalink" href="#DryBubble" title="Permalink"></a></h2><p><img src="../DryBubble.svg" alt/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../References/">References »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.10 on <span class="colophon-date" title="Thursday 23 December 2021 20:38">Thursday 23 December 2021</span>. Using Julia version 1.7.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
