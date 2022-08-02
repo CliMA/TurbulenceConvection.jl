@@ -482,8 +482,8 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
 
     @inbounds for i in 1:N_up
         aux_up_i = aux_up[i]
-        @. aux_up_i.entr_turb_dyn = aux_up_i.entr_sc + aux_up_i.frac_turb_entr
-        @. aux_up_i.detr_turb_dyn = aux_up_i.detr_sc + aux_up_i.frac_turb_entr
+        @. aux_up_i.entr_turb_dyn = aux_up_i.entr_sc + aux_up_i.entr_ml + aux_up_i.frac_turb_entr
+        @. aux_up_i.detr_turb_dyn = aux_up_i.detr_sc + aux_up_i.detr_ml + aux_up_i.frac_turb_entr
     end
 
     UB = CCO.UpwindBiasedProductC2F(bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
@@ -836,6 +836,8 @@ function compute_covariance_entr(
         eps_turb = frac_turb_entr
         detr_sc = aux_up_i.detr_sc
         entr_sc = aux_up_i.entr_sc
+        detr_ml = aux_up_i.detr_ml
+        entr_ml = aux_up_i.entr_ml
         w_up = aux_up_f[i].w
         prog_up_i = prog_up[i]
         ϕ_up = getproperty(prog_up_i, ϕ_sym)
@@ -844,8 +846,15 @@ function compute_covariance_entr(
         a_up = aux_up_i.area
 
         @. entr_gain +=
-            Int(a_up > min_area) *
-            (tke_factor * ρ_c * a_up * abs(Ic(w_up)) * detr_sc * (Idc(ϕ_up) - Idc(ϕ_en)) * (Idc(ψ_up) - Idc(ψ_en))) + (
+            Int(a_up > min_area) * (
+                tke_factor *
+                ρ_c *
+                a_up *
+                abs(Ic(w_up)) *
+                (detr_sc + detr_ml) *
+                (Idc(ϕ_up) - Idc(ϕ_en)) *
+                (Idc(ψ_up) - Idc(ψ_en))
+            ) + (
                 tke_factor *
                 ρ_c *
                 a_up *
@@ -857,7 +866,8 @@ function compute_covariance_entr(
                 )
             )
 
-        @. detr_loss += Int(a_up > min_area) * tke_factor * ρ_c * a_up * abs(Ic(w_up)) * (entr_sc + eps_turb) * covar
+        @. detr_loss +=
+            Int(a_up > min_area) * tke_factor * ρ_c * a_up * abs(Ic(w_up)) * (entr_sc + entr_ml + eps_turb) * covar
 
     end
 
@@ -960,11 +970,12 @@ function compute_en_tendencies!(
     @inbounds for i in 1:N_up
         turb_entr = aux_up[i].frac_turb_entr
         entr_sc = aux_up[i].entr_sc
+        entr_ml = aux_up[i].entr_ml
         w_up = aux_up_f[i].w
         a_up = aux_up[i].area
         # TODO: using `Int(bool) *` means that NaNs can propagate
         # into the solution. Could we somehow call `ifelse` instead?
-        @. D_env += Int(a_up > min_area) * ρ_c * a_up * Ic(w_up) * (entr_sc + turb_entr)
+        @. D_env += Int(a_up > min_area) * ρ_c * a_up * Ic(w_up) * (entr_sc + entr_ml + turb_entr)
     end
 
     RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
@@ -1020,11 +1031,12 @@ function update_diagnostic_covariances!(
     @inbounds for i in 1:N_up
         turb_entr = aux_up[i].frac_turb_entr
         entr_sc = aux_up[i].entr_sc
+        entr_ml = aux_up[i].entr_ml
         w_up = aux_up_f[i].w
         a_up = aux_up[i].area
         # TODO: using `Int(bool) *` means that NaNs can propagate
         # into the solution. Could we somehow call `ifelse` instead?
-        @. D_env += Int(a_up > min_area) * ρ_c * a_up * Ic(w_up) * (entr_sc + turb_entr)
+        @. D_env += Int(a_up > min_area) * ρ_c * a_up * Ic(w_up) * (entr_sc + entr_ml + turb_entr)
     end
 
     @. covar =

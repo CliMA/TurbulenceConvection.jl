@@ -47,6 +47,10 @@ function io_dictionary_diagnostics()
         "nondim_entrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).ε_nondim),
         "detrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).detr_sc),
         "nondim_detrainment_sc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).δ_nondim),
+        "entrainment_ml" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).entr_ml),
+        "nondim_entrainment_ml" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).ε_ml_nondim),
+        "detrainment_ml" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).detr_ml),
+        "nondim_detrainment_ml" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).δ_ml_nondim),
         "asp_ratio" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).asp_ratio),
         "massflux" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).massflux),
         "rain_flux" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_precip(state).rain_flux),
@@ -275,6 +279,10 @@ function compute_diagnostics!(
         diag_tc.ε_nondim[k] = 0
         diag_tc.detr_sc[k] = 0
         diag_tc.δ_nondim[k] = 0
+        diag_tc.entr_ml[k] = 0
+        diag_tc.ε_ml_nondim[k] = 0
+        diag_tc.detr_ml[k] = 0
+        diag_tc.δ_ml_nondim[k] = 0
         diag_tc.asp_ratio[k] = 0
         diag_tc.frac_turb_entr[k] = 0
         if a_up_bulk_k > 0.0
@@ -284,6 +292,10 @@ function compute_diagnostics!(
                 diag_tc.ε_nondim[k] += aux_up_i.area[k] * aux_up_i.ε_nondim[k] / a_up_bulk_k
                 diag_tc.detr_sc[k] += aux_up_i.area[k] * aux_up_i.detr_sc[k] / a_up_bulk_k
                 diag_tc.δ_nondim[k] += aux_up_i.area[k] * aux_up_i.δ_nondim[k] / a_up_bulk_k
+                diag_tc.entr_ml[k] += aux_up_i.area[k] * aux_up_i.entr_ml[k] / a_up_bulk_k
+                diag_tc.ε_ml_nondim[k] += aux_up_i.area[k] * aux_up_i.ε_ml_nondim[k] / a_up_bulk_k
+                diag_tc.detr_ml[k] += aux_up_i.area[k] * aux_up_i.detr_ml[k] / a_up_bulk_k
+                diag_tc.δ_ml_nondim[k] += aux_up_i.area[k] * aux_up_i.δ_ml_nondim[k] / a_up_bulk_k
                 diag_tc.asp_ratio[k] += aux_up_i.area[k] * aux_up_i.asp_ratio[k] / a_up_bulk_k
                 diag_tc.frac_turb_entr[k] += aux_up_i.area[k] * aux_up_i.frac_turb_entr[k] / a_up_bulk_k
             end
