@@ -125,6 +125,10 @@ steps:
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --stoch_entr prognostic_noisy_relaxation_process --skip_tests true --suffix _prognostic_noisy_relaxation_process"
         artifact_paths: "Output.Bomex.01_prognostic_noisy_relaxation_process/stats/comparison/*"
 
+      - label: ":partly_sunny: Rico with prognostic_noisy_relaxation_process"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Rico --stoch_entr prognostic_noisy_relaxation_process --skip_tests true --suffix _prognostic_noisy_relaxation_process"
+        artifact_paths: "Output.Rico.01_prognostic_noisy_relaxation_process/stats/comparison/*"
+
       - label: ":partly_sunny: Bomex with multiple updrafts"
         command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --n_up 2 --dt_max 8.0 --suffix _n_up_2 --skip_tests true"
         artifact_paths: "Output.Bomex.01_n_up_2/stats/comparison/*"
