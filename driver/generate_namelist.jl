@@ -422,6 +422,11 @@ function Rico(namelist_defaults)
     namelist["microphysics"]["microph_scaling_melt"] = 1.0
     namelist["microphysics"]["microph_scaling_acnv"] = 1.0
     namelist["microphysics"]["microph_scaling_accr"] = 1.0
+    # add KK2000 parameters for calibrations
+    namelist["microphysics"]["A_acnv_KK2000"] = 7.42e13
+    namelist["microphysics"]["a_acnv_KK2000"] = 2.47
+    namelist["microphysics"]["b_acnv_KK2000"] = -1.79
+    namelist["microphysics"]["c_acnv_KK2000"] = -1.47
 
     namelist["meta"]["simname"] = "Rico"
     namelist["meta"]["casename"] = "Rico"
@@ -465,6 +470,11 @@ function TRMM_LBA(namelist_defaults)
     namelist["microphysics"]["microph_scaling_melt"] = 1.0
     namelist["microphysics"]["microph_scaling_acnv"] = 1.0
     namelist["microphysics"]["microph_scaling_accr"] = 1.0
+    # add KK2000 parameters for calibrations
+    namelist["microphysics"]["A_acnv_KK2000"] = 7.42e13
+    namelist["microphysics"]["a_acnv_KK2000"] = 2.47
+    namelist["microphysics"]["b_acnv_KK2000"] = -1.79
+    namelist["microphysics"]["c_acnv_KK2000"] = -1.47
 
     namelist["meta"]["simname"] = "TRMM_LBA"
     namelist["meta"]["casename"] = "TRMM_LBA"
@@ -564,6 +574,11 @@ function DYCOMS_RF02(namelist_defaults)
     namelist["microphysics"]["microph_scaling_melt"] = 1.0
     namelist["microphysics"]["microph_scaling_acnv"] = 1.0
     namelist["microphysics"]["microph_scaling_accr"] = 1.0
+    # add KK2000 parameters for calibrations
+    namelist["microphysics"]["A_acnv_KK2000"] = 7.42e13
+    namelist["microphysics"]["a_acnv_KK2000"] = 2.47
+    namelist["microphysics"]["b_acnv_KK2000"] = -1.79
+    namelist["microphysics"]["c_acnv_KK2000"] = -1.47
 
     namelist["meta"]["simname"] = "DYCOMS_RF02"
     namelist["meta"]["casename"] = "DYCOMS_RF02"
