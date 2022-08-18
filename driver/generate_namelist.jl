@@ -323,7 +323,7 @@ function Soares(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 8 * 3600.0
-    namelist["time_stepping"]["dt_min"] = 1.0
+    namelist["time_stepping"]["dt_min"] = 0.75
 
     namelist["meta"]["simname"] = "Soares"
     namelist["meta"]["casename"] = "Soares"
@@ -339,7 +339,7 @@ function Nieuwstadt(namelist_defaults)
     namelist["grid"]["dz"] = 50.0
 
     namelist["time_stepping"]["t_max"] = 8 * 3600.0
-    namelist["time_stepping"]["dt_min"] = 1.2
+    namelist["time_stepping"]["dt_min"] = 0.75
 
     namelist["meta"]["simname"] = "Nieuwstadt"
     namelist["meta"]["casename"] = "Nieuwstadt"
@@ -597,7 +597,7 @@ function GABLS(namelist_defaults)
     namelist["forcing"]["coriolis"] = 1.39e-4
 
     namelist["time_stepping"]["t_max"] = 9 * 3600.0
-    namelist["time_stepping"]["dt_min"] = 4.0
+    namelist["time_stepping"]["dt_min"] = 2.0
     namelist["time_stepping"]["dt_max"] = 8.0
     namelist["meta"]["simname"] = "GABLS"
     namelist["meta"]["casename"] = "GABLS"
