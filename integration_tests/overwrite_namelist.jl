@@ -36,6 +36,7 @@ function overwrite_namelist!(namelist, parsed_args)
     "float_type"                   => (nl, pa, key) -> (nl["float_type"] = pa[key]),
     )
     no_overwrites = (
+        "job_id",
         "case", # default_namelist already overwrites namelist["meta"]["casename"]
         "skip_post_proc",
         "skip_tests",

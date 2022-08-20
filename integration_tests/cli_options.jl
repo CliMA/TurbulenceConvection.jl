@@ -3,6 +3,9 @@ import ArgParse
 function parse_commandline()
     s = ArgParse.ArgParseSettings()
     ArgParse.@add_arg_table s begin
+        "--job_id"
+        help = "A unique job identifier (currently only supported in flame graphs)"
+        default = "UNDEFINED"
         "--case"
         help = "Case to run"
         default = "Bomex"
