@@ -12,6 +12,7 @@ agents:
   config: cpu
   queue: central
   slurm_ntasks: 1
+  slurm_mem: 10GB
 
 steps:
   - label: "init environment :computer:"
@@ -189,6 +190,11 @@ steps:
 
       - label: ":rocket: Allocations analysis"
         command: "julia --color=yes --project=perf perf/allocs.jl"
+
+      - label: ":rocket: Flame graph"
+        command: "julia --color=yes --project=perf perf/flame.jl --job_id Bomex"
+        env:
+          CI_PERF_CPUPROFILE: "true"
 
       - label: ":rocket: Allocations analysis (exhaustive)"
         command: "julia --color=yes --project=perf perf/allocs.jl exhaustive=true"
