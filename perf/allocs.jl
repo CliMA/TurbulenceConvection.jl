@@ -70,7 +70,7 @@ all_cases = [
     # "Nieuwstadt",
     "Rico",
     # "Soares",
-    "TRMM_LBA",
+    # "TRMM_LBA",
     "LES_driven_SCM",
 ]
 
