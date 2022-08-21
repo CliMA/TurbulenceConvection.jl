@@ -12,6 +12,7 @@ agents:
   config: cpu
   queue: central
   slurm_ntasks: 1
+  slurm_mem: 10GB
 
 steps:
   - label: "init environment :computer:"
