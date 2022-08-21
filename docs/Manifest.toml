@@ -1631,9 +1631,9 @@ version = "1.0.1"
 
 [[deps.Thermodynamics]]
 deps = ["DocStringExtensions", "KernelAbstractions", "Random", "RootSolvers"]
-git-tree-sha1 = "0ff7428af31cc2925d29384144d495aef19b9047"
+git-tree-sha1 = "0151b1a971fdd9438a6341ffde927efecfe275c1"
 uuid = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
-version = "0.9.3"
+version = "0.9.5"
 
 [[deps.ThreadingUtilities]]
 deps = ["ManualMemory"]
