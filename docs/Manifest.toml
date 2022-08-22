@@ -1063,9 +1063,9 @@ version = "0.2.2"
 
 [[deps.NCDatasets]]
 deps = ["CFTime", "DataStructures", "Dates", "NetCDF_jll", "NetworkOptions", "Printf"]
-git-tree-sha1 = "3d81cbe30a384061854c96fac12f02f5e7e372d3"
+git-tree-sha1 = "16463e1587495780aa05e05440f16959042bfcb1"
 uuid = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
-version = "0.12.5"
+version = "0.12.7"
 
 [[deps.NLSolversBase]]
 deps = ["DiffResults", "Distributed", "FiniteDiff", "ForwardDiff"]
