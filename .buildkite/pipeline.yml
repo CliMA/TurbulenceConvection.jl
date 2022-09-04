@@ -192,9 +192,8 @@ steps:
         command: "julia --color=yes --project=perf perf/allocs.jl"
 
       - label: ":rocket: Flame graph"
-        command: "julia --color=yes --project=perf perf/flame.jl --job_id Bomex"
-        env:
-          CI_PERF_CPUPROFILE: "true"
+        command: "julia --color=yes --project=perf perf/flame.jl --job_id flame_Bomex --case Bomex"
+        artifact_paths: "flame_Bomex/*"
 
       - label: ":rocket: Allocations analysis (exhaustive)"
         command: "julia --color=yes --project=perf perf/allocs.jl exhaustive=true"
