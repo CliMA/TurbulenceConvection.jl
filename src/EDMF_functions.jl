@@ -724,6 +724,7 @@ function compute_covariance_shear(
     aux_en_2m = center_aux_environment_2m(state)
     aux_covar = getproperty(aux_en_2m, covar_sym)
     uₕ_gm = grid_mean_uₕ(state)
+    k̂ = center_aux_grid_mean(state).k̂
 
     aux_en_c = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
@@ -738,8 +739,6 @@ function compute_covariance_shear(
     shear = aux_covar.shear
 
     C123 = CCG.Covariant123Vector
-    local_geometry = CC.Fields.local_geometry_field(axes(ρ_c))
-    k̂ = @. CCG.Contravariant3Vector(CCG.WVector(FT(1)), local_geometry)
     Ifuₕ = uₕ_bcs()
     ∇uvw = CCO.GradientF2C()
     # TODO: k_eddy and Shear² should probably be tensors (Contravariant3 tensor),

@@ -63,6 +63,7 @@ cent_aux_vars_gm(FT, local_geometry, edmf) = (;
     θ_liq_ice = FT(0),
     q_tot = FT(0),
     p = FT(0),
+    k̂ = CCG.Contravariant3Vector(CCG.WVector(FT(1)), local_geometry),
 )
 cent_aux_vars(FT, local_geometry, edmf) =
     (; cent_aux_vars_gm(FT, local_geometry, edmf)..., TC.cent_aux_vars_edmf(FT, local_geometry, edmf)...)
