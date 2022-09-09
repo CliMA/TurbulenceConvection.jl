@@ -197,9 +197,9 @@ function ∑stoch_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) whe
     parent(tends_face) .= 0
     parent(tends_cent) .= 0
 
-    for inds in TC.iterate_columns(prog.cent)
+    CC.Fields.bycolumn(axes(prog.cent)) do colidx
 
-        state = TC.column_state(prog, aux, tendencies, inds...)
+        state = TC.column_state(prog, aux, tendencies, colidx)
         grid = TC.Grid(state)
         surf = get_surface(surf_params, grid, state, t, param_set)
 
@@ -219,8 +219,8 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
     parent(tends_face) .= 0
     parent(tends_cent) .= 0
 
-    for inds in TC.iterate_columns(prog.cent)
-        state = TC.column_state(prog, aux, tendencies, inds...)
+    CC.Fields.bycolumn(axes(prog.cent)) do colidx
+        state = TC.column_state(prog, aux, tendencies, colidx)
         grid = TC.Grid(state)
 
         set_thermo_state_from_prog!(state, grid, edmf.moisture_model, param_set)
