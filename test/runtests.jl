@@ -15,6 +15,11 @@ best_mse = all_best_mse["Bomex"]
     # TODO: add unit tests.
 end
 
+import Aqua
+@testset "Quality Assurance" begin
+    @test length(Aqua.detect_ambiguities(TurbulenceConvection; recursive = true)) ≤ 108
+end
+
 @testset "Bomex" begin
 
     case_name = "Bomex"
