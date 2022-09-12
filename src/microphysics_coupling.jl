@@ -114,45 +114,13 @@ function precipitation_formation(
             # that the supersaturation is present in the domain.
             if rain_formation_model isa Clima1M_default
                 S_qt_rain = -min(q.liq / Δt, α_acnv * CM1.conv_q_liq_to_q_rai(microphys_params, q.liq))
-            elseif rain_formation_model isa KK2000
+            elseif rain_formation_model isa Clima2M
                 S_qt_rain =
                     -min(
                         q.liq / Δt,
-                        α_acnv * CM2.conv_q_liq_to_q_rai_KK2000(
+                        α_acnv * CM2.conv_q_liq_to_q_rai(
                             microphys_params,
-                            q.liq,
-                            ρ,
-                            N_d = rain_formation_model.prescribed_Nd,
-                        ),
-                    )
-            elseif rain_formation_model isa B1994
-                S_qt_rain =
-                    -min(
-                        q.liq / Δt,
-                        α_acnv * CM2.conv_q_liq_to_q_rai_B1994(
-                            microphys_params,
-                            q.liq,
-                            ρ,
-                            N_d = rain_formation_model.prescribed_Nd,
-                        ),
-                    )
-            elseif rain_formation_model isa TC1980
-                S_qt_rain =
-                    -min(
-                        q.liq / Δt,
-                        α_acnv * CM2.conv_q_liq_to_q_rai_TC1980(
-                            microphys_params,
-                            q.liq,
-                            ρ,
-                            N_d = rain_formation_model.prescribed_Nd,
-                        ),
-                    )
-            elseif rain_formation_model isa LD2004
-                S_qt_rain =
-                    -min(
-                        q.liq / Δt,
-                        α_acnv * CM2.conv_q_liq_to_q_rai_LD2004(
-                            microphys_params,
+                            rain_formation_model.type,
                             q.liq,
                             ρ,
                             N_d = rain_formation_model.prescribed_Nd,
@@ -175,16 +143,26 @@ function precipitation_formation(
                 S_qr =
                     min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ)) *
                     precip_fraction
-            elseif rain_formation_model isa KK2000
-                S_qr = min(q.liq / Δt, α_accr * CM2.accretion_KK2000(microphys_params, q.liq, qr, ρ)) * precip_fraction
-            elseif rain_formation_model isa B1994
-                S_qr = min(q.liq / Δt, α_accr * CM2.accretion_B1994(microphys_params, q.liq, qr, ρ)) * precip_fraction
-            elseif rain_formation_model isa TC1980
-                S_qr = min(q.liq / Δt, α_accr * CM2.accretion_TC1980(microphys_params, q.liq, qr)) * precip_fraction
-            elseif rain_formation_model isa LD2004
-                S_qr =
-                    min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ)) *
-                    precip_fraction
+            elseif rain_formation_model isa Clima2M
+                if rain_formation_model.type isa CMT.LD2004Type
+                    S_qr =
+                        min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ)) *
+                        precip_fraction
+                elseif rain_formation_model.type isa CMT.KK2000Type || rain_formation_model.type isa CMT.B1994Type
+                    S_qr =
+                        min(
+                            q.liq / Δt,
+                            α_accr * CM2.accretion(microphys_params, rain_formation_model.type, q.liq, qr, ρ),
+                        ) * precip_fraction
+                elseif rain_formation_model.type isa CMT.TC1980Type
+                    S_qr =
+                        min(
+                            q.liq / Δt,
+                            α_accr * CM2.accretion(microphys_params, rain_formation_model.type, q.liq, qr),
+                        ) * precip_fraction
+                else
+                    error("Unrecognized 2-moment rain formation model type")
+                end
             else
                 error("Unrecognized rain formation model")
             end
