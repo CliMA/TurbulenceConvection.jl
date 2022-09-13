@@ -147,7 +147,7 @@ function get_shallow_LES_library()
     LES_library["CNRM-CM5"]["10"] = Dict()
     LES_library["CNRM-CM5"]["10"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [15, 22, 23])
     LES_library["CNRM-CM5"]["07"] = Dict()
-    LES_library["CNRM-CM5"]["07"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [13, 14, 15])
+    LES_library["CNRM-CM5"]["07"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [13, 14, 15, 18])
     LES_library["CNRM-CM5"]["04"] = Dict()
     LES_library["CNRM-CM5"]["04"]["cfsite_numbers"] =
         setdiff(Shen_et_al_sites, [11, 12, 13, 14, 15, 17, 18, 21, 22, 23])
