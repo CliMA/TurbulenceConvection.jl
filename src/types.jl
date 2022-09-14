@@ -270,17 +270,9 @@ and the additional options with prescribed cloud droplet number concentration.
 abstract type AbstractRainFormationModel end
 struct NoRainFormation <: AbstractRainFormationModel end
 struct Clima1M_default <: AbstractRainFormationModel end
-struct KK2000{FT} <: AbstractRainFormationModel
+struct Clima2M{FT, PT} <: AbstractRainFormationModel
     prescribed_Nd::FT
-end
-struct B1994{FT} <: AbstractRainFormationModel
-    prescribed_Nd::FT
-end
-struct TC1980{FT} <: AbstractRainFormationModel
-    prescribed_Nd::FT
-end
-struct LD2004{FT} <: AbstractRainFormationModel
-    prescribed_Nd::FT
+    type::PT
 end
 
 abstract type AbstractPrecipFractionModel end
