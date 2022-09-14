@@ -608,11 +608,13 @@ end
 function DryBubble(namelist_defaults)
     namelist = deepcopy(namelist_defaults)
     namelist["meta"]["casename"] = "DryBubble"
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.0
+    # Commented out numbers here is (presumably) what we intend for the case. However this crashes the simulation.
+    # instead, the overarching default parameters are imposed, and we can revisit this issue another time. -Haakon
+    namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.1  # 0.0
 
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] = 0.12
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = 0.25
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = 0.1
+    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] = 0.12
+    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = 0.1  # 0.25
+    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = 10.0  # 0.1
 
     namelist["grid"]["nz"] = 200
     namelist["grid"]["dz"] = 50.0
@@ -637,8 +639,8 @@ function LES_driven_SCM(namelist_defaults)
 
     namelist["stats_io"]["frequency"] = 10.0
     namelist["time_stepping"]["t_max"] = 3600.0 * 6
-    namelist_defaults["time_stepping"]["dt_max"] = 5.0
-    namelist_defaults["time_stepping"]["dt_min"] = 0.5
+    namelist["time_stepping"]["dt_max"] = 5.0
+    namelist["time_stepping"]["dt_min"] = 0.5
 
     # use last 6 hours of LES simulation to drive LES
     namelist["t_interval_from_end_s"] = 3600.0 * 6
