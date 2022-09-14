@@ -608,11 +608,13 @@ end
 function DryBubble(namelist_defaults)
     namelist = deepcopy(namelist_defaults)
     namelist["meta"]["casename"] = "DryBubble"
-    namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.0
+    # Commented out numbers here is (presumably) what we intend for the case. However this crashes the simulation.
+    # instead, the overarching default parameters are imposed, and we can revisit this issue another time. -Haakon
+    namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.1  # 0.0
 
     namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_buoy_coeff1"] = 0.12
-    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = 0.25
-    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = 0.1
+    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_adv_coeff"] = 0.1  # 0.25
+    namelist["turbulence"]["EDMF_PrognosticTKE"]["pressure_normalmode_drag_coeff"] = 10.0  # 0.1
 
     namelist["grid"]["nz"] = 200
     namelist["grid"]["dz"] = 50.0
