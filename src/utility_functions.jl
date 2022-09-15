@@ -154,9 +154,20 @@ function get_shallow_LES_library()
     LES_library["CNRM-CM5"]["01"] = Dict()
     LES_library["CNRM-CM5"]["01"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [14, 15, 17, 18, 19, 20, 21, 22, 23])
 
+    # CNRM-CM6-1 model (69 AMIP-AMIP4K pairs)
+    LES_library["CNRM-CM6-1"]["10"] = Dict()
+    LES_library["CNRM-CM6-1"]["10"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [22, 23])
+    LES_library["CNRM-CM6-1"]["07"] = Dict()
+    LES_library["CNRM-CM6-1"]["07"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [12, 13, 14, 15, 17])
+    LES_library["CNRM-CM6-1"]["04"] = Dict()
+    LES_library["CNRM-CM6-1"]["04"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [13, 14, 15])
+    LES_library["CNRM-CM6-1"]["01"] = Dict()
+    LES_library["CNRM-CM6-1"]["01"]["cfsite_numbers"] = setdiff(Shen_et_al_sites, [14, 15, 21, 22, 23])
+
     for month in ["01", "04", "07", "10"]
         LES_library["HadGEM2-A"][month]["experiments"] = ["amip", "amip4K"]
         LES_library["CNRM-CM5"][month]["experiments"] = ["amip", "amip4K"]
+        LES_library["CNRM-CM6-1"][month]["experiments"] = ["amip", "amip4K"]
     end
     return LES_library
 end
