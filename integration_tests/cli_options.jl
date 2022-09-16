@@ -13,14 +13,14 @@ function parse_commandline()
         arg_type = String
         "--quad_type"      # SGS quadrature type (lognormal or Gaussian)
         arg_type = String
-        "--entr"           # Try other entr-detr models
+        "--entr"           # Try other phys entr-detr models
+        arg_type = String
+        "--ml_entr"          # Try machine learning entr-detr models
         arg_type = String
         "--entr_dim_scale" # Specify dimensional scale for entrainment
         arg_type = String
         "--detr_dim_scale" # Specify dimensional scale for detrainment
         arg_type = String
-        "--area_limiter_power" # Specify area limiter power
-        arg_type = Float64
         "--nn_ent_biases" # Specify whether NN parameter vector contains biases
         arg_type = Bool
         "--stoch_entr"     # Choose type of stochastic entr-detr model

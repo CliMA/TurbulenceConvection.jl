@@ -43,7 +43,6 @@ Base.@kwdef struct EntrDetr{FT}
 end
 
 Base.@kwdef struct εδModelParams{FT, AFT}
-    c_div::FT
     w_min::FT # minimum updraft velocity to avoid zero division in b/w²
     c_ε::FT # factor multiplier for dry term in entrainment/detrainment
     μ_0::FT # dimensional scale logistic function in the dry term in entrainment/detrainment
@@ -58,35 +57,52 @@ Base.@kwdef struct εδModelParams{FT, AFT}
 end
 
 abstract type AbstractEntrDetrModel end
-abstract type AbstractNonLocalEntrDetrModel <: AbstractEntrDetrModel end
 abstract type AbstractNoisyEntrDetrModel <: AbstractEntrDetrModel end
 Base.@kwdef struct MDEntr{P} <: AbstractEntrDetrModel
     params::P
 end  # existing model
+Base.@kwdef struct EntrNone{P} <: AbstractEntrDetrModel
+    params::P
+end  # empthy model
+Base.@kwdef struct NoisyRelaxationProcess{MT, T} <: AbstractNoisyEntrDetrModel
+    mean_model::MT
+    c_gen_stoch::T
+end
+Base.@kwdef struct LogNormalScalingProcess{MT, T} <: AbstractNoisyEntrDetrModel
+    mean_model::MT
+    c_gen_stoch::T
+end
 
-Base.@kwdef struct NNEntr{P, AFT, T} <: AbstractEntrDetrModel
+Base.@kwdef struct PrognosticNoisyRelaxationProcess{MT, T} <: AbstractNoisyEntrDetrModel
+    mean_model::MT
+    c_gen_stoch::T
+end
+
+abstract type AbstractMLEntrDetrModel end
+abstract type AbstractMLNonLocalEntrDetrModel <: AbstractMLEntrDetrModel end
+Base.@kwdef struct NNEntr{P, AFT, T} <: AbstractMLEntrDetrModel
     params::P
     c_nn_params::AFT
     nn_arc::T
     biases_bool::Bool
 end
-Base.@kwdef struct NNEntrNonlocal{P, AFT, T} <: AbstractNonLocalEntrDetrModel
+Base.@kwdef struct NNEntrNonlocal{P, AFT, T} <: AbstractMLNonLocalEntrDetrModel
     params::P
     c_nn_params::AFT
     nn_arc::T
     biases_bool::Bool
 end
-Base.@kwdef struct LinearEntr{P, T} <: AbstractEntrDetrModel
+Base.@kwdef struct LinearEntr{P, T} <: AbstractMLEntrDetrModel
     params::P
     c_linear::T
 end
-Base.@kwdef struct FNOEntr{P, T} <: AbstractNonLocalEntrDetrModel
+Base.@kwdef struct FNOEntr{P, T} <: AbstractMLNonLocalEntrDetrModel
     params::P
     w_fno::Int
     nm_fno::Int
     c_fno::T
 end
-struct RFEntr{d, m, FT, P, A, B} <: AbstractEntrDetrModel
+struct RFEntr{d, m, FT, P, A, B} <: AbstractMLEntrDetrModel
     params::P
     c_rf_fix::A
     c_rf_opt::B
@@ -120,7 +136,9 @@ Base.@kwdef struct PrognosticNoisyRelaxationProcess{MT, T} <: AbstractNoisyEntrD
 end
 
 εδ_params(m::AbstractEntrDetrModel) = m.params
+εδ_params(m::AbstractMLEntrDetrModel) = m.params
 εδ_params(m::AbstractNoisyEntrDetrModel) = m.mean_model.params
+
 
 abstract type EntrDimScale end
 struct BuoyVelEntrDimScale <: EntrDimScale end
@@ -421,7 +439,7 @@ Base.@kwdef struct SurfaceBase{FT}
     wstar::FT = 0
 end
 
-struct EDMFModel{N_up, FT, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}
+struct EDMFModel{N_up, FT, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, EDS, DDS, EPG}
     surface_area::FT
     max_area::FT
     minimum_area::FT
@@ -435,6 +453,7 @@ struct EDMFModel{N_up, FT, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, 
     mixing_length_params::MLP
     pressure_model_params::PMP
     entr_closure::EC
+    ml_entr_closure::MLEC
     entr_dim_scale::EDS
     detr_dim_scale::DDS
     entr_pi_subset::EPG
@@ -539,7 +558,16 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         "EDMF_PrognosticTKE",
         "entrainment";
         default = "moisture_deficit",
-        valid_options = ["moisture_deficit", "NN", "NN_nonlocal", "FNO", "Linear", "RF"],
+        valid_options = ["moisture_deficit", "None"],
+    )
+
+    ml_entr_type = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "ml_entrainment";
+        default = "None",
+        valid_options = ["None", "NN", "NN_nonlocal", "FNO", "Linear", "RF"],
     )
 
     nn_biases = parse_namelist(
@@ -551,8 +579,6 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         valid_options = [true, false],
     )
 
-    c_div =
-        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_massflux_div_factor"; default = 0.0)
     w_min = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_upd_velocity")
     c_ε = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_factor")
     μ_0 = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_scale")
@@ -566,34 +592,42 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     Π_norm = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pi_norm_consts")
     Π_norm = SA.SVector{length(Π_norm), FT}(Π_norm)
 
-    εδ_params = εδModelParams{FT, typeof(Π_norm)}(; c_div, w_min, c_ε, μ_0, β, χ, c_λ, γ_lim, β_lim, c_γ, c_δ, Π_norm)
+    εδ_params = εδModelParams{FT, typeof(Π_norm)}(; w_min, c_ε, μ_0, β, χ, c_λ, γ_lim, β_lim, c_γ, c_δ, Π_norm)
 
     entr_pi_subset = Tuple(parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_pi_subset"))
 
     mean_entr_closure = if entr_type == "moisture_deficit"
         MDEntr(; params = εδ_params)
-    elseif entr_type == "NN"
+    elseif entr_type == "None"
+        EntrNone(; params = εδ_params)
+    else
+        error("Something went wrong. Invalid entrainment type '$entr_type'")
+    end
+
+    ml_entr_closure = if ml_entr_type == "None"
+        EntrNone(; params = εδ_params)
+    elseif ml_entr_type == "NN"
         c_nn_params = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_ent_params")
         nn_arc = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_arc")
         NNEntr(; params = εδ_params, biases_bool = nn_biases, c_nn_params, nn_arc)
-    elseif entr_type == "NN_nonlocal"
+    elseif ml_entr_type == "NN_nonlocal"
         c_nn_params = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_ent_params")
         nn_arc = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "nn_arc")
         NNEntrNonlocal(; params = εδ_params, biases_bool = nn_biases, c_nn_params, nn_arc)
-    elseif entr_type == "FNO"
+    elseif ml_entr_type == "FNO"
         w_fno = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_width")
         nm_fno = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_n_modes")
         c_fno = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fno_ent_params")
         FNOEntr(; params = εδ_params, w_fno, nm_fno, c_fno)
-    elseif entr_type == "Linear"
+    elseif ml_entr_type == "Linear"
         c_linear = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "linear_ent_params")
         LinearEntr(; params = εδ_params, c_linear)
-    elseif entr_type == "RF"
+    elseif ml_entr_type == "RF"
         c_rf_fix = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_fix_ent_params")
         c_rf_opt = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_opt_ent_params")
         RFEntr(εδ_params, c_rf_fix, c_rf_opt, length(entr_pi_subset))
     else
-        error("Something went wrong. Invalid entrainment type '$entr_type'")
+        error("Something went wrong. Invalid ML entrainment type '$ml_entr_type'")
     end
 
     # Overwrite `entr_closure` if a noisy relaxation process is used
@@ -675,6 +709,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     EDS = typeof(entr_dim_scale)
     DDS = typeof(detr_dim_scale)
     EC = typeof(entr_closure)
+    MLEC = typeof(ml_entr_closure)
     MM = typeof(moisture_model)
     TCM = typeof(thermo_covariance_model)
     PM = typeof(precip_model)
@@ -685,7 +720,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     EPG = typeof(entr_pi_subset)
     MLP = typeof(mixing_length_params)
     PMP = typeof(pressure_model_params)
-    return EDMFModel{n_updrafts, FT, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, EDS, DDS, EPG}(
+    return EDMFModel{n_updrafts, FT, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, EDS, DDS, EPG}(
         surface_area,
         max_area,
         minimum_area,
@@ -699,6 +734,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         mixing_length_params,
         pressure_model_params,
         entr_closure,
+        ml_entr_closure,
         entr_dim_scale,
         detr_dim_scale,
         entr_pi_subset,
