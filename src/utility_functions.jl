@@ -105,8 +105,8 @@ function get_LES_library()
     append!(LES_library["HadGEM2-A"]["10"]["cfsite_numbers"], sites_10)
 
     LES_library_full = deepcopy(LES_library)
-    for month in ["01", "04", "07", "10"]
-        for model in ["HadGEM2-A", "CNRM-CM5"]
+    for model in keys(LES_library_full)
+        for month in keys(LES_library_full[model])
             LES_library_full[model][month]["cfsite_numbers"] = Dict()
             for cfsite_number in LES_library[model][month]["cfsite_numbers"]
                 cfsite_number_str = string(cfsite_number, pad = 2)
