@@ -210,16 +210,14 @@ end
 
 # Compute the sum of tendencies for the scheme
 function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
-    UnPack.@unpack edmf, precip_model, param_set, case = params
-    UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
-
-    thermo_params = TCP.thermodynamics_params(param_set)
-    tends_face = tendencies.face
-    tends_cent = tendencies.cent
-    parent(tends_face) .= 0
-    parent(tends_cent) .= 0
-
     CC.Fields.bycolumn(axes(prog.cent)) do colidx
+        UnPack.@unpack edmf, precip_model, param_set, case = params
+        UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
+
+        thermo_params = TCP.thermodynamics_params(param_set)
+
+        parent(tendencies.face[colidx]) .= 0
+        parent(tendencies.cent[colidx]) .= 0
         state = TC.column_state(prog, aux, tendencies, colidx)
         grid = TC.Grid(state)
 
@@ -250,6 +248,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
         TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt)
         compute_gm_tendencies!(edmf, grid, state, surf, radiation, forcing, param_set)
+        nothing
     end
 
     return nothing

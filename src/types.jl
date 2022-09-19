@@ -785,10 +785,16 @@ function Base.summary(io::IO, edmf::EDMFModel)
 end
 
 
-struct State{P, A, T}
+struct State{P, A, T, G}
     prog::P
     aux::A
     tendencies::T
+    grid::G
+end
+
+function State(prog::P, aux::A, tendencies::T) where {P, A, T}
+    grid = Grid(axes(prog.cent))
+    return State{P, A, T, typeof(grid)}(prog, aux, tendencies, grid)
 end
 
 """
@@ -840,7 +846,7 @@ function column_diagnostics(diagnostics, colidx)
 end
 
 
-Grid(state::State) = Grid(axes(state.prog.cent))
+Grid(state::State) = state.grid
 
 float_type(state::State) = eltype(state.prog)
 # float_type(field::CC.Fields.Field) = CC.Spaces.undertype(axes(field))
