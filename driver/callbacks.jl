@@ -12,13 +12,12 @@ end
 condition_every_iter(u, t, integrator) = true
 
 function affect_io!(integrator)
-    UnPack.@unpack edmf, calibrate_io, precip_model, aux, io_nt, diagnostics, surf_params, param_set, Stats, skip_io =
-        integrator.p
-    skip_io && return nothing
-    t = integrator.t
-    prog = integrator.u
+    integrator.p.skip_io && return nothing
 
-    CC.Fields.bycolumn(axes(prog.cent)) do colidx
+    CC.Fields.bycolumn(axes(integrator.u.cent)) do colidx
+        (; edmf, calibrate_io, precip_model, aux, io_nt, diagnostics, surf_params, param_set, Stats) = integrator.p
+        t = integrator.t
+        prog = integrator.u
         stats = Stats[colidx]
         # TODO: remove `vars` hack that avoids
         # https://github.com/Alexander-Barth/NCDatasets.jl/issues/135
@@ -68,22 +67,23 @@ function affect_io!(integrator)
 
         surf = get_surface(surf_params, grid, state, t, param_set)
         io(surf, surf_params, grid, state, stats, t)
+        nothing
     end
 
     ODE.u_modified!(integrator, false) # We're legitamately not mutating `u` (the state vector)
 end
 
 function affect_filter!(integrator)
-    UnPack.@unpack edmf, param_set, aux, case, surf_params = integrator.p
-    t = integrator.t
-    prog = integrator.u
-    prog = integrator.u
+    CC.Fields.bycolumn(axes(integrator.u.cent)) do colidx
+        (; edmf, param_set, aux, case, surf_params) = integrator.p
+        t = integrator.t
+        prog = integrator.u
 
-    CC.Fields.bycolumn(axes(prog.cent)) do colidx
         state = TC.column_prog_aux(prog, aux, colidx)
         grid = TC.Grid(state)
         surf = get_surface(surf_params, grid, state, t, param_set)
         TC.affect_filter!(edmf, grid, state, param_set, surf, t)
+        nothing
     end
 
     # We're lying to OrdinaryDiffEq.jl, in order to avoid
@@ -139,27 +139,26 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
     return dt_max
 end
 
-function dt_max!(integrator)
-    UnPack.@unpack edmf, aux, TS = integrator.p
-    prog = integrator.u
-
-    dt_max = TS.dt_max # initialize dt_max
-    CC.Fields.bycolumn(axes(prog.cent)) do colidx
+dt_max!(integrator) = dt_max!(integrator, integrator.p.TS.dt_max)
+function dt_max!(integrator, dt_max)
+    CC.Fields.bycolumn(axes(integrator.u.cent)) do colidx
+        (; edmf, aux, TS) = integrator.p
+        prog = integrator.u
         state = TC.column_prog_aux(prog, aux, colidx)
         dt_max = compute_dt_max(state, edmf, dt_max, TS.cfl_limit)
     end
     to_float(f) = f isa ForwardDiff.Dual ? ForwardDiff.value(f) : f
+    (; TS) = integrator.p
     TS.dt_max_edmf = to_float(dt_max)
 
     ODE.u_modified!(integrator, false)
 end
 
 function monitor_cfl!(integrator)
-    UnPack.@unpack edmf, aux, TS = integrator.p
-    prog = integrator.u
-    frac_tol = 0.05
-
-    CC.Fields.bycolumn(axes(prog.cent)) do colidx
+    CC.Fields.bycolumn(axes(integrator.u.cent)) do colidx
+        (; edmf, aux, TS) = integrator.p
+        frac_tol = 0.05
+        prog = integrator.u
         state = TC.column_prog_aux(prog, aux, colidx)
         grid = TC.Grid(state)
         prog_gm = TC.center_prog_grid_mean(state)
@@ -193,6 +192,7 @@ function monitor_cfl!(integrator)
                 )
             end
         end
+        nothing
     end
 
     ODE.u_modified!(integrator, false)
