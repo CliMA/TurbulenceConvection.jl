@@ -121,20 +121,6 @@ end
 
 Base.eltype(::RFEntr{d, m, FT}) where {d, m, FT} = FT
 
-Base.@kwdef struct NoisyRelaxationProcess{MT, T} <: AbstractNoisyEntrDetrModel
-    mean_model::MT
-    c_gen_stoch::T
-end
-Base.@kwdef struct LogNormalScalingProcess{MT, T} <: AbstractNoisyEntrDetrModel
-    mean_model::MT
-    c_gen_stoch::T
-end
-
-Base.@kwdef struct PrognosticNoisyRelaxationProcess{MT, T} <: AbstractNoisyEntrDetrModel
-    mean_model::MT
-    c_gen_stoch::T
-end
-
 εδ_params(m::AbstractEntrDetrModel) = m.params
 εδ_params(m::AbstractMLEntrDetrModel) = m.params
 εδ_params(m::AbstractNoisyEntrDetrModel) = m.mean_model.params
