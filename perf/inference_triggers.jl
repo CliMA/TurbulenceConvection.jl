@@ -32,8 +32,7 @@ pmtrigs = SnoopCompile.parcel(mtrigs)
 filter!(x -> (x.first == TurbulenceConvection), pmtrigs)
 
 @testset "Zero inference triggers" begin
-    @test length(pmtrigs) ≤ 1
-    # @test isempty(pmtrigs) # temporarily suppressed
+    @test isempty(pmtrigs) # temporarily suppressed
 end
 
 # If we can't help but have inference triggers:
