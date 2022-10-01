@@ -208,6 +208,7 @@ Base.@kwdef struct MixingLengthParams{FT}
     κ_star²::FT # Ratio of TKE to squared friction velocity in surface layer
     Pr_n::FT # turbulent Prandtl number in neutral conditions
     Ri_c::FT # critical Richardson number
+    Le::FT # Lewis number
     smin_ub::FT # lower limit for smin function
     smin_rm::FT # upper ratio limit for smin function
     l_max::FT
@@ -658,6 +659,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         κ_star² = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_surf_scale"),
         Pr_n = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Prandtl_number_0"),
         Ri_c = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Ri_crit"),
+        Le = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Lewis_number"; default = 1.0),
         smin_ub = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_ub"),
         smin_rm = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_rm"),
         l_max = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),
