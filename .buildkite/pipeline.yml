@@ -15,6 +15,15 @@ agents:
   slurm_mem: 10GB
 
 steps:
+
+  # Clear depot
+  # - label: "clear depot"
+  #   command:
+  #     - "rm -rf /central/scratch/esm/slurm-buildkite/turbulenceconvection-ci/depot/cpu"
+  #   agents:
+  #     config: init
+  #     queue: central
+
   - label: "init environment :computer:"
     key: "init_cpu_env"
     command:

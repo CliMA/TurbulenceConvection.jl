@@ -36,14 +36,14 @@ all_best_mse["Bomex"]["Hvar_mean"] = 5601.260506164766
 all_best_mse["Bomex"]["QTvar_mean"] = 1923.646741638184
 #
 all_best_mse["DryBubble"] = OrderedCollections.OrderedDict()
-all_best_mse["DryBubble"]["updraft_area"] = 7.182747373498557e-12
-all_best_mse["DryBubble"]["updraft_w"] = 1.609948014179499e-11
-all_best_mse["DryBubble"]["updraft_thetal"] = 9.28573500681797e-21
-all_best_mse["DryBubble"]["u_mean"] = 1.0567977214917925
-all_best_mse["DryBubble"]["tke_mean"] = 3.116257962141502e-9
-all_best_mse["DryBubble"]["temperature_mean"] = 2.0601684985243762e-21
-all_best_mse["DryBubble"]["thetal_mean"] = 1.447535484365659e-21
-all_best_mse["DryBubble"]["Hvar_mean"] = 1.979096604202492e-16
+all_best_mse["DryBubble"]["updraft_area"] = 0.0
+all_best_mse["DryBubble"]["updraft_w"] = 0.0
+all_best_mse["DryBubble"]["updraft_thetal"] = 0.0
+all_best_mse["DryBubble"]["u_mean"] = 0.0
+all_best_mse["DryBubble"]["tke_mean"] = 0.0
+all_best_mse["DryBubble"]["temperature_mean"] = 0.0
+all_best_mse["DryBubble"]["thetal_mean"] = 0.0
+all_best_mse["DryBubble"]["Hvar_mean"] = 0.0
 #
 all_best_mse["DYCOMS_RF01"] = OrderedCollections.OrderedDict()
 all_best_mse["DYCOMS_RF01"]["qt_mean"] = 0.03217501192315457
@@ -77,13 +77,13 @@ all_best_mse["DYCOMS_RF02"]["Hvar_mean"] = 1190.6762793971188
 all_best_mse["DYCOMS_RF02"]["QTvar_mean"] = 266.2926925739899
 #
 all_best_mse["GABLS"] = OrderedCollections.OrderedDict()
-all_best_mse["GABLS"]["updraft_thetal"] = 2.5692284806543916e-5
-all_best_mse["GABLS"]["v_mean"] = 1.358361273132038
-all_best_mse["GABLS"]["u_mean"] = 0.10846384667083965
-all_best_mse["GABLS"]["tke_mean"] = 1.4569523587250721
-all_best_mse["GABLS"]["temperature_mean"] = 2.5668038620595768e-5
-all_best_mse["GABLS"]["thetal_mean"] = 2.5692284806543916e-5
-all_best_mse["GABLS"]["Hvar_mean"] = 10.52500403721058
+all_best_mse["GABLS"]["updraft_thetal"] = 0.0
+all_best_mse["GABLS"]["v_mean"] = 0.0
+all_best_mse["GABLS"]["u_mean"] = 0.0
+all_best_mse["GABLS"]["tke_mean"] = 0.0
+all_best_mse["GABLS"]["temperature_mean"] = 0.0
+all_best_mse["GABLS"]["thetal_mean"] = 0.0
+all_best_mse["GABLS"]["Hvar_mean"] = 0.0
 #
 all_best_mse["life_cycle_Tan2018"] = OrderedCollections.OrderedDict()
 all_best_mse["life_cycle_Tan2018"]["qt_mean"] = 0.0
@@ -158,12 +158,12 @@ all_best_mse["TRMM_LBA"]["Hvar_mean"] = 444931.6237907534
 all_best_mse["TRMM_LBA"]["QTvar_mean"] = 6244.828727237164
 #
 all_best_mse["LES_driven_SCM"] = OrderedCollections.OrderedDict()
-all_best_mse["LES_driven_SCM"]["qt_mean"] = 3.073537489792759
-all_best_mse["LES_driven_SCM"]["v_mean"] = 1.3492543702772406
-all_best_mse["LES_driven_SCM"]["u_mean"] = 0.4669040013117011
-all_best_mse["LES_driven_SCM"]["temperature_mean"] = 0.0011963613541137285
-all_best_mse["LES_driven_SCM"]["ql_mean"] = 6967.447317068747
-all_best_mse["LES_driven_SCM"]["thetal_mean"] = 0.0013394307757492142
+all_best_mse["LES_driven_SCM"]["qt_mean"] = 3.0715485278478605
+all_best_mse["LES_driven_SCM"]["v_mean"] = 0.6352636711890354
+all_best_mse["LES_driven_SCM"]["u_mean"] = 0.1931300463888762
+all_best_mse["LES_driven_SCM"]["temperature_mean"] = 0.0011957836462326932
+all_best_mse["LES_driven_SCM"]["ql_mean"] = 7086.824440772947
+all_best_mse["LES_driven_SCM"]["thetal_mean"] = 0.0013376413773120888
 #
 #################################
 #################################

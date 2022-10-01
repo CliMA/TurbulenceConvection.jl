@@ -40,6 +40,7 @@ function lamb_smooth_minimum(l::SA.SVector, lower_bound::FT, upper_bound::FT) wh
 end
 
 mean_nc_data(data, group, var, imin, imax) = StatsBase.mean(data.group[group][var][:][:, imin:imax], dims = 2)[:]
+init_nc_data(data, group, var) = data.group[group][var][:][:, 1]
 
 #= Simple linear interpolation function, wrapping Dierckx =#
 function pyinterp(x, xp, fp)
