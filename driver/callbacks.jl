@@ -114,6 +114,7 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
     aux_en_f = TC.face_aux_environment(state)
     KM = aux_tc.KM
     KH = aux_tc.KH
+    KQ = aux_tc.KQ
 
     # helper to calculate the rain velocity
     # TODO: assuming w_gm = 0
@@ -134,7 +135,7 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
         # Check terminal rain/snow velocity CFL
         dt_max = min(dt_max, CFL_limit * Δzc[k] / (vel_max + ε))
         # Check diffusion CFL (i.e., Fourier number)
-        dt_max = min(dt_max, CFL_limit * Δzc[k]^2 / (max(KH[k], KM[k]) + ε))
+        dt_max = min(dt_max, CFL_limit * Δzc[k]^2 / (max(KH[k], KM[k], KQ[k]) + ε))
     end
     return dt_max
 end

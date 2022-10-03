@@ -173,32 +173,37 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     aux_gm_f = face_aux_grid_mean(state)
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
+    KQ = center_aux_turbconv(state).KQ
     aeKM = center_aux_turbconv(state).ϕ_temporary
     aeKH = center_aux_turbconv(state).ψ_temporary
+    aeKQ = center_aux_turbconv(state).φ_temporary
     prog_gm_uₕ = grid_mean_uₕ(state)
 
     ρ_f = aux_gm_f.ρ
     a_en = aux_en.area
     @. aeKM = a_en * KM
     @. aeKH = a_en * KH
+    @. aeKQ = a_en * KQ
     kc_surf = kc_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     kf_surf = kf_surface(grid)
     prog_gm = center_prog_grid_mean(state)
-    IfKH = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKH[kc_surf]), top = CCO.SetValue(aeKH[kc_toa]))
     IfKM = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKM[kc_surf]), top = CCO.SetValue(aeKM[kc_toa]))
+    IfKH = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKH[kc_surf]), top = CCO.SetValue(aeKH[kc_toa]))
+    IfKQ = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKQ[kc_surf]), top = CCO.SetValue(aeKQ[kc_toa]))
 
-    @. aux_tc_f.ρ_ae_KH = IfKH(aeKH) * ρ_f
     @. aux_tc_f.ρ_ae_KM = IfKM(aeKM) * ρ_f
+    @. aux_tc_f.ρ_ae_KH = IfKH(aeKH) * ρ_f
+    @. aux_tc_f.ρ_ae_KQ = IfKQ(aeKQ) * ρ_f
 
-    aeKHq_tot_bc = -surf.ρq_tot_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    aeKQq_tot_bc = -surf.ρq_tot_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KQ[kf_surf]
     aeKHθ_liq_ice_bc = -surf.ρθ_liq_ice_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
     aeKMu_bc = -surf.ρu_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
     aeKMv_bc = -surf.ρv_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
 
     aeKMuₕ_bc = CCG.UVVector(aeKMu_bc, aeKMv_bc)
 
-    ∇q_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_tot_bc), top = CCO.SetDivergence(FT(0)))
+    ∇q_tot_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKQq_tot_bc), top = CCO.SetDivergence(FT(0)))
     ∇θ_liq_ice_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHθ_liq_ice_bc), top = CCO.SetDivergence(FT(0)))
     # CCG.Covariant3Vector(FT(1)) ⊗ CCG.Covariant12Vector(FT(aeKMu_bc),FT(aeKMv_bc))
     local_geometry_surf = CC.Fields.local_geometry_field(axes(ρ_f))[kf_surf]
@@ -213,19 +218,19 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
         ),
     )
 
-    @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KH * ∇q_tot_en(wvec(aux_en.q_tot))
+    @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KQ * ∇q_tot_en(wvec(aux_en.q_tot))
     @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇θ_liq_ice_en(wvec(aux_en.θ_liq_ice))
     @. aux_tc_f.diffusive_flux_uₕ = -aux_tc_f.ρ_ae_KM * ∇uₕ_gm(prog_gm_uₕ)
 
     if edmf.moisture_model isa NonEquilibriumMoisture
-        aeKHq_liq_bc = FT(0)
-        aeKHq_ice_bc = FT(0)
+        aeKQq_liq_bc = FT(0)
+        aeKQq_ice_bc = FT(0)
 
-        ∇q_liq_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_liq_bc), top = CCO.SetDivergence(FT(0)))
-        ∇q_ice_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKHq_ice_bc), top = CCO.SetDivergence(FT(0)))
+        ∇q_liq_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKQq_liq_bc), top = CCO.SetDivergence(FT(0)))
+        ∇q_ice_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKQq_ice_bc), top = CCO.SetDivergence(FT(0)))
 
-        @. aux_tc_f.diffusive_flux_ql = -aux_tc_f.ρ_ae_KH * ∇q_liq_en(wvec(aux_en.q_liq))
-        @. aux_tc_f.diffusive_flux_qi = -aux_tc_f.ρ_ae_KH * ∇q_ice_en(wvec(aux_en.q_ice))
+        @. aux_tc_f.diffusive_flux_ql = -aux_tc_f.ρ_ae_KQ * ∇q_liq_en(wvec(aux_en.q_liq))
+        @. aux_tc_f.diffusive_flux_qi = -aux_tc_f.ρ_ae_KQ * ∇q_ice_en(wvec(aux_en.q_ice))
     end
 
     return nothing

@@ -99,6 +99,7 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_scale"] = 53.0 / 13.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["Prandtl_number_0"] = 0.74
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"] = 0.25
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["Lewis_number"] = 1.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["smin_ub"] = 0.1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["smin_rm"] = 1.5
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["l_max"] = 1.0e6

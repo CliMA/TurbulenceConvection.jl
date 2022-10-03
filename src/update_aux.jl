@@ -9,8 +9,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     kf_surf = kf_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     c_m = mixing_length_params(edmf).c_m
+    Le = mixing_length_params(edmf).Le
     KM = center_aux_turbconv(state).KM
     KH = center_aux_turbconv(state).KH
+    KQ = center_aux_turbconv(state).KQ
     obukhov_length = surf.obukhov_length
     FT = float_type(state)
     prog_gm = center_prog_grid_mean(state)
@@ -418,6 +420,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
         KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0))
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
+        KQ[k] = KH[k] / Le
 
         aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
     end

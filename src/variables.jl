@@ -80,6 +80,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
     turbconv = (;
         ϕ_temporary = FT(0),
         ψ_temporary = FT(0),
+        φ_temporary = FT(0),
         bulk = (;
             area = FT(0),
             θ_liq_ice = FT(0),
@@ -140,6 +141,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
         term_vel_snow = FT(0),
         KM = FT(0),
         KH = FT(0),
+        KQ = FT(0),
         mixing_length = FT(0),
         massflux_tendency_h = FT(0),
         massflux_tendency_qt = FT(0),
@@ -191,6 +193,7 @@ face_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
         bulk = (; w = FT(0)),
         ρ_ae_KM = FT(0),
         ρ_ae_KH = FT(0),
+        ρ_ae_KQ = FT(0),
         ρ_ae_K = FT(0),
         en = (; w = FT(0)),
         up = ntuple(i -> face_aux_vars_up(FT, local_geometry), Val(n_updrafts(edmf))),

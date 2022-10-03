@@ -34,7 +34,7 @@ microphysics_params(ps::ATCP) = ps.microphys_params
 Base.eltype(::TurbulenceConvectionParameters{FT}) where {FT} = FT
 Omega(ps::ATCP) = ps.Omega
 planet_radius(ps::ATCP) = ps.planet_radius
-# TODO - microph_scaling is the factor for adjusting evapoartion.
+# TODO - microph_scaling is the factor for adjusting evaporation.
 # The name will be fixed in CLIMAParameters first.
 microph_scaling(ps::ATCP) = ps.microph_scaling
 microph_scaling_dep_sub(ps::ATCP) = ps.microph_scaling_dep_sub
