@@ -6,7 +6,6 @@ const AW = ArtifactWrappers
 function pycles_output_dataset_folder(lazy_download = true)
     PyCLES_output_dataset = AW.ArtifactWrapper(
         @__DIR__,
-        lazy_download,
         "PyCLES_output",
         AW.ArtifactFile[
         AW.ArtifactFile(url = "https://caltech.box.com/shared/static/johlutwhohvr66wn38cdo7a6rluvz708.nc", filename = "Rico.nc",),
@@ -18,7 +17,8 @@ function pycles_output_dataset_folder(lazy_download = true)
         AW.ArtifactFile(url = "https://caltech.box.com/shared/static/jci8l11qetlioab4cxf5myr1r492prk6.nc", filename = "Bomex.nc",),
         AW.ArtifactFile(url = "https://caltech.box.com/shared/static/pzuu6ii99by2s356ij69v5cb615200jq.nc", filename = "Soares.nc",),
         AW.ArtifactFile(url = "https://caltech.box.com/shared/static/7upt639siyc2umon8gs6qsjiqavof5cq.nc", filename = "Nieuwstadt.nc",),
-        ],
+        ];
+        lazy_download = lazy_download,
     )
     return AW.get_data_folder(PyCLES_output_dataset)
 end
@@ -26,7 +26,6 @@ end
 function scampy_output_dataset_folder(lazy_download = true)
     SCAMPy_output_dataset = AW.ArtifactWrapper(
         @__DIR__,
-        lazy_download,
         "SCAMPy_output",
         AW.ArtifactFile[
         AW.ArtifactFile(url = "https://caltech.box.com/shared/static/1dzpydqiagjvzfpyv9lbic3atvca93hl.nc", filename = "Rico.nc",),
@@ -39,7 +38,8 @@ function scampy_output_dataset_folder(lazy_download = true)
         AW.ArtifactFile(url = "https://caltech.box.com/shared/static/vbuxzg85scwy9mg0ziiuzy6fimo0e389.nc", filename = "Nieuwstadt.nc",),
         AW.ArtifactFile(url = "https://caltech.box.com/shared/static/72t6fr1gq10tg3jjputtp35nfzex0o4k.nc", filename = "DryBubble.nc",),
         AW.ArtifactFile(url = "https://caltech.box.com/shared/static/7axeussneeg8g3k0ndvagsn0pkmbij3e.nc", filename = "life_cycle_Tan2018.nc",),
-        ],
+        ];
+        lazy_download = lazy_download,
     )
     return AW.get_data_folder(SCAMPy_output_dataset)
 end
@@ -47,11 +47,11 @@ end
 function les_driven_scm_data_folder(lazy_download = true)
     LESDrivenSCM_output_dataset = AW.ArtifactWrapper(
         @__DIR__,
-        lazy_download,
         "LESDrivenSCM_output_dataset",
         AW.ArtifactFile[
             AW.ArtifactFile(url = "https://caltech.box.com/shared/static/0hnf7nkttueraaqf9tpkqsx38gjqx41p.nc", filename = "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc",),
-        ],
+        ];
+        lazy_download = lazy_download,
     )
     return AW.get_data_folder(LESDrivenSCM_output_dataset)
 end
