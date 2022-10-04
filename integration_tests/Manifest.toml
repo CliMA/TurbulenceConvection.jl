@@ -1663,9 +1663,11 @@ version = "5.10.1+0"
 
 [[deps.SurfaceFluxes]]
 deps = ["DocStringExtensions", "KernelAbstractions", "RootSolvers", "StaticArrays", "Thermodynamics"]
-git-tree-sha1 = "0951d44509951340e1a92c1c9670107fa33f7a07"
+git-tree-sha1 = "82011987e80a3bc309a05407f53d72c89b3a58e7"
+repo-rev = "as/stablebl-analytic"
+repo-url = "https://github.com/CliMA/SurfaceFluxes.jl.git"
 uuid = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
-version = "0.4.7"
+version = "0.4.8"
 
 [[deps.TOML]]
 deps = ["Dates"]
