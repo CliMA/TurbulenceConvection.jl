@@ -23,7 +23,7 @@ jobs:
 
     - uses: julia-actions/setup-julia@latest
       with:
-        version: 1.8.1
+        version: 1.8
 
     - name: Apply UpDeps
       run: |
