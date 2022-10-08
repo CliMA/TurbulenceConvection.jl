@@ -36,6 +36,7 @@ cent_aux_vars_gm(FT, local_geometry, edmf) = (;
     RH = FT(0),
     s = FT(0),
     T = FT(0),
+    f = CCG.Contravariant3Vector(CCG.WVector(FT(0)), local_geometry),
     buoy = FT(0),
     cloud_fraction = FT(0),
     H_third_m = FT(0),

@@ -330,7 +330,8 @@ function compute_gm_tendencies!(
     # lat = CC.Fields.coordinate_field(axes(ρ_c)).lat
     coords = CC.Fields.coordinate_field(axes(ρ_c))
     coriolis_fn(coord) = CCG.WVector(coriolis_param)
-    f = @. CCG.Contravariant3Vector(coriolis_fn(coords))
+    f = TC.center_aux_grid_mean(state).f
+    @. f = CCG.Contravariant3Vector(coriolis_fn(coords))
 
     C123 = CCG.Covariant123Vector
     C12 = CCG.Contravariant12Vector
