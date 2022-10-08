@@ -324,7 +324,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
     # TODO: Will need to be changed with topography
     local_geometry = CC.Fields.local_geometry_field(axes(ρ_c))
-    k̂ = @. CCG.Contravariant3Vector(CCG.WVector(FT(1)), local_geometry)
+    k̂ = center_aux_turbconv(state).k̂
+    @. k̂ = CCG.Contravariant3Vector(CCG.WVector(FT(1)), local_geometry)
     Ifuₕ = uₕ_bcs()
     ∇uvw = CCO.GradientF2C()
     uvw = @. C123(Ifuₕ(uₕ_gm)) + C123(wvec(w_en))

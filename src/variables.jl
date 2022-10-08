@@ -81,6 +81,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
         ϕ_temporary = FT(0),
         ψ_temporary = FT(0),
         φ_temporary = FT(0),
+        k̂ = CCG.Contravariant3Vector(CCG.WVector(FT(1)), local_geometry),
         bulk = (;
             area = FT(0),
             θ_liq_ice = FT(0),
