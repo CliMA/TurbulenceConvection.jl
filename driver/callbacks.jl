@@ -157,44 +157,46 @@ end
 
 function monitor_cfl!(integrator)
     CC.Fields.bycolumn(axes(integrator.u.cent)) do colidx
-        (; edmf, aux, TS) = integrator.p
-        frac_tol = 0.05
+        (; aux, TS) = integrator.p
         prog = integrator.u
         state = TC.column_prog_aux(prog, aux, colidx)
-        grid = TC.Grid(state)
-        prog_gm = TC.center_prog_grid_mean(state)
-        Δz = TC.get_Δz(prog_gm.ρ)
-        Δt = TS.dt
-        CFL_limit = TS.cfl_limit
-
-        aux_tc = TC.center_aux_turbconv(state)
-
-        # helper to calculate the rain velocity
-        # TODO: assuming w_gm = 0
-        # TODO: verify translation
-        term_vel_rain = aux_tc.term_vel_rain
-        term_vel_snow = aux_tc.term_vel_snow
-
-        @inbounds for k in TC.real_center_indices(grid)
-            # check stability criterion
-            CFL_out_rain = Δt / Δz[k] * term_vel_rain[k]
-            CFL_out_snow = Δt / Δz[k] * term_vel_snow[k]
-            if TC.is_toa_center(grid, k)
-                CFL_in_rain = 0.0
-                CFL_in_snow = 0.0
-            else
-                CFL_in_rain = Δt / Δz[k] * term_vel_rain[k + 1]
-                CFL_in_snow = Δt / Δz[k] * term_vel_snow[k + 1]
-            end
-            CFL_meteor = max(CFL_in_rain, CFL_in_snow, CFL_out_rain, CFL_out_snow)
-            if CFL_meteor > CFL_limit * (1.0 + frac_tol)
-                error(
-                    "Time step is too large for hydrometeor fall velocity! Hydrometeor CFL is $(CFL_meteor) > $(CFL_limit).",
-                )
-            end
-        end
-        nothing
+        monitor_cfl!(state, TS.dt, TS.cfl_limit)
     end
-
     ODE.u_modified!(integrator, false)
+end
+
+function monitor_cfl!(state, Δt, CFL_limit)
+    grid = TC.Grid(state)
+    prog_gm = TC.center_prog_grid_mean(state)
+    Δz = TC.get_Δz(prog_gm.ρ)
+    FT = TC.float_type(state)
+    frac_tol = FT(0.05)
+
+    aux_tc = TC.center_aux_turbconv(state)
+
+    # helper to calculate the rain velocity
+    # TODO: assuming w_gm = 0
+    # TODO: verify translation
+    term_vel_rain = aux_tc.term_vel_rain
+    term_vel_snow = aux_tc.term_vel_snow
+
+    @inbounds for k in TC.real_center_indices(grid)
+        # check stability criterion
+        CFL_out_rain = Δt / Δz[k] * term_vel_rain[k]
+        CFL_out_snow = Δt / Δz[k] * term_vel_snow[k]
+        if TC.is_toa_center(grid, k)
+            CFL_in_rain = FT(0)
+            CFL_in_snow = FT(0)
+        else
+            CFL_in_rain = Δt / Δz[k] * term_vel_rain[k + 1]
+            CFL_in_snow = Δt / Δz[k] * term_vel_snow[k + 1]
+        end
+        CFL_meteor = max(CFL_in_rain, CFL_in_snow, CFL_out_rain, CFL_out_snow)
+        if CFL_meteor > CFL_limit * (1 + frac_tol)
+            error(
+                "Time step is too large for hydrometeor fall velocity! Hydrometeor CFL is $(CFL_meteor) > $(CFL_limit).",
+            )
+        end
+    end
+    return nothing
 end
