@@ -207,6 +207,7 @@ face_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
         diffusive_flux_qt = FT(0),
         face_aux_vars_edmf_moisture(FT, edmf.moisture_model)...,
         diffusive_flux_uₕ = CCG.Covariant3Vector(FT(0)) ⊗ CCG.Covariant12Vector(FT(0), FT(0)),
+        uvw = CCG.Covariant123Vector(CCG.WVector(FT(0)), local_geometry),
     )
 )
 

@@ -328,7 +328,9 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @. k̂ = CCG.Contravariant3Vector(CCG.WVector(FT(1)), local_geometry)
     Ifuₕ = uₕ_bcs()
     ∇uvw = CCO.GradientF2C()
-    uvw = @. C123(Ifuₕ(uₕ_gm)) + C123(wvec(w_en))
+    uvw = face_aux_turbconv(state).uvw
+    Shear² = center_aux_turbconv(state).Shear²
+    @. uvw = C123(Ifuₕ(uₕ_gm)) + C123(wvec(w_en))
     @. Shear² = LA.norm_sqr(adjoint(∇uvw(uvw)) * k̂)
 
     q_tot_en = aux_en.q_tot
