@@ -41,8 +41,7 @@ cd(root) do
         @info "Pkg.up for environment $dir"
         pkgname = "\"$pkg\""
         vernum = "\"$ver\""
-        cmd =
-            `$(Base.julia_cmd()) --project=$dir -e """import Pkg; Pkg.rm($(pkgname)); Pkg.add(Pkg.PackageSpec(name=$(pkgname),version=$(vernum)))"""`
+        cmd = `$(Base.julia_cmd()) --project=$dir -e """import Pkg; Pkg.rm($(pkgname)); Pkg.add(Pkg.PackageSpec(name=$(pkgname),version=$(vernum)))"""`
         run(cmd)
         @warn "Package $pkgname was removed from the Project toml from directory $dir. Please add it back in!"
         # run(`git checkout $dir/Project.toml`) # for convenience.
