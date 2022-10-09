@@ -180,6 +180,7 @@ face_aux_vars_up(FT, local_geometry) = (;
     nh_pressure_adv = FT(0),
     nh_pressure_drag = FT(0),
     massflux = FT(0),
+    area = FT(0),
 )
 face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
     massflux_en = FT(0), # TODO: is this the right place for this?
@@ -191,7 +192,7 @@ face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
 face_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
 face_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
     turbconv = (;
-        bulk = (; w = FT(0)),
+        bulk = (; w = FT(0), a_up = FT(0)),
         ρ_ae_KM = FT(0),
         ρ_ae_KH = FT(0),
         ρ_ae_KQ = FT(0),
