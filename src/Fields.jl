@@ -68,13 +68,13 @@ function FieldFromNamedTuple(space, initial_conditions::Function, ::Type{FT}, pa
 end
 
 function Base.cumsum(field::CC.Fields.FiniteDifferenceField)
-    Base.cumsum(parent(CC.Fields.weighted_jacobian(field)) .* vec(field), dims = 1)
+    Base.cumsum(parent(CC.Spaces.weighted_jacobian(axes(field))) .* vec(field), dims = 1)
 end
 function Base.cumsum!(fieldout::CC.Fields.FiniteDifferenceField, fieldin::CC.Fields.FiniteDifferenceField)
-    Base.cumsum!(fieldout, parent(CC.Fields.weighted_jacobian(fieldin)) .* vec(fieldin), dims = 1)
+    Base.cumsum!(fieldout, parent(CC.Spaces.weighted_jacobian(axes(fieldin))) .* vec(fieldin), dims = 1)
 end
 
-get_Δz(field::CC.Fields.FiniteDifferenceField) = parent(CC.Fields.weighted_jacobian(field))
+get_Δz(field::CC.Fields.FiniteDifferenceField) = parent(CC.Spaces.weighted_jacobian(axes(field)))
 
 # TODO: move these things into ClimaCore
 
