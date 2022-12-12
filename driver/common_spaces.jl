@@ -68,7 +68,7 @@ function construct_mesh(namelist; FT = Float64)
         nz = isnothing(nz) ? Int(zmax ÷ Δz) : Int(nz)
         Δz = isnothing(Δz) ? FT(zmax ÷ nz) : FT(Δz)
     elseif Cases.get_case(namelist) == Cases.SOCRATES_RF09_obs() # you can't easily create your own mesh in ClimaCore.Meshes so we'll use some representation of the one they have...
-        z_mesh = CC.Geometry.ZPoint{FT}.([FT(0), vec(readdlm("/home/jbenjami/data1/jbenjami/Research_Schneider/CliMa/Data/SOCRATES/320level-grd.txt", FT))...]) # added 0 to beginning? copy from the file #Array(TC.get_nc_data(data, "zc")) also idk what to do about paths like this
+        z_mesh = CC.Geometry.ZPoint{FT}.([FT(0), vec(readdlm("/home/jbenjami/Research_Schneider/CliMa/Data/SOCRATES/320level-grd.txt", FT))...]) # added 0 to beginning? copy from the file #Array(TC.get_nc_data(data, "zc")) also idk what to do about paths like this
         nz = length(z_mesh)
         z₀, z₁ = z_mesh[1], z_mesh[end]
         zmax = z_mesh[end]

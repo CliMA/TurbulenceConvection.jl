@@ -11,11 +11,13 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts)
     qi_tendency = FT(0)
     if area > 0
 
+        use_supersat = get(param_set.userargs, :use_supersat, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
+
         q = TD.PhasePartition(thermo_params, ts)
         T = TD.air_temperature(thermo_params, ts)
         q_vap = TD.vapor_specific_humidity(thermo_params, ts)
 
-        if param_set.user_args.use_supersat # use phase partition in case we wanna use the conv_q_vap fcn but maybe not best for supersat since it's not really a phase partition (all 3 are vapor amounts)
+        if use_supersat # use phase partition in case we wanna use the conv_q_vap fcn but maybe not best for supersat since it's not really a phase partition (all 3 are vapor amounts)
             q_eq = TD.PhasePartition(q.tot, TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()), TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())) # all 3 are vapor amounts
             S_ql = (q_vap - q_eq.liq) / CMNe.τ_relax(microphys_params, liq_type) # | microphys_params.τ_cond_evap | CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, TD.PhasePartition(FT(0),q_vap,FT(0)))  
             S_qi = (q_vap - q_eq.ice) / CMNe.τ_relax(microphys_params, ice_type) # -(source to vapor) = source to condensate
@@ -32,7 +34,7 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts)
             S_qi = min(0,S_qi)
         end
 
-        if param_set.user_args.use_supersat # might need to do these first bc ql,qc tendencies maybe are applied individually and can still crash the code if one is too large...
+        if use_supersat # might need to do these first bc ql,qc tendencies maybe are applied individually and can still crash the code if one is too large...
             # add homogenous freezing (first so can limit later)s
             if (T < thermo_params.T_icenuc)
                 if (S_ql > 0)
@@ -46,11 +48,22 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts)
             end
         
             # limiter (maybe we dont need this cause of our later limiters?) was useful when we did this first....
-            S = S_ql + S_qi
+            # could be bad in wbf if ice drain on vapor is too large but liquid is supposed to be going to vapor but less so 
+            # S = S_ql + S_qi
+            S = max(0, S_ql) + max(0,S_qi) # only add if positive sources to condensate
             Qv = q_vap / Δt
-            if S > Qv # not enough vapor to create condensate (reverse are both handled already)
-                S_ql *= Qv/S
-                S_qi *= Qv/S
+            # if S > Qv # not enough vapor to create condensate (reverse are both handled already)
+            if S > ( Qv - min(0,S_ql) - min(0,S_qi)  ) # only add if positive source to vapor (subtracat the negative)
+                if (S_qi > 0) && (S_ql > 0)
+                        S_ql *= Qv/S
+                        S_qi *= Qv/S
+                elseif (S_qi > 0) && (S_ql < 0)
+                    S_qi *= (Qv + S_ql)/S # source to ice not to exceed vapor plus addition from liquid... (S=S_qi here)
+                elseif (S_qi < 0) && (S_ql > 0)
+                    S_ql *= (Qv + S_qi)/S
+                end # otherwise we have the negative limiters below for sublimation, evaporation... if both are neg that's sufficient....
+                # S_ql *= Qv/S
+                # S_qi *= Qv/S
             end
         end
 
@@ -66,14 +79,14 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts)
             S_qi = -min(-S_qi, q.ice / Δt)
         end
 
-        numerical_mismatch = q_vap - S_ql*Δt - S_qi*Δt
-        if numerical_mismatch < 0 # there would be negative vapor (fix doesnt fix numeral instabilities tho so maybe exclude, is an FT error)
-            if S_ql  > 0
-                S_ql += numerical_mismatch
-            else
-                S_qi += numerical_mismatch
-            end
-        end
+        # numerical_mismatch = q_vap - S_ql*Δt - S_qi*Δt
+        # if numerical_mismatch < 0 # there would be negative vapor (fix doesnt fix numeral instabilities tho so maybe exclude, is an FT error)
+        #     if S_ql  > 0
+        #         S_ql += numerical_mismatch
+        #     else
+        #         S_qi += numerical_mismatch
+        #     end
+        # end
 
         ql_tendency += S_ql
         qi_tendency += S_qi
