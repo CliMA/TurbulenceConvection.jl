@@ -25,7 +25,23 @@ function compute_nonequilibrium_moisture_tendencies!(
             ts_up = TD.PhaseNonEquil_pTq(thermo_params, p_c[k], T_up, q_up)
 
             # condensation/evaporation, deposition/sublimation
-            mph = noneq_moisture_sources(param_set, aux_up[i].area[k], ρ_c[k], Δt, ts_up)
+
+            # if keep this w getting, you'd want this call to be moved outside the loop
+            aux_up_f = face_aux_updrafts(state) # state or does ts include this? I guess you'd want to move this to the calling place... to choose updraft or environment
+            # @show(aux_up_f[i].w)
+            w = CCO.InterpolateF2C(aux_up_f[i].w) # how to access?
+            # @show(w)
+            k_int = getfield(k,Base.propertynames(k)[1]) # get the value k.i out
+            # @show(k_int)
+            w = Base.getindex(CC.Fields.field_values(getfield(w,Base.propertynames(w)[1])), k_int) # w first field is w.bcs = getfield(w,Base.propertynames(w)[1]) , then get the index from the field value
+            # if w > 0
+            #     @show(w)
+            # end
+
+
+
+
+            mph = noneq_moisture_sources(param_set, aux_up[i].area[k], ρ_c[k], Δt, ts_up, w)
             aux_up[i].ql_tendency_noneq[k] = mph.ql_tendency * aux_up[i].area[k]
             aux_up[i].qi_tendency_noneq[k] = mph.qi_tendency * aux_up[i].area[k]
         end

@@ -2,7 +2,7 @@
 Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 (autoconversion + accretion)
 """
-function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts) where {FT}
+function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts, w) where {FT}
     thermo_params = TCP.thermodynamics_params(param_set)
     microphys_params = TCP.microphysics_params(param_set)
     # TODO - when using adaptive timestepping we are limiting the source terms
@@ -11,16 +11,73 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts)
     qi_tendency = FT(0)
     if area > 0
 
-        use_supersat = get(param_set.userargs, :use_supersat, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
-
+        use_supersat      = get(param_set.user_args, :use_supersat, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
+        use_korolev_mazin = get(param_set.user_args, :use_korolev_mazin, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
+        raymond_ice_test  = get(param_set.user_args, :raymond_ice_test, false)
         q = TD.PhasePartition(thermo_params, ts)
         T = TD.air_temperature(thermo_params, ts)
         q_vap = TD.vapor_specific_humidity(thermo_params, ts)
 
+
         if use_supersat # use phase partition in case we wanna use the conv_q_vap fcn but maybe not best for supersat since it's not really a phase partition (all 3 are vapor amounts)
+            
+            # nonmutable param_set so would have to edit tau usage everywhere -- let's just do in supersat
+            τ_liq = CMNe.τ_relax(microphys_params, liq_type)
+            τ_ice = CMNe.τ_relax(microphys_params, ice_type)
+            if raymond_ice_test
+                # problems: 
+                # - POTENTIAL CCN SHOULD GO UP W/ SUPERSATURATION (for a given q this also means up with decreasing temp?)
+                # - INP CONC HERE COULD GROW W/O BOUND, WE HAVE NO METRIC FOR GROWING CCN  conc
+                # - if you trust something like https://doi.org/10.5194/acp-14-81-2014 then INP/CDNC_i concentrations are way lower than liq but droplet sizes way higher... how to handle?
+                # either way our CCN concentratinos seems to be far too large for our INP numbers to give relevant taus until far too cold...
+                # gets even worse cause CDNC,CCN etc are advected in updraft so... it's not just local...
+                # if we assume CDCN/CCN/INP is constant ish and it's just activation fraction of CCN/INP that changes with T and/or SS, then what...
+
+
+                N_0 = FT(100*10e6) # per m^3 both ccn and N_d in this range https://doi.org/10.1029/2020MS002205
+                N_0 = FT(1) # params tuned to fit this better...
+                N_m = FT(-.2) # log slope https://doi.org/10.1073/pnas.1514034112
+                N_b = -5 - 273.15 * N_m
+
+                N_0 = get(param_set.user_args, :N_0, FT(100*10e6))
+                N_m = get(param_set.user_args, :N_m, FT(-0.2))
+                N_b = get(param_set.user_args, :N_b, FT(-5 - 273.15 * N_m))
+
+
+                N_INP = 10^(N_m*T + N_b) * 10^3 # per liter to per m^3
+                # f_INP = clamp( N_INP/(N_0+min(N_0, N_INP)), 0, 1) 
+                f_INP = clamp( N_INP/(N_0+N_INP), 0, 1)  # put a note elucdiating differeince between these 2 (this definition is bounded for sure tho)
+
+
+                # τ_liq = CMNe.τ_relax(microphys_params, liq_type) # could try (4 pi D N)^(-1)
+                # Alternate form if we don't wish to condense all our condensate away... works on presumption of fixed N_0 aerosol...
+                # -- hopefully this gets around the problem of draining water vapor at initialization of clouds but also allows speedup as droplets grow (assuming fixed drop concenctration)
+                D, N, ρ_w = FT(0.0000226), FT(190*10^6), FT(1) # 190 taken from CCN estimates for TRMM... equiv to N_0 above...
+                R    =  max(((q.liq + q.ice)/(4/3*π*ρ_w*N))^(1/3), FT(0.2*10^-6)) # bound to be at least ~micron size...something like kohler crit radius
+                num = 1 # too small but first principles correct 
+                num = 10 # 
+                base = num/(4*π*D*N*R) # as q goes up, R goes 
+                τ_liq = base / (1-f_INP)
+                τ_ice = base / (f_INP)
+                
+                # # this one would require some knowledge of scaling... gives correct fractionation but not absolute value...
+                # adjust = 1 # too fast
+                # adjust = 10 # works
+                # τ_liq = adjust / (N_0 * (1-f_INP))
+                # τ_ice = adjust / (N_0 * (f_INP))
+
+                @show((T, q, τ_liq, τ_ice))
+            end
+
             q_eq = TD.PhasePartition(q.tot, TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()), TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())) # all 3 are vapor amounts
-            S_ql = (q_vap - q_eq.liq) / CMNe.τ_relax(microphys_params, liq_type) # | microphys_params.τ_cond_evap | CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, TD.PhasePartition(FT(0),q_vap,FT(0)))  
-            S_qi = (q_vap - q_eq.ice) / CMNe.τ_relax(microphys_params, ice_type) # -(source to vapor) = source to condensate
+            S_ql = (q_vap - q_eq.liq) / τ_liq # | microphys_params.τ_cond_evap | CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, TD.PhasePartition(FT(0),q_vap,FT(0)))  
+            S_qi = (q_vap - q_eq.ice) / τ_ice # -(source to vapor) = source to condensate
+        elseif use_korolev_mazin
+            # need to get w into here somewhere...
+            S_ql,S_qi = korolev_mazin_2007(param_set, area, ρ, Δt, ts, w)
+            q_eq = TD.PhasePartition(q.tot, TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()), TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())) # all 3 are vapor amounts
+            # println("effective τ_liq = ",(q_vap - q_eq.liq)/S_ql, " effective τ_ice = ",(q_vap - q_eq.ice)/S_qi, " T = ", T, " w = ",w, " q = ",q, " q_eq = ", q_eq )
+            
         else
             # TODO - is that the state we want to be relaxing to?
             ts_eq = TD.PhaseEquil_ρTq(thermo_params, ρ, T, q.tot)
@@ -34,7 +91,8 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts)
             S_qi = min(0,S_qi)
         end
 
-        if use_supersat # might need to do these first bc ql,qc tendencies maybe are applied individually and can still crash the code if one is too large...
+        if (use_supersat || use_korolev_mazin) # might need to do these first bc ql,qc tendencies maybe are applied individually and can still crash the code if one is too large...
+            # print("limiting")
             # add homogenous freezing (first so can limit later)s
             if (T < thermo_params.T_icenuc)
                 if (S_ql > 0)
