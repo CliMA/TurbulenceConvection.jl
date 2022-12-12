@@ -1825,7 +1825,7 @@ version = "1.0.1"
 
 [[deps.Thermodynamics]]
 deps = ["DocStringExtensions", "KernelAbstractions", "Random", "RootSolvers"]
-path = "/export/data1/jbenjami/Research_Schneider/CliMa/Thermodynamics.jl"
+path = "/home/jbenjami/Research_Schneider/CliMa/Thermodynamics.jl"
 uuid = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 version = "0.9.7"
 
@@ -1878,7 +1878,7 @@ version = "0.3.5"
 
 [[deps.TurbulenceConvection]]
 deps = ["ClimaCore", "CloudMicrophysics", "Dierckx", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "Flux", "LambertW", "LinearAlgebra", "OperatorFlux", "Random", "SciMLBase", "StaticArrays", "StatsBase", "StochasticDiffEq", "SurfaceFluxes", "Thermodynamics", "UnPack"]
-path = "/export/data1/jbenjami/Research_Schneider/CliMa/TurbulenceConvection.jl"
+path = "/home/jbenjami/Research_Schneider/CliMa/TurbulenceConvection.jl"
 uuid = "8e072fc4-01f8-44fb-b9dc-f9336c367e6b"
 version = "1.3.3"
 
