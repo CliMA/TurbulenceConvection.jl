@@ -645,12 +645,6 @@ git-tree-sha1 = "a5e6e7f12607e90d71b09e6ce2c965e41b337968"
 uuid = "77dc65aa-8811-40c2-897b-53d922fa7daf"
 version = "0.1.1"
 
-[[deps.FunctionWrappersWrappers]]
-deps = ["FunctionWrappers"]
-git-tree-sha1 = "a5e6e7f12607e90d71b09e6ce2c965e41b337968"
-uuid = "77dc65aa-8811-40c2-897b-53d922fa7daf"
-version = "0.1.1"
-
 [[deps.Functors]]
 deps = ["LinearAlgebra"]
 git-tree-sha1 = "a2657dd0f3e8a61dbe70fc7c122038bd33790af5"
