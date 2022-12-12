@@ -15,23 +15,64 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts)
         T = TD.air_temperature(thermo_params, ts)
         q_vap = TD.vapor_specific_humidity(thermo_params, ts)
 
-        # TODO - is that the state we want to be relaxing to?
-        ts_eq = TD.PhaseEquil_ρTq(thermo_params, ρ, T, q.tot)
-        q_eq = TD.PhasePartition(thermo_params, ts_eq)
+        if param_set.user_args.use_supersat # use phase partition in case we wanna use the conv_q_vap fcn but maybe not best for supersat since it's not really a phase partition (all 3 are vapor amounts)
+            q_eq = TD.PhasePartition(q.tot, TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()), TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())) # all 3 are vapor amounts
+            S_ql = (q_vap - q_eq.liq) / CMNe.τ_relax(microphys_params, liq_type) # | microphys_params.τ_cond_evap | CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, TD.PhasePartition(FT(0),q_vap,FT(0)))  
+            S_qi = (q_vap - q_eq.ice) / CMNe.τ_relax(microphys_params, ice_type) # -(source to vapor) = source to condensate
+        else
+            # TODO - is that the state we want to be relaxing to?
+            ts_eq = TD.PhaseEquil_ρTq(thermo_params, ρ, T, q.tot)
+            q_eq = TD.PhasePartition(thermo_params, ts_eq)
 
-        S_ql = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, q)
-        S_qi = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, ice_type, q_eq, q)
+            S_ql = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, q) 
+            S_qi = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, ice_type, q_eq, q)
+        end
+
+        if T >= thermo_params.T_freeze # could go insisde supersat bc base eq is already 0 above freezng
+            S_qi = min(0,S_qi)
+        end
+
+        if param_set.user_args.use_supersat # might need to do these first bc ql,qc tendencies maybe are applied individually and can still crash the code if one is too large...
+            # add homogenous freezing (first so can limit later)s
+            if (T < thermo_params.T_icenuc)
+                if (S_ql > 0)
+                    S_qi += S_ql # any vapor coming to liquid goes to ice instead (smoother than setting it to 0 suddenly?)
+                    S_ql = 0
+                end
+                if q.liq > 0
+                    S_ql -= q.liq/Δt # send any existing liquid to ice (maybe make this a rate later)
+                    S_qi += q.liq/Δt # send any existing liquid to ice (maybe make this a rate later)
+                end
+            end
+        
+            # limiter (maybe we dont need this cause of our later limiters?) was useful when we did this first....
+            S = S_ql + S_qi
+            Qv = q_vap / Δt
+            if S > Qv # not enough vapor to create condensate (reverse are both handled already)
+                S_ql *= Qv/S
+                S_qi *= Qv/S
+            end
+        end
 
         # TODO - handle limiters elswhere
         if S_ql >= FT(0)
-            S_ql = min(S_ql, q_vap / Δt)
+            S_ql = min(S_ql, q_vap / Δt) # source to liquid not more than current vapor
         else
-            S_ql = -min(-S_ql, q.liq / Δt)
+            S_ql = -min(-S_ql, q.liq / Δt) # loss of liquid not to exceed current liquid
         end
         if S_qi >= FT(0)
             S_qi = min(S_qi, q_vap / Δt)
         else
             S_qi = -min(-S_qi, q.ice / Δt)
+        end
+
+        numerical_mismatch = q_vap - S_ql*Δt - S_qi*Δt
+        if numerical_mismatch < 0 # there would be negative vapor (fix doesnt fix numeral instabilities tho so maybe exclude, is an FT error)
+            if S_ql  > 0
+                S_ql += numerical_mismatch
+            else
+                S_qi += numerical_mismatch
+            end
         end
 
         ql_tendency += S_ql
