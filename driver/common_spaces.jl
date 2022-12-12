@@ -1,4 +1,6 @@
 import ClimaCore
+using DelimitedFiles
+
 const CC = ClimaCore
 
 function periodic_line_mesh(; x_max, x_elem)
@@ -65,6 +67,18 @@ function construct_mesh(namelist; FT = Float64)
         end
         nz = isnothing(nz) ? Int(zmax ÷ Δz) : Int(nz)
         Δz = isnothing(Δz) ? FT(zmax ÷ nz) : FT(Δz)
+    elseif Cases.get_case(namelist) == Cases.SOCRATES_RF09_obs() # you can't easily create your own mesh in ClimaCore.Meshes so we'll use some representation of the one they have...
+        z_mesh = CC.Geometry.ZPoint{FT}.([FT(0), vec(readdlm("/home/jbenjami/Research_Schneider/CliMa/Data/SOCRATES/320level-grd.txt", FT))...]) # added 0 to beginning? copy from the file #Array(TC.get_nc_data(data, "zc")) also idk what to do about paths like this
+        nz = length(z_mesh)
+        z₀, z₁ = z_mesh[1], z_mesh[end]
+        zmax = z_mesh[end]
+        domain = CC.Domains.IntervalDomain(
+            CC.Geometry.ZPoint{FT}(z₀),
+            CC.Geometry.ZPoint{FT}(z₁),
+            boundary_tags = (:bottom, :top),
+        )
+        z_mesh = CC.Meshes.IntervalMesh(domain, z_mesh)
+        return (; z_mesh)
     else
         Δz = FT(namelist["grid"]["dz"])
         nz = namelist["grid"]["nz"]

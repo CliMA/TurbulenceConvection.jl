@@ -305,6 +305,8 @@ function default_namelist(
         namelist = DryBubble(namelist_defaults)
     elseif case_name == "LES_driven_SCM"
         namelist = LES_driven_SCM(namelist_defaults)
+    elseif case_name == "SOCRATES_RF09_obs"
+        namelist = SOCRATES_RF09_obs(namelist_defaults)
     else
         error("Not a valid case name")
     end
@@ -679,6 +681,50 @@ function LES_driven_SCM(namelist_defaults)
 
     return namelist
 end
+
+function SOCRATES_RF09_obs(namelist_defaults)
+    namelist = deepcopy(namelist_defaults)
+    # grid is currently constructed from the same one used by the paper's LES grid
+    namelist["stats_io"]["frequency"] = 10.0
+    namelist["time_stepping"]["t_max"] = 3600.0 * 14 # they ran LES for 12-14 hours (reference is supposed to be at hour 12)
+    namelist_defaults["time_stepping"]["dt_max"] = 5.0
+    namelist_defaults["time_stepping"]["dt_min"] = 0.5
+
+    namelist["microphysics"]["precipitation_model"] = "clima_1m"
+    namelist["microphysics"]["precip_fraction_model"] = "prescribed" # "prescribed" or "cloud_cover"
+    namelist["microphysics"]["prescribed_precip_frac_value"] = 1.0
+    namelist["microphysics"]["precip_fraction_limiter"] = 0.3
+
+    #TODO - all those are part of toml file
+    namelist["microphysics"]["τ_acnv_rai"] = 1000.0 # https://github.com/szy21/pycles_GCM/blob/v1.0/Csrc/microphysics_CLIMA.h#L13
+    namelist["microphysics"]["q_liq_threshold"] = 0.5e-3 # https://github.com/szy21/pycles_GCM/blob/v1.0/Csrc/microphysics_CLIMA.h#L12
+
+    # Defaults from RICO
+    namelist["microphysics"]["τ_acnv_sno"] = 100.0
+    namelist["microphysics"]["q_ice_threshold"] = 1e-6
+    namelist["microphysics"]["E_liq_rai"] = 0.8
+    namelist["microphysics"]["E_liq_sno"] = 0.1
+    namelist["microphysics"]["E_ice_rai"] = 1.0
+    namelist["microphysics"]["E_ice_sno"] = 0.1
+    namelist["microphysics"]["E_rai_sno"] = 1.0
+    # TODO microph_scaling adjusts evaporation process.
+    # The name will be first fixed in CLIMAParameters.
+    namelist["microphysics"]["microph_scaling"] = 1.0
+    namelist["microphysics"]["microph_scaling_dep_sub"] = 1.0
+    namelist["microphysics"]["microph_scaling_melt"] = 1.0
+    namelist["microphysics"]["microph_scaling_acnv"] = 1.0
+    namelist["microphysics"]["microph_scaling_accr"] = 1.0
+
+    # LES filename should follow pattern: (maybe we do somethin like this wit forcing stuff from socrates?)
+    # Stats.cfsite<SITE-NUMBER>_<FORCING-MODEL>_<EXPERIMENT>_2004-2008.<MONTH>.nc
+    namelist["meta"]["datafile"] = "/home/jbenjami/Research_Schneider/CliMa/Data/SOCRATES/RF09/RF09_obs-based_SAM_input.nc" # doesn't contain the zof the data or we want to run on though i guess idk if that matters
+    namelist["meta"]["simname"] = "SOCRATES_RF09_obs"
+    namelist["meta"]["casename"] = "SOCRATES_RF09_obs"
+
+    return namelist
+end
+
+
 
 function write_file(namelist, root::String = ".")
     mkpath(root)
