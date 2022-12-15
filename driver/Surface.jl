@@ -2,6 +2,37 @@ import StaticArrays as SA
 import SurfaceFluxes as SF
 import SurfaceFluxes.UniversalFunctions as UF
 
+
+"""
+    entropy_flux_from_thetali_q_tot_flux(
+        thermo_params,
+        ρθ_liq_ice_flux::FT,
+        ρq_tot_flux::FT,
+        ts::TD.PhaseEquil,
+    )
+    Computes entropy flux given fluxes of thetali and q_tot.
+    Adapted from pycles function :
+    https://github.com/CliMA/pycles/blob/edfd57156711ec37e1f47972bfc7ba53277c3487/Csrc/surface.h#L95
+"""
+
+function entropy_flux_from_thetali_q_tot_flux(
+    thermo_params,
+    ρθ_liq_ice_flux::FT,
+    ρq_tot_flux::FT,
+    ts::Union{TD.PhaseEquil{FT}, TD.PhaseNonEquil{FT}},
+) where {FT}
+    cp_m = TD.cp_m(thermo_params, ts)
+    T = TD.air_temperature(thermo_params, ts)
+    q = TD.PhasePartition(thermo_params, ts)
+    p = TD.air_pressure(thermo_params, ts)
+    s_d = TD.specific_entropy_dry(thermo_params, p, T, q)
+    s_v = TD.specific_entropy_vapor(thermo_params, p, T, q)
+    Π = TD.exner(thermo_params, ts)
+    ρs_flux = (cp_m * ρθ_liq_ice_flux * Π / T) + ρq_tot_flux * (s_v - s_d)
+    return ρs_flux
+end
+
+
 function get_surface(
     surf_params::TC.FixedSurfaceFlux,
     grid::TC.Grid,
@@ -56,6 +87,9 @@ function get_surface(
         SF.Fluxes{FT}(; kwargs...)
     end
     result = SF.surface_conditions(surf_flux_params, sc, scheme)
+    ρθ_liq_ice_flux = shf / TD.cp_m(thermo_params, ts_in)
+    ρq_tot_flux = lhf / TD.latent_heat_vapor(thermo_params, ts_in)
+    ρs_flux = entropy_flux_from_thetali_q_tot_flux(thermo_params, ρθ_liq_ice_flux, ρq_tot_flux, ts_in)
     return TC.SurfaceBase{FT}(;
         shf = shf,
         lhf = lhf,
@@ -66,8 +100,9 @@ function get_surface(
         ch = result.Ch,
         ρu_flux = surf_params.zero_uv_fluxes ? FT(0) : result.ρτxz,
         ρv_flux = surf_params.zero_uv_fluxes ? FT(0) : result.ρτyz,
-        ρθ_liq_ice_flux = shf / TD.cp_m(thermo_params, ts_in),
-        ρq_tot_flux = lhf / TD.latent_heat_vapor(thermo_params, ts_in),
+        ρθ_liq_ice_flux = ρθ_liq_ice_flux,
+        ρq_tot_flux = ρq_tot_flux,
+        ρs_flux = ρs_flux,
         wstar = convective_vel,
         ρq_liq_flux = FT(0),
         ρq_ice_flux = FT(0),
@@ -114,6 +149,10 @@ function get_surface(
     lhf = result.lhf
     shf = result.shf
 
+    ρθ_liq_ice_flux = shf / TD.cp_m(thermo_params, ts_in)
+    ρq_tot_flux = lhf / TD.latent_heat_vapor(thermo_params, ts_in)
+    ρs_flux = entropy_flux_from_thetali_q_tot_flux(thermo_params, ρθ_liq_ice_flux, ρq_tot_flux, ts_in)
+
     zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)
     convective_vel = TC.get_wstar(result.buoy_flux, zi)
     return TC.SurfaceBase{FT}(;
@@ -125,8 +164,9 @@ function get_surface(
         ustar = result.ustar,
         ρu_flux = result.ρτxz,
         ρv_flux = result.ρτyz,
-        ρθ_liq_ice_flux = shf / TD.cp_m(thermo_params, ts_in),
-        ρq_tot_flux = lhf / TD.latent_heat_vapor(thermo_params, ts_in),
+        ρθ_liq_ice_flux = ρθ_liq_ice_flux,
+        ρq_tot_flux = ρq_tot_flux,
+        ρs_flux = ρs_flux,
         bflux = result.buoy_flux,
         wstar = convective_vel,
         ρq_liq_flux = FT(0),
@@ -174,6 +214,10 @@ function get_surface(
     shf = result.shf
     zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)
     convective_vel = TC.get_wstar(result.buoy_flux, zi)
+    ρθ_liq_ice_flux = shf / TD.cp_m(thermo_params, ts_in)
+    ρq_tot_flux = lhf / TD.latent_heat_vapor(thermo_params, ts_in)
+    ρs_flux = entropy_flux_from_thetali_q_tot_flux(thermo_params, ρθ_liq_ice_flux, ρq_tot_flux, ts_in)
+
     return TC.SurfaceBase{FT}(;
         cm = result.Cd,
         ch = result.Ch,
@@ -183,8 +227,9 @@ function get_surface(
         ustar = result.ustar,
         ρu_flux = result.ρτxz,
         ρv_flux = result.ρτyz,
-        ρθ_liq_ice_flux = shf / TD.cp_m(thermo_params, ts_in),
-        ρq_tot_flux = lhf / TD.latent_heat_vapor(thermo_params, ts_in),
+        ρθ_liq_ice_flux = ρθ_liq_ice_flux,
+        ρq_tot_flux = ρq_tot_flux,
+        ρs_flux = ρs_flux,
         bflux = result.buoy_flux,
         wstar = convective_vel,
         ρq_liq_flux = FT(0),
