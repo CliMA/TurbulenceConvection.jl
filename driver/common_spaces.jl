@@ -59,7 +59,9 @@ function construct_mesh(namelist; FT = Float64)
         )
 
         les_filename = namelist["meta"]["lesfile"]
-        TC.valid_lespath(les_filename)
+        if namelist["meta"]["special"] != "LLJ_case"
+            TC.valid_lespath(les_filename)
+        end
         zmax = NC.Dataset(les_filename, "r") do data
             Array(TC.get_nc_data(data, "zf"))[end]
         end

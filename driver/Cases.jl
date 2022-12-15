@@ -138,6 +138,8 @@ Base.@kwdef struct LESData
     t_interval_from_end_s::Float64 = 6 * 3600.0
     "Length of time to average over for SCM initialization"
     initial_condition_averaging_window_s::Float64 = 3600.0
+    "Special case flag for Emily's LLJ cases"
+    special::String = nothing
 end
 
 #####
@@ -1103,19 +1105,28 @@ end
 function forcing_kwargs(::LES_driven_SCM, namelist)
     coriolis_param = namelist["forcing"]["coriolis"]
     les_filename = namelist["meta"]["lesfile"]
-    cfsite_number, forcing_model, month, experiment = TC.parse_les_path(les_filename)
-    LES_library = TC.get_LES_library()
-    les_type = LES_library[forcing_model][string(month, pad = 2)]["cfsite_numbers"][string(cfsite_number, pad = 2)]
-    if les_type == "shallow"
-        wind_nudge_τᵣ = 6.0 * 3600.0
+    special_case = namelist["meta"]["special"]
+
+    if special_case == "LLJ_case" # TODO Emily
+        wind_nudge_τᵣ = 6.0 * 3600.0 * 1000.0
         scalar_nudge_zᵢ = 3000.0
         scalar_nudge_zᵣ = 3500.0
-        scalar_nudge_τᵣ = 24.0 * 3600.0
-    elseif les_type == "deep"
-        wind_nudge_τᵣ = 3600.0
-        scalar_nudge_zᵢ = 16000.0
-        scalar_nudge_zᵣ = 20000.0
-        scalar_nudge_τᵣ = 2.0 * 3600.0
+        scalar_nudge_τᵣ = 24.0 * 3600.0 * 1000.0
+    else
+        cfsite_number, forcing_model, month, experiment = TC.parse_les_path(les_filename)
+        LES_library = TC.get_LES_library()
+        les_type = LES_library[forcing_model][string(month, pad = 2)]["cfsite_numbers"][string(cfsite_number, pad = 2)]
+        if les_type == "shallow"
+            wind_nudge_τᵣ = 6.0 * 3600.0
+            scalar_nudge_zᵢ = 3000.0
+            scalar_nudge_zᵣ = 3500.0
+            scalar_nudge_τᵣ = 24.0 * 3600.0
+        elseif les_type == "deep"
+            wind_nudge_τᵣ = 3600.0
+            scalar_nudge_zᵢ = 16000.0
+            scalar_nudge_zᵣ = 20000.0
+            scalar_nudge_τᵣ = 2.0 * 3600.0
+        end
     end
 
     return (; wind_nudge_τᵣ, scalar_nudge_zᵢ, scalar_nudge_zᵣ, scalar_nudge_τᵣ, coriolis_param)
@@ -1123,9 +1134,14 @@ end
 
 function les_data_kwarg(::LES_driven_SCM, namelist)
     les_filename = namelist["meta"]["lesfile"]
+    special = namelist["meta"]["special"]
     # load data here
     LESDat = NC.Dataset(les_filename, "r") do data
-        t = data.group["profiles"]["t"][:]
+        if special == "LLJ_case"
+            t = data["t"][:]
+        else
+            t = data.group["profiles"]["t"][:]
+        end
         t_interval_from_end_s = namelist["t_interval_from_end_s"]
         t_from_end_s = t .- t[end]
         # find inds within time interval
@@ -1133,7 +1149,7 @@ function les_data_kwarg(::LES_driven_SCM, namelist)
         imin = time_interval_bool[1]
         imax = time_interval_bool[end]
 
-        LESData(imin, imax, les_filename, t_interval_from_end_s, namelist["initial_condition_averaging_window_s"])
+        LESData(imin, imax, les_filename, t_interval_from_end_s, namelist["initial_condition_averaging_window_s"], special)
     end
     return (; LESDat)
 end
@@ -1142,14 +1158,23 @@ function surface_ref_state(::LES_driven_SCM, param_set::APS, namelist)
     thermo_params = TCP.thermodynamics_params(param_set)
     FT = eltype(param_set)
     les_filename = namelist["meta"]["lesfile"]
+    special_case = namelist["meta"]["special"]
 
     Pg, Tg, qtg = NC.Dataset(les_filename, "r") do data
-        pg_str = haskey(data.group["reference"], "p0_full") ? "p0_full" : "p0"
-        Pg = data.group["reference"][pg_str][1] #Pressure at ground
-        Tg = data.group["reference"]["temperature0"][1] #Temperature at ground
-        ql_ground = data.group["reference"]["ql0"][1]
-        qv_ground = data.group["reference"]["qv0"][1]
-        qi_ground = data.group["reference"]["qi0"][1]
+        if special_case == "LLJ_case"
+            Pg = data["p0"][1]
+            Tg = data["temperature0"][1]
+            ql_ground = data["ql0"][1]
+            qv_ground = data["qv0"][1]
+            qi_ground = data["qi0"][1]
+        else
+            pg_str = haskey(data.group["reference"], "p0_full") ? "p0_full" : "p0"
+            Pg = data.group["reference"][pg_str][1] #Pressure at ground
+            Tg = data.group["reference"]["temperature0"][1] #Temperature at ground
+            ql_ground = data.group["reference"]["ql0"][1]
+            qv_ground = data.group["reference"]["qv0"][1]
+            qi_ground = data.group["reference"]["qi0"][1]
+        end 
         qtg = ql_ground + qv_ground + qi_ground #Total water mixing ratio at surface
         (FT(Pg), FT(Tg), FT(qtg))
     end
@@ -1161,28 +1186,52 @@ function initialize_profiles(::LES_driven_SCM, grid::Grid, param_set, state; LES
     FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
+    
+    if LESDat.special == "LLJ_case"
+        nt = NC.Dataset(LESDat.les_filename, "r") do data
+            t = data["t"][:]
+            zc_les = data["z"][:]
+            getvar(var) = pyinterp(vec(grid.zc.z), Array(FT(zc_les)), data[var][0,:])
+            println(vec(grid.zc.z))
+            println(Array(zc_les))
+            var = "thetali_mean"
+            println(data[var][:])
 
-    nt = NC.Dataset(LESDat.les_filename, "r") do data
-        t = data.group["profiles"]["t"][:]
-        # define time interval
-        half_window = LESDat.initial_condition_averaging_window_s / 2
-        t_window_start = (LESDat.t_interval_from_end_s + half_window)
-        t_window_end = (LESDat.t_interval_from_end_s - half_window)
-        t_from_end_s = Array(t) .- t[end]
-        # find inds within time interval
-        in_window(x) = -t_window_start <= x <= -t_window_end
-        time_interval_bool = findall(in_window, t_from_end_s)
-        imin = time_interval_bool[1]
-        imax = time_interval_bool[end]
-        zc_les = Array(TC.get_nc_data(data, "zc"))
+            θ_liq_ice_gm = getvar("thetali_mean")
+            q_tot_gm = getvar("qt_mean")
+            prog_gm_u_gm = getvar("u_mean")
+            prog_gm_v_gm = getvar("v_mean")
 
-        getvar(var) = pyinterp(vec(grid.zc.z), zc_les, TC.mean_nc_data(data, "profiles", var, imin, imax))
+            (; zc_les, θ_liq_ice_gm, q_tot_gm, prog_gm_u_gm, prog_gm_v_gm)
+        end
+    else
+        nt = NC.Dataset(LESDat.les_filename, "r") do data
+            t = data.group["profiles"]["t"][:]
+            # define time interval
+            half_window = LESDat.initial_condition_averaging_window_s / 2
+            t_window_start = (LESDat.t_interval_from_end_s + half_window)
+            t_window_end = (LESDat.t_interval_from_end_s - half_window)
+            t_from_end_s = Array(t) .- t[end]
+            # find inds within time interval
+            in_window(x) = -t_window_start <= x <= -t_window_end
+            time_interval_bool = findall(in_window, t_from_end_s)
+            imin = time_interval_bool[1]
+            imax = time_interval_bool[end]
+            zc_les = Array(TC.get_nc_data(data, "zc"))
 
-        θ_liq_ice_gm = getvar("thetali_mean")
-        q_tot_gm = getvar("qt_mean")
-        prog_gm_u_gm = getvar("u_mean")
-        prog_gm_v_gm = getvar("v_mean")
-        (; zc_les, θ_liq_ice_gm, q_tot_gm, prog_gm_u_gm, prog_gm_v_gm)
+            getvar(var) = pyinterp(vec(grid.zc.z), zc_les, TC.mean_nc_data(data, "profiles", var, imin, imax))
+            println(vec(grid.zc.z))
+            println(zc_les)
+            var = "thetali_mean"
+            println(TC.mean_nc_data(data, "profiles", var, imin, imax))
+
+            θ_liq_ice_gm = getvar("thetali_mean")
+            q_tot_gm = getvar("qt_mean")
+            prog_gm_u_gm = getvar("u_mean")
+            prog_gm_v_gm = getvar("v_mean")
+            
+            (; zc_les, θ_liq_ice_gm, q_tot_gm, prog_gm_u_gm, prog_gm_v_gm)
+        end
     end
 
     prog_gm_u = copy(aux_gm.q_tot)
@@ -1214,13 +1263,23 @@ function surface_params(case::LES_driven_SCM, surf_ref_state, param_set; Ri_bulk
         imax = LESDat.imax
 
         zrough = FT(1.0e-4)
-        Tsurface = Statistics.mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims = 1)[1]
-        # get surface value of q
-        mean_qt_prof = Statistics.mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)[:]
-        # TODO: this will need to be changed if/when we don't prescribe surface fluxes
-        qsurface = FT(0)
-        lhf = FT(Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1])
-        shf = FT(Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1])
+        if LESDat.special == "LLJ_case"
+            Tsurface = FT(data["surface_temperature"][1])
+            # get surface value of q
+            mean_qt_prof = FT(data["qt_mean"][:][1])
+            # TODO: this will need to be changed if/when we don't prescribe surface fluxes
+            qsurface = FT(0)
+            lhf = FT(data["lhf_surface_mean"][1])
+            shf = FT(data["shf_surface_mean"][1])
+        else
+            Tsurface = Statistics.mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims = 1)[1]
+            # get surface value of q
+            mean_qt_prof = Statistics.mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)[:]
+            # TODO: this will need to be changed if/when we don't prescribe surface fluxes
+            qsurface = FT(0)
+            lhf = FT(Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1])
+            shf = FT(Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1])
+        end
         (; zrough, Tsurface, qsurface, lhf, shf)
     end
     UnPack.@unpack zrough, Tsurface, qsurface, lhf, shf = nt

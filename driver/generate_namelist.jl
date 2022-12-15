@@ -676,6 +676,12 @@ function LES_driven_SCM(namelist_defaults)
         joinpath(les_driven_scm_data_folder(), "Stats.cfsite23_HadGEM2-A_amip_2004-2008.07.nc")
     namelist["meta"]["simname"] = "LES_driven_SCM"
     namelist["meta"]["casename"] = "LES_driven_SCM"
+    namelist["meta"]["special"] = "none"
+
+    # Stuff added by Emily to accomodate an LLJ case
+    namelist["meta"]["special"] = "LLJ_case"
+    namelist["forcing"]["coriolis"] = 0.729e-4
+    namelist["meta"]["lesfile"] = joinpath("/Users/emilydejong/OneDrive - California Institute of Technology/2021NREL/data/WRF/wrf_TCjl_inputs.nc")
 
     return namelist
 end
