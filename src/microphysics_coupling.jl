@@ -137,8 +137,6 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
             S_qi = -min(-S_qi, q.ice / Δt)
         end
 
-<<<<<<< HEAD
-=======
         # numerical_mismatch = q_vap - S_ql*Δt - S_qi*Δt
         # if numerical_mismatch < 0 # there would be negative vapor (fix doesnt fix numeral instabilities tho so maybe exclude, is an FT error)
         #     if S_ql  > 0
@@ -148,7 +146,6 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
         #     end
         # end
 
->>>>>>> 2c7eebd1 (small fixes for path names, supersat formulation limiters, typos)
         ql_tendency += S_ql
         qi_tendency += S_qi
     end
