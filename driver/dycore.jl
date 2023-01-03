@@ -236,7 +236,13 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
         # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
         # treat them as auxiliary variables for now, until we disentangle the tendency computations.
-        Cases.update_forcing(case, grid, state, t, param_set)
+        if isa(case, Cases.SOCRATES_RF09_obs)
+            # @show("updating forcing socrates")
+            Cases.update_forcing(case, grid, state, t, param_set, forcing) # should dispatch to socrates
+        else
+            # @show(" non socrates updating forcing")
+            Cases.update_forcing(case, grid, state, t, param_set)
+        end
         Cases.update_radiation(radiation, grid, state, t, param_set)
 
         TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt)
@@ -247,8 +253,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set)
 
         TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt)
-        compute_gm_tendencies!(edmf, grid, state, surf, radiation, forcing, param_set)
-        nothing
+        compute_gm_tendencies!(edmf, grid, state, surf, radiation, forcing, t, param_set)
     end
 
     return nothing
@@ -273,6 +278,7 @@ function compute_gm_tendencies!(
     surf::TC.SurfaceBase,
     radiation::Cases.RadiationBase,
     force::Cases.ForcingBase,
+    t::Real, # added for time varying forcings...
     param_set::APS,
 )
     thermo_params = TCP.thermodynamics_params(param_set)
@@ -341,19 +347,24 @@ function compute_gm_tendencies!(
     @inbounds for k in TC.real_center_indices(grid)
         Π = TD.exner(thermo_params, ts_gm[k])
         # LS Subsidence
+        # if !(Cases.force_type(force) <: Cases.ForcingSOCRATES_RF09_obs ) # not socrates has time func ( i think we've fixed this, should work for socrates now? could move back here...)
         tendencies_gm.ρθ_liq_ice[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇θ_liq_ice_gm[k]
         tendencies_gm.ρq_tot[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇q_tot_gm[k]
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
             tendencies_gm.q_liq[k] -= ∇q_liq_gm[k] * aux_gm.subsidence[k]
             tendencies_gm.q_ice[k] -= ∇q_ice_gm[k] * aux_gm.subsidence[k]
         end
+        # end
         # Radiation
         if Cases.rad_type(radiation) <: Union{Cases.RadiationDYCOMS_RF01, Cases.RadiationLES, Cases.RadiationTRMM_LBA}
             tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_rad[k] / Π
         end
         # LS advection
+        # if !(Cases.force_type(force) <: Cases.ForcingSOCRATES_RF09_obs ) # not socrates (could move this back here tho...)
         tendencies_gm.ρq_tot[k] += ρ_c[k] * aux_gm.dqtdt_hadv[k]
-        if !(Cases.force_type(force) <: Cases.ForcingDYCOMS_RF01)
+        # end
+        # if !(Cases.force_type(force) <: Union{Cases.ForcingDYCOMS_RF01,Cases.ForcingSOCRATES_RF09_obs} ) # use union cause socrates has time func
+        if !(Cases.force_type(force) <: Union{Cases.ForcingDYCOMS_RF01} ) # use union cause socrates has time func
             tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_hadv[k] / Π
         end
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
@@ -379,6 +390,46 @@ function compute_gm_tendencies!(
             tendencies_gm.ρq_tot[k] += ρ_c[k] * (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k])
             tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * (gm_H_nudge_k + H_fluc)
             tendencies_gm_uₕ[k] += CCG.Covariant12Vector(CCG.UVVector(gm_U_nudge_k, gm_V_nudge_k), lg[k])
+            if edmf.moisture_model isa TC.NonEquilibriumMoisture
+                tendencies_gm.q_liq[k] += aux_gm.dqldt_hadv[k] + gm_q_liq_nudge_k + aux_gm.dqldt_fluc[k]
+                tendencies_gm.q_ice[k] += aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k]
+            end
+        end
+
+        if Cases.force_type(force) <: Cases.ForcingSOCRATES_RF09_obs
+            # # LS subsidence (very unstable)
+            # tendencies_gm.ρθ_liq_ice[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇θ_liq_ice_gm[k] # check if maybe subsidence is problem? (makes it fail faster, removing doesn't fix tho.../)
+            # tendencies_gm.ρq_tot[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇q_tot_gm[k]
+            # if edmf.moisture_model isa TC.NonEquilibriumMoisture # somewhat unstable, doesnt always crash...
+            #     tendencies_gm.q_liq[k] -= ∇q_liq_gm[k] * aux_gm.subsidence[k]
+            #     tendencies_gm.q_ice[k] -= ∇q_ice_gm[k] * aux_gm.subsidence[k]
+            # end
+
+            # LS advection (worked wit short timestep)
+            # tendencies_gm.ρq_tot[k] += ρ_c[k] * aux_gm.dqtdt_hadv[k] # as in all cases above # testing turning this off for converge...
+            # tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_hadv[k] / Π # as in all cases but dycoms_rf01 above
+
+            # # Socrates specific tendencies
+            H_fluc = aux_gm.dTdt_fluc[k] / Π # should be 0
+
+            # force with era 5 geostrophic...
+            # tendencies_gm_uₕ[k] = aux_gm.uₕ_g[k] #add forcing? turned off cause i still dont get what they mean forced by this but nudged to 
+
+            # nudge back to era 5 horizosntal
+            gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm_u[k]) / force.wind_nudge_τᵣ 
+            gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm_v[k]) / force.wind_nudge_τᵣ
+
+            gm_H_nudge_k =  (aux_gm.H_nudge[k] - aux_gm.θ_liq_ice[k]) / force.scalar_nudge_τᵣ # go back to regular tau relaxation (entire column now unlike zhaoyi's func )
+            gm_q_tot_nudge_k =  (aux_gm.qt_nudge[k] - aux_gm.q_tot[k]) / force.scalar_nudge_τᵣ
+            if edmf.moisture_model isa TC.NonEquilibriumMoisture
+                gm_q_liq_nudge_k =  (aux_gm.ql_nudge[k] - prog_gm.q_liq[k]) / force.scalar_nudge_τᵣ
+                gm_q_ice_nudge_k =  (aux_gm.qi_nudge[k] - prog_gm.q_ice[k]) / force.scalar_nudge_τᵣ
+            end
+
+            tendencies_gm.ρq_tot[k] += ρ_c[k] * (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k])
+            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * (gm_H_nudge_k + H_fluc) # we have no fluc so get that out (but we have the other terms so brought it back maybe itll lfix intsbailitis?)
+
+            tendencies_gm_uₕ[k] += CCG.Covariant12Vector(CCG.UVVector(gm_U_nudge_k, gm_V_nudge_k), lg[k]) # add nudge
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
                 tendencies_gm.q_liq[k] += aux_gm.dqldt_hadv[k] + gm_q_liq_nudge_k + aux_gm.dqldt_fluc[k]
                 tendencies_gm.q_ice[k] += aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k]
