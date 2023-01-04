@@ -81,16 +81,16 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
             τ_ice_eff = (q_vap - q_eq.ice)/S_qi
             # println("effective τ_liq = ",τ_liq_eff, " effective τ_ice = ",τ_ice_eff, " T = ", T, " w = ",w, " q = ",q, " q_eq = ", q_eq )
             if     (0 < τ_liq_eff) && (τ_liq_eff < 1) # fast source
-                @show("rate limiting cond: ", S_ql, (q_vap - q_eq.liq) / 1)
+                # @show("rate limiting cond: ", S_ql, (q_vap - q_eq.liq) / 1)
                 S_ql = (q_vap - q_eq.liq) / 1
             elseif (0 < τ_ice_eff) && (τ_ice_eff < 1) # fast source
-                @show("rate limiting dep: ", S_qi, (q_vap - q_eq.ice) / 1)
+                # @show("rate limiting dep: ", S_qi, (q_vap - q_eq.ice) / 1)
                 S_qi = (q_vap - q_eq.ice) / 1
             elseif (-1 < τ_liq_eff) && (τ_liq_eff < 0) # fast sink
-                @show("rate limiting evap: ", S_ql, (q_vap - q_eq.liq) / 1)
+                # @show("rate limiting evap: ", S_ql, (q_vap - q_eq.liq) / 1)
                 S_ql = (q_vap - q_eq.liq) / -1
             elseif (-1 < τ_ice_eff) && (τ_ice_eff < 0) # fast sink
-                @show("rate limiting sub: ", S_qi, (q_vap - q_eq.ice) / 1)
+                # @show("rate limiting sub: ", S_qi, (q_vap - q_eq.ice) / 1)
                 S_qi = (q_vap - q_eq.ice) / -1
             else
             end
