@@ -47,7 +47,7 @@ function overwrite_namelist!(namelist, parsed_args)
     #! format: on
     for key in keys(overwrite_namelist_map)
         if !isnothing(parsed_args[key])
-            @warn "Parameter `$key` overwriting namelist"
+            @warn "Parameter `$key` overwriting namelist, `$key` = $(parsed_args[key])"
             overwrite_namelist_map[key](namelist, parsed_args, key)
         end
     end
