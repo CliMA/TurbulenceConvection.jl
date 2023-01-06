@@ -128,7 +128,10 @@ function compute_diagnostics!(
     aux_bulk = TC.center_aux_bulk(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
     ts_en = TC.center_aux_environment(state).ts
+    a_en = aux_en.area
     a_up_bulk = aux_bulk.area
+    kf_surf = TC.kf_surface(grid)
+    kc_surf = TC.kc_surface(grid)
     kc_toa = TC.kc_top_of_atmos(grid)
     prog_gm = TC.center_prog_grid_mean(state)
     diag_tc = center_diagnostics_turbconv(diagnostics)
@@ -169,16 +172,14 @@ function compute_diagnostics!(
         end
     end
 
-    # TODO(ilopezgp): Fix bottom gradient
     wvec = CC.Geometry.WVector
-    m_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
-    # ∇0_bcs = (; bottom = CCO.SetDivergence(wvec(FT(0))), top = CCO.SetDivergence(wvec(FT(0))))
-    ∇0_bcs = (; bottom = CCO.SetDivergence(FT(0)), top = CCO.SetDivergence(FT(0)))
-    If = CCO.InterpolateC2F(; m_bcs...)
-    ∇f = CCO.DivergenceC2F(; ∇0_bcs...)
+    aeKHs_bc = -surf.ρs_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+
+    If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+    ∇f_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(FT(aeKHs_bc)), top = CCO.SetDivergence(FT(0)))
     massflux_s = aux_gm_f.massflux_s
     parent(massflux_s) .= 0
-    @. aux_gm_f.diffusive_flux_s = -aux_tc_f.ρ_ae_KH * ∇f(wvec(aux_en.s))
+    @. aux_gm_f.diffusive_flux_s = -aux_tc_f.ρ_ae_KH * ∇f_en(wvec(aux_en.s))
     @inbounds for i in 1:N_up
         @. massflux_s += aux_up_f[i].massflux * (If(aux_up[i].s) - If(aux_en.s))
     end
