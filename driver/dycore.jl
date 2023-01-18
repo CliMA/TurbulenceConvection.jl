@@ -365,8 +365,8 @@ function compute_gm_tendencies!(
         if Cases.force_type(force) <: Cases.ForcingLES
             H_fluc = aux_gm.dTdt_fluc[k] / Π
 
-            gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm_u[k]) / force.wind_nudge_τᵣ
-            gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm_v[k]) / force.wind_nudge_τᵣ
+            gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm_u[k]) / force.wind_nudge_τᵣ + aux_gm.dudt_adv[k] + aux_gm.dudt_pgf[k]
+            gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm_v[k]) / force.wind_nudge_τᵣ + aux_gm.dvdt_adv[k] + aux_gm.dvdt_pgf[k]
 
             Γᵣ = compute_les_Γᵣ(grid.zc[k].z, force.scalar_nudge_τᵣ, force.scalar_nudge_zᵢ, force.scalar_nudge_zᵣ)
             gm_H_nudge_k = Γᵣ * (aux_gm.H_nudge[k] - aux_gm.θ_liq_ice[k])

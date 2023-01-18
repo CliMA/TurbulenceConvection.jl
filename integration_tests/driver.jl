@@ -43,19 +43,19 @@ parsed_args["broken_tests"] && exit()
 end
 
 # # Post-processing case kwargs
-# include(joinpath(tc_dir, "integration_tests", "sphere_utils.jl"))
-# include(joinpath(tc_dir, "post_processing", "case_kwargs.jl"))
-# include(joinpath(tc_dir, "post_processing", "compute_mse.jl"))
-# include(joinpath(tc_dir, "post_processing", "mse_tables.jl"))
-# best_mse = all_best_mse[case_name]
+include(joinpath(tc_dir, "integration_tests", "sphere_utils.jl"))
+include(joinpath(tc_dir, "post_processing", "case_kwargs.jl"))
+include(joinpath(tc_dir, "post_processing", "compute_mse.jl"))
+include(joinpath(tc_dir, "post_processing", "mse_tables.jl"))
+best_mse = all_best_mse[case_name]
 
-# parsed_args["skip_post_proc"] && exit()
+parsed_args["skip_post_proc"] && exit()
 
-# plot_dir = joinpath(dirname(first(ds_tc_filenames)), "comparison")
-# if parsed_args["config"] == "sphere"
-#     plot_profiles(integrator.sol.u[end], plot_dir)
-#     test_zero_horizontal_variance(integrator.sol.u[end])
-# end
+plot_dir = joinpath(dirname(first(ds_tc_filenames)), "comparison")
+if parsed_args["config"] == "sphere"
+    plot_profiles(integrator.sol.u[end], plot_dir)
+    test_zero_horizontal_variance(integrator.sol.u[end])
+end
 
 # for ds_tc_filename in ds_tc_filenames
 #     computed_mse = compute_mse_wrapper(case_name, best_mse, ds_tc_filename; case_kwargs[case_name]..., plot_dir)

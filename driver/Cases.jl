@@ -1108,10 +1108,10 @@ function forcing_kwargs(::LES_driven_SCM, namelist)
     special_case = namelist["meta"]["special"]
 
     if special_case == "LLJ_case" # TODO Emily
-        wind_nudge_τᵣ = 6.0 * 3600.0 * 1000.0
+        wind_nudge_τᵣ = 6.0 * 3600.0
         scalar_nudge_zᵢ = 3000.0
         scalar_nudge_zᵣ = 3500.0
-        scalar_nudge_τᵣ = 24.0 * 3600.0 * 1000.0
+        scalar_nudge_τᵣ = 24.0 * 3600.0
     else
         cfsite_number, forcing_model, month, experiment = TC.parse_les_path(les_filename)
         LES_library = TC.get_LES_library()
@@ -1190,12 +1190,8 @@ function initialize_profiles(::LES_driven_SCM, grid::Grid, param_set, state; LES
     if LESDat.special == "LLJ_case"
         nt = NC.Dataset(LESDat.les_filename, "r") do data
             t = data["t"][:]
-            zc_les = data["z"][:]
-            getvar(var) = pyinterp(vec(grid.zc.z), Array(FT(zc_les)), data[var][0,:])
-            println(vec(grid.zc.z))
-            println(Array(zc_les))
-            var = "thetali_mean"
-            println(data[var][:])
+            zc_les = FT.(identity.(data["z"][:]))
+            getvar(var) = pyinterp(vec(grid.zc.z), zc_les, FT.(identity.(data[var][:,1])))
 
             θ_liq_ice_gm = getvar("thetali_mean")
             q_tot_gm = getvar("qt_mean")
@@ -1220,10 +1216,7 @@ function initialize_profiles(::LES_driven_SCM, grid::Grid, param_set, state; LES
             zc_les = Array(TC.get_nc_data(data, "zc"))
 
             getvar(var) = pyinterp(vec(grid.zc.z), zc_les, TC.mean_nc_data(data, "profiles", var, imin, imax))
-            println(vec(grid.zc.z))
-            println(zc_les)
             var = "thetali_mean"
-            println(TC.mean_nc_data(data, "profiles", var, imin, imax))
 
             θ_liq_ice_gm = getvar("thetali_mean")
             q_tot_gm = getvar("qt_mean")

@@ -71,13 +71,18 @@ function initialize(self::RadiationBase{RadiationLES}, grid, state, LESDat::LESD
     # load from LES
     aux_gm = TC.center_aux_grid_mean(state)
     dTdt = NC.Dataset(LESDat.les_filename, "r") do data
-        imin = LESDat.imin
-        imax = LESDat.imax
+        if LESDat.special == "LLJ_case"
+            zc_les = identity.(data["z"][:])
+            TC.pyinterp(vec(grid.zc.z), zc_les, identity.(data["dtdt_rad"][:,1]))
+        else
+            imin = LESDat.imin
+            imax = LESDat.imax
 
-        # interpolate here
-        zc_les = Array(TC.get_nc_data(data, "zc"))
-        meandata = TC.mean_nc_data(data, "profiles", "dtdt_rad", imin, imax)
-        pyinterp(vec(grid.zc.z), zc_les, meandata)
+            # interpolate here
+            zc_les = Array(TC.get_nc_data(data, "zc"))
+            meandata = TC.mean_nc_data(data, "profiles", "dtdt_rad", imin, imax)
+            pyinterp(vec(grid.zc.z), zc_les, meandata)
+        end
     end
     @inbounds for k in TC.real_center_indices(grid)
         aux_gm.dTdt_rad[k] = dTdt[k]
