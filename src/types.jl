@@ -95,6 +95,7 @@ end
 Base.@kwdef struct LinearEntr{P, T} <: AbstractMLEntrDetrModel
     params::P
     c_linear::T
+    biases_bool::Bool
 end
 Base.@kwdef struct FNOEntr{P, T} <: AbstractMLNonLocalEntrDetrModel
     params::P
@@ -563,7 +564,16 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         "turbulence",
         "EDMF_PrognosticTKE",
         "nn_ent_biases";
-        default = false,
+        default = true,
+        valid_options = [true, false],
+    )
+
+    linear_biases = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "linear_ent_biases";
+        default = true,
         valid_options = [true, false],
     )
 
@@ -609,7 +619,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         FNOEntr(; params = εδ_params, w_fno, nm_fno, c_fno)
     elseif ml_entr_type == "Linear"
         c_linear = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "linear_ent_params")
-        LinearEntr(; params = εδ_params, c_linear)
+        LinearEntr(; params = εδ_params, biases_bool = linear_biases, c_linear)
     elseif ml_entr_type == "RF"
         c_rf_fix = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_fix_ent_params")
         c_rf_opt = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_opt_ent_params")

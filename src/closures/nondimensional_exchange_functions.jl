@@ -219,6 +219,62 @@ function construct_fully_connected_nn(
 end
 
 """
+serialize_ml_model(
+    ml_model::Flux.Chain,
+    )
+
+    Given Flux NN model, serialize model weights into a vector of parameters.
+    - `ml_model` - A Flux model instance.
+"""
+
+function serialize_ml_model(ml_model::Flux.Chain)
+    parameters = []
+    param_type = eltype.(Flux.params(ml_model))[1]
+    for layer_i in 1:length(ml_model)
+        params_layer_i = Flux.params(ml_model[layer_i]).order.data[1]
+        params_layer_i_flattened = reshape(params_layer_i, length(params_layer_i))
+        push!(parameters, params_layer_i_flattened...)
+    end
+    return convert(Array{param_type}, parameters)
+end
+
+"""
+    construct_fully_connected_nn_default(
+        arc::AbstractArray{Int};
+        biases_bool::Bool = false,
+        activation_function::Flux.Function = Flux.sigmoid,
+        output_layer_activation_function::Flux.Function = Flux.relu,
+    )
+
+Given network architecture, construct NN model with default `Flux.jl` weight initialization (glorot_uniform).
+- `arc` :: vector specifying network architecture
+- `biases_bool` :: bool specifying whether to include biases.
+- `activation_function` :: activation function for hidden layers
+- `output_layer_activation_function` :: activation function for output layer
+"""
+
+function construct_fully_connected_nn_default(
+    arc::AbstractArray{Int};
+    biases_bool::Bool = false,
+    activation_function::Flux.Function = Flux.sigmoid,
+    output_layer_activation_function::Flux.Function = Flux.relu,
+)
+
+    layers = []
+    # unpack parameters in parameter vector into network
+    for layer_i in 1:(length(arc) - 1)
+        if layer_i == length(arc) - 1
+            activation_function = output_layer_activation_function
+        end
+
+        layer = Flux.Dense(arc[layer_i] => arc[layer_i + 1], activation_function; bias = biases_bool)
+        push!(layers, layer)
+    end
+
+    return Flux.Chain(layers...)
+end
+
+"""
     non_dimensional_function!(nondim_ε, nondim_δ, Π_groups, εδ_model::NNEntrNonlocal)
 
 Uses a fully connected neural network to predict the non-dimensional components of dynamical entrainment/detrainment.
@@ -272,13 +328,31 @@ Uses a simple linear model to predict the non-dimensional components of dynamica
  - `εδ_model_vars`  :: structure containing variables
 """
 function non_dimensional_function(εδ_model::LinearEntr, εδ_model_vars)
-    c_linear = εδ_model.c_linear
 
+    c_linear = εδ_model.c_linear
     nondim_groups = collect(non_dimensional_groups(εδ_model, εδ_model_vars))
+
     # Linear closure
     lin_arc = (length(nondim_groups), 1)  # (#inputs, #outputs)
-    lin_model_ε = Flux.Dense(reshape(c_linear[1:6], lin_arc[2], lin_arc[1]), [c_linear[7]], Flux.relu)
-    lin_model_δ = Flux.Dense(reshape(c_linear[8:13], lin_arc[2], lin_arc[1]), [c_linear[14]], Flux.relu)
+    if εδ_model.biases_bool
+        @assert length(c_linear) == 2 * length(nondim_groups) + 2 "Incorrect number of parameters specified for linear closure"
+        lin_model_ε =
+            Flux.Dense(reshape(c_linear[1:lin_arc[1]], lin_arc[2], lin_arc[1]), [c_linear[lin_arc[1] + 1]], Flux.relu)
+        lin_model_δ = Flux.Dense(
+            reshape(c_linear[(lin_arc[1] + 2):(2 * lin_arc[1] + 1)], lin_arc[2], lin_arc[1]),
+            [c_linear[end]],
+            Flux.relu,
+        )
+    else
+        @assert length(c_linear) == 2 * length(nondim_groups) "Incorrect number of parameters specified for linear closure"
+        lin_model_ε =
+            Flux.Dense(reshape(c_linear[1:lin_arc[1]], lin_arc[2], lin_arc[1]), εδ_model.biases_bool, Flux.relu)
+        lin_model_δ = Flux.Dense(
+            reshape(c_linear[(lin_arc[1] + 1):(2 * lin_arc[1])], lin_arc[2], lin_arc[1]),
+            εδ_model.biases_bool,
+            Flux.relu,
+        )
+    end
 
     nondim_ε = lin_model_ε(nondim_groups)[1]
     nondim_δ = lin_model_δ(nondim_groups)[1]
