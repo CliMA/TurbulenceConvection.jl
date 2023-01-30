@@ -1108,10 +1108,10 @@ function forcing_kwargs(::LES_driven_SCM, namelist)
     special_case = namelist["meta"]["special"]
 
     if special_case == "LLJ_case" # TODO Emily
-        wind_nudge_τᵣ = 6.0 * 3600.0
+        wind_nudge_τᵣ = 6.0 * 3600.0 * 1000.0
         scalar_nudge_zᵢ = 3000.0
         scalar_nudge_zᵣ = 3500.0
-        scalar_nudge_τᵣ = 24.0 * 3600.0
+        scalar_nudge_τᵣ = 24.0 * 3600.0 * 1000.0
     else
         cfsite_number, forcing_model, month, experiment = TC.parse_les_path(les_filename)
         LES_library = TC.get_LES_library()
@@ -1251,20 +1251,48 @@ end
 
 function surface_params(case::LES_driven_SCM, surf_ref_state, param_set; Ri_bulk_crit, LESDat)
     FT = eltype(surf_ref_state)
-    nt = NC.Dataset(LESDat.les_filename, "r") do data
-        imin = LESDat.imin
-        imax = LESDat.imax
-
-        zrough = FT(1.0e-4)
-        if LESDat.special == "LLJ_case"
-            Tsurface = FT(data["surface_temperature"][1])
+    if LESDat.special == "LLJ_case"
+        nt = NC.Dataset(LESDat.les_filename, "r") do data
+            imin = LESDat.imin
+            imax = LESDat.imax
+            @show keys(data)
+            zrough = FT(1.0e-4)
+            
+            Tsurface0 = FT(data["surface_temperature"][1])
+            Tsurface = t -> Tsurface0 + 3.0 + 3.0 * sign(t - 3600.0)
             # get surface value of q
             mean_qt_prof = FT(data["qt_mean"][:][1])
             # TODO: this will need to be changed if/when we don't prescribe surface fluxes
             qsurface = FT(0)
-            lhf = FT(data["lhf_surface_mean"][1])
-            shf = FT(data["shf_surface_mean"][1])
-        else
+            lhf0 = FT(data["lhf_surface_mean"][1])
+            shf0 = FT(data["shf_surface_mean"][1])
+            # skeleton code
+            # shf_all = FT(data["shf_surface_mean][:])
+            # shf(t) = t -> pyinterp()
+            shf = t -> shf0 + 30.00 + 30.00 * sign(t - 3600.0)
+            lhf = t -> lhf0 + 30.00 + 30.00 * sign(t - 3600.0)
+            (; zrough, Tsurface, qsurface, lhf, shf)
+        end
+        UnPack.@unpack zrough, Tsurface, qsurface, lhf, shf = nt
+
+        ustar = FT(0) # TODO: why is initialization missing?
+        kwargs = (; zrough, Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
+        return TC.FixedSurfaceFlux(FT, TC.VariableFrictionVelocity; kwargs...)
+        
+        # FT = eltype(surf_ref_state)
+        # Tsurface = t -> 287 + 4 * sign(t - 3600)
+        # qsurface::FT = 0.0
+        # zrough::FT = FT(1e-4)
+    
+        # kwargs = (; Tsurface, qsurface, zrough)
+        # return TC.MoninObukhovSurface(FT; kwargs...)
+    else
+        nt = NC.Dataset(LESDat.les_filename, "r") do data
+            imin = LESDat.imin
+            imax = LESDat.imax
+
+            zrough = FT(1.0e-4)
+
             Tsurface = Statistics.mean(data.group["timeseries"]["surface_temperature"][:][imin:imax], dims = 1)[1]
             # get surface value of q
             mean_qt_prof = Statistics.mean(data.group["profiles"]["qt_mean"][:][:, imin:imax], dims = 2)[:]
@@ -1272,14 +1300,14 @@ function surface_params(case::LES_driven_SCM, surf_ref_state, param_set; Ri_bulk
             qsurface = FT(0)
             lhf = FT(Statistics.mean(data.group["timeseries"]["lhf_surface_mean"][:][imin:imax], dims = 1)[1])
             shf = FT(Statistics.mean(data.group["timeseries"]["shf_surface_mean"][:][imin:imax], dims = 1)[1])
+            (; zrough, Tsurface, qsurface, lhf, shf)
         end
-        (; zrough, Tsurface, qsurface, lhf, shf)
-    end
-    UnPack.@unpack zrough, Tsurface, qsurface, lhf, shf = nt
+        UnPack.@unpack zrough, Tsurface, qsurface, lhf, shf = nt
 
-    ustar = FT(0) # TODO: why is initialization missing?
-    kwargs = (; zrough, Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
-    return TC.FixedSurfaceFlux(FT, TC.VariableFrictionVelocity; kwargs...)
+        ustar = FT(0) # TODO: why is initialization missing?
+        kwargs = (; zrough, Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
+        return TC.FixedSurfaceFlux(FT, TC.VariableFrictionVelocity; kwargs...)
+    end
 end
 
 initialize_forcing(::LES_driven_SCM, forcing, grid::Grid, state, param_set; LESDat) =
