@@ -1255,22 +1255,28 @@ function surface_params(case::LES_driven_SCM, surf_ref_state, param_set; Ri_bulk
         nt = NC.Dataset(LESDat.les_filename, "r") do data
             imin = LESDat.imin
             imax = LESDat.imax
-            @show keys(data)
             zrough = FT(1.0e-4)
             
-            Tsurface0 = FT(data["surface_temperature"][1])
-            Tsurface = t -> Tsurface0 + 3.0 + 3.0 * sign(t - 3600.0)
             # get surface value of q
             mean_qt_prof = FT(data["qt_mean"][:][1])
             # TODO: this will need to be changed if/when we don't prescribe surface fluxes
-            qsurface = FT(0)
-            lhf0 = FT(data["lhf_surface_mean"][1])
-            shf0 = FT(data["shf_surface_mean"][1])
-            # skeleton code
-            # shf_all = FT(data["shf_surface_mean][:])
-            # shf(t) = t -> pyinterp()
-            shf = t -> shf0 + 30.00 + 30.00 * sign(t - 3600.0)
-            lhf = t -> lhf0 + 30.00 + 30.00 * sign(t - 3600.0)
+            qsurface = mean_qt_prof[1]
+
+            t_data = identity.(data["t"][:])
+            Tsurf_all = identity.(data["surface_temperature"][:])
+            lhf_all = identity.(data["lhf_surface_mean"][:]) * FT(-1.0)
+            shf_all = identity.(data["shf_surface_mean"][:]) * FT(-1.0)
+
+            Tsurface = t -> pyinterp([t], t_data, Tsurf_all)[1]
+            lhf = t -> pyinterp([t], t_data, lhf_all)[1]
+            shf = t -> pyinterp([t], t_data, shf_all)[1]
+
+            # Tsurface0 = FT(data["surface_temperature"][1])
+            # Tsurface = t -> Tsurface0 + 3.0 + 3.0 * sign(t - 3600.0)
+            # lhf0 = FT(data["lhf_surface_mean"][1])
+            # shf0 = FT(data["shf_surface_mean"][1])
+            # shf = t -> shf0 + 30.00 + 30.00 * sign(t - 3600.0)
+            # lhf = t -> lhf0 + 30.00 + 30.00 * sign(t - 3600.0)
             (; zrough, Tsurface, qsurface, lhf, shf)
         end
         UnPack.@unpack zrough, Tsurface, qsurface, lhf, shf = nt
