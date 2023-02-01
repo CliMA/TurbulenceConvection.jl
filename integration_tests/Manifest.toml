@@ -1832,7 +1832,6 @@ version = "1.0.1"
 
 [[deps.Thermodynamics]]
 deps = ["DocStringExtensions", "KernelAbstractions", "Random", "RootSolvers"]
-path = "/export/data1/jbenjami/Research_Schneider/CliMa/Thermodynamics.jl"
 uuid = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
 version = "0.10.1"
 
