@@ -1,4 +1,4 @@
-initialize(::ForcingBase, grid, state) = nothing
+initialize(::ForcingBase, grid, state) = nothingå
 
 function initialize(::ForcingBase{ForcingLES}, grid, state, LESDat::LESData)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -292,9 +292,14 @@ end
 function initialize(forcing::ForcingBase{T}, grid, state, param_set) where {T<:ForcingSOCRATES}# added param_set so we can calculate stuff....
     FT = eltype(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
+
+    # set the geostrophic velocity profiles (need to make sure u doesnt include this already...)
+    prof_ug = # add this (also needs its own forcing update function... cause we gotta do the set_z thing...)
+    prof_vg = # add this
+    aux_gm_uₕ_g = TC.grid_mean_uₕ_g(state)
+    TC.set_z!(aux_gm_uₕ_g, prof_ug, prof_vg)
+    
     # forcing_funcs = create_forcing_funcs(forcing, grid, state, param_set; Dat) 
-    # forcing_funcs = SOCRATES_Single_Column_Forcings.process_case(9;initial_condition=false)
-    # @show(fieldnames(forcing))
     forcing_funcs = forcing.forcing_funcs[]
     for (name,funcs) in zip(keys(forcing_funcs),forcing_funcs) # iterate over the named tuple of our forcings...
         for k in TC.real_center_indices(grid)

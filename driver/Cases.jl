@@ -102,7 +102,7 @@ for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
     for forcing_type in SOCRATES_Single_Column_Forcings.forcing_types
         # eval( Meta.parse("struct SOCRATES_RF$(flight_number)_$(forcing_type) <: SOCRATES end")) # create subtypes of SOCRATES for each flight number and forcing type (works but not ideal)
         name = Symbol("SOCRATES_RF$(string(flight_number,pad=2))_$(forcing_type)") # separated this way cause nested dollar signs gave me too much trouble... (invalid type signature) but allows for easier addition of methods
-        @show(name)
+        # @show(name)
         fn = QuoteNode(flight_number)
         ft = QuoteNode(forcing_type) # we have to do this QuoteNode thing so that particulalry forcing_type is not evaluated to a string before Main.eval can analyze it, so that we can actually create a string, e.g. https://stackoverflow.com/a/70018854 
         eval( quote Base.@kwdef struct $name <: SOCRATES # kwdef to add methods as defaults, see https://discourse.julialang.org/t/default-value-of-some-fields-in-a-mutable-struct/33408/4, this is the only way I could get it to work https://docs.julialang.org/en/v1/manual/metaprogramming/#man-macros (doesn't need to be Main.eval, just the eval for our case here since not in fcn)
@@ -1326,15 +1326,11 @@ initialize_radiation(::LES_driven_SCM, radiation, grid::Grid, state, param_set; 
  
 # you cant instatiatie the socrates subtype so we'll iterate here 
 
-@show(1111)
-@show(SOCRATES)
-@show(SOCRATES_RF01_obs_data)
-@show(2222)
 for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
     for forcing_type in SOCRATES_Single_Column_Forcings.forcing_types
         # @show(flight_number)
         name = Symbol("SOCRATES_RF$(string(flight_number,pad=2))_$(forcing_type)") # separated this way cause nested dollar signs gave me too much trouble... (invalid type signature) but allows for easier addition of methods
-        @show(name)
+        # @show(name)
         qnn = QuoteNode(name)
         @eval get_case(::Val{$qnn}) = $(Symbol(name))() # name should already be a symbol, original syntax was get_case(::Val{:x}) = x() , not sure how to evaluate as fcn at end if eval will work like that
         @eval get_forcing_type(::$(Symbol(name))) = $(Symbol("Forcing"*string(name))) # originally would be get_forcing_type(::x) = Forcingx
@@ -1377,8 +1373,8 @@ function initialize_profiles(S::SOCRATES, grid::Grid, param_set, state; ) # shou
         prog_gm_v[k]        = IC.v_nudge[k]
         aux_gm.tke[k]       = 0 # what is this supposed to be? unset for interactive? maybe we dont need to set it initially at all idk... didn't check yet but these get updated later interactively so hope it's fine
     end
-    # prog_gm_uₕ = TC.grid_mean_uₕ(state)
-    # @. prog_gm_uₕ = CCG.Covariant12Vector(CCG.UVVector(prog_gm_u, prog_gm_v))
+    prog_gm_uₕ = TC.grid_mean_uₕ(state) # not too well versed in the details here but this should set the wind profiles IC
+    @. prog_gm_uₕ = CCG.Covariant12Vector(CCG.UVVector(prog_gm_u, prog_gm_v))
 end
 
 # function initialize_profiles(::SOCRATES_RF09_obs, grid::Grid, param_set, state; Dat) # should use LESDat or just use something like the normal cases? we dont need a window so...
@@ -1490,10 +1486,10 @@ end
 
 
 function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_set; ) # added param_set so we can calculate stuff...
-    @show(case)
-    @show(forcing)
-    forcing.forcing_funcs[] = case.get_forcing() # maybe need to add param_set to this fcn args? everywhere really
+    # @show(case)
     # @show(forcing)
+    forcing.forcing_funcs[] = case.get_forcing() # maybe need to add param_set to this fcn args? everywhere really
+    
     # forcing.forcing_funcs[] = create_forcing_funcs(forcing, grid, state, param_set; )  # initialize our forcing_funcs and insert them into our object and we can cheat and use the mutable array inside immutable struct :)    # not sure how this fits into the module... here but it seems to find it...
     initialize(forcing, grid, state, param_set) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
 end
