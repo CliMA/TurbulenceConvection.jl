@@ -22,6 +22,9 @@ function microphysics(
     aux_en_unsat = aux_en.unsat
     precip_fraction = compute_precip_fraction(edmf, state)
 
+
+    ts_LCL = cloud_base(aux_en, grid, ts_env, :env)[:cloud_base_ts] # cloud base, only keep the thermodynamic state part
+
     @inbounds for k in real_center_indices(grid)
         # condensation
         ts = ts_env[k]
@@ -37,7 +40,7 @@ function microphysics(
             #     @show(w)
             # end
 
-            mph_neq = noneq_moisture_sources(param_set, aux_en.area[k], ρ_c[k], Δt, ts, w)
+            mph_neq = noneq_moisture_sources(param_set, aux_en.area[k], ρ_c[k], Δt, ts, w; ts_LCL=ts_LCL)
             aux_en.ql_tendency_noneq[k] = mph_neq.ql_tendency * aux_en.area[k]
             aux_en.qi_tendency_noneq[k] = mph_neq.qi_tendency * aux_en.area[k]
         end

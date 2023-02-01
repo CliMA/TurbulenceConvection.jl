@@ -19,6 +19,9 @@ function compute_nonequilibrium_moisture_tendencies!(
     ρ_c = prog_gm.ρ
 
     @inbounds for i in 1:N_up
+
+        ts_LCL = cloud_base(aux_up[i], grid, TD.PhaseNonEquil_pTq.(thermo_params, p_c, aux_up[i].T, TD.PhasePartition.(aux_up[i].q_tot, aux_up[i].q_liq, aux_up[i].q_ice)), :up)[:cloud_base_ts] # cloud base, only keep the thermodynamic state part
+
         @inbounds for k in real_center_indices(grid)
             T_up = aux_up[i].T[k]
             q_up = TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k])
@@ -39,9 +42,9 @@ function compute_nonequilibrium_moisture_tendencies!(
             # end
 
 
-
-
-            mph = noneq_moisture_sources(param_set, aux_up[i].area[k], ρ_c[k], Δt, ts_up, w)
+        
+            
+            mph = noneq_moisture_sources(param_set, aux_up[i].area[k], ρ_c[k], Δt, ts_up, w; ts_LCL=ts_LCL)
             aux_up[i].ql_tendency_noneq[k] = mph.ql_tendency * aux_up[i].area[k]
             aux_up[i].qi_tendency_noneq[k] = mph.qi_tendency * aux_up[i].area[k]
         end

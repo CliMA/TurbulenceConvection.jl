@@ -2,7 +2,7 @@
 Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 (autoconversion + accretion)
 """
-function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts, w) where {FT}
+function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts, w; ts_LCL=nothing) where {FT}
     thermo_params = TCP.thermodynamics_params(param_set)
     microphys_params = TCP.microphysics_params(param_set)
     # TODO - when using adaptive timestepping we are limiting the source terms
@@ -13,6 +13,7 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
         use_supersat      = get(param_set.user_args, :use_supersat, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
         use_korolev_mazin = get(param_set.user_args, :use_korolev_mazin, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
         raymond_ice_test  = get(param_set.user_args, :raymond_ice_test, false) # the timescale parameterization from raymond...
+        N_r_closure       = get(param_set.user_args, :N_r_closure, :monodisperse)
 
         q = TD.PhasePartition(thermo_params, ts)
         T = TD.air_temperature(thermo_params, ts)
@@ -40,15 +41,25 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
 
                 # -- hopefully this gets around the problem of draining water vapor at initialization of clouds but also allows speedup as droplets grow (assuming fixed drop concenctration)
                 D, ρ_w = FT(0.0000226), FT(1) 
-                R    =  max(((q.liq + q.ice)/(4/3*π*ρ_w*N_0))^(1/3), FT(0.2*10^-6)) # bound to be at least ~micron size...something like kohler crit radius
-                # Homogenous mixing would have r fixed and then let N vary... set r based on adiabatic extrapolation from cloud base 
+                # R    =  max(((q.liq + q.ice)/(4/3*π*ρ_w*N_0))^(1/3), FT(0.2*10^-6)) # bound to be at least ~micron size...something like kohler crit radius
 
-                base = 1/(4*π*D*R) # as q goes up, R goes 
-                τ_liq = base / N_0
-                τ_ice = base / N_INP
+                # @show(ts_LCL)
+                if N_r_closure == :inhomogeneous
+                    _,R_liq = NR_inhomogeneous_mixing_liquid(thermo_params, N_0, TD.air_pressure(thermo_params,ts), q.liq, ts_LCL) # testing inhomogeneous mixing would have r fixed and then let N vary... set r based on adiabatic extrapolation from cloud base 
+                    _,R_ice = NR_monodisperse(N_INP,q.ice)
+                elseif N_r_closure == :monodisperse # uniform size for all droplets, liquid and Ice I guess
+                    _,R_liq = NR_monodisperse(N_0  ,q.liq)
+                    _,R_ice = NR_monodisperse(N_INP,q.ice)
+                else
+                    error("Unsupported size distribution closure (N_r_closure): $(N_r_closure)")
+                end
+
+                base = 1/(4*π*D) # as q goes up, R goes 
+                τ_liq = base / (N_0 * R_liq)
+                τ_ice = base / (N_INP * R_ice)
                 # @show((T, q, τ_liq, τ_ice))
 
-                # limit effective tau to at least one second for stability
+                # limit effective tau to at least one second for stability (stable with dt == limit timescale is unstable, gotta go faster...
                 # println("effective τ_liq = ",τ_liq_eff, " effective τ_ice = ",τ_ice_eff, " T = ", T, " w = ",w, " q = ",q, " q_eq = ", q_eq )
                 if     (0 < τ_liq) && (τ_liq < 1) # fast source
                     # @show("rate limiting cond: ", S_ql, (q_vap - q_eq.liq) / 1)
@@ -105,7 +116,11 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
         end
 
         if T >= thermo_params.T_freeze # could go insisde supersat bc base eq is already 0 above freezng
-            S_qi = min(0,S_qi)
+            S_qi = min(0,S_qi) # allow sublimation but not new ice formation ( or should we just melt and then let evaporation work? )
+            
+            # send existing ice to liquid
+            S_qi -= q.ice/Δt # send any existing ice to liquid
+            S_ql += q.ice/Δt # send any existing ice to liquid
         end
 
         if (use_supersat || use_korolev_mazin) # might need to do these first bc ql,qc tendencies maybe are applied individually and can still crash the code if one is too large...

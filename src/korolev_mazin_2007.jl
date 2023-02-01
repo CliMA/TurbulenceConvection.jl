@@ -99,3 +99,35 @@ Need to add w in EDMF_Env and EDMF_Up
     end
     return S_ql,S_qi
 end
+
+
+function korolev_field_2007()
+    """
+    In mixed-phase clouds, this should work to diagnose what adiabatic q_liq and q_ice would be
+
+    # we separately handle the liquid and ice adiabats to diagnose, assuming fixed radii to calculate the number concentration
+
+    We take eq 8,9 from this formulation and assuming we start at the LCL (for liquid or ice) the delta term should be 0... i think?
+
+    """
+
+
+    # You do need to solve for T(z) etc using equations D1-D4 in the paper I guess... and then would need evaluate some integrals...
+
+    # q_i0 = 
+    # q_l0 = 
+    # δ_i0 = 0 # start at LCL...? why no liquid value?
+
+    # a_i = (g/R_a*T) 
+    # b_i = 
+
+    # a_l = 
+    # b_l = 
+
+    # β_l = a_i/b_i
+    # β_i = a_l/b_l
+
+    # q_ad_l = 
+    # q_ad_i = 
+
+end
