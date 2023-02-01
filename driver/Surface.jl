@@ -192,6 +192,7 @@ function get_surface(
     aux_gm_f = TC.face_aux_grid_mean(state)
     p_f_surf = aux_gm_f.p[kf_surf]
     ts_gm = aux_gm.ts
+    # @show(aux_gm)
     Tsurface = TC.surface_temperature(surf_params, t)
     qsurface = TC.surface_q_tot(surf_params, t)
     zrough = surf_params.zrough
@@ -200,6 +201,7 @@ function get_surface(
 
     scheme = SF.FVScheme()
     ts_sfc = TD.PhaseEquil_pTq(thermo_params, p_f_surf, Tsurface, qsurface)
+    # @show(t, kc_surf, ts_gm, grid)
     ts_in = ts_gm[kc_surf]
 
     u_sfc = SA.SVector{2, FT}(0, 0)
