@@ -10,17 +10,15 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
     ql_tendency = FT(0)
     qi_tendency = FT(0)
     if area > 0
-
         use_supersat      = get(param_set.user_args, :use_supersat, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
         use_korolev_mazin = get(param_set.user_args, :use_korolev_mazin, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
-        raymond_ice_test  = get(param_set.user_args, :raymond_ice_test, false)
+        raymond_ice_test  = get(param_set.user_args, :raymond_ice_test, false) # the timescale parameterization from raymond...
+
         q = TD.PhasePartition(thermo_params, ts)
         T = TD.air_temperature(thermo_params, ts)
         q_vap = TD.vapor_specific_humidity(thermo_params, ts)
 
-
         if use_supersat # use phase partition in case we wanna use the conv_q_vap fcn but maybe not best for supersat since it's not really a phase partition (all 3 are vapor amounts)
-            
             # nonmutable param_set so would have to edit tau usage everywhere -- let's just do in supersat
             τ_liq = CMNe.τ_relax(microphys_params, liq_type)
             τ_ice = CMNe.τ_relax(microphys_params, ice_type)
@@ -33,40 +31,40 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                 # gets even worse cause CDNC,CCN etc are advected in updraft so... it's not just local...
                 # if we assume CDCN/CCN/INP is constant ish and it's just activation fraction of CCN/INP that changes with T and/or SS, then what...
 
-
-                N_0 = FT(100*10e6) # per m^3 both ccn and N_d in this range https://doi.org/10.1029/2020MS002205
-                N_0 = FT(1) # params tuned to fit this better...
-                N_m = FT(-.2) # log slope https://doi.org/10.1073/pnas.1514034112
-                N_b = -5 - 273.15 * N_m
-
-                N_0 = get(param_set.user_args, :N_0, FT(100*10e6))
-                N_m = get(param_set.user_args, :N_m, FT(-0.2))
-                N_b = get(param_set.user_args, :N_b, FT(-5 - 273.15 * N_m))
-
+                N_0 = get(param_set.user_args, :N_0, FT(100*10e6))  # per m^3 both ccn and N_d in this range https://doi.org/10.1029/2020MS002205 (or  FT(1) # params tuned to fit this better... )
+                N_m = get(param_set.user_args, :N_m, FT(-0.2)) # log slope https://doi.org/10.1073/pnas.1514034112
+                N_b = get(param_set.user_args, :N_b, FT(-5 - 273.15 * N_m)) # -5 - 273.15 * N_m
 
                 N_INP = 10^(N_m*T + N_b) * 10^3 # per liter to per m^3
-                # f_INP = clamp( N_INP/(N_0+min(N_0, N_INP)), 0, 1) 
-                f_INP = clamp( N_INP/(N_0+N_INP), 0, 1)  # put a note elucdiating differeince between these 2 (this definition is bounded for sure tho)
+                f_INP = N_INP/(N_0+N_INP) # clamp( N_INP/(N_0+N_INP), 0, 1)  # let N_0 and N_INP vary freely...
 
-
-                # τ_liq = CMNe.τ_relax(microphys_params, liq_type) # could try (4 pi D N)^(-1)
-                # Alternate form if we don't wish to condense all our condensate away... works on presumption of fixed N_0 aerosol...
                 # -- hopefully this gets around the problem of draining water vapor at initialization of clouds but also allows speedup as droplets grow (assuming fixed drop concenctration)
-                D, N, ρ_w = FT(0.0000226), FT(190*10^6), FT(1) # 190 taken from CCN estimates for TRMM... equiv to N_0 above...
-                R    =  max(((q.liq + q.ice)/(4/3*π*ρ_w*N))^(1/3), FT(0.2*10^-6)) # bound to be at least ~micron size...something like kohler crit radius
-                num = 1 # too small but first principles correct 
-                num = 10 # 
-                base = num/(4*π*D*N*R) # as q goes up, R goes 
-                τ_liq = base / (1-f_INP)
-                τ_ice = base / (f_INP)
-                
-                # # this one would require some knowledge of scaling... gives correct fractionation but not absolute value...
-                # adjust = 1 # too fast
-                # adjust = 10 # works
-                # τ_liq = adjust / (N_0 * (1-f_INP))
-                # τ_ice = adjust / (N_0 * (f_INP))
+                D, ρ_w = FT(0.0000226), FT(1) 
+                R    =  max(((q.liq + q.ice)/(4/3*π*ρ_w*N_0))^(1/3), FT(0.2*10^-6)) # bound to be at least ~micron size...something like kohler crit radius
+                # Homogenous mixing would have r fixed and then let N vary... set r based on adiabatic extrapolation from cloud base 
 
-                @show((T, q, τ_liq, τ_ice))
+                base = 1/(4*π*D*R) # as q goes up, R goes 
+                τ_liq = base / N_0
+                τ_ice = base / N_INP
+                # @show((T, q, τ_liq, τ_ice))
+
+                # limit effective tau to at least one second for stability
+                # println("effective τ_liq = ",τ_liq_eff, " effective τ_ice = ",τ_ice_eff, " T = ", T, " w = ",w, " q = ",q, " q_eq = ", q_eq )
+                if     (0 < τ_liq) && (τ_liq < 1) # fast source
+                    # @show("rate limiting cond: ", S_ql, (q_vap - q_eq.liq) / 1)
+                    τ_liq = FT(1)
+                elseif (0 < τ_ice) && (τ_ice < 1) # fast source
+                    # @show("rate limiting dep: ", S_qi, (q_vap - q_eq.ice) / 1)
+                    τ_ice = FT(1)
+                elseif (-1 < τ_liq) && (τ_liq < 0) # fast sink
+                    # @show("rate limiting evap: ", S_ql, (q_vap - q_eq.liq) / 1)
+                    τ_liq = FT(-1)
+                elseif (-1 < τ_ice) && (τ_ice < 0) # fast sink
+                    # @show("rate limiting sub: ", S_qi, (q_vap - q_eq.ice) / 1)
+                    τ_ice = FT(-1)
+                else
+                end
+
             end
 
             q_eq = TD.PhasePartition(q.tot, TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()), TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())) # all 3 are vapor amounts
@@ -77,6 +75,25 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
             S_ql,S_qi = korolev_mazin_2007(param_set, area, ρ, Δt, ts, w)
             q_eq = TD.PhasePartition(q.tot, TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()), TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())) # all 3 are vapor amounts
             # println("effective τ_liq = ",(q_vap - q_eq.liq)/S_ql, " effective τ_ice = ",(q_vap - q_eq.ice)/S_qi, " T = ", T, " w = ",w, " q = ",q, " q_eq = ", q_eq )
+
+            # korolev_mazin fix effective tau > 1 (or whatever timestep was realy but we run w/ 1 mostly rn)
+            τ_liq_eff = (q_vap - q_eq.liq)/S_ql 
+            τ_ice_eff = (q_vap - q_eq.ice)/S_qi
+            # println("effective τ_liq = ",τ_liq_eff, " effective τ_ice = ",τ_ice_eff, " T = ", T, " w = ",w, " q = ",q, " q_eq = ", q_eq )
+            if     (0 < τ_liq_eff) && (τ_liq_eff < 1) # fast source
+                @show("rate limiting cond: ", S_ql, (q_vap - q_eq.liq) / 1)
+                S_ql = (q_vap - q_eq.liq) / 1
+            elseif (0 < τ_ice_eff) && (τ_ice_eff < 1) # fast source
+                @show("rate limiting dep: ", S_qi, (q_vap - q_eq.ice) / 1)
+                S_qi = (q_vap - q_eq.ice) / 1
+            elseif (-1 < τ_liq_eff) && (τ_liq_eff < 0) # fast sink
+                @show("rate limiting evap: ", S_ql, (q_vap - q_eq.liq) / 1)
+                S_ql = (q_vap - q_eq.liq) / -1
+            elseif (-1 < τ_ice_eff) && (τ_ice_eff < 0) # fast sink
+                @show("rate limiting sub: ", S_qi, (q_vap - q_eq.ice) / 1)
+                S_qi = (q_vap - q_eq.ice) / -1
+            else
+            end
             
         else
             # TODO - is that the state we want to be relaxing to?
