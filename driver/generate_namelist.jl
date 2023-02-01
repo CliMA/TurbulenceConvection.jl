@@ -719,7 +719,7 @@ function SOCRATES_RF09_obs(namelist_defaults)
 
     # LES filename should follow pattern: (maybe we do somethin like this wit forcing stuff from socrates?)
     # Stats.cfsite<SITE-NUMBER>_<FORCING-MODEL>_<EXPERIMENT>_2004-2008.<MONTH>.nc
-    namelist["meta"]["datafile"] = "/home/jbenjami/data1/jbenjami/Research_Schneider/CliMa/Data/SOCRATES/RF09/RF09_obs-based_SAM_input.nc" # doesn't contain the zof the data or we want to run on though i guess idk if that matters
+    namelist["meta"]["datafile"] = "/home/jbenjami/Research_Schneider/CliMa/Data/SOCRATES/RF09/RF09_obs-based_SAM_input.nc" # doesn't contain the zof the data or we want to run on though i guess idk if that matters
     namelist["meta"]["simname"] = "SOCRATES_RF09_obs"
     namelist["meta"]["casename"] = "SOCRATES_RF09_obs"
 

@@ -1395,7 +1395,7 @@ end
 function forcing_kwargs(case::SOCRATES_RF09_obs,namelist) # call in main.jl is forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
     # (; wind_nudge_τᵣ = 12*3600, scalar_nudge_τᵣ = 12*3600) # test for stabiity (didn't work/)
     # (; wind_nudge_τᵣ = .01*60, scalar_nudge_τᵣ = 0.01*60) # test for quick convergence to ref state
-    # (; wind_nudge_τᵣ = 24*3600, scalar_nudge_τᵣ = 34*3600) # test for free ish run (closer to gettelman) but still unstable...? hmmm
+    # (; wind_nudge_τᵣ = 24*3600, scalar_nudge_τᵣ = 24*3600) # test for free ish run (closer to gettelman) but still unstable...? hmmm
     (; wind_nudge_τᵣ = 20*60, scalar_nudge_τᵣ = 20*60) # paper standard
 end
 
