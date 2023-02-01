@@ -264,6 +264,8 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["linear_ent_params"] =
         SA.SVector{14}(rand(14))
 
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["linear_ent_biases"] = true
+
     # General stochastic entrainment/detrainment parameters
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_stochastic_ent_params"] =
     SA.SVector(
