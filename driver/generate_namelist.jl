@@ -307,8 +307,8 @@ function default_namelist(
         namelist = DryBubble(namelist_defaults)
     elseif case_name == "LES_driven_SCM"
         namelist = LES_driven_SCM(namelist_defaults)
-    elseif case_name == "SOCRATES_RF09_obs"
-        namelist = SOCRATES_RF09_obs(namelist_defaults)
+    elseif occursin("SOCRATES", case_name) # when you're setting up the namelist for the case, you would have to specify the specific socrates type so this should be an umbrella for all of them...
+        namelist = SOCRATES(namelist_defaults;case_name=case_name) # pass in case_name so we can record it just cause we have no other way to mark down the case_type...
     else
         error("Not a valid case name")
     end
@@ -684,7 +684,7 @@ function LES_driven_SCM(namelist_defaults)
     return namelist
 end
 
-function SOCRATES_RF09_obs(namelist_defaults)
+function SOCRATES(namelist_defaults;case_name="SOCRATES")
     namelist = deepcopy(namelist_defaults)
     # grid is currently constructed from the same one used by the paper's LES grid
     namelist["stats_io"]["frequency"] = 10.0
@@ -719,9 +719,9 @@ function SOCRATES_RF09_obs(namelist_defaults)
 
     # LES filename should follow pattern: (maybe we do somethin like this wit forcing stuff from socrates?)
     # Stats.cfsite<SITE-NUMBER>_<FORCING-MODEL>_<EXPERIMENT>_2004-2008.<MONTH>.nc
-    namelist["meta"]["datafile"] = "/home/jbenjami/Research_Schneider/CliMa/Data/SOCRATES/RF09/RF09_obs-based_SAM_input.nc" # doesn't contain the zof the data or we want to run on though i guess idk if that matters
-    namelist["meta"]["simname"] = "SOCRATES_RF09_obs"
-    namelist["meta"]["casename"] = "SOCRATES_RF09_obs"
+    # namelist["meta"]["datafile"] = "/home/jbenjami/Research_Schneider/CliMa/Data/SOCRATES/RF09/RF09_obs-based_SAM_input.nc" # doesn't contain the zof the data or we want to run on though i guess idk if that matters
+    namelist["meta"]["simname"]  = "SOCRATES"
+    namelist["meta"]["casename"] = case_name # record the specific case name which would be a subtype of SOCRATES supertype (e.g. SOCRATES_RF09_obs) (needs to be case_name for Cases.jl) get_case
 
     return namelist
 end

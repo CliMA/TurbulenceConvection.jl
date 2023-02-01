@@ -78,7 +78,56 @@ struct DryBubble <: AbstractCaseType end
 
 struct LES_driven_SCM <: AbstractCaseType end
 
-struct SOCRATES_RF09_obs <: AbstractCaseType end
+
+using Pkg
+Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/jbphyswx/MyRegistry")) # see https://discourse.julialang.org/t/more-informative-project-toml-or-partial-manifest-toml/92804/5
+# Pkg.add(url="https://github.com/jbphyswx/SOCRATES_Single_Column_Forcings.git#main") # my socrates library rn (not sure if wen eed this or just Pkg.add("SOCRATES_Single_Column_Forcings") after adding the registry)
+# Pkg.add("SOCRATES_Single_Column_Forcings") # hopefully this just works from adding the registry... (comment out after it's added?)
+using SOCRATES_Single_Column_Forcings
+abstract type SOCRATES <: AbstractCaseType end # this is the abstract type for all SOCRATES cases, cause you can't subtype non abstract types in julia...
+
+# Consider adding intermediate SOCRATES_obs and SOCRATES_ERA5 types to maybe better handle namelists or separate relaxation timescales... (switch order of generation in for loop I guess and handle where applicable)
+
+"""
+This has to be a function because otherwise, eval will evaluate in the module/global scope which doesn't include the for loop variables...
+"""
+macro main_eval(exp)
+    Main.eval(quote exp end) # didn't work
+    # Main.eval(QuoteNode(exp))
+end
+
+
+
+for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
+    for forcing_type in SOCRATES_Single_Column_Forcings.forcing_types
+        # eval( Meta.parse("struct SOCRATES_RF$(flight_number)_$(forcing_type) <: SOCRATES end")) # create subtypes of SOCRATES for each flight number and forcing type (works but not ideal)
+        name = Symbol("SOCRATES_RF$(string(flight_number,pad=2))_$(forcing_type)") # separated this way cause nested dollar signs gave me too much trouble... (invalid type signature) but allows for easier addition of methods
+        @show(name)
+        fn = QuoteNode(flight_number)
+        ft = QuoteNode(forcing_type) # we have to do this QuoteNode thing so that particulalry forcing_type is not evaluated to a string before Main.eval can analyze it, so that we can actually create a string, e.g. https://stackoverflow.com/a/70018854 
+        eval( quote Base.@kwdef struct $name <: SOCRATES # kwdef to add methods as defaults, see https://discourse.julialang.org/t/default-value-of-some-fields-in-a-mutable-struct/33408/4, this is the only way I could get it to work https://docs.julialang.org/en/v1/manual/metaprogramming/#man-macros (doesn't need to be Main.eval, just the eval for our case here since not in fcn)
+            # any methods we may come to need or want... 
+            flight_number::Int = $fn
+            forcing_type::Symbol = $ft # :x #:$(forcing_type)
+            # move to ForcingSocrates? 
+            get_forcing = () ->  SOCRATES_Single_Column_Forcings.process_case($fn; obs_or_ERA5=$ft,initial_condition=false) 
+            get_initial_conditions = (;new_z=nothing) -> SOCRATES_Single_Column_Forcings.process_case($fn; new_z=new_z, obs_or_ERA5=$ft,initial_condition=true)
+            get_surface_ref_state = () -> SOCRATES_Single_Column_Forcings.process_case($fn; obs_or_ERA5=$ft,surface="ref")
+            get_surface = () -> SOCRATES_Single_Column_Forcings.process_case($fn; obs_or_ERA5=$ft,surface="conditions")
+            get_default_new_z = () -> SOCRATES_Single_Column_Forcings.get_default_new_z($fn;)
+            end
+        end)
+    end
+end
+
+
+
+# create_socrates_types() # execute the function
+
+# @show(SOCRATES_RF09_obs_data())
+# @show(methods(SOCRATES_RF09_obs_data))
+
+
 
 #####
 ##### Radiation and forcing types
@@ -89,6 +138,15 @@ struct ForcingStandard end
 struct ForcingDYCOMS_RF01 end
 struct ForcingLES end
 struct ForcingSOCRATES_RF09_obs end # this has to go before Forcing.jl is included
+
+abstract type ForcingSOCRATES end
+abstract type SOCRATES <: AbstractCaseType end # this is the abstract type for all SOCRATES cases, cause you can't subtype non abstract types in julia
+for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
+    for forcing_type in SOCRATES_Single_Column_Forcings.forcing_types
+        name = Symbol("ForcingSOCRATES_RF$(string(flight_number,pad=2))_$(forcing_type)") # separated this way cause nested dollar signs gave me too much trouble... (invalid type signature) but allows for easier addition of methods
+        @eval struct $name <: ForcingSOCRATES end
+    end
+end
 
 struct RadiationNone end
 struct RadiationDYCOMS_RF01 end
@@ -120,7 +178,9 @@ Base.@kwdef struct ForcingBase{T, FT} # this gets initialized in main.jl and the
     # might be too specific, maybe just Array{NamedTuple,0}
 end
 
+
 force_type(::ForcingBase{T}) where {T} = T
+
 
 Base.@kwdef struct RadiationBase{T, FT}
     "Large-scale divergence (same as in ForcingBase)"
@@ -146,10 +206,20 @@ Base.@kwdef struct LESData
     initial_condition_averaging_window_s::Float64 = 3600.0
 end
 
-Base.@kwdef struct SOCRATES_RF09_obsData # needs to go before Forcing.jl is included...
-    "Path to stats file used to drive SCM"
-    data_filename::String = nothing
-    "Drive SCM with LES data from t = [end - t_interval_from_end_s, end]"
+# Data struct needs to go before Forcing.jl is included...
+# Base.@kwdef struct SOCRATES_RF09_obsData 
+#     "Path to stats file used to drive SCM"
+#     data_filename::String = nothing
+#     "Drive SCM with LES data from t = [end - t_interval_from_end_s, end]"
+# end
+abstract type SOCRATESData end
+for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
+    for forcing_type in SOCRATES_Single_Column_Forcings.forcing_types
+        name = Symbol("SOCRATESData_RF$(string(flight_number,pad=2))_$(forcing_type)") # separated this way cause nested dollar signs gave me too much trouble... (invalid type signature) but allows for easier addition of methods
+        @eval struct $name <: SOCRATESData
+            # any methods we may come to need or want...         
+        end
+    end
 end
 
 #####
@@ -160,7 +230,7 @@ include("Radiation.jl")
 include("Forcing.jl")
 
 #####
-##### Case methods
+##### Case methods (returns an instance of the case type)
 #####
 
 get_case(namelist::Dict) = get_case(namelist["meta"]["casename"])
@@ -1254,152 +1324,193 @@ initialize_radiation(::LES_driven_SCM, radiation, grid::Grid, state, param_set; 
 ##### SOCRATES RF09_obs
 #####
  
-get_case(::Val{:SOCRATES_RF09_obs}) = SOCRATES_RF09_obs()
-get_forcing_type(::SOCRATES_RF09_obs) = ForcingSOCRATES_RF09_obs # is this what we want?
-# get_radiation_type(::SOCRATES_RF09_obs) = RadiationSOCRATES_RF09_obs # is this what we want? (for now leave as default to none) should be RRTMG
+# you cant instatiatie the socrates subtype so we'll iterate here 
 
-function SOCRATES_data_kwarg(::SOCRATES_RF09_obs, namelist) # adopted from LES type setup, but instead of setting to a tuple taking out and or computing what we need (do that later), we'll just return the whole dataset...
-    data_filename = namelist["meta"]["datafile"]
-    # load data here
-    Dat = NC.Dataset(data_filename, "r") do data
-        SOCRATES_RF09_obsData(data_filename)
+@show(1111)
+@show(SOCRATES)
+@show(SOCRATES_RF01_obs_data)
+@show(2222)
+for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
+    for forcing_type in SOCRATES_Single_Column_Forcings.forcing_types
+        # @show(flight_number)
+        name = Symbol("SOCRATES_RF$(string(flight_number,pad=2))_$(forcing_type)") # separated this way cause nested dollar signs gave me too much trouble... (invalid type signature) but allows for easier addition of methods
+        @show(name)
+        qnn = QuoteNode(name)
+        @eval get_case(::Val{$qnn}) = $(Symbol(name))() # name should already be a symbol, original syntax was get_case(::Val{:x}) = x() , not sure how to evaluate as fcn at end if eval will work like that
+        @eval get_forcing_type(::$(Symbol(name))) = $(Symbol("Forcing"*string(name))) # originally would be get_forcing_type(::x) = Forcingx
+        # @eval get_radiation_type(::$(Symbol(name))) = $Symbol("Radiation"*name)  # is this what we want? (for now leave as default to none) should be RRTMG
     end
-    return (; Dat)
 end
 
-function les_data_kwarg(::SOCRATES_RF09_obs,namelist) # wrap the fcn so it still works w/ main.jl which callsed based on les_data_kwarg's output for this case...
-    return SOCRATES_data_kwarg(SOCRATES_RF09_obs(),namelist) # I think we have to instantiate in the call? ::SOCRATES_data_kwarg doesn't work...
+# deimplemented these for now since it should be enough to create the SOCRATES instance and use its contstiutent methods to get the data we need
+# function SOCRATES_data_kwarg(::SOCRATES, namelist) # adopted from LES type setup, but instead of setting to a tuple taking out and or computing what we need (do that later), we'll just return the whole dataset...
+#     # data_filename = namelist["meta"]["datafile"]
+#     # load data here
+#     # Dat = NC.Dataset(data_filename, "r") do data
+#     #     SOCRATESData(data_filename)
+#     # end
+#     return (;)
+# end
+
+# function les_data_kwarg(::SOCRATES,namelist) # wrap the fcn so it still works w/ main.jl which called based on les_data_kwarg's output for this case...
+#     # I would just wrap this in APL or something but for now I'll allow this usage....
+#     return SOCRATES_data_kwarg(SOCRATES(),namelist) # I think we have to instantiate in the call? ::SOCRATES_data_kwarg doesn't work...
+# end
+
+function surface_ref_state(S::SOCRATES, param_set::APS, namelist) # adopted mostly from LES (most similar setup, but what is this for? should i set it to somethign more generic?
+    return S.get_surface_ref_state() # added S so it has a name and then use the method we defined, currently param_set isn't an accepted argument cause it shouldnt be necessary for this part on earth but maybe can edit later...
 end
 
-function surface_ref_state(::SOCRATES_RF09_obs, param_set::APS, namelist) # adopted mostly from LES (most similar setup, but what is this for? should i set it to somethign more generic?
-    thermo_params = TCP.thermodynamics_params(param_set)
-    FT = eltype(param_set)
-    molmass_ratio = TCP.molmass_ratio(param_set)
-    data_filename = namelist["meta"]["datafile"]
-
-    Pg, Tg, qtg = NC.Dataset(data_filename, "r") do data
-        Pg  = FT.(vec(data["Ps"]))[end]
-        Tg  = FT.(vec(data["Tg"]))[end]
-        pvg = TD.saturation_vapor_pressure(thermo_params, Tg, TD.Liquid())
-        qtg = (1 / molmass_ratio) * pvg / (Pg - pvg) #Total water mixing ratio at surface   
-        (FT(Pg), FT(Tg), FT(qtg))
-    end
-    return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
-end
-
-function initialize_profiles(::SOCRATES_RF09_obs, grid::Grid, param_set, state; Dat) # should use LESDat or just use something like the normal cases? we dont need a window so...
-    thermo_params = TCP.thermodynamics_params(param_set)
-    FT = TC.float_type(state)
+function initialize_profiles(S::SOCRATES, grid::Grid, param_set, state; ) # should use LESDat or just use something like the normal cases? we dont need a window so...
+    # need θ_liq_ice, q_tot, prog_gm_u, prog_gm_v, tke, prog_gm_uₕ (is returned as (; dTdt_hadv, H_nudge, dqtdt_hadv, qt_nudge, subsidence, u_nudge, v_nudge))
+    #FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-
-    R_d  = TCP.R_d(param_set) # TD.Parameters.R_d(thermo_params)
-    grav = TCP.grav(param_set)  # TD.Parameters.grav(thermo_params)
-    molmass_ratio = TCP.molmass_ratio(param_set)
-
-    # here we use the first timestep to initialize (t_ind=1) hopefully that works lmao...
-    nt = NC.Dataset(Dat.data_filename, "r") do data
-        p  = data["lev"][:]
-        T  = data["T"][:,:,:,1][:]
-        q  = data["q"][:,:,:,1][:]
-        # surface
-        pg = vec(data["Ps"])[1]
-        Tg = vec(data["Tg"])[1]
-        pvg = TD.saturation_vapor_pressure(thermo_params, Tg, TD.Liquid())
-        qtg = (1 / molmass_ratio) * pvg / (pg - pvg) #Total water mixing ratio at surface   
-        # calculate approximate z (https://en.wikipedia.org/wiki/Hypsometric_equation)
-        Tz = [ T...,  Tg] # pad with ground for calculating dz
-        qz = [ q..., qtg]
-        pz = [ p...,  pg]
-        tsz = TD.PhaseEquil_pTq.(thermo_params, pz, Tz, qz)
-        Tvz = TD.virtual_temperature.(thermo_params, tsz)
-        T_bar  = Statistics.mean((Tvz[1:end-1], Tvz[2:end])) # mean layer temperature assuming linearity in z
-        p_frac = pz[2:end] ./ pz[1:end-1] # ratio of adjacent pressures
-        dz = (R_d .* T_bar ./ grav) .* log.(p_frac)
-        z = reverse(cumsum(reverse(dz))) # grid goes from aloft to surface so we need to sum right to left...
-
-        getrawvar(var)                   = data[var][:,:,:,1][:]
-        getvar(var)                      = pyinterp(vec(grid.zc.z), reverse(z), reverse(getrawvar(var))) # reverse data so it's with monotonic increasing z (maybe also pad w/ ground since clima grid might have a lower lower bound... current extrapolation i believe is just to repeat the ends)
-        getvardata(vardata)              = pyinterp(vec(grid.zc.z), reverse(z), reverse(vardata))  # TC.mean_nc_data(data, "profiles", var, length(t), length(t))) # how do we know which var is time?)
-        getvar_wg(var, varg)             = pyinterp(vec(grid.zc.z), reverse([z...,0.]), reverse([getrawvar(var)..., data[varg][1]])) # use ground data to extend interpolation since i think the clima grid has lower lower bound (default was just to repeat value but maybe could also later code pyinterp here to have an extend keyword instead)
-        getvardata_wg(vardata, vardatag) = pyinterp(vec(grid.zc.z), reverse([z...,0.]), reverse([vardata..., vardatag]))  
-
-        p         = getvardata_wg(p, pg)
-        T         = getvardata_wg(T, Tg )
-        q_tot_gm  = getvardata_wg(q, qtg)
-        prog_gm_u = getvardata_wg( getrawvar("u"), 0.) # u
-        prog_gm_v = getvardata_wg( getrawvar("v"), 0.) # v
-
-        (; z, p,T,q_tot_gm, prog_gm_u, prog_gm_v)
-    end
-
+    IC = S.get_initial_conditions(;new_z = vec(grid.zc.z) ) # added S so it has a name and then use the method we defined, currently param_set isn't an accepted argument cause it shouldnt be necessary for this part on earth but maybe can edit later...
+    
     prog_gm_u = copy(aux_gm.q_tot) # copy as template cause u,g go into a uₕ vector so this is easier to work with (copied from other cases...)
     prog_gm_v = copy(aux_gm.q_tot)
     @inbounds for k in real_center_indices(grid) # we are goin the TRMM way wit this rather than LES... not sure why they use k.i but maybe it's cause forcing has time component? idk
-        ts =  TD.PhaseEquil_pTq(thermo_params, nt.p[k], nt.T[k], nt.q_tot_gm[k])
-        aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(thermo_params, ts)
-        aux_gm.q_tot[k] = nt.q_tot_gm[k]
-        prog_gm_u[k] = nt.prog_gm_u[k]
-        prog_gm_v[k] = nt.prog_gm_v[k]
-        aux_gm.tke[k] = 0 # what is this supposed to be? unset for interactive? maybe we dont need to set it initially at all idk... didn't check yet but these get updated later interactively so hope it's fine
+        aux_gm.θ_liq_ice[k] = IC.H_nudge[k]
+        aux_gm.q_tot[k]     = IC.qt_nudge[k]
+        prog_gm_u[k]        = IC.u_nudge[k]
+        prog_gm_v[k]        = IC.v_nudge[k]
+        aux_gm.tke[k]       = 0 # what is this supposed to be? unset for interactive? maybe we dont need to set it initially at all idk... didn't check yet but these get updated later interactively so hope it's fine
     end
-
-    prog_gm_uₕ = TC.grid_mean_uₕ(state)
-    @. prog_gm_uₕ = CCG.Covariant12Vector(CCG.UVVector(prog_gm_u, prog_gm_v))
+    # prog_gm_uₕ = TC.grid_mean_uₕ(state)
+    # @. prog_gm_uₕ = CCG.Covariant12Vector(CCG.UVVector(prog_gm_u, prog_gm_v))
 end
 
+# function initialize_profiles(::SOCRATES_RF09_obs, grid::Grid, param_set, state; Dat) # should use LESDat or just use something like the normal cases? we dont need a window so...
+#     thermo_params = TCP.thermodynamics_params(param_set)
+#     FT = TC.float_type(state)
+#     aux_gm = TC.center_aux_grid_mean(state)
+#     prog_gm = TC.center_prog_grid_mean(state)
+
+#     R_d  = TCP.R_d(param_set) # TD.Parameters.R_d(thermo_params)
+#     grav = TCP.grav(param_set)  # TD.Parameters.grav(thermo_params)
+#     molmass_ratio = TCP.molmass_ratio(param_set)
+
+#     # here we use the first timestep to initialize (t_ind=1) hopefully that works lmao...
+#     nt = NC.Dataset(Dat.data_filename, "r") do data
+#         p  = data["lev"][:]
+#         T  = data["T"][:,:,:,1][:]
+#         q  = data["q"][:,:,:,1][:]
+#         # surface
+#         pg = vec(data["Ps"])[1]
+#         Tg = vec(data["Tg"])[1]
+#         pvg = TD.saturation_vapor_pressure(thermo_params, Tg, TD.Liquid())
+#         qtg = (1 / molmass_ratio) * pvg / (pg - pvg) #Total water mixing ratio at surface   
+#         # calculate approximate z (https://en.wikipedia.org/wiki/Hypsometric_equation)
+#         Tz = [ T...,  Tg] # pad with ground for calculating dz
+#         qz = [ q..., qtg]
+#         pz = [ p...,  pg]
+#         tsz = TD.PhaseEquil_pTq.(thermo_params, pz, Tz, qz)
+#         Tvz = TD.virtual_temperature.(thermo_params, tsz)
+#         T_bar  = Statistics.mean((Tvz[1:end-1], Tvz[2:end])) # mean layer temperature assuming linearity in z
+#         p_frac = pz[2:end] ./ pz[1:end-1] # ratio of adjacent pressures
+#         dz = (R_d .* T_bar ./ grav) .* log.(p_frac)
+#         z = reverse(cumsum(reverse(dz))) # grid goes from aloft to surface so we need to sum right to left...
+
+#         getrawvar(var)                   = data[var][:,:,:,1][:]
+#         getvar(var)                      = pyinterp(vec(grid.zc.z), reverse(z), reverse(getrawvar(var))) # reverse data so it's with monotonic increasing z (maybe also pad w/ ground since clima grid might have a lower lower bound... current extrapolation i believe is just to repeat the ends)
+#         getvardata(vardata)              = pyinterp(vec(grid.zc.z), reverse(z), reverse(vardata))  # TC.mean_nc_data(data, "profiles", var, length(t), length(t))) # how do we know which var is time?)
+#         getvar_wg(var, varg)             = pyinterp(vec(grid.zc.z), reverse([z...,0.]), reverse([getrawvar(var)..., data[varg][1]])) # use ground data to extend interpolation since i think the clima grid has lower lower bound (default was just to repeat value but maybe could also later code pyinterp here to have an extend keyword instead)
+#         getvardata_wg(vardata, vardatag) = pyinterp(vec(grid.zc.z), reverse([z...,0.]), reverse([vardata..., vardatag]))  
+
+#         p         = getvardata_wg(p, pg)
+#         T         = getvardata_wg(T, Tg )
+#         q_tot_gm  = getvardata_wg(q, qtg)
+#         prog_gm_u = getvardata_wg( getrawvar("u"), 0.) # u
+#         prog_gm_v = getvardata_wg( getrawvar("v"), 0.) # v
+
+#         (; z, p,T,q_tot_gm, prog_gm_u, prog_gm_v)
+#     end
+
+#     prog_gm_u = copy(aux_gm.q_tot) # copy as template cause u,g go into a uₕ vector so this is easier to work with (copied from other cases...)
+#     prog_gm_v = copy(aux_gm.q_tot)
+#     @inbounds for k in real_center_indices(grid) # we are goin the TRMM way wit this rather than LES... not sure why they use k.i but maybe it's cause forcing has time component? idk
+#         ts =  TD.PhaseEquil_pTq(thermo_params, nt.p[k], nt.T[k], nt.q_tot_gm[k])
+#         aux_gm.θ_liq_ice[k] = TD.liquid_ice_pottemp(thermo_params, ts)
+#         aux_gm.q_tot[k] = nt.q_tot_gm[k]
+#         prog_gm_u[k] = nt.prog_gm_u[k]
+#         prog_gm_v[k] = nt.prog_gm_v[k]
+#         aux_gm.tke[k] = 0 # what is this supposed to be? unset for interactive? maybe we dont need to set it initially at all idk... didn't check yet but these get updated later interactively so hope it's fine
+#     end
+
+#     prog_gm_uₕ = TC.grid_mean_uₕ(state)
+#     @. prog_gm_uₕ = CCG.Covariant12Vector(CCG.UVVector(prog_gm_u, prog_gm_v))
+# end
+
+function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # seems Ri_bulk_crit is never aactually changed...
+    FT = eltype(param_set)
+    sc = case.get_surface()
+    zrough   = 0.1 # copied from gabls which is also w/ monin obhukov boundary layer
+    # no ustar w/ monin obukhov i guess, seems to be calculated in https://github.com/CliMA/SurfaceFluxes.jl src/SurfaceFluxes.jl/compute_ustar()
+    kwargs = (; Tsurface=sc.Tg, qsurface=sc.qg, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive,
+    return TC.MoninObukhovSurface(FT; kwargs...) # interactive?
+end
 
 # function surface_params(case::SOCRATES_RF09_obs, surf_ref_state, param_set; Ri_bulk_crit,Dat) # Went more the trmm route cause we dont need much here..., the LES version reads from files we don't have...
-function surface_params(case::SOCRATES_RF09_obs, surf_ref_state, param_set;Dat,kwargs...) # seems Ri_bulk_crit is never aactually changed...
-    # - we're going interactive cause we don't have specified lhf, shf just sst n lower atmosphere winds n stuff
+# function surface_params(case::SOCRATES_RF09_obs, surf_ref_state, param_set;Dat,kwargs...) # seems Ri_bulk_crit is never aactually changed...
+#     # - we're going interactive cause we don't have specified lhf, shf just sst n lower atmosphere winds n stuff
 
-    thermo_params = TCP.thermodynamics_params(param_set)
-    data_filename_obs  = Dat.data_filename #namelist["meta"]["datafile"]
-    data_filename_ERA5 = replace(data_filename_obs, "obs"=>"ERA5") # still needed to force winds antypd such (time-varying forcing)
-    FT = eltype(param_set)
-    molmass_ratio = TCP.molmass_ratio(param_set)
+#     thermo_params = TCP.thermodynamics_params(param_set)
+#     data_filename_obs  = Dat.data_filename #namelist["meta"]["datafile"]
+#     data_filename_ERA5 = replace(data_filename_obs, "obs"=>"ERA5") # still needed to force winds antypd such (time-varying forcing)
+#     FT = eltype(param_set)
+#     molmass_ratio = TCP.molmass_ratio(param_set)
 
-    # surf_ref_state has no time evol so we'll use these instead, these are [lon, lat, time]...
-    nt = NC.Dataset(data_filename_obs, "r")  do obs_data
-        ERA5_data = NC.Dataset(data_filename_ERA5, "r") 
-        data = Dict("obs" => obs_data, "ERA5" => ERA5_data)
-        t = data["obs"]["tsec"][:]
-        Tsurface = data["ERA5"]["Tg"] # winds, pressure, sst, winds at surface are from era5
-        dimnames = NC.dimnames(Tsurface)
-        Tsurface = FT.(vec(Tsurface))
-        Psurface = FT.(vec(data["ERA5"]["Ps"]))
-        pvg = TD.saturation_vapor_pressure.(thermo_params, Tsurface, TD.Liquid())
-        # q same as lowest atmos? saturation for suraface? not sure what to do cause can't get rho w/o q and vice versa, just set vapor to 0 in _From_pressure here 22.45e-3 # kg/kg, not sure what the phase_type means, and is equil or nonequil
-        # qsurface = FT(0)  # not sure which this is...
-        qsurface = @. (1 / molmass_ratio) * pvg / (Psurface - pvg) #Total water mixing ratio at surface  
+#     # surf_ref_state has no time evol so we'll use these instead, these are [lon, lat, time]...
+#     nt = NC.Dataset(data_filename_obs, "r")  do obs_data
+#         ERA5_data = NC.Dataset(data_filename_ERA5, "r") 
+#         data = Dict("obs" => obs_data, "ERA5" => ERA5_data)
+#         t = data["obs"]["tsec"][:]
+#         Tsurface = data["ERA5"]["Tg"] # winds, pressure, sst, winds at surface are from era5
+#         dimnames = NC.dimnames(Tsurface)
+#         Tsurface = FT.(vec(Tsurface))
+#         Psurface = FT.(vec(data["ERA5"]["Ps"]))
+#         pvg = TD.saturation_vapor_pressure.(thermo_params, Tsurface, TD.Liquid())
+#         # q same as lowest atmos? saturation for suraface? not sure what to do cause can't get rho w/o q and vice versa, just set vapor to 0 in _From_pressure here 22.45e-3 # kg/kg, not sure what the phase_type means, and is equil or nonequil
+#         # qsurface = FT(0)  # not sure which this is...
+#         qsurface = @. (1 / molmass_ratio) * pvg / (Psurface - pvg) #Total water mixing ratio at surface  
 
-        # zrough = 1.0e-4 # not actually used, but initialized to reasonable value (tan, trmm etc)
-        zrough   = 0.1 # copied from gabls which is also w/ monin obhukov boundary layer
-        # no ustar w/ monin obukhov i guess, seems to be calculated in https://github.com/CliMA/SurfaceFluxes.jl src/SurfaceFluxes.jl/compute_ustar()
+#         # zrough = 1.0e-4 # not actually used, but initialized to reasonable value (tan, trmm etc)
+#         zrough   = 0.1 # copied from gabls which is also w/ monin obhukov boundary layer
+#         # no ustar w/ monin obukhov i guess, seems to be calculated in https://github.com/CliMA/SurfaceFluxes.jl src/SurfaceFluxes.jl/compute_ustar()
 
-        interp_fcn(d) = time -> TC.pyinterp([time], t, d)[1] # would use ref and broadcast but doesnt convert back to array
-        Tsurface = interp_fcn(Tsurface)
-        qsurface = interp_fcn(qsurface) 
-        kwargs = (; Tsurface, qsurface, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive,
-        (;kwargs)
-    end
-    return TC.MoninObukhovSurface(FT; nt.kwargs...) # interactive?
+#         interp_fcn(d) = time -> TC.pyinterp([time], t, d)[1] # would use ref and broadcast but doesnt convert back to array
+#         Tsurface = interp_fcn(Tsurface)
+#         qsurface = interp_fcn(qsurface) 
+#         kwargs = (; Tsurface, qsurface, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive,
+#         (;kwargs)
+#     end
+#     return TC.MoninObukhovSurface(FT; nt.kwargs...) # interactive?
+# end
+
+
+function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_set; ) # added param_set so we can calculate stuff...
+    @show(case)
+    @show(forcing)
+    forcing.forcing_funcs[] = case.get_forcing() # maybe need to add param_set to this fcn args? everywhere really
+    # @show(forcing)
+    # forcing.forcing_funcs[] = create_forcing_funcs(forcing, grid, state, param_set; )  # initialize our forcing_funcs and insert them into our object and we can cheat and use the mutable array inside immutable struct :)    # not sure how this fits into the module... here but it seems to find it...
+    initialize(forcing, grid, state, param_set) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
 end
 
-
-function initialize_forcing(case::SOCRATES_RF09_obs, forcing, grid::Grid, state, param_set; Dat) # added param_set so we can calculate stuff...
-    forcing.forcing_funcs[] = create_forcing_funcs(forcing, grid, state, param_set; Dat)  # initialize our forcing_funcs and insert them into our object and we can cheat and use the mutable array inside immutable struct :)    # not sure how this fits into the module... here but it seems to find it...
-    initialize(forcing, grid, state, param_set, Dat) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
-end
-
-function forcing_kwargs(case::SOCRATES_RF09_obs,namelist) # call in main.jl is forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
+function forcing_kwargs(case::SOCRATES,namelist) # call in main.jl is forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
     # (; wind_nudge_τᵣ = 12*3600, scalar_nudge_τᵣ = 12*3600) # test for stabiity (didn't work/)
     # (; wind_nudge_τᵣ = .01*60, scalar_nudge_τᵣ = 0.01*60) # test for quick convergence to ref state
     # (; wind_nudge_τᵣ = 24*3600, scalar_nudge_τᵣ = 24*3600) # test for free ish run (closer to gettelman) but still unstable...? hmmm
-    (; wind_nudge_τᵣ = 20*60, scalar_nudge_τᵣ = 20*60) # paper standard
+
+    if occursin("obs", string(typeof(case))) # later when we add SOCRATES_obs/ERA5 types we can just do isa(case, SOCRATES_obs)
+        (; wind_nudge_τᵣ = 20*60, scalar_nudge_τᵣ = 20*60) # paper standard
+    else # SOCRATES_ERA5
+        (; wind_nudge_τᵣ = 60*60, scalar_nudge_τᵣ = 20*60) # paper standard
+    end
 end
 
-function update_forcing(::SOCRATES_RF09_obs, grid, state, t::Real, param_set, forcing) # Adapted from ARM_SGP -- should these be in Forcing.jl -- called in dycore.jl
+function update_forcing(::SOCRATES, grid, state, t::Real, param_set, forcing) # Adapted from ARM_SGP -- should these be in Forcing.jl -- called in dycore.jl
     aux_gm = TC.center_aux_grid_mean(state)
     FT = TC.float_type(state)
     forcing_funcs = forcing.forcing_funcs[] # access our functions
@@ -1421,7 +1532,7 @@ end
 # end
 
 # currently still nothing just cause idk what to do w/ RRTMG or if it's long enough to need...
-RadiationBase(   case::SOCRATES_RF09_obs, FT) = RadiationBase{Cases.get_radiation_type(case), FT}() # i think this should default to none, would deprecate this call for now cause we dont have a use, default is just none... but les_Data_kwarg is in the end of the main.jl initialize_radiation.jl cal so we gotta improvise
-initialize_radiation(::SOCRATES_RF09_obs, radiation, grid::Grid, state, param_set ; Dat) = nothing # for now we jus deprecate, if we reimplement a call to radation it will need to match our initialize forcing call structure w/ param_set and Dat
+RadiationBase(   case::SOCRATES, FT) = RadiationBase{Cases.get_radiation_type(case), FT}() # i think this should default to none, would deprecate this call for now cause we dont have a use, default is just none... but les_Data_kwarg is in the end of the main.jl initialize_radiation.jl cal so we gotta improvise
+initialize_radiation(::SOCRATES, radiation, grid::Grid, state, param_set) = nothing # for now we jus deprecate, if we reimplement a call to radation it will need to match our initialize forcing call structure w/ param_set and Dat
 
 end # module Cases

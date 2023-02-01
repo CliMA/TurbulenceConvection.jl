@@ -236,7 +236,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
         # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
         # treat them as auxiliary variables for now, until we disentangle the tendency computations.
-        if isa(case, Cases.SOCRATES_RF09_obs)
+        if isa(case, Cases.SOCRATES)
             # @show("updating forcing socrates")
             Cases.update_forcing(case, grid, state, t, param_set, forcing) # should dispatch to socrates
         else
@@ -396,7 +396,8 @@ function compute_gm_tendencies!(
             end
         end
 
-        if Cases.force_type(force) <: Cases.ForcingSOCRATES_RF09_obs
+        if Cases.force_type(force) <: Cases.ForcingSOCRATES
+            # @show("forcing socrates")
             # # LS subsidence (very unstable)
             # tendencies_gm.ρθ_liq_ice[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇θ_liq_ice_gm[k] # check if maybe subsidence is problem? (makes it fail faster, removing doesn't fix tho.../)
             # tendencies_gm.ρq_tot[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇q_tot_gm[k]
