@@ -26,7 +26,18 @@ function microphysics(
         # condensation
         ts = ts_env[k]
         if edmf.moisture_model isa NonEquilibriumMoisture
-            mph_neq = noneq_moisture_sources(param_set, aux_en.area[k], ρ_c[k], Δt, ts)
+            aux_en_f = face_aux_environment(state) # state or does ts include this? I guess you'd want to move this to the calling place... to choose updraft or environment
+            # @show(aux_en_f.w)
+            w = CCO.InterpolateF2C(aux_en_f.w)
+            # @show(w)
+            k_int = getfield(k,Base.propertynames(k)[1]) # get the value k.i out
+            w = Base.getindex(CC.Fields.field_values(getfield(w,Base.propertynames(w)[1])), k_int) # w first field is w.bcs = getfield(w,Base.propertynames(w)[1]) , then get the index from the field value
+            # @show(w)
+            # if w > 0
+            #     @show(w)
+            # end
+
+            mph_neq = noneq_moisture_sources(param_set, aux_en.area[k], ρ_c[k], Δt, ts, w)
             aux_en.ql_tendency_noneq[k] = mph_neq.ql_tendency * aux_en.area[k]
             aux_en.qi_tendency_noneq[k] = mph_neq.qi_tendency * aux_en.area[k]
         end
