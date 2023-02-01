@@ -1595,6 +1595,12 @@ git-tree-sha1 = "cda0aece8080e992f6370491b08ef3909d1c04e7"
 uuid = "476501e8-09a2-5ece-8869-fb82de89a1fa"
 version = "0.6.38"
 
+[[deps.SOCRATES_Single_Column_Forcings]]
+deps = ["CLIMAParameters", "CloudMicrophysics", "DelimitedFiles", "Dierckx", "NCDatasets", "Pkg", "Statistics", "Thermodynamics"]
+git-tree-sha1 = "455e53332f86bd52e9c3e84bc5bb0cad21be7435"
+uuid = "efca6b66-9b98-11ed-1a32-7b7cdccd517a"
+version = "0.0.1"
+
 [[deps.SciMLBase]]
 deps = ["ArrayInterfaceCore", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Preferences", "RecipesBase", "RecursiveArrayTools", "RuntimeGeneratedFunctions", "StaticArraysCore", "Statistics", "Tables"]
 git-tree-sha1 = "fe89a8113ea445bcff9ee570077830674babb534"
@@ -1834,7 +1840,7 @@ version = "1.0.1"
 deps = ["DocStringExtensions", "KernelAbstractions", "Random", "RootSolvers"]
 git-tree-sha1 = "1c7cd13268e5941df47884aac6efdb29189a7224"
 uuid = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
-version = "0.10.1"
+version = "0.9.6"
 
 [[deps.ThreadingUtilities]]
 deps = ["ManualMemory"]
