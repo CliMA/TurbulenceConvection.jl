@@ -23,7 +23,7 @@ function NR_fixed_radius(r::FT, q::FT) where {FT}
 end
 
 
-function NR_inhomogeneous_mixing_liquid(param_set::APS, N0::FT, p::FT, q_liq::FT, p_LCL::FT, T_LCL::FT, q_LCL::FT) where {FT}
+function NR_inhomogeneous_mixing_liquid(param_set::TD.APS, N0::FT, p::FT, q_liq::FT, p_LCL::FT, T_LCL::FT, q_LCL::FT) where {FT}
     """
     # add some DOI references
 
@@ -59,14 +59,14 @@ function NR_inhomogeneous_mixing_liquid(param_set::APS, N0::FT, p::FT, q_liq::FT
     end
 end
 
-function NR_inhomogeneous_mixing_liquid(param_set::APS, N0::FT, p::FT, q_liq::FT, ts_LCL::TD.ThermodynamicState) where {FT}
+function NR_inhomogeneous_mixing_liquid(param_set::TD.APS, N0::FT, p::FT, q_liq::FT, ts_LCL::TD.ThermodynamicState) where {FT}
     p_LCL = TD.air_pressure(param_set,ts_LCL)
     T_LCL = TD.air_temperature(param_set,ts_LCL)
     q_LCL = TD.total_specific_humidity(param_set,ts_LCL)
     return NR_inhomogeneous_mixing_liquid(param_set, N0, p, q_liq, p_LCL, T_LCL, q_LCL)
 end
 
-function NR_inhomogeneous_mixing_liquid(param_set::APS, N0::FT, ts::TD.ThermodynamicState, q_liq::FT, ts_LCL::TD.ThermodynamicState) where {FT}
+function NR_inhomogeneous_mixing_liquid(param_set::TD.APS, N0::FT, ts::TD.ThermodynamicState, q_liq::FT, ts_LCL::TD.ThermodynamicState) where {FT}
     p = TD.air_pressure(param_set,ts)
     p_LCL = TD.air_pressure(param_set,ts_LCL)
     T_LCL = TD.air_temperature(param_set,ts_LCL)
@@ -80,7 +80,7 @@ Phase equil but the output is always liquid, pretend ice doesnt exist even below
 """
 function PhaseEquil_pθq_q(
     # param_set::APS,
-    param_set::APS, #testing my version bootleg version lmao cause i can't create parameter sets easily in TC and the APS raw type is in TC
+    param_set::TD.APS, # a thermo_params to pass in
     p::FT,
     θ_liq_ice::FT,
     q_tot::FT,
@@ -114,7 +114,7 @@ end
 
 
 function PhasePartition_equil_given_p(
-    param_set::APS,
+    param_set::TD.APS,
     T::FT,
     p::FT,
     q_tot::FT,
@@ -134,7 +134,7 @@ end
 # adjust this one to make sure it uses our local PhasePartition_equil_given_p which always has liq_frac = 1
 function saturation_adjustment_given_pθq(
     ::Type{sat_adjust_method},
-    param_set::APS,
+    param_set::TD.APS,
     p::FT,
     θ_liq_ice::FT,
     q_tot::FT,
