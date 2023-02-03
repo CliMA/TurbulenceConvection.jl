@@ -1,4 +1,4 @@
-initialize(::ForcingBase, grid, state) = nothingå
+initialize(::ForcingBase, grid, state) = nothing
 
 function initialize(::ForcingBase{ForcingLES}, grid, state, LESDat::LESData)
     aux_gm = TC.center_aux_grid_mean(state)
