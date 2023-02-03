@@ -54,6 +54,7 @@ function NR_inhomogeneous_mixing_liquid(param_set::TD.APS, N0::FT, p::FT, q_liq:
         q_adiabatic = PhaseEquil_pθq_q(param_set, p, θ_liq_ice, q_LCL.tot)# can we ascend the adiabat here without having to do a full solve? -- also how do I partition liquid and ice in this framework? assume one phase?e
         ρ_w = FT(1) 
         r_adiabatic = (q_adiabatic.liq/(4/3*π*ρ_w*N0))^(1/3)
+        r_adiabatic = max(r_adiabatic, 0.2*1e-6) # bound to be at least ~micron size...something like kohler crit radius (e.g. if the cloud is new, diagnosed r is 0 for selecting tau in principle) (also if q_liq is 0 so is r_liq so rly need some bounds)
         N = q_liq/(4/3 * π * r_adiabatic^3 * ρ_w)
         return (;N,r=r_adiabatic)
     end

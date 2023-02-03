@@ -45,8 +45,9 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
 
                 # @show(ts_LCL)
                 if N_r_closure == :inhomogeneous
-                    _,R_liq = NR_inhomogeneous_mixing_liquid(thermo_params, N_0, TD.air_pressure(thermo_params,ts), q.liq, ts_LCL) # testing inhomogeneous mixing would have r fixed and then let N vary... set r based on adiabatic extrapolation from cloud base 
+                    N_0,R_liq = NR_inhomogeneous_mixing_liquid(thermo_params, N_0, TD.air_pressure(thermo_params,ts), q.liq, ts_LCL) # testing inhomogeneous mixing would have r fixed and then let N vary... set r based on adiabatic extrapolation from cloud base 
                     _,R_ice = NR_monodisperse(N_INP,q.ice)
+                    # maybe look into using a mixed model where N/R are partly towards the inhomogenous value depending on the true entrainment/mixing params... see literature on this
                 elseif N_r_closure == :monodisperse # uniform size for all droplets, liquid and Ice I guess
                     _,R_liq = NR_monodisperse(N_0  ,q.liq)
                     _,R_ice = NR_monodisperse(N_INP,q.ice)
