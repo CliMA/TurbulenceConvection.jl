@@ -6,7 +6,7 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
     thermo_params = TCP.thermodynamics_params(param_set)
     microphys_params = TCP.microphysics_params(param_set)
     # TODO - when using adaptive timestepping we are limiting the source terms
-    #        with the previous timestep Δt
+    #        with the previous timestep Δt 
     ql_tendency = FT(0)
     qi_tendency = FT(0)
     if area > 0
@@ -48,6 +48,9 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                     N_0,R_liq = NR_inhomogeneous_mixing_liquid(thermo_params, N_0, TD.air_pressure(thermo_params,ts), q.liq, ts_LCL) # testing inhomogeneous mixing would have r fixed and then let N vary... set r based on adiabatic extrapolation from cloud base 
                     _,R_ice = NR_monodisperse(N_INP,q.ice)
                     # maybe look into using a mixed model where N/R are partly towards the inhomogenous value depending on the true entrainment/mixing params... see literature on this
+
+                    # NOTE, ON DYCOMS ADIABATIC R W/ ORIGINAL N_0 WORKED BETTER... HMMM (though that's not using DYCOMS N)
+
                 elseif N_r_closure == :monodisperse # uniform size for all droplets, liquid and Ice I guess
                     _,R_liq = NR_monodisperse(N_0  ,q.liq)
                     _,R_ice = NR_monodisperse(N_INP,q.ice)
@@ -56,6 +59,7 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                 end
 
                 base = 1/(4*π*D) # as q goes up, R goes 
+                @show(N_0 * R_liq, N_INP * R_ice) # trouble shooet instability
                 τ_liq = base / (N_0 * R_liq)
                 τ_ice = base / (N_INP * R_ice)
                 # @show((T, q, τ_liq, τ_ice))
@@ -107,7 +111,7 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
             else
             end
             
-        else
+        else # basic noneq (no supersat formulation so not likely to be right)
             # TODO - is that the state we want to be relaxing to?
             ts_eq = TD.PhaseEquil_ρTq(thermo_params, ρ, T, q.tot)
             q_eq = TD.PhasePartition(thermo_params, ts_eq)
@@ -157,6 +161,8 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                 # S_qi *= Qv/S
             end
         end
+
+        # @show(Δt, CMNe.τ_relax(microphys_params, liq_type), CMNe.τ_relax(microphys_params, ice_type))
 
         # TODO - handle limiters elswhere
         if S_ql >= FT(0)
