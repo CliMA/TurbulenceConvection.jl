@@ -82,7 +82,7 @@ struct LES_driven_SCM <: AbstractCaseType end
 using Pkg
 Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/jbphyswx/MyRegistry")) # see https://discourse.julialang.org/t/more-informative-project-toml-or-partial-manifest-toml/92804/5
 # Pkg.add(url="https://github.com/jbphyswx/SOCRATES_Single_Column_Forcings.git#main") # my socrates library rn (not sure if wen eed this or just Pkg.add("SOCRATES_Single_Column_Forcings") after adding the registry)
-# Pkg.add("SOCRATES_Single_Column_Forcings") # hopefully this just works from adding the registry... (comment out after it's added?)
+# Pkg.add("SOCRATES_Single_Column_Forcings") # hopefully this just works from adding the registry... (comment out after it's added? might preclude getting updates --- also gotta uncomment at some point on new machines cause you the registry isn't in the toml
 using SOCRATES_Single_Column_Forcings
 abstract type SOCRATES <: AbstractCaseType end # this is the abstract type for all SOCRATES cases, cause you can't subtype non abstract types in julia...
 
@@ -1509,7 +1509,22 @@ end
 function update_forcing(::SOCRATES, grid, state, t::Real, param_set, forcing) # Adapted from ARM_SGP -- should these be in Forcing.jl -- called in dycore.jl
     aux_gm = TC.center_aux_grid_mean(state)
     FT = TC.float_type(state)
+
     forcing_funcs = forcing.forcing_funcs[] # access our functions
+    ug_keys = (:ug_nudge, :vg_nudge)
+    # update geostrophic profile
+    g_func = (f) -> f([FT(t)])[1]
+    prof_ug = g_func.(forcing_funcs[:ug_nudge]) # map over the forcing funcs to get the profile at t=0
+    prof_vg = g_func.(forcing_funcs[:vg_nudge])
+    # it wants a fcn out, could edit src/Fields.jl I guess to add another method but maybe it needs to face/center points idk...
+    prof_ug = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_ug); k = 1)
+    prof_vg = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_vg); k = 1)
+
+
+    aux_gm_uₕ_g = TC.grid_mean_uₕ_g(state)
+    TC.set_z!(aux_gm_uₕ_g, prof_ug, prof_vg) 
+
+    forcing_funcs = forcing_funcs[setdiff(keys(forcing_funcs), ug_keys)] # remove keys we don't need
     @inbounds for k in real_center_indices(grid)
         for (name,funcs) in zip(keys(forcing_funcs),forcing_funcs)
             func = funcs[k]

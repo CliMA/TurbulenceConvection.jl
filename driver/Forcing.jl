@@ -293,14 +293,31 @@ function initialize(forcing::ForcingBase{T}, grid, state, param_set) where {T<:F
     FT = eltype(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
 
-    # set the geostrophic velocity profiles (need to make sure u doesnt include this already...)
-    prof_ug = # add this (also needs its own forcing update function... cause we gotta do the set_z thing...)
-    prof_vg = # add this
-    aux_gm_uₕ_g = TC.grid_mean_uₕ_g(state)
-    TC.set_z!(aux_gm_uₕ_g, prof_ug, prof_vg)
-    
-    # forcing_funcs = create_forcing_funcs(forcing, grid, state, param_set; Dat) 
+
+    ug_keys = (:ug_nudge, :vg_nudge)
     forcing_funcs = forcing.forcing_funcs[]
+    @show(keys(forcing_funcs))
+
+    # set the geostrophic velocity profiles -- need to check if we actually have a fcn that can take in t=0 and return a profile... ( i think ours is one func for each z so whoops... maybe need to reconstruct?)
+    g_func = (f) -> f([FT(0)])[1]
+    prof_ug = g_func.(forcing_funcs[:ug_nudge]) # map over the forcing funcs to get the profile at t=0
+    prof_vg = g_func.(forcing_funcs[:vg_nudge])
+    # it wants a fcn out, could edit src/Fields.jl I guess to add another method but maybe it needs to face/center points idk...
+    prof_ug = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_ug); k = 1)
+    prof_vg = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_vg); k = 1)
+
+    # prof_ug = map.(g_func, collect(forcing_funcs[:ug_nudge])) # map over the forcing funcs to get the profile at t=0
+    # prof_ug = map.(g_func, collect(forcing_funcs[:vg_nudge]))
+
+    # prof_ug = forcing_funcs[:ug_nudge]([FT(0)])[1] # full profile;  add this (also needs its own forcing update function... cause we gotta do the set_z thing...)
+    # prof_vg = forcing_funcs[:vg_nudge]([FT(0)])[1] # 
+    aux_gm_uₕ_g = TC.grid_mean_uₕ_g(state)
+    TC.set_z!(aux_gm_uₕ_g, prof_ug, prof_vg) 
+    
+
+
+
+    forcing_funcs = forcing_funcs[setdiff(keys(forcing_funcs), ug_keys)] # keys we don't need.
     for (name,funcs) in zip(keys(forcing_funcs),forcing_funcs) # iterate over the named tuple of our forcings...
         for k in TC.real_center_indices(grid)
             func = funcs[k]
