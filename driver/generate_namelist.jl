@@ -720,7 +720,7 @@ function SOCRATES(namelist_defaults;case_name="SOCRATES")
     # LES filename should follow pattern: (maybe we do somethin like this wit forcing stuff from socrates?)
     # Stats.cfsite<SITE-NUMBER>_<FORCING-MODEL>_<EXPERIMENT>_2004-2008.<MONTH>.nc
     # namelist["meta"]["datafile"] = "/home/jbenjami/Research_Schneider/CliMa/Data/SOCRATES/RF09/RF09_obs-based_SAM_input.nc" # doesn't contain the zof the data or we want to run on though i guess idk if that matters
-    namelist["meta"]["simname"]  = "SOCRATES"
+    namelist["meta"]["simname"]  = case_name # "SOCRATES" # switched to using case_name cause it's what NetCDFIO.jl uses to name the output file 
     namelist["meta"]["casename"] = case_name # record the specific case name which would be a subtype of SOCRATES supertype (e.g. SOCRATES_RF09_obs) (needs to be case_name for Cases.jl) get_case
 
     return namelist
