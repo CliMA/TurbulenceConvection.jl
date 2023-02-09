@@ -36,6 +36,7 @@ function entrainment_inv_length_scale(
     w_en::FT,
     tke::FT,
     zc_i::FT,
+    ref_H::FT,
     ::BuoyVelEntrDimScale,
 ) where {FT}
     Δw = get_Δw(εδ_model, w_up, w_en)
@@ -51,6 +52,21 @@ function entrainment_inv_length_scale(
     w_en::FT,
     tke::FT,
     zc_i::FT,
+    ref_H::FT,
+    ::InvScaleHeightEntrDimScale,
+) where {FT}
+    return (1 / ref_H)
+end
+
+function entrainment_inv_length_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
     ::InvZEntrDimScale,
 ) where {FT}
     return (1 / zc_i)
@@ -64,6 +80,7 @@ function entrainment_inv_length_scale(
     w_en::FT,
     tke::FT,
     zc_i::FT,
+    ref_H::FT,
     ::InvMeterEntrDimScale,
 ) where {FT}
     return FT(1)
@@ -79,6 +96,7 @@ function entrainment_inv_length_scale(εδ_model, εδ_vars, dim_scale)
         εδ_vars.w_en,
         εδ_vars.tke_en,
         εδ_vars.zc_i,
+        εδ_vars.ref_H,
         dim_scale,
     )
 end
@@ -236,6 +254,7 @@ function compute_phys_entr_detr!(
                     tke_en = aux_en.tke[k], # environment tke
                     a_up = aux_up[i].area[k], # updraft area fraction
                     a_en = aux_en.area[k], # environment area fraction
+                    ref_H = p_c[k] / (ρ_c[k] * g), # reference state scale height
                     RH_up = aux_up[i].RH[k], # updraft relative humidity
                     RH_en = aux_en.RH[k], # environment relative humidity
                     max_area = max_area, # maximum updraft area
@@ -502,6 +521,7 @@ function compute_ml_entr_detr!(
                 w_en_c[k],
                 aux_en.tke[k],
                 FT(grid.zc[k].z),
+                p_c[k] / (ρ_c[k] * g),
                 edmf.entr_dim_scale,
             )
             δ_dim_scale = entrainment_inv_length_scale(
@@ -512,6 +532,7 @@ function compute_ml_entr_detr!(
                 w_en_c[k],
                 aux_en.tke[k],
                 FT(grid.zc[k].z),
+                p_c[k] / (ρ_c[k] * g),
                 edmf.detr_dim_scale,
             )
             aux_up[i].entr_ml[k] = ε_dim_scale * aux_up[i].ε_ml_nondim[k]
