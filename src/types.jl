@@ -129,6 +129,7 @@ Base.eltype(::RFEntr{d, m, FT}) where {d, m, FT} = FT
 
 abstract type EntrDimScale end
 struct BuoyVelEntrDimScale <: EntrDimScale end
+struct InvScaleHeightEntrDimScale <: EntrDimScale end
 struct InvZEntrDimScale <: EntrDimScale end
 struct InvMeterEntrDimScale <: EntrDimScale end
 
@@ -653,7 +654,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         "EDMF_PrognosticTKE",
         "entr_dim_scale";
         default = "buoy_vel",
-        valid_options = ["buoy_vel", "inv_z", "none"],
+        valid_options = ["buoy_vel", "inv_scale_height", "inv_z", "none"],
     )
 
     pressure_model_params = PressureModelParams{FT}(;
@@ -678,6 +679,8 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
 
     entr_dim_scale = if entr_dim_scale == "buoy_vel"
         BuoyVelEntrDimScale()
+    elseif entr_dim_scale == "inv_scale_height"
+        InvScaleHeightEntrDimScale()
     elseif entr_dim_scale == "inv_z"
         InvZEntrDimScale()
     elseif entr_dim_scale == "none"
@@ -692,11 +695,13 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         "EDMF_PrognosticTKE",
         "detr_dim_scale";
         default = "buoy_vel",
-        valid_options = ["buoy_vel", "inv_z", "none"],
+        valid_options = ["buoy_vel", "inv_scale_height", "inv_z", "none"],
     )
 
     detr_dim_scale = if detr_dim_scale == "buoy_vel"
         BuoyVelEntrDimScale()
+    elseif detr_dim_scale == "inv_scale_height"
+        InvScaleHeightEntrDimScale()
     elseif detr_dim_scale == "inv_z"
         InvZEntrDimScale()
     elseif detr_dim_scale == "none"
