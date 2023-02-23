@@ -79,11 +79,11 @@ struct DryBubble <: AbstractCaseType end
 struct LES_driven_SCM <: AbstractCaseType end
 
 
-using Pkg
-Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/jbphyswx/MyRegistry")) # see https://discourse.julialang.org/t/more-informative-project-toml-or-partial-manifest-toml/92804/5
-# Pkg.add(url="https://github.com/jbphyswx/SOCRATES_Single_Column_Forcings.git#main") # my socrates library rn (not sure if wen eed this or just Pkg.add("SOCRATES_Single_Column_Forcings") after adding the registry)
-# Pkg.add("SOCRATES_Single_Column_Forcings") # hopefully this just works from adding the registry... (comment out after it's added? might preclude getting updates --- also gotta uncomment at some point on new machines cause you the registry isn't in the toml
-using SOCRATES_Single_Column_Forcings
+# using Pkg
+# Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/jbphyswx/MyRegistry")) # see https://discourse.julialang.org/t/more-informative-project-toml-or-partial-manifest-toml/92804/5
+# Pkg.add(url="https://github.com/jbphyswx/SOCRATESSingleColumnForcings.git#main") # my socrates library rn (not sure if wen eed this or just Pkg.add("SOCRATESSingleColumnForcings") after adding the registry)
+# Pkg.add("SOCRATESSingleColumnForcings") # hopefully this just works from adding the registry... (comment out after it's added? might preclude getting updates --- also gotta uncomment at some point on new machines cause you the registry isn't in the toml
+using SOCRATESSingleColumnForcings
 abstract type SOCRATES <: AbstractCaseType end # this is the abstract type for all SOCRATES cases, cause you can't subtype non abstract types in julia...
 
 # Consider adding intermediate SOCRATES_obs and SOCRATES_ERA5 types to maybe better handle namelists or separate relaxation timescales... (switch order of generation in for loop I guess and handle where applicable)
@@ -98,8 +98,8 @@ end
 
 
 
-for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
-    for forcing_type in SOCRATES_Single_Column_Forcings.forcing_types
+for flight_number in SOCRATESSingleColumnForcings.flight_numbers
+    for forcing_type in SOCRATESSingleColumnForcings.forcing_types
         # eval( Meta.parse("struct SOCRATES_RF$(flight_number)_$(forcing_type) <: SOCRATES end")) # create subtypes of SOCRATES for each flight number and forcing type (works but not ideal)
         name = Symbol("SOCRATES_RF$(string(flight_number,pad=2))_$(forcing_type)") # separated this way cause nested dollar signs gave me too much trouble... (invalid type signature) but allows for easier addition of methods
         # @show(name)
@@ -110,11 +110,11 @@ for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
             flight_number::Int = $fn
             forcing_type::Symbol = $ft # :x #:$(forcing_type)
             # move to ForcingSocrates? 
-            get_forcing = () ->  SOCRATES_Single_Column_Forcings.process_case($fn; obs_or_ERA5=$ft,initial_condition=false) 
-            get_initial_conditions = (;new_z=nothing) -> SOCRATES_Single_Column_Forcings.process_case($fn; new_z=new_z, obs_or_ERA5=$ft,initial_condition=true)
-            get_surface_ref_state = () -> SOCRATES_Single_Column_Forcings.process_case($fn; obs_or_ERA5=$ft,surface="ref")
-            get_surface = () -> SOCRATES_Single_Column_Forcings.process_case($fn; obs_or_ERA5=$ft,surface="conditions")
-            get_default_new_z = () -> SOCRATES_Single_Column_Forcings.get_default_new_z($fn;)
+            get_forcing = (;thermo_params) ->  SOCRATESSingleColumnForcings.process_case($fn; obs_or_ERA5=$ft,initial_condition=false, thermo_params=thermo_params) 
+            get_initial_conditions = (;new_z=nothing, thermo_params) -> SOCRATESSingleColumnForcings.process_case($fn; new_z=new_z, obs_or_ERA5=$ft,initial_condition=true, thermo_params=thermo_params)
+            get_surface_ref_state = (;thermo_params) -> SOCRATESSingleColumnForcings.process_case($fn; obs_or_ERA5=$ft,surface="ref", thermo_params=thermo_params)
+            get_surface = (;thermo_params) -> SOCRATESSingleColumnForcings.process_case($fn; obs_or_ERA5=$ft,surface="conditions", thermo_params=thermo_params)
+            get_default_new_z = () -> SOCRATESSingleColumnForcings.get_default_new_z($fn;)
             end
         end)
     end
@@ -141,8 +141,8 @@ struct ForcingSOCRATES_RF09_obs end # this has to go before Forcing.jl is includ
 
 abstract type ForcingSOCRATES end
 abstract type SOCRATES <: AbstractCaseType end # this is the abstract type for all SOCRATES cases, cause you can't subtype non abstract types in julia
-for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
-    for forcing_type in SOCRATES_Single_Column_Forcings.forcing_types
+for flight_number in SOCRATESSingleColumnForcings.flight_numbers
+    for forcing_type in SOCRATESSingleColumnForcings.forcing_types
         name = Symbol("ForcingSOCRATES_RF$(string(flight_number,pad=2))_$(forcing_type)") # separated this way cause nested dollar signs gave me too much trouble... (invalid type signature) but allows for easier addition of methods
         @eval struct $name <: ForcingSOCRATES end
     end
@@ -213,8 +213,8 @@ end
 #     "Drive SCM with LES data from t = [end - t_interval_from_end_s, end]"
 # end
 abstract type SOCRATESData end
-for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
-    for forcing_type in SOCRATES_Single_Column_Forcings.forcing_types
+for flight_number in SOCRATESSingleColumnForcings.flight_numbers
+    for forcing_type in SOCRATESSingleColumnForcings.forcing_types
         name = Symbol("SOCRATESData_RF$(string(flight_number,pad=2))_$(forcing_type)") # separated this way cause nested dollar signs gave me too much trouble... (invalid type signature) but allows for easier addition of methods
         @eval struct $name <: SOCRATESData
             # any methods we may come to need or want...         
@@ -1326,8 +1326,8 @@ initialize_radiation(::LES_driven_SCM, radiation, grid::Grid, state, param_set; 
  
 # you cant instatiatie the socrates subtype so we'll iterate here 
 
-for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
-    for forcing_type in SOCRATES_Single_Column_Forcings.forcing_types
+for flight_number in SOCRATESSingleColumnForcings.flight_numbers
+    for forcing_type in SOCRATESSingleColumnForcings.forcing_types
         # @show(flight_number)
         name = Symbol("SOCRATES_RF$(string(flight_number,pad=2))_$(forcing_type)") # separated this way cause nested dollar signs gave me too much trouble... (invalid type signature) but allows for easier addition of methods
         # @show(name)
@@ -1354,7 +1354,8 @@ end
 # end
 
 function surface_ref_state(S::SOCRATES, param_set::APS, namelist) # adopted mostly from LES (most similar setup, but what is this for? should i set it to somethign more generic?
-    return S.get_surface_ref_state() # added S so it has a name and then use the method we defined, currently param_set isn't an accepted argument cause it shouldnt be necessary for this part on earth but maybe can edit later...
+    thermo_params = TCP.thermodynamics_params(param_set)
+    return S.get_surface_ref_state(;thermo_params=thermo_params) # added S so it has a name and then use the method we defined, currently param_set isn't an accepted argument cause it shouldnt be necessary for this part on earth but maybe can edit later...
 end
 
 function initialize_profiles(S::SOCRATES, grid::Grid, param_set, state; ) # should use LESDat or just use something like the normal cases? we dont need a window so...
@@ -1362,7 +1363,8 @@ function initialize_profiles(S::SOCRATES, grid::Grid, param_set, state; ) # shou
     #FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    IC = S.get_initial_conditions(;new_z = vec(grid.zc.z) ) # added S so it has a name and then use the method we defined, currently param_set isn't an accepted argument cause it shouldnt be necessary for this part on earth but maybe can edit later...
+    thermo_params = TCP.thermodynamics_params(param_set)
+    IC = S.get_initial_conditions(;new_z = vec(grid.zc.z), thermo_params=thermo_params ) # added S so it has a name and then use the method we defined, currently param_set isn't an accepted argument cause it shouldnt be necessary for this part on earth but maybe can edit later...
     
     prog_gm_u = copy(aux_gm.q_tot) # copy as template cause u,g go into a uₕ vector so this is easier to work with (copied from other cases...)
     prog_gm_v = copy(aux_gm.q_tot)
@@ -1440,7 +1442,8 @@ end
 
 function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # seems Ri_bulk_crit is never aactually changed...
     FT = eltype(param_set)
-    sc = case.get_surface()
+    thermo_params = TCP.thermodynamics_params(param_set)
+    sc = case.get_surface(;thermo_params=thermo_params)
     zrough   = 0.1 # copied from gabls which is also w/ monin obhukov boundary layer
     # no ustar w/ monin obukhov i guess, seems to be calculated in https://github.com/CliMA/SurfaceFluxes.jl src/SurfaceFluxes.jl/compute_ustar()
     kwargs = (; Tsurface=sc.Tg, qsurface=sc.qg, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive,
@@ -1488,7 +1491,8 @@ end
 function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_set; ) # added param_set so we can calculate stuff...
     # @show(case)
     # @show(forcing)
-    forcing.forcing_funcs[] = case.get_forcing() # maybe need to add param_set to this fcn args? everywhere really
+    thermo_params = TCP.thermodynamics_params(param_set)
+    forcing.forcing_funcs[] = case.get_forcing(;thermo_params=thermo_params) # maybe need to add param_set to this fcn args? everywhere really
     
     # forcing.forcing_funcs[] = create_forcing_funcs(forcing, grid, state, param_set; )  # initialize our forcing_funcs and insert them into our object and we can cheat and use the mutable array inside immutable struct :)    # not sure how this fits into the module... here but it seems to find it...
     initialize(forcing, grid, state, param_set) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
