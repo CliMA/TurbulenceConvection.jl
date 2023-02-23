@@ -171,7 +171,10 @@ function create_parameter_set(
     pairs = CP.get_parameter_values!(toml_dict, aliases, "TurbulenceConvection")
 
     SFP = typeof(surf_flux_params)
-    param_set = TCP.TurbulenceConvectionParameters{FTD, MP, SFP}(; pairs..., microphys_params, surf_flux_params)
+    user_args = namelist["user_args"]
+    user_aux  = namelist["user_aux"]
+
+    param_set = TCP.TurbulenceConvectionParameters{FTD, MP, SFP, NamedTuple}(; pairs..., microphys_params, surf_flux_params, user_args, user_aux) # not sure how to convert user_args to isbits and preserve names, write own retriever?
     if !isbits(param_set)
         @warn "The parameter set SHOULD be isbits in order to be stack-allocated."
     end
