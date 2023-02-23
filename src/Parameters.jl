@@ -26,6 +26,7 @@ Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP, NamedTuple} <: AT
     microphys_params::MP
     surf_flux_params::SFP
     user_args::NamedTuple # not sure if this is completely necessary yet
+    user_aux::NamedTuple # not sure if this is completely necessary yet
 end
 
 thermodynamics_params(ps::ATCP) = CM.Parameters.thermodynamics_params(ps.microphys_params)

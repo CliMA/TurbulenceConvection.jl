@@ -177,7 +177,9 @@ function create_parameter_set(
 
     SFP = typeof(surf_flux_params)
     user_args = namelist["user_args"]
-    param_set = TCP.TurbulenceConvectionParameters{FTD, MP, SFP, NamedTuple}(; pairs..., microphys_params, surf_flux_params, user_args) # not sure how to convert user_args to isbits and preserve names, write own retriever?
+    user_aux  = namelist["user_aux"]
+
+    param_set = TCP.TurbulenceConvectionParameters{FTD, MP, SFP, NamedTuple}(; pairs..., microphys_params, surf_flux_params, user_args, user_aux) # not sure how to convert user_args to isbits and preserve names, write own retriever?
     if !isbits(param_set)
         @warn "The parameter set SHOULD be isbits in order to be stack-allocated."
     end
