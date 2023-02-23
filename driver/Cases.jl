@@ -9,12 +9,13 @@ import ClimaCore.Operators as CCO
 import ClimaCore.Geometry as CCG
 import DocStringExtensions
 
-import AtmosphericProfilesLibrary as APL
-
 import Dierckx
 import Statistics
 import Random
 import UnPack
+
+import AtmosphericProfilesLibrary as APL
+import SOCRATESSingleColumnForcings as SOC
 
 import ..TurbulenceConvection as TC
 import ..TurbulenceConvection.Parameters as TCP

@@ -2,6 +2,12 @@ import TurbulenceConvection as TC
 import TurbulenceConvection.Parameters as TCP
 const APS = TCP.AbstractTurbulenceConvectionParameters
 
+import AtmosphericProfilesLibrary
+const APL = AtmosphericProfilesLibrary
+
+import SOCRATESSingleColumnForcings
+const SOC = SOCRATESSingleColumnForcings
+
 import Thermodynamics as TD
 
 function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, surf_params, param_set::APS, t::Real, case)
@@ -88,8 +94,6 @@ function initialize_updrafts(edmf, grid, state, surf)
     return
 end
 
-import AtmosphericProfilesLibrary
-const APL = AtmosphericProfilesLibrary
 function initialize_updrafts_DryBubble(edmf, grid, state)
 
     # criterion 2: b>1e-4
