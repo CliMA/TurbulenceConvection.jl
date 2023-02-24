@@ -10,6 +10,7 @@ import ClimaCore.Geometry as CCG
 import DocStringExtensions
 
 import AtmosphericProfilesLibrary as APL
+import SOCRATESSingleColumnForcings as SOC
 
 import Dierckx
 import Statistics
