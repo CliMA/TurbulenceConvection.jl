@@ -73,10 +73,11 @@ SciMLBase = "1"
 StaticArrays = "1.2"
 StatsBase = "0.33"
 StochasticDiffEq = "6.41"
+SurfaceFluxes = "0.4"
 TerminalLoggers = "0.1"
 Thermodynamics = "0.9, 0.10"
 UnPack = "1.0"
-julia = "1.6"
+julia = "1.5"
 
 [extras]
 CPUSummary = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"
