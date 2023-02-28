@@ -43,7 +43,7 @@ function DiffEqNoiseProcess.wiener_randn!(rng::Random.AbstractRNG, rand_vec::CC.
     parent(rand_vec.face) .= Random.randn.()
 end
 
-struct Simulation1d{IONT, P, A, C, F, R, SM, EDMF, PM, RFM, D, TIMESTEPPING, STATS, PS, SRS, LESDK}
+struct Simulation1d{IONT, P, A, C, F, R, SM, EDMF, PM, RFM, D, TIMESTEPPING, STATS, PS, SRS, AUXDK}
     io_nt::IONT
     prog::P
     aux::A
@@ -65,7 +65,7 @@ struct Simulation1d{IONT, P, A, C, F, R, SM, EDMF, PM, RFM, D, TIMESTEPPING, STA
     dt_min::Float64
     truncate_stack_trace::Bool
     surf_ref_state::SRS
-    les_data_kwarg::LESDK
+    aux_data_kwarg::AUXDK
 end
 
 function open_files(sim::Simulation1d)
@@ -206,8 +206,8 @@ function Simulation1d(namelist)
         JSON.print(io, namelist, 4)
     end
 
-    case = Cases.get_case(namelist)
-    surf_ref_state = Cases.surface_ref_state(case, param_set, namelist)
+    case = Cases.get_case(namelist, param_set)
+    surf_ref_state = Cases.surface_ref_state(case, param_set, namelist) # this doesn't accept aux_data_kwarg which would be useful for socrates... didn't want to change the call for all cases though...
 
     forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
 
@@ -215,8 +215,8 @@ function Simulation1d(namelist)
     TS = TimeStepping(FT, namelist)
 
     Ri_bulk_crit::FTD = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
-    les_data_kwarg = Cases.les_data_kwarg(case, namelist)
-    surf_params = Cases.surface_params(case, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, les_data_kwarg...)
+    aux_data_kwarg = Cases.aux_data_kwarg(case, namelist, param_set) # change name and pass in all info we may need for this (added param_set) -- I kinda wanted this for surf ref state though...
+    surf_params = Cases.surface_params(case, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, aux_data_kwarg...)
 
     calibrate_io = namelist["stats_io"]["calibrate_io"]
     aux_dict = calibrate_io ? TC.io_dictionary_aux_calibrate() : TC.io_dictionary_aux()
@@ -246,7 +246,7 @@ function Simulation1d(namelist)
         dt_min,
         truncate_stack_trace,
         surf_ref_state,
-        les_data_kwarg,
+        aux_data_kwarg,
     )
 end
 
@@ -254,7 +254,7 @@ function initialize(sim::Simulation1d)
     TC = TurbulenceConvection
 
     (; prog, aux, edmf, case, forcing, radiation, surf_params, param_set, surf_ref_state) = sim
-    (; les_data_kwarg, skip_io, Stats, io_nt, diagnostics, truncate_stack_trace) = sim
+    (; aux_data_kwarg, skip_io, Stats, io_nt, diagnostics, truncate_stack_trace) = sim
 
     ts_gm = ["Tsurface", "shf", "lhf", "ustar", "wstar", "lwp_mean", "iwp_mean"]
     ts_edmf = [
@@ -298,12 +298,12 @@ function initialize(sim::Simulation1d)
                 add_write_field(ds, "p_c", vec(TC.center_aux_grid_mean(state).p), group, ("zc",))
             end
         end
-        Cases.initialize_profiles(case, grid, param_set, state; les_data_kwarg...)
+        Cases.initialize_profiles(case, grid, param_set, state; aux_data_kwarg...)
         set_thermo_state_from_aux!(state, grid, edmf.moisture_model, param_set)
         set_grid_mean_from_thermo_state!(param_set, state, grid)
         assign_thermo_aux!(state, grid, edmf.moisture_model, param_set)
-        Cases.initialize_forcing(case, forcing, grid, state, param_set; les_data_kwarg...)
-        Cases.initialize_radiation(case, radiation, grid, state, param_set; les_data_kwarg...)
+        Cases.initialize_forcing(case, forcing, grid, state, param_set; aux_data_kwarg...)
+        Cases.initialize_radiation(case, radiation, grid, state, param_set; aux_data_kwarg...)
         initialize_edmf(edmf, grid, state, surf_params, param_set, t, case)
         if !skip_io
             stats = Stats[colidx]
