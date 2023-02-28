@@ -83,6 +83,7 @@ using Pkg
 # Use a local CI registry so that SOCRATES_Single_Column_Forcings can be registered and installed on any machine. That package provides machinery to convert our forcings to any vertical grid/time
 Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/jbphyswx/MyRegistry")) # see https://discourse.julialang.org/t/more-informative-project-toml-or-partial-manifest-toml/92804/5
 using SOCRATES_Single_Column_Forcings
+abstract type SOCRATES <: AbstractCaseType end # this is the abstract type for all SOCRATES cases, cause you can't subtype non abstract types in julia...
 
 
 macro main_eval(exp)
