@@ -206,8 +206,8 @@ function Simulation1d(namelist)
         JSON.print(io, namelist, 4)
     end
 
-    case = Cases.get_case(namelist)
-    surf_ref_state = Cases.surface_ref_state(case, param_set, namelist)
+    case = Cases.get_case(namelist, param_set)
+    surf_ref_state = Cases.surface_ref_state(case, param_set, namelist) # this doesn't accept aux_data_kwarg which would be useful for socrates... didn't want to change the call for all cases though...
 
     forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
 
@@ -215,7 +215,7 @@ function Simulation1d(namelist)
     TS = TimeStepping(FT, namelist)
 
     Ri_bulk_crit::FTD = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
-    aux_data_kwarg = Cases.aux_data_kwarg(case, namelist)
+    aux_data_kwarg = Cases.aux_data_kwarg(case, namelist, param_set) # change name and pass in all info we may need for this (added param_set) -- I kinda wanted this for surf ref state though...
     surf_params = Cases.surface_params(case, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, aux_data_kwarg...)
 
     calibrate_io = namelist["stats_io"]["calibrate_io"]
