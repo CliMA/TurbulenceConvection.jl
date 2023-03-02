@@ -90,7 +90,7 @@ For the first, we'd just need to change our dispatch to also act on the namelist
 
 For the second I renamed les_data_kwarg to aux_data_kwarg to be more general and just made use of that with a separate SOCRATESData type...
 
-======== =# 
+======== =#
 
 
 # struct SOCRATES <: AbstractCaseType end # this is the abstract type for all SOCRATES cases, cause you can't subtype non abstract types in julia...
@@ -107,20 +107,57 @@ struct SOCRATES <: AbstractCaseType
     # either we can do this here or we could instead defer to aux_data_kwarg below... here we don't necessarily have thermo_params defined yet tho...
     function SOCRATES(flight_number::Int, forcing_type::Symbol, param_set::APS)
         thermo_params = TCP.thermodynamics_params(param_set)
-        get_forcing            = (;new_z=nothing) -> SSCF.process_case(flight_number; obs_or_ERA5=forcing_type, new_z=new_z, initial_condition=false, thermo_params=thermo_params) 
-        get_initial_conditions = (;new_z=nothing) -> SSCF.process_case(flight_number; obs_or_ERA5=forcing_type, new_z=new_z, initial_condition=true , thermo_params=thermo_params)
-        get_surface_ref_state  = ()               -> SSCF.process_case(flight_number; obs_or_ERA5=forcing_type, surface="ref"                       , thermo_params=thermo_params)
-        get_surface            = ()               -> SSCF.process_case(flight_number; obs_or_ERA5=forcing_type, surface="conditions"                , thermo_params=thermo_params)
-        get_default_new_z      = ()               -> SSCF.get_default_new_z(flight_number)
-        new(flight_number, forcing_type, get_forcing, get_initial_conditions, get_surface_ref_state, get_surface, get_default_new_z)
+        get_forcing =
+            (; new_z = nothing) -> SSCF.process_case(
+                flight_number;
+                obs_or_ERA5 = forcing_type,
+                new_z = new_z,
+                initial_condition = false,
+                thermo_params = thermo_params,
+            )
+        get_initial_conditions =
+            (; new_z = nothing) -> SSCF.process_case(
+                flight_number;
+                obs_or_ERA5 = forcing_type,
+                new_z = new_z,
+                initial_condition = true,
+                thermo_params = thermo_params,
+            )
+        get_surface_ref_state =
+            () -> SSCF.process_case(
+                flight_number;
+                obs_or_ERA5 = forcing_type,
+                surface = "ref",
+                thermo_params = thermo_params,
+            )
+        get_surface =
+            () -> SSCF.process_case(
+                flight_number;
+                obs_or_ERA5 = forcing_type,
+                surface = "conditions",
+                thermo_params = thermo_params,
+            )
+        get_default_new_z = () -> SSCF.get_default_new_z(flight_number)
+        new(
+            flight_number,
+            forcing_type,
+            get_forcing,
+            get_initial_conditions,
+            get_surface_ref_state,
+            get_surface,
+            get_default_new_z,
+        )
     end
 
     function SOCRATES(flight_number, forcing_type) # doesnt need param_set
-        get_default_new_z  = () -> SSCF.get_default_new_z(flight_number)
-        new(flight_number, forcing_type, ()->return, ()->return, ()->return, ()->return, get_default_new_z) # apparently you need to fill in everything but trailing fields https://github.com/JuliaLang/julia/issues/36789
+        get_default_new_z = () -> SSCF.get_default_new_z(flight_number)
+        function null() end # dummy function
+        new(flight_number, forcing_type, null, null, null, null, get_default_new_z) # apparently you need to fill in everything but trailing fields https://github.com/JuliaLang/julia/issues/36789
     end
 
-    function SOCRATES() new() end# Incomplete Initialization constructor for backwards compat :)
+    function SOCRATES()
+        new()
+    end # Incomplete Initialization constructor for backwards compat :)
 end
 
 #####
@@ -132,7 +169,7 @@ struct ForcingStandard end
 struct ForcingDYCOMS_RF01 end
 struct ForcingLES end
 
-struct ForcingSOCRATES end 
+struct ForcingSOCRATES end
 
 struct RadiationNone end
 struct RadiationDYCOMS_RF01 end
@@ -160,7 +197,7 @@ Base.@kwdef struct ForcingBase{T, FT} # this gets initialized in main.jl and the
     "Large-scale divergence (same as in RadiationBase)"
     divergence::FT = 0
     "Forcing Functions Storage"
-    forcing_funcs::Array{NamedTuple,0} = fill(NamedTuple()) # used 0 d array intead[nothing] to retain mutability in forcing_funcs[]  # use a list here, so that we can mutate the internals of the imutable type (could make it a named tuple type insdie i guess that's what the init returns),... # might be too specific, maybe just Array{NamedTuple,0}
+    forcing_funcs::Array{NamedTuple, 0} = fill(NamedTuple()) # used 0 d array intead[nothing] to retain mutability in forcing_funcs[]  # use a list here, so that we can mutate the internals of the imutable type (could make it a named tuple type insdie i guess that's what the init returns),... # might be too specific, maybe just Array{NamedTuple,0}
 end
 
 force_type(::ForcingBase{T}) where {T} = T
@@ -191,7 +228,7 @@ end
 
 
 Base.@kwdef struct SOCRATESData # placeholder cause we deprecated SOCRATESData in favor of having everything in the SOCRATES object but maybe we'll have to switch back... idk...
-    function SOCRATESData(case::SOCRATES) 
+    function SOCRATESData(case::SOCRATES)
         case
     end
 end
@@ -207,12 +244,13 @@ include("Forcing.jl")
 ##### Case methods (returns an instance of the case type) 
 #####
 
-get_case(namelist::Dict, param_set::APS)  = get_case(namelist["meta"]["casename"], namelist, param_set) 
+get_case(namelist::Dict, param_set::APS) = get_case(namelist["meta"]["casename"], namelist, param_set)
 get_case(namelist::Dict) = get_case(namelist["meta"]["casename"]) # backwards compat (e.g. in common_spaces.jl) for dispatch (use positional argumetns only cause keywords don't participate in dispatch)
-get_case(casename::String, namelist::Dict,param_set::APS) = get_case(Val(Symbol(casename)), namelist, param_set)
+get_case(casename::String, namelist::Dict, param_set::APS) = get_case(Val(Symbol(casename)), namelist, param_set)
 get_case(casename::String) = get_case(Val(Symbol(casename))) # backwards compat (e.g. in common_spaces.jl) for dispatxh (use positional argumetns only cause keywords don't participate in dispatch)
-get_case(::Val{:SOCRATES}, namelist::Dict, param_set::APS) = SOCRATES(namelist["meta"]["flight_number"], namelist["meta"]["forcing_type"],param_set) # avert dropping namelist, param_set for socrates
-get_case(x::Val, namelist::Dict,param_set::APS) = get_case(x) #
+get_case(::Val{:SOCRATES}, namelist::Dict, param_set::APS) =
+    SOCRATES(namelist["meta"]["flight_number"], namelist["meta"]["forcing_type"], param_set) # avert dropping namelist, param_set for socrates
+get_case(x::Val, namelist::Dict, param_set::APS) = get_case(x) #
 function get_case(x::Val)
     case = typeof(x).parameters[1]  # this is a hack to get the case name from the Val object e.g. get_case(::Val{:Soares}) = Soares()
     return eval(case)()
@@ -1319,20 +1357,20 @@ function surface_ref_state(case::SOCRATES, param_set::APS, namelist) # adopted m
     return case.get_surface_ref_state() # added S so it has a name and then use the method we defined, currently param_set isn't an accepted argument cause it shouldnt be necessary for this part on earth but maybe can edit later...
 end
 
-function initialize_profiles(case::SOCRATES, grid::Grid, param_set, state; SOCRATESDat ) # Relies on SOCRATES_Single_Column_Forcings.jl
+function initialize_profiles(case::SOCRATES, grid::Grid, param_set, state; SOCRATESDat) # Relies on SOCRATES_Single_Column_Forcings.jl
     """ need θ_liq_ice, q_tot, prog_gm_u, prog_gm_v, tke, prog_gm_uₕ (is returned as (; dTdt_hadv, H_nudge, dqtdt_hadv, qt_nudge, subsidence, u_nudge, v_nudge, ug_nudge, vg_nudge) """
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    IC = case.get_initial_conditions(;new_z = vec(grid.zc.z)) # added S so it has a name and then use the method we defined, currently param_set isn't an accepted argument cause it shouldnt be necessary for this part on earth but maybe can edit later...
-    
+    IC = case.get_initial_conditions(; new_z = vec(grid.zc.z)) # added S so it has a name and then use the method we defined, currently param_set isn't an accepted argument cause it shouldnt be necessary for this part on earth but maybe can edit later...
+
     prog_gm_u = copy(aux_gm.q_tot) # copy as template cause u,g go into a uₕ vector so this is easier to work with (copied from other cases...)
     prog_gm_v = copy(aux_gm.q_tot)
     @inbounds for k in real_center_indices(grid) # we are goin the TRMM way wit this rather than LES... not sure why they use k.i but maybe it's cause forcing has time component? idk
         aux_gm.θ_liq_ice[k] = IC.H_nudge[k]
-        aux_gm.q_tot[k]     = IC.qt_nudge[k]
-        prog_gm_u[k]        = IC.u_nudge[k]
-        prog_gm_v[k]        = IC.v_nudge[k]
-        aux_gm.tke[k]       = 0 # what is this supposed to be? unset for interactive? maybe we dont need to set it initially at all idk... didn't check yet but these get updated later interactively so hope it's fine
+        aux_gm.q_tot[k] = IC.qt_nudge[k]
+        prog_gm_u[k] = IC.u_nudge[k]
+        prog_gm_v[k] = IC.v_nudge[k]
+        aux_gm.tke[k] = 0 # what is this supposed to be? unset for interactive? maybe we dont need to set it initially at all idk... didn't check yet but these get updated later interactively so hope it's fine
     end
     prog_gm_uₕ = TC.grid_mean_uₕ(state) # not too well versed in the details here but this should set the wind profiles IC
     @. prog_gm_uₕ = CCG.Covariant12Vector(CCG.UVVector(prog_gm_u, prog_gm_v))
@@ -1341,31 +1379,31 @@ end
 
 
 
-function surface_params(case::SOCRATES, surf_ref_state, param_set; SOCRATESDat,kwargs...) # seems Ri_bulk_crit is never aactually changed...
+function surface_params(case::SOCRATES, surf_ref_state, param_set; SOCRATESDat, kwargs...) # seems Ri_bulk_crit is never aactually changed...
     FT = eltype(param_set)
     sc = case.get_surface()
-    zrough   = 0.1 # copied from gabls which is also w/ monin obhukov boundary layer
+    zrough = 0.1 # copied from gabls which is also w/ monin obhukov boundary layer
     # no ustar w/ monin obukhov i guess, seems to be calculated in https://github.com/CliMA/SurfaceFluxes.jl src/SurfaceFluxes.jl/compute_ustar()
-    kwargs = (; Tsurface=sc.Tg, qsurface=sc.qg, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive,
+    kwargs = (; Tsurface = sc.Tg, qsurface = sc.qg, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive,
     return TC.MoninObukhovSurface(FT; kwargs...) # interactive?
 end
 
 
 
-function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_set; SOCRATESDat ) # added param_set so we can calculate stuff...
-    forcing.forcing_funcs[] = case.get_forcing(; new_z = vec(grid.zc.z) )
+function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_set; SOCRATESDat) # added param_set so we can calculate stuff...
+    forcing.forcing_funcs[] = case.get_forcing(; new_z = vec(grid.zc.z))
     initialize(forcing, grid, state, param_set) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
 end
 
-function forcing_kwargs(case::SOCRATES,namelist) # call in main.jl is forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
+function forcing_kwargs(case::SOCRATES, namelist) # call in main.jl is forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
     # (; wind_nudge_τᵣ = 12*3600, scalar_nudge_τᵣ = 12*3600) # test for stabiity (didn't work/)
     # (; wind_nudge_τᵣ = .01*60, scalar_nudge_τᵣ = 0.01*60) # test for quick convergence to ref state
     # (; wind_nudge_τᵣ = 24*3600, scalar_nudge_τᵣ = 24*3600) # test for free ish run (closer to gettelman) but still unstable...? hmmm
 
     if occursin("obs", string(typeof(case))) # later when we add SOCRATES_obs/ERA5 types we can just do isa(case, SOCRATES_obs)
-        (; wind_nudge_τᵣ = 20*60, scalar_nudge_τᵣ = 20*60) # paper standard
+        (; wind_nudge_τᵣ = 20 * 60, scalar_nudge_τᵣ = 20 * 60) # paper standard
     else # SOCRATES_ERA5
-        (; wind_nudge_τᵣ = 60*60, scalar_nudge_τᵣ = 20*60) # paper standard
+        (; wind_nudge_τᵣ = 60 * 60, scalar_nudge_τᵣ = 20 * 60) # paper standard
     end
 end
 
@@ -1385,11 +1423,11 @@ function update_forcing(case::SOCRATES, grid, state, t::Real, param_set, forcing
 
 
     aux_gm_uₕ_g = TC.grid_mean_uₕ_g(state)
-    TC.set_z!(aux_gm_uₕ_g, prof_ug, prof_vg) 
+    TC.set_z!(aux_gm_uₕ_g, prof_ug, prof_vg)
 
     forcing_funcs = forcing_funcs[setdiff(keys(forcing_funcs), ug_keys)] # remove keys we don't need
     @inbounds for k in real_center_indices(grid)
-        for (name,funcs) in zip(keys(forcing_funcs),forcing_funcs)
+        for (name, funcs) in zip(keys(forcing_funcs), forcing_funcs)
             func = funcs[k]
             getproperty(aux_gm, name)[k] = func([t])[1] # turn to vec cause needs to be cast as in https://github.com/CliMA/TurbulenceConvection.jl/blob/a9ebce1f5f15f049fc3719a013ddbc4a9662943a/src/utility_functions.jl#L48, run fcn on vec and index it back outssss
         end
@@ -1406,7 +1444,7 @@ end
 # end
 
 # currently still nothing just cause idk what to do w/ RRTMG or if it's long enough to need...
-RadiationBase(   case::SOCRATES, FT) = RadiationBase{Cases.get_radiation_type(case), FT}() # i think this should default to none, would deprecate this call for now cause we dont have a use, default is just none... but aux_data_kwarg is in the end of the main.jl initialize_radiation.jl cal so we gotta improvise
+RadiationBase(case::SOCRATES, FT) = RadiationBase{Cases.get_radiation_type(case), FT}() # i think this should default to none, would deprecate this call for now cause we dont have a use, default is just none... but aux_data_kwarg is in the end of the main.jl initialize_radiation.jl cal so we gotta improvise
 initialize_radiation(::SOCRATES, radiation, grid::Grid, state, param_set; SOCRATESDat) = nothing # for now we jus deprecate, if we reimplement a call to radation it will need to match our initialize forcing call structure w/ param_set and Dat
 
 end # module Cases
