@@ -308,7 +308,7 @@ function default_namelist(
     elseif case_name == "LES_driven_SCM"
         namelist = LES_driven_SCM(namelist_defaults)
     elseif occursin("SOCRATES", case_name) # when you're setting up the namelist for the case, you would have to specify the specific socrates type so this should be an umbrella for all of them...
-        namelist = SOCRATES(namelist_defaults;case_name=case_name) # pass in case_name so we can record it just cause we have no other way to mark down the case_type...
+        namelist = SOCRATES(namelist_defaults; case_name = case_name) # pass in case_name so we can record it just cause we have no other way to mark down the case_type...
     else
         error("Not a valid case name")
     end
@@ -684,7 +684,7 @@ function LES_driven_SCM(namelist_defaults)
     return namelist
 end
 
-function SOCRATES(namelist_defaults;case_name="SOCRATES_RFXX_XXX_data")
+function SOCRATES(namelist_defaults; case_name = "SOCRATES_RFXX_XXX_data")
     namelist = deepcopy(namelist_defaults)
     # grid is currently constructed from the same one used by the paper's LES grid
     namelist["stats_io"]["frequency"] = 100.0 # long runs so try a lower output rate for smaller files... (seems to be seconds)
@@ -718,18 +718,20 @@ function SOCRATES(namelist_defaults;case_name="SOCRATES_RFXX_XXX_data")
     namelist["microphysics"]["microph_scaling_accr"] = 1.0
 
     # casename for data
-    namelist["meta"]["simname"]  = case_name # "SOCRATES" # switched to using case_name cause it's what NetCDFIO.jl uses to name the output file 
+    namelist["meta"]["simname"] = case_name # "SOCRATES" # switched to using case_name cause it's what NetCDFIO.jl uses to name the output file 
     namelist["meta"]["casename"] = "SOCRATES" # switch back to using just socrates as casename to handle dispatch properly # record the specific case name which would be a subtype of SOCRATES supertype (e.g. SOCRATES_RF09_obs) (needs to be case_name for Cases.jl) get_case
 
-    flight_num_spec = split(case_name,"_")[2]
-    namelist["meta"]["flight_number"] = parse(Int,filter.(isdigit, flight_num_spec))
+    flight_num_spec = split(case_name, "_")[2]
+    namelist["meta"]["flight_number"] = parse(Int, filter.(isdigit, flight_num_spec))
 
-    if      occursin("obs" , lowercase(case_name))
+    if occursin("obs", lowercase(case_name))
         namelist["meta"]["forcing_type"] = :obs_data
-    elseif  occursin("era5", lowercase(case_name))
+    elseif occursin("era5", lowercase(case_name))
         namelist["meta"]["forcing_type"] = :ERA5_data
     else
-        error("Invalid SOCRATES setup specification, forcing_type in string of form SOCRATES_{flight_specifier}_{forcing_specifier} must contain either \"obs\" or \"ERA5\"")
+        error(
+            "Invalid SOCRATES setup specification, forcing_type in string of form SOCRATES_{flight_specifier}_{forcing_specifier} must contain either \"obs\" or \"ERA5\"",
+        )
     end
 
     return namelist
