@@ -2,6 +2,7 @@
 Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 (autoconversion + accretion)
 """
+
 function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts, w; ts_LCL=nothing) where {FT}
     thermo_params = TCP.thermodynamics_params(param_set)
     microphys_params = TCP.microphysics_params(param_set)
@@ -14,6 +15,18 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
         use_korolev_mazin = get(param_set.user_args, :use_korolev_mazin, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
         raymond_ice_test  = get(param_set.user_args, :raymond_ice_test, false) # the timescale parameterization from raymond...
         N_r_closure       = get(param_set.user_args, :N_r_closure, :monodisperse)
+        tau_weights       = get(param_set.user_aux,  :tau_weights, nothing) # training weights for tau
+
+
+
+
+        # @show(param_set.user_aux)
+        # @show(tau_weights)
+        # if isa(tau_weights,String) # deserialize
+        #     @info("deserializing")
+        #     tau_weights = Serialization.deserialize(tau_weights) # doesn't work w/o TrainTau being imported...
+        #     @show(tau_weights)
+        # end
 
         q = TD.PhasePartition(thermo_params, ts)
         T = TD.air_temperature(thermo_params, ts)
@@ -21,8 +34,17 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
 
         if use_supersat # use phase partition in case we wanna use the conv_q_vap fcn but maybe not best for supersat since it's not really a phase partition (all 3 are vapor amounts)
             # nonmutable param_set so would have to edit tau usage everywhere -- let's just do in supersat
-            τ_liq = CMNe.τ_relax(microphys_params, liq_type)
-            τ_ice = CMNe.τ_relax(microphys_params, ice_type)
+            if isnothing(tau_weights)
+                τ_liq = CMNe.τ_relax(microphys_params, liq_type)
+                τ_ice = CMNe.τ_relax(microphys_params, ice_type)
+            else
+                #use the weights to calculat tau
+                # @info("using τ from auxiliary weight function")
+                # τ_liq, τ_ice = tau_weights(;locals=Base.@locals())
+                # τ_liq, τ_ice = tau_weights
+                τ_liq, τ_ice = 10 .^ tau_weights.liq, 10 .^ tau_weights.ice # log fcn
+            end
+
             if raymond_ice_test
                 # problems: 
                 # - POTENTIAL CCN SHOULD GO UP W/ SUPERSATURATION (for a given q this also means up with decreasing temp?)
@@ -32,7 +54,7 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                 # gets even worse cause CDNC,CCN etc are advected in updraft so... it's not just local...
                 # if we assume CDCN/CCN/INP is constant ish and it's just activation fraction of CCN/INP that changes with T and/or SS, then what...
 
-                N_0 = get(param_set.user_args, :N_0, FT(100*10e6))  # per m^3 both ccn and N_d in this range https://doi.org/10.1029/2020MS002205 (or  FT(1) # params tuned to fit this better... )
+                N_0 = get(param_set.user_args, :N_0, FT(100*10e6))  # per m^3 both ccn and N_d in this range https://doi.org/10.1029/2020MS002205 (or  FT(1) # params tuned to fit this better... )                
                 N_m = get(param_set.user_args, :N_m, FT(-0.2)) # log slope https://doi.org/10.1073/pnas.1514034112
                 N_b = get(param_set.user_args, :N_b, FT(-5 - 273.15 * N_m)) # -5 - 273.15 * N_m
 
