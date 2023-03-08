@@ -21,18 +21,12 @@ function microphysics(
     aux_en_sat = aux_en.sat
     aux_en_unsat = aux_en.unsat
     precip_fraction = compute_precip_fraction(edmf, state)
-<<<<<<< Updated upstream
-=======
     ts_LCL = cloud_base(aux_en, grid, ts_env, :env)[:cloud_base_ts] # cloud base, only keep the thermodynamic state part
->>>>>>> Stashed changes
 
     @inbounds for k in real_center_indices(grid)
         # condensation
         ts = ts_env[k]
         if edmf.moisture_model isa NonEquilibriumMoisture
-<<<<<<< Updated upstream
-            mph_neq = noneq_moisture_sources(param_set, aux_en.area[k], ρ_c[k], Δt, ts)
-=======
             aux_en_f = face_aux_environment(state) # state or does ts include this? I guess you'd want to move this to the calling place... to choose updraft or environment
             w = CCO.InterpolateF2C(aux_en_f.w)
             k_int = getfield(k,Base.propertynames(k)[1]) # get the value k.i out
@@ -40,7 +34,6 @@ function microphysics(
             zc = FT(grid.zc[k].z)
             
             mph_neq = noneq_moisture_sources(param_set, aux_en.area[k], ρ_c[k], Δt, ts, w, zc; ts_LCL=ts_LCL)
->>>>>>> Stashed changes
             aux_en.ql_tendency_noneq[k] = mph_neq.ql_tendency * aux_en.area[k]
             aux_en.qi_tendency_noneq[k] = mph_neq.qi_tendency * aux_en.area[k]
         end
