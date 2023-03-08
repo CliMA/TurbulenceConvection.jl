@@ -2,12 +2,8 @@
 Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 (autoconversion + accretion)
 """
-<<<<<<< Updated upstream
-function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts) where {FT}
-=======
 
 function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts, w, z; ts_LCL=nothing) where {FT}
->>>>>>> Stashed changes
     thermo_params = TCP.thermodynamics_params(param_set)
     microphys_params = TCP.microphysics_params(param_set)
     # TODO - when using adaptive timestepping we are limiting the source terms
@@ -15,8 +11,6 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
     ql_tendency = FT(0)
     qi_tendency = FT(0)
     if area > 0
-<<<<<<< Updated upstream
-=======
         use_supersat      = get(param_set.user_args, :use_supersat, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
         use_korolev_mazin = get(param_set.user_args, :use_korolev_mazin, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
         raymond_ice_test  = get(param_set.user_args, :raymond_ice_test, false) # the timescale parameterization from raymond...
@@ -27,20 +21,11 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
         tau_weights       = get(param_set.user_aux,  :tau_weights, nothing) # training weights for tau
         # deserialization doesn't work, wanted to be able to pass functions in or something but no dice... (e.g. for when the method depends on something like w or T or something else...)
         # maybe could do with expressions? say we pass in weights=(;a,b,c) and then evaluate eval(expr), expr = :(w^a + b*T^c) or something... will try on sampo I guess... will let tau_weights = (;weights, func_expr)
->>>>>>> Stashed changes
 
         q = TD.PhasePartition(thermo_params, ts)
         T = TD.air_temperature(thermo_params, ts)
         q_vap = TD.vapor_specific_humidity(thermo_params, ts)
 
-<<<<<<< Updated upstream
-        # TODO - is that the state we want to be relaxing to?
-        ts_eq = TD.PhaseEquil_ρTq(thermo_params, ρ, T, q.tot)
-        q_eq = TD.PhasePartition(thermo_params, ts_eq)
-
-        S_ql = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, q)
-        S_qi = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, ice_type, q_eq, q)
-=======
         if use_supersat # use phase partition in case we wanna use the conv_q_vap fcn but maybe not best for supersat since it's not really a phase partition (all 3 are vapor amounts)
             D = FT(0.0000226)
 
@@ -192,7 +177,6 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
         end
 
         # @show(Δt, CMNe.τ_relax(microphys_params, liq_type), CMNe.τ_relax(microphys_params, ice_type))
->>>>>>> Stashed changes
 
         # TODO - handle limiters elswhere
         if S_ql >= FT(0)
