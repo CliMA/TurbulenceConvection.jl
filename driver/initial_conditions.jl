@@ -81,9 +81,9 @@ function initialize_updrafts(edmf, grid, state, surf)
             @. prog_up[i].δ_nondim = 0
         end
 
-        a_surf = TC.area_surface_bc(surf, edmf, i)
-        aux_up[i].area[kc_surf] = a_surf
-        prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_surf
+        a_up_initial = TC.bottom_cell_a_up_initial(edmf)
+        aux_up[i].area[kc_surf] = a_up_initial
+        prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_up_initial
     end
     return
 end
