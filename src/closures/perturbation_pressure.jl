@@ -54,9 +54,8 @@ function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, surf)
         w_en = aux_en_f.w
 
         b_bcs = (; bottom = CCO.SetValue(b_up[kc_surf]), top = CCO.SetValue(b_up[kc_toa]))
-        a_bcs = a_up_boundary_conditions(surf, edmf, i)
         Ifb = CCO.InterpolateC2F(; b_bcs...)
-        Ifa = CCO.InterpolateC2F(; a_bcs...)
+        Ifa = CCO.InterpolateC2F()
 
         nh_press_buoy = aux_up_f[i].nh_pressure_b
         nh_press_adv = aux_up_f[i].nh_pressure_adv

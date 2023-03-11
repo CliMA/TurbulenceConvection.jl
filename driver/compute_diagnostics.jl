@@ -303,16 +303,14 @@ function compute_diagnostics!(
         end
     end
 
-    a_bulk_bcs = TC.a_bulk_boundary_conditions(surf, edmf)
-    Ifabulk = CCO.InterpolateC2F(; a_bulk_bcs...)
+    Ifabulk = CCO.InterpolateC2F()
     a_up_bulk_f = TC.face_aux_turbconv(state).bulk.a_up
     @. a_up_bulk_f = Ifabulk(a_up_bulk)
 
     RB_precip = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
 
     @inbounds for i in 1:N_up
-        a_up_bcs = TC.a_up_boundary_conditions(surf, edmf, i)
-        Ifaup = CCO.InterpolateC2F(; a_up_bcs...)
+        Ifaup = CCO.InterpolateC2F()
         a_up_f = aux_up_f[i].area
         @. a_up_f = Ifaup(aux_up[i].area)
         @inbounds for k in TC.real_face_indices(grid)

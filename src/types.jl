@@ -246,6 +246,14 @@ Base.@kwdef struct MinDisspLen{FT}
     b_exch::FT
 end
 
+abstract type SurfaceAreaBC end
+struct FixedSurfaceAreaBC <: SurfaceAreaBC end
+struct PrognosticSurfaceAreaBC <: SurfaceAreaBC end
+Base.@kwdef struct ClosureSurfaceAreaBC{P} <: SurfaceAreaBC
+    params::P
+end
+
+
 Base.@kwdef struct PressureModelParams{FT}
     α_b::FT # factor multiplier for pressure buoyancy terms (effective buoyancy is (1-α_b))
     α_a::FT # factor multiplier for pressure advection
@@ -429,8 +437,9 @@ Base.@kwdef struct SurfaceBase{FT}
     wstar::FT = 0
 end
 
-struct EDMFModel{N_up, FT, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, EDS, DDS, EPG}
+struct EDMFModel{N_up, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, EDS, DDS, EPG}
     surface_area::FT
+    surface_area_bc::SABC
     max_area::FT
     minimum_area::FT
     moisture_model::MM
@@ -466,6 +475,26 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     )
 
     surface_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "surface_area"; default = 0.1)
+    surface_area_bc = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "surface_area_bc";
+        default = "Fixed",
+        valid_options = ["Fixed", "Prognostic", "Closure"],
+    )
+
+    surface_area_bc = if surface_area_bc == "Fixed"
+        FixedSurfaceAreaBC()
+    elseif surface_area_bc == "Prognostic"
+        PrognosticSurfaceAreaBC()
+    elseif surface_area_bc == "Closure"
+        surface_area_bc_params = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "surface_area_bc_params")
+        ClosureSurfaceAreaBC(params = surface_area_bc_params)
+    else
+        error("Something went wrong. Invalid surface area boundary condition '$surface_area_bc'")
+    end
+
     max_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "max_area"; default = 0.9)
     minimum_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_area"; default = 1e-5)
 
@@ -710,6 +739,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         error("Something went wrong. Invalid entrainment dimension scale '$detr_dim_scale'")
     end
 
+    SABC = typeof(surface_area_bc)
     EDS = typeof(entr_dim_scale)
     DDS = typeof(detr_dim_scale)
     EC = typeof(entr_closure)
@@ -724,8 +754,9 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     EPG = typeof(entr_pi_subset)
     MLP = typeof(mixing_length_params)
     PMP = typeof(pressure_model_params)
-    return EDMFModel{n_updrafts, FT, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, EDS, DDS, EPG}(
+    return EDMFModel{n_updrafts, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, EDS, DDS, EPG}(
         surface_area,
+        surface_area_bc,
         max_area,
         minimum_area,
         moisture_model,

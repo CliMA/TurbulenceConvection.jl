@@ -12,7 +12,7 @@ function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, sur
     @. aux_gm.θ_virt = TD.virtual_pottemp(thermo_params, ts_gm)
     surf = get_surface(surf_params, grid, state, t, param_set)
     if case isa Cases.DryBubble
-        initialize_updrafts_DryBubble(edmf, grid, state)
+        initialize_updrafts_DryBubble(edmf, grid, state, surf)
     else
         initialize_updrafts(edmf, grid, state, surf)
     end
@@ -48,14 +48,18 @@ end
 function initialize_updrafts(edmf, grid, state, surf)
     N_up = TC.n_updrafts(edmf)
     kc_surf = TC.kc_surface(grid)
+    kf_surf = TC.kf_surface(grid)
     aux_up = TC.center_aux_updrafts(state)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_up = TC.center_aux_updrafts(state)
     aux_up_f = TC.face_aux_updrafts(state)
     aux_gm = TC.center_aux_grid_mean(state)
+    aux_gm_f = TC.face_aux_grid_mean(state)
     prog_up = TC.center_prog_updrafts(state)
     prog_up_f = TC.face_prog_updrafts(state)
     ρ_c = prog_gm.ρ
+    ρ_f = aux_gm_f.ρ
+    FT = TC.float_type(state)
     @inbounds for i in 1:N_up
         @inbounds for k in TC.real_face_indices(grid)
             aux_up_f[i].w[k] = 0
@@ -81,16 +85,31 @@ function initialize_updrafts(edmf, grid, state, surf)
             @. prog_up[i].δ_nondim = 0
         end
 
-        a_surf = TC.area_surface_bc(surf, edmf, i)
-        aux_up[i].area[kc_surf] = a_surf
-        prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_surf
+        if edmf.surface_area_bc isa TC.FixedSurfaceAreaBC || edmf.surface_area_bc isa TC.ClosureSurfaceAreaBC
+            a_surf = TC.area_surface_bc(surf, edmf, i, edmf.surface_area_bc)
+            aux_up[i].area[kc_surf] = a_surf
+            prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_surf
+
+            # To avoid degeneracy from 0 BC on surface updraft area fraction, add small perturbation
+            # to relevant prognostic variables in bottom cell -> This avoids trivial solution with no updrafts.
+        elseif edmf.surface_area_bc isa TC.PrognosticSurfaceAreaBC
+            a_up_initial = FT(0.1)
+            aux_up[i].area[kc_surf] = a_up_initial
+            prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_up_initial
+
+            aux_up_f[i].w[kf_surf + 1] = FT(0.01) # small velocity perturbation
+            prog_up_f[i].ρaw[kf_surf + 1] = ρ_f[kf_surf + 1] * a_up_initial * FT(0.01) # small ρaw perturbation
+
+            prog_up[i].ρaq_tot[kc_surf] = ρ_c[kc_surf] * a_up_initial * aux_gm.q_tot[kc_surf]
+            prog_up[i].ρaθ_liq_ice[kc_surf] = ρ_c[kc_surf] * a_up_initial * aux_gm.θ_liq_ice[kc_surf]
+        end
     end
     return
 end
 
 import AtmosphericProfilesLibrary
 const APL = AtmosphericProfilesLibrary
-function initialize_updrafts_DryBubble(edmf, grid, state)
+function initialize_updrafts_DryBubble(edmf, grid, state, surf)
 
     # criterion 2: b>1e-4
     aux_up = TC.center_aux_updrafts(state)
@@ -100,6 +119,7 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_up = TC.center_prog_updrafts(state)
     prog_up_f = TC.face_prog_updrafts(state)
+    kc_surf = TC.kc_surface(grid)
     ρ_0_c = prog_gm.ρ
     ρ_0_f = aux_gm_f.ρ
     N_up = TC.n_updrafts(edmf)
@@ -143,6 +163,9 @@ function initialize_updrafts_DryBubble(edmf, grid, state)
             end
         end
         @. prog_up_f[i].ρaw = If(prog_up[i].ρarea) * aux_up_f[i].w
+        a_surf = TC.area_surface_bc(surf, edmf, i, edmf.surface_area_bc)
+        aux_up[i].area[kc_surf] = a_surf
+        prog_up[i].ρarea[kc_surf] = ρ_0_c[kc_surf] * a_surf
     end
     return nothing
 end
