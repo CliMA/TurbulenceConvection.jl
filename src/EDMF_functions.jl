@@ -621,7 +621,6 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     prog_up_f = face_prog_updrafts(state)
     ρ_c = prog_gm.ρ
     ρ_f = aux_gm_f.ρ
-    a_min = edmf.minimum_area
     a_max = edmf.max_area
 
     @inbounds for i in 1:N_up
@@ -642,12 +641,9 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
             prog_up[i].ρaq_ice .= max.(prog_up[i].ρaq_ice, 0)
         end
     end
-    # apply clipping at 0 and minimum area to ρaw
+    # apply clipping at 0
     @inbounds for i in 1:N_up
         @. prog_up_f[i].ρaw = max.(prog_up_f[i].ρaw, 0)
-        a_up_bcs = a_up_boundary_conditions(surf)
-        If = CCO.InterpolateC2F(; a_up_bcs...)
-        @. prog_up_f[i].ρaw = Int(If(prog_up[i].ρarea) >= ρ_f * a_min) * prog_up_f[i].ρaw
     end
 
     @inbounds for k in real_center_indices(grid)
@@ -657,9 +653,9 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
             # this is needed to make sure Rico is unchanged.
             # TODO : look into it further to see why
             # a similar filtering of ρaθ_liq_ice breaks the simulation
-            if prog_up[i].ρarea[k] / ρ_c[k] < a_min
-                prog_up[i].ρaq_tot[k] = 0
-            end
+            # if prog_up[i].ρarea[k] / ρ_c[k] < a_min
+            #     prog_up[i].ρaq_tot[k] = 0
+            # end
         end
     end
     if edmf.moisture_model isa NonEquilibriumMoisture
@@ -670,10 +666,10 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
                 # this is needed to make sure Rico is unchanged.
                 # TODO : look into it further to see why
                 # a similar filtering of ρaθ_liq_ice breaks the simulation
-                if prog_up[i].ρarea[k] / ρ_c[k] < a_min
-                    prog_up[i].ρaq_liq[k] = 0
-                    prog_up[i].ρaq_ice[k] = 0
-                end
+                # if prog_up[i].ρarea[k] / ρ_c[k] < a_min
+                #     prog_up[i].ρaq_liq[k] = 0
+                #     prog_up[i].ρaq_ice[k] = 0
+                # end
             end
         end
     end
@@ -824,7 +820,6 @@ function compute_covariance_entr(
     # TODO: we shouldn't need `parent` call here:
     parent(entr_gain) .= 0
     parent(detr_loss) .= 0
-    min_area = edmf.minimum_area
 
     @inbounds for i in 1:N_up
         aux_up_i = aux_up[i]
@@ -842,7 +837,7 @@ function compute_covariance_entr(
         a_up = aux_up_i.area
 
         @. entr_gain +=
-            Int(a_up > min_area) * (
+            Int(a_up > 0) * (
                 tke_factor *
                 ρ_c *
                 a_up *
@@ -863,7 +858,7 @@ function compute_covariance_entr(
             )
 
         @. detr_loss +=
-            Int(a_up > min_area) * tke_factor * ρ_c * a_up * abs(Ic(w_up)) * (entr_sc + entr_ml + eps_turb) * covar
+            Int(a_up > 0) * tke_factor * ρ_c * a_up * abs(Ic(w_up)) * (entr_sc + entr_ml + eps_turb) * covar
 
     end
 
@@ -955,7 +950,6 @@ function compute_en_tendencies!(
     ∇c = CCO.DivergenceF2C()
 
     mixing_length = aux_tc.mixing_length
-    min_area = edmf.minimum_area
 
     Ic = CCO.InterpolateF2C()
     area_en = aux_en.area
@@ -971,7 +965,7 @@ function compute_en_tendencies!(
         a_up = aux_up[i].area
         # TODO: using `Int(bool) *` means that NaNs can propagate
         # into the solution. Could we somehow call `ifelse` instead?
-        @. D_env += Int(a_up > min_area) * ρ_c * a_up * Ic(w_up) * (entr_sc + entr_ml + turb_entr)
+        @. D_env += Int(a_up > 0) * ρ_c * a_up * Ic(w_up) * (entr_sc + entr_ml + turb_entr)
     end
 
     RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
@@ -1018,7 +1012,6 @@ function update_diagnostic_covariances!(
     entr_gain = aux_covar.entr_gain
     rain_src = aux_covar.rain_src
     mixing_length = aux_tc.mixing_length
-    min_area = edmf.minimum_area
 
     Ic = CCO.InterpolateF2C()
     area_en = aux_en.area
@@ -1032,7 +1025,7 @@ function update_diagnostic_covariances!(
         a_up = aux_up[i].area
         # TODO: using `Int(bool) *` means that NaNs can propagate
         # into the solution. Could we somehow call `ifelse` instead?
-        @. D_env += Int(a_up > min_area) * ρ_c * a_up * Ic(w_up) * (entr_sc + entr_ml + turb_entr)
+        @. D_env += Int(a_up > 0) * ρ_c * a_up * Ic(w_up) * (entr_sc + entr_ml + turb_entr)
     end
 
     @. covar =

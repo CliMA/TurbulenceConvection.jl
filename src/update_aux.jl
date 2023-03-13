@@ -51,7 +51,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         #####
         e_pot = geopotential(param_set, grid.zc.z[k])
         @inbounds for i in 1:N_up
-            if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
+            if prog_up[i].ρarea[k] / ρ_c[k] > 0
                 aux_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / prog_up[i].ρarea[k]
                 aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
                 aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ_c[k]
@@ -62,7 +62,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             end
             thermo_args = ()
             if edmf.moisture_model isa NonEquilibriumMoisture
-                if prog_up[i].ρarea[k] / ρ_c[k] >= edmf.minimum_area
+                if prog_up[i].ρarea[k] / ρ_c[k] > 0
                     aux_up[i].q_liq[k] = prog_up[i].ρaq_liq[k] / prog_up[i].ρarea[k]
                     aux_up[i].q_ice[k] = prog_up[i].ρaq_ice[k] / prog_up[i].ρarea[k]
                 else
@@ -155,7 +155,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @inbounds for k in real_center_indices(grid)
         a_bulk_c = aux_bulk.area[k]
         @inbounds for i in 1:N_up
-            if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
+            if aux_up[i].area[k] < 1e-5 && k > kc_surf && aux_up[i].area[k - 1] > 0.0
                 qt = aux_up[i].q_tot[k - 1]
                 h = aux_up[i].θ_liq_ice[k - 1]
                 if edmf.moisture_model isa EquilibriumMoisture
@@ -244,9 +244,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @inbounds for i in 1:N_up
         a_up_bcs = a_up_boundary_conditions(surf)
         If = CCO.InterpolateC2F(; a_up_bcs...)
-        a_min = edmf.minimum_area
         a_up = aux_up[i].area
-        @. aux_up_f[i].w = ifelse(If(a_up) >= a_min, max(prog_up_f[i].ρaw / (ρ_f * If(a_up)), 0), FT(0))
+        @. aux_up_f[i].w = ifelse(If(a_up) > 0, max(prog_up_f[i].ρaw / (ρ_f * If(a_up)), 0), FT(0))
     end
     @inbounds for i in 1:N_up
         aux_up_f[i].w[kf_surf] = w_surface_bc(surf)

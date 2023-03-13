@@ -432,7 +432,6 @@ end
 struct EDMFModel{N_up, FT, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, EDS, DDS, EPG}
     surface_area::FT
     max_area::FT
-    minimum_area::FT
     moisture_model::MM
     thermo_covariance_model::TCM
     precip_model::PM
@@ -467,7 +466,6 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
 
     surface_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "surface_area"; default = 0.1)
     max_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "max_area"; default = 0.9)
-    minimum_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_area"; default = 1e-5)
 
     moisture_model_name = parse_namelist(namelist, "thermodynamics", "moisture_model"; default = "equilibrium")
 
@@ -727,7 +725,6 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     return EDMFModel{n_updrafts, FT, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, EDS, DDS, EPG}(
         surface_area,
         max_area,
-        minimum_area,
         moisture_model,
         thermo_covariance_model,
         precip_model,
