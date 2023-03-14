@@ -299,8 +299,9 @@ function compute_phys_entr_detr!(
                         δ_nondim,
                     )
                 end
-                aux_up[i].entr_sc[k] = ε_dyn
-                aux_up[i].detr_sc[k] = δ_dyn
+                aux_up[i].entr_sc[k] = 1 / FT(grid.zc[k].z) #ε_dyn
+                aux_up[i].detr_sc[k] = 1e-4 #δ_dyn
+                # aux_up[i].detr_sc[k] = max_area_limiter(εδ_closure, εδ_model_vars.max_area, εδ_model_vars.a_up) #
                 # update nondimensional entr/detr
                 aux_up[i].ε_nondim[k] = ε_nondim
                 aux_up[i].δ_nondim[k] = δ_nondim

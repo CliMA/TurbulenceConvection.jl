@@ -267,7 +267,7 @@ function microphysics(
     # arrays for storing quadarature points and ints for labeling items in the arrays
     # a python dict would be nicer, but its 30% slower than this (for python 2.7. It might not be the case for python 3)
 
-    epsilon = 10e-14 # eps(float)
+    epsilon = 0.0 #10e-14 # eps(float)
 
     if edmf.moisture_model isa NonEquilibriumMoisture
         error("The SGS quadrature microphysics is not compatible with non-equilibrium moisture")
