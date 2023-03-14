@@ -48,14 +48,17 @@ end
 function initialize_updrafts(edmf, grid, state, surf)
     N_up = TC.n_updrafts(edmf)
     kc_surf = TC.kc_surface(grid)
+    kf_surf = TC.kf_surface(grid)
     aux_up = TC.center_aux_updrafts(state)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_up = TC.center_aux_updrafts(state)
     aux_up_f = TC.face_aux_updrafts(state)
     aux_gm = TC.center_aux_grid_mean(state)
+    aux_gm_f = TC.face_aux_grid_mean(state)
     prog_up = TC.center_prog_updrafts(state)
     prog_up_f = TC.face_prog_updrafts(state)
     ρ_c = prog_gm.ρ
+    ρ_f = aux_gm_f.ρ
     @inbounds for i in 1:N_up
         @inbounds for k in TC.real_face_indices(grid)
             aux_up_f[i].w[k] = 0
@@ -82,8 +85,16 @@ function initialize_updrafts(edmf, grid, state, surf)
         end
 
         a_up_initial = TC.bottom_cell_a_up_initial(edmf)
+        # a_up_initial = 0.1
         aux_up[i].area[kc_surf] = a_up_initial
         prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_up_initial
+        # aux_up[i].area[kc_surf + 1] = a_up_initial
+        # prog_up[i].ρarea[kc_surf + 1] = ρ_c[kc_surf] * a_up_initial
+        aux_up_f[i].w[kf_surf + 1] = 0.01
+        prog_up_f[i].ρaw[kf_surf + 1] = ρ_f[kf_surf + 1] * a_up_initial * 0.01
+
+        prog_up[i].ρaq_tot[kc_surf] = ρ_c[kc_surf] * a_up_initial * aux_gm.q_tot[kc_surf]
+        prog_up[i].ρaθ_liq_ice[kc_surf] = ρ_c[kc_surf] * a_up_initial * aux_gm.θ_liq_ice[kc_surf]
     end
     return
 end

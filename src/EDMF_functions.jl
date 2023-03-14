@@ -602,6 +602,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
 
         @. tends_ρaw = -(∇f(wvec(LBC(ρaw * w_up))))
         @. tends_ρaw += (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + (ρ_f * Iaf(a_up) * I0f(buoy)) + nh_pressure
+        tends_ρaw[kf_surf] = 0
     end
 
     return nothing
@@ -628,7 +629,6 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         @. prog_up[i].ρarea = max(prog_up[i].ρarea, 0)
         @. prog_up[i].ρaθ_liq_ice = max(prog_up[i].ρaθ_liq_ice, 0)
         @. prog_up[i].ρaq_tot = max(prog_up[i].ρaq_tot, 0)
-        @. prog_up_f[i].ρaw = max(prog_up_f[i].ρaw, 0)
 
         if edmf.entr_closure isa PrognosticNoisyRelaxationProcess
             @. prog_up[i].ε_nondim = max(prog_up[i].ε_nondim, 0)
@@ -643,6 +643,23 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
             prog_up[i].ρaq_liq .= max.(prog_up[i].ρaq_liq, 0)
             prog_up[i].ρaq_ice .= max.(prog_up[i].ρaq_ice, 0)
         end
+    end
+
+    @inbounds for i in 1:N_up
+        @. prog_up_f[i].ρaw = max.(prog_up_f[i].ρaw, 0)
+        a_up_bcs = a_up_boundary_conditions(surf)
+        If = CCO.InterpolateC2F(; a_up_bcs...)
+        @. prog_up_f[i].ρaw = Int(If(prog_up[i].ρarea) > 0) * prog_up_f[i].ρaw
+        # @. prog_up[i].ρaθ_liq_ice = Int(prog_up[i].ρarea > 0) * prog_up[i].ρaθ_liq_ice
+        # @. prog_up[i].ρaq_tot = Int(prog_up[i].ρarea > 0) * prog_up[i].ρaq_tot
+    end
+
+
+    Ic = CCO.InterpolateF2C()
+    @inbounds for i in 1:N_up
+        @. prog_up[i].ρarea = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρarea)
+        @. prog_up[i].ρaθ_liq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaθ_liq_ice)
+        @. prog_up[i].ρaq_tot = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_tot)
     end
 
     # Ic = CCO.InterpolateF2C()

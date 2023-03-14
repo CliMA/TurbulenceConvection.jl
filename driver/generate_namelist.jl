@@ -88,7 +88,7 @@ function default_namelist(
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"] = Dict()
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.5
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = 0.90
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = 0.9
 
     # mixing_length
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.14
