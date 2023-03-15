@@ -1,10 +1,10 @@
 #### Non-dimensional Entrainment-Detrainment functions
+
 function max_area_limiter(εδ_model, max_area, a_up)
     FT = eltype(a_up)
-    γ_lim = εδ_params(εδ_model).γ_lim
-    β_lim = εδ_params(εδ_model).β_lim
-    logistic_term = (2 - 1 / (1 + exp(-γ_lim * (max_area - a_up))))
-    return (logistic_term)^β_lim - 1
+    A = εδ_params(εδ_model).γ_lim
+    k = εδ_params(εδ_model).β_lim
+    return A * exp(-k * (max_area - a_up))
 end
 
 function non_dimensional_groups(εδ_model, εδ_model_vars)
@@ -354,8 +354,10 @@ function non_dimensional_function(εδ_model::LinearEntr, εδ_model_vars)
         )
     end
 
+    area_limiter = max_area_limiter(εδ_model, εδ_model_vars.max_area, εδ_model_vars.a_up)
     nondim_ε = lin_model_ε(nondim_groups)[1]
-    nondim_δ = lin_model_δ(nondim_groups)[1]
+    nondim_δ = lin_model_δ(nondim_groups)[1] + area_limiter
+
     return nondim_ε, nondim_δ
 end
 

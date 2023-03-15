@@ -110,8 +110,8 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.075
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.25
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_scale"] = 10.0
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_power"] = 4.0
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_scale"] = 0.1
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_power"] = 10.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_scale"] = 0.0004
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["sorting_power"] = 2.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["min_upd_velocity"] = 0.001
@@ -153,10 +153,10 @@ function default_namelist(
     namelist_defaults["microphysics"]["precipitation_model"] = "None"
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "None"}
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["ml_entrainment"] = "None"  # {"None", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_scale_height", "inv_z", "none"}
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_scale_height", "inv_z", "none"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "None"  # {"moisture_deficit", "None"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["ml_entrainment"] = "Linear"  # {"None", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "inv_z" # {"buoy_vel", "inv_scale_height", "inv_z", "none"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detr_dim_scale"] = "none" # {"buoy_vel", "inv_scale_height", "inv_z", "none"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"] = ntuple(i -> i, 6) # or, e.g., (1, 3, 6)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pi_norm_consts"] = [478.298, 1.0, 1.0, 1.0, 1.0, 1.0] # normalization constants for Pi groups
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = "deterministic"  # {"deterministic", "noisy_relaxation_process", "lognormal_scaling", "prognostic_noisy_relaxation_process"}
