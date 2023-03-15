@@ -242,8 +242,9 @@ function affect_filter!(edmf::EDMFModel, grid::Grid, state::State, param_set::AP
     ###
     ### Filters
     ###
-    set_edmf_surface_bc(edmf, grid, state, surf, param_set)
+
     filter_updraft_vars(edmf, grid, state, surf)
+    set_edmf_surface_bc(edmf, grid, state, surf, param_set)
 
     @inbounds for k in real_center_indices(grid)
         prog_en.ρatke[k] = max(prog_en.ρatke[k], 0.0)
