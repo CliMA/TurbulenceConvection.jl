@@ -169,9 +169,11 @@ function εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nond
     ε_dim_scale = entrainment_inv_length_scale(εδ_model, εδ_vars, entr_dim_scale)
     δ_dim_scale = entrainment_inv_length_scale(εδ_model, εδ_vars, detr_dim_scale)
 
+    area_limiter = max_area_limiter(εδ_model, εδ_vars.max_area, εδ_vars.a_up)
+
     # fractional dynamical entrainment / detrainment [1 / m]
     ε_dyn = ε_dim_scale * ε_nondim
-    δ_dyn = δ_dim_scale * δ_nondim
+    δ_dyn = δ_dim_scale * (δ_nondim + area_limiter)
 
     return ε_dyn, δ_dyn
 end
@@ -602,8 +604,11 @@ function compute_ml_entr_detr!(
                 aux_tc.∂lnM∂z[k],
                 edmf.detr_dim_scale,
             )
+
+            area_limiter = max_area_limiter(εδ_model, max_area, aux_up[i].area[k])
+
             aux_up[i].entr_ml[k] = ε_dim_scale * aux_up[i].ε_ml_nondim[k]
-            aux_up[i].detr_ml[k] = δ_dim_scale * aux_up[i].δ_ml_nondim[k]
+            aux_up[i].detr_ml[k] = δ_dim_scale * (aux_up[i].δ_ml_nondim[k] + area_limiter)
         end
 
         @. aux_up[i].ε_ml_nondim = ifelse(aux_up[i].area > 0, aux_up[i].ε_ml_nondim, 0)
