@@ -10,6 +10,7 @@ function compute_nonequilibrium_moisture_tendencies!(
     param_set::APS,
 )
     thermo_params = TCP.thermodynamics_params(param_set)
+    FT = float_type(state)
     N_up = n_updrafts(edmf)
     aux_gm = center_aux_grid_mean(state)
     aux_up = center_aux_updrafts(state)
@@ -17,7 +18,7 @@ function compute_nonequilibrium_moisture_tendencies!(
     prog_gm = center_prog_grid_mean(state)
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
-
+    
     @inbounds for i in 1:N_up
         ts_LCL = cloud_base(aux_up[i], grid, TD.PhaseNonEquil_pTq.(thermo_params, p_c, aux_up[i].T, TD.PhasePartition.(aux_up[i].q_tot, aux_up[i].q_liq, aux_up[i].q_ice)), :up)[:cloud_base_ts] # cloud base, only keep the thermodynamic state part
         @inbounds for k in real_center_indices(grid)
