@@ -173,7 +173,8 @@ function compute_diagnostics!(
     end
 
     wvec = CC.Geometry.WVector
-    aeKHs_bc = -surf.ρs_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    # aeKHs_bc = -surf.ρs_flux / a_env(surface) / aux_tc_f.ρ_ae_KH[kf_surf]  a_env at bottom cell face = 1
+    aeKHs_bc = -surf.ρs_flux / aux_tc_f.ρ_ae_KH[kf_surf]
 
     If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
     ∇f_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(FT(aeKHs_bc)), top = CCO.SetDivergence(FT(0)))

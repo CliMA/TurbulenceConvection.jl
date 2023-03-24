@@ -196,10 +196,11 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     @. aux_tc_f.ρ_ae_KH = IfKH(aeKH) * ρ_f
     @. aux_tc_f.ρ_ae_KQ = IfKQ(aeKQ) * ρ_f
 
-    aeKQq_tot_bc = -surf.ρq_tot_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KQ[kf_surf]
-    aeKHθ_liq_ice_bc = -surf.ρθ_liq_ice_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
-    aeKMu_bc = -surf.ρu_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
-    aeKMv_bc = -surf.ρv_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KM[kf_surf]
+    # aeKQq_tot_bc = -surf.ρq_tot_flux / a_env(surface) / aux_tc_f.ρ_ae_KQ[kf_surf] # a_env at bottom cell face = 1
+    aeKQq_tot_bc = -surf.ρq_tot_flux / aux_tc_f.ρ_ae_KQ[kf_surf]
+    aeKHθ_liq_ice_bc = -surf.ρθ_liq_ice_flux / aux_tc_f.ρ_ae_KH[kf_surf]
+    aeKMu_bc = -surf.ρu_flux / aux_tc_f.ρ_ae_KM[kf_surf]
+    aeKMv_bc = -surf.ρv_flux / aux_tc_f.ρ_ae_KM[kf_surf]
 
     aeKMuₕ_bc = CCG.UVVector(aeKMu_bc, aeKMv_bc)
 
