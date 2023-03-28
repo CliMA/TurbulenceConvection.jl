@@ -107,7 +107,7 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_factor"] = 0.13
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detrainment_factor"] = 0.51
 
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.075
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.0
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_smin_tke_coeff"] = 0.3
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.25
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_scale"] = 0.1
@@ -157,8 +157,9 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["ml_entrainment"] = "Linear"  # {"None", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "inv_z" # {"buoy_vel", "inv_scale_height", "inv_z", "none"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detr_dim_scale"] = "none" # {"buoy_vel", "inv_scale_height", "inv_z", "none"}
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"] = ntuple(i -> i, 6) # or, e.g., (1, 3, 6)
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pi_norm_consts"] = [478.298, 1.0, 1.0, 1.0, 1.0, 1.0] # normalization constants for Pi groups
+    # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"] = ntuple(i -> i, 6) # or, e.g., (1, 3, 6)
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"] = (1, 3, 4, 6) # or, e.g., (1, 3, 6)
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pi_norm_consts"] = [1e3, 1.0, 1.0, 1.0, 1.0, 1.0] # normalization constants for Pi groups
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = "deterministic"  # {"deterministic", "noisy_relaxation_process", "lognormal_scaling", "prognostic_noisy_relaxation_process"}
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"] = "normalmode"
@@ -262,7 +263,16 @@ function default_namelist(
                     randn(2,100,6), dims=3)) # randn(2, m, d), dims=3))
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["linear_ent_params"] =
-        SA.SVector{14}(rand(14))
+        SA.SVector{10}([-4.013287807784625,
+        -0.9682080701838962,
+        0.35697381622131674,
+        -0.40312408231617214,
+        1.5032614359226857,
+        3.535208444753528,
+        0.5984962423088215,
+        1.583348484772816,
+        0.0462747118542598,
+        -0.3448356809682705])
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["linear_ent_biases"] = true
 
@@ -359,7 +369,8 @@ function Bomex(namelist_defaults)
     namelist["forcing"]["coriolis"] = 0.376e-4
 
     namelist["time_stepping"]["t_max"] = 21600.0
-    namelist["time_stepping"]["dt_min"] = 6.0
+    namelist["time_stepping"]["dt_max"] = 5.0
+    namelist["time_stepping"]["dt_min"] = 0.5
 
     namelist["meta"]["simname"] = "Bomex"
     namelist["meta"]["casename"] = "Bomex"
@@ -394,8 +405,8 @@ function Rico(namelist_defaults)
 
     namelist["time_stepping"]["adapt_dt"] = false
     namelist["time_stepping"]["t_max"] = 86400.0
-    #namelist["time_stepping"]["dt_max"] = 5.0
-    namelist["time_stepping"]["dt_min"] = 1.5
+    namelist["time_stepping"]["dt_max"] = 5.0
+    namelist["time_stepping"]["dt_min"] = 0.5
 
     namelist["forcing"]["latitude"] = 18.0
     namelist["forcing"]["coriolis"] = 4.5e-5
@@ -531,7 +542,8 @@ function DYCOMS_RF01(namelist_defaults)
     namelist["grid"]["dz"] = 50
 
     namelist["time_stepping"]["t_max"] = 60 * 60 * 16.0
-    namelist["time_stepping"]["dt_min"] = 6.0
+    namelist["time_stepping"]["dt_max"] = 5.0
+    namelist["time_stepping"]["dt_min"] = 0.5
 
     namelist["meta"]["simname"] = "DYCOMS_RF01"
     namelist["meta"]["casename"] = "DYCOMS_RF01"
@@ -549,8 +561,8 @@ function DYCOMS_RF02(namelist_defaults)
 
     namelist["time_stepping"]["adapt_dt"] = true
     namelist["time_stepping"]["t_max"] = 60 * 60 * 6.0
-    namelist["time_stepping"]["dt_max"] = 4.0
-    namelist["time_stepping"]["dt_min"] = 1.0
+    namelist["time_stepping"]["dt_max"] = 5.0
+    namelist["time_stepping"]["dt_min"] = 0.5
 
     namelist["microphysics"]["precipitation_model"] = "clima_1m" #"cutoff"
     namelist["microphysics"]["rain_formation_scheme"] = "clima_1m_default"
