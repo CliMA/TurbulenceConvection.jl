@@ -119,9 +119,10 @@ function εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nond
     ε_dim_scale = entrainment_inv_length_scale(εδ_model, εδ_vars, entr_dim_scale)
     δ_dim_scale = entrainment_inv_length_scale(εδ_model, εδ_vars, detr_dim_scale)
 
+    area_limiter = max_area_limiter(εδ_model, εδ_vars.max_area, εδ_vars.a_up)
     # fractional dynamical entrainment / detrainment [1 / m]
     ε_dyn = ε_dim_scale * ε_nondim
-    δ_dyn = δ_dim_scale * δ_nondim
+    δ_dyn = δ_dim_scale * (δ_nondim + area_limiter)
 
     return ε_dyn, δ_dyn
 end
