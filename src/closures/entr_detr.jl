@@ -16,7 +16,7 @@ function compute_inverse_timescale(εδ_model, b_up::FT, b_en::FT, w_up::FT, w_e
     Δw = get_Δw(εδ_model, w_up, w_en)
     c_λ = εδ_params(εδ_model).c_λ
 
-    l_1 = c_λ * abs(Δb / sqrt(tke + 1e-8))
+    l_1 = c_λ * abs(Δb / (sqrt(abs(tke)) + eps(FT)))
     l_2 = abs(Δb / Δw)
     l = SA.SVector(l_1, l_2)
     return lamb_smooth_minimum(l, FT(0.1), FT(0.0005))
@@ -44,6 +44,7 @@ function entrainment_inv_length_scale(
     λ = compute_inverse_timescale(εδ_model, b_up, b_en, w_up, w_en, tke)
     return (λ / Δw)
 end
+
 
 function entrainment_inv_length_scale(
     εδ_model,
@@ -331,35 +332,17 @@ function compute_phys_entr_detr!(
                     # fractional dynamical entrainment from prognostic state
                     ε_nondim, δ_nondim = prog_up[i].ε_nondim[k], prog_up[i].δ_nondim[k]
                     mean_model = εδ_closure.mean_model
-                    ε_dyn, δ_dyn = εδ_dyn(
-                        mean_model,
-                        εδ_model_vars,
-                        BuoyVelEntrDimScale(),
-                        BuoyVelEntrDimScale(),
-                        ε_nondim,
-                        δ_nondim,
-                    )
+                    ε_dyn, δ_dyn =
+                        εδ_dyn(mean_model, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, ε_nondim, δ_nondim)
                     # turbulent & mean nondimensional entrainment
                     ε_nondim, δ_nondim = non_dimensional_function(mean_model, εδ_model_vars)
-                    ε_dyn, δ_dyn = εδ_dyn(
-                        mean_model,
-                        εδ_model_vars,
-                        BuoyVelEntrDimScale(),
-                        BuoyVelEntrDimScale(),
-                        ε_nondim,
-                        δ_nondim,
-                    )
+                    ε_dyn, δ_dyn =
+                        εδ_dyn(mean_model, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, ε_nondim, δ_nondim)
                 else
                     # fractional, turbulent & nondimensional entrainment
                     ε_nondim, δ_nondim = non_dimensional_function(εδ_closure, εδ_model_vars)
-                    ε_dyn, δ_dyn = εδ_dyn(
-                        εδ_closure,
-                        εδ_model_vars,
-                        BuoyVelEntrDimScale(),
-                        BuoyVelEntrDimScale(),
-                        ε_nondim,
-                        δ_nondim,
-                    )
+                    ε_dyn, δ_dyn =
+                        εδ_dyn(εδ_closure, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, ε_nondim, δ_nondim)
                 end
                 aux_up[i].entr_sc[k] = ε_dyn
                 aux_up[i].detr_sc[k] = δ_dyn
