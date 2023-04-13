@@ -15,11 +15,12 @@ function compute_inverse_timescale(εδ_model, b_up::FT, b_en::FT, w_up::FT, w_e
     Δb = b_up - b_en
     Δw = get_Δw(εδ_model, w_up, w_en)
     c_λ = εδ_params(εδ_model).c_λ
+    smin_rm = εδ_params(εδ_model).smin_rm
 
-    l_1 = c_λ * abs(Δb / sqrt(tke + 1e-8))
+    l_1 = c_λ * abs(Δb / (sqrt(tke) + eps(FT)))
     l_2 = abs(Δb / Δw)
     l = SA.SVector(l_1, l_2)
-    return lamb_smooth_minimum(l, FT(0.1), FT(0.0005))
+    return lamb_smooth_minimum(l, FT(0.1), smin_rm)
 end
 
 function get_Δw(εδ_model, w_up::FT, w_en::FT) where {FT}
@@ -43,6 +44,7 @@ function entrainment_inv_length_scale(
     λ = compute_inverse_timescale(εδ_model, b_up, b_en, w_up, w_en, tke)
     return (λ / Δw)
 end
+
 
 function entrainment_inv_length_scale(
     εδ_model,
