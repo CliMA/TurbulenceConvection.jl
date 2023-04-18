@@ -105,6 +105,8 @@ function io_dictionary_aux()
         "updraft_qt_precip" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qt_tendency_precip_formation),
         "updraft_thetal_precip" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).θ_liq_ice_tendency_precip_formation),
 
+        "massflux_grad" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂M∂z),
+        "ln_massflux_grad" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂lnM∂z),
         "massflux_tendency_h" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_h),
         "massflux_tendency_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_qt),
         "diffusive_tendency_h" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_h),

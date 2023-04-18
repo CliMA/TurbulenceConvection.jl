@@ -20,6 +20,7 @@ function non_dimensional_groups(εδ_model, εδ_model_vars)
     Π₄ = (εδ_model_vars.RH_up - εδ_model_vars.RH_en) / Π_norm[4]
     Π₅ = εδ_model_vars.zc_i / εδ_model_vars.H_up / Π_norm[5]
     Π₆ = εδ_model_vars.zc_i / εδ_model_vars.ref_H / Π_norm[6]
+    
     Π_groups = (Π₁, Π₂, Π₃, Π₄, Π₅, Π₆)
 
     return map(i -> Π_groups[i], εδ_model_vars.entr_Π_subset)

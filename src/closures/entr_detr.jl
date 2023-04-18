@@ -38,6 +38,7 @@ function entrainment_inv_length_scale(
     tke::FT,
     zc_i::FT,
     ref_H::FT,
+    ∂lnM∂z::FT,
     ::BuoyVelEntrDimScale,
 ) where {FT}
     Δw = get_Δw(εδ_model, w_up, w_en)
@@ -55,6 +56,7 @@ function entrainment_inv_length_scale(
     tke::FT,
     zc_i::FT,
     ref_H::FT,
+    ∂lnM∂z::FT,
     ::InvScaleHeightEntrDimScale,
 ) where {FT}
     return (1 / ref_H)
@@ -69,6 +71,7 @@ function entrainment_inv_length_scale(
     tke::FT,
     zc_i::FT,
     ref_H::FT,
+    ∂lnM∂z::FT,
     ::InvZEntrDimScale,
 ) where {FT}
     return (1 / zc_i)
@@ -83,9 +86,55 @@ function entrainment_inv_length_scale(
     tke::FT,
     zc_i::FT,
     ref_H::FT,
+    ∂lnM∂z::FT,
     ::InvMeterEntrDimScale,
 ) where {FT}
     return FT(1)
+end
+
+function entrainment_inv_length_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ::PosMassFluxGradDimScale,
+) where {FT}
+    return max(∂lnM∂z, FT(0))
+end
+
+function entrainment_inv_length_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ::NegMassFluxGradDimScale,
+) where {FT}
+    return  abs(min(∂lnM∂z, FT(0)))
+end
+
+function entrainment_inv_length_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ::AbsMassFluxGradDimScale,
+) where {FT}
+    return abs(∂lnM∂z)
 end
 
 """A convenience wrapper for entrainment_inv_length_scale"""
@@ -99,6 +148,7 @@ function entrainment_inv_length_scale(εδ_model, εδ_vars, dim_scale)
         εδ_vars.tke_en,
         εδ_vars.zc_i,
         εδ_vars.ref_H,
+        εδ_vars.∂lnM∂z,
         dim_scale,
     )
 end
@@ -263,6 +313,7 @@ function compute_phys_entr_detr!(
                     RH_en = aux_en.RH[k], # environment relative humidity
                     max_area = max_area, # maximum updraft area
                     zc_i = FT(grid.zc[k].z), # vertical coordinate
+                    ∂lnM∂z = aux_tc.∂lnM∂z[k], # ln(massflux) gradient
                     Δt = Δt, # Model time step
                     ε_nondim = aux_up[i].ε_nondim[k], # nondimensional fractional dynamical entrainment
                     δ_nondim = aux_up[i].δ_nondim[k], # nondimensional fractional dynamical detrainment
@@ -397,6 +448,7 @@ function compute_ml_entr_detr!(
                     max_area = max_area, # maximum updraft area
                     zc_i = FT(grid.zc[k].z), # vertical coordinate
                     wstar = surf.wstar, # convective velocity
+                    ∂lnM∂z = aux_tc.∂lnM∂z[k], # ln(massflux) gradient
                     entr_Π_subset = entrainment_Π_subset(edmf), # indices of Pi groups to include
                 )
 
