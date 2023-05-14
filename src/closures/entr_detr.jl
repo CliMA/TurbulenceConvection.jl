@@ -447,7 +447,6 @@ function compute_ml_entr_detr!(
                     RH_en = aux_en.RH[k], # environment relative humidity
                     max_area = max_area, # maximum updraft area
                     zc_i = FT(grid.zc[k].z), # vertical coordinate
-                    wstar = surf.wstar, # convective velocity
                     ∂lnM∂z = aux_tc.∂lnM∂z[k], # ln(massflux) gradient
                     entr_Π_subset = entrainment_Π_subset(edmf), # indices of Pi groups to include
                 )
@@ -547,7 +546,6 @@ function compute_ml_entr_detr!(
                     zc_i = FT(grid.zc[k].z), # vertical coordinate
                     ε_ml_nondim = aux_up[i].ε_ml_nondim[k], # nondimensional fractional dynamical entrainment
                     δ_ml_nondim = aux_up[i].δ_ml_nondim[k], # nondimensional fractional dynamical detrainment
-                    wstar = surf.wstar, # convective velocity
                     entr_Π_subset = entrainment_Π_subset(edmf), # indices of Pi groups to include
                 )
                 Π = non_dimensional_groups(εδ_model, εδ_model_vars)
