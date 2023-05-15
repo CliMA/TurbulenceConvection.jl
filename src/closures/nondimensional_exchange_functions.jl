@@ -12,14 +12,13 @@ function non_dimensional_groups(εδ_model, εδ_model_vars)
     Δw = get_Δw(εδ_model, εδ_model_vars.w_up, εδ_model_vars.w_en)
     Δb = εδ_model_vars.b_up - εδ_model_vars.b_en
     Π_norm = εδ_params(εδ_model).Π_norm
-    Π₁ = (εδ_model_vars.zc_i * Δb) / (Δw^2 + εδ_model_vars.wstar^2) / Π_norm[1]
-    Π₂ =
-        (εδ_model_vars.tke_gm - εδ_model_vars.a_en * εδ_model_vars.tke_en) / (εδ_model_vars.tke_gm + eps(FT)) /
-        Π_norm[2]
+    Π₁ = (εδ_model_vars.zc_i * Δb) / (Δw^2 + eps(FT)) / Π_norm[1]
+    Π₂ = εδ_model_vars.tke_en / (Δw^2 + eps(FT)) / Π_norm[2]
     Π₃ = √(εδ_model_vars.a_up) / Π_norm[3]
     Π₄ = (εδ_model_vars.RH_up - εδ_model_vars.RH_en) / Π_norm[4]
     Π₅ = εδ_model_vars.zc_i / εδ_model_vars.H_up / Π_norm[5]
     Π₆ = εδ_model_vars.zc_i / εδ_model_vars.ref_H / Π_norm[6]
+
     Π_groups = (Π₁, Π₂, Π₃, Π₄, Π₅, Π₆)
 
     return map(i -> Π_groups[i], εδ_model_vars.entr_Π_subset)
