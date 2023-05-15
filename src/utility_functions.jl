@@ -116,7 +116,7 @@ and experiments.
 """
 function get_shallow_LES_library()
     LES_library = Dict("HadGEM2-A" => Dict(), "CNRM-CM5" => Dict(), "CNRM-CM6-1" => Dict())
-    Shen_et_al_sites = collect(2:15)
+    Shen_et_al_sites = collect(4:15)
     append!(Shen_et_al_sites, collect(17:23))
 
     # HadGEM2-A model (76 AMIP-AMIP4K pairs)
