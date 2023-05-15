@@ -450,7 +450,12 @@ function compute_ml_entr_detr!(
                     ∂lnM∂z = aux_tc.∂lnM∂z[k], # ln(massflux) gradient
                     entr_Π_subset = entrainment_Π_subset(edmf), # indices of Pi groups to include
                 )
-
+                # store pi groups for output
+                Π = non_dimensional_groups(εδ_closure, εδ_model_vars)
+                @assert length(Π) == n_Π_groups(edmf)
+                for Π_i in 1:length(entrainment_Π_subset(edmf))
+                    aux_up[i].Π_groups[Π_i][k] = Π[Π_i]
+                end
                 # update fractional and turbulent entr/detr
                 # fractional, turbulent & nondimensional entrainment
                 ε_ml_nondim, δ_ml_nondim = non_dimensional_function(εδ_closure, εδ_model_vars)

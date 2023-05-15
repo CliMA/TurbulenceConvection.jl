@@ -55,6 +55,12 @@ function io_dictionary_diagnostics()
         "massflux" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).massflux),
         "rain_flux" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_precip(state).rain_flux),
         "snow_flux" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_precip(state).snow_flux,),
+        "pi_1" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).Π₁),
+        "pi_2" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).Π₂),
+        "pi_3" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).Π₃),
+        "pi_4" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).Π₄),
+        "pi_5" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).Π₅),
+        "pi_6" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).Π₆),
     )
     return io_dict
 end
@@ -287,6 +293,12 @@ function compute_diagnostics!(
         diag_tc.δ_ml_nondim[k] = 0
         diag_tc.asp_ratio[k] = 0
         diag_tc.frac_turb_entr[k] = 0
+        diag_tc.Π₁[k] = 0
+        diag_tc.Π₂[k] = 0
+        diag_tc.Π₃[k] = 0
+        diag_tc.Π₄[k] = 0
+        diag_tc.Π₅[k] = 0
+        diag_tc.Π₆[k] = 0
         if a_up_bulk_k > 0.0
             @inbounds for i in 1:N_up
                 aux_up_i = aux_up[i]
@@ -300,6 +312,12 @@ function compute_diagnostics!(
                 diag_tc.δ_ml_nondim[k] += aux_up_i.area[k] * aux_up_i.δ_ml_nondim[k] / a_up_bulk_k
                 diag_tc.asp_ratio[k] += aux_up_i.area[k] * aux_up_i.asp_ratio[k] / a_up_bulk_k
                 diag_tc.frac_turb_entr[k] += aux_up_i.area[k] * aux_up_i.frac_turb_entr[k] / a_up_bulk_k
+                diag_tc.Π₁[k] = aux_up_i.Π_groups[1][k]
+                diag_tc.Π₂[k] = aux_up_i.Π_groups[2][k]
+                diag_tc.Π₃[k] = aux_up_i.Π_groups[3][k]
+                diag_tc.Π₄[k] = aux_up_i.Π_groups[4][k]
+                diag_tc.Π₅[k] = aux_up_i.Π_groups[5][k]
+                diag_tc.Π₆[k] = aux_up_i.Π_groups[6][k]
             end
         end
     end
