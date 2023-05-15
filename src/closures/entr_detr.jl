@@ -327,8 +327,8 @@ function compute_phys_entr_detr!(
                     ε_dyn, δ_dyn = εδ_dyn(
                         mean_model,
                         εδ_model_vars,
-                        BuoyVelEntrDimScale(),
-                        BuoyVelEntrDimScale(),
+                        edmf.entr_dim_scale,
+                        edmf.detr_dim_scale,
                         ε_nondim,
                         δ_nondim,
                     )
@@ -337,8 +337,8 @@ function compute_phys_entr_detr!(
                     ε_dyn, δ_dyn = εδ_dyn(
                         mean_model,
                         εδ_model_vars,
-                        BuoyVelEntrDimScale(),
-                        BuoyVelEntrDimScale(),
+                        edmf.entr_dim_scale,
+                        edmf.detr_dim_scale,
                         ε_nondim,
                         δ_nondim,
                     )
@@ -348,8 +348,8 @@ function compute_phys_entr_detr!(
                     ε_dyn, δ_dyn = εδ_dyn(
                         εδ_closure,
                         εδ_model_vars,
-                        BuoyVelEntrDimScale(),
-                        BuoyVelEntrDimScale(),
+                        edmf.entr_dim_scale,
+                        edmf.detr_dim_scale,
                         ε_nondim,
                         δ_nondim,
                     )
