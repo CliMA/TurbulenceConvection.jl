@@ -1177,7 +1177,7 @@ function initialize_profiles(::LES_driven_SCM, grid::Grid, param_set, state; LES
         imax = time_interval_bool[end]
         zc_les = Array(TC.get_nc_data(data, "zc"))
 
-        getvar(var) = pyinterp(vec(grid.zc.z), zc_les, TC.init_nc_data(data, "profiles", var, imin, imax))
+        getvar(var) = pyinterp(vec(grid.zc.z), zc_les, TC.init_nc_data(data, "profiles", var))
 
         θ_liq_ice_gm = getvar("thetali_mean")
         q_tot_gm = getvar("qt_mean")
