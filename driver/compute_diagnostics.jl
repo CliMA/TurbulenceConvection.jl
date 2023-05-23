@@ -280,7 +280,7 @@ function compute_diagnostics!(
     @inbounds for i in 1:N_up
         @. diag_tc.massflux += Ic(aux_up_f[i].massflux)
     end
-
+    pi_subset = TC.entrainment_Π_subset(edmf)
     @inbounds for k in TC.real_center_indices(grid)
         a_up_bulk_k = a_up_bulk[k]
         diag_tc.entr_sc[k] = 0
@@ -312,12 +312,17 @@ function compute_diagnostics!(
                 diag_tc.δ_ml_nondim[k] += aux_up_i.area[k] * aux_up_i.δ_ml_nondim[k] / a_up_bulk_k
                 diag_tc.asp_ratio[k] += aux_up_i.area[k] * aux_up_i.asp_ratio[k] / a_up_bulk_k
                 diag_tc.frac_turb_entr[k] += aux_up_i.area[k] * aux_up_i.frac_turb_entr[k] / a_up_bulk_k
-                diag_tc.Π₁[k] = aux_up_i.Π_groups[1][k]
-                diag_tc.Π₂[k] = aux_up_i.Π_groups[2][k]
-                diag_tc.Π₃[k] = aux_up_i.Π_groups[3][k]
-                diag_tc.Π₄[k] = aux_up_i.Π_groups[4][k]
-                diag_tc.Π₅[k] = aux_up_i.Π_groups[5][k]
-                diag_tc.Π₆[k] = aux_up_i.Π_groups[6][k]
+
+                for Π_i in 1:length(pi_subset)
+                    sub_script = ""
+                    for digit in string(pi_subset[Π_i])
+                        sub_script *= Char('₀' + parse(Int, digit))
+                    end
+                    property_name = "Π" * sub_script  # Concatenate "Π" with the subscript
+                    property = getproperty(diag_tc, Symbol(property_name))
+                    property[k] = aux_up_i.Π_groups[Π_i][k]
+                end
+
             end
         end
     end
