@@ -98,6 +98,15 @@ Base.@kwdef struct LinearEntr{P, T} <: AbstractMLEntrDetrModel
     c_linear::T
     biases_bool::Bool
 end
+Base.@kwdef struct GPEntr{D, N, P, A, B} <: AbstractMLEntrDetrModel
+    params::P
+    c_gp_params::A
+    gp_x_fixed::B
+    function GPEntr(params::P, c_gp_params::A, gp_x_fixed::B, D::Int, N::Int) where {P, A, B}
+        gp_x_fixed = reshape(gp_x_fixed, N, D)
+        return new{D, N, P, typeof(c_gp_params), typeof(gp_x_fixed)}(params, c_gp_params, gp_x_fixed)
+    end
+end
 Base.@kwdef struct FNOEntr{P, T} <: AbstractMLNonLocalEntrDetrModel
     params::P
     w_fno::Int
@@ -561,7 +570,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         "EDMF_PrognosticTKE",
         "ml_entrainment";
         default = "None",
-        valid_options = ["None", "NN", "NN_nonlocal", "FNO", "Linear", "RF"],
+        valid_options = ["None", "NN", "NN_nonlocal", "FNO", "Linear", "GP", "RF"],
     )
 
     nn_biases = parse_namelist(
@@ -626,6 +635,11 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     elseif ml_entr_type == "Linear"
         c_linear = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "linear_ent_params")
         LinearEntr(; params = εδ_params, biases_bool = linear_biases, c_linear)
+    elseif ml_entr_type == "GP"
+        c_gp_params = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "gp_ent_params")
+        gp_x_fixed = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "gp_x_fixed")
+        gp_num_x_fixed = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "gp_num_x_fixed")
+        GPEntr(εδ_params, c_gp_params, gp_x_fixed, length(entr_pi_subset), gp_num_x_fixed)
     elseif ml_entr_type == "RF"
         c_rf_fix = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_fix_ent_params")
         c_rf_opt = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "rf_opt_ent_params")

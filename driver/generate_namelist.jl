@@ -154,11 +154,11 @@ function default_namelist(
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "None"  # {"moisture_deficit", "None"}
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["ml_entrainment"] = "Linear"  # {"None", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["ml_entrainment"] = "GP"  # {"None", "NN", "NN_nonlocal", "Linear", "GP", "FNO", "RF"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "inv_z" # {"buoy_vel", "inv_scale_height", "inv_z", "none"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detr_dim_scale"] = "none" # {"buoy_vel", "inv_scale_height", "inv_z", "none"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"] = ntuple(i -> i, 6) # or, e.g., (1, 3, 6)
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pi_norm_consts"] = [478.298, 1.0, 1.0, 1.0, 1.0, 1.0] # normalization constants for Pi groups
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pi_norm_consts"] = [1e3, 10, 1.0, 1.0, 1.0, 1.0] # normalization constants for Pi groups
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = "deterministic"  # {"deterministic", "noisy_relaxation_process", "lognormal_scaling", "prognostic_noisy_relaxation_process"}
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pressure_closure_buoy"] = "normalmode"
@@ -265,6 +265,13 @@ function default_namelist(
         SA.SVector{14}(rand(14))
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["linear_ent_biases"] = true
+
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["gp_ent_params"] = rand(34)
+
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["gp_x_fixed"] = rand(10, 6) # NxD
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["gp_num_x_fixed"] = 10
+
+
 
     # General stochastic entrainment/detrainment parameters
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["general_stochastic_ent_params"] =

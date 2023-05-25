@@ -318,6 +318,96 @@ function non_dimensional_function(εδ_model::NNEntr, εδ_model_vars)
     return nondim_ε, nondim_δ
 end
 
+
+# Define the squared exponential kernel function
+function squared_exponential_kernel(x1, x2, length_scales, signal_variance)
+    sq_dist = LA.norm(x1 - x2)^2
+    kernel = signal_variance * exp(-0.5 * sum((sq_dist ./ length_scales) .^ 2))
+    return kernel
+end
+
+# Define the multivariate Gaussian process regression function
+function multivariate_gaussian_process(X_train, y_train, X_star, length_scales, signal_variance; sigma_sq = 1e-6)
+    n_train = size(X_train, 1)
+    K_train = zeros(n_train, n_train)
+
+    # Compute the kernel matrix for training data
+    for i = 1:n_train
+        for j = 1:n_train
+            K_train[i, j] = squared_exponential_kernel(X_train[i, :], X_train[j, :], length_scales, signal_variance)
+        end
+    end
+
+    # Compute the kernel vector for prediction point
+    K_test = zeros(n_train)
+    for i = 1:n_train
+        K_test[i] = squared_exponential_kernel(X_star, X_train[i, :], length_scales, signal_variance)
+    end
+
+    # Compute the mean and covariance of the predictive distribution
+    L = LA.cholesky(K_train + sigma_sq * LA.I)
+    alpha = L' \ (L \ y_train) # solves alpha * K_train = y_train for alpha
+    y_mean = LA.dot(K_test, alpha)
+    # v = L \ K_test
+    # y_cov = squared_exponential_kernel(X_star, X_star, length_scales, signal_variance) - dot(v, v)
+
+    return y_mean
+end
+
+"""
+    unpack_gp_params(serialized_params, D, N)
+Unpack GP parameters from serialized vector
+    - `serialized_params` - seralized vector of GP params
+    - `D` - number of inputs (Pi groups)
+    - `N` - number of fixed training samples
+"""
+
+function unpack_gp_params(serialized_params, D, N)
+
+    sig_var_ε = serialized_params[1]
+    sig_var_δ = serialized_params[2]
+
+    len_scales_ε = serialized_params[3:(D + 2)]
+    len_scales_δ = serialized_params[(D + 3):(2*D + 2)]
+
+    start_i = 2*D + 3
+    y_ε = serialized_params[start_i:(start_i + N - 1)]
+    y_δ = serialized_params[(start_i + N):(start_i + 2*N - 1)]
+
+    return (sig_var_ε, sig_var_δ, len_scales_ε, len_scales_δ, y_ε, y_δ)
+end
+
+function expected_gp_n_params(D, N)
+    return 2*(1 + D + N)
+end
+
+"""
+    non_dimensional_function(εδ_model::GPEntr, εδ_model_vars)
+
+Uses a Gaussian Process to predict the non-dimensional components of dynamical entrainment/detrainment.
+ - `εδ_model`       :: GPEntr - Gaussian Process entrainment closure
+ - `εδ_model_vars`  :: structure containing variables
+"""
+function non_dimensional_function(εδ_model::GPEntr, εδ_model_vars)
+    gp_x_fixed = εδ_model.gp_x_fixed
+    c_gp_params = εδ_model.c_gp_params
+
+    nondim_groups = collect(non_dimensional_groups(εδ_model, εδ_model_vars))
+    D = length(nondim_groups)
+    N = size(gp_x_fixed, 1)
+    # ensure parameter vector has correct shape
+    @assert length(c_gp_params) == expected_gp_n_params(D, N)
+
+    sig_var_ε, sig_var_δ, len_scales_ε, len_scales_δ, y_ε, y_δ = unpack_gp_params(c_gp_params, D, N)
+
+    nondim_ε = multivariate_gaussian_process(gp_x_fixed, y_ε, nondim_groups, len_scales_ε, sig_var_ε)
+    nondim_ε = max(nondim_ε, 0)
+    nondim_δ = multivariate_gaussian_process(gp_x_fixed, y_δ, nondim_groups, len_scales_δ, sig_var_δ)
+    nondim_δ = max(nondim_δ, 0)
+    return nondim_ε, nondim_δ
+end
+
+
 """
     non_dimensional_function(εδ_model::LinearEntr, εδ_model_vars)
 
