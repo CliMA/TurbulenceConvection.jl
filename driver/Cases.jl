@@ -196,7 +196,7 @@ RadiationBase(case::AbstractCaseType, FT) = RadiationBase{Cases.get_radiation_ty
 forcing_kwargs(::AbstractCaseType, namelist) = (; coriolis_param = namelist["forcing"]["coriolis"])
 forcing_kwargs(case::DYCOMS_RF01, namelist) = (; divergence = large_scale_divergence(case))
 forcing_kwargs(case::DYCOMS_RF02, namelist) = (; divergence = large_scale_divergence(case))
-les_data_kwarg(::AbstractCaseType, namelist) = ()
+aux_data_kwarg(::AbstractCaseType, namelist) = ()
 
 ForcingBase(case::AbstractCaseType, FT; kwargs...) = ForcingBase{get_forcing_type(case), FT}(; kwargs...)
 
@@ -1122,7 +1122,7 @@ function forcing_kwargs(::LES_driven_SCM, namelist)
     return (; wind_nudge_τᵣ, scalar_nudge_zᵢ, scalar_nudge_zᵣ, scalar_nudge_τᵣ, coriolis_param)
 end
 
-function les_data_kwarg(::LES_driven_SCM, namelist)
+function aux_data_kwarg(::LES_driven_SCM, namelist)
     les_filename = namelist["meta"]["lesfile"]
     # load data here
     LESDat = NC.Dataset(les_filename, "r") do data
