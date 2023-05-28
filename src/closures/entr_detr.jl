@@ -308,6 +308,7 @@ function compute_phys_entr_detr!(
                     tke_en = aux_en.tke[k], # environment tke
                     a_up = aux_up[i].area[k], # updraft area fraction
                     a_en = aux_en.area[k], # environment area fraction
+                    H_up = plume_scale_height[i], # plume scale height
                     ref_H = p_c[k] / (ρ_c[k] * g), # reference state scale height
                     RH_up = aux_up[i].RH[k], # updraft relative humidity
                     RH_en = aux_en.RH[k], # environment relative humidity
@@ -317,7 +318,15 @@ function compute_phys_entr_detr!(
                     Δt = Δt, # Model time step
                     ε_nondim = aux_up[i].ε_nondim[k], # nondimensional fractional dynamical entrainment
                     δ_nondim = aux_up[i].δ_nondim[k], # nondimensional fractional dynamical detrainment
+                    entr_Π_subset = entrainment_Π_subset(edmf), # indices of Pi groups to include
                 )
+
+                # store pi groups for output
+                Π = non_dimensional_groups(εδ_closure, εδ_model_vars)
+                @assert length(Π) == n_Π_groups(edmf)
+                for Π_i in 1:length(entrainment_Π_subset(edmf))
+                    aux_up[i].Π_groups[Π_i][k] = Π[Π_i]
+                end
 
                 # update fractional and turbulent entr/detr
                 if εδ_closure isa PrognosticNoisyRelaxationProcess
