@@ -19,12 +19,12 @@ function compute_turbconv_tendencies!(
     Δt::Real,
 )
     compute_up_tendencies!(edmf, grid, state, param_set, surf)
-    compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
+    compute_en_tendencies!(edmf, grid, state, param_set, surf, Val(:tke), Val(:ρatke))
 
     if edmf.thermo_covariance_model isa PrognosticThermoCovariances
-        compute_en_tendencies!(edmf, grid, state, param_set, Val(:Hvar), Val(:ρaHvar))
-        compute_en_tendencies!(edmf, grid, state, param_set, Val(:QTvar), Val(:ρaQTvar))
-        compute_en_tendencies!(edmf, grid, state, param_set, Val(:HQTcov), Val(:ρaHQTcov))
+        compute_en_tendencies!(edmf, grid, state, param_set, surf, Val(:Hvar), Val(:ρaHvar))
+        compute_en_tendencies!(edmf, grid, state, param_set, surf, Val(:QTvar), Val(:ρaQTvar))
+        compute_en_tendencies!(edmf, grid, state, param_set, surf, Val(:HQTcov), Val(:ρaHQTcov))
     end
 
     return nothing
@@ -300,7 +300,6 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     ρLL = prog_gm.ρ[kc_surf]
     ρ_ae = ρ_c[kc_surf] * ae_surf
     mix_len_params = mixing_length_params(edmf)
-    prog_en.ρatke[kc_surf] = ρ_ae * get_surface_tke(mix_len_params, surf.ustar, zLL, surf.obukhov_length)
     if edmf.thermo_covariance_model isa PrognosticThermoCovariances
         prog_en.ρaHvar[kc_surf] = ρ_ae * get_surface_variance(flux1 / ρLL, flux1 / ρLL, ustar, zLL, oblength)
         prog_en.ρaQTvar[kc_surf] = ρ_ae * get_surface_variance(flux2 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
@@ -909,11 +908,13 @@ function compute_en_tendencies!(
     grid::Grid,
     state::State,
     param_set::APS,
+    surf::SurfaceBase,
     ::Val{covar_sym},
     ::Val{prog_sym},
 ) where {covar_sym, prog_sym}
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
+    kf_surf = kf_surface(grid)
     kc_toa = kc_top_of_atmos(grid)
     aux_gm_f = face_aux_grid_mean(state)
     prog_en = center_prog_environment(state)
@@ -931,6 +932,7 @@ function compute_en_tendencies!(
     ρ_c = prog_gm.ρ
     ρ_f = aux_gm_f.ρ
     c_d = mixing_length_params(edmf).c_d
+    mix_len_params = mixing_length_params(edmf)
     is_tke = covar_sym == :tke
     FT = float_type(state)
 
@@ -962,6 +964,20 @@ function compute_en_tendencies!(
     ∇f = CCO.GradientC2F(; prog_bcs...)
     ∇c = CCO.DivergenceF2C()
 
+    # compute bottom BC for TKE
+    if is_tke
+        ρ_f_surf = ρ_f[kf_surf]
+        a_e_surf = 1 - edmf.surface_area
+        u_surf = physical_grid_mean_u(state)[kc_surf]
+        v_surf = physical_grid_mean_v(state)[kc_surf]
+        U_surf_norm = sqrt(u_surf^2 + v_surf^2)
+        ustar = surf.ustar
+        surface_tke_turb_flux = get_surface_tke_turb_flux(mix_len_params, ustar, ρ_f_surf, a_e_surf, U_surf_norm)
+        ∇c_turb = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(surface_tke_turb_flux)))
+    else
+        ∇c_turb = CCO.DivergenceF2C()
+    end
+
     mixing_length = aux_tc.mixing_length
     min_area = edmf.minimum_area
 
@@ -986,7 +1002,7 @@ function compute_en_tendencies!(
     @. tend_covar =
         press + buoy + shear + entr_gain + rain_src - D_env * covar -
         (c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * prog_covar - ∇c(wvec(RB(prog_covar * Ic(w_en_f)))) +
-        ∇c(ρ_f * If(aeK) * ∇f(covar))
+        ∇c_turb(ρ_f * If(aeK) * ∇f(covar))
 
     return nothing
 end
