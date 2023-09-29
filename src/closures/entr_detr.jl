@@ -16,7 +16,7 @@ function compute_inverse_timescale(εδ_model, b_up::FT, b_en::FT, w_up::FT, w_e
     Δw = get_Δw(εδ_model, w_up, w_en)
     c_λ = εδ_params(εδ_model).c_λ
 
-    l_1 = c_λ * abs(Δb / sqrt(tke + 1e-8))
+    l_1 = c_λ * abs(Δb / sqrt(abs(tke) + eps(FT)))
     l_2 = abs(Δb / Δw)
     l = SA.SVector(l_1, l_2)
     return lamb_smooth_minimum(l, FT(0.1), FT(0.0005))
