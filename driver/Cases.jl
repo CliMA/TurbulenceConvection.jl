@@ -301,7 +301,7 @@ forcing_kwargs(case::DYCOMS_RF02, namelist) = (; divergence = large_scale_diverg
 aux_data_kwarg(::AbstractCaseType, namelist) = ()
 aux_data_kwarg(case::AbstractCaseType, namelist, param_set) = aux_data_kwarg(case::AbstractCaseType, namelist)  # for dispatch + backwards compat
 
-ForcingBase(case::AbstractCaseType, FT; kwargs...) = ForcingBase{get_forcing_type(case), FT}(; kwargs...)
+ForcingBase(case::AbstractCaseType, FT; kwargs...) = ForcingBase{get_forcing_type(case), FT}(; kwargs...) # constructor for forcing base above...
 
 #####
 ##### Default case behavior:
@@ -1406,7 +1406,7 @@ function forcing_kwargs(case::SOCRATES, namelist) # call in main.jl is forcing =
         (; wind_nudge_τᵣ = wind_nudge_τᵣ, scalar_nudge_τᵣ = scalar_nudge_τᵣ)
     else # SOCRATES_ERA5
         wind_nudge_τᵣ = get(namelist["forcing"], "wind_nudge_τᵣ", 60 * 60) # paper standard
-        scalar_nudge_τᵣ = get(namelist["forcing"], "scalar_nudge_τᵣ", (6 * 60) * 60) # paper standard (testing 6 hr relaxation on T/q since we don't have RRTMG to be in line more w/ appendix D)
+        scalar_nudge_τᵣ = get(namelist["forcing"], "scalar_nudge_τᵣ", (Inf * 60) * 60) # paper standard = do not relax (for T, qt i.e. H_nudge, qt_nudge -- can test 6 hours again later sincee don't have RRTMG to be in line more w/ appendix D
         (; wind_nudge_τᵣ = wind_nudge_τᵣ, scalar_nudge_τᵣ = scalar_nudge_τᵣ)
     end
 end
