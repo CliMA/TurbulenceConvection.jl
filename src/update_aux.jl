@@ -240,10 +240,9 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ##### face variables: diagnose primitive, diagnose env and compute bulk
     #####
     # TODO: figure out why `ifelse` is allocating
+    # clip updraft w below minimum area threshold
     @inbounds for i in 1:N_up
-        a_surf = area_surface_bc(surf, edmf, i)
-        a_up_bcs = a_up_boundary_conditions(surf, edmf, i)
-        If = CCO.InterpolateC2F(; a_up_bcs...)
+        If = CCO.InterpolateC2F()
         a_min = edmf.minimum_area
         a_up = aux_up[i].area
         @. aux_up_f[i].w = ifelse(If(a_up) >= a_min, max(prog_up_f[i].ρaw / (ρ_f * If(a_up)), 0), FT(0))
@@ -253,12 +252,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     end
 
     parent(aux_tc_f.bulk.w) .= 0
-    a_bulk_bcs = a_bulk_boundary_conditions(surf, edmf)
-    Ifb = CCO.InterpolateC2F(; a_bulk_bcs...)
+    Ifb = CCO.InterpolateC2F()
     @inbounds for i in 1:N_up
         a_up = aux_up[i].area
-        a_up_bcs = a_up_boundary_conditions(surf, edmf, i)
-        Ifu = CCO.InterpolateC2F(; a_up_bcs...)
+        Ifu = CCO.InterpolateC2F()
         @. aux_tc_f.bulk.w += ifelse(Ifb(aux_bulk.area) > 0, Ifu(a_up) * aux_up_f[i].w / Ifb(aux_bulk.area), FT(0))
     end
     # Assuming w_gm = 0!
