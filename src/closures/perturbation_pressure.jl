@@ -42,7 +42,7 @@ function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, surf)
     α₂_asp_ratio² = FT(0)
     press_model_params = pressure_model_params(edmf)
     α_b = press_model_params.α_b
-    α_a = press_model_params.α_a
+    #α_a = press_model_params.α_a
     α_d = press_model_params.α_d
 
     @inbounds for i in 1:N_up
@@ -63,10 +63,10 @@ function compute_nh_pressure!(state::State, grid::Grid, edmf::EDMFModel, surf)
         nh_pressure = aux_up_f[i].nh_pressure
 
         @. nh_press_buoy = Int(Ifa(a_up) > 0) * -α_b / (1 + α₂_asp_ratio²) * ρ_f * Ifa(a_up) * Ifb(b_up)
-        @. nh_press_adv = Int(Ifa(a_up) > 0) * ρ_f * Ifa(a_up) * α_a * w_up * ∇(wvec(Ifc(w_up)))
+        #@. nh_press_adv = Int(Ifa(a_up) > 0) * ρ_f * Ifa(a_up) * α_a * w_up * ∇(wvec(Ifc(w_up)))
         # drag as w_dif and account for downdrafts
         @. nh_press_drag = Int(Ifa(a_up) > 0) * -1 * ρ_f * Ifa(a_up) * α_d * (w_up - w_en) * abs(w_up - w_en) / H_up
-        @. nh_pressure = nh_press_buoy + nh_press_adv + nh_press_drag
+        @. nh_pressure = nh_press_buoy + nh_press_drag
     end
     return nothing
 end
