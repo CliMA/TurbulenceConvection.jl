@@ -1401,8 +1401,8 @@ function forcing_kwargs(case::SOCRATES, namelist) # call in main.jl is forcing =
     # (; wind_nudge_τᵣ = 24*3600, scalar_nudge_τᵣ = 24*3600) # test for free ish run (closer to gettelman) but still unstable...? hmmm
 
     if case.forcing_type == :obs_data # use the socrates type to handle timescale setting
-        wind_nudge_τᵣ = get(namelist["forcing"], "wind_nudge_τᵣ", 20*60) # paper standard (should I cast as FT?)
-        scalar_nudge_τᵣ = get(namelist["forcing"], "scalar_nudge_τᵣ", 60*60) # paper standard
+        wind_nudge_τᵣ = get(namelist["forcing"], "wind_nudge_τᵣ", 20 * 60) # paper standard (should I cast as FT?)
+        scalar_nudge_τᵣ = get(namelist["forcing"], "scalar_nudge_τᵣ", 20 * 60) # paper standard
         (; wind_nudge_τᵣ = wind_nudge_τᵣ, scalar_nudge_τᵣ = scalar_nudge_τᵣ)
     elseif case.forcing_type == :ERA5_data # ERA5
         wind_nudge_τᵣ = get(namelist["forcing"], "wind_nudge_τᵣ", 60 * 60) # paper standard
