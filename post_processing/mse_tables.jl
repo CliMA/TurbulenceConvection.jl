@@ -158,12 +158,12 @@ all_best_mse["TRMM_LBA"]["Hvar_mean"] = 446332.29960805096
 all_best_mse["TRMM_LBA"]["QTvar_mean"] = 6279.987008045119
 #
 all_best_mse["LES_driven_SCM"] = OrderedCollections.OrderedDict()
-all_best_mse["LES_driven_SCM"]["qt_mean"] = 3.1245243580973274
-all_best_mse["LES_driven_SCM"]["v_mean"] = 0.6312894226846458
-all_best_mse["LES_driven_SCM"]["u_mean"] = 0.19168439308615623
-all_best_mse["LES_driven_SCM"]["temperature_mean"] = 0.0012149531297031915
-all_best_mse["LES_driven_SCM"]["ql_mean"] = 5645.4805762575825
-all_best_mse["LES_driven_SCM"]["thetal_mean"] = 0.0013525039758698536
+all_best_mse["LES_driven_SCM"]["qt_mean"] = 0.1816324057400173
+all_best_mse["LES_driven_SCM"]["v_mean"] = 0.32293581806860794
+all_best_mse["LES_driven_SCM"]["u_mean"] = 0.07547494635765321
+all_best_mse["LES_driven_SCM"]["temperature_mean"] = 5.497077391865199e-5
+all_best_mse["LES_driven_SCM"]["ql_mean"] = 27662.597548577323
+all_best_mse["LES_driven_SCM"]["thetal_mean"] = 6.008525349326801e-5
 #
 #################################
 #################################
