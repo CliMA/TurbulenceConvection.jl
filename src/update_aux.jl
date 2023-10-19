@@ -242,24 +242,22 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     # TODO: figure out why `ifelse` is allocating
     # clip updraft w below minimum area threshold
     @inbounds for i in 1:N_up
-        If = CCO.InterpolateC2F()
         a_min = edmf.minimum_area
         a_up = aux_up[i].area
-        @. aux_up_f[i].w = ifelse(If(a_up) >= a_min, max(prog_up_f[i].ρaw / (ρ_f * If(a_up)), 0), FT(0))
+        @. aux_up_f[i].w = ifelse(ᶠinterp_a(a_up) >= a_min, max(prog_up_f[i].ρaw / (ρ_f * ᶠinterp_a(a_up)), 0), FT(0))
     end
     @inbounds for i in 1:N_up
         aux_up_f[i].w[kf_surf] = w_surface_bc(surf)
     end
 
     parent(aux_tc_f.bulk.w) .= 0
-    Ifb = CCO.InterpolateC2F()
     @inbounds for i in 1:N_up
         a_up = aux_up[i].area
-        Ifu = CCO.InterpolateC2F()
-        @. aux_tc_f.bulk.w += ifelse(Ifb(aux_bulk.area) > 0, Ifu(a_up) * aux_up_f[i].w / Ifb(aux_bulk.area), FT(0))
+        @. aux_tc_f.bulk.w +=
+            ifelse(ᶠinterp_a(aux_bulk.area) > 0, ᶠinterp_a(a_up) * aux_up_f[i].w / ᶠinterp_a(aux_bulk.area), FT(0))
     end
     # Assuming w_gm = 0!
-    @. aux_en_f.w = -Ifb(aux_bulk.area) / (1 - Ifb(aux_bulk.area)) * aux_tc_f.bulk.w
+    @. aux_en_f.w = -1 * ᶠinterp_a(aux_bulk.area) / (1 - ᶠinterp_a(aux_bulk.area)) * aux_tc_f.bulk.w
 
     #####
     #####  diagnose_GMV_moments

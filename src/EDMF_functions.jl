@@ -63,13 +63,12 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     θ_liq_ice_gm = aux_gm.θ_liq_ice
     q_tot_gm = aux_gm.q_tot
     q_tot_en = aux_en.q_tot
-    Ifae = CCO.InterpolateC2F()
     If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
 
     # Compute the mass flux and associated scalar fluxes
-    @. massflux = ρ_f * Ifae(a_en) * (w_en - toscalar(w_gm))
-    @. massflux_h = ρ_f * Ifae(a_en) * (w_en - toscalar(w_gm)) * (If(θ_liq_ice_en) - If(θ_liq_ice_gm))
-    @. massflux_qt = ρ_f * Ifae(a_en) * (w_en - toscalar(w_gm)) * (If(q_tot_en) - If(q_tot_gm))
+    @. massflux = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm))
+    @. massflux_h = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm)) * (If(θ_liq_ice_en) - If(θ_liq_ice_gm))
+    @. massflux_qt = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm)) * (If(q_tot_en) - If(q_tot_gm))
     @inbounds for i in 1:N_up
         aux_up_f_i = aux_up_f[i]
         aux_up_i = aux_up[i]
@@ -77,9 +76,9 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         w_up_i = aux_up_f[i].w
         q_tot_up = aux_up_i.q_tot
         θ_liq_ice_up = aux_up_i.θ_liq_ice
-        @. aux_up_f[i].massflux = ρ_f * Ifae(a_up) * (w_up_i - toscalar(w_gm))
-        @. massflux_h += ρ_f * (Ifae(a_up) * (w_up_i - toscalar(w_gm)) * (If(θ_liq_ice_up) - If(θ_liq_ice_gm)))
-        @. massflux_qt += ρ_f * (Ifae(a_up) * (w_up_i - toscalar(w_gm)) * (If(q_tot_up) - If(q_tot_gm)))
+        @. aux_up_f[i].massflux = ρ_f * ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm))
+        @. massflux_h += ρ_f * (ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm)) * (If(θ_liq_ice_up) - If(θ_liq_ice_gm)))
+        @. massflux_qt += ρ_f * (ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm)) * (If(q_tot_up) - If(q_tot_gm)))
     end
 
     if edmf.moisture_model isa NonEquilibriumMoisture
@@ -90,7 +89,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         q_ice_en = aux_en.q_ice
         q_liq_gm = prog_gm.q_liq
         q_ice_gm = prog_gm.q_ice
-        @. massflux_en = ρ_f * Ifae(a_en) * (w_en - toscalar(w_gm))
+        @. massflux_en = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm))
         @. massflux_ql = massflux_en * (If(q_liq_en) - If(q_liq_gm))
         @. massflux_qi = massflux_en * (If(q_ice_en) - If(q_ice_gm))
         @inbounds for i in 1:N_up
@@ -315,6 +314,8 @@ function surface_helper(surf::SurfaceBase, grid::Grid, state::State)
     ρLL = prog_gm.ρ[kc_surf]
     return (; ustar, zLL, oblength, ρLL)
 end
+
+const ᶠinterp_a = CCO.InterpolateC2F(bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
 
 function area_surface_bc(surf::SurfaceBase{FT}, edmf::EDMFModel, i::Int, bc::FixedSurfaceAreaBC)::FT where {FT}
     N_up = n_updrafts(edmf)
@@ -576,7 +577,6 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     # and buoyancy should not matter in the end
     zero_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
     I0f = CCO.InterpolateC2F(; zero_bcs...)
-    Iaf = CCO.InterpolateC2F()
     adv_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
     LBC = CCO.LeftBiasedF2C(; bottom = CCO.SetValue(FT(0)))
     ∇f = CCO.DivergenceC2F(; adv_bcs...)
@@ -593,7 +593,8 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         buoy = aux_up[i].buoy
 
         @. tends_ρaw = -(∇f(wvec(LBC(ρaw * w_up))))
-        @. tends_ρaw += (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + (ρ_f * Iaf(a_up) * I0f(buoy)) + nh_pressure
+        @. tends_ρaw +=
+            (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) + nh_pressure
         tends_ρaw[kf_surf] = 0
     end
 
@@ -637,10 +638,9 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         end
     end
     # apply clipping at 0 and minimum area to ρaw
-    If = CCO.InterpolateC2F()
     @inbounds for i in 1:N_up
         @. prog_up_f[i].ρaw = max.(prog_up_f[i].ρaw, 0)
-        @. prog_up_f[i].ρaw = Int(If(prog_up[i].ρarea) >= ρ_f * a_min) * prog_up_f[i].ρaw
+        @. prog_up_f[i].ρaw = Int(ᶠinterp_a(prog_up[i].ρarea) >= ρ_f * a_min) * prog_up_f[i].ρaw
     end
 
     @inbounds for k in real_center_indices(grid)
