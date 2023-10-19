@@ -242,7 +242,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     # TODO: figure out why `ifelse` is allocating
     # clip updraft w below minimum area threshold
     @inbounds for i in 1:N_up
-        If = CCO.InterpolateC2F()
+        If = CCO.InterpolateC2F(extrapolate_bc_kwargs())
         a_min = edmf.minimum_area
         a_up = aux_up[i].area
         @. aux_up_f[i].w = ifelse(If(a_up) >= a_min, max(prog_up_f[i].ρaw / (ρ_f * If(a_up)), 0), FT(0))
@@ -252,10 +252,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     end
 
     parent(aux_tc_f.bulk.w) .= 0
-    Ifb = CCO.InterpolateC2F()
+    Ifb = CCO.InterpolateC2F(extrapolate_bc_kwargs())
     @inbounds for i in 1:N_up
         a_up = aux_up[i].area
-        Ifu = CCO.InterpolateC2F()
+        Ifu = CCO.InterpolateC2F(extrapolate_bc_kwargs())
         @. aux_tc_f.bulk.w += ifelse(Ifb(aux_bulk.area) > 0, Ifu(a_up) * aux_up_f[i].w / Ifb(aux_bulk.area), FT(0))
     end
     # Assuming w_gm = 0!
