@@ -1,10 +1,11 @@
 #### Non-dimensional Entrainment-Detrainment functions
 function max_area_limiter(εδ_model, max_area, a_up)
-    FT = eltype(a_up)
-    γ_lim = εδ_params(εδ_model).γ_lim
-    β_lim = εδ_params(εδ_model).β_lim
-    logistic_term = (2 - 1 / (1 + exp(-γ_lim * (max_area - a_up))))
-    return (logistic_term)^β_lim - 1
+    # FT = eltype(a_up)
+    # γ_lim = εδ_params(εδ_model).γ_lim
+    # β_lim = εδ_params(εδ_model).β_lim
+    # logistic_term = (2 - 1 / (1 + exp(-γ_lim * (max_area - a_up))))
+    # return (logistic_term)^β_lim - 1
+    return 0.0
 end
 
 function non_dimensional_groups(εδ_model, εδ_model_vars)
