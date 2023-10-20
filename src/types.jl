@@ -132,6 +132,9 @@ struct BuoyVelEntrDimScale <: EntrDimScale end
 struct InvScaleHeightEntrDimScale <: EntrDimScale end
 struct InvZEntrDimScale <: EntrDimScale end
 struct InvMeterEntrDimScale <: EntrDimScale end
+struct PosMassFluxGradDimScale <: EntrDimScale end
+struct NegMassFluxGradDimScale <: EntrDimScale end
+struct AbsMassFluxGradDimScale <: EntrDimScale end
 
 """
     GradBuoy
@@ -683,7 +686,15 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         "EDMF_PrognosticTKE",
         "entr_dim_scale";
         default = "buoy_vel",
-        valid_options = ["buoy_vel", "inv_scale_height", "inv_z", "none"],
+        valid_options = [
+            "buoy_vel",
+            "inv_scale_height",
+            "inv_z",
+            "pos_massflux",
+            "neg_massflux",
+            "abs_massflux",
+            "none",
+        ],
     )
 
     pressure_model_params = PressureModelParams{FT}(;
@@ -712,6 +723,12 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         InvScaleHeightEntrDimScale()
     elseif entr_dim_scale == "inv_z"
         InvZEntrDimScale()
+    elseif entr_dim_scale == "pos_massflux"
+        PosMassFluxGradDimScale()
+    elseif entr_dim_scale == "neg_massflux"
+        NegMassFluxGradDimScale()
+    elseif entr_dim_scale == "abs_massflux"
+        AbsMassFluxGradDimScale()
     elseif entr_dim_scale == "none"
         InvMeterEntrDimScale()
     else
@@ -724,7 +741,15 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         "EDMF_PrognosticTKE",
         "detr_dim_scale";
         default = "buoy_vel",
-        valid_options = ["buoy_vel", "inv_scale_height", "inv_z", "none"],
+        valid_options = [
+            "buoy_vel",
+            "inv_scale_height",
+            "inv_z",
+            "pos_massflux",
+            "neg_massflux",
+            "abs_massflux",
+            "none",
+        ],
     )
 
     detr_dim_scale = if detr_dim_scale == "buoy_vel"
@@ -733,6 +758,12 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         InvScaleHeightEntrDimScale()
     elseif detr_dim_scale == "inv_z"
         InvZEntrDimScale()
+    elseif detr_dim_scale == "pos_massflux"
+        PosMassFluxGradDimScale()
+    elseif detr_dim_scale == "neg_massflux"
+        NegMassFluxGradDimScale()
+    elseif detr_dim_scale == "abs_massflux"
+        AbsMassFluxGradDimScale()
     elseif detr_dim_scale == "none"
         InvMeterEntrDimScale()
     else

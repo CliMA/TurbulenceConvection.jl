@@ -144,6 +144,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
         KH = FT(0),
         KQ = FT(0),
         mixing_length = FT(0),
+        massflux = FT(0),
         massflux_tendency_h = FT(0),
         massflux_tendency_qt = FT(0),
         diffusive_tendency_h = FT(0),
@@ -158,6 +159,8 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
         w_up_c = FT(0),
         w_en_c = FT(0),
         Shear² = FT(0),
+        ∂M∂z = FT(0),
+        ∂lnM∂z = FT(0),
         ∂θv∂z = FT(0),
         ∂qt∂z = FT(0),
         ∂θl∂z = FT(0),
@@ -227,6 +230,13 @@ cent_diagnostic_vars_edmf(FT, local_geometry, edmf) = (;
         δ_ml_nondim = FT(0),
         massflux = FT(0),
         frac_turb_entr = FT(0),
+        Π_groups = ntuple(i -> FT(0), n_Π_groups(edmf)),
+        Π₁ = FT(0),
+        Π₂ = FT(0),
+        Π₃ = FT(0),
+        Π₄ = FT(0),
+        Π₅ = FT(0),
+        Π₆ = FT(0),
     )
 )
 

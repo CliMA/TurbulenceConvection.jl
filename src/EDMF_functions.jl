@@ -51,6 +51,9 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     massflux_h = aux_tc_f.massflux_h
     massflux_qt = aux_tc_f.massflux_qt
     aux_tc = center_aux_turbconv(state)
+    ∂M∂z = aux_tc.∂M∂z
+    ∂lnM∂z = aux_tc.∂lnM∂z
+    massflux_c = aux_tc.massflux
 
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
@@ -64,9 +67,9 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     q_tot_gm = aux_gm.q_tot
     q_tot_en = aux_en.q_tot
     If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+    Ic = CCO.InterpolateF2C()
 
     # Compute the mass flux and associated scalar fluxes
-    @. massflux = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm))
     @. massflux_h = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm)) * (If(θ_liq_ice_en) - If(θ_liq_ice_gm))
     @. massflux_qt = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm)) * (If(q_tot_en) - If(q_tot_gm))
     @inbounds for i in 1:N_up
@@ -77,8 +80,18 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         q_tot_up = aux_up_i.q_tot
         θ_liq_ice_up = aux_up_i.θ_liq_ice
         @. aux_up_f[i].massflux = ρ_f * ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm))
+        @. massflux_c += Ic(aux_up_f[i].massflux)
         @. massflux_h += ρ_f * (ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm)) * (If(θ_liq_ice_up) - If(θ_liq_ice_gm)))
         @. massflux_qt += ρ_f * (ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm)) * (If(q_tot_up) - If(q_tot_gm)))
+    end
+
+    @inbounds for i in 1:N_up
+        @. massflux += aux_up_f[i].massflux
+    end
+    @. ∂M∂z = ∇c(wvec(massflux))
+
+    @inbounds for k in real_center_indices(grid)
+        aux_tc.∂lnM∂z[k] = ∂M∂z[k] / (massflux_c[k] + eps(FT))
     end
 
     if edmf.moisture_model isa NonEquilibriumMoisture
