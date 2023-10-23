@@ -23,6 +23,8 @@ function parse_commandline()
         arg_type = String
         "--nn_ent_biases" # Specify whether NN parameter vector contains biases
         arg_type = Bool
+        "--linear_ent_biases"
+        arg_type = Bool
         "--stoch_entr"     # Choose type of stochastic entr-detr model
         arg_type = String
         "--t_max"          # Simulation time to run to

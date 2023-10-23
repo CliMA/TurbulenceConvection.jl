@@ -159,7 +159,7 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["ml_entrainment"] = "None"  # {"None", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_scale_height", "inv_z", "none"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_scale_height", "inv_z", "none"}
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"] = ntuple(i -> i, 6) # or, e.g., (1, 3, 6)
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"] = (1, 2, 3, 4, 6) #ntuple(i -> i, 6) # or, e.g., (1, 3, 6)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["pi_norm_consts"] = [478.298, 1.0, 1.0, 1.0, 1.0, 1.0] # normalization constants for Pi groups
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["stochastic_entrainment"] = "deterministic"  # {"deterministic", "noisy_relaxation_process", "lognormal_scaling", "prognostic_noisy_relaxation_process"}
 
@@ -263,8 +263,7 @@ function default_namelist(
         vec(cat(2*pi*rand(2,100,1), # vec(cat(2*pi*rand(2, m, 1),
                     randn(2,100,6), dims=3)) # randn(2, m, d), dims=3))
 
-    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["linear_ent_params"] =
-        SA.SVector{14}(rand(14))
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["linear_ent_params"] = repeat([1.0], 10)
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["linear_ent_biases"] = true
 
