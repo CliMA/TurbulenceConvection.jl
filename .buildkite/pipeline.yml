@@ -180,7 +180,7 @@ steps:
     steps:
 
       - label: ":partly_sunny: Bomex on sphere"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --config sphere --set_src_seed true --skip_tests true --suffix _sphere"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --config sphere --set_src_seed true --dt_max 8.0 --skip_tests true --suffix _sphere"
         artifact_paths: "Output.Bomex.01_sphere/stats/comparison/*"
 
   - group: "Config testing"
