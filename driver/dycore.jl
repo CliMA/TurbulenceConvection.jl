@@ -338,7 +338,7 @@ function compute_gm_tendencies!(
     C123 = CCG.Covariant123Vector
     C12 = CCG.Contravariant12Vector
     lg = CC.Fields.local_geometry_field(axes(ρ_c))
-    @. tendencies_gm_uₕ -= f × (C12(C123(prog_gm_uₕ)) - C12(C123(aux_gm_uₕ_g))) # geostrophic matters here...
+    @. tendencies_gm_uₕ -= f × (C12(C123(prog_gm_uₕ)) - C12(C123(aux_gm_uₕ_g)))
 
 
     @inbounds for k in TC.real_center_indices(grid)
@@ -391,8 +391,7 @@ function compute_gm_tendencies!(
         end
 
         if Cases.force_type(force) <: Cases.ForcingSOCRATES
-            # temperature horizontal divergence (handeled above)
-
+            # temperature horizontal divergence is handeled above
             # geostrophic handled elsewhere (only affects u,v tendency and maybe surface fluxes?)
 
             # nudge back to era 5 horizosntal
