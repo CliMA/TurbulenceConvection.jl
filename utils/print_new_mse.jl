@@ -15,6 +15,7 @@ all_cases = [
     "Soares",
     "TRMM_LBA",
     "LES_driven_SCM",
+    "SOCRATES_RF13_ERA5_data"
 ]
 
 include(joinpath("..", "post_processing", "mse_tables.jl"))
