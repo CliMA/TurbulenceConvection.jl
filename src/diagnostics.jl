@@ -144,6 +144,7 @@ function io_dictionary_aux_calibrate()
         "cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).cloud_fraction), # was this "cloud_fraction_mean"?
         "RH_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).RH),
         "temperature_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).T),
+        "updraft_area" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).area),
     )
     return io_dict
 end

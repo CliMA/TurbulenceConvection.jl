@@ -124,7 +124,9 @@ function compute_diagnostics!(
     FT = TC.float_type(state)
     N_up = TC.n_updrafts(edmf)
     aux_gm = TC.center_aux_grid_mean(state)
+    prog_gm_f = TC.face_prog_grid_mean(state)
     aux_en = TC.center_aux_environment(state)
+    aux_en_f = TC.face_aux_environment(state)
     aux_up = TC.center_aux_updrafts(state)
     aux_up_f = TC.face_aux_updrafts(state)
     aux_tc_f = TC.face_aux_turbconv(state)
@@ -145,6 +147,8 @@ function compute_diagnostics!(
     diag_tc_f_precip = face_diagnostics_precip(diagnostics)
     ρ_c = prog_gm.ρ
     p_c = aux_gm.p
+    ρ_f = aux_gm_f.ρ
+    w_gm = prog_gm_f.w
 
     diag_tc_svpc = svpc_diagnostics_turbconv(diagnostics)
     diag_svpc = svpc_diagnostics_grid_mean(diagnostics)
@@ -179,15 +183,18 @@ function compute_diagnostics!(
     end
 
     wvec = CC.Geometry.WVector
-    aeKHs_bc = -surf.ρs_flux / a_en[kc_surf] / aux_tc_f.ρ_ae_KH[kf_surf]
+    aeKHs_bc = -surf.ρs_flux / aux_tc_f.ρ_ae_KH[kf_surf]
 
     If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
     ∇f_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(FT(aeKHs_bc)), top = CCO.SetDivergence(FT(0)))
     massflux_s = aux_gm_f.massflux_s
-    parent(massflux_s) .= 0
     @. aux_gm_f.diffusive_flux_s = -aux_tc_f.ρ_ae_KH * ∇f_en(wvec(aux_en.s))
+
+    @. massflux_s = ρ_f * TC.ᶠinterp_a(a_en) * (aux_en_f.w - TC.toscalar(w_gm)) * (If(aux_en.s) - If(aux_gm.s))
     @inbounds for i in 1:N_up
-        @. massflux_s += aux_up_f[i].massflux * (If(aux_up[i].s) - If(aux_en.s))
+        w_up_i = aux_up_f[i].w
+        a_up = aux_up[i].area
+        @. massflux_s += ρ_f * (TC.ᶠinterp_a(a_up) * (w_up_i - TC.toscalar(w_gm)) * (If(aux_up[i].s) - If(aux_gm.s)))
     end
 
     # Mean water paths for calibration
