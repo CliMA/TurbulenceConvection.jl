@@ -1401,9 +1401,13 @@ function forcing_kwargs(case::SOCRATES, namelist) # call in main.jl is forcing =
     # (; wind_nudge_τᵣ = 24*3600, scalar_nudge_τᵣ = 24*3600) # test for free ish run (closer to gettelman) but still unstable...? hmmm
 
     if occursin("obs", string(typeof(case))) # later when we add SOCRATES_obs/ERA5 types we can just do isa(case, SOCRATES_obs)
-        (; wind_nudge_τᵣ = 20 * 60, scalar_nudge_τᵣ = 20 * 60) # paper standard
+        wind_nudge_τᵣ = get(namelist["forcing"], "wind_nudge_τᵣ", 20 * 60) # paper standard (should I cast as FT?)
+        scalar_nudge_τᵣ = get(namelist["forcing"], "scalar_nudge_τᵣ", 20 * 60) # paper standard
+        (; wind_nudge_τᵣ = wind_nudge_τᵣ, scalar_nudge_τᵣ = scalar_nudge_τᵣ)
     else # SOCRATES_ERA5
-        (; wind_nudge_τᵣ = 60 * 60, scalar_nudge_τᵣ = 20 * 60) # paper standard
+        wind_nudge_τᵣ = get(namelist["forcing"], "wind_nudge_τᵣ", 60 * 60) # paper standard
+        scalar_nudge_τᵣ = get(namelist["forcing"], "scalar_nudge_τᵣ", (6 * 60) * 60) # paper standard (testing 6 hr relaxation on T/q since we don't have RRTMG to be in line more w/ appendix D)
+        (; wind_nudge_τᵣ = wind_nudge_τᵣ, scalar_nudge_τᵣ = scalar_nudge_τᵣ)
     end
 end
 
