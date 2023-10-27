@@ -65,6 +65,19 @@ function construct_mesh(namelist; FT = Float64)
         end
         nz = isnothing(nz) ? Int(zmax ÷ Δz) : Int(nz)
         Δz = isnothing(Δz) ? FT(zmax ÷ nz) : FT(Δz)
+    elseif typeof(Cases.get_case(namelist)) <: Cases.SOCRATES # (we dont have a Cases.SOCRATES instance so improvise) # you can't easily create your own mesh in ClimaCore.Meshes so we'll use some representation of the one they have...
+        new_z = vec(eval(Meta.parse("Cases."*namelist["meta"]["casename"]*"()")).get_default_new_z())[:]# we don't have access the object here...namelist[meta][casename] is string of our type though
+        z_mesh = CC.Geometry.ZPoint{FT}.([FT(0), new_z...]) # added 0 to beginning? copy from the file #Array(TC.get_nc_data(data, "zc")) also idk what to do about paths like this
+        nz = length(z_mesh)
+        z₀, z₁ = z_mesh[1], z_mesh[end]
+        zmax = z_mesh[end]
+        domain = CC.Domains.IntervalDomain(
+            CC.Geometry.ZPoint{FT}(z₀),
+            CC.Geometry.ZPoint{FT}(z₁),
+            boundary_tags = (:bottom, :top),
+        )
+        z_mesh = CC.Meshes.IntervalMesh(domain, z_mesh)
+        return (; z_mesh)
     else
         Δz = FT(namelist["grid"]["dz"])
         nz = namelist["grid"]["nz"]
