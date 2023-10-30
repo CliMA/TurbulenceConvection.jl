@@ -165,9 +165,43 @@ all_best_mse["LES_driven_SCM"]["temperature_mean"] = 5.4877160276794674e-5
 all_best_mse["LES_driven_SCM"]["ql_mean"] = 27438.0665544269
 all_best_mse["LES_driven_SCM"]["thetal_mean"] = 5.979480643194291e-5
 #
-all_best_mse["SOCRATES"] = OrderedCollections.OrderedDict(["qt_mean", "ql_mean", "qi_mean", "updraft_qt", "updraft_ql", "updraft_qi", "env_qt", "env_ql", "env_qi", "v_mean", "u_mean", "temperature_mean", "thetal_mean", "updraft_area"] .=>  "NA") # We don't have any SOCRATES individual cases yet so we'll use this catch-all for now for all SOCRATES cases.
+all_best_mse["SOCRATES"] = OrderedCollections.OrderedDict(
+    [
+        "qt_mean",
+        "ql_mean",
+        "qi_mean",
+        "updraft_qt",
+        "updraft_ql",
+        "updraft_qi",
+        "env_qt",
+        "env_ql",
+        "env_qi",
+        "v_mean",
+        "u_mean",
+        "temperature_mean",
+        "thetal_mean",
+        "updraft_area",
+    ] .=> "NA",
+) # We don't have any SOCRATES individual cases yet so we'll use this catch-all for now for all SOCRATES cases.
 #
-all_best_mse["missing_table_placeholder"] = OrderedCollections.OrderedDict(["qt_mean", "ql_mean", "qi_mean", "updraft_qt", "updraft_ql", "updraft_qi", "env_qt", "env_ql", "env_qi", "v_mean", "u_mean", "temperature_mean", "thetal_mean", "updraft_area"] .=>  "NA") # an empty table we can use if we don't have mse values already so that we can proceed with plotting, "NA" will pass all  test_mse() checks
+all_best_mse["missing_table_placeholder"] = OrderedCollections.OrderedDict(
+    [
+        "qt_mean",
+        "ql_mean",
+        "qi_mean",
+        "updraft_qt",
+        "updraft_ql",
+        "updraft_qi",
+        "env_qt",
+        "env_ql",
+        "env_qi",
+        "v_mean",
+        "u_mean",
+        "temperature_mean",
+        "thetal_mean",
+        "updraft_area",
+    ] .=> "NA",
+) # an empty table we can use if we don't have mse values already so that we can proceed with plotting, "NA" will pass all  test_mse() checks
 #################################
 #################################
 #################################
