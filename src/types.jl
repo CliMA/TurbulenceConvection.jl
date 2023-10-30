@@ -215,7 +215,6 @@ Base.@kwdef struct MixingLengthParams{FT}
     Ri_c::FT # critical Richardson number
     Le::FT # Lewis number
     smin_ub::FT # lower limit for smin function
-    smin_rm::FT # upper ratio limit for smin function
     l_max::FT
 end
 
@@ -620,7 +619,6 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     β_lim = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "area_limiter_power")
     c_γ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "turbulent_entrainment_factor")
     c_δ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "detrainment_factor")
-    smin_rm = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_rm")
     Π_norm = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pi_norm_consts")
     Π_norm = SA.SVector{length(Π_norm), FT}(Π_norm)
 
@@ -714,7 +712,6 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         Ri_c = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Ri_crit"),
         Le = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "Lewis_number"; default = 1.0),
         smin_ub = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "smin_ub"),
-        smin_rm = smin_rm,
         l_max = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),
     )
 

@@ -14,9 +14,9 @@ end
 # lambert_2_over_e(::Type{FT}) where {FT} = FT(LambertW.lambertw(FT(2) / FT(MathConstants.e)))
 lambert_2_over_e(::Type{FT}) where {FT} = FT(0.46305551336554884) # since we can evaluate
 
-function lamb_smooth_minimum(l::SA.SVector, lower_bound::FT, upper_bound::FT) where {FT}
+function lamb_smooth_minimum(l::SA.SVector, lower_bound::FT) where {FT}
     x_min = minimum(l)
-    λ_0 = max(x_min * lower_bound / lambert_2_over_e(FT), upper_bound)
+    λ_0 = (x_min * lower_bound / lambert_2_over_e(FT)) + eps(FT)
 
     num = sum(l_i -> l_i * exp(-(l_i - x_min) / λ_0), l)
     den = sum(l_i -> exp(-(l_i - x_min) / λ_0), l)
