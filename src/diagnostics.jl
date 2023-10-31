@@ -99,6 +99,7 @@ function io_dictionary_aux()
         "qs_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno),
 
         "mixing_length" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).mixing_length),
+        "buoy_grad" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂b∂z),
 
         "updraft_cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).cloud_fraction),
 

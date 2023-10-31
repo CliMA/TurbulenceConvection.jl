@@ -47,15 +47,18 @@ function mixing_length(mix_len_params, param_set, ml_model::MinDisspLen{FT}) whe
     end
 
     # add limiters
-    l = SA.SVector(
-        (l_N < eps(FT) || l_N > l_max) ? l_max : l_N,
-        (l_TKE < eps(FT) || l_TKE > l_max) ? l_max : l_TKE,
-        (l_W < eps(FT) || l_W > l_max) ? l_max : l_W,
-    )
+    # l = SA.SVector(
+    #     (l_N < eps(FT) || l_N > l_max) ? l_max : l_N,
+    #     (l_TKE < eps(FT) || l_TKE > l_max) ? l_max : l_TKE,
+    #     (l_W < eps(FT) || l_W > l_max) ? l_max : l_W,
+    # )
 
     # get soft minimum
     min_len, min_len_ind = findmin(l)
-    mix_len = lamb_smooth_minimum(l, smin_ub, smin_rm)
+    # mix_len = lamb_smooth_minimum(l, smin_ub, smin_rm)
+    l_smin = lamb_smooth_minimum(SA.SVector(l_N, l_TKE, l_W), smin_ub, smin_rm)
+    mix_len = max(l_N, min(l_smin, z))
+
     ml_ratio = mix_len / min_len
     return MixLen(min_len_ind, mix_len, ml_ratio)
 end
