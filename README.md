@@ -71,6 +71,10 @@ julia --project=integration_tests
 julia> ]
 pkg> instantiate
 ```
+ClimaCore.jl, a dependency of TC.jl, will by default attempt to run code on a GPU device if available. TC.jl is not compatible with GPUs, and the following environmental variable needs to be exported to prevent GPU attempts:
+```
+export CLIMACOMMS_DEVICE=CPU
+```
 
 # Running #
 
