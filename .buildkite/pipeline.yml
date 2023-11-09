@@ -2,6 +2,8 @@ env:
   JULIA_VERSION: "1.9.3"
   OPENMPI_VERSION: "4.0.4"
   CUDA_VERSION: "11.2"
+  CLIMACOMMS_DEVICE: "CPU"
+  JULIA_CPU_TARGET: 'broadwell;skylake'
   OPENBLAS_NUM_THREADS: 1
   CLIMATEMACHINE_SETTINGS_FIX_RNG_SEED: "true"
   BUILDKITE_COMMIT: "${BUILDKITE_COMMIT}"
@@ -16,7 +18,7 @@ agents:
 
 steps:
 
-  # Clear depot
+  # # Clear depot
   # - label: "clear depot"
   #   command:
   #     - "rm -rf /central/scratch/esm/slurm-buildkite/turbulenceconvection-ci/depot/cpu"
@@ -28,6 +30,9 @@ steps:
     key: "init_cpu_env"
     command:
       - "echo $$JULIA_DEPOT_PATH"
+
+      - echo "--- Configure MPI"
+      - julia -e 'using Pkg; Pkg.add("MPIPreferences"); using MPIPreferences; use_system_binary()'
 
       - echo "--- Instantiate integration_tests"
       - "julia --project=integration_tests -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
