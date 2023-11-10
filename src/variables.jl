@@ -144,6 +144,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
         KH = FT(0),
         KQ = FT(0),
         mixing_length = FT(0),
+        ∂b∂z = FT(0),
         massflux = FT(0),
         massflux_tendency_h = FT(0),
         massflux_tendency_qt = FT(0),

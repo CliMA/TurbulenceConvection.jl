@@ -46,16 +46,31 @@ function mixing_length(mix_len_params, param_set, ml_model::MinDisspLen{FT}) whe
         l_N = l_max
     end
 
+
+    c_smag = 0.2
+    N_eff = sqrt(max(∂b∂z, 0))
+    if N_eff > 0.0
+        l_smag =
+            c_smag *
+            50.0 *
+            max(0, 1 - N_eff^2 / ml_model.Pr / (ml_model.Shear²))^(1 / 4)
+    else
+        l_smag = c_smag * 50.0
+    end
+
     # add limiters
-    l = SA.SVector(
-        (l_N < eps(FT) || l_N > l_max) ? l_max : l_N,
-        (l_TKE < eps(FT) || l_TKE > l_max) ? l_max : l_TKE,
-        (l_W < eps(FT) || l_W > l_max) ? l_max : l_W,
-    )
+    # l = SA.SVector(
+    #     (l_N < eps(FT) || l_N > l_max) ? l_max : l_N,
+    #     (l_TKE < eps(FT) || l_TKE > l_max) ? l_max : l_TKE,
+    #     (l_W < eps(FT) || l_W > l_max) ? l_max : l_W,
+    # )
 
     # get soft minimum
-    min_len, min_len_ind = findmin(l)
-    mix_len = lamb_smooth_minimum(l, smin_ub, smin_rm)
+    min_len, min_len_ind = findmin(SA.SVector(l_N, l_TKE, l_W))
+    # mix_len = lamb_smooth_minimum(l, smin_ub, smin_rm)
+    l_smin = lamb_smooth_minimum(SA.SVector(l_N, l_TKE, l_W), smin_ub, smin_rm)
+    mix_len = max(l_smag, min(l_smin, l_max))
+
     ml_ratio = mix_len / min_len
     return MixLen(min_len_ind, mix_len, ml_ratio)
 end

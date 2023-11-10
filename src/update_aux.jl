@@ -308,6 +308,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ∂qt∂z_sat = center_aux_turbconv(state).∂qt∂z_sat
     ∂θl∂z_sat = center_aux_turbconv(state).∂θl∂z_sat
     ∂θv∂z_unsat = center_aux_turbconv(state).∂θv∂z_unsat
+    ∂b∂z = center_aux_turbconv(state).∂b∂z
 
     ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
     If0 = CCO.InterpolateC2F(; ∇0_bcs...)
@@ -419,6 +420,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0))
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
         KQ[k] = KH[k] / Le
+        ∂b∂z[k] = bg.∂b∂z
 
         aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
     end
