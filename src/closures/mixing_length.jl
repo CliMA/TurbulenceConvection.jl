@@ -2,7 +2,6 @@ function mixing_length(mix_len_params, param_set, ml_model::MinDisspLen{FT}) whe
     c_m = mix_len_params.c_m
     c_d = mix_len_params.c_d
     smin_ub = mix_len_params.smin_ub
-    smin_rm = mix_len_params.smin_rm
     l_max = mix_len_params.l_max
     c_b = mix_len_params.c_b
     g::FT = TCP.grav(param_set)
@@ -55,7 +54,7 @@ function mixing_length(mix_len_params, param_set, ml_model::MinDisspLen{FT}) whe
 
     # get soft minimum
     min_len, min_len_ind = findmin(l)
-    mix_len = lamb_smooth_minimum(l, smin_ub, smin_rm)
+    mix_len = lamb_smooth_minimum(l, smin_ub)
     ml_ratio = mix_len / min_len
     return MixLen(min_len_ind, mix_len, ml_ratio)
 end
