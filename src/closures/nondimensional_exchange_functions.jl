@@ -7,6 +7,13 @@ function max_area_limiter(εδ_model, max_area, a_up)
     return A * exp(-k * (max_area - a_up))
 end
 
+function min_area_limiter(εδ_model, a_up)
+    FT = eltype(a_up)
+    A = εδ_params(εδ_model).min_area_limiter_scale
+    k = εδ_params(εδ_model).min_area_limiter_power
+    return A * exp(-k * a_up)
+end
+
 function non_dimensional_groups(εδ_model, εδ_model_vars)
     FT = eltype(εδ_model_vars.tke_en)
     Δw = get_Δw(εδ_model, εδ_model_vars.w_up, εδ_model_vars.w_en)
@@ -18,6 +25,10 @@ function non_dimensional_groups(εδ_model, εδ_model_vars)
     Π₄ = (εδ_model_vars.RH_up - εδ_model_vars.RH_en) / Π_norm[4]
     Π₅ = εδ_model_vars.zc_i / εδ_model_vars.H_up / Π_norm[5]
     Π₆ = εδ_model_vars.zc_i / εδ_model_vars.ref_H / Π_norm[6]
+
+    # Π₁, Π₂ are unbounded, so clip values that blow up
+    Π₁ = clamp(Π₁, -1.0, 1.0)
+    Π₂ = clamp(Π₂, -1.0, 1.0)
 
     Π_groups = (Π₁, Π₂, Π₃, Π₄, Π₅, Π₆)
 
