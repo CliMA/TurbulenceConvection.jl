@@ -51,6 +51,9 @@ Base.@kwdef struct εδModelParams{FT, AFT}
     c_λ::FT # scaling factor for TKE in entrainment scale calculations
     γ_lim::FT
     β_lim::FT
+    limit_min_area::Bool
+    min_area_limiter_scale::FT
+    min_area_limiter_power::FT
     c_γ::FT # scaling factor for turbulent entrainment rate
     c_δ::FT # factor multiplier for moist term in entrainment/detrainment
     Π_norm::AFT
@@ -617,12 +620,30 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     c_λ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entrainment_smin_tke_coeff")
     γ_lim = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "area_limiter_scale")
     β_lim = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "area_limiter_power")
+    limit_min_area = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "limit_min_area")
+    min_area_limiter_scale = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_area_limiter_scale")
+    min_area_limiter_power = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_area_limiter_power")
     c_γ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "turbulent_entrainment_factor")
     c_δ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "detrainment_factor")
     Π_norm = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pi_norm_consts")
     Π_norm = SA.SVector{length(Π_norm), FT}(Π_norm)
 
-    εδ_params = εδModelParams{FT, typeof(Π_norm)}(; w_min, c_ε, μ_0, β, χ, c_λ, γ_lim, β_lim, c_γ, c_δ, Π_norm)
+    εδ_params = εδModelParams{FT, typeof(Π_norm)}(;
+        w_min,
+        c_ε,
+        μ_0,
+        β,
+        χ,
+        c_λ,
+        γ_lim,
+        β_lim,
+        limit_min_area,
+        min_area_limiter_scale,
+        min_area_limiter_power,
+        c_γ,
+        c_δ,
+        Π_norm,
+    )
 
     entr_pi_subset = Tuple(parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_pi_subset"))
 
