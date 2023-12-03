@@ -28,7 +28,7 @@ UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 [compat]
 CLIMAParameters = "0.7"
 ClimaCore = "0.10"
-ClimaComms = ">= 0.5.6"
+ClimaComms = "0.5.6"
 CloudMicrophysics = "0.10, 0.11, 0.12"
 Dierckx = "0.5"
 Distributions = "0.25"
@@ -44,7 +44,7 @@ StochasticDiffEq = "6"
 SurfaceFluxes = "0.6, 0.7, 0.8"
 Thermodynamics = "0.9, 0.10, 0.11"
 UnPack = "1.0"
-julia = "1.7"
+julia = "1.5"
 
 [extras]
 CPUSummary = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"
