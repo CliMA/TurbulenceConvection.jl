@@ -166,7 +166,7 @@ num_biases_from_arc(nn_arc::AbstractArray{Int}) = sum(i -> nn_arc[i + 1], 1:(len
         arc::AbstractArray{Int},
         params::AbstractArray{FT};
         biases_bool::bool = false,
-        activation_function::Flux.Function = Flux.sigmoid,
+        activation_function::Flux.Function = Flux.relu,
         output_layer_activation_function::Flux.Function = Flux.relu,)
 
     Given network architecture and parameter vectors, construct NN model and unpack weights (and biases if `biases_bool` is true).
@@ -180,7 +180,7 @@ function construct_fully_connected_nn(
     arc::AbstractArray{Int},
     params::AbstractArray{FT};
     biases_bool::Bool = false,
-    activation_function::Flux.Function = Flux.sigmoid,
+    activation_function::Flux.Function = Flux.relu,
     output_layer_activation_function::Flux.Function = Flux.relu,
 ) where {FT <: Real}
 
@@ -251,7 +251,7 @@ end
     construct_fully_connected_nn_default(
         arc::AbstractArray{Int};
         biases_bool::Bool = false,
-        activation_function::Flux.Function = Flux.sigmoid,
+        activation_function::Flux.Function = Flux.relu,
         output_layer_activation_function::Flux.Function = Flux.relu,
     )
 
@@ -265,7 +265,7 @@ Given network architecture, construct NN model with default `Flux.jl` weight ini
 function construct_fully_connected_nn_default(
     arc::AbstractArray{Int};
     biases_bool::Bool = false,
-    activation_function::Flux.Function = Flux.sigmoid,
+    activation_function::Flux.Function = Flux.relu,
     output_layer_activation_function::Flux.Function = Flux.relu,
 )
 
