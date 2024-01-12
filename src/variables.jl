@@ -53,7 +53,9 @@ cent_aux_vars_up(FT, local_geometry, edmf) = (;
     entr_turb_dyn = FT(0),
     detr_turb_dyn = FT(0),
     asp_ratio = FT(0),
+    ρarea_temp = FT(0),
     Π_groups = ntuple(i -> FT(0), n_Π_groups(edmf)),
+
 )
 cent_aux_vars_edmf_bulk_moisture(FT, ::NonEquilibriumMoisture) = (;
     ql_tendency_precip_formation = FT(0),
@@ -147,6 +149,10 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
         massflux = FT(0),
         massflux_tendency_h = FT(0),
         massflux_tendency_qt = FT(0),
+        rhoa_tend = FT(0),
+        rhoa_tend_term1 = FT(0), 
+        rhoa_tend_term2 = FT(0),
+        rhoa_tend_term3 = FT(0),
         diffusive_tendency_h = FT(0),
         diffusive_tendency_qt = FT(0),
         cent_aux_vars_edmf_moisture(FT, edmf.moisture_model)...,
@@ -184,6 +190,7 @@ face_aux_vars_up(FT, local_geometry) = (;
     nh_pressure_drag = FT(0),
     massflux = FT(0),
     area = FT(0),
+    ρarea_temp = FT(0),
 )
 face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
     massflux_en = FT(0), # TODO: is this the right place for this?
@@ -211,6 +218,7 @@ face_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
         face_aux_vars_edmf_moisture(FT, edmf.moisture_model)...,
         diffusive_flux_uₕ = CCG.Covariant3Vector(FT(0)) ⊗ CCG.Covariant12Vector(FT(0), FT(0)),
         uvw = CCG.Covariant123Vector(CCG.WVector(FT(0)), local_geometry),
+        # ρarea_temp = FT(0),
     )
 )
 
