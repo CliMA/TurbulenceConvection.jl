@@ -57,6 +57,9 @@ Base.@kwdef struct εδModelParams{FT, AFT}
     c_γ::FT # scaling factor for turbulent entrainment rate
     c_δ::FT # factor multiplier for moist term in entrainment/detrainment
     Π_norm::AFT
+    entr_nondim_norm_factor::FT
+    detr_nondim_norm_factor::FT
+
 end
 
 abstract type AbstractEntrDetrModel end
@@ -129,6 +132,9 @@ Base.eltype(::RFEntr{d, m, FT}) where {d, m, FT} = FT
 εδ_params(m::AbstractMLEntrDetrModel) = m.params
 εδ_params(m::AbstractNoisyEntrDetrModel) = m.mean_model.params
 
+abstract type EntrModelFacTotalType end
+struct FractionalEntrModel <: EntrModelFacTotalType end
+struct TotalRateEntrModel <: EntrModelFacTotalType end
 
 abstract type EntrDimScale end
 struct BuoyVelEntrDimScale <: EntrDimScale end
@@ -138,6 +144,15 @@ struct InvMeterEntrDimScale <: EntrDimScale end
 struct PosMassFluxGradDimScale <: EntrDimScale end
 struct NegMassFluxGradDimScale <: EntrDimScale end
 struct AbsMassFluxGradDimScale <: EntrDimScale end
+struct MassFluxGradDimScale <: EntrDimScale end
+struct BOverWDimScale <: EntrDimScale end
+struct WOverHeightDimScale <: EntrDimScale end
+struct BOverSqrtTKEDimScale <: EntrDimScale end
+struct SqrtBOverZDimScale <: EntrDimScale end
+struct TKEBWDimScale <: EntrDimScale end
+struct DwDzDimScale <: EntrDimScale end
+struct DmDzOverRhoaDimScale <: EntrDimScale end
+
 
 """
     GradBuoy
@@ -442,7 +457,7 @@ Base.@kwdef struct SurfaceBase{FT}
     wstar::FT = 0
 end
 
-struct EDMFModel{N_up, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, EDS, DDS, EPG}
+struct EDMFModel{N_up, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}
     surface_area::FT
     surface_area_bc::SABC
     max_area::FT
@@ -458,6 +473,7 @@ struct EDMFModel{N_up, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC,
     pressure_model_params::PMP
     entr_closure::EC
     ml_entr_closure::MLEC
+    entrainment_type::ET
     entr_dim_scale::EDS
     detr_dim_scale::DDS
     entr_pi_subset::EPG
@@ -627,6 +643,10 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     c_δ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "detrainment_factor")
     Π_norm = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pi_norm_consts")
     Π_norm = SA.SVector{length(Π_norm), FT}(Π_norm)
+    entr_nondim_norm_factor =
+        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_nondim_norm_factor", default = 1.0)
+    detr_nondim_norm_factor =
+        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "detr_nondim_norm_factor", default = 1.0)
 
     εδ_params = εδModelParams{FT, typeof(Π_norm)}(;
         w_min,
@@ -643,6 +663,8 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         c_γ,
         c_δ,
         Π_norm,
+        entr_nondim_norm_factor,
+        detr_nondim_norm_factor,
     )
 
     entr_pi_subset = Tuple(parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_pi_subset"))
@@ -700,6 +722,24 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     # minimum updraft top to avoid zero division in pressure drag and turb-entr
     H_up_min = FT(parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_updraft_top"))
 
+
+    entrainment_type = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "entrainment_type";
+        default = "fractional",
+        valid_options = ["fractional", "total_rate"],
+    )
+
+    if entrainment_type == "fractional"
+        entrainment_type = FractionalEntrModel()
+    elseif entrainment_type == "total_rate"
+        entrainment_type = TotalRateEntrModel()
+    else
+        error("Something went wrong. Invalid entrainment type '$entrainment_type'")
+    end
+
     entr_dim_scale = parse_namelist(
         namelist,
         "turbulence",
@@ -713,7 +753,15 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
             "pos_massflux",
             "neg_massflux",
             "abs_massflux",
+            "mf_grad",
             "none",
+            "b_w",
+            "w_height",
+            "b_sqrt_tke",
+            "sqrt_b_z",
+            "tke_b_w",
+            "dw_dz",
+            "mf_grad_rhoa",
         ],
     )
 
@@ -748,8 +796,24 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         NegMassFluxGradDimScale()
     elseif entr_dim_scale == "abs_massflux"
         AbsMassFluxGradDimScale()
+    elseif entr_dim_scale == "mf_grad"
+        MassFluxGradDimScale()
     elseif entr_dim_scale == "none"
         InvMeterEntrDimScale()
+    elseif entr_dim_scale == "b_w" # b/w
+        BOverWDimScale()
+    elseif entr_dim_scale == "w_height" # w/z
+        WOverHeightDimScale()
+    elseif entr_dim_scale == "b_sqrt_tke" # b/sqrt(tke)
+        BOverSqrtTKEDimScale()
+    elseif entr_dim_scale == "sqrt_b_z" # sqrt(b/z)
+        SqrtBOverZDimScale()
+    elseif entr_dim_scale == "tke_b_w" # (tke*b)/w^3
+        TKEBWDimScale()
+    elseif entr_dim_scale == "dw_dz"
+        DwDzDimScale()
+    elseif entr_dim_scale == "mf_grad_rhoa"
+        DmDzOverRhoaDimScale()
     else
         error("Something went wrong. Invalid entrainment dimension scale '$entr_dim_scale'")
     end
@@ -767,7 +831,15 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
             "pos_massflux",
             "neg_massflux",
             "abs_massflux",
+            "mf_grad",
             "none",
+            "b_w",
+            "w_height",
+            "b_sqrt_tke",
+            "sqrt_b_z",
+            "tke_b_w",
+            "dw_dz",
+            "mf_grad_rhoa",
         ],
     )
 
@@ -783,14 +855,31 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         NegMassFluxGradDimScale()
     elseif detr_dim_scale == "abs_massflux"
         AbsMassFluxGradDimScale()
+    elseif detr_dim_scale == "mf_grad"
+        MassFluxGradDimScale()
     elseif detr_dim_scale == "none"
         InvMeterEntrDimScale()
+    elseif detr_dim_scale == "b_w" # b/w
+        BOverWDimScale()
+    elseif detr_dim_scale == "w_height" # w/z
+        WOverHeightDimScale()
+    elseif detr_dim_scale == "b_sqrt_tke" # b/sqrt(tke)
+        BOverSqrtTKEDimScale()
+    elseif detr_dim_scale == "sqrt_b_z" # sqrt(b/z)
+        SqrtBOverZDimScale()
+    elseif detr_dim_scale == "tke_b_w" # (tke*b)/w^3
+        TKEBWDimScale()
+    elseif detr_dim_scale == "dw_dz"
+        DwDzDimScale()
+    elseif detr_dim_scale == "mf_grad_rhoa"
+        DmDzOverRhoaDimScale()
     else
         error("Something went wrong. Invalid entrainment dimension scale '$detr_dim_scale'")
     end
 
     SABC = typeof(surface_area_bc)
     EDS = typeof(entr_dim_scale)
+    ET = typeof(entrainment_type)
     DDS = typeof(detr_dim_scale)
     EC = typeof(entr_closure)
     MLEC = typeof(ml_entr_closure)
@@ -804,7 +893,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     EPG = typeof(entr_pi_subset)
     MLP = typeof(mixing_length_params)
     PMP = typeof(pressure_model_params)
-    return EDMFModel{n_updrafts, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, EDS, DDS, EPG}(
+    return EDMFModel{n_updrafts, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}(
         surface_area,
         surface_area_bc,
         max_area,
@@ -820,6 +909,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         pressure_model_params,
         entr_closure,
         ml_entr_closure,
+        entrainment_type,
         entr_dim_scale,
         detr_dim_scale,
         entr_pi_subset,
