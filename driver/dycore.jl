@@ -119,6 +119,8 @@ function set_thermo_state_from_prog!(state, grid, moisture_model, param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
+    aux_up = TC.center_aux_updrafts(state)
+    aux_up_f = TC.face_aux_updrafts(state)
 
     @inbounds for k in TC.real_center_indices(grid)
         thermo_args = if moisture_model isa TC.EquilibriumMoisture
@@ -128,13 +130,24 @@ function set_thermo_state_from_prog!(state, grid, moisture_model, param_set)
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
-        ts_gm[k] = TC.thermo_state_pθq(
-            param_set,
-            p_c[k],
-            prog_gm.ρθ_liq_ice[k] / ρ_c[k],
-            prog_gm.ρq_tot[k] / ρ_c[k],
-            thermo_args...,
-        )
+        try
+            ts_gm[k] = TC.thermo_state_pθq(
+                param_set,
+                p_c[k],
+                prog_gm.ρθ_liq_ice[k] / ρ_c[k],
+                prog_gm.ρq_tot[k] / ρ_c[k],
+                thermo_args...,
+            )
+        catch e
+            println("nooooo, grid mean: ----", e)
+            @show p_c[k]
+            @show prog_gm.ρθ_liq_ice[k] / ρ_c[k]
+            @show prog_gm.ρq_tot[k] / ρ_c[k]
+            @show aux_up[1].area[k]
+            # @show aux_up_f[1].w
+            @show k
+            rethrow(e)
+        end
     end
     return nothing
 end

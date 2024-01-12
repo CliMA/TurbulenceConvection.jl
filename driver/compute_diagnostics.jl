@@ -278,6 +278,9 @@ function compute_diagnostics!(
     diag_svpc.cloud_base_mean[cent] = cloud_base_gm
     diag_svpc.cloud_top_mean[cent] = cloud_top_gm
 
+
+    
+
     #####
     ##### Fluxes
     #####
@@ -305,9 +308,35 @@ function compute_diagnostics!(
         diag_tc.Π₄[k] = 0
         diag_tc.Π₅[k] = 0
         diag_tc.Π₆[k] = 0
-        if a_up_bulk_k > 0.0
+        if a_up_bulk_k > edmf.minimum_area * N_up
             @inbounds for i in 1:N_up
                 aux_up_i = aux_up[i]
+
+                # @show "------- here ----------"
+                # @show aux_up_i.entr_ml[k]
+                # @show abs(aux_tc.∂lnM∂z[k])
+                # @show aux_up_i.ε_ml_nondim[k] 
+                # @show aux_up_i.entr_ml[k] - (abs(aux_tc.∂lnM∂z[k])*aux_up_i.ε_ml_nondim[k])
+                # @show k
+            
+                # @assert aux_up_i.entr_ml[k] == abs(aux_tc.∂lnM∂z[k]) * aux_up_i.ε_ml_nondim[k] 
+                # @assert aux_up_i.detr_ml[k] == abs(aux_tc.∂lnM∂z[k]) * aux_up_i.δ_ml_nondim[k]
+
+                                # Showing original values
+                # if round(aux_up_i.entr_ml[k], digits = 5) != round(abs(aux_tc.∂lnM∂z[k]) * aux_up_i.ε_ml_nondim[k], digits = 5)
+                #     # @show "------- here ----------"
+                #     @show aux_up_i.entr_ml[k]
+                #     @show abs(aux_tc.∂lnM∂z[k])
+                #     @show aux_up_i.ε_ml_nondim[k]
+                #     @show aux_up_i.entr_ml[k] - (abs(aux_tc.∂lnM∂z[k]) * aux_up_i.ε_ml_nondim[k])
+                #     @show k
+                # end
+
+                # Assertions with rounded values
+                # @assert round(aux_up_i.entr_ml[k], digits=5) == round(abs(aux_tc.∂lnM∂z[k]) * aux_up_i.ε_ml_nondim[k], digits=5)
+                # @assert round(aux_up_i.detr_ml[k], digits=5) == round(abs(aux_tc.∂lnM∂z[k]) * aux_up_i.δ_ml_nondim[k], digits=5)
+
+
                 diag_tc.entr_sc[k] += aux_up_i.area[k] * aux_up_i.entr_sc[k] / a_up_bulk_k
                 diag_tc.ε_nondim[k] += aux_up_i.area[k] * aux_up_i.ε_nondim[k] / a_up_bulk_k
                 diag_tc.detr_sc[k] += aux_up_i.area[k] * aux_up_i.detr_sc[k] / a_up_bulk_k
@@ -318,6 +347,9 @@ function compute_diagnostics!(
                 diag_tc.δ_ml_nondim[k] += aux_up_i.area[k] * aux_up_i.δ_ml_nondim[k] / a_up_bulk_k
                 diag_tc.asp_ratio[k] += aux_up_i.area[k] * aux_up_i.asp_ratio[k] / a_up_bulk_k
                 diag_tc.frac_turb_entr[k] += aux_up_i.area[k] * aux_up_i.frac_turb_entr[k] / a_up_bulk_k
+
+                # @assert diag_tc.entr_ml[k] == aux_up_i.entr_ml[k]
+                # @assert diag_tc.detr_ml[k] == aux_up_i.detr_ml[k]
 
                 for Π_i in 1:length(pi_subset)
                     sub_script = ""

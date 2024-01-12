@@ -95,13 +95,17 @@ function initialize_updrafts(edmf, grid, state, surf)
         elseif edmf.surface_area_bc isa TC.PrognosticSurfaceAreaBC
             a_up_initial = FT(0.1)
             aux_up[i].area[kc_surf] = a_up_initial
+            aux_up[i].area[kc_surf + 1] = a_up_initial
             prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_up_initial
+            prog_up[i].ρarea[kc_surf + 1] = ρ_c[kc_surf + 1] * a_up_initial
 
-            aux_up_f[i].w[kf_surf + 1] = FT(0.01) # small velocity perturbation
-            prog_up_f[i].ρaw[kf_surf + 1] = ρ_f[kf_surf + 1] * a_up_initial * FT(0.01) # small ρaw perturbation
+            aux_up_f[i].w[kf_surf + 1] = FT(0.1) # small velocity perturbation
+            prog_up_f[i].ρaw[kf_surf + 1] = ρ_f[kf_surf + 1] * a_up_initial * FT(0.1) # small ρaw perturbation
 
             prog_up[i].ρaq_tot[kc_surf] = ρ_c[kc_surf] * a_up_initial * aux_gm.q_tot[kc_surf]
             prog_up[i].ρaθ_liq_ice[kc_surf] = ρ_c[kc_surf] * a_up_initial * aux_gm.θ_liq_ice[kc_surf]
+            prog_up[i].ρaq_tot[kc_surf + 1] = ρ_c[kc_surf + 1] * a_up_initial * aux_gm.q_tot[kc_surf + 1]
+            prog_up[i].ρaθ_liq_ice[kc_surf + 1] = ρ_c[kc_surf + 1] * a_up_initial * aux_gm.θ_liq_ice[kc_surf + 1]
         end
     end
     return
