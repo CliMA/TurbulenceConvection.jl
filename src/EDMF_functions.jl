@@ -51,13 +51,6 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     massflux_h = aux_tc_f.massflux_h
     massflux_qt = aux_tc_f.massflux_qt
     aux_tc = center_aux_turbconv(state)
-    ∂M∂z = aux_tc.∂M∂z
-    ∂lnM∂z = aux_tc.∂lnM∂z
-    massflux_c = aux_tc.massflux
-    parent(massflux) .= 0
-    parent(massflux_c) .= 0
-    parent(∂M∂z) .= 0
-    parent(∂lnM∂z) .= 0
 
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
@@ -77,25 +70,17 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     @. massflux_h = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm)) * (If(θ_liq_ice_en) - If(θ_liq_ice_gm))
     @. massflux_qt = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm)) * (If(q_tot_en) - If(q_tot_gm))
     @inbounds for i in 1:N_up
-        aux_up_f_i = aux_up_f[i]
+        massflux_face_i = aux_up_f[i].massflux
+        parent(massflux_face_i) .= 0
         aux_up_i = aux_up[i]
         a_up = aux_up[i].area
         w_up_i = aux_up_f[i].w
         q_tot_up = aux_up_i.q_tot
         θ_liq_ice_up = aux_up_i.θ_liq_ice
         @. aux_up_f[i].massflux = ρ_f * ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm))
-        @. massflux_c += Ic(aux_up_f[i].massflux)
+        # @. massflux_c += Ic(aux_up_f[i].massflux)
         @. massflux_h += ρ_f * (ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm)) * (If(θ_liq_ice_up) - If(θ_liq_ice_gm)))
         @. massflux_qt += ρ_f * (ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm)) * (If(q_tot_up) - If(q_tot_gm)))
-    end
-
-    @inbounds for i in 1:N_up
-        @. massflux += aux_up_f[i].massflux
-    end
-    @. ∂M∂z = ∇c(wvec(massflux))
-
-    @inbounds for k in real_center_indices(grid)
-        aux_tc.∂lnM∂z[k] = ∂M∂z[k] / (massflux_c[k] + eps(FT))
     end
 
     if edmf.moisture_model isa NonEquilibriumMoisture
@@ -490,6 +475,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     tendencies_up_f = face_tendencies_updrafts(state)
     prog_gm = center_prog_grid_mean(state)
     aux_gm_f = face_aux_grid_mean(state)
+    aux_tc = center_aux_turbconv(state)
     ρ_c = prog_gm.ρ
     ρ_f = aux_gm_f.ρ
     au_lim = edmf.max_area
@@ -519,6 +505,8 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         θ_liq_ice_up = aux_up_i.θ_liq_ice
         entr_turb_dyn = aux_up_i.entr_turb_dyn
         detr_turb_dyn = aux_up_i.detr_turb_dyn
+        entr_rate_inv_s = aux_up_i.entr_rate_inv_s
+        detr_rate_inv_s = aux_up_i.detr_rate_inv_s
         θ_liq_ice_tendency_precip_formation = aux_up_i.θ_liq_ice_tendency_precip_formation
         qt_tendency_precip_formation = aux_up_i.qt_tendency_precip_formation
 
@@ -529,16 +517,33 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         tends_ρarea = tendencies_up[i].ρarea
         tends_ρaθ_liq_ice = tendencies_up[i].ρaθ_liq_ice
         tends_ρaq_tot = tendencies_up[i].ρaq_tot
-        @. tends_ρarea =
-            -∇c(wvec(LBF(Ic(w_up) * ρarea))) + (ρarea * Ic(w_up) * entr_turb_dyn) - (ρarea * Ic(w_up) * detr_turb_dyn)
 
-        @. tends_ρaθ_liq_ice =
-            -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice))) + (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) -
-            (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn) + (ρ_c * θ_liq_ice_tendency_precip_formation)
+        if edmf.entrainment_type isa FractionalEntrModel
+            @. tends_ρarea =
+                -∇c(wvec(LBF(Ic(w_up) * ρarea))) + (ρarea * Ic(w_up) * entr_turb_dyn) -
+                (ρarea * Ic(w_up) * detr_turb_dyn)
+        elseif edmf.entrainment_type isa TotalRateEntrModel
+            @. tends_ρarea = -∇c(wvec(LBF(Ic(w_up) * ρarea))) + ρarea * (entr_rate_inv_s - detr_rate_inv_s)
+        end
 
-        @. tends_ρaq_tot =
-            -∇c(wvec(LBF(Ic(w_up) * ρaq_tot))) + (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en) -
-            (ρaq_tot * Ic(w_up) * detr_turb_dyn) + (ρ_c * qt_tendency_precip_formation)
+        if edmf.entrainment_type isa FractionalEntrModel
+            @. tends_ρaθ_liq_ice =
+                -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice))) + (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) -
+                (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn) + (ρ_c * θ_liq_ice_tendency_precip_formation)
+
+            @. tends_ρaq_tot =
+                -∇c(wvec(LBF(Ic(w_up) * ρaq_tot))) + (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en) -
+                (ρaq_tot * Ic(w_up) * detr_turb_dyn) + (ρ_c * qt_tendency_precip_formation)
+
+        elseif edmf.entrainment_type isa TotalRateEntrModel
+            @. tends_ρaθ_liq_ice =
+                -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice))) + (ρarea * entr_rate_inv_s * θ_liq_ice_en) -
+                (ρarea * detr_rate_inv_s * θ_liq_ice_up) + (ρ_c * θ_liq_ice_tendency_precip_formation)
+
+            @. tends_ρaq_tot =
+                -∇c(wvec(LBF(Ic(w_up) * ρaq_tot))) + (ρarea * entr_rate_inv_s * q_tot_en) -
+                (ρarea * detr_rate_inv_s * q_tot_up) + (ρ_c * qt_tendency_precip_formation)
+        end
 
         if edmf.moisture_model isa NonEquilibriumMoisture
 
@@ -608,11 +613,21 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         w_en = aux_en_f.w
         entr_w = aux_up[i].entr_turb_dyn
         detr_w = aux_up[i].detr_turb_dyn
+        entr_rate_inv_s = aux_up[i].entr_rate_inv_s
+        detr_rate_inv_s = aux_up[i].detr_rate_inv_s
         buoy = aux_up[i].buoy
 
         @. tends_ρaw = -(∇f(wvec(LBC(ρaw * w_up))))
-        @. tends_ρaw +=
-            (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) + nh_pressure
+        if edmf.entrainment_type isa FractionalEntrModel
+            @. tends_ρaw +=
+                (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) + nh_pressure
+        elseif edmf.entrainment_type isa TotalRateEntrModel
+            @. tends_ρaw +=
+                ρ_f * ᶠinterp_a(a_up) * (ᶠinterp_a(entr_rate_inv_s) * w_en - ᶠinterp_a(detr_rate_inv_s) * w_up) +
+                (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) +
+                nh_pressure
+        end
+
         tends_ρaw[kf_surf] = 0
     end
 
@@ -852,6 +867,8 @@ function compute_covariance_entr(
         entr_sc = aux_up_i.entr_sc
         detr_ml = aux_up_i.detr_ml
         entr_ml = aux_up_i.entr_ml
+        entr_rate_inv_s = aux_up_i.entr_rate_inv_s
+        detr_rate_inv_s = aux_up_i.detr_rate_inv_s
         w_up = aux_up_f[i].w
         prog_up_i = prog_up[i]
         ϕ_up = getproperty(prog_up_i, ϕ_sym)
@@ -859,29 +876,49 @@ function compute_covariance_entr(
 
         a_up = aux_up_i.area
 
-        @. entr_gain +=
-            Int(a_up > min_area) * (
-                tke_factor *
-                ρ_c *
-                a_up *
-                abs(Ic(w_up)) *
-                (detr_sc + detr_ml) *
-                (Idc(ϕ_up) - Idc(ϕ_en)) *
-                (Idc(ψ_up) - Idc(ψ_en))
-            ) + (
-                tke_factor *
-                ρ_c *
-                a_up *
-                abs(Ic(w_up)) *
-                eps_turb *
-                (
-                    (Idc(ϕ_en) - Idc(to_scalar(ϕ_gm))) * (Idc(ψ_up) - Idc(ψ_en)) +
-                    (Idc(ψ_en) - Idc(to_scalar(ψ_gm))) * (Idc(ϕ_up) - Idc(ϕ_en))
-                )
-            )
 
-        @. detr_loss +=
-            Int(a_up > min_area) * tke_factor * ρ_c * a_up * abs(Ic(w_up)) * (entr_sc + entr_ml + eps_turb) * covar
+        if edmf.entrainment_type isa FractionalEntrModel
+            @. entr_gain +=
+                Int(a_up > min_area) * (
+                    tke_factor *
+                    ρ_c *
+                    a_up *
+                    abs(Ic(w_up)) *
+                    (detr_sc + detr_ml) *
+                    (Idc(ϕ_up) - Idc(ϕ_en)) *
+                    (Idc(ψ_up) - Idc(ψ_en))
+                ) + (
+                    tke_factor *
+                    ρ_c *
+                    a_up *
+                    abs(Ic(w_up)) *
+                    eps_turb *
+                    (
+                        (Idc(ϕ_en) - Idc(to_scalar(ϕ_gm))) * (Idc(ψ_up) - Idc(ψ_en)) +
+                        (Idc(ψ_en) - Idc(to_scalar(ψ_gm))) * (Idc(ϕ_up) - Idc(ϕ_en))
+                    )
+                )
+
+            @. detr_loss +=
+                Int(a_up > min_area) * tke_factor * ρ_c * a_up * abs(Ic(w_up)) * (entr_sc + entr_ml + eps_turb) * covar
+
+        elseif edmf.entrainment_type isa TotalRateEntrModel
+            @. entr_gain +=
+                Int(a_up > min_area) *
+                (tke_factor * ρ_c * a_up * detr_rate_inv_s * (Idc(ϕ_up) - Idc(ϕ_en)) * (Idc(ψ_up) - Idc(ψ_en))) + (
+                    tke_factor *
+                    ρ_c *
+                    a_up *
+                    entr_rate_inv_s *
+                    (
+                        (Idc(ϕ_en) - Idc(to_scalar(ϕ_gm))) * (Idc(ψ_up) - Idc(ψ_en)) +
+                        (Idc(ψ_en) - Idc(to_scalar(ψ_gm))) * (Idc(ϕ_up) - Idc(ϕ_en))
+                    )
+                )
+
+            @. detr_loss += Int(a_up > min_area) * tke_factor * entr_rate_inv_s * covar
+
+        end
 
     end
 
@@ -985,11 +1022,16 @@ function compute_en_tendencies!(
         turb_entr = aux_up[i].frac_turb_entr
         entr_sc = aux_up[i].entr_sc
         entr_ml = aux_up[i].entr_ml
+        entr_rate_inv_s = aux_up[i].entr_rate_inv_s
         w_up = aux_up_f[i].w
         a_up = aux_up[i].area
         # TODO: using `Int(bool) *` means that NaNs can propagate
         # into the solution. Could we somehow call `ifelse` instead?
-        @. D_env += Int(a_up > min_area) * ρ_c * a_up * Ic(w_up) * (entr_sc + entr_ml + turb_entr)
+        if edmf.entrainment_type isa FractionalEntrModel
+            @. D_env += Int(a_up > min_area) * ρ_c * a_up * Ic(w_up) * (entr_sc + entr_ml + turb_entr)
+        elseif edmf.entrainment_type isa TotalRateEntrModel
+            @. D_env += Int(a_up > min_area) * ρ_c * a_up * entr_rate_inv_s
+        end
     end
 
     RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
@@ -1046,11 +1088,16 @@ function update_diagnostic_covariances!(
         turb_entr = aux_up[i].frac_turb_entr
         entr_sc = aux_up[i].entr_sc
         entr_ml = aux_up[i].entr_ml
+        entr_rate_inv_s = aux_up[i].entr_rate_inv_s
         w_up = aux_up_f[i].w
         a_up = aux_up[i].area
         # TODO: using `Int(bool) *` means that NaNs can propagate
         # into the solution. Could we somehow call `ifelse` instead?
-        @. D_env += Int(a_up > min_area) * ρ_c * a_up * Ic(w_up) * (entr_sc + entr_ml + turb_entr)
+        if edmf.entrainment_type isa FractionalEntrModel
+            @. D_env += Int(a_up > min_area) * ρ_c * a_up * Ic(w_up) * (entr_sc + entr_ml + turb_entr)
+        elseif edmf.entrainment_type isa TotalRateEntrModel
+            @. D_env += Int(a_up > min_area) * ρ_c * a_up * entr_rate_inv_s
+        end
     end
 
     @. covar =
