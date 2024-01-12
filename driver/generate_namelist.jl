@@ -158,6 +158,7 @@ function default_namelist(
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 1
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "moisture_deficit"  # {"moisture_deficit", "None"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entrainment_type"] = "fractional" # {"fractional", "total_rate"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["ml_entrainment"] = "None"  # {"None", "NN", "NN_nonlocal", "Linear", "FNO", "RF"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_scale_height", "inv_z", "none"}
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["detr_dim_scale"] = "buoy_vel" # {"buoy_vel", "inv_scale_height", "inv_z", "none"}
