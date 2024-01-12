@@ -28,7 +28,7 @@ function get_Δw(εδ_model, w_up::FT, w_en::FT) where {FT}
     return Δw
 end
 
-function entrainment_inv_length_scale(
+function entrainment_dim_scale(
     εδ_model,
     b_up::FT,
     b_en::FT,
@@ -38,6 +38,9 @@ function entrainment_inv_length_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
     ::BuoyVelEntrDimScale,
 ) where {FT}
     Δw = get_Δw(εδ_model, w_up, w_en)
@@ -46,7 +49,7 @@ function entrainment_inv_length_scale(
 end
 
 
-function entrainment_inv_length_scale(
+function entrainment_dim_scale(
     εδ_model,
     b_up::FT,
     b_en::FT,
@@ -56,12 +59,15 @@ function entrainment_inv_length_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
     ::InvScaleHeightEntrDimScale,
 ) where {FT}
     return (1 / ref_H)
 end
 
-function entrainment_inv_length_scale(
+function entrainment_dim_scale(
     εδ_model,
     b_up::FT,
     b_en::FT,
@@ -71,12 +77,15 @@ function entrainment_inv_length_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
     ::InvZEntrDimScale,
 ) where {FT}
     return (1 / zc_i)
 end
 
-function entrainment_inv_length_scale(
+function entrainment_dim_scale(
     εδ_model,
     b_up::FT,
     b_en::FT,
@@ -86,12 +95,15 @@ function entrainment_inv_length_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
     ::InvMeterEntrDimScale,
 ) where {FT}
     return FT(1)
 end
 
-function entrainment_inv_length_scale(
+function entrainment_dim_scale(
     εδ_model,
     b_up::FT,
     b_en::FT,
@@ -101,12 +113,15 @@ function entrainment_inv_length_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
     ::PosMassFluxGradDimScale,
 ) where {FT}
     return max(∂lnM∂z, FT(0))
 end
 
-function entrainment_inv_length_scale(
+function entrainment_dim_scale(
     εδ_model,
     b_up::FT,
     b_en::FT,
@@ -116,12 +131,15 @@ function entrainment_inv_length_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
     ::NegMassFluxGradDimScale,
 ) where {FT}
     return abs(min(∂lnM∂z, FT(0)))
 end
 
-function entrainment_inv_length_scale(
+function entrainment_dim_scale(
     εδ_model,
     b_up::FT,
     b_en::FT,
@@ -131,14 +149,162 @@ function entrainment_inv_length_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
     ::AbsMassFluxGradDimScale,
 ) where {FT}
     return abs(∂lnM∂z)
 end
 
-"""A convenience wrapper for entrainment_inv_length_scale"""
-function entrainment_inv_length_scale(εδ_model, εδ_vars, dim_scale)
-    return entrainment_inv_length_scale(
+function entrainment_dim_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
+    ::BOverWDimScale,
+) where {FT}
+    Δb = b_up - b_en
+    Δw = get_Δw(εδ_model, w_up, w_en)
+    if Δb > 0
+        return ρ_c * abs(Δb / (Δw + eps(FT)))
+    else
+        return 0.0
+    end
+end
+
+function entrainment_dim_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
+    ::WOverHeightDimScale,
+) where {FT}
+    Δw = get_Δw(εδ_model, w_up, w_en)
+    return ρ_c * (Δw / zc_i) * 1e-2
+end
+
+function entrainment_dim_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
+    ::BOverSqrtTKEDimScale,
+) where {FT}
+    Δb = b_up - b_en
+    return ρ_c * abs(Δb / sqrt(abs(tke) + 1e-3)) * 1e-3
+end
+
+function entrainment_dim_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
+    ::SqrtBOverZDimScale,
+) where {FT}
+    Δb = b_up - b_en
+    if Δb > 0
+        return ρ_c * sqrt(abs(Δb / zc_i)) * 3e-3
+    else
+        return 0.0
+    end
+end
+
+function entrainment_dim_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
+    ::TKEBWDimScale,
+) where {FT}
+    Δb = b_up - b_en
+    Δw = get_Δw(εδ_model, w_up, w_en)
+    return ρ_c * abs((tke * Δb) / (Δw^3))
+end
+
+function entrainment_dim_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
+    ::DwDzDimScale,
+) where {FT}
+    return ρ_c * ∂w∂z
+end
+
+function entrainment_dim_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
+    ::MassFluxGradDimScale,
+) where {FT}
+    if ∂M∂z < 0
+        return abs(∂M∂z)
+    else
+        return 0.0
+    end
+end
+
+"""A convenience wrapper for entrainment_dim_scale"""
+function entrainment_dim_scale(εδ_model, εδ_vars, dim_scale)
+    return entrainment_dim_scale(
         εδ_model,
         εδ_vars.b_up,
         εδ_vars.b_en,
@@ -148,6 +314,9 @@ function entrainment_inv_length_scale(εδ_model, εδ_vars, dim_scale)
         εδ_vars.zc_i,
         εδ_vars.ref_H,
         εδ_vars.∂lnM∂z,
+        εδ_vars.∂M∂z,
+        εδ_vars.∂w∂z,
+        εδ_vars.ρ_c,
         dim_scale,
     )
 end
@@ -167,8 +336,8 @@ Parameters:
 """
 function εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nondim, δ_nondim)
     FT = eltype(εδ_vars.q_cond_up)
-    ε_dim_scale = entrainment_inv_length_scale(εδ_model, εδ_vars, entr_dim_scale)
-    δ_dim_scale = entrainment_inv_length_scale(εδ_model, εδ_vars, detr_dim_scale)
+    ε_dim_scale = entrainment_dim_scale(εδ_model, εδ_vars, entr_dim_scale)
+    δ_dim_scale = entrainment_dim_scale(εδ_model, εδ_vars, detr_dim_scale)
 
     area_limiter = max_area_limiter(εδ_model, εδ_vars.max_area, εδ_vars.a_up)
     min_limiter = min_area_limiter(εδ_model, εδ_vars.a_up)
@@ -177,13 +346,20 @@ function εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nond
     δ_dim_scale = min(δ_dim_scale, 1.0)
 
     # fractional dynamical entrainment / detrainment [1 / m]
+    # nondim_type
     ε_dyn = ε_dim_scale * ε_nondim
     δ_dyn = δ_dim_scale * δ_nondim
+
+    # ε_dyn = ε_dim_scale * (1.0 + ε_nondim)
+    # δ_dyn = δ_dim_scale * (1.0 + δ_nondim)
+
+
+    # ε_dyn = ε_dim_scale * 1.0
+    # δ_dyn = δ_dim_scale * 1.0
 
     if εδ_params(εδ_model).limit_min_area
         ε_dyn += max(δ_dyn, ε_dyn) * min_limiter
     end
-
     δ_dyn += max(ε_dyn, δ_dyn) * area_limiter
 
     return ε_dyn, δ_dyn
@@ -230,7 +406,7 @@ function compute_turb_entr!(state::State, grid::Grid, edmf::EDMFModel)
         w_up = aux_up_f[i].w
         @. w_up_c = Ic(w_up)
         @inbounds for k in real_center_indices(grid)
-            if aux_up[i].area[k] > 0.0
+            if aux_up[i].area[k] > edmf.minimum_area
                 aux_up[i].frac_turb_entr[k] = compute_turbulent_entrainment(
                     εδ_params(edmf.entr_closure).c_γ,
                     aux_up[i].area[k],
@@ -306,7 +482,7 @@ function compute_phys_entr_detr!(
             q_cond_up = TD.condensate(TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k]))
             q_cond_en = TD.condensate(TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k]))
 
-            if aux_up[i].area[k] > 0.0
+            if aux_up[i].area[k] > edmf.minimum_area
                 εδ_model_vars = (;
                     q_cond_up = q_cond_up, # updraft condensate (liquid water + ice)
                     q_cond_en = q_cond_en, # environment condensate (liquid water + ice)
@@ -328,7 +504,10 @@ function compute_phys_entr_detr!(
                     Δt = Δt, # Model time step
                     ε_nondim = aux_up[i].ε_nondim[k], # nondimensional fractional dynamical entrainment
                     δ_nondim = aux_up[i].δ_nondim[k], # nondimensional fractional dynamical detrainment
+                    ∂M∂z = aux_tc.∂M∂z[k],
                     entr_Π_subset = entrainment_Π_subset(edmf), # indices of Pi groups to include
+                    ∂w∂z = aux_tc.∂w∂z[k],
+                    ρ_c = ρ_c[k],
                 )
 
                 # store pi groups for output
@@ -355,16 +534,36 @@ function compute_phys_entr_detr!(
                     ε_dyn, δ_dyn =
                         εδ_dyn(εδ_closure, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, ε_nondim, δ_nondim)
                 end
-                aux_up[i].entr_sc[k] = ε_dyn
-                aux_up[i].detr_sc[k] = δ_dyn
-                # update nondimensional entr/detr
-                aux_up[i].ε_nondim[k] = ε_nondim
-                aux_up[i].δ_nondim[k] = δ_nondim
+
+                if edmf.entrainment_type isa FractionalEntrModel
+
+                    aux_up[i].entr_sc[k] = ε_dyn
+                    aux_up[i].detr_sc[k] = δ_dyn
+                    # update nondimensional entr/detr
+                    aux_up[i].ε_nondim[k] = ε_nondim
+                    aux_up[i].δ_nondim[k] = δ_nondim
+
+                    aux_up[i].entr_rate_inv_s[k] = ρ_c[k] * aux_up[i].area[k] * w_up_c[k] * ε_dyn
+                    aux_up[i].detr_rate_inv_s[k] = ρ_c[k] * aux_up[i].area[k] * w_up_c[k] * δ_dyn
+
+                elseif edmf.entrainment_type isa TotalRateEntrModel
+                    aux_up[i].entr_sc[k] = ε_dyn / (ρ_c[k] * aux_up[i].area[k] * w_up_c[k]) # fractional rates
+                    aux_up[i].detr_sc[k] = δ_dyn / (ρ_c[k] * aux_up[i].area[k] * w_up_c[k]) # fractional rates
+                    # update nondimensional entr/detr
+                    aux_up[i].ε_nondim[k] = ε_ml_nondim
+                    aux_up[i].δ_nondim[k] = δ_ml_nondim
+
+                    aux_up[i].entr_rate_inv_s[k] = ε_dyn
+                    aux_up[i].detr_rate_inv_s[k] = δ_dyn
+                end
+
             else
                 aux_up[i].entr_sc[k] = 0.0
                 aux_up[i].detr_sc[k] = 0.0
                 aux_up[i].ε_nondim[k] = 0.0
                 aux_up[i].δ_nondim[k] = 0.0
+                aux_up[i].entr_rate_inv_s[k] = 0.0
+                aux_up[i].detr_rate_inv_s[k] = 0.0
             end
         end
     end
@@ -420,6 +619,7 @@ function compute_ml_entr_detr!(
         # compute ∇m at cell centers
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
+        Π_groups = aux_up[i].Π_groups
         w_en = aux_en_f.w
         w_gm = prog_gm_f.w
         @. w_up_c = Ic(w_up)
@@ -429,8 +629,7 @@ function compute_ml_entr_detr!(
 
             q_cond_up = TD.condensate(TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k]))
             q_cond_en = TD.condensate(TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k]))
-
-            if aux_up[i].area[k] > 0.0
+            if aux_up[i].area[k] > edmf.minimum_area
                 εδ_model_vars = (;
                     q_cond_up = q_cond_up, # updraft condensate (liquid water + ice)
                     q_cond_en = q_cond_en, # environment condensate (liquid water + ice)
@@ -449,13 +648,16 @@ function compute_ml_entr_detr!(
                     max_area = max_area, # maximum updraft area
                     zc_i = FT(grid.zc[k].z), # vertical coordinate
                     ∂lnM∂z = aux_tc.∂lnM∂z[k], # ln(massflux) gradient
+                    ∂M∂z = aux_tc.∂M∂z[k],
                     entr_Π_subset = entrainment_Π_subset(edmf), # indices of Pi groups to include
+                    ∂w∂z = aux_tc.∂w∂z[k],
+                    ρ_c = ρ_c[k],
                 )
                 # store pi groups for output
                 Π = non_dimensional_groups(εδ_closure, εδ_model_vars)
                 @assert length(Π) == n_Π_groups(edmf)
                 for Π_i in 1:length(entrainment_Π_subset(edmf))
-                    aux_up[i].Π_groups[Π_i][k] = Π[Π_i]
+                    Π_groups[Π_i][k] = Π[Π_i]
                 end
                 # update fractional and turbulent entr/detr
                 # fractional, turbulent & nondimensional entrainment
@@ -468,17 +670,38 @@ function compute_ml_entr_detr!(
                     ε_ml_nondim,
                     δ_ml_nondim,
                 )
-                aux_up[i].entr_ml[k] = ε_dyn
-                aux_up[i].detr_ml[k] = δ_dyn
-                # update nondimensional entr/detr
-                aux_up[i].ε_ml_nondim[k] = ε_ml_nondim
-                aux_up[i].δ_ml_nondim[k] = δ_ml_nondim
+
+                if edmf.entrainment_type isa FractionalEntrModel
+
+                    aux_up[i].entr_ml[k] = ε_dyn
+                    aux_up[i].detr_ml[k] = δ_dyn
+                    # update nondimensional entr/detr
+                    aux_up[i].ε_ml_nondim[k] = ε_ml_nondim
+                    aux_up[i].δ_ml_nondim[k] = δ_ml_nondim
+
+                    aux_up[i].entr_rate_inv_s[k] = ρ_c[k] * aux_up[i].area[k] * w_up_c[k] * ε_dyn
+                    aux_up[i].detr_rate_inv_s[k] = ρ_c[k] * aux_up[i].area[k] * w_up_c[k] * δ_dyn
+
+                elseif edmf.entrainment_type isa TotalRateEntrModel
+                    aux_up[i].entr_ml[k] = ε_dyn / (ρ_c[k] * aux_up[i].area[k] * w_up_c[k]) # fractional rates
+                    aux_up[i].detr_ml[k] = δ_dyn / (ρ_c[k] * aux_up[i].area[k] * w_up_c[k]) # fractional rates
+                    # update nondimensional entr/detr
+                    aux_up[i].ε_ml_nondim[k] = ε_ml_nondim
+                    aux_up[i].δ_ml_nondim[k] = δ_ml_nondim
+
+                    aux_up[i].entr_rate_inv_s[k] = ε_dyn
+                    aux_up[i].detr_rate_inv_s[k] = δ_dyn
+                end
+
             else
                 aux_up[i].entr_ml[k] = 0.0
                 aux_up[i].detr_ml[k] = 0.0
                 aux_up[i].ε_ml_nondim[k] = 0.0
                 aux_up[i].δ_ml_nondim[k] = 0.0
+                aux_up[i].entr_rate_inv_s[k] = 0.0
+                aux_up[i].detr_rate_inv_s[k] = 0.0
             end
+
         end
     end
 end
@@ -521,6 +744,7 @@ function compute_ml_entr_detr!(
         # compute ∇m at cell centers
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
+        Π_groups = aux_up[i].Π_groups
         w_en = aux_en_f.w
         w_gm = prog_gm_f.w
         @. w_up_c = Ic(w_up)
@@ -532,7 +756,7 @@ function compute_ml_entr_detr!(
             q_cond_up = TD.condensate(TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k]))
             q_cond_en = TD.condensate(TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k]))
 
-            if aux_up[i].area[k] > 0.0
+            if aux_up[i].area[k] > edmf.minimum_area
                 εδ_model_vars = (;
                     q_cond_up = q_cond_up, # updraft condensate (liquid water + ice)
                     q_cond_en = q_cond_en, # environment condensate (liquid water + ice)
@@ -558,7 +782,7 @@ function compute_ml_entr_detr!(
                 Π = non_dimensional_groups(εδ_model, εδ_model_vars)
                 @assert length(Π) == n_Π_groups(edmf)
                 for Π_i in 1:length(entrainment_Π_subset(edmf))
-                    aux_up[i].Π_groups[Π_i][k] = Π[Π_i]
+                    Π_groups[Π_i][k] = Π[Π_i]
                 end
 
             else
@@ -574,7 +798,7 @@ function compute_ml_entr_detr!(
         non_dimensional_function!(ε_ml_nondim, δ_ml_nondim, Π_groups, εδ_model)
 
         @inbounds for k in real_center_indices(grid)
-            ε_dim_scale = entrainment_inv_length_scale(
+            ε_dim_scale = entrainment_dim_scale(
                 εδ_model,
                 aux_up[i].buoy[k],
                 aux_en.buoy[k],
@@ -586,7 +810,7 @@ function compute_ml_entr_detr!(
                 aux_tc.∂lnM∂z[k],
                 edmf.entr_dim_scale,
             )
-            δ_dim_scale = entrainment_inv_length_scale(
+            δ_dim_scale = entrainment_dim_scale(
                 εδ_model,
                 aux_up[i].buoy[k],
                 aux_en.buoy[k],
@@ -605,10 +829,10 @@ function compute_ml_entr_detr!(
             aux_up[i].detr_ml[k] = δ_dim_scale * (aux_up[i].δ_ml_nondim[k] + area_limiter)
         end
 
-        @. aux_up[i].ε_ml_nondim = ifelse(aux_up[i].area > 0, aux_up[i].ε_ml_nondim, 0)
-        @. aux_up[i].δ_ml_nondim = ifelse(aux_up[i].area > 0, aux_up[i].δ_ml_nondim, 0)
-        @. aux_up[i].entr_ml = ifelse(aux_up[i].area > 0, aux_up[i].entr_ml, 0)
-        @. aux_up[i].detr_ml = ifelse(aux_up[i].area > 0, aux_up[i].detr_ml, 0)
+        @. aux_up[i].ε_ml_nondim = ifelse(aux_up[i].area > edmf.minimum_area, aux_up[i].ε_ml_nondim, 0)
+        @. aux_up[i].δ_ml_nondim = ifelse(aux_up[i].area > edmf.minimum_area, aux_up[i].δ_ml_nondim, 0)
+        @. aux_up[i].entr_ml = ifelse(aux_up[i].area > edmf.minimum_area, aux_up[i].entr_ml, 0)
+        @. aux_up[i].detr_ml = ifelse(aux_up[i].area > edmf.minimum_area, aux_up[i].detr_ml, 0)
 
     end
 end
