@@ -2,13 +2,14 @@
 
 function compute_turbulent_entrainment(c_γ::FT, a_up::FT, w_up::FT, tke::FT, H_up::FT) where {FT}
 
-    ε_turb = if w_up * a_up > 0
-        2 * c_γ * sqrt(max(tke, 0)) / (w_up * H_up)
-    else
-        FT(0)
-    end
-
-    return ε_turb
+    #ε_turb = if w_up * a_up > 0
+    #    2 * c_γ * sqrt(max(tke, 0)) / (w_up * H_up)
+    #else
+    #    FT(0)
+    #end
+    #
+    #return ε_turb
+    return FT(0)
 end
 
 function compute_inverse_timescale(εδ_model, b_up::FT, b_en::FT, w_up::FT, w_en::FT, tke::FT) where {FT}
