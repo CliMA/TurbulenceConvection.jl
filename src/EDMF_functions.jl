@@ -51,13 +51,6 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     massflux_h = aux_tc_f.massflux_h
     massflux_qt = aux_tc_f.massflux_qt
     aux_tc = center_aux_turbconv(state)
-    # ∂M∂z = aux_tc.∂M∂z
-    # ∂lnM∂z = aux_tc.∂lnM∂z
-    # massflux_c = aux_tc.massflux
-    # parent(massflux) .= 0
-    # parent(massflux_c) .= 0
-    # parent(∂M∂z) .= 0
-    # parent(∂lnM∂z) .= 0
 
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
@@ -89,15 +82,6 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         @. massflux_h += ρ_f * (ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm)) * (If(θ_liq_ice_up) - If(θ_liq_ice_gm)))
         @. massflux_qt += ρ_f * (ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm)) * (If(q_tot_up) - If(q_tot_gm)))
     end
-
-    # @inbounds for i in 1:N_up
-    #     @. massflux += aux_up_f[i].massflux
-    # end
-    # @. ∂M∂z = ∇c(wvec(massflux))
-
-    # @inbounds for k in real_center_indices(grid)
-    #     aux_tc.∂lnM∂z[k] = ∂M∂z[k] / (massflux_c[k] + eps(FT))
-    # end
 
     if edmf.moisture_model isa NonEquilibriumMoisture
         massflux_en = aux_tc_f.massflux_en
@@ -534,9 +518,6 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         @. tends_ρarea =
             -∇c(wvec(LBF(Ic(w_up) * ρarea))) + (ρarea * Ic(w_up) * entr_turb_dyn) - (ρarea * Ic(w_up) * detr_turb_dyn)
 
-        # @. tends_ρarea =
-        #     -∇c(wvec(LBF(Ic(w_up) * ρarea))) #+ (ρarea * Ic(w_up) * entr_turb_dyn) - (ρarea * Ic(w_up) * detr_turb_dyn)
-
         rhoa_tend = aux_tc.rhoa_tend
         rhoa_tend_term1 = aux_tc.rhoa_tend_term1
         rhoa_tend_term2 = aux_tc.rhoa_tend_term2
@@ -606,33 +587,6 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         tends_ρaq_tot[kc_surf] = 0
     end
 
-    @inbounds for k in real_center_indices(grid)
-        @inbounds for i in 1:N_up
-            aux_up_i_k = aux_up[i].area[k]
-            tends_ρarea = tendencies_up[i].ρarea
-
-            # if isnan(tends_ρarea[k])
-            #     @show "bef"
-            #     @show tends_ρarea[k]
-            #     @show rhoa_tend_term1[k]
-            #     @show rhoa_tend_term2[k]
-            #     @show rhoa_tend_term3[k]
-            # end
-
-            # if 0.0 < aux_up_i_k < 0.005
-                
-            #     # tends_ρarea[k] += abs(tends_ρarea[k]) * 2.0*exp(- 100.0 * aux_up_i_k)
-            #     if tends_ρarea[k] < 0.0
-            #         @show "bef"
-            #         @show tends_ρarea[k]
-            #         tends_ρarea[k] = 2*abs(tends_ρarea[k])
-            #         @show tends_ρarea[k]
-            #     end
-            # end
-        end 
-    end
-
-
     # Solve for updraft velocity
 
     # We know that, since W = 0 at z = 0, BCs for entr, detr,
@@ -655,8 +609,6 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         buoy = aux_up[i].buoy
 
         @. tends_ρaw = -(∇f(wvec(LBC(ρaw * w_up))))
-        # @. tends_ρaw +=
-        #     (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) + nh_pressure
         @. tends_ρaw +=
             (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) + nh_pressure
         tends_ρaw[kf_surf] = 0
@@ -677,15 +629,12 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     aux_gm_f = face_aux_grid_mean(state)
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
-    aux_tc = center_aux_turbconv(state)
     prog_up_f = face_prog_updrafts(state)
     ρ_c = prog_gm.ρ
     ρ_f = aux_gm_f.ρ
     a_min = edmf.minimum_area
     a_max = edmf.max_area
 
-    Ic = CCO.InterpolateF2C()
-    
     @inbounds for i in 1:N_up
         prog_up[i].ρarea .= max.(prog_up[i].ρarea, 0)
         prog_up[i].ρaθ_liq_ice .= max.(prog_up[i].ρaθ_liq_ice, 0)
@@ -696,103 +645,18 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         end
         @inbounds for k in real_center_indices(grid)
             prog_up[i].ρarea[k] = min(prog_up[i].ρarea[k], ρ_c[k] * a_max)
-            aux_up[i].ρarea_temp[k] = prog_up[i].ρarea[k]
-
-            min_area_clip = 1e-10
-            if 0.0 < prog_up[i].ρarea[k] / ρ_c[k] < min_area_clip
-                prog_up[i].ρaθ_liq_ice[k] = (prog_up[i].ρaθ_liq_ice[k] / prog_up[i].ρarea[k]) * ρ_c[k] * min_area_clip
-                prog_up[i].ρaq_tot[k] = (prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]) * ρ_c[k] * min_area_clip
-            end
-
-            if prog_up[i].ρarea[k] < ρ_c[k] * a_min
-                prog_up[i].ρarea[k] = 0
-                # prog_up_f[i].ρaw[k] = 0
-                # aux_up_f[i].w[k] = 0
-            end
-            # aux_up[i].Π_groups[Π_i][k]
-            # dump(aux_up[i])
-        end
-
-        min_area_clip = 1e-10
-        rho_a_f = aux_up_f[i].ρarea_temp
-        @. rho_a_f = ᶠinterp_a(aux_up[i].ρarea_temp)
-        # @show prog_up[i].ρarea / ρ_c
-        # @. prog_up_f[i].ρaw = ifelse(0.0 .< prog_up[i].ρarea ./ ρ_c < .min_area_clip, 
-        #                             prog_up_f[i].ρaw / Ic(prog_up[i].ρarea) * Ic(ρ_c) * min_area_clip, 
-        #                             prog_up_f[i].ρaw)
-
-        ### method 2
-        # @show prog_up[i].ρarea ./ ρ_c
-        # @show ᶠinterp_a(prog_up[i].ρarea)
-        # @show prog_up_f[i].ρaw / ᶠinterp_a(prog_up[i].ρarea)
-        # @show (0.0 .< prog_up[i].ρarea ./ ρ_c)
-        # @show ((0.0 .< prog_up[i].ρarea ./ ρ_c) .& (prog_up[i].ρarea ./ ρ_c .< min_area_clip))
-        # @. prog_up_f[i].ρaw = ifelse((0.0 .< prog_up[i].ρarea ./ ρ_c) .& (prog_up[i].ρarea ./ ρ_c .< min_area_clip), 
-        #                      prog_up_f[i].ρaw / ᶠinterp_a(prog_up[i].ρarea) * ᶠinterp_a(ρ_c) .* min_area_clip, 
-        #                      prog_up_f[i].ρaw)
-
-        # ### method 3
-        # rho_a_f = aux_up_f[i].ρarea_temp
-        # @inbounds for k in real_face_indices(grid)
-        #     min_area_clip = 1e-10
-        #     if 0.0 < rho_a_f[k] / ρ_f[k] < min_area_clip
-        #         @show "clip rhoa"
-        #         @show rho_a_f[k] / ρ_f[k]
-        #         @show prog_up_f[i].ρaw[k] / rho_a_f[k]
-        #         prog_up_f[i].ρaw[k] = (prog_up_f[i].ρaw[k] / rho_a_f[k]) * ρ_f[k] * min_area_clip
-        #         @show "after"
-        #         @show prog_up_f[i].ρaw[k]/ (ρ_f[k] * min_area_clip)
-        #         @show "---"
-        #     end
-        # end
-
-        ### method 4
-
-        # min_area_clip = 1e-10
-
-        # @. prog_up_f[i].ρaw = ifelse(prog_up_f[i].ρaw < min_area_clip * ρ_f, 
-        #                              prog_up_f[i].ρaw ./ , 
-        #                              prog_up_f[i].ρaw)
-
-
-    end
-
-    # this has to be after the prognostic vars are updated!
-    @inbounds for i in 1:N_up
-        @inbounds for k in real_center_indices(grid)
-            min_area_clip = 1e-10
-            if 0.0 < prog_up[i].ρarea[k] / ρ_c[k] < min_area_clip
-                prog_up[i].ρarea[k] = ρ_c[k] * min_area_clip
-            end
         end
     end
-
     if edmf.moisture_model isa NonEquilibriumMoisture
         @inbounds for i in 1:N_up
             prog_up[i].ρaq_liq .= max.(prog_up[i].ρaq_liq, 0)
             prog_up[i].ρaq_ice .= max.(prog_up[i].ρaq_ice, 0)
         end
     end
-
-    
     # apply clipping at 0 and minimum area to ρaw
     @inbounds for i in 1:N_up
         @. prog_up_f[i].ρaw = max.(prog_up_f[i].ρaw, 0)
-        # @. prog_up_f[i].ρaw = min.(prog_up_f[i].ρaw, 0.05)
-
-        ### method 1
-        # @. prog_up_f[i].ρaw = Int(ᶠinterp_a(prog_up[i].ρarea) > 0) * prog_up_f[i].ρaw
-
-        ## method 1.5
-        # @. prog_up[i].ρarea = Int(Ic(prog_up_f[i].ρaw) > 0) * prog_up[i].ρarea
-
-        ### method 2
-        # min_area_clip = 1e-10
-        # @. prog_up_f[i].ρaw = Int(ᶠinterp_a(prog_up[i].ρarea) > min_area_clip * ρ_f) * prog_up_f[i].ρaw
-        # @. prog_up_f[i].ρaw = ifelse(prog_up_f[i].ρaw < min_area_clip * ρ_f, 
-        #                              prog_up_f[i].ρaw ./ , 
-        #                              prog_up[i].ρaθ_liq_ice)
-        # ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaθ_liq_ice)
+        @. prog_up_f[i].ρaw = Int(ᶠinterp_a(prog_up[i].ρarea) >= ρ_f * a_min) * prog_up_f[i].ρaw
     end
 
     @inbounds for k in real_center_indices(grid)
@@ -826,9 +690,9 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
 
     Ic = CCO.InterpolateF2C()
     @inbounds for i in 1:N_up
-        # @. prog_up[i].ρarea = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρarea)
-        # @. prog_up[i].ρaθ_liq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaθ_liq_ice)
-        # @. prog_up[i].ρaq_tot = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_tot)
+        @. prog_up[i].ρarea = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρarea)
+        @. prog_up[i].ρaθ_liq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaθ_liq_ice)
+        @. prog_up[i].ρaq_tot = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_tot)
         if edmf.surface_area_bc isa FixedSurfaceAreaBC || edmf.surface_area_bc isa ClosureSurfaceAreaBC
             a_surf = area_surface_bc(surf, edmf, i, edmf.surface_area_bc)
             prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_surf

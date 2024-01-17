@@ -173,13 +173,6 @@ function εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nond
     area_limiter = max_area_limiter(εδ_model, εδ_vars.max_area, εδ_vars.a_up)
     min_limiter = min_area_limiter(εδ_model, εδ_vars.a_up)
 
-    if ε_dim_scale > 1.0
-        @show "ε_dim_scale big"
-    end
-    if δ_dim_scale > 1.0
-        @show "δ_dim_scale big"
-    end
-
     ε_dim_scale = min(ε_dim_scale, 1.0)
     δ_dim_scale = min(δ_dim_scale, 1.0)
 
@@ -187,20 +180,12 @@ function εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nond
     ε_dyn = ε_dim_scale * ε_nondim
     δ_dyn = δ_dim_scale * δ_nondim
 
-    # if εδ_params(εδ_model).limit_min_area
-    #     ε_dyn += max(δ_dyn, ε_dyn) * min_limiter
-    # end
-    # δ_dyn += max(ε_dyn, δ_dyn) * area_limiter
-
     if εδ_params(εδ_model).limit_min_area
-        ε_dyn += max(δ_dim_scale, ε_dim_scale) * min_limiter
+        ε_dyn += max(δ_dyn, ε_dyn) * min_limiter
     end
-    δ_dyn += max(ε_dim_scale, δ_dim_scale) * area_limiter
-
+    δ_dyn += max(ε_dyn, δ_dyn) * area_limiter
 
     return ε_dyn, δ_dyn
-    # return 0.0, 0.0
-    # return 0.8, 0.9
 end
 
 """
@@ -442,7 +427,6 @@ function compute_ml_entr_detr!(
 
             q_cond_up = TD.condensate(TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k]))
             q_cond_en = TD.condensate(TD.PhasePartition(aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k]))
-            # @show "In compute func"
             if aux_up[i].area[k] > edmf.minimum_area
                 εδ_model_vars = (;
                     q_cond_up = q_cond_up, # updraft condensate (liquid water + ice)
@@ -494,13 +478,6 @@ function compute_ml_entr_detr!(
                 aux_up[i].δ_ml_nondim[k] = 0.0
             end
 
-            # @show k
-            # @show aux_up[i].entr_ml[k]
-            # @show abs(aux_tc.∂lnM∂z[k])
-            # @show  aux_up[i].ε_ml_nondim[k]
-
-            # @assert aux_up[i].entr_ml[k] == abs(aux_tc.∂lnM∂z[k]) * aux_up[i].ε_ml_nondim[k] 
-            # @assert aux_up[i].detr_ml[k] == abs(aux_tc.∂lnM∂z[k]) * aux_up[i].δ_ml_nondim[k] 
         end
     end
 end

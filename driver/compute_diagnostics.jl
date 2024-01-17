@@ -322,7 +322,7 @@ function compute_diagnostics!(
                 # @assert aux_up_i.entr_ml[k] == abs(aux_tc.∂lnM∂z[k]) * aux_up_i.ε_ml_nondim[k] 
                 # @assert aux_up_i.detr_ml[k] == abs(aux_tc.∂lnM∂z[k]) * aux_up_i.δ_ml_nondim[k]
 
-                                # Showing original values
+                #                 Showing original values
                 # if round(aux_up_i.entr_ml[k], digits = 5) != round(abs(aux_tc.∂lnM∂z[k]) * aux_up_i.ε_ml_nondim[k], digits = 5)
                 #     # @show "------- here ----------"
                 #     @show aux_up_i.entr_ml[k]
@@ -332,10 +332,10 @@ function compute_diagnostics!(
                 #     @show k
                 # end
 
-                # Assertions with rounded values
                 # @assert round(aux_up_i.entr_ml[k], digits=5) == round(abs(aux_tc.∂lnM∂z[k]) * aux_up_i.ε_ml_nondim[k], digits=5)
                 # @assert round(aux_up_i.detr_ml[k], digits=5) == round(abs(aux_tc.∂lnM∂z[k]) * aux_up_i.δ_ml_nondim[k], digits=5)
 
+                @assert aux_up_i.area[k] == a_up_bulk_k
 
                 diag_tc.entr_sc[k] += aux_up_i.area[k] * aux_up_i.entr_sc[k] / a_up_bulk_k
                 diag_tc.ε_nondim[k] += aux_up_i.area[k] * aux_up_i.ε_nondim[k] / a_up_bulk_k

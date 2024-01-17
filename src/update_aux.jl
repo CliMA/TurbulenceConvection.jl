@@ -16,6 +16,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     obukhov_length = surf.obukhov_length
     FT = float_type(state)
     prog_gm = center_prog_grid_mean(state)
+    prog_gm_f = face_prog_grid_mean(state)
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
     aux_en = center_aux_environment(state)
@@ -173,20 +174,16 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         a_bulk_c = aux_bulk.area[k]
         @inbounds for i in 1:N_up
             if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
-                # @show "Buoy ext"
-                # qt = aux_up[i].q_tot[k - 1]
-                # h = aux_up[i].θ_liq_ice[k - 1]
-                # if edmf.moisture_model isa EquilibriumMoisture
-                #     ts_up = thermo_state_pθq(param_set, p_c[k], h, qt)
-                # elseif edmf.moisture_model isa NonEquilibriumMoisture
-                #     ql = aux_up[i].q_liq[k - 1]
-                #     qi = aux_up[i].q_ice[k - 1]
-                #     ts_up = thermo_state_pθq(param_set, p_c[k], h, qt, ql, qi)
-                # else
-                #     error("Something went wrong. emdf.moisture_model options are equilibrium or nonequilibrium")
-                # end
+                qt = aux_up[i].q_tot[k - 1]
+                h = aux_up[i].θ_liq_ice[k - 1]
                 if edmf.moisture_model isa EquilibriumMoisture
-                    ts_up = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
+                    ts_up = thermo_state_pθq(param_set, p_c[k], h, qt)
+                elseif edmf.moisture_model isa NonEquilibriumMoisture
+                    ql = aux_up[i].q_liq[k - 1]
+                    qi = aux_up[i].q_ice[k - 1]
+                    ts_up = thermo_state_pθq(param_set, p_c[k], h, qt, ql, qi)
+                else
+                    error("Something went wrong. emdf.moisture_model options are equilibrium or nonequilibrium")
                 end
             else
                 if edmf.moisture_model isa EquilibriumMoisture
@@ -263,30 +260,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     # TODO: figure out why `ifelse` is allocating
     # clip updraft w below minimum area threshold
 
-    #interp 
-    # @inbounds for i in 1:N_up
-    #     a_up = aux_up[i].area
-    #     a_up_f_interp = ᶠinterp_a(a_up)
-    #     @inbounds for k in real_face_indices(grid)
-    #         a_min = edmf.minimum_area
-    #         if a_up_f_interp[k] > a_min
-    #             aux_up_f[i].w[k] = prog_up_f[i].ρaw[k] / (ρ_f[k] * a_up_f_interp[k])
-
-    #             @show "clip massflux"
-    #             @show aux_up_f[i].w[k]
-    #             @show a_up_f_interp[k]
-    #         else
-    #             aux_up_f[i].w[k] = FT(0)
-    #         end
-    #     end
-    # end
 
     @inbounds for i in 1:N_up
         a_min = edmf.minimum_area
         a_up = aux_up[i].area
-        # if a_up > 0
-        #     @show prog_up_f[i].ρaw / (ρ_f * ᶠinterp_a(a_up)
-        # end
         @. aux_up_f[i].w = ifelse(ᶠinterp_a(a_up) > a_min, max(prog_up_f[i].ρaw / (ρ_f * ᶠinterp_a(a_up)), 0), FT(0))
     end
     @inbounds for i in 1:N_up
@@ -297,7 +274,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @inbounds for i in 1:N_up
         a_up = aux_up[i].area
         @. aux_tc_f.bulk.w +=
-            ifelse(ᶠinterp_a(aux_bulk.area) > 0.0, ᶠinterp_a(a_up) * aux_up_f[i].w / ᶠinterp_a(aux_bulk.area), FT(0))
+            ifelse(ᶠinterp_a(aux_bulk.area) > 0, ᶠinterp_a(a_up) * aux_up_f[i].w / ᶠinterp_a(aux_bulk.area), FT(0))
     end
     # Assuming w_gm = 0!
     @. aux_en_f.w = -1 * ᶠinterp_a(aux_bulk.area) / (1 - ᶠinterp_a(aux_bulk.area)) * aux_tc_f.bulk.w
@@ -317,7 +294,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         compute_nonequilibrium_moisture_tendencies!(grid, state, edmf, Δt, param_set)
     end
 
-    # update massflux quantities 
+    # update massflux quantities
+    w_gm = prog_gm_f.w
     ∇c = CCO.DivergenceF2C()
     @inbounds for i in 1:N_up
         massflux_face_i = aux_up_f[i].massflux
@@ -325,7 +303,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_up_i = aux_up[i]
         a_up = aux_up[i].area
         w_up_i = aux_up_f[i].w
-        @. aux_up_f[i].massflux = ρ_f * ᶠinterp_a(a_up) * w_up_i
+        @. aux_up_f[i].massflux = ifelse(ᶠinterp_a(aux_bulk.area) > 0, ρ_f * ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm)) , FT(0))
         @. massflux_c += Ic(aux_up_f[i].massflux)
     end
 
