@@ -4,7 +4,7 @@ function max_area_limiter(εδ_model, max_area, a_up)
     FT = eltype(a_up)
     A = εδ_params(εδ_model).γ_lim
     k = εδ_params(εδ_model).β_lim
-    return A * exp(-k * (max_area - a_up))
+    return A * exp(-k * (1.0 - a_up))
 end
 
 function min_area_limiter(εδ_model, a_up)

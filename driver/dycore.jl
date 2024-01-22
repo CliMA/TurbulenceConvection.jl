@@ -117,6 +117,7 @@ function set_thermo_state_from_prog!(state, grid, moisture_model, param_set)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
+    prog_up = TC.center_prog_updrafts(state)
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
 
@@ -128,13 +129,31 @@ function set_thermo_state_from_prog!(state, grid, moisture_model, param_set)
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
-        ts_gm[k] = TC.thermo_state_pθq(
-            param_set,
-            p_c[k],
-            prog_gm.ρθ_liq_ice[k] / ρ_c[k],
-            prog_gm.ρq_tot[k] / ρ_c[k],
-            thermo_args...,
-        )
+        try
+            ts_gm[k] = TC.thermo_state_pθq(
+                param_set,
+                p_c[k],
+                prog_gm.ρθ_liq_ice[k] / ρ_c[k],
+                prog_gm.ρq_tot[k] / ρ_c[k],
+                thermo_args...,
+            )
+        catch e
+            println("nooooo: ", e)
+            @show  p_c[k]
+            @show  prog_gm.ρθ_liq_ice[k]
+            @show prog_gm.ρq_tot[k]
+            @show k
+            @show grid.zc[k].z
+            @inbounds for i in 1:1
+                @show prog_up[i].ρarea[k]
+                @show prog_up[i].ρarea[k] / ρ_c[k]
+                @show prog_up[i].ρaθ_liq_ice[k]
+                @show prog_up[i].ρaθ_liq_ice[k] / prog_up[i].ρarea[k]
+                @show prog_up[i].ρaq_tot[k]
+                @show prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
+            end
+            rethrow(e)
+        end
     end
     return nothing
 end

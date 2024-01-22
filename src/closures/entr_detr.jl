@@ -185,7 +185,17 @@ function εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nond
     end
     δ_dyn += max(ε_dyn, δ_dyn) * area_limiter
 
+    # return ε_dyn, δ_dyn
+
+    ε_dyn = 1.0 / FT(εδ_vars.zc_i)
+    # ε_dyn += max(δ_dyn, ε_dyn) * min_limiter
+    
+    δ_dyn = 0.0
+    δ_dyn = max(ε_dyn, δ_dyn) * area_limiter
+
     return ε_dyn, δ_dyn
+
+
 end
 
 """

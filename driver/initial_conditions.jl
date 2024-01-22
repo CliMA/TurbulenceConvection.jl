@@ -85,6 +85,44 @@ function initialize_updrafts(edmf, grid, state, surf)
             @. prog_up[i].δ_nondim = 0
         end
 
+        # @inbounds for k in TC.real_center_indices(grid)
+        #     z = grid.zc[k].z
+        #     if 0.0 <= z <= 5000.0
+        #         a_surf = 0.10
+        #         amplitude_init = exp(-(1/100.0)*z)
+        #         a_up_initial = amplitude_init * a_surf
+                
+        #         aux_up[i].area[k] = a_up_initial
+        #         prog_up[i].ρarea[k] = ρ_c[k] * a_up_initial
+        #         prog_up[i].ρaq_tot[k] = ρ_c[k] * a_up_initial * aux_gm.q_tot[k]
+        #         prog_up[i].ρaθ_liq_ice[k] = ρ_c[k] * a_up_initial * aux_gm.θ_liq_ice[k]
+
+        #         @show prog_up[i].ρarea[k]
+        #         @show aux_up[i].area[k]
+        #     end
+        # end
+
+        # aux_up_area_f = aux_up_f[i].area
+        # @. aux_up_area_f = TC.ᶠinterp_a(aux_up[i].area)
+
+        # @inbounds for k in TC.real_face_indices(grid)
+        #     z = grid.zf[k].z
+        #     if 0.0 < z <= 5000.0
+        #         amplitude_init = exp(-(1/100.0)*z)
+        #         w_surf = 0.1
+        #         w_i = amplitude_init * w_surf
+        #         prog_up_f[i].ρaw[k] = ρ_f[k] * aux_up_area_f[k] * w_i
+        #         aux_up_f[i].w[k] = w_i
+
+        #         prog_up_f[i].ρaw[kf_surf] = 0.0
+        #         aux_up_f[i].w[kf_surf] = 0.0
+        #         @show aux_up_f[i].w[k]
+        #     end
+        # end
+
+
+
+
         if edmf.surface_area_bc isa TC.FixedSurfaceAreaBC || edmf.surface_area_bc isa TC.ClosureSurfaceAreaBC
             a_surf = TC.area_surface_bc(surf, edmf, i, edmf.surface_area_bc)
             aux_up[i].area[kc_surf] = a_surf
