@@ -471,11 +471,17 @@ function compute_ml_entr_detr!(
                 # update nondimensional entr/detr
                 aux_up[i].ε_ml_nondim[k] = ε_ml_nondim
                 aux_up[i].δ_ml_nondim[k] = δ_ml_nondim
+
+                aux_up[i].entr_rate_inv_s[k] = ρ_c[k] * aux_up[i].area[k] * w_up_c[k] * ε_dyn
+                aux_up[i].detr_rate_inv_s[k] = ρ_c[k] * aux_up[i].area[k] * w_up_c[k] * δ_dyn
+
             else
                 aux_up[i].entr_ml[k] = 0.0
                 aux_up[i].detr_ml[k] = 0.0
                 aux_up[i].ε_ml_nondim[k] = 0.0
                 aux_up[i].δ_ml_nondim[k] = 0.0
+                aux_up[i].entr_rate_inv_s[k] = 0.0
+                aux_up[i].detr_rate_inv_s[k] = 0.0
             end
 
         end

@@ -51,6 +51,8 @@ function io_dictionary_diagnostics()
         "nondim_entrainment_ml" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).ε_ml_nondim),
         "detrainment_ml" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).detr_ml),
         "nondim_detrainment_ml" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).δ_ml_nondim),
+        "entr_rate_inv_s" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).entr_rate_inv_s),
+        "detr_rate_inv_s" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).detr_rate_inv_s),
         "asp_ratio" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).asp_ratio),
         "massflux" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_diagnostics_turbconv(state).massflux),
         "rain_flux" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_diagnostics_precip(state).rain_flux),
@@ -302,6 +304,8 @@ function compute_diagnostics!(
         diag_tc.δ_ml_nondim[k] = 0
         diag_tc.asp_ratio[k] = 0
         diag_tc.frac_turb_entr[k] = 0
+        diag_tc.entr_rate_inv_s[k] = 0
+        diag_tc.detr_rate_inv_s[k] = 0
         diag_tc.Π₁[k] = 0
         diag_tc.Π₂[k] = 0
         diag_tc.Π₃[k] = 0
@@ -347,6 +351,9 @@ function compute_diagnostics!(
                 diag_tc.δ_ml_nondim[k] += aux_up_i.area[k] * aux_up_i.δ_ml_nondim[k] / a_up_bulk_k
                 diag_tc.asp_ratio[k] += aux_up_i.area[k] * aux_up_i.asp_ratio[k] / a_up_bulk_k
                 diag_tc.frac_turb_entr[k] += aux_up_i.area[k] * aux_up_i.frac_turb_entr[k] / a_up_bulk_k
+
+                diag_tc.entr_rate_inv_s[k] += aux_up_i.area[k] * aux_up_i.entr_rate_inv_s[k] / a_up_bulk_k
+                diag_tc.detr_rate_inv_s[k] += aux_up_i.area[k] * aux_up_i.detr_rate_inv_s[k] / a_up_bulk_k
 
                 # @assert diag_tc.entr_ml[k] == aux_up_i.entr_ml[k]
                 # @assert diag_tc.detr_ml[k] == aux_up_i.detr_ml[k]
