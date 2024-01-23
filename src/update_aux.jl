@@ -61,22 +61,29 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         e_pot = geopotential(param_set, grid.zc.z[k])
         @inbounds for i in 1:N_up
             if prog_up[i].ρarea[k] / ρ_c[k] > edmf.minimum_area
-                @show "first"
-                @show prog_up[i].ρaθ_liq_ice[k]
-                @show prog_up[i].ρarea[k]
-                @show k
-                @show "-------"
+                # @show "first"
+                # @show prog_up[i].ρaθ_liq_ice[k]
+                # @show prog_up[i].ρarea[k]
+                # @show k
+                # @show "-------"
                 aux_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / prog_up[i].ρarea[k]
                 aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
                 aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ_c[k]
             else
-                @show "second"
-                @show aux_gm.θ_liq_ice[k]
-                @show "-------"
+                # @show "second"
+                # @show aux_gm.θ_liq_ice[k]
+                # @show k
+                # @show "-------"
                 aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
                 aux_up[i].q_tot[k] = aux_gm.q_tot[k]
                 aux_up[i].area[k] = 0
             end
+
+
+            # @inbounds for k in real_center_indices(grid)
+            #     
+            # end
+
             thermo_args = ()
             if edmf.moisture_model isa NonEquilibriumMoisture
                 if prog_up[i].ρarea[k] / ρ_c[k] > edmf.minimum_area
@@ -95,6 +102,11 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 @show  p_c[k]
                 @show  aux_up[i].θ_liq_ice[k]
                 @show aux_up[i].q_tot[k]
+                @show prog_up[i].ρarea[k]
+                @show aux_up[i].area[k]
+                @show prog_up[i].ρaθ_liq_ice[k]
+                @show prog_up[i].ρaq_tot[k]
+                @show k
 
                 rethrow(e)
             end
@@ -294,10 +306,11 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @inbounds for i in 1:N_up
         a_min = edmf.minimum_area
         a_up = aux_up[i].area
-        # if a_up > 0
-        #     @show prog_up_f[i].ρaw / (ρ_f * ᶠinterp_a(a_up)
-        # end
+        ρarea_c = prog_up[i].ρarea
         @. aux_up_f[i].w = ifelse(ᶠinterp_a(a_up) > a_min, max(prog_up_f[i].ρaw / (ρ_f * ᶠinterp_a(a_up)), 0), FT(0))
+        # @. aux_up_f[i].w = prog_up_f[i].ρaw / ᶠinterp_a(ρarea_c) - no
+        # @. aux_up_f[i].w = ifelse(ᶠinterp_a(a_up) > a_min, max(prog_up_f[i].ρaw / (ρ_f * ᶠinterp_a(a_up)), 0), FT(0))
+
     end
     @inbounds for i in 1:N_up
         aux_up_f[i].w[kf_surf] = w_surface_bc(surf)
@@ -492,7 +505,11 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_tc.mixing_length[k] = ml.mixing_length
         aux_tc.ml_ratio[k] = ml.ml_ratio
 
-        KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0))
+        if 0.0 <= grid.zc[k].z <= 1000.0
+            KM[k] = 50.0
+        end
+
+        # KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0))
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
         KQ[k] = KH[k] / Le
 

@@ -197,10 +197,11 @@ function εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nond
     end
     δ_dyn += max(ε_dim_scale, δ_dim_scale) * area_limiter
 
-
-    # return ε_dyn, δ_dyn
+    
+    # return min_limiter, 0.0
     return 0.0, 0.0
     # return 0.8, 0.9
+    # return ε_dyn, δ_dyn
 end
 
 """
@@ -487,6 +488,14 @@ function compute_ml_entr_detr!(
                 # update nondimensional entr/detr
                 aux_up[i].ε_ml_nondim[k] = ε_ml_nondim
                 aux_up[i].δ_ml_nondim[k] = δ_ml_nondim
+
+                # if 0.0 < FT(grid.zc[k].z) < 50000.0
+                #     aux_up[i].entr_ml[k] = 0.0
+                #     aux_up[i].detr_ml[k] = 0.0
+                #     # update nondimensional entr/detr
+                #     aux_up[i].ε_ml_nondim[k] = 0.0 # 1
+                #     aux_up[i].δ_ml_nondim[k] = 0.0 # 1
+                # end
             else
                 aux_up[i].entr_ml[k] = 0.0
                 aux_up[i].detr_ml[k] = 0.0

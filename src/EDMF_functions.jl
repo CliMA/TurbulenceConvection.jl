@@ -18,7 +18,7 @@ function compute_turbconv_tendencies!(
     surf::SurfaceBase,
     Δt::Real,
 )
-    compute_up_tendencies!(edmf, grid, state, param_set, surf)
+    compute_up_tendencies!(edmf, grid, state, param_set, surf, Δt)
     compute_en_tendencies!(edmf, grid, state, param_set, Val(:tke), Val(:ρatke))
 
     if edmf.thermo_covariance_model isa PrognosticThermoCovariances
@@ -294,6 +294,9 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         θ_surf = θ_surface_bc(surf, grid, state, edmf, i)
         q_surf = q_surface_bc(surf, grid, state, edmf, i)
 
+        ρaw = prog_up_f[i].ρaw
+        ρaw[kf_surf] = 1e-4
+
         ρa_surf = prog_up[i].ρarea[kc_surf]
         prog_up[i].ρaθ_liq_ice[kc_surf] = prog_up[i].ρarea[kc_surf] * θ_surf
         prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * q_surf
@@ -348,7 +351,8 @@ function area_surface_bc(surf::SurfaceBase{FT}, edmf::EDMFModel, i::Int, bc::Clo
 end
 
 function w_surface_bc(::SurfaceBase{FT})::FT where {FT}
-    return FT(0)
+    # return FT(0)
+    return FT(1e-2)
 end
 function uₕ_bcs()
     return CCO.InterpolateC2F(bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
@@ -475,7 +479,7 @@ function compute_up_stoch_tendencies!(edmf::EDMFModel, grid::Grid, state::State,
 end
 
 
-function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param_set::APS, surf::SurfaceBase)
+function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param_set::APS, surf::SurfaceBase, Δt::Real)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
     kf_surf = kf_surface(grid)
@@ -490,6 +494,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     tendencies_up = center_tendencies_updrafts(state)
     tendencies_up_f = face_tendencies_updrafts(state)
     prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     aux_gm_f = face_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
     ρ_c = prog_gm.ρ
@@ -508,7 +513,8 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
     w_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
-    LBF = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
+    LBF = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(1e-4)))
+    
 
     # Solve for updraft area fraction
     @inbounds for i in 1:N_up
@@ -535,20 +541,29 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         # @. tends_ρarea =
         #     -∇c(wvec(LBF(Ic(w_up) * ρarea))) + (ρarea * Ic(w_up) * entr_turb_dyn) - (ρarea * Ic(w_up) * detr_turb_dyn)
 
+        # linear_decay_const = Δt * 1e-1
+        linear_decay_const = Δt * 0.0
+        relax_below = 1e-10
+
         @. tends_ρarea =
-            -∇c(wvec(LBF(Ic(ρaw)))) #+ (ρarea * Ic(w_up) * entr_turb_dyn) - (ρarea * Ic(w_up) * detr_turb_dyn)
+            # -∇c(wvec(LBF(Ic(ρaw)))) + (Ic(ρaw) * entr_turb_dyn) - (Ic(ρaw) * detr_turb_dyn) - ifelse(ρarea < relax_below, linear_decay_const * (ρarea - 1e-15), FT(0.0))
+
+            -∇c(wvec(LBF(Ic(ρaw)))) + (Ic(ρaw) * entr_turb_dyn) - (Ic(ρaw) * detr_turb_dyn) - ifelse(ρarea < relax_below, linear_decay_const * ρarea * Ic(w_up), FT(0.0))
+            # -∇c(wvec(LBF(Ic(ρaw)))) + (Ic(ρaw) * entr_turb_dyn) - (Ic(ρaw) * detr_turb_dyn) - ifelse(ρarea < relax_below, linear_decay_const * ((Ic(ρaw) / Ic(w_up)) - 1e-15), FT(0.0))
             # -(∇f(wvec(LBC(ρaw * w_up))))
         rhoa_tend = aux_tc.rhoa_tend
         rhoa_tend_term1 = aux_tc.rhoa_tend_term1
         rhoa_tend_term2 = aux_tc.rhoa_tend_term2
         rhoa_tend_term3 = aux_tc.rhoa_tend_term3
+        rhoa_tend_relax = aux_tc.rhoa_tend_relax
+        rhoa_tend_nonrelax = aux_tc.rhoa_tend_nonrelax
 
         @. rhoa_tend = tends_ρarea
-        @. rhoa_tend_term1 = -∇c(wvec(LBF(Ic(w_up) * ρarea)))
-        @. rhoa_tend_term2 = ρarea * Ic(w_up) * entr_turb_dyn
-        @. rhoa_tend_term3 = ρarea * Ic(w_up) * detr_turb_dyn
-
-        
+        @. rhoa_tend_term1 = -∇c(wvec(LBF(Ic(ρaw))))
+        @. rhoa_tend_term2 = (Ic(ρaw) * entr_turb_dyn)
+        @. rhoa_tend_term3 = -1.0*(Ic(ρaw) * detr_turb_dyn)
+        @. rhoa_tend_relax = -1.0*ifelse(ρarea < relax_below, linear_decay_const * ρarea * Ic(w_up), FT(0.0))
+        @. rhoa_tend_nonrelax = -∇c(wvec(LBF(Ic(ρaw)))) + (Ic(ρaw) * entr_turb_dyn) - (Ic(ρaw) * detr_turb_dyn)
 
         # @. tends_ρaθ_liq_ice =
         #     -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice))) + (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) -
@@ -557,14 +572,35 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         # @. tends_ρaq_tot =
         #     -∇c(wvec(LBF(Ic(w_up) * ρaq_tot))) + (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en) -
         #     (ρaq_tot * Ic(w_up) * detr_turb_dyn) + (ρ_c * qt_tendency_precip_formation)
+        linear_decay_const = Δt * 0.0
+        relax_below = 1e-10
 
         @. tends_ρaθ_liq_ice =
-            -∇c(wvec(LBF(Ic(ρaw) * aux_up[i].θ_liq_ice))) + (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) -
-            (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn) #+ (ρ_c * θ_liq_ice_tendency_precip_formation)
+            -∇c(wvec(LBF(Ic(ρaw) * aux_up[i].θ_liq_ice))) + (Ic(ρaw) * entr_turb_dyn * θ_liq_ice_en) - (Ic(ρaw) * detr_turb_dyn * aux_up[i].θ_liq_ice) - ifelse(Ic(ρaw) < relax_below, linear_decay_const * ρarea * (aux_up[i].θ_liq_ice - aux_gm.θ_liq_ice), FT(0.0))
+            # - (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn) #+ (ρ_c * θ_liq_ice_tendency_precip_formation)
 
         @. tends_ρaq_tot =
-            -∇c(wvec(LBF(Ic(ρaw) * aux_up[i].q_tot))) + (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en) -
-            (ρaq_tot * Ic(w_up) * detr_turb_dyn) #+ (ρ_c * qt_tendency_precip_formation)
+            -∇c(wvec(LBF(Ic(ρaw) * aux_up[i].q_tot))) + (Ic(ρaw) * entr_turb_dyn * q_tot_en) - (Ic(ρaw) * detr_turb_dyn * aux_up[i].q_tot) - ifelse(Ic(ρaw) < relax_below, linear_decay_const  * ρarea * (aux_up[i].q_tot - aux_gm.q_tot), FT(0.0))
+            # - (ρaq_tot * Ic(w_up) * detr_turb_dyn) + (ρ_c * qt_tendency_precip_formation)
+
+        
+        theta_tend = aux_tc.theta_tend
+        theta_tend_relax = aux_tc.theta_tend_relax
+        theta_tend_nonrelax = aux_tc.theta_tend_nonrelax
+        qt_tend = aux_tc.qt_tend
+        qt_tend_relax = aux_tc.qt_tend_relax
+        qt_tend_nonrelax = aux_tc.qt_tend_nonrelax
+
+        @. theta_tend = tends_ρaθ_liq_ice
+        @. theta_tend_relax = -1.0*ifelse(Ic(ρaw) < relax_below, linear_decay_const * ρarea * (aux_up[i].θ_liq_ice - aux_gm.θ_liq_ice), FT(0.0))
+        @. theta_tend_nonrelax = -∇c(wvec(LBF(Ic(ρaw) * aux_up[i].θ_liq_ice))) + (Ic(ρaw) * entr_turb_dyn * θ_liq_ice_en) - (Ic(ρaw) * detr_turb_dyn * aux_up[i].θ_liq_ice)
+        @. qt_tend = tends_ρaq_tot
+        @. qt_tend_relax = -1.0*ifelse(Ic(ρaw) < relax_below, linear_decay_const  * ρarea * (aux_up[i].q_tot - aux_gm.q_tot), FT(0.0))
+        @. qt_tend_nonrelax = -∇c(wvec(LBF(Ic(ρaw) * aux_up[i].q_tot))) + (Ic(ρaw) * entr_turb_dyn * q_tot_en) - (Ic(ρaw) * detr_turb_dyn * aux_up[i].q_tot)
+
+        # @. tends_ρaq_tot =
+        #     -∇c(wvec(LBF(Ic(ρaw) * aux_up[i].q_tot)))#+ (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en)
+        #     # - (ρaq_tot * Ic(w_up) * detr_turb_dyn) #+ (ρ_c * qt_tendency_precip_formation)
 
 
         if edmf.moisture_model isa NonEquilibriumMoisture
@@ -648,13 +684,20 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     # We know that, since W = 0 at z = 0, BCs for entr, detr,
     # and buoyancy should not matter in the end
     zero_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
-    I0f = CCO.InterpolateC2F(; zero_bcs...)
-    adv_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
-    LBC = CCO.LeftBiasedF2C(; bottom = CCO.SetValue(FT(0)))
+    extrap_bottom_bcs = (; bottom = CCO.Extrapolate(), top = CCO.SetValue(FT(0)))
+    I0f = CCO.InterpolateC2F(; extrap_bottom_bcs...)
+    # adv_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
+    # LBC = CCO.LeftBiasedF2C(; bottom = CCO.SetValue(FT(0)))
+    # ∇f = CCO.DivergenceC2F(; adv_bcs...)
+
+    adv_bcs = (; bottom = CCO.SetValue(wvec(FT(1e-6))), top = CCO.SetValue(wvec(FT(1e-6))))
+    LBC = CCO.LeftBiasedF2C(; bottom = CCO.SetValue(FT(1e-6)))
     ∇f = CCO.DivergenceC2F(; adv_bcs...)
+
 
     @inbounds for i in 1:N_up
         ρaw = prog_up_f[i].ρaw
+        ρarea = prog_up[i].ρarea
         tends_ρaw = tendencies_up_f[i].ρaw
         nh_pressure = aux_up_f[i].nh_pressure
         a_up = aux_up[i].area
@@ -664,12 +707,46 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         detr_w = aux_up[i].detr_turb_dyn
         buoy = aux_up[i].buoy
 
+        @show "------------"
+        @show w_up[kf_surf]
+        @show w_up[kf_surf + 1]
+        @show ".."
+        @show ρaw[kf_surf]
+        @show ρaw[kf_surf + 1]
+        @show ".."
+        @show 
+        @show "------------"
+
+
         @. tends_ρaw = -(∇f(wvec(LBC(ρaw * w_up))))
         # @. tends_ρaw +=
         #     (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) + nh_pressure
-        @. tends_ρaw +=
-            (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) #+ nh_pressure
-        tends_ρaw[kf_surf] = 0
+        # linear_decay_const = Δt * 1e-2
+        linear_decay_const = Δt * 0.0
+        relax_below = 1e-10
+        min_mf_decay_const = Δt * 10000.0
+
+        # @. tends_ρaw +=                                         
+        #     (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) #+ (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) #- ifelse(ρaw < relax_below, linear_decay_const * ᶠinterp_a(ρarea) * w_up, FT(0.0))  - ifelse(ρaw < relax_below, min_mf_decay_const * (ρaw - 1e-20), FT(0.0))
+
+
+            #+ nh_pressure
+            #+ (ρ_f * ᶠinterp_a(a_up) * I0f(buoy))
+            # (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) - ifelse(ρaw < relax_below, linear_decay_const * (ρaw - 1e-20), FT(0.0))  #+ nh_pressure
+        # @. tends_ρaw +=
+        #     (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + (ᶠinterp_a(ρarea) * I0f(buoy)) #+ nh_pressure
+
+        # tends_ρaw[kf_surf] = 0
+
+        mf_tend_c = aux_tc.mf_tend_c
+        mf_tend_relax_c = aux_tc.mf_tend_relax_c
+        mf_tend_nonrelax_c = aux_tc.mf_tend_nonrelax_c
+
+        @. mf_tend_c = Ic(tends_ρaw)
+        # @. mf_tend_relax_c = Ic(-1.0 * ifelse(ρaw < relax_below, linear_decay_const * ᶠinterp_a(ρarea) * w_up, FT(0.0)))
+        @. mf_tend_relax_c = Ic(-1.0 * ifelse(ρaw < relax_below, min_mf_decay_const * (ρaw - 1e-20), FT(0.0)))
+        @. mf_tend_nonrelax_c = Ic(-1.0 * ∇f(wvec(LBC(ρaw * w_up))) + (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)))
+
     end
 
     return nothing
@@ -697,6 +774,12 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     Ic = CCO.InterpolateF2C()
     
     @inbounds for i in 1:N_up
+        # @inbounds for k in real_center_indices(grid)
+        #     @show prog_up[i].ρarea[k]
+        #     @show prog_up[i].ρaθ_liq_ice[k]
+        #     @show prog_up[i].ρaq_tot[k]
+        # end
+
         prog_up[i].ρarea .= max.(prog_up[i].ρarea, 0)
         prog_up[i].ρaθ_liq_ice .= max.(prog_up[i].ρaθ_liq_ice, 0)
         prog_up[i].ρaq_tot .= max.(prog_up[i].ρaq_tot, 0)
@@ -793,8 +876,11 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         ### method 1
         # @. prog_up_f[i].ρaw = Int(ᶠinterp_a(prog_up[i].ρarea) > 0) * prog_up_f[i].ρaw
 
-        ## method 1.5
+        # ## method 1.5
         # @. prog_up[i].ρarea = Int(Ic(prog_up_f[i].ρaw) > 0) * prog_up[i].ρarea
+        # @. prog_up[i].ρarea = Int(prog_up[i].ρaθ_liq_ice > 0)  * prog_up[i].ρarea
+        # @. prog_up[i].ρarea = Int(prog_up[i].ρaq_tot > 0)  * prog_up[i].ρarea
+        # @. prog_up_f[i].ρaw = Int(ᶠinterp_a(prog_up[i].ρarea) > 0) * prog_up_f[i].ρaw
 
         ### method 2
         # min_area_clip = 1e-10
@@ -831,6 +917,25 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     #             end
     #         end
     #     end
+    # end
+
+
+    # kc_surf = TC.kc_surface(grid)
+    # kf_surf = TC.kf_surface(grid)
+    # @inbounds for k in real_center_indices(grid)
+    #         a_up_initial = FT(0.1)
+    #         aux_up[i].area[kc_surf] = a_up_initial
+    #         aux_up[i].area[kc_surf + 1] = a_up_initial
+    #         prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_up_initial
+    #         prog_up[i].ρarea[kc_surf + 1] = ρ_c[kc_surf + 1] * a_up_initial
+
+    #         aux_up_f[i].w[kf_surf + 1] = FT(0.1) # small velocity perturbation
+    #         prog_up_f[i].ρaw[kf_surf + 1] = ρ_f[kf_surf + 1] * a_up_initial * FT(0.1) # small ρaw perturbation
+
+    #         prog_up[i].ρaq_tot[kc_surf] = ρ_c[kc_surf] * a_up_initial * aux_gm.q_tot[kc_surf]
+    #         prog_up[i].ρaθ_liq_ice[kc_surf] = ρ_c[kc_surf] * a_up_initial * aux_gm.θ_liq_ice[kc_surf]
+    #         prog_up[i].ρaq_tot[kc_surf + 1] = ρ_c[kc_surf + 1] * a_up_initial * aux_gm.q_tot[kc_surf + 1]
+    #         prog_up[i].ρaθ_liq_ice[kc_surf + 1] = ρ_c[kc_surf + 1] * a_up_initial * aux_gm.θ_liq_ice[kc_surf + 1]
     # end
 
 

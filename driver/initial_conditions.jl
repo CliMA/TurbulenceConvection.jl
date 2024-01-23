@@ -65,21 +65,47 @@ function initialize_updrafts(edmf, grid, state, surf)
             aux_up_f[i].w[k] = 0
             prog_up_f[i].ρaw[k] = 0
         end
-
+       
         @inbounds for k in TC.real_center_indices(grid)
+
+            # z = grid.zc[k].z
+            # if  0.0 <= z <= 3500.0
+
+            # a_up_initial = FT(1e-15) / ρ_c[k]
+            a_up_initial = FT(1e-2) / ρ_c[k]
+            # else
+                # a_up_initial = 0.0
+            # end
+            # a_up_initial = 0.0
             aux_up[i].buoy[k] = 0
             # Simple treatment for now, revise when multiple updraft closures
             # become more well defined
-            aux_up[i].area[k] = 0
+            aux_up[i].area[k] = a_up_initial
             aux_up[i].q_tot[k] = aux_gm.q_tot[k]
             aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
             aux_up[i].q_liq[k] = aux_gm.q_liq[k]
             aux_up[i].q_ice[k] = aux_gm.q_ice[k]
             aux_up[i].T[k] = aux_gm.T[k]
-            prog_up[i].ρarea[k] = 0
-            prog_up[i].ρaq_tot[k] = 0
-            prog_up[i].ρaθ_liq_ice[k] = 0
+            prog_up[i].ρarea[k] = ρ_c[k] * a_up_initial 
+            prog_up[i].ρaq_tot[k] = ρ_c[k] * a_up_initial * aux_gm.q_tot[k]
+            prog_up[i].ρaθ_liq_ice[k] = ρ_c[k] * a_up_initial * aux_gm.θ_liq_ice[k]
         end
+
+        @inbounds for k in TC.real_face_indices(grid)
+
+            # z = grid.zf[k].z
+            # if  0.0 <= z <= 3500.0
+            # ρaw_initial = FT(1e-20)
+            ρaw_initial = FT(1e-4)
+            # else
+            #     ρaw_initial = 0.0
+            # end
+            prog_up_f[i].ρaw[k] = ρaw_initial 
+        end
+
+        a_up = aux_up[i].area
+        @. aux_up_f[i].w = prog_up_f[i].ρaw / (ρ_f * TC.ᶠinterp_a(a_up))
+
         if edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess
             @. prog_up[i].ε_nondim = 0
             @. prog_up[i].δ_nondim = 0
@@ -93,22 +119,58 @@ function initialize_updrafts(edmf, grid, state, surf)
             # To avoid degeneracy from 0 BC on surface updraft area fraction, add small perturbation
             # to relevant prognostic variables in bottom cell -> This avoids trivial solution with no updrafts.
         elseif edmf.surface_area_bc isa TC.PrognosticSurfaceAreaBC
-            a_up_initial = FT(0.1)
-            aux_up[i].area[kc_surf] = a_up_initial
-            aux_up[i].area[kc_surf + 1] = a_up_initial
-            prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_up_initial
-            prog_up[i].ρarea[kc_surf + 1] = ρ_c[kc_surf + 1] * a_up_initial
+            # a_up_initial = FT(0.1)
+            # aux_up[i].area[kc_surf] = a_up_initial
+            # aux_up[i].area[kc_surf + 1] = a_up_initial
+            # prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_up_initial
+            # prog_up[i].ρarea[kc_surf + 1] = ρ_c[kc_surf + 1] * a_up_initial
 
-            aux_up_f[i].w[kf_surf + 1] = FT(0.1) # small velocity perturbation
-            prog_up_f[i].ρaw[kf_surf + 1] = ρ_f[kf_surf + 1] * a_up_initial * FT(0.1) # small ρaw perturbation
+            # aux_up_f[i].w[kf_surf + 1] = FT(0.1) # small velocity perturbation
+            # prog_up_f[i].ρaw[kf_surf + 1] = ρ_f[kf_surf + 1] * a_up_initial * FT(0.1) # small ρaw perturbation
 
-            prog_up[i].ρaq_tot[kc_surf] = ρ_c[kc_surf] * a_up_initial * aux_gm.q_tot[kc_surf]
-            prog_up[i].ρaθ_liq_ice[kc_surf] = ρ_c[kc_surf] * a_up_initial * aux_gm.θ_liq_ice[kc_surf]
-            prog_up[i].ρaq_tot[kc_surf + 1] = ρ_c[kc_surf + 1] * a_up_initial * aux_gm.q_tot[kc_surf + 1]
-            prog_up[i].ρaθ_liq_ice[kc_surf + 1] = ρ_c[kc_surf + 1] * a_up_initial * aux_gm.θ_liq_ice[kc_surf + 1]
+            # prog_up[i].ρaq_tot[kc_surf] = ρ_c[kc_surf] * a_up_initial * aux_gm.q_tot[kc_surf]
+            # prog_up[i].ρaθ_liq_ice[kc_surf] = ρ_c[kc_surf] * a_up_initial * aux_gm.θ_liq_ice[kc_surf]
+            # prog_up[i].ρaq_tot[kc_surf + 1] = ρ_c[kc_surf + 1] * a_up_initial * aux_gm.q_tot[kc_surf + 1]
+            # prog_up[i].ρaθ_liq_ice[kc_surf + 1] = ρ_c[kc_surf + 1] * a_up_initial * aux_gm.θ_liq_ice[kc_surf + 1]
+
+            # @inbounds for k in TC.real_center_indices(grid)
+            #     z = grid.zc[k].z
+            #     if 0.0 <= z <= 5000.0
+            #         a_surf = 0.05
+
+            #         amplitude_init = exp(-(1/100.0)*z)
+            #         a_up_initial = amplitude_init * a_surf
+            #         if ρ_c[k] * a_up_initial > prog_up[i].ρarea[k]
+            #             aux_up[i].area[k] = a_up_initial
+            #             prog_up[i].ρarea[k] = ρ_c[k] * a_up_initial
+            #             prog_up[i].ρaq_tot[k] = ρ_c[k] * a_up_initial * aux_gm.q_tot[k]
+            #             prog_up[i].ρaθ_liq_ice[k] = ρ_c[k] * a_up_initial * aux_gm.θ_liq_ice[k]
+            #         end
+            #     end
+            # end
+
+            # aux_up_area_f = aux_up_f[i].area
+            # @. aux_up_area_f = TC.ᶠinterp_a(aux_up[i].area)
+
+            # @inbounds for k in TC.real_face_indices(grid)
+            #     z = grid.zf[k].z
+            #     if 0.0 < z <= 5000.0
+            #         amplitude_init = exp(-(1/100.0)*z)
+            #         w_surf = 0.01
+            #         w_i = amplitude_init * w_surf
+
+            #         if ρ_f[k] * aux_up_area_f[k] * w_i > prog_up_f[i].ρaw[k]
+            #             prog_up_f[i].ρaw[k] = ρ_f[k] * aux_up_area_f[k] * w_i
+            #             aux_up_f[i].w[k] = w_i
+            #         end
+            #     end
+            # end
+            
         end
+
     end
     return
+
 end
 
 import AtmosphericProfilesLibrary

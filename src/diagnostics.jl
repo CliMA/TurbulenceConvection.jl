@@ -116,7 +116,20 @@ function io_dictionary_aux()
         "rhoa_tend_term1" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).rhoa_tend_term1),
         "rhoa_tend_term2" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).rhoa_tend_term2),
         "rhoa_tend_term3" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).rhoa_tend_term3),
+        "rhoa_tend_relax" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).rhoa_tend_relax),
+        "rhoa_tend_nonrelax" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).rhoa_tend_nonrelax),
 
+        "mf_tend_c" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).mf_tend_c),
+        "mf_tend_relax_c" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).mf_tend_relax_c),
+        "mf_tend_nonrelax_c" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).mf_tend_nonrelax_c),
+
+
+        "theta_tend" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).theta_tend),
+        "theta_tend_relax" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).theta_tend_relax),
+        "theta_tend_nonrelax" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).theta_tend_nonrelax),
+        "qt_tend" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qt_tend),
+        "qt_tend_relax" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qt_tend_relax),
+        "qt_tend_nonrelax" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qt_tend_nonrelax),
 
         "total_flux_h" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_h .+ face_aux_turbconv(state).massflux_h),
         "total_flux_qt" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qt .+ face_aux_turbconv(state).massflux_qt),
