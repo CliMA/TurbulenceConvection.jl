@@ -499,6 +499,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     @inbounds for i in 1:N_up
         aux_up_i = aux_up[i]
         w_up = aux_up_f[i].w
+        ρaw = prog_up_f[i].ρaw
         a_up = aux_up_i.area
         q_tot_up = aux_up_i.q_tot
         q_tot_en = aux_en.q_tot
@@ -516,9 +517,11 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         tends_ρarea = tendencies_up[i].ρarea
         tends_ρaθ_liq_ice = tendencies_up[i].ρaθ_liq_ice
         tends_ρaq_tot = tendencies_up[i].ρaq_tot
-        @. tends_ρarea =
-            -∇c(wvec(LBF(Ic(w_up) * ρarea))) + (ρarea * Ic(w_up) * entr_turb_dyn) - (ρarea * Ic(w_up) * detr_turb_dyn)
+        # @. tends_ρarea =
+        #     -∇c(wvec(LBF(Ic(w_up) * ρarea))) + (ρarea * Ic(w_up) * entr_turb_dyn) - (ρarea * Ic(w_up) * detr_turb_dyn)
 
+        @. tends_ρarea =
+            -∇c(wvec(LBF(Ic(ρaw)))) + (Ic(ρaw) * entr_turb_dyn) - (Ic(ρaw) * detr_turb_dyn)
 
         # add tend to reduce area fraction at large values
         # @inbounds for k in real_center_indices(grid)
@@ -543,34 +546,24 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         rhoa_tend_term3 = aux_tc.rhoa_tend_term3
 
         @. rhoa_tend = tends_ρarea
-        @. rhoa_tend_term1 = -∇c(wvec(LBF(Ic(w_up) * ρarea)))
-        @. rhoa_tend_term2 = ρarea * Ic(w_up) * entr_turb_dyn
-        @. rhoa_tend_term3 = ρarea * Ic(w_up) * detr_turb_dyn
-
-
-        @inbounds for k in real_center_indices(grid)
-            if (tends_ρarea[k] < 0) && (entr_turb_dyn[k] > 0)  && (rhoa_tend_term1[k] > 0)
-                @show "Bad tend!"
-                @show tends_ρarea[k]
-                @show k
-                @show ρarea[k]
-                @show entr_turb_dyn[k]
-                @show rhoa_tend_term1[k]
-                @show rhoa_tend_term2[k]
-                @show rhoa_tend_term3[k]
-            end
-
-        end
-
+        @. rhoa_tend_term1 = -∇c(wvec(LBF(Ic(ρaw))))
+        @. rhoa_tend_term2 = Ic(ρaw) * entr_turb_dyn
+        @. rhoa_tend_term3 = Ic(ρaw) * detr_turb_dyn
         
 
+        # @. tends_ρaθ_liq_ice =
+        #     -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice))) + (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) -
+        #     (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn) + (ρ_c * θ_liq_ice_tendency_precip_formation)
+
+        # @. tends_ρaq_tot =
+        #     -∇c(wvec(LBF(Ic(w_up) * ρaq_tot))) + (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en) -
+        #     (ρaq_tot * Ic(w_up) * detr_turb_dyn) + (ρ_c * qt_tendency_precip_formation)
+
         @. tends_ρaθ_liq_ice =
-            -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice))) + (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) -
-            (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn) + (ρ_c * θ_liq_ice_tendency_precip_formation)
+            -∇c(wvec(LBF(Ic(ρaw) * aux_up[i].θ_liq_ice))) + (Ic(ρaw) * entr_turb_dyn * θ_liq_ice_en) - (Ic(ρaw) * detr_turb_dyn * aux_up[i].θ_liq_ice) + (ρ_c * θ_liq_ice_tendency_precip_formation)
 
         @. tends_ρaq_tot =
-            -∇c(wvec(LBF(Ic(w_up) * ρaq_tot))) + (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en) -
-            (ρaq_tot * Ic(w_up) * detr_turb_dyn) + (ρ_c * qt_tendency_precip_formation)
+            -∇c(wvec(LBF(Ic(ρaw) * aux_up[i].q_tot))) + (Ic(ρaw) * entr_turb_dyn * q_tot_en) - (Ic(ρaw) * detr_turb_dyn * aux_up[i].q_tot) + (ρ_c * qt_tendency_precip_formation)
 
 
         @inbounds for k in real_center_indices(grid)
@@ -659,6 +652,16 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         @. tends_ρaw +=
             (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) + nh_pressure
         tends_ρaw[kf_surf] = 0
+
+        mf_tend_c = aux_tc.mf_tend_c
+        mf_tend_term_1 = aux_tc.mf_tend_term_1
+        mf_tend_term_2 = aux_tc.mf_tend_term_2
+        mf_tend_term_3 = aux_tc.mf_tend_term_3
+
+        @. mf_tend_c = Ic(tends_ρaw)
+        @. mf_tend_term_1 = Ic(- 1.0 * ∇f(wvec(LBC(ρaw * w_up))))
+        @. mf_tend_term_2 = Ic(ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up))
+        @. mf_tend_term_3 = Ic(ρ_f * ᶠinterp_a(a_up) * I0f(buoy))
     end
 
     return nothing
@@ -741,10 +744,28 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         # @. prog_up[i].ρarea = ifelse(Ic(prog_up_f[i].ρaw) < 1e-15, FT(1e-10), prog_up[i].ρarea)
         # @. prog_up[i].ρaθ_liq_ice = ifelse(Ic(prog_up_f[i].ρaw) < 1e-15, FT(1e-10) * aux_gm_c.θ_liq_ice, prog_up[i].ρaθ_liq_ice)
         # @. prog_up[i].ρaq_tot = ifelse(Ic(prog_up_f[i].ρaw) < 1e-15, FT(1e-10) * aux_gm_c.q_tot, prog_up[i].ρaq_tot)
-
         # @. prog_up_f[i].ρaw = ifelse(prog_up_f[i].ρaw < 1e-15, FT(1e-15), prog_up_f[i].ρaw)
         # prog_up_f[i].ρaw[kf_surf] = 0.0
 
+        # clip prog variables when rhoa, mf are small
+        @. prog_up[i].ρaθ_liq_ice = ifelse((Ic(prog_up_f[i].ρaw) < 1e-15) || (prog_up[i].ρarea < FT(1e-10)), FT(1e-10) * aux_gm_c.θ_liq_ice, prog_up[i].ρaθ_liq_ice)
+        @. prog_up[i].ρaq_tot = ifelse((Ic(prog_up_f[i].ρaw) < 1e-15) || (prog_up[i].ρarea < FT(1e-10)), FT(1e-10) * aux_gm_c.q_tot, prog_up[i].ρaq_tot)
+        @. prog_up[i].ρarea = ifelse((Ic(prog_up_f[i].ρaw) < 1e-15) || (prog_up[i].ρarea < FT(1e-10)), FT(1e-10), prog_up[i].ρarea)
+        @. prog_up_f[i].ρaw = ifelse((prog_up_f[i].ρaw < 1e-15) || (ᶠinterp_a(prog_up[i].ρarea) <= FT(1e-10)), FT(1e-15), prog_up_f[i].ρaw)
+        prog_up_f[i].ρaw[kf_surf] = 0.0
+
+
+        # @. prog_up[i].ρaθ_liq_ice = ifelse((Ic(prog_up_f[i].ρaw) < 1e-15) || (prog_up[i].ρarea < FT(1e-10)), FT(1e-10) * aux_gm_c.θ_liq_ice, prog_up[i].ρaθ_liq_ice)
+        # @. prog_up[i].ρaq_tot = ifelse((Ic(prog_up_f[i].ρaw) < 1e-15) || (prog_up[i].ρarea < FT(1e-10)), FT(1e-10) * aux_gm_c.q_tot, prog_up[i].ρaq_tot)
+        # @. prog_up[i].ρarea = ifelse((Ic(prog_up_f[i].ρaw) < 1e-15) || (prog_up[i].ρarea < FT(1e-10)), FT(1e-10), prog_up[i].ρarea)
+        # @. prog_up_f[i].ρaw = ifelse((prog_up_f[i].ρaw < 1e-15) || (ᶠinterp_a(prog_up[i].ρarea) <= FT(1e-10)), FT(1e-15), prog_up_f[i].ρaw)
+        # prog_up_f[i].ρaw[kf_surf] = 0.0
+
+        # @. prog_up[i].ρaθ_liq_ice = ifelse(prog_up[i].ρarea > ρ_c * 0.9, ρ_c * 0.9 * aux_gm_c.θ_liq_ice, prog_up[i].ρaθ_liq_ice)
+        # @. prog_up[i].ρaq_tot = ifelse(prog_up[i].ρarea > ρ_c * 0.9, ρ_c * 0.9 * aux_gm_c.q_tot, prog_up[i].ρaq_tot)
+        # # @. prog_up_f[i].ρaw = ifelse(ᶠinterp_a(prog_up[i].ρarea) > ρ_c * 0.9, FT(1e-15), prog_up_f[i].ρaw)
+        # @. prog_up[i].ρarea = ifelse(prog_up[i].ρarea > ρ_c * 0.9,  ρ_c * 0.9, prog_up[i].ρarea)
+        # # prog_up_f[i].ρaw[kf_surf] = 0.0
        
 
         # @show "center"

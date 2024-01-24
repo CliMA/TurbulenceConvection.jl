@@ -117,6 +117,12 @@ function io_dictionary_aux()
         "rhoa_tend_term2" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).rhoa_tend_term2),
         "rhoa_tend_term3" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).rhoa_tend_term3),
 
+        "mf_tend_c" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).mf_tend_c),
+        "mf_tend_term_1" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).mf_tend_term_1),
+        "mf_tend_term_2" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).mf_tend_term_2),
+        "mf_tend_term_3" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).mf_tend_term_3),
+
+
 
         "total_flux_h" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_h .+ face_aux_turbconv(state).massflux_h),
         "total_flux_qt" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qt .+ face_aux_turbconv(state).massflux_qt),
