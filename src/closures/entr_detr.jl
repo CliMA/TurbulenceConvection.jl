@@ -28,7 +28,7 @@ function get_Δw(εδ_model, w_up::FT, w_en::FT) where {FT}
     return Δw
 end
 
-function entrainment_inv_length_scale(
+function entrainment_dim_scale(
     εδ_model,
     b_up::FT,
     b_en::FT,
@@ -46,7 +46,7 @@ function entrainment_inv_length_scale(
 end
 
 
-function entrainment_inv_length_scale(
+function entrainment_dim_scale(
     εδ_model,
     b_up::FT,
     b_en::FT,
@@ -61,7 +61,7 @@ function entrainment_inv_length_scale(
     return (1 / ref_H)
 end
 
-function entrainment_inv_length_scale(
+function entrainment_dim_scale(
     εδ_model,
     b_up::FT,
     b_en::FT,
@@ -76,7 +76,7 @@ function entrainment_inv_length_scale(
     return (1 / zc_i)
 end
 
-function entrainment_inv_length_scale(
+function entrainment_dim_scale(
     εδ_model,
     b_up::FT,
     b_en::FT,
@@ -91,7 +91,7 @@ function entrainment_inv_length_scale(
     return FT(1)
 end
 
-function entrainment_inv_length_scale(
+function entrainment_dim_scale(
     εδ_model,
     b_up::FT,
     b_en::FT,
@@ -106,7 +106,7 @@ function entrainment_inv_length_scale(
     return max(∂lnM∂z, FT(0))
 end
 
-function entrainment_inv_length_scale(
+function entrainment_dim_scale(
     εδ_model,
     b_up::FT,
     b_en::FT,
@@ -121,7 +121,7 @@ function entrainment_inv_length_scale(
     return abs(min(∂lnM∂z, FT(0)))
 end
 
-function entrainment_inv_length_scale(
+function entrainment_dim_scale(
     εδ_model,
     b_up::FT,
     b_en::FT,
@@ -136,9 +136,92 @@ function entrainment_inv_length_scale(
     return abs(∂lnM∂z)
 end
 
-"""A convenience wrapper for entrainment_inv_length_scale"""
-function entrainment_inv_length_scale(εδ_model, εδ_vars, dim_scale)
-    return entrainment_inv_length_scale(
+function entrainment_dim_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ::BOverWDimScale,
+) where {FT}
+    Δb = b_up - b_en
+    Δw = get_Δw(εδ_model, w_up, w_en)
+    return abs(Δb / (Δw + eps(FT)))
+end
+
+function entrainment_dim_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ::WOverHeightDimScale,
+) where {FT}
+    Δw = get_Δw(εδ_model, w_up, w_en)
+    return (Δw/zc_i)*1e-1
+end
+
+function entrainment_dim_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ::BOverSqrtTKEDimScale,
+) where {FT}
+    Δb = b_up - b_en
+    return abs(Δb/sqrt(abs(tke) + 1e-3))*1e-3
+end
+
+
+function entrainment_dim_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ::SqrtBOverZDimScale,
+) where {FT}
+    Δb = b_up - b_en
+    return sqrt(abs(Δb/zc_i))
+end
+
+function entrainment_dim_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ::TKEBWDimScale,
+) where {FT}
+    Δb = b_up - b_en
+    Δw = get_Δw(εδ_model, w_up, w_en)
+    return abs((tke * Δb)/ (Δw^3))
+end
+
+"""A convenience wrapper for entrainment_dim_scale"""
+function entrainment_dim_scale(εδ_model, εδ_vars, dim_scale)
+    return entrainment_dim_scale(
         εδ_model,
         εδ_vars.b_up,
         εδ_vars.b_en,
@@ -167,8 +250,8 @@ Parameters:
 """
 function εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nondim, δ_nondim)
     FT = eltype(εδ_vars.q_cond_up)
-    ε_dim_scale = entrainment_inv_length_scale(εδ_model, εδ_vars, entr_dim_scale)
-    δ_dim_scale = entrainment_inv_length_scale(εδ_model, εδ_vars, detr_dim_scale)
+    ε_dim_scale = entrainment_dim_scale(εδ_model, εδ_vars, entr_dim_scale)
+    δ_dim_scale = entrainment_dim_scale(εδ_model, εδ_vars, detr_dim_scale)
 
     area_limiter = max_area_limiter(εδ_model, εδ_vars.max_area, εδ_vars.a_up)
     min_limiter = min_area_limiter(εδ_model, εδ_vars.a_up)
@@ -466,14 +549,27 @@ function compute_ml_entr_detr!(
                     δ_ml_nondim,
                 )
 
-                aux_up[i].entr_ml[k] = ε_dyn
-                aux_up[i].detr_ml[k] = δ_dyn
-                # update nondimensional entr/detr
-                aux_up[i].ε_ml_nondim[k] = ε_ml_nondim
-                aux_up[i].δ_ml_nondim[k] = δ_ml_nondim
+                if edmf.entrainment_type isa FractionalEntrModel
 
-                aux_up[i].entr_rate_inv_s[k] = ρ_c[k] * aux_up[i].area[k] * w_up_c[k] * ε_dyn
-                aux_up[i].detr_rate_inv_s[k] = ρ_c[k] * aux_up[i].area[k] * w_up_c[k] * δ_dyn
+                    aux_up[i].entr_ml[k] = ε_dyn
+                    aux_up[i].detr_ml[k] = δ_dyn
+                    # update nondimensional entr/detr
+                    aux_up[i].ε_ml_nondim[k] = ε_ml_nondim
+                    aux_up[i].δ_ml_nondim[k] = δ_ml_nondim
+
+                    aux_up[i].entr_rate_inv_s[k] = ρ_c[k] * aux_up[i].area[k] * w_up_c[k] * ε_dyn
+                    aux_up[i].detr_rate_inv_s[k] = ρ_c[k] * aux_up[i].area[k] * w_up_c[k] * δ_dyn
+
+                elseif edmf.entrainment_type isa TotalRateEntrModel
+                    aux_up[i].entr_ml[k] = ε_dyn / (ρ_c[k] * aux_up[i].area[k] * w_up_c[k]) # fractional rates
+                    aux_up[i].detr_ml[k] = δ_dyn / (ρ_c[k] * aux_up[i].area[k] * w_up_c[k]) # fractional rates
+                    # update nondimensional entr/detr
+                    aux_up[i].ε_ml_nondim[k] = ε_ml_nondim
+                    aux_up[i].δ_ml_nondim[k] = δ_ml_nondim
+
+                    aux_up[i].entr_rate_inv_s[k] = ε_dyn
+                    aux_up[i].detr_rate_inv_s[k] = δ_dyn
+                end
 
             else
                 aux_up[i].entr_ml[k] = 0.0
@@ -579,7 +675,7 @@ function compute_ml_entr_detr!(
         non_dimensional_function!(ε_ml_nondim, δ_ml_nondim, Π_groups, εδ_model)
 
         @inbounds for k in real_center_indices(grid)
-            ε_dim_scale = entrainment_inv_length_scale(
+            ε_dim_scale = entrainment_dim_scale(
                 εδ_model,
                 aux_up[i].buoy[k],
                 aux_en.buoy[k],
@@ -591,7 +687,7 @@ function compute_ml_entr_detr!(
                 aux_tc.∂lnM∂z[k],
                 edmf.entr_dim_scale,
             )
-            δ_dim_scale = entrainment_inv_length_scale(
+            δ_dim_scale = entrainment_dim_scale(
                 εδ_model,
                 aux_up[i].buoy[k],
                 aux_en.buoy[k],
