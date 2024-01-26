@@ -166,7 +166,7 @@ function entrainment_dim_scale(
     ::WOverHeightDimScale,
 ) where {FT}
     Δw = get_Δw(εδ_model, w_up, w_en)
-    return (Δw/zc_i)*1e-1
+    return (Δw/zc_i) * 1e-1
 end
 
 function entrainment_dim_scale(
@@ -182,9 +182,8 @@ function entrainment_dim_scale(
     ::BOverSqrtTKEDimScale,
 ) where {FT}
     Δb = b_up - b_en
-    return abs(Δb/sqrt(abs(tke) + 1e-3))*1e-3
+    return abs(Δb/sqrt(abs(tke) + 1e-3))*5e-3
 end
-
 
 function entrainment_dim_scale(
     εδ_model,

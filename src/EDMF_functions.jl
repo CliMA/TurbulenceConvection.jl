@@ -524,6 +524,12 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         elseif edmf.entrainment_type isa TotalRateEntrModel
             @. tends_ρarea =
                 -∇c(wvec(LBF(Ic(w_up) * ρarea))) + entr_rate_inv_s - detr_rate_inv_s
+
+            # @inbounds for k in real_center_indices(grid)
+            #     if ρarea[k]/ρ_c[k] > 0.5
+            #         tends_ρarea[k] += 0.0005 * exp(-10.0 *(0.9 - (ρarea[k]/ρ_c[k])))
+            #     end
+            # end
         end
 
         rhoa_tend = aux_tc.rhoa_tend
@@ -533,8 +539,8 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
 
         @. rhoa_tend = tends_ρarea
         @. rhoa_tend_term1 = -∇c(wvec(LBF(Ic(w_up) * ρarea)))
-        @. rhoa_tend_term2 = ρarea * Ic(w_up) * entr_turb_dyn
-        @. rhoa_tend_term3 = ρarea * Ic(w_up) * detr_turb_dyn
+        @. rhoa_tend_term2 = entr_rate_inv_s
+        @. rhoa_tend_term3 = -1.0 * detr_rate_inv_s
 
         
         if edmf.entrainment_type isa FractionalEntrModel
@@ -635,9 +641,11 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         elseif edmf.entrainment_type isa TotalRateEntrModel
             @. tends_ρaw +=
                 (ᶠinterp_a(entr_rate_inv_s) * w_en - ᶠinterp_a(detr_rate_inv_s) * w_up) + (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) + nh_pressure
+            # @. tends_ρaw +=
+            #     (ᶠinterp_a(entr_rate_inv_s) * w_en - ᶠinterp_a(detr_rate_inv_s) * w_up) + (ρ_f * ᶠinterp_a(a_up) * I0f(ifelse(buoy < -0.1, FT(0), buoy))) + nh_pressure
         end
 
-
+        
 
         tends_ρaw[kf_surf] = 0
     end
