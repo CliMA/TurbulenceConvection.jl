@@ -146,6 +146,7 @@ struct WOverHeightDimScale <: EntrDimScale end
 struct BOverSqrtTKEDimScale <: EntrDimScale end
 struct SqrtBOverZDimScale <: EntrDimScale end
 struct TKEBWDimScale <: EntrDimScale end
+struct DwDzDimScale <: EntrDimScale end
 
 
 """
@@ -796,6 +797,8 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         SqrtBOverZDimScale()
     elseif entr_dim_scale == "tke_b_w" # (tke*b)/w^3
         TKEBWDimScale()
+    elseif entr_dim_scale == "dw_dz"
+        DwDzDimScale()
     else
         error("Something went wrong. Invalid entrainment dimension scale '$entr_dim_scale'")
     end
@@ -846,6 +849,8 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         SqrtBOverZDimScale()
     elseif detr_dim_scale == "tke_b_w" # (tke*b)/w^3
         TKEBWDimScale()
+    elseif detr_dim_scale == "dw_dz"
+        DwDzDimScale()
     else
         error("Something went wrong. Invalid entrainment dimension scale '$detr_dim_scale'")
     end

@@ -43,11 +43,13 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     massflux = aux_tc_f.massflux
     ∂M∂z = aux_tc.∂M∂z
     ∂lnM∂z = aux_tc.∂lnM∂z
+    ∂w∂z = aux_tc.∂w∂z
     massflux_c = aux_tc.massflux
     parent(massflux) .= 0
     parent(massflux_c) .= 0
     parent(∂M∂z) .= 0
     parent(∂lnM∂z) .= 0
+    parent(∂w∂z) .= 0
 
     prog_gm_uₕ = grid_mean_uₕ(state)
     Ic = CCO.InterpolateF2C()
@@ -316,6 +318,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_tc.∂lnM∂z[k] = ∂M∂z[k] / (massflux_c[k] + eps(FT))
     end
 
+    @. ∂w∂z = ∇c(wvec(aux_tc_f.bulk.w))
 
     compute_turb_entr!(state, grid, edmf)
     compute_phys_entr_detr!(state, grid, edmf, param_set, surf, Δt, edmf.entr_closure)

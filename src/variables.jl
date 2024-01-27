@@ -168,6 +168,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
         w_en_c = FT(0),
         Shear² = FT(0),
         ∂M∂z = FT(0),
+        ∂w∂z = FT(0),
         ∂lnM∂z = FT(0),
         ∂θv∂z = FT(0),
         ∂qt∂z = FT(0),
