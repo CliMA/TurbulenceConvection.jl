@@ -141,6 +141,7 @@ struct InvMeterEntrDimScale <: EntrDimScale end
 struct PosMassFluxGradDimScale <: EntrDimScale end
 struct NegMassFluxGradDimScale <: EntrDimScale end
 struct AbsMassFluxGradDimScale <: EntrDimScale end
+struct MassFluxGradDimScale <: EntrDimScale end
 struct BOverWDimScale <: EntrDimScale end
 struct WOverHeightDimScale <: EntrDimScale end
 struct BOverSqrtTKEDimScale <: EntrDimScale end
@@ -745,6 +746,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
             "pos_massflux",
             "neg_massflux",
             "abs_massflux",
+            "mf_grad",
             "none",
             "b_w",
             "w_height", 
@@ -785,6 +787,8 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         NegMassFluxGradDimScale()
     elseif entr_dim_scale == "abs_massflux"
         AbsMassFluxGradDimScale()
+    elseif entr_dim_scale == "mf_grad"
+        MassFluxGradDimScale()
     elseif entr_dim_scale == "none"
         InvMeterEntrDimScale()
     elseif entr_dim_scale == "b_w" # b/w
@@ -816,6 +820,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
             "pos_massflux",
             "neg_massflux",
             "abs_massflux",
+            "mf_grad",
             "none",
             "b_w",
             "w_height", 
@@ -837,6 +842,8 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         NegMassFluxGradDimScale()
     elseif detr_dim_scale == "abs_massflux"
         AbsMassFluxGradDimScale()
+    elseif detr_dim_scale == "mf_grad"
+        MassFluxGradDimScale()
     elseif detr_dim_scale == "none"
         InvMeterEntrDimScale()
     elseif detr_dim_scale == "b_w" # b/w

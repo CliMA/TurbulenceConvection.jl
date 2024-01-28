@@ -38,7 +38,9 @@ function entrainment_dim_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
     ∂w∂z::FT,
+    ρ_c::FT,
     ::BuoyVelEntrDimScale,
 ) where {FT}
     Δw = get_Δw(εδ_model, w_up, w_en)
@@ -57,7 +59,9 @@ function entrainment_dim_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
     ∂w∂z::FT,
+    ρ_c::FT,
     ::InvScaleHeightEntrDimScale,
 ) where {FT}
     return (1 / ref_H)
@@ -73,7 +77,9 @@ function entrainment_dim_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
     ∂w∂z::FT,
+    ρ_c::FT,
     ::InvZEntrDimScale,
 ) where {FT}
     return (1 / zc_i)
@@ -89,7 +95,9 @@ function entrainment_dim_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
     ∂w∂z::FT,
+    ρ_c::FT,
     ::InvMeterEntrDimScale,
 ) where {FT}
     return FT(1)
@@ -105,7 +113,9 @@ function entrainment_dim_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
     ∂w∂z::FT,
+    ρ_c::FT,
     ::PosMassFluxGradDimScale,
 ) where {FT}
     return max(∂lnM∂z, FT(0))
@@ -121,7 +131,9 @@ function entrainment_dim_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
     ∂w∂z::FT,
+    ρ_c::FT,
     ::NegMassFluxGradDimScale,
 ) where {FT}
     return abs(min(∂lnM∂z, FT(0)))
@@ -137,7 +149,9 @@ function entrainment_dim_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
     ∂w∂z::FT,
+    ρ_c::FT,
     ::AbsMassFluxGradDimScale,
 ) where {FT}
     return abs(∂lnM∂z)
@@ -153,12 +167,14 @@ function entrainment_dim_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
     ∂w∂z::FT,
+    ρ_c::FT,
     ::BOverWDimScale,
 ) where {FT}
     Δb = b_up - b_en
     Δw = get_Δw(εδ_model, w_up, w_en)
-    return abs(Δb / (Δw + eps(FT)))
+    return ρ_c*abs(Δb / (Δw + eps(FT)))
 end
 
 function entrainment_dim_scale(
@@ -171,11 +187,13 @@ function entrainment_dim_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
     ∂w∂z::FT,
+    ρ_c::FT,
     ::WOverHeightDimScale,
 ) where {FT}
     Δw = get_Δw(εδ_model, w_up, w_en)
-    return (Δw/zc_i) * 1e-1
+    return ρ_c*(Δw/zc_i) * 1e-2
 end
 
 function entrainment_dim_scale(
@@ -188,11 +206,13 @@ function entrainment_dim_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
     ∂w∂z::FT,
+    ρ_c::FT,
     ::BOverSqrtTKEDimScale,
 ) where {FT}
     Δb = b_up - b_en
-    return abs(Δb/sqrt(abs(tke) + 1e-3))*5e-3
+    return ρ_c*abs(Δb/sqrt(abs(tke) + 1e-3))*5e-3
 end
 
 function entrainment_dim_scale(
@@ -205,11 +225,13 @@ function entrainment_dim_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
     ∂w∂z::FT,
+    ρ_c::FT,
     ::SqrtBOverZDimScale,
 ) where {FT}
     Δb = b_up - b_en
-    return sqrt(abs(Δb/zc_i))
+    return ρ_c*sqrt(abs(Δb/zc_i))
 end
 
 function entrainment_dim_scale(
@@ -222,12 +244,14 @@ function entrainment_dim_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
     ∂w∂z::FT,
+    ρ_c::FT,
     ::TKEBWDimScale,
 ) where {FT}
     Δb = b_up - b_en
     Δw = get_Δw(εδ_model, w_up, w_en)
-    return abs((tke * Δb)/ (Δw^3))
+    return ρ_c*abs((tke * Δb)/ (Δw^3))
 end
 
 function entrainment_dim_scale(
@@ -240,10 +264,34 @@ function entrainment_dim_scale(
     zc_i::FT,
     ref_H::FT,
     ∂lnM∂z::FT,
+    ∂M∂z::FT,
     ∂w∂z::FT,
+    ρ_c::FT,
     ::DwDzDimScale,
 ) where {FT}
-    return ∂w∂z
+    return ρ_c*∂w∂z
+end
+
+function entrainment_dim_scale(
+    εδ_model,
+    b_up::FT,
+    b_en::FT,
+    w_up::FT,
+    w_en::FT,
+    tke::FT,
+    zc_i::FT,
+    ref_H::FT,
+    ∂lnM∂z::FT,
+    ∂M∂z::FT,
+    ∂w∂z::FT,
+    ρ_c::FT,
+    ::MassFluxGradDimScale,
+) where {FT}
+    if ∂M∂z < 0
+        return abs(∂M∂z)
+    else
+        return 0.0
+    end
 end
 
 """A convenience wrapper for entrainment_dim_scale"""
@@ -258,7 +306,9 @@ function entrainment_dim_scale(εδ_model, εδ_vars, dim_scale)
         εδ_vars.zc_i,
         εδ_vars.ref_H,
         εδ_vars.∂lnM∂z,
+        εδ_vars.∂M∂z,
         εδ_vars.∂w∂z,
+        εδ_vars.ρ_c,
         dim_scale,
     )
 end
@@ -560,8 +610,10 @@ function compute_ml_entr_detr!(
                     max_area = max_area, # maximum updraft area
                     zc_i = FT(grid.zc[k].z), # vertical coordinate
                     ∂lnM∂z = aux_tc.∂lnM∂z[k], # ln(massflux) gradient
+                    ∂M∂z = aux_tc.∂M∂z[k],
                     entr_Π_subset = entrainment_Π_subset(edmf), # indices of Pi groups to include
                     ∂w∂z = aux_tc.∂w∂z[k],
+                    ρ_c = ρ_c[k],
                 )
                 # store pi groups for output
                 Π = non_dimensional_groups(εδ_closure, εδ_model_vars)
