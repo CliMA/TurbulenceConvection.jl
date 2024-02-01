@@ -174,7 +174,11 @@ function entrainment_dim_scale(
 ) where {FT}
     Δb = b_up - b_en
     Δw = get_Δw(εδ_model, w_up, w_en)
-    return ρ_c*abs(Δb / (Δw + eps(FT)))
+    if Δb > 0
+        return ρ_c*abs(Δb / (Δw + eps(FT)))*1e-3
+    else
+        return 0.0
+    end
 end
 
 function entrainment_dim_scale(
@@ -212,7 +216,7 @@ function entrainment_dim_scale(
     ::BOverSqrtTKEDimScale,
 ) where {FT}
     Δb = b_up - b_en
-    return ρ_c*abs(Δb/sqrt(abs(tke) + 1e-3))*5e-3
+    return ρ_c*abs(Δb/sqrt(abs(tke) + 1e-3))*1e-3
 end
 
 function entrainment_dim_scale(
@@ -231,7 +235,11 @@ function entrainment_dim_scale(
     ::SqrtBOverZDimScale,
 ) where {FT}
     Δb = b_up - b_en
-    return ρ_c*sqrt(abs(Δb/zc_i))
+    if Δb > 0
+        return ρ_c*sqrt(abs(Δb/zc_i))*3e-3
+    else
+        return 0.0
+    end
 end
 
 function entrainment_dim_scale(
@@ -338,11 +346,16 @@ function εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nond
     δ_dim_scale = min(δ_dim_scale, 1.0)
 
     # fractional dynamical entrainment / detrainment [1 / m]
-    # ε_dyn = ε_dim_scale * ε_nondim
-    # δ_dyn = δ_dim_scale * δ_nondim
+    # nondim_type
+    ε_dyn = ε_dim_scale * ε_nondim
+    δ_dyn = δ_dim_scale * δ_nondim
 
-    ε_dyn = ε_dim_scale * 1.0
-    δ_dyn = δ_dim_scale * 1.0
+    # ε_dyn = ε_dim_scale * (1.0 + ε_nondim)
+    # δ_dyn = δ_dim_scale * (1.0 + δ_nondim)
+
+
+    # ε_dyn = ε_dim_scale * 1.0
+    # δ_dyn = δ_dim_scale * 1.0
 
     if εδ_params(εδ_model).limit_min_area
         ε_dyn += max(δ_dyn, ε_dyn) * min_limiter

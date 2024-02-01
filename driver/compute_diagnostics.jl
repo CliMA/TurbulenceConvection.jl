@@ -419,8 +419,8 @@ function compute_diagnostics!(
         diag_svpc.cutoff_precipitation_rate[cent] = sum(f)
     end
 
-    lwp = sum(i -> sum(ρ_c .* aux_up[i].q_liq .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
-    iwp = sum(i -> sum(ρ_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> 1e-3)), 1:N_up)
+    lwp = sum(i -> sum(ρ_c .* aux_up[i].q_liq .* aux_up[i].area .* (aux_up[i].area .> edmf.minimum_area)), 1:N_up)
+    iwp = sum(i -> sum(ρ_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> edmf.minimum_area)), 1:N_up)
 
     plume_scale_height = map(1:N_up) do i
         TC.compute_plume_scale_height(grid, state, edmf.H_up_min, i)
