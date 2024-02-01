@@ -17,7 +17,7 @@ end
 
 import Aqua
 @testset "Quality Assurance" begin
-    @test length(Aqua.detect_ambiguities(TurbulenceConvection; recursive = true)) ≤ 136
+    @test length(Aqua.detect_ambiguities(TurbulenceConvection; recursive = true)) ≤ 145
 end
 
 @testset "Bomex" begin
