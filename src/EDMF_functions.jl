@@ -441,7 +441,8 @@ end
 
 function compute_updraft_top(grid::Grid{FT}, state::State, i::Int)::FT where {FT}
     aux_up = center_aux_updrafts(state)
-    return z_findlast_center(k -> aux_up[i].area[k] > 1e-3, grid)
+    a_up = aux_up[i].area
+    return z_findlast_center(k -> a_up[k] > 1e-3, grid)
 end
 
 function compute_plume_scale_height(grid::Grid, state::State, H_up_min::FT, i::Int)::FT where {FT}
