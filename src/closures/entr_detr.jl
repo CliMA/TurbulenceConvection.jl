@@ -295,6 +295,7 @@ function compute_phys_entr_detr!(
         # compute ∇m at cell centers
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
+        Π_groups = aux_up[i].Π_groups
         w_en = aux_en_f.w
         w_gm = prog_gm_f.w
         @. w_up_c = Ic(w_up)
@@ -334,7 +335,7 @@ function compute_phys_entr_detr!(
                 Π = non_dimensional_groups(εδ_closure, εδ_model_vars)
                 @assert length(Π) == n_Π_groups(edmf)
                 for Π_i in 1:length(entrainment_Π_subset(edmf))
-                    aux_up[i].Π_groups[Π_i][k] = Π[Π_i]
+                    Π_groups[Π_i][k] = Π[Π_i]
                 end
 
                 # update fractional and turbulent entr/detr
