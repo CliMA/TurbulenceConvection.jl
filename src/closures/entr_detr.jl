@@ -175,7 +175,7 @@ function entrainment_dim_scale(
     Δb = b_up - b_en
     Δw = get_Δw(εδ_model, w_up, w_en)
     if Δb > 0
-        return ρ_c*abs(Δb / (Δw + eps(FT)))*1e-3
+        return ρ_c*abs(Δb / (Δw + eps(FT)))
     else
         return 0.0
     end
@@ -471,6 +471,7 @@ function compute_phys_entr_detr!(
         # compute ∇m at cell centers
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
+        Π_groups = aux_up[i].Π_groups
         w_en = aux_en_f.w
         w_gm = prog_gm_f.w
         @. w_up_c = Ic(w_up)
@@ -503,14 +504,17 @@ function compute_phys_entr_detr!(
                     Δt = Δt, # Model time step
                     ε_nondim = aux_up[i].ε_nondim[k], # nondimensional fractional dynamical entrainment
                     δ_nondim = aux_up[i].δ_nondim[k], # nondimensional fractional dynamical detrainment
+                    ∂M∂z = aux_tc.∂M∂z[k],
                     entr_Π_subset = entrainment_Π_subset(edmf), # indices of Pi groups to include
+                    ∂w∂z = aux_tc.∂w∂z[k],
+                    ρ_c = ρ_c[k],
                 )
 
                 # store pi groups for output
                 Π = non_dimensional_groups(εδ_closure, εδ_model_vars)
                 @assert length(Π) == n_Π_groups(edmf)
                 for Π_i in 1:length(entrainment_Π_subset(edmf))
-                    aux_up[i].Π_groups[Π_i][k] = Π[Π_i]
+                    Π_groups[Π_i][k] = Π[Π_i]
                 end
 
                 # update fractional and turbulent entr/detr
@@ -595,6 +599,7 @@ function compute_ml_entr_detr!(
         # compute ∇m at cell centers
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
+        Π_groups = aux_up[i].Π_groups
         w_en = aux_en_f.w
         w_gm = prog_gm_f.w
         @. w_up_c = Ic(w_up)
@@ -632,7 +637,7 @@ function compute_ml_entr_detr!(
                 Π = non_dimensional_groups(εδ_closure, εδ_model_vars)
                 @assert length(Π) == n_Π_groups(edmf)
                 for Π_i in 1:length(entrainment_Π_subset(edmf))
-                    aux_up[i].Π_groups[Π_i][k] = Π[Π_i]
+                    Π_groups[Π_i][k] = Π[Π_i]
                 end
                 # update fractional and turbulent entr/detr
                 # fractional, turbulent & nondimensional entrainment
@@ -719,6 +724,7 @@ function compute_ml_entr_detr!(
         # compute ∇m at cell centers
         a_up = aux_up[i].area
         w_up = aux_up_f[i].w
+        Π_groups = aux_up[i].Π_groups
         w_en = aux_en_f.w
         w_gm = prog_gm_f.w
         @. w_up_c = Ic(w_up)
@@ -756,7 +762,7 @@ function compute_ml_entr_detr!(
                 Π = non_dimensional_groups(εδ_model, εδ_model_vars)
                 @assert length(Π) == n_Π_groups(edmf)
                 for Π_i in 1:length(entrainment_Π_subset(edmf))
-                    aux_up[i].Π_groups[Π_i][k] = Π[Π_i]
+                    Π_groups[Π_i][k] = Π[Π_i]
                 end
 
             else
