@@ -206,7 +206,7 @@ function Simulation1d(namelist)
         JSON.print(io, namelist, 4)
     end
 
-    case = Cases.get_case(namelist, param_set)
+    case = Cases.get_case(namelist)
     surf_ref_state = Cases.surface_ref_state(case, param_set, namelist) # this doesn't accept aux_data_kwarg which would be useful for socrates... didn't want to change the call for all cases though...
 
     forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)

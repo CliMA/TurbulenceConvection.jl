@@ -186,18 +186,16 @@ include("Forcing.jl")
 ##### Case methods (returns an instance of the case type) 
 #####
 
-get_case(namelist::Dict, param_set::APS) = get_case(namelist["meta"]["casename"], namelist, param_set)
-get_case(namelist::Dict) = get_case(namelist["meta"]["casename"]) # backwards compat (e.g. in common_spaces.jl) for dispatch (use positional argumetns only cause keywords don't participate in dispatch)
-get_case(casename::String, namelist::Dict, param_set::APS) = get_case(Val(Symbol(casename)), namelist, param_set)
-get_case(casename::String) = get_case(Val(Symbol(casename))) # backwards compat (e.g. in common_spaces.jl) for dispatxh (use positional argumetns only cause keywords don't participate in dispatch)
-get_case(::Val{:SOCRATES}, namelist::Dict, param_set::APS) =
-    SOCRATES(namelist["meta"]["flight_number"], namelist["meta"]["forcing_type"], param_set) # avert dropping namelist, param_set for socrates
-get_case(x::Val, namelist::Dict, param_set::APS) = get_case(x) #
+get_case(namelist::Dict) = get_case(namelist["meta"]["casename"], namelist) # backwards compat (e.g. in common_spaces.jl) for dispatch (use positional argumetns only cause keywords don't participate in dispatch) -- force namelist inclusion to separate from get_case(casename::String) method for use in other places like common_spaces.jl
+get_case(casename::String, namelist::Dict) = get_case(Val(Symbol(casename)), namelist)
+get_case(casename::String) = get_case(Val(Symbol(casename))) # backwards compat (e.g. in common_spaces.jl) -- not really used anywhere now but you can create a type instance with just a string using this
+get_case(::Val{:SOCRATES}, namelist::Dict) =
+    SOCRATES(namelist["meta"]["flight_number"], namelist["meta"]["forcing_type"]) # avert dropping namelist for socrates
+get_case(x::Val, namelist::Dict) = get_case(x) # namelist to match dispatch from above
 function get_case(x::Val)
     case = typeof(x).parameters[1]  # this is a hack to get the case name from the Val object e.g. get_case(::Val{:Soares}) = Soares()
     return eval(case)()
 end
-
 # get_case(::Val{:Soares}) = Soares()
 # get_case(::Val{:Nieuwstadt}) = Nieuwstadt()
 # get_case(::Val{:Bomex}) = Bomex()
