@@ -1386,9 +1386,9 @@ end
 
 
 
-function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_set; SOCRATESDat) # added param_set so we can calculate stuff...
+function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state; SOCRATESDat)
     forcing.forcing_funcs[] = case.get_forcing(; new_z = vec(grid.zc.z))
-    initialize(forcing, grid, state, param_set) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
+    initialize(forcing, grid, state) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
 end
 
 function forcing_kwargs(case::SOCRATES, namelist) # call in main.jl is forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)

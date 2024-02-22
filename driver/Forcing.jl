@@ -34,8 +34,8 @@ function initialize(::ForcingBase{ForcingLES}, grid, state, LESDat::LESData)
     end
 end
 
-function initialize(forcing::ForcingBase{T}, grid, state, param_set) where {T <: ForcingSOCRATES}# added param_set so we can calculate stuff....
-    FT = eltype(param_set)
+function initialize(forcing::ForcingBase{T}, grid, state) where {T <: ForcingSOCRATES}# added param_set so we can calculate stuff....
+    FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
 
     ug_keys = (:ug_nudge, :vg_nudge)
