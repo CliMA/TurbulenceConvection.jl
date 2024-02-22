@@ -99,61 +99,7 @@ Thus, we can have one call to SSCF and then just pass around the results.
 struct SOCRATES <: AbstractCaseType  
     flight_number::Int
     forcing_type::Symbol
-    get_forcing::Function
-    get_initial_conditions::Function
-    get_surface_ref_state::Function
-    get_surface::Function
-    get_default_new_z::Function
 
-    function SOCRATES(flight_number::Int, forcing_type::Symbol, param_set::APS)
-        thermo_params = TCP.thermodynamics_params(param_set)
-        get_forcing =
-            (; new_z = nothing) -> SSCF.process_case(
-                flight_number;
-                obs_or_ERA5 = forcing_type,
-                new_z = new_z,
-                initial_condition = false,
-                thermo_params = thermo_params,
-            )
-        get_initial_conditions =
-            (; new_z = nothing) -> SSCF.process_case(
-                flight_number;
-                obs_or_ERA5 = forcing_type,
-                new_z = new_z,
-                initial_condition = true,
-                thermo_params = thermo_params,
-            )
-        get_surface_ref_state =
-            () -> SSCF.process_case(
-                flight_number;
-                obs_or_ERA5 = forcing_type,
-                surface = "ref",
-                thermo_params = thermo_params,
-            )
-        get_surface =
-            () -> SSCF.process_case(
-                flight_number;
-                obs_or_ERA5 = forcing_type,
-                surface = "conditions",
-                thermo_params = thermo_params,
-            )
-        get_default_new_z = () -> SSCF.get_default_new_z(flight_number)
-        new(
-            flight_number,
-            forcing_type,
-            get_forcing,
-            get_initial_conditions,
-            get_surface_ref_state,
-            get_surface,
-            get_default_new_z,
-        )
-    end
-
-    function SOCRATES(flight_number, forcing_type) # doesnt need param_set
-        get_default_new_z = () -> SSCF.get_default_new_z(flight_number)
-        function null() end # dummy fcn returns nothing for climaformatter, could try Union{Function, nothing}  above but that seems like a pain
-        new(flight_number, forcing_type, null, null, null, null, get_default_new_z) # apparently you need to fill in everything but trailing fields https://github.com/JuliaLang/julia/issues/36789
-    end
 
     function SOCRATES()
         new()
@@ -1338,14 +1284,17 @@ initialize_radiation(::LES_driven_SCM, radiation, grid::Grid, state, param_set; 
 #####
 
 function surface_ref_state(case::SOCRATES, param_set::APS, namelist) # adopted mostly from LES (most similar setup, but what is this for? should i set it to somethign more generic?
-    return case.get_surface_ref_state() # added S so it has a name and then use the method we defined, currently param_set isn't an accepted argument cause it shouldnt be necessary for this part on earth but maybe can edit later...
+    thermo_params = TCP.thermodynamics_params(param_set)
+    return SSCF.process_case(case.flight_number; obs_or_ERA5 = case.forcing_type, surface = "ref", thermo_params = thermo_params)
 end
 
 function initialize_profiles(case::SOCRATES, grid::Grid, param_set, state; kwargs...) # Relies on SOCRATES_Single_Column_Forcings.jl
     """ need θ_liq_ice, q_tot, prog_gm_u, prog_gm_v, tke, prog_gm_uₕ (is returned as (; dTdt_hadv, H_nudge, dqtdt_hadv, qt_nudge, subsidence, u_nudge, v_nudge, ug_nudge, vg_nudge) """
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    IC = case.get_initial_conditions(; new_z = vec(grid.zc.z)) # added S so it has a name and then use the method we defined, currently param_set isn't an accepted argument cause it shouldnt be necessary for this part on earth but maybe can edit later...
+    thermo_params = TCP.thermodynamics_params(param_set)
+    new_z = vec(grid.zc.z)
+    IC = SSCF.process_case(case.flight_number; obs_or_ERA5 = case.forcing_type, new_z = new_z, initial_condition = true, thermo_params = thermo_params)
 
     prog_gm_u = copy(aux_gm.q_tot) # copy as template cause u,g go into a uₕ vector so this is easier to work with (copied from other cases...)
     prog_gm_v = copy(aux_gm.q_tot)
@@ -1362,7 +1311,8 @@ end
 
 function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # seems Ri_bulk_crit is never aactually changed...
     FT = eltype(param_set)
-    sc = case.get_surface()
+    thermo_params = TCP.thermodynamics_params(param_set)
+    sc = SSCF.process_case(case.flight_number; obs_or_ERA5 = case.forcing_type, surface = "conditions", thermo_params = thermo_params)
     zrough = 0.1 # copied from gabls which is also w/ monin obhukov boundary layer
     # no ustar w/ monin obukhov i guess, seems to be calculated in https://github.com/CliMA/SurfaceFluxes.jl src/SurfaceFluxes.jl/compute_ustar()
     kwargs = (; Tsurface = sc.Tg, qsurface = sc.qg, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive,
@@ -1370,7 +1320,9 @@ function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # 
 end
 
 function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_set) # param_set isn't used but matches form in main.jl
-    forcing.forcing_funcs[] = case.get_forcing(; new_z = vec(grid.zc.z))
+    new_z = vec(grid.zc.z)
+    thermo_params = TCP.thermodynamics_params(param_set)
+    forcing.forcing_funcs[] = SSCF.process_case( case.flight_number; obs_or_ERA5 = case.forcing_type, new_z = new_z, initial_condition = false, thermo_params = thermo_params)
     initialize(forcing, grid, state) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
 end
 
