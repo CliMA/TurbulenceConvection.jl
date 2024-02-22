@@ -65,8 +65,10 @@ function construct_mesh(namelist; FT = Float64)
         end
         nz = isnothing(nz) ? Int(zmax ÷ Δz) : Int(nz)
         Δz = isnothing(Δz) ? FT(zmax ÷ nz) : FT(Δz)
-    elseif typeof(Cases.get_case(namelist)) <: Cases.SOCRATES # (we dont have a Cases.SOCRATES instance so improvise) # you can't easily create your own mesh in ClimaCore.Meshes so we'll use some representation of the one they have...
-        new_z = vec(eval(Meta.parse("Cases."*namelist["meta"]["casename"]*"()")).get_default_new_z())[:]# we don't have access the object here...namelist[meta][casename] is string of our type though
+    elseif typeof(Cases.get_case(namelist)) <: Cases.SOCRATES # Maybe we dont wanna keep doing this so move the data part to SOCRATES data and just pass in the arg to all the surface_ref_state construcors instead...
+        flight_number = namelist["meta"]["flight_number"]
+        forcing_type = namelist["meta"]["forcing_type"]
+        new_z = vec(Cases.SOCRATES(flight_number, forcing_type).get_default_new_z())[:] # redundant constructor here, can we evade this somehow somewhere by passing in the object? this gets called before Cases stuff tho in main.
         z_mesh = CC.Geometry.ZPoint{FT}.([FT(0), new_z...]) # added 0 to beginning? copy from the file #Array(TC.get_nc_data(data, "zc")) also idk what to do about paths like this
         nz = length(z_mesh)
         z₀, z₁ = z_mesh[1], z_mesh[end]
