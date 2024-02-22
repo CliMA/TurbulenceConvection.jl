@@ -392,8 +392,7 @@ function compute_gm_tendencies!(
         end
 
         if Cases.force_type(force) <: Cases.ForcingSOCRATES
-            # temperature horizontal divergence
-            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_hadv[k] / Π # as in all cases but dycoms_rf01 above
+            # temperature horizontal divergence (handeled above)
 
             # geostrophic handled elsewhere (only affects u,v tendency and maybe surface fluxes?)
 
