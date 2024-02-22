@@ -215,7 +215,7 @@ function Simulation1d(namelist)
     TS = TimeStepping(FT, namelist)
 
     Ri_bulk_crit::FTD = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
-    aux_data_kwarg = Cases.aux_data_kwarg(case, namelist, param_set) # change name and pass in all info we may need for this (added param_set) -- I kinda wanted this for surf ref state though...
+    aux_data_kwarg = Cases.aux_data_kwarg(case, namelist)
     surf_params = Cases.surface_params(case, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, aux_data_kwarg...)
 
     calibrate_io = namelist["stats_io"]["calibrate_io"]
