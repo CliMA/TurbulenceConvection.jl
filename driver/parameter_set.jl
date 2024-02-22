@@ -38,6 +38,7 @@ function create_parameter_set(
     a_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "a_acnv_KK2000"; default = 2.47)
     b_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "b_acnv_KK2000"; default = -1.79)
     c_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "c_acnv_KK2000"; default = -1.47)
+    pow_icenuc=TC.parse_namelist(namelist, "microphysics", "pow_icenuc"; default = 1e7) # I think this has to be here to overwrite toml..., and to place it so we can overwrite_namelist it .. picked high value initially to keep ramp but maybe should keep original default... https://github.com/CliMA/CLIMAParameters.jl/blob/2f298661d527c1b9a11188ee2abc92ba4ba0c5ec/src/parameters.toml#L558
 
     # Override the default files in the toml file
     open(override_file, "w") do io
@@ -129,6 +130,10 @@ function create_parameter_set(
         println(io, "alias = \"c_acnv_KK2000\"")
         println(io, "value = " * string(c_acnv_KK2000))
         println(io, "type = \"float\"")
+        println(io, "[pow_icenuc]") # add in our overwrite above of the original toml from ClimaParameters
+        println(io, "alias = \"pow_icenuc\"")
+        println(io, "value = " * string(pow_icenuc))
+        println(io, "type = \"float\"")
     end
 
     toml_dict = CP.create_toml_dict(FT; override_file, dict_type="alias")
@@ -171,7 +176,13 @@ function create_parameter_set(
     pairs = CP.get_parameter_values!(toml_dict, aliases, "TurbulenceConvection")
 
     SFP = typeof(surf_flux_params)
-    param_set = TCP.TurbulenceConvectionParameters{FTD, MP, SFP}(; pairs..., microphys_params, surf_flux_params)
+    namelist["user_args"] = get(namelist,"user_args", (;)) # handle if empty so we don't have to add to namelist defaults
+    namelist["user_aux"] = get(namelist,"user_aux", (;)) # handle if empty so we don't have to add to namelist defaults
+
+    user_args = namelist["user_args"]
+    user_aux  = namelist["user_aux"]
+
+    param_set = TCP.TurbulenceConvectionParameters{FTD, MP, SFP, NamedTuple}(; pairs..., microphys_params, surf_flux_params, user_args, user_aux) # not sure how to convert user_args to isbits and preserve names, write own retriever?
     if !isbits(param_set)
         @warn "The parameter set SHOULD be isbits in order to be stack-allocated."
     end

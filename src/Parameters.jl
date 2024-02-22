@@ -15,7 +15,7 @@ const ATCP = AbstractTurbulenceConvectionParameters
 ##### TurbulenceConvection parameters
 #####
 
-Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP} <: ATCP
+Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP, NamedTuple} <: ATCP
     Omega::FT
     planet_radius::FT
     microph_scaling::FT
@@ -25,6 +25,8 @@ Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP} <: ATCP
     microph_scaling_accr::FT
     microphys_params::MP
     surf_flux_params::SFP
+    user_args::NamedTuple # not sure if this is completely necessary yet
+    user_aux::NamedTuple # not sure if this is completely necessary yet
 end
 
 thermodynamics_params(ps::ATCP) = CM.Parameters.thermodynamics_params(ps.microphys_params)
