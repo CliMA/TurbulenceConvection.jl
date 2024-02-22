@@ -3,6 +3,19 @@ Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 (autoconversion + accretion)
 """
 
+function handle_expr(expr::String; kwargs...)
+    # see https://stackoverflow.com/a/57749395, takes a function that accepts kwargs
+    # create tuple from args and create func
+    
+    if ~contains(expr, "->")
+        expr  = "(" * join([string(x) for x in keys(kwargs)],',') *  ")" * " -> " * expr
+    end
+
+    expr  = eval(Meta.parse(expr))
+    return Base.invokelatest(expr,values(NamedTuple(kwargs))...) # works but very slow to use invokelatest, maybe try https://github.com/SciML/RuntimeGeneratedFunctions.jl
+end
+
+
 function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts, w, z; ts_LCL=nothing) where {FT}
     thermo_params = TCP.thermodynamics_params(param_set)
     microphys_params = TCP.microphysics_params(param_set)
@@ -37,11 +50,15 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                 #use the weights to calculate tau
                 # @info("using τ from auxiliary weight function")
                 # τ_liq, τ_ice = 10 .^ tau_weights.liq, 10 .^ tau_weights.ice # log fcn
-                tau_weights = eval(Meta.parse(tau_weights)) # test string version cause was crashing....
-                liq_params = eval(tau_weights.liq.liq_params) # gets used in eval below
-                ice_params = eval(tau_weights.ice.ice_params)
-                τ_liq      = eval(tau_weights.liq.func_expr)
-                τ_ice      = eval(tau_weights.ice.func_expr)
+                # tau_weights = eval(Meta.parse(tau_weights)) # test string version cause was crashing....
+                liq_params = tau_weights.liq.liq_params # gets used in eval below
+                ice_params = tau_weights.ice.ice_params
+
+                τ_liq, τ_ice = 10 .^ liq_params.log10_tau_liq, 10 .^ ice_params.log10_tau_ice # log fcn hand implementation...
+                # @show(liq_params)
+                # τ_liq = handle_expr(string(tau_weights.liq.func_expr); liq_params) # works! (turn to string, parse to func and eval with the argument) (or use handle_expr above... :), # works but very slow to use invokelatest, maybe try https://github.com/SciML/RuntimeGeneratedFunctions.jl
+                # τ_ice = handle_expr(string(tau_weights.ice.func_expr); ice_params) # works! (turn to string, parse to func and eval with the argument) (or use handle_expr above... :)
+
             end
 
             if raymond_ice_test
