@@ -179,8 +179,25 @@ function create_parameter_set(
     namelist["user_args"] = get(namelist,"user_args", (;)) # handle if empty so we don't have to add to namelist defaults
     namelist["user_aux"] = get(namelist,"user_aux", (;)) # handle if empty so we don't have to add to namelist defaults
 
-    user_args = namelist["user_args"]
-    user_aux  = namelist["user_aux"]
+    user_args = namelist["user_args"] # Let this be a NamedTuple
+    user_aux  = namelist["user_aux"] # Let this be a Dict()
+
+    leaves_to_tuples(x) = x
+    leaves_to_tuples(x::Array) = Tuple(x)
+    leaves_to_tuples(x::Dict) = Dict{String, Any}((k => leaves_to_tuples(v) for (k,v) in x))
+    user_aux = leaves_to_tuples(user_aux) # convert any leaves that are Arrays to tuples to preserve isbits
+
+
+    leaves_to_Vals(x) = x # this turns leaves that are string into symbols and then all symbols into Vals so that they can be isbits, thus we are allowed to pass in symbols or strings, to extract, use typeof(valitem).parameters[1]
+    leaves_to_Vals(x::Symbol) = Val(x)
+    leaves_to_Vals(x::String) = Val(Symbol(x))
+    leaves_to_Vals(x::Dict) = Dict{String, Any}((k => leaves_to_Vals(v) for (k,v) in x))
+    user_aux = leaves_to_Vals(user_aux) # convert any leaves that are Arrays to tuples to preserve isbits
+
+
+    namedtuple_fromdict(x) = x 
+    namedtuple_fromdict(d::Dict) = (; (Symbol(k) => namedtuple_fromdict(v) for (k,v) in d)...) # from https://discourse.julialang.org/t/how-to-make-a-named-tuple-from-a-dictionary/10899/46?u=jbphyswx
+    user_aux = namedtuple_fromdict(user_aux) # convert dict to NamedTuple to preserve isbits
 
     param_set = TCP.TurbulenceConvectionParameters{FTD, MP, SFP, typeof(user_args), typeof(user_aux)}(; pairs..., microphys_params, surf_flux_params, user_args, user_aux) # `typeof` so we have concrete types such that if user_args and user_aux are isbits, then param_set is isbits
     if !isbits(param_set)

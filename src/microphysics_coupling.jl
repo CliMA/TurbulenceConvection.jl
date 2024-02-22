@@ -25,8 +25,12 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
     qi_tendency = FT(0)
     if area > 0
         use_supersat      = get(param_set.user_args, :use_supersat, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
+        if isa(use_supersat, Val)
+            use_supersat = typeof(use_supersat).parameters[1] # extract the value from the Val type (we put it in there in parameter_set.jl to make it isbits)
+        end
         use_korolev_mazin = get(param_set.user_args, :use_korolev_mazin, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
-        raymond_ice_test  = get(param_set.user_args, :raymond_ice_test, false) # the timescale parameterization from raymond...
+        # raymond_ice_test  = get(param_set.user_args, :raymond_ice_test, false) # the timescale parameterization from raymond... deprecated, use use_supersat keyword
+
         N_r_closure       = get(param_set.user_args, :N_r_closure, :monodisperse)
         N_0 = get(param_set.user_aux,  :N_0, nothing) |> x ->  ( isnothing(x) ? get(param_set.user_args, :N_0, FT(100*10e6)) : pyinterp(z, x.z, x.values) ) # if defined in aux, interp at current z, otherwise default to user_args value, otherwise default to a value
         # this isn't clear to me yet what to do cause I don't think we have INP so i'm gonna just leave this and discuss with raymond rly quick
@@ -38,53 +42,68 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
         q = TD.PhasePartition(thermo_params, ts)
         T = TD.air_temperature(thermo_params, ts)
         q_vap = TD.vapor_specific_humidity(thermo_params, ts)
+        p = TD.air_pressure(thermo_params, ts)
 
-        if use_supersat # use phase partition in case we wanna use the conv_q_vap fcn but maybe not best for supersat since it's not really a phase partition (all 3 are vapor amounts)
-            D = FT(0.0000226)
+        if !(use_supersat == false) # it's either true or a specified value
+            # use phase partition in case we wanna use the conv_q_vap fcn but maybe not best for supersat since it's not really a phase partition (all 3 are vapor amounts)
+            # D_ref = FT(0.0000226)
+            D = (2.11 * 1e-5) * (T/273.15)^1.94 *  (p/101325)  # m2 s**-1 for T in Kelvin, p in Pa (from Pruppacher and Klett 1997)
+            
+            if use_supersat == true
+                # @info("using default supersaturation formulation")
+                # nonmutable param_set so would have to edit tau usage everywhere -- let's just do in supersat
+                if isnothing(tau_weights)
+                    τ_liq = CMNe.τ_relax(microphys_params, liq_type)
+                    τ_ice = CMNe.τ_relax(microphys_params, ice_type)
+                else
+                    #use the weights to calculate tau
+                    # @info("using τ from auxiliary weight function")
+                    # τ_liq, τ_ice = 10 .^ tau_weights.liq, 10 .^ tau_weights.ice # log fcn
+                    # tau_weights = eval(Meta.parse(tau_weights)) # test string version cause was crashing....
+                    liq_params = tau_weights.liq.liq_params # gets used in eval below
+                    ice_params = tau_weights.ice.ice_params
 
-            # nonmutable param_set so would have to edit tau usage everywhere -- let's just do in supersat
-            if isnothing(tau_weights)
-                τ_liq = CMNe.τ_relax(microphys_params, liq_type)
-                τ_ice = CMNe.τ_relax(microphys_params, ice_type)
-            else
-                #use the weights to calculate tau
-                # @info("using τ from auxiliary weight function")
-                # τ_liq, τ_ice = 10 .^ tau_weights.liq, 10 .^ tau_weights.ice # log fcn
-                # tau_weights = eval(Meta.parse(tau_weights)) # test string version cause was crashing....
-                liq_params = tau_weights.liq.liq_params # gets used in eval below
-                ice_params = tau_weights.ice.ice_params
+                    τ_liq, τ_ice = 10 .^ liq_params.log10_tau_liq, 10 .^ ice_params.log10_tau_ice # log fcn hand implementation...
+                    # τ_liq = handle_expr(string(tau_weights.liq.func_expr); liq_params) # works! (turn to string, parse to func and eval with the argument) (or use handle_expr above... :), # works but very slow to use invokelatest, maybe try https://github.com/SciML/RuntimeGeneratedFunctions.jl
+                    # τ_ice = handle_expr(string(tau_weights.ice.func_expr); ice_params) # works! (turn to string, parse to func and eval with the argument) (or use handle_expr above... :)
+                end
 
-                τ_liq, τ_ice = 10 .^ liq_params.log10_tau_liq, 10 .^ ice_params.log10_tau_ice # log fcn hand implementation...
-                # @show(liq_params)
-                # τ_liq = handle_expr(string(tau_weights.liq.func_expr); liq_params) # works! (turn to string, parse to func and eval with the argument) (or use handle_expr above... :), # works but very slow to use invokelatest, maybe try https://github.com/SciML/RuntimeGeneratedFunctions.jl
-                # τ_ice = handle_expr(string(tau_weights.ice.func_expr); ice_params) # works! (turn to string, parse to func and eval with the argument) (or use handle_expr above... :)
+            elseif use_supersat == :exponential_T_scaling # TODO: Drop the constants from this and just subsume them into N (makes picking an initial c_1, c_2 harder though so maybe not? Also is much harder for more complicated N_INP expressions)
+                # @info("using $use_supersat supersaturation formulation")
+                r_0 = 20 * 10^-6 # 20 micron
+                c_1 = get(param_set.user_aux, :T_scaling_c_1, 0.02 * exp(-0.6 * -273.15)) # Fletcher 1962 (values taken from Frostenberg 2022)
+                c_2 = get(param_set.user_aux, :T_scaling_c_2, -0.6) # Fletcher 1962 (values taken from Frostenberg 2022)
+                N = c_1 * exp(c_2*T) * r_0
+                τ_ice = 1 / (4 * π * D * N * r_0)
 
-            end
+                if isnothing(tau_weights)
+                    τ_liq = CMNe.τ_relax(microphys_params, liq_type)
+                else
+                    #use the weights to calculate tau
+                    liq_params = tau_weights.liq.liq_params # gets used in eval below
+                    τ_liq = 10 .^ liq_params.log10_tau_liq # log fcn hand implementation...
+                end
 
-            if raymond_ice_test
-                # problems: 
-                # - POTENTIAL CCN SHOULD GO UP W/ SUPERSATURATION (for a given q this also means up with decreasing temp?)
-                # - INP CONC HERE COULD GROW W/O BOUND, WE HAVE NO METRIC FOR GROWING CCN  conc
-                # - if you trust something like https://doi.org/10.5194/acp-14-81-2014 then INP/CDNC_i concentrations are way lower than liq but droplet sizes way higher... how to handle?
-                # either way our CCN concentratinos seems to be far too large for our INP numbers to give relevant taus until far too cold...
-                # gets even worse cause CDNC,CCN etc are advected in updraft so... it's not just local...
-                # if we assume CDCN/CCN/INP is constant ish and it's just activation fraction of CCN/INP that changes with T and/or SS, then what...
+                # ADD STABILITY LIMITERS (OR JUST BORROW FROM RAYMOND ICE TEST AND HAVE ONE BIG ONE BELOW?)
 
+            elseif use_supersat == :powerlaw_T_scaling
+                # @info("using $use_supersat supersaturation formulation")
+                error("NotImplmentedError: This supersat_type functionality has not been implemented yet")
+            elseif use_supersat == :exponential_times_powerlaw_scaling # Demott 2010
+                # @info("using $use_supersat supersaturation formulation")
+                error("NotImplmentedError: This supersat_type functionality has not been implemented yet")
+            elseif use_supersat == :raymond_ice_test # should be closer to DeMott 2015 but...
+                # @info("using $use_supersat supersaturation formulation")
                 N_m = get(param_set.user_args, :N_m, FT(-0.2)) # log slope https://doi.org/10.1073/pnas.1514034112
                 N_b = get(param_set.user_args, :N_b, FT(-5 - 273.15 * N_m)) # -5 - 273.15 * N_m
-
                 N_INP = 10^(N_m*T + N_b) * 10^3 # per liter to per m^3
-                # f_INP = N_INP/(N_0+N_INP) # clamp( N_INP/(N_0+N_INP), 0, 1)  # let N_0 and N_INP vary freely...
-
                 # -- hopefully this gets around the problem of draining water vapor at initialization of clouds but also allows speedup as droplets grow (assuming fixed drop concenctration)
                 # R    =  max(((q.liq + q.ice)/(4/3*π*ρ_w*N_0))^(1/3), FT(0.2*10^-6)) # bound to be at least ~micron size...something like kohler crit radius
 
-                # @show(ts_LCL)
                 if N_r_closure == :inhomogeneous
                     N_0,R_liq = NR_inhomogeneous_mixing_liquid(thermo_params, N_0, TD.air_pressure(thermo_params,ts), q.liq, ts_LCL) # testing inhomogeneous mixing would have r fixed and then let N vary... set r based on adiabatic extrapolation from cloud base 
                     _,R_ice = NR_monodisperse(N_INP,q.ice)
                     # maybe look into using a mixed model where N/R are partly towards the inhomogenous value depending on the true entrainment/mixing params... see literature on this
-
                     # NOTE, ON DYCOMS ADIABATIC R W/ ORIGINAL N_0 WORKED BETTER... HMMM (though that's not using DYCOMS N)
 
                 elseif N_r_closure == :monodisperse # uniform size for all droplets, liquid and Ice I guess
@@ -95,11 +114,8 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                 end
 
                 base = 1/(4*π*D) # as q goes up, R goes 
-                @show(N_0 * R_liq, N_INP * R_ice) # trouble shooet instability
                 τ_liq = base / (N_0 * R_liq)
                 τ_ice = base / (N_INP * R_ice)
-                # @show((T, q, τ_liq, τ_ice))
-
                 # limit effective tau to at least one second for stability (stable with dt == limit timescale is unstable, gotta go faster...
                 # println("effective τ_liq = ",τ_liq_eff, " effective τ_ice = ",τ_ice_eff, " T = ", T, " w = ",w, " q = ",q, " q_eq = ", q_eq )
                 if     (0 < τ_liq) && (τ_liq < 1) # fast source
@@ -116,8 +132,11 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                     τ_ice = FT(-1)
                 else
                 end
-
-            end
+            else
+                error("Unsupported supersaturation type: $(use_supersat)")
+            end 
+                
+                
 
             q_eq = TD.PhasePartition(q.tot, TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()), TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())) # all 3 are vapor amounts
             S_ql = (q_vap - q_eq.liq) / τ_liq # | microphys_params.τ_cond_evap | CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, TD.PhasePartition(FT(0),q_vap,FT(0)))  
@@ -164,7 +183,7 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
             S_ql += q.ice/Δt # send any existing ice to liquid
         end
 
-        if (use_supersat || use_korolev_mazin) # might need to do these first bc ql,qc tendencies maybe are applied individually and can still crash the code if one is too large...
+        if !(use_supersat==false) # might need to do these first bc ql,qc tendencies maybe are applied individually and can still crash the code if one is too large...
             # print("limiting")
             # add homogenous freezing (first so can limit later)s
             if (T < thermo_params.T_icenuc)
