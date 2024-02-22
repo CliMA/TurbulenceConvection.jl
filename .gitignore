@@ -33,7 +33,6 @@ docs/site/
 # environment.
 Manifest.toml
 test/Manifest.toml
-integration_tests/Manifest.toml
 
 # Ignore any local depot stored here.
 .julia*/
