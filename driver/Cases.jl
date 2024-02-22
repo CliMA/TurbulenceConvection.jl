@@ -85,13 +85,6 @@ Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/jbphyswx/MyRegistry"))
 using SOCRATES_Single_Column_Forcings
 abstract type SOCRATES <: AbstractCaseType end # this is the abstract type for all SOCRATES cases, cause you can't subtype non abstract types in julia...
 
-
-macro main_eval(exp)
-    """ A necessary function to use because otherwise, eval will evaluate in the module/global scope which doesn't include the for loop variables... """
-    Main.eval(quote exp end) # didn't work
-    # Main.eval(QuoteNode(exp))
-end
-
 # Create unique types for all the case and give them methods for their construction. (eval bad but couldn't figure out better way to generate parametric subtypes -- look into using only the flight_number variable)
 # This way it triages nicely w/ casename etc from the namelist -- alternative to eliminate would be to add more keywords in the namelist so that the constructor can know what flight number/forcing to initialize or have that casename not match the case type here and set up a constructor based on that name.
 # Also gives easier dispatch for forcing, data later etc that may not refer back to this type/method/constructor directly
