@@ -344,7 +344,7 @@ function compute_gm_tendencies!(
 
     @inbounds for k in TC.real_center_indices(grid)
         Π = TD.exner(thermo_params, ts_gm[k])
-        
+
         # LS Subsidence (any positive subsidence (ascent) leads to numerical instability) -- why?)
         tendencies_gm.ρθ_liq_ice[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇θ_liq_ice_gm[k]
         tendencies_gm.ρq_tot[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇q_tot_gm[k]
@@ -398,24 +398,24 @@ function compute_gm_tendencies!(
             # geostrophic handled elsewhere (only affects u,v tendency and maybe surface fluxes?)
 
             # nudge back to era 5 horizosntal
-            gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm_u[k]) / force.wind_nudge_τᵣ 
+            gm_U_nudge_k = (aux_gm.u_nudge[k] - prog_gm_u[k]) / force.wind_nudge_τᵣ
             gm_V_nudge_k = (aux_gm.v_nudge[k] - prog_gm_v[k]) / force.wind_nudge_τᵣ
             tendencies_gm_uₕ[k] += CCG.Covariant12Vector(CCG.UVVector(gm_U_nudge_k, gm_V_nudge_k), lg[k]) # add nudge (again we have dqtdt_hadv so what re dqldt and dqidt derived from?)
 
             # nudge liq-ice pottemp back towards our forcing profile
             H_fluc = aux_gm.dTdt_fluc[k] / Π # should be 0
-            gm_H_nudge_k =  (aux_gm.H_nudge[k] - aux_gm.θ_liq_ice[k]) / force.scalar_nudge_τᵣ # go back to regular tau relaxation (entire column now unlike zhaoyi's func )
+            gm_H_nudge_k = (aux_gm.H_nudge[k] - aux_gm.θ_liq_ice[k]) / force.scalar_nudge_τᵣ # go back to regular tau relaxation (entire column now unlike zhaoyi's func )
             tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * (gm_H_nudge_k + H_fluc) # we have no fluc so get that out (but we have the other terms so brought it back maybe itll lfix intsbailitis?)
 
             # nudge total water back towards our forcing profile
-            gm_q_tot_nudge_k =  (aux_gm.qt_nudge[k] - aux_gm.q_tot[k]) / force.scalar_nudge_τᵣ
+            gm_q_tot_nudge_k = (aux_gm.qt_nudge[k] - aux_gm.q_tot[k]) / force.scalar_nudge_τᵣ
             tendencies_gm.ρq_tot[k] += ρ_c[k] * (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k])
 
             # nudge liquid and ice -- but we don't have a ql_nudge qi_nudge from external forcing in socrates? only qt_nudge -- what are ql_nudge and qi_nudge derived from
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
-                gm_q_liq_nudge_k =  (aux_gm.ql_nudge[k] - prog_gm.q_liq[k]) / force.scalar_nudge_τᵣ
-                gm_q_ice_nudge_k =  (aux_gm.qi_nudge[k] - prog_gm.q_ice[k]) / force.scalar_nudge_τᵣ
-                tendencies_gm.q_liq[k] += aux_gm.dqldt_hadv[k] + gm_q_liq_nudge_k + aux_gm.dqldt_fluc[k] 
+                gm_q_liq_nudge_k = (aux_gm.ql_nudge[k] - prog_gm.q_liq[k]) / force.scalar_nudge_τᵣ
+                gm_q_ice_nudge_k = (aux_gm.qi_nudge[k] - prog_gm.q_ice[k]) / force.scalar_nudge_τᵣ
+                tendencies_gm.q_liq[k] += aux_gm.dqldt_hadv[k] + gm_q_liq_nudge_k + aux_gm.dqldt_fluc[k]
                 tendencies_gm.q_ice[k] += aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k]
             end
         end
