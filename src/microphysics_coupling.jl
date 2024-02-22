@@ -36,7 +36,12 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
             else
                 #use the weights to calculate tau
                 # @info("using τ from auxiliary weight function")
-                τ_liq, τ_ice = 10 .^ tau_weights.liq, 10 .^ tau_weights.ice # log fcn
+                # τ_liq, τ_ice = 10 .^ tau_weights.liq, 10 .^ tau_weights.ice # log fcn
+                tau_weights = eval(Meta.parse(tau_weights)) # test string version cause was crashing....
+                liq_params = eval(tau_weights.liq.liq_params) # gets used in eval below
+                ice_params = eval(tau_weights.ice.ice_params)
+                τ_liq      = eval(tau_weights.liq.func_expr)
+                τ_ice      = eval(tau_weights.ice.func_expr)
             end
 
             if raymond_ice_test
