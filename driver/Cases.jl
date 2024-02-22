@@ -79,14 +79,59 @@ struct DryBubble <: AbstractCaseType end
 
 struct LES_driven_SCM <: AbstractCaseType end
 
+using Pkg
+# Use a local CI registry so that SOCRATES_Single_Column_Forcings can be registered and installed on any machine. That package provides machinery to convert our forcings to any vertical grid/time
+Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/jbphyswx/MyRegistry")) # see https://discourse.julialang.org/t/more-informative-project-toml-or-partial-manifest-toml/92804/5
+using SOCRATES_Single_Column_Forcings
+
+
+macro main_eval(exp)
+    """ A necessary function to use because otherwise, eval will evaluate in the module/global scope which doesn't include the for loop variables... """
+    Main.eval(quote exp end) # didn't work
+    # Main.eval(QuoteNode(exp))
+end
+
+# Create unique types for all the case and give them methods for their construction. (eval bad but couldn't figure out better way to generate parametric subtypes -- look into using only the flight_number variable)
+# This way it triages nicely w/ casename etc from the namelist -- alternative to eliminate would be to add more keywords in the namelist so that the constructor can know what flight number/forcing to initialize or have that casename not match the case type here and set up a constructor based on that name.
+# Also gives easier dispatch for forcing, data later etc that may not refer back to this type/method/constructor directly
+# Final alternative would be to type out every case individually w/ no eval...
+# Some use of Value types maybe to dispatch but would stlil need to use some information in the namelist to allow get_case(::Val{:SOCRATES}) to be adapted to use the right flight number and forcing type
+for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
+    for forcing_type in SOCRATES_Single_Column_Forcings.forcing_types
+        name = Symbol("SOCRATES_RF$(string(flight_number,pad=2))_$(forcing_type)") # separated this way cause nested dollar signs gave me too much trouble... (invalid type signature) but allows for easier addition of methods
+        fn = QuoteNode(flight_number)
+        ft = QuoteNode(forcing_type) # we have to do this QuoteNode thing so that particulalry forcing_type is not evaluated to a string before Main.eval can analyze it, so that we can actually create a string, e.g. https://stackoverflow.com/a/70018854 
+        eval( quote Base.@kwdef struct $name <: SOCRATES # kwdef to add methods as defaults, see https://discourse.julialang.org/t/default-value-of-some-fields-in-a-mutable-struct/33408/4, this is the only way I could get it to work https://docs.julialang.org/en/v1/manual/metaprogramming/#man-macros (doesn't need to be Main.eval, just the eval for our case here since not in fcn)
+            # create any methods we may come to need for setting up the case
+            flight_number::Int = $fn
+            forcing_type::Symbol = $ft 
+            # move to ForcingSocrates? 
+            get_forcing = () ->  SOCRATES_Single_Column_Forcings.process_case($fn; obs_or_ERA5=$ft,initial_condition=false) 
+            get_initial_conditions = (;new_z=nothing) -> SOCRATES_Single_Column_Forcings.process_case($fn; new_z=new_z, obs_or_ERA5=$ft,initial_condition=true)
+            get_surface_ref_state = () -> SOCRATES_Single_Column_Forcings.process_case($fn; obs_or_ERA5=$ft,surface="ref")
+            get_surface = () -> SOCRATES_Single_Column_Forcings.process_case($fn; obs_or_ERA5=$ft,surface="conditions")
+            get_default_new_z = () -> SOCRATES_Single_Column_Forcings.get_default_new_z($fn;)
+            end
+        end)
+    end
+end
 #####
-##### Radiation and forcing types
+##### Radiation and forcing types  (this has to go before Forcing.jl is included)
 #####
 
 struct ForcingNone end
 struct ForcingStandard end
 struct ForcingDYCOMS_RF01 end
 struct ForcingLES end
+
+abstract type ForcingSOCRATES end 
+abstract type SOCRATES <: AbstractCaseType end # this is the abstract type for all SOCRATES cases, cause you can't subtype non abstract types in julia
+for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
+    for forcing_type in SOCRATES_Single_Column_Forcings.forcing_types
+        name = Symbol("ForcingSOCRATES_RF$(string(flight_number,pad=2))_$(forcing_type)") # separated this way cause nested dollar signs gave me too much trouble... (invalid type signature) but allows for easier addition of methods
+        @eval struct $name <: ForcingSOCRATES end
+    end
+end
 
 struct RadiationNone end
 struct RadiationDYCOMS_RF01 end
@@ -100,7 +145,7 @@ LES-driven forcing
 
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct ForcingBase{T, FT}
+Base.@kwdef struct ForcingBase{T, FT} # this gets initialized in main.jl and then unpacked including in dycore.jl where we need it :)       ( see https://github.com/CliMA/TurbulenceConvection.jl/blob/f3218667a67f7ee37fcd9db8d7076372ce20c20b/driver/main.jl#L212 ) # forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
     "Coriolis parameter"
     coriolis_param::FT = 0
     "Wind relaxation timescale"
@@ -113,6 +158,8 @@ Base.@kwdef struct ForcingBase{T, FT}
     scalar_nudge_τᵣ::FT = 0.0
     "Large-scale divergence (same as in RadiationBase)"
     divergence::FT = 0
+    "Forcing Functions Storage"
+    forcing_funcs::Array{NamedTuple,0} = fill(NamedTuple()) # used 0 d array intead[nothing] to retain mutability in forcing_funcs[]  # use a list here, so that we can mutate the internals of the imutable type (could make it a named tuple type insdie i guess that's what the init returns),... # might be too specific, maybe just Array{NamedTuple,0}
 end
 
 force_type(::ForcingBase{T}) where {T} = T
@@ -141,6 +188,17 @@ Base.@kwdef struct LESData
     initial_condition_averaging_window_s::Float64 = 3600.0
 end
 
+# Data struct needs to go before Forcing.jl is included...
+abstract type SOCRATESData end
+for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
+    for forcing_type in SOCRATES_Single_Column_Forcings.forcing_types
+        name = Symbol("SOCRATESData_RF$(string(flight_number,pad=2))_$(forcing_type)") # separated this way cause nested dollar signs gave me too much trouble... (invalid type signature) but allows for easier addition of methods
+        @eval struct $name <: SOCRATESData
+            # any methods we may come to need or want...         
+        end
+    end
+end
+
 #####
 ##### Radiation and forcing functions
 #####
@@ -149,7 +207,7 @@ include("Radiation.jl")
 include("Forcing.jl")
 
 #####
-##### Case methods
+##### Case methods (returns an instance of the case type)
 #####
 
 get_case(namelist::Dict) = get_case(namelist["meta"]["casename"])
@@ -732,7 +790,7 @@ function initialize_forcing(::ARM_SGP, forcing, grid::Grid, state, param_set)
     return nothing
 end
 
-function update_forcing(::ARM_SGP, grid, state, t::Real, param_set)
+function update_forcing(::ARM_SGP, grid, state, t::Real, param_set) #- should these be in Forcing.jl?
     thermo_params = TCP.thermodynamics_params(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
@@ -1236,5 +1294,118 @@ initialize_forcing(::LES_driven_SCM, forcing, grid::Grid, state, param_set; LESD
 
 initialize_radiation(::LES_driven_SCM, radiation, grid::Grid, state, param_set; LESDat) =
     initialize(radiation, grid, state, LESDat)
+
+
+#####
+##### SOCRATES
+#####
+ 
+# you cant instantiate the socrates subtype so we'll iterate here 
+for flight_number in SOCRATES_Single_Column_Forcings.flight_numbers
+    for forcing_type in SOCRATES_Single_Column_Forcings.forcing_types
+        name = Symbol("SOCRATES_RF$(string(flight_number,pad=2))_$(forcing_type)") # separated this way cause nested dollar signs gave me too much trouble... (invalid type signature) but allows for easier addition of methods
+        qnn = QuoteNode(name)
+        @eval get_case(::Val{$qnn}) = $(Symbol(name))() # name should already be a symbol, original syntax was get_case(::Val{:x}) = x() , not sure how to evaluate as fcn at end if eval will work like that
+        @eval get_forcing_type(::$(Symbol(name))) = $(Symbol("Forcing"*string(name))) # originally would be get_forcing_type(::x) = Forcingx
+        # @eval get_radiation_type(::$(Symbol(name))) = $Symbol("Radiation"*name)  # is this what we want? (for now leave as default to none) should be RRTMG
+    end
+end
+
+
+function surface_ref_state(S::SOCRATES, param_set::APS, namelist) # adopted mostly from LES (most similar setup, but what is this for? should i set it to somethign more generic?
+    return S.get_surface_ref_state() # added S so it has a name and then use the method we defined, currently param_set isn't an accepted argument cause it shouldnt be necessary for this part on earth but maybe can edit later...
+end
+
+function initialize_profiles(S::SOCRATES, grid::Grid, param_set, state; ) # Relies on SOCRATES_Single_Column_Forcings.jl
+    """ need θ_liq_ice, q_tot, prog_gm_u, prog_gm_v, tke, prog_gm_uₕ (is returned as (; dTdt_hadv, H_nudge, dqtdt_hadv, qt_nudge, subsidence, u_nudge, v_nudge, ug_nudge, vg_nudge) """
+    aux_gm = TC.center_aux_grid_mean(state)
+    prog_gm = TC.center_prog_grid_mean(state)
+    IC = S.get_initial_conditions(;new_z = vec(grid.zc.z) ) # added S so it has a name and then use the method we defined, currently param_set isn't an accepted argument cause it shouldnt be necessary for this part on earth but maybe can edit later...
+    
+    prog_gm_u = copy(aux_gm.q_tot) # copy as template cause u,g go into a uₕ vector so this is easier to work with (copied from other cases...)
+    prog_gm_v = copy(aux_gm.q_tot)
+    @inbounds for k in real_center_indices(grid) # we are goin the TRMM way wit this rather than LES... not sure why they use k.i but maybe it's cause forcing has time component? idk
+        aux_gm.θ_liq_ice[k] = IC.H_nudge[k]
+        aux_gm.q_tot[k]     = IC.qt_nudge[k]
+        prog_gm_u[k]        = IC.u_nudge[k]
+        prog_gm_v[k]        = IC.v_nudge[k]
+        aux_gm.tke[k]       = 0 # what is this supposed to be? unset for interactive? maybe we dont need to set it initially at all idk... didn't check yet but these get updated later interactively so hope it's fine
+    end
+    prog_gm_uₕ = TC.grid_mean_uₕ(state) # not too well versed in the details here but this should set the wind profiles IC
+    @. prog_gm_uₕ = CCG.Covariant12Vector(CCG.UVVector(prog_gm_u, prog_gm_v))
+end
+
+
+
+
+function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # seems Ri_bulk_crit is never aactually changed...
+    FT = eltype(param_set)
+    sc = case.get_surface()
+    zrough   = 0.1 # copied from gabls which is also w/ monin obhukov boundary layer
+    # no ustar w/ monin obukhov i guess, seems to be calculated in https://github.com/CliMA/SurfaceFluxes.jl src/SurfaceFluxes.jl/compute_ustar()
+    kwargs = (; Tsurface=sc.Tg, qsurface=sc.qg, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive,
+    return TC.MoninObukhovSurface(FT; kwargs...) # interactive?
+end
+
+
+
+function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_set; ) # added param_set so we can calculate stuff...
+    forcing.forcing_funcs[] = case.get_forcing() # maybe need to add param_set to this fcn args? everywhere really
+    
+    # forcing.forcing_funcs[] = create_forcing_funcs(forcing, grid, state, param_set; )  # initialize our forcing_funcs and insert them into our object and we can cheat and use the mutable array inside immutable struct :)    # not sure how this fits into the module... here but it seems to find it...
+    initialize(forcing, grid, state, param_set) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
+end
+
+function forcing_kwargs(case::SOCRATES,namelist) # call in main.jl is forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
+    # (; wind_nudge_τᵣ = 12*3600, scalar_nudge_τᵣ = 12*3600) # test for stabiity (didn't work/)
+    # (; wind_nudge_τᵣ = .01*60, scalar_nudge_τᵣ = 0.01*60) # test for quick convergence to ref state
+    # (; wind_nudge_τᵣ = 24*3600, scalar_nudge_τᵣ = 24*3600) # test for free ish run (closer to gettelman) but still unstable...? hmmm
+
+    if occursin("obs", string(typeof(case))) # later when we add SOCRATES_obs/ERA5 types we can just do isa(case, SOCRATES_obs)
+        (; wind_nudge_τᵣ = 20*60, scalar_nudge_τᵣ = 20*60) # paper standard
+    else # SOCRATES_ERA5
+        (; wind_nudge_τᵣ = 60*60, scalar_nudge_τᵣ = 20*60) # paper standard
+    end
+end
+
+function update_forcing(::SOCRATES, grid, state, t::Real, param_set, forcing) # Adapted from ARM_SGP -- should these be in Forcing.jl -- called in dycore.jl
+    aux_gm = TC.center_aux_grid_mean(state)
+    FT = TC.float_type(state)
+
+    forcing_funcs = forcing.forcing_funcs[] # access our functions
+    ug_keys = (:ug_nudge, :vg_nudge)
+    # update geostrophic profile
+    g_func = (f) -> f([FT(t)])[1]
+    prof_ug = g_func.(forcing_funcs[:ug_nudge]) # map over the forcing funcs to get the profile at t=0
+    prof_vg = g_func.(forcing_funcs[:vg_nudge])
+    # it wants a fcn out, could edit src/Fields.jl I guess to add another method but maybe it needs to face/center points idk...
+    prof_ug = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_ug); k = 1)
+    prof_vg = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_vg); k = 1)
+
+
+    aux_gm_uₕ_g = TC.grid_mean_uₕ_g(state)
+    TC.set_z!(aux_gm_uₕ_g, prof_ug, prof_vg) 
+
+    forcing_funcs = forcing_funcs[setdiff(keys(forcing_funcs), ug_keys)] # remove keys we don't need
+    @inbounds for k in real_center_indices(grid)
+        for (name,funcs) in zip(keys(forcing_funcs),forcing_funcs)
+            func = funcs[k]
+            getproperty(aux_gm, name)[k] = func([t])[1] # turn to vec cause needs to be cast as in https://github.com/CliMA/TurbulenceConvection.jl/blob/a9ebce1f5f15f049fc3719a013ddbc4a9662943a/src/utility_functions.jl#L48, run fcn on vec and index it back outssss
+        end
+    end
+end
+
+
+# paper says RRTMG...
+# function initialize(self::RadiationBase{SOCRATES_RF09_obs}, grid, state)
+#     return nothing
+# end
+# function update_radiation(self::RadiationBase{SOCRATES_RF09_obs}, grid, state, t::Real, param_set)
+#     return nothing
+# end
+
+# currently still nothing just cause idk what to do w/ RRTMG or if it's long enough to need...
+RadiationBase(   case::SOCRATES, FT) = RadiationBase{Cases.get_radiation_type(case), FT}() # i think this should default to none, would deprecate this call for now cause we dont have a use, default is just none... but les_Data_kwarg is in the end of the main.jl initialize_radiation.jl cal so we gotta improvise
+initialize_radiation(::SOCRATES, radiation, grid::Grid, state, param_set) = nothing # for now we jus deprecate, if we reimplement a call to radation it will need to match our initialize forcing call structure w/ param_set and Dat
 
 end # module Cases
