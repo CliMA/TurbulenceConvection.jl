@@ -72,4 +72,9 @@ case_kwargs["LES_driven_SCM"] = (;
     t_stop = 6 * 3600,
 )
 
+case_kwargs["SOCRATES"] = (;
+    plot_comparison = true, # Do plot
+    skip_comparison = true, # Don't compare until we get truth values in for each SOCRATES subcase (then we'll have to split this up somehow)
+    t_start = 11 * 3600,
+    t_stop = 13 * 3600,)
 #! format: on
