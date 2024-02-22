@@ -47,7 +47,7 @@ include(joinpath(tc_dir, "integration_tests", "sphere_utils.jl"))
 include(joinpath(tc_dir, "post_processing", "case_kwargs.jl"))
 include(joinpath(tc_dir, "post_processing", "compute_mse.jl"))
 include(joinpath(tc_dir, "post_processing", "mse_tables.jl"))
-best_mse = all_best_mse[case_name]
+best_mse = get(all_best_mse, case_name, OrderedCollections.OrderedDict()) # default to empty if mse isn't there
 
 parsed_args["skip_post_proc"] && exit()
 
