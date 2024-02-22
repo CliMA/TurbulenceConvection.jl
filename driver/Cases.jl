@@ -100,6 +100,9 @@ struct SOCRATES <: AbstractCaseType
     flight_number::Int
     forcing_type::Symbol
 
+    function SOCRATES(flight_number::Int, forcing_type::Symbol)
+        new(flight_number, forcing_type)
+    end
 
     function SOCRATES()
         new()
