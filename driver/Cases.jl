@@ -1384,9 +1384,7 @@ function surface_params(case::SOCRATES, surf_ref_state, param_set; SOCRATESDat, 
     return TC.MoninObukhovSurface(FT; kwargs...) # interactive?
 end
 
-
-
-function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state; SOCRATESDat)
+function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_set) # param_set isn't used but matches form in main.jl
     forcing.forcing_funcs[] = case.get_forcing(; new_z = vec(grid.zc.z))
     initialize(forcing, grid, state) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
 end
