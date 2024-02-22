@@ -79,23 +79,24 @@ struct DryBubble <: AbstractCaseType end
 
 struct LES_driven_SCM <: AbstractCaseType end
 
-
-
 #= ========
 
 We have two options here... I'm not entirely sure why les_data_kwargs was made a separate item and not part of the lesdata subtype...
 I thought it would be nicer to have the LES_driven_SCM() type have the LESData data contained inside itself but if not; SOCRATES could take either approach.
 
 For the first, we'd just need to change our dispatch to also act on the namelist. NOTE: this is not currently implemented in the code below... primarily because I didn't want to change the call for surface_ref_state() in main.jl to accomodate aux_data_kwarg etc
-
 For the second I renamed les_data_kwarg to aux_data_kwarg to be more general and just made use of that with a separate SOCRATESData type...
 
 ======== =#
+"""
+This is the abstract type for all SOCRATES cases, because you can't subtype non abstract types in julia...
+I've placed a lot of relevant data inside this struct, based on calling the SOCRATESSingleColumnForcings package
 
-
-# struct SOCRATES <: AbstractCaseType end # this is the abstract type for all SOCRATES cases, cause you can't subtype non abstract types in julia...
-
-struct SOCRATES <: AbstractCaseType
+Either we can do this setup here or we could instead defer to aux_data_kwarg below... 
+Doing it here and passing param_set here is what we're doing rather than really using a SOCRATESDat construction or something similar to LESDat
+Thus, we can have one call to SSCF and then just pass around the results.
+"""
+struct SOCRATES <: AbstractCaseType  
     flight_number::Int
     forcing_type::Symbol
     get_forcing::Function
@@ -104,7 +105,6 @@ struct SOCRATES <: AbstractCaseType
     get_surface::Function
     get_default_new_z::Function
 
-    # either we can do this here or we could instead defer to aux_data_kwarg below... here we don't necessarily have thermo_params defined yet tho...
     function SOCRATES(flight_number::Int, forcing_type::Symbol, param_set::APS)
         thermo_params = TCP.thermodynamics_params(param_set)
         get_forcing =
@@ -157,7 +157,7 @@ struct SOCRATES <: AbstractCaseType
 
     function SOCRATES()
         new()
-    end# Incomplete Initialization constructor for backwards compat :)
+    end # Incomplete Initialization constructor for backwards compat :)
 end
 
 #####
@@ -168,7 +168,6 @@ struct ForcingNone end
 struct ForcingStandard end
 struct ForcingDYCOMS_RF01 end
 struct ForcingLES end
-
 struct ForcingSOCRATES end
 
 struct RadiationNone end
@@ -226,12 +225,6 @@ Base.@kwdef struct LESData
     initial_condition_averaging_window_s::Float64 = 3600.0
 end
 
-
-Base.@kwdef struct SOCRATESData # placeholder cause we deprecated SOCRATESData in favor of having everything in the SOCRATES object but maybe we'll have to switch back... idk...
-    function SOCRATESData(case::SOCRATES)
-        case
-    end
-end
 
 #####
 ##### Radiation and forcing functions
@@ -1343,16 +1336,12 @@ initialize_radiation(::LES_driven_SCM, radiation, grid::Grid, state, param_set; 
 #####
 ##### SOCRATES
 #####
-function aux_data_kwarg(s::SOCRATES, namelist)
-    SOCRATESDat = SOCRATESData(s) # rn is kinda useless cause we're going with having everything inside the socrates object, if we gotta revert we can...
-    return (; SOCRATESDat)
-end
 
 function surface_ref_state(case::SOCRATES, param_set::APS, namelist) # adopted mostly from LES (most similar setup, but what is this for? should i set it to somethign more generic?
     return case.get_surface_ref_state() # added S so it has a name and then use the method we defined, currently param_set isn't an accepted argument cause it shouldnt be necessary for this part on earth but maybe can edit later...
 end
 
-function initialize_profiles(case::SOCRATES, grid::Grid, param_set, state; SOCRATESDat) # Relies on SOCRATES_Single_Column_Forcings.jl
+function initialize_profiles(case::SOCRATES, grid::Grid, param_set, state; kwargs...) # Relies on SOCRATES_Single_Column_Forcings.jl
     """ need θ_liq_ice, q_tot, prog_gm_u, prog_gm_v, tke, prog_gm_uₕ (is returned as (; dTdt_hadv, H_nudge, dqtdt_hadv, qt_nudge, subsidence, u_nudge, v_nudge, ug_nudge, vg_nudge) """
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -1371,10 +1360,7 @@ function initialize_profiles(case::SOCRATES, grid::Grid, param_set, state; SOCRA
     @. prog_gm_uₕ = CCG.Covariant12Vector(CCG.UVVector(prog_gm_u, prog_gm_v))
 end
 
-
-
-
-function surface_params(case::SOCRATES, surf_ref_state, param_set; SOCRATESDat, kwargs...) # seems Ri_bulk_crit is never aactually changed...
+function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # seems Ri_bulk_crit is never aactually changed...
     FT = eltype(param_set)
     sc = case.get_surface()
     zrough = 0.1 # copied from gabls which is also w/ monin obhukov boundary layer
@@ -1389,10 +1375,6 @@ function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_se
 end
 
 function forcing_kwargs(case::SOCRATES, namelist) # call in main.jl is forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
-    # (; wind_nudge_τᵣ = 12*3600, scalar_nudge_τᵣ = 12*3600) # test for stabiity (didn't work/)
-    # (; wind_nudge_τᵣ = .01*60, scalar_nudge_τᵣ = 0.01*60) # test for quick convergence to ref state
-    # (; wind_nudge_τᵣ = 24*3600, scalar_nudge_τᵣ = 24*3600) # test for free ish run (closer to gettelman) but still unstable...? hmmm
-
     if case.forcing_type == :obs_data # use the socrates type to handle timescale setting
         wind_nudge_τᵣ = get(namelist["forcing"], "wind_nudge_τᵣ", 20 * 60) # paper standard (should I cast as FT?)
         scalar_nudge_τᵣ = get(namelist["forcing"], "scalar_nudge_τᵣ", 20 * 60) # paper standard
@@ -1420,7 +1402,6 @@ function update_forcing(case::SOCRATES, grid, state, t::Real, param_set, forcing
     prof_ug = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_ug); k = 1)
     prof_vg = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_vg); k = 1)
 
-
     aux_gm_uₕ_g = TC.grid_mean_uₕ_g(state)
     TC.set_z!(aux_gm_uₕ_g, prof_ug, prof_vg)
 
@@ -1433,17 +1414,17 @@ function update_forcing(case::SOCRATES, grid, state, t::Real, param_set, forcing
     end
 end
 
-
 # paper says RRTMG...
 # function initialize(self::RadiationBase{SOCRATES_RF09_obs}, grid, state)
 #     return nothing
 # end
+
 # function update_radiation(self::RadiationBase{SOCRATES_RF09_obs}, grid, state, t::Real, param_set)
 #     return nothing
 # end
 
 # currently still nothing just cause idk what to do w/ RRTMG or if it's long enough to need...
 RadiationBase(case::SOCRATES, FT) = RadiationBase{Cases.get_radiation_type(case), FT}() # i think this should default to none, would deprecate this call for now cause we dont have a use, default is just none... but aux_data_kwarg is in the end of the main.jl initialize_radiation.jl cal so we gotta improvise
-initialize_radiation(::SOCRATES, radiation, grid::Grid, state, param_set; SOCRATESDat) = nothing # for now we jus deprecate, if we reimplement a call to radation it will need to match our initialize forcing call structure w/ param_set and Dat
+initialize_radiation(::SOCRATES, radiation, grid::Grid, state, param_set;) = nothing # for now we jus deprecate, if we reimplement a call to radation it will need to match our initialize forcing call structure w/ param_set and Dat
 
 end # module Cases
