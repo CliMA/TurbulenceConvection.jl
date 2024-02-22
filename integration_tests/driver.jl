@@ -47,7 +47,7 @@ include(joinpath(tc_dir, "integration_tests", "sphere_utils.jl"))
 include(joinpath(tc_dir, "post_processing", "case_kwargs.jl"))
 include(joinpath(tc_dir, "post_processing", "compute_mse.jl"))
 include(joinpath(tc_dir, "post_processing", "mse_tables.jl"))
-best_mse = all_best_mse[case_name]
+best_mse = get(all_best_mse, namelist["meta"]["casename"], all_best_mse["missing_table_placeholder"]) # default to empty if mse table isn't there ("NA" is what we use for empty to pass test_mse()
 
 parsed_args["skip_post_proc"] && exit()
 
@@ -58,7 +58,8 @@ if parsed_args["config"] == "sphere"
 end
 
 for ds_tc_filename in ds_tc_filenames
-    computed_mse = compute_mse_wrapper(case_name, best_mse, ds_tc_filename; case_kwargs[case_name]..., plot_dir)
+    computed_mse =
+        compute_mse_wrapper(case_name, best_mse, ds_tc_filename; case_kwargs[namelist["meta"]["casename"]]..., plot_dir)
 
     parsed_args["skip_tests"] && exit()
 
