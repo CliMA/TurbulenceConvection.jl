@@ -251,7 +251,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set)
 
         TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt)
-        compute_gm_tendencies!(edmf, grid, state, surf, radiation, forcing, t, param_set)
+        compute_gm_tendencies!(edmf, grid, state, surf, radiation, forcing, param_set)
     end
 
     return nothing
@@ -276,7 +276,6 @@ function compute_gm_tendencies!(
     surf::TC.SurfaceBase,
     radiation::Cases.RadiationBase,
     force::Cases.ForcingBase,
-    t::Real, # added for time varying forcings...
     param_set::APS,
 )
     thermo_params = TCP.thermodynamics_params(param_set)
