@@ -47,7 +47,7 @@ include(joinpath(tc_dir, "integration_tests", "sphere_utils.jl"))
 include(joinpath(tc_dir, "post_processing", "case_kwargs.jl"))
 include(joinpath(tc_dir, "post_processing", "compute_mse.jl"))
 include(joinpath(tc_dir, "post_processing", "mse_tables.jl"))
-best_mse = get(all_best_mse, namelist["meta"]["casename"], OrderedCollections.OrderedDict(["qt_mean", "ql_mean", "qi_mean", "updraft_qt", "updraft_ql", "updraft_qi", "env_qt", "env_ql", "env_qi", "v_mean", "u_mean", "temperature_mean", "thetal_mean", "updraft_area"] .=>  NaN)) # default to empty if mse isn't there ( i dont think that works cause then in compute_mse_wrapper the plotting breaks cause it plots nothing, only the vars from best_mse), using case_name rn until we make a different version for each socrates case...
+best_mse = get(all_best_mse, namelist["meta"]["casename"], all_best_mse["missing_table_placeholder"] ) # default to empty if mse table isn't there ("NA" is what we use for empty to pass test_mse()
 
 parsed_args["skip_post_proc"] && exit()
 
