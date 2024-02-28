@@ -19,6 +19,16 @@ cent_aux_vars_en_2m(FT) = (;
     buoy = FT(0),
     interdomain = FT(0),
     rain_src = FT(0),
+    term_1 = FT(0),
+    term_2 = FT(0),
+    term_3 = FT(0),
+    term_4 = FT(0),
+    term_5 = FT(0),
+    term_6 = FT(0),
+    term_7 = FT(0),
+    term_8 = FT(0),
+    term_9 = FT(0),
+    term_10 = FT(0),
 )
 cent_aux_vars_up_moisture(FT, ::NonEquilibriumMoisture) = (;
     ql_tendency_precip_formation = FT(0),

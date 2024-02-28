@@ -315,6 +315,11 @@ function microphysics(
 
             # update cloudy/dry variables for buoyancy in TKE
             aux_en.cloud_fraction[k] = outer_env.cf
+
+            # if aux_en.cloud_fraction[k] < 0.95
+            #     aux_en.cloud_fraction[k] = 0.0
+            # end
+
             if aux_en.cloud_fraction[k] < 1
                 aux_en_unsat.q_tot[k] = outer_env.qt_unsat / (1 - aux_en.cloud_fraction[k])
                 T_unsat = outer_env.T_unsat / (1 - aux_en.cloud_fraction[k])

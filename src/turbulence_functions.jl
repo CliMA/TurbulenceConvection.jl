@@ -59,12 +59,24 @@ function get_surface_tke(mixing_length_params, ustar::FT, zLL::FT, oblength::FT)
     end
 end
 
-function get_surface_tke_turb_flux(mixing_length_params, ustar::FT, ρ_f_surf::FT, a_e_surf::FT, U_surf_norm::FT) where {FT}
+function get_surface_tke_turb_flux(mixing_length_params, ustar::FT, ρ_f_surf::FT, a_e_surf::FT, U_surf_norm::FT, bflux_surf::FT) where {FT}
     κ_star² = mixing_length_params.κ_star²
     c_d = mixing_length_params.c_d
     c_m = mixing_length_params.c_m
-    return ρ_f_surf*a_e_surf*(1 - c_d*c_m*κ_star²^2) * ustar^2 * U_surf_norm
+    # return ρ_f_surf*a_e_surf*(1 - c_d*c_m*κ_star²^2) * ustar^2 * (U_surf_norm + 1.1)
+    # @show κ_star²
+    # @show (1 - c_d*c_m*κ_star²^2) * ustar^2 * U_surf_norm
+    # @show bflux_surf
+    return ρ_f_surf*a_e_surf*((1 - c_d*c_m*κ_star²^2) * ustar^2 * U_surf_norm + bflux_surf)
 end
+
+function surface_tke_turb_flux_div(mixing_length_params, ustar::FT, shear_surf::FT, ρ_f_surf::FT, a_e_surf::FT, bflux_surf::FT) where {FT}
+    κ_star² = mixing_length_params.κ_star²
+    c_d = mixing_length_params.c_d
+    c_m = mixing_length_params.c_m
+    return ρ_f_surf*a_e_surf*((c_d*c_m*κ_star²^2 - 1) * ustar^2 * shear_surf  - bflux_surf)
+end
+
 
 function get_surface_variance(flux1::FT, flux2::FT, ustar::FT, zLL::FT, oblength::FT) where {FT}
     c_star1 = -flux1 / ustar

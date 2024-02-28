@@ -242,7 +242,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_gm.buoy[k] = (aux_bulk.area[k] * aux_bulk.buoy[k] + (1 - aux_bulk.area[k]) * aux_en.buoy[k])
 
         has_condensate = TD.has_condensate(aux_bulk.q_liq[k] + aux_bulk.q_ice[k])
-        aux_bulk.cloud_fraction[k] = if has_condensate && a_bulk_c > 1e-3
+        aux_bulk.cloud_fraction[k] = if has_condensate && a_bulk_c > N_up * edmf.minimum_area
             1
         else
             0
@@ -359,7 +359,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     local_geometry = CC.Fields.local_geometry_field(axes(ρ_c))
     k̂ = center_aux_turbconv(state).k̂
     @. k̂ = CCG.Contravariant3Vector(CCG.WVector(FT(1)), local_geometry)
-    Ifuₕ = uₕ_bcs()
+    Ifuₕ = uₕ_bcs(FT)
     ∇uvw = CCO.GradientF2C()
     uvw = face_aux_turbconv(state).uvw
     Shear² = center_aux_turbconv(state).Shear²
@@ -385,9 +385,16 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @. ∂qt∂z_sat = ∇c(wvec(If0(aux_en_sat.q_tot)))
     @. ∂θl∂z_sat = ∇c(wvec(If0(aux_en_sat.θ_liq_ice)))
     @. ∂θv∂z_unsat = ∇c(wvec(If0(aux_en_unsat.θ_virt)))
-    @. ∂qt∂z_sat = ifelse(shm == 0, ∂qt∂z, ∂qt∂z_sat)
-    @. ∂θl∂z_sat = ifelse(shm == 0, ∂θl∂z, ∂θl∂z_sat)
-    @. ∂θv∂z_unsat = ifelse(shm == 0, ∂θv∂z, ∂θv∂z_unsat)
+    # @. ∂qt∂z_sat = ifelse(shm == 0, ∂qt∂z, ∂qt∂z_sat)
+    # @. ∂θl∂z_sat = ifelse(shm == 0, ∂θl∂z, ∂θl∂z_sat)
+    # @. ∂θv∂z_unsat = ifelse(shm == 0, ∂θv∂z, ∂θv∂z_unsat)
+
+    # @inbounds for k in real_center_indices(grid)
+    #     no_condensate_i = !TD.has_condensate(aux_en.q_liq[k] + aux_en.q_ice[k])
+    #     ∂qt∂z_sat[k] = ifelse(no_condensate_i, ∂qt∂z[k], ∂qt∂z_sat[k])
+    #     ∂θl∂z_sat[k] = ifelse(no_condensate_i, ∂θl∂z[k], ∂θl∂z_sat[k])
+    #     ∂θv∂z_unsat[k] = ifelse(no_condensate_i, ∂θv∂z[k], ∂θv∂z_unsat[k])
+    # end
 
     @inbounds for k in real_center_indices(grid)
 
@@ -407,6 +414,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 p = p_c[k],
                 en_cld_frac = aux_en.cloud_fraction[k],
                 ρ = ρ_c[k],
+                has_condensate = TD.has_condensate(aux_en.q_liq[k] + aux_en.q_ice[k])
             )
             bg_model = EnvBuoyGrad(edmf.bg_closure; bg_kwargs...)
 
@@ -424,6 +432,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 p = p_c[k],
                 en_cld_frac = aux_en.cloud_fraction[k],
                 ρ = ρ_c[k],
+                has_condensate = TD.has_condensate(aux_en.q_liq[k] + aux_en.q_ice[k])
             )
             bg_model = EnvBuoyGrad(edmf.bg_closure; bg_kwargs...)
         else
@@ -459,6 +468,25 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         KQ[k] = KH[k] / Le
 
         aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
+
+        # if aux_en_2m.tke.buoy[k] < 0 
+        #     aux_en_2m.tke.buoy[k] = 0
+        # end
+
+
+        aux_en_2m.tke.buoy[kc_surf] = aux_en.area[kc_surf] * ρ_c[kc_surf] * surf.bflux
+
+        # @show aux_en_2m.tke.buoy[kc_surf]
+        # @show aux_en_2m.tke.buoy[kc_surf + 1]
+        # @show aux_en_2m.tke.buoy[kc_surf + 2]
+        # @show aux_en_2m.tke.buoy[kc_surf + 3]
+        # @show surf.bflux
+
+        # @show aux_en_2m.tke.buoy[kc_surf]
+        # @show aux_en.area[k] 
+        # @show ρ_c[k]
+        # @show KH[k] 
+        # @show bg.∂b∂z
     end
 
     #####

@@ -200,6 +200,8 @@ Base.@kwdef struct EnvBuoyGrad{FT, EBC <: AbstractEnvBuoyGradClosure}
     en_cld_frac::FT
     "density"
     ρ::FT
+    "has condensate?"
+    has_condensate::Bool
 end
 function EnvBuoyGrad(::EBG; t_sat::FT, bg_kwargs...) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
     return EnvBuoyGrad{FT, EBG}(; t_sat, bg_kwargs...)

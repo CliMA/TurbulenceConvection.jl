@@ -60,6 +60,13 @@ function io_dictionary_aux()
         "tke_detr_loss" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.detr_loss),
         "tke_shear" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.shear),
         "tke_interdomain" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.interdomain),
+        "tke_term_1" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.term_1),
+        "tke_term_2" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.term_2),
+        "tke_term_3" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.term_3),
+        "tke_term_4" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.term_4),
+        "tke_term_5" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.term_5),
+        "tke_term_6" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.term_6),
+        "tke_term_7" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.term_7),
 
         "Hvar_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).Hvar.dissipation),
         "Hvar_entr_gain" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).Hvar.entr_gain),

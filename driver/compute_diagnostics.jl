@@ -231,7 +231,7 @@ function compute_diagnostics!(
         cloud_cover_up[i] = FT(0)
 
         @inbounds for k in TC.real_center_indices(grid)
-            if aux_up[i].area[k] > 1e-3
+            if aux_up[i].area[k] > edmf.minimum_area
                 if TD.has_condensate(aux_up[i].q_liq[k] + aux_up[i].q_ice[k])
                     cloud_base_up[i] = min(cloud_base_up[i], grid.zc[k].z)
                     cloud_top_up[i] = max(cloud_top_up[i], grid.zc[k].z)

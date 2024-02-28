@@ -1,3 +1,4 @@
+using JLD2
 
 function update_cloud_frac(edmf::EDMFModel, grid::Grid, state::State)
     # update grid-mean cloud fraction and cloud cover
@@ -297,6 +298,7 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     oblength = surf.obukhov_length
     ρLL = prog_gm.ρ[kc_surf]
     mix_len_params = mixing_length_params(edmf)
+    # prog_en.ρatke[kc_surf] = ρa_env_surf * 0.6
     if edmf.thermo_covariance_model isa PrognosticThermoCovariances
         prog_en.ρaHvar[kc_surf] = ρa_env_surf * get_surface_variance(flux1 / ρLL, flux1 / ρLL, ustar, zLL, oblength)
         prog_en.ρaQTvar[kc_surf] = ρa_env_surf * get_surface_variance(flux2 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
@@ -332,9 +334,25 @@ end
 function w_surface_bc(::SurfaceBase{FT})::FT where {FT}
     return FT(0)
 end
-function uₕ_bcs()
-    return CCO.InterpolateC2F(bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+# function uₕ_bcs()
+#     return CCO.InterpolateC2F(bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+# end
+
+# u_h boundary conditions used in shear computation
+# function uₕ_bcs(FT)
+#     return CCO.InterpolateC2F(
+#         bottom = CCO.SetValue(CCG.UVVector(FT(0), FT(0))),
+#         top = CCO.SetValue(CCG.UVVector(FT(0), FT(0)))
+#     )
+# end
+
+function uₕ_bcs(FT)
+    return CCO.InterpolateC2F(
+        bottom = CCO.SetValue(CCG.UVVector(FT(0), FT(0))),
+        top = CCO.Extrapolate()
+    )
 end
+
 function θ_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDMFModel, i::Int)::FT where {FT}
     aux_gm = center_aux_grid_mean(state)
     prog_gm = center_prog_grid_mean(state)
@@ -731,6 +749,9 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     return nothing
 end
 
+
+
+
 function compute_covariance_shear(
     edmf::EDMFModel,
     grid::Grid,
@@ -749,6 +770,8 @@ function compute_covariance_shear(
     aux_en_2m = center_aux_environment_2m(state)
     aux_covar = getproperty(aux_en_2m, covar_sym)
     uₕ_gm = grid_mean_uₕ(state)
+    kc_surf = kc_surface(grid)
+    kf_surf = kf_surface(grid)
 
     aux_en_c = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
@@ -763,19 +786,83 @@ function compute_covariance_shear(
     shear = aux_covar.shear
 
     C123 = CCG.Covariant123Vector
+    CT2 = CCG.Contravariant2Vector
     local_geometry = CC.Fields.local_geometry_field(axes(ρ_c))
     k̂ = center_aux_turbconv(state).k̂
     @. k̂ = CCG.Contravariant3Vector(CCG.WVector(FT(1)), local_geometry)
-    Ifuₕ = uₕ_bcs()
+    Ifuₕ = uₕ_bcs(FT)
+
+
+    
+
+    # Ifuₕ = CCO.InterpolateC2F(bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+    # Ifuₕ = CCO.InterpolateC2F(bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+    
+    # Ifuₕ = CCO.InterpolateC2F(
+    #     bottom = CCO.SetValue(CT2(FT(0), FT(0))),  # Set horizontal velocity components u and v to 0 at the bottom
+    #     top = CCO.SetValue(CT2(FT(0), FT(0)))      # Set horizontal velocity components u and v to 0 at the top (if needed)
+    # )
+
+    # Ifuₕ = CCO.InterpolateC2F(
+    #     bottom = CCO.SetValue(CCG.Covariant12Vector(CCG.UVVector(FT(0), FT(0)), local_geometry)),  # Set horizontal velocity components u and v to 0 at the bottom
+    #     top = CCO.SetValue(CCG.Covariant12Vector(CCG.UVVector(FT(0), FT(0)), local_geometry))      # Set horizontal velocity components u and v to 0 at the top (if needed)
+    # )
+
+    # Ifuₕ = CCO.InterpolateC2F(
+    #         bottom = CCO.SetValue(CCG.Covariant12Vector(CCG.UVVector(FT(0), FT(0)), local_geometry)),  # Set horizontal velocity components u and v to 0 at the bottom
+    #         top = CCO.SetValue(CCG.Covariant12Vector(CCG.UVVector(FT(0), FT(0)), local_geometry))      # Set horizontal velocity components u and v to 0 at the top (if needed)
+    # )
+
+    # uₕ = CCG.Covariant12Vector(CCG.UVVector(FT(0), FT(0)), local_geometry),
+
+
+    # Ifuₕ = CCO.InterpolateC2F(
+    #     bottom = CCO.SetValue(CCG.UVVector(FT(0), FT(0))),  # Set horizontal velocity components u and v to 0 at the bottom
+    #     top = CCO.SetValue(CCG.UVVector(FT(0), FT(0)))     # Set horizontal velocity components u and v to 0 at the top (if needed)
+    # )
+
+
+
+    
+    # ∇uₕ_gm = CCO.GradientC2F(;
+    #     bottom = CCO.SetGradient(
+    #         CCG.Covariant3Vector(wvec(FT(1)), local_geometry_surf) ⊗
+    #         CCG.Covariant12Vector(aeKMuₕ_bc, local_geometry_surf),
+    #     ),
+    #     top = CCO.SetGradient(
+    #         CCG.Covariant3Vector(wvec(FT(0)), local_geometry_surf) ⊗ CCG.Covariant12Vector(FT(0), FT(0)),
+    #     ),
+    # )
+
+
+
     ∇uvw = CCO.GradientF2C()
+
+
     # TODO: k_eddy and Shear² should probably be tensors (Contravariant3 tensor),
     #       so that the result (a contraction) is a scalar.
     if is_tke
         uvw = face_aux_turbconv(state).uvw
         Shear² = center_aux_turbconv(state).Shear²
+
+        # jldsave("int_var3.jld2"; uₕ_gm, uvw, Shear², local_geometry, ϕ_en, k̂, state)
+
         @. uvw = C123(Ifuₕ(uₕ_gm)) + C123(wvec(ϕ_en)) # ϕ_en === ψ_en
-        @. Shear² = LA.norm_sqr(adjoint(∇uvw(uvw)) * k̂)
+
+        @. Shear² = LA.norm_sqr(adjoint(∇uvw(uvw)) * k̂) # LA.norm_sqr(strain rate) ; #Shear² = strain_rate_norm
         @. shear = ρ_c * area_en * k_eddy * Shear²
+
+        # @show shear[kc_surf]
+        # @show shear[kc_surf + 1]
+
+        # @show area_en[kc_surf]
+        # @show area_en[kc_surf + 1]
+
+        # @show k_eddy[kc_surf]
+        # @show k_eddy[kc_surf + 1]
+
+        # @show Shear²[kc_surf]
+        # @show Shear²[kc_surf + 1]
     else
         ∇c = CCO.GradientF2C()
         @. shear = 2 * ρ_c * area_en * k_eddy * LA.dot(∇c(If(ϕ_en)), k̂) * LA.dot(∇c(If(ψ_en)), k̂)
@@ -904,14 +991,14 @@ function compute_covariance_entr(
         elseif edmf.entrainment_type isa TotalRateEntrModel
             @. entr_gain +=
                 Int(a_up > min_area) *
-                (tke_factor * detr_rate_inv_s * (Idc(ϕ_up) - Idc(ϕ_en)) * (Idc(ψ_up) - Idc(ψ_en))) + (
-                    tke_factor *
-                    entr_rate_inv_s *
-                    (
-                        (Idc(ϕ_en) - Idc(to_scalar(ϕ_gm))) * (Idc(ψ_up) - Idc(ψ_en)) +
-                        (Idc(ψ_en) - Idc(to_scalar(ψ_gm))) * (Idc(ϕ_up) - Idc(ϕ_en))
-                    )
-                )
+                (tke_factor * detr_rate_inv_s * (Idc(ϕ_up) - Idc(ϕ_en)) * (Idc(ψ_up) - Idc(ψ_en))) #+ (
+                #     tke_factor *
+                #     entr_rate_inv_s *
+                #     (
+                #         (Idc(ϕ_en) - Idc(to_scalar(ϕ_gm))) * (Idc(ψ_up) - Idc(ψ_en)) +
+                #         (Idc(ψ_en) - Idc(to_scalar(ψ_gm))) * (Idc(ϕ_up) - Idc(ϕ_en))
+                #     )
+                # )
 
             @. detr_loss += Int(a_up > min_area) * tke_factor * entr_rate_inv_s * covar
 
@@ -945,7 +1032,13 @@ function compute_covariance_dissipation(
     mixing_length = aux_tc.mixing_length
 
     @. dissipation = ρ_c * area_en * covar * max(tke_en, 0)^FT(0.5) / max(mixing_length, FT(1.0e-3)) * c_d
+    # @. dissipation = ρ_c * area_en * covar * max(tke_en, 0)^FT(0.5) / mixing_length * c_d
     return nothing
+end
+
+function unit_basis_vector_data(::Type{V}, local_geometry) where {V}
+    FT = CCG.undertype(typeof(local_geometry))
+    return FT(1) / CCG._norm(V(FT(1)), local_geometry)
 end
 
 function compute_en_tendencies!(
@@ -978,6 +1071,8 @@ function compute_en_tendencies!(
     ρ_f = aux_gm_f.ρ
     c_d = mixing_length_params(edmf).c_d
     mix_len_params = mixing_length_params(edmf)
+    k̂ = center_aux_turbconv(state).k̂
+    Shear² = center_aux_turbconv(state).Shear²
     is_tke = covar_sym == :tke
     FT = float_type(state)
 
@@ -1001,9 +1096,27 @@ function compute_en_tendencies!(
     entr_gain = aux_covar.entr_gain
     rain_src = aux_covar.rain_src
 
+    term_1 = aux_covar.term_1
+    term_2 = aux_covar.term_2
+    term_3 = aux_covar.term_3
+    term_4 = aux_covar.term_4
+    term_5 = aux_covar.term_5
+    term_6 = aux_covar.term_6
+    term_7 = aux_covar.term_7
+    term_8 = aux_covar.term_8
+    term_9 = aux_covar.term_9
+    term_10 = aux_covar.term_10
+
     wvec = CC.Geometry.WVector
-    aeK_bcs = (; bottom = CCO.SetValue(aeK[kc_surf]), top = CCO.SetValue(aeK[kc_toa]))
-    prog_bcs = (; bottom = CCO.SetGradient(wvec(FT(0))), top = CCO.SetGradient(wvec(FT(0))))
+    # aeK_bcs = (; bottom = CCO.SetValue(aeK[kc_surf]), top = CCO.SetValue(aeK[kc_toa]))
+    # prog_bcs = (; bottom = CCO.SetGradient(wvec(FT(0))), top = CCO.SetGradient(wvec(FT(0))))
+
+    # @show aeK[kc_toa]
+
+    aeK_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+    # prog_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+    prog_bcs = (; bottom = CCO.Extrapolate(), top = CCO.SetGradient(wvec(FT(0))))
+    
 
     If = CCO.InterpolateC2F(; aeK_bcs...)
     ∇f = CCO.GradientC2F(; prog_bcs...)
@@ -1017,10 +1130,36 @@ function compute_en_tendencies!(
         v_surf = physical_grid_mean_v(state)[kc_surf]
         U_surf_norm = sqrt(u_surf^2 + v_surf^2)
         ustar = surf.ustar
-        surface_tke_turb_flux = get_surface_tke_turb_flux(mix_len_params, ustar, ρ_f_surf, a_e_surf, U_surf_norm)
-        ∇c_turb = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(surface_tke_turb_flux)))
+        bflux_surf = surf.bflux
+        surface_tke_turb_flux = get_surface_tke_turb_flux(mix_len_params, ustar, ρ_f_surf, a_e_surf, U_surf_norm, bflux_surf)
+        # @show surface_tke_turb_flux
+        shear_surf = sqrt(Shear²[kc_surf])
+        # @show shear_surf
+        surf_tke_turb_flux_flux_div = surface_tke_turb_flux_div(mix_len_params, ustar, shear_surf, ρ_f_surf, a_e_surf, bflux_surf)
+
+        # @show surf_tke_turb_flux_flux_div
+
+        # surface_tke_turb_flux = 0.01
+        # @show surface_tke_turb_flux
+        surface_tke_turb_flux = 0.01
+
+
+        # ∇c_turb = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(surface_tke_turb_flux)))
+        # ∇c_turb = CCO.DivergenceF2C(; bottom = CCO.SetValue(CCG.Covariant3Vector(surface_tke_turb_flux)), top = CCO.SetValue(CCG.Covariant3Vector(FT(0))))
+        # ∇c_turb = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(surface_tke_turb_flux)), top = CCO.SetValue(wvec(FT(0))))
+
+        # local_geometry = CC.Fields.local_geometry_field(axes(ρ_c))
+        lg_surf = CC.Fields.local_geometry_field(axes(ρ_f))[kf_surf]
+        c3_unit = CCG.Covariant3Vector(unit_basis_vector_data(CCG.Covariant3Vector, lg_surf))
+
+        ∇c_turb = CCO.DivergenceF2C(; bottom = CCO.SetValue(surface_tke_turb_flux * c3_unit), 
+                                        top = CCO.SetValue(CCG.Covariant3Vector(FT(0))))
+
+
+    
     else
         ∇c_turb = CCO.DivergenceF2C()
+        # ∇c_turb = CCO.Divergence()
     end
 
     mixing_length = aux_tc.mixing_length
@@ -1049,10 +1188,108 @@ function compute_en_tendencies!(
     end
 
     RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
+    
+    # @. tend_covar =
+    #     press + buoy + shear + entr_gain + rain_src - D_env * covar -
+    #     (c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * prog_covar - ∇c(wvec(RB(prog_covar * Ic(w_en_f)))) +
+    #     ∇c_turb(ρ_f * If(aeK) * ∇f(covar))
+
+    @. term_4 = ∇c_turb(ρ_f * If(aeK) * ∇f(covar))
+    # term_4[kc_surf] = surf_tke_turb_flux_flux_div
+    # term_4[kc_surf] = - 0.001
+
     @. tend_covar =
         press + buoy + shear + entr_gain + rain_src - D_env * covar -
-        (c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * prog_covar - ∇c(wvec(RB(prog_covar * Ic(w_en_f)))) +
-        ∇c_turb(ρ_f * If(aeK) * ∇f(covar))
+        (c_d * sqrt(max(tke_en, 0)) / mixing_length) * prog_covar - ∇c(wvec(RB(prog_covar * Ic(w_en_f)))) +
+        term_4
+        # ∇c_turb(ρ_f * If(aeK) * ∇f(covar))
+        # term_4
+        # ∇c_turb(ρ_f * If(aeK) * ∇f(covar))        
+        # ∇c_turb(ρ_f * If(aeK) * ∇f(covar))
+        # term_4
+        # ∇c_turb(ρ_f * If(aeK) * ∇f(covar))
+        # ∇c_turb(ρ_c * aeK * covar)
+        # ∇c_turb(ρ_f * If(aeK) * ∇f(covar))
+
+    if is_tke
+
+        @. term_1 = tend_covar
+        @. term_2 = ∇c_turb(ρ_f * If(aeK) * ∇f(covar))
+        @. term_3 = rain_src
+        # @. term_4 = -1.0 * D_env * covar
+        @. term_5 = -1.0 * (c_d * sqrt(max(tke_en, 0)) / mixing_length)  * prog_covar
+        @. term_6 = - 1.0 * ∇c(wvec(RB(prog_covar * Ic(w_en_f)))) 
+        @. term_7 = ρ_c * aeK
+        # @. term_7 = ρ_c * aeK * ∇c(If(covar))
+
+
+        # @show term_2[kc_surf]
+        # @show term_2[kc_surf + 1]
+        # @show term_2[kc_surf + 2]
+
+
+        # @show term_7[kc_surf]
+        # @show term_7[kc_surf + 1]
+        # @show term_7[kc_surf + 2]
+
+        # @show term_2[kc_surf]
+        # @show term_2[kc_surf + 1]
+        # @show term_2[kc_surf + 2]
+        # @show term_2[kc_surf + 3]
+
+        # @show covar[kc_surf]
+        # @show covar[kc_surf + 1]
+        # @show covar[kc_surf + 2]
+
+        # @show aeK[kc_surf]
+        # @show aeK[kc_surf + 1]
+        # @show aeK[kc_surf + 2]
+
+
+
+
+        # @show press[kc_surf]
+        # @show press[kc_surf + 1] 
+        # @show press[kc_surf + 2] 
+
+        # @show buoy[kc_surf]
+        # @show buoy[kc_surf + 1]
+        # @show buoy[kc_surf + 2]
+
+        # @show shear[kc_surf]
+        # @show shear[kc_surf + 1]
+        # @show shear[kc_surf + 2]
+
+        # @show entr_gain[kc_surf]
+        # @show entr_gain[kc_surf + 1]
+        # @show entr_gain[kc_surf + 2]
+
+        # @show rain_src[kc_surf]
+        # @show rain_src[kc_surf + 1]
+        # @show rain_src[kc_surf + 2]
+
+        # @show prog_covar[kc_surf]
+        # @show prog_covar[kc_surf + 1]
+        # @show prog_covar[kc_surf + 2]
+
+
+        # @show D_env[kc_surf]
+        # @show D_env[kc_surf + 1]
+        # @show D_env[kc_surf + 2]
+
+        # @show tend_covar[kc_surf]
+        # @show tend_covar[kc_surf + 1]
+        # @show tend_covar[kc_surf + 2]
+
+        # @show covar[kc_surf]
+        # @show covar[kc_surf + 1]
+        # @show covar[kc_surf + 2]
+
+        # @show U_surf_norm
+
+        # @show surface_tke_turb_flux
+        
+    end
 
     return nothing
 end
