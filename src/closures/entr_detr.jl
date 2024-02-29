@@ -356,11 +356,15 @@ function εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nond
 
     # ε_dyn = ε_dim_scale * 1.0
     # δ_dyn = δ_dim_scale * 1.0
-
+    
     if εδ_params(εδ_model).limit_min_area
         ε_dyn += max(δ_dyn, ε_dyn) * min_limiter
     end
     δ_dyn += max(ε_dyn, δ_dyn) * area_limiter
+
+    # if εδ_vars.zc_i < 1400
+    #     δ_dyn = 0.0
+    # end
 
     return ε_dyn, δ_dyn
 end

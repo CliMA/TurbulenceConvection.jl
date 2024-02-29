@@ -363,7 +363,8 @@ function Bomex(namelist_defaults)
 
     namelist["forcing"]["coriolis"] = 0.376e-4
 
-    namelist["time_stepping"]["t_max"] = 21600.0
+    # namelist["time_stepping"]["t_max"] = 21600.0
+    namelist["time_stepping"]["t_max"] = 100000.0
     namelist["time_stepping"]["dt_min"] = 6.0
 
     namelist["meta"]["simname"] = "Bomex"

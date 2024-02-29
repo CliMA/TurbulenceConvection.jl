@@ -214,6 +214,8 @@ function quad_loop(en_thermo::SGSQuadrature, precip_model, rain_formation_model,
             outer_src[idx] += inner_src[idx] * weights[m_q] * sqpi_inv
         end
     end
+
+
     outer_src_nt = (;
         SH_qt = outer_src[i_SH_qt],
         Sqt_H = outer_src[i_Sqt_H],
@@ -314,7 +316,17 @@ function microphysics(
             tendencies_pr.q_sno[k] += qs_tendency * aux_en.area[k]
 
             # update cloudy/dry variables for buoyancy in TKE
-            aux_en.cloud_fraction[k] = outer_env.cf
+
+            # if outer_env.ql + outer_env.qi > 1e-8
+            if TD.has_condensate(outer_env.ql + outer_env.qi)
+                aux_en.cloud_fraction[k] = outer_env.cf
+                aux_en.q_liq[k] = outer_env.ql
+                aux_en.q_ice[k] = outer_env.qi
+            else
+                aux_en.cloud_fraction[k] = 0.0
+                aux_en.q_liq[k] = 0.0
+                aux_en.q_ice[k] = 0.0
+            end
 
             # if aux_en.cloud_fraction[k] < 0.95
             #     aux_en.cloud_fraction[k] = 0.0
@@ -373,7 +385,7 @@ function microphysics(
             aux_en.θ_liq_ice_tendency_precip_formation[k] = mph.θ_liq_ice_tendency * aux_en.area[k]
             tendencies_pr.q_rai[k] += mph.qr_tendency * aux_en.area[k]
             tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
-
+            # @show "outside!"
             # update_sat_unsat
             if TD.has_condensate(thermo_params, ts)
                 aux_en.cloud_fraction[k] = 1

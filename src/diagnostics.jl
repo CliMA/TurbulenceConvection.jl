@@ -52,6 +52,17 @@ function io_dictionary_aux()
         "env_Hvar" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).Hvar),
         "env_QTvar" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).QTvar),
         "env_HQTcov" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).HQTcov),
+        "qt_sat_env" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).sat.q_tot),
+        "theta_li_sat" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).sat.θ_liq_ice),
+        "theta_virt_unsat" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).unsat.θ_virt),
+
+        "dqt_dz" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂qt∂z),
+        "d_thetal_dz" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂θl∂z),
+        "d_thetav_dz" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂θv∂z),
+        "dqt_dz_sat" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂qt∂z_sat),
+        "d_thetal_dz_sat" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂θl∂z_sat),
+        "d_thetav_dz_unsat" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂θv∂z_unsat),
+        
 
         "tke_buoy" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.buoy),
         "tke_pressure" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.press),
