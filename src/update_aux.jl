@@ -143,8 +143,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.T[k] = TD.air_temperature(thermo_params, ts_en)
         aux_en.θ_virt[k] = TD.virtual_pottemp(thermo_params, ts_en)
         aux_en.θ_dry[k] = TD.dry_pottemp(thermo_params, ts_en)
-        aux_en.q_liq[k] = TD.liquid_specific_humidity(thermo_params, ts_en)
-        aux_en.q_ice[k] = TD.ice_specific_humidity(thermo_params, ts_en)
         rho = TD.air_density(thermo_params, ts_en)
         aux_en.buoy[k] = buoyancy_c(param_set, ρ_c[k], rho)
         aux_en.RH[k] = TD.relative_humidity(thermo_params, ts_en)
@@ -336,20 +334,11 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @. ∂θv∂z = ∇c(wvec(If0(θ_virt_en)))
 
     # Second order approximation: Use dry and cloudy environmental fields.
-    cf = aux_en.cloud_fraction
-    shm = copy(cf)
-    pshm = parent(shm)
-    shrink_mask!(pshm, vec(cf))
     mix_len_params = mixing_length_params(edmf)
 
-    # Since NaN*0 ≠ 0, we need to conditionally replace
-    # our gradients by their default values.
     @. ∂qt∂z_sat = ∇c(wvec(If0(aux_en_sat.q_tot)))
     @. ∂θl∂z_sat = ∇c(wvec(If0(aux_en_sat.θ_liq_ice)))
     @. ∂θv∂z_unsat = ∇c(wvec(If0(aux_en_unsat.θ_virt)))
-    @. ∂qt∂z_sat = ifelse(shm == 0, ∂qt∂z, ∂qt∂z_sat)
-    @. ∂θl∂z_sat = ifelse(shm == 0, ∂θl∂z, ∂θl∂z_sat)
-    @. ∂θv∂z_unsat = ifelse(shm == 0, ∂θv∂z, ∂θv∂z_unsat)
 
     @inbounds for k in real_center_indices(grid)
 
