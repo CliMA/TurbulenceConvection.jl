@@ -376,10 +376,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @. ∂θv∂z = ∇c(wvec(If0(θ_virt_en)))
 
     # Second order approximation: Use dry and cloudy environmental fields.
-    cf = aux_en.cloud_fraction
-    shm = copy(cf)
-    pshm = parent(shm)
-    shrink_mask!(pshm, vec(cf))
+    # cf = aux_en.cloud_fraction
+    # shm = copy(cf)
+    # pshm = parent(shm)
+    # shrink_mask!(pshm, vec(cf))
     mix_len_params = mixing_length_params(edmf)
 
     # Since NaN*0 ≠ 0, we need to conditionally replace
@@ -387,11 +387,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @. ∂qt∂z_sat = ∇c(wvec(If0(aux_en_sat.q_tot)))
     @. ∂θl∂z_sat = ∇c(wvec(If0(aux_en_sat.θ_liq_ice)))
     @. ∂θv∂z_unsat = ∇c(wvec(If0(aux_en_unsat.θ_virt)))
-
-    # @. ∂qt∂z_sat = ifelse(shm == 0, ∂qt∂z, ∂qt∂z_sat)
-    # @. ∂θl∂z_sat = ifelse(shm == 0, ∂θl∂z, ∂θl∂z_sat)
-    # @. ∂θv∂z_unsat = ifelse(shm == 0, ∂θv∂z, ∂θv∂z_unsat)
-
 
     # @. ∂qt∂z_sat = ifelse(shm == 0, ∂qt∂z, ∂qt∂z_sat)
     # @. ∂θl∂z_sat = ifelse(shm == 0, ∂θl∂z, ∂θl∂z_sat)
@@ -482,6 +477,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         # end
 
 
+        # zc = grid.zc[k].z
+        # if zc >= 200 && aux_en.area[k] < 1.0
+        #     aux_en_2m.tke.buoy[k] = 2e-4
+        # end
+
+
         aux_en_2m.tke.buoy[kc_surf] = aux_en.area[kc_surf] * ρ_c[kc_surf] * surf.bflux
 
         # @show aux_en_2m.tke.buoy[kc_surf]
@@ -507,7 +508,15 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         w_up = aux_up_f[i].w
         nh_press = aux_up_f[i].nh_pressure
         @. tke_press += (Ic(w_en) - Ic(w_up)) * Ic(nh_press)
+        # @. tke_press += 0.0
     end
+
+    # @inbounds for k in real_center_indices(grid)
+    #     zc = grid.zc[k].z
+    #     if zc >= 400
+    #         tke_press[k] = 0.0
+    #     end
+    # end
 
     compute_covariance_entr(edmf, grid, state, Val(:tke), Val(:w), Val(:w))
     compute_covariance_entr(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))

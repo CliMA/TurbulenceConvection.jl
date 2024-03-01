@@ -31,7 +31,7 @@ function buoyancy_gradients(
     # if false
     # if true
 
-    if bg_model.has_condensate
+    if bg_model.en_cld_frac > 0.0
         ts_sat = thermo_state_pθq(param_set, bg_model.p, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
         phase_part = TD.PhasePartition(thermo_params, ts_sat)
         lh = TD.latent_heat_liq_ice(thermo_params, phase_part)
@@ -73,7 +73,7 @@ function buoyancy_gradient_chain_rule(
     # if false
     # if true
 
-    if bg_model.has_condensate
+    if bg_model.en_cld_frac > FT(0)
         ∂b∂z_θl_sat = ∂b∂θl_sat * bg_model.∂θl∂z_sat
         ∂b∂z_qt_sat = ∂b∂qt_sat * bg_model.∂qt∂z_sat
     else

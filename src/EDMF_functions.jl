@@ -298,7 +298,7 @@ function set_edmf_surface_bc(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     oblength = surf.obukhov_length
     ρLL = prog_gm.ρ[kc_surf]
     mix_len_params = mixing_length_params(edmf)
-    # prog_en.ρatke[kc_surf] = ρa_env_surf * 0.6
+    prog_en.ρatke[kc_surf] = ρa_env_surf * 1.0
     if edmf.thermo_covariance_model isa PrognosticThermoCovariances
         prog_en.ρaHvar[kc_surf] = ρa_env_surf * get_surface_variance(flux1 / ρLL, flux1 / ρLL, ustar, zLL, oblength)
         prog_en.ρaQTvar[kc_surf] = ρa_env_surf * get_surface_variance(flux2 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
@@ -1032,6 +1032,8 @@ function compute_covariance_dissipation(
     mixing_length = aux_tc.mixing_length
 
     @. dissipation = ρ_c * area_en * covar * max(tke_en, 0)^FT(0.5) / max(mixing_length, FT(1.0e-3)) * c_d
+    # @. dissipation = ρ_c * area_en * covar * max(tke_en, 0)^FT(0.5) / max(mixing_length, FT(1.0e-3)) * c_d
+    # (c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1))
     # @. dissipation = ρ_c * area_en * covar * max(tke_en, 0)^FT(0.5) / mixing_length * c_d
     return nothing
 end
@@ -1141,6 +1143,7 @@ function compute_en_tendencies!(
 
         # surface_tke_turb_flux = 0.01
         # @show surface_tke_turb_flux
+        # surface_tke_turb_flux = 0.01
         surface_tke_turb_flux = 0.01
 
 
@@ -1200,7 +1203,7 @@ function compute_en_tendencies!(
 
     @. tend_covar =
         press + buoy + shear + entr_gain + rain_src - D_env * covar -
-        (c_d * sqrt(max(tke_en, 0)) / mixing_length) * prog_covar - ∇c(wvec(RB(prog_covar * Ic(w_en_f)))) +
+        (c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * prog_covar - ∇c(wvec(RB(prog_covar * Ic(w_en_f)))) +
         term_4
         # ∇c_turb(ρ_f * If(aeK) * ∇f(covar))
         # term_4
@@ -1217,7 +1220,7 @@ function compute_en_tendencies!(
         @. term_2 = ∇c_turb(ρ_f * If(aeK) * ∇f(covar))
         @. term_3 = rain_src
         # @. term_4 = -1.0 * D_env * covar
-        @. term_5 = -1.0 * (c_d * sqrt(max(tke_en, 0)) / mixing_length)  * prog_covar
+        @. term_5 = -1.0 * (c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * prog_covar
         @. term_6 = - 1.0 * ∇c(wvec(RB(prog_covar * Ic(w_en_f)))) 
         @. term_7 = ρ_c * aeK
         # @. term_7 = ρ_c * aeK * ∇c(If(covar))
@@ -1354,6 +1357,7 @@ function update_diagnostic_covariances!(
     @. covar =
         (shear + entr_gain + rain_src) /
         max(D_env + ρ_c * area_en * c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1), covar_lim)
+        # max(D_env + ρ_c * area_en * c_d * sqrt(max(tke_en, 0)) / mixing_length, covar_lim)
     return nothing
 end
 
