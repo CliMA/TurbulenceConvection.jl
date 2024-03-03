@@ -58,6 +58,14 @@ function get_surface_tke(mixing_length_params, ustar::FT, zLL::FT, oblength::FT)
         return κ_star² * ustar * ustar
     end
 end
+
+function get_surface_tke_turb_flux(mixing_length_params, ustar::FT, ρ_f_surf::FT, a_e_surf::FT, U_surf_norm::FT) where {FT}
+    κ_star² = mixing_length_params.κ_star²
+    c_d = mixing_length_params.c_d
+    c_m = mixing_length_params.c_m
+    return ρ_f_surf*a_e_surf*(1 - c_d*c_m*κ_star²^2) * ustar^2 * U_surf_norm
+end
+
 function get_surface_variance(flux1::FT, flux2::FT, ustar::FT, zLL::FT, oblength::FT) where {FT}
     c_star1 = -flux1 / ustar
     c_star2 = -flux2 / ustar
