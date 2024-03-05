@@ -131,7 +131,6 @@ include("diagnostics.jl")
 include("Fields.jl")
 include("types.jl")
 include("name_aliases.jl")
-include("Operators.jl")
 
 include("microphysics_coupling.jl")
 include("turbulence_functions.jl")
