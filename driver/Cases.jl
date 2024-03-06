@@ -1226,7 +1226,7 @@ function surface_params(case::LES_driven_SCM, surf_ref_state, param_set; Ri_bulk
     end
     UnPack.@unpack zrough, Tsurface, qsurface, lhf, shf = nt
 
-    ustar = FT(0) # TODO: why is initialization missing?
+    ustar = FT(0.28)
     kwargs = (; zrough, Tsurface, qsurface, shf, lhf, ustar, Ri_bulk_crit)
     return TC.FixedSurfaceFlux(FT, TC.VariableFrictionVelocity; kwargs...)
 end
