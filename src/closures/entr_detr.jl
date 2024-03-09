@@ -322,7 +322,7 @@ function entrainment_dim_scale(
     ::MassFluxGradDimScale,
 ) where {FT}
     if ∂M∂z < 0
-        return abs(∂M∂z) * 1e2
+        return abs(∂M∂z)
     else
         return 0.0
     end
