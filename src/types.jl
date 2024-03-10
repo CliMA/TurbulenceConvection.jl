@@ -57,6 +57,9 @@ Base.@kwdef struct εδModelParams{FT, AFT}
     c_γ::FT # scaling factor for turbulent entrainment rate
     c_δ::FT # factor multiplier for moist term in entrainment/detrainment
     Π_norm::AFT
+    entr_nondim_norm_factor::FT
+    detr_nondim_norm_factor::FT
+
 end
 
 abstract type AbstractEntrDetrModel end
@@ -640,6 +643,8 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     c_δ = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "detrainment_factor")
     Π_norm = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "pi_norm_consts")
     Π_norm = SA.SVector{length(Π_norm), FT}(Π_norm)
+    entr_nondim_norm_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_nondim_norm_factor", default = 1.0)
+    detr_nondim_norm_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "detr_nondim_norm_factor", default = 1.0)
 
     εδ_params = εδModelParams{FT, typeof(Π_norm)}(;
         w_min,
@@ -656,6 +661,8 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         c_γ,
         c_δ,
         Π_norm,
+        entr_nondim_norm_factor,
+        detr_nondim_norm_factor,
     )
 
     entr_pi_subset = Tuple(parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "entr_pi_subset"))

@@ -174,6 +174,7 @@ function entrainment_dim_scale(
 ) where {FT}
     Δb = b_up - b_en
     Δw = get_Δw(εδ_model, w_up, w_en)
+
     if Δb > 0
         return abs(Δb / (Δw + eps(FT)))
     else
@@ -371,9 +372,13 @@ function εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nond
     ε_dim_scale = min(ε_dim_scale, 1.0)
     δ_dim_scale = min(δ_dim_scale, 1.0)
 
-    # fractional dynamical entrainment / detrainment [1 / m]
-    ε_dyn = ε_dim_scale * ε_nondim
-    δ_dyn = δ_dim_scale * δ_nondim
+
+
+    entr_nondim_norm_factor = εδ_params(εδ_model).entr_nondim_norm_factor
+    detr_nondim_norm_factor = εδ_params(εδ_model).detr_nondim_norm_factor
+
+    ε_dyn = ε_dim_scale * (entr_nondim_norm_factor * ε_nondim)
+    δ_dyn = δ_dim_scale * (detr_nondim_norm_factor * δ_nondim)
 
     if εδ_params(εδ_model).limit_min_area
         ε_dyn += max(δ_dyn, ε_dyn) * min_limiter
@@ -681,6 +686,9 @@ function compute_ml_entr_detr!(
                 # update fractional and turbulent entr/detr
                 # fractional, turbulent & nondimensional entrainment
                 ε_ml_nondim, δ_ml_nondim = non_dimensional_function(εδ_closure, εδ_model_vars)
+
+                # ε_ml_nondim = max(Π[2] * 1.0 , 0)
+
                 ε_dyn, δ_dyn = εδ_dyn(
                     εδ_closure,
                     εδ_model_vars,
