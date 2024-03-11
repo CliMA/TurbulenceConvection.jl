@@ -78,7 +78,6 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         q_tot_up = aux_up_i.q_tot
         θ_liq_ice_up = aux_up_i.θ_liq_ice
         @. aux_up_f[i].massflux = ρ_f * ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm))
-        # @. massflux_c += Ic(aux_up_f[i].massflux)
         @. massflux_h += ρ_f * (ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm)) * (If(θ_liq_ice_up) - If(θ_liq_ice_gm)))
         @. massflux_qt += ρ_f * (ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm)) * (If(q_tot_up) - If(q_tot_gm)))
     end
@@ -906,16 +905,7 @@ function compute_covariance_entr(
         elseif edmf.entrainment_type isa TotalRateEntrModel
             @. entr_gain +=
                 Int(a_up > min_area) *
-                (tke_factor * ρ_c * a_up * detr_rate_inv_s * (Idc(ϕ_up) - Idc(ϕ_en)) * (Idc(ψ_up) - Idc(ψ_en))) + (
-                    tke_factor *
-                    ρ_c *
-                    a_up *
-                    entr_rate_inv_s *
-                    (
-                        (Idc(ϕ_en) - Idc(to_scalar(ϕ_gm))) * (Idc(ψ_up) - Idc(ψ_en)) +
-                        (Idc(ψ_en) - Idc(to_scalar(ψ_gm))) * (Idc(ϕ_up) - Idc(ϕ_en))
-                    )
-                )
+                (tke_factor * ρ_c * a_up * detr_rate_inv_s * (Idc(ϕ_up) - Idc(ϕ_en)) * (Idc(ψ_up) - Idc(ψ_en)))
 
             @. detr_loss += Int(a_up > min_area) * tke_factor * ρ_c * a_up * entr_rate_inv_s * covar
 
