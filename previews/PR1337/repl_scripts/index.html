@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>REPL scripts · TurbulenceConvection.jl</title><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">TurbulenceConvection.jl</a></span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../Overview/">Overview</a></li><li><a class="tocitem" href="../Formulation/">Formulation</a></li><li><a class="tocitem" href="../ReferenceStates/">Reference states</a></li><li><a class="tocitem" href="../API/">API</a></li><li><a class="tocitem" href="../dev/">Developer docs</a></li><li><a class="tocitem" href="../cl_args/">Command line arguments</a></li><li class="is-active"><a class="tocitem" href>REPL scripts</a></li><li><a class="tocitem" href="../References/">References</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>REPL scripts</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>REPL scripts</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/CliMA/TurbulenceConvection.jl/blob/main/docs/src/repl_scripts.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Julia-scripts-per-Buildkite-job"><a class="docs-heading-anchor" href="#Julia-scripts-per-Buildkite-job">Julia scripts per Buildkite job</a><a id="Julia-scripts-per-Buildkite-job-1"></a><a class="docs-heading-anchor-permalink" href="#Julia-scripts-per-Buildkite-job" title="Permalink"></a></h1><pre><code class="language-julia hljs">include(&quot;repl_scripts.jl&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;Bomex&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case life_cycle_Tan2018&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;life_cycle_Tan2018&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Soares&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;Soares&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Rico&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;Rico&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Nieuwstadt&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;Nieuwstadt&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;TRMM_LBA&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case ARM_SGP&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;ARM_SGP&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `      #  command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case GATE_III --t_max 86400.0&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;t_max&quot;] = 86400.0;
+parsed_args[&quot;case&quot;] = &quot;GATE_III&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case DYCOMS_RF01&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;DYCOMS_RF01&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case DYCOMS_RF02&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;DYCOMS_RF02&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case GABLS&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;GABLS&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case DryBubble&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;DryBubble&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case LES_driven_SCM&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;LES_driven_SCM&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --sgs quadrature --quad_type gaussian --skip_tests true --suffix _gaussian&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;Bomex&quot;;
+parsed_args[&quot;sgs&quot;] = &quot;quadrature&quot;;
+parsed_args[&quot;quad_type&quot;] = &quot;gaussian&quot;;
+parsed_args[&quot;suffix&quot;] = &quot;_gaussian&quot;;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case LES_driven_SCM --stretch_grid true --skip_tests true --suffix _stretch_grid_true&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;LES_driven_SCM&quot;;
+parsed_args[&quot;stretch_grid&quot;] = true;
+parsed_args[&quot;suffix&quot;] = &quot;_stretch_grid_true&quot;;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr None --ml_entr NN_nonlocal --entr_dim_scale inv_z --detr_dim_scale inv_z --dt_max 2.0 --nn_ent_biases true --skip_tests true --suffix _NN_nonlocal&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;nn_ent_biases&quot;] = true;
+parsed_args[&quot;entr_dim_scale&quot;] = &quot;inv_z&quot;;
+parsed_args[&quot;ml_entr&quot;] = &quot;NN_nonlocal&quot;;
+parsed_args[&quot;case&quot;] = &quot;Bomex&quot;;
+parsed_args[&quot;entr&quot;] = &quot;None&quot;;
+parsed_args[&quot;detr_dim_scale&quot;] = &quot;inv_z&quot;;
+parsed_args[&quot;dt_max&quot;] = 2.0;
+parsed_args[&quot;suffix&quot;] = &quot;_NN_nonlocal&quot;;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr None --ml_entr NN --entr_dim_scale inv_z --detr_dim_scale inv_z --dt_max 2.0 --nn_ent_biases true --skip_tests true --suffix _NN&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;nn_ent_biases&quot;] = true;
+parsed_args[&quot;entr_dim_scale&quot;] = &quot;inv_z&quot;;
+parsed_args[&quot;ml_entr&quot;] = &quot;NN&quot;;
+parsed_args[&quot;case&quot;] = &quot;Bomex&quot;;
+parsed_args[&quot;entr&quot;] = &quot;None&quot;;
+parsed_args[&quot;detr_dim_scale&quot;] = &quot;inv_z&quot;;
+parsed_args[&quot;dt_max&quot;] = 2.0;
+parsed_args[&quot;suffix&quot;] = &quot;_NN&quot;;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr None --ml_entr FNO --skip_tests true --broken_tests true --suffix _FNO&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;broken_tests&quot;] = true;
+parsed_args[&quot;ml_entr&quot;] = &quot;FNO&quot;;
+parsed_args[&quot;case&quot;] = &quot;Bomex&quot;;
+parsed_args[&quot;entr&quot;] = &quot;None&quot;;
+parsed_args[&quot;suffix&quot;] = &quot;_FNO&quot;;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --entr None --ml_entr RF --skip_tests true --broken_tests true --suffix _RF&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;broken_tests&quot;] = true;
+parsed_args[&quot;ml_entr&quot;] = &quot;RF&quot;;
+parsed_args[&quot;case&quot;] = &quot;Bomex&quot;;
+parsed_args[&quot;entr&quot;] = &quot;None&quot;;
+parsed_args[&quot;suffix&quot;] = &quot;_RF&quot;;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --stoch_entr noisy_relaxation_process --skip_tests true --suffix _noisy_relaxation_process&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;skip_tests&quot;] = true;
+parsed_args[&quot;case&quot;] = &quot;Bomex&quot;;
+parsed_args[&quot;suffix&quot;] = &quot;_noisy_relaxation_process&quot;;
+parsed_args[&quot;stoch_entr&quot;] = &quot;noisy_relaxation_process&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --stoch_entr prognostic_noisy_relaxation_process --skip_tests true --suffix _prognostic_noisy_relaxation_process&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;skip_tests&quot;] = true;
+parsed_args[&quot;case&quot;] = &quot;Bomex&quot;;
+parsed_args[&quot;suffix&quot;] = &quot;_prognostic_noisy_relaxation_process&quot;;
+parsed_args[&quot;stoch_entr&quot;] = &quot;prognostic_noisy_relaxation_process&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --n_up 2 --dt_max 8.0 --suffix _n_up_2 --skip_tests true&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;Bomex&quot;;
+parsed_args[&quot;dt_max&quot;] = 8.0;
+parsed_args[&quot;suffix&quot;] = &quot;_n_up_2&quot;;
+parsed_args[&quot;n_up&quot;] = 2;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA --sgs mean --adapt_dt false --dt 1.0 --moisture_model nonequilibrium --skip_tests true --suffix _nonequilibrium_moisture&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;moisture_model&quot;] = &quot;nonequilibrium&quot;;
+parsed_args[&quot;case&quot;] = &quot;TRMM_LBA&quot;;
+parsed_args[&quot;adapt_dt&quot;] = false;
+parsed_args[&quot;sgs&quot;] = &quot;mean&quot;;
+parsed_args[&quot;suffix&quot;] = &quot;_nonequilibrium_moisture&quot;;
+parsed_args[&quot;dt&quot;] = 1.0;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA --sgs mean --adapt_dt false --dt 1.0 --precipitation_model cutoff --skip_tests true --suffix _0moment_precipitation&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;precipitation_model&quot;] = &quot;cutoff&quot;;
+parsed_args[&quot;case&quot;] = &quot;TRMM_LBA&quot;;
+parsed_args[&quot;adapt_dt&quot;] = false;
+parsed_args[&quot;sgs&quot;] = &quot;mean&quot;;
+parsed_args[&quot;suffix&quot;] = &quot;_0moment_precipitation&quot;;
+parsed_args[&quot;dt&quot;] = 1.0;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA --sgs mean --adapt_dt false --dt 1.0 --precipitation_model clima_1m --precip_fraction_model prescribed --prescribed_precip_frac_value 0.42 --skip_tests true --suffix _prescribed_precipitation_fraction&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;prescribed_precip_frac_value&quot;] = 0.42;
+parsed_args[&quot;precip_fraction_model&quot;] = &quot;prescribed&quot;;
+parsed_args[&quot;precipitation_model&quot;] = &quot;clima_1m&quot;;
+parsed_args[&quot;case&quot;] = &quot;TRMM_LBA&quot;;
+parsed_args[&quot;adapt_dt&quot;] = false;
+parsed_args[&quot;sgs&quot;] = &quot;mean&quot;;
+parsed_args[&quot;suffix&quot;] = &quot;_prescribed_precipitation_fraction&quot;;
+parsed_args[&quot;dt&quot;] = 1.0;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA --sgs mean --adapt_dt false --dt 1.0 --precipitation_model clima_1m --precip_fraction_model cloud_cover --precip_fraction_limiter 0.42 --skip_tests true --suffix _diagnostic_precipitation_fraction&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;precip_fraction_model&quot;] = &quot;cloud_cover&quot;;
+parsed_args[&quot;precipitation_model&quot;] = &quot;clima_1m&quot;;
+parsed_args[&quot;case&quot;] = &quot;TRMM_LBA&quot;;
+parsed_args[&quot;adapt_dt&quot;] = false;
+parsed_args[&quot;sgs&quot;] = &quot;mean&quot;;
+parsed_args[&quot;precip_fraction_limiter&quot;] = 0.42;
+parsed_args[&quot;dt&quot;] = 1.0;
+parsed_args[&quot;suffix&quot;] = &quot;_diagnostic_precipitation_fraction&quot;;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case TRMM_LBA --precipitation_model clima_1m --acnv_scaling 0.44 --accr_scaling 0.44 --evap_scaling 0.44 --depsub_scaling 0.44 --melt_scaling 0.42 --skip_tests true --suffix _microph_scaling&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;melt_scaling&quot;] = 0.42;
+parsed_args[&quot;precipitation_model&quot;] = &quot;clima_1m&quot;;
+parsed_args[&quot;acnv_scaling&quot;] = 0.44;
+parsed_args[&quot;case&quot;] = &quot;TRMM_LBA&quot;;
+parsed_args[&quot;depsub_scaling&quot;] = 0.44;
+parsed_args[&quot;suffix&quot;] = &quot;_microph_scaling&quot;;
+parsed_args[&quot;accr_scaling&quot;] = 0.44;
+parsed_args[&quot;evap_scaling&quot;] = 0.44;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --calibrate_io true --skip_post_proc true --suffix _calibrate_io_true&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;calibrate_io&quot;] = true;
+parsed_args[&quot;skip_post_proc&quot;] = true;
+parsed_args[&quot;case&quot;] = &quot;Bomex&quot;;
+parsed_args[&quot;suffix&quot;] = &quot;_calibrate_io_true&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --skip_io true --skip_post_proc true --suffix _skip_io_true&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;skip_io&quot;] = true;
+parsed_args[&quot;skip_post_proc&quot;] = true;
+parsed_args[&quot;case&quot;] = &quot;Bomex&quot;;
+parsed_args[&quot;suffix&quot;] = &quot;_skip_io_true&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Rico --thermo_covariance_model prognostic --skip_tests true --suffix _prognostic_covarinaces&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;Rico&quot;;
+parsed_args[&quot;suffix&quot;] = &quot;_prognostic_covarinaces&quot;;
+parsed_args[&quot;thermo_covariance_model&quot;] = &quot;prognostic&quot;;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Rico --skip_tests true --precipitation_model clima_1m --rain_formation_scheme KK2000 --prescribed_Nd 2e8 --suffix _two_moment_micro_KK2000&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;prescribed_Nd&quot;] = 2.0e8;
+parsed_args[&quot;precipitation_model&quot;] = &quot;clima_1m&quot;;
+parsed_args[&quot;case&quot;] = &quot;Rico&quot;;
+parsed_args[&quot;rain_formation_scheme&quot;] = &quot;KK2000&quot;;
+parsed_args[&quot;suffix&quot;] = &quot;_two_moment_micro_KK2000&quot;;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --config sphere --set_src_seed true --skip_tests true --suffix _sphere&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;Bomex&quot;;
+parsed_args[&quot;config&quot;] = &quot;sphere&quot;;
+parsed_args[&quot;set_src_seed&quot;] = true;
+parsed_args[&quot;suffix&quot;] = &quot;_sphere&quot;;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --test_duals true --suffix _duals&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;Bomex&quot;;
+parsed_args[&quot;test_duals&quot;] = true;
+parsed_args[&quot;suffix&quot;] = &quot;_duals&quot;;
+
+include(&quot;integration_tests/driver.jl&quot;)
+
+
+### Buildkite `        command: &quot;julia --color=yes --project=integration_tests integration_tests/driver.jl --case Bomex --float_type Float32 --skip_tests true --suffix _float32&quot;`
+
+using Revise; include(&quot;integration_tests/cli_options.jl&quot;);
+
+(s, parsed_args) = parse_commandline();
+parsed_args[&quot;case&quot;] = &quot;Bomex&quot;;
+parsed_args[&quot;suffix&quot;] = &quot;_float32&quot;;
+parsed_args[&quot;float_type&quot;] = &quot;Float32&quot;;
+parsed_args[&quot;skip_tests&quot;] = true;
+
+include(&quot;integration_tests/driver.jl&quot;)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../cl_args/">« Command line arguments</a><a class="docs-footer-nextpage" href="../References/">References »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Thursday 4 May 2023 18:38">Thursday 4 May 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
