@@ -1,20 +1,17 @@
 env:
-  JULIA_VERSION: "1.10.0"
-  OPENMPI_VERSION: "4.1.5"
-  CUDA_VERSION: "11.2"
   CLIMACOMMS_DEVICE: "CPU"
-  JULIA_CPU_TARGET: 'broadwell;skylake'
   OPENBLAS_NUM_THREADS: 1
   CLIMATEMACHINE_SETTINGS_FIX_RNG_SEED: "true"
   BUILDKITE_COMMIT: "${BUILDKITE_COMMIT}"
   BUILDKITE_BRANCH: "${BUILDKITE_BRANCH}"
-  JULIA_DEPOT_PATH: "${BUILDKITE_BUILD_PATH}/${BUILDKITE_PIPELINE_SLUG}/depot/cpu"
+  JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
+  JULIA_DEPOT_PATH: "${BUILDKITE_BUILD_PATH}/${BUILDKITE_PIPELINE_SLUG}/depot/default"
 
 agents:
-  config: cpu
-  queue: central
+  queue: new-central
   slurm_ntasks: 1
   slurm_mem: 10GB
+  modules: climacommon/2024_04_05
 
 steps:
 
@@ -24,15 +21,12 @@ steps:
   #     - "rm -rf /central/scratch/esm/slurm-buildkite/turbulenceconvection-ci/depot/cpu"
   #   agents:
   #     config: init
-  #     queue: central
+  #     queue: new-central
 
   - label: "init environment :computer:"
     key: "init_cpu_env"
     command:
       - "echo $$JULIA_DEPOT_PATH"
-
-      - echo "--- Configure MPI"
-      - julia -e 'using Pkg; Pkg.add("MPIPreferences"); using MPIPreferences; use_system_binary()'
 
       - echo "--- Instantiate integration_tests"
       - "julia --project=integration_tests -e 'using Pkg; Pkg.instantiate(;verbose=true)'"
