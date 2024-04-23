@@ -266,6 +266,57 @@ Base.@kwdef struct MinDisspLen{FT}
     b_exch::FT
 end
 
+"""
+    MinDisspLen
+
+Data-driven mixing length model
+
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct MLMixLen{FT}
+    "height"
+    z::FT
+    "obukhov length"
+    obukhov_length::FT
+    "surface TKE values"
+    tke_surf::FT
+    "u star - surface velocity scale"
+    ustar::FT
+    "turbulent Prandtl number"
+    Pr::FT
+    "reference pressure"
+    p::FT
+    "vertical buoyancy gradient struct"
+    ∇b::GradBuoy{FT}
+    "env shear"
+    Shear²::FT
+    "environment turbulent kinetic energy"
+    tke::FT
+    "Updraft tke source"
+    b_exch::FT
+    "Reference height"
+    ref_H::FT
+end
+
+abstract type MixingLengthModel end
+struct MinDisspMixingLength <: MixingLengthModel end
+
+Base.@kwdef struct MLMixingLength{P} <: MixingLengthModel
+    params::P
+    biases_bool::Bool
+end
+
+Base.@kwdef struct AddMLMixingLength{P, T} <: MixingLengthModel
+    params::P
+    ml_type::T
+    biases_bool::Bool
+end
+
+abstract type AddMLMixingLengthMLModel end
+struct LinearAddMLMixingLengthMLModel <: AddMLMixingLengthMLModel end
+struct NNAddMLMixingLengthMLModel <: AddMLMixingLengthMLModel end
+
+
 abstract type SurfaceAreaBC end
 struct FixedSurfaceAreaBC <: SurfaceAreaBC end
 struct PrognosticSurfaceAreaBC <: SurfaceAreaBC end
@@ -457,7 +508,7 @@ Base.@kwdef struct SurfaceBase{FT}
     wstar::FT = 0
 end
 
-struct EDMFModel{N_up, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}
+struct EDMFModel{N_up, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, MLC, PMP, EC, MLEC, ET, EDS, DDS, EPG}
     surface_area::FT
     surface_area_bc::SABC
     max_area::FT
@@ -470,6 +521,7 @@ struct EDMFModel{N_up, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC,
     en_thermo::ENT
     bg_closure::EBGC
     mixing_length_params::MLP
+    mixing_length_closure::MLC
     pressure_model_params::PMP
     entr_closure::EC
     ml_entr_closure::MLEC
@@ -784,6 +836,32 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         l_max = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "l_max"; default = 1.0e6),
     )
 
+
+    mixing_length_closure_name =
+        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "mixing_length_closure", default = "min_dissp_len")
+    ml_mixing_length_params =
+        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "ml_mixing_length_params", default = nothing)
+    ml_mixing_length_biases_bool =
+        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "ml_mixing_length_biases_bool", default = false)
+    add_ml_dissp_len_type_name =
+        parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "add_ml_dissp_len_type", default = "linear")
+
+    add_ml_dissp_len_type = if add_ml_dissp_len_type_name == "linear"
+        LinearAddMLMixingLengthMLModel()
+    elseif add_ml_dissp_len_type_name == "NN"
+        NNAddMLMixingLengthMLModel()
+    end
+
+    mixing_length_closure = if mixing_length_closure_name == "min_dissp_len"
+        MinDisspMixingLength()
+    elseif mixing_length_closure_name == "ml_dissp_len"
+        MLMixingLength(; params = ml_mixing_length_params, biases_bool = ml_mixing_length_biases_bool)
+    elseif mixing_length_closure_name == "add_ml_dissp_len"
+        AddMLMixingLength(; params = ml_mixing_length_params, ml_type = add_ml_dissp_len_type, biases_bool = ml_mixing_length_biases_bool)
+    else
+        error("Something went wrong. Invalid mixing length type '$mixing_length_closure'")
+    end
+
     entr_dim_scale = if entr_dim_scale == "buoy_vel"
         BuoyVelEntrDimScale()
     elseif entr_dim_scale == "inv_scale_height"
@@ -883,6 +961,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     DDS = typeof(detr_dim_scale)
     EC = typeof(entr_closure)
     MLEC = typeof(ml_entr_closure)
+    MLC = typeof(mixing_length_closure)
     MM = typeof(moisture_model)
     TCM = typeof(thermo_covariance_model)
     PM = typeof(precip_model)
@@ -893,7 +972,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     EPG = typeof(entr_pi_subset)
     MLP = typeof(mixing_length_params)
     PMP = typeof(pressure_model_params)
-    return EDMFModel{n_updrafts, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}(
+    return EDMFModel{n_updrafts, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, MLC, PMP, EC, MLEC, ET, EDS, DDS, EPG}(
         surface_area,
         surface_area_bc,
         max_area,
@@ -906,6 +985,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
         en_thermo,
         bg_closure,
         mixing_length_params,
+        mixing_length_closure,
         pressure_model_params,
         entr_closure,
         ml_entr_closure,

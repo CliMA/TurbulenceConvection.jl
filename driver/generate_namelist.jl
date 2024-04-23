@@ -94,6 +94,13 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["min_area"] = 1e-5
 
     # mixing_length
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["mixing_length_closure"] = "add_ml_dissp_len" #{"min_dissp_len", "ml_dissp_len", "add_ml_dissp_len"}
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["add_ml_dissp_len_type"] = "linear" #{"linear", "NN"}
+    # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["ml_mixing_length_params"] = randn(161)#randn(171)
+    # namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["ml_mixing_length_params"] = randn(7)
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["ml_mixing_length_params"] = [1.0, 1.0, 1.0, 0.1, 1.0, 1.0, 1.0]
+    namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["ml_mixing_length_biases_bool"] = true
+
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.14
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.22
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["static_stab_coeff"] = 0.4

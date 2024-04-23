@@ -14,6 +14,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     KH = center_aux_turbconv(state).KH
     KQ = center_aux_turbconv(state).KQ
     obukhov_length = surf.obukhov_length
+    g = TCP.grav(param_set)
     FT = float_type(state)
     prog_gm = center_prog_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
@@ -341,6 +342,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     end
 
     Shear² = center_aux_turbconv(state).Shear²
+    ∂b∂z = center_aux_turbconv(state).∂b∂z
     ∂qt∂z = center_aux_turbconv(state).∂qt∂z
     ∂θl∂z = center_aux_turbconv(state).∂θl∂z
     ∂θv∂z = center_aux_turbconv(state).∂θv∂z
@@ -428,27 +430,93 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         ∇_Ri = gradient_Richardson_number(mix_len_params, bg.∂b∂z, Shear²[k], FT(eps(FT)))
         aux_tc.prandtl_nvec[k] = turbulent_Prandtl_number(mix_len_params, obukhov_length, ∇_Ri)
 
-        ml_model = MinDisspLen{FT}(;
-            z = FT(grid.zc[k].z),
-            obukhov_length = obukhov_length,
-            tke_surf = aux_en.tke[kc_surf],
-            ustar = surf.ustar,
-            Pr = aux_tc.prandtl_nvec[k],
-            p = p_c[k],
-            ∇b = bg,
-            Shear² = Shear²[k],
-            tke = aux_en.tke[k],
-            b_exch = b_exch[k],
-        )
+        if isa(edmf.mixing_length_closure, MinDisspMixingLength)
+            ml_model = MinDisspLen{FT}(;
+                z = FT(grid.zc[k].z),
+                obukhov_length = obukhov_length,
+                tke_surf = aux_en.tke[kc_surf],
+                ustar = surf.ustar,
+                Pr = aux_tc.prandtl_nvec[k],
+                p = p_c[k],
+                ∇b = bg,
+                Shear² = Shear²[k],
+                tke = aux_en.tke[k],
+                b_exch = b_exch[k],
+            )
 
-        ml = mixing_length(mix_len_params, param_set, ml_model)
-        aux_tc.mls[k] = ml.min_len_ind
-        aux_tc.mixing_length[k] = ml.mixing_length
-        aux_tc.ml_ratio[k] = ml.ml_ratio
 
-        KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0))
+            ml = mixing_length(mix_len_params, param_set, ml_model)
+            aux_tc.mls[k] = ml.min_len_ind
+            aux_tc.mixing_length[k] = ml.mixing_length
+            aux_tc.ml_ratio[k] = ml.ml_ratio
+
+            mixing_len = ml.mixing_length
+
+
+        elseif isa(edmf.mixing_length_closure, MLMixingLength)
+            ml_model = MLMixLen{FT}(;
+                z = FT(grid.zc[k].z),
+                obukhov_length = obukhov_length,
+                tke_surf = aux_en.tke[kc_surf],
+                ustar = surf.ustar,
+                Pr = aux_tc.prandtl_nvec[k],
+                p = p_c[k],
+                ∇b = bg,
+                Shear² = Shear²[k],
+                tke = aux_en.tke[k],
+                b_exch = b_exch[k],
+                ref_H = p_c[k] / (ρ_c[k] * g)
+            )
+
+            mixing_len = ml_mixing_length(mix_len_params, param_set, edmf.mixing_length_closure, ml_model)
+            aux_tc.mixing_length[k] = mixing_len
+        
+        elseif isa(edmf.mixing_length_closure, AddMLMixingLength)
+            # physical mixing length 
+
+            ml_model = MinDisspLen{FT}(;
+                z = FT(grid.zc[k].z),
+                obukhov_length = obukhov_length,
+                tke_surf = aux_en.tke[kc_surf],
+                ustar = surf.ustar,
+                Pr = aux_tc.prandtl_nvec[k],
+                p = p_c[k],
+                ∇b = bg,
+                Shear² = Shear²[k],
+                tke = aux_en.tke[k],
+                b_exch = b_exch[k],
+            )
+
+
+            physical_ml = mixing_length(mix_len_params, param_set, ml_model)
+            aux_tc.mls[k] = physical_ml.min_len_ind
+            aux_tc.ml_ratio[k] = physical_ml.ml_ratio
+
+            # ml mixing length
+            ml_model = MLMixLen{FT}(;
+                z = FT(grid.zc[k].z),
+                obukhov_length = obukhov_length,
+                tke_surf = aux_en.tke[kc_surf],
+                ustar = surf.ustar,
+                Pr = aux_tc.prandtl_nvec[k],
+                p = p_c[k],
+                ∇b = bg,
+                Shear² = Shear²[k],
+                tke = aux_en.tke[k],
+                b_exch = b_exch[k],
+                ref_H = p_c[k] / (ρ_c[k] * g)
+            )
+            ml_mixing_len = ml_mixing_length(mix_len_params, param_set, edmf.mixing_length_closure, ml_model)
+
+            mixing_len = physical_ml.mixing_length + ml_mixing_len
+            aux_tc.mixing_length[k] = mixing_len
+            aux_tc.physical_mixing_length[k] = physical_ml.mixing_length
+        end
+
+        KM[k] = c_m * mixing_len * sqrt(max(aux_en.tke[k], 0))
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
         KQ[k] = KH[k] / Le
+        ∂b∂z[k] = bg.∂b∂z
 
         aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
     end

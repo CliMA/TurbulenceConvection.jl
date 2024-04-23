@@ -60,6 +60,8 @@ function io_dictionary_aux()
         "tke_detr_loss" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.detr_loss),
         "tke_shear" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.shear),
         "tke_interdomain" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.interdomain),
+        "shear_sq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).Shear²),
+        "buoy_gradient" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂b∂z),
 
         "Hvar_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).Hvar.dissipation),
         "Hvar_entr_gain" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).Hvar.entr_gain),
@@ -99,6 +101,7 @@ function io_dictionary_aux()
         "qs_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno),
 
         "mixing_length" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).mixing_length),
+        "physical_mixing_length" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).physical_mixing_length),
 
         "updraft_cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).cloud_fraction),
 
