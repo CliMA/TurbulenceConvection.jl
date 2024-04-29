@@ -997,7 +997,12 @@ function compute_en_tendencies!(
 
     wvec = CC.Geometry.WVector
     aeK_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
-    prog_bcs = (; bottom = CCO.SetGradient(wvec(FT(0))), top = CCO.SetGradient(wvec(FT(0))))
+
+    if edmf.thermo_covariance_model isa PrognosticThermoCovariances
+        prog_bcs = (; bottom = CCO.SetGradient(wvec(FT(0))), top = CCO.SetGradient(wvec(FT(0))))
+    else
+        prog_bcs = (; bottom = CCO.Extrapolate(), top = CCO.SetGradient(wvec(FT(0))))
+    end
 
     If = CCO.InterpolateC2F(; aeK_bcs...)
     ∇f = CCO.GradientC2F(; prog_bcs...)
