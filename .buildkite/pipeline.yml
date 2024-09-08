@@ -11,14 +11,14 @@ agents:
   queue: new-central
   slurm_ntasks: 1
   slurm_mem: 10GB
-  modules: climacommon/2024_04_05
+  modules: climacommon/2024_05_27
 
 steps:
 
   # # Clear depot
   # - label: "clear depot"
   #   command:
-  #     - "rm -rf /central/scratch/esm/slurm-buildkite/turbulenceconvection-ci/depot/cpu"
+  #     - "rm -rf /central/scratch/esm/slurm-buildkite/turbulenceconvection-ci/depot/default"
   #   agents:
   #     config: init
   #     queue: new-central
