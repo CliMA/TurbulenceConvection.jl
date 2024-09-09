@@ -38,6 +38,15 @@ import Random
 
 import JSON
 
+function reproducible_rand(reset_seed, seed, ns...)
+    reset_seed && Random.seed!(seed)
+    return rand(ns...)
+end
+function reproducible_randn(reset_seed, seed, ns...)
+    reset_seed && Random.seed!(seed)
+    return randn(ns...)
+end
+
 function parse_commandline()
     s = ArgParseSettings(; description = "namelist Generator")
 
@@ -63,6 +72,7 @@ function default_namelist(
     root::String = ".",
     write::Bool = true,
     set_seed::Bool = true,
+    reset_seed::Bool = true,
     seed::Int = 2022,
     truncate_stack_trace::Bool = false,
 )
@@ -260,16 +270,16 @@ function default_namelist(
     # m=100 random features, d=6 input Pi groups
     # RF: parameters to optimize, 2 x (m + 1 + d)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["rf_opt_ent_params"] =
-        vec(cat(randn(2,100), # vec(cat(randn(2, m),
+        vec(cat(reproducible_randn(reset_seed, seed,2,100), # vec(cat(randn(2, m),
                     ones(2,7), dims=2)) # ones(2, d + 1), dims=2))
 
     # RF: fixed realizations of random variables, 2 x m x (1 + d)
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["rf_fix_ent_params"] =
-        vec(cat(2*pi*rand(2,100,1), # vec(cat(2*pi*rand(2, m, 1),
-                    randn(2,100,6), dims=3)) # randn(2, m, d), dims=3))
+        vec(cat(2*pi*reproducible_rand(reset_seed, seed, 2,100,1), # vec(cat(2*pi*rand(2, m, 1),
+                    reproducible_randn(reset_seed, seed,2,100,6), dims=3)) # randn(2, m, d), dims=3))
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["linear_ent_params"] =
-        SA.SVector{14}(rand(14))
+        SA.SVector{14}(reproducible_rand(reset_seed, seed,14))
 
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["linear_ent_biases"] = true
 
@@ -284,7 +294,7 @@ function default_namelist(
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_width"] = 2
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_n_modes"] = 2
     namelist_defaults["turbulence"]["EDMF_PrognosticTKE"]["fno_ent_params"] =
-        SA.SVector{50}(rand(50))
+        SA.SVector{50}(reproducible_rand(reset_seed, seed,50))
 
     #! format: on
 
@@ -317,6 +327,10 @@ function default_namelist(
     else
         error("Not a valid case name")
     end
+
+    # if src/ depends on sampled random numbers,
+    # then let's make those numbers reproducible:
+    set_seed && Random.seed!(seed)
 
     if write
         write_file(namelist, root)
