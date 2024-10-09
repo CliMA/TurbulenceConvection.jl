@@ -68,7 +68,7 @@ function construct_mesh(namelist; FT = Float64)
     elseif typeof(Cases.get_case(namelist)) <: Cases.SOCRATES # Maybe we dont wanna keep doing this so move the data part to SOCRATES data and just pass in the arg to all the surface_ref_state construcors instead...
         flight_number = namelist["meta"]["flight_number"]
         forcing_type = namelist["meta"]["forcing_type"]
-        new_z = vec(Cases.SOCRATES(flight_number, forcing_type).get_default_new_z())[:] # redundant constructor here, can we evade this somehow somewhere by passing in the object? this gets called before Cases stuff tho in main.
+        new_z = vec(Cases.SSCF.get_default_new_z(flight_number))[:] # redundant constructor here, can we evade this somehow somewhere by passing in the object? this gets called before Cases stuff tho in main.
         z_mesh = CC.Geometry.ZPoint{FT}.([FT(0), new_z...]) # added 0 to beginning? copy from the file #Array(TC.get_nc_data(data, "zc")) also idk what to do about paths like this
         nz = length(z_mesh)
         z₀, z₁ = z_mesh[1], z_mesh[end]
