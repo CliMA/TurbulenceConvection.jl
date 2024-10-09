@@ -228,7 +228,17 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
         @. aux_gm.θ_virt = TD.virtual_pottemp(thermo_params, aux_gm.ts)
 
-        Δt = TS.dt
+        # reduce dt during spinup period for stability... (edit in side TS just in case it's called anywhere else (don't think it it but can't be too careful... original setting is in callbacks if using adaptive, but we need to be able to set it generally otherwise...)
+        Δt = TS.dt # we need to extract Δt first and then edit it... we cannot directly edit TS.dt bc repeated calls would decimate TS.dt... hopefully this causes no dissonance w/ callbacks setting in adapt_dt, or just dt=dt_min in regular case...
+        if !TS.spinup_adapt_dt
+            Δt = TS.dt_min # enforce no adapt_dt if not allowed
+        end
+        if t < TS.spinup_half_t_max
+            Δt *= TS.spinup_dt_factor # can we fade this out gradually between t=spinup_half_t_max and t=2*spinup_half_t_max?, and ramp up from Δt*spinup_dt_factor to Δt?
+        elseif t < 2 * TS.spinup_half_t_max # if spinup_half_t_max is 0, we'll bypass this
+            Δt *= TS.spinup_dt_factor + (1 - TS.spinup_dt_factor) * (t - TS.spinup_half_t_max) / TS.spinup_half_t_max # a smooth ramp from TS.spinup_dt_factor to 1 between t=spinup_half_t_max and t=2*spinup_half_t_max
+        end
+  
         surf = get_surface(surf_params, grid, state, t, param_set)
 
         TC.affect_filter!(edmf, grid, state, param_set, surf, t)
