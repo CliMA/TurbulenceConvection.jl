@@ -183,6 +183,7 @@ function assign_thermo_aux!(state, grid, moisture_model, param_set)
         aux_gm.q_liq[k] = TD.liquid_specific_humidity(thermo_params, ts)
         aux_gm.q_ice[k] = TD.ice_specific_humidity(thermo_params, ts)
         aux_gm.T[k] = TD.air_temperature(thermo_params, ts)
+        @assert aux_gm.T[k] > 0 "Negative or NaN temperature will cause issues here, status is z = $(grid.zc[k].z), T = $(aux_gm.T[k]), q = $(ts_gm[k].q), θ_liq_ice = $(aux_gm.θ_liq_ice[k]), ts = $ts" # debugging, remove later -- will slow down code
         aux_gm.RH[k] = TD.relative_humidity(thermo_params, ts)
     end
     return
