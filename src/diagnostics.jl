@@ -122,6 +122,25 @@ function io_dictionary_aux()
 
         "rad_dTdt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).dTdt_rad),
         "rad_flux" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_grid_mean(state).f_rad),
+
+        # == My additions == ( only things we've used as calibration targets we add to io_dictionary_aux_calibrate() ) #
+        # combined liquid and ice categories
+        "ql_all_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_liq .+ center_prog_precipitation(state).q_rai),
+        "qi_all_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_ice .+ center_prog_precipitation(state).q_sno),
+        # sedimentation (tendency, so not density weighted?)
+        "qi_mean_sedimentation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_sedimentation .+ center_aux_environment(state).qi_tendency_sedimentation), # I believe these already area weightd so just sum
+        "ql_mean_sedimentation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_sedimentation .+ center_aux_environment(state).ql_tendency_sedimentation),
+        # cond/evap and sub/dep (exists for noneq but noq eq... (liq/ice aren't tracked only diagnosed in eq... so it's not even clear what's melting vs cond/evap etc...) also need to make sure it's per second)
+        "ql_mean_cond_evap" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_mean_cond_evap .+ center_aux_environment(state).ql_mean_cond_evap),
+        "qi_mean_sub_dep" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_mean_sub_dep .+ center_aux_environment(state).qi_mean_sub_dep),
+        # autoconversion + accretion (we don't have these disambiguated rn and it's hard w/ limiters, so just compare combined values w/ LES for now...)
+        "ql_mean_autoconv_accr" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_mean_autoconv_accr .+ center_aux_environment(state).ql_mean_autoconv_accr),
+        "qi_mean_autoconv_accr" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_mean_autoconv_accr .+ center_aux_environment(state).qi_mean_autoconv_accr),
+        # all ice precip (do this or just add grapuel to snow in LES output?)
+        "qip_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno),
+        # possible future additions
+        # - N and assumed N
+        # τ just straight up
     )
     return io_dict
 end
@@ -146,6 +165,12 @@ function io_dictionary_aux_calibrate()
         "RH_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).RH),
         "temperature_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).T),
         "updraft_area" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).area),
+        #
+        "ql_all_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_liq .+ center_prog_precipitation(state).q_rai),
+        "qi_all_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_ice .+ center_prog_precipitation(state).q_sno),
+        #
+        "qip_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno),
+
     )
     return io_dict
 end

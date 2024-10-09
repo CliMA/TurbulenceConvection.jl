@@ -25,8 +25,27 @@ cent_aux_vars_up_moisture(FT, ::NonEquilibriumMoisture) = (;
     qi_tendency_precip_formation = FT(0),
     ql_tendency_noneq = FT(0),
     qi_tendency_noneq = FT(0),
+    ql_tendency_sedimentation = FT(0),
+    qi_tendency_sedimentation = FT(0),
+    qt_tendency_sedimentation = FT(0),
+    θ_liq_ice_tendency_sedimentation = FT(0),
+    # diagnostic stuff (not used in calculations)
+    ql_mean_cond_evap = FT(0),
+    qi_mean_sub_dep = FT(0),
+    ql_mean_autoconv_accr = FT(0),
+    qi_mean_autoconv_accr = FT(0),
 )
-cent_aux_vars_up_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
+cent_aux_vars_up_moisture(FT, ::EquilibriumMoisture) = (;
+    ql_tendency_sedimentation = FT(0),
+    qi_tendency_sedimentation = FT(0),
+    qt_tendency_sedimentation = FT(0),
+    θ_liq_ice_tendency_sedimentation = FT(0),
+    # diagnostic stuff (not used in calculations)
+    ql_mean_cond_evap = FT(0),
+    qi_mean_sub_dep = FT(0),
+    ql_mean_autoconv_accr = FT(0),
+    qi_mean_autoconv_accr = FT(0),
+)
 cent_aux_vars_up(FT, local_geometry, edmf) = (;
     ts = thermo_state(FT, edmf.moisture_model),
     q_liq = FT(0),
@@ -62,15 +81,53 @@ cent_aux_vars_edmf_bulk_moisture(FT, ::NonEquilibriumMoisture) = (;
     qi_tendency_precip_formation = FT(0),
     ql_tendency_noneq = FT(0),
     qi_tendency_noneq = FT(0),
+    ql_tendency_sedimentation = FT(0),
+    qi_tendency_sedimentation = FT(0),
+    qt_tendency_sedimentation = FT(0),
+    θ_liq_ice_tendency_sedimentation = FT(0),
+    # diagnostic stuff (not used in calculations)
+    ql_mean_cond_evap = FT(0),
+    qi_mean_sub_dep = FT(0),
+    ql_mean_autoconv_accr = FT(0),
+    qi_mean_autoconv_accr = FT(0),
 )
-cent_aux_vars_edmf_bulk_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
+cent_aux_vars_edmf_bulk_moisture(FT, ::EquilibriumMoisture) = (;
+    ql_tendency_sedimentation = FT(0),
+    qi_tendency_sedimentation = FT(0),
+    qt_tendency_sedimentation = FT(0),
+    θ_liq_ice_tendency_sedimentation = FT(0),
+    # diagnostic stuff (not used in calculations)
+    ql_mean_cond_evap = FT(0),
+    qi_mean_sub_dep = FT(0),
+    ql_mean_autoconv_accr = FT(0),
+    qi_mean_autoconv_accr = FT(0),
+)
 cent_aux_vars_edmf_en_moisture(FT, ::NonEquilibriumMoisture) = (;
     ql_tendency_precip_formation = FT(0),
     qi_tendency_precip_formation = FT(0),
     ql_tendency_noneq = FT(0),
     qi_tendency_noneq = FT(0),
+    ql_tendency_sedimentation = FT(0),
+    qi_tendency_sedimentation = FT(0),
+    qt_tendency_sedimentation = FT(0),
+    θ_liq_ice_tendency_sedimentation = FT(0),
+    # diagnostic stuff (not used in calculations)
+    ql_mean_cond_evap = FT(0),
+    qi_mean_sub_dep = FT(0),
+    ql_mean_autoconv_accr = FT(0),
+    qi_mean_autoconv_accr = FT(0),
 )
-cent_aux_vars_edmf_en_moisture(FT, ::EquilibriumMoisture) = NamedTuple()
+cent_aux_vars_edmf_en_moisture(FT, ::EquilibriumMoisture) = (;
+    ql_tendency_sedimentation = FT(0),
+    qi_tendency_sedimentation = FT(0),
+    qt_tendency_sedimentation = FT(0),
+    θ_liq_ice_tendency_sedimentation = FT(0),
+    # diagnostic stuff (not used in calculations)
+    ql_mean_cond_evap = FT(0),
+    qi_mean_sub_dep = FT(0),
+    ql_mean_autoconv_accr = FT(0),
+    qi_mean_autoconv_accr = FT(0),
+)
 cent_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
     massflux_tendency_ql = FT(0),
     massflux_tendency_qi = FT(0),

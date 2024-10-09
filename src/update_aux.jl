@@ -53,6 +53,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     parent(∂w∂z) .= 0
     parent(∂M∂z_ρa) .= 0
 
+
+    rain_velo_scheme = get_termvel_type(get_isbits_nt(param_set.user_args, :rain_velo_scheme, :Blk1MVel))
+    snow_velo_scheme = get_termvel_type(get_isbits_nt(param_set.user_args, :snow_velo_scheme, :Blk1MVel))
+
     prog_gm_uₕ = grid_mean_uₕ(state)
     Ic = CCO.InterpolateF2C()
     #####
@@ -162,7 +166,49 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.RH[k] = TD.relative_humidity(thermo_params, ts_en)
     end
 
-    microphysics(edmf.en_thermo, grid, state, edmf, edmf.precip_model, edmf.rain_formation_model, Δt, param_set)
+    # ======================================================== #
+    # zero out noneq tendencies before calling microphysics again (does this interfere w/ writing to disk? -- needed bc env/updraft are cross writing to each other...
+    # aux_en.ql_tendency_noneq .= FT(0)
+    # aux_en.qi_tendency_noneq .= FT(0)
+    #
+    aux_en.ql_tendency_sedimentation .= FT(0)
+    aux_en.qi_tendency_sedimentation .= FT(0)
+    aux_en.qt_tendency_sedimentation .= FT(0)
+    aux_en.θ_liq_ice_tendency_sedimentation .= FT(0)
+
+    aux_en.ql_mean_cond_evap .= FT(0)
+    aux_en.qi_mean_sub_dep .= FT(0)
+    aux_en.ql_mean_autoconv_accr .= FT(0)
+    aux_en.qi_mean_autoconv_accr .= FT(0)
+    @inbounds for i in 1:N_up
+        # aux_up[i].ql_tendency_noneq .= FT(0)
+        # aux_up[i].qi_tendency_noneq .= FT(0)
+        #
+        aux_up[i].ql_tendency_sedimentation .= FT(0)
+        aux_up[i].qi_tendency_sedimentation .= FT(0)
+        aux_up[i].qt_tendency_sedimentation .= FT(0)
+        aux_up[i].θ_liq_ice_tendency_sedimentation .= FT(0)
+
+        aux_up[i].ql_mean_cond_evap .= FT(0)
+        aux_up[i].qi_mean_sub_dep .= FT(0)
+        aux_up[i].ql_mean_autoconv_accr .= FT(0)
+        aux_up[i].qi_mean_autoconv_accr .= FT(0)
+    end
+    # aux_bulk.ql_tendency_noneq .= FT(0)
+    # aux_bulk.qi_tendency_noneq .= FT(0)
+    #
+    aux_bulk.ql_tendency_sedimentation .= FT(0)
+    aux_bulk.qi_tendency_sedimentation .= FT(0)
+    aux_bulk.qt_tendency_sedimentation .= FT(0)
+    aux_bulk.θ_liq_ice_tendency_sedimentation .= FT(0)
+
+    aux_bulk.ql_mean_cond_evap .= FT(0)
+    aux_bulk.qi_mean_sub_dep .= FT(0)
+    aux_bulk.ql_mean_autoconv_accr .= FT(0)
+    aux_bulk.qi_mean_autoconv_accr .= FT(0)
+    # ======================================================== #
+
+    microphysics(edmf.en_thermo, grid, state, edmf, edmf.precip_model, edmf.rain_formation_model, Δt, param_set) # set env tendencies for microphysics
 
     @inbounds for k in real_center_indices(grid)
         a_bulk_c = aux_bulk.area[k]
@@ -285,6 +331,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     if edmf.moisture_model isa NonEquilibriumMoisture
         compute_nonequilibrium_moisture_tendencies!(grid, state, edmf, Δt, param_set)
     end
+    compute_cloud_condensate_sedimentation_tendencies!(grid, state, edmf, Δt, param_set) # not sure on the merits of doing it here vs at the end w/ precipitation tendencies... leaving here bc originally i had it in compute_nonequilibrium_moisture_tendencies!()
 
     # update massflux quantities
     w_gm = prog_gm_f.w
@@ -454,7 +501,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     end
 
     #####
-    ##### compute covarinaces tendendies
+    ##### compute covariances tendencies
     #####
     tke_press = aux_en_2m.tke.press
     w_en = aux_en_f.w
@@ -502,10 +549,11 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         #precip_fraction = compute_precip_fraction(edmf, state)
 
         @inbounds for k in real_center_indices(grid)
-            # term_vel_rain[k] = CM1.terminal_velocity(microphys_params, rain_type, ρ_c[k], prog_pr.q_rai[k])# / precip_fraction)
-            # term_vel_snow[k] = CM1.terminal_velocity(microphys_params, snow_type, ρ_c[k], prog_pr.q_sno[k])# / precip_fraction)
-            term_vel_rain[k] = CM1.terminal_velocity(microphys_params, rain_type, Blk1MVel, ρ_c[k], prog_pr.q_rai[k])
-            term_vel_snow[k] = CM1.terminal_velocity(microphys_params, snow_type, Blk1MVel, ρ_c[k], prog_pr.q_sno[k])
+            # term_vel_rain[k] = CM1.terminal_velocity(microphys_params, rain_type, rain_velo_scheme, ρ_c[k], prog_pr.q_rai[k])
+            # term_vel_snow[k] = CM1.terminal_velocity(microphys_params, snow_type, snow_velo_scheme, ρ_c[k], prog_pr.q_sno[k])
+            # use my own that's nan-safe
+            term_vel_rain[k] = my_terminal_velocity(microphys_params, rain_type, rain_velo_scheme, ρ_c[k], prog_pr.q_rai[k])
+            term_vel_snow[k] = my_terminal_velocity(microphys_params, snow_type, snow_velo_scheme, ρ_c[k], prog_pr.q_sno[k])
         end
     end
 
@@ -541,5 +589,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         Δt,
         param_set,
     )
+  
+
     return nothing
 end
