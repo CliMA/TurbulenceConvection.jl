@@ -57,11 +57,7 @@ const TDPS = TD.Parameters.ThermodynamicsParameters
 Because we pack our parameters in a named tuple and put symbols in Vals so they're isbits, we use a convenience get fcn.
 Put in here so can use here and in driver
 """
-function get_isbits_nt(
-    named_tuple::NamedTuple,
-    symbol::Symbol,
-    default = nothing
-)
+function get_isbits_nt(named_tuple::NamedTuple, symbol::Symbol, default = nothing)
 
     val = get(named_tuple, symbol, default)
 

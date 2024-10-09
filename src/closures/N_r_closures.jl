@@ -2,11 +2,11 @@
 
 # maybe add an oversider dispatch fcn here?
 
-function NR_monodisperse(N::FT, q::FT; r_0::FT=0.2*1e-6, ρ_w = 1000 ) where {FT}
+function NR_monodisperse(N::FT, q::FT; r_0::FT = 0.2 * 1e-6, ρ_w = 1000) where {FT}
     """
     constant N
     """
-    r = (q / ((4/3) * π * ρ_w * N))^(1 / 3)
+    r = (q / ((4 / 3) * π * ρ_w * N))^(1 / 3)
     r = max(r, 0.2 * 1e-6) # bound to be at least ~micron size...something like kohler crit radius (e.g. if the cloud is new, diagnosed r is 0 for selecting tau in principle)
     return (; N, r)
 end
@@ -16,7 +16,7 @@ function NR_fixed_radius(r::FT, q::FT; ρ_w = 1000) where {FT}
     """
     constant r
     """
-    N = q / ((4/3) * π * r^3 * ρ_w)
+    N = q / ((4 / 3) * π * r^3 * ρ_w)
     return (; N, r)
 end
 
@@ -267,14 +267,22 @@ function cloud_base(aux, grid, ts, mode)
 end
 
 function q_is(microphys_params::ACMP, ::CMT.IceType)
-    return  (4/3) * π * CMP.r_ice_snow(microphys_params)^3 * CMP.ρ_cloud_ice(microphys_params)
+    return (4 / 3) * π * CMP.r_ice_snow(microphys_params)^3 * CMP.ρ_cloud_ice(microphys_params)
 end
 # no equiv for liquid
 
 """
 
 """
-function get_N_threshold(param_set::APS, type::CMT.IceType, q::TD.PhasePartition, T::FT, p::FT, supersat_type::Symbol; N0::FT=NaN) where {FT}
+function get_N_threshold(
+    param_set::APS,
+    type::CMT.IceType,
+    q::TD.PhasePartition,
+    T::FT,
+    p::FT,
+    supersat_type::Symbol;
+    N0::FT = NaN,
+) where {FT}
     if isnothing(N0)
         # Let N0 be the number of droplets of radius r_is that means q = q_threshold
         microphys_params::ACMP = TCP.microphysics_params(param_set)
@@ -290,21 +298,37 @@ function get_N_threshold(param_set::APS, type::CMT.IceType, q::TD.PhasePartition
 
 end
 
-function get_q_threshold(param_set::APS, ::CMT.LiquidType, q::TD.PhasePartition, T::FT, p::FT, supersat_type::Symbol; N0::FT=NaN) where {FT}
+function get_q_threshold(
+    param_set::APS,
+    ::CMT.LiquidType,
+    q::TD.PhasePartition,
+    T::FT,
+    p::FT,
+    supersat_type::Symbol;
+    N0::FT = NaN,
+) where {FT}
     return CMP.q_liq_threshold(TCP.microphysics_params(param_set))::FT
 end
 
 """
 Get the implied q threshold based on r_is, and q 
 """
-function get_q_threshold(param_set::APS, type::CMT.IceType, q::TD.PhasePartition, T::FT, p::FT, supersat_type::Symbol; N0::FT=NaN) where {FT}
+function get_q_threshold(
+    param_set::APS,
+    type::CMT.IceType,
+    q::TD.PhasePartition,
+    T::FT,
+    p::FT,
+    supersat_type::Symbol;
+    N0::FT = NaN,
+) where {FT}
 
     microphys_params::ACMP = TCP.microphysics_params(param_set)
 
     if isnan(N0)
         return CMP.q_ice_threshold(microphys_params)::FT
     else
-        N_thresh::FT = get_N_threshold(param_set, type, q, T, p, supersat_type; N0=N0) # if N0 was nothing, get_N_threshold() makes N_thresh * q_is = q_threshold (we could add an if block check for that to save fcn calls...)
+        N_thresh::FT = get_N_threshold(param_set, type, q, T, p, supersat_type; N0 = N0) # if N0 was nothing, get_N_threshold() makes N_thresh * q_is = q_threshold (we could add an if block check for that to save fcn calls...)
         q_is_here::FT = q_is(microphys_params, type)
         return N_thresh * q_is_here
     end
@@ -313,12 +337,19 @@ end
 # copy of CM1.conv_q_liq_to_q_rai that uses our local get_q_threshold
 function my_conv_q_liq_to_q_rai(param_set::APS, q::TD.PhasePartition, T::FT, p::FT, supersat_type::Symbol) where {FT}
     microphys_params::ACMP = TCP.microphysics_params(param_set)
-    return max(0, q.liq - get_q_threshold(param_set, CMT.LiquidType(), q, T, p, supersat_type)) / CMP.τ_acnv_sno(microphys_params)
+    return max(0, q.liq - get_q_threshold(param_set, CMT.LiquidType(), q, T, p, supersat_type)) /
+           CMP.τ_acnv_sno(microphys_params)
 end
 
 # copy of CM1.conv_q_ice_to_q_sno_no_supersat that uses our local get_q_threshold
-function my_conv_q_ice_to_q_sno_no_supersat(param_set::APS, q::TD.PhasePartition, T::FT, p::FT, supersat_type::Symbol) where {FT}
+function my_conv_q_ice_to_q_sno_no_supersat(
+    param_set::APS,
+    q::TD.PhasePartition,
+    T::FT,
+    p::FT,
+    supersat_type::Symbol,
+) where {FT}
     microphys_params::ACMP = TCP.microphysics_params(param_set)
-    return max(0, q.ice - get_q_threshold(param_set, CMT.IceType(), q, T, p, supersat_type)) / CMP.τ_acnv_sno(microphys_params)
+    return max(0, q.ice - get_q_threshold(param_set, CMT.IceType(), q, T, p, supersat_type)) /
+           CMP.τ_acnv_sno(microphys_params)
 end
-

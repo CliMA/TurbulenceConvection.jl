@@ -200,25 +200,25 @@ function monitor_cfl!(state, Δt, CFL_limit)
             aux_en = TC.center_aux_environment(state)
 
             if i_CFL_meteor == 1
-                term_vel = term_vel_rain[k+1]
+                term_vel = term_vel_rain[k + 1]
                 species = "rain"
-                q = prog_pr.q_rai[k+1]
-                q_liq, q_ice = prog_gm.q_liq[k+1], prog_gm.q_ice[k+1]
-                q_tot = aux_gm.q_tot[k+1]
-                q_tot_up, q_liq_up, q_ice_up = aux_bulk.q_tot[k+1], aux_bulk.q_liq[k+1], aux_bulk.q_ice[k+1]
-                q_tot_env, q_liq_env, q_ice_env = aux_en.q_tot[k+1], aux_en.q_liq[k+1], aux_en.q_ice[k+1]
-                updraft_area = aux_bulk.area[k+1]
-                T = aux_gm.T[k+1]
+                q = prog_pr.q_rai[k + 1]
+                q_liq, q_ice = prog_gm.q_liq[k + 1], prog_gm.q_ice[k + 1]
+                q_tot = aux_gm.q_tot[k + 1]
+                q_tot_up, q_liq_up, q_ice_up = aux_bulk.q_tot[k + 1], aux_bulk.q_liq[k + 1], aux_bulk.q_ice[k + 1]
+                q_tot_env, q_liq_env, q_ice_env = aux_en.q_tot[k + 1], aux_en.q_liq[k + 1], aux_en.q_ice[k + 1]
+                updraft_area = aux_bulk.area[k + 1]
+                T = aux_gm.T[k + 1]
             elseif i_CFL_meteor == 2
-                term_vel = term_vel_snow[k+1]
+                term_vel = term_vel_snow[k + 1]
                 species = "snow"
-                q = prog_pr.q_sno[k+1]
-                q_liq, q_ice = prog_gm.q_liq[k+1], prog_gm.q_ice[k+1]
-                q_tot = aux_gm.q_tot[k+1]
-                q_tot_up, q_liq_up, q_ice_up = aux_bulk.q_tot[k+1], aux_bulk.q_liq[k+1], aux_bulk.q_ice[k+1]
-                q_tot_env, q_liq_env, q_ice_env = aux_en.q_tot[k+1], aux_en.q_liq[k+1], aux_en.q_ice[k+1]
-                updraft_area = aux_bulk.area[k+1]
-                T = aux_gm.T[k+1]
+                q = prog_pr.q_sno[k + 1]
+                q_liq, q_ice = prog_gm.q_liq[k + 1], prog_gm.q_ice[k + 1]
+                q_tot = aux_gm.q_tot[k + 1]
+                q_tot_up, q_liq_up, q_ice_up = aux_bulk.q_tot[k + 1], aux_bulk.q_liq[k + 1], aux_bulk.q_ice[k + 1]
+                q_tot_env, q_liq_env, q_ice_env = aux_en.q_tot[k + 1], aux_en.q_liq[k + 1], aux_en.q_ice[k + 1]
+                updraft_area = aux_bulk.area[k + 1]
+                T = aux_gm.T[k + 1]
             elseif i_CFL_meteor == 3
                 term_vel = term_vel_rain[k]
                 species = "rain"
@@ -242,7 +242,7 @@ function monitor_cfl!(state, Δt, CFL_limit)
             end
             q_tot
             error(
-                "Time step is too large for hydrometeor fall velocity! Hydrometeor CFL is $(CFL_meteor) > $(CFL_limit), Δt = $(Δt), Δz = $(Δz[k]), term_vel = $(term_vel), species = $(species), q_$(species) = $(q), q_liq = $(q_liq), q_ice = $(q_ice), q_tot = $(q_tot) | q_tot_up = $(q_tot_up), q_liq_up = $(q_liq_up), q_ice_up = $(q_ice_up) | q_tot_env = $(q_tot_env), q_liq_env = $(q_liq_env), q_ice_env = $(q_ice_env) | updraft_area = $(updraft_area) | T = $(T)"
+                "Time step is too large for hydrometeor fall velocity! Hydrometeor CFL is $(CFL_meteor) > $(CFL_limit), Δt = $(Δt), Δz = $(Δz[k]), term_vel = $(term_vel), species = $(species), q_$(species) = $(q), q_liq = $(q_liq), q_ice = $(q_ice), q_tot = $(q_tot) | q_tot_up = $(q_tot_up), q_liq_up = $(q_liq_up), q_ice_up = $(q_ice_up) | q_tot_env = $(q_tot_env), q_liq_env = $(q_liq_env), q_ice_env = $(q_ice_env) | updraft_area = $(updraft_area) | T = $(T)",
             )
         end
     end

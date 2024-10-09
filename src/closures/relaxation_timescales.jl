@@ -10,7 +10,7 @@ function adjust_ice_N(param_set::APS, microphys_params::ACMP, N_i::FT, q::TD.Pha
     r_is = CMP.r_ice_snow(microphys_params)
     ρ_i = CMP.ρ_cloud_ice(microphys_params)
 
-    q_is  = FT(ρ_i * 4/3 * π * r_is^3) # r_is radius ice sphere --
+    q_is = FT(ρ_i * 4 / 3 * π * r_is^3) # r_is radius ice sphere --
     N_i = max(N_i, q.ice / q_is) # make sure existing ice contributes to the size, particularly w/ sedimentation bringing in new ice
 
     #= limit N based on q autoconversion threshold =#
@@ -31,7 +31,7 @@ function adjust_ice_N(param_set::APS, microphys_params::ACMP, N_i::FT, q::TD.Pha
 end
 
 # r_from_qN(q::FT, N::FT, ρ::FT; r_min::FT=0) = FT(max((q / ((4/3) * π * N * ρ))^(1/3), r_min))
-function r_from_qN(q::FT, N::FT, ρ::FT; r_min::FT2=0) where{FT, FT2}
+function r_from_qN(q::FT, N::FT, ρ::FT; r_min::FT2 = 0) where {FT, FT2}
     if iszero(N) || isinf(N)
         return FT(r_min) # N/N will give NaN...
         # even if N = 0 and q is not 0 (in which case N shouldn't be 0), we need some fix...
@@ -39,7 +39,7 @@ function r_from_qN(q::FT, N::FT, ρ::FT; r_min::FT2=0) where{FT, FT2}
         # If N = 0, we'll just return r_min, then 1/Nr = 1/0 will yield timescale = Inf
     end
 
-    return  FT((q + 4/3 * π * FT(r_min)^3 * ρ * N) / (4/3 * π * N * ρ))^(1/3)
+    return FT((q + 4 / 3 * π * FT(r_min)^3 * ρ * N) / (4 / 3 * π * N * ρ))^(1 / 3)
 end
 
 function get_τ(
@@ -51,9 +51,10 @@ function get_τ(
     p::FT,
     ρ::FT,
     w::FT,
-    z::FT) where {FT}
+    z::FT,
+) where {FT}
 
-       
+
     # ===== Are these annotations faster? ===== #
     local τ_liq::FT
     local τ_ice::FT
@@ -70,7 +71,7 @@ function get_τ(
     local q_i_0::FT
     local q_0::FT
     # ========================================= #
-    
+
 
     if supersat_type == :Base
         tau_weights = get_isbits_nt(param_set.user_aux, :tau_weights, nothing) # training weights for tau (made so could pass in things in TrainTau.jl but now I use CalibrateEDMF)
@@ -89,7 +90,7 @@ function get_τ(
         ρ_i = CMP.ρ_cloud_ice(microphys_params)
         r_is = CMP.r_ice_snow(microphys_params)
 
-        N_i = get_N_i( param_set, supersat_type, q, T, p, w)
+        N_i = get_N_i(param_set, supersat_type, q, T, p, w)
 
         r_0 = FT(0.2 * 1e-6) # .2 micron base aerosol
         # r_i = FT((q.ice / ((4/3) * π * N_i * ρ_i))^(1/3)) # (the mass-diameter relationship is poorly defined anyway for ice crystals) -- if q.ice is 0 this goes to 0... making it hard to generate ice
@@ -111,8 +112,12 @@ function get_τ(
         r_0 = FT(20.0 * 10^-6) # 20 micron
         # derived from typical values and assume q_i = 4/3 * π * r^3 * ρ_i * N_i and N_i = c_1 e^(c_2 T)
 
-        c_1 = get_isbits_nt(param_set.user_aux, :exponential_T_scaling_ice_raw_c_1, FT(4*π*D * (q_i_0 / (4/3) * π * ρ_i)^(1/3) * (0.02)^(2/3)) ) # Fletcher 1962 (values taken from Frostenberg 2022)
-        c_2 = get_isbits_nt(param_set.user_aux, :exponential_T_scaling_ice_raw_c_2, FT(-0.6 * 2/3)) # Fletcher 1962 (values taken from Frostenberg 2022)
+        c_1 = get_isbits_nt(
+            param_set.user_aux,
+            :exponential_T_scaling_ice_raw_c_1,
+            FT(4 * π * D * (q_i_0 / (4 / 3) * π * ρ_i)^(1 / 3) * (0.02)^(2 / 3)),
+        ) # Fletcher 1962 (values taken from Frostenberg 2022)
+        c_2 = get_isbits_nt(param_set.user_aux, :exponential_T_scaling_ice_raw_c_2, FT(-0.6 * 2 / 3)) # Fletcher 1962 (values taken from Frostenberg 2022)
         τ_ice = FT(1 / (c_1 * exp(c_2 * (T - T_fr))))
         τ_liq = CMNe.τ_relax(microphys_params, liq_type)
 
@@ -124,7 +129,7 @@ function get_τ(
         else
             ρ_i = CMP.ρ_cloud_ice(microphys_params) # CLIMAParameters default for cloud_ice
             r_0 = FT(0.2 * 1e-6) # .2 micron base aerosol
-            N_i = get_N_i( param_set, supersat_type, q, T, p, w)
+            N_i = get_N_i(param_set, supersat_type, q, T, p, w)
 
             # r_i = FT((q.ice / ((4/3) * π * N_i * ρ_i))^(1/3)) # (the mass-diameter relationship is poorly defined anyway for ice crystals) -- if q.ice is 0 this goes to 0... making it hard to generate ice
             r_i = r_from_qN(q.ice, N_i, ρ_i)
@@ -153,8 +158,8 @@ function get_τ(
         # c_2l = get_isbits_nt(param_set.user_aux, :geometric_liq_c_2, FT(2 / 3)) # Halfway between 1/3 and 1
         # c_3l = get_isbits_nt(param_set.user_aux, :geometric_liq_c_3, FT(N_l0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
 
-        N_l = get_N_l( param_set, supersat_type, q, T, p, w)
-        r_l = r_from_qN(q.liq, N_l, ρ_l, r_min=r_0)
+        N_l = get_N_l(param_set, supersat_type, q, T, p, w)
+        r_l = r_from_qN(q.liq, N_l, ρ_l, r_min = r_0)
         τ_liq = FT(1 / (4 * π * D * N_l * r_l))
         # τ_liq = FT(1 / (4 * π * D * (c_1l * q.liq^(c_2l) + c_3l))) # let  be Nr = c_1 * q^(c_2) + c_3
 
@@ -163,8 +168,8 @@ function get_τ(
         # c_2i = get_isbits_nt(param_set.user_aux, :geometric_ice_c_2, FT(2 / 3.0)) # Halfway between 1/3 and 1
         # c_3i = get_isbits_nt(param_set.user_aux, :geometric_ice_c_3, FT(N_i0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
 
-        N_i = get_N_i( param_set, supersat_type, q, T, p, w)
-        r_i = r_from_qN(q.ice, N_i, ρ_i; r_min=r_0)
+        N_i = get_N_i(param_set, supersat_type, q, T, p, w)
+        r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0)
         τ_ice = FT(1 / (4 * π * D * N_i * r_i))
         # τ_ice = FT(1 / (4 * π * D * (c_1i * q.ice^(c_2i) + c_3i))) # let  be Nr = c_1 * q^(c_2) + c_3
 
@@ -178,13 +183,13 @@ function get_τ(
         c_2l = get_isbits_nt(param_set.user_aux, :geometric_liq_c_2, FT(2 / 3.0)) # Halfway between 1/3 and 1
         c_3l = get_isbits_nt(param_set.user_aux, :geometric_liq_c_3, FT(1e-5 / (4 / 3 * π * r_r^3 * ρ_i))) # estimated total N assuming reasonable q.ice... (N = N_r + N_0)
 
-        N_l = get_N_l( param_set, supersat_type, q, T, p, w)
-        r_l = r_from_qN(q.liq, N_l, ρ_l; r_min=r_0)
+        N_l = get_N_l(param_set, supersat_type, q, T, p, w)
+        r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0)
         τ_liq = FT(1 / (4 * π * D * N_l * r_l))
         # τ_liq = FT(1 / (4 * π * D * (c_1l * q.liq^(c_2l) + c_3l))) # let  be Nr = c_1 * q^(c_2)
 
-        N_i = get_N_i( param_set, supersat_type, q, T, p, w)
-        r_i = r_from_qN(q.ice, N_i, ρ_i; r_min=r_0)
+        N_i = get_N_i(param_set, supersat_type, q, T, p, w)
+        r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0)
         τ_ice = FT(1 / (4 * π * D * N_i * r_i))
 
     elseif supersat_type == :geometric_liq__powerlaw_T_scaling_ice # scaling on q that impacts liquid and ice
@@ -203,8 +208,8 @@ function get_τ(
         # c_1l = get_isbits_nt(param_set.user_aux, :geometric_liq_c_1, FT(1 / (4 / 3 * π * ρ_l * r_0^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
         # c_2l = get_isbits_nt(param_set.user_aux, :geometric_liq_c_2, FT(2 / 3.0)) # Halfway between 1/3 and 1
         # c_3l = get_isbits_nt(param_set.user_aux, :geometric_liq_c_3, FT(N_l0*r_0)) # estimated total N assuming reasonable q.ice... (N = N_r + N_0)
-        N_l = get_N_l( param_set, supersat_type, q, T, p, w)
-        r_l = r_from_qN(q.liq, N_l, ρ_l; r_min=r_0)
+        N_l = get_N_l(param_set, supersat_type, q, T, p, w)
+        r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0)
         τ_liq = FT(1 / (4 * π * D * N_l * r_l))
         # τ_liq = FT(1 / (4 * π * D * (c_1l * q.liq^(c_2l) + c_3l))) # let  be Nr = c_1 * q^(c_2)
 
@@ -212,14 +217,14 @@ function get_τ(
         if T >= T_fr
             τ_ice = FT(Inf)
         else
-            N_i = get_N_i( param_set, supersat_type, q, T, p, w)
-            r_i = r_from_qN(q.ice, N_i, ρ_i; r_min=r_0)
+            N_i = get_N_i(param_set, supersat_type, q, T, p, w)
+            r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0)
             τ_ice = FT(1 / (4 * π * D * N_i * r_i))
             # if isnan(τ_liq) || isnan(τ_ice) || isinf(τ_liq) || isinf(τ_ice)
-                # println("Status: N_l: $N_l, N_i: $N_i, r_l: $r_l, r_i: $r_i, τ_liq: $τ_liq, τ_ice: $τ_ice")
+            # println("Status: N_l: $N_l, N_i: $N_i, r_l: $r_l, r_i: $r_i, τ_liq: $τ_liq, τ_ice: $τ_ice")
             # end
         end
-        
+
 
 
     elseif supersat_type == :geometric_liq__exponential_T_scaling_and_geometric_ice # scaling on q that impacts liquid and ice
@@ -238,8 +243,8 @@ function get_τ(
         # c_2l = get_isbits_nt(param_set.user_aux, :geometric_liq_c_2, FT(2 / 3.0)) # Halfway between 1/3 and 1
         # c_3l = get_isbits_nt(param_set.user_aux, :geometric_liq_c_3, FT(N_l0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
 
-        N_l = get_N_l( param_set, supersat_type, q, T, p, w)
-        r_l = r_from_qN(q.liq, N_l, ρ_l; r_min=r_0)
+        N_l = get_N_l(param_set, supersat_type, q, T, p, w)
+        r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0)
         τ_liq = FT(1 / (4 * π * D * N_l * r_l))
         # τ_liq = FT(1 / (4 * π * D * (c_1l * q.liq^(c_2l) + c_3l))) # let  be Nr = c_1 * q^(c_2) 
 
@@ -253,9 +258,9 @@ function get_τ(
         # c_4i = get_isbits_nt(param_set.user_aux, :exponential_T_scaling_and_geometric_ice_c_4, FT(-0.6)) # Fletcher 1962 (values taken from Frostenberg 2022)
 
 
-        N_i = get_N_i( param_set, supersat_type, q, T, p, w)
-        r_i = r_from_qN(q.ice, N_i, ρ_i; r_min=r_0)
-        τ_ice = 1 / (4 * π * D * N_i * r_i)    
+        N_i = get_N_i(param_set, supersat_type, q, T, p, w)
+        r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0)
+        τ_ice = 1 / (4 * π * D * N_i * r_i)
         # τ_ice = 1 / ((c_1i * q.ice^(c_2i) * exp(c_2i * c_4i * (T - T_fr)) + c_3i) * exp(c_4i * (T - T_fr)))
         # τ_ice = FT(1 / ((c_1i * q.ice^(c_2i) + c_3i) * exp(c_4i * (T - T_fr))))
 
@@ -279,21 +284,23 @@ function get_τ(
         # c_2l = get_isbits_nt(param_set.user_aux, :linear_combination_liq_c_2, FT(-1e-10)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
         # c_3l = get_isbits_nt(param_set.user_aux, :linear_combination_liq_c_3, FT(2 / 3)) # asssume nothing here? (keep 0 as upper bound?) 
 
-        N_l = get_N_l( param_set, supersat_type, q, T, p, w)
-        r_l = r_from_qN(q.liq, N_l, ρ_l; r_min=r_0)
+        N_l = get_N_l(param_set, supersat_type, q, T, p, w)
+        r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0)
         τ_liq = FT(1 / (4 * π * D * N_l * r_l))
         # τ_liq = FT(1 / ( exp(c_1l + c_2l * (T - T_fr) + c_3l * log10(q.liq))))
         #
         # c_1i = get_isbits_nt(param_set.user_aux, :linear_combination_ice_c_1, FT(N_i0 * r_0)) # I think at q=0, we need c_1 from linear = c_1 from geometric...
         # c_2i = get_isbits_nt(param_set.user_aux, :linear_combination_ice_c_2, FT(-0.6)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
         # c_3i = get_isbits_nt(param_set.user_aux, :linear_combination_ice_c_3, FT(2 / 3)) # Fletcher 1962 (values taken from Frostenberg 2022), same sign again I suppose...
-        N_i = get_N_i( param_set, supersat_type, q, T, p, w)
-        r_i = r_from_qN(q.ice, N_i, ρ_i; r_min=r_0)
+        N_i = get_N_i(param_set, supersat_type, q, T, p, w)
+        r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0)
         τ_ice = FT(1 / (4 * π * D * N_i * r_i))
         # τ_ice = FT(1 / ( exp(c_1i + c_2i * (T - T_fr) + c_3i * log10(q.ice))))
 
         if isnan(τ_liq) || isnan(τ_ice) #|| isinf(τ_liq) || isinf(τ_ice)
-            println("Status: N_l: $N_l, N_i: $N_i, r_l: $r_l, r_i: $r_i, τ_liq: $τ_liq, τ_ice: $τ_ice, q = $q, T = $T, p = $p, w = $w")
+            println(
+                "Status: N_l: $N_l, N_i: $N_i, r_l: $r_l, r_i: $r_i, τ_liq: $τ_liq, τ_ice: $τ_ice, q = $q, T = $T, p = $p, w = $w",
+            )
             flush(stdout)
             flush(stderr)
         end
@@ -313,22 +320,24 @@ function get_τ(
         # c_2l = get_isbits_nt(param_set.user_aux, :linear_combination_liq_c_2, FT(-0.6)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
         # c_3l = get_isbits_nt(param_set.user_aux, :linear_combination_liq_c_3, FT(-10)) # asssume nothing here? (keep 0 as upper bound?) 
         # c_4l = get_isbits_nt(param_set.user_aux, :linear_combination_liq_c_4, FT(0)) # start at 0
-        N_l = get_N_l( param_set, supersat_type, q, T, p, w)
-        r_l = r_from_qN(q.liq, N_l, ρ_l; r_min=r_0)
-        τ_liq = FT(1/(4 * π * D * N_l * r_l))
+        N_l = get_N_l(param_set, supersat_type, q, T, p, w)
+        r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0)
+        τ_liq = FT(1 / (4 * π * D * N_l * r_l))
         # τ_liq = FT(1 / ( exp( c_1l + c_2l * (T - T_fr) + c_3l * log10(q.liq) + c_4l * w/w_0)))
         #
         # c_1i = get_isbits_nt(param_set.user_aux, :linear_combination_ice_c_1, FT(N_i0 * r_0)) # I think at q=0, we need c_1 from linear = c_1 from geometric...
         # c_2i = get_isbits_nt(param_set.user_aux, :linear_combination_ice_c_2, FT(-0.6)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
         # c_3i = get_isbits_nt(param_set.user_aux, :linear_combination_ice_c_3, FT(-10)) # Fletcher 1962 (values taken from Frostenberg 2022), same sign again I suppose...
         # c_4i = get_isbits_nt(param_set.user_aux, :linear_combination_ice_c_4, FT(0)) # start at 0
-        N_i = get_N_i( param_set, supersat_type, q, T, p, w)
-        r_i = r_from_qN(q.ice, N_i, ρ_i; r_min=r_0)
+        N_i = get_N_i(param_set, supersat_type, q, T, p, w)
+        r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0)
         τ_ice = FT(1 / (4 * π * D * N_i * r_i))
         # τ_ice = FT(1 / (exp(c_1i + c_2i * (T - T_fr) + c_3i * log10(q.ice) + c_4i * w/w_0)))
 
         if isnan(τ_liq) || isnan(τ_ice) #|| isinf(τ_liq) || isinf(τ_ice)
-            println("Status: N_l: $N_l, N_i: $N_i, r_l: $r_l, r_i: $r_i, τ_liq: $τ_liq, τ_ice: $τ_ice, q = $q, T = $T, p = $p, w = $w")
+            println(
+                "Status: N_l: $N_l, N_i: $N_i, r_l: $r_l, r_i: $r_i, τ_liq: $τ_liq, τ_ice: $τ_ice, q = $q, T = $T, p = $p, w = $w",
+            )
             flush(stdout)
             flush(stderr)
         end
@@ -346,7 +355,7 @@ function get_τ(
             if !isnothing(model_re_location)
                 model_re_location = string(model_re_location) # convert symbol to string...
             end
-            
+
             re = model_destructure_re_from_file(model_re_location) # get the reconstruction function from the file ( this is probably slow, we could pass the string repr)
             neural_network = vec_to_NN(neural_network_params, re) # construct the NN from the parameters
             TC.re = re # store it in the TC so we don't have to reconstruct it every time
@@ -356,8 +365,8 @@ function get_τ(
 
         τ_liq = min(τ_liq, FT(1e10)) # ensure we don't just get a huge number all the time
         τ_ice = min(τ_ice, FT(1e10)) # ensure we don't just get a huge number all the time   
-        
-        
+
+
     elseif supersat_type == :raymond_ice_test # should be closer to DeMott 2015 but...
         T_fr = TCP.T_freeze(param_set)
 
@@ -376,13 +385,7 @@ function get_τ(
         N_i = get_N_i(param_set, supersat_type, q, T, p, w)
 
         if N_r_closure == :inhomogeneous
-            N_l, R_liq = NR_inhomogeneous_mixing_liquid(
-                thermo_params,
-                N_l,
-                p,
-                q.liq,
-                ts_LCL,
-            ) # testing inhomogeneous mixing would have r fixed and then let N vary... set r based on adiabatic extrapolation from cloud base 
+            N_l, R_liq = NR_inhomogeneous_mixing_liquid(thermo_params, N_l, p, q.liq, ts_LCL) # testing inhomogeneous mixing would have r fixed and then let N vary... set r based on adiabatic extrapolation from cloud base 
             _, R_ice = NR_monodisperse(N_i, q.ice)
             # maybe look into using a mixed model where N/R are partly towards the inhomogenous value depending on the true entrainment/mixing params... see literature on this
             # NOTE, ON DYCOMS ADIABATIC R W/ ORIGINAL N_0 WORKED BETTER... HMMM (though that's not using DYCOMS N)
@@ -422,12 +425,7 @@ end
 
 
 
-function get_N_i(
-    param_set::APS,
-    supersat_type::Symbol,
-    ts::TD.ThermodynamicState,
-    w::FT,
-    ) where {FT}
+function get_N_i(param_set::APS, supersat_type::Symbol, ts::TD.ThermodynamicState, w::FT) where {FT}
 
     # FT = eltype(param_set)
 
@@ -440,12 +438,7 @@ function get_N_i(
     return get_N_i(param_set, supersat_type, q, T, p, w)
 end
 
-function get_N_l(
-    param_set::APS,
-    supersat_type::Symbol,
-    ts::TD.ThermodynamicState,
-    w::FT,
-    ) where {FT}
+function get_N_l(param_set::APS, supersat_type::Symbol, ts::TD.ThermodynamicState, w::FT) where {FT}
 
     # FT = eltype(param_set)
 
@@ -460,12 +453,7 @@ function get_N_l(
 end
 
 
-function get_Ns(
-    param_set::APS,
-    supersat_type::Symbol,
-    ts::TD.ThermodynamicState,
-    w::FT,
-    ) where {FT}
+function get_Ns(param_set::APS, supersat_type::Symbol, ts::TD.ThermodynamicState, w::FT) where {FT}
 
     # FT = eltype(param_set)
 
@@ -479,14 +467,7 @@ function get_Ns(
 end
 
 
-function get_N_i(
-    param_set::APS,
-    supersat_type::Symbol,
-    q::TD.PhasePartition,
-    T::FT,
-    p::FT,
-    w::FT,
-    ) where {FT}
+function get_N_i(param_set::APS, supersat_type::Symbol, q::TD.PhasePartition, T::FT, p::FT, w::FT) where {FT}
 
     # ===== Are these annotations faster? ===== #
     local τ_liq::FT
@@ -526,11 +507,11 @@ function get_N_i(
         # if get_isbits_nt(param_set.user_aux, :adjust_ice_N, false)
         #     N_i = max(N_i, q.ice / q_is_0) # make sure existing ice contributes to the size, particularly w/ sedimentation
         # end            
-    
+
     elseif supersat_type == :exponential_T_scaling_ice_raw
         # N_i = nothing
         N_i = FT(NaN) # testing NaN over nothing for type stability
-        
+
     elseif (supersat_type == :T_scaling_ice_F23) || (supersat_type == :powerlaw_T_scaling_ice) # this should have a gentler curve though the cloud
         ρ_i = CMP.ρ_cloud_ice(microphys_params) # CLIMAParameters default for cloud_ice
         # q_is_0 = FT(ρ_i * 4/3 * π * CMP.r_ice_snow(microphys_params)^3) # r_is radius ice sphere --
@@ -541,7 +522,7 @@ function get_N_i(
         else
             c_1 = get_isbits_nt(param_set.user_aux, :powerlaw_T_scaling_ice_c_1, FT(-9)) # F23 (values taken from Frostenberg 2022)
             c_2 = get_isbits_nt(param_set.user_aux, :powerlaw_T_scaling_ice_c_2, FT(9)) # F23 (values taken from Frostenberg 2022)
-            N_i = (10^c_1) *  (-(T - T_fr))^c_2
+            N_i = (10^c_1) * (-(T - T_fr))^c_2
         end
 
         # if get_isbits_nt(param_set.user_aux, :adjust_ice_N, false)
@@ -601,7 +582,7 @@ function get_N_i(
             c_1 = get_isbits_nt(param_set.user_aux, :powerlaw_T_scaling_ice_c_1, -9) # F23 (values taken from Frostenberg 2022)
             c_2 = get_isbits_nt(param_set.user_aux, :powerlaw_T_scaling_ice_c_2, FT(9)) # F23 (values taken from Frostenberg 2022)
             # c_3i = get_isbits_nt(param_set.user_aux, :T_scaling_ice_c_3, -c_2i) # F23 (values taken from Frostenberg 2022) -- is redundant w/ c_1i
-            N_i = FT((10^c_1) *  (-(T - T_fr))^c_2)
+            N_i = FT((10^c_1) * (-(T - T_fr))^c_2)
 
             # if get_isbits_nt(param_set.user_aux, :adjust_ice_N, false)
             #     N_i = FT(max(N_i, q.ice / q_is_0)) # make sure existing ice contributes to the size, particularly w/ sedimentation
@@ -623,7 +604,11 @@ function get_N_i(
             FT((4 * π * D) * ((4 / 3 * π * ρ_i)^(-1 / 3) * (N_i0)^(2 / 3) * (0.02)^(2 / 3) + (N_i0 * r_0))),
         ) # Yeahhh.... idk for this one lol... just combined them serially from the homogenous case where c_3 is -1/3, and used .02 as the prefactor
         c_2i = get_isbits_nt(param_set.user_aux, :exponential_T_scaling_and_geometric_ice_c_2, FT(2 / 3.0)) # Halfway between 1/3 and 1 -- should this be the same as c_2g? It's the same mixing... 
-        c_3i = get_isbits_nt(param_set.user_aux, :exponential_T_scaling_and_geometric_ice_c_3, FT((4 * π * D) * r_0 * 0.02)) # Fletcher 1962 (values taken from Frostenberg 2022) and used .02 as the prefactor
+        c_3i = get_isbits_nt(
+            param_set.user_aux,
+            :exponential_T_scaling_and_geometric_ice_c_3,
+            FT((4 * π * D) * r_0 * 0.02),
+        ) # Fletcher 1962 (values taken from Frostenberg 2022) and used .02 as the prefactor
         c_4i = get_isbits_nt(param_set.user_aux, :exponential_T_scaling_and_geometric_ice_c_4, FT(-0.6)) # Fletcher 1962 (values taken from Frostenberg 2022)
 
         # Not really clear what is N and what is r with this mixed mode... certainly there could be some threshold effect but it's not clear what it is...
@@ -646,7 +631,7 @@ function get_N_i(
         c_2 = get_isbits_nt(param_set.user_aux, :linear_combination_ice_c_2, FT(-0.6)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
         c_3 = get_isbits_nt(param_set.user_aux, :linear_combination_ice_c_3, FT(2 / 3)) # Fletcher 1962 (values taken from Frostenberg 2022), same sign again I suppose...
         # N_i = FT(NaN) # testing NaN over nothing for type stability
-        N_i = exp(c_1 + c_2 * (T - T_fr) + c_3 * q.ice/1e-7)
+        N_i = exp(c_1 + c_2 * (T - T_fr) + c_3 * q.ice / 1e-7)
 
     elseif supersat_type == :linear_combination_with_w
         T_fr = TCP.T_freeze(param_set)
@@ -663,12 +648,12 @@ function get_N_i(
         c_3 = get_isbits_nt(param_set.user_aux, :linear_combination_ice_c_3, FT(-10)) # Fletcher 1962 (values taken from Frostenberg 2022), same sign again I suppose...
         c_4 = get_isbits_nt(param_set.user_aux, :linear_combination_ice_c_4, FT(0)) # start at 0
         # N_i = FT(NaN) # testing NaN over nothing for type stability
-        N_i = exp(c_1 + c_2 * (T - T_fr) + c_3 * q.ice/1e-7 + c_4 * w/w_0)
+        N_i = exp(c_1 + c_2 * (T - T_fr) + c_3 * q.ice / 1e-7 + c_4 * w / w_0)
 
-    elseif supersat_type == :neural_network    
+    elseif supersat_type == :neural_network
         # N_i = nothing
         N_i = FT(NaN) # testing NaN over nothing for type stability
-        
+
     elseif supersat_type == :raymond_ice_test # should be closer to DeMott 2015 but...
         T_fr = TCP.T_freeze(param_set)
 
@@ -694,14 +679,7 @@ function get_N_i(
 end
 
 
-function get_N_l(
-    param_set::APS,
-    supersat_type::Symbol,
-    q::TD.PhasePartition,
-    T::FT,
-    p::FT,
-    w::FT,
-    ) where {FT}
+function get_N_l(param_set::APS, supersat_type::Symbol, q::TD.PhasePartition, T::FT, p::FT, w::FT) where {FT}
 
     # local N_l::Union{FT ,Nothing}
     local N_l::FT
@@ -719,18 +697,12 @@ function get_N_l(
         # R    =  max(((q.liq + q.ice)/(4/3*π*ρ_l*N_0))^(1/3), FT(0.2*10^-6)) # bound to be at least ~micron size...something like kohler crit radius
 
         if N_r_closure == :inhomogeneous
-            N_l, R_liq = NR_inhomogeneous_mixing_liquid(
-                thermo_params,
-                N_l,
-                p,
-                q.liq,
-                ts_LCL,
-            ) # testing inhomogeneous mixing would have r fixed and then let N vary... set r based on adiabatic extrapolation from cloud base 
-            # maybe look into using a mixed model where N/R are partly towards the inhomogenous value depending on the true entrainment/mixing params... see literature on this
-            # NOTE, ON DYCOMS ADIABATIC R W/ ORIGINAL N_0 WORKED BETTER... HMMM (though that's not using DYCOMS N)
+            N_l, R_liq = NR_inhomogeneous_mixing_liquid(thermo_params, N_l, p, q.liq, ts_LCL) # testing inhomogeneous mixing would have r fixed and then let N vary... set r based on adiabatic extrapolation from cloud base 
+        # maybe look into using a mixed model where N/R are partly towards the inhomogenous value depending on the true entrainment/mixing params... see literature on this
+        # NOTE, ON DYCOMS ADIABATIC R W/ ORIGINAL N_0 WORKED BETTER... HMMM (though that's not using DYCOMS N)
 
         elseif N_r_closure == :monodisperse # uniform size for all droplets, liquid and Ice I guess
-            #
+        #
         else
             error("Unsupported size distribution closure (N_r_closure): $(N_r_closure)")
         end
@@ -761,9 +733,11 @@ function get_N_l(
         c_1 = get_isbits_nt(param_set.user_aux, :linear_combination_liq_c_1, FT(N_l0 * r_0)) # I think at q=0, we need c_1 from linear = c_1 from geometric...
         c_2 = get_isbits_nt(param_set.user_aux, :linear_combination_liq_c_2, FT(-0.6)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
         c_3 = get_isbits_nt(param_set.user_aux, :linear_combination_liq_c_3, FT(-10)) # asssume nothing here? (keep 0 as upper bound?) 
-        c_4 = supersat_type == :linear_combination_with_w ? get_isbits_nt(param_set.user_aux, :linear_combination_liq_c_4, FT(0)) : FT(0) # start at 0
+        c_4 =
+            supersat_type == :linear_combination_with_w ?
+            get_isbits_nt(param_set.user_aux, :linear_combination_liq_c_4, FT(0)) : FT(0) # start at 0
 
-        N_l = exp(c_1 + c_2 * (T - T_fr) + c_3 * q.liq + c_4 * w/w_0)
+        N_l = exp(c_1 + c_2 * (T - T_fr) + c_3 * q.liq + c_4 * w / w_0)
 
     else
         # N_l = nothing
@@ -773,18 +747,10 @@ function get_N_l(
 
 end
 
-function get_Ns(
-    param_set::APS,
-    supersat_type::Symbol,
-    q::TD.PhasePartition,
-    T::FT,
-    p::FT,
-    w::FT,
-    ) where {FT}
+function get_Ns(param_set::APS, supersat_type::Symbol, q::TD.PhasePartition, T::FT, p::FT, w::FT) where {FT}
 
     N_l::FT = get_N_l(param_set, supersat_type, q, T, p, w)
     N_i::FT = get_N_i(param_set, supersat_type, q, T, p, w)
 
-    return (;liq=N_l, ice=N_i)
+    return (; liq = N_l, ice = N_i)
 end
-

@@ -239,7 +239,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         elseif t < 2 * TS.spinup_half_t_max # if spinup_half_t_max is 0, we'll bypass this
             Δt *= TS.spinup_dt_factor + (1 - TS.spinup_dt_factor) * (t - TS.spinup_half_t_max) / TS.spinup_half_t_max # a smooth ramp from TS.spinup_dt_factor to 1 between t=spinup_half_t_max and t=2*spinup_half_t_max
         end
-  
+
         surf = get_surface(surf_params, grid, state, t, param_set)
 
         TC.affect_filter!(edmf, grid, state, param_set, surf, t)
@@ -530,7 +530,7 @@ function compute_gm_tendencies!(
         if TC.get_isbits_nt(param_set.user_args, :grid_mean_sedimentation, false)
             # @info "grid mean sedimenting"
             ts_gm = TC.center_aux_grid_mean(state).ts
-            mph, _ = TC.calculate_sedimentation_sources(param_set, grid, ρ_c, ts_gm; grid_mean=true)
+            mph, _ = TC.calculate_sedimentation_sources(param_set, grid, ρ_c, ts_gm; grid_mean = true)
 
             L_v0 = TCP.LH_v0(param_set)
             L_s0 = TCP.LH_s0(param_set)
@@ -552,7 +552,8 @@ function compute_gm_tendencies!(
 
                 Π_m = TD.exner(thermo_params, ts_gm[k])
                 c_pm = TD.cp_m(thermo_params, ts_gm[k])
-                θ_liq_ice_tendency_sedimentation = 1 / Π_m / c_pm * ( L_v0 * ql_tendency_sedimentation + L_s0 * qi_tendency_sedimentation )
+                θ_liq_ice_tendency_sedimentation =
+                    1 / Π_m / c_pm * (L_v0 * ql_tendency_sedimentation + L_s0 * qi_tendency_sedimentation)
                 tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * θ_liq_ice_tendency_sedimentation
             end
         else # TC.get_isbits_nt(param_set.user_args, :grid_mean_sedimentation, false) # separate env/updraft sedimentation calcs
@@ -561,21 +562,17 @@ function compute_gm_tendencies!(
             @inbounds for k in TC.real_center_indices(grid)
 
                 if edmf.moisture_model isa TC.NonEquilibriumMoisture
-                    tendencies_gm.q_liq[k] += aux_en.ql_tendency_sedimentation[k] + aux_bulk.ql_tendency_sedimentation[k]
-                    tendencies_gm.q_ice[k] += aux_en.qi_tendency_sedimentation[k] + aux_bulk.qi_tendency_sedimentation[k]
+                    tendencies_gm.q_liq[k] +=
+                        aux_en.ql_tendency_sedimentation[k] + aux_bulk.ql_tendency_sedimentation[k]
+                    tendencies_gm.q_ice[k] +=
+                        aux_en.qi_tendency_sedimentation[k] + aux_bulk.qi_tendency_sedimentation[k]
                 end
 
                 tendencies_gm.ρq_tot[k] +=
-                ρ_c[k] * (
-                    aux_bulk.qt_tendency_sedimentation[k] +
-                    aux_en.qt_tendency_sedimentation[k]
-                )
+                    ρ_c[k] * (aux_bulk.qt_tendency_sedimentation[k] + aux_en.qt_tendency_sedimentation[k])
 
                 tendencies_gm.ρθ_liq_ice[k] +=
-                ρ_c[k] * (
-                    aux_bulk.θ_liq_ice_tendency_sedimentation[k] +
-                    aux_en.θ_liq_ice_tendency_sedimentation[k]
-                )
+                    ρ_c[k] * (aux_bulk.θ_liq_ice_tendency_sedimentation[k] + aux_en.θ_liq_ice_tendency_sedimentation[k])
             end
         end
     end

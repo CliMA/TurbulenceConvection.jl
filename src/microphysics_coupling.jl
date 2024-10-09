@@ -15,7 +15,16 @@ end
 
 """
 """
-function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts::TD.ThermodynamicState, w::FT, z::FT; ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing) where {FT}
+function noneq_moisture_sources(
+    param_set::APS,
+    area::FT,
+    ρ::FT,
+    Δt::Real,
+    ts::TD.ThermodynamicState,
+    w::FT,
+    z::FT;
+    ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
+) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     microphys_params::ACMP = TCP.microphysics_params(param_set)
     # TODO - when using adaptive timestepping we are limiting the source terms with the previous timestep Δt
@@ -45,7 +54,7 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts:
                 TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()),
                 TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice()),
             ) # all 3 are vapor amounts
-            # @info ("τliq =  $τ_liq,  τice =  $τ_ice, T =  $T, w = $w  qliq =  $(q.liq), qice = $(q.ice) qvap = $q_vap, qveq liq = $(q_eq.liq), qveq ice = $(q_eq.ice) ")
+        # @info ("τliq =  $τ_liq,  τice =  $τ_ice, T =  $T, w = $w  qliq =  $(q.liq), qice = $(q.ice) qvap = $q_vap, qveq liq = $(q_eq.liq), qveq ice = $(q_eq.ice) ")
 
         elseif use_korolev_mazin
             # need to get w into here somewhere...
@@ -241,22 +250,9 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts:
             elseif τ_use == :morrison_milbrandt_2015_style
                 # this *shouldn't* need limiters the way it's defined but... lol we'll see...
                 S_ql, S_qi =
-                    morrison_milbrandt_2015_style(
-                        param_set,
-                        area,
-                        ρ,
-                        p,
-                        T,
-                        w,
-                        τ_liq,
-                        τ_ice,
-                        q_vap,
-                        q,
-                        q_eq,
-                        Δt,
-                        ts)
+                    morrison_milbrandt_2015_style(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, q, q_eq, Δt, ts)
 
-                    # Still needs limiters (don't consume liquid that isn't there mainly...)
+                # Still needs limiters (don't consume liquid that isn't there mainly...)
             elseif τ_use == :morrison_milbrandt_2015_style_exponential_part_only
                 # this *shouldn't* need limiters the way it's defined but... lol we'll see...
                 S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(
@@ -399,8 +395,8 @@ function precipitation_formation(
     θ_liq_ice_tendency = FT(0)
 
 
-    ql_tendency_acnv  = FT(0)
-    qi_tendency_acnv  = FT(0)
+    ql_tendency_acnv = FT(0)
+    qi_tendency_acnv = FT(0)
     ql_tendency_accr_liq_rai = FT(0)
     ql_tendency_accr_liq_sno = FT(0)
     qi_tendency_accr_ice_rai = FT(0)
@@ -467,7 +463,7 @@ function precipitation_formation(
             else
                 error("Unrecognized rain formation model")
             end
-            
+
             ql_tendency_acnv = S_qt_rain # for storage
 
             use_supersat = get_isbits_nt(param_set.user_args, :use_supersat, false)
@@ -475,11 +471,12 @@ function precipitation_formation(
                 S_qt_snow = -min(q.ice / Δt, α_acnv * CM1.conv_q_ice_to_q_sno_no_supersat(microphys_params, q.ice))
             else
                 p = TD.air_pressure(thermo_params, ts)
-                S_qt_snow = -min(q.ice / Δt, α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q, T, p, use_supersat))
+                S_qt_snow =
+                    -min(q.ice / Δt, α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q, T, p, use_supersat))
             end
 
             qi_tendency_acnv = S_qt_snow # for storage
-            
+
             qr_tendency -= S_qt_rain
             qs_tendency -= S_qt_snow
             qt_tendency += S_qt_rain + S_qt_snow
@@ -583,7 +580,13 @@ function precipitation_formation(
             θ_liq_ice_tendency += S_qs * Lf / Π_m / c_vm
         end
     end
-    return PrecipFormation{FT}(θ_liq_ice_tendency, qt_tendency, ql_tendency, qi_tendency, qr_tendency, qs_tendency, 
+    return PrecipFormation{FT}(
+        θ_liq_ice_tendency,
+        qt_tendency,
+        ql_tendency,
+        qi_tendency,
+        qr_tendency,
+        qs_tendency,
         # my additions
         ql_tendency_acnv,
         qi_tendency_acnv,
@@ -592,7 +595,7 @@ function precipitation_formation(
         ql_tendency_accr_liq_sno,
         FT(0), # qi_tendency_accr_ice_liq,
         qi_tendency_accr_ice_rai,
-        qi_tendency_accr_ice_sno
+        qi_tendency_accr_ice_sno,
     )
 end
 
@@ -604,7 +607,18 @@ This is probably good bc we had it in noneq_moisture_sources but it's conflated 
 
 For consistency I've kept passing in S_ql, S_qi here but maybe we should just deprecate that and just have one limiter at the end? idk...
 """
-function other_microphysics_processes(param_set::APS, area::FT, ρ::FT, Δt::Real, ts::TD.ThermodynamicState, w::FT, z::FT, S_ql::FT, S_qi::FT; ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing) where {FT}
+function other_microphysics_processes(
+    param_set::APS,
+    area::FT,
+    ρ::FT,
+    Δt::Real,
+    ts::TD.ThermodynamicState,
+    w::FT,
+    z::FT,
+    S_ql::FT,
+    S_qi::FT;
+    ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
+) where {FT}
 
     S_ql_init::FT = S_ql
     S_qi_init::FT = S_qi
@@ -657,19 +671,24 @@ function other_microphysics_processes(param_set::APS, area::FT, ρ::FT, Δt::Rea
                 S_qi += qi_tendency_homogeneous_freezing # send any existing liquid to ice that isn't already evaporating (if S_ql was positive, it's already been sent to ice and set to 0)
                 S_ql = -q.liq / Δt # remove all liquid
             end
-        # Heterogeneous ice nucleation
+            # Heterogeneous ice nucleation
         else
             if get_isbits_nt(param_set.user_args, :use_heterogeneous_ice_nucleation, false)
-                heterogeneous_ice_nuclation_coefficient = get_isbits_nt(param_set.user_aux, :heterogeneous_ice_nuclation_coefficient, FT(1))
-                heterogeneous_ice_nuclation_exponent = get_isbits_nt(param_set.user_aux, :heterogeneous_ice_nuclation_exponent, FT(1))
+                heterogeneous_ice_nuclation_coefficient =
+                    get_isbits_nt(param_set.user_aux, :heterogeneous_ice_nuclation_coefficient, FT(1))
+                heterogeneous_ice_nuclation_exponent =
+                    get_isbits_nt(param_set.user_aux, :heterogeneous_ice_nuclation_exponent, FT(1))
 
-                c_1 = ρ * heterogeneous_ice_nuclation_coefficient * exp(heterogeneous_ice_nuclation_exponent * (T - thermo_params.T_freeze) - 1)
-                qi_tendency_heterogeneous_icenuc =  q.liq * ( 1 - exp(- c_1 * Δt)) # positive number, how much liquid is losing
+                c_1 =
+                    ρ *
+                    heterogeneous_ice_nuclation_coefficient *
+                    exp(heterogeneous_ice_nuclation_exponent * (T - thermo_params.T_freeze) - 1)
+                qi_tendency_heterogeneous_icenuc = q.liq * (1 - exp(-c_1 * Δt)) # positive number, how much liquid is losing
 
 
                 # we have two exponentials so if we'd deplete all our liquid we just scale down.
                 if S_ql < 0
-                    qi_tendency_heterogeneous_icenuc = max( -q.liq/Δt - S_ql, -qi_tendency_heterogeneous_icenuc ) # S_ql should be smaller than q.liq/Δt after doing limiters above, but maybe move them down here?
+                    qi_tendency_heterogeneous_icenuc = max(-q.liq / Δt - S_ql, -qi_tendency_heterogeneous_icenuc) # S_ql should be smaller than q.liq/Δt after doing limiters above, but maybe move them down here?
                 end
                 S_ql -= qi_tendency_heterogeneous_icenuc
                 S_qi += qi_tendency_heterogeneous_icenuc
@@ -677,12 +696,13 @@ function other_microphysics_processes(param_set::APS, area::FT, ρ::FT, Δt::Rea
         end
     end
 
-    return OtherMicrophysicsSources{FT}(S_ql - S_ql_init , S_qi - S_qi_init,
+    return OtherMicrophysicsSources{FT}(
+        S_ql - S_ql_init,
+        S_qi - S_qi_init,
         # my additions for storage
         qi_tendency_homogeneous_freezing,
         qi_tendency_heterogeneous_icenuc,
         qi_tendency_heterogeneous_freezing,
-        qi_tendency_melting)
+        qi_tendency_melting,
+    )
 end
-        
-

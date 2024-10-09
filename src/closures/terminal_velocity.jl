@@ -15,8 +15,8 @@ taken from https://github.com/CliMA/CloudMicrophysics.jl/blob/v0.14.0/src/Microp
 import SpecialFunctions as SF
 
 
-Γ_lower(a,x) = SF.gamma(a) - SF.gamma(a,x) # lower incomplete gamma function, ∫_0^x t^(a-1) e^(-t) dt instead of ∫_0^∞
-resolve_nan(x::FT; val=0.0) where{FT} = isnan(x) ? FT(val) : x # replace nan w/ 0
+Γ_lower(a, x) = SF.gamma(a) - SF.gamma(a, x) # lower incomplete gamma function, ∫_0^x t^(a-1) e^(-t) dt instead of ∫_0^∞
+resolve_nan(x::FT; val = 0.0) where {FT} = isnan(x) ? FT(val) : x # replace nan w/ 0
 
 
 # ============================================================================= #
@@ -87,7 +87,7 @@ function my_Chen2022snow_coeffs(prs::ACMP, ρ_i::FT) where {FT <: Real}
     As_s::FT, Bs_s::FT, Cs_s::FT, Es_s::FT, Fs_s, Gs_s::FT = my_Chen2022ice_coeffs(prs, ρ_i)
 
     # Large Ice (Tables B5)
-    As_1l::FT, As_2l::FT, As_3l::FT = 0.475897, 0.00231270, 1.12293 
+    As_1l::FT, As_2l::FT, As_3l::FT = 0.475897, 0.00231270, 1.12293
     Bs_1l::FT, Bs_2l::FT, Bs_3l::FT = 2.56289, 0.00513504, 0.608459
     Cs_1l::FT, Cs_2l::FT, Cs_3l::FT = 0.756064, 0.935922, 1.70952
     Es_1l::FT, Es_2l::FT, Es_3l::FT = 0.00639847, 0.00906454, 0.108232
@@ -95,13 +95,13 @@ function my_Chen2022snow_coeffs(prs::ACMP, ρ_i::FT) where {FT <: Real}
     Gs_1l::FT, Gs_2l::FT, Gs_3l::FT = 2.65236, 0.00158269, 259.935
     Hs_1l::FT, Hs_2l::FT, Hs_3l::FT = 0.346044, 7.17829e-11, 1.24394e20
 
-    As_l = -As_1l - As_2l * log(ρ_i) + As_3l * ρ_i^(-3/2)
+    As_l = -As_1l - As_2l * log(ρ_i) + As_3l * ρ_i^(-3 / 2)
     Bs_l = exp(-Bs_1l - Bs_2l * log(ρ_i)^2 + Bs_3l * log(ρ_i))
     Cs_l = exp(-Cs_1l + Cs_2l / log(ρ_i) - Cs_3l / ρ_i)
     Es_l = Es_1l + Es_2l * log(ρ_i) * sqrt(ρ_i) - Es_3l * sqrt(ρ_i)
     Fs_l = Fs_1l - Fs_2l * log(ρ_i) - Fs_3l * exp(-ρ_i)
     Gs_l = (Gs_1l + Gs_2l * log(ρ_i) * sqrt(ρ_i) + Gs_3l / sqrt(ρ_i))^(-1)
-    Hs_l = -Hs_1l - Hs_2l * ρ_i^(5/2) - Hs_3l * exp(-ρ_i)
+    Hs_l = -Hs_1l - Hs_2l * ρ_i^(5 / 2) - Hs_3l * exp(-ρ_i)
 
     return (As_s, Bs_s, Cs_s, Es_s, Fs_s, Gs_s), (As_l, Bs_l, Cs_l, Es_l, Fs_l, Gs_l, Hs_l) # small and large particles 
 end
@@ -143,11 +143,7 @@ function my_Chen2022_vel_coeffs(prs::ACMP, ::CMT.RainType, ρ::FT) where {FT <: 
     return (aiu, bi, ciu)
 end
 
-function my_Chen2022_vel_coeffs(
-    prs::ACMP,
-    ::CMT.IceType,
-    ρ::FT,
-) where {FT <: Real}
+function my_Chen2022_vel_coeffs(prs::ACMP, ::CMT.IceType, ρ::FT) where {FT <: Real}
 
     ρ_i::FT = CMP.ρ_cloud_ice(prs)
 
@@ -164,15 +160,12 @@ function my_Chen2022_vel_coeffs(
 end
 
 
-function my_Chen2022_vel_coeffs(
-    prs::ACMP,
-    ::CMT.SnowType,
-    ρ::FT,
-) where {FT <: Real}
+function my_Chen2022_vel_coeffs(prs::ACMP, ::CMT.SnowType, ρ::FT) where {FT <: Real}
 
     ρ_i::FT = CMP.ρ_cloud_ice(prs)
 
-    (_As_s, _Bs_s, _Cs_s, _Es_s, _Fs_s, _Gs_s), (_As_l, _Bs_l, _Cs_l, _Es_l, _Fs_l, _Gs_l, _Hs_l)  = my_Chen2022snow_coeffs(prs, ρ_i)
+    (_As_s, _Bs_s, _Cs_s, _Es_s, _Fs_s, _Gs_s), (_As_l, _Bs_l, _Cs_l, _Es_l, _Fs_l, _Gs_l, _Hs_l) =
+        my_Chen2022snow_coeffs(prs, ρ_i)
 
     # == small ================================================== # Table B2
     ai_s = (_Es_s * ρ^_As_s, _Fs_s * ρ^_As_s)
@@ -185,7 +178,7 @@ function my_Chen2022_vel_coeffs(
 
 
     # == large ================================================== # Table B4
-    ai_l = (_Bs_l * ρ^_As_l, _Es_l * ρ^_As_l*exp(_Hs_l*ρ))
+    ai_l = (_Bs_l * ρ^_As_l, _Es_l * ρ^_As_l * exp(_Hs_l * ρ))
     bi_l = (_Cs_l, _Fs_l)
     ci_l = (FT(0), _Gs_l)
     # unit conversions
@@ -208,11 +201,12 @@ Returns the addends of the bulk fall speed of rain or ice particles
 following Chen et al 2022 DOI: 10.1016/j.atmosres.2022.106171 in [m/s].
 We are assuming exponential size distribution and hence μ=0.
 """
-function my_Chen2022_vel_add(a::FT, b::FT, c::FT, λ::FT, k::Int; Dmax::FT=Inf, Dmin::FT=0.0) where {FT <: Real}
+function my_Chen2022_vel_add(a::FT, b::FT, c::FT, λ::FT, k::Int; Dmax::FT = Inf, Dmin::FT = 0.0) where {FT <: Real}
     μ = 0 # Exponantial instaed of gamma distribution
     δ = μ + k + 1
     # return a * λ^δ * SF.gamma(b + δ) / (λ + c)^(b + δ) / SF.gamma(δ)
-    return a * λ^δ  / (λ + c)^(b + δ)  * ( SF.gamma(b + δ, Dmax*(λ+c)) - SF.gamma(b + δ, Dmin*(λ+c))) /  ( SF.gamma(δ, Dmax*λ) - SF.gamma(δ, Dmin*λ))
+    return a * λ^δ / (λ + c)^(b + δ) * (SF.gamma(b + δ, Dmax * (λ + c)) - SF.gamma(b + δ, Dmin * (λ + c))) /
+           (SF.gamma(δ, Dmax * λ) - SF.gamma(δ, Dmin * λ))
     # this should be the result of truncating at Dmax, where we transition from rain to snow for example...
 end
 
@@ -228,10 +222,23 @@ I think the only difference in the formula is that instead of deriving λ alone,
 but in the exponential is still just only λ and c?
 =#
 """
-function my_Chen2022_vel_add_sno(t::FT, b::FT, aec::FT, mec::FT, κ::FT, k::Int, c::FT, λ::FT, Dmin::FT, Dmax::FT) where {FT}
+function my_Chen2022_vel_add_sno(
+    t::FT,
+    b::FT,
+    aec::FT,
+    mec::FT,
+    κ::FT,
+    k::Int,
+    c::FT,
+    λ::FT,
+    Dmin::FT,
+    Dmax::FT,
+) where {FT}
 
-    return t * ( SF.gamma(3 * κ * aec - 2 * κ * mec + b + k + 1, Dmax * (λ+c)) - SF.gamma(3 * κ * aec - 2 * κ * mec + b + k + 1, Dmin * (λ+c))) /
-    ( SF.gamma(k + 1, Dmax * λ ) - SF.gamma(k + 1, Dmin * λ))
+    return t * (
+        SF.gamma(3 * κ * aec - 2 * κ * mec + b + k + 1, Dmax * (λ + c)) -
+        SF.gamma(3 * κ * aec - 2 * κ * mec + b + k + 1, Dmin * (λ + c))
+    ) / (SF.gamma(k + 1, Dmax * λ) - SF.gamma(k + 1, Dmin * λ))
 
 
     # Checking here
@@ -240,8 +247,8 @@ function my_Chen2022_vel_add_sno(t::FT, b::FT, aec::FT, mec::FT, κ::FT, k::Int,
 end
 # This is for \int_0^∞, but we want transitions
 # my_Chen2022_vel_add_sno(t, b, aec, mec, κ, k; Dmax=Dmax) =
-    # t * SF.gamma(3 * κ * aec - 2 * κ * mec + b + k + 1) /
-    # SF.gamma(k + 1)
+# t * SF.gamma(3 * κ * aec - 2 * κ * mec + b + k + 1) /
+# SF.gamma(k + 1)
 
 # ============================================================================= #
 
@@ -289,7 +296,7 @@ function n0(
     ρ::FT,
     Nt::FT,
     precip::Union{CMT.IceType, CMT.RainType, CMT.SnowType}, # not sure if have a liqtype
-    ) where {FT <: Real}
+) where {FT <: Real}
     # _n0::FT = n0(prs, q, ρ, precip)
     _r0::FT = r0(prs, precip)
     _m0::FT = m0(prs, precip)
@@ -299,19 +306,15 @@ function n0(
 
     n0::FT = FT(0)
     if q > FT(0)
-        E::FT = FT(1 / (_me + _Δm + 1)) 
-        λ_no_n0::FT =
-            (
-                _χm * _m0 * SF.gamma(_me + _Δm + FT(1)) / ρ / q /
-                _r0^(_me + _Δm)
-            )^E # We've divided λ by n_0 ^ FT(1 / (_me + _Δm + 1)) = n_0^E so that λ = λ_no_n0 * n_0^E
+        E::FT = FT(1 / (_me + _Δm + 1))
+        λ_no_n0::FT = (_χm * _m0 * SF.gamma(_me + _Δm + FT(1)) / ρ / q / _r0^(_me + _Δm))^E # We've divided λ by n_0 ^ FT(1 / (_me + _Δm + 1)) = n_0^E so that λ = λ_no_n0 * n_0^E
 
         # call FT(1 / (_me + _Δm + 1)) E
         #  So we have  N_t = n_0 / λ = n_0 / (λ_no_n0 * n_0^E) = n_0^(1-E) / λ_no_n0
         # Then, n_0^(1-E) = N_t λ_no_n0
         # n_0 = (N_t λ_no_n0)^(1 / (1-E))
 
-        n0 = (Nt * λ_no_n0)^(1 / (1-E))
+        n0 = (Nt * λ_no_n0)^(1 / (1 - E))
 
         return n0
     end
@@ -336,9 +339,7 @@ function v0(prs::ACMP, ρ::FT, ::CMT.RainType) where {FT <: Real}
     _grav::FT = CMP.grav(prs)
     _r0_rai::FT = CMP.r0_rai(prs)
 
-    return sqrt(
-        FT(8 / 3) / _C_drag * (_ρ_cloud_liq / ρ - FT(1)) * _grav * _r0_rai,
-    )
+    return sqrt(FT(8 / 3) / _C_drag * (_ρ_cloud_liq / ρ - FT(1)) * _grav * _r0_rai)
 end
 v0(prs::ACMP, ::Any, ::CMT.SnowType) = CMP.v0_sno(prs)
 
@@ -409,21 +410,17 @@ function lambda(
     _me::FT = me(prs, precip)
     _Δm::FT = Δm(prs, precip)
     _χm::FT = χm(prs, precip)
-    
+
 
     λ::FT = FT(0)
 
     if q > FT(0)
-        λ =
-            (
-                _χm * _m0 * _n0 * SF.gamma(_me + _Δm + FT(1)) / ρ / q /
-                _r0^(_me + _Δm)
-            )^FT(1 / (_me + _Δm + 1))
+        λ = (_χm * _m0 * _n0 * SF.gamma(_me + _Δm + FT(1)) / ρ / q / _r0^(_me + _Δm))^FT(1 / (_me + _Δm + 1))
     end
 
     # this would be scaling N to get the right q, but no point bc doesnt affect terminal velocity anyway (we wouldn't recompute λ, and the mass weighting wouldn't change...)
     # if Dmin > 0 || Dmax < Inf
-        # _n0 = SF.Gamma(μ+1) / (SF.Gamma(μ+1, D_max * λ) - SF.Gamma(μ+1, D_min * λ))
+    # _n0 = SF.Gamma(μ+1) / (SF.Gamma(μ+1, D_max * λ) - SF.Gamma(μ+1, D_min * λ))
     # end
 
     return λ
@@ -456,7 +453,6 @@ function my_terminal_velocity(
     Dmax::FT = Inf, # not implemented yet
     # Nt::Union{FT, Nothing} = nothing,
     Nt::FT = NaN, # testing for type stability, use NaN instead of nothing
-
 ) where {FT <: Real}
     fall_w = FT(0)
     if q_ > FT(0)
@@ -472,11 +468,7 @@ function my_terminal_velocity(
         _λ::FT = lambda(prs, precip, q_, ρ, Nt, Dmin, Dmax)
 
         fall_w =
-            _χv *
-            _v0 *
-            (_λ * _r0)^(-_ve - _Δv) *
-            SF.gamma(_me + _ve + _Δm + _Δv + FT(1)) /
-            SF.gamma(_me + _Δm + FT(1))
+            _χv * _v0 * (_λ * _r0)^(-_ve - _Δv) * SF.gamma(_me + _ve + _Δm + _Δv + FT(1)) / SF.gamma(_me + _Δm + FT(1))
     end
 
     return resolve_nan(fall_w)
@@ -501,7 +493,7 @@ function my_terminal_velocity(
         _λ::FT = lambda(prs, precip, q_, ρ, Nt, Dmin, Dmax)
 
         # eq 20 from Chen et al 2022
-        fall_w = sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, 3; Dmin=Dmin,Dmax=Dmax))
+        fall_w = sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, 3; Dmin = Dmin, Dmax = Dmax))
         # It should be ϕ^κ * fall_w, but for rain drops ϕ = 1 and κ = 0
         fall_w = max(FT(0), fall_w)
     end
@@ -545,9 +537,9 @@ function my_terminal_velocity(
         # ================================================================= #
         k = 3 # mass weighted
         # coefficients from Appendix B from Chen et. al. 2022
-        (aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l)  = my_Chen2022_vel_coeffs(prs, CM.CommonTypes.SnowType(), ρ)
+        (aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l) = my_Chen2022_vel_coeffs(prs, CM.CommonTypes.SnowType(), ρ)
 
-        local mass_weights::SA.MVector{2,FT}
+        local mass_weights::SA.MVector{2, FT}
         mass_weights = SA.@MVector [FT(0), FT(0)]
         if Dmin < D_transition
             if Dmax <= D_transition
@@ -563,13 +555,13 @@ function my_terminal_velocity(
         end
 
         fall_w = FT(0)
-        for (i, ((Dmin, Dmax), (aiu, bi , ciu))) in enumerate(zip(regions, abcs)) # we basically need to sum the integral as before but over all regions
-           
-            mass_weights[i] = _λ^-(k+1) * (-SF.gamma(k+1, Dmax*_λ) + SF.gamma(k+1, Dmin*_λ)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
+        for (i, ((Dmin, Dmax), (aiu, bi, ciu))) in enumerate(zip(regions, abcs)) # we basically need to sum the integral as before but over all regions
+
+            mass_weights[i] = _λ^-(k + 1) * (-SF.gamma(k + 1, Dmax * _λ) + SF.gamma(k + 1, Dmin * _λ)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
 
 
             # eq 20 from Chen et al 2022
-            fall_w += sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, 3; Dmin=Dmin, Dmax=Dmax)) .* mass_weights[i]
+            fall_w += sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, 3; Dmin = Dmin, Dmax = Dmax)) .* mass_weights[i]
         end
 
         if (total_weight = sum(mass_weights)) != 0
@@ -613,7 +605,7 @@ function my_terminal_velocity(
 
         # short circuit cause greater than .625 mm is giving negative values for some reason... so we'll just ignore that I guess...
         # return my_terminal_velocity(prs, ice_type, velo_scheme, ρ, q_; Dmin=Dmin, Dmax=Dmax, Nt=Nt) # backup for now bc large ice is broken...
-        
+
         _r0::FT = r0(prs, precip)
         _λ::FT = lambda(prs, precip, q_, ρ, Nt, Dmin, Dmax)
         m0c::FT = m0(prs, precip) * χm(prs, precip)
@@ -625,10 +617,10 @@ function my_terminal_velocity(
 
         # D_transition::FT = 0.625e-3 # .625mm is the transition from small to large ice crystals in Chen paper
 
-        local mass_weights::SA.MVector{2,FT}
+        local mass_weights::SA.MVector{2, FT}
 
         # coefficients from Appendix B from Chen et. al. 2022
-        (aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l)  = my_Chen2022_vel_coeffs(prs, precip, ρ)
+        (aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l) = my_Chen2022_vel_coeffs(prs, precip, ρ)
 
         κ = FT(-1 / 3) #oblate
         # κ = FT(1 / 3) #oblate (anna says this is right)
@@ -653,19 +645,15 @@ function my_terminal_velocity(
             abcs = [(aiu_l, bi_l, ciu_l)]
         end
 
-        tmp =
-            _λ^(k + 1) *
-            ((16 * a0c^3 * ρ_i^2) / (9 * π * m0c^2 * _r0^(3 * aec - 2 * mec)))^κ
+        tmp = _λ^(k + 1) * ((16 * a0c^3 * ρ_i^2) / (9 * π * m0c^2 * _r0^(3 * aec - 2 * mec)))^κ
         fall_w = FT(0)
-        for (i, ((Dmin, Dmax), (aiu, bi , ciu))) in enumerate(zip(regions, abcs)) # we basically need to sum the integral as before but over all regions
-            ci_pow =
-                (2 .* ciu .+ _λ) .^
-                (.-(3 .* aec .* κ .- 2 .* mec .* κ .+ bi .+ k .+ 1))
-            
+        for (i, ((Dmin, Dmax), (aiu, bi, ciu))) in enumerate(zip(regions, abcs)) # we basically need to sum the integral as before but over all regions
+            ci_pow = (2 .* ciu .+ _λ) .^ (.-(3 .* aec .* κ .- 2 .* mec .* κ .+ bi .+ k .+ 1))
+
             ti = tmp .* aiu .* FT(2) .^ bi .* ci_pow
 
             # k = 3 for mass, μ = 0 for exponential size distribution instead of gamma
-            mass_weights[i] = _λ^-(k+1) * (-SF.gamma(k+1, Dmax*_λ) + SF.gamma(k+1, Dmin*_λ)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
+            mass_weights[i] = _λ^-(k + 1) * (-SF.gamma(k + 1, Dmax * _λ) + SF.gamma(k + 1, Dmin * _λ)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
             # In general, if we're cutting off at a (Dmin, Dmax) but the exponential size distribution wasn't derived with those in mind, will it work out for terminal velocity? might get unrealistic results?
             # total mass q would be ∼  _λ^-(k+1) * (-Γ(k+1, ∞) + Γ(k+1, 0)) = Γ(k+1) / λ^(k+1)... so if we wanna limit ourselves to Dmin, Dmax, we are applying  the speed from that region to the entire dist...
             # for single moment... maybe

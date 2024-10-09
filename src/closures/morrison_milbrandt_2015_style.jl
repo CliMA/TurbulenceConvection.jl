@@ -88,7 +88,7 @@ function morrison_milbrandt_2015_style(
 
             # Does evaporating water releasing more latent heat than forming ice takeup risk evaporating a cloud completely?
         end
-        
+
 
         Γ_l = 1 + L_l / c_p * dqsl_dT  # Eqn C3
         Γ_i = 1 + L_i / c_p * dqsi_dT  # Eqn C3
@@ -104,32 +104,30 @@ function morrison_milbrandt_2015_style(
 
         τ::FT = 1 / (1 / τ_liq + (1 + (L_i / c_p) * dqsl_dT) * ((1 / τ_ice) / (Γ_i))) # Eqn C2
 
-        
+
         # τ_max = max(τ_liq, τ_ice)
 
 
         A_c::FT =
-            dTdt_mix - (q_sl * ρ * g * w) / (p - e_sl) -
-            dqsl_dT * (dTdt_rad + dTdt_mix - (w * g) / c_p) -
+            dTdt_mix - (q_sl * ρ * g * w) / (p - e_sl) - dqsl_dT * (dTdt_rad + dTdt_mix - (w * g) / c_p) -
             (q_sl - q_si) / (τ_ice * Γ_l) * (1 + (L_i / c_p) * dqsl_dT) # Eq C4
 
-        S_ql = A_c * τ / (τ_liq * Γ_l) +
-        (δ_0 - A_c * τ) * τ / (Δt * τ_liq * Γ_l) * (1 - exp(-Δt / τ))   # QCCON EQN C6
+        S_ql = A_c * τ / (τ_liq * Γ_l) + (δ_0 - A_c * τ) * τ / (Δt * τ_liq * Γ_l) * (1 - exp(-Δt / τ))   # QCCON EQN C6
 
 
-        β =  -(q_sl - q_si) / (τ_ice * Γ_l) * (1 + (L_i / c_p) * dqsl_dT)
-        β_cont = β * τ / (τ_liq * Γ_l) +  (-β * τ) * τ / (Δt * τ_liq * Γ_l) * (1 - exp(-Δt / τ)) 
+        β = -(q_sl - q_si) / (τ_ice * Γ_l) * (1 + (L_i / c_p) * dqsl_dT)
+        β_cont = β * τ / (τ_liq * Γ_l) + (-β * τ) * τ / (Δt * τ_liq * Γ_l) * (1 - exp(-Δt / τ))
         α = (A_c - β)
-        α_cont = α * τ / (τ_liq * Γ_l) +  (-α * τ) * τ / (Δt * τ_liq * Γ_l) * (1 - exp(-Δt / τ))
+        α_cont = α * τ / (τ_liq * Γ_l) + (-α * τ) * τ / (Δt * τ_liq * Γ_l) * (1 - exp(-Δt / τ))
 
-        δ_0_cont = δ_0 *  τ / (Δt * τ_liq * Γ_l) * (1 - exp(-Δt / τ))
+        δ_0_cont = δ_0 * τ / (Δt * τ_liq * Γ_l) * (1 - exp(-Δt / τ))
 
         WBF_cont = β_cont
-        WBF_limit = -max(WBF_cont, -q.liq/Δt) # not more than liq can provide
+        WBF_limit = -max(WBF_cont, -q.liq / Δt) # not more than liq can provide
         evap_cont = δ_0_cont + α_cont # some of this should go to ice... let's just say if it would have been WBF'd remove it
 
         # evap_cont = max(evap_cont - WBF_cont,) # no negative evap
-        S_ql = max(WBF_cont + evap_cont,  -q.liq/Δt)
+        S_ql = max(WBF_cont + evap_cont, -q.liq / Δt)
 
         S_qi =
             A_c * τ / (τ_ice * Γ_i) +
@@ -140,18 +138,18 @@ function morrison_milbrandt_2015_style(
         # β_ice_cont = β * τ / (τ_ice * Γ_i) +  (-β * τ) * τ / (Δt * τ_ice * Γ_i) * (1 - exp(-Δt / τ)) 
         # δ_0_ice_cont = δ_0 *  τ / (Δt * τ_ice * Γ_i) * (1 - exp(-Δt / τ))
 
-        if S_qi  > 0
-            liq_provide = min( max(-S_ql, 0), q.liq/Δt)
+        if S_qi > 0
+            liq_provide = min(max(-S_ql, 0), q.liq / Δt)
             WBF_cont_ice = -max(-WBF_cont, -liq_provide) # not more than liq can provide
             WBF_cont = min(S_qi, WBF_limit)
-            S_qi = min(S_qi, (δ_0 + q_sl-q_si)/Δt - S_ql)
+            S_qi = min(S_qi, (δ_0 + q_sl - q_si) / Δt - S_ql)
         else
             # Any WBF going to ice is less than what's being evaporated...
-            WBF_cont_ice = -max(-WBF_cont, -q.liq/Δt) # not more than liq can provide
+            WBF_cont_ice = -max(-WBF_cont, -q.liq / Δt) # not more than liq can provide
             WBF_cont = min(S_qi, WBF_limit)
             S_qi += (WBF_cont_ice - WBF_cont) # switch to our limited WBF contribution from liquid
         end
-        S_qi = max(S_qi, -q.ice/Δt) # don't let it take more ice than exists
+        S_qi = max(S_qi, -q.ice / Δt) # don't let it take more ice than exists
 
 
         # Go from mixing ratio world back to specific humidity world

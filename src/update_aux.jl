@@ -255,7 +255,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     # aux_bulk.qi_tendency_vert_adv .= FT(0) # gm only
     # aux_bulk.qi_tendency_ls_vert_adv .= FT(0) # gm only
     # aux_bulk.qi_tendency_sgs .= FT(0) # gm only
-    
+
     # ======================================================== #
 
     microphysics(edmf.en_thermo, grid, state, edmf, edmf.precip_model, edmf.rain_formation_model, Δt, param_set) # set env tendencies for microphysics
@@ -603,8 +603,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             # term_vel_rain[k] = CM1.terminal_velocity(microphys_params, rain_type, rain_velo_scheme, ρ_c[k], prog_pr.q_rai[k])
             # term_vel_snow[k] = CM1.terminal_velocity(microphys_params, snow_type, snow_velo_scheme, ρ_c[k], prog_pr.q_sno[k])
             # use my own that's nan-safe
-            term_vel_rain[k] = my_terminal_velocity(microphys_params, rain_type, rain_velo_scheme, ρ_c[k], prog_pr.q_rai[k]) .* get_isbits_nt(param_set.user_args, :rain_sedimentation_scaling_factor, FT(1.0))
-            term_vel_snow[k] = my_terminal_velocity(microphys_params, snow_type, snow_velo_scheme, ρ_c[k], prog_pr.q_sno[k]) .* get_isbits_nt(param_set.user_args, :snow_sedimentation_scaling_factor, FT(1.0))
+            term_vel_rain[k] =
+                my_terminal_velocity(microphys_params, rain_type, rain_velo_scheme, ρ_c[k], prog_pr.q_rai[k]) .*
+                get_isbits_nt(param_set.user_args, :rain_sedimentation_scaling_factor, FT(1.0))
+            term_vel_snow[k] =
+                my_terminal_velocity(microphys_params, snow_type, snow_velo_scheme, ρ_c[k], prog_pr.q_sno[k]) .*
+                get_isbits_nt(param_set.user_args, :snow_sedimentation_scaling_factor, FT(1.0))
         end
     end
 
@@ -640,7 +644,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         Δt,
         param_set,
     )
-  
+
 
     return nothing
 end

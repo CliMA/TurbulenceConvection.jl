@@ -73,7 +73,7 @@ function construct_mesh(namelist; FT = Float64)
         # convert zc to zf (this is not guaranteed to always work but it does for the grids they gave us)
         new_z = FT[FT(0)] # zf
         for zc in new_zc
-            append!(new_z, 2*zc - new_z[end]) # new_z[end] + 2*(zc - zf_data[end]) = 2*zc - new_z[end] # This happens to work for the grids they gave us and not yield any negative numbers...
+            append!(new_z, 2 * zc - new_z[end]) # new_z[end] + 2*(zc - zf_data[end]) = 2*zc - new_z[end] # This happens to work for the grids they gave us and not yield any negative numbers...
         end
         @assert all(diff(new_z) .> 0) "calulated face points zf from new_z is not monotonically increasing, try passing in a new_z that is a a valid center zc for some zf grid or adding functionality to interpret input grid as zf instead of as zc"
 
@@ -87,8 +87,10 @@ function construct_mesh(namelist; FT = Float64)
 
 
         dz_min_old = minimum(diff(old_z))
-        if  dz_min_old < dz_min
-            @info("minimum Δz $dz_min_old is smaller than the minimum allowed Δz of  $dz_min between z levels in the LES file, reducing...")
+        if dz_min_old < dz_min
+            @info(
+                "minimum Δz $dz_min_old is smaller than the minimum allowed Δz of  $dz_min between z levels in the LES file, reducing..."
+            )
             @info("old_z for $flight_number, $forcing_type: ", old_z)
             for (i, val) in enumerate(old_z)
                 if (val - current_z) < dz_min # hopefully this is goin in the right direction...

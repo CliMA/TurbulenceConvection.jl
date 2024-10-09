@@ -11,7 +11,7 @@ thermo_state(FT, ::NonEquilibriumMoisture) = TD.PhaseNonEquil{FT}(0, 0, TD.Phase
 
 
 # consolidate my additions so it's easier to edit. These will exist everywhere... (though they may not be used or defined in eq case...)
-my_microphysics_additions(FT, ::Union{NonEquilibriumMoisture, EquilibriumMoisture}) = (; 
+my_microphysics_additions(FT, ::Union{NonEquilibriumMoisture, EquilibriumMoisture}) = (;
     #
     ql_tendency_cond_evap = FT(0), # tendency due to condensation/evaporation
     qi_tendency_sub_dep = FT(0), # tendency due to sublimation/deposition

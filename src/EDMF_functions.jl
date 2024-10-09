@@ -573,13 +573,13 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
                 (ρaq_ice * Ic(w_up) * detr_turb_dyn) + (ρ_c * (qi_tendency_precip_formation + qi_tendency_noneq))
 
             if !get_isbits_nt(param_set.user_args, :use_sedimentation, false) # original
-                #
+            #
             else # use_sedimentation=true, # add logic for entr/detr sedimentation tendencies
 
                 ql_tendency_sedimentation = aux_up_i.ql_tendency_sedimentation
                 qi_tendency_sedimentation = aux_up_i.qi_tendency_sedimentation
                 qt_tendency_sedimentation = aux_up_i.qt_tendency_sedimentation # this is just the sum of the liq and ice tendencies
-                θ_liq_ice_tendency_sedimentation = aux_up_i.θ_liq_ice_tendency_sedimentation 
+                θ_liq_ice_tendency_sedimentation = aux_up_i.θ_liq_ice_tendency_sedimentation
                 # ==  these get backed out after gm tendencies applied in dycore so only use if addin entr/detr == #
                 # ql_tendency_sedimentation_en = aux_en.ql_tendency_sedimentation 
                 # qi_tendency_sedimentation_en = aux_en.qi_tendency_sedimentation
@@ -588,18 +588,16 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
                 # ================================================================================================ #
 
                 # ρaql_tendency_sedimentation = @. ρ_c * ql_tendency_sedimentation # sedimentation tendencies are already times area 
-                @. tends_ρaq_liq +=
-                    (ρ_c * ql_tendency_sedimentation) # +  # rolled vertical velocity into the sedimentation tendency (undid)
-                    # (ρarea * Ic(w_up) * entr_turb_dyn * q_liq_en) -
-                    # (ρaq_liq * Ic(w_up) * detr_turb_dyn) +
-                    # (ρ_c * (ql_tendency_precip_formation + ql_tendency_noneq))
+                @. tends_ρaq_liq += (ρ_c * ql_tendency_sedimentation) # +  # rolled vertical velocity into the sedimentation tendency (undid)
+                # (ρarea * Ic(w_up) * entr_turb_dyn * q_liq_en) -
+                # (ρaq_liq * Ic(w_up) * detr_turb_dyn) +
+                # (ρ_c * (ql_tendency_precip_formation + ql_tendency_noneq))
 
                 # ρaqi_tendency_sedimentation = @. ρ_c * qi_tendency_sedimentation # sedimentation tendencies are already times area
-                @. tends_ρaq_ice +=
-                    (ρ_c * qi_tendency_sedimentation) # + # rolled vertical velocity into the sedimentation tendency (undid)
-                    # (ρarea * Ic(w_up) * entr_turb_dyn * q_ice_en) -
-                    # (ρaq_ice * Ic(w_up) * detr_turb_dyn) +
-                    # (ρ_c * (qi_tendency_precip_formation + qi_tendency_noneq))
+                @. tends_ρaq_ice += (ρ_c * qi_tendency_sedimentation) # + # rolled vertical velocity into the sedimentation tendency (undid)
+                # (ρarea * Ic(w_up) * entr_turb_dyn * q_ice_en) -
+                # (ρaq_ice * Ic(w_up) * detr_turb_dyn) +
+                # (ρ_c * (qi_tendency_precip_formation + qi_tendency_noneq))
 
                 # ( we don't want to do that for the other noneq tendencies -- or do we lol)
                 # on1 = 1.0
@@ -608,37 +606,33 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
                 # do we need additional entr/detr on the sedimentation tendencies? we didn't have them for pure advection so maybe not?
                 # entr_detr_ql_tendency_sedimentation = @. (ρ_c * Ic(w_up) * entr_turb_dyn * ql_tendency_sedimentation_en) - (ρ_c * Ic(w_up) * detr_turb_dyn * ql_tendency_sedimentation)   # these tendencies are already times area
                 # @. tends_ρaq_liq +=  entr_detr_ql_tendency_sedimentation * on2
-                    
+
                 # entr_detr_qi_tendency_sedimentation = @. (ρ_c * Ic(w_up) * entr_turb_dyn * qi_tendency_sedimentation_en) - (ρ_c * Ic(w_up) * detr_turb_dyn * qi_tendency_sedimentation)   # these tendencies are already times area
                 # @. tends_ρaq_ice +=  entr_detr_qi_tendency_sedimentation * on2
 
 
                 # redo ρq_tot and θ_li
                 if edmf.entrainment_type isa FractionalEntrModel
-                    @. tends_ρaθ_liq_ice +=
-                        (ρ_c * θ_liq_ice_tendency_sedimentation) # + # rolled vertical velocity into the sedimentation tendency (undid)
-                        # (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) -
-                        # (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn) + 
-                        # (ρ_c * θ_liq_ice_tendency_precip_formation)
-    
-                    @. tends_ρaq_tot +=
-                        (ρ_c * qt_tendency_sedimentation) # + # rolled vertical velocity into the sedimentation tendency (undid)
-                        # (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en) -
-                        # (ρaq_tot * Ic(w_up) * detr_turb_dyn) + 
-                        # (ρ_c * qt_tendency_precip_formation)
-    
+                    @. tends_ρaθ_liq_ice += (ρ_c * θ_liq_ice_tendency_sedimentation) # + # rolled vertical velocity into the sedimentation tendency (undid)
+                    # (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) -
+                    # (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn) + 
+                    # (ρ_c * θ_liq_ice_tendency_precip_formation)
+
+                    @. tends_ρaq_tot += (ρ_c * qt_tendency_sedimentation) # + # rolled vertical velocity into the sedimentation tendency (undid)
+                # (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en) -
+                # (ρaq_tot * Ic(w_up) * detr_turb_dyn) + 
+                # (ρ_c * qt_tendency_precip_formation)
+
                 elseif edmf.entrainment_type isa TotalRateEntrModel
-                    @. tends_ρaθ_liq_ice +=
-                        (ρ_c * θ_liq_ice_tendency_sedimentation) # + # rolled vertical velocity into the sedimentation tendency (undid)
-                        # (ρarea * entr_rate_inv_s * θ_liq_ice_en) -
-                        # (ρarea * detr_rate_inv_s * θ_liq_ice_up) + 
-                        # (ρ_c * θ_liq_ice_tendency_precip_formation)
-    
-                    @. tends_ρaq_tot +=
-                        (ρ_c * qt_tendency_sedimentation) # + # rolled vertical velocity into the sedimentation tendency (undid)
-                        # (ρarea * entr_rate_inv_s * q_tot_en) -
-                        # (ρarea * detr_rate_inv_s * q_tot_up) +
-                        # (ρ_c * qt_tendency_precip_formation)
+                    @. tends_ρaθ_liq_ice += (ρ_c * θ_liq_ice_tendency_sedimentation) # + # rolled vertical velocity into the sedimentation tendency (undid)
+                    # (ρarea * entr_rate_inv_s * θ_liq_ice_en) -
+                    # (ρarea * detr_rate_inv_s * θ_liq_ice_up) + 
+                    # (ρ_c * θ_liq_ice_tendency_precip_formation)
+
+                    @. tends_ρaq_tot += (ρ_c * qt_tendency_sedimentation) # + # rolled vertical velocity into the sedimentation tendency (undid)
+                    # (ρarea * entr_rate_inv_s * q_tot_en) -
+                    # (ρarea * detr_rate_inv_s * q_tot_up) +
+                    # (ρ_c * qt_tendency_precip_formation)
                 end
 
                 # @. tends_ρaq_tot += entr_detr_ql_tendency_sedimentation * on2  + entr_detr_qi_tendency_sedimentation .* on2 # need to break out only the sedimentation part...

@@ -21,18 +21,31 @@ function TimeStepping(::Type{FT}, namelist) where {FT}
     dt_max = TC.parse_namelist(namelist, "time_stepping", "dt_max"; default = FT(10.0))
     dt_max_edmf = FT(0)
 
-    spinup_half_t_max =  TC.parse_namelist(namelist, "time_stepping", "spinup_half_t_max"; default = FT(0.0))
-    spinup_dt_factor =  TC.parse_namelist(namelist, "time_stepping", "spinup_dt_factor"; default = FT(1.0))
+    spinup_half_t_max = TC.parse_namelist(namelist, "time_stepping", "spinup_half_t_max"; default = FT(0.0))
+    spinup_dt_factor = TC.parse_namelist(namelist, "time_stepping", "spinup_dt_factor"; default = FT(1.0))
     adapt_dt = TC.parse_namelist(namelist, "time_stepping", "adapt_dt"; default = false)
     spinup_adapt_dt = TC.parse_namelist(namelist, "time_stepping", "spinup_adapt_dt"; default = adapt_dt)
 
     @assert (FT(0) <= spinup_half_t_max) "spinup_half_t_max must be greater than or equal to 0, given value $(spinup_half_t_max) is invalid"
-    @assert (FT(0) < spinup_dt_factor ) "spinup_dt_factor must be greater than 0, given value $(spinup_dt_factor) is invalid"
+    @assert (FT(0) < spinup_dt_factor) "spinup_dt_factor must be greater than 0, given value $(spinup_dt_factor) is invalid"
 
     # set time
     t = FT(0)
     dt_io = FT(0)
     nstep = 0
 
-    return TimeStepping{FT}(dt, dt_min, t_max, t, nstep, cfl_limit, dt_max, dt_max_edmf, dt_io, spinup_half_t_max, spinup_dt_factor, spinup_adapt_dt)
+    return TimeStepping{FT}(
+        dt,
+        dt_min,
+        t_max,
+        t,
+        nstep,
+        cfl_limit,
+        dt_max,
+        dt_max_edmf,
+        dt_io,
+        spinup_half_t_max,
+        spinup_dt_factor,
+        spinup_adapt_dt,
+    )
 end

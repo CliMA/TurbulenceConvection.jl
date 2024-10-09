@@ -20,7 +20,7 @@ Base.@kwdef struct PrecipFormation{FT}
     ql_tendency_accr_liq_sno::FT
     qi_tendency_accr_ice_liq::FT
     qi_tendency_accr_ice_rai::FT
-    qi_tendency_accr_ice_sno::FT    
+    qi_tendency_accr_ice_sno::FT
 end
 
 """

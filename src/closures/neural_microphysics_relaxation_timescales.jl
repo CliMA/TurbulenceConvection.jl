@@ -4,14 +4,14 @@ using JLD2
 
 FT = Float32
 # ρ_0, T_0, q_liq_0, q_ice_0, w_0 = FT(1.), FT(273.15), FT(1e-4), FT(1e-7), FT(1e-3) # characteristic values
-ρ_0, T_0, q_liq_0, q_ice_0, w_0 = FT(1.), FT(1), FT(1e-4), FT(1e-7), FT(1e-3) # characteristic values, shifted -- still divide liquid values despite log scale, moves us up towards 0....
-x_0_characteristic = [ρ_0, T_0, q_liq_0, q_ice_0, w_0] 
+ρ_0, T_0, q_liq_0, q_ice_0, w_0 = FT(1.0), FT(1), FT(1e-4), FT(1e-7), FT(1e-3) # characteristic values, shifted -- still divide liquid values despite log scale, moves us up towards 0....
+x_0_characteristic = [ρ_0, T_0, q_liq_0, q_ice_0, w_0]
 
-function prepare_for_NN(ρ, T, q_liq, q_ice, w; FT=Float32, norm = x_0_characteristic) 
+function prepare_for_NN(ρ, T, q_liq, q_ice, w; FT = Float32, norm = x_0_characteristic)
     # normalize
 
     ρ = ρ ./ norm[1]
-    T = (T.-273.15) ./ norm[2]
+    T = (T .- 273.15) ./ norm[2]
     q_liq = q_liq ./ norm[3]
     q_ice = q_ice ./ norm[4]
     w = w ./ norm[5]
