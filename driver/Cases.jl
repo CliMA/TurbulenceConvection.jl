@@ -299,7 +299,6 @@ forcing_kwargs(::AbstractCaseType, namelist) = (; coriolis_param = namelist["for
 forcing_kwargs(case::DYCOMS_RF01, namelist) = (; divergence = large_scale_divergence(case))
 forcing_kwargs(case::DYCOMS_RF02, namelist) = (; divergence = large_scale_divergence(case))
 aux_data_kwarg(::AbstractCaseType, namelist) = ()
-aux_data_kwarg(case::AbstractCaseType, namelist) = aux_data_kwarg(case::AbstractCaseType, namelist)  # for dispatch + backwards compat
 
 ForcingBase(case::AbstractCaseType, FT; kwargs...) = ForcingBase{get_forcing_type(case), FT}(; kwargs...) # constructor for forcing base above...
 
