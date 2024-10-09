@@ -1,6 +1,4 @@
 """
-Computes the tendencies to qt and θ_liq_ice due to precipitation formation
-(autoconversion + accretion)
 """
 function korolev_mazin_2007(param_set::APS, area::FT, ρ::FT, Δt::Real, ts::TD.ThermodynamicState, w::FT) where {FT}
     """

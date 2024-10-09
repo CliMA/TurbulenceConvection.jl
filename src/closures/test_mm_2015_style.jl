@@ -61,7 +61,7 @@ T = FT(260)
 q_vap_0 = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()) + 2.0 .* ( TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()) - TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice()))
 
 
-q_liq = FT(1e-5)  * 10
+q_liq = FT(1e-5) * 10
 q_ice = FT(1e-5) * 1
 q = TD.PhasePartition(q_vap_0, q_liq, q_ice)
 
@@ -69,6 +69,13 @@ use_fix = true
 w = FT(0)
 τ_liq = FT(1.1)
 τ_ice = FT(0.1)
+
+τ_liq = FT(1e-20)
+τ_ice = FT(1e-13)
+# q_vap_0, q_liq, q_ice = (0.0027351234431657536, 4.4465037826352686e-61, 2.094458880577658e-19)
+# q_vap_0, q_liq, q_ice = (0.0027351234431657536, 4.4465037826352686e-4, 2.094458880577658e-4)
+# q = TD.PhasePartition(q_vap_0, q_liq, q_ice)
+
 
 # τ_liq = FT(Inf)
 # τ_ice = FT(Inf)
@@ -130,11 +137,15 @@ qis_exp = zeros(length(Δts))
 δ_ΔTs = zeros(length(Δts))
 using Plots
 for (i, Δt) in enumerate(Δts)
-    qls[i], qis[i], δ_ΔTs[i] = morrison_milbrandt_2015_style(param_set, area, ρ,p, T, w, τ_liq, τ_ice, q_vap_0, q, q_eq, Δt, ts; use_fix=use_fix)
+    # qls[i], qis[i], δ_ΔTs[i] = morrison_milbrandt_2015_style(param_set, area, ρ,p, T, w, τ_liq, τ_ice, q_vap_0, q, q_eq, Δt, ts; use_fix=use_fix)
+    # qls_exp[i], qis_exp[i] = morrison_milbrandt_2015_style_exponential_part_only(param_set, area, ρ, T, w, τ_liq, τ_ice, q_vap_0, q_eq, Δt,)
+
+    qls[i], qis[i]  = morrison_milbrandt_2015_style(param_set, area, ρ,p, T, w, τ_liq, τ_ice, q_vap_0, q, q_eq, Δt, ts; use_fix=use_fix)
     qls_exp[i], qis_exp[i] = morrison_milbrandt_2015_style_exponential_part_only(param_set, area, ρ, T, w, τ_liq, τ_ice, q_vap_0, q_eq, Δt,)
 end
 # plot the results, x scale log
 linthresh = FT(-5)
+linthresh = mean(log10.(abs.((qls .+ qis) .* Δts))) - 1
 yformatter = x->symlogformatter.(x,linthresh)
 yscale = :symlog
 # yscale = :linear
@@ -146,8 +157,8 @@ if yscale == :symlog
     plot!(Δts, symlog(qis_exp .* Δts ,linthresh), label = "S_qi_exp", color=:blue, linestyle=:dash, yformatter=yformatter)
     plot!(Δts, symlog((qls_exp .+ qis_exp) .* Δts ,linthresh), label = "sum_exp", color=:red, linestyle=:dash, yformatter=yformatter)
     hline!([0], color=:black, linestyle=:dash, yformatter=yformatter, label="")
-    # hline!(symlog([q_vap_0 - q_eq.liq], linthresh), color=:darkgreen, linestyle=:dashdot, yformatter=yformatter, label="δ_l", alpha=0.5)
-    # hline!(symlog([q_vap_0 - q_eq.ice], linthresh), color=:darkblue, linestyle=:dashdot, yformatter=yformatter, label="δ_i", alpha=0.5)
+    hline!(symlog([q_vap_0 - q_eq.liq], linthresh), color=:darkgreen, linestyle=:dashdot, yformatter=yformatter, label="δ_l", alpha=0.5)
+    hline!(symlog([q_vap_0 - q_eq.ice], linthresh), color=:darkblue, linestyle=:dashdot, yformatter=yformatter, label="δ_i", alpha=0.5)
     # plot!(Δts, symlog(-δ_ΔTs .* Δts, linthresh), label = "δ_ΔT", color=:orange, linestyle=:dashdot, yformatter=yformatter)
 elseif yscale == :linear
     plot(Δts, ql .* Δts , label = "ql", dpi=600, size = (1000, 400), xaxis=:log, yaxis=:linear, legend=:outertopright, color=:green)
@@ -160,6 +171,19 @@ elseif yscale == :linear
     hline!([q_vap_0 - q_eq.liq], color=:gray, linestyle=:dashdot, yformatter=yformatter, label="δ_l")
 
 end
+
+ymin_l = yscale == :symlog ? minimum(symlog(qls .* Δts , linthresh)) : minimum(qls .* Δts)
+ymin_i = yscale == :symlog ? minimum(symlog(qis .* Δts , linthresh)) : minimum(qis .* Δts)
+ymax_l = yscale == :symlog ? maximum(symlog(qls .* Δts , linthresh)) : maximum(qls .* Δts)
+ymax_i = yscale == :symlog ? maximum(symlog(qis .* Δts , linthresh)) : maximum(qis .* Δts)
+ymin = min(ymin_l, ymin_i) 
+ymax = max(ymax_l, ymax_i)
+ymin = ymin > 0 ? ymin * 0.9 : ymin * 1.1
+ymax = ymax > 0 ? ymax * 1.1 : ymax * 0.9
+ylims!(ymin, ymax)
+
+# hline!([-q_liq], color=:green, linestyle=:dashdot, label="-q_liq(t=0)")
+# hline!([-q_ice], color=:blue, linestyle=:dashdot, label="-q_ice(t=0)")
 
 # save
 thisfile = "/home/jbenjami/Research_Schneider/CliMa/TurbulenceConvection.jl/src/closures/test_mm_2015_style.jl"
