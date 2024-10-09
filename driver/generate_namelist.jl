@@ -314,6 +314,8 @@ function default_namelist(
         namelist = DryBubble(namelist_defaults)
     elseif case_name == "LES_driven_SCM"
         namelist = LES_driven_SCM(namelist_defaults)
+    elseif occursin("SOCRATES", case_name) # when you're setting up the namelist for the case, you would have to specify the specific socrates type so this should be an umbrella for all of them...
+        namelist = SOCRATES(namelist_defaults; case_name = case_name) # pass in case_name so we can record it just cause we have no other way to mark down the case_type...
     else
         error("Not a valid case name")
     end
@@ -688,6 +690,61 @@ function LES_driven_SCM(namelist_defaults)
 
     return namelist
 end
+
+function SOCRATES(namelist_defaults; case_name = "SOCRATES_RFXX_XXX_data")
+    namelist = deepcopy(namelist_defaults)
+    # grid is currently constructed from the same one used by the paper's LES grid
+    namelist["stats_io"]["frequency"] = 600.0 # long runs so try a lower output rate for smaller files... (seems to be seconds) -- changed to 10 minutes... 14 hours default runs are loooong...
+    namelist["time_stepping"]["t_max"] = 3600.0 * 14 # they ran LES for 12-14 hours (reference is supposed to be at hour 12)
+    namelist_defaults["time_stepping"]["dt_max"] = 5.0
+    namelist_defaults["time_stepping"]["dt_min"] = 0.5
+
+    namelist["microphysics"]["precipitation_model"] = "clima_1m"
+    namelist["microphysics"]["precip_fraction_model"] = "prescribed" # "prescribed" or "cloud_cover"
+    namelist["microphysics"]["prescribed_precip_frac_value"] = 1.0
+    namelist["microphysics"]["precip_fraction_limiter"] = 0.3
+
+    #TODO - all those are part of toml file
+    namelist["microphysics"]["τ_acnv_rai"] = 1000.0 # https://github.com/szy21/pycles_GCM/blob/v1.0/Csrc/microphysics_CLIMA.h#L13
+    namelist["microphysics"]["q_liq_threshold"] = 0.5e-3 # https://github.com/szy21/pycles_GCM/blob/v1.0/Csrc/microphysics_CLIMA.h#L12
+
+    # Defaults from RICO
+    namelist["microphysics"]["τ_acnv_sno"] = 100.0
+    namelist["microphysics"]["q_ice_threshold"] = 1e-6
+    namelist["microphysics"]["E_liq_rai"] = 0.8
+    namelist["microphysics"]["E_liq_sno"] = 0.1
+    namelist["microphysics"]["E_ice_rai"] = 1.0
+    namelist["microphysics"]["E_ice_sno"] = 0.1
+    namelist["microphysics"]["E_rai_sno"] = 1.0
+    # TODO microph_scaling adjusts evaporation process.
+    # The name will be first fixed in CLIMAParameters.
+    namelist["microphysics"]["microph_scaling"] = 1.0
+    namelist["microphysics"]["microph_scaling_dep_sub"] = 1.0
+    namelist["microphysics"]["microph_scaling_melt"] = 1.0
+    namelist["microphysics"]["microph_scaling_acnv"] = 1.0
+    namelist["microphysics"]["microph_scaling_accr"] = 1.0
+
+    # casename for data
+    namelist["meta"]["simname"] = case_name # "SOCRATES" # switched to using case_name cause it's what NetCDFIO.jl uses to name the output file 
+    namelist["meta"]["casename"] = "SOCRATES" # switch back to using just socrates as casename to handle dispatch properly # record the specific case name which would be a subtype of SOCRATES supertype (e.g. SOCRATES_RF09_obs) (needs to be case_name for Cases.jl) get_case
+
+    flight_num_spec = split(case_name, "_")[2]
+    namelist["meta"]["flight_number"] = parse(Int, filter.(isdigit, flight_num_spec))
+
+    if occursin("obs", lowercase(case_name))
+        namelist["meta"]["forcing_type"] = :obs_data
+    elseif occursin("era5", lowercase(case_name))
+        namelist["meta"]["forcing_type"] = :ERA5_data
+    else
+        error(
+            "Invalid SOCRATES setup specification, forcing_type in string of form SOCRATES_{flight_specifier}_{forcing_specifier} must contain either \"obs\" or \"ERA5\"",
+        )
+    end
+
+    return namelist
+end
+
+
 
 function write_file(namelist, root::String = ".")
     mkpath(root)
