@@ -25,8 +25,8 @@ Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP, NT, NT2} <: ATCP
     microph_scaling_accr::FT
     microphys_params::MP
     surf_flux_params::SFP
-    user_args::NT # not sure if this is completely necessary yet
-    user_aux::NT2 # not sure if this is completely necessary yet
+    user_args::NT # Let this be a Namedtuple of user arguments passed taken straight from namelist["user_args"]::NamedTuple in the main program
+    user_aux::NT2 # Let this be a NamedTuple created from namelist["user_aux"]::Dict in the main program.. to ensure this is `isbits`, the values in the dict should have been be turned to tuples if they were arrays... string keys should have been  converted to symbols (get_parameter_valus() in parameter_set.jl did a similar thing )
 end
 
 thermodynamics_params(ps::ATCP) = CM.Parameters.thermodynamics_params(ps.microphys_params)
