@@ -15,7 +15,8 @@ function morrison_milbrandt_2015_style(
     q::TD.PhasePartition,
     q_eq::TD.PhasePartition,
     Δt::Real,
-    ts::TD.ThermodynamicState,
+    ts::TD.ThermodynamicState;
+    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
 ) where {FT}
     """
     See https://doi.org/10.1175/JAS-D-14-0065.1
@@ -59,13 +60,20 @@ function morrison_milbrandt_2015_style(
         dqsl_dT = TD.∂q_vap_sat_∂T(thermo_params, ts) # how do we make this work differently for ice/liquid? or do we need to? currently it's based on the  current condensate mix... is it a good enough approx?
         dqsi_dT = TD.∂q_vap_sat_∂T(thermo_params, ts) # how do we make this work differently for ice/liquid? or do we need to? currently it's based on the  current condensate mix...
 
+        q_vap_sat = TD.vapor_specific_humidity(thermo_params, ts)
+        dqsl_dT = TD.∂q_vap_sat_∂T(thermo_params, FT(1), T, q_vap_sat) # how do we make this work differently for ice/liquid? or do we need to? currently it's based on the  current condensate mix... is it a good enough approx?
+        dqsi_dT = TD.∂q_vap_sat_∂T(thermo_params, FT(0), T, q_vap_sat) # how do we make this work differently for ice/liquid? or do we need to? currently it's based on the  current condensate mix...
+
+
         dqsl_dT /= (1 - q_eq.liq)^2 # convert derivative from specific humidity to mixing_ratio, q_eq.liq = q_sl at T
         dqsi_dT /= (1 - q_eq.ice)^2 # convert derivative from specific humidity to mixing_ratio, q_eq.ice = q_si at T
 
+
         # So, we can do everything in mixing ratio and then convert back at the end instead of trying to convert everythig in their derivation to figure out what q_tot_mix
         q_vap = TD.shum_to_mixing_ratio(q_vap, q.tot)
-        q_sl = TD.shum_to_mixing_ratio(q_eq.liq, q_eq.tot) # q_eq is the equilibrium mixing ratio, q_sl is the saturation mixing ratio, q_eq we made to contain only saturation vapor pressure values...
-        q_si = TD.shum_to_mixing_ratio(q_eq.ice, q_eq.tot)
+        q_sl = TD.shum_to_mixing_ratio(q_eq.liq, q.tot) # q_eq is the equilibrium mixing ratio, q_sl is the saturation mixing ratio, q_eq we made to contain only saturation vapor pressure values...
+        q_si = TD.shum_to_mixing_ratio(q_eq.ice, q.tot)
+
 
         # saturation_mixing_ratio_liq = TD.shum_to_mixing_ratio( TD.q_vap_saturation_generic(thermo_params, T, p, TD.Liquid()), q.tot)
         # saturation_mixing_ratio_ice = TD.shum_to_mixing_ratio( TD.q_vap_saturation_generic(thermo_params, T, p, TD.Ice()), q.tot)
@@ -73,23 +81,79 @@ function morrison_milbrandt_2015_style(
 
         δ_0::FT = q_vap - q_sl # supersaturation over liquid
 
-        Γ_l = 1 + L_l / c_p * dqsl_dT # Eqn C3
-        Γ_i = 1 + L_i / c_p * dqsi_dT # Eqn C3
+
+        # Balanced at large timestep, but needs limiters (otherwise, may consume more liq/ice than exists... but handles WBF directions fine and most stuff for short timesteps
+        if use_fix # setting these makes the asymptote ok, not sure if it breaks other things....
+            # i think their equation balances liq evap <-> ice growth, but doesn't limit it properly over the timestep, technically q_sl-q_si addition/subtraction should decay as you approach saturation...
+            L_i = L_l
+            dqsi_dT = dqsl_dT
+
+            # Does evaporating water releasing more latent heat than forming ice takeup risk evaporating a cloud completely?
+        end
+        
+
+        Γ_l = 1 + L_l / c_p * dqsl_dT  # Eqn C3
+        Γ_i = 1 + L_i / c_p * dqsi_dT  # Eqn C3
+
+        # Γ_l = 1 + L_l / c_p * dqsi_dT 
+        # Γ_i = 1 + L_l / c_p * dqsi_dT 
+
+        # @info "Γ_l" Γ_l  L_l / c_p dqsl_dT
+        # @info "Γ_i" Γ_i  L_i / c_p dqsi_dT
 
         dTdt_mix = FT(0) # ignore for now
         dTdt_rad = FT(0) # ignore for now
 
         τ::FT = 1 / (1 / τ_liq + (1 + (L_i / c_p) * dqsl_dT) * ((1 / τ_ice) / (Γ_i))) # Eqn C2
 
+        
+        # τ_max = max(τ_liq, τ_ice)
+
+
         A_c::FT =
-            dTdt_mix - (q_sl * ρ * g * w) / (p - e_sl) - dqsl_dT * (dTdt_rad + dTdt_mix - (w * g) / c_p) -
+            dTdt_mix - (q_sl * ρ * g * w) / (p - e_sl) -
+            dqsl_dT * (dTdt_rad + dTdt_mix - (w * g) / c_p) -
             (q_sl - q_si) / (τ_ice * Γ_l) * (1 + (L_i / c_p) * dqsl_dT) # Eq C4
 
-        S_ql = A_c * τ / (τ_liq * Γ_l) + (δ_0 - A_c * τ) * τ / (Δt * τ_liq * Γ_l) * (1 - exp(-Δt / τ))   # QCCON EQN C6
+        S_ql = A_c * τ / (τ_liq * Γ_l) +
+        (δ_0 - A_c * τ) * τ / (Δt * τ_liq * Γ_l) * (1 - exp(-Δt / τ))   # QCCON EQN C6
+
+
+        β =  -(q_sl - q_si) / (τ_ice * Γ_l) * (1 + (L_i / c_p) * dqsl_dT)
+        β_cont = β * τ / (τ_liq * Γ_l) +  (-β * τ) * τ / (Δt * τ_liq * Γ_l) * (1 - exp(-Δt / τ)) 
+        α = (A_c - β)
+        α_cont = α * τ / (τ_liq * Γ_l) +  (-α * τ) * τ / (Δt * τ_liq * Γ_l) * (1 - exp(-Δt / τ))
+
+        δ_0_cont = δ_0 *  τ / (Δt * τ_liq * Γ_l) * (1 - exp(-Δt / τ))
+
+        WBF_cont = β_cont
+        WBF_limit = -max(WBF_cont, -q.liq/Δt) # not more than liq can provide
+        evap_cont = δ_0_cont + α_cont # some of this should go to ice... let's just say if it would have been WBF'd remove it
+
+        # evap_cont = max(evap_cont - WBF_cont,) # no negative evap
+        S_ql = max(WBF_cont + evap_cont,  -q.liq/Δt)
+
         S_qi =
             A_c * τ / (τ_ice * Γ_i) +
             (δ_0 - A_c * τ) * τ / (Δt * τ_ice * Γ_i) * (1 - exp(-Δt / τ)) +
-            (q_sl - q_si) / (τ_ice * Γ_i)  # QICON Eqn C7
+            (q_sl - q_si) / (τ_ice * Γ_i) #+  # QICON Eqn C7
+
+        # δ_q_cont = (q_sl - q_si) / (τ_ice * Γ_i)
+        # β_ice_cont = β * τ / (τ_ice * Γ_i) +  (-β * τ) * τ / (Δt * τ_ice * Γ_i) * (1 - exp(-Δt / τ)) 
+        # δ_0_ice_cont = δ_0 *  τ / (Δt * τ_ice * Γ_i) * (1 - exp(-Δt / τ))
+
+        if S_qi  > 0
+            liq_provide = min( max(-S_ql, 0), q.liq/Δt)
+            WBF_cont_ice = -max(-WBF_cont, -liq_provide) # not more than liq can provide
+            WBF_cont = min(S_qi, WBF_limit)
+            S_qi = min(S_qi, (δ_0 + q_sl-q_si)/Δt - S_ql)
+        else
+            # Any WBF going to ice is less than what's being evaporated...
+            WBF_cont_ice = -max(-WBF_cont, -q.liq/Δt) # not more than liq can provide
+            WBF_cont = min(S_qi, WBF_limit)
+            S_qi += (WBF_cont_ice - WBF_cont) # switch to our limited WBF contribution from liquid
+        end
+        S_qi = max(S_qi, -q.ice/Δt) # don't let it take more ice than exists
 
 
         # Go from mixing ratio world back to specific humidity world
@@ -99,7 +163,10 @@ function morrison_milbrandt_2015_style(
 
     end
 
-    return S_ql, S_qi
+    # δ_Δt::FT = A_c * τ + (δ_0 - A_c*τ) * exp(-Δt/τ) # supersaturation over liquid
+    # return S_ql, S_qi, (δ_Δt - δ_0)/Δt
+
+    return S_ql, S_qi #, (δ_Δt - δ_0)/Δt
 end
 
 
@@ -131,11 +198,46 @@ function morrison_milbrandt_2015_style_exponential_part_only(
         τ::FT = 1 / (1 / τ_liq + 1 / τ_ice)
         A_c::FT = -(q_eq.liq - q_eq.ice) / (τ_ice) # Eq C4
         S_ql = A_c * τ / (τ_liq) + (δ_0 - A_c * τ) * τ / (Δt * τ_liq) * (1 - exp(-Δt / τ))   # QCCON EQN C6
+
         S_qi =
             A_c * τ / (τ_ice) +
             (δ_0 - A_c * τ) * τ / (Δt * τ_ice) * (1 - exp(-Δt / τ)) +
             (q_eq.liq - q_eq.ice) / (τ_ice)  # QICON Eqn C7
     end
+
+
+    # # liquid consumption limiting
+    # if S_ql < -q.liq/Δt
+    #     # S_qi -= -S_ql - q.liq/Δt
+    #     S_extra = S_ql + q.liq/Δt
+    #     S_ql -= S_extra  # Discard the extra part.
+    #     # What part of this is from vapor and what part went to ice?
+
+
+    #     @info "before" S_qi, S_extra, S_qi - S_extra
+    #     # @info δ_0i, S_extra, S_qi - δ_0i, S_qi
+    #     if S_qi > q.ice/Δt + S_ql
+    #         # S_qi += min(S_extra, max(S_qi - δ_0i, 0), 0) # only if ice source is more than initial ice supersat, remove extra liquid contribution, otherwise leave.
+    #         I_extra = 0
+    #         # @info "I_extra" I_extra
+    #         S_qi +=  max(I_extra - S_extra, 0) # only if ice source is more than initial ice supersat, remove extra liquid contribution, otherwise leave.
+    #         # S_qi += min(S_extra, S_qi - δ_0i, 0) # neg + pos, remove contribution up to initial ice supersat
+
+    #         # @info "after" S_qi
+    #     end
+    #     # S_extra = 0
+    #     # I_extra = max( δ_0i/Δt - S_qi, 0)
+    #     # @info "I_extra" I_extra, S_qi ,  δ_0i
+    #     # S_qi +=  min(I_extra + S_extra, 0) 
+
+    #     # S_qi = min(S_qi + I_extra, S_qi + S_extra)
+    #     # S_qi += min( I_extra, S_extra)
+    #     # I_extra = min(S_qi - δ_0i, 0)
+    #     # S_qi += min(I_extra, 0) # only if ice source is more than initial ice supersat, remove extra liquid contribution, otherwise leave.  
+    #     # @info "after" S_qi, δ_0i/Δt, S_extra
+    # end
+
+
 
     return S_ql, S_qi
 
