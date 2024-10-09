@@ -68,8 +68,8 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                 # TODO: Drop the constants from this and just subsume them into N (makes picking an initial c_1, c_2 harder though so maybe not? Also is much harder for more complicated N_INP expressions)
                 ρ_i = FT(916.7) # CLIMAParameters default for cloud_ice 
                 # c_1 = get(param_set.user_aux, :T_scaling_c_1, 0.02 * exp(-0.6 * -273.15)) # Fletcher 1962 (values taken from Frostenberg 2022) (high power makes calibrating hard)
-                c_1 = get(param_set.user_aux, :T_scaling_c_1, 0.02) # Fletcher 1962 (values taken from Frostenberg 2022)
-                c_2 = get(param_set.user_aux, :T_scaling_c_2, -0.6) # Fletcher 1962 (values taken from Frostenberg 2022)
+                c_1 = get(param_set.user_aux, :T_scaling_ice_c_1, 0.02) # Fletcher 1962 (values taken from Frostenberg 2022)
+                c_2 = get(param_set.user_aux, :T_scaling_ice_c_2, -0.6) # Fletcher 1962 (values taken from Frostenberg 2022)
                 N = c_1 * exp(c_2 * (T - 273.15))
                 # r_r = FT(20 * 1e-6) # 20 microns
                 r_0 = FT(0.2 * 1e-6) # .2 micron base aerosol
@@ -129,8 +129,8 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                 c_2g = get(param_set.user_aux, :geometric_c_2, 2 / 3.0) # Halfway between 1/3 and 1
                 τ_liq = 1 / (4 * π * D * (c_1g * q.liq^(c_2g) + c_3g)) # let  be Nr = c_1 * q^(c_2)
 
-                c_1 = get(param_set.user_aux, :T_scaling_c_1, 0.02) # Fletcher 1962 (values taken from Frostenberg 2022)
-                c_2 = get(param_set.user_aux, :T_scaling_c_2, -0.6) # Fletcher 1962 (values taken from Frostenberg 2022)
+                c_1 = get(param_set.user_aux, :T_scaling_ice_c_1, 0.02) # Fletcher 1962 (values taken from Frostenberg 2022)
+                c_2 = get(param_set.user_aux, :T_scaling_ice_c_2, -0.6) # Fletcher 1962 (values taken from Frostenberg 2022)
                 N = c_1 * exp(c_2 * (T - 273.15))
                 ρ_i = FT(916.7) # CLIMAParameters default for cloud_ice 
                 r_0 = (q.ice / (4 / 3 * π * N * ρ_i))^(1 / 3) # (the mass-diameter relationship is poorly defined anyway for ice crystals)
@@ -287,8 +287,6 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                 TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()),
                 TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice()),
             ) # all 3 are vapor amounts
-            S_ql = (q_vap - q_eq.liq) / τ_liq # | microphys_params.τ_cond_evap | CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, TD.PhasePartition(FT(0),q_vap,FT(0)))  
-            S_qi = (q_vap - q_eq.ice) / τ_ice # -(source to vapor) = source to condensate
         elseif use_korolev_mazin
             # need to get w into here somewhere...
             S_ql, S_qi = korolev_mazin_2007(param_set, area, ρ, Δt, ts, w)
@@ -329,10 +327,12 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
 
 
 
-        # LIMITER
+        # LIMITER (and calculate source)
         if !(use_supersat == false) # might need to do these first bc ql,qc tendencies maybe are applied individually and can still crash the code if one is too large...
 
             if τ_use == :standard
+                S_ql = (q_vap - q_eq.liq) / τ_liq # | microphys_params.τ_cond_evap | CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, TD.PhasePartition(FT(0),q_vap,FT(0)))  
+                S_qi = (q_vap - q_eq.ice) / τ_ice # -(source to vapor) = source to condensate
 
                 # Local sources, note these will always have the same sign as the source terms above since they just have a different Δt instead of τ
                 Q_vl = (q_vap - q_eq.liq) / Δt # vapor available for liquid growth in this timestep
@@ -481,7 +481,8 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
 
             elseif τ_use == :morrison_milbrandt_2015_style
                 # this *shouldn't* need limiters the way it's defined but... lol we'll see...
-                S_ql, S_qi = morrison_milbrandt_2015_style(param_set, area, ρ, T, w, τ_liq, τ_ice, q_vap, q_eq, Δt)
+                S_ql, S_qi =
+                    morrison_milbrandt_2015_style(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, q, q_eq, Δt, ts)
             elseif τ_use == :morrison_milbrandt_2015_style_exponential_part_only
                 # this *shouldn't* need limiters the way it's defined but... lol we'll see...
                 S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(
