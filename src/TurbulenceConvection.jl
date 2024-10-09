@@ -148,4 +148,7 @@ include("closures/nondimensional_exchange_functions.jl")
 include("closures/mixing_length.jl")
 include("closures/buoyancy_gradients.jl")
 
+include("closures/N_r_closures.jl") # testing different N/r distribution closures
+
+
 end

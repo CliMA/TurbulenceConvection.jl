@@ -10,6 +10,7 @@ function compute_nonequilibrium_moisture_tendencies!(
     param_set::APS,
 )
     thermo_params = TCP.thermodynamics_params(param_set)
+    FT = float_type(state)
     N_up = n_updrafts(edmf)
     aux_gm = center_aux_grid_mean(state)
     aux_up = center_aux_updrafts(state)
@@ -17,15 +18,24 @@ function compute_nonequilibrium_moisture_tendencies!(
     prog_gm = center_prog_grid_mean(state)
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
-
+    
     @inbounds for i in 1:N_up
+        ts_LCL = cloud_base(aux_up[i], grid, TD.PhaseNonEquil_pTq.(thermo_params, p_c, aux_up[i].T, TD.PhasePartition.(aux_up[i].q_tot, aux_up[i].q_liq, aux_up[i].q_ice)), :up)[:cloud_base_ts] # cloud base, only keep the thermodynamic state part
         @inbounds for k in real_center_indices(grid)
             T_up = aux_up[i].T[k]
             q_up = TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k])
             ts_up = TD.PhaseNonEquil_pTq(thermo_params, p_c[k], T_up, q_up)
 
             # condensation/evaporation, deposition/sublimation
-            mph = noneq_moisture_sources(param_set, aux_up[i].area[k], ρ_c[k], Δt, ts_up)
+
+            # if keep this w getting, you'd want this call to be moved outside the loop
+            aux_up_f = face_aux_updrafts(state) # state or does ts include this? I guess you'd want to move this to the calling place... to choose updraft or environment
+            w = CCO.InterpolateF2C(aux_up_f[i].w) # how to access?
+            k_int = getfield(k,Base.propertynames(k)[1]) # get the value k.i out
+            w = Base.getindex(CC.Fields.field_values(getfield(w,Base.propertynames(w)[1])), k_int) # w first field is w.bcs = getfield(w,Base.propertynames(w)[1]) , then get the index from the field value
+            zc = FT(grid.zc[k].z)
+
+            mph = noneq_moisture_sources(param_set, aux_up[i].area[k], ρ_c[k], Δt, ts_up, w, zc; ts_LCL=ts_LCL)
             aux_up[i].ql_tendency_noneq[k] = mph.ql_tendency * aux_up[i].area[k]
             aux_up[i].qi_tendency_noneq[k] = mph.qi_tendency * aux_up[i].area[k]
         end
