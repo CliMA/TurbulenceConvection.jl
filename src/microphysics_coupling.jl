@@ -27,6 +27,10 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
         use_supersat = isa(use_supersat, Val) ? typeof(use_supersat).parameters[1] : use_supersat # extract the value from the Val type (we put it in there in parameter_set.jl to make it isbits)
         use_korolev_mazin = get(param_set.user_args, :use_korolev_mazin, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
         use_korolev_mazin = isa(use_korolev_mazin, Val) ? typeof(use_korolev_mazin).parameters[1] : use_korolev_mazin # extract the value from the Val type (we put it in there in parameter_set.jl to make it isbits)
+       
+        # τ_use = get(param_set.user_args, :τ_use, :morrison_milbrandt_2015_style)  # this has w built in though, no way around it, maybe we should write one that's just the exponential decay part w/o anything else...
+        τ_use = get(param_set.user_args, :τ_use, :standard)  # this has w built in though, no way around it, maybe we should write one that's just the exponential decay part w/o anything else... ( # change the default to at least :morrison_milbrandt_2015_style_exponential_part_only soon )
+        τ_use = isa(τ_use, Val) ? typeof(τ_use).parameters[1] : τ_use 
 
         q = TD.PhasePartition(thermo_params, ts)
         T = TD.air_temperature(thermo_params, ts)
@@ -67,7 +71,7 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                 c_1 = get(param_set.user_aux, :T_scaling_c_1, 0.02) # Fletcher 1962 (values taken from Frostenberg 2022)
                 c_2 = get(param_set.user_aux, :T_scaling_c_2, -0.6) # Fletcher 1962 (values taken from Frostenberg 2022)
                 N = c_1 * exp(c_2*(T-273.15))
-                r_r = FT(20 * 1e-6) # 20 microns
+                # r_r = FT(20 * 1e-6) # 20 microns
                 r_0 = FT(.2 * 1e-6) # .2 micron base aerosol
                 # r_0 = FT(20. * 10^-6) # 20 micron
                 r_r = (q.ice / (4/3 * π * N * ρ_i)) ^ (1/3) # (the mass-diameter relationship is poorly defined anyway for ice crystals) -- if q.ice is 0 this goes to 0... making it hard to generate ice
@@ -194,38 +198,38 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
             elseif use_supersat == :linear_combination
                 ρ_l = FT(1000.) # kg m^-3, CLIMAParameters default for cloud_liquid
                 ρ_i = FT(916.7) # CLIMAParameters default for cloud_ice
-                r_r = 20 * 1e-6 # 20 microns
-                r_0 = .2 * 1e-6 # .2 micron base aerosol
+                r_r = FT(20 * 1e-6) # 20 microns
+                r_0 = FT(.2 * 1e-6) # .2 micron base aerosol
                 N_l = FT(1e-5 / (4/3 * π * r_r^3 * ρ_l)) # estimated total N assuming reasonable q_liq.. (N = N_r in homogenous)
                 N_i = FT(1e-7 / (4/3 * π * r_r^3 * ρ_i)) # estimated total N assuming reasonable q_ice... (N = N_r + N_0)
                 #
                 c_1l = get(param_set.user_aux, :linear_combination_liq_c_1, FT(N_l * r_0)  ) # I think at q=0, we need c_1 from linear = c_1 from geometric...
-                c_2l = get(param_set.user_aux, :linear_combination_liq_c_2, FT(2/3) ) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
-                c_3l = get(param_set.user_aux, :linear_combination_liq_c_3, FT(-1e-10)) # asssume nothing here? (keep 0 as upper bound?) 
+                c_2l = get(param_set.user_aux, :linear_combination_liq_c_2,  FT(-1e-10)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
+                c_3l = get(param_set.user_aux, :linear_combination_liq_c_3,  FT(2/3)) # asssume nothing here? (keep 0 as upper bound?) 
                 τ_liq = 1/( c_1l * exp(c_2l*(T-273.15) + c_3l*q.liq))
                 #
                 c_1i = get(param_set.user_aux, :linear_combination_ice_c_1, FT(N_i * r_0)  ) # I think at q=0, we need c_1 from linear = c_1 from geometric...
-                c_2i = get(param_set.user_aux, :linear_combination_ice_c_2, FT(2/3) ) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
-                c_3i = get(param_set.user_aux, :linear_combination_ice_c_3, FT(-0.6)) # Fletcher 1962 (values taken from Frostenberg 2022), same sign again I suppose...
+                c_2i = get(param_set.user_aux, :linear_combination_ice_c_2, FT(-0.6)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
+                c_3i = get(param_set.user_aux, :linear_combination_ice_c_3, FT(2/3)) # Fletcher 1962 (values taken from Frostenberg 2022), same sign again I suppose...
                 τ_ice = 1/( c_1i * exp(c_2i*(T-273.15) + c_3i*q.ice))
 
             elseif use_supersat == :linear_combination_with_w
                 ρ_l = FT(1000.) # kg m^-3, CLIMAParameters default for cloud_liquid
                 ρ_i = FT(916.7) # CLIMAParameters default for cloud_ice
-                r_r = 20 * 1e-6 # 20 microns
-                r_0 = .2 * 1e-6 # .2 micron base aerosol
+                r_r = FT(20 * 1e-6) # 20 microns
+                r_0 = FT(.2 * 1e-6) # .2 micron base aerosol
                 N_l = FT(1e-5 / (4/3 * π * r_r^3 * ρ_l)) # estimated total N assuming reasonable q_liq.. (N = N_r in homogenous)
                 N_i = FT(1e-7 / (4/3 * π * r_r^3 * ρ_i)) # estimated total N assuming reasonable q_ice... (N = N_r + N_0)
                 #
                 c_1l = get(param_set.user_aux, :linear_combination_liq_c_1, FT(N_l * r_0)  ) # I think at q=0, we need c_1 from linear = c_1 from geometric...
-                c_2l = get(param_set.user_aux, :linear_combination_liq_c_2, FT(2/3) ) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
-                c_3l = get(param_set.user_aux, :linear_combination_liq_c_3, FT(0)) # asssume nothing here? (keep 0 as upper bound?) 
+                c_2l = get(param_set.user_aux, :linear_combination_liq_c_2, FT(-0.6) ) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
+                c_3l = get(param_set.user_aux, :linear_combination_liq_c_3, FT(-10) ) # asssume nothing here? (keep 0 as upper bound?) 
                 c_4l = get(param_set.user_aux, :linear_combination_liq_c_4, FT(0)) # start at 0
                 τ_liq = 1/( c_1l * exp(c_2l*(T-273.15) + c_3l*q.liq + c_4l*w))
                 #
                 c_1i = get(param_set.user_aux, :linear_combination_ice_c_1, FT(N_i * r_0)  ) # I think at q=0, we need c_1 from linear = c_1 from geometric...
-                c_2i = get(param_set.user_aux, :linear_combination_ice_c_2, FT(2/3) ) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
-                c_3i = get(param_set.user_aux, :linear_combination_ice_c_3, FT(-0.6)) # Fletcher 1962 (values taken from Frostenberg 2022), same sign again I suppose...
+                c_2i = get(param_set.user_aux, :linear_combination_ice_c_2, FT(-0.6)  ) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
+                c_3i = get(param_set.user_aux, :linear_combination_ice_c_3, FT(-10)  ) # Fletcher 1962 (values taken from Frostenberg 2022), same sign again I suppose...
                 c_4i = get(param_set.user_aux, :linear_combination_ice_c_4, FT(0)) # start at 0
                 τ_ice = 1/( c_1i * exp(c_2i*(T-273.15) + c_3i*q.ice + c_4i*w))
 
@@ -249,7 +253,9 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                 τ_liq, τ_ice = predict_τ(ρ, T, q, w, TC.neural_network; norm=model_x_0_characteristic) # pass in the NN and get the τs out
 
                 τ_liq = min(τ_liq, FT(1e10)) # ensure we don't just get a huge number all the time
-                τ_ice = min(τ_ice, FT(1e10)) # ensure we don't just get a huge number all the time
+                τ_ice = min(τ_ice, FT(1e10)) # ensure we don't just get a huge number all the time                
+
+
             else
                 error("Unsupported supersaturation type: $(use_supersat)")
             end
@@ -259,15 +265,6 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
             min_τ_liq = get(param_set.user_aux, :min_τ_liq, FT(1)) # training weights for tau (made so could pass in things in TrainTau.jl but now I use CalibrateEDMF)
             min_τ_ice = get(param_set.user_aux, :min_τ_ice, FT(1)) # training weights for tau (made so could pass in things in TrainTau.jl but now I use CalibrateEDMF)
 
-            # @info("τ_liq", (τ_liq, min_τ_liq)) 
-            # @info("τ_ice", (τ_ice, min_τ_ice)) 
-
-            # if (0 < τ_liq) && (τ_liq < min_τ_liq) # fast source (convert to chaining operators)
-            #     τ_liq = min_τ_liq
-            # elseif (0 < τ_ice) && (τ_ice < min_τ_ice) # fast source
-            #     τ_ice = min_τ_ice
-            # else
-            # end
             τ_liq = max(min_τ_liq, τ_liq) # make sure it's at least some value
             τ_ice = max(min_τ_ice, τ_ice) # make sure it's at least some value
 
@@ -309,58 +306,193 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
         end
 
         
-        # melting
-        if T >= thermo_params.T_freeze # could go insisde supersat bc base eq is already 0 above freezng
-            S_qi = min(0,S_qi) # allow sublimation but not new ice formation ( or should we just melt and then let evaporation work? )
-            
-            # send existing ice to liquid
-            S_qi -= q.ice/Δt # send any existing ice to liquid
-            S_ql += q.ice/Δt # send any existing ice to liquid
-        # homogenous freezing
-        elseif (T < thermo_params.T_icenuc)
-            if (S_ql > 0)
-                S_qi += S_ql # any vapor coming to liquid goes to ice instead (smoother in total condensate than setting it to 0 suddenly?)
-                S_ql = 0
-            end
-            if q.liq > 0
-                S_ql -= q.liq/Δt # send any existing liquid to ice (maybe make this a rate later)
-                S_qi += q.liq/Δt # send any existing liquid to ice (maybe make this a rate later)
-            end
-        end
 
         # LIMITER
         if !(use_supersat==false) # might need to do these first bc ql,qc tendencies maybe are applied individually and can still crash the code if one is too large...
 
-            # Don't let depletion exceed condensate (esp after melting and homogenous freezing adjustments above) -- do this first before growth limiter since growth through vapor is potentially limited by condensate consumption given no direct liquid-ice pathway
-            if S_ql < FT(0)
-                S_ql = -min(-S_ql, q.liq / (2*Δt)) # limit to liquid amount (2*Δt for stability thoug hthat implies you can never fully deplete the condensate lol, just Δt doesn't work)
-            end
-            if S_qi < FT(0)
-                S_qi = -min(-S_qi, q.ice / (2*Δt))
-            end
+            if τ_use == :standard
 
-            # Don't let growth exceed vapor (or existing vapor plus vapor gain from condensate)
-            S = max(0, S_ql) + max(0,S_qi) # only add if positive sources to condensate
-            Qv = q_vap / (2 * Δt) # should this be 2*Δt for stability like with condensate? we still have some crashes...
+                # Local sources, note these will always have the same sign as the source terms above since they just have a different Δt instead of τ
+                Q_vl = (q_vap - q_eq.liq)/Δt # vapor available for liquid growth in this timestep
+                Q_vi = (q_vap - q_eq.ice)/Δt # vapor available for ice growth in this timestep (if positive, this is larger?)
 
-            # Too much vapor consumption (note in a supersaturation context, that's a little bit ridiculous to worry about since supersaturation is usually single digit percent at most and timesteps are short-ish)
-            if S > ( Qv - min(0,S_ql) - min(0,S_qi)  ) # only add positive sources to vapor (i.e. subtract if negative S_q)
-                if (S_qi > 0) && (S_ql > 0)
-                        S_ql *= Qv/S
-                        S_qi *= Qv/S
-                elseif (S_qi > 0) && (S_ql < 0)
-                    S_qi *= (Qv - S_ql)/S # source to ice not to exceed vapor plus addition from liquid... (S=S_qi here) # (are these stable?, theyre potentially big leaps)
-                elseif (S_qi < 0) && (S_ql > 0)
-                    S_ql *= (Qv - S_qi)/S # source to liquid not to exceed vapor plus addition from ice... (S=S_ql here) # (are these stable?, theyre potentially big leaps)
+                # Limiters, where we can rely on the fact that Q_vl,Q_vi are always the same sign as S_ql,S_qi
+
+                # debug check            
+                if Q_vl < Q_vi 
+                    if T > thermo_params.T_triple
+                        @info("status", T, thermo_params.T_freeze, thermo_params.T_triple,  Q_vl, Q_vi, q_vap, q_eq.liq, q_eq.ice, S_ql, S_qi)
+                        error("This should not happen (we should be below triple point?)") # This is just a check that all is working properly, remove later
+                    end
+                elseif Q_vl > Q_vi
+                    if T < thermo_params.T_triple
+                        @info("status", T, Q_vl, Q_vi, q_vap, q_eq.liq, q_eq.ice, S_ql, S_qi)
+                        error("This should not happen (we should be above triple point?)") # This is just a check that all is working properly, remove later
+                    end
+                else
+                    # all good, we're at the triple point or indistinguashable within numerical precision (e.g. at very cold temperatures)
+                end
+
+                # @info( "current", S_ql, S_qi, "--",Q_vl, Q_vi, "---", q.liq / Δt, q.ice / Δt, q_vap/Δt)
+                if (S_ql > 0) && (S_qi > 0) # both growing (this is the hardest with the different saturation vapor pressures) - we'll partition based on respective source magnitudes limited by Q_vi which is larger...
+                    S_tot = S_ql + S_qi
+                    # create liquid and ice in proportion to their source magnitudes and see if we reach liquid saturation
+                    
+                    if Q_vl < Q_vi 
+                        if S_tot > Q_vl # this handles S_ql whether or not it's larger than Q_vl while simultaneously handling the first part of S_qi
+                            S_ql_Qvl = S_ql * Q_vl/S_tot # liquid growth limited by vapor supersat over liquid and simultaneous ice growth (S_ql_Qvl + S_qi_Qvl = Q_vl)
+                            S_qi_Qvl = S_qi * Q_vl/S_tot # ice growth limited by vapor supersat over liquid and simultaneous liquid growth
+
+                            S_ql = S_ql_Qvl
+                            S_qi_addit = min(S_qi-S_qi_Qvl, Q_vi-Q_vl)  # we should still be able to consume some more ice as long as there was more room in the original ice source, (should be up to Q_vi - S_ql_Qvl which is total growth potential minus current accounted for growth)
+                            S_qi = S_qi_Qvl + S_qi_addit # ice growth limited by vapor supersat over liquid and simultaneous liquid growth
+                        end # if not > Q_vl, it's def not greater than Q_vi so we don't need to do anything else I think
+                    else
+                        if S_tot > Q_vi # this handles S_ql whether or not it's larger than Q_vl while simultaneously handling the first part of S_qi
+                            S_ql_Qvi = S_ql * Q_vi/S_tot # liquid growth limited by vapor supersat over liquid and simultaneous ice growth (S_ql_Qvl + S_qi_Qvl = Q_vl)
+                            S_qi_Qvi = S_qi * Q_vi/S_tot # ice growth limited by vapor supersat over liquid and simultaneous liquid growth
+
+                            S_qi = S_qi_Qvi
+                            S_ql_addit = min(S_ql-S_ql_Qvi, Q_vl-Q_vi)  # we should still be able to consume some more ice as long as there was more room in the original ice source, (should be up to Q_vi - S_ql_Qvl which is total growth potential minus current accounted for growth)
+                            S_ql = S_qi_Qvi + S_ql_addit # ice growth limited by vapor supersat over liquid and simultaneous liquid growth
+                        end # if not > Q_vl, it's def not greater than Q_vi so we don't need to do anything else I think
+                    end
+                
+                elseif (S_ql > 0) && (S_qi < 0) # liquid growth but ice depletion (this can't happen I thnk because we'd be supersaturated over ice if we are over liquid)
+                    if T < thermo_params.T_freeze
+                        error("This should not happen (though I guess it can above freezing but that will be handled in limiters later?)") # This is just a check that all is working properly, remove later
+                    else
+                        # the ice is sublimating anyway lol idk...
+                    end
+
+                elseif (S_ql < 0) && (S_qi > 0) # ice growth but liquid depletion ( WBF)
+
+                    # we go equally until until either liquid or ice reaches saturation, then the remainder is a balance at that saturation
+                    S_ql = -min(-S_ql, q.liq / Δt)  # don't let liquid deplete more than exists (smaller absolute value)
+                    S_tot = S_ql + S_qi
+                    q_vap_after = q_vap + S_tot*Δt
+
+                    if Q_vl < Q_vi
+                        if  q_eq.ice <= q_vap_after <= q_eq.liq # we stay between the equilibrium saturation range
+                            # all good
+                        elseif q_eq.ice > q_vap_after # we can't evaporate enough liquid to grow all the ice it wants to grow, so we scale both down so that we land on the ice saturation line
+                            scaling = (q_eq.ice - q_vap) / ( S_tot*Δt) # should be a positive number < 1 (S_tot should be negative, and  q_eq.ice - q_vap should be negative)
+                            S_qi = S_qi * scaling
+                            S_ql = S_ql * scaling
+                        elseif q_vap_after > q_eq.liq # we can't grow enough ice to support the liquid we want to evaporate
+                            scaling = (q_eq.liq - q_vap) / ( S_tot*Δt) # should be a positive number < 1 (S_tot should be positive, and q_eq.liq - q_vap should be positive)
+                            S_qi *= scaling
+                            S_ql *= scaling
+                        end
+                    else
+                        if  q_eq.liq <= q_vap_after <= q_eq.ice # we stay between the equilibrium saturation range
+                            # all good
+                        elseif q_eq.liq > q_vap_after # we can't evaporate enough liquid to grow all the ice it wants to grow, so we scale both down so that we land on the ice saturation line
+                            scaling = (q_eq.liq - q_vap) / ( S_tot*Δt) # should be a positive number < 1 (S_tot should be negative, and  q_eq.ice - q_vap should be negative)
+                            S_qi = S_qi * scaling
+                            S_ql = S_ql * scaling
+                        elseif q_vap_after > q_eq.ice # we can't grow enough ice to support the liquid we want to evaporate
+                            scaling = (q_eq.ice - q_vap) / ( S_tot*Δt) # should be a positive number < 1 (S_tot should be positive, and q_eq.liq - q_vap should be positive)
+                            S_qi *= scaling
+                            S_ql *= scaling
+                        end
+                    end
+
+                elseif (S_ql < 0) && (S_qi < 0) # both are depleting (limit by condensate amount and enough to return to saturation)
+                    S_ql = -min(-S_ql, q.liq / Δt)  # don't let liquid deplete more than exists (smaller absolute value)
+                    S_qi = -min(-S_qi, q.ice / Δt)  # don't let ice deplete more than exists (smaller absolute value)
+
+                    S_ql = -min(-S_ql, -Q_vl)  # don't let liquid deplete more than the vapor can support (smaller absolute value)
+                    S_qi = -min(-S_qi, -Q_vi)  # don't let ice deplete more than the vapor can support (smaller absolute value)
+                    
+                    S_tot = S_ql + S_qi
+                    # consume liquid and ice in proportion to their source magnitudes and see if we reach ice saturation
+
+                    if Q_vl < Q_vi # should mean we're below freezing and can evaporate more liquid than we can ice 
+                        if S_tot < Q_vi # we would create more vapor than the air wants
+                            # go combined until reaching ice saturation, then remainder is liquid evaporation only... (with no re-condensation of ice)
+                            S_ql_Qvi = S_ql * Q_vi/S_tot # liquid growth limited by vapor supersat over liquid and simultaneous ice growth (S_ql_Qvl + S_qi_Qvl = Q_vl)
+                            S_qi_Qvi = S_qi * Q_vi/S_tot # ice growth limited by vapor supersat over liquid and simultaneous liquid growth
+                        
+                            S_qi = S_qi_Qvi # ice until ice reaching ice saturation vapor pressure... (ice T > freezing, ice is actually more )
+                            S_ql_addit = max(S_ql-S_ql_Qvi, Q_vl-Q_vi)  # we should be able to consume some more liquid up until we exhaust the original liquid source (S_ql - S_ql_Qvi), or reach the liquid saturation vapor pressure (Q_vl - Q_vi), whichever is smaller (max of 2 negative numbers)
+                            S_ql = S_ql_Qvi + S_ql_addit # liquid growth limited by vapor supersat over liquid and simultaneous ice growth
+
+                            if S_ql_addit > 0
+                                error("this shouldnt happen lol, should be max of two negative numbers")
+                            end
+                            
+                        end # if not < Q_vi, we dont even reach ice saturation so we don't need to do anything else
+                    else # this is technically weird bc all the ice should evaporate anyway when we're above freezing, but we'll handle anyway... (actually it's slightly different due to difference between thermo_params.T_triple and thermo_params.T_freeze which is 0.01 K but good to handle properly...)
+                        if S_tot < Q_vl # we would create more vapor than the air wants
+                            # go combined until reaching ice saturation, then remainder is liquid evaporation only... (with no re-condensation of ice)
+                            S_ql_Qvl = S_ql * Q_vl/S_tot # liquid growth limited by vapor supersat over liquid and simultaneous ice growth (S_ql_Qvl + S_qi_Qvl = Q_vl)
+                            S_qi_Qvl = S_qi * Q_vl/S_tot # ice growth limited by vapor supersat over liquid and simultaneous liquid growth
+                        
+                            S_ql = S_ql_Qvl # ice until ice reaching ice saturation vapor pressure... (ice T > freezing, ice is actually more )
+                            S_qi_addit = max(S_qi-S_qi_Qvl, Q_vi-Q_vl)  # we should be able to consume some more liquid up until we exhaust the original liquid source (S_ql - S_ql_Qvi), or reach the liquid saturation vapor pressure (Q_vl - Q_vi), whichever is smaller (max of 2 negative numbers)
+                            S_qi = S_qi_Qvl + S_qi_addit # liquid growth limited by vapor supersat over liquid and simultaneous ice growth
+
+                            if S_qi_addit > 0
+                                error("this shouldnt happen lol, should be max of two negative numbers")
+                            end
+                            
+                        end # 
+
+                    end
+
                 end # otherwise we have the negative limiters below for sublimation, evaporation... if both are neg that's sufficient....
+            
+            elseif τ_use == :morrison_milbrandt_2015_style
+                # this *shouldn't* need limiters the way it's defined but... lol we'll see...
+                S_ql, S_qi = morrison_milbrandt_2015_style(param_set, area, ρ, T, w, τ_liq, τ_ice, q_vap, q_eq, Δt)
+            elseif τ_use == :morrison_milbrandt_2015_style_exponential_part_only
+                # this *shouldn't* need limiters the way it's defined but... lol we'll see...
+                S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(param_set, area, ρ, T, w, τ_liq, τ_ice, q_vap, q_eq, Δt)
+            else
+                error("Unsupported τ_use: $(τ_use)")
             end
 
-            # # NOTE - TEST - DONT LOET EITHER S_QL OR S_QI APPROACH QVAP ON THEIR OWN ( in case one gets processed before the other -- but then why did it fail before?")
-            # if S_ql >= FT(0)
-            #     S_ql = min(S_ql, Qv)
-            # end
-            # if S_qi >= FT(0)
-            #     S_qi = min(S_qi, Qv)
+
+
+            #### REALLY WE SHOULD ONLY MELT ENOUGH TO KNOCK THE EMPERATURE BACK DOWN TO freezing
+            #### REALLY WE SHOULD ONLY FREEZE ENOUGH TO KNOCK THE TEMPERATURE BACK UP ABOVE HOMOGENOUS 
+            
+            # These would mess with the limiters (because the limiters are saturation bound but these are not) so we do them after... we assume they're agnostic to the antecedent saturation vapor pressures (but no hypsometric correction so can overshoot... but at least they work in one timestep...)
+            # Also we only add the remainder after the sources that already exist (debatable the order of operations with the new saturation vapor pressures after the timestep but...)
+            if T >= thermo_params.T_freeze # could go insisde supersat bc base eq is already 0 above freezng
+                S_qi = min(0,S_qi) # allow sublimation but not new ice formation ( or should we just melt and then let evaporation work? ), i think this is better than redirecting bc that could go on forever with a different timescale, and ice doesn't form above freezing and then melt
+                # send existing ice to liquid
+                S_ql += (q.ice/Δt + S_qi) # send any existing ice that is not sublimating to liquid (maybe make this a rate later)
+                S_qi = -q.ice/Δt # destroy all existing ice
+
+            # homogeneous_freezing
+            elseif (T < thermo_params.T_icenuc)
+                # Here we allow the V -> L --> I pathway to happen, since it's probably smoother idk and mayb still be physical (form liquid then instafreee unlike ice forming above freezing and then melting...)
+                if (S_ql > 0)
+                    S_qi += S_ql # any vapor coming to liquid goes to ice instead (smoother in total condensate than setting it to 0 suddenly?)
+                    S_ql = 0
+                end
+                if q.liq > 0
+                    S_qi += (q.liq/Δt + S_ql) # send any existing liquid to ice that isn't already evaporating (if S_ql was positive, it's already been sent to ice and set to 0)
+                    S_ql = -q.liq/Δt # remove all liquid
+                end
+            end
+
+
+
+
+            # # This limiter I believe is wrong, we should be limited by supersaturation, not by the vapor amount and this lets fast timescales do bizarre things and jump to states that condense or create a ton of papper that lead to unrealizeable temperatures...
+            # # Too much vapor consumption (note in a supersaturation context, that's a little bit ridiculous to worry about since supersaturation is usually single digit percent at most and timesteps are short-ish)
+            # if S > ( Qv - min(0,S_ql) - min(0,S_qi)  ) # only add positive sources to vapor (i.e. subtract if negative S_q)
+            #     if (S_qi > 0) && (S_ql > 0)
+            #             S_ql *= Qv/S
+            #             S_qi *= Qv/S
+            #     elseif (S_qi > 0) && (S_ql < 0)
+            #         S_qi *= (Qv - S_ql)/S # source to ice not to exceed vapor plus addition from liquid... (S=S_qi here) # (are these stable?, theyre potentially big leaps)
+            #     elseif (S_qi < 0) && (S_ql > 0)
+            #         S_ql *= (Qv - S_qi)/S # source to liquid not to exceed vapor plus addition from ice... (S=S_ql here) # (are these stable?, theyre potentially big leaps)
+            #     end # otherwise we have the negative limiters below for sublimation, evaporation... if both are neg that's sufficient....
             # end
 
             
@@ -378,6 +510,12 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                 S_qi = -min(-S_qi, q.ice / Δt)
             end
         end
+
+
+
+        # debug
+        # S_ql *= 0. 
+        # S_qi *= 0.
 
         ql_tendency += S_ql
         qi_tendency += S_qi
