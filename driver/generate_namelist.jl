@@ -693,6 +693,11 @@ end
 
 function SOCRATES(namelist_defaults; case_name = "SOCRATES_RFXX_XXX_data")
     namelist = deepcopy(namelist_defaults)
+
+    # # probably better to change this to have some min dz since this reduction could be really overkill on a stretched/squeezed grid
+    # namelist["grid"]["z_reduction_factor"] = 1 # reduction factor from LES z grid... useful bc if we want to increase the timestep, we can run into CFL issues with the smaller grid
+    namelist["grid"]["dz_min"] = 10.0 # the lowest grid spacing in the original Atlas files...
+
     # grid is currently constructed from the same one used by the paper's LES grid
     namelist["stats_io"]["frequency"] = 600.0 # long runs so try a lower output rate for smaller files... (seems to be seconds) -- changed to 10 minutes... 14 hours default runs are loooong...
     namelist["time_stepping"]["t_max"] = 3600.0 * 14 # they ran LES for 12-14 hours (reference is supposed to be at hour 12)
