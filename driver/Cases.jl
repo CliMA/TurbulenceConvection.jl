@@ -299,7 +299,7 @@ forcing_kwargs(::AbstractCaseType, namelist) = (; coriolis_param = namelist["for
 forcing_kwargs(case::DYCOMS_RF01, namelist) = (; divergence = large_scale_divergence(case))
 forcing_kwargs(case::DYCOMS_RF02, namelist) = (; divergence = large_scale_divergence(case))
 aux_data_kwarg(::AbstractCaseType, namelist) = ()
-aux_data_kwarg(case::AbstractCaseType, namelist, param_set) = aux_data_kwarg(case::AbstractCaseType, namelist)  # for dispatch + backwards compat
+aux_data_kwarg(case::AbstractCaseType, namelist) = aux_data_kwarg(case::AbstractCaseType, namelist)  # for dispatch + backwards compat
 
 ForcingBase(case::AbstractCaseType, FT; kwargs...) = ForcingBase{get_forcing_type(case), FT}(; kwargs...) # constructor for forcing base above...
 
@@ -1225,7 +1225,6 @@ function forcing_kwargs(::LES_driven_SCM, namelist)
     return (; wind_nudge_τᵣ, scalar_nudge_zᵢ, scalar_nudge_zᵣ, scalar_nudge_τᵣ, coriolis_param)
 end
 
-aux_data_kwarg(case::LES_driven_SCM, namelist, param_set) = aux_data_kwarg(case::LES_driven_SCM, namelist) #for dispatch + backwards compat
 function aux_data_kwarg(::LES_driven_SCM, namelist)
     les_filename = namelist["meta"]["lesfile"]
     # load data here
@@ -1345,10 +1344,7 @@ initialize_radiation(::LES_driven_SCM, radiation, grid::Grid, state, param_set; 
 #####
 ##### SOCRATES
 #####
-function aux_data_kwarg(s::SOCRATES, namelist, param_set)
-    # flight_number=namelist["meta"]["flight_number"]
-    # forcing_type=namelist["meta"]["forcing_type"]
-    # SOCRATESDat = SOCRATESData(flight_number,forcing_type; param_set=param_set)
+function aux_data_kwarg(s::SOCRATES, namelist)
     SOCRATESDat = SOCRATESData(s) # rn is kinda useless cause we're going with having everything inside the socrates object, if we gotta revert we can...
     return (; SOCRATESDat)
 end
