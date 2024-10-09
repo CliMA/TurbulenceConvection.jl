@@ -63,12 +63,16 @@ cent_aux_vars_gm(FT, local_geometry, edmf) = (;
     θ_liq_ice = FT(0),
     q_tot = FT(0),
     p = FT(0),
+    ql_tendency_ls_vert_adv = FT(0), # my addition
+    qi_tendency_ls_vert_adv = FT(0), # my addition
+    sgs_tendency_q_liq = FT(0), # testing here instead of below to see if it's the right spaces type... cause after deriv we're back on center no longer on faces...
+    sgs_tendency_q_ice = FT(0), # testing here instead of below to see if it's the right spaces type... cause after deriv we're back on center no longer on faces...
 )
 cent_aux_vars(FT, local_geometry, edmf) =
     (; cent_aux_vars_gm(FT, local_geometry, edmf)..., TC.cent_aux_vars_edmf(FT, local_geometry, edmf)...)
 
 # Face only
-face_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture) = (; sgs_flux_q_liq = FT(0), sgs_flux_q_ice = FT(0))
+face_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture) = (; sgs_flux_q_liq = FT(0), sgs_flux_q_ice = FT(0))#, sgs_tendency_q_liq = FT(0), sgs_tendency_q_ice = FT(0))
 face_aux_vars_gm_moisture(FT, ::TC.EquilibriumMoisture) = NamedTuple()
 face_aux_vars_gm(FT, local_geometry, edmf) = (;
     massflux_s = FT(0),

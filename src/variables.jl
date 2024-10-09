@@ -9,6 +9,38 @@ thermo_state(FT, ::NonEquilibriumMoisture) = TD.PhaseNonEquil{FT}(0, 0, TD.Phase
 
 ##### Auxiliary fields
 
+
+# consolidate my additions so it's easier to edit. These will exist everywhere... (though they may not be used or defined in eq case...)
+my_microphysics_additions(FT, ::Union{NonEquilibriumMoisture, EquilibriumMoisture}) = (; 
+    #
+    ql_tendency_cond_evap = FT(0), # tendency due to condensation/evaporation
+    qi_tendency_sub_dep = FT(0), # tendency due to sublimation/deposition
+    #
+    ql_tendency_sedimentation = FT(0), # tendency due to sedimentation
+    qi_tendency_sedimentation = FT(0), # tendency due to sedimentation
+    qt_tendency_sedimentation = FT(0), # tendency due to sedimentation
+    θ_liq_ice_tendency_sedimentation = FT(0),
+    #
+    # # # diagnostic stuff (not used in calculations)
+    #
+    ql_tendency_acnv = FT(0), # tendency due to autoconversion
+    qi_tendency_acnv = FT(0), # tendency due to autoconversion
+    #
+    ql_tendency_accr_liq_rai = FT(0), # tendency due to accretion of liquid by rain
+    ql_tendency_accr_liq_ice = FT(0), # tendency due to accretion of liquid by ice
+    ql_tendency_accr_liq_sno = FT(0), # tendency due to accretion of liquid by snow
+    #
+    qi_tendency_accr_ice_liq = FT(0), # tendency due to accretion of ice by liquid
+    qi_tendency_accr_ice_rai = FT(0), # tendency due to accretion of ice by rain
+    qi_tendency_accr_ice_sno = FT(0), # tendency due to accretion of ice by snow
+    #
+    qi_tendency_het_nuc = FT(0), # tendency due to heterogeneous nucleation
+    #
+    # qi_tendency_vert_adv = FT(0), # tendency due to vertical advection # gm only
+    # qi_tendency_ls_vert_adv = FT(0), # tendency due to large-scale vertical advection # gm only
+    # qi_tendency_sgs = FT(0), # tendency due to subgrid-scale vertical advection is in sgs_tendency_q_ice in dycore_variables.jl # gm only
+)
+
 # Center only
 cent_aux_vars_en_2m(FT) = (;
     dissipation = FT(0),
@@ -20,31 +52,33 @@ cent_aux_vars_en_2m(FT) = (;
     interdomain = FT(0),
     rain_src = FT(0),
 )
-cent_aux_vars_up_moisture(FT, ::NonEquilibriumMoisture) = (;
+cent_aux_vars_up_moisture(FT, moisture_model::NonEquilibriumMoisture) = (;
     ql_tendency_precip_formation = FT(0),
     qi_tendency_precip_formation = FT(0),
     ql_tendency_noneq = FT(0),
     qi_tendency_noneq = FT(0),
-    ql_tendency_sedimentation = FT(0),
-    qi_tendency_sedimentation = FT(0),
-    qt_tendency_sedimentation = FT(0),
-    θ_liq_ice_tendency_sedimentation = FT(0),
-    # diagnostic stuff (not used in calculations)
-    ql_mean_cond_evap = FT(0),
-    qi_mean_sub_dep = FT(0),
-    ql_mean_autoconv_accr = FT(0),
-    qi_mean_autoconv_accr = FT(0),
+    # ql_tendency_sedimentation = FT(0),
+    # qi_tendency_sedimentation = FT(0),
+    # qt_tendency_sedimentation = FT(0),
+    # θ_liq_ice_tendency_sedimentation = FT(0),
+    # # diagnostic stuff (not used in calculations)
+    # ql_tendency_cond_evap = FT(0),
+    # qi_tendency_sub_dep = FT(0),
+    # ql_mean_autoconv_accr = FT(0),
+    # qi_mean_autoconv_accr = FT(0),
+    my_microphysics_additions(FT, moisture_model)...,
 )
-cent_aux_vars_up_moisture(FT, ::EquilibriumMoisture) = (;
-    ql_tendency_sedimentation = FT(0),
-    qi_tendency_sedimentation = FT(0),
-    qt_tendency_sedimentation = FT(0),
-    θ_liq_ice_tendency_sedimentation = FT(0),
-    # diagnostic stuff (not used in calculations)
-    ql_mean_cond_evap = FT(0),
-    qi_mean_sub_dep = FT(0),
-    ql_mean_autoconv_accr = FT(0),
-    qi_mean_autoconv_accr = FT(0),
+cent_aux_vars_up_moisture(FT, moisture_model::EquilibriumMoisture) = (;
+    # ql_tendency_sedimentation = FT(0),
+    # qi_tendency_sedimentation = FT(0),
+    # qt_tendency_sedimentation = FT(0),
+    # θ_liq_ice_tendency_sedimentation = FT(0),
+    # # diagnostic stuff (not used in calculations)
+    # ql_tendency_cond_evap = FT(0),
+    # qi_tendency_sub_dep = FT(0),
+    # ql_mean_autoconv_accr = FT(0),
+    # qi_mean_autoconv_accr = FT(0),
+    my_microphysics_additions(FT, moisture_model)...,
 )
 cent_aux_vars_up(FT, local_geometry, edmf) = (;
     ts = thermo_state(FT, edmf.moisture_model),
@@ -76,61 +110,65 @@ cent_aux_vars_up(FT, local_geometry, edmf) = (;
     asp_ratio = FT(0),
     Π_groups = ntuple(i -> FT(0), n_Π_groups(edmf)),
 )
-cent_aux_vars_edmf_bulk_moisture(FT, ::NonEquilibriumMoisture) = (;
+cent_aux_vars_edmf_bulk_moisture(FT, moisture_model::NonEquilibriumMoisture) = (;
     ql_tendency_precip_formation = FT(0),
     qi_tendency_precip_formation = FT(0),
     ql_tendency_noneq = FT(0),
     qi_tendency_noneq = FT(0),
-    ql_tendency_sedimentation = FT(0),
-    qi_tendency_sedimentation = FT(0),
-    qt_tendency_sedimentation = FT(0),
-    θ_liq_ice_tendency_sedimentation = FT(0),
-    # diagnostic stuff (not used in calculations)
-    ql_mean_cond_evap = FT(0),
-    qi_mean_sub_dep = FT(0),
-    ql_mean_autoconv_accr = FT(0),
-    qi_mean_autoconv_accr = FT(0),
+    # ql_tendency_sedimentation = FT(0),
+    # qi_tendency_sedimentation = FT(0),
+    # qt_tendency_sedimentation = FT(0),
+    # θ_liq_ice_tendency_sedimentation = FT(0),
+    # # diagnostic stuff (not used in calculations)
+    # ql_tendency_cond_evap = FT(0),
+    # qi_tendency_sub_dep = FT(0),
+    # ql_mean_autoconv_accr = FT(0),
+    # qi_mean_autoconv_accr = FT(0),
+    my_microphysics_additions(FT, moisture_model)...,
 )
-cent_aux_vars_edmf_bulk_moisture(FT, ::EquilibriumMoisture) = (;
-    ql_tendency_sedimentation = FT(0),
-    qi_tendency_sedimentation = FT(0),
-    qt_tendency_sedimentation = FT(0),
-    θ_liq_ice_tendency_sedimentation = FT(0),
-    # diagnostic stuff (not used in calculations)
-    ql_mean_cond_evap = FT(0),
-    qi_mean_sub_dep = FT(0),
-    ql_mean_autoconv_accr = FT(0),
-    qi_mean_autoconv_accr = FT(0),
+cent_aux_vars_edmf_bulk_moisture(FT, moisture_model::EquilibriumMoisture) = (;
+    # ql_tendency_sedimentation = FT(0),
+    # qi_tendency_sedimentation = FT(0),
+    # qt_tendency_sedimentation = FT(0),
+    # θ_liq_ice_tendency_sedimentation = FT(0),
+    # # diagnostic stuff (not used in calculations)
+    # ql_tendency_cond_evap = FT(0),
+    # qi_tendency_sub_dep = FT(0),
+    # ql_mean_autoconv_accr = FT(0),
+    # qi_mean_autoconv_accr = FT(0),
+    my_microphysics_additions(FT, moisture_model)...,
 )
-cent_aux_vars_edmf_en_moisture(FT, ::NonEquilibriumMoisture) = (;
+cent_aux_vars_edmf_en_moisture(FT, moisture_model::NonEquilibriumMoisture) = (;
     ql_tendency_precip_formation = FT(0),
     qi_tendency_precip_formation = FT(0),
     ql_tendency_noneq = FT(0),
     qi_tendency_noneq = FT(0),
-    ql_tendency_sedimentation = FT(0),
-    qi_tendency_sedimentation = FT(0),
-    qt_tendency_sedimentation = FT(0),
-    θ_liq_ice_tendency_sedimentation = FT(0),
-    # diagnostic stuff (not used in calculations)
-    ql_mean_cond_evap = FT(0),
-    qi_mean_sub_dep = FT(0),
-    ql_mean_autoconv_accr = FT(0),
-    qi_mean_autoconv_accr = FT(0),
+    # ql_tendency_sedimentation = FT(0),
+    # qi_tendency_sedimentation = FT(0),
+    # qt_tendency_sedimentation = FT(0),
+    # θ_liq_ice_tendency_sedimentation = FT(0),
+    # # diagnostic stuff (not used in calculations)
+    # ql_tendency_cond_evap = FT(0),
+    # qi_tendency_sub_dep = FT(0),
+    # ql_mean_autoconv_accr = FT(0),
+    # qi_mean_autoconv_accr = FT(0),
+    my_microphysics_additions(FT, moisture_model)...,
 )
-cent_aux_vars_edmf_en_moisture(FT, ::EquilibriumMoisture) = (;
-    ql_tendency_sedimentation = FT(0),
-    qi_tendency_sedimentation = FT(0),
-    qt_tendency_sedimentation = FT(0),
-    θ_liq_ice_tendency_sedimentation = FT(0),
-    # diagnostic stuff (not used in calculations)
-    ql_mean_cond_evap = FT(0),
-    qi_mean_sub_dep = FT(0),
-    ql_mean_autoconv_accr = FT(0),
-    qi_mean_autoconv_accr = FT(0),
+cent_aux_vars_edmf_en_moisture(FT, moisture_model::EquilibriumMoisture) = (;
+    # ql_tendency_sedimentation = FT(0),
+    # qi_tendency_sedimentation = FT(0),
+    # qt_tendency_sedimentation = FT(0),
+    # θ_liq_ice_tendency_sedimentation = FT(0),
+    # # diagnostic stuff (not used in calculations)
+    # ql_tendency_cond_evap = FT(0),
+    # qi_tendency_sub_dep = FT(0),
+    # ql_mean_autoconv_accr = FT(0),
+    # qi_mean_autoconv_accr = FT(0),
+    my_microphysics_additions(FT, moisture_model)...,
 )
 cent_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
-    massflux_tendency_ql = FT(0),
-    massflux_tendency_qi = FT(0),
+    # massflux_tendency_ql = FT(0),
+    # massflux_tendency_qi = FT(0),
     diffusive_tendency_ql = FT(0),
     diffusive_tendency_qi = FT(0),
 )
@@ -206,6 +244,8 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
         massflux = FT(0),
         massflux_tendency_h = FT(0),
         massflux_tendency_qt = FT(0),
+        massflux_tendency_ql = FT(0), # moving to here so they're always there even for eq so can put in diagnostics output
+        massflux_tendency_qi = FT(0), #  moving to here so they're always there even for eq so can put in diagnostics output
         diffusive_tendency_h = FT(0),
         diffusive_tendency_qt = FT(0),
         cent_aux_vars_edmf_moisture(FT, edmf.moisture_model)...,

@@ -564,25 +564,17 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
             tends_ρaq_liq = tendencies_up[i].ρaq_liq
             tends_ρaq_ice = tendencies_up[i].ρaq_ice
 
+            @. tends_ρaq_liq =
+                -∇c(wvec(LBF(Ic(w_up) * ρaq_liq))) + (ρarea * Ic(w_up) * entr_turb_dyn * q_liq_en) -
+                (ρaq_liq * Ic(w_up) * detr_turb_dyn) + (ρ_c * (ql_tendency_precip_formation + ql_tendency_noneq))
+
+            @. tends_ρaq_ice =
+                -∇c(wvec(LBF(Ic(w_up) * ρaq_ice))) + (ρarea * Ic(w_up) * entr_turb_dyn * q_ice_en) -
+                (ρaq_ice * Ic(w_up) * detr_turb_dyn) + (ρ_c * (qi_tendency_precip_formation + qi_tendency_noneq))
+
             if !get_isbits_nt(param_set.user_args, :use_sedimentation, false) # original
-
-                @. tends_ρaq_liq =
-                    -∇c(wvec(LBF(Ic(w_up) * ρaq_liq))) + (ρarea * Ic(w_up) * entr_turb_dyn * q_liq_en) -
-                    (ρaq_liq * Ic(w_up) * detr_turb_dyn) + (ρ_c * (ql_tendency_precip_formation + ql_tendency_noneq))
-
-                @. tends_ρaq_ice =
-                    -∇c(wvec(LBF(Ic(w_up) * ρaq_ice))) + (ρarea * Ic(w_up) * entr_turb_dyn * q_ice_en) -
-                    (ρaq_ice * Ic(w_up) * detr_turb_dyn) + (ρ_c * (qi_tendency_precip_formation + qi_tendency_noneq))
-
+                #
             else # use_sedimentation=true, # add logic for entr/detr sedimentation tendencies
-
-                @. tends_ρaq_liq =
-                    -∇c(wvec(LBF(Ic(w_up) * ρaq_liq))) + (ρarea * Ic(w_up) * entr_turb_dyn * q_liq_en) -
-                    (ρaq_liq * Ic(w_up) * detr_turb_dyn) + (ρ_c * (ql_tendency_precip_formation + ql_tendency_noneq))
-
-                @. tends_ρaq_ice =
-                    -∇c(wvec(LBF(Ic(w_up) * ρaq_ice))) + (ρarea * Ic(w_up) * entr_turb_dyn * q_ice_en) -
-                    (ρaq_ice * Ic(w_up) * detr_turb_dyn) + (ρ_c * (qi_tendency_precip_formation + qi_tendency_noneq))
 
                 ql_tendency_sedimentation = aux_up_i.ql_tendency_sedimentation
                 qi_tendency_sedimentation = aux_up_i.qi_tendency_sedimentation

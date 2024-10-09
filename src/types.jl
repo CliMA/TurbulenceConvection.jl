@@ -12,6 +12,15 @@ Base.@kwdef struct PrecipFormation{FT}
     qi_tendency::FT
     qr_tendency::FT
     qs_tendency::FT
+    # added these below for use in storing for outputs
+    ql_tendency_acnv::FT
+    qi_tendency_acnv::FT
+    ql_tendency_accr_liq_rai::FT
+    ql_tendency_accr_liq_ice::FT
+    ql_tendency_accr_liq_sno::FT
+    qi_tendency_accr_ice_liq::FT
+    qi_tendency_accr_ice_rai::FT
+    qi_tendency_accr_ice_sno::FT    
 end
 
 """
@@ -24,6 +33,24 @@ $(DocStringExtensions.FIELDS)
 Base.@kwdef struct NoneqMoistureSources{FT}
     ql_tendency::FT
     qi_tendency::FT
+end
+
+
+"""
+    Other Microphysics
+
+Storage for tendencies due to other microphsyics moisture formation
+
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct OtherMicrophysicsSources{FT}
+    ql_tendency::FT
+    qi_tendency::FT
+    # added these for separate writing to outputs
+    qi_tendency_homogeneous_freezing::FT
+    qi_tendency_heterogeneous_icenuc::FT
+    qi_tendency_heterogeneous_freezing::FT
+    qi_tendency_melting::FT
 end
 
 """

@@ -49,8 +49,21 @@ function microphysics(
             aux_en.ql_tendency_noneq[k] = mph_neq.ql_tendency * aux_en.area[k]
             aux_en.qi_tendency_noneq[k] = mph_neq.qi_tendency * aux_en.area[k]
 
-            aux_en.ql_mean_cond_evap[k] = aux_en.ql_tendency_noneq[k] # storage
-            aux_en.qi_mean_sub_dep[k] = aux_en.qi_tendency_noneq[k] # storage
+            aux_en.ql_tendency_cond_evap[k] = aux_en.ql_tendency_noneq[k] # for storage
+            aux_en.qi_tendency_sub_dep[k] = aux_en.qi_tendency_noneq[k] # for storage
+
+
+            # MOVE HETEROGENOUS FREEZ/ICENUC, MELTING, HOMOGENOUS FREEZING/ICENUC HERE -- the limiters on those processes in noneq_moisture_sources() aren't even that good because they don't account for precip anyway
+            mph_other = other_microphysics_processes(param_set, aux_en.area[k], ρ_c[k], Δt, ts, w, zc, mph_neq.ql_tendency, mph_neq.qi_tendency; ts_LCL = ts_LCL) 
+
+            aux_en.ql_tendency_noneq[k] += mph_other.ql_tendency * aux_en.area[k] # is storing them w/ noneq best? should i add another one...? would need to tie it into everywhere else as well in dycore.jl etc... but wouldn't be too bad
+            aux_en.qi_tendency_noneq[k] += mph_other.qi_tendency * aux_en.area[k]
+
+
+            aux_en.qi_tendency_het_nuc[k] = mph_other.qi_tendency_heterogeneous_icenuc * aux_en.area[k] # for storage
+
+
+
         end
 
         # autoconversion and accretion
@@ -99,11 +112,20 @@ function microphysics(
             aux_en.ql_tendency_precip_formation[k] = mph.ql_tendency * aux_en.area[k]
             aux_en.qi_tendency_precip_formation[k] = mph.qi_tendency * aux_en.area[k]
 
-            aux_en.ql_mean_autoconv_accr[k] = aux_en.ql_tendency_precip_formation[k] # storage
-            aux_en.qi_mean_autoconv_accr[k] = aux_en.qi_tendency_precip_formation[k] # storage
         end
         tendencies_pr.q_rai[k] += mph.qr_tendency * aux_en.area[k]
         tendencies_pr.q_sno[k] += mph.qs_tendency * aux_en.area[k]
+
+        # store autoconversion and accretion for diagnostics (doens't mean much for Eq since liq/ice get set by sat adjust and T...)
+        aux_en.ql_tendency_acnv[k] = mph.ql_tendency_acnv * aux_en.area[k]
+        aux_en.qi_tendency_acnv[k] = mph.qi_tendency_acnv * aux_en.area[k]
+        aux_en.ql_tendency_accr_liq_rai[k] = mph.ql_tendency_accr_liq_rai * aux_en.area[k]
+        aux_en.ql_tendency_accr_liq_ice[k] = mph.ql_tendency_accr_liq_ice * aux_en.area[k]
+        aux_en.ql_tendency_accr_liq_sno[k] = mph.ql_tendency_accr_liq_sno * aux_en.area[k]
+        aux_en.qi_tendency_accr_ice_liq[k] = mph.qi_tendency_accr_ice_liq * aux_en.area[k]
+        aux_en.qi_tendency_accr_ice_rai[k] = mph.qi_tendency_accr_ice_rai * aux_en.area[k]
+        aux_en.qi_tendency_accr_ice_sno[k] = mph.qi_tendency_accr_ice_sno * aux_en.area[k]
+
     end
 
     # ======================================================================== # To Do: Separate sedimentation out so it can be called w/ either sgs or mean...
@@ -127,6 +149,10 @@ function microphysics(
         # get liquid number concentration
         if isa(sedimentation_liq_number_concentration, Number)
             N_l = FT(sedimentation_liq_number_concentration)
+        elseif isa(sedimentation_liq_number_concentration, Symbol)
+            # N_l = get_N_l.(param_set, sedimentation_liq_number_concentration, ts_env, w)
+            N_l = get_N_l.(param_set, sedimentation_liq_number_concentration, [ts_env[k] for k in real_center_indices(grid)], w) # broadcasting not working for some reason
+            # N_l = FT(NaN)
         # elseif isnothing(sedimentation_liq_number_concentration)
             # N_l = sedimentation_liq_number_concentration
         else
@@ -137,7 +163,9 @@ function microphysics(
         if isa(sedimentation_ice_number_concentration, Number)
             N_i = FT(sedimentation_ice_number_concentration)
         elseif isa(sedimentation_ice_number_concentration, Symbol)
-            N_i = get_N_i.(param_set, sedimentation_ice_number_concentration, ts_env)
+            # N_i = get_N_i.(param_set, sedimentation_ice_number_concentration, ts_env, w)
+            N_i = get_N_i.(param_set, sedimentation_ice_number_concentration, [ts_env[k] for k in real_center_indices(grid)], w) # broadcasting not working for some reason
+            # N_i = FT(NaN)
         # elseif isnothing(sedimentation_ice_number_concentration)
             # N_i = sedimentation_ice_number_concentration
         else
@@ -172,18 +200,18 @@ function microphysics(
         L_v0 = TCP.LH_v0(param_set)
         L_s0 = TCP.LH_s0(param_set)
         @inbounds for k in real_center_indices(grid)
-            ql_sedimentation_tendency = mph[k].ql_tendency
-            qi_sedimentation_tendency = mph[k].qi_tendency
-            qt_sedimentation_tendency = ql_sedimentation_tendency + qi_sedimentation_tendency
-            aux_en.ql_tendency_sedimentation[k] += ql_sedimentation_tendency # these get added to gm in compute_gm
-            aux_en.qi_tendency_sedimentation[k] += qi_sedimentation_tendency
-            aux_en.qt_tendency_sedimentation[k] += qt_sedimentation_tendency # used in dycore.jl (= not += , cause this doesnt seem to get reset every iteration?) (fixed in update_aux)
+            ql_tendency_sedimentation = mph[k].ql_tendency
+            qi_tendency_sedimentation = mph[k].qi_tendency
+            qt_tendency_sedimentation = ql_tendency_sedimentation + qi_tendency_sedimentation
+            aux_en.ql_tendency_sedimentation[k] += ql_tendency_sedimentation # these get added to gm in compute_gm
+            aux_en.qi_tendency_sedimentation[k] += qi_tendency_sedimentation
+            aux_en.qt_tendency_sedimentation[k] += qt_tendency_sedimentation # used in dycore.jl (= not += , cause this doesnt seem to get reset every iteration?) (fixed in update_aux)
 
 
             Π_m = TD.exner(thermo_params, ts_env[k])
             c_pm = TD.cp_m(thermo_params, ts_env[k])
-            θ_liq_ice_sedimentation_tendency = 1 / Π_m / c_pm * (L_v0 * ql_sedimentation_tendency + L_s0 * qi_sedimentation_tendency)
-            aux_en.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_sedimentation_tendency # adapted from microphysics_coupling.jl | precipitation_formation() | (= not += caue these don't seem to get reset every iteration?)
+            θ_liq_ice_tendency_sedimentation = 1 / Π_m / c_pm * (L_v0 * ql_tendency_sedimentation + L_s0 * qi_tendency_sedimentation)
+            aux_en.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation # adapted from microphysics_coupling.jl | precipitation_formation() | (= not += caue these don't seem to get reset every iteration?)
 
             # sedimentation loss into updraft (should this be allowed lol)
             # How do we know when these get set to 0 and can be used again?
@@ -192,18 +220,18 @@ function microphysics(
                 aux_up = center_aux_updrafts(state)
                 aux_bulk = center_aux_bulk(state)
                 @inbounds for i in 1:N_up
-                    ql_sedimentation_tendency_other = mph_other[k].ql_tendency .* (aux_up[i].area[k] ./ aux_bulk.area[k]) # was made with environment area, so aux_en[i].area
-                    qi_sedimentation_tendency_other = mph_other[k].qi_tendency .* (aux_up[i].area[k] ./ aux_bulk.area[k])
-                    qt_sedimentation_tendency_other = ql_sedimentation_tendency_other + qi_sedimentation_tendency_other
-                    θ_liq_ice_sedimentation_tendency_other = 1 / Π_m / c_pm * (L_v0 * ql_sedimentation_tendency_other + L_s0 * qi_sedimentation_tendency_other)
-                    aux_up[i].ql_tendency_sedimentation[k] += ql_sedimentation_tendency_other
-                    aux_up[i].qi_tendency_sedimentation[k] += qi_sedimentation_tendency_other
-                    aux_up[i].qt_tendency_sedimentation[k] += qt_sedimentation_tendency_other
-                    aux_up[i].θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_sedimentation_tendency_other
-                    aux_bulk.ql_tendency_sedimentation[k] += ql_sedimentation_tendency_other
-                    aux_bulk.qi_tendency_sedimentation[k] += qi_sedimentation_tendency_other
-                    aux_bulk.qt_tendency_sedimentation[k] += qt_sedimentation_tendency_other
-                    aux_bulk.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_sedimentation_tendency_other
+                    ql_tendency_sedimentation_other = mph_other[k].ql_tendency .* (aux_up[i].area[k] ./ aux_bulk.area[k]) # was made with environment area, so aux_en[i].area
+                    qi_tendency_sedimentation_other = mph_other[k].qi_tendency .* (aux_up[i].area[k] ./ aux_bulk.area[k])
+                    qt_tendency_sedimentation_other = ql_tendency_sedimentation_other + qi_tendency_sedimentation_other
+                    θ_liq_ice_tendency_sedimentation_other = 1 / Π_m / c_pm * (L_v0 * ql_tendency_sedimentation_other + L_s0 * qi_tendency_sedimentation_other)
+                    aux_up[i].ql_tendency_sedimentation[k] += ql_tendency_sedimentation_other
+                    aux_up[i].qi_tendency_sedimentation[k] += qi_tendency_sedimentation_other
+                    aux_up[i].qt_tendency_sedimentation[k] += qt_tendency_sedimentation_other
+                    aux_up[i].θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
+                    aux_bulk.ql_tendency_sedimentation[k] += ql_tendency_sedimentation_other
+                    aux_bulk.qi_tendency_sedimentation[k] += qi_tendency_sedimentation_other
+                    aux_bulk.qt_tendency_sedimentation[k] += qt_tendency_sedimentation_other
+                    aux_bulk.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
                 end
             end
 

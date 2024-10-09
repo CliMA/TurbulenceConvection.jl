@@ -14,6 +14,7 @@ These functions return a dictionary whose
 
 #! format: off
 # TODO: use a better name, this exports fields from the prognostic state, and the aux state.
+
 function io_dictionary_aux()
     DT = NamedTuple{(:dims, :group, :field), Tuple{Tuple{String, String}, String, Any}}
     io_dict = Dict{String, DT}(
@@ -110,6 +111,8 @@ function io_dictionary_aux()
         "ln_massflux_grad" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂lnM∂z),
         "massflux_tendency_h" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_h),
         "massflux_tendency_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_qt),
+        "massflux_tendency_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_ql), # saved here
+        "massflux_tendency_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_qi), # saved here
         "diffusive_tendency_h" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_h),
         "diffusive_tendency_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_qt),
 
@@ -127,15 +130,65 @@ function io_dictionary_aux()
         # combined liquid and ice categories
         "ql_all_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_liq .+ center_prog_precipitation(state).q_rai),
         "qi_all_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_ice .+ center_prog_precipitation(state).q_sno),
-        # sedimentation (tendency, so not density weighted?)
-        "qi_mean_sedimentation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_sedimentation .+ center_aux_environment(state).qi_tendency_sedimentation), # I believe these already area weightd so just sum
-        "ql_mean_sedimentation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_sedimentation .+ center_aux_environment(state).ql_tendency_sedimentation),
-        # cond/evap and sub/dep (exists for noneq but noq eq... (liq/ice aren't tracked only diagnosed in eq... so it's not even clear what's melting vs cond/evap etc...) also need to make sure it's per second)
-        "ql_mean_cond_evap" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_mean_cond_evap .+ center_aux_environment(state).ql_mean_cond_evap),
-        "qi_mean_sub_dep" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_mean_sub_dep .+ center_aux_environment(state).qi_mean_sub_dep),
-        # autoconversion + accretion (we don't have these disambiguated rn and it's hard w/ limiters, so just compare combined values w/ LES for now...)
-        "ql_mean_autoconv_accr" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_mean_autoconv_accr .+ center_aux_environment(state).ql_mean_autoconv_accr),
-        "qi_mean_autoconv_accr" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_mean_autoconv_accr .+ center_aux_environment(state).qi_mean_autoconv_accr),
+
+        # cond/evap and sub/dep (exists for noneq but noq eq... (liq/ice aren't tracked only diagnosed in eq... so it's not even clear what's melting vs cond/evap etc...) also need to make sure it's per second) -- is already area weighted
+        "ql_mean_cond_evap" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_cond_evap .+ center_aux_environment(state).ql_tendency_cond_evap),
+        "qi_mean_sub_dep" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_sub_dep .+ center_aux_environment(state).qi_tendency_sub_dep),
+
+        # sedimentation
+        "qi_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_sedimentation .+ center_aux_environment(state).qi_tendency_sedimentation), # I believe these already area weightd so just sum
+        "ql_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_sedimentation .+ center_aux_environment(state).ql_tendency_sedimentation),
+
+        # acnv
+        "ql_mean_acnv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_acnv .+ center_aux_environment(state).ql_tendency_acnv),
+        "qi_mean_acnv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_acnv .+ center_aux_environment(state).qi_tendency_acnv),
+        
+        # accr
+        "ql_mean_accr_liq" => (; dims = ("zc", "t"), group = "profiles", field = state ->
+            center_aux_bulk(state).ql_tendency_accr_liq_rai .+ center_aux_environment(state).ql_tendency_accr_liq_rai .+
+            center_aux_bulk(state).ql_tendency_accr_liq_ice .+ center_aux_environment(state).ql_tendency_accr_liq_ice .+
+            center_aux_bulk(state).ql_tendency_accr_liq_sno .+ center_aux_environment(state).ql_tendency_accr_liq_sno),
+        "ql_mean_accr_liq_rai" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_accr_liq_rai .+ center_aux_environment(state).ql_tendency_accr_liq_rai),
+        "ql_mean_accr_liq_ice" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_accr_liq_ice .+ center_aux_environment(state).ql_tendency_accr_liq_ice),
+        "ql_mean_accr_liq_sno" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_accr_liq_sno .+ center_aux_environment(state).ql_tendency_accr_liq_sno),
+
+        "qi_mean_accr_ice" => (; dims = ("zc", "t"), group = "profiles", field = state ->
+            center_aux_bulk(state).qi_tendency_accr_ice_liq .+ center_aux_environment(state).qi_tendency_accr_ice_liq .+
+            center_aux_bulk(state).qi_tendency_accr_ice_rai .+ center_aux_environment(state).qi_tendency_accr_ice_rai .+
+            center_aux_bulk(state).qi_tendency_accr_ice_sno .+ center_aux_environment(state).qi_tendency_accr_ice_sno),
+        "qi_mean_accr_ice_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_accr_ice_liq .+ center_aux_environment(state).qi_tendency_accr_ice_liq),
+        "qi_mean_accr_ice_rai" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_accr_ice_rai .+ center_aux_environment(state).qi_tendency_accr_ice_rai),
+        "qi_mean_accr_ice_sno" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_accr_ice_sno .+ center_aux_environment(state).qi_tendency_accr_ice_sno),
+        "qi_mean_accr_ice_no_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> # because ice-liq interaction doesn't exist in TC.jl (PSACWI)
+            center_aux_bulk(state).qi_tendency_accr_ice_rai .+ center_aux_environment(state).qi_tendency_accr_ice_rai .+
+            center_aux_bulk(state).qi_tendency_accr_ice_sno .+ center_aux_environment(state).qi_tendency_accr_ice_sno),
+
+        # het nucleation
+        "qi_mean_het_nuc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_het_nuc .+ center_aux_environment(state).qi_tendency_het_nuc),
+
+        # advection and sgs
+        "ql_mean_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_ql), # same as massflux_tendency_ql
+        "ql_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).ql_tendency_ls_vert_adv),
+        "ql_mean_sgs_tend" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).sgs_tendency_q_liq), # as defined, this includes the massflux...
+
+        "qi_mean_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_qi), # same as massflux_tendency_qi (seems to only show updraft... is this related to our problem of not tracking wq in both env and up?)
+        "qi_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qi_tendency_ls_vert_adv), # looks good 
+        "qi_mean_sgs_tend" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).sgs_tendency_q_ice), # as defined, this includes the massflux... (seems to only show updraft... is this related to our problem of not tracking wq in both env and up?)
+
+        # all microphys
+        "qi_microphys" => (; dims = ("zc", "t"), group = "profiles", field = state -> 
+            center_aux_bulk(state).qi_tendency_sub_dep .+ center_aux_environment(state).qi_tendency_sub_dep .+
+            center_aux_bulk(state).qi_tendency_sedimentation .+ center_aux_environment(state).qi_tendency_sedimentation .+
+            center_aux_bulk(state).qi_tendency_acnv .+ center_aux_environment(state).qi_tendency_acnv .+
+            center_aux_bulk(state).qi_tendency_accr_ice_liq .+ center_aux_environment(state).qi_tendency_accr_ice_liq .+
+            center_aux_bulk(state).qi_tendency_accr_ice_rai .+ center_aux_environment(state).qi_tendency_accr_ice_rai .+
+            center_aux_bulk(state).qi_tendency_accr_ice_sno .+ center_aux_environment(state).qi_tendency_accr_ice_sno .+
+            center_aux_bulk(state).qi_tendency_het_nuc .+ center_aux_environment(state).qi_tendency_het_nuc),
+
+        # # autoconversion + accretion (we don't have these disambiguated rn and it's hard w/ limiters, so just compare combined values w/ LES for now...)
+        # "ql_mean_autoconv_accr" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_mean_autoconv_accr .+ center_aux_environment(state).ql_mean_autoconv_accr),
+        # "qi_mean_autoconv_accr" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_mean_autoconv_accr .+ center_aux_environment(state).qi_mean_autoconv_accr),
+
         # all ice precip (do this or just add grapuel to snow in LES output?)
         "qip_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno),
         # possible future additions

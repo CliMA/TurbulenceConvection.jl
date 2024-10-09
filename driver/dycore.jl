@@ -427,7 +427,11 @@ function compute_gm_tendencies!(
             tendencies_gm.q_liq[k] -= w∇q_liq_gm[k]
             # tendencies_gm.q_ice[k] -= ∇q_ice_gm[k] * aux_gm.subsidence[k]
             tendencies_gm.q_ice[k] -= w∇q_ice_gm[k]
+
+            aux_gm.ql_tendency_ls_vert_adv[k] = w∇q_liq_gm[k] # FOR STORAGE
+            aux_gm.qi_tendency_ls_vert_adv[k] = w∇q_ice_gm[k] # FOR STORAGE
         end
+        # aux_gm.qt_tendency_ls_vert_adv[k] -= w∇q_tot_gm[k] # not implemented yet
 
         # Radiation
         if Cases.rad_type(radiation) <:
@@ -531,9 +535,9 @@ function compute_gm_tendencies!(
             L_v0 = TCP.LH_v0(param_set)
             L_s0 = TCP.LH_s0(param_set)
             @inbounds for k in TC.real_center_indices(grid)
-                ql_sedimentation_tendency = mph.ql_tendency[k]
-                qi_sedimentation_tendency = mph.qi_tendency[k]
-                qt_sedimentation_tendency = ql_sedimentation_tendency + qi_sedimentation_tendency
+                ql_tendency_sedimentation = mph.ql_tendency[k]
+                qi_tendency_sedimentation = mph.qi_tendency[k]
+                qt_tendency_sedimentation = ql_tendency_sedimentation + qi_tendency_sedimentation
 
                 # How does updrafts/bulk know about these? does it just all end up in the environment?
                 # We need to split somehow so that the updrafts/bulk can also know about these tendencies...
@@ -541,29 +545,20 @@ function compute_gm_tendencies!(
                 # if so, that leads to instabilities here...
 
                 if edmf.moisture_model isa TC.NonEquilibriumMoisture
-                    tendencies_gm.q_liq[k] += ql_sedimentation_tendency
-                    tendencies_gm.q_ice[k] += qi_sedimentation_tendency
+                    tendencies_gm.q_liq[k] += ql_tendency_sedimentation
+                    tendencies_gm.q_ice[k] += qi_tendency_sedimentation
                 end
-                tendencies_gm.ρq_tot[k] += ρ_c[k] * qt_sedimentation_tendency
+                tendencies_gm.ρq_tot[k] += ρ_c[k] * qt_tendency_sedimentation
 
                 Π_m = TD.exner(thermo_params, ts_gm[k])
                 c_pm = TD.cp_m(thermo_params, ts_gm[k])
-                θ_liq_ice_sedimentation_tendency = 1 / Π_m / c_pm * ( L_v0 * ql_sedimentation_tendency + L_s0 * qi_sedimentation_tendency )
-                tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * θ_liq_ice_sedimentation_tendency
+                θ_liq_ice_tendency_sedimentation = 1 / Π_m / c_pm * ( L_v0 * ql_tendency_sedimentation + L_s0 * qi_tendency_sedimentation )
+                tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * θ_liq_ice_tendency_sedimentation
             end
         else # TC.get_isbits_nt(param_set.user_args, :grid_mean_sedimentation, false) # separate env/updraft sedimentation calcs
 
-            # kmax = argmax([abs(aux_en.qt_tendency_sedimentation[k]) for k in TC.real_center_indices(grid)])
-            # kmax = TC.real_center_indices(grid)[kmax] # convert to real index
-            # @info "z", grid.zc[kmax].z,
-            # " ql_tendency_sedimentation[kmax]: ", (aux_en.ql_tendency_sedimentation[kmax], aux_bulk.ql_tendency_sedimentation[kmax]),
-            # " qi_tendency_sedimentation[kmax]: ", (aux_en.qi_tendency_sedimentation[kmax], aux_bulk.qi_tendency_sedimentation[kmax]),
-            # " qt_tendency_sedimentation[kmax]: ", (aux_en.qt_tendency_sedimentation[kmax], aux_bulk.qt_tendency_sedimentation[kmax])
 
             @inbounds for k in TC.real_center_indices(grid)
-                # @info aux_en.ql_tendency_sedimentation[k] + aux_bulk.ql_tendency_sedimentation[k]
-                # @info aux_en.qi_tendency_sedimentation[k] + aux_bulk.qi_tendency_sedimentation[k]
-                # @info aux_en.qt_tendency_sedimentation[k] + aux_bulk.qt_tendency_sedimentation[k]
 
                 if edmf.moisture_model isa TC.NonEquilibriumMoisture
                     tendencies_gm.q_liq[k] += aux_en.ql_tendency_sedimentation[k] + aux_bulk.ql_tendency_sedimentation[k]
@@ -604,10 +599,18 @@ function compute_gm_tendencies!(
         sgs_flux_q_liq = aux_gm_f.sgs_flux_q_liq
         sgs_flux_q_ice = aux_gm_f.sgs_flux_q_ice
 
+        sgs_tendency_q_liq = aux_gm.sgs_tendency_q_liq
+        sgs_tendency_q_ice = aux_gm.sgs_tendency_q_ice
+
+        @. sgs_tendency_q_liq = -∇sgs(wvec(sgs_flux_q_liq)) / ρ_c
+        @. sgs_tendency_q_ice = -∇sgs(wvec(sgs_flux_q_ice)) / ρ_c
+
         tends_q_liq = tendencies_gm.q_liq
         tends_q_ice = tendencies_gm.q_ice
-        @. tends_q_liq += -∇sgs(wvec(sgs_flux_q_liq)) / ρ_c
-        @. tends_q_ice += -∇sgs(wvec(sgs_flux_q_ice)) / ρ_c
+        # @. tends_q_liq += -∇sgs(wvec(sgs_flux_q_liq)) / ρ_c
+        # @. tends_q_ice += -∇sgs(wvec(sgs_flux_q_ice)) / ρ_c
+        @. tends_q_liq += sgs_tendency_q_liq
+        @. tends_q_ice += sgs_tendency_q_ice
     end
 
     return nothing

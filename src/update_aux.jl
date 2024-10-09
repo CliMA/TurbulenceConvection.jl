@@ -166,46 +166,96 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.RH[k] = TD.relative_humidity(thermo_params, ts_en)
     end
 
-    # ======================================================== #
-    # zero out noneq tendencies before calling microphysics again (does this interfere w/ writing to disk? -- needed bc env/updraft are cross writing to each other...
-    # aux_en.ql_tendency_noneq .= FT(0)
-    # aux_en.qi_tendency_noneq .= FT(0)
+    # ======================================================== # zero out noneq tendencies before calling microphysics again (does this interfere w/ writing to disk? -- needed bc env/updraft are cross writing to each other... #
+    # aux_en.ql_tendency_noneq .= FT(0) # don't zero this out  bc it seeemd to break the output writing (some order of read, calculate gm, write, zero out problem probably...)
+    # aux_en.qi_tendency_noneq .= FT(0) # don't zero this out  bc it seeemd to break the output writing (some order of read, calculate gm, write, zero out problem probably...)
+    #
+    aux_en.ql_tendency_cond_evap .= FT(0)
+    aux_en.qi_tendency_sub_dep .= FT(0)
     #
     aux_en.ql_tendency_sedimentation .= FT(0)
     aux_en.qi_tendency_sedimentation .= FT(0)
     aux_en.qt_tendency_sedimentation .= FT(0)
     aux_en.θ_liq_ice_tendency_sedimentation .= FT(0)
+    #
+    aux_en.ql_tendency_acnv .= FT(0)
+    aux_en.qi_tendency_acnv .= FT(0)
+    #
+    aux_en.ql_tendency_accr_liq_rai .= FT(0)
+    aux_en.ql_tendency_accr_liq_ice .= FT(0)
+    aux_en.ql_tendency_accr_liq_sno .= FT(0)
+    #
+    aux_en.qi_tendency_accr_ice_liq .= FT(0)
+    aux_en.qi_tendency_accr_ice_rai .= FT(0)
+    aux_en.qi_tendency_accr_ice_sno .= FT(0)
+    #
+    aux_en.qi_tendency_het_nuc .= FT(0)
+    #
+    # aux_en.qi_tendency_vert_adv .= FT(0) # gm only
+    # aux_en.qi_tendency_ls_vert_adv .= FT(0) # gm only
+    # aux_en.qi_tendency_sgs .= FT(0) # gm only
 
-    aux_en.ql_mean_cond_evap .= FT(0)
-    aux_en.qi_mean_sub_dep .= FT(0)
-    aux_en.ql_mean_autoconv_accr .= FT(0)
-    aux_en.qi_mean_autoconv_accr .= FT(0)
+
+
+
     @inbounds for i in 1:N_up
         # aux_up[i].ql_tendency_noneq .= FT(0)
         # aux_up[i].qi_tendency_noneq .= FT(0)
+        #
+        aux_up[i].ql_tendency_cond_evap .= FT(0)
+        aux_up[i].qi_tendency_sub_dep .= FT(0)
         #
         aux_up[i].ql_tendency_sedimentation .= FT(0)
         aux_up[i].qi_tendency_sedimentation .= FT(0)
         aux_up[i].qt_tendency_sedimentation .= FT(0)
         aux_up[i].θ_liq_ice_tendency_sedimentation .= FT(0)
-
-        aux_up[i].ql_mean_cond_evap .= FT(0)
-        aux_up[i].qi_mean_sub_dep .= FT(0)
-        aux_up[i].ql_mean_autoconv_accr .= FT(0)
-        aux_up[i].qi_mean_autoconv_accr .= FT(0)
+        #
+        #
+        aux_up[i].ql_tendency_acnv .= FT(0)
+        aux_up[i].qi_tendency_acnv .= FT(0)
+        #
+        aux_up[i].ql_tendency_accr_liq_rai .= FT(0)
+        aux_up[i].ql_tendency_accr_liq_ice .= FT(0)
+        aux_up[i].ql_tendency_accr_liq_sno .= FT(0)
+        #
+        aux_up[i].qi_tendency_accr_ice_liq .= FT(0)
+        aux_up[i].qi_tendency_accr_ice_rai .= FT(0)
+        aux_up[i].qi_tendency_accr_ice_sno .= FT(0)
+        #
+        aux_up[i].qi_tendency_het_nuc .= FT(0)
+        #
+        # aux_up[i].qi_tendency_vert_adv .= FT(0) # gm only
+        # aux_up[i].qi_tendency_ls_vert_adv .= FT(0) # gm only
+        # aux_up[i].qi_tendency_sgs .= FT(0) # gm only
     end
     # aux_bulk.ql_tendency_noneq .= FT(0)
     # aux_bulk.qi_tendency_noneq .= FT(0)
+    #
+    aux_bulk.ql_tendency_cond_evap .= FT(0)
+    aux_bulk.qi_tendency_sub_dep .= FT(0)
     #
     aux_bulk.ql_tendency_sedimentation .= FT(0)
     aux_bulk.qi_tendency_sedimentation .= FT(0)
     aux_bulk.qt_tendency_sedimentation .= FT(0)
     aux_bulk.θ_liq_ice_tendency_sedimentation .= FT(0)
-
-    aux_bulk.ql_mean_cond_evap .= FT(0)
-    aux_bulk.qi_mean_sub_dep .= FT(0)
-    aux_bulk.ql_mean_autoconv_accr .= FT(0)
-    aux_bulk.qi_mean_autoconv_accr .= FT(0)
+    #
+    aux_bulk.ql_tendency_acnv .= FT(0)
+    aux_bulk.qi_tendency_acnv .= FT(0)
+    #
+    aux_bulk.ql_tendency_accr_liq_rai .= FT(0)
+    aux_bulk.ql_tendency_accr_liq_ice .= FT(0)
+    aux_bulk.ql_tendency_accr_liq_sno .= FT(0)
+    #
+    aux_bulk.qi_tendency_accr_ice_liq .= FT(0)
+    aux_bulk.qi_tendency_accr_ice_rai .= FT(0)
+    aux_bulk.qi_tendency_accr_ice_sno .= FT(0)
+    #
+    aux_bulk.qi_tendency_het_nuc .= FT(0)
+    #
+    # aux_bulk.qi_tendency_vert_adv .= FT(0) # gm only
+    # aux_bulk.qi_tendency_ls_vert_adv .= FT(0) # gm only
+    # aux_bulk.qi_tendency_sgs .= FT(0) # gm only
+    
     # ======================================================== #
 
     microphysics(edmf.en_thermo, grid, state, edmf, edmf.precip_model, edmf.rain_formation_model, Δt, param_set) # set env tendencies for microphysics
@@ -330,6 +380,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     #TODO - AJ add the non-equilibrium tendency computation here
     if edmf.moisture_model isa NonEquilibriumMoisture
         compute_nonequilibrium_moisture_tendencies!(grid, state, edmf, Δt, param_set)
+        compute_other_microphysics_tendencies!(grid, state, edmf, Δt, param_set) # i think only in noneq case is ok... idk... these are tendencies that would be overwritten in equilibrium case, and ql_tendency_noneq/qi_tendency_noneq don't exist in equilibrium case
     end
     compute_cloud_condensate_sedimentation_tendencies!(grid, state, edmf, Δt, param_set) # not sure on the merits of doing it here vs at the end w/ precipitation tendencies... leaving here bc originally i had it in compute_nonequilibrium_moisture_tendencies!()
 
@@ -552,8 +603,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             # term_vel_rain[k] = CM1.terminal_velocity(microphys_params, rain_type, rain_velo_scheme, ρ_c[k], prog_pr.q_rai[k])
             # term_vel_snow[k] = CM1.terminal_velocity(microphys_params, snow_type, snow_velo_scheme, ρ_c[k], prog_pr.q_sno[k])
             # use my own that's nan-safe
-            term_vel_rain[k] = my_terminal_velocity(microphys_params, rain_type, rain_velo_scheme, ρ_c[k], prog_pr.q_rai[k])
-            term_vel_snow[k] = my_terminal_velocity(microphys_params, snow_type, snow_velo_scheme, ρ_c[k], prog_pr.q_sno[k])
+            term_vel_rain[k] = my_terminal_velocity(microphys_params, rain_type, rain_velo_scheme, ρ_c[k], prog_pr.q_rai[k]) .* get_isbits_nt(param_set.user_args, :rain_sedimentation_scaling_factor, FT(1.0))
+            term_vel_snow[k] = my_terminal_velocity(microphys_params, snow_type, snow_velo_scheme, ρ_c[k], prog_pr.q_sno[k]) .* get_isbits_nt(param_set.user_args, :snow_sedimentation_scaling_factor, FT(1.0))
         end
     end
 
