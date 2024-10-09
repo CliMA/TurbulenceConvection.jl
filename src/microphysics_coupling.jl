@@ -10,17 +10,67 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts)
     ql_tendency = FT(0)
     qi_tendency = FT(0)
     if area > 0
+        use_supersat = get(param_set.user_args, :use_supersat, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
 
         q = TD.PhasePartition(thermo_params, ts)
         T = TD.air_temperature(thermo_params, ts)
         q_vap = TD.vapor_specific_humidity(thermo_params, ts)
 
-        # TODO - is that the state we want to be relaxing to?
-        ts_eq = TD.PhaseEquil_ρTq(thermo_params, ρ, T, q.tot)
-        q_eq = TD.PhasePartition(thermo_params, ts_eq)
+        if use_supersat # use phase partition in case we wanna use the conv_q_vap fcn but maybe not best for supersat since it's not really a phase partition (all 3 are vapor amounts)
+            # Relax supersaturation towards 0.
+            q_eq = TD.PhasePartition(q.tot, TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()), TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())) # all 3 are vapor amounts
+            
+            S_ql = (q_vap - q_eq.liq) / τ_liq # | microphys_params.τ_cond_evap | CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, TD.PhasePartition(FT(0),q_vap,FT(0)))  
+            S_qi = (q_vap - q_eq.ice) / τ_ice # -(source to vapor) = source to condensate
+        else # Original relaxation to equilibrium (note this means you can't create both liquid and ice at once)
+            # TODO - is that the state we want to be relaxing to?
+            ts_eq = TD.PhaseEquil_ρTq(thermo_params, ρ, T, q.tot)
+            q_eq = TD.PhasePartition(thermo_params, ts_eq)
 
-        S_ql = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, q)
-        S_qi = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, ice_type, q_eq, q)
+            S_ql = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, q)
+            S_qi = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, ice_type, q_eq, q)
+        end
+
+        # Ice Melting
+        if T >= thermo_params.T_freeze # Melting of existing ice above freezing
+            S_qi = min(0,S_qi) # allow sublimation but not new ice formation ( or should we just melt and then let evaporation work? )
+            
+            # send existing ice to liquid
+            S_qi -= q.ice/Δt # send any existing ice to liquid
+            S_ql += q.ice/Δt # send any existing ice to liquid
+        end
+
+        if use_supersat
+            # Homogeneous Ice Nucleation
+            if (T < thermo_params.T_icenuc) 
+                if (S_ql > 0) # Homogeneous Ice Nucleation below -40C on newly forming condensate
+                    S_qi += S_ql # any vapor coming to liquid goes to ice instead (smoother than setting it to 0 suddenly?)
+                    S_ql = 0
+                end
+                if q.liq > 0 # Homogeneous Ice Nucleation below -40C on newly forming condensate
+                    S_ql -= q.liq/Δt # send any existing liquid to ice (maybe make this a rate later)
+                    S_qi += q.liq/Δt # send any existing liquid to ice (maybe make this a rate later)
+                end
+            end
+
+            # limiter (maybe we dont need this cause of our later limiters?) was useful when we did this first....
+            # could be bad in wbf if ice drain on vapor is too large but liquid is supposed to be going to vapor but less so 
+            # S = S_ql + S_qi
+            S = max(0, S_ql) + max(0,S_qi) # only add if positive sources to condensate
+            Qv = q_vap / Δt
+            # if S > Qv # not enough vapor to create condensate (reverse are both handled already)
+            if S > ( Qv - min(0,S_ql) - min(0,S_qi)  ) # only add if positive source to vapor (subtracat the negative)
+                if (S_qi > 0) && (S_ql > 0)
+                        S_ql *= Qv/S
+                        S_qi *= Qv/S
+                elseif (S_qi > 0) && (S_ql < 0)
+                    S_qi *= (Qv + S_ql)/S # source to ice not to exceed vapor plus addition from liquid... (S=S_qi here)
+                elseif (S_qi < 0) && (S_ql > 0)
+                    S_ql *= (Qv + S_qi)/S
+                end # otherwise we have the negative limiters below for sublimation, evaporation... if both are neg that's sufficient....
+                # S_ql *= Qv/S
+                # S_qi *= Qv/S
+        end
 
         # TODO - handle limiters elswhere
         if S_ql >= FT(0)
