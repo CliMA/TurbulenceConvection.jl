@@ -93,7 +93,7 @@ function Simulation1d(namelist)
     # TODO: the namelist should override whatever
     # we need to override for calibration
 
-    param_set = create_parameter_set(namelist, toml_dict, FTD)
+    param_set = create_parameter_set(namelist, toml_dict, FTD) # can this be const? or do we edit it somehow later? I think it's supposed to be tuples anyway
 
     skip_io = namelist["stats_io"]["skip"]
     calibrate_io = namelist["stats_io"]["calibrate_io"]

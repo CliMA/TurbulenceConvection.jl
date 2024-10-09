@@ -39,6 +39,7 @@ function create_parameter_set(
     b_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "b_acnv_KK2000"; default = -1.79)
     c_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "c_acnv_KK2000"; default = -1.47)
     pow_icenuc = TC.parse_namelist(namelist, "microphysics", "pow_icenuc"; default = 1e7) # I think this has to be here to overwrite toml..., and to place it so we can overwrite_namelist it .. picked high value initially to keep ramp but maybe should keep original default... https://github.com/CliMA/CLIMAParameters.jl/blob/2f298661d527c1b9a11188ee2abc92ba4ba0c5ec/src/parameters.toml#L558
+    r_ice_snow = TC.parse_namelist(namelist, "microphysics", "r_ice_snow"; default = 62.5e-6) # allow changing this in the namelist/param_set/microphys_params instead of user_aux (probably not ideal if you used a 2-moment or something where this mattered more but ...)
 
     # Override the default files in the toml file
     open(override_file, "w") do io
@@ -134,6 +135,10 @@ function create_parameter_set(
         println(io, "alias = \"pow_icenuc\"")
         println(io, "value = " * string(pow_icenuc))
         println(io, "type = \"float\"")
+        println(io, "[ice_snow_threshold_radius]") # allow chaninging r_ice_snow in the namelist (probably not how you wanna do it in Blk1mVel, etc, but we're not using)
+        println(io, "alias = \"r_ice_snow\"")
+        println(io, "value = " * string(r_ice_snow))
+        println(io, "type = \"float\"")
     end
 
     toml_dict = CP.create_toml_dict(FT; override_file, dict_type="alias")
@@ -210,6 +215,7 @@ function create_parameter_set(
     leaves_to_Vals(x::Symbol) = Val(x)
     leaves_to_Vals(x::String) = Val(Symbol(x))
     leaves_to_Vals(x::Dict) = Dict{String, Any}((k => leaves_to_Vals(v) for (k,v) in x))
+    leaves_to_Vals(x::NamedTuple) = map(leaves_to_Vals, x)
     user_aux = leaves_to_Vals(user_aux)  # convert leaves that are strings or symbols into Vals to preserve isbits
     user_args = leaves_to_Vals(user_args) # convert leaves that are strings or symbols into Vals to preserve isbits
 
@@ -220,6 +226,7 @@ function create_parameter_set(
 
     param_set = TCP.TurbulenceConvectionParameters{FTD, MP, SFP, typeof(user_args), typeof(user_aux)}(; pairs..., microphys_params, surf_flux_params, user_args, user_aux) # `typeof` so we have concrete types such that if user_args and user_aux are isbits, then param_set is isbits
     if !isbits(param_set)
+        @info("param_set", param_set)
         @warn "The parameter set SHOULD be isbits in order to be stack-allocated."
     end
     return param_set

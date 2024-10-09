@@ -126,7 +126,7 @@ function initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set)
     ρ_f = aux_gm_f.ρ
     FT = TC.float_type(state)
 
-    initial_profile_updraft_area = get(param_set.user_aux, :initial_profile_updraft_area, 0.0)
+    initial_profile_updraft_area = TC.get_isbits_nt(param_set.user_aux, :initial_profile_updraft_area, 0.0)
     @inbounds for i in 1:N_up
         @inbounds for k in TC.real_face_indices(grid)
             aux_up_f[i].w[k] = 0
