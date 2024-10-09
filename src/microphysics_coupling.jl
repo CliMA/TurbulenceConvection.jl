@@ -16,277 +16,38 @@ function handle_expr(expr::String; kwargs...)
 end
 
 
-function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts, w, z; ts_LCL = nothing) where {FT}
-    thermo_params = TCP.thermodynamics_params(param_set)
-    microphys_params = TCP.microphysics_params(param_set)
+function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts::TD.ThermodynamicState, w::FT, z::FT; ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing) where {FT}
+    thermo_params::TDPS = TCP.thermodynamics_params(param_set)
+    microphys_params::ACMP = TCP.microphysics_params(param_set)
     # TODO - when using adaptive timestepping we are limiting the source terms with the previous timestep Δt
-    ql_tendency = FT(0)
-    qi_tendency = FT(0)
+    ql_tendency::FT = FT(0)
+    qi_tendency::FT = FT(0)
     if area > 0
-        use_supersat = get(param_set.user_args, :use_supersat, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
+        use_supersat = get_isbits_nt(param_set.user_args, :use_supersat, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
         use_supersat = isa(use_supersat, Val) ? typeof(use_supersat).parameters[1] : use_supersat # extract the value from the Val type (we put it in there in parameter_set.jl to make it isbits)
-        use_korolev_mazin = get(param_set.user_args, :use_korolev_mazin, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
+        use_korolev_mazin = get_isbits_nt(param_set.user_args, :use_korolev_mazin, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
         use_korolev_mazin = isa(use_korolev_mazin, Val) ? typeof(use_korolev_mazin).parameters[1] : use_korolev_mazin # extract the value from the Val type (we put it in there in parameter_set.jl to make it isbits)
 
-        # τ_use = get(param_set.user_args, :τ_use, :morrison_milbrandt_2015_style)  # this has w built in though, no way around it, maybe we should write one that's just the exponential decay part w/o anything else...
-        τ_use = get(param_set.user_args, :τ_use, :standard)  # this has w built in though, no way around it, maybe we should write one that's just the exponential decay part w/o anything else... ( # change the default to at least :morrison_milbrandt_2015_style_exponential_part_only soon )
+        τ_use = get_isbits_nt(param_set.user_args, :τ_use, :standard)  # this has w built in though, no way around it, maybe we should write one that's just the exponential decay part w/o anything else... ( # change the default to at least :morrison_milbrandt_2015_style_exponential_part_only soon )
         τ_use = isa(τ_use, Val) ? typeof(τ_use).parameters[1] : τ_use
 
-        q = TD.PhasePartition(thermo_params, ts)
-        T = TD.air_temperature(thermo_params, ts)
-        p = TD.air_pressure(thermo_params, ts)
-        q_vap = TD.vapor_specific_humidity(thermo_params, ts)
+        q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+        T::FT = TD.air_temperature(thermo_params, ts)
+        p::FT = TD.air_pressure(thermo_params, ts)
+        q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
 
         if !(use_supersat == false) # it's either true or a specified value
             # use phase partition in case we wanna use the conv_q_vap fcn but maybe not best for supersat since it's not really a phase partition (all 3 are vapor amounts)
-            D = FT((2.11 * 1e-5) * (T / 273.15)^1.94 * (p / 101325))  # m2 s**-1 for T in Kelvin, p in Pa (from Pruppacher and Klett 1997) # D_ref = FT(0.0000226)
 
-            if use_supersat == true || use_supersat == :Base
-                # @info("using default supersaturation formulation")
-                # nonmutable param_set so would have to edit tau usage everywhere -- let's just do in supersat
-                tau_weights = get(param_set.user_aux, :tau_weights, nothing) # training weights for tau (made so could pass in things in TrainTau.jl but now I use CalibrateEDMF)
-                if isnothing(tau_weights)
-                    τ_liq = CMNe.τ_relax(microphys_params, liq_type)
-                    τ_ice = CMNe.τ_relax(microphys_params, ice_type)
-                else
-                    #use the weights to calculate tau
-                    # @info("using τ from auxiliary weight function")
-                    # τ_liq, τ_ice = 10 .^ tau_weights.liq, 10 .^ tau_weights.ice # log fcn
-                    # tau_weights = eval(Meta.parse(tau_weights)) # test string version cause was crashing....
-                    # τ_liq = handle_expr(string(tau_weights.liq.func_expr); liq_params) # works! (turn to string, parse to func and eval with the argument) (or use handle_expr above... :), # works but very slow to use invokelatest, maybe try https://github.com/SciML/RuntimeGeneratedFunctions.jl
-                    # τ_ice = handle_expr(string(tau_weights.ice.func_expr); ice_params) # works! (turn to string, parse to func and eval with the argument) (or use handle_expr above... :)
-                    liq_params, ice_params = tau_weights.liq.liq_params, tau_weights.ice.ice_params # gets used in eval below
-                    τ_liq, τ_ice = 10 .^ liq_params.log10_tau_liq, 10 .^ ice_params.log10_tau_ice # log fcn hand implementation...
-                end
-
-                min_τ_liq = get(param_set.user_aux, :min_τ_liq, FT(1)) # training weights for tau (made so could pass in things in TrainTau.jl but now I use CalibrateEDMF)
-                min_τ_ice = get(param_set.user_aux, :min_τ_ice, FT(1)) # training weights for tau (made so could pass in things in TrainTau.jl but now I use CalibrateEDMF)
-                τ_liq = max(min_τ_liq, τ_liq) # make sure it's at least some value
-                τ_ice = max(min_τ_ice, τ_ice) # make sure it's at least some value
-
-            elseif use_supersat == :exponential_T_scaling_ice
-                # TODO: Drop the constants from this and just subsume them into N (makes picking an initial c_1, c_2 harder though so maybe not? Also is much harder for more complicated N_INP expressions)
-                ρ_i = FT(916.7) # CLIMAParameters default for cloud_ice 
-                # c_1 = get(param_set.user_aux, :T_scaling_c_1, 0.02 * exp(-0.6 * -273.15)) # Fletcher 1962 (values taken from Frostenberg 2022) (high power makes calibrating hard)
-                c_1 = get(param_set.user_aux, :T_scaling_ice_c_1, 0.02) # Fletcher 1962 (values taken from Frostenberg 2022)
-                c_2 = get(param_set.user_aux, :T_scaling_ice_c_2, -0.6) # Fletcher 1962 (values taken from Frostenberg 2022)
-                N = c_1 * exp(c_2 * (T - 273.15))
-                # r_r = FT(20 * 1e-6) # 20 microns
-                r_0 = FT(0.2 * 1e-6) # .2 micron base aerosol
-                # r_0 = FT(20. * 10^-6) # 20 micron
-                r_r = (q.ice / (4 / 3 * π * N * ρ_i))^(1 / 3) # (the mass-diameter relationship is poorly defined anyway for ice crystals) -- if q.ice is 0 this goes to 0... making it hard to generate ice
-                r_r = max(r_r, r_0) # bound to be at least ~micron size...something like kohler crit radius
-                τ_ice = 1 / (4 * π * D * N * r_r)
-                τ_liq = CMNe.τ_relax(microphys_params, liq_type)
-
-            elseif use_supersat == :powerlaw_T_scaling_ice
-                # @info("using $use_supersat supersaturation formulation")
-                error("NotImplmentedError: This supersat_type functionality has not been implemented yet")
-            elseif use_supersat == :exponential_times_powerlaw_scaling_ice # Demott 2010
-                # @info("using $use_supersat supersaturation formulation")
-                error("NotImplmentedError: This supersat_type functionality has not been implemented yet")
-
-            elseif use_supersat == :geometric_liq # scaling on q that impacts liquid
-                r_0 = FT(20.0 * 10^-6) # 20 micron
-                ρ_l = FT(1000.0) # kg m^-3, CLIMAParameters default for cloud_liquid
-                c_1 = get(param_set.user_aux, :geometric_liq_c_1, 1 / (4 / 3 * π * ρ_l * r_0^2)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
-                c_2 = get(param_set.user_aux, :geometric_liq_c_2, 2 / 3.0) # Halfway between 1/3 and 1
-                τ_liq = 1 / (4 * π * D * c_1 * q.liq^(c_2)) # let  be Nr = c_1 * q^(c_2) 
-                τ_ice = CMNe.τ_relax(microphys_params, liq_type)
-
-            elseif use_supersat == :geometric_liq__geometric_ice # scaling on q that impacts liquid
-                ρ_l = FT(1000.0) # kg m^-3, CLIMAParameters default for cloud_liquid
-                ρ_i = FT(916.7) # CLIMAParameters default for cloud_ice 
-                r_r = FT(20 * 1e-6) # 20 microns
-                r_0 = FT(0.2 * 1e-6) # .2 micron base aerosol
-                N_l = FT(1e-5 / (4 / 3 * π * r_r^3 * ρ_l)) # estimated total N assuming reasonable q_liq.. (N = N_r in homogenous)
-                N_i = FT(1e-7 / (4 / 3 * π * r_r^3 * ρ_i)) # estimated total N assuming reasonable q_ice... (N = N_r + N_0)
-
-                # need a threshold bc otherwise, if there no condensate, τ will be infinity and we'll never get any since we don't have separate activation scheme...
-                # q_liq = max(q.liq, FT(1e-12)) # replaced with a tunable parameter
-                # q_ice = max(q.ice, FT(1e-12))
-
-                q_liq = q.liq
-                q_ice = q.ice
-
-                c_1l = get(param_set.user_aux, :geometric_liq_c_1, FT(1 / (4 / 3 * π * ρ_l * r_r^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
-                c_2l = get(param_set.user_aux, :geometric_liq_c_2, FT(2 / 3.0)) # Halfway between 1/3 and 1
-                c_3l = get(param_set.user_aux, :geometric_liq_c_3, FT(N_l * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
-                τ_liq = 1 / (4 * π * D * (c_1l * q_liq^(c_2l) + c_3l)) # let  be Nr = c_1 * q^(c_2) + c_3
-
-                ρ_i = FT(916.7) # CLIMAParameters default for cloud_ice
-                c_1i = get(param_set.user_aux, :geometric_ice_c_1, 1 / (4 / 3 * π * ρ_i * r_r^2)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
-                c_2i = get(param_set.user_aux, :geometric_ice_c_2, 2 / 3.0) # Halfway between 1/3 and 1
-                c_3i = get(param_set.user_aux, :geometric_ice_c_3, FT(N_i * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
-
-                τ_ice = 1 / (4 * π * D * (c_1i * q_ice^(c_2i) + c_3i)) # let  be Nr = c_1 * q^(c_2) + c_3
-
-            elseif use_supersat == :geometric_liq__exponential_T_scaling_ice #
-                r_0 = FT(20.0 * 10^-6) # 20 micron
-                ρ_l = FT(1000.0) # kg m^-3, CLIMAParameters default for cloud_liquid
-                ρ_i = FT(916.7) # CLIMAParameters default for cloud_ice
-                c_1g = get(param_set.user_aux, :geometric_c_1, 1 / (4 / 3 * π * ρ_l * r_0^2)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
-                c_2g = get(param_set.user_aux, :geometric_c_2, 2 / 3.0) # Halfway between 1/3 and 1
-                τ_liq = 1 / (4 * π * D * (c_1g * q.liq^(c_2g) + c_3g)) # let  be Nr = c_1 * q^(c_2)
-
-                c_1 = get(param_set.user_aux, :T_scaling_ice_c_1, 0.02) # Fletcher 1962 (values taken from Frostenberg 2022)
-                c_2 = get(param_set.user_aux, :T_scaling_ice_c_2, -0.6) # Fletcher 1962 (values taken from Frostenberg 2022)
-                N = c_1 * exp(c_2 * (T - 273.15))
-                ρ_i = FT(916.7) # CLIMAParameters default for cloud_ice 
-                r_0 = (q.ice / (4 / 3 * π * N * ρ_i))^(1 / 3) # (the mass-diameter relationship is poorly defined anyway for ice crystals)
-                τ_ice = 1 / (4 * π * D * N * r_0)
-
-            elseif use_supersat == :geometric_liq__exponential_T_scaling_and_geometric_ice # scaling on q that impacts liquid and ice
-
-                q_liq = q.liq
-                q_ice = q.ice
-
-                ρ_l = FT(1000.0) # kg m^-3, CLIMAParameters default for cloud_liquid
-                ρ_i = FT(916.7) # CLIMAParameters default for cloud_ice
-
-                r_r = 20 * 1e-6 # 20 microns
-                r_0 = 0.2 * 1e-6 # .2 micron base aerosol
-                N_l = FT(1e-5 / (4 / 3 * π * r_r^3 * ρ_l)) # estimated total N assuming reasonable q_liq.. (N = N_r in homogenous)
-                N_i = FT(1e-7 / (4 / 3 * π * r_r^3 * ρ_i)) # estimated total N assuming reasonable q_ice... (N = N_r + N_0)
-
-                c_1l = get(param_set.user_aux, :geometric_liq_c_1, FT(1 / (4 / 3 * π * ρ_l * r_r^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
-                c_2l = get(param_set.user_aux, :geometric_liq_c_2, 2 / 3.0) # Halfway between 1/3 and 1
-                c_3l = get(param_set.user_aux, :geometric_liq_c_3, FT(N_l * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
-                τ_liq = 1 / (4 * π * D * (c_1l * q_liq^(c_2l) + c_3l)) # let  be Nr = c_1 * q^(c_2) 
-
-                c_1i = get(
-                    param_set.user_aux,
-                    :geometric_and_T_scaling_ice_c_1,
-                    FT((4 * π * D) * ((4 / 3 * π * ρ_i)^(-1 / 3) * (N_i)^(2 / 3) * (0.02)^(2 / 3) + (N_i * r_0))),
-                ) # Yeahhh.... idk for this one lol... just combined them serially from the homogenous case where c_3 is -1/3, and used .02 as the prefactor
-                c_2i = get(param_set.user_aux, :geometric_and_T_scaling_ice_c_2, FT(2 / 3.0)) # Halfway between 1/3 and 1 -- should this be the same as c_2g? It's the same mixing... 
-                c_3i = get(param_set.user_aux, :geometric_and_T_scaling_ice_c_3, FT((4 * π * D) * r_0 * 0.02)) # Fletcher 1962 (values taken from Frostenberg 2022) and used .02 as the prefactor
-                c_4i = get(param_set.user_aux, :geometric_and_T_scaling_ice_c_4, FT(-0.6)) # Fletcher 1962 (values taken from Frostenberg 2022)
-
-                τ_ice = 1 / ((c_1i * q_ice^(c_2i) * exp(c_2i * c_4i * (T - 273.15)) + c_3i) * exp(c_4i * (T - 273.15)))
-
-                τ_liq = min(τ_liq, FT(1e10)) # ensure we don't just get a huge number all the time
-                τ_ice = min(τ_ice, FT(1e10)) # ensure we don't just get a huge number all the time
-
-
-            elseif use_supersat == :raymond_ice_test # should be closer to DeMott 2015 but...
-                N_r_closure = get(param_set.user_args, :N_r_closure, :monodisperse)
-                N_0 =
-                    get(param_set.user_aux, :N_0, nothing) |>
-                    x -> (isnothing(x) ? get(param_set.user_args, :N_0, FT(100 * 10e6)) : pyinterp(z, x.z, x.values)) # if defined in aux, interp at current z, otherwise default to user_args value, otherwise default to a value
-                # @info("using $use_supersat supersaturation formulation")
-                N_m = get(param_set.user_args, :N_m, FT(-0.2)) # log slope https://doi.org/10.1073/pnas.1514034112
-                N_b = get(param_set.user_args, :N_b, FT(-5 - 273.15 * N_m)) # -5 - 273.15 * N_m
-                N_INP = 10^(N_m * T + N_b) * 10^3 # per liter to per m^3
-                # -- hopefully this gets around the problem of draining water vapor at initialization of clouds but also allows speedup as droplets grow (assuming fixed drop concenctration)
-                # R    =  max(((q.liq + q.ice)/(4/3*π*ρ_l*N_0))^(1/3), FT(0.2*10^-6)) # bound to be at least ~micron size...something like kohler crit radius
-
-                if N_r_closure == :inhomogeneous
-                    N_0, R_liq = NR_inhomogeneous_mixing_liquid(
-                        thermo_params,
-                        N_0,
-                        TD.air_pressure(thermo_params, ts),
-                        q.liq,
-                        ts_LCL,
-                    ) # testing inhomogeneous mixing would have r fixed and then let N vary... set r based on adiabatic extrapolation from cloud base 
-                    _, R_ice = NR_monodisperse(N_INP, q.ice)
-                    # maybe look into using a mixed model where N/R are partly towards the inhomogenous value depending on the true entrainment/mixing params... see literature on this
-                    # NOTE, ON DYCOMS ADIABATIC R W/ ORIGINAL N_0 WORKED BETTER... HMMM (though that's not using DYCOMS N)
-
-                elseif N_r_closure == :monodisperse # uniform size for all droplets, liquid and Ice I guess
-                    _, R_liq = NR_monodisperse(N_0, q.liq)
-                    _, R_ice = NR_monodisperse(N_INP, q.ice)
-                else
-                    error("Unsupported size distribution closure (N_r_closure): $(N_r_closure)")
-                end
-
-                base = 1 / (4 * π * D) # as q goes up, R goes 
-                τ_liq = base / (N_0 * R_liq)
-                τ_ice = base / (N_INP * R_ice)
-                # limit effective tau to at least one second for stability (stable with dt == limit timescale is unstable, gotta go faster...
-                # println("effective τ_liq = ",τ_liq_eff, " effective τ_ice = ",τ_ice_eff, " T = ", T, " w = ",w, " q = ",q, " q_eq = ", q_eq )
-
-
-            elseif use_supersat == :linear_combination
-                ρ_l = FT(1000.0) # kg m^-3, CLIMAParameters default for cloud_liquid
-                ρ_i = FT(916.7) # CLIMAParameters default for cloud_ice
-                r_r = FT(20 * 1e-6) # 20 microns
-                r_0 = FT(0.2 * 1e-6) # .2 micron base aerosol
-                N_l = FT(1e-5 / (4 / 3 * π * r_r^3 * ρ_l)) # estimated total N assuming reasonable q_liq.. (N = N_r in homogenous)
-                N_i = FT(1e-7 / (4 / 3 * π * r_r^3 * ρ_i)) # estimated total N assuming reasonable q_ice... (N = N_r + N_0)
-                #
-                c_1l = get(param_set.user_aux, :linear_combination_liq_c_1, FT(N_l * r_0)) # I think at q=0, we need c_1 from linear = c_1 from geometric...
-                c_2l = get(param_set.user_aux, :linear_combination_liq_c_2, FT(-1e-10)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
-                c_3l = get(param_set.user_aux, :linear_combination_liq_c_3, FT(2 / 3)) # asssume nothing here? (keep 0 as upper bound?) 
-                τ_liq = 1 / (c_1l * exp(c_2l * (T - 273.15) + c_3l * q.liq))
-                #
-                c_1i = get(param_set.user_aux, :linear_combination_ice_c_1, FT(N_i * r_0)) # I think at q=0, we need c_1 from linear = c_1 from geometric...
-                c_2i = get(param_set.user_aux, :linear_combination_ice_c_2, FT(-0.6)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
-                c_3i = get(param_set.user_aux, :linear_combination_ice_c_3, FT(2 / 3)) # Fletcher 1962 (values taken from Frostenberg 2022), same sign again I suppose...
-                τ_ice = 1 / (c_1i * exp(c_2i * (T - 273.15) + c_3i * q.ice))
-
-            elseif use_supersat == :linear_combination_with_w
-                ρ_l = FT(1000.0) # kg m^-3, CLIMAParameters default for cloud_liquid
-                ρ_i = FT(916.7) # CLIMAParameters default for cloud_ice
-                r_r = FT(20 * 1e-6) # 20 microns
-                r_0 = FT(0.2 * 1e-6) # .2 micron base aerosol
-                N_l = FT(1e-5 / (4 / 3 * π * r_r^3 * ρ_l)) # estimated total N assuming reasonable q_liq.. (N = N_r in homogenous)
-                N_i = FT(1e-7 / (4 / 3 * π * r_r^3 * ρ_i)) # estimated total N assuming reasonable q_ice... (N = N_r + N_0)
-                #
-                c_1l = get(param_set.user_aux, :linear_combination_liq_c_1, FT(N_l * r_0)) # I think at q=0, we need c_1 from linear = c_1 from geometric...
-                c_2l = get(param_set.user_aux, :linear_combination_liq_c_2, FT(-0.6)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
-                c_3l = get(param_set.user_aux, :linear_combination_liq_c_3, FT(-10)) # asssume nothing here? (keep 0 as upper bound?) 
-                c_4l = get(param_set.user_aux, :linear_combination_liq_c_4, FT(0)) # start at 0
-                τ_liq = 1 / (c_1l * exp(c_2l * (T - 273.15) + c_3l * q.liq + c_4l * w))
-                #
-                c_1i = get(param_set.user_aux, :linear_combination_ice_c_1, FT(N_i * r_0)) # I think at q=0, we need c_1 from linear = c_1 from geometric...
-                c_2i = get(param_set.user_aux, :linear_combination_ice_c_2, FT(-0.6)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
-                c_3i = get(param_set.user_aux, :linear_combination_ice_c_3, FT(-10)) # Fletcher 1962 (values taken from Frostenberg 2022), same sign again I suppose...
-                c_4i = get(param_set.user_aux, :linear_combination_ice_c_4, FT(0)) # start at 0
-                τ_ice = 1 / (c_1i * exp(c_2i * (T - 273.15) + c_3i * q.ice + c_4i * w))
-
-
-            elseif use_supersat == :neural_network
-                neural_network_params = param_set.user_aux.neural_microphysics_relaxation_network # training weights for tau (made so could pass in things in TrainTau.jl but now I use CalibrateEDMF)
-                neural_network_params = Float32.(collect(neural_network_params)) # collect from ntuple, then convert to Float32 for NN since that's what it's supposed to be (save eltype in the jld2?)
-                model_x_0_characteristic = get(param_set.user_aux, :model_x_0_characteristic, nothing) # store the model structure so you can create the model from the parameters in the namelist (the parameters must be in namelist for CalibrateEDMF.jl)
-
-                TC = TurbulenceConvection
-                if isdefined(TC, :neural_network) # do this so we don't have to read from disk and recreate the network evry time bc that's super slow
-                    TC.neural_network = TC.re(neural_network_params) # set the parameters to the ones we just read in                       
-                else
-                    model_re_location = get(param_set.user_aux, :model_re_location, nothing) # store the model structure so you can create the model from the parameters in the namelist (the parameters must be in namelist for CalibrateEDMF.jl)
-                    model_re_location =
-                        isa(model_re_location, Val) ? string(typeof(model_re_location).parameters[1]) :
-                        model_re_location # extract the value from the Val type (we put it in there in parameter_set.jl to make it isbits)
-                    re = model_destructure_re_from_file(model_re_location) # get the reconstruction function from the file ( this is probably slow, we could pass the string repr)
-                    neural_network = vec_to_NN(neural_network_params, re) # construct the NN from the parameters
-                    TC.re = re # store it in the TC so we don't have to reconstruct it every time
-                    TC.neural_network = neural_network # store it in the TC so we don't have to reconstruct it every time
-                end
-                τ_liq, τ_ice = predict_τ(ρ, T, q, w, TC.neural_network; norm = model_x_0_characteristic) # pass in the NN and get the τs out
-
-                τ_liq = min(τ_liq, FT(1e10)) # ensure we don't just get a huge number all the time
-                τ_ice = min(τ_ice, FT(1e10)) # ensure we don't just get a huge number all the time                
-
-
-            else
-                error("Unsupported supersaturation type: $(use_supersat)")
-            end
-
-            # limit effective tau to at least one second for stability (stable with dt == limit timescale is unstable, gotta go faster... change to be dt related)
-
-            min_τ_liq = get(param_set.user_aux, :min_τ_liq, FT(1)) # training weights for tau (made so could pass in things in TrainTau.jl but now I use CalibrateEDMF)
-            min_τ_ice = get(param_set.user_aux, :min_τ_ice, FT(1)) # training weights for tau (made so could pass in things in TrainTau.jl but now I use CalibrateEDMF)
-
-            τ_liq = max(min_τ_liq, τ_liq) # make sure it's at least some value
-            τ_ice = max(min_τ_ice, τ_ice) # make sure it's at least some value
+            τ_liq, τ_ice = get_τ(param_set, microphys_params, use_supersat, q, T, p, w, z)
 
             q_eq = TD.PhasePartition(
                 q.tot,
                 TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()),
                 TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice()),
             ) # all 3 are vapor amounts
+            # @info ("τliq =  $τ_liq,  τice =  $τ_ice, T =  $T, w = $w  qliq =  $(q.liq), qice = $(q.ice) qvap = $q_vap, qveq liq = $(q_eq.liq), qveq ice = $(q_eq.ice) ")
+
         elseif use_korolev_mazin
             # need to get w into here somewhere...
             S_ql, S_qi = korolev_mazin_2007(param_set, area, ρ, Δt, ts, w)
@@ -295,7 +56,6 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                 TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()),
                 TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice()),
             ) # all 3 are vapor amounts
-            # println("effective τ_liq = ",(q_vap - q_eq.liq)/S_ql, " effective τ_ice = ",(q_vap - q_eq.ice)/S_qi, " T = ", T, " w = ",w, " q = ",q, " q_eq = ", q_eq )
 
             # korolev_mazin fix effective tau > 1 (or whatever timestep was realy but we run w/ 1 mostly rn)
             τ_liq_eff = (q_vap - q_eq.liq) / S_ql
@@ -341,31 +101,31 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                 # Limiters, where we can rely on the fact that Q_vl,Q_vi are always the same sign as S_ql,S_qi
 
                 # debug check            
-                if Q_vl < Q_vi
-                    if T > thermo_params.T_triple
-                        @info(
-                            "status",
-                            T,
-                            thermo_params.T_freeze,
-                            thermo_params.T_triple,
-                            Q_vl,
-                            Q_vi,
-                            q_vap,
-                            q_eq.liq,
-                            q_eq.ice,
-                            S_ql,
-                            S_qi
-                        )
-                        error("This should not happen (we should be below triple point?)") # This is just a check that all is working properly, remove later
-                    end
-                elseif Q_vl > Q_vi
-                    if T < thermo_params.T_triple
-                        @info("status", T, Q_vl, Q_vi, q_vap, q_eq.liq, q_eq.ice, S_ql, S_qi)
-                        error("This should not happen (we should be above triple point?)") # This is just a check that all is working properly, remove later
-                    end
-                else
-                    # all good, we're at the triple point or indistinguashable within numerical precision (e.g. at very cold temperatures)
-                end
+                # if Q_vl < Q_vi
+                #     if T > thermo_params.T_triple
+                #         @info(
+                #             "status",
+                #             T,
+                #             thermo_params.T_freeze,
+                #             thermo_params.T_triple,
+                #             Q_vl,
+                #             Q_vi,
+                #             q_vap,
+                #             q_eq.liq,
+                #             q_eq.ice,
+                #             S_ql,
+                #             S_qi
+                #         )
+                #         error("This should not happen (we should be below triple point?)") # This is just a check that all is working properly, remove later
+                #     end
+                # elseif Q_vl > Q_vi
+                #     if T < thermo_params.T_triple
+                #         @info("status", T, Q_vl, Q_vi, q_vap, q_eq.liq, q_eq.ice, S_ql, S_qi)
+                #         error("This should not happen (we should be above triple point?)") # This is just a check that all is working properly, remove later
+                #     end
+                # else
+                #     # all good, we're at the triple point or indistinguashable within numerical precision (e.g. at very cold temperatures)
+                # end
 
                 # @info( "current", S_ql, S_qi, "--",Q_vl, Q_vi, "---", q.liq / Δt, q.ice / Δt, q_vap/Δt)
                 if (S_ql > 0) && (S_qi > 0) # both growing (this is the hardest with the different saturation vapor pressures) - we'll partition based on respective source magnitudes limited by Q_vi which is larger...
@@ -482,7 +242,22 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
             elseif τ_use == :morrison_milbrandt_2015_style
                 # this *shouldn't* need limiters the way it's defined but... lol we'll see...
                 S_ql, S_qi =
-                    morrison_milbrandt_2015_style(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, q, q_eq, Δt, ts)
+                    morrison_milbrandt_2015_style(
+                        param_set,
+                        area,
+                        ρ,
+                        p,
+                        T,
+                        w,
+                        τ_liq,
+                        τ_ice,
+                        q_vap,
+                        q,
+                        q_eq,
+                        Δt,
+                        ts)
+
+                    # Still needs limiters (don't consume liquid that isn't there mainly...)
             elseif τ_use == :morrison_milbrandt_2015_style_exponential_part_only
                 # this *shouldn't* need limiters the way it's defined but... lol we'll see...
                 S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(
@@ -525,7 +300,25 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
                     S_qi += (q.liq / Δt + S_ql) # send any existing liquid to ice that isn't already evaporating (if S_ql was positive, it's already been sent to ice and set to 0)
                     S_ql = -q.liq / Δt # remove all liquid
                 end
+            # Heterogeneous ice nucleation
+            else
+                if get_isbits_nt(param_set.user_args, :use_heterogeneous_ice_nucleation, false)
+                    heterogeneous_ice_nuclation_coefficient = get_isbits_nt(param_set.user_aux, :heterogeneous_ice_nuclation_coefficient, FT(1))
+                    heterogeneous_ice_nuclation_exponent = get_isbits_nt(param_set.user_aux, :heterogeneous_ice_nuclation_exponent, FT(1))
+
+                    c_1 = ρ * heterogeneous_ice_nuclation_coefficient * exp(heterogeneous_ice_nuclation_exponent * (T - thermo_params.T_freeze) - 1)
+                    heterogeneous_ice_nuclation =  q.liq * ( 1 - exp(- c_1 * Δt)) # positive number, how much liquid is losing
+
+
+                    # we have two exponentials so if we'd deplete all our liquid we just scale down.
+                    if S_ql < 0
+                        heterogeneous_ice_nuclation = max( -q.liq/Δt - S_ql, -heterogeneous_ice_nuclation ) # S_ql should be smaller than q.liq/Δt after doing limiters above, but maybe move them down here?
+                    end
+                    S_ql -= heterogeneous_ice_nuclation
+                    S_qi += heterogeneous_ice_nuclation
+                end
             end
+
 
 
 
@@ -545,7 +338,7 @@ function noneq_moisture_sources(param_set::APS, area::FT, ρ::FT, Δt::Real, ts,
 
 
 
-        else # let other limiters do their thing...
+        else # let other limiters do their thing... (this is only acting on sat adjust)
             # TODO - handle limiters elswhere (note, these break our allowance for liquid to ice compensation, no?)
             if S_ql >= FT(0)
                 S_ql = min(S_ql, q_vap / Δt)
@@ -663,7 +456,15 @@ function precipitation_formation(
             else
                 error("Unrecognized rain formation model")
             end
-            S_qt_snow = -min(q.ice / Δt, α_acnv * CM1.conv_q_ice_to_q_sno_no_supersat(microphys_params, q.ice))
+
+            use_supersat = get_isbits_nt(param_set.user_args, :use_supersat, false)
+            if use_supersat == false # it's either true or a specified value
+                S_qt_snow = -min(q.ice / Δt, α_acnv * CM1.conv_q_ice_to_q_sno_no_supersat(microphys_params, q.ice))
+            else
+                p::FT = TD.air_pressure(thermo_params, ts)
+                S_qt_snow = -min(q.ice / Δt, α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q, T, p, use_supersat))
+            end
+            
             qr_tendency -= S_qt_rain
             qs_tendency -= S_qt_snow
             qt_tendency += S_qt_rain + S_qt_snow
