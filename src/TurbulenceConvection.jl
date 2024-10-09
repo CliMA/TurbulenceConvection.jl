@@ -32,6 +32,44 @@ const rain_type = CM.CommonTypes.RainType()
 const snow_type = CM.CommonTypes.SnowType()
 
 const Blk1MVel = CMT.Blk1MVelType() # for terminal velocity
+const Chen2022Vel = CMT.Chen2022Type() # for terminal velocity
+
+
+function get_termvel_type(termvel_type::Symbol)
+    if termvel_type == :Blk1MVel
+        return Blk1MVel
+    elseif termvel_type == :Chen2022Vel
+        return Chen2022Vel
+    else
+        error("Unknown termvel_type: $termvel_type")
+    end
+end
+
+# CMP = CM.Parameters
+import CloudMicrophysics.Parameters as CMP
+# CT = CMT
+const ACMP = CMP.AbstractCloudMicrophysicsParameters #
+# const TDP = TD.parameters
+const TDPS = TD.Parameters.ThermodynamicsParameters
+
+
+"""
+Because we pack our parameters in a named tuple and put symbols in Vals so they're isbits, we use a convenience get fcn.
+Put in here so can use here and in driver
+"""
+function get_isbits_nt(
+    named_tuple::NamedTuple,
+    symbol::Symbol,
+    default = nothing
+)
+
+    val = get(named_tuple, symbol, default)
+
+    if isa(val, Val) # extract from it's Val wrapped prison
+        val = typeof(val).parameters[1] # this is a hack to get the case name from the Val object
+    end
+    return val
+end
 
 include("Parameters.jl")
 import .Parameters as TCP
@@ -150,9 +188,12 @@ include("closures/nondimensional_exchange_functions.jl")
 include("closures/mixing_length.jl")
 include("closures/buoyancy_gradients.jl")
 
+include("closures/relaxation_timescales.jl")
 include("closures/N_r_closures.jl") # testing different N/r distribution closures
 include("closures/neural_microphysics_relaxation_timescales.jl") # testing different microphysics relaxation timescales
 include("closures/korolev_mazin_2007.jl")
 include("closures/morrison_milbrandt_2015_style.jl")
+include("closures/sedimentation.jl")
+include("closures/terminal_velocity.jl")
 
 end
