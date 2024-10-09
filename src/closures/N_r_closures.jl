@@ -6,10 +6,10 @@ function NR_monodisperse(N::FT, q::FT) where {FT}
     """
     constant N
     """
-    ρ_w = FT(1) 
-    r = (q/(4/3*π*ρ_w*N))^(1/3)
-    r = max(r, 0.2*1e-6) # bound to be at least ~micron size...something like kohler crit radius (e.g. if the cloud is new, diagnosed r is 0 for selecting tau in principle)
-    return (;N,r)
+    ρ_w = FT(1)
+    r = (q / (4 / 3 * π * ρ_w * N))^(1 / 3)
+    r = max(r, 0.2 * 1e-6) # bound to be at least ~micron size...something like kohler crit radius (e.g. if the cloud is new, diagnosed r is 0 for selecting tau in principle)
+    return (; N, r)
 end
 
 
@@ -17,13 +17,21 @@ function NR_fixed_radius(r::FT, q::FT) where {FT}
     """
     constant r
     """
-    ρ_w = FT(1) 
-    N = q/(4/3 * π * r^3 * ρ_w)
-    return (;N,r)
+    ρ_w = FT(1)
+    N = q / (4 / 3 * π * r^3 * ρ_w)
+    return (; N, r)
 end
 
 
-function NR_inhomogeneous_mixing_liquid(param_set::TD.APS, N0::FT, p::FT, q_liq::FT, p_LCL::FT, T_LCL::FT, q_LCL::FT) where {FT}
+function NR_inhomogeneous_mixing_liquid(
+    param_set::TD.APS,
+    N0::FT,
+    p::FT,
+    q_liq::FT,
+    p_LCL::FT,
+    T_LCL::FT,
+    q_LCL::FT,
+) where {FT}
     """
     # add some DOI references
 
@@ -46,33 +54,45 @@ function NR_inhomogeneous_mixing_liquid(param_set::TD.APS, N0::FT, p::FT, q_liq:
     """
     # theta_li is conserved so we just need to back out states based on theta_li and our two pressures
     if p_LCL < p # LCL is above current condensation, so new cloud... use default monodisperse relation
-        return NR_monodisperse(N0,q_liq) 
+        return NR_monodisperse(N0, q_liq)
     else
         q_LCL = TD.PhasePartition(q_LCL) # assume all vapor at cloud base (or should I read in the real value?) would have to make q_pt an argument rather than q_LCL or only accept ts for example...
-        θ_liq_ice = TD.liquid_ice_pottemp_given_pressure(param_set,T_LCL,p_LCL,q_LCL)
+        θ_liq_ice = TD.liquid_ice_pottemp_given_pressure(param_set, T_LCL, p_LCL, q_LCL)
         # @show(p, θ_liq_ice)
         q_adiabatic = PhaseEquil_pθq_q(param_set, p, θ_liq_ice, q_LCL.tot)# can we ascend the adiabat here without having to do a full solve? -- also how do I partition liquid and ice in this framework? assume one phase?e
-        ρ_w = FT(1) 
-        r_adiabatic = (q_adiabatic.liq/(4/3*π*ρ_w*N0))^(1/3)
-        r_adiabatic = max(r_adiabatic, 0.2*1e-6) # bound to be at least ~micron size...something like kohler crit radius (e.g. if the cloud is new, diagnosed r is 0 for selecting tau in principle) (also if q_liq is 0 so is r_liq so rly need some bounds)
-        N = q_liq/(4/3 * π * r_adiabatic^3 * ρ_w)
-        return (;N,r=r_adiabatic)
+        ρ_w = FT(1)
+        r_adiabatic = (q_adiabatic.liq / (4 / 3 * π * ρ_w * N0))^(1 / 3)
+        r_adiabatic = max(r_adiabatic, 0.2 * 1e-6) # bound to be at least ~micron size...something like kohler crit radius (e.g. if the cloud is new, diagnosed r is 0 for selecting tau in principle) (also if q_liq is 0 so is r_liq so rly need some bounds)
+        N = q_liq / (4 / 3 * π * r_adiabatic^3 * ρ_w)
+        return (; N, r = r_adiabatic)
     end
 end
 
-function NR_inhomogeneous_mixing_liquid(param_set::TD.APS, N0::FT, p::FT, q_liq::FT, ts_LCL::TD.ThermodynamicState) where {FT}
-    p_LCL = TD.air_pressure(param_set,ts_LCL)
-    T_LCL = TD.air_temperature(param_set,ts_LCL)
-    q_LCL = TD.total_specific_humidity(param_set,ts_LCL)
+function NR_inhomogeneous_mixing_liquid(
+    param_set::TD.APS,
+    N0::FT,
+    p::FT,
+    q_liq::FT,
+    ts_LCL::TD.ThermodynamicState,
+) where {FT}
+    p_LCL = TD.air_pressure(param_set, ts_LCL)
+    T_LCL = TD.air_temperature(param_set, ts_LCL)
+    q_LCL = TD.total_specific_humidity(param_set, ts_LCL)
     return NR_inhomogeneous_mixing_liquid(param_set, N0, p, q_liq, p_LCL, T_LCL, q_LCL)
 end
 
-function NR_inhomogeneous_mixing_liquid(param_set::TD.APS, N0::FT, ts::TD.ThermodynamicState, q_liq::FT, ts_LCL::TD.ThermodynamicState) where {FT}
-    p = TD.air_pressure(param_set,ts)
-    p_LCL = TD.air_pressure(param_set,ts_LCL)
-    T_LCL = TD.air_temperature(param_set,ts_LCL)
-    q_LCL = TD.total_specific_humidity(param_set,ts_LCL)
-    return NR_inhomogeneous_mixing_liquid(param_set ,N0, p, q_liq, p_LCL, T_LCL, q_LCL)
+function NR_inhomogeneous_mixing_liquid(
+    param_set::TD.APS,
+    N0::FT,
+    ts::TD.ThermodynamicState,
+    q_liq::FT,
+    ts_LCL::TD.ThermodynamicState,
+) where {FT}
+    p = TD.air_pressure(param_set, ts)
+    p_LCL = TD.air_pressure(param_set, ts_LCL)
+    T_LCL = TD.air_temperature(param_set, ts_LCL)
+    q_LCL = TD.total_specific_humidity(param_set, ts_LCL)
+    return NR_inhomogeneous_mixing_liquid(param_set, N0, p, q_liq, p_LCL, T_LCL, q_LCL)
 end
 
 
@@ -91,8 +111,7 @@ function PhaseEquil_pθq_q(
     T_guess::Union{FT, Nothing} = nothing,
 ) where {FT <: Real, IT <: TD.ITERTYPE, FTT <: TD.TOLTYPE(FT), sat_adjust_method}
     maxiter === nothing && (maxiter = 50)
-    relative_temperature_tol === nothing &&
-        (relative_temperature_tol = FT(1e-4))
+    relative_temperature_tol === nothing && (relative_temperature_tol = FT(1e-4))
     phase_type = TD.PhaseEquil{FT} # equil or non equil
     q_tot_safe = clamp(q_tot, FT(0), FT(1))
     T = saturation_adjustment_given_pθq( # use my local version... force liq_frac to 1
@@ -152,22 +171,10 @@ function saturation_adjustment_given_pθq(
     air_temp(q) = TD.air_temperature_given_pθq(param_set, p, θ_liq_ice, q)
     function θ_liq_ice_closure(T)
         # use local version of PhasePartition_equil_given_p which always has liq_frac = 1
-        q_pt = PhasePartition_equil_given_p(
-            param_set,
-            T,
-            oftype(T, p),
-            oftype(T, q_tot),
-            phase_type,
-        )
-        return TD.liquid_ice_pottemp_given_pressure(
-            param_set,
-            T,
-            oftype(T, p),
-            q_pt,
-        )
+        q_pt = PhasePartition_equil_given_p(param_set, T, oftype(T, p), oftype(T, q_tot), phase_type)
+        return TD.liquid_ice_pottemp_given_pressure(param_set, T, oftype(T, p), q_pt)
     end
-    q_vap_sat(T) =
-        TD.q_vap_saturation_from_pressure(param_set, q_tot, p, T, phase_type)
+    q_vap_sat(T) = TD.q_vap_saturation_from_pressure(param_set, q_tot, p, T, phase_type)
     T_1 = max(T_min, air_temp(TD.PhasePartition(q_tot))) # Assume all vapor
     q_v_sat_1 = q_vap_sat(T_1)
     unsaturated = q_tot <= q_v_sat_1
@@ -183,15 +190,7 @@ function saturation_adjustment_given_pθq(
     roots(T) = oftype(T, θ_liq_ice) - θ_liq_ice_closure(T)
     sol = TD.RS.find_zero(
         roots,
-        TD.sa_numerical_method_pθq(
-            sat_adjust_method,
-            param_set,
-            p,
-            θ_liq_ice,
-            q_tot,
-            phase_type,
-            T_guess,
-        ),
+        TD.sa_numerical_method_pθq(sat_adjust_method, param_set, p, θ_liq_ice, q_tot, phase_type, T_guess),
         TD.RS.CompactSolution(),
         tol,
         maxiter,
@@ -270,6 +269,6 @@ function cloud_base(aux, grid, ts, mode)
         end
     end
 
-    return (;cloud_base_ts, cloud_base)
+    return (; cloud_base_ts, cloud_base)
 
 end

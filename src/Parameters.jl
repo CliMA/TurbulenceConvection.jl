@@ -15,7 +15,7 @@ const ATCP = AbstractTurbulenceConvectionParameters
 ##### TurbulenceConvection parameters
 #####
 
-Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP, NT, NT2} <: ATCP 
+Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP, NT, NT2} <: ATCP
     Omega::FT
     planet_radius::FT
     microph_scaling::FT

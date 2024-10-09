@@ -29,11 +29,11 @@ function microphysics(
         if edmf.moisture_model isa NonEquilibriumMoisture
             aux_en_f = face_aux_environment(state) # state or does ts include this? I guess you'd want to move this to the calling place... to choose updraft or environment
             w = CCO.InterpolateF2C(aux_en_f.w)
-            k_int = getfield(k,Base.propertynames(k)[1]) # get the value k.i out
-            w = Base.getindex(CC.Fields.field_values(getfield(w,Base.propertynames(w)[1])), k_int) # w first field is w.bcs = getfield(w,Base.propertynames(w)[1]) , then get the index from the field value
+            k_int = getfield(k, Base.propertynames(k)[1]) # get the value k.i out
+            w = Base.getindex(CC.Fields.field_values(getfield(w, Base.propertynames(w)[1])), k_int) # w first field is w.bcs = getfield(w,Base.propertynames(w)[1]) , then get the index from the field value
             zc = FT(grid.zc[k].z)
-            
-            mph_neq = noneq_moisture_sources(param_set, aux_en.area[k], ρ_c[k], Δt, ts, w, zc; ts_LCL=ts_LCL)
+
+            mph_neq = noneq_moisture_sources(param_set, aux_en.area[k], ρ_c[k], Δt, ts, w, zc; ts_LCL = ts_LCL)
             aux_en.ql_tendency_noneq[k] = mph_neq.ql_tendency * aux_en.area[k]
             aux_en.qi_tendency_noneq[k] = mph_neq.qi_tendency * aux_en.area[k]
         end
