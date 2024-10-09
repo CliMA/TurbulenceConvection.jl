@@ -103,3 +103,27 @@ function update_radiation(self::RadiationBase{RadiationTRMM_LBA}, grid, state, t
     end
     return nothing
 end
+
+
+# technically the code as written already sets this cause it's in the SSCF output...
+function initialize(radiation::RadiationBase{RadiationSOCRATES}, grid, state) #where {T <: RadiationSOCRATES}
+    FT = TC.float_type(state)
+    aux_gm = TC.center_aux_grid_mean(state)
+    radiation_funcs = radiation.radiation_funcs[]
+
+    @inbounds for k in TC.real_center_indices(grid)
+        aux_gm.dTdt_rad[k] = radiation_funcs[:dTdt_rad][k]([FT(0)])[1] # apply to time = 0 and apply to aux_gm, turn to vec cause needs to be cast as in https://github.com/CliMA/TurbulenceConvection.jl/blob/a9ebce1f5f15f049fc3719a013ddbc4a9662943a/src/utility_functions.jl#L48
+    end
+    return nothing
+end
+
+function update_radiation(radiation::RadiationBase{RadiationSOCRATES}, grid, state, t::Real, param_set) # where {T <: RadiationSOCRATES}
+    # FT = TC.float_type(state)
+    aux_gm = TC.center_aux_grid_mean(state)
+    radiation_funcs = radiation.radiation_funcs[]
+
+    @inbounds for k in TC.real_center_indices(grid)
+        aux_gm.dTdt_rad[k] = radiation_funcs[:dTdt_rad][k]([t])[1] # apply to time = 0 and apply to aux_gm, turn to vec cause needs to be cast as in
+    end
+    return nothing
+end

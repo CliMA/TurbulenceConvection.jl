@@ -319,7 +319,8 @@ const ᶠinterp_a = CCO.InterpolateC2F(bottom = CCO.Extrapolate(), top = CCO.Ext
 
 function area_surface_bc(surf::SurfaceBase{FT}, edmf::EDMFModel, i::Int, bc::FixedSurfaceAreaBC)::FT where {FT}
     N_up = n_updrafts(edmf)
-    return surf.bflux > 0 ? edmf.surface_area / N_up : FT(0)
+    surface_area = length(edmf.surface_area) == N_up ? edmf.surface_area[i] : edmf.surface_area[1] / N_up # length and [1] will work on scalars or arrays, so either take the i'th value or assume it's a sum like it did before
+    return surf.bflux > 0 ? surface_area : FT(0)
 end
 
 function area_surface_bc(surf::SurfaceBase{FT}, edmf::EDMFModel, i::Int, bc::ClosureSurfaceAreaBC)::FT where {FT}

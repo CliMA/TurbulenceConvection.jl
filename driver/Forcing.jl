@@ -34,11 +34,13 @@ function initialize(::ForcingBase{ForcingLES}, grid, state, LESDat::LESData)
     end
 end
 
-function initialize(forcing::ForcingBase{T}, grid, state) where {T <: ForcingSOCRATES}# added param_set so we can calculate stuff....
+function initialize(forcing::ForcingBase{ForcingSOCRATES}, grid, state) #where {T <: ForcingSOCRATES} # added param_set so we can calculate stuff....
     FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
 
-    ug_keys = (:ug_nudge, :vg_nudge)
+    forcing_keys = (:dTdt_hadv, :H_nudge, :dqtdt_hadv, :qt_nudge, :subsidence, :u_nudge, :v_nudge) # all socrates forcings except those handled separately
+    # ug_keys = (:ug_nudge, :vg_nudge)
+    # rad_keys = (:dTdt_rad,)
     forcing_funcs = forcing.forcing_funcs[]
 
     # set the geostrophic velocity profiles -- need to check if we actually have a fcn that can take in t=0 and return a profile... ( i think ours is one func for each z so whoops... maybe need to reconstruct?)
@@ -52,9 +54,9 @@ function initialize(forcing::ForcingBase{T}, grid, state) where {T <: ForcingSOC
     aux_gm_uₕ_g = TC.grid_mean_uₕ_g(state)
     TC.set_z!(aux_gm_uₕ_g, prof_ug, prof_vg)
 
-    forcing_funcs = forcing_funcs[setdiff(keys(forcing_funcs), ug_keys)] # keys we don't need.
+    forcing_funcs = forcing_funcs[forcing_keys] # keys we don't need.
     for (name, funcs) in zip(keys(forcing_funcs), forcing_funcs) # iterate over the named tuple of our forcings...
-        for k in TC.real_center_indices(grid)
+        @inbounds for k in TC.real_center_indices(grid)
             func = funcs[k]
             getproperty(aux_gm, name)[k] = func([FT(0)])[1] # apply to time = 0 and apply to aux_gm, turn to vec cause needs to be cast as in https://github.com/CliMA/TurbulenceConvection.jl/blob/a9ebce1f5f15f049fc3719a013ddbc4a9662943a/src/utility_functions.jl#L48
         end

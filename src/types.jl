@@ -457,8 +457,10 @@ Base.@kwdef struct SurfaceBase{FT}
     wstar::FT = 0
 end
 
-struct EDMFModel{N_up, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}
-    surface_area::FT
+# struct EDMFModel{N_up, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}
+struct EDMFModel{N_up, FT, SFCA, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}
+    # surface_area::FT
+    surface_area::SFCA # trying to allow for non even split of surface area in updrafts... we'll read this in driver/initial_conditions.jl which will call src/EDMF_Functions.jl area_surface_bc()
     surface_area_bc::SABC
     max_area::FT
     minimum_area::FT
@@ -893,7 +895,10 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
     EPG = typeof(entr_pi_subset)
     MLP = typeof(mixing_length_params)
     PMP = typeof(pressure_model_params)
-    return EDMFModel{n_updrafts, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}(
+
+    SFCA = typeof(surface_area) # testing allowing this to be a vector for initializing updrafts with non equal areas
+    # return EDMFModel{n_updrafts,FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}(
+    return EDMFModel{n_updrafts, FT, SFCA, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}(
         surface_area,
         surface_area_bc,
         max_area,

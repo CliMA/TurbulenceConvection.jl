@@ -289,6 +289,7 @@ function initialize(sim::Simulation1d)
         FT = TC.float_type(state)
         t = FT(0)
         compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
+        Cases.overwrite_ref_state_from_file!(case, state, grid, param_set)  # if we have an external reference state we may want to do this instead, if isn't socrates should do nothing
         if !skip_io
             stats = Stats[colidx]
             NC.Dataset(stats.nc_filename, "a") do ds

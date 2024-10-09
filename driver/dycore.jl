@@ -302,23 +302,23 @@ function compute_gm_tendencies!(
 
     θ_liq_ice_gm_toa = prog_gm.ρθ_liq_ice[kc_toa] / ρ_c[kc_toa]
     q_tot_gm_toa = prog_gm.ρq_tot[kc_toa] / ρ_c[kc_toa]
-    RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_liq_ice_gm_toa))
-    RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa))
+    # RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_liq_ice_gm_toa)) # right biased
+    # RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa)) # right biased
     wvec = CC.Geometry.WVector
-    ∇c = CCO.DivergenceF2C()
-    @. ∇θ_liq_ice_gm = ∇c(wvec(RBθ(prog_gm.ρθ_liq_ice / ρ_c)))
-    @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.ρq_tot / ρ_c)))
+    ∇c = CCO.DivergenceF2C() # F2C to come back from C2F
+    # @. ∇θ_liq_ice_gm = ∇c(wvec(RBθ(prog_gm.ρθ_liq_ice / ρ_c)))
+    # @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.ρq_tot / ρ_c)))
 
-    if edmf.moisture_model isa TC.NonEquilibriumMoisture
-        ∇q_liq_gm = TC.center_aux_grid_mean(state).∇q_liq_gm
-        ∇q_ice_gm = TC.center_aux_grid_mean(state).∇q_ice_gm
-        q_liq_gm_toa = prog_gm.q_liq[kc_toa]
-        q_ice_gm_toa = prog_gm.q_ice[kc_toa]
-        RBq_liq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_liq_gm_toa))
-        RBq_ice = CCO.RightBiasedC2F(; top = CCO.SetValue(q_ice_gm_toa))
-        @. ∇q_liq_gm = ∇c(wvec(RBq(prog_gm.q_liq)))
-        @. ∇q_ice_gm = ∇c(wvec(RBq(prog_gm.q_ice)))
-    end
+    # if edmf.moisture_model isa TC.NonEquilibriumMoisture
+    #     ∇q_liq_gm = TC.center_aux_grid_mean(state).∇q_liq_gm
+    #     ∇q_ice_gm = TC.center_aux_grid_mean(state).∇q_ice_gm
+    #     q_liq_gm_toa = prog_gm.q_liq[kc_toa]
+    #     q_ice_gm_toa = prog_gm.q_ice[kc_toa]
+    #     RBq_liq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_liq_gm_toa))
+    #     RBq_ice = CCO.RightBiasedC2F(; top = CCO.SetValue(q_ice_gm_toa))
+    #     @. ∇q_liq_gm = ∇c(wvec(RBq_liq(prog_gm.q_liq)))
+    #     @. ∇q_ice_gm = ∇c(wvec(RBq_ice(prog_gm.q_ice)))
+    # end
 
     # Apply forcing and radiation
     prog_gm_uₕ = TC.grid_mean_uₕ(state)
@@ -341,25 +341,91 @@ function compute_gm_tendencies!(
     @. tendencies_gm_uₕ -= f × (C12(C123(prog_gm_uₕ)) - C12(C123(aux_gm_uₕ_g)))
 
 
+    # ========================================================================================================================================== #
+    # trying subsidence here outside the loop w/ upwinding...
+    # 1) it seems we before just used a straight product, subsidence * dq/dz
+    # 2) This could be bad because q is right biased C2F (towards ground), so dq/dz F2C encodes information shifted towards the ground (i.e. from the q above).
+    #    Then, if we have descent, w x dqdz on the center is w times q_above-q and the flux is good from upstream :)
+    #    But ascent is propagating q-q_above into the current node, when the information should be q-q_below. 
+    #    This is bad, if the point above is smaller, for example, this point will continue to grow -- even if the point below is smaller and w is upwards, as it has no way to access that information -- and blowup :(
+    # 3) here we'll try upwinding d/dz (wq) instead. This hopefully will make ascent stable :)
+    # 4) unclear if things have to be rightbiased in converting c to f, instead of just interpolatec2f (with what BCs?), so we'll see if it's stable...
+    # 5) assume no penetration BCs on subsidence w
+
+    UBsub = CCO.UpwindBiasedProductC2F(;bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # upwinding, extrapolate bc we don't know the boa/toa derivatives
+
+    kc_surf = TC.kc_surface(grid)
+    θ_liq_ice_gm_boa  = prog_gm.ρθ_liq_ice[kc_surf] / ρ_c[kc_surf]
+    q_tot_gm_boa = prog_gm.ρq_tot[kc_surf] / ρ_c[kc_surf]
+
+    # subsidence should be face valued so we'll need a C2F call
+    C2Fsub = CCO.InterpolateC2F(;bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # not sure but maybe we should use this for stability as it's not biased for your upwind algorithm... no penetration. # I think this hsould be the more stable option? Though according to cgarkue github issue, it doesn't always work (see https://github.com/CliMA/TurbulenceConvection.jl/pull/1146)
+    C2Fθ = CCO.InterpolateC2F(;bottom = CCO.SetValue(FT(θ_liq_ice_gm_boa)), top = CCO.SetValue(FT(θ_liq_ice_gm_toa))) # not sure if this should be right biased or not
+    C2Fq = CCO.InterpolateC2F(;bottom = CCO.SetValue(FT(q_tot_gm_boa)), top = CCO.SetValue(FT(q_tot_gm_toa))) # not sure if this should be right biased or not
+
+    # we to C2F, then ∇c goes F2C, then UBsub got C2F, but we wanna end on C [ there's no UpwindBiasedProductF2C and we had UpwindBiasedProductF2C(u[F], x[C])
+    F2Csub = CCO.InterpolateF2C(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # We might have put 0 for no penetration on boundary, but that's not exactly true in our dataset...
+    CV32FT = x->x[1] # convert Contravariant3Vector to Float64
+
+    # regular upwinding 
+    ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
+    @. ∇θ_liq_ice_gm = ∇c(wvec(C2Fθ(prog_gm.ρθ_liq_ice / ρ_c)))
+    w∇θ_liq_ice_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇θ_liq_ice_gm) # works, but output type is different than tendencies type
+    w∇θ_liq_ice_gm = @. F2Csub(w∇θ_liq_ice_gm) # convert back to C
+    w∇θ_liq_ice_gm = @. CV32FT(w∇θ_liq_ice_gm) # convert back to Float64 from Contravariant3Vector
+
+    ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
+    @. ∇q_tot_gm = ∇c(wvec(C2Fq(prog_gm.ρq_tot / ρ_c)))
+    w∇q_tot_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_tot_gm) # works, but output type is different than tendencies type
+    w∇q_tot_gm = @. F2Csub(w∇q_tot_gm) # convert back to C
+    w∇q_tot_gm = @. CV32FT(w∇q_tot_gm) # convert back to Float64 from Contravariant3Vector
+
+
+    if edmf.moisture_model isa TC.NonEquilibriumMoisture
+        q_liq_gm_toa = prog_gm.q_liq[kc_toa]
+        q_ice_gm_toa = prog_gm.q_ice[kc_toa]
+        q_liq_boa = prog_gm.q_liq[kc_surf]
+        q_ice_boa = prog_gm.q_ice[kc_surf]
+        C2Fq_liq = CCO.InterpolateC2F(bottom = CCO.SetValue(FT(q_liq_boa)), top = CCO.SetValue(FT(q_liq_gm_toa))) # not sure if this should be right biased or not
+        C2Fq_ice = CCO.InterpolateC2F(bottom = CCO.SetValue(FT(q_ice_boa)), top = CCO.SetValue(FT(q_ice_gm_toa))) # not sure if this should be right biased or not
+
+        ∇q_liq_gm = TC.center_aux_grid_mean(state).∇q_liq_gm
+        @. ∇q_liq_gm = ∇c(wvec(C2Fq_liq(prog_gm.q_liq)))
+        w∇q_liq_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_liq_gm) # works, but output type is different than tendencies type
+        w∇q_liq_gm = @. F2Csub(w∇q_liq_gm) # convert back to C
+        w∇q_liq_gm = @. CV32FT(w∇q_liq_gm) # convert back to Float64 from Contravariant3Vector
+
+        ∇q_ice_gm = TC.center_aux_grid_mean(state).∇q_ice_gm
+        @. ∇q_ice_gm = ∇c(wvec(C2Fq_ice(prog_gm.q_ice)))
+        w∇q_ice_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_ice_gm) # works, but output type is different than tendencies type
+        w∇q_ice_gm = @. F2Csub(w∇q_ice_gm) # convert back to C
+        w∇q_ice_gm = @. CV32FT(w∇q_ice_gm) # convert back to Float64 from Contravariant3Vector
+    end
+
+
     @inbounds for k in TC.real_center_indices(grid)
         Π = TD.exner(thermo_params, ts_gm[k])
 
-        # LS Subsidence (any positive subsidence (ascent) leads to numerical instability) -- why?)
-        tendencies_gm.ρθ_liq_ice[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇θ_liq_ice_gm[k]
-        tendencies_gm.ρq_tot[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇q_tot_gm[k]
+        # LS Subsidence (any positive subsidence (ascent) leads to numerical instability) -- why? fast descent is unstable too...)
+        # tendencies_gm.ρθ_liq_ice[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇θ_liq_ice_gm[k] # trying turning this off
+        tendencies_gm.ρθ_liq_ice[k] -= ρ_c[k] * w∇θ_liq_ice_gm[k] # trying turning this off
+        # tendencies_gm.ρq_tot[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇q_tot_gm[k] # trying turning this off
+        tendencies_gm.ρq_tot[k] -= ρ_c[k] * w∇q_tot_gm[k] # trying turning this off
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
-            tendencies_gm.q_liq[k] -= ∇q_liq_gm[k] * aux_gm.subsidence[k]
-            tendencies_gm.q_ice[k] -= ∇q_ice_gm[k] * aux_gm.subsidence[k]
+            # tendencies_gm.q_liq[k] -= ∇q_liq_gm[k] * aux_gm.subsidence[k]
+            tendencies_gm.q_liq[k] -= w∇q_liq_gm[k]
+            # tendencies_gm.q_ice[k] -= ∇q_ice_gm[k] * aux_gm.subsidence[k]
+            tendencies_gm.q_ice[k] -= w∇q_ice_gm[k]
         end
 
         # Radiation
-        if Cases.rad_type(radiation) <: Union{Cases.RadiationDYCOMS_RF01, Cases.RadiationLES, Cases.RadiationTRMM_LBA}
-            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_rad[k] / Π
+        if Cases.rad_type(radiation) <: Union{Cases.RadiationDYCOMS_RF01, Cases.RadiationLES, Cases.RadiationTRMM_LBA, Cases.RadiationSOCRATES}
+            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_rad[k] / Π   .* 1  # testing maybe it's an order of operations thing and the radiation needs to happen first before precip then nudging? idk
         end
         # LS advection
-        tendencies_gm.ρq_tot[k] += ρ_c[k] * aux_gm.dqtdt_hadv[k]
+        tendencies_gm.ρq_tot[k] += ρ_c[k] * aux_gm.dqtdt_hadv[k] .* 1
         if !(Cases.force_type(force) <: Cases.ForcingDYCOMS_RF01)
-            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_hadv[k] / Π
+            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_hadv[k] / Π .* 1 # testing maybe it's an order of operations thing and the radiation needs to happen first before precip then nudging? idk
         end
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
             tendencies_gm.q_liq[k] += aux_gm.dqldt[k] # we never set these, e.g. in socrates... presumably they're zero?
@@ -410,10 +476,10 @@ function compute_gm_tendencies!(
 
             # nudge liquid and ice -- but we don't have a ql_nudge qi_nudge from external forcing in socrates? only qt_nudge -- what are ql_nudge and qi_nudge derived from
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
-                gm_q_liq_nudge_k = (aux_gm.ql_nudge[k] - prog_gm.q_liq[k]) / force.scalar_nudge_τᵣ
-                gm_q_ice_nudge_k = (aux_gm.qi_nudge[k] - prog_gm.q_ice[k]) / force.scalar_nudge_τᵣ
-                tendencies_gm.q_liq[k] += aux_gm.dqldt_hadv[k] + gm_q_liq_nudge_k + aux_gm.dqldt_fluc[k]
-                tendencies_gm.q_ice[k] += aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k]
+                # gm_q_liq_nudge_k = (aux_gm.ql_nudge[k] - prog_gm.q_liq[k]) / force.scalar_nudge_τᵣ
+                # gm_q_ice_nudge_k = (aux_gm.qi_nudge[k] - prog_gm.q_ice[k]) / force.scalar_nudge_τᵣ
+                # tendencies_gm.q_liq[k] += aux_gm.dqldt_hadv[k] + gm_q_liq_nudge_k + aux_gm.dqldt_fluc[k] # we dont have ql_nudge or dqldt_hadv,fluc in socrates
+                # tendencies_gm.q_ice[k] += aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k] # we dont have qi_nudge or dqidt_hadv,fluc in socrates
             end
         end
 
