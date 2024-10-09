@@ -321,10 +321,10 @@ uuid = "fb6a15b2-703c-40df-9091-08a04967cfa9"
 version = "0.1.13"
 
 [[deps.CloudMicrophysics]]
-deps = ["CLIMAParameters", "DocStringExtensions", "ForwardDiff", "KernelAbstractions", "RootSolvers", "SpecialFunctions", "Thermodynamics"]
-git-tree-sha1 = "153238dfeb7bed07fa8f10c535d78e2340f3c882"
+deps = ["CLIMAParameters", "DocStringExtensions", "SpecialFunctions", "Thermodynamics"]
+git-tree-sha1 = "d412a157375b445f251e3c95c61bc127bf8e1bdb"
 uuid = "6a9e3e04-43cd-43ba-94b9-e8782df3c71b"
-version = "0.14.0"
+version = "0.11.0"
 
 [[deps.CodecZlib]]
 deps = ["TranscodingStreams", "Zlib_jll"]
@@ -1067,12 +1067,6 @@ version = "0.2.2"
 git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
 uuid = "82899510-4779-5014-852e-03e436cf321d"
 version = "1.0.0"
-
-[[deps.JLD2]]
-deps = ["FileIO", "MacroTools", "Mmap", "OrderedCollections", "Pkg", "PrecompileTools", "Reexport", "Requires", "TranscodingStreams", "UUIDs", "Unicode"]
-git-tree-sha1 = "bdbe8222d2f5703ad6a7019277d149ec6d78c301"
-uuid = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
-version = "0.4.48"
 
 [[deps.JLFzf]]
 deps = ["Pipe", "REPL", "Random", "fzf_jll"]
@@ -2052,10 +2046,10 @@ uuid = "f50d1b31-88e8-58de-be2c-1cc44531875f"
 version = "0.4.3+0"
 
 [[deps.RootSolvers]]
-deps = ["ForwardDiff"]
-git-tree-sha1 = "a87fd671f7a298de98f2f3c5a9cd9890714eb9dd"
+deps = ["DocStringExtensions", "ForwardDiff"]
+git-tree-sha1 = "9fb3462240d2898be5d4acf8925e47f70ec64d07"
 uuid = "7181ea78-2dcb-4de3-ab41-2b8ab5a31e74"
-version = "0.4.2"
+version = "0.3.5"
 
 [[deps.RuntimeGeneratedFunctions]]
 deps = ["ExprTools", "SHA", "Serialization"]
@@ -2374,10 +2368,10 @@ uuid = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
 version = "0.2.8"
 
 [[deps.SurfaceFluxes]]
-deps = ["CLIMAParameters", "DocStringExtensions", "RootSolvers", "Thermodynamics"]
-git-tree-sha1 = "a167924897731ee57ef0197bb19357bfc2d007bc"
+deps = ["DocStringExtensions", "KernelAbstractions", "RootSolvers", "StaticArrays", "Thermodynamics"]
+git-tree-sha1 = "d6a2fc6e439c8cef9d0c04a0929090bb2218ba85"
 uuid = "49b00bb7-8bd4-4f2b-b78c-51cd0450215f"
-version = "0.8.1"
+version = "0.6.3"
 
 [[deps.SymbolicIndexingInterface]]
 deps = ["DocStringExtensions"]
@@ -2442,9 +2436,9 @@ version = "1.0.2"
 
 [[deps.Thermodynamics]]
 deps = ["DocStringExtensions", "KernelAbstractions", "Random", "RootSolvers"]
-git-tree-sha1 = "2de4b5ccc71baf3578959928c295a2fa13105db7"
+git-tree-sha1 = "dd055cd2ef16f8d373a7dc833f4ddf72165524c5"
 uuid = "b60c26fb-14c3-4610-9d3e-2d17fe7ff00c"
-version = "0.11.2"
+version = "0.10.2"
 
 [[deps.ThreadingUtilities]]
 deps = ["ManualMemory"]
@@ -2519,7 +2513,7 @@ version = "0.3.7"
     Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
 
 [[deps.TurbulenceConvection]]
-deps = ["CLIMAParameters", "ClimaComms", "ClimaCore", "CloudMicrophysics", "Dierckx", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "Flux", "JLD2", "LambertW", "LinearAlgebra", "OperatorFlux", "Random", "SOCRATESSingleColumnForcings", "SciMLBase", "StaticArrays", "StatsBase", "StochasticDiffEq", "SurfaceFluxes", "Thermodynamics", "UnPack"]
+deps = ["CLIMAParameters", "ClimaComms", "ClimaCore", "CloudMicrophysics", "Dierckx", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "Flux", "LambertW", "LinearAlgebra", "OperatorFlux", "Random", "SciMLBase", "StaticArrays", "StatsBase", "StochasticDiffEq", "SurfaceFluxes", "Thermodynamics", "UnPack"]
 path = ".."
 uuid = "8e072fc4-01f8-44fb-b9dc-f9336c367e6b"
 version = "1.3.6"
