@@ -1,0 +1,9 @@
+[MPIPreferences]
+__clear__ = ["preloads_env_switch"]
+_format = "1.0"
+abi = "MPICH"
+binary = "system"
+cclibs = []
+libmpi = "libmpi"
+mpiexec = "mpiexec"
+preloads = []
