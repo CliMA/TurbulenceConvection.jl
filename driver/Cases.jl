@@ -1303,11 +1303,22 @@ function initialize_profiles(case::SOCRATES, grid::Grid, param_set, state; kwarg
     prog_gm = TC.center_prog_grid_mean(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     new_zc = vec(grid.zc.z)
-    new_zf = vec(grid.zf.z)[1:end-1] # apply the zf interpolated forcing on zc ahead (I think that's what atlas did..., we might just have different face/center logic
+    new_zf = vec(grid.zf.z)[1:(end - 1)] # apply the zf interpolated forcing on zc ahead (I think that's what atlas did..., we might just have different face/center logic
     IC = SSCF.process_case(
         case.flight_number;
         obs_or_ERA5 = case.forcing_type,
-        new_z = (;dTdt_hadv=new_zc, H_nudge=new_zc, dqtdt_hadv=new_zc, qt_nudge=new_zc, subsidence=new_zc, u_nudge=new_zc, v_nudge=new_zc, ug_nudge=new_zc, vg_nudge=new_zc, dTdt_rad=new_zc),
+        new_z = (;
+            dTdt_hadv = new_zc,
+            H_nudge = new_zc,
+            dqtdt_hadv = new_zc,
+            qt_nudge = new_zc,
+            subsidence = new_zc,
+            u_nudge = new_zc,
+            v_nudge = new_zc,
+            ug_nudge = new_zc,
+            vg_nudge = new_zc,
+            dTdt_rad = new_zc,
+        ),
         initial_condition = true,
         thermo_params = thermo_params,
     )
@@ -1348,7 +1359,7 @@ function overwrite_ref_state_from_file!(case::SOCRATES, state, grid, param_set)
         case.flight_number;
         obs_or_ERA5 = case.forcing_type,
         new_zc = new_zc,
-        new_zf = new_zf,    
+        new_zf = new_zf,
     )
 
     # set center profiles
@@ -1383,13 +1394,24 @@ end
 
 function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_set) # param_set isn't used but matches form in main.jl
     new_zc = vec(grid.zc.z)
-    new_zf = vec(grid.zf.z)[1:end-1]
+    new_zf = vec(grid.zf.z)[1:(end - 1)]
 
     thermo_params = TCP.thermodynamics_params(param_set)
     forcing.forcing_funcs[] = SSCF.process_case(
         case.flight_number;
         obs_or_ERA5 = case.forcing_type,
-        new_z = (;dTdt_hadv=new_zc, H_nudge=new_zc, dqtdt_hadv=new_zc, qt_nudge=new_zc, subsidence=new_zc, u_nudge=new_zc, v_nudge=new_zc, ug_nudge=new_zc, vg_nudge=new_zc, dTdt_rad=new_zc),
+        new_z = (;
+            dTdt_hadv = new_zc,
+            H_nudge = new_zc,
+            dqtdt_hadv = new_zc,
+            qt_nudge = new_zc,
+            subsidence = new_zc,
+            u_nudge = new_zc,
+            v_nudge = new_zc,
+            ug_nudge = new_zc,
+            vg_nudge = new_zc,
+            dTdt_rad = new_zc,
+        ),
         initial_condition = false,
         thermo_params = thermo_params,
     )
@@ -1451,13 +1473,24 @@ RadiationBase(case::SOCRATES, FT) = RadiationBase{Cases.get_radiation_type(case)
 # initialize_radiation(::SOCRATES, radiation, grid::Grid, state, param_set;) = nothing # for now we jus deprecate, if we reimplement a call to radation it will need to match our initialize forcing call structure w/ param_set and Dat
 function initialize_radiation(case::SOCRATES, radiation, grid::Grid, state, param_set)
     new_zc = vec(grid.zc.z)
-    new_zf = vec(grid.zf.z)[1:end-1]
+    new_zf = vec(grid.zf.z)[1:(end - 1)]
 
     thermo_params = TCP.thermodynamics_params(param_set)
     radiation.radiation_funcs[] = SSCF.process_case(
         case.flight_number;
         obs_or_ERA5 = case.forcing_type,
-        new_z = (;dTdt_hadv=new_zc, H_nudge=new_zc, dqtdt_hadv=new_zc, qt_nudge=new_zc, subsidence=new_zc, u_nudge=new_zc, v_nudge=new_zc, ug_nudge=new_zc, vg_nudge=new_zc, dTdt_rad=new_zc),
+        new_z = (;
+            dTdt_hadv = new_zc,
+            H_nudge = new_zc,
+            dqtdt_hadv = new_zc,
+            qt_nudge = new_zc,
+            subsidence = new_zc,
+            u_nudge = new_zc,
+            v_nudge = new_zc,
+            ug_nudge = new_zc,
+            vg_nudge = new_zc,
+            dTdt_rad = new_zc,
+        ),
         initial_condition = false,
         thermo_params = thermo_params,
     ) # redundant w/ forcing but oh well

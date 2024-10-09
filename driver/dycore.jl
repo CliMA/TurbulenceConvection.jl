@@ -352,20 +352,20 @@ function compute_gm_tendencies!(
     # 4) unclear if things have to be rightbiased in converting c to f, instead of just interpolatec2f (with what BCs?), so we'll see if it's stable...
     # 5) assume no penetration BCs on subsidence w
 
-    UBsub = CCO.UpwindBiasedProductC2F(;bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # upwinding, extrapolate bc we don't know the boa/toa derivatives
+    UBsub = CCO.UpwindBiasedProductC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # upwinding, extrapolate bc we don't know the boa/toa derivatives
 
     kc_surf = TC.kc_surface(grid)
-    θ_liq_ice_gm_boa  = prog_gm.ρθ_liq_ice[kc_surf] / ρ_c[kc_surf]
+    θ_liq_ice_gm_boa = prog_gm.ρθ_liq_ice[kc_surf] / ρ_c[kc_surf]
     q_tot_gm_boa = prog_gm.ρq_tot[kc_surf] / ρ_c[kc_surf]
 
     # subsidence should be face valued so we'll need a C2F call
-    C2Fsub = CCO.InterpolateC2F(;bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # not sure but maybe we should use this for stability as it's not biased for your upwind algorithm... no penetration. # I think this hsould be the more stable option? Though according to cgarkue github issue, it doesn't always work (see https://github.com/CliMA/TurbulenceConvection.jl/pull/1146)
-    C2Fθ = CCO.InterpolateC2F(;bottom = CCO.SetValue(FT(θ_liq_ice_gm_boa)), top = CCO.SetValue(FT(θ_liq_ice_gm_toa))) # not sure if this should be right biased or not
-    C2Fq = CCO.InterpolateC2F(;bottom = CCO.SetValue(FT(q_tot_gm_boa)), top = CCO.SetValue(FT(q_tot_gm_toa))) # not sure if this should be right biased or not
+    C2Fsub = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # not sure but maybe we should use this for stability as it's not biased for your upwind algorithm... no penetration. # I think this hsould be the more stable option? Though according to cgarkue github issue, it doesn't always work (see https://github.com/CliMA/TurbulenceConvection.jl/pull/1146)
+    C2Fθ = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(θ_liq_ice_gm_boa)), top = CCO.SetValue(FT(θ_liq_ice_gm_toa))) # not sure if this should be right biased or not
+    C2Fq = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(q_tot_gm_boa)), top = CCO.SetValue(FT(q_tot_gm_toa))) # not sure if this should be right biased or not
 
     # we to C2F, then ∇c goes F2C, then UBsub got C2F, but we wanna end on C [ there's no UpwindBiasedProductF2C and we had UpwindBiasedProductF2C(u[F], x[C])
     F2Csub = CCO.InterpolateF2C(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # We might have put 0 for no penetration on boundary, but that's not exactly true in our dataset...
-    CV32FT = x->x[1] # convert Contravariant3Vector to Float64
+    CV32FT = x -> x[1] # convert Contravariant3Vector to Float64
 
     # regular upwinding 
     ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
@@ -419,8 +419,9 @@ function compute_gm_tendencies!(
         end
 
         # Radiation
-        if Cases.rad_type(radiation) <: Union{Cases.RadiationDYCOMS_RF01, Cases.RadiationLES, Cases.RadiationTRMM_LBA, Cases.RadiationSOCRATES}
-            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_rad[k] / Π   .* 1  # testing maybe it's an order of operations thing and the radiation needs to happen first before precip then nudging? idk
+        if Cases.rad_type(radiation) <:
+           Union{Cases.RadiationDYCOMS_RF01, Cases.RadiationLES, Cases.RadiationTRMM_LBA, Cases.RadiationSOCRATES}
+            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_rad[k] / Π .* 1  # testing maybe it's an order of operations thing and the radiation needs to happen first before precip then nudging? idk
         end
         # LS advection
         tendencies_gm.ρq_tot[k] += ρ_c[k] * aux_gm.dqtdt_hadv[k] .* 1

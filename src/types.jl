@@ -898,7 +898,27 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model) whe
 
     SFCA = typeof(surface_area) # testing allowing this to be a vector for initializing updrafts with non equal areas
     # return EDMFModel{n_updrafts,FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}(
-    return EDMFModel{n_updrafts, FT, SFCA, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}(
+    return EDMFModel{
+        n_updrafts,
+        FT,
+        SFCA,
+        SABC,
+        MM,
+        TCM,
+        PM,
+        RFM,
+        PFM,
+        ENT,
+        EBGC,
+        MLP,
+        PMP,
+        EC,
+        MLEC,
+        ET,
+        EDS,
+        DDS,
+        EPG,
+    }(
         surface_area,
         surface_area_bc,
         max_area,
