@@ -274,7 +274,7 @@ end
 """
 
 """
-function get_N_threshold(param_set::APS, type::CMT.IceType, q::TD.PhasePartition, T::FT, p::FT, supersat_type::Symbol; N0::Union{FT2, Nothing}=nothing) where {FT, FT2}
+function get_N_threshold(param_set::APS, type::CMT.IceType, q::TD.PhasePartition, T::FT, p::FT, supersat_type::Symbol; N0::FT=NaN) where {FT}
     if isnothing(N0)
         # Let N0 be the number of droplets of radius r_is that means q = q_threshold
         microphys_params::ACMP = TCP.microphysics_params(param_set)
@@ -283,25 +283,31 @@ function get_N_threshold(param_set::APS, type::CMT.IceType, q::TD.PhasePartition
         N0 = q_threshold / q_is_here # the implied number concentration at threshold for the largest possible droplets... so N and threshold are linked... ( i guess that makes sense? idk...)
     end
 
-    # N = get_N_i(param_set, microphys_params, supersat_type, q, T, p) # I think this is bad... bc high N w/ high r should lead to more autoconversion..., but this raises the threshold in an uncontrolled way...
+    # N = get_N_i(param_set, microphys_params, supersat_type, q, T, p, w) # I think this is bad... bc high N w/ high r should lead to more autoconversion..., but this raises the threshold in an uncontrolled way...
     # return  isnothing(N) ? N0 : max(N, N0)
 
     return N0
 
 end
 
-function get_q_threshold(param_set::APS, ::CMT.LiquidType, q::TD.PhasePartition, T::FT, p::FT, supersat_type::Symbol; N0::Union{FT2, Nothing}=nothing) where {FT, FT2}
+function get_q_threshold(param_set::APS, ::CMT.LiquidType, q::TD.PhasePartition, T::FT, p::FT, supersat_type::Symbol; N0::FT=NaN) where {FT}
     return CMP.q_liq_threshold(TCP.microphysics_params(param_set))::FT
 end
 
 """
 Get the implied q threshold based on r_is, and q 
 """
-function get_q_threshold(param_set::APS, type::CMT.IceType, q::TD.PhasePartition, T::FT, p::FT, supersat_type::Symbol; N0::Union{FT2,Nothing}=nothing) where {FT, FT2}
+function get_q_threshold(param_set::APS, type::CMT.IceType, q::TD.PhasePartition, T::FT, p::FT, supersat_type::Symbol; N0::FT=NaN) where {FT}
+
     microphys_params::ACMP = TCP.microphysics_params(param_set)
-    N_thresh::FT = get_N_threshold(param_set, type, q, T, p, supersat_type; N0=N0) # if N0 was nothing, get_N_threshold() makes N_thresh * q_is = q_threshold
-    q_is_here::FT = q_is(microphys_params, type)
-    return N_thresh * q_is_here
+
+    if isnan(N0)
+        return CMP.q_ice_threshold(microphys_params)::FT
+    else
+        N_thresh::FT = get_N_threshold(param_set, type, q, T, p, supersat_type; N0=N0) # if N0 was nothing, get_N_threshold() makes N_thresh * q_is = q_threshold (we could add an if block check for that to save fcn calls...)
+        q_is_here::FT = q_is(microphys_params, type)
+        return N_thresh * q_is_here
+    end
 end
 
 # copy of CM1.conv_q_liq_to_q_rai that uses our local get_q_threshold

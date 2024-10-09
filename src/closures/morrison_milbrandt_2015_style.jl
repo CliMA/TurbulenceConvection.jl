@@ -1,6 +1,4 @@
 """
-Computes the tendencies to qt and θ_liq_ice due to precipitation formation
-(autoconversion + accretion)
 """
 function morrison_milbrandt_2015_style(
     param_set::APS,

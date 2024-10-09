@@ -19,6 +19,10 @@ function adjust_ice_N(param_set::APS, microphys_params::ACMP, N_i::FT, q::TD.Pha
 
     # The argument to do it is bc otherwise, N can grow arbitrarily large... and r can't respnod as fast... lack of autoconversion is more due to r than N surely? but the N could have come from above... so no way around that, and autoconv should eventually take care of it...
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> f9ecfddc (updated relaxation timescales and microphysical timescale setups)
     # N_thresh = get_N_threshold(param_set, CMT.IceType(), q, T, p, supersat_type; N0=nothing) # testing a threshold on how large N_i can be -- basically saying that we can't have more droplets than q_thresh / q(r_is) bc then they should be snow... w/o this limit we just assume autoconv will catch up and take care of it 
     # N_i = min(N_i, N_thresh) # make sure we don't get too many ice crystals
 
