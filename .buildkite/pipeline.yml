@@ -100,7 +100,7 @@ steps:
         artifact_paths: "Output.LES_driven_SCM.01/stats/comparison/*"
 
       - label: "SOCRATES"
-        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case SOCRATES_RF13_ERA5_data --t_max=3600"
+        command: "julia --color=yes --project=integration_tests integration_tests/driver.jl --case SOCRATES_RF13_ERA5_data --t_max 3600"
         artifact_paths: "Output.SOCRATES_RF13_ERA5_data.01/stats/comparison/*"
 
   - group: "Vanilla + Deviations"
