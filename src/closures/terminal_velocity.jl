@@ -562,7 +562,7 @@ function my_terminal_velocity(
             abcs = [(aiu_l, bi_l, ciu_l)]
         end
 
-        fall_w = 0
+        fall_w = FT(0)
         for (i, ((Dmin, Dmax), (aiu, bi , ciu))) in enumerate(zip(regions, abcs)) # we basically need to sum the integral as before but over all regions
            
             mass_weights[i] = _λ^-(k+1) * (-SF.gamma(k+1, Dmax*_λ) + SF.gamma(k+1, Dmin*_λ)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
