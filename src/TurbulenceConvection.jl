@@ -31,6 +31,8 @@ const ice_type = CM.CommonTypes.IceType()
 const rain_type = CM.CommonTypes.RainType()
 const snow_type = CM.CommonTypes.SnowType()
 
+const Blk1MVel = CMT.Blk1MVelType() # for terminal velocity
+
 include("Parameters.jl")
 import .Parameters as TCP
 const APS = TCP.AbstractTurbulenceConvectionParameters

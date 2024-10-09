@@ -146,13 +146,31 @@ function create_parameter_set(
     # CP.log_parameter_information(toml_dict, logfilepath)
     TP = typeof(thermo_params)
 
+    # CM 0.13
+    # see  https://github.com/CliMA/CloudMicrophysics.jl/pull/193/files#diff-2624a4f6514b5d8d4cdf38f495c23a1167682c3accbdda813b80b425a02ab2f1
+    # not sure if I should really pivot and change `import CLIMAParameters.Parameters` to `CMP` by using `import CloudMicrophysics.Parameters as CMP``
+    # aliases = string.(fieldnames(CM.Parameters.ModalNucleationParameters))
+    # pairs = CP.get_parameter_values!(toml_dict, aliases, "CloudMicrophysics")
+    # modal_nucleation_params = CM.Parameters.ModalNucleationParameters{FT}(; pairs...)
+    # MNP = typeof(modal_nucleation_params)
+
+    # aliases = string.(fieldnames(CM.Parameters.CloudMicrophysicsParameters))
+    # pairs = CP.get_parameter_values!(toml_dict, aliases, "CloudMicrophysics")
+    # microphys_params = CM.Parameters.CloudMicrophysicsParameters{FT, TP, MNP}(;
+    # pairs...,
+    # thermo_params,
+    # modal_nucleation_params,
+    # )
+
+    # CM 0.14
     aliases = string.(fieldnames(CM.Parameters.CloudMicrophysicsParameters))
-    aliases = setdiff(aliases, ["thermo_params"])
     pairs = CP.get_parameter_values!(toml_dict, aliases, "CloudMicrophysics")
-    microphys_params = CM.Parameters.CloudMicrophysicsParameters{FTD, TP}(;
-        pairs...,
-        thermo_params,
+    microphys_params = CM.Parameters.CloudMicrophysicsParameters{FT, TP}(;
+    pairs...,
+    thermo_params,
     )
+
+    #
     MP = typeof(microphys_params)
 
     aliases = ["Pr_0_Businger", "a_m_Businger", "a_h_Businger", "ζ_a_Businger", "γ_Businger"]

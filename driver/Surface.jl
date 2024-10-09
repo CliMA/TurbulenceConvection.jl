@@ -1,4 +1,4 @@
-import StaticArrays as SA
+# import StaticArrays as SA # see https://github.com/CliMA/SurfaceFluxes.jl/pull/128/commits 
 import SurfaceFluxes as SF
 import SurfaceFluxes.UniversalFunctions as UF
 
@@ -60,31 +60,38 @@ function get_surface(
 
     ts_sfc = TD.PhaseEquil_pTq(thermo_params, p_f_surf, Tsurface, qsurface)
     ts_in = aux_gm.ts[kc_surf]
-    scheme = SF.FVScheme()
+    # scheme = SF.FVScheme()
+    scheme = SF.LayerAverageScheme() # see https://github.com/CliMA/SurfaceFluxes.jl/pull/132
 
     bflux = SF.compute_buoyancy_flux(surf_flux_params, shf, lhf, ts_in, ts_sfc, scheme)
     zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)
     convective_vel = TC.get_wstar(bflux, zi) # yair here zi in TRMM should be adjusted
 
-    u_sfc = SA.SVector{2, FT}(0, 0)
+    # u_sfc = SA.SVector{2, FT}(0, 0) 
+    u_sfc = (FT(0), FT(0)) # see https://github.com/CliMA/SurfaceFluxes.jl/pull/128/commits 
     # TODO: make correct with topography
     uₕ_gm_surf = TC.physical_grid_mean_uₕ(state)[kc_surf]
-    u_in = SA.SVector{2, FT}(uₕ_gm_surf.u, uₕ_gm_surf.v)
-    vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
-    vals_int = SF.InteriorValues(z_in, u_in, ts_in)
-    kwargs = (;
-        state_in = vals_int,
-        state_sfc = vals_sfc,
-        shf = shf,
-        lhf = lhf,
-        z0m = zrough,
-        z0b = zrough,
-        gustiness = convective_vel,
-    )
+    # u_in = SA.SVector{2, FT}(uₕ_gm_surf.u, uₕ_gm_surf.v)
+    u_in = (FT(uₕ_gm_surf.u), FT(uₕ_gm_surf.v)) # see  https://github.com/CliMA/SurfaceFluxes.jl/pull/128/commits 
+    # vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
+    vals_sfc = SF.StateValues(z_sfc, u_sfc, ts_sfc) # see https://github.com/CliMA/SurfaceFluxes.jl/pull/126/commits
+
+    # vals_int = SF.InteriorValues(z_in, u_in, ts_in)
+    vals_int = SF.StateValues(z_in, u_in, ts_in) # see https://github.com/CliMA/SurfaceFluxes.jl/pull/126/commits
+    # kwargs = (;
+    #     state_in = vals_int,
+    #     state_sfc = vals_sfc,
+    #     shf = shf,
+    #     lhf = lhf,
+    #     z0m = zrough,
+    #     z0b = zrough,
+    #     gustiness = convective_vel,
+    # ) # see https://github.com/CliMA/SurfaceFluxes.jl/commit/2bdb6ee7c92f1504912dc869be8ce43c69a27215#diff-6059b3ed786f8df9a4697af825ca0c680479fec22c617e328302dc4e2aaece66 and onward
     sc = if TC.fixed_ustar(surf_params)
-        SF.FluxesAndFrictionVelocity{FT}(; kwargs..., ustar = surf_params.ustar)
-    else
-        SF.Fluxes{FT}(; kwargs...)
+        # SF.FluxesAndFrictionVelocity{FT}(; kwargs..., ustar = surf_params.ustar) # see https://github.com/CliMA/SurfaceFluxes.jl/commit/2bdb6ee7c92f1504912dc869be8ce43c69a27215#diff-6059b3ed786f8df9a4697af825ca0c680479fec22c617e328302dc4e2aaece66 and onward
+        SF.FluxesAndFrictionVelocity(vals_int, vals_sfc, shf, lhf, surf_params.ustar, zrough, zrough, convective_vel)
+        # SF.Fluxes{FT}(; kwargs...) # see same linke
+        SF.Fluxes(vals_int, vals_sfc, shf, lhf, zrough, zrough, convective_vel)
     end
     result = SF.surface_conditions(surf_flux_params, sc, scheme)
     ρθ_liq_ice_flux = shf / TD.cp_m(thermo_params, ts_in)
@@ -133,18 +140,24 @@ function get_surface(
     Ri_bulk_crit = surf_params.Ri_bulk_crit
     thermo_params = TCP.thermodynamics_params(param_set)
 
-    scheme = SF.FVScheme()
+    # scheme = SF.FVScheme()
+    scheme = SF.LayerAverageScheme() # see https://github.com/CliMA/SurfaceFluxes.jl/pull/132
     z_sfc = FT(0)
     z_in = grid.zc[kc_surf].z
     ts_sfc = TD.PhaseEquil_pθq(thermo_params, p_f_surf, Tsurface, qsurface)
     ts_in = aux_gm.ts[kc_surf]
-    u_sfc = SA.SVector{2, FT}(0, 0)
+    # u_sfc = SA.SVector{2, FT}(0, 0)
+    u_sfc = (FT(0), FT(0)) # see 
     # TODO: make correct with topography
     uₕ_gm_surf = TC.physical_grid_mean_uₕ(state)[kc_surf]
-    u_in = SA.SVector{2, FT}(uₕ_gm_surf.u, uₕ_gm_surf.v)
-    vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
-    vals_int = SF.InteriorValues(z_in, u_in, ts_in)
-    sc = SF.Coefficients{FT}(state_in = vals_int, state_sfc = vals_sfc, Cd = cm, Ch = ch, z0m = zrough, z0b = zrough)
+    # u_in = SA.SVector{2, FT}(uₕ_gm_surf.u, uₕ_gm_surf.v)
+    u_in = (FT(uₕ_gm_surf.u), FT(uₕ_gm_surf.v)) # see
+    # vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
+    vals_sfc = SF.StateValues(z_sfc, u_sfc, ts_sfc) # see
+    # vals_int = SF.InteriorValues(z_in, u_in, ts_in)
+    vals_int = SF.StateValues(z_in, u_in, ts_in) # see
+    # sc = SF.Coefficients{FT}(state_in = vals_int, state_sfc = vals_sfc, Cd = cm, Ch = ch, z0m = zrough, z0b = zrough) # # see https://github.com/CliMA/SurfaceFluxes.jl/commit/2bdb6ee7c92f1504912dc869be8ce43c69a27215#diff-6059b3ed786f8df9a4697af825ca0c680479fec22c617e328302dc4e2aaece66
+    sc = SF.Coefficients(vals_int, vals_sfc, cm, ch)
     result = SF.surface_conditions(surf_flux_params, sc, scheme)
     lhf = result.lhf
     shf = result.shf
@@ -198,17 +211,23 @@ function get_surface(
     Ri_bulk_crit = surf_params.Ri_bulk_crit
     thermo_params = TCP.thermodynamics_params(param_set)
 
-    scheme = SF.FVScheme()
+    # scheme = SF.FVScheme()
+    scheme = SF.LayerAverageScheme() # see https://github.com/CliMA/SurfaceFluxes.jl/pull/132
     ts_sfc = TD.PhaseEquil_pTq(thermo_params, p_f_surf, Tsurface, qsurface)
     ts_in = ts_gm[kc_surf]
 
-    u_sfc = SA.SVector{2, FT}(0, 0)
+    # u_sfc = SA.SVector{2, FT}(0, 0)
+    u_sfc = (FT(0), FT(0)) # see above 
     # TODO: make correct with topography
     uₕ_gm_surf = TC.physical_grid_mean_uₕ(state)[kc_surf]
-    u_in = SA.SVector{2, FT}(uₕ_gm_surf.u, uₕ_gm_surf.v)
-    vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc)
-    vals_int = SF.InteriorValues(z_in, u_in, ts_in)
-    sc = SF.ValuesOnly{FT}(state_in = vals_int, state_sfc = vals_sfc, z0m = zrough, z0b = zrough)
+    # u_in = SA.SVector{2, FT}(uₕ_gm_surf.u, uₕ_gm_surf.v)
+    u_in = (FT(uₕ_gm_surf.u), FT(uₕ_gm_surf.v)) # see above
+    # vals_sfc = SF.SurfaceValues(z_sfc, u_sfc, ts_sfc) 
+    vals_sfc = SF.StateValues(z_sfc, u_sfc, ts_sfc) # see above
+    # vals_int = SF.InteriorValues(z_in, u_in, ts_in)
+    vals_int = SF.StateValues(z_in, u_in, ts_in) # see above
+    # sc = SF.ValuesOnly{FT}(state_in = vals_int, state_sfc = vals_sfc, z0m = zrough, z0b = zrough) # see https://github.com/CliMA/SurfaceFluxes.jl/commit/2bdb6ee7c92f1504912dc869be8ce43c69a27215#diff-6059b3ed786f8df9a4697af825ca0c680479fec22c617e328302dc4e2aaece66
+    sc = SF.ValuesOnly(vals_int, vals_sfc, zrough, zrough)
     result = SF.surface_conditions(surf_flux_params, sc, scheme)
     lhf = result.lhf
     shf = result.shf

@@ -21,6 +21,7 @@ import SciMLBase
 import OrdinaryDiffEq as ODE
 import StochasticDiffEq as SDE
 import StaticArrays: SVector
+import StaticArrays as SA  # moved out of driver/Surface.jl due to https://github.com/CliMA/SurfaceFluxes.jl/pull/128/commits 
 
 const tc_dir = pkgdir(TurbulenceConvection)
 
