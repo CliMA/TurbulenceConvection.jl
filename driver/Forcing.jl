@@ -21,7 +21,7 @@ function initialize(::ForcingBase{ForcingLES}, grid, state, LESDat::LESData)
         v_nudge = get_nudgevar("v_mean")
         (; dTdt_hadv, H_nudge, dTdt_fluc, dqtdt_hadv, qt_nudge, dqtdt_fluc, subsidence, u_nudge, v_nudge)
     end
-    for k in TC.real_center_indices(grid)
+    @inbounds for k in TC.real_center_indices(grid)
         aux_gm.dTdt_hadv[k] = nt.dTdt_hadv[k]
         aux_gm.H_nudge[k] = nt.H_nudge[k]
         aux_gm.dTdt_fluc[k] = nt.dTdt_fluc[k]

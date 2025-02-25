@@ -849,7 +849,7 @@ end
 function initialize_forcing(::GATE_III, forcing, grid::Grid, state, param_set)
     FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
-    for k in TC.real_center_indices(grid)
+    @inbounds for k in TC.real_center_indices(grid)
         z = grid.zc[k].z
         aux_gm.dqtdt_hadv[k] = APL.GATE_III_dqtdt(FT)(z)
         aux_gm.dTdt_hadv[k] = APL.GATE_III_dTdt(FT)(z)
@@ -1291,7 +1291,7 @@ function surface_ref_state(case::SOCRATES, param_set::APS, namelist) # adopted m
     thermo_params = TCP.thermodynamics_params(param_set)
     return SSCF.process_case(
         case.flight_number;
-        obs_or_ERA5 = case.forcing_type,
+        forcing_type = case.forcing_type,
         surface = "ref",
         thermo_params = thermo_params,
     )
@@ -1306,7 +1306,7 @@ function initialize_profiles(case::SOCRATES, grid::Grid, param_set, state; kwarg
     new_zf = vec(grid.zf.z)[1:(end - 1)] # apply the zf interpolated forcing on zc ahead (I think that's what atlas did..., we might just have different face/center logic
     IC = SSCF.process_case(
         case.flight_number;
-        obs_or_ERA5 = case.forcing_type,
+        forcing_type = case.forcing_type,
         new_z = (;
             dTdt_hadv = new_zc,
             H_nudge = new_zc,
@@ -1357,19 +1357,19 @@ function overwrite_ref_state_from_file!(case::SOCRATES, state, grid, param_set)
     # calculate new reference states
     reference_state_profiles = SSCF.get_LES_reference_profiles(
         case.flight_number;
-        obs_or_ERA5 = case.forcing_type,
+        forcing_type = case.forcing_type,
         new_zc = new_zc,
         new_zf = new_zf,
     )
 
     # set center profiles
-    for k in TC.real_center_indices(grid)
+    @inbounds for k in TC.real_center_indices(grid)
         p_c[k] = reference_state_profiles.p_c[k]
         ρ_c[k] = reference_state_profiles.ρ_c[k]
     end
 
     # set face profiles
-    for k in TC.real_face_indices(grid)
+    @inbounds for k in TC.real_face_indices(grid)
         p_f[k] = reference_state_profiles.p_f[k]
         ρ_f[k] = reference_state_profiles.ρ_f[k]
     end
@@ -1382,7 +1382,7 @@ function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # 
     thermo_params = TCP.thermodynamics_params(param_set)
     sc = SSCF.process_case(
         case.flight_number;
-        obs_or_ERA5 = case.forcing_type,
+        forcing_type = case.forcing_type,
         surface = "conditions",
         thermo_params = thermo_params,
     )
@@ -1399,7 +1399,7 @@ function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_se
     thermo_params = TCP.thermodynamics_params(param_set)
     forcing.forcing_funcs[] = SSCF.process_case(
         case.flight_number;
-        obs_or_ERA5 = case.forcing_type,
+        forcing_type = case.forcing_type,
         new_z = (;
             dTdt_hadv = new_zc,
             H_nudge = new_zc,
@@ -1419,11 +1419,11 @@ function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_se
 end
 
 function forcing_kwargs(case::SOCRATES, namelist) # call in main.jl is forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
-    if case.forcing_type == :obs_data # use the socrates type to handle timescale setting
+    if case.forcing_type === :obs_data # use the socrates type to handle timescale setting
         wind_nudge_τᵣ = get(namelist["forcing"], "wind_nudge_τᵣ", 20 * 60) # paper standard (should I cast as FT?)
         scalar_nudge_τᵣ = get(namelist["forcing"], "scalar_nudge_τᵣ", 20 * 60) # paper standard
         (; wind_nudge_τᵣ = wind_nudge_τᵣ, scalar_nudge_τᵣ = scalar_nudge_τᵣ)
-    elseif case.forcing_type == :ERA5_data # ERA5
+    elseif case.forcing_type === :ERA5_data # ERA5
         wind_nudge_τᵣ = get(namelist["forcing"], "wind_nudge_τᵣ", 60 * 60) # paper standard
         scalar_nudge_τᵣ = get(namelist["forcing"], "scalar_nudge_τᵣ", (Inf * 60) * 60) # paper standard = do not relax (for T, qt i.e. H_nudge, qt_nudge -- can test 6 hours again later sincee don't have RRTMG to be in line more w/ appendix D
         (; wind_nudge_τᵣ = wind_nudge_τᵣ, scalar_nudge_τᵣ = scalar_nudge_τᵣ)
@@ -1478,7 +1478,7 @@ function initialize_radiation(case::SOCRATES, radiation, grid::Grid, state, para
     thermo_params = TCP.thermodynamics_params(param_set)
     radiation.radiation_funcs[] = SSCF.process_case(
         case.flight_number;
-        obs_or_ERA5 = case.forcing_type,
+        forcing_type = case.forcing_type,
         new_z = (;
             dTdt_hadv = new_zc,
             H_nudge = new_zc,

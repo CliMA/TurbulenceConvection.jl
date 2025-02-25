@@ -11,11 +11,100 @@ import CloudMicrophysics as CM
 abstract type AbstractTurbulenceConvectionParameters end
 const ATCP = AbstractTurbulenceConvectionParameters
 
+
+"""
+Because we pack our parameters in a named tuple and put symbols in Vals so they're isbits, we use a convenience get fcn.
+Put in here so can use here and in driver
+"""
+
+ # like SciMLBase._unwrap_val with _unwrap_val(::Val{B}) where {B} = B and _unwrap_val(B) = B
+ unwrap_val(::Val{B}) where {B} = B 
+ unwrap_val(B) = B # idk if we should keep this definition, seems error prone
+
+ 
+function get_isbits_nt(named_tuple::NamedTuple, symbol::Symbol, default)
+
+    if symbol in keys(named_tuple)
+        val = Base.getproperty(named_tuple, symbol)
+    else
+        val = default
+    end
+
+    # val = get(named_tuple, symbol, default)
+
+    # if isa(val, Val) # extract from it's Val wrapped prison
+    #     val = typeof(val).parameters[1] # this is a hack to get the case name from the Val object
+    # end
+    # return val
+    return unwrap_val(val)
+end
+
+
+
+
+
+function get_isbits_nt(named_tuple::NamedTuple, symbol::Symbol)
+
+    val = Base.getproperty(named_tuple, symbol)
+
+    # if isa(val, Val) # extract from it's Val wrapped prison
+    #     val = typeof(val).parameters[1] # this is a hack to get the case name from the Val object 
+    #     # could also do something like SciMLBase._unwrap_val with _unwrap_val(::Val{B}) where {B} = B and _unwrap_val(B) = B
+    # end
+    # return val
+    return unwrap_val(val)
+end
+
+
+
+"""
+Just lik get_isbits_nt, but warns if using the default (just like parse_namelist() does)
+Probably slower, so only use e.g. in types.jl when building our objects.
+"""
+function parse_isbits_nt(named_tuple::NamedTuple, symbol::Symbol, default)
+
+    if symbol in keys(named_tuple)
+        val = Base.getproperty(named_tuple, symbol)
+    else
+        val = default
+        @info "Using default value, $default, for parameter $symbol."
+    end
+
+    # if isa(val, Val) # extract from it's Val wrapped prison
+    #     val = typeof(val).parameters[1] # this is a hack to get the case name from the Val object
+    # end
+    # return val
+    return unwrap_val(val)
+end
+
+# ---------------------------------------------------------------------- #
+
+# # Base.@kwdef struct UserParameters{FT} <: ATCP # Things i wanna have just for me... (so i dont have to keep reaching into user_params for things that may or may not be there)
+# #     particle_min_radius::FT
+# #     # add more here as needed
+# # end
+
+# # If this new UserParameters works, maybe we can get rid of / combine user_params and user_args
+# # still have to check on isbits ness... rn user_params / user_args are namedtuples, now this would be a struct containing a named tuple
+# # iirc i used the dict/nt mix because of strings or something i found hard to generate? but now it just seems unnecessary... it also allowed us to go through and make sure all the values are isbits
+
+# # Based on https://discourse.julialang.org/t/creating-a-struct-from-a-named-tuple/94586/6?u=jbphyswx 
+# Base.@kwdef struct UserParameters{NT <: NamedTuple} <: ATCP # Things i wanna have just for me... (so i dont have to keep reaching into user_params for things that may or may not be there)
+#     nt::NT
+# end
+# Base.getproperty(x::UserParameters, y::Symbol) = get_isbits_nt(getfield(x,:nt), y) # overload getproperty to access the value in the namedtuple. Idk how fragile this is...
+# # Base.getproperty(x::UserParameters, y::Symbol) = Base.getproperty(getfield(x,:nt),y) # overload getproperty to access the value in the namedtuple. Idk how fragile this is...
+# get_isbits_nt(UP::UserParameters, symbol::Symbol) = get_isbits_nt(UP.nt, symbol)
+# get_isbits_nt(UP::UserParameters, symbol::Symbol, default) = get_isbits_nt(UP.nt, symbol, default)
+
+# # ---------------------------------------------------------------------- #
+
+
 #####
 ##### TurbulenceConvection parameters
 #####
 
-Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP, NT, NT2} <: ATCP
+Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP, NT <: NamedTuple, UP <: NamedTuple} <: ATCP
     Omega::FT
     planet_radius::FT
     microph_scaling::FT
@@ -26,7 +115,7 @@ Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP, NT, NT2} <: ATCP
     microphys_params::MP
     surf_flux_params::SFP
     user_args::NT # Let this be a Namedtuple of user arguments passed taken straight from namelist["user_args"]::NamedTuple in the main program
-    user_aux::NT2 # Let this be a NamedTuple created from namelist["user_aux"]::Dict in the main program.. to ensure this is `isbits`, the values in the dict should have been be turned to tuples if they were arrays... string keys should have been  converted to symbols (get_parameter_valus() in parameter_set.jl did a similar thing )
+    user_params::UP # Let this be a NamedTuple created from namelist["user_params"]::Dict in the main program.. to ensure this is `isbits`, the values in the dict should have been be turned to tuples if they were arrays... string keys should have been  converted to symbols (get_parameter_valus() in parameter_set.jl did a similar thing )
 end
 
 thermodynamics_params(ps::ATCP) = CM.Parameters.thermodynamics_params(ps.microphys_params)

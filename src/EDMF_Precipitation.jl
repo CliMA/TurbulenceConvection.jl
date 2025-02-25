@@ -9,6 +9,7 @@ compute_precip_fraction(precip_fraction_model::PrescribedPrecipFraction, ::State
     precip_fraction_model.prescribed_precip_frac_value
 
 function compute_precip_fraction(precip_fraction_model::DiagnosticPrecipFraction, state::State)
+    FT = float_type(state)
     aux_gm = center_aux_grid_mean(state)
     maxcf = maximum(aux_gm.cloud_fraction)
     return max(maxcf, precip_fraction_model.precip_fraction_limiter)
@@ -23,6 +24,7 @@ compute_precipitation_advection_tendencies(
     grid::Grid,
     state::State,
     param_set::APS,
+    use_fallback_tendency_limiters::Bool,
 ) = nothing
 
 function compute_precipitation_advection_tendencies(
@@ -31,6 +33,7 @@ function compute_precipitation_advection_tendencies(
     grid::Grid,
     state::State,
     param_set::APS,
+    use_fallback_tendency_limiters::Bool,
 )
     FT = float_type(state)
 
@@ -57,8 +60,8 @@ function compute_precipitation_advection_tendencies(
     wvec = CC.Geometry.WVector
 
     # TODO - some positivity limiters are needed
-    @. aux_tc.qr_tendency_advection = ∇(wvec(RB(ρ_c * q_rai * term_vel_rain))) / ρ_c# * precip_fraction
-    @. aux_tc.qs_tendency_advection = ∇(wvec(RB(ρ_c * q_sno * term_vel_snow))) / ρ_c# * precip_fraction
+    @. aux_tc.qr_tendency_advection = ∇(wvec(RB(ρ_c * q_rai * term_vel_rain))) / ρ_c # * precip_fraction
+    @. aux_tc.qs_tendency_advection = ∇(wvec(RB(ρ_c * q_sno * term_vel_snow))) / ρ_c # * precip_fraction
 
     @. tendencies_pr.q_rai += aux_tc.qr_tendency_advection
     @. tendencies_pr.q_sno += aux_tc.qs_tendency_advection
@@ -76,6 +79,7 @@ compute_precipitation_sink_tendencies(
     state::State,
     param_set::APS,
     Δt::Real,
+    use_fallback_tendency_limiters::Bool,
 ) = nothing
 
 function compute_precipitation_sink_tendencies(
@@ -85,6 +89,7 @@ function compute_precipitation_sink_tendencies(
     state::State,
     param_set::APS,
     Δt::Real,
+    use_fallback_tendency_limiters::Bool,
 )
     thermo_params = TCP.thermodynamics_params(param_set)
     microphys_params = TCP.microphysics_params(param_set)
@@ -100,8 +105,13 @@ function compute_precipitation_sink_tendencies(
 
     FT = float_type(state)
 
+    # ptl = edmf.tendency_limiters.precipitation_tendency_limiter
+    ptl = get_tendency_limiter(edmf.tendency_limiters, Val(:precipitation), use_fallback_tendency_limiters)
+
+
     @inbounds for k in real_center_indices(grid)
         # TODO - limiters and positivity checks should be done elsewhere
+
         qr = max(FT(0), prog_pr.q_rai[k]) / precip_fraction
         qs = max(FT(0), prog_pr.q_sno[k]) / precip_fraction
         ρ = ρ_c[k]
@@ -135,15 +145,34 @@ function compute_precipitation_sink_tendencies(
         # TODO - move limiters elsewhere
         # TODO - when using adaptive timestepping we are limiting the source terms
         #        with the previous timestep dt
-        S_qr_evap =
-            -min(qr / Δt, -α_evp * CM1.evaporation_sublimation(microphys_params, rain_type, q, qr, ρ, T_gm)) *
-            precip_fraction
-        S_qs_melt = -min(qs / Δt, α_melt * CM1.snow_melt(microphys_params, qs, ρ, T_gm)) * precip_fraction
+        # S_qr_evap = -min(qr / Δt, -α_evp * CM1.evaporation_sublimation(microphys_params, rain_type, q, qr, ρ, T_gm)) * precip_fraction
+        S_qr_evap = limit_tendency(ptl, α_evp * CM1.evaporation_sublimation(microphys_params, rain_type, q, qr, ρ, T_gm), qr, Δt) * precip_fraction # i guess rain only evaporates but never condenses?
+
+        # S_qs_melt = -min(qs / Δt, α_melt * CM1.snow_melt(microphys_params, qs, ρ, T_gm)) * precip_fraction
+        S_qs_melt = limit_tendency(ptl, -α_melt * CM1.snow_melt(microphys_params, qs, ρ, T_gm), qs, Δt) * precip_fraction
+
         tmp = α_dep_sub * CM1.evaporation_sublimation(microphys_params, snow_type, q, qs, ρ, T_gm) * precip_fraction
         if tmp > 0
-            S_qs_sub_dep = min(qv / Δt, tmp)
+            # S_qs_sub_dep = min(qv / Δt, tmp)
+            S_qs_sub_dep = -limit_tendency(ptl, -tmp, qv, Δt)
+
+            # think these are wrong...
+            # S_qs_sub_dep = limit_tendency(ptl, -tmp, qv, Δt)
+            # S_qs_sub_dep = -limit_tendency(ptl, -tmp, qs, Δt)
+            
+            # ts_eq = TD.PhaseEquil_ρTq(thermo_params, ρ, T_gm, q.tot)
+            # q_eq = TD.PhasePartition(thermo_params, ts_eq)
+            # qv_eq = TD.vapor_specific_humidity(thermo_params, ts_eq)
+
+            qvsat_ice = TD.q_vap_saturation_generic(thermo_params, T_gm, ρ, TD.Ice()) # we don't have this stored for grid-mean and we can't calculate form en/up bc it's non-linear...
+            δi = qv - qvsat_ice 
+            S_qs_sub_dep = -limit_tendency(ptl, -tmp, max(FT(0), δi), Δt) # presumably if tmp > 0 then δi > 0 but can't be too careful
+            # I think this is wrong...
+            # S_qs_sub_dep = limit_tendency(ptl, -tmp, max(FT(0), δi), Δt)
+
         else
-            S_qs_sub_dep = -min(qs / Δt, -tmp)
+            # S_qs_sub_dep = -min(qs / Δt, -tmp)
+            S_qs_sub_dep = limit_tendency(ptl, tmp, qs, Δt)
         end
 
         aux_tc.qr_tendency_evap[k] = S_qr_evap

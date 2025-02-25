@@ -73,6 +73,17 @@ center_tendencies_environment(state) = tendencies_turbconv(state, CentField()).e
 center_tendencies_precipitation(state) = tendencies_turbconv(state, CentField()).pr
 face_tendencies_updrafts(state) = tendencies_turbconv(state, FaceField()).up
 
+center_tendencies_bulk(state) = aux_turbconv(state, CentField()).bulk.tendencies # see if we can keep track of bulk tendencies for limiters
+center_tendencies_bulk_adjustments(state) = aux_turbconv(state, CentField()).bulk.tendencies_adjustments # see if we can keep track of bulk tendencies for limiters
+face_tendencies_bulk(state) = aux_turbconv(state, FaceField()).bulk.tendencies # see if we can keep track of bulk tendencies for limiters
+face_tendencies_bulk_adjustments(state) = aux_turbconv(state, FaceField()).bulk.tendencies_adjustments # see if we can keep track of bulk tendencies for limiters
+
+center_prog_bulk(state) = aux_turbconv(state, CentField()).bulk.prognostic # a place to store prognostic bulk variables in exact form w/o clippings for use in limiting tendencies
+face_prog_bulk(state) = aux_turbconv(state, FaceField()).bulk.prognostic # a place to store prognostic bulk variables in exact form w/o clippings for use in limiting tendencies
+
+center_prog_environment_up_gm_version(state) = aux_turbconv(state, CentField()).en.prognostic
+face_prog_environment_up_gm_version(state) = aux_turbconv(state, FaceField()).en.prognostic
+
 physical_grid_mean_uₕ(state) = CCG.UVVector.(grid_mean_uₕ(state))
 physical_grid_mean_u(state) = map(x -> x.u, physical_grid_mean_uₕ(state))
 physical_grid_mean_v(state) = map(x -> x.v, physical_grid_mean_uₕ(state))

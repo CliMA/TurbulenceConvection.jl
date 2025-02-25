@@ -13,17 +13,92 @@ function handle_expr(expr::String; kwargs...)
     return Base.invokelatest(expr, values(NamedTuple(kwargs))...) # works but very slow to use invokelatest, maybe try https://github.com/SciML/RuntimeGeneratedFunctions.jl
 end
 
+include("microphysics_coupling_limiters.jl")
+
 """
+for dispatch backwards compat. we've moved to caching saturation sepcific humidities, so in general those methods can just accept an argument.
 """
-function noneq_moisture_sources(
-    param_set::APS,
+function noneq_moisture_sources(param_set::APS,
+    noneq_sources_type::AbstractNonEquillibriumSourcesType,
+    moisture_sources_limiter::AbstractMoistureSourcesLimiter,
     area::FT,
     ρ::FT,
     Δt::Real,
     ts::TD.ThermodynamicState,
     w::FT,
-    z::FT;
-    ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
+    z::FT
+    ;
+    # ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
+)  where {FT}
+
+    thermo_params::TDPS = TCP.thermodynamics_params(param_set)
+    microphys_params::ACMP = TCP.microphysics_params(param_set)
+    # TODO - when using adaptive timestepping we are limiting the source terms with the previous timestep Δt
+    
+    T::FT = TD.air_temperature(thermo_params, ts)
+
+    q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
+    q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
+
+    return noneq_moisture_sources(param_set, noneq_sources_type, moisture_sources_limiter, area, ρ, Δt, ts, w, z, q_vap_sat_liq, q_vap_sat_ice)
+end
+
+# -------------------------------------------------------------------------------------------------------------------------- #
+
+function noneq_moisture_sources(
+    param_set::APS,
+    ::RelaxToEquilibrium,
+    moisture_sources_limiter::Union{NoMoistureSourcesLimiter, BasicMoistureSourcesLimiter},
+    area::FT,
+    ρ::FT,
+    Δt::Real,
+    ts::TD.ThermodynamicState,
+    w::FT,
+    z::FT,
+    q_vap_sat_liq::FT,
+    q_vap_sat_ice::FT,
+    ;
+    # ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
+)  where {FT}
+    thermo_params::TDPS = TCP.thermodynamics_params(param_set)
+    microphys_params::ACMP = TCP.microphysics_params(param_set)
+    # TODO - when using adaptive timestepping we are limiting the source terms with the previous timestep Δt
+    ql_tendency::FT = FT(0)
+    qi_tendency::FT = FT(0)
+    if area > 0
+        # basic noneq (no supersat formulation so not likely to be right) should be a RelaxToEquilibrium()
+        q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+        T::FT = TD.air_temperature(thermo_params, ts)
+        p::FT = TD.air_pressure(thermo_params, ts)
+        q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
+
+        # TODO - is that the state we want to be relaxing to?
+        ts_eq = TD.PhaseEquil_ρTq(thermo_params, ρ, T, q.tot)
+        q_eq = TD.PhasePartition(thermo_params, ts_eq)
+
+        S_ql = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, q)
+        S_qi = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, ice_type, q_eq, q)
+        S_ql, S_qi = calculate_timestep_limited_sources(moisture_sources_limiter, param_set, area, ρ, FT(0), FT(0), FT(0), FT(0),FT(0), q_vap, q, q_eq, Δt, ts, S_ql, S_qi)
+        ql_tendency += S_ql
+        qi_tendency += S_qi
+    end
+    return NoneqMoistureSources{FT}(ql_tendency, qi_tendency)
+end
+
+function noneq_moisture_sources(
+    param_set::APS,
+    noneq_moisture_scheme::AbstractRelaxationTimescaleType,
+    moisture_sources_limiter::AbstractMoistureSourcesLimiter,
+    area::FT,
+    ρ::FT,
+    Δt::Real,
+    ts::TD.ThermodynamicState,
+    w::FT,
+    z::FT,
+    q_vap_sat_liq::FT,
+    q_vap_sat_ice::FT,
+    ;
+    # ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
 ) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     microphys_params::ACMP = TCP.microphysics_params(param_set)
@@ -31,340 +106,195 @@ function noneq_moisture_sources(
     ql_tendency::FT = FT(0)
     qi_tendency::FT = FT(0)
     if area > 0
-        use_supersat = get_isbits_nt(param_set.user_args, :use_supersat, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
-        use_supersat = isa(use_supersat, Val) ? typeof(use_supersat).parameters[1] : use_supersat # extract the value from the Val type (we put it in there in parameter_set.jl to make it isbits)
-        use_korolev_mazin = get_isbits_nt(param_set.user_args, :use_korolev_mazin, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
-        use_korolev_mazin = isa(use_korolev_mazin, Val) ? typeof(use_korolev_mazin).parameters[1] : use_korolev_mazin # extract the value from the Val type (we put it in there in parameter_set.jl to make it isbits)
 
-        τ_use = get_isbits_nt(param_set.user_args, :τ_use, :standard)  # this has w built in though, no way around it, maybe we should write one that's just the exponential decay part w/o anything else... ( # change the default to at least :morrison_milbrandt_2015_style_exponential_part_only soon )
-        τ_use = isa(τ_use, Val) ? typeof(τ_use).parameters[1] : τ_use
+        q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+        T::FT = TD.air_temperature(thermo_params, ts)
+        p::FT = TD.air_pressure(thermo_params, ts) # really this should come from aux_gm.p_c but I don't want to change the form of non_eq_moisture_sources for backwards compat...
+        q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
 
+        # use phase partition in case we wanna use the conv_q_vap fcn but maybe not best for supersat since it's not really a phase partition (all 3 are vapor amounts)
+
+        τ_liq, τ_ice = get_τ(param_set, microphys_params, noneq_moisture_scheme, q, T, p, ρ, w, z)
+
+        q_eq = TD.PhasePartition(
+            q.tot,
+            q_vap_sat_liq,
+            q_vap_sat_ice,
+            # TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()),
+            # TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice()),
+        ) # all 3 are vapor amounts
+        S_ql, S_qi = calculate_timestep_limited_sources(moisture_sources_limiter, param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, q, q_eq, Δt, ts)
+        ql_tendency += S_ql
+        qi_tendency += S_qi
+    end
+    return NoneqMoistureSources{FT}(ql_tendency, qi_tendency)
+end
+
+
+function noneq_moisture_sources(
+    param_set::APS,
+    ::KorolevMazin2007,
+    moisture_sources_limiter::Union{BasicMoistureSourcesLimiter, StandardSupersaturationMoistureSourcesLimiter},
+    area::FT,
+    ρ::FT,
+    Δt::Real,
+    ts::TD.ThermodynamicState,
+    w::FT,
+    z::FT,
+    q_vap_sat_liq::FT,
+    q_vap_sat_ice::FT,
+    ;
+    # ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
+)  where {FT}
+    thermo_params::TDPS = TCP.thermodynamics_params(param_set)
+    microphys_params::ACMP = TCP.microphysics_params(param_set)
+    # TODO - when using adaptive timestepping we are limiting the source terms with the previous timestep Δt
+    ql_tendency::FT = FT(0)
+    qi_tendency::FT = FT(0)
+    if area > 0
+        q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+        T::FT = TD.air_temperature(thermo_params, ts)
+        p::FT = TD.air_pressure(thermo_params, ts)
+        q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
+        
+        S_ql, S_qi = korolev_mazin_2007(param_set, area, ρ, Δt, ts, w)
+        q_eq = TD.PhasePartition(
+            q.tot,
+            q_vap_sat_liq,
+            q_vap_sat_ice,
+            # TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()),
+            # TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice()),
+        ) # all 3 are vapor amounts
+
+        # korolev_mazin fix effective tau > 1 (or whatever timestep was realy but we run w/ 1 mostly rn)
+        τ_liq_eff = (q_vap - q_eq.liq) / S_ql
+        τ_ice_eff = (q_vap - q_eq.ice) / S_qi
+        # println("effective τ_liq = ",τ_liq_eff, " effective τ_ice = ",τ_ice_eff, " T = ", T, " w = ",w, " q = ",q, " q_eq = ", q_eq )
+        if (0 < τ_liq_eff) && (τ_liq_eff < 1) # fast source
+            # @show("rate limiting cond: ", S_ql, (q_vap - q_eq.liq) / 1)
+            S_ql = (q_vap - q_eq.liq) / 1
+        elseif (0 < τ_ice_eff) && (τ_ice_eff < 1) # fast source
+            # @show("rate limiting dep: ", S_qi, (q_vap - q_eq.ice) / 1)
+            S_qi = (q_vap - q_eq.ice) / 1
+        elseif (-1 < τ_liq_eff) && (τ_liq_eff < 0) # fast sink
+            # @show("rate limiting evap: ", S_ql, (q_vap - q_eq.liq) / 1)
+            S_ql = (q_vap - q_eq.liq) / -1
+        elseif (-1 < τ_ice_eff) && (τ_ice_eff < 0) # fast sink
+            # @show("rate limiting sub: ", S_qi, (q_vap - q_eq.ice) / 1)
+            S_qi = (q_vap - q_eq.ice) / -1
+        else
+        end
+
+    S_ql, S_qi = calculate_timestep_limited_sources(moisture_sources_limiter, param_set, area, ρ, FT(0), FT(0), FT(0), FT(0),FT(0), q_vap, q, q_eq, Δt, ts,  S_ql, S_qi)
+    ql_tendency += S_ql
+    qi_tendency += S_qi    
+    end
+    return NoneqMoistureSources{FT}(ql_tendency, qi_tendency)
+end
+
+# -------------------------------------------------------------------------------------------------------------------------- #
+
+"""
+Allow for other microphysics processes to be handled outside of the main microphysics noneq calls
+This is probably good bc we had it in noneq_moisture_sources but it's conflated w/ cond/evap sub/dep then and the limiters we had didn't account for precip tendencies anyway...
+
+For consistency I've kept passing in S_ql, S_qi here but maybe we should just deprecate that and just have one limiter at the end? idk...
+"""
+function other_microphysics_processes(
+    param_set::APS,
+    heterogeneous_ice_nucleation::Tuple{Bool, FT, FT},
+    moisture_sources_limiter::AbstractMoistureSourcesLimiter,
+    area::FT,
+    ρ::FT,
+    Δt::Real,
+    ts::TD.ThermodynamicState,
+    w::FT,
+    z::FT,
+    S_ql::FT,
+    S_qi::FT
+    ;
+    # ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
+) where {FT}
+
+    S_ql_init::FT = S_ql
+    S_qi_init::FT = S_qi
+
+    # S_ql = FT(0) # for backwards compat, but in the end should just remove this altogether... this might be unstable though bc it has no relaxation so might run up against limiters? doesn't account for incoming noneq fluxes... (old way didn't account for precip but that's within one condensate species at least)
+    # S_qi = FT(0) # for backwards compat, but in the end should just remove this altogether... this might be unstable though bc it has no relaxation so might run up against limiters? doesn't account for incoming noneq fluxes... (old way didn't account for precip but that's within one condensate species at least)
+    # if it becomes a problem we could try also passing state and pulling out the sources from there... but we'll have to know if we're in env or up etc...
+
+    thermo_params::TDPS = TCP.thermodynamics_params(param_set)
+    microphys_params::ACMP = TCP.microphysics_params(param_set)
+    # TODO - when using adaptive timestepping we are limiting the source terms with the previous timestep Δt
+    ql_tendency::FT = FT(0)
+    qi_tendency::FT = FT(0)
+    qi_tendency_homogeneous_freezing::FT = FT(0)
+    qi_tendency_heterogeneous_icenuc::FT = FT(0)
+    qi_tendency_heterogeneous_freezing::FT = FT(0)
+    qi_tendency_icemult::FT = FT(0)
+    qi_tendency_melting::FT = FT(0)
+    if area > 0
         q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
         T::FT = TD.air_temperature(thermo_params, ts)
         p::FT = TD.air_pressure(thermo_params, ts)
         q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
 
-        if !(use_supersat == false) # it's either true or a specified value
-            # use phase partition in case we wanna use the conv_q_vap fcn but maybe not best for supersat since it's not really a phase partition (all 3 are vapor amounts)
+        if T >= thermo_params.T_freeze # could go insisde supersat bc base eq is already 0 above freezng
+            S_qi = min(0, S_qi) # allow sublimation but not new ice formation ( or should we just melt and then let evaporation work? ), i think this is better than redirecting bc that could go on forever with a different timescale, and ice doesn't form above freezing and then melt
+            # send existing ice to liquid
+            qi_tendency_melting = (q.ice / Δt + S_qi) # send any existing ice that is not sublimating to liquid (maybe make this a rate later)
+            S_ql += qi_tendency_melting # send any existing ice that is not sublimating to liquid (maybe make this a rate later)
+            S_qi = -q.ice / Δt # destroy all existing ice  # limiters will maybe fight against this... could also make some very large number? idk.. if this fails in one timestep, the next should take care of it... as long as those sources are aware of temp regimes?)
 
-            τ_liq, τ_ice = get_τ(param_set, microphys_params, use_supersat, q, T, p, ρ, w, z)
-
-            q_eq = TD.PhasePartition(
-                q.tot,
-                TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()),
-                TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice()),
-            ) # all 3 are vapor amounts
-        # @info ("τliq =  $τ_liq,  τice =  $τ_ice, T =  $T, w = $w  qliq =  $(q.liq), qice = $(q.ice) qvap = $q_vap, qveq liq = $(q_eq.liq), qveq ice = $(q_eq.ice) ")
-
-        elseif use_korolev_mazin
-            # need to get w into here somewhere...
-            S_ql, S_qi = korolev_mazin_2007(param_set, area, ρ, Δt, ts, w)
-            q_eq = TD.PhasePartition(
-                q.tot,
-                TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()),
-                TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice()),
-            ) # all 3 are vapor amounts
-
-            # korolev_mazin fix effective tau > 1 (or whatever timestep was realy but we run w/ 1 mostly rn)
-            τ_liq_eff = (q_vap - q_eq.liq) / S_ql
-            τ_ice_eff = (q_vap - q_eq.ice) / S_qi
-            # println("effective τ_liq = ",τ_liq_eff, " effective τ_ice = ",τ_ice_eff, " T = ", T, " w = ",w, " q = ",q, " q_eq = ", q_eq )
-            if (0 < τ_liq_eff) && (τ_liq_eff < 1) # fast source
-                # @show("rate limiting cond: ", S_ql, (q_vap - q_eq.liq) / 1)
-                S_ql = (q_vap - q_eq.liq) / 1
-            elseif (0 < τ_ice_eff) && (τ_ice_eff < 1) # fast source
-                # @show("rate limiting dep: ", S_qi, (q_vap - q_eq.ice) / 1)
-                S_qi = (q_vap - q_eq.ice) / 1
-            elseif (-1 < τ_liq_eff) && (τ_liq_eff < 0) # fast sink
-                # @show("rate limiting evap: ", S_ql, (q_vap - q_eq.liq) / 1)
-                S_ql = (q_vap - q_eq.liq) / -1
-            elseif (-1 < τ_ice_eff) && (τ_ice_eff < 0) # fast sink
-                # @show("rate limiting sub: ", S_qi, (q_vap - q_eq.ice) / 1)
-                S_qi = (q_vap - q_eq.ice) / -1
-            else
+        # homogeneous_freezing
+        elseif (T < thermo_params.T_icenuc)
+            # Here we allow the V -> L --> I pathway to happen, since it's probably smoother idk and mayb still be physical (form liquid then instafreee unlike ice forming above freezing and then melting...)
+            if (S_ql > 0)
+                qi_tendency_homogeneous_freezing = S_ql # any vapor coming to liquid goes to ice instead (smoother in total condensate than setting it to 0 suddenly?)
+                S_qi += qi_tendency_homogeneous_freezing # any vapor coming to liquid goes to ice instead (smoother in total condensate than setting it to 0 suddenly?)
+                S_ql = 0
             end
-
-        else # basic noneq (no supersat formulation so not likely to be right)
-            # TODO - is that the state we want to be relaxing to?
-            ts_eq = TD.PhaseEquil_ρTq(thermo_params, ρ, T, q.tot)
-            q_eq = TD.PhasePartition(thermo_params, ts_eq)
-
-            S_ql = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, q)
-            S_qi = CMNe.conv_q_vap_to_q_liq_ice(microphys_params, ice_type, q_eq, q)
-        end
-
-
-
-        # LIMITER (and calculate source)
-        if !(use_supersat == false) # might need to do these first bc ql,qc tendencies maybe are applied individually and can still crash the code if one is too large...
-
-            if τ_use == :standard
-                S_ql = (q_vap - q_eq.liq) / τ_liq # | microphys_params.τ_cond_evap | CMNe.conv_q_vap_to_q_liq_ice(microphys_params, liq_type, q_eq, TD.PhasePartition(FT(0),q_vap,FT(0)))  
-                S_qi = (q_vap - q_eq.ice) / τ_ice # -(source to vapor) = source to condensate
-
-                # Local sources, note these will always have the same sign as the source terms above since they just have a different Δt instead of τ
-                Q_vl = (q_vap - q_eq.liq) / Δt # vapor available for liquid growth in this timestep
-                Q_vi = (q_vap - q_eq.ice) / Δt # vapor available for ice growth in this timestep (if positive, this is larger?)
-
-                # Limiters, where we can rely on the fact that Q_vl,Q_vi are always the same sign as S_ql,S_qi
-
-                # debug check            
-                # if Q_vl < Q_vi
-                #     if T > thermo_params.T_triple
-                #         @info(
-                #             "status",
-                #             T,
-                #             thermo_params.T_freeze,
-                #             thermo_params.T_triple,
-                #             Q_vl,
-                #             Q_vi,
-                #             q_vap,
-                #             q_eq.liq,
-                #             q_eq.ice,
-                #             S_ql,
-                #             S_qi
-                #         )
-                #         error("This should not happen (we should be below triple point?)") # This is just a check that all is working properly, remove later
-                #     end
-                # elseif Q_vl > Q_vi
-                #     if T < thermo_params.T_triple
-                #         @info("status", T, Q_vl, Q_vi, q_vap, q_eq.liq, q_eq.ice, S_ql, S_qi)
-                #         error("This should not happen (we should be above triple point?)") # This is just a check that all is working properly, remove later
-                #     end
-                # else
-                #     # all good, we're at the triple point or indistinguashable within numerical precision (e.g. at very cold temperatures)
-                # end
-
-                # @info( "current", S_ql, S_qi, "--",Q_vl, Q_vi, "---", q.liq / Δt, q.ice / Δt, q_vap/Δt)
-                if (S_ql > 0) && (S_qi > 0) # both growing (this is the hardest with the different saturation vapor pressures) - we'll partition based on respective source magnitudes limited by Q_vi which is larger...
-                    S_tot = S_ql + S_qi
-                    # create liquid and ice in proportion to their source magnitudes and see if we reach liquid saturation
-
-                    if Q_vl < Q_vi
-                        if S_tot > Q_vl # this handles S_ql whether or not it's larger than Q_vl while simultaneously handling the first part of S_qi
-                            S_ql_Qvl = S_ql * Q_vl / S_tot # liquid growth limited by vapor supersat over liquid and simultaneous ice growth (S_ql_Qvl + S_qi_Qvl = Q_vl)
-                            S_qi_Qvl = S_qi * Q_vl / S_tot # ice growth limited by vapor supersat over liquid and simultaneous liquid growth
-
-                            S_ql = S_ql_Qvl
-                            S_qi_addit = min(S_qi - S_qi_Qvl, Q_vi - Q_vl)  # we should still be able to consume some more ice as long as there was more room in the original ice source, (should be up to Q_vi - S_ql_Qvl which is total growth potential minus current accounted for growth)
-                            S_qi = S_qi_Qvl + S_qi_addit # ice growth limited by vapor supersat over liquid and simultaneous liquid growth
-                        end # if not > Q_vl, it's def not greater than Q_vi so we don't need to do anything else I think
-                    else
-                        if S_tot > Q_vi # this handles S_ql whether or not it's larger than Q_vl while simultaneously handling the first part of S_qi
-                            S_ql_Qvi = S_ql * Q_vi / S_tot # liquid growth limited by vapor supersat over liquid and simultaneous ice growth (S_ql_Qvl + S_qi_Qvl = Q_vl)
-                            S_qi_Qvi = S_qi * Q_vi / S_tot # ice growth limited by vapor supersat over liquid and simultaneous liquid growth
-
-                            S_qi = S_qi_Qvi
-                            S_ql_addit = min(S_ql - S_ql_Qvi, Q_vl - Q_vi)  # we should still be able to consume some more ice as long as there was more room in the original ice source, (should be up to Q_vi - S_ql_Qvl which is total growth potential minus current accounted for growth)
-                            S_ql = S_qi_Qvi + S_ql_addit # ice growth limited by vapor supersat over liquid and simultaneous liquid growth
-                        end # if not > Q_vl, it's def not greater than Q_vi so we don't need to do anything else I think
-                    end
-
-                elseif (S_ql > 0) && (S_qi < 0) # liquid growth but ice depletion (this can't happen I thnk because we'd be supersaturated over ice if we are over liquid)
-                    if T < thermo_params.T_freeze
-                        error(
-                            "This should not happen (though I guess it can above freezing but that will be handled in limiters later?)",
-                        ) # This is just a check that all is working properly, remove later
-                    else
-                        # the ice is sublimating anyway lol idk...
-                    end
-
-                elseif (S_ql < 0) && (S_qi > 0) # ice growth but liquid depletion ( WBF)
-
-                    # we go equally until until either liquid or ice reaches saturation, then the remainder is a balance at that saturation
-                    S_ql = -min(-S_ql, q.liq / Δt)  # don't let liquid deplete more than exists (smaller absolute value)
-                    S_tot = S_ql + S_qi
-                    q_vap_after = q_vap + S_tot * Δt
-
-                    if Q_vl < Q_vi
-                        if q_eq.ice <= q_vap_after <= q_eq.liq # we stay between the equilibrium saturation range
-                        # all good
-                        elseif q_eq.ice > q_vap_after # we can't evaporate enough liquid to grow all the ice it wants to grow, so we scale both down so that we land on the ice saturation line
-                            scaling = (q_eq.ice - q_vap) / (S_tot * Δt) # should be a positive number < 1 (S_tot should be negative, and  q_eq.ice - q_vap should be negative)
-                            S_qi = S_qi * scaling
-                            S_ql = S_ql * scaling
-                        elseif q_vap_after > q_eq.liq # we can't grow enough ice to support the liquid we want to evaporate
-                            scaling = (q_eq.liq - q_vap) / (S_tot * Δt) # should be a positive number < 1 (S_tot should be positive, and q_eq.liq - q_vap should be positive)
-                            S_qi *= scaling
-                            S_ql *= scaling
-                        end
-                    else
-                        if q_eq.liq <= q_vap_after <= q_eq.ice # we stay between the equilibrium saturation range
-                        # all good
-                        elseif q_eq.liq > q_vap_after # we can't evaporate enough liquid to grow all the ice it wants to grow, so we scale both down so that we land on the ice saturation line
-                            scaling = (q_eq.liq - q_vap) / (S_tot * Δt) # should be a positive number < 1 (S_tot should be negative, and  q_eq.ice - q_vap should be negative)
-                            S_qi = S_qi * scaling
-                            S_ql = S_ql * scaling
-                        elseif q_vap_after > q_eq.ice # we can't grow enough ice to support the liquid we want to evaporate
-                            scaling = (q_eq.ice - q_vap) / (S_tot * Δt) # should be a positive number < 1 (S_tot should be positive, and q_eq.liq - q_vap should be positive)
-                            S_qi *= scaling
-                            S_ql *= scaling
-                        end
-                    end
-
-                elseif (S_ql < 0) && (S_qi < 0) # both are depleting (limit by condensate amount and enough to return to saturation)
-                    S_ql = -min(-S_ql, q.liq / Δt)  # don't let liquid deplete more than exists (smaller absolute value)
-                    S_qi = -min(-S_qi, q.ice / Δt)  # don't let ice deplete more than exists (smaller absolute value)
-
-                    S_ql = -min(-S_ql, -Q_vl)  # don't let liquid deplete more than the vapor can support (smaller absolute value)
-                    S_qi = -min(-S_qi, -Q_vi)  # don't let ice deplete more than the vapor can support (smaller absolute value)
-
-                    S_tot = S_ql + S_qi
-                    # consume liquid and ice in proportion to their source magnitudes and see if we reach ice saturation
-
-                    if Q_vl < Q_vi # should mean we're below freezing and can evaporate more liquid than we can ice 
-                        if S_tot < Q_vi # we would create more vapor than the air wants
-                            # go combined until reaching ice saturation, then remainder is liquid evaporation only... (with no re-condensation of ice)
-                            S_ql_Qvi = S_ql * Q_vi / S_tot # liquid growth limited by vapor supersat over liquid and simultaneous ice growth (S_ql_Qvl + S_qi_Qvl = Q_vl)
-                            S_qi_Qvi = S_qi * Q_vi / S_tot # ice growth limited by vapor supersat over liquid and simultaneous liquid growth
-
-                            S_qi = S_qi_Qvi # ice until ice reaching ice saturation vapor pressure... (ice T > freezing, ice is actually more )
-                            S_ql_addit = max(S_ql - S_ql_Qvi, Q_vl - Q_vi)  # we should be able to consume some more liquid up until we exhaust the original liquid source (S_ql - S_ql_Qvi), or reach the liquid saturation vapor pressure (Q_vl - Q_vi), whichever is smaller (max of 2 negative numbers)
-                            S_ql = S_ql_Qvi + S_ql_addit # liquid growth limited by vapor supersat over liquid and simultaneous ice growth
-
-                            if S_ql_addit > 0
-                                error("this shouldnt happen lol, should be max of two negative numbers")
-                            end
-
-                        end # if not < Q_vi, we dont even reach ice saturation so we don't need to do anything else
-                    else # this is technically weird bc all the ice should evaporate anyway when we're above freezing, but we'll handle anyway... (actually it's slightly different due to difference between thermo_params.T_triple and thermo_params.T_freeze which is 0.01 K but good to handle properly...)
-                        if S_tot < Q_vl # we would create more vapor than the air wants
-                            # go combined until reaching ice saturation, then remainder is liquid evaporation only... (with no re-condensation of ice)
-                            S_ql_Qvl = S_ql * Q_vl / S_tot # liquid growth limited by vapor supersat over liquid and simultaneous ice growth (S_ql_Qvl + S_qi_Qvl = Q_vl)
-                            S_qi_Qvl = S_qi * Q_vl / S_tot # ice growth limited by vapor supersat over liquid and simultaneous liquid growth
-
-                            S_ql = S_ql_Qvl # ice until ice reaching ice saturation vapor pressure... (ice T > freezing, ice is actually more )
-                            S_qi_addit = max(S_qi - S_qi_Qvl, Q_vi - Q_vl)  # we should be able to consume some more liquid up until we exhaust the original liquid source (S_ql - S_ql_Qvi), or reach the liquid saturation vapor pressure (Q_vl - Q_vi), whichever is smaller (max of 2 negative numbers)
-                            S_qi = S_qi_Qvl + S_qi_addit # liquid growth limited by vapor supersat over liquid and simultaneous ice growth
-
-                            if S_qi_addit > 0
-                                error("this shouldnt happen lol, should be max of two negative numbers")
-                            end
-
-                        end # 
-
-                    end
-
-                end # otherwise we have the negative limiters below for sublimation, evaporation... if both are neg that's sufficient....
-
-            elseif τ_use == :morrison_milbrandt_2015_style
-                # this *shouldn't* need limiters the way it's defined but... lol we'll see...
-                S_ql, S_qi =
-                    morrison_milbrandt_2015_style(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, q, q_eq, Δt, ts)
-
-                # Still needs limiters (don't consume liquid that isn't there mainly...)
-            elseif τ_use == :morrison_milbrandt_2015_style_exponential_part_only
-                # this *shouldn't* need limiters the way it's defined but... lol we'll see...
-                S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(
-                    param_set,
-                    area,
-                    ρ,
-                    T,
-                    w,
-                    τ_liq,
-                    τ_ice,
-                    q_vap,
-                    q_eq,
-                    Δt,
-                )
-            else
-                error("Unsupported τ_use: $(τ_use)")
+            if q.liq > 0
+                qi_tendency_homogeneous_freezing = q.liq / Δt + S_ql
+                S_qi += qi_tendency_homogeneous_freezing # send any existing liquid to ice that isn't already evaporating (if S_ql was positive, it's already been sent to ice and set to 0)
+                S_ql = -q.liq / Δt # remove all liquid (is this the best way to do this? limiters will maybe fight against this... could also make some very large number? idk.. if this fails in one timestep, the next should take care of it... maybe?)
             end
+            # Heterogeneous ice nucleation
+        else
+            if heterogeneous_ice_nucleation[1]
+                heterogeneous_ice_nuclation_coefficient, heterogeneous_ice_nuclation_exponent = heterogeneous_ice_nucleation[2:3]
+                c_1 =
+                    ρ *
+                    heterogeneous_ice_nuclation_coefficient *
+                    exp(heterogeneous_ice_nuclation_exponent * (T - thermo_params.T_freeze) - 1)
+                qi_tendency_heterogeneous_icenuc = q.liq * (1 - exp(-c_1 * Δt)) # positive number, how much liquid is losing and ice is gaining
 
 
-
-            # ==================================================================================================================================================================================== #
-
-            # ###### MOVED THIS TO SEPARATE FUNC!!! #######
-
-            # #### REALLY WE SHOULD ONLY MELT ENOUGH TO KNOCK THE EMPERATURE BACK DOWN TO freezing
-            # #### REALLY WE SHOULD ONLY FREEZE ENOUGH TO KNOCK THE TEMPERATURE BACK UP ABOVE HOMOGENOUS 
-
-            # # These would mess with the limiters (because the limiters are saturation bound but these are not) so we do them after... we assume they're agnostic to the antecedent saturation vapor pressures (but no hypsometric correction so can overshoot... but at least they work in one timestep...)
-            # # Also we only add the remainder after the sources that already exist (debatable the order of operations with the new saturation vapor pressures after the timestep but...)
-            # if T >= thermo_params.T_freeze # could go insisde supersat bc base eq is already 0 above freezng
-            #     S_qi = min(0, S_qi) # allow sublimation but not new ice formation ( or should we just melt and then let evaporation work? ), i think this is better than redirecting bc that could go on forever with a different timescale, and ice doesn't form above freezing and then melt
-            #     # send existing ice to liquid
-            #     S_ql += (q.ice / Δt + S_qi) # send any existing ice that is not sublimating to liquid (maybe make this a rate later)
-            #     S_qi = -q.ice / Δt # destroy all existing ice
-
-            # # homogeneous_freezing
-            # elseif (T < thermo_params.T_icenuc)
-            #     # Here we allow the V -> L --> I pathway to happen, since it's probably smoother idk and mayb still be physical (form liquid then instafreee unlike ice forming above freezing and then melting...)
-            #     if (S_ql > 0)
-            #         S_qi += S_ql # any vapor coming to liquid goes to ice instead (smoother in total condensate than setting it to 0 suddenly?)
-            #         S_ql = 0
-            #     end
-            #     if q.liq > 0
-            #         S_qi += (q.liq / Δt + S_ql) # send any existing liquid to ice that isn't already evaporating (if S_ql was positive, it's already been sent to ice and set to 0)
-            #         S_ql = -q.liq / Δt # remove all liquid
-            #     end
-            # # Heterogeneous ice nucleation
-            # else
-            #     if get_isbits_nt(param_set.user_args, :use_heterogeneous_ice_nucleation, false)
-            #         heterogeneous_ice_nuclation_coefficient = get_isbits_nt(param_set.user_aux, :heterogeneous_ice_nuclation_coefficient, FT(1))
-            #         heterogeneous_ice_nuclation_exponent = get_isbits_nt(param_set.user_aux, :heterogeneous_ice_nuclation_exponent, FT(1))
-
-            #         c_1 = ρ * heterogeneous_ice_nuclation_coefficient * exp(heterogeneous_ice_nuclation_exponent * (T - thermo_params.T_freeze) - 1)
-            #         heterogeneous_ice_nuclation =  q.liq * ( 1 - exp(- c_1 * Δt)) # positive number, how much liquid is losing
-
-
-            #         # we have two exponentials so if we'd deplete all our liquid we just scale down.
-            #         if S_ql < 0
-            #             heterogeneous_ice_nuclation = max( -q.liq/Δt - S_ql, -heterogeneous_ice_nuclation ) # S_ql should be smaller than q.liq/Δt after doing limiters above, but maybe move them down here?
-            #         end
-            #         S_ql -= heterogeneous_ice_nuclation
-            #         S_qi += heterogeneous_ice_nuclation
-            #     end
-            # end
-
-
-            # ==================================================================================================================================================================================== #
-
-
-            # # This limiter I believe is wrong, we should be limited by supersaturation, not by the vapor amount and this lets fast timescales do bizarre things and jump to states that condense or create a ton of papper that lead to unrealizeable temperatures...
-            # # Too much vapor consumption (note in a supersaturation context, that's a little bit ridiculous to worry about since supersaturation is usually single digit percent at most and timesteps are short-ish)
-            # if S > ( Qv - min(0,S_ql) - min(0,S_qi)  ) # only add positive sources to vapor (i.e. subtract if negative S_q)
-            #     if (S_qi > 0) && (S_ql > 0)
-            #             S_ql *= Qv/S
-            #             S_qi *= Qv/S
-            #     elseif (S_qi > 0) && (S_ql < 0)
-            #         S_qi *= (Qv - S_ql)/S # source to ice not to exceed vapor plus addition from liquid... (S=S_qi here) # (are these stable?, theyre potentially big leaps)
-            #     elseif (S_qi < 0) && (S_ql > 0)
-            #         S_ql *= (Qv - S_qi)/S # source to liquid not to exceed vapor plus addition from ice... (S=S_ql here) # (are these stable?, theyre potentially big leaps)
-            #     end # otherwise we have the negative limiters below for sublimation, evaporation... if both are neg that's sufficient....
-            # end
-
-
-
-        else # let other limiters do their thing... (this is only acting on sat adjust)
-            # TODO - handle limiters elswhere (note, these break our allowance for liquid to ice compensation, no?)
-            if S_ql >= FT(0)
-                S_ql = min(S_ql, q_vap / Δt)
-            else
-                S_ql = -min(-S_ql, q.liq / Δt)
-            end
-            if S_qi >= FT(0)
-                S_qi = min(S_qi, q_vap / Δt)
-            else
-                S_qi = -min(-S_qi, q.ice / Δt)
+                # we have two exponentials so if we'd deplete all our liquid we just scale down.
+                if S_ql < 0
+                    # qi_tendency_heterogeneous_icenuc = max(-q.liq / Δt - S_ql, -qi_tendency_heterogeneous_icenuc) # S_ql should be smaller than q.liq/Δt after doing limiters above, but maybe move them down here? [[ i think this is wrong..., should be -max(...) ]]
+                    # qi_tendency_heterogeneous_icenuc = min(q.liq / Δt + S_ql, qi_tendency_heterogeneous_icenuc) # S_ql should be smaller than q.liq/Δt after doing limiters above, but maybe move them down here?
+                    qi_tendency_heterogeneous_icenuc = -limit_tendency(moisture_sources_limiter, -qi_tendency_heterogeneous_icenuc, q.liq + S_ql * Δt, Δt)
+                end
+                S_ql -= qi_tendency_heterogeneous_icenuc
+                S_qi += qi_tendency_heterogeneous_icenuc
             end
         end
-
-
-
-        # debug
-        # S_ql *= 0. 
-        # S_qi *= 0.
-
-        ql_tendency += S_ql
-        qi_tendency += S_qi
-        # if area < 1e-2
-        # @info( "current", Qv, S_ql, S_qi, q.liq / Δt, q.ice / Δt, T, area)
-        # end
     end
-    return NoneqMoistureSources{FT}(ql_tendency, qi_tendency)
+
+    return OtherMicrophysicsSources{FT}(
+        S_ql - S_ql_init,
+        S_qi - S_qi_init,
+        # my additions for storage
+        qi_tendency_homogeneous_freezing,
+        qi_tendency_heterogeneous_freezing,
+        qi_tendency_heterogeneous_icenuc,
+        qi_tendency_melting,
+    )
 end
+
+
+# -------------------------------------------------------------------------------------------------------------------------- #
 
 """
 Computes the tendencies to qt and θ_liq_ice due to precipitation formation
@@ -373,14 +303,23 @@ Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 function precipitation_formation(
     param_set::APS,
     precip_model::AbstractPrecipitationModel,
+    cloud_sedimentation_model::AbstractCloudSedimentationModel,
     rain_formation_model::AbstractRainFormationModel,
+    snow_formation_model::AbstractSnowFormationModel,
     qr::FT,
     qs::FT,
+    ql::FT,
+    qi::FT,
+    Ni::FT,
+    term_vel_ice::FT, # maybe this isn't needed lol
+    term_vel_rain::FT,
+    term_vel_snow::FT,
     area::FT,
     ρ::FT,
     Δt::Real,
-    ts,
-    precip_fraction,
+    ts::TD.ThermodynamicState,
+    precip_fraction::FT,
+    precipitation_tendency_limiter::AbstractTendencyLimiter,
 ) where {FT}
     thermo_params = TCP.thermodynamics_params(param_set)
 
@@ -397,8 +336,10 @@ function precipitation_formation(
 
     ql_tendency_acnv = FT(0)
     qi_tendency_acnv = FT(0)
+    ql_tendency_accr_liq_ice = FT(0)
     ql_tendency_accr_liq_rai = FT(0)
     ql_tendency_accr_liq_sno = FT(0)
+    qi_tendency_accr_ice_liq = FT(0)
     qi_tendency_accr_ice_rai = FT(0)
     qi_tendency_accr_ice_sno = FT(0)
 
@@ -406,8 +347,9 @@ function precipitation_formation(
     α_accr = TCP.microph_scaling_accr(param_set)
 
     if area > 0
-
         q = TD.PhasePartition(thermo_params, ts)
+        # ql = q.liq
+        # qi = q.ice
 
         Π_m = TD.exner(thermo_params, ts)
         c_pm = TD.cp_m(thermo_params, ts)
@@ -420,7 +362,8 @@ function precipitation_formation(
             qsat = TD.q_vap_saturation(thermo_params, ts)
             λ = TD.liquid_fraction(thermo_params, ts)
 
-            S_qt = -min((q.liq + q.ice) / Δt, -CM0.remove_precipitation(microphys_params, q, qsat))
+            # S_qt = -min((q.liq + q.ice) / Δt, -CM0.remove_precipitation(microphys_params, q, qsat))
+            S_qt = limit_tendency(precipitation_tendency_limiter, CM0.remove_precipitation(microphys_params, q, qsat), (q.liq + q.ice), Δt)
 
             qr_tendency -= S_qt * λ
             qs_tendency -= S_qt * (1 - λ)
@@ -447,7 +390,9 @@ function precipitation_formation(
             # 1-moment snow autoconversion rate that assumes
             # that the supersaturation is present in the domain.
             if rain_formation_model isa Clima1M_default
-                S_qt_rain = -min(q.liq / Δt, α_acnv * CM1.conv_q_liq_to_q_rai(microphys_params, q.liq))
+                # S_qt_rain = -min(q.liq / Δt, α_acnv * CM1.conv_q_liq_to_q_rai(microphys_params, q.liq))
+                S_qt_rain = limit_tendency(precipitation_tendency_limiter, -α_acnv * CM1.conv_q_liq_to_q_rai(microphys_params, q.liq), q.liq, Δt)
+                # should we have a noneq version here? that uses my_conv_q_liq_to_q_rai()
             elseif rain_formation_model isa Clima2M
                 S_qt_rain =
                     -min(
@@ -466,13 +411,13 @@ function precipitation_formation(
 
             ql_tendency_acnv = S_qt_rain # for storage
 
-            use_supersat = get_isbits_nt(param_set.user_args, :use_supersat, false)
-            if use_supersat == false # it's either true or a specified value
-                S_qt_snow = -min(q.ice / Δt, α_acnv * CM1.conv_q_ice_to_q_sno_no_supersat(microphys_params, q.ice))
-            else
+            if snow_formation_model isa NonEquilibriumSnowFormationModel 
                 p = TD.air_pressure(thermo_params, ts)
-                S_qt_snow =
-                    -min(q.ice / Δt, α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q, T, p, use_supersat))
+                # S_qt_snow = -min(q.ice / Δt, α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q, T, p))
+                S_qt_snow = limit_tendency(precipitation_tendency_limiter, -α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q, T, p), q.ice, Δt)
+            else
+                # S_qt_snow = -min(q.ice / Δt, α_acnv * CM1.conv_q_ice_to_q_sno_no_supersat(microphys_params, q.ice))
+                S_qt_snow = limit_tendency(precipitation_tendency_limiter, -α_acnv * CM1.conv_q_ice_to_q_sno_no_supersat(microphys_params, q.ice), q.ice, Δt)
             end
 
             qi_tendency_acnv = S_qt_snow # for storage
@@ -487,26 +432,18 @@ function precipitation_formation(
 
             # accretion cloud water + rain
             if rain_formation_model isa Clima1M_default
-                S_qr =
-                    min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ)) *
-                    precip_fraction
+                # S_qr = min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ)) * precip_fraction
+                S_qr = -limit_tendency(precipitation_tendency_limiter, -α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ), q.liq, Δt) * precip_fraction
             elseif rain_formation_model isa Clima2M
                 if rain_formation_model.type isa CMT.LD2004Type
-                    S_qr =
-                        min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ)) *
-                        precip_fraction
+                    # S_qr = min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ)) * precip_fraction
+                    S_qr = -limit_tendency(precipitation_tendency_limiter, -α_accr * CM1.accretion(microphys_params, liq_type, rain_type, q.liq, qr, ρ), q.liq, Δt) * precip_fraction
                 elseif rain_formation_model.type isa CMT.KK2000Type || rain_formation_model.type isa CMT.B1994Type
-                    S_qr =
-                        min(
-                            q.liq / Δt,
-                            α_accr * CM2.accretion(microphys_params, rain_formation_model.type, q.liq, qr, ρ),
-                        ) * precip_fraction
+                    # S_qr = min(q.liq / Δt, α_accr * CM2.accretion(microphys_params, rain_formation_model.type, q.liq, qr, ρ), ) * precip_fraction
+                    S_qr = -limit_tendency(precipitation_tendency_limiter, -α_accr * CM2.accretion(microphys_params, rain_formation_model.type, q.liq, qr, ρ), q.liq, Δt) * precip_fraction
                 elseif rain_formation_model.type isa CMT.TC1980Type
-                    S_qr =
-                        min(
-                            q.liq / Δt,
-                            α_accr * CM2.accretion(microphys_params, rain_formation_model.type, q.liq, qr),
-                        ) * precip_fraction
+                    # S_qr = min(q.liq / Δt, α_accr * CM2.accretion(microphys_params, rain_formation_model.type, q.liq, qr),) * precip_fraction
+                    S_qr = -limit_tendency(precipitation_tendency_limiter, -α_accr * CM2.accretion(microphys_params, rain_formation_model.type, q.liq, qr), q.liq, Δt) * precip_fraction
                 else
                     error("Unrecognized 2-moment rain formation model type")
                 end
@@ -520,9 +457,9 @@ function precipitation_formation(
             ql_tendency_accr_liq_rai = -S_qr # for storage
 
             # accretion cloud ice + snow
-            S_qs =
-                min(q.ice / Δt, α_accr * CM1.accretion(microphys_params, ice_type, snow_type, q.ice, qs, ρ)) *
-                precip_fraction
+            # S_qs = min(q.ice / Δt, α_accr * CM1.accretion(microphys_params, ice_type, snow_type, q.ice, qs, ρ)) * precip_fraction
+            S_qs = -limit_tendency(precipitation_tendency_limiter,  -α_accr * CM1.accretion(microphys_params, ice_type, snow_type, q.ice, qs, ρ), q.ice, Δt) * precip_fraction
+
             qs_tendency += S_qs
             qt_tendency -= S_qs
             qi_tendency -= S_qs
@@ -530,9 +467,8 @@ function precipitation_formation(
             qi_tendency_accr_ice_sno = -S_qs # for storage
 
             # sink of cloud water via accretion cloud water + snow
-            S_qt =
-                -min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, snow_type, q.liq, qs, ρ)) *
-                precip_fraction
+            # S_qt = -min(q.liq / Δt, α_accr * CM1.accretion(microphys_params, liq_type, snow_type, q.liq, qs, ρ)) * precip_fraction
+            S_qt = limit_tendency(precipitation_tendency_limiter, -α_accr * CM1.accretion(microphys_params, liq_type, snow_type, q.liq, qs, ρ), q.liq, Δt) * precip_fraction
             if T < T_fr # cloud droplets freeze to become snow)
                 qs_tendency -= S_qt
                 qt_tendency += S_qt
@@ -551,11 +487,11 @@ function precipitation_formation(
 
 
             # sink of cloud ice via accretion cloud ice - rain
-            S_qt =
-                -min(q.ice / Δt, α_accr * CM1.accretion(microphys_params, ice_type, rain_type, q.ice, qr, ρ)) *
-                precip_fraction
+            # S_qt = -min(q.ice / Δt, α_accr * CM1.accretion(microphys_params, ice_type, rain_type, q.ice, qr, ρ)) * precip_fraction
+            S_qt = limit_tendency(precipitation_tendency_limiter, -α_accr * CM1.accretion(microphys_params, ice_type, rain_type, q.ice, qr, ρ), q.ice, Δt) * precip_fraction
             # sink of rain via accretion cloud ice - rain
-            S_qr = -min(qr / Δt, α_accr * CM1.accretion_rain_sink(microphys_params, q.ice, qr, ρ)) * precip_fraction
+            # S_qr = -min(qr / Δt, α_accr * CM1.accretion_rain_sink(microphys_params, q.ice, qr, ρ)) * precip_fraction
+            S_qr = limit_tendency(precipitation_tendency_limiter, -α_accr * CM1.accretion_rain_sink(microphys_params, q.ice, qr, ρ), qr, Δt) * precip_fraction
             qt_tendency += S_qt
             qi_tendency += S_qt
             qr_tendency += S_qr
@@ -565,19 +501,39 @@ function precipitation_formation(
 
             # accretion rain - snow
             if T < T_fr
-                S_qs =
-                    min(qr / Δt, α_accr * CM1.accretion_snow_rain(microphys_params, snow_type, rain_type, qs, qr, ρ)) *
-                    precip_fraction *
-                    precip_fraction
+                # S_qs = min(qr / Δt, α_accr * CM1.accretion_snow_rain(microphys_params, snow_type, rain_type, qs, qr, ρ)) * precip_fraction * precip_fraction
+                S_qs = -limit_tendency(precipitation_tendency_limiter, -α_accr * my_accretion_snow_rain(microphys_params, snow_type, rain_type, qs, qr, ρ, term_vel_snow, term_vel_rain), qr, Δt) * precip_fraction * precip_fraction
             else
-                S_qs =
-                    -min(qs / Δt, α_accr * CM1.accretion_snow_rain(microphys_params, rain_type, snow_type, qr, qs, ρ)) *
-                    precip_fraction *
-                    precip_fraction
+                # S_qs = -min(qs / Δt, α_accr * CM1.accretion_snow_rain(microphys_params, rain_type, snow_type, qr, qs, ρ)) * precip_fraction * precip_fraction
+                S_qs = limit_tendency(precipitation_tendency_limiter, -α_accr * my_accretion_snow_rain(microphys_params, rain_type, snow_type, qr, qs, ρ, term_vel_rain, term_vel_snow), qs, Δt) * precip_fraction * precip_fraction
             end
             qs_tendency += S_qs
             qr_tendency -= S_qs
             θ_liq_ice_tendency += S_qs * Lf / Π_m / c_vm
+
+            # liq - ice accretion
+
+            if T < T_fr # losing liq
+                S_qi = accretion_liq_ice(microphys_params, ql, qi, ρ, term_vel_ice, cloud_sedimentation_model.ice_terminal_velocity_scheme, Ni, cloud_sedimentation_model.ice_Dmax, cloud_sedimentation_model.liq_ice_collision_efficiency; liq_ice_accr_scaling_factor = cloud_sedimentation_model.liq_ice_collision_scaling_factor ) # should be a positive number
+                # Tendencies get multiplied by area outside of this fcn and cloud fraction is 1 if has condensate and 0 if not so no need here
+                S_qi = max(S_qi, FT(0)) # don't allow negative values (depending on ai, bi, ci in Chen that can just barely happen)
+                S_qi = -limit_tendency(precipitation_tendency_limiter, -α_accr * S_qi , ql, Δt) # signs should match accretion_snow_rain except snow ⟹ ice, rain ⟹ liq
+            else # losing ice
+                # S_qi = accretion_liq_ice(microphys_params, ql, qi, ρ, term_vel_ice, cloud_sedimentation_model.ice_terminal_velocity_scheme, Ni, cloud_sedimentation_model.ice_Dmax, cloud_sedimentation_model.liq_ice_collision_efficiency; liq_ice_accr_scaling_factor = cloud_sedimentation_model.liq_ice_collision_scaling_factor ) # should be a positive number
+                # S_qi = max(S_qi, FT(0)) # don't allow negative values (depending on ai, bi, ci  Chen that can just barely happen)
+                # S_qi = limit_tendency(precipitation_tendency_limiter, -α_accr * S_qi , qi, Δt) # signs should match accretion_snow_rain except snow ⟹ ice, rain ⟹ liq
+                S_qi = FT(0) # PSACWI doesn't cover this, either way we have instant melting so...
+            end
+            qi_tendency += S_qi
+            ql_tendency -= S_qi   
+            # Because both ql and qi are part of the working fluid and θ_liq_ice_tendency is 0, we really should have  no change in θ_liq_ice_tendency
+            # θ_liq_ice_tendency += FT(0)
+            # θ_liq_ice_tendency += S_qi * Lf / Π_m / c_vm # fusion liq ⟹ ice
+            # if !iszero(S_qi)
+            #     @info "S_qi = $S_qi; qi = $qi; ql = $ql; Δt = $Δt; ρ = $ρ; term_vel_ice = $term_vel_ice; Ni = $Ni; θ_liq_ice_tendency_addit = $θ_liq_ice_tendency_addit"
+            # end
+            qi_tendency_accr_ice_liq = S_qi # for storage
+            ql_tendency_accr_liq_ice = -S_qi # for storage
         end
     end
     return PrecipFormation{FT}(
@@ -591,118 +547,132 @@ function precipitation_formation(
         ql_tendency_acnv,
         qi_tendency_acnv,
         ql_tendency_accr_liq_rai,
-        FT(0), # ql_tendency_accr_liq_ice
+        # FT(0), # ql_tendency_accr_liq_ice
+        ql_tendency_accr_liq_ice,
         ql_tendency_accr_liq_sno,
-        FT(0), # qi_tendency_accr_ice_liq,
+        # FT(0), # qi_tendency_accr_ice_liq,
+        qi_tendency_accr_ice_liq,
         qi_tendency_accr_ice_rai,
         qi_tendency_accr_ice_sno,
     )
 end
 
 
-
 """
-Allow for other microphysics processes to be handled outside of the main microphysics noneq calls
-This is probably good bc we had it in noneq_moisture_sources but it's conflated w/ cond/evap sub/dep then and the limiters we had didn't account for precip tendencies anyway...
+    We'd copy from accretion_snow_rain() in Microphysics1M.jl bc it has framework for dueling terminal velocities we don't have all parameters defined there.
 
-For consistency I've kept passing in S_ql, S_qi here but maybe we should just deprecate that and just have one limiter at the end? idk...
+    Liq also doesn't sediment rn so the implementation is more like accretion(). Then, the source is to the moving one (qi) by default.
+    But, like accretion_rain_snow(), we change that based on T < T_fr.
+
+    accretion_liq_sno(prs, type_i, type_j, q_i, q_j, ρ)
+
+    - `i` - snow for temperatures below freezing
+            or rain for temperatures above freezing
+    - `j` - rain for temperatures below freezing
+            or snow for temperatures above freezing
+    - `prs` - abstract set with Earth parameters
+    - `type_i`, `type_j` - a type for snow or rain
+    - `q_` - specific humidity of snow or rain
+    - `ρ` - air density
+
+    Returns the accretion rate between rain and snow.
+    Collisions between liq and ice result in ice at temperatures below freezing and in liq at temperatures above freezing.
+
+    As written, using already calculated terminal velocities, nothing here depends on the terminal velocity scheme for Blk1MVel or Chen2022, though if you didn't have that precomputed you would need it.
+    This is just because they both assume the same form for m(r)
+        
 """
-function other_microphysics_processes(
-    param_set::APS,
-    area::FT,
+function accretion_liq_ice(
+    prs::ACMP,
+    ql::FT, # stationary
+    qi::FT, # moving
     ρ::FT,
-    Δt::Real,
-    ts::TD.ThermodynamicState,
-    w::FT,
-    z::FT,
-    S_ql::FT,
-    S_qi::FT;
-    ts_LCL::Union{Nothing, TD.ThermodynamicState} = nothing,
-) where {FT}
+    term_vel_ice::FT,
+    velo_scheme::Union{CMT.Chen2022Type, CMT.Blk1MVelType},
+    N_i::FT,
+    ice_Dmax::FT,
+    E_liq_ice::FT;
+    liq_ice_accr_scaling_factor::FT = FT(1),
+    # D_transition::FT = FT(0.625e-3), # .625mm is the transition from small to large ice crystals in Chen paper, leave unchanged
+) where {FT <: Real}
 
-    S_ql_init::FT = S_ql
-    S_qi_init::FT = S_qi
+    accr_rate = FT(0)
+    if (ql > FT(0) && qi > FT(0))
+        
+        integral_nav = int_nav_dr(prs, ice_type, velo_scheme, qi, ρ, FT(0); Nt=N_i, Dmax=ice_Dmax) # assume μ in n(r) is 0 (exponential distribution)
 
-    # S_ql = FT(0) # for backwards compat, but in the end should just remove this altogether... this might be unstable though bc it has no relaxation so might run up against limiters? doesn't account for incoming noneq fluxes... (old way didn't account for precip but that's within one condensate species at least)
-    # S_qi = FT(0) # for backwards compat, but in the end should just remove this altogether... this might be unstable though bc it has no relaxation so might run up against limiters? doesn't account for incoming noneq fluxes... (old way didn't account for precip but that's within one condensate species at least)
-    # if it becomes a problem we could try also passing state and pulling out the sources from there... but we'll have to know if we're in env or up etc...
+        # what do we do if nm_integral_value is inf?
 
-    thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    microphys_params::ACMP = TCP.microphysics_params(param_set)
-    # TODO - when using adaptive timestepping we are limiting the source terms with the previous timestep Δt
-    ql_tendency::FT = FT(0)
-    qi_tendency::FT = FT(0)
-    qi_tendency_homogeneous_freezing::FT = FT(0)
-    qi_tendency_heterogeneous_icenuc::FT = FT(0)
-    qi_tendency_heterogeneous_freezing::FT = FT(0)
-    qi_tendency_icemult::FT = FT(0)
-    qi_tendency_melting::FT = FT(0)
-    if area > 0
-        use_supersat = get_isbits_nt(param_set.user_args, :use_supersat, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
-        # use_supersat = isa(use_supersat, Val) ? typeof(use_supersat).parameters[1] : use_supersat # extract the value from the Val type (we put it in there in parameter_set.jl to make it isbits)
-        use_korolev_mazin = get_isbits_nt(param_set.user_args, :use_korolev_mazin, false) # (:use_supersat in keys(param_set.user_args)) ? param_set.user_args.use_supersat : false # so we dont have to set everything we dont know is in user_args in the defaults...
-        # use_korolev_mazin = isa(use_korolev_mazin, Val) ? typeof(use_korolev_mazin).parameters[1] : use_korolev_mazin # extract the value from the Val type (we put it in there in parameter_set.jl to make it isbits)
+        # if isnan(integral_nav) || !isfinite(integral_nav)
+        #     error("Got nm_integral_value = $integral_nav from nm_integral() in accretion_liq_ice() for inputs qi = $qi; ρ = $ρ; N_i = $N_i; ice_Dmax = $ice_Dmax")
+        # end
 
-        τ_use = get_isbits_nt(param_set.user_args, :τ_use, :standard)  # this has w built in though, no way around it, maybe we should write one that's just the exponential decay part w/o anything else... ( # change the default to at least :morrison_milbrandt_2015_style_exponential_part_only soon )
-        τ_use = isa(τ_use, Val) ? typeof(τ_use).parameters[1] : τ_use
+        # if isnan(integral_nav) || !isfinite(integral_nav)
+        #     error("Got integral_nav = $integral_nav from term_vel_ice * integral_nav in accretion_liq_ice() for inputs qi = $qi; ρ = $ρ; N_i = $N_i; ice_Dmax = $ice_Dmax; term_vel_ice = $term_vel_ice; nm_integral_value = $nm_integral_value")
+        # end
+        
+        accr_rate = E_liq_ice * ql * integral_nav * liq_ice_accr_scaling_factor  # Eq 16 https://clima.github.io/CloudMicrophysics.jl/dev/Microphysics1M/#Accretion
 
-        q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
-        T::FT = TD.air_temperature(thermo_params, ts)
-        p::FT = TD.air_pressure(thermo_params, ts)
-        q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
+        # if isnan(accr_rate) || !isfinite(accr_rate)
+        #     error("Got accr_rate = $accr_rate from E_liq_ice * ql * int in accretion_liq_ice() for inputs qi = $qi; ρ = $ρ; N_i = $N_i; ice_Dmax = $ice_Dmax; term_vel_ice = $term_vel_ice; nm_integral_value = $nm_integral_value; E_liq_ice = $E_liq_ice; ql = $ql")
+        # end
 
-        if T >= thermo_params.T_freeze # could go insisde supersat bc base eq is already 0 above freezng
-            S_qi = min(0, S_qi) # allow sublimation but not new ice formation ( or should we just melt and then let evaporation work? ), i think this is better than redirecting bc that could go on forever with a different timescale, and ice doesn't form above freezing and then melt
-            # send existing ice to liquid
-            qi_tendency_melting = (q.ice / Δt + S_qi) # send any existing ice that is not sublimating to liquid (maybe make this a rate later)
-            S_ql += qi_tendency_melting # send any existing ice that is not sublimating to liquid (maybe make this a rate later)
-            S_qi = -q.ice / Δt # destroy all existing ice
-
-        # homogeneous_freezing
-        elseif (T < thermo_params.T_icenuc)
-            # Here we allow the V -> L --> I pathway to happen, since it's probably smoother idk and mayb still be physical (form liquid then instafreee unlike ice forming above freezing and then melting...)
-            if (S_ql > 0)
-                qi_tendency_homogeneous_freezing = S_ql # any vapor coming to liquid goes to ice instead (smoother in total condensate than setting it to 0 suddenly?)
-                S_qi += qi_tendency_homogeneous_freezing # any vapor coming to liquid goes to ice instead (smoother in total condensate than setting it to 0 suddenly?)
-                S_ql = 0
-            end
-            if q.liq > 0
-                qi_tendency_homogeneous_freezing = q.liq / Δt + S_ql
-                S_qi += qi_tendency_homogeneous_freezing # send any existing liquid to ice that isn't already evaporating (if S_ql was positive, it's already been sent to ice and set to 0)
-                S_ql = -q.liq / Δt # remove all liquid
-            end
-            # Heterogeneous ice nucleation
-        else
-            if get_isbits_nt(param_set.user_args, :use_heterogeneous_ice_nucleation, false)
-                heterogeneous_ice_nuclation_coefficient =
-                    get_isbits_nt(param_set.user_aux, :heterogeneous_ice_nuclation_coefficient, FT(1))
-                heterogeneous_ice_nuclation_exponent =
-                    get_isbits_nt(param_set.user_aux, :heterogeneous_ice_nuclation_exponent, FT(1))
-
-                c_1 =
-                    ρ *
-                    heterogeneous_ice_nuclation_coefficient *
-                    exp(heterogeneous_ice_nuclation_exponent * (T - thermo_params.T_freeze) - 1)
-                qi_tendency_heterogeneous_icenuc = q.liq * (1 - exp(-c_1 * Δt)) # positive number, how much liquid is losing
-
-
-                # we have two exponentials so if we'd deplete all our liquid we just scale down.
-                if S_ql < 0
-                    qi_tendency_heterogeneous_icenuc = max(-q.liq / Δt - S_ql, -qi_tendency_heterogeneous_icenuc) # S_ql should be smaller than q.liq/Δt after doing limiters above, but maybe move them down here?
-                end
-                S_ql -= qi_tendency_heterogeneous_icenuc
-                S_qi += qi_tendency_heterogeneous_icenuc
-            end
-        end
     end
+    return accr_rate 
+end
 
-    return OtherMicrophysicsSources{FT}(
-        S_ql - S_ql_init,
-        S_qi - S_qi_init,
-        # my additions for storage
-        qi_tendency_homogeneous_freezing,
-        qi_tendency_heterogeneous_icenuc,
-        qi_tendency_heterogeneous_freezing,
-        qi_tendency_melting,
-    )
+
+"""
+My version of this function that uses the true terminal_velocity() [stored or recalculated]
+"""
+function my_accretion_snow_rain(
+    prs::ACMP,
+    type_i::CMT.AbstractPrecipType,
+    type_j::CMT.AbstractPrecipType,
+    q_i::FT,
+    q_j::FT,
+    ρ::FT,
+    term_vel_i::FT, # ordinarily CloudMicrophysics.jl would recalculate this but we already have it stored in TC.jl
+    term_vel_j::FT, # ordinarily CloudMicrophysics.jl would recalculate this but we already have it stored in TC.jl
+) where {FT <: Real}
+
+    accr_rate = FT(0)
+    if (q_i > FT(0) && q_j > FT(0))
+
+        _n0_i::FT = CM1.n0(prs, q_i, ρ, type_i)
+        _n0_j::FT = CM1.n0(prs, q_j, ρ, type_j)
+
+        _r0_j::FT = CM1.r0(prs, type_j)
+        _m0_j::FT = CM1.m0(prs, type_j)
+        _me_j::FT = CM1.me(prs, type_j)
+        _Δm_j::FT = CM1.Δm(prs, type_j)
+        _χm_j::FT = CM1.χm(prs, type_j)
+
+        _E_ij::FT = CM1.E(prs, type_i, type_j)
+
+        _λ_i::FT = CM1.lambda(prs, type_i, q_i, ρ)
+        _λ_j::FT = CM1.lambda(prs, type_j, q_j, ρ)
+
+        # _v_ti = terminal_velocity(prs, type_i, CT.Blk1MVelType(), ρ, q_i)
+        # _v_tj = terminal_velocity(prs, type_j, CT.Blk1MVelType(), ρ, q_j)
+        _v_ti = term_vel_i
+        _v_tj = term_vel_j
+
+        accr_rate =
+            FT(π) / ρ *
+            _n0_i *
+            _n0_j *
+            _m0_j *
+            _χm_j *
+            _E_ij *
+            abs(_v_ti - _v_tj) / _r0_j^(_me_j + _Δm_j) * (
+                FT(2) * CM1.SF.gamma(_me_j + _Δm_j + FT(1)) / _λ_i^FT(3) /
+                _λ_j^(_me_j + _Δm_j + FT(1)) +
+                FT(2) * CM1.SF.gamma(_me_j + _Δm_j + FT(2)) / _λ_i^FT(2) /
+                _λ_j^(_me_j + _Δm_j + FT(2)) +
+                CM1.SF.gamma(_me_j + _Δm_j + FT(3)) / _λ_i /
+                _λ_j^(_me_j + _Δm_j + FT(3))
+            )
+    end
+    return accr_rate
 end

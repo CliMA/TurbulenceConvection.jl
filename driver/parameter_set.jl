@@ -6,6 +6,20 @@ import SurfaceFluxes.UniversalFunctions as UF
 import Thermodynamics as TD
 import TurbulenceConvection.Parameters as TCP
 
+
+leaves_to_tuples(x) = x
+leaves_to_tuples(x::Array) = Tuple(x)
+leaves_to_tuples(x::Dict) = Dict{String, Any}((k => leaves_to_tuples(v) for (k,v) in x))
+
+leaves_to_Vals(x) = x # this turns leaves that are string into symbols and then all symbols into Vals so that they can be isbits, thus we are allowed to pass in symbols or strings, to extract, use typeof(valitem).parameters[1]
+leaves_to_Vals(x::Symbol) = Val(x)
+leaves_to_Vals(x::String) = Val(Symbol(x))
+leaves_to_Vals(x::Dict) = Dict{String, Any}((k => leaves_to_Vals(v) for (k,v) in x))
+leaves_to_Vals(x::NamedTuple) = map(leaves_to_Vals, x)
+
+namedtuple_fromdict(x) = x 
+namedtuple_fromdict(d::Dict) = (; (Symbol(k) => namedtuple_fromdict(v) for (k,v) in d)...) # from https://discourse.julialang.org/t/how-to-make-a-named-tuple-from-a-dictionary/10899/46?u=jbphyswx
+
 #! format: off
 function create_parameter_set(
     namelist,
@@ -39,7 +53,7 @@ function create_parameter_set(
     b_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "b_acnv_KK2000"; default = -1.79)
     c_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "c_acnv_KK2000"; default = -1.47)
     pow_icenuc = TC.parse_namelist(namelist, "microphysics", "pow_icenuc"; default = 1e7) # I think this has to be here to overwrite toml..., and to place it so we can overwrite_namelist it .. picked high value initially to keep ramp but maybe should keep original default... https://github.com/CliMA/CLIMAParameters.jl/blob/2f298661d527c1b9a11188ee2abc92ba4ba0c5ec/src/parameters.toml#L558
-    r_ice_snow = TC.parse_namelist(namelist, "microphysics", "r_ice_snow"; default = 62.5e-6) # allow changing this in the namelist/param_set/microphys_params instead of user_aux (probably not ideal if you used a 2-moment or something where this mattered more but ...)
+    r_ice_snow = TC.parse_namelist(namelist, "microphysics", "r_ice_snow"; default = 62.5e-6) # allow changing this in the namelist/param_set/microphys_params instead of user_params (probably not ideal if you used a 2-moment or something where this mattered more but ...)
 
     # Override the default files in the toml file
     open(override_file, "w") do io
@@ -178,6 +192,8 @@ function create_parameter_set(
     #
     MP = typeof(microphys_params)
 
+     
+
     aliases = ["Pr_0_Businger", "a_m_Businger", "a_h_Businger", "ζ_a_Businger", "γ_Businger"]
     pairs = CP.get_parameter_values!(toml_dict, aliases, "UniversalFunctions")
     pairs = (; pairs...) # convert to NamedTuple
@@ -199,32 +215,50 @@ function create_parameter_set(
     pairs = CP.get_parameter_values!(toml_dict, aliases, "TurbulenceConvection")
 
     SFP = typeof(surf_flux_params)
+
+
+
     namelist["user_args"] = get(namelist,"user_args", (;)) # handle if empty so we don't have to add to namelist defaults
-    namelist["user_aux"] = get(namelist,"user_aux", (;)) # handle if empty so we don't have to add to namelist defaults
-
     user_args = namelist["user_args"] # Let this be a NamedTuple
-    user_aux  = namelist["user_aux"] # Let this be a Dict()
-
-    leaves_to_tuples(x) = x
-    leaves_to_tuples(x::Array) = Tuple(x)
-    leaves_to_tuples(x::Dict) = Dict{String, Any}((k => leaves_to_tuples(v) for (k,v) in x))
-    user_aux = leaves_to_tuples(user_aux) # convert any leaves that are Arrays to tuples to preserve isbits
     user_args = leaves_to_tuples(user_args) # convert any leaves that are Arrays to tuples to preserve isbits
-
-    leaves_to_Vals(x) = x # this turns leaves that are string into symbols and then all symbols into Vals so that they can be isbits, thus we are allowed to pass in symbols or strings, to extract, use typeof(valitem).parameters[1]
-    leaves_to_Vals(x::Symbol) = Val(x)
-    leaves_to_Vals(x::String) = Val(Symbol(x))
-    leaves_to_Vals(x::Dict) = Dict{String, Any}((k => leaves_to_Vals(v) for (k,v) in x))
-    leaves_to_Vals(x::NamedTuple) = map(leaves_to_Vals, x)
-    user_aux = leaves_to_Vals(user_aux)  # convert leaves that are strings or symbols into Vals to preserve isbits
     user_args = leaves_to_Vals(user_args) # convert leaves that are strings or symbols into Vals to preserve isbits
-
-    namedtuple_fromdict(x) = x 
-    namedtuple_fromdict(d::Dict) = (; (Symbol(k) => namedtuple_fromdict(v) for (k,v) in d)...) # from https://discourse.julialang.org/t/how-to-make-a-named-tuple-from-a-dictionary/10899/46?u=jbphyswx
-    user_aux = namedtuple_fromdict(user_aux) # convert dict to NamedTuple to preserve isbits
     user_args = namedtuple_fromdict(user_args) # convert dict to NamedTuple to preserve isbits
 
-    param_set = TCP.TurbulenceConvectionParameters{FTD, MP, SFP, typeof(user_args), typeof(user_aux)}(; pairs..., microphys_params, surf_flux_params, user_args, user_aux) # `typeof` so we have concrete types such that if user_args and user_aux are isbits, then param_set is isbits
+    namelist["user_params"] = get(namelist, "user_params", Dict()) # handle if empty so we don't have to add to namelist defaults, put in nameslist so it'll be there for storage
+    user_params = namelist["user_params"]
+    # user_params = get(namelist, "user_params", Dict())
+    # overwrites, but this is all local so no need for TOML
+    user_params["particle_min_radius"] =  TC.parse_namelist(namelist, "user_params", "particle_min_radius"; default = 0.2e-6) # this is set no matter what
+    user_params["q_min"] = TC.parse_namelist(namelist, "user_params", "q_min"; default = zero(FT)) # maybe one day swap to var limiter step
+    user_params  = namelist["user_params"] # Let this be a Dict()
+    user_params = leaves_to_tuples(user_params) # convert any leaves that are Arrays to tuples to preserve isbits
+    user_params = leaves_to_Vals(user_params)  # convert leaves that are strings or symbols into Vals to preserve isbits
+    user_params = namedtuple_fromdict(user_params) # convert dict to NamedTuple to preserve isbits
+
+    # ------------------------------------------------ #
+
+    # # Do we actually need to wrap the type if it's a nt anyway...
+    # # Create user_params, see Parameters.jl for what we store in here...
+    # user_params = get(namelist, "user_params", Dict()) # should be a dict...
+    # # overwrites, not using TOML
+    # user_params["particle_min_radius"] = particle_min_radius 
+    # # ensure isbitsness
+    # user_params = leaves_to_tuples(user_params) # convert leaves that are strings or symbols into Vals to preserve isbits
+    # user_params = leaves_to_Vals(user_params) # convert leaves that are strings or symbols into Vals to preserve isbits
+    # # set the user_params
+    # user_params = namedtuple_fromdict(user_args)
+    # user_params = TCP.UserParameters{typeof(user_args)}(user_params) # version that store NamedTuple
+
+    # # I also used user_args and user_params to separate parameters like process_x_parameter_1::FT=0.1 and keyword arguments like use_x_process::Bool = true, etc.
+
+
+    # Some things in param_set are used in the construction of other objects, is kind of redundant lol. No way to fix at the moment I guess given the namelist isn't passed everywhere...
+
+    # ------------------------------------------------ #
+
+    # ------------------------------------------------ #
+
+    param_set = TCP.TurbulenceConvectionParameters{FTD, MP, SFP, typeof(user_args), typeof(user_params)}(; pairs..., microphys_params, surf_flux_params, user_args, user_params) # `typeof` so we have concrete types such that if user_args and user_params are isbits, then param_set is isbits
     if !isbits(param_set)
         @info("param_set", param_set)
         @warn "The parameter set SHOULD be isbits in order to be stack-allocated."

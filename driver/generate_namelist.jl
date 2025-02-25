@@ -701,8 +701,11 @@ function SOCRATES(namelist_defaults; case_name = "SOCRATES_RFXX_XXX_data")
     # grid is currently constructed from the same one used by the paper's LES grid
     namelist["stats_io"]["frequency"] = 600.0 # long runs so try a lower output rate for smaller files... (seems to be seconds) -- changed to 10 minutes... 14 hours default runs are loooong...
     namelist["time_stepping"]["t_max"] = 3600.0 * 14 # they ran LES for 12-14 hours (reference is supposed to be at hour 12)
-    namelist_defaults["time_stepping"]["dt_max"] = 5.0
+    namelist_defaults["time_stepping"]["dt_max"] = 1.0
     namelist_defaults["time_stepping"]["dt_min"] = 0.5
+    namelist["time_stepping"]["spinup_dt_factor"] = 1.0 # 1/4 of the dt_min to stabilize the model
+    namelist["time_stepping"]["spinup_half_t_max"] = 3600.0 * 1.0 # 1 hour
+    namelist["time_stepping"]["allow_spinup_adapt_dt"] = false
 
     namelist["microphysics"]["precipitation_model"] = "clima_1m"
     namelist["microphysics"]["precip_fraction_model"] = "prescribed" # "prescribed" or "cloud_cover"

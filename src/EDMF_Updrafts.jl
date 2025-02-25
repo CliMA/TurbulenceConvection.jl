@@ -8,29 +8,30 @@ function compute_nonequilibrium_moisture_tendencies!(
     edmf::EDMFModel,
     Δt::Real,
     param_set::APS,
+    use_fallback_tendency_limiters::Bool,
 )
     thermo_params = TCP.thermodynamics_params(param_set)
     FT = float_type(state)
     N_up = n_updrafts(edmf)
     aux_gm = center_aux_grid_mean(state)
     aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state) # state or does ts include this? I guess you'd want to move this to the calling place... to choose updraft or environment
     aux_bulk = center_aux_bulk(state)
     prog_gm = center_prog_grid_mean(state)
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
 
+    F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
+    nonequilibrium_moisture_scheme = edmf.moisture_model.scheme # my new addition
+    # moisture_sources_limiter = edmf.tendency_limiters.moisture_sources_limiter
+    moisture_sources_limiter = get_tendency_limiter(edmf.tendency_limiters, Val(:moisture_sources), use_fallback_tendency_limiters)
+
+    ε = eps(FT) # see EDMF_Environment.jl for explanation
+
     @inbounds for i in 1:N_up
-        ts_LCL = cloud_base(
-            aux_up[i],
-            grid,
-            TD.PhaseNonEquil_pTq.(
-                thermo_params,
-                p_c,
-                aux_up[i].T,
-                TD.PhasePartition.(aux_up[i].q_tot, aux_up[i].q_liq, aux_up[i].q_ice),
-            ),
-            :up,
-        )[:cloud_base_ts] # cloud base, only keep the thermodynamic state part
+        # ts_LCL = cloud_base(aux_up[i], grid, TD.PhaseNonEquil_pTq.(thermo_params, p_c, aux_up[i].T, TD.PhasePartition.(aux_up[i].q_tot, aux_up[i].q_liq, aux_up[i].q_ice)), :up)[:cloud_base_ts] # cloud base, only keep the thermodynamic state part # deprecated for now
+        w::CC.Fields.Field = F2Cw.(aux_up_f[i].w) # fill correct type  w/ interpolated w values
+
         @inbounds for k in real_center_indices(grid)
             T_up = aux_up[i].T[k]
             q_up = TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k])
@@ -38,14 +39,11 @@ function compute_nonequilibrium_moisture_tendencies!(
 
             # condensation/evaporation, deposition/sublimation
 
-            # if keep this w getting, you'd want this call to be moved outside the loop
-            aux_up_f = face_aux_updrafts(state) # state or does ts include this? I guess you'd want to move this to the calling place... to choose updraft or environment
-            w = CCO.InterpolateF2C(aux_up_f[i].w) # how to access?
-            k_int = getfield(k, Base.propertynames(k)[1]) # get the value k.i out
-            w = Base.getindex(CC.Fields.field_values(getfield(w, Base.propertynames(w)[1])), k_int) # w first field is w.bcs = getfield(w,Base.propertynames(w)[1]) , then get the index from the field value (would toscalar(x::CCG.Covariant3Vector) = x.u₃ have worked?  i guess not cause it's an interp object      )
             zc = FT(grid.zc[k].z)
 
-            mph = noneq_moisture_sources(param_set, aux_up[i].area[k], ρ_c[k], Δt, ts_up, w, zc; ts_LCL = ts_LCL)
+            q_vap_sat_liq = aux_up[i].q_vap_sat_liq[k]
+            q_vap_sat_ice = aux_up[i].q_vap_sat_ice[k]
+            mph = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, aux_up[i].area[k], ρ_c[k], Δt + ε, ts_up, w[k], zc, q_vap_sat_liq, q_vap_sat_ice) # ts_LCL = nothing)
             aux_up[i].ql_tendency_noneq[k] = mph.ql_tendency * aux_up[i].area[k]
             aux_up[i].qi_tendency_noneq[k] = mph.qi_tendency * aux_up[i].area[k]
 
@@ -54,11 +52,12 @@ function compute_nonequilibrium_moisture_tendencies!(
         end
     end
     @inbounds for k in real_center_indices(grid)
-        aux_bulk.ql_tendency_noneq[k] = 0
-        aux_bulk.qi_tendency_noneq[k] = 0
+        aux_bulk.ql_tendency_noneq[k] = FT(0)
+        aux_bulk.qi_tendency_noneq[k] = FT(0)
 
-        aux_bulk.ql_tendency_cond_evap[k] = 0 # for storage
-        aux_bulk.qi_tendency_sub_dep[k] = 0 # for storage
+        aux_bulk.ql_tendency_cond_evap[k] = FT(0) # for storage
+        aux_bulk.qi_tendency_sub_dep[k] = FT(0) # for storage
+        
         @inbounds for i in 1:N_up
             aux_bulk.ql_tendency_noneq[k] += aux_up[i].ql_tendency_noneq[k]
             aux_bulk.qi_tendency_noneq[k] += aux_up[i].qi_tendency_noneq[k]
@@ -73,54 +72,60 @@ end
 """
 Computes tendencies to q_liq and q_ice due to...
 """
-function compute_other_microphysics_tendencies!(grid::Grid, state::State, edmf::EDMFModel, Δt::Real, param_set::APS)
+function compute_other_microphysics_tendencies!(grid::Grid, state::State, edmf::EDMFModel, Δt::Real, param_set::APS, use_fallback_tendency_limiters::Bool)
     thermo_params = TCP.thermodynamics_params(param_set)
     FT = float_type(state)
     N_up = n_updrafts(edmf)
     aux_gm = center_aux_grid_mean(state)
     aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state) # state or does ts include this? I guess you'd want to move this to the calling place... to choose updraft or environment
     aux_bulk = center_aux_bulk(state)
     prog_gm = center_prog_grid_mean(state)
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
 
+    F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+    local w::CC.Fields.Field
+
+    # mstl = edmf.tendency_limiters.moisture_sources_limiter
+    mstl = get_tendency_limiter(edmf.tendency_limiters, Val(:moisture_sources), use_fallback_tendency_limiters)
+
+
     @inbounds for i in 1:N_up
-        ts_LCL = cloud_base(
-            aux_up[i],
-            grid,
-            TD.PhaseNonEquil_pTq.(
-                thermo_params,
-                p_c,
-                aux_up[i].T,
-                TD.PhasePartition.(aux_up[i].q_tot, aux_up[i].q_liq, aux_up[i].q_ice),
-            ),
-            :up,
-        )[:cloud_base_ts] # cloud base, only keep the thermodynamic state part
+    #     ts_LCL = cloud_base(
+    #         aux_up[i],
+    #         grid,
+    #         TD.PhaseNonEquil_pTq.(
+    #             thermo_params,
+    #             p_c,
+    #             aux_up[i].T,
+    #             TD.PhasePartition.(aux_up[i].q_tot, aux_up[i].q_liq, aux_up[i].q_ice),
+    #         ),
+    #         :up,
+    #     )[:cloud_base_ts] # cloud base, only keep the thermodynamic state part # deprecate for now
+        w = F2Cw.(aux_up_f[i].w) # fill correct type  w/ interpolated w values
         @inbounds for k in real_center_indices(grid)
             T_up = aux_up[i].T[k]
             q_up = TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k])
             ts_up = TD.PhaseNonEquil_pTq(thermo_params, p_c[k], T_up, q_up)
 
-            # if keep this w getting, you'd want this call to be moved outside the loop
-            aux_up_f = face_aux_updrafts(state) # state or does ts include this? I guess you'd want to move this to the calling place... to choose updraft or environment
-            w = CCO.InterpolateF2C(aux_up_f[i].w) # how to access?
-            k_int = getfield(k, Base.propertynames(k)[1]) # get the value k.i out
-            w = Base.getindex(CC.Fields.field_values(getfield(w, Base.propertynames(w)[1])), k_int) # w first field is w.bcs = getfield(w,Base.propertynames(w)[1]) , then get the index from the field value (would toscalar(x::CCG.Covariant3Vector) = x.u₃ have worked?  i guess not cause it's an interp object      )
             zc = FT(grid.zc[k].z)
 
             S_ql_from_before::FT = iszero(aux_up[i].area[k]) ? 0 : aux_up[i].ql_tendency_noneq[k] / aux_up[i].area[k]
             S_qi_from_before::FT = iszero(aux_up[i].area[k]) ? 0 : aux_up[i].qi_tendency_noneq[k] / aux_up[i].area[k] # is it possible we lost some info here if area won't be 0 after? i dont think so cause you multiply byy 0 in the end anyway
             mph_other = other_microphysics_processes(
                 param_set,
+                edmf.moisture_model.heterogeneous_ice_nucleation,
+                mstl,
                 aux_up[i].area[k],
                 ρ_c[k],
                 Δt,
                 ts_up,
-                w,
+                w[k],
                 zc,
                 S_ql_from_before,
                 S_qi_from_before;
-                ts_LCL = ts_LCL,
+                # ts_LCL = nothing,
             ) # new way w/ no depdnedence on sources from anywhere else...
 
             aux_up[i].ql_tendency_noneq[k] += mph_other.ql_tendency * aux_up[i].area[k] # add to existing tendency (it's called 2nd to compute_nonequilibrium_moisture_tendencies!)
@@ -128,8 +133,21 @@ function compute_other_microphysics_tendencies!(grid::Grid, state::State, edmf::
             aux_bulk.ql_tendency_noneq[k] += mph_other.ql_tendency * aux_up[i].area[k] # add here bc we're not gonna zero out again (we zero out in compute_nonequilibrium_moisture_tendencies!() )
             aux_bulk.qi_tendency_noneq[k] += mph_other.qi_tendency * aux_up[i].area[k] # add here bc we're not gonna zero out again (we zero out in compute_nonequilibrium_moisture_tendencies!() )
 
+
+            aux_up[i].qi_tendency_hom_frz[k] = mph_other.qi_tendency_homogeneous_freezing * aux_up[i].area[k] # for storage
+            aux_bulk.qi_tendency_hom_frz[k] += mph_other.qi_tendency_homogeneous_freezing * aux_up[i].area[k] # for storage
+
+            aux_up[i].qi_tendency_het_frz[k] = mph_other.qi_tendency_heterogeneous_freezing * aux_up[i].area[k] # for storage
+            aux_bulk.qi_tendency_het_frz[k] += mph_other.qi_tendency_heterogeneous_freezing * aux_up[i].area[k] # for storage
+
             aux_up[i].qi_tendency_het_nuc[k] = mph_other.qi_tendency_heterogeneous_icenuc * aux_up[i].area[k] # for storage
-            aux_bulk.qi_tendency_het_nuc[k] = mph_other.qi_tendency_heterogeneous_icenuc * aux_up[i].area[k] # for storage
+            aux_bulk.qi_tendency_het_nuc[k] += mph_other.qi_tendency_heterogeneous_icenuc * aux_up[i].area[k] # for storage
+
+            aux_up[i].qi_tendency_mlt[k] = mph_other.qi_tendency_melting * aux_up[i].area[k] # for storage
+            aux_bulk.qi_tendency_mlt[k] += mph_other.qi_tendency_melting * aux_up[i].area[k] # for storage
+
+
+
         end
     end
 
@@ -153,23 +171,25 @@ function compute_cloud_condensate_sedimentation_tendencies!(
     N_up = n_updrafts(edmf)
     aux_gm = center_aux_grid_mean(state)
     aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state) # state or does ts include this? I guess you'd want to move this to the calling place... to choose updraft or environment
     aux_bulk = center_aux_bulk(state)
     prog_gm = center_prog_grid_mean(state)
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
 
-    local liq_velo_scheme::Union{CMT.Blk1MVelType, CMT.Chen2022Type}
-    local ice_velo_scheme::Union{CMT.Blk1MVelType, CMT.Chen2022Type}
-    local liq_Dmax::FT
-    local ice_Dmax::FT
-    local scaling_factor::FT
-    local c_1::FT
-    local c_2::FT
+    # local liq_velo_scheme::Union{CMT.Blk1MVelType, CMT.Chen2022Type}
+    # local ice_velo_scheme::Union{CMT.Blk1MVelType, CMT.Chen2022Type}
+    # local liq_Dmax::FT
+    # local ice_Dmax::FT
+    # local scaling_factor::FT
+    # local c_1::FT
+    # local c_2::FT
 
+    # F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+    # local w::CC.Fields.Field
     @inbounds for i in 1:N_up
         # ======================================================================== #
-        if get_isbits_nt(param_set.user_args, :use_sedimentation, false) &&
-           !get_isbits_nt(param_set.user_args, :grid_mean_sedimentation, false) # drop this eventually?
+        if edmf.cloud_sedimentation_model isa CloudSedimentationModel &&  !edmf.cloud_sedimentation_model.grid_mean        
             # sedimentation (should this maybe be a grid mean tendency?)
             ts_up =
                 TD.PhaseNonEquil_pTq.(
@@ -179,100 +199,28 @@ function compute_cloud_condensate_sedimentation_tendencies!(
                     TD.PhasePartition.(aux_up[i].q_tot, aux_up[i].q_liq, aux_up[i].q_ice),
                 )
 
-            aux_up_f = face_aux_updrafts(state) # state or does ts include this? I guess you'd want to move this to the calling place... to choose updraft or environment
-            w = CCO.InterpolateF2C(aux_up_f[i].w) # how to access?
-            w = [
-                Base.getindex(
-                    CC.Fields.field_values(getfield(w, Base.propertynames(w)[1])),
-                    getfield(k, Base.propertynames(k)[1]),
-                ) for k in real_center_indices(grid)
-            ] # w first field is w.bcs = getfield(w,Base.propertynames(w)[1]) , then get the index from the field value
+            # w = F2Cw.(aux_up_f[i].w) # fill correct type  w/ interpolated w values
 
-            # sedimentation_liq_number_concentration = get_isbits_nt(param_set.user_args, :sedimentation_liq_number_concentration, nothing)
-            # sedimentation_ice_number_concentration = get_isbits_nt(param_set.user_args, :sedimentation_ice_number_concentration, nothing)
-
-            sedimentation_liq_number_concentration =
-                get_isbits_nt(param_set.user_args, :sedimentation_liq_number_concentration, FT(NaN)) # testing NaN over nothing for type stability
-            sedimentation_ice_number_concentration =
-                get_isbits_nt(param_set.user_args, :sedimentation_ice_number_concentration, FT(NaN)) # testing NaN over nothing for type stability
-
-
-            # get liquid number concentration
-            if isa(sedimentation_liq_number_concentration, Number)
-                N_l = FT(sedimentation_liq_number_concentration)
-            elseif isa(sedimentation_liq_number_concentration, Symbol)
-                # N_l = get_N_l.(param_set, sedimentation_liq_number_concentration, ts_up, w)
-                N_l =
-                    get_N_l.(
-                        param_set,
-                        sedimentation_liq_number_concentration,
-                        [ts_up[k] for k in real_center_indices(grid)],
-                        w,
-                    )
-                # N_l = FT(NaN)
-                # elseif isnothing(sedimentation_liq_number_concentration)
-                # N_l = sedimentation_liq_number_concentration
-            else
-                error("Unsupported liquid number concentration")
-            end
-
-            # get ice number concentration
-            if isa(sedimentation_ice_number_concentration, Number)
-                N_i = FT(sedimentation_ice_number_concentration)
-            elseif isa(sedimentation_ice_number_concentration, Symbol)
-                # N_i = get_N_i.(param_set, sedimentation_ice_number_concentration, ts_up, w)
-                N_i =
-                    get_N_i.(
-                        param_set,
-                        sedimentation_ice_number_concentration,
-                        [ts_up[k] for k in real_center_indices(grid)],
-                        w,
-                    )
-                # N_i = FT(NaN)
-                # elseif isnothing(sedimentation_ice_number_concentration)
-                # N_i = sedimentation_ice_number_concentration
-            else
-                error("Unsupported ice number concentration")
-            end
-
-
-
-            liq_velo_scheme = get_termvel_type(get_isbits_nt(param_set.user_args, :liq_velo_scheme, :Blk1MVel)) # we dont have this anyway
-            ice_velo_scheme = get_termvel_type(get_isbits_nt(param_set.user_args, :ice_velo_scheme, :Chen2022Vel)) # Blk1MVel was too fast I believe
-
-
-            sedimentation_integration_method::Symbol =
-                get_isbits_nt(param_set.user_args, :sedimentation_integration_method, :upwinding)
-            liq_Dmax = get_isbits_nt(param_set.user_aux, :liq_sedimentation_Dmax, FT(Inf))
-            ice_Dmax = get_isbits_nt(param_set.user_aux, :ice_sedimentation_Dmax, FT(62.5e-6)) # should this default to r_ice_snow?
-            liq_sedimentation_scaling_factor =
-                get_isbits_nt(param_set.user_aux, :liq_sedimentation_scaling_factor, FT(1.0))
-            ice_sedimentation_scaling_factor =
-                get_isbits_nt(param_set.user_aux, :ice_sedimentation_scaling_factor, FT(1.0))
             mph, mph_other = calculate_sedimentation_sources(
                 param_set,
-                grid,
+                ice_type,
                 ρ_c,
-                ts_up;
-                w = w,
-                area = aux_up[i].area,
+                aux_up[i].q_ice,
+                aux_up[i].term_vel_ice,
+                aux_up[i].area,
+                grid,
+                CMP.ρ_cloud_ice(TCP.microphysics_params(param_set));
+                differencing_scheme = edmf.cloud_sedimentation_model.sedimentation_differencing_scheme,
+                velo_scheme = edmf.cloud_sedimentation_model.ice_terminal_velocity_scheme, # defined in update_aux
                 grid_mean = false,
-                integration_method = sedimentation_integration_method,
-                liq_velo_scheme = liq_velo_scheme, # defined in update_aux
-                ice_velo_scheme = ice_velo_scheme, # defined in update_aux
-                liq_Dmax = liq_Dmax,
-                ice_Dmax = ice_Dmax,
-                liq_scaling_factor = liq_sedimentation_scaling_factor,
-                ice_scaling_factor = ice_sedimentation_scaling_factor,
-                Nl = N_l,
-                Ni = N_i,
-            )
+            ) # should this be a grid mean tendency?
+
 
             L_v0 = TCP.LH_v0(param_set)
             L_s0 = TCP.LH_s0(param_set)
             @inbounds for k in real_center_indices(grid)
-                ql_tendency_sedimentation = mph[k].ql_tendency
-                qi_tendency_sedimentation = mph[k].qi_tendency
+                ql_tendency_sedimentation = FT(0)
+                qi_tendency_sedimentation = mph[k].q_tendency
                 qt_tendency_sedimentation = ql_tendency_sedimentation + qi_tendency_sedimentation
                 aux_up[i].ql_tendency_sedimentation[k] += ql_tendency_sedimentation
                 aux_up[i].qi_tendency_sedimentation[k] += qi_tendency_sedimentation
@@ -292,8 +240,8 @@ function compute_cloud_condensate_sedimentation_tendencies!(
                 # sedimentation loss into environment
                 if aux_bulk[k].area < 1 # we have an environment
                     aux_en = center_aux_environment(state)
-                    ql_tendency_sedimentation_other = mph_other[k].ql_tendency
-                    qi_tendency_sedimentation_other = mph_other[k].qi_tendency
+                    ql_tendency_sedimentation_other = FT(0)
+                    qi_tendency_sedimentation_other = mph_other[k].q_tendency
                     qt_tendency_sedimentation_other = ql_tendency_sedimentation_other + qi_tendency_sedimentation_other
                     θ_liq_ice_tendency_sedimentation_other =
                         1 / Π_m / c_pm *
@@ -326,9 +274,12 @@ function compute_precipitation_formation_tendencies(
     state::State,
     edmf::EDMFModel,
     precip_model::AbstractPrecipitationModel,
+    cloud_sedimentation_model::AbstractCloudSedimentationModel,
     rain_formation_model::AbstractRainFormationModel,
+    snow_formation_model::AbstractSnowFormationModel,
     Δt::Real,
     param_set::APS,
+    use_fallback_tendency_limiters::Bool,
 )
     thermo_params = TCP.thermodynamics_params(param_set)
     FT = float_type(state)
@@ -336,6 +287,7 @@ function compute_precipitation_formation_tendencies(
     prog_gm = center_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
     aux_up = center_aux_updrafts(state)
+    aux_tc = center_aux_turbconv(state)
     aux_bulk = center_aux_bulk(state)
     prog_pr = center_prog_precipitation(state)
     tendencies_pr = center_tendencies_precipitation(state)
@@ -365,14 +317,24 @@ function compute_precipitation_formation_tendencies(
             mph = precipitation_formation(
                 param_set,
                 precip_model,
+                cloud_sedimentation_model,
                 rain_formation_model,
+                snow_formation_model,
                 prog_pr.q_rai[k],
                 prog_pr.q_sno[k],
+                aux_up[i].q_liq[k],
+                aux_up[i].q_ice[k],
+                aux_up[i].N_i[k],
+                aux_up[i].term_vel_ice[k],
+                aux_tc.term_vel_rain[k],
+                aux_tc.term_vel_snow[k],
                 aux_up[i].area[k],
                 ρ_c[k],
                 Δt,
                 ts_up,
                 precip_fraction,
+                # edmf.tendency_limiters.precipitation_tendency_limiter,
+                get_tendency_limiter(edmf.tendency_limiters, Val(:precipitation), use_fallback_tendency_limiters),
             )
             aux_up[i].qt_tendency_precip_formation[k] = mph.qt_tendency * aux_up[i].area[k]
             aux_up[i].θ_liq_ice_tendency_precip_formation[k] = mph.θ_liq_ice_tendency * aux_up[i].area[k]

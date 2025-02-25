@@ -1,4 +1,4 @@
-function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS, t::Real, Δt::Real)
+function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS, t::Real, Δt::Real, cfl_limit::Real, use_fallback_tendency_limiters::Bool)
     #####
     ##### Unpack common variables
     #####
@@ -54,9 +54,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     parent(∂M∂z_ρa) .= 0
 
 
-    rain_velo_scheme = get_termvel_type(get_isbits_nt(param_set.user_args, :rain_velo_scheme, :Blk1MVel))
-    snow_velo_scheme = get_termvel_type(get_isbits_nt(param_set.user_args, :snow_velo_scheme, :Blk1MVel))
-
     prog_gm_uₕ = grid_mean_uₕ(state)
     Ic = CCO.InterpolateF2C()
     #####
@@ -69,7 +66,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         #####
         e_pot = geopotential(param_set, grid.zc.z[k])
         @inbounds for i in 1:N_up
-            if prog_up[i].ρarea[k] / ρ_c[k] > edmf.minimum_area
+            if prog_up[i].ρarea[k] / ρ_c[k] > edmf.minimum_area # this condition is problematic for limiters, should never rely on aux_up or aux_bulk for limiting...
                 aux_up[i].θ_liq_ice[k] = prog_up[i].ρaθ_liq_ice[k] / prog_up[i].ρarea[k]
                 aux_up[i].q_tot[k] = prog_up[i].ρaq_tot[k] / prog_up[i].ρarea[k]
                 aux_up[i].area[k] = prog_up[i].ρarea[k] / ρ_c[k]
@@ -84,16 +81,23 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                     aux_up[i].q_liq[k] = prog_up[i].ρaq_liq[k] / prog_up[i].ρarea[k]
                     aux_up[i].q_ice[k] = prog_up[i].ρaq_ice[k] / prog_up[i].ρarea[k]
                 else
-                    aux_up[i].q_liq[k] = prog_gm.q_liq[k]
-                    aux_up[i].q_ice[k] = prog_gm.q_ice[k]
+                    aux_up[i].q_liq[k] = prog_gm.q_liq[k] # what's the point of these? If we do this should we not just set ρarea to 0
+                    aux_up[i].q_ice[k] = prog_gm.q_ice[k] # what's the point of  these?
+                    # if prog_up[i].ρarea[k] / ρ_c[k] > 0
+                    #     aux_up[i].q_liq[k] = prog_up[i].ρaq_liq[k] / prog_up[i].ρarea[k]
+                    #     aux_up[i].q_ice[k] = prog_up[i].ρaq_ice[k] / prog_up[i].ρarea[k]
+                    # else
+                    #     aux_up[i].q_liq[k] = prog_gm.q_liq[k]
+                    #     aux_up[i].q_ice[k] = prog_gm.q_ice[k]
+                    # end
                 end
                 thermo_args = (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
             end
-            ts_up_i = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k], thermo_args...)
+            # ts_up_i = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k], thermo_args...)
         end
 
         #####
-        ##### compute bulk
+        ##### compute bulk (aux)
         #####
         aux_bulk.q_tot[k] = 0
         aux_bulk.θ_liq_ice[k] = 0
@@ -139,8 +143,14 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         val1 = 1 / (1 - a_bulk_c)
         val2 = a_bulk_c * val1
         aux_en.q_tot[k] = max(val1 * aux_gm.q_tot[k] - val2 * aux_bulk.q_tot[k], 0) #Yair - this is here to prevent negative QT
+
+        # if (val1 * aux_gm.q_tot[k] - val2 * aux_bulk.q_tot[k]) < 0
+        #     env_bad_area = (val1 * aux_gm.q_tot[k] - val2 * aux_bulk.q_tot[k])
+        #     @warn "This is gonna crash, environmental q_tot was gonna be $env_bad_area"
+        # end
+
         aux_en.θ_liq_ice[k] = val1 * aux_gm.θ_liq_ice[k] - val2 * aux_bulk.θ_liq_ice[k]
-        if edmf.moisture_model isa NonEquilibriumMoisture
+        if edmf.moisture_model isa NonEquilibriumMoisture # otherwise it's diagnosed in thermo_state_pθq() calculation...
             aux_en.q_liq[k] = max(val1 * prog_gm.q_liq[k] - val2 * aux_bulk.q_liq[k], 0)
             aux_en.q_ice[k] = max(val1 * prog_gm.q_ice[k] - val2 * aux_bulk.q_ice[k], 0)
         end
@@ -159,12 +169,54 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         ts_env[k] = thermo_state_pθq(param_set, p_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], thermo_args...)
         ts_en = ts_env[k]
         aux_en.T[k] = TD.air_temperature(thermo_params, ts_en)
+
+        # @assert aux_en.T[k] > 0 "Backed out environment has negative temperature, this is bad. Status is z = $(grid.zc.z[k]), T = $(aux_en.T[k]), p = $(p_c[k]), θ = $(aux_en.θ_liq_ice[k]), q = $(aux_en.q_tot[k]),  ts = $ts_en"
+
         aux_en.θ_virt[k] = TD.virtual_pottemp(thermo_params, ts_en)
         aux_en.θ_dry[k] = TD.dry_pottemp(thermo_params, ts_en)
         rho = TD.air_density(thermo_params, ts_en)
         aux_en.buoy[k] = buoyancy_c(param_set, ρ_c[k], rho)
         aux_en.RH[k] = TD.relative_humidity(thermo_params, ts_en)
     end
+
+
+    #####
+    #####  update prognostic bulk (these mirror the prognostic variables exactly, no minimum_area or other clippings -- filtering already happened so should be good)
+    ### - these are important because while sometimes tendencies are calculated using aux, they are always applied to prog, so for limiting we need to know the exact prognostic values
+    #####
+    prog_bulk = center_prog_bulk(state)
+    prog_bulk.ρarea .= FT(0)
+    prog_bulk.ρaθ_liq_ice .= FT(0)
+    prog_bulk.ρaq_tot .= FT(0)
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        prog_bulk.ρaq_liq .= FT(0)
+        prog_bulk.ρaq_ice .= FT(0)
+    end
+    prog_bulk_f = face_prog_bulk(state)
+    prog_bulk_f.ρaw .= FT(0)
+
+    @inbounds for i in 1:N_up
+        @. prog_bulk.ρarea += prog_up[i].ρarea
+        @. prog_bulk.ρaθ_liq_ice += prog_up[i].ρaθ_liq_ice
+        @. prog_bulk.ρaq_tot += prog_up[i].ρaq_tot
+        if edmf.moisture_model isa NonEquilibriumMoisture
+            @. prog_bulk.ρaq_liq += prog_up[i].ρaq_liq
+            @. prog_bulk.ρaq_ice += prog_up[i].ρaq_ice
+        end
+        @. prog_bulk_f.ρaw += prog_up_f[i].ρaw
+    end
+
+    # track prog_en exactly (not to be confused with aux_en which is limited by clippings on aux_up etc)
+    prog_en_gm = center_prog_environment_up_gm_version(state)
+    @. prog_en_gm.ρarea = ρ_c - prog_bulk.ρarea
+    @. prog_en_gm.ρaθ_liq_ice = prog_gm.ρθ_liq_ice - prog_bulk.ρaθ_liq_ice
+    @. prog_en_gm.ρaq_tot = prog_gm.ρq_tot - prog_bulk.ρaq_tot
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        @. prog_en_gm.ρaq_liq = ρ_c * prog_gm.q_liq - prog_bulk.ρaq_liq
+        @. prog_en_gm.ρaq_ice = ρ_c * prog_gm.q_ice - prog_bulk.ρaq_ice
+    end
+    prog_en_gm_f = face_prog_environment_up_gm_version(state)
+    @. prog_en_gm_f.ρaw = -prog_bulk_f.ρaw
 
     # ======================================================== # zero out noneq tendencies before calling microphysics again (does this interfere w/ writing to disk? -- needed bc env/updraft are cross writing to each other... #
     # aux_en.ql_tendency_noneq .= FT(0) # don't zero this out  bc it seeemd to break the output writing (some order of read, calculate gm, write, zero out problem probably...)
@@ -189,7 +241,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     aux_en.qi_tendency_accr_ice_rai .= FT(0)
     aux_en.qi_tendency_accr_ice_sno .= FT(0)
     #
+    aux_en.qi_tendency_hom_frz .= FT(0)
+    aux_en.qi_tendency_het_frz .= FT(0)
     aux_en.qi_tendency_het_nuc .= FT(0)
+    aux_en.qi_tendency_mlt .= FT(0)
     #
     # aux_en.qi_tendency_vert_adv .= FT(0) # gm only
     # aux_en.qi_tendency_ls_vert_adv .= FT(0) # gm only
@@ -222,7 +277,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_up[i].qi_tendency_accr_ice_rai .= FT(0)
         aux_up[i].qi_tendency_accr_ice_sno .= FT(0)
         #
+        aux_up[i].qi_tendency_hom_frz .= FT(0)
+        aux_up[i].qi_tendency_het_frz .= FT(0)
         aux_up[i].qi_tendency_het_nuc .= FT(0)
+        aux_up[i].qi_tendency_mlt .= FT(0)
         #
         # aux_up[i].qi_tendency_vert_adv .= FT(0) # gm only
         # aux_up[i].qi_tendency_ls_vert_adv .= FT(0) # gm only
@@ -250,20 +308,56 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     aux_bulk.qi_tendency_accr_ice_rai .= FT(0)
     aux_bulk.qi_tendency_accr_ice_sno .= FT(0)
     #
+    aux_bulk.qi_tendency_hom_frz .= FT(0)
+    aux_bulk.qi_tendency_het_frz .= FT(0)
     aux_bulk.qi_tendency_het_nuc .= FT(0)
+    aux_bulk.qi_tendency_mlt .= FT(0)
     #
     # aux_bulk.qi_tendency_vert_adv .= FT(0) # gm only
     # aux_bulk.qi_tendency_ls_vert_adv .= FT(0) # gm only
     # aux_bulk.qi_tendency_sgs .= FT(0) # gm only
 
+
+    # zero out our bulk tendency trackers... these are used in limit_up_tendencies!() to limit tendencies for model stability...
+    tendencies_bulk = center_tendencies_bulk(state)
+    tendencies_bulk.ρarea .= FT(0)
+    tendencies_bulk.ρaθ_liq_ice .= FT(0)
+    tendencies_bulk.ρaq_tot .= FT(0)
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        tendencies_bulk.ρaq_liq .= FT(0)
+        tendencies_bulk.ρaq_ice .= FT(0)
+    end
+    tendencies_bulk_f = face_tendencies_bulk(state)
+    tendencies_bulk_f.ρaw .= FT(0)
+
+
+    # these get overwritten technically so don't actually need zeroing out
+    # tendencies_bulk_adjustments = center_tendencies_bulk_adjustments(state)
+    # tendencies_bulk_adjustments.ρarea .= FT(0)
+    # tendencies_bulk_adjustments.ρaθ_liq_ice .= FT(0)
+    # tendencies_bulk_adjustments.ρaq_tot .= FT(0)
+    # tendencies_bulk_adjustments.ρaq_liq .= FT(0)
+    # tendencies_bulk_adjustments.ρaq_ice .= FT(0)
+    # tendencies_bulk_adjustments_f = face_tendencies_bulk_adjustments(state)
+    # tendencies_bulk_adjustments_f.ρaw .= FT(0)
+
+    # ======================================================== # 
+
+    # calculate and  q_vap_sat_liq, q_vap_sat_ice (maybe move to assing_thermo_aux?)
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        # en has been updated, call before microphysics(). Use aux_en bc that's what microphysics uses
+        @. aux_en.q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, aux_en.T, ρ_c, TD.Liquid())
+        @. aux_en.q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, aux_en.T, ρ_c, TD.Ice())
+    end
+
     # ======================================================== #
 
-    microphysics(edmf.en_thermo, grid, state, edmf, edmf.precip_model, edmf.rain_formation_model, Δt, param_set) # set env tendencies for microphysics
+    microphysics(edmf.en_thermo, grid, state, edmf, edmf.precip_model, edmf.cloud_sedimentation_model, edmf.rain_formation_model, edmf.snow_formation_model, Δt, param_set, use_fallback_tendency_limiters) # set env tendencies for microphysics
 
     @inbounds for k in real_center_indices(grid)
         a_bulk_c = aux_bulk.area[k]
         @inbounds for i in 1:N_up
-            if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0
+            if aux_up[i].area[k] < edmf.minimum_area && k > kc_surf && aux_up[i].area[k - 1] > 0.0 # buoyancy hack for left biased buoyancy calc... should ensure paw, buoyancy never goes below 0.
                 qt = aux_up[i].q_tot[k - 1]
                 h = aux_up[i].θ_liq_ice[k - 1]
                 if edmf.moisture_model isa EquilibriumMoisture
@@ -351,8 +445,25 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     # clip updraft w below minimum area threshold
     @inbounds for i in 1:N_up
         a_min = edmf.minimum_area
-        a_up = aux_up[i].area
-        @. aux_up_f[i].w = ifelse(ᶠinterp_a(a_up) > a_min, max(prog_up_f[i].ρaw / (ρ_f * ᶠinterp_a(a_up)), 0), FT(0))
+        # a_up = aux_up[i].area
+        # @. aux_up_f[i].w = ifelse(ᶠinterp_a(a_up) > a_min, max(prog_up_f[i].ρaw / (ρ_f * ᶠinterp_a(a_up)), 0), FT(0)) # should we have some cfl type limiter on this?
+
+        @. aux_up_f[i].area = ᶠinterp_a(aux_up[i].area)  # aux_up_f[i].area is set in callbacks but condition_io() is called irregularly so maybe don't depend on it...
+        a_up = aux_up_f[i].area
+        @. aux_up_f[i].w = ifelse(a_up > a_min, max(prog_up_f[i].ρaw / (ρ_f * a_up), 0), FT(0)) # should we have some cfl type limiter on this?
+        w_max = cfl_limit * min(grid.Δz) / Δt
+
+        for k in real_face_indices(grid)
+            if aux_up_f[i].w[k] > w_max
+                z = grid.zf.z[k]
+                # @warn "Updraft $i at z=$z has w = $(aux_up_f[i].w[k]) > CFL w_max $w_max, reducing" # should the reducing be done in limiters? It can't be bc limiters is called before this but this is needed to calculate tendencies...
+                aux_up_f[i].w[k] = w_max
+                adj = ρ_f[k] * a_up[k] * (w_max - aux_up_f[i].w[k])
+                prog_up_f[i].ρaw[k] += adj
+                prog_bulk_f.ρaw[k] += adj
+                prog_en_gm_f.ρaw[k] -= adj
+            end
+        end
     end
     @inbounds for i in 1:N_up
         aux_up_f[i].w[kf_surf] = w_surface_bc(surf)
@@ -374,13 +485,29 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     get_GMV_CoVar(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
     get_GMV_CoVar(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
 
+
+
+    # ======================================================== # 
+    # calculate and q_vap_sat_liq, q_vap_sat_ice (maybe move to assing_thermo_aux?)
+    # en was already done, now do up/bulk before caling compute_nonequilibrium_moisture_tendencies!() now that aux up/bulk have ben updated.
+    # use aux bc that's what compute_nonequilibrium_moisture_tendencies!() uses
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        @inbounds for i in 1:N_up
+            @. aux_up[i].q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, aux_up[i].T, ρ_c, TD.Liquid())
+            @. aux_up[i].q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, aux_up[i].T, ρ_c, TD.Ice())
+        end
+        @. aux_bulk.q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, aux_bulk.T, ρ_c, TD.Liquid())
+        @. aux_bulk.q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, aux_bulk.T, ρ_c, TD.Ice())
+    end
+    # ======================================================== #
+
     #####
     ##### compute_updraft_closures
     #####
     #TODO - AJ add the non-equilibrium tendency computation here
     if edmf.moisture_model isa NonEquilibriumMoisture
-        compute_nonequilibrium_moisture_tendencies!(grid, state, edmf, Δt, param_set)
-        compute_other_microphysics_tendencies!(grid, state, edmf, Δt, param_set) # i think only in noneq case is ok... idk... these are tendencies that would be overwritten in equilibrium case, and ql_tendency_noneq/qi_tendency_noneq don't exist in equilibrium case
+        compute_nonequilibrium_moisture_tendencies!(grid, state, edmf, Δt, param_set, use_fallback_tendency_limiters)
+        compute_other_microphysics_tendencies!(grid, state, edmf, Δt, param_set, use_fallback_tendency_limiters) # i think only in noneq case is ok... idk... these are tendencies that would be overwritten in equilibrium case, and ql_tendency_noneq/qi_tendency_noneq don't exist in equilibrium case
     end
     compute_cloud_condensate_sedimentation_tendencies!(grid, state, edmf, Δt, param_set) # not sure on the merits of doing it here vs at the end w/ precipitation tendencies... leaving here bc originally i had it in compute_nonequilibrium_moisture_tendencies!()
 
@@ -604,12 +731,75 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             # term_vel_snow[k] = CM1.terminal_velocity(microphys_params, snow_type, snow_velo_scheme, ρ_c[k], prog_pr.q_sno[k])
             # use my own that's nan-safe
             term_vel_rain[k] =
-                my_terminal_velocity(microphys_params, rain_type, rain_velo_scheme, ρ_c[k], prog_pr.q_rai[k]) .*
-                get_isbits_nt(param_set.user_args, :rain_sedimentation_scaling_factor, FT(1.0))
+                my_terminal_velocity(microphys_params, rain_type, edmf.precip_model.rain_terminal_velocity_scheme, ρ_c[k], prog_pr.q_rai[k]) .* edmf.precip_model.rain_sedimentation_scaling_factor
             term_vel_snow[k] =
-                my_terminal_velocity(microphys_params, snow_type, snow_velo_scheme, ρ_c[k], prog_pr.q_sno[k]) .*
-                get_isbits_nt(param_set.user_args, :snow_sedimentation_scaling_factor, FT(1.0))
+                my_terminal_velocity(microphys_params, snow_type, edmf.precip_model.snow_terminal_velocity_scheme, ρ_c[k], prog_pr.q_sno[k]) .* edmf.precip_model.snow_sedimentation_scaling_factor
         end
+    end
+
+    if edmf.cloud_sedimentation_model isa CloudSedimentationModel
+        ρ_i = CMP.ρ_cloud_ice(microphys_params)
+        F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+        if edmf.cloud_sedimentation_model.grid_mean
+            error("Not impelemented yet")
+            # TODO: Impelement this. term_vel_ice is stored in aux_gm here I believe.
+        else
+            w::CC.Fields.Field = F2Cw.(aux_en_f.w)
+            term_vel_ice = aux_en.term_vel_ice
+            N_i = aux_en.N_i
+            @inbounds for k in real_center_indices(grid)
+                N_i[k] = get_N_i(param_set, edmf.cloud_sedimentation_model.sedimentation_ice_number_concentration, ts_env[k], w[k])
+
+                term_vel_ice[k] = calculate_sedimentation_velocity(
+                    microphys_params,
+                    q_effective_nan_N_safe(aux_en.q_ice[k], N_i[k], ρ_i, param_set.user_params.particle_min_radius), # if N is NaN this just returns q, which should be fine? the Chen2022Type makes some assumption about what N is... which is probably trustworthy? assume no NaNs in the vector...
+                    ρ_c[k], # air density
+                    ice_type,
+                    N_i[k]; # broadcasting is using _first and not going through properly for some reason...
+                    velo_scheme = edmf.cloud_sedimentation_model.ice_terminal_velocity_scheme,
+                    Dmax = edmf.cloud_sedimentation_model.ice_Dmax,
+                ) .* edmf.cloud_sedimentation_model.ice_sedimentation_scaling_factor 
+            end
+
+            @. aux_bulk.N_i = FT(0) # reset N_i
+            @inbounds for i in 1:N_up
+                w = F2Cw.(aux_up_f[i].w)
+                term_vel_ice = aux_up[i].term_vel_ice
+                N_i = aux_up[i].N_i
+                @inbounds for k in real_center_indices(grid)
+                    T_up = aux_up[i].T[k]
+                    q_up = TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k])
+                    ts_up = TD.PhaseNonEquil_ρTq(thermo_params, ρ_c[k], T_up, q_up)
+                    N_i[k] = get_N_i(param_set, edmf.cloud_sedimentation_model.sedimentation_ice_number_concentration, ts_up, w[k])
+                    if !isnan(N_i[k])
+                        aux_bulk.N_i[k] += N_i[k] * (aux_up[i].area[k] / aux_bulk.area[k]) # add N weighted by updraft fraction
+                    end
+                    term_vel_ice[k] = calculate_sedimentation_velocity(
+                        microphys_params,
+                        q_effective_nan_N_safe(aux_up[i].q_ice[k], N_i[k], ρ_i, param_set.user_params.particle_min_radius), # if N is NaN this just returns q, which should be fine? the Chen2022Type makes some assumption about what N is... which is probably trustworthy? assume no NaNs in the vector...
+                        ρ_c[k], # air density
+                        ice_type,
+                        N_i[k]; # broadcasting is using _first and not going through properly for some reason...
+                        velo_scheme = edmf.cloud_sedimentation_model.ice_terminal_velocity_scheme,
+                        Dmax = edmf.cloud_sedimentation_model.ice_Dmax,
+                    ) .* edmf.cloud_sedimentation_model.ice_sedimentation_scaling_factor
+                end
+            end
+            
+            # Save N_i in grid mean being sensitive to what could be NaNs in one but not the other
+            @inbounds for k in real_center_indices(grid)
+                if aux_bulk.area[k] > FT(0)
+                    if aux_en.area[k] > FT(0)
+                        aux_gm.N_i[k] = (aux_bulk.N_i[k] * aux_bulk.area[k]) + (aux_en.N_i[k] * aux_en.area[k])
+                    else
+                        aux_gm.N_i[k] = aux_bulk.N_i[k]
+                    end
+                else
+                    aux_gm.N_i[k] = aux_en.N_i[k]
+                end
+            end
+        end
+        # should we save N grid mean? Could be a useful thing to look at ...
     end
 
     ### Diagnostic thermodynamiccovariances
@@ -640,10 +830,19 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         state,
         edmf,
         edmf.precip_model,
+        edmf.cloud_sedimentation_model,
         edmf.rain_formation_model,
+        edmf.snow_formation_model,
         Δt,
         param_set,
+        use_fallback_tendency_limiters,
     )
+
+
+    # limit env tendencies (up tendencies done after compute_up_tendencies!())
+    # if !isa(edmf.tendency_limiters.up_en_tendency_limiter, NoTendencyLimiter)
+        # limit_env_tendencies!(grid, state, edmf, Δt, param_set)
+    # end
 
 
     return nothing

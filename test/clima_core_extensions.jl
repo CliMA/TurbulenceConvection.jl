@@ -28,7 +28,7 @@ face_state = TC.FieldFromNamedTuple(face_space(grid), prognostic_vars(FT, n_updr
 state = CC.Fields.FieldVector(cent = cent_state, face = face_state)
 
 using Test
-for k in TC.real_center_indices(grid)
+@inbounds for k in TC.real_center_indices(grid)
     for i in 1:n_updrafts
         x = state.cent.turbconv.up[i].Area[k]
         state.cent.turbconv.up[i].Area[k] = 2
@@ -125,7 +125,7 @@ end
     ∫yc_simple .= 0
     ∫yf_simple .= 0
 
-    for k in TC.real_center_indices(grid)
+    @inbounds for k in TC.real_center_indices(grid)
         ∫yc_simple[k] += yc[k] * grid.Δz
         if k.i > 1
             ∫yc_simple[k] += ∫yc_simple[k - 1]

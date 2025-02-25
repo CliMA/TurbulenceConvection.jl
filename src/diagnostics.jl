@@ -135,6 +135,11 @@ function io_dictionary_aux()
         "ql_mean_cond_evap" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_cond_evap .+ center_aux_environment(state).ql_tendency_cond_evap),
         "qi_mean_sub_dep" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_sub_dep .+ center_aux_environment(state).qi_tendency_sub_dep),
 
+        # N [if we end up deciding to save N here... -- rn in variables/dycore_variables these are optional depending on what sedimentation model we're using but if theyre in the diagnostics bere they should be a permanent part of the model and not optionally defined...]
+        "env_N_i" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).N_i),
+        "up_N_i" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).N_i),
+        "N_i_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).N_i),
+
         # sedimentation
         "qi_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_sedimentation .+ center_aux_environment(state).qi_tendency_sedimentation), # I believe these already area weightd so just sum
         "ql_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_sedimentation .+ center_aux_environment(state).ql_tendency_sedimentation),
@@ -163,17 +168,24 @@ function io_dictionary_aux()
             center_aux_bulk(state).qi_tendency_accr_ice_rai .+ center_aux_environment(state).qi_tendency_accr_ice_rai .+
             center_aux_bulk(state).qi_tendency_accr_ice_sno .+ center_aux_environment(state).qi_tendency_accr_ice_sno),
 
-        # het nucleation
+        # liq -> ice direct conversion
+        "qi_mean_hom_frz" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_hom_frz .+ center_aux_environment(state).qi_tendency_hom_frz),
+        "qi_mean_het_frz" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_het_frz .+ center_aux_environment(state).qi_tendency_het_frz),
         "qi_mean_het_nuc" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_het_nuc .+ center_aux_environment(state).qi_tendency_het_nuc),
+        "qi_mean_mlt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_mlt .+ center_aux_environment(state).qi_tendency_mlt),
 
         # advection and sgs
-        "ql_mean_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_ql), # same as massflux_tendency_ql
+        "ql_mean_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).ql_tendency_vert_adv), # same as massflux_tendency_ql
         "ql_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).ql_tendency_ls_vert_adv),
         "ql_mean_sgs_tend" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).sgs_tendency_q_liq), # as defined, this includes the massflux...
 
-        "qi_mean_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).massflux_tendency_qi), # same as massflux_tendency_qi (seems to only show updraft... is this related to our problem of not tracking wq in both env and up?)
+        "qi_mean_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qi_tendency_vert_adv), # same as massflux_tendency_qi (seems to only show updraft... is this related to our problem of not tracking wq in both env and up?)
         "qi_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qi_tendency_ls_vert_adv), # looks good 
         "qi_mean_sgs_tend" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).sgs_tendency_q_ice), # as defined, this includes the massflux... (seems to only show updraft... is this related to our problem of not tracking wq in both env and up?)
+
+        "qt_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qt_tendency_ls_vert_adv),
+
+        "subsidence" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).subsidence),
 
         # all microphys
         "qi_microphys" => (; dims = ("zc", "t"), group = "profiles", field = state -> 
@@ -183,7 +195,11 @@ function io_dictionary_aux()
             center_aux_bulk(state).qi_tendency_accr_ice_liq .+ center_aux_environment(state).qi_tendency_accr_ice_liq .+
             center_aux_bulk(state).qi_tendency_accr_ice_rai .+ center_aux_environment(state).qi_tendency_accr_ice_rai .+
             center_aux_bulk(state).qi_tendency_accr_ice_sno .+ center_aux_environment(state).qi_tendency_accr_ice_sno .+
-            center_aux_bulk(state).qi_tendency_het_nuc .+ center_aux_environment(state).qi_tendency_het_nuc),
+            center_aux_bulk(state).qi_tendency_hom_frz .+ center_aux_environment(state).qi_tendency_hom_frz .+
+            center_aux_bulk(state).qi_tendency_het_frz .+ center_aux_environment(state).qi_tendency_het_frz .+
+            center_aux_bulk(state).qi_tendency_het_nuc .+ center_aux_environment(state).qi_tendency_het_nuc .+
+            center_aux_bulk(state).qi_tendency_mlt .+ center_aux_environment(state).qi_tendency_mlt
+            ),
 
         # # autoconversion + accretion (we don't have these disambiguated rn and it's hard w/ limiters, so just compare combined values w/ LES for now...)
         # "ql_mean_autoconv_accr" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_mean_autoconv_accr .+ center_aux_environment(state).ql_mean_autoconv_accr),
@@ -191,6 +207,8 @@ function io_dictionary_aux()
 
         # all ice precip (do this or just add grapuel to snow in LES output?)
         "qip_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno),
+
+        #
         # possible future additions
         # - N and assumed N
         # τ just straight up
@@ -201,21 +219,21 @@ end
 function io_dictionary_aux_calibrate()
     DT = NamedTuple{(:dims, :group, :field), Tuple{Tuple{String, String}, String, Any}}
     io_dict = Dict{String, DT}(
-        "u_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> physical_grid_mean_u(state)),
-        "v_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> physical_grid_mean_v(state)),
-        "s_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).s),
+        # "u_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> physical_grid_mean_u(state)),
+        # "v_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> physical_grid_mean_v(state)),
+        # "s_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).s),
         "qt_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_tot),
         "ql_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_liq),
-        "total_flux_h" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_h .+ face_aux_turbconv(state).massflux_h),
-        "total_flux_qt" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qt .+ face_aux_turbconv(state).massflux_qt),
-        "total_flux_s" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_grid_mean(state).massflux_s .+ face_aux_grid_mean(state).diffusive_flux_s),
+        # "total_flux_h" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_h .+ face_aux_turbconv(state).massflux_h),
+        # "total_flux_qt" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qt .+ face_aux_turbconv(state).massflux_qt),
+        # "total_flux_s" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_grid_mean(state).massflux_s .+ face_aux_grid_mean(state).diffusive_flux_s),
         "thetal_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).θ_liq_ice),
-        "tke_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).tke),
+        # "tke_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).tke),
         "qr_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_rai),
         "qi_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_ice),
         "qs_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno),
-        "cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).cloud_fraction), # was this "cloud_fraction_mean"?
-        "RH_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).RH),
+        # "cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).cloud_fraction), # was this "cloud_fraction_mean"?
+        # "RH_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).RH),
         "temperature_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).T),
         "updraft_area" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).area),
         #
@@ -223,6 +241,8 @@ function io_dictionary_aux_calibrate()
         "qi_all_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).q_ice .+ center_prog_precipitation(state).q_sno),
         #
         "qip_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno),
+        #
+        # I believe lwp_mean and iwp_mean get added automatically in affect_io!() regardless of whether you're in calibrate mode or not. If you do snow, you can also add ipwp_mean there for all ice precip.
 
     )
     return io_dict

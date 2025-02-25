@@ -1,5 +1,4 @@
 
-
 # maybe add an oversider dispatch fcn here?
 
 function NR_monodisperse(N::FT, q::FT; r_0::FT = 0.2 * 1e-6, ρ_w = 1000) where {FT}
@@ -19,6 +18,8 @@ function NR_fixed_radius(r::FT, q::FT; ρ_w = 1000) where {FT}
     N = q / ((4 / 3) * π * r^3 * ρ_w)
     return (; N, r)
 end
+
+
 
 
 function NR_inhomogeneous_mixing_liquid(
@@ -223,13 +224,10 @@ function cloud_base(aux, grid, ts, mode)
     either runs in each updraft or in the environment so doesn't need to worry about that structure
     """
 
-    # @show(real_center_indices(grid))
-    # @show(collect(real_center_indices(grid)))
-    # @show(collect(real_center_indices(grid))[end])
 
     k_end = collect(real_center_indices(grid))[end]
 
-    if mode == :env
+    if mode === :env
         cloud_base = zc_toa(grid).z
         cloud_base_ts = ts[k_end] # i think it goes bottom to top but need to check...
         @inbounds for k in real_center_indices(grid)
@@ -249,7 +247,7 @@ function cloud_base(aux, grid, ts, mode)
         # while the updraft classes are assumed to have no overlap at all.
         # Thus total updraft cover is the sum of each updraft's cover
 
-    elseif mode == :up
+    elseif mode === :up
         cloud_base = zc_toa(grid).z
         cloud_base_ts = ts[k_end]
         @inbounds for k in real_center_indices(grid)
@@ -275,12 +273,12 @@ end
 
 """
 function get_N_threshold(
-    param_set::APS,
+    param_set::APS, # consider changing to just microphys_params since we're not using user_params anymore
     type::CMT.IceType,
     q::TD.PhasePartition,
     T::FT,
     p::FT,
-    supersat_type::Symbol;
+    # relaxation_timescale_type::Union{Symbol, AbstractNonEquillibriumSourcesType};
     N0::FT = NaN,
 ) where {FT}
     if isnothing(N0)
@@ -291,7 +289,7 @@ function get_N_threshold(
         N0 = q_threshold / q_is_here # the implied number concentration at threshold for the largest possible droplets... so N and threshold are linked... ( i guess that makes sense? idk...)
     end
 
-    # N = get_N_i(param_set, microphys_params, supersat_type, q, T, p, w) # I think this is bad... bc high N w/ high r should lead to more autoconversion..., but this raises the threshold in an uncontrolled way...
+    # N = get_N_i(param_set, microphys_params, relaxation_timescale_type, q, T, p, w) # I think this is bad... bc high N w/ high r should lead to more autoconversion..., but this raises the threshold in an uncontrolled way...
     # return  isnothing(N) ? N0 : max(N, N0)
 
     return N0
@@ -299,13 +297,13 @@ function get_N_threshold(
 end
 
 function get_q_threshold(
-    param_set::APS,
+    param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
     ::CMT.LiquidType,
     q::TD.PhasePartition,
     T::FT,
     p::FT,
-    supersat_type::Symbol;
-    N0::FT = NaN,
+    # relaxation_timescale_type::Union{Symbol, AbstractNonEquillibriumSourcesType};
+    N0::FT = FT(NaN),
 ) where {FT}
     return CMP.q_liq_threshold(TCP.microphysics_params(param_set))::FT
 end
@@ -314,13 +312,13 @@ end
 Get the implied q threshold based on r_is, and q 
 """
 function get_q_threshold(
-    param_set::APS,
+    param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
     type::CMT.IceType,
     q::TD.PhasePartition,
     T::FT,
     p::FT,
-    supersat_type::Symbol;
-    N0::FT = NaN,
+    # relaxation_timescale_type::Union{Symbol, AbstractNonEquillibriumSourcesType};
+    N0::FT = FT(NaN),
 ) where {FT}
 
     microphys_params::ACMP = TCP.microphysics_params(param_set)
@@ -328,28 +326,115 @@ function get_q_threshold(
     if isnan(N0)
         return CMP.q_ice_threshold(microphys_params)::FT
     else
-        N_thresh::FT = get_N_threshold(param_set, type, q, T, p, supersat_type; N0 = N0) # if N0 was nothing, get_N_threshold() makes N_thresh * q_is = q_threshold (we could add an if block check for that to save fcn calls...)
+        N_thresh::FT = get_N_threshold(param_set, type, q, T, p; N0 = N0) # if N0 was nothing, get_N_threshold() makes N_thresh * q_is = q_threshold (we could add an if block check for that to save fcn calls...)
         q_is_here::FT = q_is(microphys_params, type)
         return N_thresh * q_is_here
     end
 end
 
 # copy of CM1.conv_q_liq_to_q_rai that uses our local get_q_threshold
-function my_conv_q_liq_to_q_rai(param_set::APS, q::TD.PhasePartition, T::FT, p::FT, supersat_type::Symbol) where {FT}
+function my_conv_q_liq_to_q_rai(
+    param_set::APS,   # consider changing to just microphys_params since we're not using user_params anymore
+    q::TD.PhasePartition,
+    T::FT, 
+    p::FT
+    # relaxation_timescale_type::Union{Symbol, AbstractNonEquillibriumSourcesType};
+) where {FT}
     microphys_params::ACMP = TCP.microphysics_params(param_set)
-    return max(0, q.liq - get_q_threshold(param_set, CMT.LiquidType(), q, T, p, supersat_type)) /
-           CMP.τ_acnv_sno(microphys_params)
+    return max(0, q.liq - get_q_threshold(param_set, CMT.LiquidType(), q, T, p)) /
+           CMP.τ_acnv_rai(microphys_params)
 end
 
 # copy of CM1.conv_q_ice_to_q_sno_no_supersat that uses our local get_q_threshold
 function my_conv_q_ice_to_q_sno_no_supersat(
-    param_set::APS,
+    param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
     q::TD.PhasePartition,
     T::FT,
     p::FT,
-    supersat_type::Symbol,
+    # relaxation_timescale_type::Union{Symbol, AbstractNonEquillibriumSourcesType};
 ) where {FT}
     microphys_params::ACMP = TCP.microphysics_params(param_set)
-    return max(0, q.ice - get_q_threshold(param_set, CMT.IceType(), q, T, p, supersat_type)) /
+    return max(0, q.ice - get_q_threshold(param_set, CMT.IceType(), q, T, p)) /
            CMP.τ_acnv_sno(microphys_params)
 end
+
+
+
+function adjust_ice_N(
+    param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
+    microphys_params::ACMP,
+    N_i::FT, 
+    q::TD.PhasePartition, 
+    T::FT, 
+    p::FT; 
+    r_min::FT2=FT2(0)
+    ) where {FT, FT2}
+    r_is = CMP.r_ice_snow(microphys_params)
+    ρ_i = CMP.ρ_cloud_ice(microphys_params)
+
+    q_is = FT(ρ_i * 4 / 3 * π * (r_is^3 - r_min^3)) # r_is radius ice sphere --
+    N_i = max(N_i, q.ice / q_is) # make sure existing ice contributes to the size, particularly w/ sedimentation bringing in new ice
+
+    #= limit N based on q autoconversion threshold =#
+    # -- unclear if to do this part
+    # We are optin NOT do this rn bc we'll assume if we haven't autoconverted yet, then it really is still in the cloud category, and should affect the timescale, otherwise it's nowhere. powerlaw_T_scaling_ice seemed to work just fine like that... can revisit
+
+    # The argument to do it is bc otherwise, N can grow arbitrarily large... and r can't respnod as fast... lack of autoconversion is more due to r than N surely? but the N could have come from above... so no way around that, and autoconv should eventually take care of it...
+
+
+    # N_thresh = get_N_threshold(param_set, CMT.IceType(), q, T, p, relaxation_timescale_type; N0=nothing) # testing a threshold on how large N_i can be -- basically saying that we can't have more droplets than q_thresh / q(r_is) bc then they should be snow... w/o this limit we just assume autoconv will catch up and take care of it 
+    # N_i = min(N_i, N_thresh) # make sure we don't get too many ice crystals
+
+    #= scale N_i by any scaling factor after limiting =#
+    #= I don't think this is necessary bc either we're scaling N_i directly which we could just use a constant for or we're scaling the threshold value which is also calibrated =#
+    # N_i *= TCP.get_isbits_nt(param_set.user_params, :adjusted_ice_N_scaling_factor, FT(1.0)) # scale N_i by any scaling factor after limiting
+
+    return N_i
+end
+
+
+# r_from_qN(q::FT, N::FT, ρ::FT; r_min::FT=0) = FT(max((q / ((4/3) * π * N * ρ))^(1/3), r_min))
+function r_from_qN(q::FT, N::FT, ρ::FT; r_min::FT2 = 0) where {FT, FT2}
+    if iszero(N) || isinf(N)
+        return FT(r_min) # N/N will give NaN...
+        # even if N = 0 and q is not 0 (in which case N shouldn't be 0), we need some fix...
+        # if N = Inf, also bad but don't let r go below r_min, 1/Nr = 1/Inf will yield timescale = 0
+        # If N = 0, we'll just return r_min, then 1/Nr = 1/0 will yield timescale = Inf
+    end
+
+    return FT((q + 4 / 3 * π * FT(r_min)^3 * ρ * N) / (4 / 3 * π * N * ρ))^(1 / 3)
+end
+
+
+
+"""
+We have no way of passing in a minimum aerosol size into λ, N0 etc in terminal_velocity...
+Instead, we calculate what q would be if there was a r_min radius sphere in the center of every drop.
+q0 = liquid in one droplet
+
+but then q and N won't match no? you'll have one giant drop... which will have a very high terminal velocity... so adusting N really is the right call...
+
+You would then pass this q into sedimentation to get a more realistic speed for extreme N
+"""
+function q_effective(
+    q::FT,
+    N::FT,
+    ρ::FT,
+    r_min::FT # 
+) where {FT}
+    """
+    effective q for a given N, r, ρ that basically shoves the r_min sphere into the center of every drop
+    """
+    return q + 4 / 3 * π * ρ * N * (r_min^3) 
+end
+
+q_effective(param_set::APS, q::FT, N::FT, ρ::FT) where {FT} = q_effective(q, N, ρ, FT(param_set.user_params.particle_min_radius))
+
+
+#= 
+q if there were no r_min sized aerosols in the middle of every drop, but we rinstead replaced that volume with liquid...
+Useful for things that only care about droplet size but estimate it from a q and N only (like my sedimentation terminal velocity implementation)
+I suppose you could try to figure how how they're doing that q <--> N mapping, but when we supply our own N, things can get wonky for very large/small N so hopefully this helps.
+=#
+q_effective_nan_N_safe(q::FT, N::FT, ρ::FT, r_min::FT) where{FT} = isnan(N) ? q : q_effective(q, N, ρ, r_min)
+q_effective_nan_N_safe(param_set::APS, q::FT, N::FT, ρ::FT) where{FT} = isnan(N) ? q :  q_effective(q, N, ρ, FT(param_set.user_params.particle_min_radius))

@@ -21,9 +21,7 @@
 #     )
 # end
 
-if !isdefined(Main, :FT)
-    const FT = Float64
-end
+const FT = Float64
 
 using Pkg
 using Statistics: mean
@@ -54,35 +52,35 @@ if reload_TC || !isdefined(Main, :TurbulenceConvection) || !isdefined(Main, :par
 end
 
 call_from_TC = false
-reload_MM2015 = false
+if call_from_TC
+    morrison_milbrandt_2015_style = TC.morrison_milbrandt_2015_style
+    morrison_milbrandt_2015_style_exponential_part_only = TC.morrison_milbrandt_2015_style_exponential_part_only
+else
+    # Things to load if we're calling directly form the script rather than TC methods
+    const AbstractSaturationRegime = TC.AbstractSaturationRegime
+    const CMP = TC.CMP
+    const Subsaturated = TC.Subsaturated
+    const Supersaturated = TC.Supersaturated
+    const WBF = TC.WBF
+    const LowerSatLine = TC.LowerSatLine
+    const LambertW = TC.LambertW
+    const CMT = TC.CMT
+    include(joinpath(tc_dir, "src", "closures", "morrison_milbrandt_2015_style.jl"))
+    include(joinpath(tc_dir, "src", "closures", "morrison_milbrandt_2015_style_exponential_part_only.jl"))
 
-if reload_MM2015 || !isdefined(Main, :morrison_milbrandt_2015_style) || !isdefined(Main, :morrison_milbrandt_2015_style_exponential_part_only)
-    if call_from_TC
-        morrison_milbrandt_2015_style = TC.morrison_milbrandt_2015_style
-        morrison_milbrandt_2015_style_exponential_part_only = TC.morrison_milbrandt_2015_style_exponential_part_only
-    else
-        # Things to load if we're calling directly form the script rather than TC methods
-        const AbstractSaturationRegime = TC.AbstractSaturationRegime
-        const Subsaturated = TC.Subsaturated
-        const Supersaturated = TC.Supersaturated
-        const WBF = TC.WBF
-        const LowerSatLine = TC.LowerSatLine
-        const LambertW = TC.LambertW
-        const CMT = TC.CMT
-        const CMP = TC.CMP
-        include(joinpath(tc_dir, "src", "closures", "morrison_milbrandt_2015_style_exponential_part_only.jl"))
-        include(joinpath(tc_dir, "src", "closures", "morrison_milbrandt_2015_style.jl"))
-
-        const Thermodynamics = TD
-        Thermodynamics.PhasePartition{Float64}(x::Float64, y::Float64, z::Float64) = TD.PhasePartition(x,y,z)
-    end
+    const NoMoistureSourcesLimiter = TC.NoMoistureSourcesLimiter
+    const BasicMoistureSourcesLimiter = TC.BasicMoistureSourcesLimiter
+    const StandardSupersaturationMoistureSourcesLimiter = TC.StandardSupersaturationMoistureSourcesLimiter
+    const MorrisonMilbrandt2015MoistureSourcesLimiter = TC.MorrisonMilbrandt2015MoistureSourcesLimiter
+    const MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter = TC.MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter
+    include(joinpath(tc_dir, "src", "microphysics_coupling_limiters.jl"))
 end
 
 
 
 
 T = FT(260)
-# T = FT(275)
+# T = FT(272)
 ρ = FT(0.5)
 
 
@@ -97,18 +95,13 @@ q_vap_0 =
     (
         TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid()) -
         TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
-    ) .* 0.0005
+    ) .* 0.5
 
 q_vap_0 *= 1
 
 
-q_liq = FT(1e-8) * 1 * 1
-q_ice = FT(1e-8) * 1 * 1
-
-# q_ice = 1.748459986808224e-110
-# q_ice = 1e-15
-# q_liq = 7.868468755570234e-150
-
+q_liq = FT(1e-8) * 1 * 25000
+q_ice = FT(1e-8) * 1 * 10 * 100
 # q_vap_0 = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
 # q_liq = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
 # q_ice = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
@@ -116,26 +109,20 @@ q = TD.PhasePartition(q_vap_0 + q_liq + q_ice, q_liq, q_ice)
 
 use_fix = false
 # w = FT(+1000000.5)
-w = FT(+.5)
+w = FT(+0.0)
 
-# τ_liq = FT(1e-2)
-# τ_ice = FT(.935e-4)
+τ_liq = FT(1e-2)
+τ_ice = FT(.935e-4)
 # τ_ice = FT(.95e-4)
 
 # τ_ice = FT(1e-2)
 # τ_liq = FT(.935e-4)
 
-# τ_ice = FT(100.0)
-# τ_liq = FT(1.0)
+τ_ice = FT(100.0)
+τ_liq = FT(1.0)
 
-# τ_ice = FT(1e200)
-# τ_liq = FT(1.0e-50)
-
-τ_ice = FT(1e4)
-τ_liq = FT(1e-3)
-
-# τ_ice = FT(1)
-# τ_liq = FT(1e3)
+τ_ice = FT(1.0)
+τ_liq = FT(10.0)
 
 
 # q_vap_0 = 0.004211891174058872
@@ -210,10 +197,8 @@ function symlogformatter(x, n; ndigits=20)
     end
 end
 
-Δts = 10 .^ range(-7, stop = 5, length = 1000)
-# Δts = 10 .^ range(-7, stop = 0, length = 100); @warn("temp test")
-# Δts = 10 .^ range(-20, stop = -10, length = 100); @warn("temp test")
-
+# Δts = 10 .^ range(-7, stop = 5, length = 100)
+Δts = 10 .^ range(-4, stop = 2, length = 100); @warn("temp test")
 # Δts = 10 .^ range(log10(5), stop = log10(10), length = 100); @warn("temp test")
 
 # Δts = 10 .^ range(-18, stop = -10, length = 1000)
@@ -222,6 +207,8 @@ qls = zeros(length(Δts))
 qis = zeros(length(Δts))
 qls_exp = zeros(length(Δts))
 qis_exp = zeros(length(Δts))
+qls_standard = zeros(length(Δts))
+qis_standard = zeros(length(Δts))
 δ_ΔTs = zeros(length(Δts))
 using Plots
 ENV["GKSwstype"]="nul"
@@ -242,8 +229,10 @@ using ProgressMeter
         # (q_vap_0 .* FT(NaN), q_vap_0 * FT(NaN))
         morrison_milbrandt_2015_style_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap_0, q, q_eq, Δt, ts; use_fix = use_fix)
 
-    # qls[i] = qls_exp[i]
-    # qis[i] = qis_exp[i]
+    qls_standard[i], qis_standard[i] = 
+        # (q_vap_0 .* FT(NaN), q_vap_0 * FT(NaN))
+        calculate_timestep_limited_sources(TC.StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, q, q_eq, Δt, ts)
+
 end
 # plot the results, x scale log
 linthresh = FT(-5)
@@ -269,33 +258,16 @@ if yscale === :symlog
     )
     plot!(Δts, symlog(qis .* Δts, linthresh), label = "S_qi", color = :blue, yformatter = yformatter, linewidth = 2)
     plot!(Δts, symlog((qls .+ qis) .* Δts, linthresh), label = "sum", color = :red, yformatter = yformatter, linewidth = 1)
-    plot!(
-        Δts,
-        symlog(qls_exp .* Δts, linthresh),
-        label = "S_ql_exp",
-        color = :green,
-        linestyle = :dash,
-        yformatter = yformatter,
-        linewidth = 2,
-    )
-    plot!(
-        Δts,
-        symlog(qis_exp .* Δts, linthresh),
-        label = "S_qi_exp",
-        color = :blue,
-        linestyle = :dash,
-        yformatter = yformatter,
-        linewidth = 2,
-    )
-    plot!(
-        Δts,
-        symlog((qls_exp .+ qis_exp) .* Δts, linthresh),
-        label = "sum_exp",
-        color = :red,
-        linestyle = :dash,
-        yformatter = yformatter,
-        linewidth = 1,
-    )
+    #
+    plot!(Δts, symlog(qls_exp .* Δts, linthresh), label = "S_ql_exp", color = :green, linestyle = :dash, yformatter = yformatter, linewidth = 2)
+    plot!(Δts, symlog(qis_exp .* Δts, linthresh), label = "S_qi_exp", color = :blue, linestyle = :dash, yformatter = yformatter, linewidth = 2)
+    plot!(Δts, symlog((qls_exp .+ qis_exp) .* Δts, linthresh), label = "sum_exp", color = :red, linestyle = :dash, yformatter = yformatter, linewidth = 1)
+    #
+    plot!(Δts, symlog(qls_standard .* Δts, linthresh), label = "S_ql_standard", color = :green, linestyle = :dot, yformatter = yformatter, linewidth = 2)
+    plot!(Δts, symlog(qis_standard .* Δts, linthresh), label = "S_qi_standard", color = :blue, linestyle = :dot, yformatter = yformatter, linewidth = 2)
+    plot!(Δts, symlog((qls_standard .+ qis_standard) .* Δts, linthresh), label = "sum_standard", color = :red, linestyle = :dot, yformatter = yformatter, linewidth = 1)
+
+
     hline!([0], color = :black, linestyle = :dash, yformatter = yformatter, label = "")
     hline!(
         symlog([(q_vap_0 - q_eq.liq)], linthresh),
@@ -366,6 +338,10 @@ elseif yscale === :linear
     plot!(Δts, qis_exp .* Δts, label = "qi_exp", color = :blue, linestyle = :dash)
     plot!(Δts, (qls_exp .+ qis_exp) .* Δts, label = "sum_exp", color = :red, linestyle = :dash)
     #
+    plot!(Δts, qls_standard .* Δts, label = "ql_standard", color = :green, linestyle = :dot)
+    plot!(Δts, qis_standard .* Δts, label = "qi_standard", color = :blue, linestyle = :dot)
+    plot!(Δts, (qls_standard .+ qis_standard) .* Δts, label = "sum_standard", color = :red, linestyle = :dot)
+    #
     hline!([0], color = :black, linestyle = :dash, label = "")
     hline!([q_vap_0 - q_eq.liq], color = :gray, linestyle = :dashdot, yformatter = yformatter, label = "δ_l")
     plot!(Δts, (q_vap_0 .- q_eq.ice) ./ τ_ice .* Δts, label = "S_i base", color = :pink, linestyle = :solid)
@@ -373,10 +349,10 @@ elseif yscale === :linear
 
 end
 
-ymin_l = yscale === :symlog ? minimum(symlog(((qls .* Δts)..., (qls_exp .* Δts)...), linthresh)) : minimum(((qls .* Δts)..., (qls_exp .* Δts)...))
-ymin_i = yscale === :symlog ? minimum(symlog(((qis .* Δts)..., (qis_exp .* Δts)...), linthresh)) : minimum(((qis .* Δts)..., (qis_exp .* Δts)...))
-ymax_l = yscale === :symlog ? maximum(symlog(((qls .* Δts)..., (qls_exp .* Δts)...), linthresh)) : maximum(((qls .* Δts)..., (qls_exp .* Δts)...))
-ymax_i = yscale === :symlog ? maximum(symlog(((qis .* Δts)..., (qis_exp .* Δts)...), linthresh)) : maximum(((qis .* Δts)..., (qis_exp .* Δts)...))
+ymin_l = yscale === :symlog ? minimum(symlog(((qls .* Δts)..., (qls_exp .* Δts)..., (qls_standard .* Δts)...), linthresh)) : minimum(((qls .* Δts)..., (qls_exp .* Δts)..., (qls_standard .* Δts)...))
+ymin_i = yscale === :symlog ? minimum(symlog(((qis .* Δts)..., (qis_exp .* Δts)..., (qis_standard .* Δts)...), linthresh)) : minimum(((qis .* Δts)..., (qis_exp .* Δts)..., (qis_standard .* Δts)...))
+ymax_l = yscale === :symlog ? maximum(symlog(((qls .* Δts)..., (qls_exp .* Δts)..., (qls_standard .* Δts)...), linthresh)) : maximum(((qls .* Δts)..., (qls_exp .* Δts)..., (qls_standard .* Δts)...))
+ymax_i = yscale === :symlog ? maximum(symlog(((qis .* Δts)..., (qis_exp .* Δts)..., (qis_standard .* Δts)...), linthresh)) : maximum(((qis .* Δts)..., (qis_exp .* Δts)..., (qis_standard .* Δts)...))
 ymin = min(ymin_l, ymin_i)
 ymax = max(ymax_l, ymax_i)
 
@@ -403,4 +379,4 @@ vline!([Δts[end]], color = :purple, linestyle = :dash, label = "")
 # hline!([-q_ice], color=:blue, linestyle=:dashdot, label="-q_ice(t=0)")
 
 # save
-savefig(joinpath(thisdir, "test_morrison_milbrandt_2015_style.png"))
+savefig(joinpath(thisdir, "test_moisture_sources_limiters.png"))

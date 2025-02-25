@@ -38,8 +38,8 @@ parsed_args["broken_tests"] && exit()
 @testset "Simulation completion" begin
     # Test that the simulation has actually finished,
     # and not aborted early.
-    @test !(return_code == :simulation_aborted)
-    @test return_code == :success
+    @test !(return_code === :simulation_aborted)
+    @test return_code === :success
 end
 
 # Post-processing case kwargs

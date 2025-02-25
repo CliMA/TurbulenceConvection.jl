@@ -65,13 +65,14 @@ function construct_mesh(namelist; FT = Float64)
         end
         nz = isnothing(nz) ? Int(zmax ÷ Δz) : Int(nz)
         Δz = isnothing(Δz) ? FT(zmax ÷ nz) : FT(Δz)
+
     elseif typeof(Cases.get_case(namelist)) <: Cases.SOCRATES # Maybe we dont wanna keep doing this so move the data part to SOCRATES data and just pass in the arg to all the surface_ref_state construcors instead...
         flight_number = namelist["meta"]["flight_number"]
         forcing_type = namelist["meta"]["forcing_type"]
         new_zc = vec(Cases.SSCF.get_default_new_z(flight_number))[:] # redundant constructor here, can we evade this somehow somewhere by passing in the object? this gets called before Cases stuff tho in main.
 
         # convert zc to zf (this is not guaranteed to always work but it does for the grids they gave us)
-        new_z = FT[FT(0)] # zf
+        new_z = FT[0] # zf
         for zc in new_zc
             append!(new_z, 2 * zc - new_z[end]) # new_z[end] + 2*(zc - zf_data[end]) = 2*zc - new_z[end] # This happens to work for the grids they gave us and not yield any negative numbers...
         end
@@ -80,8 +81,9 @@ function construct_mesh(namelist; FT = Float64)
         # # probably better to change this to have some min dz since this reduction could be really overkill on a stretched/squeezed grid
         # new_z = new_z[begin:namelist["grid"]["z_reduction_factor"]:end] #  a way to reduce the resolution of the LES z so we can for example avoid CFL errors when running with a larger timestep
 
-        old_z = new_z
-        new_z = FT[]
+        old_z = new_z # zf from old zc
+        # new_z = FT[]
+        new_z = FT[0] # we can have a face at 0 right? then zc will be too close to ground but i think that's fine? for CFL it's on faces... but maybe it messes w/ BCs? But the meshes for non-Socrates use z₀ = 0 so it should be fine... I think the problem was CFL on ice sed since that's not on faces... but that's just going into the ground? i dont see/recall why it would be a problem... (actually it shouldn't be because we go C2F w/ wsed anyway...)
         current_z = FT(0) # first level can't be too close to sfc or else CFL still fails for faces
         dz_min = namelist["grid"]["dz_min"]
 
@@ -101,6 +103,8 @@ function construct_mesh(namelist; FT = Float64)
                 end
             end
             @info("new_z for $flight_number, $forcing_type: ", new_z)
+        else
+            new_z = old_z # we could interpolate to higher res but we won't for now...
         end
 
         z_mesh = CC.Geometry.ZPoint{FT}.(new_z) # added 0 to beginning? copy from the file #Array(TC.get_nc_data(data, "zc")) also idk what to do about paths like this

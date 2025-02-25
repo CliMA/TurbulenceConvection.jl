@@ -36,9 +36,9 @@ const Chen2022Vel = CMT.Chen2022Type() # for terminal velocity
 
 
 function get_termvel_type(termvel_type::Symbol)
-    if termvel_type == :Blk1MVel
+    if termvel_type === :Blk1MVel
         return Blk1MVel
-    elseif termvel_type == :Chen2022Vel
+    elseif termvel_type === :Chen2022Vel
         return Chen2022Vel
     else
         error("Unknown termvel_type: $termvel_type")
@@ -52,20 +52,10 @@ const ACMP = CMP.AbstractCloudMicrophysicsParameters #
 # const TDP = TD.parameters
 const TDPS = TD.Parameters.ThermodynamicsParameters
 
-
-"""
-Because we pack our parameters in a named tuple and put symbols in Vals so they're isbits, we use a convenience get fcn.
-Put in here so can use here and in driver
-"""
-function get_isbits_nt(named_tuple::NamedTuple, symbol::Symbol, default = nothing)
-
-    val = get(named_tuple, symbol, default)
-
-    if isa(val, Val) # extract from it's Val wrapped prison
-        val = typeof(val).parameters[1] # this is a hack to get the case name from the Val object
-    end
-    return val
-end
+function safe_clamp(x, lo, hi)
+    # current clamp doesn't safely work when min < max.  Because of its order of operations it returns x if lo < x < hi, then if x > hi, returns hi (bad if hi is lo), and if x < lo, returns lo (bad if lo is hi)
+    return (lo < hi) ? clamp(x, lo, hi) : clamp(x, hi, lo)
+end # safe_clamp
 
 include("Parameters.jl")
 import .Parameters as TCP
@@ -78,11 +68,11 @@ function parse_namelist(namelist, keys...; default = nothing, valid_options = no
     for k in keys
         if haskey(param, k)
             param = param[k]
-            if valid_options ≠ nothing && !(param isa Dict)
+            if !isnothing(valid_options) && !(param isa Dict)
                 @assert param in valid_options
             end
         else
-            if default == nothing
+            if isnothing(default)
                 error("No default value given for parameter (`$(join(keys, ", "))`).")
             else
                 @info "Using default value, $default, for parameter (`$(join(keys, ", "))`)."
@@ -189,6 +179,7 @@ include("closures/N_r_closures.jl") # testing different N/r distribution closure
 include("closures/neural_microphysics_relaxation_timescales.jl") # testing different microphysics relaxation timescales
 include("closures/korolev_mazin_2007.jl")
 include("closures/morrison_milbrandt_2015_style.jl")
+include("closures/morrison_milbrandt_2015_style_exponential_part_only.jl")
 include("closures/sedimentation.jl")
 include("closures/terminal_velocity.jl")
 

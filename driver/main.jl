@@ -119,7 +119,7 @@ function Simulation1d(namelist)
     elseif precip_name == "cutoff"
         TC.Clima0M()
     elseif precip_name == "clima_1m"
-        TC.Clima1M()
+        TC.Clima1M(param_set)
     else
         error("Invalid precip_name $(precip_name)")
     end
@@ -146,7 +146,7 @@ function Simulation1d(namelist)
         rain_formation_model = TC.NoRainFormation()
     end
 
-    edmf = TC.EDMFModel(FTD, namelist, precip_model, rain_formation_model)
+    edmf = TC.EDMFModel(FTD, namelist, precip_model, rain_formation_model, param_set)
     # RF contains a very large number of parameters,
     # using SVectors / Tuples for this is very expensive
     # for the compiler, so we'll just accept Arrays for now.
@@ -215,6 +215,8 @@ function Simulation1d(namelist)
     radiation = Cases.RadiationBase(case, FT)
     TS = TimeStepping(FT, namelist)
 
+    @info "TS" TS 
+
     Ri_bulk_crit::FTD = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
     aux_data_kwarg = Cases.aux_data_kwarg(case, namelist)
     surf_params = Cases.surface_params(case, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, aux_data_kwarg...)
@@ -255,10 +257,12 @@ function initialize(sim::Simulation1d)
     TC = TurbulenceConvection
 
     (; prog, aux, edmf, case, forcing, radiation, surf_params, param_set, surf_ref_state) = sim
-    (; aux_data_kwarg, skip_io, Stats, io_nt, diagnostics, truncate_stack_trace) = sim
+    (; aux_data_kwarg, skip_io, Stats, io_nt, calibrate_io, diagnostics, truncate_stack_trace) = sim
+
+    @info "calibrate_io = $calibrate_io"
 
     ts_gm = ["Tsurface", "shf", "lhf", "ustar", "wstar", "lwp_mean", "iwp_mean"]
-    ts_edmf = [
+    ts_edmf = calibrate_io ?  ["rwp_mean", "swp_mean"] : [
         "cloud_base_mean",
         "cloud_top_mean",
         "cloud_cover_mean",
@@ -279,7 +283,9 @@ function initialize(sim::Simulation1d)
         "integ_total_flux_qt",
         "integ_total_flux_s",
     ]
+
     ts_list = vcat(ts_gm, ts_edmf)
+
 
     # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
     CC.Fields.bycolumn(axes(prog.cent)) do colidx
@@ -310,7 +316,7 @@ function initialize(sim::Simulation1d)
         if !skip_io
             stats = Stats[colidx]
             initialize_io(stats.nc_filename, eltype(grid), io_nt.aux, io_nt.diagnostics)
-            initialize_io(stats.nc_filename, eltype(grid), ts_list)
+            initialize_io(stats.nc_filename, eltype(grid), ts_list) # technically w/ calibrate_io this should be pared down to match what's listed in affect_io!()
         end
     end
 
@@ -373,21 +379,89 @@ function solve_args(sim::Simulation1d)
     callback_dtmax = ODE.DiscreteCallback(condition_every_iter, dt_max!; save_positions = (false, false))
     callback_filters = ODE.DiscreteCallback(condition_every_iter, affect_filter!; save_positions = (false, false))
     callback_adapt_dt = ODE.DiscreteCallback(condition_every_iter, adaptive_dt!; save_positions = (false, false))
-    callback_adapt_dt = sim.adapt_dt ? (callback_adapt_dt,) : ()
+    callback_adapt_dt = (sim.adapt_dt || sim.TS.spinup_half_t_max > 0 || sim.TS.use_tendency_timestep_limiter) ? (callback_adapt_dt,) : ()
+    # callback_spinup_dt = ODE.DiscreteCallback(condition_every_iter, spinup_dt!; save_positions = (false, false)) 
+    # callback_spinup_dt = (sim.TS.spinup_half_t_max > 0) ? (callback_spinup_dt,) : () # we condition on spinup_half_t_max > 0 | put in tuple so can splat if it doesnt exist
     if sim.edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess && sim.adapt_dt
         @warn("The prognostic noisy relaxation process currently uses a Euler-Maruyama time stepping method,
               which does not support adaptive time stepping. Adaptive time stepping disabled.")
         callback_adapt_dt = ()
     end
 
-    callbacks = ODE.CallbackSet(callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_filters, callback_io...)
+    callback_∑tendencies! = ODE.DiscreteCallback(condition_every_iter, call_∑tendencies!; save_positions = (false, false))
+    callback_∑tendencies! = sim.TS.use_tendency_timestep_limiter ? (callback_∑tendencies!,) : ()
+
+    callback_reset_dt = sim.adapt_dt ? ODE.DiscreteCallback(condition_every_iter, reset_dt!; save_positions = (false, false)) : ()
+    
+
+    # Maybe we need to edit TS.dt here at the start? idk when the callback is called but seems to be every 100 steps... perhaps?
+    # The ode callback will adjust sim.TS.dt but i'm not sure letting dycore do it is the right move...
+
+    # callbacks = ODE.CallbackSet(callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_filters, callback_io...)
+    local callbacks::ODE.CallbackSet
 
     if sim.edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess
         prob = SDE.SDEProblem(∑tendencies!, ∑stoch_tendencies!, prog, t_span, params; dt = sim.TS.dt)
         alg = SDE.EM()
     else
-        prob = ODE.ODEProblem(∑tendencies!, prog, t_span, params; dt = sim.TS.dt)
-        alg = ODE.Euler()
+        if sim.TS.explicit_solver
+            if sim.TS.fixed_step_solver
+                if sim.TS.use_tendency_timestep_limiter
+                    @info "Using ∑tendencies_null! for ODEProblem, callback will calculate tendencies"
+                    # Before, we would update_aux then calculate tendencies in ∑tendencies!, then take the step, then calculate a dt in callbacks, then filter then do io in callbacks. 
+                    # To match, we should filter then do io in callbacks, then update aux then calculate tendencies in callback_∑tendencies!, then calculate the needed timestep in dt_max/adapt_dt, then take the step
+                    # if we left the original order, we'd calculate our tendencies then do all our filtering, then take the step...
+                    callbacks = ODE.CallbackSet(callback_filters, callback_io..., callback_reset_dt, callback_∑tendencies!..., callback_dtmax, callback_adapt_dt..., callback_cfl..., )  
+                    prob = ODE.ODEProblem(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # we will calculate tendencies in the callback so that we can use them for the most up to date du so we don't need another call to ∑tendencies!, so we use ∑tendencies_null!
+                    # The upside is we get the dt we want, the downside is we calculate the tendencies in the dt_max! callback so when the step is taken, we return to the io callback without having dones any filtering/etc
+                else
+                    callbacks = ODE.CallbackSet(callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_filters, callback_io...) # original
+                    prob = ODE.ODEProblem(∑tendencies!, prog, t_span, params; dt = sim.TS.dt)
+                end
+                alg = if sim.TS.algorithm isa Val{:Euler}
+                    ODE.Euler()
+                else
+                    # alg_string = String(typeof(alg).parameters[1])
+                    alg_string = String(TC.Parameters.unwrap_val(alg))
+                    error("Unsupported explicit fixed-step algorithm $(alg_string)()")
+                end
+
+            else
+
+                callbacks = ODE.CallbackSet(callback_cfl..., callback_filters, callback_io...) # drop the dt stuff since the adaptive solver will do it by itself
+                prob = ODE.ODEProblem(∑tendencies_robust!, prog, t_span, params; dt = sim.TS.dt) # use robust version that won't crash when out of domain.
+
+                alg = if sim.TS.algorithm isa Val{:Heun}
+                    ODE.Heun()
+                elseif sim.TS.algorithm isa Val{:RK4}
+                    alg = ODE.RK4()
+                elseif sim.TS.algorithm isa Val{:Tsit5}
+                    alg = ODE.Tsit5()
+                else
+                    # alg_string = String(typeof(a).parameters[1])
+                    alg_string = String(TC.Parameters.unwrap_val(alg))
+                    error("Unsupported explicit adaptive algorithm $(alg_string)()")
+                end
+            end
+
+        else  # implicit solver
+            if sim.TS.fixed_step_solver
+                error("No implicit fixed-step solver currently supported")
+            else
+                callbacks = ODE.CallbackSet(callback_cfl..., callback_filters, callback_io...) # drop the dt stuff since the implicit solver will do it by itself. leave cfl... hopefully the model stability also prevents cfl violations.... (we still also have buoyancy limits)
+                prob = ODE.ODEProblem(∑tendencies!, prog, t_span, params; dt = sim.TS.dt)
+                if sim.TS.algorithm isa Val{:ImplicitEuler} # adaptive solver
+                    alg = ODE.ImplicitEuler(; autodiff = false) # this is far too slow to actually use...
+                elseif sim.TS.algorithm isa Val{:KenCarp47}
+                    alg = ODE.KenCarp47(; autodiff = false, linsolve = ODE.KrylovJL_GMRES()) # see https://docs.sciml.ai/DiffEqDocs/stable/tutorials/advanced_ode_example/#Using-Jacobian-Free-Newton-Krylov
+                else
+                    # alg_string = String(typeof(a).parameters[1])
+                    alg_string = String(TC.Parameters.unwrap_val(alg))
+                    error("Unsupported implicit algorithm $(alg_string)()")
+                end
+            end
+
+        end
     end
 
     kwargs = (;
@@ -397,11 +471,19 @@ function solve_args(sim::Simulation1d)
         callback = callbacks,
         progress = true,
         progress_message = (dt, u, p, t) -> t,
+        # my additions
+        isoutofdomain = sim.TS.use_isoutofdomain_limiter ? isoutofdomain : ODE.ODE_DEFAULT_ISOUTOFDOMAIN, # use our isoutofdomain if we set it, otherwise use their default which just returns false
+        (isnan(sim.TS.abstol) ? (;) : (;abstol = sim.TS.abstol))...,
+        (isnan(sim.TS.reltol) ? (;) : (;reltol = sim.TS.reltol))...,
+        (sim.TS.fixed_step_solver ? (;) : (;))..., # use their default for dtmin (set nothing, don't set for fixed-step solver)
+        ((!sim.TS.fixed_step_solver &&  (sim.TS.adaptive_depth_limit ≥ 0)) ? (;maxiters = sim.TS.adaptive_depth_limit) : (;) )..., # use our adaptive_depth_limit if we set it, otherwise use their default
+        ((!sim.TS.fixed_step_solver && !isnan(sim.TS.dt_max) && !isinf(sim.TS.dt_max)) ? (;dtmax = sim.TS.dt_max) : (;))..., # use our dt_max if we set it, otherwise use their default
+        force_dtmin = true, # Allow solver to continue at dtmin failure in adapt
     )
     return (prob, alg, kwargs)
 end
 
-function run(sim::Simulation1d, integrator; time_run = true)
+function sim_run(sim::Simulation1d, integrator; time_run = true) # named sim_run to not clash with Base.run()
     TC = TurbulenceConvection
     sim.skip_io || open_files(sim)
 
@@ -454,13 +536,13 @@ function main1d(namelist; time_run = true)
     end
     sim = Simulation1d(namelist)
     (integrator, return_init) = initialize(sim)
-    return_init == :success && @info "The initialization has completed."
+    return_init === :success && @info "The initialization has completed."
     if time_run
-        (Y, return_code) = @timev run(sim, integrator; time_run)
+        (Y, return_code) = @timev sim_run(sim, integrator; time_run)
     else
-        (Y, return_code) = run(sim, integrator; time_run)
+        (Y, return_code) = sim_run(sim, integrator; time_run)
     end
-    return_code == :success && @info "The simulation has completed."
+    return_code === :success && @info "The simulation has completed."
     return Y, nc_results_file(sim.Stats), return_code
 end
 
