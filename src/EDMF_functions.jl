@@ -451,7 +451,8 @@ function θ_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::ED
     UnPack.@unpack ustar, zLL, oblength, ρLL = surface_helper(surf, grid, state)
     N_up = n_updrafts(edmf)
 
-    surf.bflux > 0 || return FT(0)
+    # surf.bflux > 0 || return FT(0) # this is bad I believe
+    surf.bflux > 0 || return aux_gm.θ_liq_ice[kc_surf]
 
     a_total = sum(i -> prog_up[i].ρarea[kc_surf] / ρ_c[kc_surf], 1:N_up)
     a_ = prog_up[i].ρarea[kc_surf] / ρ_c[kc_surf]
