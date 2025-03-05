@@ -7,6 +7,7 @@ FT = Float64
 forcing_type = :obs_data
 
 flight_numbers = 10
+# flight_numbers = 9
 # flight_numbers = [1, 9, 10, 12, 13]
 # flight_numbers = 1
 
@@ -150,7 +151,7 @@ for flight_number in flight_numbers
 
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.6
         # ("turbulence", "EDMF_PrognosticTKE", "max_area", FT(.3)), # stability limiting...
-        # namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area_bc"] = "Prognostic" # unstable w/o  setting other params (didn't help lol, was 0 at sfc)
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area_bc"] = "Prognostic" # unstable w/o  setting other params (didn't help lol, was 0 at sfc)
         # 
 
 
@@ -316,6 +317,7 @@ for flight_number in flight_numbers
 
         # namelist["thermodynamics"]["potential_temperature_reference_pressure"] = 985. * 100 # try changing this...
 
+        # namelist["thermodynamics"]["moisture_model"] = "equilibrium"
         namelist["thermodynamics"]["moisture_model"] = "nonequilibrium"
         namelist["thermodynamics"]["sgs"] = "mean"
 
@@ -337,6 +339,7 @@ for flight_number in flight_numbers
         # namelist["stats_io"]["frequency"] = dt * 10
         namelist["stats_io"]["frequency"] = 600.
         namelist["stats_io"]["frequency"] = 60.
+        # namelist["stats_io"]["frequency"] = dt
         # namelist["user_params"]["ice_sedimentation_scaling_factor"] = 1.0
 
         namelist["user_params"]["liq_ice_collision_efficiency"] = 1.0 * 0.0
@@ -460,6 +463,9 @@ for flight_number in flight_numbers
             rain_terminal_velocity_scheme = :Chen2022Vel,
             snow_terminal_velocity_scheme = :Chen2022Vel,
             )
+            
+
+
 
 
         global debug = true # allow to run multiple simulaitons at once if we're just debugging and wan't to go faster, puts them in random subdirectories in target location with random uuid suffix

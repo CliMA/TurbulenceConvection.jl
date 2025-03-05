@@ -229,8 +229,13 @@ function create_parameter_set(
     # user_params = get(namelist, "user_params", Dict())
     # overwrites, but this is all local so no need for TOML
     user_params["particle_min_radius"] =  TC.parse_namelist(namelist, "user_params", "particle_min_radius"; default = 0.2e-6) # this is set no matter what
+
+    # If we decide to add this to the calibration... 
+    user_params["mean_r_factor_liq"] =  TC.parse_namelist(namelist, "user_params", "mean_r_factor_liq"; default = FT(((4/3) / 8)^(1/3))) # this is set no matter what
+    user_params["mean_r_factor_ice"] =  TC.parse_namelist(namelist, "user_params", "mean_r_factor_ice"; default = FT(((4/3) / 8)^(1/3))) # this is set no matter what
+
     user_params["q_min"] = TC.parse_namelist(namelist, "user_params", "q_min"; default = zero(FT)) # maybe one day swap to var limiter step
-    user_params  = namelist["user_params"] # Let this be a Dict()
+    user_params = namelist["user_params"] # Let this be a Dict()
     user_params = leaves_to_tuples(user_params) # convert any leaves that are Arrays to tuples to preserve isbits
     user_params = leaves_to_Vals(user_params)  # convert leaves that are strings or symbols into Vals to preserve isbits
     user_params = namedtuple_fromdict(user_params) # convert dict to NamedTuple to preserve isbits

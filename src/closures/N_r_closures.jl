@@ -394,7 +394,12 @@ end
 
 
 # r_from_qN(q::FT, N::FT, ρ::FT; r_min::FT=0) = FT(max((q / ((4/3) * π * N * ρ))^(1/3), r_min))
-function r_from_qN(q::FT, N::FT, ρ::FT; r_min::FT2 = 0) where {FT, FT2}
+"""
+Calculate r from q, N, and ρ.
+mean_r_factor exists so you can choose dfiferent estimates of <r> based on the q and N you're using.
+For example in gamma distribution, <r> = 1/2λ, q = N_0 Γ(5) / λ^4 , and N = N_0/λ so <r> = (32q/N)^1/3. Then to go from r = (q/(4/3πρN))^(1/3) to  (32q/N)^1/3 we need to multiply by (24/(πρ))^(1/3)
+"""
+function r_from_qN(q::FT, N::FT, ρ::FT; r_min::FT = FT(0), mean_r_factor::FT = FT(1) ) where {FT}
     if iszero(N) || isinf(N)
         return FT(r_min) # N/N will give NaN...
         # even if N = 0 and q is not 0 (in which case N shouldn't be 0), we need some fix...
@@ -402,7 +407,7 @@ function r_from_qN(q::FT, N::FT, ρ::FT; r_min::FT2 = 0) where {FT, FT2}
         # If N = 0, we'll just return r_min, then 1/Nr = 1/0 will yield timescale = Inf
     end
 
-    return FT((q + 4 / 3 * π * FT(r_min)^3 * ρ * N) / (4 / 3 * π * N * ρ))^(1 / 3)
+    return FT((q + 4 / 3 * π * FT(r_min)^3 * ρ * N) / (4 / 3 * π * N * ρ))^(1 / 3) * mean_r_factor
 end
 
 

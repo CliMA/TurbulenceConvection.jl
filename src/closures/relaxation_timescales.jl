@@ -1,5 +1,9 @@
 """
 Get timescales for relaxation of the supersaturation
+
+
+Throughout, mean_r_factor exists so you can choose dfiferent estimates of <r> based on the q and N you're using.
+For example in gamma distribution, <r> = 1/2λ, q = N_0 Γ(5) / λ^4 , and N = N_0/λ so <r> = (32q/N)^1/3. Then to go from r = (q/(4/3πρN))^(1/3) to  (32q/N)^1/3 we need to multiply by (24/(πρ))^(1/3)
 """
 
 # N can be arbitrarily small so D * N_l could yield 0, times r = Inf could yield NaN... always group (N * r) to avoid this, can't have Inf and 0 here bc of condition in r_from_qN()
@@ -36,11 +40,12 @@ end
 # :exponential_T_scaling_ice
 function get_τ_helper(param_set::APS, microphys_params::ACMP, relaxation_timescale_type::ExponentialTScalingIceRelaxationTimescale, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT, z::FT,) where {FT}
     D = D_func(T, p) # m2 s**-1 for T in Kelvin, p in Pa (from Pruppacher and Klett 1997) # D_ref = FT(0.0000226)
-    T_fr = TCP.T_freeze(param_set)
+    # T_fr = TCP.T_freeze(param_set)
     N_i = get_N_i(param_set, relaxation_timescale_type, q, T, p, w)
     ρ_i = CMP.ρ_cloud_ice(microphys_params) # CLIMAParameters default for cloud_ice
     r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
-    r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0)
+
+    r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0, mean_r_factor = param_set.user_params.mean_r_factor_ice)
     τ_ice = FT(1 / (4 * π * D * (N_i * r_i)))
     τ_liq = CMNe.τ_relax(microphys_params, liq_type)
     return τ_liq, τ_ice
@@ -69,7 +74,7 @@ function get_τ_helper(param_set::APS, microphys_params::ACMP, relaxation_timesc
         ρ_i = CMP.ρ_cloud_ice(microphys_params) # CLIMAParameters default for cloud_ice
         r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
         N_i = get_N_i(param_set, relaxation_timescale_type, q, T, p, w)
-        r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0)
+        r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0, mean_r_factor = param_set.user_params.mean_r_factor_ice)
         τ_ice = FT(1 / (4 * π * D * (N_i * r_i)))
     end
     τ_liq = CMNe.τ_relax(microphys_params, liq_type)
@@ -89,11 +94,11 @@ function get_τ_helper(param_set::APS, microphys_params::ACMP, relaxation_timesc
     r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
 
     N_l = get_N_l(param_set, relaxation_timescale_type, q, T, p, w)
-    r_l = r_from_qN(q.liq, N_l, ρ_l, r_min = r_0)
+    r_l = r_from_qN(q.liq, N_l, ρ_l, r_min = r_0, mean_r_factor = param_set.user_params.mean_r_factor_liq)
     τ_liq = FT(1 / (4 * π * D * (N_l * r_l)))
 
     N_i = get_N_i(param_set, relaxation_timescale_type, q, T, p, w)
-    r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0)
+    r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0, mean_r_factor = param_set.user_params.mean_r_factor_ice)
     τ_ice = FT(1 / (4 * π * D * (N_i * r_i)))
     return τ_liq, τ_ice
 end
@@ -106,11 +111,11 @@ function get_τ_helper(param_set::APS, microphys_params::ACMP, relaxation_timesc
     r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
 
     N_l = get_N_l(param_set, relaxation_timescale_type, q, T, p, w)
-    r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0)
+    r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0, mean_r_factor = param_set.user_params.mean_r_factor_liq)
     τ_liq = FT(1 / (4 * π * D * (N_l * r_l)))
 
     N_i = get_N_i(param_set, relaxation_timescale_type, q, T, p, w)
-    r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0)
+    r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0, mean_r_factor = param_set.user_params.mean_r_factor_ice)
     τ_ice = FT(1 / (4 * π * D * (N_i * r_i)))
     return τ_liq, τ_ice
 end
@@ -124,14 +129,14 @@ function get_τ_helper(param_set::APS, microphys_params::ACMP, relaxation_timesc
     r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
 
     N_l = get_N_l(param_set, relaxation_timescale_type, q, T, p, w)
-    r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0)
+    r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0, mean_r_factor = param_set.user_params.mean_r_factor_liq)
     τ_liq = FT(1 / (4 * π * D * (N_l * r_l)))
 
     if T >= T_fr
         τ_ice = FT(Inf)
     else
         N_i = get_N_i(param_set, relaxation_timescale_type, q, T, p, w)
-        r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0)
+        r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0, mean_r_factor = param_set.user_params.mean_r_factor_ice)
         τ_ice = FT(1 / (4 * π * D * (N_i * r_i)))
     end
     return τ_liq, τ_ice
@@ -148,11 +153,11 @@ function get_τ_helper(param_set::APS, microphys_params::ACMP, relaxation_timesc
     r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
 
     N_l = get_N_l(param_set, relaxation_timescale_type, q, T, p, w)
-    r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0)
+    r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0, mean_r_factor = param_set.user_params.mean_r_factor_liq)
     τ_liq = FT(1 / (4 * π * D * (N_l * r_l)))
 
     N_i = get_N_i(param_set, relaxation_timescale_type, q, T, p, w)
-    r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0)
+    r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0, mean_r_factor = param_set.user_params.mean_r_factor_ice)
     τ_ice = 1 / (4 * π * D * (N_i * r_i))
 
     return τ_liq, τ_ice
@@ -168,11 +173,11 @@ function get_τ_helper(param_set::APS, microphys_params::ACMP, relaxation_timesc
     r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
 
     N_l = get_N_l(param_set, relaxation_timescale_type, q, T, p, w)
-    r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0)
+    r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0, mean_r_factor = param_set.user_params.mean_r_factor_liq)
     τ_liq = FT(1 / (4 * π * D * (N_l * r_l)))
 
     N_i = get_N_i(param_set, relaxation_timescale_type, q, T, p, w)
-    r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0)
+    r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0, mean_r_factor = param_set.user_params.mean_r_factor_ice)
     τ_ice = FT(1 / (4 * π * D * (N_i * r_i)))
 
     return τ_liq, τ_ice
@@ -187,12 +192,12 @@ function get_τ_helper(param_set::APS, microphys_params::ACMP, relaxation_timesc
     r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
     #
     N_l = get_N_l(param_set, relaxation_timescale_type, q, T, p, w)
-    r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0)
+    r_l = r_from_qN(q.liq, N_l, ρ_l; r_min = r_0, mean_r_factor = param_set.user_params.mean_r_factor_liq)
     τ_liq = FT(1 / (4 * π * D * (N_l * r_l))) 
     #
 
     N_i = get_N_i(param_set, relaxation_timescale_type, q, T, p, w)
-    r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0)
+    r_i = r_from_qN(q.ice, N_i, ρ_i; r_min = r_0, mean_r_factor = param_set.user_params.mean_r_factor_ice)
     τ_ice = FT(1 / (4 * π * D * (N_i * r_i)))
     return τ_liq, τ_ice
 end
