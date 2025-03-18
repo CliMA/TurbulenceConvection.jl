@@ -1,0 +1,85 @@
+{
+    "meta": {
+        "simname": "Bomex",
+        "uuid": "jl_Ljt0cd",
+        "casename": "Bomex"
+    },
+    "microphysics": {
+        "rain_model": "None"
+    },
+    "output": {
+        "output_root": "./"
+    },
+    "thermodynamics": {
+        "thermal_variable": "thetal",
+        "quadrature_order": 3,
+        "sgs": "quadrature",
+        "quadrature_type": "log-normal"
+    },
+    "time_stepping": {
+        "t_max": 21600.0,
+        "dt": 6.0
+    },
+    "grid": {
+        "nz": 60,
+        "dz": 50.0,
+        "dims": 1
+    },
+    "stats_io": {
+        "stats_dir": "stats",
+        "frequency": 60.0
+    },
+    "turbulence": {
+        "Ri_bulk_crit": 0.2,
+        "EDMF_PrognosticTKE": {
+            "turbulent_entrainment_factor": 0.015,
+            "entrainment_massflux_div_factor": 0.0,
+            "lambda_stab": 0.9,
+            "entrainment_scale": 0.004,
+            "smin_ub": 0.1,
+            "surface_area": 0.1,
+            "entrainment_smin_tke_coeff": 0.3,
+            "constant_area": false,
+            "static_stab_coeff": 0.4,
+            "detrainment_factor": 0.51,
+            "stochastic": {
+                "sde_entr_std": 0.0,
+                "sde_detr_theta": 1.0,
+                "closure": "none",
+                "sde_detr_std": 0.0,
+                "detr_lognormal_var": 0.0,
+                "sde_entr_theta": 1.0,
+                "entr_lognormal_var": 0.0
+            },
+            "sorting_power": 2.0,
+            "entrainment_factor": 0.13,
+            "extrapolate_buoyancy": true,
+            "pressure_closure_buoy": "normalmode",
+            "mixing_length": "sbtd_eq",
+            "entrainment_sigma": 10.0,
+            "l_max": 1.0e6,
+            "tke_diss_coeff": 0.22,
+            "Prandtl_number_scale": 4.076923076923077,
+            "env_buoy_grad": "quadratures",
+            "pressure_closure_drag": "normalmode",
+            "updraft_mixing_frac": 0.25,
+            "min_upd_velocity": 0.001,
+            "min_updraft_top": 500.0,
+            "pressure_normalmode_buoy_coeff2": 0.0,
+            "pressure_normalmode_adv_coeff": 0.1,
+            "entrainment": "moisture_deficit",
+            "updraft_number": 1,
+            "smin_rm": 1.5,
+            "pressure_closure_asp_label": "const",
+            "pressure_normalmode_drag_coeff": 10.0,
+            "use_local_micro": true,
+            "tke_ed_coeff": 0.14,
+            "aspect_ratio": 0.2,
+            "max_area": 0.9,
+            "calculate_tke": true,
+            "pressure_normalmode_buoy_coeff1": 0.12
+        },
+        "prandtl_number_0": 0.74,
+        "scheme": "EDMF_PrognosticTKE"
+    }
+}
