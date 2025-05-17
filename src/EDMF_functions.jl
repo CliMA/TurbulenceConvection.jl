@@ -328,7 +328,23 @@ function filter_small_moisture_vars(edmf::EDMFModel, grid::Grid, state::State, p
 end
 
 function filter_small_vars(edmf::EDMFModel, grid::Grid, state::State, param_set::APS)
-    filter_small_moisture_vars(edmf, grid, state, param_set)
+
+    if !iszero(param_set.user_params.q_min)
+        filter_small_moisture_vars(edmf, grid, state, param_set)
+    end
+    return nothing
+end
+
+function filter_precipitation_vars(state::State)
+    #=
+        ensure positivity of q_sno, q_rai in center_prog_precipitation(state)
+        I'm not sure there are any downsides lol.
+    =#
+    prog_pr = center_prog_precipitation(state)
+
+    @. prog_pr.q_rai = max(prog_pr.q_rai, 0)
+    @. prog_pr.q_sno = max(prog_pr.q_sno, 0)
+
     return nothing
 end
 
@@ -341,6 +357,8 @@ function affect_filter!(edmf::EDMFModel, grid::Grid, state::State, param_set::AP
     filter_gm_vars(edmf, grid, state, surf) # my addition, theyre not filtered anywhere...
     filter_updraft_vars(edmf, grid, state, surf)
     set_edmf_surface_bc(edmf, grid, state, surf, param_set)
+
+    filter_precipitation_vars(state)
 
     @inbounds for k in real_center_indices(grid)
         prog_en.ρatke[k] = max(prog_en.ρatke[k], 0.0)
@@ -424,6 +442,9 @@ const ᶠinterp_a = CCO.InterpolateC2F(bottom = CCO.Extrapolate(), top = CCO.Ext
 function area_surface_bc(surf::SurfaceBase{FT}, edmf::EDMFModel, i::Int, bc::FixedSurfaceAreaBC)::FT where {FT}
     N_up = n_updrafts(edmf)
     surface_area = length(edmf.surface_area) == N_up ? edmf.surface_area[i] : edmf.surface_area[1] / N_up # length and [1] will work on scalars or arrays, so either take the i'th value or assume it's a sum like it did before
+    if (surf.bflux > 0) && iszero(surface_area)
+        @warn "area_surface_bc: surface area is zero, but bflux > 0; this is likely a bug in the model; surface_area = $(surface_area); bflux = $(surf.bflux);"
+    end
     return surf.bflux > 0 ? surface_area : FT(0)
 end
 
@@ -432,6 +453,11 @@ function area_surface_bc(surf::SurfaceBase{FT}, edmf::EDMFModel, i::Int, bc::Clo
     surf_area_bc_pred = params[1] + params[2] * surf.lhf + params[3] * surf.shf
     return min(max(0, FT(surf_area_bc_pred)), edmf.max_area)
 end
+
+function area_surface_bc(surf::SurfaceBase{FT}, edmf::EDMFModel, i::Int, bc::PrognosticSurfaceAreaBC)::FT where {FT}
+    return area_surface_bc(surf, edmf, i, FixedSurfaceAreaBC())  # helper for init condition to allow a custom starting area
+end
+
 
 function w_surface_bc(::SurfaceBase{FT})::FT where {FT}
     return FT(0)
@@ -454,12 +480,18 @@ function θ_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::ED
     # surf.bflux > 0 || return FT(0) # this is bad I believe
     surf.bflux > 0 || return aux_gm.θ_liq_ice[kc_surf]
 
+    if iszero(prog_up[i].ρarea[kc_surf])
+        # this can happen while bflux > 0, but only with Prognostic surface area Boundary Condition [though maybe we should use a limiter on that?]
+        # if it does, we need to short circuit here bc surface_scalar_coeff will be NaN from going percentile 0 to 0. Fall back to gm
+        return aux_gm.θ_liq_ice[kc_surf] # fall back -- surface_scalar_coeff would be integral from percentiles 1-0 to 1 which goes to inf but idk...
+    end
+
     a_total = sum(i -> prog_up[i].ρarea[kc_surf] / ρ_c[kc_surf], 1:N_up)
     a_ = prog_up[i].ρarea[kc_surf] / ρ_c[kc_surf]
 
     ρθ_liq_ice_flux = surf.ρθ_liq_ice_flux # assuming no ql,qi flux
     h_var = get_surface_variance(ρθ_liq_ice_flux / ρLL, ρθ_liq_ice_flux / ρLL, ustar, zLL, oblength)
-    surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_)
+    surface_scalar_coeff = percentile_bounds_mean_norm(1 - a_total + (i - 1) * a_, 1 - a_total + i * a_) # with one updraft this is from 1-a to 1
     return aux_gm.θ_liq_ice[kc_surf] + surface_scalar_coeff * sqrt(h_var)
 end
 function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDMFModel, i::Int)::FT where {FT}
@@ -471,6 +503,12 @@ function q_surface_bc(surf::SurfaceBase{FT}, grid::Grid, state::State, edmf::EDM
     N_up = n_updrafts(edmf)
 
     surf.bflux > 0 || return aux_gm.q_tot[kc_surf]
+
+    if iszero(prog_up[i].ρarea[kc_surf])
+        # this can happen while bflux > 0, but only with Prognostic surface area Boundary Condition [though maybe we should use a limiter on that?]
+        # if it does, we need to short circuit here bc surface_scalar_coeff will be NaN from going percentile 0 to 0. Fall back to gm
+        return aux_gm.q_tot[kc_surf] # fall back -- surface_scalar_coeff would be integral from percentiles 1-0 to 1 which goes to inf but idk...
+    end
 
     a_total = sum(i -> prog_up[i].ρarea[kc_surf] / ρ_c[kc_surf], 1:N_up)
     a_ = prog_up[i].ρarea[kc_surf] / ρ_c[kc_surf]
@@ -615,6 +653,83 @@ end
 # end
 
 
+"""
+Stop these ridiculous upgradient fluxes from using separate equations for area and the prognostic variable
+    - makes sure the resulting pure prognostic variable (without ρa) comes out between itself and the original grid mean value...
+
+    Based on the idea that things don't gotta be balanced, but you gotta be approaching the mean...
+"""
+function progvar_area_tendency_resolver(
+    limiter::AbstractTendencyLimiter,
+    ρarea::FT,
+    progvar::FT,
+    gridmean_progvar::FT,
+    ρarea_tendency::FT,
+    ρaprogvar_tendency::FT,
+    ρ::FT,
+    Δt::FT;
+    use_resolver::Bool = true
+) where {FT}
+
+    # if iszero(ρarea) # if no area, use the grid mean value bc the progvar value came from bad information potentially. [deprecated in favor of forcing the user to fix -- you couuld hav put in aux for example...]
+    #     progvar = gridmean_progvar
+    # end
+
+    if any(isnan, [ρarea, progvar, gridmean_progvar, ρaprogvar_tendency])
+        error("NaN in progvar_area_tendency_resolver, ρarea = $ρarea; progvar = $progvar; gridmean_progvar = $gridmean_progvar; ρaprogvar_tendency = $ρaprogvar_tendency; ρaprogvar_tendency = $ρaprogvar_tendency; ρ = $ρ")
+    end
+
+    if !use_resolver
+        return ρaprogvar_tendency # test just short circuiting
+    end
+        
+    new_ρa = clamp(ρarea + ρarea_tendency * Δt,  FT(0), FT(1)) # only w/ explicit timesteps...
+    ρarea_tendency = (new_ρa - ρarea) / Δt # update after clamping.
+
+
+    ρaprogvar = progvar * ρarea
+    # ρgridmean_progvar = gridmean_progvar * ρ
+
+    #=
+    Updraft raw var is greater than grid mean, so after mixing assuming no upgradient fluxes, the raw value should be greater than the current grid mean
+        Thus: ρaprogvar > (new_ρa * gridmean_progvar)
+    Note ρarea_tendency could be negative so we don't actually know the sign of the tendency, so we use safe_clamp
+
+        - really, no matter the direction of the area tendency, the raw value should approach the grid mean
+        - so increasing area
+    =#
+
+    val_1 = (new_ρa*gridmean_progvar - ρaprogvar) / Δt # whatever direction this is, we must not pass it, it could be up or down
+    val_2 = ρarea_tendency * progvar # this is no change. We also must not pass this and go the wrong direction.
+
+
+    # in case we're using a more conservative limiter
+    if val_1 > FT(0) # positive tendency, (new_ρa*gridmean_progvar - ρaprogvar) > 0, don't deplete it
+        val_1 = -limit_tendency(limiter, -val_1, new_ρa*gridmean_progvar - ρaprogvar, Δt) # in case we're using a more conservative limiter
+    else # negative tendency, so (ρaprogvar - new_ρa*gridmean_progvar) > 0, don't deplete it
+        val_1 = limit_tendency(limiter, val_1, ρaprogvar - new_ρa*gridmean_progvar, Δt) # in case we're using a more conservative limiter
+    end
+
+    if val_2 > FT(0) # don't consume more than ρarea*gridmean_progvar - ρaprogvar
+        if val_1 > FT(0)
+            val_2 = -limit_tendency(limiter, -val_2, new_ρa*gridmean_progvar - ρaprogvar, Δt) # in case we're using a more conservative limiter
+        else
+            val_2 = FT(0) # dont move away from the grid mean.
+        end
+    else
+        if val_1 > FT(0)
+            val_2 = FT(0) # don't move away from the grid mean.
+        else
+            val_2 = limit_tendency(limiter, val_2, ρaprogvar - new_ρa*gridmean_progvar, Δt) # in case we're using a more conservative limiter
+        end
+    end
+
+    ρaprogvar_tendency = safe_clamp(ρaprogvar_tendency, val_1, val_2) # this is the tendency we want to limit
+
+    return ρaprogvar_tendency
+end
+
+
 function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param_set::APS, surf::SurfaceBase, Δt::Real, use_fallback_tendency_limiters::Bool)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
@@ -630,6 +745,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     tendencies_up = center_tendencies_updrafts(state)
     tendencies_up_f = face_tendencies_updrafts(state)
     prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     aux_gm_f = face_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
     ρ_c = prog_gm.ρ
@@ -638,6 +754,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     # edtl = edmf.tendency_limiters.entr_detr_tendency_limiter
     edtl = get_tendency_limiter(edmf.tendency_limiters, Val(:entr_detr), use_fallback_tendency_limiters)
 
+    use_resolver = TCP.get_isbits_nt(param_set.user_params, :use_resolver, false)
 
     @inbounds for i in 1:N_up
         aux_up_i = aux_up[i]
@@ -652,6 +769,15 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     ∇c = CCO.DivergenceF2C()
     w_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
     LBF = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
+
+    # We know that, since W = 0 at z = 0, BCs for entr, detr,
+    # and buoyancy should not matter in the end
+    zero_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+    I0f = CCO.InterpolateC2F(; zero_bcs...)
+    adv_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
+    LBC = CCO.LeftBiasedF2C(; bottom = CCO.SetValue(FT(0)))
+    ∇f = CCO.DivergenceC2F(; adv_bcs...)
+    a_en = aux_en.area
 
     # Solve for updraft area fraction
     @inbounds for i in 1:N_up
@@ -677,7 +803,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         tends_ρaθ_liq_ice = tendencies_up[i].ρaθ_liq_ice
         tends_ρaq_tot = tendencies_up[i].ρaq_tot
         area_en = aux_en.area
-
+        
         # Try using these to ensure our limits are correct, no negs, etc
         # prog_en_gm = center_prog_environment_up_gm_version(state)
         # prog_en_gm_f = face_prog_environment_up_gm_version(state)
@@ -701,27 +827,112 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         # advection, precipitation, and sedimentation tendencies are somewaht constrained at construction, but the overall system can still be unstable.
         # one method would be to apply clamp and to normalize the tendencies by their individual contributions to the total tendency... would take a lot more tracking though...
 
+
+
+        # store area tendency due to entrainment and detrainment bc that is the only part that really affects the limiters later on that push us towards grid mean. the advection part really isn't relevant to that -- advection is handled outside.
+        # For the same reason, we also don't know the true new area so it's hard to say the limiter will work but only that in the area part from entr/detr we are purhsed towards grid mean.
+        # tends_ρarea_entr_detr = similar(tends_ρarea) # ideally, this would be limited by current value + advection tendency * Δt but we don't limit the advection tendency so it's hard to make that a sure thing...
+        @. tends_ρarea = -∇c(wvec(LBF(Ic(w_up) * ρarea))) # this is the advection tendency
+
+        # test_advect = similar(tends_ρarea)
+        # test_advect_p = similar(tends_ρarea)
+        # test_advect_n = similar(tends_ρarea)
+        # @. test_advect = -∇c(wvec(LBF(Ic(w_up) * ρarea))) * Δt # this is the advection tendency
+        # @. test_advect_p = max(test_advect, FT(0)) # this is coming in so we can add to detr (current up value)
+        # @. test_advect_n = -min(test_advect, FT(0)) # if advection is taking some away we have room to entrain even more.
+
         if edmf.entrainment_type isa FractionalEntrModel
-            @. tends_ρarea = -∇c(wvec(LBF(Ic(w_up) * ρarea))) + limit_tendency(edtl, ρarea * Ic(w_up) * (entr_turb_dyn - detr_turb_dyn), ρarea, ρ_c * a_max - ρarea, Δt)
+            # @. tends_ρarea = -∇c(wvec(LBF(Ic(w_up) * ρarea))) + limit_tendency(edtl, ρarea * Ic(w_up) * (entr_turb_dyn - detr_turb_dyn), ρarea, ρ_c * a_max - ρarea, Δt)
+            @. tends_ρarea += limit_tendency(edtl, ρarea * Ic(w_up) * (entr_turb_dyn - detr_turb_dyn), ρarea, ρ_c * a_max - ρarea, Δt)
+            # @. tends_ρarea += limit_tendency(edtl, ρarea * Ic(w_up) * (entr_turb_dyn - detr_turb_dyn), ρarea + test_advect_p , ρ_c * a_max - ρarea + test_advect_n, Δt)
+            # @. tends_ρarea += limit_tendency(edtl, ρarea * Ic(w_up) * (entr_turb_dyn - detr_turb_dyn), max(ρarea+tends_ρarea*Δt,0), ρ_c * a_max - max(ρarea+tends_ρarea*Δt,0), Δt) # the area available to entr/detr is affected by how much area advection is coming in? this could be bad though as that advection comes with new scalar values as well so maybe it's best to ignore it?
         elseif edmf.entrainment_type isa TotalRateEntrModel
-            @. tends_ρarea = -∇c(wvec(LBF(Ic(w_up) * ρarea))) + limit_tendency(edtl, ρarea * (entr_rate_inv_s - detr_rate_inv_s), ρarea, ρ_c * a_max - ρarea, Δt)
+            # @. tends_ρarea = -∇c(wvec(LBF(Ic(w_up) * ρarea))) + limit_tendency(edtl, ρarea * (entr_rate_inv_s - detr_rate_inv_s), ρarea, ρ_c * a_max - ρarea, Δt)
+            @.tends_ρarea += limit_tendency(edtl, ρarea * (entr_rate_inv_s - detr_rate_inv_s), ρarea, ρ_c * a_max - ρarea, Δt)
+            # @. tends_ρarea += limit_tendency(edtl, ρarea * (entr_rate_inv_s - detr_rate_inv_s), ρarea + test_advect_p, ρ_c * a_max - ρarea + test_advect_n, Δt)
+            # @. tends_ρarea_entr_detr = limit_tendency(edtl, ρarea * (entr_rate_inv_s - detr_rate_inv_s), max(ρarea+tends_ρarea*Δt,0), ρ_c * a_max - max(ρarea+tends_ρarea*Δt,0), Δt)
         end
 
+        # test_advect = similar(tends_ρarea)
+        # test_advect_p = similar(tends_ρarea)
+        # test_advect_n = similar(tends_ρarea)
+        # @. test_advect = -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice))) * Δt
+        # @. test_advect_p = max(test_advect, FT(0))
+        # @. test_advect_n = -min(test_advect, FT(0))
+
+        # test_precip = similar(tends_ρarea)
+        # test_precip_p = similar(tends_ρarea)
+        # test_precip_n = similar(tends_ρarea)
+        # @. test_precip = ρ_c * θ_liq_ice_tendency_precip_formation * Δt
+        # @. test_precip_p = max(test_precip, FT(0))
+        # @. test_precip_n = -min(test_precip, FT(0))
+
+
+        # test_advect_q = similar(tends_ρarea)
+        # test_advect_q_p = similar(tends_ρarea)
+        # test_advect_q_n = similar(tends_ρarea)
+        # @. test_advect_q = -∇c(wvec(LBF(Ic(w_up) * ρaq_tot))) * Δt
+        # @. test_advect_q_p = max(test_advect_q, FT(0))
+        # @. test_advect_q_n = -min(test_advect_q, FT(0))
+
+        # test_precip_q = similar(tends_ρarea)
+        # test_precip_q_p = similar(tends_ρarea)
+        # test_precip_q_n = similar(tends_ρarea)
+        # @. test_precip_q = ρ_c * qt_tendency_precip_formation * Δt
+        # @. test_precip_q_p = max(test_precip_q, FT(0))
+        # @. test_precip_q_n = -min(test_precip_q, FT(0))
+
         if edmf.entrainment_type isa FractionalEntrModel
             @. tends_ρaθ_liq_ice =
-                -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice))) + limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) - (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn) , ρaθ_liq_ice, ρ_c * area_en * θ_liq_ice_en, Δt) +
-                 (ρ_c * θ_liq_ice_tendency_precip_formation)
+                -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice))) + 
+
+                # progvar_area_tendency_resolver(edtl, ρarea, θ_liq_ice_up, θ_liq_ice_gm, tends_ρarea,
+
+                progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaθ_liq_ice / ρarea, prog_gm.ρθ_liq_ice / ρ_c), prog_gm.ρθ_liq_ice / ρ_c, tends_ρarea,
+                    limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) - (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn) , ρaθ_liq_ice, ρ_c * area_en * θ_liq_ice_en, Δt), ρ_c, Δt, use_resolver = use_resolver) +
+                 
+                # progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaθ_liq_ice / ρarea, prog_gm.ρθ_liq_ice / ρ_c), prog_gm.ρθ_liq_ice / ρ_c, tends_ρarea_entr_detr, # really only the entr/detr part of the area tendency is involved in the mixing... but you could be entr/detr incoming air that has diff properties so hard to  implement
+                #     limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) - (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn) , ρaθ_liq_ice + test_advect_p + test_precip_p, ρ_c * area_en * θ_liq_ice_en + test_advect_n + test_precip_n , Δt), ρ_c, Δt, use_resolver = use_resolver) +
+                 
+                    (ρ_c * θ_liq_ice_tendency_precip_formation)
             @. tends_ρaq_tot =
-                -∇c(wvec(LBF(Ic(w_up) * ρaq_tot))) + limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en) - (ρaq_tot * Ic(w_up) * detr_turb_dyn), ρaq_tot, ρ_c * area_en * q_tot_en, Δt) +
-                 (ρ_c * qt_tendency_precip_formation)
+                -∇c(wvec(LBF(Ic(w_up) * ρaq_tot))) +
+
+                # progvar_area_tendency_resolver(edtl, ρarea, q_tot_up, q_tot_gm, tends_ρarea,
+
+                progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_tot / ρarea, prog_gm.ρq_tot / ρ_c), prog_gm.ρq_tot / ρ_c, tends_ρarea,
+                    limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en) - (ρaq_tot * Ic(w_up) * detr_turb_dyn), ρaq_tot, ρ_c * area_en * q_tot_en, Δt), ρ_c, Δt, use_resolver = use_resolver) +
+
+                # progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_tot / ρarea, prog_gm.ρq_tot / ρ_c), prog_gm.ρq_tot / ρ_c, tends_ρarea_entr_detr,
+                #     limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en) - (ρaq_tot * Ic(w_up) * detr_turb_dyn), ρaq_tot + test_advect_q_p + test_precip_q_p, ρ_c * area_en * q_tot_en + test_advect_q_n + test_precip_q_n, Δt), ρ_c, Δt, use_resolver = use_resolver) +
+                
+                    (ρ_c * qt_tendency_precip_formation)
 
         elseif edmf.entrainment_type isa TotalRateEntrModel
             @. tends_ρaθ_liq_ice =
-                -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice))) + limit_tendency(edtl, (ρarea * entr_rate_inv_s * θ_liq_ice_en) - (ρarea * detr_rate_inv_s * θ_liq_ice_up), ρaθ_liq_ice, ρ_c * area_en * θ_liq_ice_en, Δt) +
-                 (ρ_c * θ_liq_ice_tendency_precip_formation)
+                -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice))) +
+
+                # progvar_area_tendency_resolver(edtl, ρarea, θ_liq_ice_up, θ_liq_ice_gm, tends_ρarea,
+
+                progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaθ_liq_ice / ρarea, prog_gm.ρθ_liq_ice / ρ_c), prog_gm.ρθ_liq_ice / ρ_c, tends_ρarea,
+                    limit_tendency(edtl, (ρarea * entr_rate_inv_s * θ_liq_ice_en) - (ρarea * detr_rate_inv_s * θ_liq_ice_up), ρaθ_liq_ice, ρ_c * area_en * θ_liq_ice_en, Δt), ρ_c, Δt, use_resolver = use_resolver) +
+
+                # progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaθ_liq_ice / ρarea, prog_gm.ρθ_liq_ice / ρ_c), prog_gm.ρθ_liq_ice / ρ_c, tends_ρarea_entr_detr,
+                #     limit_tendency(edtl, (ρarea * entr_rate_inv_s * θ_liq_ice_en) - (ρarea * detr_rate_inv_s * θ_liq_ice_up), ρaθ_liq_ice + test_advect_p + test_precip_p, ρ_c * area_en * θ_liq_ice_en + test_advect_n + test_precip_n , Δt), ρ_c, Δt, use_resolver = use_resolver) +
+                 
+                (ρ_c * θ_liq_ice_tendency_precip_formation)
             @. tends_ρaq_tot =
-                -∇c(wvec(LBF(Ic(w_up) * ρaq_tot))) + limit_tendency(edtl, (ρarea * entr_rate_inv_s * q_tot_en) - (ρarea * detr_rate_inv_s * q_tot_up), ρaq_tot, ρ_c * area_en * q_tot_en, Δt) +
-                 (ρ_c * qt_tendency_precip_formation)
+                -∇c(wvec(LBF(Ic(w_up) * ρaq_tot))) + 
+
+                # progvar_area_tendency_resolver(edtl, ρarea, q_tot_up, q_tot_gm, tends_ρarea,   
+
+                progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_tot / ρarea, prog_gm.ρq_tot / ρ_c), prog_gm.ρq_tot / ρ_c, tends_ρarea,
+                    limit_tendency(edtl, (ρarea * entr_rate_inv_s * q_tot_en) - (ρarea * detr_rate_inv_s * q_tot_up), ρaq_tot, ρ_c * area_en * q_tot_en, Δt), ρ_c, Δt, use_resolver = use_resolver) +
+
+                # progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_tot / ρarea, prog_gm.ρq_tot / ρ_c),  prog_gm.ρq_tot / ρ_c, tends_ρarea_entr_detr,             
+                #     limit_tendency(edtl, (ρarea * entr_rate_inv_s * q_tot_en) - (ρarea * detr_rate_inv_s * q_tot_up), ρaq_tot + test_advect_q_p + test_precip_q_p, ρ_c * area_en * q_tot_en + test_advect_q_n + test_precip_q_n, Δt), ρ_c, Δt, use_resolver = use_resolver) +
+                 
+                    (ρ_c * qt_tendency_precip_formation)
         end
 
         if edmf.moisture_model isa NonEquilibriumMoisture
@@ -755,19 +966,45 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
             if edmf.entrainment_type isa FractionalEntrModel
                 
                 @. tends_ρaq_liq =
-                    -∇c(wvec(LBF(Ic(w_up) * ρaq_liq))) + limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * q_liq_en) - (ρaq_liq * Ic(w_up) * detr_turb_dyn) , ρaq_liq, ρ_c * area_en * q_liq_en, Δt) +
-                     (ρ_c * (ql_tendency_precip_formation + ql_tendency_noneq))
+                    -∇c(wvec(LBF(Ic(w_up) * ρaq_liq))) + 
+
+                    # progvar_area_tendency_resolver(edtl, ρarea, q_liq_up, q_liq_gm, tends_ρarea,
+
+                    progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_liq / ρarea, prog_gm.q_liq), prog_gm.q_liq, tends_ρarea,
+                        limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * q_liq_en) - (ρaq_liq * Ic(w_up) * detr_turb_dyn) , ρaq_liq, ρ_c * area_en * q_liq_en, Δt), ρ_c, Δt, use_resolver = use_resolver) +
+
+                        (ρ_c * (ql_tendency_precip_formation + ql_tendency_noneq))
+                        
                 @. tends_ρaq_ice =
-                    -∇c(wvec(LBF(Ic(w_up) * ρaq_ice))) + limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * q_ice_en) - (ρaq_ice * Ic(w_up) * detr_turb_dyn) , ρaq_ice, ρ_c * area_en * q_ice_en, Δt) + 
-                     (ρ_c * (qi_tendency_precip_formation + qi_tendency_noneq))
+                    -∇c(wvec(LBF(Ic(w_up) * ρaq_ice))) +
+                    
+                    # progvar_area_tendency_resolver(edtl, ρarea, q_ice_up, q_ice_gm, tends_ρarea, 
+
+                    progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_ice / ρarea, prog_gm.q_ice), prog_gm.q_ice, tends_ρarea,
+                        limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * q_ice_en) - (ρaq_ice * Ic(w_up) * detr_turb_dyn) , ρaq_ice, ρ_c * area_en * q_ice_en, Δt), ρ_c, Δt, use_resolver = use_resolver) +
+
+                        (ρ_c * (qi_tendency_precip_formation + qi_tendency_noneq))
                     
             elseif edmf.entrainment_type isa TotalRateEntrModel
                 @. tends_ρaq_liq =
-                    -∇c(wvec(LBF(Ic(w_up) * ρaq_liq))) + limit_tendency(edtl, (ρarea * entr_rate_inv_s * q_liq_en) - (ρarea * detr_rate_inv_s * q_liq_up), ρaq_liq, ρ_c * area_en * q_liq_en, Δt) +
-                     (ρ_c * (ql_tendency_precip_formation + ql_tendency_noneq))
+                    -∇c(wvec(LBF(Ic(w_up) * ρaq_liq))) + 
+
+                    # progvar_area_tendency_resolver(edtl, ρarea, q_liq_up, q_liq_gm, tends_ρarea,
+
+                    progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_liq / ρarea, prog_gm.q_liq), prog_gm.q_liq, tends_ρarea,
+                        limit_tendency(edtl, (ρarea * entr_rate_inv_s * q_liq_en) - (ρarea * detr_rate_inv_s * q_liq_up), ρaq_liq, ρ_c * area_en * q_liq_en, Δt), ρ_c, Δt, use_resolver = use_resolver) +
+
+                        (ρ_c * (ql_tendency_precip_formation + ql_tendency_noneq))
+
                 @. tends_ρaq_ice =
-                    -∇c(wvec(LBF(Ic(w_up) * ρaq_ice))) + limit_tendency(edtl, (ρarea * entr_rate_inv_s * q_ice_en) - (ρarea * detr_rate_inv_s * q_ice_up), ρaq_ice, ρ_c * area_en * q_ice_en, Δt) +
-                     (ρ_c * (qi_tendency_precip_formation + qi_tendency_noneq))
+                    -∇c(wvec(LBF(Ic(w_up) * ρaq_ice))) +
+
+                    # progvar_area_tendency_resolver(edtl, ρarea, q_ice_up, q_ice_gm, tends_ρarea,
+
+                    progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_ice / ρarea, prog_gm.q_ice), prog_gm.q_ice, tends_ρarea,
+                        limit_tendency(edtl, (ρarea * entr_rate_inv_s * q_ice_en) - (ρarea * detr_rate_inv_s * q_ice_up), ρaq_ice, ρ_c * area_en * q_ice_en, Δt), ρ_c, Δt, use_resolver = use_resolver) +
+
+                        (ρ_c * (qi_tendency_precip_formation + qi_tendency_noneq))
             end
 
 
@@ -776,7 +1013,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
                 qi_tendency_sedimentation = aux_up_i.qi_tendency_sedimentation
                 qt_tendency_sedimentation = aux_up_i.qt_tendency_sedimentation # this is just the sum of the liq and ice tendencies
                 θ_liq_ice_tendency_sedimentation = aux_up_i.θ_liq_ice_tendency_sedimentation
-                # ==  these get backed out after gm tendencies applied in dycore so only use if addin entr/detr == #
+                # ==  these get backed out after gm tendencies applied in dycore so only add if using in calculation of entr/detr == #
                 # ql_tendency_sedimentation_en = aux_en.ql_tendency_sedimentation 
                 # qi_tendency_sedimentation_en = aux_en.qi_tendency_sedimentation
                 # qt_tendency_sedimentation_en = aux_en.qt_tendency_sedimentation # this is just the sum of the liq and ice tendencies
@@ -795,13 +1032,12 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
             tends_ρaq_ice[kc_surf] = 0
 
 
-    
-            tends_ρaq_liq_advec = @. (-∇c(wvec(LBF(Ic(w_up) * ρaq_liq))))
-            if edmf.entrainment_type isa FractionalEntrModel
-                tends_ρaq_liq_entr_detr = @. limit_tendency(edtl,(ρarea * Ic(w_up) * entr_turb_dyn * q_liq_en) - (ρaq_liq * Ic(w_up) * detr_turb_dyn), ρaq_liq, ρ_c * area_en * q_liq_en, Δt)
-            elseif edmf.entrainment_type isa TotalRateEntrModel
-                tends_ρaq_liq_entr_detr = @. limit_tendency(edtl,(ρarea * entr_rate_inv_s * q_liq_en) - (ρarea * detr_rate_inv_s * q_liq_up), ρaq_liq, ρ_c * area_en * q_liq_en, Δt)
-            end
+            # tends_ρaq_liq_advec = @. (-∇c(wvec(LBF(Ic(w_up) * ρaq_liq))))
+            # if edmf.entrainment_type isa FractionalEntrModel
+            #     tends_ρaq_liq_entr_detr = @. limit_tendency(edtl,(ρarea * Ic(w_up) * entr_turb_dyn * q_liq_en) - (ρaq_liq * Ic(w_up) * detr_turb_dyn), ρaq_liq, ρ_c * area_en * q_liq_en, Δt)
+            # elseif edmf.entrainment_type isa TotalRateEntrModel
+            #     tends_ρaq_liq_entr_detr = @. limit_tendency(edtl,(ρarea * entr_rate_inv_s * q_liq_en) - (ρarea * detr_rate_inv_s * q_liq_up), ρaq_liq, ρ_c * area_en * q_liq_en, Δt)
+            # end
 
             # print_all::Bool = false
             # @inbounds for k in real_center_indices(grid)
@@ -828,6 +1064,8 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
             #     @info "w_up = $(parent(Ic.(w_up)))"
             # end
         end
+
+        # we cannot bound the overall tendency , we are not bound to go towards the mean overall.... just only from entr/detr !!!!
 
         # prognostic entr/detr
         if edmf.entr_closure isa PrognosticNoisyRelaxationProcess
@@ -859,20 +1097,11 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         However, filtering is done at the beginning of ∑tendencies!(), not the end... so any limiter here won't know the gm_tendencies
         =#
 
-    end
+    # end
 
-    # Solve for updraft velocity
+    # # Solve for updraft velocity
 
-    # We know that, since W = 0 at z = 0, BCs for entr, detr,
-    # and buoyancy should not matter in the end
-    zero_bcs = (; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
-    I0f = CCO.InterpolateC2F(; zero_bcs...)
-    adv_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
-    LBC = CCO.LeftBiasedF2C(; bottom = CCO.SetValue(FT(0)))
-    ∇f = CCO.DivergenceC2F(; adv_bcs...)
-    a_en = aux_en.area
 
-    @inbounds for i in 1:N_up
         ρaw = prog_up_f[i].ρaw
         tends_ρaw = tendencies_up_f[i].ρaw
         nh_pressure = aux_up_f[i].nh_pressure
@@ -886,18 +1115,16 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         buoy = aux_up[i].buoy
 
         @. tends_ρaw = -(∇f(wvec(LBC(ρaw * w_up))))
+
+        # w_en can go negative so these limiters don't make sense..., if it's a problem we can set the limiter based on CFL using new w_en and w_up estimates but we already limit CFL in the updraft so maybe it's best to just do nothing... not sure.
         if edmf.entrainment_type isa FractionalEntrModel
-            # @. tends_ρaw +=
-                # (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) + nh_pressure
-            @. tends_ρaw += limit_tendency(edtl, ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up), ρaw, ρ_f * ᶠinterp_a(a_en) * w_en, Δt) + 
-                (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) + nh_pressure
+            @. tends_ρaw +=
+                (ρaw * (I0f(entr_w) * w_en - I0f(detr_w) * w_up)) + (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) + nh_pressure
         elseif edmf.entrainment_type isa TotalRateEntrModel
-            # @. tends_ρaw +=
-            #     ρ_f * ᶠinterp_a(a_up) * (ᶠinterp_a(entr_rate_inv_s) * w_en - ᶠinterp_a(detr_rate_inv_s) * w_up) +
-            #     (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) +
-            #     nh_pressure
-            @. tends_ρaw += limit_tendency(edtl, ρ_f * ᶠinterp_a(a_up) * (ᶠinterp_a(entr_rate_inv_s) * w_en - ᶠinterp_a(detr_rate_inv_s) * w_up), ρaw, ρ_f * ᶠinterp_a(a_en) * w_en, Δt) +
-                (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) + nh_pressure
+            @. tends_ρaw +=
+                ρ_f * ᶠinterp_a(a_up) * (ᶠinterp_a(entr_rate_inv_s) * w_en - ᶠinterp_a(detr_rate_inv_s) * w_up) +
+                (ρ_f * ᶠinterp_a(a_up) * I0f(buoy)) +
+                nh_pressure
         end
 
         tends_ρaw[kf_surf] = 0
@@ -956,6 +1183,7 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
 
     prog_up = center_prog_updrafts(state)
     prog_gm = center_prog_grid_mean(state)
+    aux_gm = center_aux_grid_mean(state)
     aux_gm_f = face_aux_grid_mean(state)
     aux_up = center_aux_updrafts(state)
     aux_up_f = face_aux_updrafts(state)
@@ -972,12 +1200,26 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         prog_up[i].ρarea .= max.(prog_up[i].ρarea, 0)
         prog_up[i].ρaθ_liq_ice .= max.(prog_up[i].ρaθ_liq_ice, 0)
         prog_up[i].ρaq_tot .= max.(prog_up[i].ρaq_tot, 0)
+
         if edmf.entr_closure isa PrognosticNoisyRelaxationProcess
             @. prog_up[i].ε_nondim = max(prog_up[i].ε_nondim, 0)
             @. prog_up[i].δ_nondim = max(prog_up[i].δ_nondim, 0)
         end
         @inbounds for k in real_center_indices(grid)
             prog_up[i].ρarea[k] = min(prog_up[i].ρarea[k], ρ_c[k] * a_max) # should we not instead be scaling down the sum of all updrafts to at most a_max?
+
+            #= If the area does not go to 0 but the tracer does, bad things may be ahead.
+            We cannot physically have θ_liq_ice = 0 if ρarea > 0, for example. qt is more debatable but probably should also not be 0.
+            So, we will enforce that if the area is not 0, and the tracer is *exactly* 0, we will set it to the grid mean value.
+            The *exactly* is important, the tracer value can be less than the grid mean, it's just that if it reaches 0 while the area hasn't something is wrong (and the model will crash w/ T=0 for example).
+            =#
+            if (prog_up[i].ρarea[k] > 0) && iszero(prog_up[i].ρaθ_liq_ice[k])
+                prog_up[i].ρaθ_liq_ice[k] = prog_gm.ρθ_liq_ice[k] / ρ_c[k] * prog_up[i].ρarea[k]
+            end
+            if (prog_up[i].ρarea[k] > 0) && iszero(prog_up[i].ρaq_tot[k])# this one is more debatable but ok. really qt is never practically 0 but you could imagine some initialization where it is
+                prog_up[i].ρaq_tot[k] = prog_gm.ρq_tot[k] / ρ_c[k] * prog_up[i].ρarea[k]
+            end
+
         end
         if edmf.moisture_model isa NonEquilibriumMoisture
             prog_up[i].ρaq_liq .= max.(prog_up[i].ρaq_liq, 0)
@@ -1020,6 +1262,20 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         @. prog_up_f[i].ρaw = Int(ᶠinterp_a(prog_up[i].ρarea) >= ρ_f * a_min) * prog_up_f[i].ρaw
     end
 
+    # no penetration at the top of the atmosphere
+    kf_toa = kf_top_of_atmos(grid)
+    kc_toa = kc_top_of_atmos(grid)
+    @inbounds for i in 1:N_up
+        prog_up_f[i].ρaw[kf_toa] = 0
+        prog_up[i].ρarea[kc_toa] = 0
+        prog_up[i].ρaθ_liq_ice[kc_toa] = 0
+        prog_up[i].ρaq_tot[kc_toa] = 0
+        if edmf.moisture_model isa NonEquilibriumMoisture
+            prog_up[i].ρaq_liq[kc_toa] = 0
+            prog_up[i].ρaq_ice[kc_toa] = 0
+        end
+    end
+
     @inbounds for k in real_center_indices(grid)
         @inbounds for i in 1:N_up
             is_surface_center(grid, k) && continue
@@ -1040,9 +1296,18 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
 
     Ic = CCO.InterpolateF2C()
     @inbounds for i in 1:N_up
-        @. prog_up[i].ρarea = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρarea)
-        @. prog_up[i].ρaθ_liq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaθ_liq_ice)
-        @. prog_up[i].ρaq_tot = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_tot)
+        # test not doing this instant detrainment..... at the least we could maybe to to grid mean? or force detrainment to actually do it... idk... also it breaks things for later mixing only really makes sense at updraft top perhaps but now we have elevated convection.
+        # the real problem is that it then spikes the gradients of everything else just bc w went to 0... so then ρarea or ρaq gradients get all jacked up 
+        # @. prog_up[i].ρarea = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρarea)  # trying not doing this
+
+        # @. prog_up[i].ρaθ_liq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaθ_liq_ice) # trying not doing this
+        # @. prog_up[i].ρaq_tot = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_tot) # trying not doing this...
+
+        if edmf.entrainment_type.mix_stalled_updraft_to_grid_mean
+            @. prog_up[i].ρaθ_liq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, prog_gm.ρθ_liq_ice * prog_up[i].ρarea/ ρ_c, prog_up[i].ρaθ_liq_ice) # test using gm | not ideal but we don't know detrainment timescale in absence of w_up so to avoid languishing w/o adding another calibrated parameter maybe it's better?
+            @. prog_up[i].ρaq_tot = ifelse(Ic(prog_up_f[i].ρaw) <= 0, prog_gm.ρq_tot * prog_up[i].ρarea / ρ_c, prog_up[i].ρaq_tot) # test using gm 
+        end
+
         if edmf.surface_area_bc isa FixedSurfaceAreaBC || edmf.surface_area_bc isa ClosureSurfaceAreaBC
             a_surf = area_surface_bc(surf, edmf, i, edmf.surface_area_bc)
             prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_surf
@@ -1053,8 +1318,14 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         prog_up[i].ρaq_tot[kc_surf] = prog_up[i].ρarea[kc_surf] * q_surf
 
         if edmf.moisture_model isa NonEquilibriumMoisture
-            @. prog_up[i].ρaq_liq = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_liq)
-            @. prog_up[i].ρaq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_ice)
+            # @. prog_up[i].ρaq_liq = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_liq) # trying not doing this
+            # @. prog_up[i].ρaq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, FT(0), prog_up[i].ρaq_ice) # trying not doing this
+
+            if edmf.entrainment_type.mix_stalled_updraft_to_grid_mean
+                @. prog_up[i].ρaq_liq = ifelse(Ic(prog_up_f[i].ρaw) <= 0, prog_gm.q_liq * prog_up[i].ρarea / ρ_c, prog_up[i].ρaq_liq) # test using gm
+                @. prog_up[i].ρaq_ice = ifelse(Ic(prog_up_f[i].ρaw) <= 0, prog_gm.q_ice * prog_up[i].ρarea / ρ_c, prog_up[i].ρaq_ice) # test using gm
+            end
+
             ql_surf = ql_surface_bc(surf)
             qi_surf = qi_surface_bc(surf)
             prog_up[i].ρaq_liq[kc_surf] = prog_up[i].ρarea[kc_surf] * ql_surf

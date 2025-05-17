@@ -1287,6 +1287,23 @@ initialize_radiation(::LES_driven_SCM, radiation, grid::Grid, state, param_set; 
 ##### SOCRATES
 #####
 
+function aux_data_kwarg(::SOCRATES, namelist)
+
+    conservative_interp_kwargs = namelist["grid"]["conservative_interp_kwargs"]["in"] # convert to nt no matter what for type stability, but don't convert to SSCF yet bc that strips out conservative_interp key...
+
+    # should be Dict of String -> Union{Bool, String}
+    # conservative_interp_kwargs = Dict{Symbol, Union{Bool, Symbol}}(Symbol(k) => isa(v, String) ? Symbol(v) : v for (k, v) in conservative_interp_kwargs)
+    conservative_interp_kwargs = NamedTuple((Symbol(k) => isa(v, String) ? Symbol(v) : v for (k, v) in conservative_interp_kwargs) ) # convert Strings to symbols
+
+    conservative_interp = get(conservative_interp_kwargs, :conservative_interp, false) # break out bc SSCF hanles this separately and will strip it from the tuple
+    conservative_interp_kwargs = SSCF.get_conservative_interp_kwargs(conservative_interp_kwargs) # convert to SSCF kwargs format and fill in missing withb defaults
+
+    @info "Using conservative interpolation kwargs: $conservative_interp_kwargs"
+
+    return (; conservative_interp, conservative_interp_kwargs)
+
+end
+
 function surface_ref_state(case::SOCRATES, param_set::APS, namelist) # adopted mostly from LES (most similar setup, but what is this for? should i set it to somethign more generic?
     thermo_params = TCP.thermodynamics_params(param_set)
     return SSCF.process_case(
@@ -1304,6 +1321,9 @@ function initialize_profiles(case::SOCRATES, grid::Grid, param_set, state; kwarg
     thermo_params = TCP.thermodynamics_params(param_set)
     new_zc = vec(grid.zc.z)
     new_zf = vec(grid.zf.z)[1:(end - 1)] # apply the zf interpolated forcing on zc ahead (I think that's what atlas did..., we might just have different face/center logic
+
+    (; conservative_interp, conservative_interp_kwargs) = values(kwargs) # values converts kwargs to named tuple which we then unpack... we could also use kwargs[:conservative_interp] ...
+
     IC = SSCF.process_case(
         case.flight_number;
         forcing_type = case.forcing_type,
@@ -1321,6 +1341,8 @@ function initialize_profiles(case::SOCRATES, grid::Grid, param_set, state; kwarg
         ),
         initial_condition = true,
         thermo_params = thermo_params,
+        conservative_interp = conservative_interp, #  aux_data_kwarg()
+        conservative_interp_kwargs = conservative_interp_kwargs, # parsed in aux_data_kwarg()
     )
 
     prog_gm_u = copy(aux_gm.q_tot) # copy as template cause u,g go into a uₕ vector so this is easier to work with (copied from other cases...)
@@ -1386,15 +1408,24 @@ function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # 
         surface = "conditions",
         thermo_params = thermo_params,
     )
+
+    # drop conservative_interp_kwargs from kwargs
+    if haskey(kwargs, :conservative_interp_kwargs) # filter named tuple
+        # drop just that key from the list of pairs
+        kwargs = filter(x -> x[1] ∉ (:conservative_interp, :conservative_interp_kwargs), kwargs)
+    end
+
     zrough = 0.1 # copied from gabls which is also w/ monin obhukov boundary layer
     # no ustar w/ monin obukhov i guess, seems to be calculated in https://github.com/CliMA/SurfaceFluxes.jl src/SurfaceFluxes.jl/compute_ustar()
     kwargs = (; Tsurface = sc.Tg, qsurface = sc.qg, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive,
     return TC.MoninObukhovSurface(FT; kwargs...) # interactive?
 end
 
-function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_set) # param_set isn't used but matches form in main.jl
+function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_set; kwargs...) # param_set isn't used but matches form in main.jl
     new_zc = vec(grid.zc.z)
     new_zf = vec(grid.zf.z)[1:(end - 1)]
+
+    (; conservative_interp, conservative_interp_kwargs) = values(kwargs) # values converts kwargs to named tuple which we then unpack... we could also use kwargs[:conservative_interp] ...
 
     thermo_params = TCP.thermodynamics_params(param_set)
     forcing.forcing_funcs[] = SSCF.process_case(
@@ -1414,6 +1445,8 @@ function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_se
         ),
         initial_condition = false,
         thermo_params = thermo_params,
+        conservative_interp = conservative_interp, # parsed in aux_data_kwarg()
+        conservative_interp_kwargs = conservative_interp_kwargs, # parsed in aux_data_kwarg()
     )
     initialize(forcing, grid, state) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
 end
@@ -1471,9 +1504,11 @@ end
 RadiationBase(case::SOCRATES, FT) = RadiationBase{Cases.get_radiation_type(case), FT}() # i think this should default to none, would deprecate this call for now cause we dont have a use, default is just none... but aux_data_kwarg is in the end of the main.jl initialize_radiation.jl cal so we gotta improvise
 
 # initialize_radiation(::SOCRATES, radiation, grid::Grid, state, param_set;) = nothing # for now we jus deprecate, if we reimplement a call to radation it will need to match our initialize forcing call structure w/ param_set and Dat
-function initialize_radiation(case::SOCRATES, radiation, grid::Grid, state, param_set)
+function initialize_radiation(case::SOCRATES, radiation, grid::Grid, state, param_set; kwargs...)
     new_zc = vec(grid.zc.z)
     new_zf = vec(grid.zf.z)[1:(end - 1)]
+
+    (; conservative_interp, conservative_interp_kwargs) = values(kwargs) # values converts kwargs to named tuple which we then unpack... we could also use kwargs[:conservative_interp] ...
 
     thermo_params = TCP.thermodynamics_params(param_set)
     radiation.radiation_funcs[] = SSCF.process_case(
@@ -1493,6 +1528,8 @@ function initialize_radiation(case::SOCRATES, radiation, grid::Grid, state, para
         ),
         initial_condition = false,
         thermo_params = thermo_params,
+        conservative_interp = conservative_interp, # parsed in aux_data_kwarg()
+        conservative_interp_kwargs = conservative_interp_kwargs, # parsed in aux_data_kwarg()
     ) # redundant w/ forcing but oh well
     initialize(radiation, grid, state) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
 end

@@ -6,8 +6,8 @@ debug = false
 FT = Float64
 forcing_type = :obs_data
 
-flight_numbers = 10
-# flight_numbers = 9
+# flight_numbers = 1
+flight_numbers = 9
 # flight_numbers = [1, 9, 10, 12, 13]
 # flight_numbers = 1
 
@@ -117,7 +117,7 @@ for flight_number in flight_numbers
 
         # namelist["time_stepping"]["dt_min"] = 1.0
         # namelist["time_stepping"]["dt_max"] = 2.0
-        namelist["time_stepping"]["dt_min"] = 20.0
+        namelist["time_stepping"]["dt_min"] = 10.0
         namelist["time_stepping"]["dt_max"] = 10.0
         namelist["time_stepping"]["adapt_dt"] = true
         namelist["time_stepping"]["use_tendency_timestep_limiter"] = true
@@ -139,28 +139,35 @@ for flight_number in flight_numbers
         nonequilibrium_moisture_scheme = :geometric_liq__powerlaw_T_scaling_ice
         # namelist["microphysics"]["τ_sub_dep"] = 100000.0
         # namelist["microphysics"]["τ_cond_evap"] = 1.0
-        # namelist["user_args"] = (; nonequilibrium_moisture_scheme = nonequilibrium_moisture_scheme, τ_use = :morrison_milbrandt_2015_style, use_sedimentation = false, grid_mean_sedimentation = false)
-        # namelist["user_args"] = (;nonequilibrium_moisture_scheme=nonequilibrium_moisture_scheme, τ_use=:morrison_milbrandt_2015_style_exponential_part_only) 
-        # namelist["user_args"] = (;nonequilibrium_moisture_scheme=nonequilibrium_moisture_scheme, τ_use=:standard) 
 
 
 
 
-        # namelist["user_params"]["initial_profile_updraft_area"] = 0.33 # i think either dict or named tuple is fine, we dispatch depending... # doesn't seem to work anyway...
+        # namelist["user_params"]["initial_profile_updraft_area"] = FT(.3) # i think either dict or named tuple is fine, we dispatch depending... # doesn't seem to work anyway...
+        namelist["user_params"]["initial_profile_updraft_area"] = FT(.05) # i think either dict or named tuple is fine, we dispatch depending... # doesn't seem to work anyway...
+        namelist["user_params"]["use_resolver"] = false # i think either dict or named tuple is fine, we dispatch depending... # doesn't seem to work anyway...
 
 
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["updraft_mixing_frac"] = 0.6
         # ("turbulence", "EDMF_PrognosticTKE", "max_area", FT(.3)), # stability limiting...
         namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area_bc"] = "Prognostic" # unstable w/o  setting other params (didn't help lol, was 0 at sfc)
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area_bc"] = "Fixed" # unstable w/o  setting other params (didn't help lol, was 0 at sfc)
+
         # 
 
 
         # surface area  
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = FT(0.45) # stability (maybe we need to use the limiter instead tho to not get flat cloud tops?)
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = FT(0.9) # stability (maybe we need to use the limiter instead tho to not get flat cloud tops?)
         namelist["turbulence"]["EDMF_PrognosticTKE"]["min_area"] = FT(1e-10) # stability (maybe we need to use the limiter instead tho to not get flat cloud tops?)
+
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["min_area"] = FT(1e-4) # stability (maybe we need to use the limiter instead tho to not get flat cloud tops?)
+
 
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["min_area"] = FT(0.3) # testing
         namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = 0.3
+
+
+
 
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["updraft_number"] = 2 # testing lol
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] = [0.25, 0.1] # testing lol, maybe they'll combine nicely
@@ -228,14 +235,14 @@ for flight_number in flight_numbers
         namelist["user_params"]["rain_sedimentation_scaling_factor"] = 1.0813243749787707 
         namelist["user_params"]["snow_sedimentation_scaling_factor"] = 1.030624346659287 
 
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_power"] = 35.52149505301267 
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_scale"] = 0.20274259096885316 
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] =  0.03176056443055847 
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_power"] = 35.52149505301267 
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["area_limiter_scale"] = 0.20274259096885316 
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area"] =  0.03176056443055847 
 
-        namelist["microphysics"]["τ_acnv_rai"] = 16.44967299681959 
-        namelist["microphysics"]["τ_acnv_sno"] = 31.87217008160495 
+        namelist["microphysics"]["τ_acnv_rai"] = 1600.44967299681959 
+        namelist["microphysics"]["τ_acnv_sno"] = 310.87217008160495 
         namelist["microphysics"]["q_liq_threshold"] = 4.273820398645035e-8 
-        namelist["microphysics"]["q_ice_threshold"] = 1.6602807618941017e-6 
+        namelist["microphysics"]["q_ice_threshold"] = 1.6602807618941017e-8
         namelist["microphysics"]["τ_cond_evap"]  = 5.684678316404151 
     
         
@@ -263,10 +270,9 @@ for flight_number in flight_numbers
             )
 
             
+        namelist["user_params"]["ice_sedimentation_Dmax"] = 62.5e-6 * 2 # 62.5 microns cutoff from CM
 
-        namelist["user_params"]["ice_sedimentation_Dmax"] = 62.5e-6 # 62.5 microns cutoff from CM
-
-        namelist["user_params"]["ice_sedimentation_Dmax"] = Inf # 62.5 microns cutoff from CM
+        # namelist["user_params"]["ice_sedimentation_Dmax"] = Inf # 62.5 microns cutoff from CM
         
         namelist["user_params"]["adjust_ice_N"] = true
         namelist["microphysics"]["r_ice_snow"] = 62.5e-6
@@ -315,6 +321,7 @@ for flight_number in flight_numbers
 
 
 
+
         # namelist["thermodynamics"]["potential_temperature_reference_pressure"] = 985. * 100 # try changing this...
 
         # namelist["thermodynamics"]["moisture_model"] = "equilibrium"
@@ -332,18 +339,17 @@ for flight_number in flight_numbers
         # namelist = setup["namelist"]
         # namelist["user_params"] = namelist["user_aux"] # backport fix
         # dt = 0.5
-        # dt = 5.0
-        dt = 2.0
-        # dt = 20.0
-        # namelist["stats_io"]["frequency"] = dt
+        dt = 5.0
+        # dt = 2.0
+        # dt = 10.0
+        # namelist["stats_io"]["frequency"] = 600.0
+        namelist["stats_io"]["frequency"] = 60.0
+        # namelist["stats_io"]["frequency"] = dt 
         # namelist["stats_io"]["frequency"] = dt * 10
-        namelist["stats_io"]["frequency"] = 600.
-        namelist["stats_io"]["frequency"] = 60.
-        # namelist["stats_io"]["frequency"] = dt
         # namelist["user_params"]["ice_sedimentation_scaling_factor"] = 1.0
 
-        namelist["user_params"]["liq_ice_collision_efficiency"] = 1.0 * 0.0
-        namelist["user_params"]["liq_ice_collision_scaling_factor"] = 1.0 * 0.0
+        # namelist["user_params"]["liq_ice_collision_efficiency"] = 1.0 * 0.0
+        # namelist["user_params"]["liq_ice_collision_scaling_factor"] = 1.0 * 0.0
 
         namelist["meta"]["simname"] = original_namelist["meta"]["simname"]
         namelist["stats_io"]["calibrate_io"] = false
@@ -366,12 +372,13 @@ for flight_number in flight_numbers
         # namelist["time_stepping"]["dt_min"] = dt
         # namelist["time_stepping"]["dt_max"] = 2*dt
 
-        namelist["time_stepping"]["spinup_dt_factor"] = 0.25
+        # namelist["time_stepping"]["spinup_dt_factor"] = 0.25
+        namelist["time_stepping"]["spinup_dt_factor"] = 1.00
         namelist["time_stepping"]["spinup_half_t_max"] = 3600.0 * 1.0 # 1 hour
 
-        namelist["time_stepping"]["t_max"] = 3600.0 * 7.0
+        namelist["time_stepping"]["t_max"] = 3600.0 * 12.0
 
-        namelist["user_params"]["ice_sedimentation_scaling_factor"] = 3.2942321652880064
+        # namelist["user_params"]["ice_sedimentation_scaling_factor"] = .3942321652880064
         # namelist["user_params"]["ice_sedimentation_scaling_factor"] = 3.2942321652880064e3
         namelist["user_params"]["q_min"] = 0. #eps(FT)
 
@@ -382,13 +389,36 @@ for flight_number in flight_numbers
 
         namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = FT(0.9) # stability (maybe we need to use the limiter instead tho to not get flat cloud tops?)
 
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_type"] = "fractional" # stability (maybe we need to use the limiter instead tho to not get flat cloud tops?)
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_type"] = "fractional" # stability (maybe we need to use the limiter instead tho to not get flat cloud tops?)
+
+
+        # args from costa....
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment_type"] = "total_rate"
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "w_height"
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["detr_dim_scale"] = "mf_grad"
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["turbulent_entrainment_factor"] = 0.0
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["entrainment"] = "None"
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["ml_entrainment"] = "Linear"
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["entr_pi_subset"] = [1, 2, 3, 4, 6]
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["pi_norm_consts"] = [100.0, 2.0, 1.0, 1.0, 1.0, 1.0]
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["linear_ent_biases"] = true
+
+        # my addition
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["base_detrainment_rate_inv_s"] = FT(1/(6.0*3600.0)) # 6 hours
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["base_detrainment_rate_inv_s"] = FT(1/(100.0)) # 6 hours
+
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["mix_stalled_updraft_to_grid_mean"] = true
+
+
+
+
+
 
         namelist["time_stepping"]["use_tendency_timestep_limiter"] = false  # testing
         namelist["time_stepping"]["N_dt_max_edmf_violate_dt_min"] = 1e3
         namelist["time_stepping"]["allow_cfl_dt_max_violate_dt_min"] = false   
         namelist["time_stepping"]["use_fallback_during_spinup"] = true
-        namelist["time_stepping"]["allow_spinup_adapt_dt"] = false
+        namelist["time_stepping"]["allow_spinup_adapt_dt"] = true
 
         # namelist["time_stepping"]["limit_tendencies_using_dt_min_factor"] = 1.0 # margin of safety 
 
@@ -424,7 +454,93 @@ for flight_number in flight_numbers
         nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_and_geometric_ice
         
 
+        # ============================================================================================================================ #
+
+        nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_and_geometric_ice
+        path_to_my_SOTA = "/central/groups/esm/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/subexperiments/SOCRATES_geometric_liq__exponential_T_scaling_and_geometric_ice/Calibrate_and_Run/tau_autoconv_noneq/adapt_dt__dt_min_5.0__dt_max_10.0/iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean/calibrate/output/Atlas_LES/RFAll_obs/Diagnostics.nc"
+        my_SOTA = optimal_parameters(path_to_my_SOTA, method = "best_particle_final")
+        my_SOTA = Dict(zip(my_SOTA...)) # turn to dict
+
+        namelist["user_params"]["exponential_T_scaling_and_geometric_ice_c_1"] = my_SOTA["exponential_T_scaling_and_geometric_ice_c_1"]
+        namelist["user_params"]["exponential_T_scaling_and_geometric_ice_c_2"] = my_SOTA["exponential_T_scaling_and_geometric_ice_c_2"]
+        namelist["user_params"]["exponential_T_scaling_and_geometric_ice_c_3"] = my_SOTA["exponential_T_scaling_and_geometric_ice_c_3"]
+        namelist["user_params"]["exponential_T_scaling_and_geometric_ice_c_4"] = my_SOTA["exponential_T_scaling_and_geometric_ice_c_4"]
+        namelist["user_params"]["exponential_T_scaling_and_geometric_ice_c_5"] = my_SOTA["exponential_T_scaling_and_geometric_ice_c_5"]
+
+        namelist["user_params"]["geometric_liq_c_1"] = my_SOTA["geometric_liq_c_1"]
+        namelist["user_params"]["geometric_liq_c_2"] = my_SOTA["geometric_liq_c_2"]
+        namelist["user_params"]["geometric_liq_c_3"] = my_SOTA["geometric_liq_c_3"]
+        namelist["user_params"]["geometric_liq_c_4"] = my_SOTA["geometric_liq_c_4"]  
+
+        # ------------------ #
+
+        # nonequilibrium_moisture_scheme = :geometric_liq__powerlaw_T_scaling_ice
+        # path_to_my_SOTA = "/central/groups/esm/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/subexperiments/SOCRATES_geometric_liq__powerlaw_T_scaling_ice/Calibrate_and_Run/tau_autoconv_noneq/adapt_dt__dt_min_5.0__dt_max_10.0/iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean/calibrate/output/Atlas_LES/RFAll_obs/Diagnostics.nc"
+        # my_SOTA = optimal_parameters(path_to_my_SOTA, method = "best_particle_final")
+        # my_SOTA = Dict(zip(my_SOTA...)) # turn to dict
+        # namelist["user_params"]["powerlaw_T_scaling_ice_c_1"] = my_SOTA["powerlaw_T_scaling_ice_c_1"]
+        # namelist["user_params"]["powerlaw_T_scaling_ice_c_2"] = my_SOTA["powerlaw_T_scaling_ice_c_2"]
+
+        # namelist["user_params"]["geometric_liq_c_1"] = my_SOTA["geometric_liq_c_1"]
+        # namelist["user_params"]["geometric_liq_c_2"] = my_SOTA["geometric_liq_c_2"]
+        # namelist["user_params"]["geometric_liq_c_3"] = my_SOTA["geometric_liq_c_3"]
+        # namelist["user_params"]["geometric_liq_c_4"] = my_SOTA["geometric_liq_c_4"]  
+
+        # ------------------ #
+
+        # nonequilibrium_moisture_scheme = :powerlaw_T_scaling_ice
+        # path_to_my_SOTA = "/central/groups/esm/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/subexperiments/SOCRATES_powerlaw_T_scaling_ice/Calibrate_and_Run/tau_autoconv_noneq/adapt_dt__dt_min_5.0__dt_max_10.0/iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean/calibrate/output/Atlas_LES/RFAll_obs/Diagnostics.nc"
+        # my_SOTA = optimal_parameters(path_to_my_SOTA, method = "best_particle_final")
+        # my_SOTA = Dict(zip(my_SOTA...)) # turn to dict
+        # namelist["user_params"]["powerlaw_T_scaling_ice_c_1"] = my_SOTA["powerlaw_T_scaling_ice_c_1"]
+        # namelist["user_params"]["powerlaw_T_scaling_ice_c_2"] = my_SOTA["powerlaw_T_scaling_ice_c_2"]
+
+
+        # namelist["user_params"]["powerlaw_T_scaling_ice_c_1"]  = FT(-8)
+        # namelist["user_params"]["powerlaw_T_scaling_ice_c_2"]  = FT(9)
+
+        # namelist["microphysics"]["τ_cond_evap"] = my_SOTA["τ_cond_evap"]
+        # namelist["microphysics"]["τ_cond_evap"] = 4.0
+
+        # ------------------ #
+
+        namelist["microphysics"]["r_ice_snow"] = my_SOTA["r_ice_snow"]
+
+
+        # @info ("my_SOTA", my_SOTA)
+
+
+        # namelist["user_params"]["initial_profile_updraft_area"] = FT(.00) # i think either dict or named tuple is fine, we dispatch depending... # doesn't seem to work anyway...
+
+        namelist["user_params"]["ice_acnv_power"] = FT(2.5)
+
+
+        # namelist["thermodynamics"]["moisture_model"] = "equilibrium"
+
+
+        # ============================================================================================================================ #
+
+
+
+        namelist["user_params"]["ice_sedimentation_scaling_factor"] = my_SOTA["ice_sedimentation_scaling_factor"]
+        namelist["user_params"]["rain_sedimentation_scaling_factor"] = my_SOTA["rain_sedimentation_scaling_factor"]
+        namelist["user_params"]["snow_sedimentation_scaling_factor"] = my_SOTA["snow_sedimentation_scaling_factor"]
+
+        namelist["user_params"]["liq_ice_collision_efficiency"] = my_SOTA["liq_ice_collision_efficiency"]
+
+        namelist["microphysics"]["τ_acnv_rai"] = my_SOTA["τ_acnv_rai"]
+        namelist["microphysics"]["q_liq_threshold"] = my_SOTA["q_liq_threshold"]
+
+
+
+        namelist["user_params"]["ice_dep_acnv_scaling_factor"] = my_SOTA["ice_dep_acnv_scaling_factor"]
         
+
+
+        namelist["user_params"]["reweight_processes_for_grid"] = true
+
+
+
         namelist["user_args"] = (; 
             nonequilibrium_moisture_scheme = nonequilibrium_moisture_scheme,
 
@@ -440,7 +556,7 @@ for flight_number in flight_numbers
             # nonequilibrium_moisture_sources_limiter_type = :standard_supersaturation,
             # nonequilibrium_moisture_sources_limiter_type = :morrison_milbrandt_2015_style,
             nonequilibrium_moisture_sources_limiter_type = :morrison_milbrandt_2015_style_exponential_part_only,
-            entr_detr_limiter_type = :basic,
+            # entr_detr_limiter_type = :basic,
             precipitation_tendency_limiter_type = :basic,
             default_tendency_limiter_type = :basic,
 
@@ -448,9 +564,17 @@ for flight_number in flight_numbers
             # fallback_nonequilibrium_moisture_sources_limiter_type = :standard_supersaturation, # has limiter issues...
             # fallback_nonequilibrium_moisture_sources_limiter_type = :morrison_milbrandt_2015_style,
             fallback_nonequilibrium_moisture_sources_limiter_type = :morrison_milbrandt_2015_style_exponential_part_only,
-            fallback_entr_detr_limiter_type = :basic,
+            # fallback_entr_detr_limiter_type = :basic,
             fallback_precipitation_tendency_limiter_type = :basic,
             fallback_default_tendency_limiter_type = :basic,
+
+            # entr_detr_limiter_type = :basic,
+            # fallback_entr_detr_limiter_type = :basic,
+
+
+            entr_detr_limiter_type = :none,
+            fallback_entr_detr_limiter_type = :none,
+
 
             use_sedimentation = true, 
             grid_mean_sedimentation = false,
@@ -466,14 +590,65 @@ for flight_number in flight_numbers
             
 
 
+        # print(my_SOTA)
+        # print(namelist)
+        # sdfds
 
+        # ========================================================================================================================= #
+        # run this jld2
+        # param_results_path = "/central/groups/esm/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/julia_parallel/slurm/param_results/jl_lNf7Y0_simulation_crashed/param_results.jld2"
+        # setup =  JLD2.load(param_results_path)["param_results"]
+        # namelist = setup["namelist"]
+        # dt = namelist["time_stepping"]["dt_min"]
+        # namelist["stats_io"]["frequency"] = dt
+        # namelist["stats_io"]["calibrate_io"] = false
+
+
+        function edit_nt_key(nt::NamedTuple, key::Symbol, value)
+            return merge(Base.structdiff(nt, NamedTuple{(key,)}(nt)), NamedTuple{(key,)}((value,)))
+        end
+        # change key nonequilibrium_moisture_sources_limiter_type in namelist["user_args"] (immutable named tuple so need to reconstruct)
+        # namelist["user_args"] = edit_nt_key(namelist["user_args"], :nonequilibrium_moisture_sources_limiter_type, :morrison_milbrandt_2015_style)
+        # namelist["user_args"] = edit_nt_key(namelist["user_args"], :nonequilibrium_moisture_sources_limiter_type, :standard_supersaturation)
+
+        # namelist["user_args"] = edit_nt_key(namelist["user_args"], :fallback_nonequilibrium_moisture_sources_limiter_type = namelist["user_args"].nonequilibrium_moisture_sources_limiter_type)
+
+        @info namelist["user_args"]
+        # ========================================================================================================================= #
+        if isnothing(get(namelist["grid"], "conservative_interp_kwargs", nothing)) || isnothing(get(namelist["grid"]["conservative_interp_kwargs"], "in", nothing))
+            namelist["grid"]["conservative_interp_kwargs"] = Dict("in" => Dict{Symbol, Union{Bool, Symbol}}(), "out" => Dict{Symbol, Union{Bool, Symbol}}())
+        end
+    
+        namelist["grid"]["conservative_interp_kwargs"]["in"] = Dict{Symbol, Union{Bool, Symbol}}(
+            :conservative_interp => true, # leave off by default
+            :preserve_monotonicity => true,
+            :enforce_positivity => false,
+            :nnls_alg => :fnnls,
+            :enforce_conservation => false,
+            # :integrate_method => :invert,
+            :integrate_method => :integrate,
+        )
+
+        # @info "τ_acnv_sno = $(namelist["microphysics"]["τ_acnv_sno"])"
+        # namelist["microphysics"]["τ_acnv_sno"] = 5000.0
+        namelist["stats_io"]["frequency"] = dt * 60
+
+        @info "q_ice_threshold = $(namelist["microphysics"]["q_ice_threshold"])"
+
+        namelist["thermodynamics"]["moisture_model"] = "equilibrium"
+        namelist["user_params"]["reweight_processes_for_grid"] = true
+        namelist["user_params"]["reweight_extrema_only"] = false
+
+
+        if namelist["user_params"]["reweight_processes_for_grid"] 
+            @warn ("reweight_processes_for_grid is true, this is a test")
+        end
 
         global debug = true # allow to run multiple simulaitons at once if we're just debugging and wan't to go faster, puts them in random subdirectories in target location with random uuid suffix
         # ========================================================================================================================= #
         # ========================================================================================================================= #
         # ========================================================================================================================= #
 
-        
 
         if debug
             Random.seed!() # switch back to random entropy
@@ -483,6 +658,7 @@ for flight_number in flight_numbers
         end
         uuid = string(namelist["meta"]["uuid"])
         simname = namelist["meta"]["simname"]
+        case_name = simname # in case the jld2 changed it
         @info("simname", simname)
         if debug
             namelist["output"]["output_root"] = expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/test/debug")
@@ -500,6 +676,7 @@ for flight_number in flight_numbers
         # @info(namelist)
 
     end
+
 
     
     run_simulation = true

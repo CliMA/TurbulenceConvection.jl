@@ -599,7 +599,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
         new_q, new_q_vap = morrison_milbrandt_2015_get_new_status_helper_EPA(q, q_liq, q_ice, S_ql, S_qi, min_t)
 
-        dδ = smallest_magnitude(-(S_ql * min_t), dδ_func_EPA(A_c, τ, δ_0, min_t)) # dδ_func_EPA can be bad bc of nextfloat problems w/ A_c, τ creation etc.
+        dδ = smallest_magnitude(-(S_ql * min_t), dδ_func_EPA(A_c, τ_liq, δ_0, min_t)) # dδ_func_EPA can be bad bc of nextfloat problems w/ A_c, τ creation etc.
         new_δ_0 = δ_0 + dδ
         new_δ_0i = FT(0) # hit ice sat
         new_δ_0 = clamp_δ(new_δ_0, regime, q_sl, q_si)

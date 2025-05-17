@@ -211,7 +211,7 @@ function create_parameter_set(
     "microph_scaling_acnv",
     "microph_scaling_accr",
     "Omega",
-    "planet_radius"]
+    "planet_radius",]
     pairs = CP.get_parameter_values!(toml_dict, aliases, "TurbulenceConvection")
 
     SFP = typeof(surf_flux_params)
@@ -230,9 +230,16 @@ function create_parameter_set(
     # overwrites, but this is all local so no need for TOML
     user_params["particle_min_radius"] =  TC.parse_namelist(namelist, "user_params", "particle_min_radius"; default = 0.2e-6) # this is set no matter what
 
+    user_params["r_ice_acnv_scaling_factor"] =  TC.parse_namelist(namelist, "user_params", "r_ice_acnv_scaling_factor"; default = 1.0) # this is set no matter what
+    user_params["ice_dep_acnv_scaling_factor"] =  TC.parse_namelist(namelist, "user_params", "ice_dep_acnv_scaling_factor"; default = 1.0) # this is set no matter what
+
+    user_params["ice_acnv_power"] =  TC.parse_namelist(namelist, "user_params", "ice_acnv_power"; default = 1.0) # this is set no matter what
+
     # If we decide to add this to the calibration... 
-    user_params["mean_r_factor_liq"] =  TC.parse_namelist(namelist, "user_params", "mean_r_factor_liq"; default = FT(((4/3) / 8)^(1/3))) # this is set no matter what
-    user_params["mean_r_factor_ice"] =  TC.parse_namelist(namelist, "user_params", "mean_r_factor_ice"; default = FT(((4/3) / 8)^(1/3))) # this is set no matter what
+    # default_r_factor_liq = FT(1) # unknown
+    # default_r_factor_ice = FT(((4/3) / 8)^(1/3))
+    user_params["mean_r_factor_liq"] =  TC.parse_namelist(namelist, "user_params", "mean_r_factor_liq"; default = FT(1)) # this is set no matter what
+    user_params["mean_r_factor_ice"] =  TC.parse_namelist(namelist, "user_params", "mean_r_factor_ice"; default = FT(1)) # this is set no matter what
 
     user_params["q_min"] = TC.parse_namelist(namelist, "user_params", "q_min"; default = zero(FT)) # maybe one day swap to var limiter step
     user_params = namelist["user_params"] # Let this be a Dict()
@@ -246,7 +253,6 @@ function create_parameter_set(
     # # Create user_params, see Parameters.jl for what we store in here...
     # user_params = get(namelist, "user_params", Dict()) # should be a dict...
     # # overwrites, not using TOML
-    # user_params["particle_min_radius"] = particle_min_radius 
     # # ensure isbitsness
     # user_params = leaves_to_tuples(user_params) # convert leaves that are strings or symbols into Vals to preserve isbits
     # user_params = leaves_to_Vals(user_params) # convert leaves that are strings or symbols into Vals to preserve isbits

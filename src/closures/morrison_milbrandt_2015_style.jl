@@ -599,7 +599,7 @@ end
 residual_tol(x::FT; factor::FT = 1.0) where{FT} = max(eps(FT), abs(nextfloat(x) - x)) * factor
 target(value::FT, add_or_sub::Union{typeof(+),typeof(-)}; factor::FT = 1.0) where{FT} = add_or_sub(value , residual_tol(value, factor = factor))
 # const TF = FT(1e0) # the default target / tolerance factor we're using throughout the code.
-const TF = FT(0) # now that we are explicitly setting δ_0, δ_0i, I don't think we need to make use of the target factor anymore... They're bad anyway if you can't reach that point e.g. for very samll inputs.
+const TF = 0 # now that we are explicitly setting δ_0, δ_0i, I don't think we need to make use of the target factor anymore... They're bad anyway if you can't reach that point e.g. for very samll inputs.
 # We don't need a buffer really anymore, now we just solve for t from get_t_var_hit_value and then just set δ_0, δ_0i based on that value
 
 """

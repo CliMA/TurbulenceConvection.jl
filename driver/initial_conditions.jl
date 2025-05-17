@@ -126,18 +126,25 @@ function initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set)
     ρ_f = aux_gm_f.ρ
     FT = TC.float_type(state)
 
+    kc_toa = TC.kc_top_of_atmos(grid)
+    kf_toa = TC.kf_top_of_atmos(grid)
+
     initial_profile_updraft_area = TCP.get_isbits_nt(param_set.user_params, :initial_profile_updraft_area, 0.0)
     @inbounds for i in 1:N_up
         @inbounds for k in TC.real_face_indices(grid)
-            aux_up_f[i].w[k] = 0
-            prog_up_f[i].ρaw[k] = 0
+            # aux_up_f[i].w[k] = 0
+            # prog_up_f[i].ρaw[k] = 0
+
+            aux_up_f[i].w[k] = FT(0.01) # a small velocity perturbation [needed so area doesn't immediately go to 0]
+            prog_up_f[i].ρaw[k] = ρ_f[k] * initial_profile_updraft_area * aux_up_f[i].w[k] # small ρaw perturbation
         end
 
         @inbounds for k in TC.real_center_indices(grid)
             aux_up[i].buoy[k] = 0
             # Simple treatment for now, revise when multiple updraft closures
             # become more well defined
-            aux_up[i].area[k] = initial_profile_updraft_area
+
+            aux_up[i].area[k] = initial_profile_updraft_area # socrates init area
             aux_up[i].q_tot[k] = aux_gm.q_tot[k]
             aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
             aux_up[i].q_liq[k] = aux_gm.q_liq[k]
@@ -147,10 +154,12 @@ function initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set)
             prog_up[i].ρaq_tot[k] = prog_up[i].ρarea[k] * aux_gm.q_tot[k] # copied from drybubble below
             prog_up[i].ρaθ_liq_ice[k] = prog_up[i].ρarea[k] * aux_gm.θ_liq_ice[k] # copied from drybubble below
         end
+
         if edmf.entr_closure isa TC.PrognosticNoisyRelaxationProcess
             @. prog_up[i].ε_nondim = 0
             @. prog_up[i].δ_nondim = 0
         end
+
 
         if edmf.surface_area_bc isa TC.FixedSurfaceAreaBC || edmf.surface_area_bc isa TC.ClosureSurfaceAreaBC
             a_surf = TC.area_surface_bc(surf, edmf, i, edmf.surface_area_bc)
@@ -160,7 +169,8 @@ function initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set)
             # To avoid degeneracy from 0 BC on surface updraft area fraction, add small perturbation
             # to relevant prognostic variables in bottom cell -> This avoids trivial solution with no updrafts.
         elseif edmf.surface_area_bc isa TC.PrognosticSurfaceAreaBC
-            a_up_initial = FT(0.1)
+            # a_up_initial = max(FT(0.1), initial_profile_updraft_area)
+            a_up_initial = TC.area_surface_bc(surf, edmf, i, edmf.surface_area_bc) # we jerry-rigged it to use surface_area from input parameters...
             aux_up[i].area[kc_surf] = a_up_initial
             prog_up[i].ρarea[kc_surf] = ρ_c[kc_surf] * a_up_initial
 
@@ -170,6 +180,14 @@ function initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set)
             prog_up[i].ρaq_tot[kc_surf] = ρ_c[kc_surf] * a_up_initial * aux_gm.q_tot[kc_surf]
             prog_up[i].ρaθ_liq_ice[kc_surf] = ρ_c[kc_surf] * a_up_initial * aux_gm.θ_liq_ice[kc_surf]
         end
+
+        # set toa back to 0
+        aux_up[i].area[kc_toa] = 0.0 # [ might make an unstable area gradient]
+        prog_up[i].ρarea[kc_toa] = 0.0 # [ might make an unstable area gradient]
+        
+        aux_up_f[i].w[kf_toa] = 0.0 # [ no penetration boundary condition]
+        prog_up_f[i].ρaw[kf_toa] = 0.0 # [ no penetration boundary condition]
+
     end
     return
 end

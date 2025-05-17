@@ -85,9 +85,17 @@ function calculate_timestep_limited_sources(moisture_sources_limiter::MorrisonMi
         return FT(0), FT(0)
     end
     S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, q, q_eq, Δt, ts; emit_warnings = false)
+
     if !isfinite(S_ql) || !isfinite(S_qi)
         error("Morrison-Milbrandt 2015 (exponential part only) source calculations failed. Got S_ql = $S_ql; S_qi = $S_qi from inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; q_vap = $q_vap; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts")
     end
+
+    if ((S_ql + S_qi)*Δt ≥ (q_vap+eps(FT))) && (!iszero(q_vap)) # consume all vapor (should never happen, really we should allow for liq and ice to contribute but all vapor gone is ridiculous, qv is like 2 orders of magnitude larger than ql, qi)
+        error("Morrison-Milbrandt 2015 (exponential part only) source calculations returned a total source greater than the available vapor. Got S_ql = $S_ql; S_qi = $S_qi from inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; q_vap = $q_vap; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts")
+    elseif (S_ql + S_qi)*Δt < -(q.liq + q.ice + eps(FT)) # consume more than all all liquid and ice
+        error("Morrison-Milbrandt 2015 (exponential part only) source calculations returned a total source less than the available liquid and ice. Got S_ql = $S_ql; S_qi = $S_qi from inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; q_vap = $q_vap; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts")
+    end
+
     return S_ql, S_qi
 end
 

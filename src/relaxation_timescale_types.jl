@@ -84,6 +84,11 @@ struct RelaxationTimescaleArgs{FT}
     min_τ_ice::FT
     max_τ_liq::FT
     max_τ_ice::FT
+    #
+    min_N_liq::FT
+    min_N_ice::FT
+    max_N_liq::FT
+    max_N_ice::FT
 end
 
 """
@@ -96,6 +101,11 @@ function get_relaxation_timescale_args(param_set::APS)
         TCP.get_isbits_nt(param_set.user_params, :min_τ_ice, FT(0)),
         TCP.get_isbits_nt(param_set.user_params, :max_τ_liq, FT(Inf)),
         TCP.get_isbits_nt(param_set.user_params, :max_τ_ice, FT(Inf)),
+        #
+        TCP.get_isbits_nt(param_set.user_params, :min_N_liq, FT(0)),
+        TCP.get_isbits_nt(param_set.user_params, :min_N_ice, FT(0)),
+        TCP.get_isbits_nt(param_set.user_params, :max_N_liq, FT(Inf)),
+        TCP.get_isbits_nt(param_set.user_params, :max_N_ice, FT(Inf))
     )
 end
 
@@ -142,9 +152,11 @@ struct GeometricLiqGeometricIceRelaxationTimescale{FT} <: AbstractRelaxationTime
     c_1l::FT
     c_2l::FT
     c_3l::FT
+    c_4l::FT
     c_1i::FT
     c_2i::FT
     c_3i::FT
+    c_4i::FT
     adjust_ice_N::Bool
     args::RelaxationTimescaleArgs{FT}
 end
@@ -154,6 +166,7 @@ struct GeometricLiqExponentialTScalingIceRelaxationTimescale{FT} <: AbstractRela
     c_1l::FT
     c_2l::FT
     c_3l::FT
+    c_4l::FT
     c_1i::FT
     c_2i::FT
     adjust_ice_N::Bool
@@ -165,6 +178,7 @@ struct GeometricLiqPowerlawTScalingIceRelaxationTimescale{FT} <: AbstractRelaxat
     c_1l::FT
     c_2l::FT
     c_3l::FT
+    c_4l::FT
     c_1i::FT
     c_2i::FT
     adjust_ice_N::Bool
@@ -176,6 +190,7 @@ struct GeometricLiqExponentialTScalingAndGeometricIceRelaxationTimescale{FT} <: 
     c_1l::FT
     c_2l::FT
     c_3l::FT
+    c_4l::FT
     c_1i::FT
     c_2i::FT
     c_3i::FT
@@ -312,13 +327,15 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__geometric_ice}, par
     c_1l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_1, FT(1 / (4 / 3 * π * ρ_l * r_r^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
     c_2l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_2, FT(2 / 3.0)) # Halfway between 1/3 and 1
     c_3l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_3, FT(N_l0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
+    c_4l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_4, FT(2e2*1e6)) # max N acceptable
 
     c_1i = TCP.get_isbits_nt(param_set.user_params, :geometric_ice_c_1, FT(1 / (4 / 3 * π * ρ_i * r_r^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
     c_2i = TCP.get_isbits_nt(param_set.user_params, :geometric_ice_c_2, FT(2 / 3.0)) # Halfway between 1/3 and 1
     c_3i = TCP.get_isbits_nt(param_set.user_params, :geometric_ice_c_3, FT(N_i0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
+    c_4i = TCP.get_isbits_nt(param_set.user_params, :geometric_ice_c_4, FT(2e4*1e6)) # max N acceptable
 
     adjust_ice_N = TCP.get_isbits_nt(param_set.user_params, :adjust_ice_N, false)
-    return GeometricLiqGeometricIceRelaxationTimescale(c_1l, c_2l, c_3l, c_1i, c_2i, c_3i, adjust_ice_N, get_relaxation_timescale_args(param_set))
+    return GeometricLiqGeometricIceRelaxationTimescale(c_1l, c_2l, c_3l, c_4l, c_1i, c_2i, c_3i, c_4i, adjust_ice_N, get_relaxation_timescale_args(param_set))
 end
 
 # :geometric_liq__exponential_T_scaling_ice
@@ -333,12 +350,13 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__exponential_T_scali
     c_1l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_1, FT(1 / (4 / 3 * π * ρ_l * r_r^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
     c_2l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_2, FT(2 / 3.0)) # Halfway between 1/3 and 1
     c_3l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_3, FT(N_l0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
+    c_4l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_4, FT(2e2*1e6)) # max N acceptable
 
     c_1i = TCP.get_isbits_nt(param_set.user_params, :exponential_T_scaling_ice_c_1, FT(0.02)) # Fletcher 1962 (values taken from Frostenberg 2022)
     c_2i = TCP.get_isbits_nt(param_set.user_params, :exponential_T_scaling_ice_c_2, FT(-0.6)) # Fletcher 1962 (values taken from Frostenberg 2022)
    
     adjust_ice_N = TCP.get_isbits_nt(param_set.user_params, :adjust_ice_N, false)
-    return GeometricLiqExponentialTScalingIceRelaxationTimescale(c_1l, c_2l, c_3l, c_1i, c_2i, adjust_ice_N, get_relaxation_timescale_args(param_set))
+    return GeometricLiqExponentialTScalingIceRelaxationTimescale(c_1l, c_2l, c_3l, c_4l, c_1i, c_2i, adjust_ice_N, get_relaxation_timescale_args(param_set))
 end
 
 
@@ -354,12 +372,13 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__powerlaw_T_scaling_
     c_1l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_1, FT(1 / (4 / 3 * π * ρ_l * r_r^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
     c_2l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_2, FT(2 / 3.0)) # Halfway between 1/3 and 1
     c_3l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_3, FT(N_l0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
+    c_4l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_4, FT(2e2*1e6)) # max N acceptable
 
     c_1i = TCP.get_isbits_nt(param_set.user_params, :powerlaw_T_scaling_ice_c_1, FT(-9)) # F23 (values taken from Frostenberg 2022)
     c_2i = TCP.get_isbits_nt(param_set.user_params, :powerlaw_T_scaling_ice_c_2, FT(9)) # F23 (values taken from Frostenberg 2022)
     
     adjust_ice_N = TCP.get_isbits_nt(param_set.user_params, :adjust_ice_N, false)
-    return GeometricLiqPowerlawTScalingIceRelaxationTimescale(c_1l, c_2l, c_3l, c_1i, c_2i, adjust_ice_N, get_relaxation_timescale_args(param_set))
+    return GeometricLiqPowerlawTScalingIceRelaxationTimescale(c_1l, c_2l, c_3l, c_4l, c_1i, c_2i, adjust_ice_N, get_relaxation_timescale_args(param_set))
 end
 
 # :geometric_liq__exponential_T_scaling_and_geometric_ice
@@ -375,6 +394,7 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__exponential_T_scali
     c_1l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_1, FT(1 / (4 / 3 * π * ρ_l * r_r^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
     c_2l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_2, FT(2 / 3.0)) # Halfway between 1/3 and 1
     c_3l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_3, FT(N_l0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since
+    c_4l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_4, FT(2e2*1e6)) # max N acceptable
 
     c_1i = TCP.get_isbits_nt(param_set.user_params, :exponential_T_scaling_and_geometric_ice_c_1, FT(1/(4/3 * π * ρ_i * r_r^2))) # Yeahhh.... idk for this one lol... just combined them serially from the homogenous case where c_3 is -1/3, and used .02 as the prefactor
     # c_2i = TCP.get_isbits_nt(param_set.user_params, :exponential_T_scaling_and_geometric_ice_c_2, FT(2 / 3.0)) # Halfway between 1/3 and 1 -- should this be the same as c_2g? It's the same mixing... 
@@ -385,7 +405,7 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__exponential_T_scali
 
     adjust_ice_N = TCP.get_isbits_nt(param_set.user_params, :adjust_ice_N, false)
 
-    return GeometricLiqExponentialTScalingAndGeometricIceRelaxationTimescale(c_1l, c_2l, c_3l, c_1i, c_2i, c_3i, c_4i, c_5i, adjust_ice_N, get_relaxation_timescale_args(param_set))
+    return GeometricLiqExponentialTScalingAndGeometricIceRelaxationTimescale(c_1l, c_2l, c_3l, c_4l, c_1i, c_2i, c_3i, c_4i, c_5i, adjust_ice_N, get_relaxation_timescale_args(param_set))
 end
 
 # :linear_combination
@@ -398,9 +418,9 @@ function get_relaxation_timescale_type(::Val{:linear_combination}, param_set::AP
     N_l0 = FT(1e-5 / (4 / 3 * π * r_r^3 * ρ_l)) # estimated total N assuming reasonable q.liq.. (N = N_r in homogenous)
     N_i0 = FT(1e-7 / (4 / 3 * π * r_r^3 * ρ_i)) # estimated total N assuming reasonable q.ice... (N = N_r + N_0)
 
-    c_1l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_1, FT(1 / (4 / 3 * π * ρ_l * r_r^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
-    c_2l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_2, FT(2 / 3.0)) # Halfway between 1/3 and 1
-    c_3l = TCP.get_isbits_nt(param_set.user_params, :geometric_liq_c_3, FT(N_l0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
+    c_1l = TCP.get_isbits_nt(param_set.user_params, :linear_combination_liq_c_1, FT(N_l0 * r_0)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
+    c_2l = TCP.get_isbits_nt(param_set.user_params, :linear_combination_liq_c_2, FT(0)) # Halfway between 1/3 and 1
+    c_3l = TCP.get_isbits_nt(param_set.user_params, :linear_combination_liq_c_3, FT(-10)) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
 
     c_1i = TCP.get_isbits_nt(param_set.user_params, :linear_combination_ice_c_1, FT(N_i0 * r_0)) # I think at q=0, we need c_1 from linear = c_1 from geometric...
     c_2i = TCP.get_isbits_nt(param_set.user_params, :linear_combination_ice_c_2, FT(-0.6)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
@@ -424,7 +444,7 @@ function get_relaxation_timescale_type(::Val{:linear_combination_with_w}, param_
     w_0 = FT(1e-3) # 1 mm/s
 
     c_1l = TCP.get_isbits_nt(param_set.user_params, :linear_combination_liq_c_1, FT(N_l0 * r_0)) # I think at q=0, we need c_1 from linear = c_1 from geometric...
-    c_2l = TCP.get_isbits_nt(param_set.user_params, :linear_combination_liq_c_2, FT(-0.6)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
+    c_2l = TCP.get_isbits_nt(param_set.user_params, :linear_combination_liq_c_2, FT(0)) # Halfway between 1/3 and 1 (we know these can't be right?) but it has the same sign lmao so it still decays... (we would need to figure out how to match slopes at some arbitrary point near 0 that isn't 0 lmao)
     c_3l = TCP.get_isbits_nt(param_set.user_params, :linear_combination_liq_c_3, FT(-10)) # asssume nothing here? (keep 0 as upper bound?) 
     c_4l = TCP.get_isbits_nt(param_set.user_params, :linear_combination_liq_c_4, FT(0))
 

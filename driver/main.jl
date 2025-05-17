@@ -463,7 +463,7 @@ function solve_args(sim::Simulation1d)
 
         end
     end
-
+    
     kwargs = (;
         progress_steps = 100,
         save_start = false,
@@ -473,6 +473,7 @@ function solve_args(sim::Simulation1d)
         progress_message = (dt, u, p, t) -> t,
         # my additions
         isoutofdomain = sim.TS.use_isoutofdomain_limiter ? isoutofdomain : ODE.ODE_DEFAULT_ISOUTOFDOMAIN, # use our isoutofdomain if we set it, otherwise use their default which just returns false
+        unstable_check = my_unstable_check,
         (isnan(sim.TS.abstol) ? (;) : (;abstol = sim.TS.abstol))...,
         (isnan(sim.TS.reltol) ? (;) : (;reltol = sim.TS.reltol))...,
         (sim.TS.fixed_step_solver ? (;) : (;))..., # use their default for dtmin (set nothing, don't set for fixed-step solver)
@@ -481,6 +482,24 @@ function solve_args(sim::Simulation1d)
         force_dtmin = true, # Allow solver to continue at dtmin failure in adapt
     )
     return (prob, alg, kwargs)
+end
+
+
+"""
+    default is any(isnan, u)
+"""
+function my_unstable_check(dt, u, p, t ) # see https://docs.sciml.ai/DiffEqDocs/stable/basics/common_solver_opts/
+    unstable = false
+
+    if any(isnan, u)
+        @warn "Unstable: NaN detected in solution, typeof(u) = $(typeof(u)); u.cent = $(u.cent); u.face = $(u.face)"
+        println(u)
+        @info "u = \n$(summary(u))"
+
+        unstable = true
+        # unstable = false # test just ignoring
+    end
+    return unstable
 end
 
 function sim_run(sim::Simulation1d, integrator; time_run = true) # named sim_run to not clash with Base.run()

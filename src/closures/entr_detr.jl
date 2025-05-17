@@ -424,7 +424,7 @@ function compute_turb_entr!(state::State, grid::Grid, edmf::EDMFModel)
     end
     Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
-    LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
+    # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
     @inbounds for i in 1:N_up
         w_up = aux_up_f[i].w
         @. w_up_c = Ic(w_up)
@@ -489,7 +489,7 @@ function compute_phys_entr_detr!(
     end
     Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
-    LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
+    # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
     @inbounds for i in 1:N_up
         # compute ∇m at cell centers
         a_up = aux_up[i].area
@@ -579,6 +579,8 @@ function compute_phys_entr_detr!(
 
                     aux_up[i].entr_rate_inv_s[k] = ε_dyn
                     aux_up[i].detr_rate_inv_s[k] = δ_dyn
+
+                    aux_up[i].detr_rate_inv_s[k] += edmf.entrainment_type.base_detrainment_rate_inv_s # 1/aux_up[i].entr_rate_inv_s[k] is timescale, so (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s)^-1 is the new timescale and (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s) is the new inverse timscale
                 end
 
             else
@@ -638,7 +640,7 @@ function compute_ml_entr_detr!(
     end
     Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
-    LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
+    # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
     @inbounds for i in 1:N_up
         # compute ∇m at cell centers
         a_up = aux_up[i].area
@@ -717,6 +719,8 @@ function compute_ml_entr_detr!(
 
                     aux_up[i].entr_rate_inv_s[k] = ε_dyn
                     aux_up[i].detr_rate_inv_s[k] = δ_dyn
+
+                    aux_up[i].detr_rate_inv_s[k] += edmf.entrainment_type.base_detrainment_rate_inv_s # 1/aux_up[i].entr_rate_inv_s[k] is timescale, so (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s)^-1 is the new timescale and (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s) is the new inverse timscale
                 end
 
             else
@@ -765,7 +769,7 @@ function compute_ml_entr_detr!(
 
     Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
-    LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
+    # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
     @inbounds for i in 1:N_up
         # compute ∇m at cell centers
         a_up = aux_up[i].area

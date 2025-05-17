@@ -21,10 +21,12 @@ end
 
 function make_horizontal_space(mesh, quad)
     if mesh isa CC.Meshes.AbstractMesh1D
-        topology = CC.Topologies.IntervalTopology(mesh)
+        # topology = CC.Topologies.IntervalTopology(mesh)
+        topology = CC.Topologies.IntervalTopology(CC.ClimaComms.SingletonCommsContext(), mesh) # see https://github.com/CliMA/ClimaCore.jl/pull/1222/files
         space = CC.Spaces.SpectralElementSpace1D(topology, quad)
     elseif mesh isa CC.Meshes.AbstractMesh2D
-        topology = CC.Topologies.Topology2D(mesh)
+        # topology = CC.Topologies.Topology2D(mesh)
+        topology = CC.Topologies.Topology2D(CC.ClimaComms.SingletonCommsContext(), mesh) # see https://github.com/CliMA/ClimaCore.jl/pull/1222/files
         space = CC.Spaces.SpectralElementSpace2D(topology, quad)
     end
     return space
@@ -33,13 +35,15 @@ end
 function make_hybrid_spaces(h_space, z_mesh)
     FT = CC.Geometry.float_type(z_mesh.domain)
     @info "z heights" z_mesh.faces
-    z_topology = CC.Topologies.IntervalTopology(z_mesh)
+    # z_topology = CC.Topologies.IntervalTopology(z_mesh)
+    z_topology = CC.Topologies.IntervalTopology(CC.ClimaComms.SingletonCommsContext(), z_mesh) # see https://github.com/CliMA/ClimaCore.jl/pull/1222/files
     z_space = CC.Spaces.CenterFiniteDifferenceSpace(z_topology)
     center_space = CC.Spaces.ExtrudedFiniteDifferenceSpace(h_space, z_space)
     face_space = CC.Spaces.FaceExtrudedFiniteDifferenceSpace(center_space)
 
     svpc_domain =
-        CC.Domains.IntervalDomain(CC.Geometry.ZPoint{FT}(0), CC.Geometry.ZPoint{FT}(1), boundary_tags = (:bottom, :top))
+        # CC.Domains.IntervalDomain(CC.Geometry.ZPoint{FT}(0), CC.Geometry.ZPoint{FT}(1), boundary_tags = (:bottom, :top))
+        CC.Domains.IntervalDomain(CC.Geometry.ZPoint{FT}(0), CC.Geometry.ZPoint{FT}(1); boundary_names = (:bottom, :top)) # see https://github.com/CliMA/ClimaCore.jl/commit/4ec6aa960a12f22e6575df64724ea8ddcd1ce0d1
     svpc_mesh = CC.Meshes.IntervalMesh(svpc_domain, nelems = 1)
     svpc_space = CC.Spaces.CenterFiniteDifferenceSpace(svpc_mesh)
 
@@ -115,7 +119,8 @@ function construct_mesh(namelist; FT = Float64)
         domain = CC.Domains.IntervalDomain(
             CC.Geometry.ZPoint{FT}(z₀),
             CC.Geometry.ZPoint{FT}(z₁),
-            boundary_tags = (:bottom, :top),
+            # boundary_tags = (:bottom, :top),
+            boundary_names = (:bottom, :top), # see https://github.com/CliMA/ClimaCore.jl/commit/4ec6aa960a12f22e6575df64724ea8ddcd1ce0d1
         )
         z_mesh = CC.Meshes.IntervalMesh(domain, z_mesh)
         return (; z_mesh)
@@ -135,7 +140,8 @@ function construct_mesh(namelist; FT = Float64)
         domain = CC.Domains.IntervalDomain(
             CC.Geometry.ZPoint{FT}(z₀),
             CC.Geometry.ZPoint{FT}(zₛ_toa),
-            boundary_tags = (:bottom, :top),
+            # boundary_tags = (:bottom, :top), # see https://github.com/CliMA/ClimaCore.jl/commit/4ec6aa960a12f22e6575df64724ea8ddcd1ce0d1
+            boundary_names = (:bottom, :top),
         )
         gcm_mesh = CC.Meshes.IntervalMesh(domain, stretch; nelems = nzₛ)
         TC.TCMeshFromGCMMesh(gcm_mesh; z_max = z₁)
@@ -144,7 +150,8 @@ function construct_mesh(namelist; FT = Float64)
         domain = CC.Domains.IntervalDomain(
             CC.Geometry.ZPoint{FT}(z₀),
             CC.Geometry.ZPoint{FT}(z₁),
-            boundary_tags = (:bottom, :top),
+            # boundary_tags = (:bottom, :top),
+            boundary_names = (:bottom, :top), # see https://github.com/CliMA/ClimaCore.jl/commit/4ec6aa960a12f22e6575df64724ea8ddcd1ce0d1
         )
         CC.Meshes.IntervalMesh(domain, stretch; nelems = nz)
     end

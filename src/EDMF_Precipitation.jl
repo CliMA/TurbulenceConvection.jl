@@ -153,12 +153,12 @@ function compute_precipitation_sink_tendencies(
 
         tmp = α_dep_sub * CM1.evaporation_sublimation(microphys_params, snow_type, q, qs, ρ, T_gm) * precip_fraction
         if tmp > 0
-            # S_qs_sub_dep = min(qv / Δt, tmp)
-            S_qs_sub_dep = -limit_tendency(ptl, -tmp, qv, Δt)
+            # S_qs_ice_dep = min(qv / Δt, tmp)
+            S_qs_ice_dep = -limit_tendency(ptl, -tmp, qv, Δt)
 
             # think these are wrong...
-            # S_qs_sub_dep = limit_tendency(ptl, -tmp, qv, Δt)
-            # S_qs_sub_dep = -limit_tendency(ptl, -tmp, qs, Δt)
+            # S_qs_ice_dep = limit_tendency(ptl, -tmp, qv, Δt)
+            # S_qs_ice_dep = -limit_tendency(ptl, -tmp, qs, Δt)
             
             # ts_eq = TD.PhaseEquil_ρTq(thermo_params, ρ, T_gm, q.tot)
             # q_eq = TD.PhasePartition(thermo_params, ts_eq)
@@ -166,27 +166,27 @@ function compute_precipitation_sink_tendencies(
 
             qvsat_ice = TD.q_vap_saturation_generic(thermo_params, T_gm, ρ, TD.Ice()) # we don't have this stored for grid-mean and we can't calculate form en/up bc it's non-linear...
             δi = qv - qvsat_ice 
-            S_qs_sub_dep = -limit_tendency(ptl, -tmp, max(FT(0), δi), Δt) # presumably if tmp > 0 then δi > 0 but can't be too careful
+            S_qs_ice_dep = -limit_tendency(ptl, -tmp, max(FT(0), δi), Δt) # presumably if tmp > 0 then δi > 0 but can't be too careful
             # I think this is wrong...
-            # S_qs_sub_dep = limit_tendency(ptl, -tmp, max(FT(0), δi), Δt)
+            # S_qs_ice_dep = limit_tendency(ptl, -tmp, max(FT(0), δi), Δt)
 
         else
-            # S_qs_sub_dep = -min(qs / Δt, -tmp)
-            S_qs_sub_dep = limit_tendency(ptl, tmp, qs, Δt)
+            # S_qs_ice_dep = -min(qs / Δt, -tmp)
+            S_qs_ice_dep = limit_tendency(ptl, tmp, qs, Δt)
         end
 
         aux_tc.qr_tendency_evap[k] = S_qr_evap
         aux_tc.qs_tendency_melt[k] = S_qs_melt
-        aux_tc.qs_tendency_dep_sub[k] = S_qs_sub_dep
+        aux_tc.qs_tendency_dep_sub[k] = S_qs_ice_dep
 
         tendencies_pr.q_rai[k] += S_qr_evap - S_qs_melt
-        tendencies_pr.q_sno[k] += S_qs_sub_dep + S_qs_melt
+        tendencies_pr.q_sno[k] += S_qs_ice_dep + S_qs_melt
 
-        aux_tc.qt_tendency_precip_sinks[k] = -S_qr_evap - S_qs_sub_dep
+        aux_tc.qt_tendency_precip_sinks[k] = -S_qr_evap - S_qs_ice_dep
         aux_tc.θ_liq_ice_tendency_precip_sinks[k] =
             1 / Π_m / c_pm * (
                 S_qr_evap * (L_v - R_v * T_gm) * (1 + R_m / c_vm) +
-                S_qs_sub_dep * (L_s - R_v * T_gm) * (1 + R_m / c_vm) +
+                S_qs_ice_dep * (L_s - R_v * T_gm) * (1 + R_m / c_vm) +
                 S_qs_melt * L_f * (1 + R_m / c_vm)
             )
     end

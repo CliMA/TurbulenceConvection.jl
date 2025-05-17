@@ -27,6 +27,27 @@ const CenterFields = Union{CC.Fields.CenterExtrudedFiniteDifferenceField, CC.Fie
 
 Base.@propagate_inbounds Base.getindex(field::FDFields, i::Integer) = Base.getproperty(field, i)
 
+# Not sure if this is a ClimaCore or a julia 1.11 problem, seemed 1.10.8 with CC 0.14.11 still didn't work tho
+if VERSION ≥ v"1.11.0-beta"
+# if VERSION ≥ v"1.10.8"
+
+    """
+    My hotfix attempt to define this method for julia 1.11
+        Leads to segfault though lol
+    """
+    function Base.getindex(field_values::CC.DataLayouts.VIJFH{S}, v::Integer) where {S}
+        i,j,_,_,h = size(field_values) # f will be 1, and we replace i... (our) (actually we wanna replace v)
+        # i, j, _, v, h = I.I
+        @inbounds CC.DataLayouts.get_struct(parent(field_values), S, Val(4), CartesianIndex(v, i, j, 1, h))
+    end
+
+    function Base.setindex!(field_values::CC.DataLayouts.VIJFH{S}, val, v::Integer) where {S}
+        i,j,_,_,h = size(field_values) # f will be 1, and we replace i...
+        # i, j, _, v, h = I.I
+        @inbounds CC.DataLayouts.set_struct!(parent(field_values), convert(S, val), Val(4), CartesianIndex(v, i, j, 1, h))
+    end
+end
+
 Base.@propagate_inbounds Base.getindex(field::CenterFields, i::Cent) = Base.getindex(CC.Fields.field_values(field), i.i)
 Base.@propagate_inbounds Base.setindex!(field::CenterFields, v, i::Cent) =
     Base.setindex!(CC.Fields.field_values(field), v, i.i)

@@ -39,6 +39,8 @@ my_microphysics_additions(FT, moisture_model::AbstractMoistureModel, cloud_sedim
     #
     ql_tendency_acnv = FT(0), # tendency due to autoconversion
     qi_tendency_acnv = FT(0), # tendency due to autoconversion
+    qi_tendency_acnv_dep = FT(0), # tendency due to sublimation/deposition
+    qi_tendency_acnv_agg = FT(0), # tendency due to autoconversion aggregation
     #
     ql_tendency_accr_liq_rai = FT(0), # tendency due to accretion of liquid by rain
     ql_tendency_accr_liq_ice = FT(0), # tendency due to accretion of liquid by ice

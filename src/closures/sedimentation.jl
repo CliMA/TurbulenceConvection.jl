@@ -14,6 +14,7 @@ function calculate_sedimentation_sources(
     ρ::CC.Fields.Field,  # figure out types for these
     q::CC.Fields.Field, # figure out types for these
     w_sed::CC.Fields.Field,
+    # w::CC.Fields.Field,
     area::CC.Fields.Field,
     grid::Grid,
     ρ_q::FT;  # figure out types for these
@@ -68,6 +69,10 @@ function calculate_sedimentation_sources(
     - However, then I think your exchange(to_other) comes out wrong? bc that should be based on w+w_sed, not w_sed bc area is also advected by w
     - or maye just the exchange alone is based on w-w_sed and then ∇(ρqaw_sed) + ∇(ρqaw) combine as desired in EDMF_Functions?
     - maybe just using w+w_sed is better w/ upwinding than trying to do both separately? to_other has to be upwinded anyway right?
+
+    What you would really want to do if you wanted to separate things would be to only calculate using w_sed+w here and remove the advection term in EDMF_functions().
+        - as written what we have is dispersive (handling up and down separately)... but that's ok I guess... for now. For very strong updrafts that might be bad but then the tendencies should be mismatched anwyay
+        - for small updrafts light dispersion is probably ok given the uncertainty in the size distribution and varying terminal velocity with droplet size.
     =#
 
     # w_sed .+= w # these must combine, though maybe we can just copy EDMF_Functions method? though there's no EDMF_Functions for Environment
@@ -104,6 +109,7 @@ function calculate_sedimentation_sources(
 
         # regular upwinding 
         wpaq = @. UBsed(wvec(C2Fsed(-w_sed)), q * area) # -w_sed is towards surface, so we want to upwind w/ -w_sed  and do -∇c after instead of just skipping and cancelling the negatives 
+        # wpaq = @. UBsed(wvec(C2Fsed(-w_sed+w)), q * area) # -w_sed is towards surface, so we want to upwind w/ -w_sed  and do -∇c after instead of just skipping and cancelling the negatives [ testing combining here...]
         ∇wρaq = @. -∇c(wvec(wpaq)) # maybe this has to be done after CV32FT for the contravariant 3 vector?
         # ∇wρaq = @. UBsed(wvec(C2Fsed(w_sed)), ∇wρaq) # works, but output type is different than tendencies type
         # F2Csed = CCO.InterpolateF2C(; bottom = CCO.Extrapolate(), top = 0) # no input from top, just extrapolate at sfc

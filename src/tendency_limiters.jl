@@ -418,7 +418,7 @@ function limit_en_tendencies_old!(edmf::EDMFModel, grid::Grid, state::State, par
     # We don't have a sum of env tendencies... there's _tendency_noneq, _tendency_precip_Formation, _tendency_sedimentation
     # bc env is diagnosed, there's no need to prevent consuming the entire updraft or anything, any growth here is already gonna be reflected in the gm... except entr/detr whose limiting is done in the updraft tendencies
     # for preventing excessive growth in general, use the individual tendency limiters...
-    ∑en_tendencies_q_tot = @. aux_en.qt_tendency_noneq + aux_en.qt_tendency_precip_formation + aux_en.qt_tendency_sedimentation
+    ∑en_tendencies_q_tot = @. aux_en.qt_tendency_precip_formation + aux_en.qt_tendency_sedimentation
     ∑en_tendencies_θ_liq_ice = @.  aux_en.θ_liq_ice_tendency_precip_formation + aux_en.θ_liq_ice_tendency_sedimentation
 
     limit_tendency(uetl, ∑en_tendencies_q_tot, ρ_c * aux_en.area * aux_en.q_tot, Δt)

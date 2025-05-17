@@ -302,6 +302,7 @@ Computes the tendencies to qt and θ_liq_ice due to precipitation formation
 """
 function precipitation_formation(
     param_set::APS,
+    moisture_model::AbstractMoistureModel,
     precip_model::AbstractPrecipitationModel,
     cloud_sedimentation_model::AbstractCloudSedimentationModel,
     rain_formation_model::AbstractRainFormationModel,
@@ -318,6 +319,10 @@ function precipitation_formation(
     ρ::FT,
     Δt::Real,
     ts::TD.ThermodynamicState,
+    w::FT,
+    z::FT,
+    qi_tendency_sub_dep::FT,
+    qi_tendency_sed::FT,
     precip_fraction::FT,
     precipitation_tendency_limiter::AbstractTendencyLimiter,
 ) where {FT}
@@ -336,6 +341,8 @@ function precipitation_formation(
 
     ql_tendency_acnv = FT(0)
     qi_tendency_acnv = FT(0)
+    qi_tendency_acnv_dep = FT(0) # is an input bc it's calculated right after noneq_moisture_sources
+    qi_tendency_acnv_agg = FT(0)
     ql_tendency_accr_liq_ice = FT(0)
     ql_tendency_accr_liq_rai = FT(0)
     ql_tendency_accr_liq_sno = FT(0)
@@ -345,6 +352,9 @@ function precipitation_formation(
 
     α_acnv = TCP.microph_scaling_acnv(param_set)
     α_accr = TCP.microph_scaling_accr(param_set)
+
+
+    
 
     if area > 0
         q = TD.PhasePartition(thermo_params, ts)
@@ -391,7 +401,8 @@ function precipitation_formation(
             # that the supersaturation is present in the domain.
             if rain_formation_model isa Clima1M_default
                 # S_qt_rain = -min(q.liq / Δt, α_acnv * CM1.conv_q_liq_to_q_rai(microphys_params, q.liq))
-                S_qt_rain = limit_tendency(precipitation_tendency_limiter, -α_acnv * CM1.conv_q_liq_to_q_rai(microphys_params, q.liq), q.liq, Δt)
+                
+                S_qt_rain = limit_tendency(precipitation_tendency_limiter, -α_acnv * CM1.conv_q_liq_to_q_rai(microphys_params, q.liq), max(q.liq - get_q_threshold(param_set, CMT.LiquidType()), 0), Δt) # don't allow reducing below threshold
                 # should we have a noneq version here? that uses my_conv_q_liq_to_q_rai()
             elseif rain_formation_model isa Clima2M
                 S_qt_rain =
@@ -411,16 +422,93 @@ function precipitation_formation(
 
             ql_tendency_acnv = S_qt_rain # for storage
 
-            if snow_formation_model isa NonEquilibriumSnowFormationModel 
-                p = TD.air_pressure(thermo_params, ts)
+            if snow_formation_model isa NonEquilibriumSnowFormationModel # should also be a NonEquilibriumMoisture model
+                # if moisture_model isa NonEquilibriumMoisture # should be true
+                q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+                T::FT = TD.air_temperature(thermo_params, ts)
+                p::FT = TD.air_pressure(thermo_params, ts)
+                # q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
+                # τ_liq, τ_ice = get_τ(param_set, microphys_params, moisture_model.scheme, q, T, p, ρ, w, z)
+
+                # S_qt_snow_ice_dep = limit_tendency(precipitation_tendency_limiter, -α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q, T, p; τ = τ_ice), q.ice, Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
+                # S_qt_snow_ice_dep = qi_tendency_acnv_dep # the qi tendencency is some fraction of positive deposition, and then this is a loss from that to snow
+
+                # [ a lot of `agg` is also just threshold driven convergence from things like sed, so also don't count sed against this let it go straight to snow if needed and can evap there ]
+
+                # not sure if we should only use positive sedimentation convergence... i think so bc losing ice doesnt make things smaller
+                # qi_tendency_sed =  max(FT(0), qi_tendency_sed)
+                qi_tendency_sed =  resolve_nan(max(FT(0), qi_tendency_sed), FT(0)) # Only accept deposition, and if we passed in FT(NaN) as a fallback (e.g. in Equilibrium, just use FT(0))
+                # qi_tendency_sed = FT(0)
+
+                # qi_tendency_sub_dep = max(FT(0), qi_tendency_sub_dep) # this is the part that is new ice formation, so we can use that to limit the snow formation
+                qi_tendency_sub_dep = resolve_nan(max(FT(0), qi_tendency_sub_dep), FT(0)) # Only accept deposition, and if we passed in FT(NaN) as a fallback (e.g. in Equilibrium, just use FT(0))
+
+                # techincally acnv really can deplete existing ice too.. so add taht to limiter. include sed just bc
+                S_qt_snow_ice_dep = limit_tendency(precipitation_tendency_limiter, -α_acnv * snow_formation_model.ice_dep_acnv_scaling_factor * my_conv_q_ice_to_q_sno(param_set, q, T, p; N = Ni), q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt, Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
+                # S_qt_snow_ice_dep = -α_acnv * snow_formation_model.ice_dep_acnv_scaling_factor * qi_tendency_sub_dep # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
+
+
+                # This check may not be true (i.e. in principle you can really acnv more than the new ice formation in thier (not morrison 05) framework -- this check also encourages boosting acnv scaling w/o penalty which may lead to unrealistic outcomes from balanced parameters.
+                # S_qt_snow_ice_dep = max(-max(0, qi_tendency_sub_dep), S_qt_snow_ice_dep) # Now that they're calculated differently, ensure S_qt_snow_ice_dep takes lss than deposition from qi_tendency_noneq
+                
+
+
+                # the limiter should probably pick one to give priority, dep i would assume
+
+                # my_conv_q_ice_to_q_sno_thresh() is really just dispatching to my_conv_q_ice_to_q_sno_no_supersat attm, but multiplying by (r/r_ice_snow)^3
+
+
+                #=
+                get minimum q threshold for snow formation
+                    path of calls is my_conv_q_ice_to_q_sno_thresh -> my_conv_q_ice_to_q_sno_no_supersat -> get_q_threshold_acnv(param_set, CMT.IceType(), q, T, p; N=N, assume_N_is = assume_N_is)
+                    this is kinda fragile though... the target threshold is kinda buried in there...
+                    and if it's a q based threshold, does it even matter? maybe we just fall back to the default min threshold regardless? either way it would be nice to get out the threshold the fcn is using...
+                =#
+                    
+                S_qt_snow_ice_agg, q_ice_thresh = get_thresh_and_my_conv_q_ice_to_q_sno_thresh(param_set, q, T, p; N = Ni)
+
+                S_qt_snow_ice_agg = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_agg , max(q.ice - q_ice_thresh, 0), Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
+                # S_qt_snow_ice_agg = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_agg , max(q.ice - q_ice_thresh, 0) + qi_tendency_sed * Δt, Δt)  # I think allowing sed to join the party is a mistake bc we do not calculate acnv including that so you still get jumps. i.e. you hit the tresh and then all of a sudden sed ca take you wherever you want, you'd need to add it when calculating the thresh, as in the input being q.ice + sed tendency etc... but that get's more and more complicated, you could make the argument with more and more tendencies... etc... this is simple and in line wit everything else...
+
+
+                # S_qt_snow_ice_agg = limit_tendency(precipitation_tendency_limiter, -α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q, T, p; N = Ni, assume_N_is=true), q.ice + qi_tendency_sed * Δt, Δt) # based on aggregation but threshold grows with N
+                # S_qt_snow_ice_agg = limit_tendency(precipitation_tendency_limiter, -α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q, T, p;), q.ice, Δt) # based on aggregation [ trialing thresh not being N depdendent q_0 small anyway, use same threshold as growth then.] otherwise we need another parameter for the stable q,N based on r_is
+
+                # S_qt_snow_ice_agg = FT(0) # nothing works and arguably i think it's pretty small? the RF09 is prolly an illusion... the other spikes seem fake too. maybe there's room for one that scales w/ q but i think it's just super small? Most of it i think is very large r driven and we just don't have that...
+
+
+
+
+
+                
+                # not sure if we should only use positive sedimentation convergence...
+                S_qt_snow = limit_tendency(precipitation_tendency_limiter, S_qt_snow_ice_dep + S_qt_snow_ice_agg, q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt, Δt) # based on growth and aggregation # technically the part from sub_dep is new ice so add that in to the limiter (net bc the acnv tendency is neg of the sub tendency)
+                    
+                # if S_qt_snow > (S_qt_snow_ice_dep + S_qt_snow_ice_agg)
+                #     error("S_qt_snow < S_qt_snow_ice_dep + S_qt_snow_ice_agg, this should not happen; S_qt_snow = $(S_qt_snow); S_qt_snow_ice_dep = $(S_qt_snow_ice_dep); S_qt_snow_ice_agg = $(S_qt_snow_ice_agg); qi_tendency_sed = $(qi_tendency_sed); q_i = $(q.ice); Δt = $(Δt);")
+                # end
+
+
+                if any(!isfinite, (S_qt_snow, S_qt_snow_ice_dep, S_qt_snow_ice_agg))
+                    error("S_qt_snow or S_qt_snow_ice_dep or S_qt_snow_ice_agg is not finite; S_qt_snow = $(S_qt_snow); S_qt_snow_ice_dep = $(S_qt_snow_ice_dep); S_qt_snow_ice_agg = $(S_qt_snow_ice_agg); qi_tendency_sub_dep = $(qi_tendency_sub_dep); qi_tendency_sed = $(qi_tendency_sed); q_i = $(q.ice); Δt = $(Δt); q = $(q); T = $(T); p = $(p);")
+                end
+
                 # S_qt_snow = -min(q.ice / Δt, α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q, T, p))
-                S_qt_snow = limit_tendency(precipitation_tendency_limiter, -α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q, T, p), q.ice, Δt)
+                # S_qt_snow = limit_tendency(precipitation_tendency_limiter, -α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q, T, p; N0 = Ni), q.ice, Δt)
             else
+                #=
+                NOTE: NonEquilibriumSnowFormationModel was maybe a bad naming convention -- it's not 1:1 with NonEquilibriumMoistureModel... even EquilibriumMoistureModel can use this...
+                So this is really just a fallback method...
+                =#
                 # S_qt_snow = -min(q.ice / Δt, α_acnv * CM1.conv_q_ice_to_q_sno_no_supersat(microphys_params, q.ice))
                 S_qt_snow = limit_tendency(precipitation_tendency_limiter, -α_acnv * CM1.conv_q_ice_to_q_sno_no_supersat(microphys_params, q.ice), q.ice, Δt)
+                S_qt_snow_ice_dep = FT(NaN) # no easy breakdown
+                S_qt_snow_ice_agg = FT(NaN) # no easy breakdown
             end
 
             qi_tendency_acnv = S_qt_snow # for storage
+            qi_tendency_acnv_agg = S_qt_snow_ice_agg # for storage
+            qi_tendency_acnv_dep = S_qt_snow_ice_dep # for storage [ was already an input but may be removing ]
 
             qr_tendency -= S_qt_rain
             qs_tendency -= S_qt_snow
@@ -546,6 +634,8 @@ function precipitation_formation(
         # my additions
         ql_tendency_acnv,
         qi_tendency_acnv,
+        qi_tendency_acnv_dep,
+        qi_tendency_acnv_agg,
         ql_tendency_accr_liq_rai,
         # FT(0), # ql_tendency_accr_liq_ice
         ql_tendency_accr_liq_ice,
@@ -556,6 +646,55 @@ function precipitation_formation(
         qi_tendency_accr_ice_sno,
     )
 end
+
+ precipitation_formation(
+    param_set::APS,
+    moisture_model::AbstractMoistureModel,
+    precip_model::AbstractPrecipitationModel,
+    cloud_sedimentation_model::AbstractCloudSedimentationModel,
+    rain_formation_model::AbstractRainFormationModel,
+    snow_formation_model::AbstractSnowFormationModel,
+    qr::FT,
+    qs::FT,
+    ql::FT,
+    qi::FT,
+    Ni::FT,
+    term_vel_ice::FT, # maybe this isn't needed lol
+    term_vel_rain::FT,
+    term_vel_snow::FT,
+    area::FT,
+    ρ::FT,
+    Δt::Real,
+    ts::TD.ThermodynamicState,
+    precip_fraction::FT,
+    precipitation_tendency_limiter::AbstractTendencyLimiter
+) where {FT} = 
+    precipitation_formation(
+        param_set,
+        moisture_model,
+        precip_model,
+        cloud_sedimentation_model,
+        rain_formation_model,
+        snow_formation_model,
+        qr,
+        qs,
+        ql,
+        qi,
+        Ni,
+        term_vel_ice,
+        term_vel_rain,
+        term_vel_snow,
+        area,
+        ρ,
+        Δt,
+        ts,
+        FT(NaN), # placeholder for backwards compat w
+        FT(NaN), # placeholder for backwards compat z
+        FT(NaN), # placeholder for backwards compat qi_tendency_sub_dep
+        FT(NaN), # placeholder for backwards compat qi_tendency_sed
+        precip_fraction,
+        precipitation_tendency_limiter,
+    )
 
 
 """
@@ -674,5 +813,6 @@ function my_accretion_snow_rain(
                 _λ_j^(_me_j + _Δm_j + FT(3))
             )
     end
-    return accr_rate
+    # return accr_rate # we shouldnt need resolve nan bc we're using the cm_1 values which shouldn't blow up? but just to be safe
+    return resolve_nan(accr_rate, FT(0))
 end

@@ -15,6 +15,8 @@ Base.@kwdef struct PrecipFormation{FT}
     # added these below for use in storing for outputs
     ql_tendency_acnv::FT
     qi_tendency_acnv::FT
+    qi_tendency_acnv_dep::FT
+    qi_tendency_acnv_agg::FT
     ql_tendency_accr_liq_rai::FT
     ql_tendency_accr_liq_ice::FT
     ql_tendency_accr_liq_sno::FT
@@ -171,8 +173,20 @@ Base.eltype(::RFEntr{d, m, FT}) where {d, m, FT} = FT
 εδ_params(m::AbstractNoisyEntrDetrModel) = m.mean_model.params
 
 abstract type EntrModelFacTotalType end
-struct FractionalEntrModel <: EntrModelFacTotalType end
-struct TotalRateEntrModel <: EntrModelFacTotalType end
+# struct FractionalEntrModel <: EntrModelFacTotalType end
+Base.@kwdef struct FractionalEntrModel{FT} <: EntrModelFacTotalType
+    "mix_stalled_updraft_to_grid_mean::Bool"
+    mix_stalled_updraft_to_grid_mean::Bool # this is the fraction of the updraft that is stalled to the grid mean
+end
+# struct TotalRateEntrModel <: EntrModelFacTotalType end
+Base.@kwdef struct TotalRateEntrModel{FT} <: EntrModelFacTotalType
+    "base detrainment rate inverse [s^-1]"
+    base_detrainment_rate_inv_s::FT # testing having some base detrainment rate so that even when w goes to 0 we can detrain slowly.
+    "mix_stalled_updraft_to_grid_mean::Bool"
+    mix_stalled_updraft_to_grid_mean::Bool # Whether or not we mix the updraft to the grid mean when we get to w=0
+end
+
+
 
 abstract type EntrDimScale end
 struct BuoyVelEntrDimScale <: EntrDimScale end
@@ -359,7 +373,7 @@ function NonEquilibriumMoisture(param_set::APS)
 
 
     RTT = typeof(nonequilibrium_moisture_scheme)
-    return NonEquilibriumMoisture{RTT, FT}(nonequilibrium_moisture_scheme, (heterogeneous_ice_nucleation, heterogeneous_ice_nuclation_coefficient, heterogeneous_ice_nuclation_exponent), )
+    return NonEquilibriumMoisture{RTT, FT}(nonequilibrium_moisture_scheme, (heterogeneous_ice_nucleation, heterogeneous_ice_nuclation_coefficient, heterogeneous_ice_nuclation_exponent) )
 end
 
 abstract type AbstractIntegrationScheme end
@@ -383,7 +397,7 @@ end
 
 struct CloudNoSedimentationModel <: AbstractCloudSedimentationModel end
 
-function CloudSedimentationModel(param_set)
+function CloudSedimentationModel(param_set::APS)
     FT = eltype(param_set)
     liq_terminal_velocity_scheme = get_termvel_type(TCP.parse_isbits_nt(param_set.user_args, :liq_terminal_velocity_scheme, :Blk1MVel)) 
     ice_terminal_velocity_scheme = get_termvel_type(TCP.parse_isbits_nt(param_set.user_args, :ice_terminal_velocity_scheme, :Blk1MVel))
@@ -398,7 +412,7 @@ function CloudSedimentationModel(param_set)
     end
 
     liq_Dmax = TCP.parse_isbits_nt(param_set.user_params, :liq_sedimentation_Dmax, FT(Inf))
-    ice_Dmax = TCP.parse_isbits_nt(param_set.user_params, :ice_sedimentation_Dmax, FT(62.5e-6)) # maybe this should also be inf? for chen it's not clear...
+    ice_Dmax = TCP.parse_isbits_nt(param_set.user_params, :ice_sedimentation_Dmax, FT(62.5e-6 * 2)) # maybe this should also be inf? for chen it's not clear...
    
     liq_sedimentation_scaling_factor = TCP.parse_isbits_nt(param_set.user_params, :liq_sedimentation_scaling_factor, FT(1.0))
     ice_sedimentation_scaling_factor = TCP.parse_isbits_nt(param_set.user_params, :ice_sedimentation_scaling_factor, FT(1.0))
@@ -455,7 +469,7 @@ struct Clima1M{FT, RTVST <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, STVST <: 
     rain_terminal_velocity_scheme::RTVST
     snow_terminal_velocity_scheme::STVST
 end
-function Clima1M(param_set)
+function Clima1M(param_set::APS)
     FT = eltype(param_set)
     rain_sedimentation_scaling_factor = TCP.parse_isbits_nt(param_set.user_params, :rain_sedimentation_scaling_factor, FT(1.0))
     snow_sedimentation_scaling_factor = TCP.parse_isbits_nt(param_set.user_params, :snow_sedimentation_scaling_factor, FT(1.0))
@@ -486,10 +500,20 @@ end
 
 abstract type AbstractSnowFormationModel end
 struct DefaultSnowFormationModel <: AbstractSnowFormationModel end
-struct NonEquilibriumSnowFormationModel <: AbstractSnowFormationModel
+struct NonEquilibriumSnowFormationModel{FT} <: AbstractSnowFormationModel
+    ice_dep_acnv_scaling_factor::FT # this is the scaling factor for the ice deposition/accretion term. It should be 1.0 in most cases but we can use it to tune the model a bit
     # scheme::RTT # currently we're not using a relaxation_timescale_type for snow formation. If we do, we can bring this back but you should reuse the same one as for the moisture model and not recreate it.
+    # inner constructor using param_set
+
 end
-function SnowFormationModel(param_set)
+
+function NonEquilibriumSnowFormationModel(param_set::APS)
+    FT = eltype(param_set)
+    ice_dep_acnv_scaling_factor = TCP.parse_isbits_nt(param_set.user_params, :ice_dep_acnv_scaling_factor, FT(1.0)) # this is the scaling factor for the ice deposition/accretion term. It should be 1.0 in most cases but we can use it to tune the model a bit
+    return NonEquilibriumSnowFormationModel{FT}(ice_dep_acnv_scaling_factor)
+end
+
+function SnowFormationModel(param_set::APS)
 
     nonequilibrium_moisture_scheme_type::Symbol = TCP.parse_isbits_nt(param_set.user_args, :nonequilibrium_moisture_scheme, :relax_to_equilibrium)
 
@@ -498,7 +522,7 @@ function SnowFormationModel(param_set)
     elseif nonequilibrium_moisture_scheme_type === :KorolevMazin2007
         DefaultSnowFormationModel() # should this be default? I guess maybe cause there's no N prediction?
     elseif nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types
-        NonEquilibriumSnowFormationModel()
+        NonEquilibriumSnowFormationModel(param_set)
     else
         error("Invalid nonequilibrium_moisture_scheme type: $nonequilibrium_moisture_scheme_type")
     end
@@ -1197,12 +1221,21 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
     )
 
     if entrainment_type == "fractional"
-        entrainment_type = FractionalEntrModel()
+        # entrainment_type = FractionalEntrModel()
+        entrainment_type = FractionalEntrModel(;
+        mix_stalled_updraft_to_grid_mean = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "mix_stalled_updraft_to_grid_mean"; default = false),
+        )
     elseif entrainment_type == "total_rate"
-        entrainment_type = TotalRateEntrModel()
+        # entrainment_type = TotalRateEntrModel()
+        entrainment_type = TotalRateEntrModel(;
+        base_detrainment_rate_inv_s = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "base_detrainment_rate_inv_s"; default = 0.0), # assume infinite timescale so 0 inv timescale (consider choosing a better default like 6 hours or something...)
+        mix_stalled_updraft_to_grid_mean = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "mix_stalled_updraft_to_grid_mean"; default = false),
+        )
     else
         error("Something went wrong. Invalid entrainment type '$entrainment_type'")
     end
+    @info "entrainment_type: $entrainment_type"
+
 
     entr_dim_scale = parse_namelist(
         namelist,
@@ -1522,3 +1555,63 @@ Grid(state::State) = state.grid
 float_type(state::State) = eltype(state.prog)
 # float_type(field::CC.Fields.Field) = CC.Spaces.undertype(axes(field))
 float_type(field::CC.Fields.Field) = eltype(parent(field))
+
+
+function fv_field_summary(io::IO, f::CC.Fields.Field)
+    # Base.show(io, f)
+    s = repr(f)
+    s = replace(s, "\n" => " \n\n ") # otherwise @info smushes onto same line, not sure why"
+    print(io, s)
+end
+
+
+function Base.summary(io::IO, fv::CC.Fields.FieldVector)
+    pns = string.(propertynames(fv))
+
+    if length(pns) == 0
+        print(io, fv)
+        return
+    end
+
+    buf = maximum(length.(pns))
+    keys = propertynames(fv)
+    vals = repeat.(" ", map(s -> buf - length(s) + 2, pns))
+    bufs = (; zip(keys, vals)...)
+    print(io, '\n')
+
+    for pn in propertynames(fv)[1:2]
+        prop = getproperty(fv, pn)
+
+
+
+        # Skip some data:
+        # prop isa Bool && continue
+        # prop isa NTuple && continue
+        # prop isa Int && continue
+        # prop isa Float64 && continue
+        # prop isa Float32 && continue
+
+
+        s = string(
+            "  ", # needed for some reason
+            getproperty(bufs, pn), # buffer for alignment
+            '`',
+            string(pn),
+            '`',
+            "::",
+            '`',
+        )
+        print(io, s)
+
+        if prop isa CC.Fields.Field
+            fv_field_summary(io, prop)
+        end
+
+
+        s = string(  '`',
+            '\n',
+            '\n', # double or else @info smushes onto same line, not sure why"
+        )
+        print(io, s)
+    end
+end

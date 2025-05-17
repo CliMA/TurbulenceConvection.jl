@@ -137,16 +137,29 @@ function io_dictionary_aux()
 
         # N [if we end up deciding to save N here... -- rn in variables/dycore_variables these are optional depending on what sedimentation model we're using but if theyre in the diagnostics bere they should be a permanent part of the model and not optionally defined...]
         "env_N_i" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).N_i),
-        "up_N_i" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).N_i),
+        "updraft_N_i" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).N_i),
         "N_i_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).N_i),
 
+        "updraft_wi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).term_vel_ice),
+        "env_wi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).term_vel_ice),
+
+        # overall need to weight by mass, e.g. weight v_up by  ρ * a_up * q_up (the ρ cancel out) and the weights just sum to grid mean bc a sums to 1.
+        "wi_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).term_vel_ice),
+        "wr_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).term_vel_rain),
+        "ws_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).term_vel_snow),
+
         # sedimentation
-        "qi_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_sedimentation .+ center_aux_environment(state).qi_tendency_sedimentation), # I believe these already area weightd so just sum
+        "qi_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_sedimentation .+ center_aux_environment(state).qi_tendency_sedimentation), # I believe these already area weighted so just sum bc you would divide out the area to get the real tendency but you'd have to multiply by area again to area weight
         "ql_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_sedimentation .+ center_aux_environment(state).ql_tendency_sedimentation),
+
+        "qr_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qr_tendency_advection .+ center_aux_turbconv(state).qr_tendency_advection), # precip sed is stored in advection
+        "qs_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qs_tendency_advection .+ center_aux_turbconv(state).qs_tendency_advection), # I believe these already area weightd so just sum
 
         # acnv
         "ql_mean_acnv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_acnv .+ center_aux_environment(state).ql_tendency_acnv),
         "qi_mean_acnv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_acnv .+ center_aux_environment(state).qi_tendency_acnv),
+        "qi_mean_acnv_dep" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_acnv_dep .+ center_aux_environment(state).qi_tendency_acnv_dep),
+        "qi_mean_acnv_agg" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_acnv_agg .+ center_aux_environment(state).qi_tendency_acnv_agg),
         
         # accr
         "ql_mean_accr_liq" => (; dims = ("zc", "t"), group = "profiles", field = state ->
@@ -164,7 +177,7 @@ function io_dictionary_aux()
         "qi_mean_accr_ice_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_accr_ice_liq .+ center_aux_environment(state).qi_tendency_accr_ice_liq),
         "qi_mean_accr_ice_rai" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_accr_ice_rai .+ center_aux_environment(state).qi_tendency_accr_ice_rai),
         "qi_mean_accr_ice_sno" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_accr_ice_sno .+ center_aux_environment(state).qi_tendency_accr_ice_sno),
-        "qi_mean_accr_ice_no_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> # because ice-liq interaction doesn't exist in TC.jl (PSACWI)
+        "qi_mean_accr_ice_no_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> # because ice-liq interaction doesn't exist in TC.jl (PSACWI) [deprecate this...]
             center_aux_bulk(state).qi_tendency_accr_ice_rai .+ center_aux_environment(state).qi_tendency_accr_ice_rai .+
             center_aux_bulk(state).qi_tendency_accr_ice_sno .+ center_aux_environment(state).qi_tendency_accr_ice_sno),
 

@@ -57,6 +57,13 @@ function safe_clamp(x, lo, hi)
     return (lo < hi) ? clamp(x, lo, hi) : clamp(x, hi, lo)
 end # safe_clamp
 
+resolve_nan(x::FT, val = FT(0.0)) where {FT} = isnan(x) ? FT(val) : x # replace nan w/ 0
+# resolve_inf(x::FT; val::FT=FT(NaN)) where {FT} = isinf(x) ? val : x # replace inf with NaN
+# resolve_not_finite(x::FT, val = FT(0.0)) where {FT} = !isfinite(x) ? FT(val) : x # replace inf and nan with 0
+
+full_print(x) = show(IOContext(stdout, :limit => false), "text/plain", x)
+
+
 include("Parameters.jl")
 import .Parameters as TCP
 const APS = TCP.AbstractTurbulenceConvectionParameters
@@ -176,6 +183,7 @@ include("closures/buoyancy_gradients.jl")
 
 include("closures/relaxation_timescales.jl")
 include("closures/N_r_closures.jl") # testing different N/r distribution closures
+include("closures/reweight_processes_for_grid.jl") # reweighting process rates to account for grid spacing...
 include("closures/neural_microphysics_relaxation_timescales.jl") # testing different microphysics relaxation timescales
 include("closures/korolev_mazin_2007.jl")
 include("closures/morrison_milbrandt_2015_style.jl")

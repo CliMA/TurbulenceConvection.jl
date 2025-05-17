@@ -128,6 +128,13 @@ function set_thermo_state_from_prog!(state, grid, moisture_model, param_set)
         else
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
+
+        if moisture_model isa TC.NonEquilibriumMoisture
+            if !isfinite(prog_gm.q_liq[k]) || !isfinite(prog_gm.q_ice[k])
+                @error("NaN in q_liq or q_ice, k = $k, prog_gm.q_liq[k] = $(prog_gm.q_liq[k]), prog_gm.q_ice[k] = $(prog_gm.q_ice[k])")
+            end
+        end
+
         ts_gm[k] = TC.thermo_state_pθq(
             param_set,
             p_c[k],
@@ -186,7 +193,7 @@ function assign_thermo_aux!(state, grid, moisture_model, param_set)
         aux_gm.T[k] = TD.air_temperature(thermo_params, ts)
         
         # @assert [for search optimization, but don't use assert, use an explicit error]
-        (aux_gm.T[k] > 0) || error("Negative or NaN temperature will cause issues here, status is z = $(grid.zc[k].z), T = $(aux_gm.T[k]), q = $(ts_gm[k].q), θ_liq_ice = $(aux_gm.θ_liq_ice[k]), ts = $ts") # debugging, remove later -- will slow down code
+        (0 < aux_gm.T[k] < Inf) || @error("Negative or nonfinite temperature will cause issues here, status is z = $(grid.zc[k].z), T = $(aux_gm.T[k]), q = $(ts_gm[k].q), θ_liq_ice = $(aux_gm.θ_liq_ice[k]), ts = $ts") # debugging, remove later -- will slow down code
         # if aux_gm.T[k] <= 0 
         #     @warn "Negative or NaN temperature will cause issues here"
         #     @info "status is z = $(grid.zc[k].z), T = $(aux_gm.T[k]), q = $(ts_gm[k].q), θ_liq_ice = $(aux_gm.θ_liq_ice[k]), ts = $ts"
@@ -221,6 +228,47 @@ function ∑stoch_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) whe
 
         # compute updraft stochastic tendencies
         TC.compute_up_stoch_tendencies!(edmf, grid, state, param_set, surf)
+    end
+end
+
+"""
+"""
+function my_unstable_check_test(dt::Real, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
+    TS = params.TS
+    TS.isoutofdomain = false # reset to false at the beginning of the function
+
+    @debug "Checking for nan in prognostic variables"
+    
+    CC.Fields.bycolumn(axes(prog.cent)) do colidx # have to do this bc it's a do block which is technically an anonymous function...
+        UnPack.@unpack edmf, precip_model, param_set, case = params
+        UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
+
+        state = TC.column_prog_aux(prog, aux, colidx)
+
+        FT = TC.float_type(state)
+
+        grid = TC.Grid(state)
+        N_up = TC.n_updrafts(edmf)
+        kc_surf = TC.kc_surface(grid)
+        kf_surf = TC.kf_surface(grid)
+    
+        aux_tc = TC.center_aux_turbconv(state)
+        aux_up = TC.center_aux_updrafts(state)
+        aux_en = TC.center_aux_environment(state)
+        aux_en_f = TC.face_aux_environment(state)
+        aux_up_f = TC.face_aux_updrafts(state)
+        aux_bulk = TC.center_aux_bulk(state)
+        aux_bulk_f = TC.face_aux_bulk(state) # same as using aux_tc_f = face_aux_turbconv(state) and then using aux_tc_f.bulk.w for example
+        prog_up = TC.center_prog_updrafts(state)
+        prog_up_f = TC.face_prog_updrafts(state)
+        prog_gm = TC.center_prog_grid_mean(state)
+        aux_gm = TC.center_aux_grid_mean(state)
+        aux_gm_f = TC.face_aux_grid_mean(state)
+
+        # check for a nan in every variable
+
+        error("not implemented yet")
+
     end
 end
 

@@ -697,6 +697,7 @@ function SOCRATES(namelist_defaults; case_name = "SOCRATES_RFXX_XXX_data")
     # # probably better to change this to have some min dz since this reduction could be really overkill on a stretched/squeezed grid
     # namelist["grid"]["z_reduction_factor"] = 1 # reduction factor from LES z grid... useful bc if we want to increase the timestep, we can run into CFL issues with the smaller grid
     namelist["grid"]["dz_min"] = 10.0 # the lowest grid spacing in the original Atlas files...
+    # we also have conservative_interp_kwargs in, in `grid`, but we'll just let the defaults in SSCF and CalibrateEDMF HelperFuncs be the defaults here as welll.
 
     # grid is currently constructed from the same one used by the paper's LES grid
     namelist["stats_io"]["frequency"] = 600.0 # long runs so try a lower output rate for smaller files... (seems to be seconds) -- changed to 10 minutes... 14 hours default runs are loooong...

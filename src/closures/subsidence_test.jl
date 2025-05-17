@@ -21,8 +21,8 @@ data = SSCF.open_atlas_les_input(10)
 new_zc = data[:grid_data]
 
 case_data = SSCF.process_case(
-    10,
-    :obs_data;
+    10;
+    forcing_type = :obs_data,
     new_z = (;
         dTdt_hadv = new_zc,
         H_nudge = new_zc,
@@ -37,6 +37,7 @@ case_data = SSCF.process_case(
     ),
     initial_condition = false,
     thermo_params = thermo_params,
+    conservative_interp = true,
 )
 
 
@@ -141,7 +142,6 @@ Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/inte
 import ClimaCore as CC
 import ClimaCore.Operators as CCO
 
-full_print(x) = show(IOContext(stdout, :limit => false), "text/plain", x)
 
 # new_z = zc_les
 # z_mesh = CC.Geometry.ZPoint{FT}.(new_z) # added 0 to beginning? copy from the file #Array(TC.get_nc_data(data, "zc")) also idk what to do about paths like this
@@ -165,7 +165,7 @@ import TurbulenceConvection as TC
 TCP = TC.Parameters
 import JSON
 namelist_file = "/central/groups/esm/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES_postprocess_runs_storage/subexperiments/SOCRATES_Base/Calibrate_and_Run/tau_autoconv_noneq/adapt_dt__dt_min_2.0__dt_max_4.0/iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean/postprocessing/output/Atlas_LES/RFAll_obs/best_particle/data/Output.SOCRATES_RF10_obs_data.1_1/namelist_SOCRATES.in"
-namelist = JSON.parsefile(namelist_file, dicttype = Dict, inttype = Int)
+namelist = JSON.parsefile(namelist_file, dicttype = Dict, inttype = Int, null = FT(NaN))
 namelist["meta"]["casename"]
 
 namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"])
