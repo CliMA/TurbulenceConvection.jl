@@ -72,7 +72,8 @@ end
     domain = CC.Domains.IntervalDomain(
         CC.Geometry.ZPoint{FT}(0),
         CC.Geometry.ZPoint{FT}(nz * Δz),
-        boundary_tags = (:bottom, :top),
+        # boundary_tags = (:bottom, :top),
+        boundary_names = (:bottom, :top), # see https://github.com/CliMA/ClimaCore.jl/commit/4ec6aa960a12f22e6575df64724ea8ddcd1ce0d1
     )
     mesh = CC.Meshes.IntervalMesh(domain, nelems = nz)
     grid = TC.Grid(mesh)

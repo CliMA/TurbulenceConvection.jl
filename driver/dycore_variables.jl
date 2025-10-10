@@ -34,6 +34,7 @@ cent_aux_vars_gm(FT, local_geometry, edmf) = (;
     q_liq = FT(0),
     q_ice = FT(0),
     RH = FT(0),
+    RH_ice = FT(0), # RH for ice, i.e. the ratio of q_vap to q_vap_sat_ice
     s = FT(0),
     T = FT(0),
     buoy = FT(0),
@@ -66,18 +67,30 @@ cent_aux_vars_gm(FT, local_geometry, edmf) = (;
     qt_tendency_ls_vert_adv = FT(0), # my addition
     ql_tendency_ls_vert_adv = FT(0), # my addition
     qi_tendency_ls_vert_adv = FT(0), # my addition
+    qr_tendency_ls_vert_adv = FT(0), # my addition [[ not sure how relevant this one is but ]]
+    qs_tendency_ls_vert_adv = FT(0), # my addition [[ not sure how relevant this one is but ]]
     ql_tendency_vert_adv = FT(0), # my addition [ For full flux, massflux is only differential between up/env and gm so sgs ]
     qi_tendency_vert_adv = FT(0), # my addition [ For full flux, massflux is only differential between up/env and gm so sgs ]
+    qr_tendency_vert_adv = FT(0), # my addition 
+    qs_tendency_vert_adv = FT(0), # my addition
+    qr_tendency_sedimentation = FT(0), # storage
+    qs_tendency_sedimentation = FT(0), # storage
     sgs_tendency_q_liq = FT(0), # testing here instead of below in face_aux_vars_gm_moisture() to see if it's the right spaces type... cause after deriv we're back on center no longer on faces...
     sgs_tendency_q_ice = FT(0), # testing here instead of below in face_aux_vars_gm_moisture() to see if it's the right spaces type... cause after deriv we're back on center no longer on faces...
+    sgs_tendency_q_rai = FT(0), # my addition
+    sgs_tendency_q_sno = FT(0), # my addition
+    # term_vel_liq = FT(0), # for grid mean sed.. .would be nice to have that conditionally but that breaks eltype inference, could make a function w/ sedimentatinon_vars that is based on edmf.cloud_sedimentation_model
     # term_vel_ice = FT(0), # for grid mean sed.. .would be nice to have that conditionally but that breaks eltype inference, could make a function w/ sedimentatinon_vars that is based on edmf.cloud_sedimentation_model
     TC.cloud_sedimentation_variables(FT, edmf.cloud_sedimentation_model)...,
+    f_ice_mult = FT(1),
 )
 cent_aux_vars(FT, local_geometry, edmf) =
     (; cent_aux_vars_gm(FT, local_geometry, edmf)..., TC.cent_aux_vars_edmf(FT, local_geometry, edmf)...)
 
 # Face only
-face_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture) = (; sgs_flux_q_liq = FT(0), sgs_flux_q_ice = FT(0),
+face_aux_vars_gm_moisture(FT, ::TC.NonEquilibriumMoisture) = (;
+    sgs_flux_q_liq = FT(0),
+    sgs_flux_q_ice = FT(0),
     ql_flux_vert_adv = FT(0), # my addition [ For full flux, massflux is only differential between up/env and gm so sgs , could also go in aux_tc_f [face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) ]
     qi_flux_vert_adv = FT(0), # my addition [ For full flux, massflux is only differential between up/env and gm so sgs , could also go in aux_tc_f [face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) ]
 )
@@ -89,6 +102,8 @@ face_aux_vars_gm(FT, local_geometry, edmf) = (;
     f_rad = FT(0),
     sgs_flux_θ_liq_ice = FT(0),
     sgs_flux_q_tot = FT(0),
+    sgs_flux_q_rai = FT(0), # my addition
+    sgs_flux_q_sno = FT(0), # my addition
     face_aux_vars_gm_moisture(FT, edmf.moisture_model)...,
     sgs_flux_uₕ = CCG.Covariant3Vector(FT(0)) ⊗ CCG.Covariant12Vector(FT(0), FT(0)),
     p = FT(0),

@@ -9,8 +9,8 @@ function korolev_mazin_2007(param_set::APS, area::FT, ρ::FT, Δt::Real, ts::TD.
     """
     thermo_params = TCP.thermodynamics_params(param_set) # currently repeated in both places, pare down later
     microphys_params = TCP.microphysics_params(param_set)
-    S_ql = 0
-    S_qi = 0
+    S_ql = FT(0) # source of liquid water
+    S_qi = FT(0) # source of ice
     if area > 0
 
         q = TD.PhasePartition(thermo_params, ts)

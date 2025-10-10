@@ -20,7 +20,8 @@ function TCMeshFromGCMMesh(gcm_mesh; z_max::FT) where {FT <: AbstractFloat}
     domain = CC.Domains.IntervalDomain(
         CC.Geometry.ZPoint{FT}(z₀),
         CC.Geometry.ZPoint{FT}(z₁),
-        boundary_tags = (:bottom, :top),
+        # boundary_tags = (:bottom, :top),
+        boundary_names = (:bottom, :top), # see https://github.com/CliMA/ClimaCore.jl/commit/4ec6aa960a12f22e6575df64724ea8ddcd1ce0d1
     )
     faces = map(1:(k_star.i)) do k
         CC.Geometry.ZPoint{FT}(gcm_grid.zf[CCO.PlusHalf(k)].z)
@@ -42,7 +43,8 @@ function adjust_mesh(mesh, z_top::FT) where {FT <: AbstractFloat}
     new_domain = CC.Domains.IntervalDomain(
         CC.Geometry.ZPoint{FT}(z0),
         CC.Geometry.ZPoint{FT}(z_top),
-        boundary_tags = (:bottom, :top),
+        # boundary_tags = (:bottom, :top),
+        boundary_names = (:bottom, :top), # see https://github.com/CliMA/ClimaCore.jl/commit/4ec6aa960a12f22e6575df64724ea8ddcd1ce0d1
     )
     return CC.Meshes.IntervalMesh(new_domain, new_stretch; nelems = nz)
 end
@@ -83,7 +85,8 @@ function Grid(Δz::FT, nz::Int) where {FT <: AbstractFloat}
     domain = CC.Domains.IntervalDomain(
         CC.Geometry.ZPoint{FT}(z₀),
         CC.Geometry.ZPoint{FT}(z₁),
-        boundary_tags = (:bottom, :top),
+        # boundary_tags = (:bottom, :top),
+        boundary_names = (:bottom, :top), # see https://github.com/CliMA/ClimaCore.jl/commit/4ec6aa960a12f22e6575df64724ea8ddcd1ce0d1
     )
 
     mesh = CC.Meshes.IntervalMesh(domain, nelems = nz)

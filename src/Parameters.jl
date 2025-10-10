@@ -104,7 +104,7 @@ end
 ##### TurbulenceConvection parameters
 #####
 
-Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP, NT <: NamedTuple, UP <: NamedTuple} <: ATCP
+Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP, UP <: NamedTuple} <: ATCP
     Omega::FT
     planet_radius::FT
     microph_scaling::FT
@@ -114,7 +114,7 @@ Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP, NT <: NamedTuple,
     microph_scaling_accr::FT
     microphys_params::MP
     surf_flux_params::SFP
-    user_args::NT # Let this be a Namedtuple of user arguments passed taken straight from namelist["user_args"]::NamedTuple in the main program
+    # user_args::UA # Let this be a Namedtuple of user arguments passed taken straight from namelist["user_args"]::NamedTuple in the main program [[ removed, see parametr_set.jl ]]
     user_params::UP # Let this be a NamedTuple created from namelist["user_params"]::Dict in the main program.. to ensure this is `isbits`, the values in the dict should have been be turned to tuples if they were arrays... string keys should have been  converted to symbols (get_parameter_valus() in parameter_set.jl did a similar thing )
 end
 

@@ -5,6 +5,7 @@ using Revise
 using Pkg
 using Plots
 using Statistics: mean
+using Printf: @sprintf
 Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/"))
 
 includet(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/src/TurbulenceConvection.jl"))
@@ -96,6 +97,40 @@ v_ice_dmax5 = ((q, N) -> TC.my_terminal_velocity(microphys_params, CM.CommonType
 N = NaN; v_ice_dmax6 = ((q, N) -> TC.my_terminal_velocity(microphys_params, CM.CommonTypes.IceType(), CM.CommonTypes.Chen2022Type(), ρ_air, q; D_transition=D_trans, Dmax=FT(Inf), Nt=FT(N))).(q, N )
 
 
+
+v_ice = TC.my_terminal_velocity(param_set, CM.CommonTypes.IceType() , CM.CommonTypes.Chen2022Type(), ρ_air, FT(1e-7); D_transition=FT(625e-6), Nt=FT(1))
+
+v_ice = TC.my_terminal_velocity(param_set, CM.CommonTypes.IceType() , CM.CommonTypes.Chen2022Type(), ρ_air, FT(1e-7); D_transition=FT(625e-6) * 1e3, Nt=FT(1))
+nav = TC.int_nav_dr(param_set, CM.CommonTypes.IceType(), CM.CommonTypes.Chen2022Type(), FT(1e-7), ρ_air, FT(NaN); Nt=FT(1), Dmax=FT(625e-6 * 1e3))
+
+accr_li = TC.accretion_liq_ice(param_set, 1e-4, 1e-6, 1., .5, TC.CMT.Chen2022Type(), FT(100), FT(Inf), 1.)
+nav = TC.int_nav_dr(param_set, CM.CommonTypes.IceType(), CM.CommonTypes.Chen2022Type(), FT(1e-6), ρ_air, FT(NaN); Nt=FT(1), Dmax=FT(Inf))
+
+
+
+precip = TC.ice_type
+Nt = FT(1); ρ=FT(1); q = FT(1e-6)
+μ = FT(NaN)
+if isnan(μ)
+    μ = TC.μ_from_qN(param_set, precip, q, Nt; ρ=ρ)
+end
+Dmin = FT(0)
+Dmax = FT(625e-6*3)
+
+# coefficients from Appendix B from Chen et. al. 2022
+(aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l) = TC.my_Chen2022_vel_coeffs(prs, CM.CommonTypes.SnowType(), ρ)
+
+# ρ_i::FT = CMP.ρ_cloud_ice(prs)
+# Ok so here's the thing.... we want q to fit between Dmin and Dmax...
+# so we need a lambda that works for that....
+# _λ::FT = lambda(param_set, precip, q, ρ, Nt, μ, Dmin, Dmax)
+_n0::FT = isnan(Nt) ? TC.n0(prs, q, ρ, precip) : TC.n0(prs, q, ρ, precip, Nt, μ; Dmin=Dmin, Dmax=Dmax) # use wanted Nt If given
+_λ::FT = TC.lambda(prs, precip, q, ρ, Nt, μ; _n0=_n0, Dmin=Dmin, Dmax=Dmax)
+
+a0c::FT = TC.a0(prs, precip) * TC.χa(prs, precip)
+aec::FT = TC.ae(prs, precip) + TC.Δa(prs, precip)
+_r0::FT = TC.r0(prs, precip)
+
 # -------------------------------------------------------------------- #
 
 function symlog(x; n = -3)
@@ -106,17 +141,21 @@ function symlog(x; n = -3)
     result
 end
 
-function symlogformatter(x, n)
-    if sign(x) == 0
-        "10^$(n)"
-    else
+function symlogformatter(x, n; ndigits=20)
+    # if sign(x) == 0
+    #     "10^$(n)"
+    # else
         s = sign(x) == 1 ? "+" : "-"
         nexp = sign(x) * (abs(x) + n)
         if sign(x) == -1
             nexp = -nexp
         end
-        s * "10^$(nexp)"
-    end
+        n_exp_print = round(nexp, digits=ndigits)
+        # get minimal
+        # s * "10^$(n_exp_print)" # this doenst work bc stuff like BigFloats dont use minimal printing and wont be truncated
+        num_str = @sprintf("%.*f", ndigits, nexp)  # ✅ dynamic precision
+        return s * "10^" * num_str
+    # end
 end
 
 
@@ -179,3 +218,133 @@ thisdir = dirname(@__FILE__)
 savefig(joinpath(thisdir, "terminal_velocity_vs_q.png"))
 
 
+
+
+
+function test_my_terminal_velocity(
+    # prs::ACMP,
+    param_set::APS,
+    precip::CMT.IceType,
+    velo_scheme::CMT.Chen2022Type,
+    ρ::FT,
+    q_::FT;
+    Dmin::FT = FT(0), # Default to 0, but in CloudMicrophysics.jl technically it's 62.5μm...
+    Dmax::FT = FT(Inf),
+    # Nt::Union{FT, Nothing} = nothing,
+    Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
+    D_transition::FT = FT(0.625e-3), # .625mm is the transition from small to large ice crystals in Chen paper
+    μ::FT = FT(NaN)
+) where {FT <: Real}
+    fall_w = FT(0)
+    # if q_ > FT(0)
+    if q_ > eps(FT) # idk if this matters but it makes the plots look prettier lol, also prevents N, q divergence problems... also once we shrink back to tiny particles, the speed should be slow... we maybe just guessed N wrong.
+
+
+        #=
+            This seems to get out of hand when <r> gets too large, surpassing what even the snow paramterization would produce.
+            I think this is because the hard sphere assumption should have broken down but hasn't, and maybe Chen is too lax about it.
+
+            So, if <r> > r_ice_snow, we'll re-index on r_ice_snow being true (we just reset lambda)
+        =#
+
+
+        prs = TC.TCP.microphysics_params(param_set)
+
+        ρ_i::FT = TC.CMP.ρ_cloud_ice(prs)
+
+        # Ok so here's the thing.... we want q to fit between Dmin and Dmax...
+        # so we need a lambda that works for that....
+
+        if isnan(μ)
+            μ = TC.μ_from_qN(param_set, precip, q_, Nt; ρ = ρ)
+        end
+        _λ::FT = TC.lambda(param_set, precip, q_, ρ, Nt, Dmin, Dmax; μ = μ)
+
+        @info "Current λ = $(_λ)"
+        microphys_params = TC.TCP.microphysics_params(param_set)
+        @info "Current <r> = $(((μ+1)/_λ)/1e-6) μm"
+        # r_is = TC.CMP.r_ice_snow(microphys_params)
+        # if _λ < (μ + 1)/r_is
+        #     _λ = (μ + 1)/r_is # let's stop Chen from going overboard with the sedimentation rates... [[ idk if this would be good, we gotta go past r_is according to the LES so idk... but the w response can't be so extreme...]]
+        # end
+
+
+        # _λ /= 2 # _λ rn now is radius, but we need diameter units
+
+        m0c::FT = TC.m0(prs, precip) * TC.χm(prs, precip)
+        a0c::FT = TC.a0(prs, precip) * TC.χa(prs, precip)
+        mec::FT = TC.me(prs, precip) + TC.Δm(prs, precip)
+        aec::FT = TC.ae(prs, precip) + TC.Δa(prs, precip)
+        _r0::FT = TC.r0(prs, precip)
+
+        # ================================================================= #
+
+        # # coefficients from Appendix B from Chen et. al. 2022
+        # aiu, bi, ciu = my_Chen2022_vel_coeffs(prs, precip, ρ)
+
+        # # eq 20 from Chen et al 2022
+        # fall_w = sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, 3; Dmin=Dmin, Dmax=Dmax))
+        # # It should be ϕ^κ * fall_w, but for rain drops ϕ = 1 and κ = 0
+        # fall_w = max(FT(0), fall_w)
+
+        # ================================================================= #
+        # k = 3 # mass weighted
+        k = mec
+        k += μ # add the size distribution exponent to the moment
+        # coefficients from Appendix B from Chen et. al. 2022
+        (aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l) = TC.my_Chen2022_vel_coeffs(prs, TC.CM.CommonTypes.SnowType(), ρ)
+
+        local mass_weights::SA.MVector{2, FT}
+        mass_weights = TC.SA.@MVector [FT(0), FT(0)]
+        if Dmin < D_transition
+            if Dmax <= D_transition
+                regions = [(Dmin, Dmax)]
+                abcs = [(aiu_s, bi_s, ciu_s)]
+            else
+                regions = [(Dmin, D_transition), (D_transition, Dmax)]
+                abcs = [(aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l)]
+            end
+        else
+            regions = [(Dmin, Dmax)]
+            abcs = [(aiu_l, bi_l, ciu_l)]
+        end
+
+        fall_w = FT(0)
+        for (i, ((Dmin, Dmax), (aiu, bi, ciu))) in enumerate(zip(regions, abcs)) # we basically need to sum the integral as before but over all regions
+
+            # are the mass weights really necessary? It's just an additive integral, no?
+            mass_weights[i] = _λ^-(k + 1) * (-TC.CM1.SF.gamma(k + 1, Dmax * _λ) + TC.CM1.SF.gamma(k + 1, Dmin * _λ)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
+
+
+            # eq 20 from Chen et al 2022
+            fall_w += sum(TC.my_Chen2022_vel_add.(aiu, bi, ciu, _λ, FT(3); Dmin = Dmin, Dmax = Dmax)) .* mass_weights[i]
+        end
+
+        if (total_weight = sum(mass_weights)) != 0
+            fall_w /= total_weight # normalize by total mass
+        end
+
+        @info mass_weights
+
+
+        # ================================================================= #
+
+    end
+
+    # if fall_w > 5
+    #     @error("something seems wrong... we got fall_w = $fall_w; Nt = $Nt; _λ=$_λ; μ=$μ; q_=$q_; ρ = $ρ;")
+    # end
+
+    return TC.resolve_nan(fall_w)
+end
+
+v_ice = test_my_terminal_velocity(param_set, CM.CommonTypes.IceType() , CM.CommonTypes.Chen2022Type(), ρ_air, FT(1e-7); D_transition=FT(625e-6/2), Nt=FT(.1), Dmax=625e-6/2)
+
+
+
+
+D = 50e-6
+(aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l) = TC.my_Chen2022_vel_coeffs(prs, CM.CommonTypes.SnowType(), ρ_air)
+aiu_s = aiu_s .* (2 .^ bi_s); ciu_s = ciu_s .*  2; aiu_l = aiu_l .* (2 .^ bi_l); ciu_l = ciu_l .*  2
+
+v_D = sum(aiu_s .* D.^bi_s .* exp.(.-ciu_s .* D))

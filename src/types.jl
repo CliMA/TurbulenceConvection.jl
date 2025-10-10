@@ -16,13 +16,18 @@ Base.@kwdef struct PrecipFormation{FT}
     ql_tendency_acnv::FT
     qi_tendency_acnv::FT
     qi_tendency_acnv_dep::FT
-    qi_tendency_acnv_agg::FT
+    qi_tendency_acnv_dep_is::FT
+    qi_tendency_acnv_dep_above::FT
+    qi_tendency_acnv_agg_mix::FT
+    qi_tendency_acnv_thresh::FT
     ql_tendency_accr_liq_rai::FT
     ql_tendency_accr_liq_ice::FT
     ql_tendency_accr_liq_sno::FT
     qi_tendency_accr_ice_liq::FT
     qi_tendency_accr_ice_rai::FT
     qi_tendency_accr_ice_sno::FT
+    #
+    qs_tendency_accr_rai_sno::FT # accretion QR by QS [QR -> QS]  (we store it this way, it's always to snow below freezing and [QS -> QR] above freezing.) - we calculate here becasue the outcome is temperature dependent, but we store in aux_tc bc precip is on the grid mean.
 end
 
 """
@@ -36,6 +41,18 @@ Base.@kwdef struct NoneqMoistureSources{FT}
     ql_tendency::FT
     qi_tendency::FT
 end
+# null constructor
+NoneqMoistureSources{FT}(; fill_value::FT = FT(NaN)) where {FT} = NoneqMoistureSources{FT}(FT(fill_value), FT(fill_value))
+
+Base.:+(a::NoneqMoistureSources{FT}, b::NoneqMoistureSources{FT}) where {FT} = NoneqMoistureSources{FT}(a.ql_tendency + b.ql_tendency, a.qi_tendency + b.qi_tendency)
+Base.:-(a::NoneqMoistureSources{FT}, b::NoneqMoistureSources{FT}) where {FT} = NoneqMoistureSources{FT}(a.ql_tendency - b.ql_tendency, a.qi_tendency - b.qi_tendency)
+Base.:*(a::NoneqMoistureSources{FT}, b::FT) where {FT} = NoneqMoistureSources{FT}(a.ql_tendency * b, a.qi_tendency * b)
+Base.:*(a::FT, b::NoneqMoistureSources{FT}) where {FT} = NoneqMoistureSources{FT}(a * b.ql_tendency, a * b.qi_tendency)
+
+Base.:+(a::NoneqMoistureSources{FT}, b::FT) where {FT} = NoneqMoistureSources{FT}(a.ql_tendency + b, a.qi_tendency + b)
+Base.:+(a::FT, b::NoneqMoistureSources{FT}) where {FT} = NoneqMoistureSources{FT}(a + b.ql_tendency, a + b.qi_tendency)
+Base.:-(a::NoneqMoistureSources{FT}, b::FT) where {FT} = NoneqMoistureSources{FT}(a.ql_tendency - b, a.qi_tendency - b)
+Base.:-(a::FT, b::NoneqMoistureSources{FT}) where {FT} = NoneqMoistureSources{FT}(a - b.ql_tendency, a - b.qi_tendency)
 
 """
     NoneqMoistureSource
@@ -47,6 +64,18 @@ $(DocStringExtensions.FIELDS)
 Base.@kwdef struct NoneqMoistureSource{FT}
     q_tendency::FT
 end
+# null constructor
+NoneqMoistureSource{FT}(; fill_value::FT = FT(NaN)) where {FT} = NoneqMoistureSource{FT}(FT(fill_value))
+
+Base.:+(a::NoneqMoistureSource{FT}, b::NoneqMoistureSource{FT}) where {FT} = NoneqMoistureSource{FT}(a.q_tendency + b.q_tendency)
+Base.:-(a::NoneqMoistureSource{FT}, b::NoneqMoistureSource{FT}) where {FT} = NoneqMoistureSource{FT}(a.q_tendency - b.q_tendency)
+Base.:*(a::NoneqMoistureSource{FT}, b::FT) where {FT} = NoneqMoistureSource{FT}(a.q_tendency * b)
+Base.:*(a::FT, b::NoneqMoistureSource{FT}) where {FT} = NoneqMoistureSource{FT}(a * b.q_tendency)
+
+Base.:+(a::NoneqMoistureSource{FT}, b::FT) where {FT} = NoneqMoistureSource{FT}(a.q_tendency + b)
+Base.:+(a::FT, b::NoneqMoistureSource{FT}) where {FT} = NoneqMoistureSource{FT}(a + b.q_tendency)
+Base.:-(a::NoneqMoistureSource{FT}, b::FT) where {FT} = NoneqMoistureSource{FT}(a.q_tendency - b)
+Base.:-(a::FT, b::NoneqMoistureSource{FT}) where {FT} = NoneqMoistureSource{FT}(a - b.q_tendency)
 
 
 """
@@ -65,6 +94,8 @@ Base.@kwdef struct OtherMicrophysicsSources{FT}
     qi_tendency_heterogeneous_icenuc::FT
     qi_tendency_melting::FT
 end
+# null constructor
+OtherMicrophysicsSources{FT}(; fill_value::FT = FT(NaN)) where {FT} = OtherMicrophysicsSources{FT}(FT(fill_value), FT(fill_value), FT(fill_value), FT(fill_value), FT(fill_value), FT(fill_value))
 
 """
     EntrDetr
@@ -172,19 +203,27 @@ Base.eltype(::RFEntr{d, m, FT}) where {d, m, FT} = FT
 εδ_params(m::AbstractMLEntrDetrModel) = m.params
 εδ_params(m::AbstractNoisyEntrDetrModel) = m.mean_model.params
 
+abstract type AbstractStalledUpdraftHandler end
+struct StalledUpdraftDoNothing <: AbstractStalledUpdraftHandler end # don't do anything. this leads to just a completely stranded updraft. However, probably not a good idea because entr/detr turn off (outside of base_detrainment_rate_inv_s if available) and the remaining stranded updraft can do strange things...
+struct StalledUpdraftMixToGridMean <: AbstractStalledUpdraftHandler end # mix the updraft tracers to grid mean but keep the area 
+struct StalledUpdraftKill <: AbstractStalledUpdraftHandler end # the original default. set area to 0 and thus remove all tracers. This is most stable but the holes left in w=0 regions can make it hard for other updrafts to continue..., and possibly unnecessarily mix all that air into the env immediately, losing local buoyancy gains. if the updraft starts from the surface it's probably ok, but this becomes very bad for elevatd convection, which gets eroded from all sides by the strong area gradients. that develop.
+struct StalledUpdraftDetrainDowndrafts <: AbstractStalledUpdraftHandler end # if the buoyancy is negative (θ_liq_ice_up < θ_liq_ice_gm), detrains enough area to bring it back into balance. this is becaue we don't have downdrafts so we can have runaway growth of negative buoyancy and temperature...
+
 abstract type EntrModelFacTotalType end
 # struct FractionalEntrModel <: EntrModelFacTotalType end
-Base.@kwdef struct FractionalEntrModel{FT} <: EntrModelFacTotalType
-    "mix_stalled_updraft_to_grid_mean::Bool"
-    mix_stalled_updraft_to_grid_mean::Bool # this is the fraction of the updraft that is stalled to the grid mean
+Base.@kwdef struct FractionalEntrModel{SUHT} <: EntrModelFacTotalType
+    "stalled_updraft_handler::SUHT"
+    stalled_updraft_handler::SUHT # Whether or not we mix the updraft to the grid mean when we get to w=0
 end
+
 # struct TotalRateEntrModel <: EntrModelFacTotalType end
-Base.@kwdef struct TotalRateEntrModel{FT} <: EntrModelFacTotalType
+Base.@kwdef struct TotalRateEntrModel{FT, SUHT} <: EntrModelFacTotalType
     "base detrainment rate inverse [s^-1]"
     base_detrainment_rate_inv_s::FT # testing having some base detrainment rate so that even when w goes to 0 we can detrain slowly.
-    "mix_stalled_updraft_to_grid_mean::Bool"
-    mix_stalled_updraft_to_grid_mean::Bool # Whether or not we mix the updraft to the grid mean when we get to w=0
+    "stalled_updraft_handler::SUHT"
+    stalled_updraft_handler::SUHT # Whether or not we mix the updraft to the grid mean when we get to w=0
 end
+
 
 
 
@@ -332,124 +371,166 @@ Base.@kwdef struct PressureModelParams{FT}
     α_d::FT # factor multiplier for pressure drag
 end
 
+include("relaxation_timescale_types.jl")
+
 abstract type AbstractMoistureModel end
-struct EquilibriumMoisture <: AbstractMoistureModel end
+# struct EquilibriumMoisture <: AbstractMoistureModel end
 # struct NonEquilibriumMoisture <: AbstractMoistureModel end
 
-"""
-NR Closures (assumptions about the size distribution) -- used in relaxation timescale types so make sure it's before
-"""
-abstract type AbstractNRClosureType end
-struct MonodisperseNRClosure <: AbstractNRClosureType end
-struct FixedRadiusNRClosure <: AbstractNRClosureType end
-struct InhomogeneousNRClosure <: AbstractNRClosureType end
+
+struct EquilibriumMoisture{RTT <: AbstractNonEquillibriumSourcesType} <: AbstractMoistureModel
+    scheme::RTT # this is to allow us choose how to diagnose N for example, even when we are not using the timescales. if it's a type that defaults to NaNs, that's ok too but at least it won't be 0. We can resolve the NaNs before saving.
+end
+function EquilibriumMoisture(param_set::APS, namelist)
+    nonequilibrium_moisture_scheme_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "nonequilibrium_moisture_scheme"; default = :relax_to_equilibrium))
+
+    nonequilibrium_moisture_scheme = if nonequilibrium_moisture_scheme_type === :relax_to_equilibrium
+        RelaxToEquilibrium()
+    elseif nonequilibrium_moisture_scheme_type === :KorolevMazin2007
+        KorolevMazin2007()
+    elseif (nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types) && (nonequilibrium_moisture_scheme_type ∉ [:neural_network, :neural_network_no_weights])
+        get_relaxation_timescale_type(nonequilibrium_moisture_scheme_type, param_set, namelist) # we really could just pass namelist here...
+    elseif nonequilibrium_moisture_scheme_type ∈ [:neural_network, :neural_network_no_weights]
+        # we decided to stop storing NN things in the param_set... it's redundant for all the objects but it's especially bad for the NN, as every call w/ param_set has to deal w/ massive tuple/svector
+        get_relaxation_timescale_type(nonequilibrium_moisture_scheme_type, param_set, namelist)
+    else
+        error("Invalid nonequilibrium_moisture_scheme type: $nonequilibrium_moisture_scheme_type")
+    end
+
+    RTT = typeof(nonequilibrium_moisture_scheme)
+    return EquilibriumMoisture{RTT}(nonequilibrium_moisture_scheme)
+end
 
 
-include("relaxation_timescale_types.jl")
 
 struct NonEquilibriumMoisture{RTT <: AbstractNonEquillibriumSourcesType, FT <: AbstractFloat} <: AbstractMoistureModel
     scheme::RTT
     heterogeneous_ice_nucleation::Tuple{Bool, FT, FT}
 end
 
-function NonEquilibriumMoisture(param_set::APS)
+function NonEquilibriumMoisture(param_set::APS, namelist)
     FT = eltype(param_set)
-    nonequilibrium_moisture_scheme_type::Symbol = TCP.parse_isbits_nt(param_set.user_args, :nonequilibrium_moisture_scheme, :relax_to_equilibrium)
+    nonequilibrium_moisture_scheme_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "nonequilibrium_moisture_scheme"; default = :relax_to_equilibrium))
 
     nonequilibrium_moisture_scheme = if nonequilibrium_moisture_scheme_type === :relax_to_equilibrium
         RelaxToEquilibrium()
     elseif nonequilibrium_moisture_scheme_type === :KorolevMazin2007
         KorolevMazin2007()
-    elseif nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types
-        get_relaxation_timescale_type(nonequilibrium_moisture_scheme_type, param_set)
+    elseif (nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types) && (nonequilibrium_moisture_scheme_type ∉ [:neural_network, :neural_network_no_weights])
+        get_relaxation_timescale_type(nonequilibrium_moisture_scheme_type, param_set, namelist) # we really could just pass namelist here...
+    elseif nonequilibrium_moisture_scheme_type ∈ [:neural_network, :neural_network_no_weights]
+        # we decided to stop storing NN things in the param_set... it's redundant for all the objects but it's especially bad for the NN, as every call w/ param_set has to deal w/ massive tuple/svector
+        get_relaxation_timescale_type(nonequilibrium_moisture_scheme_type, param_set, namelist)
     else
         error("Invalid nonequilibrium_moisture_scheme type: $nonequilibrium_moisture_scheme_type")
     end
 
-
-    heterogeneous_ice_nucleation = TCP.parse_isbits_nt(param_set.user_args, :use_heterogeneous_ice_nucleation, false)
-    heterogeneous_ice_nuclation_coefficient = TCP.parse_isbits_nt(param_set.user_params, :heterogeneous_ice_nuclation_coefficient, FT(1))
-    heterogeneous_ice_nuclation_exponent = TCP.parse_isbits_nt(param_set.user_params, :heterogeneous_ice_nuclation_exponent, FT(1))
-
+    heterogeneous_ice_nucleation = parse_namelist(namelist, "user_args", "use_heterogeneous_ice_nucleation"; default = false)
+    heterogeneous_ice_nucleation_coefficient = parse_namelist(namelist, "user_params", "heterogeneous_ice_nucleation_coefficient"; default = FT(1))
+    heterogeneous_ice_nucleation_exponent = parse_namelist(namelist, "user_params", "heterogeneous_ice_nucleation_exponent"; default = FT(1))
 
     RTT = typeof(nonequilibrium_moisture_scheme)
-    return NonEquilibriumMoisture{RTT, FT}(nonequilibrium_moisture_scheme, (heterogeneous_ice_nucleation, heterogeneous_ice_nuclation_coefficient, heterogeneous_ice_nuclation_exponent) )
+    return NonEquilibriumMoisture{RTT, FT}(nonequilibrium_moisture_scheme, (heterogeneous_ice_nucleation, heterogeneous_ice_nucleation_coefficient, heterogeneous_ice_nucleation_exponent) )
 end
 
+"""
+NR Closures (assumptions about the size distribution) -- used in relaxation timescale types so make sure it's before
+"""
+# abstract type AbstractNRClosureType end
+# struct GammaNRClosure <: AbstractNRClosureType end # default
+# struct MonodisperseNRClosure <: AbstractNRClosureType end # redundant...
+# struct FixedRadiusNRClosure <: AbstractNRClosureType end # r fixed
+# struct InhomogeneousNRClosure <: AbstractNRClosureType end # N fixed
+
+
+# Sedimentation
 abstract type AbstractIntegrationScheme end
 struct UpwindDifferencingScheme <: AbstractIntegrationScheme end
 struct RightBiasedDifferencingScheme <: AbstractIntegrationScheme end
 abstract type AbstractCloudSedimentationModel end
-struct CloudSedimentationModel{FT <: AbstractFloat, LTVS <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, ITVS <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, SLNC <: Union{AbstractFloat, AbstractRelaxationTimescaleType}, SINC <: Union{AbstractFloat, AbstractRelaxationTimescaleType}, SIM <: AbstractIntegrationScheme} <: AbstractCloudSedimentationModel
+# struct CloudSedimentationModel{FT <: AbstractFloat, LTVS <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, ITVS <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, SLNC <: Union{AbstractFloat, AbstractRelaxationTimescaleType}, SINC <: Union{AbstractFloat, AbstractRelaxationTimescaleType}, SIM <: AbstractIntegrationScheme} <: AbstractCloudSedimentationModel
+struct CloudSedimentationModel{FT <: AbstractFloat, LTVS <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, ITVS <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, SIM <: AbstractIntegrationScheme} <: AbstractCloudSedimentationModel
     liq_terminal_velocity_scheme::LTVS
     ice_terminal_velocity_scheme::ITVS
-    sedimentation_liq_number_concentration::SLNC
-    sedimentation_ice_number_concentration::SINC
+    # sedimentation_liq_number_concentration::SLNC # we now cache N_i, which derives directly from moisture_model, and term_vel_ice, derived from that N_i, so we don't need this.
+    # sedimentation_ice_number_concentration::SINC # we now cache N_i, which derives directly from moisture_model, and term_vel_ice, derived from that N_i, so we don't need this.
     liq_Dmax::FT
     ice_Dmax::FT
     liq_sedimentation_scaling_factor::FT
     ice_sedimentation_scaling_factor::FT
     sedimentation_differencing_scheme::SIM
-    liq_ice_collision_efficiency::FT 
-    liq_ice_collision_scaling_factor::FT # this should be deprecated one day but I'm using it for initial calibration just to check if we're even close
+    E_liq_liq::FT # liq_liq_collision_efficiency (E_liq_liq to match other micorphysics efficiencies)
+    E_liq_ice::FT # liq_ice_collision_efficiency (E_liq_ice to match other micorphysics efficiencies)
+    E_ice_ice::FT # ice_ice_collision_efficiency (E_ice_ice to match other micorphysics efficiencies)
+    E_ice_ice_mix::FT # testing
+    # liq_ice_collision_scaling_factor::FT # this should be deprecated one day but I'm using it for initial calibration just to check if we're even close
+    # liq_sno_accretion_scaling_factor::FT # could also go in snow_formation I guess [[ E_liq_sno already exists in microphysics so we'll just use that...]]
     grid_mean::Bool # whether or not sedimentation is applied to the grid mean only instead of in env/up separately
 end
 
 struct CloudNoSedimentationModel <: AbstractCloudSedimentationModel end
 
-function CloudSedimentationModel(param_set::APS)
+function CloudSedimentationModel(param_set::APS, moisture_model::AbstractMoistureModel, namelist)
     FT = eltype(param_set)
-    liq_terminal_velocity_scheme = get_termvel_type(TCP.parse_isbits_nt(param_set.user_args, :liq_terminal_velocity_scheme, :Blk1MVel)) 
-    ice_terminal_velocity_scheme = get_termvel_type(TCP.parse_isbits_nt(param_set.user_args, :ice_terminal_velocity_scheme, :Blk1MVel))
 
-    sedimentation_liq_number_concentration = TCP.parse_isbits_nt(param_set.user_args, :sedimentation_liq_number_concentration, FT(NaN)) # testing NaN over nothing for type stability
-    sedimentation_ice_number_concentration = TCP.parse_isbits_nt(param_set.user_args, :sedimentation_ice_number_concentration, FT(NaN))
-    if sedimentation_liq_number_concentration isa Symbol
-        sedimentation_liq_number_concentration = get_relaxation_timescale_type(sedimentation_liq_number_concentration, param_set) # preserve isbits
-    end
-    if sedimentation_ice_number_concentration isa Symbol
-        sedimentation_ice_number_concentration = get_relaxation_timescale_type(sedimentation_ice_number_concentration, param_set) # preserve isbits
-    end
+    liq_terminal_velocity_scheme = get_termvel_type(Symbol(parse_namelist(namelist, "user_args", "liq_terminal_velocity_scheme"; default = :Blk1MVel)))
+    ice_terminal_velocity_scheme = get_termvel_type(Symbol(parse_namelist(namelist, "user_args", "ice_terminal_velocity_scheme"; default = :Blk1MVel)))
 
-    liq_Dmax = TCP.parse_isbits_nt(param_set.user_params, :liq_sedimentation_Dmax, FT(Inf))
-    ice_Dmax = TCP.parse_isbits_nt(param_set.user_params, :ice_sedimentation_Dmax, FT(62.5e-6 * 2)) # maybe this should also be inf? for chen it's not clear...
-   
-    liq_sedimentation_scaling_factor = TCP.parse_isbits_nt(param_set.user_params, :liq_sedimentation_scaling_factor, FT(1.0))
-    ice_sedimentation_scaling_factor = TCP.parse_isbits_nt(param_set.user_params, :ice_sedimentation_scaling_factor, FT(1.0))
 
-    sedimentation_differencing_scheme = TCP.parse_isbits_nt(param_set.user_params, :sedimentation_differencing_scheme, :upwinding)
-     if sedimentation_differencing_scheme === :upwinding
-        sedimentation_differencing_scheme = UpwindDifferencingScheme()
-    elseif sedimentation_differencing_scheme === :right_biased
-        sedimentation_differencing_scheme = RightBiasedDifferencingScheme()
+    liq_Dmax = parse_namelist(namelist, "user_params", "liq_sedimentation_Dmax"; default =  FT(Inf))
+    ice_Dmax = parse_namelist(namelist, "user_params", "ice_sedimentation_Dmax"; default =  FT(62.5e-6 * 2)) # maybe this should also be inf? for chen it's not clear...
+
+    # NaN's (e.g. from json) get converted to Inf here
+    liq_Dmax = isnan(liq_Dmax) ? FT(Inf) : liq_Dmax
+    ice_Dmax = isnan(ice_Dmax) ? FT(Inf) : ice_Dmax
+
+
+    liq_sedimentation_scaling_factor = parse_namelist(namelist, "user_params", "liq_sedimentation_scaling_factor"; default = FT(1.0))
+    ice_sedimentation_scaling_factor = parse_namelist(namelist, "user_params", "ice_sedimentation_scaling_factor"; default = FT(1.0))
+
+    sedimentation_differencing_scheme_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "sedimentation_differencing_scheme"; default = :upwinding))
+    sedimentation_differencing_scheme = if sedimentation_differencing_scheme_type === :upwinding
+        UpwindDifferencingScheme()
+    elseif sedimentation_differencing_scheme_type === :right_biased
+        RightBiasedDifferencingScheme()
     else
-        error("Invalid sedimentation_differencing_scheme: $sedimentation_differencing_scheme")
+        error("Invalid sedimentation_differencing_scheme: $sedimentation_differencing_scheme_type")
     end
 
-    liq_ice_collision_efficiency = TCP.parse_isbits_nt(param_set.user_params, :liq_ice_collision_efficiency, FT(1.0))
-    liq_ice_collision_scaling_factor = TCP.parse_isbits_nt(param_set.user_params, :liq_ice_collision_scaling_factor, FT(1.0))
+    E_liq_liq = parse_namelist(namelist, "user_params", "E_liq_liq"; default = FT(1.0)) # this is the collision efficiency for liquid to liquid collisions, it should be 1.0 in most cases but we can use it to tune the model a bit
+    E_liq_ice = parse_namelist(namelist, "user_params", "E_liq_ice"; default = FT(1.0)) # this is the collision efficiency for liquid to ice collisions, it should be 1.0 in most cases but we can use it to tune the model a bit
+    E_ice_ice = parse_namelist(namelist, "user_params", "E_ice_ice"; default = FT(1.0)) # this is the collision efficiency for ice to ice collisions, it should be 1.0 in most cases but we can use it to tune the model a bit
+
+    E_ice_ice_mix = parse_namelist(namelist, "user_params", "E_ice_ice_mix"; default = FT(1.0)) # this is the collision efficiency for ice to ice collisions in the mixed phase, it should be 1.0 in most cases but we can use it to tune the model a bit
+
+    # liq_sno_accretion_scaling_factor = parse_namelist(namelist, "user_params", "liq_sno_accretion_scaling_factor"; default = FT(1.0)) # this is the scaling factor for the liquid to snow accretion term. It should be 1.0 in most cases but we can use it to tune the model a bit
 
     LTVS = typeof(liq_terminal_velocity_scheme)
     ITVS = typeof(ice_terminal_velocity_scheme)
-    SLNC = typeof(sedimentation_liq_number_concentration)
-    SINC = typeof(sedimentation_ice_number_concentration)
+    # SLNC = typeof(sedimentation_liq_number_concentration)
+    # SINC = typeof(sedimentation_ice_number_concentration)
     SDS = typeof(sedimentation_differencing_scheme)
 
-    grid_mean = TCP.parse_isbits_nt(param_set.user_args, :grid_mean_sedimentation, false) # only apply to grid mean values, never actually got it to work though
+    grid_mean::Bool = parse_namelist(namelist, "user_args", "grid_mean_sedimentation"; default = false) # only apply to grid mean values, never actually got it to work though
 
 
-    return CloudSedimentationModel{FT, LTVS, ITVS, SLNC, SINC, SDS}(
+    # return CloudSedimentationModel{FT, LTVS, ITVS, SLNC, SINC, SDS}(
+    return CloudSedimentationModel{FT, LTVS, ITVS, SDS}(
         liq_terminal_velocity_scheme, 
         ice_terminal_velocity_scheme,
-        sedimentation_liq_number_concentration,
-        sedimentation_ice_number_concentration,
+        # sedimentation_liq_number_concentration,
+        # sedimentation_ice_number_concentration,
         liq_Dmax,
         ice_Dmax,
         liq_sedimentation_scaling_factor,
         ice_sedimentation_scaling_factor,
         sedimentation_differencing_scheme,
-        liq_ice_collision_efficiency,
-        liq_ice_collision_scaling_factor,
+        E_liq_liq,
+        E_liq_ice,
+        E_ice_ice,
+        E_ice_ice_mix, # testing
+        # liq_ice_collision_scaling_factor,
+        # liq_sno_accretion_scaling_factor,
         grid_mean,
     )
 end
@@ -463,21 +544,37 @@ end
 abstract type AbstractPrecipitationModel end
 struct NoPrecipitation <: AbstractPrecipitationModel end
 struct Clima0M <: AbstractPrecipitationModel end
-struct Clima1M{FT, RTVST <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, STVST <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}} <: AbstractPrecipitationModel 
-    rain_sedimentation_scaling_factor::FT
-    snow_sedimentation_scaling_factor::FT
+# struct Clima1M{FT, RTVST <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, STVST <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}} <: AbstractPrecipitationModel 
+struct Clima1M{RTVST <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}, STVST <: Union{CMT.Blk1MVelType, CMT.Chen2022Type}} <: AbstractPrecipitationModel 
+    # rain_sedimentation_scaling_factor::FT # just use χv
+    # snow_sedimentation_scaling_factor::FT # just use χv
     rain_terminal_velocity_scheme::RTVST
     snow_terminal_velocity_scheme::STVST
+    # sedimentation_differencing_scheme::CMT.AbstractSedimentationDifferencingScheme # This is shared w/ condensate but there's only one option, so i feel like it should be in only one place
 end
-function Clima1M(param_set::APS)
-    FT = eltype(param_set)
-    rain_sedimentation_scaling_factor = TCP.parse_isbits_nt(param_set.user_params, :rain_sedimentation_scaling_factor, FT(1.0))
-    snow_sedimentation_scaling_factor = TCP.parse_isbits_nt(param_set.user_params, :snow_sedimentation_scaling_factor, FT(1.0))
-    rain_terminal_velocity_scheme = get_termvel_type(TCP.parse_isbits_nt(param_set.user_args, :rain_terminal_velocity_scheme, :Blk1MVel))
-    snow_terminal_velocity_scheme = get_termvel_type(TCP.parse_isbits_nt(param_set.user_args, :snow_terminal_velocity_scheme, :Blk1MVel))
+function Clima1M(param_set::APS, namelist)
+    # FT = eltype(param_set)
+
+    # rain_sedimentation_scaling_factor::FT = parse_namelist(namelist, "user_params", "rain_sedimentation_scaling_factor"; default =  FT(1.0))
+    # snow_sedimentation_scaling_factor::FT = parse_namelist(namelist, "user_params", "snow_sedimentation_scaling_factor"; default =  FT(1.0))
+    rain_terminal_velocity_scheme = get_termvel_type(Symbol(parse_namelist(namelist, "user_args", "rain_terminal_velocity_scheme"; default =  :Blk1MVel)))
+    snow_terminal_velocity_scheme = get_termvel_type(Symbol(parse_namelist(namelist, "user_args", "snow_terminal_velocity_scheme"; default =  :Blk1MVel)))
+
+
+    # sedimentation_differencing_scheme_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "sedimentation_differencing_scheme"; default = :upwinding))
+    # sedimentation_differencing_scheme = if sedimentation_differencing_scheme_type === :upwinding
+    #     UpwindDifferencingScheme()
+    # elseif sedimentation_differencing_scheme_type === :right_biased
+    #     RightBiasedDifferencingScheme()
+    # else
+    #     error("Invalid sedimentation_differencing_scheme: $sedimentation_differencing_scheme_type")
+    # end
+
     RTVST = typeof(rain_terminal_velocity_scheme)
     STVST = typeof(snow_terminal_velocity_scheme)
-    return Clima1M{FT, RTVST, STVST}(rain_sedimentation_scaling_factor, snow_sedimentation_scaling_factor, rain_terminal_velocity_scheme, snow_terminal_velocity_scheme)
+    # SDST = typeof(sedimentation_differencing_scheme)
+    # return Clima1M{FT, RTVST, STVST}(rain_sedimentation_scaling_factor, snow_sedimentation_scaling_factor, rain_terminal_velocity_scheme, snow_terminal_velocity_scheme) # , sedimentation_differencing_scheme)
+    return Clima1M{RTVST, STVST}(rain_terminal_velocity_scheme, snow_terminal_velocity_scheme) # , sedimentation_differencing_scheme)
 end
 
 
@@ -502,29 +599,38 @@ abstract type AbstractSnowFormationModel end
 struct DefaultSnowFormationModel <: AbstractSnowFormationModel end
 struct NonEquilibriumSnowFormationModel{FT} <: AbstractSnowFormationModel
     ice_dep_acnv_scaling_factor::FT # this is the scaling factor for the ice deposition/accretion term. It should be 1.0 in most cases but we can use it to tune the model a bit
-    # scheme::RTT # currently we're not using a relaxation_timescale_type for snow formation. If we do, we can bring this back but you should reuse the same one as for the moisture model and not recreate it.
-    # inner constructor using param_set
-
+    ice_dep_acnv_scaling_factor_above::FT
+    ice_acnv_power::FT # this is the power for the ice accretion term, it should be 1.0 in most cases but we can use it to tune the model a bit
+    r_ice_acnv_scaling_factor::FT # this is the scaling factor for the rain to ice accretion term. It should be 1.0 in most cases but we can use it to tune the model a bit
+    r_ice_snow_threshold_scaling_factor::FT # factor for how much higher the forced <r> auto convert threshold is than r_ice_snow
 end
 
-function NonEquilibriumSnowFormationModel(param_set::APS)
+function NonEquilibriumSnowFormationModel(param_set::APS, namelist)
     FT = eltype(param_set)
-    ice_dep_acnv_scaling_factor = TCP.parse_isbits_nt(param_set.user_params, :ice_dep_acnv_scaling_factor, FT(1.0)) # this is the scaling factor for the ice deposition/accretion term. It should be 1.0 in most cases but we can use it to tune the model a bit
-    return NonEquilibriumSnowFormationModel{FT}(ice_dep_acnv_scaling_factor)
+    ice_dep_acnv_scaling_factor = parse_namelist(namelist, "user_params", "ice_dep_acnv_scaling_factor"; default = 1.0)
+    ice_dep_acnv_scaling_factor_above = parse_namelist(namelist, "user_params", "ice_dep_acnv_scaling_factor_above"; default = 1.0)
+    ice_acnv_power = parse_namelist(namelist, "user_params", "ice_acnv_power"; default = 1.0)
+    r_ice_acnv_scaling_factor = parse_namelist(namelist, "user_params", "r_ice_acnv_scaling_factor"; default = 1.0)
+    r_ice_snow_threshold_scaling_factor = parse_namelist(namelist, "user_params", "r_ice_snow_threshold_scaling_factor"; default = 1.0)
+    return NonEquilibriumSnowFormationModel{FT}(ice_dep_acnv_scaling_factor, ice_dep_acnv_scaling_factor_above, ice_acnv_power, r_ice_acnv_scaling_factor, r_ice_snow_threshold_scaling_factor)
 end
 
-function SnowFormationModel(param_set::APS)
+function SnowFormationModel(param_set::APS, moisture_model::AbstractMoistureModel, namelist)
 
-    nonequilibrium_moisture_scheme_type::Symbol = TCP.parse_isbits_nt(param_set.user_args, :nonequilibrium_moisture_scheme, :relax_to_equilibrium)
-
-    snow_formation_model = if nonequilibrium_moisture_scheme_type === :relax_to_equilibrium
-        DefaultSnowFormationModel()
-    elseif nonequilibrium_moisture_scheme_type === :KorolevMazin2007
-        DefaultSnowFormationModel() # should this be default? I guess maybe cause there's no N prediction?
-    elseif nonequilibrium_moisture_scheme_type ∈ valid_relaxation_timescale_types
-        NonEquilibriumSnowFormationModel(param_set)
+    if moisture_model isa NonEquilibriumMoisture
+        snow_formation_model = if moisture_model.scheme isa RelaxToEquilibrium
+            DefaultSnowFormationModel()
+        elseif moisture_model.scheme isa KorolevMazin2007
+            DefaultSnowFormationModel() # should this be default? I guess maybe cause there's no N prediction?
+        elseif moisture_model.scheme isa AbstractRelaxationTimescaleType
+            NonEquilibriumSnowFormationModel(param_set, namelist)
+        else
+            error("Invalid moisture_model type: $(typeof(moisture_model))")
+        end
+    elseif moisture_model isa EquilibriumMoisture
+        snow_formation_model = DefaultSnowFormationModel()
     else
-        error("Invalid nonequilibrium_moisture_scheme type: $nonequilibrium_moisture_scheme_type")
+        error("Invalid moisture model type: $(typeof(moisture_model))")
     end
 
     return snow_formation_model
@@ -561,6 +667,13 @@ struct BasicTendencyLimiter <: AbstractTendencyLimiter end # Truncate to the ava
 limit_tendency(::BasicTendencyLimiter, x::FT, x_avail::FT, Δt::FT) where {FT} = max(x, -x_avail/Δt) #
 limit_tendency(::BasicTendencyLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} = safe_clamp(x, -x_up/Δt, x_en/Δt)
 
+struct TruncatedBasicTendencyLimiter{FT} <: AbstractTendencyLimiter 
+    factor::FT
+end # Same as BasicTendencyLimiter but scaled down so things take more than 1 timestep. For stability.
+
+limit_tendency(limiter::TruncatedBasicTendencyLimiter, x::FT, x_avail::FT, Δt::FT) where {FT} = max(x, -x_avail/Δt * limiter.factor)
+limit_tendency(limiter::TruncatedBasicTendencyLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} = safe_clamp(x, -x_up/Δt * limiter.factor, x_en/Δt * limiter.factor)
+
 # Maybe consider adding
 # abstract type AbstractdtDependentTendencyLimiter <: AbstractTendencyLimiter end that can supertype all dt dependent tendencies... rn using !isa(NoTendencyLimiter, limiter) is a bit hacky
 # could also try to find a way to unify NoTendency and NoMoistureSourcesLimiter ? idk.
@@ -570,14 +683,21 @@ limit_tendency(::BasicTendencyLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where
 abstract type AbstractMoistureSourcesLimiter <: AbstractTendencyLimiter end
 struct NoMoistureSourcesLimiter <: AbstractMoistureSourcesLimiter end # No limiting is done, the sources are just directly calculated
 struct BasicMoistureSourcesLimiter <: AbstractMoistureSourcesLimiter end # Sources are truncated to their available value within a timestep
+struct TruncatedBasicMoistureSourcesLimiter{FT} <: AbstractMoistureSourcesLimiter 
+    factor::FT
+end # Same as BasicMoistureSourcesLimiter but scaled down so things take more than 1 timestep. For stability.
 struct StandardSupersaturationMoistureSourcesLimiter <: AbstractMoistureSourcesLimiter end # Sources are truncated to their available value within a timestep but this is geared towards supersaturation relaxation. It does a lot of checks that are unnecessary if you're just relaxing to equilibrium e.g. WBF regimes etc.
 struct MorrisonMilbrandt2015MoistureSourcesLimiter <: AbstractMoistureSourcesLimiter end
-struct MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter <: AbstractMoistureSourcesLimiter end
+struct MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter <: AbstractMoistureSourcesLimiter
+    fallback_to_standard_supersaturation_limiter::Bool
+end
 # Fallbacks (in noneq_moisture sources we have our own setup, but for dispatch these may be needed elsewhere)
 limit_tendency(::AbstractMoistureSourcesLimiter, x::FT, x_avail::FT, Δt::FT) where {FT} = max(x, -x_avail/Δt)
 limit_tendency(::AbstractMoistureSourcesLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} = safe_clamp(x, -x_up/Δt, x_en/Δt) 
 limit_tendency(::NoMoistureSourcesLimiter, x::FT, x_avail::FT, Δt::FT) where {FT} = x
 limit_tendency(::NoMoistureSourcesLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} = x
+limit_tendency(limiter::TruncatedBasicMoistureSourcesLimiter, x::FT, x_avail::FT, Δt::FT) where {FT} = max(x, -x_avail/Δt * limiter.factor)
+limit_tendency(limiter::TruncatedBasicMoistureSourcesLimiter, x::FT, x_up::FT, x_en::FT, Δt::FT) where {FT} = safe_clamp(x, -x_up/Δt * limiter.factor, x_en/Δt * limiter.factor)
 
 # # Small Tendency Limiter
 # abstract type AbstractSmallTendencyLimiter <: AbstractTendencyLimiter end
@@ -620,6 +740,8 @@ struct TendencyLimiterSet{DTLT <: AbstractTendencyLimiter, MSLT <: AbstractMoist
     fallback_moisture_sources_limiter::FMSLT
     fallback_entr_detr_tendency_limiter::FEDTLT
     fallback_precipitation_tendency_limiter::FPTLT
+    use_tendency_resolver::Bool
+    use_tendency_resolver_on_full_tendencies::Bool
 end
 
 get_tendency_limiter(tendency_limiter_set::TendencyLimiterSet, ::Val{:default}, use_fallback::Bool) = use_fallback ? tendency_limiter_set.fallback_default_tendency_limiter : tendency_limiter_set.default_tendency_limiter
@@ -627,117 +749,154 @@ get_tendency_limiter(tendency_limiter_set::TendencyLimiterSet, ::Val{:moisture_s
 get_tendency_limiter(tendency_limiter_set::TendencyLimiterSet, ::Val{:entr_detr}, use_fallback::Bool) = use_fallback ? tendency_limiter_set.fallback_entr_detr_tendency_limiter : tendency_limiter_set.entr_detr_tendency_limiter
 get_tendency_limiter(tendency_limiter_set::TendencyLimiterSet, ::Val{:precipitation}, use_fallback::Bool) = use_fallback ? tendency_limiter_set.fallback_precipitation_tendency_limiter : tendency_limiter_set.precipitation_tendency_limiter
 
-function TendencyLimiterSet(param_set::APS, moisture_model_name::String)
+function TendencyLimiterSet(param_set::APS, moisture_model::AbstractMoistureModel, namelist)
     FT = eltype(param_set)
 
-    # ------------------ Default Tendency Limiter ------------------ #
-    default_tendency_limiter_type::Symbol = TCP.parse_isbits_nt(param_set.user_args, :default_tendency_limiter_type, :none)  # Default to none bc that's purest (basic is how anna wrote it though)
+    factor::FT = parse_namelist(namelist, "user_args", "truncated_basic_limiter_factor"; default = FT(1.0)) # ideally in user_args so it's with the other limiter settings but i don't remember if scalars are ok there...
 
+    # ------------------ Default Tendency Limiter ------------------ #
+    default_tendency_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "default_tendency_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
     default_tendency_limiter = if default_tendency_limiter_type === :none
         NoTendencyLimiter()
     elseif default_tendency_limiter_type === :basic
         BasicTendencyLimiter()
+    elseif default_tendency_limiter_type === :truncated_basic
+        TruncatedBasicTendencyLimiter(factor)
     else
         error("Invalid default_tendency_limiter_type: $default_tendency_limiter_type, valid options are :none, :basic")
     end
 
-    fallback_default_tendency_limiter_type::Symbol = TCP.parse_isbits_nt(param_set.user_args, :fallback_default_tendency_limiter_type, :none)  # Default to none bc that's purest (basic is how anna wrote it though)
+    fallback_default_tendency_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "fallback_default_tendency_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
     fallback_default_tendency_limiter = if fallback_default_tendency_limiter_type === :none
         NoTendencyLimiter()
     elseif fallback_default_tendency_limiter_type === :basic
         BasicTendencyLimiter()
+    elseif fallback_default_tendency_limiter_type === :truncated_basic
+        TruncatedBasicTendencyLimiter(factor)
     else
         error("Invalid fallback_default_tendency_limiter_type: $fallback_default_tendency_limiter_type, valid options are :none, :basic")
     end
 
     # ------------------ Moisture Sources Limiter ------------------ #
-    if moisture_model_name == "equilibrium" 
+    if moisture_model isa EquilibriumMoisture
         # can we change this to create no object at all? Or not, idk... maybe it's not that wasteful and improves type inference/stability.
         moisture_sources_limiter = NoMoistureSourcesLimiter() # if we're not a nonequilibrium moisture model, there's no limiting just sat adjust (liq/ice are diagnosed)...can just use NoMoistureSourcesLimiter
         fallback_moisture_sources_limiter = NoMoistureSourcesLimiter()
-    elseif moisture_model_name == "nonequilibrium"    
+    elseif moisture_model isa NonEquilibriumMoisture
 
-        nonequilibrium_moisture_scheme_type::Symbol = TCP.parse_isbits_nt(param_set.user_args, :nonequilibrium_moisture_scheme, :relax_to_equilibrium)
-        nonequilibrium_moisture_sources_limiter_type::Symbol = TCP.parse_isbits_nt(param_set.user_args, :nonequilibrium_moisture_sources_limiter_type, :standard)  # this has w built in though, no way around it, maybe we should write one that's just the exponential decay part w/o anything else... ( # change the default to at least :morrison_milbrandt_2015_style_exponential_part_only soon )
+        nonequilibrium_moisture_scheme_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "nonequilibrium_moisture_scheme"; default = :relax_to_equilibrium))
+
+        nonequilibrium_moisture_sources_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "nonequilibrium_moisture_sources_limiter_type"; default = :standard_supersaturation))
+
+        local fallback_to_standard_supersaturation_limiter::Bool 
         if nonequilibrium_moisture_scheme_type === :relax_to_equilibrium
-            @assert nonequilibrium_moisture_sources_limiter_type ∈ [:None, :standard,] "Relaxation to equilibrium only supports no integrator limiter or basic integrator limiter"
+            @assert nonequilibrium_moisture_sources_limiter_type ∈ [:None, :standard_supersaturation,] "Relaxation to equilibrium only supports no integrator limiter or basic integrator limiter"
         end
         
-
         moisture_sources_limiter = if nonequilibrium_moisture_sources_limiter_type === :none
             NoMoistureSourcesLimiter()
         elseif nonequilibrium_moisture_sources_limiter_type === :standard_supersaturation
             StandardSupersaturationMoistureSourcesLimiter()
         elseif nonequilibrium_moisture_sources_limiter_type === :basic
             BasicMoistureSourcesLimiter()
+        elseif nonequilibrium_moisture_sources_limiter_type === :truncated_basic
+            TruncatedBasicMoistureSourcesLimiter(factor)
         elseif nonequilibrium_moisture_sources_limiter_type === :morrison_milbrandt_2015_style
             MorrisonMilbrandt2015MoistureSourcesLimiter()
         elseif nonequilibrium_moisture_sources_limiter_type === :morrison_milbrandt_2015_style_exponential_part_only
-            MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter()
+            fallback_to_standard_supersaturation_limiter = parse_namelist(namelist, "user_args", "fallback_to_standard_supersaturation_limiter"; default = false)
+            MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter(fallback_to_standard_supersaturation_limiter)
         else
-            error("Invalid nonequilibrium_moisture_sources_limiter_type: $nonequilibrium_moisture_sources_limiter_type, valid options are :none, :standard, :morrison_milbrandt_2015_style, :morrison_milbrandt_2015_style_exponential_part_only")
+            error("Invalid nonequilibrium_moisture_sources_limiter_type: $nonequilibrium_moisture_sources_limiter_type, valid options are :none, :standard_supersaturation, :morrison_milbrandt_2015_style, :morrison_milbrandt_2015_style_exponential_part_only")
         end
 
-        fallback_nonequilibrium_moisture_sources_limiter_type::Symbol = TCP.parse_isbits_nt(param_set.user_args, :fallback_nonequilibrium_moisture_sources_limiter_type, :none)  # Default to none bc that's purest (basic is how anna wrote it though)
+        fallback_nonequilibrium_moisture_sources_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "fallback_nonequilibrium_moisture_sources_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
         if nonequilibrium_moisture_scheme_type === :relax_to_equilibrium
-            @assert fallback_nonequilibrium_moisture_sources_limiter_type ∈ [:None, :standard,] "Relaxation to equilibrium only supports no integrator limiter or basic integrator limiter"
+            @assert fallback_nonequilibrium_moisture_sources_limiter_type ∈ [:None, :standard_supersaturation,] "Relaxation to equilibrium only supports no integrator limiter or basic integrator limiter"
         end
 
         fallback_moisture_sources_limiter = if fallback_nonequilibrium_moisture_sources_limiter_type === :none
             NoMoistureSourcesLimiter()
         elseif fallback_nonequilibrium_moisture_sources_limiter_type === :basic
             BasicMoistureSourcesLimiter()
+        elseif fallback_nonequilibrium_moisture_sources_limiter_type === :truncated_basic
+            TruncatedBasicMoistureSourcesLimiter(factor)
         elseif fallback_nonequilibrium_moisture_sources_limiter_type === :standard_supersaturation
             StandardSupersaturationMoistureSourcesLimiter()
         elseif fallback_nonequilibrium_moisture_sources_limiter_type === :morrison_milbrandt_2015_style
             MorrisonMilbrandt2015MoistureSourcesLimiter()
         elseif fallback_nonequilibrium_moisture_sources_limiter_type === :morrison_milbrandt_2015_style_exponential_part_only
-            MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter()
+            fallback_to_standard_supersaturation_limiter = parse_namelist(namelist, "user_args", "fallback_to_standard_supersaturation_limiter"; default = false)
+            MorrisonMilbrandt2015ExponentialPartOnlyMoistureSourcesLimiter(fallback_to_standard_supersaturation_limiter)
         else
             error("Invalid fallback_nonequilibrium_moisture_sources_limiter_type: $fallback_nonequilibrium_moisture_sources_limiter_type, valid options are :none, :basic, :standard_supersaturation, :morrison_milbrandt_2015_style, :morrison_milbrandt_2015_style_exponential_part_only")
         end
 
     else
-        error("Something went wrong. Invalid moisture model: '$moisture_model_name'")
+        error("Something went wrong. Invalid moisture model: `$moisture_model`")
     end
     
 
     # ------------------ Entrainment/Detrainment Limiter ------------------ #
-    entr_detr_limiter_type::Symbol = TCP.parse_isbits_nt(param_set.user_args, :entr_detr_limiter_type, :none)  # note entr/detr as written are never depndent on env, so the values here can be truly uninged w/ no limiting. However, that's the purest form for composability with other tendencies.
+    entr_detr_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "entr_detr_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
     entr_detr_tendency_limiter = if entr_detr_limiter_type === :none
         NoTendencyLimiter()
     elseif entr_detr_limiter_type === :basic
         BasicTendencyLimiter()
+    elseif entr_detr_limiter_type === :truncated_basic
+        TruncatedBasicTendencyLimiter(factor)
     else
         error("Invalid entr_detr_limiter_type: $entr_detr_limiter_type, valid options are :none, :basic")
     end
 
-    fallback_entr_detr_limiter_type::Symbol = TCP.parse_isbits_nt(param_set.user_args, :fallback_entr_detr_limiter_type, :none)  # Default to none bc that's purest (basic is how anna wrote it though)
+    fallback_entr_detr_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "fallback_entr_detr_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
     fallback_entr_detr_tendency_limiter = if fallback_entr_detr_limiter_type === :none
         NoTendencyLimiter()
     elseif fallback_entr_detr_limiter_type === :basic
         BasicTendencyLimiter()
+    elseif fallback_entr_detr_limiter_type === :truncated_basic
+        TruncatedBasicTendencyLimiter(factor)
     else
         error("Invalid fallback_entr_detr_limiter_type: $fallback_entr_detr_limiter_type, valid options are :none, :basic")
     end
     
     # ------------------ Precipitation Limiter ------------------ #
-    precipitation_tendency_limiter_type::Symbol = TCP.parse_isbits_nt(param_set.user_args, :precipitation_tendency_limiter_type, :none)  # Default to none bc that's purest (basic is how anna wrote it though)
+    precipitation_tendency_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "precipitation_tendency_limiter_type"; default = :none))  # Default to none bc that's purest (basic is how anna wrote it though)
     precipitation_tendency_limiter = if precipitation_tendency_limiter_type === :none
         NoTendencyLimiter()
     elseif precipitation_tendency_limiter_type === :basic
         BasicTendencyLimiter()
+    elseif precipitation_tendency_limiter_type === :truncated_basic
+        TruncatedBasicTendencyLimiter(factor)
     else
         error("Invalid precipitation_tendency_limiter_type: $precipitation_tendency_limiter_type, valid options are :none, :basic")
     end
 
-    fallback_precipitation_tendency_limiter_type::Symbol = TCP.parse_isbits_nt(param_set.user_args, :fallback_precipitation_tendency_limiter_type, :none)  # Default to none bc that's purest (basic is how anna wrote it though)
+    fallback_precipitation_tendency_limiter_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "fallback_precipitation_tendency_limiter_type"; default = :none))
     fallback_precipitation_tendency_limiter = if fallback_precipitation_tendency_limiter_type === :none
         NoTendencyLimiter()
     elseif fallback_precipitation_tendency_limiter_type === :basic
         BasicTendencyLimiter()
+    elseif fallback_precipitation_tendency_limiter_type === :truncated_basic
+        TruncatedBasicTendencyLimiter(factor)
     else
         error("Invalid fallback_precipitation_tendency_limiter_type: $fallback_precipitation_tendency_limiter_type, valid options are :none, :basic")
+    end
+
+
+    # ------------------ Tendency Resolver ------------------ #
+    tendency_resolver_setup::Symbol = Symbol(parse_namelist(namelist, "user_args", "tendency_resolver_setup"; default = :none)) # if you do it just on entr/det's it's funamentally unstable....
+    if tendency_resolver_setup == :none
+        use_tendency_resolver = false
+        use_tendency_resolver_on_full_tendencies = false
+    elseif tendency_resolver_setup == :full_tendencies
+        use_tendency_resolver = true
+        use_tendency_resolver_on_full_tendencies = true
+    elseif tendency_resolver_setup == :normal
+        use_tendency_resolver = true
+        use_tendency_resolver_on_full_tendencies = false
+    else
+        error("tendency_resolver_setup must be :none, :full_tendencies, or :normal, not $tendency_resolver_setup")
     end
 
     # ------------------ Return ------------------ #
@@ -762,6 +921,9 @@ function TendencyLimiterSet(param_set::APS, moisture_model_name::String)
         fallback_moisture_sources_limiter,
         fallback_entr_detr_tendency_limiter,
         fallback_precipitation_tendency_limiter,
+        #
+        use_tendency_resolver,
+        use_tendency_resolver_on_full_tendencies,
     )
 
 end
@@ -1003,19 +1165,19 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
     moisture_model_name = parse_namelist(namelist, "thermodynamics", "moisture_model"; default = "equilibrium")
 
     moisture_model = if moisture_model_name == "equilibrium"
-        EquilibriumMoisture()
+        EquilibriumMoisture(param_set, namelist)
     elseif moisture_model_name == "nonequilibrium"
-        NonEquilibriumMoisture(param_set)
+        NonEquilibriumMoisture(param_set, namelist)
     else
         error("Something went wrong. Invalid moisture model: '$moisture_model_name'")
     end
 
-    snow_formation_model = SnowFormationModel(param_set)
+    snow_formation_model = SnowFormationModel(param_set, moisture_model, namelist) # rn this has to go after moisture_model, if we need it to go before later we can go back to dispatching on symbols etc...
 
-    use_sedimentation = TCP.parse_isbits_nt(param_set.user_args, :use_sedimentation, false)
-    cloud_sedimentation_model = use_sedimentation ? CloudSedimentationModel(param_set) : CloudNoSedimentationModel()
+    use_sedimentation = parse_namelist(namelist, "user_args", "use_sedimentation"; default = false)
+    cloud_sedimentation_model = use_sedimentation ? CloudSedimentationModel(param_set, moisture_model, namelist) : CloudNoSedimentationModel()
 
-    tendency_limiters = TendencyLimiterSet(param_set, moisture_model_name)
+    tendency_limiters = TendencyLimiterSet(param_set, moisture_model, namelist)
 
     thermo_covariance_model_name =
         parse_namelist(namelist, "thermodynamics", "thermo_covariance_model"; default = "prognostic")
@@ -1220,16 +1382,29 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
         valid_options = ["fractional", "total_rate"],
     )
 
+    stalled_updraft_handler = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stalled_updraft_handler", default = "kill") # kill bc that was original default
+    stalled_updraft_handler = if stalled_updraft_handler == "none"
+        StalledUpdraftDoNothing()
+    elseif stalled_updraft_handler == "mix_to_grid_mean"
+        StalledUpdraftMixToGridMean()
+    elseif stalled_updraft_handler == "kill"
+        StalledUpdraftKill()
+    elseif stalled_updraft_handler == "detrain_downdrafts"
+        StalledUpdraftDetrainDowndrafts()
+    else
+        error("Something went wrong. Invalid stalled updraft handler '$stalled_updraft_handler'")
+    end
+
     if entrainment_type == "fractional"
         # entrainment_type = FractionalEntrModel()
         entrainment_type = FractionalEntrModel(;
-        mix_stalled_updraft_to_grid_mean = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "mix_stalled_updraft_to_grid_mean"; default = false),
+        stalled_updraft_handler = stalled_updraft_handler,
         )
     elseif entrainment_type == "total_rate"
         # entrainment_type = TotalRateEntrModel()
         entrainment_type = TotalRateEntrModel(;
-        base_detrainment_rate_inv_s = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "base_detrainment_rate_inv_s"; default = 0.0), # assume infinite timescale so 0 inv timescale (consider choosing a better default like 6 hours or something...)
-        mix_stalled_updraft_to_grid_mean = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "mix_stalled_updraft_to_grid_mean"; default = false),
+        base_detrainment_rate_inv_s = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "base_detrainment_rate_inv_s", default = 0.0), # assume infinite timescale so 0 inv timescale (consider choosing a better default like 6 hours or something...)
+        stalled_updraft_handler = stalled_updraft_handler, 
         )
     else
         error("Something went wrong. Invalid entrainment type '$entrainment_type'")
@@ -1557,61 +1732,142 @@ float_type(state::State) = eltype(state.prog)
 float_type(field::CC.Fields.Field) = eltype(parent(field))
 
 
-function fv_field_summary(io::IO, f::CC.Fields.Field)
-    # Base.show(io, f)
-    s = repr(f)
-    s = replace(s, "\n" => " \n\n ") # otherwise @info smushes onto same line, not sure why"
-    print(io, s)
+function full_raw_string(f::CC.Fields.Field)
+    # No truncation
+    # Use parent to get the raw array and join elements horizontally
+    raw_array = parent(f)
+
+    out = "$(eltype(f))-valued Field:  ["
+
+    out *= string(Base.join((raw_array), " ")) * "]"
+
+    return out
 end
 
 
+function fv_field_summary_helper(f::CC.Fields.Field)
+    pns = propertynames(f)
+
+    if iszero(length(pns)) # no properties
+        # Base.show(io, f)
+        # s = repr(f)
+        s = full_raw_string(f) # no truncation
+        # s = replace(s, "\n" => " \n     ") # otherwise @info smushes onto same line, not sure why"
+        # print(io, s)
+        return s
+    else
+        s = map(pn -> (pn, fv_field_summary_helper(getproperty(f, pn))), pns)
+        # s = map(pn -> string("`", pn, "`::", fv_field_summary_helper(getproperty(f, pn))), pns)
+        # s = join(s, ",\n ")
+        return s
+    end
+end
+
+
+function do_print(io, fv_strings; indent::Int=0, return_str::Bool=false)
+    function action(io, xargs..., ; s, return_str::Bool=return_str)
+        if return_str
+            return s * string(xargs...)
+        else
+            print(io, xargs...)
+            return string() # for type stability, don't return `nothing`
+        end
+    end
+    
+    big_space_and_newline = "\n              " # for some reason, this triggers nicer output w/ @info
+    s = "" # you have to start with this to get the nice formatting w/ @info, otherwise it just prints in a long line
+    if fv_strings isa String
+        s = action(io, fv_strings, big_space_and_newline; s=s)
+    elseif fv_strings isa Tuple || s isa Base.Generator
+        for (pn, psummary) in fv_strings
+            s = action(io, " "^indent; s=s)
+            s = action(io, "`", pn, "`::",; s=s)
+            if !(psummary isa String)
+                s = action(io, big_space_and_newline; s=s)
+            end
+
+            if return_str
+                s = s * do_print(io, psummary; indent = indent + 2, return_str = return_str)
+            else
+                do_print(io, psummary; indent = indent + 2, return_str = return_str)
+            end
+        end
+    else
+        error("Unexpected type in fv_field_summary: $(typeof(s))")
+    end
+    if return_str
+        return s
+    else
+        return string() # for type stability, don't return `nothing`
+    end
+
+end
+
+function fv_field_summary(io::IO, f::CC.Fields.Field)
+    s = fv_field_summary_helper(f)
+    do_print(io, s)
+end
+
+function fv_field_summary(f::CC.Fields.Field)
+    s = fv_field_summary_helper(f);
+    big_space_and_newline = "\n              " # for some reason, this triggers nicer output w/ @info
+    s =  big_space_and_newline  * do_print(stdout, s; return_str = true) # add leading big space to outermost call
+    return s
+end
+    
+
+function Base.summary(io::IO, f::CC.Fields.Field)
+    fv_field_summary(io, f)
+end
+
+function Base.summary(f::CC.Fields.Field) 
+    fv_field_summary(f)
+end
+
 function Base.summary(io::IO, fv::CC.Fields.FieldVector)
+
     pns = string.(propertynames(fv))
 
     if length(pns) == 0
         print(io, fv)
         return
     end
+    
+    for pn in propertynames(fv)[1:2]
+        prop = getproperty(fv, pn)
 
-    buf = maximum(length.(pns))
-    keys = propertynames(fv)
-    vals = repeat.(" ", map(s -> buf - length(s) + 2, pns))
-    bufs = (; zip(keys, vals)...)
-    print(io, '\n')
+        if prop isa CC.Fields.Field
+           fv_field_summary(io, prop)
+        elseif prop isa CC.Fields.FieldVector
+            Base.summary(io, prop)
+        else
+            error("Unexpected type in FieldVector summary: $(typeof(prop))")
+        end
+
+    end
+end
+
+
+function Base.summary(fv::CC.Fields.FieldVector)
+    s = ""
+    pns = string.(propertynames(fv))
+
+    if length(pns) == 0
+        s = string(fv)
+        return s
+    end
 
     for pn in propertynames(fv)[1:2]
         prop = getproperty(fv, pn)
 
-
-
-        # Skip some data:
-        # prop isa Bool && continue
-        # prop isa NTuple && continue
-        # prop isa Int && continue
-        # prop isa Float64 && continue
-        # prop isa Float32 && continue
-
-
-        s = string(
-            "  ", # needed for some reason
-            getproperty(bufs, pn), # buffer for alignment
-            '`',
-            string(pn),
-            '`',
-            "::",
-            '`',
-        )
-        print(io, s)
-
         if prop isa CC.Fields.Field
-            fv_field_summary(io, prop)
+            s *= fv_field_summary(prop)
+        elseif prop isa CC.Fields.FieldVector
+            s *= Base.summary(prop)
+        else
+            error("Unexpected type in FieldVector summary: $(typeof(prop))")
         end
 
-
-        s = string(  '`',
-            '\n',
-            '\n', # double or else @info smushes onto same line, not sure why"
-        )
-        print(io, s)
     end
+    return s
 end

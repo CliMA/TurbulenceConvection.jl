@@ -1288,8 +1288,18 @@ initialize_radiation(::LES_driven_SCM, radiation, grid::Grid, state, param_set; 
 #####
 
 function aux_data_kwarg(::SOCRATES, namelist)
+    FT = Float64
+    if haskey(namelist["grid"], "conservative_interp_kwargs")  && haskey(namelist["grid"]["conservative_interp_kwargs"], "in") # if it exists, use it
+        conservative_interp_kwargs = namelist["grid"]["conservative_interp_kwargs"]["in"] # convert to nt no matter what for type stability, but don't convert to SSCF yet bc that strips out conservative_interp key...
+    else
+        if !haskey(namelist["grid"], "conservative_interp_kwargs")
+            namelist["grid"]["conservative_interp_kwargs"] = Dict{String, Any}()
+        end
+        namelist["grid"]["conservative_interp_kwargs"]["in"] = Dict{String, Union{Bool, String, FT}}( ) # will default to no conwservative interp
+        conservative_interp_kwargs = namelist["grid"]["conservative_interp_kwargs"]["in"] # convert to nt no matter what for type stability, but don't convert to SSCF yet bc that strips out conservative_interp key...
+    end
 
-    conservative_interp_kwargs = namelist["grid"]["conservative_interp_kwargs"]["in"] # convert to nt no matter what for type stability, but don't convert to SSCF yet bc that strips out conservative_interp key...
+    # conservative_interp_kwargs = namelist["grid"]["conservative_interp_kwargs"]["in"] # convert to nt no matter what for type stability, but don't convert to SSCF yet bc that strips out conservative_interp key...
 
     # should be Dict of String -> Union{Bool, String}
     # conservative_interp_kwargs = Dict{Symbol, Union{Bool, Symbol}}(Symbol(k) => isa(v, String) ? Symbol(v) : v for (k, v) in conservative_interp_kwargs)

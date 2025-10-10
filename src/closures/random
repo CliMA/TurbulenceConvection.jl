@@ -1,0 +1,1943 @@
+
+
+namelist = nothing
+try
+    namelist = namelist_stash[end]
+catch e
+    CEDMF_dir = expanduser("~/Research_Schneider/CliMA/CalibrateEDMF.jl")
+    flight_number = 9
+    forcing_str = "Obs"
+    nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_ice
+    dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
+    method = "best_particle_final"
+    case_name = "SOCRATES_RF" * string(flight_number, pad = 2) * "_" * lowercase(forcing_str) * "_data" # can't recall why it's lower here lol
+    namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments","SOCRATES_"*string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "tau_autoconv_noneq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
+    # namelist_path = "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES_postprocess_runs_storage/subexperiments/SOCRATES_geometric_liq__exponential_T_scaling_ice/Calibrate_and_Run/tau_autoconv_noneq/adapt_dt__dt_min_5.0__dt_max_10.0/iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean/postprocessing/output/Atlas_LES/RFAll_obs/best_particle_final/data/Output.SOCRATES_RF09_obs_data.1_1/namelist_SOCRATES.in"
+    # namelist_path = "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES_postprocess_runs_storage/subexperiments/SOCRATES_geometric_liq__exponential_T_scaling_ice/Calibrate_and_Run/tau_autoconv_noneq/adapt_dt__dt_min_5.0__dt_max_10.0/iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean/postprocessing/output/Atlas_LES/RFAll_obs/median_final_ensemble/data/Output.SOCRATES_RF09_obs_data.1_1/namelist_SOCRATES.in"
+    namelist_path = "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES_postprocess_runs_storage/subexperiments/SOCRATES_neural_network/Calibrate_and_Run/tau_autoconv_noneq/adapt_dt__dt_min_5.0__dt_max_10.0/iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean/postprocessing/output/Atlas_LES/RFAll_obs/median_final_ensemble/data/Output.SOCRATES_RF09_obs_data.1_1/namelist_SOCRATES.in"
+    # namelist_path = "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES_postprocess_runs_storage/subexperiments/SOCRATES_neural_network_pca_noise/Calibrate_and_Run/tau_autoconv_noneq/adapt_dt__dt_min_5.0__dt_max_10.0/iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean/postprocessing/output/Atlas_LES/RFAll_obs/median_final_ensemble/data/Output.SOCRATES_RF09_obs_data.1_1/namelist_SOCRATES.in"
+    namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
+    namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
+    default_namelist = NameList.default_namelist(case_name)
+    NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
+end
+
+toml_dict = CP.create_toml_dict(FT; dict_type = "alias");
+aliases = string.(fieldnames(TDP.ThermodynamicsParameters));
+param_pairs = CP.get_parameter_values!(toml_dict, aliases, "Thermodynamics")
+thermo_params = TDP.ThermodynamicsParameters{FT}(; param_pairs...)
+
+includet(joinpath(tc_dir, "driver", "generate_namelist.jl"))
+param_set = create_parameter_set(namelist, toml_dict, FT);
+microphys_params = TCP.microphysics_params(param_set)
+prs = microphys_params
+q_type = TC.ice_type
+Dmax=FT(Inf)
+
+
+# ======== #
+
+
+
+N_INP = 600.; r_is = 62.5e-6; ρ = 1.2324726009797524; ice_type = :ice_and_snow; q_i = 5e-7; q_s = 6e-7 ; μ = 0.0; N_i = 500.
+m0s = TC.m0(microphys_params, TC.snow_type) # one snow particle mass?
+qs_here = min(q_s, N_INP * m0s) # clamp snow by N_INP * m0s, a `characteristic` amount I guess...
+r_min = param_set.user_params.particle_min_radius
+q_here = q_i + qs_here + TC.mass(param_set, TC.ice_type, r_min, N_INP; monodisperse = true) # If we are going to enforce N_INP, we must enforce some particle size, else we risk under flow from say, N_INP = 300 but q = 1e-300 leading to n0 overflowing to Inf
+N_below_r_is = TC.get_fraction_below_or_above_thresh_from_qN(param_set, TC.ice_type, q_here, N_INP, ρ, r_is; return_N = true, below_thresh = true, return_fraction=false, μ=μ, Dmax=Inf) # asssuming all ice and snow was ice, how much is below r_is?
+
+r_acnv_scaling_factor = param_set.user_params.r_ice_acnv_scaling_factor # this MUST be less than 1!!!
+r_thresh = TC.get_r_cond_precip(param_set, TC.ice_type) * param_set.user_params.r_ice_snow_threshold_scaling_factor
+r_is = TC.CMP.r_ice_snow(microphys_params)
+
+S_i = 1.1
+decrease_N_if_subsaturated = true
+r_i_acnv = TC.r_ice_acnv(param_set, FT(r_acnv_scaling_factor)) # this is the radius of the ice crystal at the acnv radius
+μ = TC.μ_from_qN(param_set, TC.ice_type, q_i, N_i; ρ=ρ) # this is the factor by which we scale the mean radius to get the mean radius for the ice crystals, so that we can use it in the N_i and N_l calculations
+N_i_acnv = TC.N_from_qr(param_set, TC.ice_type, q_i, r_i_acnv; monodisperse = false, μ=μ, ρ=ρ)
+if decrease_N_if_subsaturated
+    if S_i < FT(0)
+        r_thresh = r_thresh + (r_thresh - 1.05 * r_thresh)/(0 - -0.05) * clamp(S_i, -0.05, 0) # Let r_thresh be 5\% bigger by S = -5%, meaning N_thresh can be inferred smaller and <r> above the true r_thresh [[ feels like we don't need this since N doesn't seem to shrink any faster in subsaturated conditions, if anything it's slower lol. might be tied to acnv and <r> ]]
+    end
+end
+N_thresh = TC.N_from_qr(param_set, TC.ice_type, q_i, r_thresh; monodisperse = false, μ=μ, ρ=ρ)
+
+
+r_prior = TC.ri_from_qN(param_set, q_i, N_i; ice_type = TC.ice_type, monodisperse = false, μ=μ, ρ=ρ) # this is the radius before we adjust N_i
+
+
+TC.get_fraction_below_or_above_thresh_from_qN(param_set, TC.ice_type, q_i, N_i, ρ, r_is; return_N = true, below_thresh = true, return_fraction=false, μ=μ, Dmax=Inf) 
+TC.get_fraction_below_or_above_thresh_from_qN(param_set, TC.ice_type, 4e-7, 209., ρ, r_is; return_N = true, below_thresh = true, return_fraction=false, μ=μ, Dmax=Inf) 
+
+
+
+
+flight_number = 9
+case_name = "SOCRATES_RF" * string(flight_number, pad = 2) * "_" * lowercase(forcing_str) * "_data" # can't recall why it's lower here lol
+
+
+nonequilibrium_moisture_scheme = :neural_network
+dt_string = "adapt_dt__dt_min_2.0__dt_max_4.0"
+method = "best_particle_final"
+CEDMF_dir = pkgdir(CalibrateEDMF) # any submodule should work the same
+case_name = "SOCRATES_RF" * string(flight_number, pad = 2) * "_" * lowercase(forcing_str) * "_data" # can't recall why it's lower here lol
+namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments","SOCRATES_"*string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "tau_autoconv_noneq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
+namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
+namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
+default_namelist = NameList.default_namelist(case_name)
+NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
+
+toml_dict = CP.create_toml_dict(FT; dict_type = "alias");
+aliases = string.(fieldnames(TDP.ThermodynamicsParameters));
+param_pairs = CP.get_parameter_values!(toml_dict, aliases, "Thermodynamics")
+thermo_params = TDP.ThermodynamicsParameters{FT}(; param_pairs...)
+param_set = create_parameter_set(namelist, toml_dict, FT);
+
+
+sim = Simulation1d(namelist);
+
+
+calibrate_io = sim.calibrate_io;
+prog = sim.prog;
+aux = sim.aux;
+TS = sim.TS;
+diagnostics = sim.diagnostics;
+
+t_span = (0.0, sim.TS.t_max);
+params = (;
+    calibrate_io,
+    edmf = sim.edmf,
+    precip_model = sim.precip_model,
+    rain_formation_model = sim.rain_formation_model,
+    param_set = sim.param_set,
+    aux = aux,
+    io_nt = sim.io_nt,
+    case = sim.case,
+    forcing = sim.forcing,
+    surf_params = sim.surf_params,
+    radiation = sim.radiation,
+    diagnostics = diagnostics,
+    TS = sim.TS,
+    Stats = sim.Stats,
+    skip_io = sim.skip_io,
+    cfl_limit = sim.cfl_limit,
+    dt_min = sim.dt_min,
+);
+
+SciMLBase.warn_paramtype(params)
+
+SciMLBase.should_warn_paramtype(params)
+
+
+
+
+
+
+
+function compute_lambert_argument_and_epsilon(c_tilde, δ_tilde, denom_tilde)
+    E = exp(1)
+    X = (c_tilde + 1 - δ_tilde) / denom_tilde
+    Y = (δ_tilde - 1) / denom_tilde
+
+    dx = X - 1          # expected to be small near branch point
+    r2 = Y + 1          # also small near branch point
+
+    r1 = expm1(-dx)     # = e^{-dx} - 1, computed accurately
+
+    lambert_arg = -exp(-1) * (1 + r1) * (1 + r2)
+
+    epsilon = -(r1 + r2 + r1 * r2)  # e * lambert_arg + 1 with high precision
+
+    @warn "r1 = $r1; r2 = $r2; dx = $dx; X = $X; Y = $Y; epsilon = $epsilon"
+
+    return lambert_arg, epsilon
+end
+
+function lambertw_branchpoint_series(z::FT, branch::Int) where {FT}
+    E = FT(exp(1))
+    ϵ = E * z + 1
+    if ϵ < 0
+        error("lambert argument out of domain for real branches")
+    end
+    p = sqrt(2 * ϵ)
+    if branch == 0
+        return FT(-1) + p - p^2/3 + (11/72)*p^3
+    elseif branch == -1
+        return FT(-1) - p - p^2/3 - (11/72)*p^3
+    else
+        error("invalid Lambert W branch")
+    end
+end
+
+function get_t_out_of_q_WBF_scaled(δ_0::FT, A_c::Union{FT, BigFloat}, τ::FT, τ_c::FT,
+                                  q_ice::FT, Γ::FT, q_sl::FT, q_si::FT) where {FT}
+    B = (q_sl - q_si) / τ
+    c = -q_ice * (τ_c * Γ / τ)
+
+
+    scale = A_c * τ
+    c_tilde = c / scale
+    B_tilde = B / A_c
+    δ_tilde = δ_0 / scale
+
+    denom_tilde = 1 + B_tilde
+
+
+    @warn "c_tilde = $c_tilde; δ_tilde = $δ_tilde; denom_tilde = $denom_tilde"
+
+
+
+
+    lambert_argument, epsilon = compute_lambert_argument_and_epsilon(c_tilde, δ_tilde, denom_tilde)
+
+    @warn lambert_argument
+
+
+    t_out_of_q = FT(Inf)
+
+    if !iszero(A_c + B) && δ_0 != scale && lambert_argument > -exp(-1)
+
+        # Select branches: 0 and maybe -1 if lambert_argument < 0
+        branches = (lambert_argument < FT(0)) ? (0, -1) : (0,)
+
+        for LW_branch in branches
+
+
+            W_direct = LambertW.lambertw(lambert_argument, LW_branch)
+            W_series = lambertw_branchpoint_series(lambert_argument, LW_branch)
+            @warn "W_val: series = $W_series, direct = $W_direct, epsilon = $epsilon"
+            W_val = abs(epsilon) < 1e-6 ? W_series : W_direct
+
+            @warn "W_val = $W_val"
+
+            numerator = τ * ((1 + B_tilde) * W_val + 1 + c_tilde - δ_tilde)
+            t_candidate = numerator / denom_tilde
+
+            @warn "t_candidate = $t_candidate"
+
+
+            if t_candidate > 0
+                t_out_of_q = min(t_out_of_q, t_candidate)
+            end
+        end
+    end
+
+    return t_out_of_q
+end
+
+
+# lambert_argument = exp(-(c_tilde + 1 - δ_tilde) / denom_tilde) * (δ_tilde - 1) / denom_tilde
+# W_val = LambertW.lambertw(lambert_argument, 0)
+# numerator = τ * ((1 + B_tilde) * W_val + 1 + c_tilde - δ_tilde)
+# t_candidate = numerator / denom_tilde
+
+# lambert_argument = nextfloat( exp(-(c_tilde + 1 - δ_tilde) / denom_tilde) * (δ_tilde - 1) / denom_tilde )
+# w_val = LambertW.lambertw(lambert_argument, 0)
+# numerator = τ * ((1 + B_tilde) * w_val + 1 + c_tilde - δ_tilde)
+# t_candidate = numerator / denom_tilde
+
+# lambert_argument = exp(-(c_tilde + 1 - δ_tilde) / denom_tilde) * (δ_tilde - 1) / denom_tilde
+# W_val = LambertW.lambertw(lambert_argument, -1)
+# numerator = τ * ((1 + B_tilde) * W_val + 1 + c_tilde - δ_tilde)
+# t_candidate = numerator / denom_tilde
+
+# lambert_argument = prevfloat( exp(-(c_tilde + 1 - δ_tilde) / denom_tilde) * (δ_tilde - 1) / denom_tilde )
+# W_val = LambertW.lambertw(lambert_argument, -1)
+# numerator = τ * ((1 + B_tilde) * W_val + 1 + c_tilde - δ_tilde)
+# t_candidate = numerator / denom_tilde
+
+
+
+A_c = 5.964714581909572e-7; τ = 3.052294790842859e9; τ_ice=4.503599627370496e15; τ_liq = 3.052296704e9; δ_0 = 5.917534256365698e-5; δ_0i = -6.011312856104862e-5; dqvdt = 0.0; Δt = 100000.0; q_sl = 0.0046979006207082; q_si = 0.004817189091832905; Γ_l = 1.787126846503776; Γ_i = 2.0480555997982215; L_l = 2.494781096532659e6; L_i = 2.8337752989941305e6; c_p = 1004.5084328766485; e_sl = 0.0046979006207082; e_si = 0.004817189091832905; dqsl_dT=0.00031693183668721756; dqsi_dT=0.0003715117033078098; w=0.23720546040942375; g=9.81; p=97835.32551757492; ρ=1.2324726009797524; q_vap = 0.004757075963271857; q_liq = 0.0; q_ice = 1.244061940488168e-40; T=275.7521203563053; T_freeze=273.16; q_sl = 0.0046979006207082; q_si = 0.004817189091832905; q_liq = 0.0; q_ice = 1.244061940488168e-40; t_out_of_ice = 219.02519394551072; dqvdt = 0.0; dTdt = 0.0
+
+# scale every timescale and rate up until the slowest nonzero quantity is order 1 second. if all are zero, just leave scaling as 1
+
+smallest_nonzero_scale = minimum(filter(!iszero, [τ_ice, τ_liq, Δt, abs(δ_0/τ), abs(δ_0i/τ), abs(q_liq/τ), abs(q_ice/τ), abs(dqvdt), abs(dTdt), abs(w)]); init=1)
+# smallest_nonzero_scale = 1e-20
+
+τ_ice = τ_ice / smallest_nonzero_scale
+τ_liq = τ_liq / smallest_nonzero_scale
+τ = τ / smallest_nonzero_scale
+Δt = Δt / smallest_nonzero_scale
+dqvdt = dqvdt * smallest_nonzero_scale
+dTdt = dTdt * smallest_nonzero_scale
+w = w * smallest_nonzero_scale
+
+
+
+# compute the autoconversion timescale
+A_c = A_c_func_EPA(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
+τ = τ_func_EPA(τ_liq, τ_ice, L_i, c_p, dqsl_dT, Γ_i)
+
+
+get_t_out_of_q_WBF(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si) * smallest_nonzero_scale
+
+
+A_c_big = A_c_func_EPA(big(τ_ice), big(Γ_l), big(q_sl), big(q_si), big(g), big(w), big(c_p), big(e_sl), big(L_i), big(dqsl_dT), big(dqvdt), big(dTdt), big(p), big(ρ)) # Eq C4
+τ_big = τ_func_EPA(big(τ_liq), big(τ_ice), big(L_i), big(c_p), big(dqsl_dT), big(Γ_i))
+
+@btime get_t_out_of_q_WBF($big(δ_0), $A_c_big, $τ_big, $big(τ_ice), $big(q_ice), $big(Γ_i), $big(q_sl), $big(q_si))
+
+A_c_double = A_c_func_EPA(Double64(τ_ice), Double64(Γ_l), Double64(q_sl), Double64(q_si), Double64(g), Double64(w), Double64(c_p), Double64(e_sl), Double64(L_i), Double64(dqsl_dT), Double64(dqvdt), Double64(dTdt), Double64(p), Double64(ρ)) # Eq C4
+τ_double = τ_func_EPA(Double64(τ_liq), Double64(τ_ice), Double64(L_i), Double64(c_p), Double64(dqsl_dT), Double64(Γ_i))
+
+
+@btime get_t_out_of_q_WBF($Double64(δ_0), $A_c_double, $τ_double, $Double64(τ_ice), $Double64(q_ice), $Double64(Γ_i), $Double64(q_sl), $Double64(q_si))
+
+
+
+S_qi_func_EPA( big(A_c), big(τ), big(τ_ice), big(δ_0), big"1.90886049367954395317626930221880496504349499279084161896685326016827616519004e-20", big(Γ_i), big(q_sl), big(q_si))
+
+
+
+
+# ===== gradient descent test ======= #
+
+using CalibrateEDMF
+using UnicodePlots: UnicodePlots
+CEDMF_dir = "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl"
+experiment_dir = joinpath(CEDMF_dir, "experiments", "SOCRATES", "subexperiments", "SOCRATES_neural_network_pca_noise")
+include(joinpath(CEDMF_dir, "experiments", "SOCRATES", "subexperiments", "SOCRATES_neural_network", "Calibrate_and_Run", "NN_pca.jl")) # this will load the NN PCA functions and add them to the valid experiment setups
+
+neural_network_dir = joinpath(dirname(experiment_dir), "SOCRATES_neural_network") # experiment_dir has no trailing slash so this should work
+pretrained_NN_checkpoints_path = joinpath(neural_network_dir, "Calibrate_and_Run", "pretrained_NN_checkpoints.jld2");
+_, model_params_matrix, _ = JLD2.load(pretrained_NN_checkpoints_path, "model_checkpoint_states", "model_checkpoint_params", "model_checkpoint_losses");
+nn_path = joinpath(neural_network_dir, "Calibrate_and_Run", "pretrained_NN.jld2") # this is the path to the pretrained NN file, we will use it in the namelist
+nn_pretrained_params, nn_pretrained_repr, nn_pretrained_x_0_characteristic = JLD2.load(nn_path, "params", "re", "x_0_characteristic");
+(; input_train, truth_train) = get_NN_training_data(joinpath(neural_network_dir, "Calibrate_and_Run", "NN_training_data.jld2"));
+
+fully_trained_loss = (nn_pretrained_repr(nn_pretrained_params)(input_train') .- truth_train').^2;
+@info "Fully trained NN loss: $(sum(fully_trained_loss))"
+
+iteration::Int
+learning_rate::CalibrateEDMF.FTNN
+
+# i_checkpoint = 250 # let's trial starting from scratch
+i_checkpoint = size(model_params_matrix, 2)-1 # last checkpoint
+model_params = model_params_matrix[:, i_checkpoint+1];
+model_params = CalibrateEDMF.FTNN.(model_params) # ensure model_params is of type FTNN
+loss = (nn_pretrained_repr(model_params)(input_train') .- truth_train').^2;
+iteration = 0
+
+n_pca = 25; N_ens = 10 # number of PCA components to use, the number of ensemble members
+ens_model_params = repeat(model_params,1, N_ens); # [N_par × N_ens] ensemble of model parameters
+pca_weights = Vector{CalibrateEDMF.FTNN}(undef, n_pca); # 25 PCA components
+σ_real = Vector{CalibrateEDMF.FTNN}(undef, n_pca); # real standard deviations from the explained variance
+dlossdp = Vector{CalibrateEDMF.FTNN}(undef, length(model_params)); # gradient of the loss with respect to the model parameters
+dp = Vector{CalibrateEDMF.FTNN}(undef, length(model_params)); # gradient descent step
+# sum_losses = Float32[]; learning_rates = Float32[]
+sum_losses = Matrix{CalibrateEDMF.FTNN}(undef, 0, N_ens); learning_rates = Matrix{CalibrateEDMF.FTNN}(undef, 0, N_ens); # store losses and learning rates for plotting
+let n_pca = n_pca, pca_weights = pca_weights, σ_real = σ_real, dlossdp = dlossdp, dp=dp, loss=loss, model_params = model_params, nn_pretrained_repr = nn_pretrained_repr, input_train = input_train, truth_train = truth_train, iteration = iteration, learning_rate = learning_rate, sum_losses = sum_losses, n_pca = n_pca, learning_rates = learning_rates
+    C_scaled = Matrix{CalibrateEDMF.FTNN}(undef, length(model_params), n_pca); # scaled PCA components
+    H_pca = Matrix{CalibrateEDMF.FTNN}(undef, n_pca, n_pca); # Hessian approx in PCA space
+
+    while sum(loss) > 100
+        @time begin
+            iteration += 1
+            for i_ens in 1:N_ens
+                components, explained_variance, mean_vec = get_NN_pca(ens_model_params[:, i_ens][:], nn_pretrained_repr, input_train, truth_train; number_components=n_pca, number_samples=100) # LinearAlgebra.svd() wants data to be samples × features, so we transpose the jacobian tensor
+
+                pca_weights .= randn(n_pca) # random weights for the PCA components
+                σ_real .= sqrt.(explained_variance) # real standard deviations from the explained variance
+                dlossdp .= mean_vec .+ (components * (pca_weights .* σ_real))
+                learning_rate_dldp = .1 * inv.(maximum(abs.(dlossdp))) # learning rate is the inverse of the maximum absolute value of the gradient
+
+                C_scaled .= components .* σ_real'    # scale each component by std dev
+                H_pca .= C_scaled' * C_scaled        # Hessian approx in PCA space
+                λ_max = maximum(LinearAlgebra.eigvals(H_pca))
+                learning_rate_pca = 1 / λ_max
+
+                if learning_rate_dldp < learning_rate_pca
+                    @warn "Using learning rate from dlossdp: $learning_rate_dldp because it is smaller than the PCA-based learning rate: $learning_rate_pca"
+                end
+                learning_rate = min(learning_rate_dldp, learning_rate_pca) # use the smaller of the two learning rates
+
+                learning_rate *= CalibrateEDMF.FTNN(0.001) # scale down the learning rate to avoid overshooting
+
+                dp .= -learning_rate * dlossdp # gradient descent step
+                ens_model_params[:, i_ens] .+= dp # update the model parameters
+
+
+                loss .= (nn_pretrained_repr(ens_model_params[:, i_ens])(input_train') .- truth_train').^2
+
+                if i_ens == 1 # we need to expand the matrix  (addpend another row)
+                    sum_losses = [sum_losses; Vector{CalibrateEDMF.FTNN}(undef, N_ens)'] # add a new row for this iteration
+                    learning_rates = [learning_rates; Vector{CalibrateEDMF.FTNN}(undef, N_ens)']
+                end
+                sum_losses[iteration, i_ens] = sum(loss) # store the loss for this ensemble member
+                learning_rates[iteration, i_ens] = learning_rate # store the learning rate for this ensemble member
+
+            end
+            # clear the terminal
+            Base.run(`clear`)
+            @info "Iteration $(iteration): loss = $(sum(loss)), learning_rate: $learning_rate " #model_params = $(model_params), pca_weights = $(pca_weights), dlossdp = $(dlossdp)"
+
+
+        end
+        # make UnicodePlots plot
+        plt = Vector{UnicodePlots.Plot}(undef, 1)  # for a vector of length n
+        for i_ens in 1:N_ens
+            if (i_ens == 1)
+               plt[1] = UnicodePlots.lineplot(1:size(sum_losses, 1), sum_losses[:, i_ens]; title="Loss over iterations", xlabel="Iteration", ylabel="Loss", color=:blue, yscale=:log10); # display to ensure it gets drawn
+            else
+                plt[1] = UnicodePlots.lineplot!(plt[1], 1:size(sum_losses, 1), sum_losses[:, i_ens]; color=:blue);
+            end
+        end
+        display(plt[1]) # display the plot
+        flush(stdout); flush(stderr) # ensure the plot is displayed
+    end
+end
+
+
+
+# ==================================== #
+
+using CalibrateEDMF
+using UnicodePlots: UnicodePlots
+CEDMF_dir = "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl"
+experiment_dir = joinpath(CEDMF_dir, "experiments", "SOCRATES", "subexperiments", "SOCRATES_neural_network_pca_noise")
+include(joinpath(CEDMF_dir, "experiments", "SOCRATES", "subexperiments", "SOCRATES_neural_network", "Calibrate_and_Run", "NN_pca.jl")) # this will load the NN PCA functions and add them to the valid experiment setups
+
+# neural_network_dir = joinpath(dirname(experiment_dir), "SOCRATES_neural_network") # experiment_dir has no trailing slash so this should work
+# pretrained_NN_checkpoints_path = joinpath(neural_network_dir, "Calibrate_and_Run", "pretrained_NN_checkpoints.jld2");
+# _, model_params_matrix, _ = JLD2.load(pretrained_NN_checkpoints_path, "model_checkpoint_states", "model_checkpoint_params", "model_checkpoint_losses");
+# nn_path = joinpath(neural_network_dir, "Calibrate_and_Run", "pretrained_NN.jld2") # this is the path to the pretrained NN file, we will use it in the namelist
+# nn_pretrained_params, nn_pretrained_repr, nn_pretrained_x_0_characteristic = JLD2.load(nn_path, "params", "re", "x_0_characteristic");
+# (; input_train, truth_train) = get_NN_training_data(joinpath(neural_network_dir, "Calibrate_and_Run", "NN_training_data.jld2"));
+
+
+
+
+# include(joinpath(CEDMF_dir, "experiments", "SOCRATES", "subexperiments", "SOCRATES_neural_network", "Calibrate_and_Run", "NN_pca.jl")) # this will load the NN PCA functions and add them to the valid experiment setups
+experiment_dir = joinpath(CEDMF_dir, "experiments", "SOCRATES", "subexperiments", "SOCRATES_neural_network_pca_noise") # this is the path to the experiment directory, we will use it in the namelist
+neural_network_dir = joinpath(dirname(experiment_dir), "SOCRATES_neural_network") # experiment_dir has no trailing slash so this should work
+pretrained_NN_checkpoints_path = joinpath(neural_network_dir, "Calibrate_and_Run", "pretrained_NN_checkpoints.jld2")
+_, model_params_matrix, _ = JLD2.load(pretrained_NN_checkpoints_path, "model_checkpoint_states", "model_checkpoint_params", "model_checkpoint_losses") # load the previous states
+#
+nn_path = joinpath(neural_network_dir, "Calibrate_and_Run", "pretrained_NN.jld2") # this is the path to the pretrained NN file, we will use it in the namelist
+nn_pretrained_params, nn_pretrained_repr, nn_pretrained_x_0_characteristic = JLD2.load(nn_path, "params", "re", "x_0_characteristic")
+#
+nn_path = joinpath(neural_network_dir, "Calibrate_and_Run", "pretrained_NN_simple_chain.jld2") # needed to be this for simple_chain loading later.
+#
+# i_checkpoint = 500 # let's trial starting from scratch
+i_checkpoint = size(model_params_matrix, 2)-1 # last checkpoint
+model_params = model_params_matrix[:, i_checkpoint+1]
+#
+n_pca = 12 # number of PCA components to use, this is the number of principal components we will use as noise
+(; input_train, truth_train) = get_NN_training_data()
+by_output = true; reference_to_truth=false
+# pca_components, pca_explained_variance, pca_mean_vec = get_NN_pca_by_output(model_params, nn_pretrained_repr, input_train, truth_train; number_components=n_pca, filter_threshold=CalibrateEDMF.FTNN(0), scale_gradients=false, reference_to_truth=reference_to_truth)
+pca_components, pca_explained_variance, pca_mean_vec = get_output_specific_directions_by_output(model_params, nn_pretrained_repr, input_train, truth_train; number_components=n_pca, filter_threshold=CalibrateEDMF.FTNN(0), scale_gradients=false, reference_to_truth=reference_to_truth)
+#
+namelist["relaxation_timescale_params"]["neural_microphysics_relaxation_network_number_components"] = n_pca # set the number of PCA components to use
+namelist["relaxation_timescale_params"]["reference_to_truth"] = reference_to_truth # set the explained variance of the PCA components
+namelist["relaxation_timescale_params"]["pca_by_output"] = by_output # set whether the PCA is by output or not
+namelist["relaxation_timescale_params"]["neural_microphysics_relaxation_network"] = model_params
+namelist["relaxation_timescale_params"]["specific_toggle"] = true # maximize toggling by direction by solving the inverse problem.
+namelist["relaxation_timescale_params"]["fine_tuning_only"] = true
+namelist["relaxation_timescale_params"]["model_x_0_characteristic"] = nn_pretrained_x_0_characteristic
+namelist["relaxation_timescale_params"]["model_re_location"] = nn_path # set the path to the pretrained NN file
+#
+if !by_output
+    namelist["relaxation_timescale_params"]["neural_microphysics_relaxation_network_pca_weights"] = randn(n_pca+1) # initialize the PCA weights to random values
+    namelist["relaxation_timescale_params"]["neural_microphysics_relaxation_network_pca_mean"] = pca_mean_vec # set the PCA mean to the mean of the training data
+    namelist["relaxation_timescale_params"]["neural_microphysics_relaxation_network_pca_components"] = pca_components # set the PCA components to the components we just calculated 
+    namelist["relaxation_timescale_params"]["neural_microphysics_relaxation_network_pca_explained_variance"] = pca_explained_variance # set the PCA explained variance to the explained variance we just calculated
+else
+    n_outputs = 4
+    namelist["relaxation_timescale_params"]["neural_microphysics_relaxation_network_pca_weights"] = randn(n_pca+n_outputs) # initialize the PCA weights to random values
+    namelist["relaxation_timescale_params"]["neural_microphysics_relaxation_network_pca_mean"] = [FT.(pca_mean_vec[i_o][:]) for i_o in 1:n_outputs] # set the PCA mean to the mean of the training data
+    namelist["relaxation_timescale_params"]["neural_microphysics_relaxation_network_pca_components"] = [FT.(pca_components[i_o]) for i_o in 1:n_outputs] # set the PCA components to the components we just calculated
+    namelist["relaxation_timescale_params"]["neural_microphysics_relaxation_network_pca_explained_variance"] = [FT.(pca_explained_variance[i_o]) for i_o in 1:n_outputs] # set the PCA explained variance to the explained variance we just calculated
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+i_checkpoint = 250 # let's trial starting from scratch
+# i_checkpoint = size(model_params_matrix, 2)-1 # last checkpoint
+model_params = model_params_matrix[:, i_checkpoint+1];
+model_params = CalibrateEDMF.FTNN.(model_params) # ensure model_params is of type FTNN
+
+# Plot Jacobian at checkpoint on its PCs 
+n_pca = 12;
+components, explained_variance, mean_vec = get_NN_pca_by_output(model_params, nn_pretrained_repr, input_train, truth_train; number_components=n_pca, reference_to_truth=false) # LinearAlgebra.svd() wants data to be samples × features, so we transpose the jacobian tensor
+
+
+jacobian_tensor = get_NN_jacobian_tensor(model_params, nn_pretrained_repr, input_train, truth_train; scale_gradients=false, number_samples=nothing, reference_to_truth=false)
+number_params, number_outputs, number_samples = size(jacobian_tensor)
+
+directions = similar(jacobian_tensor)
+for i_o in 1:number_outputs
+    for i_s in 1:number_samples
+        directions[:, i_o, i_s] = most_selective_direction(jacobian_tensor[:, :, i_s], i_o; ε=1e-6) # get the most selective direction for each output and sample
+    end
+end
+
+number_subsample = 100
+jacobian_tensor_subsample = jacobian_tensor[:, :, rand(1:size(input_train, 1), number_subsample)]
+directions_subsample = similar(jacobian_tensor_subsample)
+directions_subsample = most_selective_directions_all!(jacobian_tensor_subsample, directions_subsample; ε=1e-6) # compute all most selective directions
+
+jacobian_tensor_reshaped = reshape(jacobian_tensor, number_params, number_outputs * number_samples); # [ number_params, number_outputs * number_samples ]
+X = jacobian_tensor_reshaped'              # size (n_samples × n_features)
+Xc = X .- mean_vec'   
+
+# We want first two PCs as vectors of length d
+pc1 = components[:, 1]
+pc2 = components[:, 2]
+# Compute projection by dot product for each sample
+proj1 = Xc * pc1
+proj2 = Xc * pc2
+
+UnicodePlots.histogram(Float64.(vec(jacobian_tensor)); nbins=30, title="Jacobian", xlabel="∂output/∂input", width=80, xscale=:log10)
+UnicodePlots.scatterplot(proj1, proj2; title="Jacobian projection on first two PCA components", xlabel="PC1", ylabel="PC2", width=80, height=40, color=:blue)
+
+using LinearAlgebra: LinearAlgebra
+
+"""
+From the jacobian, get directions that are most selective for a given output (i.e. they wiggle that output but not the others).
+"""
+function most_selective_direction(J::AbstractMatrix, i_o::Integer; ε::Real = 1e-6)
+    n_params, n_outputs = size(J)
+
+    # A = ∇y_i_o * ∇y_i_oᵀ
+    g_target = J[:, i_o]
+    A = g_target * g_target'
+
+    # B = sum_{k ≠ i_o} ∇y_k * ∇y_kᵀ
+    B = zeros(LinearAlgebra.eltype(J), n_params, n_params)
+    for k in 1:n_outputs
+        if k != i_o
+            g_k = J[:, k]
+            B .+= g_k * g_k'
+        end
+    end
+
+    # Regularize B to ensure positive-definiteness
+    B .+= ε * LinearAlgebra.I(n_params)
+
+    # Solve generalized eigenproblem: A v = λ B v
+    F = LinearAlgebra.eigen(A, B; sortby = x -> -Base.real(x))
+
+    # Take top eigenvector and ensure it's real
+    v_complex = F.vectors[:, 1]
+    v_real = Base.real(v_complex)
+    v_real ./= LinearAlgebra.norm(v_real)
+
+    return v_real  # best direction to perturb p to target y[i_o]
+end
+
+
+
+
+
+
+most_selective_directions_vec, directions_scales_vec = get_NN_most_selective_direction_by_output(model_params, nn_pretrained_repr, input_train, truth_train; number_components=n_pca, reference_to_truth=false, number_samples=1000)
+
+for i_o in 1:n_outputs
+    most_selective_direction = most_selective_directions_vec[:, i_o]
+    direction_scale = directions_scales_vec[i_o]
+
+    # pick the ones with the largest scale so that we need the smallest perturbatoin (top 1)
+    valid = abs.(direction_scale) .> 1e-6
+
+
+    # calculate the perturbation that would change the output by 1 for each sample
+    perturbation = inv.(direction_scale)' .* most_selective_direction
+
+end
+
+
+
+function get_output_specific_directions(jacobian::AbstractMatrix)
+    # jacobian: m × n (outputs × parameters)
+    J = jacobian
+    m, n = size(J)
+    Jdagger = LinearAlgebra.pinv(J)  # n × m pseudoinverse
+
+    # each column of Jdagger is a direction that affects one output
+    # out_dirs[:, i] will perturb y_i
+    out_dirs = Jdagger  # shape n × m
+
+    return out_dirs  # return a matrix of directions
+end
+
+
+
+
+function mean_dropdims(A; dims)
+    dropdims(mean(A, dims=dims), dims=dims)
+end
+
+
+ d2 = get_output_specific_directions_all(jacobian_tensor_subsample)
+ d3 = mean_dropdims(d2; dims=3)
+ j3 = mean_dropdims(jacobian_tensor_subsample, dims=3)
+
+ julia> j3' * d3
+4×4 Matrix{Float32}:
+ 0.649128    0.0169583   0.023982    0.00271752
+ 0.0181839   0.642569   -0.0286066   0.0290403
+ 0.024434   -0.0284417   0.798948   -0.0111983
+ 0.005218    0.0290928  -0.0115154   0.640474
+
+
+ orig = nn_pretrained_repr(model_params)(input_train')
+
+ d_outputs = [ nn_pretrained_repr(model_params .+ d3[:, i_o])(input_train') - orig for i_o in 1:number_outputs ]
+
+
+d_output_slow_liq_fast_ice = nn_pretrained_repr(model_params .+ d3[:, 1] - d3[:, 2])(input_train') - orig
+
+
+dpTC = CalibrateEDMF.FTNN[0.0011324695008200513, 0.00015137592864365116, 0.003412153787001256, 3.412860104161873e-9, 3.3199529668276264e-9, -0.0012815203238317194, 0.00038780773962322263, -0.01227992370400438, 9.039969488015603e-5, -5.3510550748419837e-14, -0.010222234898918629, -0.013138729401776086, 0.0011604171519607699, -7.848077253935376e-17, 5.0609724434943454e-18, -0.001344284873078591, -0.0048579978545995215, 0.08504040736257545, -0.00990659774158131, 0.0, -0.009055583296696082, 0.0119442312379582, -0.0008967858573571202, 0.0, 0.0, -0.0019210861548907242, 0.011274267667874234, -0.025592998692831846, 0.08144945050023551, 0.0, -0.007075692063299383, 0.008405740231240537, -0.028481812736188373, 0.0, 0.0, 0.011110736048138042, -6.003348515770103e-5, 0.04095747417284165, -0.0087593872940562, 0.0, -0.0001695249635594634, 0.00025534868951029, -3.790388748280574e-5, 0.0, 0.0, 0.0002127234875725727, 0.00030626654855249685, -0.0003180556888184934, 0.0003768516882474726, 0.0, 0.0010490660543936202, 0.00022957833218168432, 0.002848258759086154, 0.0, 0.0, -0.0010661367319382913, 0.00036443149051347155, -0.011013144161639173, 4.272011594698465e-5, 0.0, -0.017186345773482405, 0.0, 0.0, -0.02439295277279549, 0.034864068551363384, 0.024309698603163316, 0.0, 0.01169299357309369, -0.06840275972790918, 0.0, 0.0, -0.01669031067442947, 0.0, -0.033059163995029305, 0.0, 0.0005614390216411461, -5.016657437411094e-5, 0.0, 0.0, -0.043220424797311446, 0.033697728068880314, 0.024936029969622735, 0.0, 0.005643978764690159, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -5.312627205304223e-5, 0.0, 0.0, -0.021425509484518032, 0.01571662800922835, 0.010262959044995431, 0.0, 0.0011762421850821975, -0.00019573841695822835, 0.0, 0.0, -0.01719167778113601, 0.0, 0.006032823064057485, 0.0, 0.0, -0.059297912549528556, 0.0, 0.0, 0.03404101254141886, 0.009688069198657404, -0.03338118759017687, 0.0, 0.00492951784435758, -0.017284549837362585, 0.0, 0.0, -0.04021665018015004, 0.03442186720309113, 0.028652255130302978, 0.0, 0.00986134272515531, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.009110554323159836, 0.0, 0.0, -0.01439230316125157, 0.004022657037402761, 0.003608008292229706, 0.0, 0.001227824750903261, -0.009098496700366304, -0.0265507510145796, -0.05551460096712866, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.008963896679859744, 0.003942915867123087, -0.06223486920242525, 0.0, 0.0005546395878952992, -0.0015488883097146868, 0.0, 0.0, 0.01418703982042213, -0.024814696775811444, -0.04127318016517974, 0.0, 0.0, 0.0, 0.0, 0.0, 0.014528306761281081, -0.059530888667488076, -0.0011558940696687068, 0.0, -0.000981497274426089, -0.01499145916375254, -0.01639351896547766, 0.0, -0.11066168881404029, -0.008595366913038338, 0.23915718836546926, -0.00644992892055643, 0.01755027254946651, -0.02670854486873301, -0.009267039919708947, -0.01305620455067314, -0.048811705337230664, -0.04246565087552222, 0.0056430937204810325, -0.03296566736044093, 0.0, 0.0, 0.0, 0.0, -0.017437686227188633, -0.008154178878510183, 0.016853862679165128, -0.006026260630553051]; 
+d_output_TC = nn_pretrained_repr(model_params .+ dpTC)(input_train') - orig
+
+dpTC =  [-0.0017004283665968593, -0.0014406994756718462, -0.0002872902528019108, 9.587793743476175e-9, 4.205215037230496e-9, 2.7600511773634325e-5, 0.00021161793527954683, -0.0010574966169708462, -0.0026582830951734186, 1.115490199017767e-15, 0.0032360584609440876, 0.013947727811004767, 8.949209439360729e-5, 0.0, 3.2578881653254155e-29, 3.6041958594844896e-5, -0.01343042796241738, -0.0017801280509432763, -0.017122705777155706, 0.0, 0.004081946588099207, -0.015548100897034215, 9.006946696198315e-5, 0.0, 0.0, 0.00011104493959082773, 0.00939682735315845, 0.004066736779557871, 0.04193251690366071, 0.0, 0.011769614056206213, -0.0009725872057138821, 0.0024185425724823108, 0.0, 0.0, -0.00025630519117374184, 0.0008346564259721022, 0.0022178915673021463, 0.012138546383984592, 0.0, -3.8725800226455235e-5, 0.00027725743235295605, -1.8463235836454883e-5, 0.0, 0.0, -3.147606785245048e-6, 0.00011871576830655263, -0.0002673848440392492, 0.0002520287176977843, 0.0, -0.0014554802519609424, -0.0013803852685741328, -0.0002418558358041888, 0.0, 0.0, 2.3079131130433572e-5, 0.0003002738014318458, -0.000857136005311281, -0.00212932184737289, 0.0, 0.0018854760844617107, 0.0, 0.0, -0.0021537702659904967, -0.0005551167063750864, -0.011053833998848163, 0.0, -0.007070227872565109, -0.00442779766515862, 0.0, 0.0, 0.011705918976334872, 0.0, -0.025213725029842468, 0.0, -3.636238275576216e-5, 4.97093815333463e-6, 0.0, 0.0, -0.0016698869078730558, -0.0005141065281001947, -0.006217339281724297, 0.0, -0.005488099921791892, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.164325023542558e-6, 0.0, 0.0, -0.000530068542085113, -0.0001853500925762233, -0.0022133723797715023, 0.0, -0.0019337061542085505, -0.012198324634469007, 0.0, 0.0, -0.0017418859176940426, 0.0, 0.004786980343304824, 0.0, 0.0, 0.012616370073912102, 0.0, 0.0, 0.013187020210201038, -0.00014100952823924568, -0.038047106655802417, 0.0, -0.00214684977131988, -0.02288166160373096, 0.0, 0.0, -0.010883289793343664, -0.0005452330228963401, -0.00298394827033788, 0.0, -0.006644840015651347, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.01151666872741329, 0.0, 0.0, -0.003134478466036682, -6.371006421882824e-5, 0.0012711249871055859, 0.0, -0.0007886568432065285, 0.019273230202504564, -0.014626802349558045, -0.04109622385301213, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.02652821317636668, 0.005475358632015844, -0.015143184555022685, 0.0, -0.0003894070700116292, 1.288920693802192e-6, 0.0, 0.0, -0.016893291456931425, -0.009082927535646431, -0.03330061826660695, 0.0, 0.0, 0.0, 0.0, 0.0, -0.013152582810889234, -4.687241397890031e-5, 2.7289043315902205e-5, 0.0, 0.006604053606923172, -0.0055956126470838195, -0.01414556519610297, 0.0, -0.009643748401729166, 0.0030086741293125253, 0.03703291861371496, 0.029337337260024816, 0.017512063555173086, -0.015328594053657017, 0.029970634937116762, 0.008489593447867335, -0.005112136432078395, -0.04821771490972812, 0.21435308885034268, -0.07204782766448276, 0.0, 0.0, 0.0, 0.0, -0.0016282073334949092, -0.008281506415682396, 0.043614639563601044, -0.01190038108340393]; 
+d_output_TC = nn_pretrained_repr(model_params .+ dpTC)(input_train') - orig
+
+
+function slope_for_output_i(p)
+    y_i = nn_pretrained_repr(p)(X)[:, i_o]  # shape [n_samples]
+    return X \ y_i  # shape [n_features]
+end
+
+
+function get_jacobian_of_best_fit_slopes(NN_params::AbstractVector{FTNN},
+                                         nn_pretrained_repr::Flux.Optimisers.Restructure,
+                                         input_train::AbstractMatrix{FTNN};
+                                         number_samples::Union{Int, Nothing} = nothing) where {FTNN}
+
+    number_params = length(NN_params)
+    number_outputs = size(nn_pretrained_repr(NN_params)(input_train), 2)
+
+    number_samples = isnothing(number_samples) ? size(input_train, 1) : number_samples
+    X = @view input_train[rand(1:end, number_samples), :]  # [number_samples, input_dim]
+
+    input_dim = size(X, 2)
+    slope_jacobian = zeros(FTNN, number_params, input_dim, number_outputs)
+
+    for i_o in 1:number_outputs
+        grad_slope = Flux.Zygote.gradient(NN_params) do p
+            y = nn_pretrained_repr(p)(X)[:, i_o]  # shape [number_samples]
+            slope = X \ y  # shape [input_dim]
+            return sum(abs2, slope)  # scalar function to differentiate
+        end
+
+        slope_jacobian[:, :, i_o] .= grad_slope[1]  # shape [number_params, input_dim]
+    end
+
+    return slope_jacobian  # shape [n_params, input_dim, n_outputs]
+end
+
+
+
+
+function print_as_python_list(arr)
+    print("[")
+    for i in 1:size(arr, 1)
+        print("[")
+        for j in 1:size(arr, 2)
+            print(arr[i, j])
+            if j < size(arr, 2)
+                print(", ")
+            end
+        end
+        print("]")
+        if i < size(arr, 1)
+            print(",\n")
+        end
+    end
+    println("]")
+end
+
+
+
+
+
+
+using ProgressMeter: ProgressMeter
+
+"""
+    most_selective_directions_all!(J::Array{FT,3}, out_dirs::Array{FT,3}; ε::Real=1e-6) where {FT <: Real}
+
+Compute the most selective perturbation directions for each output and sample of a neural network.
+
+# Arguments
+- `J::Array{FT,3}`: Jacobian tensor of shape `(n_params, n_outputs, n_samples)` representing the derivatives
+  of network outputs with respect to parameters for each sample.
+- `out_dirs::Array{FT,3}`: Preallocated output array of the same shape as `J` to store computed selective directions.
+- `ε::Real=1e-6`: Small regularization parameter added to denominator matrix to ensure numerical stability.
+
+# Returns
+- `out_dirs`: The same array as input, modified in-place to contain the most selective directions.
+
+# Description
+For each sample and each output index `i_o`, this function finds a direction vector `v` in parameter space
+that maximizes the squared directional derivative of output `i_o` relative to the sum of squared directional
+derivatives of all other outputs. Formally, it solves the generalized eigenvalue problem:
+
+```julia
+    max_v ( (g_i_o' * v)^2 ) / ( sum_{k != i_o} (g_k' * v)^2 + ε * ||v||^2 )
+"""
+"""
+    most_selective_directions_all!(J::Array{FT,3}, out_dirs::Array{FT,3}, out_scales::Array{FT,2}; ε::Real=1e-6) where {FT <: Real}
+
+Compute the most selective perturbation directions for each output and sample, along with their scaling factors.
+
+# Arguments
+- `J::Array{FT,3}`: Jacobian tensor `(n_params, n_outputs, n_samples)`.
+- `out_dirs::Array{FT,3}`: Preallocated output array for directions, same shape as `J`.
+- `out_scales::Array{FT,2}`: Preallocated output array `(n_outputs, n_samples)` for scaling factors.
+- `ε::Real=1e-6`: Regularization parameter.
+
+# Returns
+- `out_dirs`: Modified in-place with unit directions.
+- `out_scales`: Modified in-place with corresponding scaling factors \( g_{i_o}^T v \).
+
+# Interpretation
+- Each column `out_dirs[:, i_o, i_s]` gives a unit vector direction in parameter space that maximally influences output `i_o` for sample `i_s` while minimizing influence on other outputs.
+- The corresponding `out_scales[i_o, i_s]` is the scalar magnitude of the output change (`∂y[i_o]/∂p ⋅ v`), i.e., how strongly output `i_o` changes along this direction.
+- To perturb parameters and induce a desired change `Δy` in output `i_o` for sample `i_s`, perturb p by `Δp = (Δy / out_scales[i_o, i_s]) * out_dirs[:, i_o, i_s]`.
+
+i.e.
+
+The function also returns `out_scales`, where
+    out_scales[i_o, i_s] = || ∂y[i_o]/∂p ⋅ out_dirs[:, i_o, i_s] ||
+represents the magnitude of the output change per unit step along that direction.
+
+**Usage:**
+- To produce a desired output change `Δy` in output `i_o` for sample `i_s`, scale the unit direction vector by
+    ```julia
+    Δp = (Δy / out_scales[i_o, i_s]) * out_dirs[:, i_o, i_s]
+    ```
+- The vector `Δp` is the actual parameter perturbation to apply.
+
+
+# Description
+Finds for each sample and output the direction `v` maximizing selectivity and the expected directional derivative magnitude.
+"""
+function most_selective_directions_all!(J::Array{FT,3}, out_dirs::Array{FT,3}; ε::Real=1e-6) where {FT <: Real}
+    n_params, n_outputs, n_samples = size(J)
+
+    A = zeros(FT, n_params, n_params)
+    B = zeros(FT, n_params, n_params)
+
+    out_scales = zeros(FT, n_outputs, n_samples)
+
+    total_iters = n_samples * n_outputs
+    p = ProgressMeter.Progress(total_iters; desc = "Computing selective directions", showspeed = true)
+
+    for i_s in 1:n_samples
+        J_s = view(J, :, :, i_s)
+        for i_o in 1:n_outputs
+            fill!(A, 0.0)
+            fill!(B, 0.0)
+
+            g_target = view(J_s, :, i_o)
+            A .= g_target * g_target'
+
+            for k in 1:n_outputs
+                if k != i_o
+                    g_k = view(J_s, :, k)
+                    @inbounds B .+= g_k * g_k'
+                end
+            end
+
+            B .+= ε * LinearAlgebra.I(n_params)
+
+            F = LinearAlgebra.eigen(A, B; sortby = x -> -Base.real(x))
+            v_complex = F.vectors[:, 1]
+            v_real = Base.real(v_complex)
+            v_real ./= LinearAlgebra.norm(v_real)
+
+            @inbounds out_dirs[:, i_o, i_s] .= v_real
+
+            # Compute scaling factor (directional derivative magnitude for output i_o)
+            out_scales[i_o, i_s] = LinearAlgebra.dot(g_target, v_real)
+
+            ProgressMeter.next!(p)
+        end
+    end
+
+    return out_dirs, out_scales
+end
+
+
+
+
+function get_NN_most_selective_direction_by_output(NN_params::AbstractVector{FTNN}, nn_pretrained_repr::Flux.Optimisers.Restructure, input_train::AbstractMatrix{FTNN}, truth_train::AbstractMatrix{FTNN}; number_components::Union{Int, Nothing} = nothing, filter_threshold::FTNN = FTNN(0), scale_gradients::Bool = false, number_samples::Union{Int, Nothing} = nothing, reference_to_truth::Bool = true, tolerance::FTNN = FTNN(1e-6)) where {FTNN}
+    # Get the PCA components from the NN jacobian tensor
+    jacobian_tensor = get_NN_jacobian_tensor(NN_params, nn_pretrained_repr, input_train, truth_train; scale_gradients=scale_gradients, number_samples=number_samples, reference_to_truth=reference_to_truth) # get the jacobian tensor, which is [ number_params, number_outputs, number_samples ]
+
+    
+    # Get the PCA components and explained variance
+    # NN_pca_components_vec, explained_variance_vec, pca_mean_vec_vec = get_NN_pca_components_by_output(jacobian_tensor; number_components=number_components, filter_threshold=filter_threshold)
+
+    # get the most selective directions for each output and sample
+    most_selective_directions = similar(jacobian_tensor) # preallocate the output array
+    most_selective_directions, direction_scales = most_selective_directions_all!(jacobian_tensor, most_selective_directions; ε=tolerance) # compute the most selective directions for each
+
+
+    most_selective_directions_vec = [
+        most_selective_directions[:, i_o, :] for i_o in 1:size(most_selective_directions, 2)
+    ] # convert to a vector of matrices, one for each output
+
+    direction_scales_vec = [
+        direction_scales[i_o, :] for i_o in 1:size(direction_scales, 1)
+    ] # convert to a vector of vectors, one for each output
+    return most_selective_directions_vec, direction_scales_vec # return the most selective directions and their scales for each output
+end
+
+
+pca_components, pca_explained_variance, pca_mean_vec = get_output_specific_directions_by_output(model_params, nn_pretrained_repr, input_train, truth_train; number_components=n_pca, filter_threshold=CalibrateEDMF.FTNN(0), scale_gradients=false, reference_to_truth=false)
+σ_real = [sqrt.(pev) for pev in pca_explained_variance]
+n_pca_per_each = n_pca ÷ number_outputs # number of PCA components per output
+pca_weights = [randn(n_pca_per_each) for pca_components in pca_components] # random weights for the PCA components
+
+dps = [  pca_mean_vec[i_o] .+ sum((pca_weights[i_o] .* σ_real[i_o])' .* pca_components[i_o], dims=2) for i_o in 1:number_outputs ] # perturbations for each output, scaled by the PCA components and their standard deviations
+dp = sum(dps)[:]
+
+
+###############################################################
+import TurbulenceConvection as TC
+import CLIMAParameters as CP # use CLIMAParameters = "0.7, 0.8, 0.9, 0.10"
+import Thermodynamics.Parameters as TDP
+import TurbulenceConvection.Parameters as TCP
+import JSON
+import Revise: include, includet
+tc_dir = pkgdir(TC)
+CEDMF_dir = expanduser("~/Research_Schneider/CliMA/CalibrateEDMF.jl")
+includet(joinpath(tc_dir, "driver", "parameter_set.jl"))
+includet(joinpath(tc_dir, "driver", "NetCDFIO.jl"))
+includet(joinpath(tc_dir, "driver", "generate_namelist.jl"))
+# includet(joinpath(tc_dir, "src", "closures", "terminal_velocity.jl"))
+
+
+ACMP = TC.ACMP
+liq_type = TC.liq_type
+ice_type = TC.ice_type
+rain_type = TC.rain_type
+snow_type = TC.snow_type
+CMT = TC.CMT
+CMP = TC.CMP
+CM1 = TC.CM1
+resolve_nan = TC.resolve_nan
+
+
+include("/home/jbenjami/Research_Schneider/CliMA/TurbulenceConvection.jl/src/microphysics_coupling_helpers.jl")
+
+
+
+
+FT = Float64
+
+flight_number = 9
+forcing_str = "Obs"
+nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_ice
+dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
+method = "best_particle_final"
+case_name = "SOCRATES_RF" * string(flight_number, pad = 2) * "_" * lowercase(forcing_str) * "_data" # can't recall why it's lower here lol
+namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments","SOCRATES_"*string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "tau_autoconv_noneq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
+namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
+namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
+default_namelist = default_namelist = NameList.default_namelist(case_name)
+NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
+
+toml_dict = CP.create_toml_dict(FT; dict_type = "alias");
+aliases = string.(fieldnames(TDP.ThermodynamicsParameters));
+param_pairs = CP.get_parameter_values!(toml_dict, aliases, "Thermodynamics")
+thermo_params = TDP.ThermodynamicsParameters{FT}(; param_pairs...)
+param_set = create_parameter_set(namelist, toml_dict, FT);
+
+
+
+microphys_params = TCP.microphysics_params(param_set)
+ice_type = TC.ice_type
+S_ice_other = 1e-5
+qi = 1e-5 # ice mixing ratio in kg/kg
+qi_other = 1e-5
+# q_other = TD.PhasePartition{qi*5, qi, qi}
+q_thresh = 1e-5
+q_thresh_other = 1e-5
+T = 273.15 # temperature in Kelvin
+p = 100000.0 # pressure in Pa
+w = 0.1 # vertical velocity in m/s
+w_other = 0.01 # vertical velocity of other phase in m/s
+Ni = 100.0 # number concentration of ice in m^-3
+Ni_other = 100.0 # number concentration of other phase in m^-3
+Dmin = FT(0) # minimum diameter in m
+Dmax = 1e-4 # maximum diameter in m
+E = FT(1)
+r_ice_acnv_scaling_factor = 0.6 # scaling factor for ice autoconversion
+ice_acnv_power = 0.4
+
+
+S_qt_snow_ice_agg = cross_domain_self_collection_or_autoconversion(microphys_params, ice_type, ice_type, S_ice_other, qi, qi_other, q_thresh, q_thresh_other, T, p, w, w_other, Ni, Ni_other, Dmin, Dmax, Dmin, Dmax, E, r_ice_acnv_scaling_factor, r_ice_acnv_scaling_factor, ice_acnv_power)
+
+
+
+
+
+
+
+
+
+
+
+# sol = TD.RS.find_zero(
+#            residual,
+#            TD.RS.RegulaFalsiMethod(., 2.),
+#            TD.RS.VerboseSolution(),
+#            TD.RS.ResidualTolerance(q/10),
+#            maxiter
+#        )
+
+methods_to_try = (TD.RS.RegulaFalsiMethod, TD.RS.BrentsMethod, TD.RS.SecantMethod, TD.RS.BisectionMethod) # False is allegedly the fastest? Secant can converge out of bounds, Bisection is slow...
+for method in methods_to_try
+    # Use RootSolvers.jl to find λ [[ it's already loaded in Thermodynamics ]]
+    sol = TD.RS.find_zero(
+        residual,
+        method(λ_lower, λ_upper),
+        TD.RS.VerboseSolution(),
+        TD.RS.ResidualTolerance(tol * target),
+        maxiter
+    )
+    print(sol)
+end
+
+
+CMP = TC.CMP; #CMT = TC.CMT
+Thermodynamics = TC.TD; Thermodynamics.PhasePartition{FT}(qt, ql, qi) where FT = Thermodynamics.PhasePartition(FT(qt), FT(ql), FT(qi))
+area = 1.0; ρ = 0.7; p = 55118.314538419516; T = 273.2; w = -10.0; τ_liq = 2.22507385850719e-309; τ_ice = 100.0; q_vap = 0.0069504727062363; q = Thermodynamics.PhasePartition{Float64}(0.0069504728062363, 0.0, 1.0e-10); q_eq = Thermodynamics.PhasePartition{Float64}(0.0069504728062363, 0.006950203347513758, 0.006952896934739183); Δt = 0.010000000000000002; ts = Thermodynamics.PhaseNonEquil{Float64}(16534.388585636614, 0.7, Thermodynamics.PhasePartition{Float64}(0.0069504728062363, 0.0, 1.0e-10)); dqvdt = 0.0; dTdt = 0.0; dqsl_dT = 0.0004791120152533068; dqsi_dT = 0.00047929769759083086
+
+qi = q.ice
+μ = FT(0.0)
+lambda = TC.lambda
+n0 = TC.n0
+get_n0_lambda = TC.get_n0_lambda
+solve_n0_lambda_upper_truncated_gamma = TC.solve_n0_lambda_upper_truncated_gamma
+Γ_lower = TC.Γ_lower
+
+namelist = namelist_stash[end]
+namelist["microphysics"]["χm_ice"] = FT(1.0) # set χm_ice to 1.0
+param_set = create_parameter_set(namelist, toml_dict, FT);
+microphys_params = TCP.microphysics_params(param_set)
+prs = microphys_params
+q_type = TC.ice_type
+Dmax=FT(62.5e-6)
+# N = FT(1e-7)
+χm = TC.get_χm(param_set, q_type)
+me = TC.me(prs, q_type)
+Δm = TC.Δm(prs, q_type)
+m0 = TC.m0(prs, q_type)
+r0 = TC.r0(prs, q_type)
+c_mass = χm * m0 * r0^-(me + Δm) # c_mass is the constant in the truncated gamma distribution
+
+
+N = FT(10.)
+
+n0_solve, λ_solve = TC.get_n0_lambda(prs, q_type, qi, ρ, N, μ; Dmax=Dmax)
+n0_solve, λ_solve = TC.solve_n0_lambda_upper_truncated_gamma(prs, qi, q_type, N, Dmax, μ, me+Δm, ρ, c_mass)
+
+
+_n0, _λ = (n0(prs, qi, ρ, N, q_type; μ=μ, Dmax=FT(Inf)), lambda(prs, q_type, qi, ρ, N; μ=μ, Dmax=FT(Inf)))
+
+
+@info "n0_solve: $n0_solve; λ_solve: $λ_solve; _n0: $_n0; _λ: $_λ"
+
+TC.verify_truncated_gamma_fit(λ_solve, n0_solve, Dmax; μ=μ, me=(me+Δm), ρ=ρ, c_mass=c_mass)
+
+N_solve_int = TC.int_n_dr(prs, q_type, n0_solve, λ_solve, ρ, μ; Dmin=FT(0), Dmax=Dmax)
+q_solve_int = TC.int_nm_dr(prs, q_type, n0_solve, λ_solve, ρ, μ; Dmin=FT(0), Dmax=Dmax) / ρ
+
+
+N_int = TC.int_n_dr(prs, q_type, _n0, _λ, ρ, μ; Dmin=FT(0), Dmax=FT(Inf))
+q_int = TC.int_nm_dr(prs, q_type, _n0, _λ, ρ, μ; Dmin=FT(0), Dmax=FT(Inf)) / ρ
+
+
+
+N_solve_inf =  TC.int_n_dr(prs, q_type, n0_solve, λ_solve, ρ, μ; Dmin=FT(0), Dmax=Inf)
+q_solve_inf = TC.int_nm_dr(prs, q_type, n0_solve, λ_solve, ρ, μ; Dmin=FT(0), Dmax=Inf) / ρ
+
+target = qi * ρ / (N * c_mass) # this can get quite small unfortunately...
+function residual(λ; target=target)
+    # if λ <= FT(0)
+    #     return FT(NaN)
+    # end
+
+    # λ = 10^λ
+
+    x = λ * Dmax
+    num = Γ_lower(μ + me + 1, x)
+    den = Γ_lower(μ + 1, x)
+    if iszero(den)  # probably means very small x, just fall back to x = 0 [ so we can't divide by 0... what do we do?]
+
+        num_o_den = Dmax^(me) * (μ+1) / (μ + me + 1) # this is the limit of the ratio as x -> 0, so we can use it to avoid division by 0
+    elseif isnan(den)  # probably means very big x, just fall back to x = Inf |  use a fallback... at very large λ, just use infinity
+
+        num = CM1.SF.gamma(μ + me + 1)
+        den = CM1.SF.gamma(μ + 1)
+        num_o_den = num / den
+    else
+        num_o_den = num / den
+    end
+
+    λ_to_neg_me = λ^(-me)
+
+    if isinf(λ_to_neg_me)
+        return floatmax(FT)
+    else
+        return λ_to_neg_me * num_o_den / target - 1
+    end
+end
+
+
+λ_lower = FT(1) # lower bound is 0
+n0_upper = n0(prs, qi, ρ, N, q_type; μ=μ, Dmin=FT(0), Dmax=FT(Inf))
+λ_upper = lambda(prs, CMT.RainType(), qi, ρ, N; _n0=n0_upper, μ=μ, Dmin=FT(0), Dmax=FT(Inf)) # upper bound is the closed form solution for the full gamma distribution
+
+
+tol = 1e-8
+maxiter = 1000
+
+λ_upper *= 100
+
+
+# λ_lower, λ_upper = log10(λ_lower), log10(λ_upper)*4 # log scale for better convergence
+
+methods_to_try = (TD.RS.RegulaFalsiMethod, TD.RS.BrentsMethod, TD.RS.BisectionMethod, TD.RS.SecantMethod,) # False is allegedly the fastest? Secant can converge out of bounds, Bisection is slow...
+for method in methods_to_try
+    # Use RootSolvers.jl to find λ [[ it's already loaded in Thermodynamics ]]
+    sol = TD.RS.find_zero(
+        residual,
+        method(λ_lower, λ_upper),
+        TD.RS.VerboseSolution(),
+        TD.RS.ResidualTolerance(tol * target),
+        maxiter
+    )
+    print(sol)
+    if sol.converged
+        converged = true
+        λ_est = sol.root
+        x = λ_est * Dmax
+        I_μ = λ_est^(-μ - 1) * Γ_lower(μ + 1, x)
+        n₀ = N / I_μ
+        return n₀, λ_est # The main return!!!
+    end
+end
+
+FT = Float64
+χm = FT(1)
+m0 = FT(3.839e-12)
+r0 = FT(1e-5)
+me = FT(3)
+Δm = FT(0)
+c_mass = χm * m0 * r0^-(me+Δm)
+ρ = FT(1)
+q = FT(2.4e-6)
+N = FT(100.)
+rmax = FT(62.5e-6)
+μ = FT(0.1)
+λ, n₀ = truncated_gamma_solver(q, N, rmax; μ=μ, χ_m=χm, m₀=m0, r₀=r0, m_e=me, Δm=Δm)
+λ, n₀ = truncated_gamma_solver(q, N, rmax, c_mass; μ=μ)
+
+
+is_feasible, q_max = check_N_q_μ_feasibility(q, N, μ, c_mass, me; Dmax=rmax)
+if q_max < q
+    # verify failure
+
+    try
+        λ, n₀ = truncated_gamma_solver(q, N, ρ, rmax, c_mass; μ=μ)
+        @info "Solution sucess!"
+    catch e
+        @warn "Solution was uncusessful"
+
+    end
+
+    println()
+    
+    r_max_min = minimum_rmax_for_solution(q, N, μ, c_mass, me)
+    @info "r_max_min = $r_max_min"
+    is_feasible, new_q_max = check_N_q_μ_feasibility(q, N, μ, c_mass, me; Dmax=r_max_min)
+    @info "Feasibility at r_max_min = $r_max_min: is_feasible? $is_feasible; new_q_max: $new_q_max"
+
+    println()
+
+    try
+        # λ, n₀ = truncated_gamma_solver(q, N, ρ, r_max_min*1.000000000000001, c_mass; μ=μ, tol=1e-10)
+        λ, n₀ = truncated_gamma_solver(big(q), big(N), big(ρ), big(r_max_min)*big"1.00000001", big(c_mass); μ=big(μ), tol=big(1e-8), λ_lower=big(1e-2), λ_upper=big(1e5))
+
+        @info "updated solution success! λ = $λ, n₀ = $n₀"
+    catch e
+        # @warn e
+        raise(e)
+        @warn "updated solution still usucessfull"
+    end
+end
+
+
+
+
+
+
+
+ z = 1243.3; w_up = 0.0; w_en = -0.0; buoy = 1.7131473157302408; ρaw = 0.0; tends_ρaw = -0.0006998306979732146; 
+ entr_w = 1.4998078462777754e10; detr_w = 3.608805332529057e6; entr_rate_inv_s = 3.3302424069021072e-6;
+ detr_rate_inv_s = 0.0002778435262465931; advection = -0.0; nh_pressure = -0.002570479056909871; ρ_f = 1.1243489092998789; a_upf = 0.000971172428326762;
+
+    ρ_f *  a_upf * (entr_rate_inv_s * w_en - detr_rate_inv_s * w_up) +
+(ρ_f *  a_upf * buoy) +
+nh_pressure
+
+
+
+
+
+
+
+
+
+
+
+
+function lower_incomplete_gamma(a, x)
+    P, _ = CM1.SF.gamma_inc(a, x)
+    return P * CM1.SF.gamma(a)
+end
+
+
+
+"""
+    acnv_mass_fraction(mu, mean_r, r_is; verbose=false)
+
+Estimate the fraction of collision mass producing particles with radius above a threshold `r_is`,
+assuming the initial particle size distribution follows a gamma distribution:
+
+    n(r) ∝ r^μ * exp(-λ r)
+
+with shape parameter μ and scale parameter λ = (μ + 1) / mean_r.
+
+# Mathematical derivation:
+
+1. The radius distribution \( n(r) \) is gamma with parameters \( \alpha = \mu + 1 \), scale \( \beta = \frac{\text{mean}_r}{\alpha} \):
+
+   \[
+   n(r) = \frac{r^{\alpha - 1} e^{-r/\beta}}{\beta^\alpha \Gamma(\alpha)}
+   \]
+
+2. Collision output radius distribution is assumed to be governed by the volume \( v = r^3 \).
+
+3. Calculate the first and second moments of volume \( v \):
+
+   \[
+   E[v] = \mathbb{E}[r^3] = \beta^3 \frac{\Gamma(\alpha + 3)}{\Gamma(\alpha)}, \quad
+   E[v^2] = \mathbb{E}[r^6] = \beta^6 \frac{\Gamma(\alpha + 6)}{\Gamma(\alpha)}
+   \]
+
+   with variance:
+
+   \[
+   \mathrm{Var}[v] = E[v^2] - (E[v])^2
+   \]
+
+4. Fit a gamma distribution for \( v \) with shape \( k_v = \frac{E[v]^2}{\mathrm{Var}[v]} \) and scale \( \theta_v = \frac{\mathrm{Var}[v]}{E[v]} \).
+
+5. The fraction of collision mass with output radius greater than threshold \( r_{is} \) is the tail probability of volume \( v > v_{th} = r_{is}^3 \):
+
+   \[
+   F_{\text{acnv}} = \frac{\Gamma(2 k_v + 1, v_{th} / \theta_v)}{2 k_v \Gamma(2 k_v)}
+   \]
+
+where \( \Gamma(s,x) \) is the upper incomplete gamma function.
+
+# Arguments
+- `mu`: shape parameter of the initial radius gamma distribution.
+- `mean_r`: mean radius of the initial distribution (meters).
+- `r_is`: threshold radius (meters).
+- `verbose`: print intermediate variables if true.
+
+# Returns
+- Fraction of collision mass above threshold radius.
+
+# Notes
+- Approximates collision output volume distribution as gamma.
+- Accuracy decreases for very peaked distributions (large μ).
+"""
+
+
+function acnv_mass_fraction(mu, mean_r, r_is; verbose::Bool=false)
+    α = mu + 1
+    β = mean_r / α  # scale parameter for Gamma distribution of r
+
+    # Moments of r^3:
+    E_r3 = β^3 * CM1.SF.gamma(α + 3) / CM1.SF.gamma(α)
+    E_r6 = β^6 * CM1.SF.gamma(α + 6) / CM1.SF.gamma(α)
+    Var_r3 = E_r6 - E_r3^2
+
+    # Fit Gamma distribution to v = r^3
+    k_v = E_r3^2 / Var_r3
+    θ_v = Var_r3 / E_r3
+
+    v_thresh = r_is^3
+
+    # Numerator: upper incomplete gamma Γ(s,x) = CM1.SF.gamma(s,x)
+    numer = CM1.SF.gamma(2*k_v + 1, v_thresh / θ_v)
+    denom = 2 * k_v * CM1.SF.gamma(2*k_v)
+
+    F_acnv = numer / denom
+
+    if verbose
+        println("Input mean radius = $(mean_r) m")
+        println("Threshold radius = $(r_is) m")
+        println("Fitted Gamma params for v=r^3: k=$(k_v), θ=$(θ_v)")
+        println("Estimated mass fraction above threshold: $(F_acnv)")
+    end
+
+    return F_acnv
+end
+
+
+function acnv_mass_fraction(mu, mean_r, r_is; verbose::Bool=false)
+    λ = (mu + 1) / mean_r
+    a = mu + 4  # mass-weighted shape parameter
+    x = λ * r_is
+    return CM1.SF.gamma(a, x) / CM1.SF.gamma(a)
+end
+
+
+
+
+"""
+    mass_fraction_above_threshold_same_dist(α, λ, r_is)
+
+Compute mass fraction of particles with radius > r_is in the output distribution formed by collisions
+from Gamma(α, λ) distribution.
+
+Uses SF.gamma and SF.gamma(a,b) notation.
+"""
+function acnv_mass_fraction(mu, mean_r, r_is; verbose::Bool=false)
+    λ = (mu + 1) / mean_r
+    mean_x = CM1.SF.gamma(mu + 4) / (λ^3 * CM1.SF.gamma(mu + 1))
+    mean_x_sq = CM1.SF.gamma(mu + 7) / (λ^6 * CM1.SF.gamma(mu + 1))
+    var_x = mean_x_sq - mean_x^2
+
+    mean_sum = 2 * mean_x
+    var_sum = 2 * var_x
+
+    α_x = mean_sum^2 / var_sum
+    θ_x = var_sum / mean_sum
+
+    u_is = r_is^3 / θ_x
+
+    # mass fraction = Γ(α_x +1, u_is) / Γ(α_x +1)
+    mass_fraction = CM1.SF.gamma(α_x + 1, u_is) / CM1.SF.gamma(α_x + 1)
+
+    return mass_fraction
+end
+
+
+
+
+
+
+using UnicodePlots
+r_is = FT(62.5e-6)  # threshold radius in meters
+mus = [0, 1, 2, 3, 10, 50, 140]
+colors = [:red, :green, :blue, :magenta, :yellow, :cyan, :white]
+
+mean_r_values = range(1e-8, 1.1 * r_is; length=80)  # increased points for smoothness
+fixed_r_is = r_is
+
+plt = nothing
+for (i, mu) in enumerate(mus)
+    y_values = acnv_mass_fraction.(mu, mean_r_values, fixed_r_is; verbose=true)  # broadcast over mean_r
+    if plt === nothing
+        plt = UnicodePlots.lineplot(mean_r_values .* 1e6, y_values, color=colors[i], width=80, height=25)
+    else
+        UnicodePlots.lineplot!(plt, mean_r_values .* 1e6, y_values, color=colors[i])
+    end
+end
+
+# Add vertical line at r_is by plotting a short segment
+x_vert = [r_is, r_is] .* 1e6  # microns
+y_vert = [0.0, 1.0]  # full vertical range
+UnicodePlots.lineplot!(plt, x_vert, y_vert, color=:blue)
+
+# Add vertical guide lines every 10 μm from 10 to just beyond r_is
+x_min = first(mean_r_values) * 1e6
+x_max = last(mean_r_values) * 1e6
+for x in 10:10:ceil(Int, x_max)
+    UnicodePlots.lineplot!(plt, [x, x], [0.0, 1.0], color=:white)
+end
+
+
+UnicodePlots.xlabel!(plt, "Mean radius (μm)")
+UnicodePlots.ylabel!(plt, "Fraction of collision mass > threshold radius")
+UnicodePlots.title!(plt, "Mass fraction vs mean radius for different μ (threshold fixed)")
+
+println("Colors: Red=μ=0, Green=1, Blue=2, Magenta=3, Yellow=10, Cyan=11, White=12")
+
+
+
+
+
+
+
+
+
+
+
+
+using UnicodePlots
+using SpecialFunctions
+
+function gamma_pdf(r, mu, λ)
+    α = mu + 1
+    return (λ^α / gamma(α)) * r^(α - 1) * exp(-λ * r)
+end
+
+mean_r = 50e-6
+mus = [0, 1, 2, 3, 10, 11, 12]
+colors = [:red, :green, :blue, :magenta, :yellow, :cyan, :white]
+
+r_max = 2 * r_is
+n_points = 80
+r_values = range(0, r_max; length=n_points)[2:end]  # avoid zero
+
+plt = nothing
+
+for (i, mu) in enumerate(mus)
+    α = mu + 1
+    λ = α / mean_r
+    y_values = [gamma_pdf(r, mu, λ) for r in r_values]
+    if plt === nothing
+        plt = UnicodePlots.lineplot(r_values .* 1e6, y_values, color=colors[i], width=80, height=25)
+    else
+        UnicodePlots.lineplot!(plt, r_values .* 1e6, y_values, color=colors[i])
+    end
+end
+
+UnicodePlots.xlabel!(plt, "Radius r (μm)")
+UnicodePlots.ylabel!(plt, "Normalized PDF n(r)")
+UnicodePlots.title!(plt, "Gamma PDFs with fixed mean radius = $(mean_r*1e6) μm")
+
+println("Colors: Red=μ=0, Green=1, Blue=2, Magenta=3, Yellow=10, Cyan=11, White=12")
+
+
+
+
+
+
+
+
+
+r_is = FT(125.5e-6)  # threshold radius in meters
+N = 50
+q = 2.4e-9
+ρ = 1
+μ = 0.
+λ = (μ + 1) / r_is
+n_0 = N * λ
+
+
+q_predict = π * ρ * n_0 * (CM1.SF.gamma(μ + 4))/(6*λ^4)
+
+TC.particle_radius_from_mass(param_set, TC.ice_type, 1.0e-9)
+
+
+
+
+
+
+
+
+
+import TurbulenceConvection as TC
+FT = Float64
+CMP = TC.CMP; TCP = TC.Parameters; #CMT = TC.CMT
+Thermodynamics = TC.TD; TDP = TD.Parameters; Thermodynamics.PhasePartition{FT}(qt, ql, qi) where FT = Thermodynamics.PhasePartition(FT(qt), FT(ql), FT(qi))
+area = 1.0; ρ = 0.7; p = 55118.314538419516; T = 273.2; w = -10.0; τ_liq = 2.22507385850719e-309; τ_ice = 100.0; q_vap = 0.0069504727062363; q = Thermodynamics.PhasePartition{Float64}(0.0069504728062363, 0.0, 1.0e-10); q_eq = Thermodynamics.PhasePartition{Float64}(0.0069504728062363, 0.006950203347513758, 0.006952896934739183); Δt = 0.010000000000000002; ts = Thermodynamics.PhaseNonEquil{Float64}(16534.388585636614, 0.7, Thermodynamics.PhasePartition{Float64}(0.0069504728062363, 0.0, 1.0e-10)); dqvdt = 0.0; dTdt = 0.0; dqsl_dT = 0.0004791120152533068; dqsi_dT = 0.00047929769759083086
+
+qi = q.ice
+# μ = FT(0.0)
+ρ_a = ρ
+N = 10.
+lambda = TC.lambda
+n0 = TC.n0
+get_n0_lambda = TC.get_n0_lambda
+solve_n0_lambda_upper_truncated_gamma = TC.solve_n0_lambda_upper_truncated_gamma
+Γ_lower = TC.Γ_lower
+
+namelist = nothing
+try
+    namelist = namelist_stash[end]
+catch e
+    CEDMF_dir = expanduser("~/Research_Schneider/CliMA/CalibrateEDMF.jl")
+    flight_number = 9
+    forcing_str = "Obs"
+    nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_ice
+    dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
+    method = "best_particle_final"
+    case_name = "SOCRATES_RF" * string(flight_number, pad = 2) * "_" * lowercase(forcing_str) * "_data" # can't recall why it's lower here lol
+    namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments","SOCRATES_"*string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "tau_autoconv_noneq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
+    # namelist_path = "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES_postprocess_runs_storage/subexperiments/SOCRATES_geometric_liq__exponential_T_scaling_ice/Calibrate_and_Run/tau_autoconv_noneq/adapt_dt__dt_min_5.0__dt_max_10.0/iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean/postprocessing/output/Atlas_LES/RFAll_obs/best_particle_final/data/Output.SOCRATES_RF09_obs_data.1_1/namelist_SOCRATES.in"
+    # namelist_path = "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES_postprocess_runs_storage/subexperiments/SOCRATES_geometric_liq__exponential_T_scaling_ice/Calibrate_and_Run/tau_autoconv_noneq/adapt_dt__dt_min_5.0__dt_max_10.0/iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean/postprocessing/output/Atlas_LES/RFAll_obs/median_final_ensemble/data/Output.SOCRATES_RF09_obs_data.1_1/namelist_SOCRATES.in"
+    namelist_path = "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES_postprocess_runs_storage/subexperiments/SOCRATES_neural_network/Calibrate_and_Run/tau_autoconv_noneq/adapt_dt__dt_min_5.0__dt_max_10.0/iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean/postprocessing/output/Atlas_LES/RFAll_obs/median_final_ensemble/data/Output.SOCRATES_RF09_obs_data.1_1/namelist_SOCRATES.in"
+    # namelist_path = "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES_postprocess_runs_storage/subexperiments/SOCRATES_neural_network_pca_noise/Calibrate_and_Run/tau_autoconv_noneq/adapt_dt__dt_min_5.0__dt_max_10.0/iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean/postprocessing/output/Atlas_LES/RFAll_obs/median_final_ensemble/data/Output.SOCRATES_RF09_obs_data.1_1/namelist_SOCRATES.in"
+    namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
+    namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
+    default_namelist = NameList.default_namelist(case_name)
+    NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
+end
+
+toml_dict = CP.create_toml_dict(FT; dict_type = "alias");
+aliases = string.(fieldnames(TDP.ThermodynamicsParameters));
+param_pairs = CP.get_parameter_values!(toml_dict, aliases, "Thermodynamics")
+thermo_params = TDP.ThermodynamicsParameters{FT}(; param_pairs...)
+
+includet(joinpath(tc_dir, "driver", "generate_namelist.jl"))
+param_set = create_parameter_set(namelist, toml_dict, FT);
+microphys_params = TCP.microphysics_params(param_set)
+prs = microphys_params
+q_type = TC.ice_type
+Dmax=FT(Inf)
+
+
+q = Thermodynamics.PhasePartition{Float64}(0.0069504728062363, 0.0, 6.5e-7);
+N = 540.
+qi = q.ice
+μ = NaN
+if isnan(μ)
+    μ = TC.μ_from_qN(param_set, q_type, qi, N; ρ=ρ)
+end
+
+n0, λ = get_n0_lambda(microphys_params, q_type, qi, ρ_a, N, μ; Dmax=Dmax)
+q = TC.int_q(microphys_params, q_type, n0, λ, ρ_a, μ; Dmin=FT(0), Dmax=Dmax) # this is the q above the threshold [[ this too easily saturates massively, even at one part in 100 above threshold far from r_is, this can dwarf lower down in the profile where even 50 percent is above the thershold ]]
+
+ratio = 0.9
+λ_new = (1/ratio) * λ
+q_new = TC.int_q(microphys_params, q_type, n0, λ_new, ρ_a, μ; Dmin=FT(0), Dmax=Dmax) # this is the q above the threshold [[ this too easily saturates massively, even at one part in 100 above threshold far from r_is, this can dwarf lower down in the profile where even 50 percent is above the thershold ]]
+
+dq = q-q_new
+
+alt = (1 - (λ/λ_new)^3) * (q)
+
+
+
+using UnicodePlots
+
+ratios = range(0.1, 1.0; length=50)
+
+dq_vals = Float64[]
+alt_vals = Float64[]
+
+for ratio in ratios
+    λ_new = (1 / ratio) * λ
+    q_new = TC.int_q(microphys_params, q_type, n0, λ_new, ρ_a, μ; Dmin=FT(0), Dmax=Dmax)
+    push!(dq_vals, q - q_new)
+    push!(alt_vals, (1 - (λ / λ_new)^3) * q)
+end
+
+p = lineplot(ratios, dq_vals; title="dq & alt vs ratio", xlabel="ratio", ylabel="value", name="dq")
+lineplot!(p, ratios, alt_vals; name="alt")
+
+println(p)
+
+
+
+ q_test and integral q 2.8936688313556714e-8 and original q 4.256311618908995e-8 for inputs q_type = CloudMicrophysics.CommonTypes.IceType();
+n0 = 1.4889245252385503e7; λ = 37532.44902878219; ρ_a = 0.9933287419863045; μ = 0.05108447964237994
+q_new = TC.int_q(microphys_params, q_type, n0, λ, ρ_a, μ; Dmin=FT(0), Dmax=Dmax) # this is the q above the threshold [[ this too easily saturates massively, even at one part in 100 above threshold far from r_is, this can dwarf lower down in the profile where even 50 percent is above the thershold ]]
+
+
+
+
+rthresh = 9.253155207129871e-5; r = 0.00012770350242923315; λthresh = 17243.601195257943; λ =
+│ 12494.388576224896; rthresholdscalingfactor = 1.604679682435949; q = 6.00371021773595e-7; τ =
+└ 30.096968061234406; qthresh = 2.2839197334616585e-7; acnv_rate = 1.235935286473413e-8
+
+
+
+┌ Info: rthresh = 9.253155207129871e-5; r = 9.386137764648855e-5; λthresh = 15745.164992742988; λ =
+│ 15522.08790163323; rthresholdscalingfactor = 1.604679682435949; q = 2.552352881951245e-6; τ =
+│ 30.096968061234406; qthresh = 2.4453976267697496e-6; acnv_rate = 3.5536886959472914e-9; μ =
+└ 0.4569245543971874
+
+
+
+# ┌ Info: got auxen.ri_mean[k] = 3.137569664297961e-5 from inputs q = 2.1725531025630696e-7; N =
+# └ 1316.6706416011473; ρ = 1.0493900676833583
+
+
+┌ Info:
+rthresh = 9.253155207129871e-5;
+r = 9.358181704841535e-5;
+λthresh = 16134.776099554378;
+λ = 15953.696154908575;
+rthresholdscalingfactor = 1.604679682435949;
+q = 2.6292293542459284e-8;
+τ = 30.096968061234406;
+qthresh = 2.5416959234189484e-8;
+acnv_rate = 2.9083803607355778e-11;
+μ = 0.49297587481466176
+
+
+
+q_type = TC.ice_type
+r_min = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
+χm = TC.get_χm(param_set, q_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
+q_r_min = TC.particle_mass(microphys_params, q_type, r_min, χm)
+
+q = 2.1725531025630696e-7
+N = 1316.6706416011473
+ρ = 1.0493900676833583
+@info "(q, q + N*q_r_min) = ($(q), $(q + N*q_r_min))"
+
+TC.r_from_qN(param_set, q_type, q, N; monodisperse=false, ρ = 1.0493900676833583)
+
+
+# μ = TC.μ_from_qN(param_set, q_type, q, N; ρ=ρ)
+# n0, λ = TC.get_n0_lambda(microphys_params, q_type, ρ, N, FT(NaN); Dmin=0., Dmax=Inf)
+n0, λ = TC.get_n0_lambda(microphys_params, q_type, q, ρ, N, μ; Dmin=0., Dmax=Inf)
+r_new = (μ + 1) / λ
+
+
+TC.n0(prs, q, ρ, N, q_type; μ=μ)
+
+
+Warning: Dmin = 0.0; Dmax = Inf; q = 4.50424937661572e-8; N = 1284.1543195286076; μ = 0.033333237397988214; ρ = 1.0493900676833583
+└ @ TurbulenceConvection /home/jbenjami/Research_Schneider/CliMA/TurbulenceConvection.jl/src/microphysics_coupling_helpers.jl:350
+
+┌ Info: rthresh = 9.253155207129871e-5; r = 0.00010011850378720864; λthresh = 11167.360908436614; λ = 10321.101477846987; rthresholdscalingfactor = 1.604679682435949; q = 4.50424937661572e-8; τ =
+└ 30.096968061234406; qthresh = 3.5558948939445034e-8; acnv_rate = 3.150996740740537e-10; μ = 0.033333237397988214; N = 1284.1543195286076
+
+
+[ Info: got auxen.ri_mean[k] = 1.717804825821735e-5 from inputs q = 4.50424937661572e-8; N = 1284.1543195286076; ρ = 1.0493900676833583
+
+
+
+_n0 = isnan(N) ? TC.n0(prs, q, ρ, precip) : TC.n0(prs, q, ρ, q_type, N, μ; Dmin=0., Dmax=Dmax) # use wanted Nt If given
+
+
+_n0 = TC.n0(prs, q, ρ, q_type, N, μ; Dmin=FT(0), Dmax=FT(Inf)) # this is the n0 we want to use
+
+function my_terminal_velocity(
+    # prs::ACMP,
+    param_set::APS,
+    precip::CMT.SnowType,
+    velo_scheme::CMT.Chen2022Type,
+    ρ::FT,
+    q_::FT;
+    Dmin::FT = FT(0), # Default to 0, but in CloudMicrophysics.jl technically it's 62.5μm...
+    Dmax::FT = FT(Inf), # not really needed for snow? maybe a Dmin? but that wouldn't make a huge diff i dont think idk...
+    # Nt::Union{FT, Nothing} = nothing,
+    Nt::FT = NaN, # testing for type stability, use NaN instead of nothing
+    D_transition::FT = Inf, # .625mm is the transition from small to large ice crystals in Chen paper
+    μ::FT = FT(0), # μ is the exponent in the PSD, default to 0 for marshall palmer
+) where {FT <: Real}
+
+TC.my_terminal_velocity(param_set, TC.ice_type, TC.Chen2022Vel, ρ, q; Nt = N)
+
+Dmin=0.
+Dmax=Inf
+
+_λ = TC.lambda(param_set, TC.ice_type, q, ρ, N, Dmin, Dmax; μ = FT(NaN))
+
+TC.μ_from_qN(param_set, TC.ice_type, q, N; ρ=ρ)
+
+
+_n0 = TC.n0(prs, q, ρ, TC.snow_type) 
+
+_λ = TC.lambda(param_set, TC.snow_type, q, ρ, NaN, Dmin, Dmax; μ = FT(NaN))
+_r0 = TC.r0(prs, TC.snow_type)
+_m0 = TC.m0(prs, TC.snow_type)
+_me = TC.me(prs, TC.snow_type)
+_Δm = TC.Δm(prs, TC.snow_type)
+_χm = TC.χm(prs, TC.snow_type)
+
+
+χm = TC.get_χm(param_set,  TC.snow_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
+r_min = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
+TC.particle_mass(microphys_params, TC.snow_type, r_min, χm)
+
+
+new_N_i = TC.adjust_ice_N(param_set, N, q; ρ=ρ, ice_type = TC.ice_type, monodisperse = true) # use monodispere true, we don't have ρ anyway...
+r_i = TC.ri_from_qN(param_set, q, N; ice_type = TC.ice_type, monodisperse = true, Dmin=Dmin, Dmax=Dmax)
+r_new = TC.ri_from_qN(param_set, q, new_N_i; ice_type = TC.ice_type, monodisperse = true, Dmin=Dmin, Dmax=Dmax)
+
+
+
+
+using SpecialFunctions
+
+"""
+    evaporate_small_particles(μ, λ, n₀, q_remove;
+                               m_e=3, Δ_e=0,
+                               r₀=1e-5,
+                               χm=1.0,
+                               ρ_i=916.7,
+                               r_max_limit=125e-6)
+
+Given a gamma PSD `n(r) = n₀ r^μ exp(-λ r)` and particle mass
+`m(r) = χm * m₀ * (r/r₀)^(m_e + Δ_e)`, remove smallest particles
+until exactly `q_remove` total mass is removed.
+
+Defaults:
+- `m_e = 3`, `Δ_e = 0`
+- `r₀ = 1e-5` m (10 µm reference radius)
+- `χm = 1`
+- `ρ_i = 916.7` kg/m³ (ice density)
+- `m₀ = (4/3) * π * ρ_i * r₀^3`
+- `r_max_limit = 125e-6` m (125 µm maximum truncation)
+
+Returns `(r_max, N_new, N_ratio)` where:
+- `r_max` is the cutoff radius used
+- `N_new` is the number concentration after removal
+- `N_ratio` is `N_new / N_old`
+"""
+using SpecialFunctions
+using Logging
+using SpecialFunctions
+using Logging
+
+using SpecialFunctions
+using Logging
+
+using SpecialFunctions
+using Logging
+
+# We could use this but even 3 percent subsaturation on qt = 0.001 is enough to completely wipe out all q  (.03 * .001 = 3e-5 which is higher than any q_ice we've had.
+# so i think in subsaturated envs we should just quickly saturate to <r> = r_max
+function evaporate_small_particles(N_total, q_tot, μ, q_remove;
+                                   m_e=3.0, Δ_e=0.0, r₀=1e-5, χ_m=1.0, ρ_i=916.7,
+                                   r_max_limit=125e-6)
+
+    # Exponents
+    α_number = μ + 1
+    α_mass   = μ + m_e + Δ_e + 1
+
+    # Single-particle mass at reference radius
+    m₀ = 4/3 * π * ρ_i * r₀^3
+    @info "Single-particle mass m₀" m₀
+
+    # Step 1: solve for λ from N_total and q_tot
+    λ = ((N_total * χ_m * m₀ * gamma(α_mass)) / (q_tot * gamma(α_number)))^(1 / (α_mass - α_number))
+    @info "Computed λ" λ
+
+    # Step 2: solve for normalization n₀
+    n₀ = N_total / (λ^(-α_number) * gamma(α_number))
+    @info "Computed n₀" n₀
+
+    # Step 3: total mass of distribution
+    M_tot = n₀ * χ_m * m₀ * λ^(-α_mass) * gamma(α_mass)
+    @info "Total mass M_tot" M_tot
+
+    # Assert that M_tot matches q_tot
+    @assert isapprox(M_tot, q_tot; rtol=1e-12) "Internal M_tot != q_tot! Check calculations."
+
+    # Step 4: fraction of mass to remove
+    p_mass = q_remove / M_tot
+    @info "Mass fraction to remove p_mass" p_mass
+
+    # Over-evaporation / no removal checks
+    if p_mass >= 1.0
+        @info "Over-evaporation: returning zeros"
+        return r_max_limit, 0.0, 0.0
+    elseif p_mass <= 0.0
+        @info "No removal: returning original N"
+        return 0.0, N_total, 1.0
+    end
+
+    # Step 5: Invert gamma_inc to get r_max
+    x = gamma_inc_inv(α_mass, p_mass, 1.0 - p_mass)  # P(a,x)=p_mass
+    r_max = x / λ
+    r_max = min(r_max, r_max_limit)
+    @info "r_max after limit" r_max
+
+    # Step 6: Compute new number of particles after removal
+    _, Q_number = gamma_inc(α_number, λ * r_max)  # upper fraction
+    N_new = n₀ * Q_number
+    N_ratio = N_new / N_total
+    @info "N_new, N_ratio" N_new N_ratio
+
+    return r_max, N_new, N_ratio
+end
+
+
+
+
+using Test
+using SpecialFunctions
+
+@testset "evaporate_small_particles" begin
+    N_tot = 100
+    μ     = 0.0
+    m_e   = 3.0
+    Δ_e   = 0.0
+    r₀    = 1e-5
+    χ_m   = 1.0
+    ρ_i   = 916.7
+    q_tot = 1e-6
+    M_tot = q_tot
+
+    # Precompute particle mass and α_mass
+    m₀ = 4/3 * π * ρ_i * r₀^3
+    α_mass = μ + m_e + Δ_e + 1
+
+    # Solve for λ to match total mass
+    prefactor = N_tot * χ_m * m₀ * r₀^(-(m_e + Δ_e)) * gamma(α_mass)
+    λ = (prefactor / q_tot)^(1 / α_mass)
+        
+
+    # 1. No removal case
+    r_max, N_new, N_ratio = evaporate_small_particles(N_tot, q_tot, μ, 0.0)
+    @test isapprox(r_max, 0.0; atol=1e-12)
+    N_old = n₀ * λ^(-(μ+1)) * gamma(μ+1)
+    @test isapprox(N_new, N_old; rtol=1e-12)
+    @test isapprox(N_ratio, 1.0; atol=1e-12)
+
+    # 2. Full removal case
+    r_max, N_new, N_ratio = evaporate_small_particles(N_tot, q_tot, μ, M_tot * 2)
+    @test r_max <= 125e-6
+    @test N_new == 0.0
+    @test N_ratio == 0.0
+
+    # 3. Partial removal
+    q_remove_partial = 0.25 * M_tot
+    r_max, N_new, N_ratio = evaporate_small_particles(N_tot, q_tot, μ, q_remove_partial)
+    @test 0.0 < r_max <= 125e-6
+    @test 0.0 < N_new < N_old
+    @test 0.0 < N_ratio < 1.0
+
+   # Check mass fraction removed if r_max < limit
+    if r_max < 125e-6
+        removed_mass_frac = gamma_inc(s_mass, λ*r_max)[1]
+        @test isapprox(removed_mass_frac, q_remove_partial / M_tot; rtol=1e-6)
+    else
+        # We expect r_max to hit the limit, removed mass ≤ requested
+        @test r_max == 125e-6
+        removed_mass_frac = gamma_inc(s_mass, λ*r_max)[1]
+        @test removed_mass_frac <= q_remove_partial / M_tot
+    end
+end
+
+
+
+
+
+
+# ======================================================================================================================================================== #
+# ======================================================================================================================================================== #
+
+    # T_top = get_T_top_from_N_i(param_set, relaxation_timescale, q_i; ρ = ρ, ice_type = ice_type) # this is the temperature at the top of the cloud, if we have it
+    # N_INP_top = isnan(T_top) ? get_N_i_raw(param_set, relaxation_timescale, q_i, T_top, ρ, w) : FT(NaN)
+    # f = N_i / N_INP_top
+
+    # While N_i might inform INP totals, the true N will be based on taking those and transferring into a new N...
+
+    # if q is growing out of line, we need a way to stop it... we cannot just diagnose N from q.
+    # So, we will keep out N_i fixed, and let <r> vary as it may... We can't really know T_top because we'd be backing it out of q.
+    # If we get it from the model, it still doesn't tell us too much...
+    # We know there's some cloud top temperature and things start there, so we know what should upper bound q...
+    # If N is too small for q, it'll just have to acnv.
+
+    # However, we're still just setting N(T) when we know it's q dependent.
+
+    # Basically we should just never allow N to pass N_i(T)... but that's too harsh and it does happen via sedimentation. but it should certainly not pass N_INP_top...
+
+    # the r factor assumes fixed q, once q starts to come down, so will N_INP_top and <r> will shrink again towards r_is i think? idk.
+
+    # r = r_is * (N_i / N_INP_top)^1/3 # e.g. so N from 800 to 100 will double <r>... N goes exponential so r goes more smoothly...
+
+    # really we just want to clamp N between N_acnv and N_thresh... if we're just leaving N_i = N_i
+    # However, maybe it's fair to assume that N's decrease with T through sed is slower than just raw INP i think? (i think it's equal then faster at the very end...)
+    # we want it to go fast at the beginning and then slow down
+
+# ------------------------------------------------------------------------------------------ #
+
+    # Pure linear interpolation from N_i at S = 0 to N_thresh at S = -0.2
+    # N_i = N_i + (N_i - N_thresh)/(0 - -0.2) * (S)
+    # N_i = N_i + (N_i - N_thresh)/(0 - -0.2) * clamp(S, -0.2, 0) # let's clamp to only hit N_thresh
+
+    # return N_i # seems sub-ideal but idk.. above the cloud this keeps the INP count right, below the cloud it's prolly less right idk.
+
+    #=
+        If N_i >> N_thresh (which can happen quickly w/ exponential growth), then moving from the minimum S can quickly explode N and r explodes as you approach S = -0.2...
+        We want <r> to always be more graciously distributed..., so we will distribute <r> with S, and then back out N. This is important for maintaining good rates, jumps in <r> impact timecales and sedimentation more.
+        
+        E.g. if N_thresh = .005, but N_i grew to say even 5, then going from S = -0.2 to S=-0.19 means moving from N=eps(FT) to N=5/(.01/.2) = .25, a 50x incrase, which implies a cbrt(50) = 3.68x increase in <r>... which is a lot, and can cause issues with sedimentation and growth rates.
+        It would have been much smoother for us to vary <r> directly, and go only .01/.2 of the way from r_thresh to r_i, which is much smaller since r explodes as N (N_thresh) got very small...
+
+        w/ a 5/.005 =  1000x fold growth in N, that's a cbrt(1000) = 10x growth in <r>, so that implies that .01/.2 * 10 = 0.5 times increase in <r> rather than 3.5, which is much more manageable.
+    =#
+
+    # we really shouldn't be assuming huge <r> for very small q... so something like 5e-7 ok, gets boosted up, but something like 5e-8 maybe doesnt?
+    # really we should only be boosting the <r> that came before it.... The
+
+# ------------------------------------------------------------------------------------------ #
+
+
+    # calculate r...
+    # r_i = ri_from_qN(param_set, q_i, N_i; ice_type = ice_type, monodisperse = false, μ=μ, ρ=ρ) # this is the radius of the ice crystal at the current N_i
+
+    # # we want to interpolate from r_i to r_thresh, r_thresh at S = -0.2, r_i at S = 0
+    # # r_i = r_i + (r_i - r_thresh)/(FT(0) - FT(-0.2)) * clamp(S, FT(-0.2), FT(0)) # let's clamp to only hit r_thresh
+    # r_i = r_i + (r_i - r_thresh)/(FT(0) - FT(-0.05)) * clamp(S, FT(-0.05), FT(0)) # let's clamp to only hit r_thresh
+    # # now to back out N
+    # λ = (μ + 1) / r_i
+    # N_i = (q_i * ρ) / (_χm * _m0 * _r0^(-(_me + _Δm)) * (CM1.SF.gamma(μ + _me + _Δm + FT(1)) / CM1.SF.gamma(μ + FT(1))) * λ^(-(_me + _Δm))) # this is the number concentration of ice crystals at the ice-snow radius
+
+# ------------------------------------------------------------------------------------------ #
+
+
+    # supersaturation boost factor [[ need to figure out how to pass supersat into here... ]]
+    # for testing, we'll aim for f_S = 2 at S = -0.33, and we want linear. so β = 1, α = 3 [[ this was for radius... N factor goes as 1/r³? maybe? hard to say because of the gamma distribtuion... ]]
+    # H = max(0, -S)
+    # α = FT(2) # this is a placeholder, you should set α based on your model
+    # β = FT(1)
+    # f_S = 1 + α*H^β
+    # f_N = f_S^-3
+
+    # This is too weak and too unreliable, we need something that asymptotes up very quickly so we'll just assume by default we're past r_thresh.
+
+    # since this is in μ space, we need to adjust.... if f_S is 1, i.e.
+    # <r> f_S = f_S (μ+1)/λ  = (μ_new + 1) / λ
+    # so, if  μ_new = f_μ * μ, then: f_μ*μ + 1 = f_S (μ + 1) → f_μ = (f_S (μ + 1) - 1) / μ
+    # this is undefined if μ = 0, so maybe we wanna avoid actually calculating f_μ and just spit out the new: μ_new = f_S(μ+1)
+
+# ------------------------------------------------------------------------------------------ #
+# ------------------------------------------------------------------------------------------ #
+# ------------------------------------------------------------------------------------------ #
+# ------------------------------------------------------------------------------------------ #
+
+# ======================================================================================================================================================== #
+# ======================================================================================================================================================== #
+
+
+
+
+
+
+function my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep_old(
+    param_set::APS,
+    qi_tendency_sub_dep::FT,
+    q::FT,
+    N::FT,
+    ρ_a::FT;
+    Dmax::FT = FT(Inf),
+    μ::FT = FT(NaN)
+) where {FT}
+
+    # condensed mass per unit volume
+
+    acnv_rate = FT(0)
+
+    if (q > FT(0)) && (qi_tendency_sub_dep > FT(0))
+        microphys_params = TCP.microphysics_params(param_set)
+        if isnan(μ)
+            μ = TC.μ_from_qN(param_set, TC.ice_type, q, N; ρ=ρ_a)
+        end
+
+        # get the number distribution parameters
+        n0, λ = TC.get_n0_lambda(microphys_params, TC.ice_type, q, ρ_a, N, μ; Dmax=Dmax)
+
+        
+        _r0 = TC.r0(microphys_params, TC.ice_type)
+        _m0 = TC.m0(microphys_params, TC.ice_type)
+        _me = TC.me(microphys_params, TC.ice_type)
+        _Δm = TC.Δm(microphys_params, TC.ice_type)
+        _χm = TC.χm(microphys_params, TC.ice_type)
+
+        r_is = TC.CMP.r_ice_snow(microphys_params)
+
+        # particle mass at threshold
+        m_r_is = _χm * _m0 * (r_is/_r0)^(_me + _Δm)
+
+        # number at threshold
+        n_r_is = n0 * r_is^μ * exp(-λ*r_is)
+
+        # total condensed mass per volume
+        M_cond = q * ρ_a
+
+        # crossing flux
+        acnv_rate = qi_tendency_sub_dep * (n_r_is * m_r_is * r_is) / M_cond
+    end
+
+    return acnv_rate
+end
+
+
+
+function my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep(
+    param_set::APS,
+    qi_tendency_sub_dep::FT,
+    q::FT,
+    N::FT,
+    ρ_a::FT;
+    Dmax::FT = FT(Inf),
+    μ::FT = FT(NaN)
+) where {FT}
+
+    acnv_rate = zero(FT)
+
+    if (q > zero(FT)) && (qi_tendency_sub_dep > zero(FT))
+
+        microphys_params = TCP.microphysics_params(param_set)
+
+        # shape parameter
+        if isnan(μ)
+            μ = TC.μ_from_qN(param_set, TC.ice_type, q, N; ρ=ρ_a)
+        end
+
+        # get gamma distribution parameters
+        _, λ = TC.get_n0_lambda(microphys_params, TC.ice_type, q, ρ_a, N, μ; Dmax=Dmax)
+
+        # mass–radius law parameters
+        _me = TC.me(microphys_params, TC.ice_type)
+        _Δm = TC.Δm(microphys_params, TC.ice_type)
+        p = _me + _Δm
+
+        # threshold radius
+        r_is = TC.CMP.r_ice_snow(microphys_params)
+        ξ = λ * r_is
+
+        # closed-form crossing fraction
+        frac_cross = (one(FT) / p) * (ξ^(μ + 2) * exp(-ξ)) / TC.CM1.SF.gamma(μ + 2)
+
+        # crossing tendency
+        acnv_rate = qi_tendency_sub_dep * frac_cross
+    end
+
+    return acnv_rate
+end
+
+
+qi_tendency_sub_dep = 1.; qi =  1e-6; N = 1000.; ρ_a = 1.;
+# qi_tendency_sub_dep = 1.; qi =  1e-7; N = 50.; ρ_a = 1.;
+# qi_tendency_sub_dep = 1.; qi =  1e-8; N = 100.; ρ_a = 1.;
+# qi_tendency_sub_dep = 1.; qi =  1e-9; N = 11.; ρ_a = 0.5;
+@info "old = $(my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep_old(param_set, qi_tendency_sub_dep, qi, N, ρ_a)); new = $(my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep(param_set, qi_tendency_sub_dep, qi, N, ρ_a)); frac_above = $(TC.get_process_threshold_fraction(param_set, TC.ice_type, qi, N, ρ_a,  TC.CMP.r_ice_snow(microphys_params)))"

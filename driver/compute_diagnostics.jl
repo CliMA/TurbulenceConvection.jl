@@ -165,18 +165,19 @@ function compute_diagnostics!(
     @inbounds for k in TC.real_center_indices(grid)
         @inbounds for i in 1:N_up
             aux_up[i].s[k] = if aux_up[i].area[k] > 0.0
-                thermo_args = if edmf.moisture_model isa TC.EquilibriumMoisture
-                    ()
-                elseif edmf.moisture_model isa TC.NonEquilibriumMoisture
-                    (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
-                end
-                ts_up = TC.thermo_state_pθq(
-                    param_set,
-                    p_c[k],
-                    aux_up[i].θ_liq_ice[k],
-                    aux_up[i].q_tot[k],
-                    thermo_args...,
-                )
+                # thermo_args = if edmf.moisture_model isa TC.EquilibriumMoisture
+                #     ()
+                # elseif edmf.moisture_model isa TC.NonEquilibriumMoisture
+                #     (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
+                # end
+                # ts_up = TC.thermo_state_pθq(
+                #     param_set,
+                #     p_c[k],
+                #     aux_up[i].θ_liq_ice[k],
+                #     aux_up[i].q_tot[k],
+                #     thermo_args...,
+                # )
+                ts_up = aux_up[i].ts[k]
                 TD.specific_entropy(thermo_params, ts_up)
             else
                 FT(0)

@@ -754,6 +754,35 @@ function SOCRATES(namelist_defaults; case_name = "SOCRATES_RFXX_XXX_data")
 end
 
 
+"""
+Coerces the types of the values in `namelist` to match those in `default_namelist`.
+This is useful when reading from a JLD2 file or a namelist.in file to ensure the types are correct
+"""
+function convert_namelist_types_to_default!(namelist, default_namelist)
+    for (key, value) in namelist
+        if haskey(default_namelist, key)
+            if isa(value, Dict) && isa(default_namelist[key], Dict)
+                convert_namelist_types_to_default!(namelist[key], default_namelist[key])
+            else
+                try
+                    namelist[key] = convert(typeof(default_namelist[key]), value)
+                catch 
+                    default_type = typeof(default_namelist[key])
+                    # @info "default_type: $default_type"
+                    if default_type <: Tuple
+                        namelist[key] = Tuple(value)
+                    elseif default_type <: SA.SVector
+                        namelist[key] = SA.SVector(value...)
+                    else
+                        @warn("Couldn't convert $key => $value to $(typeof(default_namelist[key]))")
+                    end
+                end
+            end
+        end
+    end
+end
+
+
 
 function write_file(namelist, root::String = ".")
     mkpath(root)

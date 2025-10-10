@@ -54,8 +54,18 @@ function create_parameter_set(
     c_acnv_KK2000 = TC.parse_namelist(namelist, "microphysics", "c_acnv_KK2000"; default = -1.47)
     pow_icenuc = TC.parse_namelist(namelist, "microphysics", "pow_icenuc"; default = 1e7) # I think this has to be here to overwrite toml..., and to place it so we can overwrite_namelist it .. picked high value initially to keep ramp but maybe should keep original default... https://github.com/CliMA/CLIMAParameters.jl/blob/2f298661d527c1b9a11188ee2abc92ba4ba0c5ec/src/parameters.toml#L558
     r_ice_snow = TC.parse_namelist(namelist, "microphysics", "r_ice_snow"; default = 62.5e-6) # allow changing this in the namelist/param_set/microphys_params instead of user_params (probably not ideal if you used a 2-moment or something where this mattered more but ...)
+    #
+    χm_ice = TC.parse_namelist(namelist, "microphysics", "χm_ice"; default = 1.0)
+    #
+    ν_sno = TC.parse_namelist(namelist, "microphysics", "ν_sno"; default = 0.63)
+    μ_sno = TC.parse_namelist(namelist, "microphysics", "μ_sno"; default = 4.36e9)
+    me_sno = TC.parse_namelist(namelist, "microphysics", "me_sno"; default = 2.0)
+    χm_sno = TC.parse_namelist(namelist, "microphysics", "χm_sno"; default = 1.0)
+    #
+    χv_rai = TC.parse_namelist(namelist, "microphysics", "χv_rai"; default = 1.0)
+    χv_sno = TC.parse_namelist(namelist, "microphysics", "χv_sno"; default = 1.0)
 
-    # Override the default files in the toml file
+    # Override the default files in the toml file with the values from the namelist -- [[ i think it's plain language name name, alias = code_name ]]
     open(override_file, "w") do io
         println(io, "[mean_sea_level_pressure]")
         println(io, "alias = \"MSLP\"")
@@ -153,6 +163,34 @@ function create_parameter_set(
         println(io, "alias = \"r_ice_snow\"")
         println(io, "value = " * string(r_ice_snow))
         println(io, "type = \"float\"")
+        println(io, "[cloud_ice_mass_size_relation_coefficient_chim]") # see https://github.com/CliMA/ClimaParams.jl/blob/70c847bd01a2963a1bbddbfc283bbcdc306888d3/src/parameters.toml#L754C2-L754C47
+        println(io, "alias = \"χm_ice\"") 
+        println(io, "value = " * string(χm_ice))
+        println(io, "type = \"float\"")
+        println(io, "[snow_flake_size_distribution_coefficient_nu]") # ν_sno
+        println(io, "alias = \"ν_sno\"")
+        println(io, "value = " * string(ν_sno))
+        println(io, "type = \"float\"")
+        println(io, "[snow_flake_size_distribution_coefficient_mu]") # μ_sno prefactor
+        println(io, "alias = \"μ_sno\"")
+        println(io, "value = " * string(μ_sno))
+        println(io, "type = \"float\"")
+        println(io, "[snow_mass_size_relation_coefficient_me]")
+        println(io, "alias = \"me_sno\"")
+        println(io, "value = " * string(me_sno))
+        println(io, "type = \"float\"")
+        println(io, "[snow_mass_size_relation_coefficient_chim]") # χm_sno
+        println(io, "alias = \"χm_sno\"")
+        println(io, "value = " * string(χm_sno))
+        println(io, "type = \"float\"")
+        println(io, "[rain_terminal_velocity_size_relation_coefficient_chiv]") # χv_rai
+        println(io, "alias = \"χv_rai\"")
+        println(io, "value = " * string(χv_rai))
+        println(io, "type = \"float\"")
+        println(io, "[snow_terminal_velocity_size_relation_coefficient_chiv]") # χv_sno
+        println(io, "alias = \"χv_sno\"")
+        println(io, "value = " * string(χv_sno))
+        println(io, "type = \"float\"")
     end
 
     toml_dict = CP.create_toml_dict(FT; override_file, dict_type="alias")
@@ -218,31 +256,84 @@ function create_parameter_set(
 
 
 
-    namelist["user_args"] = get(namelist,"user_args", (;)) # handle if empty so we don't have to add to namelist defaults
-    user_args = namelist["user_args"] # Let this be a NamedTuple
-    user_args = leaves_to_tuples(user_args) # convert any leaves that are Arrays to tuples to preserve isbits
-    user_args = leaves_to_Vals(user_args) # convert leaves that are strings or symbols into Vals to preserve isbits
-    user_args = namedtuple_fromdict(user_args) # convert dict to NamedTuple to preserve isbits
+    namelist_user_args = get!(namelist, "user_args", Dict()) # handle if empty so we don't have to add to namelist defaults
+    namelist_user_params = get!(namelist, "user_params", Dict())  # handle if empty so we don't have to add to namelist defaults, put in nameslist so it'll be there for storage
+    
+    # relaxation_timescale_params = get(namelist, "relaxation_timescale_params", Dict()) # handle if empty so we don't have to add to namelist defaults
+    # merge relaxation_timescale_params into user_params (in the future we could handle separately , but this is backwards compatible)
+    # the relaxation_timescale_params go into relaxation_timescale_types so they shouldn't actually need to be stored but oh well
+    # user_params = merge(user_params, relaxation_timescale_params) # it's no longer just a reference into namelist, so be careful
+    # namelist["user_params"] = user_params # put it back into namelist so we can use it later
 
-    namelist["user_params"] = get(namelist, "user_params", Dict()) # handle if empty so we don't have to add to namelist defaults, put in nameslist so it'll be there for storage
-    user_params = namelist["user_params"]
+
+    # honestly now that we are creating object types w/ the relaxation params, we really don't need them to be stored in user_params in the param_set, maybe we should move them all to like namelist["relaxation_timescale_parms"] or something ...
+   
+
     # user_params = get(namelist, "user_params", Dict())
     # overwrites, but this is all local so no need for TOML
-    user_params["particle_min_radius"] =  TC.parse_namelist(namelist, "user_params", "particle_min_radius"; default = 0.2e-6) # this is set no matter what
+    namelist_user_params["particle_min_radius"] =  TC.parse_namelist(namelist, "user_params", "particle_min_radius"; default = 0.2e-6) # this is set no matter what
+    # namelist_user_params["r_liq_rain"] =  TC.parse_namelist(namelist, "user_params", "r_liq_rain"; default = 100e-6) # this is set no matter what [ We take the default form the cutoff for raindrop in Chen]
+    namelist_user_params["r_liq_rain"] =  TC.parse_namelist(namelist, "user_params", "r_liq_rain"; default = 30e-6) # I think literature likes to stay with between 20-50 microns... https://ntrs.nasa.gov/api/citations/20220009419/downloads/SSantosJAMESLimitationsReprint.pdf used 40
+    namelist_user_params["χm_liq"] =  TC.parse_namelist(namelist, "user_params", "χm_liq"; default = 1.0) # this is set no matter what
 
-    user_params["r_ice_acnv_scaling_factor"] =  TC.parse_namelist(namelist, "user_params", "r_ice_acnv_scaling_factor"; default = 1.0) # this is set no matter what
-    user_params["ice_dep_acnv_scaling_factor"] =  TC.parse_namelist(namelist, "user_params", "ice_dep_acnv_scaling_factor"; default = 1.0) # this is set no matter what
+    namelist_user_params["r_ice_acnv_scaling_factor"] =  TC.parse_namelist(namelist, "user_params", "r_ice_acnv_scaling_factor"; default = 1.0) # this is set no matter what
+    namelist_user_params["r_ice_snow_threshold_scaling_factor"] =  TC.parse_namelist(namelist, "user_params", "r_ice_snow_threshold_scaling_factor"; default = 200/125) # this is set no matter what
 
-    user_params["ice_acnv_power"] =  TC.parse_namelist(namelist, "user_params", "ice_acnv_power"; default = 1.0) # this is set no matter what
+    namelist_user_params["τ_acnv_sno_threshold"] =  TC.parse_namelist(namelist, "user_params", "τ_acnv_sno_threshold"; default = 100.0) # this is set no matter waht
+    namelist_user_params["τ_acnv_liq_thresh"] =  TC.parse_namelist(namelist, "user_params", "τ_acnv_liq_thresh"; default = 100.0) # this is set no matter what
+
+    namelist_user_params["massflux_N_i_boost_factor"] =  TC.parse_namelist(namelist, "user_params", "massflux_N_i_boost_factor"; default = 2.0) # this is set no matter what
+    namelist_user_params["sedimentation_N_i_boost_factor"] =  TC.parse_namelist(namelist, "user_params", "sedimentation_N_i_boost_factor"; default = 0.2) # this is set no matter what
+    namelist_user_params["apply_massflux_N_i_boost"] =  TC.parse_namelist(namelist, "user_params", "apply_massflux_N_i_boost"; default = false) # this is set no matter what
+    namelist_user_params["apply_sedimentation_N_i_boost"] =  TC.parse_namelist(namelist, "user_params", "apply_sedimentation_N_i_boost"; default = false) # this is set no matter what
+
+    namelist_user_params["massflux_N_i_boost_max_ratio"] =  TC.parse_namelist(namelist, "user_params", "massflux_N_i_boost_max_ratio"; default = 0.7) # this is set no matter what
+    namelist_user_params["massflux_N_i_boost_progress_fraction"] =  TC.parse_namelist(namelist, "user_params", "massflux_N_i_boost_progress_fraction"; default = 0.5) # this is set no matter what
+    
+    namelist_user_params["use_ice_mult"] =  TC.parse_namelist(namelist, "user_params", "use_ice_mult"; default = true) # this is set no matter what
 
     # If we decide to add this to the calibration... 
     # default_r_factor_liq = FT(1) # unknown
     # default_r_factor_ice = FT(((4/3) / 8)^(1/3))
-    user_params["mean_r_factor_liq"] =  TC.parse_namelist(namelist, "user_params", "mean_r_factor_liq"; default = FT(1)) # this is set no matter what
-    user_params["mean_r_factor_ice"] =  TC.parse_namelist(namelist, "user_params", "mean_r_factor_ice"; default = FT(1)) # this is set no matter what
+    # namelist_user_params["mean_r_factor_liq"] =  TC.parse_namelist(namelist, "user_params", "mean_r_factor_liq"; default = FT(1)) # this is set no matter what
+    # namelist_user_params["mean_r_factor_ice"] =  TC.parse_namelist(namelist, "user_params", "mean_r_factor_ice"; default = FT(1)) # this is set no matter what
 
-    user_params["q_min"] = TC.parse_namelist(namelist, "user_params", "q_min"; default = zero(FT)) # maybe one day swap to var limiter step
-    user_params = namelist["user_params"] # Let this be a Dict()
+    namelist_user_params["q_min"] = TC.parse_namelist(namelist, "user_params", "q_min"; default = zero(FT)) # maybe one day swap to var limiter step
+    # user_params = namelist["user_params"] # Let this be a Dict()
+
+
+    user_params = deepcopy(namelist_user_params) # make a copy of user_params so we can modify it without changing the original
+    user_args = deepcopy(namelist_user_args) # make a copy of user_args so we can modify it without changing the original
+    # delete things stored in relaxation timescales
+    delete!.(Ref(user_params), ["neural_microphysics_relaxation_network", "model_re_location", "model_x_0_characteristic"]) # drop neural_microphysics_relaxation_network, model_re_location, model_x_0_characteristic, etc. from user_param.  deletes from user_params, but not from namelist, so we can use it later, so it doesnt end up in the param_set
+    delete!.(Ref(user_args), ["nonequilibrium_moisture_scheme", "adjust_liq_N", "adjust_ice_N", "use_heterogeneous_ice_nucleation",]) # these are now in relaxtion_timescale object
+    delete!.(Ref(user_params), ["heterogeneous_ice_nucleation_coefficient", "heterogeneous_ice_nucleation_exponent", "min_τ_liq", "min_τ_ice", "max_τ_liq", "max_τ_ice", "min_N_liq", "min_N_ice", "max_N_liq", "max_N_ice"]) # these are now in relaxtion_timescale object
+
+    # delete things stored in cloud_sedimentation_model (or in its setup)
+    delete!.(Ref(user_params), ["liq_sedimentation_Dmax", "ice_sedimentation_Dmax", "liq_sedimentation_scaling_factor", "ice_sedimentation_scaling_factor", "E_liq_ice"])
+    delete!.(Ref(user_args), ["use_sedimentation", "liq_terminal_velocity_scheme", "ice_terminal_velocity_scheme", "sedimentation_differencing_scheme", "grid_mean", ]) 
+
+    # delete things stored in precip_model
+    delete!.(Ref(user_params), ["rain_sedimentation_scaling_factor", "snow_sedimentation_scaling_factor"])
+    delete!.(Ref(user_args), ["rain_terminal_velocity_scheme", "snow_terminal_velocity_scheme",]) 
+
+    # delete things stored in precip_formation model
+    delete!.(Ref(user_params), ["ice_dep_acnv_scaling_factor", "ice_dep_acnv_scaling_factor_above", "ice_acnv_power",]) # "r_ice_acnv_scaling_factor", "r_ice_snow_threshold_scaling_factor"
+
+    # delete things stored in tendency limiter set
+    delete!.(Ref(user_args), ["truncated_basic_limiter_factor", "default_tendency_limiter_type", "fallback_default_tendency_limiter_type", "nonequilibrium_moisture_sources_limiter_type", "fallback_nonequilibrium_moisture_sources_limiter_type", "fallback_to_standard_supersaturation_limiter", "entr_detr_limiter_type", "fallback_entr_detr_limiter_type", "precipitation_tendency_limiter_type", "fallback_precipitation_tendency_limiter_type", "tendency_resolver_setup"])
+
+
+    # delete things not stored anywhere but that we don't need
+    # delete!.(Ref(user_args, [
+    #     "", # we make a cloud sedimentation model...
+    #     ])
+    # )
+
+    user_args = leaves_to_tuples(user_args) # convert any leaves that are Arrays to tuples to preserve isbits
+    user_args = leaves_to_Vals(user_args) # convert leaves that are strings or symbols into Vals to preserve isbits
+    user_args = namedtuple_fromdict(user_args) # convert dict to NamedTuple to preserve isbits
+
     user_params = leaves_to_tuples(user_params) # convert any leaves that are Arrays to tuples to preserve isbits
     user_params = leaves_to_Vals(user_params)  # convert leaves that are strings or symbols into Vals to preserve isbits
     user_params = namedtuple_fromdict(user_params) # convert dict to NamedTuple to preserve isbits
@@ -269,7 +360,14 @@ function create_parameter_set(
 
     # ------------------------------------------------ #
 
-    param_set = TCP.TurbulenceConvectionParameters{FTD, MP, SFP, typeof(user_args), typeof(user_params)}(; pairs..., microphys_params, surf_flux_params, user_args, user_params) # `typeof` so we have concrete types such that if user_args and user_params are isbits, then param_set is isbits
+    #= [[ deprecate `user_args` ]]
+        user_args was originally created to store arguments that might be useful in the models evolution. it still serves that purpose in the namelist.
+        However, arguments need not be passed as parameters. The are helpful in construction, in types.jl. 
+        If they are important for runtime, either place them into user_params or into an specific object that is part of edmf.
+
+    =#
+
+    param_set = TCP.TurbulenceConvectionParameters{FTD, MP, SFP, typeof(user_params)}(; pairs..., microphys_params, surf_flux_params, user_params) # `typeof` so we have concrete types such that if user_args and user_params are isbits, then param_set is isbits
     if !isbits(param_set)
         @info("param_set", param_set)
         @warn "The parameter set SHOULD be isbits in order to be stack-allocated."

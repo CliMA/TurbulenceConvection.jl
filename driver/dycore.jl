@@ -129,11 +129,6 @@ function set_thermo_state_from_prog!(state, grid, moisture_model, param_set)
             error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
         end
 
-        if moisture_model isa TC.NonEquilibriumMoisture
-            if !isfinite(prog_gm.q_liq[k]) || !isfinite(prog_gm.q_ice[k])
-                @error("NaN in q_liq or q_ice, k = $k, prog_gm.q_liq[k] = $(prog_gm.q_liq[k]), prog_gm.q_ice[k] = $(prog_gm.q_ice[k])")
-            end
-        end
 
         ts_gm[k] = TC.thermo_state_pθq(
             param_set,
@@ -193,20 +188,32 @@ function assign_thermo_aux!(state, grid, moisture_model, param_set)
         aux_gm.T[k] = TD.air_temperature(thermo_params, ts)
         
         # @assert [for search optimization, but don't use assert, use an explicit error]
-        (0 < aux_gm.T[k] < Inf) || @error("Negative or nonfinite temperature will cause issues here, status is z = $(grid.zc[k].z), T = $(aux_gm.T[k]), q = $(ts_gm[k].q), θ_liq_ice = $(aux_gm.θ_liq_ice[k]), ts = $ts") # debugging, remove later -- will slow down code
-        # if aux_gm.T[k] <= 0 
-        #     @warn "Negative or NaN temperature will cause issues here"
-        #     @info "status is z = $(grid.zc[k].z), T = $(aux_gm.T[k]), q = $(ts_gm[k].q), θ_liq_ice = $(aux_gm.θ_liq_ice[k]), ts = $ts"
-        #     aux_en = TC.center_aux_environment(state)
-        #     aux_bulk = TC.center_aux_bulk(state)
+        (0 < aux_gm.T[k] < Inf) || error("Negative/zero or nonfinite temperature will cause issues here, status is z = $(grid.zc[k].z), T = $(aux_gm.T[k]), q = $(ts_gm[k].q), θ_liq_ice = $(aux_gm.θ_liq_ice[k]), ts = $ts") # debugging, remove later -- will slow down code
 
-        #     ts_en = TC.thermo_state_pθq(thermo_params, p_c[k], aux_en.θ_virt[k], aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k])
-        #     ts_up = TC.thermo_state_pθq(thermo_params, p_c[k], aux_bulk.θ_virt[k], aux_bulk.q_tot[k], aux_bulk.q_liq[k], aux_bulk.q_ice[k])
-        #     @info "en status: T = $(ts_en.T), ts = $(ts_en)"
-        #     @info "up status: T = $(ts_up.T), ts = $(ts_up)"
+        # if !(0 < aux_gm.T[k] < Inf)
+            # @info "status: T = $(TC.full_print(aux_gm.T)); θ_liq_ice = $(TC.full_print(aux_gm.θ_liq_ice)); q_tot = $(TC.full_print(aux_gm.q_tot)); q_liq = $(TC.full_print(aux_gm.q_liq)); q_ice = $(TC.full_print(aux_gm.q_ice))"
+            # aux_up = TC.center_aux_updrafts(state)
+            # aux_up_f = TC.face_aux_updrafts(state)
+            # aux_en = TC.center_aux_environment(state)
+            # aux_en_f = TC.face_aux_environment(state)
+            # prog_up = TC.center_prog_updrafts(state)
+            # prog_up_f = TC.face_prog_updrafts(state)
+            # prog_gm = TC.center_prog_grid_mean(state)
+            # aux_gm = TC.center_aux_grid_mean(state)
+
+            # println("---------------------------------------------------")
+            # # summary(stdout, state.prog)
+            # @info summary(state.prog)
+            # println("---------------------------------------------------")
+            # # summary(stdout, state.aux)
+            # @info summary(state.aux)
+            # println("---------------------------------------------------")
+            # flush(stdout); flush(stderr)
+            # error("Negative or nonfinite temperature will cause issues here, status is z = $(grid.zc[k].z), T = $(aux_gm.T[k]), q = $(ts_gm[k].q), θ_liq_ice = $(aux_gm.θ_liq_ice[k]), ts = $ts")
         # end
         
         aux_gm.RH[k] = TD.relative_humidity(thermo_params, ts)
+        aux_gm.RH_ice[k] = TC.relative_humidity_over_ice(thermo_params, ts)
     end
     return
 end
@@ -424,78 +431,9 @@ end
     The safest (and easiest to maintain and keep bug-free) solution, despite being slower, is to recalculate all the tendencies.
 """
 function update_noneq_moisture_sources_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real, use_fallback_tendency_limiters::Bool) where {NT, FV <: CC.Fields.FieldVector}
-    CC.Fields.bycolumn(axes(prog.cent)) do colidx
-        UnPack.@unpack edmf, precip_model, param_set, case = params
-        UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
 
-        state = TC.column_prog_aux(prog, aux, colidx)
-        grid = TC.Grid(state)
+    error("this function has been deprecated")
 
-        # Δt = TS.dt 
-        Δt = TS.dt_limit_tendencies
-
-
-
-        # environment
-        FT = TC.float_type(state)
-        thermo_params = TCP.thermodynamics_params(param_set)
-        # tendencies_pr = TC.center_tendencies_precipitation(state)
-        aux_en = TC.center_aux_environment(state)
-        aux_en_f = TC.face_aux_environment(state) # state or does ts include this? I guess you'd want to move this to the calling place... to choose updraft or environment
-        # prog_pr = TC.center_prog_precipitation(state)
-        prog_gm = TC.center_prog_grid_mean(state)
-        # aux_gm = TC.center_aux_grid_mean(state)
-        ts_env = TC.center_aux_environment(state).ts
-        # p_c = aux_gm.p
-        ρ_c = prog_gm.ρ
-        # aux_en_sat = aux_en.sat
-        # aux_en_unsat = aux_en.unsat
-        # precip_fraction = TC.compute_precip_fraction(edmf, state)
-        # ts_LCL = cloud_base(aux_en, grid, ts_env, :env)[:cloud_base_ts] # cloud base, only keep the thermodynamic state part deprecated for now
-
-
-        F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
-        w::CC.Fields.Field = F2Cw.(aux_en_f.w)
-        nonequilibrium_moisture_scheme = edmf.moisture_model.scheme # my new addition
-        # moisture_sources_limiter = edmf.tendency_limiters.moisture_sources_limiter
-        moisture_sources_limiter = TC.get_tendency_limiter(edmf.tendency_limiters, Val(:moisture_sources_limiter), use_fallback_tendency_limiters)
-
-
-        @inbounds for k in TC.real_center_indices(grid)
-            # condensation
-            ts = ts_env[k]
-            zc = FT(grid.zc[k].z)
-
-            q_vap_sat_liq = aux_en.q_vap_sat_liq[k]
-            q_vap_sat_ice = aux_en.q_vap_sat_ice[k]
-            mph_neq = TC.noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, aux_en.area[k], ρ_c[k], Δt, ts, w[k], zc, q_vap_sat_liq, q_vap_sat_ice )
-
-            # use diffs so can update gm
-            diff_liq_en = @. mph_neq.ql_tendency * aux_en.area[k] - aux_en.ql_tendency_cond_evap[k]
-            diff_ice_en = @. mph_neq.qi_tendency * aux_en.area[k] - aux_en.qi_tendency_sub_dep[k]
-            aux_en.ql_tendency_noneq[k] += diff_l
-            aux_en.qi_tendency_noneq[k] += diff_i
-
-            aux_gm.ql_tendency_noneq[k] += diff_l
-            aux_gm.qi_tendency_noneq[k] += diff_i
-
-            aux_en.ql_tendency_cond_evap[k] = aux_en.ql_tendency_noneq[k] # for storage
-            aux_en.qi_tendency_sub_dep[k] = aux_en.qi_tendency_noneq[k] # for storage
-        end
-
-        # updrafts/bulk
-        cond_evap_old = copy(aux_bulk.ql_tendency_cond_evap) # hope this works, i think it does from CC
-        sub_dep_old = copy(aux_bulk.qi_tendency_sub_dep) # hope this works, i think it does from CC
-        TC.compute_nonequilibrium_moisture_tendencies!(grid, state, edmf, Δt, param_set, use_fallback_tendency_limiters)
-        diff_liq_bulk = @. aux_bulk.ql_tendency_noneq * aux_bulk.area - cond_evap_old
-        diff_ice_bulk = @. aux_bulk.qi_tendency_noneq * aux_bulk.area - sub_dep_old
-
-        # In principle, you're probably supposed to update the OtherMicrophysicsSources too right?
-        # Additionally apply cloud liquid and ice formation tendencies ( no effect on qtot, θ_li)
-        tendencies_gm.q_liq[k] += diff_liq_bulk .+ diff_liq_en
-        tendencies_gm.q_ice[k] += diff_ice_bulk .+ diff_ice_en
-
-    end
     return nothing
 end
 
@@ -535,6 +473,13 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         state = TC.column_state(prog, aux, tendencies, colidx) # also creates face and cent
         grid = TC.Grid(state)
 
+        # @error(" testing applying filter before setting thermo stuff...") # -- really I think we could get away with just moving filter_gm_vars() here...
+        # surf = get_surface(surf_params, grid, state, t, param_set)
+        # TC.affect_filter!(edmf, grid, state, param_set, surf, t)
+
+        TC.filter_gm_vars(edmf, grid, state)  # filter gm vars before setting thermo state so that we don't have to do it again later
+
+
         set_thermo_state_from_prog!(state, grid, edmf.moisture_model, param_set)
         assign_thermo_aux!(state, grid, edmf.moisture_model, param_set)
 
@@ -543,7 +488,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         @. aux_gm.θ_virt = TD.virtual_pottemp(thermo_params, aux_gm.ts)
 
         # Δt = TS.dt 
-        Δt = TS.dt_limit_tendencies
+        Δt = TS.dt_limit_tendencies_factor * (TS.limit_tendencies_by_dt_min ? TS.dt_min : TS.dt)
         @debug "calc'ing tends: t = $t, Δt = $Δt, use_fallback_tendency_limiters = $(TS.use_fallback_tendency_limiters)"
         cfl_limit = TS.cfl_limit
 
@@ -577,6 +522,9 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
         TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt, TS.use_fallback_tendency_limiters)
         compute_gm_tendencies!(edmf, grid, state, surf, radiation, forcing, param_set, TS.use_fallback_tendency_limiters)
+
+        # Now that we have updraft, gm from updraft, we can calculate any post tendencies that we need for things that are backed out.
+        # TC.compute_post_tendencies!(edmf, grid, state, param_set, Δt)
 
         # I haven't come up with a limiter that's better than filtering... (we can stop the model from crashing but you're essentially getting random results, just use tendency-adaptive dt)
         # TC.affect_limiter!(edmf, grid, state, param_set, surf, Δt) # limit tendencies now that grid_mean tendencies are computed so that we won't have any crashes later... filtering updraft vars isn't enough bc env can still be forced to be negative... can't clamp at filtering time bc need to include gm tendencies to get full picture. need to do at end here so that the ODE du step is valid.
@@ -776,6 +724,15 @@ function compute_gm_tendencies!(
     end
 
 
+    N_up = TC.n_updrafts(edmf)
+    aux_en.dqvdt .= FT(0) # reset to zero, do here instead of in update_aux bc we need only some of these values...
+    aux_en.dTdt .= FT(0) # reset to zero, do here instead of in update_aux bc we need only some of these values...
+    @inbounds for i in 1:N_up
+        aux_up[i].dqvdt .= FT(0) # reset to zero, do here instead of in update_aux bc we need only some of these values...
+        aux_up[i].dTdt .= FT(0) # reset to zero, do here instead of in update_aux bc we need only some of these values...
+    end
+
+
     @inbounds for k in TC.real_center_indices(grid)
         Π = TD.exner(thermo_params, ts_gm[k])
 
@@ -784,6 +741,13 @@ function compute_gm_tendencies!(
         tendencies_gm.ρθ_liq_ice[k] -= ρ_c[k] * w∇θ_liq_ice_gm[k] # trying turning this off
         # tendencies_gm.ρq_tot[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇q_tot_gm[k] # trying turning this off
         tendencies_gm.ρq_tot[k] -= ρ_c[k] * w∇q_tot_gm[k] # trying turning this off
+
+
+        aux_en.dqvdt[k] -=  w∇q_tot_gm[k] # [store things that matter for our aux_en.dqvdt] [ dqvdt priority ]
+        @inbounds for i in 1:N_up
+            aux_up[i].dqvdt[k] -= w∇q_tot_gm[k] # [store things that matter for our aux_up.dqvdt] [ dqvdt priority ]
+        end
+
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
             # tendencies_gm.q_liq[k] -= ∇q_liq_gm[k] * aux_gm.subsidence[k]
             tendencies_gm.q_liq[k] -= w∇q_liq_gm[k]
@@ -792,23 +756,48 @@ function compute_gm_tendencies!(
 
             aux_gm.ql_tendency_ls_vert_adv[k] = -w∇q_liq_gm[k] # FOR STORAGE
             aux_gm.qi_tendency_ls_vert_adv[k] = -w∇q_ice_gm[k] # FOR STORAGE
+
+            # aux_en.dqvdt[k] -= w∇q_liq_gm[k] # [store things that matter for our aux_en.dqvdt] [only keep qv part]
+            # aux_en.dqvdt[k] -= w∇q_ice_gm[k] # [store things that matter for our aux_en.dqvdt] [only keep qv part]
+
         end
         aux_gm.qt_tendency_ls_vert_adv[k] = -w∇q_tot_gm[k] # not implemented yet
 
         # Radiation
         if Cases.rad_type(radiation) <:
            Union{Cases.RadiationDYCOMS_RF01, Cases.RadiationLES, Cases.RadiationTRMM_LBA, Cases.RadiationSOCRATES}
-            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_rad[k] / Π .* 1  # testing maybe it's an order of operations thing and the radiation needs to happen first before precip then nudging? idk
+            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_rad[k] / Π 
+
+            aux_en.dTdt[k] += aux_gm.dTdt_rad[k] # [store things that matter for our aux_en.dTdt] [ dTdt priority ] [ idk if this totally helps, it's typically strong cloud top cooling so maybe it drives liquid generation?]
+            @inbounds for i in 1:N_up
+                aux_up[i].dTdt[k] += aux_gm.dTdt_rad[k] # [store things that matter for our aux_up.dTdt] [ dTdt priority ] [ idk if this totally helps, it's typically strong cloud top cooling so maybe it drives liquid generation?]
+            end
         end
         # LS advection
-        tendencies_gm.ρq_tot[k] += ρ_c[k] * aux_gm.dqtdt_hadv[k] .* 1
+        tendencies_gm.ρq_tot[k] += ρ_c[k] * aux_gm.dqtdt_hadv[k]
         if !(Cases.force_type(force) <: Cases.ForcingDYCOMS_RF01)
-            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_hadv[k] / Π .* 1 # testing maybe it's an order of operations thing and the radiation needs to happen first before precip then nudging? idk
+            tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_hadv[k] / Π 
+
+            aux_en.dTdt[k] += aux_gm.dTdt_hadv[k] # [store things that matter for our aux_en.dTdt] [ dTdt priority ]
+            @inbounds for i in 1:N_up
+                aux_up[i].dTdt[k] += aux_gm.dTdt_hadv[k] # [store things that matter for our aux_up.dTdt] [ dTdt priority ]
+            end
+
         end
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
             tendencies_gm.q_liq[k] += aux_gm.dqldt[k] # we never set these, e.g. in socrates... presumably they're zero?
             tendencies_gm.q_ice[k] += aux_gm.dqidt[k]
         end
+
+
+
+        aux_en.dqvdt[k] += aux_gm.dqtdt_hadv[k] # [store things that matter for our aux_en.dqvdt] [ dqvdt priority ]
+        # if edmf.moisture_model isa TC.NonEquilibriumMoisture
+        #     aux_en.dqvdt[k] -= aux_gm.dqldt[k] # [store things that matter for our aux_en.dqvdt] [only keep qv part]
+        #     aux_en.dqvdt[k] -= aux_gm.dqidt[k] # [store things that matter for our aux_en.dqvdt] [only keep qv part]
+        # end
+
+
 
         # LES specific forcings
         if Cases.force_type(force) <: Cases.ForcingLES
@@ -826,11 +815,22 @@ function compute_gm_tendencies!(
             end
 
             tendencies_gm.ρq_tot[k] += ρ_c[k] * (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k])
+
+            aux_en.dqvdt[k] += (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k]) # [store things that matter for our aux_en.dqvdt] [  dqvdt priority ]
+            @inbounds for i in 1:N_up
+                aux_up[i].dqvdt[k] += (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k]) # [store things that matter for our aux_up.dqvdt] [  dqvdt priority ]
+            end
+
+
             tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * (gm_H_nudge_k + H_fluc)
             tendencies_gm_uₕ[k] += CCG.Covariant12Vector(CCG.UVVector(gm_U_nudge_k, gm_V_nudge_k), lg[k])
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
                 tendencies_gm.q_liq[k] += aux_gm.dqldt_hadv[k] + gm_q_liq_nudge_k + aux_gm.dqldt_fluc[k]
                 tendencies_gm.q_ice[k] += aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k]
+
+                # aux_en.dqvdt[k] -= (aux_gm.dqldt_hadv[k] + gm_q_liq_nudge_k + aux_gm.dqldt_fluc[k]) # [store things that matter for our aux_en.dqvdt] [only keep qv part]
+                # aux_en.dqvdt[k] -= (aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k]) # [store things that matter for our aux_en.dqvdt] [only keep qv part]
+                
             end
         end
 
@@ -851,6 +851,13 @@ function compute_gm_tendencies!(
             # nudge total water back towards our forcing profile
             gm_q_tot_nudge_k = (aux_gm.qt_nudge[k] - aux_gm.q_tot[k]) / force.scalar_nudge_τᵣ
             tendencies_gm.ρq_tot[k] += ρ_c[k] * (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k])
+
+            aux_en.dqvdt[k] += (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k]) # [store things that matter for our aux_en.dqvdt] [dqvdt priority ]
+            aux_en.dTdt[k] += (gm_H_nudge_k* Π + aux_gm.dTdt_fluc[k]) #  [store things that matter for our aux_en.dTdt] [dTdt priority ] [ go opposite way with exner] # DO NOT DO THIS, it's not at all the same thing as temperature!!! because of condensate. it's really not the same thing as θ_liq_ice, so we don't do this.
+            @inbounds for i in 1:N_up
+                aux_up[i].dqvdt[k] += (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k]) # [store things that matter for our aux_up.dqvdt] [dqvdt priority ]
+                aux_up[i].dTdt[k] += (gm_H_nudge_k * Π + aux_gm.dTdt_fluc[k]) #  [store things that matter for our aux_up.dTdt] [dTdt priority ] [ go opposite way with exner]
+            end
 
             # nudge liquid and ice -- but we don't have a ql_nudge qi_nudge from external forcing in socrates? only qt_nudge -- what are ql_nudge and qi_nudge derived from
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
@@ -890,39 +897,38 @@ function compute_gm_tendencies!(
     # ====== sedimentation grid mean only (stability fix...)
     if edmf.cloud_sedimentation_model isa TC.CloudSedimentationModel 
         if edmf.cloud_sedimentation_model.grid_mean
-            # @info "grid mean sedimenting"
-            ts_gm = TC.center_aux_grid_mean(state).ts
-            mph, _ = TC.calculate_sedimentation_sources(param_set, grid, ρ_c, ts_gm; grid_mean = true)
+            error("not implmented yet")
+            # # @info "grid mean sedimenting"
+            # ts_gm = TC.center_aux_grid_mean(state).ts
+            # mph, _ = TC.calculate_sedimentation_sources(param_set, grid, ρ_c, ts_gm; grid_mean = true)
 
-            L_v0 = TCP.LH_v0(param_set)
-            L_s0 = TCP.LH_s0(param_set)
-            @inbounds for k in TC.real_center_indices(grid)
-                ql_tendency_sedimentation = mph.ql_tendency[k]
-                qi_tendency_sedimentation = mph.qi_tendency[k]
-                qt_tendency_sedimentation = ql_tendency_sedimentation + qi_tendency_sedimentation
+            # L_v0 = TCP.LH_v0(param_set)
+            # L_s0 = TCP.LH_s0(param_set)
+            # @inbounds for k in TC.real_center_indices(grid)
+            #     ql_tendency_sedimentation = mph.ql_tendency[k]
+            #     qi_tendency_sedimentation = mph.qi_tendency[k]
+            #     qt_tendency_sedimentation = ql_tendency_sedimentation + qi_tendency_sedimentation
 
-                # How does updrafts/bulk know about these? does it just all end up in the environment?
-                # We need to split somehow so that the updrafts/bulk can also know about these tendencies...
-                # How do the large-scale tendencies work? do they just work on the environment?
-                # if so, that leads to instabilities here...
+            #     # How does updrafts/bulk know about these? does it just all end up in the environment?
+            #     # We need to split somehow so that the updrafts/bulk can also know about these tendencies...
+            #     # How do the large-scale tendencies work? do they just work on the environment?
+            #     # if so, that leads to instabilities here...
 
-                if edmf.moisture_model isa TC.NonEquilibriumMoisture
-                    tendencies_gm.q_liq[k] += ql_tendency_sedimentation
-                    tendencies_gm.q_ice[k] += qi_tendency_sedimentation
-                end
-                tendencies_gm.ρq_tot[k] += ρ_c[k] * qt_tendency_sedimentation
+            #     if edmf.moisture_model isa TC.NonEquilibriumMoisture
+            #         tendencies_gm.q_liq[k] += ql_tendency_sedimentation
+            #         tendencies_gm.q_ice[k] += qi_tendency_sedimentation
+            #     end
+            #     tendencies_gm.ρq_tot[k] += ρ_c[k] * qt_tendency_sedimentation
 
-                Π_m = TD.exner(thermo_params, ts_gm[k])
-                c_pm = TD.cp_m(thermo_params, ts_gm[k])
-                θ_liq_ice_tendency_sedimentation =
-                    1 / Π_m / c_pm * (L_v0 * ql_tendency_sedimentation + L_s0 * qi_tendency_sedimentation)
-                tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * θ_liq_ice_tendency_sedimentation
-            end
+            #     Π_m = TD.exner(thermo_params, ts_gm[k])
+            #     c_pm = TD.cp_m(thermo_params, ts_gm[k])
+            #     θ_liq_ice_tendency_sedimentation =
+            #         1 / Π_m / c_pm * (L_v0 * ql_tendency_sedimentation + L_s0 * qi_tendency_sedimentation)
+            #     tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * θ_liq_ice_tendency_sedimentation
+            # end
         else
 
-
             @inbounds for k in TC.real_center_indices(grid)
-
                 if edmf.moisture_model isa TC.NonEquilibriumMoisture
                     tendencies_gm.q_liq[k] +=
                         aux_en.ql_tendency_sedimentation[k] + aux_bulk.ql_tendency_sedimentation[k]
@@ -939,7 +945,7 @@ function compute_gm_tendencies!(
         end
     end
     # =================================================== #
-
+    # note, these `sgs` fluxes also include the mass fluxes from vertical advection
 
     TC.compute_sgs_flux!(edmf, grid, state, surf)
     sgs_flux_θ_liq_ice = aux_gm_f.sgs_flux_θ_liq_ice
@@ -953,6 +959,8 @@ function compute_gm_tendencies!(
     @. tends_ρθ_liq_ice += -∇sgs(wvec(sgs_flux_θ_liq_ice))
     @. tends_ρq_tot += -∇sgs(wvec(sgs_flux_q_tot))
     @. tends_uₕ += -∇sgs(sgs_flux_uₕ) / ρ_c
+
+    # @. aux_en.dqvdt += -∇sgs(wvec(sgs_flux_q_tot)) / ρ_c # [store things that matter for our aux_en.dqvdt] [ dont use these bc includes updraft fluxes, we need a version that's just local sgs tend but oh well]
 
     if edmf.moisture_model isa TC.NonEquilibriumMoisture
         sgs_flux_q_liq = aux_gm_f.sgs_flux_q_liq
@@ -970,7 +978,43 @@ function compute_gm_tendencies!(
         # @. tends_q_ice += -∇sgs(wvec(sgs_flux_q_ice)) / ρ_c
         @. tends_q_liq += sgs_tendency_q_liq
         @. tends_q_ice += sgs_tendency_q_ice
+
+
+        # if edmf.moisture_model isa TC.NonEquilibriumMoisture
+        #     @. aux_en.dqvdt -= -∇sgs(wvec(sgs_flux_q_liq))  / ρ_c # [store things that matter for our aux_en.dqvdt] [only keep qv part]
+        #     @. aux_en.dqvdt -= -∇sgs(wvec(sgs_flux_q_ice)) / ρ_c # [store things that matter for our aux_en.dqvdt] [only keep qv part]
+        # end
     end
+
+    # my addition -- note this is the sgs flux only, doesn't include advection
+    tendencies_pr = TC.center_tendencies_precipitation(state)
+    sgs_flux_q_rai = aux_gm_f.sgs_flux_q_rai
+    sgs_flux_q_sno = aux_gm_f.sgs_flux_q_sno
+    sgs_tendency_q_rai = aux_gm.sgs_tendency_q_rai
+    sgs_tendency_q_sno = aux_gm.sgs_tendency_q_sno
+
+    @. sgs_tendency_q_rai = -∇sgs(wvec(sgs_flux_q_rai)) / ρ_c
+    @. sgs_tendency_q_sno = -∇sgs(wvec(sgs_flux_q_sno)) / ρ_c
+
+
+    @. tendencies_pr.q_rai += sgs_tendency_q_rai
+    @. tendencies_pr.q_sno += sgs_tendency_q_sno
+
+
+
+    # lwp = sum(i -> sum(ρ_c .* aux_up[i].q_liq .* aux_up[i].area .* (aux_up[i].area .> edmf.minimum_area)), 1:N_up)
+
+    @inbounds for k in TC.real_center_indices(grid)
+        if aux_bulk.area[k] > FT(0)
+            aux_bulk.dqvdt[k] = sum(i -> aux_up[i].dqvdt[k] * aux_up[i].area[k], 1:N_up) / aux_bulk.area[k]
+            aux_bulk.dTdt[k] = sum(i -> aux_up[i].dTdt[k] * aux_up[i].area[k], 1:N_up) / aux_bulk.area[k]
+        else
+            aux_bulk.dqvdt[k] = sum(i -> aux_up[i].dqvdt[k] * aux_up[i].area[k], 1:N_up) / N_up
+            aux_bulk.dTdt[k] = sum(i -> aux_up[i].dTdt[k] * aux_up[i].area[k], 1:N_up) / N_up
+        end
+    end
+
 
     return nothing
 end
+

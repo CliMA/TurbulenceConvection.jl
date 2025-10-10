@@ -30,7 +30,8 @@ mutable struct TimeStepping{FT, AT <: Val}
     const allow_cfl_dt_max_violate_dt_min::Bool # whether to let falling precip violate the cfl (we calculated w/ a max of 5 m/s but maybe that's arbitrary -- rain can in principle go up to 10 or so).
     use_fallback_tendency_limiters::Bool # check if this could be in a callback or something w/ remake to just remake the ode problem (remake edmf w/ limiters hopefully...)
     const use_fallback_during_spinup::Bool # whether to use fallback limiters during spinup
-    const dt_limit_tendencies::FT # whether to calculate tendencies using dt_min or the current dt -- I think we should default to dt_min bc (though there's some risk they dont compose nicely? hopefully fine in steady state... could do dt_max but dt_max could be arbitrarily large and then cold never take shorter steps... could also pick some fixed number...)
+    const dt_limit_tendencies_factor::FT # whether to calculate tendencies using dt_min or the current dt -- I think we should default to dt_min bc (though there's some risk they dont compose nicely? hopefully fine in steady state... could do dt_max but dt_max could be arbitrarily large and then cold never take shorter steps... could also pick some fixed number...)
+    const limit_tendencies_by_dt_min::Bool # whether to limit by dt_min or current dt.
     #
     isoutofdomain::Bool # whether or not we are out of domain
 end
@@ -132,12 +133,17 @@ function TimeStepping(::Type{FT}, namelist) where {FT}
     use_fallback_tendency_limiters = false # initialize as false for everything... it'll get set to true later if needed.
     use_fallback_during_spinup = TC.parse_namelist(namelist, "time_stepping", "use_fallback_during_spinup"; default = false)
 
-    limit_tendencies_using_dt_min_factor = TC.parse_namelist(namelist, "time_stepping", "limit_tendencies_using_dt_min_factor"; default = missing) # nothing triggers a special path in parse_namelist lmao
-    if ismissing(limit_tendencies_using_dt_min_factor)
-        dt_limit_tendencies = TC.parse_namelist(namelist, "time_stepping", "dt_limit_tendencies"; default = dt_min)
-    else
-        dt_limit_tendencies = dt_min * limit_tendencies_using_dt_min_factor
-    end
+    # [[ deprecated ]] [ this was bad because, say if dt was longer than dt_limit_tendencies, then you're actually undoing your limiter. it's the real TS.dt that matters for most things, not the Δt you pass to ∑tendencies!()
+    # so passing in a custom dt to calculate the tendencies, but then using the real one in ODE solver did bad things. We now still offer a factor but base it off the real TS.dt ]
+    # limit_tendencies_using_dt_min_factor = TC.parse_namelist(namelist, "time_stepping", "limit_tendencies_using_dt_min_factor"; default = missing) # nothing triggers a special path in parse_namelist lmao
+    # if ismissing(limit_tendencies_using_dt_min_factor)
+    #     dt_limit_tendencies = TC.parse_namelist(namelist, "time_stepping", "dt_limit_tendencies"; default = dt_min) # we dont need this, you can just calculate it yourself, deprecate this whole section...
+    # else
+    #     dt_limit_tendencies = dt_min * limit_tendencies_using_dt_min_factor
+    # end
+
+    dt_limit_tendencies_factor = TC.parse_namelist(namelist, "time_stepping", "dt_limit_tendencies_factor"; default = FT(1)) # for consistency, tendencies are limited by this factor times dt_min (so adapt_dt doesn't oscillate)
+    limit_tendencies_by_dt_min = TC.parse_namelist(namelist, "time_stepping", "limit_tendencies_by_dt_min"; default = false) # whether to limit by dt_min instead of current dt. The former is at least consistent in magnitude, but if dt is changing bad things can happen. Limiting by dt is prone to wild swings in the limited tendencies though.
 
     dt_max_edmf = FT(0)  # initialize
 
@@ -190,7 +196,9 @@ function TimeStepping(::Type{FT}, namelist) where {FT}
         allow_cfl_dt_max_violate_dt_min,
         use_fallback_tendency_limiters,
         use_fallback_during_spinup,
-        dt_limit_tendencies, # for consistency, tendencies are limited by this factor times dt_min (so adapt_dt doesn't oscillate)
+        # dt_limit_tendencies, # for consistency, tendencies are limited by this factor times dt_min (so adapt_dt doesn't oscillate) [ this is bad because as the timestep changes, you can induce instability, e.g., consider you have a dt longer than dt_limit_tendencies, then you've underdone your limiter! Essentially the relative magnitudes of things were constantly changing if the real dt was. if you allowed more adaptivity, this would be even worse.] [ essentially, this gave nice looking consistently smooth tendencies, but the integrated values suffered. the reverse is actually more important.]
+        dt_limit_tendencies_factor, # just stick to a fixed factor of dt. this won't be as stationary in the calculated tendencies, but the integrated tendencies, i.e. the real values, will be stable and properly limited, which is what actually matters.
+        limit_tendencies_by_dt_min,
         #
         isoutofdomain,
     )

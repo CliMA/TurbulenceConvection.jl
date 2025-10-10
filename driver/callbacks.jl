@@ -2,7 +2,8 @@ function condition_io(u, t, integrator)
     UnPack.@unpack TS, Stats = integrator.p
     TS.dt_io += TS.dt
     io_flag = false
-    if TS.dt_io > Stats[CC.Fields.ColumnIndex((1, 1), 1)].frequency
+    # if TS.dt_io > Stats[CC.Fields.ColumnIndex((1, 1), 1)].frequency
+    if TS.dt_io ≥ Stats[CC.Fields.ColumnIndex((1, 1), 1)].frequency # allow exact dt outputs
         TS.dt_io = 0
         io_flag = true
     end
@@ -222,7 +223,7 @@ function adaptive_dt!(integrator; depth::Int=0)
                     reset_violate_dt_min_remaining = true
                     recalculate_dt_edmf = true
                     @debug "Recalculating noneq_moisture_sources tendencies for adaptive timestep calculation iteration... "
-                    update_noneq_moisture_sources_tendencies!(tendencies, prog, params, t) # update the tendencies again
+                    update_noneq_moisture_sources_tendencies!(tendencies, prog, params, t, TS.use_fallback_tendency_limiters) # update the tendencies again
                 end
             end
 
@@ -260,6 +261,7 @@ function adaptive_dt!(integrator; depth::Int=0)
         end
     end
 
+    # we really should limit tendencies according to TS.dt...
 
     @debug "t = $t | TS.dt = $(TS.dt) (TS.dt_max_edmf = $(TS.dt_max_edmf), TS.cfl_dt_max = $(TS.cfl_dt_max)), TS.use_fallback_tendency_limiters  = $(TS.use_fallback_tendency_limiters)"
     
@@ -374,8 +376,8 @@ function compute_tendency_dt_max(state::TC.State, edmf::TC.EDMFModel)
     tendencies_up = TC.center_tendencies_updrafts(state)
     tendencies_up_f = TC.face_tendencies_updrafts(state)
 
-    tendencies_bulk = TC.center_tendencies_bulk(state)
-    tendencies_bulk_f = TC.face_tendencies_bulk(state)
+    # tendencies_bulk = TC.center_tendencies_bulk(state)
+    # tendencies_bulk_f = TC.face_tendencies_bulk(state)
 
     tendencies_gm = TC.center_tendencies_grid_mean(state)
 
@@ -402,14 +404,6 @@ function compute_tendency_dt_max(state::TC.State, edmf::TC.EDMFModel)
 
         ρarea = prog_up[i].ρarea
         @inbounds for k in TC.real_center_indices(grid)
-            # @info "z = $(grid.zc.z[k])"
-            # @info "tends_ρarea[k] = $(tends_ρarea[k]) |  ρ_c[k] * area[k] = $(ρ_c[k] * area[k])"
-            # @info "tends_ρaθ_liq_ice[k] = $(tends_ρaθ_liq_ice[k]) |  ρ_c[k] * area[k] * θ_liq_ice[k] = $(ρ_c[k] * area[k] * θ_liq_ice[k])"
-            # @info "tends_ρaq_tot[k] = $(tends_ρaq_tot[k]) |  ρ_c[k] * area[k] * q_tot[k] = $(ρ_c[k] * area[k] * q_tot[k])"
-            if edmf.moisture_model isa TC.NonEquilibriumMoisture
-                # @info "tends_ρaq_liq[k] = $(tends_ρaq_liq[k]) |  ρ_c[k] * area[k] * q_liq[k] = $(ρ_c[k] * area[k] * q_liq[k])"
-                # @info "tends_ρaq_ice[k] = $(tends_ρaq_ice[k]) |  ρ_c[k] * area[k] * q_ice[k] = $(ρ_c[k] * area[k] * q_ice[k])"
-            end
             old_Δt_max = Δt_max
             Δt_max = Δt_max_helper(Δt_max, tends_ρarea[k], prog_up[i].ρarea[k]; message = "ρarea")
             # if Δt_max < old_Δt_max
@@ -475,8 +469,6 @@ function compute_tendency_dt_max(state::TC.State, edmf::TC.EDMFModel)
         ρaw = prog_up_f[i].ρaw
         area_f = aux_up_f[i].area # This should have been set in update_aux
         @inbounds for k in TC.real_face_indices(grid)
-            # @info "z = $(grid.zf.z[k])"
-            # @info "tends_ρaw[k] = $(tends_ρaw[k]) |  ρ_f[k] * area_f[k] * ρaw[k] = $(ρ_f[k] * area_f[k] * ρaw[k])"
 
             old_Δt_max = Δt_max
             Δt_max = Δt_max_helper(Δt_max, tends_ρaw[k] , prog_up_f[i].ρaw[k]; message = "ρaw")
@@ -493,41 +485,42 @@ function compute_tendency_dt_max(state::TC.State, edmf::TC.EDMFModel)
     # q_tot_bulk = aux_bulk.q_tot
 
 
-    prog_bulk = TC.center_prog_bulk(state)
-    prog_bulk_f = TC.face_prog_bulk(state)
+    # prog_bulk = TC.center_prog_bulk(state)
+    # prog_bulk_f = TC.face_prog_bulk(state)
 
-    ρarea_bulk = prog_bulk.ρarea
-    ρaθ_liq_ice_bulk = prog_bulk.ρaθ_liq_ice
-    ρaq_tot_bulk = prog_bulk.ρaq_tot
-    if edmf.moisture_model isa TC.NonEquilibriumMoisture
-        ρaq_liq_bulk = prog_bulk.ρaq_liq
-        ρaq_ice_bulk = prog_bulk.ρaq_ice
-    end
-    ρaw_bulk = prog_bulk_f.ρaw
+    # ρarea_bulk = prog_bulk.ρarea
+    # ρaθ_liq_ice_bulk = prog_bulk.ρaθ_liq_ice
+    # ρaq_tot_bulk = prog_bulk.ρaq_tot
+    # if edmf.moisture_model isa TC.NonEquilibriumMoisture
+    #     ρaq_liq_bulk = prog_bulk.ρaq_liq
+    #     ρaq_ice_bulk = prog_bulk.ρaq_ice
+    # end
+    # ρaw_bulk = prog_bulk_f.ρaw
 
-    prog_en = TC.center_prog_environment_up_gm_version(state)
-    prog_en_f = TC.face_prog_environment_up_gm_version(state)
+    # prog_en = TC.center_prog_environment_up_gm_version(state)
+    # prog_en_f = TC.face_prog_environment_up_gm_version(state)
     # aux_en = center_aux_environment(state)
 
-    ρarea_en = prog_en.ρarea
-    ρaθ_liq_ice_en = prog_en.ρaθ_liq_ice
-    ρaq_tot_en = prog_en.ρaq_tot
-    if edmf.moisture_model isa TC.NonEquilibriumMoisture
-        ρaq_liq_en = prog_en.ρaq_liq
-        ρaq_ice_en = prog_en.ρaq_ice
-    end
-    ρaw_en = prog_en_f.ρaw
+    # ρarea_en = prog_en.ρarea
+    # ρaθ_liq_ice_en = prog_en.ρaθ_liq_ice
+    # ρaq_tot_en = prog_en.ρaq_tot
+    # if edmf.moisture_model isa TC.NonEquilibriumMoisture
+    #     ρaq_liq_en = prog_en.ρaq_liq
+    #     ρaq_ice_en = prog_en.ρaq_ice
+    # end
+
+    ρaq_tot_en = aux_en.ρaq_tot # this is the prognostic value, not the clipped one
 
     # area_en = aux_en.area
     # θ_liq_ice_en = aux_en.θ_liq_ice
     # q_tot_en = aux_en.q_tot
 
-    tends_ρarea_bulk = tendencies_bulk.ρarea
-    tends_ρaθ_liq_ice_bulk = tendencies_bulk.ρaθ_liq_ice
-    tends_ρaq_tot_bulk = tendencies_bulk.ρaq_tot
+    # tends_ρarea_bulk = tendencies_bulk.ρarea
+    # tends_ρaθ_liq_ice_bulk = tendencies_bulk.ρaθ_liq_ice
+    # tends_ρaq_tot_bulk = tendencies_bulk.ρaq_tot
     if edmf.moisture_model isa TC.NonEquilibriumMoisture
-        tends_ρaq_liq_bulk = tendencies_bulk.ρaq_liq
-        tends_ρaq_ice_bulk = tendencies_bulk.ρaq_ice
+        # tends_ρaq_liq_bulk = tendencies_bulk.ρaq_liq
+        # tends_ρaq_ice_bulk = tendencies_bulk.ρaq_ice
 
         q_liq_bulk = aux_bulk.q_liq
         q_ice_bulk = aux_bulk.q_ice
@@ -551,63 +544,63 @@ function compute_tendency_dt_max(state::TC.State, edmf::TC.EDMFModel)
 
     # so really you need the smaller one...
     @inbounds for k in TC.real_center_indices(grid) 
-        # @info "z = $(grid.zc.z[k])"
-        # @info "tends_ρarea_bulk[k] = $(tends_ρarea_bulk[k]) |  ρ_c[k] * area_bulk[k] = $(ρ_c[k] * area_bulk[k])"
-        # @info "tends_ρaθ_liq_ice_bulk[k] = $(tends_ρaθ_liq_ice_bulk[k]) |  ρ_c[k] * area_bulk[k] * θ_liq_ice_bulk[k] = $(ρ_c[k] * area_bulk[k] * θ_liq_ice_bulk[k])"
-        # @info "tends_ρaq_tot_bulk[k] = $(tends_ρaq_tot_bulk[k]) |  ρ_c[k] * area_bulk[k] * q_tot_bulk[k] = $(ρ_c[k] * area_bulk[k] * q_tot_bulk[k])"
+
+        ρarea_bulk = sum(i-> prog_up[i].ρarea[k], 1:N_up)
+        ρaθ_liq_ice_bulk = sum(i-> prog_up[i].ρaθ_liq_ice[k], 1:N_up)
+        ρaq_tot_bulk = sum(i-> prog_up[i].ρaq_tot[k], 1:N_up)
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
-            # @info "tends_ρaq_liq_bulk[k] = $(tends_ρaq_liq_bulk[k]) |  ρ_c[k] * area_bulk[k] * q_liq_bulk[k] = $(ρ_c[k] * area_bulk[k] * q_liq_bulk[k])"
-            # @info "tends_ρaq_ice_bulk[k] = $(tends_ρaq_ice_bulk[k]) |  ρ_c[k] * area_bulk[k] * q_ice_bulk[k] = $(ρ_c[k] * area_bulk[k] * q_ice_bulk[k])"
+            ρaq_liq_bulk = sum(i-> prog_up[i].ρaq_liq[k], 1:N_up)
+            ρaq_ice_bulk = sum(i-> prog_up[i].ρaq_ice[k], 1:N_up)
         end
 
-        Δt_max_old = Δt_max
-        Δt_max = Δt_max_helper(Δt_max, tends_ρarea_bulk[k], FT(0), ρarea_bulk[k], ρ_c[k] * a_max - ρarea_bulk[k]; message = "ρarea bulk")
-        # if Δt_max < Δt_max_old
-        #     @warn "Δt_max decreased from $Δt_max_old to Δt_max = $Δt_max | tends_ρarea_bulk[k] = $(tends_ρarea_bulk[k]) | ρarea_bulk[k] = $(ρarea_bulk[k]) | z = $(grid.zc.z[k]) | T = $(aux_bulk.T[k])"
-        # end
+        tends_ρarea_bulk = sum(i-> tendencies_up[i].ρarea[k], 1:N_up)
+        tends_ρaθ_liq_ice_bulk = sum(i-> tendencies_up[i].ρaθ_liq_ice[k], 1:N_up)
+        tends_ρaq_tot_bulk = sum(i-> tendencies_up[i].ρaq_tot[k], 1:N_up)
+        if edmf.moisture_model isa TC.NonEquilibriumMoisture
+            tends_ρaq_liq_bulk = sum(i-> tendencies_up[i].ρaq_liq[k], 1:N_up)
+            tends_ρaq_ice_bulk = sum(i-> tendencies_up[i].ρaq_ice[k], 1:N_up)
+        end
+
+        ρaq_tot_en = max(prog_gm.ρq_tot[k] - ρaq_tot_bulk[k], 0)
+        ρaθ_liq_ice_en = max(prog_gm.ρaθ_liq_ice[k] - ρaθ_liq_ice_bulk[k], 0)
+        if edmf.moisture_model isa TC.NonEquilibriumMoisture
+            ρaq_liq_en = max(ρ_c[k] * prog_gm.q_liq[k] - ρaq_liq_bulk[k], 0)
+            ρaq_ice_en = max(ρ_c[k] * prog_gm.ρq_ice[k] - ρaq_ice_bulk[k], 0)
+        end
+
+
 
         Δt_max_old = Δt_max
-        Δt_max = Δt_max_helper(Δt_max, tends_ρaθ_liq_ice_bulk[k], tendencies_gm.ρθ_liq_ice[k], ρaθ_liq_ice_bulk[k], ρaθ_liq_ice_en[k]; message = "ρaθ_liq_ice bulk")
-        # if Δt_max < Δt_max_old
-        #    @warn "Δt_max decreased from $Δt_max_old to Δt_max = $Δt_max | tends_ρaθ_liq_ice_bulk[k] = $(tends_ρaθ_liq_ice_bulk[k]) | ρaθ_liq_ice_bulk[k] = $(ρaθ_liq_ice_bulk[k]) | ρaθ_liq_ice_en[k] = $(ρaθ_liq_ice_en[k]) | z = $(grid.zc.z[k]) | T = $(aux_bulk.T[k])"
-        # end
+        Δt_max = Δt_max_helper(Δt_max, tends_ρarea_bulk, FT(0), ρarea_bulk, ρ_c[k] * a_max - ρarea_bulk; message = "ρarea bulk")
 
         Δt_max_old = Δt_max
-        Δt_max = Δt_max_helper(Δt_max, tends_ρaq_tot_bulk[k], tendencies_gm.ρq_tot[k], ρaq_tot_bulk[k], ρaq_tot_en[k]; message = "ρaq_tot bulk")
-        # if Δt_max < Δt_max_old
-        #     @warn "Δt_max decreased from $Δt_max_old to Δt_max = $Δt_max | tends_ρaq_tot_bulk[k] = $(tends_ρaq_tot_bulk[k]) | ρaq_tot_bulk[k] = $(ρaq_tot_bulk[k]) | ρaq_tot_en[k] = $(ρaq_tot_en[k]) | z = $(grid.zc.z[k]) | T = $(aux_bulk.T[k])"
-        # end
+        Δt_max = Δt_max_helper(Δt_max, tends_ρaθ_liq_ice_bulk, tendencies_gm.ρθ_liq_ice[k], ρaθ_liq_ice_bulk, ρaθ_liq_ice_en; message = "ρaθ_liq_ice bulk")
+
+        Δt_max_old = Δt_max
+        Δt_max = Δt_max_helper(Δt_max, tends_ρaq_tot_bulk, tendencies_gm.ρq_tot[k], ρaq_tot_bulk, ρaq_tot_en; message = "ρaq_tot bulk")
 
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
             Δt_max_old = Δt_max
-            Δt_max = Δt_max_helper(Δt_max, tends_ρaq_liq_bulk[k], ρ_c[k] * tendencies_gm.q_liq[k], ρaq_liq_bulk[k], ρaq_liq_en[k]; message = "ρaq_liq bulk")
-            # if Δt_max < Δt_max_old
-            #     @warn "Δt_max decreased from $Δt_max_old to Δt_max = $Δt_max | tends_ρaq_liq_bulk[k] = $(tends_ρaq_liq_bulk[k]) | ρaq_liq_bulk[k] = $(ρaq_liq_bulk[k]) | ρaq_liq_en[k] = $(ρaq_liq_en[k]) | z = $(grid.zc.z[k]) | T = $(aux_bulk.T[k])"
-            # end
+            Δt_max = Δt_max_helper(Δt_max, tends_ρaq_liq_bulk, ρ_c[k] * tendencies_gm.q_liq[k], ρaq_liq_bulk, ρaq_liq_en; message = "ρaq_liq bulk")
 
             Δt_max_old = Δt_max
-            Δt_max = Δt_max_helper(Δt_max, tends_ρaq_ice_bulk[k], ρ_c[k] * tendencies_gm.q_ice[k], ρaq_ice_bulk[k], ρaq_ice_en[k]; message = "ρaq_ice bulk")
-            # if Δt_max < Δt_max_old
-            #     @warn "Δt_max decreased from $Δt_max_old to Δt_max = $Δt_max | tends_ρaq_ice_bulk[k] = $(tends_ρaq_ice_bulk[k]) | ρaq_ice_bulk[k] = $(ρaq_ice_bulk[k]) | ρaq_ice_en[k] = $(ρaq_ice_en[k]) | z = $(grid.zc.z[k]) | T = $(aux_bulk.T[k])"
-            # end
+            Δt_max = Δt_max_helper(Δt_max, tends_ρaq_ice_bulk, ρ_c[k] * tendencies_gm.q_ice[k], ρaq_ice_bulk, ρaq_ice_en; message = "ρaq_ice bulk")
 
             # Prevent positive supersaturation from being more than depleted in one timestep (negative supersaturation is limited by the condensate itself... ql_tendency_noneq and qi_tendency_noneq should already be 0 or positive (barring melting etc)
             # -- if we have very low supersaturation for example, we dont need it to take many timesteps to go from liq to ice by homogeneous freezing
             # Δt_max_old = Δt_max
 
             # bulk liq
-            ρaq_vap = prog_bulk.ρaq_tot[k] - prog_bulk.ρaq_liq[k] - prog_bulk.ρaq_ice[k]
-            ρaq_vap_sat_liq = ρarea_bulk[k] *  aux_bulk.q_vap_sat_liq[k]
-            ρaq_vap_sat_ice = ρarea_bulk[k] *  aux_bulk.q_vap_sat_ice[k]
+            # ρaq_vap = prog_bulk.ρaq_tot - prog_bulk.ρaq_liq - prog_bulk.ρaq_ice
+            ρaq_vap = ρaq_tot_bulk - ρaq_liq_bulk - ρaq_ice_bulk # should this be prog? or aux?
+            ρaq_vap_sat_liq = ρarea_bulk *  aux_bulk.q_vap_sat_liq[k]
+            ρaq_vap_sat_ice = ρarea_bulk *  aux_bulk.q_vap_sat_ice[k]
 
             if ρaq_vap > ρaq_vap_sat_liq # if supersaturated
                 ql_tendency_cond_evap = aux_bulk.ql_tendency_cond_evap[k]
                 if ql_tendency_cond_evap > 0 
                     old_Δt_max = Δt_max
-                    Δt_max = Δt_max_helper(Δt_max, -ql_tendency_cond_evap, (ρaq_vap - ρaq_vap_sat_liq) / ρarea_bulk[k] ; message = "ρaq_vap_sat_liq bulk") # ql tendency could come from vap or ice, but to be safe assume from vap, ql tendency is negative of the vap tendency
-                    # if Δt_max < old_Δt_max
-                    #     @warn "Δt_max decreased from $old_Δt_max to Δt_max = $Δt_max | ql_tendency_cond_evap = $(ql_tendency_cond_evap) | ρaq_vap = $(ρaq_vap) | ρaq_vap_sat_liq = $(ρaq_vap_sat_liq) | ρarea_bulk = $(ρarea_bulk[k]) | z = $(grid.zc.z[k]) | T = $(aux_bulk.T[k])"
-                    # end
+                    Δt_max = Δt_max_helper(Δt_max, -ql_tendency_cond_evap, (ρaq_vap - ρaq_vap_sat_liq) / ρarea_bulk ; message = "ρaq_vap_sat_liq bulk") # ql tendency could come from vap or ice, but to be safe assume from vap, ql tendency is negative of the vap tendency
                 end # otherwise, ql is shrinking despite supersaturation
             end
 
@@ -616,56 +609,49 @@ function compute_tendency_dt_max(state::TC.State, edmf::TC.EDMFModel)
                 qi_tendency_sub_dep = aux_bulk.qi_tendency_sub_dep[k]
                 if qi_tendency_sub_dep > 0
                     old_Δt_max = Δt_max
-                    Δt_max = Δt_max_helper(Δt_max, -qi_tendency_sub_dep, (ρaq_vap - ρaq_vap_sat_ice) / ρarea_bulk[k] ; message = "ρaq_vap_sat_ice bulk") # qi tendency could come from vap or liq, but to be safe assume from vap, qi tendency is negative of the vap tendency
-                    # if Δt_max < old_Δt_max
-                    #     @warn "Δt_max decreased from $old_Δt_max to Δt_max = $Δt_max | qi_tendency_sub_dep = $(qi_tendency_sub_dep) | ρaq_vap = $(ρaq_vap) | ρaq_vap_sat_ice = $(ρaq_vap_sat_ice) | ρarea_bulk = $(ρarea_bulk[k]) | z = $(grid.zc.z[k]) | T = $(aux_bulk.T[k])"
-                    # end
+                    Δt_max = Δt_max_helper(Δt_max, -qi_tendency_sub_dep, (ρaq_vap - ρaq_vap_sat_ice) / ρarea_bulk ; message = "ρaq_vap_sat_ice bulk") # qi tendency could come from vap or liq, but to be safe assume from vap, qi tendency is negative of the vap tendency
                 end # otherwise, qi is shrinking despite supersaturation
             end
 
-            # en liq
-            ρaq_vap = prog_en.ρaq_tot[k] - prog_en.ρaq_liq[k] - prog_en.ρaq_ice[k]
-            ρaq_vap_sat_liq = ρarea_en[k] *  aux_en.q_vap_sat_liq[k] 
-            ρaq_vap_sat_ice = ρarea_en[k] *  aux_en.q_vap_sat_ice[k] 
-            if ρaq_vap > ρaq_vap_sat_liq # if supersaturated
-                ql_tendency_cond_evap = aux_en.ql_tendency_cond_evap[k]
-                if ql_tendency_cond_evap > 0 
-                    old_Δt_max = Δt_max
-                    Δt_max = Δt_max_helper(Δt_max, -ql_tendency_cond_evap, (ρaq_vap - ρaq_vap_sat_liq) / ρarea_en[k] ; message = "ρaq_vap_sat_liq en") # ql tendency could come from vap or ice, but to be safe assume from vap, ql tendency is negative of the vap tendency
-                    # if Δt_max < old_Δt_max
-                    #     @warn "Δt_max decreased from $old_Δt_max to Δt_max = $Δt_max | ql_tendency_cond_evap = $(ql_tendency_cond_evap) | ρaq_vap = $(ρaq_vap) | ρaq_vap_sat_liq = $(ρaq_vap_sat_liq) | ρarea_en = $(ρarea_en[k]) | z = $(grid.zc.z[k]) | T = $(aux_en.T[k])"
-                    # end
-                end # otherwise, ql is shrinking despite supersaturation
-            end
+            # [[ we deprecated prog_en, if we ever bring this fcn back, it would need a different form ]]
+            # # en liq
+            # # ρaq_vap = prog_en.ρaq_tot[k] - prog_en.ρaq_liq[k] - prog_en.ρaq_ice[k]
+            # ρaq_vap_sat_liq = ρarea_en[k] *  aux_en.q_vap_sat_liq[k] 
+            # ρaq_vap_sat_ice = ρarea_en[k] *  aux_en.q_vap_sat_ice[k] 
+            # if ρaq_vap > ρaq_vap_sat_liq # if supersaturated
+            #     ql_tendency_cond_evap = aux_en.ql_tendency_cond_evap[k]
+            #     if ql_tendency_cond_evap > 0 
+            #         old_Δt_max = Δt_max
+            #         Δt_max = Δt_max_helper(Δt_max, -ql_tendency_cond_evap, (ρaq_vap - ρaq_vap_sat_liq) / ρarea_en[k] ; message = "ρaq_vap_sat_liq en") # ql tendency could come from vap or ice, but to be safe assume from vap, ql tendency is negative of the vap tendency
+            #         # if Δt_max < old_Δt_max
+            #         #     @warn "Δt_max decreased from $old_Δt_max to Δt_max = $Δt_max | ql_tendency_cond_evap = $(ql_tendency_cond_evap) | ρaq_vap = $(ρaq_vap) | ρaq_vap_sat_liq = $(ρaq_vap_sat_liq) | ρarea_en = $(ρarea_en[k]) | z = $(grid.zc.z[k]) | T = $(aux_en.T[k])"
+            #         # end
+            #     end # otherwise, ql is shrinking despite supersaturation
+            # end
 
-            # en ice
-            if ρaq_vap > ρaq_vap_sat_ice # if supersaturated
-                qi_tendency_sub_dep = aux_en.qi_tendency_sub_dep[k]
-                if qi_tendency_sub_dep > 0
-                    old_Δt_max = Δt_max
-                    Δt_max = Δt_max_helper(Δt_max, -qi_tendency_sub_dep, (ρaq_vap - ρaq_vap_sat_ice) / ρarea_en[k] ; message = "ρaq_vap_sat_ice en") # qi tendency could come from vap or liq, but to be safe assume from vap, qi tendency is negative of the vap tendency
-                    # if Δt_max < old_Δt_max
-                    #     @warn "Δt_max decreased from $old_Δt_max to Δt_max = $Δt_max | qi_tendency_sub_dep = $(qi_tendency_sub_dep) | ρaq_vap = $(ρaq_vap) | ρaq_vap_sat_ice = $(ρaq_vap_sat_ice) | ρarea_en = $(ρarea_en[k]) | z = $(grid.zc.z[k]) | T = $(aux_en.T[k])"
-                    # end
-                end # otherwise, qi is shrinking despite supersaturation
-            end
+            # # en ice
+            # if ρaq_vap > ρaq_vap_sat_ice # if supersaturated
+            #     qi_tendency_sub_dep = aux_en.qi_tendency_sub_dep[k]
+            #     if qi_tendency_sub_dep > 0
+            #         old_Δt_max = Δt_max
+            #         Δt_max = Δt_max_helper(Δt_max, -qi_tendency_sub_dep, (ρaq_vap - ρaq_vap_sat_ice) / ρarea_en[k] ; message = "ρaq_vap_sat_ice en") # qi tendency could come from vap or liq, but to be safe assume from vap, qi tendency is negative of the vap tendency
+            #         # if Δt_max < old_Δt_max
+            #         #     @warn "Δt_max decreased from $old_Δt_max to Δt_max = $Δt_max | qi_tendency_sub_dep = $(qi_tendency_sub_dep) | ρaq_vap = $(ρaq_vap) | ρaq_vap_sat_ice = $(ρaq_vap_sat_ice) | ρarea_en = $(ρarea_en[k]) | z = $(grid.zc.z[k]) | T = $(aux_en.T[k])"
+            #         # end
+            #     end # otherwise, qi is shrinking despite supersaturation
+            # end
 
         end
     end
 
-    tends_ρaw_bulk = tendencies_bulk_f.ρaw
     area_bulk_f = TC.face_aux_turbconv(state).bulk.a_up # this originally was only updated in compute_diagnostics() but we'll do it here
     @. area_bulk_f = TC.ᶠinterp_a(area_bulk)
 
     @inbounds for k in TC.real_face_indices(grid)
-        # @info "z = $(grid.zf.z[k])"
-        # @info "tends_ρaw_bulk[k] = $(tends_ρaw_bulk[k]) |  ρ_f[k] * area_bulk_f[k] = $(ρ_f[k] * area_bulk_f[k])"
-
         Δt_max_old = Δt_max
-        Δt_max = Δt_max_helper(Δt_max, tends_ρaw_bulk[k], ρaw_bulk[k]; message = "ρaw bulk") # no env limit, env can go neg... (is that true?)
-        # if Δt_max < Δt_max_old
-        #     @warn "Δt_max decreased from $Δt_max_old to Δt_max = $Δt_max | tends_ρaw_bulk[k] = $(tends_ρaw_bulk[k]) | ρaw_bulk[k] = $(ρaw_bulk[k]) | z = $(grid.zf.z[k])"
-        # end
+        ρaw_bulk = sum(i-> prog_up_f[i].ρaw[k], 1:N_up)
+        tends_ρaw_bulk = sum(i-> tendencies_bulk_f.ρaw[i], 1:N_up) # this is the tendency of the bulk updrafts, not the face updrafts
+        Δt_max = Δt_max_helper(Δt_max, tends_ρaw_bulk, ρaw_bulk; message = "ρaw bulk") # no env limit, env can go neg... (is that true?)
     end 
 
 
@@ -681,15 +667,6 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
     prog_gm_f = TC.face_prog_grid_mean(state)
     Δzc = TC.get_Δz(prog_gm.ρ) # I'm not entirely sure what this returns, it's not the grid spacing precisely, some sort of weighted jacobian
     Δzf = TC.get_Δz(prog_gm_f.w) # I'm not entirely sure what this returns, it's not the grid spacing precisely, some sort of weighted jacobian
-
-    # @info "length(zc) = $(length(parent(grid.zc.z))) | length(Δzc) = $(length(Δzc)) | length(zf) = $(length(parent(grid.zf.z))) | length(Δzf) = $(length(Δzf))"
-    # # @info "zc = $(parent(grid.zc.z)) | Δzc = $(Δzc)) | zf = $(parent(grid.zf.z)) | Δzf = $(Δzf)"
-    # show(stdout, "text/plain", "zc = $(parent(grid.zc.z))")
-    # show(stdout, "text/plain", "my_Δzc = $(diff([grid.zc.z[k] for k in TC.real_center_indices(grid)]))")
-    # show(stdout, "text/plain", "Δzc = $(Δzc)")
-    # show(stdout, "text/plain", "zf = $(parent(grid.zf.z))")
-    # show(stdout, "text/plain", "my_Δzf = $(diff([grid.zf.z[k] for k in TC.real_face_indices(grid)]))")
-    # show(stdout, "text/plain", "Δzf = $(Δzf)")
 
     N_up = TC.n_updrafts(edmf)
 
@@ -733,9 +710,12 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
         # - Except at k_max (toa), there's no k + 1? (also idk how dz has the same length as z but ok...)
         if edmf.cloud_sedimentation_model isa TC.CloudSedimentationModel
             if edmf.cloud_sedimentation_model.grid_mean
-                vel_max = max(term_vel_rain[k_in], term_vel_rain[k_out], term_vel_snow[k_in], term_vel_snow[k_out], aux_gm.term_vel_ice[k_in], aux_gm.term_vel_ice[k_out])
+                vel_max = max(term_vel_rain[k_in], term_vel_rain[k_out], term_vel_snow[k_in], term_vel_snow[k_out], aux_gm.term_vel_liq[k_in], aux_gm.term_vel_liq[k_out], aux_gm.term_vel_ice[k_in], aux_gm.term_vel_ice[k_out])
             else
-                vel_max = max(term_vel_rain[k_in], term_vel_rain[k_out], term_vel_snow[k_in], term_vel_snow[k_out], aux_en.term_vel_ice[k_in], aux_en.term_vel_ice[k_out],  (aux_up[i].term_vel_ice[k_in] for i in 1:N_up)...,  (aux_up[i].term_vel_ice[k_out] for i in 1:N_up)...,)
+                vel_max = max(term_vel_rain[k_in], term_vel_rain[k_out], term_vel_snow[k_in], term_vel_snow[k_out],
+                    aux_en.term_vel_liq[k_in], aux_en.term_vel_liq[k_out], (aux_up[i].term_vel_liq[k_in] for i in 1:N_up)...,  (aux_up[i].term_vel_liq[k_out] for i in 1:N_up)...,
+                    aux_en.term_vel_ice[k_in], aux_en.term_vel_ice[k_out], (aux_up[i].term_vel_ice[k_in] for i in 1:N_up)...,  (aux_up[i].term_vel_ice[k_out] for i in 1:N_up)...,
+                    )
             end
         else
             vel_max = max(term_vel_rain[k_in], term_vel_rain[k_out], term_vel_snow[k_in],  term_vel_snow[k_out])
@@ -749,6 +729,7 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
 
     if use_tendency_timestep_limiter
         dt_max_tendency = compute_tendency_dt_max(state, edmf)
+        error("Deprecated this, to save space on not storing prog_en... if you ever bring that back, you can use this again")
 
         # dt_max_tendency = max(dt_max_tendency, ε) # arguably it doesn't matter, if we step tendency times dt and t doesnt change that's probably still ok
         # if dt_max_tendency < dt_max
@@ -828,16 +809,19 @@ function monitor_cfl!(state, edmf, Δt, CFL_limit)
     if edmf.cloud_sedimentation_model isa TC.CloudSedimentationModel
         if edmf.cloud_sedimentation_model.grid_mean
             aux_gm = TC.center_aux_grid_mean(state)
+            term_vel_liqs = (aux_gm.term_vel_liq, )
             term_vel_ices = (aux_gm.term_vel_ice, )
             aux_ice = (aux_gm, ) # q_liq, q_ice are stored in prog... the values in aux are different... but prog_gm  also doesn't have q_tot, T etc...
         else
             aux_en = TC.center_aux_environment(state)
             N_up = TC.n_updrafts(edmf)
             aux_up = TC.center_aux_updrafts(state)
+            @inbounds term_vel_liqs = (aux_en.term_vel_liq, (aux_up[i].term_vel_liq for i in 1:N_up)...)
             @inbounds term_vel_ices = (aux_en.term_vel_ice, (aux_up[i].term_vel_ice for i in 1:N_up)...)
             aux_ice = (aux_en, (aux_up[i] for i in 1:N_up)...)
         end
     else
+        term_vel_liqs = ()
         term_vel_ices = ()
         aux_ice = ()
     end
@@ -848,17 +832,24 @@ function monitor_cfl!(state, edmf, Δt, CFL_limit)
         # check stability criterion
         CFL_out_rain = Δt / Δz[k] * term_vel_rain[k]
         CFL_out_snow = Δt / Δz[k] * term_vel_snow[k]
+        CFL_out_liqs = (Δt / Δz[k] * term_vel_liq[k] for term_vel_liq in term_vel_liqs)
         CFL_out_ices = (Δt / Δz[k] * term_vel_ice[k] for term_vel_ice in term_vel_ices)
         if TC.is_toa_center(grid, k)
             CFL_in_rain = FT(0)
             CFL_in_snow = FT(0)
+            CFL_in_liqs = (FT(0) for _ in term_vel_liqs)
             CFL_in_ices = (FT(0) for _ in term_vel_ices)
         else
             CFL_in_rain = Δt / Δz[k] * term_vel_rain[k + 1]
             CFL_in_snow = Δt / Δz[k] * term_vel_snow[k + 1]
+            CFL_in_liqs = (Δt / Δz[k] * term_vel_liq[k + 1] for term_vel_liq in term_vel_liqs)
             CFL_in_ices = (Δt / Δz[k] * term_vel_ice[k + 1] for term_vel_ice in term_vel_ices)
         end
-        CFL_meteor, i_CFL_meteor = findmax((CFL_in_rain, CFL_out_rain, CFL_in_snow, CFL_out_snow, Iterators.flatten(zip(CFL_in_ices, CFL_out_ices))...))
+        CFL_meteor, i_CFL_meteor = findmax((CFL_in_rain, CFL_out_rain, CFL_in_snow, CFL_out_snow, Iterators.flatten(zip(CFL_in_liqs, CFL_out_liqs))..., Iterators.flatten(zip(CFL_in_ices, CFL_out_ices))...))
+
+        i_liq_0 = 4 + 1 # the first liquid index
+        i_ice_0 = 4 + 2*length(term_vel_liqs) + 1 # the first ice index
+
         if CFL_meteor > CFL_limit * (1 + frac_tol)
             prog_pr = TC.center_prog_precipitation(state)
             prog_gm = TC.center_prog_grid_mean(state)
@@ -905,9 +896,26 @@ function monitor_cfl!(state, edmf, Δt, CFL_limit)
                 q_tot_env, q_liq_env, q_ice_env = aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k]
                 updraft_area = aux_bulk.area[k]
                 T = aux_gm.T[k]
+
+            elseif 5 ≤ i_CFL_meteor < (5 + 2 * length(term_vel_liqs)) # 5 is the first liquid hydrometeor, and then we have 2 per updraft
+                species = "liquid"
+                i_liq = i_CFL_meteor - i_liq_0 + 1 # the index we are in the liquid list
+                i_liq = (i_liq - 1) ÷ 2 + 1 # the index we are in the aux list
+                k_liq = (i_CFL_meteor % 2) == 1 ? (k + 1) : k # continue the alternating in/out k/k+1 pattern
+
+                term_vel = term_vel_liqs[i_liq][k_liq]
+                q = aux_ice[i_liq].q_liq[k_liq]
+                q_liq, q_ice = aux_ice[i_liq].q_liq[k_liq], aux_ice[i_liq].q_ice[k_liq]
+                q_tot = aux_ice[i_liq].q_tot[k_liq]
+
+                q_tot_up, q_liq_up, q_ice_up = aux_bulk.q_tot[k_liq], aux_bulk.q_liq[k_liq], aux_bulk.q_ice[k_liq]
+                q_tot_env, q_liq_env, q_ice_env = aux_en.q_tot[k_liq], aux_en.q_liq[k_liq], aux_en.q_ice[k_liq]
+                updraft_area = aux_bulk.area[k_liq]
+                T = aux_gm.T[k_liq]
             else
                 species = "ice"
-                i_ice = i_CFL_meteor - 4 # the index we are in the ice list
+                # i_ice = i_CFL_meteor - 4 # the index we are in the ice list [[ from when we had only ice]]
+                i_ice = i_CFL_meteor - i_ice_0 + 1 # the index we are in the ice list
                 i_ice = (i_ice - 1) ÷ 2 + 1 # the index we are in the aux list
                 k_ice = (i_CFL_meteor % 2) == 1 ? (k + 1) : k # continue the alternating in/out k/k+1 pattern
 

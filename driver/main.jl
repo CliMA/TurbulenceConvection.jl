@@ -119,7 +119,7 @@ function Simulation1d(namelist)
     elseif precip_name == "cutoff"
         TC.Clima0M()
     elseif precip_name == "clima_1m"
-        TC.Clima1M(param_set)
+        TC.Clima1M(param_set, namelist)
     else
         error("Invalid precip_name $(precip_name)")
     end
@@ -222,7 +222,7 @@ function Simulation1d(namelist)
     surf_params = Cases.surface_params(case, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, aux_data_kwarg...)
 
     calibrate_io = namelist["stats_io"]["calibrate_io"]
-    aux_dict = calibrate_io ? TC.io_dictionary_aux_calibrate() : TC.io_dictionary_aux()
+    aux_dict = calibrate_io ? TC.io_dictionary_aux_calibrate() : TC.io_dictionary_aux(edmf)
     diagnostics_dict = calibrate_io ? Dict() : io_dictionary_diagnostics()
 
     io_nt = (; aux = aux_dict, diagnostics = diagnostics_dict)
@@ -491,10 +491,23 @@ end
 function my_unstable_check(dt, u, p, t ) # see https://docs.sciml.ai/DiffEqDocs/stable/basics/common_solver_opts/
     unstable = false
 
-    if any(isnan, u)
+    # if any(isnan, u)
+    if any(!isfinite, u) # this is more strict than isnan, but also catches Inf
         @warn "Unstable: NaN detected in solution, typeof(u) = $(typeof(u)); u.cent = $(u.cent); u.face = $(u.face)"
         println(u)
-        @info "u = \n$(summary(u))"
+        flush(stdout); flush(stderr)
+
+        # prog = integrator.u
+        # (; edmf, param_set, aux, case, surf_params) = integrator.p
+
+        summary(stdout, u)
+        summary(stdout, p.aux)
+
+        flush(stdout); flush(stderr)
+
+        # if isdefined(Main, :Infiltrator)
+        #     Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+        # end
 
         unstable = true
         # unstable = false # test just ignoring

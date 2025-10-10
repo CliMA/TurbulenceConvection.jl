@@ -405,6 +405,8 @@ function entr_detr(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale)
 
     # fractional entrainment / detrainment
     ε_nondim, δ_nondim = non_dimensional_function(εδ_model, εδ_vars)
+    ε_ml_nondim = min(ε_ml_nondim,  1/eps(FT)) # don't let these blow up
+    δ_ml_nondim = min(δ_ml_nondim,  1/eps(FT)) # don't let these blow up
     ε_dyn, δ_dyn = εδ_dyn(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale, ε_nondim, δ_nondim)
 
     return EntrDetr{FT}(ε_dyn, δ_dyn, ε_nondim, δ_nondim)
@@ -549,14 +551,19 @@ function compute_phys_entr_detr!(
                         εδ_dyn(mean_model, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, ε_nondim, δ_nondim)
                     # turbulent & mean nondimensional entrainment
                     ε_nondim, δ_nondim = non_dimensional_function(mean_model, εδ_model_vars)
+                    ε_ml_nondim = min(ε_ml_nondim,  1/eps(FT)) # don't let these blow up
+                    δ_ml_nondim = min(δ_ml_nondim,  1/eps(FT)) # don't let these blow up
                     ε_dyn, δ_dyn =
                         εδ_dyn(mean_model, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, ε_nondim, δ_nondim)
                 else
                     # fractional, turbulent & nondimensional entrainment
                     ε_nondim, δ_nondim = non_dimensional_function(εδ_closure, εδ_model_vars)
+                    ε_ml_nondim = min(ε_ml_nondim,  1/eps(FT)) # don't let these blow up
+                    δ_ml_nondim = min(δ_ml_nondim,  1/eps(FT)) # don't let these blow up
                     ε_dyn, δ_dyn =
                         εδ_dyn(εδ_closure, εδ_model_vars, edmf.entr_dim_scale, edmf.detr_dim_scale, ε_nondim, δ_nondim)
                 end
+
 
                 if edmf.entrainment_type isa FractionalEntrModel
 
@@ -580,7 +587,10 @@ function compute_phys_entr_detr!(
                     aux_up[i].entr_rate_inv_s[k] = ε_dyn
                     aux_up[i].detr_rate_inv_s[k] = δ_dyn
 
-                    aux_up[i].detr_rate_inv_s[k] += edmf.entrainment_type.base_detrainment_rate_inv_s # 1/aux_up[i].entr_rate_inv_s[k] is timescale, so (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s)^-1 is the new timescale and (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s) is the new inverse timscale
+                    # taper away base_detrainment_rate_inv_s by w = 5cm/s
+                    base_detrainment_rate_inv_s = edmf.entrainment_type.base_detrainment_rate_inv_s * clamp(FT(1) - w_up_c[k] / FT(0.05), FT(0), FT(1))
+
+                    aux_up[i].detr_rate_inv_s[k] += base_detrainment_rate_inv_s # 1/aux_up[i].entr_rate_inv_s[k] is timescale, so (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s)^-1 is the new timescale and (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s) is the new inverse timscale
                 end
 
             else
@@ -689,6 +699,9 @@ function compute_ml_entr_detr!(
                 # fractional, turbulent & nondimensional entrainment
                 ε_ml_nondim, δ_ml_nondim = non_dimensional_function(εδ_closure, εδ_model_vars)
 
+                ε_ml_nondim = min(ε_ml_nondim,  1/eps(FT)) # don't let these blow up
+                δ_ml_nondim = min(δ_ml_nondim,  1/eps(FT)) # don't let these blow up
+
                 ε_dyn, δ_dyn = εδ_dyn(
                     εδ_closure,
                     εδ_model_vars,
@@ -706,8 +719,10 @@ function compute_ml_entr_detr!(
                     aux_up[i].ε_ml_nondim[k] = ε_ml_nondim
                     aux_up[i].δ_ml_nondim[k] = δ_ml_nondim
 
-                    aux_up[i].entr_rate_inv_s[k] = w_up_c[k] * ε_dyn
-                    aux_up[i].detr_rate_inv_s[k] = w_up_c[k] * δ_dyn
+                    # aux_up[i].entr_rate_inv_s[k] = w_up_c[k] * ε_dyn
+                    # aux_up[i].detr_rate_inv_s[k] = w_up_c[k] * δ_dyn
+                    aux_up[i].entr_rate_inv_s[k] = min(w_up_c[k] * ε_dyn, 1 / eps(FT)) # don't let these blow up to Inf [ though values this large may do unspeakable things to w ] [ Costa also recommended trying 1/Δt ]
+                    aux_up[i].detr_rate_inv_s[k] = min(w_up_c[k] * δ_dyn, 1 / eps(FT)) # don't let these blow up Inf [ though values this large may do unspeakable things to w ] [ Costa also recommended trying 1/Δt ]
 
                 elseif edmf.entrainment_type isa TotalRateEntrModel
                     FT = eltype(εδ_model_vars.q_cond_up)
@@ -717,10 +732,17 @@ function compute_ml_entr_detr!(
                     aux_up[i].ε_ml_nondim[k] = ε_ml_nondim
                     aux_up[i].δ_ml_nondim[k] = δ_ml_nondim
 
-                    aux_up[i].entr_rate_inv_s[k] = ε_dyn
-                    aux_up[i].detr_rate_inv_s[k] = δ_dyn
 
-                    aux_up[i].detr_rate_inv_s[k] += edmf.entrainment_type.base_detrainment_rate_inv_s # 1/aux_up[i].entr_rate_inv_s[k] is timescale, so (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s)^-1 is the new timescale and (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s) is the new inverse timscale
+                    area_limiter = max_area_limiter(εδ_closure, εδ_model_vars.max_area, εδ_model_vars.a_up)
+                    # 1/aux_up[i].entr_rate_inv_s[k] is timescale, so (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s)^-1 is the new timescale and (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s) is the new inverse timscale
+                    # if w = 0, then depending on the `dim_scale` you chose, it's very possible that you'll get 0 for ε_dyn, δ_dyn. So it's important that this background rate also scale up via the limiter.
+
+                    # taper away base_detrainment_rate_inv_s by w = 5cm/s...
+                    base_detrainment_rate_inv_s = edmf.entrainment_type.base_detrainment_rate_inv_s * clamp(FT(1) - w_up_c[k] / FT(0.05), FT(0), FT(1))
+
+                    
+                    aux_up[i].entr_rate_inv_s[k] = min(ε_dyn, inv(eps(FT))) # don't let these blow up to Inf [ though values this large may do unspeakable things to w ] [ Costa also recommended trying 1/Δt ]
+                    aux_up[i].detr_rate_inv_s[k] = min(δ_dyn + base_detrainment_rate_inv_s * (1+area_limiter), inv(eps(FT))) # don't let these blow up to Inf [ though values this large may do unspeakable things to w ] [ Costa also recommended trying 1/Δt ]
                 end
 
             else

@@ -25,6 +25,7 @@ const FT = Float64
 
 using Pkg
 using Statistics: mean
+using Printf: @sprintf
 
 thisdir = dirname(@__FILE__)
 @info thisdir
@@ -175,17 +176,20 @@ function symlog(x, n = -3)
 end
 
 function symlogformatter(x, n; ndigits=20)
-    if sign(x) == 0
-        "10^$(n)"
-    else
+    # if sign(x) == 0
+    #     "10^$(n)"
+    # else
         s = sign(x) == 1 ? "+" : "-"
         nexp = sign(x) * (abs(x) + n)
         if sign(x) == -1
             nexp = -nexp
         end
         n_exp_print = round(nexp, digits=ndigits)
-        s * "10^$(n_exp_print)"
-    end
+        # get minimal
+        # s * "10^$(n_exp_print)" # this doenst work bc stuff like BigFloats dont use minimal printing and wont be truncated
+        num_str = @sprintf("%.*f", ndigits, nexp)  # ✅ dynamic precision
+        return s * "10^" * num_str
+    # end
 end
 
 # Δts = 10 .^ range(-7, stop = 5, length = 100)
@@ -204,13 +208,13 @@ ENV["GKSwstype"]="nul"
 using ProgressMeter
 @showprogress dt=1 desc="Computing..." for (i, Δt) in enumerate(Δts)
     # qls[i], qis[i], δ_ΔTs[i] = morrison_milbrandt_2015_style(param_set, area, ρ,p, T, w, τ_liq, τ_ice, q_vap_0, q, q_eq, Δt, ts; use_fix=use_fix)
-    # qls_exp[i], qis_exp[i] = morrison_milbrandt_2015_style_exponential_part_only(param_set, area, ρ, T, w, τ_liq, τ_ice, q_vap_0, q_eq, Δt,)
+    # qls_exp[i], qis_exp[i] = morrison_milbrandt_2015_style_exponential_part_only(param_set, area, ρ, T, w, τ_liq, τ_ice, q_vap_0, dqvdt, dTdt, q_eq, Δt,)
 
     # println("============================================================================================================================================================== Δt = $Δt")
 
     qls[i], qis[i] = 
         # (q_vap_0 .* FT(NaN), q_vap_0 * FT(NaN))
-        calculate_timestep_limited_sources(TC.StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, q, q_eq, Δt, ts)
+        calculate_timestep_limited_sources(TC.StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, q, q_eq, Δt, ts)
 
 
 

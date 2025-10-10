@@ -12,10 +12,7 @@ taken from https://github.com/CliMA/CloudMicrophysics.jl/blob/v0.14.0/src/Microp
 # const ACMP = CMP.AbstractCloudMicrophysicsParameters #
 # const ACMP = CMP.AbstractCloudMicrophysicsParameters #
 
-import SpecialFunctions as SF
 
-
-Γ_lower(a, x) = SF.gamma(a) - SF.gamma(a, x) # lower incomplete gamma function, ∫_0^x t^(a-1) e^(-t) dt instead of ∫_0^∞
 
 
 # ============================================================================= #
@@ -136,8 +133,8 @@ function my_Chen2022_vel_coeffs(prs::ACMP, ::CMT.RainType, ρ::FT) where {FT <: 
     ci = (c1, c2, c3)
 
     # unit conversions
-    aiu = ai .* 1000 .^ bi
-    ciu = ci .* 1000
+    aiu = ai .* 1000 .^ bi .* (2 .^ bi) # mm^-bi to m^-bi
+    ciu = ci .* 1000 .* 2
 
     return (aiu, bi, ciu)
 end
@@ -151,9 +148,9 @@ function my_Chen2022_vel_coeffs(prs::ACMP, ::CMT.IceType, ρ::FT) where {FT <: R
     ai = (_Es * ρ^_As, _Fs * ρ^_As)
     bi = (_Bs + ρ * _Cs, _Bs + ρ * _Cs)
     ci = (FT(0), _Gs)
-    # unit conversions
-    aiu = ai .* 1000 .^ bi
-    ciu = ci .* 1000
+    # unit conversions [ mm to m and diameter to radius]
+    aiu = ai .* 1000 .^ bi .* (2 .^ bi)
+    ciu = ci .* 1000 .* 2
 
     return (aiu, bi, ciu)
 end
@@ -171,8 +168,8 @@ function my_Chen2022_vel_coeffs(prs::ACMP, ::CMT.SnowType, ρ::FT) where {FT <: 
     bi_s = (_Bs_s + ρ * _Cs_s, _Bs_s + ρ * _Cs_s)
     ci_s = (FT(0), _Gs_s)
     # unit conversions
-    aiu_s = ai_s .* 1000 .^ bi_s
-    ciu_s = ci_s .* 1000
+    aiu_s = ai_s .* 1000 .^ bi_s .* (2 .^ bi_s)
+    ciu_s = ci_s .* 1000 .* 2
     # =========================================================== #
 
 
@@ -180,9 +177,9 @@ function my_Chen2022_vel_coeffs(prs::ACMP, ::CMT.SnowType, ρ::FT) where {FT <: 
     ai_l = (_Bs_l * ρ^_As_l, _Es_l * ρ^_As_l * exp(_Hs_l * ρ))
     bi_l = (_Cs_l, _Fs_l)
     ci_l = (FT(0), _Gs_l)
-    # unit conversions
-    aiu_l = ai_l .* 1000 .^ bi_l # mm^-bi to m^-bi
-    ciu_l = ci_l .* 1000 # /mm to /m
+    # unit conversions [ *2 for diameteter to radius...]
+    aiu_l = ai_l .* 1000 .^ bi_l .* (2 .^ bi_l) # mm^-bi to m^-bi
+    ciu_l = ci_l .* 1000 .* 2 # /mm to /m
     # =========================================================== #
 
     return (aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l)
@@ -200,10 +197,9 @@ Returns the addends of the bulk fall speed of rain or ice particles
 following Chen et al 2022 DOI: 10.1016/j.atmosres.2022.106171 in [m/s].
 We are assuming exponential size distribution and hence μ=0.
 """
-function my_Chen2022_vel_add(a::FT, b::FT, c::FT, λ::FT, k::Int; Dmax::FT = Inf, Dmin::FT = 0.0) where {FT <: Real}
-    μ = 0 # Exponential instaed of gamma distribution
-    δ = μ + k + 1
-    # return a * λ^δ * SF.gamma(b + δ) / (λ + c)^(b + δ) / SF.gamma(δ)
+function my_Chen2022_vel_add(a::FT, b::FT, c::FT, λ::FT, k::FT; Dmax::FT = Inf, Dmin::FT = 0.0, μ::FT = FT(0)) where {FT <: Real}
+    δ = μ + k + FT(1)
+    # return a * λ^δ * CM1.SF.gamma(b + δ) / (λ + c)^(b + δ) / CM1.SF.gamma(δ)
 
     upper_limit_num = Dmax * (λ + c) # Dmax should not be 0
     lower_limit_num = iszero(Dmin) ? FT(0) : Dmin * (λ + c) # avoid 0 * inf
@@ -211,8 +207,8 @@ function my_Chen2022_vel_add(a::FT, b::FT, c::FT, λ::FT, k::Int; Dmax::FT = Inf
     upper_limit_den = Dmax * λ
     lower_limit_den = iszero(Dmin) ? FT(0) : Dmin * λ
 
-    return a * λ^δ / (λ + c)^(b + δ) * (SF.gamma(b + δ, upper_limit_num) - SF.gamma(b + δ, lower_limit_num)) /
-           (SF.gamma(δ, upper_limit_den) - SF.gamma(δ, lower_limit_den))
+    return a * λ^δ / (λ + c)^(b + δ) * (CM1.SF.gamma(b + δ, upper_limit_num) - CM1.SF.gamma(b + δ, lower_limit_num)) /
+           (CM1.SF.gamma(δ, upper_limit_den) - CM1.SF.gamma(δ, lower_limit_den))
     # this should be the result of truncating at Dmax, where we transition from rain to snow for example...
 end
 
@@ -236,7 +232,7 @@ function my_Chen2022_vel_add_sno(
     aec::FT,
     mec::FT,
     κ::FT,
-    k::Int,
+    k::FT,
     c::FT,
     λ::FT,
     Dmin::FT,
@@ -249,9 +245,9 @@ function my_Chen2022_vel_add_sno(
     lower_limit_den = iszero(Dmin) ? FT(0) : Dmin * λ
 
     return t * (
-        SF.gamma(3 * κ * aec - 2 * κ * mec + b + k + 1, upper_limit_num) -
-        SF.gamma(3 * κ * aec - 2 * κ * mec + b + k + 1, lower_limit_num)
-    ) / (SF.gamma(k + 1, upper_limit_den) - SF.gamma(k + 1, lower_limit_den))
+        CM1.SF.gamma(3 * κ * aec - 2 * κ * mec + b + k + 1, upper_limit_num) -
+        CM1.SF.gamma(3 * κ * aec - 2 * κ * mec + b + k + 1, lower_limit_num)
+    ) / (CM1.SF.gamma(k + 1, upper_limit_den) - CM1.SF.gamma(k + 1, lower_limit_den))
 
 
     # Checking here
@@ -260,203 +256,10 @@ function my_Chen2022_vel_add_sno(
 end
 # This is for \int_0^∞, but we want transitions
 # my_Chen2022_vel_add_sno(t, b, aec, mec, κ, k; Dmax=Dmax) =
-# t * SF.gamma(3 * κ * aec - 2 * κ * mec + b + k + 1) /
-# SF.gamma(k + 1)
+# t * CM1.SF.gamma(3 * κ * aec - 2 * κ * mec + b + k + 1) /
+# CM1.SF.gamma(k + 1)
 
 # ============================================================================= #
-
-"""
-    n0(prs, q_sno, ρ, snow_type)
-
- - `prs` - abstract set with Earth parameters
- - `q_sno` -  snow specific humidity
- - `ρ` - air density
- - `type` - type for dispatch
-
-Returns the intercept parameter of the assumed Marshall-Palmer distribution
-"""
-function n0(prs::ACMP, q_sno::FT, ρ::FT, ::CMT.SnowType) where {FT <: Real}
-
-    _ν_sno::FT = CMP.ν_sno(prs)
-    _μ_sno::FT = CMP.μ_sno(prs)
-
-    # TODO               this max should be replaced by
-    #                    limiting inside a PhasePartition struct for
-    #                    precipitation (once it is implemented)
-    return _μ_sno * (ρ * max(0, q_sno))^_ν_sno
-end
-n0(prs::ACMP, ::Any, ::Any, ::CMT.IceType) = CMP.n0_ice(prs)
-n0(prs::ACMP, ::Any, ::Any, ::CMT.RainType) = CMP.n0_rai(prs)
-
-
-"""
-if you think you know what the total number concentration N_t should be, you can use this
-For marshall palmer, we take gamma dist N_0 D^μ exp(-λD) and set μ=0, leaving N_0 exp(-λD)
-
-the total mass is based on a bunch of constants below... and n_0 is just set.
-However, integrating we can show ∫(PSD) = Γ(μ+1) / λ^(μ+1) N_0 = N_t  so N_0 = N_t λ^(μ+1) / Γ(μ+1)
-
-For μ = 0 this is just N_0 =  N_t λ
-
-If we take λ as written in https://clima.github.io/CloudMicrophysics.jl/dev/Microphysics1M/#Assumed-particle-size-relationships Eq 7 (which accounts for the size <-> mass relationship assumptions)
-then we can take N_t = N_0 Γ(μ+1) / λ^(μ+1) = N_0 / λ, plug in our desired N_t, and solve for N_0
-
-I'm not sure if we can use other μ, bc I am not certain on how λ was derived, but i assume it assumes μ=0
-"""
-function n0(
-    prs::ACMP,
-    q::FT,
-    ρ::FT,
-    Nt::FT,
-    precip::Union{CMT.IceType, CMT.RainType, CMT.SnowType}, # not sure if have a liqtype
-) where {FT <: Real}
-    # _n0::FT = n0(prs, q, ρ, precip)
-    _r0::FT = r0(prs, precip)
-    _m0::FT = m0(prs, precip)
-    _me::FT = me(prs, precip)
-    _Δm::FT = Δm(prs, precip)
-    _χm::FT = χm(prs, precip)
-
-    n0::FT = FT(0)
-    if q > FT(0)
-        E::FT = FT(1 / (_me + _Δm + 1))
-        λ_no_n0::FT = (_χm * _m0 * SF.gamma(_me + _Δm + FT(1)) / ρ / q / _r0^(_me + _Δm))^E # We've divided λ by n_0 ^ FT(1 / (_me + _Δm + 1)) = n_0^E so that λ = λ_no_n0 * n_0^E
-
-        # call FT(1 / (_me + _Δm + 1)) E
-        #  So we have  N_t = n_0 / λ = n_0 / (λ_no_n0 * n_0^E) = n_0^(1-E) / λ_no_n0
-        # Then, n_0^(1-E) = N_t λ_no_n0
-        # n_0 = (N_t λ_no_n0)^(1 / (1-E))
-
-        n0 = (Nt * λ_no_n0)^(1 / (1 - E))
-
-        return n0
-    end
-
-    return n0
-end
-
-
-"""
-    v0(prs, ρ, rain_type)
-
- - `prs` - abstract set with Earth parameters
- - `ρ` - air density
- - `type` - type for dispatch
-
-Returns the proportionality coefficient in terminal velocity(r/r0).
-"""
-function v0(prs::ACMP, ρ::FT, ::CMT.RainType) where {FT <: Real}
-
-    _ρ_cloud_liq::FT = CMP.ρ_cloud_liq(prs)
-    _C_drag::FT = CMP.C_drag(prs)
-    _grav::FT = CMP.grav(prs)
-    _r0_rai::FT = CMP.r0_rai(prs)
-
-    return sqrt(FT(8 / 3) / _C_drag * (_ρ_cloud_liq / ρ - FT(1)) * _grav * _r0_rai)
-end
-v0(prs::ACMP, ::FT, ::CMT.SnowType) where{FT <: Real} = CMP.v0_sno(prs)
-
-# Other ice/rain/snow parameters to dispatch over
-a_vent(prs::ACMP, ::CMT.RainType) = CMP.a_vent_rai(prs)
-b_vent(prs::ACMP, ::CMT.RainType) = CMP.b_vent_rai(prs)
-a_vent(prs::ACMP, ::CMT.SnowType) = CMP.a_vent_sno(prs)
-b_vent(prs::ACMP, ::CMT.SnowType) = CMP.b_vent_sno(prs)
-
-r0(prs::ACMP, ::CMT.IceType) = CMP.r0_ice(prs)
-m0(prs::ACMP, ::CMT.IceType) = CMP.m0_ice(prs)
-me(prs::ACMP, ::CMT.IceType) = CMP.me_ice(prs)
-χm(prs::ACMP, ::CMT.IceType) = CMP.χm_ice(prs)
-Δm(prs::ACMP, ::CMT.IceType) = CMP.Δm_ice(prs)
-
-# my additions ----------------------------------------------- #
-
-v0(prs::ACMP, ρ::FT, ::CMT.IceType) where {FT <: Real} = CM1.v0(prs, ρ, snow_type) # fall back to snow bc we don't have a value for ice
-a0(prs::ACMP, ice_type::CMT.IceType) = CM1.a0(prs, snow_type) # fall back to snow values [ this has a scaling factor of 0.3 on it -- is that ok? or should snow have it but smaller ice crystals not?]
-ae(prs::ACMP, ice_type::CMT.IceType) = CM1.ae(prs, snow_type) # fall back to snow values [ should just be 2 for r^2]
-
-ve(prs::ACMP, ::CMT.IceType) = CM1.ve(prs, snow_type) # fall back to snow bc we don't have a value for ice
-χa(prs::ACMP, ::CMT.IceType) = CM1.χa(prs, snow_type) # fall back to snow bc we don't have a value for ice
-Δa(prs::ACMP, ::CMT.IceType) = CM1.Δa(prs, snow_type) # fall back to snow bc we don't have a value for ice [ should just be 0 ]
-χv(prs::ACMP, ::CMT.IceType) = CM1.χv(prs, snow_type) # fall back to snow bc we don't have a value for ice
-Δv(prs::ACMP, ::CMT.IceType) = CM1.Δv(prs, snow_type) # fall back to snow bc we don't have a value for ice
-
-# ------------------------------------------------------------ #
-
-r0(prs::ACMP, ::CMT.RainType) = CMP.r0_rai(prs)
-m0(prs::ACMP, ::CMT.RainType) = CMP.m0_rai(prs)
-me(prs::ACMP, ::CMT.RainType) = CMP.me_rai(prs)
-a0(prs::ACMP, ::CMT.RainType) = CMP.a0_rai(prs)
-ae(prs::ACMP, ::CMT.RainType) = CMP.ae_rai(prs)
-ve(prs::ACMP, ::CMT.RainType) = CMP.ve_rai(prs)
-χm(prs::ACMP, ::CMT.RainType) = CMP.χm_rai(prs)
-Δm(prs::ACMP, ::CMT.RainType) = CMP.Δm_rai(prs)
-χa(prs::ACMP, ::CMT.RainType) = CMP.χa_rai(prs)
-Δa(prs::ACMP, ::CMT.RainType) = CMP.Δa_rai(prs)
-χv(prs::ACMP, ::CMT.RainType) = CMP.χv_rai(prs)
-Δv(prs::ACMP, ::CMT.RainType) = CMP.Δv_rai(prs)
-
-r0(prs::ACMP, ::CMT.SnowType) = CMP.r0_sno(prs)
-m0(prs::ACMP, ::CMT.SnowType) = CMP.m0_sno(prs)
-me(prs::ACMP, ::CMT.SnowType) = CMP.me_sno(prs)
-a0(prs::ACMP, ::CMT.SnowType) = CMP.a0_sno(prs)
-ae(prs::ACMP, ::CMT.SnowType) = CMP.ae_sno(prs)
-ve(prs::ACMP, ::CMT.SnowType) = CMP.ve_sno(prs)
-χm(prs::ACMP, ::CMT.SnowType) = CMP.χm_sno(prs)
-Δm(prs::ACMP, ::CMT.SnowType) = CMP.Δm_sno(prs)
-χa(prs::ACMP, ::CMT.SnowType) = CMP.χa_sno(prs)
-Δa(prs::ACMP, ::CMT.SnowType) = CMP.Δa_sno(prs)
-χv(prs::ACMP, ::CMT.SnowType) = CMP.χv_sno(prs)
-Δv(prs::ACMP, ::CMT.SnowType) = CMP.Δv_sno(prs)
-
-"""
-    lambda(q, ρ, n0, m0, me, r0, χm, Δm)
-
- - `prs` - set with free parameters
- - `precip` - a type for cloud ice, rain or snow
- - `q` - specific humidity of rain, ice or snow
- - `ρ` - air density
-
-Returns the rate parameter of the assumed size distribution of
-particles (rain drops, ice crystals, snow crystals).
-"""
-function lambda(
-    prs::ACMP,
-    precip::Union{CMT.IceType, CMT.RainType, CMT.SnowType},
-    q::FT,
-    ρ::FT,
-    # Nt::Union{FT, Nothing},
-    Nt::FT, # testing for type stability, use NaN instead of nothing
-    Dmin::FT,
-    Dmax::FT;
-    _n0::FT = FT(NaN) # allow avoiding repeated caclulations of _n0, since a lot of fcns use both n0 and lambda
-) where {FT <: Real}
-
-    # _n0::FT = isnothing(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, Nt, precip) # use wanted Nt If given
-    if isnan(_n0)
-        _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, Nt, precip) # use wanted Nt If given
-    end
-    _r0::FT = r0(prs, precip)
-    _m0::FT = m0(prs, precip)
-    _me::FT = me(prs, precip)
-    _Δm::FT = Δm(prs, precip)
-    _χm::FT = χm(prs, precip)
-
-
-    λ::FT = FT(0)
-
-    if q > FT(0)
-        λ = (_χm * _m0 * _n0 * SF.gamma(_me + _Δm + FT(1)) / ρ / q / _r0^(_me + _Δm))^FT(1 / (_me + _Δm + 1))
-    end
-
-    # this would be scaling N to get the right q, but no point bc doesnt affect terminal velocity anyway (we wouldn't recompute λ, and the mass weighting wouldn't change...)
-    # if Dmin > 0 || Dmax < Inf
-    # upper_limit = Dmax * λ # Dmax should not be zero...
-    # lower_limit = iszero(Dmin) ? FT(0) : Dmin * λ # avoid 0*Inf
-    # _n0 = SF.Gamma(μ+1) / (SF.Gamma(μ+1, upper_limit) - SF.Gamma(μ+1, lower_limit))
-    # end
-
-    return λ
-end
 
 """
     nm_int(prs, precip, velo_scheme, ρ, q_)
@@ -474,41 +277,59 @@ end
         though in principle we put bounds on the integral so it's not infinite...so it's really
     -χ_m m_0 n_0 (1/(r_0*λ))^(m_e + Δ_m)) [Γ(m_e + Δ_m + 1, Dmax*λ) - Γ(m_e + Δ_m + 1, Dmin*λ)]
 
+    q = ∫ n(r)m(r) dr / ρ
 
  """
  function int_nm_dr(
     prs::ACMP,
-    precip::Union{CMT.IceType, CMT.RainType, CMT.SnowType},
+    precip::CMTWaterTypes,
     q::FT,
     ρ::FT,
-    μ_precip::FT;
+    μ::FT;
     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
     Dmin::FT = FT(0),
     Dmax::FT = FT(Inf),
 ) where {FT <: Real}
 
     # _n0::FT = isnothing(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, Nt, precip) # use wanted Nt If given
-    _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, Nt, precip) # use wanted Nt If given
+    _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ) # use wanted Nt If given
+    λ = lambda(prs, precip, q, ρ, Nt, μ, Dmin, Dmax)
+
+    return int_nm_dr(prs, precip, _n0, λ, ρ, μ; Dmin=Dmin, Dmax=Dmax)
+ end
+
+    
+
+function int_nm_dr(
+    prs::ACMP,
+    precip::CMTWaterTypes,
+    n0::FT,
+    λ::FT,
+    ρ::FT,
+    μ::FT;
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+) where {FT <: Real}
+
     _r0::FT = r0(prs, precip)
     _m0::FT = m0(prs, precip)
     _me::FT = me(prs, precip)
     _Δm::FT = Δm(prs, precip)
     _χm::FT = χm(prs, precip)
 
-    λ = lambda(prs, precip, q, ρ, Nt, Dmin, Dmax)
 
     upper_limit = Dmax * λ # Dmax should not be zero...
     lower_limit = iszero(Dmin) ? FT(0) : Dmin * λ # avoid 0*Inf
 
 
-    μ = μ_precip + _me + _Δm
+    μ_tot = μ + _me + _Δm
     parts = (
         _χm,
         _m0,
-        _n0,
+        n0,
         (1/(_r0))^(_me + _Δm), 
-        λ^-(μ + FT(1)), # this is the same as λ^(-μ) * λ^(-1)
-        SF.gamma(μ + FT(1), upper_limit) - SF.gamma(μ + FT(1), lower_limit)
+        λ^-(μ_tot + FT(1)), # this is the same as λ^(-μ) * λ^(-1)
+        CM1.SF.gamma(μ_tot + FT(1), upper_limit) - CM1.SF.gamma(μ_tot + FT(1), lower_limit)
     )
 
     if any(iszero, parts)
@@ -517,11 +338,16 @@ end
         out = -reduce(*, parts)
         return isnan(out) ? FT(0) : out # in case the inf was introduced later, default to 0... (is that bad should probably only happen with very small inputs so probably is fine.)
     end
-    # return -_χm * _m0 * _n0 * (SF.gamma(μ + FT(1), upper_limit) - SF.gamma(μ + FT(1), lower_limit))
+    # return -_χm * _m0 * n0 * (CM1.SF.gamma(μ + FT(1), upper_limit) - CM1.SF.gamma(μ + FT(1), lower_limit))
  end
 
-# alias int_nm_dr as q_int
-q_int(prs::ACMP, precip::Union{CMT.IceType, CMT.RainType, CMT.SnowType}, q::FT, ρ::FT, μ_precip::FT; Nt::FT = FT(NaN), Dmin::FT = FT(0), Dmax::FT = FT(Inf)) where {FT} = int_nm_dr(prs, precip, q, ρ, μ_precip; Nt=Nt, Dmin=Dmin, Dmax=Dmax) / ρ
+int_q(prs::ACMP, precip::CMTWaterTypes, q::FT, ρ::FT, μ::FT; Nt::FT = FT(NaN), Dmin::FT = FT(0), Dmax::FT = FT(Inf)) where {FT} =
+    int_nm_dr(prs, precip, q, ρ, μ; Nt=Nt, Dmin=Dmin, Dmax=Dmax) / ρ
+int_q(prs::ACMP, precip::CMTWaterTypes, n0::FT, λ::FT, ρ::FT, μ::FT; Dmin::FT = FT(0), Dmax::FT = FT(Inf)) where {FT} =
+    int_nm_dr(prs, precip, n0, λ, ρ, μ; Dmin=Dmin, Dmax=Dmax) / ρ
+
+
+
 
 """
 integrate n(r) from Dmin to Dmax
@@ -531,48 +357,177 @@ integrate n(r) from Dmin to Dmax
 """
 function int_n_dr(
     prs::ACMP,
-    precip::Union{CMT.IceType, CMT.RainType, CMT.SnowType},
+    precip::CMTWaterTypes,
     q::FT,
     ρ::FT,
-    μ_precip::FT;
+    μ::FT;
     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
     Dmin::FT = FT(0),
     Dmax::FT = FT(Inf),
 ) where {FT <: Real}
 
-    # _n0::FT = isnothing(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, Nt, precip) # use wanted Nt If given
-    _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, Nt, precip) # use wanted Nt If given
-    _r0::FT = r0(prs, precip)
+    _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ; Dmin=Dmin, Dmax=Dmax) # use wanted Nt If given
+    λ::FT = lambda(prs, precip, q, ρ, Nt, μ, Dmin, Dmax)
+    return int_n_dr(prs, precip, _n0, λ, ρ, μ; Dmin=Dmin, Dmax=Dmax)
+end
 
-    λ = lambda(prs, precip, q, ρ, Nt, Dmin, Dmax)
+function int_n_dr(
+    prs::ACMP,
+    precip::CMTWaterTypes,
+    n0::FT,
+    λ::FT,
+    ρ::FT,
+    μ::FT;
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+) where {FT <: Real}
+
+    _r0::FT = r0(prs, precip)
 
     upper_limit = Dmax * λ # Dmax should not be zero...
     lower_limit = iszero(Dmin) ? FT(0) : Dmin * λ # avoid 0*Inf
 
-    μ = μ_precip
 
     parts = (
-        _n0,
+        n0,
         λ^-(μ + FT(1)), # this is the same as λ^(-μ) * λ^(-1)
-        SF.gamma(μ + FT(1), upper_limit) - SF.gamma(μ + FT(1), lower_limit)
+        CM1.SF.gamma(μ + FT(1), upper_limit) - CM1.SF.gamma(μ + FT(1), lower_limit)
     )
 
 
     if any(iszero, parts)
         return FT(0) # avoid 0*Inf -- you could get th wrong answer if it's really close to but not quite 0
     else
-        out = reduce(*, parts)
+        out = -reduce(*, parts)
         return isnan(out) ? FT(0) : out # in case the inf was introduced later
     end
 end
-n_int(prs::ACMP, precip::Union{CMT.IceType, CMT.RainType, CMT.SnowType}, q::FT, ρ::FT, μ_precip::FT; Nt::FT = FT(NaN), Dmin::FT = FT(0), Dmax::FT = FT(Inf)) where {FT} = int_n_dr(prs, precip, q, ρ, μ_precip; Nt=Nt, Dmin=Dmin, Dmax=Dmax) / ρ
+n_int(prs::ACMP, precip::CMTWaterTypes, q::FT, ρ::FT, μ::FT; Nt::FT = FT(NaN), Dmin::FT = FT(0), Dmax::FT = FT(Inf)) where {FT} = int_n_dr(prs, precip, q, ρ, μ; Nt=Nt, Dmin=Dmin, Dmax=Dmax) / ρ
 
+
+"""
+Integrate n(r) * r
+    n(D) = N_0 D^μ e^(-D*λ)
+
+    ∫n(r) r dr = ∫ N_0 D^(μ+1) e^(-D*λ) dr = N_0 / λ^(μ+2) * (Γ(μ+2, Dmax*λ) - Γ(μ+2, Dmin*λ))
+
+"""
+function int_nr_dr(
+    prs::ACMP,
+    precip::CMTWaterTypes,
+    q::FT,
+    ρ::FT,
+    μ::FT;
+    Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+) where {FT <: Real}
+
+    _n0 = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ; Dmin=Dmin, Dmax=Dmax) # use wanted Nt If given
+    λ = lambda(prs, precip, q, ρ, Nt, μ, Dmin, Dmax)
+
+    return int_nr_dr(prs, precip, _n0, λ, ρ, μ; Dmin=Dmin, Dmax=Dmax)
+end
+
+function int_nr_dr(
+    prs::ACMP,
+    precip::CMTWaterTypes,
+    n0::FT,
+    λ::FT,
+    ρ::FT,
+    μ::FT;
+    Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+) where {FT <: Real}
+
+    upper_limit = Dmax * λ # Dmax should not be zero...
+    lower_limit = iszero(Dmin) ? FT(0) : Dmin * λ # avoid 0*Inf
+    μ_tot = μ + FT(1) # we add 1 to the moment for x r
+    parts = (
+        n0,
+        λ^-(μ + FT(1)), # this is the same as λ^(-μ) * λ^(-1)
+        CM1.SF.gamma(μ_tot + FT(1), upper_limit) - CM1.SF.gamma(μ_tot + FT(1), lower_limit)
+    )
+
+    if any(iszero, parts)
+        return FT(0) # avoid 0*Inf -- you could get th wrong answer if it's really close to but not quite 0
+    else
+        out = -reduce(*, parts)
+        return isnan(out) ? FT(0) : out # in case the inf was introduced later
+    end
+end
+
+
+"""
+Integrate n(r)a(r) dr
+    n(r) = N_0 D^μ e^(-D*λ)
+    a(r) = χ_a a_0 (r/r_0)^(a_e + Δ_a)
+
+    ∫n(r)a(r) dr = -χ_a a_0 N_0 / λ^(μ + a_e + Δ_a + 1) * (Γ(μ + a_e + Δ_a + 1, Dmax*λ) - Γ(μ + a_e + Δ_a + 1, Dmin*λ))
+"""
+function int_na_dr(
+    prs::ACMP,
+    precip::CMTWaterTypes,
+    q::FT,
+    ρ::FT,
+    μ::FT;
+    Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+) where {FT <: Real}    
+
+    _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ; Dmin=Dmin, Dmax=Dmax) # use wanted Nt If given
+    λ = lambda(prs, precip, q, ρ, Nt, μ, Dmin, Dmax)
+    return int_na_dr(prs, precip, _n0, λ, ρ, μ; Dmin=Dmin, Dmax=Dmax)
+end
+
+function int_na_dr(
+    prs::ACMP,
+    precip::CMTWaterTypes,
+    n0::FT,
+    λ::FT,
+    ρ::FT,
+    μ::FT;
+    Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+) where {FT <: Real}   
+
+    _r0::FT = r0(prs, precip)
+    _a0::FT = a0(prs, precip)
+    _ae::FT = ae(prs, precip)
+    _Δa::FT = Δa(prs, precip)
+    _χa::FT = χa(prs, precip)
+
+
+    upper_limit = Dmax * λ # Dmax should not be zero...
+    lower_limit = iszero(Dmin) ? FT(0) : Dmin * λ # avoid 0*Inf
+
+    μ_tot = μ + _ae + _Δa
+    parts = (
+        _χa,
+        _a0,
+        n0,
+        (1/(_r0))^(_ae + _Δa), 
+        λ^-(μ_tot + FT(1)), # this is the same as λ^(-μ) * λ^(-1)
+        CM1.SF.gamma(μ_tot + FT(1), upper_limit) - CM1.SF.gamma(μ_tot + FT(1), lower_limit)
+    )
+
+    if any(iszero, parts)
+        return FT(0) # avoid 0*Inf -- you could get th wrong answer if it's really close to but not quite 0
+    else
+        out = -reduce(*, parts)
+        return isnan(out) ? FT(0) : out # in case the inf was introduced later
+    end
+
+end
 
 
 
  """
     Numerator of Eq 20 in Chen et al 2022 for the kth moment.
-        = ∫_Dmin^Dmax V(D) D^k n(D) dD =  m0 ∑ -a / (λ + c)^(b + δ) * (SF.gamma(b + δ, upper_limit) - SF.gamma(b + δ, lower_limit))
+        = ∫_Dmin^Dmax V(D) D^k n(D) dD =  n0 ∑ -a / (λ + c)^(b + δ) * (CM1.SF.gamma(b + δ, upper_limit) - CM1.SF.gamma(b + δ, lower_limit))
         V(D) = ϕ^κ ∑(a_i * D_i^b_i * e^(-c_i * D))
         n(D) = n_0 D^μ e^(-λD)
 
@@ -582,14 +537,14 @@ n_int(prs::ACMP, precip::Union{CMT.IceType, CMT.RainType, CMT.SnowType}, q::FT, 
 
         Helper for int_nav_dr
 """
-function int__v_Dk_n__dD(a::FT, b::FT, c::FT, n0::FT, λ::FT, k::Int; Dmax::FT = FT(Inf), Dmin::FT = FT(0)) where {FT <: Real}
-    μ = 0 # Exponential instaed of gamma distribution
+function int__v_Dk_n__dD(a::FT, b::FT, c::FT, n0::FT, λ::FT, k::FT; Dmax::FT = FT(Inf), Dmin::FT = FT(0), μ::FT=FT(0)) where {FT <: Real}
+    # defaults to μ = 0,  Exponential (Marshall-Palmer) instead of Gamma distribution
     δ = μ + k + 1
 
     upper_limit = Dmax * (λ + c) # Dmax should not be 0
     lower_limit = iszero(Dmin) ? FT(0) : Dmin * (λ + c) # avoid 0 * inf
 
-    return -a * n0 / (λ + c)^(b + δ) * (SF.gamma(b + δ, upper_limit) - SF.gamma(b + δ, lower_limit))
+    return -a * n0 / (λ + c)^(b + δ) * (CM1.SF.gamma(b + δ, upper_limit) - CM1.SF.gamma(b + δ, lower_limit))
     # this should be the result of truncating at Dmax, where we transition from rain to snow for example...
 end
 
@@ -605,12 +560,13 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
 -χ_m m_0 χ_a m_a n_0 (1/(r_0*λ))^(m_e + Δ_m + a_e + Δ_a)) [Γ(m_e + Δ_m + m_a + Δ_a 1, Dmax*λ) - Γ(m_e + Δ_m + m_a + Δ_a + 1, Dmin*λ)]
 """
  function int_nav_dr(
-    prs::ACMP,
-    precip::Union{CMT.IceType, CMT.RainType, CMT.SnowType},
+    # prs::ACMP,
+    param_set::APS,
+    precip::CMTWaterTypes,
     velo_scheme::CMT.Blk1MVelType,
     q::FT,
     ρ::FT,
-    μ_precip::FT;
+    μ::FT;
     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
     Dmin::FT = FT(0),
     Dmax::FT = FT(Inf),
@@ -628,6 +584,9 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
         Note we just also use ql instead of having m(r) for liquid in the integral like in accretion_snow_rain() and don't have m for ice at all. I'm not sure why that's ok.
 
     If we plug in a(r) = π (D/2)^2 things are simplest... 
+    We really have a(r) = χ_a a_0 (r/r_0)^(a_e + Δ_a)
+
+    Then we have v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = χ_v v_0 (D/r_0)^(v_e + Δ_v)
 
     ∫ n(r)a(r)v(r) dr = π/4 ∫ n(r)D^2v(r) dr so you just have k = 2
 
@@ -636,20 +595,27 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
         ∫ n(r)a(r)v(r) dr = π/4 ϕ^κ n0 ∑_i (a_i * λ^δ Γ(b_i + δ) / (λ+c_i)^(b_i+δ)
 """
  function int_nav_dr(
-    prs::ACMP,
+    # prs::ACMP,
+    param_set::APS,
     precip::CMT.IceType,
     velo_scheme::CMT.Chen2022Type,
     q::FT,
     ρ::FT,
-    μ_precip::FT;
+    μ::FT;
     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
     Dmin::FT = FT(0),
     Dmax::FT = FT(Inf),
-    D_transition::FT = FT(0.625e-3 * 2), # .625mm is the transition from small to large ice crystals in Chen paper
+    D_transition::FT = FT((0.625e-3)/2), # .625mm is the transition from small to large ice crystals in Chen paper
 ) where {FT <: Real}
 
     int = FT(0)
     if q > FT(0)
+
+        prs = TCP.microphysics_params(param_set)
+
+        if isnan(μ)
+            μ = μ_from_qN(param_set, precip, q, Nt; ρ=ρ)
+        end
 
         # coefficients from Appendix B from Chen et. al. 2022
         (aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l) = my_Chen2022_vel_coeffs(prs, CM.CommonTypes.SnowType(), ρ)
@@ -657,8 +623,13 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
         # ρ_i::FT = CMP.ρ_cloud_ice(prs)
         # Ok so here's the thing.... we want q to fit between Dmin and Dmax...
         # so we need a lambda that works for that....
-        _λ::FT = lambda(prs, precip, q, ρ, Nt, Dmin, Dmax)
-        _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, Nt, precip) # use wanted Nt If given
+        # _λ::FT = lambda(param_set, precip, q, ρ, Nt, μ, Dmin, Dmax)
+        _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, precip, Nt, μ; Dmin=Dmin, Dmax=Dmax) # use wanted Nt If given
+        _λ::FT = lambda(prs, precip, q, ρ, Nt, μ; _n0=_n0, Dmin=Dmin, Dmax=Dmax)
+
+        a0c::FT = a0(prs, precip) * χa(prs, precip)
+        aec::FT = ae(prs, precip) + Δa(prs, precip)
+        _r0::FT = r0(prs, precip)
 
 
         if Dmin < D_transition
@@ -674,16 +645,21 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
             abcs = [(aiu_l, bi_l, ciu_l)]
         end
 
-        # Here we assume μ_precip = 0, otherewise we would add it to k... (we had δ = μ + k + 1)
+        # Here we assume μ = 0, otherewise we would add it to k... (we had δ = μ + k + 1)
+
+        Dmax = min(Dmax,  FT(.625e-3)/2) # v is I think poorly defined past that point... for Chen.. grows too big, so we upper bound it.
+        
 
         # Here the integrals should be additive, so we can just sum them up without any weighting
-        k = 2 #  k = 2 here bc a ∝ r^2
+        # k = 2 #  k = 2 here bc a ∝ r^2
+        k = aec # should be a ∝ r^2
         for (i, ((Dmin, Dmax), (aiu, bi, ciu))) in enumerate(zip(regions, abcs)) # we basically need to sum the integral as before but over all regions
             # eq 20 from Chen et al 2022
-            int += sum(int__v_Dk_n__dD.(aiu, bi, ciu, _n0, _λ, k; Dmin = Dmin, Dmax = Dmax)) 
+            int += sum(int__v_Dk_n__dD.(aiu, bi, ciu, _n0, _λ, k; Dmin = Dmin, Dmax = Dmax, μ=μ)) 
         end
 
-        int *= π /4 # we need to multiply by π/4 to get the right answer for π(D/2)^2 = π/4 D^2 [CloudMicrophysics.j actually uses radius]
+        # int *= π /4 # we need to multiply by π/4 to get the right answer for π(D/2)^2 = π/4 D^2 [CloudMicrophysics.j actually uses radius]
+        int *= (a0c * _r0^-(aec))  
 
         int = max(FT(0), int) # n, a, and v are all positive, so the integral should be positive
     end
@@ -692,12 +668,13 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
 
 
  function int_nav_dr(
-    prs::ACMP,
+    # prs::ACMP,
+    param_set::APS,
     precip::CMT.RainType,
     velo_scheme::CMT.Chen2022Type,
     q::FT,
     ρ::FT,
-    μ_precip::FT;
+    μ::FT;
     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
     Dmin::FT = FT(0),
     Dmax::FT = FT(Inf),
@@ -706,18 +683,28 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
     int = FT(0)
     if q > FT(0)
 
+        prs = TCP.microphysics_params(param_set)
+        aec = ae(prs, precip) + Δa(prs, precip)
+
 
         # coefficients from Table B1 from Chen et. al. 2022
         aiu, bi, ciu = my_Chen2022_vel_coeffs(prs, precip, ρ)
         # size distribution parameter
-        _λ::FT = lambda(prs, precip, q, ρ, Nt, Dmin, Dmax)
-        _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(prs, q, ρ, Nt, precip)
+        _λ::FT = lambda(param_set, precip, q, ρ, Nt, Dmin, Dmax; μ=μ)
+        _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(param_set, q, ρ, precip, Nt; Dmin=Dmin, Dmax=Dmax, μ=μ)
 
         # what is n0 here?
+        _χa = χa(prs, precip)
+        _a0 = a0(prs, precip)
+        _r0 = r0(prs, precip)
 
         # eq 20 from Chen et al 2022
         # k = 2 here bc a ∝ r^2
-        int = FT(π)/4 * sum(int__v_Dk_n__dD.(aiu, bi, ciu, _n0, _λ, 2; Dmin = Dmin, Dmax = Dmax))
+        k = aec # should be right...
+        int = sum(int__v_Dk_n__dD.(aiu, bi, ciu, _n0, _λ, k; Dmin = Dmin, Dmax = Dmax))
+        # int *=  FT(π)/4 
+        int *= _χa * _a0 * _r0^(-aec) # a0 is the cross section, r0 is the reference radius, so this is the same as π(D/2)^2 = π/4 D^2 [CloudMicrophysics.j actually uses radius]
+
         # It should be ϕ^κ * fall_w, but for rain drops ϕ = 1 and κ = 0
         int = max(FT(0), int) # n, a, and v are all positive, so the integral should be positive
     end
@@ -730,11 +717,11 @@ function int_nav_dr(
     velo_scheme::CMT.Chen2022Type,
     q::FT,
     ρ::FT,
-    μ_precip::FT;
+    μ::FT;
     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
     Dmin::FT = FT(0),
     Dmax::FT = FT(Inf),
-    D_transition::FT = FT(0.625e-3), # .625mm is the transition from small to large ice crystals in Chen paper
+    D_transition::FT = FT((0.625e-3)/2), # .625mm is the transition from small to large ice crystals in Chen paper
 ) where {FT <: Real}
     error("Not implemented yet")
     # you would just look to terminal_velocity() for inspiration but we don't need this atm... so
@@ -760,18 +747,26 @@ Fall velocity of individual rain drops is parameterized:
  - following Chen et. al 2022, DOI: 10.1016/j.atmosres.2022.106171, for `velo_scheme == Chen2022Type`
 """
 function my_terminal_velocity(
-    prs::ACMP,
+    # prs::ACMP,
+    param_set::APS,
     precip::CMT.AbstractPrecipType,
     velo_scheme::CMT.Blk1MVelType,
     ρ::FT,
     q_::FT;
-    Dmin::FT = 0.0, # Default to 0, but in CloudMicrophysics.jl technically it's 62.5μm...
-    Dmax::FT = Inf, # not implemented yet
+    Dmin::FT = FT(0.0), # Default to 0, but in CloudMicrophysics.jl technically it's 62.5μm...
+    Dmax::FT = FT(Inf), # not implemented yet
     # Nt::Union{FT, Nothing} = nothing,
-    Nt::FT = NaN, # testing for type stability, use NaN instead of nothing
+    Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
+    μ::FT = FT(NaN),
 ) where {FT <: Real}
     fall_w = FT(0)
     if q_ > FT(0)
+
+        prs = TCP.microphysics_params(param_set)
+
+        if isnan(μ)
+            μ = μ_from_qN(param_set, precip, q_, Nt; ρ = ρ) # maybe we could have a joint get_μ_λ_from_qN() function
+        end
 
         _r0::FT = r0(prs, precip)
         _me::FT = me(prs, precip)
@@ -781,70 +776,129 @@ function my_terminal_velocity(
         _v0::FT = v0(prs, ρ, precip)
         _ve::FT = ve(prs, precip)
         _Δv::FT = Δv(prs, precip)
-        _λ::FT = lambda(prs, precip, q_, ρ, Nt, Dmin, Dmax)
+        _λ::FT = lambda(param_set, precip, q_, ρ, Nt, Dmin, Dmax; μ=μ)
 
         upper_limit = Dmax * _λ # Dmax should not be zero...
         lower_limit = iszero(Dmin) ? FT(0) : Dmin * _λ # avoid 0*Inf
 
         fall_w =
             _χv * _v0 * (_λ * _r0)^(-_ve - _Δv) * 
-            (SF.gamma(_me + _ve + _Δm + _Δv + FT(1), upper_limit) - SF.gamma(_me + _Δm + _Δv + FT(1), lower_limit)) /
-            (SF.gamma(_me + _Δm + FT(1), upper_limit) - SF.gamma(_me + _Δm + FT(1), lower_limit))
-            # SF.gamma(_me + _ve + _Δm + _Δv + FT(1)) / SF.gamma(_me + _Δm + FT(1))
+            (CM1.SF.gamma(_me + _ve + _Δm + _Δv + FT(1), upper_limit) - CM1.SF.gamma(_me + _Δm + _Δv + FT(1), lower_limit)) /
+            (CM1.SF.gamma(_me + _Δm + FT(1), upper_limit) - CM1.SF.gamma(_me + _Δm + FT(1), lower_limit))
+            # CM1.SF.gamma(_me + _ve + _Δm + _Δv + FT(1)) / CM1.SF.gamma(_me + _Δm + FT(1))
     end
 
     return resolve_nan(fall_w)
 end
+
 function my_terminal_velocity(
-    prs::ACMP,
+    # prs::ACMP,
+    param_set::APS,
     precip::CMT.RainType,
     velo_scheme::CMT.Chen2022Type,
     ρ::FT,
     q_::FT;
-    Dmin::FT = 0.0, # Default to 0, but in CloudMicrophysics.jl technically it's 62.5μm...
-    Dmax::FT = Inf,
+    Dmin::FT = FT(0), # Default to 0, but in CloudMicrophysics.jl technically it's 62.5μm...
+    Dmax::FT = FT(Inf),
     # Nt::Union{FT, Nothing} = nothing,
-    Nt::FT = NaN, # testing for type stability, use NaN instead of nothing
+    Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
+    μ::FT = FT(NaN),
 ) where {FT <: Real}
     fall_w = FT(0)
     if q_ > FT(0)
+        prs = TCP.microphysics_params(param_set)
+
+        if isnan(μ)
+            μ = μ_from_qN(param_set, precip, q_, Nt; ρ = ρ)
+        end
 
         # coefficients from Table B1 from Chen et. al. 2022
         aiu, bi, ciu = my_Chen2022_vel_coeffs(prs, precip, ρ)
         # size distribution parameter
-        _λ::FT = lambda(prs, precip, q_, ρ, Nt, Dmin, Dmax)
-
+        _λ::FT = lambda(param_set, precip, q_, ρ, Nt, Dmin, Dmax; μ=μ)
         # eq 20 from Chen et al 2022
-        fall_w = sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, 3; Dmin = Dmin, Dmax = Dmax))
+        fall_w = sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, FT(3); Dmin = Dmin, Dmax = Dmax))
         # It should be ϕ^κ * fall_w, but for rain drops ϕ = 1 and κ = 0
         fall_w = max(FT(0), fall_w)
+
+        fall_w *= χv(prs, precip) # scaling_factor
     end
     return resolve_nan(fall_w)
 end
 
+"""
+For liquid we will copy rain, but if Nt is not given, we will enforce a large N (250 / cm^3) bc the assumed rain params are not valid for small rain drops.
+"""
+function my_terminal_velocity(
+    # prs::ACMP,
+    param_set::APS,
+    precip::CMT.LiquidType,
+    velo_scheme::CMT.Chen2022Type,
+    ρ::FT,
+    q_::FT;
+    Dmin::FT = FT(0.0), # Default to 0, but in CloudMicrophysics.jl technically it's 62.5μm...
+    Dmax::FT = FT(Inf),
+    # Nt::Union{FT, Nothing} = nothing,
+    Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
+) where {FT <: Real}
+    error("my_terminal_velocity for LiquidType not implemented yet, use my_terminal_velocity for RainType instead, but be sure to pass in your own `N` as the default will be far too small for rain.")
+end
+
 
 function my_terminal_velocity(
-    prs::ACMP,
+    # prs::ACMP,
+    param_set::APS,
     precip::CMT.IceType,
     velo_scheme::CMT.Chen2022Type,
     ρ::FT,
     q_::FT;
-    Dmin::FT = 0.0, # Default to 0, but in CloudMicrophysics.jl technically it's 62.5μm...
-    Dmax::FT = Inf,
+    Dmin::FT = FT(0), # Default to 0, but in CloudMicrophysics.jl technically it's 62.5μm...
+    Dmax::FT = FT((0.625e-3)/2), # 625 μm but we're really in r units now
     # Nt::Union{FT, Nothing} = nothing,
-    Nt::FT = NaN, # testing for type stability, use NaN instead of nothing
-    D_transition::FT = FT(0.625e-3), # .625mm is the transition from small to large ice crystals in Chen paper
+    Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
+    D_transition::FT = FT((0.625e-3)/2), # .625mm is the transition from small to large ice crystals in Chen paper
+    μ::FT = FT(NaN)
 ) where {FT <: Real}
     fall_w = FT(0)
-    if q_ > FT(0)
+    # if q_ > FT(0)
+    if q_ > eps(FT) # idk if this matters but it makes the plots look prettier lol, also prevents N, q divergence problems... also once we shrink back to tiny particles, the speed should be slow... we maybe just guessed N wrong.
 
+
+        #=
+            This seems to get out of hand when <r> gets too large, surpassing what even the snow paramterization would produce.
+            I think this is because the hard sphere assumption should have broken down but hasn't, and maybe Chen is too lax about it.
+
+            So, if <r> > r_ice_snow, we'll re-index on r_ice_snow being true (we just reset lambda)
+        =#
+
+
+        prs = TCP.microphysics_params(param_set)
 
         ρ_i::FT = CMP.ρ_cloud_ice(prs)
 
         # Ok so here's the thing.... we want q to fit between Dmin and Dmax...
         # so we need a lambda that works for that....
 
-        _λ::FT = lambda(prs, precip, q_, ρ, Nt, Dmin, Dmax)
+        if isnan(μ)
+            μ = μ_from_qN(param_set, precip, q_, Nt; ρ = ρ)
+        end
+        _λ::FT = lambda(param_set, precip, q_, ρ, Nt, Dmin, Dmax; μ = μ)
+
+        microphys_params = TCP.microphysics_params(param_set)
+        # r_is = CMP.r_ice_snow(microphys_params)
+        # if _λ < (μ + 1)/r_is # too limiting, we def see w_i increases after <r_is>
+        #     _λ = (μ + 1)/r_is # let's stop Chen from going overboard with the sedimentation rates... [[ idk if this would be good, we gotta go past r_is according to the LES so idk... but the w response can't be so extreme...]]
+        # end
+        # r_th = get_r_cond_precip(param_set, precip) * param_set.user_params.r_ice_snow_threshold_scaling_factor
+        # if _λ < (μ + 1)/r_th # I think with the limits we put in on max r in the integration, we can go all the way up to r_th now... and maybe even not need a limit...
+        #     _λ = (μ + 1)/r_th # let's stop Chen from going overboard with the sedimentation rates... [[ idk if this would be good, we gotta go past r_is according to the LES so idk... but the w response can't be so extreme...]]
+        # end
+
+        m0c::FT = m0(prs, precip) * χm(prs, precip)
+        a0c::FT = a0(prs, precip) * χa(prs, precip)
+        mec::FT = me(prs, precip) + Δm(prs, precip)
+        aec::FT = ae(prs, precip) + Δa(prs, precip)
+        _r0::FT = r0(prs, precip)
 
         # ================================================================= #
 
@@ -857,7 +911,9 @@ function my_terminal_velocity(
         # fall_w = max(FT(0), fall_w)
 
         # ================================================================= #
-        k = 3 # mass weighted
+        # k = 3 # mass weighted
+        k = mec
+        k += μ # add the size distribution exponent to the moment
         # coefficients from Appendix B from Chen et. al. 2022
         (aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l) = my_Chen2022_vel_coeffs(prs, CM.CommonTypes.SnowType(), ρ)
 
@@ -880,11 +936,11 @@ function my_terminal_velocity(
         for (i, ((Dmin, Dmax), (aiu, bi, ciu))) in enumerate(zip(regions, abcs)) # we basically need to sum the integral as before but over all regions
 
             # are the mass weights really necessary? It's just an additive integral, no?
-            mass_weights[i] = _λ^-(k + 1) * (-SF.gamma(k + 1, Dmax * _λ) + SF.gamma(k + 1, Dmin * _λ)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
+            mass_weights[i] = _λ^-(k + 1) * (-CM1.SF.gamma(k + 1, Dmax * _λ) + CM1.SF.gamma(k + 1, Dmin * _λ)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
 
 
             # eq 20 from Chen et al 2022
-            fall_w += sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, 3; Dmin = Dmin, Dmax = Dmax)) .* mass_weights[i]
+            fall_w += sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, FT(3); Dmin = Dmin, Dmax = Dmax)) .* mass_weights[i]
         end
 
         if (total_weight = sum(mass_weights)) != 0
@@ -893,8 +949,11 @@ function my_terminal_velocity(
 
 
         # ================================================================= #
+        fall_w *=  χv(prs, precip) # scaling_factor
 
     end
+
+
     return resolve_nan(fall_w)
 end
 
@@ -911,26 +970,33 @@ Or are we supposed to integrate both the whole way and the gamma functions just 
 
 """
 function my_terminal_velocity(
-    prs::ACMP,
+    # prs::ACMP,
+    param_set::APS,
     precip::CMT.SnowType,
     velo_scheme::CMT.Chen2022Type,
     ρ::FT,
     q_::FT;
-    Dmin::FT = 0.0, # Default to 0, but in CloudMicrophysics.jl technically it's 62.5μm...
-    Dmax::FT = Inf, # not really needed for snow? maybe a Dmin? but that wouldn't make a huge diff i dont think idk...
+    Dmin::FT = FT(0), # Default to 0, but in CloudMicrophysics.jl technically it's 62.5μm...
+    Dmax::FT = FT(Inf), # not really needed for snow? maybe a Dmin? but that wouldn't make a huge diff i dont think idk...
     # Nt::Union{FT, Nothing} = nothing,
-    Nt::FT = NaN, # testing for type stability, use NaN instead of nothing
-    D_transition::FT = Inf, # .625mm is the transition from small to large ice crystals in Chen paper
+    Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
+    D_transition::FT = FT((.625e-3)/2), # .625mm is the transition from small to large ice crystals in Chen paper
+    μ::FT = FT(0), # μ is the exponent in the PSD, default to 0 for marshall palmer
 ) where {FT <: Real}
     fall_w = FT(0)
     if q_ > FT(0)
 
+        prs = TCP.microphysics_params(param_set)
+
+        if isnan(μ)
+            μ = μ_from_qN(param_set, precip, q_, Nt; ρ = ρ)
+        end
 
         # short circuit cause greater than .625 mm is giving negative values for some reason... so we'll just ignore that I guess...
         # return my_terminal_velocity(prs, ice_type, velo_scheme, ρ, q_; Dmin=Dmin, Dmax=Dmax, Nt=Nt) # backup for now bc large ice is broken...
 
         _r0::FT = r0(prs, precip)
-        _λ::FT = lambda(prs, precip, q_, ρ, Nt, Dmin, Dmax)
+        _λ::FT = lambda(param_set, precip, q_, ρ, Nt, Dmin, Dmax; μ = μ)
         m0c::FT = m0(prs, precip) * χm(prs, precip)
         a0c::FT = a0(prs, precip) * χa(prs, precip)
         mec::FT = me(prs, precip) + Δm(prs, precip)
@@ -948,7 +1014,8 @@ function my_terminal_velocity(
         κ = FT(-1 / 3) #oblate
         # κ = FT(1 / 3) #oblate (anna says this is right)
 
-        k = 3 # mass weighted
+        # k = 3 # mass weighted
+        k = mec # should still be mass weight
 
         @assert(Dmin <= Dmax, "Dmin must be less than Dmax, got Dmin = $Dmin and Dmax = $Dmax")
 
@@ -980,7 +1047,7 @@ function my_terminal_velocity(
 
             # k = 3 for mass, μ = 0 for exponential size distribution instead of gamma
             # k = 3 means we're already mass weighting, however we need to properly mass weight in between regions. For that we use the mass_weights
-            mass_weights[i] = _λ^-(k + 1) * (-SF.gamma(k + 1, upper_limit) + SF.gamma(k + 1, lower_limit)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
+            mass_weights[i] = _λ^-(k + 1) * (-CM1.SF.gamma(k + 1, upper_limit) + CM1.SF.gamma(k + 1, lower_limit)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
             # In general, if we're cutting off at a (Dmin, Dmax) but the exponential size distribution wasn't derived with those in mind, will it work out for terminal velocity? might get unrealistic results?
             # total mass q would be ∼  _λ^-(k+1) * (-Γ(k+1, ∞) + Γ(k+1, 0)) = Γ(k+1) / λ^(k+1)... so if we wanna limit ourselves to Dmin, Dmax, we are applying  the speed from that region to the entire dist...
             # for single moment... maybe
@@ -996,6 +1063,7 @@ function my_terminal_velocity(
             fall_w /= total_weight # normalize by total mass
         end
 
+        fall_w *= χv(prs, precip) # scaling_factor
         # fall_w = max(FT(0), fall_w)
     end
     return resolve_nan(fall_w)
@@ -1003,157 +1071,3 @@ end
 
 
 
-
-# """
-#     mean_velocity_difference(prs, precip, q, N, ρ, μ_precip; Nt=NaN)
-
-# Compute the mean absolute terminal velocity difference ⟨Δv⟩ between particles 
-# in a size distribution defined by a gamma distribution:
-
-#     n(r) = n₀ * r^μ * exp(-λr)
-
-# The terminal velocity is defined as:
-
-#     v(r) = χ_v * v₀ * (r / r₀)^(v_e + Δv)
-
-# This function computes:
-
-#     ⟨Δv⟩ = (1/N²) ∫∫ |v(r) - v(r′)| * n(r) * n(r′) dr dr′
-
-# Assuming:
-# - The integral can be solved analytically.
-# - The distribution parameters (λ and n₀) are solved using total number (N) and mass mixing ratio (q) constraints.
-# - λ is derived from:
-
-#         λ = [
-#             χₘ * m₀ * (1 / r₀)^(mₑ + Δₘ) * Γ(μ + mₑ + Δₘ + 1)
-#             -----------------------------------------------
-#             (q / N) * Γ(μ + 1)
-#         ] ^ (1 / (mₑ + Δₘ))
-
-# ⟨Δv⟩ is then given by:
-
-#     ⟨Δv⟩ = 2 * χ_v * v₀ * (1 / (r₀ * λ))^α * (Γ(μ + α + 1) / Γ(μ + 1)) * (1 - 1 / 2^(2μ + α + 2))
-
-# where α = vₑ + Δv.
-
-# # Arguments
-# - `prs`: parameter struct (e.g. microphysics scheme).
-# - `precip`: precipitation type (Rain, Snow, Ice).
-# - `q`: bulk mass mixing ratio.
-# - `N`: number concentration.
-# - `ρ`: air density.
-# - `μ_precip`: shape parameter μ of the size distribution.
-# - `Nt`: optional override for number concentration in lambda closure.
-
-# # Returns
-# - `Δv̄::FT`: mean absolute velocity difference.
-# """
-# function mean_velocity_difference(
-#     prs::ACMP,
-#     precip::Union{CMT.IceType, CMT.RainType, CMT.SnowType},
-#     q::FT,
-#     # N::FT,
-#     ρ::FT,
-#     μ_precip::FT;
-#     Nt::FT = FT(NaN),
-# ) where {FT <: Real}
-
-#     # Microphysical parameters
-#     _χv::FT = χv(prs, precip)
-#     _v0::FT = v0(prs, ρ, precip)
-#     _r0::FT = r0(prs, precip)
-#     _me::FT = me(prs, precip)
-#     _Δm::FT = Δm(prs, precip)
-#     _χm::FT = χm(prs, precip)
-#     _m0::FT = m0(prs, precip)
-#     _ve::FT = ve(prs, precip)
-#     _Δv::FT = Δv(prs, precip)
-
-#     _μ::FT = μ_precip
-#     α = _ve + _Δv
-
-#     # Solve for λ from closure
-#     top = _χm * _m0 * (1 / _r0)^(_me + _Δm) * SF.gamma(_μ + _me + _Δm + 1)
-#     bot = (q / Nt) * SF.gamma(_μ + 1)
-#     λ = (top / bot)^(1 / (_me + _Δm))
-
-#     # Compute ⟨Δv⟩
-#     factor = (_χv * _v0) * (1 / (_r0 * λ))^α
-#     gamma_ratio = SF.gamma(_μ + α + 1) / SF.gamma(_μ + 1)
-#     correction = 1 - 1 / 2^(2 * _μ + α + 2)
-
-#     Δv̄ = 2 * factor * gamma_ratio * correction
-#     return Δv̄
-# end
-
-
-# """
-#     mass_weighted_velocity_difference(prs, precip, q, N, ρ, μ_precip)
-
-# Compute the **mass-weighted** mean absolute terminal velocity difference ⟨Δv⟩ₘ:
-
-#     n(r) = n₀ * r^μ * exp(-λr)
-#     m(r) = χₘ * m₀ * (r / r₀)^(mₑ + Δₘ)
-#     v(r) = χᵥ * v₀ * (r / r₀)^(vₑ + Δᵥ)
-
-# This computes:
-
-#     ⟨Δv⟩ₘ = (1/q²) ∫∫ |v(r) - v(r′)| m(r) m(r′) n(r) n(r′) dr dr′
-
-# Assuming:
-# - Closure is enforced using `N` and `q` to solve for λ.
-# - The double integral has a closed-form.
-
-# Final form:
-
-#     ⟨Δv⟩ₘ = 2 * χᵥ * v₀ * (1 / (r₀ * λ))^α *
-#              [Γ(μ + α + mₑ + Δₘ + 1) / Γ(μ + mₑ + Δₘ + 1)] *
-#              [1 - 1 / 2^(2μ + 2(mₑ + Δₘ) + α + 2)]
-
-# # Arguments
-# - `prs`: parameter struct
-# - `precip`: Rain, Snow, or Ice type
-# - `q`: mass mixing ratio
-# - `N`: total number concentration
-# - `ρ`: air density
-# - `μ_precip`: shape parameter μ
-
-# # Returns
-# - `Δv̄ₘ::FT`: mass-weighted mean velocity difference
-# """
-# function mass_weighted_velocity_difference(
-#     prs::ACMP,
-#     precip::Union{CMT.IceType, CMT.RainType, CMT.SnowType},
-#     q::FT,
-#     ρ::FT,
-#     μ_precip::FT;
-#     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
-# ) where {FT <: Real}
-
-#     _χv::FT = χv(prs, precip)
-#     _v0::FT = v0(prs, ρ, precip)
-#     _r0::FT = r0(prs, precip)
-#     _me::FT = me(prs, precip)
-#     _Δm::FT = Δm(prs, precip)
-#     _χm::FT = χm(prs, precip)
-#     _m0::FT = m0(prs, precip)
-#     _ve::FT = ve(prs, precip)
-#     _Δv::FT = Δv(prs, precip)
-
-#     _μ::FT = μ_precip
-#     α = _ve + _Δv
-
-#     # Closure for λ
-#     top = _χm * _m0 * (1 / _r0)^(_me + _Δm) * SF.gamma(_μ + _me + _Δm + 1)
-#     bot = (q / Nt) * SF.gamma(_μ + 1)
-#     λ = (top / bot)^(1 / (_me + _Δm))
-
-#     # Compute ⟨Δv⟩ₘ
-#     factor = (_χv * _v0) * (1 / (_r0 * λ))^α
-#     gamma_ratio = SF.gamma(_μ + α + _me + _Δm + 1) / SF.gamma(_μ + _me + _Δm + 1)
-#     correction = 1 - 1 / 2^(2 * _μ + 2 * (_me + _Δm) + α + 2)
-
-#     Δv̄ₘ = 2 * factor * gamma_ratio * correction
-#     return Δv̄ₘ
-# end

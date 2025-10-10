@@ -418,7 +418,7 @@ function non_dimensional_function(εδ_model::LogNormalScalingProcess, εδ_mode
     δ_σ² = c_gen_stoch[2]
 
     # Mean model closure
-    ε_mean_nondim, δ_mean_nondim = non_dimensional_function(εδ_model, εδ_model_vars, mean_model)
+    ε_mean_nondim, δ_mean_nondim = non_dimensional_function(mean_model, εδ_model_vars)
 
     # lognormal scaling
     nondim_ε = ε_mean_nondim * lognormal_sampler(FT(1), ε_σ²)

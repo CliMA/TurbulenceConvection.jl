@@ -53,6 +53,13 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     parent(∂w∂z) .= 0
     parent(∂M∂z_ρa) .= 0
 
+    # Bringing earlier for dTdz calc
+    ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+    If0 = CCO.InterpolateC2F(; ∇0_bcs...)
+    RB = CCO.RightBiasedC2F(; top = CCO.Extrapolate()) # top = CCO.SetValue(T_toa)) # right biased
+    ∇c = CCO.DivergenceF2C()
+
+
 
     prog_gm_uₕ = grid_mean_uₕ(state)
     Ic = CCO.InterpolateF2C()
@@ -104,10 +111,43 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                     # end
                 end
                 thermo_args = (aux_up[i].q_liq[k], aux_up[i].q_ice[k])
+            elseif edmf.moisture_model isa EquilibriumMoisture
+                thermo_args = ()
+            else
+                error("Something went wrong. The moisture_model options are equilibrium or nonequilibrium")
             end
-            # ts_up_i = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k], thermo_args...)
-        end
+            
+            aux_up[i].ts[k] = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k], thermo_args...)
+            aux_up[i].T[k] = TD.air_temperature(thermo_params, aux_up[i].ts[k])
+            aux_up[i].p[k] = TD.air_pressure(thermo_params, aux_up[i].ts[k])
 
+            if edmf.moisture_model isa EquilibriumMoisture
+                aux_up[i].q_liq[k] = TD.liquid_specific_humidity(thermo_params, aux_up[i].ts[k])
+                aux_up[i].q_ice[k] = TD.ice_specific_humidity(thermo_params, aux_up[i].ts[k])
+            end
+        end
+    end
+    @inbounds for i in 1:N_up
+        @. aux_up[i].dTdz = ∇c(wvec(If0(aux_up[i].T))) # compute dTdz for each updraft [[ we dont use it for boost though ]]
+        # @. aux_up[i].dTdz = ∇c(wvec(RB(aux_up[i].T))) # right biased version, maybe better for downwards fluxes for boosting
+    end
+
+    # reweight in equilibrium... (env call is in microphysics())
+    reweight_processes_for_grid::Bool = TCP.get_isbits_nt(param_set.user_params, :reweight_processes_for_grid, false)
+    reweight_extrema_only::Bool = TCP.get_isbits_nt(param_set.user_params, :reweight_extrema_only, false)
+    if reweight_processes_for_grid && (edmf.moisture_model isa EquilibriumMoisture) # really this needs qt to be updated at all k so you arent overreaching right?
+        @inbounds for i in 1:N_up
+            @inbounds for k in real_center_indices(grid)
+                q = TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k]) # already did the calc, let's reuse
+                q_liq, q_ice = reweight_equilibrium_saturation_adjustment_for_grid(k, grid, param_set, thermo_params, aux_up[i], q, p_c; reweight_extrema_only = reweight_extrema_only)
+                aux_up[i].q_liq[k] = q_liq
+                aux_up[i].q_ice[k] = q_ice
+            end
+        end
+    end
+
+    # compute bulk and decompose environment
+    @inbounds for k in real_center_indices(grid)
         #####
         ##### compute bulk (aux)
         #####
@@ -156,15 +196,27 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         val2 = a_bulk_c * val1
         aux_en.q_tot[k] = max(val1 * aux_gm.q_tot[k] - val2 * aux_bulk.q_tot[k], 0) #Yair - this is here to prevent negative QT
 
-        # if (val1 * aux_gm.q_tot[k] - val2 * aux_bulk.q_tot[k]) < 0
-        #     env_bad_area = (val1 * aux_gm.q_tot[k] - val2 * aux_bulk.q_tot[k])
-        #     @warn "This is gonna crash, environmental q_tot was gonna be $env_bad_area"
+
+
+        # aux_en.θ_liq_ice[k] = val1 * aux_gm.θ_liq_ice[k] - val2 * aux_bulk.θ_liq_ice[k]
+        aux_en.θ_liq_ice[k] = max(val1 * aux_gm.θ_liq_ice[k] - val2 * aux_bulk.θ_liq_ice[k], 0) #Jordan - this is here to prevent negative θ_liq_ice -- why would this happen? some tendency mismatch...
+
+        # if aux_en.θ_liq_ice[k] < 0
+        #     error("aux_en.θ_liq_ice[$k] = $(aux_en.θ_liq_ice[k]); aux_gm.θ_liq_ice[$k] = $(aux_gm.θ_liq_ice[k]); aux_bulk.θ_liq_ice[$k] = $(aux_bulk.θ_liq_ice[k]); val1 = $val1; val2 = $val2")
         # end
 
-        aux_en.θ_liq_ice[k] = val1 * aux_gm.θ_liq_ice[k] - val2 * aux_bulk.θ_liq_ice[k]
         if edmf.moisture_model isa NonEquilibriumMoisture # otherwise it's diagnosed in thermo_state_pθq() calculation...
-            aux_en.q_liq[k] = max(val1 * prog_gm.q_liq[k] - val2 * aux_bulk.q_liq[k], 0)
-            aux_en.q_ice[k] = max(val1 * prog_gm.q_ice[k] - val2 * aux_bulk.q_ice[k], 0)
+            # aux_en.q_liq[k] = max(val1 * prog_gm.q_liq[k] - val2 * aux_bulk.q_liq[k], 0) # in equilibrium, these get diagnosed in microphysics()
+            # aux_en.q_ice[k] = max(val1 * prog_gm.q_ice[k] - val2 * aux_bulk.q_ice[k], 0) # in equilibrium, these get diagnosed in microphysics()
+            aux_en.q_liq[k] = clamp(val1 * aux_gm.q_liq[k] - val2 * aux_bulk.q_liq[k], FT(0), FT(0.5) - eps(FT))
+            aux_en.q_ice[k] = clamp(val1 * aux_gm.q_ice[k] - val2 * aux_bulk.q_ice[k], FT(0), FT(0.5) - eps(FT))
+
+            aux_en.q_tot[k] = max(aux_en.q_tot[k], aux_en.q_liq[k] + aux_en.q_ice[k] + eps(FT)) # ensure that total specific humidity is at least the sum of liquid and ice
+
+            if isnan(aux_en.q_tot[k])
+                error("aux_en.q_tot[$k] is NaN; aux_gm.q_tot[$k] = $(aux_gm.q_tot[k]); aux_bulk.q_tot[$k] = $(aux_bulk.q_tot[k]); val1 = $val1; val2 = $val2")
+            end
+
         end
 
         #=
@@ -197,54 +249,60 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         ts_env[k] = thermo_state_pθq(param_set, p_c[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], thermo_args...)
         ts_en = ts_env[k]
         aux_en.T[k] = TD.air_temperature(thermo_params, ts_en)
+        aux_en.p[k] = TD.air_pressure(thermo_params, ts_en)
 
-        # @assert aux_en.T[k] > 0 "Backed out environment has negative temperature, this is bad. Status is z = $(grid.zc.z[k]), T = $(aux_en.T[k]), p = $(p_c[k]), θ = $(aux_en.θ_liq_ice[k]), q = $(aux_en.q_tot[k]),  ts = $ts_en"
 
+        ρ = TD.air_density(thermo_params, ts_en)
         aux_en.θ_virt[k] = TD.virtual_pottemp(thermo_params, ts_en)
         aux_en.θ_dry[k] = TD.dry_pottemp(thermo_params, ts_en)
-        rho = TD.air_density(thermo_params, ts_en)
-        aux_en.buoy[k] = buoyancy_c(param_set, ρ_c[k], rho)
+        aux_en.buoy[k] = buoyancy_c(param_set, ρ_c[k], ρ)
         aux_en.RH[k] = TD.relative_humidity(thermo_params, ts_en)
+        aux_en.RH_ice[k] = relative_humidity_over_ice(thermo_params, ts_en)
     end
+
+    @. aux_en.dTdz = ∇c(wvec(If0(aux_en.T))) # compute dTdz for env
+    # @. aux_en.dTdz = ∇c(wvec(RB(aux_en.T))) # right biased version, maybe better for downwards fluxes for boosting
+
+
 
 
     #####
     #####  update prognostic bulk (these mirror the prognostic variables exactly, no minimum_area or other clippings -- filtering already happened so should be good)
     ### - these are important because while sometimes tendencies are calculated using aux, they are always applied to prog, so for limiting we need to know the exact prognostic values
     #####
-    prog_bulk = center_prog_bulk(state)
-    prog_bulk.ρarea .= FT(0)
-    prog_bulk.ρaθ_liq_ice .= FT(0)
-    prog_bulk.ρaq_tot .= FT(0)
-    if edmf.moisture_model isa NonEquilibriumMoisture
-        prog_bulk.ρaq_liq .= FT(0)
-        prog_bulk.ρaq_ice .= FT(0)
-    end
-    prog_bulk_f = face_prog_bulk(state)
-    prog_bulk_f.ρaw .= FT(0)
+    # prog_bulk = center_prog_bulk(state)
+    # prog_bulk.ρarea .= FT(0)
+    # prog_bulk.ρaθ_liq_ice .= FT(0)
+    # prog_bulk.ρaq_tot .= FT(0)
+    # if edmf.moisture_model isa NonEquilibriumMoisture
+    #     prog_bulk.ρaq_liq .= FT(0)
+    #     prog_bulk.ρaq_ice .= FT(0)
+    # end
+    # prog_bulk_f = face_prog_bulk(state)
+    # prog_bulk_f.ρaw .= FT(0)
 
-    @inbounds for i in 1:N_up
-        @. prog_bulk.ρarea += prog_up[i].ρarea
-        @. prog_bulk.ρaθ_liq_ice += prog_up[i].ρaθ_liq_ice
-        @. prog_bulk.ρaq_tot += prog_up[i].ρaq_tot
-        if edmf.moisture_model isa NonEquilibriumMoisture
-            @. prog_bulk.ρaq_liq += prog_up[i].ρaq_liq
-            @. prog_bulk.ρaq_ice += prog_up[i].ρaq_ice
-        end
-        @. prog_bulk_f.ρaw += prog_up_f[i].ρaw
-    end
+    # @inbounds for i in 1:N_up
+    #     @. prog_bulk.ρarea += prog_up[i].ρarea
+    #     @. prog_bulk.ρaθ_liq_ice += prog_up[i].ρaθ_liq_ice
+    #     @. prog_bulk.ρaq_tot += prog_up[i].ρaq_tot
+    #     if edmf.moisture_model isa NonEquilibriumMoisture
+    #         @. prog_bulk.ρaq_liq += prog_up[i].ρaq_liq
+    #         @. prog_bulk.ρaq_ice += prog_up[i].ρaq_ice
+    #     end
+    #     @. prog_bulk_f.ρaw += prog_up_f[i].ρaw
+    # end
 
     # track prog_en exactly (not to be confused with aux_en which is limited by clippings on aux_up etc)
-    prog_en_gm = center_prog_environment_up_gm_version(state)
-    @. prog_en_gm.ρarea = ρ_c - prog_bulk.ρarea
-    @. prog_en_gm.ρaθ_liq_ice = prog_gm.ρθ_liq_ice - prog_bulk.ρaθ_liq_ice
-    @. prog_en_gm.ρaq_tot = prog_gm.ρq_tot - prog_bulk.ρaq_tot
-    if edmf.moisture_model isa NonEquilibriumMoisture
-        @. prog_en_gm.ρaq_liq = ρ_c * prog_gm.q_liq - prog_bulk.ρaq_liq
-        @. prog_en_gm.ρaq_ice = ρ_c * prog_gm.q_ice - prog_bulk.ρaq_ice
-    end
-    prog_en_gm_f = face_prog_environment_up_gm_version(state)
-    @. prog_en_gm_f.ρaw = -prog_bulk_f.ρaw
+    # prog_en_gm = center_prog_environment_up_gm_version(state)
+    # @. prog_en_gm.ρarea = ρ_c - prog_bulk.ρarea
+    # @. prog_en_gm.ρaθ_liq_ice = prog_gm.ρθ_liq_ice - prog_bulk.ρaθ_liq_ice
+    # @. prog_en_gm.ρaq_tot = prog_gm.ρq_tot - prog_bulk.ρaq_tot
+    # if edmf.moisture_model isa NonEquilibriumMoisture
+    #     @. prog_en_gm.ρaq_liq = ρ_c * prog_gm.q_liq - prog_bulk.ρaq_liq
+    #     @. prog_en_gm.ρaq_ice = ρ_c * prog_gm.q_ice - prog_bulk.ρaq_ice
+    # end
+    # prog_en_gm_f = face_prog_environment_up_gm_version(state)
+    # @. prog_en_gm_f.ρaw = -prog_bulk_f.ρaw
 
     # ======================================================== # zero out noneq tendencies before calling microphysics again (does this interfere w/ writing to disk? -- needed bc env/updraft are cross writing to each other... #
     # aux_en.ql_tendency_noneq .= FT(0) # don't zero this out  bc it seeemd to break the output writing (some order of read, calculate gm, write, zero out problem probably...)
@@ -258,10 +316,20 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     aux_en.qt_tendency_sedimentation .= FT(0)
     aux_en.θ_liq_ice_tendency_sedimentation .= FT(0)
     #
+    aux_en.ql_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+    aux_en.qi_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+    aux_en.qt_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+    aux_en.θ_liq_ice_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+    #
     aux_en.ql_tendency_acnv .= FT(0)
     aux_en.qi_tendency_acnv .= FT(0)
     aux_en.qi_tendency_acnv_dep .= FT(0)
+    aux_en.qi_tendency_acnv_dep_is .= FT(0)
+    aux_en.qi_tendency_acnv_dep_above .= FT(0)
     aux_en.qi_tendency_acnv_agg .= FT(0)
+    aux_en.qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
+    aux_en.qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+    aux_en.qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
     #
     aux_en.ql_tendency_accr_liq_rai .= FT(0)
     aux_en.ql_tendency_accr_liq_ice .= FT(0)
@@ -274,11 +342,13 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     aux_en.qi_tendency_hom_frz .= FT(0)
     aux_en.qi_tendency_het_frz .= FT(0)
     aux_en.qi_tendency_het_nuc .= FT(0)
-    aux_en.qi_tendency_mlt .= FT(0)
+    aux_en.qi_tendency_melt .= FT(0)
     #
     # aux_en.qi_tendency_vert_adv .= FT(0) # gm only
     # aux_en.qi_tendency_ls_vert_adv .= FT(0) # gm only
     # aux_en.qi_tendency_sgs .= FT(0) # gm only
+
+    # aux_en.dqvdt .= FT(0) # zero out [ don't do this bc we need it for later calculations... in microphysics!() for example... it'll just have to be from the last timestep...]
 
 
 
@@ -295,11 +365,21 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_up[i].qt_tendency_sedimentation .= FT(0)
         aux_up[i].θ_liq_ice_tendency_sedimentation .= FT(0)
         #
+        aux_up[i].ql_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+        aux_up[i].qi_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+        aux_up[i].qt_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+        aux_up[i].θ_liq_ice_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+        #
         #
         aux_up[i].ql_tendency_acnv .= FT(0)
         aux_up[i].qi_tendency_acnv .= FT(0)
         aux_up[i].qi_tendency_acnv_dep .= FT(0)
+        aux_up[i].qi_tendency_acnv_dep_is .= FT(0)
+        aux_up[i].qi_tendency_acnv_dep_above .= FT(0)
         aux_up[i].qi_tendency_acnv_agg .= FT(0)
+        aux_up[i].qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
+        aux_up[i].qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+        aux_up[i].qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
         #
         aux_up[i].ql_tendency_accr_liq_rai .= FT(0)
         aux_up[i].ql_tendency_accr_liq_ice .= FT(0)
@@ -312,11 +392,13 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_up[i].qi_tendency_hom_frz .= FT(0)
         aux_up[i].qi_tendency_het_frz .= FT(0)
         aux_up[i].qi_tendency_het_nuc .= FT(0)
-        aux_up[i].qi_tendency_mlt .= FT(0)
+        aux_up[i].qi_tendency_melt .= FT(0)
         #
         # aux_up[i].qi_tendency_vert_adv .= FT(0) # gm only
         # aux_up[i].qi_tendency_ls_vert_adv .= FT(0) # gm only
         # aux_up[i].qi_tendency_sgs .= FT(0) # gm only
+
+        # aux_up[i].dqvdt .= FT(0) # zero out [ don't do this bc we need it for later calculations... in microphysics!() for example... it'll just have to be from the last timestep...]
     end
     # aux_bulk.ql_tendency_noneq .= FT(0)
     # aux_bulk.qi_tendency_noneq .= FT(0)
@@ -329,10 +411,20 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     aux_bulk.qt_tendency_sedimentation .= FT(0)
     aux_bulk.θ_liq_ice_tendency_sedimentation .= FT(0)
     #
+    aux_bulk.ql_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+    aux_bulk.qi_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+    aux_bulk.qt_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+    aux_bulk.θ_liq_ice_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other up
+    #
     aux_bulk.ql_tendency_acnv .= FT(0)
     aux_bulk.qi_tendency_acnv .= FT(0)
     aux_bulk.qi_tendency_acnv_dep .= FT(0)
+    aux_bulk.qi_tendency_acnv_dep_is .= FT(0)
+    aux_bulk.qi_tendency_acnv_dep_above .= FT(0)
     aux_bulk.qi_tendency_acnv_agg .= FT(0)
+    aux_bulk.qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
+    aux_bulk.qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+    aux_bulk.qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
     #
     aux_bulk.ql_tendency_accr_liq_rai .= FT(0)
     aux_bulk.ql_tendency_accr_liq_ice .= FT(0)
@@ -345,27 +437,30 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     aux_bulk.qi_tendency_hom_frz .= FT(0)
     aux_bulk.qi_tendency_het_frz .= FT(0)
     aux_bulk.qi_tendency_het_nuc .= FT(0)
-    aux_bulk.qi_tendency_mlt .= FT(0)
+    aux_bulk.qi_tendency_melt .= FT(0)
     #
     # aux_bulk.qi_tendency_vert_adv .= FT(0) # gm only
     # aux_bulk.qi_tendency_ls_vert_adv .= FT(0) # gm only
     # aux_bulk.qi_tendency_sgs .= FT(0) # gm only
 
+    # aux_bulk.dqvdt .= FT(0) # zero out [ don't do this bc we need it for later calculations... in microphysics!() for example... it'll just have to be from the last timestep...]
+
 
     # zero out our bulk tendency trackers... these are used in limit_up_tendencies!() to limit tendencies for model stability...
-    tendencies_bulk = center_tendencies_bulk(state)
-    tendencies_bulk.ρarea .= FT(0)
-    tendencies_bulk.ρaθ_liq_ice .= FT(0)
-    tendencies_bulk.ρaq_tot .= FT(0)
-    if edmf.moisture_model isa NonEquilibriumMoisture
-        tendencies_bulk.ρaq_liq .= FT(0)
-        tendencies_bulk.ρaq_ice .= FT(0)
-    end
-    tendencies_bulk_f = face_tendencies_bulk(state)
-    tendencies_bulk_f.ρaw .= FT(0)
+    # tendencies_bulk = center_tendencies_bulk(state)
+    # tendencies_bulk.ρarea .= FT(0)
+    # tendencies_bulk.ρaθ_liq_ice .= FT(0)
+    # tendencies_bulk.ρaq_tot .= FT(0)
+    # if edmf.moisture_model isa NonEquilibriumMoisture
+    #     tendencies_bulk.ρaq_liq .= FT(0)
+    #     tendencies_bulk.ρaq_ice .= FT(0)
+    # end
+    # tendencies_bulk_f = face_tendencies_bulk(state)
+    # tendencies_bulk_f.ρaw .= FT(0)
 
 
     # these get overwritten technically so don't actually need zeroing out
+    # [deprecated, we can bring this back if we determine we need them...]
     # tendencies_bulk_adjustments = center_tendencies_bulk_adjustments(state)
     # tendencies_bulk_adjustments.ρarea .= FT(0)
     # tendencies_bulk_adjustments.ρaθ_liq_ice .= FT(0)
@@ -375,21 +470,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     # tendencies_bulk_adjustments_f = face_tendencies_bulk_adjustments(state)
     # tendencies_bulk_adjustments_f.ρaw .= FT(0)
 
-    # ======================================================== # 
 
-    # calculate and  q_vap_sat_liq, q_vap_sat_ice (maybe move to assing_thermo_aux?)
-    if edmf.moisture_model isa NonEquilibriumMoisture
-        # en has been updated, call before microphysics(). Use aux_en bc that's what microphysics uses
-        @. aux_en.q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, aux_en.T, ρ_c, TD.Liquid())
-        @. aux_en.q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, aux_en.T, ρ_c, TD.Ice())
-    end
+    aux_tc.qs_tendency_accr_rai_sno .= FT(0) # this is edited in both aux_up and aux_en because the outcome is temperature dependent, so we zero it out here
 
-    # ======================================================== #
-
-    microphysics(edmf.en_thermo, grid, state, edmf, edmf.moisture_model, edmf.precip_model, edmf.cloud_sedimentation_model, edmf.rain_formation_model, edmf.snow_formation_model, Δt, param_set, use_fallback_tendency_limiters) # set env tendencies for microphysics
-    
-    reweight_processes_for_grid::Bool = TCP.get_isbits_nt(param_set.user_params, :reweight_processes_for_grid, false)
-    reweight_extrema_only::Bool = TCP.get_isbits_nt(param_set.user_params, :reweight_extrema_only, false)
+    # ==================================================================================== #
 
     @inbounds for k in real_center_indices(grid)
         a_bulk_c = aux_bulk.area[k]
@@ -398,45 +482,24 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 qt = aux_up[i].q_tot[k - 1]
                 h = aux_up[i].θ_liq_ice[k - 1]
                 if edmf.moisture_model isa EquilibriumMoisture
-                    ts_up = thermo_state_pθq(param_set, p_c[k], h, qt)
+                    ts_up = thermo_state_pθq(param_set, p_c[k], h, qt) # see https://github.com/CliMA/TurbulenceConvection.jl/pull/1056
                 elseif edmf.moisture_model isa NonEquilibriumMoisture
                     ql = aux_up[i].q_liq[k - 1]
                     qi = aux_up[i].q_ice[k - 1]
-                    ts_up = thermo_state_pθq(param_set, p_c[k], h, qt, ql, qi)
+                    ts_up = thermo_state_pθq(param_set, p_c[k], h, qt, ql, qi) # see https://github.com/CliMA/TurbulenceConvection.jl/pull/1056
                 else
                     error("Something went wrong. emdf.moisture_model options are equilibrium or nonequilibrium")
                 end
+                # aux_up[i].q_liq[k] = TD.liquid_specific_humidity(thermo_params, ts_up) # holdover from buoyancy hack days... but it was only done for liq,ice not qt... not sure why.. so i'm turning it off
+                # aux_up[i].q_ice[k] = TD.ice_specific_humidity(thermo_params, ts_up) # holdover from buoyancy hack days... but it was only done for liq,ice not qt... not sure why.. so i'm turning it off
             else
-                if edmf.moisture_model isa EquilibriumMoisture
-                    ts_up = thermo_state_pθq(param_set, p_c[k], aux_up[i].θ_liq_ice[k], aux_up[i].q_tot[k])
-                elseif edmf.moisture_model isa NonEquilibriumMoisture
-                    ts_up = thermo_state_pθq(
-                        param_set,
-                        p_c[k],
-                        aux_up[i].θ_liq_ice[k],
-                        aux_up[i].q_tot[k],
-                        aux_up[i].q_liq[k],
-                        aux_up[i].q_ice[k],
-                    )
-                else
-                    error("Something went wrong. emdf.moisture_model options are equilibrium or nonequilibrium")
-                end
-            end
-            aux_up[i].q_liq[k] = TD.liquid_specific_humidity(thermo_params, ts_up)
-            aux_up[i].q_ice[k] = TD.ice_specific_humidity(thermo_params, ts_up)
-
-
-            if reweight_processes_for_grid && (edmf.moisture_model isa EquilibriumMoisture) # really this needs qt to be updated at all k so you arent overreaching right?
-                q = TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k]) # already did the calc, let's reuse
-                q_liq, q_ice = reweight_equilibrium_saturation_adjustment_for_grid(k, grid, param_set, thermo_params, aux_up[i], q, p_c; reweight_extrema_only = reweight_extrema_only)
-                aux_up[i].q_liq[k] = q_liq
-                aux_up[i].q_ice[k] = q_ice
+                ts_up = aux_up[i].ts[k] # this is already set above, so we can just use it
             end
 
-            aux_up[i].T[k] = TD.air_temperature(thermo_params, ts_up)
             ρ = TD.air_density(thermo_params, ts_up)
             aux_up[i].buoy[k] = buoyancy_c(param_set, ρ_c[k], ρ)
             aux_up[i].RH[k] = TD.relative_humidity(thermo_params, ts_up)
+            aux_up[i].RH_ice[k] = relative_humidity_over_ice(thermo_params, ts_up)
         end
         aux_gm.buoy[k] = (1.0 - aux_bulk.area[k]) * aux_en.buoy[k]
         @inbounds for i in 1:N_up
@@ -455,6 +518,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_bulk.q_ice[k] = 0
         aux_bulk.T[k] = 0
         aux_bulk.RH[k] = 0
+        aux_bulk.RH_ice[k] = 0
         aux_bulk.buoy[k] = 0
         if a_bulk_c > 0
             @inbounds for i in 1:N_up
@@ -462,27 +526,21 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 aux_bulk.q_ice[k] += aux_up[i].area[k] * aux_up[i].q_ice[k] / a_bulk_c
                 aux_bulk.T[k] += aux_up[i].area[k] * aux_up[i].T[k] / a_bulk_c
                 aux_bulk.RH[k] += aux_up[i].area[k] * aux_up[i].RH[k] / a_bulk_c
+                aux_bulk.RH_ice[k] += aux_up[i].area[k] * aux_up[i].RH_ice[k] / a_bulk_c
                 aux_bulk.buoy[k] += aux_up[i].area[k] * aux_up[i].buoy[k] / a_bulk_c
             end
         else
             aux_bulk.RH[k] = aux_en.RH[k]
+            aux_bulk.RH_ice[k] = aux_en.RH_ice[k]
             aux_bulk.T[k] = aux_en.T[k]
         end
 
         #####
-        ##### update_GMV_diagnostics
+        ##### update_GMV_diagnostics (can't call in Eq until after microphysics())
         #####
-        aux_gm.q_liq[k] = (aux_bulk.area[k] * aux_bulk.q_liq[k] + (1 - aux_bulk.area[k]) * aux_en.q_liq[k])
-        aux_gm.q_ice[k] = (aux_bulk.area[k] * aux_bulk.q_ice[k] + (1 - aux_bulk.area[k]) * aux_en.q_ice[k])
-        aux_gm.T[k] = (aux_bulk.area[k] * aux_bulk.T[k] + (1 - aux_bulk.area[k]) * aux_en.T[k])
-        aux_gm.buoy[k] = (aux_bulk.area[k] * aux_bulk.buoy[k] + (1 - aux_bulk.area[k]) * aux_en.buoy[k])
+       
+        # moved below
 
-        has_condensate = TD.has_condensate(aux_bulk.q_liq[k] + aux_bulk.q_ice[k])
-        aux_bulk.cloud_fraction[k] = if has_condensate && a_bulk_c > 1e-3
-            1
-        else
-            0
-        end
     end
     #####
     ##### face variables: diagnose primitive, diagnose env and compute bulk
@@ -499,15 +557,15 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         @. aux_up_f[i].w = ifelse(a_up > a_min, max(prog_up_f[i].ρaw / (ρ_f * a_up), 0), FT(0)) # should we have some cfl type limiter on this?
         w_max = cfl_limit * min(grid.Δz) / Δt
 
-        for k in real_face_indices(grid)
+        @inbounds for k in real_face_indices(grid)
             if aux_up_f[i].w[k] > w_max
                 z = grid.zf.z[k]
-                # @warn "Updraft $i at z=$z has w = $(aux_up_f[i].w[k]) > CFL w_max $w_max, reducing" # should the reducing be done in limiters? It can't be bc limiters is called before this but this is needed to calculate tendencies...
-                aux_up_f[i].w[k] = w_max
+                # @debug "Updraft $i at z=$z has w = $(aux_up_f[i].w[k]) > CFL w_max $w_max, reducing" # should the reducing be done in limiters? It can't be bc limiters is called before this but this is needed to calculate tendencies...
                 adj = ρ_f[k] * a_up[k] * (w_max - aux_up_f[i].w[k])
+                aux_up_f[i].w[k] = w_max
                 prog_up_f[i].ρaw[k] += adj
-                prog_bulk_f.ρaw[k] += adj
-                prog_en_gm_f.ρaw[k] -= adj
+                # prog_bulk_f.ρaw[k] += adj
+                # prog_en_gm_f.ρaw[k] -= adj
             end
         end
     end
@@ -533,14 +591,22 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
 
 
-    # ======================================================== # 
-    # calculate and q_vap_sat_liq, q_vap_sat_ice (maybe move to assing_thermo_aux?)
+    # ============================================================================================================================================================================== # 
+    # calculate and  q_vap_sat_liq, q_vap_sat_ice (maybe move to assing_thermo_aux?)
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        # en has been updated, call before microphysics(). Use aux_en bc that's what microphysics uses
+        # use aux_en.ts because it has the real ρ for the ts_up...
+        @. aux_en.q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, aux_en.T, TD.air_density(thermo_params, aux_en.ts), TD.Liquid())
+        @. aux_en.q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, aux_en.T, TD.air_density(thermo_params, aux_en.ts), TD.Ice())
+    end
+
     # en was already done, now do up/bulk before caling compute_nonequilibrium_moisture_tendencies!() now that aux up/bulk have ben updated.
     # use aux bc that's what compute_nonequilibrium_moisture_tendencies!() uses
     if edmf.moisture_model isa NonEquilibriumMoisture
         @inbounds for i in 1:N_up
-            @. aux_up[i].q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, aux_up[i].T, ρ_c, TD.Liquid())
-            @. aux_up[i].q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, aux_up[i].T, ρ_c, TD.Ice())
+            # use aux_up[i].ts because it has the real ρ for the ts_up...
+            @. aux_up[i].q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, aux_up[i].T, TD.air_density(thermo_params, aux_up[i].ts) , TD.Liquid())
+            @. aux_up[i].q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, aux_up[i].T, TD.air_density(thermo_params, aux_up[i].ts) , TD.Ice())
         end
         # This is nonlinear so really there's not a good answer here... just never use this variable I suppose...
         # @. aux_bulk.q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, aux_bulk.T, ρ_c, TD.Liquid())
@@ -548,6 +614,29 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     end
     # ======================================================== #
 
+    # update massflux quantities [[ moved up for use w/ update_N_τ_termvel!() ]]
+    w_gm = prog_gm_f.w
+    # ∇c = CCO.DivergenceF2C()
+    @inbounds for i in 1:N_up
+        massflux_face_i = aux_up_f[i].massflux
+        parent(massflux_face_i) .= 0
+        # aux_up_i = aux_up[i]
+        a_up = aux_up[i].area
+        w_up_i = aux_up_f[i].w
+        @. aux_up_f[i].massflux =
+            ifelse(ᶠinterp_a(aux_bulk.area) > 0, ρ_f * ᶠinterp_a(a_up) * (w_up_i - toscalar(w_gm)), FT(0))
+        @. massflux_c += Ic(aux_up_f[i].massflux)
+    end
+
+
+    # update N, τ, and termvel now that everything including w is updated.
+    update_N_τ_termvel!(edmf, grid, state, param_set, thermo_params, microphys_params) # update and store N, τ, and termvel... This gets things set but also needs updraft set for efficiency for the NN, but updraft isn't set until after...
+    microphysics!(edmf.en_thermo, grid, state, edmf, edmf.moisture_model, edmf.precip_model, edmf.cloud_sedimentation_model, edmf.rain_formation_model, edmf.snow_formation_model, Δt, param_set, use_fallback_tendency_limiters) # set env tendencies for microphysics
+
+    # return back to origin state incase it needs to be zerod out for recalc
+    parent(massflux) .= 0
+    parent(massflux_c) .= 0
+    
     #####
     ##### compute_updraft_closures
     #####
@@ -558,13 +647,48 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     end
     compute_cloud_condensate_sedimentation_tendencies!(grid, state, edmf, Δt, param_set) # not sure on the merits of doing it here vs at the end w/ precipitation tendencies... leaving here bc originally i had it in compute_nonequilibrium_moisture_tendencies!()
 
+
+
+    # domain interaction microphysics
+    # compute_domain_interaction_microphysics_tendencies!(grid, state, edmf, Δt, param_set, use_fallback_tendency_limiters) # this is the microphysics that happens between updrafts and environment (e.g. accretion, evaporation, etc)
+
+
+    # ============================================================================================================================================================================== #
+
+    #######
+    ##### deferred grid mean calculations (done after microphysics has updated things..)
+    #######
+
+    @inbounds for k in real_center_indices(grid)
+    a_bulk_c = aux_bulk.area[k]
+        #####
+        ##### update_GMV_diagnostics (can't call in Eq until after microphysics())
+        #####
+        aux_gm.q_liq[k] = (aux_bulk.area[k] * aux_bulk.q_liq[k] + (1 - aux_bulk.area[k]) * aux_en.q_liq[k])
+        aux_gm.q_ice[k] = (aux_bulk.area[k] * aux_bulk.q_ice[k] + (1 - aux_bulk.area[k]) * aux_en.q_ice[k])
+        aux_gm.T[k] = (aux_bulk.area[k] * aux_bulk.T[k] + (1 - aux_bulk.area[k]) * aux_en.T[k])
+        aux_gm.buoy[k] = (aux_bulk.area[k] * aux_bulk.buoy[k] + (1 - aux_bulk.area[k]) * aux_en.buoy[k])
+
+        if iszero(aux_gm.T[k]) # print aux_gm and aux_bulk and aux_en values for q_tot, q_liq, q_ice, T, buoy and area in the error message...
+            error("aux_gm.T[$k] is 0. Other values are aux_gm.q_tot[k] = $(aux_gm.q_tot[k]), aux_gm.q_liq[k] = $(aux_gm.q_liq[k]); aux_gm.q_ice[k] = $(aux_gm.q_ice[k]); aux_gm.buoy[k] = $(aux_gm.buoy[k]); aux_bulk.area[k] = $(aux_bulk.area[k]); aux_bulk.T[k] = $(aux_bulk.T[k]); aux_en.area[k] = $(aux_en.area[k]); aux_en.T[k] = $(aux_en.T[k]); aux_en.q_tot[k] = $(aux_en.q_tot[k]); aux_en.q_liq[k] = $(aux_en.q_liq[k]); aux_en.q_ice[k] = $(aux_en.q_ice[k])")
+        end
+
+        has_condensate = TD.has_condensate(aux_bulk.q_liq[k] + aux_bulk.q_ice[k])
+        aux_bulk.cloud_fraction[k] = if has_condensate && a_bulk_c > 1e-3
+            1
+        else
+            0
+        end
+    end
+    
+
     # update massflux quantities
     w_gm = prog_gm_f.w
-    ∇c = CCO.DivergenceF2C()
+    # ∇c = CCO.DivergenceF2C()
     @inbounds for i in 1:N_up
         massflux_face_i = aux_up_f[i].massflux
         parent(massflux_face_i) .= 0
-        aux_up_i = aux_up[i]
+        # aux_up_i = aux_up[i]
         a_up = aux_up[i].area
         w_up_i = aux_up_f[i].w
         @. aux_up_f[i].massflux =
@@ -594,7 +718,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     #####
 
     # Subdomain exchange term
-    ∇c = CCO.DivergenceF2C()
+    # ∇c = CCO.DivergenceF2C()
     Ic = CCO.InterpolateF2C()
     b_exch = center_aux_turbconv(state).b_exch
     parent(b_exch) .= 0
@@ -620,8 +744,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ∂θl∂z_sat = center_aux_turbconv(state).∂θl∂z_sat
     ∂θv∂z_unsat = center_aux_turbconv(state).∂θv∂z_unsat
 
-    ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
-    If0 = CCO.InterpolateC2F(; ∇0_bcs...)
+    # ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # moved earlier for dTdz
+    # If0 = CCO.InterpolateC2F(; ∇0_bcs...)
     C123 = CCG.Covariant123Vector
 
     uₕ_gm = grid_mean_uₕ(state)
@@ -709,7 +833,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             p = p_c[k],
             ∇b = bg,
             Shear² = Shear²[k],
-            tke = aux_en.tke[k],
+            tke = max(aux_en.tke[k], FT(0)),
             b_exch = b_exch[k],
         )
 
@@ -778,96 +902,17 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             # term_vel_snow[k] = CM1.terminal_velocity(microphys_params, snow_type, snow_velo_scheme, ρ_c[k], prog_pr.q_sno[k])
             # use my own that's nan-safe
             term_vel_rain[k] =
-                my_terminal_velocity(microphys_params, rain_type, edmf.precip_model.rain_terminal_velocity_scheme, ρ_c[k], prog_pr.q_rai[k]) .* edmf.precip_model.rain_sedimentation_scaling_factor
+                my_terminal_velocity(param_set, rain_type, edmf.precip_model.rain_terminal_velocity_scheme, ρ_c[k], prog_pr.q_rai[k])  # .* edmf.precip_model.rain_sedimentation_scaling_factor
             term_vel_snow[k] =
-                my_terminal_velocity(microphys_params, snow_type, edmf.precip_model.snow_terminal_velocity_scheme, ρ_c[k], prog_pr.q_sno[k]) .* edmf.precip_model.snow_sedimentation_scaling_factor
+                my_terminal_velocity(param_set, snow_type, edmf.precip_model.snow_terminal_velocity_scheme, ρ_c[k], prog_pr.q_sno[k])  # .* edmf.precip_model.snow_sedimentation_scaling_factor
         end
     end
 
-    if edmf.cloud_sedimentation_model isa CloudSedimentationModel
-        ρ_i = CMP.ρ_cloud_ice(microphys_params)
-        F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
-        if edmf.cloud_sedimentation_model.grid_mean
-            error("Not impelemented yet")
-            # TODO: Impelement this. term_vel_ice is stored in aux_gm here I believe.
-        else # TODO : Implement the same below for N_l
-            w::CC.Fields.Field = F2Cw.(aux_en_f.w)
-            term_vel_ice = aux_en.term_vel_ice
-            N_i = aux_en.N_i
-            @inbounds for k in real_center_indices(grid)
-                N_i[k] = get_N_i(param_set, edmf.cloud_sedimentation_model.sedimentation_ice_number_concentration, ts_env[k], w[k])
+   
 
-                term_vel_ice[k] = calculate_sedimentation_velocity(
-                    microphys_params,
-                    q_effective_nan_N_safe(aux_en.q_ice[k], N_i[k], ρ_i, param_set.user_params.particle_min_radius), # if N is NaN this just returns q, which should be fine? the Chen2022Type makes some assumption about what N is... which is probably trustworthy? assume no NaNs in the vector...
-                    ρ_c[k], # air density
-                    ice_type,
-                    N_i[k]; # broadcasting is using _first and not going through properly for some reason...
-                    velo_scheme = edmf.cloud_sedimentation_model.ice_terminal_velocity_scheme,
-                    Dmax = edmf.cloud_sedimentation_model.ice_Dmax,
-                ) .* edmf.cloud_sedimentation_model.ice_sedimentation_scaling_factor 
-            end
 
-            @. aux_bulk.N_i = FT(0) # reset N_i
-            @. aux_bulk.term_vel_ice = FT(0) # reset term_vel_ice for bulk so we can sum
-            @inbounds for i in 1:N_up
-                w = F2Cw.(aux_up_f[i].w)
-                term_vel_ice = aux_up[i].term_vel_ice
-                N_i = aux_up[i].N_i
-                @inbounds for k in real_center_indices(grid)
-                    T_up = aux_up[i].T[k]
-                    q_up = TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k])
-                    ts_up = TD.PhaseNonEquil_ρTq(thermo_params, ρ_c[k], T_up, q_up)
-                    N_i[k] = get_N_i(param_set, edmf.cloud_sedimentation_model.sedimentation_ice_number_concentration, ts_up, w[k])
-                    
-                    term_vel_ice[k] = calculate_sedimentation_velocity(
-                        microphys_params,
-                        q_effective_nan_N_safe(aux_up[i].q_ice[k], N_i[k], ρ_i, param_set.user_params.particle_min_radius), # if N is NaN this just returns q, which should be fine? the Chen2022Type makes some assumption about what N is... which is probably trustworthy? assume no NaNs in the vector...
-                        ρ_c[k], # air density
-                        ice_type,
-                        N_i[k]; # broadcasting is using _first and not going through properly for some reason...
-                        velo_scheme = edmf.cloud_sedimentation_model.ice_terminal_velocity_scheme,
-                        Dmax = edmf.cloud_sedimentation_model.ice_Dmax,
-                    ) .* edmf.cloud_sedimentation_model.ice_sedimentation_scaling_factor
 
-                    
-                    if aux_bulk.area[k] > FT(0)
-                        if !isnan(N_i[k])
-                            aux_bulk.N_i[k] += N_i[k] * (aux_up[i].area[k] / aux_bulk.area[k]) # add N weighted by updraft fraction
-                        else
-                            # is 0 right here? or something else?
-                        end
-                        aux_bulk.term_vel_ice[k] += term_vel_ice[k] * (aux_up[i].area[k] / aux_bulk.area[k]) # add sedimentation velocity weighted by updraft fraction
-                    else
-                        if !isnan(N_i[k])
-                            aux_bulk.N_i[k] += N_i[k] * (1. / N_up)
-                        else
-                            # is 0 right here? or something else?
-                        end
-                        aux_bulk.term_vel_ice[k] += term_vel_ice[k] * (1. / N_up)
-                    end
 
-                end
-            end
-            
-            # Save N_i in grid mean being sensitive to what could be NaNs in one but not the other
-            @inbounds for k in real_center_indices(grid)
-                if aux_bulk.area[k] > FT(0)
-                    if aux_en.area[k] > FT(0)
-                        aux_gm.N_i[k] = (aux_bulk.N_i[k] * aux_bulk.area[k]) + (aux_en.N_i[k] * aux_en.area[k])
-                        aux_gm.term_vel_ice[k] = (aux_bulk.term_vel_ice[k] * aux_bulk.area[k] * aux_bulk.q_ice[k]  + aux_en.term_vel_ice[k] * aux_en.area[k] * aux_en.q_ice[k]) / aux_gm.q_ice[k] # mass weighted, area sums and cancels out... as does density
-                    else
-                        aux_gm.N_i[k] = aux_bulk.N_i[k]
-                        aux_gm.term_vel_ice[k] = aux_bulk.term_vel_ice[k]
-                    end
-                else
-                    aux_gm.N_i[k] = aux_en.N_i[k]
-                    aux_gm.term_vel_ice[k] = aux_en.term_vel_ice[k]
-                end
-            end
-        end
-        # should we save N grid mean? Could be a useful thing to look at ...
-    end
 
     ### Diagnostic thermodynamiccovariances
     if edmf.thermo_covariance_model isa DiagnosticThermoCovariances
@@ -913,6 +958,538 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         # limit_env_tendencies!(grid, state, edmf, Δt, param_set)
     # end
 
+
+    return nothing
+end
+
+
+
+
+function update_N_τ_termvel!(edmf::EDMFModel, grid::Grid, state::State, param_set::APS, thermo_params::TDPS, microphys_params::ACMP)
+
+    aux_en = center_aux_environment(state)
+    aux_en_f = face_aux_environment(state)
+    aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
+    aux_bulk = center_aux_bulk(state)
+    aux_gm = center_aux_grid_mean(state)
+    aux_tc = center_aux_turbconv(state)
+    prog_gm = center_prog_grid_mean(state)
+    prog_pr = center_prog_precipitation(state)
+
+    FT = float_type(state)
+    N_up = n_updrafts(edmf)
+
+    ρ_c = prog_gm.ρ
+
+    ts_env = center_aux_environment(state).ts
+
+    massflux_c = aux_tc.massflux
+
+    kc_toa = kc_top_of_atmos(grid)
+
+
+
+
+     # ======================================================== #
+    # update N_i, calculate sedimentation velocity [ TODO: Implement for N_l]
+    # if edmf.moisture_model isa NonEquilibriumMoisture # we only use w to calculate N here, we aren't currently passing it into calculate_sedimentation_velocity() (we used to but stopped)
+        F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+        w::CC.Fields.Field = F2Cw.(aux_en_f.w) # start w env since we use it first
+    # end
+
+    # ============================================================================================================================================================================================================================================================================== #
+
+    # Stabilize our estimate of cloud top height against index jumps
+
+    # ice  cloud top height
+    # Environment
+    cloud_top_ice_z_en = FT(0)
+    cloud_top_ice_T_en = FT(Inf)
+    k_cloud_top_ice_en = kc_surface(grid)
+    N_i_cloud_top_ice_en = FT(0)
+    @inbounds for k in real_center_indices(grid)
+        if (TD.has_condensate(aux_en.q_ice[k]) && aux_en.area[k] > 1e-6) && ((S_k = TD.supersaturation(thermo_params,  TD.PhasePartition(thermo_params, aux_en.ts[k]), ρ_c[k], aux_en.T[k], TD.Ice())) > FT(0) )
+            
+            if edmf.moisture_model isa NonEquilibriumMoisture
+                N_i_cloud_top_ice_en_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), aux_en.T[k], ρ_c[k], w[k])
+            else
+                N_i_cloud_top_ice_en_here = get_N_i_Cooper_curve(aux_en.T[k]; clamp_N=true) # the fallback
+            end
+
+            if N_i_cloud_top_ice_en_here ≥ N_i_cloud_top_ice_en
+                N_i_cloud_top_ice_en = N_i_cloud_top_ice_en_here
+                cloud_top_ice_z_en = max(cloud_top_ice_z_en, grid.zc[k].z)
+                k_cloud_top_ice_en = k
+                # cloud_top_ice_T_en = min(cloud_top_ice_T_en, aux_en.T[k])
+                if k == kc_toa
+                    T_top = aux_en.T[k]
+                else
+                    S_kp1 = TD.supersaturation(thermo_params, TD.PhasePartition(thermo_params, aux_en.ts[k+1]), ρ_c[k+1], aux_en.T[k+1], TD.Ice())
+                    T_top = (S_kp1 < FT(0)) ? linear_interpolate_extrapolate(FT(0), (S_k, S_kp1), (aux_en.T[k], aux_en.T[k+1])) : aux_en.T[k]
+                end
+                cloud_top_ice_T_en = min(cloud_top_ice_T_en, T_top)
+            end
+        end
+    end
+
+
+    # updraft
+    cloud_top_ice_z_ups = fill(FT(0), N_up)
+    cloud_top_ice_T_ups = fill(FT(Inf), N_up)
+    k_cloud_top_ice_ups = fill(kc_surface(grid), N_up)
+    N_i_cloud_top_ice_ups = fill(FT(0), N_up)
+    @inbounds for k in real_center_indices(grid)
+        @inbounds for i in 1:N_up
+            if (TD.has_condensate(aux_up[i].q_ice[k])) && (aux_up[i].area[k] > 1e-6) && ((S_k = TD.supersaturation(thermo_params, TD.PhasePartition(thermo_params, aux_up[i].ts[k]), ρ_c[k], aux_up[i].T[k], TD.Ice())) > FT(0))
+                
+                if edmf.moisture_model isa NonEquilibriumMoisture
+                    # we know w_mean = 0 so we can calulate w_up 
+                    w_up = -w[k] * aux_en.area[k] / (1-aux_up[i].area[k] + eps(FT))
+                    N_i_cloud_top_ice_ups_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_up[i].ts[k]), aux_up[i].T[k], ρ_c[k], w_up)
+                else
+                    N_i_cloud_top_ice_ups_here = get_N_i_Cooper_curve(aux_up[i].T[k]; clamp_N=true) # the fallback
+                end
+
+                if N_i_cloud_top_ice_ups_here ≥ N_i_cloud_top_ice_ups[i]
+                    N_i_cloud_top_ice_ups[i] = N_i_cloud_top_ice_ups_here
+                    cloud_top_ice_z_ups[i] = max(cloud_top_ice_z_ups[i], grid.zc[k].z)
+                    k_cloud_top_ice_ups[i] = k
+                    # cloud_top_ice_T_ups[i] = min(cloud_top_ice_T_ups[i], aux_up[i].T[k])
+                    if k == kc_toa
+                        T_top = aux_up[i].T[k]
+                    else
+                        S_kp1 = TD.supersaturation(thermo_params, TD.PhasePartition(thermo_params, aux_up[i].ts[k+1]), ρ_c[k+1], aux_up[i].T[k+1], TD.Ice())
+                        T_top = (S_kp1 < FT(0)) ? linear_interpolate_extrapolate(FT(0), (S_k, S_kp1), (aux_up[i].T[k], aux_up[i].T[k+1])) : aux_up[i].T[k]
+                    end
+                    cloud_top_ice_T_ups[i] = min(cloud_top_ice_T_ups[i], T_top)
+                end
+            end
+        end
+    end
+
+    # we need to rank from highest to lowest, waterfalling any remaining area, let en be domain 0, then ups 1, 2, ..., N_up. We sort by height rather than z but idk...
+    domains_zs_ks_Ts = Vector{Tuple{Int,FT,Cent{Int64},FT}}(undef, N_up+1)
+    N_INP_cloud_top_ices = fill(FT(0), N_up+1) # updrafts + 1 env
+    domains_zs_ks_Ts[1] = (0, cloud_top_ice_z_en, k_cloud_top_ice_en, cloud_top_ice_T_en)
+    N_INP_cloud_top_ices[1] = N_i_cloud_top_ice_en
+    @inbounds for i in 1:N_up
+        domains_zs_ks_Ts[i+1] = (i, cloud_top_ice_z_ups[i], k_cloud_top_ice_ups[i], cloud_top_ice_T_ups[i])
+        N_INP_cloud_top_ices[i+1] = N_i_cloud_top_ice_ups[i]
+    end
+    sort!(domains_zs_ks_Ts, by=x->x[2], rev=true) # sort by height, highest first, should be more robust than sorting by temperature (with inversions and all possibly existing)
+
+    @inbounds for (i, (domain, _, k_top, T_top)) in enumerate(domains_zs_ks_Ts)
+
+        if !isinf(T_top)
+            if iszero(domain) # env
+                N_i_cloud_top_ice_here = N_i_cloud_top_ice_en
+            else # updraft
+                N_i_cloud_top_ice_here = N_i_cloud_top_ice_ups[domain]
+            end
+
+            # if it's an updraft, let it just keep its internal properties unless env came before and was larger
+            if !iszero(domain)
+                # N_INP_cloud_top_ices[domain+1] = N_i_cloud_top_ice_here
+                N_INP_cloud_top_ices[domain+1] = max(N_INP_cloud_top_ices[domain+1], N_INP_cloud_top_ices[1])
+            else # if it's env, let it be a waterfalled sum of everything above it
+                # area_remaining = FT(1)
+                # for j in 1:(i-1) # loop over all updrafts higher than it
+                #     a_up = aux_up[domains_zs_ks_Ts[j][1]].area[domains_zs_ks_Ts[j][3]]
+                #     N_i_up = N_INP_cloud_top_ices[domains_zs_ks_Ts[j][1]+1]
+                #     if N_i_up > N_i_cloud_top_ice_here
+                #         a_count = min(area_remaining, a_up * 50) # assume anvil seeds INP everywhere by detrainment, and also that our updraft core is an undercount of the true area...
+                #         N_INP_cloud_top_ices[domain+1] += (N_i_up * a_count) # allow up to full detrainment as the contribution
+                #         area_remaining -= a_count
+                #     end
+                # end
+                # N_INP_cloud_top_ices[domain+1] += N_i_cloud_top_ice_here * min(area_remaining, aux_en.area[k_top])
+                # N_INP_cloud_top_ices[domain+1] = maximum(N_INP_cloud_top_ices) # max of all...
+                N_INP_cloud_top_ices[domain+1] = N_INP_cloud_top_ices[domain+1] # I think giving in to the arbitrarily large updraft values allows too much boosting? idk...
+
+            end
+        end
+    end
+
+    # # print with probability 1/100
+    # if rand() < 0.01
+    #     @warn "N_INP_cloud_top_ices = $N_INP_cloud_top_ices"
+    # end
+
+    # # get T at cloud top z
+    # N_i_cloud_top_ice = FT(NaN)
+    # if !isinf(cloud_top_ice_T)
+    #     if edmf.moisture_model isa NonEquilibriumMoisture
+    #         # N_i_cloud_top_ice = get_N_i_raw(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k_cloud_top_ice]), cloud_top_ice_T,  ρ_c[k_cloud_top_ice], w[k_cloud_top_ice])
+    #         # N_i at cloud top doesn't matter, that could be just a smidgen above 0 for all we know, it's INP that matters as our upper bound.
+    #         N_i_cloud_top_ice = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k_cloud_top_ice]), cloud_top_ice_T, ρ_c[k_cloud_top_ice], w[k_cloud_top_ice])
+    #     else
+    #         N_i_cloud_top_ice = get_N_i_Cooper_curve(cloud_top_ice_T; clamp_N=true) # the fallback
+    #     end
+    # end
+
+    # ------------------------ #
+
+    # Get the highest q_r for SIP ? Everywhere below the SIP zone needs the max ICNC raised...
+    # ICNC_SIP_scaling_factors = similar(aux_gm.q_ice) # it needs its own vector so we can work up from the bottom, one factor won't cut it
+    ICNC_SIP_scaling_factors = aux_gm.f_ice_mult
+    ICNC_SIP_scaling_factors .= FT(1) # reset
+    ICNC_SIP_scaling_factor = FT(1) # this is the running value, we only allow it to increase as we move towards sfc. this is because an INP explosion will have to be propagated downwards, a 10^3 growth permanently impacts everywhere below. (we could for example propose just turning off the INP upper bound or something idk.  +seeder-feeder and all that)
+    
+    if param_set.user_params.use_ice_mult
+        @inbounds for k in Base.Iterators.reverse(real_center_indices(grid)) # have to use fully qualified Base.Iterators.reverse(), see Grid.jl for implementation. But we wanna go TOA to SFC since the factor increases w/ depth
+            if (prog_pr.q_rai[k] > FT(0)) # drizzle drive both Hallet-Mossop and Droplet Shattering ICNC growth
+                if edmf.moisture_model isa NonEquilibriumMoisture
+                    N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_gm.ts[k]), aux_gm.T[k], ρ_c[k], w[k])
+                else
+                    N_INP = get_N_i_Cooper_curve(aux_gm.T[k]; clamp_N=true)
+                end
+
+                if (ice_mult_factor_candidate = get_ice_mult_factor_ICNC_max(param_set, N_INP, aux_gm.N_i[k], aux_gm.q_ice[k], prog_pr.q_rai[k], prog_pr.q_sno[k], aux_gm.T[k], ρ_c[k])) > ICNC_SIP_scaling_factor
+                    ICNC_SIP_scaling_factor = ice_mult_factor_candidate
+                end
+                ICNC_SIP_scaling_factors[k] = ICNC_SIP_scaling_factor
+            else
+                ICNC_SIP_scaling_factors[k] = ICNC_SIP_scaling_factor
+            end
+        end
+    end
+
+
+    # ============================================================================================================================================================================================================================================================================== #
+
+    # ============================================================================================================================================================================================================================================================================== #
+
+    apply_massflux_boost = param_set.user_params.apply_massflux_N_i_boost # env only
+    apply_sedimentation_boost = param_set.user_params.apply_sedimentation_N_i_boost # everywhere, default to false
+
+    # ------------------------ #
+
+    # env
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        if edmf.moisture_model.scheme isa NeuralNetworkRelaxationTimescale # can we do the entire vector at once for efficiency?
+            # get_τs_and_Ns!(param_set, microphys_params, edmf.moisture_model.scheme, TD.PhasePartition.(thermo_params, ts_env), aux_en.T, aux_en.p, TD.air_density.(thermo_params, ts_env), w, aux_en.area, aux_en.τ_liq, aux_en.τ_ice, aux_en.N_l, aux_en.N_i, ICNC_SIP_scaling_factors, prog_pr.q_sno, massflux_c, aux_en.dTdz, aux_en.term_vel_ice; N_INP_top = N_INP_cloud_top_ices[1], apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
+            get_τs_and_Ns_and_N_i_no_boost!(param_set, microphys_params, edmf.moisture_model.scheme, TD.PhasePartition.(thermo_params, ts_env), aux_en.T, aux_en.p, TD.air_density.(thermo_params, ts_env), w, aux_en.area, aux_en.τ_liq, aux_en.τ_ice, aux_en.N_l, aux_en.N_i, aux_en.N_i_no_boost, ICNC_SIP_scaling_factors, prog_pr.q_sno, massflux_c, aux_en.dTdz, aux_en.term_vel_ice; N_INP_top = N_INP_cloud_top_ices[1], apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
+        end
+    end # no NN for eq
+
+    @inbounds for k in real_center_indices(grid)
+        if aux_en.area[k] > 0
+            if edmf.moisture_model isa NonEquilibriumMoisture
+                # aux_en.N_i[k] = get_N_i(param_set, edmf.moisture_model.scheme, ts_env[k], w[k])
+                # aux_en.N_l[k] = get_N_l(param_set, edmf.moisture_model.scheme, ts_env[k], w[k])
+                # aux_en.N_l[k], aux_en.N_i[k] = get_Ns(param_set, edmf.moisture_model.scheme, ts_env[k], w[k])
+                # aux_en.N_l[k], aux_en.N_i[k] = get_Ns(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_env[k]), aux_en.T[k], TD.air_density(thermo_params, ts_env[k]), w[k]) # cheaper bc T and ρ are stored in the ts.
+                # aux_en.τ_liq[k], aux_en.τ_ice[k] = get_τs(param_set, microphys_params, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_env[k]), aux_en.T[k], aux_en.p[k], TD.air_density(thermo_params, ts_env[k]), w[k]) # cheaper bc T and ρ are stored in the ts.
+                if !(edmf.moisture_model.scheme isa NeuralNetworkRelaxationTimescale)
+                    # aux_en.τ_liq[k], aux_en.τ_ice[k], aux_en.N_l[k], aux_en.N_i[k] = get_τs_and_Ns(param_set, microphys_params, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_env[k]), aux_en.T[k], aux_en.p[k], TD.air_density(thermo_params, ts_env[k]), w[k]; N_INP_top = N_INP_cloud_top_ices[1], f_ice_mult = ICNC_SIP_scaling_factors[k], q_sno = prog_pr.q_sno[k], massflux=massflux_c[k], dTdz=aux_en.dTdz[k], w_i = aux_en.term_vel_ice[k], apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
+                    aux_en.τ_liq[k], aux_en.τ_ice[k], aux_en.N_l[k], aux_en.N_i[k], aux_en.N_i_no_boost[k] = get_τs_and_Ns_and_N_i_no_boost(param_set, microphys_params, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_env[k]), aux_en.T[k], aux_en.p[k], TD.air_density(thermo_params, ts_env[k]), w[k]; N_INP_top = N_INP_cloud_top_ices[1], f_ice_mult = ICNC_SIP_scaling_factors[k], q_sno = prog_pr.q_sno[k], massflux=massflux_c[k], dTdz=aux_en.dTdz[k], w_i = aux_en.term_vel_ice[k], apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
+                end
+            else
+                if !(edmf.moisture_model.scheme isa NeuralNetworkRelaxationTimescale)
+                    # aux_en.N_l[k], aux_en.N_i[k] = get_Ns(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_env[k]), aux_en.T[k], TD.air_density(thermo_params, ts_env[k]), w[k]; N_INP_top = N_INP_cloud_top_ices[1], f_ice_mult = ICNC_SIP_scaling_factors[k], q_sno = prog_pr.q_sno[k], massflux=massflux_c[k], dTdz=aux_en.dTdz[k], w_i = aux_en.term_vel_ice[k], apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
+                    aux_en.N_l[k], aux_en.N_i[k], aux_en.N_i_no_boost[k] = get_Ns_and_N_i_no_boost(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_env[k]), aux_en.T[k], TD.air_density(thermo_params, ts_env[k]), w[k]; N_INP_top = N_INP_cloud_top_ices[1], f_ice_mult = ICNC_SIP_scaling_factors[k], q_sno = prog_pr.q_sno[k], massflux=massflux_c[k], dTdz=aux_en.dTdz[k], w_i = aux_en.term_vel_ice[k], apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
+                end
+            end
+            aux_en.r_l_mean[k] = r_from_qN(param_set, liq_type, aux_en.q_liq[k], aux_en.N_l[k]; monodisperse = true, ρ = ρ_c[k])
+            aux_en.r_i_mean[k] = r_from_qN(param_set, ice_type, aux_en.q_ice[k], aux_en.N_i[k]; monodisperse = false, ρ = ρ_c[k])
+
+            if edmf.cloud_sedimentation_model isa CloudSedimentationModel
+                if edmf.cloud_sedimentation_model.grid_mean
+                    error("Not impelemented yet") # TODO: Impelement this. term_vel_ice is stored in aux_gm here I believe
+                else
+
+                    ρ_l = CMP.ρ_cloud_liq(microphys_params)
+                    aux_en.term_vel_liq[k] = calculate_sedimentation_velocity(
+                        param_set,
+                        q_effective_nan_N_safe(param_set, liq_type, aux_en.q_liq[k], aux_en.N_l[k]; monodisperse = true), # if N is NaN this just returns q, which should be fine? the Chen2022Type makes some assumption about what N is... which is probably trustworthy? assume no NaNs in the vector...
+                        ρ_c[k], # air density
+                        liq_type,
+                        aux_en.N_l[k]; # broadcasting is using _first and not going through properly for some reason...
+                        velo_scheme = edmf.cloud_sedimentation_model.liq_terminal_velocity_scheme,
+                        # Dmax = edmf.cloud_sedimentation_model.liq_Dmax,
+                        Dmax = FT(Inf), # testing [i think it is better]
+                    ) .* edmf.cloud_sedimentation_model.liq_sedimentation_scaling_factor
+                    
+                    ρ_i = CMP.ρ_cloud_ice(microphys_params)
+                    aux_en.term_vel_ice[k] = calculate_sedimentation_velocity(
+                        param_set,
+                        q_effective_nan_N_safe(param_set, ice_type, aux_en.q_ice[k], aux_en.N_i[k]; monodisperse = true), # if N is NaN this just returns q, which should be fine? the Chen2022Type makes some assumption about what N is... which is probably trustworthy? assume no NaNs in the vector...
+                        ρ_c[k], # air density
+                        ice_type,
+                        aux_en.N_i[k]; # broadcasting is using _first and not going through properly for some reason...
+                        velo_scheme = edmf.cloud_sedimentation_model.ice_terminal_velocity_scheme,
+                        # Dmax = edmf.cloud_sedimentation_model.ice_Dmax,
+                        Dmax = FT(Inf), # testing [ i think it is better ]
+                    ) .* edmf.cloud_sedimentation_model.ice_sedimentation_scaling_factor
+                end
+            end
+        else
+            aux_en.N_l[k] = FT(0)
+            aux_en.N_i[k] = FT(0)
+            aux_en.r_l_mean[k] = r_from_qN(param_set, liq_type, FT(0), FT(0); monodisperse = true, ρ = ρ_c[k])
+            aux_en.r_i_mean[k] = r_from_qN(param_set, ice_type, FT(0), FT(0); monodisperse = false, ρ = ρ_c[k])
+            aux_en.term_vel_liq[k] = FT(0)
+            aux_en.term_vel_ice[k] = FT(0)
+            aux_en.τ_liq[k], aux_en.τ_ice[k] = FT(Inf), FT(Inf) # we can't store NaNs or Infs and have the regridder not complain..., but we don't want to waste compute calling the methods when the values wont be used...
+        end
+    end
+
+    # -------------------- #
+
+    # updraft
+    @. aux_bulk.N_l = FT(0) # reset N_l
+    @. aux_bulk.N_i = FT(0) # reset N_i
+    @. aux_bulk.r_l_mean = FT(0) # reset r_l_mean
+    @. aux_bulk.r_i_mean = FT(0) # reset r_i_mean
+    @. aux_bulk.term_vel_liq = FT(0) # reset term_vel_liq
+    @. aux_bulk.term_vel_ice = FT(0) # reset term_vel_ice
+
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        @. aux_bulk.τ_liq = FT(0) # reset τ_liq [ store 1/τ here so that we can sum and then take the inverse at the end , so 1/Inf is 0 ]
+        @. aux_bulk.τ_ice = FT(0) # reset τ_ice [ store 1/τ here so that we can sum and then take the inverse at the end , so 1/Inf is 0 ]
+    end
+
+
+    @inbounds for i in 1:N_up
+        if edmf.moisture_model isa NonEquilibriumMoisture
+            # w = F2Cw.(aux_up_f[i].w)
+            @. w = F2Cw(aux_up_f[i].w) # reuse same w allocation
+        end
+        ts_up = aux_up[i].ts # reuse ts_up allocation
+
+
+        if edmf.moisture_model isa NonEquilibriumMoisture
+            if edmf.moisture_model.scheme isa NeuralNetworkRelaxationTimescale # can we do the entire vector at once for efficiency?
+                get_τs_and_Ns!(param_set, microphys_params, edmf.moisture_model.scheme, TD.PhasePartition.(thermo_params, ts_up), aux_up[i].T, aux_up[i].p, TD.air_density.(thermo_params, ts_up), w, aux_up[i].area, aux_up[i].τ_liq, aux_up[i].τ_ice, aux_up[i].N_l, aux_up[i].N_i, ICNC_SIP_scaling_factors, prog_pr.q_sno, massflux_c, aux_up[i].dTdz, aux_up[i].term_vel_ice; N_INP_top = N_INP_cloud_top_ices[i+1], apply_massflux_boost=false, apply_sedimentation_boost=apply_sedimentation_boost) # not sure if massflux boost should be 0 in the updraft
+            end
+        else
+            if edmf.moisture_model.scheme isa NeuralNetworkRelaxationTimescale # can we do the entire vector at once for efficiency?
+                get_Ns!(param_set, microphys_params, edmf.moisture_model.scheme, TD.PhasePartition.(thermo_params, ts_up), aux_up[i].T, aux_up[i].p, TD.air_density.(thermo_params, ts_up), w, aux_up[i].area, aux_up[i].τ_liq, aux_up[i].τ_ice, aux_up[i].N_l, aux_up[i].N_i, ICNC_SIP_scaling_factors, prog_pr.q_sno, massflux_c, aux_up[i].dTdz, aux_up[i].term_vel_ice; N_INP_top = N_INP_cloud_top_ices[i+1], apply_massflux_boost=false, apply_sedimentation_boost=apply_sedimentation_boost) # not sure if massflux boost should be 0 in the updraft
+            end
+        end
+
+        @inbounds for k in real_center_indices(grid)
+            if aux_up[i].area[k] > 0
+                # calculate N_i
+                if edmf.moisture_model isa NonEquilibriumMoisture
+                    # aux_up[i].N_i[k] = get_N_i(param_set, edmf.moisture_model.scheme, ts_up, w[k])
+                    # aux_up[i].N_l[k] = get_N_l(param_set, edmf.moisture_model.scheme, ts_up, w[k])
+                    # aux_up[i].N_l[k], aux_up[i].N_i[k] = get_Ns(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_up[k]), aux_up[i].T[k], TD.air_density(thermo_params, ts_up[k]), w[k]) # cheaper bc T and ρ are stored in the ts.
+                    # aux_up[i].τ_liq[k], aux_up[i].τ_ice[k] = get_τs(param_set, microphys_params, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_up[k]), aux_up[i].T[k], aux_up[i].p[k], TD.air_density(thermo_params, ts_up[k]), w[k]) # cheaper bc T and ρ are stored in the ts.
+                    if !(edmf.moisture_model.scheme isa NeuralNetworkRelaxationTimescale) # you could use the vector methods but probably just makes more allocations since a for loop is probably sufficient. not sure the SIMD speedup is meanigful.
+                        aux_up[i].τ_liq[k], aux_up[i].τ_ice[k], aux_up[i].N_l[k], aux_up[i].N_i[k] = get_τs_and_Ns(param_set, microphys_params, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_up[k]), aux_up[i].T[k], aux_up[i].p[k], TD.air_density(thermo_params, ts_up[k]), w[k]; N_INP_top = N_INP_cloud_top_ices[i+1], f_ice_mult = ICNC_SIP_scaling_factors[k], q_sno = prog_pr.q_sno[k], massflux = massflux_c[k], dTdz = aux_up[i].dTdz[k], w_i = aux_up[i].term_vel_ice[k], apply_massflux_boost=false, apply_sedimentation_boost=apply_sedimentation_boost) # not sure if massflux boost should be 0 in the updraft
+                    end
+                else
+                    # we need to come up with what we do for equilibrium... rn for base and others we just have no N if it's not predicted, but maybe that's not ideal idk... maybe there should be a fallback method for eq and for the relaationtimescales that don't predict N that just gets the default values based on the given q.
+                    # we just need to get_Ns
+                    if !(edmf.moisture_model.scheme isa NeuralNetworkRelaxationTimescale) # you could use the vector methods but probably just makes more allocations since a for loop is probably sufficient. not sure the SIMD speedup is meanigful.
+                        aux_up[i].N_l[k], aux_up[i].N_i[k] = get_Ns(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_up[k]), aux_up[i].T[k], TD.air_density(thermo_params, ts_up[k]), w[k]; N_INP_top = N_INP_cloud_top_ices[i+1], f_ice_mult = ICNC_SIP_scaling_factors[k], q_sno = prog_pr.q_sno[k], massflux = massflux_c[k], dTdz = aux_up[i].dTdz[k], w_i = aux_up[i].term_vel_ice[k], apply_massflux_boost=false, apply_sedimentation_boost=apply_sedimentation_boost) # not sure if massflux boost should be 0 in the updraft
+                    end
+                end
+
+                aux_up[i].r_l_mean[k] = r_from_qN(param_set, liq_type, aux_up[i].q_liq[k], aux_up[i].N_l[k]; monodisperse = true, ρ = ρ_c[k])
+                aux_up[i].r_i_mean[k] = r_from_qN(param_set, ice_type, aux_up[i].q_ice[k], aux_up[i].N_i[k]; monodisperse = false, ρ = ρ_c[k])
+
+                # store N_i_no_boost
+                aux_up[i].N_i_no_boost[k] = aux_up[i].N_i[k] # updrafts don't get massflux boost
+                
+                # calculate sedimentation velocity
+                if edmf.cloud_sedimentation_model isa CloudSedimentationModel
+
+                    # calculate terminal velocity
+                    if edmf.cloud_sedimentation_model.grid_mean
+                        error("Not impelemented yet")     # TODO: Impelement this. term_vel_ice is stored in aux_gm here I believe
+                    else
+
+                        # liquid terminal velocity
+                        ρ_l = CMP.ρ_cloud_liq(microphys_params)
+                        aux_up[i].term_vel_liq[k] = calculate_sedimentation_velocity(
+                            param_set,
+                            q_effective_nan_N_safe(param_set, liq_type, aux_up[i].q_liq[k], aux_up[i].N_l[k]; monodisperse = true), # if N is NaN this just returns q, which should be fine? the Chen2022Type makes some assumption about what N is... which is probably trustworthy? assume no NaNs in the vector...
+                            ρ_c[k], # air density
+                            liq_type,
+                            aux_up[i].N_l[k]; # broadcasting is using _first and not going through properly for some reason...
+                            velo_scheme = edmf.cloud_sedimentation_model.liq_terminal_velocity_scheme,
+                            # Dmax = edmf.cloud_sedimentation_model.liq_Dmax,
+                            Dmax = FT(Inf), # testing [ i think it is better ]
+                        ) .* edmf.cloud_sedimentation_model.liq_sedimentation_scaling_factor
+                            
+                        # ice terminal veocity
+                        ρ_i = CMP.ρ_cloud_ice(microphys_params)
+                        aux_up[i].term_vel_ice[k] = calculate_sedimentation_velocity(
+                            param_set,
+                            q_effective_nan_N_safe(param_set, ice_type, aux_up[i].q_ice[k], aux_up[i].N_i[k]; monodisperse = true), # if N is NaN this just returns q, which should be fine? the Chen2022Type makes some assumption about what N is... which is probably trustworthy? assume no NaNs in the vector...
+                            ρ_c[k], # air density
+                            ice_type,
+                            aux_up[i].N_i[k]; # broadcasting is using _first and not going through properly for some reason...
+                            velo_scheme = edmf.cloud_sedimentation_model.ice_terminal_velocity_scheme,
+                            # Dmax = edmf.cloud_sedimentation_model.ice_Dmax,
+                            Dmax = FT(Inf), # testing [ i think it is better ]
+                        ) .* edmf.cloud_sedimentation_model.ice_sedimentation_scaling_factor
+                    end
+                end
+
+                # calculate bulk N_i and term_vel_ice and N_l and term_vel_liq
+                if aux_bulk.area[k] > FT(0)
+
+                    # liquid 
+                    if !isnan(aux_up[i].N_l[k])
+                        aux_bulk.N_l[k] += aux_up[i].N_l[k] * (aux_up[i].area[k] / aux_bulk.area[k]) # add N weighted by updraft fraction
+                        # r_l needs to be weighted by total N, so multiply by N*area
+                        aux_bulk.r_l_mean[k] += aux_up[i].r_l_mean[k] * aux_up[i].N_l[k] * (aux_up[i].area[k] / aux_bulk.area[k]) # add r_l weighted by updraft fraction
+                    else
+                        # is 0 right here? or something else?
+                    end
+                    aux_bulk.term_vel_liq[k] += aux_up[i].term_vel_liq[k] * (aux_up[i].area[k] / aux_bulk.area[k]) # add sedimentation velocity weighted by updraft fraction
+
+                    # ice 
+                    if !isnan(aux_up[i].N_i[k])
+                        aux_bulk.N_i[k] += aux_up[i].N_i[k] * (aux_up[i].area[k] / aux_bulk.area[k]) # add N weighted by updraft fraction
+                        aux_bulk.r_i_mean[k] += aux_up[i].r_i_mean[k] * aux_up[i].N_i[k] * (aux_up[i].area[k] / aux_bulk.area[k]) # add r_i weighted by updraft fraction
+
+                    else
+                        # is 0 right here? or something else?
+                    end
+                    aux_bulk.term_vel_ice[k] += aux_up[i].term_vel_ice[k] * (aux_up[i].area[k] / aux_bulk.area[k]) # add sedimentation velocity weighted by updraft fraction
+
+                    if edmf.moisture_model isa NonEquilibriumMoisture
+                        aux_bulk.τ_liq[k] += inv(aux_up[i].τ_liq[k]) * (aux_up[i].area[k] / aux_bulk.area[k]) # add τ_liq weighted by updraft fraction
+                        aux_bulk.τ_ice[k] += inv(aux_up[i].τ_ice[k]) * (aux_up[i].area[k] / aux_bulk.area[k]) # add τ_ice weighted by updraft fraction
+                    end
+
+                else
+                    # liquid
+                    if !isnan(aux_up[i].N_l[k])
+                        aux_bulk.N_l[k] += aux_up[i].N_l[k] * (1. / N_up) # add N weighted by updraft fraction
+                        aux_bulk.r_l_mean[k] += aux_up[i].r_l_mean[k] * aux_up[i].N_l[k] * (1. / N_up) # add r_l weighted by updraft fraction
+                    else
+                        # is 0 right here? or something else?
+                    end
+                    aux_bulk.N_i[k] += aux_up[i].N_i[k] * (1. / N_up) # add N weighted by updraft fraction
+
+                    # ice
+                    if !isnan(aux_up[i].N_i[k])
+                        aux_bulk.N_i[k] += aux_up[i].N_i[k] * (1. / N_up)
+                        aux_bulk.r_i_mean[k] += aux_up[i].r_i_mean[k] * aux_up[i].N_i[k] * (1. / N_up) # add r_i weighted by updraft fraction
+
+                    else
+                        # is 0 right here? or something else?
+                    end
+                    aux_bulk.term_vel_ice[k] += aux_up[i].term_vel_ice[k] * (1. / N_up)
+
+                    if edmf.moisture_model isa NonEquilibriumMoisture
+                        aux_bulk.τ_liq[k] += inv(aux_up[i].τ_liq[k]) * (1. / N_up) # add τ_liq weighted by updraft fraction
+                        aux_bulk.τ_ice[k] += inv(aux_up[i].τ_ice[k]) * (1. / N_up) # add τ_ice weighted by updraft fraction
+                    end
+
+                end
+            else
+                aux_up[i].N_l[k] = FT(0)
+                aux_up[i].N_i[k] = FT(0)
+                aux_up[i].r_l_mean[k] = r_from_qN(param_set, liq_type, FT(0), FT(0); monodisperse = true, ρ = ρ_c[k])
+                aux_up[i].r_i_mean[k] = r_from_qN(param_set, ice_type, FT(0), FT(0); monodisperse = false, ρ = ρ_c[k])
+                aux_up[i].term_vel_ice[k] = FT(0)
+                aux_up[i].term_vel_liq[k] = FT(0)
+
+
+                if edmf.moisture_model isa NonEquilibriumMoisture
+                    aux_up[i].τ_liq[k] = FT(Inf) # reset τ_liq
+                    aux_up[i].τ_ice[k] = FT(Inf) # reset τ_ice
+                end
+
+            end
+            #
+        end
+    end
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        @. aux_bulk.τ_liq = inv(aux_bulk.τ_liq) # undo inverse
+        @. aux_bulk.τ_ice = inv(aux_bulk.τ_ice) # undo inverse
+    end
+
+    # to get r_mean we need to divide by the toal N_l, N_i
+    @inbounds for k in real_center_indices(grid)
+        aux_bulk.r_l_mean[k] = iszero(aux_bulk.N_l[k]) ? r_from_qN(param_set, liq_type, FT(0), FT(0); monodisperse = true, ρ = ρ_c[k]) : aux_bulk.r_l_mean[k] / aux_bulk.N_l[k] # if N_l is 0 then r_l_mean is the default minimum
+        aux_bulk.r_i_mean[k] = iszero(aux_bulk.N_i[k]) ? r_from_qN(param_set, ice_type, FT(0), FT(0); monodisperse = false, ρ = ρ_c[k]) : aux_bulk.r_i_mean[k] / aux_bulk.N_i[k] # if N_i is 0 then r_i_mean is the default minimum
+
+        aux_bulk.N_i_no_boost[k] = aux_bulk.N_i[k]
+    end
+
+    # -------------------- #
+
+    # update grid mean N_i and term_vel_ice, being sensitive to what could be NaNs in one but not the other
+    if (edmf.cloud_sedimentation_model isa CloudSedimentationModel) && !edmf.cloud_sedimentation_model.grid_mean
+        @inbounds for k in real_center_indices(grid)
+            if aux_bulk.area[k] > FT(0)
+                if aux_en.area[k] > FT(0)
+                    aux_gm.N_i[k] = (aux_bulk.N_i[k] * aux_bulk.area[k]) + (aux_en.N_i[k] * aux_en.area[k])
+                    aux_gm.N_l[k] = (aux_bulk.N_l[k] * aux_bulk.area[k]) + (aux_en.N_l[k] * aux_en.area[k])
+                    aux_gm.r_l_mean[k] = (aux_bulk.r_l_mean[k] * aux_bulk.N_l[k] * aux_bulk.area[k] + aux_en.r_l_mean[k] * aux_en.N_l[k] * aux_en.area[k]) / (aux_gm.N_l[k]) # area is 1
+                    aux_gm.r_i_mean[k] = (aux_bulk.r_i_mean[k] * aux_bulk.N_i[k] * aux_bulk.area[k] + aux_en.r_i_mean[k] * aux_en.N_i[k] * aux_en.area[k]) / (aux_gm.N_i[k]) # area is 1
+
+                    aux_gm.N_i_no_boost[k] = (aux_bulk.N_i_no_boost[k] * aux_bulk.area[k]) + (aux_en.N_i_no_boost[k] * aux_en.area[k]) # bulk N_i_no_boost is just N_i since bulk doesn't get massflux boost
+
+                    # calculate grid mean term_vel_liq
+                    if aux_gm.q_liq[k] > FT(0) # if q_liq is 0 then N_l is 0
+                        aux_gm.term_vel_liq[k] = (aux_bulk.term_vel_liq[k] * aux_bulk.area[k] * aux_bulk.q_liq[k] + aux_en.term_vel_liq[k] * aux_en.area[k] * aux_en.q_liq[k]) / aux_gm.q_liq[k] # mass weighted, area sums and cancels out... as does density
+                    else
+                        aux_gm.term_vel_liq[k] = FT(0) # i think this is already true but just to be sure
+                    end
+
+                    # calculate grid mean term_vel_ice
+                    if aux_gm.q_ice[k] > FT(0)
+                        aux_gm.term_vel_ice[k] = (aux_bulk.term_vel_ice[k] * aux_bulk.area[k] * aux_bulk.q_ice[k] + aux_en.term_vel_ice[k] * aux_en.area[k] * aux_en.q_ice[k]) / aux_gm.q_ice[k] # mass weighted, area sums and cancels out... as does density
+                    else
+                        aux_gm.term_vel_ice[k] = FT(0) # i think this is already true but just to be sure
+                    end
+
+                else
+                    aux_gm.N_i[k] = aux_bulk.N_i[k]
+                    aux_gm.r_i_mean[k] = aux_bulk.r_i_mean[k]
+                    aux_gm.term_vel_ice[k] = aux_bulk.term_vel_ice[k]
+                    aux_gm.N_l[k] = aux_bulk.N_l[k]
+                    aux_gm.r_l_mean[k] = aux_bulk.r_l_mean[k]
+                    aux_gm.term_vel_liq[k] = aux_bulk.term_vel_liq[k]
+
+                    aux_gm.N_i_no_boost[k] = aux_bulk.N_i_no_boost[k] # bulk N_i_no_boost is just N_i since bulk doesn't get massflux boost
+                end
+            else
+                aux_gm.N_i[k] = aux_en.N_i[k]
+                aux_gm.r_i_mean[k] = aux_en.r_i_mean[k]
+                aux_gm.term_vel_ice[k] = aux_en.term_vel_ice[k]
+                aux_gm.N_l[k] = aux_en.N_l[k]
+                aux_gm.r_l_mean[k] = aux_en.r_l_mean[k]
+                aux_gm.term_vel_liq[k] = aux_en.term_vel_liq[k]
+
+                aux_gm.N_i_no_boost[k] = aux_en.N_i_no_boost[k]
+            end
+        end
+    end
+
+
+    # update gradients #    
+    wvec = CC.Geometry.WVector
+    ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+    If0 = CCO.InterpolateC2F(; ∇0_bcs...)
+    RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0))) # top = CCO.SetValue(T_toa)) # right biased
+    ∇c = CCO.DivergenceF2C()
+    # @. aux_en.dr_i_mean_dz = ∇c(wvec(If0(aux_en.r_i_mean)))
+    # @. aux_en.dr_l_mean_dz = ∇c(wvec(If0(aux_en.r_l_mean)))
+    @. aux_en.dN_i_dz = ∇c(wvec(RB(aux_en.N_i)))
+    # @. aux_en.dN_l_dz = ∇c(wvec(If0(aux_en.N_l)))
+    @. aux_en.dqidz = ∇c(wvec(RB(aux_en.q_ice))) # right biased divergence for sedimentation flux
+
+    @inbounds for i in 1:N_up
+    #     @. aux_up[i].dr_i_mean_dz = ∇c(wvec(If0(aux_up[i].r_i_mean)))
+    #     @. aux_up[i].dr_l_mean_dz = ∇c(wvec(If0(aux_up[i].r_l_mean)))
+        @. aux_up[i].dN_i_dz = ∇c(wvec(RB(aux_up[i].N_i)))
+    #     @. aux_up[i].dN_l_dz = ∇c(wvec(If0(aux_up[i].N_l)))
+        @. aux_up[i].dqidz = ∇c(wvec(RB(aux_up[i].q_ice))) # right biased divergence for sedimentation flux
+    end
+
+
+
+    # ======================================================== #
 
     return nothing
 end
