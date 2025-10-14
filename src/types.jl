@@ -251,13 +251,18 @@ end
 # ========== Area Partition Models ============================================================================== #
 
 abstract type AreaPartitionModel end
-struct StandardAreaPartitionModel <: AreaPartitionModel
+struct StandardAreaPartitionModel{FT} <: AreaPartitionModel
     "apply_second_order_flux_correction::Bool"
     apply_second_order_flux_correction::Bool
-end;
-function StandardAreaPartitionModel(namelist::Dict)
+    "second_order_correction_limit_factor::FT"
+    second_order_correction_limit_factor::FT # factor to limit the second order correction to avoid overshoots. 0 means no correction, 1 means full correction
+
+    end;
+function StandardAreaPartitionModel(param_set::APS, namelist)
+    FT = eltype(param_set)
     apply_second_order_flux_correction = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "apply_second_order_flux_correction"; default = false)
-    return StandardAreaPartitionModel(apply_second_order_flux_correction)
+    second_order_correction_limit_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "second_order_correction_limit_factor"; default = FT(Inf)) # default Inf (no limit)
+    return StandardAreaPartitionModel{FT}(apply_second_order_flux_correction, second_order_correction_limit_factor)
 end
 
 #=
