@@ -257,6 +257,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.θ_dry[k] = TD.dry_pottemp(thermo_params, ts_en)
         aux_en.buoy[k] = buoyancy_c(param_set, ρ_c[k], ρ)
         aux_en.RH[k] = TD.relative_humidity(thermo_params, ts_en)
+        aux_en.RH_liq[k] = relative_humidity_over_liquid(thermo_params, ts_en)
         aux_en.RH_ice[k] = relative_humidity_over_ice(thermo_params, ts_en)
     end
 
@@ -499,6 +500,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             ρ = TD.air_density(thermo_params, ts_up)
             aux_up[i].buoy[k] = buoyancy_c(param_set, ρ_c[k], ρ)
             aux_up[i].RH[k] = TD.relative_humidity(thermo_params, ts_up)
+            aux_up[i].RH_liq[k] = relative_humidity_over_liquid(thermo_params, ts_up)
             aux_up[i].RH_ice[k] = relative_humidity_over_ice(thermo_params, ts_up)
         end
         aux_gm.buoy[k] = (1.0 - aux_bulk.area[k]) * aux_en.buoy[k]
@@ -518,6 +520,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_bulk.q_ice[k] = 0
         aux_bulk.T[k] = 0
         aux_bulk.RH[k] = 0
+        aux_bulk.RH_liq[k] = 0
         aux_bulk.RH_ice[k] = 0
         aux_bulk.buoy[k] = 0
         if a_bulk_c > 0
@@ -526,11 +529,13 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 aux_bulk.q_ice[k] += aux_up[i].area[k] * aux_up[i].q_ice[k] / a_bulk_c
                 aux_bulk.T[k] += aux_up[i].area[k] * aux_up[i].T[k] / a_bulk_c
                 aux_bulk.RH[k] += aux_up[i].area[k] * aux_up[i].RH[k] / a_bulk_c
+                aux_bulk.RH_liq[k] += aux_up[i].area[k] * aux_up[i].RH_liq[k] / a_bulk_c
                 aux_bulk.RH_ice[k] += aux_up[i].area[k] * aux_up[i].RH_ice[k] / a_bulk_c
                 aux_bulk.buoy[k] += aux_up[i].area[k] * aux_up[i].buoy[k] / a_bulk_c
             end
         else
             aux_bulk.RH[k] = aux_en.RH[k]
+            aux_bulk.RH_liq[k] = aux_en.RH_liq[k]
             aux_bulk.RH_ice[k] = aux_en.RH_ice[k]
             aux_bulk.T[k] = aux_en.T[k]
         end

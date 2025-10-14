@@ -25,33 +25,30 @@ end
 
 
 
-
-function relative_humidity_over_ice(thermo_params::TD.APS, T::FT, p::FT, ::Type{phase_type},
-    q::TD.PhasePartition{FT} = TD.q_pt_0(FT),
-) where {FT <: Real, phase_type <: TD.ThermodynamicState}
+# --------------------------------------------------------------- #
+function relative_humidity_over_phase(thermo_params::TD.APS, T::FT, p::FT, phase::TD.Phase, q::TD.PhasePartition{FT} = TD.q_pt_0(FT),
+) where {FT <: Real}
     R_v::FT = TD.TP.R_v(thermo_params)
     q_vap = TD.vapor_specific_humidity(q)
     p_vap = q_vap * TD.air_density(thermo_params, T, p, q) * R_v * T
-    p_vap_sat = TD.saturation_vapor_pressure(thermo_params, T, TD.Ice())
+    p_vap_sat = TD.saturation_vapor_pressure(thermo_params, T, phase)
     return p_vap / p_vap_sat
 end
-relative_humidity_over_ice(param_set::APS, T::FT, p::FT, ::Type{phase_type}) where {FT <: Real, phase_type <: TD.ThermodynamicState} = 
-    relative_humidity_over_ice(TCP.thermodynamics_params(param_set), T, p, phase_type)
+relative_humidity_over_phase(param_set::APS, T::FT, p::FT, phase::TD.Phase) where {FT <: Real} = relative_humidity_over_phase(TCP.thermodynamics_params(param_set), T, p, phase)
 
+function relative_humidity_over_phase(thermo_params::TD.APS, ts::TD.ThermodynamicState{FT}, phase::TD.Phase) where {FT <: Real}
+    return relative_humidity_over_phase(thermo_params, TD.air_temperature(thermo_params, ts), TD.air_pressure(thermo_params, ts), phase, TD.PhasePartition(thermo_params, ts))
+end
+# --------------------------------------------------------------- #
 """
-The default assumes over liquid, or if you provide a q, it could be over ice but it doesnt pass that q to saturation_vapor_pressure anyway...
+The default assumes over equilibrium phase, or if you provide a q, it could be over that q but it doesnt pass that q to saturation_vapor_pressure anyway...
 """
-relative_humidity_over_ice(thermo_params::TD.APS, ts::TD.ThermodynamicState{FT}) where {FT <: Real} = 
-    relative_humidity_over_ice(
-        thermo_params,
-        TD.air_temperature(thermo_params, ts),
-        TD.air_pressure(thermo_params, ts),
-        typeof(ts),
-        TD.PhasePartition(thermo_params, ts),
-    )
+relative_humidity_over_ice(param_set::APS, ts::TD.ThermodynamicState{FT}) where {FT <: Real} = relative_humidity_over_ice(TCP.thermodynamics_params(param_set), ts)
+relative_humidity_over_ice(thermo_params::TD.APS, ts::TD.ThermodynamicState{FT}) where {FT <: Real} = relative_humidity_over_phase(thermo_params, ts, TD.Ice())
+relative_humidity_over_ice(param_set::APS, T::FT, p::FT, q::TD.PhasePartition{FT} = TD.q_pt_0(FT)) where {FT <: Real} = relative_humidity_over_phase(TCP.thermodynamics_params(param_set), T, p, TD.Ice(), q)
 
+relative_humidity_over_liquid(param_set::APS, ts::TD.ThermodynamicState{FT}) where {FT <: Real} = relative_humidity_over_liquid(TCP.thermodynamics_params(param_set), ts)
+relative_humidity_over_liquid(thermo_params::TD.APS, ts::TD.ThermodynamicState{FT}) where {FT <: Real} = relative_humidity_over_phase(thermo_params, ts, TD.Liquid())
+relative_humidity_over_liquid(param_set::APS, T::FT, p::FT, q::TD.PhasePartition{FT} = TD.q_pt_0(FT)) where {FT <: Real} = relative_humidity_over_phase(TCP.thermodynamics_params(param_set), T, p, TD.Liquid(), q)
+# --------------------------------------------------------------- #
 
-relative_humidity_over_ice(param_set::APS, ts::TD.ThermodynamicState{FT}) where {FT <: Real} = relative_humidity_over_ice(
-    TCP.thermodynamics_params(param_set),
-    ts,
-)

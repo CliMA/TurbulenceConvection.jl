@@ -96,7 +96,7 @@ function LBC2F_field(field::CC.Fields.Field, kc_surf::Cent{Int64};)
     LBC2F = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(field[kc_surf]))
     return LBC2F.(field)
 end
-function RBC2F_field(field::CC.Fields.Field, kc_toa::Face{Int64})
+function RBC2F_field(field::CC.Fields.Field, kc_toa::Cent{Int64})
     RBC2F = CCO.RightBiasedC2F(; top = CCO.SetValue(field[kc_toa]))
     return RBC2F.(field)
 end

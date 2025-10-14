@@ -34,6 +34,7 @@ cent_aux_vars_gm(FT, local_geometry, edmf) = (;
     q_liq = FT(0),
     q_ice = FT(0),
     RH = FT(0),
+    RH_liq = FT(0),
     RH_ice = FT(0), # RH for ice, i.e. the ratio of q_vap to q_vap_sat_ice
     s = FT(0),
     T = FT(0),
