@@ -57,7 +57,7 @@ function apply_second_order_correction(flux::CC.Fields.Field, w::CC.Fields.Field
     return @. flux - (Δt/FT(2)) * w * Iff(∇c(wvec(flux))) # -Δt/2 * wΔ(wq)
 end
 
-function apply_second_order_correction!(flux::CC.Fields.Field, w::CC.Fields.Field, Δt::FT; apply_diffusive_damping::Bool = false, correction_limit_factor::FT = FT(Inf)) where{FT}
+function apply_second_order_flux_correction(flux::CC.Fields.Field, w::CC.Fields.Field, Δt::FT; apply_diffusive_damping::Bool = false, correction_limit_factor::FT = FT(Inf)) where{FT}
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
     Iff = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # we know the bc on flux is 0, but not what the gradient of the flux is. we can extrapolate the gradient or assume it's constant
@@ -90,6 +90,15 @@ function apply_second_order_correction!(flux::CC.Fields.Field, w::CC.Fields.Fiel
     # return corrected
 
     # return flux
+end
+
+function LBC2F_field(field::CC.Fields.Field, kc_surf::Cent{Int64};)
+    LBC2F = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(field[kc_surf]))
+    return LBC2F.(field)
+end
+function RBC2F_field(field::CC.Fields.Field, kc_toa::Face{Int64})
+    RBC2F = CCO.RightBiasedC2F(; top = CCO.SetValue(field[kc_toa]))
+    return RBC2F.(field)
 end
 
 
@@ -140,7 +149,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
 
     # Compute the mass flux and associated scalar fluxes [[ note the mass flux here goes into the grid mean, but the updraft part should be pretty close to the same as compute_up_tendencies!() So the `updraft` and `env` and thus the massflux are `sgs` but not really in the classical way we'd think about turbulence ]]
 
-    if edmf.area_partition_model isa CoreCloakAreaPartitionModel
+    if edmf.area_partition_model.apply_second_order_flux_correction
         seclf = edmf.area_partition_model.second_order_correction_limit_factor
     end
 
@@ -160,33 +169,35 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     if edmf.area_partition_model isa StandardAreaPartitionModel
 
         if edmf.area_partition_model.apply_second_order_flux_correction
-            massflux_en .= apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_en) .* w_en, w_en, Δt; correction_limit_factor = seclf) # note we use w_en not (w_en - w_gm) here since this is the full flux
-            massflux_h .= apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_en) .* w_en, w_en, Δt; correction_limit_factor = seclf) # note we use w_en not (w_en - w_gm) here since this is the full flux
-            massflux_qt .= apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_en) .* w_en, w_en, Δt; correction_limit_factor = seclf) # note we use w_en not (w_en - w_gm) here since this is the full flux
-
+            massflux_en .= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_en) .* w_en, w_en, Δt; correction_limit_factor = seclf) # note we use w_en not (w_en - w_gm) here since this is the full flux
+            massflux_h .= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_en) .* w_en .* If.(θ_liq_ice_en), w_en, Δt; correction_limit_factor = seclf) # note we use w_en not (w_en - w_gm) here since this is the full flux
+            massflux_qt .= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_en) .* w_en .* If.(q_tot_en), w_en, Δt; correction_limit_factor = seclf) # note we use w_en not (w_en - w_gm) here since this is the full flux
             if edmf.moisture_model isa NonEquilibriumMoisture
-                massflux_ql .= apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_en) .* (w_en) .* If.(q_liq_en), w_en, Δt; correction_limit_factor = seclf) # note we use w_en not (w_en - w_gm) here since this is the full flux
-                massflux_qi .= apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_en) .* (w_en) .* If.(q_ice_en), w_en, Δt; correction_limit_factor = seclf) # note we use w_en not (w_en - w_gm) here since this is the full flux
+                massflux_ql .= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_en) .* (w_en) .* If.(q_liq_en), w_en, Δt; correction_limit_factor = seclf) # note we use w_en not (w_en - w_gm) here since this is the full flux
+                massflux_qi .= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_en) .* (w_en) .* If.(q_ice_en), w_en, Δt; correction_limit_factor = seclf) # note we use w_en not (w_en - w_gm) here since this is the full flux
 
                 @. ql_flux_vert_adv = massflux_ql # rn they're the same since we omit gm in the second order correction case
                 @. qi_flux_vert_adv = massflux_qi # rn they're the same since we omit gm in the second order correction case
             end
         else
-            @. massflux_en = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm))
-
-            @. massflux_h = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm)) * (If(θ_liq_ice_en) - If(θ_liq_ice_gm))
-            @. massflux_qt = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm)) * (If(q_tot_en) - If(q_tot_gm))
+            # @. massflux_en = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm))
+            # @. massflux_h = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm)) * (If(θ_liq_ice_en) - If(θ_liq_ice_gm))
+            # @. massflux_qt = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm)) * (If(q_tot_en) - If(q_tot_gm))
+            @. massflux_en = ρ_f * ᶠinterp_a(a_en) * w_en
+            @. massflux_h = massflux_en * If(θ_liq_ice_en)
+            @. massflux_qt = massflux_en * If(q_tot_en)
 
             if edmf.moisture_model isa NonEquilibriumMoisture
-                @. massflux_ql = massflux_en * (If(q_liq_en) - If(q_liq_gm))
-                @. massflux_qi = massflux_en * (If(q_ice_en) - If(q_ice_gm))
+                # @. massflux_ql = massflux_en * (If(q_liq_en) - If(q_liq_gm))
+                # @. massflux_qi = massflux_en * (If(q_ice_en) - If(q_ice_gm))
+                @. massflux_ql = massflux_en * If(q_liq_en)
+                @. massflux_qi = massflux_en * If(q_ice_en)
 
                 massflux_vert_adv_en = @. ρ_f * ᶠinterp_a(a_en) * w_en # (w_en - toscalar(w_gm)) # not sure what this should be, it's just the raw flux right?
                 @. ql_flux_vert_adv = massflux_vert_adv_en * If(q_liq_en)
                 @. qi_flux_vert_adv = massflux_vert_adv_en * If(q_ice_en)
             end
         end
-
 
     elseif edmf.area_partition_model isa CoreCloakAreaPartitionModel
 
@@ -312,16 +323,16 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
             # calculate fluxes
             if edmf.area_partition_model.apply_second_order_flux_correction
                 massflux_h .+=
-                    apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_cloak_ups[i]) .* w_cloak_ups[i] .* If.(h_tot_cloak_ups[i]), w_cloak_ups[i], Δt; correction_limit_factor = seclf) .+
-                    apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_cloak_dns[i]) .* w_cloak_dns[i] .* If.(h_tot_cloak_dns[i]), w_cloak_dns[i], Δt; correction_limit_factor = seclf)
+                    apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_cloak_ups[i]) .* w_cloak_ups[i] .* If.(h_tot_cloak_ups[i]), w_cloak_ups[i], Δt; correction_limit_factor = seclf) .+
+                    apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_cloak_dns[i]) .* w_cloak_dns[i] .* If.(h_tot_cloak_dns[i]), w_cloak_dns[i], Δt; correction_limit_factor = seclf)
                     if !edmf.area_partition_model.confine_all_downdraft_to_cloak && isone(i)
-                        massflux_h .+= apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_en_left) .* w_en .* If.(θ_liq_ice_en), w_en, Δt; correction_limit_factor = seclf) # add in the remaining env part if we didn't move all the downdraft to cloak
+                        massflux_h .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_en_left) .* w_en .* If.(θ_liq_ice_en), w_en, Δt; correction_limit_factor = seclf) # add in the remaining env part if we didn't move all the downdraft to cloak
                     end
                 massflux_qt .+=
-                    apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_cloak_ups[i]) .* w_cloak_ups[i] .* If.(q_tot_cloak_ups[i]), w_cloak_ups[i], Δt; correction_limit_factor = seclf) .+
-                    apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_cloak_dns[i]) .* w_cloak_dns[i] .* If.(q_tot_cloak_dns[i]), w_cloak_dns[i], Δt; correction_limit_factor = seclf)
+                    apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_cloak_ups[i]) .* w_cloak_ups[i] .* If.(q_tot_cloak_ups[i]), w_cloak_ups[i], Δt; correction_limit_factor = seclf) .+
+                    apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_cloak_dns[i]) .* w_cloak_dns[i] .* If.(q_tot_cloak_dns[i]), w_cloak_dns[i], Δt; correction_limit_factor = seclf)
                 if !edmf.area_partition_model.confine_all_downdraft_to_cloak && isone(i)
-                    massflux_qt .+= apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_en_left) .* w_en .* If.(q_tot_en), w_en, Δt; correction_limit_factor = seclf) # add in the remaining env part if we didn't move all the downdraft to cloak
+                    massflux_qt .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_en_left) .* w_en .* If.(q_tot_en), w_en, Δt; correction_limit_factor = seclf) # add in the remaining env part if we didn't move all the downdraft to cloak
                 end
             else
                 # @. massflux_h += 
@@ -362,16 +373,16 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
                 # calculate fluxes
                 if edmf.area_partition_model.apply_second_order_flux_correction
                     massflux_ql .+=
-                        apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_cloak_ups[i]) .* w_cloak_ups[i] .* If.(q_liq_cloak_ups[i]), w_cloak_ups[i], Δt; correction_limit_factor = seclf) .+
-                        apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_cloak_dns[i]) .* w_cloak_dns[i] .* If.(q_liq_cloak_dns[i]), w_cloak_dns[i], Δt; correction_limit_factor = seclf)
+                        apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_cloak_ups[i]) .* w_cloak_ups[i] .* If.(q_liq_cloak_ups[i]), w_cloak_ups[i], Δt; correction_limit_factor = seclf) .+
+                        apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_cloak_dns[i]) .* w_cloak_dns[i] .* If.(q_liq_cloak_dns[i]), w_cloak_dns[i], Δt; correction_limit_factor = seclf)
                     if !edmf.area_partition_model.confine_all_downdraft_to_cloak && isone(i)
-                        massflux_ql .+= apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_en_left) .* w_en .* If.(q_liq_en), w_en, Δt; correction_limit_factor = seclf) # add in the remaining env part if we didn't move
+                        massflux_ql .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_en_left) .* w_en .* If.(q_liq_en), w_en, Δt; correction_limit_factor = seclf) # add in the remaining env part if we didn't move
                     end
                     massflux_qi .+=
-                        apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_cloak_ups[i]) .* w_cloak_ups[i] .* If.(q_ice_cloak_ups[i]), w_cloak_ups[i], Δt; correction_limit_factor = seclf) .+
-                        apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_cloak_dns[i]) .* w_cloak_dns[i] .* If.(q_ice_cloak_dns[i]), w_cloak_dns[i], Δt; correction_limit_factor = seclf)
+                        apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_cloak_ups[i]) .* w_cloak_ups[i] .* If.(q_ice_cloak_ups[i]), w_cloak_ups[i], Δt; correction_limit_factor = seclf) .+
+                        apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_cloak_dns[i]) .* w_cloak_dns[i] .* If.(q_ice_cloak_dns[i]), w_cloak_dns[i], Δt; correction_limit_factor = seclf)
                     if !edmf.area_partition_model.confine_all_downdraft_to_cloak && isone(i)
-                        massflux_qi .+= apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_en_left) .* w_en .* If.(q_ice_en), w_en, Δt; correction_limit_factor = seclf)
+                        massflux_qi .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_en_left) .* w_en .* If.(q_ice_en), w_en, Δt; correction_limit_factor = seclf)
                     end
 
                     @. ql_flux_vert_adv = massflux_ql # rn they're the same since we omit gm in the second order correction case
@@ -434,8 +445,8 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         massflux_up_i = aux_up_f[i].massflux
 
         if edmf.area_partition_model.apply_second_order_flux_correction
-            massflux_h .+= apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_up) .* w_up_i .* If.(θ_liq_ice_up), w_up_i, Δt; correction_limit_factor = seclf)
-            massflux_qt .+= apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_up) .* w_up_i .* If.(q_tot_up), w_up_i, Δt; correction_limit_factor = seclf)
+            massflux_h .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_up) .* w_up_i .* If.(θ_liq_ice_up), w_up_i, Δt; correction_limit_factor = seclf)
+            massflux_qt .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_up) .* w_up_i .* If.(q_tot_up), w_up_i, Δt; correction_limit_factor = seclf)
         else
             # @. massflux_h += massflux_up_i * (If(θ_liq_ice_up) - If(θ_liq_ice_gm))
             # @. massflux_qt += massflux_up_i * (If(q_tot_up) - If(q_tot_gm))
@@ -454,8 +465,8 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
             q_ice_up = aux_up_i.q_ice
 
             if edmf.area_partition_model.apply_second_order_flux_correction
-                massflux_ql .+= apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_up) .* w_up_i .* If.(q_liq_up), w_up_i, Δt; correction_limit_factor = seclf) # note we use w_en not (w_en - w_gm) here since this is the full flux
-                massflux_qi .+= apply_second_order_correction!(ρ_f .* ᶠinterp_a.(a_up) .* w_up_i .* If.(q_ice_up), w_up_i, Δt; correction_limit_factor = seclf) # note we use w_en not (w_en - w_gm) here since this is the full flux
+                massflux_ql .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_up) .* w_up_i .* If.(q_liq_up), w_up_i, Δt; correction_limit_factor = seclf) # note we use w_en not (w_en - w_gm) here since this is the full flux
+                massflux_qi .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a.(a_up) .* w_up_i .* If.(q_ice_up), w_up_i, Δt; correction_limit_factor = seclf) # note we use w_en not (w_en - w_gm) here since this is the full flux
 
                 @. ql_flux_vert_adv = massflux_ql # rn theyre the same since we took gm out the second order correction
                 @. qi_flux_vert_adv = massflux_qi # rn theyre the same since we took gm out the second order correction

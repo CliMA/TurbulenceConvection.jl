@@ -580,7 +580,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             ifelse(ᶠinterp_a(aux_bulk.area) > 0, ᶠinterp_a(a_up) * aux_up_f[i].w / ᶠinterp_a(aux_bulk.area), FT(0))
     end
     # Assuming w_gm = 0!
-    # if edmf.area_partition_model isa CoreCloakAreaPartitinModel && edmf.area_partition_model.move_all_downdraft_to_cloak # I think w_en is used so many places that don't have the cloak model we need to keep it here.
     @. aux_en_f.w = -1 * ᶠinterp_a(aux_bulk.area) / (1 - ᶠinterp_a(aux_bulk.area)) * aux_tc_f.bulk.w
 
     #####

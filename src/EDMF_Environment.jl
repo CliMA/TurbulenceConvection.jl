@@ -31,12 +31,15 @@ function microphysics!(
     aux_en_sat = aux_en.sat
     aux_en_unsat = aux_en.unsat
     precip_fraction = compute_precip_fraction(edmf, state)
-    # ts_LCL = cloud_base(aux_en, grid, ts_env, :env)[:cloud_base_ts] # cloud base, only keep the thermodynamic state part deprecated for now
-
 
     if (moisture_model isa NonEquilibriumMoisture) || (edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean)
-        F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
-        w::CC.Fields.Field = F2Cw.(aux_en_f.w)
+        if (edmf.area_partition_model isa CoreCloakAreaPartitionModel) && edmf.area_partition_model.confine_all_downdraft_to_cloak
+            w::CC.Fields.Field = similar(aux_en.T)
+            @. w = FT(0) # we confine the downdraft (which will be drier) to the cloak region, so we can set w = 0 in the environment
+        else
+            F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
+            w = F2Cw.(aux_en_f.w)
+        end
     else
         # don't think we need w for EquilibriumMoisture... we're using w on faces rn...
     end
@@ -54,7 +57,6 @@ function microphysics!(
     # - con: could maybe lead to leftovers from inexact removal of tendencies in the specirfied timestep (though the leftover should maybe be small enough to be elided by our eps(FT) size filter...)
     # - con: for very short Δt, could significantly change the rates (counterpoint -- eps(FT) is a ridiculously fast rate for anything...)
     ε = eps(FT)
-
 
     # ======================================================================== # To Do: Separate sedimentation out so it can be called w/ either sgs or mean...
     # sedimentation (should this maybe be a grid mean tendency?)
@@ -969,11 +971,7 @@ function microphysics!(
     # arrays for storing quadarature points and ints for labeling items in the arrays
     # a python dict would be nicer, but its 30% slower than this (for python 2.7. It might not be the case for python 3)
 
-    epsilon = FT(10e-14) # eps(float)
-
-    # if moisture_model isa NonEquilibriumMoisture
-    #     error("The SGS quadrature microphysics is not compatible with non-equilibrium moisture")
-    # end
+    epsilon = FT(1e-14) # eps(float)
 
     if (moisture_model isa NonEquilibriumMoisture) || (edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean)
 
@@ -990,7 +988,6 @@ function microphysics!(
         # F2Cw = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
         # w = F2Cw.(aux_en_f.w)
     end
-
 
     # ======================================================================================================================================================================================== #
     # Calculate Sedimentation

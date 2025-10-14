@@ -313,7 +313,7 @@ function CoreCloakAreaPartitionModel(param_set::APS, namelist)
     FT = eltype(param_set)
     cloak_area_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "cloak_area_factor"; default = FT(4.0))
     cloak_mix_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "cloak_mix_factor"; default = FT(0.5))
-    confine_all_downdraft_to_cloak = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "confine_all_downdraft_to_cloak"; default = true)
+    confine_all_downdraft_to_cloak = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "confine_all_downdraft_to_cloak"; default = false)
     # combine_fluxes_before_gradients = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "combine_fluxes_before_gradients"; default = true) # I'm not sure this does anything w/o prognostic q in each region. Instead we opt for a second order correction....
     apply_second_order_flux_correction = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "apply_second_order_flux_correction"; default = false)
     second_order_correction_limit_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "second_order_correction_limit_factor"; default = FT(Inf)) # no limit
