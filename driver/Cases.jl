@@ -1425,9 +1425,10 @@ function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # 
         kwargs = filter(x -> x[1] ∉ (:conservative_interp, :conservative_interp_kwargs), kwargs)
     end
 
-    zrough = 0.1 # copied from gabls which is also w/ monin obhukov boundary layer
+    zrough = FT(0.1) # copied from gabls which is also w/ monin obhukov boundary layer
     # no ustar w/ monin obukhov i guess, seems to be calculated in https://github.com/CliMA/SurfaceFluxes.jl src/SurfaceFluxes.jl/compute_ustar()
-    kwargs = (; Tsurface = sc.Tg, qsurface = sc.qg, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive,
+    # kwargs = (; Tsurface = sc.Tg, qsurface = sc.qg, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive, [ I think using Tg is a mistake becase w get too low LHF and SHF. in rf09 that reduces convection]
+    kwargs = (; Tsurface = sc.Tsfc, qsurface = sc.qg, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive, # This seems to be most accurate...
     return TC.MoninObukhovSurface(FT; kwargs...) # interactive?
 end
 

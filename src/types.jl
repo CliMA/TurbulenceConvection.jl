@@ -30,6 +30,18 @@ Base.@kwdef struct PrecipFormation{FT}
     qs_tendency_accr_rai_sno::FT # accretion QR by QS [QR -> QS]  (we store it this way, it's always to snow below freezing and [QS -> QR] above freezing.) - we calculate here becasue the outcome is temperature dependent, but we store in aux_tc bc precip is on the grid mean.
 end
 
+Base.:+(a::PrecipFormation{FT}, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((getfield(a, f) + getfield(b, f) for f in fieldnames(PrecipFormation))...)
+Base.:-(a::PrecipFormation{FT}, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((getfield(a, f) - getfield(b, f) for f in fieldnames(PrecipFormation))...)
+
+Base.:*(a::PrecipFormation{FT}, b::FT) where {FT} = PrecipFormation{FT}((getfield(a, f) * b for f in fieldnames(PrecipFormation))...)
+Base.:*(a::FT, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((a * getfield(b, f) for f in fieldnames(PrecipFormation))...)
+Base.:+(a::PrecipFormation{FT}, b::FT) where {FT} = PrecipFormation{FT}((getfield(a, f) + b for f in fieldnames(PrecipFormation))...)
+Base.:+(a::FT, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((a + getfield(b, f) for f in fieldnames(PrecipFormation))...)
+Base.:-(a::PrecipFormation{FT}, b::FT) where {FT} = PrecipFormation{FT}((getfield(a, f) - b for f in fieldnames(PrecipFormation))...)
+Base.:-(a::FT, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((a - getfield(b, f) for f in fieldnames(PrecipFormation))...)
+
+
+
 """
     NoneqMoistureSources
 
@@ -41,14 +53,14 @@ Base.@kwdef struct NoneqMoistureSources{FT}
     ql_tendency::FT
     qi_tendency::FT
 end
-# null constructor
-NoneqMoistureSources{FT}(; fill_value::FT = FT(NaN)) where {FT} = NoneqMoistureSources{FT}(FT(fill_value), FT(fill_value))
+# null constructor [separate name to not clobber kwdef method]
+null_NoneqMoistureSources(::Type{FT}; fill_value::FT = FT(NaN)) where {FT} = NoneqMoistureSources{FT}(fill_value, fill_value)
 
 Base.:+(a::NoneqMoistureSources{FT}, b::NoneqMoistureSources{FT}) where {FT} = NoneqMoistureSources{FT}(a.ql_tendency + b.ql_tendency, a.qi_tendency + b.qi_tendency)
 Base.:-(a::NoneqMoistureSources{FT}, b::NoneqMoistureSources{FT}) where {FT} = NoneqMoistureSources{FT}(a.ql_tendency - b.ql_tendency, a.qi_tendency - b.qi_tendency)
+
 Base.:*(a::NoneqMoistureSources{FT}, b::FT) where {FT} = NoneqMoistureSources{FT}(a.ql_tendency * b, a.qi_tendency * b)
 Base.:*(a::FT, b::NoneqMoistureSources{FT}) where {FT} = NoneqMoistureSources{FT}(a * b.ql_tendency, a * b.qi_tendency)
-
 Base.:+(a::NoneqMoistureSources{FT}, b::FT) where {FT} = NoneqMoistureSources{FT}(a.ql_tendency + b, a.qi_tendency + b)
 Base.:+(a::FT, b::NoneqMoistureSources{FT}) where {FT} = NoneqMoistureSources{FT}(a + b.ql_tendency, a + b.qi_tendency)
 Base.:-(a::NoneqMoistureSources{FT}, b::FT) where {FT} = NoneqMoistureSources{FT}(a.ql_tendency - b, a.qi_tendency - b)
@@ -64,14 +76,14 @@ $(DocStringExtensions.FIELDS)
 Base.@kwdef struct NoneqMoistureSource{FT}
     q_tendency::FT
 end
-# null constructor
-NoneqMoistureSource{FT}(; fill_value::FT = FT(NaN)) where {FT} = NoneqMoistureSource{FT}(FT(fill_value))
+# null constructor [separate name to not clobber kwdef method]
+null_NoneqMoistureSource(::Type{FT}; fill_value::FT = FT(NaN)) where {FT} = NoneqMoistureSource{FT}(fill_value)
 
 Base.:+(a::NoneqMoistureSource{FT}, b::NoneqMoistureSource{FT}) where {FT} = NoneqMoistureSource{FT}(a.q_tendency + b.q_tendency)
 Base.:-(a::NoneqMoistureSource{FT}, b::NoneqMoistureSource{FT}) where {FT} = NoneqMoistureSource{FT}(a.q_tendency - b.q_tendency)
+
 Base.:*(a::NoneqMoistureSource{FT}, b::FT) where {FT} = NoneqMoistureSource{FT}(a.q_tendency * b)
 Base.:*(a::FT, b::NoneqMoistureSource{FT}) where {FT} = NoneqMoistureSource{FT}(a * b.q_tendency)
-
 Base.:+(a::NoneqMoistureSource{FT}, b::FT) where {FT} = NoneqMoistureSource{FT}(a.q_tendency + b)
 Base.:+(a::FT, b::NoneqMoistureSource{FT}) where {FT} = NoneqMoistureSource{FT}(a + b.q_tendency)
 Base.:-(a::NoneqMoistureSource{FT}, b::FT) where {FT} = NoneqMoistureSource{FT}(a.q_tendency - b)
@@ -94,8 +106,18 @@ Base.@kwdef struct OtherMicrophysicsSources{FT}
     qi_tendency_heterogeneous_icenuc::FT
     qi_tendency_melting::FT
 end
-# null constructor
-OtherMicrophysicsSources{FT}(; fill_value::FT = FT(NaN)) where {FT} = OtherMicrophysicsSources{FT}(FT(fill_value), FT(fill_value), FT(fill_value), FT(fill_value), FT(fill_value), FT(fill_value))
+# null constructor [separate name to not clobber kwdef method]
+null_OtherMicrophysicsSources(::Type{FT}; fill_value::FT = FT(NaN)) where {FT} = OtherMicrophysicsSources{FT}(fill_value, fill_value, fill_value, fill_value, fill_value, fill_value)
+
+Base.:+(a::OtherMicrophysicsSources{FT}, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) + getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
+Base.:-(a::OtherMicrophysicsSources{FT}, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) - getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
+
+Base.:*(a::OtherMicrophysicsSources{FT}, b::FT) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) * b for f in fieldnames(OtherMicrophysicsSources))...)
+Base.:*(a::FT, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((a * getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
+Base.:+(a::OtherMicrophysicsSources{FT}, b::FT) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) + b for f in fieldnames(OtherMicrophysicsSources))...)
+Base.:+(a::FT, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((a + getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
+Base.:-(a::OtherMicrophysicsSources{FT}, b::FT) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) - b for f in fieldnames(OtherMicrophysicsSources))...)
+Base.:-(a::FT, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((a - getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
 
 """
     EntrDetr
@@ -209,6 +231,8 @@ struct StalledUpdraftMixToGridMean <: AbstractStalledUpdraftHandler end # mix th
 struct StalledUpdraftKill <: AbstractStalledUpdraftHandler end # the original default. set area to 0 and thus remove all tracers. This is most stable but the holes left in w=0 regions can make it hard for other updrafts to continue..., and possibly unnecessarily mix all that air into the env immediately, losing local buoyancy gains. if the updraft starts from the surface it's probably ok, but this becomes very bad for elevatd convection, which gets eroded from all sides by the strong area gradients. that develop.
 struct StalledUpdraftDetrainDowndrafts <: AbstractStalledUpdraftHandler end # if the buoyancy is negative (θ_liq_ice_up < θ_liq_ice_gm), detrains enough area to bring it back into balance. this is becaue we don't have downdrafts so we can have runaway growth of negative buoyancy and temperature...
 
+
+
 abstract type EntrModelFacTotalType end
 # struct FractionalEntrModel <: EntrModelFacTotalType end
 Base.@kwdef struct FractionalEntrModel{SUHT} <: EntrModelFacTotalType
@@ -224,7 +248,73 @@ Base.@kwdef struct TotalRateEntrModel{FT, SUHT} <: EntrModelFacTotalType
     stalled_updraft_handler::SUHT # Whether or not we mix the updraft to the grid mean when we get to w=0
 end
 
+# ========== Area Partition Models ============================================================================== #
 
+abstract type AreaPartitionModel end
+struct StandardAreaPartitionModel <: AreaPartitionModel
+    "apply_second_order_flux_correction::Bool"
+    apply_second_order_flux_correction::Bool
+end;
+function StandardAreaPartitionModel(namelist::Dict)
+    apply_second_order_flux_correction = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "apply_second_order_flux_correction"; default = false)
+    return StandardAreaPartitionModel(apply_second_order_flux_correction)
+end
+
+#=
+            Based on the idea that for a lot of convection, sure the core does most of the MF, but the cloak has much of the area and is needed for correctly diagnosing environmental advection fluxes
+
+            Each updraft has an updraft cloak that has a_cloak_up = cloak_area_factor * core_area, 
+            Then there's a downdraft cloak with area  a_cloak_dn = a_up + a_cloak_up.
+
+            max_combined_updraft_area = edmf.max_area for simplicity... so in regions of max_area and strong detrainment, no cloak.
+
+            The combined cloak area [[ a_cloak = a_cloak_up + a_cloak_dn]] is limited so that the total a_bulk + a_bulk_cloak <= max(a_bulk, max_combined_updraft_area), and a_cloak_up and a_cloak_dn are scaled accordingly
+
+            Let f_cm = f_cloak_mix ==> The fractional combination of env and updraft that creates this updraft cloak. Default is 0.5
+
+            Then
+                q_cloak_up = f_cloak_mix * q_updraft + (1 - f_cloak_mix) * q_env
+                w_updraft_cloak_up = f_cloak_mix * w_updraft #  + (1 - f_cloak_mix) * w_mean  (use w_mean to ensure positivity, w_mean should be 0...)
+
+                # For the downdraft, we just have to close the budget. we need qi_mean to remain unchanged, and w_mean to remain unchanged
+                q_cloak_dn = (qi_mean - (a_cloak_up * q_cloak_up) - (a_up * q_updraft)) / a_cloak_dn
+                w_cloak_dn = (w_mean - (a_cloak_up * w_cloak_up) - (a_up * w_updraft)) / a_cloak_dn
+
+                NOTE: We need to limit the above to ensure positivity for q... we are ok with negative w.
+                This does pose some challenges since if q_env = 0, this precludes any vertical advection in the cloak when it might really be real...
+
+            To calculate advective tendencies in the env then, we just do these cloak regions. We do need to limit losses so that we don't get negative ql or qi in the env
+        
+            We derive an upper limit for q_cloak_up such that q_cloak_dn >= 0.
+                This is:  q_cloak_up <= (qi_mean - a_up * q_updraft) / a_cloak_up
+        =#
+Base.@kwdef struct CoreCloakAreaPartitionModel{FT} <: AreaPartitionModel
+    # max_combined_updraft_area::FT # Might be hard to have this be separate from edmf.max_area...
+    cloak_area_factor::FT # Scaling factor for how much larger the cloak area is than the core area
+    cloak_mix_factor::FT # Scaling factor that decides how close the cloak is to the env vs the core, 1 means fully updraft, 0 means fully env
+    confine_all_downdraft_to_cloak::Bool # If true, all downdraft area is put into the cloak, if false, downdraft area is split between cloak and env based on remaining area.
+    apply_second_order_flux_correction::Bool # If true, the fluxes from core and cloak are combined before computing gradients, otherwise gradients are computed separately and then combined. This is NOT as necessary for StandardAreaPartitionMode because we have prognostic up and env, though env is backed out so it kind of matters
+    second_order_correction_limit_factor::FT # factor to limit the second order correction to avoid overshoots. 0 means no correction, 1 means full correction
+end
+
+"""
+    We could either
+    - confine the downdraft to the cloak only (confine_all_downdraft_to_cloak = true)
+    - construct the cloak downdraft such that w_en remains unchanged
+    - have no downdraft cloak, and just let the remaining environment take the enhanced downdraft. in this case however, we'd have to change all the env properties... so for the math/code implementation it would probably be easier to make everything left in env be the cloak.
+
+"""
+function CoreCloakAreaPartitionModel(param_set::APS, namelist)
+    FT = eltype(param_set)
+    cloak_area_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "cloak_area_factor"; default = FT(4.0))
+    cloak_mix_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "cloak_mix_factor"; default = FT(0.5))
+    confine_all_downdraft_to_cloak = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "confine_all_downdraft_to_cloak"; default = true)
+    # combine_fluxes_before_gradients = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "combine_fluxes_before_gradients"; default = true) # I'm not sure this does anything w/o prognostic q in each region. Instead we opt for a second order correction....
+    apply_second_order_flux_correction = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "apply_second_order_flux_correction"; default = false)
+    second_order_correction_limit_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "second_order_correction_limit_factor"; default = FT(Inf)) # no limit
+    return CoreCloakAreaPartitionModel{FT}(cloak_area_factor, cloak_mix_factor, confine_all_downdraft_to_cloak, apply_second_order_flux_correction, second_order_correction_limit_factor)
+end
+# ============================================================================================================= #
 
 
 abstract type EntrDimScale end
@@ -955,14 +1045,16 @@ cutoff_small_values_positive(x::FT, cutoff::FT) where {FT} =  x < cutoff ? zero(
 cutoff_small_values_negative(x::FT, cutoff::FT) where {FT} =  x > -cutoff ? zero(FT) : x
 
 
-
+# =============== #
 abstract type AbstractQuadratureType end
 struct LogNormalQuad <: AbstractQuadratureType end
 struct GaussianQuad <: AbstractQuadratureType end
 
 abstract type AbstractEnvThermo end
 struct SGSMean <: AbstractEnvThermo end
-struct SGSQuadrature{N, QT, A, W} <: AbstractEnvThermo
+
+abstract type AbstractSGSQuadratureType end
+struct SGSQuadrature{N, QT, A, W} <: AbstractSGSQuadratureType
     quadrature_type::QT
     a::A
     w::W
@@ -986,6 +1078,33 @@ struct SGSQuadrature{N, QT, A, W} <: AbstractEnvThermo
 end
 quadrature_order(::SGSQuadrature{N}) where {N} = N
 quad_type(::SGSQuadrature{N}) where {N} = N
+
+
+struct SGSMeanWQuadratureAdjustedNoneqMoistureSources{N, QT, A, W} <: AbstractSGSQuadratureType
+    quadrature_type::QT
+    a::A
+    w::W
+    function SGSMeanWQuadratureAdjustedNoneqMoistureSources(::Type{FT}, namelist) where {FT}
+        N = parse_namelist(namelist, "thermodynamics", "quadrature_order"; default = 3)
+        quadrature_name = parse_namelist(namelist, "thermodynamics", "quadrature_type"; default = "log-normal")
+        quadrature_type = if quadrature_name == "log-normal"
+            LogNormalQuad()
+        elseif quadrature_name == "gaussian"
+            GaussianQuad()
+        else
+            error("Invalid thermodynamics quadrature $(quadrature_name)")
+        end
+        # TODO: double check this python-> julia translation
+        # a, w = np.polynomial.hermite.hermgauss(N)
+        a, w = FastGaussQuadrature.gausshermite(N)
+        a, w = SA.SVector{N, FT}(a), SA.SVector{N, FT}(w)
+        QT = typeof(quadrature_type)
+        return new{N, QT, typeof(a), typeof(w)}(quadrature_type, a, w)
+    end
+end
+quadrature_order(::SGSMeanWQuadratureAdjustedNoneqMoistureSources{N}) where {N} = N
+quad_type(::SGSMeanWQuadratureAdjustedNoneqMoistureSources{N}) where {N} = N
+# =============== #
 
 abstract type FrictionVelocityType end
 struct FixedFrictionVelocity <: FrictionVelocityType end
@@ -1096,7 +1215,7 @@ Base.@kwdef struct SurfaceBase{FT}
 end
 
 # struct EDMFModel{N_up, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}
-struct EDMFModel{N_up, FT, SFCA, SABC, MM, CSM, TCM, PM, RFM, SFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG, TLT}
+struct EDMFModel{N_up, FT, SFCA, SABC, MM, CSM, TCM, PM, RFM, SFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG, TLT, APM}
     # surface_area::FT
     surface_area::SFCA # trying to allow for non even split of surface area in updrafts... we'll read this in driver/initial_conditions.jl which will call src/EDMF_Functions.jl area_surface_bc()
     surface_area_bc::SABC
@@ -1122,6 +1241,7 @@ struct EDMFModel{N_up, FT, SFCA, SABC, MM, CSM, TCM, PM, RFM, SFM, PFM, ENT, EBG
     set_src_seed::Bool
     H_up_min::FT # minimum updraft top to avoid zero division in pressure drag and turb-entr
     tendency_limiters::TLT
+    area_partition_model::APM
 end
 function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, param_set) where {FT}
 
@@ -1209,11 +1329,13 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
 
     # Create the class for environment thermodynamics and buoyancy gradient computation
     en_sgs_name =
-        parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean", valid_options = ["mean", "quadrature"])
+        parse_namelist(namelist, "thermodynamics", "sgs"; default = "mean", valid_options = ["mean", "quadrature", "mean_w_quadrature_adjusted_noneq_moisture_sources"])
     en_thermo = if en_sgs_name == "mean"
         SGSMean()
     elseif en_sgs_name == "quadrature"
         SGSQuadrature(FT, namelist)
+    elseif en_sgs_name == "mean_w_quadrature_adjusted_noneq_moisture_sources"
+        SGSMeanWQuadratureAdjustedNoneqMoistureSources(FT, namelist) # special case for nonequilibrium moisture with quadrature thermo, we do mean thermo but quadrature adjusted non-eq sources
     else
         error("Something went wrong. Invalid environmental sgs type '$en_sgs_name'")
     end
@@ -1221,6 +1343,8 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
         BuoyGradMean()
     elseif en_sgs_name == "quadrature"
         BuoyGradQuadratures()
+    elseif en_sgs_name == "mean_w_quadrature_adjusted_noneq_moisture_sources"
+        BuoyGradMean() # same as quadrature, we just do mean thermo but quadrature adjusted non-eq sources
     else
         error("Something went wrong. Invalid environmental buoyancy gradient closure type '$en_sgs_name'")
     end
@@ -1373,16 +1497,9 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
     H_up_min = FT(parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "min_updraft_top"))
 
 
-    entrainment_type = parse_namelist(
-        namelist,
-        "turbulence",
-        "EDMF_PrognosticTKE",
-        "entrainment_type";
-        default = "fractional",
-        valid_options = ["fractional", "total_rate"],
-    )
+    # -- Stalled updraft handler ----------------------------------------------------- #
 
-    stalled_updraft_handler = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stalled_updraft_handler", default = "kill") # kill bc that was original default
+    stalled_updraft_handler = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "stalled_updraft_handler", default = "kill", valid_options = ["none", "mix_to_grid_mean", "kill", "detrain_downdrafts"]) # kill bc that was original default
     stalled_updraft_handler = if stalled_updraft_handler == "none"
         StalledUpdraftDoNothing()
     elseif stalled_updraft_handler == "mix_to_grid_mean"
@@ -1394,6 +1511,18 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
     else
         error("Something went wrong. Invalid stalled updraft handler '$stalled_updraft_handler'")
     end
+    # ---------------------------------------------------------------------------------- #
+
+
+    entrainment_type = parse_namelist(
+        namelist,
+        "turbulence",
+        "EDMF_PrognosticTKE",
+        "entrainment_type";
+        default = "fractional",
+        valid_options = ["fractional", "total_rate"],
+    )
+
 
     if entrainment_type == "fractional"
         # entrainment_type = FractionalEntrModel()
@@ -1549,6 +1678,20 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
         error("Something went wrong. Invalid entrainment dimension scale '$detr_dim_scale'")
     end
 
+    # -- Area partition model ----------------------------------------------------- #
+
+    area_partition_model = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "area_partition_model", default = "standard", valid_options = ["standard", "core_cloak"],) # standard bc that was original default
+    area_partition_model = if area_partition_model == "standard"
+        StandardAreaPartitionModel(param_set, namelist)
+    elseif area_partition_model == "core_cloak"
+        CoreCloakAreaPartitionModel(param_set, namelist)
+    else
+        error("Something went wrong. Invalid area partition model '$area_partition_model'")
+    end
+
+    # ================================================================================= #
+
+
     SABC = typeof(surface_area_bc)
     EDS = typeof(entr_dim_scale)
     ET = typeof(entrainment_type)
@@ -1568,6 +1711,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
     MLP = typeof(mixing_length_params)
     PMP = typeof(pressure_model_params)
     TLT = typeof(tendency_limiters)
+    APM = typeof(area_partition_model)
 
     SFCA = typeof(surface_area) # testing allowing this to be a vector for initializing updrafts with non equal areas
     # return EDMFModel{n_updrafts,FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG, TLT}(
@@ -1593,7 +1737,8 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
         EDS,
         DDS,
         EPG,
-        TLT
+        TLT,
+        APM,
     }(
         surface_area,
         surface_area_bc,
@@ -1619,6 +1764,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
         set_src_seed,
         H_up_min,
         tendency_limiters,
+        area_partition_model
     )
 end
 

@@ -138,7 +138,7 @@ function compute_other_microphysics_tendencies!(grid::Grid, state::State, edmf::
 
 
             aux_up[i].qi_tendency_hom_frz[k] = mph_neq_other.qi_tendency_homogeneous_freezing * aux_up[i].area[k] # for storage
-            aux_bulk.qi_tendency_hom_frz[k] += mph_neq_other``.qi_tendency_homogeneous_freezing * aux_up[i].area[k] # for storage
+            aux_bulk.qi_tendency_hom_frz[k] += mph_neq_other.qi_tendency_homogeneous_freezing * aux_up[i].area[k] # for storage
 
             aux_up[i].qi_tendency_het_frz[k] = mph_neq_other.qi_tendency_heterogeneous_freezing * aux_up[i].area[k] # for storage
             aux_bulk.qi_tendency_het_frz[k] += mph_neq_other.qi_tendency_heterogeneous_freezing * aux_up[i].area[k] # for storage

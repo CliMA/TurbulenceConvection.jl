@@ -465,15 +465,34 @@ for flight_number in flight_numbers
         # namelist["user_params"]["sedimentation_N_i_boost_factor"] = FT(0.2)
         namelist["user_params"]["apply_massflux_N_i_boost"] = true
         namelist["user_params"]["apply_sedimentation_N_i_boost"] = false
-        namelist["user_params"]["use_ice_mult"] = true
+        namelist["user_params"]["use_ice_mult"] = false
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["base_detrainment_rate_inv_s"] = FT(1/(0.1*3600.0)) # 6 hours
-        namelist["relaxation_timescale_params"]["τ_sub_dep_scaling_factor"] = FT(0.25)
+        # namelist["relaxation_timescale_params"]["τ_sub_dep_scaling_factor"] = FT(0.25)
         # namelist["user_params"]["ice_dep_acnv_scaling_factor"] = FT(0.8)
-        # namelist["user_params"]["ice_dep_acnv_scaling_factor_above"] = FT(0.8)
+        # namelist["user_params"]["ice_dep_acnv_scaling_factor_above"] = FT(0.5)
+        namelist["thermodynamics"]["sgs"] = "mean"
+        # namelist["thermodynamics"]["sgs"] = "mean_w_quadrature_adjusted_noneq_moisture_sources"
+        # namelist["thermodynamics"]["sgs"] = "quadrature"
+        namelist["thermodynamics"]["quadrature_order"] = 4
+
+        # namelist["microphysics"]["τ_cond_evap"] = FT(1.)
+        # namelist["microphysics"]["χv_ice"] = FT(0.0001)
+        # namelist["user_params"]["ice_sedimentation_scaling_factor"] = FT(0.05)
+
+        # namelist["microphysics"]["initial_profile_updraft_area"] = FT(0.4)
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = FT(0.5) # stability (maybe we need to use the limiter instead tho to not get flat cloud tops?)
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area_bc"] = "Fixed"
+
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["area_partition_model"] = "core_cloak"
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["cloak_area_factor"] = 2.0
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["cloak_mix_factor"] = 0.5
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["confine_all_downdraft_to_cloak"] = false # true leads to stronger transport across z = 22, combined w/ second order correction seems to lead to better qt mixing?
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["apply_second_order_flux_correction"] = true
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["second_order_correction_limit_factor"] = Inf # Especially above 0.8, this can clash with quadrature... but it is a huge help in actually allowing for downwards qt advection w/o the need for prognostic cloaks.
 
         
 
-        if apply_edits
+        if apply_edits``
             dt = namelist["time_stepping"]["dt_min"]
             namelist["time_stepping"]["dt_min"] = dt
             namelist["time_stepping"]["dt_max"] = 2*dt

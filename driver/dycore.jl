@@ -521,7 +521,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set, TS.use_fallback_tendency_limiters)
 
         TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt, TS.use_fallback_tendency_limiters)
-        compute_gm_tendencies!(edmf, grid, state, surf, radiation, forcing, param_set, TS.use_fallback_tendency_limiters)
+        compute_gm_tendencies!(edmf, grid, state, surf, radiation, forcing, param_set, TS.use_fallback_tendency_limiters, Δt)
 
         # Now that we have updraft, gm from updraft, we can calculate any post tendencies that we need for things that are backed out.
         # TC.compute_post_tendencies!(edmf, grid, state, param_set, Δt)
@@ -554,6 +554,7 @@ function compute_gm_tendencies!(
     force::Cases.ForcingBase,
     param_set::APS,
     use_fallback_tendency_limiters::Bool,
+    Δt::Real,
 )
     thermo_params = TCP.thermodynamics_params(param_set)
     Ic = CCO.InterpolateF2C()
@@ -643,7 +644,7 @@ function compute_gm_tendencies!(
 
     # we to C2F, then ∇c goes F2C, then UBsub got C2F, but we wanna end on C [ there's no UpwindBiasedProductF2C and we had UpwindBiasedProductF2C(u[F], x[C])
     F2Csub = CCO.InterpolateF2C(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # We might have put 0 for no penetration on boundary, but that's not exactly true in our dataset...
-    CV32FT = x -> x[1] # convert Contravariant3Vector to Float64
+    CV32FT = x -> x[1] # convert Contravariant3Vector to Float64 
 
     if true # considering deprecation pending Dennis's response (or dividing by dz)
 
@@ -947,7 +948,7 @@ function compute_gm_tendencies!(
     # =================================================== #
     # note, these `sgs` fluxes also include the mass fluxes from vertical advection
 
-    TC.compute_sgs_flux!(edmf, grid, state, surf)
+    TC.compute_sgs_flux!(edmf, grid, state, surf, Δt)
     sgs_flux_θ_liq_ice = aux_gm_f.sgs_flux_θ_liq_ice
     sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot
     sgs_flux_uₕ = aux_gm_f.sgs_flux_uₕ

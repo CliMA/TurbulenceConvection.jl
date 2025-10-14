@@ -650,7 +650,7 @@ function compute_tendency_dt_max(state::TC.State, edmf::TC.EDMFModel)
     @inbounds for k in TC.real_face_indices(grid)
         Δt_max_old = Δt_max
         ρaw_bulk = sum(i-> prog_up_f[i].ρaw[k], 1:N_up)
-        tends_ρaw_bulk = sum(i-> tendencies_bulk_f.ρaw[i], 1:N_up) # this is the tendency of the bulk updrafts, not the face updrafts
+        tends_ρaw_bulk = sum(i-> tendencies_bulk_f[i].ρaw[k], 1:N_up) # this is the tendency of the bulk updrafts, not the face updrafts
         Δt_max = Δt_max_helper(Δt_max, tends_ρaw_bulk, ρaw_bulk; message = "ρaw bulk") # no env limit, env can go neg... (is that true?)
     end 
 
