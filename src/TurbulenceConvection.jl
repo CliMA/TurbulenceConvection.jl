@@ -293,6 +293,7 @@ include("turbulence_functions.jl")
 include("utility_functions.jl")
 include("variables.jl")
 include("EDMF_Precipitation.jl")
+include("closures/ql_qi_supersaturation_covariance_closure.jl") # for SGS quadrature w/ ql, qi
 include("EDMF_Environment.jl")
 include("EDMF_Updrafts.jl")
 include("update_aux.jl")

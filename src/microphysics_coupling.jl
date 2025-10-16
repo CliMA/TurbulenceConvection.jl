@@ -1596,7 +1596,7 @@ function threshold_driven_acnv(
 
     if (q > 0) && !isnan(N)
 
-        do_print = (rand() < 1e-3)
+        # do_print = (rand() < 1e-3)
         # if do_print
         #     println("=====================================================================================")
         # end

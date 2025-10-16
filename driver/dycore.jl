@@ -188,7 +188,7 @@ function assign_thermo_aux!(state, grid, moisture_model, param_set)
         aux_gm.T[k] = TD.air_temperature(thermo_params, ts)
         
         # @assert [for search optimization, but don't use assert, use an explicit error]
-        (0 < aux_gm.T[k] < Inf) || error("Negative/zero or nonfinite temperature will cause issues here, status is z = $(grid.zc[k].z), T = $(aux_gm.T[k]), q = $(ts_gm[k].q), θ_liq_ice = $(aux_gm.θ_liq_ice[k]), ts = $ts") # debugging, remove later -- will slow down code
+        # (0 < aux_gm.T[k] < Inf) || error("Negative/zero or nonfinite temperature will cause issues here, status is z = $(grid.zc[k].z), T = $(aux_gm.T[k]), q = $(ts_gm[k].q), θ_liq_ice = $(aux_gm.θ_liq_ice[k]), ts = $ts") # debugging, remove later -- will slow down code
 
         # if !(0 < aux_gm.T[k] < Inf)
             # @info "status: T = $(TC.full_print(aux_gm.T)); θ_liq_ice = $(TC.full_print(aux_gm.θ_liq_ice)); q_tot = $(TC.full_print(aux_gm.q_tot)); q_liq = $(TC.full_print(aux_gm.q_liq)); q_ice = $(TC.full_print(aux_gm.q_ice))"
@@ -213,6 +213,7 @@ function assign_thermo_aux!(state, grid, moisture_model, param_set)
         # end
         
         aux_gm.RH[k] = TD.relative_humidity(thermo_params, ts)
+        aux_gm.RH_liq[k] = TC.relative_humidity_over_liquid(thermo_params, ts)
         aux_gm.RH_ice[k] = TC.relative_humidity_over_ice(thermo_params, ts)
     end
     return
@@ -251,31 +252,9 @@ function my_unstable_check_test(dt::Real, prog::FV, params::NT, t::Real) where {
         UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
 
         state = TC.column_prog_aux(prog, aux, colidx)
-
         FT = TC.float_type(state)
-
-        grid = TC.Grid(state)
-        N_up = TC.n_updrafts(edmf)
-        kc_surf = TC.kc_surface(grid)
-        kf_surf = TC.kf_surface(grid)
-    
-        aux_tc = TC.center_aux_turbconv(state)
-        aux_up = TC.center_aux_updrafts(state)
-        aux_en = TC.center_aux_environment(state)
-        aux_en_f = TC.face_aux_environment(state)
-        aux_up_f = TC.face_aux_updrafts(state)
-        aux_bulk = TC.center_aux_bulk(state)
-        aux_bulk_f = TC.face_aux_bulk(state) # same as using aux_tc_f = face_aux_turbconv(state) and then using aux_tc_f.bulk.w for example
-        prog_up = TC.center_prog_updrafts(state)
-        prog_up_f = TC.face_prog_updrafts(state)
-        prog_gm = TC.center_prog_grid_mean(state)
-        aux_gm = TC.center_aux_grid_mean(state)
-        aux_gm_f = TC.face_aux_grid_mean(state)
-
         # check for a nan in every variable
-
         error("not implemented yet")
-
     end
 end
 
