@@ -191,13 +191,15 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     ᶠinterp_a_LBF(::CC.Fields.Field) = ᶠinterp_a
     ᶠinterp_a_RBF(::CC.Fields.Field) = ᶠinterp_a
     # second order flux correction doesnt need any biasing
-    IfLBF(field::CC.Fields.Field) = edmf.area_partition_model.apply_second_order_flux_correction ? If : LBC2F_field(field, kc_surf) 
-    IfRBF(field::CC.Fields.Field) = edmf.area_partition_model.apply_second_order_flux_correction ? If : RBC2F_field(field, kc_toa)
+    # IfLBF(field::CC.Fields.Field) = edmf.area_partition_model.apply_second_order_flux_correction ? If : LBC2F_field(field, kc_surf) 
+    # IfRBF(field::CC.Fields.Field) = edmf.area_partition_model.apply_second_order_flux_correction ? If : RBC2F_field(field, kc_toa)
 
     # # just testing
     # IfLBF(field::CC.Fields.Field) = LBC2F_field(field, kc_surf)
     # IfRBF(field::CC.Fields.Field) = RBC2F_field(field, kc_toa)
 
+    IfLBF(field::CC.Fields.Field) = If
+    IfRBF(field::CC.Fields.Field) = If
  
 
 
@@ -257,7 +259,9 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         aux_bulk = center_aux_bulk(state)
         aux_bulk_f = face_aux_bulk(state)
         f_cm = edmf.area_partition_model.cloak_mix_factor
-        max_combined_up_area = max.(aux_bulk.area, edmf.max_area)
+        # max_combined_up_area = max.(aux_bulk.area, edmf.max_area)
+        f_aamaaic = edmf.area_partition_model.fraction_of_area_above_max_area_allowed_in_cloak
+        max_combined_up_area = @. max(aux_bulk.area, edmf.max_area + f_aamaaic * (one(FT) - edmf.max_area)) # allow some area above max area to go into cloak
 
         # Initialize [[ need full vectors for gradients... ]] -- as written this should really be based on bulk... it's hard to do the area limiting etc otherwise... especially cause we're backing things out from gm
         
@@ -281,7 +285,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
 
         # determine cloak areas
         # we could consider letting the updraft + cloak region exceed max_area...
-        @. a_cloak_up = min(aux_bulk.area * edmf.area_partition_model.cloak_area_factor, max.(edmf.max_area .- aux_bulk.area, 0)) # limit updraft cloak area to ensure combined_up_area <= max_combined_up_area
+        @. a_cloak_up = min(aux_bulk.area * edmf.area_partition_model.cloak_area_factor, max.(max_combined_up_area .- aux_bulk.area, 0)) # limit updraft cloak area to ensure combined_up_area <= max_combined_up_area
         @. a_cloak_dn = min(aux_bulk.area + a_cloak_up, one(FT) - (aux_bulk.area + a_cloak_up)) # limit downdraft cloak area to ensure total area <= 1
         combined_area = aux_bulk.area .+ a_cloak_up .+ a_cloak_dn
         a_en_left = @. max(one(FT) - combined_area, zero(FT)) # remaining env area not in cloaks
@@ -333,7 +337,6 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
             # For the downdraft, we just have to close the budget. we need qi_mean to remain unchanged, and w_mean to remain unchanged
             @. q_liq_cloak_dn = ifelse( a_cloak_dn > edmf.minimum_area, max((q_liq_gm - (a_cloak_up * q_liq_cloak_up) - (aux_bulk.area * q_liq_up) - (a_en_left * q_liq_en)) / a_cloak_dn, 0), q_liq_en) # if the cloak area is too small, just set to env
             @. q_ice_cloak_dn = ifelse( a_cloak_dn > edmf.minimum_area, max((q_ice_gm - (a_cloak_up * q_ice_cloak_up) - (aux_bulk.area * q_ice_up) - (a_en_left * q_ice_en)) / a_cloak_dn, 0), q_ice_en)
-
         end
 
         # ======================================================================================================================== # # cloak up is updraft so LBF, cloak dn is downdraft so RBF, leftover env is downdraft so RBF
@@ -448,6 +451,14 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         #     @warn "No prolly not -- because we don't have prognostic cloaks, we get the same result either way. That's why we added the second order correction option."
         # end
 
+    end
+
+    # save en massflux tendencies before adding updraft contributions
+    @. aux_tc.env_qt_tendency_vert_adv = -∇c(wvec(massflux_qt)) / ρ_c
+    @. aux_tc.env_h_tendency_vert_adv = -∇c(wvec(massflux_h)) / ρ_c
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        @. aux_tc.env_ql_tendency_vert_adv = -∇c(wvec(massflux_ql)) / ρ_c
+        @. aux_tc.env_qi_tendency_vert_adv = -∇c(wvec(massflux_qi)) / ρ_c
     end
 
     # ============================================================================================================================== #
@@ -788,8 +799,14 @@ function affect_filter!(edmf::EDMFModel, grid::Grid, state::State, param_set::AP
 
     filter_precipitation_vars(state)
 
+    # filter env vars
+    aux_en = center_aux_environment(state)
+    prog_gm = center_prog_grid_mean(state)
+    ρ_c = prog_gm.ρ
+    FT = float_type(state)
+    vmin = FT(0.01) * FT(1e-3) # 0.01 mm/s minimum velocity scale for tke floor
     @inbounds for k in real_center_indices(grid)
-        prog_en.ρatke[k] = max(prog_en.ρatke[k], 0.0)
+        prog_en.ρatke[k] = max(prog_en.ρatke[k],   FT(0.5) * ρ_c[k] * aux_en.area[k]  * vmin^2)  # min tke based on min velocity scale
         if edmf.thermo_covariance_model isa PrognosticThermoCovariances
             prog_en.ρaHvar[k] = max(prog_en.ρaHvar[k], 0.0)
             prog_en.ρaQTvar[k] = max(prog_en.ρaQTvar[k], 0.0)
@@ -1386,7 +1403,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
                 tends_advec +
                 progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaθ_liq_ice / ρarea, prog_gm.ρθ_liq_ice / ρ_c), prog_gm.ρθ_liq_ice / ρ_c, tends_ρarea,
                     limit_tendency(edtl, (ρarea * entr_rate_inv_s * θ_liq_ice_en) - (ρarea * detr_rate_inv_s * θ_liq_ice_up), ρaθ_liq_ice+max(tends_advec+tends_other,0), ρ_c * area_en * θ_liq_ice_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
-                (ρ_c * θ_liq_ice_tendency_precip_formation) #+ ρarea*aux_up[i].dTdt/Π # test adding nudging in so that nudging doesnt prevent env and updraft from mixing and converging...
+                (ρ_c * θ_liq_ice_tendency_precip_formation)  #+ ρarea*aux_up[i].dTdt/Π # test adding nudging in so that nudging doesnt prevent env and updraft from mixing and converging...
 
             @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaq_tot)))
             @. tends_other = (ρ_c * qt_tendency_precip_formation) + (ρ_c * qt_tendency_sedimentation) # external tendencies... we will limit entr/detr as the final tendency to not violate this contract...
@@ -1395,7 +1412,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
                 tends_advec +
                 progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_tot / ρarea, prog_gm.ρq_tot / ρ_c), prog_gm.ρq_tot / ρ_c, tends_ρarea,
                     limit_tendency(edtl, (ρarea * entr_rate_inv_s * q_tot_en) - (ρarea * detr_rate_inv_s * q_tot_up), ρaq_tot + max(tends_advec+tends_other,0), ρ_c * area_en * q_tot_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
-                    (ρ_c * qt_tendency_precip_formation) #+ ρarea*aux_up[i].dqvdt # test adding nudging in so that nudging doesnt prevent env and updraft from mixing and converging...
+                    (ρ_c * qt_tendency_precip_formation)  #+ ρarea*aux_up[i].dqvdt # test adding nudging in so that nudging doesnt prevent env and updraft from mixing and converging...
         end
 
         if edmf.moisture_model isa NonEquilibriumMoisture

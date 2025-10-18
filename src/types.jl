@@ -300,6 +300,8 @@ Base.@kwdef struct CoreCloakAreaPartitionModel{FT} <: AreaPartitionModel
     confine_all_downdraft_to_cloak::Bool # If true, all downdraft area is put into the cloak, if false, downdraft area is split between cloak and env based on remaining area.
     apply_second_order_flux_correction::Bool # If true, the fluxes from core and cloak are combined before computing gradients, otherwise gradients are computed separately and then combined. This is NOT as necessary for StandardAreaPartitionMode because we have prognostic up and env, though env is backed out so it kind of matters
     second_order_correction_limit_factor::FT # factor to limit the second order correction to avoid overshoots. 0 means no correction, 1 means full correction
+    apply_cloak_to_condensate_formation::Bool = true # Whether or not to apply the cloak area partitioning to condensate formation tendencies. Default true.
+    fraction_of_area_above_max_area_allowed_in_cloak::FT = FT(0.5)
 end
 
 """
@@ -317,7 +319,9 @@ function CoreCloakAreaPartitionModel(param_set::APS, namelist)
     # combine_fluxes_before_gradients = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "combine_fluxes_before_gradients"; default = true) # I'm not sure this does anything w/o prognostic q in each region. Instead we opt for a second order correction....
     apply_second_order_flux_correction = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "apply_second_order_flux_correction"; default = false)
     second_order_correction_limit_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "second_order_correction_limit_factor"; default = FT(Inf)) # no limit
-    return CoreCloakAreaPartitionModel{FT}(cloak_area_factor, cloak_mix_factor, confine_all_downdraft_to_cloak, apply_second_order_flux_correction, second_order_correction_limit_factor)
+    apply_cloak_to_condensate_formation = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "apply_cloak_to_condensate_formation"; default = true)
+    fraction_of_area_above_max_area_allowed_in_cloak = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fraction_of_area_above_max_area_allowed_in_cloak"; default = FT(0.5))
+    return CoreCloakAreaPartitionModel{FT}(cloak_area_factor, cloak_mix_factor, confine_all_downdraft_to_cloak, apply_second_order_flux_correction, second_order_correction_limit_factor, apply_cloak_to_condensate_formation, fraction_of_area_above_max_area_allowed_in_cloak)
 end
 # ============================================================================================================= #
 

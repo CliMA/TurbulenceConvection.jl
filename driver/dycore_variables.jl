@@ -70,6 +70,7 @@ cent_aux_vars_gm(FT, local_geometry, edmf) = (;
     qi_tendency_ls_vert_adv = FT(0), # my addition
     qr_tendency_ls_vert_adv = FT(0), # my addition [[ not sure how relevant this one is but ]]
     qs_tendency_ls_vert_adv = FT(0), # my addition [[ not sure how relevant this one is but ]]
+    # qt_tendency_vert_adv = error("not implemented, see massflux_tendency_qt")
     ql_tendency_vert_adv = FT(0), # my addition [ For full flux, massflux is only differential between up/env and gm so sgs ]
     qi_tendency_vert_adv = FT(0), # my addition [ For full flux, massflux is only differential between up/env and gm so sgs ]
     qr_tendency_vert_adv = FT(0), # my addition 

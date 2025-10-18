@@ -22,7 +22,7 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "updraft_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).q_liq),
         "updraft_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).q_ice),
         "updraft_RH" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).RH),
-        "updraft_RH_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_liq),
+        "updraft_RH_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).RH_liq),
         "updraft_RH_ice" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).RH_ice),
         "updraft_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).q_tot),
         "updraft_w" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_bulk(state).w),
@@ -115,6 +115,8 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "qs_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno),
 
         "mixing_length" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).mixing_length),
+
+        "b_grad" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).∂b∂z),  # my addition
 
         "updraft_cloud_fraction" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).cloud_fraction),
 
@@ -301,6 +303,12 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "qs_mean_diff" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_qs), # this is the diffusive tendency of qs, not including  massflux tendency
         "qt_mean_diff" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).diffusive_tendency_qt), # this is the diffusive tendency of qt, not including  massflux tendency
 
+        # temporary!
+        "env_qt_tendency_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).env_qt_tendency_vert_adv),
+        "env_h_tendency_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).env_h_tendency_vert_adv),
+        "env_ql_tendency_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).env_ql_tendency_vert_adv),
+        "env_qi_tendency_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).env_qi_tendency_vert_adv),
+        #
 
         "qt_mean_ls_vert_adv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qt_tendency_ls_vert_adv),
 

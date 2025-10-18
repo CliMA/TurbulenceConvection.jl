@@ -823,6 +823,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             error("Something went wrong. The buoyancy gradient model is not specified")
         end
         bg = buoyancy_gradients(param_set, bg_model)
+        aux_tc.∂b∂z[k] = bg.∂b∂z # my addition
 
         # Limiting stratification scale (Deardorff, 1976)
         # compute ∇Ri and Pr
@@ -851,7 +852,18 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
         KQ[k] = KH[k] / Le
 
-        aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
+        # min_KH = FT(1e3)
+        # KH_here = (bg.∂b∂z > FT(0)) ? KH[k] : max(KH[k], min_KH) # allow generation of tke when we are statically unstable, even if existing tke is 0...
+        # aux_en_2m.tke.buoy[k] = -aux_en.area[k] * ρ_c[k] * KH_here * bg.∂b∂z
+
+        # 1. Calculate the normal buoyancy production
+        original_buoy = -aux_en.area[k] * ρ_c[k] * KH[k] * bg.∂b∂z
+        # 2. Calculate a "buoyancy floor" that ramps up linearly with instability. This single line implements the ramp you described.
+        min_∂b∂z = FT(1e-5)  # threshold for tke starting to be produced from buoyancy. above this value, we want the buoyancy to be unchanged.
+        max_∂b∂z = FT(-1e-4) # benchmark value for very strong instability, at this ∂b∂z, we want buoyancy tke production to be at least 1e-2
+        buoy_floor = (FT(1e-2) / (min_∂b∂z - max_∂b∂z )) * max(FT(0), min_∂b∂z - bg.∂b∂z)        # 3. Apply the floor to ensure a minimum production rate in strong instability
+        aux_en_2m.tke.buoy[k] = (bg.∂b∂z < min_∂b∂z) ? max(original_buoy, buoy_floor) : original_buoy
+    
     end
 
     #####

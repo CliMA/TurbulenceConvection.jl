@@ -279,6 +279,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
         KH = FT(0),
         KQ = FT(0),
         mixing_length = FT(0),
+        ∂b∂z = FT(0), # store this so we can try to use it to generate tke even if there's not existing tke
         massflux = FT(0),
         massflux_tendency_h = FT(0),
         massflux_tendency_qt = FT(0),
@@ -290,6 +291,12 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf) where {FT} = (;
         diffusive_tendency_qi = FT(0), # my addition [ this is the
         diffusive_tendency_qr = FT(0), # my addition [ this is the diffusive tendency of qr, not including  massflux tendency ]
         diffusive_tendency_qs = FT(0), # my addition [ this is the diffusive tendency of qs, not including  massflux tendency ]
+        #
+        env_qt_tendency_vert_adv = FT(0), # diagnostic: vertical advection tendency of qt in the environment
+        env_h_tendency_vert_adv = FT(0), # diagnostic: vertical advection tendency of h in the environment
+        env_ql_tendency_vert_adv = FT(0), # diagnostic: vertical advection tendency of ql in the environment
+        env_qi_tendency_vert_adv = FT(0), # diagnostic: vertical advection
+        #
         cent_aux_vars_edmf_moisture(FT, edmf.moisture_model)...,
         prandtl_nvec = FT(0),
         # Added by Ignacio : Length scheme in use (mls), and smooth min effect (ml_ratio)

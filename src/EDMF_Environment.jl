@@ -20,6 +20,7 @@ function microphysics!(
     aux_up = center_aux_updrafts(state)
     aux_bulk = center_aux_bulk(state)
     aux_en_f = face_aux_environment(state) # state or does ts include this? I guess you'd want to move this to the calling place... to choose updraft or environment
+    aux_tc_f = face_aux_turbconv(state)
     prog_pr = center_prog_precipitation(state)
     prog_gm = center_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
@@ -31,12 +32,17 @@ function microphysics!(
     aux_en_unsat = aux_en.unsat
     precip_fraction = compute_precip_fraction(edmf, state)
 
-    if (moisture_model isa NonEquilibriumMoisture) || (edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean)
-        if (edmf.area_partition_model isa CoreCloakAreaPartitionModel) && edmf.area_partition_model.confine_all_downdraft_to_cloak
-            w::CC.Fields.Field = similar(aux_en.T)
-            @. w = FT(0) # we confine the downdraft (which will be drier) to the cloak region, so we can set w = 0 in the environment
+    if (moisture_model isa NonEquilibriumMoisture) || (edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean) || ((edmf.area_partition_model isa CoreCloakAreaPartitionModel) && edmf.area_partition_model.apply_cloak_to_condensate_formation)
+        F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
+        if (edmf.area_partition_model isa CoreCloakAreaPartitionModel)
+            if edmf.area_partition_model.confine_all_downdraft_to_cloak
+                w::CC.Fields.Field = similar(aux_en.T)
+                @. w = FT(0) # we confine the downdraft (which will be drier) to the cloak region, so we can set w = 0 in the environment
+            else # not confined to cloak, but also we do need some to be converted to updraft, maybe still go with 0. That biases us towards respecting supersat generation in the cloak updraft...
+                w = similar(aux_en.T)
+                @. w = FT(0)
+            end
         else
-            F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
             w = F2Cw.(aux_en_f.w)
         end
     else
@@ -127,11 +133,72 @@ function microphysics!(
             if en_thermo isa SGSMean
                 q_vap_sat_liq = aux_en.q_vap_sat_liq[k]
                 q_vap_sat_ice = aux_en.q_vap_sat_ice[k]
-                mph_neq = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, aux_en.area[k], ρ_c[k], aux_en.p[k], aux_en.T[k], Δt + ε, ts, w[k], q_vap_sat_liq, q_vap_sat_ice, aux_en.dqvdt[k], aux_en.dTdt[k], aux_en.τ_liq[k], aux_en.τ_ice[k])
 
-                # if at an extrema, we don't know where the peak is so we'll reweight based on probability of where it could be in between.
-                if reweight_processes_for_grid
-                    mph_neq = reweight_noneq_moisture_sources_for_grid(k, grid, param_set, thermo_params, aux_en, aux_en_f, mph_neq, nonequilibrium_moisture_scheme, moisture_sources_limiter, Δt, ρ_c, p_c, w, aux_en.dqvdt, aux_en.dTdt; reweight_extrema_only = reweight_extrema_only)
+                # [[ TEST only -- figure out implementation later -- would also need to add to equilibrium block, w/ sat adjust logic ]]
+
+                if (edmf.area_partition_model isa CoreCloakAreaPartitionModel) && (edmf.area_partition_model.apply_cloak_to_condensate_formation) && (aux_bulk.area[k] > edmf.minimum_area)
+                    # we'll do this cloaking thingy -- I think we have to, the LES readily generates supersat in the cloak regime for liquid that we just can't
+                    a_up = aux_bulk.area[k]
+                    # a_cloak_up = min(a_up * edmf.area_partition_model.cloak_area_factor, max(edmf.max_area - a_up, 0))
+                    f_aamaaic = edmf.area_partition_model.fraction_of_area_above_max_area_allowed_in_cloak
+                    max_combined_up_area = max(edmf.max_area + f_aamaaic * (one(FT) - edmf.max_area), a_up) # allow some area above max area to go into cloak
+                    a_cloak_up = min(a_up * edmf.area_partition_model.cloak_area_factor, max_combined_up_area - a_up)
+
+                    a_cloak_dn = min(a_up + a_cloak_up, one(FT) - (a_up + a_cloak_up))
+                    combined_area = a_up + a_cloak_up + a_cloak_dn
+                    a_en_left = max(one(FT) - combined_area, FT(0))
+                    w_up = F2Cw.(aux_tc_f.bulk.w)[k] # maybe optimize this later
+                    f_cm = edmf.area_partition_model.cloak_mix_factor
+                    w_cloak_up = (f_cm * w_up) # + (1 - f_cm) * w_gm # use w_gm instead of w_en to ensure positivity... w_gm = 0 rn.
+                    w_gm = FT(0) # F2Cw.(prog_gm_f.w)[k] # should be zero anyway
+                    if edmf.area_partition_model.confine_all_downdraft_to_cloak # w_en --> 0
+                        w_cloak_dn = (w_gm - (a_up * w_up) - (a_cloak_up * w_cloak_up)) / a_cloak_dn
+                        w_en = FT(0)
+                    else # w_en unchanged
+                        w_cloak_dn = (w_gm - (a_up * w_up) - (a_cloak_up * w_cloak_up) - (a_en_left * w[k])) / a_cloak_dn
+                        w_en = w[k]
+                    end
+                    q_tot_cloak_max = (aux_gm.q_tot[k] - (a_up * aux_bulk.q_tot[k]) - (a_en_left * aux_en.q_tot[k])) / a_cloak_up # ensure positivity for down cloak
+                    h_tot_cloak_max = (aux_gm.θ_liq_ice[k] - (a_up * aux_bulk.θ_liq_ice[k])  - (a_en_left * aux_en.θ_liq_ice[k])) / a_cloak_up
+                    q_liq_cloak_max = (aux_gm.q_liq[k] - (a_up * aux_bulk.q_liq[k]) - (a_en_left * aux_en.q_liq[k])) / a_cloak_up
+                    q_ice_cloak_max = (aux_gm.q_ice[k] - (a_up * aux_bulk.q_ice[k]) - (a_en_left * aux_en.q_ice[k])) / a_cloak_up
+
+                    q_tot_cloak_up = clamp(f_cm * aux_bulk.q_tot[k] + (1-f_cm) * aux_en.q_tot[k], FT(0), q_tot_cloak_max)
+                    h_tot_cloak_up = clamp(f_cm * aux_bulk.θ_liq_ice[k] + (1-f_cm) * aux_en.θ_liq_ice[k], FT(0), h_tot_cloak_max)
+                    q_liq_cloak_up = clamp(f_cm * aux_bulk.q_liq[k] + (1-f_cm) * aux_en.q_liq[k], FT(0), q_liq_cloak_max)
+                    q_ice_cloak_up = clamp(f_cm * aux_bulk.q_ice[k] + (1-f_cm) * aux_en.q_ice[k], FT(0), q_ice_cloak_max)
+
+                    # I think a_cloak_dn is guaranteed to be nonzero so no need to check? since a_cloak_up + a_up can't exceed edmf.max_area...
+                    q_tot_cloak_dn = max(aux_gm.q_tot[k] - (a_up * aux_bulk.q_tot[k]) - (a_cloak_up * q_tot_cloak_up) - (a_en_left * aux_en.q_tot[k]), FT(0)) / a_cloak_dn
+                    h_tot_cloak_dn = max(aux_gm.θ_liq_ice[k] - (a_up * aux_bulk.θ_liq_ice[k]) - (a_cloak_up * h_tot_cloak_up) - (a_en_left * aux_en.θ_liq_ice[k]), FT(0)) / a_cloak_dn
+                    q_liq_cloak_dn = max(aux_gm.q_liq[k] - (a_up * aux_bulk.q_liq[k]) - (a_cloak_up * q_liq_cloak_up) - (a_en_left * aux_en.q_liq[k]), FT(0)) / a_cloak_dn
+                    q_ice_cloak_dn = max(aux_gm.q_ice[k] - (a_up * aux_bulk.q_ice[k]) - (a_cloak_up * q_ice_cloak_up) - (a_en_left * aux_en.q_ice[k]), FT(0)) / a_cloak_dn
+
+                    # iterate cloak up, cloak down, and remaining env
+                    mph_neq = null_NoneqMoistureSources(FT; fill_value = FT(0)) # initialize...
+                    for (region_area, q_tot, h_tot, q_liq, q_ice, w_region) in (
+                        (a_cloak_up, q_tot_cloak_up, h_tot_cloak_up, q_liq_cloak_up, q_ice_cloak_up, w_cloak_up),
+                        (a_cloak_dn, q_tot_cloak_dn, h_tot_cloak_dn, q_liq_cloak_dn, q_ice_cloak_dn, w_cloak_dn),
+                        (a_en_left, aux_en.q_tot[k], aux_en.θ_liq_ice[k], aux_en.q_liq[k], aux_en.q_ice[k], w_en))
+
+                        if region_area > FT(0) # can be zero for a_en_left
+                            ts = thermo_state_pθq(param_set, p_c[k], h_tot, q_tot, q_liq, q_ice)
+                            T = TD.air_temperature(thermo_params, ts)
+                            q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, ρ_c[k], TD.Liquid())
+                            q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, T, ρ_c[k], TD.Ice())
+                            mph_neq += (region_area/aux_en.area[k]) * noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, ts, w_region, q_vap_sat_liq, q_vap_sat_ice, aux_en.dqvdt[k], aux_en.dTdt[k], aux_en.τ_liq[k], aux_en.τ_ice[k]) # keep same timescales
+                        end
+                    end
+
+
+                else
+
+                    mph_neq = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, aux_en.area[k], ρ_c[k], aux_en.p[k], aux_en.T[k], Δt + ε, ts, w[k], q_vap_sat_liq, q_vap_sat_ice, aux_en.dqvdt[k], aux_en.dTdt[k], aux_en.τ_liq[k], aux_en.τ_ice[k])
+
+                    # if at an extrema, we don't know where the peak is so we'll reweight based on probability of where it could be in between.
+                    if reweight_processes_for_grid
+                        mph_neq = reweight_noneq_moisture_sources_for_grid(k, grid, param_set, thermo_params, aux_en, aux_en_f, mph_neq, nonequilibrium_moisture_scheme, moisture_sources_limiter, Δt, ρ_c, p_c, w, aux_en.dqvdt, aux_en.dTdt; reweight_extrema_only = reweight_extrema_only)
+                    end
                 end
 
                 # (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(...)
@@ -243,12 +310,6 @@ function microphysics!(
 
                         mph_neq += mph_neq_quad * weights[m_h] * sqpi_inv * weights[m_q] * sqpi_inv
                         
-                        # TEST
-                        # if (m_h, m_q) == (1, quad_order)
-                        #     mph_neq += mph_neq_quad * FT(1)
-                        # else
-                        #     mph_neq += FT(0)
-                        # end
 
                         #                         
                         mph_neq_other_quad = other_microphysics_processes(
@@ -892,10 +953,6 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
 
         for m_h in 1:quad_order
 
-            # # test going all out to see if quadrature is causing low q_i
-            # m_h = 1
-            # m_q = quad_order
-
             if quadrature_type isa LogNormalQuad
                 h_hat = exp(ν_c + sqrt2 * s_c * χ[m_h])
             elseif quadrature_type isa GaussianQuad
@@ -1086,20 +1143,21 @@ function microphysics!(
 
     epsilon = FT(1e-14) # eps(float)
 
-    if (moisture_model isa NonEquilibriumMoisture) || (edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean)
-
-        if (edmf.area_partition_model isa CoreCloakAreaPartitionModel) && edmf.area_partition_model.confine_all_downdraft_to_cloak
-            w::CC.Fields.Field = similar(aux_en.T)
-            @. w = FT(0) # we confine the downdraft (which will be drier) to the cloak region, so we can set w = 0 in the environment
+     if (moisture_model isa NonEquilibriumMoisture) || (edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean) || ((edmf.area_partition_model isa CoreCloakAreaPartitionModel) && edmf.area_partition_model.apply_cloak_to_condensate_formation)
+        F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
+        if (edmf.area_partition_model isa CoreCloakAreaPartitionModel)
+            if edmf.area_partition_model.confine_all_downdraft_to_cloak
+                w::CC.Fields.Field = similar(aux_en.T)
+                @. w = FT(0) # we confine the downdraft (which will be drier) to the cloak region, so we can set w = 0 in the environment
+            else # not confined to cloak, but also we do need some to be converted to updraft, maybe still go with 0. That biases us towards respecting supersat generation in the cloak updraft...
+                w = similar(aux_en.T)
+                @. w = FT(0)
+            end
         else
-            F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
             w = F2Cw.(aux_en_f.w)
         end
-
     else
-        # don't think we need w for EquilibriumMoisture... we're using w on faces rn... calculate to ensure type stability
-        # F2Cw = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
-        # w = F2Cw.(aux_en_f.w)
+        # don't think we need w for EquilibriumMoisture... we're using w on faces rn...
     end
 
     # ======================================================================================================================================================================================== #

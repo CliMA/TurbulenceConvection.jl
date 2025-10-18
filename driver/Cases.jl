@@ -1331,6 +1331,7 @@ function initialize_profiles(case::SOCRATES, grid::Grid, param_set, state; kwarg
     thermo_params = TCP.thermodynamics_params(param_set)
     new_zc = vec(grid.zc.z)
     new_zf = vec(grid.zf.z)[1:(end - 1)] # apply the zf interpolated forcing on zc ahead (I think that's what atlas did..., we might just have different face/center logic
+    FT = TC.float_type(state)
 
     (; conservative_interp, conservative_interp_kwargs) = values(kwargs) # values converts kwargs to named tuple which we then unpack... we could also use kwargs[:conservative_interp] ...
 
@@ -1362,7 +1363,11 @@ function initialize_profiles(case::SOCRATES, grid::Grid, param_set, state; kwarg
         aux_gm.q_tot[k] = IC.qt_nudge[k]
         prog_gm_u[k] = IC.u_nudge[k]
         prog_gm_v[k] = IC.v_nudge[k]
-        aux_gm.tke[k] = 0 # what is this supposed to be? unset for interactive? maybe we dont need to set it initially at all idk... didn't check yet but these get updated later interactively so hope it's fine
+        #=
+            Initializing tke as 0 is bad becaue it prevents further tke generation, since buoyancy tke production is tied to tke existence (not sure it has to be that way)
+            We have a couple options. Atlas LES suggests TKE peaks about about 2 m²/s² near cloud top for RF09, but we can try mediate based on stability... idk
+        =#
+        aux_gm.tke[k] = FT(1) 
     end
     prog_gm_uₕ = TC.grid_mean_uₕ(state) # not too well versed in the details here but this should set the wind profiles IC
     @. prog_gm_uₕ = CCG.Covariant12Vector(CCG.UVVector(prog_gm_u, prog_gm_v))
@@ -1425,7 +1430,10 @@ function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # 
         kwargs = filter(x -> x[1] ∉ (:conservative_interp, :conservative_interp_kwargs), kwargs)
     end
 
-    zrough = FT(0.1) # copied from gabls which is also w/ monin obhukov boundary layer
+
+    # zrough = FT(0.1) # copied from gabls which is also w/ monin obhukov boundary layer [[ i think this is far too high. GABLS is a land case!!!]]
+    zrough = TCP.get_isbits_nt(param_set.user_params, :zrough, FT(5e-4)) # 1e-4 is typical for open ocean, see https://en.wikipedia.org/wiki/Roughness_length. 5e-4 generate LHF and SFH of about 90 W/m² in RF09 which is close to LES which is about 90 for SHF and about 150 for LHF
+
     # no ustar w/ monin obukhov i guess, seems to be calculated in https://github.com/CliMA/SurfaceFluxes.jl src/SurfaceFluxes.jl/compute_ustar()
     # kwargs = (; Tsurface = sc.Tg, qsurface = sc.qg, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive, [ I think using Tg is a mistake becase w get too low LHF and SHF. in rf09 that reduces convection]
     kwargs = (; Tsurface = sc.Tsfc, qsurface = sc.qg, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive, # This seems to be most accurate... [[ i think this is better becaue it brings more qt to heights, though it does leave more at cloud top spike ]]
