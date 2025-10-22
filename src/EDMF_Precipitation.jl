@@ -243,6 +243,7 @@ function compute_precipitation_sink_tendencies(
         Π_m = TD.exner(thermo_params, ts)
         c_pm = TD.cp_m(thermo_params, ts)
         c_vm = TD.cv_m(thermo_params, ts)
+        c_p = TD.TP.cp_d(thermo_params)
         R_m = TD.gas_constant_air(thermo_params, ts)
         R_v = TCP.R_v(param_set)
         # L_v0 = TCP.LH_v0(param_set)
@@ -273,6 +274,7 @@ function compute_precipitation_sink_tendencies(
             # As with advection, we will again partition everything outside of en_remaining into the updrafts and cloak up, leaving nothing in cloak_dn, and en_remainig unchanged
             combined_up_area = aux_bulk.area[k] + aux_en.a_cloak_up[k]
             f_q = (combined_up_area > sqrt(eps(FT))) ? ((one(FT) - aux_en.a_en_remaining[k]) / combined_up_area) : one(FT) # how much q is enhanced in updraft and cloak up by squeezing out of downdraft cloak
+            # f_q = FT(1) # testing no biasing for now
 
             if edmf.moisture_model isa NonEquilibriumMoisture
                 ts_bulk = thermo_state_pθq(param_set, p_c[k], aux_bulk.θ_liq_ice[k], aux_bulk.q_tot[k], aux_bulk.q_liq[k], aux_bulk.q_ice[k])
@@ -281,14 +283,17 @@ function compute_precipitation_sink_tendencies(
             end
             w0 = FT(0) # use this instead of doing the face to center conversion, it would only be used for getting NINP
             regions = (
-                (aux_bulk.area[k], aux_bulk.T[k], ts_bulk, w0, aux_bulk.N_i[k], TD.vapor_specific_humidity(thermo_params, ts_bulk), f_q*qr, f_q*qs), # we don't store bulk ts, so just use grid mean ts (we only really need density)
-                (aux_en.a_cloak_up[k], aux_en.T_cloak_up[k], aux_en.ts_cloak_up[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_up[k]), f_q*qr, f_q*qs),
-                (aux_en.a_cloak_dn[k], aux_en.T_cloak_dn[k], aux_en.ts_cloak_dn[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_dn[k]), FT(0), FT(0)), # all zeroed out
-                (aux_en.a_en_remaining[k], aux_en.T[k], aux_en.ts[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts[k]), qr, qs)
+                (aux_bulk.area[k], aux_bulk.T[k], ts_bulk, w0, aux_bulk.N_i[k], TD.vapor_specific_humidity(thermo_params, ts_bulk), f_q*qr, f_q*qs, true), # we don't store bulk ts, so just use grid mean ts (we only really need density)
+                (aux_en.a_cloak_up[k], aux_en.T_cloak_up[k], aux_en.ts_cloak_up[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_up[k]), f_q*qr, f_q*qs, true),
+                # (aux_en.a_cloak_dn[k], aux_en.T_cloak_dn[k], aux_en.ts_cloak_dn[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_dn[k]), FT(0), FT(0), false), # all zeroed out
+                # (aux_en.a_cloak_dn[k], aux_en.T_cloak_dn[k], aux_en.ts_cloak_dn[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_dn[k]), qr, qs, false), # testing
+                (aux_en.a_en_remaining[k], aux_en.T[k], aux_en.ts[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts[k]), qr, qs, false)
+
+                # (FT(1), T_gm, ts, w0, aux_gm.N_i[k], qv, qr, qs, false), # testing
             )
         else
             regions = (
-                (FT(1), T_gm, ts, w0, aux_gm.N_i[k], qv, qr, qs), 
+                (FT(1), T_gm, ts, w0, aux_gm.N_i[k], qv, qr, qs, false), 
                 ) # we don't store gm w, so just use 0
         end
 
@@ -296,7 +301,7 @@ function compute_precipitation_sink_tendencies(
         S_qr_evap = FT(0)
         S_qs_melt = FT(0)
         S_qs_sub_dep = FT(0)
-        for (area_region, T_region, ts_region, w, N_i, qv_region, qr_region, qs_region) in regions
+        for (area_region, T_region, ts_region, w, N_i, qv_region, qr_region, qs_region, is_updraft) in regions
             ρ_region = TD.air_density(thermo_params, ts_region)
             q_region = TD.PhasePartition(thermo_params, ts_region)
             # S_qr_evap = -min(qr / Δt, -α_evp * CM1.evaporation_sublimation(microphys_params, rain_type, q_region, qr_region, ρ_region, T_region)) * precip_fraction
@@ -306,20 +311,21 @@ function compute_precipitation_sink_tendencies(
             S_qs_melt_here = limit_tendency(ptl, -α_melt * CM1.snow_melt(microphys_params, qs_region, ρ_region, T_region), qs_region, Δt) * precip_fraction
 
             # -------------------------- #
-            if edmf.moisture_model isa NonEquilibriumMoisture
-                N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, q_region, T_region, ρ_region, w)
-            else
-                N_INP = get_N_i_Cooper_curve(T_region; clamp_N=true)
-            end
+            # if edmf.moisture_model isa NonEquilibriumMoisture
+            #     N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, q_region, T_region, ρ_region, w)
+            # else
+            #     N_INP = get_N_i_Cooper_curve(T_region; clamp_N=true)
+            # end
 
-            N_s_min = max(N_INP - N_i, FT(0)) # the fewest N,
-            if N_s_min > FT(0) && (qs_region > 1e-9) # we could add dry aerosol mass but we don't know N, # we will do this by varying lambda...
-                _, λ_min = get_n0_lambda(param_set, snow_type, qs_region, ρ_region, N_s_min) # the largest droplets we should allow... [so lambda is smallest]
-            else
-                λ_min = eps(FT)
-            end
-            λ_s = CM1.lambda(microphys_params, snow_type, qs_region, ρ_region)
-            λ_s = max(λ_s, λ_min) # so that we don't sublimate more than we have INP for
+            # N_s_min = max(N_INP - N_i, FT(0)) # the fewest N,
+            # if N_s_min > FT(0) && (qs_region > 1e-9) # we could add dry aerosol mass but we don't know N, # we will do this by varying lambda...
+            #     _, λ_min = get_n0_lambda(param_set, snow_type, qs_region, ρ_region, N_s_min) # the largest droplets we should allow... [so lambda is smallest]
+            # else
+            #     λ_min = eps(FT)
+            # end
+            # λ_s = CM1.lambda(microphys_params, snow_type, qs_region, ρ_region)
+            # λ_s = max(λ_s, λ_min) # so that we don't sublimate more than we have INP for
+            λ_s = FT(NaN)
             # -------------------------- #
 
             tmp = α_dep_sub * my_evaporation_sublimation(microphys_params, snow_type, q_region, qs_region, ρ_region, T_region; _λ=λ_s) * precip_fraction
@@ -327,14 +333,19 @@ function compute_precipitation_sink_tendencies(
             # Note if T makes a very low excursion (or too high) , while S*G might mostly cancel and give a real result, you can get NaN from 0 * Inf or something, but I think this is just a legitimate model crash bc those temps are super extreme.
             if tmp > 0
                 qvsat_ice = TD.q_vap_saturation_generic(thermo_params, T_region, ρ_region, TD.Ice()) # we don't have this stored for grid-mean and we can't calculate form en/up bc it's non-linear...
-                δi = qv_region - qvsat_ice
+                dqsi_dT = TD.∂q_vap_sat_∂T(thermo_params, FT(0), T_region, qvsat_ice) # how do we make this work differently for ice/liquid? or do we need to? currently it's based on the  current condensate mix...
+                Γ_i = one(FT) + (L_s / c_p) * dqsi_dT  # Eqn C3
+                δi = (qv_region - qvsat_ice) / Γ_i
+                
                 # since we don't wanna do the noneq_moisture_sources() style thing, we'll settle for just adding dqvdt, and qt advection here. sed doesn't count.., lsadv does but is slow
                 dv = FT(0)
-                dv += Δt * max(aux_en.dqvdt[k] * aux_en.area[k], FT(0)) + max(aux_bulk.dqvdt[k] * aux_bulk.area[k], FT(0)) # hopefully this is ok to just add like this...
-                dv += Δt * max(( (aux_tc.massflux_tendency_qt[k] + aux_tc.diffusive_tendency_qt[k]) - (aux_tc.massflux_tendency_ql[k] + aux_tc.diffusive_tendency_ql[k]) - (aux_tc.massflux_tendency_qi[k] + aux_tc.diffusive_tendency_qi[k])), FT(0))
-                dv += Δt * max(aux_gm.qt_tendency_ls_vert_adv[k] - aux_gm.ql_tendency_ls_vert_adv[k] - aux_gm.qi_tendency_ls_vert_adv[k], FT(0))
+                # dv += Δt * max(aux_en.dqvdt[k] * aux_en.area[k], FT(0)) + max(aux_bulk.dqvdt[k] * aux_bulk.area[k], FT(0)) # hopefully this is ok to just add like this...
+                if is_updraft
+                    # dv += Δt * max(( (aux_tc.massflux_tendency_qt[k] + aux_tc.diffusive_tendency_qt[k]) - max(aux_tc.massflux_tendency_ql[k] + aux_tc.diffusive_tendency_ql[k], FT(0)) - max(aux_tc.massflux_tendency_qi[k] + aux_tc.diffusive_tendency_qi[k], FT(0))), FT(0))
+                    # dv += Δt * max(aux_gm.qt_tendency_ls_vert_adv[k] - max(aux_gm.ql_tendency_ls_vert_adv[k], FT(0)) - max(aux_gm.qi_tendency_ls_vert_adv[k], FT(0)), FT(0))
+                end
                 # S_qs_sub_dep_here = -limit_tendency(ptl, -tmp, qv_region+dv, Δt) # might be too restrictive at cloud top w/o the dv
-                S_qs_sub_dep_here = -limit_tendency(ptl, -tmp, max(FT(0), δi+dv), Δt) # presumably if tmp > 0 then δi > 0 but can't be too careful
+                S_qs_sub_dep_here = -limit_tendency(ptl, -tmp, max(FT(0), min(δi+dv/2, qv_region+dv/2, δi*Δt/2)), Δt) # presumably if tmp > 0 then δi > 0 but can't be too careful, δi*Δt would be assuming you're in steady state...
             else
                 S_qs_sub_dep_here = limit_tendency(ptl, tmp, qs_region, Δt)
             end

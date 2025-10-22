@@ -155,7 +155,7 @@ function initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set)
             if  k ∉ (kc_toa, kc_surf) # don't do this for surface or top of atmosphere
                 unstable = aux_gm.θ_liq_ice[k] ≥ aux_gm.θ_liq_ice[k+1] # unstable if θ_liq_ice decreases with height
                 if unstable
-                    aux_up[i].area[k+2] = TC.resolve_nan(aux_up[i].area[k+2], FT(0)) + (((k+2) != kc_toa) ? initial_profile_updraft_area : FT(0)) # socrates init area
+                    # aux_up[i].area[k+2] = TC.resolve_nan(aux_up[i].area[k+2], FT(0)) + (((k+2) != kc_toa) ? initial_profile_updraft_area : FT(0)) # socrates init area
                     aux_up[i].area[k+1] = TC.resolve_nan(aux_up[i].area[k+1], FT(0)) + (((k+1) != kc_toa) ? initial_profile_updraft_area : FT(0)) # socrates init area
                     aux_up[i].area[k] = TC.resolve_nan(aux_up[i].area[k], FT(0)) + initial_profile_updraft_area # socrates init area
                     aux_up[i].area[k-1] = TC.resolve_nan(aux_up[i].area[k-1], FT(0)) + (((k-1) != kc_surf) ? initial_profile_updraft_area : FT(0)) # socrates init area
