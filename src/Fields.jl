@@ -18,7 +18,7 @@ Base.max(h1::Cent, h2::Cent) = Cent(max(h1.i, h2.i))
 Base.min(h1::Cent, h2::Cent) = Cent(min(h1.i, h2.i))
 
 toscalar(x::CCG.Covariant3Vector) = x.u₃
-toscalar(x::CCG.Contravariant3Vector) = CC.Geometry.WVector(x).components.data.:1 # from dennis., not sure precisely why it works... or why it needs to wvector...
+# toscalar(x::CCG.Contravariant3Vector) = CC.Geometry.WVector(x).components.data.:1 # from dennis., not sure precisely why it works... or why it needs to wvector... [ think method might not exist properly like this]
 
 const FDFields = Union{CC.Fields.ExtrudedFiniteDifferenceField, CC.Fields.FiniteDifferenceField}
 

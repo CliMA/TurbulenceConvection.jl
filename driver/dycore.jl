@@ -111,7 +111,6 @@ end
 
 
 function set_thermo_state_from_prog!(state, grid, moisture_model, param_set)
-    Ic = CCO.InterpolateF2C()
     thermo_params = TCP.thermodynamics_params(param_set)
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
@@ -142,7 +141,6 @@ function set_thermo_state_from_prog!(state, grid, moisture_model, param_set)
 end
 
 function set_thermo_state_from_aux!(state, grid, moisture_model, param_set)
-    Ic = CCO.InterpolateF2C()
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -536,13 +534,14 @@ function compute_gm_tendencies!(
     Δt::Real,
 )
     thermo_params = TCP.thermodynamics_params(param_set)
-    Ic = CCO.InterpolateF2C()
     tendencies_gm = TC.center_tendencies_grid_mean(state)
+    tendencies_pr = TC.center_tendencies_precipitation(state)
     kc_toa = TC.kc_top_of_atmos(grid)
     kf_surf = TC.kf_surface(grid)
     FT = TC.float_type(state)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)
+    prog_pr = TC.center_prog_precipitation(state)
     aux_gm = TC.center_aux_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
@@ -698,8 +697,8 @@ function compute_gm_tendencies!(
             # w∇q_ice_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_gm.q_ice) # works, but output type is different than tendencies type
             # w∇q_liq_gm = @. ∇c(wvec(w∇q_liq_gm))
             # w∇q_ice_gm = @. ∇c(wvec(w∇q_ice_gm))
-            w∇q_liq_gm = @. ∇c(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_gm.q_liq)))
-            w∇q_ice_gm = @. ∇c(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_gm.q_ice)))
+            w∇q_liq_gm = @. ∇c(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_gm.q_liq * ρ_c))) / ρ_c
+            w∇q_ice_gm = @. ∇c(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_gm.q_ice * ρ_c))) / ρ_c
         end
     end
 
@@ -742,6 +741,17 @@ function compute_gm_tendencies!(
 
         end
         aux_gm.qt_tendency_ls_vert_adv[k] = -w∇q_tot_gm[k] # not implemented yet
+
+
+        # LS Vert for precipitation
+        w∇q_rai_gm = @. ∇c(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_pr.q_rai * ρ_c))) / ρ_c
+        w∇q_sno_gm = @. ∇c(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_pr.q_sno * ρ_c))) / ρ_c
+        @. tendencies_pr.q_rai += -w∇q_rai_gm
+        @. tendencies_pr.q_sno += -w∇q_sno_gm
+        @. aux_gm.qr_tendency_ls_vert_adv = -w∇q_rai_gm # FOR STORAGE
+        @. aux_gm.qs_tendency_ls_vert_adv = -w∇q_sno_gm # FOR STORAGE
+
+        
 
         # Radiation
         if Cases.rad_type(radiation) <:
@@ -945,44 +955,35 @@ function compute_gm_tendencies!(
     if edmf.moisture_model isa TC.NonEquilibriumMoisture
         sgs_flux_q_liq = aux_gm_f.sgs_flux_q_liq
         sgs_flux_q_ice = aux_gm_f.sgs_flux_q_ice
-
-        sgs_tendency_q_liq = aux_gm.sgs_tendency_q_liq
-        sgs_tendency_q_ice = aux_gm.sgs_tendency_q_ice
-
-        @. sgs_tendency_q_liq = -∇sgs(wvec(sgs_flux_q_liq)) / ρ_c
-        @. sgs_tendency_q_ice = -∇sgs(wvec(sgs_flux_q_ice)) / ρ_c
-
         tends_q_liq = tendencies_gm.q_liq
         tends_q_ice = tendencies_gm.q_ice
-        # @. tends_q_liq += -∇sgs(wvec(sgs_flux_q_liq)) / ρ_c
-        # @. tends_q_ice += -∇sgs(wvec(sgs_flux_q_ice)) / ρ_c
-        @. tends_q_liq += sgs_tendency_q_liq
-        @. tends_q_ice += sgs_tendency_q_ice
 
+        # sgs_tendency_q_liq = aux_gm.sgs_tendency_q_liq
+        # sgs_tendency_q_ice = aux_gm.sgs_tendency_q_ice
+        # @. sgs_tendency_q_liq = -∇sgs(wvec(sgs_flux_q_liq)) / ρ_c
+        # @. sgs_tendency_q_ice = -∇sgs(wvec(sgs_flux_q_ice)) / ρ_c
+        # @. tends_q_liq += sgs_tendency_q_liq
+        # @. tends_q_ice += sgs_tendency_q_ice
 
-        # if edmf.moisture_model isa TC.NonEquilibriumMoisture
-        #     @. aux_en.dqvdt -= -∇sgs(wvec(sgs_flux_q_liq))  / ρ_c # [store things that matter for our aux_en.dqvdt] [only keep qv part]
-        #     @. aux_en.dqvdt -= -∇sgs(wvec(sgs_flux_q_ice)) / ρ_c # [store things that matter for our aux_en.dqvdt] [only keep qv part]
-        # end
+        @. tends_q_liq += -∇sgs(wvec(sgs_flux_q_liq)) / ρ_c
+        @. tends_q_ice += -∇sgs(wvec(sgs_flux_q_ice)) / ρ_c
+
     end
 
     # my addition -- note this is the sgs flux only, doesn't include advection
-    tendencies_pr = TC.center_tendencies_precipitation(state)
     sgs_flux_q_rai = aux_gm_f.sgs_flux_q_rai
     sgs_flux_q_sno = aux_gm_f.sgs_flux_q_sno
-    sgs_tendency_q_rai = aux_gm.sgs_tendency_q_rai
-    sgs_tendency_q_sno = aux_gm.sgs_tendency_q_sno
+    # sgs_tendency_q_rai = aux_gm.sgs_tendency_q_rai
+    # sgs_tendency_q_sno = aux_gm.sgs_tendency_q_sno
 
-    @. sgs_tendency_q_rai = -∇sgs(wvec(sgs_flux_q_rai)) / ρ_c
-    @. sgs_tendency_q_sno = -∇sgs(wvec(sgs_flux_q_sno)) / ρ_c
+    # @. sgs_tendency_q_rai = -∇sgs(wvec(sgs_flux_q_rai)) / ρ_c
+    # @. sgs_tendency_q_sno = -∇sgs(wvec(sgs_flux_q_sno)) / ρ_c
+    # @. tendencies_pr.q_rai += sgs_tendency_q_rai
+    # @. tendencies_pr.q_sno += sgs_tendency_q_sno
 
+    @. tendencies_pr.q_rai += -∇sgs(wvec(sgs_flux_q_rai)) / ρ_c
+    @. tendencies_pr.q_sno += -∇sgs(wvec(sgs_flux_q_sno)) / ρ_c
 
-    @. tendencies_pr.q_rai += sgs_tendency_q_rai
-    @. tendencies_pr.q_sno += sgs_tendency_q_sno
-
-
-
-    # lwp = sum(i -> sum(ρ_c .* aux_up[i].q_liq .* aux_up[i].area .* (aux_up[i].area .> edmf.minimum_area)), 1:N_up)
 
     @inbounds for k in TC.real_center_indices(grid)
         if aux_bulk.area[k] > FT(0)

@@ -60,9 +60,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ∇c = CCO.DivergenceF2C()
 
 
+    w_gm = prog_gm_f.w
+    w_en = aux_en_f.w
+
+
 
     prog_gm_uₕ = grid_mean_uₕ(state)
-    Ic = CCO.InterpolateF2C()
     #####
     ##### center variables
     #####
@@ -180,6 +183,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 aux_bulk.q_ice[k] = prog_gm.q_ice[k]
             end
         end
+
+        
         aux_en.area[k] = 1 - aux_bulk.area[k]
         aux_en.tke[k] = prog_en.ρatke[k] / (ρ_c[k] * aux_en.area[k])
         if edmf.thermo_covariance_model isa PrognosticThermoCovariances
@@ -267,212 +272,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
 
 
+
     #####
     #####  update prognostic bulk (these mirror the prognostic variables exactly, no minimum_area or other clippings -- filtering already happened so should be good)
     ### - these are important because while sometimes tendencies are calculated using aux, they are always applied to prog, so for limiting we need to know the exact prognostic values
     #####
-    # prog_bulk = center_prog_bulk(state)
-    # prog_bulk.ρarea .= FT(0)
-    # prog_bulk.ρaθ_liq_ice .= FT(0)
-    # prog_bulk.ρaq_tot .= FT(0)
-    # if edmf.moisture_model isa NonEquilibriumMoisture
-    #     prog_bulk.ρaq_liq .= FT(0)
-    #     prog_bulk.ρaq_ice .= FT(0)
-    # end
-    # prog_bulk_f = face_prog_bulk(state)
-    # prog_bulk_f.ρaw .= FT(0)
 
-    # @inbounds for i in 1:N_up
-    #     @. prog_bulk.ρarea += prog_up[i].ρarea
-    #     @. prog_bulk.ρaθ_liq_ice += prog_up[i].ρaθ_liq_ice
-    #     @. prog_bulk.ρaq_tot += prog_up[i].ρaq_tot
-    #     if edmf.moisture_model isa NonEquilibriumMoisture
-    #         @. prog_bulk.ρaq_liq += prog_up[i].ρaq_liq
-    #         @. prog_bulk.ρaq_ice += prog_up[i].ρaq_ice
-    #     end
-    #     @. prog_bulk_f.ρaw += prog_up_f[i].ρaw
-    # end
-
-    # track prog_en exactly (not to be confused with aux_en which is limited by clippings on aux_up etc)
-    # prog_en_gm = center_prog_environment_up_gm_version(state)
-    # @. prog_en_gm.ρarea = ρ_c - prog_bulk.ρarea
-    # @. prog_en_gm.ρaθ_liq_ice = prog_gm.ρθ_liq_ice - prog_bulk.ρaθ_liq_ice
-    # @. prog_en_gm.ρaq_tot = prog_gm.ρq_tot - prog_bulk.ρaq_tot
-    # if edmf.moisture_model isa NonEquilibriumMoisture
-    #     @. prog_en_gm.ρaq_liq = ρ_c * prog_gm.q_liq - prog_bulk.ρaq_liq
-    #     @. prog_en_gm.ρaq_ice = ρ_c * prog_gm.q_ice - prog_bulk.ρaq_ice
-    # end
-    # prog_en_gm_f = face_prog_environment_up_gm_version(state)
-    # @. prog_en_gm_f.ρaw = -prog_bulk_f.ρaw
-
-    # ======================================================== # zero out noneq tendencies before calling microphysics again (does this interfere w/ writing to disk? -- needed bc env/updraft are cross writing to each other... #
-    # aux_en.ql_tendency_noneq .= FT(0) # don't zero this out  bc it seeemd to break the output writing (some order of read, calculate gm, write, zero out problem probably...)
-    # aux_en.qi_tendency_noneq .= FT(0) # don't zero this out  bc it seeemd to break the output writing (some order of read, calculate gm, write, zero out problem probably...)
-    #
-    aux_en.ql_tendency_cond_evap .= FT(0)
-    aux_en.qi_tendency_sub_dep .= FT(0)
-    #
-    aux_en.ql_tendency_sedimentation .= FT(0)
-    aux_en.qi_tendency_sedimentation .= FT(0)
-    aux_en.qt_tendency_sedimentation .= FT(0)
-    aux_en.θ_liq_ice_tendency_sedimentation .= FT(0)
-    #
-    aux_en.ql_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
-    aux_en.qi_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
-    aux_en.qt_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
-    aux_en.θ_liq_ice_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
-    #
-    aux_en.ql_tendency_acnv .= FT(0)
-    aux_en.qi_tendency_acnv .= FT(0)
-    aux_en.qi_tendency_acnv_dep .= FT(0)
-    aux_en.qi_tendency_acnv_dep_is .= FT(0)
-    aux_en.qi_tendency_acnv_dep_above .= FT(0)
-    aux_en.qi_tendency_acnv_agg .= FT(0)
-    aux_en.qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
-    aux_en.qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
-    aux_en.qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
-    #
-    aux_en.ql_tendency_accr_liq_rai .= FT(0)
-    aux_en.ql_tendency_accr_liq_ice .= FT(0)
-    aux_en.ql_tendency_accr_liq_sno .= FT(0)
-    #
-    aux_en.qi_tendency_accr_ice_liq .= FT(0)
-    aux_en.qi_tendency_accr_ice_rai .= FT(0)
-    aux_en.qi_tendency_accr_ice_sno .= FT(0)
-    #
-    aux_en.qi_tendency_hom_frz .= FT(0)
-    aux_en.qi_tendency_het_frz .= FT(0)
-    aux_en.qi_tendency_het_nuc .= FT(0)
-    aux_en.qi_tendency_melt .= FT(0)
-    #
-    # aux_en.qi_tendency_vert_adv .= FT(0) # gm only
-    # aux_en.qi_tendency_ls_vert_adv .= FT(0) # gm only
-    # aux_en.qi_tendency_sgs .= FT(0) # gm only
-
-    # aux_en.dqvdt .= FT(0) # zero out [ don't do this bc we need it for later calculations... in microphysics!() for example... it'll just have to be from the last timestep...]
-
-
-
-
-    @inbounds for i in 1:N_up
-        # aux_up[i].ql_tendency_noneq .= FT(0)
-        # aux_up[i].qi_tendency_noneq .= FT(0)
-        #
-        aux_up[i].ql_tendency_cond_evap .= FT(0)
-        aux_up[i].qi_tendency_sub_dep .= FT(0)
-        #
-        aux_up[i].ql_tendency_sedimentation .= FT(0)
-        aux_up[i].qi_tendency_sedimentation .= FT(0)
-        aux_up[i].qt_tendency_sedimentation .= FT(0)
-        aux_up[i].θ_liq_ice_tendency_sedimentation .= FT(0)
-        #
-        aux_up[i].ql_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
-        aux_up[i].qi_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
-        aux_up[i].qt_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
-        aux_up[i].θ_liq_ice_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
-        #
-        #
-        aux_up[i].ql_tendency_acnv .= FT(0)
-        aux_up[i].qi_tendency_acnv .= FT(0)
-        aux_up[i].qi_tendency_acnv_dep .= FT(0)
-        aux_up[i].qi_tendency_acnv_dep_is .= FT(0)
-        aux_up[i].qi_tendency_acnv_dep_above .= FT(0)
-        aux_up[i].qi_tendency_acnv_agg .= FT(0)
-        aux_up[i].qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
-        aux_up[i].qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
-        aux_up[i].qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
-        #
-        aux_up[i].ql_tendency_accr_liq_rai .= FT(0)
-        aux_up[i].ql_tendency_accr_liq_ice .= FT(0)
-        aux_up[i].ql_tendency_accr_liq_sno .= FT(0)
-        #
-        aux_up[i].qi_tendency_accr_ice_liq .= FT(0)
-        aux_up[i].qi_tendency_accr_ice_rai .= FT(0)
-        aux_up[i].qi_tendency_accr_ice_sno .= FT(0)
-        #
-        aux_up[i].qi_tendency_hom_frz .= FT(0)
-        aux_up[i].qi_tendency_het_frz .= FT(0)
-        aux_up[i].qi_tendency_het_nuc .= FT(0)
-        aux_up[i].qi_tendency_melt .= FT(0)
-        #
-        # aux_up[i].qi_tendency_vert_adv .= FT(0) # gm only
-        # aux_up[i].qi_tendency_ls_vert_adv .= FT(0) # gm only
-        # aux_up[i].qi_tendency_sgs .= FT(0) # gm only
-
-        # aux_up[i].dqvdt .= FT(0) # zero out [ don't do this bc we need it for later calculations... in microphysics!() for example... it'll just have to be from the last timestep...]
-    end
-    # aux_bulk.ql_tendency_noneq .= FT(0)
-    # aux_bulk.qi_tendency_noneq .= FT(0)
-    #
-    aux_bulk.ql_tendency_cond_evap .= FT(0)
-    aux_bulk.qi_tendency_sub_dep .= FT(0)
-    #
-    aux_bulk.ql_tendency_sedimentation .= FT(0)
-    aux_bulk.qi_tendency_sedimentation .= FT(0)
-    aux_bulk.qt_tendency_sedimentation .= FT(0)
-    aux_bulk.θ_liq_ice_tendency_sedimentation .= FT(0)
-    #
-    aux_bulk.ql_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
-    aux_bulk.qi_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
-    aux_bulk.qt_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
-    aux_bulk.θ_liq_ice_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other up
-    #
-    aux_bulk.ql_tendency_acnv .= FT(0)
-    aux_bulk.qi_tendency_acnv .= FT(0)
-    aux_bulk.qi_tendency_acnv_dep .= FT(0)
-    aux_bulk.qi_tendency_acnv_dep_is .= FT(0)
-    aux_bulk.qi_tendency_acnv_dep_above .= FT(0)
-    aux_bulk.qi_tendency_acnv_agg .= FT(0)
-    aux_bulk.qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
-    aux_bulk.qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
-    aux_bulk.qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
-    #
-    aux_bulk.ql_tendency_accr_liq_rai .= FT(0)
-    aux_bulk.ql_tendency_accr_liq_ice .= FT(0)
-    aux_bulk.ql_tendency_accr_liq_sno .= FT(0)
-    #
-    aux_bulk.qi_tendency_accr_ice_liq .= FT(0)
-    aux_bulk.qi_tendency_accr_ice_rai .= FT(0)
-    aux_bulk.qi_tendency_accr_ice_sno .= FT(0)
-    #
-    aux_bulk.qi_tendency_hom_frz .= FT(0)
-    aux_bulk.qi_tendency_het_frz .= FT(0)
-    aux_bulk.qi_tendency_het_nuc .= FT(0)
-    aux_bulk.qi_tendency_melt .= FT(0)
-    #
-    # aux_bulk.qi_tendency_vert_adv .= FT(0) # gm only
-    # aux_bulk.qi_tendency_ls_vert_adv .= FT(0) # gm only
-    # aux_bulk.qi_tendency_sgs .= FT(0) # gm only
-
-    # aux_bulk.dqvdt .= FT(0) # zero out [ don't do this bc we need it for later calculations... in microphysics!() for example... it'll just have to be from the last timestep...]
-
-
-    # zero out our bulk tendency trackers... these are used in limit_up_tendencies!() to limit tendencies for model stability...
-    # tendencies_bulk = center_tendencies_bulk(state)
-    # tendencies_bulk.ρarea .= FT(0)
-    # tendencies_bulk.ρaθ_liq_ice .= FT(0)
-    # tendencies_bulk.ρaq_tot .= FT(0)
-    # if edmf.moisture_model isa NonEquilibriumMoisture
-    #     tendencies_bulk.ρaq_liq .= FT(0)
-    #     tendencies_bulk.ρaq_ice .= FT(0)
-    # end
-    # tendencies_bulk_f = face_tendencies_bulk(state)
-    # tendencies_bulk_f.ρaw .= FT(0)
-
-
-    # these get overwritten technically so don't actually need zeroing out
-    # [deprecated, we can bring this back if we determine we need them...]
-    # tendencies_bulk_adjustments = center_tendencies_bulk_adjustments(state)
-    # tendencies_bulk_adjustments.ρarea .= FT(0)
-    # tendencies_bulk_adjustments.ρaθ_liq_ice .= FT(0)
-    # tendencies_bulk_adjustments.ρaq_tot .= FT(0)
-    # tendencies_bulk_adjustments.ρaq_liq .= FT(0)
-    # tendencies_bulk_adjustments.ρaq_ice .= FT(0)
-    # tendencies_bulk_adjustments_f = face_tendencies_bulk_adjustments(state)
-    # tendencies_bulk_adjustments_f.ρaw .= FT(0)
-
-
-    aux_tc.qs_tendency_accr_rai_sno .= FT(0) # this is edited in both aux_up and aux_en because the outcome is temperature dependent, so we zero it out here
 
     # ==================================================================================== #
 
@@ -543,9 +348,30 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         #####
         ##### update_GMV_diagnostics (can't call in Eq until after microphysics())
         #####
-       
-        # moved below
+        if edmf.moisture_model isa NonEquilibriumMoisture
+            @inbounds for k in real_center_indices(grid)
+                a_bulk_c = aux_bulk.area[k]
+                #####
+                ##### update_GMV_diagnostics (can't call in Eq until after microphysics())
+                #####
+                aux_gm.q_liq[k] = (aux_bulk.area[k] * aux_bulk.q_liq[k] + (1 - aux_bulk.area[k]) * aux_en.q_liq[k])
+                aux_gm.q_ice[k] = (aux_bulk.area[k] * aux_bulk.q_ice[k] + (1 - aux_bulk.area[k]) * aux_en.q_ice[k])
+                aux_gm.T[k] = (aux_bulk.area[k] * aux_bulk.T[k] + (1 - aux_bulk.area[k]) * aux_en.T[k])
+                aux_gm.buoy[k] = (aux_bulk.area[k] * aux_bulk.buoy[k] + (1 - aux_bulk.area[k]) * aux_en.buoy[k])
 
+                if iszero(aux_gm.T[k]) # print aux_gm and aux_bulk and aux_en values for q_tot, q_liq, q_ice, T, buoy and area in the error message...
+                    error("aux_gm.T[$k] is 0. Other values are aux_gm.q_tot[k] = $(aux_gm.q_tot[k]), aux_gm.q_liq[k] = $(aux_gm.q_liq[k]); aux_gm.q_ice[k] = $(aux_gm.q_ice[k]); aux_gm.buoy[k] = $(aux_gm.buoy[k]); aux_bulk.area[k] = $(aux_bulk.area[k]); aux_bulk.T[k] = $(aux_bulk.T[k]); aux_en.area[k] = $(aux_en.area[k]); aux_en.T[k] = $(aux_en.T[k]); aux_en.q_tot[k] = $(aux_en.q_tot[k]); aux_en.q_liq[k] = $(aux_en.q_liq[k]); aux_en.q_ice[k] = $(aux_en.q_ice[k])")
+                end
+
+                has_condensate = TD.has_condensate(aux_bulk.q_liq[k] + aux_bulk.q_ice[k])
+                aux_bulk.cloud_fraction[k] = if has_condensate && a_bulk_c > 1e-3
+                    1
+                else
+                    0
+                end
+            end
+        end
+       
     end
     #####
     ##### face variables: diagnose primitive, diagnose env and compute bulk
@@ -569,8 +395,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 adj = ρ_f[k] * a_up[k] * (w_max - aux_up_f[i].w[k])
                 aux_up_f[i].w[k] = w_max
                 prog_up_f[i].ρaw[k] += adj
-                # prog_bulk_f.ρaw[k] += adj
-                # prog_en_gm_f.ρaw[k] -= adj
             end
         end
     end
@@ -586,6 +410,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     end
     # Assuming w_gm = 0!
     @. aux_en_f.w = -1 * ᶠinterp_a(aux_bulk.area) / (1 - ᶠinterp_a(aux_bulk.area)) * aux_tc_f.bulk.w
+    # @. aux_en.w = Ic(aux_en_f.w) # face to center interp [[ gonna deprecate this for space savings ]]
 
     #####
     #####  diagnose_GMV_moments
@@ -593,6 +418,227 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     get_GMV_CoVar(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
     get_GMV_CoVar(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
     get_GMV_CoVar(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
+
+
+
+    # === CLOAK ========================================================================================================================= #
+    if edmf.area_partition_model isa CoreCloakAreaPartitionModel
+        f_cm = edmf.area_partition_model.cloak_mix_factor
+        f_aamaaic = edmf.area_partition_model.fraction_of_area_above_max_area_allowed_in_cloak
+
+        a_cloak_up = aux_en.a_cloak_up
+        a_cloak_dn = aux_en.a_cloak_dn
+        a_en_remaining = aux_en.a_en_remaining
+        #
+        w_cloak_up  = aux_en_f.w_cloak_up
+        w_cloak_dn  = aux_en_f.w_cloak_dn
+        #
+        q_tot_cloak_up = aux_en.q_tot_cloak_up
+        q_tot_cloak_dn = aux_en.q_tot_cloak_dn
+        #
+        h_tot_cloak_up = aux_en.θ_liq_ice_cloak_up
+        h_tot_cloak_dn = aux_en.θ_liq_ice_cloak_dn
+        #
+        if edmf.moisture_model isa NonEquilibriumMoisture # For EquilibriumMoisture, we can't update these immediately. We'll set them in the call to microphysics() based on q_tot, h_tot, etc... The grid-mean ql, qi aren't updated till later after microphysics() is called (see defereed update_GMV_diagnostics later) so we couldn't use them here even if we wanted to
+            q_liq_cloak_up = aux_en.q_liq_cloak_up
+            q_liq_cloak_dn = aux_en.q_liq_cloak_dn
+            #
+            q_ice_cloak_up = aux_en.q_ice_cloak_up
+            q_ice_cloak_dn = aux_en.q_ice_cloak_dn
+        end
+
+        ## Calculate areas
+        @inbounds for k in real_center_indices(grid)
+            max_combined_up_area = max(aux_bulk.area[k], edmf.max_area + f_aamaaic * (one(FT) - edmf.max_area)) # allow some area above max area to go into cloak
+            a_cloak_up[k] = min(aux_bulk.area[k] * edmf.area_partition_model.cloak_area_factor, max(max_combined_up_area - aux_bulk.area[k], 0)) # limit updraft cloak area to ensure combined_up_area <= max_combined_up_area
+            a_cloak_dn[k] = min(aux_bulk.area[k] + a_cloak_up[k], one(FT) - (aux_bulk.area[k] + a_cloak_up[k])) # limit downdraft cloak area to ensure total area <= 1
+            combined_area = aux_bulk.area[k] + a_cloak_up[k] + a_cloak_dn[k]
+            a_en_remaining[k] =  max(one(FT) - combined_area, zero(FT)) # remaining env area not in cloaks
+        end
+
+        # calculate ws
+        w_up = aux_tc_f.bulk.w # should be the same as aux_bulk_f.w [[ this isn't set till line 600 rn...]]
+        @. w_cloak_up = f_cm * w_up # + (1 - f_cm) * w_gm # use w_gm to ensure positivity, w_gm should be 0...
+
+        if edmf.area_partition_model.confine_all_downdraft_to_cloak
+            @. w_cloak_dn = ifelse( ᶠinterp_a(a_cloak_dn) > edmf.minimum_area, (toscalar(w_gm) - (ᶠinterp_a(a_cloak_up) * w_cloak_up) - (ᶠinterp_a(aux_bulk.area) * w_up)) / ᶠinterp_a(a_cloak_dn), w_en) # for w_dn, leave nothing for env (w_en -> 0 ). w_en can be (is) negative, so do not clamp. If the cloak area is too small, just set to w_en env value, 
+        else # w_en should remain unchanged, so we need to included a_en_remaining
+            @. w_cloak_dn = ifelse( ᶠinterp_a(a_cloak_dn) > edmf.minimum_area, (toscalar(w_gm) - (ᶠinterp_a(a_cloak_up) * w_cloak_up) - (ᶠinterp_a(aux_bulk.area) * w_up) - (ᶠinterp_a(a_en_remaining) * w_en)) / ᶠinterp_a(a_cloak_dn), w_en) # if the cloak area is too small, just set to env value
+        end
+
+
+        # Calculate tracers
+        @inbounds for k in real_center_indices(grid) # for loop to remove allocations for max/min checks (doesn't work for w because those use face interp)
+            q_tot_cloak_max = (a_cloak_up[k] > edmf.minimum_area) ? max((aux_gm.q_tot[k] - (aux_bulk.area[k] * aux_bulk.q_tot[k]) - (a_en_remaining[k] * aux_en.q_tot[k])) / a_cloak_up[k], FT(0)) : aux_en.q_tot[k]
+            h_tot_cloak_max = (a_cloak_up[k] > edmf.minimum_area) ? max((aux_gm.θ_liq_ice[k] - (aux_bulk.area[k] * aux_bulk.θ_liq_ice[k]) - (a_en_remaining[k] * aux_en.θ_liq_ice[k])) / a_cloak_up[k], FT(0)) : aux_en.θ_liq_ice[k] # limit to ensure h_cloak_dn >= 0
+
+            q_tot_cloak_up[k] = clamp(f_cm * aux_bulk.q_tot[k] + (1 - f_cm) * aux_en.q_tot[k], 0, q_tot_cloak_max)
+            h_tot_cloak_up[k] = clamp(f_cm * aux_bulk.θ_liq_ice[k] + (1 - f_cm) * aux_en.θ_liq_ice[k], 0, h_tot_cloak_max)
+
+            # For the downdraft, we just have to close the budget. we need qi_mean to remain unchanged, and w_mean to remain unchanged
+            q_tot_cloak_dn[k] = (a_cloak_dn[k] > edmf.minimum_area) ? max((aux_gm.q_tot[k] - (a_cloak_up[k] * q_tot_cloak_up[k]) - (aux_bulk.area[k] * aux_bulk.q_tot[k]) - (a_en_remaining[k] * aux_en.q_tot[k])) / a_cloak_dn[k], FT(0)) : aux_en.q_tot[k] # if the cloak area is too small, just set to env
+            h_tot_cloak_dn[k] = (a_cloak_dn[k] > edmf.minimum_area) ? max((aux_gm.θ_liq_ice[k] - (a_cloak_up[k] * h_tot_cloak_up[k]) - (aux_bulk.area[k] * aux_bulk.θ_liq_ice[k]) - (a_en_remaining[k] * aux_en.θ_liq_ice[k])) / a_cloak_dn[k], FT(0)) : aux_en.θ_liq_ice[k]
+
+            if edmf.moisture_model isa NonEquilibriumMoisture
+                q_liq_up = aux_bulk.q_liq
+                q_ice_up = aux_bulk.q_ice
+                q_liq_cloak_max = (a_cloak_up[k] > edmf.minimum_area) ? max((aux_gm.q_liq[k] - (aux_bulk.area[k] * q_liq_up[k]) - (a_en_remaining[k] * aux_en.q_liq[k])) / a_cloak_up[k], FT(0)) : aux_en.q_liq[k]
+                q_ice_cloak_max = (a_cloak_up[k] > edmf.minimum_area) ? max((aux_gm.q_ice[k] - (aux_bulk.area[k] * q_ice_up[k]) - (a_en_remaining[k] * aux_en.q_ice[k])) / a_cloak_up[k], FT(0)) : aux_en.q_ice[k] # limit to ensure q_cloak_dn >= 0
+
+                q_liq_cloak_up[k] = clamp(f_cm * q_liq_up[k] + (1 - f_cm) * aux_en.q_liq[k], FT(0), q_liq_cloak_max)
+                q_ice_cloak_up[k] = clamp(f_cm * q_ice_up[k] + (1 - f_cm) * aux_en.q_ice[k], FT(0), q_ice_cloak_max)
+                # For the downdraft, we just have to close the budget. we need qi_mean to remain unchanged, and w_mean to remain unchanged
+                q_liq_cloak_dn[k] = (a_cloak_dn[k] > edmf.minimum_area) ? max((aux_gm.q_liq[k] - (a_cloak_up[k] * q_liq_cloak_up[k]) - (aux_bulk.area[k] * q_liq_up[k]) - (a_en_remaining[k] * aux_en.q_liq[k])) / a_cloak_dn[k], FT(0)) : aux_en.q_liq[k] # if the cloak area is too small, just set to env
+                q_ice_cloak_dn[k] = (a_cloak_dn[k] > edmf.minimum_area) ? max((aux_gm.q_ice[k] - (a_cloak_up[k] * q_ice_cloak_up[k]) - (aux_bulk.area[k] * q_ice_up[k]) - (a_en_remaining[k] * aux_en.q_ice[k])) / a_cloak_dn[k], FT(0)) : aux_en.q_ice[k]
+            end
+
+
+            # Derived variables
+
+            # Thermo State
+            aux_en.ts_cloak_up[k] =  (edmf.moisture_model isa EquilibriumMoisture) ? thermo_state_pθq(param_set, p_c[k], h_tot_cloak_up[k], q_tot_cloak_up[k]) : thermo_state_pθq(param_set, p_c[k], h_tot_cloak_up[k], q_tot_cloak_up[k], q_liq_cloak_up[k], q_ice_cloak_up[k])
+            aux_en.ts_cloak_dn[k] =  (edmf.moisture_model isa EquilibriumMoisture) ? thermo_state_pθq(param_set, p_c[k], h_tot_cloak_dn[k], q_tot_cloak_dn[k]) : thermo_state_pθq(param_set, p_c[k], h_tot_cloak_dn[k], q_tot_cloak_dn[k], q_liq_cloak_dn[k], q_ice_cloak_dn[k])
+            # Temperature
+            aux_en.T_cloak_up[k] = TD.air_temperature(thermo_params, aux_en.ts_cloak_up[k])
+            aux_en.T_cloak_dn[k] = TD.air_temperature(thermo_params, aux_en.ts_cloak_dn[k])
+        end
+
+
+    end
+    # ===================================================================================================================================== #
+
+
+
+
+    ### == ZERO OUT MIROPHYSICS TENDENCIES ========================================================================================== #
+        # ======================================================== # zero out noneq tendencies before calling microphysics again (does this interfere w/ writing to disk? -- needed bc env/updraft are cross writing to each other... #
+    # aux_en.ql_tendency_noneq .= FT(0) # don't zero this out  bc it seeemd to break the output writing (some order of read, calculate gm, write, zero out problem probably...)
+    # aux_en.qi_tendency_noneq .= FT(0) # don't zero this out  bc it seeemd to break the output writing (some order of read, calculate gm, write, zero out problem probably...)
+    #
+    aux_en.ql_tendency_cond_evap .= FT(0)
+    aux_en.qi_tendency_sub_dep .= FT(0)
+    #
+    aux_en.ql_tendency_sedimentation .= FT(0)
+    aux_en.qi_tendency_sedimentation .= FT(0)
+    aux_en.qt_tendency_sedimentation .= FT(0)
+    aux_en.θ_liq_ice_tendency_sedimentation .= FT(0)
+    #
+    aux_en.ql_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+    aux_en.qi_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+    aux_en.qt_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+    aux_en.θ_liq_ice_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+    #
+    aux_en.ql_tendency_acnv .= FT(0)
+    aux_en.qi_tendency_acnv .= FT(0)
+    aux_en.qi_tendency_acnv_dep .= FT(0)
+    aux_en.qi_tendency_acnv_dep_is .= FT(0)
+    aux_en.qi_tendency_acnv_dep_above .= FT(0)
+    aux_en.qi_tendency_acnv_agg .= FT(0)
+    aux_en.qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
+    aux_en.qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+    aux_en.qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+    #
+    aux_en.ql_tendency_accr_liq_rai .= FT(0)
+    aux_en.ql_tendency_accr_liq_ice .= FT(0)
+    aux_en.ql_tendency_accr_liq_sno .= FT(0)
+    #
+    aux_en.qi_tendency_accr_ice_liq .= FT(0)
+    aux_en.qi_tendency_accr_ice_rai .= FT(0)
+    aux_en.qi_tendency_accr_ice_sno .= FT(0)
+    #
+    aux_en.qi_tendency_hom_frz .= FT(0)
+    aux_en.qi_tendency_het_frz .= FT(0)
+    aux_en.qi_tendency_het_nuc .= FT(0)
+    aux_en.qi_tendency_melt .= FT(0)
+    #
+    # aux_en.dqvdt .= FT(0) # zero out [ don't do this bc we need it for later calculations... in microphysics!() for example... it'll just have to be from the last timestep...]
+
+
+
+
+    @inbounds for i in 1:N_up
+        # aux_up[i].ql_tendency_noneq .= FT(0) # don't zero this out  bc it seeemd to break the output writing (some order of read, calculate gm, write, zero out problem probably...)
+        # aux_up[i].qi_tendency_noneq .= FT(0) # don't zero this out  bc it seeemd to break the output writing (some order of read, calculate gm, write, zero out problem probably...)
+        #
+        aux_up[i].ql_tendency_cond_evap .= FT(0)
+        aux_up[i].qi_tendency_sub_dep .= FT(0)
+        #
+        aux_up[i].ql_tendency_sedimentation .= FT(0)
+        aux_up[i].qi_tendency_sedimentation .= FT(0)
+        aux_up[i].qt_tendency_sedimentation .= FT(0)
+        aux_up[i].θ_liq_ice_tendency_sedimentation .= FT(0)
+        #
+        aux_up[i].ql_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+        aux_up[i].qi_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+        aux_up[i].qt_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+        aux_up[i].θ_liq_ice_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+        #
+        #
+        aux_up[i].ql_tendency_acnv .= FT(0)
+        aux_up[i].qi_tendency_acnv .= FT(0)
+        aux_up[i].qi_tendency_acnv_dep .= FT(0)
+        aux_up[i].qi_tendency_acnv_dep_is .= FT(0)
+        aux_up[i].qi_tendency_acnv_dep_above .= FT(0)
+        aux_up[i].qi_tendency_acnv_agg .= FT(0)
+        aux_up[i].qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
+        aux_up[i].qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+        aux_up[i].qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+        #
+        aux_up[i].ql_tendency_accr_liq_rai .= FT(0)
+        aux_up[i].ql_tendency_accr_liq_ice .= FT(0)
+        aux_up[i].ql_tendency_accr_liq_sno .= FT(0)
+        #
+        aux_up[i].qi_tendency_accr_ice_liq .= FT(0)
+        aux_up[i].qi_tendency_accr_ice_rai .= FT(0)
+        aux_up[i].qi_tendency_accr_ice_sno .= FT(0)
+        #
+        aux_up[i].qi_tendency_hom_frz .= FT(0)
+        aux_up[i].qi_tendency_het_frz .= FT(0)
+        aux_up[i].qi_tendency_het_nuc .= FT(0)
+        aux_up[i].qi_tendency_melt .= FT(0)
+        #
+        # aux_up[i].dqvdt .= FT(0) # zero out [ don't do this bc we need it for later calculations... in microphysics!() for example... it'll just have to be from the last timestep...]
+    end
+    #
+    aux_bulk.ql_tendency_cond_evap .= FT(0)
+    aux_bulk.qi_tendency_sub_dep .= FT(0)
+    #
+    aux_bulk.ql_tendency_sedimentation .= FT(0)
+    aux_bulk.qi_tendency_sedimentation .= FT(0)
+    aux_bulk.qt_tendency_sedimentation .= FT(0)
+    aux_bulk.θ_liq_ice_tendency_sedimentation .= FT(0)
+    #
+    aux_bulk.ql_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+    aux_bulk.qi_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+    aux_bulk.qt_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
+    aux_bulk.θ_liq_ice_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other up
+    #
+    aux_bulk.ql_tendency_acnv .= FT(0)
+    aux_bulk.qi_tendency_acnv .= FT(0)
+    aux_bulk.qi_tendency_acnv_dep .= FT(0)
+    aux_bulk.qi_tendency_acnv_dep_is .= FT(0)
+    aux_bulk.qi_tendency_acnv_dep_above .= FT(0)
+    aux_bulk.qi_tendency_acnv_agg .= FT(0)
+    aux_bulk.qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
+    aux_bulk.qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+    aux_bulk.qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+    #
+    aux_bulk.ql_tendency_accr_liq_rai .= FT(0)
+    aux_bulk.ql_tendency_accr_liq_ice .= FT(0)
+    aux_bulk.ql_tendency_accr_liq_sno .= FT(0)
+    #
+    aux_bulk.qi_tendency_accr_ice_liq .= FT(0)
+    aux_bulk.qi_tendency_accr_ice_rai .= FT(0)
+    aux_bulk.qi_tendency_accr_ice_sno .= FT(0)
+    #
+    aux_bulk.qi_tendency_hom_frz .= FT(0)
+    aux_bulk.qi_tendency_het_frz .= FT(0)
+    aux_bulk.qi_tendency_het_nuc .= FT(0)
+    aux_bulk.qi_tendency_melt .= FT(0)
+    #
+    #
+    aux_tc.qs_tendency_accr_rai_sno .= FT(0) # this is edited in both aux_up and aux_en because the outcome is temperature dependent, so we zero it out here
+    ## ================================================================================================================= ##
 
 
 
@@ -620,7 +666,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     # ======================================================== #
 
     # update massflux quantities [[ moved up for use w/ update_N_τ_termvel!() ]]
-    w_gm = prog_gm_f.w
     # ∇c = CCO.DivergenceF2C()
     @inbounds for i in 1:N_up
         massflux_face_i = aux_up_f[i].massflux
@@ -663,32 +708,32 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     #######
     ##### deferred grid mean calculations (done after microphysics has updated things..)
     #######
+    if edmf.moisture_model isa EquilibriumMoisture
+        @inbounds for k in real_center_indices(grid)
+            a_bulk_c = aux_bulk.area[k]
+            #####
+            ##### update_GMV_diagnostics (can't call in Eq until after microphysics())
+            #####
+            aux_gm.q_liq[k] = (aux_bulk.area[k] * aux_bulk.q_liq[k] + (1 - aux_bulk.area[k]) * aux_en.q_liq[k])
+            aux_gm.q_ice[k] = (aux_bulk.area[k] * aux_bulk.q_ice[k] + (1 - aux_bulk.area[k]) * aux_en.q_ice[k])
+            aux_gm.T[k] = (aux_bulk.area[k] * aux_bulk.T[k] + (1 - aux_bulk.area[k]) * aux_en.T[k])
+            aux_gm.buoy[k] = (aux_bulk.area[k] * aux_bulk.buoy[k] + (1 - aux_bulk.area[k]) * aux_en.buoy[k])
 
-    @inbounds for k in real_center_indices(grid)
-    a_bulk_c = aux_bulk.area[k]
-        #####
-        ##### update_GMV_diagnostics (can't call in Eq until after microphysics())
-        #####
-        aux_gm.q_liq[k] = (aux_bulk.area[k] * aux_bulk.q_liq[k] + (1 - aux_bulk.area[k]) * aux_en.q_liq[k])
-        aux_gm.q_ice[k] = (aux_bulk.area[k] * aux_bulk.q_ice[k] + (1 - aux_bulk.area[k]) * aux_en.q_ice[k])
-        aux_gm.T[k] = (aux_bulk.area[k] * aux_bulk.T[k] + (1 - aux_bulk.area[k]) * aux_en.T[k])
-        aux_gm.buoy[k] = (aux_bulk.area[k] * aux_bulk.buoy[k] + (1 - aux_bulk.area[k]) * aux_en.buoy[k])
+            if iszero(aux_gm.T[k]) # print aux_gm and aux_bulk and aux_en values for q_tot, q_liq, q_ice, T, buoy and area in the error message...
+                error("aux_gm.T[$k] is 0. Other values are aux_gm.q_tot[k] = $(aux_gm.q_tot[k]), aux_gm.q_liq[k] = $(aux_gm.q_liq[k]); aux_gm.q_ice[k] = $(aux_gm.q_ice[k]); aux_gm.buoy[k] = $(aux_gm.buoy[k]); aux_bulk.area[k] = $(aux_bulk.area[k]); aux_bulk.T[k] = $(aux_bulk.T[k]); aux_en.area[k] = $(aux_en.area[k]); aux_en.T[k] = $(aux_en.T[k]); aux_en.q_tot[k] = $(aux_en.q_tot[k]); aux_en.q_liq[k] = $(aux_en.q_liq[k]); aux_en.q_ice[k] = $(aux_en.q_ice[k])")
+            end
 
-        if iszero(aux_gm.T[k]) # print aux_gm and aux_bulk and aux_en values for q_tot, q_liq, q_ice, T, buoy and area in the error message...
-            error("aux_gm.T[$k] is 0. Other values are aux_gm.q_tot[k] = $(aux_gm.q_tot[k]), aux_gm.q_liq[k] = $(aux_gm.q_liq[k]); aux_gm.q_ice[k] = $(aux_gm.q_ice[k]); aux_gm.buoy[k] = $(aux_gm.buoy[k]); aux_bulk.area[k] = $(aux_bulk.area[k]); aux_bulk.T[k] = $(aux_bulk.T[k]); aux_en.area[k] = $(aux_en.area[k]); aux_en.T[k] = $(aux_en.T[k]); aux_en.q_tot[k] = $(aux_en.q_tot[k]); aux_en.q_liq[k] = $(aux_en.q_liq[k]); aux_en.q_ice[k] = $(aux_en.q_ice[k])")
-        end
-
-        has_condensate = TD.has_condensate(aux_bulk.q_liq[k] + aux_bulk.q_ice[k])
-        aux_bulk.cloud_fraction[k] = if has_condensate && a_bulk_c > 1e-3
-            1
-        else
-            0
+            has_condensate = TD.has_condensate(aux_bulk.q_liq[k] + aux_bulk.q_ice[k])
+            aux_bulk.cloud_fraction[k] = if has_condensate && a_bulk_c > 1e-3
+                1
+            else
+                0
+            end
         end
     end
     
 
     # update massflux quantities
-    w_gm = prog_gm_f.w
     # ∇c = CCO.DivergenceF2C()
     @inbounds for i in 1:N_up
         massflux_face_i = aux_up_f[i].massflux
@@ -724,11 +769,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
     # Subdomain exchange term
     # ∇c = CCO.DivergenceF2C()
-    Ic = CCO.InterpolateF2C()
+    # Ic = CCO.InterpolateF2C()
     b_exch = center_aux_turbconv(state).b_exch
     parent(b_exch) .= 0
     a_en = aux_en.area
-    w_en = aux_en_f.w
     tke_en = aux_en.tke
     @inbounds for i in 1:N_up
         a_up = aux_up[i].area
@@ -754,7 +798,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     C123 = CCG.Covariant123Vector
 
     uₕ_gm = grid_mean_uₕ(state)
-    w_en = aux_en_f.w
     # compute shear
 
     # TODO: Will need to be changed with topography
@@ -870,7 +913,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ##### compute covariances tendencies
     #####
     tke_press = aux_en_2m.tke.press
-    w_en = aux_en_f.w
     parent(tke_press) .= 0
     @inbounds for i in 1:N_up
         w_up = aux_up_f[i].w
@@ -1011,8 +1053,7 @@ function update_N_τ_termvel!(edmf::EDMFModel, grid::Grid, state::State, param_s
      # ======================================================== #
     # update N_i, calculate sedimentation velocity [ TODO: Implement for N_l]
     # if edmf.moisture_model isa NonEquilibriumMoisture # we only use w to calculate N here, we aren't currently passing it into calculate_sedimentation_velocity() (we used to but stopped)
-        F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
-        w::CC.Fields.Field = F2Cw.(aux_en_f.w) # start w env since we use it first
+        w::CC.Fields.Field = Ic.(aux_en_f.w) # start w env since we use it first
     # end
 
     # ============================================================================================================================================================================================================================================================================== #
@@ -1270,8 +1311,7 @@ function update_N_τ_termvel!(edmf::EDMFModel, grid::Grid, state::State, param_s
 
     @inbounds for i in 1:N_up
         if edmf.moisture_model isa NonEquilibriumMoisture
-            # w = F2Cw.(aux_up_f[i].w)
-            @. w = F2Cw(aux_up_f[i].w) # reuse same w allocation
+            @. w = Ic(aux_up_f[i].w) # reuse same w allocation
         end
         ts_up = aux_up[i].ts # reuse ts_up allocation
 

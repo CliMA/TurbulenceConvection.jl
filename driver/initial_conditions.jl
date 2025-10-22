@@ -135,6 +135,7 @@ function initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set)
     @info "kc_surf = $kc_surf; kf_surf = $kf_surf; kc_toa = $kc_toa; kf_toa = $kf_toa; k_mf = $k_mf; k_pf = $k_pf"
 
     initial_profile_updraft_area::FT = TCP.get_isbits_nt(param_set.user_params, :initial_profile_updraft_area, FT(0))
+    stable_updraft_area_reduction_factor::FT = TCP.get_isbits_nt(param_set.user_params, :stable_updraft_area_reduction_factor, FT(100))
     @inbounds for i in 1:N_up
         @inbounds for k in TC.real_face_indices(grid)
             # aux_up_f[i].w[k] = 0
@@ -154,13 +155,14 @@ function initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set)
             if  k ∉ (kc_toa, kc_surf) # don't do this for surface or top of atmosphere
                 unstable = aux_gm.θ_liq_ice[k] ≥ aux_gm.θ_liq_ice[k+1] # unstable if θ_liq_ice decreases with height
                 if unstable
+                    aux_up[i].area[k+2] = TC.resolve_nan(aux_up[i].area[k+2], FT(0)) + (((k+2) != kc_toa) ? initial_profile_updraft_area : FT(0)) # socrates init area
                     aux_up[i].area[k+1] = TC.resolve_nan(aux_up[i].area[k+1], FT(0)) + (((k+1) != kc_toa) ? initial_profile_updraft_area : FT(0)) # socrates init area
                     aux_up[i].area[k] = TC.resolve_nan(aux_up[i].area[k], FT(0)) + initial_profile_updraft_area # socrates init area
                     aux_up[i].area[k-1] = TC.resolve_nan(aux_up[i].area[k-1], FT(0)) + (((k-1) != kc_surf) ? initial_profile_updraft_area : FT(0)) # socrates init area
+                    # aux_up[i].area[k-2] = TC.resolve_nan(aux_up[i].area[k-2], FT(0)) + (((k-2) != kc_surf) ? initial_profile_updraft_area : FT(0)) # socrates init area
 
                     k_mf = CCO.PlusHalf(k.i)
                     k_pf = CCO.PlusHalf((k+1).i)
-
                     aux_up_f[i].w[k_pf] = TC.resolve_nan(aux_up_f[i].w[k_pf], FT(0)) + FT(0.01) # small velocity perturbation
                     aux_up_f[i].w[k_mf] = TC.resolve_nan(aux_up_f[i].w[k_mf], FT(0)) + FT(0.01) # small velocity perturbation
 
@@ -169,32 +171,60 @@ function initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set)
                     aux_up_f[i].w[k_m2f] = (k_m2f != kf_surf) ? TC.resolve_nan(aux_up_f[i].w[k_m2f], FT(0)) + FT(0.01) : aux_up_f[i].w[k_m2f] # small velocity perturbation
                     aux_up_f[i].w[k_p2f] = (k_p2f != kf_toa) ? TC.resolve_nan(aux_up_f[i].w[k_p2f], FT(0)) + FT(0.01) : aux_up_f[i].w[k_p2f] # small velocity perturbation
 
+                    k_m3f = CCO.PlusHalf((k-2).i)
+                    k_p3f = CCO.PlusHalf((k+3).i)
+                    aux_up_f[i].w[k_p3f] = (k_p3f != kf_toa) ? TC.resolve_nan(aux_up_f[i].w[k_p3f], FT(0)) + FT(0.01) : aux_up_f[i].w[k_p3f] # small velocity perturbation
+                    # aux_up_f[i].w[k_m3f] = (k_m3f != kf_surf) ? TC.resolve_nan(aux_up_f[i].w[k_m3f], FT(0)) + FT(0.01) : aux_up_f[i].w[k_m3f] # small velocity perturbation
+
+                    # Update state variables slightly to reflect buoyant updraft
+                    aux_up[i].q_tot[k] = aux_gm.q_tot[k] * 1.01
+                    aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k] * 1.001 # smaller bc absolute temp
+                    aux_up[i].q_liq[k] = aux_gm.q_liq[k] * 1.01
+                    aux_up[i].q_ice[k] = aux_gm.q_ice[k] * 1.01
+                    aux_up[i].T[k] = aux_gm.T[k] * 1.002 # would need to solve for T given θ_liq_ice and q_tot increase, no?
+
                 else
                     aux_up[i].area[k] = TC.resolve_nan(aux_up[i].area[k], FT(0)) # socrates init area
-
-
-                    aux_up[i].area[k] +=  initial_profile_updraft_area / 100
+                    aux_up[i].area[k] += initial_profile_updraft_area / stable_updraft_area_reduction_factor
 
                     k_mf = CCO.PlusHalf(k.i)
                     k_pf = CCO.PlusHalf((k+1).i)
-                    aux_up_f[i].w[k_mf] += FT(0.01) / 100
-                    aux_up_f[i].w[k_pf] += FT(0.01) / 100
+                    aux_up_f[i].w[k_mf] += FT(0.01) / stable_updraft_area_reduction_factor
+                    aux_up_f[i].w[k_pf] += FT(0.01) / stable_updraft_area_reduction_factor
+
+                    # update state variables, default to grid mean [[ we could divide by stable_updraft_area_reduction_factor, we don't bc we assume the area reduction is enough ]]
+                    aux_up[i].q_tot[k] = aux_gm.q_tot[k] * (1 + .01 / 1.)
+                    aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k] * (1 + .001 / 1.)
+                    aux_up[i].q_liq[k] = aux_gm.q_liq[k] * (1 + .01 / 1.)
+                    aux_up[i].q_ice[k] = aux_gm.q_ice[k] * (1 + .01 / 1.)
+                    aux_up[i].T[k] = aux_gm.T[k] * (1 + .01 / 1.)
                 end
             else
                 aux_up[i].area[k] = FT(0)
+
+                # update state variables, default to grid mean
+                aux_up[i].q_tot[k] = aux_gm.q_tot[k]
+                aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
+                aux_up[i].q_liq[k] = aux_gm.q_liq[k]
+                aux_up[i].q_ice[k] = aux_gm.q_ice[k]
+                aux_up[i].T[k] = aux_gm.T[k]
             end
 
+            # Do not allow initializing above max_area because strong detrainment can occur immediately, which compounded with things like MF_grad detrainment can do strange things...
+            aux_up[i].area[k] = min(aux_up[i].area[k], edmf.max_area)
 
 
             # aux_up[i].area[k] = initial_profile_updraft_area # socrates init area
-            aux_up[i].q_tot[k] = aux_gm.q_tot[k]
-            aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
-            aux_up[i].q_liq[k] = aux_gm.q_liq[k]
-            aux_up[i].q_ice[k] = aux_gm.q_ice[k]
-            aux_up[i].T[k] = aux_gm.T[k]
+            # aux_up[i].q_tot[k] = aux_gm.q_tot[k]
+            # aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k]
+            # aux_up[i].q_liq[k] = aux_gm.q_liq[k]
+            # aux_up[i].q_ice[k] = aux_gm.q_ice[k]
+            # aux_up[i].T[k] = aux_gm.T[k]
             prog_up[i].ρarea[k] = ρ_c[k] * aux_up[i].area[k] # copied from drybubble below
-            prog_up[i].ρaq_tot[k] = prog_up[i].ρarea[k] * aux_gm.q_tot[k] # copied from drybubble below
-            prog_up[i].ρaθ_liq_ice[k] = prog_up[i].ρarea[k] * aux_gm.θ_liq_ice[k] # copied from drybubble below
+            prog_up[i].ρaq_tot[k] = prog_up[i].ρarea[k] * aux_up[i].q_tot[k] # copied from drybubble below
+            prog_up[i].ρaθ_liq_ice[k] = prog_up[i].ρarea[k] * aux_up[i].θ_liq_ice[k] # copied from drybubble below
+            prog_up[i].ρaq_liq[k] = prog_up[i].ρarea[k] * aux_up[i].q_liq[k] # copied from drybubble below
+            prog_up[i].ρaq_ice[k] = prog_up[i].ρarea[k] * aux_up[i].q_ice[k] # copied from drybubble below
         end
 
         C2F = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # face to center interpolation

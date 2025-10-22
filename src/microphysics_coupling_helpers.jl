@@ -93,11 +93,12 @@ function n0(
             else
                 E = FT(1 / (_me + _Δm + μ + 1)) # this is the exponent in the PSD, so we can use it to scale n_0
                 λ_no_n0 = (_χm * _m0 * CM1.SF.gamma(_me + _Δm + μ + FT(1)) / ρ / q / _r0^(_me + _Δm))^E # We've divided λ by n_0 ^ E so that λ = λ_no_n0 * n_0^E
+                # w/ loggama you could do something like    log_λ_no_n0 = E * (log(_χm * _m0) + CM1.SF.loggamma(_me + _Δm + μ + FT(1)) - log(ρ) - log(q) - (_me + _Δm) * log(_r0))
 
                 # Call FT(1 / (_me + _Δm + μ + 1)) `E`
                 #  So we have  N_t = n_0 *  Γ(μ+1) / λ^(μ+1) = n_0 * Γ(μ+1) / (λ_no_n0 * n_0^E)^(μ+1) = n_0^(1-E) * Γ(μ+1) / λ_no_n0^(μ+1)
                 # Then, n_0^(1-E) = N_t λ_no_n0^(μ+1) / Γ(μ+1), and:
-                _n0 = (Nt * λ_no_n0^(μ + FT(1)) / CM1.SF.gamma(μ + FT(1)))^(1 / (1 - E)) 
+                _n0 = (Nt * λ_no_n0^(μ + FT(1)) / CM1.SF.gamma(μ + FT(1)))^(1 / (1 - E*(μ + FT(1))))
             end
         else
             if !iszero(Dmin) && !isinf(Dmax) # use numerical solver...
@@ -293,6 +294,7 @@ function lambda(
             _χm::FT = isnan(_χm) ? χm(prs, precip) : _χm
 
             λ = (_χm * _m0 * _n0 * CM1.SF.gamma(_me + _Δm + μ + FT(1)) / ρ / q / _r0^(_me + _Δm))^FT(1 / (_me + _Δm + μ + 1))
+            # w/ loggama you could do something like     λ = exp((1 / (_me + _Δm + μ + 1)) * (log(_χm * _m0 * _n0) + CM1.SF.loggamma(_me + _Δm + μ + FT(1)) - log(ρ) - log(q) - (_me + _Δm) * log(_r0)))
 
             if !isfinite(_n0) || (iszero(_n0) && !iszero(Nt) && !iszero(q)) # if we wanted a nonzero Nt and q, but got n0 = 0 or Inf, something is wrong
                 @error("Got n0 = $_n0; λ = $λ; q = $q; ρ = $ρ; Nt = $Nt; μ = $μ; Dmin = $Dmin; Dmax = $Dmax; precip = $precip; _r0 = $_r0; _m0 = $_m0; _me = $_me; _Δm = $_Δm; _χm = $_χm;")

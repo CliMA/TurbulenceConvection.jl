@@ -21,7 +21,6 @@ function compute_nonequilibrium_moisture_tendencies!(
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
 
-    F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
     nonequilibrium_moisture_scheme = edmf.moisture_model.scheme # my new addition
     # moisture_sources_limiter = edmf.tendency_limiters.moisture_sources_limiter
     moisture_sources_limiter = get_tendency_limiter(edmf.tendency_limiters, Val(:moisture_sources), use_fallback_tendency_limiters)
@@ -33,7 +32,7 @@ function compute_nonequilibrium_moisture_tendencies!(
 
 
     @inbounds for i in 1:N_up
-        w::CC.Fields.Field = F2Cw.(aux_up_f[i].w) # fill correct type  w/ interpolated w values
+        w::CC.Fields.Field = Ic.(aux_up_f[i].w) # fill correct type  w/ interpolated w values
 
         @inbounds for k in real_center_indices(grid)
             # condensation/evaporation, deposition/sublimation
@@ -86,7 +85,6 @@ function compute_other_microphysics_tendencies!(grid::Grid, state::State, edmf::
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
 
-    F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
     local w::CC.Fields.Field
     nonequilibrium_moisture_scheme = edmf.moisture_model.scheme # my new addition
 
@@ -105,7 +103,7 @@ function compute_other_microphysics_tendencies!(grid::Grid, state::State, edmf::
     #         ),
     #         :up,
     #     )[:cloud_base_ts] # cloud base, only keep the thermodynamic state part # deprecate for now
-        w = F2Cw.(aux_up_f[i].w) # fill correct type  w/ interpolated w values
+        w = Ic.(aux_up_f[i].w) # fill correct type  w/ interpolated w values
         @inbounds for k in real_center_indices(grid)
             q_up = TD.PhasePartition(aux_up[i].q_tot[k], aux_up[i].q_liq[k], aux_up[i].q_ice[k])
 
@@ -183,19 +181,13 @@ function compute_cloud_condensate_sedimentation_tendencies!(
     ρ_c = prog_gm.ρ
 
 
-    if edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean
-        F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
-    end
-
     @inbounds for i in 1:N_up
         # ======================================================================== #
         if edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean        
             # sedimentation (should this maybe be a grid mean tendency?)
             ts_up = aux_up[i].ts # this is the thermodynamic state of the updraft, which is used to compute the sedimentation sources
 
-            # w = F2Cw.(aux_up_f[i].w) # fill correct type  w/ interpolated w values
 
-            Ic = CCO.InterpolateF2C()
             wvec = CC.Geometry.WVector
             ∇c = CCO.DivergenceF2C()
             LBF = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
@@ -373,9 +365,8 @@ function compute_precipitation_formation_tendencies(
     precip_fraction = compute_precip_fraction(edmf, state)
 
     @inbounds for i in 1:N_up
-        F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
         if moisture_model isa NonEquilibriumMoisture
-            w::CC.Fields.Field = F2Cw.(aux_up_f[i].w) # fill correct type w/ interpolated w values
+            w::CC.Fields.Field = Ic.(aux_up_f[i].w) # fill correct type w/ interpolated w values
         end
         @inbounds for k in real_center_indices(grid)
 

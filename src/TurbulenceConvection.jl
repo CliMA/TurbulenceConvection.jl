@@ -281,6 +281,8 @@ function debug_state(state, code_location::String)
     end
 end
 
+const Ic = CCO.InterpolateF2C() # no bcs on F2C, this gets used all the time, so define it once here
+
 include("Grid.jl")
 include("dycore_api.jl")
 include("diagnostics.jl")

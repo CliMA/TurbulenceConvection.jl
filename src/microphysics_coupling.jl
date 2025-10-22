@@ -24,7 +24,7 @@ function noneq_moisture_sources(param_set::APS,
     noneq_sources_type::AbstractNonEquillibriumSourcesType,
     moisture_sources_limiter::AbstractMoistureSourcesLimiter,
     area::FT,
-    ρ::FT,
+    ρ_c::FT,
     p::FT,
     T::FT,
     Δt::Real,
@@ -41,6 +41,7 @@ function noneq_moisture_sources(param_set::APS,
 
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
     microphys_params::ACMP = TCP.microphysics_params(param_set)
+    ρ = TD.air_density(thermo_params, ts)
     # TODO - when using adaptive timestepping we are limiting the source terms with the previous timestep Δt
     
     q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
@@ -424,6 +425,7 @@ function precipitation_formation(
         q = TD.PhasePartition(thermo_params, ts)
         # ql = q.liq
         # qi = q.ice
+        ρ = TD.air_density(thermo_params, ts)
 
         Π_m = TD.exner(thermo_params, ts)
         c_pm = TD.cp_m(thermo_params, ts)
@@ -512,8 +514,8 @@ function precipitation_formation(
                 # S_qt_snow_ice_dep_is = limit_tendency(precipitation_tendency_limiter, -α_acnv * snow_formation_model.ice_dep_acnv_scaling_factor * my_conv_q_ice_to_q_sno(param_set, q, T, p; N = Ni, thresh_only=true), q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt, Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
 
                 # this version respects whatever the limiter did in creating qi_tendency_sub_dep, even for the MM2015 variants
-                S_qt_snow_ice_dep_is = -α_acnv * snow_formation_model.ice_dep_acnv_scaling_factor * my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep(param_set, qi_tendency_sub_dep, q.ice, Ni, ρ_c) # This is better i think  bc it respects the real sub_dep tendency
-                S_qt_snow_ice_dep_above = -α_acnv * snow_formation_model.ice_dep_acnv_scaling_factor_above * my_conv_q_ice_to_q_sno_by_fraction(param_set, qi_tendency_sub_dep, q.ice, Ni, ρ_c) # I feel like this shouldn't really be rescalable idk...
+                S_qt_snow_ice_dep_is = -α_acnv * snow_formation_model.ice_dep_acnv_scaling_factor * my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep(param_set, qi_tendency_sub_dep, q.ice, Ni, ρ) # This is better i think  bc it respects the real sub_dep tendency
+                S_qt_snow_ice_dep_above = -α_acnv * snow_formation_model.ice_dep_acnv_scaling_factor_above * my_conv_q_ice_to_q_sno_by_fraction(param_set, qi_tendency_sub_dep, q.ice, Ni, ρ) # I feel like this shouldn't really be rescalable idk...
                 S_qt_snow_ice_dep = limit_tendency(precipitation_tendency_limiter, S_qt_snow_ice_dep_is + S_qt_snow_ice_dep_above, q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt, Δt) # technically this is the way to do it that respects the sub_dep from the limiter, even MM2015
 
                 # This check may not be true (i.e. in principle you can really acnv more than the new ice formation in thier (not morrison 05) framework -- this check also encourages boosting acnv scaling w/o penalty which may lead to unrealistic outcomes from balanced parameters.
@@ -559,7 +561,7 @@ function precipitation_formation(
                 # S_qt_snow_ice_agg_mix = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_agg_mix, max(q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt, 0), Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
                 S_qt_snow_ice_agg_mix = FT(0)
 
-                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ_c; Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=snow_formation_model.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux) # pass in sed tendency so it can be accounted for in the threshold calculation
+                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ; Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=snow_formation_model.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux) # pass in sed tendency so it can be accounted for in the threshold calculation
                 S_qt_snow_ice_thresh = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_thresh, max(q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt - q_thresh_acnv, 0), Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
 
                 # TEST!
@@ -592,7 +594,7 @@ function precipitation_formation(
                 S_qt_snow = limit_tendency(precipitation_tendency_limiter, -α_acnv * CM1.conv_q_ice_to_q_sno_no_supersat(microphys_params, q.ice), max(q.ice + qi_tendency_sub_dep*Δt - CMP.q_ice_threshold(TCP.microphysics_params(param_set)), 0), Δt) # don't allow reducing below threshold
 
                 if !isfinite(S_qt_snow)
-                    @error("Got nonfinite S_qt_snow = $(S_qt_snow) from inputs qi = $(qi); Ni = $(Ni); ρ_c = $(ρ_c)")
+                    @error("Got nonfinite S_qt_snow = $(S_qt_snow) from inputs qi = $(qi); Ni = $(Ni); ρ_c = $(ρ_c); p = $(p)")
                 end
 
                 S_qt_snow_ice_dep = FT(0) # no easy breakdown [ don't actually put NaN because it messes with the sums below and with the regridder afterwards], just put 0
@@ -1366,9 +1368,8 @@ function compute_domain_interaction_microphysics_tendencies!(
     # acnv from environment to updraft and vice versa
 
 
-    F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
-    w_en::CC.Fields.Field = F2Cw.(aux_en_f.w)
-    w_up::CC.Fields.Field = F2Cw.(aux_bulk_f.w)
+    w_en::CC.Fields.Field = Ic.(aux_en_f.w)
+    w_up::CC.Fields.Field = Ic.(aux_bulk_f.w)
 
 
 

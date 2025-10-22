@@ -236,8 +236,11 @@ function my_Chen2022_vel_add_sno(
     c::FT,
     λ::FT,
     Dmin::FT,
-    Dmax::FT,
+    Dmax::FT;
+    μ::FT = FT(0),
 ) where {FT}
+
+    k += μ # since we dont use δ here
 
     upper_limit_num = Dmax * (λ + c) # Dmax should not be 0
     lower_limit_num = iszero(Dmin) ? FT(0) : Dmin * (λ + c) # avoid 0 * inf
@@ -812,12 +815,15 @@ function my_terminal_velocity(
             μ = μ_from_qN(param_set, precip, q_, Nt; ρ = ρ)
         end
 
+        mec::FT = me(prs, precip) + Δm(prs, precip)
+        k = mec
+
         # coefficients from Table B1 from Chen et. al. 2022
         aiu, bi, ciu = my_Chen2022_vel_coeffs(prs, precip, ρ)
         # size distribution parameter
         _λ::FT = lambda(param_set, precip, q_, ρ, Nt, Dmin, Dmax; μ=μ)
         # eq 20 from Chen et al 2022
-        fall_w = sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, FT(3); Dmin = Dmin, Dmax = Dmax))
+        fall_w = sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, k; Dmin = Dmin, Dmax = Dmax, μ=μ))
         # It should be ϕ^κ * fall_w, but for rain drops ϕ = 1 and κ = 0
         fall_w = max(FT(0), fall_w)
 
@@ -913,7 +919,8 @@ function my_terminal_velocity(
         # ================================================================= #
         # k = 3 # mass weighted
         k = mec
-        k += μ # add the size distribution exponent to the moment
+        # k += μ # add the size distribution exponent to the moment [[ if you don't do this, you need to add it in the mass weights ]]
+
         # coefficients from Appendix B from Chen et. al. 2022
         (aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l) = my_Chen2022_vel_coeffs(prs, CM.CommonTypes.SnowType(), ρ)
 
@@ -936,11 +943,11 @@ function my_terminal_velocity(
         for (i, ((Dmin, Dmax), (aiu, bi, ciu))) in enumerate(zip(regions, abcs)) # we basically need to sum the integral as before but over all regions
 
             # are the mass weights really necessary? It's just an additive integral, no?
-            mass_weights[i] = _λ^-(k + 1) * (-CM1.SF.gamma(k + 1, Dmax * _λ) + CM1.SF.gamma(k + 1, Dmin * _λ)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
+            mass_weights[i] = _λ^-(μ + k + 1) * (-CM1.SF.gamma(μ + k + 1, Dmax * _λ) + CM1.SF.gamma(μ + k + 1, Dmin * _λ)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
 
 
             # eq 20 from Chen et al 2022
-            fall_w += sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, FT(3); Dmin = Dmin, Dmax = Dmax)) .* mass_weights[i]
+            fall_w += sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, k; Dmin = Dmin, Dmax = Dmax, μ=μ)) .* mass_weights[i] # I think it's supposed to be k not FT(3) here
         end
 
         if (total_weight = sum(mass_weights)) != 0
@@ -1054,7 +1061,7 @@ function my_terminal_velocity(
 
             # fall_w += resolve_nan(sum(my_Chen2022_vel_add_sno.(ti, bi, aec, mec, κ, k, ciu, _λ, Dmin, Dmax)))
 
-            fall_w += sum(my_Chen2022_vel_add_sno.(ti, bi, aec, mec, κ, k, ciu, _λ, Dmin, Dmax)) * mass_weights[i]  # need to weight by mass
+            fall_w += sum(my_Chen2022_vel_add_sno.(ti, bi, aec, mec, κ, k, ciu, _λ, Dmin, Dmax; μ=μ)) * mass_weights[i]  # need to weight by mass
 
 
         end

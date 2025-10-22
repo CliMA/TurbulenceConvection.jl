@@ -29,6 +29,7 @@ Base.@kwdef struct PrecipFormation{FT}
     #
     qs_tendency_accr_rai_sno::FT # accretion QR by QS [QR -> QS]  (we store it this way, it's always to snow below freezing and [QS -> QR] above freezing.) - we calculate here becasue the outcome is temperature dependent, but we store in aux_tc bc precip is on the grid mean.
 end
+null_PrecipitationSources(::Type{FT}; fill_value::FT = FT(NaN)) where {FT} = PrecipFormation{FT}((fill_value for f in fieldnames(PrecipFormation))...)
 
 Base.:+(a::PrecipFormation{FT}, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((getfield(a, f) + getfield(b, f) for f in fieldnames(PrecipFormation))...)
 Base.:-(a::PrecipFormation{FT}, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((getfield(a, f) - getfield(b, f) for f in fieldnames(PrecipFormation))...)
@@ -250,8 +251,8 @@ end
 
 # ========== Area Partition Models ============================================================================== #
 
-abstract type AreaPartitionModel end
-struct StandardAreaPartitionModel{FT} <: AreaPartitionModel
+abstract type AbstractAreaPartitionModel end
+struct StandardAreaPartitionModel{FT} <: AbstractAreaPartitionModel
     "apply_second_order_flux_correction::Bool"
     apply_second_order_flux_correction::Bool
     "second_order_correction_limit_factor::FT"
@@ -293,7 +294,7 @@ end
             We derive an upper limit for q_cloak_up such that q_cloak_dn >= 0.
                 This is:  q_cloak_up <= (qi_mean - a_up * q_updraft) / a_cloak_up
         =#
-Base.@kwdef struct CoreCloakAreaPartitionModel{FT} <: AreaPartitionModel
+Base.@kwdef struct CoreCloakAreaPartitionModel{FT} <: AbstractAreaPartitionModel
     # max_combined_updraft_area::FT # Might be hard to have this be separate from edmf.max_area...
     cloak_area_factor::FT # Scaling factor for how much larger the cloak area is than the core area
     cloak_mix_factor::FT # Scaling factor that decides how close the cloak is to the env vs the core, 1 means fully updraft, 0 means fully env

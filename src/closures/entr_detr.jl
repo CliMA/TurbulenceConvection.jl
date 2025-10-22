@@ -424,7 +424,6 @@ function compute_turb_entr!(state::State, grid::Grid, edmf::EDMFModel)
     plume_scale_height = map(1:N_up) do i
         compute_plume_scale_height(grid, state, edmf.H_up_min, i)
     end
-    Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
     # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
     @inbounds for i in 1:N_up
@@ -489,7 +488,6 @@ function compute_phys_entr_detr!(
     plume_scale_height = map(1:N_up) do i
         compute_plume_scale_height(grid, state, edmf.H_up_min, i)
     end
-    Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
     # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
     @inbounds for i in 1:N_up
@@ -648,7 +646,6 @@ function compute_ml_entr_detr!(
     plume_scale_height = map(1:N_up) do i
         compute_plume_scale_height(grid, state, edmf.H_up_min, i)
     end
-    Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
     # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
     @inbounds for i in 1:N_up
@@ -789,7 +786,6 @@ function compute_ml_entr_detr!(
         compute_plume_scale_height(grid, state, edmf.H_up_min, i)
     end
 
-    Ic = CCO.InterpolateF2C()
     ∇c = CCO.DivergenceF2C()
     # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
     @inbounds for i in 1:N_up

@@ -478,36 +478,7 @@ function compute_tendency_dt_max(state::TC.State, edmf::TC.EDMFModel)
         end
     end
 
-    # === Bulk Tendencies === #
-    # aux_up and thus aux_bulk are unreliable for limiting tendencies, paritcularly bc of minimum_area clippings and such.
-    # area_bulk = aux_bulk.area
-    # θ_liq_ice_bulk = aux_bulk.θ_liq_ice
-    # q_tot_bulk = aux_bulk.q_tot
 
-
-    # prog_bulk = TC.center_prog_bulk(state)
-    # prog_bulk_f = TC.face_prog_bulk(state)
-
-    # ρarea_bulk = prog_bulk.ρarea
-    # ρaθ_liq_ice_bulk = prog_bulk.ρaθ_liq_ice
-    # ρaq_tot_bulk = prog_bulk.ρaq_tot
-    # if edmf.moisture_model isa TC.NonEquilibriumMoisture
-    #     ρaq_liq_bulk = prog_bulk.ρaq_liq
-    #     ρaq_ice_bulk = prog_bulk.ρaq_ice
-    # end
-    # ρaw_bulk = prog_bulk_f.ρaw
-
-    # prog_en = TC.center_prog_environment_up_gm_version(state)
-    # prog_en_f = TC.face_prog_environment_up_gm_version(state)
-    # aux_en = center_aux_environment(state)
-
-    # ρarea_en = prog_en.ρarea
-    # ρaθ_liq_ice_en = prog_en.ρaθ_liq_ice
-    # ρaq_tot_en = prog_en.ρaq_tot
-    # if edmf.moisture_model isa TC.NonEquilibriumMoisture
-    #     ρaq_liq_en = prog_en.ρaq_liq
-    #     ρaq_ice_en = prog_en.ρaq_ice
-    # end
 
     ρaq_tot_en = aux_en.ρaq_tot # this is the prognostic value, not the clipped one
 
@@ -591,7 +562,6 @@ function compute_tendency_dt_max(state::TC.State, edmf::TC.EDMFModel)
             # Δt_max_old = Δt_max
 
             # bulk liq
-            # ρaq_vap = prog_bulk.ρaq_tot - prog_bulk.ρaq_liq - prog_bulk.ρaq_ice
             ρaq_vap = ρaq_tot_bulk - ρaq_liq_bulk - ρaq_ice_bulk # should this be prog? or aux?
             ρaq_vap_sat_liq = ρarea_bulk *  aux_bulk.q_vap_sat_liq[k]
             ρaq_vap_sat_ice = ρarea_bulk *  aux_bulk.q_vap_sat_ice[k]
@@ -613,33 +583,6 @@ function compute_tendency_dt_max(state::TC.State, edmf::TC.EDMFModel)
                 end # otherwise, qi is shrinking despite supersaturation
             end
 
-            # [[ we deprecated prog_en, if we ever bring this fcn back, it would need a different form ]]
-            # # en liq
-            # # ρaq_vap = prog_en.ρaq_tot[k] - prog_en.ρaq_liq[k] - prog_en.ρaq_ice[k]
-            # ρaq_vap_sat_liq = ρarea_en[k] *  aux_en.q_vap_sat_liq[k] 
-            # ρaq_vap_sat_ice = ρarea_en[k] *  aux_en.q_vap_sat_ice[k] 
-            # if ρaq_vap > ρaq_vap_sat_liq # if supersaturated
-            #     ql_tendency_cond_evap = aux_en.ql_tendency_cond_evap[k]
-            #     if ql_tendency_cond_evap > 0 
-            #         old_Δt_max = Δt_max
-            #         Δt_max = Δt_max_helper(Δt_max, -ql_tendency_cond_evap, (ρaq_vap - ρaq_vap_sat_liq) / ρarea_en[k] ; message = "ρaq_vap_sat_liq en") # ql tendency could come from vap or ice, but to be safe assume from vap, ql tendency is negative of the vap tendency
-            #         # if Δt_max < old_Δt_max
-            #         #     @warn "Δt_max decreased from $old_Δt_max to Δt_max = $Δt_max | ql_tendency_cond_evap = $(ql_tendency_cond_evap) | ρaq_vap = $(ρaq_vap) | ρaq_vap_sat_liq = $(ρaq_vap_sat_liq) | ρarea_en = $(ρarea_en[k]) | z = $(grid.zc.z[k]) | T = $(aux_en.T[k])"
-            #         # end
-            #     end # otherwise, ql is shrinking despite supersaturation
-            # end
-
-            # # en ice
-            # if ρaq_vap > ρaq_vap_sat_ice # if supersaturated
-            #     qi_tendency_sub_dep = aux_en.qi_tendency_sub_dep[k]
-            #     if qi_tendency_sub_dep > 0
-            #         old_Δt_max = Δt_max
-            #         Δt_max = Δt_max_helper(Δt_max, -qi_tendency_sub_dep, (ρaq_vap - ρaq_vap_sat_ice) / ρarea_en[k] ; message = "ρaq_vap_sat_ice en") # qi tendency could come from vap or liq, but to be safe assume from vap, qi tendency is negative of the vap tendency
-            #         # if Δt_max < old_Δt_max
-            #         #     @warn "Δt_max decreased from $old_Δt_max to Δt_max = $Δt_max | qi_tendency_sub_dep = $(qi_tendency_sub_dep) | ρaq_vap = $(ρaq_vap) | ρaq_vap_sat_ice = $(ρaq_vap_sat_ice) | ρarea_en = $(ρarea_en[k]) | z = $(grid.zc.z[k]) | T = $(aux_en.T[k])"
-            #         # end
-            #     end # otherwise, qi is shrinking despite supersaturation
-            # end
 
         end
     end

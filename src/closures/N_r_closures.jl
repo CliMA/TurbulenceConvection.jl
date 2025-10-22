@@ -1538,7 +1538,8 @@ function μ_from_qN(
     ρ::FT = FT(1),
     ice_type::CMT.IceType = ice_type,
     Dmin::FT = FT(0),
-    Dmax::FT = FT(Inf)
+    Dmax::FT = FT(Inf),
+    ηmax::FT = FT(0.577), # from MG08
 ) where {FT}
 
     if !isfinite(N_l)
@@ -1556,9 +1557,9 @@ function μ_from_qN(
     =#
 
     η = FT(0.0005714) * N_l/FT(1e6) + FT(0.2714) # from Morrison & Gettelman, 2008 derived from Martin et al, 1994
+    η = min(η, ηmax)
     μ =  1/η^2 -1
-
-    return clamp(μ, FT(0), FT(10))
+    return clamp(μ, FT(0), FT(10)) #  Would probably be fine just running 0s but it should be ok...
 
     # return FT(0)
 end
@@ -1566,7 +1567,7 @@ end
 
 function μ_from_qN(
     param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
-    q_type::CMT.AbstractPrecipType,
+    q_type::CMT.SnowType,
     q_i::FT, 
     N_i::FT;
     ρ::FT = FT(1),
@@ -1575,7 +1576,27 @@ function μ_from_qN(
     Dmax::FT = FT(Inf),
 ) where {FT}
     # return FT(NaN) # for type completenes, but these are not defined
-    return FT(0) # I think 0 is the same as not defined bc it adds nothing... snow has it's own mu thingy wrapped up in n0 or m0, afaik rain has nothing
+    # return FT(0) # I think 0 is the same as not defined bc it adds nothing... snow has it's own mu thingy wrapped up in n0 or m0, afaik rain has nothing
+    
+    # NOTE: They explicitly use Mashall-Palmer, so μ = 0
+    # It's unfortunate they used the name CMP.μ_sno(TCP.microphysics_params(param_set)), it is NOT size disribution shape parameter μ, just a coefficient to set the intercept...
+    return FT(0) # 
+end
+
+function μ_from_qN(
+    param_set::APS,  # consider changing to just microphys_params since we're not using user_params anymore
+    q_type::CMT.RainType,
+    q_l::FT, 
+    N_l::FT;
+    ρ::FT = FT(1),
+    ice_type::CMT.IceType = ice_type,
+    liq_type::CMT.LiquidType = liq_type,
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+) where {FT}
+    # return FT(NaN) # for type completenes, but these are not defined
+    # return FT(0) # I think 0 is the same as not defined bc it adds nothing... snow has it's own mu thingy wrapped up in n0 or m0, afaik rain has nothing
+    return μ_from_qN(param_set, liq_type, q_l, N_l; ρ=ρ, ice_type=ice_type, Dmin=Dmin, Dmax=Dmax) # we could defer to the liquid one but it does crazy things... idk why...
 end
 
 

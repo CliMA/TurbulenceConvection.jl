@@ -258,37 +258,24 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
 
         aux_bulk = center_aux_bulk(state)
         aux_bulk_f = face_aux_bulk(state)
-        f_cm = edmf.area_partition_model.cloak_mix_factor
-        # max_combined_up_area = max.(aux_bulk.area, edmf.max_area)
-        f_aamaaic = edmf.area_partition_model.fraction_of_area_above_max_area_allowed_in_cloak
-        max_combined_up_area = @. max(aux_bulk.area, edmf.max_area + f_aamaaic * (one(FT) - edmf.max_area)) # allow some area above max area to go into cloak
 
-        # Initialize [[ need full vectors for gradients... ]] -- as written this should really be based on bulk... it's hard to do the area limiting etc otherwise... especially cause we're backing things out from gm
-        
-        # xxx = ntuple(_ -> similar(yyy), N_up) # if you wanted one for each updraft, but we'll just go against bulk rn
-        a_cloak_up = similar(a_en)
-        a_cloak_dn = similar(a_en)
-        w_cloak_up = similar(w_en)
-        w_cloak_dn = similar(w_en)
+        a_cloak_up = aux_en.a_cloak_up
+        a_cloak_dn = aux_en.a_cloak_dn
+        a_en_remaining = aux_en.a_en_remaining
+        w_cloak_up = aux_en_f.w_cloak_up
+        w_cloak_dn = aux_en_f.w_cloak_dn
         #
-        q_tot_cloak_up = similar(q_tot_en)
-        q_tot_cloak_dn = similar(q_tot_en)
-        h_tot_cloak_up = similar(θ_liq_ice_en)
-        h_tot_cloak_dn = similar(θ_liq_ice_en)
-
+        q_tot_cloak_up = aux_en.q_tot_cloak_up
+        q_tot_cloak_dn = aux_en.q_tot_cloak_dn
+        h_tot_cloak_up = aux_en.θ_liq_ice_cloak_up
+        h_tot_cloak_dn = aux_en.θ_liq_ice_cloak_dn
+        # The transport of these is only relevant in noneq since qt transport is also calculated
         if edmf.moisture_model isa NonEquilibriumMoisture
-            q_liq_cloak_up = similar(q_liq_en)
-            q_ice_cloak_up = similar(q_ice_en)
-            q_liq_cloak_dn = similar(q_liq_en)
-            q_ice_cloak_dn = similar(q_ice_en)
+            q_liq_cloak_up = aux_en.q_liq_cloak_up
+            q_ice_cloak_up = aux_en.q_ice_cloak_up
+            q_liq_cloak_dn = aux_en.q_liq_cloak_dn
+            q_ice_cloak_dn = aux_en.q_ice_cloak_dn
         end
-
-        # determine cloak areas
-        # we could consider letting the updraft + cloak region exceed max_area...
-        @. a_cloak_up = min(aux_bulk.area * edmf.area_partition_model.cloak_area_factor, max.(max_combined_up_area .- aux_bulk.area, 0)) # limit updraft cloak area to ensure combined_up_area <= max_combined_up_area
-        @. a_cloak_dn = min(aux_bulk.area + a_cloak_up, one(FT) - (aux_bulk.area + a_cloak_up)) # limit downdraft cloak area to ensure total area <= 1
-        combined_area = aux_bulk.area .+ a_cloak_up .+ a_cloak_dn
-        a_en_left = @. max(one(FT) - combined_area, zero(FT)) # remaining env area not in cloaks
 
         # zero out
         @. massflux_h = FT(0)
@@ -304,45 +291,11 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
         # @. massflux_en = ρ_f * ᶠinterp_a_(a_en) * (w_en - toscalar(w_gm))
         @. massflux_en = ρ_f * ᶠinterp_a_RBF_a_en(a_en) * w_en
 
-        # calculate cloak properties [[ Note: If the env value is zero (e.g. q_i = 0), we can't go negative in the downdraft cloak... This would preclude any vert_adv... ]]
-        # w/ all the ifelses, maybe we should do a for loop... basically we should skip anything where the updraft area is 0 anyway..., but that gets dicey if there's an incoming flux..., but rn the cloak area can't be 0 if the updraft area isn't 0...
-
-        # calculate ws
-        w_up = aux_tc_f.bulk.w # should be the same as aux_bulk_f.w
-        @. w_cloak_up = f_cm * w_up # + (1 - f_cm) * w_gm # use w_gm to ensure positivity, w_gm should be 0...
-
-        if edmf.area_partition_model.confine_all_downdraft_to_cloak
-            @. w_cloak_dn = ifelse( ᶠinterp_a(a_cloak_dn) > edmf.minimum_area, (toscalar(w_gm) - (ᶠinterp_a(a_cloak_up) * w_cloak_up) - (ᶠinterp_a(aux_bulk.area) * w_up)) / ᶠinterp_a(a_cloak_dn), w_en) # for w_dn, leave nothing for env (w_en -> 0 ). w_en can be (is) negative, so do not clamp. If the cloak area is too small, just set to w_en env value, 
-        else # w_en should remain unchanged, so we need to included a_en_left
-            @. w_cloak_dn = ifelse( ᶠinterp_a(a_cloak_dn) > edmf.minimum_area, (toscalar(w_gm) - (ᶠinterp_a(a_cloak_up) * w_cloak_up) - (ᶠinterp_a(aux_bulk.area) * w_up) - (ᶠinterp_a(a_en_left) * w_en)) / ᶠinterp_a(a_cloak_dn), w_en) # if the cloak area is too small, just set to env value
-        end
-
-        q_tot_cloak_max = @. ifelse( a_cloak_up > edmf.minimum_area, max((q_tot_gm - (aux_bulk.area * aux_bulk.q_tot) - (a_en_left * q_tot_en)) / a_cloak_up, FT(0)), q_tot_en)
-        h_tot_cloak_max = @. ifelse( a_cloak_up > edmf.minimum_area, max((θ_liq_ice_gm - (aux_bulk.area * aux_bulk.θ_liq_ice) - (a_en_left * θ_liq_ice_en)) / a_cloak_up, FT(0)), θ_liq_ice_en) # limit to ensure h_cloak_dn >= 0
-
-        @. q_tot_cloak_up = clamp(f_cm * aux_bulk.q_tot + (1 - f_cm) * q_tot_en, 0, q_tot_cloak_max)
-        @. h_tot_cloak_up = clamp(f_cm * aux_bulk.θ_liq_ice + (1 - f_cm) * θ_liq_ice_en, 0, h_tot_cloak_max)
-        # For the downdraft, we just have to close the budget. we need qi_mean to remain unchanged, and w_mean to remain unchanged
-        @. q_tot_cloak_dn = ifelse( a_cloak_dn > edmf.minimum_area, max((q_tot_gm - (a_cloak_up * q_tot_cloak_up) - (aux_bulk.area * aux_bulk.q_tot) - (a_en_left * q_tot_en)) / a_cloak_dn, 0), q_tot_en) # if the cloak area is too small, just set to env
-        @. h_tot_cloak_dn = ifelse( a_cloak_dn > edmf.minimum_area, max((θ_liq_ice_gm - (a_cloak_up * h_tot_cloak_up) - (aux_bulk.area * aux_bulk.θ_liq_ice) - (a_en_left * θ_liq_ice_en)) / a_cloak_dn, 0), θ_liq_ice_en)
-
-
-        if edmf.moisture_model isa NonEquilibriumMoisture
-            q_liq_up = aux_bulk.q_liq
-            q_ice_up = aux_bulk.q_ice
-            q_liq_cloak_max = @. ifelse( a_cloak_up > edmf.minimum_area, max((q_liq_gm - (aux_bulk.area * q_liq_up) - (a_en_left * q_liq_en)) / a_cloak_up, FT(0)), q_liq_en)
-            q_ice_cloak_max = @. ifelse( a_cloak_up > edmf.minimum_area, max((q_ice_gm - (aux_bulk.area * q_ice_up) - (a_en_left * q_ice_en)) / a_cloak_up, FT(0)), q_ice_en) # limit to ensure q_cloak_dn >= 0
-            @. q_liq_cloak_up = clamp(f_cm * q_liq_up + (1 - f_cm) * q_liq_en, 0, q_liq_cloak_max)
-            @. q_ice_cloak_up = clamp(f_cm * q_ice_up + (1 - f_cm) * q_ice_en, 0, q_ice_cloak_max)
-            # For the downdraft, we just have to close the budget. we need qi_mean to remain unchanged, and w_mean to remain unchanged
-            @. q_liq_cloak_dn = ifelse( a_cloak_dn > edmf.minimum_area, max((q_liq_gm - (a_cloak_up * q_liq_cloak_up) - (aux_bulk.area * q_liq_up) - (a_en_left * q_liq_en)) / a_cloak_dn, 0), q_liq_en) # if the cloak area is too small, just set to env
-            @. q_ice_cloak_dn = ifelse( a_cloak_dn > edmf.minimum_area, max((q_ice_gm - (a_cloak_up * q_ice_cloak_up) - (aux_bulk.area * q_ice_up) - (a_en_left * q_ice_en)) / a_cloak_dn, 0), q_ice_en)
-        end
 
         # ======================================================================================================================== # # cloak up is updraft so LBF, cloak dn is downdraft so RBF, leftover env is downdraft so RBF
         ᶠinterp_a_LBF_a_cloak_up = ᶠinterp_a_LBF(a_cloak_up)
         ᶠinterp_a_RBF_a_cloak_dn = ᶠinterp_a_RBF(a_cloak_dn)
-        ᶠinterp_a_RBF_a_en_left = ᶠinterp_a_RBF(a_en_left)
+        ᶠinterp_a_RBF_a_en_remaining = ᶠinterp_a_RBF(a_en_remaining)
         #
         IfLBF_θ_liq_ice_cloak_up = IfLBF(h_tot_cloak_up)
         IfRBF_θ_liq_ice_cloak_dn = IfRBF(h_tot_cloak_dn)
@@ -364,13 +317,13 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
                 apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_LBF_a_cloak_up.(a_cloak_up) .* w_cloak_up .* IfLBF_θ_liq_ice_cloak_up.(h_tot_cloak_up), w_cloak_up, Δt; correction_limit_factor = seclf) .+
                 apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_cloak_dn.(a_cloak_dn) .* w_cloak_dn .* IfRBF_θ_liq_ice_cloak_dn.(h_tot_cloak_dn), w_cloak_dn, Δt; correction_limit_factor = seclf)
                 if !edmf.area_partition_model.confine_all_downdraft_to_cloak
-                    massflux_h .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_en_left.(a_en_left) .* w_en .* IfRBF_θ_liq_ice_en.(θ_liq_ice_en), w_en, Δt; correction_limit_factor = seclf) # add in the remaining env part if we didn't move all the downdraft to cloak
+                    massflux_h .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_en_remaining.(a_en_remaining) .* w_en .* IfRBF_θ_liq_ice_en.(θ_liq_ice_en), w_en, Δt; correction_limit_factor = seclf) # add in the remaining env part if we didn't move all the downdraft to cloak
                 end
             massflux_qt .+=
                 apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_LBF_a_cloak_up.(a_cloak_up) .* w_cloak_up .* IfLBF_q_tot_cloak_up.(q_tot_cloak_up), w_cloak_up, Δt; correction_limit_factor = seclf) .+
                 apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_cloak_dn.(a_cloak_dn) .* w_cloak_dn .* IfRBF_q_tot_cloak_dn.(q_tot_cloak_dn), w_cloak_dn, Δt; correction_limit_factor = seclf)
             if !edmf.area_partition_model.confine_all_downdraft_to_cloak
-                massflux_qt .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_en_left.(a_en_left) .* w_en .* IfRBF_q_tot_en.(q_tot_en), w_en, Δt; correction_limit_factor = seclf) # add in the remaining env part if we didn't move all the downdraft to cloak
+                massflux_qt .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_en_remaining.(a_en_remaining) .* w_en .* IfRBF_q_tot_en.(q_tot_en), w_en, Δt; correction_limit_factor = seclf) # add in the remaining env part if we didn't move all the downdraft to cloak
             end
         else
             # @. massflux_h += 
@@ -378,8 +331,8 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
             #     ρ_f * ᶠinterp_a(a_cloak_dn) * (w_cloak_dn - toscalar(w_gm)) * (If(h_tot_cloak_dn) - If(θ_liq_ice_gm))
             @. massflux_h += ρ_f * ᶠinterp_a_LBF_a_cloak_up(a_cloak_up) * (w_cloak_up) * IfLBF_θ_liq_ice_cloak_up(h_tot_cloak_up) + ρ_f * ᶠinterp_a_RBF_a_cloak_dn(a_cloak_dn) * (w_cloak_dn) * IfRBF_θ_liq_ice_cloak_dn(h_tot_cloak_dn) # RB for downdraft
                 if !edmf.area_partition_model.confine_all_downdraft_to_cloak
-                    # @. massflux_h += ρ_f * ᶠinterp_a(a_en_left) * (w_en - toscalar(w_gm)) * (If(θ_liq_ice_en) - If(θ_liq_ice_gm)) # add in the remaining env part if we didn't move all the downdraft to cloak
-                    @. massflux_h += ρ_f * ᶠinterp_a_RBF_a_en_left(a_en_left) * (w_en) * IfRBF_θ_liq_ice_en(θ_liq_ice_en) # add in the remaining env part if we didn't move all the downdraft to cloak
+                    # @. massflux_h += ρ_f * ᶠinterp_a(a_en_remaining) * (w_en - toscalar(w_gm)) * (If(θ_liq_ice_en) - If(θ_liq_ice_gm)) # add in the remaining env part if we didn't move all the downdraft to cloak
+                    @. massflux_h += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * (w_en) * IfRBF_θ_liq_ice_en(θ_liq_ice_en) # add in the remaining env part if we didn't move all the downdraft to cloak
                 end
             
             # @. massflux_qt +=
@@ -387,8 +340,8 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
                 # ρ_f * ᶠinterp_a_RB_a_cloak_dn(a_cloak_dn) * (w_cloak_dn - toscalar(w_gm)) * (IfRB_q_tot_cloak_dn(q_tot_cloak_dn) - IfRB_q_tot_gm(q_tot_gm)) # RB for downdraft
             @. massflux_qt += ρ_f * ᶠinterp_a_LBF_a_cloak_up(a_cloak_up) * (w_cloak_up) * IfLBF_q_tot_cloak_up(q_tot_cloak_up) + ρ_f * ᶠinterp_a_RBF_a_cloak_dn(a_cloak_dn) * (w_cloak_dn) * IfRBF_q_tot_cloak_dn(q_tot_cloak_dn) # RB for downdraft
             if !edmf.area_partition_model.confine_all_downdraft_to_cloak
-                # @. massflux_qt += ρ_f * ᶠinterp_a_RB_a_en_left(a_en_left) * (w_en - toscalar(w_gm)) * (IfRB_q_tot_en(q_tot_en) - IfRB_q_tot_gm(q_tot_gm)) # add in the remaining env part if we didn't move all the downdraft to cloak
-                @. massflux_qt += ρ_f * ᶠinterp_a_RBF_a_en_left(a_en_left) * (w_en) * IfRBF_q_tot_en(q_tot_en) # add in the remaining env part if we didn't move all the downdraft to cloak
+                # @. massflux_qt += ρ_f * ᶠinterp_a_RB_a_en_remaining(a_en_remaining) * (w_en - toscalar(w_gm)) * (IfRB_q_tot_en(q_tot_en) - IfRB_q_tot_gm(q_tot_gm)) # add in the remaining env part if we didn't move all the downdraft to cloak
+                @. massflux_qt += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * (w_en) * IfRBF_q_tot_en(q_tot_en) # add in the remaining env part if we didn't move all the downdraft to cloak
             end
         end
 
@@ -399,13 +352,13 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
                     apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_LBF_a_cloak_up.(a_cloak_up) .* w_cloak_up .* IfLBF_q_liq_cloak_up.(q_liq_cloak_up), w_cloak_up, Δt; correction_limit_factor = seclf) .+
                     apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_cloak_dn.(a_cloak_dn) .* w_cloak_dn .* IfRBF_q_liq_cloak_dn.(q_liq_cloak_dn), w_cloak_dn, Δt; correction_limit_factor = seclf)
                 if !edmf.area_partition_model.confine_all_downdraft_to_cloak
-                    massflux_ql .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_en_left.(a_en_left) .* w_en .* IfRBF_q_liq_en.(q_liq_en), w_en, Δt; correction_limit_factor = seclf) # add in the remaining env part if we didn't move
+                    massflux_ql .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_en_remaining.(a_en_remaining) .* w_en .* IfRBF_q_liq_en.(q_liq_en), w_en, Δt; correction_limit_factor = seclf) # add in the remaining env part if we didn't move
                 end
                 massflux_qi .+=
                     apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_LBF_a_cloak_up.(a_cloak_up) .* w_cloak_up .* IfLBF_q_ice_cloak_up.(q_ice_cloak_up), w_cloak_up, Δt; correction_limit_factor = seclf) .+
                     apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_cloak_dn.(a_cloak_dn) .* w_cloak_dn .* IfRBF_q_ice_cloak_dn.(q_ice_cloak_dn), w_cloak_dn, Δt; correction_limit_factor = seclf)
                 if !edmf.area_partition_model.confine_all_downdraft_to_cloak
-                    massflux_qi .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_en_left.(a_en_left) .* w_en .* IfRBF_q_ice_en.(q_ice_en), w_en, Δt; correction_limit_factor = seclf)
+                    massflux_qi .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_en_remaining.(a_en_remaining) .* w_en .* IfRBF_q_ice_en.(q_ice_en), w_en, Δt; correction_limit_factor = seclf)
                 end
 
                 @. ql_flux_vert_adv = massflux_ql # rn they're the same since we omit gm in the second order correction case
@@ -416,50 +369,31 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
                 @. massflux_ql += ρ_f * ᶠinterp_a_LBF_a_cloak_up(a_cloak_up) * w_cloak_up * IfLBF_q_liq_cloak_up(q_liq_cloak_up) + ρ_f * ᶠinterp_a_RBF_a_cloak_dn(a_cloak_dn) * w_cloak_dn * IfRBF_q_liq_cloak_dn(q_liq_cloak_dn) # leave w_en outside the cloaks as 0
                 @. massflux_qi += ρ_f * ᶠinterp_a_LBF_a_cloak_up(a_cloak_up) * w_cloak_up * IfLBF_q_ice_cloak_up(q_ice_cloak_up) + ρ_f * ᶠinterp_a_RBF_a_cloak_dn(a_cloak_dn) * w_cloak_dn * IfRBF_q_ice_cloak_dn(q_ice_cloak_dn)
                 if !edmf.area_partition_model.confine_all_downdraft_to_cloak
-                    # @. massflux_ql += ρ_f * ᶠinterp_a(a_en_left) * (w_en - toscalar(w_gm)) * (If(q_liq_en) - If(q_liq_gm)) # add in the remaining env part if we didn't move all the downdraft to cloak
-                    # @. massflux_qi += ρ_f * ᶠinterp_a(a_en_left) * (w_en - toscalar(w_gm)) * (If(q_ice_en) - If(q_ice_gm))
-                    @. massflux_ql += ρ_f * ᶠinterp_a_RBF_a_en_left(a_en_left) * w_en * IfRBF_q_liq_en(q_liq_en) # add in the remaining env part if we didn't move all the downdraft to cloak
-                    @. massflux_qi += ρ_f * ᶠinterp_a_RBF_a_en_left(a_en_left) * w_en * IfRBF_q_ice_en(q_ice_en)
+                    # @. massflux_ql += ρ_f * ᶠinterp_a(a_en_remaining) * (w_en - toscalar(w_gm)) * (If(q_liq_en) - If(q_liq_gm)) # add in the remaining env part if we didn't move all the downdraft to cloak
+                    # @. massflux_qi += ρ_f * ᶠinterp_a(a_en_remaining) * (w_en - toscalar(w_gm)) * (If(q_ice_en) - If(q_ice_gm))
+                    @. massflux_ql += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_liq_en(q_liq_en) # add in the remaining env part if we didn't move all the downdraft to cloak
+                    @. massflux_qi += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_ice_en(q_ice_en)
                 end
 
                 @. ql_flux_vert_adv += ρ_f * ᶠinterp_a_LBF_a_cloak_up(a_cloak_up) * w_cloak_up * IfLBF_q_liq_cloak_up(q_liq_cloak_up) + ρ_f * ᶠinterp_a_RBF_a_cloak_dn(a_cloak_dn) * w_cloak_dn * IfRBF_q_liq_cloak_dn(q_liq_cloak_dn) # add up all the updraft cloaks, leave w_en outside the cloaks as 0
                 @. qi_flux_vert_adv += ρ_f * ᶠinterp_a_LBF_a_cloak_up(a_cloak_up) * w_cloak_up * IfLBF_q_ice_cloak_up(q_ice_cloak_up) + ρ_f * ᶠinterp_a_RBF_a_cloak_dn(a_cloak_dn) * w_cloak_dn * IfRBF_q_ice_cloak_dn(q_ice_cloak_dn) # add up all the updraft cloaks, leave w_en outside the cloaks as 0
                 if !edmf.area_partition_model.confine_all_downdraft_to_cloak
-                    @. ql_flux_vert_adv += ρ_f * ᶠinterp_a_RBF_a_en_left(a_en_left) * w_en * IfRBF_q_liq_en(q_liq_en)
-                    @. qi_flux_vert_adv += ρ_f * ᶠinterp_a_RBF_a_en_left(a_en_left) * w_en * IfRBF_q_ice_en(q_ice_en)
+                    @. ql_flux_vert_adv += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_liq_en(q_liq_en)
+                    @. qi_flux_vert_adv += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_ice_en(q_ice_en)
                 end
             end
 
-            # @warn "q_liq_cloak_max = $(q_liq_cloak_max); q_ice_cloak_max = $(q_ice_cloak_max);"
-            # println("--------------------------------------------")
         end
-        # if rand() < 5e-4
-        #     @warn "q_tot_cloak_max / h_tot_cloak_max"; println("  q_tot_cloak_max = $(q_tot_cloak_max)"); println("  h_tot_cloak_max = $(h_tot_cloak_max)"); println("--------------------------------------------")
-        #     @warn "status"; println("  a_up_i = $(aux_bulk.area)"); println("  a_cloak_up = $(a_cloak_up)"); println("  a_cloak_dn = $(a_cloak_dn)"); println("  a_en = $(a_en)"); println("  combined_area = $(combined_area)"); println("  a_en_left = $(a_en_left)"); println("--------------------------------------------")
-        #     @warn "w values"; println("  w_up = $(w_up)"); println("  w_cloak_up = $(w_cloak_up)"); println("  w_cloak_dn = $(w_cloak_dn)"); println("  w_en = $(w_en)"); println("--------------------------------------------")
-        #     @warn "q_tot values"; println("  q_tot_up = $(aux_bulk.q_tot)"); println("  q_tot_cloak_up = $(q_tot_cloak_up)"); println("  q_tot_cloak_dn = $(q_tot_cloak_dn)"); println("  q_tot_en = $(q_tot_en)"); println("  q_tot_gm = $(q_tot_gm)"); println("--------------------------------------------")
-        #     @warn "h_tot values"; println("  h_tot_up = $(aux_bulk.θ_liq_ice)"); println("  h_tot_cloak_up = $(h_tot_cloak_up)"); println("  h_tot_cloak_dn = $(h_tot_cloak_dn)"); println("  h_tot_en = $(θ_liq_ice_en)"); println("  h_tot_gm = $(θ_liq_ice_gm)"); println("--------------------------------------------")
-        #     @warn "q_liq values"; println("  q_liq_up = $(aux_bulk.q_liq)"); println("  q_liq_cloak_up = $(q_liq_cloak_up)"); println("  q_liq_cloak_dn = $(q_liq_cloak_dn)"); println("  q_liq_en = $(q_liq_en)"); println("  q_liq_gm = $(q_liq_gm)"); println("--------------------------------------------")
-        #     @warn "q_ice values"; println("  q_ice_up = $(aux_bulk.q_ice)"); println("  q_ice_cloak_up = $(q_ice_cloak_up)"); println("  q_ice_cloak_dn = $(q_ice_cloak_dn)"); println("  q_ice_en = $(q_ice_en)"); println("  q_ice_gm = $(q_ice_gm)"); println("--------------------------------------------")
-        #     @warn "massflux and flux values"; println("  massflux_ql = $(massflux_ql)"); println("  massflux_qi = $(massflux_qi)"); println("  ql_flux_vert_adv = $(ql_flux_vert_adv)"); println("  qi_flux_vert_adv = $(qi_flux_vert_adv)"); println("--------------------------------------------")
-        #     @warn "total fluxes"; println("  massflux_h = $(massflux_h)"); println("  massflux_qt = $(massflux_qt)");
-        #     println("============================================================================="); println(" ")
-        # end
-
-        # if rand() < 1e-4
-        #     @warn "Since we split into different qs, etc, maybe we want to compute the flux tendencies separately before combining? not sure since core up and core down are going different directins they might over cancel out in the fluxes despite not being co-located."
-        #     @warn "No prolly not -- because we don't have prognostic cloaks, we get the same result either way. That's why we added the second order correction option."
-        # end
 
     end
 
-    # save en massflux tendencies before adding updraft contributions
-    @. aux_tc.env_qt_tendency_vert_adv = -∇c(wvec(massflux_qt)) / ρ_c
-    @. aux_tc.env_h_tendency_vert_adv = -∇c(wvec(massflux_h)) / ρ_c
-    if edmf.moisture_model isa NonEquilibriumMoisture
-        @. aux_tc.env_ql_tendency_vert_adv = -∇c(wvec(massflux_ql)) / ρ_c
-        @. aux_tc.env_qi_tendency_vert_adv = -∇c(wvec(massflux_qi)) / ρ_c
-    end
+    # # save en massflux tendencies before adding updraft contributions
+    # @. aux_tc.env_qt_tendency_vert_adv = -∇c(wvec(massflux_qt)) / ρ_c
+    # @. aux_tc.env_h_tendency_vert_adv = -∇c(wvec(massflux_h)) / ρ_c
+    # if edmf.moisture_model isa NonEquilibriumMoisture
+    #     @. aux_tc.env_ql_tendency_vert_adv = -∇c(wvec(massflux_ql)) / ρ_c
+    #     @. aux_tc.env_qi_tendency_vert_adv = -∇c(wvec(massflux_qi)) / ρ_c
+    # end
 
     # ============================================================================================================================== #
     @inbounds for i in 1:N_up
@@ -717,7 +651,6 @@ function filter_small_moisture_vars(edmf::EDMFModel, grid::Grid, state::State, p
 
         prog_up = center_prog_updrafts(state)
         aux_up = center_aux_updrafts(state)
-        # prog_bulk = center_prog_bulk(state)
         aux_bulk = center_aux_bulk(state)
         ρ_c = prog_gm.ρ
 
@@ -743,11 +676,6 @@ function filter_small_moisture_vars(edmf::EDMFModel, grid::Grid, state::State, p
             @. aux_up[i].q_ice = cutoff_small_values_positive(aux_up[i].q_ice, q_min)
         end
 
-        # bulk
-        # if edmf.moisture_model isa NonEquilibriumMoisture
-        #     @. prog_bulk.ρaq_liq = cutoff_small_values_positive(prog_bulk.ρaq_liq, q_min * prog_bulk.ρarea)
-        #     @. prog_bulk.ρaq_ice = cutoff_small_values_positive(prog_bulk.ρaq_ice, q_min * prog_bulk.ρarea)
-        # end
         @. aux_bulk.q_liq = cutoff_small_values_positive(aux_bulk.q_liq, q_min)
         @. aux_bulk.q_ice = cutoff_small_values_positive(aux_bulk.q_ice, q_min)
 
@@ -1274,7 +1202,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     end
 
     UB = CCO.UpwindBiasedProductC2F(bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
-    Ic = CCO.InterpolateF2C()
+    # Ic = CCO.InterpolateF2C()
 
     wvec = CC.Geometry.WVector
     ∇c = CCO.DivergenceF2C()
@@ -1717,8 +1645,6 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     a_min = edmf.minimum_area
     a_max = edmf.max_area
 
-    # prog_bulk = center_prog_bulk(state)
-    # prog_bulk_f = face_prog_bulk(state)
 
     f_lim = FT(2.)
 
@@ -1864,7 +1790,7 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     end
 
 
-    Ic = CCO.InterpolateF2C()
+    # Ic = CCO.InterpolateF2C()
     @inbounds for i in 1:N_up
         # test not doing this instant detrainment..... at the least we could maybe to to grid mean? or force detrainment to actually do it... idk... also it breaks things for later mixing only really makes sense at updraft top perhaps but now we have elevated convection.
         # the real problem is that it then spikes the gradients of everything else just bc w went to 0... so then ρarea or ρaq gradients get all jacked up 
@@ -2087,7 +2013,7 @@ function compute_covariance_entr(
     ψ_en = getproperty(aux_en, ψ_sym)
     entr_gain = aux_covar.entr_gain
     detr_loss = aux_covar.detr_loss
-    Ic = CCO.InterpolateF2C()
+    # Ic = CCO.InterpolateF2C()
     Idc = is_tke ? Ic : x -> x
     # TODO: we shouldn't need `parent` call here:
     parent(entr_gain) .= 0
@@ -2260,7 +2186,6 @@ function compute_en_tendencies!(
     mixing_length = aux_tc.mixing_length
     min_area = edmf.minimum_area
 
-    Ic = CCO.InterpolateF2C()
     area_en = aux_en.area
     tke_en = aux_en.tke
 
@@ -2346,7 +2271,6 @@ function update_diagnostic_covariances!(
     mixing_length = aux_tc.mixing_length
     min_area = edmf.minimum_area
 
-    Ic = CCO.InterpolateF2C()
     area_en = aux_en.area
 
     parent(D_env) .= 0

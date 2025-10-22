@@ -224,7 +224,8 @@ RBq_ice = CCO.RightBiasedC2F(; top = CCO.SetValue(q_ice_gm_toa))
 LBq_ice = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(q_ice_boa))
 C2Fsub = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.Extrapolate()) # not sure but maybe we should use this for stability as it's not biased for your upwind algorithm... no penetration. # I think this hsould be the more stable option? Though according to cgarkue github issue, it doesn't always work (see https://github.com/CliMA/TurbulenceConvection.jl/pull/1146)
 
-F2Csub = CCO.InterpolateF2C(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # We might have put 0 for no penetration on boundary, but that's not exactly true in our dataset...
+# F2Csub = CCO.InterpolateF2C(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # We might have put 0 for no penetration on boundary, but that's not exactly true in our dataset...
+F2Csub = Ic # don't need bcs for F2c
 CV32FT = x -> x[1] # convert Contravariant3Vector to Float64
 
 # Note C2F is lossy, peaks will be cut off and diffused out. So it's not exactly a harmless opearation like RB/LB. Just doing the full sol'n (see _5) is conservative.

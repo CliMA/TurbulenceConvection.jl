@@ -77,13 +77,14 @@ cent_aux_vars_gm(FT, local_geometry, edmf) = (;
     qs_tendency_vert_adv = FT(0), # my addition
     qr_tendency_sedimentation = FT(0), # storage
     qs_tendency_sedimentation = FT(0), # storage
-    sgs_tendency_q_liq = FT(0), # testing here instead of below in face_aux_vars_gm_moisture() to see if it's the right spaces type... cause after deriv we're back on center no longer on faces...
-    sgs_tendency_q_ice = FT(0), # testing here instead of below in face_aux_vars_gm_moisture() to see if it's the right spaces type... cause after deriv we're back on center no longer on faces...
-    sgs_tendency_q_rai = FT(0), # my addition
-    sgs_tendency_q_sno = FT(0), # my addition
+    # # Maybe deprecate these... we store diff and massflux already...
+    # sgs_tendency_q_liq = FT(0), # testing here instead of below in face_aux_vars_gm_moisture() to see if it's the right spaces type... cause after deriv we're back on center no longer on faces...
+    # sgs_tendency_q_ice = FT(0), # testing here instead of below in face_aux_vars_gm_moisture() to see if it's the right spaces type... cause after deriv we're back on center no longer on faces...
+    # sgs_tendency_q_rai = FT(0), # my addition
+    # sgs_tendency_q_sno = FT(0), # my addition
     # term_vel_liq = FT(0), # for grid mean sed.. .would be nice to have that conditionally but that breaks eltype inference, could make a function w/ sedimentatinon_vars that is based on edmf.cloud_sedimentation_model
     # term_vel_ice = FT(0), # for grid mean sed.. .would be nice to have that conditionally but that breaks eltype inference, could make a function w/ sedimentatinon_vars that is based on edmf.cloud_sedimentation_model
-    TC.cloud_sedimentation_variables(FT, edmf.cloud_sedimentation_model)...,
+    TC.cloud_sedimentation_variables(FT, edmf.cloud_sedimentation_model)..., # no need for area partition stuff in grid mean.
     f_ice_mult = FT(1),
 )
 cent_aux_vars(FT, local_geometry, edmf) =

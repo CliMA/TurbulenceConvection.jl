@@ -287,10 +287,9 @@ function compute_diagnostics!(
     #####
     ##### Fluxes
     #####
-    Ic = CCO.InterpolateF2C()
     parent(diag_tc.massflux) .= 0
     @inbounds for i in 1:N_up
-        @. diag_tc.massflux += Ic(aux_up_f[i].massflux)
+        @. diag_tc.massflux += TC.Ic(aux_up_f[i].massflux)
     end
     pi_subset = TC.entrainment_Π_subset(edmf)
     @inbounds for k in TC.real_center_indices(grid)

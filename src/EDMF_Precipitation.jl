@@ -56,12 +56,10 @@ function compute_precipitation_advection_tendencies(
     q_rai = prog_pr.q_rai #./ precip_fraction
     q_sno = prog_pr.q_sno #./ precip_fraction
 
-    If = CCO.DivergenceF2C()
     RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0))) # sedimentation
     LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0))) # updraft
     # ∇ = CCO.DivergenceF2C(; bottom = CCO.Extrapolate())
     ∇ = CCO.DivergenceF2C(;) # extrapolation makes the bottom cell value the same as the one above (preventing buildup at sfc bc 0 gradient...), we don't need that I think? unless it's some stability thing...
-    Ic = CCO.InterpolateF2C()
 
     
     wvec = CC.Geometry.WVector
@@ -74,7 +72,6 @@ function compute_precipitation_advection_tendencies(
 
     # Calculate net tendencies allowing for both sedimentation and advection
 
-    # F2Cw::CCO.InterpolateF2C = CCO.InterpolateF2C(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # shouldnt need bcs for interior interp right?
     sedimentation_differencing_scheme = edmf.cloud_sedimentation_model.sedimentation_differencing_scheme # reuse from cloud_sedimentation_model since it's all the same user_args option
 
     aux_en = center_aux_environment(state)
@@ -88,7 +85,7 @@ function compute_precipitation_advection_tendencies(
     # aux_tc_f = face_aux_turbconv(state) # aux_tc_f.bulk.w should be the same as aux_bulk_f.w, so we don't need this one.
 
 
-    # w = F2Cw.(aux_bulk_f.w) # this is the bulk wind
+    # w = Ic.(aux_bulk_f.w) # this is the bulk wind
     mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_rai, term_vel_rain, aux_bulk_f.w, aux_bulk.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false)
     mph_sed_q_rai = mph_sed #.* aux_bulk.area # all goes to same bucket
     mph_sed_q_rai .+= mph_sed_other #.* aux_en.area # all goes to same bucket
@@ -98,7 +95,7 @@ function compute_precipitation_advection_tendencies(
 
 
     # [[ ignore this part, I dont think the env response should be so locally constrained or overly important. ]] [[ maybe we should've done the same for liq/ice now that we allow high updraft areas... idk]]
-    # @. w = F2Cw(aux_en_f.w) # this is the environment wind 
+    # @. w = Ic(aux_en_f.w) # this is the environment wind 
     # mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_rai, term_vel_rain, w, aux_en.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = true)
     mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_rai, term_vel_rain, aux_en_f.w .* 0, aux_en.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false) # test ignoring the environment downdraft
     mph_sed_q_rai .+= mph_sed #.* aux_en.area
@@ -117,16 +114,64 @@ function compute_precipitation_advection_tendencies(
     # @. aux_gm.qr_tendency_vert_adv = mph_sed_q_rai.q_tendency - aux_gm.qr_tendency_sedimentation # take out the sed only part to get the advection part
     # @. aux_gm.qs_tendency_vert_adv = mph_sed_q_sno.q_tendency - aux_gm.qs_tendency_sedimentation # take out the sed only part to get the advection part
 
-    # @. aux_gm.qr_tendency_vert_adv = -∇(wvec(LB(Ic(aux_en_f.w) * ρ_c * aux_en.area * q_rai))) / ρ_c #  [[ i think the env part is fake ... a dryish downdraft shoould take care of it.... ]]
-    # @. aux_gm.qs_tendency_vert_adv = -∇(wvec(LB(Ic(aux_en_f.w) * ρ_c * aux_en.area * q_sno))) / ρ_c # [[ i think the env part is fake ... a dryish downdraft shoould take care of it.... ]]
+
     @. aux_gm.qr_tendency_vert_adv = FT(0)
     @. aux_gm.qs_tendency_vert_adv = FT(0)
-    for i in 1:N_up
-        @. aux_gm.qr_tendency_vert_adv +=  -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_sno))) / ρ_c
-        @. aux_gm.qs_tendency_vert_adv +=  -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_sno))) / ρ_c
-    end
 
-    #
+
+    if edmf.area_partition_model isa CoreCloakAreaPartitionModel
+        #=
+        unlike with up/en, we can't just use f_cm directly to mix an updraft and an environment.
+        We'd like to partition q_rai and q_sno into the updraft and environment, e.g. q_rai_up and q_rai_en, such that q_rai_up * a_up_tot + q_rai_en a_en = q_rai  ... However there are infinitely many pairs that solve this so we're kinda stuck
+        So instead we pivot. We assume the updraft and updraft cloak will have the same qr, and downdraft cloak will close the budget with remaining env unchanged...
+        So for example,  want the value q_rai in a_en_remaining = a_en - a_cloak_up - a_cloak_dn to be unchanged from q_rai, ditto for snow
+        So, for example, for liquid need to solve for q_rai_up and q_rai_en, and then q_rai_cloak_up and q_rai_cloak_dn
+        We can't really do that easily, so we'll just put all the precip in the updraft and cloak up and leave nothing the downdraft, with the remaining env unchanged.
+
+        So we partition as q_rai - aux_en.a_en_remaining * q_rai, leaving nothing for cloak_dn
+        =#
+        # f_cm = edmf.area_partition_model.cloak_mix_factor #  Not using this biasing and relying on LB and RB wasn't unstable per se, but it drastically undercounts vert adv
+
+        # Basically in the updraft you'd have q_rai_up * a_up + ((f_cm * q_rai_up) + (1-f_cm) * q_rai_en)
+
+        a_up_tot = aux_bulk.area .+ aux_en.a_cloak_up
+        q_rai_up = @. ifelse(a_up_tot > 0, (q_rai - aux_en.a_en_remaining * q_rai) / a_up_tot , FT(0))
+        # q_rai_en = @. q_rai
+        q_sno_up = @. ifelse(a_up_tot > 0, (q_sno - aux_en.a_en_remaining * q_sno) / a_up_tot , FT(0))
+        # q_sno_en = @. q_sno
+
+        for i in 1:N_up
+            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_rai_up))) / ρ_c
+            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_sno_up))) / ρ_c
+        end
+        
+        if edmf.area_partition_model.confine_all_downdraft_to_cloak # left of right biased based on direction. This does have the risk to be unstable though... hopefully running out of w helps moderate.... otherwise we could try the second order correction lol...
+            regions = (
+                (aux_en.a_cloak_up, aux_en_f.w_cloak_up, q_rai_up, q_sno_up, LB), # q is same in updraft and updraft cloak
+                # (aux_en.a_cloak_dn, aux_en_f.w_cloak_dn, q_rai_cloak_dn, q_sno_cloak_dn, RB), # all zeroed out
+                )
+        else
+            regions = (
+                (aux_en.a_cloak_up, aux_en_f.w_cloak_up, q_rai_up, q_sno_up, LB), # q is same in updraft and updraft cloak
+                # (aux_en.a_cloak_dn, aux_en_f.w_cloak_dn, q_rai_cloak_dn, q_sno_cloak_dn, RB), # all zeroed out
+                (aux_en.a_en_remaining, aux_en_f.w, q_rai, q_sno, RB), # we could try ignoring this I fear it will dominate... idk
+                )
+        end
+
+        for (area_region, w_region, q_rai_here, q_sno_here, LRB) in regions
+            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LRB(Ic(w_region) * ρ_c * area_region * q_rai_here))) / ρ_c
+            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LRB(Ic(w_region) * ρ_c * area_region * q_sno_here))) / ρ_c
+        end
+
+    else
+        for i in 1:N_up
+            @. aux_gm.qr_tendency_vert_adv +=  -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_rai))) / ρ_c
+            @. aux_gm.qs_tendency_vert_adv +=  -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_sno))) / ρ_c
+        end
+        # ignore env contribution for now....
+        # @. aux_gm.qr_tendency_vert_adv = -∇(wvec(LB(Ic(aux_en_f.w) * ρ_c * aux_en.area * q_rai))) / ρ_c #  [[ i think the env part is fake ... a dryish downdraft shoould take care of it.... ]]
+        # @. aux_gm.qs_tendency_vert_adv = -∇(wvec(LB(Ic(aux_en_f.w) * ρ_c * aux_en.area * q_sno))) / ρ_c # [[ i think the env part is fake ... a dryish downdraft shoould take care of it.... ]]
+    end
 
     @. aux_tc.qr_tendency_advection = mph_sed_q_rai.q_tendency + aux_gm.qr_tendency_vert_adv # / precip_fraction
     @. aux_tc.qs_tendency_advection = mph_sed_q_sno.q_tendency + aux_gm.qs_tendency_vert_adv # / precip_fraction
@@ -167,8 +212,12 @@ function compute_precipitation_sink_tendencies(
     prog_gm = center_prog_grid_mean(state)
     prog_pr = center_prog_precipitation(state)
     ρ_c = prog_gm.ρ
+    p_c = aux_gm.p
     tendencies_pr = center_tendencies_precipitation(state)
     ts_gm = aux_gm.ts
+    aux_en = center_aux_environment(state)
+    aux_up = center_aux_updrafts(state)
+    aux_bulk = center_aux_bulk(state)
 
     precip_fraction = compute_precip_fraction(edmf, state)
 
@@ -183,28 +232,28 @@ function compute_precipitation_sink_tendencies(
 
         qr = max(FT(0), prog_pr.q_rai[k]) / precip_fraction
         qs = max(FT(0), prog_pr.q_sno[k]) / precip_fraction
-        ρ = ρ_c[k]
+        # ρ = ρ_c[k]
         q_tot_gm = aux_gm.q_tot[k]
         T_gm = aux_gm.T[k]
         # When we fuse loops, this should hopefully disappear
         ts = ts_gm[k]
-        q = TD.PhasePartition(thermo_params, ts)
+        # q = TD.PhasePartition(thermo_params, ts)
         qv = TD.vapor_specific_humidity(thermo_params, ts)
-
+        # qvsat_ice_gm = qv - TD.q_vap_saturation_generic(thermo_params, T_gm, ρ_c[k], TD.Ice())
         Π_m = TD.exner(thermo_params, ts)
         c_pm = TD.cp_m(thermo_params, ts)
         c_vm = TD.cv_m(thermo_params, ts)
         R_m = TD.gas_constant_air(thermo_params, ts)
         R_v = TCP.R_v(param_set)
-        L_v0 = TCP.LH_v0(param_set)
-        L_s0 = TCP.LH_s0(param_set)
+        # L_v0 = TCP.LH_v0(param_set)
+        # L_s0 = TCP.LH_s0(param_set)
         L_v = TD.latent_heat_vapor(thermo_params, ts)
         L_s = TD.latent_heat_sublim(thermo_params, ts)
         L_f = TD.latent_heat_fusion(thermo_params, ts)
 
-        I_l = TD.internal_energy_liquid(thermo_params, ts)
-        I_i = TD.internal_energy_ice(thermo_params, ts)
-        I = TD.internal_energy(thermo_params, ts)
+        # I_l = TD.internal_energy_liquid(thermo_params, ts)
+        # I_i = TD.internal_energy_ice(thermo_params, ts)
+        # I = TD.internal_energy(thermo_params, ts)
         Φ = geopotential(param_set, grid.zc.z[k])
 
         α_evp = TCP.microph_scaling(param_set)
@@ -214,21 +263,86 @@ function compute_precipitation_sink_tendencies(
         # TODO - move limiters elsewhere
         # TODO - when using adaptive timestepping we are limiting the source terms
         #        with the previous timestep dt
-        # S_qr_evap = -min(qr / Δt, -α_evp * CM1.evaporation_sublimation(microphys_params, rain_type, q, qr, ρ, T_gm)) * precip_fraction
-        S_qr_evap = limit_tendency(ptl, α_evp * CM1.evaporation_sublimation(microphys_params, rain_type, q, qr, ρ, T_gm), qr, Δt) * precip_fraction # i guess rain only evaporates but never condenses?
 
-        # S_qs_melt = -min(qs / Δt, α_melt * CM1.snow_melt(microphys_params, qs, ρ, T_gm)) * precip_fraction
-        S_qs_melt = limit_tendency(ptl, -α_melt * CM1.snow_melt(microphys_params, qs, ρ, T_gm), qs, Δt) * precip_fraction
+        # we could try to constrain lambda for ice to respect atleast N_INP_top - N_ice but... 1) too complex 2) we don't currently store N_INP_top 3) it wouldnt be clear how to blend the top for env and updrafts
+        # we could at least enforce at least local N_INP - N_i_mean? idk but with boost it's almost certainly above that...
 
-        tmp = α_dep_sub * CM1.evaporation_sublimation(microphys_params, snow_type, q, qs, ρ, T_gm) * precip_fraction
-        # Note if T makes a very low excursion (or too high) , while S*G might mostly cancel and give a real result, you can get NaN from 0 * Inf or something, but I think this is just a legitimate model crash bc those temps are super extreme.
-        if tmp > 0
-            S_qs_sub_dep = -limit_tendency(ptl, -tmp, qv, Δt)
-            qvsat_ice = TD.q_vap_saturation_generic(thermo_params, T_gm, ρ, TD.Ice()) # we don't have this stored for grid-mean and we can't calculate form en/up bc it's non-linear...
-            δi = qv - qvsat_ice 
-            S_qs_sub_dep = -limit_tendency(ptl, -tmp, max(FT(0), δi), Δt) # presumably if tmp > 0 then δi > 0 but can't be too careful
+
+
+        if edmf.area_partition_model isa CoreCloakAreaPartitionModel # Igore w for now
+            # As with advection, we will again partition everything outside of en_remaining into the updrafts and cloak up, leaving nothing in cloak_dn, and en_remainig unchanged
+            combined_up_area = aux_bulk.area[k] + aux_en.a_cloak_up[k]
+            f_q = (combined_up_area > sqrt(eps(FT))) ? ((one(FT) - aux_en.a_en_remaining[k]) / combined_up_area) : one(FT) # how much q is enhanced in updraft and cloak up by squeezing out of downdraft cloak
+
+            if edmf.moisture_model isa NonEquilibriumMoisture
+                ts_bulk = thermo_state_pθq(param_set, p_c[k], aux_bulk.θ_liq_ice[k], aux_bulk.q_tot[k], aux_bulk.q_liq[k], aux_bulk.q_ice[k])
+            else
+                ts_bulk = thermo_state_pθq(param_set, p_c[k], aux_bulk.θ_liq_ice[k], aux_bulk.q_tot[k])
+            end
+            w0 = FT(0) # use this instead of doing the face to center conversion, it would only be used for getting NINP
+            regions = (
+                (aux_bulk.area[k], aux_bulk.T[k], ts_bulk, w0, aux_bulk.N_i[k], TD.vapor_specific_humidity(thermo_params, ts_bulk), f_q*qr, f_q*qs), # we don't store bulk ts, so just use grid mean ts (we only really need density)
+                (aux_en.a_cloak_up[k], aux_en.T_cloak_up[k], aux_en.ts_cloak_up[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_up[k]), f_q*qr, f_q*qs),
+                (aux_en.a_cloak_dn[k], aux_en.T_cloak_dn[k], aux_en.ts_cloak_dn[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_dn[k]), FT(0), FT(0)), # all zeroed out
+                (aux_en.a_en_remaining[k], aux_en.T[k], aux_en.ts[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts[k]), qr, qs)
+            )
         else
-            S_qs_sub_dep = limit_tendency(ptl, tmp, qs, Δt)
+            regions = (
+                (FT(1), T_gm, ts, w0, aux_gm.N_i[k], qv, qr, qs), 
+                ) # we don't store gm w, so just use 0
+        end
+
+
+        S_qr_evap = FT(0)
+        S_qs_melt = FT(0)
+        S_qs_sub_dep = FT(0)
+        for (area_region, T_region, ts_region, w, N_i, qv_region, qr_region, qs_region) in regions
+            ρ_region = TD.air_density(thermo_params, ts_region)
+            q_region = TD.PhasePartition(thermo_params, ts_region)
+            # S_qr_evap = -min(qr / Δt, -α_evp * CM1.evaporation_sublimation(microphys_params, rain_type, q_region, qr_region, ρ_region, T_region)) * precip_fraction
+            S_qr_evap_here = limit_tendency(ptl, α_evp * CM1.evaporation_sublimation(microphys_params, rain_type, q_region, qr_region, ρ_region, T_region), qr_region, Δt) * precip_fraction # i guess rain only evaporates but never condenses?
+
+            # S_qs_melt = -min(qs / Δt, α_melt * CM1.snow_melt(microphys_params, qs_region, ρ_region, T_region)) * precip_fraction
+            S_qs_melt_here = limit_tendency(ptl, -α_melt * CM1.snow_melt(microphys_params, qs_region, ρ_region, T_region), qs_region, Δt) * precip_fraction
+
+            # -------------------------- #
+            if edmf.moisture_model isa NonEquilibriumMoisture
+                N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, q_region, T_region, ρ_region, w)
+            else
+                N_INP = get_N_i_Cooper_curve(T_region; clamp_N=true)
+            end
+
+            N_s_min = max(N_INP - N_i, FT(0)) # the fewest N,
+            if N_s_min > FT(0) && (qs_region > 1e-9) # we could add dry aerosol mass but we don't know N, # we will do this by varying lambda...
+                _, λ_min = get_n0_lambda(param_set, snow_type, qs_region, ρ_region, N_s_min) # the largest droplets we should allow... [so lambda is smallest]
+            else
+                λ_min = eps(FT)
+            end
+            λ_s = CM1.lambda(microphys_params, snow_type, qs_region, ρ_region)
+            λ_s = max(λ_s, λ_min) # so that we don't sublimate more than we have INP for
+            # -------------------------- #
+
+            tmp = α_dep_sub * my_evaporation_sublimation(microphys_params, snow_type, q_region, qs_region, ρ_region, T_region; _λ=λ_s) * precip_fraction
+
+            # Note if T makes a very low excursion (or too high) , while S*G might mostly cancel and give a real result, you can get NaN from 0 * Inf or something, but I think this is just a legitimate model crash bc those temps are super extreme.
+            if tmp > 0
+                qvsat_ice = TD.q_vap_saturation_generic(thermo_params, T_region, ρ_region, TD.Ice()) # we don't have this stored for grid-mean and we can't calculate form en/up bc it's non-linear...
+                δi = qv_region - qvsat_ice
+                # since we don't wanna do the noneq_moisture_sources() style thing, we'll settle for just adding dqvdt, and qt advection here. sed doesn't count.., lsadv does but is slow
+                dv = FT(0)
+                dv += Δt * max(aux_en.dqvdt[k] * aux_en.area[k], FT(0)) + max(aux_bulk.dqvdt[k] * aux_bulk.area[k], FT(0)) # hopefully this is ok to just add like this...
+                dv += Δt * max(( (aux_tc.massflux_tendency_qt[k] + aux_tc.diffusive_tendency_qt[k]) - (aux_tc.massflux_tendency_ql[k] + aux_tc.diffusive_tendency_ql[k]) - (aux_tc.massflux_tendency_qi[k] + aux_tc.diffusive_tendency_qi[k])), FT(0))
+                dv += Δt * max(aux_gm.qt_tendency_ls_vert_adv[k] - aux_gm.ql_tendency_ls_vert_adv[k] - aux_gm.qi_tendency_ls_vert_adv[k], FT(0))
+                # S_qs_sub_dep_here = -limit_tendency(ptl, -tmp, qv_region+dv, Δt) # might be too restrictive at cloud top w/o the dv
+                S_qs_sub_dep_here = -limit_tendency(ptl, -tmp, max(FT(0), δi+dv), Δt) # presumably if tmp > 0 then δi > 0 but can't be too careful
+            else
+                S_qs_sub_dep_here = limit_tendency(ptl, tmp, qs_region, Δt)
+            end
+
+            # accumulate over regions
+            S_qr_evap += area_region * S_qr_evap_here
+            S_qs_melt += area_region * S_qs_melt_here
+            S_qs_sub_dep += area_region * S_qs_sub_dep_here
         end
 
         # [[ We could move from precipitation_formation() to here, but the outcome of that is dispatched based on local temperature in the environment and updraft(s) so we leave it there. ]]
@@ -249,4 +363,58 @@ function compute_precipitation_sink_tendencies(
             )
     end
     return nothing
+end
+
+
+
+
+"""
+    A copy just so we can override the default n0, _λ assumptions
+"""
+function my_evaporation_sublimation(
+    prs::ACMP,
+    snow_type::CMT.SnowType,
+    q::TD.PhasePartition{FT},
+    q_sno::FT,
+    ρ::FT,
+    T::FT;
+    _λ::FT = FT(NaN),
+) where {FT <: Real}
+    evap_subl_rate = FT(0)
+    if q_sno > FT(0)
+        _ν_air::FT = CMP.ν_air(prs)
+        _D_vapor::FT = CMP.D_vapor(prs)
+
+        thermo_params = CMP.thermodynamics_params(prs)
+        _S::FT = TD.supersaturation(thermo_params, q, ρ, T, TD.Ice())
+        _G::FT = CM.Common.G_func(prs, T, TD.Ice())
+
+        _n0::FT = n0(prs, q_sno, ρ, snow_type)
+        _r0::FT = r0(prs, snow_type)
+        _χv::FT = χv(prs, snow_type)
+        _v0::FT = v0(prs, ρ, snow_type)
+        _ve::FT = ve(prs, snow_type)
+        _Δv::FT = Δv(prs, snow_type)
+
+        _a_vent::FT = a_vent(prs, snow_type)
+        _b_vent::FT = b_vent(prs, snow_type)
+
+        _λ::FT = isnan(_λ) ? CM1.lambda(prs, snow_type, q_sno, ρ) : _λ
+
+        evap_subl_rate =
+            4 * FT(π) * _n0 / ρ * _S * _G / _λ^FT(2) * (
+                _a_vent +
+                _b_vent * (_ν_air / _D_vapor)^FT(1 / 3) /
+                (_r0 * _λ)^((_ve + _Δv) / FT(2)) *
+                (FT(2) * _v0 * _χv / _ν_air / _λ)^FT(1 / 2) *
+                CM1.SF.gamma((_ve + _Δv + FT(5)) / FT(2))
+            )
+    end
+
+    if !isfinite(evap_subl_rate)
+        @error "Got non-finite evap_subl_rate $evap_subl_rate at T = $T; q_sno = $q_sno; ρ = $ρ; λ = $_λ; n0 = $(_n0); S = $(_S); G = $(_G); a_vent = $(_a_vent); b_vent = $(_b_vent); ν_air = $(_ν_air); D_vapor = $(_D_vapor); r0 = $(_r0); v0 = $(_v0); χv = $(_χv); ve = $(_ve); Δv = $(_Δv) "
+    end
+
+    # return evap_subl_rate
+    return resolve_nan(evap_subl_rate, FT(0))
 end

@@ -121,7 +121,7 @@ function calculate_sedimentation_sources(
         # C2Fq = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(q_boa)), top = CCO.SetValue(FT(q_toa))) # not sure if this should be right biased or not
 
         # we to C2F, then ∇c goes F2C, then UBsed got C2F, but we wanna end on C [ there's no UpwindBiasedProductF2C and we had UpwindBiasedProductF2C(u[F], x[C])
-        F2Csed = CCO.InterpolateF2C(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # We might have put 0 for no penetration on boundary, but that's not exactly true in our dataset...
+        F2Csed = Ic # don't need bcs for F2C
         # CV32FT = x -> x[1] # convert Contravariant3Vector to Float64
 
         if use_relative_w # seems to induce weird behavior around w_sed = 0...
@@ -199,7 +199,7 @@ function calculate_sedimentation_sources(
         ∇ = CCO.DivergenceF2C(; bottom = CCO.Extrapolate())
 
         C2Fsed = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # just extrapolate, it's just sedimentation velocity
-        F2Csed = CCO.InterpolateF2C(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # just extrapolate, it's just sedimentation velocity
+        F2Csed = Ic # don't need bcs for F2c
         if use_relative_w
             w_sed = @. F2Csed(C2Fsed(w_sed) - w) # preserve full information in w, however for RB we need to go back to C values
         else

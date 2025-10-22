@@ -324,6 +324,8 @@ function create_parameter_set(
     delete!.(Ref(user_args), ["truncated_basic_limiter_factor", "default_tendency_limiter_type", "fallback_default_tendency_limiter_type", "nonequilibrium_moisture_sources_limiter_type", "fallback_nonequilibrium_moisture_sources_limiter_type", "fallback_to_standard_supersaturation_limiter", "entr_detr_limiter_type", "fallback_entr_detr_limiter_type", "precipitation_tendency_limiter_type", "fallback_precipitation_tendency_limiter_type", "tendency_resolver_setup"])
 
 
+    # delete stored area partition things
+
     # delete things not stored anywhere but that we don't need
     # delete!.(Ref(user_args, [
     #     "", # we make a cloud sedimentation model...
