@@ -197,7 +197,7 @@ function initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set)
                     aux_up[i].θ_liq_ice[k] = aux_gm.θ_liq_ice[k] * (1 + .001 / 1.)
                     aux_up[i].q_liq[k] = aux_gm.q_liq[k] * (1 + .01 / 1.)
                     aux_up[i].q_ice[k] = aux_gm.q_ice[k] * (1 + .01 / 1.)
-                    aux_up[i].T[k] = aux_gm.T[k] * (1 + .01 / 1.)
+                    aux_up[i].T[k] = aux_gm.T[k] * (1 + .002 / 1.)
                 end
             else
                 aux_up[i].area[k] = FT(0)

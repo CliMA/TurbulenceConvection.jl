@@ -1174,6 +1174,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
 
     aux_up = center_aux_updrafts(state)
     aux_en = center_aux_environment(state)
+    aux_bulk = center_aux_bulk(state)
     aux_en_f = face_aux_environment(state)
     aux_up_f = face_aux_updrafts(state)
     prog_up = center_prog_updrafts(state)
@@ -1293,6 +1294,17 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         # thermo_params = TCP.thermodynamics_params(param_set)
         # Π = TD.exner.(thermo_params, aux_gm.ts)
 
+        f_q = similar(ρarea)
+        if edmf.area_partition_model isa CoreCloakAreaPartitionModel # Igore w for now
+            # As with advection, we will again partition everything outside of en_remaining into the updrafts and cloak up, leaving nothing in cloak_dn, and en_remainig unchanged
+            # Boost factors for ice formation segregation to updraft.
+            @inbounds for k in real_center_indices(grid)
+                combined_up_area = aux_bulk.area[k] + aux_en.a_cloak_up[k]
+                f_q[k] = (combined_up_area > sqrt(eps(FT))) ? ((one(FT) - aux_en.a_en_remaining[k]) / combined_up_area) : one(FT)
+            end
+        else
+            @. f_q = one(FT)
+        end
 
         if edmf.entrainment_type isa FractionalEntrModel
             @. tends_ρarea = 
@@ -1312,7 +1324,9 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
                 tends_advec + 
                 progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaθ_liq_ice / ρarea, prog_gm.ρθ_liq_ice / ρ_c), prog_gm.ρθ_liq_ice / ρ_c, tends_ρarea,
                     limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) - (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn) , ρaθ_liq_ice + max(tends_advec+tends_other,0), ρ_c * area_en * θ_liq_ice_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
-                    (ρ_c * θ_liq_ice_tendency_precip_formation) #+ ρarea*aux_up[i].dTdt/Π # test adding nudging in so that nudging doesnt prevent env and updraft from mixing and converging...
+                    (ρ_c * θ_liq_ice_tendency_precip_formation) + 
+                    f_q*max(ρarea * aux_tc.θ_liq_ice_tendency_precip_sinks, 0) # + # qi_sub_dep contribution [[ i think this is needed so significant snow formation doesn't kill updrafts?]]
+                    #+ ρarea*aux_up[i].dTdt/Π # test adding nudging in so that nudging doesnt prevent env and updraft from mixing and converging...
 
             @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaq_tot)))
             @. tends_other = (ρ_c * qt_tendency_precip_formation) + (ρ_c * qt_tendency_sedimentation) # external tendencies... we will limit entr/detr as the final tendency to not violate this contract...
@@ -1331,7 +1345,9 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
                 tends_advec +
                 progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaθ_liq_ice / ρarea, prog_gm.ρθ_liq_ice / ρ_c), prog_gm.ρθ_liq_ice / ρ_c, tends_ρarea,
                     limit_tendency(edtl, (ρarea * entr_rate_inv_s * θ_liq_ice_en) - (ρarea * detr_rate_inv_s * θ_liq_ice_up), ρaθ_liq_ice+max(tends_advec+tends_other,0), ρ_c * area_en * θ_liq_ice_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
-                (ρ_c * θ_liq_ice_tendency_precip_formation)  #+ ρarea*aux_up[i].dTdt/Π # test adding nudging in so that nudging doesnt prevent env and updraft from mixing and converging...
+                (ρ_c * θ_liq_ice_tendency_precip_formation) +
+                f_q*max(ρarea * aux_tc.θ_liq_ice_tendency_precip_sinks, 0) # + # qi_sub_dep contribution [[ i think this is needed so significant snow formation doesn't kill updrafts?]]
+                #ρarea*aux_up[i].dTdt/Π # test adding nudging in so that nudging doesnt prevent env and updraft from mixing and converging...
 
             @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaq_tot)))
             @. tends_other = (ρ_c * qt_tendency_precip_formation) + (ρ_c * qt_tendency_sedimentation) # external tendencies... we will limit entr/detr as the final tendency to not violate this contract...
