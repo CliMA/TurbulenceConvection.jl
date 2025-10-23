@@ -561,6 +561,7 @@ function precipitation_formation(
                 # S_qt_snow_ice_agg_mix = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_agg_mix, max(q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt, 0), Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
                 S_qt_snow_ice_agg_mix = FT(0)
 
+                # [[ since we assume evap is constantly raising <r>, there is actually no need to enforce q_thresh... just proceed at τ or even faster -- you should never get <r> below your target value... honestly the longer time timestep the worse it should get lol. No threshold kind of means assuming <r> constant and so the rate is fixed.. maybe not a bad guess if you assume steady state idk... ]]
                 S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ; Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=snow_formation_model.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux) # pass in sed tendency so it can be accounted for in the threshold calculation
                 S_qt_snow_ice_thresh = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_thresh, max(q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt - q_thresh_acnv, 0), Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
 
@@ -1559,6 +1560,33 @@ At the same time, even the subsat rate should be mediated by ∂qi/∂z, since i
 
 At the same time, we know we have PITOSN at supersat due to unresolved supersaturation variability in updrafts/downdrafts, so maybe massflux should mediate in suprsat?
 
+# =================================================================================== #
+Threshold autoconversion for a gamma PSD under the <r> fixed assumption.
+
+The standard relaxation toward a critical radius rₜₕ is:
+
+    dq/dt = -(q - q_th)/τ
+    q_th = q * (rₜₕ / <r>)³
+
+Enforcing <r> fixed implies that the number concentration N decreases proportionally to q:
+
+    dN/dt = (N / q) * dq/dt   ⇒   <r> = constant
+
+The effective relaxation timescale can be written as:
+
+    τ_eff = τ / [1 - (rₜₕ / <r>)³] > τ
+
+so the relaxation toward the threshold is slightly slower, since we would start to more gently asymptote. No hard threshold enforcement is required; q naturally relaxes toward q_th while <r> remains constant.
+
+Semi-analytic timestep update:
+
+    q_new = q_old * exp(-Δt / τ_eff)
+    N_new = N_old * (q_new / q_old)
+
+You can choose to use the semi-analytic or not. I think we should not, so that we can assume steady state since this will balance sedimentation.
+
+When supersaturated, we do not move towards 0, but keep the move only towards q_th. (though if it's supersat fluctuation based who knows lol)
+
 """
 function threshold_driven_acnv(
     param_set::APS,
@@ -1723,7 +1751,12 @@ function threshold_driven_acnv(
              Additionally, once N_i_boost goes to N at -5% subsat, the <r> will probably drop some...
              But if you set r_boost = r_thresh, then you risk very little acnv happening...
             =#
-            τ = τ_sub_dep + (τ - τ_sub_dep) * clamp((r - r_thresh) / (FT(0.05) * r_thresh), FT(0), FT(1))
+            # τ = τ_sub_dep + (τ - τ_sub_dep) * clamp((r - r_thresh) / (FT(0.05) * r_thresh), FT(0), FT(1))
+            # τ = τ_sub_dep * (τ / τ_sub_dep)^clamp((r - r_thresh) / (FT(0.05) * r_thresh), FT(0), FT(1)) # geometric spacing
+
+            f = clamp((r - r_thresh) / (FT(0.05) * r_thresh), FT(0), FT(1))  # normalized ramp
+            γ = FT(0.05)  # adjust to control how fast τ drops
+            τ = τ_sub_dep^(1 - f^γ) * τ^(f^γ)
 
 
             # TEST [ This is based on an assumption about downdraft qtvar driving acnv rates]
@@ -1784,8 +1817,13 @@ function threshold_driven_acnv(
                 
 
                 # TEST
-                acnv_rate = (1 - (λ/λ_thresh)^3) * (q / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept
-                q_thresh = (λ/λ_thresh)^3 * q # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                # acnv_rate = (1 - (λ/λ_thresh)^3) * (q / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                # q_thresh = (λ/λ_thresh)^3 * q # q goes as λ^-4, this is variable N, fixed n_0 intercept
+
+                τ_eff = τ / (1 - (λ/λ_thresh)^3) # effective timescale [[ see docstring,     τ_eff = τ / [1 - (rₜₕ / <r>)³] > τ  ]]
+                acnv_rate = q / τ_eff
+                q_thresh = FT(0) # we go all the way to 0 in subsaturated regions
+
             end
         else  # supersaturated S_i > 0
             # we separate boost and no boost regions, and treat them differently.

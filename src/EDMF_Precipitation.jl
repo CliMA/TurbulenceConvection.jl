@@ -129,6 +129,8 @@ function compute_precipitation_advection_tendencies(
         We can't really do that easily, so we'll just put all the precip in the updraft and cloak up and leave nothing the downdraft, with the remaining env unchanged.
 
         So we partition as q_rai - aux_en.a_en_remaining * q_rai, leaving nothing for cloak_dn
+
+        I think in reality we should do what we did from the `precipitation_sink_tendencies()` fcn... otherwise we will risk the same fate of being overly at the whims of updraft area...
         =#
         # f_cm = edmf.area_partition_model.cloak_mix_factor #  Not using this biasing and relying on LB and RB wasn't unstable per se, but it drastically undercounts vert adv
 
@@ -140,21 +142,35 @@ function compute_precipitation_advection_tendencies(
         q_sno_up = @. ifelse(a_up_tot > 0, (q_sno - aux_en.a_en_remaining * q_sno) / a_up_tot , FT(0))
         # q_sno_en = @. q_sno
 
+        # ============================================================== #
+            # Partition same way as `compute_precipitation_sink_tendencies()`
+        # ============================================================== #
+        qs_up = @. ifelse(aux_gm.q_ice > FT(0), (aux_bulk.q_ice * aux_bulk.area) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Updraft
+        qs_cup = @. ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_cloak_up * aux_en.a_cloak_up) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Updraft cloak
+        qs_cdn = @. ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_cloak_dn * aux_en.a_cloak_dn) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Downdraft cloak
+        qs_enr = @. ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice * aux_en.a_en_remaining) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Env remaining
+ 
+        qr_up = @. ifelse(aux_gm.q_liq > FT(0), (aux_bulk.q_liq * aux_bulk.area) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Updraft
+        qr_cup = @. ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_cloak_up * aux_en.a_cloak_up) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Updraft cloak
+        qr_cdn = @. ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_cloak_dn * aux_en.a_cloak_dn) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Downdraft cloak
+        qr_enr = @. ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq * aux_en.a_en_remaining) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Env remaining
+
+
         for i in 1:N_up
-            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_rai_up))) / ρ_c
-            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_sno_up))) / ρ_c
+            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * qr_up))) / ρ_c
+            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * qs_up))) / ρ_c
         end
         
         if edmf.area_partition_model.confine_all_downdraft_to_cloak # left of right biased based on direction. This does have the risk to be unstable though... hopefully running out of w helps moderate.... otherwise we could try the second order correction lol...
             regions = (
-                (aux_en.a_cloak_up, aux_en_f.w_cloak_up, q_rai_up, q_sno_up, LB), # q is same in updraft and updraft cloak
-                # (aux_en.a_cloak_dn, aux_en_f.w_cloak_dn, q_rai_cloak_dn, q_sno_cloak_dn, RB), # all zeroed out
+                (aux_en.a_cloak_up, aux_en_f.w_cloak_up, qr_cup,  qs_cup, LB),
+                (aux_en.a_cloak_dn, aux_en_f.w_cloak_dn, qr_cdn, qs_cdn, RB),
                 )
         else
             regions = (
-                (aux_en.a_cloak_up, aux_en_f.w_cloak_up, q_rai_up, q_sno_up, LB), # q is same in updraft and updraft cloak
-                # (aux_en.a_cloak_dn, aux_en_f.w_cloak_dn, q_rai_cloak_dn, q_sno_cloak_dn, RB), # all zeroed out
-                (aux_en.a_en_remaining, aux_en_f.w, q_rai, q_sno, RB), # we could try ignoring this I fear it will dominate... idk
+                (aux_en.a_cloak_up, aux_en_f.w_cloak_up, qr_cup, qs_cup, LB),
+                (aux_en.a_cloak_dn, aux_en_f.w_cloak_dn, qr_cdn, qs_cdn, RB),
+                (aux_en.a_en_remaining, aux_en_f.w, qr_enr, qs_enr, RB),
                 )
         end
 
@@ -269,26 +285,39 @@ function compute_precipitation_sink_tendencies(
         # we could at least enforce at least local N_INP - N_i_mean? idk but with boost it's almost certainly above that...
 
 
-
+        w0 = FT(0) # use this instead of doing the face to center conversion, it would only be used for getting NINP
         if edmf.area_partition_model isa CoreCloakAreaPartitionModel # Igore w for now
             # As with advection, we will again partition everything outside of en_remaining into the updrafts and cloak up, leaving nothing in cloak_dn, and en_remainig unchanged
-            combined_up_area = aux_bulk.area[k] + aux_en.a_cloak_up[k]
-            f_q = (combined_up_area > sqrt(eps(FT))) ? ((one(FT) - aux_en.a_en_remaining[k]) / combined_up_area) : one(FT) # how much q is enhanced in updraft and cloak up by squeezing out of downdraft cloak
+            #=
+            [[ I think this is too strong. The problem is that variability in updraft area can lead to wild swings in overall sub/dep rate. We had tried e.g. initializing with large updraft area and that was disastrous. at a=0, sure it's just env, but in the middle with large cloaks you bias highly to only growth. It's worse than doubling the rate because you lose the offsetting sum if a_en_remaining is very small]]
+            [[ Instead, we'll just keep the ratio 1:1 with the ratios of q_liq, q_ice as a heuristic. It gels w/ local autoconv as well, esp dep driven.. though becomes less accurate with further growth and sedimentation... ]]
+            =#
+            # combined_up_area = aux_bulk.area[k] + aux_en.a_cloak_up[k]
+            # f_q = (combined_up_area > sqrt(eps(FT))) ? ((one(FT) - aux_en.a_en_remaining[k]) / combined_up_area) : one(FT) # how much q is enhanced in updraft and cloak up by squeezing out of downdraft cloak
             # f_q = FT(1) # testing no biasing for now
+
+
+            f_qi_up = (aux_gm.q_ice[k] > FT(0)) ? (aux_bulk.q_ice[k] * aux_bulk.area[k]) / aux_gm.q_ice[k] : FT(1) # fraction of ice in Updraft
+            f_qi_cup = (aux_gm.q_ice[k] > FT(0)) ? (aux_en.q_ice_cloak_up[k] * aux_en.a_cloak_up[k]) / aux_gm.q_ice[k] : FT(1) # fraction of ice in Updraft cloak
+            f_qi_cdn = (aux_gm.q_ice[k] > FT(0)) ? (aux_en.q_ice_cloak_dn[k] * aux_en.a_cloak_dn[k]) / aux_gm.q_ice[k] : FT(1) # fraction of ice in Downdraft cloak
+            f_qi_enr = (aux_gm.q_ice[k] > FT(0)) ? (aux_en.q_ice[k] * aux_en.a_en_remaining[k]) / aux_gm.q_ice[k] : FT(1) # fraction of ice in Env remaining
+
+            f_ql_up = (aux_gm.q_liq[k] > FT(0)) ? (aux_bulk.q_liq[k] * aux_bulk.area[k]) / aux_gm.q_liq[k] : FT(1) # fraction of liquid in Updraft
+            f_ql_cup = (aux_gm.q_liq[k] > FT(0)) ? (aux_en.q_liq_cloak_up[k] * aux_en.a_cloak_up[k]) / aux_gm.q_liq[k] : FT(1) # fraction of liquid in Updraft cloak
+            f_ql_cdn = (aux_gm.q_liq[k] > FT(0)) ? (aux_en.q_liq_cloak_dn[k] * aux_en.a_cloak_dn[k]) / aux_gm.q_liq[k] : FT(1) # fraction of liquid in Downdraft cloak
+            f_ql_enr = (aux_gm.q_liq[k] > FT(0)) ? (aux_en.q_liq[k] * aux_en.a_en_remaining[k]) / aux_gm.q_liq[k] : FT(1) # fraction of liquid in Env remaining
+
 
             if edmf.moisture_model isa NonEquilibriumMoisture
                 ts_bulk = thermo_state_pθq(param_set, p_c[k], aux_bulk.θ_liq_ice[k], aux_bulk.q_tot[k], aux_bulk.q_liq[k], aux_bulk.q_ice[k])
             else
                 ts_bulk = thermo_state_pθq(param_set, p_c[k], aux_bulk.θ_liq_ice[k], aux_bulk.q_tot[k])
             end
-            w0 = FT(0) # use this instead of doing the face to center conversion, it would only be used for getting NINP
             regions = (
-                (aux_bulk.area[k], aux_bulk.T[k], ts_bulk, w0, aux_bulk.N_i[k], TD.vapor_specific_humidity(thermo_params, ts_bulk), f_q*qr, f_q*qs, true), # we don't store bulk ts, so just use grid mean ts (we only really need density)
-                (aux_en.a_cloak_up[k], aux_en.T_cloak_up[k], aux_en.ts_cloak_up[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_up[k]), f_q*qr, f_q*qs, true),
-                # (aux_en.a_cloak_dn[k], aux_en.T_cloak_dn[k], aux_en.ts_cloak_dn[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_dn[k]), FT(0), FT(0), false), # all zeroed out
-                # (aux_en.a_cloak_dn[k], aux_en.T_cloak_dn[k], aux_en.ts_cloak_dn[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_dn[k]), qr, qs, false), # testing
-                (aux_en.a_en_remaining[k], aux_en.T[k], aux_en.ts[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts[k]), qr, qs, false)
-
+                (aux_bulk.area[k], aux_bulk.T[k], ts_bulk, w0, aux_bulk.N_i[k], TD.vapor_specific_humidity(thermo_params, ts_bulk), f_ql_up*qr, f_qi_up*qs, true), # we don't store bulk ts, so just use grid mean ts (we only really need density)
+                (aux_en.a_cloak_up[k], aux_en.T_cloak_up[k], aux_en.ts_cloak_up[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_up[k]), f_ql_cup*qr, f_qi_cup*qs, true),
+                (aux_en.a_cloak_dn[k], aux_en.T_cloak_dn[k], aux_en.ts_cloak_dn[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts_cloak_dn[k]), f_ql_cdn*qr, f_qi_cdn*qs, false), # all zeroed out
+                (aux_en.a_en_remaining[k], aux_en.T[k], aux_en.ts[k], w0, aux_en.N_i[k], TD.vapor_specific_humidity(thermo_params, aux_en.ts[k]), f_ql_enr*qr, f_qi_enr*qs, false),
                 # (FT(1), T_gm, ts, w0, aux_gm.N_i[k], qv, qr, qs, false), # testing
             )
         else
@@ -304,8 +333,15 @@ function compute_precipitation_sink_tendencies(
         for (area_region, T_region, ts_region, w, N_i, qv_region, qr_region, qs_region, is_updraft) in regions
             ρ_region = TD.air_density(thermo_params, ts_region)
             q_region = TD.PhasePartition(thermo_params, ts_region)
+
+            # Note if T makes a very low excursion (or too high) , while S*G might mostly cancel and give a real result, you can get NaN from 0 * Inf or something, but I think this is just a legitimate model crash bc those temps are super extreme.
+            qvsat_liq = TD.q_vap_saturation_generic(thermo_params, T_region, ρ_region, TD.Liquid()) # we don't have this stored for grid-mean and we can't calculate form en/up bc it's non-linear...
+            dqsl_dT = TD.∂q_vap_sat_∂T(thermo_params, FT(1), T_region, qvsat_liq) # how do we make this work differently for ice/liquid? or do we need to? currently it's based on the  current condensate mix...
+            Γ_l = one(FT) + (L_v / c_p) * dqsl_dT  # Eqn C3
+            δ = (qv_region - qvsat_liq) / Γ_l
+            δ = min(δ, FT(0)) # only consider subsaturation for evaporation
             # S_qr_evap = -min(qr / Δt, -α_evp * CM1.evaporation_sublimation(microphys_params, rain_type, q_region, qr_region, ρ_region, T_region)) * precip_fraction
-            S_qr_evap_here = limit_tendency(ptl, α_evp * CM1.evaporation_sublimation(microphys_params, rain_type, q_region, qr_region, ρ_region, T_region), qr_region, Δt) * precip_fraction # i guess rain only evaporates but never condenses?
+            S_qr_evap_here = limit_tendency(ptl, α_evp * CM1.evaporation_sublimation(microphys_params, rain_type, q_region, qr_region, ρ_region, T_region), min(qr_region, -δ), Δt) * precip_fraction # i guess rain only evaporates but never condenses?
 
             # S_qs_melt = -min(qs / Δt, α_melt * CM1.snow_melt(microphys_params, qs_region, ρ_region, T_region)) * precip_fraction
             S_qs_melt_here = limit_tendency(ptl, -α_melt * CM1.snow_melt(microphys_params, qs_region, ρ_region, T_region), qs_region, Δt) * precip_fraction
@@ -331,23 +367,27 @@ function compute_precipitation_sink_tendencies(
             tmp = α_dep_sub * my_evaporation_sublimation(microphys_params, snow_type, q_region, qs_region, ρ_region, T_region; _λ=λ_s) * precip_fraction
 
             # Note if T makes a very low excursion (or too high) , while S*G might mostly cancel and give a real result, you can get NaN from 0 * Inf or something, but I think this is just a legitimate model crash bc those temps are super extreme.
+            qvsat_ice = TD.q_vap_saturation_generic(thermo_params, T_region, ρ_region, TD.Ice()) # we don't have this stored for grid-mean and we can't calculate form en/up bc it's non-linear...
+            dqsi_dT = TD.∂q_vap_sat_∂T(thermo_params, FT(0), T_region, qvsat_ice) # how do we make this work differently for ice/liquid? or do we need to? currently it's based on the  current condensate mix...
+            Γ_i = one(FT) + (L_s / c_p) * dqsi_dT  # Eqn C3
+            δi = (qv_region - qvsat_ice) / Γ_i
+
+            dv = FT(0)
+            # dv += Δt * max(aux_en.dqvdt[k] * aux_en.area[k], FT(0)) + max(aux_bulk.dqvdt[k] * aux_bulk.area[k], FT(0)) # hopefully this is ok to just add like this...
+            if is_updraft
+                # dv += Δt * max(( (aux_tc.massflux_tendency_qt[k] + aux_tc.diffusive_tendency_qt[k]) - max(aux_tc.massflux_tendency_ql[k] + aux_tc.diffusive_tendency_ql[k], FT(0)) - max(aux_tc.massflux_tendency_qi[k] + aux_tc.diffusive_tendency_qi[k], FT(0))), FT(0))
+                # dv += Δt * max(aux_gm.qt_tendency_ls_vert_adv[k] - max(aux_gm.ql_tendency_ls_vert_adv[k], FT(0)) - max(aux_gm.qi_tendency_ls_vert_adv[k], FT(0)), FT(0))
+            end
+            
             if tmp > 0
-                qvsat_ice = TD.q_vap_saturation_generic(thermo_params, T_region, ρ_region, TD.Ice()) # we don't have this stored for grid-mean and we can't calculate form en/up bc it's non-linear...
-                dqsi_dT = TD.∂q_vap_sat_∂T(thermo_params, FT(0), T_region, qvsat_ice) # how do we make this work differently for ice/liquid? or do we need to? currently it's based on the  current condensate mix...
-                Γ_i = one(FT) + (L_s / c_p) * dqsi_dT  # Eqn C3
-                δi = (qv_region - qvsat_ice) / Γ_i
-                
+                δi = max(δi, FT(0)) # only consider depositional supersaturation for sublimation/deposition
                 # since we don't wanna do the noneq_moisture_sources() style thing, we'll settle for just adding dqvdt, and qt advection here. sed doesn't count.., lsadv does but is slow
-                dv = FT(0)
-                # dv += Δt * max(aux_en.dqvdt[k] * aux_en.area[k], FT(0)) + max(aux_bulk.dqvdt[k] * aux_bulk.area[k], FT(0)) # hopefully this is ok to just add like this...
-                if is_updraft
-                    # dv += Δt * max(( (aux_tc.massflux_tendency_qt[k] + aux_tc.diffusive_tendency_qt[k]) - max(aux_tc.massflux_tendency_ql[k] + aux_tc.diffusive_tendency_ql[k], FT(0)) - max(aux_tc.massflux_tendency_qi[k] + aux_tc.diffusive_tendency_qi[k], FT(0))), FT(0))
-                    # dv += Δt * max(aux_gm.qt_tendency_ls_vert_adv[k] - max(aux_gm.ql_tendency_ls_vert_adv[k], FT(0)) - max(aux_gm.qi_tendency_ls_vert_adv[k], FT(0)), FT(0))
-                end
+                
                 # S_qs_sub_dep_here = -limit_tendency(ptl, -tmp, qv_region+dv, Δt) # might be too restrictive at cloud top w/o the dv
                 S_qs_sub_dep_here = -limit_tendency(ptl, -tmp, max(FT(0), min(δi+dv/2, qv_region+dv/2, δi*Δt/2)), Δt) # presumably if tmp > 0 then δi > 0 but can't be too careful, δi*Δt would be assuming you're in steady state...
             else
-                S_qs_sub_dep_here = limit_tendency(ptl, tmp, qs_region, Δt)
+                δi = min(δi, FT(0)) # only consider subsaturational undersaturation for sublimation/deposition
+                S_qs_sub_dep_here = limit_tendency(ptl, tmp, max(FT(0), min(qs_region, -δi)), Δt) # Hard to use dv here because gains in vapor are fighting against sublimation.
             end
 
             # accumulate over regions

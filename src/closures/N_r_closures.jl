@@ -2124,7 +2124,9 @@ function adjust_ice_N(
                 # N_thresh_adjusted = N_from_qr(param_set, ice_type, q_i, 1.1 * r_thresh; monodisperse = false, μ=μ, ρ=ρ) # aim for 10% above r_thresh so we can still have acnv
 
                 # N_thresh_adjusted should increase as N_INP_adjusted becomes smaller... let's have it asymptote to N_th as N_INP_adjusted --> N_th, and to r = 1.2 * r_th as N_INP_adjusted --> 0
-                r_thresh_adjusted = r_thresh + (1.2*r_thresh - r_thresh) * (1 - clamp(N_INP_adjusted / N_thresh, 0, 1)) # so at N_INP_adjusted = N_th, r_thresh_adjusted = r_thresh, at N_INP_adjusted = 0, r_thresh_adjusted = 1.2 * r_thresh
+                # r_thresh_adjusted = r_thresh + (1.2*r_thresh - r_thresh) * (1 - clamp(N_INP_adjusted / N_thresh, 0, 1)) # so at N_INP_adjusted = N_th, r_thresh_adjusted = r_thresh, at N_INP_adjusted = 0, r_thresh_adjusted = 1.2 * r_thresh
+                r_thresh_adjusted = 1.08*r_thresh + (1.2*r_thresh - 1.08*r_thresh) * (1 - clamp(N_INP_adjusted / N_thresh, 0, 1)) # so at N_INP_adjusted = N_th, r_thresh_adjusted = r_thresh, at N_INP_adjusted = 0, r_thresh_adjusted = 1.2 * r_thresh [[ starts above r_thresh so we at least have some pitosn which can reduce qi and push us towards more pitosn as N shrinks (or if it's temp controlled at least we'll have some pitosn by 25% subsat -- it it's not strong enough we can still jump straight to 1.2 r_thresh but that might be too sharp given the big S_i gradients we have and the assumption that more native N_i really does slow pitosn...]]
+
                 N_thresh_adjusted = N_from_qr(param_set, ice_type, q_i, r_thresh_adjusted; monodisperse = false, μ=μ, ρ=ρ)
 
                 if N_INP_adjusted < N_thresh
@@ -2156,6 +2158,13 @@ function adjust_ice_N(
                     else
                         N_INP_adjusted_here = N_thresh + (N_thresh_adjusted - N_thresh) * ((-clamp(S_i, -0.25, -0.125) - 0.125) / 0.125)
                     end
+                    #
+                    
+                    # Even when RH is super low, at cloud top this is still resulting in very high <r>. I think in scenarios when lambda is high and larger, falling INP arent advected up there, we're overly skewing to high <r>/...
+                    # In narrow dry layers like RF10, we don't let <r> grow too much either since it takes time for size sorting to happen and high NINP means large amounts of ice probably came from saturation nearby.
+                    # We can bound the reduction in N_INP_adjusted, but this might make it hard in calibration if N_INP is universally overpowering...
+                    N_INP_adjusted_here = max(N_INP_adjusted_here, N_INP_adjusted/2) # added 10/23 1028 am, /10 seems to be too strong, /2 is ok....could use raw N_INP but that feels too overpowering...
+
                     #
                     if N_i_from_INP
                         N_i = N_INP_adjusted_here

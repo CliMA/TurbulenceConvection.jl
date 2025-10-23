@@ -143,7 +143,7 @@ function calculate_timestep_limited_sources(moisture_sources_limiter::MorrisonMi
 
     thermo_params = TCP.thermodynamics_params(param_set)
     dqsl_dT = TD.∂q_vap_sat_∂T(thermo_params, FT(1), T, q_eq.liq)
-    dqsi_dT = TD.∂q_vap_sat_∂T(thermo_params, FT(1), T, q_eq.ice)
+    dqsi_dT = TD.∂q_vap_sat_∂T(thermo_params, FT(0), T, q_eq.ice)
 
     if ((S_ql + S_qi)*Δt ≥ (q_vap+eps(FT) + max(dqvdt, FT(0))*Δt + max(-dTdt * dqsl_dT, -dTdt * dqsi_dT, 0)*Δt)) && (!iszero(q_vap)) # consume all vapor (should never happen, really we should allow for liq and ice to contribute but all vapor gone is ridiculous, qv is like 2 orders of magnitude larger than ql, qi)
     # if ((S_ql + S_qi)*Δt ≥ (q_vap+eps(FT))) && (!iszero(q_vap)) # consume all vapor (should never happen, really we should allow for liq and ice to contribute but all vapor gone is ridiculous, qv is like 2 orders of magnitude larger than ql, qi)
