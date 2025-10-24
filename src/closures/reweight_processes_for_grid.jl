@@ -37,7 +37,7 @@ function reweight_noneq_moisture_sources_for_grid(
     dTdt::CC.Fields.Field, # this is the tendency of T, if we have it, we can use it to reweight the sources
     ;
     reweight_extrema_only::Bool = true, # should we pass this in or get it from param_set? maybe make it explicity so you can cache it slash it's more viislbe in the code
-    region::Union{Val{:en_or_up}, Val{:cloak_up}, Val{:cloak_down}, Val{:en_remaining},} = Val{:en_or_up}()
+    region::AbstractDomain = Env,
     ) where {FT}
 
     microphys_params = TCP.microphysics_params(param_set)
@@ -51,7 +51,7 @@ function reweight_noneq_moisture_sources_for_grid(
 
     # no cloak
     if !((k == kc_surf) || (k == kc_toa))
-        if (region isa Val{:en_or_up}) || (region isa Val{:en_remaining}) # no cloak
+        if (region isa EnvOrUp) || (region isa EnvRemainingDomain) # no cloak
             q_tot_km1 = aux_domain.q_tot[k - 1]
             q_tot = aux_domain.q_tot[k]
             q_tot_kp1 = aux_domain.q_tot[k + 1]
@@ -79,7 +79,7 @@ function reweight_noneq_moisture_sources_for_grid(
             q_vap_sat_liq_km1 = aux_domain.q_vap_sat_liq[k - 1]
             q_vap_sat_liq = aux_domain.q_vap_sat_liq[k]
             q_vap_sat_liq_kp1 = aux_domain.q_vap_sat_liq[k + 1]
-        elseif (region isa Val{:cloak_up}) # cloak up
+        elseif (region isa CloakUp) # cloak up
             q_tot_km1 = aux_domain.q_tot_cloak_up[k - 1]
             q_tot = aux_domain.q_tot_cloak_up[k]
             q_tot_kp1 = aux_domain.q_tot_cloak_up[k + 1]
@@ -107,7 +107,7 @@ function reweight_noneq_moisture_sources_for_grid(
             q_vap_sat_liq_km1 = TD.q_vap_saturation_generic(thermo_params, T_km1, TD.air_density(thermo_params, ts_km1), TD.Liquid())
             q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Liquid())
             q_vap_sat_liq_kp1 = TD.q_vap_saturation_generic(thermo_params, T_kp1, TD.air_density(thermo_params, ts_kp1), TD.Liquid())
-        elseif (region isa Val{:cloak_down}) # cloak down
+        elseif (region isa CloakDown) # cloak down
             q_tot_km1 = aux_domain.q_tot_cloak_down[k - 1]
             q_tot = aux_domain.q_tot_cloak_down[k]
             q_tot_kp1 = aux_domain.q_tot_cloak_down[k + 1]
@@ -224,19 +224,19 @@ function reweight_noneq_moisture_sources_for_grid(
         for scenario in scenarios
 
 
-            if (region isa Val{:en_or_up}) || (region isa Val{:en_remaining}) # no cloak
-                area = (region isa Val{:en_remaining}) ? aux_domain.a_en_remaining : aux_domain.area
+            if (region isa EnvOrUp) || (region isa EnvRemainingDomain) # no cloak
+                area = (region isa EnvRemainingDomain) ? aux_domain.a_en_remaining : aux_domain.area
                 θ_liq_ice = aux_domain.θ_liq_ice
                 q_tot = aux_domain.q_tot
                 q_liq = aux_domain.q_liq
                 q_ice = aux_domain.q_ice
-            elseif (region isa Val{:cloak_up}) # cloak up
+            elseif (region isa CloakUp) # cloak up
                 area = aux_domain.area_cloak_up
                 θ_liq_ice = aux_domain.θ_liq_ice_cloak_up
                 q_tot = aux_domain.q_tot_cloak_up
                 q_liq = aux_domain.q_liq_cloak_up
                 q_ice = aux_domain.q_ice_cloak_up
-            elseif (region isa Val{:cloak_down}) # cloak down
+            elseif (region isa CloakDown) # cloak down
                 area = aux_domain.area_cloak_down
                 θ_liq_ice = aux_domain.θ_liq_ice_cloak_down
                 q_tot = aux_domain.q_tot_cloak_down
@@ -366,7 +366,7 @@ function reweight_equilibrium_saturation_adjustment_for_grid(
     p_c::CC.Fields.Field, # this is from gm so just pass In
     ;
     reweight_extrema_only::Bool = true, # should we pass this in or get it from param_set? maybe make it explicity so you can cache it slash it's more viislbe in the code
-    region::Union{Val{:en_or_up}, Val{:cloak_up}, Val{:cloak_down}, Val{:en_remaining},} = Val{:en_or_up}()
+    region::AbstractDomain = Env,
     )
 
     FT = eltype(param_set)
@@ -374,7 +374,7 @@ function reweight_equilibrium_saturation_adjustment_for_grid(
 
     # no cloak
     if reweight_extrema_only && !((k == kc_surf) || (k == kc_toa))
-        if (region isa Val{:en_or_up}) || (region isa Val{:en_remaining}) # no cloak
+        if (region isa EnvOrUpDomain) || (region isa EnvRemainingDomain) # no cloak
             q_tot_km1 = aux_domain.q_tot[k - 1]
             q_tot = aux_domain.q_tot[k]
             q_tot_kp1 = aux_domain.q_tot[k + 1]
@@ -386,7 +386,7 @@ function reweight_equilibrium_saturation_adjustment_for_grid(
             T_km1 = aux_domain.T[k - 1]
             T = aux_domain.T[k]
             T_kp1 = aux_domain.T[k + 1]
-        elseif (region isa Val{:cloak_up}) # cloak up
+        elseif (region isa CloakUp) # cloak up
             q_tot_km1 = aux_domain.q_tot_cloak_up[k - 1]
             q_tot = aux_domain.q_tot_cloak_up[k]
             q_tot_kp1 = aux_domain.q_tot_cloak_up[k + 1]
@@ -398,7 +398,7 @@ function reweight_equilibrium_saturation_adjustment_for_grid(
             T_km1 = aux_domain.T_cloak_up[k - 1]
             T = aux_domain.T_cloak_up[k]
             T_kp1 = aux_domain.T_cloak_up[k + 1]
-        elseif (region isa Val{:cloak_down}) # cloak down
+        elseif (region isa CloakDown) # cloak down
             q_tot_km1 = aux_domain.q_tot_cloak_down[k - 1]
             q_tot = aux_domain.q_tot_cloak_down[k]
             q_tot_kp1 = aux_domain.q_tot_cloak_down[k + 1]
@@ -492,15 +492,15 @@ function reweight_equilibrium_saturation_adjustment_for_grid(
 
         for scenario in scenarios
 
-            if (region isa Val{:en_or_up}) || (region isa Val{:en_remaining}) # no cloak
-                area = (region isa Val{:en_remaining}) ? aux_domain.a_en_remaining : aux_domain.area
+            if (region isa en_or_up) || (region isa EnvRemainingDomain) # no cloak
+                area = (region isa EnvRemainingDomain) ? aux_domain.a_en_remaining : aux_domain.area
                 θ_liq_ice = aux_domain.θ_liq_ice
                 q_tot = aux_domain.q_tot
-            elseif (region isa Val{:cloak_up}) # cloak up
+            elseif (region isa CloakUp) # cloak up
                 θ_liq_ice = aux_domain.θ_liq_ice_cloak_up
                 q_tot = aux_domain.q_tot_cloak_up
                 area = aux_domain.area_cloak_up
-            elseif (region isa Val{:cloak_down}) # cloak down
+            elseif (region isa CloakDown) # cloak down
                 θ_liq_ice = aux_domain.θ_liq_ice_cloak_down
                 q_tot = aux_domain.q_tot_cloak_down
                 area = aux_domain.area_cloak_down

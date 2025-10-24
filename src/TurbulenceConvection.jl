@@ -290,6 +290,15 @@ include("Fields.jl")
 include("types.jl")
 include("name_aliases.jl")
 
+# Domains we use [[ mostly for reweighting, and for threshold_acnv etc...]]
+const Env = EnvDomain()
+const Up = UpDomain()
+const Bulk = BulkDomain()
+#
+const CloakUp = CloakUpDomain()
+const CloakDown = CloakDownDomain()
+const EnvRemaining = EnvRemainingDomain()
+
 include("microphysics_coupling.jl")
 include("turbulence_functions.jl")
 include("utility_functions.jl")

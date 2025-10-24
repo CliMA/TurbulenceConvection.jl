@@ -195,13 +195,13 @@ function microphysics!(
                 do_cloak = (edmf.area_partition_model isa CoreCloakAreaPartitionModel) && (edmf.area_partition_model.apply_cloak_to_condensate_formation) && (aux_bulk.area[k] > edmf.minimum_area)
                 # (region_area, w_region, T, ts, cloak_up) 
                 if !do_cloak
-                    regions = ((aux_en.area[k], w[k], aux_en.T[k], ts_env[k], Val{:en}()),)
+                    regions = ((aux_en.area[k], w[k], aux_en.T[k], ts_env[k], Env),)
                 else
                     w_en_remaining = (edmf.area_partition_model.confine_all_downdraft_to_cloak) ? FT(0) : w[k] # if we confine all downdraft to cloak, then the remaining env has no vertical velocity
                     regions = (
-                        (aux_en.a_cloak_up[k], w_cloak_up[k], aux_en.T_cloak_up[k], aux_en.ts_cloak_up[k], Val{:cloak_up}()),
-                        (aux_en.a_cloak_dn[k], w_cloak_dn[k], aux_en.T_cloak_dn[k], aux_en.ts_cloak_dn[k], Val{:cloak_dn}()),
-                        (aux_en.a_en_remaining[k], w_en_remaining, aux_en.T[k], ts_env[k], Val{:en_remaining}()),
+                        (aux_en.a_cloak_up[k], w_cloak_up[k], aux_en.T_cloak_up[k], aux_en.ts_cloak_up[k], CloakUp),
+                        (aux_en.a_cloak_dn[k], w_cloak_dn[k], aux_en.T_cloak_dn[k], aux_en.ts_cloak_dn[k], CloakDown),
+                        (aux_en.a_en_remaining[k], w_en_remaining, aux_en.T[k], ts_env[k], EnvRemaining),
                         )
                 end
 
@@ -212,7 +212,7 @@ function microphysics!(
                 for (region_area, w_region, T, ts, region) in regions
 
                     ρ = TD.air_density(thermo_params, ts)
-                    if (region isa Val{:en}) || (region isa Val{:en_remaining})
+                    if (region isa EnvDomain) || (region isa EnvRemainingDomain)
                         q_vap_sat_liq = aux_en.q_vap_sat_liq[k]
                         q_vap_sat_ice = aux_en.q_vap_sat_ice[k]
                         p = aux_en.p[k]
@@ -226,13 +226,13 @@ function microphysics!(
                     mph_neq_here = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, ts, w_region, q_vap_sat_liq, q_vap_sat_ice, aux_en.dqvdt[k], aux_en.dTdt[k], aux_en.τ_liq[k], aux_en.τ_ice[k])
                     # if at an extrema, we don't know where the peak is so we'll reweight based on probability of where it could be in between.
                     if reweight_processes_for_grid
-                        w_region_full = if region isa Val{:en_or_up}
+                        w_region_full = if region isa EnvOrUp
                             w # is already on centers
-                        elseif region isa Val{:en_remaining}
+                        elseif region isa EnvRemainingDomain
                             edmf.area_partition_model.confine_all_downdraft_to_cloak ? (w .* FT(0)) : w
-                        elseif region isa Val{:cloak_up}
+                        elseif region isa CloakUp
                             w_cloak_up
-                        elseif region isa Val{:cloak_dn}
+                        elseif region isa CloakDown
                             w_cloak_dn
                         else
                             error("Unknown region type")
@@ -273,6 +273,7 @@ function microphysics!(
                         cloud_sedimentation_model,
                         rain_formation_model,
                         snow_formation_model,
+                        edmf.area_partition_model,
                         prog_pr.q_rai[k],
                         prog_pr.q_sno[k],
                         aux_en.q_liq[k],
@@ -301,7 +302,8 @@ function microphysics!(
                         aux_en.dN_i_dz[k],
                         aux_en.dqidz[k],
                         N_INP,
-                        aux_tc.massflux[k]
+                        aux_tc.massflux[k],
+                        region,
                     )
                     mph_precip += mph_precip_here * (region_area / aux_en.area[k]) # weight by area fraction
                 end
@@ -427,6 +429,7 @@ function microphysics!(
                     cloud_sedimentation_model,
                     rain_formation_model,
                     snow_formation_model,
+                    edmf.area_partition_model,
                     prog_pr.q_rai[k],
                     prog_pr.q_sno[k],
                     aux_en.q_liq[k],
@@ -455,7 +458,8 @@ function microphysics!(
                     aux_en.dN_i_dz[k],
                     aux_en.dqidz[k],
                     N_INP,
-                    aux_tc.massflux[k]
+                    aux_tc.massflux[k],
+                    Env,
                 )
 
             else
@@ -514,6 +518,7 @@ function microphysics!(
                     cloud_sedimentation_model,
                     rain_formation_model,
                     snow_formation_model,
+                    edmf.area_partition_model,
                     prog_pr.q_rai[k],
                     prog_pr.q_sno[k],
                     aux_en.q_liq[k],
@@ -542,6 +547,7 @@ function microphysics!(
                     dqidz = aux_en.dqidz[k],
                     N_INP = N_INP,
                     massflux = aux_tc.massflux[k],
+                    domain = Env,
                 )
                 mph_precip += mph_precip_here * (region_area / aux_en.area[k]) # weight by area fraction
             end
@@ -552,9 +558,9 @@ function microphysics!(
         if moisture_model isa EquilibriumMoisture
             if (edmf.area_partition_model isa CoreCloakAreaPartitionModel)
                 for (region_area,  ts, region) in (
-                    (aux_en.a_cloak_up[k], aux_en.ts_cloak_up[k], Val{:cloak_up}()),
-                    (aux_en.a_cloak_dn[k], aux_en.ts_cloak_dn[k], Val{:cloak_dn}()),
-                    (aux_en.a_en_remaining[k], aux_en.ts[k], Val{:en_remaining}())
+                    (aux_en.a_cloak_up[k], aux_en.ts_cloak_up[k], CloakUp),
+                    (aux_en.a_cloak_dn[k], aux_en.ts_cloak_dn[k], CloakDown),
+                    (aux_en.a_en_remaining[k], aux_en.ts[k], EnvRemaining)
                 )
 
                     aux_en.q_liq[k] = FT(0)
@@ -1625,6 +1631,7 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, moisture_model::Abstra
     dqidz::FT = FT(0),
     N_INP::FT = FT(NaN),
     massflux::FT = FT(0),
+    domain = Env,
 ) where {FT}
 
 
@@ -1689,6 +1696,7 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, moisture_model::Abstra
                 cloud_sedimentation_model,
                 rain_formation_model,
                 snow_formation_model,
+                edmf.area_partition_model,
                 q_rai,
                 q_sno,
                 q_liq,
@@ -1716,6 +1724,7 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, moisture_model::Abstra
                 dqidz,
                 N_INP,
                 massflux,
+                domain,
             )
     else
 
@@ -1735,6 +1744,7 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, moisture_model::Abstra
                 cloud_sedimentation_model,
                 rain_formation_model,
                 snow_formation_model,
+                edmf.area_partition_model,
                 q_rai,
                 q_sno,
                 q_liq,
@@ -1761,6 +1771,7 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, moisture_model::Abstra
                 dqidz = dqidz,
                 N_INP = N_INP,
                 massflux = massflux,
+                domain = domain,
             )
 
     end

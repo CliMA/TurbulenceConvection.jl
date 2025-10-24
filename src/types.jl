@@ -1,3 +1,28 @@
+
+"""
+Model Regions
+"""
+# --- Level 0: Root
+abstract type AbstractDomain end
+
+# --- Level 1: Categories
+abstract type AbstractPrimitiveDomain <: AbstractDomain end
+abstract type AbstractDerivedDomain   <: AbstractDomain end
+
+# --- Level 2: Concrete domains
+# Original EDMF domains
+struct EnvDomain          <: AbstractPrimitiveDomain end
+struct BulkDomain         <: AbstractPrimitiveDomain end
+struct UpDomain           <: AbstractPrimitiveDomain end
+# Regions for cloaking
+struct CloakUpDomain      <: AbstractDerivedDomain end
+struct CloakDownDomain    <: AbstractDerivedDomain end
+struct EnvRemainingDomain <: AbstractDerivedDomain end
+
+const EnvOrUpDomain = Union{EnvDomain, BulkDomain, UpDomain} # for functions that work on both env and updrafts, but this cant be instantiated
+# const CloakRegions = Union{CloakUpDomain, CloakDownDomain}
+
+
 """
     PrecipFormation
 

@@ -358,6 +358,7 @@ function precipitation_formation(
     cloud_sedimentation_model::AbstractCloudSedimentationModel,
     rain_formation_model::AbstractRainFormationModel,
     snow_formation_model::AbstractSnowFormationModel,
+    area_partition_model::AbstractAreaPartitionModel,
     qr::FT,
     qs::FT,
     ql::FT,
@@ -384,7 +385,8 @@ function precipitation_formation(
     dN_i_dz::FT,
     dqidz::FT,
     N_INP::FT,
-    massflux::FT
+    massflux::FT,
+    domain::AbstractDomain,
 ) where {FT}
     thermo_params = TCP.thermodynamics_params(param_set)
 
@@ -562,7 +564,8 @@ function precipitation_formation(
                 S_qt_snow_ice_agg_mix = FT(0)
 
                 # [[ since we assume evap is constantly raising <r>, there is actually no need to enforce q_thresh... just proceed at τ or even faster -- you should never get <r> below your target value... honestly the longer time timestep the worse it should get lol. No threshold kind of means assuming <r> constant and so the rate is fixed.. maybe not a bad guess if you assume steady state idk... ]]
-                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ; Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=snow_formation_model.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux) # pass in sed tendency so it can be accounted for in the threshold calculation
+                use_cloak = (area_partition_model isa CoreCloakAreaPartitionModel)
+                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ; Δt = Δt, Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=snow_formation_model.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux, domain=domain, use_cloak=use_cloak) # pass in sed tendency so it can be accounted for in the threshold calculation
                 S_qt_snow_ice_thresh = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_thresh, max(q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt - q_thresh_acnv, 0), Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
 
                 # TEST!
@@ -602,7 +605,8 @@ function precipitation_formation(
                 S_qt_snow_ice_dep_is = FT(0)
                 S_qt_snow_ice_dep_above = FT(0)
                 S_qt_snow_ice_agg_mix = FT(0) # no easy breakdown
-                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ_c; Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor = param_set.user_params.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor = param_set.user_params.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux) # pass in sed tendency so it can be accounted for in the threshold calculation
+                use_cloak = (area_partition_model isa CoreCloakAreaPartitionModel)
+                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ_c; Δt=Δt, Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=param_set.user_params.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=param_set.user_params.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux, domain=domain, use_cloak=use_cloak) # pass in sed tendency so it can be accounted for in the threshold calculation
 
                 if !isfinite(S_qt_snow_ice_thresh) || ~isfinite(q_thresh_acnv)
                     @error("Got nonfinite S_qt_snow_ice_thresh = $(S_qt_snow_ice_thresh) or q_thresh_acnv = $(q_thresh_acnv) from inputs qi = $(qi); Ni = $(Ni); ρ_c = $(ρ_c)")
@@ -780,6 +784,7 @@ end
     cloud_sedimentation_model::AbstractCloudSedimentationModel,
     rain_formation_model::AbstractRainFormationModel,
     snow_formation_model::AbstractSnowFormationModel,
+    area_partition_model::AbstractAreaPartitionModel,
     qr::FT,
     qs::FT,
     ql::FT,
@@ -805,7 +810,8 @@ end
     dN_i_dz::FT = FT(0),
     dqidz::FT = FT(0),
     N_INP::FT = FT(NaN),
-    massflux::FT = FT(0)
+    massflux::FT = FT(0),
+    domain::AbstractDomain = Env,
 ) where {FT} = 
     precipitation_formation(
         param_set,
@@ -814,6 +820,7 @@ end
         cloud_sedimentation_model,
         rain_formation_model,
         snow_formation_model,
+        area_partition_model,
         qr,
         qs,
         ql,
@@ -842,7 +849,8 @@ end
         dN_i_dz,
         dqidz,
         N_INP,
-        massflux
+        massflux,
+        domain,
     )
 
 
@@ -1587,6 +1595,42 @@ You can choose to use the semi-analytic or not. I think we should not, so that w
 
 When supersaturated, we do not move towards 0, but keep the move only towards q_th. (though if it's supersat fluctuation based who knows lol)
 
+If we're going up (domain = Up() or CloakUp() or Bulk()), we'll forgo supersaturated pitosn...
+
+Note while, when subsaturated, this is driven by evaporation raising <r>, there's no clear exchange rate. small losses in q to sublimation could mean larger increases in <r> that require removing large particles (lots of mass) to rectify.
+So it's sort of hard to turn this on and off... you basically get up to <r> = r_th and then lose everything suddenly...
+We will try to ease into it as we approach r = r_th if subsat to represent underlying variability, and changes in <r> over a timestep even if the initial <r> is below r_th.
+
+
+# ================================================================================== #
+
+When S_i < 0 , since evaporation keeps increasing <r>, we go all the way to q = 0 eventually. because of this strong bound, we can afford to not really turn on until we get close to r_th.
+Still, we're not as into instantaneous acnv as Morrison, so we want to ramp up as we approach r_th.
+By r = r_th, we should still have fairly quick growth since small changes in N from the low end evaporating can be canceled by huge changes in q from the large end of N autoconverting in response....
+Should converge at S_i = 0 to 0 though (up to variance)
+
+However, when S_i > 0, we only go to q_th since new small particles are being formed all the time... Technically this wouldn't be until the 2q_is limit.
+For continuity, however, and because we don't believe in instantaneous acnv in general like Morrison, we'd like the target to converge to q_th as S_i -> 0+. We don't want to cross and go from a target of 2*r_is to r_thresh instantly. Arguably it would be safer to just use r_thresh for everything, and we might... idk.
+The rate also converges to lower number then too though since sub_dep goes down.
+
+
+Basically the LES believes in letting everything grow to r_max = 2r_is and then transferring everything at once, we take a more gradual stance where starting sooner, we start bringing things over such that we never actually get up to r_thresh.
+In that way our `r_thresh` is a unique entity -- it both represents the radius at which mixing with dry air ensures acnv, but on the growth side is a contract for when to limit growth. if you ever see <r> = 2 r_is, we've gone too far since to match the LES we would need sudden catastrophic acnv at S_i > 0...
+You could argue that this evap r_thresh, and growth r_thresh could be different, for simplicity we use the same number...
+
+Maybe one could look at the fraction of mass above 2r_is and try to keep it down?
+
+
+A complicating factor is in the environment where we have σ(q) that can drive thresh acnv even at S_i > 0... Our heuristic for this is :
+
+
+Finally, since we do have this heuristic of having some acnv before getting to r_thresh, q_target just snapping to 0 at S_i = 0 is a little strong... since the decay rate slows over the timestep, we can get an effective rate...
+then, q_target would be q at the end of the timestep = q * exp(-Δt / τ)
+
+When we lose some small particles to evap and then autoconvert some large ones to balance it out, we in this framework keep the q in the middle... so we should start to slow down as <r> comes down as we lose more of the largest particles...
+losing one 10 micron particle balanced by losing 1 100 micron particle is a huge mass loss yes, but there are so many more 1 micron particles that soon you'll run out of large particles and stop...
+However, even if we restricted the loss to particles above 2*r_is, that is like 95% of the mass still...
+
 """
 function threshold_driven_acnv(
     param_set::APS,
@@ -1594,6 +1638,7 @@ function threshold_driven_acnv(
     q::FT,
     N::FT,
     ρ_a::FT; # air density
+    Δt::FT = FT(Inf),
     Dmax = FT(Inf), # maximum diameter for the particles, used to limit the
     μ::FT = FT(NaN),
     r_threshold_scaling_factor::FT = FT(1),
@@ -1610,43 +1655,63 @@ function threshold_driven_acnv(
     dqidz::FT = FT(0),
     w::FT = FT(0),
     N_INP::FT = FT(NaN),
-    massflux::FT = FT(0)
+    massflux::FT = FT(0),
+    domain = En,
+    use_cloak::Bool = false
 ) where {FT <: Real}
 
 
     acnv_rate = FT(0)
-    q_thresh = q # default to doing nothing
-    
-    r_thresh = get_r_cond_precip(param_set, q_type) * r_threshold_scaling_factor
-    r_i_acnv = r_ice_acnv(param_set, r_acnv_scaling_factor)
-
-    r = r_from_qN(param_set, q_type, q, N; monodisperse = false, ρ=ρ_a, Dmax=Dmax)
-
+    q_target = q # default to doing nothing
 
     if (q > 0) && !isnan(N)
-
-        # do_print = (rand() < 1e-3)
-        # if do_print
-        #     println("=====================================================================================")
-        # end
-
         if iszero(N)
             N = FT(NaN) # have an invalid prediction
             error("Got positive q = $q but N = 0, cannot calculate threshold_driven_acnv")
         end
 
+        microphys_params = TCP.microphysics_params(param_set)
 
-            if isnan(μ)
-                μ = μ_from_qN(param_set, q_type, q, N; ρ=ρ_a)
-            end
-            if add_dry_aerosol_mass
-                q += mass(param_set, q_type, param_set.user_params.particle_min_radius, N; monodisperse=true) / ρ_a # add the dry aerosol mass to q when calculating λ and n0
-            end
+        is_growing = S_i > FT(0) # need to use this because we use S_i for exponentiation and such
+        # is_growing = iszero(dqdt_dep) ? (S_i > FT(0)) : (dqdt_dep > FT(0)) # if dep is zero, use S_i, else use dep rate. dep rate might be better bc better captures the entire timestep...
+        # r_i_acnv = r_ice_acnv(param_set, r_acnv_scaling_factor)
 
-        if !isnan(N_i_no_boost)
+        r_is = get_r_cond_precip(param_set, q_type)
+        r_thresh = r_is * r_threshold_scaling_factor
+
+        if is_growing
+            r_max = 2*r_is # the MG max value... maybe we should ramp up from something small at r = r_is to max power at 2*r_is
+
+            # we start acnv long before r_max...
+            # some factor on r_thresh but yeah instead of letting this go all the way to 2 r_is and then crashing down, we just start siphoning off mass earlier so it's a continous process. Staying near to r_thresh for sublimation acnv is good cause it means things are more continous.
+            # in highly supersaturated environments, maybe we tolerate slightly higher <r>... but not that much. at 25% supersat maybe we go halfway to r_max (cubic mean of r^3 and r_thresh^3?, e.g. blend Ns, assuming m_e = 3). at 0% supersat we go to r_thresh Only
+            r_max = ((1 - min(S_i / 0.25, 1)) * r_thresh^3 + min(S_i / 0.25, 1) * ((r_thresh^3 + (2*r_is)^3) / 2))^(1/3)
+
+
+            
+            if ((domain isa UpDomain) || (domain isa BulkDomain)) #  || (domain isa CloakUpDomain)
+                # let's have this converge to r_thresh at S_i = 0+, and to full r_max at S_i = 0.05 (5% supersat)
+                r_target = r_thresh + (r_max - r_thresh) * clamp(S_i / FT(0.05), FT(0), FT(1))
+            else # Growing, but in Env or Cloak. Because of assumed variance, we will stay close to r_thresh for longer, not reaching r_max until 20% supersaturation
+                r_target = r_thresh + (r_max - r_thresh) * clamp(S_i / FT(0.2), FT(0), FT(1))
+            end
+        else # Shrinking. Here we want to reach r_thresh quickly since evaporation is pushing <r> up.
+            r_target = r_thresh
+        end
+
+        if isnan(μ)
+            μ = μ_from_qN(param_set, q_type, q, N; ρ=ρ_a)
+        end
+        if add_dry_aerosol_mass
+            q += mass(param_set, q_type, param_set.user_params.particle_min_radius, N; monodisperse=true) / ρ_a # add the dry aerosol mass to q when calculating λ and n0
+        end
+        r = r_from_qN(param_set, q_type, q, N; monodisperse = false, ρ=ρ_a, Dmax=Dmax, μ=μ)
+
+
+        # == Undo Boost == # [[ Prolly shouldn't do it for the cloak... ]] The idea is that the boost is small particles coming down in dryer air and maybe aren't the bulk of the threshold acnv, but .... debatable lol. you could also argue theyre the ones drying out more and autoconverting... maybe we should just deprecate this.
+        if !isnan(N_i_no_boost) && !use_cloak
             # at 5 percent subsat reach r_thresh, at 5% supersat reach r_i_acnv?
-
-            if S_i < FT(0)
+            if !is_growing
                 r_boost = r
                 N_i_boost = max(N - N_i_no_boost, FT(0)) # if subsat, any imported N_i should be large...
                 q_boost = (N_i_boost/N) * q
@@ -1654,38 +1719,32 @@ function threshold_driven_acnv(
                 r_no_boost = r
             else
                 # in supersaturated regimers, it's harder to know what r is. we'll assume it's smaller than the current r, catching up to r_i_acnv at 5% supersat
-                # r_boost = r + (r_i_acnv - r) * clamp(S_i / FT(0.05), FT(0), FT(1))
-                # r_boost = r
                 
-                # Basically the downwelling particles are dryer, so maybe don't grow as much (there's some supersaturation deficit)
-                # We observe PITOSN at almost any RH, I think any real MF should engender r_boost to hit r_thresh regardless of supersat
-                # Say that deficit is 5-10%. Then r_boost hits r at 15% supersat the maximum of that and 1.1 r_thresh at 5% supersat
-                # r_boost = r + (max(r, 1.1r_thresh) - r) * clamp((FT(0.15) - S_i) / FT(0.10), FT(0), FT(1))
+                if !use_cloak
+                    # Basically the downwelling particles are dryer, so maybe don't grow as much (there's some supersaturation deficit)
+                    # We observe PITOSN at almost any RH, I think any real MF should engender r_boost to hit r_thresh regardless of supersat
+                    # Say that deficit is 5-10%. Then r_boost hits r at 15% supersat the maximum of that and 1.1 r_thresh at 5% supersat
 
-                # start at original r, reach 1.2r_th at MF = 0.02
-                r_boost = r + (max(r, 1.2r_thresh) - r) * clamp(massflux / FT(0.02), FT(0), FT(1))
+                    # start at original r, reach 1.2r_th at MF = 0.02
+                    r_boost = r + (max(r, 1.2r_thresh) - r) * clamp(massflux / FT(0.02), FT(0), FT(1))
+                    # if subsat, any imported N_i should be large...
+                    N_i_boost = max(N - N_i_no_boost, FT(0)) # might need to be some fraction of this idk... going from r of say 50 microns to r_boost of 70 microns is a 5x boost in q, might be too extreme.
 
-
-                # if subsat, any imported N_i should be large...
-                N_i_boost = max(N - N_i_no_boost, FT(0)) # might need to be some fraction of this idk... going from r of say 50 microns to r_boost of 70 microns is a 5x boost in q, might be too extreme.
-                # q_boost = iszero(N_i_boost) ? FT(0) : min(q, q_from_rN(param_set, q_type, r_boost, N_i_boost; ρ=ρ_a, monodisperse=false)) # the mass in the boosted part
-                # q_no_boost = max(q - q_boost, FT(0)) # remove the dry aerosol mass from q when calculating λ and n0
-                # r_no_boost = iszero(q_no_boost) ? FT(0) : r_from_qN(param_set, q_type, q_no_boost, N_i_no_boost; monodisperse = false, ρ=ρ_a, Dmax=Dmax)
-
-                q_boost = (N_i_boost/N) * q
-                N_i_boost = N_from_qr(param_set, q_type, q_boost, r_boost; ρ=ρ_a, monodisperse=false) # change (mostly reduce) N_i_boost to match r_boost
-                q_no_boost = (N_i_no_boost/N) * q
-                r_no_boost = r
-
-                # If the above is too strong, maybe try just relaxing the part above r_thresh but keeping N_boost or something idk... or changing the timescale.
-
-                # if do_print
-                #     @warn "Supersat acnv: S_i = $S_i; (q = $q; r = $r; N = $N); (q_boost = $q_boost; r_boost = $r_boost; N_i_boost = $N_i_boost); (q_no_boost = $q_no_boost; r_no_boost = $r_no_boost; N_i_no_boost = $N_i_no_boost); "
-                # end
+                    q_boost = (N_i_boost/N) * q
+                    N_i_boost = N_from_qr(param_set, q_type, q_boost, r_boost; ρ=ρ_a, monodisperse=false) # change (mostly reduce) N_i_boost to match r_boost
+                    q_no_boost = (N_i_no_boost/N) * q
+                    r_no_boost = r
+                    # If the above is too strong, maybe try just relaxing the part above r_thresh but keeping N_boost or something idk... or changing the timescale.
+                else # Cloak the boost is inherent, so ignore
+                    r_boost = r
+                    N_i_boost = N
+                    q_boost = q
+                    r_no_boost = r
+                    q_no_boost = q
+                end
             end
         end
         
-        microphys_params = TCP.microphysics_params(param_set)
 
         if q_type isa CMT.IceType
             τ = param_set.user_params.τ_acnv_sno_threshold # use separate timescale bc this should be order timestep scale (in M2005), while real acnv should be like 10^4 seconds.
@@ -1694,208 +1753,182 @@ function threshold_driven_acnv(
         else
             error("threshold_driven_acnv not supported for q_type $q_type")
         end
-
         τ_orig = τ
 
 
         # TODO: Turn this into a smooth transition, allow more masflux effect at supersat as proxy for qtvar.
         acnv_rate_other = FT(0)
-        if S_i > FT(0)
-            # timescale should match the growth timescale
-            # τ = τ_sub_dep # should probably lean towards the shorter of this and the pitosn timescale at high QTVAR (massflux if using proxy)
-            # In the growth regime we avoid vigorously prevent exceeding r_thresh... really, we should redirect the rest of acnv...
-            # realistically, we want to get to the point where we also cancel out incoming sub_dep..., so we should also add the sub_dep tendency...
-            # however, this needs to be a continuous process...
-            # w/o redirecting the sub_dep tendency we reach some natural eq with sub/dep, where we are above the threshold...
+        acnv_rate_fluc = FT(0)
+        if is_growing # growing, so we only go to q_th, not 0
 
-            # re-direct deposition -- by r = 1.2 r_th, redirecting all of it to acnv_thresh
-            # acnv_rate_other = dqdt_dep * clamp((r - r_thresh) / (0.2r_thresh), FT(0), FT(1))
+            if ((domain isa UpDomain) || (domain isa BulkDomain))
+                # we're at max r so autoconvert quickly, tapering off as we approach r_target since there we are essentially balancing depositional growth once you reach the target.. so use the same timescale as a rough heuristic, but ttight taper so small γ
+                f = clamp((r - r_target) / (FT(0.05) * r_target), FT(0), FT(1))  # normalized ramp
+                γ = FT(0.05)  # adjust to control how fast τ drops
+                τ = τ_sub_dep^(1 - f^γ) * τ^(f^γ)
 
-            # Don't let growth get out of hand, start redirecting to snow at 1.2r_thresh even forthe no boost.
-            acnv_rate_other += dqdt_dep * clamp((r_no_boost - r_thresh) / (0.2r_thresh), FT(0), FT(1)) # re-direct deposition -- by r = 1.2 r_th, redirecting all of it to acnv_thresh
+                # redirect deposition: by r = r_max we want to redirect all of it to acnv_thresh, at r=r_th we want none of it redirected
+                acnv_rate_other += dqdt_dep * clamp((r - r_target) / (r_max - r_target), FT(0), FT(1)) # re-direct deposition -- by r = r_max, redirecting all of it to acnv_thresh
+            else # Env or Cloak growing.
+                #=
+                    Here it's slightly more complex. We of course don't want to hit r_target. But we also have some variance like metrics for staying close to r_thresh since σ(q) is real in the environment
+                    The growth part right now is tied to 2*r_is, but the variance part should be tied to r_thresh... To compromise, we used a lower r_target
+                =#
 
-            # I think this should also be broken down by boost and no boost... idk. The hard part is assigning a size to the boost part...
+                # Don't let growth get out of hand. At r = r_thresh, redirect none, at r = r_max redirect all.
+                # acnv_rate_other += dqdt_dep * clamp((r_no_boost - r_thresh) / (0.2r_thresh), FT(0), FT(1)) # re-direct deposition -- by r = 1.2 r_th, redirecting all of it to acnv_thresh
+                acnv_rate_other += dqdt_dep * clamp((r - r_target) / (r_max - r_target), FT(0), FT(1)) # re-direct deposition -- by r = r_max, redirecting all of it to acnv_thresh
 
-            # growth regime so probably no excursions that force acnv... can still tie to MF
-            # TEST [ This is based on an assumption about downdraft qtvar driving acnv rates]
-            # [[ unlike subsat where the default acnv rate is fast, but is slowed by MF bringing down particles and moisture and spreading the size dist]], we're supersaturated here, so the default rate is 0, not fast.
-            # so here, MF can speed things up by making qt variability. have supersaturation fluctuations etc. So this will depend on MF and S_i
-            # The S_N thing matters less here as well, since we're not tapering out N, we're just 
-            τ = τ_sub_dep + (τ_orig - τ_sub_dep) * clamp((r - r_thresh) / (FT(0.05) * r_thresh), FT(0), FT(1)) # tau gets fast as we approach r_thresh, peaks at 1.05 r_thresh...
+                # growth regime so probably no excursions that force acnv... can still tie to MF
+                # [[ unlike subsat where the default acnv rate is fast, but is slowed by MF bringing down particles and moisture and spreading the size dist]], we're supersaturated here, so the default rate is 0, not fast.
+                # so here, MF can speed things up by making qt variability. have supersaturation fluctuations etc. So this will depend on MF and S_i
+                # τ = τ_sub_dep + (τ_orig - τ_sub_dep) * clamp((r - r_thresh) / (FT(0.05) * r_thresh), FT(0), FT(1)) # tau gets fast as we approach r_thresh, peaks at 1.05 r_thresh...
 
-            # Mass flux (MF) generates fluctuations that *enable* autoconversion.
-            M_norm = clamp(massflux / FT(0.02), FT(0), FT(1)) # At MF=0 → τ=∞ (no acnv), At MF=0.02 → τ=τ (normal, fast), Clamp ensures saturation at MF=0.02
-            S_i_max = FT(0.05) * M_norm             # vanish at 5% supersat for MF=0.02, linearly less for smaller MF
-            S_norm = clamp(one(FT) - S_i / max(S_i_max, eps(FT)), FT(0), FT(1)) # at S_i = S_i_max, S_norm = 0, so τ → ∞, at S_i = 0, S_norm = 1, so τ = τ
-            τ /= (max(M_norm * S_norm, eps(FT))) # as MF→0, τ→∞; as MF→0.02, τ→τ
+                # Adjust to asymptote to target
+                f = clamp((r - r_target) / (FT(0.05) * r_target), FT(0), FT(1))  # normalized ramp
+                γ = FT(0.05)  # adjust to control how fast τ drops
+                τ = τ_sub_dep^(1 - f^γ) * τ^(f^γ)
+
+                # Adjustment towards slower τ as S_i → 0+ not needed because growth acnv isn't sub/dep dependent and we have a defiend target that also shrinks as S_i → 0+
+                
+                
+                # Mass flux (MF) generates fluctuations that *enable* autoconversion. [[ this probably matters more when not cloaking...]] This pushes us towards faster acnv from runaway losses on the dry side... this keeps τ closer to τ_orig, and also might push the target q down a bit...
+                
+               
+                # Fluctuations [[ fluctuations also do have a target limit, since not all of the particles are susceptible to fluctuations...]]
+                if use_cloak # smaller but still existent fluctuations in env
+                    M_norm = clamp(massflux / FT(0.02), FT(0), FT(1)) # At MF=0 → τ=∞ (no acnv), At MF=0.02 → τ=τ (normal, fast), Clamp ensures saturation at MF=0.02
+                    S_i_max = FT(0.05) * M_norm  # vanish at 5% supersat for MF=0.02, linearly less for smaller MF
+                    S_norm = clamp(one(FT) - S_i / max(S_i_max, eps(FT)), FT(0), FT(1)) # at S_i = S_i_max, S_norm = 0, so τ → ∞, at S_i = 0, S_norm = 1, so τ = τ
+                    τ_fluc = τ / max(M_norm * S_norm, eps(FT)) # as MF→0, τ→∞; as MF→0.02, τ→τ]
+                    
+                else # Entertain more MF based fluctuations when not cloaking. Here we update acnv_rate_fluc
+                    M_norm = clamp(massflux / FT(0.02), FT(0), FT(1)) # At MF=0 → τ=∞ (no acnv), At MF=0.02 → τ=τ (normal, fast), Clamp ensures saturation at MF=0.02
+                    S_i_max = FT(0.05) * M_norm  # vanish at 5% supersat for MF=0.02, linearly less for smaller MF
+                    S_norm = clamp(one(FT) - S_i / max(S_i_max, eps(FT)), FT(0), FT(1)) # at S_i = S_i_max, S_norm = 0, so τ → ∞, at S_i = 0, S_norm = 1, so τ = τ
+                    τ_fluc = τ / max(M_norm * S_norm, eps(FT)) # as MF→0, τ→∞; as MF→0.02, τ→τ]
+                end
 
 
 
-            τ_boost = τ_sub_dep + (τ_orig - τ_sub_dep) * clamp((r_boost - r_thresh) / (FT(0.05) * r_thresh), FT(0), FT(1)) # tau gets fast as we approach r_thresh, peaks at 1.05 r_thresh...
-            R = FT(10) # how much to slowdown
-            M_norm = clamp(massflux / FT(0.02), FT(0), FT(1)) # saturate slowdown at MF = 0.02
-            τ_boost = min(τ_sub_dep, τ_boost * (one(FT) + (R - one(FT)) * M_norm)) # no S_N here since N is being converted out anyway
+                if !use_cloak # Boost for downwelling particles
+                    # The boost part (downwelling particles) are assumed to be dryer, so more likely to autoconvert. We calculate their part separately
+                    # τ_boost = τ_sub_dep + (τ_orig - τ_sub_dep) * clamp((r_boost - r_thresh) / (FT(0.05) * r_thresh), FT(0), FT(1)) # tau gets fast as we approach r_thresh, peaks at 1.05 r_thresh...
+                    f_boost = clamp((r_boost - r_thresh) / (FT(0.05) * r_thresh), FT(0), FT(1))  # normalized ramp
+                    γ_boost = FT(0.05)  # adjust to control how fast τ drops
+                    τ_boost = τ_sub_dep^(1 - f_boost^γ_boost)
+                    R = FT(10) # how much to slowdown
+                    M_norm = clamp(massflux / FT(0.02), FT(0), FT(1)) # saturate slowdown at MF = 0.02
+                    τ_boost = min(τ_sub_dep, τ_boost * (one(FT) + (R - one(FT)) * M_norm)) # no S_N here since N is being converted out anyway
+                end
+            end
 
-        else
-            # Here , there's no growth to cancel out, so acnv is really tied to where we are.... closer to r_th and it should be slower, farther and it should be faster.
-
-            # at dqdz --> 0, τ --> ∞, at dqdz --> ∞, τ --> τ (really it should be more like something relative to QIADV and NIADV)
-
-            # we want τ_sub_dep at <r> = r_thresh, τ_acnv_sno_thresh at <r> = 1.2 r_thresh
-            # r = r_from_qN(param_set, q_type, q, N; monodisperse = false, ρ=ρ_a, Dmax=Dmax) 
-            #=
-             I think we want the original values here..
-             we used the MF to partition SGS into growth and non-growth regions but now they're all falling out of the cloud all the same, and both at risk of evaporation boosting.
-             w/o a clear picture of r_i we risk going from supersaturated to well above r_i in the non boost region and overdoing the acnv by overestimating <r>
-
-             Additionally, once N_i_boost goes to N at -5% subsat, the <r> will probably drop some...
-             But if you set r_boost = r_thresh, then you risk very little acnv happening...
-            =#
+        else # subsaturated... We are losing q. We show in the docstring that evaporation raises <r> while acnv combats this by shrinking <r>, all the way till everything evaporates and autoconverts. This should go faster at higher subsat, and slower the closer to the target you are... though here the target r=r_thresh but q is going to 0 eventually.
             # τ = τ_sub_dep + (τ - τ_sub_dep) * clamp((r - r_thresh) / (FT(0.05) * r_thresh), FT(0), FT(1))
-            # τ = τ_sub_dep * (τ / τ_sub_dep)^clamp((r - r_thresh) / (FT(0.05) * r_thresh), FT(0), FT(1)) # geometric spacing
-
-            f = clamp((r - r_thresh) / (FT(0.05) * r_thresh), FT(0), FT(1))  # normalized ramp
+            f = clamp((r - r_target) / (FT(0.05) * r_target), FT(0), FT(1))  # normalized ramp
             γ = FT(0.05)  # adjust to control how fast τ drops
-            τ = τ_sub_dep^(1 - f^γ) * τ^(f^γ)
+            τ = τ_sub_dep^(1 - f^γ) * τ^(f^γ) # As we get very close to the target, we do slow down as we rely on evaporation to raise <r> and drive acnv, though the ratio is between how much q needs to evaporate vs how much q needs to autoconvert are massively different, asymptote to the same timescale as a heuristic.
 
-
-            # TEST [ This is based on an assumption about downdraft qtvar driving acnv rates]
-            R = FT(10) # how much to slowdown
-            M_norm = clamp(massflux / FT(0.02), FT(0), FT(1)) # saturate slowdown at MF = 0.02
-            S_N    = clamp((N - N_INP) / N_INP, FT(0), FT(1)) # at N = N_INP, no slowdown, but slowdown goes from there, maxes out at 2*N_INP. this helps taper things off as N are converted out.
-            τ = min(τ_sub_dep, τ * (one(FT) + (R - one(FT)) * M_norm * S_N))
-            
-
+            # at S_i = 0, we'd like to slow down a lot since evaporation is not helping raise <r>, at S_i = -0.05 (5% subsat) we'd like to be at full speed since evaporation is strongly helping raise <r>. By S_i = -0.05, we want full speed
+            # τ /= clamp(S_i / FT(0.05), FT(0), FT(1))
+            γ_S = FT(0.25)
+            fS = clamp((-S_i / FT(0.05))^γ_S, FT(0), one(FT))  # use -S_i so base is positive
+            τ = τ_sub_dep^(one(FT) - fS) * τ^(fS)  # geometric blend, slow near S_i=0, ramps near max subsaturation
         end
 
 
-
-
-
-
-
         λ_thresh = (μ + FT(1)) / r_thresh # this is the λ for the threshold radius, so we can use it to scale the acnv rate
+        λ_target = (μ + FT(1)) / r_target
         _, λ = get_n0_lambda(microphys_params, q_type, q, ρ_a, N, μ; Dmax=Dmax)
 
-        # q_above_thresh = int_q(microphys_params, q_type, n0, λ, ρ_a, μ; Dmin=r_thresh, Dmax=Dmax) # this is the q above the threshold [[ this too easily saturates massively, even at one part in 100 above threshold far from r_is, this can dwarf lower down in the profile where even 50 percent is above the thershold ]]
-
-        # Let's try to keep mean radius below  what it would be if `μ` = 0 (i.e. we will push back away from <r> = r_is and towads <r> = r_acnv)
-        # i think by construction we're already at/below the limit if μ = the current μ
-
-        # _, q_max = check_N_q_μ_feasibility(param_set, q, q_type, N, FT(0); Dmax=Dmax) # this is the maximum q for the given N and μ, so we can use it to scale the acnv rate
-        # q_above_thresh = max(q-q_max, FT(0)) # this is the q above the threshold, so we can use it to scale the acnv rate
-        # acnv_rate = q_above_thresh / τ
 
 
-        if S_i <= FT(0)
-            if λ < λ_thresh
-                # here, no separation between boost and no boost.
-                # acnv_rate = (1-(r_thresh / r)^3) * (q / τ) # Ferrier style [[ 1 - (λ/λ_thresh)^3 ]]. Any μ cancel out so that's good...
-                # acnv_rate = (1 - (λ/λ_thresh)^3) * (q / τ) # this would be fixed N
-                # # q_above_thresh = max(q-q_max, FT(0)) # this is the q above the threshold, so we can use it to scale the acnv rate
-                # acnv_rate = (1-(r_thresh / r)^3) * (q_above_thresh / τ) # can maybe try this if things aren't peaked enough...
-                # q_thresh = (λ/λ_thresh)^3 * q # this would be fixed N
-
-                # acnv_rate = (1 - (λ/λ_thresh)^4) * (q / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept
-                # q_thresh = (λ/λ_thresh)^4 * q # q goes as λ^-4, this is variable N, fixed n_0 intercept
-
-                # N_thresh = N_from_qr(param_set, q_type, q_thresh, r_thresh; ρ=ρ_a, monodisperse=false)
-                # dNdt_thresh = (N - N_thresh) / τ
-                # dNdt_sed = (dqdt_sed/q) * N # assume sed reduces N in proportion to q
-
-                # don't let thresh destroy all of sedimentation tendency if
-                #  <r> is barely above r_thresh maybe? I'm not sure what this should be.
-                # In general some acnv is fine but it should not be allowed to override legitimate incoming sedimentation of q and N, but I can't figure out how to define that.
-                # We know the size sorting premium in w_q about cbrt(4) over w_N, but I can't figure out how to translate that to a size sorting premium in acnv...
-                # 
-
-                # # Theoretical equation based on dr/dt being 0.
-                # α = FT(0.25)
-                # acnv_rate = (1-α)*dqdt_sed + α*(-w)*(q/N*dN_i_dz - dqidz) # this is a mix of sed and growth driven acnv, leaning towards sed
-                # acnv_rate = max(acnv_rate, 0)
-                # q_thresh =  (λ/λ_thresh)^4 * q 
-                
+        if !is_growing
+            if λ < λ_target
+                # No boost/no-boost separation here...
 
                 # TEST
-                # acnv_rate = (1 - (λ/λ_thresh)^3) * (q / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept
-                # q_thresh = (λ/λ_thresh)^3 * q # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                # acnv_rate = (1 - (λ/λ_target)^3) * (q / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                # q_target = (λ/λ_target)^3 * q # q goes as λ^-4, this is variable N, fixed n_0 intercept
 
-                τ_eff = τ / (1 - (λ/λ_thresh)^3) # effective timescale [[ see docstring,     τ_eff = τ / [1 - (rₜₕ / <r>)³] > τ  ]]
+                # τ_eff = τ / (1 - (λ/λ_target)^3) # effective timescale [[ see docstring,     τ_eff = τ / [1 - (rₜₕ / <r>)³] > τ  ]] However, this goes away as we approach the threshold despite continued sublimation driving <r> up. We know  (1 - (λ/λ_target)^3) * (q / τ)  is the instantaneous rate at t=0... it just isn't representative of the entire timeste as evap keeps driving <r> up and massive amounts of q need to autoconvert to keep up.
+                acnv_rate = q / τ
+                # q_target = FT(0) # we go all the way to 0 in subsaturated regions
+
+                q_below_r_max = get_fraction_below_or_above_thresh_from_qN(param_set, ice_type, q, N, ρ_a, 2*r_is; return_N = false, below_thresh = true, return_fraction = false, μ=μ, Dmax=FT(Inf)) # we'll only allow losing the particles above 2*r_max, at some point we'll run out of large particles to acnv and then <r> won't go up anymore...
+                q_target = q_below_r_max * exp(-Δt / τ) # target at end of timestep
+            else
+                # We're not big enough but could get there...
+                # Since our formulation has no lower bound, we don't want it to turn off suddenly... so we want to ramp into things... at λ = λ_target, we'd have acnv_rate = 0...
+                # It's very hard to know the exchange rate between evaporation driving <r> up and acnv driving <r> down... so we just assume a smooth ramps. The λ at which we hit 0 gets lower with increasing subsat since evaporation is helping more...
+                # At S_i = 0, we'd like to be off by r = 0.75 r_target, at S_i = -0.25 (5% subsat) we'd like to be off by r = 0.95 r_target. At 'off' τ → ∞ [or here just τ_sub_dep]
+                λ_off = λ_target / (FT(0.75) + (FT(0.95) - FT(0.75)) * clamp(-S_i / FT(0.05), FT(0), one(FT))) # at S_i = 0, λ_off = λ_target / 0.75; at S_i = -0.05, λ_off = λ_target / 0.95
+                γ_λ = FT(0.25)
+                f = clamp((λ - λ_off) / (λ_target - λ_off), FT(0), one(FT))
+                τ_eff = τ_sub_dep^(1 - f^γ_λ) * τ^(f^γ_λ)
                 acnv_rate = q / τ_eff
-                q_thresh = FT(0) # we go all the way to 0 in subsaturated regions
+                # q_target = FT(0) # we go all the way to 0 in subsaturated regions
+                q_below_r_max = get_fraction_below_or_above_thresh_from_qN(param_set, ice_type, q, N, ρ_a, 2*r_is; return_N = false, below_thresh = true, return_fraction = false, μ=μ, Dmax=FT(Inf)) # we'll only allow losing the particles above 2*r_max, at some point we'll run out of large particles to acnv and then <r> won't go up anymore...
+                q_target = q_below_r_max * exp(-Δt / τ) # target at end of timestep
 
             end
         else  # supersaturated S_i > 0
             # we separate boost and no boost regions, and treat them differently.
 
+
+            if ((domain isa UpDomain) || (domain isa BulkDomain)) # just direct acnv... since we're supersaturated though, no runaway, just go to target
+                if λ < λ_target
+                    acnv_rate = (1 - (λ/λ_target)^3) * (q / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                    q_target = (λ/λ_target)^3 * q # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                end
+            else
             
-            _, λ_boost = get_n0_lambda(microphys_params, q_type, q_boost, ρ_a, N_i_boost, μ; Dmax=Dmax)
-            _, λ_no_boost = get_n0_lambda(microphys_params, q_type, q_no_boost, ρ_a, N_i_no_boost, μ; Dmax=Dmax)
+                if !use_cloak # Entertain more MF based fluctuations when not cloaking. Here we update acnv_rate_fluc
+                    # Boost
+                    _, λ_boost = get_n0_lambda(microphys_params, q_type, q_boost, ρ_a, N_i_boost, μ; Dmax=Dmax)
+                    _, λ_no_boost = get_n0_lambda(microphys_params, q_type, q_no_boost, ρ_a, N_i_no_boost, μ; Dmax=Dmax)
 
-            if (λ_boost < λ_thresh) && (q_boost > 0)
-                # if do_print
-                #     @warn "adding boost acnv: $((1 - (λ_boost/λ_thresh)^4) * (q_boost / τ_boost)) from boost region with S_i = $S_i; r_boost = $r_boost; r_thresh = $r_thresh; λ_boost = $λ_boost; λ_thresh = $λ_thresh; q_boost = $q_boost; N_i_boost = $N_i_boost; τ_boost = $τ_boost"
-                # end
-                acnv_rate += (1 - (λ_boost/λ_thresh)^3) * (q_boost / τ_boost) # q goes as λ^-4, this is variable N, fixed n_0 intercept (we're losing particles without new generation, so not fixed N)
-                q_thresh_boost = (λ_boost/λ_thresh)^3 * q_boost # q goes as λ^-4, this is variable N, fixed n_0 intercept
-            else
-                q_thresh_boost = FT(q_boost) # no acnv in boost region
+                    if (λ_boost < λ_target) && (q_boost > 0)
+                        acnv_rate += (1 - (λ_boost/λ_target)^3) * (q_boost / τ_boost) # q goes as λ^-4, this is variable N, fixed n_0 intercept (we're losing particles without new generation, so not fixed N)
+                        q_target_boost = (λ_boost/λ_target)^3 * q_boost # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                    else
+                        q_target_boost = FT(q_boost) # no acnv in boost region
+                    end
+
+                    if (λ_no_boost < λ_target) && (q_no_boost > 0)
+                        acnv_rate += (1 - (λ_no_boost/λ_target)^3) * (q_no_boost / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept (we're losing particles without new generation, so not fixed N)
+                        q_target_no_boost = (λ_no_boost/λ_target)^3 * q_no_boost # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                    else
+                        q_target_no_boost = FT(q_no_boost) # no acnv in no boost region
+                    end
+
+                    q_target = q_target_boost + q_target_no_boost
+
+                else # regular growth, stop at threshold
+                   
+                    if λ < λ_target
+                        acnv_rate = ( 1 - (λ/λ_target)^3) * (q / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                        q_target = (λ/λ_target)^3 * q # q goes as λ^-4, this is variable N, fixed n_0 intercept
+                    end
+                end
+
+                 # Fluctuations
+                acnv_rate_fluc = q/τ_fluc
+                # This is hard because yes the target should go down but it's not clear how much... We need to estimate how much of the original mass i guess was susceptible to fluctuations into subsat...
+                # Maybe one could use `get_qs_from_saturation_excesses()` and a closure but that's a bit complex...
+                # We'll aim for q_target = q at S_i = 10%, and 0 at S_i = 0% 
+                q_target_fluc = q * clamp(S_i / FT(0.1), FT(0), one(FT))
+                q_target = min(q_target, q_target_fluc) # take the lower of the two targets
+
             end
-
-            if (λ_no_boost < λ_thresh) && (q_no_boost > 0)
-                # if do_print
-                #     @warn "adding no boost acnv: $((1 - (λ_no_boost/λ_thresh)^3) * (q_no_boost / τ)) from no boost region with S_i = $S_i; r_no_boost = $r_no_boost; r_thresh = $r_thresh; λ_no_boost = $λ_no_boost; λ_thresh = $λ_thresh; q_no_boost = $q_no_boost; N_i_no_boost = $N_i_no_boost; τ = $τ"
-                # end
-                acnv_rate += (1 - (λ_no_boost/λ_thresh)^3) * (q_no_boost / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept (we're losing particles without new generation, so not fixed N)
-                q_thresh_no_boost = (λ_no_boost/λ_thresh)^3 * q_no_boost # q goes as λ^-4, this is variable N, fixed n_0 intercept
-            else
-                q_thresh_no_boost = FT(q_no_boost) # no acnv in no boost region
-            end
-
-            q_thresh = q_thresh_boost + q_thresh_no_boost
         end
 
 
-
-
         acnv_rate += acnv_rate_other # add any other acnv rate from redirected deposition
-
-
-        # if do_print
-        #     @warn "threshold_driven_acnv: acnv_rate = $acnv_rate; q_thresh = $q_thresh; q = $q; N = $N; r = $r; r_thresh = $r_thresh; λ = $λ; λ_thresh = $λ_thresh; τ = $τ (orig: $τ_orig); S_i = $S_i"
-        # end
-
-
-
-
-
-        # Adjusting λ directly style [[ if we don't do the μ adjustment, we might need to just scale λ down a little since we'll never pass r_is... ]]
-        
-        # try
-        #     q = int_q(microphys_params, q_type, n0, λ, ρ_a, μ; Dmin=FT(0), Dmax=Dmax) # this is the q above the threshold [[ this too easily saturates massively, even at one part in 100 above threshold far from r_is, this can dwarf lower down in the profile where even 50 percent is above the thershold ]]
-        # catch e
-        #     @warn "Failed to compute int_q for threshold_driven_acnv with q_type = $q_type, n0 = $n0, λ = $λ, ρ_a = $ρ_a, μ = $μ, Dmin = $(FT(0)), Dmax = $Dmax"
-        #     throw(e)
-        # end
-
-
-        # # should still have μ or should it go back to μ=0?
-        # if λ < λ_thresh
-        #     # I dont think Dmax is useful here... because we wouldnt only wanna integrate below Dmax (maybe above?) but that doesnt help us w/ the other things...
-        #     # q_Dmax = int_q(microphys_params, q_type, n0, λ, ρ_a, μ; Dmin=FT(0), Dmax=Dmax) # this is the q above the threshold [[ this too easily saturates massively, even at one part in 100 above threshold far from r_is, this can dwarf lower down in the profile where even 50 percent is above the thershold ]]
-        #     # q_thresh_Dmax = int_q(microphys_params, q_type, n0, λ_thresh, ρ_a, μ; Dmin=FT(0), Dmax=Dmax) # this is the q at the threshold radius, so we can use it to scale the acnv rate
-        #     # acnv_rate = max((q_dmax-q_thresh) / τ, FT(0)) # this is the acnv rate, scaled by the difference between the current q and the threshold q
-        
-        #     q_thresh = int_q(microphys_params, q_type, n0, λ_thresh, ρ_a, μ; Dmin=FT(0), Dmax=FT(Inf)) # this is the q at the threshold radius, so we can use it to scale the acnv rate
-        #     acnv_rate = max((q - q_thresh) / τ, FT(0))
-        # end
-
-        # according to my calculations q = 4/3 π ρ_a r^3 n_0 Γ(μ + 4) / λ^4  = 4/3 π ρ_a r^3 N Γ(μ + 4) / λ^3 ( the full form has the me, Δm, and _χm, but this is the basic form)
-        # So if we change λ, and not n_0, then we scale down N and q in this 1/3 manner, and τ captures the constants.
-        # if we had decided to instead change n_0 and not N, it would be more artificial as we'd have no number flux to ice.
+        acnv_rate += acnv_rate_fluc
     
     end
-    return resolve_nan(acnv_rate, FT(0)), q_thresh # also return q_thresh for limiters
+    return resolve_nan(acnv_rate, FT(0)), q_target # also return q_target for limiters
 end
 
 

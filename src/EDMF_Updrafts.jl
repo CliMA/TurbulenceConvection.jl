@@ -383,6 +383,7 @@ function compute_precipitation_formation_tendencies(
                     cloud_sedimentation_model,
                     rain_formation_model,
                     snow_formation_model,
+                    edmf.area_partition_model,
                     prog_pr.q_rai[k],
                     prog_pr.q_sno[k],
                     aux_up[i].q_liq[k],
@@ -410,7 +411,8 @@ function compute_precipitation_formation_tendencies(
                     aux_up[i].dN_i_dz[k],
                     aux_up[i].dqidz[k],
                     N_INP,
-                    FT(0) # massflux doesnt count in updraft
+                    FT(0), # massflux doesnt count in updraft [[ we pass domain as an arg now anyway]]
+                    Up,
                 )
 
             else
@@ -421,6 +423,7 @@ function compute_precipitation_formation_tendencies(
                     cloud_sedimentation_model,
                     rain_formation_model,
                     snow_formation_model,
+                    edmf.area_partition_model,
                     prog_pr.q_rai[k],
                     prog_pr.q_sno[k],
                     aux_up[i].q_liq[k],
@@ -446,7 +449,8 @@ function compute_precipitation_formation_tendencies(
                     dN_i_dz = aux_up[i].dN_i_dz[k],
                     dqidz = aux_up[i].dqidz[k],
                     N_INP = N_INP,
-                    massflux = FT(0) # massflux doesnt count in updraft
+                    massflux = FT(0), # massflux doesnt count in updraft
+                    domain = Up
                 )
             end
 
