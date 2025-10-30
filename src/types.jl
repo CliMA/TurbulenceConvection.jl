@@ -270,6 +270,8 @@ end
 Base.@kwdef struct TotalRateEntrModel{FT, SUHT} <: EntrModelFacTotalType
     "base detrainment rate inverse [s^-1]"
     base_detrainment_rate_inv_s::FT # testing having some base detrainment rate so that even when w goes to 0 we can detrain slowly.
+    "base_entrainment_rate_inv_s::FT"
+    base_entrainment_rate_inv_s::FT # testing having some base entrainment rate so [[ this gets applied if ∂θ_virt/∂z < 0 ]] So we can start updrafts from rest in unstable layers
     "stalled_updraft_handler::SUHT"
     stalled_updraft_handler::SUHT # Whether or not we mix the updraft to the grid mean when we get to w=0
 end
@@ -322,6 +324,7 @@ end
 Base.@kwdef struct CoreCloakAreaPartitionModel{FT} <: AbstractAreaPartitionModel
     # max_combined_updraft_area::FT # Might be hard to have this be separate from edmf.max_area...
     cloak_area_factor::FT # Scaling factor for how much larger the cloak area is than the core area
+    cloak_dn_area_factor::FT # Scaling factor for the ratio of downdraft cloak to (updraft + updraft cloak) area. a_cloak_dn = cloak_dn_area_factor * (a_up + a_cloak_up) up to area limit
     cloak_mix_factor::FT # Scaling factor that decides how close the cloak is to the env vs the core, 1 means fully updraft, 0 means fully env
     confine_all_downdraft_to_cloak::Bool # If true, all downdraft area is put into the cloak, if false, downdraft area is split between cloak and env based on remaining area.
     apply_second_order_flux_correction::Bool # If true, the fluxes from core and cloak are combined before computing gradients, otherwise gradients are computed separately and then combined. This is NOT as necessary for StandardAreaPartitionMode because we have prognostic up and env, though env is backed out so it kind of matters
@@ -340,6 +343,7 @@ end
 function CoreCloakAreaPartitionModel(param_set::APS, namelist)
     FT = eltype(param_set)
     cloak_area_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "cloak_area_factor"; default = FT(4.0))
+    cloak_dn_area_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "cloak_dn_area_factor"; default = FT(1.0))
     cloak_mix_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "cloak_mix_factor"; default = FT(0.5))
     confine_all_downdraft_to_cloak = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "confine_all_downdraft_to_cloak"; default = false)
     # combine_fluxes_before_gradients = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "combine_fluxes_before_gradients"; default = true) # I'm not sure this does anything w/o prognostic q in each region. Instead we opt for a second order correction....
@@ -347,7 +351,7 @@ function CoreCloakAreaPartitionModel(param_set::APS, namelist)
     second_order_correction_limit_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "second_order_correction_limit_factor"; default = FT(Inf)) # no limit
     apply_cloak_to_condensate_formation = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "apply_cloak_to_condensate_formation"; default = true)
     fraction_of_area_above_max_area_allowed_in_cloak = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "fraction_of_area_above_max_area_allowed_in_cloak"; default = FT(0.5))
-    return CoreCloakAreaPartitionModel{FT}(cloak_area_factor, cloak_mix_factor, confine_all_downdraft_to_cloak, apply_second_order_flux_correction, second_order_correction_limit_factor, apply_cloak_to_condensate_formation, fraction_of_area_above_max_area_allowed_in_cloak)
+    return CoreCloakAreaPartitionModel{FT}(cloak_area_factor, cloak_dn_area_factor, cloak_mix_factor, confine_all_downdraft_to_cloak, apply_second_order_flux_correction, second_order_correction_limit_factor, apply_cloak_to_condensate_formation, fraction_of_area_above_max_area_allowed_in_cloak)
 end
 # ============================================================================================================= #
 
@@ -404,6 +408,10 @@ Base.@kwdef struct EnvBuoyGrad{FT, EBC <: AbstractEnvBuoyGradClosure}
     qv_sat::FT
     "total specific humidity in the saturated part"
     qt_sat::FT
+    "liquid specific humidity in the saturated part" # [[ my addition ]] # see https://github.com/CliMA/ClimaAtmos.jl/issues/2429 https://github.com/CliMA/ClimaAtmos.jl/pull/2401
+    ql_sat::FT
+    "ice specific humidity in the saturated part" # [[ my addition ]] # see https://github.com/CliMA/ClimaAtmos.jl/issues/2429 https://github.com/CliMA/ClimaAtmos.jl/pull/2401 
+    qi_sat::FT
     "potential temperature in the saturated part"
     θ_sat::FT
     "liquid ice potential temperature in the saturated part"
@@ -1568,6 +1576,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
         # entrainment_type = TotalRateEntrModel()
         entrainment_type = TotalRateEntrModel(;
         base_detrainment_rate_inv_s = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "base_detrainment_rate_inv_s", default = 0.0), # assume infinite timescale so 0 inv timescale (consider choosing a better default like 6 hours or something...)
+        base_entrainment_rate_inv_s = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "base_entrainment_rate_inv_s", default = 0.0), # assume infinite timescale so 0 inv timescale (consider choosing a better default like 6 hours or something...)
         stalled_updraft_handler = stalled_updraft_handler, 
         )
     else

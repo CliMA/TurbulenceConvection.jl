@@ -22,12 +22,12 @@ function compute_turbconv_tendencies!(
     use_fallback_tendency_limiters::Bool,
 )
     compute_up_tendencies!(edmf, grid, state, param_set, surf, Δt, use_fallback_tendency_limiters)
-    compute_en_tendencies!(edmf, grid, state, param_set, surf, Val(:tke), Val(:ρatke), use_fallback_tendency_limiters)
+    compute_en_tendencies!(edmf, grid, state, param_set, surf, Val(:tke), Val(:ρatke), Δt, use_fallback_tendency_limiters)
 
     if edmf.thermo_covariance_model isa PrognosticThermoCovariances
-        compute_en_tendencies!(edmf, grid, state, param_set, surf, Val(:Hvar), Val(:ρaHvar), use_fallback_tendency_limiters)
-        compute_en_tendencies!(edmf, grid, state, param_set, surf, Val(:QTvar), Val(:ρaQTvar), use_fallback_tendency_limiters)
-        compute_en_tendencies!(edmf, grid, state, param_set, surf, Val(:HQTcov), Val(:ρaHQTcov), use_fallback_tendency_limiters)
+        compute_en_tendencies!(edmf, grid, state, param_set, surf, Val(:Hvar), Val(:ρaHvar), Δt, use_fallback_tendency_limiters)
+        compute_en_tendencies!(edmf, grid, state, param_set, surf, Val(:QTvar), Val(:ρaQTvar), Δt, use_fallback_tendency_limiters)
+        compute_en_tendencies!(edmf, grid, state, param_set, surf, Val(:HQTcov), Val(:ρaHQTcov), Δt, use_fallback_tendency_limiters)
     end
 
     return nothing
@@ -51,7 +51,7 @@ This is based on the second order approximation
 """
 function apply_second_order_correction(flux::CC.Fields.Field, w::CC.Fields.Field, Δt::FT) where{FT}
     wvec = CC.Geometry.WVector
-    ∇c = CCO.DivergenceF2C()
+    # ∇c = CCO.DivergenceF2C()
     # Iff = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
     Iff = CCO.InterpolateC2F(; bottom = CCO.SetGradient(wvec(zero(FT))), top = CCO.SetGradient(wvec(zero(FT)))) # we know the bc on flux is 0, but not what the gradient of the flux is. we can extrapolate the gradient or assume it's constant
     return @. flux - (Δt/FT(2)) * w * Iff(∇c(wvec(flux))) # -Δt/2 * wΔ(wq)
@@ -59,7 +59,7 @@ end
 
 function apply_second_order_flux_correction(flux::CC.Fields.Field, w::CC.Fields.Field, Δt::FT; apply_diffusive_damping::Bool = false, correction_limit_factor::FT = FT(Inf)) where{FT}
     wvec = CC.Geometry.WVector
-    ∇c = CCO.DivergenceF2C()
+    # ∇c = CCO.DivergenceF2C()
     Iff = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # we know the bc on flux is 0, but not what the gradient of the flux is. we can extrapolate the gradient or assume it's constant
     # Iff = CCO.InterpolateC2F(; bottom = CCO.SetGradient(wvec(zero(FT))), top = CCO.SetGradient(wvec(zero(FT)))) # we know the bc on flux is 0, but not what the gradient of the flux is. we can extrapolate the gradient or assume it's constant
     # Iff = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
@@ -136,7 +136,7 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
 
 
     wvec = CC.Geometry.WVector
-    ∇c = CCO.DivergenceF2C()
+    # ∇c = CCO.DivergenceF2C()
 
     # TODO: we shouldn't need to call parent here
     a_en = aux_en.area
@@ -198,8 +198,8 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
     # IfLBF(field::CC.Fields.Field) = LBC2F_field(field, kc_surf)
     # IfRBF(field::CC.Fields.Field) = RBC2F_field(field, kc_toa)
 
-    IfLBF(field::CC.Fields.Field) = If
-    IfRBF(field::CC.Fields.Field) = If
+    IfLBF(::CC.Fields.Field) = If
+    IfRBF(::CC.Fields.Field) = If
  
 
 
@@ -277,6 +277,11 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
             q_ice_cloak_dn = aux_en.q_ice_cloak_dn
         end
 
+        # q_liq_en_remaining = q_liq_en
+        # q_ice_en_remaining = q_ice_en
+        q_liq_en_remaining = aux_en.q_liq_en_remaining
+        q_ice_en_remaining = aux_en.q_ice_en_remaining
+
         # zero out
         @. massflux_h = FT(0)
         @. massflux_qt = FT(0)
@@ -352,13 +357,13 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
                     apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_LBF_a_cloak_up.(a_cloak_up) .* w_cloak_up .* IfLBF_q_liq_cloak_up.(q_liq_cloak_up), w_cloak_up, Δt; correction_limit_factor = seclf) .+
                     apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_cloak_dn.(a_cloak_dn) .* w_cloak_dn .* IfRBF_q_liq_cloak_dn.(q_liq_cloak_dn), w_cloak_dn, Δt; correction_limit_factor = seclf)
                 if !edmf.area_partition_model.confine_all_downdraft_to_cloak
-                    massflux_ql .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_en_remaining.(a_en_remaining) .* w_en .* IfRBF_q_liq_en.(q_liq_en), w_en, Δt; correction_limit_factor = seclf) # add in the remaining env part if we didn't move
+                    massflux_ql .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_en_remaining.(a_en_remaining) .* w_en .* IfRBF_q_liq_en.(q_liq_en_remaining), w_en, Δt; correction_limit_factor = seclf) # add in the remaining env part if we didn't move
                 end
                 massflux_qi .+=
                     apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_LBF_a_cloak_up.(a_cloak_up) .* w_cloak_up .* IfLBF_q_ice_cloak_up.(q_ice_cloak_up), w_cloak_up, Δt; correction_limit_factor = seclf) .+
                     apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_cloak_dn.(a_cloak_dn) .* w_cloak_dn .* IfRBF_q_ice_cloak_dn.(q_ice_cloak_dn), w_cloak_dn, Δt; correction_limit_factor = seclf)
                 if !edmf.area_partition_model.confine_all_downdraft_to_cloak
-                    massflux_qi .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_en_remaining.(a_en_remaining) .* w_en .* IfRBF_q_ice_en.(q_ice_en), w_en, Δt; correction_limit_factor = seclf)
+                    massflux_qi .+= apply_second_order_flux_correction(ρ_f .* ᶠinterp_a_RBF_a_en_remaining.(a_en_remaining) .* w_en .* IfRBF_q_ice_en.(q_ice_en_remaining), w_en, Δt; correction_limit_factor = seclf)
                 end
 
                 @. ql_flux_vert_adv = massflux_ql # rn they're the same since we omit gm in the second order correction case
@@ -371,15 +376,15 @@ function compute_sgs_flux!(edmf::EDMFModel, grid::Grid, state::State, surf::Surf
                 if !edmf.area_partition_model.confine_all_downdraft_to_cloak
                     # @. massflux_ql += ρ_f * ᶠinterp_a(a_en_remaining) * (w_en - toscalar(w_gm)) * (If(q_liq_en) - If(q_liq_gm)) # add in the remaining env part if we didn't move all the downdraft to cloak
                     # @. massflux_qi += ρ_f * ᶠinterp_a(a_en_remaining) * (w_en - toscalar(w_gm)) * (If(q_ice_en) - If(q_ice_gm))
-                    @. massflux_ql += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_liq_en(q_liq_en) # add in the remaining env part if we didn't move all the downdraft to cloak
-                    @. massflux_qi += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_ice_en(q_ice_en)
+                    @. massflux_ql += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_liq_en(q_liq_en_remaining) # add in the remaining env part if we didn't move all the downdraft to cloak
+                    @. massflux_qi += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_ice_en(q_ice_en_remaining)
                 end
 
                 @. ql_flux_vert_adv += ρ_f * ᶠinterp_a_LBF_a_cloak_up(a_cloak_up) * w_cloak_up * IfLBF_q_liq_cloak_up(q_liq_cloak_up) + ρ_f * ᶠinterp_a_RBF_a_cloak_dn(a_cloak_dn) * w_cloak_dn * IfRBF_q_liq_cloak_dn(q_liq_cloak_dn) # add up all the updraft cloaks, leave w_en outside the cloaks as 0
                 @. qi_flux_vert_adv += ρ_f * ᶠinterp_a_LBF_a_cloak_up(a_cloak_up) * w_cloak_up * IfLBF_q_ice_cloak_up(q_ice_cloak_up) + ρ_f * ᶠinterp_a_RBF_a_cloak_dn(a_cloak_dn) * w_cloak_dn * IfRBF_q_ice_cloak_dn(q_ice_cloak_dn) # add up all the updraft cloaks, leave w_en outside the cloaks as 0
                 if !edmf.area_partition_model.confine_all_downdraft_to_cloak
-                    @. ql_flux_vert_adv += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_liq_en(q_liq_en)
-                    @. qi_flux_vert_adv += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_ice_en(q_ice_en)
+                    @. ql_flux_vert_adv += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_liq_en(q_liq_en_remaining)
+                    @. qi_flux_vert_adv += ρ_f * ᶠinterp_a_RBF_a_en_remaining(a_en_remaining) * w_en * IfRBF_q_ice_en(q_ice_en_remaining)
                 end
             end
 
@@ -730,11 +735,26 @@ function affect_filter!(edmf::EDMFModel, grid::Grid, state::State, param_set::AP
     # filter env vars
     aux_en = center_aux_environment(state)
     prog_gm = center_prog_grid_mean(state)
+
+    aux_up = center_aux_updrafts(state)
+    aux_up_f = face_aux_updrafts(state)
+    aux_en_f = face_aux_environment(state)
+
     ρ_c = prog_gm.ρ
     FT = float_type(state)
     vmin = FT(0.01) * FT(1e-3) # 0.01 mm/s minimum velocity scale for tke floor
     @inbounds for k in real_center_indices(grid)
-        prog_en.ρatke[k] = max(prog_en.ρatke[k],   FT(0.5) * ρ_c[k] * aux_en.area[k]  * vmin^2)  # min tke based on min velocity scale
+        # Lower bound tke. no upper bound bc env area is never 0...
+        prog_en.ρatke[k] = max(prog_en.ρatke[k],   FT(0.5) * ρ_c[k] * aux_en.area[k]  * vmin^2)  # min tke based on min velocity scale [[ don't let go to 0 bc it never re-emerges]]
+
+        prog_en.ρatke_convective[k] = max(prog_en.ρatke_convective[k], FT(0)) # min tke based on min velocity scale [[ this one is specifically convective so could go to 0, could also argue there's always some micro-convection going on lol]]
+
+
+
+        # if param_set.user_params.use_convective_tke # rn this one keeps them separate but we need to add tke's so it acts on the real qt etc [[ dont do this!!!]]
+        #     prog_en.ρatke[k] += prog_en.ρatke_convective[k] # this is bad because we have no way to remove so it builds up forever... i think only apply to aux...
+        # end
+
         if edmf.thermo_covariance_model isa PrognosticThermoCovariances
             prog_en.ρaHvar[k] = max(prog_en.ρaHvar[k], 0.0)
             prog_en.ρaQTvar[k] = max(prog_en.ρaQTvar[k], 0.0)
@@ -1206,7 +1226,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
     # Ic = CCO.InterpolateF2C()
 
     wvec = CC.Geometry.WVector
-    ∇c = CCO.DivergenceF2C()
+    # ∇c = CCO.DivergenceF2C()
     w_bcs = (; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0))))
     LBF = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
 
@@ -1294,17 +1314,17 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         # thermo_params = TCP.thermodynamics_params(param_set)
         # Π = TD.exner.(thermo_params, aux_gm.ts)
 
-        f_q = similar(ρarea)
-        if edmf.area_partition_model isa CoreCloakAreaPartitionModel # Igore w for now
-            # As with advection, we will again partition everything outside of en_remaining into the updrafts and cloak up, leaving nothing in cloak_dn, and en_remainig unchanged
-            # Boost factors for ice formation segregation to updraft.
-            @inbounds for k in real_center_indices(grid)
-                combined_up_area = aux_bulk.area[k] + aux_en.a_cloak_up[k]
-                f_q[k] = (combined_up_area > sqrt(eps(FT))) ? ((one(FT) - aux_en.a_en_remaining[k]) / combined_up_area) : one(FT)
-            end
-        else
-            @. f_q = one(FT)
-        end
+        # f_q = similar(ρarea)
+        # if edmf.area_partition_model isa CoreCloakAreaPartitionModel # Igore w for now
+        #     # As with advection, we will again partition everything outside of en_remaining into the updrafts and cloak up, leaving nothing in cloak_dn, and en_remainig unchanged
+        #     # Boost factors for ice formation segregation to updraft.
+        #     @inbounds for k in real_center_indices(grid)
+        #         combined_up_area = aux_bulk.area[k] + aux_en.a_cloak_up[k]
+        #         f_q[k] = (combined_up_area > sqrt(eps(FT))) ? ((one(FT) - aux_en.a_en_remaining[k]) / combined_up_area) : one(FT)
+        #     end
+        # else
+        #     @. f_q = one(FT)
+        # end
 
         if edmf.entrainment_type isa FractionalEntrModel
             @. tends_ρarea = 
@@ -1324,8 +1344,8 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
                 tends_advec + 
                 progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaθ_liq_ice / ρarea, prog_gm.ρθ_liq_ice / ρ_c), prog_gm.ρθ_liq_ice / ρ_c, tends_ρarea,
                     limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) - (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn) , ρaθ_liq_ice + max(tends_advec+tends_other,0), ρ_c * area_en * θ_liq_ice_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
-                    (ρ_c * θ_liq_ice_tendency_precip_formation) + 
-                    f_q*max(ρarea * aux_tc.θ_liq_ice_tendency_precip_sinks, 0) # + # qi_sub_dep contribution [[ i think this is needed so significant snow formation doesn't kill updrafts?]]
+                    (ρ_c * θ_liq_ice_tendency_precip_formation) # + 
+                    # f_q*max(ρarea * aux_tc.θ_liq_ice_tendency_precip_sinks, 0) # + # qi_sub_dep contribution [[ i think this is needed so significant snow formation doesn't kill updrafts?]]
                     #+ ρarea*aux_up[i].dTdt/Π # test adding nudging in so that nudging doesnt prevent env and updraft from mixing and converging...
 
             @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaq_tot)))
@@ -1345,8 +1365,8 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
                 tends_advec +
                 progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaθ_liq_ice / ρarea, prog_gm.ρθ_liq_ice / ρ_c), prog_gm.ρθ_liq_ice / ρ_c, tends_ρarea,
                     limit_tendency(edtl, (ρarea * entr_rate_inv_s * θ_liq_ice_en) - (ρarea * detr_rate_inv_s * θ_liq_ice_up), ρaθ_liq_ice+max(tends_advec+tends_other,0), ρ_c * area_en * θ_liq_ice_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
-                (ρ_c * θ_liq_ice_tendency_precip_formation) +
-                f_q*max(ρarea * aux_tc.θ_liq_ice_tendency_precip_sinks, 0) # + # qi_sub_dep contribution [[ i think this is needed so significant snow formation doesn't kill updrafts?]]
+                (ρ_c * θ_liq_ice_tendency_precip_formation) # +
+                # f_q*max(ρarea * aux_tc.θ_liq_ice_tendency_precip_sinks, 0) # + # qi_sub_dep contribution [[ i think this is needed so significant snow formation doesn't kill updrafts?]]
                 #ρarea*aux_up[i].dTdt/Π # test adding nudging in so that nudging doesnt prevent env and updraft from mixing and converging...
 
             @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaq_tot)))
@@ -1955,7 +1975,7 @@ function compute_covariance_shear(
         @. Shear² = LA.norm_sqr(adjoint(∇uvw(uvw)) * k̂)
         @. shear = ρ_c * area_en * k_eddy * Shear²
     else
-        ∇c = CCO.GradientF2C()
+        ∇c = CCO.GradientF2C() # for some reason commenting this one out breaks things?
         @. shear = 2 * ρ_c * area_en * k_eddy * LA.dot(∇c(If(ϕ_en)), k̂) * LA.dot(∇c(If(ψ_en)), k̂)
     end
     return nothing
@@ -2127,6 +2147,7 @@ function compute_en_tendencies!(
     surf::SurfaceBase,
     ::Val{covar_sym},
     ::Val{prog_sym},
+    Δt::Real,
     use_fallback_tendency_limiters::Bool,
 ) where {covar_sym, prog_sym}
     N_up = n_updrafts(edmf)
@@ -2152,6 +2173,7 @@ function compute_en_tendencies!(
     mix_len_params = mixing_length_params(edmf)
     is_tke = covar_sym === :tke
     FT = float_type(state)
+    thermo_params = TCP.thermodynamics_params(param_set)
 
     ρ_ae_K = face_aux_turbconv(state).ρ_ae_K
     KM = center_aux_turbconv(state).KM
@@ -2184,7 +2206,7 @@ function compute_en_tendencies!(
 
     If = CCO.InterpolateC2F(; aeK_bcs...)
     ∇f = CCO.GradientC2F(; prog_bcs...)
-    ∇c = CCO.DivergenceF2C()
+    # ∇c = CCO.DivergenceF2C()
 
     # compute bottom BC for TKE
     if is_tke
@@ -2228,6 +2250,199 @@ function compute_en_tendencies!(
         press + buoy + shear + entr_gain + rain_src - D_env * covar -
         (c_d * sqrt(max(tke_en, 0)) / max(mixing_length, 1)) * prog_covar - ∇c(wvec(RB(prog_covar * Ic(w_en_f)))) -
         ∇c_turb(-1 * ρ_f * If(aeK) * ∇f(covar))
+
+
+    if is_tke && param_set.user_params.use_convective_tke_production_only # let it advect and diffuse on its own.... [[ this one is not tke dependent ]]
+        # production due to instability [[should we use static stability ? ]]
+        ρatke_convective_production = aux_en.tke_convective_production # for some reason these have ρa in ρatke but are named this way so we follow
+        K_buoy = param_set.user_params.convective_tke_buoyancy_coeff
+        a_en = aux_en.area
+        ∂MSE∂z = aux_en.∂MSE∂z
+        @. ρatke_convective_production = K_buoy * ρ_c * a_en * max(-∂MSE∂z, 0) # only positive values of convective TKE [[ not sure if existing tke should matter...]]
+        @. tend_covar += ρatke_convective_production # maybe don't combine?
+
+        # Here we let normal dissipation take care of it... we find it is very slow to diffuse though... it mainly stays where it is created...
+    end
+
+    if is_tke && param_set.user_params.use_convective_tke
+
+        (!param_set.user_params.use_convective_tke_production_only) || error("Cannot use convective TKE while also using convective TKE production only")
+        Ifw = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+
+        a_en = aux_en.area
+        # We want here to keep our `convective TKE` and move it around etc, but dont dissipate it unless there's strong stability.
+        ρatke_convective = prog_en.ρatke_convective
+        tend_ρatke_convective = tendencies_en.ρatke_convective
+        ∂MSE∂z = aux_en.∂MSE∂z
+
+
+
+        #=
+        Compute theoretical max TKE (J/kg) from local MSE stratification.
+        Derived from potential energy available over one mixing length:
+            Emax = (g / (2(h_0-Φ))) * (-∂h/∂z) * ℓ_mix^2
+        where:
+            h0 ≈ cp*T + L*qv   (reference moist static energy)
+            ∂h/∂z < 0 indicates unstable stratification
+            ℓ_mix   is the mixing length (m)
+        Used to cap TKE growth at physically realizable values.
+        =#
+        MSE = aux_en.MSE
+        # Φ = TC.geopotential(param_set, grid.zc[k].z)
+        Φ = geopotential.(param_set, getfield.(grid.zc, :z))
+        g = TCP.grav(param_set)
+        tke_max = @. (g/(2*max(MSE - Φ,0))) * max(-∂MSE∂z, 0) * aux_tc.mixing_length^2 * param_set.user_params.tke_convective_max_scaling_factor # max tke we could get from total conversion of MSE gradient to tke
+
+        # @warn "tke_max = $tke_max; MSE = $MSE; Φ = $Φ; ∂MSE∂z = $∂MSE∂z; mixing_length = $(aux_tc.mixing_length)"  # remove later
+        # if any(!isfinite, tke_max)
+        #     error("Non-finite values in tke_max computation.")
+        # end 
+
+
+
+        # -- production -- #
+        # production due to static instability (conditional)``
+        ρatke_convective_production = aux_en.tke_convective_production # for some reason these have ρa in ρatke but are named this way so we follow
+ 
+        #= unstable if:
+            - subsaturated and dry static instability [[ dry static energy gradient looks like ]]
+            - saturated and moist static instability
+              - saturated wrt ice if below freezing, liquid if above
+        =#
+
+        instability = similar(∂MSE∂z)
+
+        DSE = @. Φ + TCP.cp_d(param_set) * aux_en.T # dry static energy
+        # ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+        # If0 = CCO.InterpolateC2F(; ∇0_bcs...)
+        ∂DSE∂z = @. ∇c(wvec(Ifx(DSE))) # dry static energy gradient
+
+        # # I think these are interchangeable...
+        # θ_virt = aux_en.θ_virt
+        # kc_toa = kc_top_of_atmos(grid)
+        # θ_virt_toa = aux_en.θ_virt[kc_toa]
+        # RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_virt_toa))
+        # dθ_virt_dz = @. ∇c(wvec(RBθ(θ_virt)))
+
+        @inbounds for k in real_center_indices(grid)
+            ts = aux_en.ts[k]
+            T = aux_en.T[k]
+            T_freeze = TCP.T_freeze(param_set)
+            below_freezing = (T < T_freeze)
+
+
+            std_qt = sqrt(aux_en.QTvar[k])
+            if std_qt > sqrt(eps(FT))
+                q_tot_hi = aux_en.q_tot[k] + sqrt(aux_en.QTvar[k])
+                # q_tot_lo = aux_en.q_tot[k] - sqrt(aux_en.QTvar[k])
+                ts_hi = (edmf.moisture_model isa EquilibriumMoisture) ? thermo_state_pθq(param_set, aux_en.p[k], aux_en.θ_liq_ice[k], q_tot_hi) : thermo_state_pθq(param_set, aux_en.p[k], aux_en.θ_liq_ice[k], q_tot_hi, aux_en.q_liq[k], aux_en.q_ice[k])
+                # ts_lo = (edmf.moisture_model isa EquilibriumMoisture) ? thermo_state_pθq(param_set, aux_en.p[k], aux_en.θ_liq_ice[k], q_tot_lo) : thermo_state_pθq(param_set, aux_en.p[k], aux_en.θ_liq_ice[k], q_tot_lo, aux_en.q_liq[k], aux_en.q_ice[k])
+                RH_ice = relative_humidity_over_ice(thermo_params, ts_hi)
+                RH_liq = relative_humidity_over_liquid(thermo_params, ts_hi)
+
+            else
+                RH_ice = aux_en.RH_ice[k]
+                RH_liq = aux_en.RH_liq[k]
+
+            end
+            if (below_freezing && (RH_ice < one(FT)) || (!below_freezing && (RH_liq < one(FT)))) # subsaturated
+                # I'm not sure if you should evaporation to contribue and use MSE or just stick to SE
+                if (aux_en.q_liq[k] + aux_en.q_ice[k]) > FT(1e-10) # use MSE? I thnk still DSE.. evaporation could spark downdrafts I guess... but it's much more finite than runaway updrafts
+                    # instability[k] = -∂MSE∂z[k]
+                    # instability[k] = -∂DSE∂z[k]
+                    instability[k] = -FT(Inf) # don't allow
+                else # use DSE
+                    # instability[k] = -∂DSE∂z[k]
+                    # c_p = TCP.cp_d(param_set)
+                    # instability[k] = c_p * -dθ_virt_dz[k] # dry static stability
+                    instability[k] = -FT(Inf) # disallow
+                end
+            else # saturated
+                instability[k] = -∂MSE∂z[k] 
+            end
+        end
+
+
+        K_buoy = param_set.user_params.convective_tke_buoyancy_coeff
+        @. ρatke_convective_production = K_buoy * ρ_c * a_en * max(instability, 0) * clamp(sqrt(aux_en.tke), eps(FT), 1) # only positive values of convective TKE [[ not sure if existing tke should matter...]]
+
+        
+        # -- advection/diffusion -- #
+        # advection (is diffusive, like pressure diffusion I guess...) # [[ they use ::         @. nh_press_adv = Int(ᶠinterp_a(a_up) > 0) * ρ_f * ᶠinterp_a(a_up) * α_a * w_up * ∇(wvec(Ifc(w_up)))      ]]
+        # We'll have a fast advection part and a slow diffusion part. diffusion is up gradient, advection is with w_convective [[ could in principle go both directions but should be biased up for convection so go up ]]
+        ρatke_convective_advection = aux_en.tke_convective_advection # for some reason these have ρa in ρatke but are named this way so we follow
+        w_convective = @. sqrt(2 * ρatke_convective/(ρ_c * a_en)) # tke = 1/2 ρ w^2  => w = sqrt(2*tke) , tke is per unit mass here
+        k_adv = param_set.user_params.convective_tke_advection_coeff
+        # tke_convective_advection = @. ρ_c * a_en * k_adv * w_convective * ∇c(wvec(Ifw(tke_convective)))
+        # @. ρatke_convective_advection = -∇c(ρ_f * ᶠinterp_a(a_en) * k_adv * wvec(Ifw(w_convective) * Ifw(ρatke_convective / (ρ_c * a_en)))) # negative divergence of flux
+        # @. ρatke_convective_advection += -∇c(ρ_f * ᶠinterp_a(a_en) * k_adv * wvec(Ifw(-w_convective) * Ifw(ρatke_convective / (ρ_c * a_en)))) # some going the other way for diffusion
+
+        k_diff = param_set.user_params.convective_tke_advection_coeff # rename to diffusiong if we go with this option...
+        # @. ρatke_convective_advection = -∇c_turb(-1 * ρ_f * ᶠinterp_a(a_en) * k_diss * (Ifw(w_convective))^2 * ∇f(ρatke_convective))
+        # diffusive_flux_tke = -ρ_f * ᶠinterp_a(a_en) * k_diss * Ifw(w_convective)^2 * ∇f(ρatke_convective) # :: Recall, @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KQ * ∇q_tot_en(wvec(aux_en.q_tot))
+        @. ρatke_convective_advection = -∇c_turb(wvec( -1 * ρ_f * ᶠinterp_a(a_en) * k_diff * (Ifw(w_convective))^2 * ∇f(ρatke_convective) )) # (w_convective)^2 comes from KE = 1/2 ρ w^2 → w = sqrt(2*KE/ρ); flux ∼ K_turb * ∇(KE) with K_turb ∼ ℓ_mix * w ∼ w^2 scaling for convective transport
+
+        
+        # -- dissipation -- #
+        # dissipation due to stability [[ should we use MSE for static stability? part of me also feels like we should be using moist static energy here since it's actually constant in the cloud but idk.... ]]
+        ρatke_convective_dissipation = aux_en.tke_convective_dissipation # for some reason these have ρa in ρatke but are named this way so we follow
+        ∂MSE∂z = aux_en.∂MSE∂z
+        k_diss = param_set.user_params.convective_tke_dissipation_coeff
+        # K_diss = @. -k_diss * ∇c_turb(ρ_f * wvec(Ifw(min(∂MSE∂z,0)))) # if MSE decreases with height, we dissipate convective TKE
+        K_diss = @. -k_diss * max(∂MSE∂z, 0)^2 # if MSE increases with height, we dissipate convective TKE squared goes like brunt vaisala
+        @. ρatke_convective_dissipation = K_diss * ρatke_convective
+        # self dissipation in `compute_covariance_dissipation()`
+
+        # -- limit production to enforce tke max -- #
+        # limit production and net if we're exceeding tke max (smooth limiter that ramps on as we exceed tke max)
+
+        # current KE per unit mass
+        KE_current = @. ρatke_convective / (ρ_c * a_en)
+        # KE increment from this timestep (production + dissipation + advection)
+        ΔKE_timestep = @. (ρatke_convective_production + ρatke_convective_dissipation + ρatke_convective_advection) * Δt / (ρ_c * a_en)
+        # overshoot due to this timestep’s contribution only
+        overage_prod = @. min(KE_current + ΔKE_timestep - tke_max, ρatke_convective_production * Δt/(ρ_c * a_en)) # only consider production contribution to overshoot
+
+        # smooth exponential decay applied only to the overshoot fraction
+        ϵ = FT(0.1)
+        @. ρatke_convective_production -= (ρ_c * a_en)/Δt * overage_prod * (1 - exp(-ϵ))
+
+        # turn off production at surface, surface +1, toa, toa -1 
+        ρatke_convective_production[kc_surf] = 0
+        ρatke_convective_production[kc_surf + 1] = 0
+        ρatke_convective_production[kc_toa] = 0
+        ρatke_convective_production[kc_toa - 1] = 0
+
+
+
+        # -- combine tendencies -- #
+        @. tend_ρatke_convective = ρatke_convective_production + ρatke_convective_advection + ρatke_convective_dissipation # prolly should have some kinda limiter but...
+        @. tend_ρatke_convective = max(tend_ρatke_convective, -ρatke_convective / Δt) # can't dissipate more than we have
+        # we do not combine tendencies [  tend_covar += tend_ρatke_convective  ] here because we track ρatke_convective separately and we cant separate them later after adding
+
+        if any(!isfinite, tend_ρatke_convective)
+            error("Non-finite values in convective TKE tendency computation. Details: 
+                ρatke_convective = $ρatke_convective
+                ρatke_convective_production = $ρatke_convective_production
+                ρatke_convective_advection = $ρatke_convective_advection
+                ρatke_convective_dissipation = $ρatke_convective_dissipation
+                KE_current = $KE_current
+                overage = $overage
+            ")
+        end
+
+
+        # if rand() < 1e-5
+        #     @warn "1) Maybe switch to advection (strong) down MSE gradient, and diffusion (weaker). 2) Figure out how we want to combine this with regular ρatke. rn we combine tendencies, but idk if that's ideal for bookkeeping and ρatke and ρatke_convective could get out of sync. esp since ρatke already faces its own transport, dissipation, etc... Maybe we should just combine prog tke later, and limit prog tke to respect convective tke and vice versa..."
+        #     @warn "1) at the same time this tke should be self-dissipatting as it removes the MSE gradient which is different from being damped, so maybe we need two dampings? Or just let the ρatke damping occur as normal and then our damping is only the stability damping"
+        #     @warn "If we keep convective TKE separate I think we're ok as long as diffusion/advection come to balance production... it still might be good to add a self-loss mechanism so in areas with persistent MSE gradients we dont simply generate more and more tke forever but it is still generated fast enough for export upwards"
+        #     @warn "The true ρatke decouples pretty quickly out of the main production region from dissipation... also it's getting double advected and stuff... so idk... the advection and dissipation from a separate convection_tke cancel out... while the real tke is already 0. i think either we just put MSE generation into real tke or we keep convective tke completely separate...."
+        #     @warn "We still have a Δt hydraulic jump somewhere"
+        #     @warn "Add an option to just increase K and/or mixing length in statically unstable regions (using θ_v or θ in unsat, and θ_e == MSE in saturated regions)"
+        #     @warn "If we're not relying on MF alone, the massflux boost should also allow for boosts from convective TKE transport... It could probably be tied to some estimate of mixing length or w... idk. dT/dz * mixing_length = ΔT or something though that's prone to variability... idk."
+        # end
+
+    end
 
     return nothing
 end
@@ -2345,7 +2560,7 @@ function GMV_third_m(
     area_en = aux_en_c.area
     Ic = is_tke ? CCO.InterpolateF2C() : x -> x
     wvec = CC.Geometry.WVector
-    ∇c = CCO.DivergenceF2C()
+    # ∇c = CCO.DivergenceF2C()
     w_en = aux_en_f.w
 
     @. ϕ_gm = area_en * Ic(var_en)

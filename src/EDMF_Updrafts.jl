@@ -189,7 +189,7 @@ function compute_cloud_condensate_sedimentation_tendencies!(
 
 
             wvec = CC.Geometry.WVector
-            ∇c = CCO.DivergenceF2C()
+            # ∇c = CCO.DivergenceF2C()
             LBF = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
 
 

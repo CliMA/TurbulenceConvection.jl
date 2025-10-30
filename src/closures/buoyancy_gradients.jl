@@ -11,7 +11,8 @@ over the conserved thermodynamic variables.
 """
 function buoyancy_gradients(
     param_set::APS,
-    bg_model::EnvBuoyGrad{FT, EBG},
+    bg_model::EnvBuoyGrad{FT, EBG};
+    is_noneq::Bool = false,
 ) where {FT <: Real, EBG <: AbstractEnvBuoyGradClosure}
 
     thermo_params = TCP.thermodynamics_params(param_set)
@@ -26,7 +27,11 @@ function buoyancy_gradients(
     ∂b∂θv = g * (R_d * bg_model.ρ / bg_model.p) * Π
 
     if bg_model.en_cld_frac > 0.0
-        ts_sat = thermo_state_pθq(param_set, bg_model.p, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
+        if is_noneq
+            ts_sat = thermo_state_pθq(param_set, bg_model.p, bg_model.θ_liq_ice_sat, bg_model.qt_sat, bg_model.ql_sat, bg_model.qi_sat) # dont assume sat...
+        else
+            ts_sat = thermo_state_pθq(param_set, bg_model.p, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
+        end
         phase_part = TD.PhasePartition(thermo_params, ts_sat)
         lh = TD.latent_heat_liq_ice(thermo_params, phase_part)
         cp_m = TD.cp_m(thermo_params, ts_sat)

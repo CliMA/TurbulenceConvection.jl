@@ -218,7 +218,7 @@ C2Fq_ice = CCO.InterpolateC2F(bottom = CCO.Extrapolate(), top = CCO.Extrapolate(
 F2Cq_liq = CCO.InterpolateF2C(bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
 F2Cq_ice = CCO.InterpolateF2C(bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
 wvec = CC.Geometry.WVector
-∇c = CCO.DivergenceF2C() # F2C to come back from C2F
+# ∇c = CCO.DivergenceF2C() # F2C to come back from C2F
 
 RBq_ice = CCO.RightBiasedC2F(; top = CCO.SetValue(q_ice_gm_toa))
 LBq_ice = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(q_ice_boa))

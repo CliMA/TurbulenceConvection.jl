@@ -66,6 +66,12 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "tke_shear" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.shear),
         "tke_interdomain" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).tke.interdomain),
 
+        # My convective tke additions
+        "tke_convective" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective),
+        "tke_convective_production" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_production),
+        "tke_convective_advection" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_advection),
+        "tke_convective_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_dissipation),
+
         "Hvar_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).Hvar.dissipation),
         "Hvar_entr_gain" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).Hvar.entr_gain),
         "Hvar_detr_loss" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).Hvar.detr_loss),
@@ -101,6 +107,14 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "massflux_s" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_grid_mean(state).massflux_s),
         "diffusive_flux_s" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_grid_mean(state).diffusive_flux_s),
         "total_flux_s" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_grid_mean(state).massflux_s .+ face_aux_grid_mean(state).diffusive_flux_s),
+        
+        "env_MSE" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).MSE),
+        "MSE_grad" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).∂MSE∂z),
+
+        # My additions
+        "env_θ_virt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).θ_virt),
+        # "updraft_θ_virt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).θ_virt),
+        "θ_virt_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).θ_virt),
 
         "env_dqvdt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).dqvdt),
         "updraft_dqvdt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).dqvdt),
@@ -135,6 +149,10 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
 
         "total_flux_h" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_h .+ face_aux_turbconv(state).massflux_h),
         "total_flux_qt" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qt .+ face_aux_turbconv(state).massflux_qt),
+
+        # TEMPORARY
+        "diffusive_flux_qt" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).diffusive_flux_qt),
+        "massflux_qt" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_turbconv(state).massflux_qt),
 
         "ed_length_scheme" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).mls),
         "mixing_length_ratio" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).ml_ratio),
@@ -341,6 +359,51 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         # all ice precip (do this or just add grapuel to snow in LES output?)
         "qip_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_prog_precipitation(state).q_sno),
 
+
+
+        ## [[ TEMPORARY ]] :: STORE THE Cloak
+
+        ( ( edmf.area_partition_model isa CoreCloakAreaPartitionModel ) ? (
+        "cloak_up_area" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).a_cloak_up),
+        "cloak_dn_area" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).a_cloak_dn),
+        "env_remaining_area" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).a_en_remaining),
+        #
+        "cloak_up_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_tot_cloak_up),
+        "cloak_dn_qt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_tot_cloak_dn),
+        #
+        "cloak_up_thetal" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).θ_liq_ice_cloak_up),
+        "cloak_dn_thetal" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).θ_liq_ice_cloak_dn),
+        #
+        "cloak_up_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_liq_cloak_up),
+        "cloak_dn_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_liq_cloak_dn),
+        "env_remaining_ql" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_liq_en_remaining),
+        #
+        "cloak_up_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_ice_cloak_up),
+        "cloak_dn_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_ice_cloak_dn),
+        "env_remaining_qi" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).q_ice_en_remaining),
+        #
+        "cloak_up_temperature" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).T_cloak_up),
+        "cloak_dn_temperature" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).T_cloak_dn),
+        "env_remaining_temperature" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).T_en_remaining),
+        #
+        "cloak_up_w" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_environment(state).w_cloak_up),
+        "cloak_dn_w" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_environment(state).w_cloak_dn),
+        #
+        "cloak_up_RH_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_liq_cloak_up),
+        "cloak_dn_RH_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_liq_cloak_dn),
+        "cloak_up_RH_ice" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_ice_cloak_up),
+        "cloak_dn_RH_ice" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_ice_cloak_dn),
+        "env_remaining_RH_liq" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_liq_en_remaining),
+        "env_remaining_RH_ice" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).RH_ice_en_remaining),
+        #
+
+        #sub_dep 
+        "cloak_up_qi_sub_dep" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).qi_tendency_sub_dep_cloak_up),
+        "cloak_dn_qi_sub_dep" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).qi_tendency_sub_dep_cloak_dn),
+        "env_remaining_qi_sub_dep" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).qi_tendency_sub_dep_en_remaining),
+        ) : () )...,
+
+        
         #
         # possible future additions
         # - N and assumed N

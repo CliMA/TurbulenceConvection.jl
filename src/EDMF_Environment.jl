@@ -201,7 +201,7 @@ function microphysics!(
                     regions = (
                         (aux_en.a_cloak_up[k], w_cloak_up[k], aux_en.T_cloak_up[k], aux_en.ts_cloak_up[k], CloakUp),
                         (aux_en.a_cloak_dn[k], w_cloak_dn[k], aux_en.T_cloak_dn[k], aux_en.ts_cloak_dn[k], CloakDown),
-                        (aux_en.a_en_remaining[k], w_en_remaining, aux_en.T[k], ts_env[k], EnvRemaining),
+                        (aux_en.a_en_remaining[k], w_en_remaining, aux_en.T_en_remaining[k], aux_en.ts_en_remaining[k], EnvRemaining),
                         )
                 end
 
@@ -222,8 +222,47 @@ function microphysics!(
                         p = TD.air_pressure(thermo_params, ts)
                     end
 
-                                    
-                    mph_neq_here = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, ts, w_region, q_vap_sat_liq, q_vap_sat_ice, aux_en.dqvdt[k], aux_en.dTdt[k], aux_en.τ_liq[k], aux_en.τ_ice[k])
+                    q_here = TD.PhasePartition(thermo_params, ts) # we don't have it cached here but we do in updraft so calculating outside the fcn saves work
+
+                    # calculate local timescales by scaling the env timescale. We know τ = 1/(4πDNr) ~ 1/(4πDqr) assuming fixed <r>. so τ_here = τ_env * (q_env/q_here) but that blows up when q_here -> 0. so we do the following scaling instead:
+                    τ_liq_here = aux_en.τ_liq[k] * (aux_en.q_liq[k] + eps(FT)) / (q_here.liq + eps(FT))
+                    τ_ice_here = aux_en.τ_ice[k] * (aux_en.q_ice[k] + eps(FT)) / (q_here.ice + eps(FT))
+
+
+                    # limit exterior tendencies to give microphysics first swing
+                    dqvdt = aux_en.dqvdt[k]
+                    dTdt = aux_en.dTdt[k]
+                    dqvdt = max(dqvdt, FT(0)) # give microphysics first right of refusal on vapor usage
+                    dTdt = min(dTdt, FT(0)) # give microphysics first right of refusal on cooling usage
+                    # dqvdt = FT(0)
+                    # # add advection, diffusion
+                    # dqvdt += (aux_tc.diffusive_tendency_qt[k] - aux_tc.diffusive_tendency_ql[k] - aux_tc.diffusive_tendency_qi[k]) / ρ # diffusion of qt into/outof env goes into vapor
+                    # dqvdt += (aux_tc.massflux_tendency_qt[k] - aux_tc.massflux_tendency_ql[k] - aux_tc.massflux_tendency_qi[k]) / ρ # massflux of qt into/outof env goes into vapor
+                    # dTdt = FT(0)
+
+                    if ((param_set.user_params.use_convective_tke) || (param_set.user_params.use_convective_tke_production_only)) && (region isa EnvDomain)
+                        # assume the condensate is in the tke part going up KE = 1/2 ρ w^2. critical to generating condensate
+                        w_noneq = sqrt(2 * aux_en.tke[k] / ρ)
+                        
+                        # Now, we assume liq is biased with covariance, when we add this eddy mixing so we go up and down 1SD, but assume liq is tied to +1 SD
+                    else
+                        w_noneq = w[k]
+                    end
+                    
+
+
+                    mph_neq_here = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here)
+
+                    if region isa EnvRemainingDomain
+                        aux_en.qi_tendency_sub_dep_en_remaining[k] = mph_neq_here.qi_tendency
+                    elseif region isa CloakUpDomain
+                        aux_en.qi_tendency_sub_dep_cloak_up[k] = mph_neq_here.qi_tendency
+                    elseif region isa CloakDownDomain
+                        aux_en.qi_tendency_sub_dep_cloak_dn[k] = mph_neq_here.qi_tendency
+                    end
+                    
+
+
                     # if at an extrema, we don't know where the peak is so we'll reweight based on probability of where it could be in between.
                     if reweight_processes_for_grid
                         w_region_full = if region isa EnvOrUp
@@ -298,7 +337,8 @@ function microphysics!(
                         aux_en.tke[k],
                         aux_en.N_i_no_boost[k],
                         S_i,
-                        aux_en.τ_ice[k], # keep same in all regions for simplicity
+                        # aux_en.τ_ice[k], # keep same in all regions for simplicity
+                        τ_ice_here,
                         aux_en.dN_i_dz[k],
                         aux_en.dqidz[k],
                         N_INP,
@@ -311,10 +351,26 @@ function microphysics!(
             elseif en_thermo isa SGSMeanWQuadratureAdjustedNoneqMoistureSources # Doesn't seem to do much in the end, variance is pretty small...
 
                 if edmf.area_partition_model isa CoreCloakAreaPartitionModel && (edmf.area_partition_model.apply_cloak_to_condensate_formation) && (aux_bulk.area[k] > edmf.minimum_area)
-                    @error "SGSMeanWQuadratureAdjustedNoneqMoistureSources with CoreCloakAreaPartitionModel not implemented yet"
+                    error("SGSMeanWQuadratureAdjustedNoneqMoistureSources with CoreCloakAreaPartitionModel not implemented yet")
                 else
                     # use quadrature to adjust noneq moisture sources based on subgrid variability in qt and θl
+                    region = Env
                 end
+
+                if ((param_set.user_params.use_convective_tke) || (param_set.user_params.use_convective_tke_production_only)) && (region isa EnvDomain)
+                    # assume the condensate is in the tke part going up KE = 1/2 ρ w^2. critical to generating condensate
+                    w_noneq = sqrt(2 * aux_en.tke[k] / ρ)
+                    
+                    # Now, we assume liq is biased with covariance, when we add this eddy mixing so we go up and down 1SD, but assume liq is tied to +1 SD
+                else
+                    w_noneq = w[k]
+                end
+
+                # limit exterior tendencies to give microphysics first swing
+                dqvdt = aux_en.dqvdt[k]
+                dTdt = aux_en.dTdt[k]
+                dqvdt = max(dqvdt, FT(0))
+                dTdt = min(dTdt, FT(0))
 
                 quadrature_type = en_thermo.quadrature_type
                 quad_order = quadrature_order(en_thermo)
@@ -386,7 +442,7 @@ function microphysics!(
 
                         q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Liquid())
                         q_vap_sat_ice = TD.q_vap_saturation_generic(thermo_params, T, ρ, TD.Ice())
-                        mph_neq_quad = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, aux_en.area[k], ρ_c[k], aux_en.p[k], T, Δt + ε, ts_hat, w[k], q_vap_sat_liq, q_vap_sat_ice, aux_en.dqvdt[k], aux_en.dTdt[k], aux_en.τ_liq[k], aux_en.τ_ice[k])
+                        mph_neq_quad = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, aux_en.area[k], ρ_c[k], aux_en.p[k], T, Δt + ε, ts_hat, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, aux_en.τ_liq[k], aux_en.τ_ice[k])
 
                         # if at an extrema, we don't know where the peak is so we'll reweight based on probability of where it could be in between.
                         if reweight_processes_for_grid
@@ -615,6 +671,8 @@ function microphysics!(
                 # aux_en_sat.q_vap[k] = min(TD.q_vap_saturation(thermo_params, ts), TD.vapor_specific_humidity(thermo_params, ts)) # having condensate is no guarantee of saturation in noneq
                 # aux_en_sat.q_vap[k] = TD.q_vap_saturation(thermo_params, ts) # having condensate is no guarantee of saturation in noneq
                 aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(thermo_params, ts) # i think it is just the local qv, not sure. note we'll be stuck in the sat state until  all condensate is gone
+                aux_en_sat.q_liq[k] = TD.liquid_specific_humidity(thermo_params, ts) # added
+                aux_en_sat.q_ice[k] = TD.ice_specific_humidity(thermo_params, ts) # added
             else
                 aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(thermo_params, ts)
             end
@@ -631,6 +689,8 @@ function microphysics!(
             if moisture_model isa NonEquilibriumMoisture # In noneq, not having condensate doesn't guarantee unsat
                 # aux_en_sat.q_vap[k] = min(TD.q_vap_saturation(thermo_params, ts), TD.vapor_specific_humidity(thermo_params, ts)) # having condensate is no guarantee of saturation in noneq
                 aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(thermo_params, ts) # i think it is just the local qv, not sure. note we'll be stuck in the sat state until  all condensate is gone
+                aux_en_sat.q_liq[k] = TD.liquid_specific_humidity(thermo_params, ts) # added
+                aux_en_sat.q_ice[k] = TD.ice_specific_humidity(thermo_params, ts) # added
             else
                 aux_en_sat.q_vap[k] = FT(0) #  i think this is wrong...
                 # aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(thermo_params, ts)
@@ -884,9 +944,7 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
         # mean_q_vap_sat_ice = TD.saturation_excess(thermo_params, T, ρ, TD.Ice(), q)
 
         # we want to reduce if below the average saturation excess, increase if above, and conserve the total, with the weights...
-        # if rand() < 1e-4
-        #     "Consider calibrating the q′S′ values for liquid and ice when using quadrature"
-        # end
+
 
         #=
             We estimate var(q)/q ≈ var(S)/S. but S can be positive or negative and even have mean 0 so you'd need to shift S so all values are positive
@@ -921,14 +979,7 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
             q_ice_ens .= q_ice
         end
        
-        # if any(!isfinite, q_liq_ens) || (rand() < 1e-4) # if we get a nonfinite value, reset to uniform distribution
-        #     @warn "Non-finite or extreme q_liq_ens in quadrature, resetting to uniform distribution"
-        #     @warn "q_liq_ens: $q_liq_ens; saturation_excesses_liq: $saturation_excesses_liq; q_liq: $q_liq; weights: $weights; sqpi_inv: $sqpi_inv"
-        # end
-        # if any(!isfinite, q_ice_ens) || (rand() < 1e-4) # if we get a nonfinite value, reset to uniform distribution
-        #     @warn "Non-finite or extreme q_ice_ens in quadrature, resetting to uniform distribution"
-        #     @warn "q_ice_ens: $q_ice_ens; saturation_excesses_ice: $saturation_excesses_ice; q_ice: $q_ice; weights: $weights; sqpi_inv: $sqpi_inv"
-        # end
+
         # total_saturation_excess_liq = sum(saturation_excesses_liq)
         # total_saturation_excess_ice = sum(saturation_excesses_ice)
     end 
@@ -1396,6 +1447,8 @@ function microphysics!(
                     aux_en_sat.q_tot[k] = aux_en.q_tot[k]
                     aux_en_sat.θ_dry[k] = TD.dry_pottemp(thermo_params, ts_sat)
                     aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(thermo_params, ts_sat)
+                    aux_en_sat.q_liq[k] = TD.liquid_specific_humidity(thermo_params, ts_sat)
+                    aux_en_sat.q_ice[k] = TD.ice_specific_humidity(thermo_params, ts_sat)
                 end
             end
 
@@ -1495,7 +1548,10 @@ function microphysics!(
                 aux_en.cloud_fraction[k] = 1
                 aux_en_sat.θ_dry[k] = TD.dry_pottemp(thermo_params, ts)
                 if moisture_model isa NonEquilibriumMoisture
-                    aux_en_sat.q_vap[k] = min(TD.q_vap_saturation(thermo_params, ts), TD.vapor_specific_humidity(thermo_params, ts)) # having condensate is no guarantee of saturation in noneq
+                    # aux_en_sat.q_vap[k] = min(TD.q_vap_saturation(thermo_params, ts), TD.vapor_specific_humidity(thermo_params, ts)) # having condensate is no guarantee of saturation in noneq
+                    aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(thermo_params, ts)
+                    aux_en_sat.q_liq[k] = TD.liquid_specific_humidity(thermo_params, ts)
+                    aux_en_sat.q_ice[k] = TD.ice_specific_humidity(thermo_params, ts)
                 else
                     aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(thermo_params, ts)
                 end
@@ -1541,6 +1597,8 @@ function microphysics!(
                 if moisture_model isa EquilibriumMoisture
                     aux_en.q_liq[k] = 0
                     aux_en.q_ice[k] = 0
+                    aux_en_sat.q_liq[k] = 0
+                    aux_en_sat.q_ice[k] = 0
                 end # if NonEquilibriumMoisture, these should be already set in update_aux(), so calling doesn't do much (doesn't hurt either I suppose)
             end
 

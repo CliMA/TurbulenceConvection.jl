@@ -148,12 +148,12 @@ function compute_precipitation_advection_tendencies(
         qs_up = @. ifelse(aux_gm.q_ice > FT(0), (aux_bulk.q_ice * aux_bulk.area) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Updraft
         qs_cup = @. ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_cloak_up * aux_en.a_cloak_up) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Updraft cloak
         qs_cdn = @. ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_cloak_dn * aux_en.a_cloak_dn) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Downdraft cloak
-        qs_enr = @. ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice * aux_en.a_en_remaining) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Env remaining
+        qs_enr = @. ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_en_remaining * aux_en.a_en_remaining) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Env remaining
  
         qr_up = @. ifelse(aux_gm.q_liq > FT(0), (aux_bulk.q_liq * aux_bulk.area) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Updraft
         qr_cup = @. ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_cloak_up * aux_en.a_cloak_up) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Updraft cloak
         qr_cdn = @. ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_cloak_dn * aux_en.a_cloak_dn) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Downdraft cloak
-        qr_enr = @. ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq * aux_en.a_en_remaining) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Env remaining
+        qr_enr = @. ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_en_remaining * aux_en.a_en_remaining) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Env remaining
 
 
         for i in 1:N_up
@@ -300,12 +300,12 @@ function compute_precipitation_sink_tendencies(
             f_qi_up = (aux_gm.q_ice[k] > FT(0)) ? (aux_bulk.q_ice[k] * aux_bulk.area[k]) / aux_gm.q_ice[k] : FT(1) # fraction of ice in Updraft
             f_qi_cup = (aux_gm.q_ice[k] > FT(0)) ? (aux_en.q_ice_cloak_up[k] * aux_en.a_cloak_up[k]) / aux_gm.q_ice[k] : FT(1) # fraction of ice in Updraft cloak
             f_qi_cdn = (aux_gm.q_ice[k] > FT(0)) ? (aux_en.q_ice_cloak_dn[k] * aux_en.a_cloak_dn[k]) / aux_gm.q_ice[k] : FT(1) # fraction of ice in Downdraft cloak
-            f_qi_enr = (aux_gm.q_ice[k] > FT(0)) ? (aux_en.q_ice[k] * aux_en.a_en_remaining[k]) / aux_gm.q_ice[k] : FT(1) # fraction of ice in Env remaining
+            f_qi_enr = (aux_gm.q_ice[k] > FT(0)) ? (aux_en.q_ice_en_remaining[k] * aux_en.a_en_remaining[k]) / aux_gm.q_ice[k] : FT(1) # fraction of ice in Env remaining
 
             f_ql_up = (aux_gm.q_liq[k] > FT(0)) ? (aux_bulk.q_liq[k] * aux_bulk.area[k]) / aux_gm.q_liq[k] : FT(1) # fraction of liquid in Updraft
             f_ql_cup = (aux_gm.q_liq[k] > FT(0)) ? (aux_en.q_liq_cloak_up[k] * aux_en.a_cloak_up[k]) / aux_gm.q_liq[k] : FT(1) # fraction of liquid in Updraft cloak
             f_ql_cdn = (aux_gm.q_liq[k] > FT(0)) ? (aux_en.q_liq_cloak_dn[k] * aux_en.a_cloak_dn[k]) / aux_gm.q_liq[k] : FT(1) # fraction of liquid in Downdraft cloak
-            f_ql_enr = (aux_gm.q_liq[k] > FT(0)) ? (aux_en.q_liq[k] * aux_en.a_en_remaining[k]) / aux_gm.q_liq[k] : FT(1) # fraction of liquid in Env remaining
+            f_ql_enr = (aux_gm.q_liq[k] > FT(0)) ? (aux_en.q_liq_en_remaining[k] * aux_en.a_en_remaining[k]) / aux_gm.q_liq[k] : FT(1) # fraction of liquid in Env remaining
 
 
             if edmf.moisture_model isa NonEquilibriumMoisture

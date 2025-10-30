@@ -2304,7 +2304,7 @@ function adjust_ice_N(
         # Added 10/23/2023 -- I think we really do need some control on N outside of just the bounds from r_acnv and r_thresh, since those don't account for INP availability at all.
         # Since the incoming NINP accounts for ice mult we're ok there, and if q gets too large most new sub/dep goes straight to snow so there are limits to how big N can become...  I saw N_i = 7000+ in an updraft... ridiculous.
         # Let's bound ourselves to below N_INP_top for sure..., if we don't have it maybe 5xN_INP_adjusted? idk...
-        N_below_r_is_top = isnan(N_INP_top) ? FT(Inf) : get_Ni_from_INP_qi_qs(param_set, N_i, N_INP_top, q_i, q_s; ρ=ρ, ice_type=ice_type, μ=μ, monodisperse=monodisperse, add_dry_aerosol_mass=true)
+        N_below_r_is_top = (isnan(N_INP_top) || iszero(N_INP_top)) ? FT(Inf) : get_Ni_from_INP_qi_qs(param_set, N_i, N_INP_top, q_i, q_s; ρ=ρ, ice_type=ice_type, μ=μ, monodisperse=monodisperse, add_dry_aerosol_mass=true)
         N_bounds = min.(N_bounds, N_below_r_is_top, (S_i < FT(0)) ? (8 * N_INP_adjusted) : (2 * N_INP_adjusted)) # not sure if should use N_INP_adjusted here or N_INP directly. I guess N_INP_adjusted is probably better since it includes MF boost, but it can also be too small with sedimentation... maybe only use it if S_i > 0? idk. it really is only a runaway growth stopper. we'll enforce a stronger limit in supersat when <r> isn't so big so terminal velocity is less important...? but also in growth regions with mf boost we should be limited by inp fairly strongly so maybe both can be more tightly bounded? idk.
 
 

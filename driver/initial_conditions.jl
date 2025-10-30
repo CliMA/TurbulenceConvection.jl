@@ -146,6 +146,12 @@ function initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set)
             # prog_up_f[i].ρaw[k] = ρ_f[k] * initial_profile_updraft_area * aux_up_f[i].w[k] # small ρaw perturbation
         end
 
+        Φ = geopotential.(param_set, getfield.(grid.zc, :z))
+        MSE_gm = TD.moist_static_energy(TCP.thermodynamics_params(param_set), aux_gm.ts, Φ)
+        # ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+        # If0 = CCO.InterpolateC2F(; ∇0_bcs...)
+        # ∂MSE_gm_∂z = ∇c(wvec(Ifx(MSE_gm)))
+
         @inbounds for k in TC.real_center_indices(grid)
             aux_up[i].buoy[k] = 0
             # Simple treatment for now, revise when multiple updraft closures become more well defined
@@ -153,7 +159,10 @@ function initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set)
 
             # check for instability by calculating dθ_liq_ice/dz
             if  k ∉ (kc_toa, kc_surf) # don't do this for surface or top of atmosphere
-                unstable = aux_gm.θ_liq_ice[k] ≥ aux_gm.θ_liq_ice[k+1] # unstable if θ_liq_ice decreases with height
+                # unstable = aux_gm.θ_liq_ice[k] ≥ aux_gm.θ_liq_ice[k+1] # unstable if θ_liq_ice decreases with height
+                unstable = aux_gm.θ_virt[k] ≥ aux_gm.θ_virt[k+1] # unstable if θ_virt decreases with height [[ would start w/ MSE but idk if it's been calculated yet for env? it's not stored for GM either.. ]]
+                # unstable = unstable || (∂MSE_gm_∂z[k] < FT(0)) # also unstable if dMSE/dz < 0
+                unstable = unstable || (MSE_gm[k] < MSE_gm[k+1]) # also unstable if MSE increases with height
                 if unstable
                     # aux_up[i].area[k+2] = TC.resolve_nan(aux_up[i].area[k+2], FT(0)) + (((k+2) != kc_toa) ? initial_profile_updraft_area : FT(0)) # socrates init area
                     aux_up[i].area[k+1] = TC.resolve_nan(aux_up[i].area[k+1], FT(0)) + (((k+1) != kc_toa) ? initial_profile_updraft_area : FT(0)) # socrates init area

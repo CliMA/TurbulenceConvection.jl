@@ -424,7 +424,7 @@ function compute_turb_entr!(state::State, grid::Grid, edmf::EDMFModel)
     plume_scale_height = map(1:N_up) do i
         compute_plume_scale_height(grid, state, edmf.H_up_min, i)
     end
-    ∇c = CCO.DivergenceF2C()
+    # ∇c = CCO.DivergenceF2C()
     # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
     @inbounds for i in 1:N_up
         w_up = aux_up_f[i].w
@@ -488,7 +488,7 @@ function compute_phys_entr_detr!(
     plume_scale_height = map(1:N_up) do i
         compute_plume_scale_height(grid, state, edmf.H_up_min, i)
     end
-    ∇c = CCO.DivergenceF2C()
+    # ∇c = CCO.DivergenceF2C()
     # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
     @inbounds for i in 1:N_up
         # compute ∇m at cell centers
@@ -587,8 +587,21 @@ function compute_phys_entr_detr!(
 
                     # taper away base_detrainment_rate_inv_s by w = 5cm/s
                     base_detrainment_rate_inv_s = edmf.entrainment_type.base_detrainment_rate_inv_s * clamp(FT(1) - w_up_c[k] / FT(0.05), FT(0), FT(1))
-
                     aux_up[i].detr_rate_inv_s[k] += base_detrainment_rate_inv_s # 1/aux_up[i].entr_rate_inv_s[k] is timescale, so (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s)^-1 is the new timescale and (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s) is the new inverse timscale
+                
+                    # we should raise entrainment if dθ_virt/dz < 0 in the environment... w_height isn't enough and all the buoyancy ones only use env buoyancy...
+                    # For the gradient we want to look up, entrain if your current value at k is less than the one above at k+1 and start the updraft here... That's Right biased, hence needing a value for toa
+                    θ_virt = aux_en.θ_virt
+                    kc_toa = kc_top_of_atmos(grid)
+                    θ_virt_toa = aux_en.θ_virt[kc_toa]
+                    RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_virt_toa))
+                    dθ_virt_dz = @. ∇c(wvec(RBθ(θ_virt)))
+
+                    if dθ_virt_dz[k] < 0 # maybe we could also use buoyancy gradient... idk...
+                        base_entrainment_rate_inv_s = edmf.entrainment_type.base_entrainment_rate_inv_s # just a test...
+                        aux_up[i].entr_rate_inv_s[k] += base_entrainment_rate_inv_s
+                    end
+
                 end
 
             else
@@ -646,7 +659,7 @@ function compute_ml_entr_detr!(
     plume_scale_height = map(1:N_up) do i
         compute_plume_scale_height(grid, state, edmf.H_up_min, i)
     end
-    ∇c = CCO.DivergenceF2C()
+    # ∇c = CCO.DivergenceF2C()
     # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
     @inbounds for i in 1:N_up
         # compute ∇m at cell centers
@@ -740,6 +753,20 @@ function compute_ml_entr_detr!(
                     
                     aux_up[i].entr_rate_inv_s[k] = min(ε_dyn, inv(eps(FT))) # don't let these blow up to Inf [ though values this large may do unspeakable things to w ] [ Costa also recommended trying 1/Δt ]
                     aux_up[i].detr_rate_inv_s[k] = min(δ_dyn + base_detrainment_rate_inv_s * (1+area_limiter), inv(eps(FT))) # don't let these blow up to Inf [ though values this large may do unspeakable things to w ] [ Costa also recommended trying 1/Δt ]
+
+
+                    # we should raise entrainment if dθ_virt/dz < 0 in the environment... w_height isn't enough and all the buoyancy ones only use env buoyancy...
+                    # For the gradient we want to look up, entrain if your current value at k is less than the one above at k+1 and start the updraft here... That's Right biased, hence needing a value for toa
+                    θ_virt = aux_en.θ_virt
+                    kc_toa = kc_top_of_atmos(grid)
+                    θ_virt_toa = aux_en.θ_virt[kc_toa]
+                    RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_virt_toa))
+                    dθ_virt_dz = @. ∇c(wvec(RBθ(θ_virt)))
+                    if dθ_virt_dz[k] < 0 # maybe we could also use buoyancy gradient... idk...
+                        base_entrainment_rate_inv_s = edmf.entrainment_type.base_entrainment_rate_inv_s # just a test...
+                        aux_up[i].entr_rate_inv_s[k] += base_entrainment_rate_inv_s
+                    end
+
                 end
 
             else
@@ -786,7 +813,7 @@ function compute_ml_entr_detr!(
         compute_plume_scale_height(grid, state, edmf.H_up_min, i)
     end
 
-    ∇c = CCO.DivergenceF2C()
+    # ∇c = CCO.DivergenceF2C()
     # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
     @inbounds for i in 1:N_up
         # compute ∇m at cell centers

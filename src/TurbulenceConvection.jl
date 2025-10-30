@@ -282,6 +282,8 @@ function debug_state(state, code_location::String)
 end
 
 const Ic = CCO.InterpolateF2C() # no bcs on F2C, this gets used all the time, so define it once here
+const Ifx = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # C2F with extrapolate bcs, this gets used all the time, so define it once here
+const ∇c = CCO.DivergenceF2C() 
 
 include("Grid.jl")
 include("dycore_api.jl")

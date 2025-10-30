@@ -565,7 +565,8 @@ function precipitation_formation(
 
                 # [[ since we assume evap is constantly raising <r>, there is actually no need to enforce q_thresh... just proceed at τ or even faster -- you should never get <r> below your target value... honestly the longer time timestep the worse it should get lol. No threshold kind of means assuming <r> constant and so the rate is fixed.. maybe not a bad guess if you assume steady state idk... ]]
                 use_cloak = (area_partition_model isa CoreCloakAreaPartitionModel)
-                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ; Δt = Δt, Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=snow_formation_model.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux, domain=domain, use_cloak=use_cloak) # pass in sed tendency so it can be accounted for in the threshold calculation
+                qi_tendency_sub_dep_for_thresh = max(qi_tendency_sub_dep + S_qt_snow_ice_dep_above + S_qt_snow_ice_dep_is, FT(0)) # remove the part already going to snow from sub dep
+                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ; Δt = Δt, Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=snow_formation_model.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep_for_thresh, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux, domain=domain, use_cloak=use_cloak) # pass in sed tendency so it can be accounted for in the threshold calculation
                 S_qt_snow_ice_thresh = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_thresh, max(q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt - q_thresh_acnv, 0), Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
 
                 # TEST!
@@ -606,7 +607,8 @@ function precipitation_formation(
                 S_qt_snow_ice_dep_above = FT(0)
                 S_qt_snow_ice_agg_mix = FT(0) # no easy breakdown
                 use_cloak = (area_partition_model isa CoreCloakAreaPartitionModel)
-                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ_c; Δt=Δt, Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=param_set.user_params.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=param_set.user_params.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux, domain=domain, use_cloak=use_cloak) # pass in sed tendency so it can be accounted for in the threshold calculation
+                qi_tendency_sub_dep_for_thresh = max(qi_tendency_sub_dep + S_qt_snow_ice_dep_above + S_qt_snow_ice_dep_is, FT(0)) # remove the part already going to snow from sub dep
+                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ_c; Δt=Δt, Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=param_set.user_params.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=param_set.user_params.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep_for_thresh, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux, domain=domain, use_cloak=use_cloak) # pass in sed tendency so it can be accounted for in the threshold calculation
 
                 if !isfinite(S_qt_snow_ice_thresh) || ~isfinite(q_thresh_acnv)
                     @error("Got nonfinite S_qt_snow_ice_thresh = $(S_qt_snow_ice_thresh) or q_thresh_acnv = $(q_thresh_acnv) from inputs qi = $(qi); Ni = $(Ni); ρ_c = $(ρ_c)")
@@ -1402,7 +1404,7 @@ function compute_domain_interaction_microphysics_tendencies!(
     _area_bottom = isa(area, FT) ? area : area[kc_surf]
     C2Fa = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(_area_bottom)), top = CCO.SetValue(FT(_area_top)))
     wvec = CC.Geometry.WVector
-    ∇c = CCO.DivergenceF2C() # F2C to come back from C2F
+    # ∇c = CCO.DivergenceF2C() # F2C to come back from C2F
     ∇a = @. ∇c(wvec(C2Fa(area))) # seems stable w/ either sign w...? (Left bias this?)
 
 
@@ -1925,6 +1927,9 @@ function threshold_driven_acnv(
 
 
         acnv_rate += acnv_rate_other # add any other acnv rate from redirected deposition
+        # if rand() < 5e-6
+        #     @error("We need to take out sub_dep_Above and crossing r_is from being redirected since it already is... maybe just subtract them from sub_Dep before passing in?")
+        # end
         acnv_rate += acnv_rate_fluc
     
     end

@@ -461,7 +461,6 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         assign_thermo_aux!(state, grid, edmf.moisture_model, param_set)
 
         aux_gm = TC.center_aux_grid_mean(state)
-
         @. aux_gm.θ_virt = TD.virtual_pottemp(thermo_params, aux_gm.ts)
 
         # Δt = TS.dt 
@@ -561,7 +560,7 @@ function compute_gm_tendencies!(
     # RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_liq_ice_gm_toa)) # right biased
     # RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa)) # right biased
     wvec = CC.Geometry.WVector
-    ∇c = CCO.DivergenceF2C() # F2C to come back from C2F
+    # ∇c = CCO.DivergenceF2C() # F2C to come back from C2F
     # @. ∇θ_liq_ice_gm = ∇c(wvec(RBθ(prog_gm.ρθ_liq_ice / ρ_c)))
     # @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.ρq_tot / ρ_c)))
 
