@@ -146,8 +146,8 @@ function initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set)
             # prog_up_f[i].ρaw[k] = ρ_f[k] * initial_profile_updraft_area * aux_up_f[i].w[k] # small ρaw perturbation
         end
 
-        Φ = geopotential.(param_set, getfield.(grid.zc, :z))
-        MSE_gm = TD.moist_static_energy(TCP.thermodynamics_params(param_set), aux_gm.ts, Φ)
+        Φ = TC.geopotential.(param_set, getfield.(grid.zc, :z))
+        MSE_gm = TD.moist_static_energy.(TCP.thermodynamics_params(param_set), aux_gm.ts, Φ)
         # ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
         # If0 = CCO.InterpolateC2F(; ∇0_bcs...)
         # ∂MSE_gm_∂z = ∇c(wvec(Ifx(MSE_gm)))

@@ -561,6 +561,7 @@ function compute_gm_tendencies!(
     # RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa)) # right biased
     wvec = CC.Geometry.WVector
     # ∇c = CCO.DivergenceF2C() # F2C to come back from C2F
+    ∇c = TC.∇c
     # @. ∇θ_liq_ice_gm = ∇c(wvec(RBθ(prog_gm.ρθ_liq_ice / ρ_c)))
     # @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.ρq_tot / ρ_c)))
 
