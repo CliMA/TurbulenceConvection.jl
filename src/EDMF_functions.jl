@@ -607,9 +607,43 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
         ),
     )
 
-    @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KQ * ∇q_tot_en(wvec(aux_en.q_tot))
-    @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇θ_liq_ice_en(wvec(aux_en.θ_liq_ice))
-    @. aux_tc_f.diffusive_flux_uₕ = -aux_tc_f.ρ_ae_KM * ∇uₕ_gm(prog_gm_uₕ)
+
+    use_separate_convective_tke_ed_coeff = (param_set.user_params.use_convective_tke && param_set.user_params.use_separate_convective_tke_ed_coeff)  # tke_ed_coeff
+    if use_separate_convective_tke_ed_coeff 
+        #= 
+            See in update_aux():
+                KM[k] = c_m * ml.mixing_length * sqrt(max(aux_en.tke[k], 0))
+                KH[k] = KM[k] / aux_tc.prandtl_nvec[k]
+                KQ[k] = KH[k] / Le
+        =#
+
+        # IfKM_tke = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKM[kc_surf] * sqrt(max(aux_en.tke[kc_surf] - aux_en.tke_convective[kc_surf], FT(0)))), top = CCO.SetValue(aeKM[kc_toa] * sqrt(max(aux_en.tke[kc_toa] - aux_en.tke_convective[kc_toa], FT(0)))))
+        # IfKH_tke = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKH[kc_surf] * sqrt(max(aux_en.tke[kc_surf] - aux_en.tke_convective[kc_surf], FT(0)))), top = CCO.SetValue(aeKH[kc_toa] * sqrt(max(aux_en.tke[kc_toa] - aux_en.tke_convective[kc_toa], FT(0)))))
+        # IfKQ_tke = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKQ[kc_surf] * sqrt(max(aux_en.tke[kc_surf] - aux_en.tke_convective[kc_surf], FT(0)))), top = CCO.SetValue(aeKQ[kc_toa] * sqrt(max(aux_en.tke[kc_toa] - aux_en.tke_convective[kc_toa], FT(0)))))
+        # #
+        # IfKH_tke_conv = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKH[kc_surf] * sqrt(aux_en.tke_convective[kc_surf])), top = CCO.SetValue(aeKH[kc_toa] * sqrt(aux_en.tke_convective[kc_toa])))
+        # IfKH_tke_conv = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKH[kc_surf] * sqrt(aux_en.tke_convective[kc_surf])), top = CCO.SetValue(aeKH[kc_toa] * sqrt(aux_en.tke_convective[kc_toa])))
+        # IfKQ_tke_conv = CCO.InterpolateC2F(; bottom = CCO.SetValue(aeKQ[kc_surf] * sqrt(aux_en.tke_convective[kc_surf])), top = CCO.SetValue(aeKQ[kc_toa] * sqrt(aux_en.tke_convective[kc_toa])))
+
+        Iftke = CCO.InterpolateC2F(; bottom = CCO.SetValue(max(aux_en.tke[kc_surf] - aux_en.tke_convective[kc_surf], FT(0))), top = CCO.SetValue(max(aux_en.tke[kc_toa] - aux_en.tke_convective[kc_toa], FT(0)))) # total tke. doesnt go to 0, but also don't extrapolate and risk neg values
+        Iftke_conv = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # no convective tke at sfc since w = 0
+        
+        f_c_m = param_set.user_params.convective_tke_ed_scaling_factor # adjustment to c_m, tke_ed_coeff
+        f_K_tke = @. ifelse(Iftke(aux_en.tke) > 0, sqrt(max(Iftke(aux_en.tke) - Iftke_conv(aux_en.tke_convective), FT(0))) / sqrt(Iftke(aux_en.tke)), FT(0)) # adjustmet factor for K based on convective tke removal (we leave tke in elsewhere to generate covariances... probably should be separated out also lol)
+        f_k_tke_conv = @. ifelse(Iftke(aux_en.tke) > 0, sqrt(Iftke_conv(aux_en.tke_convective)) / sqrt(Iftke(aux_en.tke)), FT(0)) # also prolly should be 1 - f_k_tke? should double check..
+    end
+
+    if !use_separate_convective_tke_ed_coeff # regular
+        @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KQ * ∇q_tot_en(wvec(aux_en.q_tot))
+        @. aux_tc_f.diffusive_flux_h = -aux_tc_f.ρ_ae_KH * ∇θ_liq_ice_en(wvec(aux_en.θ_liq_ice))
+        @. aux_tc_f.diffusive_flux_uₕ = -aux_tc_f.ρ_ae_KM * ∇uₕ_gm(prog_gm_uₕ)
+    else # with convective tke adjustment
+        @. aux_tc_f.diffusive_flux_qt = -((aux_tc_f.ρ_ae_KQ * f_K_tke) + (f_c_m * aux_tc_f.ρ_ae_KQ * f_k_tke_conv)) * ∇q_tot_en(wvec(aux_en.q_tot))
+        @. aux_tc_f.diffusive_flux_h = -((aux_tc_f.ρ_ae_KH * f_K_tke) + (f_c_m * aux_tc_f.ρ_ae_KH * f_k_tke_conv)) * ∇θ_liq_ice_en(wvec(aux_en.θ_liq_ice))
+        @. aux_tc_f.diffusive_flux_uₕ = -((aux_tc_f.ρ_ae_KM * f_K_tke) + (f_c_m * aux_tc_f.ρ_ae_KM * f_k_tke_conv)) * ∇uₕ_gm(prog_gm_uₕ)
+    end
+
+    # we could consider adding a convective tke block here with a different K... c_m by default is very conservative and probably very wrong for convective tke.... we cant fully separate the TKE's because convective tke still does generate correlations... [[ would need a KQ no convective tke too then.. i think that's just * sqrt(tke - convective tke) / sqrt(tke) ? if tke > 0 else 0 ]]
 
     if edmf.moisture_model isa NonEquilibriumMoisture
         aeKQq_liq_bc = FT(0)
@@ -618,8 +652,13 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
         ∇q_liq_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKQq_liq_bc), top = CCO.SetDivergence(FT(0)))
         ∇q_ice_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKQq_ice_bc), top = CCO.SetDivergence(FT(0)))
 
-        @. aux_tc_f.diffusive_flux_ql = -aux_tc_f.ρ_ae_KQ * ∇q_liq_en(wvec(aux_en.q_liq))
-        @. aux_tc_f.diffusive_flux_qi = -aux_tc_f.ρ_ae_KQ * ∇q_ice_en(wvec(aux_en.q_ice))
+        if !use_separate_convective_tke_ed_coeff # regular
+            @. aux_tc_f.diffusive_flux_ql = -aux_tc_f.ρ_ae_KQ * ∇q_liq_en(wvec(aux_en.q_liq))
+            @. aux_tc_f.diffusive_flux_qi = -aux_tc_f.ρ_ae_KQ * ∇q_ice_en(wvec(aux_en.q_ice))
+        else # with convective tke adjustment
+            @. aux_tc_f.diffusive_flux_ql = -((aux_tc_f.ρ_ae_KQ * f_K_tke) + (f_c_m * aux_tc_f.ρ_ae_KQ * f_k_tke_conv)) * ∇q_liq_en(wvec(aux_en.q_liq))
+            @. aux_tc_f.diffusive_flux_qi = -((aux_tc_f.ρ_ae_KQ * f_K_tke) + (f_c_m * aux_tc_f.ρ_ae_KQ * f_k_tke_conv)) * ∇q_ice_en(wvec(aux_en.q_ice))
+        end
     end
 
     prog_pr = center_prog_precipitation(state)
@@ -629,10 +668,13 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     ∇q_rai_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKQq_rai_bc), top = CCO.SetDivergence(FT(0)))
     ∇q_sno_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(aeKQq_sno_bc), top = CCO.SetDivergence(FT(0)))
 
-
-    @. aux_tc_f.diffusive_flux_qr = -aux_tc_f.ρ_ae_KQ * ∇q_rai_en(wvec(prog_pr.q_rai)) # add diffusive (SGS) flux for rain
-    @. aux_tc_f.diffusive_flux_qs = -aux_tc_f.ρ_ae_KQ * ∇q_sno_en(wvec(prog_pr.q_sno)) # add diffusive (SGS) flux for snow
-
+    if !use_separate_convective_tke_ed_coeff
+        @. aux_tc_f.diffusive_flux_qr = -aux_tc_f.ρ_ae_KQ * ∇q_rai_en(wvec(prog_pr.q_rai)) # add diffusive (SGS) flux for rain
+        @. aux_tc_f.diffusive_flux_qs = -aux_tc_f.ρ_ae_KQ * ∇q_sno_en(wvec(prog_pr.q_sno)) # add diffusive (SGS) flux for snow
+    else
+        @. aux_tc_f.diffusive_flux_qr = -((aux_tc_f.ρ_ae_KQ * f_K_tke) + (f_c_m * aux_tc_f.ρ_ae_KQ * f_k_tke_conv)) * ∇q_rai_en(wvec(prog_pr.q_rai)) # add diffusive (SGS) flux for rain
+        @. aux_tc_f.diffusive_flux_qs = -((aux_tc_f.ρ_ae_KQ * f_K_tke) + (f_c_m * aux_tc_f.ρ_ae_KQ * f_k_tke_conv)) * ∇q_sno_en(wvec(prog_pr.q_sno)) # add diffusive (SGS) flux for snow
+    end
 
     return nothing
 end
@@ -2373,7 +2415,7 @@ function compute_en_tendencies!(
         # We'll have a fast advection part and a slow diffusion part. diffusion is up gradient, advection is with w_convective [[ could in principle go both directions but should be biased up for convection so go up ]]
         ρatke_convective_advection = aux_en.tke_convective_advection # for some reason these have ρa in ρatke but are named this way so we follow
         w_convective = @. sqrt(2 * ρatke_convective/(ρ_c * a_en)) # tke = 1/2 ρ w^2  => w = sqrt(2*tke) , tke is per unit mass here
-        k_adv = param_set.user_params.convective_tke_advection_coeff
+        # k_adv = param_set.user_params.convective_tke_advection_coeff
         # tke_convective_advection = @. ρ_c * a_en * k_adv * w_convective * ∇c(wvec(Ifw(tke_convective)))
         # @. ρatke_convective_advection = -∇c(ρ_f * ᶠinterp_a(a_en) * k_adv * wvec(Ifw(w_convective) * Ifw(ρatke_convective / (ρ_c * a_en)))) # negative divergence of flux
         # @. ρatke_convective_advection += -∇c(ρ_f * ᶠinterp_a(a_en) * k_adv * wvec(Ifw(-w_convective) * Ifw(ρatke_convective / (ρ_c * a_en)))) # some going the other way for diffusion

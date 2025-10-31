@@ -1689,8 +1689,8 @@ function threshold_driven_acnv(
 
             # we start acnv long before r_max...
             # some factor on r_thresh but yeah instead of letting this go all the way to 2 r_is and then crashing down, we just start siphoning off mass earlier so it's a continous process. Staying near to r_thresh for sublimation acnv is good cause it means things are more continous.
-            # in highly supersaturated environments, maybe we tolerate slightly higher <r>... but not that much. at 25% supersat maybe we go halfway to r_max (cubic mean of r^3 and r_thresh^3?, e.g. blend Ns, assuming m_e = 3). at 0% supersat we go to r_thresh Only
-            r_max = ((1 - min(S_i / 0.25, 1)) * r_thresh^3 + min(S_i / 0.25, 1) * ((r_thresh^3 + (2*r_is)^3) / 2))^(1/3)
+            # in highly supersaturated environments, maybe we tolerate slightly higher <r>... but not that much. at 20% supersat maybe we go halfway to r_max (cubic mean of r^3 and r_thresh^3?, e.g. blend Ns, assuming m_e = 3). at 0% supersat we go to r_thresh Only
+            r_max = ((1 - min(S_i / 0.2, 1)) * r_thresh^3 + min(S_i / 0.2, 1) * ((r_thresh^3 + (2*r_is)^3) / 2))^(1/3)
 
 
             

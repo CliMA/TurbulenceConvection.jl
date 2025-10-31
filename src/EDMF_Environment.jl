@@ -248,7 +248,14 @@ function microphysics!(
                     else
                         w_noneq = w[k]
                     end
-                    
+
+                    if !iszero(param_set.user_params.cond_qt_SD) # maybe you'd want different values for liq and ice but theyre irreparably tied together in MM2015 microphysics, etc.
+                        # TODO: Consider turning this off for when we are using cloaks.... also set an error in the quadrature branches
+                        q_tot_sd = sqrt(aux_en.QTvar[k])
+                        qt = q_here.tot + param_set.user_params.cond_qt_SD * q_tot_sd
+                        θ = TD.liquid_ice_pottemp(thermo_params, ts)
+                        ts = (edmf.moisture_model isa NonEquilibriumMoisture) ? thermo_state_pθq(param_set, p_c[k], θ, qt, q_here.liq, q_here.ice) : thermo_state_pθq(param_set, p_c[k], θ, qt)
+                    end
 
 
                     mph_neq_here = noneq_moisture_sources(param_set, nonequilibrium_moisture_scheme, moisture_sources_limiter, region_area, ρ_c[k], aux_en.p[k], T, Δt + ε, ts, w_noneq, q_vap_sat_liq, q_vap_sat_ice, dqvdt, dTdt, τ_liq_here, τ_ice_here)
