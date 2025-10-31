@@ -1674,6 +1674,9 @@ function threshold_driven_acnv(
 
         microphys_params = TCP.microphysics_params(param_set)
 
+
+        # do_print = (rand() < 1e-3) && (domain isa EnvDomain) # for debugging
+
         is_growing = S_i > FT(0) # need to use this because we use S_i for exponentiation and such
         # is_growing = iszero(dqdt_dep) ? (S_i > FT(0)) : (dqdt_dep > FT(0)) # if dep is zero, use S_i, else use dep rate. dep rate might be better bc better captures the entire timestep...
         # r_i_acnv = r_ice_acnv(param_set, r_acnv_scaling_factor)
@@ -1727,11 +1730,17 @@ function threshold_driven_acnv(
                     # We observe PITOSN at almost any RH, I think any real MF should engender r_boost to hit r_thresh regardless of supersat
                     # Say that deficit is 5-10%. Then r_boost hits r at 15% supersat the maximum of that and 1.1 r_thresh at 5% supersat
 
-                    # start at original r, reach 1.2r_th at MF = 0.02
-                    r_boost = r + (max(r, 1.2r_thresh) - r) * clamp(massflux / FT(0.02), FT(0), FT(1))
+                    # start at original r, reach 1.2r_th at MF = 0.02 [[[ this is too strong... you can go from <r> = 20 micron all the way to way above threshold instantly... even at super high supersaturation.... and it also puts most mass in the downcloak which probably isn't true.... ]]]
+                    # r_boost = r + (max(r, 1.2r_thresh) - r) * clamp(massflux / FT(0.02), FT(0), FT(1))
+
+
+                    # We're growing so supersat, but we need to converge to meet the !isgrowing branch at r_boost = r_no_boost at S_i = 0. When more supersaturated we should probably assume even less in the downdraft? but it's not clear... We know $τ is slower than N, r suggest so maybe that's less evap because more is in the non cloak... So we'll go 0.9 r at 10% supersat, 1.0 r at 0% supersat
+                    r_boost = r - (r - 0.9r) * clamp(S_i / FT(0.1), FT(0), FT(1))
+
                     # if subsat, any imported N_i should be large...
                     N_i_boost = max(N - N_i_no_boost, FT(0)) # might need to be some fraction of this idk... going from r of say 50 microns to r_boost of 70 microns is a 5x boost in q, might be too extreme.
 
+                    
                     q_boost = (N_i_boost/N) * q
                     N_i_boost = N_from_qr(param_set, q_type, q_boost, r_boost; ρ=ρ_a, monodisperse=false) # change (mostly reduce) N_i_boost to match r_boost
                     q_no_boost = (N_i_no_boost/N) * q
@@ -1890,16 +1899,32 @@ function threshold_driven_acnv(
                     _, λ_boost = get_n0_lambda(microphys_params, q_type, q_boost, ρ_a, N_i_boost, μ; Dmax=Dmax)
                     _, λ_no_boost = get_n0_lambda(microphys_params, q_type, q_no_boost, ρ_a, N_i_no_boost, μ; Dmax=Dmax)
 
+                    # if do_print
+                    #     @warn("Boost region: r_boost = $r_boost; N_i_boost = $N_i_boost; q_boost = $q_boost; λ_boost = $λ_boost; τ_boost = $τ_boost;")
+                    #     @warn("No-boost region: r_no_boost = $r_no_boost; N_i_no_boost = $N_i_no_boost; q_no_boost = $q_no_boost; λ_no_boost = $λ_no_boost; τ = $τ;")
+                    # end
+
                     if (λ_boost < λ_target) && (q_boost > 0)
                         acnv_rate += (1 - (λ_boost/λ_target)^3) * (q_boost / τ_boost) # q goes as λ^-4, this is variable N, fixed n_0 intercept (we're losing particles without new generation, so not fixed N)
                         q_target_boost = (λ_boost/λ_target)^3 * q_boost # q goes as λ^-4, this is variable N, fixed n_0 intercept
+
+                        # if do_print
+                        #     @warn("Boost region: λ_boost = $λ_boost; λ_target = $λ_target; q_boost = $q_boost; N_i_boost = $N_i_boost; acnv_rate contribution = $((1 - (λ_boost/λ_target)^3) * (q_boost / τ_boost)); q_target_boost = $q_target_boost; S_i = $S_i; τ_boost = $τ_boost; r_boost = $r_boost;")
+                        # end
+
                     else
                         q_target_boost = FT(q_boost) # no acnv in boost region
                     end
 
+
                     if (λ_no_boost < λ_target) && (q_no_boost > 0)
                         acnv_rate += (1 - (λ_no_boost/λ_target)^3) * (q_no_boost / τ) # q goes as λ^-4, this is variable N, fixed n_0 intercept (we're losing particles without new generation, so not fixed N)
                         q_target_no_boost = (λ_no_boost/λ_target)^3 * q_no_boost # q goes as λ^-4, this is variable N, fixed n_0 intercept
+
+                        # if do_print
+                        #     @warn("No-boost region: λ_no_boost = $λ_no_boost; λ_target = $λ_target; q_no_boost = $q_no_boost; N_i_no_boost = $N_i_no_boost; acnv_rate contribution = $((1 - (λ_no_boost/λ_target)^3) * (q_no_boost / τ)); q_target_no_boost = $q_target_no_boost; S_i = $S_i; τ = $τ; r_no_boost = $r_no_boost;")
+                        # end
+
                     else
                         q_target_no_boost = FT(q_no_boost) # no acnv in no boost region
                     end
@@ -1915,11 +1940,25 @@ function threshold_driven_acnv(
                 end
 
                  # Fluctuations
-                acnv_rate_fluc = q/τ_fluc
+                # acnv_rate_fluc = q/τ_fluc
                 # This is hard because yes the target should go down but it's not clear how much... We need to estimate how much of the original mass i guess was susceptible to fluctuations into subsat...
                 # Maybe one could use `get_qs_from_saturation_excesses()` and a closure but that's a bit complex...
                 # We'll aim for q_target = q at S_i = 10%, and 0 at S_i = 0% 
-                q_target_fluc = q * clamp(S_i / FT(0.1), FT(0), one(FT))
+                # q_target_fluc = q * clamp(S_i / FT(0.1), FT(0), one(FT))
+                q_target_fluc = q * clamp(1 + S_i / FT(0.1), FT(0), one(FT))
+
+                acnv_rate_fluc = (q - q_target_fluc) / τ_fluc # just setting acnv_rate to this (0) seemed to work ok lol
+                
+                # if do_print
+                #     @warn("S_i = $S_i")
+                #     f = 1 + S_i / FT(0.1)
+                #     f_clamped = clamp(f, FT(0), one(FT))
+                #     @warn("f = $f; f_clamped = $f_clamped;")
+                #     @warn("q = $q;  q_target_fluc = $(q * f_clamped); diff = $(q - q * f_clamped)")
+                #     println("--------------------------------")
+                # end
+
+
                 q_target = min(q_target, q_target_fluc) # take the lower of the two targets
 
             end

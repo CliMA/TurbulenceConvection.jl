@@ -2427,7 +2427,7 @@ function compute_en_tendencies!(
                 ρatke_convective_advection = $ρatke_convective_advection
                 ρatke_convective_dissipation = $ρatke_convective_dissipation
                 KE_current = $KE_current
-                overage = $overage
+                overage_prod = $overage_prod
             ")
         end
 
