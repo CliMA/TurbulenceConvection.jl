@@ -1948,7 +1948,8 @@ function threshold_driven_acnv(
                 q_target_fluc = q * clamp(1 + S_i / FT(0.1), FT(0), one(FT))
 
                 acnv_rate_fluc = (q - q_target_fluc) / τ_fluc # just setting acnv_rate to this (0) seemed to work ok lol
-                
+                acnv_rate_fluc = min(acnv_rate_fluc, (q - q_target)/Δt) # ensure we don't go slower than the main acnv rate
+
                 # if do_print
                 #     @warn("S_i = $S_i")
                 #     f = 1 + S_i / FT(0.1)
