@@ -1975,7 +1975,7 @@ function compute_covariance_shear(
         @. Shear² = LA.norm_sqr(adjoint(∇uvw(uvw)) * k̂)
         @. shear = ρ_c * area_en * k_eddy * Shear²
     else
-        ∇c = CCO.GradientF2C() # for some reason commenting this one out breaks things?
+        ∇c = CCO.GradientF2C() # This one is Gradient not Divergence so it's not the global one
         @. shear = 2 * ρ_c * area_en * k_eddy * LA.dot(∇c(If(ϕ_en)), k̂) * LA.dot(∇c(If(ψ_en)), k̂)
     end
     return nothing
@@ -2368,6 +2368,7 @@ function compute_en_tendencies!(
 
         
         # -- advection/diffusion -- #
+        ∇c_tkec = CCO.DivergenceF2C(; bottom = CCO.SetValue(wvec(FT(0))), top = CCO.SetValue(wvec(FT(0)))) # we have no sure surface value so we could just extrapolate. However since our sfc generates no tke and we leave that to updraft and shear (for now, could revisit if it's problematic), we'll just go w/ 0 on both (technically tke could go out the top but we enforce w=0 so...)
         # advection (is diffusive, like pressure diffusion I guess...) # [[ they use ::         @. nh_press_adv = Int(ᶠinterp_a(a_up) > 0) * ρ_f * ᶠinterp_a(a_up) * α_a * w_up * ∇(wvec(Ifc(w_up)))      ]]
         # We'll have a fast advection part and a slow diffusion part. diffusion is up gradient, advection is with w_convective [[ could in principle go both directions but should be biased up for convection so go up ]]
         ρatke_convective_advection = aux_en.tke_convective_advection # for some reason these have ρa in ρatke but are named this way so we follow
@@ -2378,9 +2379,9 @@ function compute_en_tendencies!(
         # @. ρatke_convective_advection += -∇c(ρ_f * ᶠinterp_a(a_en) * k_adv * wvec(Ifw(-w_convective) * Ifw(ρatke_convective / (ρ_c * a_en)))) # some going the other way for diffusion
 
         k_diff = param_set.user_params.convective_tke_advection_coeff # rename to diffusiong if we go with this option...
-        # @. ρatke_convective_advection = -∇c_turb(-1 * ρ_f * ᶠinterp_a(a_en) * k_diss * (Ifw(w_convective))^2 * ∇f(ρatke_convective))
+        # @. ρatke_convective_advection = -∇c_tkec(-1 * ρ_f * ᶠinterp_a(a_en) * k_diss * (Ifw(w_convective))^2 * ∇f(ρatke_convective))
         # diffusive_flux_tke = -ρ_f * ᶠinterp_a(a_en) * k_diss * Ifw(w_convective)^2 * ∇f(ρatke_convective) # :: Recall, @. aux_tc_f.diffusive_flux_qt = -aux_tc_f.ρ_ae_KQ * ∇q_tot_en(wvec(aux_en.q_tot))
-        @. ρatke_convective_advection = -∇c_turb(wvec( -1 * ρ_f * ᶠinterp_a(a_en) * k_diff * (Ifw(w_convective))^2 * ∇f(ρatke_convective) )) # (w_convective)^2 comes from KE = 1/2 ρ w^2 → w = sqrt(2*KE/ρ); flux ∼ K_turb * ∇(KE) with K_turb ∼ ℓ_mix * w ∼ w^2 scaling for convective transport
+        @. ρatke_convective_advection = -∇c_tkec(wvec( -1 * ρ_f * ᶠinterp_a(a_en) * k_diff * (Ifw(w_convective))^2 * ∇f(ρatke_convective) )) # (w_convective)^2 comes from KE = 1/2 ρ w^2 → w = sqrt(2*KE/ρ); flux ∼ K_turb * ∇(KE) with K_turb ∼ ℓ_mix * w ∼ w^2 scaling for convective transport [[ I think because of the ∇f we need to specify a BC? idk... the output is on F so it's not super clear to me why...]]
 
         
         # -- dissipation -- #
@@ -2388,7 +2389,7 @@ function compute_en_tendencies!(
         ρatke_convective_dissipation = aux_en.tke_convective_dissipation # for some reason these have ρa in ρatke but are named this way so we follow
         ∂MSE∂z = aux_en.∂MSE∂z
         k_diss = param_set.user_params.convective_tke_dissipation_coeff
-        # K_diss = @. -k_diss * ∇c_turb(ρ_f * wvec(Ifw(min(∂MSE∂z,0)))) # if MSE decreases with height, we dissipate convective TKE
+        # K_diss = @. -k_diss * ∇c(ρ_f * wvec(Ifw(min(∂MSE∂z,0)))) # if MSE decreases with height, we dissipate convective TKE
         K_diss = @. -k_diss * max(∂MSE∂z, 0)^2 # if MSE increases with height, we dissipate convective TKE squared goes like brunt vaisala
         @. ρatke_convective_dissipation = K_diss * ρatke_convective
         # self dissipation in `compute_covariance_dissipation()`
