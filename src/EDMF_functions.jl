@@ -2401,11 +2401,14 @@ function compute_en_tendencies!(
         # KE increment from this timestep (production + dissipation + advection)
         ΔKE_timestep = @. (ρatke_convective_production + ρatke_convective_dissipation + ρatke_convective_advection) * Δt / (ρ_c * a_en)
         # overshoot due to this timestep’s contribution only
-        overage_prod = @. min(KE_current + ΔKE_timestep - tke_max, ρatke_convective_production * Δt/(ρ_c * a_en)) # only consider production contribution to overshoot
+        # overage_prod = @. min(KE_current + ΔKE_timestep - tke_max, ρatke_convective_production * Δt/(ρ_c * a_en)) # only consider production contribution to overshoot
+        # overage_prod = @. max(min(KE_current + ΔKE_timestep - tke_max, ρatke_convective_production * Δt / (ρ_c * a_en)), 0) # GPT
+        overage_prod = @. min(max(KE_current + ΔKE_timestep - tke_max, 0), max(ρatke_convective_production, 0) * Δt/(ρ_c * a_en)) # my fix, i think ρatke_convective_production is already positive
 
         # smooth exponential decay applied only to the overshoot fraction
         ϵ = FT(0.1)
         @. ρatke_convective_production -= (ρ_c * a_en)/Δt * overage_prod * (1 - exp(-ϵ))
+        @. ρatke_convective_production = max(ρatke_convective_production, 0) # no negative production [[just a double check safety net, should still be positive]]
 
         # turn off production at surface, surface +1, toa, toa -1 
         ρatke_convective_production[kc_surf] = 0
@@ -2422,12 +2425,16 @@ function compute_en_tendencies!(
 
         if any(!isfinite, tend_ρatke_convective)
             error("Non-finite values in convective TKE tendency computation. Details: 
-                ρatke_convective = $ρatke_convective
-                ρatke_convective_production = $ρatke_convective_production
-                ρatke_convective_advection = $ρatke_convective_advection
-                ρatke_convective_dissipation = $ρatke_convective_dissipation
-                KE_current = $KE_current
-                overage_prod = $overage_prod
+                ρatke_convective = $(full_print(ρatke_convective))
+                ρatke_convective_production = $(full_print(ρatke_convective_production))
+                ρatke_convective_advection = $(full_print(ρatke_convective_advection))
+                ρatke_convective_dissipation = $(full_print(ρatke_convective_dissipation))
+                tend_ρatke_convective = $(full_print(tend_ρatke_convective))
+                KE_current = $(full_print(KE_current))
+                ΔKE_timestep = $(full_print(ΔKE_timestep))
+                overage_prod = $(full_print(overage_prod))
+                tke_max = $(full_print(tke_max))
+                tke = $(full_print(aux_en.tke))
             ")
         end
 
