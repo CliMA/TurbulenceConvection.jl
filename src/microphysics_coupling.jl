@@ -387,6 +387,8 @@ function precipitation_formation(
     N_INP::FT,
     massflux::FT,
     domain::AbstractDomain,
+    qt_var::FT,
+    dqtdz::FT,
 ) where {FT}
     thermo_params = TCP.thermodynamics_params(param_set)
 
@@ -566,7 +568,7 @@ function precipitation_formation(
                 # [[ since we assume evap is constantly raising <r>, there is actually no need to enforce q_thresh... just proceed at τ or even faster -- you should never get <r> below your target value... honestly the longer time timestep the worse it should get lol. No threshold kind of means assuming <r> constant and so the rate is fixed.. maybe not a bad guess if you assume steady state idk... ]]
                 use_cloak = (area_partition_model isa CoreCloakAreaPartitionModel)
                 qi_tendency_sub_dep_for_thresh = max(qi_tendency_sub_dep + S_qt_snow_ice_dep_above + S_qt_snow_ice_dep_is, FT(0)) # remove the part already going to snow from sub dep
-                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ; Δt = Δt, Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=snow_formation_model.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep_for_thresh, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux, domain=domain, use_cloak=use_cloak) # pass in sed tendency so it can be accounted for in the threshold calculation
+                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ; Δt = Δt, Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=snow_formation_model.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep_for_thresh, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux, domain=domain, use_cloak=use_cloak, tke=tke_var, qt_var=qt_var, qt = q.tot, dqtdz=dqtdz, qisedflux = term_vel_ice*qi) # pass in sed tendency so it can be accounted for in the threshold calculation
                 S_qt_snow_ice_thresh = limit_tendency(precipitation_tendency_limiter, -α_acnv * S_qt_snow_ice_thresh, max(q.ice + qi_tendency_sub_dep*Δt + qi_tendency_sed*Δt - q_thresh_acnv, 0), Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
 
                 # TEST!
@@ -608,7 +610,7 @@ function precipitation_formation(
                 S_qt_snow_ice_agg_mix = FT(0) # no easy breakdown
                 use_cloak = (area_partition_model isa CoreCloakAreaPartitionModel)
                 qi_tendency_sub_dep_for_thresh = max(qi_tendency_sub_dep + S_qt_snow_ice_dep_above + S_qt_snow_ice_dep_is, FT(0)) # remove the part already going to snow from sub dep
-                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ_c; Δt=Δt, Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=param_set.user_params.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=param_set.user_params.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep_for_thresh, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux, domain=domain, use_cloak=use_cloak) # pass in sed tendency so it can be accounted for in the threshold calculation
+                S_qt_snow_ice_thresh, q_thresh_acnv = threshold_driven_acnv(param_set, ice_type, qi, Ni, ρ_c; Δt=Δt, Dmax=cloud_sedimentation_model.ice_Dmax, r_threshold_scaling_factor=param_set.user_params.r_ice_snow_threshold_scaling_factor, r_acnv_scaling_factor=param_set.user_params.r_ice_acnv_scaling_factor, add_dry_aerosol_mass=true, N_i_no_boost=N_i_no_boost, S_i=S_i, τ_sub_dep=τ_sub_dep, dqdt_sed=qi_tendency_sed, dqdt_dep=qi_tendency_sub_dep_for_thresh, dN_i_dz=dN_i_dz, dqidz=dqidz, w=term_vel_ice, N_INP=N_INP, massflux=massflux, domain=domain, use_cloak=use_cloak, tke=tke_var, qt=q.tot, qt_var=qt_var, dqtdz=dqtdz, qisedflux=term_vel_ice*qi) # pass in sed tendency so it can be accounted for in the threshold calculation
 
                 if !isfinite(S_qt_snow_ice_thresh) || ~isfinite(q_thresh_acnv)
                     @error("Got nonfinite S_qt_snow_ice_thresh = $(S_qt_snow_ice_thresh) or q_thresh_acnv = $(q_thresh_acnv) from inputs qi = $(qi); Ni = $(Ni); ρ_c = $(ρ_c)")
@@ -814,6 +816,8 @@ end
     N_INP::FT = FT(NaN),
     massflux::FT = FT(0),
     domain::AbstractDomain = Env,
+    qt_var::FT = FT(0),
+    dqtdz::FT = FT(0),
 ) where {FT} = 
     precipitation_formation(
         param_set,
@@ -853,6 +857,8 @@ end
         N_INP,
         massflux,
         domain,
+        qt_var,
+        dqtdz,
     )
 
 
@@ -1659,7 +1665,12 @@ function threshold_driven_acnv(
     N_INP::FT = FT(NaN),
     massflux::FT = FT(0),
     domain = En,
-    use_cloak::Bool = false
+    use_cloak::Bool = false,
+    tke::FT = FT(0), # not sure which vars i want
+    qt::FT = FT(NaN), # not sure which vars i want
+    qt_var::FT = FT(0), # not sure which vars i want
+    dqtdz::FT = FT(0), # not sure which vars i want
+    qisedflux::FT = FT(0),
 ) where {FT <: Real}
 
 
@@ -1767,7 +1778,7 @@ function threshold_driven_acnv(
         τ_orig = τ
 
 
-        # TODO: Turn this into a smooth transition, allow more masflux effect at supersat as proxy for qtvar.
+        # TODO: Turn this into a smooth transition, allow more masflux effect at supersat as proxy for qt_var.
         acnv_rate_other = FT(0)
         acnv_rate_fluc = FT(0)
         if is_growing # growing, so we only go to q_th, not 0
@@ -1789,6 +1800,9 @@ function threshold_driven_acnv(
                 # Don't let growth get out of hand. At r = r_thresh, redirect none, at r = r_max redirect all.
                 # acnv_rate_other += dqdt_dep * clamp((r_no_boost - r_thresh) / (0.2r_thresh), FT(0), FT(1)) # re-direct deposition -- by r = 1.2 r_th, redirecting all of it to acnv_thresh
                 acnv_rate_other += dqdt_dep * clamp((r - r_target) / (r_max - r_target), FT(0), FT(1)) # re-direct deposition -- by r = r_max, redirecting all of it to acnv_thresh
+
+                # # redirect sedimentation
+                # acnv_rate_other += dqdt_sed * clamp((r - r_target) / (r_max - r_target), FT(0), FT(1)) # re-direct sedimentation -- by r = r_max, redirecting all of it to acnv_thresh
 
                 # growth regime so probably no excursions that force acnv... can still tie to MF
                 # [[ unlike subsat where the default acnv rate is fast, but is slowed by MF bringing down particles and moisture and spreading the size dist]], we're supersaturated here, so the default rate is 0, not fast.
@@ -1845,6 +1859,10 @@ function threshold_driven_acnv(
             γ_S = FT(0.25)
             fS = clamp((-S_i / FT(0.05))^γ_S, FT(0), one(FT))  # use -S_i so base is positive
             τ = τ_sub_dep^(one(FT) - fS) * τ^(fS)  # geometric blend, slow near S_i=0, ramps near max subsaturation
+
+            # # redirect sedimentation
+            # acnv_rate_other += dqdt_sed * clamp((r - r_target) / (1.2*r_thresh - r_target), FT(0), FT(1)) # re-direct sedimentation -- by r = r_max, redirecting all of it to acnv_thresh
+
         end
 
 
@@ -1959,6 +1977,9 @@ function threshold_driven_acnv(
                 #     println("--------------------------------")
                 # end
 
+                # acnv_rate = acnv_rate_other
+                acnv_rate = dqdt_sed
+
 
                 q_target = min(q_target, q_target_fluc) # take the lower of the two targets
 
@@ -1970,7 +1991,70 @@ function threshold_driven_acnv(
         # if rand() < 5e-6
         #     @error("We need to take out sub_dep_Above and crossing r_is from being redirected since it already is... maybe just subtract them from sub_Dep before passing in?")
         # end
-        acnv_rate += acnv_rate_fluc
+        # acnv_rate += acnv_rate_fluc
+        # acnv_rate = dqdt_sed * clamp((r - r_thresh) / (1.2*r_thresh - r_thresh), FT(0), FT(1))  # / (N/100) # re-direct sedimentation -- by r = r_max, redirecting all of it to acnv_thresh
+
+
+        # Redirect sedimentation :: on when both (r > r_thresh) and subsaturated (S_i < 0)
+        # Off at S_i = 0 and r = r_thresh, fully on by S_i = -0.05 and r = 1.05*r_thresh
+
+
+
+        #=
+            We should have a slowdown factor tied to TKE/QTvar/S_i_var.... LES seems to go over at -10% subsat automatically...
+
+            They do : FOR DETRAINED CLOUD ICE, ASSUME MEAN VOLUME DIAM OF 80 MICRON :: see [ https://github.com/DOI-USGS/COAWST/blob/6419fc46d737b9703f31206112ff5fba65be400d/WRF/phys/module_mp_morr_two_moment.F#L1361C14-L1366C22 ]
+
+            IF (QVQVSI(K).LT.0.9) THEN
+               IF (QI3D(K).LT.1.E-8) THEN
+                  QV3D(K)=QV3D(K)+QI3D(K)
+                  T3D(K)=T3D(K)-QI3D(K)*XXLS(K)/CPM(K)
+                  QI3D(K)=0.
+               END IF
+
+            This is probably why it was so hard for us to capture, they have both DCS = 2 r_is acnv happening and this, but this only comes on at q_i = 1e-8 which is borderline on RF09, and then the variability in QT on it as well.
+        =#
+
+        # scale down based on how much is actually below -10% subsat
+        # calculate q_vap_sat_ice from qt and S_i
+        q_vap_sat = qt / (one(FT) + S_i)
+        q_subsat = q_vap_sat * 0.9  # 10% subsat
+        qt_std = sqrt(qt_var)
+        frac_sub10 = (qt_std > 0) ? Distributions.cdf(Distributions.Normal(qt, qt_std), q_subsat) : ((qt < q_subsat) ? one(FT) : zero(FT))
+        # acnv_rate *= frac_sub10
+
+
+        if (domain isa EnvDomain) || (domain isa CloakDownDomain) # only do this in env/cloak env
+            f_r  = clamp((r - r_thresh) / (1.05*r_thresh - r_thresh), FT(0), FT(1))
+            f_Si = clamp(-S_i / FT(0.1), FT(0), one(FT)) # -10% full force to match LES behavior
+            acnv_rate = FT(0)
+            acnv_rate_addit = dqdt_sed * f_r * f_Si # / (N/100)
+        else # 
+            f_r  = clamp((r - r_thresh) / (1.05*r_thresh - r_thresh), FT(0), FT(1))
+            f_Si = clamp(-S_i / FT(0.1), FT(0), one(FT))
+            acnv_rate_addit = dqdt_sed * f_r * f_Si
+        end
+
+        # acnv_rate = qisedflux * f_r * f_Si * frac_sub10 / τ # direct sedimentation redirection scaled by subsat fraction [[ pure qi_sed_flux is too susceptible to being 0 and have having no acnv despite being deeply subsat....  we want flux, but maybe enhanced if convergent since that implies more size sorting. ]]
+        acnv_rate_addit = (dqdt_sed + q) * f_r * f_Si * frac_sub10 / τ # direct sedimentation redirection scaled by subsat fraction [[ pure qi_sed_flux is too susceptible to being 0 and have having no acnv despite being deeply subsat....  we want flux, but maybe enhanced if convergent since that implies more size sorting. ]]
+        acnv_rate += acnv_rate_addit
+
+
+
+
+        # # TEST :: Scale down based on dNdz [[ 0 at dNdz = 0, 1 at dNdz = +2 ]], 
+        # scale_factor = clamp(dN_i_dz / FT(2), FT(0), one(FT))
+        # acnv_rate *= scale_factor
+        # q_target += (q - q_target) * scale_factor
+
+        # w_0 = 0.5
+        # drdt = (r/3)*(-(1/q)*dqdt_dep + 1/N* dN_i_dz * w_0)
+        # acnv_rate = max(drdt / 500, 0) * max(((r - r_thresh)/r_thresh)^3, 0) * N/.005 / (N/50)
+        # # q_target = q - drdt * (3 * q / r) * Δt
+
+        # # acnv_rate /= (N/100)
+
+
     
     end
     return resolve_nan(acnv_rate, FT(0)), q_target # also return q_target for limiters

@@ -762,7 +762,7 @@ function filter_precipitation_vars(state::State)
     return nothing
 end
 
-function affect_filter!(edmf::EDMFModel, grid::Grid, state::State, param_set::APS, surf::SurfaceBase, t::Real)
+function affect_filter!(edmf::EDMFModel, grid::Grid, state::State, param_set::APS, surf::SurfaceBase, cfl_limit::FTT, Δt::FTT) where {FTT <: Real}
     prog_en = center_prog_environment(state)
     aux_en = center_aux_environment(state)
     ###
@@ -784,12 +784,31 @@ function affect_filter!(edmf::EDMFModel, grid::Grid, state::State, param_set::AP
 
     ρ_c = prog_gm.ρ
     FT = float_type(state)
+    (FTT === FT) || throw(ArgumentError("Δt type $FTT does not match state float type $FT")) # hoping this helps inference...
     vmin = FT(0.01) * FT(1e-3) # 0.01 mm/s minimum velocity scale for tke floor
     @inbounds for k in real_center_indices(grid)
         # Lower bound tke. no upper bound bc env area is never 0...
         prog_en.ρatke[k] = max(prog_en.ρatke[k],   FT(0.5) * ρ_c[k] * aux_en.area[k]  * vmin^2)  # min tke based on min velocity scale [[ don't let go to 0 bc it never re-emerges]]
 
         prog_en.ρatke_convective[k] = max(prog_en.ρatke_convective[k], FT(0)) # min tke based on min velocity scale [[ this one is specifically convective so could go to 0, could also argue there's always some micro-convection going on lol]]
+
+        # CFL Filter
+        Δz = get_Δz(prog_gm.ρ)
+        w_max = cfl_limit * min(Δz[k], Δz[k+1]) / Δt # conservative...
+        ρatke_max = FT(0.5) * ρ_c[k] * aux_en.area[k] * w_max^2
+
+        if param_set.user_params.use_convective_tke # convective tke sums with other tke in aux, so need to limit sum
+            total_tke = prog_en.ρatke[k] + prog_en.ρatke_convective[k]
+            if total_tke > ρatke_max
+                scaling_factor = ρatke_max / total_tke
+                prog_en.ρatke[k] *= scaling_factor
+                prog_en.ρatke_convective[k] *= scaling_factor
+            end
+        else # covective tke is lumped in with regular tke so just limit individually
+            prog_en.ρatke[k] = min(prog_en.ρatke[k], ρatke_max)
+            prog_en.ρatke_convective[k] = min(prog_en.ρatke_convective[k], ρatke_max)
+            # aux_en tke is a combination of these two so we need to really limit their sum...
+        end
 
 
 
@@ -2205,6 +2224,7 @@ function compute_en_tendencies!(
     prog_covar = getproperty(prog_en, prog_sym)
     aux_up_f = face_aux_updrafts(state)
     aux_en = center_aux_environment(state)
+    prog_pr = center_prog_precipitation(state)
     covar = getproperty(aux_en, covar_sym)
     aux_covar = getproperty(aux_en_2m, covar_sym)
     aux_up = center_aux_updrafts(state)
@@ -2333,12 +2353,8 @@ function compute_en_tendencies!(
         # Φ = TC.geopotential(param_set, grid.zc[k].z)
         Φ = geopotential.(param_set, getfield.(grid.zc, :z))
         g = TCP.grav(param_set)
-        tke_max = @. (g/(2*max(MSE - Φ,0))) * max(-∂MSE∂z, 0) * aux_tc.mixing_length^2 * param_set.user_params.tke_convective_max_scaling_factor # max tke we could get from total conversion of MSE gradient to tke
+        tke_max = @. (g/(2*max(MSE - Φ, eps(FT)))) * max(-∂MSE∂z, 0) * aux_tc.mixing_length^2 * param_set.user_params.tke_convective_max_scaling_factor # max tke we could get from total conversion of MSE gradient to tke
 
-        # @warn "tke_max = $tke_max; MSE = $MSE; Φ = $Φ; ∂MSE∂z = $∂MSE∂z; mixing_length = $(aux_tc.mixing_length)"  # remove later
-        # if any(!isfinite, tke_max)
-        #     error("Non-finite values in tke_max computation.")
-        # end 
 
 
 
@@ -2352,7 +2368,7 @@ function compute_en_tendencies!(
               - saturated wrt ice if below freezing, liquid if above
         =#
 
-        instability = similar(∂MSE∂z)
+        instability = similar(∂MSE∂z) .* 0
 
         DSE = @. Φ + TCP.cp_d(param_set) * aux_en.T # dry static energy
         # ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
@@ -2365,6 +2381,8 @@ function compute_en_tendencies!(
         # θ_virt_toa = aux_en.θ_virt[kc_toa]
         # RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_virt_toa))
         # dθ_virt_dz = @. ∇c(wvec(RBθ(θ_virt)))
+
+
 
         @inbounds for k in real_center_indices(grid)
             ts = aux_en.ts[k]
@@ -2381,32 +2399,92 @@ function compute_en_tendencies!(
                 # ts_lo = (edmf.moisture_model isa EquilibriumMoisture) ? thermo_state_pθq(param_set, aux_en.p[k], aux_en.θ_liq_ice[k], q_tot_lo) : thermo_state_pθq(param_set, aux_en.p[k], aux_en.θ_liq_ice[k], q_tot_lo, aux_en.q_liq[k], aux_en.q_ice[k])
                 RH_ice = relative_humidity_over_ice(thermo_params, ts_hi)
                 RH_liq = relative_humidity_over_liquid(thermo_params, ts_hi)
-
             else
                 RH_ice = aux_en.RH_ice[k]
                 RH_liq = aux_en.RH_liq[k]
-
             end
+
+            L_v = TD.latent_heat_vapor(thermo_params, T)
+            L_f = TD.latent_heat_fusion(thermo_params, T)
+            L_s = TD.latent_heat_sublim(thermo_params, T)
+            latent_heating = zero(FT)
+            if edmf.moisture_model isa NonEquilibriumMoisture
+                # calculate how much latent heat we're actually generating... [[ we want negative for unsat downdrafts, and positive for saturated updrafts when we multiply by instability later... ]]
+                # liq + rai
+                latent_heating += -L_v * ((iszero(aux_en.ql_tendency_cond_evap[k]) ? zero(FT) : aux_en.ql_tendency_cond_evap[k] / aux_en.area[k]) + aux_tc.qr_tendency_evap[k]) # liq + rai
+                # ice + sno
+                latent_heating += -L_s * ((iszero(aux_en.qi_tendency_sub_dep[k]) ? zero(FT) : aux_en.qi_tendency_sub_dep[k] / aux_en.area[k]) + aux_tc.qs_tendency_dep_sub[k]) # ice + sno
+            else
+                # For eq we don't have cond/evap rates for liq ice, only rain snow...
+                # liq + rai
+                latent_heating += -L_v * (aux_tc.qr_tendency_evap[k]) # liq + rai
+                # ice + sno
+                latent_heating += -L_s * (aux_tc.qs_tendency_dep_sub[k]) # ice + sno
+            end
+
             if (below_freezing && (RH_ice < one(FT)) || (!below_freezing && (RH_liq < one(FT)))) # subsaturated
                 # I'm not sure if you should evaporation to contribue and use MSE or just stick to SE
-                if (aux_en.q_liq[k] + aux_en.q_ice[k]) > FT(1e-10) # use MSE? I thnk still DSE.. evaporation could spark downdrafts I guess... but it's much more finite than runaway updrafts
+
+                # check fraction of qt distribution above saturation..
+                q_vap_sat = below_freezing ? TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Ice()) : TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Liquid())
+                qt_std = sqrt(aux_en.QTvar[k])
+                qt_mean = aux_en.q_tot[k]
+                cov_qtθ = aux_en.HQTcov[k]
+                # θli_mean = aux_en.θ_liq_ice[k]
+                θli_std = aux_en.Hvar[k]
+                p = aux_en.p[k]
+                p0 = TD.TP.p_ref_theta(thermo_params)
+                R_d = TCP.R_d(param_set)
+                R_v = TCP.R_v(param_set)
+                c_p = TCP.cp_d(param_set)
+                ql_mean = aux_en.q_liq[k]
+                qi_mean = aux_en.q_ice[k]
+
+                frac_supersat_old = (qt_std > 0) ? (one(FT) - Distributions.cdf(Distributions.Normal(qt_mean, qt_std), q_vap_sat)) : ((qt_mean > q_vap_sat) ? one(FT) : zero(FT)) # doesn't handle covar
+                                
+                β = (p / p0)^(R_d/c_p) # θl -> T conversion factor
+                dq_sat_dT = below_freezing ? L_f * q_vap_sat / (R_v * T^2) : L_v * q_vap_sat / (R_v * T^2) # Clausius–Clapeyron slope for linearization
+                α = dq_sat_dT * β
+                μ_X = qt_mean - q_vap_sat # linear combination mean and variance
+                σ2_X = qt_std^2 + (α*θli_std)^2 - 2*α*cov_qtθ
+                σ_X = sqrt(max(σ2_X, 0.0))
+                frac_supersat = σ_X > 0 ? 1 - Distributions.cdf(Distributions.Normal(0, σ_X), -μ_X) : (μ_X > 0 ? one(FT) : zero(FT)) # fraction supersaturated
+
+
+                # @info "frac_supersat =  $frac_supersat at level $k (T=$T; RH_ice=$RH_ice; RH_liq=$RH_liq; qt_mean=$qt_mean; qt_std=$qt_std; q_vap_sat=$q_vap_sat)" # remove later
+                if frac_supersat > 0
+                    instability[k] = -∂MSE∂z[k] * frac_supersat * abs(latent_heating) # partially saturated
+                else
+                    instability[k] = -FT(Inf) # disallow
+                end
+
+                if (aux_en.q_liq[k] + aux_en.q_ice[k] + prog_pr.q_rai[k] + prog_pr.q_sno[k]) > FT(1e-10) # use MSE? I thnk still DSE.. evaporation could spark downdrafts I guess... but it's much more finite than runaway updrafts
                     # instability[k] = -∂MSE∂z[k]
                     # instability[k] = -∂DSE∂z[k]
-                    instability[k] = -FT(Inf) # don't allow
+                    # instability[k] += -FT(Inf) # don't allow, DSE is handled fine in I think by normal tke... not sure...
+
+                    # We are unstable to evaporation fueled downdrafts... [[ technically liquid should release more energy but... ]]
+                    instability[k] += -∂MSE∂z[k] * abs(latent_heating)
+                    
                 else # use DSE
                     # instability[k] = -∂DSE∂z[k]
                     # c_p = TCP.cp_d(param_set)
                     # instability[k] = c_p * -dθ_virt_dz[k] # dry static stability
-                    instability[k] = -FT(Inf) # disallow
+                    instability[k] += -FT(Inf) # disallow
                 end
             else # saturated
-                instability[k] = -∂MSE∂z[k] 
+                instability[k] = -∂MSE∂z[k] * abs(latent_heating)
             end
         end
 
 
         K_buoy = param_set.user_params.convective_tke_buoyancy_coeff
         @. ρatke_convective_production = K_buoy * ρ_c * a_en * max(instability, 0) * clamp(sqrt(aux_en.tke), eps(FT), 1) # only positive values of convective TKE [[ not sure if existing tke should matter...]]
+
+        if any(!isfinite, ρatke_convective_production)
+            @warn "Non-finite values in convective TKE production computation."
+            error("K_buoy = $(K_buoy); a_en = $(a_en); instability = $(parent(instability)); tke = $(parent(aux_en.tke))")
+        end
 
         
         # -- advection/diffusion -- #
@@ -2453,6 +2531,11 @@ function compute_en_tendencies!(
         @. ρatke_convective_production -= (ρ_c * a_en)/Δt * overage_prod * (1 - exp(-ϵ))
         @. ρatke_convective_production = max(ρatke_convective_production, 0) # no negative production [[just a double check safety net, should still be positive]]
 
+        if any(!isfinite, ρatke_convective_production)
+            @warn "Non-finite values in convective TKE production limiter computation."
+            error("KE_current = $(parent(KE_current)); ΔKE_timestep = $(parent(ΔKE_timestep)); overage_prod = $(parent(overage_prod)); tke_max = $(parent(tke_max)); tke = $(parent(aux_en.tke))")
+        end
+
         # turn off production at surface, surface +1, toa, toa -1 
         ρatke_convective_production[kc_surf] = 0
         ρatke_convective_production[kc_surf + 1] = 0
@@ -2467,18 +2550,31 @@ function compute_en_tendencies!(
         # we do not combine tendencies [  tend_covar += tend_ρatke_convective  ] here because we track ρatke_convective separately and we cant separate them later after adding
 
         if any(!isfinite, tend_ρatke_convective)
+
+            full_print("ρatke_convective = $(parent(ρatke_convective))")
+            full_print("ρatke_convective_production = $(parent(ρatke_convective_production))")
+            full_print("ρatke_convective_advection = $(parent(ρatke_convective_advection))")
+            full_print("ρatke_convective_dissipation = $(parent(ρatke_convective_dissipation))")
+            full_print("tend_ρatke_convective = $(parent(tend_ρatke_convective))")
+            full_print("KE_current = $(parent(KE_current))")
+            full_print("ΔKE_timestep = $(parent(ΔKE_timestep))")
+            full_print("overage_prod = $(parent(overage_prod))")
+            full_print("tke_max = $(parent(tke_max))")
+            full_print("tke = $(parent(aux_en.tke))")
+
             error("Non-finite values in convective TKE tendency computation. Details: 
-                ρatke_convective = $(full_print(ρatke_convective))
-                ρatke_convective_production = $(full_print(ρatke_convective_production))
-                ρatke_convective_advection = $(full_print(ρatke_convective_advection))
-                ρatke_convective_dissipation = $(full_print(ρatke_convective_dissipation))
-                tend_ρatke_convective = $(full_print(tend_ρatke_convective))
-                KE_current = $(full_print(KE_current))
-                ΔKE_timestep = $(full_print(ΔKE_timestep))
-                overage_prod = $(full_print(overage_prod))
-                tke_max = $(full_print(tke_max))
-                tke = $(full_print(aux_en.tke))
+                ρatke_convective = $((ρatke_convective))
+                ρatke_convective_production = $((ρatke_convective_production))
+                ρatke_convective_advection = $((ρatke_convective_advection))
+                ρatke_convective_dissipation = $((ρatke_convective_dissipation))
+                tend_ρatke_convective = $((tend_ρatke_convective))
+                KE_current = $((KE_current))
+                ΔKE_timestep = $((ΔKE_timestep))
+                overage_prod = $((overage_prod))
+                tke_max = $((tke_max))
+                tke = $((aux_en.tke))
             ")
+            
         end
 
 

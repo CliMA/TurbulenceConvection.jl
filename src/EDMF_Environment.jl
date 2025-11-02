@@ -255,6 +255,10 @@ function microphysics!(
                         qt = q_here.tot + param_set.user_params.condensate_qt_SD * q_tot_sd
                         θ = TD.liquid_ice_pottemp(thermo_params, ts)
                         ts = (edmf.moisture_model isa NonEquilibriumMoisture) ? thermo_state_pθq(param_set, p_c[k], θ, qt, q_here.liq, q_here.ice) : thermo_state_pθq(param_set, p_c[k], θ, qt)
+
+                        if (region isa EnvDomain) && !((param_set.user_params.use_convective_tke) || (param_set.user_params.use_convective_tke_production_only)) #if we're doing SDs, associate q with upward motion. We dont have varw, and we're not using convective tke, but at least don't let it be negative. if the mean is -w, the positive side can be 
+                            w_noneq = w_noneq + param_set.user_params.condensate_qt_SD * abs(w_noneq) # each SD moves us up in w, so 1 SD, w = 0
+                        end
                     end
 
 
@@ -351,6 +355,8 @@ function microphysics!(
                         N_INP,
                         aux_tc.massflux[k],
                         region,
+                        aux_en.QTvar[k],
+                        aux_tc.∂qt∂z[k],
                     )
                     mph_precip += mph_precip_here * (region_area / aux_en.area[k]) # weight by area fraction
                 end
@@ -523,6 +529,8 @@ function microphysics!(
                     N_INP,
                     aux_tc.massflux[k],
                     Env,
+                    aux_en.QTvar[k],
+                    aux_tc.∂qt∂z[k],
                 )
 
             else
@@ -611,6 +619,8 @@ function microphysics!(
                     N_INP = N_INP,
                     massflux = aux_tc.massflux[k],
                     domain = Env,
+                    qt_var = aux_en.QTvar[k],
+                    dqtdz = aux_tc.∂qt∂z[k],
                 )
                 mph_precip += mph_precip_here * (region_area / aux_en.area[k]) # weight by area fraction
             end
@@ -1790,6 +1800,8 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, moisture_model::Abstra
                 N_INP,
                 massflux,
                 domain,
+                aux_en.QTvar[k],
+                aux_tc.∂qt∂z[k],
             )
     else
 
@@ -1837,6 +1849,8 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, moisture_model::Abstra
                 N_INP = N_INP,
                 massflux = massflux,
                 domain = domain,
+                qt_var = aux_en.QTvar[k],
+                dqtdz = aux_tc.∂qt∂z[k],
             )
 
     end

@@ -452,7 +452,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
         # @error(" testing applying filter before setting thermo stuff...") # -- really I think we could get away with just moving filter_gm_vars() here...
         # surf = get_surface(surf_params, grid, state, t, param_set)
-        # TC.affect_filter!(edmf, grid, state, param_set, surf, t)
+        # TC.affect_filter!(edmf, grid, state, param_set, surf, cfl_limit, Δt)
 
         TC.filter_gm_vars(edmf, grid, state)  # filter gm vars before setting thermo state so that we don't have to do it again later
 
@@ -477,7 +477,7 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
 
         surf = get_surface(surf_params, grid, state, t, param_set)
 
-        TC.affect_filter!(edmf, grid, state, param_set, surf, t)
+        TC.affect_filter!(edmf, grid, state, param_set, surf, cfl_limit, Δt)
 
         # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
         # Some of these methods should probably live in `compute_tendencies`, when written, but we'll

@@ -80,10 +80,14 @@ function affect_filter!(integrator) #  affect_filter!() is also called in the dr
         t = integrator.t
         prog = integrator.u
 
+        cfl_limit = integrator.p.TS.cfl_limit
+        TS = integrator.p.TS
+        Δt = TS.dt_limit_tendencies_factor * (TS.limit_tendencies_by_dt_min ? TS.dt_min : TS.dt)
+
         state = TC.column_prog_aux(prog, aux, colidx)
         grid = TC.Grid(state)
         surf = get_surface(surf_params, grid, state, t, param_set)
-        TC.affect_filter!(edmf, grid, state, param_set, surf, t)
+        TC.affect_filter!(edmf, grid, state, param_set, surf, cfl_limit, Δt)
         nothing
     end
 

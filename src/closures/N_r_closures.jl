@@ -2163,7 +2163,13 @@ function adjust_ice_N(
                     # Even when RH is super low, at cloud top this is still resulting in very high <r>. I think in scenarios when lambda is high and larger, falling INP arent advected up there, we're overly skewing to high <r>/...
                     # In narrow dry layers like RF10, we don't let <r> grow too much either since it takes time for size sorting to happen and high NINP means large amounts of ice probably came from saturation nearby.
                     # We can bound the reduction in N_INP_adjusted, but this might make it hard in calibration if N_INP is universally overpowering...
-                    N_INP_adjusted_here = max(N_INP_adjusted_here, N_INP_adjusted/2) # added 10/23 1028 am, /10 seems to be too strong, /2 is ok....could use raw N_INP but that feels too overpowering...
+                    # N_INP_adjusted_here = max(N_INP_adjusted_here, N_INP_adjusted/2) # added 10/23 1028 am, /10 seems to be too strong, /2 is ok....could use raw N_INP but that feels too overpowering...
+
+
+                    # Gradually reduce enforcement from full (N_INP_adjusted/2) at cloud top # [[ 10/31 to replace the line above that i think is too agressive low down and prevents autoconv in RF01 -- gradually go from full enforcement (N_INP_adjusted/2))]] to none at N_INP_adjusted = N_INP_top/10
+                    w = clamp((N_INP_adjusted - N_INP_top/FT(10)) / (N_INP_top - N_INP_top/FT(10)), FT(0), one(FT))
+                    N_limit = (one(FT) - w)*N_INP_adjusted_here + w*(N_INP_adjusted/2)
+                    N_INP_adjusted_here = max(N_INP_adjusted_here, N_limit)
 
                     #
                     if N_i_from_INP

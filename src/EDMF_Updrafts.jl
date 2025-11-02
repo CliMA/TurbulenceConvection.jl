@@ -413,6 +413,8 @@ function compute_precipitation_formation_tendencies(
                     N_INP,
                     FT(0), # massflux doesnt count in updraft [[ we pass domain as an arg now anyway]]
                     Up,
+                    FT(0),
+                    aux_tc.∂qt∂z[k],
                 )
 
             else
@@ -450,7 +452,9 @@ function compute_precipitation_formation_tendencies(
                     dqidz = aux_up[i].dqidz[k],
                     N_INP = N_INP,
                     massflux = FT(0), # massflux doesnt count in updraft
-                    domain = Up
+                    domain = Up,
+                    qt_var = FT(0),
+                    dqtdz = aux_tc.∂qt∂z[k],
                 )
             end
 

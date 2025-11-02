@@ -237,6 +237,11 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "qi_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).qi_tendency_sedimentation .+ center_aux_environment(state).qi_tendency_sedimentation), # I believe these already area weighted so just sum bc you would divide out the area to get the real tendency but you'd have to multiply by area again to area weight
         "ql_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_sedimentation .+ center_aux_environment(state).ql_tendency_sedimentation),
 
+
+        # w * ρ * a * q
+        "env_qi_sed_flux" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).term_vel_ice .* center_aux_environment(state).area .* center_aux_environment(state).q_ice),
+
+
         # "qr_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qr_tendency_advection), # precip sed is stored in advection
         # "qs_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qs_tendency_advection), # I believe these already area weightd so just sum
         # "qip_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qs_tendency_advection), # I believe these already area weightd so just sum
