@@ -52,6 +52,7 @@ cent_aux_vars_gm(FT, local_geometry, edmf) = (;
     dqtdt_hadv = FT(0), #Horizontal advection of moisture
     H_nudge = FT(0), #Reference thetali profile for relaxation tendency
     qt_nudge = FT(0), #Reference qt profile for relaxation tendency
+    dqtdt_nudge = FT(0), #Relaxation tendency for qt my addition
     dTdt_fluc = FT(0), #Vertical turbulent advection of temperature
     dqtdt_fluc = FT(0), #Vertical turbulent advection of moisture
     u_nudge = FT(0), #Reference u profile for relaxation tendency

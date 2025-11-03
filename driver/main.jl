@@ -261,7 +261,7 @@ function initialize(sim::Simulation1d)
 
     @info "calibrate_io = $calibrate_io"
 
-    ts_gm = ["Tsurface", "shf", "lhf", "ustar", "wstar", "lwp_mean", "iwp_mean"]
+    ts_gm = ["Tsurface", "qtsurface", "shf", "lhf", "ustar", "wstar", "lwp_mean", "iwp_mean"]
     ts_edmf = calibrate_io ?  ["rwp_mean", "swp_mean"] : [
         "cloud_base_mean",
         "cloud_top_mean",

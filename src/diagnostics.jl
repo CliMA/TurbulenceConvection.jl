@@ -119,6 +119,10 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "env_dqvdt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).dqvdt),
         "updraft_dqvdt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).dqvdt),
 
+        "dqtdt_hadv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).dqtdt_hadv),
+        "qt_nudge" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qt_nudge),
+        "dqtdt_nudge" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).dqtdt_nudge),
+
         "env_dTdt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).dTdt),
         "updraft_dTdt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).dTdt),
 

@@ -1324,6 +1324,30 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         tends_ρaθ_liq_ice = tendencies_up[i].ρaθ_liq_ice
         tends_ρaq_tot = tendencies_up[i].ρaq_tot
         area_en = aux_en.area
+
+
+        # if param_set.user_params.use_convective_tke
+        #     # TESTING TKE ENTR [[ very unstable lol]]
+        #     if rand() < 1e-4
+        #         @warn "Using convective TKE based entrainment enhancement"
+        #     end
+        #     if edmf.entrainment_type isa TotalRateEntrModel
+        #         entr_rate_inv_s = similar(detr_rate_inv_s) # new object
+        #         entr_rate_inv_s .= aux_up_i.entr_rate_inv_s # start w/ original entrainment rate
+        #         @inbounds for k in real_center_indices(grid)
+        #             # check if we have convective tke. if we do, raise the entrainment rate.
+        #             if (prog_up[i].ρarea[k] / ρ_c[k] < FT(0.25)) && (aux_en.tke_convective[k] > FT(1e-10))
+        #                 if edmf.entrainment_type isa TotalRateEntrModel
+        #                     if rand() < 1e-4
+        #                         @warn "At level $(k.i); Changing entrainment rate from $(entr_rate_inv_s[k]) to $(FT(5.1) * max(entr_rate_inv_s[k], detr_rate_inv_s[k])) due to convective TKE of $(aux_en.tke_convective[k]); detrainment rate is $(detr_rate_inv_s[k])"
+        #                     end
+        #                     entr_rate_inv_s[k] = max(FT(1+aux_en.tke_convective[k]) * max(entr_rate_inv_s[k], detr_rate_inv_s[k]), (FT(1)+aux_en.tke_convective[k]) * FT(1/300), entr_rate_inv_s[k]) # boost entrainment rate, at least 1s faster than nudging
+        #                 end
+        #             end
+        #         end
+        #     end
+        # end
+
         
         # Try using these to ensure our limits are correct, no negs, etc
         # prog_en_gm = center_prog_environment_up_gm_version(state)
@@ -1630,11 +1654,8 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
             end
         end
 
-    # end
 
-    # # Solve for updraft velocity
-
-
+        # # Solve for updraft velocity
         ρaw = prog_up_f[i].ρaw
         tends_ρaw = tendencies_up_f[i].ρaw
         nh_pressure = aux_up_f[i].nh_pressure
@@ -1682,6 +1703,13 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
                 end
             end
         end
+
+        # if param_set.user_params.use_convective_tke # we want to absorb the updrafts from convective tke... w variance isn't captured in the environment
+        #     # TESTING TKE CONV
+        #     if edmf.entrainment_type isa TotalRateEntrModel
+        #         @. tends_ρaw += ρ_f * ᶠinterp_a(a_up) * (ᶠinterp_a(entr_rate_inv_s) * sqrt(2 * I0f(aux_en.tke_convective) / ρ_f) - ᶠinterp_a(detr_rate_inv_s) * w_up) * 5
+        #     end
+        # end
 
         tends_ρaw[kf_surf] = 0
     end
@@ -2353,8 +2381,8 @@ function compute_en_tendencies!(
         # Φ = TC.geopotential(param_set, grid.zc[k].z)
         Φ = geopotential.(param_set, getfield.(grid.zc, :z))
         g = TCP.grav(param_set)
-        tke_max = @. (g/(2*max(MSE - Φ, eps(FT)))) * max(-∂MSE∂z, 0) * aux_tc.mixing_length^2 * param_set.user_params.tke_convective_max_scaling_factor # max tke we could get from total conversion of MSE gradient to tke
-
+        # mixing length is set by dry static stability so we prolly don't wanna use that...
+        tke_max = @. (g/(2*max(MSE - Φ, eps(FT)))) * max(-∂MSE∂z, 0) * ifelse((∂MSE∂z < FT(0)) , max(aux_tc.mixing_length, 200) , aux_tc.mixing_length)^2 * param_set.user_params.tke_convective_max_scaling_factor # max tke we could get from total conversion of MSE gradient to tke
 
 
 
@@ -2455,17 +2483,17 @@ function compute_en_tendencies!(
                 if frac_supersat > 0
                     instability[k] = -∂MSE∂z[k] * frac_supersat * abs(latent_heating) # partially saturated
                 else
-                    instability[k] = -FT(Inf) # disallow
+                    instability[k] = FT(0) # no instability
                 end
 
-                if (aux_en.q_liq[k] + aux_en.q_ice[k] + prog_pr.q_rai[k] + prog_pr.q_sno[k]) > FT(1e-10) # use MSE? I thnk still DSE.. evaporation could spark downdrafts I guess... but it's much more finite than runaway updrafts
+                if (aux_en.q_liq[k] + aux_en.q_ice[k] + prog_pr.q_rai[k] + prog_pr.q_sno[k]) > FT(1e-10) # Might not need this since we have 
                     # instability[k] = -∂MSE∂z[k]
                     # instability[k] = -∂DSE∂z[k]
                     # instability[k] += -FT(Inf) # don't allow, DSE is handled fine in I think by normal tke... not sure...
 
                     # We are unstable to evaporation fueled downdrafts... [[ technically liquid should release more energy but... ]]
+                    instability[k] = min(instability[k], 0)
                     instability[k] += -∂MSE∂z[k] * abs(latent_heating)
-                    
                 else # use DSE
                     # instability[k] = -∂DSE∂z[k]
                     # c_p = TCP.cp_d(param_set)
@@ -2510,9 +2538,11 @@ function compute_en_tendencies!(
         ∂MSE∂z = aux_en.∂MSE∂z
         k_diss = param_set.user_params.convective_tke_dissipation_coeff
         # K_diss = @. -k_diss * ∇c(ρ_f * wvec(Ifw(min(∂MSE∂z,0)))) # if MSE decreases with height, we dissipate convective TKE
-        K_diss = @. -k_diss * max(∂MSE∂z, 0)^2 # if MSE increases with height, we dissipate convective TKE squared goes like brunt vaisala
+        K_diss = @. k_diss * max(∂MSE∂z, 0)^2 # if MSE increases with height, we dissipate convective TKE squared goes like brunt vaisala
         @. ρatke_convective_dissipation = K_diss * ρatke_convective
-        # self dissipation in `compute_covariance_dissipation()`
+
+        # self dissipation [[ calculated in  `compute_covariance_dissipation()`.. we apply here or else tke can build up for the entire run if it's not advected away ]]
+        @. ρatke_convective_dissipation += ρ_c * a_en * (aux_en_2m.tke.dissipation) * ifelse.( aux_en.tke > eps(FT), aux_en.tke_convective / aux_en.tke , FT(0)) # scale by fraction of convective tke in total tke to get dissipation of convective part
 
         # -- limit production to enforce tke max -- #
         # limit production and net if we're exceeding tke max (smooth limiter that ramps on as we exceed tke max)
@@ -2520,14 +2550,15 @@ function compute_en_tendencies!(
         # current KE per unit mass
         KE_current = @. ρatke_convective / (ρ_c * a_en)
         # KE increment from this timestep (production + dissipation + advection)
-        ΔKE_timestep = @. (ρatke_convective_production + ρatke_convective_dissipation + ρatke_convective_advection) * Δt / (ρ_c * a_en)
+        ΔKE_timestep = @. (ρatke_convective_production - ρatke_convective_dissipation + ρatke_convective_advection) * Δt / (ρ_c * a_en)
         # overshoot due to this timestep’s contribution only
         # overage_prod = @. min(KE_current + ΔKE_timestep - tke_max, ρatke_convective_production * Δt/(ρ_c * a_en)) # only consider production contribution to overshoot
         # overage_prod = @. max(min(KE_current + ΔKE_timestep - tke_max, ρatke_convective_production * Δt / (ρ_c * a_en)), 0) # GPT
         overage_prod = @. min(max(KE_current + ΔKE_timestep - tke_max, 0), max(ρatke_convective_production, 0) * Δt/(ρ_c * a_en)) # my fix, i think ρatke_convective_production is already positive
 
         # smooth exponential decay applied only to the overshoot fraction
-        ϵ = FT(0.1)
+        # ϵ = FT(0.1)
+        ϵ = FT(4) # get rid of like 90% of overage
         @. ρatke_convective_production -= (ρ_c * a_en)/Δt * overage_prod * (1 - exp(-ϵ))
         @. ρatke_convective_production = max(ρatke_convective_production, 0) # no negative production [[just a double check safety net, should still be positive]]
 
@@ -2545,7 +2576,7 @@ function compute_en_tendencies!(
 
 
         # -- combine tendencies -- #
-        @. tend_ρatke_convective = ρatke_convective_production + ρatke_convective_advection + ρatke_convective_dissipation # prolly should have some kinda limiter but...
+        @. tend_ρatke_convective = ρatke_convective_production - ρatke_convective_dissipation + ρatke_convective_advection  # prolly should have some kinda limiter but...
         @. tend_ρatke_convective = max(tend_ρatke_convective, -ρatke_convective / Δt) # can't dissipate more than we have
         # we do not combine tendencies [  tend_covar += tend_ρatke_convective  ] here because we track ρatke_convective separately and we cant separate them later after adding
 

@@ -842,6 +842,8 @@ function compute_gm_tendencies!(
             gm_q_tot_nudge_k = (aux_gm.qt_nudge[k] - aux_gm.q_tot[k]) / force.scalar_nudge_τᵣ
             tendencies_gm.ρq_tot[k] += ρ_c[k] * (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k])
 
+            aux_gm.dqtdt_nudge[k] = gm_q_tot_nudge_k
+
             aux_en.dqvdt[k] += (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k]) # [store things that matter for our aux_en.dqvdt] [dqvdt priority ]
             aux_en.dTdt[k] += (gm_H_nudge_k* Π + aux_gm.dTdt_fluc[k]) #  [store things that matter for our aux_en.dTdt] [dTdt priority ] [ go opposite way with exner] # DO NOT DO THIS, it's not at all the same thing as temperature!!! because of condensate. it's really not the same thing as θ_liq_ice, so we don't do this.
             @inbounds for i in 1:N_up

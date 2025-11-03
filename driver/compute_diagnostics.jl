@@ -70,6 +70,7 @@ end
 
 function io(surf::TC.SurfaceBase, surf_params, grid, state, Stats::NetCDFIO_Stats, t::Real)
     write_ts(Stats, "Tsurface", TC.surface_temperature(surf_params, t))
+    write_ts(Stats, "qtsurface", TC.surface_q_tot(surf_params, t)) # my addition
     write_ts(Stats, "shf", surf.shf)
     write_ts(Stats, "lhf", surf.lhf)
     write_ts(Stats, "ustar", surf.ustar)
@@ -80,7 +81,6 @@ function io(io_dict::Dict, Stats::NetCDFIO_Stats, state)
         write_field(Stats, var, vec(io_dict[var].field(state)), io_dict[var].group)
     end
 end
-
 
 function initialize_io(nc_filename, FT, ts_list)
     NC.Dataset(nc_filename, "a") do ds
