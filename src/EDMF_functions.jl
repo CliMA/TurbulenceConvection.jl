@@ -608,7 +608,7 @@ function compute_diffusive_fluxes(edmf::EDMFModel, grid::Grid, state::State, sur
     )
 
 
-    use_separate_convective_tke_ed_coeff = (param_set.user_params.use_convective_tke && param_set.user_params.use_separate_convective_tke_ed_coeff)  # tke_ed_coeff
+    use_separate_convective_tke_ed_coeff = (param_set.user_params.use_convective_tke && !isone(param_set.user_params.convective_tke_ed_scaling_factor))  # tke_ed_coeff
     if use_separate_convective_tke_ed_coeff 
         #= 
             See in update_aux():
@@ -1326,27 +1326,10 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         area_en = aux_en.area
 
 
-        # if param_set.user_params.use_convective_tke
-        #     # TESTING TKE ENTR [[ very unstable lol]]
-        #     if rand() < 1e-4
-        #         @warn "Using convective TKE based entrainment enhancement"
-        #     end
-        #     if edmf.entrainment_type isa TotalRateEntrModel
-        #         entr_rate_inv_s = similar(detr_rate_inv_s) # new object
-        #         entr_rate_inv_s .= aux_up_i.entr_rate_inv_s # start w/ original entrainment rate
-        #         @inbounds for k in real_center_indices(grid)
-        #             # check if we have convective tke. if we do, raise the entrainment rate.
-        #             if (prog_up[i].ρarea[k] / ρ_c[k] < FT(0.25)) && (aux_en.tke_convective[k] > FT(1e-10))
-        #                 if edmf.entrainment_type isa TotalRateEntrModel
-        #                     if rand() < 1e-4
-        #                         @warn "At level $(k.i); Changing entrainment rate from $(entr_rate_inv_s[k]) to $(FT(5.1) * max(entr_rate_inv_s[k], detr_rate_inv_s[k])) due to convective TKE of $(aux_en.tke_convective[k]); detrainment rate is $(detr_rate_inv_s[k])"
-        #                     end
-        #                     entr_rate_inv_s[k] = max(FT(1+aux_en.tke_convective[k]) * max(entr_rate_inv_s[k], detr_rate_inv_s[k]), (FT(1)+aux_en.tke_convective[k]) * FT(1/300), entr_rate_inv_s[k]) # boost entrainment rate, at least 1s faster than nudging
-        #                 end
-        #             end
-        #         end
-        #     end
-        # end
+        #=
+            We tried some convective-tke based adjustments to entr/detr rate but they didn't work at all.
+            Instead we now just at the end directly adjoin to the existing updraft.
+        =#
 
         
         # Try using these to ensure our limits are correct, no negs, etc
@@ -1400,7 +1383,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         # Π = TD.exner.(thermo_params, aux_gm.ts)
 
         # f_q = similar(ρarea)
-        # if edmf.area_partition_model isa CoreCloakAreaPartitionModel # Igore w for now
+        # if edmf.area_partition_model isa CoreCloakAreaPartitionModel # Ignore w for now
         #     # As with advection, we will again partition everything outside of en_remaining into the updrafts and cloak up, leaving nothing in cloak_dn, and en_remainig unchanged
         #     # Boost factors for ice formation segregation to updraft.
         #     @inbounds for k in real_center_indices(grid)
@@ -1410,6 +1393,8 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
         # else
         #     @. f_q = one(FT)
         # end
+
+        scalar_nudge_τᵣ = 20*60 # testing hardcoded to see if its' good before going all in [ would neet to pass forcing object to this fcn]
 
         if edmf.entrainment_type isa FractionalEntrModel
             @. tends_ρarea = 
@@ -1423,7 +1408,7 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
 
         if edmf.entrainment_type isa FractionalEntrModel
             @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice)))
-            @. tends_other = (ρ_c * θ_liq_ice_tendency_precip_formation) + (ρ_c * θ_liq_ice_tendency_sedimentation)# external tendencies... we will limit entr/detr as the final tendency to not violate this contract...
+            @. tends_other = (ρ_c * θ_liq_ice_tendency_precip_formation) + (ρ_c * θ_liq_ice_tendency_sedimentation) # external tendencies... we will limit entr/detr as the final tendency to not violate this contract...
             @. tends_ρaθ_liq_ice =
                 # -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice))) + 
                 tends_advec + 
@@ -1450,9 +1435,10 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
                 tends_advec +
                 progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaθ_liq_ice / ρarea, prog_gm.ρθ_liq_ice / ρ_c), prog_gm.ρθ_liq_ice / ρ_c, tends_ρarea,
                     limit_tendency(edtl, (ρarea * entr_rate_inv_s * θ_liq_ice_en) - (ρarea * detr_rate_inv_s * θ_liq_ice_up), ρaθ_liq_ice+max(tends_advec+tends_other,0), ρ_c * area_en * θ_liq_ice_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
-                (ρ_c * θ_liq_ice_tendency_precip_formation) # +
+                (ρ_c * θ_liq_ice_tendency_precip_formation) +
                 # f_q*max(ρarea * aux_tc.θ_liq_ice_tendency_precip_sinks, 0) # + # qi_sub_dep contribution [[ i think this is needed so significant snow formation doesn't kill updrafts?]]
-                #ρarea*aux_up[i].dTdt/Π # test adding nudging in so that nudging doesnt prevent env and updraft from mixing and converging...
+                # ifelse(param_set.user_params.apply_nudging_to_updraft && (ρarea/ρ_c > 1.), ρarea * aux_up[i].dTdt/TD.exner(thermo_params, aux_gm.ts), FT(0)) # This version breaks because dTdt contains extraneous stuff and because we're not restoring directly to gm, we can have unresolved drift that simply gets compensated in env.
+                ifelse(param_set.user_params.apply_nudging_to_updraft && (ρarea/ρ_c > FT(0.01)), ρarea * (aux_gm.H_nudge - aux_up[i].θ_liq_ice)/scalar_nudge_τᵣ, FT(0)) # dTdt includes hadv and stuff... ... nudging can kill the updraft though...
 
             @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaq_tot)))
             @. tends_other = (ρ_c * qt_tendency_precip_formation) + (ρ_c * qt_tendency_sedimentation) # external tendencies... we will limit entr/detr as the final tendency to not violate this contract...
@@ -1461,7 +1447,9 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
                 tends_advec +
                 progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_tot / ρarea, prog_gm.ρq_tot / ρ_c), prog_gm.ρq_tot / ρ_c, tends_ρarea,
                     limit_tendency(edtl, (ρarea * entr_rate_inv_s * q_tot_en) - (ρarea * detr_rate_inv_s * q_tot_up), ρaq_tot + max(tends_advec+tends_other,0), ρ_c * area_en * q_tot_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
-                    (ρ_c * qt_tendency_precip_formation)  #+ ρarea*aux_up[i].dqvdt # test adding nudging in so that nudging doesnt prevent env and updraft from mixing and converging...
+                    (ρ_c * qt_tendency_precip_formation) +
+                    # ifelse(param_set.user_params.apply_nudging_to_updraft, ρarea * aux_gm.dqtdt_nudge, FT(0)) # dqvdt includes hadv and stuff... ... nudging can kill the updraft though... [[ Tghis version has has no restoring force... so it can cause drift... as the updraft area changes... we'd have to nudge updraft and env separate
+                    ifelse(param_set.user_params.apply_nudging_to_updraft && (ρarea/ρ_c > FT(0.01)), ρarea * (aux_gm.qt_nudge - aux_up[i].q_tot)/scalar_nudge_τᵣ, FT(0)) # dqvdt includes hadv and stuff... ... nudging can kill the updraft though... [[ This version calculates nudging separately so no drift... ]]
         end
 
         if edmf.moisture_model isa NonEquilibriumMoisture
@@ -1704,12 +1692,31 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
             end
         end
 
-        # if param_set.user_params.use_convective_tke # we want to absorb the updrafts from convective tke... w variance isn't captured in the environment
-        #     # TESTING TKE CONV
-        #     if edmf.entrainment_type isa TotalRateEntrModel
-        #         @. tends_ρaw += ρ_f * ᶠinterp_a(a_up) * (ᶠinterp_a(entr_rate_inv_s) * sqrt(2 * I0f(aux_en.tke_convective) / ρ_f) - ᶠinterp_a(detr_rate_inv_s) * w_up) * 5
-        #     end
-        # end
+        # TESTING CONVECTIVE TKE [[ NOTE: this will dilute the updrafts, so we should probably have some heuristic around that... ]]
+        if param_set.user_params.use_convective_tke
+            entr_rate_inv_s_tke_conv =  param_set.user_params.tke_conv_entr_inv_s # FT(1/600) or so seems ok
+            a_en_tke_conv = @. (aux_en.area / 2) * (1 - exp(-aux_en.tke_convective / FT(0.1^2)))
+            # ramp onto max_area as a function of tke_conv [[ fully on by tke = 0.1² ]]
+            @. a_en_tke_conv = min(a_en_tke_conv, max(edmf.max_area - aux_up_i.area, FT(0))) # ensure we don't entrain more than available area
+            q_tot_en_tke_conv = @. aux_en.q_tot + sqrt(aux_en.QTvar)*sqrt(2/π) # entrain the moist unstable air [[ mean of upper half of gaussian ]]
+            θ_liq_ice_en_tke_conv = @. aux_en.θ_liq_ice - sqrt(aux_en.Hvar)*sqrt(2/π) # entrain the warm unstable air [[ mean of upper half of gaussian ]]
+
+            tends_ρarea_tke_conv = similar(tends_ρarea)
+            @. tends_ρarea_tke_conv = limit_tendency(edtl, ρ_c * a_en_tke_conv * entr_rate_inv_s_tke_conv, FT(0), a_en_tke_conv * ρ_c / Δt)
+            @. tends_ρarea += tends_ρarea_tke_conv
+            @. tends_ρaq_tot += limit_tendency(edtl, tends_ρarea_tke_conv * q_tot_en_tke_conv, FT(0), FT(Inf))
+            @. tends_ρaθ_liq_ice += limit_tendency(edtl, tends_ρarea_tke_conv * θ_liq_ice_en_tke_conv, FT(0), FT(Inf))
+            if edmf.moisture_model isa NonEquilibriumMoisture
+                @. tends_ρaq_liq += limit_tendency(edtl, tends_ρarea_tke_conv * aux_en.q_liq, FT(0), FT(Inf))
+                @. tends_ρaq_ice += limit_tendency(edtl, tends_ρarea_tke_conv * aux_en.q_ice, FT(0), FT(Inf))
+            end
+
+            w_convective = @. sqrt(2 * I0f(aux_en.tke_convective))
+            @. tends_ρaw += limit_tendency(edtl, I0f(tends_ρarea_tke_conv) * w_convective, FT(0), FT(Inf))
+
+            tendencies_en = center_tendencies_environment(state)
+            @. tendencies_en.ρatke_convective -= tends_ρarea_tke_conv * Ic(w_convective)^2 # remove tke we are sending to updraft
+        end
 
         tends_ρaw[kf_surf] = 0
     end
@@ -1771,7 +1778,8 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
     a_max = edmf.max_area
 
 
-    f_lim = FT(2.)
+    f_lim_q = FT(3) # 100% error on q_tot is already quite large. but a large updraft could bring large amounts of water up... That would ideally add to the grid mean though...
+    f_lim_θ = FT(1.1) # 20% error on θ_li is huge, that's like 50+K Maybe a super deep updraft could pull it off, but updrafts by definition imply thetali isn't wildly varying
 
 
     @inbounds for i in 1:N_up
@@ -1781,8 +1789,8 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         @. prog_up[i].ρaq_tot = safe_clamp(prog_up[i].ρaq_tot, FT(0),  max(FT(0), prog_up[i].ρarea - eps(FT))) # specific humidity cannot exceed 1 (at 1 you'll get inf)
 
         # maybe we could filter ρaq_tot and ρaθ_liq_ice so that qt and θ_liq_ice are within 1/f and f times the grid mean? [ we re-enforce this again at the end, but doing it here is good for intermediate calculations]
-        @. prog_up[i].ρaq_tot = safe_clamp(prog_up[i].ρaq_tot, prog_up[i].ρarea  * prog_gm.ρq_tot / ρ_c / f_lim, prog_up[i].ρarea * prog_gm.ρq_tot / ρ_c * f_lim)
-        @. prog_up[i].ρaθ_liq_ice = safe_clamp(prog_up[i].ρaθ_liq_ice, prog_up[i].ρarea * prog_gm.ρθ_liq_ice / ρ_c / f_lim, prog_up[i].ρarea * prog_gm.ρθ_liq_ice / ρ_c * f_lim)
+        @. prog_up[i].ρaq_tot = safe_clamp(prog_up[i].ρaq_tot, prog_up[i].ρarea  * prog_gm.ρq_tot / ρ_c / f_lim_q, prog_up[i].ρarea * prog_gm.ρq_tot / ρ_c * f_lim_q)
+        @. prog_up[i].ρaθ_liq_ice = safe_clamp(prog_up[i].ρaθ_liq_ice, prog_up[i].ρarea * prog_gm.ρθ_liq_ice / ρ_c / f_lim_θ, prog_up[i].ρarea * prog_gm.ρθ_liq_ice / ρ_c * f_lim_θ)
 
         if edmf.entr_closure isa PrognosticNoisyRelaxationProcess
             @. prog_up[i].ε_nondim = max(prog_up[i].ε_nondim, 0)
@@ -1976,8 +1984,8 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
 
 
         # re-enforce this in case any of our other limiting broke it...
-        @. prog_up[i].ρaq_tot = safe_clamp(prog_up[i].ρaq_tot, prog_up[i].ρarea * prog_gm.ρq_tot / ρ_c / f_lim, prog_up[i].ρarea * prog_gm.ρq_tot / ρ_c * f_lim)
-        @. prog_up[i].ρaθ_liq_ice = safe_clamp(prog_up[i].ρaθ_liq_ice, prog_up[i].ρarea * prog_gm.ρθ_liq_ice / ρ_c / f_lim, prog_up[i].ρarea * prog_gm.ρθ_liq_ice / ρ_c * f_lim)
+        @. prog_up[i].ρaq_tot = safe_clamp(prog_up[i].ρaq_tot, prog_up[i].ρarea * prog_gm.ρq_tot / ρ_c / f_lim_q, prog_up[i].ρarea * prog_gm.ρq_tot / ρ_c * f_lim_q)
+        @. prog_up[i].ρaθ_liq_ice = safe_clamp(prog_up[i].ρaθ_liq_ice, prog_up[i].ρarea * prog_gm.ρθ_liq_ice / ρ_c / f_lim_θ, prog_up[i].ρarea * prog_gm.ρθ_liq_ice / ρ_c * f_lim_θ)
         # ---------------------------------------------------------------------------- #
 
 
@@ -2013,6 +2021,12 @@ function filter_updraft_vars(edmf::EDMFModel, grid::Grid, state::State, surf::Su
         # Enforce CFL on updraft velocities. [[ rn we enforce this in update_aux only ... ]]
         # w_max = cfl_limit * min(grid.Δz ) / Δt
 
+
+        
+        #=
+            When 2 updrafts collide, the middle cell when it goes from 0 to on usually has horrible things happen in w, θli, etc...
+            It would be good to investigate why this happens and concoct a cure.
+        =#
 
     end
     return nothing
@@ -2224,7 +2238,11 @@ function compute_covariance_dissipation(
     tke_en = aux_en.tke
     mixing_length = aux_tc.mixing_length
 
-    @. dissipation = ρ_c * area_en * covar * max(tke_en, 0)^FT(0.5) / max(mixing_length, FT(1.0e-3)) * c_d
+    if param_set.user_params.use_convective_tke && (covar_sym === :tke)
+        @. dissipation = ρ_c * area_en * max(covar - aux_en.tke_convective, 0) * max(max(tke_en - aux_en.tke_convective, 0), 0)^FT(0.5) / max(mixing_length, FT(1.0e-3)) * c_d # we handle convective tke dissipation separately since it has different mixing length, coherence, etc.
+    else
+        @. dissipation = ρ_c * area_en * covar * max(tke_en, 0)^FT(0.5) / max(mixing_length, FT(1.0e-3)) * c_d
+    end
     return nothing
 end
 
@@ -2438,16 +2456,19 @@ function compute_en_tendencies!(
             latent_heating = zero(FT)
             if edmf.moisture_model isa NonEquilibriumMoisture
                 # calculate how much latent heat we're actually generating... [[ we want negative for unsat downdrafts, and positive for saturated updrafts when we multiply by instability later... ]]
-                # liq + rai
-                latent_heating += -L_v * ((iszero(aux_en.ql_tendency_cond_evap[k]) ? zero(FT) : aux_en.ql_tendency_cond_evap[k] / aux_en.area[k]) + aux_tc.qr_tendency_evap[k]) # liq + rai
-                # ice + sno
-                latent_heating += -L_s * ((iszero(aux_en.qi_tendency_sub_dep[k]) ? zero(FT) : aux_en.qi_tendency_sub_dep[k] / aux_en.area[k]) + aux_tc.qs_tendency_dep_sub[k]) # ice + sno
+                # liq + rai [vapor --> liquid]
+                latent_heating += L_v * (aux_en.ql_tendency_cond_evap[k] / aux_en.area[k] + aux_tc.qr_tendency_evap[k]) # liq + rai # area won't be 0
+                # ice + sno [vapor --> ice]
+                latent_heating += L_s * (aux_en.qi_tendency_sub_dep[k] / aux_en.area[k] + aux_tc.qs_tendency_dep_sub[k]) # ice + sno
+
+                # met, frz, and ice-liq accr [liquid --> ice]
+                latent_heating += L_f * (aux_en.qi_tendency_melt[k] / aux_en.area[k] + aux_tc.qs_tendency_melt[k] + aux_en.qi_tendency_accr_ice_liq[k] / aux_en.area[k] + aux_en.qi_tendency_hom_frz[k] / aux_en.area[k]) # frz + ice-liq accr
             else
                 # For eq we don't have cond/evap rates for liq ice, only rain snow...
                 # liq + rai
-                latent_heating += -L_v * (aux_tc.qr_tendency_evap[k]) # liq + rai
+                latent_heating += L_v * (aux_tc.qr_tendency_evap[k]) # liq + rai
                 # ice + sno
-                latent_heating += -L_s * (aux_tc.qs_tendency_dep_sub[k]) # ice + sno
+                latent_heating += L_s * (aux_tc.qs_tendency_dep_sub[k]) # ice + sno
             end
 
             if (below_freezing && (RH_ice < one(FT)) || (!below_freezing && (RH_liq < one(FT)))) # subsaturated
@@ -2468,7 +2489,7 @@ function compute_en_tendencies!(
                 ql_mean = aux_en.q_liq[k]
                 qi_mean = aux_en.q_ice[k]
 
-                frac_supersat_old = (qt_std > 0) ? (one(FT) - Distributions.cdf(Distributions.Normal(qt_mean, qt_std), q_vap_sat)) : ((qt_mean > q_vap_sat) ? one(FT) : zero(FT)) # doesn't handle covar
+                # frac_supersat_old = (qt_std > 0) ? (one(FT) - Distributions.cdf(Distributions.Normal(qt_mean, qt_std), q_vap_sat)) : ((qt_mean > q_vap_sat) ? one(FT) : zero(FT)) # doesn't handle covar
                                 
                 β = (p / p0)^(R_d/c_p) # θl -> T conversion factor
                 dq_sat_dT = below_freezing ? L_f * q_vap_sat / (R_v * T^2) : L_v * q_vap_sat / (R_v * T^2) # Clausius–Clapeyron slope for linearization
@@ -2505,9 +2526,11 @@ function compute_en_tendencies!(
             end
         end
 
+        # only consider instabilities less than 10 [ units are from mse gradient so J/kg/m, and from latent heating scaling so J/kg/s...? ]
+        @. instability = sign(instability) * min(sqrt(abs(instability)), 10)
 
         K_buoy = param_set.user_params.convective_tke_buoyancy_coeff
-        @. ρatke_convective_production = K_buoy * ρ_c * a_en * max(instability, 0) * clamp(sqrt(aux_en.tke), eps(FT), 1) # only positive values of convective TKE [[ not sure if existing tke should matter...]]
+        @. ρatke_convective_production = K_buoy * ρ_c * a_en * max(instability, 0) # only positive values of convective TKE [[ not sure if existing tke should matter...]]
 
         if any(!isfinite, ρatke_convective_production)
             @warn "Non-finite values in convective TKE production computation."
@@ -2539,10 +2562,12 @@ function compute_en_tendencies!(
         k_diss = param_set.user_params.convective_tke_dissipation_coeff
         # K_diss = @. -k_diss * ∇c(ρ_f * wvec(Ifw(min(∂MSE∂z,0)))) # if MSE decreases with height, we dissipate convective TKE
         K_diss = @. k_diss * max(∂MSE∂z, 0)^2 # if MSE increases with height, we dissipate convective TKE squared goes like brunt vaisala
-        @. ρatke_convective_dissipation = K_diss * ρatke_convective
+        @. ρatke_convective_dissipation = K_diss * (ρatke_convective/(ρ_c * area_en))^(3/2) * ρ_c * area_en / FT(1000) # dissipation  goes as tke^(3/2)/l
 
         # self dissipation [[ calculated in  `compute_covariance_dissipation()`.. we apply here or else tke can build up for the entire run if it's not advected away ]]
-        @. ρatke_convective_dissipation += ρ_c * a_en * (aux_en_2m.tke.dissipation) * ifelse.( aux_en.tke > eps(FT), aux_en.tke_convective / aux_en.tke , FT(0)) # scale by fraction of convective tke in total tke to get dissipation of convective part
+        # @. ρatke_convective_dissipation += (aux_en_2m.tke.dissipation * 1) * ifelse.( aux_en.tke > eps(FT), aux_en.tke_convective / aux_en.tke , FT(0)) # scale by fraction of convective tke in total tke to get dissipation of convective part
+        k_self_diss = param_set.user_params.convective_tke_self_dissipation_coeff
+        @. ρatke_convective_dissipation += k_self_diss * ρ_c * area_en * max(aux_en.tke_convective, 0)^FT(3/2) / FT(1000) # should have mixing_length maybe 1000+ . For them, c_d was < 1 so this made dissipation smaller... unclear where our c_d lands... but it's bigger but we want less disipation I think..
 
         # -- limit production to enforce tke max -- #
         # limit production and net if we're exceeding tke max (smooth limiter that ramps on as we exceed tke max)
