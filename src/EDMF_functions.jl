@@ -1702,17 +1702,17 @@ function compute_up_tendencies!(edmf::EDMFModel, grid::Grid, state::State, param
             θ_liq_ice_en_tke_conv = @. aux_en.θ_liq_ice - sqrt(aux_en.Hvar)*sqrt(2/π) # entrain the warm unstable air [[ mean of upper half of gaussian ]]
 
             tends_ρarea_tke_conv = similar(tends_ρarea)
-            @. tends_ρarea_tke_conv = limit_tendency(edtl, ρ_c * a_en_tke_conv * entr_rate_inv_s_tke_conv, FT(0), a_en_tke_conv * ρ_c / Δt)
+            @. tends_ρarea_tke_conv = limit_tendency(edtl, ρ_c * a_en_tke_conv * entr_rate_inv_s_tke_conv, FT(0), a_en_tke_conv * ρ_c, Δt)
             @. tends_ρarea += tends_ρarea_tke_conv
-            @. tends_ρaq_tot += limit_tendency(edtl, tends_ρarea_tke_conv * q_tot_en_tke_conv, FT(0), FT(Inf))
-            @. tends_ρaθ_liq_ice += limit_tendency(edtl, tends_ρarea_tke_conv * θ_liq_ice_en_tke_conv, FT(0), FT(Inf))
+            @. tends_ρaq_tot += limit_tendency(edtl, tends_ρarea_tke_conv * q_tot_en_tke_conv, FT(0), FT(Inf), Δt)
+            @. tends_ρaθ_liq_ice += limit_tendency(edtl, tends_ρarea_tke_conv * θ_liq_ice_en_tke_conv, FT(0), FT(Inf), Δt)
             if edmf.moisture_model isa NonEquilibriumMoisture
-                @. tends_ρaq_liq += limit_tendency(edtl, tends_ρarea_tke_conv * aux_en.q_liq, FT(0), FT(Inf))
-                @. tends_ρaq_ice += limit_tendency(edtl, tends_ρarea_tke_conv * aux_en.q_ice, FT(0), FT(Inf))
+                @. tends_ρaq_liq += limit_tendency(edtl, tends_ρarea_tke_conv * aux_en.q_liq, FT(0), FT(Inf), Δt)
+                @. tends_ρaq_ice += limit_tendency(edtl, tends_ρarea_tke_conv * aux_en.q_ice, FT(0), FT(Inf), Δt)
             end
 
             w_convective = @. sqrt(2 * I0f(aux_en.tke_convective))
-            @. tends_ρaw += limit_tendency(edtl, I0f(tends_ρarea_tke_conv) * w_convective, FT(0), FT(Inf))
+            @. tends_ρaw += limit_tendency(edtl, I0f(tends_ρarea_tke_conv) * w_convective, FT(0), FT(Inf), Δt)
 
             tendencies_en = center_tendencies_environment(state)
             @. tendencies_en.ρatke_convective -= tends_ρarea_tke_conv * Ic(w_convective)^2 # remove tke we are sending to updraft
