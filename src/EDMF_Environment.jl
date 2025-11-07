@@ -630,7 +630,7 @@ function microphysics!(
                     N_i_no_boost = aux_en.N_i_no_boost[k],
                     qi_tendency_sed = (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation[k] / aux_en.area[k] : FT(0), # this is the sedimentation contribution to precip formation
                     S_i = S_i,
-                    τ_sub_dep = aux_en.τ_ice[k],
+                    τ_sub_dep = FT(NaN),
                     dN_i_dz = aux_en.dN_i_dz[k],
                     dqidz = aux_en.dqidz[k],
                     N_INP = N_INP,

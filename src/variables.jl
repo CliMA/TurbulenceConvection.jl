@@ -417,7 +417,7 @@ face_aux_vars_up(FT, local_geometry) = (;
     area = FT(0),
 )
 face_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture) = (;
-    massflux_en = FT(0), # TODO: is this the right place for this?
+    # massflux_en = FT(0), # TODO: is this the right place for this?
     massflux_ql = FT(0),
     massflux_qi = FT(0),
     diffusive_flux_ql = FT(0),
@@ -441,6 +441,7 @@ face_aux_vars_edmf(::Type{FT}, local_geometry, edmf, ::Val{calibrate_io}) where 
         ),
         up = ntuple(i -> face_aux_vars_up(FT, local_geometry), Val(n_updrafts(edmf))),
         massflux = FT(0),
+        massflux_en = FT(0), # TODO: is this the right place for this?
         massflux_h = FT(0),
         massflux_qt = FT(0),
         temporary_f1 = FT(0), # temporary face variable for intermediate computations

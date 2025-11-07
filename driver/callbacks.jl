@@ -684,8 +684,8 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
         dt_max = min(dt_max, dt_max_tendency)
     end
 
-    (max_term_vel_rain, ind_max) = findmax([aux_tc.term_vel_rain[k] for k in TC.real_center_indices(grid)])
-    inds = [k for k in TC.real_center_indices(grid)]
+    @inbounds (max_term_vel_rain, ind_max) = findmax([aux_tc.term_vel_rain[k] for k in TC.real_center_indices(grid)])
+    @inbounds inds = [k for k in TC.real_center_indices(grid)]
 
     @debug "dt_max = $dt_max | cfl_dt_max = $cfl_dt_max | max_term_vel_rain = $max_term_vel_rain, dz_max_termvel = $(Δzc[inds[ind_max]]))"
     return dt_max, cfl_dt_max

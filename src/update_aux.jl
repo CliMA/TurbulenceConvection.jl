@@ -202,11 +202,11 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
 
         if edmf.area_partition_model isa CoreCloakAreaPartitionModel
             # upcloak
-            TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_up[k]) * (aux_en.area_cloak_up[k]) * Ic.(aux_en_f.w_cloak_up)[k]^2
+            TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_up[k]) * (aux_en.a_cloak_up[k]) * Ic.(aux_en_f.w_cloak_up)[k]^2
             # downcloak
-            TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_down[k]) * (aux_en.area_cloak_down[k]) * Ic.(aux_en_f.w_cloak_down)[k]^2
+            TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_down[k]) * (aux_en.a_cloak_dn[k]) * Ic.(aux_en_f.w_cloak_down)[k]^2
             # env_remaining
-            TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_en_remaining[k]) * (aux_en.area_en_remaining[k]) * Ic.(aux_en_f.w_en_remaining)[k]^2
+            TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_en_remaining[k]) * (aux_en.a_en_remaining[k]) * Ic.(aux_en_f.w_en_remaining)[k]^2
         else # Remove env KE
             TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts[k]) * (aux_en.area[k]) * Ic.(aux_en_f.w)[k]^2
         end

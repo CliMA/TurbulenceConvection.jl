@@ -235,8 +235,10 @@ function initialize_updrafts_SOCRATES(edmf, state, surf, param_set)
             prog_up[i].ρarea[k] = ρ_c[k] * aux_up[i].area[k] # copied from drybubble below
             prog_up[i].ρaq_tot[k] = prog_up[i].ρarea[k] * aux_up[i].q_tot[k] # copied from drybubble below
             prog_up[i].ρaθ_liq_ice[k] = prog_up[i].ρarea[k] * aux_up[i].θ_liq_ice[k] # copied from drybubble below
-            prog_up[i].ρaq_liq[k] = prog_up[i].ρarea[k] * aux_up[i].q_liq[k] # copied from drybubble below
-            prog_up[i].ρaq_ice[k] = prog_up[i].ρarea[k] * aux_up[i].q_ice[k] # copied from drybubble below
+            if edmf.moisture_model isa TC.NonEquilibriumMoisture
+                prog_up[i].ρaq_liq[k] = prog_up[i].ρarea[k] * aux_up[i].q_liq[k] # copied from drybubble below
+                prog_up[i].ρaq_ice[k] = prog_up[i].ρarea[k] * aux_up[i].q_ice[k] # copied from drybubble below
+            end
         end
 
         C2F = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # face to center interpolation
