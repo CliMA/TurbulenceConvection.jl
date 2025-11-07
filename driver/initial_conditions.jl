@@ -4,26 +4,27 @@ const APS = TCP.AbstractTurbulenceConvectionParameters
 
 import Thermodynamics as TD
 
-function initialize_edmf(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State, surf_params, param_set::APS, t::Real, case)
+function initialize_edmf(edmf::TC.EDMFModel, state::TC.State, surf_params, param_set::APS, t::Real, case)
+    grid = TC.Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
-    initialize_covariance(edmf, grid, state)
+    initialize_covariance(edmf, state)
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = aux_gm.ts
     @. aux_gm.θ_virt = TD.virtual_pottemp(thermo_params, ts_gm)
-    surf = get_surface(surf_params, grid, state, t, param_set)
+    surf = get_surface(surf_params, state, t, param_set)
     if case isa Cases.DryBubble
-        initialize_updrafts_DryBubble(edmf, grid, state, surf)
+        initialize_updrafts_DryBubble(edmf, state, surf)
     elseif case isa Cases.SOCRATES
-        initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set) # testing so i can start updrafts w/o 0 area
+        initialize_updrafts_SOCRATES(edmf, state, surf, param_set) # testing so i can start updrafts w/o 0 area
     else
-        initialize_updrafts(edmf, grid, state, surf)
+        initialize_updrafts(edmf, state, surf)
     end
-    TC.set_edmf_surface_bc(edmf, grid, state, surf, param_set)
+    TC.set_edmf_surface_bc(edmf, state, surf, param_set)
     return
 end
 
-function initialize_covariance(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.State)
-
+function initialize_covariance(edmf::TC.EDMFModel, state::TC.State)
+    grid = TC.Grid(state)
     kc_surf = TC.kc_surface(grid)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_en = TC.center_prog_environment(state)
@@ -47,7 +48,8 @@ function initialize_covariance(edmf::TC.EDMFModel, grid::TC.Grid, state::TC.Stat
     return
 end
 
-function initialize_updrafts(edmf, grid, state, surf)
+function initialize_updrafts(edmf, state, surf)
+    grid = TC.Grid(state)
     N_up = TC.n_updrafts(edmf)
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
@@ -110,7 +112,8 @@ function initialize_updrafts(edmf, grid, state, surf)
 end
 
 # my own testing fcn for changing initial area
-function initialize_updrafts_SOCRATES(edmf, grid, state, surf, param_set)
+function initialize_updrafts_SOCRATES(edmf, state, surf, param_set)
+    grid = TC.Grid(state)
     N_up = TC.n_updrafts(edmf)
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
@@ -279,8 +282,8 @@ end
 
 import AtmosphericProfilesLibrary
 const APL = AtmosphericProfilesLibrary
-function initialize_updrafts_DryBubble(edmf, grid, state, surf)
-
+function initialize_updrafts_DryBubble(edmf, state, surf)
+    grid = TC.Grid(state)
     # criterion 2: b>1e-4
     aux_up = TC.center_aux_updrafts(state)
     aux_up_f = TC.face_aux_updrafts(state)

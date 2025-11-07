@@ -71,6 +71,8 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "tke_convective_production" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_production),
         "tke_convective_advection" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_advection),
         "tke_convective_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_dissipation),
+        "latent_heating" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).latent_heating),
+        "frac_supersat" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).frac_supersat),
 
         "Hvar_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).Hvar.dissipation),
         "Hvar_entr_gain" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).Hvar.entr_gain),
@@ -116,15 +118,13 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         # "updraft_θ_virt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).θ_virt),
         "θ_virt_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).θ_virt),
 
-        "env_dqvdt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).dqvdt),
-        "updraft_dqvdt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).dqvdt),
+        "dqvdt_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).dqvdt),
+        "dTdt_mean" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).dTdt),
 
         "dqtdt_hadv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).dqtdt_hadv),
         "qt_nudge" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qt_nudge),
         "dqtdt_nudge" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).dqtdt_nudge),
 
-        "env_dTdt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).dTdt),
-        "updraft_dTdt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).dTdt),
 
         "env_dTdz" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).dTdz),
         "updraft_dTdz" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).dTdz),
@@ -160,7 +160,7 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
 
         "ed_length_scheme" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).mls),
         "mixing_length_ratio" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).ml_ratio),
-        "entdet_balance_length" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).l_entdet),
+        # "entdet_balance_length" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).l_entdet), # Not used
 
         "rad_dTdt" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).dTdt_rad),
         "rad_flux" => (; dims = ("zf", "t"), group = "profiles", field = state -> face_aux_grid_mean(state).f_rad),

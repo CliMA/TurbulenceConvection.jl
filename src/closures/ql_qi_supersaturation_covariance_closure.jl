@@ -1,35 +1,4 @@
 
-# function get_qs_from_saturation_excesses_old(S::AbstractMatrix{FT}, weights::AbstractVector{FT}, q_target::FT; B::FT=one(FT), ε=nothing) where FT
-
-#     if iszero(q_target)
-#         return zeros(FT, size(S))
-#     end
-
-#     N = size(S,1)
-#     @assert size(S,2) == N
-#     W = @. weights * weights'
-#     Wtot = sum(W)
-
-#     # center saturation excesses
-#     S̄ = sum(W .* S) / Wtot
-#     δS = S .- S̄
-
-#     # residual ε: zero-weighted mean
-#     if ε === nothing
-#         ε = zeros(FT, N, N)
-#     else
-#         με = sum(W .* ε) / Wtot
-#         @. ε -= με
-#     end
-
-#     # compute μ to enforce weighted mean = q_target
-#     μ = log(q_target) - log(sum(W .* exp.(B .* δS .+ ε)) / Wtot)
-
-#     # construct ensemble
-#     q_ens = exp.(μ .+ B .* δS .+ ε)
-#     return q_ens
-# end
-
 
 """
     get_qs_from_saturation_excesses(

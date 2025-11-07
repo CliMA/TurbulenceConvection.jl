@@ -68,7 +68,7 @@ function io_dictionary_diagnostics()
 end
 #! format: on
 
-function io(surf::TC.SurfaceBase, surf_params, grid, state, Stats::NetCDFIO_Stats, t::Real)
+function io(surf::TC.SurfaceBase, surf_params, Stats::NetCDFIO_Stats, t::Real)
     write_ts(Stats, "Tsurface", TC.surface_temperature(surf_params, t))
     write_ts(Stats, "qtsurface", TC.surface_q_tot(surf_params, t)) # my addition
     write_ts(Stats, "shf", surf.shf)
@@ -112,9 +112,7 @@ tendencies.
 =#
 function compute_diagnostics!(
     edmf::TC.EDMFModel,
-    precip_model::TC.AbstractPrecipitationModel,
     param_set::APS,
-    grid::TC.Grid,
     state::TC.State,
     diagnostics::D,
     Stats::NetCDFIO_Stats,
@@ -122,6 +120,8 @@ function compute_diagnostics!(
     t::Real,
     calibrate_io::Bool,
 ) where {D <: CC.Fields.FieldVector}
+    precip_model = edmf.precip_model
+    grid = TC.Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     FT = TC.float_type(state)
     N_up = TC.n_updrafts(edmf)
@@ -155,7 +155,7 @@ function compute_diagnostics!(
     diag_tc_svpc = svpc_diagnostics_turbconv(diagnostics)
     diag_svpc = svpc_diagnostics_grid_mean(diagnostics)
 
-    surf = get_surface(surf_params, grid, state, t, param_set)
+    surf = get_surface(surf_params, state, t, param_set)
 
     @. aux_gm.s = TD.specific_entropy(thermo_params, ts_gm)
     @. aux_gm.θ_liq_ice = prog_gm.ρθ_liq_ice / ρ_c
@@ -185,20 +185,7 @@ function compute_diagnostics!(
         end
     end
 
-    wvec = CC.Geometry.WVector
-    aeKHs_bc = -surf.ρs_flux / aux_tc_f.ρ_ae_KH[kf_surf]
 
-    If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
-    ∇f_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(FT(aeKHs_bc)), top = CCO.SetDivergence(FT(0)))
-    massflux_s = aux_gm_f.massflux_s
-    @. aux_gm_f.diffusive_flux_s = -aux_tc_f.ρ_ae_KH * ∇f_en(wvec(aux_en.s))
-
-    @. massflux_s = ρ_f * TC.ᶠinterp_a(a_en) * (aux_en_f.w - TC.toscalar(w_gm)) * (If(aux_en.s) - If(aux_gm.s))
-    @inbounds for i in 1:N_up
-        w_up_i = aux_up_f[i].w
-        a_up = aux_up[i].area
-        @. massflux_s += ρ_f * (TC.ᶠinterp_a(a_up) * (w_up_i - TC.toscalar(w_gm)) * (If(aux_up[i].s) - If(aux_gm.s)))
-    end
 
     # Mean water paths for calibration
     # A sum over a ClimaCore Field is defined as the vertical integral,
@@ -210,197 +197,219 @@ function compute_diagnostics!(
     diag_svpc.rwp_mean[cent] = sum(ρ_c .* prog_pr.q_rai)
     diag_svpc.swp_mean[cent] = sum(ρ_c .* prog_pr.q_sno)
 
-    # Integrated vertical subgrid-scale fluxes (already multiplied by density)
-    diag_svpc.integ_total_flux_qt[cent] = sum(aux_tc_f.massflux_qt .+ aux_tc_f.diffusive_flux_qt)
-    diag_svpc.integ_total_flux_s[cent] = sum(aux_gm_f.massflux_s .+ aux_gm_f.diffusive_flux_s)
-
     # We only need computations above here for calibration io.
     calibrate_io && return nothing
 
-    #####
-    ##### Cloud base, top and cover
-    #####
+
+
     # TODO: write this in a mutating-free way using findfirst/findlast/map
 
-    cloud_base_up = Vector{FT}(undef, N_up)
-    cloud_top_up = Vector{FT}(undef, N_up)
-    cloud_cover_up = Vector{FT}(undef, N_up)
+    if !calibrate_io
+        
+        wvec = CC.Geometry.WVector
+        aeKHs_bc = -surf.ρs_flux / aux_tc_f.ρ_ae_KH[kf_surf]
 
-    @inbounds for i in 1:N_up
-        cloud_base_up[i] = TC.zc_toa(grid).z
-        cloud_top_up[i] = FT(0)
-        cloud_cover_up[i] = FT(0)
+        If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+        ∇f_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(FT(aeKHs_bc)), top = CCO.SetDivergence(FT(0)))
+        massflux_s = aux_gm_f.massflux_s
 
-        @inbounds for k in TC.real_center_indices(grid)
-            if aux_up[i].area[k] > 1e-3
-                if TD.has_condensate(aux_up[i].q_liq[k] + aux_up[i].q_ice[k])
-                    cloud_base_up[i] = min(cloud_base_up[i], grid.zc[k].z)
-                    cloud_top_up[i] = max(cloud_top_up[i], grid.zc[k].z)
-                    cloud_cover_up[i] = max(cloud_cover_up[i], aux_up[i].area[k])
-                end
-            end
+        @. massflux_s = ρ_f * TC.ᶠinterp_a(a_en) * (aux_en_f.w - TC.toscalar(w_gm)) * (If(aux_en.s) - If(aux_gm.s))
+        @inbounds for i in 1:N_up
+            w_up_i = aux_up_f[i].w
+            a_up = aux_up[i].area
+            @. massflux_s += ρ_f * (TC.ᶠinterp_a(a_up) * (w_up_i - TC.toscalar(w_gm)) * (If(aux_up[i].s) - If(aux_gm.s)))
         end
-    end
-    # Note definition of cloud cover : each updraft is associated with
-    # a cloud cover equal to the maximum area fraction of the updraft
-    # where ql > 0. Each updraft is assumed to have maximum overlap with
-    # respect to itup (i.e. no consideration of tilting due to shear)
-    # while the updraft classes are assumed to have no overlap at all.
-    # Thus total updraft cover is the sum of each updraft's cover
+        @. aux_gm_f.diffusive_flux_s = -aux_tc_f.ρ_ae_KH * ∇f_en(wvec(aux_en.s))
 
-    diag_tc_svpc.updraft_cloud_cover[cent] = sum(cloud_cover_up)
-    diag_tc_svpc.updraft_cloud_base[cent] = minimum(abs.(cloud_base_up))
-    diag_tc_svpc.updraft_cloud_top[cent] = maximum(abs.(cloud_top_up))
+        # Integrated vertical subgrid-scale fluxes (already multiplied by density)
+        diag_svpc.integ_total_flux_qt[cent] = sum(aux_tc_f.massflux_qt .+ aux_tc_f.diffusive_flux_qt)
+        diag_svpc.integ_total_flux_s[cent] = sum(aux_gm_f.massflux_s .+ aux_gm_f.diffusive_flux_s)
 
-    cloud_top_en = FT(0)
-    cloud_base_en = TC.zc_toa(grid).z
-    cloud_cover_en = FT(0)
-    @inbounds for k in TC.real_center_indices(grid)
-        if TD.has_condensate(aux_en.q_liq[k] + aux_en.q_ice[k]) && aux_en.area[k] > 1e-6
-            cloud_base_en = min(cloud_base_en, grid.zc[k].z)
-            cloud_top_en = max(cloud_top_en, grid.zc[k].z)
-            cloud_cover_en = max(cloud_cover_en, aux_en.area[k] * aux_en.cloud_fraction[k])
-        end
-    end
-    # Assuming amximum overlap in environmental clouds
-    diag_tc_svpc.env_cloud_cover[cent] = cloud_cover_en
-    diag_tc_svpc.env_cloud_base[cent] = cloud_base_en
-    diag_tc_svpc.env_cloud_top[cent] = cloud_top_en
+        #####
+        ##### Cloud base, top and cover
+        #####
 
-    cloud_cover_gm = min(cloud_cover_en + sum(cloud_cover_up), 1)
-    cloud_base_gm = grid.zc[kc_toa].z
-    cloud_top_gm = FT(0)
-    @inbounds for k in TC.real_center_indices(grid)
-        if TD.has_condensate(aux_gm.q_liq[k] + aux_gm.q_ice[k])
-            cloud_base_gm = min(cloud_base_gm, grid.zc[k].z)
-            cloud_top_gm = max(cloud_top_gm, grid.zc[k].z)
-        end
-    end
+        cloud_base_up = Vector{FT}(undef, N_up)
+        cloud_top_up = Vector{FT}(undef, N_up)
+        cloud_cover_up = Vector{FT}(undef, N_up)
 
-    diag_svpc.cloud_cover_mean[cent] = cloud_cover_gm
-    diag_svpc.cloud_base_mean[cent] = cloud_base_gm
-    diag_svpc.cloud_top_mean[cent] = cloud_top_gm
+        @inbounds for i in 1:N_up
+            cloud_base_up[i] = TC.zc_toa(grid).z
+            cloud_top_up[i] = FT(0)
+            cloud_cover_up[i] = FT(0)
 
-
-
-
-    #####
-    ##### Fluxes
-    #####
-    parent(diag_tc.massflux) .= 0
-    @inbounds for i in 1:N_up
-        @. diag_tc.massflux += TC.Ic(aux_up_f[i].massflux)
-    end
-    pi_subset = TC.entrainment_Π_subset(edmf)
-    @inbounds for k in TC.real_center_indices(grid)
-        a_up_bulk_k = a_up_bulk[k]
-        diag_tc.entr_sc[k] = 0
-        diag_tc.ε_nondim[k] = 0
-        diag_tc.detr_sc[k] = 0
-        diag_tc.δ_nondim[k] = 0
-        diag_tc.entr_ml[k] = 0
-        diag_tc.ε_ml_nondim[k] = 0
-        diag_tc.detr_ml[k] = 0
-        diag_tc.δ_ml_nondim[k] = 0
-        diag_tc.asp_ratio[k] = 0
-        diag_tc.frac_turb_entr[k] = 0
-        diag_tc.entr_rate_inv_s[k] = 0
-        diag_tc.detr_rate_inv_s[k] = 0
-        diag_tc.Π₁[k] = 0
-        diag_tc.Π₂[k] = 0
-        diag_tc.Π₃[k] = 0
-        diag_tc.Π₄[k] = 0
-        diag_tc.Π₅[k] = 0
-        diag_tc.Π₆[k] = 0
-        if a_up_bulk_k > edmf.minimum_area * N_up
-            @inbounds for i in 1:N_up
-                aux_up_i = aux_up[i]
-
-                diag_tc.entr_sc[k] += aux_up_i.area[k] * aux_up_i.entr_sc[k] / a_up_bulk_k
-                diag_tc.ε_nondim[k] += aux_up_i.area[k] * aux_up_i.ε_nondim[k] / a_up_bulk_k
-                diag_tc.detr_sc[k] += aux_up_i.area[k] * aux_up_i.detr_sc[k] / a_up_bulk_k
-                diag_tc.δ_nondim[k] += aux_up_i.area[k] * aux_up_i.δ_nondim[k] / a_up_bulk_k
-                diag_tc.entr_ml[k] += aux_up_i.area[k] * aux_up_i.entr_ml[k] / a_up_bulk_k
-                diag_tc.ε_ml_nondim[k] += aux_up_i.area[k] * aux_up_i.ε_ml_nondim[k] / a_up_bulk_k
-                diag_tc.detr_ml[k] += aux_up_i.area[k] * aux_up_i.detr_ml[k] / a_up_bulk_k
-                diag_tc.δ_ml_nondim[k] += aux_up_i.area[k] * aux_up_i.δ_ml_nondim[k] / a_up_bulk_k
-                diag_tc.asp_ratio[k] += aux_up_i.area[k] * aux_up_i.asp_ratio[k] / a_up_bulk_k
-                diag_tc.frac_turb_entr[k] += aux_up_i.area[k] * aux_up_i.frac_turb_entr[k] / a_up_bulk_k
-
-                diag_tc.entr_rate_inv_s[k] += aux_up_i.area[k] * aux_up_i.entr_rate_inv_s[k] / a_up_bulk_k
-                diag_tc.detr_rate_inv_s[k] += aux_up_i.area[k] * aux_up_i.detr_rate_inv_s[k] / a_up_bulk_k
-
-                for Π_i in 1:length(pi_subset)
-                    sub_script = ""
-                    for digit in string(pi_subset[Π_i])
-                        sub_script *= Char('₀' + parse(Int, digit))
+            @inbounds for k in TC.real_center_indices(grid)
+                if aux_up[i].area[k] > 1e-3
+                    if TD.has_condensate(aux_up[i].q_liq[k] + aux_up[i].q_ice[k])
+                        cloud_base_up[i] = min(cloud_base_up[i], grid.zc[k].z)
+                        cloud_top_up[i] = max(cloud_top_up[i], grid.zc[k].z)
+                        cloud_cover_up[i] = max(cloud_cover_up[i], aux_up[i].area[k])
                     end
-                    property_name = "Π" * sub_script  # Concatenate "Π" with the subscript
-                    property = getproperty(diag_tc, Symbol(property_name))
-                    property[k] = aux_up_i.Π_groups[Π_i][k]
                 end
-
             end
         end
-    end
+        # Note definition of cloud cover : each updraft is associated with
+        # a cloud cover equal to the maximum area fraction of the updraft
+        # where ql > 0. Each updraft is assumed to have maximum overlap with
+        # respect to itup (i.e. no consideration of tilting due to shear)
+        # while the updraft classes are assumed to have no overlap at all.
+        # Thus total updraft cover is the sum of each updraft's cover
 
-    a_up_bulk_f = TC.face_aux_turbconv(state).bulk.a_up
-    @. a_up_bulk_f = TC.ᶠinterp_a(a_up_bulk)
+        diag_tc_svpc.updraft_cloud_cover[cent] = sum(cloud_cover_up)
+        diag_tc_svpc.updraft_cloud_base[cent] = minimum(abs.(cloud_base_up))
+        diag_tc_svpc.updraft_cloud_top[cent] = maximum(abs.(cloud_top_up))
 
-    RB_precip = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
-
-    @inbounds for i in 1:N_up
-        a_up_f = aux_up_f[i].area
-        @. a_up_f = TC.ᶠinterp_a(aux_up[i].area)
-        @inbounds for k in TC.real_face_indices(grid)
-            diag_tc_f.nh_pressure[k] = 0
-            diag_tc_f.nh_pressure_b[k] = 0
-            diag_tc_f.nh_pressure_adv[k] = 0
-            diag_tc_f.nh_pressure_drag[k] = 0
-            if a_up_bulk_f[k] > 0.0
-                diag_tc_f.nh_pressure[k] += a_up_f[k] * aux_up_f[i].nh_pressure[k] / a_up_bulk_f[k]
-                diag_tc_f.nh_pressure_b[k] += a_up_f[k] * aux_up_f[i].nh_pressure_b[k] / a_up_bulk_f[k]
-                diag_tc_f.nh_pressure_adv[k] += a_up_f[k] * aux_up_f[i].nh_pressure_adv[k] / a_up_bulk_f[k]
-                diag_tc_f.nh_pressure_drag[k] += a_up_f[k] * aux_up_f[i].nh_pressure_drag[k] / a_up_bulk_f[k]
+        cloud_top_en = FT(0)
+        cloud_base_en = TC.zc_toa(grid).z
+        cloud_cover_en = FT(0)
+        @inbounds for k in TC.real_center_indices(grid)
+            if TD.has_condensate(aux_en.q_liq[k] + aux_en.q_ice[k]) && aux_en.area[k] > 1e-6
+                cloud_base_en = min(cloud_base_en, grid.zc[k].z)
+                cloud_top_en = max(cloud_top_en, grid.zc[k].z)
+                cloud_cover_en = max(cloud_cover_en, aux_en.area[k] * aux_en.cloud_fraction[k])
             end
         end
+        # Assuming amximum overlap in environmental clouds
+        diag_tc_svpc.env_cloud_cover[cent] = cloud_cover_en
+        diag_tc_svpc.env_cloud_base[cent] = cloud_base_en
+        diag_tc_svpc.env_cloud_top[cent] = cloud_top_en
+
+        cloud_cover_gm = min(cloud_cover_en + sum(cloud_cover_up), 1)
+        cloud_base_gm = grid.zc[kc_toa].z
+        cloud_top_gm = FT(0)
+        @inbounds for k in TC.real_center_indices(grid)
+            if TD.has_condensate(aux_gm.q_liq[k] + aux_gm.q_ice[k])
+                cloud_base_gm = min(cloud_base_gm, grid.zc[k].z)
+                cloud_top_gm = max(cloud_top_gm, grid.zc[k].z)
+            end
+        end
+
+        diag_svpc.cloud_cover_mean[cent] = cloud_cover_gm
+        diag_svpc.cloud_base_mean[cent] = cloud_base_gm
+        diag_svpc.cloud_top_mean[cent] = cloud_top_gm
+
+
+
+
+        #####
+        ##### Fluxes
+        #####
+        parent(diag_tc.massflux) .= 0
+        @inbounds for i in 1:N_up
+            @. diag_tc.massflux += TC.Ic(aux_up_f[i].massflux)
+        end
+        pi_subset = TC.entrainment_Π_subset(edmf)
+        @inbounds for k in TC.real_center_indices(grid)
+            a_up_bulk_k = a_up_bulk[k]
+            diag_tc.entr_sc[k] = 0
+            diag_tc.ε_nondim[k] = 0
+            diag_tc.detr_sc[k] = 0
+            diag_tc.δ_nondim[k] = 0
+            diag_tc.entr_ml[k] = 0
+            diag_tc.ε_ml_nondim[k] = 0
+            diag_tc.detr_ml[k] = 0
+            diag_tc.δ_ml_nondim[k] = 0
+            diag_tc.asp_ratio[k] = 0
+            diag_tc.frac_turb_entr[k] = 0
+            diag_tc.entr_rate_inv_s[k] = 0
+            diag_tc.detr_rate_inv_s[k] = 0
+            diag_tc.Π₁[k] = 0
+            diag_tc.Π₂[k] = 0
+            diag_tc.Π₃[k] = 0
+            diag_tc.Π₄[k] = 0
+            diag_tc.Π₅[k] = 0
+            diag_tc.Π₆[k] = 0
+            if a_up_bulk_k > edmf.minimum_area * N_up
+                @inbounds for i in 1:N_up
+                    aux_up_i = aux_up[i]
+
+                    diag_tc.entr_sc[k] += aux_up_i.area[k] * aux_up_i.entr_sc[k] / a_up_bulk_k
+                    diag_tc.ε_nondim[k] += aux_up_i.area[k] * aux_up_i.ε_nondim[k] / a_up_bulk_k
+                    diag_tc.detr_sc[k] += aux_up_i.area[k] * aux_up_i.detr_sc[k] / a_up_bulk_k
+                    diag_tc.δ_nondim[k] += aux_up_i.area[k] * aux_up_i.δ_nondim[k] / a_up_bulk_k
+                    diag_tc.entr_ml[k] += aux_up_i.area[k] * aux_up_i.entr_ml[k] / a_up_bulk_k
+                    diag_tc.ε_ml_nondim[k] += aux_up_i.area[k] * aux_up_i.ε_ml_nondim[k] / a_up_bulk_k
+                    diag_tc.detr_ml[k] += aux_up_i.area[k] * aux_up_i.detr_ml[k] / a_up_bulk_k
+                    diag_tc.δ_ml_nondim[k] += aux_up_i.area[k] * aux_up_i.δ_ml_nondim[k] / a_up_bulk_k
+                    diag_tc.asp_ratio[k] += aux_up_i.area[k] * aux_up_i.asp_ratio[k] / a_up_bulk_k
+                    diag_tc.frac_turb_entr[k] += aux_up_i.area[k] * aux_up_i.frac_turb_entr[k] / a_up_bulk_k
+
+                    diag_tc.entr_rate_inv_s[k] += aux_up_i.area[k] * aux_up_i.entr_rate_inv_s[k] / a_up_bulk_k
+                    diag_tc.detr_rate_inv_s[k] += aux_up_i.area[k] * aux_up_i.detr_rate_inv_s[k] / a_up_bulk_k
+
+                    # for Π_i in 1:length(pi_subset)
+                    for Π_i in eachindex(pi_subset)
+                        sub_script = ""
+                        for digit in string(pi_subset[Π_i])
+                            sub_script *= Char('₀' + parse(Int, digit))
+                        end
+                        property_name = "Π" * sub_script  # Concatenate "Π" with the subscript
+                        property = getproperty(diag_tc, Symbol(property_name))
+                        property[k] = aux_up_i.Π_groups[Π_i][k]
+                    end
+
+                end
+            end
+        end
+
+        a_up_bulk_f = TC.face_aux_turbconv(state).bulk.a_up
+        @. a_up_bulk_f = TC.ᶠinterp_a(a_up_bulk)
+
+        RB_precip = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
+
+        @inbounds for i in 1:N_up
+            a_up_f = aux_up_f[i].area
+            @. a_up_f = TC.ᶠinterp_a(aux_up[i].area)
+            @inbounds for k in TC.real_face_indices(grid)
+                diag_tc_f.nh_pressure[k] = 0
+                diag_tc_f.nh_pressure_b[k] = 0
+                diag_tc_f.nh_pressure_adv[k] = 0
+                diag_tc_f.nh_pressure_drag[k] = 0
+                if a_up_bulk_f[k] > 0.0
+                    diag_tc_f.nh_pressure[k] += a_up_f[k] * aux_up_f[i].nh_pressure[k] / a_up_bulk_f[k]
+                    diag_tc_f.nh_pressure_b[k] += a_up_f[k] * aux_up_f[i].nh_pressure_b[k] / a_up_bulk_f[k]
+                    diag_tc_f.nh_pressure_adv[k] += a_up_f[k] * aux_up_f[i].nh_pressure_adv[k] / a_up_bulk_f[k]
+                    diag_tc_f.nh_pressure_drag[k] += a_up_f[k] * aux_up_f[i].nh_pressure_drag[k] / a_up_bulk_f[k]
+                end
+            end
+        end
+        @. diag_tc_f_precip.rain_flux = RB_precip(ρ_c * prog_pr.q_rai * aux_tc.term_vel_rain)
+        @. diag_tc_f_precip.snow_flux = RB_precip(ρ_c * prog_pr.q_sno * aux_tc.term_vel_snow)
+
+        TC.GMV_third_m(N_up, state, Val(:Hvar), Val(:θ_liq_ice), Val(:H_third_m))
+        TC.GMV_third_m(N_up, state, Val(:QTvar), Val(:q_tot), Val(:QT_third_m))
+        TC.GMV_third_m(N_up, state, Val(:tke), Val(:w), Val(:W_third_m))
+
+        TC.compute_covariance_interdomain_src(N_up, state, Val(:tke), Val(:w), Val(:w))
+        TC.compute_covariance_interdomain_src(N_up, state, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
+        TC.compute_covariance_interdomain_src(N_up, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
+        TC.compute_covariance_interdomain_src(N_up, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
+
+        TC.update_cloud_frac(edmf, state)
+
+        diag_tc_svpc.env_lwp[cent] = sum(ρ_c .* aux_en.q_liq .* aux_en.area)
+        diag_tc_svpc.env_iwp[cent] = sum(ρ_c .* aux_en.q_ice .* aux_en.area)
+
+        #TODO - change to rain rate that depends on rain model choice
+        ρ_cloud_liq = TCP.ρ_cloud_liq(param_set)
+        if (precip_model isa TC.Clima0M)
+            f =
+                (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ_c ./ ρ_cloud_liq .*
+                FT(3.6) .* 1e6
+            diag_svpc.cutoff_precipitation_rate[cent] = sum(f)
+        end
+
+        lwp = sum(i -> sum(ρ_c .* aux_up[i].q_liq .* aux_up[i].area .* (aux_up[i].area .> edmf.minimum_area)), 1:N_up)
+        iwp = sum(i -> sum(ρ_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> edmf.minimum_area)), 1:N_up)
+
+        plume_scale_height = map(1:N_up) do i
+            TC.compute_plume_scale_height(state, edmf.H_up_min, i)
+        end
+
+        diag_tc_svpc.updraft_lwp[cent] = lwp
+        diag_tc_svpc.updraft_iwp[cent] = iwp
+        diag_tc_svpc.Hd[cent] = StatsBase.mean(plume_scale_height)
     end
-    @. diag_tc_f_precip.rain_flux = RB_precip(ρ_c * prog_pr.q_rai * aux_tc.term_vel_rain)
-    @. diag_tc_f_precip.snow_flux = RB_precip(ρ_c * prog_pr.q_sno * aux_tc.term_vel_snow)
-
-    TC.GMV_third_m(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:H_third_m))
-    TC.GMV_third_m(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:QT_third_m))
-    TC.GMV_third_m(edmf, grid, state, Val(:tke), Val(:w), Val(:W_third_m))
-
-    TC.compute_covariance_interdomain_src(edmf, grid, state, Val(:tke), Val(:w), Val(:w))
-    TC.compute_covariance_interdomain_src(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
-    TC.compute_covariance_interdomain_src(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
-    TC.compute_covariance_interdomain_src(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
-
-    TC.update_cloud_frac(edmf, grid, state)
-
-    diag_tc_svpc.env_lwp[cent] = sum(ρ_c .* aux_en.q_liq .* aux_en.area)
-    diag_tc_svpc.env_iwp[cent] = sum(ρ_c .* aux_en.q_ice .* aux_en.area)
-
-    #TODO - change to rain rate that depends on rain model choice
-    ρ_cloud_liq = TCP.ρ_cloud_liq(param_set)
-    if (precip_model isa TC.Clima0M)
-        f =
-            (aux_en.qt_tendency_precip_formation .+ aux_bulk.qt_tendency_precip_formation) .* ρ_c ./ ρ_cloud_liq .*
-            FT(3.6) .* 1e6
-        diag_svpc.cutoff_precipitation_rate[cent] = sum(f)
-    end
-
-    lwp = sum(i -> sum(ρ_c .* aux_up[i].q_liq .* aux_up[i].area .* (aux_up[i].area .> edmf.minimum_area)), 1:N_up)
-    iwp = sum(i -> sum(ρ_c .* aux_up[i].q_ice .* aux_up[i].area .* (aux_up[i].area .> edmf.minimum_area)), 1:N_up)
-
-    plume_scale_height = map(1:N_up) do i
-        TC.compute_plume_scale_height(grid, state, edmf.H_up_min, i)
-    end
-
-    diag_tc_svpc.updraft_lwp[cent] = lwp
-    diag_tc_svpc.updraft_iwp[cent] = iwp
-    diag_tc_svpc.Hd[cent] = StatsBase.mean(plume_scale_height)
 
     return
 end

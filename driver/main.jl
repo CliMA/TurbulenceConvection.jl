@@ -155,16 +155,16 @@ function Simulation1d(namelist)
         @show edmf
         error("Something non-isbits was added to edmf and needs to be fixed.")
     end
-    N_up = TC.n_updrafts(edmf)
+    # N_up = TC.n_updrafts(edmf) # not used?
 
-    cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars, FT, edmf)
-    face_prog_fields = TC.FieldFromNamedTuple(fspace, face_prognostic_vars, FT, edmf)
-    aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars, FT, edmf)
-    aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars, FT, edmf)
-    diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars, FT, edmf)
-    diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars, FT, edmf)
+    cent_prog_fields = TC.FieldFromNamedTuple(cspace, cent_prognostic_vars, FT, edmf; calibrate_io=calibrate_io)
+    face_prog_fields = TC.FieldFromNamedTuple(fspace, face_prognostic_vars, FT, edmf; calibrate_io=calibrate_io)
+    aux_cent_fields = TC.FieldFromNamedTuple(cspace, cent_aux_vars, FT, edmf; calibrate_io=calibrate_io)
+    aux_face_fields = TC.FieldFromNamedTuple(fspace, face_aux_vars, FT, edmf; calibrate_io=calibrate_io)
+    diagnostic_cent_fields = TC.FieldFromNamedTuple(cspace, cent_diagnostic_vars, FT, edmf; calibrate_io=calibrate_io)
+    diagnostic_face_fields = TC.FieldFromNamedTuple(fspace, face_diagnostic_vars, FT, edmf; calibrate_io=calibrate_io)
     diagnostics_single_value_per_col =
-        TC.FieldFromNamedTuple(svpc_space, single_value_per_col_diagnostic_vars(FT, edmf))
+        TC.FieldFromNamedTuple(svpc_space, single_value_per_col_diagnostic_vars(FT, edmf, Val{calibrate_io}()))
 
     prog = CC.Fields.FieldVector(cent = cent_prog_fields, face = face_prog_fields)
     aux = CC.Fields.FieldVector(cent = aux_cent_fields, face = aux_face_fields)
@@ -195,7 +195,7 @@ function Simulation1d(namelist)
         colidx_type = TC.column_idx_type(axes(prog.cent))
         stats = Dict{colidx_type, NetCDFIO_Stats{FT}}()
         CC.Fields.bycolumn(axes(prog.cent)) do colidx
-            col_state = TC.column_prog_aux(prog, aux, colidx)
+            col_state = TC.column_prog_aux(prog, aux, colidx, calibrate_io)
             grid = TC.Grid(col_state)
             ncfn = nc_filename_suffix(nc_filename, colidx)
             stats[colidx] = NetCDFIO_Stats(ncfn, frequency, grid)
@@ -289,13 +289,13 @@ function initialize(sim::Simulation1d)
 
     # `nothing` goes into State because OrdinaryDiffEq.jl owns tendencies.
     CC.Fields.bycolumn(axes(prog.cent)) do colidx
-        state = TC.column_prog_aux(prog, aux, colidx)
+        state = TC.column_prog_aux(prog, aux, colidx, calibrate_io)
         diagnostics_col = TC.column_diagnostics(diagnostics, colidx)
         grid = TC.Grid(state)
         FT = TC.float_type(state)
         t = FT(0)
-        compute_ref_state!(state, grid, param_set; ts_g = surf_ref_state)
-        Cases.overwrite_ref_state_from_file!(case, state, grid, param_set)  # if we have an external reference state we may want to do this instead, if isn't socrates should do nothing
+        compute_ref_state!(state, param_set; ts_g = surf_ref_state)
+        Cases.overwrite_ref_state_from_file!(case, state, param_set)  # if we have an external reference state we may want to do this instead, if isn't socrates should do nothing
         if !skip_io
             stats = Stats[colidx]
             NC.Dataset(stats.nc_filename, "a") do ds
@@ -306,13 +306,13 @@ function initialize(sim::Simulation1d)
                 add_write_field(ds, "p_c", vec(TC.center_aux_grid_mean(state).p), group, ("zc",))
             end
         end
-        Cases.initialize_profiles(case, grid, param_set, state; aux_data_kwarg...)
-        set_thermo_state_from_aux!(state, grid, edmf.moisture_model, param_set)
-        set_grid_mean_from_thermo_state!(param_set, state, grid)
-        assign_thermo_aux!(state, grid, edmf.moisture_model, param_set)
-        Cases.initialize_forcing(case, forcing, grid, state, param_set; aux_data_kwarg...)
-        Cases.initialize_radiation(case, radiation, grid, state, param_set; aux_data_kwarg...)
-        initialize_edmf(edmf, grid, state, surf_params, param_set, t, case)
+        Cases.initialize_profiles(case, param_set, state; aux_data_kwarg...)
+        set_thermo_state_from_aux!(state, edmf.moisture_model, param_set)
+        set_grid_mean_from_thermo_state!(param_set, state)
+        assign_thermo_aux!(state, param_set)
+        Cases.initialize_forcing(case, forcing, state, param_set; aux_data_kwarg...)
+        Cases.initialize_radiation(case, radiation, state, param_set; aux_data_kwarg...)
+        initialize_edmf(edmf, state, surf_params, param_set, t, case)
         if !skip_io
             stats = Stats[colidx]
             initialize_io(stats.nc_filename, eltype(grid), io_nt.aux, io_nt.diagnostics)

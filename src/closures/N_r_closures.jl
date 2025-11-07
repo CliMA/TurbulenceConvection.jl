@@ -1938,8 +1938,22 @@ function get_Ni_from_INP_qi_qs(
                 NI_below_r_is = min(NI_below_r_is, N_i_acnv) # Force q to at least mean N_i_acnv exists, but don't enforce threshold radius.
 
                 # ensure N_s supports the N we predict
-                Ns_est = N_from_qr(param_set, ice_type, q_s, r_thresh; monodisperse = false, μ=μ, ρ=ρ) # this is how many crystals we would expect to see in the snow
+                r_i = r_from_qN(param_set, ice_type, q_i, NI_below_r_is; monodisperse = false, μ=μ, ρ=ρ) # rought r_i based on current N below r_is
+                if !isfinite(r_i)
+                    @warn "Got non-finite r_i = $r_i from q_i = $q_i; NI_below_r_is = $NI_below_r_is; N_INP = $N_INP; μ = $μ; ρ = $ρ"
+                end
+                # r_s_i = r_thresh # snow should be at least r_thresh [[ the radius snow would have if it was still just ice]]
+                r_s_i = clamp(2.5 * r_i, r_thresh, 3r_thresh) # [[ empirical fit from data in RF09 , goes from about 2x at cloud top to 3x at bottom... but then r_i disappears ]]
+                Ns_est = N_from_qr(param_set, ice_type, q_s, r_s_i; monodisperse = false, μ=μ, ρ=ρ) # this is how many crystals we would expect to see in the snow
                 NI_below_r_is += max((N_INP - NI_below_r_is) - Ns_est, FT(0))
+
+                # if rand() < 1e-6
+                #     @warn "I feel like as qs grows, we prevent qi growth by forcing N to go over to snow rather than allowing r to grow.. i'm not sure which param is controlling this... maybe we can change it."
+                #     @warn "We also want to allow larger <r>, not more <r>... reducing N_s will increase N... but still..."
+                #     @warn "Maybe our acnv/production ratio peaks at too low an <r>? but we have calibrated params for that."
+                #     @warn "Our wi also maybe is peaking at too low an <r>? idk..."
+                #     @warn "Or it could have just been our too-low midddle from using no_boost... meant that not enoguh production reached middle levels but sed had to remain high. also we didnt have vert_adv right before so maybe that artificially amde no boost tau look more optimal by reducing growth with height..."
+                # end
 
                 return NI_below_r_is
 

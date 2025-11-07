@@ -970,12 +970,13 @@ function get_τs_and_Ns(param_set::APS, microphys_params::ACMP, relaxation_times
 end
 
 
-function get_τs_and_Ns_and_N_i_no_boost(param_set::APS, microphys_params::ACMP, relaxation_timescale::AbstractRelaxationTimescaleType, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT; N_INP_top::FT = FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT = FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
+function get_τs_and_Ns_and_N_i_no_boost(param_set::APS, microphys_params::ACMP, relaxation_timescale::AbstractRelaxationTimescaleType, q::TD.PhasePartition, T::FT, p::FT, ρ::FT, w::FT; N_INP_top::FT = FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT = FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false, use_boost_for_τ::Bool=true) where {FT}
     # Ns = get_Ns(param_set,                   relaxation_timescale, q, T, ρ, w; N_INP_top = N_INP_top, f_ice_mult = f_ice_mult, q_sno = q_sno, massflux = massflux, dTdz = dTdz, w_i = w_i, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
     Ns = get_Ns_raw_and_adjusted_and_N_i_no_boost(param_set, relaxation_timescale, q, T, ρ, w; N_INP_top = N_INP_top, f_ice_mult = f_ice_mult, q_sno = q_sno, massflux = massflux, dTdz = dTdz, w_i = w_i, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
 
     # Don't use boosted values for τs, also the raw value should just be w/o the boost? (we assume the remaining particles are in snow... so we don't use N_i_raw....
-    τs = get_τs(param_set, microphys_params, relaxation_timescale, q, T, p, ρ, w; N_l = Ns.N_liq, N_i_raw = Ns.N_ice_adjusted, N_i_adjusted = Ns.N_ice_no_boost, N_INP_top = N_INP_top, f_ice_mult = f_ice_mult, q_sno = q_sno, massflux = massflux, dTdz = dTdz, w_i = w_i, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
+    N_i_adjusted = use_boost_for_τ ? Ns.N_ice_adjusted : Ns.N_ice_no_boost
+    τs = get_τs(param_set, microphys_params, relaxation_timescale, q, T, p, ρ, w; N_l = Ns.N_liq, N_i_raw = Ns.N_ice_adjusted, N_i_adjusted = N_i_adjusted, N_INP_top = N_INP_top, f_ice_mult = f_ice_mult, q_sno = q_sno, massflux = massflux, dTdz = dTdz, w_i = w_i, apply_massflux_boost = apply_massflux_boost, apply_sedimentation_boost = apply_sedimentation_boost)
     return (; τ_liq = τs.τ_liq, τ_ice = τs.τ_ice, N_liq = Ns.N_liq, N_ice = Ns.N_ice_adjusted, N_ice_no_boost = Ns.N_ice_no_boost)
 end
 

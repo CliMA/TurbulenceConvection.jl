@@ -7,7 +7,8 @@ function buoyancy_c(param_set::APS, ρ::FT, ρ_i::FT) where {FT}
 end
 
 # BL height
-function get_inversion(grid::Grid, state::State, param_set::APS, Ri_bulk_crit)
+function get_inversion(state::State, param_set::APS, Ri_bulk_crit)
+    grid = Grid(state)
     FT = float_type(state)
     g::FT = TCP.grav(param_set)
     kc_surf = kc_surface(grid)
@@ -22,13 +23,13 @@ function get_inversion(grid::Grid, state::State, param_set::APS, Ri_bulk_crit)
 
     # test if we need to look at the free convective limit
     if (u[kc_surf]^2 + v[kc_surf]^2) <= 0.01
-        ∇θ_virt = center_aux_turbconv(state).ϕ_temporary
+        ∇θ_virt = center_aux_turbconv(state).temporary_1
         k_star = findlast_center(k -> θ_virt[k] > θ_virt_b, grid)
         LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(θ_virt[kc_surf]))
         @. ∇θ_virt = ∇c(wvec(LB(θ_virt)))
         h = (θ_virt_b - θ_virt[k_star - 1]) / ∇θ_virt[k_star] + z_c[k_star - 1].z
     else
-        ∇Ri_bulk = center_aux_turbconv(state).ϕ_temporary
+        ∇Ri_bulk = center_aux_turbconv(state).temporary_1
         Ri_bulk_fn(k) = g * (θ_virt[k] - θ_virt_b) * z_c[k].z / θ_virt_b / (u[k] * u[k] + v[k] * v[k])
 
         @inbounds for k in real_center_indices(grid)
@@ -92,4 +93,64 @@ function turbulent_Prandtl_number(mixing_length_params, obukhov_length::FT, ∇R
         prandtl_nvec = Pr_n
     end
     return prandtl_nvec
+end
+
+"""
+    This allows for MSE gradients to drive instability...
+        In this way it is `theoretical` and not immediately apparent...
+        but can help drive TKE formation in conditionally unstable moist environments that are globally stable prior to microphysical processes.
+
+    It does assume moisture is present, either for latent heating (condensation/deposition/fusion) or cooling (evaporation/sublimation/melting)
+    so you don't need to be at saturation or anything to use it, but you do need to ensure the relevant conditions are met
+
+    ... short derivation here ... 
+"""
+function moist_gradient_Richardson_number_helper(mixing_length_params, param_set::APS, ∂b∂z::FT, ∂MSE∂z::FT, Shear²::FT, ϵ::FT, T::FT) where {FT}
+    g::FT = TCP.grav(param_set)
+    c_p::FT = TCP.cp_d(param_set)
+    Ri_c::FT = mixing_length_params.Ri_c
+
+    ∂b∂z_moist =  g/(c_p * T) * ∂MSE∂z
+    return min(min(∂b∂z, ∂b∂z_moist) / max(Shear², ϵ), Ri_c) # the same as usual but the less stable of the two gradients
+end
+
+"""
+This one checks which state we're in... for example using moist is ok if subsat given we have condensate but not if we dont.
+
+Perhaps what you'd want to pass in to avoid some complexity is the latent heating rate... but that's not strictly available in Eq ....
+
+"""
+function moist_gradient_Richardson_number(mixing_length_params, param_set::APS, ts::TD.ThermodynamicState, qr::FT, qs::FT, ∂b∂z::FT, ∂MSE∂z::FT, Shear²::FT, ϵ::FT; is_noneq::Bool=true, RH_liq::FT=FT(NaN), RH_ice::FT=FT(NaN), T::FT = FT(NaN)) where {FT}
+    thermo_params = TCP.thermodynamics_params(param_set)
+    T_freeze = TCP.T_freeze(param_set)
+    T::FT = isnan(T) ? TD.air_temperature(thermo_params, ts) : T
+    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+
+    below_freezing = (T < T_freeze)
+    q_min = FT(1e-10) # a reasonable minimum for thermodynamic activity
+
+    if is_noneq
+        # This only works in NonEq... I guess in 
+        RH_ice = isnan(RH_ice) ? relative_humidity_over_ice(thermo_params, ts) : RH_ice
+        RH_liq = isnan(RH_liq) ? relative_humidity_over_liquid(thermo_params, ts) : RH_liq
+        if (
+            (RH_ice < FT(1)) ||
+            ((RH_liq > FT(1)) && below_freezing) || 
+            (RH_ice < FT(1) && ((q.ice + qs) < q_min)) ||
+            (RH_liq < FT(1) && (q.liq + qr) < q_min)
+        )
+            return moist_gradient_Richardson_number_helper(mixing_length_params, param_set, ∂b∂z, ∂MSE∂z, Shear², ϵ, T)
+        else
+            return gradient_Richardson_number(mixing_length_params, ∂b∂z, Shear², ϵ)
+        end
+    else
+        # For the Eq case we can't check for supersat...
+
+        if ((q.ice + qs) < q_min) && ((q.liq + qr) < q_min) # Having condensate implies not subsat in Eq. Hard to know what direction we're going then.
+            return gradient_Richardson_number(mixing_length_params, ∂b∂z, Shear², ϵ)
+        # saturated and MSE gradient I guess is all we have, there's no supersaturation or lack of condensate to check for
+        else # we have condensate. so we're at sat... presumably...
+            return moist_gradient_Richardson_number_helper(mixing_length_params, param_set, ∂b∂z, ∂MSE∂z, Shear², ϵ, T)
+        end
+    end
 end

@@ -84,9 +84,9 @@ function FieldFromNamedTuple(space, nt::NamedTuple)
     return cmv.(CC.Fields.coordinate_field(space))
 end
 # Non-constant field
-function FieldFromNamedTuple(space, initial_conditions::Function, ::Type{FT}, params...) where {FT}
+function FieldFromNamedTuple(space, initial_conditions::Function, ::Type{FT}, params...; calibrate_io::Bool=false) where {FT}
     local_geometry = CC.Fields.local_geometry_field(space)
-    return initial_conditions.(FT, local_geometry, params...)
+    return initial_conditions.(FT, local_geometry, params..., Val{calibrate_io}()) # Val so it can be dispatched on at compile time
 end
 
 function Base.cumsum(field::CC.Fields.FiniteDifferenceField)

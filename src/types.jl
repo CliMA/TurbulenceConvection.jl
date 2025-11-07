@@ -1854,16 +1854,17 @@ function Base.summary(io::IO, edmf::EDMFModel)
 end
 
 
-struct State{P, A, T, G}
+struct State{P, A, T, G <: Grid}
     prog::P
     aux::A
     tendencies::T
     grid::G
+    calibrate_io::Bool # put it in here so we don't have to carry it around...
 end
 
-function State(prog::P, aux::A, tendencies::T) where {P, A, T}
+function State(prog::P, aux::A, tendencies::T, calibrate_io::Bool) where {P, A, T}
     grid = Grid(axes(prog.cent))
-    return State{P, A, T, typeof(grid)}(prog, aux, tendencies, grid)
+    return State{P, A, T, typeof(grid)}(prog, aux, tendencies, grid, calibrate_io)
 end
 
 """
@@ -1878,11 +1879,11 @@ Create a columnar state given full 3D states
 ## Example
 ```julia
 bycolumn(axes(prog.cent)) do colidx
-    state = TC.column_state(prog, aux, tendencies, colidx)
+    state = TC.column_state(prog, aux, tendencies, colidx, calibrate_io)
     ...
 end
 """
-function column_state(prog, aux, tendencies, colidx)
+function column_state(prog, aux, tendencies, colidx, calibrate_io::Bool)
     prog_cent_column = CC.column(prog.cent, colidx)
     prog_face_column = CC.column(prog.face, colidx)
     aux_cent_column = CC.column(aux.cent, colidx)
@@ -1893,10 +1894,10 @@ function column_state(prog, aux, tendencies, colidx)
     aux_column = CC.Fields.FieldVector(cent = aux_cent_column, face = aux_face_column)
     tends_column = CC.Fields.FieldVector(cent = tends_cent_column, face = tends_face_column)
 
-    return State(prog_column, aux_column, tends_column)
+    return State(prog_column, aux_column, tends_column, calibrate_io)
 end
 
-function column_prog_aux(prog, aux, colidx)
+function column_prog_aux(prog, aux, colidx, calibrate_io::Bool)
     prog_cent_column = CC.column(prog.cent, colidx)
     prog_face_column = CC.column(prog.face, colidx)
     aux_cent_column = CC.column(aux.cent, colidx)
@@ -1904,7 +1905,7 @@ function column_prog_aux(prog, aux, colidx)
     prog_column = CC.Fields.FieldVector(cent = prog_cent_column, face = prog_face_column)
     aux_column = CC.Fields.FieldVector(cent = aux_cent_column, face = aux_face_column)
 
-    return State(prog_column, aux_column, nothing)
+    return State(prog_column, aux_column, nothing, calibrate_io)
 end
 
 function column_diagnostics(diagnostics, colidx)

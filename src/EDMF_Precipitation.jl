@@ -21,7 +21,6 @@ Computes the rain and snow advection (down) tendency
 compute_precipitation_advection_tendencies(
     ::AbstractPrecipitationModel,
     edmf::EDMFModel,
-    grid::Grid,
     state::State,
     param_set::APS,
     use_fallback_tendency_limiters::Bool,
@@ -30,19 +29,29 @@ compute_precipitation_advection_tendencies(
 function compute_precipitation_advection_tendencies(
     ::Clima1M,
     edmf::EDMFModel,
-    grid::Grid,
     state::State,
     param_set::APS,
     use_fallback_tendency_limiters::Bool,
 )
     FT = float_type(state)
+    grid = Grid(state)
 
     N_up = n_updrafts(edmf)
 
     tendencies_pr = center_tendencies_precipitation(state)
     prog_pr = center_prog_precipitation(state)
     aux_tc = center_aux_turbconv(state)
+    aux_tc_f = face_aux_turbconv(state)
     prog_gm = center_prog_grid_mean(state)
+
+    aux_en = center_aux_environment(state)
+    aux_up = center_aux_updrafts(state)
+    aux_bulk = center_aux_bulk(state)
+    aux_en_f = face_aux_environment(state)
+    aux_bulk_f = face_aux_bulk(state)
+    aux_up_f = face_aux_updrafts(state)
+    aux_gm = center_aux_grid_mean(state)
+
     ρ_c = prog_gm.ρ
 
     # helper to calculate the rain velocity
@@ -51,7 +60,7 @@ function compute_precipitation_advection_tendencies(
     term_vel_rain = aux_tc.term_vel_rain
     term_vel_snow = aux_tc.term_vel_snow
 
-    precip_fraction = compute_precip_fraction(edmf, state)
+    # precip_fraction = compute_precip_fraction(edmf, state)
 
     q_rai = prog_pr.q_rai #./ precip_fraction
     q_sno = prog_pr.q_sno #./ precip_fraction
@@ -74,34 +83,23 @@ function compute_precipitation_advection_tendencies(
 
     sedimentation_differencing_scheme = edmf.cloud_sedimentation_model.sedimentation_differencing_scheme # reuse from cloud_sedimentation_model since it's all the same user_args option
 
-    aux_en = center_aux_environment(state)
-    aux_up = center_aux_updrafts(state)
-    aux_bulk = center_aux_bulk(state)
-    aux_en_f = face_aux_environment(state)
-    aux_bulk_f = face_aux_bulk(state)
-    aux_up_f = face_aux_updrafts(state)
-    aux_gm = center_aux_grid_mean(state)
-
-    # aux_tc_f = face_aux_turbconv(state) # aux_tc_f.bulk.w should be the same as aux_bulk_f.w, so we don't need this one.
 
 
-    # w = Ic.(aux_bulk_f.w) # this is the bulk wind
-    mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_rai, term_vel_rain, aux_bulk_f.w, aux_bulk.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false)
+    mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_rai, term_vel_rain, aux_bulk_f.w, aux_bulk.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false, scratch1 = aux_tc.temporary_1, scratch2 = aux_tc.temporary_2, scratch3 = aux_tc.temporary_3, scratch4 = aux_tc.temporary_4, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2)
     mph_sed_q_rai = mph_sed #.* aux_bulk.area # all goes to same bucket
     mph_sed_q_rai .+= mph_sed_other #.* aux_en.area # all goes to same bucket
-    mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_sno, term_vel_snow, aux_bulk_f.w, aux_bulk.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false)
+    mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_sno, term_vel_snow, aux_bulk_f.w, aux_bulk.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false, scratch1 = aux_tc.temporary_1, scratch2 = aux_tc.temporary_2, scratch3 = aux_tc.temporary_3, scratch4 = aux_tc.temporary_4, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2)
     mph_sed_q_sno = mph_sed #.* aux_bulk.area # all goes to same bucket
     mph_sed_q_sno .+= mph_sed_other #.* aux_en.area # all goes to same bucket
 
 
     # [[ ignore this part, I dont think the env response should be so locally constrained or overly important. ]] [[ maybe we should've done the same for liq/ice now that we allow high updraft areas... idk]]
-    # @. w = Ic(aux_en_f.w) # this is the environment wind 
     # mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_rai, term_vel_rain, w, aux_en.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = true)
-    mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_rai, term_vel_rain, aux_en_f.w .* 0, aux_en.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false) # test ignoring the environment downdraft
+    mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_rai, term_vel_rain, aux_en_f.w .* 0, aux_en.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false, scratch1 = aux_tc.temporary_1, scratch2 = aux_tc.temporary_2, scratch3 = aux_tc.temporary_3, scratch4 = aux_tc.temporary_4, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2) # test ignoring the environment downdraft
     mph_sed_q_rai .+= mph_sed #.* aux_en.area
     mph_sed_q_rai .+= mph_sed_other #.* aux_bulk.area # all goes to same bucket [these are fields so idk how this works...]
     # mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_sno, term_vel_snow, w, aux_en.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = true)
-    mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_sno, term_vel_snow, aux_en_f.w .* 0, aux_en.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false) # test ignoring the environment downdraft
+    mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_sno, term_vel_snow, aux_en_f.w .* 0, aux_en.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false, scratch1 = aux_tc.temporary_1, scratch2 = aux_tc.temporary_2, scratch3 = aux_tc.temporary_3, scratch4 = aux_tc.temporary_4, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2) # test ignoring the environment downdraft
     mph_sed_q_sno .+= mph_sed #.* aux_en.area # all goes to same bucket
     mph_sed_q_sno .+= mph_sed_other #.* aux_bulk.area # all goes to same bucket
 
@@ -136,45 +134,59 @@ function compute_precipitation_advection_tendencies(
 
         # Basically in the updraft you'd have q_rai_up * a_up + ((f_cm * q_rai_up) + (1-f_cm) * q_rai_en)
 
-        a_up_tot = aux_bulk.area .+ aux_en.a_cloak_up
-        q_rai_up = @. ifelse(a_up_tot > 0, (q_rai - aux_en.a_en_remaining * q_rai) / a_up_tot , FT(0))
-        # q_rai_en = @. q_rai
-        q_sno_up = @. ifelse(a_up_tot > 0, (q_sno - aux_en.a_en_remaining * q_sno) / a_up_tot , FT(0))
-        # q_sno_en = @. q_sno
-
         # ============================================================== #
             # Partition same way as `compute_precipitation_sink_tendencies()`
         # ============================================================== #
-        qs_up = @. ifelse(aux_gm.q_ice > FT(0), (aux_bulk.q_ice * aux_bulk.area) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Updraft
-        qs_cup = @. ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_cloak_up * aux_en.a_cloak_up) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Updraft cloak
-        qs_cdn = @. ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_cloak_dn * aux_en.a_cloak_dn) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Downdraft cloak
-        qs_enr = @. ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_en_remaining * aux_en.a_en_remaining) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Env remaining
+        # qs_up :: ifelse(aux_gm.q_ice > FT(0), (aux_bulk.q_ice * aux_bulk.area) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Updraft
+        # qs_cup :: ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_cloak_up * aux_en.a_cloak_up) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Updraft cloak
+        # qs_cdn :: ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_cloak_dn * aux_en.a_cloak_dn) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Downdraft cloak
+        # qs_enr :: ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_en_remaining * aux_en.a_en_remaining) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Env remaining
  
-        qr_up = @. ifelse(aux_gm.q_liq > FT(0), (aux_bulk.q_liq * aux_bulk.area) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Updraft
-        qr_cup = @. ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_cloak_up * aux_en.a_cloak_up) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Updraft cloak
-        qr_cdn = @. ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_cloak_dn * aux_en.a_cloak_dn) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Downdraft cloak
-        qr_enr = @. ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_en_remaining * aux_en.a_en_remaining) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Env remaining
+        # qr_up :: ifelse(aux_gm.q_liq > FT(0), (aux_bulk.q_liq * aux_bulk.area) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Updraft
+        # qr_cup :: ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_cloak_up * aux_en.a_cloak_up) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Updraft cloak
+        # qr_cdn :: ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_cloak_dn * aux_en.a_cloak_dn) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Downdraft cloak
+        # qr_enr :: ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_en_remaining * aux_en.a_en_remaining) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Env remaining
 
+        q_rai_here = aux_tc.temporary_1
+        q_sno_here = aux_tc.temporary_2
 
         for i in 1:N_up
-            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * qr_up))) / ρ_c
-            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * qs_up))) / ρ_c
+            @. q_rai_here = ifelse(aux_gm.q_liq > FT(0), (aux_up[i].q_liq * aux_up[i].area) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Updraft
+            @. q_sno_here = ifelse(aux_gm.q_ice > FT(0), (aux_up[i].q_ice * aux_up[i].area) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Updraft
+            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_rai_here))) / ρ_c
+            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_sno_here))) / ρ_c
         end
         
         if edmf.area_partition_model.confine_all_downdraft_to_cloak # left of right biased based on direction. This does have the risk to be unstable though... hopefully running out of w helps moderate.... otherwise we could try the second order correction lol...
             regions = (
-                (aux_en.a_cloak_up, aux_en_f.w_cloak_up, qr_cup,  qs_cup, LB),
-                (aux_en.a_cloak_dn, aux_en_f.w_cloak_dn, qr_cdn, qs_cdn, RB),
+                # (aux_en.a_cloak_up, aux_en_f.w_cloak_up, qr_cup, qs_cup, LB),
+                (aux_en.a_cloak_up, aux_en_f.w_cloak_up, LB, CloakUpDomain),
+                # (aux_en.a_cloak_dn, aux_en_f.w_cloak_dn, qr_cdn, qs_cdn, RB),
+                (aux_en.a_cloak_dn, aux_en_f.w_cloak_dn, RB, CloakDownDomain),
                 )
         else
             regions = (
-                (aux_en.a_cloak_up, aux_en_f.w_cloak_up, qr_cup, qs_cup, LB),
-                (aux_en.a_cloak_dn, aux_en_f.w_cloak_dn, qr_cdn, qs_cdn, RB),
-                (aux_en.a_en_remaining, aux_en_f.w, qr_enr, qs_enr, RB),
+                # (aux_en.a_cloak_up, aux_en_f.w_cloak_up, qr_cup, qs_cup, LB),
+                (aux_en.a_cloak_up, aux_en_f.w_cloak_up, LB, CloakUpDomain),
+                # (aux_en.a_cloak_dn, aux_en_f.w_cloak_dn, qr_cdn, qs_cdn, RB),
+                (aux_en.a_cloak_dn, aux_en_f.w_cloak_dn, RB, CloakDownDomain),
+                # (aux_en.a_en_remaining, aux_en_f.w, qr_enr, qs_enr, RB),
+                (aux_en.a_en_remaining, aux_en_f.w, RB, EnvRemainingDomain),
                 )
         end
 
-        for (area_region, w_region, q_rai_here, q_sno_here, LRB) in regions
+        # for (area_region, w_region, q_rai_here, q_sno_here, LRB) in regions
+        for (area_region, w_region, LRB, domain_type) in regions
+            if domain_type === CloakUpDomain
+                @. q_rai_here = ifelse(aux_gm.q_liq > FT(0), (aux_up[i].q_liq * aux_up[i].area) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Updraft
+                @. q_sno_here = ifelse(aux_gm.q_ice > FT(0), (aux_up[i].q_ice * aux_up[i].area) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Updraft
+            elseif domain_type === CloakDownDomain
+                @. q_rai_here = ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_cloak_dn * aux_en.a_cloak_dn) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Downdraft cloak
+                @. q_sno_here = ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_cloak_dn * aux_en.a_cloak_dn) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Downdraft cloak
+            elseif domain_type === EnvRemainingDomain
+                @. q_rai_here = ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_en_remaining * aux_en.a_en_remaining) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Env remaining
+                @. q_sno_here = ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_en_remaining * aux_en.a_en_remaining) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Env remaining
+            end
             @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LRB(Ic(w_region) * ρ_c * area_region * q_rai_here))) / ρ_c
             @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LRB(Ic(w_region) * ρ_c * area_region * q_sno_here))) / ρ_c
         end
@@ -205,7 +217,6 @@ due to rain evaporation, snow deposition and sublimation and snow melt
 compute_precipitation_sink_tendencies(
     ::AbstractPrecipitationModel,
     edmf::EDMFModel,
-    grid::Grid,
     state::State,
     param_set::APS,
     Δt::Real,
@@ -215,12 +226,12 @@ compute_precipitation_sink_tendencies(
 function compute_precipitation_sink_tendencies(
     ::Clima1M,
     edmf::EDMFModel,
-    grid::Grid,
     state::State,
     param_set::APS,
     Δt::Real,
     use_fallback_tendency_limiters::Bool,
 )
+    grid = Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     microphys_params = TCP.microphysics_params(param_set)
     aux_gm = center_aux_grid_mean(state)
@@ -262,8 +273,6 @@ function compute_precipitation_sink_tendencies(
         c_p = TD.TP.cp_d(thermo_params)
         R_m = TD.gas_constant_air(thermo_params, ts)
         R_v = TCP.R_v(param_set)
-        # L_v0 = TCP.LH_v0(param_set)
-        # L_s0 = TCP.LH_s0(param_set)
         L_v = TD.latent_heat_vapor(thermo_params, ts)
         L_s = TD.latent_heat_sublim(thermo_params, ts)
         L_f = TD.latent_heat_fusion(thermo_params, ts)
@@ -373,7 +382,7 @@ function compute_precipitation_sink_tendencies(
             δi = (qv_region - qvsat_ice) / Γ_i
 
             dv = FT(0)
-            # dv += Δt * max(aux_en.dqvdt[k] * aux_en.area[k], FT(0)) + max(aux_bulk.dqvdt[k] * aux_bulk.area[k], FT(0)) # hopefully this is ok to just add like this...
+            # dv += Δt * max(aux_tc.dqvdt[k] * aux_tc.area[k], FT(0)) # hopefully this is ok to just add like this...
             if is_updraft
                 # dv += Δt * max(( (aux_tc.massflux_tendency_qt[k] + aux_tc.diffusive_tendency_qt[k]) - max(aux_tc.massflux_tendency_ql[k] + aux_tc.diffusive_tendency_ql[k], FT(0)) - max(aux_tc.massflux_tendency_qi[k] + aux_tc.diffusive_tendency_qi[k], FT(0))), FT(0))
                 # dv += Δt * max(aux_gm.qt_tendency_ls_vert_adv[k] - max(aux_gm.ql_tendency_ls_vert_adv[k], FT(0)) - max(aux_gm.qi_tendency_ls_vert_adv[k], FT(0)), FT(0))

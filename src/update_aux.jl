@@ -1,7 +1,8 @@
-function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBase, param_set::APS, t::Real, Δt::Real, cfl_limit::Real, use_fallback_tendency_limiters::Bool)
+function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set::APS, t::Real, Δt::Real, cfl_limit::Real, use_fallback_tendency_limiters::Bool)
     #####
     ##### Unpack common variables
     #####
+    grid = Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     microphys_params = TCP.microphysics_params(param_set)
     N_up = n_updrafts(edmf)
@@ -30,6 +31,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     aux_en_2m = center_aux_environment_2m(state)
     prog_up = center_prog_updrafts(state)
     prog_up_f = face_prog_updrafts(state)
+    prog_pr = center_prog_precipitation(state)
     ρ_f = aux_gm_f.ρ
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
@@ -39,6 +41,7 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     max_area = edmf.max_area
     ts_gm = center_aux_grid_mean(state).ts
     ts_env = center_aux_environment(state).ts
+    calibrate_io = state.calibrate_io
 
     massflux = aux_tc_f.massflux
     ∂M∂z = aux_tc.∂M∂z
@@ -212,7 +215,12 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
 
         if param_set.user_params.use_convective_tke # rn this one keeps them separate but we need to add tke's so it acts on the real qt etc... i think just doing it to ρatke is enough.. not sure
-            aux_en.tke[k] += tke_convective
+            #= these have to be combined to generate variance etc correctly
+            I don't want to rewrite all that code separately.. idk.
+
+            We could separate out the variance generating part in `compute_en_tendencies!()` but we'd also have to fix entrainment and detrainment...
+            =#
+            aux_en.tke[k] += tke_convective 
         end
 
         # aux_en.tke_convective[k] = prog_en.ρatke_convective[k] / (ρ_c[k] * aux_en.area[k])
@@ -225,6 +233,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             aux_en.Hvar[k] = prog_en.ρaHvar[k] / (ρ_c[k] * aux_en.area[k])
             aux_en.QTvar[k] = prog_en.ρaQTvar[k] / (ρ_c[k] * aux_en.area[k])
             aux_en.HQTcov[k] = prog_en.ρaHQTcov[k] / (ρ_c[k] * aux_en.area[k])
+
+            # don't let STD exceed half of mean
+            aux_en.Hvar[k] = min(aux_en.Hvar[k], (aux_en.θ_liq_ice[k]/FT(2))^2)
+            aux_en.QTvar[k] = min(aux_en.QTvar[k], (aux_en.q_tot[k]/FT(2))^2)
         end
 
         #####
@@ -296,8 +308,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.θ_dry[k] = TD.dry_pottemp(thermo_params, ts_en)
         aux_en.buoy[k] = buoyancy_c(param_set, ρ_c[k], ρ)
         aux_en.RH[k] = TD.relative_humidity(thermo_params, ts_en)
-        aux_en.RH_liq[k] = relative_humidity_over_liquid(thermo_params, ts_en)
-        aux_en.RH_ice[k] = relative_humidity_over_ice(thermo_params, ts_en)
+        if !state.calibrate_io
+            aux_en.RH_liq[k] = relative_humidity_over_liquid(thermo_params, ts_en)
+            aux_en.RH_ice[k] = relative_humidity_over_ice(thermo_params, ts_en)
+        end
 
         Φ = geopotential(param_set, grid.zc[k].z)
         aux_en.MSE[k] = TD.moist_static_energy(thermo_params, ts_en, Φ)
@@ -343,8 +357,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             ρ = TD.air_density(thermo_params, ts_up)
             aux_up[i].buoy[k] = buoyancy_c(param_set, ρ_c[k], ρ)
             aux_up[i].RH[k] = TD.relative_humidity(thermo_params, ts_up)
-            aux_up[i].RH_liq[k] = relative_humidity_over_liquid(thermo_params, ts_up)
-            aux_up[i].RH_ice[k] = relative_humidity_over_ice(thermo_params, ts_up)
+            if !state.calibrate_io
+                aux_up[i].RH_liq[k] = relative_humidity_over_liquid(thermo_params, ts_up)
+                aux_up[i].RH_ice[k] = relative_humidity_over_ice(thermo_params, ts_up)
+            end
         end
         aux_gm.buoy[k] = (1.0 - aux_bulk.area[k]) * aux_en.buoy[k]
         @inbounds for i in 1:N_up
@@ -363,8 +379,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_bulk.q_ice[k] = 0
         aux_bulk.T[k] = 0
         aux_bulk.RH[k] = 0
-        aux_bulk.RH_liq[k] = 0
-        aux_bulk.RH_ice[k] = 0
+        if !state.calibrate_io
+            aux_bulk.RH_liq[k] = 0
+            aux_bulk.RH_ice[k] = 0
+        end
         aux_bulk.buoy[k] = 0
         if a_bulk_c > 0
             @inbounds for i in 1:N_up
@@ -372,14 +390,18 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
                 aux_bulk.q_ice[k] += aux_up[i].area[k] * aux_up[i].q_ice[k] / a_bulk_c
                 aux_bulk.T[k] += aux_up[i].area[k] * aux_up[i].T[k] / a_bulk_c
                 aux_bulk.RH[k] += aux_up[i].area[k] * aux_up[i].RH[k] / a_bulk_c
-                aux_bulk.RH_liq[k] += aux_up[i].area[k] * aux_up[i].RH_liq[k] / a_bulk_c
-                aux_bulk.RH_ice[k] += aux_up[i].area[k] * aux_up[i].RH_ice[k] / a_bulk_c
+                if !state.calibrate_io
+                    aux_bulk.RH_liq[k] += aux_up[i].area[k] * aux_up[i].RH_liq[k] / a_bulk_c
+                    aux_bulk.RH_ice[k] += aux_up[i].area[k] * aux_up[i].RH_ice[k] / a_bulk_c
+                end
                 aux_bulk.buoy[k] += aux_up[i].area[k] * aux_up[i].buoy[k] / a_bulk_c
             end
         else
             aux_bulk.RH[k] = aux_en.RH[k]
-            aux_bulk.RH_liq[k] = aux_en.RH_liq[k]
-            aux_bulk.RH_ice[k] = aux_en.RH_ice[k]
+            if !state.calibrate_io
+                aux_bulk.RH_liq[k] = aux_en.RH_liq[k]
+                aux_bulk.RH_ice[k] = aux_en.RH_ice[k]
+            end
             aux_bulk.T[k] = aux_en.T[k]
         end
 
@@ -448,14 +470,13 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     end
     # Assuming w_gm = 0!
     @. aux_en_f.w = -1 * ᶠinterp_a(aux_bulk.area) / (1 - ᶠinterp_a(aux_bulk.area)) * aux_tc_f.bulk.w
-    # @. aux_en.w = Ic(aux_en_f.w) # face to center interp [[ gonna deprecate this for space savings ]]
-
+    @. aux_tc.w_en_c = Ic(aux_en_f.w) # store cell centered env w for buoyancy calc in next time step
     #####
     #####  diagnose_GMV_moments
     #####
-    get_GMV_CoVar(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
-    get_GMV_CoVar(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
-    get_GMV_CoVar(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
+    get_GMV_CoVar(edmf, state, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
+    get_GMV_CoVar(edmf, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
+    get_GMV_CoVar(edmf, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
 
 
 
@@ -679,12 +700,14 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             aux_en.T_en_remaining[k] = TD.air_temperature(thermo_params, aux_en.ts_en_remaining[k])
 
             # [[ TEMPORARY :: RH]]
-            aux_en.RH_liq_cloak_up[k] = relative_humidity_over_liquid(thermo_params, aux_en.ts_cloak_up[k])
-            aux_en.RH_liq_cloak_dn[k] = relative_humidity_over_liquid(thermo_params, aux_en.ts_cloak_dn[k])
-            aux_en.RH_liq_en_remaining[k] = relative_humidity_over_liquid(thermo_params, aux_en.ts_en_remaining[k])
-            aux_en.RH_ice_cloak_up[k] = relative_humidity_over_ice(thermo_params, aux_en.ts_cloak_up[k])
-            aux_en.RH_ice_cloak_dn[k] = relative_humidity_over_ice(thermo_params, aux_en.ts_cloak_dn[k])
-            aux_en.RH_ice_en_remaining[k] = relative_humidity_over_ice(thermo_params, aux_en.ts_en_remaining[k])
+            if !state.calibrate_io
+                aux_en.RH_liq_cloak_up[k] = relative_humidity_over_liquid(thermo_params, aux_en.ts_cloak_up[k])
+                aux_en.RH_liq_cloak_dn[k] = relative_humidity_over_liquid(thermo_params, aux_en.ts_cloak_dn[k])
+                aux_en.RH_liq_en_remaining[k] = relative_humidity_over_liquid(thermo_params, aux_en.ts_en_remaining[k])
+                aux_en.RH_ice_cloak_up[k] = relative_humidity_over_ice(thermo_params, aux_en.ts_cloak_up[k])
+                aux_en.RH_ice_cloak_dn[k] = relative_humidity_over_ice(thermo_params, aux_en.ts_cloak_dn[k])
+                aux_en.RH_ice_en_remaining[k] = relative_humidity_over_ice(thermo_params, aux_en.ts_en_remaining[k])
+            end
 
         end
 
@@ -713,30 +736,33 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     aux_en.qt_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
     aux_en.θ_liq_ice_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
     #
-    aux_en.ql_tendency_acnv .= FT(0)
-    aux_en.qi_tendency_acnv .= FT(0)
-    aux_en.qi_tendency_acnv_dep .= FT(0)
-    aux_en.qi_tendency_acnv_dep_is .= FT(0)
-    aux_en.qi_tendency_acnv_dep_above .= FT(0)
-    aux_en.qi_tendency_acnv_agg .= FT(0)
-    aux_en.qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
-    aux_en.qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
-    aux_en.qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+
+    if !state.calibrate_io
+        aux_en.ql_tendency_acnv .= FT(0)
+        aux_en.qi_tendency_acnv .= FT(0)
+        aux_en.qi_tendency_acnv_dep .= FT(0)
+        aux_en.qi_tendency_acnv_dep_is .= FT(0)
+        aux_en.qi_tendency_acnv_dep_above .= FT(0)
+        aux_en.qi_tendency_acnv_agg .= FT(0)
+        aux_en.qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
+        aux_en.qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+        aux_en.qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+        #
+        aux_en.ql_tendency_accr_liq_rai .= FT(0)
+        aux_en.ql_tendency_accr_liq_ice .= FT(0)
+        aux_en.ql_tendency_accr_liq_sno .= FT(0)
+        #
+        aux_en.qi_tendency_accr_ice_liq .= FT(0)
+        aux_en.qi_tendency_accr_ice_rai .= FT(0)
+        aux_en.qi_tendency_accr_ice_sno .= FT(0)
+        #
+        aux_en.qi_tendency_hom_frz .= FT(0)
+        aux_en.qi_tendency_het_frz .= FT(0)
+        aux_en.qi_tendency_het_nuc .= FT(0)
+        aux_en.qi_tendency_melt .= FT(0)
+    end
     #
-    aux_en.ql_tendency_accr_liq_rai .= FT(0)
-    aux_en.ql_tendency_accr_liq_ice .= FT(0)
-    aux_en.ql_tendency_accr_liq_sno .= FT(0)
-    #
-    aux_en.qi_tendency_accr_ice_liq .= FT(0)
-    aux_en.qi_tendency_accr_ice_rai .= FT(0)
-    aux_en.qi_tendency_accr_ice_sno .= FT(0)
-    #
-    aux_en.qi_tendency_hom_frz .= FT(0)
-    aux_en.qi_tendency_het_frz .= FT(0)
-    aux_en.qi_tendency_het_nuc .= FT(0)
-    aux_en.qi_tendency_melt .= FT(0)
-    #
-    # aux_en.dqvdt .= FT(0) # zero out [ don't do this bc we need it for later calculations... in microphysics!() for example... it'll just have to be from the last timestep...]
+    # aux_tc.dqvdt .= FT(0) # zero out [ don't do this bc we need it for later calculations... in microphysics!() for example... it'll just have to be from the last timestep...]
 
 
 
@@ -759,30 +785,31 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_up[i].θ_liq_ice_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
         #
         #
-        aux_up[i].ql_tendency_acnv .= FT(0)
-        aux_up[i].qi_tendency_acnv .= FT(0)
-        aux_up[i].qi_tendency_acnv_dep .= FT(0)
-        aux_up[i].qi_tendency_acnv_dep_is .= FT(0)
-        aux_up[i].qi_tendency_acnv_dep_above .= FT(0)
-        aux_up[i].qi_tendency_acnv_agg .= FT(0)
-        aux_up[i].qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
-        aux_up[i].qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
-        aux_up[i].qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+        if !state.calibrate_io
+            aux_up[i].ql_tendency_acnv .= FT(0)
+            aux_up[i].qi_tendency_acnv .= FT(0)
+            aux_up[i].qi_tendency_acnv_dep .= FT(0)
+            aux_up[i].qi_tendency_acnv_dep_is .= FT(0)
+            aux_up[i].qi_tendency_acnv_dep_above .= FT(0)
+            aux_up[i].qi_tendency_acnv_agg .= FT(0)
+            aux_up[i].qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
+            aux_up[i].qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+            aux_up[i].qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+            #
+            aux_up[i].ql_tendency_accr_liq_rai .= FT(0)
+            aux_up[i].ql_tendency_accr_liq_ice .= FT(0)
+            aux_up[i].ql_tendency_accr_liq_sno .= FT(0)
+            #
+            aux_up[i].qi_tendency_accr_ice_liq .= FT(0)
+            aux_up[i].qi_tendency_accr_ice_rai .= FT(0)
+            aux_up[i].qi_tendency_accr_ice_sno .= FT(0)
+            #
+            aux_up[i].qi_tendency_hom_frz .= FT(0)
+            aux_up[i].qi_tendency_het_frz .= FT(0)
+            aux_up[i].qi_tendency_het_nuc .= FT(0)
+            aux_up[i].qi_tendency_melt .= FT(0)
+        end
         #
-        aux_up[i].ql_tendency_accr_liq_rai .= FT(0)
-        aux_up[i].ql_tendency_accr_liq_ice .= FT(0)
-        aux_up[i].ql_tendency_accr_liq_sno .= FT(0)
-        #
-        aux_up[i].qi_tendency_accr_ice_liq .= FT(0)
-        aux_up[i].qi_tendency_accr_ice_rai .= FT(0)
-        aux_up[i].qi_tendency_accr_ice_sno .= FT(0)
-        #
-        aux_up[i].qi_tendency_hom_frz .= FT(0)
-        aux_up[i].qi_tendency_het_frz .= FT(0)
-        aux_up[i].qi_tendency_het_nuc .= FT(0)
-        aux_up[i].qi_tendency_melt .= FT(0)
-        #
-        # aux_up[i].dqvdt .= FT(0) # zero out [ don't do this bc we need it for later calculations... in microphysics!() for example... it'll just have to be from the last timestep...]
     end
     #
     aux_bulk.ql_tendency_cond_evap .= FT(0)
@@ -798,31 +825,36 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     aux_bulk.qt_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other updrafts
     aux_bulk.θ_liq_ice_tendency_sedimentation_other .= FT(0) # this is the sedimentation contribution to precip formation from the other up
     #
-    aux_bulk.ql_tendency_acnv .= FT(0)
-    aux_bulk.qi_tendency_acnv .= FT(0)
-    aux_bulk.qi_tendency_acnv_dep .= FT(0)
-    aux_bulk.qi_tendency_acnv_dep_is .= FT(0)
-    aux_bulk.qi_tendency_acnv_dep_above .= FT(0)
-    aux_bulk.qi_tendency_acnv_agg .= FT(0)
-    aux_bulk.qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
-    aux_bulk.qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
-    aux_bulk.qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+    if !state.calibrate_io
+        aux_bulk.ql_tendency_acnv .= FT(0)
+        aux_bulk.qi_tendency_acnv .= FT(0)
+        aux_bulk.qi_tendency_acnv_dep .= FT(0)
+        aux_bulk.qi_tendency_acnv_dep_is .= FT(0)
+        aux_bulk.qi_tendency_acnv_dep_above .= FT(0)
+        aux_bulk.qi_tendency_acnv_agg .= FT(0)
+        aux_bulk.qi_tendency_acnv_agg_other .= FT(0) # this is the aggregation contribution to precip formation from the other updrafts
+        aux_bulk.qi_tendency_acnv_agg_mix .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+        aux_bulk.qi_tendency_acnv_thresh .= FT(0) # this is the aggregation tendency that goes into snow (i.e. not the one that goes into rain)
+        #
+        aux_bulk.ql_tendency_accr_liq_rai .= FT(0)
+        aux_bulk.ql_tendency_accr_liq_ice .= FT(0)
+        aux_bulk.ql_tendency_accr_liq_sno .= FT(0)
+        #
+        aux_bulk.qi_tendency_accr_ice_liq .= FT(0)
+        aux_bulk.qi_tendency_accr_ice_rai .= FT(0)
+        aux_bulk.qi_tendency_accr_ice_sno .= FT(0)
+        #
+        aux_bulk.qi_tendency_hom_frz .= FT(0)
+        aux_bulk.qi_tendency_het_frz .= FT(0)
+        aux_bulk.qi_tendency_het_nuc .= FT(0)
+        aux_bulk.qi_tendency_melt .= FT(0)
+        #
+        #
+        aux_tc.qs_tendency_accr_rai_sno .= FT(0) # this is edited in both aux_up and aux_en because the outcome is temperature dependent, so we zero it out here
+
+    end
     #
-    aux_bulk.ql_tendency_accr_liq_rai .= FT(0)
-    aux_bulk.ql_tendency_accr_liq_ice .= FT(0)
-    aux_bulk.ql_tendency_accr_liq_sno .= FT(0)
     #
-    aux_bulk.qi_tendency_accr_ice_liq .= FT(0)
-    aux_bulk.qi_tendency_accr_ice_rai .= FT(0)
-    aux_bulk.qi_tendency_accr_ice_sno .= FT(0)
-    #
-    aux_bulk.qi_tendency_hom_frz .= FT(0)
-    aux_bulk.qi_tendency_het_frz .= FT(0)
-    aux_bulk.qi_tendency_het_nuc .= FT(0)
-    aux_bulk.qi_tendency_melt .= FT(0)
-    #
-    #
-    aux_tc.qs_tendency_accr_rai_sno .= FT(0) # this is edited in both aux_up and aux_en because the outcome is temperature dependent, so we zero it out here
     ## ================================================================================================================= ##
 
 
@@ -855,7 +887,6 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     @inbounds for i in 1:N_up
         massflux_face_i = aux_up_f[i].massflux
         parent(massflux_face_i) .= 0
-        # aux_up_i = aux_up[i]
         a_up = aux_up[i].area
         w_up_i = aux_up_f[i].w
         @. aux_up_f[i].massflux =
@@ -865,8 +896,8 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
 
     # update N, τ, and termvel now that everything including w is updated.
-    update_N_τ_termvel!(edmf, grid, state, param_set, thermo_params, microphys_params) # update and store N, τ, and termvel... This gets things set but also needs updraft set for efficiency for the NN, but updraft isn't set until after...
-    microphysics!(edmf.en_thermo, grid, state, edmf, edmf.moisture_model, edmf.precip_model, edmf.cloud_sedimentation_model, edmf.rain_formation_model, edmf.snow_formation_model, Δt, param_set, use_fallback_tendency_limiters) # set env tendencies for microphysics
+    update_N_τ_termvel!(edmf, state, param_set, thermo_params, microphys_params) # update and store N, τ, and termvel... This gets things set but also needs updraft set for efficiency for the NN, but updraft isn't set until after...
+    microphysics!(edmf.en_thermo, state, edmf, Δt, param_set, use_fallback_tendency_limiters) # set env tendencies for microphysics
 
     # return back to origin state incase it needs to be zerod out for recalc
     parent(massflux) .= 0
@@ -876,16 +907,17 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
     ##### compute_updraft_closures
     #####
     #TODO - AJ add the non-equilibrium tendency computation here
+    compute_cloud_condensate_sedimentation_tendencies!(state, edmf, Δt, param_set) # not sure on the merits of doing it here vs at the end w/ precipitation tendencies... leaving here bc originally i had it in compute_nonequilibrium_moisture_tendencies!() call before other microphysics though...
     if edmf.moisture_model isa NonEquilibriumMoisture
-        compute_nonequilibrium_moisture_tendencies!(grid, state, edmf, Δt, param_set, use_fallback_tendency_limiters)
-        compute_other_microphysics_tendencies!(grid, state, edmf, Δt, param_set, use_fallback_tendency_limiters) # i think only in noneq case is ok... idk... these are tendencies that would be overwritten in equilibrium case, and ql_tendency_noneq/qi_tendency_noneq don't exist in equilibrium case
+        # compute_nonequilibrium_moisture_tendencies!(state, edmf, Δt, param_set, use_fallback_tendency_limiters)
+        # compute_other_microphysics_tendencies!(state, edmf, Δt, param_set, use_fallback_tendency_limiters) # i think only in noneq case is ok... idk... these are tendencies that would be overwritten in equilibrium case, and ql_tendency_noneq/qi_tendency_noneq don't exist in equilibrium case
+        updraft_microphysics!(state, edmf, Δt, param_set, use_fallback_tendency_limiters) # set updraft tendencies for microphysics
     end
-    compute_cloud_condensate_sedimentation_tendencies!(grid, state, edmf, Δt, param_set) # not sure on the merits of doing it here vs at the end w/ precipitation tendencies... leaving here bc originally i had it in compute_nonequilibrium_moisture_tendencies!()
-
+    # compute_precipitation_formation_tendencies(state, edmf, Δt, param_set, use_fallback_tendency_limiters)
 
 
     # domain interaction microphysics
-    # compute_domain_interaction_microphysics_tendencies!(grid, state, edmf, Δt, param_set, use_fallback_tendency_limiters) # this is the microphysics that happens between updrafts and environment (e.g. accretion, evaporation, etc)
+    # compute_domain_interaction_microphysics_tendencies!(state, edmf, Δt, param_set, use_fallback_tendency_limiters) # this is the microphysics that happens between updrafts and environment (e.g. accretion, evaporation, etc)
 
 
     # ============================================================================================================================================================================== #
@@ -943,10 +975,10 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 
     @. ∂w∂z = ∇c(wvec(aux_tc_f.bulk.w))
 
-    compute_turb_entr!(state, grid, edmf)
-    compute_phys_entr_detr!(state, grid, edmf, param_set, surf, Δt, edmf.entr_closure)
-    compute_ml_entr_detr!(state, grid, edmf, param_set, surf, Δt, edmf.ml_entr_closure)
-    compute_nh_pressure!(state, grid, edmf, surf)
+    compute_turb_entr!(state, edmf)
+    compute_phys_entr_detr!(state, edmf, param_set, surf, Δt, edmf.entr_closure)
+    compute_ml_entr_detr!(state, edmf, param_set, surf, Δt, edmf.ml_entr_closure)
+    compute_nh_pressure!(state, edmf, surf)
 
     #####
     ##### compute_eddy_diffusivities_tke
@@ -1053,23 +1085,30 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
             error("Something went wrong. The buoyancy gradient model is not specified")
         end
         bg = buoyancy_gradients(param_set, bg_model; is_noneq = (edmf.moisture_model isa NonEquilibriumMoisture))
-        aux_tc.∂b∂z[k] = bg.∂b∂z # my addition
+
+        if !state.calibrate_io
+            aux_tc.∂b∂z[k] = bg.∂b∂z # my addition
+        end
 
         # Limiting stratification scale (Deardorff, 1976)
         # compute ∇Ri and Pr
-        ∇_Ri = gradient_Richardson_number(mix_len_params, bg.∂b∂z, Shear²[k], FT(eps(FT)))
+        # ∇_Ri = gradient_Richardson_number(mix_len_params, bg.∂b∂z, Shear²[k], FT(eps(FT)))
+
+        RH_liq = state.calibrate_io ? relative_humidity_over_liquid(thermo_params, aux_en.ts[k]) : aux_en.RH_liq[k]
+        RH_ice = state.calibrate_io ? relative_humidity_over_ice(thermo_params, aux_en.ts[k]) : aux_en.RH_ice[k]
+        ∇_Ri = moist_gradient_Richardson_number(mix_len_params, param_set, ts_env[k], prog_pr.q_rai[k], prog_pr.q_sno[k], bg.∂b∂z, aux_en.∂MSE∂z[k], Shear²[k], FT(eps(FT)); is_noneq = (edmf.moisture_model isa NonEquilibriumMoisture), RH_liq=RH_liq, RH_ice=RH_ice)
         aux_tc.prandtl_nvec[k] = turbulent_Prandtl_number(mix_len_params, obukhov_length, ∇_Ri)
 
         ml_model = MinDisspLen{FT}(;
             z = FT(grid.zc[k].z),
             obukhov_length = obukhov_length,
-            tke_surf = aux_en.tke[kc_surf],
+            tke_surf = max(aux_en.tke[kc_surf], FT(0)),
             ustar = surf.ustar,
             Pr = aux_tc.prandtl_nvec[k],
             p = p_c[k],
             ∇b = bg,
             Shear² = Shear²[k],
-            tke = max(aux_en.tke[k], FT(0)),
+            tke = aux_en.tke[k],
             b_exch = b_exch[k],
         )
 
@@ -1110,18 +1149,18 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         @. tke_press += (Ic(w_en) - Ic(w_up)) * Ic(nh_press)
     end
 
-    compute_covariance_entr(edmf, grid, state, Val(:tke), Val(:w), Val(:w))
-    compute_covariance_entr(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
-    compute_covariance_entr(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
-    compute_covariance_entr(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
-    compute_covariance_shear(edmf, grid, state, Val(:tke), Val(:w), Val(:w))
-    compute_covariance_shear(edmf, grid, state, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
-    compute_covariance_shear(edmf, grid, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
-    compute_covariance_shear(edmf, grid, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
-    compute_covariance_dissipation(edmf, grid, state, Val(:tke), param_set)
-    compute_covariance_dissipation(edmf, grid, state, Val(:Hvar), param_set)
-    compute_covariance_dissipation(edmf, grid, state, Val(:QTvar), param_set)
-    compute_covariance_dissipation(edmf, grid, state, Val(:HQTcov), param_set)
+    compute_covariance_entr(edmf, state, Val(:tke), Val(:w), Val(:w))
+    compute_covariance_entr(edmf, state, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
+    compute_covariance_entr(edmf, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
+    compute_covariance_entr(edmf, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
+    compute_covariance_shear(edmf, state, Val(:tke), Val(:w), Val(:w))
+    compute_covariance_shear(edmf, state, Val(:Hvar), Val(:θ_liq_ice), Val(:θ_liq_ice))
+    compute_covariance_shear(edmf, state, Val(:QTvar), Val(:q_tot), Val(:q_tot))
+    compute_covariance_shear(edmf, state, Val(:HQTcov), Val(:θ_liq_ice), Val(:q_tot))
+    compute_covariance_dissipation(edmf, state, Val(:tke), param_set)
+    compute_covariance_dissipation(edmf, state, Val(:Hvar), param_set)
+    compute_covariance_dissipation(edmf, state, Val(:QTvar), param_set)
+    compute_covariance_dissipation(edmf, state, Val(:HQTcov), param_set)
 
     # TODO defined again in compute_covariance_shear and compute_covaraince
     @inbounds for k in real_center_indices(grid)
@@ -1131,9 +1170,9 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en_2m.HQTcov.rain_src[k] = ρ_c[k] * aux_en.area[k] * aux_en.HQTcov_rain_dt[k]
     end
 
-    get_GMV_CoVar(edmf, grid, state, Val(:tke), Val(:w), Val(:w))
+    get_GMV_CoVar(edmf, state, Val(:tke), Val(:w), Val(:w))
 
-    compute_diffusive_fluxes(edmf, grid, state, surf, param_set)
+    compute_diffusive_fluxes(edmf, state, surf, param_set)
 
     # TODO: use dispatch
     if edmf.precip_model isa Clima1M
@@ -1172,12 +1211,18 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         oblength = surf.obukhov_length
         prog_gm = center_prog_grid_mean(state)
         ρLL = prog_gm.ρ[kc_surf]
-        update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:Hvar))
-        update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:QTvar))
-        update_diagnostic_covariances!(edmf, grid, state, param_set, Val(:HQTcov))
+        update_diagnostic_covariances!(edmf, state, Val(:Hvar))
+        update_diagnostic_covariances!(edmf, state, Val(:QTvar))
+        update_diagnostic_covariances!(edmf, state, Val(:HQTcov))
         @inbounds for k in real_center_indices(grid)
-            aux_en.Hvar[k] = max(aux_en.Hvar[k], 0)
-            aux_en.QTvar[k] = max(aux_en.QTvar[k], 0)
+            # aux_en.Hvar[k] = max(aux_en.Hvar[k], 0)
+            # aux_en.QTvar[k] = max(aux_en.QTvar[k], 0)
+
+
+            # don't let STD of θ_liq_ice be larger than half the mean value
+            aux_en.Hvar[k] = clamp(aux_en.Hvar[k], FT(0), (aux_en.θ_liq_ice[k]/2)^2)
+            aux_en.QTvar[k] = clamp(aux_en.QTvar[k], FT(0), (aux_en.q_tot[k]/2)^2)
+
             aux_en.HQTcov[k] = max(aux_en.HQTcov[k], -sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]))
             aux_en.HQTcov[k] = min(aux_en.HQTcov[k], sqrt(aux_en.Hvar[k] * aux_en.QTvar[k]))
         end
@@ -1187,24 +1232,25 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
         aux_en.HQTcov[kc_surf] = ae_surf * get_surface_variance(flux1 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
     end
 
-    compute_precipitation_formation_tendencies(
-        grid,
-        state,
-        edmf,
-        edmf.moisture_model,
-        edmf.precip_model,
-        edmf.cloud_sedimentation_model,
-        edmf.rain_formation_model,
-        edmf.snow_formation_model,
-        Δt,
-        param_set,
-        use_fallback_tendency_limiters,
-    )
+    # compute_precipitation_formation_tendencies(
+    #     grid,
+    #     state,
+    #     edmf,
+    #     edmf.moisture_model,
+    #     edmf.precip_model,
+    #     edmf.cloud_sedimentation_model,
+    #     edmf.rain_formation_model,
+    #     edmf.snow_formation_model,
+    #     Δt,
+    #     param_set,
+    #     use_fallback_tendency_limiters,
+    # )
+    # compute_precipitation_formation_tendencies(state, edmf, Δt, param_set, use_fallback_tendency_limiters)
 
 
     # limit env tendencies (up tendencies done after compute_up_tendencies!())
     # if !isa(edmf.tendency_limiters.up_en_tendency_limiter, NoTendencyLimiter)
-        # limit_env_tendencies!(grid, state, edmf, Δt, param_set)
+        # limit_env_tendencies!(state, edmf, Δt, param_set)
     # end
 
 
@@ -1212,10 +1258,52 @@ function update_aux!(edmf::EDMFModel, grid::Grid, state::State, surf::SurfaceBas
 end
 
 
+"""
+    transform_T(T::Real, T_min::Real, T_max::Real, T_ref::Real; inverse::Bool=false)
+
+Transform a value `T` in the range [T_min, T_max] such that `T_ref` maps to the midpoint 
+of the transformed space. If `inverse=true`, apply the inverse transformation.
+
+# Arguments
+- `T`: the input value (raw or transformed depending on `inverse`)  
+- `T_min`: lower bound  
+- `T_max`: upper bound  
+- `T_ref`: reference value (T_top) to map to midpoint  
+- `inverse` (optional): if true, applies the inverse transform
+
+# Returns
+- Transformed (or inverse-transformed) value
+"""
+function transform_T(T::FT, T_min::FT, T_max::FT, T_ref::FT; inverse::Bool=false) where {FT}
+    if T_min > T_max
+        T_min, T_max = T_max, T_min
+    end
+    mid = (T_min + T_max)/2
+
+    if !inverse
+        # forward transform
+        if T <= T_ref
+            return T_min + (mid - T_min)*(T - T_min)/(T_ref - T_min)
+        else
+            return mid + (T_max - mid)*(T - T_ref)/(T_max - T_ref)
+        end
+    else
+        # inverse transform
+        if T <= mid
+            return T_min + (T_ref - T_min)*(T - T_min)/(mid - T_min)
+        else
+            return T_ref + (T_max - T_ref)*(T - mid)/(T_max - mid)
+        end
+    end
+end
 
 
-function update_N_τ_termvel!(edmf::EDMFModel, grid::Grid, state::State, param_set::APS, thermo_params::TDPS, microphys_params::ACMP)
 
+
+
+function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, thermo_params::TDPS, microphys_params::ACMP)
+
+    grid = Grid(state)
     aux_en = center_aux_environment(state)
     aux_en_f = face_aux_environment(state)
     aux_up = center_aux_updrafts(state)
@@ -1243,7 +1331,8 @@ function update_N_τ_termvel!(edmf::EDMFModel, grid::Grid, state::State, param_s
      # ======================================================== #
     # update N_i, calculate sedimentation velocity [ TODO: Implement for N_l]
     # if edmf.moisture_model isa NonEquilibriumMoisture # we only use w to calculate N here, we aren't currently passing it into calculate_sedimentation_velocity() (we used to but stopped)
-        w::CC.Fields.Field = Ic.(aux_en_f.w) # start w env since we use it first
+        # w::CC.Fields.Field = Ic.(aux_en_f.w) # start w env since we use it first
+        w = aux_tc.w_en_c
     # end
 
     # ============================================================================================================================================================================================================================================================================== #
@@ -1274,12 +1363,48 @@ function update_N_τ_termvel!(edmf::EDMFModel, grid::Grid, state::State, param_s
                     T_top = aux_en.T[k]
                 else
                     S_kp1 = TD.supersaturation(thermo_params, TD.PhasePartition(thermo_params, aux_en.ts[k+1]), ρ_c[k+1], aux_en.T[k+1], TD.Ice())
-                    T_top = (S_kp1 < FT(0)) ? linear_interpolate_extrapolate(FT(0), (S_k, S_kp1), (aux_en.T[k], aux_en.T[k+1])) : aux_en.T[k]
+                    T_top = if (S_kp1 < FT(0))
+                        T_top_here = linear_interpolate_extrapolate(FT(0), (S_k, S_kp1), (aux_en.T[k], aux_en.T[k+1]))
+                        do_print = false
+                        # if rand() < 1e-4
+                        #     @warn "Got T_top = $T_top_here at k=$k with S_k=$S_k and S_kp1=$S_kp1, T_k=$(aux_en.T[k]), T_kp1=$(aux_en.T[k+1])"
+                        #     do_print = true
+                        # end
+                        # add noise [so we land somewhere between our interpolation bounds
+                        # T_top_here when transformed becomes (aux_en.T[k] + aux_en.T[k+1])/2 in transformed space.
+                        # Add noise with 4σ = (aux_en.T[k+1] - aux_en.T[k]) so 95% of the time we stay within bounds. clamp the result to be sure
+                        T_top_transformed = clamp((aux_en.T[k] + aux_en.T[k+1])/2 + randn()*((aux_en.T[k+1] - aux_en.T[k])/4), aux_en.T[k], aux_en.T[k+1])
+                        T_top_here = transform_T(T_top_transformed, aux_en.T[k], aux_en.T[k+1], T_top_here; inverse=true)
+                        # if do_print
+                        #     @warn "Transformed T_top is now $T_top_here after adding noise"
+                        #     println("-----------------------")
+                        # end
+
+                        # update N_i
+                        if edmf.moisture_model isa NonEquilibriumMoisture
+                            N_i_cloud_top_ice_en_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), T_top_here, ρ_c[k], w[k])
+                        else
+                            N_i_cloud_top_ice_en_here = get_N_i_Cooper_curve(T_top_here; clamp_N=true) # the fallback
+                        end
+                        if !isfinite(N_i_cloud_top_ice_en_here)
+                            @error "cloud_top_ice_T_en is not finite. N_i_cloud_top_ice_en = $N_i_cloud_top_ice_en;"
+                        end
+                        N_i_cloud_top_ice_en_here = max(N_i_cloud_top_ice_en_here, N_i_cloud_top_ice_en)
+                        N_i_cloud_top_ice_en = N_i_cloud_top_ice_en_here
+
+                        T_top_here # return to if
+                    else
+                        aux_en.T[k]
+                    end
+
+                    
                 end
                 cloud_top_ice_T_en = min(cloud_top_ice_T_en, T_top)
             end
         end
     end
+
+
 
 
     # updraft
@@ -1308,7 +1433,29 @@ function update_N_τ_termvel!(edmf::EDMFModel, grid::Grid, state::State, param_s
                         T_top = aux_up[i].T[k]
                     else
                         S_kp1 = TD.supersaturation(thermo_params, TD.PhasePartition(thermo_params, aux_up[i].ts[k+1]), ρ_c[k+1], aux_up[i].T[k+1], TD.Ice())
-                        T_top = (S_kp1 < FT(0)) ? linear_interpolate_extrapolate(FT(0), (S_k, S_kp1), (aux_up[i].T[k], aux_up[i].T[k+1])) : aux_up[i].T[k]
+                        T_top = if (S_kp1 < FT(0))
+                            T_top_here = linear_interpolate_extrapolate(FT(0), (S_k, S_kp1), (aux_up[i].T[k], aux_up[i].T[k+1]))
+
+                            # add noise
+                            # T_top_here when transformed becomes (aux_up[i].T[k] + aux_up[i].T[k+1])/2 in transformed space.
+                            # Add noise with 4σ = (aux_up[i].T[k+1] - aux_up[i].T[k]) so 95% of the time we stay within bounds. clamp the result to be sure
+                            T_top_transformed = clamp((aux_up[i].T[k] + aux_up[i].T[k+1])/2 + randn()*((aux_up[i].T[k+1] - aux_up[i].T[k])/4), aux_up[i].T[k], aux_up[i].T[k+1])
+                            T_top_here = transform_T(T_top_transformed, aux_up[i].T[k], aux_up[i].T[k+1], T_top_here; inverse=true)
+
+                            # update N_i
+                            if edmf.moisture_model isa NonEquilibriumMoisture
+                                N_i_cloud_top_ice_ups_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_up[i].ts[k]), T_top_here, ρ_c[k], w_up)
+                            else
+                                N_i_cloud_top_ice_ups_here = get_N_i_Cooper_curve(T_top_here; clamp_N=true) # the fallback
+                            end
+                            N_i_cloud_top_ice_ups_here = max(N_i_cloud_top_ice_ups_here, N_i_cloud_top_ice_ups[i])
+                            N_i_cloud_top_ice_ups[i] = N_i_cloud_top_ice_ups_here
+
+                            T_top_here # return to if
+                        else
+                            aux_up[i].T[k]
+                        end
+
                     end
                     cloud_top_ice_T_ups[i] = min(cloud_top_ice_T_ups[i], T_top)
                 end
@@ -1375,7 +1522,6 @@ function update_N_τ_termvel!(edmf::EDMFModel, grid::Grid, state::State, param_s
     # ------------------------ #
 
     # Get the highest q_r for SIP ? Everywhere below the SIP zone needs the max ICNC raised...
-    # ICNC_SIP_scaling_factors = similar(aux_gm.q_ice) # it needs its own vector so we can work up from the bottom, one factor won't cut it
     ICNC_SIP_scaling_factors = aux_gm.f_ice_mult
     ICNC_SIP_scaling_factors .= FT(1) # reset
     ICNC_SIP_scaling_factor = FT(1) # this is the running value, we only allow it to increase as we move towards sfc. this is because an INP explosion will have to be propagated downwards, a 10^3 growth permanently impacts everywhere below. (we could for example propose just turning off the INP upper bound or something idk.  +seeder-feeder and all that)
@@ -1410,7 +1556,9 @@ function update_N_τ_termvel!(edmf::EDMFModel, grid::Grid, state::State, param_s
     # ------------------------ #
     # massflux_N_i = massflux_c # default
     tke = (param_set.user_params.use_convective_tke) ? aux_en.tke_convective : aux_en.tke
-    massflux_N_i = @. max((ρ_c * sqrt(2 * tke) * aux_en.area / 2) * (FT(0.02) / FT(0.5)), massflux_c) # use max of the two to be safe
+    # use max of the two to be safe [[ aim for equivalent MF 0.02 = ρ a w at tke = 0.5 --> [[ # At tke = 0.5, we have ρ a/2 * (1) * f = 0.02 [= ρ a w], so f = 0.04 / (ρ a )]] ==> sqrt(2*TKE) * 0.02
+    massflux_N_i = aux_tc.temporary_1
+    @. massflux_N_i = max((sqrt(2 * tke) * FT(0.02)), massflux_c) # maybe keep @. since we go to deeper function calls...
     # ------------------------ #
 
     # env
@@ -1431,7 +1579,7 @@ function update_N_τ_termvel!(edmf::EDMFModel, grid::Grid, state::State, param_s
                 # aux_en.τ_liq[k], aux_en.τ_ice[k] = get_τs(param_set, microphys_params, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_env[k]), aux_en.T[k], aux_en.p[k], TD.air_density(thermo_params, ts_env[k]), w[k]) # cheaper bc T and ρ are stored in the ts.
                 if !(edmf.moisture_model.scheme isa NeuralNetworkRelaxationTimescale)
                     # aux_en.τ_liq[k], aux_en.τ_ice[k], aux_en.N_l[k], aux_en.N_i[k] = get_τs_and_Ns(param_set, microphys_params, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_env[k]), aux_en.T[k], aux_en.p[k], TD.air_density(thermo_params, ts_env[k]), w[k]; N_INP_top = N_INP_cloud_top_ices[1], f_ice_mult = ICNC_SIP_scaling_factors[k], q_sno = prog_pr.q_sno[k], massflux = massflux_N_i[k], dTdz=aux_en.dTdz[k], w_i = aux_en.term_vel_ice[k], apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
-                    aux_en.τ_liq[k], aux_en.τ_ice[k], aux_en.N_l[k], aux_en.N_i[k], aux_en.N_i_no_boost[k] = get_τs_and_Ns_and_N_i_no_boost(param_set, microphys_params, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_env[k]), aux_en.T[k], aux_en.p[k], TD.air_density(thermo_params, ts_env[k]), w[k]; N_INP_top = N_INP_cloud_top_ices[1], f_ice_mult = ICNC_SIP_scaling_factors[k], q_sno = prog_pr.q_sno[k], massflux = massflux_N_i[k], dTdz=aux_en.dTdz[k], w_i = aux_en.term_vel_ice[k], apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost)
+                    aux_en.τ_liq[k], aux_en.τ_ice[k], aux_en.N_l[k], aux_en.N_i[k], aux_en.N_i_no_boost[k] = get_τs_and_Ns_and_N_i_no_boost(param_set, microphys_params, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, ts_env[k]), aux_en.T[k], aux_en.p[k], TD.air_density(thermo_params, ts_env[k]), w[k]; N_INP_top = N_INP_cloud_top_ices[1], f_ice_mult = ICNC_SIP_scaling_factors[k], q_sno = prog_pr.q_sno[k], massflux = massflux_N_i[k], dTdz=aux_en.dTdz[k], w_i = aux_en.term_vel_ice[k], apply_massflux_boost=apply_massflux_boost, apply_sedimentation_boost=apply_sedimentation_boost, use_boost_for_τ = true)
                 end
             else
                 if !(edmf.moisture_model.scheme isa NeuralNetworkRelaxationTimescale)
@@ -1501,7 +1649,9 @@ function update_N_τ_termvel!(edmf::EDMFModel, grid::Grid, state::State, param_s
 
     @inbounds for i in 1:N_up
         if edmf.moisture_model isa NonEquilibriumMoisture
-            @. w = Ic(aux_up_f[i].w) # reuse same w allocation
+            # @. w = Ic(aux_up_f[i].w) # reuse same w allocation
+            w = aux_tc.w_up_c
+            @. w = Ic(aux_up_f[i].w) # this one gets updated every time it's used
         end
         ts_up = aux_up[i].ts # reuse ts_up allocation
 

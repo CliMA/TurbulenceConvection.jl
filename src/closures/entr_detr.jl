@@ -414,7 +414,8 @@ function entr_detr(εδ_model, εδ_vars, entr_dim_scale, detr_dim_scale)
 end
 
 ##### Compute entr detr
-function compute_turb_entr!(state::State, grid::Grid, edmf::EDMFModel)
+function compute_turb_entr!(state::State, edmf::EDMFModel)
+    grid = Grid(state) # state.grid
     FT = float_type(state)
     N_up = n_updrafts(edmf)
     aux_up = center_aux_updrafts(state)
@@ -423,7 +424,7 @@ function compute_turb_entr!(state::State, grid::Grid, edmf::EDMFModel)
     aux_tc = center_aux_turbconv(state)
     w_up_c = aux_tc.w_up_c
     plume_scale_height = map(1:N_up) do i
-        compute_plume_scale_height(grid, state, edmf.H_up_min, i)
+        compute_plume_scale_height(state, edmf.H_up_min, i)
     end
     # ∇c = CCO.DivergenceF2C()
     # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
@@ -448,7 +449,6 @@ end
 
 function compute_phys_entr_detr!(
     state::State,
-    grid::Grid,
     edmf::EDMFModel,
     param_set::APS,
     surf::SurfaceBase,
@@ -461,13 +461,13 @@ end
 ##### Compute physical entr detr
 function compute_phys_entr_detr!(
     state::State,
-    grid::Grid,
     edmf::EDMFModel,
     param_set::APS,
     surf::SurfaceBase,
     Δt::Real,
     εδ_closure::AbstractEntrDetrModel,
 )
+    grid = Grid(state)
     FT = float_type(state)
     N_up = n_updrafts(edmf)
     aux_up = center_aux_updrafts(state)
@@ -487,7 +487,7 @@ function compute_phys_entr_detr!(
     wvec = CC.Geometry.WVector
     max_area = edmf.max_area
     plume_scale_height = map(1:N_up) do i
-        compute_plume_scale_height(grid, state, edmf.H_up_min, i)
+        compute_plume_scale_height(state, edmf.H_up_min, i)
     end
     # ∇c = CCO.DivergenceF2C()
     # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
@@ -504,7 +504,7 @@ function compute_phys_entr_detr!(
         w_en = aux_en_f.w
         w_gm = prog_gm_f.w
         @. w_up_c = Ic(w_up)
-        @. w_en_c = Ic(w_en)
+        # @. w_en_c = Ic(w_en) # moved to update_aux()
         @inbounds for k in real_center_indices(grid)
             # entrainment
 
@@ -591,8 +591,12 @@ function compute_phys_entr_detr!(
                     aux_up[i].entr_rate_inv_s[k] = min(ε_dyn, max_entr_detr_rate)
                     aux_up[i].detr_rate_inv_s[k] = min(δ_dyn, max_entr_detr_rate)
 
-                    # taper away base_detrainment_rate_inv_s by w = 5cm/s
-                    base_detrainment_rate_inv_s = edmf.entrainment_type.base_detrainment_rate_inv_s * clamp(FT(1) - w_up_c[k] / FT(0.05), FT(0), FT(1))
+                    # taper away base_detrainment_rate_inv_s by w = 5cm/s if negatively buoyant..., by eps(FT) if positively buoyant
+                    if aux_up[i].buoy[k] < 0
+                        base_detrainment_rate_inv_s = edmf.entrainment_type.base_detrainment_rate_inv_s * clamp(FT(1) - w_up_c[k] / FT(0.05), FT(0), FT(1))
+                    else
+                        base_detrainment_rate_inv_s = edmf.entrainment_type.base_detrainment_rate_inv_s * clamp(FT(1) - w_up_c[k] / eps(FT), FT(0), FT(1))
+                    end
                     aux_up[i].detr_rate_inv_s[k] += base_detrainment_rate_inv_s # 1/aux_up[i].entr_rate_inv_s[k] is timescale, so (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s)^-1 is the new timescale and (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s) is the new inverse timscale
                 
                     # we should raise entrainment if dθ_virt/dz < 0 in the environment... w_height isn't enough and all the buoyancy ones only use env buoyancy...
@@ -601,8 +605,9 @@ function compute_phys_entr_detr!(
                     kc_toa = kc_top_of_atmos(grid)
                     θ_virt_toa = aux_en.θ_virt[kc_toa]
                     RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_virt_toa))
-                    dθ_virt_dz = @. ∇c(wvec(RBθ(θ_virt)))
 
+                    dθ_virt_dz = aux_tc.temporary_1 # reuse temporary storage
+                    @. dθ_virt_dz = ∇c(wvec(RBθ(θ_virt)))
                     if dθ_virt_dz[k] < 0 # maybe we could also use buoyancy gradient... idk...
                         base_entrainment_rate_inv_s = edmf.entrainment_type.base_entrainment_rate_inv_s # just a test...
                         aux_up[i].entr_rate_inv_s[k] += base_entrainment_rate_inv_s
@@ -625,7 +630,6 @@ end
 ##### Compute machine learning entr detr
 function compute_ml_entr_detr!(
     state::State,
-    grid::Grid,
     edmf::EDMFModel,
     param_set::APS,
     surf::SurfaceBase,
@@ -637,13 +641,13 @@ end
 
 function compute_ml_entr_detr!(
     state::State,
-    grid::Grid,
     edmf::EDMFModel,
     param_set::APS,
     surf::SurfaceBase,
     Δt::Real,
     εδ_closure::AbstractMLEntrDetrModel,
 )
+    grid = Grid(state)
     FT = float_type(state)
     N_up = n_updrafts(edmf)
     aux_up = center_aux_updrafts(state)
@@ -663,7 +667,7 @@ function compute_ml_entr_detr!(
     wvec = CC.Geometry.WVector
     max_area = edmf.max_area
     plume_scale_height = map(1:N_up) do i
-        compute_plume_scale_height(grid, state, edmf.H_up_min, i)
+        compute_plume_scale_height(state, edmf.H_up_min, i)
     end
     # ∇c = CCO.DivergenceF2C()
     # LB = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
@@ -680,7 +684,7 @@ function compute_ml_entr_detr!(
         w_en = aux_en_f.w
         w_gm = prog_gm_f.w
         @. w_up_c = Ic(w_up)
-        @. w_en_c = Ic(w_en)
+        # @. w_en_c = Ic(w_en) # moved to update_aux()
         @inbounds for k in real_center_indices(grid)
             # entrainment
 
@@ -758,10 +762,13 @@ function compute_ml_entr_detr!(
                     # 1/aux_up[i].entr_rate_inv_s[k] is timescale, so (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s)^-1 is the new timescale and (aux_up[i].entr_rate_inv_s[k] + base_detrainment_rate_inv_s) is the new inverse timscale
                     # if w = 0, then depending on the `dim_scale` you chose, it's very possible that you'll get 0 for ε_dyn, δ_dyn. So it's important that this background rate also scale up via the limiter.
 
-                    # taper away base_detrainment_rate_inv_s by w = 5cm/s...
-                    base_detrainment_rate_inv_s = edmf.entrainment_type.base_detrainment_rate_inv_s * clamp(FT(1) - w_up_c[k] / FT(0.05), FT(0), FT(1))
+                    # taper away base_detrainment_rate_inv_s by w = 5cm/s if negatively buoyant..., by eps(FT) if positively buoyant
+                    if aux_up[i].buoy[k] < 0
+                        base_detrainment_rate_inv_s = edmf.entrainment_type.base_detrainment_rate_inv_s * clamp(FT(1) - w_up_c[k] / FT(0.05), FT(0), FT(1))
+                    else
+                        base_detrainment_rate_inv_s = edmf.entrainment_type.base_detrainment_rate_inv_s * clamp(FT(1) - w_up_c[k] / eps(FT), FT(0), FT(1))
+                    end
 
-                    
                     aux_up[i].entr_rate_inv_s[k] = min(ε_dyn, max_entr_detr_rate) # don't let these blow up to Inf [ though values this large may do unspeakable things to w ] [ Costa also recommended trying 1/Δt ]
                     aux_up[i].detr_rate_inv_s[k] = min(δ_dyn + base_detrainment_rate_inv_s * (1+area_limiter), max_entr_detr_rate) # don't let these blow up to Inf [ though values this large may do unspeakable things to w ] [ Costa also recommended trying 1/Δt ]
 
@@ -772,7 +779,8 @@ function compute_ml_entr_detr!(
                     kc_toa = kc_top_of_atmos(grid)
                     θ_virt_toa = aux_en.θ_virt[kc_toa]
                     RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_virt_toa))
-                    dθ_virt_dz = @. ∇c(wvec(RBθ(θ_virt)))
+                    dθ_virt_dz = aux_tc.temporary_1 # reuse temporary storage
+                    @. dθ_virt_dz = ∇c(wvec(RBθ(θ_virt)))
                     if dθ_virt_dz[k] < 0 # maybe we could also use buoyancy gradient... idk...
                         base_entrainment_rate_inv_s = edmf.entrainment_type.base_entrainment_rate_inv_s # just a test...
                         aux_up[i].entr_rate_inv_s[k] += base_entrainment_rate_inv_s
@@ -796,13 +804,13 @@ end
 ##### Compute nonlocal machine learning entr detr
 function compute_ml_entr_detr!(
     state::State,
-    grid::Grid,
     edmf::EDMFModel,
     param_set::APS,
     surf::SurfaceBase,
     Δt::Real,
     εδ_model::AbstractMLNonLocalEntrDetrModel,
 )
+    grid = Grid(state)
     FT = float_type(state)
     N_up = n_updrafts(edmf)
     aux_up = center_aux_updrafts(state)
@@ -821,7 +829,7 @@ function compute_ml_entr_detr!(
     wvec = CC.Geometry.WVector
     max_area = edmf.max_area
     plume_scale_height = map(1:N_up) do i
-        compute_plume_scale_height(grid, state, edmf.H_up_min, i)
+        compute_plume_scale_height(state, edmf.H_up_min, i)
     end
 
     # ∇c = CCO.DivergenceF2C()
@@ -834,7 +842,7 @@ function compute_ml_entr_detr!(
         w_en = aux_en_f.w
         w_gm = prog_gm_f.w
         @. w_up_c = Ic(w_up)
-        @. w_en_c = Ic(w_en)
+        # @. w_en_c = Ic(w_en) # moved to update_aux()
 
         @inbounds for k in real_center_indices(grid)
             # entrainment

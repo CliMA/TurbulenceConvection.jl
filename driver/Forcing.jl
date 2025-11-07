@@ -1,6 +1,7 @@
-initialize(::ForcingBase, grid, state) = nothing
+initialize(::ForcingBase, state) = nothing
 
-function initialize(::ForcingBase{ForcingLES}, grid, state, LESDat::LESData)
+function initialize(::ForcingBase{ForcingLES}, state, LESDat::LESData)
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     nt = NC.Dataset(LESDat.les_filename, "r") do data
         imin = LESDat.imin
@@ -34,7 +35,8 @@ function initialize(::ForcingBase{ForcingLES}, grid, state, LESDat::LESData)
     end
 end
 
-function initialize(forcing::ForcingBase{ForcingSOCRATES}, grid, state) #where {T <: ForcingSOCRATES} # added param_set so we can calculate stuff....
+function initialize(forcing::ForcingBase{ForcingSOCRATES}, state) #where {T <: ForcingSOCRATES} # added param_set so we can calculate stuff....
+    grid = TC.Grid(state)
     FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
 

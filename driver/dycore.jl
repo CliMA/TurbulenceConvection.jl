@@ -25,7 +25,6 @@ include(joinpath(@__DIR__, "dycore_variables.jl"))
 """
     compute_ref_state!(
         state,
-        grid::Grid,
         param_set::PS;
         ts_g,
     ) where {PS}
@@ -37,7 +36,8 @@ The reference profiles, given
  - `param_set` the parameter set
  - `ts_g` the surface reference state (a thermodynamic state)
 """
-function compute_ref_state!(state, grid::TC.Grid, param_set::PS; ts_g) where {PS}
+function compute_ref_state!(state, param_set::PS; ts_g) where {PS}
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -110,7 +110,8 @@ function compute_ref_state!(
 end
 
 
-function set_thermo_state_from_prog!(state, grid, moisture_model, param_set)
+function set_thermo_state_from_prog!(state::TC.State, moisture_model::TC.AbstractMoistureModel, param_set::APS)
+    grid = TC.Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
@@ -140,7 +141,8 @@ function set_thermo_state_from_prog!(state, grid, moisture_model, param_set)
     return nothing
 end
 
-function set_thermo_state_from_aux!(state, grid, moisture_model, param_set)
+function set_thermo_state_from_aux!(state, moisture_model, param_set)
+    grid = TC.Grid(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -158,7 +160,8 @@ function set_thermo_state_from_aux!(state, grid, moisture_model, param_set)
     return nothing
 end
 
-function set_grid_mean_from_thermo_state!(param_set, state, grid)
+function set_grid_mean_from_thermo_state!(param_set, state)
+    grid = TC.Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     prog_gm = TC.center_prog_grid_mean(state)
     prog_gm_f = TC.face_prog_grid_mean(state)
@@ -170,7 +173,8 @@ function set_grid_mean_from_thermo_state!(param_set, state, grid)
     return nothing
 end
 
-function assign_thermo_aux!(state, grid, moisture_model, param_set)
+function assign_thermo_aux!(state, param_set)
+    grid = TC.Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -211,8 +215,10 @@ function assign_thermo_aux!(state, grid, moisture_model, param_set)
         # end
         
         aux_gm.RH[k] = TD.relative_humidity(thermo_params, ts)
-        aux_gm.RH_liq[k] = TC.relative_humidity_over_liquid(thermo_params, ts)
-        aux_gm.RH_ice[k] = TC.relative_humidity_over_ice(thermo_params, ts)
+        if !state.calibrate_io
+            aux_gm.RH_liq[k] = TC.relative_humidity_over_liquid(thermo_params, ts)
+            aux_gm.RH_ice[k] = TC.relative_humidity_over_ice(thermo_params, ts)
+        end
     end
     return
 end
@@ -228,12 +234,12 @@ function ∑stoch_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) whe
 
     CC.Fields.bycolumn(axes(prog.cent)) do colidx
 
-        state = TC.column_state(prog, aux, tendencies, colidx)
+        state = TC.column_state(prog, aux, tendencies, colidx, params.calibrate_io)
         grid = TC.Grid(state)
-        surf = get_surface(surf_params, grid, state, t, param_set)
+        surf = get_surface(surf_params, state, t, param_set)
 
         # compute updraft stochastic tendencies
-        TC.compute_up_stoch_tendencies!(edmf, grid, state, param_set, surf)
+        TC.compute_up_stoch_tendencies!(edmf, state)
     end
 end
 
@@ -249,7 +255,7 @@ function my_unstable_check_test(dt::Real, prog::FV, params::NT, t::Real) where {
         UnPack.@unpack edmf, precip_model, param_set, case = params
         UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
 
-        state = TC.column_prog_aux(prog, aux, colidx)
+        state = TC.column_prog_aux(prog, aux, colidx, params.calibrate_io)
         FT = TC.float_type(state)
         # check for a nan in every variable
         error("not implemented yet")
@@ -278,7 +284,7 @@ function isoutofdomain(prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields
         UnPack.@unpack edmf, precip_model, param_set, case = params
         UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
 
-        state = TC.column_prog_aux(prog, aux, colidx)
+        state = TC.column_prog_aux(prog, aux, colidx, params.calibrate_io)
 
         FT = TC.float_type(state)
 
@@ -443,22 +449,22 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         UnPack.@unpack edmf, precip_model, param_set, case = params
         UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
 
+
         thermo_params = TCP.thermodynamics_params(param_set)
 
         parent(tendencies.face[colidx]) .= 0 # reset tendencies to 0?
         parent(tendencies.cent[colidx]) .= 0 # reset tendencies to 0?
-        state = TC.column_state(prog, aux, tendencies, colidx) # also creates face and cent
-        grid = TC.Grid(state)
+        state = TC.column_state(prog, aux, tendencies, colidx, params.calibrate_io) # also creates face and cent
 
         # @error(" testing applying filter before setting thermo stuff...") # -- really I think we could get away with just moving filter_gm_vars() here...
-        # surf = get_surface(surf_params, grid, state, t, param_set)
-        # TC.affect_filter!(edmf, grid, state, param_set, surf, cfl_limit, Δt)
+        # surf = get_surface(surf_params, state, t, param_set)
+        # TC.affect_filter!(edmf, state, param_set, surf, cfl_limit, Δt)
 
-        TC.filter_gm_vars(edmf, grid, state)  # filter gm vars before setting thermo state so that we don't have to do it again later
+        TC.filter_gm_vars(edmf, state)  # filter gm vars before setting thermo state so that we don't have to do it again later
 
 
-        set_thermo_state_from_prog!(state, grid, edmf.moisture_model, param_set)
-        assign_thermo_aux!(state, grid, edmf.moisture_model, param_set)
+        set_thermo_state_from_prog!(state, edmf.moisture_model, param_set)
+        assign_thermo_aux!(state, param_set)
 
         aux_gm = TC.center_aux_grid_mean(state)
         @. aux_gm.θ_virt = TD.virtual_pottemp(thermo_params, aux_gm.ts)
@@ -475,35 +481,33 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         #     use_fallback_tendency_limiters = false
         # end
 
-        surf = get_surface(surf_params, grid, state, t, param_set)
+        surf = get_surface(surf_params, state, t, param_set)
 
-        TC.affect_filter!(edmf, grid, state, param_set, surf, cfl_limit, Δt)
+        TC.affect_filter!(edmf, state, param_set, surf, cfl_limit, Δt)
 
         # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
         # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
         # treat them as auxiliary variables for now, until we disentangle the tendency computations.
         if isa(case, Cases.SOCRATES)
-            Cases.update_forcing(case, grid, state, t, param_set, forcing) # should dispatch to socrates
+            Cases.update_forcing(case, state, t, param_set, forcing) # should dispatch to socrates
         else
-            Cases.update_forcing(case, grid, state, t, param_set)
+            Cases.update_forcing(case, state, t, param_set)
         end
-        Cases.update_radiation(radiation, grid, state, t, param_set)
+        Cases.update_radiation(radiation, state, t, param_set)
 
-        TC.update_aux!(edmf, grid, state, surf, param_set, t, Δt, cfl_limit, TS.use_fallback_tendency_limiters) # update aux vars, reset tendencies... call to microphsyics!() also resets some aux vars and calculates en tendencies
+        TC.update_aux!(edmf, state, surf, param_set, t, Δt, cfl_limit, TS.use_fallback_tendency_limiters) # update aux vars, reset tendencies... call to microphsyics!() also resets some aux vars and calculates en tendencies
         
         # compute tendencies
         # causes division error in dry bubble first time step
-        TC.compute_precipitation_sink_tendencies(precip_model, edmf, grid, state, param_set, Δt, TS.use_fallback_tendency_limiters)
-        TC.compute_precipitation_advection_tendencies(precip_model, edmf, grid, state, param_set, TS.use_fallback_tendency_limiters)
+        TC.compute_precipitation_sink_tendencies(precip_model, edmf, state, param_set, Δt, TS.use_fallback_tendency_limiters)
+        TC.compute_precipitation_advection_tendencies(precip_model, edmf, state, param_set, TS.use_fallback_tendency_limiters)
 
-        TC.compute_turbconv_tendencies!(edmf, grid, state, param_set, surf, Δt, TS.use_fallback_tendency_limiters)
-        compute_gm_tendencies!(edmf, grid, state, surf, radiation, forcing, param_set, TS.use_fallback_tendency_limiters, Δt)
+        TC.compute_turbconv_tendencies!(edmf, state, param_set, surf, Δt, cfl_limit, TS.use_fallback_tendency_limiters)
+        compute_gm_tendencies!(edmf, state, surf, radiation, forcing, param_set, TS.use_fallback_tendency_limiters, Δt)
 
         # Now that we have updraft, gm from updraft, we can calculate any post tendencies that we need for things that are backed out.
-        # TC.compute_post_tendencies!(edmf, grid, state, param_set, Δt)
 
         # I haven't come up with a limiter that's better than filtering... (we can stop the model from crashing but you're essentially getting random results, just use tendency-adaptive dt)
-        # TC.affect_limiter!(edmf, grid, state, param_set, surf, Δt) # limit tendencies now that grid_mean tendencies are computed so that we won't have any crashes later... filtering updraft vars isn't enough bc env can still be forced to be negative... can't clamp at filtering time bc need to include gm tendencies to get full picture. need to do at end here so that the ODE du step is valid.
     end
 
     return nothing
@@ -523,7 +527,6 @@ end
 
 function compute_gm_tendencies!(
     edmf::TC.EDMFModel,
-    grid::TC.Grid,
     state::TC.State,
     surf::TC.SurfaceBase,
     radiation::Cases.RadiationBase,
@@ -532,6 +535,7 @@ function compute_gm_tendencies!(
     use_fallback_tendency_limiters::Bool,
     Δt::Real,
 )
+    grid = TC.Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     tendencies_gm = TC.center_tendencies_grid_mean(state)
     tendencies_pr = TC.center_tendencies_precipitation(state)
@@ -543,8 +547,6 @@ function compute_gm_tendencies!(
     prog_pr = TC.center_prog_precipitation(state)
     aux_gm = TC.center_aux_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
-    ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
-    ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
     aux_en = TC.center_aux_environment(state)
     aux_en_f = TC.face_aux_environment(state)
     aux_up = TC.center_aux_updrafts(state)
@@ -553,28 +555,15 @@ function compute_gm_tendencies!(
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
     aux_tc = TC.center_aux_turbconv(state)
+    aux_tc_f = TC.face_aux_turbconv(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
+    N_up = TC.n_updrafts(edmf)
 
     θ_liq_ice_gm_toa = prog_gm.ρθ_liq_ice[kc_toa] / ρ_c[kc_toa]
     q_tot_gm_toa = prog_gm.ρq_tot[kc_toa] / ρ_c[kc_toa]
-    # RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_liq_ice_gm_toa)) # right biased
-    # RBq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_tot_gm_toa)) # right biased
-    wvec = CC.Geometry.WVector
-    # ∇c = CCO.DivergenceF2C() # F2C to come back from C2F
-    ∇c = TC.∇c
-    # @. ∇θ_liq_ice_gm = ∇c(wvec(RBθ(prog_gm.ρθ_liq_ice / ρ_c)))
-    # @. ∇q_tot_gm = ∇c(wvec(RBq(prog_gm.ρq_tot / ρ_c)))
 
-    # if edmf.moisture_model isa TC.NonEquilibriumMoisture
-    #     ∇q_liq_gm = TC.center_aux_grid_mean(state).∇q_liq_gm
-    #     ∇q_ice_gm = TC.center_aux_grid_mean(state).∇q_ice_gm
-    #     q_liq_gm_toa = prog_gm.q_liq[kc_toa]
-    #     q_ice_gm_toa = prog_gm.q_ice[kc_toa]
-    #     RBq_liq = CCO.RightBiasedC2F(; top = CCO.SetValue(q_liq_gm_toa))
-    #     RBq_ice = CCO.RightBiasedC2F(; top = CCO.SetValue(q_ice_gm_toa))
-    #     @. ∇q_liq_gm = ∇c(wvec(RBq_liq(prog_gm.q_liq)))
-    #     @. ∇q_ice_gm = ∇c(wvec(RBq_ice(prog_gm.q_ice)))
-    # end
+    wvec = CC.Geometry.WVector
+    ∇c = TC.∇c
 
     # Apply forcing and radiation
     prog_gm_uₕ = TC.grid_mean_uₕ(state)
@@ -622,156 +611,145 @@ function compute_gm_tendencies!(
 
     # we to C2F, then ∇c goes F2C, then UBsub got C2F, but we wanna end on C [ there's no UpwindBiasedProductF2C and we had UpwindBiasedProductF2C(u[F], x[C])
     F2Csub = CCO.InterpolateF2C(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # We might have put 0 for no penetration on boundary, but that's not exactly true in our dataset...
-    CV32FT = x -> x[1] # convert Contravariant3Vector to Float64 
+    # CV32FT = x -> x[1] # convert Contravariant3Vector to Float64 
 
-    if true # considering deprecation pending Dennis's response (or dividing by dz)
 
-        #=
-            I don't know for sure why but this version works much better
-            I think the problem is that convergence in the other one isn't reflected in density so you get weird temperature and other changes
-            Because we ignore density changes, we really do need to stick to this one and just the w∇q part, and leave out the q∇w part...
-        =#
 
-        # regular upwinding 
-        ∇θ_liq_ice_gm = TC.center_aux_grid_mean(state).∇θ_liq_ice_gm
-        @. ∇θ_liq_ice_gm = ∇c(wvec(C2Fθ(prog_gm.ρθ_liq_ice / ρ_c)))
-        # w∇θ_liq_ice_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇θ_liq_ice_gm) # works, but output type is different than tendencies type
-        w∇θ_liq_ice_gm = @. wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇θ_liq_ice_gm)) # works, but output type is different than tendencies type, outer wvec important for getting physical units
-        w∇θ_liq_ice_gm = @. F2Csub(w∇θ_liq_ice_gm) # convert back to C
-        # w∇θ_liq_ice_gm = @. CV32FT(w∇θ_liq_ice_gm) # convert back to Float64 from Contravariant3Vector
-        w∇θ_liq_ice_gm = w∇θ_liq_ice_gm.components.data.:1 # from Dennis
+    aux_tc.dqvdt .= FT(0) # reset to zero, do here instead of in update_aux bc we need only some of these values...
+    aux_tc.dTdt .= FT(0) # reset to zero, do here instead of in update_aux bc we need only some of these values...
 
-        ∇q_tot_gm = TC.center_aux_grid_mean(state).∇q_tot_gm
-        @. ∇q_tot_gm = ∇c(wvec(C2Fq(prog_gm.ρq_tot / ρ_c)))
-        # w∇q_tot_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_tot_gm) # works, but output type is different than tendencies type
-        w∇q_tot_gm = @. wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_tot_gm)) # works, but output type is different than tendencies type, outer wvec important for getting physical units
-        w∇q_tot_gm = @. F2Csub(w∇q_tot_gm) # convert back to C
-        # w∇q_tot_gm = @. CV32FT(w∇q_tot_gm) # convert back to Float64 from Contravariant3Vector
-        w∇q_tot_gm = w∇q_tot_gm.components.data.:1 # from Dennis
 
-        if edmf.moisture_model isa TC.NonEquilibriumMoisture
-            q_liq_gm_toa = prog_gm.q_liq[kc_toa]
-            q_ice_gm_toa = prog_gm.q_ice[kc_toa]
-            q_liq_boa = prog_gm.q_liq[kc_surf]
-            q_ice_boa = prog_gm.q_ice[kc_surf]
-            C2Fq_liq = CCO.InterpolateC2F(bottom = CCO.SetValue(FT(q_liq_boa)), top = CCO.SetValue(FT(q_liq_gm_toa))) # not sure if this should be right biased or not
-            C2Fq_ice = CCO.InterpolateC2F(bottom = CCO.SetValue(FT(q_ice_boa)), top = CCO.SetValue(FT(q_ice_gm_toa))) # not sure if this should be right biased or not
+    # We have access to three center temp vars: ϕ, ψ, and Φ, and one face temp var ϕ [[ These are okay because we do not make any nested calls here... ]]
+    # ∇Tr = aux_tc.temporary_1 # reusing temporary storage for w∇ stuff :: Tracer
+    w∇Tr = aux_tc.temporary_2 # reusing temporary storage for w∇ stuff :: w∇Tracer
+    # w∇TrF = aux_tc_f.temporary_f1 # reusing temporary storage for w∇ stuff on faces :: w∇Tracer on faces
+    # w∇CV3 = similar(f)
 
-            ∇q_liq_gm = TC.center_aux_grid_mean(state).∇q_liq_gm
-            @. ∇q_liq_gm = ∇c(wvec(C2Fq_liq(prog_gm.q_liq)))
-            # w∇q_liq_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_liq_gm) # works, but output type is different than tendencies type
-            w∇q_liq_gm = @. wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_liq_gm)) # works, but output type is different than tendencies type, outer wvec important for getting physical units
-            w∇q_liq_gm = @. F2Csub(w∇q_liq_gm) # convert back to C
-            # w∇q_liq_gm = @. CV32FT(w∇q_liq_gm) # convert back to Float64 from Contravariant3Vector
-            w∇q_liq_gm = w∇q_liq_gm.components.data.:1 # from Dennis
 
-            ∇q_ice_gm = TC.center_aux_grid_mean(state).∇q_ice_gm
-            @. ∇q_ice_gm = ∇c(wvec(C2Fq_ice(prog_gm.q_ice)))
-            # w∇q_ice_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_ice_gm) # works, but output type is different than tendencies type
-            w∇q_ice_gm = @. wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_ice_gm)) # works, but output type is different than tendencies type, outer wvec important for getting physical units
-            w∇q_ice_gm = @. F2Csub(w∇q_ice_gm) # convert back to C
-            # w∇q_ice_gm = @. CV32FT(w∇q_ice_gm) # convert back to Float64 from Contravariant3Vector
-            w∇q_ice_gm = w∇q_ice_gm.components.data.:1 # from Dennis
+
+    # considering deprecation pending Dennis's response (or dividing by dz)
+
+    #=
+        I don't know for sure why but this version works much better
+        I think the problem is that convergence in the other one isn't reflected in density so you get weird temperature and other changes
+        Because we ignore density changes, we really do need to stick to this one and just the w∇q part, and leave out the q∇w part...
+    =#
+
+    # regular upwinding 
+    # ∇θ_liq_ice_gm = ∇Tr # alias
+    # w∇θ_liq_ice_gm_F = w∇TrF # alias
+    # w∇θ_liq_ice_gm_CV3 = w∇CV3 # alias
+    w∇θ_liq_ice_gm = w∇Tr # alias
+    # @. ∇θ_liq_ice_gm = ∇c(wvec(C2Fθ(prog_gm.ρθ_liq_ice / ρ_c)))
+    # @. w∇θ_liq_ice_gm_F = wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇θ_liq_ice_gm)) # works. outer wvec important for getting physical units [[ # w∇θ_liq_ice_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇θ_liq_ice_gm) # works, but output type is different than tendencies type ]]
+    # @. w∇θ_liq_ice_gm_CV3 = F2Csub(w∇θ_liq_ice_gm_F) # convert back to C
+    # @. w∇θ_liq_ice_gm = w∇θ_liq_ice_gm_CV3.components.data.:1 # from Dennis [[ x = @. CV32FT(x) # convert back to Float64 from Contravariant3Vector I think maybe also works?]]
+    @. w∇θ_liq_ice_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fθ(prog_gm.ρθ_liq_ice / ρ_c))))))).components.data.:1
+    @. tendencies_gm.ρθ_liq_ice -= ρ_c * w∇θ_liq_ice_gm
+    # if !state.calibrate_io
+    #     @. aux_gm.θ_liq_ice_tendency_ls_vert_adv = -w∇θ_liq_ice_gm # FOR STORAGE [[ Doesn't exist rn...]]
+    # end
+
+
+    # ∇q_tot_gm = ∇Tr # alias
+    # w∇q_tot_gm_F = w∇TrF # alias
+    # w∇q_tot_gm_CV3 = w∇CV3 # alias
+    w∇q_tot_gm = w∇Tr # alias
+    # @. ∇q_tot_gm = ∇c(wvec(C2Fq(prog_gm.ρq_tot / ρ_c)))
+    # @. w∇q_tot_gm_F = wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_tot_gm)) # works, outer wvec important for getting physical units
+    # @. w∇q_tot_gm_CV3 = F2Csub(w∇q_tot_gm_F) # convert back to C
+    # @. w∇q_tot_gm = w∇q_tot_gm_CV3.components.data.:1 # from Dennis
+    @. w∇q_tot_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fq(prog_gm.ρq_tot / ρ_c))))))).components.data.:1
+    @. tendencies_gm.ρq_tot -= ρ_c * w∇q_tot_gm
+    if !state.calibrate_io
+        @. aux_gm.qt_tendency_ls_vert_adv = -w∇q_tot_gm # FOR STORAGE
+    end
+
+    @. aux_tc.dqvdt -= w∇q_tot_gm # grid mean contribution to dqt/dt
+
+    if edmf.moisture_model isa TC.NonEquilibriumMoisture
+        q_liq_gm_toa = prog_gm.q_liq[kc_toa]
+        q_ice_gm_toa = prog_gm.q_ice[kc_toa]
+        q_liq_gm_boa = prog_gm.q_liq[kc_surf]
+        q_ice_gm_boa = prog_gm.q_ice[kc_surf]
+        C2Fq_liq = CCO.InterpolateC2F(bottom = CCO.SetValue(FT(q_liq_gm_boa)), top = CCO.SetValue(FT(q_liq_gm_toa))) # not sure if this should be right biased or not
+        C2Fq_ice = CCO.InterpolateC2F(bottom = CCO.SetValue(FT(q_ice_gm_boa)), top = CCO.SetValue(FT(q_ice_gm_toa))) # not sure if this should be right biased or not
+
+        # ∇q_liq_gm = ∇Tr # alias
+        # w∇q_liq_gm_F = w∇TrF # alias
+        # w∇q_liq_gm_CV3 = w∇CV3 # alias
+        w∇q_liq_gm = w∇Tr # alias
+        # @. ∇q_liq_gm = ∇c(wvec(C2Fq_liq(prog_gm.q_liq)))
+        # @. w∇q_liq_gm_F = wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_liq_gm)) # works, outer wvec important for getting physical units
+        # @. w∇q_liq_gm_CV3 = F2Csub(w∇q_liq_gm_F) # convert back to C
+        # @. w∇q_liq_gm = w∇q_liq_gm_CV3.components.data.:1 # from Dennis
+        @. w∇q_liq_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fq_liq(prog_gm.q_liq))))))).components.data.:1
+        @. tendencies_gm.q_liq -= ρ_c * w∇q_liq_gm
+        if !state.calibrate_io
+            @. aux_gm.ql_tendency_ls_vert_adv = -w∇q_liq_gm # FOR STORAGE
         end
-    else
 
-        #=
-            This one may look better but it really messed up our simulations. We had really strange results.
-            I think the w∇q part is fine but the q∇w part is not
-            It cause weird temperature changes for example which I believe are because convergence isn't reflected in density so it then falls solely on the tracer.
-        =#
-
-        # upwinding alt_version [Conservative bc only one conversion C2Fsub]
-        # w∇θ_liq_ice_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_gm.ρθ_liq_ice / ρ_c) # works, but output type is different than tendencies type
-        # w∇q_tot_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_gm.ρq_tot / ρ_c) # works, but output type is different than tendencies type
-        # w∇θ_liq_ice_gm = @. ∇c(wvec(w∇θ_liq_ice_gm))
-        # w∇q_tot_gm = @. ∇c(wvec(w∇q_tot_gm))
-
-
-        w∇θ_liq_ice_gm = @. ∇c(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_gm.ρθ_liq_ice / ρ_c)))
-        w∇q_tot_gm = @. ∇c(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_gm.ρq_tot / ρ_c)))
-
-
-        if edmf.moisture_model isa TC.NonEquilibriumMoisture
-            # w∇q_liq_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_gm.q_liq) # works, but output type is different than tendencies type
-            # w∇q_ice_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_gm.q_ice) # works, but output type is different than tendencies type
-            # w∇q_liq_gm = @. ∇c(wvec(w∇q_liq_gm))
-            # w∇q_ice_gm = @. ∇c(wvec(w∇q_ice_gm))
-            w∇q_liq_gm = @. ∇c(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_gm.q_liq * ρ_c))) / ρ_c
-            w∇q_ice_gm = @. ∇c(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_gm.q_ice * ρ_c))) / ρ_c
+        # ∇q_ice_gm = ∇Tr # alias
+        # w∇q_ice_gm_F = w∇TrF # alias
+        # w∇q_ice_gm_CV3 = w∇CV3 # alias
+        w∇q_ice_gm = w∇Tr # alias
+        # @. ∇q_ice_gm = ∇c(wvec(C2Fq_ice(prog_gm.q_ice)))
+        # @. w∇q_ice_gm_F = wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_ice_gm)) # works, outer wvec important for getting physical units
+        # @. w∇q_ice_gm_CV3 = F2Csub(w∇q_ice_gm_F) # convert back to C
+        # @. w∇q_ice_gm = w∇q_ice_gm_CV3.components.data.:1 # from Dennis
+        @. w∇q_ice_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fq_ice(prog_gm.q_ice))))))).components.data.:1
+        @. tendencies_gm.q_ice -= ρ_c * w∇q_ice_gm
+        if !state.calibrate_io
+            @. aux_gm.qi_tendency_ls_vert_adv = -w∇q_ice_gm # FOR STORAGE
         end
     end
 
-
-    N_up = TC.n_updrafts(edmf)
-    aux_en.dqvdt .= FT(0) # reset to zero, do here instead of in update_aux bc we need only some of these values...
-    aux_en.dTdt .= FT(0) # reset to zero, do here instead of in update_aux bc we need only some of these values...
-    @inbounds for i in 1:N_up
-        aux_up[i].dqvdt .= FT(0) # reset to zero, do here instead of in update_aux bc we need only some of these values...
-        aux_up[i].dTdt .= FT(0) # reset to zero, do here instead of in update_aux bc we need only some of these values...
+    # LS Vert for precipitation
+    # ∇q_rai_gm = ∇Tr # alias
+    # w∇q_rai_gm_F = w∇TrF # alias
+    # w∇q_rai_gm_CV3 = w∇CV3 # alias
+    w∇q_rai_gm = w∇Tr # alias
+    # @. ∇q_rai_gm = ∇c(wvec(C2Fsub(prog_pr.q_rai * ρ_c))) / ρ_c
+    # @. w∇q_rai_gm_F = wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_rai_gm))
+    # @. w∇q_rai_gm_CV3 = F2Csub(w∇q_rai_gm_F) # convert back to C
+    # @. w∇q_rai_gm = w∇q_rai_gm_CV3.components.data.:1 # from Dennis
+    @. w∇q_rai_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fsub(prog_pr.q_rai * ρ_c))))))).components.data.:1
+    @. tendencies_pr.q_rai += -w∇q_rai_gm
+    if !state.calibrate_io
+        @. aux_gm.qr_tendency_ls_vert_adv = -w∇q_rai_gm # FOR STORAGE
     end
+
+    # ∇q_sno_gm = ∇Tr # alias
+    # w∇q_sno_gm_F = w∇TrF # alias
+    # w∇q_sno_gm_CV3 = w∇CV3 # alias
+    w∇q_sno_gm = w∇Tr # alias
+    # @. ∇q_sno_gm = ∇c(wvec(C2Fsub(prog_pr.q_sno * ρ_c))) / ρ_c
+    # @. w∇q_sno_gm_F = wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_sno_gm))
+    # @. w∇q_sno_gm_CV3 = F2Csub(w∇q_sno_gm_F) # convert back to C
+    # @. w∇q_sno_gm = w∇q_sno_gm_CV3.components.data.:1 # from Dennis
+    @. w∇q_sno_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fsub(prog_pr.q_sno * ρ_c))))))).components.data.:1
+    @. tendencies_pr.q_sno += -w∇q_sno_gm
+    if !state.calibrate_io
+        @. aux_gm.qs_tendency_ls_vert_adv = -w∇q_sno_gm # FOR STORAGE
+    end
+
 
 
     @inbounds for k in TC.real_center_indices(grid)
         Π = TD.exner(thermo_params, ts_gm[k])
 
-        # LS Subsidence (any positive subsidence (ascent) leads to numerical instability) -- why? fast descent is unstable too...)
-        # tendencies_gm.ρθ_liq_ice[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇θ_liq_ice_gm[k] # trying turning this off
-        tendencies_gm.ρθ_liq_ice[k] -= ρ_c[k] * w∇θ_liq_ice_gm[k] # trying turning this off
-        # tendencies_gm.ρq_tot[k] -= ρ_c[k] * aux_gm.subsidence[k] * ∇q_tot_gm[k] # trying turning this off
-        tendencies_gm.ρq_tot[k] -= ρ_c[k] * w∇q_tot_gm[k] # trying turning this off
-
-
-        aux_en.dqvdt[k] -=  w∇q_tot_gm[k] # [store things that matter for our aux_en.dqvdt] [ dqvdt priority ]
-        @inbounds for i in 1:N_up
-            aux_up[i].dqvdt[k] -= w∇q_tot_gm[k] # [store things that matter for our aux_up.dqvdt] [ dqvdt priority ]
-        end
-
-        if edmf.moisture_model isa TC.NonEquilibriumMoisture
-            # tendencies_gm.q_liq[k] -= ∇q_liq_gm[k] * aux_gm.subsidence[k]
-            tendencies_gm.q_liq[k] -= w∇q_liq_gm[k]
-            # tendencies_gm.q_ice[k] -= ∇q_ice_gm[k] * aux_gm.subsidence[k]
-            tendencies_gm.q_ice[k] -= w∇q_ice_gm[k]
-
-            aux_gm.ql_tendency_ls_vert_adv[k] = -w∇q_liq_gm[k] # FOR STORAGE
-            aux_gm.qi_tendency_ls_vert_adv[k] = -w∇q_ice_gm[k] # FOR STORAGE
-
-            # aux_en.dqvdt[k] -= w∇q_liq_gm[k] # [store things that matter for our aux_en.dqvdt] [only keep qv part]
-            # aux_en.dqvdt[k] -= w∇q_ice_gm[k] # [store things that matter for our aux_en.dqvdt] [only keep qv part]
-
-        end
-        aux_gm.qt_tendency_ls_vert_adv[k] = -w∇q_tot_gm[k] # not implemented yet
-
-
-        # LS Vert for precipitation
-        w∇q_rai_gm = @. ∇c(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_pr.q_rai * ρ_c))) / ρ_c
-        w∇q_sno_gm = @. ∇c(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), prog_pr.q_sno * ρ_c))) / ρ_c
-        @. tendencies_pr.q_rai += -w∇q_rai_gm
-        @. tendencies_pr.q_sno += -w∇q_sno_gm
-        @. aux_gm.qr_tendency_ls_vert_adv = -w∇q_rai_gm # FOR STORAGE
-        @. aux_gm.qs_tendency_ls_vert_adv = -w∇q_sno_gm # FOR STORAGE
-
-        
-
         # Radiation
         if Cases.rad_type(radiation) <:
            Union{Cases.RadiationDYCOMS_RF01, Cases.RadiationLES, Cases.RadiationTRMM_LBA, Cases.RadiationSOCRATES}
             tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_rad[k] / Π 
-
-            aux_en.dTdt[k] += aux_gm.dTdt_rad[k] # [store things that matter for our aux_en.dTdt] [ dTdt priority ] [ idk if this totally helps, it's typically strong cloud top cooling so maybe it drives liquid generation?]
-            @inbounds for i in 1:N_up
-                aux_up[i].dTdt[k] += aux_gm.dTdt_rad[k] # [store things that matter for our aux_up.dTdt] [ dTdt priority ] [ idk if this totally helps, it's typically strong cloud top cooling so maybe it drives liquid generation?]
-            end
+            aux_tc.dTdt[k] += aux_gm.dTdt_rad[k] # [store things that matter for our dTdt] [ dTdt priority ] [ idk if this totally helps, it's typically strong cloud top cooling so maybe it drives liquid generation?]
         end
+
         # LS advection
         tendencies_gm.ρq_tot[k] += ρ_c[k] * aux_gm.dqtdt_hadv[k]
         if !(Cases.force_type(force) <: Cases.ForcingDYCOMS_RF01)
             tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_hadv[k] / Π 
-
-            aux_en.dTdt[k] += aux_gm.dTdt_hadv[k] # [store things that matter for our aux_en.dTdt] [ dTdt priority ]
-            @inbounds for i in 1:N_up
-                aux_up[i].dTdt[k] += aux_gm.dTdt_hadv[k] # [store things that matter for our aux_up.dTdt] [ dTdt priority ]
-            end
+            aux_tc.dTdt[k] += aux_gm.dTdt_hadv[k] # [store things that matter for our dTdt] [ dTdt priority ]
 
         end
         if edmf.moisture_model isa TC.NonEquilibriumMoisture
@@ -779,15 +757,7 @@ function compute_gm_tendencies!(
             tendencies_gm.q_ice[k] += aux_gm.dqidt[k]
         end
 
-
-
-        aux_en.dqvdt[k] += aux_gm.dqtdt_hadv[k] # [store things that matter for our aux_en.dqvdt] [ dqvdt priority ]
-        # if edmf.moisture_model isa TC.NonEquilibriumMoisture
-        #     aux_en.dqvdt[k] -= aux_gm.dqldt[k] # [store things that matter for our aux_en.dqvdt] [only keep qv part]
-        #     aux_en.dqvdt[k] -= aux_gm.dqidt[k] # [store things that matter for our aux_en.dqvdt] [only keep qv part]
-        # end
-
-
+        aux_tc.dqvdt[k] += aux_gm.dqtdt_hadv[k] # [store things that matter for our dqvdt] [ dqvdt priority ]
 
         # LES specific forcings
         if Cases.force_type(force) <: Cases.ForcingLES
@@ -806,21 +776,13 @@ function compute_gm_tendencies!(
 
             tendencies_gm.ρq_tot[k] += ρ_c[k] * (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k])
 
-            aux_en.dqvdt[k] += (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k]) # [store things that matter for our aux_en.dqvdt] [  dqvdt priority ]
-            @inbounds for i in 1:N_up
-                aux_up[i].dqvdt[k] += (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k]) # [store things that matter for our aux_up.dqvdt] [  dqvdt priority ]
-            end
-
+            aux_tc.dqvdt[k] += (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k]) # [store things that matter for our dqvdt] [  dqvdt priority ]
 
             tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * (gm_H_nudge_k + H_fluc)
             tendencies_gm_uₕ[k] += CCG.Covariant12Vector(CCG.UVVector(gm_U_nudge_k, gm_V_nudge_k), lg[k])
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
                 tendencies_gm.q_liq[k] += aux_gm.dqldt_hadv[k] + gm_q_liq_nudge_k + aux_gm.dqldt_fluc[k]
-                tendencies_gm.q_ice[k] += aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k]
-
-                # aux_en.dqvdt[k] -= (aux_gm.dqldt_hadv[k] + gm_q_liq_nudge_k + aux_gm.dqldt_fluc[k]) # [store things that matter for our aux_en.dqvdt] [only keep qv part]
-                # aux_en.dqvdt[k] -= (aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k]) # [store things that matter for our aux_en.dqvdt] [only keep qv part]
-                
+                tendencies_gm.q_ice[k] += aux_gm.dqidt_hadv[k] + gm_q_ice_nudge_k + aux_gm.dqidt_fluc[k]                
             end
         end
 
@@ -844,12 +806,8 @@ function compute_gm_tendencies!(
 
             aux_gm.dqtdt_nudge[k] = gm_q_tot_nudge_k
 
-            aux_en.dqvdt[k] += (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k]) # [store things that matter for our aux_en.dqvdt] [dqvdt priority ]
-            aux_en.dTdt[k] += (gm_H_nudge_k* Π + aux_gm.dTdt_fluc[k]) #  [store things that matter for our aux_en.dTdt] [dTdt priority ] [ go opposite way with exner] # DO NOT DO THIS, it's not at all the same thing as temperature!!! because of condensate. it's really not the same thing as θ_liq_ice, so we don't do this.
-            @inbounds for i in 1:N_up
-                aux_up[i].dqvdt[k] += (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k]) # [store things that matter for our aux_up.dqvdt] [dqvdt priority ]
-                aux_up[i].dTdt[k] += (gm_H_nudge_k * Π + aux_gm.dTdt_fluc[k]) #  [store things that matter for our aux_up.dTdt] [dTdt priority ] [ go opposite way with exner]
-            end
+            aux_tc.dqvdt[k] += (gm_q_tot_nudge_k + aux_gm.dqtdt_fluc[k]) # [store things that matter for our dqvdt] [dqvdt priority ]
+            aux_tc.dTdt[k] += (gm_H_nudge_k* Π + aux_gm.dTdt_fluc[k]) #  [store things that matter for our aux_tc.dTdt] [dTdt priority ] [ go opposite way with exner] # DO NOT DO THIS, it's not at all the same thing as temperature!!! because of condensate. it's really not the same thing as θ_liq_ice, so we don't do this.
 
             # nudge liquid and ice -- but we don't have a ql_nudge qi_nudge from external forcing in socrates? only qt_nudge -- what are ql_nudge and qi_nudge derived from
             if edmf.moisture_model isa TC.NonEquilibriumMoisture
@@ -889,35 +847,7 @@ function compute_gm_tendencies!(
     # ====== sedimentation grid mean only (stability fix...)
     if edmf.cloud_sedimentation_model isa TC.CloudSedimentationModel 
         if edmf.cloud_sedimentation_model.grid_mean
-            error("not implmented yet")
-            # # @info "grid mean sedimenting"
-            # ts_gm = TC.center_aux_grid_mean(state).ts
-            # mph, _ = TC.calculate_sedimentation_sources(param_set, grid, ρ_c, ts_gm; grid_mean = true)
-
-            # L_v0 = TCP.LH_v0(param_set)
-            # L_s0 = TCP.LH_s0(param_set)
-            # @inbounds for k in TC.real_center_indices(grid)
-            #     ql_tendency_sedimentation = mph.ql_tendency[k]
-            #     qi_tendency_sedimentation = mph.qi_tendency[k]
-            #     qt_tendency_sedimentation = ql_tendency_sedimentation + qi_tendency_sedimentation
-
-            #     # How does updrafts/bulk know about these? does it just all end up in the environment?
-            #     # We need to split somehow so that the updrafts/bulk can also know about these tendencies...
-            #     # How do the large-scale tendencies work? do they just work on the environment?
-            #     # if so, that leads to instabilities here...
-
-            #     if edmf.moisture_model isa TC.NonEquilibriumMoisture
-            #         tendencies_gm.q_liq[k] += ql_tendency_sedimentation
-            #         tendencies_gm.q_ice[k] += qi_tendency_sedimentation
-            #     end
-            #     tendencies_gm.ρq_tot[k] += ρ_c[k] * qt_tendency_sedimentation
-
-            #     Π_m = TD.exner(thermo_params, ts_gm[k])
-            #     c_pm = TD.cp_m(thermo_params, ts_gm[k])
-            #     θ_liq_ice_tendency_sedimentation =
-            #         1 / Π_m / c_pm * (L_v0 * ql_tendency_sedimentation + L_s0 * qi_tendency_sedimentation)
-            #     tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * θ_liq_ice_tendency_sedimentation
-            # end
+            error("Grid mean sedimentation not implemented yet")
         else
 
             @inbounds for k in TC.real_center_indices(grid)
@@ -939,7 +869,7 @@ function compute_gm_tendencies!(
     # =================================================== #
     # note, these `sgs` fluxes also include the mass fluxes from vertical advection
 
-    TC.compute_sgs_flux!(edmf, grid, state, surf, Δt)
+    TC.compute_sgs_flux!(edmf, state, surf, param_set, Δt)
     sgs_flux_θ_liq_ice = aux_gm_f.sgs_flux_θ_liq_ice
     sgs_flux_q_tot = aux_gm_f.sgs_flux_q_tot
     sgs_flux_uₕ = aux_gm_f.sgs_flux_uₕ
@@ -951,8 +881,6 @@ function compute_gm_tendencies!(
     @. tends_ρθ_liq_ice += -∇sgs(wvec(sgs_flux_θ_liq_ice))
     @. tends_ρq_tot += -∇sgs(wvec(sgs_flux_q_tot))
     @. tends_uₕ += -∇sgs(sgs_flux_uₕ) / ρ_c
-
-    # @. aux_en.dqvdt += -∇sgs(wvec(sgs_flux_q_tot)) / ρ_c # [store things that matter for our aux_en.dqvdt] [ dont use these bc includes updraft fluxes, we need a version that's just local sgs tend but oh well]
 
     if edmf.moisture_model isa TC.NonEquilibriumMoisture
         sgs_flux_q_liq = aux_gm_f.sgs_flux_q_liq
@@ -986,16 +914,6 @@ function compute_gm_tendencies!(
     @. tendencies_pr.q_rai += -∇sgs(wvec(sgs_flux_q_rai)) / ρ_c
     @. tendencies_pr.q_sno += -∇sgs(wvec(sgs_flux_q_sno)) / ρ_c
 
-
-    @inbounds for k in TC.real_center_indices(grid)
-        if aux_bulk.area[k] > FT(0)
-            aux_bulk.dqvdt[k] = sum(i -> aux_up[i].dqvdt[k] * aux_up[i].area[k], 1:N_up) / aux_bulk.area[k]
-            aux_bulk.dTdt[k] = sum(i -> aux_up[i].dTdt[k] * aux_up[i].area[k], 1:N_up) / aux_bulk.area[k]
-        else
-            aux_bulk.dqvdt[k] = sum(i -> aux_up[i].dqvdt[k] * aux_up[i].area[k], 1:N_up) / N_up
-            aux_bulk.dTdt[k] = sum(i -> aux_up[i].dTdt[k] * aux_up[i].area[k], 1:N_up) / N_up
-        end
-    end
 
 
     return nothing

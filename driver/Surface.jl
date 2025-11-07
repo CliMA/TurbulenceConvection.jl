@@ -35,11 +35,11 @@ end
 
 function get_surface(
     surf_params::TC.FixedSurfaceFlux,
-    grid::TC.Grid,
     state::TC.State,
     t::Real,
     param_set::TCP.AbstractTurbulenceConvectionParameters,
 )
+    grid = TC.Grid(state)
     FT = TC.float_type(state)
     surf_flux_params = TCP.surface_fluxes_params(param_set)
     kc_surf = TC.kc_surface(grid)
@@ -64,7 +64,7 @@ function get_surface(
     scheme = SF.LayerAverageScheme() # see https://github.com/CliMA/SurfaceFluxes.jl/pull/132
 
     bflux = SF.compute_buoyancy_flux(surf_flux_params, shf, lhf, ts_in, ts_sfc, scheme)
-    zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)
+    zi = TC.get_inversion(state, param_set, Ri_bulk_crit)
     convective_vel = TC.get_wstar(bflux, zi) # yair here zi in TRMM should be adjusted
 
     # u_sfc = SA.SVector{2, FT}(0, 0) 
@@ -118,11 +118,11 @@ end
 
 function get_surface(
     surf_params::TC.FixedSurfaceCoeffs,
-    grid::TC.Grid,
     state::TC.State,
     t::Real,
     param_set::TCP.AbstractTurbulenceConvectionParameters,
 )
+    grid = TC.Grid(state)
     FT = TC.float_type(state)
     surf_flux_params = TCP.surface_fluxes_params(param_set)
     kc_surf = TC.kc_surface(grid)
@@ -166,7 +166,7 @@ function get_surface(
     ρq_tot_flux = lhf / TD.latent_heat_vapor(thermo_params, ts_in)
     ρs_flux = entropy_flux_from_thetali_q_tot_flux(thermo_params, ρθ_liq_ice_flux, ρq_tot_flux, ts_in)
 
-    zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)
+    zi = TC.get_inversion(state, param_set, Ri_bulk_crit)
     convective_vel = TC.get_wstar(result.buoy_flux, zi)
     return TC.SurfaceBase{FT}(;
         cm = result.Cd,
@@ -189,11 +189,11 @@ end
 
 function get_surface(
     surf_params::TC.MoninObukhovSurface,
-    grid::TC.Grid,
     state::TC.State,
     t::Real,
     param_set::TCP.AbstractTurbulenceConvectionParameters,
 )
+    grid = TC.Grid(state)
     surf_flux_params = TCP.surface_fluxes_params(param_set)
     kc_surf = TC.kc_surface(grid)
     kf_surf = TC.kf_surface(grid)
@@ -231,7 +231,7 @@ function get_surface(
     result = SF.surface_conditions(surf_flux_params, sc, scheme)
     lhf = result.lhf
     shf = result.shf
-    zi = TC.get_inversion(grid, state, param_set, Ri_bulk_crit)
+    zi = TC.get_inversion(state, param_set, Ri_bulk_crit)
     convective_vel = TC.get_wstar(result.buoy_flux, zi)
     ρθ_liq_ice_flux = shf / TD.cp_m(thermo_params, ts_in)
     ρq_tot_flux = lhf / TD.latent_heat_vapor(thermo_params, ts_in)

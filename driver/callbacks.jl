@@ -26,12 +26,12 @@ function affect_io!(integrator)
         # TurbulenceConvection.io(sim) # #removeVarsHack
         write_simulation_time(stats, t) # #removeVarsHack
 
-        state = TC.column_prog_aux(prog, aux, colidx)
+        state = TC.column_prog_aux(prog, aux, colidx, calibrate_io)
         grid = TC.Grid(state)
         diag_col = TC.column_diagnostics(diagnostics, colidx)
 
         # TODO: is this the best location to call diagnostics?
-        compute_diagnostics!(edmf, precip_model, param_set, grid, state, diag_col, stats, surf_params, t, calibrate_io)
+        compute_diagnostics!(edmf, param_set, state, diag_col, stats, surf_params, t, calibrate_io)
 
         cent = TC.Cent(1)
         diag_svpc = svpc_diagnostics_grid_mean(diag_col)
@@ -66,8 +66,8 @@ function affect_io!(integrator)
         io(io_nt.aux, stats, state)
         io(io_nt.diagnostics, stats, diag_col)
 
-        surf = get_surface(surf_params, grid, state, t, param_set) # calls Tsurface, shf, lhf, ustar, wstar automatically
-        io(surf, surf_params, grid, state, stats, t)
+        surf = get_surface(surf_params, state, t, param_set) # calls Tsurface, shf, lhf, ustar, wstar automatically
+        io(surf, surf_params, stats, t)
         nothing
     end
 
@@ -84,10 +84,9 @@ function affect_filter!(integrator) #  affect_filter!() is also called in the dr
         TS = integrator.p.TS
         Δt = TS.dt_limit_tendencies_factor * (TS.limit_tendencies_by_dt_min ? TS.dt_min : TS.dt)
 
-        state = TC.column_prog_aux(prog, aux, colidx)
-        grid = TC.Grid(state)
-        surf = get_surface(surf_params, grid, state, t, param_set)
-        TC.affect_filter!(edmf, grid, state, param_set, surf, cfl_limit, Δt)
+        state = TC.column_prog_aux(prog, aux, colidx, integrator.p.calibrate_io)
+        surf = get_surface(surf_params, state, t, param_set)
+        TC.affect_filter!(edmf, state, param_set, surf, cfl_limit, Δt)
         nothing
     end
 
@@ -700,9 +699,9 @@ function dt_max!(integrator, dt_max, cfl_dt_max)
         tendencies = ODE.get_du(integrator) # should be integrator.fsallast for Euler
         if isnothing(tendencies)
             @warn "No tendencies available for timestep calculation, might be during initialization"
-            state = TC.column_prog_aux(prog, aux, colidx)
+            state = TC.column_prog_aux(prog, aux, colidx, integrator.p.calibrate_io)
         else
-            state = TC.column_state(prog, aux, tendencies, colidx) # use this so that we can use tendencies to control the timestep
+            state = TC.column_state(prog, aux, tendencies, colidx, integrator.p.calibrate_io) # use this so that we can use tendencies to control the timestep
         end
         (dt_max, cfl_dt_max) = compute_dt_max(state, edmf, dt_max, TS.cfl_limit, TS.use_tendency_timestep_limiter)
     end
@@ -732,7 +731,7 @@ function monitor_cfl!(integrator)
     CC.Fields.bycolumn(axes(integrator.u.cent)) do colidx
         (; edmf, aux, TS) = integrator.p
         prog = integrator.u
-        state = TC.column_prog_aux(prog, aux, colidx)
+        state = TC.column_prog_aux(prog, aux, colidx, integrator.p.calibrate_io)
         monitor_cfl!(state, edmf, TS.dt, TS.cfl_limit)
     end
     ODE.u_modified!(integrator, false)

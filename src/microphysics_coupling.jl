@@ -200,7 +200,6 @@ For consistency I've kept passing in S_ql, S_qi here but maybe we should just de
 function other_microphysics_processes(
     param_set::APS,
     moisture_model::AbstractMoistureModel,
-    # heterogeneous_ice_nucleation::Tuple{Bool, FT, FT},
     noneq_moisture_scheme::AbstractRelaxationTimescaleType,
     moisture_sources_limiter::AbstractMoistureSourcesLimiter,
     area::FT,
@@ -433,14 +432,16 @@ function precipitation_formation(
 
         Π_m = TD.exner(thermo_params, ts)
         c_pm = TD.cp_m(thermo_params, ts)
-        L_v0 = TCP.LH_v0(param_set)
-        L_s0 = TCP.LH_s0(param_set)
+
         I_i = TD.internal_energy_ice(thermo_params, ts)
         I = TD.internal_energy(thermo_params, ts)
 
         if precip_model isa Clima0M
             qsat = TD.q_vap_saturation(thermo_params, ts)
             λ = TD.liquid_fraction(thermo_params, ts)
+
+            L_v = TD.latent_heat_vaporization(thermo_params, ts)
+            L_s = TD.latent_heat_sublimation(thermo_params, ts)
 
             # S_qt = -min((q.liq + q.ice) / Δt, -CM0.remove_precipitation(microphys_params, q, qsat))
             S_qt = limit_tendency(precipitation_tendency_limiter, CM0.remove_precipitation(microphys_params, q, qsat), (q.liq + q.ice), Δt)
@@ -450,7 +451,7 @@ function precipitation_formation(
             qt_tendency += S_qt
             ql_tendency += S_qt * λ
             qi_tendency += S_qt * (1 - λ)
-            θ_liq_ice_tendency -= S_qt / Π_m / c_pm * (L_v0 * λ + L_s0 * (1 - λ))
+            θ_liq_ice_tendency -= S_qt / Π_m / c_pm * (L_v * λ + L_s * (1 - λ))
         end
 
         if precip_model isa Clima1M
@@ -642,7 +643,10 @@ function precipitation_formation(
             ql_tendency += S_qt_rain
             qi_tendency += S_qt_snow
 
-            θ_liq_ice_tendency -= 1 / Π_m / c_pm * (L_v0 * S_qt_rain + L_s0 * S_qt_snow)
+            L_v = TD.latent_heat_vapor(thermo_params, ts)
+            L_s = TD.latent_heat_sublim(thermo_params, ts)
+
+            θ_liq_ice_tendency -= 1 / Π_m / c_pm * (L_v * S_qt_rain + L_s * S_qt_snow)
 
             # accretion cloud water + rain
             if rain_formation_model isa Clima1M_default
@@ -667,7 +671,7 @@ function precipitation_formation(
             qr_tendency += S_qr
             qt_tendency -= S_qr
             ql_tendency -= S_qr
-            θ_liq_ice_tendency += S_qr / Π_m / c_pm * L_v0
+            θ_liq_ice_tendency += S_qr / Π_m / c_pm * L_v
             ql_tendency_accr_liq_rai = -S_qr # for storage
 
             # accretion cloud ice + snow
@@ -677,7 +681,7 @@ function precipitation_formation(
             qs_tendency += S_qs
             qt_tendency -= S_qs
             qi_tendency -= S_qs
-            θ_liq_ice_tendency += S_qs / Π_m / c_pm * L_s0
+            θ_liq_ice_tendency += S_qs / Π_m / c_pm * L_s
             qi_tendency_accr_ice_sno = -S_qs # for storage
 
             # sink of cloud water via accretion cloud water + snow
@@ -695,7 +699,7 @@ function precipitation_formation(
                 ql_tendency += S_qt
                 qs_tendency += S_qt * α
                 qr_tendency -= S_qt * (1 + α)
-                θ_liq_ice_tendency += S_qt / Π_m / c_pm * (Lf * (1 + Rm / c_vm) * α - L_v0)
+                θ_liq_ice_tendency += S_qt / Π_m / c_pm * (Lf * (1 + Rm / c_vm) * α - L_v)
                 ql_tendency_accr_liq_sno = S_qt # for storage
             end
 
@@ -710,7 +714,7 @@ function precipitation_formation(
             qi_tendency += S_qt
             qr_tendency += S_qr
             qs_tendency += -(S_qt + S_qr)
-            θ_liq_ice_tendency -= 1 / Π_m / c_pm * (S_qr * Lf * (1 + Rm / c_vm) + S_qt * L_s0)
+            θ_liq_ice_tendency -= 1 / Π_m / c_pm * (S_qr * Lf * (1 + Rm / c_vm) + S_qt * L_s)
             qi_tendency_accr_ice_rai = S_qt # for storage
 
             # accretion rain - snow
@@ -1348,14 +1352,13 @@ end
 These use domain interactions so they need both sides to have been calculated already, and thus can't be folded into env and up specific functions.
 """
 function compute_domain_interaction_microphysics_tendencies!(
-    grid::Grid,
     state::State,
     edmf::EDMFModel,
     Δt::Real,
     param_set::APS,
     use_fallback_tendency_limiters::Bool,
 ) 
-
+    grid = Grid(state)
     FT = float_type(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     microphys_params = TCP.microphysics_params(param_set)
@@ -1371,9 +1374,6 @@ function compute_domain_interaction_microphysics_tendencies!(
     ρ_c = prog_gm.ρ
     # precip_fraction = compute_precip_fraction(edmf, state)
     N_up = n_updrafts(edmf)
-
-    L_s0 = TCP.LH_s0(param_set)
-
 
     cloud_sedimentation_model = edmf.cloud_sedimentation_model
     # rain_formation_model = edmf.rain_formation_model
@@ -1450,7 +1450,8 @@ function compute_domain_interaction_microphysics_tendencies!(
                 qi_tendency_agg_acnv_other_env_blk_i = S_qt_snow_ice_agg_other_env_blk # already should be area weighted
                 Π_m = TD.exner(thermo_params, aux_up[i].ts[k])
                 c_pm = TD.cp_m(thermo_params, aux_up[i].ts[k])
-                θ_liq_ice_tendency_agg_acnv_other_env_blk = S_qt_snow_ice_agg_other_env_blk / Π_m / c_pm * L_s0
+                L_s = TCP.LH_s(param_set, aux_up[i].ts[k])
+                θ_liq_ice_tendency_agg_acnv_other_env_blk = S_qt_snow_ice_agg_other_env_blk / Π_m / c_pm * L_s
 
                 aux_up[i].qi_tendency_acnv_agg_other[k] += qi_tendency_agg_acnv_other_env_blk * interface_area / aux_up[i].area[k] # add back area weight
                 aux_up[i].qi_tendency_acnv[k] += qi_tendency_agg_acnv_other_env_blk * interface_area / aux_up[i].area[k] # add back area weight
@@ -1500,7 +1501,7 @@ function compute_domain_interaction_microphysics_tendencies!(
             qi_tendency_agg_acnv_other_blk_env = S_qt_snow_ice_agg_other_blk_env # already should be area weighted
             Π_m = TD.exner(thermo_params, aux_en.ts[k])
             c_pm = TD.cp_m(thermo_params, aux_en.ts[k])
-            θ_liq_ice_tendency_agg_acnv_other_blk_env = S_qt_snow_ice_agg_other_blk_env / Π_m / c_pm * L_s0
+            θ_liq_ice_tendency_agg_acnv_other_blk_env = S_qt_snow_ice_agg_other_blk_env / Π_m / c_pm * L_s
 
             aux_en.qi_tendency_acnv_agg_other[k] += qi_tendency_agg_acnv_other_blk_env * interface_area/ aux_en.area[k] # this is the total tendency for the environment
             aux_en.qi_tendency_acnv[k] += qi_tendency_agg_acnv_other_blk_env * interface_area / aux_en.area[k]

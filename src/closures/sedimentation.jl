@@ -24,6 +24,12 @@ function calculate_sedimentation_sources(
     # velo_scheme::Union{CMT.Blk1MVelType, CMT.Chen2022Type} = Chen2022Vel, # deprecated
     grid_mean::Bool = false, # whether or not this is a grid mean calc or if we have subdomains...
     use_relative_w::Bool = false,
+    scratch1::CC.Fields.Field,
+    scratch2::CC.Fields.Field,
+    scratch3::CC.Fields.Field,
+    scratch4::CC.Fields.Field,
+    scratch1F::CC.Fields.Field,
+    scratch2F::CC.Fields.Field
 )
 
 
@@ -57,8 +63,11 @@ function calculate_sedimentation_sources(
     # create vector of zeros for sedimentation sources
     # S_q = ρ .* 0 # I dont know how to create zeros lol (similar doesn't fill -- do we need it filled?)
     # S_other = ρ .* 0 # I dont know how to create zeros lol
-    S = similar(ρ) # a copy but don't actually fill in
-    S_other = similar(ρ) # a copy but don't actually fill in
+    # S = similar(ρ) # a copy but don't actually fill in
+    # S_other = similar(ρ) # a copy but don't actually fill in
+
+    S = scratch1 # reuse temporary storage
+    S_other = scratch2 # reuse temporary storage
 
     wvec = CC.Geometry.WVector
     # ∇c = CCO.DivergenceF2C() # F2C to come back from C2F
@@ -94,8 +103,6 @@ function calculate_sedimentation_sources(
 
     # also this is still bad bc we'd need to remove the w_up in EDMF_Functions anyway now that it's included here... to not double count...
 
-    # q .*= ρ # convert to absolute amount (area and density weight so fluxes are accurate)
-    q = q .* ρ # convert to absolute amount (area and density weight so fluxes are accurate) (multiply separately so copy doesn't mutate)
 
     if !grid_mean
         # w_sed_to_other = copy(w_sed) # make a copy for the exchange calculation (not sure if this is enough, maybe deepcopy() or w_sed_to_other = w_sed .* 1.0 or something is better?)
@@ -124,67 +131,51 @@ function calculate_sedimentation_sources(
         F2Csed = Ic # don't need bcs for F2C
         # CV32FT = x -> x[1] # convert Contravariant3Vector to Float64
 
+        w_sed_f = scratch1F # reuse temporary storage
         if use_relative_w # seems to induce weird behavior around w_sed = 0...
-            w_sed = @. C2Fsed(w_sed) - w # preserve full information in w
+            @. w_sed_f = C2Fsed(w_sed) - w # preserve full information in w
         else
-            w_sed = @. C2Fsed(w_sed) # convert to face values
+            @. w_sed_f = C2Fsed(w_sed) # convert to face values
         end
+        w_sed = w_sed_f # alias
 
         # regular upwinding 
-        wρaq = @. UBsed(wvec(-w_sed), q * area) # -w_sed is towards surface, so we want to upwind w/ -w_sed  and do -∇c after instead of just skipping and cancelling the negatives 
+        # wρaq = scratch2F
+        # @. wρaq = UBsed(wvec(-w_sed), ρ * q * area) # -w_sed is towards surface, so we want to upwind w/ -w_sed  and do -∇c after instead of just skipping and cancelling the negatives 
 
 
         # replace the lowest cell with the right-biased value [[ it's guaranted w = 0, so the terminal velocity should be all... ]]
 
         # I deally we would use the boundary condition option in UBSub for this conversion. however, if the upper flux that UBsub pulls is zero, we wont be able to adjust the lower (otherwise we could use a scaling factor on the ratio between the value at k+1 and k and put that as our CCO.SetValue(...))
-        # wρaq[kf_surf] = CCG.Contravariant3Vector(q[kc_surf] * area[kc_surf] * -w_sed[kf_surf]) # not quite right as far as i can tell... needs wvec first for physical units
-
-    
-
+        # wρaq[kf_surf] = CCG.Contravariant3Vector(ρq[kc_surf] * area[kc_surf] * -w_sed[kf_surf]) # not quite right as far as i can tell... needs wvec first for physical units
 
         # replace the highest cell with 0
         # wρaq[kf_toa] = FT(0) # i think the bc has this alraedy
 
-
-        wvec_wρaq = @. wvec(wρaq) # convert to vector type for divergence [to get back to physical units]
+        # wvec_wρaq = @. wvec(wρaq) # convert to vector type for divergence [to get back to physical units]
+        wvec_wρaq = @. wvec( UBsed(wvec(-w_sed), ρ * q * area) )
+        scratch_wvec = wvec_wρaq # alias
         # wvec_wρaq[kf_surf] = q[kc_surf] * area[kc_surf] * -w_sed[kf_surf]
-        wvec_wρaq[kf_surf] = map(x -> q[kc_surf] * area[kc_surf] * -w_sed[kf_surf], wvec_wρaq[kf_surf]) # i think this works, following the logic in # /home/jbenjami/.julia/packages/ClimaCore/vJw0m/src/Geometry/axistensors.jl. Also would have worked on the Contravariant3vector but the units would have been wrong (not physical w/o wvec)
-        ∇wρaq = @. -∇c(wvec_wρaq) # maybe this has to be done after CV32FT for the contravariant 3 vector?
+        wvec_wρaq[kf_surf] = map(x -> ρ[kc_surf] * q[kc_surf] * area[kc_surf] * -w_sed[kf_surf], wvec_wρaq[kf_surf]) # i think this works, following the logic in # /home/jbenjami/.julia/packages/ClimaCore/vJw0m/src/Geometry/axistensors.jl. Also would have worked on the Contravariant3vector but the units would have been wrong (not physical w/o wvec)
         
-
-
-        # # wρaq = @. UBsed(wvec(C2Fsed(-w_sed+w)), q * area) # -w_sed is towards surface, so we want to upwind w/ -w_sed  and do -∇c after instead of just skipping and cancelling the negatives [ testing combining here...]
-        # ∇wρaq = @. -∇c(wvec(wρaq)) # maybe this has to be done after CV32FT for the contravariant 3 vector?
-        # # ∇wρaq = @. UBsed(wvec(C2Fsed(w_sed)), ∇wρaq) # works, but output type is different than tendencies type
-        # # F2Csed = CCO.InterpolateF2C(; bottom = CCO.Extrapolate(), top = 0) # no input from top, just extrapolate at sfc
-        # # ∇wρaq = @. F2Csed(∇wρaq) # convert back to C
-        # # ∇wρaq = @. CV32FT(∇wρaq) # convert back to Float64 from Contravariant3Vector
+        ∇wρaq = scratch3 # reuse temporary storage
+        @. ∇wρaq = -∇c(wvec_wρaq) # maybe this has to be done after CV32FT for the contravariant 3 vector?
 
         # flux from one partition to the other
         if !grid_mean
-            # to_other = @. ∇wρaq * 0
             _area_top = isa(area, FT) ? area : area[kc_toa]
             _area_bottom = isa(area, FT) ? area : area[kc_surf]
             C2Fa = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(_area_bottom)), top = CCO.SetValue(FT(_area_top)))
-            ∇a = @. ∇c(wvec(C2Fa(area))) # seems stable w/ either sign w...? (Left bias this?)
+            ∇a = scratch4
+            @. ∇a = ∇c(wvec(C2Fa(area))) # seems stable w/ either sign w...? (Left bias this?)
+            prod = scratch4 # in place
+            @. prod = ifelse(∇a > 0, ρ * q * ∇a, FT(0)) # only send to other if area is increasing towards surface
 
-            prod = @. q * ∇a * (∇a > 0)
-
-            # to_other = @. -UBsed(wvec(C2Fsed(-w_sed_to_other)), prod)  # upwinded
-            to_other = @. -wvec(UBsed(wvec(C2Fsed(-w_sed_to_other)), prod))  # upwinded, outer wvec important to get physical units
-            to_other = @. F2Csed(to_other) # convert back to C
-            # to_other = @. CV32FT(to_other) # convert back to Float64 from Contravariant3Vector
-            to_other = to_other.components.data.:1 # from Dennis 
-
-            @. ∇wρaq -= to_other # remove from source
-
-
-            # @inbounds for k in real_center_indices(grid)
-            #     if (∇a[k] > 0) # &&  (w_sed_to_other[k] > 0) # area is decreasing towards surface and we have a positive net w_sed (towards surface), otherwise it's either getting lofted inside it's regime or falling into the same regime
-            #         to_other[k] = -w_sed_to_other[k] * q[k] * ∇a[k]  # flux to other (if ∇a is large for example, send most of the source to the other side):/
-            #         ∇wρaq[k] -= to_other[k] # remove from source
-            #     end
-            # end
+            to_other_f = scratch_wvec # reuse wvec vector
+            @. to_other_f = -wvec(UBsed(wvec(C2Fsed(-w_sed_to_other)), prod))  # upwinded, outer wvec important to get physical units
+            to_other = scratch4 # reuse temporary storage
+            @. to_other = F2Csed(to_other_f).components.data.:1 # from Dennis # remove from source.  # convert back to C
+            @. ∇wρaq -= to_other
         end
 
 
@@ -193,46 +184,38 @@ function calculate_sedimentation_sources(
         # Right Biased (copy from EDMF_Precipitation) -- seems stable
         # get toa values
         kc_toa = kc_top_of_atmos(grid)
-        q_toa = q[kc_toa]
         # right biased operators
-        RB = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(q_toa)))
+        RB = CCO.RightBiasedC2F(; top = CCO.Extrapolate())
         ∇ = CCO.DivergenceF2C(; bottom = CCO.Extrapolate())
 
         C2Fsed = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # just extrapolate, it's just sedimentation velocity
         F2Csed = Ic # don't need bcs for F2c
+
+        w_sed = scratch1F # reuse temporary storage
         if use_relative_w
-            w_sed = @. F2Csed(C2Fsed(w_sed) - w) # preserve full information in w, however for RB we need to go back to C values
+            @. w_sed = F2Csed(C2Fsed(w_sed) - w) # preserve full information in w, however for RB we need to go back to C values
         else
-            w_sed = @. C2Fsed(w_sed) # convert to face values
+            @. w_sed = C2Fsed(w_sed) # convert to face values
         end
 
-        ∇wρaq = @. ∇(wvec(RB(q * w_sed * area))) # this is the way they did rain and snow...
+        ∇wρaq = scratch3
+        @. ∇wρaq = ∇(wvec(RB(ρ * q * w_sed * area))) # this is the way they did rain and snow...
 
         # surely this should be upwinded.... bc w_sed_to_other could have either sign right?
         if !grid_mean
-            # to_other = ∇wρaq .* 0
-            to_other = similar(∇wρaq) # a copy but don't actually fill in
+            # to_other = similar(∇wρaq) # a copy but don't actually fill in
+            to_other = scratch4 # reuse temporary storage
+
             # _area_top = isa(area, Number) ? area : area[kc_toa]
             _area_top = isa(area, FT) ? area : area[kc_toa]
             RBa = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(_area_top)))
-            ∇a = @. ∇(wvec(RBa(area))) # seems stable w/ either sign w...? (Left bias this?)
+            ∇a = similar(∇wρaq) # a copy but don't actually fill in
+            @. ∇a = ∇(wvec(RBa(area))) # seems stable w/ either sign w...? (Left bias this?)
 
             @inbounds for k in real_center_indices(grid)
                 if ∇a[k] > 0  # && w_sed_to_other[k] > 0 # area is decreasing towards surface and we have a positive net w_sed (towards surface), otherwise it's either getting lofted inside it's regime or falling into the same regime
                     to_other[k] = w_sed_to_other[k] * q[k] * ∇a[k]  # flux to other (if ∇a is large for example, send most of the source to the other side):/
-                    # if w_sed_to_other[k] > 0
-                        # @info "w_sed_to_other[k] > 0 at k: $k, w_sed_to_other[k]: $(w_sed_to_other[k])" # we're not adding vertical wind to w_sed_other rn so this is not needd rn
-                    # end
-
-                    # if ∇wρaq[k] < 0 && to_other[k] > 0 # this is ok, it just exacerbates the rate of decline.
-                    #     @info "∇wρaq[k] < 0 but to_other > 0 at k: $k, (∇wρaq[k], to_other[k]): ($(∇wρaq[k]), $(to_other[k]))"
-                    # end
-                    # if to_other[k] < 0 # this would be bad, can't happen...
-                        # @info "to_other < 0 at k: $k, to_other[k]: $(to_other[k])"
-                    # end
-
                     ∇wρaq[k] -= to_other[k] # remove from source
-
                 end
             end
         end

@@ -1,15 +1,16 @@
-update_radiation(self::RadiationBase, grid, state, t::Real, param_set) = nothing
-initialize(self::RadiationBase{RadiationNone}, grid, state) = nothing
+update_radiation(self::RadiationBase, state, t::Real, param_set) = nothing
+initialize(self::RadiationBase{RadiationNone}, state) = nothing
 
 """
 see eq. 3 in Stevens et. al. 2005 DYCOMS paper
 """
-function update_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state, t::Real, param_set)
+function update_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, state, t::Real, param_set)
+    grid = TC.Grid(state)
     cp_d = TCP.cp_d(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    q_tot_f = TC.face_aux_turbconv(state).ϕ_temporary
+    q_tot_f = TC.face_aux_turbconv(state).temporary_1
     ρ_f = aux_gm_f.ρ
     ρ_c = prog_gm.ρ
     # find zi (level of 8.0 g/kg isoline of qt)
@@ -67,7 +68,8 @@ function update_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, grid, state
     return
 end
 
-function initialize(self::RadiationBase{RadiationLES}, grid, state, LESDat::LESData)
+function initialize(self::RadiationBase{RadiationLES}, state, LESDat::LESData)
+    grid = TC.Grid(state)
     # load from LES
     aux_gm = TC.center_aux_grid_mean(state)
     dTdt = NC.Dataset(LESDat.les_filename, "r") do data
@@ -86,19 +88,21 @@ function initialize(self::RadiationBase{RadiationLES}, grid, state, LESDat::LESD
 end
 
 
-function initialize(self::RadiationBase{RadiationTRMM_LBA}, grid, state)
+function initialize(self::RadiationBase{RadiationTRMM_LBA}, state)
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     rad = APL.TRMM_LBA_radiation(eltype(grid))
-    @inbounds for k in real_center_indices(grid)
+    @inbounds for k in TC.real_center_indices(grid)
         aux_gm.dTdt_rad[k] = rad(0, grid.zc[k].z)
     end
     return nothing
 end
 
-function update_radiation(self::RadiationBase{RadiationTRMM_LBA}, grid, state, t::Real, param_set)
+function update_radiation(self::RadiationBase{RadiationTRMM_LBA}, state, t::Real, param_set)
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     rad = APL.TRMM_LBA_radiation(eltype(grid))
-    @inbounds for k in real_center_indices(grid)
+    @inbounds for k in TC.real_center_indices(grid)
         aux_gm.dTdt_rad[k] = rad(t, grid.zc[k].z)
     end
     return nothing
@@ -106,8 +110,9 @@ end
 
 
 # technically the code as written already sets this cause it's in the SSCF output...
-function initialize(radiation::RadiationBase{RadiationSOCRATES}, grid, state) #where {T <: RadiationSOCRATES}
+function initialize(radiation::RadiationBase{RadiationSOCRATES}, state) #where {T <: RadiationSOCRATES}
     FT = TC.float_type(state)
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     radiation_funcs = radiation.radiation_funcs[]
 
@@ -117,13 +122,15 @@ function initialize(radiation::RadiationBase{RadiationSOCRATES}, grid, state) #w
     return nothing
 end
 
-function update_radiation(radiation::RadiationBase{RadiationSOCRATES}, grid, state, t::Real, param_set) # where {T <: RadiationSOCRATES}
-    # FT = TC.float_type(state)
+function update_radiation(radiation::RadiationBase{RadiationSOCRATES}, state, t::Real, param_set) # where {T <: RadiationSOCRATES}
+    grid = TC.Grid(state)
+    FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
     radiation_funcs = radiation.radiation_funcs[]
 
     @inbounds for k in TC.real_center_indices(grid)
-        aux_gm.dTdt_rad[k] = radiation_funcs[:dTdt_rad][k]([t])[1] # apply to time = 0 and apply to aux_gm, turn to vec cause needs to be cast as in
+        aux_gm.dTdt_rad[k] = radiation_funcs[:dTdt_rad][k]([FT(t)])[1] # apply to time = 0 and apply to aux_gm, turn to vec cause needs to be cast as in
     end
     return nothing
 end
+    

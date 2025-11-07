@@ -249,10 +249,10 @@ ForcingBase(case::AbstractCaseType, FT; kwargs...) = ForcingBase{get_forcing_typ
 ##### Default case behavior:
 #####
 
-initialize_radiation(::AbstractCaseType, radiation, grid, state, param_set) = nothing
+initialize_radiation(::AbstractCaseType, radiation, state, param_set) = nothing
 
-update_forcing(::AbstractCaseType, grid, state, t::Real, param_set) = nothing
-initialize_forcing(::AbstractCaseType, forcing, grid::Grid, state, param_set) = initialize(forcing, grid, state)
+update_forcing(::AbstractCaseType, state, t::Real, param_set) = nothing
+initialize_forcing(::AbstractCaseType, forcing, state, param_set) = initialize(forcing, state)
 
 #####
 ##### Soares
@@ -266,7 +266,8 @@ function surface_ref_state(::Soares, param_set::APS, namelist)
     Tg::FT = 300.0
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
-function initialize_profiles(::Soares, grid::Grid, param_set, state; kwargs...)
+function initialize_profiles(::Soares, param_set, state; kwargs...)
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
@@ -317,7 +318,8 @@ function surface_ref_state(::Nieuwstadt, param_set::APS, namelist)
     qtg::FT = 0.0
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
-function initialize_profiles(::Nieuwstadt, grid::Grid, param_set, state; kwargs...)
+function initialize_profiles(::Nieuwstadt, param_set, state; kwargs...)
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
@@ -367,7 +369,8 @@ function surface_ref_state(::Bomex, param_set::APS, namelist)
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 
-function initialize_profiles(::Bomex, grid::Grid, param_set, state; kwargs...)
+function initialize_profiles(::Bomex, param_set, state; kwargs...)
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
@@ -407,9 +410,10 @@ function surface_params(case::Bomex, surf_ref_state, param_set; Ri_bulk_crit)
     return TC.FixedSurfaceFlux(FT, TC.FixedFrictionVelocity; kwargs...)
 end
 
-function initialize_forcing(::Bomex, forcing, grid::Grid, state, param_set)
+function initialize_forcing(::Bomex, forcing, state, param_set)
+    grid = TC.Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
-    initialize(forcing, grid, state)
+    initialize(forcing, state)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = aux_gm.ts
@@ -450,7 +454,8 @@ function surface_ref_state(::life_cycle_Tan2018, param_set::APS, namelist)
     qtg::FT = 0.02245   #Total water mixing ratio at surface
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
-function initialize_profiles(::life_cycle_Tan2018, grid::Grid, param_set, state; kwargs...)
+function initialize_profiles(::life_cycle_Tan2018, param_set, state; kwargs...)
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
@@ -497,9 +502,10 @@ function surface_params(case::life_cycle_Tan2018, surf_ref_state, param_set; Ri_
     return TC.FixedSurfaceFlux(FT, TC.FixedFrictionVelocity; kwargs...)
 end
 
-function initialize_forcing(::life_cycle_Tan2018, forcing, grid::Grid, state, param_set)
+function initialize_forcing(::life_cycle_Tan2018, forcing, state, param_set)
+    grid = TC.Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
-    initialize(forcing, grid, state)
+    initialize(forcing, state)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
     p_c = aux_gm.p
@@ -542,7 +548,8 @@ function surface_ref_state(::Rico, param_set::APS, namelist)
     qtg = (1 / molmass_ratio) * pvg / (Pg - pvg)   #Total water mixing ratio at surface
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
-function initialize_profiles(::Rico, grid::Grid, param_set, state; kwargs...)
+function initialize_profiles(::Rico, param_set, state; kwargs...)
+    grid = TC.Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -572,7 +579,7 @@ function initialize_profiles(::Rico, grid::Grid, param_set, state; kwargs...)
         ts = TD.PhaseEquil_pθq(thermo_params, p[k], aux_gm.θ_liq_ice[k], aux_gm.q_tot[k])
         aux_gm.θ_virt[k] = TD.virtual_pottemp(thermo_params, ts)
     end
-    zi = FT(0.6) * get_inversion(grid, state, param_set, FT(0.2))
+    zi = FT(0.6) * get_inversion(state, param_set, FT(0.2))
 
     @inbounds for k in real_center_indices(grid)
         z = grid.zc[k].z
@@ -607,9 +614,10 @@ function surface_params(case::Rico, surf_ref_state, param_set; kwargs...)
     return TC.FixedSurfaceCoeffs(FT; kwargs...)
 end
 
-function initialize_forcing(::Rico, forcing, grid::Grid, state, param_set)
+function initialize_forcing(::Rico, forcing, state, param_set)
+    grid = TC.Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
-    initialize(forcing, grid, state)
+    initialize(forcing, state)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = aux_gm.ts
@@ -649,7 +657,8 @@ function surface_ref_state(::TRMM_LBA, param_set::APS, namelist)
     qtg = (1 / molmass_ratio) * pvg / (Pg - pvg) #Total water mixing ratio at surface
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
-function initialize_profiles(::TRMM_LBA, grid::Grid, param_set, state; kwargs...)
+function initialize_profiles(::TRMM_LBA, param_set, state; kwargs...)
+    grid = TC.Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -706,7 +715,7 @@ end
 
 RadiationBase(case::TRMM_LBA, FT) = RadiationBase{Cases.get_radiation_type(case), FT}()
 
-initialize_radiation(::TRMM_LBA, radiation, grid::Grid, state, param_set) = initialize(radiation, grid, state)
+initialize_radiation(::TRMM_LBA, radiation, state, param_set) = initialize(radiation, state)
 
 #####
 ##### ARM_SGP
@@ -721,9 +730,10 @@ function surface_ref_state(::ARM_SGP, param_set::APS, namelist)
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 
-function initialize_profiles(::ARM_SGP, grid::Grid, param_set, state; kwargs...)
+function initialize_profiles(::ARM_SGP, param_set, state; kwargs...)
     thermo_params = TCP.thermodynamics_params(param_set)
     # ARM_SGP inputs
+    grid = TC.Grid(state)
     prog_gm = TC.center_prog_grid_mean(state)
     aux_gm = TC.center_aux_grid_mean(state)
     ρ_c = prog_gm.ρ
@@ -770,14 +780,16 @@ function surface_params(case::ARM_SGP, surf_ref_state, param_set; Ri_bulk_crit)
     return TC.FixedSurfaceFlux(FT, TC.FixedFrictionVelocity; kwargs...)
 end
 
-function initialize_forcing(::ARM_SGP, forcing, grid::Grid, state, param_set)
+function initialize_forcing(::ARM_SGP, forcing, state, param_set)
+    grid = TC.Grid(state)
     FT = TC.float_type(state)
     aux_gm_uₕ_g = TC.grid_mean_uₕ_g(state)
     TC.set_z!(aux_gm_uₕ_g, FT(10), FT(0))
     return nothing
 end
 
-function update_forcing(::ARM_SGP, grid, state, t::Real, param_set) #- should these be in Forcing.jl?
+function update_forcing(::ARM_SGP, state, t::Real, param_set) #- should these be in Forcing.jl?
+    grid = TC.Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     aux_gm = TC.center_aux_grid_mean(state)
     ts_gm = TC.center_aux_grid_mean(state).ts
@@ -806,7 +818,8 @@ function surface_ref_state(::GATE_III, param_set::APS, namelist)
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 
-function initialize_profiles(::GATE_III, grid::Grid, param_set, state; kwargs...)
+function initialize_profiles(::GATE_III, param_set, state; kwargs...)
+    grid = TC.Grid(state)
     thermo_params = TCP.thermodynamics_params(param_set)
     FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
@@ -846,7 +859,8 @@ function surface_params(case::GATE_III, surf_ref_state, param_set; kwargs...)
     return TC.FixedSurfaceCoeffs(FT; kwargs...)
 end
 
-function initialize_forcing(::GATE_III, forcing, grid::Grid, state, param_set)
+function initialize_forcing(::GATE_III, forcing, state, param_set)
+    grid = TC.Grid(state)
     FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
     @inbounds for k in TC.real_center_indices(grid)
@@ -871,7 +885,8 @@ function surface_ref_state(::DYCOMS_RF01, param_set::APS, namelist)
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 
-function initialize_profiles(::DYCOMS_RF01, grid::Grid, param_set, state; kwargs...)
+function initialize_profiles(::DYCOMS_RF01, param_set, state; kwargs...)
+    grid = TC.Grid(state)
     FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -908,7 +923,8 @@ function surface_params(case::DYCOMS_RF01, surf_ref_state, param_set; Ri_bulk_cr
     return TC.FixedSurfaceFlux(FT, TC.VariableFrictionVelocity; kwargs...)
 end
 
-function initialize_forcing(::DYCOMS_RF01, forcing, grid::Grid, state, param_set)
+function initialize_forcing(::DYCOMS_RF01, forcing, state, param_set)
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     FT = TC.float_type(state)
 
@@ -936,15 +952,15 @@ function RadiationBase(case::DYCOMS_RF01, FT)
     )
 end
 
-function initialize_radiation(::DYCOMS_RF01, radiation, grid::Grid, state, param_set)
+function initialize_radiation(::DYCOMS_RF01, radiation, state, param_set)
     aux_gm = TC.center_aux_grid_mean(state)
 
     # no large-scale drying
-    parent(aux_gm.dqtdt_rad) .= 0 #kg/(kg * s)
+    # parent(aux_gm.dqtdt_rad) .= 0 #kg/(kg * s) # seems unused
 
     # Radiation based on eq. 3 in Stevens et. al., (2005)
     # cloud-top cooling + cloud-base warming + cooling in free troposphere
-    update_radiation(radiation, grid, state, 0, param_set)
+    update_radiation(radiation, state, 0, param_set)
 end
 
 #####
@@ -962,7 +978,8 @@ function surface_ref_state(::DYCOMS_RF02, param_set::APS, namelist)
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 
-function initialize_profiles(::DYCOMS_RF02, grid::Grid, param_set, state; kwargs...)
+function initialize_profiles(::DYCOMS_RF02, param_set, state; kwargs...)
+    grid = TC.Grid(state)
     FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -998,7 +1015,8 @@ function surface_params(case::DYCOMS_RF02, surf_ref_state, param_set; Ri_bulk_cr
     return TC.FixedSurfaceFlux(FT, TC.FixedFrictionVelocity; kwargs...)
 end
 
-function initialize_forcing(::DYCOMS_RF02, forcing, grid::Grid, state, param_set)
+function initialize_forcing(::DYCOMS_RF02, forcing, state, param_set)
+    grid = TC.Grid(state)
     FT = TC.float_type(state)
     # the same as in DYCOMS_RF01
     aux_gm = TC.center_aux_grid_mean(state)
@@ -1027,16 +1045,16 @@ function RadiationBase(case::DYCOMS_RF02, FT)
     )
 end
 
-function initialize_radiation(::DYCOMS_RF02, radiation, grid::Grid, state, param_set)
+function initialize_radiation(::DYCOMS_RF02, radiation, state, param_set)
     # the same as in DYCOMS_RF01
     aux_gm = TC.center_aux_grid_mean(state)
 
     # no large-scale drying
-    parent(aux_gm.dqtdt_rad) .= 0 #kg/(kg * s)
+    # parent(aux_gm.dqtdt_rad) .= 0 #kg/(kg * s) [[ seems unused? ]]
 
     # Radiation based on eq. 3 in Stevens et. al., (2005)
     # cloud-top cooling + cloud-base warming + cooling in free troposphere
-    update_radiation(radiation, grid, state, 0, param_set)
+    update_radiation(radiation, state, 0, param_set)
 end
 
 #####
@@ -1051,7 +1069,8 @@ function surface_ref_state(::GABLS, param_set::APS, namelist)
     qtg::FT = 0.0
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
-function initialize_profiles(::GABLS, grid::Grid, param_set, state; kwargs...)
+function initialize_profiles(::GABLS, param_set, state; kwargs...)
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     ρ_c = prog_gm.ρ
@@ -1068,7 +1087,7 @@ function initialize_profiles(::GABLS, grid::Grid, param_set, state; kwargs...)
         aux_gm.θ_liq_ice[k] = APL.GABLS_θ_liq_ice(FT)(z)
         aux_gm.q_tot[k] = APL.GABLS_q_tot(FT)(z)
         aux_gm.tke[k] = APL.GABLS_tke(FT)(z)
-        aux_gm.Hvar[k] = aux_gm.tke[k]
+        aux_gm.Hvar[k] = aux_gm.tke[k] # seems wrong
     end
 end
 
@@ -1082,9 +1101,10 @@ function surface_params(case::GABLS, surf_ref_state, param_set; kwargs...)
     return TC.MoninObukhovSurface(FT; kwargs...)
 end
 
-function initialize_forcing(::GABLS, forcing, grid::Grid, state, param_set)
+function initialize_forcing(::GABLS, forcing, state, param_set)
+    grid = TC.Grid(state)
     FT = TC.float_type(state)
-    initialize(forcing, grid, state)
+    initialize(forcing, state)
     aux_gm = TC.center_aux_grid_mean(state)
 
     prof_ug = APL.GABLS_geostrophic_ug(FT)
@@ -1109,7 +1129,8 @@ function surface_ref_state(::DryBubble, param_set::APS, namelist)
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 
-function initialize_profiles(::DryBubble, grid::Grid, param_set, state; kwargs...)
+function initialize_profiles(::DryBubble, param_set, state; kwargs...)
+    grid = TC.Grid(state)
     FT = TC.float_type(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -1202,9 +1223,10 @@ function surface_ref_state(::LES_driven_SCM, param_set::APS, namelist)
     return TD.PhaseEquil_pTq(thermo_params, Pg, Tg, qtg)
 end
 
-function initialize_profiles(::LES_driven_SCM, grid::Grid, param_set, state; LESDat)
+function initialize_profiles(::LES_driven_SCM, param_set, state; LESDat)
 
     FT = TC.float_type(state)
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
 
@@ -1276,11 +1298,11 @@ function surface_params(case::LES_driven_SCM, surf_ref_state, param_set; Ri_bulk
     return TC.FixedSurfaceFlux(FT, TC.VariableFrictionVelocity; kwargs...)
 end
 
-initialize_forcing(::LES_driven_SCM, forcing, grid::Grid, state, param_set; LESDat) =
-    initialize(forcing, grid, state, LESDat)
+initialize_forcing(::LES_driven_SCM, forcing, state, param_set; LESDat) =
+    initialize(forcing, state, LESDat)
 
-initialize_radiation(::LES_driven_SCM, radiation, grid::Grid, state, param_set; LESDat) =
-    initialize(radiation, grid, state, LESDat)
+initialize_radiation(::LES_driven_SCM, radiation, state, param_set; LESDat) =
+    initialize(radiation, state, LESDat)
 
 
 #####
@@ -1324,8 +1346,9 @@ function surface_ref_state(case::SOCRATES, param_set::APS, namelist) # adopted m
     )
 end
 
-function initialize_profiles(case::SOCRATES, grid::Grid, param_set, state; kwargs...) # Relies on SOCRATES_Single_Column_Forcings.jl
+function initialize_profiles(case::SOCRATES, param_set, state; kwargs...) # Relies on SOCRATES_Single_Column_Forcings.jl
     """ need θ_liq_ice, q_tot, prog_gm_u, prog_gm_v, tke, prog_gm_uₕ (is returned as (; dTdt_hadv, H_nudge, dqtdt_hadv, qt_nudge, subsidence, u_nudge, v_nudge, ug_nudge, vg_nudge) """
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
     thermo_params = TCP.thermodynamics_params(param_set)
@@ -1373,12 +1396,13 @@ function initialize_profiles(case::SOCRATES, grid::Grid, param_set, state; kwarg
     @. prog_gm_uₕ = CCG.Covariant12Vector(CCG.UVVector(prog_gm_u, prog_gm_v))
 end
 
-function overwrite_ref_state_from_file!(case::AbstractCaseType, state, grid, param_set)
+function overwrite_ref_state_from_file!(case::AbstractCaseType, state, param_set)
     nothing
 end
 
-function overwrite_ref_state_from_file!(case::SOCRATES, state, grid, param_set)
+function overwrite_ref_state_from_file!(case::SOCRATES, state, param_set)
     # read grid
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     aux_gm_f = TC.face_aux_grid_mean(state)
     prog_gm = TC.center_prog_grid_mean(state)
@@ -1440,7 +1464,8 @@ function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # 
     return TC.MoninObukhovSurface(FT; kwargs...) # interactive?
 end
 
-function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_set; kwargs...) # param_set isn't used but matches form in main.jl
+function initialize_forcing(case::SOCRATES, forcing, state, param_set; kwargs...) # param_set isn't used but matches form in main.jl
+    grid = TC.Grid(state)
     new_zc = vec(grid.zc.z)
     new_zf = vec(grid.zf.z)[1:(end - 1)]
 
@@ -1467,7 +1492,7 @@ function initialize_forcing(case::SOCRATES, forcing, grid::Grid, state, param_se
         conservative_interp = conservative_interp, # parsed in aux_data_kwarg()
         conservative_interp_kwargs = conservative_interp_kwargs, # parsed in aux_data_kwarg()
     )
-    initialize(forcing, grid, state) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
+    initialize(forcing, state) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
 end
 
 function forcing_kwargs(case::SOCRATES, namelist) # call in main.jl is forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
@@ -1484,7 +1509,8 @@ function forcing_kwargs(case::SOCRATES, namelist) # call in main.jl is forcing =
     end
 end
 
-function update_forcing(case::SOCRATES, grid, state, t::Real, param_set, forcing) # Adapted from ARM_SGP -- should these be in Forcing.jl -- called in dycore.jl
+function update_forcing(case::SOCRATES, state, t::Real, param_set, forcing) # Adapted from ARM_SGP -- should these be in Forcing.jl -- called in dycore.jl
+    grid = TC.Grid(state)
     aux_gm = TC.center_aux_grid_mean(state)
     FT = TC.float_type(state)
 
@@ -1510,20 +1536,13 @@ function update_forcing(case::SOCRATES, grid, state, t::Real, param_set, forcing
     end
 end
 
-# paper says RRTMG...
-# function initialize(self::RadiationBase{SOCRATES_RF09_obs}, grid, state)
-#     return nothing
-# end
 
-# function update_radiation(self::RadiationBase{SOCRATES_RF09_obs}, grid, state, t::Real, param_set)
-#     return nothing
-# end
 
 # currently still nothing just cause idk what to do w/ RRTMG or if it's long enough to need...
 RadiationBase(case::SOCRATES, FT) = RadiationBase{Cases.get_radiation_type(case), FT}() # i think this should default to none, would deprecate this call for now cause we dont have a use, default is just none... but aux_data_kwarg is in the end of the main.jl initialize_radiation.jl cal so we gotta improvise
 
-# initialize_radiation(::SOCRATES, radiation, grid::Grid, state, param_set;) = nothing # for now we jus deprecate, if we reimplement a call to radation it will need to match our initialize forcing call structure w/ param_set and Dat
-function initialize_radiation(case::SOCRATES, radiation, grid::Grid, state, param_set; kwargs...)
+function initialize_radiation(case::SOCRATES, radiation, state, param_set; kwargs...)
+    grid = TC.Grid(state)
     new_zc = vec(grid.zc.z)
     new_zf = vec(grid.zf.z)[1:(end - 1)]
 
@@ -1550,7 +1569,7 @@ function initialize_radiation(case::SOCRATES, radiation, grid::Grid, state, para
         conservative_interp = conservative_interp, # parsed in aux_data_kwarg()
         conservative_interp_kwargs = conservative_interp_kwargs, # parsed in aux_data_kwarg()
     ) # redundant w/ forcing but oh well
-    initialize(radiation, grid, state) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
+    initialize(radiation, state) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
 end
 
 end # module Cases

@@ -140,18 +140,7 @@ function to_static_strided_array(x::NTuple{N, FT}) where {FT, N}
     return out
 end
 
-# """
-# Vector(svec) takes like 138 ns...
-# calling NN_simiple_chain(input, v) tkes about 87 ns
-# """
-# function fast_vec_from_svec(x::SVector{N, FT}) where {N, FT}
-#     out = Vector{FT}(undef, N) # 125 ns
-#     # out = similar(Vector{FT}, N) # this is faster than Vector{FT}(undef, length(x)) # 123 ns 
-#     @inbounds for i in eachindex(x)
-#         out[i] = x[i]
-#     end
-#     return out
-# end 
+
 
 @inline linear_interpolate_extrapolate(x::FT, xs::Tuple{FT,FT}, vs::Tuple{FT,FT}) where {FT} = (x - xs[1]) / (xs[2] - xs[1]) * (vs[2] - vs[1]) + vs[1] # fast linear interpolation/extrapolation
 @inline positive_linear_interpolate_extrapolate(x::FT, xs::Tuple{FT,FT}, vs::Tuple{FT,FT}) where {FT} = max(0, linear_interpolate_extrapolate(x, xs, vs)) # fast linear interpolation/extrapolation
