@@ -492,15 +492,15 @@ function reweight_equilibrium_saturation_adjustment_for_grid(
 
         for scenario in scenarios
 
-            if (region isa en_or_up) || (region isa EnvRemainingDomain) # no cloak
+            if (region isa EnvOrUpDomain) || (region isa EnvRemainingDomain) # no cloak
                 area = (region isa EnvRemainingDomain) ? aux_domain.a_en_remaining : aux_domain.area
                 θ_liq_ice = aux_domain.θ_liq_ice
                 q_tot = aux_domain.q_tot
-            elseif (region isa CloakUp) # cloak up
+            elseif (region isa CloakUpDomain) # cloak up
                 θ_liq_ice = aux_domain.θ_liq_ice_cloak_up
                 q_tot = aux_domain.q_tot_cloak_up
                 area = aux_domain.area_cloak_up
-            elseif (region isa CloakDown) # cloak down
+            elseif (region isa CloakDownDomain) # cloak down
                 θ_liq_ice = aux_domain.θ_liq_ice_cloak_down
                 q_tot = aux_domain.q_tot_cloak_down
                 area = aux_domain.area_cloak_down

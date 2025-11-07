@@ -178,8 +178,8 @@ function compute_precipitation_advection_tendencies(
         # for (area_region, w_region, q_rai_here, q_sno_here, LRB) in regions
         for (area_region, w_region, LRB, domain_type) in regions
             if domain_type === CloakUpDomain
-                @. q_rai_here = ifelse(aux_gm.q_liq > FT(0), (aux_up[i].q_liq * aux_up[i].area) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Updraft
-                @. q_sno_here = ifelse(aux_gm.q_ice > FT(0), (aux_up[i].q_ice * aux_up[i].area) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Updraft
+                @. q_rai_here = ifelse(aux_gm.q_liq > FT(0), aux_en.q_liq_cloak_up * aux_en.a_cloak_up / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Updraft
+                @. q_sno_here = ifelse(aux_gm.q_ice > FT(0), aux_en.q_ice_cloak_up * aux_en.a_cloak_up / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Updraft
             elseif domain_type === CloakDownDomain
                 @. q_rai_here = ifelse(aux_gm.q_liq > FT(0), (aux_en.q_liq_cloak_dn * aux_en.a_cloak_dn) / aux_gm.q_liq , FT(1)) * q_rai # fraction of liquid in Downdraft cloak
                 @. q_sno_here = ifelse(aux_gm.q_ice > FT(0), (aux_en.q_ice_cloak_dn * aux_en.a_cloak_dn) / aux_gm.q_ice , FT(1)) * q_sno # fraction of ice in Downdraft cloak

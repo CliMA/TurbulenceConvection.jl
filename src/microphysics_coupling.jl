@@ -440,8 +440,8 @@ function precipitation_formation(
             qsat = TD.q_vap_saturation(thermo_params, ts)
             λ = TD.liquid_fraction(thermo_params, ts)
 
-            L_v = TD.latent_heat_vaporization(thermo_params, ts)
-            L_s = TD.latent_heat_sublimation(thermo_params, ts)
+            L_v = TD.latent_heat_vapor(thermo_params, ts)
+            L_s = TD.latent_heat_sublim(thermo_params, ts)
 
             # S_qt = -min((q.liq + q.ice) / Δt, -CM0.remove_precipitation(microphys_params, q, qsat))
             S_qt = limit_tendency(precipitation_tendency_limiter, CM0.remove_precipitation(microphys_params, q, qsat), (q.liq + q.ice), Δt)
@@ -1450,7 +1450,7 @@ function compute_domain_interaction_microphysics_tendencies!(
                 qi_tendency_agg_acnv_other_env_blk_i = S_qt_snow_ice_agg_other_env_blk # already should be area weighted
                 Π_m = TD.exner(thermo_params, aux_up[i].ts[k])
                 c_pm = TD.cp_m(thermo_params, aux_up[i].ts[k])
-                L_s = TCP.LH_s(param_set, aux_up[i].ts[k])
+                L_s = TD.latent_heat_sublim(thermo_params, aux_up[i].ts[k])
                 θ_liq_ice_tendency_agg_acnv_other_env_blk = S_qt_snow_ice_agg_other_env_blk / Π_m / c_pm * L_s
 
                 aux_up[i].qi_tendency_acnv_agg_other[k] += qi_tendency_agg_acnv_other_env_blk * interface_area / aux_up[i].area[k] # add back area weight
@@ -1501,6 +1501,7 @@ function compute_domain_interaction_microphysics_tendencies!(
             qi_tendency_agg_acnv_other_blk_env = S_qt_snow_ice_agg_other_blk_env # already should be area weighted
             Π_m = TD.exner(thermo_params, aux_en.ts[k])
             c_pm = TD.cp_m(thermo_params, aux_en.ts[k])
+            L_s = TD.latent_heat_sublim(thermo_params, aux_en.ts[k])
             θ_liq_ice_tendency_agg_acnv_other_blk_env = S_qt_snow_ice_agg_other_blk_env / Π_m / c_pm * L_s
 
             aux_en.qi_tendency_acnv_agg_other[k] += qi_tendency_agg_acnv_other_blk_env * interface_area/ aux_en.area[k] # this is the total tendency for the environment
@@ -1665,7 +1666,7 @@ function threshold_driven_acnv(
     w::FT = FT(0),
     N_INP::FT = FT(NaN),
     massflux::FT = FT(0),
-    domain = En,
+    domain = Env,
     use_cloak::Bool = false,
     tke::FT = FT(0), # not sure which vars i want
     qt::FT = FT(NaN), # not sure which vars i want

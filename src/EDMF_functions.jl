@@ -2844,7 +2844,9 @@ function compute_en_tendencies!(
 
         if any(!isfinite, ρatke_convective_production)
             @warn "Non-finite values in convective TKE production limiter computation."
-            error("KE_current = $(parent(KE_current)); ΔKE_timestep = $(parent(ΔKE_timestep)); overage_prod = $(parent(overage_prod)); tke_max = $(parent(tke_max)); tke = $(parent(aux_en.tke))")
+            error("KE_current = $(parent(max(ρatke_convective / (ρ_c * a_en))));
+                ΔKE_timestep = $(parent((ρatke_convective_production - ρatke_convective_dissipation + ρatke_convective_advection) * Δt / (ρ_c * a_en))); 
+                overage_prod = $(parent(overage_prod)); tke_max = $(parent(tke_max)); tke = $(parent(aux_en.tke))")
         end
 
         # turn off production at surface, surface +1, toa, toa -1 

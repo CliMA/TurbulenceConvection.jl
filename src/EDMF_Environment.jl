@@ -282,13 +282,13 @@ function microphysics!(
 
                     # if at an extrema, we don't know where the peak is so we'll reweight based on probability of where it could be in between.
                     if reweight_processes_for_grid
-                        w_region_full = if region isa EnvOrUp
+                        w_region_full = if region isa EnvOrUpDomain
                             w # is already on centers
                         elseif region isa EnvRemainingDomain
                             edmf.area_partition_model.confine_all_downdraft_to_cloak ? (w .* FT(0)) : w
-                        elseif region isa CloakUp
+                        elseif region isa CloakUpDomain
                             w_cloak_up
-                        elseif region isa CloakDown
+                        elseif region isa CloakDownDomain
                             w_cloak_dn
                         else
                             error("Unknown region type")
@@ -822,6 +822,8 @@ const QuadratureVarsType{FT} = @NamedTuple{
     dN_i_dz::FT,
     dqidz::FT,
     massflux::FT,
+    ∂b∂z::FT,
+    ∂qt∂z::FT,
 }
 
 # doesnt really support NonEq yet
@@ -1060,7 +1062,7 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
             if moisture_model isa NonEquilibriumMoisture # Here we do noneqmoisture sources. We assume the same ql, qi everywhere w/ no quadrature though...
 
                 # assume q_liq and q_en do not change and have no variance... ( do not participate in quadrature )
-                (; use_fallback_tendency_limiters, aux_en, aux_en_f, k, q_liq, q_ice, N_l, N_i, N_i_no_boost, term_vel_liq, term_vel_ice, term_vel_rain, term_vel_snow, w, tke, ql_tendency_sedimentation, ql_tendency_sedimentation_other, qi_tendency_sedimentation, qi_tendency_sedimentation_other, dqvdt, dTdt, S_i, N_INP, τ_liq, τ_ice, dN_i_dz, dqidz, massflux) = vars # unpack
+                (; use_fallback_tendency_limiters, aux_en, aux_en_f, k, q_liq, q_ice, N_l, N_i, N_i_no_boost, term_vel_liq, term_vel_ice, term_vel_rain, term_vel_snow, w, tke, ql_tendency_sedimentation, ql_tendency_sedimentation_other, qi_tendency_sedimentation, qi_tendency_sedimentation_other, dqvdt, dTdt, S_i, N_INP, τ_liq, τ_ice, dN_i_dz, dqidz, massflux, ∂b∂z, ∂qt∂z) = vars # unpack
 
                 ts = thermo_state_pθq(param_set, p_c, h_hat, qt_hat, q_liq, q_ice)
                 T = TD.air_temperature(thermo_params, ts)
@@ -1078,7 +1080,7 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
                 (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(grid, edmf, Δt, param_set, use_fallback_tendency_limiters, aux_en, aux_en_f, k,
                     subdomain_area, h_hat, qt_hat, q_liq_en, q_ice_en, q_rai, q_sno, N_l, N_i, N_i_no_boost, term_vel_liq, term_vel_ice, term_vel_rain, term_vel_snow, ρ_c, p_c, T, ts, precip_frac,
                     ql_tendency_sedimentation, ql_tendency_sedimentation_other, qi_tendency_sedimentation, qi_tendency_sedimentation_other;
-                    q_vap_sat_liq = q_vap_sat_liq, q_vap_sat_ice = q_vap_sat_ice, dqvdt = dqvdt, dTdt = dTdt, w=w, tke = tke, S_i = S_i, τ_liq = τ_liq, τ_ice = τ_ice, dN_i_dz = dN_i_dz, dqidz = dqidz, N_INP = N_INP, massflux = massflux)
+                    q_vap_sat_liq = q_vap_sat_liq, q_vap_sat_ice = q_vap_sat_ice, dqvdt = dqvdt, dTdt = dTdt, w=w, tke = tke, S_i = S_i, τ_liq = τ_liq, τ_ice = τ_ice, dN_i_dz = dN_i_dz, dqidz = dqidz, N_INP = N_INP, massflux = massflux, ∂b∂z = ∂b∂z, ∂qt∂z = ∂qt∂z)
             else
                 (; use_fallback_tendency_limiters, aux_en, aux_en_f, k, N_l, N_i, N_i_no_boost, term_vel_liq, term_vel_ice, term_vel_rain, term_vel_snow, w, tke, ql_tendency_sedimentation, ql_tendency_sedimentation_other, qi_tendency_sedimentation, qi_tendency_sedimentation_other) = vars # unpack
 
@@ -1223,6 +1225,7 @@ function microphysics!(
     prog_gm = center_prog_grid_mean(state)
     aux_gm = center_aux_grid_mean(state)
     aux_tc = center_aux_turbconv(state)
+    aux_tc_f = face_aux_turbconv(state)
     ts_env = center_aux_environment(state).ts
     p_c = aux_gm.p
     ρ_c = prog_gm.ρ
@@ -1421,6 +1424,8 @@ function microphysics!(
                 dN_i_dz = aux_en.dN_i_dz[k], # only needed for NonEq
                 dqidz = aux_en.dqidz[k], # only needed for NonEq
                 massflux = aux_tc.massflux[k],
+                ∂b∂z = aux_tc.∂b∂z[k], # only needed for NonEq
+                ∂qt∂z = aux_tc.∂qt∂z[k], # only needed for NonEq
             )
             
             # outer_env, outer_src = quad_loop(en_thermo, grid, moisture_model, precip_model, cloud_sedimentation_model, rain_formation_model, snow_formation_model, edmf.tendency_limiters, vars, param_set, Δt, use_fallback_tendency_limiters)
@@ -1572,7 +1577,7 @@ function microphysics!(
                     (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation[k] / aux_en.area[k] : FT(0),
                     (aux_en.area[k] > FT(0)) ? aux_en.qi_tendency_sedimentation_other[k] / aux_en.area[k] : FT(0)
                     ;
-                    q_vap_sat_liq = aux_en.q_vap_sat_liq[k], q_vap_sat_ice = aux_en.q_vap_sat_ice[k], dqvdt = aux_tc.dqvdt[k], dTdt = aux_tc.dTdt[k], w=w[k], tke = aux_en.tke[k], S_i = S_i, τ_liq = aux_en.τ_liq[k], τ_ice = aux_en.τ_ice[k], dN_i_dz = aux_en.dN_i_dz[k], dqidz = aux_en.dqidz[k], N_INP = N_INP, massflux = aux_tc.massflux[k])
+                    q_vap_sat_liq = aux_en.q_vap_sat_liq[k], q_vap_sat_ice = aux_en.q_vap_sat_ice[k], dqvdt = aux_tc.dqvdt[k], dTdt = aux_tc.dTdt[k], w=w[k], tke = aux_en.tke[k], S_i = S_i, τ_liq = aux_en.τ_liq[k], τ_ice = aux_en.τ_ice[k], dN_i_dz = aux_en.dN_i_dz[k], dqidz = aux_en.dqidz[k], N_INP = N_INP, massflux = aux_tc.massflux[k], ∂b∂z = aux_tc.∂b∂z[k], ∂qt∂z = aux_tc.∂qt∂z[k])
             else                
                 (; mph_neq, mph_neq_other, mph_precip) = microphysics_helper(grid, edmf, Δt, param_set, use_fallback_tendency_limiters, aux_en, aux_en_f, k,
                     aux_en.area[k], aux_en.θ_liq_ice[k], aux_en.q_tot[k], aux_en.q_liq[k], aux_en.q_ice[k], prog_pr.q_rai[k], prog_pr.q_sno[k], aux_en.N_l[k], aux_en.N_i[k], aux_en.N_i_no_boost[k], aux_en.term_vel_liq[k], aux_en.term_vel_ice[k], aux_tc.term_vel_rain[k], aux_tc.term_vel_snow[k], ρ_c[k], p_c[k], aux_en.T[k], ts, precip_fraction,
@@ -1746,6 +1751,8 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, Δt::FT, param_set::AP
     dqidz::FT = FT(0),
     N_INP::FT = FT(NaN),
     massflux::FT = FT(0),
+    ∂b∂z::FT = FT(0),
+    ∂qt∂z::FT = FT(0),
     domain = Env,
 ) where {FT}
 
@@ -1847,7 +1854,7 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, Δt::FT, param_set::AP
                 massflux,
                 domain,
                 aux_en.QTvar[k],
-                aux_tc.∂qt∂z[k],
+                ∂qt∂z,
             )
     else
 
@@ -1896,7 +1903,7 @@ function microphysics_helper(grid::Grid, edmf::EDMFModel, Δt::FT, param_set::AP
                 massflux = massflux,
                 domain = domain,
                 qt_var = aux_en.QTvar[k],
-                dqtdz = aux_tc.∂qt∂z[k],
+                dqtdz = ∂qt∂z,
             )
 
     end

@@ -706,7 +706,7 @@ function compute_precipitation_formation_tendencies(
                     FT(0), # massflux doesnt count in updraft [[ we pass domain as an arg now anyway]]
                     Up,
                     FT(0),
-                    aux_tc.∂qt∂z[k],
+                    aux_en.∂qt∂z[k],
                 )
 
             else
