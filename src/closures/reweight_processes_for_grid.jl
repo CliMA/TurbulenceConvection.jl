@@ -108,29 +108,29 @@ function reweight_noneq_moisture_sources_for_grid(
             q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Liquid())
             q_vap_sat_liq_kp1 = TD.q_vap_saturation_generic(thermo_params, T_kp1, TD.air_density(thermo_params, ts_kp1), TD.Liquid())
         elseif (region isa CloakDown) # cloak down
-            q_tot_km1 = aux_domain.q_tot_cloak_down[k - 1]
-            q_tot = aux_domain.q_tot_cloak_down[k]
-            q_tot_kp1 = aux_domain.q_tot_cloak_down[k + 1]
+            q_tot_km1 = aux_domain.q_tot_cloak_dn[k - 1]
+            q_tot = aux_domain.q_tot_cloak_dn[k]
+            q_tot_kp1 = aux_domain.q_tot_cloak_dn[k + 1]
             #
-            q_liq_km1 = aux_domain.q_liq_cloak_down[k - 1]
-            q_liq = aux_domain.q_liq_cloak_down[k]
-            q_liq_kp1 = aux_domain.q_liq_cloak_down[k + 1]
+            q_liq_km1 = aux_domain.q_liq_cloak_dn[k - 1]
+            q_liq = aux_domain.q_liq_cloak_dn[k]
+            q_liq_kp1 = aux_domain.q_liq_cloak_dn[k + 1]
             #
-            q_ice_km1 = aux_domain.q_ice_cloak_down[k - 1]
-            q_ice = aux_domain.q_ice_cloak_down[k]
-            q_ice_kp1 = aux_domain.q_ice_cloak_down[k + 1]
+            q_ice_km1 = aux_domain.q_ice_cloak_dn[k - 1]
+            q_ice = aux_domain.q_ice_cloak_dn[k]
+            q_ice_kp1 = aux_domain.q_ice_cloak_dn[k + 1]
             #
-            θ_liq_ice_km1 = aux_domain.θ_liq_ice_cloak_down[k - 1]
-            θ_liq_ice = aux_domain.θ_liq_ice_cloak_down[k]
-            θ_liq_ice_kp1 = aux_domain.θ_liq_ice_cloak_down[k + 1]
+            θ_liq_ice_km1 = aux_domain.θ_liq_ice_cloak_dn[k - 1]
+            θ_liq_ice = aux_domain.θ_liq_ice_cloak_dn[k]
+            θ_liq_ice_kp1 = aux_domain.θ_liq_ice_cloak_dn[k + 1]
             #
-            T_km1 = aux_domain.T_cloak_down[k - 1]
-            T = aux_domain.T_cloak_down[k]
-            T_kp1 = aux_domain.T_cloak_down[k + 1]
+            T_km1 = aux_domain.T_cloak_dn[k - 1]
+            T = aux_domain.T_cloak_dn[k]
+            T_kp1 = aux_domain.T_cloak_dn[k + 1]
             #
-            ts_km1 = aux_domain.ts_cloak_down[k - 1]
-            ts = aux_domain.ts_cloak_down[k]
-            ts_kp1 = aux_domain.ts_cloak_down[k + 1]
+            ts_km1 = aux_domain.ts_cloak_dn[k - 1]
+            ts = aux_domain.ts_cloak_dn[k]
+            ts_kp1 = aux_domain.ts_cloak_dn[k + 1]
             #
             q_vap_sat_liq_km1 = TD.q_vap_saturation_generic(thermo_params, T_km1, TD.air_density(thermo_params, ts_km1), TD.Liquid())
             q_vap_sat_liq = TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Liquid())
@@ -231,17 +231,17 @@ function reweight_noneq_moisture_sources_for_grid(
                 q_liq = aux_domain.q_liq
                 q_ice = aux_domain.q_ice
             elseif (region isa CloakUp) # cloak up
-                area = aux_domain.area_cloak_up
+                area = aux_domain.a_cloak_up
                 θ_liq_ice = aux_domain.θ_liq_ice_cloak_up
                 q_tot = aux_domain.q_tot_cloak_up
                 q_liq = aux_domain.q_liq_cloak_up
                 q_ice = aux_domain.q_ice_cloak_up
             elseif (region isa CloakDown) # cloak down
-                area = aux_domain.area_cloak_down
-                θ_liq_ice = aux_domain.θ_liq_ice_cloak_down
-                q_tot = aux_domain.q_tot_cloak_down
-                q_liq = aux_domain.q_liq_cloak_down
-                q_ice = aux_domain.q_ice_cloak_down
+                area = aux_domain.a_cloak_dn
+                θ_liq_ice = aux_domain.θ_liq_ice_cloak_dn
+                q_tot = aux_domain.q_tot_cloak_dn
+                q_liq = aux_domain.q_liq_cloak_dn
+                q_ice = aux_domain.q_ice_cloak_dn
             end
 
             θ_liq_ice_lo = positive_linear_interpolate_extrapolate(zf_lo, scenario.bottom_extrap.zs, (θ_liq_ice[scenario.bottom_extrap.ks[1]], θ_liq_ice[scenario.bottom_extrap.ks[2]]))
@@ -399,17 +399,17 @@ function reweight_equilibrium_saturation_adjustment_for_grid(
             T = aux_domain.T_cloak_up[k]
             T_kp1 = aux_domain.T_cloak_up[k + 1]
         elseif (region isa CloakDown) # cloak down
-            q_tot_km1 = aux_domain.q_tot_cloak_down[k - 1]
-            q_tot = aux_domain.q_tot_cloak_down[k]
-            q_tot_kp1 = aux_domain.q_tot_cloak_down[k + 1]
+            q_tot_km1 = aux_domain.q_tot_cloak_dn[k - 1]
+            q_tot = aux_domain.q_tot_cloak_dn[k]
+            q_tot_kp1 = aux_domain.q_tot_cloak_dn[k + 1]
             #
-            θ_liq_ice_km1 = aux_domain.θ_liq_ice_cloak_down[k - 1]
-            θ_liq_ice = aux_domain.θ_liq_ice_cloak_down[k]
-            θ_liq_ice_kp1 = aux_domain.θ_liq_ice_cloak_down[k + 1]
+            θ_liq_ice_km1 = aux_domain.θ_liq_ice_cloak_dn[k - 1]
+            θ_liq_ice = aux_domain.θ_liq_ice_cloak_dn[k]
+            θ_liq_ice_kp1 = aux_domain.θ_liq_ice_cloak_dn[k + 1]
             #
-            T_km1 = aux_domain.T_cloak_down[k - 1]
-            T = aux_domain.T_cloak_down[k]
-            T_kp1 = aux_domain.T_cloak_down[k + 1]
+            T_km1 = aux_domain.T_cloak_dn[k - 1]
+            T = aux_domain.T_cloak_dn[k]
+            T_kp1 = aux_domain.T_cloak_dn[k + 1]
         end
     end
 
@@ -499,11 +499,11 @@ function reweight_equilibrium_saturation_adjustment_for_grid(
             elseif (region isa CloakUpDomain) # cloak up
                 θ_liq_ice = aux_domain.θ_liq_ice_cloak_up
                 q_tot = aux_domain.q_tot_cloak_up
-                area = aux_domain.area_cloak_up
+                area = aux_domain.a_cloak_up
             elseif (region isa CloakDownDomain) # cloak down
-                θ_liq_ice = aux_domain.θ_liq_ice_cloak_down
-                q_tot = aux_domain.q_tot_cloak_down
-                area = aux_domain.area_cloak_down
+                θ_liq_ice = aux_domain.θ_liq_ice_cloak_dn
+                q_tot = aux_domain.q_tot_cloak_dn
+                area = aux_domain.a_cloak_dn
             end
 
 

@@ -204,7 +204,7 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
             # upcloak
             TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_up[k]) * (aux_en.a_cloak_up[k]) * Ic.(aux_en_f.w_cloak_up)[k]^2
             # downcloak
-            TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_down[k]) * (aux_en.a_cloak_dn[k]) * Ic.(aux_en_f.w_cloak_down)[k]^2
+            TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_cloak_dn[k]) * (aux_en.a_cloak_dn[k]) * Ic.(aux_en_f.w_cloak_dn)[k]^2
             # env_remaining
             TKE += FT(0.5) * TD.air_density(thermo_params, aux_en.ts_en_remaining[k]) * (aux_en.a_en_remaining[k]) * Ic.(aux_en_f.w_en_remaining)[k]^2
         else # Remove env KE
@@ -582,7 +582,7 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
             # if edmf.area_partition_model.confine_all_downdraft_to_cloak
             #     # we want ρ_en_remaining = ρ_gm, so we can rearrange to solve for ρ_cloak_dn
             #     ρ_cloak_dn = (a_cloak_dn[k] > edmf.minimum_area) ? ( (ρ_gm - (aux_bulk.area[k] * ρ_bulk) - (a_cloak_up[k] * ρ_cloak_up)) / a_cloak_dn[k] ) : ρ_en
-            #     ts_cloak_down = (edmf.moisture_model isa NonEquilibriumMoisture) ? TD.PhaseNonEquil_ρpq(param_set, ρ_cloak_dn, p_c[k], TD.PhasePartition(q_tot_cloak_dn[k], q_liq_cloak_dn[k], q_ice_cloak_dn[k])) : TD.PhaseEquil_ρpq(param_set, ρ_cloak_dn, p_c[k], TD.PhasePartition(q_tot_cloak_dn[k], q_liq_cloak_dn[k], q_ice_cloak_dn[k]))
+            #     ts_cloak_dn = (edmf.moisture_model isa NonEquilibriumMoisture) ? TD.PhaseNonEquil_ρpq(param_set, ρ_cloak_dn, p_c[k], TD.PhasePartition(q_tot_cloak_dn[k], q_liq_cloak_dn[k], q_ice_cloak_dn[k])) : TD.PhaseEquil_ρpq(param_set, ρ_cloak_dn, p_c[k], TD.PhasePartition(q_tot_cloak_dn[k], q_liq_cloak_dn[k], q_ice_cloak_dn[k]))
 
             #     # ts_en_remaining = (edmf.moisture_model isa NonEquilibriumMoisture) ? TD.PhaseNonEquil_ρpq(param_set, p_c[k], ρ_gm, TD.PhasePartition(aux_en.q_tot[k], q_liq_en_remaining[k], q_ice_en_remaining[k])) : TD.PhaseEquil_ρpq(param_set, p_c[k], ρ_gm, TD.PhasePartition(aux_en.q_tot[k], q_liq_en_remaining[k], q_ice_en_remaining[k]))
             #     # in principle that would mean recalculating theta and h for the remaining env... but since ρ_en_remaining = ρ_gm, the buoyancy is 0 so it doesn't matter for buoyancy calculations... so we skip it for now.
@@ -592,12 +592,12 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
                 
             #     # ρ_en unchanged, so we can rearrange to solve for ρ_cloak_dn
             #     ρ_cloak_dn = (a_cloak_dn[k] > edmf.minimum_area) ? ( (ρ_gm - (aux_bulk.area[k] * ρ_bulk) - (a_cloak_up[k] * ρ_cloak_up) - (a_en_remaining[k] * ρ_en)) / a_cloak_dn[k] ) : ρ_en
-            #     # ts_cloak_down = (edmf.moisture_model isa NonEquilibriumMoisture) ? TD.PhaseNonEquil_ρpq(thermo_params, ρ_cloak_dn, p_c[k], TD.PhasePartition(q_tot_cloak_dn[k], q_liq_cloak_dn[k], q_ice_cloak_dn[k])) : TD.PhaseEquil_ρpq(param_set, ρ_cloak_dn, p_c[k], TD.PhasePartition(q_tot_cloak_dn[k], q_liq_cloak_dn[k], q_ice_cloak_dn[k]))
+            #     # ts_cloak_dn = (edmf.moisture_model isa NonEquilibriumMoisture) ? TD.PhaseNonEquil_ρpq(thermo_params, ρ_cloak_dn, p_c[k], TD.PhasePartition(q_tot_cloak_dn[k], q_liq_cloak_dn[k], q_ice_cloak_dn[k])) : TD.PhaseEquil_ρpq(param_set, ρ_cloak_dn, p_c[k], TD.PhasePartition(q_tot_cloak_dn[k], q_liq_cloak_dn[k], q_ice_cloak_dn[k]))
             
             #     h_tot_cloak_dn[k] = (a_cloak_dn[k] > edmf.minimum_area) ? max((aux_gm.θ_liq_ice[k] - (a_cloak_up[k] * h_tot_cloak_up[k]) - (aux_bulk.area[k] * aux_bulk.θ_liq_ice[k]) - (a_en_remaining[k] * aux_en.θ_liq_ice[k])) / a_cloak_dn[k], FT(0)) : aux_en.θ_liq_ice[k] # I think this is wrong, we instead want to cancel the buoyancy of the updraft and updraft cloak, and if confine to cloak, we want ρ_env = ρ_gm so we'd need to account for that.
-            #     ts_cloak_down = (edmf.moisture_model isa NonEquilibriumMoisture) ? TD.PhaseNonEquil_ρθq(thermo_params, ρ_cloak_dn, h_tot_cloak_dn[k], TD.PhasePartition(q_tot_cloak_dn[k], q_liq_cloak_dn[k], q_ice_cloak_dn[k])) : TD.PhaseEquil_ρθq(thermo_params, ρ_cloak_dn, h_tot_cloak_dn[k], TD.PhasePartition(q_tot_cloak_dn[k], q_liq_cloak_dn[k], q_ice_cloak_dn[k]))
+            #     ts_cloak_dn = (edmf.moisture_model isa NonEquilibriumMoisture) ? TD.PhaseNonEquil_ρθq(thermo_params, ρ_cloak_dn, h_tot_cloak_dn[k], TD.PhasePartition(q_tot_cloak_dn[k], q_liq_cloak_dn[k], q_ice_cloak_dn[k])) : TD.PhaseEquil_ρθq(thermo_params, ρ_cloak_dn, h_tot_cloak_dn[k], TD.PhasePartition(q_tot_cloak_dn[k], q_liq_cloak_dn[k], q_ice_cloak_dn[k]))
             # end
-            # h_tot_cloak_dn[k] = TD.liquid_ice_pottemp(thermo_params, ts_cloak_down)
+            # h_tot_cloak_dn[k] = TD.liquid_ice_pottemp(thermo_params, ts_cloak_dn)
 
 
 
