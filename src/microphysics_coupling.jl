@@ -1771,9 +1771,9 @@ function threshold_driven_acnv(
         
 
         if q_type isa CMT.IceType
-            τ = param_set.user_params.τ_acnv_sno_threshold # use separate timescale bc this should be order timestep scale (in M2005), while real acnv should be like 10^4 seconds.
+            τ = FT(param_set.user_params.τ_acnv_sno_threshold) # use separate timescale bc this should be order timestep scale (in M2005), while real acnv should be like 10^4 seconds.
         elseif q_type isa CMT.LiquidType
-            τ = param_set.user_params.τ_acnv_liq_thresh
+            τ = FT(param_set.user_params.τ_acnv_liq_thresh)
         else
             error("threshold_driven_acnv not supported for q_type $q_type")
         end

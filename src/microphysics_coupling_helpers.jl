@@ -123,7 +123,7 @@ function n0(param_set::APS, q::FT, ρ::FT, precip::CMTWaterTypes, Nt::FT; μ::FT
     microphys_params = TCP.microphysics_params(param_set)
 
     if !isnan(Nt) # aerosol inside each particle...
-        r_min = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
+        r_min::FT = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
         χm = get_χm(param_set, precip) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
         q_r_min = particle_mass(microphys_params, precip, r_min, χm)
         q += Nt * q_r_min
@@ -323,7 +323,7 @@ function lambda(param_set::APS, precip::CMTWaterTypes, q::FT, ρ::FT, Nt::FT; Dm
     microphys_params = TCP.microphysics_params(param_set)
 
     if !isnan(Nt) # aerosol inside each particle...
-        r_min = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
+        r_min::FT = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
         # _χm = get_χm(param_set, precip) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
         _χm = isnan(_χm) ? get_χm(param_set, precip) : _χm
         q_r_min = particle_mass(microphys_params, precip, r_min, _χm)

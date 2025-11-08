@@ -16,10 +16,10 @@ function compute_turbconv_tendencies!(
     state::State,
     param_set::APS,
     surf::SurfaceBase,
-    Δt::Real,
-    cfl_limit::Real,
+    Δt::FT,
+    cfl_limit::FT,
     use_fallback_tendency_limiters::Bool,
-)
+) where {FT}
     compute_up_tendencies!(edmf, state, param_set, Δt, use_fallback_tendency_limiters)
     compute_en_tendencies!(edmf, state, param_set, surf, Val(:tke), Val(:ρatke), Δt, cfl_limit, use_fallback_tendency_limiters)
     if edmf.thermo_covariance_model isa PrognosticThermoCovariances
@@ -707,7 +707,7 @@ function compute_diffusive_fluxes(edmf::EDMFModel, state::State, surf::SurfaceBa
         ∇uₕ_gm_tke_conv = ∇uₕ_gm
 
         
-        f_c_m = param_set.user_params.convective_tke_ed_scaling_factor # adjustment to c_m, tke_ed_coeff
+        f_c_m = FT(param_set.user_params.convective_tke_ed_scaling_factor) # adjustment to c_m, tke_ed_coeff
         f_K_tke = aux_tc_f.temporary_f1
         @. f_K_tke = ifelse(Iftke(aux_en.tke) > 0, sqrt(max(Iftke(aux_en.tke) - Iftke_conv(aux_en.tke_convective), FT(0))) / sqrt(Iftke(aux_en.tke)), FT(0)) # adjustment factor for K based on convective tke removal (we leave tke in elsewhere to generate covariances... probably should be separated out also lol)
         # @. f_k_tke_conv = ifelse(Iftke(aux_en.tke) > 0, sqrt(Iftke_conv(aux_en.tke_convective)) / sqrt(Iftke(aux_en.tke)), FT(0)) # also probably should be 1 - f_K_tke? should double check..
@@ -822,7 +822,8 @@ function filter_small_moisture_vars(edmf::EDMFModel, state::State, param_set::AP
     # if cond/evap sub/dep are a function of existing ql, qi, this could unnecessarily stunt what otherwise could be exponential growth depending on the base case
     # but the values we get sometimes of like 1e-100 are diabolical for explicit time stepping
     
-    q_min = param_set.user_params.q_min
+    FT = float_type(state)
+    q_min::FT = param_set.user_params.q_min
 
     if !iszero(q_min)
         aux_en = center_aux_environment(state)
@@ -1826,7 +1827,7 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
                 Then again you could have say surface convection rising into air that is dry with falling snow from a layer above or something.
             =#
 
-            entr_rate_inv_s_tke_conv = param_set.user_params.tke_conv_entr_inv_s # FT(1/600) or so seems ok
+            entr_rate_inv_s_tke_conv::FT = param_set.user_params.tke_conv_entr_inv_s # FT(1/600) or so seems ok
             a_en_tke_conv = aux_tc.temporary_1
             @. a_en_tke_conv = ifelse(aux_en.latent_heating > 0,  (aux_en.area / 2) * (1 - exp(-aux_en.tke_convective / FT(0.1^2))), FT(0))
             # @. a_en_tke_conv = (aux_en.area / 2) * (1 - exp(-aux_en.tke_convective / FT(0.1^2)))
@@ -1835,57 +1836,61 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
             # @. Δa_en_tke_conv = min(max(a_en_tke_conv - aux_up[i].area, FT(0)), max(edmf.max_area - aux_up_i.area, FT(0))) # ensure we don't entrain more than available area
 
             Δa_en_tke_conv = a_en_tke_conv # alias
+            tends_ρarea_tke_conv = aux_tc.temporary_2
             @inbounds for k in real_center_indices(grid)
                 if aux_en.latent_heating[k] > 0
                     Δa_en_tke_conv[k] = min(max(a_en_tke_conv[k] - aux_up[i].area[k], FT(0)), max(edmf.max_area - aux_up_i.area[k], FT(0)))
+                    tends_ρarea_tke_conv[k] = -limit_tendency(edtl, -ρ_c[k] * Δa_en_tke_conv[k] * entr_rate_inv_s_tke_conv, FT(0), Δa_en_tke_conv[k] * ρ_c[k], Δt)
                 else
                     Δa_en_tke_conv[k] = -aux_up_i.area[k]
+                    tends_ρarea_tke_conv[k] = limit_tendency(edtl, ρ_c[k] * Δa_en_tke_conv[k] * entr_rate_inv_s_tke_conv, prog_up[i].ρarea[k], Δt)
                 end
             end
-            tends_ρarea_tke_conv = aux_tc.temporary_2
-            @. tends_ρarea_tke_conv = limit_tendency(edtl, ρ_c * Δa_en_tke_conv * entr_rate_inv_s_tke_conv, FT(0), Δa_en_tke_conv * ρ_c, Δt)
 
 
             q_tot_en_tke_conv = aux_tc.temporary_1
             θ_liq_ice_en_tke_conv = aux_tc.temporary_3
-            @. q_tot_en_tke_conv = aux_en.q_tot + sqrt(aux_en.QTvar)*sqrt(2/π) # entrain the moist unstable air [[ mean of upper half of gaussian ]]
-            @. θ_liq_ice_en_tke_conv = aux_en.θ_liq_ice - sqrt(aux_en.Hvar)*sqrt(2/π) # entrain the warm unstable air [[ mean of upper half of gaussian ]]
+            @. q_tot_en_tke_conv = max(aux_en.q_tot + sqrt(aux_en.QTvar)*sqrt(2/π), FT(0)) # entrain the moist unstable air [[ mean of upper half of gaussian ]]
+            @. θ_liq_ice_en_tke_conv = max(aux_en.θ_liq_ice - sqrt(aux_en.Hvar)*sqrt(2/π), FT(0)) # entrain the warm unstable air [[ mean of upper half of gaussian ]]
 
             @inbounds for k in real_center_indices(grid)
-                if aux_en.latent_heating[k] > 0
+                if aux_en.latent_heating[k] > 0 # allow TKE generation to go to updraft
                     tends_ρarea[k] += tends_ρarea_tke_conv[k]
-                    tends_ρaq_tot[k] += limit_tendency(edtl, tends_ρarea_tke_conv[k] * q_tot_en_tke_conv[k], FT(0), FT(Inf), Δt)
-                    tends_ρaθ_liq_ice[k] += limit_tendency(edtl, tends_ρarea_tke_conv[k] * θ_liq_ice_en_tke_conv[k], FT(0), FT(Inf), Δt)
+                    tends_ρaq_tot[k] += -limit_tendency(edtl, -tends_ρarea_tke_conv[k] * q_tot_en_tke_conv[k], ρ_c[k] * area_en[k] * q_tot_en[k], Δt)
+                    tends_ρaθ_liq_ice[k] += -limit_tendency(edtl, -tends_ρarea_tke_conv[k] * θ_liq_ice_en_tke_conv[k], ρ_c[k] * area_en[k] * θ_liq_ice_en[k], Δt)
                     if edmf.moisture_model isa NonEquilibriumMoisture
-                        tends_ρaq_liq[k] += limit_tendency(edtl, tends_ρarea_tke_conv[k] * aux_en.q_liq[k], FT(0), FT(Inf), Δt)
-                        tends_ρaq_ice[k] += limit_tendency(edtl, tends_ρarea_tke_conv[k] * aux_en.q_ice[k], FT(0), FT(Inf), Δt)
+                        tends_ρaq_liq[k] += -limit_tendency(edtl, -tends_ρarea_tke_conv[k] * aux_en.q_liq[k], ρ_c[k] * area_en[k] * aux_en.q_liq[k], Δt)
+                        tends_ρaq_ice[k] += -limit_tendency(edtl, -tends_ρarea_tke_conv[k] * aux_en.q_ice[k], ρ_c[k] * area_en[k] * aux_en.q_ice[k], Δt)
                     end
                     w_convective = sqrt(2 * aux_en.tke_convective[k])
                     tendencies_en.ρatke_convective[k] -= tends_ρarea_tke_conv[k] * w_convective^2 # remove tke we are sending to updraft
-                else
-                    tends_ρarea[k] += limit_tendency(edtl, -tends_ρarea_tke_conv[k], prog_up[i].ρarea[k], FT(Inf), Δt) # detraining the tke convective area
-                    tends_ρaq_tot[k] += limit_tendency(edtl, -tends_ρarea_tke_conv[k] * q_tot_en_tke_conv[k], prog_up[i].ρaq_tot[k], FT(Inf), Δt)
-                    tends_ρaθ_liq_ice[k] += limit_tendency(edtl, -tends_ρarea_tke_conv[k] * θ_liq_ice_en_tke_conv[k], prog_up[i].ρaθ_liq_ice[k], FT(Inf), Δt)
+                else # Take from updraft as we generate downdraft TKE [[ tends_ρarea_tke_conv is neg ]]
+                    tends_ρarea[k] += limit_tendency(edtl, tends_ρarea_tke_conv[k], prog_up[i].ρarea[k], Δt) # detraining the tke convective area
+                    tends_ρaq_tot[k] += limit_tendency(edtl, tends_ρarea_tke_conv[k] * q_tot_en_tke_conv[k], prog_up[i].ρaq_tot[k], Δt)
+                    tends_ρaθ_liq_ice[k] += limit_tendency(edtl, tends_ρarea_tke_conv[k] * θ_liq_ice_en_tke_conv[k], prog_up[i].ρaθ_liq_ice[k], Δt)
                     if edmf.moisture_model isa NonEquilibriumMoisture
-                        tends_ρaq_liq[k] += limit_tendency(edtl, -tends_ρarea_tke_conv[k] * aux_en.q_liq[k], prog_up[i].ρaq_liq[k], FT(Inf), Δt)
-                        tends_ρaq_ice[k] += limit_tendency(edtl, -tends_ρarea_tke_conv[k] * aux_en.q_ice[k], prog_up[i].ρaq_ice[k], FT(Inf), Δt)
+                        tends_ρaq_liq[k] += limit_tendency(edtl, tends_ρarea_tke_conv[k] * aux_en.q_liq[k], prog_up[i].ρaq_liq[k], Δt)
+                        tends_ρaq_ice[k] += limit_tendency(edtl, tends_ρarea_tke_conv[k] * aux_en.q_ice[k], prog_up[i].ρaq_ice[k], Δt)
                     end
                     w_convective = sqrt(2 * aux_en.tke_convective[k])
-                    tendencies_en.ρatke_convective[k] += tends_ρarea_tke_conv[k] * w_convective^2 # add back tke we are detraining from updraft
+                    # tendencies_en.ρatke_convective[k] -= tends_ρarea_tke_conv[k] * w_convective^2 # add back tke we are detraining from updraft
                 end
             end
 
-            tends_ρarea_tke_conv_f = @. I0f(tends_ρarea_tke_conv) # face version
-            tke_convective_f = aux_tc_f.temporary_f1
+            tends_ρarea_tke_conv_f = aux_tc_f.temporary_f1
+            @. tends_ρarea_tke_conv_f = I0f(tends_ρarea_tke_conv) # face version
+            tke_convective_f = aux_tc_f.temporary_f2
             @. tke_convective_f = I0f(aux_en.tke_convective)
-            latent_heating_f = aux_tc_f.temporary_f2
+            latent_heating_f = aux_tc_f.temporary_f3
             @. latent_heating_f = I0f(aux_en.latent_heating)
+            a_en_f = aux_tc_f.temporary_f4
+            @. a_en_f = I0f(area_en)
             @inbounds for k in real_face_indices(grid)
                 w_convective = sqrt(2 * tke_convective_f[k])
                 if latent_heating_f[k] > 0
-                    tends_ρaw[k] += limit_tendency(edtl, tends_ρarea_tke_conv_f[k] * w_convective, FT(0), FT(Inf), Δt)
+                    tends_ρaw[k] += -limit_tendency(edtl, -tends_ρarea_tke_conv_f[k] * w_convective, ρ_f[k] * a_en_f[k] * w_convective, Δt)
                 else
-                    tends_ρaw[k] += limit_tendency(edtl, -tends_ρarea_tke_conv_f[k] * w_convective, prog_up_f[i].ρaw[k], FT(Inf), Δt)
+                    tends_ρaw[k] += limit_tendency(edtl, tends_ρarea_tke_conv_f[k] * w_convective, prog_up_f[i].ρaw[k], Δt)
                 end
             end
 
@@ -2441,14 +2446,15 @@ end
 function compute_en_tendencies!(
     edmf::EDMFModel,
     state::State,
-    param_set::APS,
+    # param_set::APS,
+    param_set::TCP.TurbulenceConvectionParameters{FT},
     surf::SurfaceBase,
     ::Val{covar_sym},
     ::Val{prog_sym},
-    Δt::Real,
-    cfl_limit::Real,
+    Δt::FT,
+    cfl_limit::FT,
     use_fallback_tendency_limiters::Bool,
-) where {covar_sym, prog_sym}
+) where {covar_sym, prog_sym, FT <: Real}
     grid = Grid(state)
     N_up = n_updrafts(edmf)
     kc_surf = kc_surface(grid)
@@ -2473,7 +2479,7 @@ function compute_en_tendencies!(
     c_d = mixing_length_params(edmf).c_d
     mix_len_params = mixing_length_params(edmf)
     is_tke = covar_sym === :tke
-    FT = float_type(state)
+    # FT = float_type(state)
     thermo_params = TCP.thermodynamics_params(param_set)
 
     ρ_ae_K = face_aux_turbconv(state).ρ_ae_K
@@ -2556,7 +2562,7 @@ function compute_en_tendencies!(
     if is_tke && param_set.user_params.use_convective_tke_production_only # let it advect and diffuse on its own.... [[ this one is not tke dependent ]]
         # production due to instability [[should we use static stability ? ]]
         ρatke_convective_production = aux_en.tke_convective_production # for some reason these have ρa in ρatke but are named this way so we follow
-        K_buoy = param_set.user_params.convective_tke_buoyancy_coeff
+        K_buoy::FT = param_set.user_params.convective_tke_buoyancy_coeff
         a_en = aux_en.area
         ∂MSE∂z = aux_en.∂MSE∂z
         @. ρatke_convective_production = K_buoy * ρ_c * a_en * max(-∂MSE∂z, 0) # only positive values of convective TKE [[ not sure if existing tke should matter...]]
@@ -2759,7 +2765,7 @@ function compute_en_tendencies!(
 
         ρatke_convective_production = aux_en.tke_convective_production # for some reason these have ρa in ρatke but are named this way so we follow
  
-        K_buoy = param_set.user_params.convective_tke_buoyancy_coeff
+        K_buoy = FT(param_set.user_params.convective_tke_buoyancy_coeff)
         @. ρatke_convective_production = K_buoy * ρ_c * a_en * max(instability, 0) # only positive values of convective TKE [[ not sure if existing tke should matter...]]
 
         # @. ρatke_convective_production = ifelse(iszero(ρatke_convective), FT(0.5) * ρ_c * a_en * K_buoy * max(instability, 0)^2 * Δt^2, sqrt(2 * ρatke_convective/(ρ_c * a_en)) * K_buoy * ρ_c * a_en * max(instability, 0)) # if no existing tke use 0.5 * (a*Δt)^2 else use w* a
@@ -2788,7 +2794,7 @@ function compute_en_tendencies!(
         ρatke_convective_advection = aux_en.tke_convective_advection # for some reason these have ρa in ρatke but are named this way so we follow
         w_convective = aux_tc.temporary_3 # 1 and 2 already taken but avaiable again
         @. w_convective = sqrt(2 * ρatke_convective/(ρ_c * a_en)) # tke = 1/2 ρ w^2  => w = sqrt(2*tke) , tke is per unit mass here
-        k_adv = param_set.user_params.convective_tke_advection_coeff
+        k_adv::FT = param_set.user_params.convective_tke_advection_coeff
         # @. tke_convective_advection = ρ_c * a_en * k_adv * w_convective * ∇c(wvec(Ifw(tke_convective)))
         LBw = CCO.LeftBiasedC2F(; bottom = CCO.SetValue(FT(0)))
         RBw = CCO.RightBiasedC2F(; top = CCO.SetValue(FT(0)))
@@ -2809,7 +2815,7 @@ function compute_en_tendencies!(
         # dissipation due to stability [[ should we use MSE for static stability? part of me also feels like we should be using moist static energy here since it's actually constant in the cloud but idk.... ]]
         ρatke_convective_dissipation = aux_en.tke_convective_dissipation # for some reason these have ρa in ρatke but are named this way so we follow
         ∂MSE∂z = aux_en.∂MSE∂z
-        k_diss = param_set.user_params.convective_tke_dissipation_coeff
+        k_diss::FT = param_set.user_params.convective_tke_dissipation_coeff
         K_diss = aux_tc.temporary_5
         # @. K_diss = -k_diss * ∇c(ρ_f * wvec(Ifw(min(∂MSE∂z,0)))) # if MSE decreases with height, we dissipate convective TKE
         @. K_diss = k_diss * max(∂MSE∂z, 0)^2 # if MSE increases with height, we dissipate convective TKE squared goes like brunt vaisala
@@ -2817,7 +2823,7 @@ function compute_en_tendencies!(
 
         # self dissipation [[ calculated in  `compute_covariance_dissipation()`.. we apply here or else tke can build up for the entire run if it's not advected away ]]
         # @. ρatke_convective_dissipation += (aux_en_2m.tke.dissipation * 1) * ifelse.( aux_en.tke > eps(FT), aux_en.tke_convective / aux_en.tke , FT(0)) # scale by fraction of convective tke in total tke to get dissipation of convective part
-        k_self_diss = param_set.user_params.convective_tke_self_dissipation_coeff
+        k_self_diss::FT = param_set.user_params.convective_tke_self_dissipation_coeff
         @. ρatke_convective_dissipation += k_self_diss * ρ_c * area_en * max(aux_en.tke_convective, 0)^FT(3/2) / FT(1000) # should have mixing_length maybe 1000+ . For them, c_d was < 1 so this made dissipation smaller... unclear where our c_d lands... but it's bigger but we want less disipation I think..
 
         # -- limit production to enforce tke max -- #

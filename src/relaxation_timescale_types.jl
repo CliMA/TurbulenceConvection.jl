@@ -290,7 +290,7 @@ function get_relaxation_timescale_type(::Val{:exponential_T_scaling_ice_raw}, pa
     FT = eltype(param_set)
     q_i0 = FT(1e-7)
     ρ_i = CMP.ρ_cloud_ice(microphys_params) # CLIMAParameters default for cloud_ice
-    r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
+    r_0::FT = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
     D = FT(0.0000226)
     # derived from typical values and assume q_i = 4/3 * π * r^3 * ρ_i * N_i and N_i = c_1 e^(c_2 T)
     c_1i = get(namelist["relaxation_timescale_params"], "exponential_T_scaling_ice_c_1", FT(4 * π * D * (q_i0 / (4 / 3) * π * ρ_i)^(1 / 3) * (0.02)^(2 / 3))) # Fletcher 1962 (values taken from Frostenberg 2022)
@@ -320,7 +320,7 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__geometric_ice}, par
     ρ_l = CMP.ρ_cloud_liq(microphys_params) # CLIMAParameters default for cloud_liquid   
     ρ_i = CMP.ρ_cloud_ice(microphys_params) # CLIMAParameters default for cloud_ice
     r_r = FT(20 * 1e-6) # 20 microns
-    r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
+    r_0::FT = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
     N_l0 = FT(1e-5 / (4 / 3 * π * r_r^3 * ρ_l)) # estimated total N assuming reasonable q.liq.. (N = N_r in homogenous)
     N_i0 = FT(1e-7 / (4 / 3 * π * r_r^3 * ρ_i)) # estimated total N assuming reasonable q.ice... (N = N_r + N_0)   # only for prior
 
@@ -348,7 +348,7 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__exponential_T_scali
     ρ_l = CMP.ρ_cloud_liq(microphys_params) # CLIMAParameters default for cloud_liquid   
     ρ_i = CMP.ρ_cloud_ice(microphys_params) # CLIMAParameters default for cloud_ice
     r_r = FT(20 * 1e-6) # 20 microns
-    r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
+    r_0::FT = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
     N_l0 = FT(1e-5 / (4 / 3 * π * r_r^3 * ρ_l)) # estimated total N assuming reasonable q.liq.. (N = N_r in homogenous)
 
     c_1l = get(namelist["relaxation_timescale_params"], "geometric_liq_c_1", FT(1 / (4 / 3 * π * ρ_l * r_r^2))) # Inhomogenous default assuming r_0 = 20 micron since `typical` N is harder to define
@@ -374,7 +374,7 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__powerlaw_T_scaling_
     ρ_l = CMP.ρ_cloud_liq(microphys_params) # CLIMAParameters default for cloud_liquid   
     ρ_i = CMP.ρ_cloud_ice(microphys_params) # CLIMAParameters default for cloud_ice
     r_r = FT(20 * 1e-6) # 20 microns
-    r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
+    r_0::FT = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
     N_l0 = FT(1e-5 / (4 / 3 * π * r_r^3 * ρ_l)) # estimated total N assuming reasonable q.liq.. (N = N_r in homogenous)
 
 
@@ -400,7 +400,7 @@ function get_relaxation_timescale_type(::Val{:geometric_liq__exponential_T_scali
     ρ_l = CMP.ρ_cloud_liq(microphys_params) # CLIMAParameters default for cloud_liquid   
     ρ_i = CMP.ρ_cloud_ice(microphys_params) # CLIMAParameters default for cloud_ice
     r_r = FT(20 * 1e-6) # 20 microns
-    r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
+    r_0::FT = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
     N_l0 = FT(1e-5 / (4 / 3 * π * r_r^3 * ρ_l)) # estimated total N assuming reasonable q.liq.. (N = N_r in homogenous)
     N_i0 = FT(1e-7 / (4 / 3 * π * r_r^3 * ρ_i)) # estimated total N assuming reasonable q.ice... (N = N_r + N_0)
     D = FT(0.0000226)
@@ -442,7 +442,7 @@ function get_relaxation_timescale_type(::Val{:linear_combination}, param_set::AP
     ρ_l = CMP.ρ_cloud_liq(microphys_params) # kg m^-3, CLIMAParameters default for cloud_liquid
     ρ_i = CMP.ρ_cloud_ice(microphys_params) # CLIMAParameters default for cloud_ice
     r_r = FT(20 * 1e-6) # 20 microns
-    r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
+    r_0::FT = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
     N_l0 = FT(1e-5 / (4 / 3 * π * r_r^3 * ρ_l)) # estimated total N assuming reasonable q.liq.. (N = N_r in homogenous)
     N_i0 = FT(1e-7 / (4 / 3 * π * r_r^3 * ρ_i)) # estimated total N assuming reasonable q.ice... (N = N_r + N_0)
 
@@ -470,7 +470,7 @@ function get_relaxation_timescale_type(::Val{:linear_combination_with_w}, param_
     ρ_l = CMP.ρ_cloud_liq(microphys_params) # kg m^-3, CLIMAParameters default for cloud_liquid
     ρ_i = CMP.ρ_cloud_ice(microphys_params) # CLIMAParameters default for cloud_ice
     r_r = FT(20 * 1e-6) # 20 microns
-    r_0 = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
+    r_0::FT = param_set.user_params.particle_min_radius # CLIMAParameters default for particle_min_radius
     N_i0 = FT(1e-7 / (4 / 3 * π * r_r^3 * ρ_i)) # estimated total N assuming reasonable q.ice... (N = N_r + N_0)
     N_l0 = FT(1e-5 / (4 / 3 * π * r_r^3 * ρ_l)) # estimated total N assuming reasonable q.liq.. (N = N_r in homogenous)
     w_0 = FT(1e-3) # 1 mm/s

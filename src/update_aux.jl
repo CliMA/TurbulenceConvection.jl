@@ -1,4 +1,4 @@
-function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set::APS, t::Real, Δt::Real, cfl_limit::Real, use_fallback_tendency_limiters::Bool)
+function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set::TCP.TurbulenceConvectionParameters{FT}, t::FT, Δt::FT, cfl_limit::FT, use_fallback_tendency_limiters::Bool) where {FT}
     #####
     ##### Unpack common variables
     #####
@@ -15,7 +15,7 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
     KH = center_aux_turbconv(state).KH
     KQ = center_aux_turbconv(state).KQ
     obukhov_length = surf.obukhov_length
-    FT = float_type(state)
+    # FT = float_type(state)
     prog_gm = center_prog_grid_mean(state)
     prog_gm_f = face_prog_grid_mean(state)
     aux_up = center_aux_updrafts(state)
