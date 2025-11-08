@@ -2181,9 +2181,13 @@ function adjust_ice_N(
 
 
                     # Gradually reduce enforcement from full (N_INP_adjusted/2) at cloud top # [[ 10/31 to replace the line above that i think is too agressive low down and prevents autoconv in RF01 -- gradually go from full enforcement (N_INP_adjusted/2))]] to none at N_INP_adjusted = N_INP_top/10
-                    w = clamp((N_INP_adjusted - N_INP_top/FT(10)) / (N_INP_top - N_INP_top/FT(10)), FT(0), one(FT))
-                    N_limit = (one(FT) - w)*N_INP_adjusted_here + w*(N_INP_adjusted/2)
-                    N_INP_adjusted_here = max(N_INP_adjusted_here, N_limit)
+                    if !isnan(N_INP_top)
+                        w = clamp((N_INP_adjusted - N_INP_top/FT(10)) / (N_INP_top - N_INP_top/FT(10)), FT(0), one(FT))
+                        N_limit = (one(FT) - w)*N_INP_adjusted_here + w*(N_INP_adjusted/2)
+                        N_INP_adjusted_here = max(N_INP_adjusted_here, N_limit)
+                    else
+                        # Not sure
+                    end
 
                     #
                     if N_i_from_INP
@@ -2225,7 +2229,7 @@ function adjust_ice_N(
             end
 
             if !isfinite(N_INP_adjusted) || !isfinite(N_i)
-                @warn "Got non-finite N_INP_adjusted = $N_INP_adjusted or N_i = $N_i from inputs N_INP = $N_INP; N_i_in = $N_i_in; q_i = $q_i; ρ = $ρ; r_is = $r_is; μ = $μ; massflux = $massflux; w_i = $w_i; S_i = $S_i"
+                @warn "Got non-finite N_INP_adjusted = $N_INP_adjusted or N_i = $N_i from inputs N_INP = $N_INP; N_i_in = $N_i_in; q_i = $q_i; ρ = $ρ; r_is = $r_is; μ = $μ; massflux = $massflux; w_i = $w_i; S_i = $S_i; dNINP_dz = $dNINP_dz; N_INP_top = $N_INP_top; N_i_from_INP = $N_i_from_INP; q_l = $q_l; q_s = $q_s; apply_massflux_boost = $apply_massflux_boost; apply_sedimentation_boost = $apply_sedimentation_boost"
             end
 
 
