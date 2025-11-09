@@ -33,13 +33,29 @@ function buoyancy_gradients(
             ts_sat = thermo_state_pθq(param_set, bg_model.p, bg_model.θ_liq_ice_sat, bg_model.qt_sat)
         end
         phase_part = TD.PhasePartition(thermo_params, ts_sat)
-        lh = TD.latent_heat_liq_ice(thermo_params, phase_part)
+        # lh = TD.latent_heat_liq_ice(thermo_params, phase_part)
+
+
+        T_freeze = TCP.T_freeze(param_set)
+        below_freezing = (bg_model.t_sat < T_freeze)
+        if is_noneq # we'll just go for a weighted sum assuming current liquid fraction.
+            # Theoretically should prolly be some fusion term on existing ice in noneq too but idk...
+            # Default to vaporization if above freezing otherwise sublimation
+            lh = (bg_model.ql_sat + bg_model.qi_sat) > FT(0) ? 
+                (TD.latent_heat_vapor(thermo_params, ts_sat) * bg_model.ql_sat + TD.latent_heat_sublim(thermo_params, ts_sat) * bg_model.qi_sat) / (bg_model.ql_sat + bg_model.qi_sat) : (below_freezing ? TD.latent_heat_sublim(thermo_params, ts_sat) : TD.latent_heat_vapor(thermo_params, ts_sat))
+        else # we'll use the saturation liquid fraction 
+            lh = (bg_model.ql_sat + bg_model.qi_sat) > FT(0) ? 
+                (TD.latent_heat_vapor(thermo_params, ts_sat) * bg_model.ql_sat + TD.latent_heat_sublim(thermo_params, ts_sat) * bg_model.qi_sat) / (bg_model.ql_sat + bg_model.qi_sat) : (below_freezing ? TD.latent_heat_sublim(thermo_params, ts_sat) : TD.latent_heat_vapor(thermo_params, ts_sat))
+        end
+
         cp_m = TD.cp_m(thermo_params, ts_sat)
         ∂b∂θl_sat = (
             ∂b∂θv * (1 + molmass_ratio * (1 + lh / R_v / bg_model.t_sat) * bg_model.qv_sat - bg_model.qt_sat) /
             (1 + lh * lh / cp_m / R_v / bg_model.t_sat / bg_model.t_sat * bg_model.qv_sat)
         )
         ∂b∂qt_sat = (lh / cp_m / bg_model.t_sat * ∂b∂θl_sat - ∂b∂θv) * bg_model.θ_sat
+        # ∂b∂qt_sat = ∂b∂θl_sat * (L_v / cp_m) # GPT/Gemini said maybe this was right but for now we'll just go for changing L
+
     else
         ∂b∂θl_sat = FT(0)
         ∂b∂qt_sat = FT(0)
