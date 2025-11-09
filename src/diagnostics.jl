@@ -245,15 +245,9 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         # w * ρ * a * q
         "env_qi_sed_flux" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).term_vel_ice .* center_aux_environment(state).area .* center_aux_environment(state).q_ice),
 
-
-        # "qr_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qr_tendency_advection), # precip sed is stored in advection
-        # "qs_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qs_tendency_advection), # I believe these already area weightd so just sum
-        # "qip_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_turbconv(state).qs_tendency_advection), # I believe these already area weightd so just sum
-
         "qr_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qr_tendency_sedimentation), # [[ added vert_adv to advection so now these are broken out separately ]]
         "qs_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qs_tendency_sedimentation), # [[ added vert_adv to advection so now these are broken out separately ]]
         "qip_mean_sed" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_grid_mean(state).qs_tendency_sedimentation), # [[ added vert_adv to advection so now these are broken out separately ]]
-
 
         # acnv
         "ql_mean_acnv" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_bulk(state).ql_tendency_acnv .+ center_aux_environment(state).ql_tendency_acnv),

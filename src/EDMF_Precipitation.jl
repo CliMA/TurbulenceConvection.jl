@@ -74,9 +74,6 @@ function compute_precipitation_advection_tendencies(
     wvec = CC.Geometry.WVector
 
     # TODO - some positivity limiters are needed
-    # @. aux_tc.qr_tendency_advection = ∇(wvec(RB(ρ_c * q_rai * term_vel_rain))) / ρ_c # * precip_fraction
-    # @. aux_tc.qs_tendency_advection = ∇(wvec(RB(ρ_c * q_sno * term_vel_snow))) / ρ_c # * precip_fraction
-
 
 
     # Calculate net tendencies allowing for both sedimentation and advection
@@ -212,8 +209,8 @@ function compute_precipitation_advection_tendencies(
     end
 
 
-    @. tendencies_pr.q_rai += aux_tc.qr_tendency_advection
-    @. tendencies_pr.q_sno += aux_tc.qs_tendency_advection
+    @. tendencies_pr.q_rai += aux_gm.qr_tendency_vert_adv + aux_gm.qr_tendency_sedimentation
+    @. tendencies_pr.q_sno += aux_gm.qs_tendency_vert_adv + aux_gm.qs_tendency_sedimentation
     return nothing
 end
 

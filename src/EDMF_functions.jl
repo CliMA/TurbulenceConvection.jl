@@ -1790,8 +1790,10 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
                 nh_pressure
         end
 
-        buoyf = I0f.(buoy)
-        a_upf = I0f.(a_up)
+        buoyf = aux_tc_f.temporary_f1
+        @. buoyf = I0f(buoy)
+        a_upf = aux_tc_f.temporary_f2
+        @. a_upf = I0f(a_up)
         @inbounds for k in real_face_indices(grid) 
             # z = grid.zf[k].z
             if iszero(w_up[k]) && (buoyf[k] > 0) && (a_upf[k] > 0)
@@ -1806,8 +1808,6 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
                     tends_ρaw[k] = eps(FT) # just some small positive number
 
                     # @error "We have buoyancy and no updraft velocity yet failed to generate an updraft velocity... inputs were z = $z; w_up = $(w_up[k]); w_en = $(w_en[k]); buoy = $(buoyf[k]); ρaw = $(ρaw[k]); tends_ρaw = $(tends_ρaw[k]); entr_w = $(entr_wf); detr_w = $(detr_wf); entr_rate_inv_s = $(entr_rate_inv_sf); detr_rate_inv_s = $(detr_rate_inv_sf); advection = $(advection[k]); nh_pressure = $(nh_pressure[k]); ρ_f = $(ρ_f[k]); a_upf = $(a_upf[k]);"
-               
-                
                 end
             end
         end
@@ -1841,6 +1841,7 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
                 if aux_en.latent_heating[k] > 0
                     Δa_en_tke_conv[k] = min(max(a_en_tke_conv[k] - aux_up[i].area[k], FT(0)), max(edmf.max_area - aux_up_i.area[k], FT(0)))
                     tends_ρarea_tke_conv[k] = -limit_tendency(edtl, -ρ_c[k] * Δa_en_tke_conv[k] * entr_rate_inv_s_tke_conv, FT(0), Δa_en_tke_conv[k] * ρ_c[k], Δt)
+                    # @info "tends_ρarea_tke_conv[$(k.i)] = $(tends_ρarea_tke_conv[k]); Δa_en_tke_conv[$(k.i)] = $(Δa_en_tke_conv[k]); a_en_tke_conv[$(k.i)] = $(a_en_tke_conv[k]); aux_up[i].area[$(k.i)] = $(aux_up[i].area[k]); aux_en.latent_heating[$(k.i)] = $(aux_en.latent_heating[k]); aux_en.tke_convective[$(k.i)] = $(aux_en.tke_convective[k]);"
                 else
                     Δa_en_tke_conv[k] = -aux_up_i.area[k]
                     tends_ρarea_tke_conv[k] = limit_tendency(edtl, ρ_c[k] * Δa_en_tke_conv[k] * entr_rate_inv_s_tke_conv, prog_up[i].ρarea[k], Δt)
@@ -1873,7 +1874,7 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
                         tends_ρaq_ice[k] += limit_tendency(edtl, tends_ρarea_tke_conv[k] * aux_en.q_ice[k], prog_up[i].ρaq_ice[k], Δt)
                     end
                     w_convective = sqrt(2 * aux_en.tke_convective[k])
-                    # tendencies_en.ρatke_convective[k] -= tends_ρarea_tke_conv[k] * w_convective^2 # add back tke we are detraining from updraft
+                    # tendencies_en.ρatke_convective[k] -= tends_ρarea_tke_conv[k] * w_convective^2 # add back tke we are detraining from updraft [[ deprecated cause i think it just gets deleted and cancels itself... ]]
                 end
             end
 
@@ -1885,14 +1886,31 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
             @. latent_heating_f = I0f(aux_en.latent_heating)
             a_en_f = aux_tc_f.temporary_f4
             @. a_en_f = I0f(area_en)
+            a_upf = I0f.(aux_up[i].area) # need to figure out a sol'n here
             @inbounds for k in real_face_indices(grid)
                 w_convective = sqrt(2 * tke_convective_f[k])
                 if latent_heating_f[k] > 0
-                    tends_ρaw[k] += -limit_tendency(edtl, -tends_ρarea_tke_conv_f[k] * w_convective, ρ_f[k] * a_en_f[k] * w_convective, Δt)
+                    # @info " heating before: tends_ρaw[$(k.i)] before = $(tends_ρaw[k]); tends_ρarea_tke_conv_f[$(k.i)] = $(tends_ρarea_tke_conv_f[k]); w_convective = $(w_convective); ρ_f = $(ρ_f[k]); a_en_f = $(a_en_f[k])"
+                    tends_ρaw[k] += max(-limit_tendency(edtl, -tends_ρarea_tke_conv_f[k] * w_convective, ρ_f[k] * a_en_f[k]/2 * w_convective, Δt), FT(0)) # max because w/ the upppper bound on area, we can have area tendency 0 inside the latent heating areas, and then the negatives outside leak in.
+                    
+                    # since we have the area limiter, we want add w to existing area as well [[ probably should have also done to the other tracers.. idk ]]
+                    δ_ρaw = max(ρ_f[k] * a_upf[k] * w_convective  - prog_up_f[i].ρaw[k], FT(0))
+                    # @info "δ_ρaw[$(k.i)] = $(δ_ρaw); adding $(-limit_tendency(edtl, -δ_ρaw * entr_rate_inv_s_tke_conv, δ_ρaw, Δt)) to tends_ρaw[$(k.i)]; ρ_f = $(ρ_f[k]); a_upf = $(a_upf[k]); w_convective = $(w_convective); prog_up_f[i].ρaw[$(k.i)] = $(prog_up_f[i].ρaw[k]);"
+                    # tends_ρaw[k] += -limit_tendency(edtl, -δ_ρaw * entr_rate_inv_s_tke_conv, δ_ρaw, Δt)
+                    tends_ρaw[k] += δ_ρaw/(Δt) # add the rest directly... should be small
+
+                    # @info " heating after: tends_ρaw[$(k.i)] after = $(tends_ρaw[k])"
                 else
-                    tends_ρaw[k] += limit_tendency(edtl, tends_ρarea_tke_conv_f[k] * w_convective, prog_up_f[i].ρaw[k], Δt)
+                    # @info " cooling before: tends_ρaw[$(k.i)] before = $(tends_ρaw[k])"
+                    tends_ρaw[k] += min(limit_tendency(edtl, tends_ρarea_tke_conv_f[k] * w_convective, prog_up_f[i].ρaw[k], Δt), FT(0)) # min because leakage
+                    # @info " cooling after: tends_ρaw[$(k.i)] after = $(tends_ρaw[k])"
                 end
             end
+
+            # @info "tends_ρarea_tke_conv = $(parent(tends_ρarea_tke_conv));"
+            # @info "tends_ρarea_tke_conv_f = $(parent(tends_ρarea_tke_conv_f));"
+            # @info "latent_heating = $(parent(aux_en.latent_heating));"
+            # @info "latent_heating_f = $(parent(latent_heating_f));"
 
             
             # @. tends_ρarea += tends_ρarea_tke_conv
@@ -2850,7 +2868,7 @@ function compute_en_tendencies!(
 
         if any(!isfinite, ρatke_convective_production)
             @warn "Non-finite values in convective TKE production limiter computation."
-            error("KE_current = $(parent(max(ρatke_convective ./ (ρ_c .* a_en))));
+            error("KE_current = $(parent(max.(ρatke_convective ./ (ρ_c .* a_en))));
                 ΔKE_timestep = $(parent((ρatke_convective_production .- ρatke_convective_dissipation .+ ρatke_convective_advection) .* Δt ./ (ρ_c .* a_en))); 
                 overage_prod = $(parent(overage_prod)); tke_max = $(parent(tke_max)); tke = $(parent(aux_en.tke))")
         end

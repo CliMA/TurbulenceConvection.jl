@@ -335,8 +335,6 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         qr_tendency_evap = FT(0),
         qs_tendency_melt = FT(0),
         qs_tendency_dep_sub = FT(0),
-        qr_tendency_advection = FT(0),
-        qs_tendency_advection = FT(0),
         en_2m = (;
             tke = cent_aux_vars_en_2m(FT),
             Hvar = cent_aux_vars_en_2m(FT),
