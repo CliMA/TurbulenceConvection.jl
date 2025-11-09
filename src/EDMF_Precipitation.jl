@@ -193,16 +193,23 @@ function compute_precipitation_advection_tendencies(
 
     else
         for i in 1:N_up
-            @. aux_gm.qr_tendency_vert_adv +=  -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_rai))) / ρ_c
-            @. aux_gm.qs_tendency_vert_adv +=  -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_sno))) / ρ_c
+            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_rai))) / ρ_c
+            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_sno))) / ρ_c
         end
-        # ignore env contribution for now....
-        # @. aux_gm.qr_tendency_vert_adv = -∇(wvec(LB(Ic(aux_en_f.w) * ρ_c * aux_en.area * q_rai))) / ρ_c #  [[ i think the env part is fake ... a dryish downdraft shoould take care of it.... ]]
-        # @. aux_gm.qs_tendency_vert_adv = -∇(wvec(LB(Ic(aux_en_f.w) * ρ_c * aux_en.area * q_sno))) / ρ_c # [[ i think the env part is fake ... a dryish downdraft shoould take care of it.... ]]
-    end
 
-    @. aux_tc.qr_tendency_advection = mph_sed_q_rai.q_tendency + aux_gm.qr_tendency_vert_adv # / precip_fraction
-    @. aux_tc.qs_tendency_advection = mph_sed_q_sno.q_tendency + aux_gm.qs_tendency_vert_adv # / precip_fraction
+        if param_set.user_params.use_convective_tke
+            w_conv = aux_tc_f.temporary_f1
+            @. w_conv = sqrt(max(Ifx(2 * aux_en.tke_convective), FT(0))) # could add a limiter here if needed
+            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB(Ic(w_conv) * ρ_c * aux_en.area/2 * q_rai))) / ρ_c
+            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB(Ic(w_conv) * ρ_c * aux_en.area/2 * q_sno))) / ρ_c    
+            # Ignore tke down draft for now...
+        else
+            # ignore env contribution for now....
+            # @. aux_gm.qr_tendency_vert_adv = -∇(wvec(LB(Ic(aux_en_f.w) * ρ_c * aux_en.area * q_rai))) / ρ_c #  [[ i think the env part is fake ... a dryish downdraft shoould take care of it.... ]]
+            # @. aux_gm.qs_tendency_vert_adv = -∇(wvec(LB(Ic(aux_en_f.w) * ρ_c * aux_en.area * q_sno))) / ρ_c # [[ i think the env part is fake ... a dryish downdraft shoould take care of it.... ]]
+        end
+
+    end
 
 
     @. tendencies_pr.q_rai += aux_tc.qr_tendency_advection
