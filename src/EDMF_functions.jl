@@ -229,32 +229,46 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                 @. qi_flux_vert_adv = massflux_qi # rn they're the same since we omit gm in the second order correction case
             end
         else
-            # @. massflux_en = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm))
-            # @. massflux_h = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm)) * (If(θ_liq_ice_en) - If(θ_liq_ice_gm))
-            # @. massflux_qt = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm)) * (If(q_tot_en) - If(q_tot_gm))
             massflux_en .= ρ_f .* ᶠinterp_a_RBF_a_en.(a_en) .* w_en
-            @. massflux_h = massflux_en .* IfRBF_θ_liq_ice_en(θ_liq_ice_en)
-            @. massflux_qt = massflux_en .* IfRBF_q_tot_en(q_tot_en)
+            if !param_set.user_params.use_convective_tke
+                # @. massflux_en = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm))
+                # @. massflux_h = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm)) * (If(θ_liq_ice_en) - If(θ_liq_ice_gm))
+                # @. massflux_qt = ρ_f * ᶠinterp_a(a_en) * (w_en - toscalar(w_gm)) * (If(q_tot_en) - If(q_tot_gm))
+                @. massflux_h = massflux_en * IfRBF_θ_liq_ice_en(θ_liq_ice_en)
+                @. massflux_qt = massflux_en * IfRBF_q_tot_en(q_tot_en)
+            else
+                w_conv = aux_tc_f.temporary_f1
+                massflux_en_conv = aux_tc_f.temporary_f2
+                @. w_conv = sqrt(max(Ifx(aux_en.tke_convective), FT(0))) # convective velocity scale # 
+                @. massflux_en_conv = ρ_f .* ᶠinterp_a_RBF_a_en.(a_en)/2 .* w_conv # feels mostly the tke scale, subsidence happens elsewhere dry
+
+                @. massflux_h = massflux_en * IfRBF_θ_liq_ice_en(θ_liq_ice_en)
+                @. massflux_qt = (massflux_en + massflux_en_conv) * IfRBF_q_tot_en(q_tot_en)
+
+                # @. massflux_h = (massflux_en + massflux_en_conv) .* IfRBF_θ_liq_ice_en(θ_liq_ice_en - sqrt(aux_en.Hvar)) + (massflux_en - massflux_en_conv) .* IfRBF_θ_liq_ice_en(θ_liq_ice_en + sqrt(aux_en.Hvar))
+                # @. massflux_qt = (massflux_en + massflux_en_conv) .* IfRBF_q_tot_en(q_tot_en + sqrt(aux_en.QTvar)) + (massflux_en - massflux_en_conv) .* IfRBF_q_tot_en(q_tot_en - sqrt(aux_en.QTvar))
+            end
 
             if edmf.moisture_model isa NonEquilibriumMoisture
-                # @. massflux_ql = massflux_en * (If(q_liq_en) - If(q_liq_gm))
-                # @. massflux_qi = massflux_en * (If(q_ice_en) - If(q_ice_gm))
-                @. massflux_ql = massflux_en .* IfRBF_q_liq_en(q_liq_en)
-                @. massflux_qi = massflux_en .* IfRBF_q_ice_en(q_ice_en)
 
-                if param_set.user_params.use_convective_tke
-                    # ql and qi should be correlated w/ tke. We handle prt of that in diffusivity but they shouldn't feel the netire advective force
-                    w_conv = aux_tc_f.temporary_f1
-                    @. w_conv = sqrt(max(Ifx(aux_en.tke_convective), FT(0))) # convective velocity scale
-                    massflux_vert_adv_en = aux_tc_f.temporary_f2
-                    @. massflux_vert_adv_en = ρ_f * ᶠinterp_a_RBF_a_en(a_en) * w_conv # feels mostly the tke scale, subsidence happens elsewhere dry
-                    @. ql_flux_vert_adv = massflux_vert_adv_en .* IfRBF_q_liq_en(q_liq_en)
-                    @. qi_flux_vert_adv = massflux_vert_adv_en .* IfRBF_q_ice_en(q_ice_en)
+                if !param_set.user_params.use_convective_tke
+                    # @. massflux_ql = massflux_en * (If(q_liq_en) - If(q_liq_gm))
+                    # @. massflux_qi = massflux_en * (If(q_ice_en) - If(q_ice_gm))
+                    @. massflux_ql = massflux_en .* IfRBF_q_liq_en(q_liq_en)
+                    @. massflux_qi = massflux_en .* IfRBF_q_ice_en(q_ice_en)
+
+                    @. ql_flux_vert_adv = massflux_ql # same here
+                    @. qi_flux_vert_adv = massflux_qi # same here
                 else
-                    massflux_vert_adv_en = aux_tc_f.temporary_f1
-                    @. massflux_vert_adv_en = ρ_f * ᶠinterp_a_RBF_a_en(a_en) * w_en # (w_en - toscalar(w_gm)) # not sure what this should be, it's just the raw flux right?
-                    @. ql_flux_vert_adv = massflux_vert_adv_en .* IfRBF_q_liq_en(q_liq_en)
-                    @. qi_flux_vert_adv = massflux_vert_adv_en .* IfRBF_q_ice_en(q_ice_en)
+                    # ql and qi should be correlated w/ tke. We handle prt of that in diffusivity but they shouldn't feel the netire advective force
+                    @. massflux_ql = (massflux_en + massflux_en_conv) .* IfRBF_q_liq_en(q_liq_en) # + (massflux_en - massflux_en_conv) .* IfRBF_q_liq_en(q_liq_en)
+                    @. massflux_qi = (massflux_en + massflux_en_conv) .* IfRBF_q_ice_en(q_ice_en) # + (massflux_en - massflux_en_conv) .* IfRBF_q_ice_en(q_ice_en)
+
+                    # @. massflux_ql = FT(0)
+                    # @. massflux_qi = FT(0)
+
+                    @. ql_flux_vert_adv = massflux_ql # same here
+                    @. qi_flux_vert_adv = massflux_qi # same here
                 end
             end
         end
@@ -2836,7 +2850,24 @@ function compute_en_tendencies!(
         k_diss::FT = param_set.user_params.convective_tke_dissipation_coeff
         K_diss = aux_tc.temporary_5
         # @. K_diss = -k_diss * ∇c(ρ_f * wvec(Ifw(min(∂MSE∂z,0)))) # if MSE decreases with height, we dissipate convective TKE
-        @. K_diss = k_diss * max(∂MSE∂z, 0)^2 # if MSE increases with height, we dissipate convective TKE squared goes like brunt vaisala
+        # @. K_diss = k_diss * max(∂MSE∂z, 0)^2 # if MSE increases with height, we dissipate convective TKE squared goes like brunt vaisala
+
+        # We should also dissipate if we have no latent heating... and we're dry stable
+        dθ_virt_dz = similar(aux_en.T)
+        c_p = TCP.cp_d(param_set)
+        RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(aux_en.θ_virt[kc_toa]))
+        θ_virt = aux_en.θ_virt
+        @. dθ_virt_dz = ∇c(wvec(RBθ(θ_virt)))
+        g = TCP.grav(param_set)
+        @inbounds for k in real_center_indices(grid)
+            K_diss[k] = k_diss * max(∂MSE∂z[k], 0)^2
+               
+            ∂DSE∂z = c_p * -dθ_virt_dz[k] + g
+            if (aux_en.latent_heating[k] < FT(0.1)) &&  (∂DSE∂z > FT(0)) # dry stable with little latent heating
+                K_diss[k] += k_diss * (∂DSE∂z)^2
+            end
+        end
+
         @. ρatke_convective_dissipation = K_diss * (ρatke_convective/(ρ_c * area_en))^(3/2) * ρ_c * area_en / FT(1000) # dissipation  goes as tke^(3/2)/l
 
         # self dissipation [[ calculated in  `compute_covariance_dissipation()`.. we apply here or else tke can build up for the entire run if it's not advected away ]]
