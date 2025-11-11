@@ -934,7 +934,14 @@ function get_process_threshold_fraction(
     ξ = λ*r_th
 
     if iszero(μ)
-        # closed-form solution for integer k ≥ 0
+        # closed-form solution for integer k ≥ 0]
+
+        if isone(k) # shortcut, see DUM in https://github.com/DOI-USGS/COAWST/blob/6419fc46d737b9703f31206112ff5fba65be400d/WRF/phys/module_mp_morr_two_moment.F#L2976
+            F_below = one(FT) - exp(-ξ)*(1 + ξ)
+            return return_below ? F_below : one(FT) - F_below
+
+        end
+
         sum_val = zero(FT)
         for i in 0:k
             sum_val += ξ^i / factorial(i)
@@ -1830,8 +1837,16 @@ function f_boost_MF(
     S_i::FT = FT(0), # supersaturation
     massflux::FT = FT(0), # if we have a massflux, we can use it to adjust the source term, (combines area and velocity, velocity is prolly more important for penetration and downdraft generation but area matters.
     NINP_top_over_N_INP::FT = FT(1),
+    massflux_min::FT = FT(0.015)
 ) where {FT}
     
+
+    #=
+        Even in the cases w/ no massflux, N_i+N_s (N_INP) still diffuses downwards by sedimentation. Sure we can get a higher boost N_i instead of N_s due to massflux but we still get an overall boost.
+        Now that we apply the boost and then split N_s off, we should force some minimum level of this effect always.
+        Otherwise, we risk N_i falling to unrealistically low levels (essentially back to NINP, but then still having N_s taken out)
+    =# 
+    massflux = max(massflux, massflux_min * ρ)
 
 
     if isfinite(NINP_top_over_N_INP)

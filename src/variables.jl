@@ -268,6 +268,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         temporary_4 = FT(0), # temporary center variable for intermediate computations
         temporary_5 = FT(0), # temporary center variable for intermediate computations
         temporary_6 = FT(0), # temporary center variable for intermediate computations
+        # temporary_locked = ntuple(i -> FT(1), 6), # whether the temporary variable is locked (i.e. in use) No way to use Bool
         k̂ = CCG.Contravariant3Vector(CCG.WVector(FT(1)), local_geometry),
         bulk = (;
             area = FT(0),
@@ -315,6 +316,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
             tke_convective_advection = FT(0),
             tke_convective_dissipation = FT(0),
             latent_heating = FT(0),
+            instability = FT(0),
             frac_supersat = FT(0),
             #
             Hvar = FT(0),
@@ -446,6 +448,7 @@ face_aux_vars_edmf(::Type{FT}, local_geometry, edmf, ::Val{calibrate_io}) where 
         temporary_f2 = FT(0), # temporary face variable for intermediate computations
         temporary_f3 = FT(0), # temporary face variable for intermediate computations
         temporary_f4 = FT(0), # temporary face variable for intermediate computations
+        # temporary_f_locked = ntuple(i -> FT(1), Val(4)), # temporary variable for locking temporary variables (No way to use bool)
         diffusive_flux_h = FT(0),
         diffusive_flux_qt = FT(0),
         diffusive_flux_qr = FT(0), # diffusive flux of rain [ my addition ]

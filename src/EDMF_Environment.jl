@@ -551,14 +551,12 @@ function microphysics!(
                 aux_en.qi_tendency_melt[k] = mph_neq_other.qi_tendency_melting * aux_en.area[k] # for storage
             end
 
-            if param_set.user_params.use_convective_tke
-                L_v = TD.latent_heat_vapor(thermo_params, aux_en.T[k])
-                L_f = TD.latent_heat_fusion(thermo_params, aux_en.T[k])
-                L_s = TD.latent_heat_sublim(thermo_params, aux_en.T[k])
-                aux_en.latent_heating[k] = L_s * (mph_neq.qi_tendency) # vapor --> Ice
-                aux_en.latent_heating[k] += L_v * (mph_neq.ql_tendency) # vapor --> liquid
-                aux_en.latent_heating[k] += L_f * (-mph_neq_other.qi_tendency_melting + mph_neq_other.qi_tendency_homogeneous_freezing + mph_neq_other.qi_tendency_heterogeneous_freezing) # Liq --> Ice
-            end
+            L_v = TD.latent_heat_vapor(thermo_params, aux_en.T[k])
+            L_f = TD.latent_heat_fusion(thermo_params, aux_en.T[k])
+            L_s = TD.latent_heat_sublim(thermo_params, aux_en.T[k])
+            aux_en.latent_heating[k] = L_s * (mph_neq.qi_tendency) # vapor --> Ice
+            aux_en.latent_heating[k] += L_v * (mph_neq.ql_tendency) # vapor --> liquid
+            aux_en.latent_heating[k] += L_f * (-mph_neq_other.qi_tendency_melting + mph_neq_other.qi_tendency_homogeneous_freezing + mph_neq_other.qi_tendency_heterogeneous_freezing) # Liq --> Ice
 
             if any(!isfinite, (mph_neq_other.ql_tendency, mph_neq_other.qi_tendency))
                 @error "Other microphysics processes returned non-finite values: $mph_neq_other; from inputs ts = $ts; w = $w[k]; mph_neq.ql_tendency = $(mph_neq.ql_tendency); mph_neq.qi_tendency = $(mph_neq.qi_tendency); ρ_c = $(ρ_c[k]); aux_en.area = $(aux_en.area[k])"
@@ -759,13 +757,11 @@ function microphysics!(
             #
             aux_tc.qs_tendency_accr_rai_sno[k] += mph_precip.qs_tendency_accr_rai_sno * aux_en.area[k] # we calculate in aux/en for the temperature dependence but store a combined output
         end
-        if param_set.user_params.use_convective_tke
-            aux_en.latent_heating[k] += L_f * mph_precip.qi_tendency_accr_ice_liq # fusion from liquid to ice [[ check sign on ice-rai ]]
 
-            # add precip terms (these are from last timestep with current order of operations, and we dont zero them out, so hopefully that's ok...)
-            aux_en.latent_heating[k] += L_v * (aux_tc.qr_tendency_evap[k]) # liq + rai # area won't be 0
-            aux_en.latent_heating[k] += L_s * (aux_tc.qs_tendency_dep_sub[k]) # ice + sno
-        end
+        aux_en.latent_heating[k] += L_f * mph_precip.qi_tendency_accr_ice_liq # fusion from liquid to ice [[ check sign on ice-rai ]]
+        # add precip terms (these are from last timestep with current order of operations, and we dont zero them out, so hopefully that's ok...)
+        aux_en.latent_heating[k] += L_v * (aux_tc.qr_tendency_evap[k]) # liq + rai # area won't be 0
+        aux_en.latent_heating[k] += L_s * (aux_tc.qs_tendency_dep_sub[k]) # ice + sno
     end
 
 

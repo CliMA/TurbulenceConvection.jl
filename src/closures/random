@@ -1936,8 +1936,31 @@ function my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep(
 end
 
 
-qi_tendency_sub_dep = 1.; qi =  1e-6; N = 1000.; ρ_a = 1.;
 # qi_tendency_sub_dep = 1.; qi =  1e-7; N = 50.; ρ_a = 1.;
 # qi_tendency_sub_dep = 1.; qi =  1e-8; N = 100.; ρ_a = 1.;
 # qi_tendency_sub_dep = 1.; qi =  1e-9; N = 11.; ρ_a = 0.5;
-@info "old = $(my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep_old(param_set, qi_tendency_sub_dep, qi, N, ρ_a)); new = $(my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep(param_set, qi_tendency_sub_dep, qi, N, ρ_a)); frac_above = $(TC.get_process_threshold_fraction(param_set, TC.ice_type, qi, N, ρ_a,  TC.CMP.r_ice_snow(microphys_params)))"
+@info "old = $(my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep_old(param_set, qi_tendency_sub_dep, qi, N, ρ_a)); new = $(my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep(param_set, qi_tendency_sub_dep, qi, N, ρ_a));"
+
+qi_tendency_sub_dep = 1.; qi =  1e-6; N = 200.; ρ_a = 1.;
+frac_above = TC.get_process_threshold_fraction(param_set, TC.ice_type, qi, N, ρ_a,  TC.CMP.r_ice_snow(microphys_params))
+
+# μ is the shape parameter of the gamma distribution
+μ = TC.μ_from_qN(param_set, TC.ice_type, qi, N; ρ=ρ_a)
+# get the number distribution parameters
+_, λ = TC.get_n0_lambda(microphys_params, TC.ice_type, qi, ρ_a, N, μ; Dmax=Dmax, add_dry_aerosol_mass = false)
+r_th = TC.CMP.r_ice_snow(microphys_params)
+ξ = λ*r_th
+@info "μ = $(μ); λ = $(λ); ξ = $(ξ)"
+# closed-form solution for integer k ≥ 0
+sum_val = zero(FT)
+k = 1
+for i in 0:k
+    sum_val += ξ^i / factorial(i)
+end
+@info "ξ = $(ξ); sum_val = $(sum_val)"
+F_target = exp(-ξ) * sum_val
+@info "F_target = $(F_target)"
+return_below = true
+out =  return_below ? one(FT) - F_target : F_target
+theoretical_frac_below = 1 - exp(-λ*r_th)*(1 + λ*r_th)
+@info "frac_above = $(one(FT) - out); frac_below = $(out); theoretical_frac_below = $(theoretical_frac_below); r = $(((μ + 1)/λ) * 1e6) μm"

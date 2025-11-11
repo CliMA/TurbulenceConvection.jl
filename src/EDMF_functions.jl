@@ -243,10 +243,16 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                 @. massflux_en_conv = ρ_f .* ᶠinterp_a_RBF_a_en.(a_en)/2 .* w_conv # feels mostly the tke scale, subsidence happens elsewhere dry
 
                 @. massflux_h = massflux_en * IfRBF_θ_liq_ice_en(θ_liq_ice_en)
-                @. massflux_qt = (massflux_en + massflux_en_conv) * IfRBF_q_tot_en(q_tot_en)
+                # @. massflux_qt = (massflux_en + massflux_en_conv) * IfRBF_q_tot_en(q_tot_en)
 
-                # @. massflux_h = (massflux_en + massflux_en_conv) .* IfRBF_θ_liq_ice_en(θ_liq_ice_en - sqrt(aux_en.Hvar)) + (massflux_en - massflux_en_conv) .* IfRBF_θ_liq_ice_en(θ_liq_ice_en + sqrt(aux_en.Hvar))
+                # supersat -- moister, lower θ air goes up
+                # subsat -- moister (qt recovered from precip), lower θ air goes down
+                # supersaturated = @. (aux_en.T < TCP.T_freeze(param_set)) ? ((aux_en.RH_ice > FT(1)) ? FT(1) : FT(-1)) : ((aux_en.RH_liq > FT(1)) ? FT(1) : FT(-1))
+                supersaturated = @. ifelse(aux_en.T < TCP.T_freeze(param_set), ifelse(aux_en.RH_ice > FT(1), FT(1), FT(-1)), ifelse(aux_en.RH_liq > FT(1), FT(1), FT(-1)))
+                supersaturated = Ifx.(supersaturated)
+                @. massflux_h = ((ρ_f .* ᶠinterp_a_RBF_a_en.(a_en)/2 .* w_en) + (supersaturated * massflux_en_conv)) .* IfRBF_θ_liq_ice_en(θ_liq_ice_en - sqrt(aux_en.Hvar)) + ((ρ_f .* ᶠinterp_a_RBF_a_en.(a_en)/2 .* w_en) - (supersaturated * massflux_en_conv)) .* IfRBF_θ_liq_ice_en(θ_liq_ice_en + sqrt(aux_en.Hvar))
                 # @. massflux_qt = (massflux_en + massflux_en_conv) .* IfRBF_q_tot_en(q_tot_en + sqrt(aux_en.QTvar)) + (massflux_en - massflux_en_conv) .* IfRBF_q_tot_en(q_tot_en - sqrt(aux_en.QTvar))
+                @. massflux_qt = ((ρ_f .* ᶠinterp_a_RBF_a_en.(a_en)/2 .* w_en) + (supersaturated * massflux_en_conv)) .* IfRBF_q_tot_en(q_tot_en + sqrt(aux_en.QTvar)) + ((ρ_f .* ᶠinterp_a_RBF_a_en.(a_en)/2 .* w_en) - (supersaturated * massflux_en_conv)) .* IfRBF_q_tot_en(q_tot_en - sqrt(aux_en.QTvar))
             end
 
             if edmf.moisture_model isa NonEquilibriumMoisture
@@ -261,8 +267,8 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                     @. qi_flux_vert_adv = massflux_qi # same here
                 else
                     # ql and qi should be correlated w/ tke. We handle prt of that in diffusivity but they shouldn't feel the netire advective force
-                    @. massflux_ql = (massflux_en + massflux_en_conv) .* IfRBF_q_liq_en(q_liq_en) # + (massflux_en - massflux_en_conv) .* IfRBF_q_liq_en(q_liq_en)
-                    @. massflux_qi = (massflux_en + massflux_en_conv) .* IfRBF_q_ice_en(q_ice_en) # + (massflux_en - massflux_en_conv) .* IfRBF_q_ice_en(q_ice_en)
+                    @. massflux_ql = (massflux_en/2 + massflux_en_conv) .* IfRBF_q_liq_en(q_liq_en) # + (massflux_en - massflux_en_conv) .* IfRBF_q_liq_en(q_liq_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
+                    @. massflux_qi = (massflux_en/2 + massflux_en_conv) .* IfRBF_q_ice_en(q_ice_en) # + (massflux_en - massflux_en_conv) .* IfRBF_q_ice_en(q_ice_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
 
                     # @. massflux_ql = FT(0)
                     # @. massflux_qi = FT(0)
@@ -2652,7 +2658,8 @@ function compute_en_tendencies!(
               - saturated wrt ice if below freezing, liquid if above
         =#
 
-        instability = aux_tc.temporary_2
+        # instability = aux_tc.temporary_2
+        instability = aux_en.instability
         @. instability = zero(FT)
 
         @inbounds for k in real_center_indices(grid)
@@ -2670,6 +2677,7 @@ function compute_en_tendencies!(
                 # ts_lo = (edmf.moisture_model isa EquilibriumMoisture) ? thermo_state_pθq(param_set, aux_en.p[k], aux_en.θ_liq_ice[k], q_tot_lo) : thermo_state_pθq(param_set, aux_en.p[k], aux_en.θ_liq_ice[k], q_tot_lo, aux_en.q_liq[k], aux_en.q_ice[k])
                 RH_ice = relative_humidity_over_ice(thermo_params, ts_hi)
                 RH_liq = relative_humidity_over_liquid(thermo_params, ts_hi)
+                ts_here = ts_hi
             else
                 if !state.calibrate_io
                     RH_ice = aux_en.RH_ice[k]
@@ -2678,6 +2686,7 @@ function compute_en_tendencies!(
                     RH_ice = relative_humidity_over_ice(thermo_params, ts)
                     RH_liq = relative_humidity_over_liquid(thermo_params, ts)
                 end
+                ts_here = ts
             end
 
 
@@ -2715,55 +2724,64 @@ function compute_en_tendencies!(
             aux_en.frac_supersat[k] = frac_supersat # for debugging
 
             # the engine efficiency peaks when we are half saturated and half subsaturated... then we can accelerate both updrafts and downdrafts... We aim for 0.25 at frac_supersat = 0 and 1, 1 at frac_supersat = 0.5, efficiency = 1.
-            peak_enhancement = FT(8)
+            peak_enhancement = FT(4); # peak = 0.5, 1/peak^2 = FT(4)
             efficiency = one(FT) + (peak_enhancement - one(FT)) * (FT(4) * frac_supersat * (one(FT) - frac_supersat))
 
-
-
+            g = TCP.grav(param_set)
+            c_p = TCP.cp_d(param_set)
+            R_d = TCP.R_d(param_set)
+            Π_here = TD.exner_given_pressure(thermo_params, aux_en.p[k], TD.PhasePartition(thermo_params, ts_here))
+            ρ_here = TD.air_density(thermo_params, ts_here)
+            ∂b∂θv = g * (R_d * ρ_here / aux_en.p[k]) * Π_here
+            # ∂θv∂z = aux_tc.∂θv∂z
+            # ∂DSE∂z = c_p * ∂θv∂z
+            ∂b∂z = ∂b∂θv * aux_tc.∂θv∂z[k] # we could use bg_model but it has its own sat/unsat breakdown
 
 
             latent_heating = aux_en.latent_heating[k] # to be precise you'd want a split into something in the subsat and something in the supersat part, but this is close enough for now...
-
             latent_heating = sign(latent_heating) * min(abs(latent_heating), FT(3)) # avoid excessive latent heating (i.e. oscillations)
 
+            instability[k] = zero(FT)
             if (below_freezing && (RH_ice < one(FT)) || (!below_freezing && (RH_liq < one(FT)))) # subsaturated
                 # I'm not sure if you should evaporation to contribue and use MSE or just stick to SE
 
+                # Moist contribution
                 if frac_supersat > 0
-                    instability[k] = -max(∂MSE∂z[k], -1) * frac_supersat * abs(latent_heating) # partially saturated
+                    instability[k] += -max(∂MSE∂z[k], -1) * frac_supersat * abs(latent_heating) * (g/(c_p * aux_en.T[k])) * efficiency # partially saturated
                 else
-                    instability[k] = FT(0) # no instability
+                    # instability[k] = FT(0) # no instability
                 end
 
+                # Dry evap contribution...
                 if (aux_en.q_liq[k] + aux_en.q_ice[k] + prog_pr.q_rai[k] + prog_pr.q_sno[k]) > FT(1e-10) # Might not need this since we have 
-                    # instability[k] = -∂MSE∂z[k]
-                    # instability[k] = -∂DSE∂z[k]
-                    # instability[k] += -FT(Inf) # don't allow, DSE is handled fine in I think by normal tke... not sure...
-
                     # We are unstable to evaporation fueled downdrafts... [[ technically liquid should release more energy but... ]]
-                    instability[k] = min(instability[k], 0)
-                    instability[k] += (-max(∂MSE∂z[k], -1) * abs(latent_heating)) * frac_subsat
+                    # instability[k] = min(instability[k], 0)
+                    # instability[k] += (-max(∂MSE∂z[k], -1) * abs(latent_heating)) * frac_subsat
+                    # Omit this evap because the LES doesn't seem to have it... might still be real though
+                    instability[k] += frac_subsat * -∂b∂z
                 else # use DSE
                     # Do nothing so as to not overwrite any frac_supersat contribution
-                    # instability[k] = -∂DSE∂z[k]
                     # c_p = TCP.cp_d(param_set)
                     # instability[k] = c_p * -dθ_virt_dz[k] # dry static stability
                     # instability[k] += -FT(Inf) # disallow
+                    instability[k] += frac_subsat * -∂b∂z
                 end
             else # saturated
-                instability[k] = -max(∂MSE∂z[k], -1) * abs(latent_heating) * frac_supersat
+                # instability[k] = -max(∂MSE∂z[k], -1) * abs(latent_heating) * frac_supersat * (g/(c_p * aux_en.T[k]))
 
                 if (frac_subsat > zero(FT)) && ((aux_en.q_liq[k] + aux_en.q_ice[k] + prog_pr.q_rai[k] + prog_pr.q_sno[k]) > FT(1e-10)) # partially subsaturated with condensate
-                    instability[k] += (-max(∂MSE∂z[k], -1) * abs(latent_heating)) * frac_subsat
+                    # instability[k] += (-max(∂MSE∂z[k], -1) * abs(latent_heating)) * frac_subsat # Ignore cause LES doesnt seem to have this...
+                    instability[k] += frac_subsat * -∂b∂z
                 end
+                instability[k] += -max(∂MSE∂z[k], -1) * frac_supersat * abs(latent_heating) * (g/(c_p * aux_en.T[k])) * efficiency
             end
-            instability[k] *= efficiency # when the downdrafts/updrafts don't have to fight their natural buoyancy you unlock a world of extra instability... its essentially undamped. you could think of it as having the circulation tucked into 1/2 the domain at 1/2 (KE down by 4, area down by 2) vs having the full domain. You get to cycle and reuse the same latent heat indefinitely
+            # instability[k] *= efficiency # when the downdrafts/updrafts don't have to fight their natural buoyancy you unlock a world of extra instability... its essentially undamped. you could think of it as having the circulation tucked into 1/2 the domain at 1/2 (KE down by 4, area down by 2) vs having the full domain. You get to cycle and reuse the same latent heat indefinitely
         end
 
-        g = TCP.grav(param_set)
-        c_p = TCP.cp_d(param_set)
-        T = aux_en.T
-        @. instability *= (g/(c_p * T)) # dw/dt = g/(c_p T)
+        # g = TCP.grav(param_set)
+        # c_p = TCP.cp_d(param_set)
+        # T = aux_en.T
+        # @. instability *= (g/(c_p * T)) # dw/dt = g/(c_p T)
 
 
         # -- production -- #
@@ -2853,19 +2871,20 @@ function compute_en_tendencies!(
         # @. K_diss = k_diss * max(∂MSE∂z, 0)^2 # if MSE increases with height, we dissipate convective TKE squared goes like brunt vaisala
 
         # We should also dissipate if we have no latent heating... and we're dry stable
-        dθ_virt_dz = similar(aux_en.T)
+        # dθ_virt_dz = similar(aux_en.T)
         c_p = TCP.cp_d(param_set)
-        RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(aux_en.θ_virt[kc_toa]))
-        θ_virt = aux_en.θ_virt
-        @. dθ_virt_dz = ∇c(wvec(RBθ(θ_virt)))
+        # RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(aux_en.θ_virt[kc_toa]))
+        # θ_virt = aux_en.θ_virt
+        # @. dθ_virt_dz = ∇c(wvec(RBθ(θ_virt)))
         g = TCP.grav(param_set)
         @inbounds for k in real_center_indices(grid)
-            K_diss[k] = k_diss * max(∂MSE∂z[k], 0)^2
+            # K_diss[k] = k_diss * max(∂MSE∂z[k], 0)^2
+            K_diss[k] = k_diss * instability[k]^2 # dissipate based on our instability measure (which includes latent heating effects)
                
-            ∂DSE∂z = c_p * -dθ_virt_dz[k] + g
-            if (aux_en.latent_heating[k] < FT(0.1)) &&  (∂DSE∂z > FT(0)) # dry stable with little latent heating
-                K_diss[k] += k_diss * (∂DSE∂z)^2
-            end
+            # ∂DSE∂z = c_p * -aux_tc.∂θv∂z[k] + g
+            # if (aux_en.latent_heating[k] < FT(0.1)) &&  (∂DSE∂z > FT(0)) # dry stable with little latent heating
+            #     K_diss[k] += k_diss * (∂DSE∂z)^2
+            # end
         end
 
         @. ρatke_convective_dissipation = K_diss * (ρatke_convective/(ρ_c * area_en))^(3/2) * ρ_c * area_en / FT(1000) # dissipation  goes as tke^(3/2)/l

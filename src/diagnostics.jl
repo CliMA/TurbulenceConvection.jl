@@ -72,6 +72,7 @@ function io_dictionary_aux(edmf) # added EDMF as an argument so we can have thin
         "tke_convective_advection" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_advection),
         "tke_convective_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).tke_convective_dissipation),
         "latent_heating" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).latent_heating),
+        "instability" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).instability),
         "frac_supersat" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment(state).frac_supersat),
 
         "Hvar_dissipation" => (; dims = ("zc", "t"), group = "profiles", field = state -> center_aux_environment_2m(state).Hvar.dissipation),

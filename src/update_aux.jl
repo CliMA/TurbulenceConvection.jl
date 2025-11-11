@@ -1036,9 +1036,11 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
     # Second order approximation: Use dry and cloudy environmental fields.
     mix_len_params = mixing_length_params(edmf)
 
-    @. ∂qt∂z_sat = ∇c(wvec(Ifx(aux_en_sat.q_tot)))
-    @. ∂θl∂z_sat = ∇c(wvec(Ifx(aux_en_sat.θ_liq_ice)))
-    @. ∂θv∂z_unsat = ∇c(wvec(Ifx(aux_en_unsat.θ_virt)))
+    if edmf.bg_closure == BuoyGradQuadratures() # seems to only be used there.
+        @. ∂qt∂z_sat = ∇c(wvec(Ifx(aux_en_sat.q_tot)))
+        @. ∂θl∂z_sat = ∇c(wvec(Ifx(aux_en_sat.θ_liq_ice)))
+        @. ∂θv∂z_unsat = ∇c(wvec(Ifx(aux_en_unsat.θ_virt)))
+    end
 
     @inbounds for k in real_center_indices(grid)
 
@@ -1049,11 +1051,11 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
             bg_kwargs = (;
                 t_sat = aux_en.T[k],
                 qv_sat = TD.vapor_specific_humidity(thermo_params, ts_en),
-                qt_sat = aux_en.q_tot[k],
+                qt_sat = aux_en.q_tot[k] + (true ? sqrt(aux_en.QTvar[k]) : FT(0)), # I think for tke generation you should use the most optimistic version of qt_sat
                 ql_sat = aux_en.q_liq[k], # my addition
                 qi_sat = aux_en.q_ice[k], # my addition
                 θ_sat = aux_en.θ_dry[k],
-                θ_liq_ice_sat = aux_en.θ_liq_ice[k],
+                θ_liq_ice_sat = aux_en.θ_liq_ice[k] - (true ? sqrt(aux_en.Hvar[k]) : FT(0)), # I think for tke generation you should use the most optimistic version of θ_liq_ice_sat
                 ∂θv∂z_unsat = ∂θv∂z[k],
                 ∂qt∂z_sat = ∂qt∂z[k],
                 ∂θl∂z_sat = ∂θl∂z[k],
@@ -1084,7 +1086,7 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
         else
             error("Something went wrong. The buoyancy gradient model is not specified")
         end
-        bg = buoyancy_gradients(param_set, bg_model; is_noneq = (edmf.moisture_model isa NonEquilibriumMoisture))
+        bg = buoyancy_gradients(param_set, bg_model; is_noneq = (edmf.moisture_model isa NonEquilibriumMoisture), latent_heating = aux_en.latent_heating[k])
 
         if !state.calibrate_io
             aux_tc.∂b∂z[k] = bg.∂b∂z # my addition
