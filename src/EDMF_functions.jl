@@ -248,10 +248,11 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                 # supersat -- moister, lower θ air goes up
                 # subsat -- moister (qt recovered from precip), lower θ air goes down
                 # supersaturated = @. (aux_en.T < TCP.T_freeze(param_set)) ? ((aux_en.RH_ice > FT(1)) ? FT(1) : FT(-1)) : ((aux_en.RH_liq > FT(1)) ? FT(1) : FT(-1))
-                if !stats.calibrate_io
+                if !state.calibrate_io
                     supersaturated = @. ifelse(aux_en.T < TCP.T_freeze(param_set), ifelse(aux_en.RH_ice > FT(1), FT(1), FT(-1)), ifelse(aux_en.RH_liq > FT(1), FT(1), FT(-1)))
                 else
-                    supersaturated = @. ifelse(aux_en.T < TCP.T_freeze(param_set), ifelse(relative_humidity_over_ice(thermo_params, aux_en.ts[k]) > FT(1), FT(1), FT(-1)), ifelse(relative_humidity_over_liquid(thermo_params, aux_en.ts[k]) > FT(1), FT(1), FT(-1)))
+                    thermo_params = TCP.thermodynamics_params(param_set)
+                    supersaturated = @. ifelse(aux_en.T < TCP.T_freeze(param_set), ifelse(relative_humidity_over_ice(thermo_params, aux_en.ts) > FT(1), FT(1), FT(-1)), ifelse(relative_humidity_over_liquid(thermo_params, aux_en.ts) > FT(1), FT(1), FT(-1)))
                 end
                 supersaturated = Ifx.(supersaturated)
                 @. massflux_h = ((ρ_f .* ᶠinterp_a_RBF_a_en.(a_en)/2 .* w_en) + (supersaturated * massflux_en_conv)) .* IfRBF_θ_liq_ice_en(θ_liq_ice_en - sqrt(aux_en.Hvar)) + ((ρ_f .* ᶠinterp_a_RBF_a_en.(a_en)/2 .* w_en) - (supersaturated * massflux_en_conv)) .* IfRBF_θ_liq_ice_en(θ_liq_ice_en + sqrt(aux_en.Hvar))
