@@ -1964,3 +1964,25 @@ return_below = true
 out =  return_below ? one(FT) - F_target : F_target
 theoretical_frac_below = 1 - exp(-λ*r_th)*(1 + λ*r_th)
 @info "frac_above = $(one(FT) - out); frac_below = $(out); theoretical_frac_below = $(theoretical_frac_below); r = $(((μ + 1)/λ) * 1e6) μm"
+
+
+
+
+TC.my_terminal_velocity(param_set, TC.snow_type, TC.Chen2022Vel, ρ, q; Nt = N)
+
+
+TC.my_terminal_velocity(param_set, TC.snow_type, TC.Chen2022Vel, FT(1), 1e-10)
+
+TC.N_from_qr(param_set, TC.snow_type, FT(1e-5), FT(100e-6); monodisperse=false)
+
+
+qs = FT(1e-5)
+μs = FT(0)
+ρ_a = FT(1)
+_n0 = TC.n0(prs, qs, ρ_a, TC.snow_type)
+λs = TC.lambda(param_set, TC.snow_type, qs, ρ_a, NaN, FT(0), FT(Inf); μ = μs)
+N = (_n0 * λs^-(μs + 1) * TC.CM1.SF.gamma(μs + 1));
+r = ((μs + 1) / λs);
+ws = TC.my_terminal_velocity(param_set, TC.snow_type, TC.Chen2022Vel, ρ_a, qs; Nt = NaN)
+ws_check = TC.my_terminal_velocity(param_set, TC.snow_type, TC.Chen2022Vel, ρ_a, qs; Nt = N)
+(N, r, ws, ws_check) = (N, r, ws, ws_check)

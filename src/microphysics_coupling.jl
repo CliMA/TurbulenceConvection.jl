@@ -1744,8 +1744,6 @@ function threshold_driven_acnv(
                     # Say that deficit is 5-10%. Then r_boost hits r at 15% supersat the maximum of that and 1.1 r_thresh at 5% supersat
 
                     # start at original r, reach 1.2r_th at MF = 0.02 [[[ this is too strong... you can go from <r> = 20 micron all the way to way above threshold instantly... even at super high supersaturation.... and it also puts most mass in the downcloak which probably isn't true.... ]]]
-                    # r_boost = r + (max(r, 1.2r_thresh) - r) * clamp(massflux / FT(0.02), FT(0), FT(1))
-
 
                     # We're growing so supersat, but we need to converge to meet the !isgrowing branch at r_boost = r_no_boost at S_i = 0. When more supersaturated we should probably assume even less in the downdraft? but it's not clear... We know $τ is slower than N, r suggest so maybe that's less evap because more is in the non cloak... So we'll go 0.9 r at 10% supersat, 1.0 r at 0% supersat
                     r_boost = r - (r - 0.9r) * clamp(S_i / FT(0.1), FT(0), FT(1))
@@ -2023,23 +2021,31 @@ function threshold_driven_acnv(
         q_subsat = q_vap_sat * 0.9  # 10% subsat
         qt_std = sqrt(qt_var)
         frac_sub10 = (qt_std > 0) ? Distributions.cdf(Distributions.Normal(qt, qt_std), q_subsat) : ((qt < q_subsat) ? one(FT) : zero(FT))
-        # acnv_rate *= frac_sub10
+        
+        qt_std_min = FT(.01) * qt
+        frac_0_to_10 = Distributions.cdf(Distributions.Normal(qt, max(qt_std, qt_std_min)), q_vap_sat) - frac_sub10
+
 
 
         if (domain isa EnvDomain) || (domain isa CloakDownDomain) # only do this in env/cloak env
             f_r  = clamp((r - r_thresh) / (1.05*r_thresh - r_thresh), FT(0), FT(1))
             f_Si = clamp(-S_i / FT(0.1), FT(0), one(FT)) # -10% full force to match LES behavior
             acnv_rate = FT(0)
-            acnv_rate_addit = dqdt_sed * f_r * f_Si # / (N/100)
+            # acnv_rate_addit = dqdt_sed * f_r * f_Si # / (N/100)
         else # 
             f_r  = clamp((r - r_thresh) / (1.05*r_thresh - r_thresh), FT(0), FT(1))
             f_Si = clamp(-S_i / FT(0.1), FT(0), one(FT))
-            acnv_rate_addit = dqdt_sed * f_r * f_Si
+            # acnv_rate_addit = dqdt_sed * f_r * f_Si
         end
 
         # acnv_rate = qisedflux * f_r * f_Si * frac_sub10 / τ # direct sedimentation redirection scaled by subsat fraction [[ pure qi_sed_flux is too susceptible to being 0 and have having no acnv despite being deeply subsat....  we want flux, but maybe enhanced if convergent since that implies more size sorting. ]]
         acnv_rate_addit = (dqdt_sed + q) * f_r * f_Si * frac_sub10 / τ # direct sedimentation redirection scaled by subsat fraction [[ pure qi_sed_flux is too susceptible to being 0 and have having no acnv despite being deeply subsat....  we want flux, but maybe enhanced if convergent since that implies more size sorting. ]]
         acnv_rate += acnv_rate_addit
+
+
+        # This should probably be calibrated somehow?  or at least taper the timescale from S = 0 to S = -10? we also have the S scaling though so maybe it's fine... idk...
+        acnv_rate += (dqdt_sed + q) * f_r * f_Si * frac_0_to_10 / (FT(5) * τ) # weaker acnv for 0-10% subsat region
+        q_target = (1-frac_sub10) * q 
 
 
 

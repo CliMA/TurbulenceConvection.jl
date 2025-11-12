@@ -939,7 +939,6 @@ function get_process_threshold_fraction(
         if isone(k) # shortcut, see DUM in https://github.com/DOI-USGS/COAWST/blob/6419fc46d737b9703f31206112ff5fba65be400d/WRF/phys/module_mp_morr_two_moment.F#L2976
             F_below = one(FT) - exp(-ξ)*(1 + ξ)
             return return_below ? F_below : one(FT) - F_below
-
         end
 
         sum_val = zero(FT)
@@ -1837,7 +1836,8 @@ function f_boost_MF(
     S_i::FT = FT(0), # supersaturation
     massflux::FT = FT(0), # if we have a massflux, we can use it to adjust the source term, (combines area and velocity, velocity is prolly more important for penetration and downdraft generation but area matters.
     NINP_top_over_N_INP::FT = FT(1),
-    massflux_min::FT = FT(0.015)
+    massflux_min::FT = FT(0.05),
+    massflux_0::FT = FT(0.05),
 ) where {FT}
     
 
@@ -1862,18 +1862,8 @@ function f_boost_MF(
     c_MF = param_set.user_params.massflux_N_i_boost_factor
     dNINP_dz = max(dNINP_dz, eps(FT)) # avoid div by 0
 
-    # f_boost = one(FT) + ((massflux / ρ) * (c_MF / FT(0.02)) * clamp(1/(dNINP_dz), 0, 3)) # so if massflux = 0, we get N_below_r_is, if massflux = 0.02 * ρ, we get (1 + massflux_N_i_boost_factor) * N_below_r_is
-    # f_boost = (massflux / ρ) * (c_MF / FT(0.02)) * clamp(1/(dNINP_dz), min_inv_dINP_dz, 3) # so if massflux = 0, we get N_below_r_is, if massflux = 0.02 * ρ, we get (1 + massflux_N_i_boost_factor) * N_below_r_is
-    # f_boost = (massflux / ρ) * (c_MF / FT(0.02)) * clamp((.75*dINP_dz_top)/(dNINP_dz), 1, 3) # so if massflux = 0, we get N_below_r_is, if massflux = 0.02 * ρ, we get (1 + massflux_N_i_boost_factor) * N_below_r_is
 
-    # f_boost = min((massflux / ρ) * (c_MF / FT(0.02)) * clamp((0.75*dINP_dz_top)/(dNINP_dz), 1, 3), (0.75*dINP_dz_top)/(dNINP_dz))
-
-
-    # f_boost = one(FT) + (max(one(FT), c_MF * clamp((0.75*dINP_dz_top)/(dNINP_dz), one(FT), FT(3))) - one(FT)) * ((massflux/ρ) / FT(0.02)) # linear interp from 1 at massflux = 0 to 1 + c_MF at massflux = 0.02 * ρ
-    # f_boost = min(one(FT) + (max(one(FT), c_MF * clamp((0.75*dINP_dz_top)/(dNINP_dz), one(FT), FT(3))) - one(FT)) * min((massflux/ρ)/FT(0.02), one(FT)), max(one(FT), (FT(0.75)*N_top) / max(N_i, eps(one(FT)))))
-
-
-    α = (massflux/ρ) / FT(0.02) # normalize to saturate at  0.02 MF, yielding c_MF boost.
+    α = (massflux/ρ) / massflux_0 # normalize to saturate at  massflux_0 MF, yielding c_MF boost.
     r = (dINP_dz_top) / max(abs(dNINP_dz), eps(FT))      # ratio = N_top / N
     # target = max(c_MF * clamp((0.6*dINP_dz_top)/(dNINP_dz), one(FT), FT(3)), one(FT))
     # cap = max(FT(0.6) * (dINP_dz_top/dNINP_dz), one(FT))

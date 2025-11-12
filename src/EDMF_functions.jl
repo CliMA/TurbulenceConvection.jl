@@ -899,6 +899,11 @@ function filter_small_moisture_vars(edmf::EDMFModel, state::State, param_set::AP
             @. prog_gm.q_ice = cutoff_small_values_positive(prog_gm.q_ice, q_min)
         end
 
+        # Precip 
+        prog_pr = center_prog_precipitation(state)
+        @. prog_pr.q_rai = cutoff_small_values_positive(prog_pr.q_rai, q_min)
+        @. prog_pr.q_sno = cutoff_small_values_positive(prog_pr.q_sno, q_min)
+
     end
     return nothing
 
@@ -909,6 +914,11 @@ function filter_small_vars(edmf::EDMFModel, state::State, param_set::APS)
     if !iszero(param_set.user_params.q_min)
         filter_small_moisture_vars(edmf, state, param_set)
     end
+
+    # if !iszero(param_set.user_params.var_min)
+        # terminal velocities [[ these might need to be don at point of creation, check order of operations... a reasonable q limit should help tho]]
+    # end
+
     return nothing
 end
 
@@ -1859,19 +1869,25 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
 
             # ramp onto max_area as a function of tke_conv [[ fully on by tke = 0.1² ]]
             # @. Δa_en_tke_conv = min(max(a_en_tke_conv - aux_up[i].area, FT(0)), max(edmf.max_area - aux_up_i.area, FT(0))) # ensure we don't entrain more than available area
+                
+            # @info "a_en_tke_conv = $(parent(a_en_tke_conv))"
+
 
             Δa_en_tke_conv = a_en_tke_conv # alias
             tends_ρarea_tke_conv = aux_tc.temporary_2
             @inbounds for k in real_center_indices(grid)
                 if aux_en.latent_heating[k] > 0
                     Δa_en_tke_conv[k] = min(max(a_en_tke_conv[k] - aux_up[i].area[k], FT(0)), max(edmf.max_area - aux_up_i.area[k], FT(0)))
-                    tends_ρarea_tke_conv[k] = -limit_tendency(edtl, -ρ_c[k] * Δa_en_tke_conv[k] * entr_rate_inv_s_tke_conv, FT(0), Δa_en_tke_conv[k] * ρ_c[k], Δt)
-                    # @info "tends_ρarea_tke_conv[$(k.i)] = $(tends_ρarea_tke_conv[k]); Δa_en_tke_conv[$(k.i)] = $(Δa_en_tke_conv[k]); a_en_tke_conv[$(k.i)] = $(a_en_tke_conv[k]); aux_up[i].area[$(k.i)] = $(aux_up[i].area[k]); aux_en.latent_heating[$(k.i)] = $(aux_en.latent_heating[k]); aux_en.tke_convective[$(k.i)] = $(aux_en.tke_convective[k]);"
+                    tends_ρarea_tke_conv[k] = -limit_tendency(edtl, -ρ_c[k] * Δa_en_tke_conv[k] * entr_rate_inv_s_tke_conv, Δa_en_tke_conv[k] * ρ_c[k], Δt)
                 else
                     Δa_en_tke_conv[k] = -aux_up_i.area[k]
                     tends_ρarea_tke_conv[k] = limit_tendency(edtl, ρ_c[k] * Δa_en_tke_conv[k] * entr_rate_inv_s_tke_conv, prog_up[i].ρarea[k], Δt)
                 end
             end
+
+            # @info "Δa_en_tke_conv = $(parent(Δa_en_tke_conv))"
+            # @info "tends_ρarea_tke_conv = $(parent(tends_ρarea_tke_conv))"
+            # @info "latent_heating = $(parent(aux_en.latent_heating))"
 
 
             q_tot_en_tke_conv = aux_tc.temporary_1
@@ -1919,23 +1935,19 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
                     tends_ρaw[k] += max(-limit_tendency(edtl, -tends_ρarea_tke_conv_f[k] * w_convective, ρ_f[k] * a_en_f[k]/2 * w_convective, Δt), FT(0)) # max because w/ the upppper bound on area, we can have area tendency 0 inside the latent heating areas, and then the negatives outside leak in.
                     
                     # since we have the area limiter, we want add w to existing area as well [[ probably should have also done to the other tracers.. idk ]]
-                    δ_ρaw = max(ρ_f[k] * a_upf[k] * w_convective  - prog_up_f[i].ρaw[k], FT(0))
+                    δ_ρaw = max(ρ_f[k] * a_upf[k] * w_convective - prog_up_f[i].ρaw[k], FT(0))
                     # @info "δ_ρaw[$(k.i)] = $(δ_ρaw); adding $(-limit_tendency(edtl, -δ_ρaw * entr_rate_inv_s_tke_conv, δ_ρaw, Δt)) to tends_ρaw[$(k.i)]; ρ_f = $(ρ_f[k]); a_upf = $(a_upf[k]); w_convective = $(w_convective); prog_up_f[i].ρaw[$(k.i)] = $(prog_up_f[i].ρaw[k]);"
                     # tends_ρaw[k] += -limit_tendency(edtl, -δ_ρaw * entr_rate_inv_s_tke_conv, δ_ρaw, Δt)
                     tends_ρaw[k] += δ_ρaw/(Δt) # add the rest directly... should be small
 
-                    # @info " heating after: tends_ρaw[$(k.i)] after = $(tends_ρaw[k])"
                 else
-                    # @info " cooling before: tends_ρaw[$(k.i)] before = $(tends_ρaw[k])"
                     tends_ρaw[k] += min(limit_tendency(edtl, tends_ρarea_tke_conv_f[k] * w_convective, prog_up_f[i].ρaw[k], Δt), FT(0)) # min because leakage
-                    # @info " cooling after: tends_ρaw[$(k.i)] after = $(tends_ρaw[k])"
                 end
             end
 
-            # @info "tends_ρarea_tke_conv = $(parent(tends_ρarea_tke_conv));"
-            # @info "tends_ρarea_tke_conv_f = $(parent(tends_ρarea_tke_conv_f));"
-            # @info "latent_heating = $(parent(aux_en.latent_heating));"
-            # @info "latent_heating_f = $(parent(latent_heating_f));"
+            # @info "ρarea = $(parent(ρarea));"
+            # @info "tends_ρaw = $(parent(tends_ρaw));"
+            # println("----------------------------------------")
 
             
             # @. tends_ρarea += tends_ρarea_tke_conv

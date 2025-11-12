@@ -195,10 +195,11 @@ function compute_precipitation_advection_tendencies(
         end
 
         if param_set.user_params.use_convective_tke
-            w_conv = aux_tc_f.temporary_f1
-            @. w_conv = sqrt(max(Ifx(2 * aux_en.tke_convective), FT(0))) # could add a limiter here if needed
-            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB(Ic(w_conv) * ρ_c * aux_en.area/2 * q_rai))) / ρ_c
-            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB(Ic(w_conv) * ρ_c * aux_en.area/2 * q_sno))) / ρ_c    
+            # w_conv = aux_tc_f.temporary_f1
+            # @. w_conv = sqrt(max(Ifx(2 * aux_en.tke_convective), FT(0))) # could add a limiter here if needed
+            w_conv = @. sqrt((2 * aux_en.tke_convective))
+            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB((w_conv) * ρ_c * aux_en.area/2 * q_rai))) / ρ_c
+            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB((w_conv) * ρ_c * aux_en.area/2 * q_sno))) / ρ_c    
             # Ignore tke down draft for now...
         else
             # ignore env contribution for now....
@@ -360,24 +361,25 @@ function compute_precipitation_sink_tendencies(
             S_qs_melt_here = limit_tendency(ptl, -α_melt * CM1.snow_melt(microphys_params, qs_region, ρ_region, T_region), qs_region, Δt) * precip_fraction
 
             # -------------------------- #
-            # if edmf.moisture_model isa NonEquilibriumMoisture
-            #     N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, q_region, T_region, ρ_region, w)
-            # else
-            #     N_INP = get_N_i_Cooper_curve(T_region; clamp_N=true)
-            # end
+            if edmf.moisture_model isa NonEquilibriumMoisture
+                N_INP = get_INP_concentration(param_set, edmf.moisture_model.scheme, q_region, T_region, ρ_region, w)
+            else
+                N_INP = get_N_i_Cooper_curve(T_region; clamp_N=true)
+            end
 
-            # N_s_min = max(N_INP - N_i, FT(0)) # the fewest N,
-            # if N_s_min > FT(0) && (qs_region > 1e-9) # we could add dry aerosol mass but we don't know N, # we will do this by varying lambda...
-            #     _, λ_min = get_n0_lambda(param_set, snow_type, qs_region, ρ_region, N_s_min) # the largest droplets we should allow... [so lambda is smallest]
-            # else
-            #     λ_min = eps(FT)
-            # end
-            # λ_s = CM1.lambda(microphys_params, snow_type, qs_region, ρ_region)
-            # λ_s = max(λ_s, λ_min) # so that we don't sublimate more than we have INP for
-            λ_s = FT(NaN)
+            N_s_min = max(N_INP - N_i, FT(0)) # the fewest N,
+            if N_s_min > FT(0) && (qs_region > 1e-9) # we could add dry aerosol mass but we don't know N, # we will do this by varying lambda...
+                _, λ_min = get_n0_lambda(param_set, snow_type, qs_region, ρ_region, N_s_min) # the largest droplets we should allow... [so lambda is smallest]
+            else
+                λ_min = eps(FT)
+            end
+            λ_s = CM1.lambda(microphys_params, snow_type, qs_region, ρ_region)
+            λ_s = max(λ_s, λ_min) # so that we don't sublimate more than we have INP for
+            # λ_s = FT(NaN)
             # -------------------------- #
 
             tmp = α_dep_sub * my_evaporation_sublimation(microphys_params, snow_type, q_region, qs_region, ρ_region, T_region; _λ=λ_s) * precip_fraction
+            # tmp = α_dep_sub * CM1.evaporation_sublimation(microphys_params, snow_type, q_region, qs_region, ρ_region, T_region) * precip_fraction
 
             # Note if T makes a very low excursion (or too high) , while S*G might mostly cancel and give a real result, you can get NaN from 0 * Inf or something, but I think this is just a legitimate model crash bc those temps are super extreme.
             qvsat_ice = TD.q_vap_saturation_generic(thermo_params, T_region, ρ_region, TD.Ice()) # we don't have this stored for grid-mean and we can't calculate form en/up bc it's non-linear...
@@ -392,6 +394,8 @@ function compute_precipitation_sink_tendencies(
                 # dv += Δt * max(aux_gm.qt_tendency_ls_vert_adv[k] - max(aux_gm.ql_tendency_ls_vert_adv[k], FT(0)) - max(aux_gm.qi_tendency_ls_vert_adv[k], FT(0)), FT(0))
             end
             
+            # δi *= 10000 # test
+
             if tmp > 0
                 δi = max(δi, FT(0)) # only consider depositional supersaturation for sublimation/deposition
                 # since we don't wanna do the noneq_moisture_sources() style thing, we'll settle for just adding dqvdt, and qt advection here. sed doesn't count.., lsadv does but is slow

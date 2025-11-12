@@ -135,8 +135,8 @@ for flight_number in flight_numbers
             # NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
 
             # nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_and_geometric_ice
-            # nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_ice
-            nonequilibrium_moisture_scheme = :exponential_T_scaling_ice
+            nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_ice
+            # nonequilibrium_moisture_scheme = :exponential_T_scaling_ice
             dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
             method = "best_particle_final"
             flight_number = 9
@@ -146,6 +146,7 @@ for flight_number in flight_numbers
             namelist["meta"]["forcing_type"] = Symbol(namelist["meta"]["forcing_type"]) # this gets messed up for some reason...
             default_namelist = default_namelist = NameList.default_namelist(case_name)
             NameList.convert_namelist_types_to_default!(namelist, default_namelist) # coerce remaining type
+            print(namelist_path)
 
             # nonequilibrium_moisture_scheme = :neural_network
             # # dt_string = "adapt_dt__dt_min_2.0__dt_max_4.0"
@@ -408,11 +409,19 @@ for flight_number in flight_numbers
             
         # ---------------------------------------------------------------- #
 
+        # namelist["time_stepping"]["dt_min"] = 50.
+        # namelist["time_stepping"]["dt_max"] = 100.
+        # namelist["time_stepping"]["spinup_half_t_max"] = 3600*8.
+
         # namelist["stats_io"]["frequency"] = .1
         # namelist["stats_io"]["frequency"] = 30.0
         # namelist["stats_io"]["frequency"] = namelist["time_stepping"]["dt_min"] # 1 timestep
         namelist["stats_io"]["frequency"] = 60.
         namelist["stats_io"]["calibrate_io"] = false
+
+        # namelist["stats_io"]["frequency"] = 600.
+        # namelist["stats_io"]["calibrate_io"] = true
+        # namelist["thermodynamics"]["moisture_model"] = "equilibrium"
 
         # nonequilibrium_moisture_scheme = :neural_network_pca_noise
         # namelist["user_args"]["nonequilibrium_moisture_scheme"] = nonequilibrium_moisture_scheme # set the nonequilibrium moisture scheme to neural_network_pca_noise
@@ -432,6 +441,7 @@ for flight_number in flight_numbers
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["stalled_updraft_handler"] = "none" # kill stalled updrafts
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["stalled_updraft_handler"] = "detrain_downdrafts" # kill stalled updrafts
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["base_detrainment_rate_inv_s"] = FT(1/(60.0*60.0)) # 10 minutes
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["base_entrainment_rate_inv_s"] = FT(.0) # strong... hopefully doesn't trigger max area limiters
         # namelist["user_params"]["ice_sedimentation_Dmax"] = FT(Inf)
         # namelist["user_args"]["use_heterogeneous_ice_nucleation"] = true
 
@@ -459,40 +469,100 @@ for flight_number in flight_numbers
         # namelist["meta"]["simname"] = "SOCRATES_RF01_obs_data"
         # namelist["meta"]["flight_number"] = 01
 
+        namelist["meta"]["simname"] = "SOCRATES_RF10_obs_data"
+        namelist["meta"]["flight_number"] = 10
+
         # namelist["user_params"]["χm_liq"] = FT(1)
         # namelist["microphysics"]["χm_ice"] = FT(1) # inv(namelist["user_params"]["mean_r_factor_ice"])^3
         # namelist["user_params"]["massflux_N_i_boost_factor"] = FT(2.0)
         # namelist["user_params"]["sedimentation_N_i_boost_factor"] = FT(0.2)
-        namelist["user_params"]["apply_massflux_N_i_boost"] = true
-        namelist["user_params"]["apply_sedimentation_N_i_boost"] = false
-        namelist["user_params"]["use_ice_mult"] = false
+        # namelist["user_params"]["apply_massflux_N_i_boost"] = true
+        # namelist["user_params"]["apply_sedimentation_N_i_boost"] = false
+        # namelist["user_params"]["use_ice_mult"] = false
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["base_detrainment_rate_inv_s"] = FT(1/(0.1*3600.0)) # 6 hours
-        # namelist["relaxation_timescale_params"]["τ_sub_dep_scaling_factor"] = FT(0.25)
-        # namelist["user_params"]["ice_dep_acnv_scaling_factor"] = FT(0.8)
-        # namelist["user_params"]["ice_dep_acnv_scaling_factor_above"] = FT(0.5)
-        namelist["thermodynamics"]["sgs"] = "mean"
+        # namelist["relaxation_timescale_params"]["τ_sub_dep_scaling_factor"] = FT(500)
+        # namelist["user_params"]["ice_dep_acnv_scaling_factor"] = FT(1.0)
+        # namelist["user_params"]["ice_dep_acnv_scaling_factor_above"] = FT(1.0)
+        # namelist["thermodynamics"]["sgs"] = "mean"
         # namelist["thermodynamics"]["sgs"] = "mean_w_quadrature_adjusted_noneq_moisture_sources"
         # namelist["thermodynamics"]["sgs"] = "quadrature"
-        namelist["thermodynamics"]["quadrature_order"] = 4
+        # namelist["thermodynamics"]["quadrature_order"] = 6
 
         # namelist["microphysics"]["τ_cond_evap"] = FT(1.)
         # namelist["microphysics"]["χv_ice"] = FT(0.0001)
-        # namelist["user_params"]["ice_sedimentation_scaling_factor"] = FT(0.05)
+        # namelist["user_params"]["ice_sedimentation_scaling_factor"] = FT(0.3)
 
-        # namelist["microphysics"]["initial_profile_updraft_area"] = FT(0.4)
+
+        # namelist["user_params"]["initial_profile_updraft_area"] = FT(0.0001)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = FT(0.5) # stability (maybe we need to use the limiter instead tho to not get flat cloud tops?)
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["surface_area_bc"] = "Fixed"
 
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["area_partition_model"] = "core_cloak"
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["cloak_area_factor"] = 2.0
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["cloak_mix_factor"] = 0.5
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["confine_all_downdraft_to_cloak"] = false # true leads to stronger transport across z = 22, combined w/ second order correction seems to lead to better qt mixing?
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["apply_second_order_flux_correction"] = true
-        namelist["turbulence"]["EDMF_PrognosticTKE"]["second_order_correction_limit_factor"] = Inf # Especially above 0.8, this can clash with quadrature... but it is a huge help in actually allowing for downwards qt advection w/o the need for prognostic cloaks.
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["area_partition_model"] = "standard"
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["apply_second_order_flux_correction"] = false
 
-        
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["area_partition_model"] = "core_cloak"
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["cloak_area_factor"] = 0.01
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["cloak_dn_area_factor"] = 10.
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["cloak_mix_factor"] = 0.05
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["cloak_dn_area_factor"] = 1.0
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["confine_all_downdraft_to_cloak"] = false # true leads to stronger transport across z = 22, combined w/ second order correction seems to lead to better qt mixing?
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["apply_second_order_flux_correction"] = true # true w/ sgs crashed with LBF RBF logic [[ I can't remember why i thought this was necessary, it only really matters for area, no? Having it on leads to huge temp problems at the inversion, though we also do not get as much qt downward transport...]]
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["second_order_correction_limit_factor"] = Inf # Especially above 0.8, this can clash with quadrature... but it is a huge help in actually allowing for downwards qt advection w/o the need for prognostic cloaks.
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["apply_cloak_to_condensate_formation"] = false # true w/ sgs crashed with LBF RBF logic [[ I can't remember why i thought this was necessary, it only really matters for area, no? Having it on leads to huge temp problems at the inversion, though we also do not get as much qt downward transport...]]
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["fraction_of_area_above_max_area_allowed_in_cloak"] = 0.0
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["l_max"] = 1e4 # default was 1e6
 
-        if apply_edits``
+        # namelist["user_params"]["use_convective_tke"] = false
+        # namelist["user_params"]["use_convective_tke_production_only"] = !(namelist["user_params"]["use_convective_tke"])
+        # namelist["user_params"]["convective_tke_scaling_factor"] = 1.0
+
+
+        # namelist["user_params"]["convective_tke_buoyancy_coeff"] = FT(1.1)
+        # namelist["user_params"]["convective_tke_advection_coeff"] = FT(0.1)
+        # namelist["user_params"]["convective_tke_dissipation_coeff"] = FT(5.5) # smaller than generation
+        # namelist["user_params"]["convective_tke_self_dissipation_coeff"] = FT(0.5) # extra dissipation when tke is convectively generated
+        # namelist["user_params"]["tke_convective_max_scaling_factor"] = FT(0.66)
+        # namelist["user_params"]["use_separate_convective_tke_ed_coeff"] = true
+        # namelist["user_params"]["convective_tke_ed_scaling_factor"] = (1/(namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"])) / 2 # so that ed is same as default at max convective tke
+        # namelist["user_params"]["convective_tke_ed_scaling_factor"] = FT(1)
+        # namelist["user_params"]["apply_nudging_to_updraft"] = true # if this is true, the updraft will feel the nudging just as much as the environment, otherwise the env would feel all of it... I think we need this. The LES updraft for RF09 doesn't go that high. without this i think we risk overshoots when say a warm updraft impinges, the environment takes the nudging cooling in response, and the updraft continues to accelerate.
+        # namelist["user_params"]["tke_conv_entr_inv_s"] = FT(1/(900.0)) # entrainment due to convective tke (1/5 min)
+
+        # namelist["user_params"]["condensate_qt_SD"] = 0.5
+
+        # namelist["user_args"]["nonequilibrium_moisture_sources_limiter_type"] = "none"
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["stalled_updraft_handler"] = "kill"
+
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["base_detrainment_rate_inv_s"] = FT(1/(0.1*3600.0)) # 360 seconds
+
+
+        # namelist["user_params"]["massflux_N_i_boost_max_ratio"] = 1.0
+        # namelist["user_params"]["massflux_N_i_boost_progress_fraction"] = 1.0
+
+        # I think through compute_en_tendencies!(), entr/detr mediate tke, which in turn mediates mixing length and tke contribution to diffusive fluxes.... I don't understand why z should matter for tke.
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["entr_dim_scale"] = "abs_massflux" # trying to use this intead of w_height... idk. we basically get no entrainment except at the sfc and then huge detraiment at cloud top. might explain our tiny areas. This is also bad because our diffusive flux is tied to entrainment it seems? idk...
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["detr_dim_scale"] = "mf_grad"
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["detr_dim_scale"] = "b_sqrt_tke"
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_diss_coeff"] = 0.01
+        # namelist["user_params"]["initial_profile_updraft_area"] = FT(0.9*namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"]) * 0.0001
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["max_area"] = FT(0.6) # stability (maybe we need to use the limiter instead tho to not get flat cloud tops?)
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["base_detrainment_rate_inv_s"] = FT(1/(0.1*3600.0)) # 6 minutes
+        # parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_ed_coeff")
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.1
+        # namelist["user_params"]["stable_updraft_area_reduction_factor"] = FT(5.0)
+        # namelist["microphysics"]["microph_scaling_dep_sub"] = FT(2.0)
+        namelist["microphysics"]["microph_scaling_melt"] = FT(1)
+
+        namelist["user_params"]["q_min"] = eps(FT)
+
+
+        # namelist["user_args"]["snow_terminal_velocity_scheme"] = "Blk1MVel"
+
+        # namelist["microphysics"]["χv_sno"] = FT(0.5) # inv(namelist["user_params"]["mean_r_factor_ice"])^3 ("microphysics", "χv_sno"
+        # namelist["user_params"]["zrough"] = FT(5e-5)
+        # namelist["user_params"]["τ_acnv_sno_threshold"] = FT(200.0)
+
+        if apply_edits
             dt = namelist["time_stepping"]["dt_min"]
             namelist["time_stepping"]["dt_min"] = dt
             namelist["time_stepping"]["dt_max"] = 2*dt

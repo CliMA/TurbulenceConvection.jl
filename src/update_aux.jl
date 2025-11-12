@@ -1195,6 +1195,17 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
                 my_terminal_velocity(param_set, rain_type, edmf.precip_model.rain_terminal_velocity_scheme, ρ_c[k], prog_pr.q_rai[k])  # .* edmf.precip_model.rain_sedimentation_scaling_factor
             term_vel_snow[k] =
                 my_terminal_velocity(param_set, snow_type, edmf.precip_model.snow_terminal_velocity_scheme, ρ_c[k], prog_pr.q_sno[k])  # .* edmf.precip_model.snow_sedimentation_scaling_factor
+            
+            # Aim for a 10% boost by 10% subsaturation...
+            if state.calibrate_io
+                RH_ice = relative_humidity_over_ice(thermo_params, aux_gm.ts[k])
+                RH_liq = relative_humidity_over_liquid(thermo_params, aux_gm.ts[k])
+            else
+                RH_ice = aux_gm.RH_ice[k]
+                RH_liq = aux_gm.RH_liq[k]
+            end
+            term_vel_snow[k] *= (1 + FT(1.0) * clamp((FT(1.0) - min(RH_ice, RH_liq)) / FT(0.1), FT(0), FT(1)) * FT(0.1)) # up to 10% boost at 10% subsat
+            term_vel_snow[k] = max(term_vel_snow[k], 1.5*aux_gm.term_vel_ice[k]) # ensure snow falls faster than ice crystals
         end
     end
 
@@ -1219,7 +1230,6 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
         @inbounds for k in real_center_indices(grid)
             # aux_en.Hvar[k] = max(aux_en.Hvar[k], 0)
             # aux_en.QTvar[k] = max(aux_en.QTvar[k], 0)
-
 
             # don't let STD of θ_liq_ice be larger than half the mean value
             aux_en.Hvar[k] = clamp(aux_en.Hvar[k], FT(0), (aux_en.θ_liq_ice[k]/2)^2)
@@ -1560,7 +1570,8 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
     tke = (param_set.user_params.use_convective_tke) ? aux_en.tke_convective : aux_en.tke
     # use max of the two to be safe [[ aim for equivalent MF 0.02 = ρ a w at tke = 0.5 --> [[ # At tke = 0.5, we have ρ a/2 * (1) * f = 0.02 [= ρ a w], so f = 0.04 / (ρ a )]] ==> sqrt(2*TKE) * 0.02
     massflux_N_i = aux_tc.temporary_1
-    @. massflux_N_i = max((sqrt(2 * tke) * FT(0.02)), massflux_c) # maybe keep @. since we go to deeper function calls...
+    massflux_0 = FT(0.05)
+    @. massflux_N_i = max((sqrt(2 * tke) * massflux_0), massflux_c) # maybe keep @. since we go to deeper function calls...
     # ------------------------ #
 
     # env

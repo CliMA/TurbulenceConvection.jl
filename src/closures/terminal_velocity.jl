@@ -976,19 +976,227 @@ Is this smooth?
 Or are we supposed to integrate both the whole way and the gamma functions just decay as necessary? idk...
 
 """
+# function my_terminal_velocity(
+#     # prs::ACMP,
+#     param_set::APS,
+#     precip::CMT.SnowType,
+#     velo_scheme::CMT.Chen2022Type,
+#     ρ::FT,
+#     q_::FT;
+#     Dmin::FT = FT(0), # Default to 0, but in CloudMicrophysics.jl technically it's 62.5μm...
+#     Dmax::FT = FT(Inf), # not really needed for snow? maybe a Dmin? but that wouldn't make a huge diff i dont think idk...
+#     # Nt::Union{FT, Nothing} = nothing,
+#     Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
+#     D_transition::FT = FT((.625e-3)/2), # .625mm is the transition from small to large ice crystals in Chen paper
+#     μ::FT = FT(NaN), # μ is the exponent in the PSD, default to 0 for marshall palmer
+# ) where {FT <: Real}
+#     fall_w = FT(0)
+#     if q_ > FT(0)
+
+#         prs = TCP.microphysics_params(param_set)
+
+#         if isnan(μ)
+#             μ = μ_from_qN(param_set, precip, q_, Nt; ρ = ρ)
+#         end
+
+#         # short circuit cause greater than .625 mm is giving negative values for some reason... so we'll just ignore that I guess...
+#         # return my_terminal_velocity(prs, ice_type, velo_scheme, ρ, q_; Dmin=Dmin, Dmax=Dmax, Nt=Nt) # backup for now bc large ice is broken...
+
+#         _r0::FT = r0(prs, precip)
+#         _λ::FT = lambda(param_set, precip, q_, ρ, Nt, Dmin, Dmax; μ = μ)
+#         m0c::FT = m0(prs, precip) * χm(prs, precip)
+#         a0c::FT = a0(prs, precip) * χa(prs, precip)
+#         mec::FT = me(prs, precip) + Δm(prs, precip)
+#         aec::FT = ae(prs, precip) + Δa(prs, precip)
+
+#         ρ_i::FT = CMP.ρ_cloud_ice(prs)
+
+#         # D_transition::FT = 0.625e-3 # .625mm is the transition from small to large ice crystals in Chen paper
+
+#         local mass_weights::SA.MVector{2, FT}
+
+#         # coefficients from Appendix B from Chen et. al. 2022
+#         (aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l) = my_Chen2022_vel_coeffs(prs, precip, ρ)
+
+#         # κ = FT(-1 / 3) #oblate
+#         # κ = FT(1 / 3) # oblate (anna says this is right) [[ lol i think she maybe is wright lol...]]
+#         κ = FT(-1 / 6) # prolate (anna says this is right) [[ lol i think she maybe is wright lol...]]
+
+#         # k = 3 # mass weighted
+#         k = mec # should still be mass weight
+#         # κ = FT(0)
+
+#         @assert(Dmin <= Dmax, "Dmin must be less than Dmax, got Dmin = $Dmin and Dmax = $Dmax")
+
+#         # Is this smooth?
+#         # or are we supposed to integrate both the whole way and the gamma functions just decay as necessary? idk...
+#         mass_weights = SA.@MVector [FT(0), FT(0)]
+#         if Dmin < D_transition
+#             if Dmax <= D_transition
+#                 regions = [(Dmin, Dmax)]
+#                 abcs = [(aiu_s, bi_s, ciu_s)]
+#             else
+#                 regions = [(Dmin, D_transition), (D_transition, Dmax)]
+#                 abcs = [(aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l)]
+#             end
+#         else
+#             regions = [(Dmin, Dmax)]
+#             abcs = [(aiu_l, bi_l, ciu_l)]
+#         end
+
+#         tmp = _λ^(k + 1) * ((16 * a0c^3 * ρ_i^2) / (9 * π * m0c^2 * _r0^(3 * aec - 2 * mec)))^κ # I got this from Anna for aspect ratio... not fuly sure if it's right tho
+
+#         fall_w = FT(0)
+#         for (i, ((Dmin, Dmax), (aiu, bi, ciu))) in enumerate(zip(regions, abcs)) # we basically need to sum the integral as before but over all regions
+#             ci_pow = (2 .* ciu .+ _λ) .^ (.-(3 .* aec .* κ .- 2 .* mec .* κ .+ bi .+ k .+ 1))
+
+#             # ti = tmp .* aiu .* FT(2) .^ bi .* ci_pow
+#             ti = tmp .* aiu .* ci_pow
+
+#             # ti = _λ^(k + 1) .* aiu;
+
+#             upper_limit = Dmax * _λ # Dmax should not be zero...
+#             lower_limit = iszero(Dmin) ? FT(0) : Dmin * _λ # avoid 0*Inf
+
+#             # k = 3 for mass, μ = 0 for exponential size distribution instead of gamma
+#             # k = 3 means we're already mass weighting, however we need to properly mass weight in between regions. For that we use the mass_weights
+#             # mass_weights[i] = _λ^-(k + 1) * (-CM1.SF.gamma(k + 1, upper_limit) + CM1.SF.gamma(k + 1, lower_limit)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
+#             mass_weights[i] = _λ^-(μ + k + 1) * (-CM1.SF.gamma(μ + k + 1, upper_limit) + CM1.SF.gamma(μ + k + 1, lower_limit)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
+
+#             # In general, if we're cutting off at a (Dmin, Dmax) but the exponential size distribution wasn't derived with those in mind, will it work out for terminal velocity? might get unrealistic results?
+#             # total mass q would be ∼  _λ^-(k+1) * (-Γ(k+1, ∞) + Γ(k+1, 0)) = Γ(k+1) / λ^(k+1)... so if we wanna limit ourselves to Dmin, Dmax, we are applying  the speed from that region to the entire dist...
+#             # for single moment... maybe
+
+#             # fall_w += resolve_nan(sum(my_Chen2022_vel_add_sno.(ti, bi, aec, mec, κ, k, ciu, _λ, Dmin, Dmax)))
+
+#             fall_w += sum(my_Chen2022_vel_add_sno.(ti, bi, aec, mec, κ, k, ciu, _λ, Dmin, Dmax; μ=μ)) * mass_weights[i]  # need to weight by mass
+
+#         end
+
+#         if (total_weight = sum(mass_weights)) != 0
+#             fall_w /= total_weight # normalize by total mass
+#         end
+
+#         fall_w *= χv(prs, precip) # scaling_factor
+#         # fall_w = max(FT(0), fall_w)
+#     end
+#     return resolve_nan(fall_w)
+# end
+
+
+
+"""
+    my_terminal_velocity(param_set, precip, velo_scheme, ρ, q_; ...)
+
+Calculates the mass-weighted average terminal velocity for a snow
+particle size distribution (PSD) using the Chen et al. 2022 parameterization.
+
+This function integrates the velocity over the PSD, splitting the integral
+into "small" and "large" particle regimes at `D_transition`. It also
+applies a physics-based aspect ratio correction and is written to be
+numerically stable by scaling the integrals.
+
+---
+### Derivation from First Principles
+---
+
+**1. The Goal: Mass-Weighted Average Velocity**
+
+We want to find V_avg:
+V_avg = [ ∫ V(R) ⋅ m(R) ⋅ N(R) dR ] / [ ∫ m(R) ⋅ N(R) dR ]
+The integrals run from R_min to R_max. This function calculates the
+total numerator `fall_w` and total denominator `total_weight` by
+summing the integrals over different regions.
+
+**2. The Components**
+
+The integral is over R (particle radius in meters).
+
+* **PSD, N(R):** A Gamma distribution:
+    N(R) dR ∝ R^μ ⋅ e^(-λR) dR
+* **Mass, m(R):** A power law:
+    m(R) ∝ R^k (where `k = mec`)
+* **Velocity, V(R):** The Chen 2022 formula:
+    V(D_mm) ≈ Φ^κ ⋅ Σ aᵢ D_mm^bᵢ e^(-cᵢ D_mm)
+
+**3. Unit Conversion**
+
+The integral is over radius in meters (R_m), but the paper's
+coefficients (aᵢ, bᵢ, cᵢ) are for diameter in millimeters (D_mm).
+
+* Conversion: D_mm = 2 ⋅ R_mm = 2 ⋅ (1000 ⋅ R_m) = 2000 ⋅ R_m
+* Substituting this into V:
+    V(R_m) ≈ Φ(R_m)^κ ⋅ Σ (aᵢ ⋅ 2000^bᵢ) ⋅ R_m^bᵢ ⋅ e^(-(cᵢ ⋅ 2000) R_m)
+* The `my_Chen2022_vel_coeffs` function correctly calculates these
+    new coefficients for R_m:
+    * `aiu = aᵢ ⋅ 2000^bᵢ`
+    * `ciu = cᵢ ⋅ 2000`
+* This function uses `aiu` and `ciu` directly. No further `* 2`
+    or `* 2^bᵢ` conversions are needed.
+
+**4. Aspect Ratio (Φ^κ)**
+
+* The aspect ratio Φ is also a power law of radius: Φ(R) = Φ₀ ⋅ (R/r₀)^α
+* The `my_aspect_ratio_coeffs` helpers compute `Φ₀` (as `tmp_phys`),
+    `α` (as `α_shape`), and `κ` for each shape.
+* Physics:
+    * Prolate (cigar): Φ > 1, requires κ = -1/6
+    * Oblate (squashed): Φ < 1, requires κ = +1/3
+    * Spherical: Φ = 1, requires κ = 0
+
+**5. The Numerator Integral (Deriving `ti` and `ci_pow`)**
+
+We must solve the numerator integral for each region `i` and term `j`:
+Numᵢⱼ = ∫ Vᵢⱼ(R) ⋅ m(R) ⋅ N(R) dR
+Numᵢⱼ = ∫ [ (Φ₀^κ (R/r₀)^(ακ)) ⋅ (a_{iu,j} R^bⱼ e^(-c_{iu,j} R)) ] ⋅ (R^k) ⋅ (R^μ e^(-λR)) dR
+
+Grouping terms (and absorbing r₀ into constants):
+Numᵢⱼ = Cᵢⱼ ⋅ ∫ R^(ακ + bⱼ + k + μ) ⋅ e^(-(λ + c_{iu,j}) R) dR
+where Cᵢⱼ = (Φ₀^κ ⋅ a_{iu,j} ⋅ ...)
+
+This integral is solved analytically. To do this robustly, we
+calculate the average velocity V_avgᵢⱼ and multiply it by the mass
+in the region Mᵢ.
+`fall_w = Σ (V_avg_i ⋅ M_i)`
+`total_weight = Σ M_i`
+
+* **Mass (Denominator), `mass_weights[i]`:**
+    Mᵢ = ∫ m(R)N(R) dR ∝ ∫ R^(k+μ) e^(-λR) dR
+    The solution is ∝ λ^-(k+μ+1) ⋅ [Γ(k+μ+1, λR_min) - Γ(k+μ+1, λR_max)]
+    The `mass_weights[i]` line calculates exactly this. It is the
+    *unscaled* mass in the region, which has a natural λ dependency.
+
+* **Avg. Velocity (Numerator), `sum(my_Chen..._sno.(...))`:**
+    This function must calculate V_avgᵢ = Numᵢ / Denomᵢ.
+    V_avgᵢ ∝ [ (Φ₀^κ a_{iu,j}) ⋅ γ⁻ᵝ ] / [ λ^-(k+μ+1) ]
+    where:
+    * γ = λ + c_{iu,j}
+    * β = ακ + bⱼ + k + μ + 1
+    
+    To make this calculation, we pass `ti` as an argument. `ti`
+    contains all the prefactors.
+    `ti = (Φ₀^κ ⋅ a_{iu,j}) ⋅ (λ + c_{iu,j})⁻ᵝ ⋅ λ^(k+μ+1)`
+
+* **Code Implementation:**
+    * `tmp = (tmp_phys)^κ ⋅ _λ^(k + μ + 1)`
+        (Aspect ratio ⋅ λ-scaling term)
+    * `ci_pow = (ciu .+ _λ) .^ (.-(α_shape .* κ .+ bi .+ k .+ μ .+ 1))`
+        (This is (λ + c_{iu,j})⁻ᵝ)
+    * `ti = tmp .* aiu .* ci_pow`
+        (This is the full prefactor)
+"""
 function my_terminal_velocity(
-    # prs::ACMP,
     param_set::APS,
     precip::CMT.SnowType,
     velo_scheme::CMT.Chen2022Type,
     ρ::FT,
     q_::FT;
-    Dmin::FT = FT(0), # Default to 0, but in CloudMicrophysics.jl technically it's 62.5μm...
-    Dmax::FT = FT(Inf), # not really needed for snow? maybe a Dmin? but that wouldn't make a huge diff i dont think idk...
-    # Nt::Union{FT, Nothing} = nothing,
-    Nt::FT = FT(NaN), # testing for type stability, use NaN instead of nothing
-    D_transition::FT = FT((.625e-3)/2), # .625mm is the transition from small to large ice crystals in Chen paper
-    μ::FT = FT(0), # μ is the exponent in the PSD, default to 0 for marshall palmer
+    Dmin::FT = FT(0),
+    Dmax::FT = FT(Inf),
+    Nt::FT = FT(NaN),
+    D_transition::FT = FT((.625e-3) / 2),
+    μ::FT = FT(NaN),
+    shape::Val = Val(:Prolate), # Default to Prolate (matches original tmp formula)
 ) where {FT <: Real}
     fall_w = FT(0)
     if q_ > FT(0)
@@ -999,9 +1207,6 @@ function my_terminal_velocity(
             μ = μ_from_qN(param_set, precip, q_, Nt; ρ = ρ)
         end
 
-        # short circuit cause greater than .625 mm is giving negative values for some reason... so we'll just ignore that I guess...
-        # return my_terminal_velocity(prs, ice_type, velo_scheme, ρ, q_; Dmin=Dmin, Dmax=Dmax, Nt=Nt) # backup for now bc large ice is broken...
-
         _r0::FT = r0(prs, precip)
         _λ::FT = lambda(param_set, precip, q_, ρ, Nt, Dmin, Dmax; μ = μ)
         m0c::FT = m0(prs, precip) * χm(prs, precip)
@@ -1011,23 +1216,19 @@ function my_terminal_velocity(
 
         ρ_i::FT = CMP.ρ_cloud_ice(prs)
 
-        # D_transition::FT = 0.625e-3 # .625mm is the transition from small to large ice crystals in Chen paper
-
         local mass_weights::SA.MVector{2, FT}
 
-        # coefficients from Appendix B from Chen et. al. 2022
         (aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l) = my_Chen2022_vel_coeffs(prs, precip, ρ)
 
-        κ = FT(-1 / 3) #oblate
-        # κ = FT(1 / 3) #oblate (anna says this is right)
+        # k = mass weighted
+        k = mec
 
-        # k = 3 # mass weighted
-        k = mec # should still be mass weight
+        # Get shape-dependent physics parameters from our new helper
+        (; tmp_phys, α_shape, κ) =
+            my_aspect_ratio_coeffs(shape, m0c, mec, a0c, aec, ρ_i, _r0)
 
         @assert(Dmin <= Dmax, "Dmin must be less than Dmax, got Dmin = $Dmin and Dmax = $Dmax")
 
-        # Is this smooth?
-        # or are we supposed to integrate both the whole way and the gamma functions just decay as necessary? idk...
         mass_weights = SA.@MVector [FT(0), FT(0)]
         if Dmin < D_transition
             if Dmax <= D_transition
@@ -1042,27 +1243,29 @@ function my_terminal_velocity(
             abcs = [(aiu_l, bi_l, ciu_l)]
         end
 
-        tmp = _λ^(k + 1) * ((16 * a0c^3 * ρ_i^2) / (9 * π * m0c^2 * _r0^(3 * aec - 2 * mec)))^κ
+        # This is the (Aspect Ratio) * (λ-scaling) term. This is physically consistent and accounts for μ
+        tmp = (tmp_phys)^κ * _λ^(k + μ + 1)
+
         fall_w = FT(0)
-        for (i, ((Dmin, Dmax), (aiu, bi, ciu))) in enumerate(zip(regions, abcs)) # we basically need to sum the integral as before but over all regions
-            ci_pow = (2 .* ciu .+ _λ) .^ (.-(3 .* aec .* κ .- 2 .* mec .* κ .+ bi .+ k .+ 1))
+        for (i, ((Dmin, Dmax), (aiu, bi, ciu))) in enumerate(zip(regions, abcs))
 
-            ti = tmp .* aiu .* FT(2) .^ bi .* ci_pow
+            # This is the (λ + c_iu)^-β term
+            # This is physically consistent and accounts for μ
+            ci_pow = (ciu .+ _λ) .^ (.-(α_shape .* κ .+ bi .+ k .+ μ .+ 1))
 
-            upper_limit = Dmax * _λ # Dmax should not be zero...
-            lower_limit = iszero(Dmin) ? FT(0) : Dmin * _λ # avoid 0*Inf
+            # This is the full prefactor for the avg. velocity calculation [[ unit conversions and rolling 2^b into a iu is handled in my_Chen2022_vel_coeffs ]]
+            ti = tmp .* aiu .* ci_pow
 
-            # k = 3 for mass, μ = 0 for exponential size distribution instead of gamma
-            # k = 3 means we're already mass weighting, however we need to properly mass weight in between regions. For that we use the mass_weights
-            mass_weights[i] = _λ^-(k + 1) * (-CM1.SF.gamma(k + 1, upper_limit) + CM1.SF.gamma(k + 1, lower_limit)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
-            # In general, if we're cutting off at a (Dmin, Dmax) but the exponential size distribution wasn't derived with those in mind, will it work out for terminal velocity? might get unrealistic results?
-            # total mass q would be ∼  _λ^-(k+1) * (-Γ(k+1, ∞) + Γ(k+1, 0)) = Γ(k+1) / λ^(k+1)... so if we wanna limit ourselves to Dmin, Dmax, we are applying  the speed from that region to the entire dist...
-            # for single moment... maybe
+            upper_limit = Dmax * _λ
+            lower_limit = iszero(Dmin) ? FT(0) : Dmin * _λ
 
-            # fall_w += resolve_nan(sum(my_Chen2022_vel_add_sno.(ti, bi, aec, mec, κ, k, ciu, _λ, Dmin, Dmax)))
-
-            fall_w += sum(my_Chen2022_vel_add_sno.(ti, bi, aec, mec, κ, k, ciu, _λ, Dmin, Dmax; μ=μ)) * mass_weights[i]  # need to weight by mass
-
+            # This is the unscaled mass in the region (the denominator of the weighted average for this region)
+            mass_weights[i] = _λ^-(μ + k + 1) * (-CM1.SF.gamma(μ + k + 1, upper_limit) + CM1.SF.gamma(μ + k + 1, lower_limit))
+            
+            # V_avg_i = sum(my_Chen..._sno.(...))
+            # fall_w += V_avg_i * mass_weights[i]
+            # This computes the total numerator of the integral
+            fall_w += sum(my_Chen2022_vel_add_sno.(ti, bi, aec, mec, κ, k, ciu, _λ, Dmin, Dmax; μ = μ)) * mass_weights[i]
 
         end
 
@@ -1071,10 +1274,78 @@ function my_terminal_velocity(
         end
 
         fall_w *= χv(prs, precip) # scaling_factor
-        # fall_w = max(FT(0), fall_w)
     end
     return resolve_nan(fall_w)
 end
 
 
 
+
+"""
+    my_aspect_ratio_coeffs(shape, m0c, mec, a0c, aec, ρ_i, _r0)
+
+Returns coefficients for the aspect ratio physics based on particle shape.
+
+Arguments:
+- `shape`: Val{:Spherical}, Val{:Prolate}, or Val{:Oblate}
+- `m0c`, `mec`: Mass-radius power law params (m(R) ∝ m0c * (R/r0)^mec)
+- `a0c`, `aec`: Area-radius power law params (a(R) ∝ a0c * (R/r0)^aec)
+- `ρ_i`: Particle density
+- `_r0`: Reference radius
+
+Returns a NamedTuple:
+- `tmp_phys`: The core aspect ratio formula (Φ₀)
+- `α_shape`: The exponent α in the power law Φ(R) = Φ₀ * (R/r0)^α
+- `κ`: The exponent κ in the velocity formula V ∝ Φ^κ
+"""
+function my_aspect_ratio_coeffs(
+    ::Val{:Spherical},
+    m0c::FT,
+    mec::FT,
+    a0c::FT,
+    aec::FT,
+    ρ_i::FT,
+    _r0::FT,
+) where {FT <: Real}
+    # For a sphere, Φ = 1 and κ = 0.
+    tmp_phys = FT(1)
+    α_shape = FT(0)
+    κ = FT(0)
+    return (; tmp_phys, α_shape, κ)
+end
+
+function my_aspect_ratio_coeffs(
+    ::Val{:Prolate},
+    m0c::FT,
+    mec::FT,
+    a0c::FT,
+    aec::FT,
+    ρ_i::FT,
+    _r0::FT,
+) where {FT <: Real}
+    # Prolate (cigar) shape: Φ(R) = 16 * ρᵢ² * a(R)³ / (9 * π * m(R)²)
+    # Φ > 1, so κ must be negative.
+    # κ = -1/6
+    α_shape = 3 * aec - 2 * mec
+    tmp_phys = (16 * a0c^3 * ρ_i^2) / (9 * π * m0c^2 * _r0^(α_shape))
+    κ = FT(-1 / 6)
+    return (; tmp_phys, α_shape, κ)
+end
+
+function my_aspect_ratio_coeffs(
+    ::Val{:Oblate},
+    m0c::FT,
+    mec::FT,
+    a0c::FT,
+    aec::FT,
+    ρ_i::FT,
+    _r0::FT,
+) where {FT <: Real}
+    # Oblate (squashed) shape: Φ(R) = 3 * sqrt(π) * m(R) / (4 * ρᵢ * a(R)^(3/2))
+    # Φ < 1, so κ must be positive.
+    # κ = +1/3
+    α_shape = mec - FT(1.5) * aec
+    tmp_phys = (3 * sqrt(FT(π)) / 4 / ρ_i * m0c / (a0c)^FT(1.5) / _r0^(α_shape))
+    κ = FT(1 / 3)
+    return (; tmp_phys, α_shape, κ)
+end
