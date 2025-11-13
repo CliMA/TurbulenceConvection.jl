@@ -633,6 +633,8 @@ function compute_gm_tendencies!(
         I don't know for sure why but this version works much better
         I think the problem is that convergence in the other one isn't reflected in density so you get weird temperature and other changes
         Because we ignore density changes, we really do need to stick to this one and just the w∇q part, and leave out the q∇w part...
+
+        :: We also always divide out the ρ_c to allow for adiabatic compression. Otherwise, advecting ρq downwards for example could imply a reduction in q, when really it will just compress. It's not like true advection e.g. in updrafts, since grid mean ρ is fixed
     =#
 
     # regular upwinding 
@@ -646,9 +648,6 @@ function compute_gm_tendencies!(
     # @. w∇θ_liq_ice_gm = w∇θ_liq_ice_gm_CV3.components.data.:1 # from Dennis [[ x = @. CV32FT(x) # convert back to Float64 from Contravariant3Vector I think maybe also works?]]
     @. w∇θ_liq_ice_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fθ(prog_gm.ρθ_liq_ice / ρ_c))))))).components.data.:1
     @. tendencies_gm.ρθ_liq_ice -= ρ_c * w∇θ_liq_ice_gm
-    # if !state.calibrate_io
-    #     @. aux_gm.θ_liq_ice_tendency_ls_vert_adv = -w∇θ_liq_ice_gm # FOR STORAGE [[ Doesn't exist rn...]]
-    # end
 
 
     # ∇q_tot_gm = ∇Tr # alias
@@ -684,7 +683,7 @@ function compute_gm_tendencies!(
         # @. w∇q_liq_gm_CV3 = F2Csub(w∇q_liq_gm_F) # convert back to C
         # @. w∇q_liq_gm = w∇q_liq_gm_CV3.components.data.:1 # from Dennis
         @. w∇q_liq_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fq_liq(prog_gm.q_liq))))))).components.data.:1
-        @. tendencies_gm.q_liq -= ρ_c * w∇q_liq_gm
+        @. tendencies_gm.q_liq -= w∇q_liq_gm
         if !state.calibrate_io
             @. aux_gm.ql_tendency_ls_vert_adv = -w∇q_liq_gm # FOR STORAGE
         end
@@ -698,7 +697,7 @@ function compute_gm_tendencies!(
         # @. w∇q_ice_gm_CV3 = F2Csub(w∇q_ice_gm_F) # convert back to C
         # @. w∇q_ice_gm = w∇q_ice_gm_CV3.components.data.:1 # from Dennis
         @. w∇q_ice_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fq_ice(prog_gm.q_ice))))))).components.data.:1
-        @. tendencies_gm.q_ice -= ρ_c * w∇q_ice_gm
+        @. tendencies_gm.q_ice -= w∇q_ice_gm
         if !state.calibrate_io
             @. aux_gm.qi_tendency_ls_vert_adv = -w∇q_ice_gm # FOR STORAGE
         end
@@ -713,7 +712,7 @@ function compute_gm_tendencies!(
     # @. w∇q_rai_gm_F = wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_rai_gm))
     # @. w∇q_rai_gm_CV3 = F2Csub(w∇q_rai_gm_F) # convert back to C
     # @. w∇q_rai_gm = w∇q_rai_gm_CV3.components.data.:1 # from Dennis
-    @. w∇q_rai_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fsub(prog_pr.q_rai * ρ_c))))))).components.data.:1
+    @. w∇q_rai_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fsub(prog_pr.q_rai))))))).components.data.:1
     @. tendencies_pr.q_rai += -w∇q_rai_gm
     if !state.calibrate_io
         @. aux_gm.qr_tendency_ls_vert_adv = -w∇q_rai_gm # FOR STORAGE
@@ -727,7 +726,7 @@ function compute_gm_tendencies!(
     # @. w∇q_sno_gm_F = wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_sno_gm))
     # @. w∇q_sno_gm_CV3 = F2Csub(w∇q_sno_gm_F) # convert back to C
     # @. w∇q_sno_gm = w∇q_sno_gm_CV3.components.data.:1 # from Dennis
-    @. w∇q_sno_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fsub(prog_pr.q_sno * ρ_c))))))).components.data.:1
+    @. w∇q_sno_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fsub(prog_pr.q_sno))))))).components.data.:1
     @. tendencies_pr.q_sno += -w∇q_sno_gm
     if !state.calibrate_io
         @. aux_gm.qs_tendency_ls_vert_adv = -w∇q_sno_gm # FOR STORAGE
@@ -739,8 +738,7 @@ function compute_gm_tendencies!(
         Π = TD.exner(thermo_params, ts_gm[k])
 
         # Radiation
-        if Cases.rad_type(radiation) <:
-           Union{Cases.RadiationDYCOMS_RF01, Cases.RadiationLES, Cases.RadiationTRMM_LBA, Cases.RadiationSOCRATES}
+        if Cases.rad_type(radiation) <: Union{Cases.RadiationDYCOMS_RF01, Cases.RadiationLES, Cases.RadiationTRMM_LBA, Cases.RadiationSOCRATES}
             tendencies_gm.ρθ_liq_ice[k] += ρ_c[k] * aux_gm.dTdt_rad[k] / Π 
             aux_tc.dTdt[k] += aux_gm.dTdt_rad[k] # [store things that matter for our dTdt] [ dTdt priority ] [ idk if this totally helps, it's typically strong cloud top cooling so maybe it drives liquid generation?]
         end

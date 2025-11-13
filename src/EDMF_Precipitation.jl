@@ -390,8 +390,6 @@ function compute_precipitation_sink_tendencies(
             dv = FT(0)
             # dv += Δt * max(aux_tc.dqvdt[k] * aux_tc.area[k], FT(0)) # hopefully this is ok to just add like this...
             if is_updraft
-                # dv += Δt * max(( (aux_tc.massflux_tendency_qt[k] + aux_tc.diffusive_tendency_qt[k]) - max(aux_tc.massflux_tendency_ql[k] + aux_tc.diffusive_tendency_ql[k], FT(0)) - max(aux_tc.massflux_tendency_qi[k] + aux_tc.diffusive_tendency_qi[k], FT(0))), FT(0))
-                # dv += Δt * max(aux_gm.qt_tendency_ls_vert_adv[k] - max(aux_gm.ql_tendency_ls_vert_adv[k], FT(0)) - max(aux_gm.qi_tendency_ls_vert_adv[k], FT(0)), FT(0))
             end
             
             # δi *= 10000 # test

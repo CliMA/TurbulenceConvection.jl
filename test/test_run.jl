@@ -420,7 +420,7 @@ for flight_number in flight_numbers
         namelist["stats_io"]["calibrate_io"] = false
 
         # namelist["stats_io"]["frequency"] = 600.
-        # namelist["stats_io"]["calibrate_io"] = true
+        namelist["stats_io"]["calibrate_io"] = true
         # namelist["thermodynamics"]["moisture_model"] = "equilibrium"
 
         # nonequilibrium_moisture_scheme = :neural_network_pca_noise
@@ -428,7 +428,7 @@ for flight_number in flight_numbers
 
 
 
-        namelist["user_args"]["adjust_ice_N"] = true # adjust ice number concentration
+        # namelist["user_args"]["adjust_ice_N"] = true # adjust ice number concentration
 
         # namelist["user_params"]["initial_profile_updraft_area"] = FT(0)
 
@@ -469,8 +469,8 @@ for flight_number in flight_numbers
         # namelist["meta"]["simname"] = "SOCRATES_RF01_obs_data"
         # namelist["meta"]["flight_number"] = 01
 
-        namelist["meta"]["simname"] = "SOCRATES_RF10_obs_data"
-        namelist["meta"]["flight_number"] = 10
+        namelist["meta"]["simname"] = "SOCRATES_RF12_obs_data"
+        namelist["meta"]["flight_number"] = 12
 
         # namelist["user_params"]["χm_liq"] = FT(1)
         # namelist["microphysics"]["χm_ice"] = FT(1) # inv(namelist["user_params"]["mean_r_factor_ice"])^3
@@ -551,9 +551,8 @@ for flight_number in flight_numbers
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"] = 0.1
         # namelist["user_params"]["stable_updraft_area_reduction_factor"] = FT(5.0)
         # namelist["microphysics"]["microph_scaling_dep_sub"] = FT(2.0)
-        namelist["microphysics"]["microph_scaling_melt"] = FT(1)
-
-        namelist["user_params"]["q_min"] = eps(FT)
+        # namelist["microphysics"]["microph_scaling_melt"] = FT(1)
+        # namelist["user_params"]["q_min"] = eps(FT)
 
 
         # namelist["user_args"]["snow_terminal_velocity_scheme"] = "Blk1MVel"

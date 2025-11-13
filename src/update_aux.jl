@@ -41,7 +41,6 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
     max_area = edmf.max_area
     ts_gm = center_aux_grid_mean(state).ts
     ts_env = center_aux_environment(state).ts
-    calibrate_io = state.calibrate_io
 
     massflux = aux_tc_f.massflux
     ∂M∂z = aux_tc.∂M∂z
@@ -909,11 +908,8 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
     #TODO - AJ add the non-equilibrium tendency computation here
     compute_cloud_condensate_sedimentation_tendencies!(state, edmf, Δt, param_set) # not sure on the merits of doing it here vs at the end w/ precipitation tendencies... leaving here bc originally i had it in compute_nonequilibrium_moisture_tendencies!() call before other microphysics though...
     if edmf.moisture_model isa NonEquilibriumMoisture
-        # compute_nonequilibrium_moisture_tendencies!(state, edmf, Δt, param_set, use_fallback_tendency_limiters)
-        # compute_other_microphysics_tendencies!(state, edmf, Δt, param_set, use_fallback_tendency_limiters) # i think only in noneq case is ok... idk... these are tendencies that would be overwritten in equilibrium case, and ql_tendency_noneq/qi_tendency_noneq don't exist in equilibrium case
         updraft_microphysics!(state, edmf, Δt, param_set, use_fallback_tendency_limiters) # set updraft tendencies for microphysics
     end
-    # compute_precipitation_formation_tendencies(state, edmf, Δt, param_set, use_fallback_tendency_limiters)
 
 
     # domain interaction microphysics
@@ -1088,9 +1084,7 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
         end
         bg = buoyancy_gradients(param_set, bg_model; is_noneq = (edmf.moisture_model isa NonEquilibriumMoisture), latent_heating = aux_en.latent_heating[k])
 
-        if !state.calibrate_io
-            aux_tc.∂b∂z[k] = bg.∂b∂z # my addition
-        end
+        aux_tc.∂b∂z[k] = bg.∂b∂z # my addition
 
         # Limiting stratification scale (Deardorff, 1976)
         # compute ∇Ri and Pr
@@ -1197,12 +1191,12 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
                 my_terminal_velocity(param_set, snow_type, edmf.precip_model.snow_terminal_velocity_scheme, ρ_c[k], prog_pr.q_sno[k])  # .* edmf.precip_model.snow_sedimentation_scaling_factor
             
             # Aim for a 10% boost by 10% subsaturation...
-            if state.calibrate_io
-                RH_ice = relative_humidity_over_ice(thermo_params, aux_gm.ts[k])
-                RH_liq = relative_humidity_over_liquid(thermo_params, aux_gm.ts[k])
-            else
+            if !state.calibrate_io
                 RH_ice = aux_gm.RH_ice[k]
                 RH_liq = aux_gm.RH_liq[k]
+            else
+                RH_ice = relative_humidity_over_ice(thermo_params, aux_gm.ts[k])
+                RH_liq = relative_humidity_over_liquid(thermo_params, aux_gm.ts[k])
             end
             term_vel_snow[k] *= (1 + FT(1.0) * clamp((FT(1.0) - min(RH_ice, RH_liq)) / FT(0.1), FT(0), FT(1)) * FT(0.1)) # up to 10% boost at 10% subsat
             term_vel_snow[k] = max(term_vel_snow[k], 1.5*aux_gm.term_vel_ice[k]) # ensure snow falls faster than ice crystals
@@ -1243,27 +1237,6 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
         aux_en.QTvar[kc_surf] = ae_surf * get_surface_variance(flux2 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
         aux_en.HQTcov[kc_surf] = ae_surf * get_surface_variance(flux1 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
     end
-
-    # compute_precipitation_formation_tendencies(
-    #     grid,
-    #     state,
-    #     edmf,
-    #     edmf.moisture_model,
-    #     edmf.precip_model,
-    #     edmf.cloud_sedimentation_model,
-    #     edmf.rain_formation_model,
-    #     edmf.snow_formation_model,
-    #     Δt,
-    #     param_set,
-    #     use_fallback_tendency_limiters,
-    # )
-    # compute_precipitation_formation_tendencies(state, edmf, Δt, param_set, use_fallback_tendency_limiters)
-
-
-    # limit env tendencies (up tendencies done after compute_up_tendencies!())
-    # if !isa(edmf.tendency_limiters.up_en_tendency_limiter, NoTendencyLimiter)
-        # limit_env_tendencies!(state, edmf, Δt, param_set)
-    # end
 
 
     return nothing

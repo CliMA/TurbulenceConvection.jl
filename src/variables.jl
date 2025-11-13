@@ -254,10 +254,7 @@ cent_aux_vars_edmf_en_moisture(FT, moisture_model::EquilibriumMoisture, cloud_se
     my_microphysics_additions(FT, moisture_model, cloud_sedimentation_model, area_partition_model, calibrate_io_val)..., # area partition for environment
 )
 cent_aux_vars_edmf_moisture(FT, ::NonEquilibriumMoisture, ::Val{calibrate_io}) where {calibrate_io} = (;
-    # massflux_tendency_ql = FT(0), # moved so is always there even for eq so can put in diagnostics output
-    # massflux_tendency_qi = FT(0), # moved so is always there even for eq so can put in diagnostics output
-    # diffusive_tendency_ql = FT(0), # moved so is always there even for eq so can put in diagnostics output
-    # diffusive_tendency_qi = FT(0), # moved so is always there even for eq so can put in diagnostics output
+    # moved mass & diffusive ql,qi fluxes so is always there even for eq so can put in diagnostics output
 )
 cent_aux_vars_edmf_moisture(FT, ::EquilibriumMoisture, ::Val{calibrate_io}) where {calibrate_io} = NamedTuple()
 cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calibrate_io}) where {FT, calibrate_io} = (;
