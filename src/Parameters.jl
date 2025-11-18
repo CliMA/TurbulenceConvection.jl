@@ -107,7 +107,7 @@ end
 Base.@kwdef struct TurbulenceConvectionParameters{FT, MP, SFP, UP <: NamedTuple} <: ATCP
     Omega::FT
     planet_radius::FT
-    microph_scaling::FT
+    microph_scaling_evap::FT
     microph_scaling_dep_sub::FT
     microph_scaling_melt::FT
     microph_scaling_acnv::FT
@@ -127,7 +127,7 @@ Omega(ps::ATCP) = ps.Omega
 planet_radius(ps::ATCP) = ps.planet_radius
 # TODO - microph_scaling is the factor for adjusting evaporation.
 # The name will be fixed in CLIMAParameters first.
-microph_scaling(ps::ATCP) = ps.microph_scaling
+microph_scaling_evap(ps::ATCP) = ps.microph_scaling_evap
 microph_scaling_dep_sub(ps::ATCP) = ps.microph_scaling_dep_sub
 microph_scaling_melt(ps::ATCP) = ps.microph_scaling_melt
 microph_scaling_acnv(ps::ATCP) = ps.microph_scaling_acnv

@@ -266,8 +266,11 @@ function other_microphysics_processes(
             else
                 # liq-ice collisions [[ nucleation only, separate from accretion liq_ice ]]
                 heterogeneous_ice_nucleation = moisture_model.heterogeneous_ice_nucleation
-                if heterogeneous_ice_nucleation[1]
-                    heterogeneous_ice_nucleation_coefficient, heterogeneous_ice_nucleation_exponent = heterogeneous_ice_nucleation[2:3]
+                # if heterogeneous_ice_nucleation[1]
+                if heterogeneous_ice_nucleation.use_heterogeneous_ice_nucleation
+                    # heterogeneous_ice_nucleation_coefficient, heterogeneous_ice_nucleation_exponent = heterogeneous_ice_nucleation[2:3]
+                    heterogeneous_ice_nucleation_coefficient = heterogeneous_ice_nucleation.heterogeneous_ice_nucleation_coefficient
+                    heterogeneous_ice_nucleation_exponent = heterogeneous_ice_nucleation.heterogeneous_ice_nucleation_exponent
                     c_1 =
                         ρ *
                         heterogeneous_ice_nucleation_coefficient *
@@ -1771,7 +1774,8 @@ function threshold_driven_acnv(
         if q_type isa CMT.IceType
             τ = FT(param_set.user_params.τ_acnv_sno_threshold) # use separate timescale bc this should be order timestep scale (in M2005), while real acnv should be like 10^4 seconds.
         elseif q_type isa CMT.LiquidType
-            τ = FT(param_set.user_params.τ_acnv_liq_thresh)
+            # τ = FT(param_set.user_params.τ_acnv_liq_threshold)
+            error("threshold_driven_acnv not implemented for liquid")
         else
             error("threshold_driven_acnv not supported for q_type $q_type")
         end

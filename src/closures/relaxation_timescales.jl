@@ -677,7 +677,7 @@ function get_ice_mult_ICNC_max(param_set::APS, N_INP::FT, N_i::FT, q_i::FT, q_r:
     if !isnan(N_i) && (N_i > 0)
 
         r_acnv_scaling_factor = param_set.user_params.r_ice_acnv_scaling_factor # this MUST be less than 1!!!
-        r_thresh = get_r_cond_precip(param_set, ice_type) * param_set.user_params.r_ice_snow_threshold_scaling_factor
+        r_thresh = get_r_cond_precip(param_set, ice_type) * FT(param_set.user_params.r_ice_snow_threshold_scaling_factor)
         r_i_acnv = r_ice_acnv(param_set, FT(r_acnv_scaling_factor)) # this is the radius of the ice crystal at the acnv radius
         μ = μ_from_qN(param_set, ice_type, q_i, N_i; ρ=ρ) # this is the factor by which we scale the mean radius to get the mean radius for the ice crystals, so that we can use it in the N_i and N_l calculations
         N_i_acnv = N_from_qr(param_set, ice_type, q_i, r_i_acnv; monodisperse = false, μ=μ, ρ=ρ)

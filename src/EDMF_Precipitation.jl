@@ -189,17 +189,15 @@ function compute_precipitation_advection_tendencies(
         end
 
     else
-        for i in 1:N_up
+        @inbounds for i in 1:N_up
             @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_rai))) / ρ_c
             @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB(Ic(aux_up_f[i].w) * ρ_c * aux_up[i].area * q_sno))) / ρ_c
         end
 
-        if param_set.user_params.use_convective_tke
-            # w_conv = aux_tc_f.temporary_f1
-            # @. w_conv = sqrt(max(Ifx(2 * aux_en.tke_convective), FT(0))) # could add a limiter here if needed
-            w_conv = @. sqrt((2 * aux_en.tke_convective))
-            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB((w_conv) * ρ_c * aux_en.area/2 * q_rai))) / ρ_c
-            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB((w_conv) * ρ_c * aux_en.area/2 * q_sno))) / ρ_c    
+        if (edmf.convective_tke_handler isa ConvectiveTKE) && (edmf.convective_tke_handler.transport_condensed_by_advection)
+            # w_conv := sqrt((2 * aux_en.tke_convective))
+            @. aux_gm.qr_tendency_vert_adv += -∇(wvec(LB((sqrt((2 * aux_en.tke_convective))) * ρ_c * aux_en.area/2 * q_rai))) / ρ_c
+            @. aux_gm.qs_tendency_vert_adv += -∇(wvec(LB((sqrt((2 * aux_en.tke_convective))) * ρ_c * aux_en.area/2 * q_sno))) / ρ_c    
             # Ignore tke down draft for now...
         else
             # ignore env contribution for now....
@@ -287,7 +285,7 @@ function compute_precipitation_sink_tendencies(
         # I = TD.internal_energy(thermo_params, ts)
         Φ = geopotential(param_set, grid.zc.z[k])
 
-        α_evp = TCP.microph_scaling(param_set)
+        α_evp = TCP.microph_scaling_evap(param_set)
         α_dep_sub = TCP.microph_scaling_dep_sub(param_set)
         α_melt = TCP.microph_scaling_melt(param_set)
 

@@ -420,7 +420,7 @@ for flight_number in flight_numbers
         namelist["stats_io"]["calibrate_io"] = false
 
         # namelist["stats_io"]["frequency"] = 600.
-        namelist["stats_io"]["calibrate_io"] = true
+        # namelist["stats_io"]["calibrate_io"] = true
         # namelist["thermodynamics"]["moisture_model"] = "equilibrium"
 
         # nonequilibrium_moisture_scheme = :neural_network_pca_noise
@@ -469,8 +469,8 @@ for flight_number in flight_numbers
         # namelist["meta"]["simname"] = "SOCRATES_RF01_obs_data"
         # namelist["meta"]["flight_number"] = 01
 
-        namelist["meta"]["simname"] = "SOCRATES_RF12_obs_data"
-        namelist["meta"]["flight_number"] = 12
+        namelist["meta"]["simname"] = "SOCRATES_RF09_obs_data"
+        namelist["meta"]["flight_number"] = 9
 
         # namelist["user_params"]["χm_liq"] = FT(1)
         # namelist["microphysics"]["χm_ice"] = FT(1) # inv(namelist["user_params"]["mean_r_factor_ice"])^3
@@ -478,7 +478,7 @@ for flight_number in flight_numbers
         # namelist["user_params"]["sedimentation_N_i_boost_factor"] = FT(0.2)
         # namelist["user_params"]["apply_massflux_N_i_boost"] = true
         # namelist["user_params"]["apply_sedimentation_N_i_boost"] = false
-        # namelist["user_params"]["use_ice_mult"] = false
+        # namelist["user_args"]["use_ice_mult"] = false
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["base_detrainment_rate_inv_s"] = FT(1/(0.1*3600.0)) # 6 hours
         # namelist["relaxation_timescale_params"]["τ_sub_dep_scaling_factor"] = FT(500)
         # namelist["user_params"]["ice_dep_acnv_scaling_factor"] = FT(1.0)
@@ -512,22 +512,34 @@ for flight_number in flight_numbers
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["fraction_of_area_above_max_area_allowed_in_cloak"] = 0.0
         # namelist["turbulence"]["EDMF_PrognosticTKE"]["l_max"] = 1e4 # default was 1e6
 
-        # namelist["user_params"]["use_convective_tke"] = false
-        # namelist["user_params"]["use_convective_tke_production_only"] = !(namelist["user_params"]["use_convective_tke"])
-        # namelist["user_params"]["convective_tke_scaling_factor"] = 1.0
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["use_convective_tke"] = namelist["user_params"]["use_convective_tke"]
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_buoyancy_coeff"] = namelist["user_params"]["convective_tke_buoyancy_coeff"]
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_advection_coeff"] = namelist["user_params"]["convective_tke_advection_coeff"]
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_dissipation_coeff"] = namelist["user_params"]["convective_tke_dissipation_coeff"]
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_self_dissipation_coeff"] = namelist["user_params"]["convective_tke_self_dissipation_coeff"]
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_ed_scaling_factor"] = namelist["user_params"]["convective_tke_ed_scaling_factor"]
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = namelist["user_params"]["tke_conv_entr_inv_s"]
 
 
-        # namelist["user_params"]["convective_tke_buoyancy_coeff"] = FT(1.1)
-        # namelist["user_params"]["convective_tke_advection_coeff"] = FT(0.1)
-        # namelist["user_params"]["convective_tke_dissipation_coeff"] = FT(5.5) # smaller than generation
-        # namelist["user_params"]["convective_tke_self_dissipation_coeff"] = FT(0.5) # extra dissipation when tke is convectively generated
-        # namelist["user_params"]["tke_convective_max_scaling_factor"] = FT(0.66)
-        # namelist["user_params"]["use_separate_convective_tke_ed_coeff"] = true
-        # namelist["user_params"]["convective_tke_ed_scaling_factor"] = (1/(namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"])) / 2 # so that ed is same as default at max convective tke
-        # namelist["user_params"]["convective_tke_ed_scaling_factor"] = FT(1)
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_buoyancy_coeff"] = FT(240.1)
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_advection_coeff"] = FT(0.005)
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_dissipation_coeff"] = FT(1.) # smaller than generation
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_self_dissipation_coeff"] = FT(0.005) # extra dissipation when tke is convectively generated
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_transport_tke_by_advection"] = true
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_transport_conserved_by_advection"] = false
+        namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_transport_condensed_by_advection"] = true
+
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_convective_max_scaling_factor"] = FT(0.66)
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["use_separate_convective_tke_ed_coeff"] = true
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_ed_scaling_factor"] = (1/(namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_ed_coeff"])) / 2 # so that ed is same as default at max convective tke
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["convective_tke_ed_scaling_factor"] = FT(20)
+        # namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = FT(1/(900.0)) # entrainment due to convective tke (1/5 min)
+         namelist["turbulence"]["EDMF_PrognosticTKE"]["tke_conv_entr_detr_rate_inv_s"] = 1/1000000
+
+
+        delete!.(Ref(namelist["user_params"]), ["use_convective_tke", "convective_tke_buoyancy_coeff", "convective_tke_advection_coeff", "convective_tke_dissipation_coeff", "convective_tke_self_dissipation_coeff", "entr_detr_rate_inv_s", "convective_tke_ed_scaling_factor", "tke_conv_entr_inv_s"])
+
         # namelist["user_params"]["apply_nudging_to_updraft"] = true # if this is true, the updraft will feel the nudging just as much as the environment, otherwise the env would feel all of it... I think we need this. The LES updraft for RF09 doesn't go that high. without this i think we risk overshoots when say a warm updraft impinges, the environment takes the nudging cooling in response, and the updraft continues to accelerate.
-        # namelist["user_params"]["tke_conv_entr_inv_s"] = FT(1/(900.0)) # entrainment due to convective tke (1/5 min)
-
         # namelist["user_params"]["condensate_qt_SD"] = 0.5
 
         # namelist["user_args"]["nonequilibrium_moisture_sources_limiter_type"] = "none"

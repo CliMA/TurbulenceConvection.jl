@@ -1332,7 +1332,11 @@ function aux_data_kwarg(::SOCRATES, namelist)
 
     @info "Using conservative interpolation kwargs: $conservative_interp_kwargs"
 
-    return (; conservative_interp, conservative_interp_kwargs)
+
+    # zrough = FT(0.1) # copied from gabls which is also w/ monin obhukov boundary layer [[ i think this is far too high. GABLS is a land case!!!]]
+    zrough::FT = TC.parse_namelist(namelist, "user_params", "zrough", default = FT(6e-4))
+
+    return (; conservative_interp, conservative_interp_kwargs, zrough)
 
 end
 
@@ -1455,12 +1459,11 @@ function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # 
     end
 
 
-    # zrough = FT(0.1) # copied from gabls which is also w/ monin obhukov boundary layer [[ i think this is far too high. GABLS is a land case!!!]]
-    zrough = TCP.get_isbits_nt(param_set.user_params, :zrough, FT(6e-4)) # 1e-4 is typical for open ocean, see https://en.wikipedia.org/wiki/Roughness_length. 5e-4 generate LHF and SFH of about 90 W/m² in RF09 which is close to LES which is about 90 for SHF and about 150 for LHF
+    # zrough :: Should be in kwargs
 
     # no ustar w/ monin obukhov i guess, seems to be calculated in https://github.com/CliMA/SurfaceFluxes.jl src/SurfaceFluxes.jl/compute_ustar()
-    # kwargs = (; Tsurface = sc.Tg, qsurface = sc.qg, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive, [ I think using Tg is a mistake becase w get too low LHF and SHF. in rf09 that reduces convection]
-    kwargs = (; Tsurface = sc.Tsfc, qsurface = sc.qg, zrough, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive, # This seems to be most accurate... [[ i think this is better becaue it brings more qt to heights, though it does leave more at cloud top spike ]]
+    # kwargs = (; Tsurface = sc.Tg, qsurface = sc.qg, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive, [ I think using Tg is a mistake becase w get too low LHF and SHF. in rf09 that reduces convection]
+    kwargs = (; Tsurface = sc.Tsfc, qsurface = sc.qg, kwargs...) # taken from gabls cause only other one w/ moninobhukov interactive, # This seems to be most accurate... [[ i think this is better becaue it brings more qt to heights, though it does leave more at cloud top spike ]]
     return TC.MoninObukhovSurface(FT; kwargs...) # interactive?
 end
 

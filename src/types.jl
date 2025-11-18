@@ -259,6 +259,64 @@ struct StalledUpdraftDetrainDowndrafts <: AbstractStalledUpdraftHandler end # if
 
 
 
+# ========== Convective TKE Handler ============================================================================== #
+
+abstract type AbstractConvectiveTKEHandler end
+struct NoConvectiveTKE <: AbstractConvectiveTKEHandler end
+struct ConvectiveTKE{FT} <: AbstractConvectiveTKEHandler
+    "buoyancy_coeff::FT"
+    buoyancy_coeff::FT
+    "advection_coeff::FT"
+    advection_coeff::FT
+    "dissipation_coeff::FT"
+    dissipation_coeff::FT # smaller than generation
+    "self_dissipation_coeff::FT"
+    self_dissipation_coeff::FT # extra dissipation when tke is convectively generated
+    "max_scaling_factor::FT"
+    max_scaling_factor::FT
+    # "use_separate_ed_coeff::Bool" # We'll just use if ed_scaling_factor != 1.0
+    # use_separate_ed_coeff::Bool
+    "ed_scaling_factor::FT"
+    ed_scaling_factor::FT
+    "transport_tke_by_advection::Bool"
+    transport_tke_by_advection::Bool
+    "transport_condensed_by_advection::Bool"
+    transport_condensed_by_advection::Bool
+    "transport_conserved_by_advection::Bool"
+    transport_conserved_by_advection::Bool
+    "entr_detr_rate_inv_s::FT"
+    entr_detr_rate_inv_s::FT # Time rate for grafting onto updraft
+end
+function ConvectiveTKE(param_set::APS, namelist)
+    FT = eltype(param_set)
+    buoyancy_coeff = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_buoyancy_coeff"; default = FT(1.0))
+    advection_coeff = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_advection_coeff"; default = FT(1.0))
+    dissipation_coeff = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_dissipation_coeff"; default = FT(1.0))
+    self_dissipation_coeff = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_self_dissipation_coeff"; default = FT(1.0))
+    max_scaling_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_max_scaling_factor"; default = FT(1.0))
+    # use_separate_ed_coeff = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_use_separate_ed_coeff"; default = false, valid_options = [true, false])
+    ed_scaling_factor = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_ed_scaling_factor"; default = FT(1.0))
+    transport_tke_by_advection = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_transport_tke_by_advection"; default = true, valid_options = [true, false])
+    transport_condensed_by_advection = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_transport_condensed_by_advection"; default = false, valid_options = [true, false]) # ql, qi, qr, qs
+    transport_conserved_by_advection = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "convective_tke_transport_conserved_by_advection"; default = true, valid_options = [true, false]) # θ_liq_ice, qt
+    entr_detr_rate_inv_s = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "tke_conv_entr_detr_rate_inv_s"; default = FT(0)) # default 0 means no grafting onto updraft (infinite time scale)
+    return ConvectiveTKE{FT}(
+        buoyancy_coeff,
+        advection_coeff,
+        dissipation_coeff,
+        self_dissipation_coeff,
+        max_scaling_factor,
+        # use_separate_convective_tke_ed_coeff, # we'll just use if convective_tke_ed_scaling_factor != 1.0
+        ed_scaling_factor,
+        transport_tke_by_advection,
+        transport_condensed_by_advection,
+        transport_conserved_by_advection,
+        entr_detr_rate_inv_s,
+    )            
+end
+
+# ========== Entrainment/Detrainment Models ============================================================================== #
+
 abstract type EntrModelFacTotalType end
 # struct FractionalEntrModel <: EntrModelFacTotalType end
 Base.@kwdef struct FractionalEntrModel{SUHT} <: EntrModelFacTotalType
@@ -511,8 +569,9 @@ abstract type AbstractMoistureModel end
 # struct NonEquilibriumMoisture <: AbstractMoistureModel end
 
 
-struct EquilibriumMoisture{RTT <: AbstractNonEquillibriumSourcesType} <: AbstractMoistureModel
+struct EquilibriumMoisture{RTT <: AbstractNonEquillibriumSourcesType, FT <: AbstractFloat} <: AbstractMoistureModel
     scheme::RTT # this is to allow us choose how to diagnose N for example, even when we are not using the timescales. if it's a type that defaults to NaNs, that's ok too but at least it won't be 0. We can resolve the NaNs before saving.
+    condensate_qt_SD::FT
 end
 function EquilibriumMoisture(param_set::APS, namelist)
     nonequilibrium_moisture_scheme_type::Symbol = Symbol(parse_namelist(namelist, "user_args", "nonequilibrium_moisture_scheme"; default = :relax_to_equilibrium))
@@ -530,15 +589,20 @@ function EquilibriumMoisture(param_set::APS, namelist)
         error("Invalid nonequilibrium_moisture_scheme type: $nonequilibrium_moisture_scheme_type")
     end
 
+    FT = eltype(param_set)
+    condensate_qt_SD::FT = parse_namelist(namelist, "user_params", "condensate_qt_SD"; default = zero(FT))
+
     RTT = typeof(nonequilibrium_moisture_scheme)
-    return EquilibriumMoisture{RTT}(nonequilibrium_moisture_scheme)
+    return EquilibriumMoisture{RTT, FT}(nonequilibrium_moisture_scheme, condensate_qt_SD)
 end
 
 
 
 struct NonEquilibriumMoisture{RTT <: AbstractNonEquillibriumSourcesType, FT <: AbstractFloat} <: AbstractMoistureModel
     scheme::RTT
-    heterogeneous_ice_nucleation::Tuple{Bool, FT, FT}
+    heterogeneous_ice_nucleation::NamedTuple{(:use_heterogeneous_ice_nucleation, :heterogeneous_ice_nucleation_coefficient, :heterogeneous_ice_nucleation_exponent, :use_ice_mult), Tuple{Bool, FT, FT, Bool}}
+    # heterogeneous_ice_nucleation::Tuple{Bool, FT, FT, Bool}
+    condensate_qt_SD::FT
 end
 
 function NonEquilibriumMoisture(param_set::APS, namelist)
@@ -558,12 +622,18 @@ function NonEquilibriumMoisture(param_set::APS, namelist)
         error("Invalid nonequilibrium_moisture_scheme type: $nonequilibrium_moisture_scheme_type")
     end
 
-    heterogeneous_ice_nucleation = parse_namelist(namelist, "user_args", "use_heterogeneous_ice_nucleation"; default = false)
+    use_heterogeneous_ice_nucleation = parse_namelist(namelist, "user_args", "use_heterogeneous_ice_nucleation"; default = false)
     heterogeneous_ice_nucleation_coefficient = parse_namelist(namelist, "user_params", "heterogeneous_ice_nucleation_coefficient"; default = FT(1))
     heterogeneous_ice_nucleation_exponent = parse_namelist(namelist, "user_params", "heterogeneous_ice_nucleation_exponent"; default = FT(1))
+    use_ice_mult = parse_namelist(namelist, "user_args", "use_ice_mult"; default = false)
+
+    # heterogeneous_ice_nucleation_named_tuple = (heterogeneous_ice_nucleation, heterogeneous_ice_nucleation_coefficient, heterogeneous_ice_nucleation_exponent, use_ice_mult) 
+    heterogeneous_ice_nucleation_named_tuple = (; use_heterogeneous_ice_nucleation, heterogeneous_ice_nucleation_coefficient, heterogeneous_ice_nucleation_exponent, use_ice_mult) 
+
+    condensate_qt_SD::FT = parse_namelist(namelist, "user_params", "condensate_qt_SD"; default = zero(FT))
 
     RTT = typeof(nonequilibrium_moisture_scheme)
-    return NonEquilibriumMoisture{RTT, FT}(nonequilibrium_moisture_scheme, (heterogeneous_ice_nucleation, heterogeneous_ice_nucleation_coefficient, heterogeneous_ice_nucleation_exponent) )
+    return NonEquilibriumMoisture{RTT, FT}(nonequilibrium_moisture_scheme, heterogeneous_ice_nucleation_named_tuple, condensate_qt_SD)
 end
 
 """
@@ -1258,7 +1328,7 @@ Base.@kwdef struct SurfaceBase{FT}
 end
 
 # struct EDMFModel{N_up, FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG}
-struct EDMFModel{N_up, FT, SFCA, SABC, MM, CSM, TCM, PM, RFM, SFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG, TLT, APM}
+struct EDMFModel{N_up, FT, SFCA, SABC, MM <: AbstractMoistureModel, CSM <: AbstractCloudSedimentationModel, TCM, PM, RFM, SFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG, TLT <: AbstractTendencyLimiterSet, APM <: AbstractAreaPartitionModel, CTKE <: AbstractConvectiveTKEHandler}
     # surface_area::FT
     surface_area::SFCA # trying to allow for non even split of surface area in updrafts... we'll read this in driver/initial_conditions.jl which will call src/EDMF_Functions.jl area_surface_bc()
     surface_area_bc::SABC
@@ -1285,6 +1355,7 @@ struct EDMFModel{N_up, FT, SFCA, SABC, MM, CSM, TCM, PM, RFM, SFM, PFM, ENT, EBG
     H_up_min::FT # minimum updraft top to avoid zero division in pressure drag and turb-entr
     tendency_limiters::TLT
     area_partition_model::APM
+    convective_tke_handler::CTKE
 end
 function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, param_set) where {FT}
 
@@ -1556,6 +1627,14 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
     end
     # ---------------------------------------------------------------------------------- #
 
+    # -- Convective TKE ---------------------------------------------------------------- #
+
+    use_convective_tke = parse_namelist(namelist, "turbulence", "EDMF_PrognosticTKE", "use_convective_tke"; default = false, valid_options = [true, false])
+    convective_tke = use_convective_tke ? ConvectiveTKE(param_set, namelist) : NoConvectiveTKE()
+
+
+    # -- Entrainment Type --------------------------------------------------------------- #
+
 
     entrainment_type = parse_namelist(
         namelist,
@@ -1756,6 +1835,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
     PMP = typeof(pressure_model_params)
     TLT = typeof(tendency_limiters)
     APM = typeof(area_partition_model)
+    CTKE = typeof(convective_tke)
 
     SFCA = typeof(surface_area) # testing allowing this to be a vector for initializing updrafts with non equal areas
     # return EDMFModel{n_updrafts,FT, SABC, MM, TCM, PM, RFM, PFM, ENT, EBGC, MLP, PMP, EC, MLEC, ET, EDS, DDS, EPG, TLT}(
@@ -1783,6 +1863,7 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
         EPG,
         TLT,
         APM,
+        CTKE,
     }(
         surface_area,
         surface_area_bc,
@@ -1808,7 +1889,8 @@ function EDMFModel(::Type{FT}, namelist, precip_model, rain_formation_model, par
         set_src_seed,
         H_up_min,
         tendency_limiters,
-        area_partition_model
+        area_partition_model,
+        convective_tke,
     )
 end
 

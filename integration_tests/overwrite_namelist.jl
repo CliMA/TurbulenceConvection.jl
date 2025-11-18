@@ -26,7 +26,7 @@ function overwrite_namelist!(namelist, parsed_args)
     "precip_fraction_limiter"      => (nl, pa, key) -> (nl["microphysics"]["precip_fraction_limiter"] = pa[key]),
     "acnv_scaling"                 => (nl, pa, key) -> (nl["microphysics"]["microph_scaling_acnv"] = pa[key]),
     "accr_scaling"                 => (nl, pa, key) -> (nl["microphysics"]["microph_scaling_accr"] = pa[key]),
-    "evap_scaling"                 => (nl, pa, key) -> (nl["microphysics"]["microph_scaling"] = pa[key]),
+    "evap_scaling"                 => (nl, pa, key) -> (nl["microphysics"][microph_scaling_evap] = pa[key]),
     "depsub_scaling"               => (nl, pa, key) -> (nl["microphysics"]["microph_scaling_dep_sub"] = pa[key]),
     "melt_scaling"                 => (nl, pa, key) -> (nl["microphysics"]["microph_scaling_melt"] = pa[key]),
     "thermo_covariance_model"      => (nl, pa, key) -> (nl["thermodynamics"]["thermo_covariance_model"] = pa[key]),

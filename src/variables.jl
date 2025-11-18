@@ -314,6 +314,7 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
             tke_convective_dissipation = FT(0),
             latent_heating = FT(0),
             instability = FT(0),
+            stability = FT(0),
             frac_supersat = FT(0),
             #
             Hvar = FT(0),

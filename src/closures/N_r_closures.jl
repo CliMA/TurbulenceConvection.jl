@@ -449,7 +449,8 @@ function q_lr(
     """
     No trivial equivalent for liquid because r_lr is in user_params, and we kind of added it ourselves.
     """
-    r_lr = param_set.user_params.r_liq_rain # There is no r_lr for liquid...instead we just set it in user_params.
+    FT = eltype(param_set)
+    r_lr::FT = param_set.user_params.r_liq_rain # There is no r_lr for liquid...instead we just set it in user_params.
     return q_from_r(param_set, q_type, r_lr)
 
 end
@@ -461,9 +462,9 @@ function r_ice_acnv(
     """
     r_ice_acnv = r_is * r_acnv_scaling_factor
     """
-    particle_min_radius = param_set.user_params.particle_min_radius
-    r_acnv_scaling_factor = isnan(r_acnv_scaling_factor) ? eltype(param_set)(param_set.user_params.r_ice_acnv_scaling_factor) : r_acnv_scaling_factor
     FT = eltype(param_set)
+    particle_min_radius::FT = param_set.user_params.particle_min_radius
+    r_acnv_scaling_factor = isnan(r_acnv_scaling_factor) ? FT(param_set.user_params.r_ice_acnv_scaling_factor) : r_acnv_scaling_factor
     # return CMP.r_ice_snow(microphys_params) * FT(r_acnv_scaling_factor) # r_acnv_scaling_factor can become small enough that it's not allowed
     return particle_min_radius + (CMP.r_ice_snow(TCP.microphysics_params(param_set)) - particle_min_radius) * FT(r_acnv_scaling_factor)
 end
@@ -476,7 +477,7 @@ function r_liq_acnv(
     r_liq_acnv = r_lr * r_acnv_scaling_factor
     """
     FT = eltype(param_set)
-    particle_min_radius = param_set.user_params.particle_min_radius
+    particle_min_radius::FT = param_set.user_params.particle_min_radius
     # return param_set.user_params.r_liq_rain * FT(r_acnv_scaling_factor) # r_acnv_scaling_factor can become small enough that it's not allowed
     return particle_min_radius + (param_set.user_params.r_liq_rain - particle_min_radius) * FT(r_acnv_scaling_factor)
 end
@@ -492,10 +493,10 @@ function r_acnv(
     FT = eltype(param_set)
     # microphys_params::ACMP = TCP.microphysics_params(param_set)
     if q_type isa CMT.IceType
-        r_acnv_scaling_factor = isnan(r_acnv_scaling_factor) ? FT(param_set.user_params.r_ice_acnv_scaling_factor) : r_acnv_scaling_factor
+        r_acnv_scaling_factor::FT = isnan(r_acnv_scaling_factor) ? FT(param_set.user_params.r_ice_acnv_scaling_factor) : FT(r_acnv_scaling_factor)
         return r_ice_acnv(param_set, FT(r_acnv_scaling_factor))
     elseif q_type isa CMT.LiquidType
-        r_acnv_scaling_factor = isnan(r_acnv_scaling_factor) ? FT(1) : r_acnv_scaling_factor
+        r_acnv_scaling_factor = isnan(r_acnv_scaling_factor) ? FT(1) : FT(r_acnv_scaling_factor)
         return r_liq_acnv(param_set, FT(r_acnv_scaling_factor))
     else
         error("Unknown q_type: $q_type")
@@ -1859,7 +1860,7 @@ function f_boost_MF(
     end
 
        
-    c_MF = param_set.user_params.massflux_N_i_boost_factor
+    c_MF::FT = param_set.user_params.massflux_N_i_boost_factor
     dNINP_dz = max(dNINP_dz, eps(FT)) # avoid div by 0
 
 
@@ -1875,8 +1876,8 @@ function f_boost_MF(
     # I feel like f_r should be bigger and f_max smaller?
     # f_r = FT(0.7) # the ratio of the max ratio we can boost to relative to the cloud top value.
     # f_max = FT(0.7) # how far we want to allow going towards the top value (rn is 0.6 N_top)
-    f_r = param_set.user_params.massflux_N_i_boost_max_ratio # the ratio of the max ratio we can boost to relative to the cloud top value.
-    f_max = param_set.user_params.massflux_N_i_boost_progress_fraction # how far we want to allow going towards the top value (rn is 0.6 N_top)
+    f_r::FT = param_set.user_params.massflux_N_i_boost_max_ratio # the ratio of the max ratio we can boost to relative to the cloud top value.
+    f_max::FT = param_set.user_params.massflux_N_i_boost_progress_fraction # how far we want to allow going towards the top value (rn is 0.6 N_top)
     target = max(one(FT), (one(FT)*(1-f_max) + f_max * f_r * clamp(r, one(FT), FT(6))))
     cap = max(one(FT), (one(FT)*(1-f_max) + f_max * f_r * r))
     f_boost = min(one(FT) + c_MF * α * (target - one(FT)), cap)
@@ -1918,7 +1919,7 @@ function get_Ni_from_INP_qi_qs(
 
         if q_i > FT(0)
 
-            r_min = param_set.user_params.particle_min_radius
+            r_min::FT = param_set.user_params.particle_min_radius
             if add_dry_aerosol_mass
                 q_i += mass(param_set, ice_type, r_min, N_INP; monodisperse = true) 
             end
@@ -1928,7 +1929,7 @@ function get_Ni_from_INP_qi_qs(
             end
             
             r_i_acnv = r_ice_acnv(param_set, param_set.user_params.r_ice_acnv_scaling_factor) # this is the radius of the ice crystal at the acnv radius
-            r_thresh = get_r_cond_precip(param_set, ice_type) * param_set.user_params.r_ice_snow_threshold_scaling_factor
+            r_thresh = get_r_cond_precip(param_set, ice_type) * FT(param_set.user_params.r_ice_snow_threshold_scaling_factor)
             N_i_acnv = N_from_qr(param_set, ice_type, q_i, r_i_acnv; monodisperse = false, μ=μ, ρ=ρ) # this is the minimum N_i we should have, since we can't have particles smaller than r_acnv
             # N_thresh = N_from_qr(param_set, ice_type, q_i, r_thresh; monodisperse = false, μ=μ, ρ=ρ)
 
@@ -2019,8 +2020,8 @@ function adjust_ice_N(
         N_i_in = N_i # save input value for debugging
 
         microphys_params::ACMP = TCP.microphysics_params(param_set)
-        r_acnv_scaling_factor = param_set.user_params.r_ice_acnv_scaling_factor # this MUST be less than 1!!!
-        r_thresh = get_r_cond_precip(param_set, ice_type) * param_set.user_params.r_ice_snow_threshold_scaling_factor
+        r_acnv_scaling_factor::FT = param_set.user_params.r_ice_acnv_scaling_factor # this MUST be less than 1!!!
+        r_thresh::FT = get_r_cond_precip(param_set, ice_type) * FT(param_set.user_params.r_ice_snow_threshold_scaling_factor)
         r_is = CMP.r_ice_snow(microphys_params)
 
         # r_thresh *= (80/70) # we really just need this to stop wi from growing too fast, but no reason we need to limit this ourselves right?... # since we aren't enforcing r_thresh at the lower end but are just letting N_INP rock, I think we're ok...
@@ -2208,7 +2209,7 @@ function adjust_ice_N(
             if apply_sedimentation_boost
                 # sedimentation boost factor -- maybe 20 percent by .5 m/s? sedimentation only reaches as far as it can before acnv, so shorter at high RH, and at subsat it's longer except you could be losing particles.
                 # maybe scale opposite of RH? idk.
-                sedimentation_N_i_boost_factor = param_set.user_params.sedimentation_N_i_boost_factor
+                sedimentation_N_i_boost_factor::FT = FT(param_set.user_params.sedimentation_N_i_boost_factor)
                 # sedimentation_N_i_boost_factor = FT(0)
                 sedimentation_N_i_boost_factor *= clamp(w_i / FT(0.5), FT(0), FT(1)) # so at 0.5 m/s we get the full amount, at 0 m/s we get none
                 # rh scaling [max at S_i = 0, by 8 percent supersat, reduce to 10 percent.]
@@ -2384,7 +2385,7 @@ function adjust_liq_N(
         μ = μ_from_qN(param_set, liq_type, q_l, N_l; ρ=ρ) # this is the factor by which we scale the mean radius to get the mean radius for the ice crystals, so that we can use it in the N_i and N_l calculations
 
         # make sure <r> < (r_lr/2)
-        r_lr = param_set.user_params.r_liq_rain # There is no r_lr for liquid...instead we just set it in user_params.
+        r_lr::FT = param_set.user_params.r_liq_rain # There is no r_lr for liquid...instead we just set it in user_params.
         λ = (μ + FT(1)) / r_lr
 
         _χm = get_χm(param_set, liq_type) 
@@ -2411,6 +2412,7 @@ We are currently using q = 4/3 π r^3 N ρ, so r = (q / (4/3 π N ρ))^(1/3)
 The difference in factor is then  FT(((4/3) / 8)^(1/3)) ≈ 0.55, that is, our r estimates will be double the size they should be, and our timescales will be about half of what they should be.
 This sounds small but it doubles any sources... if you rely on having a good prediction of N... this could result in say deposition sources being 2x too large, which isn't insignificant.
 
+Could try `TCP.TurbulenceConvectionParameters{FT}` over APS
 
 """
 
@@ -2418,7 +2420,7 @@ function r_from_qN(param_set::APS, q_type::CMTWaterTypes, q::FT, N::FT; monodisp
     """
     Calculate r from q, N
     """
-    r_min = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
+    r_min::FT = FT(param_set.user_params.particle_min_radius) # this is the minimum radius we want to consider, if r < r_min, we return 0
     if iszero(N) || isinf(N) || iszero(q)
         return FT(r_min) # N/N will give NaN...
         # even if N = 0 and q is not 0 (in which case N shouldn't be 0), we need some fix...
@@ -2429,7 +2431,7 @@ function r_from_qN(param_set::APS, q_type::CMTWaterTypes, q::FT, N::FT; monodisp
 
 
     microphys_params::ACMP = TCP.microphysics_params(param_set)
-    _χm = get_χm(param_set, q_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
+    _χm::FT = get_χm(param_set, q_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
     q_r_min = particle_mass(microphys_params, q_type, r_min, _χm)
 
     if (q < 0) || (N < 0)
@@ -2491,7 +2493,7 @@ function r_from_q(param_set::APS, q_type::CMTWaterTypes, q::FT) where {FT}
     """
     Calculate r from q
     """
-    r_min = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
+    r_min::FT = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
     microphys_params::ACMP = TCP.microphysics_params(param_set)
     χm = get_χm(param_set, q_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
     q_r_min = particle_mass(microphys_params, q_type, r_min, χm) # this is the volume of a single droplet with radius r_min, so we add it to q to get the effective q
@@ -2511,7 +2513,7 @@ function q_from_rN(param_set::APS, q_type::CMTWaterTypes, r::FT, N::FT; monodisp
     elseif isinf(N)
         error("N is infinite, cannot calculate q from r and N")
     else
-        r_min = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
+        r_min::FT = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
         microphys_params::ACMP = TCP.microphysics_params(param_set)
         # _χm = get_χm(param_set, q_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
         _χm = isnan(_χm) ? get_χm(param_set, q_type) : _χm
@@ -2548,7 +2550,7 @@ function q_from_r(param_set::APS, q_type::CMTWaterTypes, r::FT) where {FT}
     """
     Calculate q from r
     """
-    r_min = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
+    r_min::FT = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
     if r > r_min
         microphys_params::ACMP = TCP.microphysics_params(param_set)
         χm = get_χm(param_set, q_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius

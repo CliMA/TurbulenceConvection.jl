@@ -238,7 +238,7 @@ function microphysics!(
                     dqvdt = max(dqvdt, FT(0)) # give microphysics first right of refusal on vapor usage
                     dTdt = min(dTdt, FT(0)) # give microphysics first right of refusal on cooling usage
 
-                    if ((param_set.user_params.use_convective_tke) || (param_set.user_params.use_convective_tke_production_only)) && (region isa EnvDomain)
+                    if (edmf.convective_tke_handler isa ConvectiveTKE) && (region isa EnvDomain)
                         # assume the condensate is in the tke part going up KE = 1/2 ρ w^2. critical to generating condensate
                         w_noneq = sqrt(2 * aux_en.tke[k] / ρ)
                         
@@ -247,15 +247,15 @@ function microphysics!(
                         w_noneq = w[k]
                     end
 
-                    if !iszero(param_set.user_params.condensate_qt_SD) # maybe you'd want different values for liq and ice but theyre irreparably tied together in MM2015 microphysics, etc.
+                    if !iszero(moisture_model.condensate_qt_SD)
                         # TODO: Consider turning this off for when we are using cloaks.... also set an error in the quadrature branches
                         q_tot_sd = sqrt(aux_en.QTvar[k])
-                        qt = q_here.tot + param_set.user_params.condensate_qt_SD * q_tot_sd
+                        qt = q_here.tot + moisture_model.condensate_qt_SD * q_tot_sd
                         θ = TD.liquid_ice_pottemp(thermo_params, ts)
                         ts = (edmf.moisture_model isa NonEquilibriumMoisture) ? thermo_state_pθq(param_set, p_c[k], θ, qt, q_here.liq, q_here.ice) : thermo_state_pθq(param_set, p_c[k], θ, qt)
 
-                        if (region isa EnvDomain) && !((param_set.user_params.use_convective_tke) || (param_set.user_params.use_convective_tke_production_only)) #if we're doing SDs, associate q with upward motion. We dont have varw, and we're not using convective tke, but at least don't let it be negative. if the mean is -w, the positive side can be 
-                            w_noneq = w_noneq + param_set.user_params.condensate_qt_SD * abs(w_noneq) # each SD moves us up in w, so 1 SD, w = 0
+                        if (region isa EnvDomain) && !(edmf.convective_tke_handler isa ConvectiveTKE) # if we're doing SDs, associate q with upward motion. We dont have varw, and we're not using convective tke, but at least don't let it be negative. if the mean is -w, the positive side can be
+                            w_noneq = w_noneq + moisture_model.condensate_qt_SD * abs(w_noneq) # each SD moves us up in w, so 1 SD, w = 0
                         end
                     end
 
@@ -367,7 +367,7 @@ function microphysics!(
                     region = Env
                 end
 
-                if ((param_set.user_params.use_convective_tke) || (param_set.user_params.use_convective_tke_production_only)) && (region isa EnvDomain)
+                if (edmf.convective_tke_handler isa ConvectiveTKE) && (region isa EnvDomain)
                     # assume the condensate is in the tke part going up KE = 1/2 ρ w^2. critical to generating condensate
                     w_noneq = sqrt(2 * aux_en.tke[k] / ρ)
                     

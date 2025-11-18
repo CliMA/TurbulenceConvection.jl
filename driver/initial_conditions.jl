@@ -129,6 +129,8 @@ function initialize_updrafts_SOCRATES(edmf, state, surf, param_set)
     ρ_f = aux_gm_f.ρ
     FT = TC.float_type(state)
 
+    C2F = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # face to center interpolation
+
     kc_toa = TC.kc_top_of_atmos(grid)
     kf_toa = TC.kf_top_of_atmos(grid)
 
@@ -241,7 +243,6 @@ function initialize_updrafts_SOCRATES(edmf, state, surf, param_set)
             end
         end
 
-        C2F = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # face to center interpolation
         @. prog_up_f[i].ρaw = ρ_f * C2F(aux_up[i].area) * aux_up_f[i].w # small ρaw perturbation
 
 

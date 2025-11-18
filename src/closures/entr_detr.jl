@@ -606,8 +606,6 @@ function compute_phys_entr_detr!(
                     θ_virt_toa = aux_en.θ_virt[kc_toa]
                     RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_virt_toa))
 
-                    # dθ_virt_dz = aux_tc.temporary_1 # reuse temporary storage
-                    # @. dθ_virt_dz = ∇c(wvec(RBθ(θ_virt)))
                     if aux_tc.∂θv∂z[k] < 0 # maybe we could also use buoyancy gradient... idk...
                         base_entrainment_rate_inv_s = edmf.entrainment_type.base_entrainment_rate_inv_s # just a test...
                         aux_up[i].entr_rate_inv_s[k] += base_entrainment_rate_inv_s
@@ -775,12 +773,6 @@ function compute_ml_entr_detr!(
 
                     # we should raise entrainment if dθ_virt/dz < 0 in the environment... w_height isn't enough and all the buoyancy ones only use env buoyancy...
                     # For the gradient we want to look up, entrain if your current value at k is less than the one above at k+1 and start the updraft here... That's Right biased, hence needing a value for toa
-                    θ_virt = aux_en.θ_virt
-                    kc_toa = kc_top_of_atmos(grid)
-                    θ_virt_toa = aux_en.θ_virt[kc_toa]
-                    RBθ = CCO.RightBiasedC2F(; top = CCO.SetValue(θ_virt_toa))
-                    # dθ_virt_dz = aux_tc.temporary_1 # reuse temporary storage
-                    # @. dθ_virt_dz = ∇c(wvec(RBθ(θ_virt)))
                     if aux_tc.∂θv∂z[k] < 0 # maybe we could also use buoyancy gradient... idk...
                         base_entrainment_rate_inv_s = edmf.entrainment_type.base_entrainment_rate_inv_s # just a test...
                         aux_up[i].entr_rate_inv_s[k] += base_entrainment_rate_inv_s

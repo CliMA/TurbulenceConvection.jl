@@ -213,7 +213,7 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
         tke_convective = max(prog_en.ρatke_convective[k] - TKE, FT(0)) / (ρ_c[k] * aux_en.area[k]) # ensure non-negative convective tke
 
 
-        if param_set.user_params.use_convective_tke # rn this one keeps them separate but we need to add tke's so it acts on the real qt etc... i think just doing it to ρatke is enough.. not sure
+        if edmf.convective_tke_handler isa ConvectiveTKE # rn this one keeps them separate but we need to add tke's so it acts on the real qt etc... i think just doing it to ρatke is enough.. not sure
             #= these have to be combined to generate variance etc correctly
             I don't want to rewrite all that code separately.. idk.
 
@@ -1238,6 +1238,43 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
         aux_en.HQTcov[kc_surf] = ae_surf * get_surface_variance(flux1 / ρLL, flux2 / ρLL, ustar, zLL, oblength)
     end
 
+    # == Store Supersaturated Fraction == # :: still need to think about how to split liq and ice here...
+    # check fraction of qt distribution above saturation..
+    p0 = TD.TP.p_ref_theta(thermo_params)
+    R_d = TCP.R_d(param_set)
+    R_v = TCP.R_v(param_set)
+    c_p = TCP.cp_d(param_set)
+    T_freeze = TCP.T_freeze(param_set)
+    @inbounds for k in real_center_indices(grid)
+        ts = aux_en.ts[k]
+        T = aux_en.T[k]
+        below_freezing = (T < T_freeze)
+        q_vap_sat = below_freezing ? TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Ice()) : TD.q_vap_saturation_generic(thermo_params, T, TD.air_density(thermo_params, ts), TD.Liquid())
+        qt_std = sqrt(aux_en.QTvar[k])
+        qt_mean = aux_en.q_tot[k]
+        cov_qtθ = aux_en.HQTcov[k]
+        # θli_mean = aux_en.θ_liq_ice[k]
+        θli_std = aux_en.Hvar[k]
+        p = aux_en.p[k]
+        T = aux_en.T[k]
+        L_v = TD.latent_heat_vapor(thermo_params, T)
+        # L_f = TD.latent_heat_fusion(thermo_params, T)
+        L_s = TD.latent_heat_sublim(thermo_params, T)
+        # ql_mean = aux_en.q_liq[k]
+        # qi_mean = aux_en.q_ice[k]
+
+        # frac_supersat_old = (qt_std > 0) ? (one(FT) - Distributions.cdf(Distributions.Normal(qt_mean, qt_std), q_vap_sat)) : ((qt_mean > q_vap_sat) ? one(FT) : zero(FT)) # doesn't handle covar         
+        β = (p / p0)^(R_d/c_p) # θl -> T conversion factor
+        dq_sat_dT = below_freezing ? L_s * q_vap_sat / (R_v * T^2) : L_v * q_vap_sat / (R_v * T^2) # Clausius–Clapeyron slope for linearization
+        α = dq_sat_dT * β
+        μ_X = qt_mean - q_vap_sat # linear combination mean and variance
+        σ2_X = qt_std^2 + (α*θli_std)^2 - 2*α*cov_qtθ
+        σ_X = sqrt(max(σ2_X, 0.0))
+        frac_supersat = σ_X > 0 ? 1 - Distributions.cdf(Distributions.Normal(0, σ_X), -μ_X) : (μ_X > 0 ? one(FT) : zero(FT)) # fraction supersaturated
+        aux_en.frac_supersat[k] = frac_supersat # for debugging
+    end
+    # =================================== #
+
 
     return nothing
 end
@@ -1331,13 +1368,16 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
     k_cloud_top_ice_en = kc_surface(grid)
     N_i_cloud_top_ice_en = FT(0)
     @inbounds for k in real_center_indices(grid)
-        if (TD.has_condensate(aux_en.q_ice[k]) && aux_en.area[k] > 1e-6) && ((S_k = TD.supersaturation(thermo_params,  TD.PhasePartition(thermo_params, aux_en.ts[k]), ρ_c[k], aux_en.T[k], TD.Ice())) > FT(0) )
+        # if (TD.has_condensate(aux_en.q_ice[k]) && aux_en.area[k] > 1e-6) && ((S_k = TD.supersaturation(thermo_params,  TD.PhasePartition(thermo_params, aux_en.ts[k]), ρ_c[k], aux_en.T[k], TD.Ice())) > FT(0) )
+        if (TD.has_condensate(aux_en.q_ice[k]) && aux_en.area[k] > 1e-6) && (aux_en.frac_supersat[k] > FT(0))
+            S_k = TD.supersaturation(thermo_params,  TD.PhasePartition(thermo_params, aux_en.ts[k]), ρ_c[k], aux_en.T[k], TD.Ice())
             
             if edmf.moisture_model isa NonEquilibriumMoisture
                 N_i_cloud_top_ice_en_here = get_INP_concentration(param_set, edmf.moisture_model.scheme, TD.PhasePartition(thermo_params, aux_en.ts[k]), aux_en.T[k], ρ_c[k], w[k])
             else
                 N_i_cloud_top_ice_en_here = get_N_i_Cooper_curve(aux_en.T[k]; clamp_N=true) # the fallback
             end
+            N_i_cloud_top_ice_en_here *= aux_en.frac_supersat[k] # scale by fraction supersat
 
             if N_i_cloud_top_ice_en_here ≥ N_i_cloud_top_ice_en
                 N_i_cloud_top_ice_en = N_i_cloud_top_ice_en_here
@@ -1347,8 +1387,11 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
                 if k == kc_toa
                     T_top = aux_en.T[k]
                 else
-                    S_kp1 = TD.supersaturation(thermo_params, TD.PhasePartition(thermo_params, aux_en.ts[k+1]), ρ_c[k+1], aux_en.T[k+1], TD.Ice())
-                    T_top = if (S_kp1 < FT(0))
+                    # S_kp1 = TD.supersaturation(thermo_params, TD.PhasePartition(thermo_params, aux_en.ts[k+1]), ρ_c[k+1], aux_en.T[k+1], TD.Ice())
+                    frac_supersat_kp1 = aux_en.frac_supersat[k+1]
+                    # T_top = if (S_kp1 < FT(0))
+                    T_top = if (frac_supersat_kp1 == FT(0))
+                        S_kp1 = TD.supersaturation(thermo_params, TD.PhasePartition(thermo_params, aux_en.ts[k+1]), ρ_c[k+1], aux_en.T[k+1], TD.Ice())
                         T_top_here = linear_interpolate_extrapolate(FT(0), (S_k, S_kp1), (aux_en.T[k], aux_en.T[k+1]))
                         do_print = false
                         # if rand() < 1e-4
@@ -1511,7 +1554,8 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
     ICNC_SIP_scaling_factors .= FT(1) # reset
     ICNC_SIP_scaling_factor = FT(1) # this is the running value, we only allow it to increase as we move towards sfc. this is because an INP explosion will have to be propagated downwards, a 10^3 growth permanently impacts everywhere below. (we could for example propose just turning off the INP upper bound or something idk.  +seeder-feeder and all that)
     
-    if param_set.user_params.use_ice_mult
+    # if param_set.user_params.use_ice_mult
+    if (edmf.moisture_model isa NonEquilibriumMoisture) && edmf.moisture_model.heterogeneous_ice_nucleation.use_ice_mult
         @inbounds for k in Base.Iterators.reverse(real_center_indices(grid)) # have to use fully qualified Base.Iterators.reverse(), see Grid.jl for implementation. But we wanna go TOA to SFC since the factor increases w/ depth
             if (prog_pr.q_rai[k] > FT(0)) # drizzle drive both Hallet-Mossop and Droplet Shattering ICNC growth
                 if edmf.moisture_model isa NonEquilibriumMoisture
@@ -1535,12 +1579,12 @@ function update_N_τ_termvel!(edmf::EDMFModel, state::State, param_set::APS, the
 
     # ============================================================================================================================================================================================================================================================================== #
 
-    apply_massflux_boost = param_set.user_params.apply_massflux_N_i_boost # env only
-    apply_sedimentation_boost = param_set.user_params.apply_sedimentation_N_i_boost # everywhere, default to false
+    apply_massflux_boost::Bool = param_set.user_params.apply_massflux_N_i_boost # env only
+    apply_sedimentation_boost::Bool = param_set.user_params.apply_sedimentation_N_i_boost # everywhere, default to false
 
     # ------------------------ #
     # massflux_N_i = massflux_c # default
-    tke = (param_set.user_params.use_convective_tke) ? aux_en.tke_convective : aux_en.tke
+    tke = (edmf.convective_tke_handler isa ConvectiveTKE) ? aux_en.tke_convective : aux_en.tke
     # use max of the two to be safe [[ aim for equivalent MF 0.02 = ρ a w at tke = 0.5 --> [[ # At tke = 0.5, we have ρ a/2 * (1) * f = 0.02 [= ρ a w], so f = 0.04 / (ρ a )]] ==> sqrt(2*TKE) * 0.02
     massflux_N_i = aux_tc.temporary_1
     massflux_0 = FT(0.05)

@@ -47,7 +47,7 @@ q_here = q_i + qs_here + TC.mass(param_set, TC.ice_type, r_min, N_INP; monodispe
 N_below_r_is = TC.get_fraction_below_or_above_thresh_from_qN(param_set, TC.ice_type, q_here, N_INP, ρ, r_is; return_N = true, below_thresh = true, return_fraction=false, μ=μ, Dmax=Inf) # asssuming all ice and snow was ice, how much is below r_is?
 
 r_acnv_scaling_factor = param_set.user_params.r_ice_acnv_scaling_factor # this MUST be less than 1!!!
-r_thresh = TC.get_r_cond_precip(param_set, TC.ice_type) * param_set.user_params.r_ice_snow_threshold_scaling_factor
+r_thresh = TC.get_r_cond_precip(param_set, TC.ice_type) * FT(param_set.user_params.r_ice_snow_threshold_scaling_factor)
 r_is = TC.CMP.r_ice_snow(microphys_params)
 
 S_i = 1.1

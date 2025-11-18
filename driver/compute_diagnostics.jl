@@ -210,6 +210,7 @@ function compute_diagnostics!(
         aeKHs_bc = -surf.ρs_flux / aux_tc_f.ρ_ae_KH[kf_surf]
 
         If = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0)))
+        # If = Ifw
         ∇f_en = CCO.DivergenceC2F(; bottom = CCO.SetDivergence(FT(aeKHs_bc)), top = CCO.SetDivergence(FT(0)))
         massflux_s = aux_gm_f.massflux_s
 

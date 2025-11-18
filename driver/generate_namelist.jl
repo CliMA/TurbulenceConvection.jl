@@ -428,7 +428,7 @@ function Rico(namelist_defaults)
     namelist["microphysics"]["E_rai_sno"] = 1.0
     # TODO microph_scaling adjusts evaporation process.
     # The name will be first fixed in CLIMAParameters.
-    namelist["microphysics"]["microph_scaling"] = 1.0
+    namelist["microphysics"]["microph_scaling_evap"] = 1.0
     namelist["microphysics"]["microph_scaling_dep_sub"] = 1.0
     namelist["microphysics"]["microph_scaling_melt"] = 1.0
     namelist["microphysics"]["microph_scaling_acnv"] = 1.0
@@ -476,7 +476,7 @@ function TRMM_LBA(namelist_defaults)
     namelist["microphysics"]["E_rai_sno"] = 1.0
     # TODO microph_scaling adjusts evaporation process.
     # The name will be first fixed in CLIMAParameters.
-    namelist["microphysics"]["microph_scaling"] = 1.0
+    namelist["microphysics"]["microph_scaling_evap"] = 1.0
     namelist["microphysics"]["microph_scaling_dep_sub"] = 1.0
     namelist["microphysics"]["microph_scaling_melt"] = 1.0
     namelist["microphysics"]["microph_scaling_acnv"] = 1.0
@@ -580,7 +580,7 @@ function DYCOMS_RF02(namelist_defaults)
     namelist["microphysics"]["E_rai_sno"] = 1.0
     # TODO microph_scaling adjusts evaporation process.
     # The name will be first fixed in CLIMAParameters.
-    namelist["microphysics"]["microph_scaling"] = 1.0
+    namelist["microphysics"]["microph_scaling_evap"] = 1.0
     namelist["microphysics"]["microph_scaling_dep_sub"] = 1.0
     namelist["microphysics"]["microph_scaling_melt"] = 1.0
     namelist["microphysics"]["microph_scaling_acnv"] = 1.0
@@ -675,7 +675,7 @@ function LES_driven_SCM(namelist_defaults)
     namelist["microphysics"]["E_rai_sno"] = 1.0
     # TODO microph_scaling adjusts evaporation process.
     # The name will be first fixed in CLIMAParameters.
-    namelist["microphysics"]["microph_scaling"] = 1.0
+    namelist["microphysics"]["microph_scaling_evap"] = 1.0
     namelist["microphysics"]["microph_scaling_dep_sub"] = 1.0
     namelist["microphysics"]["microph_scaling_melt"] = 1.0
     namelist["microphysics"]["microph_scaling_acnv"] = 1.0
@@ -727,7 +727,7 @@ function SOCRATES(namelist_defaults; case_name = "SOCRATES_RFXX_XXX_data")
     namelist["microphysics"]["E_rai_sno"] = 1.0
     # TODO microph_scaling adjusts evaporation process.
     # The name will be first fixed in CLIMAParameters.
-    namelist["microphysics"]["microph_scaling"] = 1.0
+    namelist["microphysics"]["microph_scaling_evap"] = 1.0
     namelist["microphysics"]["microph_scaling_dep_sub"] = 1.0
     namelist["microphysics"]["microph_scaling_melt"] = 1.0
     namelist["microphysics"]["microph_scaling_acnv"] = 1.0

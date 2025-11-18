@@ -40,7 +40,7 @@ function create_parameter_set(
     q_ice_threshold = TC.parse_namelist(namelist, "microphysics", "q_ice_threshold"; default = 1e-6)
     microph_scaling_acnv = TC.parse_namelist(namelist, "microphysics", "microph_scaling_acnv"; default = 1.0)
     microph_scaling_accr = TC.parse_namelist(namelist, "microphysics", "microph_scaling_accr"; default = 1.0)
-    microph_scaling = TC.parse_namelist(namelist, "microphysics", "microph_scaling"; default = 1.0)
+    microph_scaling_evap = TC.parse_namelist(namelist, "microphysics", "microph_scaling_evap"; default = 1.0)
     microph_scaling_dep_sub = TC.parse_namelist(namelist, "microphysics", "microph_scaling_dep_sub"; default = 1.0)
     microph_scaling_melt = TC.parse_namelist(namelist, "microphysics", "microph_scaling_melt"; default = 1.0)
     E_liq_rai = TC.parse_namelist(namelist, "microphysics", "E_liq_rai"; default = 0.8)
@@ -107,9 +107,9 @@ function create_parameter_set(
         println(io, "alias = \"microph_scaling_accr\"")
         println(io, "value = " * string(microph_scaling_accr))
         println(io, "type = \"float\"")
-        println(io, "[microph_scaling]")
-        println(io, "alias = \"microph_scaling\"")
-        println(io, "value = " * string(microph_scaling))
+        println(io, "[microph_scaling_evap]")
+        println(io, "alias = \"microph_scaling_evap\"")
+        println(io, "value = " * string(microph_scaling_evap))
         println(io, "type = \"float\"")
         println(io, "[microph_scaling_dep_sub]")
         println(io, "alias = \"microph_scaling_dep_sub\"")
@@ -245,7 +245,7 @@ function create_parameter_set(
     aliases = [
     "microph_scaling_dep_sub",
     "microph_scaling_melt",
-    "microph_scaling",
+    "microph_scaling_evap",
     "microph_scaling_acnv",
     "microph_scaling_accr",
     "Omega",
@@ -280,7 +280,7 @@ function create_parameter_set(
     namelist_user_params["r_ice_snow_threshold_scaling_factor"] =  TC.parse_namelist(namelist, "user_params", "r_ice_snow_threshold_scaling_factor"; default = 200/125) # this is set no matter what
 
     namelist_user_params["τ_acnv_sno_threshold"] =  TC.parse_namelist(namelist, "user_params", "τ_acnv_sno_threshold"; default = 100.0) # this is set no matter waht
-    namelist_user_params["τ_acnv_liq_thresh"] =  TC.parse_namelist(namelist, "user_params", "τ_acnv_liq_thresh"; default = 100.0) # this is set no matter what
+    # namelist_user_params["τ_acnv_liq_threshold"] =  TC.parse_namelist(namelist, "user_params", "τ_acnv_liq_threshold"; default = 100.0) # this is set no matter what [[ deprecated]]
 
     namelist_user_params["massflux_N_i_boost_factor"] =  TC.parse_namelist(namelist, "user_params", "massflux_N_i_boost_factor"; default = 2.0) # this is set no matter what
     namelist_user_params["sedimentation_N_i_boost_factor"] =  TC.parse_namelist(namelist, "user_params", "sedimentation_N_i_boost_factor"; default = 0.2) # this is set no matter what
@@ -290,7 +290,7 @@ function create_parameter_set(
     namelist_user_params["massflux_N_i_boost_max_ratio"] =  TC.parse_namelist(namelist, "user_params", "massflux_N_i_boost_max_ratio"; default = 0.7) # this is set no matter what
     namelist_user_params["massflux_N_i_boost_progress_fraction"] =  TC.parse_namelist(namelist, "user_params", "massflux_N_i_boost_progress_fraction"; default = 0.5) # this is set no matter what
     
-    namelist_user_params["use_ice_mult"] =  TC.parse_namelist(namelist, "user_params", "use_ice_mult"; default = true) # this is set no matter what
+    # namelist_user_params["use_ice_mult"] =  TC.parse_namelist(namelist, "user_params", "use_ice_mult"; default = true) # this is set no matter what
 
     # If we decide to add this to the calibration... 
     # default_r_factor_liq = FT(1) # unknown
@@ -322,6 +322,11 @@ function create_parameter_set(
 
     # delete things stored in tendency limiter set
     delete!.(Ref(user_args), ["truncated_basic_limiter_factor", "default_tendency_limiter_type", "fallback_default_tendency_limiter_type", "nonequilibrium_moisture_sources_limiter_type", "fallback_nonequilibrium_moisture_sources_limiter_type", "fallback_to_standard_supersaturation_limiter", "entr_detr_limiter_type", "fallback_entr_detr_limiter_type", "precipitation_tendency_limiter_type", "fallback_precipitation_tendency_limiter_type", "tendency_resolver_setup"])
+
+
+    # delete use_ice_mult
+    delete!.(Ref(user_params), ["condensate_qt_SD", "zrough", "use_ice_mult", "τ_acnv_liq_thresh"])
+    delete!.(Ref(user_args), ["use_ice_mult"])
 
 
     # delete stored area partition things
@@ -366,7 +371,6 @@ function create_parameter_set(
         user_args was originally created to store arguments that might be useful in the models evolution. it still serves that purpose in the namelist.
         However, arguments need not be passed as parameters. The are helpful in construction, in types.jl. 
         If they are important for runtime, either place them into user_params or into an specific object that is part of edmf.
-
     =#
 
     param_set = TCP.TurbulenceConvectionParameters{FTD, MP, SFP, typeof(user_params)}(; pairs..., microphys_params, surf_flux_params, user_params) # `typeof` so we have concrete types such that if user_args and user_params are isbits, then param_set is isbits

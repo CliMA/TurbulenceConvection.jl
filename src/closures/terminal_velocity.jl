@@ -895,7 +895,7 @@ function my_terminal_velocity(
         # if _λ < (μ + 1)/r_is # too limiting, we def see w_i increases after <r_is>
         #     _λ = (μ + 1)/r_is # let's stop Chen from going overboard with the sedimentation rates... [[ idk if this would be good, we gotta go past r_is according to the LES so idk... but the w response can't be so extreme...]]
         # end
-        # r_th = get_r_cond_precip(param_set, precip) * param_set.user_params.r_ice_snow_threshold_scaling_factor
+        # r_th = get_r_cond_precip(param_set, precip) * FT(param_set.user_params.r_ice_snow_threshold_scaling_factor)
         # if _λ < (μ + 1)/r_th # I think with the limits we put in on max r in the integration, we can go all the way up to r_th now... and maybe even not need a limit...
         #     _λ = (μ + 1)/r_th # let's stop Chen from going overboard with the sedimentation rates... [[ idk if this would be good, we gotta go past r_is according to the LES so idk... but the w response can't be so extreme...]]
         # end
