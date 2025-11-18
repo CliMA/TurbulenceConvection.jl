@@ -108,7 +108,6 @@ function calculate_sedimentation_sources(
         # w_sed_to_other = copy(w_sed) # make a copy for the exchange calculation (not sure if this is enough, maybe deepcopy() or w_sed_to_other = w_sed .* 1.0 or something is better?)
         # w_sed_to_other = similar(w_sed) # a copy but don't actually fill in 
         w_sed_to_other = w_sed # rn, we're not actually addting background wind to w_sed, so this is fine we can reuse the same object... This also assumes the area is advecting with w..., which isn't exactly true... e.g. w_en may not see a spike in w_up coming so da/dt is unknowable, and thus the crosover rate. instantatenously, you probably want advection from en and up together 
-        # @inbounds for k in real_center_indices(grid)
         # w_sed_to_other[k] += w[k.i] # add background wind (can't figure out how to add to F2C direclty? idk...)  w_sed .+= w didn't work..., minus bc w_sed is defined towards surface, but w is up
         # end
     end

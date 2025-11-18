@@ -9,7 +9,7 @@ Returns a case-specific subset of the expected GCM mesh between the surface and 
 function TCMeshFromGCMMesh(gcm_mesh; z_max::FT) where {FT <: AbstractFloat}
     gcm_grid = Grid(gcm_mesh)
     k_star = kf_top_of_atmos(gcm_grid)
-    for k in real_face_indices(gcm_grid)
+    @inbounds for k in real_face_indices(gcm_grid)
         if gcm_grid.zf[k].z > z_max || z_max ≈ gcm_grid.zf[k].z
             k_star = k
             break

@@ -38,7 +38,7 @@ using Test
     end
 end
 
-for k in TC.real_face_indices(grid)
+@inbounds for k in TC.real_face_indices(grid)
     for i in 1:n_updrafts
         x = state.face.turbconv.up[i].Area[k]
         state.face.turbconv.up[i].Area[k] = 2
@@ -132,7 +132,7 @@ end
             ∫yc_simple[k] += ∫yc_simple[k - 1]
         end
     end
-    for k in TC.real_face_indices(grid)
+    @inbounds for k in TC.real_face_indices(grid)
         ∫yf_simple[k] += yf[k] * grid.Δz * boundary_fact(k)
         if k.i > 1
             ∫yf_simple[k] += ∫yf_simple[k - 1]

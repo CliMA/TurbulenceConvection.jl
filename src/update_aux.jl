@@ -408,27 +408,27 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
         ##### update_GMV_diagnostics (can't call in Eq until after microphysics())
         #####
         if edmf.moisture_model isa NonEquilibriumMoisture
-            @inbounds for k in real_center_indices(grid)
-                a_bulk_c = aux_bulk.area[k]
-                #####
-                ##### update_GMV_diagnostics (can't call in Eq until after microphysics())
-                #####
-                aux_gm.q_liq[k] = (aux_bulk.area[k] * aux_bulk.q_liq[k] + (1 - aux_bulk.area[k]) * aux_en.q_liq[k])
-                aux_gm.q_ice[k] = (aux_bulk.area[k] * aux_bulk.q_ice[k] + (1 - aux_bulk.area[k]) * aux_en.q_ice[k])
-                aux_gm.T[k] = (aux_bulk.area[k] * aux_bulk.T[k] + (1 - aux_bulk.area[k]) * aux_en.T[k])
-                aux_gm.buoy[k] = (aux_bulk.area[k] * aux_bulk.buoy[k] + (1 - aux_bulk.area[k]) * aux_en.buoy[k])
+            # @inbounds for k in real_center_indices(grid)
+            a_bulk_c = aux_bulk.area[k]
+            #####
+            ##### update_GMV_diagnostics (can't call in Eq until after microphysics())
+            #####
+            aux_gm.q_liq[k] = (aux_bulk.area[k] * aux_bulk.q_liq[k] + (1 - aux_bulk.area[k]) * aux_en.q_liq[k])
+            aux_gm.q_ice[k] = (aux_bulk.area[k] * aux_bulk.q_ice[k] + (1 - aux_bulk.area[k]) * aux_en.q_ice[k])
+            aux_gm.T[k] = (aux_bulk.area[k] * aux_bulk.T[k] + (1 - aux_bulk.area[k]) * aux_en.T[k])
+            aux_gm.buoy[k] = (aux_bulk.area[k] * aux_bulk.buoy[k] + (1 - aux_bulk.area[k]) * aux_en.buoy[k])
 
-                if iszero(aux_gm.T[k]) # print aux_gm and aux_bulk and aux_en values for q_tot, q_liq, q_ice, T, buoy and area in the error message...
-                    error("aux_gm.T[$k] is 0. Other values are aux_gm.q_tot[k] = $(aux_gm.q_tot[k]), aux_gm.q_liq[k] = $(aux_gm.q_liq[k]); aux_gm.q_ice[k] = $(aux_gm.q_ice[k]); aux_gm.buoy[k] = $(aux_gm.buoy[k]); aux_bulk.area[k] = $(aux_bulk.area[k]); aux_bulk.T[k] = $(aux_bulk.T[k]); aux_en.area[k] = $(aux_en.area[k]); aux_en.T[k] = $(aux_en.T[k]); aux_en.q_tot[k] = $(aux_en.q_tot[k]); aux_en.q_liq[k] = $(aux_en.q_liq[k]); aux_en.q_ice[k] = $(aux_en.q_ice[k])")
-                end
-
-                has_condensate = TD.has_condensate(aux_bulk.q_liq[k] + aux_bulk.q_ice[k])
-                aux_bulk.cloud_fraction[k] = if has_condensate && a_bulk_c > 1e-3
-                    1
-                else
-                    0
-                end
+            if iszero(aux_gm.T[k]) # print aux_gm and aux_bulk and aux_en values for q_tot, q_liq, q_ice, T, buoy and area in the error message...
+                error("aux_gm.T[$k] is 0. Other values are aux_gm.q_tot[k] = $(aux_gm.q_tot[k]), aux_gm.q_liq[k] = $(aux_gm.q_liq[k]); aux_gm.q_ice[k] = $(aux_gm.q_ice[k]); aux_gm.buoy[k] = $(aux_gm.buoy[k]); aux_bulk.area[k] = $(aux_bulk.area[k]); aux_bulk.T[k] = $(aux_bulk.T[k]); aux_en.area[k] = $(aux_en.area[k]); aux_en.T[k] = $(aux_en.T[k]); aux_en.q_tot[k] = $(aux_en.q_tot[k]); aux_en.q_liq[k] = $(aux_en.q_liq[k]); aux_en.q_ice[k] = $(aux_en.q_ice[k])")
             end
+
+            has_condensate = TD.has_condensate(aux_bulk.q_liq[k] + aux_bulk.q_ice[k])
+            aux_bulk.cloud_fraction[k] = if has_condensate && a_bulk_c > 1e-3
+                1
+            else
+                0
+            end
+            # end
         end
        
     end
