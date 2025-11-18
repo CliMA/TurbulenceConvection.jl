@@ -2682,7 +2682,7 @@ function compute_en_tendencies!(
         g = TCP.grav(param_set)
         # mixing length is set by dry static stability so we prolly don't wanna use that...
         tke_max = aux_tc.temporary_1 # 1 and 2 used above but available again
-        @. tke_max = (g/(2*max(MSE - Φ, eps(FT)))) * max(-∂MSE∂z, 0) * ifelse((∂MSE∂z < FT(0)) , max(aux_tc.mixing_length, FT(200)) , aux_tc.mixing_length)^2 * param_set.user_params.tke_convective_max_scaling_factor # max tke we could get from total conversion of MSE gradient to tke
+        @. tke_max = (g/(2*max(MSE - Φ, eps(FT)))) * max(-∂MSE∂z, 0) * ifelse((∂MSE∂z < FT(0)) , max(aux_tc.mixing_length, FT(200)) , aux_tc.mixing_length)^2 * edmf.convective_tke_handler.max_scaling_Factor # max tke we could get from total conversion of MSE gradient to tke
 
         # confine tke_max to CFL
         Δz = get_Δz(prog_gm.ρ) # This is just a regular array not a CC field so we 
