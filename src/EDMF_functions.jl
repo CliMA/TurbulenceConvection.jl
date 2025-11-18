@@ -304,7 +304,7 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
 
                     @. ql_flux_vert_adv = massflux_ql # same here
                     @. qi_flux_vert_adv = massflux_qi # same here
-e                else
+                else
                     # ql and qi should be correlated w/ tke. We handle prt of that in diffusivity but they shouldn't feel the netire advective force
                     @. massflux_ql = (massflux_en/2 + massflux_en_conv) .* IfRBF_q_liq_en(q_liq_en) # + (massflux_en - massflux_en_conv) .* IfRBF_q_liq_en(q_liq_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
                     @. massflux_qi = (massflux_en/2 + massflux_en_conv) .* IfRBF_q_ice_en(q_ice_en) # + (massflux_en - massflux_en_conv) .* IfRBF_q_ice_en(q_ice_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
