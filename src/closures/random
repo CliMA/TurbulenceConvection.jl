@@ -1986,3 +1986,78 @@ r = ((μs + 1) / λs);
 ws = TC.my_terminal_velocity(param_set, TC.snow_type, TC.Chen2022Vel, ρ_a, qs; Nt = NaN)
 ws_check = TC.my_terminal_velocity(param_set, TC.snow_type, TC.Chen2022Vel, ρ_a, qs; Nt = N)
 (N, r, ws, ws_check) = (N, r, ws, ws_check)
+
+
+qi_tendency_sub_dep = 1.; qi =  1e-6; N = 200.; ρ = 1.; ql=FT(0); N_INP = 300.; q_s = 1e-5; μ = FT(0)
+Thermodynamics = TC.TD; Thermodynamics.PhasePartition{FT}(qt, ql, qi) where FT = Thermodynamics.PhasePartition(FT(qt), FT(ql), FT(qi))
+q = TD.PhasePartition{Float64}(0.0049504728062363, ql, qi);
+new_N_i = TC.adjust_ice_N(param_set, N, N_INP, q.ice; ρ=ρ, S_i=FT(0.05), q_l=ql, q_s=q_s, monodisperse=false, ice_type=TC.ice_type, decrease_N_if_subsaturated=true, N_INP_top=FT(150.))
+
+
+
+
+
+
+
+# function do_standard_fallback(milestone_t::FT, milestone::AbstractSupersaturationLimiterMilestone, time_tolerance::FT, S_ql::FT, S_qi::FT, q_liq::FT, q_ice::FT, δ_eq::FT, δi_eq::FT, dδdt_no_S::FT, Γ_l::FT, Γ_i::FT,
+    # regime::AbstractSaturationRegime, param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState; use_fix::Bool = true, return_mixing_ratio::Bool = false, depth::Int = 0, dqvdt::FT = FT(0), dTdt::FT = FT(0), fallback_to_standard_supersaturation_limiter::Bool = false
+    # ) where {FT}
+
+
+
+import Pkg
+Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/integration_tests/"))
+# using OrderedCollections: OrderedCollections # is only available from /integration_tests/ so we have to load it here
+# Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/"))
+tc_dir = expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl")
+# Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/integration_tests/"))
+# include(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/src/TurbulenceConvection.jl")) 
+# using ForwardDiff # for netcdf.io
+# include(joinpath(tc_dir, "driver", "NetCDFIO.jl"))
+include(joinpath(tc_dir, "driver", "generate_namelist.jl"))
+include(joinpath(tc_dir, "driver", "Cases.jl"))
+include(joinpath(tc_dir, "driver", "parameter_set.jl"))
+include(joinpath(tc_dir, "driver", "dycore.jl"))
+toml_dict = CP.create_toml_dict(FT; dict_type = "alias")
+namelist = NameList.default_namelist("SOCRATES_RF09_Obs_data"; write = false) # we don't need a directory
+# namelist["root"] = thisdir
+# namelist["output"]["output_root"] = thisdir
+namelist["meta"] = Dict("simname" => "test_mm_2015", "uuid" => "")
+
+param_set = create_parameter_set(namelist, toml_dict, FT) # this creates an override file in  a directory we don' need...
+thermo_params = TCP.thermodynamics_params(param_set)
+
+
+FT = Float64; TCP = TC.TCP; 
+qi_tendency_sub_dep = 1.; qi =  1e-6; N = 200.; ρ = 1.; ql=FT(0); N_INP = 300.; q_s = 1e-5; μ = FT(0); Δt_factor = 1.; p_c = 1e5; ρ_c = 1.;
+Thermodynamics = TC.TD; Thermodynamics.PhasePartition{FT}(qt, ql, qi) where FT = Thermodynamics.PhasePartition(FT(qt), FT(ql), FT(qi))
+q = TD.PhasePartition{Float64}(0.0049504728062363, ql, qi);
+new_N_i = TC.adjust_ice_N(param_set, N, N_INP, q.ice; ρ=ρ, S_i=FT(0.05), q_l=ql, q_s=q_s, monodisperse=false, ice_type=TC.ice_type, decrease_N_if_subsaturated=true, N_INP_top=FT(150.))
+
+S_ql = 1.5740282460754777e-6; S_qi = 8.837601096511839e-8; area = 0.049966362669001334; ρ = 1.4607008779607433; p = 74651.29711651805; T = 178.1058319793084; w = 0.018706561325269898; τ_liq = 6.656910134239524e-9; τ_ice = 0.14858242869377136; q_vap = 5.095529671220612e-10; q = Thermodynamics.PhasePartition{Float64}(0.00020172170899797012, 5.7675685444915575e-9, 0.0002017154318764585); q_eq = Thermodynamics.PhasePartition{Float64}(0.00020172170899797012, 7.545234665120191e-8, 2.9644619882828738e-8); Δt = 0.007696511708622092; ts = Thermodynamics.PhaseNonEquil{Float64}(-68295.73889316698, 1.4607008779607433, Thermodynamics.PhasePartition{Float64}(0.00020172170899797012, 5.7675685444915575e-9, 0.0002017154318764585)); dqvdt = 1.2898707234822461e-5; dTdt = 0.01384903619503847
+q_liq = q.liq; q_ice = q.ice; δ_eq = q_vap - q_eq.liq; δi_eq = q_vap - q_eq.ice; dδdt_no_S = dqvdt; Γ_l = 1.7; Γ_i = 1.6; δ_0 = q_vap - q_eq.liq; δ_0i = q_vap - q_eq.ice; below_freezing = (T < TCP.T_freeze(param_set)); microphys_params = TCP.microphysics_params(param_set)
+q_vap_0 = q_vap_0 = q.tot -q.liq - q.ice + .00001
+regime = TC.get_regime(δ_0, δ_0i, q.liq, q.ice, below_freezing)
+
+milestone_t = FT(.001); milestone = TC.NotAtSupersaturationMilestone(); time_tolerance = FT(1e-6)
+# TC.do_standard_fallback(milestone_t, milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, dδdt_no_S, Γ_l, Γ_i, regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix=true, return_mixing_ratio=false, depth=0, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter=false )
+# TC.standard_supersaturation_sources(TC.StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) 
+
+
+use_fix = false
+fallback_to_standard_supersaturation_limiter = false
+
+for regime_type in (TC.Supersaturated, TC.WBF, TC.Subsaturated)
+    for has_liq in (true, false)
+        for has_ice in (true, false)
+            for below_freezing in (true, false)
+                regime = regime_type(has_liq, has_ice, below_freezing)
+                @info "regime = $(regime)"
+                @code_warntype TC.morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+            end
+        end
+    end
+end
+
+regime = TurbulenceConvection.WBF{false, false, true}(false, false, true)
+@code_warntype TC.morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)

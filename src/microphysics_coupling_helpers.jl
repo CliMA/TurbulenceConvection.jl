@@ -124,7 +124,7 @@ function n0(param_set::APS, q::FT, ρ::FT, precip::CMTWaterTypes, Nt::FT; μ::FT
 
     if !isnan(Nt) # aerosol inside each particle...
         r_min::FT = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
-        χm = get_χm(param_set, precip) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
+        χm::FT = get_χm(param_set, precip) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
         q_r_min = particle_mass(microphys_params, precip, r_min, χm)
         q += Nt * q_r_min
     end
@@ -324,8 +324,8 @@ function lambda(param_set::APS, precip::CMTWaterTypes, q::FT, ρ::FT, Nt::FT; Dm
 
     if !isnan(Nt) # aerosol inside each particle...
         r_min::FT = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
-        # _χm = get_χm(param_set, precip) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
-        _χm = isnan(_χm) ? get_χm(param_set, precip) : _χm
+        # _χm::FT = get_χm(param_set, precip) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
+        _χm::FT = isnan(_χm) ? get_χm(param_set, precip) : _χm
         q_r_min = particle_mass(microphys_params, precip, r_min, _χm)
         q += Nt*q_r_min
     end
@@ -689,10 +689,10 @@ function check_N_q_μ_feasibility(
     _χm = get_χm(param_set, q_type)
 
 
-    _m0 = m0(prs, q_type)
-    _r0 = r0(prs, q_type)
-    _me = me(prs, q_type)
-    _Δm = Δm(prs, q_type)
+    _m0::FT = m0(prs, q_type)
+    _r0::FT = r0(prs, q_type)
+    _me::FT = me(prs, q_type)
+    _Δm::FT = Δm(prs, q_type)
     c_mass = _χm * _m0 * _r0^(-(_me + _Δm)) # should be equal to χm * m0 * r0 ^(-(m_e + Δm))
     return check_N_q_μ_feasibility(q, N, μ, c_mass, _me; Dmin=Dmin, Dmax=Dmax)
 end

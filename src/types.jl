@@ -379,7 +379,7 @@ end
             We derive an upper limit for q_cloak_up such that q_cloak_dn >= 0.
                 This is:  q_cloak_up <= (qi_mean - a_up * q_updraft) / a_cloak_up
         =#
-Base.@kwdef struct CoreCloakAreaPartitionModel{FT} <: AbstractAreaPartitionModel
+struct CoreCloakAreaPartitionModel{FT} <: AbstractAreaPartitionModel
     # max_combined_updraft_area::FT # Might be hard to have this be separate from edmf.max_area...
     cloak_area_factor::FT # Scaling factor for how much larger the cloak area is than the core area
     cloak_dn_area_factor::FT # Scaling factor for the ratio of downdraft cloak to (updraft + updraft cloak) area. a_cloak_dn = cloak_dn_area_factor * (a_up + a_cloak_up) up to area limit
@@ -387,8 +387,8 @@ Base.@kwdef struct CoreCloakAreaPartitionModel{FT} <: AbstractAreaPartitionModel
     confine_all_downdraft_to_cloak::Bool # If true, all downdraft area is put into the cloak, if false, downdraft area is split between cloak and env based on remaining area.
     apply_second_order_flux_correction::Bool # If true, the fluxes from core and cloak are combined before computing gradients, otherwise gradients are computed separately and then combined. This is NOT as necessary for StandardAreaPartitionMode because we have prognostic up and env, though env is backed out so it kind of matters
     second_order_correction_limit_factor::FT # factor to limit the second order correction to avoid overshoots. 0 means no correction, 1 means full correction
-    apply_cloak_to_condensate_formation::Bool = true # Whether or not to apply the cloak area partitioning to condensate formation tendencies. Default true.
-    fraction_of_area_above_max_area_allowed_in_cloak::FT = FT(0.5)
+    apply_cloak_to_condensate_formation::Bool # Whether or not to apply the cloak area partitioning to condensate formation tendencies. Default true.
+    fraction_of_area_above_max_area_allowed_in_cloak::FT
 end
 
 """

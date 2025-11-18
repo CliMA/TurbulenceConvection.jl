@@ -697,9 +697,9 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
         _n0::FT = isnan(Nt) ? n0(prs, q, ρ, precip) : n0(param_set, q, ρ, precip, Nt; Dmin=Dmin, Dmax=Dmax, μ=μ)
 
         # what is n0 here?
-        _χa = χa(prs, precip)
-        _a0 = a0(prs, precip)
-        _r0 = r0(prs, precip)
+        _χa::FT = χa(prs, precip)
+        _a0::FT = a0(prs, precip)
+        _r0::FT = r0(prs, precip)
 
         # eq 20 from Chen et al 2022
         # k = 2 here bc a ∝ r^2

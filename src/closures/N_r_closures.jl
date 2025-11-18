@@ -270,11 +270,12 @@
 # CloudMicrophysics.jl:Microphysics1M tie-ins
 
 function get_r_cond_precip(param_set::APS, q_type::CMTWaterTypes)
+    FT = eltype(param_set)
 
     if (q_type isa CMT.LiquidType) || (q_type isa CMT.RainType)
-        return param_set.user_params.r_liq_rain
+        return FT(param_set.user_params.r_liq_rain)
     elseif (q_type isa CMT.IceType) || (q_type isa CMT.SnowType)
-        return CMP.r_ice_snow(TCP.microphysics_params(param_set))
+        return FT(CMP.r_ice_snow(TCP.microphysics_params(param_set)))
     else
         error("Unknown water type for r_threshold: $q_type")
     end
@@ -282,6 +283,7 @@ end
 get_r_cond_precip(microphys_params::ACMP, q_type::Union{CMT.IceType, CMT.SnowType}) = CMP.r_ice_snow(microphys_params)
 
 function get_autoconversion_timescale(microphys_params::ACMP, q_type::CMTWaterTypes)
+    # FT = eltype(microphys_params)
     if (q_type isa CMT.LiquidType) || (q_type isa CMT.RainType)
         return CMP.τ_acnv_rai(microphys_params)
     elseif (q_type isa CMT.IceType) || (q_type isa CMT.SnowType)
@@ -293,12 +295,13 @@ end
 get_autoconversion_timescale(param_set::APS, q_type::CMTWaterTypes) = get_autoconversion_timescale(TCP.microphysics_params(param_set), q_type)
 
 function get_χm(param_set::APS, q_type::CMTWaterTypes)
+    FT = eltype(param_set)
     if (q_type isa CMT.LiquidType)
         microphys_params = TCP.microphysics_params(param_set)
-        return param_set.user_params.χm_liq
+        return FT(param_set.user_params.χm_liq)
     else
         microphys_params = TCP.microphysics_params(param_set)
-        return CM1.χm(microphys_params, q_type)
+        return FT(CM1.χm(microphys_params, q_type))
     end
 end
 get_χm(microphys_params::ACMP, q_type::Union{CMT.IceType, CMT.AbstractPrecipType}) = χm(microphys_params, q_type)
@@ -315,10 +318,10 @@ function particle_mass(microphys_params::ACMP, q_type::CMTWaterTypes, r::FT, χm
     Mass of a single droplet.
     Not defined in CM1 for liquid
     """
-    _r0 = r0(microphys_params, q_type)
-    _m0 = m0(microphys_params, q_type)
-    _me = me(microphys_params, q_type)
-    _Δm = Δm(microphys_params, q_type)
+    _r0::FT = r0(microphys_params, q_type)
+    _m0::FT = m0(microphys_params, q_type)
+    _me::FT = me(microphys_params, q_type)
+    _Δm::FT = Δm(microphys_params, q_type)
     return χm * _m0 * (r/_r0)^(_me + _Δm)
 end
 particle_mass(microphys_params::ACMP, q_type::Union{CMT.IceType, CMT.AbstractPrecipType}, r::FT) where FT = particle_mass(microphys_params, q_type, r, CM1.χm(microphys_params, q_type))
@@ -337,10 +340,10 @@ function particle_radius_from_mass(microphys_params::ACMP, q_type::CMTWaterTypes
     """
 
 
-    _m0 = m0(microphys_params, q_type)
-    _me = me(microphys_params, q_type)
-    _Δm = Δm(microphys_params, q_type)
-    _r0 = r0(microphys_params, q_type)
+    _m0::FT = m0(microphys_params, q_type)
+    _me::FT = me(microphys_params, q_type)
+    _Δm::FT = Δm(microphys_params, q_type)
+    _r0::FT = r0(microphys_params, q_type)
 
     return _r0 * (m / (χm * _m0))^(1 / (_me + _Δm))
 end
@@ -354,10 +357,10 @@ function radius_from_mass(microphys_params::ACMP, q_type::CMTWaterTypes, q::FT, 
     else
         if iszero(Dmin) && isinf(Dmax)
             # we know <q> = ...
-            _m0 = m0(microphys_params, q_type)
-            _me = me(microphys_params, q_type)
-            _Δm = Δm(microphys_params, q_type)
-            _r0 = r0(microphys_params, q_type)
+            _m0::FT = m0(microphys_params, q_type)
+            _me::FT = me(microphys_params, q_type)
+            _Δm::FT = Δm(microphys_params, q_type)
+            _r0::FT = r0(microphys_params, q_type)
 
             factor = (χm * _m0 / ρ) * _r0^(-(_me + _Δm))
             G_num = CM1.SF.gamma(μ + _me + _Δm + 1)
@@ -383,10 +386,10 @@ function particle_area(microphys_params::ACMP, q_type::CMTWaterTypes, r::FT, χa
     Not defined in CM1 for liquid or ice
     """
 
-    _a0 = a0(microphys_params, q_type)
-    _r0 = r0(microphys_params, q_type)
-    _ae = ae(microphys_params, q_type)
-    _Δa = Δa(microphys_params, q_type)
+    _a0::FT = a0(microphys_params, q_type)
+    _r0::FT = r0(microphys_params, q_type)
+    _ae::FT = ae(microphys_params, q_type)
+    _Δa::FT = Δa(microphys_params, q_type)
     return χa * _a0 * (r/_r0)^(_Δa + _ae)
 end
 particle_area(microphys_params::ACMP, q_type::CMT.AbstractPrecipType, r::FT) where FT = particle_area(microphys_params, q_type, r, CM1.χa(microphys_params, q_type))
@@ -1189,13 +1192,13 @@ function my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep_old(
         n0, λ = get_n0_lambda(microphys_params, ice_type, q, ρ_a, N, μ; Dmax=Dmax)
 
         
-        _r0 = r0(microphys_params, ice_type)
-        _m0 = m0(microphys_params, ice_type)
-        _me = me(microphys_params, ice_type)
-        _Δm = Δm(microphys_params, ice_type)
-        _χm = χm(microphys_params, ice_type)
+        _r0::FT = r0(microphys_params, ice_type)
+        _m0::FT = m0(microphys_params, ice_type)
+        _me::FT = me(microphys_params, ice_type)
+        _Δm::FT = Δm(microphys_params, ice_type)
+        _χm::FT = χm(microphys_params, ice_type)
 
-        r_is = CMP.r_ice_snow(microphys_params)
+        r_is::FT = CMP.r_ice_snow(microphys_params)
 
         # particle mass at threshold
         m_r_is = _χm * _m0 * (r_is/_r0)^(_me + _Δm)
@@ -1325,9 +1328,9 @@ function invert__my_conv_q_ice_to_q_sno_at_r_is_given_qi_tendency_sub_dep__to_N(
         end
 
         # --- coefficients from microphys_params
-        _m0  = m0(microphys_params, ice_type)
-        _χm  = χm(microphys_params, ice_type)
-        _r0  = r0(microphys_params, ice_type)
+        _m0::FT  = m0(microphys_params, ice_type)
+        _χm::FT  = χm(microphys_params, ice_type)
+        _r0::FT  = r0(microphys_params, ice_type)
 
         # Prefactor C
         C = _m0 * _χm * _r0^(-p) * CM1.SF.gamma(p + 1)
@@ -1644,11 +1647,11 @@ function get_T_top_from_N_i(
         N_top = q_i * ρ / _q_is
     else
         λ = (μ + FT(1)) / r_is # this is the scaling factor for the radius, so we can use it to get n0
-        _χm = get_χm(param_set, ice_type) # this is the mass scaling factor, so we can use it to get n0
-        _m0 = m0(microphys_params, ice_type) # this is the mass of the ice crystal at the acnv radius
-        _r0 = r0(microphys_params, ice_type) # this is the radius of the ice crystal at the acnv radius
-        _me = me(microphys_params, ice_type) # this is the exponent for the mass of the ice crystal
-        _Δm = Δm(microphys_params, ice_type) # this is the exponent for the mass of the ice crystal
+        _χm::FT = get_χm(param_set, ice_type) # this is the mass scaling factor, so we can use it to get n0
+        _m0::FT = m0(microphys_params, ice_type) # this is the mass of the ice crystal at the acnv radius
+        _r0::FT = r0(microphys_params, ice_type) # this is the radius of the ice crystal at the acnv radius
+        _me::FT = me(microphys_params, ice_type) # this is the exponent for the mass of the ice crystal
+        _Δm::FT = Δm(microphys_params, ice_type) # this is the exponent for the mass of the ice crystal
         N_top = (q_i * ρ) / (_χm * _m0 * _r0^(-(_me + _Δm)) * (CM1.SF.gamma(μ + _me + _Δm + FT(1)) / CM1.SF.gamma(μ + FT(1))) * λ^(-(_me + _Δm))) # this is the number concentration of ice crystals at the acnv radius
     end
     # Now we would just need to get T_top. For the exponential and powerlaw T-scalings it's easy... otherwise it's hard.
@@ -1792,11 +1795,11 @@ function N_from_qr(param_set::APS, q_type::CMTWaterTypes, q::FT, r::FT; monodisp
 
         if (iszero(Dmin) && isinf(Dmax))
             λ = (μ + FT(1)) / r # this is the scaling factor for the radius, so we can use it to get n0
-            _χm = get_χm(param_set, ice_type) # this is the mass scaling factor, so we can use it to get n0
-            _m0 = m0(microphys_params, ice_type) # this is the mass of the ice crystal at the acnv radius
-            _r0 = r0(microphys_params, ice_type) # this is the radius of the ice crystal at the acnv radius
-            _me = me(microphys_params, ice_type) # this is the exponent for the mass of the ice crystal
-            _Δm = Δm(microphys_params, ice_type) # this is the exponent for the mass of the ice crystal
+            _χm::FT = get_χm(param_set, ice_type) # this is the mass scaling factor, so we can use it to get n0
+            _m0::FT = m0(microphys_params, ice_type) # this is the mass of the ice crystal at the acnv radius
+            _r0::FT = r0(microphys_params, ice_type) # this is the radius of the ice crystal at the acnv radius
+            _me::FT = me(microphys_params, ice_type) # this is the exponent for the mass of the ice crystal
+            _Δm::FT = Δm(microphys_params, ice_type) # this is the exponent for the mass of the ice crystal
 
             Dmin = (add_dry_aerosol_mass ? max(param_set.user_params.particle_min_radius, Dmin) : Dmin)
             if iszero(Dmin)
@@ -2028,6 +2031,7 @@ function adjust_ice_N(
         # [[ if we do not expand this range, then by only ever setting r to maybe 5% over r_thresh, \tau_acnv_thresh can be slower... but keep in mind <r> gets diagnosed at the same time as the tendency so you don't wanna let it go too far overboard because the diagnosed value will stick since it's diagnosed and not prognosed. the LES looks like maybe 80 micron peak and activating around 70 micron.. this thresh scaling allows activation w/o having to boost N_i or anything ]]
 
         if monodisperse
+            μ = FT(NaN) # not used in monodisperse case
             _q_acnv_0_ = q_acnv_0(param_set, ice_type, r_acnv_scaling_factor) # this is the volume of a single ice crystal at the acnv radius, so N * q_acnv_0 = q_threshold
             N_i_acnv = (q_i * ρ) / _q_acnv_0_ # make sure existing ice contributes to the size, particularly w/ sedimentation bringing in new ice
         
@@ -2388,11 +2392,11 @@ function adjust_liq_N(
         r_lr::FT = param_set.user_params.r_liq_rain # There is no r_lr for liquid...instead we just set it in user_params.
         λ = (μ + FT(1)) / r_lr
 
-        _χm = get_χm(param_set, liq_type) 
-        _m0 = m0(microphys_params, liq_type)
-        _r0 = r0(microphys_params, liq_type) 
-        _me = me(microphys_params, liq_type) 
-        _Δm = Δm(microphys_params, liq_type) 
+        _χm::FT = get_χm(param_set, liq_type) 
+        _m0::FT = m0(microphys_params, liq_type)
+        _r0::FT = r0(microphys_params, liq_type) 
+        _me::FT = me(microphys_params, liq_type) 
+        _Δm::FT = Δm(microphys_params, liq_type) 
         N_lr = (q_l * ρ) / (_χm * _m0 * _r0^(-(_me + _Δm)) * (CM1.SF.gamma(μ + _me + _Δm + FT(1)) / CM1.SF.gamma(μ + FT(1))) * λ^(-(_me + _Δm))) # this is the number concentration of ice crystals at the ice-snow radius
         N_l = max(N_l, N_lr) # make sure we don't get too many liquid droplets
     end
@@ -2495,7 +2499,7 @@ function r_from_q(param_set::APS, q_type::CMTWaterTypes, q::FT) where {FT}
     """
     r_min::FT = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
     microphys_params::ACMP = TCP.microphysics_params(param_set)
-    χm = get_χm(param_set, q_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
+    χm::FT = get_χm(param_set, q_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
     q_r_min = particle_mass(microphys_params, q_type, r_min, χm) # this is the volume of a single droplet with radius r_min, so we add it to q to get the effective q
     return particle_radius_from_mass(microphys_params, q_type, q+q_r_min, χm) # we use q=0 to get the mean radius for the given N
 end
@@ -2515,18 +2519,18 @@ function q_from_rN(param_set::APS, q_type::CMTWaterTypes, r::FT, N::FT; monodisp
     else
         r_min::FT = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
         microphys_params::ACMP = TCP.microphysics_params(param_set)
-        # _χm = get_χm(param_set, q_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
-        _χm = isnan(_χm) ? get_χm(param_set, q_type) : _χm
+        # _χm::FT = get_χm(param_set, q_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
+        _χm::FT = isnan(_χm) ? get_χm(param_set, q_type) : _χm
         if r > r_min
             if monodisperse
                 return mass(microphys_params, q_type, r, N, _χm; monodisperse=true) - mass(microphys_params, q_type, r_min, N, _χm; monodisperse=true) # we subtract the r_min radius sphere volume to get the effective q
             else
                 # _χm = get_χm(param_set, q_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
-                _χm = isnan(_χm) ? get_χm(param_set, q_type) : _χm
-                _m0 = m0(microphys_params, q_type) # this is the mass of the droplet at the acnv radius
-                _r0 = r0(microphys_params, q_type) # this is the radius of the droplet at the acnv radius
-                _me = me(microphys_params, q_type)
-                _Δm = Δm(microphys_params, q_type)
+                # _χm::FT = isnan(_χm) ? get_χm(param_set, q_type) : _χm
+                _m0::FT = m0(microphys_params, q_type) # this is the mass of the droplet at the acnv radius
+                _r0::FT = r0(microphys_params, q_type) # this is the radius of the droplet at the acnv radius
+                _me::FT = me(microphys_params, q_type)
+                _Δm::FT = Δm(microphys_params, q_type)
                 _λ = (μ+1) / r
                 _n0 = n0_from_Nλ(N, _λ; μ=μ)
 
@@ -2553,7 +2557,7 @@ function q_from_r(param_set::APS, q_type::CMTWaterTypes, r::FT) where {FT}
     r_min::FT = param_set.user_params.particle_min_radius # this is the minimum radius we want to consider, if r < r_min, we return 0
     if r > r_min
         microphys_params::ACMP = TCP.microphysics_params(param_set)
-        χm = get_χm(param_set, q_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
+        χm::FT = get_χm(param_set, q_type) # this is the mass scaling factor for the mass diameter relationship, so we can use it to scale the mean radius
         return particle_mass(microphys_params, q_type, r, χm) - particle_mass(microphys_params, q_type, r_min, χm) # we subtract the r_min radius sphere volume to get the effective q
     else
         return FT(0) # consider erroring for r < r_min
