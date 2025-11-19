@@ -38,14 +38,35 @@ Subsaturated(has_liquid::Bool, has_ice::Bool, below_freezing::Bool) = Subsaturat
 
 
 # -=-=- Milestones -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
-abstract type AbstractSupersaturationLimiterMilestone end
-struct NotAtSupersaturationMilestone <: AbstractSupersaturationLimiterMilestone end
-struct OutOfLiquid <: AbstractSupersaturationLimiterMilestone end
-struct OutOfIce <: AbstractSupersaturationLimiterMilestone end
-struct AtSaturationOverLiquid <: AbstractSupersaturationLimiterMilestone end
-struct AtSaturationOverIce <: AbstractSupersaturationLimiterMilestone end
-struct AtSupersaturationStationaryPoint <: AbstractSupersaturationLimiterMilestone end
-struct OutofVapor <: AbstractSupersaturationLimiterMilestone end
+# abstract type AbstractSupersaturationLimiterMilestone end
+# struct NotAtSupersaturationMilestone <: AbstractSupersaturationLimiterMilestone end
+# struct OutOfLiquidMilestone <: AbstractSupersaturationLimiterMilestone end
+# struct OutOfIceMilestone <: AbstractSupersaturationLimiterMilestone end
+# struct AtSaturationOverLiquidMilestone <: AbstractSupersaturationLimiterMilestone end
+# struct AtSaturationOverIceMilestone <: AbstractSupersaturationLimiterMilestone end
+# struct AtSupersaturationStationaryPointMilestone <: AbstractSupersaturationLimiterMilestone end
+# # struct OutofVapor <: AbstractSupersaturationLimiterMilestone end # Not used rn.
+# const ValidMilestones = Union{OutOfLiquidMilestone, OutOfIceMilestone, AtSaturationOverLiquidMilestone, AtSaturationOverIceMilestone, AtSupersaturationStationaryPointMilestone, NotAtSupersaturationMilestone}
+
+
+#= 
+    For Type Stability, use an enum since these are singleton subtypes with no subfieldtypes, 
+    Also this keeps the number on its own, you can do MilestoneType(int) and get the number, and define your own helper methods (e.g. if we ever want to go back to types bc we have fields or something).
+    These type instances are available globally already.
+
+    If we ever were to add fields to the milestones, we could either keep the enum and define helper conversion methods, or have a dictionary to help us map back and forth between integers and type instance.
+
+    The `enum` dict is techincally available at Base.Enums.Enums.namemap(MilestoneType) , which you could see from doing `@macroexpand @enum MilestoneType ... end``
+=#
+@enum MilestoneType begin
+    OutOfLiquidMilestone
+    OutOfIceMilestone
+    AtSaturationOverLiquidMilestone
+    AtSaturationOverIceMilestone
+    AtSupersaturationStationaryPointMilestone
+    NotAtSupersaturationMilestone
+end
+
 
 
 # ==== Methods ============================================================================================================================================================================================== #

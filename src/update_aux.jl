@@ -712,9 +712,7 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
 
 
     end
-    # ===================================================================================================================================== #
-
-
+    # ===================================================================================================================================== 
 
 
     ### == ZERO OUT MIROPHYSICS TENDENCIES ========================================================================================== #
@@ -722,8 +720,10 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
     # aux_en.ql_tendency_noneq .= FT(0) # don't zero this out  bc it seeemd to break the output writing (some order of read, calculate gm, write, zero out problem probably...)
     # aux_en.qi_tendency_noneq .= FT(0) # don't zero this out  bc it seeemd to break the output writing (some order of read, calculate gm, write, zero out problem probably...)
     #
-    aux_en.ql_tendency_cond_evap .= FT(0)
-    aux_en.qi_tendency_sub_dep .= FT(0)
+    # aux_en.ql_tendency_cond_evap .= FT(0)
+    # aux_en.qi_tendency_sub_dep .= FT(0)
+    zero_field!(aux_en.ql_tendency_cond_evap) # can use this in the future
+    zero_field!(aux_en.qi_tendency_sub_dep)
     #
     aux_en.ql_tendency_sedimentation .= FT(0)
     aux_en.qi_tendency_sedimentation .= FT(0)

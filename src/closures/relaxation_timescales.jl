@@ -57,7 +57,7 @@ get_τs(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, t
 
 function get_τs(param_set::APS, microphys_params::ACMP, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT; N_l::FT = FT(NaN), N_i_raw::FT = FT(NaN), N_i_adjusted::FT = FT(NaN), N_INP_top::FT = FT(NaN), f_ice_mult::FT = FT(1), q_sno::FT = FT(0), massflux::FT = FT(0), dTdz::FT = FT(0), w_i::FT = FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+    q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
     p::FT = TD.air_pressure(thermo_params, ts) 
     ρ::FT = TD.air_density(thermo_params, ts)
@@ -432,7 +432,7 @@ end
 # end
 function get_N_i(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT = FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+    q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
     # p::FT = TD.air_pressure(thermo_params, ts) 
     ρ::FT = TD.air_density(thermo_params, ts)
@@ -441,7 +441,7 @@ end
 
 function get_N_i_and_N_i_no_boost(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT = FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+    q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
     # p::FT = TD.air_pressure(thermo_params, ts) 
     ρ::FT = TD.air_density(thermo_params, ts)
@@ -453,7 +453,7 @@ end
 
 function get_N_i_raw_and_adjusted(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT = FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+    q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
     # p::FT = TD.air_pressure(thermo_params, ts) 
     ρ::FT = TD.air_density(thermo_params, ts)
@@ -462,7 +462,7 @@ end
 
 function get_N_i_raw_and_adjusted_and_N_i_no_boost(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT = FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+    q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
     # p::FT = TD.air_pressure(thermo_params, ts) 
     ρ::FT = TD.air_density(thermo_params, ts)
@@ -471,7 +471,7 @@ end
 
 function get_N_i_raw(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+    q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
     # p::FT = TD.air_pressure(thermo_params, ts) 
     ρ::FT = TD.air_density(thermo_params, ts)
@@ -484,7 +484,7 @@ end
 # end
 function get_N_l(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+    q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
     # p::FT = TD.air_pressure(thermo_params, ts) 
     ρ::FT = TD.air_density(thermo_params, ts)
@@ -493,7 +493,7 @@ end
 
 function get_N_l_raw_and_adjusted(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+    q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
     # p::FT = TD.air_pressure(thermo_params, ts) 
     ρ::FT = TD.air_density(thermo_params, ts)
@@ -502,7 +502,7 @@ end
 
 function get_N_l_raw(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+    q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
     # p::FT = TD.air_pressure(thermo_params, ts) 
     ρ::FT = TD.air_density(thermo_params, ts)
@@ -917,7 +917,7 @@ end
 
 function get_Ns(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT = FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+    q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
     # p::FT = TD.air_pressure(thermo_params, ts) 
     ρ::FT = TD.air_density(thermo_params, ts)
@@ -926,7 +926,7 @@ end
 
 function get_Ns_and_N_i_no_boost(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT = FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+    q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
     # p::FT = TD.air_pressure(thermo_params, ts) 
     ρ::FT = TD.air_density(thermo_params, ts)
@@ -935,7 +935,7 @@ end
 
 function get_Ns_raw_and_adjusted(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT = FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+    q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
     # p::FT = TD.air_pressure(thermo_params, ts) 
     ρ::FT = TD.air_density(thermo_params, ts)
@@ -944,7 +944,7 @@ end
 
 function get_Ns_raw_and_adjusted_and_N_i_no_boost(param_set::APS, relaxation_timescale::AbstractRelaxationTimescaleType, ts::TD.ThermodynamicState, w::FT; N_INP_top::FT = FT(NaN), f_ice_mult::FT=FT(1), q_sno::FT=FT(0), massflux::FT=FT(0), dTdz::FT=FT(0), w_i::FT=FT(0), apply_massflux_boost::Bool=false, apply_sedimentation_boost::Bool=false) where {FT}
     thermo_params::TDPS = TCP.thermodynamics_params(param_set)
-    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+    q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
     T::FT = TD.air_temperature(thermo_params, ts)
     # p::FT = TD.air_pressure(thermo_params, ts) 
     ρ::FT = TD.air_density(thermo_params, ts)

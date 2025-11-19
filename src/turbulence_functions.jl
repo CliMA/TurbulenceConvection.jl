@@ -122,9 +122,9 @@ Perhaps what you'd want to pass in to avoid some complexity is the latent heatin
 """
 function moist_gradient_Richardson_number(mixing_length_params, param_set::APS, ts::TD.ThermodynamicState, qr::FT, qs::FT, ∂b∂z::FT, ∂MSE∂z::FT, Shear²::FT, ϵ::FT; is_noneq::Bool=true, RH_liq::FT=FT(NaN), RH_ice::FT=FT(NaN), T::FT = FT(NaN)) where {FT}
     thermo_params = TCP.thermodynamics_params(param_set)
-    T_freeze = TCP.T_freeze(param_set)
+    T_freeze::FT = TCP.T_freeze(param_set)
     T::FT = isnan(T) ? TD.air_temperature(thermo_params, ts) : T
-    q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+    q = TD.PhasePartition(thermo_params, ts)
 
     below_freezing = (T < T_freeze)
     q_min = FT(1e-10) # a reasonable minimum for thermodynamic activity

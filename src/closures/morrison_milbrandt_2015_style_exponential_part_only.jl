@@ -24,7 +24,7 @@ This is in line w/ neglecting T changes, unlike the other regular MM2015 that fi
 
 
 
-function do_standard_fallback(milestone_t::FT, milestone::AbstractSupersaturationLimiterMilestone, time_tolerance::FT, S_ql::FT, S_qi::FT, q_liq::FT, q_ice::FT, δ_eq::FT, δi_eq::FT, dδdt_no_S::FT, Γ_l::FT, Γ_i::FT,
+function do_standard_fallback(milestone_t::FT, milestone::MilestoneType, time_tolerance::FT, S_ql::FT, S_qi::FT, q_liq::FT, q_ice::FT, δ_eq::FT, δi_eq::FT, dδdt_no_S::FT, Γ_l::FT, Γ_i::FT,
     regime::AbstractSaturationRegime, param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState; use_fix::Bool = true, return_mixing_ratio::Bool = false, depth::Int = 0, dqvdt::FT = FT(0), dTdt::FT = FT(0), fallback_to_standard_supersaturation_limiter::Bool = false
     ) where {FT}
 
@@ -36,12 +36,12 @@ function do_standard_fallback(milestone_t::FT, milestone::AbstractSupersaturatio
 
     # do step
     dt = min(milestone_t, Δt)
-    q_liq, q_ice, δ_0, δ_0i, new_regime = step(regime, StandardSupersaturationMoistureSourcesLimiter(), dt, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, q_eq, S_ql, S_qi, ((milestone_t < Δt) ? milestone : NotAtSupersaturationMilestone()); dδdt_no_S=dδdt_no_S, Γ_l=Γ_l, Γ_i=Γ_i) # if milestone_t < Δt then we do the step, otherwise we don't (we just return the current state)
+    q_liq, q_ice, δ_0, δ_0i, new_regime = step(regime, StandardSupersaturationMoistureSourcesLimiter(), dt, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, q_eq, S_ql, S_qi, ((milestone_t < Δt) ? milestone : NotAtSupersaturationMilestone); dδdt_no_S=dδdt_no_S, Γ_l=Γ_l, Γ_i=Γ_i) # if milestone_t < Δt then we do the step, otherwise we don't (we just return the current state)
     Δt_left = Δt - dt
 
     @debug("status: regime = $regime; milestone = $milestone; regime.below_freezing = $(regime.below_freezing); q_liq = $q_liq; q_ice = $q_ice; q_eq = $q_eq; S_ql = $S_ql; S_qi = $S_qi; δ_0 = $δ_0; δ_0i = $δ_0i; Δt_left = $Δt_left; dt = $dt; Γ_l = $Γ_l; Γ_i = $Γ_i; dqvdt = $dqvdt; dTdt = $dTdt; T = $T; p = $p; area = $area; ρ = $ρ; τ_liq = $τ_liq; τ_ice = $τ_ice; dδdt_no_S = $dδdt_no_S")
 
-    if (milestone isa AtSupersaturationStationaryPoint) && (Δt_left > 0) # hit eq point, not a real milestone for morrison milbrandt (only for standard) so we still want to continue on to the next milestone
+    if (milestone == AtSupersaturationStationaryPointMilestone) && (Δt_left > 0) # hit eq point, not a real milestone for morrison milbrandt (only for standard) so we still want to continue on to the next milestone
         # do this again
         milestone_t, milestone, S_ql_addit, S_qi_addit, δ_eq, δi_eq = calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, regime.below_freezing, τ_liq, τ_ice; dδdt_no_S = dδdt_no_S, Γ_l=Γ_l, Γ_i=Γ_i, at_δ_eq_point = true) # can we use the sources we already have here?
         @debug "milestone_t = $milestone_t; milestone = $milestone; S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit; δ_eq=$δ_eq; δi_eq=$δi_eq"
@@ -66,7 +66,7 @@ function do_standard_fallback(milestone_t::FT, milestone::AbstractSupersaturatio
         # do step
         dt_here = min(milestone_t - dt, Δt_left) # go up to the milestone time, but not past the remaining time
         Δt_left -= dt_here
-        q_liq, q_ice, δ_0, δ_0i, new_regime = step(new_regime, StandardSupersaturationMoistureSourcesLimiter(), dt_here, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, q_eq, S_ql_addit, S_qi_addit, ((milestone_t < Δt_left) ? milestone : NotAtSupersaturationMilestone()); at_δ_eq_point = true, dδdt_no_S=dδdt_no_S, Γ_l=Γ_l, Γ_i=Γ_i) # if milestone_t < Δt_left then we do the step, otherwise we don't (we just return the current state)
+        q_liq, q_ice, δ_0, δ_0i, new_regime = step(new_regime, StandardSupersaturationMoistureSourcesLimiter(), dt_here, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, q_eq, S_ql_addit, S_qi_addit, ((milestone_t < Δt_left) ? milestone : NotAtSupersaturationMilestone); at_δ_eq_point = true, dδdt_no_S=dδdt_no_S, Γ_l=Γ_l, Γ_i=Γ_i) # if milestone_t < Δt_left then we do the step, otherwise we don't (we just return the current state)
         S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, dt, S_ql_addit, S_qi_addit, dt_here, dt + dt_here) # rescale to the timestep
         dt += dt_here
 
@@ -75,7 +75,7 @@ function do_standard_fallback(milestone_t::FT, milestone::AbstractSupersaturatio
         # regime = add_regime_parameters(get_new_regime_type_from_milestone(milestone, regime, δ_0, δ_0i ), q_liq, q_ice, regime.below_freezing) # add the parameters to the regime [[ i think this way is safer as it assures transitions ]]
         # end
 
-        !(milestone isa AtSupersaturationStationaryPoint) || error("milestone should not be AtSupersaturationStationaryPoint() here, i dont think you should be able to get AtSupersaturationStationaryPoint() twice in a row")
+        !(milestone == AtSupersaturationStationaryPointMilestone) || error("milestone should not be AtSupersaturationStationaryPoint() here, i dont think you should be able to get AtSupersaturationStationaryPoint() twice in a row")
     end
 
 
@@ -722,7 +722,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # ===== Fallback Block ===== #
     standard_milestone_t, standard_milestone, S_ql, S_qi, δ_eq, δi_eq = calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, T<T_freeze, τ_liq, τ_ice; dδdt_no_S = A_c_no_WBF, Γ_l=Γ_l, Γ_i=Γ_i, allow_δ_eq_point = true) # we need to allow the eq point because otherwise we risk WBF oscillations, see note in do_standard_fallback()
     @debug "standard_milestone_t = $standard_milestone_t; standard_milestone = $standard_milestone; A_c = $A_c; τ = $τ; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; dqvdt = $dqvdt; dTdt = $dTdt"
-    if (standard_milestone_t < time_tolerance) && !(standard_milestone isa NotAtSupersaturationMilestone) && !(standard_milestone isa AtSupersaturationStationaryPoint) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
+    if (standard_milestone_t < time_tolerance) && !(standard_milestone == NotAtSupersaturationMilestone) && !(standard_milestone == AtSupersaturationStationaryPointMilestone) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
         @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c_no_WBF, Γ_l, Γ_i,
@@ -735,7 +735,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
     @debug "t_hit_liq_sat = $t_hit_liq_sat; A_c = $A_c; A_c_no_WBF = $A_c_no_WBF; τ = $τ; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q_sl = $q_sl; q_si = $q_si; q_liq = $q_liq; q_ice = $q_ice; Δt = $Δt; dqvdt = $dqvdt; dTdt = $dTdt; Γ_l = $Γ_l; Γ_i = $Γ_i"
 
-    min_t, i_min_t = find_min_t([t_hit_liq_sat])  # find_min_t helps resolve if min_t is 0 for example, don't skip this call
+    min_t, i_min_t = find_min_t(t_hit_liq_sat)  # find_min_t helps resolve if min_t is 0 for example, don't skip this call
     if min_t < Δt
         @debug "will hit liq sat before timestep is over... will transition to wbf at t = $(t_hit_liq_sat)..."
         S_ql = S_ql_func_EPA( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # This includes the wbf part though...
@@ -811,7 +811,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # ===== Fallback Block ===== #
     standard_milestone_t, standard_milestone, S_ql, S_qi, δ_eq, δi_eq = calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, T<T_freeze, τ_liq, τ_ice; dδdt_no_S = A_c_no_WBF, Γ_l=Γ_l, Γ_i=Γ_i, allow_δ_eq_point = true) # we need to allow the eq point because otherwise we risk WBF oscillations, see note in do_standard_fallback()
     @debug "standard_milestone_t = $standard_milestone_t; standard_milestone = $standard_milestone; A_c = $A_c; τ = $τ; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; dqvdt = $dqvdt; dTdt = $dTdt"
-    if (standard_milestone_t < time_tolerance) && !(standard_milestone isa NotAtSupersaturationMilestone) && !(standard_milestone isa AtSupersaturationStationaryPoint) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
+    if (standard_milestone_t < time_tolerance) && !(standard_milestone == NotAtSupersaturationMilestone) && !(standard_milestone == AtSupersaturationStationaryPointMilestone) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
         @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c, Γ_l, Γ_i,
@@ -821,11 +821,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # =========================== #
 
 
-    # t_hit_liq_sat = t_δ_hit_value(FT(0), δ_0, A_c, τ_liq) # Eq C5 (can only happen bc of A_c) we're above freezing so we hit ice sat first?
-    # min_t, i_min_t = find_min_t([t_hit_liq_sat])  # find_min_t helps resolve if min_t is 0 for example, don't skip this call
-
     t_hit_ice_sat = t_δ_hit_value(q_si - q_sl, δ_0, A_c, τ_liq) # Eq C5 (can only happen bc of A_c) [ we're above freezing so we hit ice sat first?]
-    min_t, i_min_t = find_min_t([t_hit_ice_sat])  # find_min_t helps resolve if min_t is 0 for example, don't skip this call
+    min_t, i_min_t = find_min_t(t_hit_ice_sat)  # find_min_t helps resolve if min_t is 0 for example, don't skip this call
 
     if min_t < Δt # bc of A_c
 
@@ -901,7 +898,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # ===== Fallback Block ===== #
     standard_milestone_t, standard_milestone, S_ql, S_qi, δ_eq, δi_eq = calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, T<T_freeze, τ_liq, τ_ice; dδdt_no_S = A_c_no_WBF, Γ_l=Γ_l, Γ_i=Γ_i, allow_δ_eq_point = true) # we need to allow the eq point because otherwise we risk WBF oscillations, see note in do_standard_fallback()
     @debug "standard_milestone_t = $standard_milestone_t; standard_milestone = $standard_milestone; A_c = $A_c; τ = $τ; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; dqvdt = $dqvdt; dTdt = $dTdt"
-    if (standard_milestone_t < time_tolerance) && !(standard_milestone isa NotAtSupersaturationMilestone) && !(standard_milestone isa AtSupersaturationStationaryPoint) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
+    if (standard_milestone_t < time_tolerance) && !(standard_milestone == NotAtSupersaturationMilestone) && !(standard_milestone == AtSupersaturationStationaryPointMilestone) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
         @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c_no_WBF, Γ_l, Γ_i,
@@ -938,9 +935,8 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # can run out of liq or reach equilibrium (but you'll never reach equilibrium right?)
     # can't reach ice sat bc liq evap would pull you up, can't hit liq sat bc ice would pull you down. equil is guaranteed to be between 0 and (q_sl - q_si) [see writeup]
 
-    # min_t, i_min_t = find_min_t([t_out_of_liq]) # find_min_t helps resolve if min_t is 0 for example, don't skip this call
 
-    min_t, i_min_t = find_min_t([t_out_of_liq, t_hit_liq_sat, t_hit_ice_sat ])  # find_min_t helps resolve if min_t is 0 for example, don't skip this call
+    min_t, i_min_t = find_min_t(t_out_of_liq, t_hit_liq_sat, t_hit_ice_sat )  # find_min_t helps resolve if min_t is 0 for example, don't skip this call
 
     @debug "min_t = $min_t; i_min_t = $i_min_t; t_out_of_liq = $t_out_of_liq;  t_hit_liq_sat = $t_hit_liq_sat; t_hit_ice_sat = $t_hit_ice_sat; Δt = $Δt"
 
@@ -1067,7 +1063,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # ===== Fallback Block ===== #
     standard_milestone_t, standard_milestone, S_ql, S_qi, δ_eq, δi_eq = calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, T<T_freeze, τ_liq, τ_ice; dδdt_no_S = A_c_no_WBF, Γ_l=Γ_l, Γ_i=Γ_i, allow_δ_eq_point = true) # we need to allow the eq point because otherwise we risk WBF oscillations, see note in do_standard_fallback()
     @debug "standard_milestone_t = $standard_milestone_t; standard_milestone = $standard_milestone; A_c = $A_c; τ = $τ; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; dqvdt = $dqvdt; dTdt = $dTdt"
-    if (standard_milestone_t < time_tolerance) && !(standard_milestone isa NotAtSupersaturationMilestone) && !(standard_milestone isa AtSupersaturationStationaryPoint) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
+    if (standard_milestone_t < time_tolerance) && !(standard_milestone == NotAtSupersaturationMilestone) && !(standard_milestone == AtSupersaturationStationaryPointMilestone) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
         @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c, Γ_l, Γ_i,
@@ -1080,7 +1076,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     t_hit_ice_sat = t_δ_hit_value(FT(0), δ_0i, A_c, τ) # switch to using δ_0i and let that hit 0
     t_hit_liq_sat = t_δ_hit_value(q_sl-q_si, δ_0i, A_c, τ) # (only possible if A_c does it...)
 
-    min_t, i_min_t = find_min_t([t_hit_ice_sat, t_hit_liq_sat])
+    min_t, i_min_t = find_min_t(t_hit_ice_sat, t_hit_liq_sat)
     @debug "min_t = $min_t, i_min_t = $i_min_t | t_hit_ice_sat = $t_hit_ice_sat, t_hit_liq_sat = $t_hit_liq_sat"
 
     # @debug "A_c = $A_c; τ = $τ; δ_0 = $δ_0; δ_0i = $δ_0i; dqvdt = $dqvdt; Δt = $Δt; q_sl = $q_sl; q_si = $q_si; q_vap = $q_vap; q_liq = $q_liq; q_ice = $q_ice; T=$T"
@@ -1177,7 +1173,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # ===== Fallback Block ===== #
     standard_milestone_t, standard_milestone, S_ql, S_qi, δ_eq, δi_eq = calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, T<T_freeze, τ_liq, τ_ice; dδdt_no_S = A_c_no_WBF, Γ_l=Γ_l, Γ_i=Γ_i, allow_δ_eq_point = true) # we need to allow the eq point because otherwise we risk WBF oscillations, see note in do_standard_fallback()
     @debug "standard_milestone_t = $standard_milestone_t; standard_milestone = $standard_milestone; A_c = $A_c; τ = $τ; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; dqvdt = $dqvdt; dTdt = $dTdt"
-    if (standard_milestone_t < time_tolerance) && !(standard_milestone isa NotAtSupersaturationMilestone) && !(standard_milestone isa AtSupersaturationStationaryPoint) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
+    if (standard_milestone_t < time_tolerance) && !(standard_milestone == NotAtSupersaturationMilestone) && !(standard_milestone == AtSupersaturationStationaryPointMilestone) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
         @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c_no_WBF, Γ_l, Γ_i,
@@ -1203,7 +1199,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     t_hit_liq_sat = t_δ_hit_value(FT(0.), δ_0, A_c, τ_liq) # Eq C5
     t_hit_ice_sat = t_δ_hit_value(q_si - q_sl, δ_0, A_c, τ_liq) # Eq C5 (can only happen bc of A_c) [ we're above freezing so we hit ice sat first?]
 
-    min_t, i_min_t = find_min_t([t_out_of_ice, t_hit_liq_sat, t_hit_ice_sat]) # find_min_t helps resolve if min_t is 0 for example, don't skip this call
+    min_t, i_min_t = find_min_t(t_out_of_ice, t_hit_liq_sat, t_hit_ice_sat) # find_min_t helps resolve if min_t is 0 for example, don't skip this call
 
     @debug "min_t = $min_t, i_min_t = $i_min_t | t_out_of_ice = $t_out_of_ice, t_hit_liq_sat = $t_hit_liq_sat, t_hit_ice_sat = $t_hit_ice_sat"
 
@@ -1322,7 +1318,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # ===== Fallback Block ===== #
     standard_milestone_t, standard_milestone, S_ql, S_qi, δ_eq, δi_eq = calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, T<T_freeze, τ_liq, τ_ice; dδdt_no_S = A_c_no_WBF, Γ_l=Γ_l, Γ_i=Γ_i, allow_δ_eq_point = true) # we need to allow the eq point because otherwise we risk WBF oscillations, see note in do_standard_fallback()
     @debug "standard_milestone_t = $standard_milestone_t; standard_milestone = $standard_milestone; A_c = $A_c; τ = $τ; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; dqvdt = $dqvdt; dTdt = $dTdt"
-    if (standard_milestone_t < time_tolerance) && !(standard_milestone isa NotAtSupersaturationMilestone) && !(standard_milestone isa AtSupersaturationStationaryPoint) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
+    if (standard_milestone_t < time_tolerance) && !(standard_milestone == NotAtSupersaturationMilestone) && !(standard_milestone == AtSupersaturationStationaryPointMilestone) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
         @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c, Γ_l, Γ_i,
@@ -1337,7 +1333,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     t_hit_liq_sat = t_δ_hit_value(FT(0.), δ_0, A_c, τ_liq) # Eq C5
     t_hit_ice_sat = t_δ_hit_value(q_si - q_sl, δ_0, A_c, τ_liq) # Eq C5 (can only happen bc of A_c) [ we're above freezing so we hit ice sat first?]
 
-    min_t, i_min_t = find_min_t([t_hit_liq_sat, t_hit_ice_sat]) # find_min_t helps resolve if min_t is 0 for example, don't skip this call
+    min_t, i_min_t = find_min_t(t_hit_liq_sat, t_hit_ice_sat) # find_min_t helps resolve if min_t is 0 for example, don't skip this call
 
     @debug "min_t = $min_t, i_min_t = $i_min_t | t_hit_liq_sat = $t_hit_liq_sat, t_hit_ice_sat = $t_hit_ice_sat"
 
@@ -1436,7 +1432,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # ===== Fallback Block ===== #
     standard_milestone_t, standard_milestone, S_ql, S_qi, δ_eq, δi_eq = calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, T<T_freeze, τ_liq, τ_ice; dδdt_no_S = A_c_no_WBF, Γ_l=Γ_l, Γ_i=Γ_i, allow_δ_eq_point = true) # we need to allow the eq point because otherwise we risk WBF oscillations, see note in do_standard_fallback()
     @debug "standard_milestone_t = $standard_milestone_t; standard_milestone = $standard_milestone; A_c = $A_c; τ = $τ; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; dqvdt = $dqvdt; dTdt = $dTdt"
-    if (standard_milestone_t < time_tolerance) && !(standard_milestone isa NotAtSupersaturationMilestone) && !(standard_milestone isa AtSupersaturationStationaryPoint) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
+    if (standard_milestone_t < time_tolerance) && !(standard_milestone == NotAtSupersaturationMilestone) && !(standard_milestone == AtSupersaturationStationaryPointMilestone) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
         @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c_no_WBF, Γ_l, Γ_i,
@@ -1478,7 +1474,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
     t_hit_sat = BF ? t_δ_hit_value(q_si-q_sl, δ_0, A_c, τ) : t_δ_hit_value(FT(0), δ_0, A_c, τ) # below freezing, stop at ice sat which is lower, above freezing, stop at liq sat which is lower
     
-    min_t, i_min_t = find_min_t([t_out_of_liq, t_out_of_ice, t_hit_sat])
+    min_t, i_min_t = find_min_t(t_out_of_liq, t_out_of_ice, t_hit_sat)
 
     # @debug "min_t = $min_t; i_min_t = $i_min_t; Δt = $Δt | t_out_of_liq = $t_out_of_liq; t_out_of_ice = $t_out_of_ice; t_hit_sat = $t_hit_sat"
 
@@ -1600,7 +1596,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # ===== Fallback Block ===== #
     standard_milestone_t, standard_milestone, S_ql, S_qi, δ_eq, δi_eq = calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, T<T_freeze, τ_liq, τ_ice; dδdt_no_S = A_c_no_WBF, Γ_l=Γ_l, Γ_i=Γ_i, allow_δ_eq_point = true) # we need to allow the eq point because otherwise we risk WBF oscillations, see note in do_standard_fallback()
     @debug "standard_milestone_t = $standard_milestone_t; standard_milestone = $standard_milestone; A_c = $A_c; τ = $τ; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; dqvdt = $dqvdt; dTdt = $dTdt"
-    if (standard_milestone_t < time_tolerance) && !(standard_milestone isa NotAtSupersaturationMilestone) && !(standard_milestone isa AtSupersaturationStationaryPoint) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
+    if (standard_milestone_t < time_tolerance) && !(standard_milestone == NotAtSupersaturationMilestone) && !(standard_milestone == AtSupersaturationStationaryPointMilestone) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
         @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c, Γ_l, Γ_i,
@@ -1625,7 +1621,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
     t_hit_sat = BF ? t_δ_hit_value(q_si-q_sl, δ_0, A_c, τ) : t_δ_hit_value(FT(0), δ_0, A_c, τ) # below freezing, stop at ice_sat which is lower, above freezing, stop at liq_sat which is lower
 
-    min_t, i_min_t = find_min_t([t_out_of_liq, t_hit_sat])
+    min_t, i_min_t = find_min_t(t_out_of_liq, t_hit_sat)
 
     if min_t < Δt
         if i_min_t == 1
@@ -1729,7 +1725,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     # ===== Fallback Block ===== #
     standard_milestone_t, standard_milestone, S_ql, S_qi, δ_eq, δi_eq = calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, T<T_freeze, τ_liq, τ_ice; dδdt_no_S = A_c_no_WBF, Γ_l=Γ_l, Γ_i=Γ_i, allow_δ_eq_point = true) # we need to allow the eq point because otherwise we risk WBF oscillations, see note in do_standard_fallback()
     @debug "standard_milestone_t = $standard_milestone_t; standard_milestone = $standard_milestone; A_c = $A_c; τ = $τ; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; dqvdt = $dqvdt; dTdt = $dTdt"
-    if (standard_milestone_t < time_tolerance) && !(standard_milestone isa NotAtSupersaturationMilestone) && !(standard_milestone isa AtSupersaturationStationaryPoint) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
+    if (standard_milestone_t < time_tolerance) && !(standard_milestone == NotAtSupersaturationMilestone) && !(standard_milestone == AtSupersaturationStationaryPointMilestone) # 0 means never hitting a milestone again, 3 means eq point which we don't recognize in this framwork.
         @debug "falling bacc"
         return do_standard_fallback(
             standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c, Γ_l, Γ_i,
@@ -1758,7 +1754,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
 
     # ================================================================================= #
 
-    min_t, i_min_t = find_min_t([t_out_of_ice, t_hit_sat])
+    min_t, i_min_t = find_min_t(t_out_of_ice, t_hit_sat)
 
     @debug "min_t = $min_t, i_min_t = $i_min_t | t_out_of_ice = $t_out_of_ice, t_hit_sat = $t_hit_sat"
 

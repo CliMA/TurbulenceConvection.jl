@@ -1140,14 +1140,99 @@ Here we remedy that - given a vector of Δts we return the minimum unless it's z
     - WARNING: This depends on, in the code, you having a separate path for the out of liq or out of ice category! In that path you should set S_ql = q_liq/Δt and S_qi = q_ice/Δt and not use the fucntions that calculate them.
 If the next smallest is < eps(FT), we just return eps(FT) in the spirit of the time being very fast
 """
-function find_min_t(Δts::AbstractVector{FT}) where {FT}
-    min_t, i_min_t = findmin(Δts)
-    if iszero(min_t)
-        min_t = minimum(Δts -> (iszero(Δts) ? FT(Inf) : Δts), Δts)  # min of all values that are not zero. Don't change index though. it should be fine as the new_regime will send us to the right place
-        min_t = min(min_t, eps(FT)) # but not further than eps(FT)
+# function find_min_t(Δts::AbstractVector{FT}) where {FT}
+#     min_t, i_min_t = findmin(Δts)
+#     if iszero(min_t)
+#         min_t = minimum(Δts -> (iszero(Δts) ? FT(Inf) : Δts), Δts)  # min of all values that are not zero. Don't change index though. it should be fine as the new_regime will send us to the right place
+#         min_t = min(min_t, eps(FT)) # but not further than eps(FT)
+#     end
+#     return min_t, i_min_t
+# end
+
+
+# function find_min_t(Δts::AbstractVector{FT}) where {FT}
+#     min_t, i_min_t = findmin(Δts)
+
+#     if min_t == zero(FT)
+#         # Find the smallest non-zero Δt
+#         best = FT(typemax(FT))
+#         @inbounds for x in Δts
+#             if x != zero(FT) && x < best
+#                 best = x
+#             end
+#         end
+
+#         # If everything was zero, best is typemax → clamp to eps(FT)
+#         if best == FT(typemax(FT))
+#             min_t = eps(FT)
+#         else
+#             min_t = min(best, eps(FT))
+#         end
+#     end
+
+#     return min_t, i_min_t
+# end
+
+
+
+# function find_min_t(Δts::NTuple{_, FT}) where {_, FT} # This should be much more type stable
+#     # 1. Initial findmin (highly optimized for NTuple)
+#     min_t, i_min_t = findmin(Δts)
+
+#     if iszero(min_t)
+#         # 2. Find the minimum non-zero value using the direct, fast loop
+        
+#         # Initialize the variable to search for the smallest non-zero time
+#         min_t_non_zero = FT(Inf) 
+        
+#         for val in Δts
+#             # Compiler unrolls this loop completely for speed
+#             if !iszero(val) && val < min_t_non_zero
+#                 min_t_non_zero = val
+#             end
+#         end
+        
+#         # Use the non-zero minimum, but clamp it at eps(FT)
+#         min_t = min(min_t_non_zero, eps(FT))
+#     end
+    
+#     # Returns the potentially adjusted min_t and the original index.
+#     return min_t, i_min_t
+# end
+
+
+# function find_min_t(x::FT...) where {FT}
+function find_min_t(x::Vararg{FT, _}) where {FT, _} # force specialization [ faster than tuple for small N, and we never go past 4-5]
+    # find minimum and its index
+    min_t = x[1]
+    i_min_t = 1
+    for (i, val) in enumerate(x)
+        if val < min_t
+            min_t = val
+            i_min_t = i
+        end
     end
+
+    if min_t == zero(FT)
+        # smallest non-zero
+        best = FT(typemax(FT))
+        for val in x
+            if val != zero(FT) && val < best
+                best = val
+            end
+        end
+
+        if best == FT(typemax(FT))
+            min_t = eps(FT)
+        else
+            min_t = min(best, eps(FT))
+        end
+    end
+
     return min_t, i_min_t
 end
+
+
 # ====================================================================================================================================================================================================== #
 
 
@@ -1233,7 +1318,7 @@ function morrison_milbrandt_2015_style(
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
     @debug "t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice, t_hit_δ_sat = $t_hit_δ_sat, t_hit_T_freeze = $t_hit_T_freeze | Δt = $Δt"
 
-    min_t, i_min_t = find_min_t([t_out_of_liq, t_out_of_ice, t_hit_δ_sat, t_hit_T_freeze])
+    min_t, i_min_t = find_min_t(t_out_of_liq, t_out_of_ice, t_hit_δ_sat, t_hit_T_freeze)
     @debug "min_t = $min_t, i_min_t = $i_min_t"
 
     if (min_t < Δt)
@@ -1379,7 +1464,7 @@ function morrison_milbrandt_2015_style(
     t_hit_δ_sat = t_hit_δ_sat_converged ? t_hit_δ_sat : FT(Inf) 
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
     
-    min_t, i_min_t = find_min_t([t_out_of_liq, t_hit_δ_sat, t_hit_T_freeze])
+    min_t, i_min_t = find_min_t(t_out_of_liq, t_hit_δ_sat, t_hit_T_freeze)
 
     if (min_t < Δt)
         if i_min_t == 1 # out of liquid
@@ -1578,7 +1663,7 @@ function morrison_milbrandt_2015_style(
     t_hit_δo_sat = t_hit_δo_sat_converged ? t_hit_δo_sat : FT(Inf) 
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
 
-    min_t, i_min_t = find_min_t([t_out_of_liq, t_out_of_ice, t_hit_δ_sat, t_hit_δo_sat, t_hit_T_freeze])
+    min_t, i_min_t = find_min_t(t_out_of_liq, t_out_of_ice, t_hit_δ_sat, t_hit_δo_sat, t_hit_T_freeze)
     @debug "t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice, t_hit_δ_sat = $t_hit_δ_sat, t_hit_δo_sat = $t_hit_δo_sat, t_hit_T_freeze = $t_hit_T_freeze"
 
     if (min_t < Δt)
@@ -1805,7 +1890,7 @@ function morrison_milbrandt_2015_style(
     t_hit_δo_sat = t_hit_δo_sat_converged ? t_hit_δo_sat : FT(Inf) 
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
 
-    min_t, i_min_t = find_min_t([t_out_of_liq, t_hit_δ_sat, t_hit_δo_sat, t_hit_T_freeze])
+    min_t, i_min_t = find_min_t(t_out_of_liq, t_hit_δ_sat, t_hit_δo_sat, t_hit_T_freeze)
     @debug "t_out_of_liq = $t_out_of_liq, t_hit_δ_sat = $t_hit_δ_sat, t_hit_δo_sat = $t_hit_δo_sat, t_hit_T_freeze = $t_hit_T_freeze"
 
     # ======================================================================================== #
@@ -2062,7 +2147,7 @@ function morrison_milbrandt_2015_style(
     t_hit_δo_sat = t_hit_δo_sat_converged ? t_hit_δo_sat : FT(Inf) 
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
 
-    min_t, i_min_t = find_min_t([t_out_of_liq, t_out_of_ice, t_hit_δ_sat, t_hit_δo_sat, t_hit_T_freeze])
+    min_t, i_min_t = find_min_t(t_out_of_liq, t_out_of_ice, t_hit_δ_sat, t_hit_δo_sat, t_hit_T_freeze)
     @debug "t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice, t_hit_δ_sat = $t_hit_δ_sat, t_hit_δo_sat = $t_hit_δo_sat, t_hit_T_freeze = $t_hit_T_freeze"
 
     # ======================================================================================== #
@@ -2306,7 +2391,7 @@ function morrison_milbrandt_2015_style(
     t_hit_δo_sat = t_hit_δo_sat_converged ? t_hit_δo_sat : FT(Inf) 
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
 
-    min_t, i_min_t = find_min_t([t_out_of_ice, t_hit_δ_sat, t_hit_δo_sat, t_hit_T_freeze])
+    min_t, i_min_t = find_min_t(t_out_of_ice, t_hit_δ_sat, t_hit_δo_sat, t_hit_T_freeze)
     @debug "t_out_of_ice = $t_out_of_ice, t_hit_δ_sat = $t_hit_δ_sat, t_hit_δo_sat = $t_hit_δo_sat, t_hit_T_freeze = $t_hit_T_freeze"
 
     if (min_t < Δt)
@@ -2435,7 +2520,7 @@ function morrison_milbrandt_2015_style(
     t_hit_δ_sat = t_hit_δ_sat_converged ? t_hit_δ_sat : FT(Inf) 
     t_hit_δi_sat = t_hit_δi_sat_converged ? t_hit_δi_sat : FT(Inf) 
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
-    min_t, i_min_t = find_min_t([t_hit_δ_sat, t_hit_δi_sat, t_hit_T_freeze])
+    min_t, i_min_t = find_min_t(t_hit_δ_sat, t_hit_δi_sat, t_hit_T_freeze)
     
     
     if (min_t < Δt)
@@ -2604,7 +2689,7 @@ function morrison_milbrandt_2015_style(
     
     t_hit_sat = t_hit_sat_converged ? t_hit_sat : FT(Inf) 
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
-    min_t, i_min_t = find_min_t([t_out_of_liq, t_out_of_ice, t_hit_sat, t_hit_T_freeze])
+    min_t, i_min_t = find_min_t(t_out_of_liq, t_out_of_ice, t_hit_sat, t_hit_T_freeze)
 
     # @debug "t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice, t_hit_sat = $t_hit_sat, t_hit_T_freeze = $t_hit_T_freeze | use_ice_perspective = $use_ice_perspective"
     
@@ -2770,7 +2855,7 @@ function morrison_milbrandt_2015_style(
     t_hit_sat = t_hit_sat_converged ? t_hit_sat : FT(Inf)
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
 
-    min_t, i_min_t = find_min_t([t_out_of_liq, t_hit_sat, t_hit_T_freeze])
+    min_t, i_min_t = find_min_t(t_out_of_liq, t_hit_sat, t_hit_T_freeze)
 
     if (min_t < Δt)
         if i_min_t == 1 # out of liq
@@ -2899,7 +2984,7 @@ function morrison_milbrandt_2015_style(
     
     t_hit_sat = t_hit_sat_converged ? t_hit_sat : FT(Inf) 
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
-    min_t, i_min_t = find_min_t([t_out_of_ice, t_hit_sat, t_hit_T_freeze])
+    min_t, i_min_t = find_min_t(t_out_of_ice, t_hit_sat, t_hit_T_freeze)
 
     if (min_t < Δt) # either way it's the same up to 
         if i_min_t == 1 # out of ice
@@ -3016,7 +3101,7 @@ function morrison_milbrandt_2015_style(
     t_hit_sat = t_hit_sat_converged ? t_hit_sat : FT(Inf)
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
 
-    min_t, i_min_t = find_min_t([t_hit_sat, t_hit_T_freeze])
+    min_t, i_min_t = find_min_t(t_hit_sat, t_hit_T_freeze)
 
     if (min_t < Δt)
         # both are same

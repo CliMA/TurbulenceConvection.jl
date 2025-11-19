@@ -27,8 +27,8 @@ function noneq_moisture_sources(param_set::APS,
     ρ_c::FT,
     p::FT,
     T::FT,
-    Δt::Real,
-    ts::TD.ThermodynamicState,
+    Δt::FT,
+    ts::TD.ThermodynamicState{FT},
     w::FT,
     # z::FT,
     dqvdt::FT = FT(0),
@@ -60,8 +60,8 @@ function noneq_moisture_sources(
     ρ_c::FT,
     p::FT,
     T::FT,
-    Δt::Real,
-    ts::TD.ThermodynamicState,
+    Δt::FT,
+    ts::TD.ThermodynamicState{FT},
     w::FT,
     # z::FT,
     q_vap_sat_liq::FT,
@@ -80,7 +80,7 @@ function noneq_moisture_sources(
     qi_tendency::FT = FT(0)
     if area > 0
         # basic noneq (no supersat formulation so not likely to be right) should be a RelaxToEquilibrium()
-        q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+        q::TD.PhasePartition{FT} = TD.PhasePartition(thermo_params, ts)
         q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
         ρ::FT = TD.air_density(thermo_params, ts)
 
@@ -105,8 +105,8 @@ function noneq_moisture_sources(
     ρ_c::FT,
     p::FT,
     T::FT,
-    Δt::Real,
-    ts::TD.ThermodynamicState,
+    Δt::FT,
+    ts::TD.ThermodynamicState{FT},
     w::FT,
     # z::FT, # deprecate, we only had it for raymond ice and that is no longer used
     q_vap_sat_liq::FT,
@@ -125,7 +125,7 @@ function noneq_moisture_sources(
     qi_tendency::FT = FT(0)
     if area > 0
 
-        q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+        q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
         ρ::FT = TD.air_density(thermo_params, ts)
         q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
 
@@ -153,8 +153,8 @@ function noneq_moisture_sources(
     ρ_c::FT,
     p::FT, # pass this bc it's not a no-op, unlike ρ and q which are stored in nonequil
     T::FT, # pass this bc it's not a no-op, unlike ρ and q which are stored in nonequil. note pressure is not stored in nonequil
-    Δt::Real,
-    ts::TD.ThermodynamicState,
+    Δt::FT,
+    ts::TD.ThermodynamicState{FT},
     w::FT,
     # z::FT,
     q_vap_sat_liq::FT,
@@ -172,7 +172,7 @@ function noneq_moisture_sources(
     ql_tendency::FT = FT(0)
     qi_tendency::FT = FT(0)
     if area > 0
-        q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+        q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
         ρ::FT = TD.air_density(thermo_params, ts)
         q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
         
@@ -206,8 +206,8 @@ function other_microphysics_processes(
     ρ_c::FT,
     p::FT,
     T::FT, # pass this bc it's not a no-op, unlike ρ and q which are stored in nonequil
-    Δt::Real,
-    ts::TD.ThermodynamicState,
+    Δt::FT,
+    ts::TD.ThermodynamicState{FT},
     w::FT,
     # z::FT, # idek why we had this, i think it just got copied from noneq_moisture_sources() but we don't need it here
     S_ql::FT,
@@ -238,7 +238,7 @@ function other_microphysics_processes(
     qi_tendency_melting::FT = FT(0)
     if area > 0
         if moisture_model isa NonEquilibriumMoisture
-            q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+            q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
             q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
             ρ = TD.air_density(thermo_params, ts)
 
@@ -373,8 +373,8 @@ function precipitation_formation(
     ρ_c::FT, # for some reason they always used ρ_c here, i'm not sure if that's good or bad.
     p::FT,
     T::FT,
-    Δt::Real,
-    ts::TD.ThermodynamicState,
+    Δt::FT,
+    ts::TD.ThermodynamicState{FT},
     ql_tendency_cond_evap::FT,
     qi_tendency_sub_dep::FT,
     qi_tendency_sed::FT,
@@ -498,7 +498,7 @@ function precipitation_formation(
             ql_tendency_acnv = S_qt_rain # for storage
 
             if (snow_formation_model isa NonEquilibriumSnowFormationModel)
-                q::TD.PhasePartition = TD.PhasePartition(thermo_params, ts)
+                q::TD.PhasePartition{FT} =TD.PhasePartition(thermo_params, ts)
                 # q_vap::FT = TD.vapor_specific_humidity(thermo_params, ts)
 
                 # S_qt_snow_ice_dep = limit_tendency(precipitation_tendency_limiter, -α_acnv * my_conv_q_ice_to_q_sno_no_supersat(param_set, q; N = Ni, τ = τ_ice, r_acnv_scaling_factor=snow_formation_model.r_ice_acnv_scaling_factor), q.ice, Δt) # based on growth but threshold is fixed [ needs a scaling factor for how much is over the thresh]
@@ -808,8 +808,8 @@ end
     ρ_c::FT,
     p::FT,
     T::FT,
-    Δt::Real,
-    ts::TD.ThermodynamicState,
+    Δt::FT,
+    ts::TD.ThermodynamicState{FT},
     precip_fraction::FT,
     precipitation_tendency_limiter::AbstractTendencyLimiter,
     tke_var::FT,

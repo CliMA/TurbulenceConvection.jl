@@ -334,33 +334,33 @@ function calculate_next_standard_milestone_time_given_milestones(S_ql::FT, S_qi:
     end
 
     # findmin goes left to right, so this is also priority if there's a tie. Eq point gets priority over saturation points bc hitting it stops oscillations
-    min_t, i_min_t = findmin([t_out_of_liq, t_out_of_ice, t_hit_eq_point, t_hit_liq_sat, t_hit_ice_sat, ]) # no need for out of vap, you get there you're cooked anyway...
+    min_t, i_min_t = findmin((t_out_of_liq, t_out_of_ice, t_hit_eq_point, t_hit_liq_sat, t_hit_ice_sat )) # no need for out of vap, you get there you're cooked anyway... # Type Stable ((should we use find_min_t?) or does not have the MM2015 problems)
 
 
-    
+    local milestone::MilestoneType
     if isinf(min_t)
-        milestone = NotAtSupersaturationMilestone()
+        milestone = NotAtSupersaturationMilestone
     else
         milestone =
         if i_min_t == 1
-            OutOfLiquid()
+            OutOfLiquidMilestone
         elseif i_min_t == 2
-            OutOfIce()
+            OutOfIceMilestone
         elseif i_min_t == 3
-            AtSupersaturationStationaryPoint()
+            AtSupersaturationStationaryPointMilestone
         elseif i_min_t == 4
-            AtSaturationOverLiquid()
+            AtSaturationOverLiquidMilestone
         elseif i_min_t == 5
-            AtSaturationOverIce()
+            AtSaturationOverIceMilestone
         end
     end
 
     @debug "min_t = $min_t; milestone = $milestone; i_min_t = $i_min_t; t_out_of_liq = $t_out_of_liq; t_out_of_ice = $t_out_of_ice; t_hit_eq_point = $t_hit_eq_point; t_hit_liq_sat = $t_hit_liq_sat; t_hit_ice_sat = $t_hit_ice_sat; S_ql = $S_ql; S_qi = $S_qi; dδdt = $dδdt; δ_0 = $δ_0; δ_0i = $δ_0i; δ_eq = $δ_eq; δi_eq = $δi_eq; q_liq = $q_liq; q_ice = $q_ice; dδdt_is_full_tendency = $dδdt_is_full_tendency; Γ_l = $Γ_l; Γ_i = $Γ_i; allow_δ_eq_point = $allow_δ_eq_point; at_δ_eq_point = $at_δ_eq_point"
-    if milestone isa AtSupersaturationStationaryPoint
+    if milestone == AtSupersaturationStationaryPointMilestone
         @debug "milestone = $milestone from inputs: S_ql = $S_ql; S_qi = $S_qi; dδdt = $dδdt; δ_0 = $δ_0; δ_0i = $δ_0i; δ_eq = $δ_eq; δi_eq = $δi_eq; q_liq = $q_liq; q_ice = $q_ice; dδdt_is_full_tendency = $dδdt_is_full_tendency; Γ_l = $Γ_l; Γ_i = $Γ_i"
     end
 
-    return min_t, milestone
+    return min_t, milestone::MilestoneType
 end
 calculate_next_standard_milestone_time_given_milestones(S_ql::FT, S_qi::FT, dδdt::FT, δ_0::FT, δ_0i::FT, δ_eq::FT, δi_eq::FT, q::TD.PhasePartition; dδdt_is_full_tendency::Bool=false, Γ_l::FT = FT(1), Γ_i::FT = FT(1), at_δ_eq_point::Bool = false, allow_δ_eq_point::Bool = true) where {FT} = calculate_next_standard_milestone_time_given_milestones(S_ql, S_qi, dδdt, δ_0, δ_0i, δ_eq, δi_eq, q.liq, q.ice; dδdt_is_full_tendency = dδdt_is_full_tendency, Γ_l = Γ_l, Γ_i = Γ_i, at_δ_eq_point = at_δ_eq_point, allow_δ_eq_point = allow_δ_eq_point)
 calculate_next_standard_milestone_time_given_milestones(S_ql::FT, S_qi::FT, dδdt::FT, q_vap::FT, δ_eq::FT, δi_eq::FT, q_liq::FT, q_ice::FT, q_eq::TD.PhasePartition; dδdt_is_full_tendency::Bool=false, Γ_l::FT = FT(1), Γ_i::FT = FT(1), at_δ_eq_point::Bool = false, allow_δ_eq_point::Bool = true) where {FT} = calculate_next_standard_milestone_time_given_milestones(S_ql, S_qi, dδdt, q_vap - q_eq.liq, q_vap - q_eq.ice, δ_eq, δi_eq, q_liq, q_ice; dδdt_is_full_tendency = dδdt_is_full_tendency, Γ_l = Γ_l, Γ_i = Γ_i, at_δ_eq_point = at_δ_eq_point, allow_δ_eq_point = allow_δ_eq_point)
@@ -370,7 +370,7 @@ calculate_next_standard_milestone_time_given_milestones(S_ql::FT, S_qi::FT, dδd
 
 function calculate_next_standard_milestone_time(q_eq::TD.PhasePartition, q_liq::FT, q_ice::FT, δ_0::FT, δ_0i::FT, δ_eq::FT, δi_eq::FT, S_ql::FT, S_qi::FT; dδdt::FT = FT(0), dδdt_is_full_tendency::Bool=false, Γ_l::FT = FT(1), Γ_i::FT = FT(1), at_δ_eq_point::Bool = false, allow_δ_eq_point::Bool = true) where {FT}
     @debug "calculate_next_standard_milestone_time: δ_eq = $δ_eq; δi_eq = $δi_eq; q_liq = $q_liq; q_ice = $q_ice; δ_0 = $δ_0; δ_0i = $δ_0i; dδdt = $dδdt; Γ_l = $Γ_l; Γ_i = $Γ_i; dδdt_is_full_tendency = $dδdt_is_full_tendency; S_ql = $S_ql; S_qi = $S_qi; at_δ_eq_point = $at_δ_eq_point; allow_δ_eq_point = $allow_δ_eq_point"
-    min_t, milestone = calculate_next_standard_milestone_time_given_milestones(S_ql, S_qi, dδdt, δ_0, δ_0i, δ_eq, δi_eq, q_liq, q_ice; Γ_l = Γ_l, Γ_i = Γ_i, dδdt_is_full_tendency = dδdt_is_full_tendency, at_δ_eq_point = at_δ_eq_point, allow_δ_eq_point = allow_δ_eq_point) # dδdt_is_full_tendency = true
+    min_t, milestone::MilestoneType = calculate_next_standard_milestone_time_given_milestones(S_ql, S_qi, dδdt, δ_0, δ_0i, δ_eq, δi_eq, q_liq, q_ice; Γ_l = Γ_l, Γ_i = Γ_i, dδdt_is_full_tendency = dδdt_is_full_tendency, at_δ_eq_point = at_δ_eq_point, allow_δ_eq_point = allow_δ_eq_point) # dδdt_is_full_tendency = true
 
     # TODO: We really should just keep track of dδdt everywhere, rather than not  returning it. that would make it easier to handle `at_δ_eq_point` and other cases with better continuity
 
@@ -437,9 +437,9 @@ end
 A clean fallback to :StandardSupersaturation when the projected timescale is very short.
 """
 
-function get_new_regime_type_from_milestone(milestone::AbstractSupersaturationLimiterMilestone, regime::AbstractSaturationRegime, old_δ_0::FT, old_δ_0i::FT) where {FT}
+function get_new_regime_type_from_milestone(milestone::MilestoneType, regime::AbstractSaturationRegime, old_δ_0::FT, old_δ_0i::FT) where {FT}
     regime_type = 
-        if typeof(milestone) ∈ (NotAtSupersaturationMilestone, OutOfLiquid, OutOfIce, AtSupersaturationStationaryPoint) # For these, we should still be in the same regime...
+        if milestone ∈ (NotAtSupersaturationMilestone, OutOfLiquidMilestone, OutOfIceMilestone, AtSupersaturationStationaryPointMilestone) # For these, we should still be in the same regime...
             if regime isa Supersaturated
                 Supersaturated
             elseif regime isa WBF
@@ -449,7 +449,7 @@ function get_new_regime_type_from_milestone(milestone::AbstractSupersaturationLi
             else
                 error("invalid regime type $regime") # for type stability, we need to remove `nothing` from outputs
             end
-        elseif milestone isa AtSaturationOverLiquid # liq sat, above freezing so that's going to Subsat
+        elseif milestone == AtSaturationOverLiquidMilestone # liq sat, above freezing so that's going to Subsat
             if regime.below_freezing
                 if regime isa Supersaturated
                     WBF
@@ -480,7 +480,7 @@ function get_new_regime_type_from_milestone(milestone::AbstractSupersaturationLi
                 end
             end
 
-        elseif milestone isa AtSaturationOverIce # ice sat, above freezing so that's going to Supersat
+        elseif milestone == AtSaturationOverIceMilestone # ice sat, above freezing so that's going to Supersat
             if regime.below_freezing
                 if (regime isa Supersaturated)
                     if !iszero(old_δ_0)
@@ -511,14 +511,14 @@ function get_new_regime_type_from_milestone(milestone::AbstractSupersaturationLi
                 end
             end
         else
-            error("milestone should be NotAtSupersaturationMilestone, OutOfLiquid, OutOfIce, AtSaturationOverLiquid, or AtSaturationOverIce, but got $milestone") # branch to remove `nothing` from outputs and keep type stability
+            error("milestone should be NotAtSupersaturationMilestone, OutOfLiquidMilestone, OutOfIceMilestone, AtSaturationOverLiquidMilestone, or AtSaturationOverIceMilestone, but got $milestone") # branch to remove `nothing` from outputs and keep type stability
         end
 
     return regime_type
 end
 
 
-function step(regime::AbstractSaturationRegime, ::StandardSupersaturationMoistureSourcesLimiter, Δt::FT, q_liq::FT, q_ice::FT, δ_0::FT, δ_0i::FT, δ_eq::FT, δi_eq::FT, q_eq::TD.PhasePartition, S_ql::FT, S_qi::FT, milestone::AbstractSupersaturationLimiterMilestone = NotAtSupersaturationMilestone(); at_δ_eq_point::Bool = false, dδdt_no_S::FT = FT(0), Γ_l = FT(1), Γ_i = FT(1)) where {FT}
+function step(regime::AbstractSaturationRegime, ::StandardSupersaturationMoistureSourcesLimiter, Δt::FT, q_liq::FT, q_ice::FT, δ_0::FT, δ_0i::FT, δ_eq::FT, δi_eq::FT, q_eq::TD.PhasePartition, S_ql::FT, S_qi::FT, milestone::MilestoneType = NotAtSupersaturationMilestone; at_δ_eq_point::Bool = false, dδdt_no_S::FT = FT(0), Γ_l = FT(1), Γ_i = FT(1)) where {FT}
     isapprox(δ_0 - δ_0i, q_eq.ice - q_eq.liq, atol = 1e-6) || error("δ_0 - δ_0i is not approximately equal to q_eq.ice - q_eq.liq, got δ_0 = $δ_0, δ_0i = $δ_0i, q_eq.ice = $(q_eq.ice), q_eq.liq = $(q_eq.liq)")
     @debug("starting with: q_liq = $q_liq; q_ice = $q_ice; δ_0 = $δ_0; δ_0i = $δ_0i; δ_eq = $δ_eq; δi_eq = $δi_eq; S_ql = $S_ql; S_qi = $S_qi; milestone = $milestone; dδdt_no_S = $dδdt_no_S; Γ_l = $Γ_l; Γ_i = $Γ_i")
     @debug("starting with (δ_0 - δ_0i) = $(δ_0 - δ_0i); (q_eq.ice - q_eq.liq) = $(q_eq.ice - q_eq.liq)")
@@ -529,7 +529,7 @@ function step(regime::AbstractSaturationRegime, ::StandardSupersaturationMoistur
     old_δ_0 = δ_0
     old_δ_0i = δ_0i
 
-    if milestone isa NotAtSupersaturationMilestone # not at a milestone or not provided, just step as far as Δt says. (not floating point safe)
+    if milestone == NotAtSupersaturationMilestone # not at a milestone or not provided, just step as far as Δt says. (not floating point safe)
         q_liq += S_ql * Δt
         q_ice += S_qi * Δt
         if (!at_δ_eq_point)
@@ -537,7 +537,7 @@ function step(regime::AbstractSaturationRegime, ::StandardSupersaturationMoistur
             δ_0 += dδ + (dδdt_no_S * Δt) 
             δ_0i += dδ + (dδdt_no_S * Δt) 
         end
-    elseif milestone isa OutOfLiquid #  out of liq
+    elseif milestone == OutOfLiquidMilestone #  out of liq
         if !at_δ_eq_point
             dδ = +q_liq * Γ_l
             δ_0 += dδ
@@ -551,7 +551,7 @@ function step(regime::AbstractSaturationRegime, ::StandardSupersaturationMoistur
             δ_0 += dδ + (dδdt_no_S * Δt) 
             δ_0i += dδ + (dδdt_no_S * Δt) 
         end
-    elseif milestone isa OutOfIce # out of ice
+    elseif milestone == OutOfIceMilestone # out of ice
         q_liq += S_ql * Δt
         if !at_δ_eq_point
             dδ = -(S_ql * Γ_l * Δt)
@@ -562,23 +562,23 @@ function step(regime::AbstractSaturationRegime, ::StandardSupersaturationMoistur
             δ_0i += dδ
         end
         q_ice = FT(0)
-    elseif milestone isa AtSupersaturationStationaryPoint # hit eq point
+    elseif milestone == AtSupersaturationStationaryPointMilestone # hit eq point
         q_liq += S_ql * Δt
         q_ice += S_qi * Δt
         δ_0i = δi_eq # pass in both explicitly to avoid underflow
         δ_0 = δ_eq
-    elseif milestone isa AtSaturationOverLiquid # hit liq sat
+    elseif milestone == AtSaturationOverLiquidMilestone # hit liq sat
         q_liq += S_ql * Δt
         q_ice += S_qi * Δt
         δ_0i = (δ_0i - δ_0) #+ q_eq.liq
         δ_0 = FT(0)
-    elseif milestone isa AtSaturationOverIce # hit ice sat
+    elseif milestone == AtSaturationOverIceMilestone # hit ice sat
         q_liq += S_ql * Δt
         q_ice += S_qi * Δt
         δ_0 = (δ_0 - δ_0i) #+ q_eq.ice
         δ_0i = FT(0)
     else
-        error("Unknown milestone type: $milestone. Expected one of NotAtSupersaturationMilestone, OutOfLiquid, OutOfIce, AtSaturationOverLiquid, or AtSaturationOverIce.")
+        error("Unknown milestone type: $milestone. Expected one of NotAtSupersaturationMilestone, OutOfLiquidMilestone, OutOfIceMilestone, AtSaturationOverLiquidMilestone, or AtSaturationOverIceMilestone.")
     end
 
 
@@ -617,7 +617,7 @@ function standard_supersaturation_sources(moisture_sources_limiter::StandardSupe
 
     Δt_left = Δt
     dt = FT(0)
-    last_milestone = NotAtSupersaturationMilestone() # this is the last milestone we hit, so we can use it to determine the next one
+    last_milestone = NotAtSupersaturationMilestone # this is the last milestone we hit, so we can use it to determine the next one
     depth = 0
 
     #= since the while loop handles the transitions, we just calculate regime internally instead of dispatching
@@ -635,9 +635,9 @@ function standard_supersaturation_sources(moisture_sources_limiter::StandardSupe
     # Get our initial regime, being careful to ensure we're going the right direction initially.
     if iszero(δ_0) || iszero(δ_0i) # possible but unlikely
         if iszero(δ_0) 
-            last_milestone = AtSaturationOverLiquid() # if δ_0 is zero, we are at liquid saturation, so we start there
+            last_milestone = AtSaturationOverLiquidMilestone # if δ_0 is zero, we are at liquid saturation, so we start there
         elseif iszero(δ_0i)
-            last_milestone = AtSaturationOverIce() # if δ_0i is zero, we are at ice saturation, so we start there
+            last_milestone = AtSaturationOverIceMilestone # if δ_0i is zero, we are at ice saturation, so we start there
         end
         dδdt_0 = get_dδdt_0(δ_0, δ_0i, q.liq, q.ice, τ_liq, τ_ice, dδdt_no_S, below_freezing)
         regime = get_regime(δ_0, δ_0i, q.liq, q.ice, below_freezing; dδdt = dδdt_0) # use this version to break ties and make sure we start going the right direction.
@@ -649,7 +649,7 @@ function standard_supersaturation_sources(moisture_sources_limiter::StandardSupe
 
     while (Δt_left > FT(0)) && (depth <= 10 + 5)
         @debug("------------------- q_liq > 0 = $((q_liq > FT(0))) ($q_liq); q_ice > 0 = $((q_ice > FT(0))) ($q_ice); δ_0 > 0 $(δ_0 > 0) ($δ_0); δ_0i > 0  $(δ_0i > 0) ($δ_0i); -----------------------\n\n")
-        milestone_t, milestone, S_ql_addit, S_qi_addit, δ_eq, δi_eq = calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, T < T_freeze, τ_liq, τ_ice; dδdt_no_S = dδdt_no_S, Γ_l = Γ_l, Γ_i = Γ_i, at_δ_eq_point = (last_milestone isa AtSupersaturationStationaryPoint)) # this is the time to the next milestone, i.e. the time to hit the next source limit
+        milestone_t, milestone, S_ql_addit, S_qi_addit, δ_eq, δi_eq = calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, T < T_freeze, τ_liq, τ_ice; dδdt_no_S = dδdt_no_S, Γ_l = Γ_l, Γ_i = Γ_i, at_δ_eq_point = (last_milestone == AtSupersaturationStationaryPointMilestone)) # this is the time to the next milestone, i.e. the time to hit the next source limit
         dt_here = min(Δt_left, milestone_t) # this is the time to the next milestone, i.e. the time to hit the next source limit
 
         # S_ql_addit, S_qi_addit = clamp_S(S_ql_addit, S_qi_addit, regime, δ_0, δ_0i, q_liq, q_ice, dt_here, dδdt_no_S) # for safety... i think this works, clamp to dt_here... [[ i think this is auto clamped by construction though... idk]]
@@ -657,7 +657,7 @@ function standard_supersaturation_sources(moisture_sources_limiter::StandardSupe
 
 
         # sometimes the δ_eq we get out here is not the same as the one input, depending on if we have q_liq, q_ice... so we double check
-        if last_milestone isa AtSupersaturationStationaryPoint
+        if last_milestone == AtSupersaturationStationaryPointMilestone
             if (δ_eq == δ_0) || (δ_eq == δ_0i) # if we hit the eq point, then we are at the stationary point
                 at_δ_eq_point = true
             else
@@ -667,7 +667,7 @@ function standard_supersaturation_sources(moisture_sources_limiter::StandardSupe
             at_δ_eq_point = false
         end
 
-        q_liq, q_ice, δ_0, δ_0i, regime = step(regime, moisture_sources_limiter, dt_here, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, q_eq, S_ql_addit, S_qi_addit, ((milestone_t < Δt_left) ? milestone : NotAtSupersaturationMilestone()); at_δ_eq_point = at_δ_eq_point, dδdt_no_S = dδdt_no_S, Γ_l = Γ_l, Γ_i = Γ_i) # this is the step to the next milestone, i.e. the time to hit the next source limit
+        q_liq, q_ice, δ_0, δ_0i, regime = step(regime, moisture_sources_limiter, dt_here, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, q_eq, S_ql_addit, S_qi_addit, ((milestone_t < Δt_left) ? milestone : NotAtSupersaturationMilestone); at_δ_eq_point = at_δ_eq_point, dδdt_no_S = dδdt_no_S, Γ_l = Γ_l, Γ_i = Γ_i) # this is the step to the next milestone, i.e. the time to hit the next source limit
 
         S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, dt, S_ql_addit, S_qi_addit, dt_here, dt + dt_here)
 
@@ -676,7 +676,7 @@ function standard_supersaturation_sources(moisture_sources_limiter::StandardSupe
         dt += dt_here # add the time to the next milestone to the total time
         Δt_left -= dt_here # reduce the time left by the time we just stepped
 
-        if !(milestone isa NotAtSupersaturationMilestone) && (milestone == last_milestone) # if we hit the same milestone twice, we have a problem
+        if !(milestone == NotAtSupersaturationMilestone) && (milestone == last_milestone) # if we hit the same milestone twice, we have a problem
             error("Hit the same milestone twice! milestone = $milestone, last_milestone = $last_milestone; dt_here = $dt_here; Δt_left = $Δt_left; S_ql = $S_ql; S_qi = $S_qi; δ_0 = $δ_0; δ_0i = $δ_0i; q_liq = $q_liq, q_ice = $q_ice; δ_eq = $δ_eq; δi_eq = $δi_eq; Γ_l = $Γ_l; Γ_i = $Γ_i; dδdt_no_S = $dδdt_no_S; q_eq = $q_eq; T = $T; p = $p; ρ = $ρ; area = $area; ts = $ts; S_ql_addit = $S_ql_addit; S_qi_addit = $S_qi_addit; dTdt = $dTdt; dqvdt = $dqvdt")
         end
 
