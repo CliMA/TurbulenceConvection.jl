@@ -5,22 +5,35 @@ Code for handling supersaturation regimes
 # === Regime Types  ======================================================================================================================================================================================== #
 
 
-abstract type AbstractSaturationRegime end
+# abstract type AbstractSaturationRegime end
+abstract type AbstractSaturationRegime{HL, HI, BF} end
 
-struct Supersaturated{HL, HI, BF} <: AbstractSaturationRegime
-    has_liquid::Bool
-    has_ice::Bool
-    below_freezing::Bool
-end
-Supersaturated(has_liquid::Bool, has_ice::Bool, below_freezing::Bool) = Supersaturated{has_liquid, has_ice, below_freezing}(has_liquid, has_ice, below_freezing)
+has_ice(::AbstractSaturationRegime{HL, HI, BF}) where {HL , HI, BF} = HI::Bool
+has_liquid(::AbstractSaturationRegime{HL, HI, BF}) where {HL, HI, BF} = HL::Bool
+is_below_freezing(::AbstractSaturationRegime{HL, HI, BF}) where {HL, HI, BF} = BF::Bool
 
-struct WBF{HL, HI, BF} <: AbstractSaturationRegime
-    has_liquid::Bool
-    has_ice::Bool
-    below_freezing::Bool # allow this type in lieu of created another type for when we're in WBF regime but not below freezing
+
+
+# -=-=- Regime Types -=-=-
+    
+struct Supersaturated{HL, HI, BF} <: AbstractSaturationRegime{HL, HI, BF}
+    # has_liquid::Bool
+    # has_ice::Bool
+    # below_freezing::Bool
 end
-WBF(has_liquid::Bool, has_ice::Bool, below_freezing::Bool) = WBF{has_liquid, has_ice, below_freezing}(has_liquid, has_ice, below_freezing)
-WBF(has_liquid::Bool, has_ice::Bool) = WBF{has_liquid, has_ice, true}(has_liquid, has_ice, true)
+Supersaturated(has_liquid::Bool, has_ice::Bool, below_freezing::Bool) = Supersaturated{has_liquid, has_ice, below_freezing}()
+# Supersaturated{has_liquid, has_ice, below_freezing}() where {has_liquid, has_ice, below_freezing} = Supersaturated(has_liquid, has_ice, below_freezing)
+
+struct WBF{HL, HI, BF} <: AbstractSaturationRegime{HL, HI, BF}
+    # has_liquid::Bool
+    # has_ice::Bool
+    # below_freezing::Bool # allow this type in lieu of created another type for when we're in WBF regime but not below freezing
+end
+
+WBF(has_liquid::Bool, has_ice::Bool, below_freezing::Bool) = WBF{has_liquid, has_ice, below_freezing}()
+WBF(has_liquid::Bool, has_ice::Bool) = WBF{has_liquid, has_ice, true}()
+# WBF{has_liquid, has_ice, below_freezing}() where {has_liquid, has_ice, below_freezing} = WBF{has_liquid, has_ice, below_freezing}()
+
 
 # [[ Deprecated :: This is problematic, because you really should never be actually on th line. When you are, it's hard to write what the rate of evap from one phase should be since the slower one sets rate controls. We've replaced with just calculating the eq point ]]
 # struct LowerSatLine{HL, HI, BF} <: AbstractSaturationRegime # you can end up here if you've reached ice sat but liq effective timescale is slower than ices so you're stuck.
@@ -29,12 +42,49 @@ WBF(has_liquid::Bool, has_ice::Bool) = WBF{has_liquid, has_ice, true}(has_liquid
 #     below_freezing::Bool # below freezing you're stuck on the ice sat line, above freezing you're stuck on the liq sat line but not really bc there's no ice formation
 # end
 
-struct Subsaturated{HL, HI, BF}  <: AbstractSaturationRegime
-    has_liquid::Bool
-    has_ice::Bool
-    below_freezing::Bool # does this really matter for subsaturated? (using it bc whether q_liq_sat or q_ice_sat is lower depends on it)
+struct Subsaturated{HL, HI, BF}  <: AbstractSaturationRegime{HL, HI, BF}
+    # has_liquid::Bool
+    # has_ice::Bool
+    # below_freezing::Bool # does this really matter for subsaturated? (using it bc whether q_liq_sat or q_ice_sat is lower depends on it)
 end
-Subsaturated(has_liquid::Bool, has_ice::Bool, below_freezing::Bool) = Subsaturated{has_liquid, has_ice, below_freezing}(has_liquid, has_ice, below_freezing)
+Subsaturated(has_liquid::Bool, has_ice::Bool, below_freezing::Bool) = Subsaturated{has_liquid, has_ice, below_freezing}()
+# Subsaturated{has_liquid, has_ice, below_freezing}() where {has_liquid, has_ice, below_freezing} = Subsaturated(has_liquid, has_ice, below_freezing)
+
+# == overload getproperty to get type parameters as properties == # [[ deprecated , use has_liq(), has_ice(), below_freezing() instead ]]
+# function Base.getproperty(r::R, name::Symbol) where R<:AbstractSaturationRegime{HL, HI, BF}
+#     # Extract type parameters
+#     tp = typeof(r).parameters
+#     HL, HI, BF = tp[1], tp[2], tp[3]
+
+#     # Return “computed fields”
+#     if name === :has_liquid
+#         return HL
+#     elseif name === :has_ice
+#         return HI
+#     elseif name === :below_freezing
+#         return BF
+#     else
+#         # Only call getfield if the struct actually has fields
+#         # Fieldless structs: throw error
+#         if isempty(fieldnames(typeof(r)))
+#             throw(KeyError(name))
+#         else
+#             return getfield(r, name)
+#         end
+#     end
+# end
+
+@enum SaturationRegimeEnumTypes begin
+    SupersaturatedEnumType
+    WBFEnumType
+    SubsaturatedEnumType
+end
+get_saturation_regime_type(::Val{SupersaturatedEnumType}) = Supersaturated
+get_saturation_regime_type(::Val{WBFEnumType}) = WBF
+get_saturation_regime_type(::Val{SubsaturatedEnumType}) = Subsaturated
+get_saturation_regime_enum_type(::Type{<:Supersaturated}) = SupersaturatedEnumType
+get_saturation_regime_enum_type(::Type{<:WBF}) = WBFEnumType
+get_saturation_regime_enum_type(::Type{<:Subsaturated}) = SubsaturatedEnumType
 
 
 # -=-=- Milestones -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
@@ -79,7 +129,7 @@ end
 """
 For getting the initial regime, we err to growth, unless dδ/dt suggests otherwise (i.e. it is explicitly negative)
 """
-function get_regime_type(δ::FT, δi::FT, BF::Bool; dδdt::FT = FT(0) ) where {FT} # 2 FT 1 Bool
+function get_saturation_regime_type(δ::FT, δi::FT, BF::Bool; dδdt::FT = FT(0) ) where {FT} # 2 FT 1 Bool
     if BF
         if δ < FT(0)
             if δi > FT(0) # ≥ bc we are usually heading towards WBF so ties go to WBF
@@ -112,10 +162,49 @@ function get_regime_type(δ::FT, δi::FT, BF::Bool; dδdt::FT = FT(0) ) where {F
         end
     end
 end
-get_regime_type(δ::FT, δi::FT, T::FT, T_freeze::FT) where {FT} = get_regime_type(δ, δi, T < T_freeze) # 4 FT
+get_saturation_regime_type(δ::FT, δi::FT, T::FT, T_freeze::FT) where {FT} = get_saturation_regime_type(δ, δi, T < T_freeze) # 4 FT
 
 # helper to use q_vap
-get_regime_type(q_vap::FT, q_sl::FT, q_si::FT, T::FT, T_freeze::FT; dδdt::FT = FT(0)) where {FT} = get_regime_type(q_vap-q_sl, q_vap-q_si, T < T_freeze; dδdt = dδdt) # 5 FT
+get_saturation_regime_type(q_vap::FT, q_sl::FT, q_si::FT, T::FT, T_freeze::FT; dδdt::FT = FT(0)) where {FT} = get_saturation_regime_type(q_vap-q_sl, q_vap-q_si, T < T_freeze; dδdt = dδdt) # 5 FT
+
+
+function get_saturation_regime_enum_type(δ::FT, δi::FT, BF::Bool; dδdt::FT = FT(0) ) where {FT} # 2 FT 1 Bool
+    if BF
+        if δ < FT(0)
+            if δi > FT(0) # ≥ bc we are usually heading towards WBF so ties go to WBF
+                return WBFEnumType
+            elseif iszero(δi) # if δi is zero, we are on the WBF/Subsaturated boundary, so we should be WBF
+                return (dδdt < FT(0)) ? SubsaturatedEnumType : WBFEnumType # if dδ/dt < 0, we are heading towards subsaturation, so we should be there. otherwise we err to WBF (dδdt == 0 shouldn't cause problems since then nothing is changing for the condensate at saturation)
+            else
+                return SubsaturatedEnumType
+            end
+        else
+            if iszero(δ) # if δ is zero, we are on the Supersaturated/WBF boundary, so we should be WBF
+                return (dδdt < FT(0)) ? WBFEnumType : SupersaturatedEnumType # if dδ/dt < 0, we are heading towards WBF, so we should be there, otherwise we err to Supersaturated (dδdt == 0 shouldn't cause problems since then nothing is changing for the condensate at saturation)
+            end
+            return SupersaturatedEnumType
+        end
+    else
+        if δi < FT(0)
+            if δ > FT(0) # ≥ bc we are usually heading towards WBF so ties go to WBF
+                return WBFEnumType
+            elseif iszero(δ) # if δ is zero, we are on the WBF/Subsaturated boundary, so we should be WBF
+                return (dδdt < FT(0)) ? SubsaturatedEnumType : WBFEnumType # if dδ/dt < 0, we are heading towards subsaturation, so we should be there ( otherwise we err to WBF, dδdt == 0 shouldn't cause problems since then nothing is changing for the condensate at saturation)
+            else
+                return SubsaturatedEnumType
+            end
+        else
+            if iszero(δi) # if δi is zero, we are on the Supersaturated/WBF boundary, so we should be WBF
+                return (dδdt < FT(0)) ? WBFEnumType : SupersaturatedEnumType # if dδ/dt < 0, we are heading towards WBF, so we should be there (otherwise we err to Supersaturated, dδdt == 0 shouldn't cause problems since then nothing is changing for the condensate at saturation)
+            end
+            return SupersaturatedEnumType # If you don't use T_freeze = T_triple, between 273.15 and 273.16, you can get sent here in this code despite being subsaturated for liquid.... bad things ensue...
+        end
+    end
+end
+get_saturation_regime_enum_type(δ::FT, δi::FT, T::FT, T_freeze::FT) where {FT} = get_saturation_regime_enum_type(δ, δi, T < T_freeze) # 4 FT
+# helper to use q_vap
+get_saturation_regime_enum_type(q_vap::FT, q_sl::FT, q_si::FT, T::FT, T_freeze::FT; dδdt::FT = FT(0)) where {FT} = get_saturation_regime_enum_type(q_vap-q_sl, q_vap-q_si, T < T_freeze; dδdt = dδdt) # 5 FT
+
 
 #=
  Note -- we really should be making a distinction between T_freeze and T_triple/T_0... the latter is actually where the supersaturations cross over...
@@ -130,30 +219,97 @@ That wouldn't solve everything tho bc we'll still have the wrong saturations...
 
 
 
-function get_regime(δ::FT, δi::FT, q_liq::FT, q_ice::FT, BF::Bool; dδdt::FT = FT(0)) where {FT} # 4 FT 1 Bool
-    regime_type = get_regime_type(δ, δi, BF; dδdt = dδdt)
+function get_saturation_regime(δ::FT, δi::FT, q_liq::FT, q_ice::FT, BF::Bool; dδdt::FT = FT(0)) where {FT} # 4 FT 1 Bool
+    regime_type = get_saturation_regime_type(δ, δi, BF; dδdt = dδdt)
     return add_regime_parameters(regime_type, q_liq, q_ice, BF)
 end
 
 # Helpers to dispatch back to supersaturation defined methods
-get_regime(q_vap::FT, q_liq::FT, q_ice::FT, q_sl::FT, q_si::FT, below_freezing::Bool; dδdt::FT = FT(0)) where {FT} = get_regime(q_vap - q_sl, q_vap - q_si, q_liq, q_ice, below_freezing; dδdt = dδdt) # 5 FT 1 Bool
-get_regime(q_vap::FT, q_liq::FT, q_ice::FT, q_sl::FT, q_si::FT, T::FT, T_freeze::FT; dδdt::FT = FT(0)) where {FT} = get_regime(q_vap, q_liq, q_ice, q_sl, q_si, T < T_freeze; dδdt = dδdt) # 7 FT
-get_regime(q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, below_freezing::Bool; dδdt::FT = FT(0)) where {FT} = get_regime(q_vap, q.liq, q.ice, q_eq.liq, q_eq.ice, below_freezing; dδdt = dδdt) # 1 FT 2 PhasePartition 1 Bool
-# get_regime(q::TD.PhasePartition, q_eq::TD.PhasePartition, below_freezing::Bool; dδdt::FT = FT(0)) where {FT} = get_regime(TD.vapor_specific_humidity(q), q.liq, q.ice, q_eq.liq, q_eq.ice, below_freezing; dδdt=dδdt) # 1 FT 2 PhasePartition 1 Bool
+get_saturation_regime(q_vap::FT, q_liq::FT, q_ice::FT, q_sl::FT, q_si::FT, below_freezing::Bool; dδdt::FT = FT(0)) where {FT} = get_saturation_regime(q_vap - q_sl, q_vap - q_si, q_liq, q_ice, below_freezing; dδdt = dδdt) # 5 FT 1 Bool
+get_saturation_regime(q_vap::FT, q_liq::FT, q_ice::FT, q_sl::FT, q_si::FT, T::FT, T_freeze::FT; dδdt::FT = FT(0)) where {FT} = get_saturation_regime(q_vap, q_liq, q_ice, q_sl, q_si, T < T_freeze; dδdt = dδdt) # 7 FT
+get_saturation_regime(q_vap::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, below_freezing::Bool; dδdt::FT = FT(0)) where {FT} = get_saturation_regime(q_vap, q.liq, q.ice, q_eq.liq, q_eq.ice, below_freezing; dδdt = dδdt) # 1 FT 2 PhasePartition 1 Bool
+# get_saturation_regime(q::TD.PhasePartition, q_eq::TD.PhasePartition, below_freezing::Bool; dδdt::FT = FT(0)) where {FT} = get_saturation_regime(TD.vapor_specific_humidity(q), q.liq, q.ice, q_eq.liq, q_eq.ice, below_freezing; dδdt=dδdt) # 1 FT 2 PhasePartition 1 Bool
 
-get_regime(δ::FT, δi::FT, q_liq::FT, q_ice::FT, T::FT, T_freeze::FT; dδdt::FT = FT(0)) where {FT} = get_regime(δ, δi, q_liq, q_ice, T < T_freeze; dδdt = dδdt) # 6 FT [ can't use BF here bc already have a 5 FT 1 Bool method]
+get_saturation_regime(δ::FT, δi::FT, q_liq::FT, q_ice::FT, T::FT, T_freeze::FT; dδdt::FT = FT(0)) where {FT} = get_saturation_regime(δ, δi, q_liq, q_ice, T < T_freeze; dδdt = dδdt) # 6 FT [ can't use BF here bc already have a 5 FT 1 Bool method]
+
+
 
 
 # ----------- #
 
-add_regime_parameters(regime_type::Type{<:AbstractSaturationRegime}, q_liq::FT, q_ice::FT, T::FT, T_freeze::FT) where {FT} = (q_liq, q_ice, T<T_freeze, regime_type)
-function add_regime_parameters(regime_type::Type{<:AbstractSaturationRegime}, q_liq::FT, q_ice::FT, BF::Bool) where {FT}
-    has_liq = q_liq > FT(0)
-    has_ice = q_ice > FT(0)
-    regime_type{has_liq, has_ice, BF}(has_liq, has_ice, BF)
+# 1. The barrier: distinct compilation for each combination of booleans
+ValTrueOrFalse = Union{Val{true}, Val{false}}
+function _create_regime(::Type{RT}, HL::ValTrueOrFalse, HI::ValTrueOrFalse, BF::ValTrueOrFalse) where {RT<:AbstractSaturationRegime}
+    # Inside here, HL, HI, and B are compile-time constants
+    return RT{TCP.unwrap_val(HL), TCP.unwrap_val(HI), TCP.unwrap_val(BF)}()
 end
-add_regime_parameters(regime_type::Type{<:AbstractSaturationRegime}, q_liq::FT, has_ice::Bool, BF::Bool) where {FT} = regime_type{q_liq > FT(0), has_ice, BF}(q_liq > FT(0), has_ice, BF) # convenience if you're sure about one
-add_regime_parameters(regime_type::Type{<:AbstractSaturationRegime}, has_liq::Bool, q_ice::FT, BF::Bool) where {FT} = regime_type{has_liq, q_ice > FT(0), BF}(has_liq, q_ice > FT(0), BF) # convenience if you're sure about one
+
+# add_regime_parameters(regime_type::Type{<:AbstractSaturationRegime}, q_liq::FT, q_ice::FT, T::FT, T_freeze::FT) where {FT} = add_regime_parameters(regime_type, q_liq, q_ice, T < T_freeze) # 4 FT 1 Bool
+# function add_regime_parameters(regime_type::Type{<:AbstractSaturationRegime}, q_liq::FT, q_ice::FT, BF::Bool) where {FT}
+#     has_liq::Bool = q_liq > FT(0)
+#     has_ice::Bool = q_ice > FT(0)
+#     regime_type{has_liq, has_ice, BF}()::Union{regime_type{true,true,BF}, regime_type{true,false,BF}, regime_type{false,true,BF}, regime_type{false,false,BF}}  # type assertion for clarity
+#     return _create_regime(regime_type, Val(has_liq), Val(has_ice), Val(BF))
+# end
+
+function add_regime_parameters(regime_type::Type{R}, q_liq::FT, q_ice::FT, BF::Bool) where {R<:AbstractSaturationRegime, FT}
+    if q_liq > 0
+        if q_ice > 0
+            return BF ? R{true,true,true}() : R{true,true,false}()
+        else
+            return BF ? R{true,false,true}() : R{true,false,false}()
+        end
+    else
+        if q_ice > 0
+            return BF ? R{false,true,true}() : R{false,true,false}()
+        else
+            return BF ? R{false,false,true}() : R{false,false,false}()
+        end
+    end
+end
+
+
+
+# function add_regime_parameters(::Type{R}, q_liq::FT, q_ice::FT, BF::Bool) where {R<:AbstractSaturationRegime, FT}
+#     if q_liq > 0
+#         if q_ice > 0
+#             return R{true,true,BF}()
+#         else
+#             return R{true,false,BF}()
+#         end
+#     else
+#         if q_ice > 0
+#             return R{false,true,BF}()
+#         else
+#             return R{false,false,BF}()
+#         end
+#     end
+# end
+
+
+# @generated function add_regime_parameters(::Type{R}, q_liq::FT, q_ice::FT, BF::Bool) where {R<:AbstractSaturationRegime, FT}
+#     has_liq = :(q_liq > 0)
+#     has_ice = :(q_ice > 0)
+#     quote
+#         if $has_liq
+#             if $has_ice
+#                 R{true,true,BF}(true,true,BF)
+#             else
+#                 R{true,false,BF}(true,false,BF)
+#             end
+#         else
+#             if $has_ice
+#                 R{false,true,BF}(false,true,BF)
+#             else
+#                 R{false,false,BF}(false,false,BF)
+#             end
+#         end
+#     end
+# end
+
+
+add_regime_parameters(regime_type::Type{R}, q_liq::FT, has_ice::Bool, BF::Bool) where {FT, R <: AbstractSaturationRegime} = regime_type{q_liq > FT(0), has_ice, BF}(q_liq > FT(0), has_ice, BF)::R # convenience if you're sure about one
+add_regime_parameters(regime_type::Type{R}, has_liq::Bool, q_ice::FT, BF::Bool) where {FT, R <: AbstractSaturationRegime} = regime_type{has_liq, q_ice > FT(0), BF}(has_liq, q_ice > FT(0), BF)::R # convenience if you're sure about one
 
 
 # -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
@@ -162,7 +318,7 @@ add_regime_parameters(regime_type::Type{<:AbstractSaturationRegime}, has_liq::Bo
 Get the initial direction of dδdt. Helpful in the very unlikely case you're starting at saturation.
 We used to just err to WBF but we can be more precise about it.
 
-You can take the outcome of this and use it in get_regime() to ensure you start in the right regime get_regime_type() in the (very unlikely) case your initial call is exactly at saturation.
+You can take the outcome of this and use it in get_saturation_regime() to ensure you start in the right regime get_saturation_regime_type() in the (very unlikely) case your initial call is exactly at saturation.
 """
 function get_dδdt_0(δ_0::FT, δ_0i::FT, q_liq::FT, q_ice::FT, τ_liq::FT, τ_ice::FT, dδdt_no_S::FT, below_freezing::Bool) where {FT}
 

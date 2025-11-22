@@ -2046,10 +2046,10 @@ uuid = "476501e8-09a2-5ece-8869-fb82de89a1fa"
 version = "0.6.43"
 
 [[deps.SOCRATESSingleColumnForcings]]
-deps = ["Dates", "DelimitedFiles", "Dierckx", "Downloads", "ForwardDiff", "LinearAlgebra", "NCDatasets", "NonNegLeastSquares", "PCHIPInterpolation", "Statistics", "Thermodynamics"]
-git-tree-sha1 = "18ddd9a532ed35baee7855e6df916175880a1394"
+deps = ["Dates", "DelimitedFiles", "Dierckx", "Downloads", "ForwardDiff", "LinearAlgebra", "NCDatasets", "NonNegLeastSquares", "PCHIPInterpolation", "StaticArrays", "Statistics", "Thermodynamics"]
+git-tree-sha1 = "071ae66ca6f0a75dea8b0217269d633acc0bd978"
 uuid = "efca6b66-9b98-11ed-1a32-7b7cdccd517a"
-version = "0.13.6"
+version = "0.13.9"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "ArrayInterface", "ChainRulesCore", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "PrecompileTools", "Preferences", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "Tables", "TruncatedStacktraces", "ZygoteRules"]
@@ -2832,7 +2832,7 @@ uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
 version = "1.52.0+1"
 
 [[deps.oneTBB_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
+deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
 git-tree-sha1 = "d5a767a3bb77135a99e433afe0eb14cd7f6914c3"
 uuid = "1317d2d5-d96f-522e-a858-c73665f53c3e"
 version = "2022.0.0+0"

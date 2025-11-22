@@ -54,18 +54,67 @@ Base.@kwdef struct PrecipFormation{FT}
     #
     qs_tendency_accr_rai_sno::FT # accretion QR by QS [QR -> QS]  (we store it this way, it's always to snow below freezing and [QS -> QR] above freezing.) - we calculate here becasue the outcome is temperature dependent, but we store in aux_tc bc precip is on the grid mean.
 end
-null_PrecipitationSources(::Type{FT}; fill_value::FT = FT(NaN)) where {FT} = PrecipFormation{FT}((fill_value for f in fieldnames(PrecipFormation))...)
+# null_PrecipitationSources(::Type{FT}; fill_value::FT = FT(NaN)) where {FT} = PrecipFormation{FT}((fill_value for f in fieldnames(PrecipFormation))...)
 
-Base.:+(a::PrecipFormation{FT}, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((getfield(a, f) + getfield(b, f) for f in fieldnames(PrecipFormation))...)
-Base.:-(a::PrecipFormation{FT}, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((getfield(a, f) - getfield(b, f) for f in fieldnames(PrecipFormation))...)
+@generated function null_PrecipitationSources(::Type{FT}; fill_value::FT = FT(NaN)) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(PrecipFormation)
+    # build expression: PrecipFormation{FT}(fill_value, fill_value, ...)
+    ex = :(PrecipFormation{FT}($(map(f -> :(fill_value), fields)...)))
+    return ex
+end
 
-Base.:*(a::PrecipFormation{FT}, b::FT) where {FT} = PrecipFormation{FT}((getfield(a, f) * b for f in fieldnames(PrecipFormation))...)
-Base.:*(a::FT, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((a * getfield(b, f) for f in fieldnames(PrecipFormation))...)
-Base.:+(a::PrecipFormation{FT}, b::FT) where {FT} = PrecipFormation{FT}((getfield(a, f) + b for f in fieldnames(PrecipFormation))...)
-Base.:+(a::FT, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((a + getfield(b, f) for f in fieldnames(PrecipFormation))...)
-Base.:-(a::PrecipFormation{FT}, b::FT) where {FT} = PrecipFormation{FT}((getfield(a, f) - b for f in fieldnames(PrecipFormation))...)
-Base.:-(a::FT, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((a - getfield(b, f) for f in fieldnames(PrecipFormation))...)
+# Base.:+(a::PrecipFormation{FT}, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((getfield(a, f) + getfield(b, f) for f in fieldnames(PrecipFormation))...)
+# Base.:-(a::PrecipFormation{FT}, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((getfield(a, f) - getfield(b, f) for f in fieldnames(PrecipFormation))...)
 
+@generated function Base.:+(a::PrecipFormation{FT}, b::PrecipFormation{FT}) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(PrecipFormation)
+    ex = :(PrecipFormation{FT}($(map(f -> :(a.$f + b.$f), fields)...)))
+    return ex
+end
+
+@generated function Base.:-(a::PrecipFormation{FT}, b::PrecipFormation{FT}) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(PrecipFormation)
+    ex = :(PrecipFormation{FT}($(map(f -> :(a.$f - b.$f), fields)...)))
+    return ex
+end
+
+
+# Base.:*(a::PrecipFormation{FT}, b::FT) where {FT} = PrecipFormation{FT}((getfield(a, f) * b for f in fieldnames(PrecipFormation))...)
+# Base.:*(a::FT, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((a * getfield(b, f) for f in fieldnames(PrecipFormation))...)
+# Base.:+(a::PrecipFormation{FT}, b::FT) where {FT} = PrecipFormation{FT}((getfield(a, f) + b for f in fieldnames(PrecipFormation))...)
+# Base.:+(a::FT, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((a + getfield(b, f) for f in fieldnames(PrecipFormation))...)
+# Base.:-(a::PrecipFormation{FT}, b::FT) where {FT} = PrecipFormation{FT}((getfield(a, f) - b for f in fieldnames(PrecipFormation))...)
+# Base.:-(a::FT, b::PrecipFormation{FT}) where {FT} = PrecipFormation{FT}((a - getfield(b, f) for f in fieldnames(PrecipFormation))...)
+
+@generated function Base.:*(a::PrecipFormation{FT}, b::FT) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(PrecipFormation)
+    return :(PrecipFormation{FT}($(map(f -> :(a.$f * b), fields)...)))
+end
+
+@generated function Base.:*(a::FT, b::PrecipFormation{FT}) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(PrecipFormation)
+    return :(PrecipFormation{FT}($(map(f -> :(a * b.$f), fields)...)))
+end
+
+@generated function Base.:+(a::PrecipFormation{FT}, b::FT) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(PrecipFormation)
+    return :(PrecipFormation{FT}($(map(f -> :(a.$f + b), fields)...)))
+end
+
+@generated function Base.:+(a::FT, b::PrecipFormation{FT}) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(PrecipFormation)
+    return :(PrecipFormation{FT}($(map(f -> :(a + b.$f), fields)...)))
+end
+
+@generated function Base.:-(a::PrecipFormation{FT}, b::FT) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(PrecipFormation)
+    return :(PrecipFormation{FT}($(map(f -> :(a.$f - b), fields)...)))
+end
+
+@generated function Base.:-(a::FT, b::PrecipFormation{FT}) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(PrecipFormation)
+    return :(PrecipFormation{FT}($(map(f -> :(a - b.$f), fields)...)))
+end
 
 
 """
@@ -133,17 +182,71 @@ Base.@kwdef struct OtherMicrophysicsSources{FT}
     qi_tendency_melting::FT
 end
 # null constructor [separate name to not clobber kwdef method]
-null_OtherMicrophysicsSources(::Type{FT}; fill_value::FT = FT(NaN)) where {FT} = OtherMicrophysicsSources{FT}(fill_value, fill_value, fill_value, fill_value, fill_value, fill_value)
+# null_OtherMicrophysicsSources(::Type{FT}; fill_value::FT = FT(NaN)) where {FT} = OtherMicrophysicsSources{FT}(fill_value, fill_value, fill_value, fill_value, fill_value, fill_value)
 
-Base.:+(a::OtherMicrophysicsSources{FT}, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) + getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
-Base.:-(a::OtherMicrophysicsSources{FT}, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) - getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
+@generated function null_OtherMicrophysicsSources(::Type{FT}; fill_value::FT = FT(NaN)) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(OtherMicrophysicsSources)
+    return :(OtherMicrophysicsSources{FT}($(map(f -> :(fill_value), fields)...)))
+end
 
-Base.:*(a::OtherMicrophysicsSources{FT}, b::FT) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) * b for f in fieldnames(OtherMicrophysicsSources))...)
-Base.:*(a::FT, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((a * getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
-Base.:+(a::OtherMicrophysicsSources{FT}, b::FT) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) + b for f in fieldnames(OtherMicrophysicsSources))...)
-Base.:+(a::FT, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((a + getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
-Base.:-(a::OtherMicrophysicsSources{FT}, b::FT) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) - b for f in fieldnames(OtherMicrophysicsSources))...)
-Base.:-(a::FT, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((a - getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
+# Base.:+(a::OtherMicrophysicsSources{FT}, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) + getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
+# Base.:-(a::OtherMicrophysicsSources{FT}, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) - getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
+
+@generated function Base.:+(a::OtherMicrophysicsSources{FT}, b::OtherMicrophysicsSources{FT}) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(OtherMicrophysicsSources)
+    ex = :(OtherMicrophysicsSources{FT}())
+    # Build tuple of additions
+    ex = :(OtherMicrophysicsSources{FT}($(map(f -> :(a.$f + b.$f), fields)...)))
+    return ex
+end
+@generated function Base.:-(a::OtherMicrophysicsSources{FT}, b::OtherMicrophysicsSources{FT}) where {FT}
+    fields = fieldnames(OtherMicrophysicsSources)
+    ex = :(OtherMicrophysicsSources{FT}($(map(f -> :(a.$f - b.$f), fields)...)))
+    return ex
+end
+
+# Base.:*(a::OtherMicrophysicsSources{FT}, b::FT) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) * b for f in fieldnames(OtherMicrophysicsSources))...)
+# Base.:*(a::FT, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((a * getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
+# Base.:+(a::OtherMicrophysicsSources{FT}, b::FT) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) + b for f in fieldnames(OtherMicrophysicsSources))...)
+# Base.:+(a::FT, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((a + getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
+# Base.:-(a::OtherMicrophysicsSources{FT}, b::FT) where {FT} = OtherMicrophysicsSources{FT}((getfield(a, f) - b for f in fieldnames(OtherMicrophysicsSources))...)
+# Base.:-(a::FT, b::OtherMicrophysicsSources{FT}) where {FT} = OtherMicrophysicsSources{FT}((a - getfield(b, f) for f in fieldnames(OtherMicrophysicsSources))...)
+
+@generated function Base.:*(a::OtherMicrophysicsSources{FT}, b::FT) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(OtherMicrophysicsSources)
+    ex = :(OtherMicrophysicsSources{FT}($(map(f -> :(a.$f * b), fields)...)))
+    return ex
+end
+
+@generated function Base.:*(a::FT, b::OtherMicrophysicsSources{FT}) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(OtherMicrophysicsSources)
+    ex = :(OtherMicrophysicsSources{FT}($(map(f -> :(a * b.$f), fields)...)))
+    return ex
+end
+
+@generated function Base.:+(a::OtherMicrophysicsSources{FT}, b::FT) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(OtherMicrophysicsSources)
+    ex = :(OtherMicrophysicsSources{FT}($(map(f -> :(a.$f + b), fields)...)))
+    return ex
+end
+
+@generated function Base.:+(a::FT, b::OtherMicrophysicsSources{FT}) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(OtherMicrophysicsSources)
+    ex = :(OtherMicrophysicsSources{FT}($(map(f -> :(a + b.$f), fields)...)))
+    return ex
+end
+
+@generated function Base.:-(a::OtherMicrophysicsSources{FT}, b::FT) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(OtherMicrophysicsSources)
+    ex = :(OtherMicrophysicsSources{FT}($(map(f -> :(a.$f - b), fields)...)))
+    return ex
+end
+
+@generated function Base.:-(a::FT, b::OtherMicrophysicsSources{FT}) where {FT} # generated runs at compile time to avoid runtime lookup
+    fields = fieldnames(OtherMicrophysicsSources)
+    ex = :(OtherMicrophysicsSources{FT}($(map(f -> :(a - b.$f), fields)...)))
+    return ex
+end
 
 """
     EntrDetr
@@ -1959,11 +2062,13 @@ Create a columnar state given full 3D states
  - `colidx` column index, from ClimaCore's `bycolumn` function
 
 ## Example
-```julia
+```
+julia
 bycolumn(axes(prog.cent)) do colidx
     state = TC.column_state(prog, aux, tendencies, colidx, calibrate_io)
     ...
 end
+```
 """
 function column_state(prog, aux, tendencies, colidx, calibrate_io::Bool)
     prog_cent_column = CC.column(prog.cent, colidx)
@@ -2048,7 +2153,7 @@ function do_print(io, fv_strings; indent::Int=0, return_str::Bool=false)
     end
     
     big_space_and_newline = "\n              " # for some reason, this triggers nicer output w/ @info
-    s = "" # you have to start with this to get the nice formatting w/ @info, otherwise it just prints in a long line
+    s::String = "" # you have to start with this to get the nice formatting w/ @info, otherwise it just prints in a long line
     if fv_strings isa String
         s = action(io, fv_strings, big_space_and_newline; s=s)
     elseif fv_strings isa Tuple || s isa Base.Generator

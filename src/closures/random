@@ -700,10 +700,10 @@ For each sample and each output index `i_o`, this function finds a direction vec
 that maximizes the squared directional derivative of output `i_o` relative to the sum of squared directional
 derivatives of all other outputs. Formally, it solves the generalized eigenvalue problem:
 
-```julia
+```
+julia
     max_v ( (g_i_o' * v)^2 ) / ( sum_{k != i_o} (g_k' * v)^2 + ε * ||v||^2 )
-"""
-"""
+```
     most_selective_directions_all!(J::Array{FT,3}, out_dirs::Array{FT,3}, out_scales::Array{FT,2}; ε::Real=1e-6) where {FT <: Real}
 
 Compute the most selective perturbation directions for each output and sample, along with their scaling factors.
@@ -1999,7 +1999,7 @@ new_N_i = TC.adjust_ice_N(param_set, N, N_INP, q.ice; ρ=ρ, S_i=FT(0.05), q_l=q
 
 
 
-import Pkg; import TurbulenceConvection 
+using Revise; import Pkg; import TurbulenceConvection 
 FT = Float64; CP = TC.CP; NameList = TC.NameList; APS = TC.APS; TD = TC.TD; create_parameter_set = TC.create_parameter_set
 Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/integration_tests/"))
 # using OrderedCollections: OrderedCollections # is only available from /integration_tests/ so we have to load it here
@@ -2031,7 +2031,7 @@ new_N_i = TC.adjust_ice_N(param_set, N, N_INP, q.ice; ρ=ρ, S_i=FT(0.05), q_l=q
 S_ql = 1.5740282460754777e-6; S_qi = 8.837601096511839e-8; area = 0.049966362669001334; ρ = 1.4607008779607433; p = 74651.29711651805; T = 178.1058319793084; w = 0.018706561325269898; τ_liq = 6.656910134239524e-9; τ_ice = 0.14858242869377136; q_vap = 5.095529671220612e-10; q = Thermodynamics.PhasePartition{Float64}(0.00020172170899797012, 5.7675685444915575e-9, 0.0002017154318764585); q_eq = Thermodynamics.PhasePartition{Float64}(0.00020172170899797012, 7.545234665120191e-8, 2.9644619882828738e-8); Δt = 0.007696511708622092; ts = Thermodynamics.PhaseNonEquil{Float64}(-68295.73889316698, 1.4607008779607433, Thermodynamics.PhasePartition{Float64}(0.00020172170899797012, 5.7675685444915575e-9, 0.0002017154318764585)); dqvdt = 1.2898707234822461e-5; dTdt = 0.01384903619503847
 q_liq = q.liq; q_ice = q.ice; δ_eq = q_vap - q_eq.liq; δi_eq = q_vap - q_eq.ice; dδdt_no_S = dqvdt; Γ_l = 1.7; Γ_i = 1.6; δ_0 = q_vap - q_eq.liq; δ_0i = q_vap - q_eq.ice; below_freezing = (T < TCP.T_freeze(param_set)); microphys_params = TCP.microphysics_params(param_set)
 q_vap_0 = q_vap_0 = q.tot -q.liq - q.ice + .00001
-regime = TC.get_regime(δ_0, δ_0i, q.liq, q.ice, below_freezing)
+regime = TC.get_saturation_regime(δ_0, δ_0i, q.liq, q.ice, below_freezing)
 
 milestone_t = FT(.001); milestone = TC.NotAtSupersaturationMilestone; time_tolerance = FT(1e-6)
 # TC.do_standard_fallback(milestone_t, milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, dδdt_no_S, Γ_l, Γ_i, regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix=true, return_mixing_ratio=false, depth=0, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter=false )
@@ -2056,29 +2056,379 @@ using BenchmarkTools: @btime
  @code_warntype TC.morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix=use_fix, return_mixing_ratio=false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter, time_tolerance=time_tolerance) 
 
 
+  do_standard_fallback(
+            standard_milestone_t, standard_milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, A_c_no_WBF, Γ_l, Γ_i,
+            regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter
+            )
+
+milestone_t, i_milestone_t = TC.calculate_next_standard_milestone_time(q_eq, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, S_ql, S_qi; dδdt=dδdt, dδdt_is_full_tendency=true, Γ_l=Γ_l, Γ_i=Γ_i, at_δ_eq_point=at_δ_eq_point, allow_δ_eq_point=allow_δ_eq_point)
+
+@btime TC.do_standard_fallback($milestone_t, $milestone, $time_tolerance, $S_ql, $S_qi, $q_liq, $q_ice, $δ_eq, $δi_eq, $dδdt_no_S, $Γ_l, $Γ_i, $regime, $param_set, $area, $ρ, $p, $T, $w, $τ_liq, $τ_ice, $δ_0, $δ_0i, $q, $q_eq, $Δt, $ts; use_fix=$use_fix, return_mixing_ratio=true, depth=0, dqvdt=$dqvdt, dTdt=$dTdt, fallback_to_standard_supersaturation_limiter=$fallback_to_standard_supersaturation_limiter)
+@code_warntype TC.do_standard_fallback(milestone_t, milestone, time_tolerance, S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, dδdt_no_S, Γ_l, Γ_i, regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix=use_fix, return_mixing_ratio=true, depth=0, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter)
 
 #  julia> @btime TC.morrison_milbrandt_2015_style_exponential_part_only($regime, $param_set, $area, $ρ, $p, $T, $w, $τ_liq, $τ_ice, $δ_0, $δ_0i, $q, $q_eq, $Δt, $ts; use_fix=$use_fix, return_mixing_ratio=false, dqvdt=$dqvdt, dTdt=$dTdt, fallback_to_standard_supersaturation_limiter=$fallback_to_standard_supersaturation_limiter, time_tolerance=$time_tolerance)
 #  9.032 μs (71 allocations: 8.69 KiB)
 # (3.0150505105728585e-6, 1.4610448958720172e-7)
+limiter = TC.StandardSupersaturationMoistureSourcesLimiter()
+q_liq, q_ice, δ_0, δ_0i, new_regime = step(regime, limiter, dt, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, q_eq, S_ql, S_qi, ((milestone_t < Δt) ? milestone : NotAtSupersaturationMilestone); dδdt_no_S=dδdt_no_S, Γ_l=Γ_l, Γ_i=Γ_i) # if milestone_t < Δt then we do the step, otherwise we don't (we just return the current state)
+@btime TC.step($regime, $limiter, $Δt, $q_liq, $q_ice, $δ_0, $δ_0i, $δ_eq, $δi_eq, $q_eq, $S_ql, $S_qi, (($milestone_t < $Δt) ? $milestone : TC.NotAtSupersaturationMilestone); dδdt_no_S=$dδdt_no_S, Γ_l=$Γ_l, Γ_i=$Γ_i)
+@code_warntype TC.step(regime, limiter, Δt, q_liq, q_ice, δ_0, δ_0i, δ_eq, δi_eq, q_eq, S_ql, S_qi, milestone; dδdt_no_S=dδdt_no_S, Γ_l=Γ_l, Γ_i=Γ_i)
 
+# new_regime_type = get_new_saturation_regime_type_from_milestone(milestone, regime, old_δ_0, old_δ_0i) # old_δ_0 and old_δ_0i are just for checks... could prolly get rid of them...
+@btime TC.get_new_saturation_regime_type_from_milestone($milestone, $regime, $δ_0, $δ_0i)
+@code_warntype TC.get_new_saturation_regime_type_from_milestone(milestone, regime, δ_0, δ_0i)
 
-for regime_type in (TC.Supersaturated, TC.WBF, TC.Subsaturated)
-    for has_liq in (true, false)
-        for has_ice in (true, false)
-            for below_freezing in (true, false)
-                regime = regime_type(has_liq, has_ice, below_freezing)
-                @info "regime = $(regime)"
-                @code_warntype TC.morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
-            end
-        end
-    end
-end
+new_regime_type = TC.get_new_saturation_regime_type_from_milestone(milestone, regime, δ_0, δ_0i)
+@btime TC.add_regime_parameters($new_regime_type, $q_liq, $q_ice, $is_below_freezing(regime))
+@code_warntype TC.add_regime_parameters(new_regime_type, q_liq, q_ice, is_below_freezing(regime))
+
+dt = Δt
+dt_here = min(milestone_t, dt)
+total_dt = dt + dt_here
+milestone_t, milestone, S_ql_addit, S_qi_addit, δ_eq, δi_eq = TC.calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, is_below_freezing(regime), τ_liq, τ_ice; dδdt_no_S = dδdt_no_S, Γ_l=Γ_l, Γ_i=Γ_i, at_δ_eq_point = true) # can we use the sources we already have here?
+S_ql, S_qi = TC.resolve_S_S_addit(S_ql, S_qi, dt, S_ql_addit, S_qi_addit, dt_here, dt + dt_here) # rescale to the timestep
+@btime TC.resolve_S_S_addit($S_ql, $S_qi, $Δt, $S_ql_addit, $S_qi_addit, $dt_here, $Δt + $dt_here)
+@code_warntype TC.resolve_S_S_addit(S_ql, S_qi, Δt, S_ql_addit, S_qi_addit, dt_here, total_dt)
+
+# S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+new_regime = TC.add_regime_parameters(new_regime_type, q_liq, q_ice, is_below_freezing(regime))
+new_q = q
+Δt_left = Δt - dt_here
+@btime TC.morrison_milbrandt_2015_style_exponential_part_only($new_regime, $param_set, $area, $ρ, $p, $T, $w, $τ_liq, $τ_ice, $δ_0, $δ_0i, $new_q, $q_eq, $Δt_left, $ts; use_fix=$use_fix, return_mixing_ratio=true, dqvdt=$dqvdt, dTdt=$dTdt, fallback_to_standard_supersaturation_limiter=$fallback_to_standard_supersaturation_limiter, time_tolerance=$time_tolerance)
+@code_warntype TC.morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, new_q, q_eq, Δt_left, ts; use_fix=use_fix, return_mixing_ratio=true, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter, time_tolerance=time_tolerance)
+
+# for regime_type in (TC.Supersaturated, TC.WBF, TC.Subsaturated)
+#     for has_liq in (true, false)
+#         for has_ice in (true, false)
+#             for below_freezing in (true, false)
+#                 regime = regime_type(has_liq, has_ice, below_freezing)
+#                 @info "regime = $(regime)"
+#                 @code_warntype TC.morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = true, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+#             end
+#         end
+#     end
+# end
 
 regime = TurbulenceConvection.WBF{false, false, true}(false, false, true)
 @code_warntype TC.morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
 
 
 
-@btime TC.get_params_and_go_to_mixing_ratio_exponential_part_only($param_set, $area, $ρ, $p, $T, $w, $τ_liq, $τ_ice, $δ_0, $δ_0i, $dqvdt, $dTdt, $q, $q_eq, $Δt, $ts; use_fix=$use_fix)
-@time TC.get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
-@time (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = TC.get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
+(; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = TC.get_params_and_go_to_mixing_ratio_exponential_part_only(param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts; use_fix=use_fix)
+(; A_c, A_c_no_WBF) = TC.A_c_func_with_and_without_WBF(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
+τ = TC.τ_func_EPA(τ_liq, τ_ice, L_i, c_p, dqsl_dT, Γ_i)
+
+
+standard_milestone_t, standard_milestone, S_ql, S_qi, δ_eq, δi_eq = TC.calculate_next_standard_milestone_time(regime, q_eq, q_liq, q_ice, δ_0, δ_0i, T<T_freeze, τ_liq, τ_ice; dδdt_no_S = A_c_no_WBF, Γ_l=Γ_l, Γ_i=Γ_i, allow_δ_eq_point = true) # we need to allow the eq point because otherwise we risk WBF oscillations, see note in do_standard_fallback()
+
+
+t_hit_sat = BF ? TC.t_δ_hit_value(q_si-q_sl, δ_0, A_c, τ) : TC.t_δ_hit_value(FT(0), δ_0, A_c, τ) # below freezing, stop at ice sat which is lower, above freezing, stop at liq sat which is lower
+t_out_of_liq = TC.get_t_out_of_q_liq_EPA(δ_0, A_c, τ, τ_liq, q_liq, Γ_l)
+t_out_of_ice = TC.get_t_out_of_q_ice_EPA(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si)
+
+BF = T < T_freeze
+value = BF ? (q_si - q_sl) : FT(0)
+@btime TC.t_δ_hit_value($value, $δ_0, $A_c, $τ)
+@code_warntype TC.t_δ_hit_value(value, δ_0, A_c, τ)
+
+@btime TC.get_t_out_of_q_liq_EPA($δ_0, $A_c, $τ, $τ_liq, $q_liq, $Γ_l)
+@code_warntype TC.get_t_out_of_q_liq_EPA(δ_0, A_c, τ, τ_liq, q_liq, Γ_l)
+
+
+# function get_t_out_of_q_no_WBF(δ_0::FT, A_c::FT, τ::FT, τ_c::FT, q_c::FT, Γ::FT, exit_if_fail::Bool=true) where {FT}
+@btime TC.get_t_out_of_q_ice_EPA($δ_0, $A_c, $τ, $τ_ice, $q_ice, $Γ_i, $q_sl, $q_si)
+@code_warntype TC.get_t_out_of_q_ice_EPA(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si)
+
+
+# ================================================ PROFILING one call Only ============================== #
+using Profile
+using Profile.Allocs
+using PProf
+
+# Clear previous allocation profile
+Profile.Allocs.clear()
+
+# Run your function under the allocation profiler
+Profile.Allocs.@profile sample_rate=1.0 begin
+    # TC.do_standard_fallback(
+    #     milestone_t, milestone, time_tolerance,
+    #     S_ql, S_qi, q_liq, q_ice, δ_eq, δi_eq, dδdt_no_S,
+    #     Γ_l, Γ_i, regime, param_set, area, ρ, p, T, w,
+    #     τ_liq, τ_ice, δ_0, δ_0i, q, q_eq, Δt, ts;
+    #     use_fix=use_fix,
+    #     return_mixing_ratio=true,
+    #     depth=0,
+    #     dqvdt=dqvdt,
+    #     dTdt=dTdt,
+    #     fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter
+    # )
+    # @btime TC.get_t_out_of_q_ice_EPA($δ_0, $A_c, $τ, $τ_ice, $q_ice, $Γ_i, $q_sl, $q_si)
+    TC.morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, new_q, q_eq, Δt_left, ts; use_fix=use_fix, return_mixing_ratio=true, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter, time_tolerance=time_tolerance)
+end
+
+# Launch PProf web UI for the allocation profile
+PProf.Allocs.pprof(from_c=false, web=true)
+
+
+# ---- text version ------ #
+# text summary:
+
+using Profile.Allocs
+
+# Fetch allocations
+alloc_results = Profile.Allocs.fetch()   # <-- AllocResults
+alloc_vector  = alloc_results.allocs     # <-- Vector{Alloc}, iterable
+
+# Summary by allocation type
+alloc_summary = Dict{Any, Tuple{Int, Int}}()
+for a in alloc_vector
+    T = a.type
+    count, total_bytes = get(alloc_summary, T, (0, 0))
+    alloc_summary[T] = (count + 1, total_bytes + a.size)
+end
+
+println("\n=== Top 20 Allocation Types ===")
+for (T, (count, bytes)) in sort(collect(alloc_summary), by = x -> -x[2][2])[1:min(20, length(alloc_summary))]
+    println("$T: $count allocations, $bytes bytes")
+end
+
+# Summary by stacktrace
+stack_summary = Dict{String, Int}()
+for a in alloc_vector
+    stack_str = join(string.(a.stacktrace), " -> ")
+    stack_summary[stack_str] = get(stack_summary, stack_str, 0) + a.size
+end
+
+println("\n=== Top 20 Allocation Hotspots ===")
+for (stack, bytes) in sort(collect(stack_summary), by = x -> -x[2])[1:min(20, length(stack_summary))]
+    println("$bytes bytes: $stack")
+end
+
+
+
+# ------------------------------ PROFILE FULL SIMULATION and SAVE/LOAD DATA ---------------------------- #
+
+
+
+# ====== SAVING and LOADING Profile Data ====== #   
+
+
+
+
+
+begin
+    using Profile
+    using Serialization
+    using StatProfilerHTML
+    # 1. Initialize the profiler with a large buffer and short sampling interval
+    Profile.clear()
+    Profile.clear_malloc_data()
+    Profile.init(10_000_000, 0.001)  # n = buffer size, delay = sampling interval in seconds
+
+    # 2. Run your simulation while profiling
+    @profile main1d(namelist)
+
+    # 3. Save the raw profiling data for later
+    thisdir = "/home/jbenjami/Research_Schneider/CliMA/TurbulenceConvection.jl/test/"
+    profile_jls_file = joinpath(thisdir, "main1d_profile.jls")
+    open(profile_jls_file, "w") do io
+        serialize(io, Profile.retrieve())
+    end
+
+    using PProf: PProf
+    PProf.pprof()
+end
+
+# --------------------------------- #
+
+
+# LOADING
+begin
+    using Profile
+    using Serialization
+    using StatProfilerHTML
+    # 4. Load the profiling data (on any machine)
+    profile_data = nothing
+    thisdir = ""
+    profile_jls_file = ""
+    try
+        thisdir = "/home/jbenjami/Research_Schneider/CliMA/TurbulenceConvection.jl/test/"
+        profile_jls_file = joinpath(thisdir, "main1d_profile.jls")
+        @warn "Loading profile data from $profile_jls_file"
+        profile_data = open(profile_jls_file, "r") do io
+            deserialize(io)
+        end
+    catch e
+        @warn "Failed to load profile data from $profile_jls_file: $e"
+        thisdir = "/Users/jordan/Downloads/"
+        profile_jls_file = joinpath(thisdir, "main1d_profile.jls")
+        profile_data = open(profile_jls_file, "r") do io
+            deserialize(io)
+        end
+    end
+
+    samples, stacktraces = profile_data
+
+    # 5. Delete existing HTML file if needed
+    # profile_html_file = joinpath(thisdir, "main1d_profile.html")
+    profile_html_file = joinpath(thisdir, "statprof/index.html")
+    if isfile(profile_html_file)
+        rm(profile_html_file)
+    end
+
+    # 6. Generate the HTML report
+    cd(thisdir) do
+        StatProfilerHTML.statprofilehtml(samples, stacktraces)  # outputs interactive HTML in StatProfilerHTML temp dir
+    end
+end
+
+println("Profiling complete!")
+println("Raw data saved to: ", profile_jls_file)
+println("HTML report saved to: ", profile_html_file)
+
+
+
+using PProf: PProf
+PProf.pprof(samples, stacktraces; web=true)
+http://localhost:57599/ui/flamegraph?tf
+
+
+# ====== LOGGING TC Only ====== #
+
+using Logging
+using TurbulenceConvection  # your package
+
+struct ModuleFilterLogger <: AbstractLogger
+    wrapped::ConsoleLogger
+    module_name::Module
+end
+
+# Required interface: min_enabled_level
+Logging.min_enabled_level(logger::ModuleFilterLogger) = Logging.min_enabled_level(logger.wrapped)
+
+# Filter by module
+function Logging.shouldlog(logger::ModuleFilterLogger, level, _module, group, id)
+    _module === logger.module_name && level >= Logging.min_enabled_level(logger)
+end
+
+# Handle messages
+function Logging.handle_message(logger::ModuleFilterLogger, level, message, _module, group, id, file, line; kwargs...)
+    if Logging.shouldlog(logger, level, _module, group, id)
+        Logging.handle_message(logger.wrapped, level, message, _module, group, id, file, line; kwargs...)
+    end
+end
+
+# Activate it
+global_logger(ModuleFilterLogger(ConsoleLogger(stderr, Logging.Debug), TurbulenceConvection))
+
+# Run your simulation
+main1d(namelist)
+
+
+
+# =================== LOGGING TC and SpecialFunctions ====== #
+
+using Logging
+
+struct ModuleFilterExcludeLogger <: AbstractLogger
+    logger::AbstractLogger
+    excluded_modules::Set{Module}
+end
+
+Logging.min_enabled_level(m::ModuleFilterExcludeLogger) = Logging.min_enabled_level(m.logger)
+Logging.shouldlog(m::ModuleFilterExcludeLogger, level, _module, group, id) =
+    !(_module in m.excluded_modules) && Logging.shouldlog(m.logger, level, _module, group, id)
+Logging.handle_message(m::ModuleFilterExcludeLogger, level, message, _module, group, id, file, line; kwargs...) =
+    Logging.handle_message(m.logger, level, message, _module, group, id, file, line; kwargs...)
+Logging.catch_exceptions(m::ModuleFilterExcludeLogger) = Logging.catch_exceptions(m.logger)
+
+# Exclude NCDatasets logging
+global_logger(ModuleFilterExcludeLogger(ConsoleLogger(stderr, Logging.Debug), Set([NCDatasets])))
+
+# Now your debug/info/warn messages from your code in Main and TurbulenceConvection will print,
+# but NCDatasets (or any other module you add to the set) is suppressed
+main1d(namelist)
+
+
+
+
+
+
+# ----------------------------
+# Scalar, allocation-free
+# ----------------------------
+function fast1d_interp(
+    x::Real,
+    xp::AbstractVector{<:Real},
+    fp::AbstractVector{<:Real};
+    monotonic::Bool = false
+)
+    N = length(xp)
+    
+    # Optional monotonicity check (only if requested)
+    if monotonic
+        asc = true
+        desc = true
+        for i in 2:N
+            if xp[i] < xp[i-1]; asc = false; end
+            if xp[i] > xp[i-1]; desc = false; end
+            if !asc && !desc
+                error("xp must be monotonic (ascending or descending)")
+            end
+        end
+    else
+        asc = xp[1] <= xp[end]
+    end
+
+    # Out-of-bounds handling: clamp to first/last
+    if asc
+        if x <= xp[1]; return fp[1]; elseif x >= xp[end]; return fp[end]; end
+    else
+        if x >= xp[1]; return fp[1]; elseif x <= xp[end]; return fp[end]; end
+    end
+
+    # Find interval index
+    if asc
+        i = searchsortedlast(xp, x)
+    else
+        # descending: find index manually without allocating
+        i = 1
+        while xp[i] > x
+            i += 1
+        end
+        i -= 1  # interval is xp[i] >= x >= xp[i+1]
+    end
+
+    i = min(max(i,1), N-1)
+
+    # Linear interpolation
+    if asc
+        x0, x1 = xp[i], xp[i+1]
+        y0, y1 = fp[i], fp[i+1]
+    else
+        x0, x1 = xp[i], xp[i+1]
+        y0, y1 = fp[i], fp[i+1]
+    end
+
+    return y0 + (y1 - y0)*(x - x0)/(x1 - x0)
+end
+
+# ----------------------------
+# Batch version, minimal allocations
+# ----------------------------
+function fast1d_interp_batch(xs::AbstractVector{<:Real},
+                             xp::AbstractVector{<:Real},
+                             fp::AbstractVector{<:Real};
+                             monotonic::Bool = false)
+    ys = similar(xs)
+    for j in eachindex(xs)
+        ys[j] = fast1d_interp(xs[j], xp, fp; monotonic=monotonic)
+    end
+    return ys
+end
+
+
+# ------------------------------------------------------------------
+# Fixed benchmark function
+# ------------------------------------------------------------------
+

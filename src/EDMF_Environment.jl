@@ -182,6 +182,9 @@ function microphysics!(
     reweight_processes_for_grid::Bool = TCP.get_isbits_nt(param_set.user_params, :reweight_processes_for_grid, false)
     reweight_extrema_only::Bool = TCP.get_isbits_nt(param_set.user_params, :reweight_extrema_only, false)
 
+    null_neq_moisture = null_NoneqMoistureSources(FT; fill_value = FT(0)) # move out of loop for performance
+    null_precip = null_PrecipitationSources(FT; fill_value = FT(0)) # move out of loop for performance, seems to take a lot to allocate it, since we iterate the fields
+    null_other = null_OtherMicrophysicsSources(FT; fill_value = FT(0)) # move out of loop for performance
 
     @inbounds for k in real_center_indices(grid)
         # condensation
@@ -208,10 +211,10 @@ function microphysics!(
                         )
                 end
 
+                mph_neq = null_neq_moisture
+                mph_neq_other = null_other
+                mph_precip = null_precip
 
-                mph_neq = null_NoneqMoistureSources(FT; fill_value = FT(0)) # initialize...
-                mph_neq_other = null_OtherMicrophysicsSources(FT; fill_value = FT(0)) # initialize...
-                mph_precip = null_PrecipitationSources(FT; fill_value = FT(0)) # initialize...
                 for (region_area, w_region, T, ts, region) in regions
 
                     ρ = TD.air_density(thermo_params, ts)
@@ -1180,6 +1183,7 @@ function quad_loop(en_thermo::SGSQuadrature, grid::Grid, edmf::EDMFModel, moistu
     )
     return outer_env_nt, outer_src_nt
 end
+
 
 
 

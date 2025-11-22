@@ -161,7 +161,7 @@ https://www.wolframalpha.com/input?i2d=true&i=solve+A+%CF%84%2B%5C%2840%29Subscr
 """
 function t_δ_hit_value( value::FT, δ_0::FT, A_c::FT, τ::FT) where {FT}
     logand = ( δ_0 - A_c * τ ) / ( value - A_c * τ )
-    # @debug "logand = $logand; τ = $τ; log(logand) = $(log(logand))"
+    # # @debug "logand = $logand; τ = $τ; log(logand) = $(log(logand))"
     return ((logand ≤ 1) || !isfinite(logand)) ? FT(Inf) : τ * log(logand) # solution. if logand is less than 1, the solution is in the past or otherwise unreachable so we return t = Inf
 end
 """
@@ -170,7 +170,7 @@ https://www.wolframalpha.com/input?i2d=true&i=solve+A+%CF%84%2B%5C%2840%29Subscr
 """
 function t_dδ_hit_value(value::FT, δ_0::FT, A_c::FT, τ::FT) where {FT}
     logand =  ( A_c * τ - δ_0 ) / ( A_c * τ - value - δ_0 )
-    # @debug "logand = $logand; τ = $τ; log(logand) = $(log(logand))"
+    # # @debug "logand = $logand; τ = $τ; log(logand) = $(log(logand))"
     return ((logand ≤ 1) || !isfinite(logand)) ? FT(Inf) : τ * log(logand) # solution. if logand is less than 1, the solution is in the past or otherwise unreachable so we return t = Inf
     # e.g. say A_c is 0 and value > -δ_0, then after removing all sub/supersat you'll be stuck at sat and will never reach value...
 end
@@ -322,8 +322,8 @@ function S_func_no_WBF(A_c::FT, τ::FT, τ_c::FT, δ_0::FT, Δt::FT, Γ::FT) whe
         preterm = A_c * τ / (τ_c * Γ)
 
         # if !isfinite(term_1) || !isfinite(term_2) || !isfinite(preterm) || !isfinite(prod)
-        #     @debug "A value is bad, got: term_1 = $term_1; term_2 = $term_2; preterm = $preterm; prod = $prod"
-        #     @debug "A_c = $A_c; τ = $τ; τ_c = $τ_c; δ_0 = $δ_0; Δt = $Δt; Γ = $Γ"
+        #     # @debug "A value is bad, got: term_1 = $term_1; term_2 = $term_2; preterm = $preterm; prod = $prod"
+        #     # @debug "A_c = $A_c; τ = $τ; τ_c = $τ_c; δ_0 = $δ_0; Δt = $Δt; Γ = $Γ"
         #     error("Bad value detected: term_1 = $term_1; term_2 = $term_2; preterm = $preterm; prod = $prod")
         # end
 
@@ -387,13 +387,14 @@ function get_t_out_of_q_no_WBF(δ_0::FT, A_c::FT, τ::FT, τ_c::FT, q_c::FT, Γ:
                 if exit_if_fail && (iszero(lambert_argument) || isinf(lambert_argument)) && !iszero(q_c)
                     # note `exit_if_fail` gives us an out, BigFloat can still undreflow, ( see [ https://github.com/JuliaLang/julia/issues/17893 ] and [ https://stackoverflow.com/a/38825652/13331585 ] ), so we want an out then
                     # right now, if we retry with BigFloat, we are setting exit_if_fail to false... You could make an argument we should just pass the nothing up the chain (i.e. return nothing immediately) and then fallback to :standard or something in microphysics_coupling_limiters.jl that will converge.
-                    return nothing # Note, the time is probably not zero. when we go through find_min_t() it'll get raised to eps(FT) but the time is almost certainly longer than that! But fast is fast so hopefully it doesnt cause too many issues. We don't want to have to go to BigFloats (or even ArbFloats https://github.com/JeffreySarnoff/ArbNumerics.jl)
+                    # return nothing # Note, the time is probably not zero. when we go through find_min_t() it'll get raised to eps(FT) but the time is almost certainly longer than that! But fast is fast so hopefully it doesnt cause too many issues. We don't want to have to go to BigFloats (or even ArbFloats https://github.com/JeffreySarnoff/ArbNumerics.jl)
+                    return (; sol = t_out_of_q, success = false)
                 else
                     for LW_branch in ((lambert_argument < FT(0)) ? (0, -1) : (0,))
                         t_candidate = (A_c * τ * LambertW.lambertw(lambert_argument, LW_branch) +  A_c*τ + c - δ_0) / A_c # for some reason this seemed more stable in paractice....
                         # t_candidate = τ * (LambertW.lambertw(lambert_argument, LW_branch) + 1) + (c-δ_0) / A_c # true if δ_0 ≠ A_c [dividing by A_c usually makes things much bigger, so we separate the tau scale stuff from the potentially much smaller ], we done do (τ + 1) though in case τ is large [[ updte wasn't actually more stable in testing... idk why... ]]
                         if t_candidate > FT(0)
-                            # @debug ("q here 1, t_candidate = $t_candidate, lambert_argument = $lambert_argument")
+                            # # @debug ("q here 1, t_candidate = $t_candidate, lambert_argument = $lambert_argument")
                             t_out_of_q = min(t_out_of_q, t_candidate)
                         elseif iszero(t_candidate) # could be an underflow problem... (i.e. nextfloat is not big enough for the addition and subtraction above to work...)
                             # t_out_of_q = FT(0) # if we're too close to zero, we can't find the solution
@@ -403,7 +404,7 @@ function get_t_out_of_q_no_WBF(δ_0::FT, A_c::FT, τ::FT, τ_c::FT, q_c::FT, Γ:
 
             end
         else # if δ_0 = A_c * τ, sol'n 2 is valid
-            # @debug "here"
+            # # @debug "here"
             t_candidate = c/A_c
             if (t_candidate = c/A_c) > FT(0)
                 t_out_of_q = min(t_out_of_q, c / A_c)  # invalid unless A * τ = δ_0.. [A_c ≠ 0] ... unlikely, need A_c = δ_0 / τ which is generally not true
@@ -415,12 +416,12 @@ function get_t_out_of_q_no_WBF(δ_0::FT, A_c::FT, τ::FT, τ_c::FT, q_c::FT, Γ:
     if iszero(δ_0) # only valid if δ_0 = 0, which is possible right at a perfect transition
         if (lambert_argument = -exp(-c/(A_c*τ) - 1)) > -exp(-1)
             if exit_if_fail && iszero(lambert_argument) && !iszero(q_c)
-                t_out_of_q = return nothing
+                return (; sol = t_out_of_q, success = false)
             else
                 for LW_branch in ((lambert_argument < FT(0)) ? (0, -1) : (0,))
                     t_candidate = τ * LambertW.lambertw(lambert_argument, LW_branch) + c/(A_c) + τ # true if δ_0 = 0 which is possible at transition
                     if t_candidate > FT(0)
-                        # @debug("q here 2, t_candidate = $t_candidate, lambert_argument = $lambert_argument")
+                        # # @debug("q here 2, t_candidate = $t_candidate, lambert_argument = $lambert_argument")
                         t_out_of_q = min(t_out_of_q, t_candidate)
                     elseif iszero(t_candidate) # could be an underflow problem... (i.e. nextfloat is not big enough for the addition and subtraction above to work...)
                         # t_out_of_q = FT(0) # if we're too close to zero, we can't find the solution
@@ -435,11 +436,11 @@ function get_t_out_of_q_no_WBF(δ_0::FT, A_c::FT, τ::FT, τ_c::FT, q_c::FT, Γ:
 
     # sol'n 5
     if iszero(A_c) && ((δ_0 * c) > c^2) # only for [δ_0 > c if c > 0] or [δ_0 < c if c < 0] (i.e. δ_0 * c > c^2) do we always get a positive answer. I believe our c is always negative btw but this is most general
-        # @debug("q here 3")
+        # # @debug("q here 3")
         t_out_of_q = min(t_out_of_q, τ * log(δ_0/(δ_0-c)) )  # invalid unless A_c = 0, unlikely...
     end
 
-    return t_out_of_q
+    return (; sol = t_out_of_q, success = true)
 end
 const get_t_out_of_q_liq = get_t_out_of_q_no_WBF
 const get_t_out_of_q_ice_no_WBF = get_t_out_of_q_no_WBF
@@ -450,11 +451,14 @@ e.g.
     Rearrange -q_ice = QICON * Δt to get: A_c * Δt +  B * Δt +  (δ_0 - A_c * τ) * (1 - exp(-Δt / τ)) = c where c = (-q_ice)) * (τ_ice * Γ_i / τ) --> RHS = q_ice
     where B = (q_sl - q_si) / (τ_ice * Γ_i) * (τ_ice * Γ_i / τ) 
 """
-function get_t_out_of_q_WBF(δ_0::FT, A_c::Union{FT, FT2}, τ::FT, τ_c::FT, q_ice::FT, Γ::FT, q_sl::FT, q_si::FT, exit_if_fail::Bool=true) where {FT, FT2}
+# function get_t_out_of_q_WBF(δ_0::FT, A_c::Union{FT, FT2}, τ::FT, τ_c::FT, q_ice::FT, Γ::FT, q_sl::FT, q_si::FT, exit_if_fail::Bool=true) where {FT, FT2}
+function get_t_out_of_q_WBF(δ_0::FT, A_c::FT2, τ::FT, τ_c::FT, q_ice::FT, Γ::FT, q_sl::FT, q_si::FT, exit_if_fail::Bool=true) where {FT, FT2}
     B = (q_sl - q_si) /  τ # (q_sl - q_si) / (τ_c * Γ) * (τ_c * Γ / τ) #
     c = -q_ice * (τ_c * Γ / τ) # Rearrange QICON * Δt = -q_ice to get: A_c * Δt + (δ_0 - A_c * τ) * (1 - exp(-Δt / τ)) + B * Δt = c and solve for Δt
 
+
     t_out_of_q = FT(Inf)
+
     # sol'n 1,2
     if !iszero(A_c + B)
         if (δ_0 ≠ (A_c * τ)) # sol'n 1 is valid [almost a surety]
@@ -462,33 +466,37 @@ function get_t_out_of_q_WBF(δ_0::FT, A_c::Union{FT, FT2}, τ::FT, τ_c::FT, q_i
             # lambert_argument_big = exp(-(c_big + A_c_big * τ_big - big(δ_0)) / ((A_c_big + B_big)*τ_big)) * (big(δ_0) - A_c_big * τ_big) / ((A_c_big + B_big)*τ_big) # for BigFloat stability
             if (lambert_argument = exp(-(c + A_c*τ - δ_0)/((A_c + B)*τ) + log(abs((δ_0 - A_c*τ)/((A_c + B)*τ))) * sign(δ_0 - A_c*τ) * sign((A_c + B)*τ))) > -exp(-1) # this is more accurate...
                 if exit_if_fail && iszero(lambert_argument) && !iszero(q_ice)
-                    return nothing # signifiy a problem
+                    # return nothing # signifiy a problem
+                    return (; sol = t_out_of_q, success = false)
                 else    
                     for LW_branch in ((lambert_argument < FT(0)) ? (0, -1) : (0,))
                         t_candidate = (τ*(A_c + B) * LambertW.lambertw(lambert_argument, LW_branch) +  A_c*τ + c - δ_0) / (A_c + B) # # for some reason this seemed more stable in paractice....
                         # t_candidate = τ * LambertW.lambertw(lambert_argument, LW_branch) +  (A_c*τ + c - δ_0) / (A_c + B) # trial version
-                        @debug("ice here 1, t_candidate = $t_candidate, lambert_argument = $lambert_argument")
+                        # @debug("ice here 1, t_candidate = $t_candidate, lambert_argument = $lambert_argument")
                         if t_candidate > FT(0)
-                            # @debug("ice here 1, t_candidate = $t_candidate, lambert_argument = $lambert_argument")
+                            # # @debug("ice here 1, t_candidate = $t_candidate, lambert_argument = $lambert_argument")
                             t_out_of_q = min(t_out_of_q, t_candidate)
                         end
                     end
                 end
             end
+            return (; sol = t_out_of_q, success = true)
+
 
         else # if δ_0 = A_c * τ, sol'n 2 is valid
-            @debug("ice here 2")
+            # @debug("ice here 2")
             if (t_candidate = c / (A_c + B)) > FT(0)
                 t_out_of_q = min(t_out_of_q, t_candidate)  # invalid unless A * τ = δ_0.. [A_c ≠ 0] ... unlikely, need A_c = δ_0 / τ which is generally not true
             end
         end
     end
 
+
     # sol'n 3, 4
     if iszero(δ_0)
         if iszero(A_c) 
             if !iszero(B*τ) # really is just iszero(B) bc τ shouldnt be 0
-                @debug("ice here 3")
+                # @debug("ice here 3")
                 if (t_candidate = c / B) > FT(0)
                     t_out_of_q = min(t_out_of_q, c / B) 
                 end
@@ -499,12 +507,13 @@ function get_t_out_of_q_WBF(δ_0::FT, A_c::Union{FT, FT2}, τ::FT, τ_c::FT, q_i
         if !iszero(A_c) && !iszero(A_c + B) && !iszero(c)
             if (lambert_argument = - A_c * exp(-(c + A_c * τ) / ((A_c + B)*τ)) / (A_c + B)) > -exp(-1) # within lambertw domain
                 if exit_if_fail && iszero(lambert_argument) && !iszero(q_ice)
-                    return nothing # signifiy a problem (we can't know sol'n for sure, you can try fallback to BigFloat)
+                    # return nothing # signifiy a problem (we can't know sol'n for sure, you can try fallback to BigFloat)
+                    return (; sol = t_out_of_q, success = false)
                 else
                     for LW_branch in ((lambert_argument < FT(0)) ? (0, -1) : (0,))
                         t_candidate = (τ*(A_c + B) * LambertW.lambertw(lambert_argument, LW_branch) + A_c * τ + c) / (A_c + B)
                         if t_candidate > FT(0)
-                            # @debug("ice here 5, t_candidate = $t_candidate")
+                            # # @debug("ice here 5, t_candidate = $t_candidate")
                             t_out_of_q = min(t_out_of_q, t_candidate)
                         end
                     end
@@ -515,11 +524,12 @@ function get_t_out_of_q_WBF(δ_0::FT, A_c::Union{FT, FT2}, τ::FT, τ_c::FT, q_i
 
     # sol'n 5
     if (B == -A_c) && !iszero(A_c * τ) && ((logand = (A_c * τ - δ_0) / (A_c * τ + c - δ_0)) > FT(1)) # only for logand > 1 do we get a positive answer
-        # @debug("ice here 6")
+        # # @debug("ice here 6")
         t_out_of_q = min(t_out_of_q, τ * log(logand)) # invalid unless A_c = 0, unlikely...
     end
 
-    return t_out_of_q
+    # return t_out_of_q
+    return (; sol = t_out_of_q, success = true)
 end
 
 const get_t_out_of_q_ice = get_t_out_of_q_WBF
@@ -550,20 +560,21 @@ function get_t_T_hit_T_freeze(δ_0::FT, A_c::FT, τ::FT, τ_liq::FT, τ_ice::FT,
         if (δ_0 ≠ (A_c * τ)) # sol'n 1 is valid [almost a surety]
             if (lambert_argument = exp(-(c + A_c*K*τ - K*δ_0) / ((A_c*K + B)*τ)) * K*(δ_0 - A_c * τ) / ((A_c*K + B)*τ)) > -exp(-1) # within lambertw domain
                 if exit_if_fail && iszero(lambert_argument) && !iszero(c)
-                    return nothing # signifiy a problem (we can't know sol'n for sure, you can try fallback to BigFloat)
+                    # return nothing # signifiy a problem (we can't know sol'n for sure, you can try fallback to BigFloat)
+                    return (; sol = t_out_of_q, success = false)
                 else
                     for LW_branch in ((lambert_argument < FT(0)) ? (0, -1) : (0,))
                         t_candidate = (τ*(A_c*K + B) * LambertW.lambertw(lambert_argument, LW_branch) +  A_c*K*τ + c - K*δ_0) / (A_c*K + B)
-                        @debug "branch is $LW_branch, t_candidate = $t_candidate"
+                        # @debug "branch is $LW_branch, t_candidate = $t_candidate"
                         if t_candidate > FT(0)
-                            @debug("vap here 1, t_candidate = $t_candidate, lambert_argument = $lambert_argument")
+                            # @debug("vap here 1, t_candidate = $t_candidate, lambert_argument = $lambert_argument")
                             t_out_of_q = min(t_out_of_q, t_candidate)
                         end
                     end
                 end
             end
         else # if δ_0 = A_c * τ, sol'n 2 is valid
-            @debug("vap here 2")
+            # @debug("vap here 2")
             t_out_of_q = min(t_out_of_q, c / (A_c * K + B))  # invalid unless A * τ = δ_0.. [A_c ≠ 0] ... unlikely, need A_c = δ_0 / τ which is generally not true
         end    
     end
@@ -573,12 +584,13 @@ function get_t_T_hit_T_freeze(δ_0::FT, A_c::FT, τ::FT, τ_liq::FT, τ_ice::FT,
         if !iszero(A_c*K + B) 
             if (lambert_argument = -A_c*K * exp(-(c + A_c*K*τ)/((B + A_c*K)*τ)) / (B + A_c*K)) > -exp(-1) # within lambertw domain
                 if exit_if_fail && iszero(lambert_argument) && !iszero(c)
-                    return nothing # signifiy a problem (we can't know sol'n for sure, you can try fallback to BigFloat)
+                    # return nothing # signifiy a problem (we can't know sol'n for sure, you can try fallback to BigFloat)
+                    return (; sol = t_out_of_q, success = false)
                 else
                     for LW_branch in ((lambert_argument < FT(0)) ? (0, -1) : (0,))
                         t_candidate = (τ*(A_c*K + B) * LambertW.lambertw(lambert_argument, LW_branch) + A_c*K*τ + c)/(A_c*K + B)
                         if t_candidate > FT(0)
-                            @debug("vap here 3, t_candidate = $t_candidate")
+                            # @debug("vap here 3, t_candidate = $t_candidate")
                             t_out_of_q = min(t_out_of_q, t_candidate)
                         end
                     end
@@ -589,12 +601,13 @@ function get_t_T_hit_T_freeze(δ_0::FT, A_c::FT, τ::FT, τ_liq::FT, τ_ice::FT,
         if iszero(c) 
             if (lambert_argument = -A_c*K * exp(-(A_c*K)/(A_c*K + B)) / (A_c*K + B)) > -exp(-1) # within lambertw domain
                 if exit_if_fail && iszero(lambert_argument) && !iszero(c)
-                    return nothing # signifiy a problem (we can't know sol'n for sure, you can try fallback to BigFloat)
+                    # return nothing # signifiy a problem (we can't know sol'n for sure, you can try fallback to BigFloat)
+                    return (; sol = t_out_of_q, success = false)
                 else
                     for LW_branch in ((lambert_argument < FT(0)) ? (0, -1) : (0,))
                         t_candidate = τ*(LambertW.lambertw(lambert_argument, LW_branch) + ((A_c*K) / (A_c*K + B)))
                         if t_candidate > FT(0)
-                            @debug("vap here 4, t_candidate = $t_candidate")
+                            # @debug("vap here 4, t_candidate = $t_candidate")
                             t_out_of_q = min(t_out_of_q, t_candidate)
                         end
                     end
@@ -605,18 +618,19 @@ function get_t_T_hit_T_freeze(δ_0::FT, A_c::FT, τ::FT, τ_liq::FT, τ_ice::FT,
 
     # sol'n 4
     if ((A_c*B*τ) ≠ (B*δ_0)) && ((A_c*c + B*δ_0) ≠ (A_c*B*τ)) && (K == B/A_c) && !iszero(A_c)
-        @debug("vap here 5")
+        # @debug("vap here 5")
         t_out_of_q = min(t_out_of_q, τ * log(B*(A_c*τ - δ_0)/(A_c*B*τ - A_c*c - B*δ_0))) # invalid unless A_c = 0, unlikely...
     end
 
     # sol'n 5
     if iszero(A_c) && iszero(B) && !iszero(K*δ_0)
-        @debug("vap here 6")
+        # @debug("vap here 6")
         t_out_of_q = min(t_out_of_q, τ * log((K*δ_0)/(K*δ_0 - c))) # invalid unless A_c = 0, unlikely...
     end
 
-    @debug "get_t_T_hit_T_freeze is gonna return $t_out_of_q"
-    return t_out_of_q
+    # @debug "get_t_T_hit_T_freeze is gonna return $t_out_of_q"
+    # return t_out_of_q
+    return (; sol = t_out_of_q, success = true)
     
 end
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
@@ -718,18 +732,18 @@ function get_t_var_hit_value(var::Union{Val{:δ}, Val{:δi}, Val{:δip}, Val{:δ
     
     # sometimes, there is a root even if the endpoints match. This just means there are multiple (an even number) roots. Bisection search can help us find some of these cases.
     if signbit(var_at_max_t - value) == signbit(var_at_min_t - value) # there's no root in the interval, could also use and 
-        # @debug(" possibly no root in interval, got var_at_max_t = $var_at_max_t, var_at_min_t = $var_at_min_t, value = $value | (var_at_max_t - value) = $(var_at_max_t - value), (var_at_min_t - value) = $(var_at_min_t - value), min_t = $min_t, max_t = $max_t")
-        # @debug "attempting to bisect range to ensure root doesn't exist"
+        # # @debug(" possibly no root in interval, got var_at_max_t = $var_at_max_t, var_at_min_t = $var_at_min_t, value = $value | (var_at_max_t - value) = $(var_at_max_t - value), (var_at_min_t - value) = $(var_at_min_t - value), min_t = $min_t, max_t = $max_t")
+        # # @debug "attempting to bisect range to ensure root doesn't exist"
         # bisect search bc sometimes the root is just hard to find...
         new_max_t = max_t
         bisection_failed::Bool = true
         while num_check_bisect_endpoints > 0
-            # @debug "$num_check_bisect_endpoints bisect iters remaining | new_max_t = $new_max_t ==> $(new_max_t/2)"
+            # # @debug "$num_check_bisect_endpoints bisect iters remaining | new_max_t = $new_max_t ==> $(new_max_t/2)"
             new_max_t /= FT(2)
             var_at_new_max_t = get_t_var_hit_value_helper_Δt_safe(var, param_set, δ_0, A_c, τ, τ_liq, τ_ice, Γ_l, Γ_i, q_sl, q_si, T, p, q_vap, q, q_eq, q_liq, q_ice, new_max_t, ts, w; dqvdt=dqvdt, dTdt=dTdt, error_on_q_neg = false, use_WBF = use_WBF)
-            # @debug "(var_at_new_max_t - value) = $(var_at_new_max_t - value) | new_max_t = $new_max_t, var_at_new_max_t = $var_at_new_max_t, value = $value"
+            # # @debug "(var_at_new_max_t - value) = $(var_at_new_max_t - value) | new_max_t = $new_max_t, var_at_new_max_t = $var_at_new_max_t, value = $value"
             if signbit(var_at_new_max_t - value) != signbit(var_at_min_t - value) # there's a root in the interval, could also use ⊻ (\xor)
-                # @debug " bisecting endpoint worked, found root in interval, var_at_max_t $new_max_t = $var_at_new_max_t, var_at_min_t $min_t = $var_at_min_t, value = $value"
+                # # @debug " bisecting endpoint worked, found root in interval, var_at_max_t $new_max_t = $var_at_new_max_t, var_at_min_t $min_t = $var_at_min_t, value = $value"
                 max_t = new_max_t
                 var_at_max_t = var_at_new_max_t
                 bisection_failed  = false
@@ -753,7 +767,7 @@ function get_t_var_hit_value(var::Union{Val{:δ}, Val{:δi}, Val{:δip}, Val{:δ
     else
         known_root = true
     end
-    @debug "get_t_var_hit_value() debug point: $var | var_at_max_t - value = $(var_at_max_t - value), var_at_min_t - value = $(var_at_min_t - value), var_at_max_t = $var_at_max_t, var_at_min_t = $var_at_min_t, value = $value, min_t = $min_t, max_t = $max_t"
+    # @debug "get_t_var_hit_value() debug point: $var | var_at_max_t - value = $(var_at_max_t - value), var_at_min_t - value = $(var_at_min_t - value), var_at_max_t = $var_at_max_t, var_at_min_t = $var_at_min_t, value = $value, min_t = $min_t, max_t = $max_t"
 
 
     # check predicted t to maybe narrow our range faster (our predicted t should be quite close to the answer normally)
@@ -775,7 +789,7 @@ function get_t_var_hit_value(var::Union{Val{:δ}, Val{:δi}, Val{:δip}, Val{:δ
                 return t_guess, true
             end
             if signbit(var_at_t_guess - value) != signbit(var_at_min_t - value) # there's a root in the interval, could also use ⊻ (\xor)
-                # @debug "var_at_t_guess = $var_at_t_guess, var_at_min_t = $var_at_min_t, value = $value"
+                # # @debug "var_at_t_guess = $var_at_t_guess, var_at_min_t = $var_at_min_t, value = $value"
                 max_t = t_guess # the sign change we found between beginning and end must be between min_t and t_guess
             else # probably not a root could still search w/ secant...
                 min_t = t_guess # the sign change we found between beginning and end must be between t_guess and the end
@@ -783,15 +797,15 @@ function get_t_var_hit_value(var::Union{Val{:δ}, Val{:δi}, Val{:δip}, Val{:δ
         end # if t_guess > max_t, we could check it but we don't know how far away it is and can't guarantee it's near enough to the root for the methods to be valid...
     end
 
-    @debug "get_t_var_hit_value() debug point: min_t = $min_t, max_t = $max_t, solver_method = $solver_method"
+    # @debug "get_t_var_hit_value() debug point: min_t = $min_t, max_t = $max_t, solver_method = $solver_method"
 
 
     # use let block to avoid penalty from capturing variables  (though it had seemed ok without let block using anonymous (NOT named) func, naming the func really killed our inference times, up from 10s to 5mins)
     val_min_t = get_t_var_hit_value_helper_Δt_safe(var, param_set, δ_0, A_c, τ, τ_liq, τ_ice, Γ_l, Γ_i, q_sl, q_si, T, p, q_vap, q, q_eq, q_liq, q_ice, min_t, ts, w; dqvdt=dqvdt, dTdt=dTdt, error_on_q_neg = false, use_WBF = use_WBF) - value
     val_max_t = get_t_var_hit_value_helper_Δt_safe(var, param_set, δ_0, A_c, τ, τ_liq, τ_ice, Γ_l, Γ_i, q_sl, q_si, T, p, q_vap, q, q_eq, q_liq, q_ice, max_t, ts, w; dqvdt=dqvdt, dTdt=dTdt, error_on_q_neg = false, use_WBF = use_WBF) - value
     if !(val_min_t * val_max_t < FT(0)) && (solver_method == TD.RS.RegulaFalsiMethod)
-        @debug "signs are the same at endpoints, we can't use regula falsi, got val_min_t = $val_min_t, val_max_t = $val_max_t, min_t = $min_t, max_t = $max_t, solver_method = $solver_method"
-        # @debug "var = $var; δ_0 = $δ_0; A_c = $A_c; τ = $τ; τ_liq = $τ_liq; τ_ice = $τ_ice; Γ_l = $Γ_l; Γ_i = $Γ_i; q_sl = $q_sl; q_si = $q_si; T = $T; p = $p; q_vap = $q_vap; q = $q; q_eq = $q_eq; q_liq = $q_liq; q_ice = $q_ice; ts = $ts; w = $w"
+        # @debug "signs are the same at endpoints, we can't use regula falsi, got val_min_t = $val_min_t, val_max_t = $val_max_t, min_t = $min_t, max_t = $max_t, solver_method = $solver_method"
+        # # @debug "var = $var; δ_0 = $δ_0; A_c = $A_c; τ = $τ; τ_liq = $τ_liq; τ_ice = $τ_ice; Γ_l = $Γ_l; Γ_i = $Γ_i; q_sl = $q_sl; q_si = $q_si; T = $T; p = $p; q_vap = $q_vap; q = $q; q_eq = $q_eq; q_liq = $q_liq; q_ice = $q_ice; ts = $ts; w = $w"
         return max_t, false
     end
     sol = let var = var, param_set = param_set, δ_0 = δ_0, A_c = A_c, τ = τ, τ_liq = τ_liq, τ_ice = τ_ice, Γ_l = Γ_l, Γ_i = Γ_i, q_sl = q_sl, q_si = q_si, T = T, p = p, q_vap = q_vap, q = q, q_eq = q_eq, q_liq = q_liq, q_ice = q_ice, ts = ts, w = w
@@ -806,9 +820,9 @@ function get_t_var_hit_value(var::Union{Val{:δ}, Val{:δi}, Val{:δip}, Val{:δ
 
     # handle convergence out of bounds caused by secant method
     if !(min_t ≤ sol.root ≤ max_t)
-        @debug "sol.root = $(sol.root) is out of bounds min_t = $min_t, max_t = $max_t, solver_method = $solver_method"
+        # @debug "sol.root = $(sol.root) is out of bounds min_t = $min_t, max_t = $max_t, solver_method = $solver_method"
         if (solver_method == TD.RS.SecantMethod) && allow_secant_fallback_to_regula_falsi && known_root
-            @debug "secant method converged out of bounds but we know a root exists (endpoint signs are different...). Falling back to RegulaFalsiMethod() which is guaranteed to converge inbounds..."
+            # @debug "secant method converged out of bounds but we know a root exists (endpoint signs are different...). Falling back to RegulaFalsiMethod() which is guaranteed to converge inbounds..."
 
             # use let block to avoid penalty from capturing variables  (though it had seemed ok without let block using anonymous (NOT named) func, naming the func really killed our inference times, up from 10s to 5mins)
             sol = let var = var, param_set = param_set, δ_0 = δ_0, A_c = A_c, τ = τ, τ_liq = τ_liq, τ_ice = τ_ice, Γ_l = Γ_l, Γ_i = Γ_i, q_sl = q_sl, q_si = q_si, T = T, p = p, q_vap = q_vap, q = q, q_eq = q_eq, q_liq = q_liq, q_ice = q_ice, ts = ts, w = w, dqvdt = dqvdt, dTdt = dTdt
@@ -821,7 +835,7 @@ function get_t_var_hit_value(var::Union{Val{:δ}, Val{:δi}, Val{:δip}, Val{:δ
                 )
             end
         else
-            @debug("secant method converged out of bounds -- the root may still exist. Consider setting allow_secant_fallback_to_regula_falsi = true or switching to regula_falsi alltogether. returning Non-Convergence and sol'n at max_t")
+            # @debug("secant method converged out of bounds -- the root may still exist. Consider setting allow_secant_fallback_to_regula_falsi = true or switching to regula_falsi alltogether. returning Non-Convergence and sol'n at max_t")
             # could use S_func_zero_Δt_safe here but also want new_T for BF checking...
             return max_t, false
         end
@@ -829,10 +843,10 @@ function get_t_var_hit_value(var::Union{Val{:δ}, Val{:δi}, Val{:δip}, Val{:δ
 
     if sol.converged
 
-        @debug "returning 2 $var| sol.root = $(sol.root)"
+        # @debug "returning 2 $var| sol.root = $(sol.root)"
         return sol.root, true
     else
-        @debug "returning 3 $var | max_t = $max_t"
+        # @debug "returning 3 $var | max_t = $max_t"
         return max_t, false
     end
 
@@ -1085,7 +1099,7 @@ function morrison_milbrandt_2015_style(
     if area > 0
 
         if emit_warnings && (Δt < eps(FT))
-            @debug "Timestep $(Δt) is very small (smaller than eps(FT) = $(eps(FT))), may cause numerical issues..."
+            # @debug "Timestep $(Δt) is very small (smaller than eps(FT) = $(eps(FT))), may cause numerical issues..."
         end
 
         δ_0 = q_vap - q_eq.liq # supersaturation over liquid
@@ -1097,7 +1111,7 @@ function morrison_milbrandt_2015_style(
 
         # below_freezing::Bool = T < TCP.T_freeze(param_set)
         below_freezing::Bool = T < TCP.T_triple(param_set) # In the code this is actually where the saturation vapor pressures are equal... I think it's wrong though
-        regime = get_regime(q_vap, q, q_eq, below_freezing)
+        regime = get_saturation_regime(q_vap, q, q_eq, below_freezing)
 
         return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, δ_0_shum = δ_0, δ_0i_shum = δ_0i, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
 
@@ -1255,7 +1269,7 @@ function morrison_milbrandt_2015_style(
     ) where {FT}
 
     if depth == max_depth
-        @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
+        # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
         S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
@@ -1263,7 +1277,7 @@ function morrison_milbrandt_2015_style(
     local S_ql_addit::FT
     local S_qi_addit::FT
 
-    @debug "Calling Supersaturated{$(q.liq > FT(0)), $(q.ice > FT(0)), true}"
+    # @debug "Calling Supersaturated{$(q.liq > FT(0)), $(q.ice > FT(0)), true}"
 
     # --- Thermo  constants ------------------------------------------------------------------------------------ #
     (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts) 
@@ -1278,31 +1292,31 @@ function morrison_milbrandt_2015_style(
 
 
     max_t = Δt
-    t_out_of_liq = get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
-    t_out_of_ice = get_t_out_of_q_ice(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si) # don't calculate if we're starting with no ice, calculation would fail  # call no matter what..., apparently this can be 0 even if you start w/ no ice and gain some eventually you can lose it again? had no idea... evem w no updraft or other external stuff i mean...
+    (t_out_of_liq, t_out_of_liq_valid) = get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
+    (t_out_of_ice, t_out_of_ice_valid) = get_t_out_of_q_ice(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si) # don't calculate if we're starting with no ice, calculation would fail  # call no matter what..., apparently this can be 0 even if you start w/ no ice and gain some eventually you can lose it again? had no idea... evem w no updraft or other external stuff i mean...
     
-    if isnothing(t_out_of_liq)
+    if !t_out_of_liq_valid
         if fallback_to_standard_supersaturation_limiter
-            @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
+            # @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
             return standard_supersaturation_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) # use this version with δ_0, δ_0i to keep our up to date supersaturation
         end
 
         # upgrade to BigFloat Call
         A_c_big = A_c_func(big(τ_ice), big(Γ_l), big(q_sl), big(q_si), big(g), big(w), big(c_p), big(e_sl), big(L_i), big(dqsl_dT), big(dqvdt), big(dTdt), big(p), big(ρ))
         τ_big = τ_func(big(τ_liq), big(τ_ice), big(L_i), big(c_p), big(dqsl_dT), big(Γ_i))
-        t_out_of_liq = FT(get_t_out_of_q_liq(big(δ_0), A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false)) # don't exit again if fail...
-        @debug "After upgrading to BigFloat, t_out_of_liq = $t_out_of_liq"
+        t_out_of_liq = FT(get_t_out_of_q_liq(big(δ_0), A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false).sol) # don't exit again if fail...
+        # @debug "After upgrading to BigFloat, t_out_of_liq = $t_out_of_liq"
     end
-    if isnothing(t_out_of_ice)
+    if !t_out_of_ice_valid
         if fallback_to_standard_supersaturation_limiter
-            @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
+            # @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
             return standard_supersaturation_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) # use this version with δ_0, δ_0i to keep our up to date supersaturation
         end
         # upgrade to BigFloat Call
         A_c_big = (@isdefined A_c_big) ? A_c_big : A_c_func(big(τ_ice), big(Γ_l), big(q_sl), big(q_si), big(g), big(w), big(c_p), big(e_sl), big(L_i), big(dqsl_dT), big(dqvdt), big(dTdt), big(p), big(ρ))
         τ_big = (@isdefined τ_big) ? τ_big : τ_func(big(τ_liq), big(τ_ice), big(L_i), big(c_p), big(dqsl_dT), big(Γ_i))
-        t_out_of_ice = FT(get_t_out_of_q_ice(big(δ_0), A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), big(q_sl), big(q_si), false)) # don't exit again if fail...
-        @debug "After upgrading to BigFloat, t_out_of_ice = $t_out_of_ice"
+        t_out_of_ice = FT(get_t_out_of_q_ice(big(δ_0), A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), big(q_sl), big(q_si), false).sol) # don't exit again if fail...
+        # @debug "After upgrading to BigFloat, t_out_of_ice = $t_out_of_ice"
     end
 
 
@@ -1316,10 +1330,10 @@ function morrison_milbrandt_2015_style(
 
     t_hit_δ_sat = t_hit_δ_sat_converged ? t_hit_δ_sat : FT(Inf) 
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
-    @debug "t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice, t_hit_δ_sat = $t_hit_δ_sat, t_hit_T_freeze = $t_hit_T_freeze | Δt = $Δt"
+    # @debug "t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice, t_hit_δ_sat = $t_hit_δ_sat, t_hit_T_freeze = $t_hit_T_freeze | Δt = $Δt"
 
     min_t, i_min_t = find_min_t(t_out_of_liq, t_out_of_ice, t_hit_δ_sat, t_hit_T_freeze)
-    @debug "min_t = $min_t, i_min_t = $i_min_t"
+    # @debug "min_t = $min_t, i_min_t = $i_min_t"
 
     if (min_t < Δt)
         if i_min_t == 1 # out of liquid
@@ -1329,8 +1343,8 @@ function morrison_milbrandt_2015_style(
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper_full_source(param_set, p, q, q_eq, q_liq, q_ice, -q_liq, S_qi*min_t, min_t, dqvdt*min_t, ts, w; error_on_q_neg = false) # floating point safe
 
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            # @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
             S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
@@ -1347,8 +1361,8 @@ function morrison_milbrandt_2015_style(
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper_full_source(param_set, p, q, q_eq, q_liq, q_ice, S_ql*min_t, -q_ice, min_t, dqvdt*min_t, ts, w; error_on_q_neg = false) # floating point safe
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            # @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
             S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
@@ -1365,9 +1379,9 @@ function morrison_milbrandt_2015_style(
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt, ts, w; error_on_q_neg = false)
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            (i_min_t == 3) && @debug "Hit liq saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
-            (i_min_t == 4) && @debug "Hit freezing before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            (i_min_t == 3) && # @debug "Hit liq saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            (i_min_t == 4) && # @debug "Hit freezing before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             if i_min_t == 3 # hit liq saturation
                 new_δ_0_shum = FT(0)
                 new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice # not sure what temp is so need to be sure, could use new_q_sl - new_q_si but that's not always correct depending on new T
@@ -1383,7 +1397,7 @@ function morrison_milbrandt_2015_style(
             return return_mixing_ratio ? (S_ql + S_ql_addit, S_qi + S_qi_addit) : (S_mixing_ratio_to_shum(S_ql + S_ql_addit, q.tot), S_mixing_ratio_to_shum(S_qi + S_qi_addit, q.tot))
         end
     else
-        @debug "nothing of note through end of timestep..."
+        # @debug "nothing of note through end of timestep..."
         S_ql = S_ql_func( A_c, τ, τ_liq, δ_0, Δt, Γ_l)
         S_qi = S_qi_func( A_c, τ, τ_ice, δ_0, Δt, Γ_i, q_sl, q_si)
         S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, Δt) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
@@ -1413,11 +1427,11 @@ function morrison_milbrandt_2015_style(
     fallback_to_standard_supersaturation_limiter::Bool = false,
     ) where {FT}
 
-    @debug "Calling Supersaturated{$(q.liq > FT(0)), $(q.ice > FT(0)), false}"
+    # @debug "Calling Supersaturated{$(q.liq > FT(0)), $(q.ice > FT(0)), false}"
 
 
     if depth == max_depth
-        @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
+        # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
         S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
@@ -1435,18 +1449,18 @@ function morrison_milbrandt_2015_style(
 
     # no ice changing above freezing
     max_t = Δt
-    t_out_of_liq = get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail (actually call it anyway, i think we ignore the t = 0 sol'n)
+    (t_out_of_liq, t_out_of_liq_valid) = get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail (actually call it anyway, i think we ignore the t = 0 sol'n)
     
-    if isnothing(t_out_of_liq)
+    if !t_out_of_liq_valid
         if fallback_to_standard_supersaturation_limiter
             q_vap = TD.vapor_specific_humidity(q)
-            @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
+            # @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
             return standard_supersaturation_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) # use this version with δ_0, δ_0i to keep our up to date supersaturation
         end
         # upgrade to BigFloat Call
         A_c_big = A_c_func_no_WBF(big(q_sl), big(g), big(w), big(c_p), big(e_sl), big(dqsl_dT), big(dqvdt), big(dTdt), big(p), big(ρ)) # no WBF above freezing
-        t_out_of_liq = FT(get_t_out_of_q_liq(big(δ_0), A_c_big, big(τ), big(τ_liq), big(q_liq), big(Γ_l), false)) # don't exit again if fail...
-        @debug "After upgrading to BigFloat, t_out_of_liq = $t_out_of_liq"
+        t_out_of_liq = FT(get_t_out_of_q_liq(big(δ_0), A_c_big, big(τ), big(τ_liq), big(q_liq), big(Γ_l), false).sol) # don't exit again if fail...
+        # @debug "After upgrading to BigFloat, t_out_of_liq = $t_out_of_liq"
     end
 
     
@@ -1472,8 +1486,8 @@ function morrison_milbrandt_2015_style(
             S_qi = FT(0)
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper_full_source(param_set, p, q, q_eq, q_liq, q_ice, -q_liq, FT(0), min_t, dqvdt*min_t, ts, w; error_on_q_neg = false) # floating point safe
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            # @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
             S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
@@ -1489,9 +1503,9 @@ function morrison_milbrandt_2015_style(
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt, ts, w; error_on_q_neg = false)
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            (i_min_t==2) && @debug "Hit saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
-            (i_min_t==3) && @debug "Hit freezing before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            (i_min_t==2) && # @debug "Hit saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            (i_min_t==3) && # @debug "Hit freezing before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             if i_min_t == 2 # hit ice saturation
                 new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
                 new_δ_0i_shum = FT(0)
@@ -1535,11 +1549,11 @@ function morrison_milbrandt_2015_style(
     fallback_to_standard_supersaturation_limiter::Bool = false,
     ) where {FT}
 
-    @debug "Calling WBF{true, $(q.ice > FT(0)), true}"
+    # @debug "Calling WBF{true, $(q.ice > FT(0)), true}"
 
 
     if depth == max_depth
-        @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
+        # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
         S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
@@ -1560,7 +1574,7 @@ function morrison_milbrandt_2015_style(
     τI = τ_func(τ_ice, τ_liq, L_l, c_p, dqsi_dT, Γ_l)
 
     if (A_cL ≤ FT(0)) && (A_cI ≥ FT(0))
-        @debug "You're probably staying in the WBF regime... unclear which perspective is better. Maybe if A_cL * τL > δ_0  (i.e. moving towards liq sat) use liq perspective? and otherwise use ice?"
+        # @debug "You're probably staying in the WBF regime... unclear which perspective is better. Maybe if A_cL * τL > δ_0  (i.e. moving towards liq sat) use liq perspective? and otherwise use ice?"
         if A_cL > δ_0
             use_ice_perspective = false # we're moving towards liq sat, use liq perspective
         else
@@ -1569,10 +1583,10 @@ function morrison_milbrandt_2015_style(
     elseif (A_cL ≥ FT(0)) && (A_cI ≤ FT(0))
         error("Not sure how compatible asymtotes of supersat over liquid and subsat over ice are...")
     elseif (A_cL ≤ FT(0)) && (A_cI ≤ FT(0))
-        @debug "You 100% are ending up subsaturated... since below freezing maybe use ice perspective?"
+        # @debug "You 100% are ending up subsaturated... since below freezing maybe use ice perspective?"
         use_ice_perspective = true
     elseif (A_cL ≥ FT(0)) && (A_cI ≥ FT(0))
-        @debug "You 100 % are ending up supersaturated... since above freezing maybe use liq perspective"
+        # @debug "You 100 % are ending up supersaturated... since above freezing maybe use liq perspective"
         use_ice_perspective = false
     end
 
@@ -1581,7 +1595,7 @@ function morrison_milbrandt_2015_style(
         In ice perspective we should, however, use δi and δipl inplace of δ and δi. we set δ and δo accordingly
     =#
     if use_ice_perspective
-        @debug "Using ice perspective"
+        # @debug "Using ice perspective"
         A_c = A_cI
         τ = τ_func(τ_ice, τ_liq, L_l, c_p, dqsi_dT, Γ_l)  # flip into ice perspective
         δ_0o = δ_0  # other 
@@ -1589,7 +1603,7 @@ function morrison_milbrandt_2015_style(
         self = :ice
         other = :liq # just for printing, can deprecate
     else
-        @debug "Using liq perspective"
+        # @debug "Using liq perspective"
         A_c = A_cL
         τ = τ_func(τ_liq, τ_ice, L_i, c_p, dqsl_dT, Γ_i) 
         δ_0o = δ_0i # other
@@ -1598,12 +1612,12 @@ function morrison_milbrandt_2015_style(
     end
 
     max_t = Δt
-    t_out_of_liq = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
-    t_out_of_ice = use_ice_perspective ? get_t_out_of_q_ice_no_WBF(δ_0, A_c, τ, τ_ice, q_ice, Γ_i) : get_t_out_of_q_ice(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si) # don't calculate if we're starting with no ice, calculation would fail
+    (t_out_of_liq, t_out_of_liq_valid) = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
+    (t_out_of_ice, t_out_of_ice_valid) = use_ice_perspective ? get_t_out_of_q_ice_no_WBF(δ_0, A_c, τ, τ_ice, q_ice, Γ_i) : get_t_out_of_q_ice(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si) # don't calculate if we're starting with no ice, calculation would fail
     
-    if isnothing(t_out_of_liq)
+    if !t_out_of_liq_valid
         if fallback_to_standard_supersaturation_limiter
-            @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
+            # @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
             return standard_supersaturation_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) # use this version with δ_0, δ_0i to keep our up to date supersaturation
         end
         # upgrade to BigFloat Call
@@ -1620,12 +1634,12 @@ function morrison_milbrandt_2015_style(
             τ_big = τ_func(big(τ_liq), big(τ_ice), big(L_i), big(c_p), big(dqsl_dT), big(Γ_i)) 
         end
 
-        t_out_of_liq = use_ice_perspective ? FT(get_t_out_of_q_WBF(big(δ_0), A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), big(q_si), big(q_sl), false)) : FT(get_t_out_of_q_liq(big(δ_0), A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false)) # don't exit again if fail...
-        @debug "After upgrading to BigFloat, t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice"
+        (t_out_of_liq, t_out_of_liq_vaid) = use_ice_perspective ? FT(get_t_out_of_q_WBF(big(δ_0), A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), big(q_si), big(q_sl), false).sol) : FT(get_t_out_of_q_liq(big(δ_0), A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false).sol) # don't exit again if fail...
+        # @debug "After upgrading to BigFloat, t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice"
     end
-    if isnothing(t_out_of_ice)
+    if !t_out_of_ice_valid
         if fallback_to_standard_supersaturation_limiter
-            @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
+            # @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
             return standard_supersaturation_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) # use this version with δ_0, δ_0i to keep our up to date supersaturation
         end
         # upgrade to BigFloat Call
@@ -1644,8 +1658,8 @@ function morrison_milbrandt_2015_style(
                 τ_big = τ_func(big(τ_liq), big(τ_ice), big(L_i), big(c_p), big(dqsl_dT), big(Γ_i)) 
             end
         end
-        t_out_of_ice = use_ice_perspective ? FT(get_t_out_of_q_ice_no_WBF(big(δ_0), A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), false)) : FT(get_t_out_of_q_ice(big(δ_0), A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), big(q_sl), big(q_si), false))
-        @debug "After upgrading to BigFloat, t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice"
+        t_out_of_ice = use_ice_perspective ? FT(get_t_out_of_q_ice_no_WBF(big(δ_0), A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), false).sol) : FT(get_t_out_of_q_ice(big(δ_0), A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), big(q_sl), big(q_si), false).sol)
+        # @debug "After upgrading to BigFloat, t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice"
 
     end 
     
@@ -1664,7 +1678,7 @@ function morrison_milbrandt_2015_style(
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
 
     min_t, i_min_t = find_min_t(t_out_of_liq, t_out_of_ice, t_hit_δ_sat, t_hit_δo_sat, t_hit_T_freeze)
-    @debug "t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice, t_hit_δ_sat = $t_hit_δ_sat, t_hit_δo_sat = $t_hit_δo_sat, t_hit_T_freeze = $t_hit_T_freeze"
+    # @debug "t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice, t_hit_δ_sat = $t_hit_δ_sat, t_hit_δo_sat = $t_hit_δo_sat, t_hit_T_freeze = $t_hit_T_freeze"
 
     if (min_t < Δt)
         if i_min_t == 1 # out of liquid
@@ -1674,8 +1688,8 @@ function morrison_milbrandt_2015_style(
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper_full_source(param_set, p, q, q_eq, q_liq, q_ice, -q_liq, S_qi*min_t, min_t, dqvdt*min_t,ts, w; error_on_q_neg = false) # use multiplied form for floating point accuracy
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            # @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
             S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
@@ -1693,8 +1707,8 @@ function morrison_milbrandt_2015_style(
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper_full_source(param_set, p, q, q_eq, q_liq, q_ice, S_ql*min_t, -q_ice, min_t, dqvdt*min_t, ts, w; error_on_q_neg = false) # use multiplied form for floating point accuracy
             Δt_left = Δt - min_t
 
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            # @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
             S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
@@ -1712,10 +1726,10 @@ function morrison_milbrandt_2015_style(
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt, ts, w; error_on_q_neg = false)
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            (i_min_t==3) && @debug "Hit $self saturation before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
-            (i_min_t==4) && @debug "Hit $other saturation before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
-            (i_min_t==5) && @debug "Hit freezing before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            (i_min_t==3) && # @debug "Hit $self saturation before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
+            (i_min_t==4) && # @debug "Hit $other saturation before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
+            (i_min_t==5) && # @debug "Hit freezing before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
             if i_min_t == 3 # hit saturation
                 if use_ice_perspective  # hit ice saturation
                     new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
@@ -1747,7 +1761,7 @@ function morrison_milbrandt_2015_style(
 
     else
 
-        @debug "nothing of note through end of timestep..."
+        # @debug "nothing of note through end of timestep..."
         S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, Δt, Γ_l, q_si, q_sl) : S_ql_func( A_c, τ, τ_liq, δ_0, Δt, Γ_l) # however much happens in that time, rescaled to the timestep
         S_qi = use_ice_perspective ? S_func_no_WBF(A_c, τ, τ_ice, δ_0, Δt, Γ_i) : S_qi_func( A_c, τ, τ_ice, δ_0, Δt, Γ_i, q_sl, q_si)
 
@@ -1776,10 +1790,10 @@ function morrison_milbrandt_2015_style(
     fallback_to_standard_supersaturation_limiter::Bool = false,
     ) where {FT}
 
-    @debug "Calling WBF{true, false, false}"
+    # @debug "Calling WBF{true, false, false}"
     # although we'd be moving towards liquid sat, with outside forcing could still be either, so still need to choose perspectives
     if depth == max_depth
-        @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
+        # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
         S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
@@ -1807,7 +1821,7 @@ function morrison_milbrandt_2015_style(
     τI = τ_func(τ_ice_here, τ_liq, L_l, c_p, dqsi_dT, Γ_l)
 
     if (A_cI ≤ FT(0)) && (A_cL ≥ FT(0)) # swap criteeria from below freezing
-        @debug "You're probably staying in the WBF regime... unclear which perspective is better. Maybe if A_cL * τL > δ_0  (i.e. moving towards liq sat) use liq perspective? and otherwise use ice?"
+        # @debug "You're probably staying in the WBF regime... unclear which perspective is better. Maybe if A_cL * τL > δ_0  (i.e. moving towards liq sat) use liq perspective? and otherwise use ice?"
         if A_cI > δ_0
             use_ice_perspective = true # we're moving towards ice sat, use ice perspective
         else
@@ -1816,10 +1830,10 @@ function morrison_milbrandt_2015_style(
     elseif (A_cI ≥ FT(0)) && (A_cL ≤ FT(0))
         error("Not sure how compatible asymtotes of supersat over liquid and subsat over ice are...")
     elseif (A_cI ≤ FT(0)) && (A_cL ≤ FT(0))
-        @debug "You 100% are ending up subsaturated... since above freezing maybe use liq perspective?"
+        # @debug "You 100% are ending up subsaturated... since above freezing maybe use liq perspective?"
         use_ice_perspective = false
     elseif (A_cI ≥ FT(0)) && (A_cL ≥ FT(0))
-        @debug "You 100 % are ending up supersaturated... since below freezing maybe use ice perspective"
+        # @debug "You 100 % are ending up supersaturated... since below freezing maybe use ice perspective"
         use_ice_perspective = true
     end
 
@@ -1828,7 +1842,7 @@ function morrison_milbrandt_2015_style(
         In ice perspective we should, however, use δi and δipl inplace of δ and δi. we set δ and δo accordingly
     =#
     if use_ice_perspective
-        @debug "Using ice perspective"
+        # @debug "Using ice perspective"
         A_c = A_cI
         τ = τ_func(τ_ice, τ_liq, L_l, c_p, dqsi_dT, Γ_l)  # flip into ice perspective
         δ_0o = δ_0  # other 
@@ -1836,7 +1850,7 @@ function morrison_milbrandt_2015_style(
         self = :ice
         other = :liq # just for printing, can deprecate
     else
-        @debug "Using liq perspective"
+        # @debug "Using liq perspective"
         A_c = A_cL
         τ = τ_func(τ_liq, τ_ice, L_i, c_p, dqsl_dT, Γ_i) 
         δ_0o = δ_0i # other
@@ -1846,11 +1860,11 @@ function morrison_milbrandt_2015_style(
 
 
     max_t = Δt
-    t_out_of_liq = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
+    (t_out_of_liq, t_out_of_liq_valid) = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
 
-    if isnothing(t_out_of_liq)
+    if !t_out_of_liq_valid
         if fallback_to_standard_supersaturation_limiter
-            @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
+            # @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
             return standard_supersaturation_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) # use this version with δ_0, δ_0i to keep our up to date supersaturation
         end
         
@@ -1872,8 +1886,8 @@ function morrison_milbrandt_2015_style(
             δ_0o_big = big(δ_0i)
         end
 
-        t_out_of_liq = use_ice_perspective ? FT(get_t_out_of_q_WBF(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), big(q_si), big(q_sl), false)) : FT(get_t_out_of_q_liq(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false)) # don't calculate if we're starting with no liquid, calculation would fail
-        @debug "After upgrading to BigFloat, t_out_of_liq = $t_out_of_liq"
+        t_out_of_liq = use_ice_perspective ? FT(get_t_out_of_q_WBF(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), big(q_si), big(q_sl), false).sol) : FT(get_t_out_of_q_liq(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false).sol) # don't calculate if we're starting with no liquid, calculation would fail
+        # @debug "After upgrading to BigFloat, t_out_of_liq = $t_out_of_liq"
     end
 
 
@@ -1891,7 +1905,7 @@ function morrison_milbrandt_2015_style(
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
 
     min_t, i_min_t = find_min_t(t_out_of_liq, t_hit_δ_sat, t_hit_δo_sat, t_hit_T_freeze)
-    @debug "t_out_of_liq = $t_out_of_liq, t_hit_δ_sat = $t_hit_δ_sat, t_hit_δo_sat = $t_hit_δo_sat, t_hit_T_freeze = $t_hit_T_freeze"
+    # @debug "t_out_of_liq = $t_out_of_liq, t_hit_δ_sat = $t_hit_δ_sat, t_hit_δo_sat = $t_hit_δo_sat, t_hit_T_freeze = $t_hit_T_freeze"
 
     # ======================================================================================== #
     # ======================================================================================== #
@@ -1904,8 +1918,8 @@ function morrison_milbrandt_2015_style(
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper_full_source(param_set, p, q, q_eq, q_liq, q_ice, -q_liq, S_qi*min_t, min_t, dqvdt*min_t, ts, w; error_on_q_neg = false) # use multiplied form for floating point accuracy
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            # @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
             S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
@@ -1922,7 +1936,7 @@ function morrison_milbrandt_2015_style(
             S_qi = FT(0)
 
             if (S_qi > FT(0))
-                @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
+                # @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
                 return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
             end
 
@@ -1930,11 +1944,11 @@ function morrison_milbrandt_2015_style(
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt, ts, w; error_on_q_neg = false)
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
 
-            (i_min_t==2) && @debug "Hit $self saturation before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
-            (i_min_t==3) && @debug "Hit $other saturation before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
-            (i_min_t==4) && @debug "Hit freezing before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
+            (i_min_t==2) && # @debug "Hit $self saturation before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
+            (i_min_t==3) && # @debug "Hit $other saturation before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
+            (i_min_t==4) && # @debug "Hit freezing before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
 
             if i_min_t == 2 # hit saturation
                 if use_ice_perspective  # hit ice saturation
@@ -1967,12 +1981,12 @@ function morrison_milbrandt_2015_style(
         end
 
     else 
-        @debug "nothing of note through end of timestep..."
+        # @debug "nothing of note through end of timestep..."
         S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # however much happens in that time, rescaled to the timestep
         S_qi = FT(0)
 
         if (S_qi > FT(0))
-            @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
+            # @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
             return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
         end
 
@@ -2005,10 +2019,10 @@ function morrison_milbrandt_2015_style(
     fallback_to_standard_supersaturation_limiter::Bool = false,
     ) where {FT}
 
-    @debug "Calling WBF{true, true, false}"
+    # @debug "Calling WBF{true, true, false}"
 
     if depth == max_depth
-        @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
+        # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
         S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
@@ -2036,7 +2050,7 @@ function morrison_milbrandt_2015_style(
     τI = τ_func(τ_ice, τ_liq, L_l, c_p, dqsi_dT, Γ_l)
 
     if (A_cI ≤   FT(0)) && (A_cL ≥ FT(0)) # swap criteeria from below freezing
-        @debug "You're probably staying in the WBF regime... unclear which perspective is better. Maybe if A_cL * τL > δ_0  (i.e. moving towards liq sat) use liq perspective? and otherwise use ice?"
+        # @debug "You're probably staying in the WBF regime... unclear which perspective is better. Maybe if A_cL * τL > δ_0  (i.e. moving towards liq sat) use liq perspective? and otherwise use ice?"
         if A_cI > δ_0
             use_ice_perspective = true # we're moving towards ice sat, use ice perspective
         else
@@ -2045,10 +2059,10 @@ function morrison_milbrandt_2015_style(
     elseif (A_cI ≥ FT(0)) && (A_cL ≤ FT(0))
         error("Not sure how compatible asymtotes of supersat over liquid and subsat over ice are...")
     elseif (A_cI ≤ FT(0)) && (A_cL ≤ FT(0))
-        @debug "You 100% are ending up subsaturated... since above freezing maybe use liq perspective?"
+        # @debug "You 100% are ending up subsaturated... since above freezing maybe use liq perspective?"
         use_ice_perspective = false
     elseif (A_cI ≥ FT(0)) && (A_cL ≥ FT(0))
-        @debug "You 100 % are ending up supersaturated... since below freezing maybe use ice perspective"
+        # @debug "You 100 % are ending up supersaturated... since below freezing maybe use ice perspective"
         use_ice_perspective = true
     end
 
@@ -2057,7 +2071,7 @@ function morrison_milbrandt_2015_style(
         In ice perspective we should, however, use δi and δipl inplace of δ and δi. we set δ and δo accordingly
     =#
     if use_ice_perspective
-        @debug "Using ice perspective"
+        # @debug "Using ice perspective"
         A_c = A_cI
         τ = τ_func(τ_ice, τ_liq, L_l, c_p, dqsi_dT, Γ_l)  # flip into ice perspective
         δ_0o = δ_0  # other 
@@ -2065,7 +2079,7 @@ function morrison_milbrandt_2015_style(
         self = :ice
         other = :liq # just for printing, can deprecate
     else
-        @debug "Using liq perspective"
+        # @debug "Using liq perspective"
         A_c = A_cL
         τ = τ_func(τ_liq, τ_ice, L_i, c_p, dqsl_dT, Γ_i) 
         δ_0o = δ_0i # other
@@ -2075,12 +2089,12 @@ function morrison_milbrandt_2015_style(
 
 
     max_t = Δt
-    t_out_of_liq = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
-    t_out_of_ice = use_ice_perspective ? get_t_out_of_q_ice_no_WBF(δ_0, A_c, τ, τ_ice, q_ice, Γ_i) : get_t_out_of_q_ice(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si) # don't calculate if we're starting with no ice, calculation would fail
+    (t_out_of_liq, t_out_of_liq_valid) = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
+    (t_out_of_ice, t_out_of_ice_valid) = use_ice_perspective ? get_t_out_of_q_ice_no_WBF(δ_0, A_c, τ, τ_ice, q_ice, Γ_i) : get_t_out_of_q_ice(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si) # don't calculate if we're starting with no ice, calculation would fail
 
-    if isnothing(t_out_of_liq)
+    if !t_out_of_liq_valid
         if fallback_to_standard_supersaturation_limiter
-            @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
+            # @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
             return standard_supersaturation_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) # use this version with δ_0, δ_0i to keep our up to date supersaturation
         end
         # upgrade to BigFloat Call
@@ -2100,12 +2114,12 @@ function morrison_milbrandt_2015_style(
             δ_0o_big = big(δ_0i)
         end
 
-        t_out_of_liq = use_ice_perspective ? FT(get_t_out_of_q_WBF(δ_0_big , A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), big(q_si), big(q_sl), false)) : FT(get_t_out_of_q_liq(δ_0_big , A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false))
-        @debug "After upgrading to BigFloat, t_out_of_liq = $t_out_of_liq"
+        t_out_of_liq = use_ice_perspective ? FT(get_t_out_of_q_WBF(δ_0_big , A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), big(q_si), big(q_sl), false).sol) : FT(get_t_out_of_q_liq(δ_0_big , A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false).sol)
+        # @debug "After upgrading to BigFloat, t_out_of_liq = $t_out_of_liq"
     end
-    if isnothing(t_out_of_ice)
+    if !t_out_of_ice_valid
         if fallback_to_standard_supersaturation_limiter
-            @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
+            # @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
             return standard_supersaturation_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) # use this version with δ_0, δ_0i to keep our up to date supersaturation
         end
         if !(@isdefined A_c_big)
@@ -2125,8 +2139,8 @@ function morrison_milbrandt_2015_style(
                 δ_0o_big = big(δ_0i)
             end
         end
-        t_out_of_ice = use_ice_perspective ? FT(get_t_out_of_q_ice_no_WBF(δ_0_big, A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), false)) : FT(get_t_out_of_q_ice(δ_0_big, A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), big(q_sl), big(q_si), false))
-        @debug "After upgrading to BigFloat, t_out_of_ice = $t_out_of_ice"
+        t_out_of_ice = use_ice_perspective ? FT(get_t_out_of_q_ice_no_WBF(δ_0_big, A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), false).sol) : FT(get_t_out_of_q_ice(δ_0_big, A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), big(q_sl), big(q_si), false).sol)
+        # @debug "After upgrading to BigFloat, t_out_of_ice = $t_out_of_ice"
     end
 
 
@@ -2148,7 +2162,7 @@ function morrison_milbrandt_2015_style(
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
 
     min_t, i_min_t = find_min_t(t_out_of_liq, t_out_of_ice, t_hit_δ_sat, t_hit_δo_sat, t_hit_T_freeze)
-    @debug "t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice, t_hit_δ_sat = $t_hit_δ_sat, t_hit_δo_sat = $t_hit_δo_sat, t_hit_T_freeze = $t_hit_T_freeze"
+    # @debug "t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice, t_hit_δ_sat = $t_hit_δ_sat, t_hit_δo_sat = $t_hit_δo_sat, t_hit_T_freeze = $t_hit_T_freeze"
 
     # ======================================================================================== #
 
@@ -2158,15 +2172,15 @@ function morrison_milbrandt_2015_style(
             S_qi = use_ice_perspective ? S_func_no_WBF(A_c, τ, τ_ice, δ_0, min_t, Γ_i) : S_qi_func( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si)
 
             if (S_qi > FT(0))
-                @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
+                # @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
                 return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
             end
 
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper_full_source(param_set, p, q, q_eq, q_liq, q_ice, -q_liq, S_qi*min_t, min_t, dqvdt*min_t, ts, w; error_on_q_neg = false) # use multiplied form for floating point accuracy
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            # @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
             S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
@@ -2184,8 +2198,8 @@ function morrison_milbrandt_2015_style(
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper_full_source(param_set, p, q, q_eq, q_liq, q_ice, S_ql*min_t, -q_ice, min_t, dqvdt*min_t, ts, w; error_on_q_neg = false) # use multiplied form for floating point accuracy
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            # @debug "Ran out of liquid before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
             S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
@@ -2205,7 +2219,7 @@ function morrison_milbrandt_2015_style(
             S_qi = use_ice_perspective ? S_func_no_WBF(A_c, τ, τ_ice, δ_0, min_t, Γ_i) : S_qi_func( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si)
 
             if (S_qi > FT(0))
-                @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
+                # @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
                 return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
             end
 
@@ -2213,11 +2227,11 @@ function morrison_milbrandt_2015_style(
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt, ts, w; error_on_q_neg = false)
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
 
-            (i_min_t==3) && @debug "Hit $self before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
-            (i_min_t==4) && @debug "Hit $other saturation before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
-            (i_min_t==5) && @debug "Hit freezing before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
+            (i_min_t==3) && # @debug "Hit $self before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
+            (i_min_t==4) && # @debug "Hit $other saturation before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
+            (i_min_t==5) && # @debug "Hit freezing before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
             if i_min_t == 3 # hit self saturation
                 if use_ice_perspective  # hit ice saturation
                     new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
@@ -2249,14 +2263,14 @@ function morrison_milbrandt_2015_style(
         end
 
     else 
-        @debug "nothing of note through end of timestep..."
+        # @debug "nothing of note through end of timestep..."
         # S_ql = S_ql_func( A_c, τ, τ_liq, δ_0, Δt, Γ_l)
         # S_qi = FT(0)
         S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, min_t, Γ_l, q_si, q_sl) : S_ql_func( A_c, τ, τ_liq, δ_0, min_t, Γ_l) # however much happens in that time, rescaled to the timestep
         S_qi = use_ice_perspective ? S_func_no_WBF(A_c, τ, τ_ice, δ_0, min_t, Γ_i) : S_qi_func( A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si)
 
         if (S_qi > FT(0))
-            @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
+            # @debug "S_qi > 0 in WBF above freezing... can't happen. Remedying by recalling with τ_ice = Inf"
             return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
         end
 
@@ -2286,10 +2300,10 @@ function morrison_milbrandt_2015_style(
     fallback_to_standard_supersaturation_limiter::Bool = false,
     ) where {FT}
 
-    @debug "Calling WBF{false, $(q.ice > FT(0)), true}"
+    # @debug "Calling WBF{false, $(q.ice > FT(0)), true}"
 
     if depth == max_depth
-        @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
+        # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
         S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
@@ -2311,20 +2325,20 @@ function morrison_milbrandt_2015_style(
     A_cI = A_c_func_no_WBF( q_si, g, w, c_p, e_si, dqsi_dT, dqvdt, dTdt, p, ρ)
 
     if (A_cL ≤ FT(0)) && (A_cI ≥ FT(0))
-        @debug "You're probably staying in the WBF regime... unclear which perspective is better. Maybe if A_cL * τL > δ_0  (i.e. moving towards liq sat) use liq perspective? and otherwise use ice?"
+        # @debug "You're probably staying in the WBF regime... unclear which perspective is better. Maybe if A_cL * τL > δ_0  (i.e. moving towards liq sat) use liq perspective? and otherwise use ice?"
         if (A_cL) > δ_0
             use_ice_perspective = false # we're moving towards liq sat, use liq perspective
         else
             use_ice_perspective = true # we're moving towards ice sat, use ice perspective
         end
     elseif (A_cL ≥ FT(0)) && (A_cI ≤ FT(0))
-        # @debug "Not sure how compatible asymtotes of supersat over liquid and subsat over ice are..."
+        # # @debug "Not sure how compatible asymtotes of supersat over liquid and subsat over ice are..."
         error("Not sure how compatible asymtotes of supersat over liquid and subsat over ice are...")
     elseif (A_cL ≤ FT(0)) && (A_cI ≤ FT(0))
-        @debug "You 100% are ending up subsaturated... since below freezing maybe use ice perspective?"
+        # @debug "You 100% are ending up subsaturated... since below freezing maybe use ice perspective?"
         use_ice_perspective = true
     elseif (A_cL ≥ FT(0)) && (A_cI ≥ FT(0))
-        @debug "You 100 % are ending up supersaturated... since above freezing maybe use liq perspective"
+        # @debug "You 100 % are ending up supersaturated... since above freezing maybe use liq perspective"
         use_ice_perspective = false
     end
     use_ice_perspective = true
@@ -2333,7 +2347,7 @@ function morrison_milbrandt_2015_style(
         We should, however, use δ instead of δi and δipl instead of δ
     =#
     if use_ice_perspective
-        @debug "Using ice perspective"
+        # @debug "Using ice perspective"
         A_c = A_cI
         τ = τ_func(τ_ice, τ_liq_here, L_l, c_p, dqsi_dT, Γ_l) 
         δ_0o = δ_0  # other 
@@ -2341,7 +2355,7 @@ function morrison_milbrandt_2015_style(
         self = :ice
         other = :liq # just for printing, can deprecate
     else
-        @debug "Using liq perspective"
+        # @debug "Using liq perspective"
         A_c = A_cL
         τ = τ_func(τ_liq_here, τ_ice, L_l, c_p, dqsl_dT, Γ_i) # treat as if is only ice cause no liq <-- can't use pure liq perspective bc no wbf, but Can have A_c defined from liq perspective...
         δ_0o = δ_0i # other
@@ -2351,11 +2365,11 @@ function morrison_milbrandt_2015_style(
     end
 
     max_t = Δt
-    t_out_of_ice = use_ice_perspective ? get_t_out_of_q_ice_no_WBF(δ_0, A_c, τ, τ_ice, q_ice, Γ_i) : get_t_out_of_q_ice(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si) # no liq growth while subsat, only ice changes
+    (t_out_of_ice, t_out_of_ice_valid) = use_ice_perspective ? get_t_out_of_q_ice_no_WBF(δ_0, A_c, τ, τ_ice, q_ice, Γ_i) : get_t_out_of_q_ice(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si) # no liq growth while subsat, only ice changes
     
-    if isnothing(t_out_of_ice)
+    if !t_out_of_ice_valid
         if fallback_to_standard_supersaturation_limiter
-            @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
+            # @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
             return standard_supersaturation_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) # use this version with δ_0, δ_0i to keep our up to date supersaturation
         end
         # upgrade to BigFloat Call
@@ -2373,7 +2387,7 @@ function morrison_milbrandt_2015_style(
             δ_0_big = big(δ_0) # already set
         end
 
-        t_out_of_ice = use_ice_perspective ? FT(get_t_out_of_q_ice_no_WBF(δ_0_big, A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), false)) : FT(get_t_out_of_q_ice(δ_0_big, A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), big(q_sl), big(q_si), false))
+        t_out_of_ice = use_ice_perspective ? FT(get_t_out_of_q_ice_no_WBF(δ_0_big, A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), false).sol) : FT(get_t_out_of_q_ice(δ_0_big, A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), big(q_sl), big(q_si), false).sol)
     end
     
     
@@ -2385,14 +2399,12 @@ function morrison_milbrandt_2015_style(
     t_hit_δo_sat, t_hit_δo_sat_converged  = get_t_var_hit_value(use_ice_perspective ? Val{:δipl}() : Val{:δi}() , param_set, target(FT(0), use_ice_perspective ? (+) : (-); factor = FT(TF)), FT(0), max_t, δ_0, A_c, τ, τ_liq_here, τ_ice, Γ_l, Γ_i, q_sl, q_si, T, w, p, q_vap, dqvdt, dTdt, q, q_eq, q_liq, q_ice, ts) # if didn't hit sat and t_hit_sat is the least, it'll just equal Δt, then we can use these S_ql and S_qi and shouldn't have to recalculate them at the end...
     max_t = min_if_converged(max_t, t_hit_δo_sat, t_hit_δo_sat_converged)
     t_hit_T_freeze, t_hit_T_freeze_converged = get_t_var_hit_value(Val{:T}(), param_set, target(T_freeze, +; factor = FT(TF)), FT(0), max_t,  δ_0, A_c, τ, τ_liq_here, τ_ice, Γ_l, Γ_i, q_sl, q_si, T, w, p, q_vap, dqvdt, dTdt, q, q_eq, q_liq, q_ice, ts)
-    @debug "t_out_of_ice = $t_out_of_ice, t_hit_δ_sat = $t_hit_δ_sat, t_hit_δo_sat = $t_hit_δo_sat, t_hit_T_freeze = $t_hit_T_freeze"
     
     t_hit_δ_sat = t_hit_δ_sat_converged ? t_hit_δ_sat : FT(Inf) 
     t_hit_δo_sat = t_hit_δo_sat_converged ? t_hit_δo_sat : FT(Inf) 
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
 
     min_t, i_min_t = find_min_t(t_out_of_ice, t_hit_δ_sat, t_hit_δo_sat, t_hit_T_freeze)
-    @debug "t_out_of_ice = $t_out_of_ice, t_hit_δ_sat = $t_hit_δ_sat, t_hit_δo_sat = $t_hit_δo_sat, t_hit_T_freeze = $t_hit_T_freeze"
 
     if (min_t < Δt)
         if i_min_t == 1 # out of ice
@@ -2401,8 +2413,8 @@ function morrison_milbrandt_2015_style(
 
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper_full_source(param_set, p, q, q_eq, q_liq, q_ice, FT(0), -q_ice, min_t, dqvdt*min_t, ts, w; error_on_q_neg = false) # use multiplied form for floating point accuracy
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            # @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
             S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
@@ -2419,10 +2431,10 @@ function morrison_milbrandt_2015_style(
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt, ts, w; error_on_q_neg = false)
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            (i_min_t==2) && @debug "Hit $self before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
-            (i_min_t==3) && @debug "Hit $other saturation before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
-            (i_min_t==4) && @debug "Hit freezing before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            (i_min_t==2) && # @debug "Hit $self before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
+            (i_min_t==3) && # @debug "Hit $other saturation before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
+            (i_min_t==4) && # @debug "Hit freezing before timestep is over... transitioning to $(typeof(regime)) at t = $(min_t)..."
             if i_min_t == 2 # hit liq saturation
                 if use_ice_perspective  # hit ice saturation
                     new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
@@ -2454,7 +2466,7 @@ function morrison_milbrandt_2015_style(
 
     else
 
-        @debug "nothing of note through end of timestep..."
+        # @debug "nothing of note through end of timestep..."
         # just regular return
         S_ql = FT(0)
         S_qi = use_ice_perspective ? S_func_indiv_no_WBF( A_c, τ, δ_0, Δt, Γ_i) : S_func_indiv_no_WBF( A_c, τ, δ_0i, Δt, Γ_i) 
@@ -2485,7 +2497,7 @@ function morrison_milbrandt_2015_style(
     ) where {FT}
 
     if depth == max_depth
-        @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
+        # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
         S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
@@ -2494,7 +2506,7 @@ function morrison_milbrandt_2015_style(
     local S_qi_addit::FT 
 
     HI::Bool = (q.ice > FT(0))
-    @debug "Calling WBF{false, $HI, false}"
+    # @debug "Calling WBF{false, $HI, false}"
 
 
     τ_liq_here = FT(Inf) # we have no liq and can't immediately grow it while in WBF mode (don't actually set in case need to pass to another func)
@@ -2515,7 +2527,7 @@ function morrison_milbrandt_2015_style(
     t_hit_δi_sat, t_hit_δi_sat_converged = get_t_var_hit_value(Val{:δi}(), param_set, target(FT(0), +; factor = FT(TF)), FT(0), min_t,  δ_0, A_c, τ_here, τ_liq_here, τ_ice_here, Γ_l, Γ_i, q_sl, q_si, T, w, p, q_vap, dqvdt, dTdt, q, q_eq, q_liq, q_ice, ts; use_WBF = false) # if didn't hit sat and t_hit_sat is the least, it'll just equal Δt, then we can use these S_ql and S_qi and shouldn't have to recalculate them at the end...
     min_t = min_if_converged(min_t, t_hit_δi_sat, t_hit_δi_sat_converged)
     t_hit_T_freeze, t_hit_T_freeze_converged = get_t_var_hit_value(Val{:T}(), param_set, target(T_freeze, -; factor = FT(TF)), FT(0), min_t,  δ_0, A_c, τ_here, τ_liq_here, τ_ice_here, Γ_l, Γ_i, q_sl, q_si, T, w, p, q_vap, dqvdt, dTdt, q, q_eq, q_liq, q_ice, ts; use_WBF = false)
-    @debug "t_hit_δ_sat = $t_hit_δ_sat, t_hit_δi_sat = $t_hit_δi_sat, t_hit_T_freeze = $t_hit_T_freeze | BF = false"
+    # @debug "t_hit_δ_sat = $t_hit_δ_sat, t_hit_δi_sat = $t_hit_δi_sat, t_hit_T_freeze = $t_hit_T_freeze | BF = false"
     
     t_hit_δ_sat = t_hit_δ_sat_converged ? t_hit_δ_sat : FT(Inf) 
     t_hit_δi_sat = t_hit_δi_sat_converged ? t_hit_δi_sat : FT(Inf) 
@@ -2530,10 +2542,10 @@ function morrison_milbrandt_2015_style(
 
         new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt, ts, w; error_on_q_neg = false)
         Δt_left = Δt - min_t
-        new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-        (i_min_t == 1) && @debug "Hit liquid saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
-        (i_min_t == 2) && @debug "Hit ice saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
-        (i_min_t == 3) && @debug "Hit freezing before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+        new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+        (i_min_t == 1) && # @debug "Hit liquid saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+        (i_min_t == 2) && # @debug "Hit ice saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+        (i_min_t == 3) && # @debug "Hit freezing before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
 
         if i_min_t == 1 # hit liq saturation
             new_δ_0_shum = FT(0)
@@ -2555,7 +2567,7 @@ function morrison_milbrandt_2015_style(
         return return_mixing_ratio ? (S_ql + S_ql_addit, S_qi + S_qi_addit) : (S_mixing_ratio_to_shum(S_ql + S_ql_addit, q.tot), S_mixing_ratio_to_shum(S_qi + S_qi_addit, q.tot))              
             
     else
-        @debug "nothing of note through end of timestep..."
+        # @debug "nothing of note through end of timestep..."
         # just regular return
         S_ql = FT(0)
         S_qi = FT(0)
@@ -2588,7 +2600,7 @@ function morrison_milbrandt_2015_style(
 
 
     if depth == max_depth
-        @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
+        # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
         S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
@@ -2599,7 +2611,7 @@ function morrison_milbrandt_2015_style(
     (; g, L_i, L_l, c_p, e_sl, e_si, dqsl_dT, dqsi_dT, q_sl, q_si, q_vap, q_liq, q_ice, T_freeze, δ_0, δ_0i, Γ_l, Γ_i, dqvdt, dTdt) = get_params_and_go_to_mixing_ratio(param_set, area, ρ, p, T, w, τ_liq, τ_ice, q_vap, dqvdt, dTdt, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts) 
 
     local BF::Bool = T < T_freeze
-    @debug "Calling Subsaturated{true, true, $BF}"
+    # @debug "Calling Subsaturated{true, true, $BF}"
 
     # (δ_0 < FT(0)) && (δ_0i < FT(0)) || error("δ_0 and δ_0i should be negative, got δ_0 = $δ_0, δ_0i = $δ_0i")
     # !iszero(q_liq) || error("liq should not be zero")
@@ -2612,14 +2624,14 @@ function morrison_milbrandt_2015_style(
         We should, however, use δ instead of δi and δipl instead of δ
     =#
     if use_ice_perspective
-        @debug "Using ice perspective"
+        # @debug "Using ice perspective"
         A_c = A_c_func(τ_liq, Γ_i, q_si, q_sl, g, w, c_p, e_si, L_l, dqsi_dT, dqvdt, dTdt, p, ρ) # Eq C4
         τ = τ_func(τ_ice, τ_liq, L_l, c_p, dqsi_dT, Γ_l)
         δ_0o = δ_0  # other 
         δ_0 = δ_0i
         other = :liq # just for printing, can deprecate
     else
-        @debug "Using liq perspective"
+        # @debug "Using liq perspective"
         A_c = A_c_func(τ_ice, Γ_l, q_sl, q_si, g, w, c_p, e_sl, L_i, dqsl_dT, dqvdt, dTdt, p, ρ) # Eq C4
         τ = τ_func(τ_liq, τ_ice, L_i, c_p, dqsl_dT, Γ_i)
         δ_0o = δ_0i # other
@@ -2627,13 +2639,13 @@ function morrison_milbrandt_2015_style(
     end
 
     max_t = Δt
-    t_out_of_liq = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
-    t_out_of_ice = use_ice_perspective ? get_t_out_of_q_ice_no_WBF(δ_0, A_c, τ, τ_ice, q_ice, Γ_i) : get_t_out_of_q_ice(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si) # don't calculate if we're starting with no ice, calculation would fail   
+    (t_out_of_liq, t_out_of_liq_valid) = use_ice_perspective ? get_t_out_of_q_WBF(δ_0, A_c, τ, τ_liq, q_liq, Γ_l, q_si, q_sl) : get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) # don't calculate if we're starting with no liquid, calculation would fail
+    (t_out_of_ice, t_out_of_ice_valid) = use_ice_perspective ? get_t_out_of_q_ice_no_WBF(δ_0, A_c, τ, τ_ice, q_ice, Γ_i) : get_t_out_of_q_ice(δ_0, A_c, τ, τ_ice, q_ice, Γ_i, q_sl, q_si) # don't calculate if we're starting with no ice, calculation would fail   
     
 
-    if isnothing(t_out_of_liq)
+    if !t_out_of_liq_valid
         if fallback_to_standard_supersaturation_limiter
-            @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
+            # @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
             return standard_supersaturation_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) # use this version with δ_0, δ_0i to keep our up to date supersaturation
         end
 
@@ -2650,12 +2662,12 @@ function morrison_milbrandt_2015_style(
             δ_0_big = big(δ_0) #
         end
 
-        t_out_of_liq = use_ice_perspective ? FT(get_t_out_of_q_WBF(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), big(q_si), big(q_sl), false)) : FT(get_t_out_of_q_liq(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false)) # don't calculate if we're starting with no liquid, calculation would fail
-        @debug "After upgrading to big, t_out_of_liq = $t_out_of_liq"
+        t_out_of_liq = use_ice_perspective ? FT(get_t_out_of_q_WBF(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), big(q_si), big(q_sl), false).sol) : FT(get_t_out_of_q_liq(δ_0_big, A_c_big, τ_big, big(τ_liq), big(q_liq), big(Γ_l), false).sol) # don't calculate if we're starting with no liquid, calculation would fail
+        # @debug "After upgrading to big, t_out_of_liq = $t_out_of_liq"
     end
-    if isnothing(t_out_of_ice)
+    if !t_out_of_ice_valid
         if fallback_to_standard_supersaturation_limiter
-            @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
+            # @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
             return standard_supersaturation_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) # use this version with δ_0, δ_0i to keep our up to date supersaturation
         end
         if !(@isdefined A_c_big)
@@ -2671,8 +2683,8 @@ function morrison_milbrandt_2015_style(
                 δ_0_big = big(δ_0) #
             end
         end
-        t_out_of_ice = use_ice_perspective ? FT(get_t_out_of_q_ice_no_WBF(δ_0_big, A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), false)) : FT(get_t_out_of_q_ice(δ_0_big, A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), big(q_sl), big(q_si), false)) # don't calculate if we're starting with no ice, calculation would fail
-        @debug "After upgrading to big, t_out_of_ice = $t_out_of_ice"
+        t_out_of_ice = use_ice_perspective ? FT(get_t_out_of_q_ice_no_WBF(δ_0_big, A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), false).sol) : FT(get_t_out_of_q_ice(δ_0_big, A_c_big, τ_big, big(τ_ice), big(q_ice), big(Γ_i), big(q_sl), big(q_si), false).sol) # don't calculate if we're starting with no ice, calculation would fail
+        # @debug "After upgrading to big, t_out_of_ice = $t_out_of_ice"
     end
     
 
@@ -2690,8 +2702,6 @@ function morrison_milbrandt_2015_style(
     t_hit_sat = t_hit_sat_converged ? t_hit_sat : FT(Inf) 
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
     min_t, i_min_t = find_min_t(t_out_of_liq, t_out_of_ice, t_hit_sat, t_hit_T_freeze)
-
-    # @debug "t_out_of_liq = $t_out_of_liq, t_out_of_ice = $t_out_of_ice, t_hit_sat = $t_hit_sat, t_hit_T_freeze = $t_hit_T_freeze | use_ice_perspective = $use_ice_perspective"
     
     if (min_t < Δt)
         if i_min_t == 1 # out of liq
@@ -2699,7 +2709,7 @@ function morrison_milbrandt_2015_style(
             S_qi = use_ice_perspective ? S_func_no_WBF(A_c, τ, τ_ice, δ_0, min_t, Γ_i) : S_qi_func(A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si)
 
             if !BF && (S_qi > FT(0))
-                @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
+                # @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
                 return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth) # we had ice growth instead of loss, set τ_ice to infinity and recall
             end
 
@@ -2707,8 +2717,8 @@ function morrison_milbrandt_2015_style(
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper_full_source(param_set, p, q, q_eq, q_liq, q_ice, -q_liq, S_qi*min_t, min_t, dqvdt*min_t, ts, w; error_on_q_neg = false)
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            @debug "Ran out of liq before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            # @debug "Ran out of liq before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
             S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
@@ -2725,8 +2735,8 @@ function morrison_milbrandt_2015_style(
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper_full_source(param_set, p, q, q_eq, q_liq, q_ice, S_ql*min_t, -q_ice, min_t, dqvdt*min_t, ts, w; error_on_q_neg = false)
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            # @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
             S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
@@ -2741,16 +2751,16 @@ function morrison_milbrandt_2015_style(
             S_qi = use_ice_perspective ? S_func_no_WBF(A_c, τ, τ_ice, δ_0, min_t, Γ_i) : S_qi_func(A_c, τ, τ_ice, δ_0, min_t, Γ_i, q_sl, q_si)
 
             if !BF && (S_qi > FT(0))
-                @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
+                # @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
                 return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, δ_0 = δ_0, δ_0i = δ_0i, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
             end
 
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt, ts, w; error_on_q_neg = false)
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, new_T, T_freeze)
-            (i_min_t==3) && @debug "Hit ice saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
-            (i_min_t==4) && @debug "Hit freezing before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, new_T, T_freeze)
+            (i_min_t==3) && # @debug "Hit ice saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            (i_min_t==4) && # @debug "Hit freezing before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
 
             if i_min_t == 3 # hit sat
                 new_δ_0_shum = BF ? TD.vapor_specific_humidity(new_q) - new_q_eq.liq : FT(0)
@@ -2769,12 +2779,12 @@ function morrison_milbrandt_2015_style(
         end
     else
 
-        @debug "nothing of note through end of timestep..."
+        # @debug "nothing of note through end of timestep..."
         S_ql = use_ice_perspective ? S_func_WBF(A_c, τ, τ_liq, δ_0, Δt, Γ_l, q_si, q_sl) : S_ql_func( A_c, τ, τ_liq, δ_0, Δt, Γ_l)
         S_qi = use_ice_perspective ? S_func_no_WBF(A_c, τ, τ_ice, δ_0, Δt, Γ_i) : S_qi_func(A_c, τ, τ_ice, δ_0, Δt, Γ_i, q_sl, q_si)
 
         if !BF && (S_qi > FT(0))
-            @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
+            # @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
             return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, fallback_to_standard_supersaturation_limiter=fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
         end
 
@@ -2810,7 +2820,7 @@ function morrison_milbrandt_2015_style(
 
 
     if depth == max_depth
-        @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
+        # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
         S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
@@ -2825,24 +2835,24 @@ function morrison_milbrandt_2015_style(
 
     
     local BF::Bool = T < T_freeze
-    @debug "Calling Subsaturated{true, false, $BF}"
+    # @debug "Calling Subsaturated{true, false, $BF}"
 
     # iszero(q_ice) || error("ice should be zero, got q_ice = $(q_ice)")
 
     A_c = A_c_func_no_WBF( q_sl, g, w, c_p, e_sl, dqsl_dT, dqvdt, dTdt, p, ρ)
 
     max_t = Δt
-    t_out_of_liq = get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) 
+    (t_out_of_liq, t_out_of_liq_valid) = get_t_out_of_q_liq(δ_0, A_c, τ, τ_liq, q_liq, Γ_l) 
 
-    if isnothing(t_out_of_liq)
+    if !t_out_of_liq_valid
         if fallback_to_standard_supersaturation_limiter
             q_vap = TD.vapor_specific_humidity(q)
-            @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
+            # @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
             return standard_supersaturation_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) # use this version with δ_0, δ_0i to keep our up to date supersaturation
         end
         A_c_big = A_c_func_no_WBF(big(q_sl), big(g), big(w), big(c_p), big(e_sl), big(dqsl_dT), big(dqvdt), big(dTdt), big(p), big(ρ))
-        t_out_of_liq = FT(get_t_out_of_q_liq(big(δ_0), A_c_big, big(τ), big(τ_liq), big(q_liq), big(Γ_l), false)) 
-        @debug "After upgrading to big, t_out_of_liq = $t_out_of_liq"
+        t_out_of_liq = FT(get_t_out_of_q_liq(big(δ_0), A_c_big, big(τ), big(τ_liq), big(q_liq), big(Γ_l), false).sol)
+        # @debug "After upgrading to big, t_out_of_liq = $t_out_of_liq"
     end
 
 
@@ -2850,7 +2860,7 @@ function morrison_milbrandt_2015_style(
     t_hit_sat, t_hit_sat_converged = get_t_var_hit_value(BF ? Val{:δi}() : Val{:δ}(), param_set, target(FT(0), +; factor = FT(TF)), FT(0), max_t, δ_0, A_c, τ, τ_liq, τ_ice_here, Γ_l, Γ_i, q_sl, q_si, T, w, p, q_vap, dqvdt, dTdt, q, q_eq, q_liq, q_ice, ts) # if didn't hit sat and t_hit_sat is the least, it'll just equal Δt, then we can use these S_ql and S_qi and shouldn't have to recalculate them at the end...
     max_t = min_if_converged(max_t, t_hit_sat, t_hit_sat_converged)
     t_hit_T_freeze, t_hit_T_freeze_converged = get_t_var_hit_value(Val{:T}(), param_set, target(T_freeze, (BF ? (+) : (-)); factor = FT(TF)), FT(0), max_t,  δ_0, A_c, τ, τ_liq, τ_ice_here, Γ_l, Γ_i, q_sl, q_si, T, w, p, q_vap, dqvdt, dTdt, q, q_eq, q_liq, q_ice, ts)
-    @debug "t_out_of_liq = $t_out_of_liq, t_hit_sat = $t_hit_sat, t_hit_T_freeze = $t_hit_T_freeze"
+    # @debug "t_out_of_liq = $t_out_of_liq, t_hit_sat = $t_hit_sat, t_hit_T_freeze = $t_hit_T_freeze"
     
     t_hit_sat = t_hit_sat_converged ? t_hit_sat : FT(Inf)
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
@@ -2865,8 +2875,8 @@ function morrison_milbrandt_2015_style(
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper_full_source(param_set, p, q, q_eq, q_liq, q_ice, -q_liq, S_qi*min_t, min_t, dqvdt*min_t, ts, w; error_on_q_neg = false) # floating point safe
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
-            @debug "Ran out of liq before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, T, T_freeze)
+            # @debug "Ran out of liq before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
             S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt - min_t, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
@@ -2883,10 +2893,10 @@ function morrison_milbrandt_2015_style(
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt, ts, w; error_on_q_neg = false)
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, new_T, T_freeze)
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, new_T, T_freeze)
             sat_hit = (T < T_freeze) ? "ice" : "liq"
-            (i_min_t==2) && @debug "Hit $sat_hit saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
-            (i_min_t==3) && @debug "Hit freezing before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            (i_min_t==2) && # @debug "Hit $sat_hit saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            (i_min_t==3) && # @debug "Hit freezing before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             if i_min_t == 2 # hit sat
                 new_δ_0_shum = BF ? TD.vapor_specific_humidity(new_q) - new_q_eq.liq : FT(0)
                 new_δ_0i_shum = BF ? FT(0) : TD.vapor_specific_humidity(new_q) - new_q_eq.ice
@@ -2905,7 +2915,7 @@ function morrison_milbrandt_2015_style(
 
     else
 
-        @debug "nothing of note through end of timestep..."
+        # @debug "nothing of note through end of timestep..."
         S_ql = S_ql_func_indiv( A_c, τ_liq, δ_0, Δt, Γ_l)
         S_qi = FT(0)
         S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, Δt) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
@@ -2937,7 +2947,7 @@ function morrison_milbrandt_2015_style(
     ) where {FT}
 
     if depth == max_depth
-        @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
+        # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
         S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
     end
@@ -2962,19 +2972,19 @@ function morrison_milbrandt_2015_style(
 
     # need to treet like is liquid...
     local BF::Bool = T < T_freeze
-    @debug "Calling Subsaturated{false, true, $BF}"
+    # @debug "Calling Subsaturated{false, true, $BF}"
 
     max_t = Δt
-    t_out_of_ice = get_t_out_of_q_ice_no_WBF(δ_0i, A_c, τ, τ_ice, q_ice, Γ_i) # calcualte as if is liquid since  there's no WBF
+    (t_out_of_ice, t_out_of_ice_valid) = get_t_out_of_q_ice_no_WBF(δ_0i, A_c, τ, τ_ice, q_ice, Γ_i) # calcualte as if is liquid since  there's no WBF
 
-    if isnothing(t_out_of_ice)
+    if !t_out_of_ice_valid
         if fallback_to_standard_supersaturation_limiter
-            @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
+            # @debug "Falling back to StandardSupersaturationMoistureSourcesLimiter due to t_out_of_ice being nothing"
             return standard_supersaturation_sources(StandardSupersaturationMoistureSourcesLimiter(), param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, dqvdt, dTdt, q, q_eq, Δt, ts) # use this version with δ_0, δ_0i to keep our up to date supersaturation
         end
         A_c_big = A_c_func_no_WBF(big(q_sl), big(g), big(w), big(c_p), big(e_sl), big(dqsl_dT), big(dqvdt), big(dTdt), big(p), big(ρ))
-        t_out_of_ice = FT(get_t_out_of_q_ice_no_WBF(big(δ_0i), A_c_big, big(τ), big(τ_ice), big(q_ice), big(Γ_i), false)) # calcualte as if is liquid since  there's no WBF
-        @debug "After upgrading to big, t_out_of_ice = $t_out_of_ice"
+        t_out_of_ice = FT(get_t_out_of_q_ice_no_WBF(big(δ_0i), A_c_big, big(τ), big(τ_ice), big(q_ice), big(Γ_i), false).sol) # calcualte as if is liquid since  there's no WBF
+        # @debug "After upgrading to big, t_out_of_ice = $t_out_of_ice"
     end
 
     max_t = min(max_t, t_out_of_ice)
@@ -2995,8 +3005,8 @@ function morrison_milbrandt_2015_style(
 
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper_full_source(param_set, p, q, q_eq, q_liq, q_ice, S_ql*min_t, -q_ice, min_t, dqvdt*min_t, ts, w; error_on_q_neg = false) # floating point safe
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, new_T, T_freeze)
-            @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, new_T, T_freeze)
+            # @debug "Ran out of ice before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
             new_δ_0_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.liq
             new_δ_0i_shum = TD.vapor_specific_humidity(new_q) - new_q_eq.ice
             S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style(new_regime, param_set, area, new_ρ, new_p, new_T, w, τ_liq, τ_ice, new_q_vap, new_q, new_q_eq, Δt_left, new_ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth + 1, δ_0_shum = new_δ_0_shum, δ_0i_shum = new_δ_0i_shum, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
@@ -3011,16 +3021,16 @@ function morrison_milbrandt_2015_style(
             S_qi = S_qi_func_indiv( A_c, τ_ice, δ_0i, Δt, Γ_i)
 
             if !BF && (S_qi > FT(0))
-                @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
+                # @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
                 return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter ) # we had ice growth instead of loss, set τ_ice to infinity and recall
             end
 
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
             new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt, ts, w; error_on_q_neg = false)
             Δt_left = Δt - min_t
-            new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, new_T, T_freeze)
-            (i_min_t==2) && @debug "Hit ice saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(t_hit_sat)..."
-            (i_min_t==3) && @debug "Hit freezing before timestep is over... transitioning to $(typeof(new_regime)) at t = $(t_hit_T_freeze)..."
+            new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, new_T, T_freeze)
+            (i_min_t==2) && # @debug "Hit ice saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(t_hit_sat)..."
+            (i_min_t==3) && # @debug "Hit freezing before timestep is over... transitioning to $(typeof(new_regime)) at t = $(t_hit_T_freeze)..."
             if i_min_t == 2 # hit sat
                 new_δ_0_shum = BF ? TD.vapor_specific_humidity(new_q) - new_q_eq.liq : FT(0)
                 new_δ_0i_shum = BF ? FT(0) : TD.vapor_specific_humidity(new_q) - new_q_eq.ice
@@ -3038,11 +3048,11 @@ function morrison_milbrandt_2015_style(
         end
         
     else
-        @debug "nothing of note through end of timestep..."
+        # @debug "nothing of note through end of timestep..."
         S_ql = FT(0)
         S_qi = S_qi_func_indiv( A_c, τ_ice, δ_0i, Δt, Γ_i)
         if !BF && (S_qi > FT(0))
-            @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
+            # @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
             return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
         end
         S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, Δt) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
@@ -3072,7 +3082,7 @@ function morrison_milbrandt_2015_style(
     ) where {FT}
 
     if depth == max_depth
-        @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
+        # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
         q_vap = TD.vapor_specific_humidity(q)
         S_ql, S_qi = morrison_milbrandt_2015_style_exponential_part_only(regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0_shum, δ_0i_shum, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = false, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter)
         return return_mixing_ratio ? (S_shum_to_mixing_ratio(S_ql, q.tot), S_shum_to_mixing_ratio(S_qi, q.tot)) : (S_ql, S_qi) # exponential only doesn't bother with mixing ratios at the moment
@@ -3086,7 +3096,7 @@ function morrison_milbrandt_2015_style(
 
 
     local BF::Bool = T < T_freeze
-    @debug "Calling Subsaturated{false, false, $BF}"
+    # @debug "Calling Subsaturated{false, false, $BF}"
 
     # (q_vap < (true ? q_si : q_sl)) || error("should be subsaturated, q_vap = $q_vap, q_vap_sat = $(true ? q_si : q_sl)")
 
@@ -3097,7 +3107,7 @@ function morrison_milbrandt_2015_style(
     t_hit_sat, t_hit_sat_converged = get_t_var_hit_value(BF ? Val{:δi}() : Val{:δ}(), param_set, target(FT(0), +; factor = FT(TF)), FT(0), max_t,  δ_0, A_c, τ_here, τ_liq_here, τ_ice_here, Γ_l, Γ_i, q_sl, q_si, T, w, p, q_vap, dqvdt, dTdt, q, q_eq, q_liq, q_ice, ts)
     max_t = min_if_converged(max_t, t_hit_sat, t_hit_sat_converged)
     t_hit_T_freeze, t_hit_T_freeze_converged = get_t_var_hit_value(Val{:T}(), param_set, T_freeze, target(T_freeze, (BF ? (+) : (-)); factor = FT(TF)), max_t,  δ_0, A_c, τ_here, τ_liq_here, τ_ice_here, Γ_l, Γ_i, q_sl, q_si, T, w, p, q_vap, dqvdt, dTdt, q, q_eq, q_liq, q_ice, ts)
-    @debug " = $t_hit_sat = $t_hit_sat, t_hit_T_freeze = $t_hit_T_freeze"
+    # @debug " = $t_hit_sat = $t_hit_sat, t_hit_T_freeze = $t_hit_T_freeze"
     t_hit_sat = t_hit_sat_converged ? t_hit_sat : FT(Inf)
     t_hit_T_freeze = t_hit_T_freeze_converged ? t_hit_T_freeze : FT(Inf) 
 
@@ -3110,9 +3120,9 @@ function morrison_milbrandt_2015_style(
 
         new_ρ, new_p, new_T, new_q_vap, new_q, new_q_eq, new_q_sl, new_q_si, new_ts = morrison_milbrandt_2015_get_new_status_helper(param_set, p, q, q_eq, q_liq, q_ice, S_ql, S_qi, min_t, dqvdt, ts, w; error_on_q_neg = false)
         Δt_left = Δt - min_t
-        new_regime = get_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, new_T, T_freeze)
-        (i_min_t == 1) && @debug "Hit ice saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
-        (i_min_t == 2) && @debug "Hit freezing before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+        new_regime = get_saturation_regime(new_q_vap, new_q.liq, new_q.ice, new_q_sl, new_q_si, new_T, T_freeze)
+        (i_min_t == 1) && # @debug "Hit ice saturation before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
+        (i_min_t == 2) && # @debug "Hit freezing before timestep is over... transitioning to $(typeof(new_regime)) at t = $(min_t)..."
         if i_min_t == 1 # hit sat
             new_δ_0_shum = BF ? TD.vapor_specific_humidity(new_q) - new_q_eq.liq : FT(0)
             new_δ_0i_shum = BF ? FT(0) : TD.vapor_specific_humidity(new_q) - new_q_eq.ice

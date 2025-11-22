@@ -27,11 +27,65 @@ end
 mean_nc_data(data, group, var, imin, imax) = StatsBase.mean(data.group[group][var][:][:, imin:imax], dims = 2)[:]
 init_nc_data(data, group, var) = data.group[group][var][:][:, 1]
 
-#= Simple linear interpolation function, wrapping Dierckx =#
-function pyinterp(x, xp, fp)
-    spl = Dierckx.Spline1D(xp, fp; k = 1)
-    return spl(vec(x))
+# #= Simple linear interpolation function, wrapping Dierckx =#
+# function pyinterp_old(x, xp, fp)
+#     spl = Dierckx.Spline1D(xp, fp; k = 1)
+#     return spl(vec(x))
+# end
+
+# #= Simple linear interpolation function, wrapping Dierckx =#
+# function pyinterp_old(x::FT, xp::AbstractVector{FT}, fp::AbstractVector{FT}) where {FT}
+#     spl = Dierckx.Spline1D(xp, fp; k = 1)
+#     return spl(x) # scalar version, I'm not sure why they did vec(x)... maybe Dierckx use to require it? It doesnt seem to as far as I can tell and in the old versions it didnt either but idk.
+# end
+
+
+"""
+    Since Spline1D with k=1 returns something like:
+        julia> a = Dierckx.Spline1D([1.,2.,3.], [1.,1.2,4.], k=1)
+        Spline1D(knots=[1.0, 2.0, 3.0], k=1, extrapolation="nearest", residual=0.0)
+
+    We implement a faster optimized version that doesnt need to allocate the Spline1D object
+
+    julia> @btime pyinterp_old(\$xq, \$xp, \$fp)
+        7.668 μs (8 allocations: 14.22 KiB)
+
+    pyinterp_light(\$xq, \$xp, \$fp)
+        594.972 ns (1 allocation: 496 bytes)
+"""
+# Scalar version (allocation-free) -- since Dierckx.Spline1D(xp, fp; k = 1) returns . These do not check for xp being sorted or unique or anything else 
+function pyinterp(x::T, xp::AbstractVector{T}, fp::AbstractVector{T}) where {T<:Real}
+    if x <= xp[1]
+        return fp[1]
+    elseif x >= xp[end]
+        return fp[end]
+    else
+        i = searchsortedlast(xp, x)
+        if i == length(xp)   # <- handle upper bound
+            return fp[end]
+        end
+        x0, x1 = xp[i], xp[i+1]
+        y0, y1 = fp[i], fp[i+1]
+        return y0 + (y1 - y0)*(x - x0)/(x1 - x0)
+    end
 end
+
+
+# Vector version
+function pyinterp(x::AbstractVector{T}, xp::AbstractVector{T}, fp::AbstractVector{T}) where {T<:Real}
+    y = similar(x)
+    pyinterp!(y, x, xp, fp)
+    return y
+end
+
+function pyinterp!(y::AbstractVector{T}, x::AbstractVector{T}, xp::AbstractVector{T}, fp::AbstractVector{T}) where {T<:Real}
+    # @assert length(y) == length(x)
+    @inbounds for j in eachindex(x)
+        y[j] = pyinterp(x[j], xp, fp)
+    end
+    return y
+end
+
 
 """
     compare(a::Field, a::Field)

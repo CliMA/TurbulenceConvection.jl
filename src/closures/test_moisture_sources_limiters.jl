@@ -75,10 +75,10 @@ else
     const AtSaturationOverIce = TC.AtSaturationOverIce
     const AtSupersaturationStationaryPoint = TC.AtSupersaturationStationaryPoint
 
-    const get_regime_type = TC.get_regime_type
-    const get_regime = TC.get_regime
+    const get_saturation_regime_type = TC.get_saturation_regime_type
+    const get_saturation_regime = TC.get_saturation_regime
     const add_regime_parameters = TC.add_regime_parameters
-    const get_new_regime_type_from_milestone = TC.get_new_regime_type_from_milestone
+    const get_new_saturation_regime_type_from_milestone = TC.get_new_regime_type_from_milestone
     const δi_from_δ = TC.δi_from_δ
     const δ_from_δi = TC.δ_from_δi
     const get_dδdt_0 = TC.get_dδdt_0

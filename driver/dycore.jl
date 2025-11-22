@@ -413,12 +413,10 @@ end
     Problematically, it's not clear what limiting the gm tendencies have... so unless that's NoTendencyLimiter(), not recalculating could be an error...
     The safest (and easiest to maintain and keep bug-free) solution, despite being slower, is to recalculate all the tendencies.
 """
-function update_noneq_moisture_sources_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real, use_fallback_tendency_limiters::Bool) where {NT, FV <: CC.Fields.FieldVector}
-
-    error("this function has been deprecated")
-
-    return nothing
-end
+# function update_noneq_moisture_sources_tendencies!(tendencies::FV, prog::FV, params::NT, t::Real, use_fallback_tendency_limiters::Bool) where {NT, FV <: CC.Fields.FieldVector}
+#     error("this function has been deprecated")
+#     return nothing
+# end
 
 function ∑tendencies_null!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
     # do nothing
@@ -449,41 +447,26 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         UnPack.@unpack edmf, precip_model, param_set, case = params
         UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
 
-
-        thermo_params = TCP.thermodynamics_params(param_set)
+        # thermo_params = TCP.thermodynamics_params(param_set)
 
         parent(tendencies.face[colidx]) .= 0 # reset tendencies to 0?
         parent(tendencies.cent[colidx]) .= 0 # reset tendencies to 0?
         state = TC.column_state(prog, aux, tendencies, colidx, params.calibrate_io) # also creates face and cent
 
-        # @error(" testing applying filter before setting thermo stuff...") # -- really I think we could get away with just moving filter_gm_vars() here...
-        # surf = get_surface(surf_params, state, t, param_set)
-        # TC.affect_filter!(edmf, state, param_set, surf, cfl_limit, Δt)
+        # TC.filter_gm_vars(edmf, state)  # filter gm vars before setting thermo state so that we don't have to do it again later
+        # TC.affect_filter!(edmf, state, param_set, surf, cfl_limit, Δt) # This should alos be done in the filter callback...
 
-        TC.filter_gm_vars(edmf, state)  # filter gm vars before setting thermo state so that we don't have to do it again later
-
-
-        set_thermo_state_from_prog!(state, edmf.moisture_model, param_set)
-        assign_thermo_aux!(state, param_set)
-
-        aux_gm = TC.center_aux_grid_mean(state)
-        @. aux_gm.θ_virt = TD.virtual_pottemp(thermo_params, aux_gm.ts)
+        # set_thermo_state_from_prog!(state, edmf.moisture_model, param_set) # moved to update_aux_caller!()
+        # assign_thermo_aux!(state, param_set) # moved to update_aux_caller!()
+        # aux_gm = TC.center_aux_grid_mean(state) # moved to update_aux_caller!()
+        # @. aux_gm.θ_virt = TD.virtual_pottemp(thermo_params, aux_gm.ts) # moved to update_aux_caller!()
 
         # Δt = TS.dt 
         Δt = TS.dt_limit_tendencies_factor * (TS.limit_tendencies_by_dt_min ? TS.dt_min : TS.dt)
         @debug "calc'ing tends: t = $t, Δt = $Δt, use_fallback_tendency_limiters = $(TS.use_fallback_tendency_limiters)"
         cfl_limit = TS.cfl_limit
 
-        # local use_fallback_tendency_limiters::Bool
-        # if (TS.use_tendency_timestep_limiter) && (Δt < dt_min) && iszero(TS.N_dt_max_edmf_violate_dt_min_remaining) # should only be true for fixed_step explicit solver
-        #     use_fallback_tendency_limiters = true
-        # else
-        #     use_fallback_tendency_limiters = false
-        # end
-
         surf = get_surface(surf_params, state, t, param_set)
-
-        TC.affect_filter!(edmf, state, param_set, surf, cfl_limit, Δt)
 
         # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
         # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
@@ -495,8 +478,8 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         end
         Cases.update_radiation(radiation, state, t, param_set)
 
-        TC.update_aux!(edmf, state, surf, param_set, t, Δt, cfl_limit, TS.use_fallback_tendency_limiters) # update aux vars, reset tendencies... call to microphsyics!() also resets some aux vars and calculates en tendencies
-        
+        # TC.update_aux!(edmf, state, surf, param_set, t, Δt, cfl_limit, TS.use_fallback_tendency_limiters) # update aux vars, reset tendencies... call to microphsyics!() also resets some aux vars and calculates en tendencies
+        TC.update_aux_tendencies!(edmf, state, param_set, Δt, TS.use_fallback_tendency_limiters) # move update aux to after step, in a callback I guess
         # compute tendencies
         # causes division error in dry bubble first time step
         TC.compute_precipitation_sink_tendencies(precip_model, edmf, state, param_set, Δt, TS.use_fallback_tendency_limiters)
@@ -508,6 +491,41 @@ function ∑tendencies!(tendencies::FV, prog::FV, params::NT, t::Real) where {NT
         # Now that we have updraft, gm from updraft, we can calculate any post tendencies that we need for things that are backed out.
 
         # I haven't come up with a limiter that's better than filtering... (we can stop the model from crashing but you're essentially getting random results, just use tendency-adaptive dt)
+    end
+
+    return nothing
+end
+
+
+# Compute the sum of tendencies for the scheme
+function update_aux_caller!(prog::FV, params::NT, t::Real) where {NT, FV <: CC.Fields.FieldVector}
+    CC.Fields.bycolumn(axes(prog.cent)) do colidx
+        UnPack.@unpack edmf, precip_model, param_set, case = params
+        UnPack.@unpack surf_params, radiation, forcing, aux, TS = params
+
+        thermo_params = TCP.thermodynamics_params(param_set)
+        # state = TC.column_state(prog, aux, tendencies, colidx, params.calibrate_io) # also creates face and cent
+        state = TC.column_prog_aux(prog, aux, colidx, params.calibrate_io)
+
+        # filter gm_vars should have been done in the filter callback
+
+        set_thermo_state_from_prog!(state, edmf.moisture_model, param_set) # sets ts_gm using prog variables
+        assign_thermo_aux!(state, param_set) # sets aux_gm thermo vars
+        aux_gm = TC.center_aux_grid_mean(state)
+        @. aux_gm.θ_virt = TD.virtual_pottemp(thermo_params, aux_gm.ts)
+
+        Δt = TS.dt_limit_tendencies_factor * (TS.limit_tendencies_by_dt_min ? TS.dt_min : TS.dt)
+        @debug "calc'ing tends: t = $t, Δt = $Δt, use_fallback_tendency_limiters = $(TS.use_fallback_tendency_limiters)"
+        cfl_limit = TS.cfl_limit
+
+        surf = get_surface(surf_params, state, t, param_set)
+
+        # Update aux / pre-tendencies filters. TODO: combine these into a function that minimizes traversals
+        # Some of these methods should probably live in `compute_tendencies`, when written, but we'll
+        # treat them as auxiliary variables for now, until we disentangle the tendency computations.
+
+        TC.update_aux!(edmf, state, surf, param_set, Δt, cfl_limit) # update aux vars, reset tendencies... call to microphsyics!() also resets some aux vars and calculates en tendencies
+
     end
 
     return nothing

@@ -1309,7 +1309,7 @@ initialize_radiation(::LES_driven_SCM, radiation, state, param_set; LESDat) =
 ##### SOCRATES
 #####
 
-function aux_data_kwarg(::SOCRATES, namelist)
+function aux_data_kwarg(case::SOCRATES, namelist, param_set::APS, grid::TC.Grid)
     FT = Float64
     if haskey(namelist["grid"], "conservative_interp_kwargs")  && haskey(namelist["grid"]["conservative_interp_kwargs"], "in") # if it exists, use it
         conservative_interp_kwargs = namelist["grid"]["conservative_interp_kwargs"]["in"] # convert to nt no matter what for type stability, but don't convert to SSCF yet bc that strips out conservative_interp key...
@@ -1325,7 +1325,9 @@ function aux_data_kwarg(::SOCRATES, namelist)
 
     # should be Dict of String -> Union{Bool, String}
     # conservative_interp_kwargs = Dict{Symbol, Union{Bool, Symbol}}(Symbol(k) => isa(v, String) ? Symbol(v) : v for (k, v) in conservative_interp_kwargs)
-    conservative_interp_kwargs = NamedTuple((Symbol(k) => isa(v, String) ? Symbol(v) : v for (k, v) in conservative_interp_kwargs) ) # convert Strings to symbols
+    # conservative_interp_kwargs = NamedTuple((Symbol(k) => isa(v, String) ? Symbol(v) : v for (k, v) in conservative_interp_kwargs) ) # convert Strings to symbols
+    conservative_interp_kwargs = (; (Symbol(k) => (isa(v,String) ? Symbol(v) : v) for (k,v) in conservative_interp_kwargs)... )
+
 
     conservative_interp = get(conservative_interp_kwargs, :conservative_interp, false) # break out bc SSCF hanles this separately and will strip it from the tuple
     conservative_interp_kwargs = SSCF.get_conservative_interp_kwargs(conservative_interp_kwargs) # convert to SSCF kwargs format and fill in missing withb defaults
@@ -1336,7 +1338,33 @@ function aux_data_kwarg(::SOCRATES, namelist)
     # zrough = FT(0.1) # copied from gabls which is also w/ monin obhukov boundary layer [[ i think this is far too high. GABLS is a land case!!!]]
     zrough::FT = TC.parse_namelist(namelist, "user_params", "zrough", default = FT(6e-4))
 
-    return (; conservative_interp, conservative_interp_kwargs, zrough)
+    # Call here so we dont need to repeat the call in radiation [[ leave the initial condition calls alone for now]] -- We would need to figure out how to pass in state or grid here...
+    new_zc = vec(grid.zc.z)
+    # new_zf = vec(grid.zf.z)[1:(end - 1)]
+    thermo_params = TCP.thermodynamics_params(param_set)
+    forcing_funcs = SSCF.process_case(
+        case.flight_number;
+        forcing_type = case.forcing_type,
+        new_z = (;
+            dTdt_hadv = new_zc,
+            H_nudge = new_zc,
+            dqtdt_hadv = new_zc,
+            qt_nudge = new_zc,
+            subsidence = new_zc,
+            u_nudge = new_zc,
+            v_nudge = new_zc,
+            ug_nudge = new_zc,
+            vg_nudge = new_zc,
+            dTdt_rad = new_zc,
+        ),
+        initial_condition = false,
+        thermo_params = thermo_params,
+        conservative_interp = conservative_interp, # parsed in aux_data_kwarg()
+        conservative_interp_kwargs = conservative_interp_kwargs, # parsed in aux_data_kwarg()
+        use_svectors = true,
+    )
+
+    return (; conservative_interp, conservative_interp_kwargs, zrough, forcing_funcs)
 
 end
 
@@ -1347,6 +1375,7 @@ function surface_ref_state(case::SOCRATES, param_set::APS, namelist) # adopted m
         forcing_type = case.forcing_type,
         surface = "ref",
         thermo_params = thermo_params,
+        use_svectors = true,
     )
 end
 
@@ -1381,6 +1410,7 @@ function initialize_profiles(case::SOCRATES, param_set, state; kwargs...) # Reli
         thermo_params = thermo_params,
         conservative_interp = conservative_interp, #  aux_data_kwarg()
         conservative_interp_kwargs = conservative_interp_kwargs, # parsed in aux_data_kwarg()
+        use_svectors = true,
     )
 
     prog_gm_u = copy(aux_gm.q_tot) # copy as template cause u,g go into a uₕ vector so this is easier to work with (copied from other cases...)
@@ -1450,12 +1480,13 @@ function surface_params(case::SOCRATES, surf_ref_state, param_set; kwargs...) # 
         forcing_type = case.forcing_type,
         surface = "conditions",
         thermo_params = thermo_params,
+        use_svectors = true,
     )
 
     # drop conservative_interp_kwargs from kwargs
     if haskey(kwargs, :conservative_interp_kwargs) # filter named tuple
         # drop just that key from the list of pairs
-        kwargs = filter(x -> x[1] ∉ (:conservative_interp, :conservative_interp_kwargs), kwargs)
+        kwargs = filter(x -> x[1] ∉ (:conservative_interp, :conservative_interp_kwargs, :forcing_funcs), kwargs)
     end
 
 
@@ -1472,29 +1503,31 @@ function initialize_forcing(case::SOCRATES, forcing, state, param_set; kwargs...
     new_zc = vec(grid.zc.z)
     new_zf = vec(grid.zf.z)[1:(end - 1)]
 
-    (; conservative_interp, conservative_interp_kwargs) = values(kwargs) # values converts kwargs to named tuple which we then unpack... we could also use kwargs[:conservative_interp] ...
+    (; conservative_interp, conservative_interp_kwargs, forcing_funcs) = values(kwargs) # values converts kwargs to named tuple which we then unpack... we could also use kwargs[:conservative_interp] ...
 
-    thermo_params = TCP.thermodynamics_params(param_set)
-    forcing.forcing_funcs[] = SSCF.process_case(
-        case.flight_number;
-        forcing_type = case.forcing_type,
-        new_z = (;
-            dTdt_hadv = new_zc,
-            H_nudge = new_zc,
-            dqtdt_hadv = new_zc,
-            qt_nudge = new_zc,
-            subsidence = new_zc,
-            u_nudge = new_zc,
-            v_nudge = new_zc,
-            ug_nudge = new_zc,
-            vg_nudge = new_zc,
-            dTdt_rad = new_zc,
-        ),
-        initial_condition = false,
-        thermo_params = thermo_params,
-        conservative_interp = conservative_interp, # parsed in aux_data_kwarg()
-        conservative_interp_kwargs = conservative_interp_kwargs, # parsed in aux_data_kwarg()
-    )
+    # thermo_params = TCP.thermodynamics_params(param_set)
+    # forcing.forcing_funcs[] = SSCF.process_case(
+    #     case.flight_number;
+    #     forcing_type = case.forcing_type,
+    #     new_z = (;
+    #         dTdt_hadv = new_zc,
+    #         H_nudge = new_zc,
+    #         dqtdt_hadv = new_zc,
+    #         qt_nudge = new_zc,
+    #         subsidence = new_zc,
+    #         u_nudge = new_zc,
+    #         v_nudge = new_zc,
+    #         ug_nudge = new_zc,
+    #         vg_nudge = new_zc,
+    #         dTdt_rad = new_zc,
+    #     ),
+    #     initial_condition = false,
+    #     thermo_params = thermo_params,
+    #     conservative_interp = conservative_interp, # parsed in aux_data_kwarg()
+    #     conservative_interp_kwargs = conservative_interp_kwargs, # parsed in aux_data_kwarg()
+    #     use_svectors = true,
+    # )[(:dTdt_hadv, :H_nudge, :dqtdt_hadv, :qt_nudge, :subsidence, :u_nudge, :v_nudge, :ug_nudge, :vg_nudge,)] #:dTdt_rad)] # only keep relevant keys
+    forcing.forcing_funcs[] = forcing_funcs[(:dTdt_hadv, :H_nudge, :dqtdt_hadv, :qt_nudge, :subsidence, :u_nudge, :v_nudge, :ug_nudge, :vg_nudge,)] #:dTdt_rad)] # only keep relevant keys
     initialize(forcing, state) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
 end
 
@@ -1520,21 +1553,40 @@ function update_forcing(case::SOCRATES, state, t::Real, param_set, forcing) # Ad
     forcing_funcs = forcing.forcing_funcs[] # access our functions
     ug_keys = (:ug_nudge, :vg_nudge)
     # update geostrophic profile
-    g_func = (f) -> f([FT(t)])[1]
-    prof_ug = g_func.(forcing_funcs[:ug_nudge]) # map over the forcing funcs to get the profile at t=0
-    prof_vg = g_func.(forcing_funcs[:vg_nudge])
+    # g_func = (f) -> f([FT(t)])[1]
+    # g_func = (f) -> f(FT(t)) # take fcn and evluate at time t
+    # prof_ug = g_func.(forcing_funcs[:ug_nudge]) # map over the forcing funcs to get the profile at t
+    # prof_vg = g_func.(forcing_funcs[:vg_nudge])
     # it wants a fcn out, could edit src/Fields.jl I guess to add another method but maybe it needs to face/center points idk...
-    prof_ug = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_ug); k = 1)
-    prof_vg = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_vg); k = 1)
+    # prof_ug = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_ug); k = 1)
+    # prof_vg = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_vg); k = 1)
 
+    # zc = vec(grid.zc.z)
+    # let prof_ug_array = prof_ug, prof_vg_array = prof_vg
+    #     prof_ug_func = z -> pyinterp(z, zc, prof_ug_array)
+    #     prof_vg_func = z -> pyinterp(z, zc, prof_vg_array)
+    #     aux_gm_uₕ_g = TC.grid_mean_uₕ_g(state)
+    #     TC.set_z!(aux_gm_uₕ_g, prof_ug_func, prof_vg_func)
+    # end
+
+
+    forcing_funcs = forcing_funcs[ug_keys]
     aux_gm_uₕ_g = TC.grid_mean_uₕ_g(state)
-    TC.set_z!(aux_gm_uₕ_g, prof_ug, prof_vg)
+    @inbounds for k in real_center_indices(grid)
+        z = grid.zc[k].z
+        ug = forcing_funcs[:ug_nudge][k](FT(t)) # we do the interp in SSCF so we dont need to redo it
+        vg = forcing_funcs[:vg_nudge][k](FT(t)) # we do the interp in SSCF so we dont need to redo it
+        TC.set_z!(k, aux_gm_uₕ_g, ug, vg)
+    end
+
+
 
     forcing_funcs = forcing_funcs[setdiff(keys(forcing_funcs), ug_keys)] # remove keys we don't need
     for (name, funcs) in zip(keys(forcing_funcs), forcing_funcs)
         @inbounds for k in real_center_indices(grid)
             func = funcs[k]
-            getproperty(aux_gm, name)[k] = func([t])[1] # turn to vec cause needs to be cast as in https://github.com/CliMA/TurbulenceConvection.jl/blob/a9ebce1f5f15f049fc3719a013ddbc4a9662943a/src/utility_functions.jl#L48, run fcn on vec and index it back outssss
+            # getproperty(aux_gm, name)[k] = func([t])[1] # turn to vec cause needs to be cast as in https://github.com/CliMA/TurbulenceConvection.jl/blob/a9ebce1f5f15f049fc3719a013ddbc4a9662943a/src/utility_functions.jl#L48, run fcn on vec and index it back outssss
+            getproperty(aux_gm, name)[k] = func(t) # turn to vec cause needs to be cast as in https://github.com/CliMA/TurbulenceConvection.jl/blob/a9ebce1f5f15f049fc3719a013ddbc4a9662943a/src/utility_functions.jl#L48, run fcn on vec and index it back outssss
         end
     end
 end
@@ -1545,33 +1597,35 @@ end
 RadiationBase(case::SOCRATES, FT) = RadiationBase{Cases.get_radiation_type(case), FT}() # i think this should default to none, would deprecate this call for now cause we dont have a use, default is just none... but aux_data_kwarg is in the end of the main.jl initialize_radiation.jl cal so we gotta improvise
 
 function initialize_radiation(case::SOCRATES, radiation, state, param_set; kwargs...)
-    grid = TC.Grid(state)
-    new_zc = vec(grid.zc.z)
-    new_zf = vec(grid.zf.z)[1:(end - 1)]
+    # grid = TC.Grid(state)
+    # new_zc = vec(grid.zc.z)
+    # new_zf = vec(grid.zf.z)[1:(end - 1)]
 
-    (; conservative_interp, conservative_interp_kwargs) = values(kwargs) # values converts kwargs to named tuple which we then unpack... we could also use kwargs[:conservative_interp] ...
+    (; forcing_funcs) = values(kwargs) # values converts kwargs to named tuple which we then unpack... we could also use kwargs[:conservative_interp] ...
 
-    thermo_params = TCP.thermodynamics_params(param_set)
-    radiation.radiation_funcs[] = SSCF.process_case(
-        case.flight_number;
-        forcing_type = case.forcing_type,
-        new_z = (;
-            dTdt_hadv = new_zc,
-            H_nudge = new_zc,
-            dqtdt_hadv = new_zc,
-            qt_nudge = new_zc,
-            subsidence = new_zc,
-            u_nudge = new_zc,
-            v_nudge = new_zc,
-            ug_nudge = new_zc,
-            vg_nudge = new_zc,
-            dTdt_rad = new_zc,
-        ),
-        initial_condition = false,
-        thermo_params = thermo_params,
-        conservative_interp = conservative_interp, # parsed in aux_data_kwarg()
-        conservative_interp_kwargs = conservative_interp_kwargs, # parsed in aux_data_kwarg()
-    ) # redundant w/ forcing but oh well
+    # thermo_params = TCP.thermodynamics_params(param_set)
+    # radiation.radiation_funcs[] = SSCF.process_case(
+    #     case.flight_number;
+    #     forcing_type = case.forcing_type,
+    #     new_z = (;
+    #         dTdt_hadv = new_zc,
+    #         H_nudge = new_zc,
+    #         dqtdt_hadv = new_zc,
+    #         qt_nudge = new_zc,
+    #         subsidence = new_zc,
+    #         u_nudge = new_zc,
+    #         v_nudge = new_zc,
+    #         ug_nudge = new_zc,
+    #         vg_nudge = new_zc,
+    #         dTdt_rad = new_zc,
+    #     ),
+    #     initial_condition = false,
+    #     thermo_params = thermo_params,
+    #     conservative_interp = conservative_interp, # parsed in aux_data_kwarg()
+    #     conservative_interp_kwargs = conservative_interp_kwargs, # parsed in aux_data_kwarg()
+    #     use_svectors = true,
+    # )[(:dTdt_rad,)] # redundant w/ forcing but oh well
+    radiation.radiation_funcs[] = forcing_funcs[(:dTdt_rad,)] # redundant w/ forcing but oh well
     initialize(radiation, state) # we have this default already to plug t=0 into functions, or else we would do this like update_forcing below right...
 end
 

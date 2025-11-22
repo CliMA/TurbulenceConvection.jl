@@ -46,21 +46,27 @@ function initialize(forcing::ForcingBase{ForcingSOCRATES}, state) #where {T <: F
     forcing_funcs = forcing.forcing_funcs[]
 
     # set the geostrophic velocity profiles -- need to check if we actually have a fcn that can take in t=0 and return a profile... ( i think ours is one func for each z so whoops... maybe need to reconstruct?)
-    g_func = (f) -> f([FT(0)])[1]
-    prof_ug = g_func.(forcing_funcs[:ug_nudge]) # map over the forcing funcs to get the profile at t=0
-    prof_vg = g_func.(forcing_funcs[:vg_nudge])
-    # it wants a fcn out, could edit src/Fields.jl I guess to add another method but maybe it needs to face/center points idk...
-    prof_ug = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_ug); k = 1)
-    prof_vg = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_vg); k = 1)
+    # g_func = (f) -> f([FT(0)])[1]
+    # g_func = (f) -> f(FT(0)) # take fcn and evluate at time 0
+    # prof_ug = g_func.(forcing_funcs[:ug_nudge]) # map over the forcing funcs to get the profile at t=0
+    # prof_vg = g_func.(forcing_funcs[:vg_nudge])
+    # # it wants a fcn out, could edit src/Fields.jl I guess to add another method but maybe it needs to face/center points idk...
+    # prof_ug = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_ug); k = 1)
+    # prof_vg = Dierckx.Spline1D(vec(grid.zc.z), vec(prof_vg); k = 1)
 
     aux_gm_uₕ_g = TC.grid_mean_uₕ_g(state)
-    TC.set_z!(aux_gm_uₕ_g, prof_ug, prof_vg)
+    # TC.set_z!(aux_gm_uₕ_g, prof_ug, prof_vg)
+
+    @inbounds for k in TC.real_center_indices(grid)
+        TC.set_z!(k, aux_gm_uₕ_g, forcing_funcs[:ug_nudge][k](FT(0)), forcing_funcs[:vg_nudge][k](FT(0))) # We do the interp in SSCF so we dont need to redo it
+    end
 
     forcing_funcs = forcing_funcs[forcing_keys] # keys we don't need.
     for (name, funcs) in zip(keys(forcing_funcs), forcing_funcs) # iterate over the named tuple of our forcings...
         @inbounds for k in TC.real_center_indices(grid)
             func = funcs[k]
-            getproperty(aux_gm, name)[k] = func([FT(0)])[1] # apply to time = 0 and apply to aux_gm, turn to vec cause needs to be cast as in https://github.com/CliMA/TurbulenceConvection.jl/blob/a9ebce1f5f15f049fc3719a013ddbc4a9662943a/src/utility_functions.jl#L48
+            # getproperty(aux_gm, name)[k] = func([FT(0)])[1] # apply to time = 0 and apply to aux_gm, turn to vec cause needs to be cast as in https://github.com/CliMA/TurbulenceConvection.jl/blob/a9ebce1f5f15f049fc3719a013ddbc4a9662943a/src/utility_functions.jl#L48
+            getproperty(aux_gm, name)[k] = func(FT(0)) # apply to time = 0 and apply to aux_gm, turn to vec cause needs to be cast as in
         end
     end
     return nothing

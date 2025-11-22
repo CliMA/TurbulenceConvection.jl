@@ -112,16 +112,21 @@ isa_face_space(space) = false
 isa_face_space(::CC.Spaces.FaceFiniteDifferenceSpace) = true
 isa_face_space(::CC.Spaces.FaceExtrudedFiniteDifferenceSpace) = true
 
-const CallableZType = Union{Function, Dierckx.Spline1D}
+const CallableZType = Union{Function, Dierckx.Spline1D} # SSCF.Fast1DLinearInterpolant is only defined in driver rn... I dont think we need it though
 
-function set_z!(field::CC.Fields.Field, u::CallableZType = x -> x, v::CallableZType = y -> y)
+function set_z!(field::CC.Fields.Field, u::CallableZType = identity, v::CallableZType = identity)
     z = CC.Fields.coordinate_field(axes(field)).z
     @. field = CCG.Covariant12Vector(CCG.UVVector(u(z), v(z)))
 end
 
-function set_z!(field::CC.Fields.Field, u::Real, v::Real)
+function set_z!(field::CC.Fields.Field, u::FT, v::FT) where {FT <: Real}
     lg = CC.Fields.local_geometry_field(axes(field))
-    uconst(coord) = u
-    vconst(coord) = v
+    uconst(_) = u # uconst(coord) = u
+    vconst(_) = v # vconst(coord) = v
     @. field = CCG.Covariant12Vector(CCG.UVVector(uconst(lg), vconst(lg)))
+end
+
+function set_z!(k::Cent, field::CC.Fields.Field, u::FT, v::FT) where {FT <: Real}
+    lg = CC.Fields.local_geometry_field(axes(field))
+    field[k] = CCG.Covariant12Vector(CCG.UVVector(u, v), lg[k])
 end

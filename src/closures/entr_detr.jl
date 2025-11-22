@@ -672,7 +672,7 @@ function compute_ml_entr_detr!(
 
     # max_entr_detr_rate = param_set.user_params.max_entr_detr_rate # move to prognostictke
     # max_entr_detr_rate = inv(eps(FT))
-    max_entr_detr_rate = (1/Δt)
+    max_entr_detr_rate::FT = (1/Δt)
 
     @inbounds for i in 1:N_up
         # compute ∇m at cell centers

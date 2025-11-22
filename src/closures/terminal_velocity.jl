@@ -143,7 +143,7 @@ function my_Chen2022_vel_coeffs(prs::ACMP, ::CMT.IceType, ρ::FT) where {FT <: R
 
     ρ_i::FT = CMP.ρ_cloud_ice(prs)
 
-    _As, _Bs, _Cs, _Es, _Fs, _Gs = my_Chen2022ice_coeffs(prs, ρ_i)
+    _As::FT, _Bs::FT, _Cs::FT, _Es::FT, _Fs::FT, _Gs::FT = my_Chen2022ice_coeffs(prs, ρ_i)
 
     ai = (_Es * ρ^_As, _Fs * ρ^_As)
     bi = (_Bs + ρ * _Cs, _Bs + ρ * _Cs)
@@ -160,7 +160,7 @@ function my_Chen2022_vel_coeffs(prs::ACMP, ::CMT.SnowType, ρ::FT) where {FT <: 
 
     ρ_i::FT = CMP.ρ_cloud_ice(prs)
 
-    (_As_s, _Bs_s, _Cs_s, _Es_s, _Fs_s, _Gs_s), (_As_l, _Bs_l, _Cs_l, _Es_l, _Fs_l, _Gs_l, _Hs_l) =
+    (_As_s::FT, _Bs_s::FT, _Cs_s::FT, _Es_s::FT, _Fs_s::FT, _Gs_s::FT), (_As_l::FT, _Bs_l::FT, _Cs_l::FT, _Es_l::FT, _Fs_l::FT, _Gs_l::FT, _Hs_l::FT) =
         my_Chen2022snow_coeffs(prs, ρ_i)
 
     # == small ================================================== # Table B2
@@ -611,7 +611,7 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
     D_transition::FT = FT((0.625e-3)/2), # .625mm is the transition from small to large ice crystals in Chen paper
 ) where {FT <: Real}
 
-    int = FT(0)
+    int::FT = FT(0)
     if q > FT(0)
 
         prs = TCP.microphysics_params(param_set)
@@ -634,18 +634,18 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
         aec::FT = ae(prs, precip) + Δa(prs, precip)
         _r0::FT = r0(prs, precip)
 
-
+        
         if Dmin < D_transition
             if Dmax <= D_transition
-                regions = [(Dmin, Dmax)]
-                abcs = [(aiu_s, bi_s, ciu_s)]
+                regions = ((Dmin, Dmax),)
+                abcs = ((aiu_s, bi_s, ciu_s),)
             else
-                regions = [(Dmin, D_transition), (D_transition, Dmax)]
-                abcs = [(aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l)]
+                regions = ((Dmin, D_transition), (D_transition, Dmax))
+                abcs = ((aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l))
             end
         else
-            regions = [(Dmin, Dmax)]
-            abcs = [(aiu_l, bi_l, ciu_l)]
+            regions = ((Dmin, Dmax),)
+            abcs = ((aiu_l, bi_l, ciu_l),)
         end
 
         # Here we assume μ = 0, otherewise we would add it to k... (we had δ = μ + k + 1)
@@ -656,15 +656,25 @@ v(r) = χ_v v_0 (r/r_0)^(v_e + Δ_v) = velocity
         # Here the integrals should be additive, so we can just sum them up without any weighting
         # k = 2 #  k = 2 here bc a ∝ r^2
         k = aec # should be a ∝ r^2
-        for (i, ((Dmin, Dmax), (aiu, bi, ciu))) in enumerate(zip(regions, abcs)) # we basically need to sum the integral as before but over all regions
-            # eq 20 from Chen et al 2022
-            int += sum(int__v_Dk_n__dD.(aiu, bi, ciu, _n0, _λ, k; Dmin = Dmin, Dmax = Dmax, μ=μ)) 
+        # for ((Dmin, Dmax), (aiu, bi, ciu)) in zip(regions, abcs)
+        #     # eq 20 from Chen et al 2022
+        #     # int += sum(int__v_Dk_n__dD.(aiu, bi, ciu, _n0, _λ, k; Dmin = Dmin, Dmax = Dmax, μ=μ)) 
+        #     int += sum(((aiu, bi, ciu) -> int__v_Dk_n__dD(aiu, bi, ciu, _n0, _λ, k; Dmin=Dmin, Dmax=Dmax, μ=μ)).(aiu, bi, ciu))
+        # end
+        # @inbounds for ((Dmin, Dmax), (aiu, bi, ciu)) in zip(regions, abcs) # zip allocates for some reason
+        @inbounds for i in eachindex(regions)
+            Dmin, Dmax = regions[i]
+            aiu, bi, ciu = abcs[i]
+            # Eq 20 from Chen et al 2022
+            @inbounds for (aiu_j, bi_j, ciu_j) in zip(aiu, bi, ciu)
+                int += int__v_Dk_n__dD(aiu_j, bi_j, ciu_j, _n0, _λ, k; Dmin=Dmin, Dmax=Dmax, μ=μ)
+            end
         end
 
         # int *= π /4 # we need to multiply by π/4 to get the right answer for π(D/2)^2 = π/4 D^2 [CloudMicrophysics.j actually uses radius]
         int *= (a0c * _r0^-(aec))  
 
-        int = max(FT(0), int) # n, a, and v are all positive, so the integral should be positive
+        int = max(zero(FT), int) # n, a, and v are all positive, so the integral should be positive
     end
     return resolve_nan(int)
  end
@@ -865,7 +875,7 @@ function my_terminal_velocity(
     D_transition::FT = FT((0.625e-3)/2), # .625mm is the transition from small to large ice crystals in Chen paper
     μ::FT = FT(NaN)
 ) where {FT <: Real}
-    fall_w = FT(0)
+    fall_w::FT = FT(0)
     # if q_ > FT(0)
     if q_ > eps(FT) # idk if this matters but it makes the plots look prettier lol, also prevents N, q divergence problems... also once we shrink back to tiny particles, the speed should be slow... we maybe just guessed N wrong.
 
@@ -924,39 +934,48 @@ function my_terminal_velocity(
         # coefficients from Appendix B from Chen et. al. 2022
         (aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l) = my_Chen2022_vel_coeffs(prs, CM.CommonTypes.SnowType(), ρ)
 
-        local mass_weights::SA.MVector{2, FT}
-        mass_weights = SA.@MVector [FT(0), FT(0)]
+        # local mass_weights::SA.MVector{2, FT}
+        # mass_weights = SA.@MVector [FT(0), FT(0)]
         if Dmin < D_transition
             if Dmax <= D_transition
-                regions = [(Dmin, Dmax)]
-                abcs = [(aiu_s, bi_s, ciu_s)]
+                regions = ((Dmin, Dmax),)
+                abcs = ((aiu_s, bi_s, ciu_s),)
             else
-                regions = [(Dmin, D_transition), (D_transition, Dmax)]
-                abcs = [(aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l)]
+                regions = ((Dmin, D_transition), (D_transition, Dmax))
+                abcs = ((aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l))
             end
         else
-            regions = [(Dmin, Dmax)]
-            abcs = [(aiu_l, bi_l, ciu_l)]
+            regions = ((Dmin, Dmax),)
+            abcs = ((aiu_l, bi_l, ciu_l),)
         end
 
-        fall_w = FT(0)
-        for (i, ((Dmin, Dmax), (aiu, bi, ciu))) in enumerate(zip(regions, abcs)) # we basically need to sum the integral as before but over all regions
+        # for (i, ((Dmin, Dmax), (aiu, bi, ciu))) in enumerate(zip(regions, abcs)) # # this allocates for some reaonwe basically need to sum the integral as before but over all regions
+        #     # are the mass weights really necessary? It's just an additive integral, no?
+        #     mass_weights[i] = _λ^-(μ + k + 1) * (-CM1.SF.gamma(μ + k + 1, Dmax * _λ) + CM1.SF.gamma(μ + k + 1, Dmin * _λ)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
 
-            # are the mass weights really necessary? It's just an additive integral, no?
-            mass_weights[i] = _λ^-(μ + k + 1) * (-CM1.SF.gamma(μ + k + 1, Dmax * _λ) + CM1.SF.gamma(μ + k + 1, Dmin * _λ)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
+        #     # eq 20 from Chen et al 2022
+        #     fall_w += sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, k; Dmin = Dmin, Dmax = Dmax, μ=μ)) .* mass_weights[i] # I think it's supposed to be k not FT(3) here
+        # end
+        total_weight = FT(0)
+        @inbounds for i in eachindex(regions)
+            Dmin, Dmax = regions[i]
+            aiu, bi, ciu = abcs[i]
 
+            mass_weight = _λ^-(μ + k + 1) * (-CM1.SF.gamma(μ + k + 1, Dmax * _λ) + CM1.SF.gamma(μ + k + 1, Dmin * _λ)) # missing constants from the integral (n_0, 4/3, π, etc) but those are all the same and cancel out
+            total_weight += mass_weight
 
-            # eq 20 from Chen et al 2022
-            fall_w += sum(my_Chen2022_vel_add.(aiu, bi, ciu, _λ, k; Dmin = Dmin, Dmax = Dmax, μ=μ)) .* mass_weights[i] # I think it's supposed to be k not FT(3) here
+            @inbounds for (aiu_j, bi_j, ciu_j) in zip(aiu, bi, ciu)
+                fall_w += my_Chen2022_vel_add(aiu_j, bi_j, ciu_j, _λ, k; Dmin = Dmin, Dmax = Dmax, μ=μ) .* mass_weight
+            end
         end
 
-        if (total_weight = sum(mass_weights)) != 0
+        if !iszero(total_weight)
             fall_w /= total_weight # normalize by total mass
         end
 
 
         # ================================================================= #
-        fall_w *=  χv(prs, precip) # scaling_factor
+        fall_w *= χv(prs, precip) # scaling_factor
 
     end
 
@@ -1033,15 +1052,15 @@ Or are we supposed to integrate both the whole way and the gamma functions just 
 #         mass_weights = SA.@MVector [FT(0), FT(0)]
 #         if Dmin < D_transition
 #             if Dmax <= D_transition
-#                 regions = [(Dmin, Dmax)]
-#                 abcs = [(aiu_s, bi_s, ciu_s)]
+#                 regions = ((Dmin, Dmax),)
+#                 abcs = ((aiu_s, bi_s, ciu_s),)
 #             else
-#                 regions = [(Dmin, D_transition), (D_transition, Dmax)]
-#                 abcs = [(aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l)]
+#                 regions = ((Dmin, D_transition), (D_transition, Dmax))
+#                 abcs = ((aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l))
 #             end
 #         else
-#             regions = [(Dmin, Dmax)]
-#             abcs = [(aiu_l, bi_l, ciu_l)]
+#             regions = ((Dmin, Dmax),)
+#             abcs = ((aiu_l, bi_l, ciu_l),)
 #         end
 
 #         tmp = _λ^(k + 1) * ((16 * a0c^3 * ρ_i^2) / (9 * π * m0c^2 * _r0^(3 * aec - 2 * mec)))^κ # I got this from Anna for aspect ratio... not fuly sure if it's right tho
@@ -1103,7 +1122,7 @@ numerically stable by scaling the integrals.
 **1. The Goal: Mass-Weighted Average Velocity**
 
 We want to find V_avg:
-V_avg = [ ∫ V(R) ⋅ m(R) ⋅ N(R) dR ] / [ ∫ m(R) ⋅ N(R) dR ]
+V_avg = ∫ V(R) ⋅ m(R) ⋅ N(R) dR ] / [ ∫ m(R) ⋅ N(R) dR 
 The integrals run from R_min to R_max. This function calculates the
 total numerator `fall_w` and total denominator `total_weight` by
 summing the integrals over different regions.
@@ -1198,7 +1217,7 @@ function my_terminal_velocity(
     μ::FT = FT(NaN),
     shape::Val = Val(:Prolate), # Default to Prolate (matches original tmp formula)
 ) where {FT <: Real}
-    fall_w = FT(0)
+    fall_w::FT = FT(0)
     if q_ > FT(0)
 
         prs = TCP.microphysics_params(param_set)
@@ -1216,7 +1235,7 @@ function my_terminal_velocity(
 
         ρ_i::FT = CMP.ρ_cloud_ice(prs)
 
-        local mass_weights::SA.MVector{2, FT}
+        # local mass_weights::SA.MVector{2, FT}
 
         (aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l) = my_Chen2022_vel_coeffs(prs, precip, ρ)
 
@@ -1229,47 +1248,57 @@ function my_terminal_velocity(
 
         @assert(Dmin <= Dmax, "Dmin must be less than Dmax, got Dmin = $Dmin and Dmax = $Dmax")
 
-        mass_weights = SA.@MVector [FT(0), FT(0)]
         if Dmin < D_transition
             if Dmax <= D_transition
-                regions = [(Dmin, Dmax)]
-                abcs = [(aiu_s, bi_s, ciu_s)]
+                regions = ((Dmin, Dmax),)
+                abcs = ((aiu_s, bi_s, ciu_s),)
             else
-                regions = [(Dmin, D_transition), (D_transition, Dmax)]
-                abcs = [(aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l)]
+                regions = ((Dmin, D_transition), (D_transition, Dmax))
+                abcs = ((aiu_s, bi_s, ciu_s), (aiu_l, bi_l, ciu_l))
             end
         else
-            regions = [(Dmin, Dmax)]
-            abcs = [(aiu_l, bi_l, ciu_l)]
+            regions = ((Dmin, Dmax),)
+            abcs = ((aiu_l, bi_l, ciu_l),)
         end
 
         # This is the (Aspect Ratio) * (λ-scaling) term. This is physically consistent and accounts for μ
         tmp = (tmp_phys)^κ * _λ^(k + μ + 1)
 
-        fall_w = FT(0)
-        for (i, ((Dmin, Dmax), (aiu, bi, ciu))) in enumerate(zip(regions, abcs))
+        # for (i, ((Dmin, Dmax), (aiu, bi, ciu))) in enumerate(zip(regions, abcs))
+        #     # This is the (λ + c_iu)^-β term
+        #     # This is physically consistent and accounts for μ
+        #     ci_pow = (ciu .+ _λ) .^ (.-(α_shape .* κ .+ bi .+ k .+ μ .+ 1))
 
-            # This is the (λ + c_iu)^-β term
-            # This is physically consistent and accounts for μ
-            ci_pow = (ciu .+ _λ) .^ (.-(α_shape .* κ .+ bi .+ k .+ μ .+ 1))
+        #     # This is the full prefactor for the avg. velocity calculation [[ unit conversions and rolling 2^b into a iu is handled in my_Chen2022_vel_coeffs ]]
+        #     ti = tmp .* aiu .* ci_pow
 
-            # This is the full prefactor for the avg. velocity calculation [[ unit conversions and rolling 2^b into a iu is handled in my_Chen2022_vel_coeffs ]]
-            ti = tmp .* aiu .* ci_pow
+        #     upper_limit = Dmax * _λ
+        #     lower_limit = iszero(Dmin) ? FT(0) : Dmin * _λ
 
-            upper_limit = Dmax * _λ
-            lower_limit = iszero(Dmin) ? FT(0) : Dmin * _λ
-
-            # This is the unscaled mass in the region (the denominator of the weighted average for this region)
-            mass_weights[i] = _λ^-(μ + k + 1) * (-CM1.SF.gamma(μ + k + 1, upper_limit) + CM1.SF.gamma(μ + k + 1, lower_limit))
+        #     # This is the unscaled mass in the region (the denominator of the weighted average for this region)
+        #     mass_weights[i] = _λ^-(μ + k + 1) * (-CM1.SF.gamma(μ + k + 1, upper_limit) + CM1.SF.gamma(μ + k + 1, lower_limit))
             
-            # V_avg_i = sum(my_Chen..._sno.(...))
-            # fall_w += V_avg_i * mass_weights[i]
-            # This computes the total numerator of the integral
-            fall_w += sum(my_Chen2022_vel_add_sno.(ti, bi, aec, mec, κ, k, ciu, _λ, Dmin, Dmax; μ = μ)) * mass_weights[i]
+        #     # V_avg_i = sum(my_Chen..._sno.(...))
+        #     # fall_w += V_avg_i * mass_weights[i]
+        #     # This computes the total numerator of the integral
+        #     fall_w += sum(my_Chen2022_vel_add_sno.(ti, bi, aec, mec, κ, k, ciu, _λ, Dmin, Dmax; μ = μ)) * mass_weights[i]
+        # end
 
+        total_weight::FT = FT(0)
+        @inbounds for i in eachindex(regions)
+            Dmin, Dmax = regions[i]
+            aiu, bi, ciu = abcs[i]
+
+            mass_weight = _λ^-(μ + k + 1) * (-CM1.SF.gamma(μ + k + 1, Dmax * _λ) + CM1.SF.gamma(μ + k + 1, Dmin * _λ))
+            total_weight += mass_weight
+            @inbounds for (aiu_j, bi_j, ciu_j) in zip(aiu, bi, ciu)
+                ci_pow = (ciu_j + _λ) ^ (-(α_shape * κ + bi_j + k + μ + 1))
+                ti = tmp * aiu_j * ci_pow
+                fall_w += my_Chen2022_vel_add_sno(ti, bi_j, aec, mec, κ, k, ciu_j, _λ, Dmin, Dmax; μ = μ) * mass_weight
+            end
         end
 
-        if (total_weight = sum(mass_weights)) != 0
+        if !iszero(total_weight)
             fall_w /= total_weight # normalize by total mass
         end
 

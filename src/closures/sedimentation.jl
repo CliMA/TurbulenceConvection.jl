@@ -262,7 +262,7 @@ function calculate_sedimentation_velocity(
     param_set::APS,
     q::FT,
     ρ::FT,
-    liq_type::CMT.LiquidType,
+    ::CMT.LiquidType,
     # Nt::Union{FT, Nothing}; # N for particle size distrobution;
     Nt::FT; # N for particle size distribution; # testing for type stability, use NaN instead of nothing
     velo_scheme::Union{CMT.Blk1MVelType, CMT.Chen2022Type} = Blk1MVel,
@@ -279,7 +279,7 @@ function calculate_sedimentation_velocity(
         # return FT(0.0) # not implemented in CloudMicrophysics.jl 0.14
     end
 
-    return (isnan(w) || (w < 0)) ? FT(0.0) : w # nans are bad, also for some really small numbers can return negative values... so just set to 0
+    return (isnan(w) || (w < 0)) ? zero(FT) : w # nans are bad, also for some really small numbers can return negative values... so just set to 0
 
 end
 

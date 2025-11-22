@@ -96,8 +96,8 @@ end
 n_cells(::Grid{FT, NZ}) where {FT, NZ} = NZ
 
 # Index of the first interior cell above the surface
-kc_surface(grid::Grid) = Cent(1)
-kf_surface(grid::Grid) = CCO.PlusHalf(1)
+kc_surface(::Grid) = Cent(1)
+kf_surface(::Grid) = CCO.PlusHalf(1)
 kc_top_of_atmos(grid::Grid) = Cent(n_cells(grid))
 kf_top_of_atmos(grid::Grid) = CCO.PlusHalf(n_cells(grid) + 1)
 

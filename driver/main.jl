@@ -218,7 +218,29 @@ function Simulation1d(namelist)
     @info "TS" TS 
 
     Ri_bulk_crit::FTD = namelist["turbulence"]["EDMF_PrognosticTKE"]["Ri_crit"]
-    aux_data_kwarg = Cases.aux_data_kwarg(case, namelist)
+
+
+    if case isa Cases.SOCRATES
+        # Helper to get the first column so we can get the grid
+        first_col = let f = nothing; 
+            try
+                CC.Fields.bycolumn(axes(prog.cent)) do col
+                    f = col
+                    throw(:stop)
+                end
+            catch e
+                e === :stop || rethrow()
+            end
+            f
+        end
+
+        sample_state = TC.column_prog_aux(prog, aux, first_col, calibrate_io)
+        sample_grid = TC.Grid(sample_state) # Create a saple grid so we can only calculate SSCF forcing functions once
+        # @warn "first_col = $first_col; sample_state = $sample_state; sample_grid = $sample_grid;"
+        aux_data_kwarg = Cases.aux_data_kwarg(case, namelist, param_set, sample_grid)
+    else
+        aux_data_kwarg = Cases.aux_data_kwarg(case, namelist)
+    end
     surf_params = Cases.surface_params(case, surf_ref_state, param_set; Ri_bulk_crit = Ri_bulk_crit, aux_data_kwarg...)
 
     calibrate_io = namelist["stats_io"]["calibrate_io"]
@@ -388,8 +410,9 @@ function solve_args(sim::Simulation1d)
         callback_adapt_dt = ()
     end
 
-    callback_∑tendencies! = ODE.DiscreteCallback(condition_every_iter, call_∑tendencies!; save_positions = (false, false))
-    callback_∑tendencies! = sim.TS.use_tendency_timestep_limiter ? (callback_∑tendencies!,) : ()
+    # callback_∑tendencies! = sim.TS.use_tendency_timestep_limiter ? (ODE.DiscreteCallback(condition_every_iter, call_∑tendencies!; save_positions = (false, false)),) : ()
+    callback_∑tendencies! = sim.TS.use_tendency_timestep_limiter ? (ODE.DiscreteCallback(condition_every_iter, call_∑tendencies!; save_positions = (false, false)),) : (ODE.DiscreteCallback(condition_every_iter, call_∑tendencies!; save_positions = (false, false)),)
+    callback_call_update_aux_caller! = sim.TS.use_tendency_timestep_limiter ? () : (ODE.DiscreteCallback(condition_every_iter, call_update_aux_caller!; save_positions = (false, false)),)
 
     callback_reset_dt = sim.adapt_dt ? ODE.DiscreteCallback(condition_every_iter, reset_dt!; save_positions = (false, false)) : ()
     
@@ -415,8 +438,24 @@ function solve_args(sim::Simulation1d)
                     prob = ODE.ODEProblem(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # we will calculate tendencies in the callback so that we can use them for the most up to date du so we don't need another call to ∑tendencies!, so we use ∑tendencies_null!
                     # The upside is we get the dt we want, the downside is we calculate the tendencies in the dt_max! callback so when the step is taken, we return to the io callback without having dones any filtering/etc
                 else
-                    callbacks = ODE.CallbackSet(callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_filters, callback_io...) # original
-                    prob = ODE.ODEProblem(∑tendencies!, prog, t_span, params; dt = sim.TS.dt)
+                    #= 
+                        We do not have a separate fcn to filter tendencies. 
+                        Right now, however, sum_tendencies calls update_aux(), which is relevant for calculating cfl, as well as many subtendency timestep limits.
+                        When we call update_aux() however, those functions want the upcoming Δt, before the step... The problem is things are so intertwined in update_aux() that it's hard to separate... for example q_liq and q_ice get set in saturation_adjustment(), but precipitation rates are also calculated here.
+
+                        1) Filter Prognostic
+                        ---> Ideally here we'd want a way to back out the new aux tracer values... without calculating tendencies.... [[ we added this as callback_call_update_aux_caller!() ]]
+                        2) Calculate dt limits [cfl, adapt dt, dtmax] [ this will not be tendency dependent]
+                            - Monitor CFL sets cfl_dt_max which we store in sim.TS.cfl_dt_max ⟹ used in dt_max! and adaptive_dt!
+                            - The CFL error check will be thrown if Δt cannot be set fast enough to meet cfl condition for example. If not using adaptive_dt!, 
+                        2) ∑tendencies! [which calls update_aux() etc]
+                        4) step
+
+                    =#
+                    # callbacks = ODE.CallbackSet(callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_filters, callback_io...) # original
+                    # prob = ODE.ODEProblem(∑tendencies!, prog, t_span, params; dt = sim.TS.dt)
+                    callbacks = ODE.CallbackSet( callback_filters, callback_call_update_aux_caller!..., callback_io..., callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_∑tendencies!..., )
+                    prob = ODE.ODEProblem(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # we will calculate tendencies in the step so we don't need another call to ∑tendencies! so we use ∑tendencies_null!
                 end
                 alg = if sim.TS.algorithm isa Val{:Euler}
                     ODE.Euler()

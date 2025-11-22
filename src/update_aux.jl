@@ -1,4 +1,39 @@
-function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set::TCP.TurbulenceConvectionParameters{FT}, t::FT, Δt::FT, cfl_limit::FT, use_fallback_tendency_limiters::Bool) where {FT}
+"""
+These are tendencies so they would benefit from having access to Δt and shouldn't be mixed with the aux updates
+From what I can tell, the only reason they were was bc in eq, microphysics!() set q_liq and q_ice... 
+    1) That's not even true in Eq.
+    2) This makes it very hard to use adaptive dt.
+"""
+function update_aux_tendencies!(edmf::EDMFModel, state::State, param_set::TCP.TurbulenceConvectionParameters{FT}, Δt::FT, use_fallback_tendency_limiters::Bool) where {FT}
+    #####
+    ##### Unpack common variables
+    #####
+    grid = Grid(state)
+    N_up = n_updrafts(edmf)
+    prog_gm = center_prog_grid_mean(state)
+    aux_up = center_aux_updrafts(state)
+    aux_gm = center_aux_grid_mean(state)
+    prog_up = center_prog_updrafts(state)
+    ρ_c = prog_gm.ρ
+
+
+
+    microphysics!(edmf.en_thermo, state, edmf, Δt, param_set, use_fallback_tendency_limiters) # set env tendencies for microphysics
+    
+    #####
+    ##### compute_updraft_closures
+    #####
+    #TODO - AJ add the non-equilibrium tendency computation here
+    compute_cloud_condensate_sedimentation_tendencies!(state, edmf, Δt, param_set) # not sure on the merits of doing it here vs at the end w/ precipitation tendencies... leaving here bc originally i had it in compute_nonequilibrium_moisture_tendencies!() call before other microphysics though...
+    if edmf.moisture_model isa NonEquilibriumMoisture
+        updraft_microphysics!(state, edmf, Δt, param_set, use_fallback_tendency_limiters) # set updraft tendencies for microphysics
+    end
+
+   
+end
+
+
+function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set::TCP.TurbulenceConvectionParameters{FT}, Δt::FT, cfl_limit::FT) where {FT}
     #####
     ##### Unpack common variables
     #####
@@ -896,20 +931,62 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
 
     # update N, τ, and termvel now that everything including w is updated.
     update_N_τ_termvel!(edmf, state, param_set, thermo_params, microphys_params) # update and store N, τ, and termvel... This gets things set but also needs updraft set for efficiency for the NN, but updraft isn't set until after...
-    microphysics!(edmf.en_thermo, state, edmf, Δt, param_set, use_fallback_tendency_limiters) # set env tendencies for microphysics
+    
 
-    # return back to origin state incase it needs to be zerod out for recalc
+    #=
+        ### Set Equilibrium Moisture Variables ### (NonEq happens above)
+
+        NOTE: As written right now, microphysics() will still overwite these values... But the call to microphysics!() won't happen until call_microphysics_tendencies!() in ∑tendencies!() right before stepping
+    =#
+    # We're only going to set ql, qi here... Everything else will be moved to update_aux_tendencies!()
+    if edmf.moisture_model isa EquilibriumMoisture
+        @inbounds for k in real_center_indicies(grid)
+            # Adapted from microphysics()!
+            ts = aux_en.ts[k]
+             # update_sat_unsat
+            if edmf.en_thermo isa SGSMean
+                if TD.has_condensate(thermo_params, ts)
+                    aux_en.cloud_fraction[k] = 1
+                    aux_en_sat.θ_dry[k] = TD.dry_pottemp(thermo_params, ts)
+                    aux_en_sat.θ_liq_ice[k] = TD.liquid_ice_pottemp(thermo_params, ts)
+                    aux_en_sat.T[k] = TD.air_temperature(thermo_params, ts)
+                    aux_en_sat.q_tot[k] = TD.total_specific_humidity(thermo_params, ts)
+                    aux_en_sat.q_vap[k] = TD.vapor_specific_humidity(thermo_params, ts)
+                    aux_en.q_liq[k] = TD.liquid_specific_humidity(thermo_params, ts)
+                    aux_en.q_ice[k] = TD.ice_specific_humidity(thermo_params, ts)
+                else
+                    aux_en.cloud_fraction[k] = 0
+                    aux_en_unsat.θ_dry[k] = TD.dry_pottemp(thermo_params, ts)
+                    aux_en_unsat.θ_virt[k] = TD.virtual_pottemp(thermo_params, ts)
+                    aux_en_unsat.q_tot[k] = TD.total_specific_humidity(thermo_params, ts)
+                    aux_en_sat.T[k] = aux_en.T[k]
+                    aux_en_sat.q_vap[k] = 0
+                    aux_en_sat.q_tot[k] = aux_en.q_tot[k]
+                    aux_en_sat.θ_dry[k] = aux_en.θ_dry[k]
+                    aux_en_sat.θ_liq_ice[k] = aux_en.θ_liq_ice[k]
+                    aux_en.q_liq[k] = 0
+                    aux_en.q_ice[k] = 0
+                end
+            elseif edmf.en_thermo isa SGSQuadrature
+                error("SGSQuadrature not broken out yet for EquilibriumMoisture model")
+            end
+        end
+    end
+
+    # microphysics!(edmf.en_thermo, state, edmf, Δt, param_set, use_fallback_tendency_limiters) # set env tendencies for microphysics
+
+    # # return back to origin state incase it needs to be zerod out for recalc
     parent(massflux) .= 0
     parent(massflux_c) .= 0
     
-    #####
-    ##### compute_updraft_closures
-    #####
-    #TODO - AJ add the non-equilibrium tendency computation here
-    compute_cloud_condensate_sedimentation_tendencies!(state, edmf, Δt, param_set) # not sure on the merits of doing it here vs at the end w/ precipitation tendencies... leaving here bc originally i had it in compute_nonequilibrium_moisture_tendencies!() call before other microphysics though...
-    if edmf.moisture_model isa NonEquilibriumMoisture
-        updraft_microphysics!(state, edmf, Δt, param_set, use_fallback_tendency_limiters) # set updraft tendencies for microphysics
-    end
+    # #####
+    # ##### compute_updraft_closures
+    # #####
+    # #TODO - AJ add the non-equilibrium tendency computation here
+    # compute_cloud_condensate_sedimentation_tendencies!(state, edmf, Δt, param_set) # not sure on the merits of doing it here vs at the end w/ precipitation tendencies... leaving here bc originally i had it in compute_nonequilibrium_moisture_tendencies!() call before other microphysics though...
+    # if edmf.moisture_model isa NonEquilibriumMoisture
+    #     updraft_microphysics!(state, edmf, Δt, param_set, use_fallback_tendency_limiters) # set updraft tendencies for microphysics
+    # end
 
 
     # domain interaction microphysics

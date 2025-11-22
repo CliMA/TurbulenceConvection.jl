@@ -121,7 +121,7 @@ end
 """
 function reset_dt!(integrator)
     UnPack.@unpack edmf, TS, dt_min = integrator.p
-    proposed_dt = SciMLBase.get_proposed_dt(integrator)
+    # proposed_dt = SciMLBase.get_proposed_dt(integrator)
     @debug "Resetting dt: TS.dt = $(TS.dt) | resetting to TS.dt = dt_min = $(dt_min)"
     TS.dt = dt_min
     
@@ -168,16 +168,32 @@ function adaptive_dt!(integrator; depth::Int=0)
     end
 
     # Enforce this last, allow cfl dt min to override all other settings if applicable..., even if spinup_adapt_dt is not allowed (for now)
-    if (TS.cfl_dt_max < TS.dt) && (TS.cfl_dt_max < TS.dt_min) && TS.allow_cfl_dt_max_violate_dt_min # is this right? is cfl_dt_max < dt a problem? bc dt hasn't necessarily been updated yet right? (actually it has if adapt_dt is true)
+    # @warn " t = $t | cfl_dt_max = $(TS.cfl_dt_max), dt = $(TS.dt), dt_min = $(TS.dt_min), allow_cfl_dt_max_violate_dt_min = $(TS.allow_cfl_dt_max_violate_dt_min); checking cfl_dt_max constraint..."
+    if (TS.cfl_dt_max < TS.dt) # (TS.cfl_dt_max < TS.dt_min) && TS.allow_cfl_dt_max_violate_dt_min # is this right? is cfl_dt_max < dt a problem? bc dt hasn't necessarily been updated yet right? (actually it has if adapt_dt is true)
+        if (TS.cfl_dt_max ≥ TS.dt_min)
+            TS.dt = TS.cfl_dt_max
+        else # cfl is below dt_min
+            if (TS.dt > TS.dt_min) && (TS.N_dt_max_edmf_violate_dt_min_remaining > 0) # violation not already counted
+                TS.N_dt_max_edmf_violate_dt_min_remaining -= 1
+                TS.dt = TS.cfl_dt_max
+            else
+                TS.dt = TS.dt_min
+            end
+        end
         @debug " t = $t | cfl_dt_max = $(TS.cfl_dt_max) is less than both dt = $(TS.dt) and dt_min = $(TS.dt_min), setting dt to cfl_dt_max."
-        TS.dt = TS.cfl_dt_max
+        # TS.dt = TS.cfl_dt_max
     end
 
     # actually, any use of basiclimiter should require recalculation of those tendencies if dt changes......
 
-    # # Note if we're using methods that return tendencies as a function of Δt, those may need to be recalculated
+    #= Note if we're using methods that return tendencies as a function of Δt, those may need to be recalculated
 
-    if TS.dt ≠ dt_old # we should recompute or tendencies and be sure
+    [[ if we're not using a tendency timestep limiter, we switched our callback order to be:
+         callbacks = ODE.CallbackSet( callback_filters, callback_call_update_aux_caller!..., callback_io..., callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_∑tendencies!..., )
+    So I don't think we should need to recalculate tendencies here since we calculate our tendencies right before stepping... ]]
+    =#
+
+    if (TS.dt ≠ dt_old) && TS.use_tendency_timestep_limiter # we should recompute or tendencies and be sure 
         reset_violate_dt_min_remaining::Bool = false
         recalculate_dt_edmf::Bool = false
 
@@ -189,21 +205,10 @@ function adaptive_dt!(integrator; depth::Int=0)
             @warn "No tendencies available for timestep calculation, might be during initialization"
             return nothing
         else # This is an attempt to not recalc all the tendencies, if it becomes too hard we can just recalculate all of them with ∑tendencies!()
-            # default_tendency_limiter = edmf.tendency_limiters.default_tendency_limiter
-            # moisture_sources_limiter = edmf.tendency_limiters.moisture_sources_limiter
-            # entr_detr_tendency_limiter = edmf.tendency_limiters.entr_detr_tendency_limiter
-            # precipitation_tendency_limiter = edmf.tendency_limiters.precipitation_tendency_limiter
-
             default_tendency_limiter = TC.get_tendency_limiter(edmf.tendency_limiters, Val(:default), TS.use_fallback_tendency_limiters)
             moisture_sources_limiter = TC.get_tendency_limiter(edmf.tendency_limiters, Val(:moisture_sources),  TS.use_fallback_tendency_limiters)
             entr_detr_tendency_limiter = TC.get_tendency_limiter(edmf.tendency_limiters, Val(:entr_detr),  TS.use_fallback_tendency_limiters)
             precipitation_tendency_limiter = TC.get_tendency_limiter(edmf.tendency_limiters, Val(:precipitation),  TS.use_fallback_tendency_limiters)
-
-            # if TS.use_fallback_tendency_limiters
-            #     @info "fallback:  default_tendency_limiter  = $(default_tendency_limiter) | moisture_sources_limiter = $(moisture_sources_limiter) | entr_detr_tendency_limiter = $(entr_detr_tendency_limiter) | precipitation_tendency_limiter = $(precipitation_tendency_limiter)"
-            # else
-            #     @info "default_tendency_limiter  = $(default_tendency_limiter) | moisture_sources_limiter = $(moisture_sources_limiter) | entr_detr_tendency_limiter = $(entr_detr_tendency_limiter) | precipitation_tendency_limiter = $(precipitation_tendency_limiter)"
-            # end
 
             if !isa(default_tendency_limiter, TC.NoTendencyLimiter) || # these are used currently for both up and gm. changing up feeds back on gm. changes in gm limit up tendencies. recalculation is best. 
                 ((edmf.moisture_model isa TC.NonEquilibriumMoisture) && !isa(moisture_sources_limiter, TC.NoMoistureSourcesLimiter)) || !isa(default_tendency_limiter, TC.NoTendencyLimiter) # while we could try to use update_noneq_moisture_sources_tendencies!(), how that composes w/ gm tendencies is less clear depending on gm limiters. recalculation is best. This could be reduced to just an updated update_noneq_moisture_sources_tendencies!() in the [[ default_tendency_limiter isa NoTendencyLimiter ]] case.
@@ -219,14 +224,17 @@ function adaptive_dt!(integrator; depth::Int=0)
                 # easiest thing to do is to just recalculate all the tendencies, but if we ever split out the limiter for gm, up, ∑tendencies, etc. we could just recalculate the gm tendencies maybe?
                 @debug "Recalculating tendencies for adaptive timestep calculation iteration... "
 
-                ∑tendencies!(tendencies, prog, params, t) # update the tendencies again, also does limiting etc
+                if TS.dt > dt_old # only if the timestep is longer does it really matter right?
+                    ∑tendencies!(tendencies, prog, params, t) # update the tendencies again, also does limiting etc
+                end
             else
                 # This block could be valid if [[ default_tendency_limiter is NoTendencyLimiter]] and update_noneq_moisture_sources_tendencies!() is updated to properly update gm tendencies.
                 if (edmf.moisture_model isa TC.NonEquilibriumMoisture) && !isa(moisture_sources_limiter, TC.NoMoistureSourcesLimiter) && isa(default_tendency_limiter, TC.NoTendencyLimiter)
                     reset_violate_dt_min_remaining = true
                     recalculate_dt_edmf = true
                     @debug "Recalculating noneq_moisture_sources tendencies for adaptive timestep calculation iteration... "
-                    update_noneq_moisture_sources_tendencies!(tendencies, prog, params, t, TS.use_fallback_tendency_limiters) # update the tendencies again
+                    # update_noneq_moisture_sources_tendencies!(tendencies, prog, params, t, TS.use_fallback_tendency_limiters) # update the tendencies again
+                    error("update_noneq_moisture_sources_tendencies!() has been deprecated")
                 end
             end
 
@@ -606,7 +614,7 @@ function compute_tendency_dt_max(state::TC.State, edmf::TC.EDMFModel)
 
 end
 
-function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_limit::FT, use_tendency_timestep_limiter::Bool) where {FT <: Real}
+function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_limit::FT, use_tendency_timestep_limiter::Bool) where {FT <: Real} #, monitor_cfl::Bool = false, dt_min::FT = dt_max) where {FT <: Real}
     grid = TC.Grid(state)
 
     prog_gm = TC.center_prog_grid_mean(state)
@@ -638,40 +646,186 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
 
     local cfl_dt_max::FT = FT(Inf)
     
+
+    # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
+    # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
+
+    # --- 1. Advection (Faces) ---
+    w_adv = FT(0)
     @inbounds for k in TC.real_face_indices(grid)
-        TC.is_surface_face(grid, k) && continue
-        @inbounds for i in 1:N_up
-            dt_max = min(dt_max, CFL_limit * Δzf[k] / (abs(aux_up_f[i].w[k]) + ε))
+        # Advection is zero at the surface face
+        TC.is_surface_face(grid, k) && continue # w bc is 0 at sfc
+        is_toa = TC.is_toa_face(grid, k)
+        
+        if is_toa #
+            w_adv = max(w_adv, abs(aux_en_f.w[k+1])) # check k+1 at toa
         end
-        dt_max = min(dt_max, CFL_limit * Δzf[k] / (abs(aux_en_f.w[k]) + ε))
+
+        for i in 1:N_up
+            w_adv = max(w_adv, abs(aux_up_f[i].w[k])) # out
+            w_adv = max(w_adv, abs(aux_up_f[i].w[k-1])) # incoming [we are already not boa]
+
+            # if is_toa # deprecated because we only have updrafts for now
+            #     w_adv = max(w_adv, abs(aux_up_f[i].w[k+1])) # check k+1 at toa
+            # end
+        end
+
+        dt_step = CFL_limit * Δzf[k] / (w_adv + ε)
+        dt_max = min(dt_max, dt_step)
+        cfl_dt_max = min(cfl_dt_max, dt_step)
     end
+
+    # --- 2. Sedimentation & Diffusion (Centers) ---
+    use_gm_sed::Bool = (edmf.cloud_sedimentation_model isa TC.CloudSedimentationModel) && edmf.cloud_sedimentation_model.grid_mean
+
+
+    # ============== #
+
+
+    if (edmf.convective_tke_handler isa TC.ConvectiveTKE)
+        use_separate_tke_conserved::Bool = (edmf.convective_tke_handler isa TC.ConvectiveTKE) && ((edmf.convective_tke_handler.transport_conserved_by_advection) || !isone(edmf.convective_tke_handler.ed_scaling_factor)) # If false, we dont need to do anything else besides the f_K_tke scaling
+        use_separate_tke_condensed::Bool = (edmf.convective_tke_handler isa TC.ConvectiveTKE) && ((edmf.convective_tke_handler.transport_condensed_by_advection) || !isone(edmf.convective_tke_handler.ed_scaling_factor)) # If false, we dont need to do anything else besides the f_K_tke scaling
+
+        if (!edmf.convective_tke_handler.transport_tke_by_advection) || (!edmf.convective_tke_handler.transport_conserved_by_advection) || (!edmf.convective_tke_handler.transport_condensed_by_advection) # Amy are diffusion
+            # We are using diffusion
+            f_c_m::FT = FT(edmf.convective_tke_handler.ed_scaling_factor) # adjustment to c_m, tke_ed_coeff
+            f_K_tke = aux_tc.temporary_1
+            @. f_K_tke = ifelse((aux_en.tke) > 0, sqrt(max((aux_en.tke) - (aux_en.tke_convective), FT(0))) / sqrt((aux_en.tke)), FT(0)) # adjustment factor for K based on convective tke removal (we leave tke in elsewhere to generate covariances... probably should be separated out also lol)
+            
+            c_m = TC.mixing_length_params(edmf).c_m
+            Le = TC.mixing_length_params(edmf).Le
+            N = aux_tc.temporary_2
+            @. N = sqrt(max(aux_tc.∂b∂z, FT(1e-6))) # buoyancy frequency, w/N is our convective overshoot mixing length, /2 for drag
+            KMconv = aux_tc.temporary_3
+            @. KMconv = f_c_m * c_m * ifelse(aux_en.∂MSE∂z < 0,  FT(200), FT(sqrt(2 * aux_en.tke_convective) /(2*max(N, FT(1e-6))))) * sqrt(max(aux_en.tke_convective, FT(0))) # rough convective tke eddy diffusivity for convective tke portion only, sqrt(w_tke/N)
+            # KH ::KM / aux_tc.prandtl_nvec # In unstable regimes Prandtl should just be Prandtl_0 in this region... (See `turbulent_Prandtl_number()`)
+            # Pr_n < 1 is unstable, we want to default to regular if ∂MSE/∂z > 0, and some enhanced value if ∂MSE/∂z < 0 :: See `/src/turbulence_functions.jl`
+            Prconv = aux_tc.temporary_4
+            # @. Prconv = ifelse(aux_en.∂MSE∂z < 0, TC.mixing_length_params(edmf).Pr_n * FT(1), aux_tc.prandtl_nvec) # reduce prandtl in unstable regions to enhance KH [maybe using nvec isn't right idk... coherent updrfts are still more penetrative but I guss that what's f_c_m was for]
+            @. Prconv = ifelse(aux_en.∂MSE∂z < 0, TC.mixing_length_params(edmf).Pr_n * FT(1), FT(Inf)) # I think going all the way to absolute stability is a better plan... TKE at that point stops transporting (up and down fluxes match)? It's the closest we can get to turning into an up-gradient flux
+
+            if !edmf.convective_tke_handler.transport_tke_by_advection
+                k_adv::FT = edmf.convective_tke_handler.advection_coeff
+                ℓ_mix = FT(500) # our TKE mixing length
+            end
+        end
+    end
+
+
+    # ============== #
+    w_sed = FT(0)
     @inbounds for k in TC.real_center_indices(grid)
-        k_in = TC.is_toa_center(grid, k) ? k : (k + 1) # To match the way the terminal velocity is calculated in the monitor_cfl callback... I'm not sure which is right, so maybe you want to do k:(k+1) to be sure?
-        k_out = k
+        is_toa = TC.is_toa_center(grid, k)
+        is_surf = TC.is_surface_center(grid, k)
+        
+        # --- A. Sedimentation (Directional: Check k and k+1) ---
+        # 1. Rain/Snow
+        w_sed = max(aux_tc.term_vel_rain[k], aux_tc.term_vel_snow[k])
+        if !is_toa
+            w_sed = max(w_sed, aux_tc.term_vel_rain[k+1], aux_tc.term_vel_snow[k+1])
+        end
 
-
-        # the way this is implemented in the monitor_cfl callback, the terminal velocity should be shifted to k+1 relative to Δzc, and then use 0 term_vel for toa...
-        # I'm not sure which is precisely right, maybe check both?
-        # IIUC, the logic goes that 1 is sfc, k_max is toa, so when you do the z diffs, those are going downwards, and each dz diff at k is from k -> k+1 and so affected by the u(z) at k+1.
-        # - Except at k_max (toa), there's no k + 1? (also idk how dz has the same length as z but ok...)
-        if edmf.cloud_sedimentation_model isa TC.CloudSedimentationModel
-            if edmf.cloud_sedimentation_model.grid_mean
-                vel_max = max(term_vel_rain[k_in], term_vel_rain[k_out], term_vel_snow[k_in], term_vel_snow[k_out], aux_gm.term_vel_liq[k_in], aux_gm.term_vel_liq[k_out], aux_gm.term_vel_ice[k_in], aux_gm.term_vel_ice[k_out])
-            else
-                vel_max = max(term_vel_rain[k_in], term_vel_rain[k_out], term_vel_snow[k_in], term_vel_snow[k_out],
-                    aux_en.term_vel_liq[k_in], aux_en.term_vel_liq[k_out], (aux_up[i].term_vel_liq[k_in] for i in 1:N_up)...,  (aux_up[i].term_vel_liq[k_out] for i in 1:N_up)...,
-                    aux_en.term_vel_ice[k_in], aux_en.term_vel_ice[k_out], (aux_up[i].term_vel_ice[k_in] for i in 1:N_up)...,  (aux_up[i].term_vel_ice[k_out] for i in 1:N_up)...,
-                    )
+        # 2. Cloud Condensates
+        if use_gm_sed
+            w_sed = max(w_sed, aux_gm.term_vel_liq[k], aux_gm.term_vel_ice[k])
+            if !is_toa
+                w_sed = max(w_sed, aux_gm.term_vel_liq[k+1], aux_gm.term_vel_ice[k+1])
             end
         else
-            vel_max = max(term_vel_rain[k_in], term_vel_rain[k_out], term_vel_snow[k_in],  term_vel_snow[k_out])
+            w_sed = max(w_sed, aux_en.term_vel_liq[k], aux_en.term_vel_ice[k])
+            if !is_toa
+                w_sed = max(w_sed, aux_en.term_vel_liq[k+1], aux_en.term_vel_ice[k+1])
+            end
+            for i in 1:N_up
+                w_sed = max(w_sed, aux_up[i].term_vel_liq[k], aux_up[i].term_vel_ice[k])
+                if !is_toa
+                    w_sed = max(w_sed, aux_up[i].term_vel_liq[k+1], aux_up[i].term_vel_ice[k+1])
+                end
+            end
         end
-        # Check terminal rain/snow velocity CFL
-        dt_max = min(dt_max, CFL_limit * Δzc[k] / (vel_max + ε))
-        cfl_dt_max = min(cfl_dt_max, CFL_limit * Δzc[k] / (vel_max + ε) ) # we have limited updrafts to cfl speeds, but if that is removed this could be a problem if combined with allow_cfl_dt_max_violate_dt_min = true
-        # Check diffusion CFL (i.e., Fourier number)
-        dt_max = min(dt_max, CFL_limit * Δzc[k]^2 / (max(KH[k], KM[k], KQ[k]) + ε))
+
+
+
+
+        # --- B. Diffusion ---
+        if !(edmf.convective_tke_handler isa TC.ConvectiveTKE)  # :: Everything Normal :: #
+            # --- B. Diffusion (Bidirectional: Check k, k+1, k-1) ---
+            # Local K
+            K_eff = max(aux_tc.KM[k], aux_tc.KH[k], aux_tc.KQ[k])
+            # Neighbor K (Above)
+            !is_toa && (K_eff = max(K_eff, max(aux_tc.KM[k+1], aux_tc.KH[k+1], aux_tc.KQ[k+1])))
+            # Neighbor K (Below)
+            !is_surf && (K_eff = max(K_eff, max(aux_tc.KM[k-1], aux_tc.KH[k-1], aux_tc.KQ[k-1])))
+
+        else
+            #= 
+            For each species, [tke], [qt, θ], [ql, qr, qi, qs] we need to check if theyre being advected or diffused.
+            =#
+
+
+            if (edmf.convective_tke_handler.transport_tke_by_advection || edmf.convective_tke_handler.transport_conserved_by_advection || edmf.convective_tke_handler.transport_condensed_by_advection) # ::: Any by Advection :: #
+                w_conv = aux_tc.temporary_2
+                @. w_conv = sqrt(2*aux_en.tke_convective) # convective velocity scale for advection
+
+                # CFL bi-directional
+                w_adv = max(w_adv, w_conv[k])
+                is_toa && (w_adv = max(w_adv, w_conv[k+1]))
+                is_surf && (w_adv = max(w_adv, w_conv[k-1]))
+            end
+
+
+            if (!edmf.convective_tke_handler.transport_conserved_by_advection) || (!edmf.convective_tke_handler.transport_condensed_by_advection) # Amy are diffusion
+                #
+            end
+
+
+            # Regular Diffusion Calculations
+            K_eff = max(aux_tc.KM[k], aux_tc.KH[k], aux_tc.KQ[k]) * f_K_tke[k]
+            !is_toa && (K_eff = max(K_eff, max(aux_tc.KM[k+1], aux_tc.KH[k+1]/(Prconv[k+1]), aux_tc.KQ[k+1])/(Prconv[k+1]*Le)))
+            !is_surf && (K_eff = max(K_eff, max(aux_tc.KM[k-1], aux_tc.KH[k-1]/(Prconv[k-1]), aux_tc.KQ[k-1])/(Prconv[k-1]*Le)))
+
+            if !edmf.convective_tke_handler.transport_tke_by_advection # ::: [tke] :: # (( See EDMF_Functions.jl ))
+                # @. ρatke_convective_advection = -∇c(wvec(  # This is the flux, F = -ρ * a * K * ∇f(k)
+                # -ρ_f * ᶠinterp_a(a_en) * (k_adv * (ℓ_mix * exp(- (Ifx(sqrt(max(aux_tc.∂b∂z, zero(FT)))) * ℓ_mix) /
+                # max(w_conv_f, eps(FT)))) * w_conv_f) * # This is ∇f(k)
+                # ∇f_tke(ρatke_convective / ρ_c))) / (ρ_c * a_en)
+                K_tke = k_adv * ℓ_mix * exp(-((sqrt(max(aux_tc.∂b∂z[k], zero(FT)))) * ℓ_mix) / max(w_conv[k], eps(FT))) * w_conv[k]
+                K_eff = max(K_eff, K_tke)
+            end
+
+
+            # so KH is just scaled by f_K_tke
+
+            if use_separate_tke_conserved # ::: [qt, θ]
+                K_eff = max(K_eff, aux_tc.KM[k] * f_c_m * f_K_tke[k] , aux_tc.KH[k] * f_c_m * f_K_tke[k])
+                !is_toa && (K_eff = max(K_eff, aux_tc.KM[k+1] * f_c_m * f_K_tke[k+1] , aux_tc.KH[k+1]/(Prconv[k+1])))
+                !is_surf && (K_eff = max(K_eff, aux_tc.KM[k-1] * f_c_m * f_K_tke[k-1] , aux_tc.KH[k-1]/(Prconv[k-1])))
+            end
+
+            if use_separate_tke_condensed # ::: [ql, qr, qi, qs]
+                K_eff = max(K_eff, KMconv[k])
+                !is_toa && (K_eff = max(K_eff, KMconv[k+1]/(Prconv[k+1]*Le)))
+                !is_surf && (K_eff = max(K_eff, KMconv[k-1]/(Prconv[k-1]*Le)))
+            end
+
+
+        end
+
+        # --- C. Update Limits ---
+        dt_adv = CFL_limit * Δzc[k] / (w_adv + ε)
+        dt_sed = CFL_limit * Δzc[k] / (w_sed + ε)
+        dt_diff = CFL_limit * Δzc[k]^2 / (K_eff + ε)
+        
+        dt_cell = min(dt_adv, dt_sed, dt_diff)
+        dt_max = min(dt_max, dt_cell)
+        cfl_dt_max = min(cfl_dt_max, dt_cell)
+
     end
+
+    # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
+    # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= #
+
+
 
     if use_tendency_timestep_limiter
         dt_max_tendency = compute_tendency_dt_max(state, edmf)
@@ -684,15 +838,11 @@ function compute_dt_max(state::TC.State, edmf::TC.EDMFModel, dt_max::FT, CFL_lim
         dt_max = min(dt_max, dt_max_tendency)
     end
 
-    @inbounds (max_term_vel_rain, ind_max) = findmax([aux_tc.term_vel_rain[k] for k in TC.real_center_indices(grid)])
-    @inbounds inds = [k for k in TC.real_center_indices(grid)]
-
-    @debug "dt_max = $dt_max | cfl_dt_max = $cfl_dt_max | max_term_vel_rain = $max_term_vel_rain, dz_max_termvel = $(Δzc[inds[ind_max]]))"
     return dt_max, cfl_dt_max
 end
 
 dt_max!(integrator) = dt_max!(integrator, integrator.p.TS.dt_max, integrator.p.TS.cfl_dt_max)
-function dt_max!(integrator, dt_max, cfl_dt_max)
+function dt_max!(integrator, dt_max::FT, cfl_dt_max::FT) where {FT <: Real} 
     CC.Fields.bycolumn(axes(integrator.u.cent)) do colidx
         (; edmf, aux, TS) = integrator.p
         prog = integrator.u
@@ -703,7 +853,8 @@ function dt_max!(integrator, dt_max, cfl_dt_max)
         else
             state = TC.column_state(prog, aux, tendencies, colidx, integrator.p.calibrate_io) # use this so that we can use tendencies to control the timestep
         end
-        (dt_max, cfl_dt_max) = compute_dt_max(state, edmf, dt_max, TS.cfl_limit, TS.use_tendency_timestep_limiter)
+        (dt_max, cfl_dt_max_here) = compute_dt_max(state, edmf, dt_max, TS.cfl_limit, TS.use_tendency_timestep_limiter)
+        # cfl_dt_max = min(cfl_dt_max, cfl_dt_max_here) # no reason to keep the old cfl_dt_max... i think it's from an old version but we recalculate it in compute_dt_max
     end
     to_float(f) = f isa ForwardDiff.Dual ? ForwardDiff.value(f) : f
     (; TS) = integrator.p
@@ -727,24 +878,48 @@ function call_∑tendencies!(integrator)
     ODE.u_modified!(integrator, false)
 end
 
-function monitor_cfl!(integrator)
+"""
+My addition so we.  cacall the update_aux function in a callback separately from update_aux_tendencies!() which is inside ∑tendencies!
+"""
+function call_update_aux_caller!(integrator)
     CC.Fields.bycolumn(axes(integrator.u.cent)) do colidx
         (; edmf, aux, TS) = integrator.p
         prog = integrator.u
-        state = TC.column_prog_aux(prog, aux, colidx, integrator.p.calibrate_io)
-        monitor_cfl!(state, edmf, TS.dt, TS.cfl_limit)
+        params = integrator.p
+        t = integrator.t
+        update_aux_caller!(prog, params, t)
     end
     ODE.u_modified!(integrator, false)
 end
 
-function monitor_cfl!(state, edmf, Δt, CFL_limit)
+function monitor_cfl!(integrator)
+    (; TS) = integrator.p
+    FT = typeof(TS.dt)
+    # @debug "CFL monitor: dt = $(TS.dt), cfl_dt_max = $(TS.cfl_dt_max), cfl_limit = $(TS.cfl_limit), dt_max_edmf = $(TS.dt_max_edmf), t = $(integrator.t); TS.N_dt_max_edmf_violate_dt_min_remaining = $(TS.N_dt_max_edmf_violate_dt_min_remaining)"
+    frac_tol::FT = FT(0.05)
+    if TS.dt > (TS.cfl_dt_max * (one(FT) + frac_tol))
+        # @warn "Failed cfl condition: dt = $(TS.dt) > cfl_dt_max = $(TS.cfl_dt_max). Consider reducing dt or increasing cfl_limit; t = $(integrator.t), TS.dt_max = $(TS.dt_max_edmf)"
+        # Error, call the more detailed methods
+        CC.Fields.bycolumn(axes(integrator.u.cent)) do colidx
+            (; edmf, aux) = integrator.p
+            prog = integrator.u
+            state = TC.column_prog_aux(prog, aux, colidx, integrator.p.calibrate_io)
+            monitor_cfl_detailed!(state, edmf, TS.dt, TS.cfl_limit)
+        end
+    end
+    ODE.u_modified!(integrator, false)
+end
+
+function monitor_cfl_detailed!(state, edmf, Δt, CFL_limit)
     grid = TC.Grid(state)
     prog_gm = TC.center_prog_grid_mean(state)
-    Δz = TC.get_Δz(prog_gm.ρ) # I'm not entirely sure what this returns, it's not the grid spacing precisely, some sort of weighted jacobian
-    FT = TC.float_type(state)
-    frac_tol = FT(0.05)
-
     aux_tc = TC.center_aux_turbconv(state)
+    FT = TC.float_type(state)
+
+    Δz = TC.get_Δz(prog_gm.ρ) # I'm not entirely sure what this returns, it's not the grid spacing precisely, some sort of weighted jacobian
+    frac_tol::FT = FT(0.05)
+
+
 
     # helper to calculate the rain velocity
     # TODO: assuming w_gm = 0
@@ -762,16 +937,15 @@ function monitor_cfl!(state, edmf, Δt, CFL_limit)
             aux_en = TC.center_aux_environment(state)
             N_up = TC.n_updrafts(edmf)
             aux_up = TC.center_aux_updrafts(state)
-            @inbounds term_vel_liqs = (aux_en.term_vel_liq, (aux_up[i].term_vel_liq for i in 1:N_up)...)
-            @inbounds term_vel_ices = (aux_en.term_vel_ice, (aux_up[i].term_vel_ice for i in 1:N_up)...)
-            aux_ice = (aux_en, (aux_up[i] for i in 1:N_up)...)
+            @inbounds term_vel_liqs = (aux_en.term_vel_liq, (aux_up[i].term_vel_liq for i in 1:N_up)...) # hopefully it infers
+            @inbounds term_vel_ices = (aux_en.term_vel_ice, (aux_up[i].term_vel_ice for i in 1:N_up)...) # hopefully it infers
+            aux_ice = (aux_en, (aux_up[i] for i in 1:N_up)...) # hopefully it infers
         end
     else
-        term_vel_liqs = ()
-        term_vel_ices = ()
-        aux_ice = ()
+        term_vel_liqs = tuple()
+        term_vel_ices = tuple()
+        aux_ice = tuple()
     end
-
 
 
     @inbounds for k in TC.real_center_indices(grid)
@@ -791,7 +965,53 @@ function monitor_cfl!(state, edmf, Δt, CFL_limit)
             CFL_in_liqs = (Δt / Δz[k] * term_vel_liq[k + 1] for term_vel_liq in term_vel_liqs)
             CFL_in_ices = (Δt / Δz[k] * term_vel_ice[k + 1] for term_vel_ice in term_vel_ices)
         end
-        CFL_meteor, i_CFL_meteor = findmax((CFL_in_rain, CFL_out_rain, CFL_in_snow, CFL_out_snow, Iterators.flatten(zip(CFL_in_liqs, CFL_out_liqs))..., Iterators.flatten(zip(CFL_in_ices, CFL_out_ices))...))
+        # CFL_meteor, i_CFL_meteor = findmax((CFL_in_rain, CFL_out_rain, CFL_in_snow, CFL_out_snow, Iterators.flatten(zip(CFL_in_liqs, CFL_out_liqs))..., Iterators.flatten(zip(CFL_in_ices, CFL_out_ices))...))
+
+        # # Fewer allocs than findmax
+        # CFL_meteor::FT = zero(FT)
+        # i_CFL_meteor::Int = 0
+        # i::Int = 0
+        # for x in Iterators.flatten((
+        #         (CFL_in_rain, CFL_out_rain, CFL_in_snow, CFL_out_snow),
+        #         Iterators.flatten(zip(CFL_in_liqs, CFL_out_liqs)),
+        #         Iterators.flatten(zip(CFL_in_ices, CFL_out_ices))
+        #     ))
+        #     i += 1
+        #     if x > CFL_meteor
+        #         CFL_meteor = x
+        #         i_CFL_meteor = i
+        #     end
+        # end
+
+
+        # truly zero allocations version
+        CFL_meteor = zero(FT)
+        i_CFL_meteor = 0
+        i = 0
+
+        # Scalars first
+        @inbounds begin
+            for x in (CFL_in_rain, CFL_out_rain, CFL_in_snow, CFL_out_snow)
+                i += 1
+                if x > CFL_meteor
+                    CFL_meteor = x
+                    i_CFL_meteor = i
+                end
+            end
+        end
+        # Pairwise liquids
+        @inbounds for (in_liq, out_liq) in zip(CFL_in_liqs, CFL_out_liqs)
+            i += 1; if in_liq > CFL_meteor; CFL_meteor = in_liq; i_CFL_meteor = i; end
+            i += 1; if out_liq > CFL_meteor; CFL_meteor = out_liq; i_CFL_meteor = i; end
+        end
+        # Pairwise ices
+        @inbounds for (in_ice, out_ice) in zip(CFL_in_ices, CFL_out_ices)
+            i += 1; if in_ice > CFL_meteor; CFL_meteor = in_ice; i_CFL_meteor = i; end
+            i += 1; if out_ice > CFL_meteor; CFL_meteor = out_ice; i_CFL_meteor = i; end
+        end
+
+
+
 
         i_liq_0 = 4 + 1 # the first liquid index
         i_ice_0 = 4 + 2*length(term_vel_liqs) + 1 # the first ice index

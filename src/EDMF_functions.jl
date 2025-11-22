@@ -983,7 +983,7 @@ function affect_filter!(edmf::EDMFModel, state::State, param_set::APS, surf::Sur
     ###
     ### Filters
     ###
-    # filter_gm_vars(edmf, state) # my addition, theyre not filtered anywhere... [[ moved to before aux_gm and prog are set in dycore.jl ]]
+    filter_gm_vars(edmf, state) # my addition, theyre not filtered anywhere... [[ moved to before aux_gm and prog are set in dycore.jl ]]
     filter_updraft_vars(edmf, state, surf)
     set_edmf_surface_bc(edmf, state, surf, param_set)
 
