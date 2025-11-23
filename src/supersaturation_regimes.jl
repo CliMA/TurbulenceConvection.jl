@@ -238,11 +238,11 @@ get_saturation_regime(δ::FT, δi::FT, q_liq::FT, q_ice::FT, T::FT, T_freeze::FT
 # ----------- #
 
 # 1. The barrier: distinct compilation for each combination of booleans
-ValTrueOrFalse = Union{Val{true}, Val{false}}
-function _create_regime(::Type{RT}, HL::ValTrueOrFalse, HI::ValTrueOrFalse, BF::ValTrueOrFalse) where {RT<:AbstractSaturationRegime}
-    # Inside here, HL, HI, and B are compile-time constants
-    return RT{TCP.unwrap_val(HL), TCP.unwrap_val(HI), TCP.unwrap_val(BF)}()
-end
+# ValTrueOrFalse = Union{Val{true}, Val{false}}
+# function _create_regime(::Type{RT}, HL::ValTrueOrFalse, HI::ValTrueOrFalse, BF::ValTrueOrFalse) where {RT<:AbstractSaturationRegime}
+#     # Inside here, HL, HI, and B are compile-time constants
+#     return RT{TCP.unwrap_val(HL), TCP.unwrap_val(HI), TCP.unwrap_val(BF)}()
+# end
 
 # add_regime_parameters(regime_type::Type{<:AbstractSaturationRegime}, q_liq::FT, q_ice::FT, T::FT, T_freeze::FT) where {FT} = add_regime_parameters(regime_type, q_liq, q_ice, T < T_freeze) # 4 FT 1 Bool
 # function add_regime_parameters(regime_type::Type{<:AbstractSaturationRegime}, q_liq::FT, q_ice::FT, BF::Bool) where {FT}
@@ -252,7 +252,7 @@ end
 #     return _create_regime(regime_type, Val(has_liq), Val(has_ice), Val(BF))
 # end
 
-function add_regime_parameters(regime_type::Type{R}, q_liq::FT, q_ice::FT, BF::Bool) where {R<:AbstractSaturationRegime, FT}
+@inline function add_regime_parameters(regime_type::Type{R}, q_liq::FT, q_ice::FT, BF::Bool) where {R<:AbstractSaturationRegime, FT <: Real}
     if q_liq > 0
         if q_ice > 0
             return BF ? R{true,true,true}() : R{true,true,false}()
@@ -267,6 +267,10 @@ function add_regime_parameters(regime_type::Type{R}, q_liq::FT, q_ice::FT, BF::B
         end
     end
 end
+@inline add_regime_parameters(regime_type::Type{R}, q_liq::FT, has_ice::Bool, BF::Bool) where {R <: AbstractSaturationRegime, FT <: Real} = R{q_liq > FT(0), has_ice, BF}()::R # convenience if you're sure about one 
+@inline add_regime_parameters(regime_type::Type{R}, has_liq::Bool, q_ice::FT, BF::Bool) where {R <: AbstractSaturationRegime, FT <: Real} = R{has_liq, q_ice > FT(0), BF}()::R # convenience if you're sure about one
+@inline add_regime_parameters(regime_type::Type{R}, has_liq::Bool, has_ice::Bool, BF::Bool) where {R<:AbstractSaturationRegime} = R{has_liq, has_ice, BF}()
+
 
 
 
@@ -306,10 +310,6 @@ end
 #         end
 #     end
 # end
-
-
-add_regime_parameters(regime_type::Type{R}, q_liq::FT, has_ice::Bool, BF::Bool) where {FT, R <: AbstractSaturationRegime} = regime_type{q_liq > FT(0), has_ice, BF}(q_liq > FT(0), has_ice, BF)::R # convenience if you're sure about one
-add_regime_parameters(regime_type::Type{R}, has_liq::Bool, q_ice::FT, BF::Bool) where {FT, R <: AbstractSaturationRegime} = regime_type{has_liq, q_ice > FT(0), BF}(has_liq, q_ice > FT(0), BF)::R # convenience if you're sure about one
 
 
 # -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- #
