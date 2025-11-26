@@ -61,7 +61,7 @@ function ∫field(field::CC.Fields.FiniteDifferenceField, field_zmin = 0)
     field_z = Dierckx.Spline1D(vec(parent(z)), vec(field); k = 1)
     integrand(x, params, z) = field_z(z)
     # Assumes uniform grid spacing:
-    prob = ODE.ODEProblem(integrand, field_zmin, z_span; dt = grid.Δz)
+    prob = ODE.ODEProblem{true, SciMLBase.FullSpecialize}(integrand, field_zmin, z_span; dt = grid.Δz)
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
     return sol
 end

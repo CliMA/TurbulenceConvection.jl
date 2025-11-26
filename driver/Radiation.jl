@@ -43,11 +43,11 @@ function update_radiation(self::RadiationBase{RadiationDYCOMS_RF01}, state, t::R
     params = (; κ = self.kappa)
 
     Δz = TC.get_Δz(prog_gm.ρ)[1]
-    rprob = ODE.ODEProblem(rintegrand, 0.0, rz_span, params; dt = Δz)
+    rprob = ODE.ODEProblem{false, SciMLBase.FullSpecialize}(rintegrand, 0.0, rz_span, params; dt = Δz) # false means not in place
     rsol = ODE.solve(rprob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
     q_0 = rsol.(vec(grid.zf.z))
 
-    prob = ODE.ODEProblem(integrand, 0.0, z_span, params; dt = Δz)
+    prob = ODE.ODEProblem{false, SciMLBase.FullSpecialize}(integrand, 0.0, z_span, params; dt = Δz) # false means not in place
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
     q_1 = sol.(vec(grid.zf.z))
     parent(aux_gm_f.f_rad) .= self.F0 .* exp.(-q_0)

@@ -84,7 +84,7 @@ function compute_ref_state!(
 
     # Perform the integration
     z_span = (grid.zmin, grid.zmax)
-    prob = ODE.ODEProblem(minus_inv_scale_height, logp, z_span)
+    prob = ODE.ODEProblem{false, SciMLBase.FullSpecialize}(minus_inv_scale_height, logp, z_span) # false means not in place
     sol = ODE.solve(prob, ODE.Tsit5(), reltol = 1e-12, abstol = 1e-12)
     parent(p_f) .= sol.(vec(grid.zf.z))
     parent(p_c) .= sol.(vec(grid.zc.z))

@@ -119,7 +119,6 @@ function microphysics!(
             if aux_en.area[k] < 1 # we have some updrafts
                 @inbounds for i in 1:N_up
                     qi_tendency_sedimentation_other = sedimentation_other[k] * (aux_up[i].area[k] ./ aux_bulk.area[k])
-                    qt_tendency_sedimentation_other = qi_tendency_sedimentation_other
                     θ_liq_ice_tendency_sedimentation_other =  1 / Π_m / c_pm * (L_s * qi_tendency_sedimentation_other)
                     aux_up[i].qi_tendency_sedimentation[k] += qi_tendency_sedimentation_other
                     aux_up[i].qt_tendency_sedimentation[k] += qi_tendency_sedimentation_other
@@ -132,8 +131,8 @@ function microphysics!(
         end
 
         calculate_sedimentation_sources!(
-            aux_tc.temporary_1,
-            aux_tc.temporary_2,
+            sedimentation,
+            sedimentation_other,
             param_set,
             ρ_c,
             aux_en.q_liq,

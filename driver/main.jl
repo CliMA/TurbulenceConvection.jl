@@ -435,7 +435,7 @@ function solve_args(sim::Simulation1d)
                     # To match, we should filter then do io in callbacks, then update aux then calculate tendencies in callback_∑tendencies!, then calculate the needed timestep in dt_max/adapt_dt, then take the step
                     # if we left the original order, we'd calculate our tendencies then do all our filtering, then take the step...
                     callbacks = ODE.CallbackSet(callback_filters, callback_io..., callback_reset_dt, callback_∑tendencies!..., callback_dtmax, callback_adapt_dt..., callback_cfl..., )  
-                    prob = ODE.ODEProblem(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # we will calculate tendencies in the callback so that we can use them for the most up to date du so we don't need another call to ∑tendencies!, so we use ∑tendencies_null!
+                    prob = ODE.ODEProblem{true, SciMLBase.FullSpecialize}(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # we will calculate tendencies in the callback so that we can use them for the most up to date du so we don't need another call to ∑tendencies!, so we use ∑tendencies_null!
                     # The upside is we get the dt we want, the downside is we calculate the tendencies in the dt_max! callback so when the step is taken, we return to the io callback without having dones any filtering/etc
                 else
                     #= 
@@ -454,7 +454,7 @@ function solve_args(sim::Simulation1d)
                     =#
                     # callbacks = ODE.CallbackSet(callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_filters, callback_io...) # original
                     # prob = ODE.ODEProblem(∑tendencies!, prog, t_span, params; dt = sim.TS.dt)
-                    callbacks = ODE.CallbackSet( callback_filters, callback_call_update_aux_caller!..., callback_io..., callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_∑tendencies!..., )
+                    callbacks = ODE.CallbackSet( callback_filters, callback_call_update_aux_caller!..., callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_∑tendencies!..., callback_io...,)
                     # prob = ODE.ODEProblem(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # we will calculate tendencies in the step so we don't need another call to ∑tendencies! so we use ∑tendencies_null!
                     prob = ODE.ODEProblem{true, SciMLBase.FullSpecialize}(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # full specialize to try to avoid inference issues
                 end
@@ -469,7 +469,7 @@ function solve_args(sim::Simulation1d)
             else
 
                 callbacks = ODE.CallbackSet(callback_cfl..., callback_filters, callback_io...) # drop the dt stuff since the adaptive solver will do it by itself
-                prob = ODE.ODEProblem(∑tendencies_robust!, prog, t_span, params; dt = sim.TS.dt) # use robust version that won't crash when out of domain.
+                prob = ODE.ODEProblem{true, SciMLBase.FullSpecialize}(∑tendencies_robust!, prog, t_span, params; dt = sim.TS.dt) # use robust version that won't crash when out of domain.
 
                 alg = if sim.TS.algorithm isa Val{:Heun}
                     ODE.Heun()
@@ -489,7 +489,7 @@ function solve_args(sim::Simulation1d)
                 error("No implicit fixed-step solver currently supported")
             else
                 callbacks = ODE.CallbackSet(callback_cfl..., callback_filters, callback_io...) # drop the dt stuff since the implicit solver will do it by itself. leave cfl... hopefully the model stability also prevents cfl violations.... (we still also have buoyancy limits)
-                prob = ODE.ODEProblem(∑tendencies!, prog, t_span, params; dt = sim.TS.dt)
+                prob = ODE.ODEProblem{true, SciMLBase.FullSpecialize}(∑tendencies!, prog, t_span, params; dt = sim.TS.dt)
                 if sim.TS.algorithm isa Val{:ImplicitEuler} # adaptive solver
                     alg = ODE.ImplicitEuler(; autodiff = false) # this is far too slow to actually use...
                 elseif sim.TS.algorithm isa Val{:KenCarp47}
