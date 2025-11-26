@@ -619,8 +619,16 @@ function main1d(namelist; time_run = true)
         end
     end
     sim = Simulation1d(namelist)
-    (integrator, return_init) = initialize(sim)
+    if time_run
+        # (integrator, return_init) = @timev initialize(sim)
+        t = @timed initialize(sim)
+        @warn "initialize() completed in $(t.time) seconds, memory used: $(round(t.bytes / 1024^3, digits=2)) GiB"
+        (integrator, return_init) = t.value
+    else
+        (integrator, return_init) = initialize(sim)
+    end    
     return_init === :success && @info "The initialization has completed."
+
     if time_run
         (Y, return_code) = begin
             # (Y, return_code) = @timev sim_run(sim, integrator; time_run)
