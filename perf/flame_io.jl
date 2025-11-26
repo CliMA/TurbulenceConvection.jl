@@ -15,6 +15,9 @@ nonequilibrium_moisture_scheme = :geometric_liq__exponential_T_scaling_ice
 dt_string = "adapt_dt__dt_min_5.0__dt_max_10.0"
 method = "best_particle_final"
 flight_number = 9
+forcing_str = "Obs"
+CEDMF_dir = expanduser("~/Research_Schneider/CliMA/CalibrateEDMF.jl")
+FT = Float64
 case_name = "SOCRATES_RF" * string(flight_number, pad = 2) * "_" * lowercase(forcing_str) * "_data" # can't recall why it's lower here lol
 namelist_path = joinpath(CEDMF_dir, "experiments", "SOCRATES_postprocess_runs_storage", "subexperiments","SOCRATES_"*string(nonequilibrium_moisture_scheme), "Calibrate_and_Run", "tau_autoconv_noneq", dt_string, "iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean", "postprocessing", "output", "Atlas_LES", "RFAll_obs", method, "data", "Output.$case_name.1_1", "namelist_SOCRATES.in")
 namelist = JSON.parsefile(namelist_path, dicttype = Dict, inttype = Int64, null = FT(NaN))
@@ -29,7 +32,7 @@ global debug = true # allow to run multiple simulaitons at once if we're just de
 
 if debug
     Random.seed!() # switch back to random entropy
-    namelist["meta"]["uuid"] = randstring(4) # allow to run multiple simulaitons at once if we're just debugging and wan't to go faster
+    namelist["meta"]["uuid"] = Random.randstring(4) # allow to run multiple simulaitons at once if we're just debugging and wan't to go faster
 else
     namelist["meta"]["uuid"] = "" # no uuid
 end

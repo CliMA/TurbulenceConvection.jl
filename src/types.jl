@@ -2070,13 +2070,29 @@ bycolumn(axes(prog.cent)) do colidx
 end
 ```
 """
+# function column_state(prog, aux, tendencies, colidx, calibrate_io::Bool)
+#     prog_cent_column = CC.column(prog.cent, colidx)
+#     prog_face_column = CC.column(prog.face, colidx)
+#     aux_cent_column = CC.column(aux.cent, colidx)
+#     aux_face_column = CC.column(aux.face, colidx)
+#     tends_cent_column = CC.column(tendencies.cent, colidx)
+#     tends_face_column = CC.column(tendencies.face, colidx)
+#     prog_column = CC.Fields.FieldVector(cent = prog_cent_column, face = prog_face_column)
+#     aux_column = CC.Fields.FieldVector(cent = aux_cent_column, face = aux_face_column)
+#     tends_column = CC.Fields.FieldVector(cent = tends_cent_column, face = tends_face_column)
+
+#     return State(prog_column, aux_column, tends_column, calibrate_io)
+# end
+
 function column_state(prog, aux, tendencies, colidx, calibrate_io::Bool)
-    prog_cent_column = CC.column(prog.cent, colidx)
-    prog_face_column = CC.column(prog.face, colidx)
-    aux_cent_column = CC.column(aux.cent, colidx)
-    aux_face_column = CC.column(aux.face, colidx)
-    tends_cent_column = CC.column(tendencies.cent, colidx)
-    tends_face_column = CC.column(tendencies.face, colidx)
+    # USE BRACKETS [colidx]
+    prog_cent_column = prog.cent[colidx]
+    prog_face_column = prog.face[colidx]
+    aux_cent_column  = aux.cent[colidx]
+    aux_face_column  = aux.face[colidx]
+    tends_cent_column = tendencies.cent[colidx]
+    tends_face_column = tendencies.face[colidx]
+    
     prog_column = CC.Fields.FieldVector(cent = prog_cent_column, face = prog_face_column)
     aux_column = CC.Fields.FieldVector(cent = aux_cent_column, face = aux_face_column)
     tends_column = CC.Fields.FieldVector(cent = tends_cent_column, face = tends_face_column)
@@ -2084,11 +2100,45 @@ function column_state(prog, aux, tendencies, colidx, calibrate_io::Bool)
     return State(prog_column, aux_column, tends_column, calibrate_io)
 end
 
+# function column_prog_aux(prog, aux, colidx, calibrate_io::Bool)
+#     prog_cent_column = CC.column(prog.cent, colidx)
+#     prog_face_column = CC.column(prog.face, colidx)
+#     aux_cent_column = CC.column(aux.cent, colidx)
+#     aux_face_column = CC.column(aux.face, colidx)
+#     prog_column = CC.Fields.FieldVector(cent = prog_cent_column, face = prog_face_column)
+#     aux_column = CC.Fields.FieldVector(cent = aux_cent_column, face = aux_face_column)
+
+#     return State(prog_column, aux_column, nothing, calibrate_io)
+# end
+
+
+"""
+    column_prog_aux(prog, aux, colidx, calibrate_io)
+
+Creates a local state vector for a single column.
+
+# ClimaCore 0.14+ Update
+In ClimaCore 0.14, using `CC.column(field, colidx)` is discouraged for 1D physics broadcasting because it returns a 3D `VIJFH` layout view, which causes `MethodError: no method matching copyto!(::VIJFH, ...)` during broadcasting.
+
+Instead, use `field[colidx]`. This invokes the specific `getindex` method that projects the DataLayout from 3D (`VIJFH`) down to 1D (`VF`), enabling standard broadcasting and kernel optimization.
+
+# Example
+# OLD (ClimaCore 0.13):
+# prog_cent_column = CC.column(prog.cent, colidx)
+
+# NEW (ClimaCore 0.14):
+prog_cent_column = prog.cent[colidx]
+"""
 function column_prog_aux(prog, aux, colidx, calibrate_io::Bool)
-    prog_cent_column = CC.column(prog.cent, colidx)
-    prog_face_column = CC.column(prog.face, colidx)
-    aux_cent_column = CC.column(aux.cent, colidx)
-    aux_face_column = CC.column(aux.face, colidx)
+    # USE BRACKETS [colidx] to get a 1D VF (Vertical Field) view
+    # CC.column(...) returns a 3D VIJFH view, which crashes the broadcaster
+    
+    prog_cent_column = prog.cent[colidx]
+    prog_face_column = prog.face[colidx]
+    aux_cent_column  = aux.cent[colidx]
+    aux_face_column  = aux.face[colidx]
+
+    # Reconstruct FieldVectors using these 1D views
     prog_column = CC.Fields.FieldVector(cent = prog_cent_column, face = prog_face_column)
     aux_column = CC.Fields.FieldVector(cent = aux_cent_column, face = aux_face_column)
 

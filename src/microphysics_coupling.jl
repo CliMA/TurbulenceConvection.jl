@@ -1414,7 +1414,8 @@ function compute_domain_interaction_microphysics_tendencies!(
     C2Fa = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(_area_bottom)), top = CCO.SetValue(FT(_area_top)))
     wvec = CC.Geometry.WVector
     # ∇c = CCO.DivergenceF2C() # F2C to come back from C2F
-    ∇a = @. ∇c(wvec(C2Fa(area))) # seems stable w/ either sign w...? (Left bias this?)
+    ∇a = aux_tc.temporary_1
+    @. ∇a =  ∇c(wvec(C2Fa(area))) # seems stable w/ either sign w...? (Left bias this?)
 
 
 
@@ -1669,7 +1670,7 @@ function threshold_driven_acnv(
     w::FT = FT(0),
     N_INP::FT = FT(NaN),
     massflux::FT = FT(0),
-    domain = Env,
+    domain::AbstractDomain = Env,
     use_cloak::Bool = false,
     tke::FT = FT(0), # not sure which vars i want
     qt::FT = FT(NaN), # not sure which vars i want

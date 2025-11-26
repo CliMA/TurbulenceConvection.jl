@@ -56,31 +56,36 @@ function apply_second_order_correction(flux::CC.Fields.Field, w::CC.Fields.Field
 end
 
 function apply_second_order_flux_correction(flux::CC.Fields.Field, w::CC.Fields.Field, Δt::FT; apply_diffusive_damping::Bool = false, correction_limit_factor::FT = FT(Inf)) where{FT}
-    wvec = CC.Geometry.WVector
-    # ∇c = CCO.DivergenceF2C()
-    Iff = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # we know the bc on flux is 0, but not what the gradient of the flux is. we can extrapolate the gradient or assume it's constant
-    # Iff = CCO.InterpolateC2F(; bottom = CCO.SetGradient(wvec(zero(FT))), top = CCO.SetGradient(wvec(zero(FT)))) # we know the bc on flux is 0, but not what the gradient of the flux is. we can extrapolate the gradient or assume it's constant
-    # Iff = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
-    # @. flux -= (Δt/FT(2)) * w * Iff(∇c(wvec(flux))) # -Δt/2 * wΔ(wq)
+    error("Not implemented yet")
+    #=
+        Need to figure out how to reduce inference cost. 
+        Maybe we need a CV3 vector allocation. not sure
+    =#
 
-    UB = CCO.UpwindBiasedProductC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # upwinding [[ I think this should be stable because it has no zero crossings within each domain...]]
-    # C2Fwf = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # not sure but maybe we should use this for stability as it's not biased for your upwind algorithm... no penetration. #
-    w∇flux = @. UB(wvec(w), ∇c(wvec(flux))) # works, but output type is different than tendencies type, outer wvec important for getting physical units
-    w∇flux_conv = (wvec.(w∇flux)).components.data.:1 # convert to field
+    # wvec = CC.Geometry.WVector
+    # # ∇c = CCO.DivergenceF2C()
+    # Iff = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # we know the bc on flux is 0, but not what the gradient of the flux is. we can extrapolate the gradient or assume it's constant
+    # # Iff = CCO.InterpolateC2F(; bottom = CCO.SetGradient(wvec(zero(FT))), top = CCO.SetGradient(wvec(zero(FT)))) # we know the bc on flux is 0, but not what the gradient of the flux is. we can extrapolate the gradient or assume it's constant
+    # # Iff = CCO.InterpolateC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+    # # @. flux -= (Δt/FT(2)) * w * Iff(∇c(wvec(flux))) # -Δt/2 * wΔ(wq)
 
-    corrected = @. flux - clamp((Δt/FT(2)) * w∇flux_conv, -correction_limit_factor * abs(flux), correction_limit_factor * abs(flux)) # -Δt/2 * wΔ(wq)
+    # UB = CCO.UpwindBiasedProductC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # upwinding [[ I think this should be stable because it has no zero crossings within each domain...]]
+    # # C2Fwf = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.SetValue(FT(0))) # not sure but maybe we should use this for stability as it's not biased for your upwind algorithm... no penetration. #
+    # w∇flux = @. UB(wvec(w), ∇c(wvec(flux))) # works, but output type is different than tendencies type, outer wvec important for getting physical units
+    # w∇flux_conv = (wvec.(w∇flux)).components.data.:1 # convert to field
+    # corrected = @. flux - clamp((Δt/FT(2)) * w∇flux_conv, -correction_limit_factor * abs(flux), correction_limit_factor * abs(flux)) # -Δt/2 * wΔ(wq)
 
-    if apply_diffusive_damping
-        # we want ν ≈ 0.1 (Δz^2/Δt). However, we don't know Δz here, so instad we use 0.1 w_max^2 . let w_max = 1 here
-        ν = FT(0.1) * FT(1.0)^2 / Δt # ν ≈ 0.1 (Δz^2/Δt) with Δz = 1
-        q = @. ifelse(iszero(w), FT(0), flux / w) # avoid division by zero [[ this isn't quite correct bc q could be anything... ]]
-        ∇q = q # alias
-        @. ∇q = ∇c(wvec(q)) # maybe just pass in q
-        ∇q .= clamp.(∇q, -FT(1e3), FT(1e3)) # prevent extreme values
-        @. corrected -= Iff(ν * ∇q)
+    # if apply_diffusive_damping
+    #     # we want ν ≈ 0.1 (Δz^2/Δt). However, we don't know Δz here, so instad we use 0.1 w_max^2 . let w_max = 1 here
+    #     # ν = FT(0.1) * FT(1.0)^2 / Δt # ν ≈ 0.1 (Δz^2/Δt) with Δz = 1
+    #     # q = @. ifelse(iszero(w), FT(0), flux / w) # avoid division by zero [[ this isn't quite correct bc q could be anything... ]]
+    #     # ∇q = q # alias
+    #     # @. ∇q = ∇c(wvec(q)) # maybe just pass in q
+    #     # ∇q .= clamp.(∇q, -FT(1e3), FT(1e3)) # prevent extreme values
+    #     # @. corrected -= Iff(ν * ∇q)
 
-        error("not implemented yet. need to pass in q...")
-    end
+    #     error("not implemented yet. need to pass in q...")
+    # end
 
     return corrected
 end
@@ -239,11 +244,11 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
             # end
 
         else
-            massflux_en .= ρ_f .* ᶠinterp_a_RBF_a_en.(a_en) .* w_en
+            @. massflux_en = ρ_f * ᶠinterp_a_RBF_a_en(a_en) * w_en
 
             if (edmf.convective_tke_handler isa ConvectiveTKE) && (edmf.convective_tke_handler.transport_conserved_by_advection || edmf.convective_tke_handler.transport_condensed_by_advection)
                 massflux_en_conv = aux_tc_f.temporary_f1
-                @. massflux_en_conv = ρ_f .* ᶠinterp_a_RBF_a_en.(a_en)/2 .* sqrt(max(Ifx(aux_en.tke_convective), FT(0))) # feels mostly the tke scale, subsidence happens elsewhere dry
+                @. massflux_en_conv = ρ_f * ᶠinterp_a_RBF_a_en.(a_en)/2 * sqrt(max(Ifx(aux_en.tke_convective), FT(0))) # feels mostly the tke scale, subsidence happens elsewhere dry
             end
 
 
@@ -259,12 +264,12 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
 
                 # supersat -- moister, lower θ air goes up
                 # subsat -- moister (qt recovered from precip), higher θ air goes down
-                if !state.calibrate_io
-                    supersaturated = @. ifelse(aux_en.T < TCP.T_freeze(param_set), ifelse(aux_en.RH_ice > FT(1), FT(1), FT(-1)), ifelse(aux_en.RH_liq > FT(1), FT(1), FT(-1)))
-                else
-                    thermo_params = TCP.thermodynamics_params(param_set)
-                    supersaturated = @. ifelse(aux_en.T < TCP.T_freeze(param_set), ifelse(relative_humidity_over_ice(thermo_params, aux_en.ts) > FT(1), FT(1), FT(-1)), ifelse(relative_humidity_over_liquid(thermo_params, aux_en.ts) > FT(1), FT(1), FT(-1)))
-                end
+                # if !state.calibrate_io
+                #     supersaturated = @. ifelse(aux_en.T < TCP.T_freeze(param_set), ifelse(aux_en.RH_ice > FT(1), FT(1), FT(-1)), ifelse(aux_en.RH_liq > FT(1), FT(1), FT(-1)))
+                # else
+                #     thermo_params = TCP.thermodynamics_params(param_set)
+                #     supersaturated = @. ifelse(aux_en.T < TCP.T_freeze(param_set), ifelse(relative_humidity_over_ice(thermo_params, aux_en.ts) > FT(1), FT(1), FT(-1)), ifelse(relative_humidity_over_liquid(thermo_params, aux_en.ts) > FT(1), FT(1), FT(-1)))
+                # end
 
                 # Test always diffusing these [[ the tke conv part]]
                 # @. massflux_h = massflux_en * IfRBF_θ_liq_ice_en(θ_liq_ice_en)
@@ -272,8 +277,8 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                 # @. massflux_h = massflux_en * IfRBF_θ_liq_ice_en(θ_liq_ice_en)
                 # @. massflux_qt = (massflux_en + massflux_en_conv) * IfRBF_q_tot_en(q_tot_en)
 
-                supersaturated = Ifx.(supersaturated)
-                supersaturated .= FT(0) # disable for testing  [[ It does seem to destabilize things a lot... ]]
+                # supersaturated = Ifx.(supersaturated)
+                # supersaturated .= FT(0) # disable for testing  [[ It does seem to destabilize things a lot... ]]
                 @. massflux_h  = (massflux_en/2 + massflux_en_conv) * If(θ_liq_ice_en - sqrt(aux_en.Hvar)) + (massflux_en/2 - massflux_en_conv) * If(θ_liq_ice_en + sqrt(aux_en.Hvar))
                 # @. massflux_qt = (massflux_en/2 + massflux_en_conv) * If(q_tot_en + supersaturated*sqrt(aux_en.QTvar)) + (massflux_en/2 - massflux_en_conv) * If(q_tot_en - supersaturated*sqrt(aux_en.QTvar))
 
@@ -299,15 +304,15 @@ function compute_sgs_flux!(edmf::EDMFModel, state::State, surf::SurfaceBase, par
                 if !((edmf.convective_tke_handler isa ConvectiveTKE) && edmf.convective_tke_handler.transport_condensed_by_advection)
                     # @. massflux_ql = massflux_en * (If(q_liq_en) - If(q_liq_gm))
                     # @. massflux_qi = massflux_en * (If(q_ice_en) - If(q_ice_gm))
-                    @. massflux_ql = massflux_en .* IfRBF_q_liq_en(q_liq_en)
-                    @. massflux_qi = massflux_en .* IfRBF_q_ice_en(q_ice_en)
+                    @. massflux_ql = massflux_en * IfRBF_q_liq_en(q_liq_en)
+                    @. massflux_qi = massflux_en * IfRBF_q_ice_en(q_ice_en)
 
                     @. ql_flux_vert_adv = massflux_ql # same here
                     @. qi_flux_vert_adv = massflux_qi # same here
                 else
                     # ql and qi should be correlated w/ tke. We handle prt of that in diffusivity but they shouldn't feel the netire advective force
-                    @. massflux_ql = (massflux_en/2 + massflux_en_conv) .* IfRBF_q_liq_en(q_liq_en) # + (massflux_en - massflux_en_conv) .* IfRBF_q_liq_en(q_liq_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
-                    @. massflux_qi = (massflux_en/2 + massflux_en_conv) .* IfRBF_q_ice_en(q_ice_en) # + (massflux_en - massflux_en_conv) .* IfRBF_q_ice_en(q_ice_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
+                    @. massflux_ql = (massflux_en/2 + massflux_en_conv) * IfRBF_q_liq_en(q_liq_en) # + (massflux_en - massflux_en_conv) .* IfRBF_q_liq_en(q_liq_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
+                    @. massflux_qi = (massflux_en/2 + massflux_en_conv) * IfRBF_q_ice_en(q_ice_en) # + (massflux_en - massflux_en_conv) .* IfRBF_q_ice_en(q_ice_en) # assume liq/ice are in the upper part of the distribution, and the down side has little flux. (massflux_en is small anyway, and significant conv downdrafts should dry quickly)
 
                     @. ql_flux_vert_adv = massflux_ql # same here
                     @. qi_flux_vert_adv = massflux_qi # same here
@@ -1529,6 +1534,8 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
     ∇f = CCO.DivergenceC2F(; adv_bcs...)
     a_en = aux_en.area
 
+    w_up_c = aux_tc.w_up_c
+
     # Solve for updraft area fraction
     @inbounds for i in 1:N_up
         aux_up_i = aux_up[i]
@@ -1586,6 +1593,9 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
         tends_advec = aux_tc.temporary_1 # Reuse temp [[ no nested calls so ok ]]
         tends_other = aux_tc.temporary_2 # Reuse temp [[ no nested calls so ok ]]
 
+        @. w_up_c = Ic(aux_up_f[i].w) # this one gets updated every time it's used
+
+
         # thermo_params = TCP.thermodynamics_params(param_set)
         # Π = TD.exner.(thermo_params, aux_gm.ts)
 
@@ -1604,43 +1614,43 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
         scalar_nudge_τᵣ = 20*60 # testing hardcoded to see if its' good before going all in [ would neet to pass forcing object to this fcn]
 
         if edmf.entrainment_type isa FractionalEntrModel
-            @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρarea)))
+            @. tends_advec = -∇c(wvec(LBF(w_up_c * ρarea)))
             @. tends_ρarea = 
                 tends_advec + 
-                limit_tendency(edtl, ρarea * Ic(w_up) * (entr_turb_dyn - detr_turb_dyn), ρarea + max(tends_advec,0), ρ_c * a_max - ρarea + max(-tends_advec,0), Δt)
+                limit_tendency(edtl, ρarea * w_up_c * (entr_turb_dyn - detr_turb_dyn), ρarea + max(tends_advec,0), ρ_c * a_max - ρarea + max(-tends_advec,0), Δt)
         elseif edmf.entrainment_type isa TotalRateEntrModel
-            @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρarea)))
+            @. tends_advec = -∇c(wvec(LBF(w_up_c * ρarea)))
             @. tends_ρarea = 
                 tends_advec + 
                 limit_tendency(edtl, ρarea * (entr_rate_inv_s - detr_rate_inv_s), ρarea + max(tends_advec,0), ρ_c * a_max - ρarea + max(-tends_advec,0), Δt)
         end
 
         if edmf.entrainment_type isa FractionalEntrModel
-            @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice)))
+            @. tends_advec = -∇c(wvec(LBF(w_up_c * ρaθ_liq_ice)))
             @. tends_other = (ρ_c * θ_liq_ice_tendency_precip_formation) + (ρ_c * θ_liq_ice_tendency_sedimentation) # external tendencies... we will limit entr/detr as the final tendency to not violate this contract...
             @. tends_ρaθ_liq_ice =
-                # -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice))) + 
+                # -∇c(wvec(LBF(w_up_c * ρaθ_liq_ice))) + 
                 tends_advec + 
                 progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaθ_liq_ice / ρarea, prog_gm.ρθ_liq_ice / ρ_c), prog_gm.ρθ_liq_ice / ρ_c, tends_ρarea,
-                    limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) - (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn) , ρaθ_liq_ice + max(tends_advec+tends_other,0), ρ_c * area_en * θ_liq_ice_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
+                    limit_tendency(edtl, (ρarea * w_up_c * entr_turb_dyn * θ_liq_ice_en) - (ρaθ_liq_ice * w_up_c * detr_turb_dyn) , ρaθ_liq_ice + max(tends_advec+tends_other,0), ρ_c * area_en * θ_liq_ice_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
                     (ρ_c * θ_liq_ice_tendency_precip_formation) # + 
                     # f_q*max(ρarea * aux_tc.θ_liq_ice_tendency_precip_sinks, 0) # + # qi_sub_dep contribution [[ i think this is needed so significant snow formation doesn't kill updrafts?]]
                     #+ ρarea*aux_up[i].dTdt/Π # test adding nudging in so that nudging doesnt prevent env and updraft from mixing and converging...
 
-            @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaq_tot)))
+            @. tends_advec = -∇c(wvec(LBF(w_up_c * ρaq_tot)))
             @. tends_other = (ρ_c * qt_tendency_precip_formation) + (ρ_c * qt_tendency_sedimentation) # external tendencies... we will limit entr/detr as the final tendency to not violate this contract...
             @. tends_ρaq_tot =
-                # -∇c(wvec(LBF(Ic(w_up) * ρaq_tot))) +
+                # -∇c(wvec(LBF(w_up_c * ρaq_tot))) +
                 tends_advec +
                 progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_tot / ρarea, prog_gm.ρq_tot / ρ_c), prog_gm.ρq_tot / ρ_c, tends_ρarea,
-                    limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en) - (ρaq_tot * Ic(w_up) * detr_turb_dyn), ρaq_tot + max(tends_advec+tends_other,0), ρ_c * area_en * q_tot_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
+                    limit_tendency(edtl, (ρarea * w_up_c * entr_turb_dyn * q_tot_en) - (ρaq_tot * w_up_c * detr_turb_dyn), ρaq_tot + max(tends_advec+tends_other,0), ρ_c * area_en * q_tot_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
                     (ρ_c * qt_tendency_precip_formation) 
 
         elseif edmf.entrainment_type isa TotalRateEntrModel
-            @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice)))
+            @. tends_advec = -∇c(wvec(LBF(w_up_c * ρaθ_liq_ice)))
             @. tends_other = (ρ_c * θ_liq_ice_tendency_precip_formation) + (ρ_c * θ_liq_ice_tendency_sedimentation)# external tendencies... we will limit entr/detr as the final tendency to
             @. tends_ρaθ_liq_ice =
-                # -∇c(wvec(LBF(Ic(w_up) * ρaθ_liq_ice))) +
+                # -∇c(wvec(LBF(w_up_c * ρaθ_liq_ice))) +
                 tends_advec +
                 progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaθ_liq_ice / ρarea, prog_gm.ρθ_liq_ice / ρ_c), prog_gm.ρθ_liq_ice / ρ_c, tends_ρarea,
                     limit_tendency(edtl, (ρarea * entr_rate_inv_s * θ_liq_ice_en) - (ρarea * detr_rate_inv_s * θ_liq_ice_up), ρaθ_liq_ice+max(tends_advec+tends_other,0), ρ_c * area_en * θ_liq_ice_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
@@ -1649,10 +1659,10 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
                 # ifelse(param_set.user_params.apply_nudging_to_updraft && (ρarea/ρ_c > 1.), ρarea * aux_up[i].dTdt/TD.exner(thermo_params, aux_gm.ts), FT(0)) # This version breaks because dTdt contains extraneous stuff and because we're not restoring directly to gm, we can have unresolved drift that simply gets compensated in env.
                 ifelse(param_set.user_params.apply_nudging_to_updraft && (ρarea/ρ_c > FT(0.01)), ρarea * (aux_gm.H_nudge - aux_up[i].θ_liq_ice)/scalar_nudge_τᵣ, FT(0)) # dTdt includes hadv and stuff... ... nudging can kill the updraft though...
 
-            @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaq_tot)))
+            @. tends_advec = -∇c(wvec(LBF(w_up_c * ρaq_tot)))
             @. tends_other = (ρ_c * qt_tendency_precip_formation) + (ρ_c * qt_tendency_sedimentation) # external tendencies... we will limit entr/detr as the final tendency to not violate this contract...
             @. tends_ρaq_tot =
-                # -∇c(wvec(LBF(Ic(w_up) * ρaq_tot))) + 
+                # -∇c(wvec(LBF(w_up_c * ρaq_tot))) + 
                 tends_advec +
                 progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_tot / ρarea, prog_gm.ρq_tot / ρ_c), prog_gm.ρq_tot / ρ_c, tends_ρarea,
                     limit_tendency(edtl, (ρarea * entr_rate_inv_s * q_tot_en) - (ρarea * detr_rate_inv_s * q_tot_up), ρaq_tot + max(tends_advec+tends_other,0), ρ_c * area_en * q_tot_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
@@ -1682,44 +1692,44 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
 
 
 
-            # TODO: Double check if it's better to use:: limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * q_liq_en) - (ρaq_liq * Ic(w_up) * detr_turb_dyn) , max(ρaq_liq + tends_advec+tends_other,0), max(ρ_c * area_en * q_liq_en + -(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
+            # TODO: Double check if it's better to use:: limit_tendency(edtl, (ρarea * w_up_c * entr_turb_dyn * q_liq_en) - (ρaq_liq * w_up_c * detr_turb_dyn) , max(ρaq_liq + tends_advec+tends_other,0), max(ρ_c * area_en * q_liq_en + -(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
 
     
 
             if edmf.entrainment_type isa FractionalEntrModel
                 
-                @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaq_liq)))
+                @. tends_advec = -∇c(wvec(LBF(w_up_c * ρaq_liq)))
                 @. tends_other = (ρ_c * ql_tendency_precip_formation + ql_tendency_noneq) + (ρ_c * ql_tendency_sedimentation) # external tendencies... we will limit entr/detr as the final tendency to not violate this contract...
                 @. tends_ρaq_liq =
-                    # -∇c(wvec(LBF(Ic(w_up) * ρaq_liq))) + 
+                    # -∇c(wvec(LBF(w_up_c * ρaq_liq))) + 
                     tends_advec +
                     progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_liq / ρarea, prog_gm.q_liq), prog_gm.q_liq, tends_ρarea,
-                        limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * q_liq_en) - (ρaq_liq * Ic(w_up) * detr_turb_dyn) , ρaq_liq + max(tends_advec+tends_other,0), ρ_c * area_en * q_liq_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
+                        limit_tendency(edtl, (ρarea * w_up_c * entr_turb_dyn * q_liq_en) - (ρaq_liq * w_up_c * detr_turb_dyn) , ρaq_liq + max(tends_advec+tends_other,0), ρ_c * area_en * q_liq_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
                         (ρ_c * (ql_tendency_precip_formation + ql_tendency_noneq))
                         
-                @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaq_ice)))
+                @. tends_advec = -∇c(wvec(LBF(w_up_c * ρaq_ice)))
                 @. tends_other = (ρ_c * qi_tendency_precip_formation + qi_tendency_noneq) + (ρ_c * qi_tendency_sedimentation) # external tendencies... we will limit entr/detr as the final tendency to not violate this contract...
                 @. tends_ρaq_ice =
-                    # -∇c(wvec(LBF(Ic(w_up) * ρaq_ice))) +
+                    # -∇c(wvec(LBF(w_up_c * ρaq_ice))) +
                     tends_advec +
                     progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_ice / ρarea, prog_gm.q_ice), prog_gm.q_ice, tends_ρarea,
-                        limit_tendency(edtl, (ρarea * Ic(w_up) * entr_turb_dyn * q_ice_en) - (ρaq_ice * Ic(w_up) * detr_turb_dyn) , ρaq_ice + max(tends_advec+tends_other,0), ρ_c * area_en * q_ice_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
+                        limit_tendency(edtl, (ρarea * w_up_c * entr_turb_dyn * q_ice_en) - (ρaq_ice * w_up_c * detr_turb_dyn) , ρaq_ice + max(tends_advec+tends_other,0), ρ_c * area_en * q_ice_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
                         (ρ_c * (qi_tendency_precip_formation + qi_tendency_noneq))
                     
             elseif edmf.entrainment_type isa TotalRateEntrModel
-                @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaq_liq)))
+                @. tends_advec = -∇c(wvec(LBF(w_up_c * ρaq_liq)))
                 @. tends_other = (ρ_c * ql_tendency_precip_formation + ql_tendency_noneq) + (ρ_c * ql_tendency_sedimentation) # external tendencies... we will limit entr/detr as the final tendency to not violate this contract...
                 @. tends_ρaq_liq =
-                    # -∇c(wvec(LBF(Ic(w_up) * ρaq_liq))) + 
+                    # -∇c(wvec(LBF(w_up_c * ρaq_liq))) + 
                     tends_advec +
                     progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_liq / ρarea, prog_gm.q_liq), prog_gm.q_liq, tends_ρarea,
                         limit_tendency(edtl, (ρarea * entr_rate_inv_s * q_liq_en) - (ρarea * detr_rate_inv_s * q_liq_up), ρaq_liq + max(tends_advec+tends_other, 0), ρ_c * area_en * q_liq_en + max(-(tends_advec+tends_other), 0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
                         (ρ_c * (ql_tendency_precip_formation + ql_tendency_noneq))
 
-                @. tends_advec = -∇c(wvec(LBF(Ic(w_up) * ρaq_ice)))
+                @. tends_advec = -∇c(wvec(LBF(w_up_c * ρaq_ice)))
                 @. tends_other = (ρ_c * qi_tendency_precip_formation + qi_tendency_noneq) + (ρ_c * qi_tendency_sedimentation) # external tendencies... we will limit entr/detr as the final tendency to not violate this contract...
                 @. tends_ρaq_ice =
-                    # -∇c(wvec(LBF(Ic(w_up) * ρaq_ice))) +
+                    # -∇c(wvec(LBF(w_up_c * ρaq_ice))) +
                     tends_advec +
                     progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_ice / ρarea, prog_gm.q_ice), prog_gm.q_ice, tends_ρarea,
                         limit_tendency(edtl, (ρarea * entr_rate_inv_s * q_ice_en) - (ρarea * detr_rate_inv_s * q_ice_up), ρaq_ice + max(tends_advec+tends_other,0), ρ_c * area_en * q_ice_en + max(-(tends_advec+tends_other),0), Δt), ρ_c, Δt, use_tendency_resolver, !use_tendency_resolver_on_full_tendencies) +
@@ -1807,17 +1817,17 @@ function compute_up_tendencies!(edmf::EDMFModel, state::State, param_set::APS, �
             if edmf.entrainment_type isa FractionalEntrModel
 
                 @. tends_ρaθ_liq_ice += progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaθ_liq_ice / ρarea, prog_gm.ρθ_liq_ice / ρ_c), prog_gm.ρθ_liq_ice / ρ_c, tends_ρarea,
-                    (ρarea * Ic(w_up) * entr_turb_dyn * θ_liq_ice_en) - (ρaθ_liq_ice * Ic(w_up) * detr_turb_dyn), ρ_c, Δt, use_tendency_resolver, use_tendency_resolver_on_full_tendencies, tends_ρaθ_liq_ice)
+                    (ρarea * w_up_c * entr_turb_dyn * θ_liq_ice_en) - (ρaθ_liq_ice * w_up_c * detr_turb_dyn), ρ_c, Δt, use_tendency_resolver, use_tendency_resolver_on_full_tendencies, tends_ρaθ_liq_ice)
 
                 @. tends_ρaq_tot += progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_tot / ρarea, prog_gm.ρq_tot / ρ_c), prog_gm.ρq_tot / ρ_c, tends_ρarea,
-                    (ρarea * Ic(w_up) * entr_turb_dyn * q_tot_en) - (ρaq_tot * Ic(w_up) * detr_turb_dyn), ρ_c, Δt, use_tendency_resolver, use_tendency_resolver_on_full_tendencies, tends_ρaq_tot)
+                    (ρarea * w_up_c * entr_turb_dyn * q_tot_en) - (ρaq_tot * w_up_c * detr_turb_dyn), ρ_c, Δt, use_tendency_resolver, use_tendency_resolver_on_full_tendencies, tends_ρaq_tot)
 
                 if edmf.moisture_model isa NonEquilibriumMoisture
                     @. tends_ρaq_liq += progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_liq / ρarea, prog_gm.q_liq), prog_gm.q_liq, tends_ρarea,
-                        (ρarea * Ic(w_up) * entr_turb_dyn * q_liq_en) - (ρaq_liq * Ic(w_up) * detr_turb_dyn), ρ_c, Δt, use_tendency_resolver, use_tendency_resolver_on_full_tendencies, tends_ρaq_liq)
+                        (ρarea * w_up_c * entr_turb_dyn * q_liq_en) - (ρaq_liq * w_up_c * detr_turb_dyn), ρ_c, Δt, use_tendency_resolver, use_tendency_resolver_on_full_tendencies, tends_ρaq_liq)
 
                     @. tends_ρaq_ice += progvar_area_tendency_resolver(edtl, ρarea, ifelse(ρarea > 0, prog_up[i].ρaq_ice / ρarea, prog_gm.q_ice), prog_gm.q_ice, tends_ρarea,
-                        (ρarea * Ic(w_up) * entr_turb_dyn * q_ice_en) - (ρaq_ice * Ic(w_up) * detr_turb_dyn), ρ_c, Δt, use_tendency_resolver, use_tendency_resolver_on_full_tendencies, tends_ρaq_ice)
+                        (ρarea * w_up_c * entr_turb_dyn * q_ice_en) - (ρaq_ice * w_up_c * detr_turb_dyn), ρ_c, Δt, use_tendency_resolver, use_tendency_resolver_on_full_tendencies, tends_ρaq_ice)
                 end
 
             elseif edmf.entrainment_type isa TotalRateEntrModel
@@ -2607,7 +2617,8 @@ function compute_en_tendencies!(
     if edmf.thermo_covariance_model isa PrognosticThermoCovariances
         prog_bcs = (; bottom = CCO.SetGradient(wvec(FT(0))), top = CCO.SetGradient(wvec(FT(0))))
     else
-        prog_bcs = (; bottom = CCO.Extrapolate(), top = CCO.SetGradient(wvec(FT(0))))
+        # prog_bcs = (; bottom = CCO.Extrapolate(), top = CCO.SetGradient(wvec(FT(0)))) # Apparently Extrapolate is an error
+        prog_bcs = (; bottom = CCO.SetGradient(wvec(FT(0))), top = CCO.SetGradient(wvec(FT(0))))
     end
 
     If = CCO.InterpolateC2F(; aeK_bcs...)
@@ -2633,7 +2644,8 @@ function compute_en_tendencies!(
     area_en = aux_en.area
     tke_en = aux_en.tke
 
-    parent(D_env) .= 0
+    # parent(D_env) .= 0
+    zero_field!(D_env)
 
     @inbounds for i in 1:N_up
         turb_entr = aux_up[i].frac_turb_entr
@@ -2883,11 +2895,12 @@ function compute_en_tendencies!(
 
             # --- 1. Stability-damped effective convective velocity ---
             # w_eff = |w| * exp(-sqrt(N2)*ℓ/|w|) * sign(w)
-            # w_eff = @. max(abs(w_convective), eps_vel) * exp(-sqrt(max(aux_tc.∂b∂z, 0)) * ℓ / max(abs(w_convective), eps_vel)) * sign(w_convective)
-            w_eff = @. max(abs(w_convective), eps_vel)
+            w_eff = aux_tc.temporary_4 # 1 and 2 used above but avail again
+            @. w_eff = max(abs(w_convective), eps_vel) # base convective velocity
 
             # --- 2. Compute first derivative of TKE using your operators (full array) ---
-            grad_tke = @. ∇c(wvec(Ifw(ρatke_convective)))  # ∂(ρTKE)/∂z, vectorized
+            grad_tke = aux_tc.temporary_5 # 1 and 2 used above but avail again
+            @. grad_tke = ∇c(wvec(If(ρatke_convective / ρ_c)))  # ∂(TKE)/∂z, vectorized
 
             # --- 3. Compute symmetric flux (first-order) ---
             # F_sym := 0.5 * ρatke_convective * w_eff  # up flux magnitude
@@ -2895,7 +2908,8 @@ function compute_en_tendencies!(
             # --- 4. Compute second-order Lax–Wendroff correction ---
             # F_corr :=  0.5 * Δt * w_eff^2 * grad_tke
 
-            f_stab = @. exp(-sqrt(max(aux_tc.∂b∂z, 0)) * ℓ_mix / max(abs(w_convective), eps_vel))
+            f_stab = aux_tc.temporary_6 # 1 and 2 used above but avail again
+            @. f_stab = exp(-sqrt(max(aux_tc.∂b∂z, 0)) * ℓ_mix / max(abs(w_convective), eps_vel))
 
             # --- 5. Assemble up/down fluxes ---
             @. flux_up = +(k_adv*f_stab)*((0.5 * ρatke_convective * w_eff) - (0.5 * Δt * w_eff^2 * grad_tke)) # w_sym - correction

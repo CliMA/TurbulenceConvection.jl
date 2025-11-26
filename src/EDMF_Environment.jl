@@ -26,6 +26,7 @@ function microphysics!(
     aux_en_sat = aux_en.sat
     aux_en_unsat = aux_en.unsat
     precip_fraction = compute_precip_fraction(edmf, state)
+    N_up = n_updrafts(edmf)
 
     moisture_model = edmf.moisture_model
     precip_model = edmf.precip_model
@@ -84,8 +85,12 @@ function microphysics!(
             Also for the `advective only` parts, those calculate `to_other` ignoring the background w, so `advection only` should cause no `to_other` atall.
 
         =#
+        sedimentation = aux_tc.temporary_1
+        sedimentation_other = aux_tc.temporary_2
 
-        mph_sed_ice, mph_sed_ice_other = calculate_sedimentation_sources(
+        calculate_sedimentation_sources!(
+            sedimentation,
+            sedimentation_other,
             param_set,
             ρ_c,
             aux_en.q_ice,
@@ -96,10 +101,39 @@ function microphysics!(
             differencing_scheme = edmf.cloud_sedimentation_model.sedimentation_differencing_scheme,
             grid_mean = false,
             use_relative_w = false,
-            scratch1 = aux_tc.temporary_1, scratch2 = aux_tc.temporary_2, scratch3 = aux_tc.temporary_3, scratch4 = aux_tc.temporary_4, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2
+            scratch1 = aux_tc.temporary_3, scratch2 = aux_tc.temporary_4, scratch3 = aux_tc.temporary_5, scratch4 = aux_tc.temporary_6, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2
         ) # should this be a grid mean tendency? 
 
-        mph_sed_liq, mph_sed_liq_other = calculate_sedimentation_sources(
+
+        @inbounds for k in real_center_indices(grid)
+            aux_en.qi_tendency_sedimentation[k] = sedimentation[k]
+            aux_en.qt_tendency_sedimentation[k] = sedimentation[k]
+        
+
+            Π_m = TD.exner(thermo_params, ts_env[k])
+            c_pm = TD.cp_m(thermo_params, ts_env[k])
+            L_s = TD.latent_heat_sublim(thermo_params, ts_env[k])
+            θ_liq_ice_tendency_sedimentation_ice =
+                1 / Π_m / c_pm * (L_s * aux_en.qi_tendency_sedimentation[k])
+            aux_en.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_ice # adapted from microphysics_coupling.jl: precipitation_formation() | (= not += caue these don't seem to get reset every iteration?
+            if aux_en.area[k] < 1 # we have some updrafts
+                @inbounds for i in 1:N_up
+                    qi_tendency_sedimentation_other = sedimentation_other[k] * (aux_up[i].area[k] ./ aux_bulk.area[k])
+                    qt_tendency_sedimentation_other = qi_tendency_sedimentation_other
+                    θ_liq_ice_tendency_sedimentation_other =  1 / Π_m / c_pm * (L_s * qi_tendency_sedimentation_other)
+                    aux_up[i].qi_tendency_sedimentation[k] += qi_tendency_sedimentation_other
+                    aux_up[i].qt_tendency_sedimentation[k] += qi_tendency_sedimentation_other
+                    aux_up[i].θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
+                    aux_bulk.qi_tendency_sedimentation[k] += qi_tendency_sedimentation_other
+                    aux_bulk.qt_tendency_sedimentation[k] += qi_tendency_sedimentation_other
+                    aux_bulk.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
+                end
+            end
+        end
+
+        calculate_sedimentation_sources!(
+            aux_tc.temporary_1,
+            aux_tc.temporary_2,
             param_set,
             ρ_c,
             aux_en.q_liq,
@@ -110,71 +144,38 @@ function microphysics!(
             differencing_scheme = edmf.cloud_sedimentation_model.sedimentation_differencing_scheme,
             grid_mean = false,
             use_relative_w = false,
-            scratch1 = aux_tc.temporary_1, scratch2 = aux_tc.temporary_2, scratch3 = aux_tc.temporary_3, scratch4 = aux_tc.temporary_4, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2
+            scratch1 = aux_tc.temporary_3, scratch2 = aux_tc.temporary_4, scratch3 = aux_tc.temporary_5, scratch4 = aux_tc.temporary_6, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2
         ) # should this be a grid mean tendency? 
+
+        @inbounds for k in real_center_indices(grid)
+            aux_en.ql_tendency_sedimentation[k] = sedimentation[k]
+            aux_en.qt_tendency_sedimentation[k] += sedimentation[k]
+
+            Π_m = TD.exner(thermo_params, ts_env[k])
+            c_pm = TD.cp_m(thermo_params, ts_env[k])
+            L_v = TD.latent_heat_vapor(thermo_params, ts_env[k])
+            θ_liq_ice_tendency_sedimentation_liq =
+                1 / Π_m / c_pm * (L_v * aux_en.ql_tendency_sedimentation[k])
+            aux_en.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_liq # adapted from microphysics_coupling.jl: precipitation_formation() | (= not += caue these don't seem to get reset every iteration?
+
+            if aux_en.area[k] < 1 # we have some updrafts
+                @inbounds for i in 1:N_up
+                    ql_tendency_sedimentation_other = sedimentation_other[k] * (aux_up[i].area[k] ./ aux_bulk.area[k])
+                    θ_liq_ice_tendency_sedimentation_other =  1 / Π_m / c_pm * (L_v * ql_tendency_sedimentation_other)
+                    aux_up[i].ql_tendency_sedimentation[k] += ql_tendency_sedimentation_other
+                    aux_up[i].qt_tendency_sedimentation[k] += ql_tendency_sedimentation_other
+                    aux_up[i].θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
+                    aux_bulk.ql_tendency_sedimentation[k] += ql_tendency_sedimentation_other
+                    aux_bulk.qt_tendency_sedimentation[k] += ql_tendency_sedimentation_other
+                    aux_bulk.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
+                end
+            end
+        end
 
 
         #=
             We divided out ρ so, instead of ρaq, these are tendencies in just aq... we did this to avoid dividing by then multiplying by a... but for storage we really should right?
         =#
-
-
-        # Store sedimentation
-        @inbounds for k in real_center_indices(grid)
-            # === sed ======================== [ do before precip_formation so we can know sed-driven aggregatory autoconversion, and it doesnt depend on anything below. ]
-            if edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean        
-                ql_tendency_sedimentation = mph_sed_liq[k].q_tendency
-                qi_tendency_sedimentation = mph_sed_ice[k].q_tendency
-                qt_tendency_sedimentation = ql_tendency_sedimentation + qi_tendency_sedimentation
-                aux_en.ql_tendency_sedimentation[k] += ql_tendency_sedimentation # these get added to gm in compute_gm
-                aux_en.qi_tendency_sedimentation[k] += qi_tendency_sedimentation
-                aux_en.qt_tendency_sedimentation[k] += qt_tendency_sedimentation # used in dycore.jl (= not += , cause this doesnt seem to get reset every iteration?) (fixed in update_aux)
-    
-                if !isfinite(qi_tendency_sedimentation)
-                    @error "qi_tendency_sedimentation is NaN at k = $k; aux_en.qi_tendency_sedimentation[k] = $(aux_en.qi_tendency_sedimentation[k]); aux_en.qi_tendency_sedimentation[k] = $(aux_en.qi_tendency_sedimentation[k])"
-                end
-
-                L_v = TD.latent_heat_vapor(thermo_params, ts_env[k])
-                L_s = TD.latent_heat_sublim(thermo_params, ts_env[k])
-    
-                Π_m = TD.exner(thermo_params, ts_env[k])
-                c_pm = TD.cp_m(thermo_params, ts_env[k])
-                θ_liq_ice_tendency_sedimentation = 1 / Π_m / c_pm * (L_v * ql_tendency_sedimentation + L_s * qi_tendency_sedimentation)
-                aux_en.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation # adapted from microphysics_coupling.jl: precipitation_formation() | (= not += caue these don't seem to get reset every iteration?)
-    
-                # sedimentation loss into updraft (should this be allowed lol)
-                # How do we know when these get set to 0 and can be used again?
-                if aux_en.area[k] < 1 # we have some updrafts
-                    N_up = n_updrafts(edmf)
-                    @inbounds for i in 1:N_up
-                        ql_tendency_sedimentation_other = mph_sed_liq_other[k].q_tendency .* (aux_up[i].area[k] ./ aux_bulk.area[k])
-                        qi_tendency_sedimentation_other = mph_sed_ice_other[k].q_tendency .* (aux_up[i].area[k] ./ aux_bulk.area[k])
-                        qt_tendency_sedimentation_other = ql_tendency_sedimentation_other + qi_tendency_sedimentation_other
-                        θ_liq_ice_tendency_sedimentation_other = 1 / Π_m / c_pm * (L_v * ql_tendency_sedimentation_other + L_s * qi_tendency_sedimentation_other)
-                        aux_up[i].ql_tendency_sedimentation[k] += ql_tendency_sedimentation_other
-                        aux_up[i].qi_tendency_sedimentation[k] += qi_tendency_sedimentation_other
-                        aux_up[i].qt_tendency_sedimentation[k] += qt_tendency_sedimentation_other
-                        aux_up[i].θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
-                        aux_bulk.ql_tendency_sedimentation[k] += ql_tendency_sedimentation_other
-                        aux_bulk.qi_tendency_sedimentation[k] += qi_tendency_sedimentation_other
-                        aux_bulk.qt_tendency_sedimentation[k] += qt_tendency_sedimentation_other
-                        aux_bulk.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
-
-                        # store contributions to other
-                        aux_up[i].ql_tendency_sedimentation_other[k] += ql_tendency_sedimentation_other # for storage
-                        aux_up[i].qi_tendency_sedimentation_other[k] += qi_tendency_sedimentation_other # for storage
-                        aux_up[i].qt_tendency_sedimentation_other[k] += qt_tendency_sedimentation_other # for storage
-                        aux_up[i].θ_liq_ice_tendency_sedimentation_other[k] += θ_liq_ice_tendency_sedimentation_other # for storage
-
-                        aux_bulk.ql_tendency_sedimentation_other[k] += ql_tendency_sedimentation_other # for storage
-                        aux_bulk.qi_tendency_sedimentation_other[k] += qi_tendency_sedimentation_other # for storage
-                        aux_bulk.qt_tendency_sedimentation_other[k] += qt_tendency_sedimentation_other # for storage
-                        aux_bulk.θ_liq_ice_tendency_sedimentation_other[k] += θ_liq_ice_tendency_sedimentation_other # for storage
-                    end
-                end
-            end
-            # ============================================== #
-        end
         #
     end
     # ======================================================================== #
@@ -1260,7 +1261,12 @@ function microphysics!(
     # Calculate Sedimentation
     if edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean  
 
-        mph_sed_ice, mph_sed_ice_other = calculate_sedimentation_sources(
+        sedimentation = aux_tc.temporary_1
+        sedimentation_other = aux_tc.temporary_2
+
+        calculate_sedimentation_sources!(
+            sedimentation,
+            sedimentation_other,
             param_set,
             ρ_c,
             aux_en.q_ice,
@@ -1271,10 +1277,41 @@ function microphysics!(
             differencing_scheme = edmf.cloud_sedimentation_model.sedimentation_differencing_scheme,
             grid_mean = false,
             use_relative_w = false,
-            scratch1 = aux_tc.temporary_1, scratch2 = aux_tc.temporary_2, scratch3 = aux_tc.temporary_3, scratch4 = aux_tc.temporary_4, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2
+            scratch1 = aux_tc.temporary_3, scratch2 = aux_tc.temporary_4, scratch3 = aux_tc.temporary_5, scratch4 = aux_tc.temporary_6, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2
         ) # should this be a grid mean tendency? 
 
-        mph_sed_liq, mph_sed_liq_other = calculate_sedimentation_sources(
+        @inbounds for k in real_center_indices(grid)
+            aux_en.qi_tendency_sedimentation[k] = sedimentation[k]
+            aux_en.qt_tendency_sedimentation[k] = sedimentation[k]
+        
+
+            Π_m = TD.exner(thermo_params, ts_env[k])
+            c_pm = TD.cp_m(thermo_params, ts_env[k])
+            L_s = TD.latent_heat_sublim(thermo_params, ts_env[k])
+            θ_liq_ice_tendency_sedimentation_ice =
+                1 / Π_m / c_pm * (L_s * aux_en.qi_tendency_sedimentation[k])
+            aux_en.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_ice # adapted from microphysics_coupling.jl: precipitation_formation() | (= not += caue these don't seem to get reset every iteration?
+            if aux_en.area[k] < 1 # we have some updrafts
+                N_up = n_updrafts(edmf)
+                @inbounds for i in 1:N_up
+                    qi_tendency_sedimentation_other = sedimentation_other[k] * (aux_up[i].area[k] ./ aux_bulk.area[k])
+                    qt_liq_ice_tendency_sedimentation_other =  qi_tendency_sedimentation_other
+                    θ_liq_ice_tendency_sedimentation_other =  1 / Π_m / c_pm * (L_s * qi_tendency_sedimentation_other)
+                    aux_up[i].qi_tendency_sedimentation[k] += qi_tendency_sedimentation_other
+                    aux_up[i].qt_tendency_sedimentation[k] += qi_tendency_sedimentation_other
+                    aux_up[i].θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
+                    aux_bulk.qi_tendency_sedimentation[k] += qi_tendency_sedimentation_other
+                    aux_bulk.qt_tendency_sedimentation[k] += qi_tendency_sedimentation_other
+                    aux_bulk.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
+                end
+            end
+        end
+
+
+
+        calculate_sedimentation_sources!(
+            sedimentation,
+            sedimentation_other,
             param_set,
             ρ_c,
             aux_en.q_liq,
@@ -1285,8 +1322,34 @@ function microphysics!(
             differencing_scheme = edmf.cloud_sedimentation_model.sedimentation_differencing_scheme,
             grid_mean = false,
             use_relative_w = false,
-            scratch1 = aux_tc.temporary_1, scratch2 = aux_tc.temporary_2, scratch3 = aux_tc.temporary_3, scratch4 = aux_tc.temporary_4, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2
+            scratch1 = aux_tc.temporary_3, scratch2 = aux_tc.temporary_4, scratch3 = aux_tc.temporary_5, scratch4 = aux_tc.temporary_6, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2
         ) # should this be a grid mean tendency? 
+
+        @inbounds for k in real_center_indices(grid)
+            aux_en.ql_tendency_sedimentation[k] = sedimentation[k]
+            aux_en.qt_tendency_sedimentation[k] += sedimentation[k]
+
+            Π_m = TD.exner(thermo_params, ts_env[k])
+            c_pm = TD.cp_m(thermo_params, ts_env[k])
+            L_v = TD.latent_heat_vapor(thermo_params, ts_env[k])
+            θ_liq_ice_tendency_sedimentation_liq =
+                1 / Π_m / c_pm * (L_v * aux_en.ql_tendency_sedimentation[k])
+            aux_en.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_liq # adapted from microphysics_coupling.jl: precipitation_formation() | (= not += caue these don't seem to get reset every iteration?
+
+            if aux_en.area[k] < 1 # we have some updrafts
+                N_up = n_updrafts(edmf)
+                @inbounds for i in 1:N_up
+                    ql_tendency_sedimentation_other = sedimentation_other[k] * (aux_up[i].area[k] ./ aux_bulk.area[k])
+                    θ_liq_ice_tendency_sedimentation_other =  1 / Π_m / c_pm * (L_v * ql_tendency_sedimentation_other)
+                    aux_up[i].ql_tendency_sedimentation[k] += ql_tendency_sedimentation_other
+                    aux_up[i].qt_tendency_sedimentation[k] += ql_tendency_sedimentation_other
+                    aux_up[i].θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
+                    aux_bulk.ql_tendency_sedimentation[k] += ql_tendency_sedimentation_other
+                    aux_bulk.qt_tendency_sedimentation[k] += ql_tendency_sedimentation_other
+                    aux_bulk.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
+                end
+            end
+        end
 
     end
 
@@ -1299,58 +1362,6 @@ function microphysics!(
     # initialize the quadrature points and their labels
 
     @inbounds for k in real_center_indices(grid)
-         # === sed ======================== [ do before precip_formation so we can know sed-driven aggregatory autoconversion, and it doesnt depend on anything below. ]
-        if edmf.cloud_sedimentation_model isa CloudSedimentationModel && !edmf.cloud_sedimentation_model.grid_mean        
-            ql_tendency_sedimentation = mph_sed_liq[k].q_tendency
-            qi_tendency_sedimentation = mph_sed_ice[k].q_tendency
-            qt_tendency_sedimentation = ql_tendency_sedimentation + qi_tendency_sedimentation
-            aux_en.ql_tendency_sedimentation[k] += ql_tendency_sedimentation # these get added to gm in compute_gm
-            aux_en.qi_tendency_sedimentation[k] += qi_tendency_sedimentation
-            aux_en.qt_tendency_sedimentation[k] += qt_tendency_sedimentation # used in dycore.jl (= not += , cause this doesnt seem to get reset every iteration?) (fixed in update_aux)
-
-            if !isfinite(qi_tendency_sedimentation)
-                @error "qi_tendency_sedimentation is NaN at k = $k; aux_en.qi_tendency_sedimentation[k] = $(aux_en.qi_tendency_sedimentation[k]); aux_en.qi_tendency_sedimentation[k] = $(aux_en.qi_tendency_sedimentation[k])"
-            end
-
-            Π_m = TD.exner(thermo_params, ts_env[k])
-            c_pm = TD.cp_m(thermo_params, ts_env[k])
-            L_v = TD.latent_heat_vapor(thermo_params, ts_env[k])
-            L_s = TD.latent_heat_sublim(thermo_params, ts_env[k])
-            θ_liq_ice_tendency_sedimentation =
-                1 / Π_m / c_pm * (L_v * ql_tendency_sedimentation + L_s * qi_tendency_sedimentation)
-            aux_en.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation # adapted from microphysics_coupling.jl: precipitation_formation() | (= not += caue these don't seem to get reset every iteration?)
-
-            # sedimentation loss into updraft (should this be allowed lol)
-            # How do we know when these get set to 0 and can be used again?
-            if aux_en.area[k] < 1 # we have some updrafts
-                N_up = n_updrafts(edmf)
-                @inbounds for i in 1:N_up
-                    ql_tendency_sedimentation_other = mph_sed_liq_other[k].q_tendency .* (aux_up[i].area[k] ./ aux_bulk.area[k])
-                    qi_tendency_sedimentation_other = mph_sed_ice_other[k].q_tendency .* (aux_up[i].area[k] ./ aux_bulk.area[k])
-                    qt_tendency_sedimentation_other = ql_tendency_sedimentation_other + qi_tendency_sedimentation_other
-                    θ_liq_ice_tendency_sedimentation_other =  1 / Π_m / c_pm * (L_v * ql_tendency_sedimentation_other + L_s * qi_tendency_sedimentation_other)
-                    aux_up[i].ql_tendency_sedimentation[k] += ql_tendency_sedimentation_other
-                    aux_up[i].qi_tendency_sedimentation[k] += qi_tendency_sedimentation_other
-                    aux_up[i].qt_tendency_sedimentation[k] += qt_tendency_sedimentation_other
-                    aux_up[i].θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
-                    aux_bulk.ql_tendency_sedimentation[k] += ql_tendency_sedimentation_other
-                    aux_bulk.qi_tendency_sedimentation[k] += qi_tendency_sedimentation_other
-                    aux_bulk.qt_tendency_sedimentation[k] += qt_tendency_sedimentation_other
-                    aux_bulk.θ_liq_ice_tendency_sedimentation[k] += θ_liq_ice_tendency_sedimentation_other
-
-                    # store contributions to other
-                    aux_up[i].ql_tendency_sedimentation_other[k] += ql_tendency_sedimentation_other # for storage
-                    aux_up[i].qi_tendency_sedimentation_other[k] += qi_tendency_sedimentation_other # for storage
-                    aux_up[i].qt_tendency_sedimentation_other[k] += qt_tendency_sedimentation_other # for storage
-                    aux_up[i].θ_liq_ice_tendency_sedimentation_other[k] += θ_liq_ice_tendency_sedimentation_other # for storage
-
-                    aux_bulk.ql_tendency_sedimentation_other[k] += ql_tendency_sedimentation_other # for storage
-                    aux_bulk.qi_tendency_sedimentation_other[k] += qi_tendency_sedimentation_other # for storage
-                    aux_bulk.qt_tendency_sedimentation_other[k] += qt_tendency_sedimentation_other # for storage
-                    aux_bulk.θ_liq_ice_tendency_sedimentation_other[k] += θ_liq_ice_tendency_sedimentation_other # for storage
-                end
-            end
-        end
         # ============================================== #
         ts = ts_env[k]
 
@@ -1699,7 +1710,7 @@ end
 
 """
 Helper function to abstract out sat_adjust and noneq_moisture_sources(), and precipitation_formation() to simplify implementation.
-     calculate_sedimentation_sources() has to be precomputed because it's not clear how it works otherwise, because it depends on vertical gradients which are weird with quadrature...
+     calculate_sedimentation_sources!() has to be precomputed because it's not clear how it works otherwise, because it depends on vertical gradients which are weird with quadrature...
 """
 function microphysics_helper(grid::Grid, edmf::EDMFModel, Δt::FT, param_set::APS, use_fallback_tendency_limiters::Bool,
     aux_en::CC.Fields.Field, aux_en_f::CC.Fields.Field, k::Cent{Int64},

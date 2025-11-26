@@ -18,22 +18,8 @@ supersat_variables(FT, ::NonEquilibriumMoisture) = (;
     τ_liq = FT(0), # time scale for liquid supersaturation
 )
 
-cloud_sedimentation_variables(FT, ::CloudSedimentationModel) = (; # these are different from the rain snow ones bc they are not on the grid mean, but also in env/up separately
-    term_vel_liq = FT(0), # rn we're not using this
-    term_vel_ice = FT(0),
-    N_i = FT(0), # [[ These are here instead of in supersat variables so that they exist even in EquilibriumMoisture ]]
-    N_l = FT(0), # [[ These are here instead of in supersat variables so that they exist even in EquilibriumMoisture ]]
-    r_i_mean = FT(0), # mean ice radius
-    r_l_mean = FT(0), # mean liquid radius
-    #
-    dN_i_dz = FT(0), # vertical gradient of N_i, used to adjust the timescale for acnv
-    # dN_l_dz = FT(0), # vertical gradient of N_l, used to adjust the timescale for acnv
-    # dr_i_mean_dz = FT(0), # vertical gradient of r_i_mean, used to adjust the timescale for acnv
-    # dr_l_mean_dz = FT(0), # vertical gradient of r_l_mean, used to adjust the timescale for acnv
-    dqidz = FT(0), # vertical gradient of qi, used to adjust the timescale for acnv
-    #
-    N_i_no_boost = FT(0), # N_i without the massflux boost factor
-)
+
+
 cloud_sedimentation_variables(FT, ::CloudNoSedimentationModel) =  (;
     N_i = FT(0), # [[ These are here instead of in supersat variables so that they exist even in EquilibriumMoisture ]]
     N_l = FT(0), # [[ These are here instead of in supersat variables so that they exist even in EquilibriumMoisture ]]
@@ -47,6 +33,12 @@ cloud_sedimentation_variables(FT, ::CloudNoSedimentationModel) =  (;
     dqidz = FT(0), # vertical gradient of qi, used to adjust the timescale for acnv
     #
     N_i_no_boost = FT(0), # N_i without the massflux boost factor
+    #
+)
+cloud_sedimentation_variables(FT, ::CloudSedimentationModel) = (; # these are different from the rain snow ones bc they are not on the grid mean, but also in env/up separately
+    term_vel_liq = FT(0), # rn we're not using this
+    term_vel_ice = FT(0),
+    cloud_sedimentation_variables(FT, CloudNoSedimentationModel())...,
 )
 cloud_sedimentation_variables(FT, ::Nothing) =  NamedTuple()
 
@@ -345,6 +337,8 @@ cent_aux_vars_edmf(::Type{FT}, local_geometry, edmf, calibrate_io_val::Val{calib
         ),
         term_vel_rain = FT(0),
         term_vel_snow = FT(0),
+        # sedimentation = NoneqMoistureSource{FT}(0), # storage for sed [[ just gonna use a scratch field]]
+        # sedimentation_other = NoneqMoistureSource{FT}(0) [[ just gonna use a scratch field ]]
         KM = FT(0),
         KH = FT(0),
         KQ = FT(0),

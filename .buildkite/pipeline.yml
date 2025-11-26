@@ -11,7 +11,7 @@ agents:
   queue: new-central
   slurm_ntasks: 1
   slurm_mem: 10GB
-  modules: climacommon/2024_10_10 
+  modules: climacommon/2025_07_30
 
 steps:
 

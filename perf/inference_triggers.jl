@@ -8,9 +8,9 @@ sim = init_sim(case_name; prefix = "inf_trig_$case_name")
 sim.skip_io || open_files(sim) # #removeVarsHack
 (prob, alg, kwargs) = solve_args(sim)
 
-tinf = SnoopCompileCore.@snoopi_deep begin
+tinf = SnoopCompileCore.@snoop_inference begin
     sol = ODE.solve(prob, alg; kwargs...)
-end
+end;
 
 sim.skip_io || close_files(sim) # #removeVarsHack
 

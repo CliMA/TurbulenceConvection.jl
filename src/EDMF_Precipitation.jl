@@ -78,36 +78,31 @@ function compute_precipitation_advection_tendencies(
 
     # Calculate net tendencies allowing for both sedimentation and advection
 
-    sedimentation_differencing_scheme = edmf.cloud_sedimentation_model.sedimentation_differencing_scheme # reuse from cloud_sedimentation_model since it's all the same user_args option
+    # sedimentation_differencing_scheme = edmf.cloud_sedimentation_model.sedimentation_differencing_scheme # reuse from cloud_sedimentation_model since it's all the same user_args option
 
 
+    # sedimentation = aux_tc.temporary_1
+    # sedimentation_other = aux_tc.temporary_2
 
-    mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_rai, term_vel_rain, aux_bulk_f.w, aux_bulk.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false, scratch1 = aux_tc.temporary_1, scratch2 = aux_tc.temporary_2, scratch3 = aux_tc.temporary_3, scratch4 = aux_tc.temporary_4, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2)
-    mph_sed_q_rai = mph_sed #.* aux_bulk.area # all goes to same bucket
-    mph_sed_q_rai .+= mph_sed_other #.* aux_en.area # all goes to same bucket
-    mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_sno, term_vel_snow, aux_bulk_f.w, aux_bulk.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false, scratch1 = aux_tc.temporary_1, scratch2 = aux_tc.temporary_2, scratch3 = aux_tc.temporary_3, scratch4 = aux_tc.temporary_4, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2)
-    mph_sed_q_sno = mph_sed #.* aux_bulk.area # all goes to same bucket
-    mph_sed_q_sno .+= mph_sed_other #.* aux_en.area # all goes to same bucket
+    # calculate_sedimentation_sources!(sedimentation, sedimentation_other, param_set, ρ_c, q_rai, term_vel_rain, aux_bulk_f.w, aux_bulk.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false, scratch1 = aux_tc.temporary_3, scratch2 = aux_tc.temporary_4, scratch3 = aux_tc.temporary_5, scratch4 = aux_tc.temporary_6, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2)
+    # @. aux_gm.qr_tendency_sedimentation += sedimentation + sedimentation_other
+
+    # calculate_sedimentation_sources!(sedimentation, sedimentation_other, param_set, ρ_c, q_sno, term_vel_snow, aux_bulk_f.w, aux_bulk.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false, scratch1 = aux_tc.temporary_3, scratch2 = aux_tc.temporary_4, scratch3 = aux_tc.temporary_5, scratch4 = aux_tc.temporary_6, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2)
+    # @. aux_gm.qs_tendency_sedimentation += sedimentation + sedimentation_other
 
 
     # [[ ignore this part, I dont think the env response should be so locally constrained or overly important. ]] [[ maybe we should've done the same for liq/ice now that we allow high updraft areas... idk]]
-    # mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_rai, term_vel_rain, w, aux_en.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = true)
-    mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_rai, term_vel_rain, aux_en_f.w .* 0, aux_en.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false, scratch1 = aux_tc.temporary_1, scratch2 = aux_tc.temporary_2, scratch3 = aux_tc.temporary_3, scratch4 = aux_tc.temporary_4, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2) # test ignoring the environment downdraft
-    mph_sed_q_rai .+= mph_sed #.* aux_en.area
-    mph_sed_q_rai .+= mph_sed_other #.* aux_bulk.area # all goes to same bucket [these are fields so idk how this works...]
-    # mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_sno, term_vel_snow, w, aux_en.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = true)
-    mph_sed, mph_sed_other = calculate_sedimentation_sources(param_set, ρ_c, q_sno, term_vel_snow, aux_en_f.w .* 0, aux_en.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false, scratch1 = aux_tc.temporary_1, scratch2 = aux_tc.temporary_2, scratch3 = aux_tc.temporary_3, scratch4 = aux_tc.temporary_4, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2) # test ignoring the environment downdraft
-    mph_sed_q_sno .+= mph_sed #.* aux_en.area # all goes to same bucket
-    mph_sed_q_sno .+= mph_sed_other #.* aux_bulk.area # all goes to same bucket
+    # calculate_sedimentation_sources!(sedimentation, sedimentation_other, param_set, ρ_c, q_rai, term_vel_rain, aux_en_f.w .* 0, aux_en.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false, scratch1 = aux_tc.temporary_3, scratch2 = aux_tc.temporary_4, scratch3 = aux_tc.temporary_5, scratch4 = aux_tc.temporary_6, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2) # test ignoring the environment downdraft
+    # @. aux_gm.qr_tendency_sedimentation += sedimentation + sedimentation_other # all goes to same bucket
+    
+    # calculate_sedimentation_sources!(sedimentation, sedimentation_other, param_set, ρ_c, q_sno, term_vel_snow, aux_en_f.w .* 0, aux_en.area, grid; differencing_scheme = sedimentation_differencing_scheme, grid_mean = false, use_relative_w = false, scratch1 = aux_tc.temporary_3, scratch2 = aux_tc.temporary_4, scratch3 = aux_tc.temporary_5, scratch4 = aux_tc.temporary_6, scratch1F = aux_tc_f.temporary_f1, scratch2F = aux_tc_f.temporary_f2) # test ignoring the environment downdraft
+    # @. aux_gm.qs_tendency_sedimentation += sedimentation + sedimentation_other # all goes to same bucket
 
     # these come out of sedimentation sources already area weighted, so we just sum them up.
 
     # storage
-    @. aux_gm.qr_tendency_sedimentation =  ∇(wvec(RB(ρ_c * q_rai * term_vel_rain))) / ρ_c # * precip_fraction
-    @. aux_gm.qs_tendency_sedimentation =  ∇(wvec(RB(ρ_c * q_sno * term_vel_snow))) / ρ_c # * precip_fraction
-
-    # @. aux_gm.qr_tendency_vert_adv = mph_sed_q_rai.q_tendency - aux_gm.qr_tendency_sedimentation # take out the sed only part to get the advection part
-    # @. aux_gm.qs_tendency_vert_adv = mph_sed_q_sno.q_tendency - aux_gm.qs_tendency_sedimentation # take out the sed only part to get the advection part
+    @. aux_gm.qr_tendency_sedimentation = ∇(wvec(RB(ρ_c * q_rai * term_vel_rain))) / ρ_c # * precip_fraction
+    @. aux_gm.qs_tendency_sedimentation = ∇(wvec(RB(ρ_c * q_sno * term_vel_snow))) / ρ_c # * precip_fraction
 
 
     @. aux_gm.qr_tendency_vert_adv = FT(0)

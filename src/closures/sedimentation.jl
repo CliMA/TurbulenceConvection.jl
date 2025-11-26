@@ -5,10 +5,26 @@
 # we may only need sedimentation for cloud ice... (e.g. as in Lohmann et al 2018 The Importance)
 # These will need to be called on entire profiles in EDMF_Environment.jl, EDMF_Updraft.jl
 
+# function swap_eltype(::Type{CC.DataLayouts.VF{OldS, Nv, OldA}}, ::Type{NewS}) where {OldS, Nv, OldA, NewS}
+#     # Extract the array wrapper (Array, CuArray, etc.)
+#     ArrayWrapper = Base.typename(OldA).wrapper
+#     # Reconstruct: Wrapper{NewElement, 2 dims for VF}
+#     NewA = ArrayWrapper{NewS, 2}
+#     return CC.DataLayouts.VF{NewS, Nv, NewA}
+# end
+# # ADD THIS: Overload for Fields
+# # This catches Field{VF, Space} and swaps the VF inside
+# function swap_eltype(::Type{CC.Fields.Field{V, S}}, ::Type{NewS}) where {V, S, NewS}
+#     NewV = swap_eltype(V, NewS) # Calls the function above
+#     return CC.Fields.Field{NewV, S}
+# end
+
 """
 This function operates not element wise but on entire CC Fields because it uses vertical gradients
 """
-function calculate_sedimentation_sources(
+function calculate_sedimentation_sources!(
+    sedimentation::SCF,
+    sedimentation_other::SCF,
     param_set::APS,
     # q_type::Union{CMT.LiquidType, CMT.IceType}, # deprecate bc we no longer dispatch on this
     ρ::CC.Fields.Field,  # figure out types for these
@@ -24,13 +40,14 @@ function calculate_sedimentation_sources(
     # velo_scheme::Union{CMT.Blk1MVelType, CMT.Chen2022Type} = Chen2022Vel, # deprecated
     grid_mean::Bool = false, # whether or not this is a grid mean calc or if we have subdomains...
     use_relative_w::Bool = false,
-    scratch1::CC.Fields.Field,
-    scratch2::CC.Fields.Field,
-    scratch3::CC.Fields.Field,
-    scratch4::CC.Fields.Field,
-    scratch1F::CC.Fields.Field,
-    scratch2F::CC.Fields.Field
-)
+    scratch1::CF,
+    scratch2::CF,
+    scratch3::CF,
+    scratch4::CF,
+    scratch1F::FF,
+    scratch2F::FF
+) where {SCF <: CC.Fields.Field, CF <: CC.Fields.Field, FF <: CC.Fields.Field}
+ #::Tuple{swap_eltype(CF, NoneqMoistureSources{eltype(CF)}), swap_eltype(CF, NoneqMoistureSources{eltype(CF)})} where {CF<:CC.Fields.Field, FF<:CC.Fields.Field}
 
 
     #= Note --
@@ -66,8 +83,11 @@ function calculate_sedimentation_sources(
     # S = similar(ρ) # a copy but don't actually fill in
     # S_other = similar(ρ) # a copy but don't actually fill in
 
-    S = scratch1 # reuse temporary storage
-    S_other = scratch2 # reuse temporary storage
+    # S = scratch1 # reuse temporary storage
+    # S_other = scratch2 # reuse temporary storage
+
+    S = sedimentation
+    S_other = sedimentation_other
 
     wvec = CC.Geometry.WVector
     # ∇c = CCO.DivergenceF2C() # F2C to come back from C2F
@@ -154,10 +174,11 @@ function calculate_sedimentation_sources(
         # wvec_wρaq = @. wvec(wρaq) # convert to vector type for divergence [to get back to physical units]
         wvec_wρaq = @. wvec( UBsed(wvec(-w_sed), ρ * q * area) )
         scratch_wvec = wvec_wρaq # alias
+        # @warn "typeof(wvec_wρaq) = $(typeof(wvec_wρaq))"
         # wvec_wρaq[kf_surf] = q[kc_surf] * area[kc_surf] * -w_sed[kf_surf]
         wvec_wρaq[kf_surf] = map(x -> ρ[kc_surf] * q[kc_surf] * area[kc_surf] * -w_sed[kf_surf], wvec_wρaq[kf_surf]) # i think this works, following the logic in # /home/jbenjami/.julia/packages/ClimaCore/vJw0m/src/Geometry/axistensors.jl. Also would have worked on the Contravariant3vector but the units would have been wrong (not physical w/o wvec)
         
-        ∇wρaq = scratch3 # reuse temporary storage
+        ∇wρaq = scratch1 # reuse temporary storage
         @. ∇wρaq = -∇c(wvec_wρaq) # maybe this has to be done after CV32FT for the contravariant 3 vector?
 
         # flux from one partition to the other
@@ -165,15 +186,18 @@ function calculate_sedimentation_sources(
             _area_top = isa(area, FT) ? area : area[kc_toa]
             _area_bottom = isa(area, FT) ? area : area[kc_surf]
             C2Fa = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(_area_bottom)), top = CCO.SetValue(FT(_area_top)))
-            ∇a = scratch4
+            ∇a = scratch2
             @. ∇a = ∇c(wvec(C2Fa(area))) # seems stable w/ either sign w...? (Left bias this?)
-            prod = scratch4 # in place
+            prod = scratch2 # in place
             @. prod = ifelse(∇a > 0, ρ * q * ∇a, FT(0)) # only send to other if area is increasing towards surface
 
             to_other_f = scratch_wvec # reuse wvec vector
             @. to_other_f = -wvec(UBsed(wvec(C2Fsed(-w_sed_to_other)), prod))  # upwinded, outer wvec important to get physical units
-            to_other = scratch4 # reuse temporary storage
-            @. to_other = F2Csed(to_other_f).components.data.:1 # from Dennis # remove from source.  # convert back to C
+            to_other = scratch2 # reuse temporary storage
+
+            # @warn "typeof(F2Csed.(to_other_f) = $(typeof(F2Csed.(to_other_f)))"
+            # @. to_other = F2Csed(to_other_f).components.data.:1 # from Dennis # remove from source.  # convert back to C
+            @. to_other = toscalar(F2Csed(to_other_f))  # from Dennis # remove from source.  # convert back to C
             @. ∇wρaq -= to_other
         end
 
@@ -197,13 +221,13 @@ function calculate_sedimentation_sources(
             @. w_sed = C2Fsed(w_sed) # convert to face values
         end
 
-        ∇wρaq = scratch3
+        ∇wρaq = scratch1
         @. ∇wρaq = ∇(wvec(RB(ρ * q * w_sed * area))) # this is the way they did rain and snow...
 
         # surely this should be upwinded.... bc w_sed_to_other could have either sign right?
         if !grid_mean
             # to_other = similar(∇wρaq) # a copy but don't actually fill in
-            to_other = scratch4 # reuse temporary storage
+            to_other = scratch2 # reuse temporary storage
 
             # _area_top = isa(area, Number) ? area : area[kc_toa]
             _area_top = isa(area, FT) ? area : area[kc_toa]
@@ -233,7 +257,8 @@ function calculate_sedimentation_sources(
     end
 
 
-    return NoneqMoistureSource{FT}.(S), NoneqMoistureSource{FT}.(S_other)
+    return nothing
+    # return NoneqMoistureSource{FT}.(S), NoneqMoistureSource{FT}.(S_other)
 
 end
 
@@ -268,7 +293,7 @@ function calculate_sedimentation_velocity(
     velo_scheme::Union{CMT.Blk1MVelType, CMT.Chen2022Type} = Blk1MVel,
     Dmax::FT = FT(Inf), # maximum diameter for ice particles
     rain_type::CMT.RainType = rain_type, # rain_type is available from a a global, we dispatch this way bc liq_type doesn't have terminal velocity defined
-) where {FT}
+) where {FT <: Real}
 
     Nt = isnan(Nt) ? FT(250*1e6) : Nt # default to 250 / cm^-3 as that's a reasonable rain amount, do not let the default value for rain win as you'll get something ridiculously high. Even this might need to be scaled down, idk.
 
@@ -294,7 +319,7 @@ function calculate_sedimentation_velocity(
     Nt::FT; # N for particle size distrobution; # testing for type stability, use NaN instead of nothing
     velo_scheme::Union{CMT.Blk1MVelType, CMT.Chen2022Type} = Chen2022Vel,
     Dmax::FT = FT(Inf), # maximum diameter for ice particles
-) where {FT}
+) where {FT <: Real}
 
     if velo_scheme == Chen2022Vel
         # w  = CM1.terminal_velocity(microphys_params, ice_type, Chen2022Vel, ρ, q) # testing

@@ -455,7 +455,8 @@ function solve_args(sim::Simulation1d)
                     # callbacks = ODE.CallbackSet(callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_filters, callback_io...) # original
                     # prob = ODE.ODEProblem(∑tendencies!, prog, t_span, params; dt = sim.TS.dt)
                     callbacks = ODE.CallbackSet( callback_filters, callback_call_update_aux_caller!..., callback_io..., callback_dtmax, callback_adapt_dt..., callback_cfl..., callback_∑tendencies!..., )
-                    prob = ODE.ODEProblem(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # we will calculate tendencies in the step so we don't need another call to ∑tendencies! so we use ∑tendencies_null!
+                    # prob = ODE.ODEProblem(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # we will calculate tendencies in the step so we don't need another call to ∑tendencies! so we use ∑tendencies_null!
+                    prob = ODE.ODEProblem{true, SciMLBase.FullSpecialize}(∑tendencies_null!, prog, t_span, params; dt = sim.TS.dt) # full specialize to try to avoid inference issues
                 end
                 alg = if sim.TS.algorithm isa Val{:Euler}
                     ODE.Euler()
@@ -511,7 +512,7 @@ function solve_args(sim::Simulation1d)
         progress = true,
         progress_message = (dt, u, p, t) -> t,
         # my additions
-        isoutofdomain = sim.TS.use_isoutofdomain_limiter ? isoutofdomain : ODE.ODE_DEFAULT_ISOUTOFDOMAIN, # use our isoutofdomain if we set it, otherwise use their default which just returns false
+        isoutofdomain = sim.TS.use_isoutofdomain_limiter ? isoutofdomain : ODE.DiffEqBase.ODE_DEFAULT_ISOUTOFDOMAIN, # use our isoutofdomain if we set it, otherwise use their default which just returns false
         unstable_check = my_unstable_check,
         (isnan(sim.TS.abstol) ? (;) : (;abstol = sim.TS.abstol))...,
         (isnan(sim.TS.reltol) ? (;) : (;reltol = sim.TS.reltol))...,
@@ -561,7 +562,13 @@ function sim_run(sim::Simulation1d, integrator; time_run = true) # named sim_run
     local sol
     try
         if time_run
-            sol = @timev ODE.solve!(integrator)
+            # sol = @timev ODE.solve!(integrator)
+        sol = begin
+            t = @timed ODE.solve!(integrator)
+            @warn "ODE.solve!() completed in $(t.time) seconds, memory used: $(round(t.bytes / 1024^3, digits=2)) GiB"
+            t.value
+        end
+
         else
             sol = ODE.solve!(integrator)
         end
@@ -585,7 +592,13 @@ function sim_run(sim::Simulation1d, integrator; time_run = true) # named sim_run
     end
 end
 
-main(namelist; kwargs...) = @timev main1d(namelist; kwargs...)
+# main(namelist; kwargs...) = @timev main1d(namelist; kwargs...)
+main(namelist; kwargs...) = begin
+    t = @timed main1d(namelist; kwargs...)
+    @warn "main1d() completed in $(t.time) seconds, memory used: $(round(t.bytes / 1024^3, digits=2)) GiB"
+    t.value
+end
+
 
 nc_results_file(stats) = map(x -> stats[x].nc_filename, collect(keys(stats)))
 nc_results_file(stats::NetCDFIO_Stats) = stats.nc_filename
@@ -609,7 +622,12 @@ function main1d(namelist; time_run = true)
     (integrator, return_init) = initialize(sim)
     return_init === :success && @info "The initialization has completed."
     if time_run
-        (Y, return_code) = @timev sim_run(sim, integrator; time_run)
+        (Y, return_code) = begin
+            # (Y, return_code) = @timev sim_run(sim, integrator; time_run)
+            t = @timed sim_run(sim, integrator; time_run)
+            @warn "sim_run() completed in $(t.time) seconds, memory used: $(round(t.bytes / 1024^3, digits=2)) GiB"
+            t.value
+        end
     else
         (Y, return_code) = sim_run(sim, integrator; time_run)
     end

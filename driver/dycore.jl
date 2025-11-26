@@ -543,6 +543,74 @@ function compute_les_Γᵣ(z::FT, τᵣ::FT = 24.0 * 3600.0, zᵢ::FT = 3000.0, 
     end
 end
 
+
+# This function is the "Firewall".
+# The compiler analyzes this ONE time. 
+# It generates code that accepts ANY val_bottom/val_top.
+# This function handles the heavy lifting.
+# The compiler compiles this ONCE for any Float64 inputs.
+# ------------------------------------------------------------------
+#  HELPER FUNCTION (Strict Types Enforced)
+# ------------------------------------------------------------------
+function apply_subsidence_barrier!(
+    tendency::F, subsidence::F, scalar::F, scalar_F::F2, scalar_F2::F2, val_bottom::FT, val_top::FT, prefactor::ForFT
+) where {FT, F <: CC.Fields.Field, F2 <: CC.Fields.Field, ForFT <: Union{F, FT}} # Strictly enforces ClimaCore Fields
+    InterpScalar = CCO.InterpolateC2F(bottom = CCO.SetValue(val_bottom), top = CCO.SetValue(val_top))
+    InterpW = CCO.InterpolateC2F(bottom = CCO.SetValue(zero(FT)), top = CCO.Extrapolate())
+    Div = CCO.DivergenceF2C()
+    Upwind = CCO.UpwindBiasedProductC2F(bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+    Reconstruct = TC.Ic # Global const
+    W = CCG.WVector
+
+    # @. scalar_F = InterpScalar(scalar)
+    # @. scalar = Div(W(scalar_F))
+    # @. scalar_F2 = InterpW(subsidence)  
+
+    # scalar_F = @. TC.lazy(InterpScalar(scalar))
+    # scalar = @. TC.lazy(Div(W(scalar_F)))
+    # scalar_F2 = @. TC.lazy(InterpW(subsidence))
+
+    # @. tendency -= prefactor * (Reconstruct(W(Upwind(W(scalar_F2), scalar))).components.data.:1) # second W seems to be important for units
+    # @. tendency -= prefactor * TC.toscalar((Reconstruct(W(Upwind(W(scalar_F2), scalar))))) # second W seems to be important for units
+
+    # L = TC.lazy
+    # @lazy = TC.@lazy
+    # out = @. L(prefactor * L(Reconstruct(L(TC.toscalar(L(W(L(Upwind(L(W(L(InterpW(subsidence)), L(Div(L(W(L(InterpScalar(scalar)))))))))))))))))
+
+    # out = @lazy @. (prefactor * (Reconstruct((TC.toscalar((W((Upwind((W((InterpW(subsidence)), (Div((W((InterpScalar(scalar)))))))))))))))))
+    # @. tendency -= Base.materialize(out)
+
+
+    
+    @. scalar_F = InterpScalar(scalar) # 1. Fill Face Scratch (Reads scalar, Writes scalar_F)  ( MUST be done first before we overwrite scalar.)
+    @. scalar = Div(W(scalar_F)) # 2. Fill Center Scratch (Reads scalar_F, Overwrites scalar) ( We use 'scalar' itself to store the Divergence result, as you did.)
+    @. scalar_F2 = InterpW(subsidence) # 3. Fill Face Scratch (Reads subsidence, Writes scalar_F2)
+    out = @. TC.lazy(prefactor * Reconstruct(TC.toscalar(Upwind(W(scalar_F2), scalar)))) # 4. Final Fused Tendency Update [[ We use TC.lazy ONLY here.  This fuses Reconstruct + toscalar + prefactor into the Upwind loop. Upwind reads the materialized 'scalar_F2' and 'scalar' from above.
+    @. tendency -= Base.materialize(out)
+        
+
+    return nothing
+end
+function save_subsidence_barrier!(dest::F, subsidence::F, scalar::F, scalar_F::F2, scalar_F2::F2, val_bottom::FT, val_top::FT, prefactor::ForFT
+) where {FT, F <: CC.Fields.Field, F2 <: CC.Fields.Field, ForFT <: Union{F, FT}}
+    InterpScalar = CCO.InterpolateC2F(bottom = CCO.SetValue(val_bottom), top = CCO.SetValue(val_top))
+    InterpW = CCO.InterpolateC2F(bottom = CCO.SetValue(zero(FT)), top = CCO.Extrapolate())
+    Div = CCO.DivergenceF2C()
+    Upwind = CCO.UpwindBiasedProductC2F(bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
+    Reconstruct = TC.Ic # Global const
+    W = CCG.WVector
+
+
+    @. scalar_F = InterpScalar(scalar)
+    @. scalar = Div(W(scalar_F))
+    @. scalar_F2 = InterpW(subsidence)
+
+    # @. dest = -prefactor * (Reconstruct(W(Upwind(W(scalar_F2), scalar))).components.data.:1) # second W seems to be important for units
+    @. dest = -prefactor * TC.toscalar((Reconstruct(W(Upwind(W(scalar_F2), scalar))))) # second W seems to be important for units
+
+    return nothing
+end
+
 function compute_gm_tendencies!(
     edmf::TC.EDMFModel,
     state::TC.State,
@@ -580,6 +648,8 @@ function compute_gm_tendencies!(
     θ_liq_ice_gm_toa = prog_gm.ρθ_liq_ice[kc_toa] / ρ_c[kc_toa]
     q_tot_gm_toa = prog_gm.ρq_tot[kc_toa] / ρ_c[kc_toa]
 
+
+
     wvec = CC.Geometry.WVector
     ∇c = TC.∇c
 
@@ -596,7 +666,10 @@ function compute_gm_tendencies!(
     # lat = CC.Fields.coordinate_field(axes(ρ_c)).lat
     coords = CC.Fields.coordinate_field(axes(ρ_c))
     coriolis_fn(coord) = CCG.WVector(coriolis_param)
-    f = @. CCG.Contravariant3Vector(coriolis_fn(coords))
+
+    f = TC.center_aux_turbconv(state).k̂
+    @. f = CCG.Contravariant3Vector(coriolis_fn(coords))
+
 
     C123 = CCG.Covariant123Vector
     C12 = CCG.Contravariant12Vector
@@ -615,31 +688,30 @@ function compute_gm_tendencies!(
     # 4) unclear if things have to be rightbiased in converting c to f, instead of just interpolatec2f (with what BCs?), so we'll see if it's stable...
     # 5) assume no penetration BCs on subsidence w
 
-    UBsub = CCO.UpwindBiasedProductC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # upwinding, extrapolate bc we don't know the boa/toa derivatives
+    # UBsub = CCO.UpwindBiasedProductC2F(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # upwinding, extrapolate bc we don't know the boa/toa derivatives
 
     kc_surf = TC.kc_surface(grid)
     θ_liq_ice_gm_boa = prog_gm.ρθ_liq_ice[kc_surf] / ρ_c[kc_surf]
     q_tot_gm_boa = prog_gm.ρq_tot[kc_surf] / ρ_c[kc_surf]
 
     # subsidence should be face valued so we'll need a C2F call
-    C2Fsub = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.Extrapolate()) # not sure but maybe we should use this for stability as it's not biased for your upwind algorithm... no penetration. #
+    # C2Fsub = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(0)), top = CCO.Extrapolate()) # not sure but maybe we should use this for stability as it's not biased for your upwind algorithm... no penetration. #
 
-    C2Fθ = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(θ_liq_ice_gm_boa)), top = CCO.SetValue(FT(θ_liq_ice_gm_toa))) # not sure if this should be right biased or not
-    C2Fq = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(q_tot_gm_boa)), top = CCO.SetValue(FT(q_tot_gm_toa))) # not sure if this should be right biased or not
+    # C2Fθ = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(θ_liq_ice_gm_boa)), top = CCO.SetValue(FT(θ_liq_ice_gm_toa))) # not sure if this should be right biased or not
+    # C2Fq = CCO.InterpolateC2F(; bottom = CCO.SetValue(FT(q_tot_gm_boa)), top = CCO.SetValue(FT(q_tot_gm_toa))) # not sure if this should be right biased or not
 
     # we to C2F, then ∇c goes F2C, then UBsub got C2F, but we wanna end on C [ there's no UpwindBiasedProductF2C and we had UpwindBiasedProductF2C(u[F], x[C])
-    F2Csub = CCO.InterpolateF2C(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # We might have put 0 for no penetration on boundary, but that's not exactly true in our dataset...
+    # F2Csub = CCO.InterpolateF2C(; bottom = CCO.Extrapolate(), top = CCO.Extrapolate()) # We might have put 0 for no penetration on boundary, but that's not exactly true in our dataset...
     # CV32FT = x -> x[1] # convert Contravariant3Vector to Float64 
 
 
-
-    aux_tc.dqvdt .= FT(0) # reset to zero, do here instead of in update_aux bc we need only some of these values...
-    aux_tc.dTdt .= FT(0) # reset to zero, do here instead of in update_aux bc we need only some of these values...
-
+    TC.zero_field!(aux_tc.dqvdt) # reset to zero, do here instead of in update_aux bc we need only some of these values...
+    TC.zero_field!(aux_tc.dTdt) # reset to zero, do here instead of in update_aux bc we need only some of these values...
+    
 
     # We have access to three center temp vars: ϕ, ψ, and Φ, and one face temp var ϕ [[ These are okay because we do not make any nested calls here... ]]
     # ∇Tr = aux_tc.temporary_1 # reusing temporary storage for w∇ stuff :: Tracer
-    w∇Tr = aux_tc.temporary_2 # reusing temporary storage for w∇ stuff :: w∇Tracer
+    # w∇Tr = aux_tc.temporary_2 # reusing temporary storage for w∇ stuff :: w∇Tracer
     # w∇TrF = aux_tc_f.temporary_f1 # reusing temporary storage for w∇ stuff on faces :: w∇Tracer on faces
     # w∇CV3 = similar(f)
 
@@ -659,28 +731,41 @@ function compute_gm_tendencies!(
     # ∇θ_liq_ice_gm = ∇Tr # alias
     # w∇θ_liq_ice_gm_F = w∇TrF # alias
     # w∇θ_liq_ice_gm_CV3 = w∇CV3 # alias
-    w∇θ_liq_ice_gm = w∇Tr # alias
+    # w∇θ_liq_ice_gm = w∇Tr # alias
     # @. ∇θ_liq_ice_gm = ∇c(wvec(C2Fθ(prog_gm.ρθ_liq_ice / ρ_c)))
     # @. w∇θ_liq_ice_gm_F = wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇θ_liq_ice_gm)) # works. outer wvec important for getting physical units [[ # w∇θ_liq_ice_gm = @. UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇θ_liq_ice_gm) # works, but output type is different than tendencies type ]]
     # @. w∇θ_liq_ice_gm_CV3 = F2Csub(w∇θ_liq_ice_gm_F) # convert back to C
     # @. w∇θ_liq_ice_gm = w∇θ_liq_ice_gm_CV3.components.data.:1 # from Dennis [[ x = @. CV32FT(x) # convert back to Float64 from Contravariant3Vector I think maybe also works?]]
-    @. w∇θ_liq_ice_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fθ(prog_gm.ρθ_liq_ice / ρ_c))))))).components.data.:1
-    @. tendencies_gm.ρθ_liq_ice -= ρ_c * w∇θ_liq_ice_gm
+    # @. w∇θ_liq_ice_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fθ(prog_gm.ρθ_liq_ice / ρ_c))))))).components.data.:1
+    # @. tendencies_gm.ρθ_liq_ice -= ρ_c * w∇θ_liq_ice_gm
+
+    # 1. Reuse one scratch field for division
+    w∇θ_liq_ice_gm = aux_tc.temporary_2
+    @. w∇θ_liq_ice_gm = prog_gm.ρθ_liq_ice / ρ_c
+    apply_subsidence_barrier!(tendencies_gm.ρθ_liq_ice, aux_gm.subsidence, w∇θ_liq_ice_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, θ_liq_ice_gm_boa, θ_liq_ice_gm_toa, ρ_c)
 
 
     # ∇q_tot_gm = ∇Tr # alias
     # w∇q_tot_gm_F = w∇TrF # alias
     # w∇q_tot_gm_CV3 = w∇CV3 # alias
-    w∇q_tot_gm = w∇Tr # alias
+    # w∇q_tot_gm = w∇Tr # alias
     # @. ∇q_tot_gm = ∇c(wvec(C2Fq(prog_gm.ρq_tot / ρ_c)))
     # @. w∇q_tot_gm_F = wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_tot_gm)) # works, outer wvec important for getting physical units
     # @. w∇q_tot_gm_CV3 = F2Csub(w∇q_tot_gm_F) # convert back to C
     # @. w∇q_tot_gm = w∇q_tot_gm_CV3.components.data.:1 # from Dennis
-    @. w∇q_tot_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fq(prog_gm.ρq_tot / ρ_c))))))).components.data.:1
-    @. tendencies_gm.ρq_tot -= ρ_c * w∇q_tot_gm
-    if !state.calibrate_io
-        @. aux_gm.qt_tendency_ls_vert_adv = -w∇q_tot_gm # FOR STORAGE
+    # @. w∇q_tot_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fq(prog_gm.ρq_tot / ρ_c))))))).components.data.:1
+    # @. tendencies_gm.ρq_tot -= ρ_c * w∇q_tot_gm
+    w∇q_tot_gm = aux_tc.temporary_2
+    @. w∇q_tot_gm = prog_gm.ρq_tot / ρ_c
+    if state.calibrate_io
+        apply_subsidence_barrier!(tendencies_gm.ρq_tot, aux_gm.subsidence, w∇q_tot_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_tot_gm_boa, q_tot_gm_toa, ρ_c)
+    else
+        save_subsidence_barrier!(aux_gm.qt_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_tot_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_tot_gm_boa, q_tot_gm_toa, one(FT))
+        @. tendencies_gm.ρq_tot -= ρ_c * aux_gm.qt_tendency_ls_vert_adv
     end
+    # if !state.calibrate_io
+    #     @. aux_gm.qt_tendency_ls_vert_adv = -w∇q_tot_gm # FOR STORAGE
+    # end
 
     @. aux_tc.dqvdt -= w∇q_tot_gm # grid mean contribution to dqt/dt
 
@@ -689,66 +774,105 @@ function compute_gm_tendencies!(
         q_ice_gm_toa = prog_gm.q_ice[kc_toa]
         q_liq_gm_boa = prog_gm.q_liq[kc_surf]
         q_ice_gm_boa = prog_gm.q_ice[kc_surf]
-        C2Fq_liq = CCO.InterpolateC2F(bottom = CCO.SetValue(FT(q_liq_gm_boa)), top = CCO.SetValue(FT(q_liq_gm_toa))) # not sure if this should be right biased or not
-        C2Fq_ice = CCO.InterpolateC2F(bottom = CCO.SetValue(FT(q_ice_gm_boa)), top = CCO.SetValue(FT(q_ice_gm_toa))) # not sure if this should be right biased or not
+        # C2Fq_liq = CCO.InterpolateC2F(bottom = CCO.SetValue(FT(q_liq_gm_boa)), top = CCO.SetValue(FT(q_liq_gm_toa))) # not sure if this should be right biased or not
+        # C2Fq_ice = CCO.InterpolateC2F(bottom = CCO.SetValue(FT(q_ice_gm_boa)), top = CCO.SetValue(FT(q_ice_gm_toa))) # not sure if this should be right biased or not
 
         # ∇q_liq_gm = ∇Tr # alias
         # w∇q_liq_gm_F = w∇TrF # alias
         # w∇q_liq_gm_CV3 = w∇CV3 # alias
-        w∇q_liq_gm = w∇Tr # alias
+        # w∇q_liq_gm = w∇Tr # alias
         # @. ∇q_liq_gm = ∇c(wvec(C2Fq_liq(prog_gm.q_liq)))
         # @. w∇q_liq_gm_F = wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_liq_gm)) # works, outer wvec important for getting physical units
         # @. w∇q_liq_gm_CV3 = F2Csub(w∇q_liq_gm_F) # convert back to C
         # @. w∇q_liq_gm = w∇q_liq_gm_CV3.components.data.:1 # from Dennis
-        @. w∇q_liq_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fq_liq(prog_gm.q_liq))))))).components.data.:1
-        @. tendencies_gm.q_liq -= w∇q_liq_gm
-        if !state.calibrate_io
-            @. aux_gm.ql_tendency_ls_vert_adv = -w∇q_liq_gm # FOR STORAGE
+        # @. w∇q_liq_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fq_liq(prog_gm.q_liq))))))).components.data.:1
+        # @. tendencies_gm.q_liq -= w∇q_liq_gm
+        w∇q_liq_gm = aux_tc.temporary_2
+        @.w∇q_liq_gm = prog_gm.q_liq
+        if state.calibrate_io
+            apply_subsidence_barrier!(tendencies_gm.q_liq, aux_gm.subsidence, w∇q_liq_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_liq_gm_boa, q_liq_gm_toa, one(FT))
+        else
+            save_subsidence_barrier!(aux_gm.ql_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_liq_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_liq_gm_boa, q_liq_gm_toa, one(FT))
+            @. tendencies_gm.q_liq -= aux_gm.ql_tendency_ls_vert_adv
         end
+        # if !state.calibrate_io
+        #     @. aux_gm.ql_tendency_ls_vert_adv = -w∇q_liq_gm # FOR STORAGE
+        # end
 
         # ∇q_ice_gm = ∇Tr # alias
         # w∇q_ice_gm_F = w∇TrF # alias
         # w∇q_ice_gm_CV3 = w∇CV3 # alias
-        w∇q_ice_gm = w∇Tr # alias
+        # w∇q_ice_gm = w∇Tr # alias
         # @. ∇q_ice_gm = ∇c(wvec(C2Fq_ice(prog_gm.q_ice)))
         # @. w∇q_ice_gm_F = wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_ice_gm)) # works, outer wvec important for getting physical units
         # @. w∇q_ice_gm_CV3 = F2Csub(w∇q_ice_gm_F) # convert back to C
         # @. w∇q_ice_gm = w∇q_ice_gm_CV3.components.data.:1 # from Dennis
-        @. w∇q_ice_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fq_ice(prog_gm.q_ice))))))).components.data.:1
-        @. tendencies_gm.q_ice -= w∇q_ice_gm
-        if !state.calibrate_io
-            @. aux_gm.qi_tendency_ls_vert_adv = -w∇q_ice_gm # FOR STORAGE
+        # @. w∇q_ice_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fq_ice(prog_gm.q_ice))))))).components.data.:1
+        # @. tendencies_gm.q_ice -= w∇q_ice_gm
+        w∇q_ice_gm = aux_tc.temporary_2
+        @. w∇q_ice_gm = prog_gm.q_ice
+        
+        if state.calibrate_io
+            apply_subsidence_barrier!(tendencies_gm.q_ice, aux_gm.subsidence, w∇q_ice_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_ice_gm_boa, q_ice_gm_toa, one(FT))
+        else
+            save_subsidence_barrier!(aux_gm.qi_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_ice_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_ice_gm_boa, q_ice_gm_toa, one(FT))
+            @. tendencies_gm.q_ice -= aux_gm.qi_tendency_ls_vert_adv
         end
+        # if !state.calibrate_io
+        #     @. aux_gm.qi_tendency_ls_vert_adv = -w∇q_ice_gm # FOR STORAGE
+        # end
     end
 
     # LS Vert for precipitation
+    q_rai_gm_toa = prog_pr.q_rai[kc_toa]
+    q_rai_gm_boa = prog_pr.q_rai[kc_surf]
+    q_sno_gm_toa = prog_pr.q_sno[kc_toa]
+    q_sno_gm_boa = prog_pr.q_sno[kc_surf]
+
     # ∇q_rai_gm = ∇Tr # alias
     # w∇q_rai_gm_F = w∇TrF # alias
     # w∇q_rai_gm_CV3 = w∇CV3 # alias
-    w∇q_rai_gm = w∇Tr # alias
+    # w∇q_rai_gm = w∇Tr # alias
     # @. ∇q_rai_gm = ∇c(wvec(C2Fsub(prog_pr.q_rai * ρ_c))) / ρ_c
     # @. w∇q_rai_gm_F = wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_rai_gm))
     # @. w∇q_rai_gm_CV3 = F2Csub(w∇q_rai_gm_F) # convert back to C
     # @. w∇q_rai_gm = w∇q_rai_gm_CV3.components.data.:1 # from Dennis
-    @. w∇q_rai_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fsub(prog_pr.q_rai))))))).components.data.:1
-    @. tendencies_pr.q_rai += -w∇q_rai_gm
-    if !state.calibrate_io
-        @. aux_gm.qr_tendency_ls_vert_adv = -w∇q_rai_gm # FOR STORAGE
+    # @. w∇q_rai_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fsub(prog_pr.q_rai))))))).components.data.:1
+    # @. tendencies_pr.q_rai += -w∇q_rai_gm
+    w∇q_rai_gm = aux_tc.temporary_2
+    @. w∇q_rai_gm = prog_pr.q_rai
+    if state.calibrate_io
+        apply_subsidence_barrier!(tendencies_pr.q_rai, aux_gm.subsidence, w∇q_rai_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_rai_gm_boa, q_rai_gm_toa, one(FT))
+    else
+        save_subsidence_barrier!(aux_gm.qr_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_rai_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_rai_gm_boa, q_rai_gm_toa, one(FT))
+        @. tendencies_pr.q_rai -= aux_gm.qr_tendency_ls_vert_adv
     end
+    # if !state.calibrate_io
+    #     @. aux_gm.qr_tendency_ls_vert_adv = -w∇q_rai_gm # FOR STORAGE
+    # end
 
     # ∇q_sno_gm = ∇Tr # alias
     # w∇q_sno_gm_F = w∇TrF # alias
     # w∇q_sno_gm_CV3 = w∇CV3 # alias
-    w∇q_sno_gm = w∇Tr # alias
+    # w∇q_sno_gm = w∇Tr # alias
     # @. ∇q_sno_gm = ∇c(wvec(C2Fsub(prog_pr.q_sno * ρ_c))) / ρ_c
     # @. w∇q_sno_gm_F = wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇q_sno_gm))
     # @. w∇q_sno_gm_CV3 = F2Csub(w∇q_sno_gm_F) # convert back to C
     # @. w∇q_sno_gm = w∇q_sno_gm_CV3.components.data.:1 # from Dennis
-    @. w∇q_sno_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fsub(prog_pr.q_sno))))))).components.data.:1
-    @. tendencies_pr.q_sno += -w∇q_sno_gm
-    if !state.calibrate_io
-        @. aux_gm.qs_tendency_ls_vert_adv = -w∇q_sno_gm # FOR STORAGE
+    # @. w∇q_sno_gm = (F2Csub(wvec(UBsub(wvec(C2Fsub(aux_gm.subsidence)), ∇c(wvec(C2Fsub(prog_pr.q_sno))))))).components.data.:1
+    w∇q_sno_gm = aux_tc.temporary_2
+    @. w∇q_sno_gm = prog_pr.q_sno
+    if state.calibrate_io
+        apply_subsidence_barrier!(tendencies_pr.q_sno, aux_gm.subsidence, w∇q_sno_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_sno_gm_boa, q_sno_gm_toa, one(FT))
+    else
+        save_subsidence_barrier!(aux_gm.qs_tendency_ls_vert_adv, aux_gm.subsidence, w∇q_sno_gm, aux_tc_f.temporary_f1, aux_tc_f.temporary_f2, q_sno_gm_boa, q_sno_gm_toa, one(FT))
+        @. tendencies_pr.q_sno -= aux_gm.qs_tendency_ls_vert_adv
     end
+    # apply_subsidence_barrier!(tendencies_pr.q_sno, w∇q_sno_gm, aux_gm.subsidence, q_sno_gm_boa, q_sno_gm_toa, -FT(1))
+    # @. tendencies_pr.q_sno += -w∇q_sno_gm
+    # if !state.calibrate_io
+    #     @. aux_gm.qs_tendency_ls_vert_adv = -w∇q_sno_gm # FOR STORAGE
+    # end
 
 
 
@@ -857,31 +981,32 @@ function compute_gm_tendencies!(
             tendencies_gm.q_liq[k] += aux_bulk.ql_tendency_noneq[k] + aux_en.ql_tendency_noneq[k]
             tendencies_gm.q_ice[k] += aux_bulk.qi_tendency_noneq[k] + aux_en.qi_tendency_noneq[k]
         end
-    end
 
 
-    # ====== sedimentation grid mean only (stability fix...)
-    if edmf.cloud_sedimentation_model isa TC.CloudSedimentationModel 
-        if edmf.cloud_sedimentation_model.grid_mean
-            error("Grid mean sedimentation not implemented yet")
-        else
 
-            @inbounds for k in TC.real_center_indices(grid)
-                if edmf.moisture_model isa TC.NonEquilibriumMoisture
-                    tendencies_gm.q_liq[k] +=
-                        aux_en.ql_tendency_sedimentation[k] + aux_bulk.ql_tendency_sedimentation[k]
-                    tendencies_gm.q_ice[k] +=
-                        aux_en.qi_tendency_sedimentation[k] + aux_bulk.qi_tendency_sedimentation[k]
-                end
+        # ====== sedimentation grid mean only (stability fix...)
+        if edmf.cloud_sedimentation_model isa TC.CloudSedimentationModel 
+            if edmf.cloud_sedimentation_model.grid_mean
+                error("Grid mean sedimentation not implemented yet")
+            else
 
-                tendencies_gm.ρq_tot[k] +=
-                    ρ_c[k] * (aux_bulk.qt_tendency_sedimentation[k] + aux_en.qt_tendency_sedimentation[k])
+            if edmf.moisture_model isa TC.NonEquilibriumMoisture
+                tendencies_gm.q_liq[k] +=
+                    aux_en.ql_tendency_sedimentation[k] + aux_bulk.ql_tendency_sedimentation[k]
+                tendencies_gm.q_ice[k] +=
+                    aux_en.qi_tendency_sedimentation[k] + aux_bulk.qi_tendency_sedimentation[k]
+            end
 
-                tendencies_gm.ρθ_liq_ice[k] +=
-                    ρ_c[k] * (aux_bulk.θ_liq_ice_tendency_sedimentation[k] + aux_en.θ_liq_ice_tendency_sedimentation[k])
+            tendencies_gm.ρq_tot[k] +=
+                ρ_c[k] * (aux_bulk.qt_tendency_sedimentation[k] + aux_en.qt_tendency_sedimentation[k])
+
+            tendencies_gm.ρθ_liq_ice[k] +=
+                ρ_c[k] * (aux_bulk.θ_liq_ice_tendency_sedimentation[k] + aux_en.θ_liq_ice_tendency_sedimentation[k])
             end
         end
     end
+
+
     # =================================================== #
     # note, these `sgs` fluxes also include the mass fluxes from vertical advection
 

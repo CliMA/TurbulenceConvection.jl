@@ -93,7 +93,8 @@ function update_aux!(edmf::EDMFModel, state::State, surf::SurfaceBase, param_set
     # Bringing earlier for dTdz calc
     # ∇0_bcs = (; bottom = CCO.Extrapolate(), top = CCO.Extrapolate())
     # If0 = CCO.InterpolateC2F(; ∇0_bcs...)
-    RB = CCO.RightBiasedC2F(; top = CCO.Extrapolate()) # top = CCO.SetValue(T_toa)) # right biased
+    # T_toa = 
+    # RB = CCO.RightBiasedC2F(; top = CCO.SetValue(T_toa)) # right biased
     # ∇c = CCO.DivergenceF2C()
 
 

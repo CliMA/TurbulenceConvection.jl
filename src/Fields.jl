@@ -18,7 +18,12 @@ Base.max(h1::Cent, h2::Cent) = Cent(max(h1.i, h2.i))
 Base.min(h1::Cent, h2::Cent) = Cent(min(h1.i, h2.i))
 
 toscalar(x::CCG.Covariant3Vector) = x.u₃
-toscalar(x::CCG.Contravariant3Vector) = CC.Geometry.WVector(x).components.data.:1 # from dennis., not sure precisely why it works... or why it needs to wvector... [ think method might not exist properly like this]
+# toscalar(x::CCG.Contravariant3Vector) = CC.Geometry.WVector(x).components.data.:1 # from dennis., not sure precisely why it works... or why it needs to wvector... [ think method might not exist properly like this]
+toscalar(x::CCG.Contravariant3Vector) = x.u³ # from dennis., not sure precisely why it works... or why it needs to wvector... [ think method might not exist properly like this]
+toscalar(x::CCG.WVector) = x.w # see https://github.com/CliMA/ClimaAtmos.jl/pull/2179#discussion_r1411416543
+
+const lazy = CC.MatrixFields.lazy
+# const @lazy = CC.MatrixFields.@lazy
 
 @inline function zero_field!(field::CC.Fields.FiniteDifferenceField)
     fill!(parent(field), zero(eltype(parent(field))))
@@ -32,35 +37,53 @@ const CenterFields = Union{CC.Fields.CenterExtrudedFiniteDifferenceField, CC.Fie
 
 Base.@propagate_inbounds Base.getindex(field::FDFields, i::Integer) = Base.getproperty(field, i)
 
-# Not sure if this is a ClimaCore or a julia 1.11 problem, seemed 1.10.8 with CC 0.14.11 still didn't work tho
-if VERSION ≥ v"1.11.0-beta"
-# if VERSION ≥ v"1.10.8"
 
-    """
-    My hotfix attempt to define this method for julia 1.11
-        Leads to segfault though lol
-    """
-    function Base.getindex(field_values::CC.DataLayouts.VIJFH{S}, v::Integer) where {S}
-        i,j,_,_,h = size(field_values) # f will be 1, and we replace i... (our) (actually we wanna replace v)
-        # i, j, _, v, h = I.I
-        @inbounds CC.DataLayouts.get_struct(parent(field_values), S, Val(4), CartesianIndex(v, i, j, 1, h))
-    end
+# Base.@propagate_inbounds Base.getindex(field::CenterFields, i::Cent) = Base.getindex(CC.Fields.field_values(field), i.i)
+# Base.@propagate_inbounds Base.setindex!(field::CenterFields, v, i::Cent) =
+#     Base.setindex!(CC.Fields.field_values(field), v, i.i)
 
-    function Base.setindex!(field_values::CC.DataLayouts.VIJFH{S}, val, v::Integer) where {S}
-        i,j,_,_,h = size(field_values) # f will be 1, and we replace i...
-        # i, j, _, v, h = I.I
-        @inbounds CC.DataLayouts.set_struct!(parent(field_values), convert(S, val), Val(4), CartesianIndex(v, i, j, 1, h))
-    end
+# Base.@propagate_inbounds Base.getindex(field::FaceFields, i::CCO.PlusHalf) =
+#     Base.getindex(CC.Fields.field_values(field), i.i)
+# Base.@propagate_inbounds Base.setindex!(field::FaceFields, v, i::CCO.PlusHalf) =
+#     Base.setindex!(CC.Fields.field_values(field), v, i.i)
+
+import ClimaCore
+
+# Check the ClimaCore version
+const CC_VERSION = pkgversion(ClimaCore)
+if CC_VERSION >= v"0.14"
+    # --- ClimaCore 0.14+ Implementation (Unwrap DataLayouts) ---
+
+    # We use parent() to access the underlying SubArray, which supports Int indexing
+    Base.@propagate_inbounds Base.getindex(field::CenterFields, i::Cent) =
+        Base.getindex(CC.Fields.field_values(field), CartesianIndex(1, 1, 1, i.i, 1))
+
+    Base.@propagate_inbounds Base.setindex!(field::CenterFields, v, i::Cent) =
+        Base.setindex!(CC.Fields.field_values(field), v, CartesianIndex(1, 1, 1, i.i, 1))
+
+    Base.@propagate_inbounds Base.getindex(field::FaceFields, i::CCO.PlusHalf) =
+        Base.getindex(CC.Fields.field_values(field), CartesianIndex(1, 1, 1, i.i, 1))
+
+    Base.@propagate_inbounds Base.setindex!(field::FaceFields, v, i::CCO.PlusHalf) =
+        Base.setindex!(CC.Fields.field_values(field), v, CartesianIndex(1, 1, 1, i.i, 1))
+
+else
+    # --- ClimaCore 0.13 Implementation (Original) ---
+
+    Base.@propagate_inbounds Base.getindex(field::CenterFields, i::Cent) =
+        Base.getindex(CC.Fields.field_values(field), i.i)
+
+    Base.@propagate_inbounds Base.setindex!(field::CenterFields, v, i::Cent) =
+        Base.setindex!(CC.Fields.field_values(field), v, i.i)
+
+    Base.@propagate_inbounds Base.getindex(field::FaceFields, i::CCO.PlusHalf) =
+        Base.getindex(CC.Fields.field_values(field), i.i)
+
+    Base.@propagate_inbounds Base.setindex!(field::FaceFields, v, i::CCO.PlusHalf) =
+        Base.setindex!(CC.Fields.field_values(field), v, i.i)
+
 end
 
-Base.@propagate_inbounds Base.getindex(field::CenterFields, i::Cent) = Base.getindex(CC.Fields.field_values(field), i.i)
-Base.@propagate_inbounds Base.setindex!(field::CenterFields, v, i::Cent) =
-    Base.setindex!(CC.Fields.field_values(field), v, i.i)
-
-Base.@propagate_inbounds Base.getindex(field::FaceFields, i::CCO.PlusHalf) =
-    Base.getindex(CC.Fields.field_values(field), i.i)
-Base.@propagate_inbounds Base.setindex!(field::FaceFields, v, i::CCO.PlusHalf) =
-    Base.setindex!(CC.Fields.field_values(field), v, i.i)
 
 Base.@propagate_inbounds Base.getindex(field::FaceFields, ::Cent) =
     error("Attempting to getindex with a center index (Cent) into a Face field")

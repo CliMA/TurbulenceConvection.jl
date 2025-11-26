@@ -4,7 +4,7 @@ exhaustive = "exhaustive=true" in ARGS
 @show exhaustive
 
 import ReportMetrics
-const RM = ReportMetrics
+# const RM = ReportMetrics
 
 # Packages to monitor
 import TurbulenceConvection
@@ -86,15 +86,15 @@ for case in all_cases
     else
         run_cmd = `$(Base.julia_cmd()) --project=integration_tests/ --track-allocation=all perf/alloc_per_case.jl`
     end
-    RM.report_allocs(;
-        job_name = case,
-        run_cmd = run_cmd,
-        dirs_to_monitor = dirs_to_monitor,
-        process_filename = function process_fn(fn)
-            fn = "TurbulenceConvection.jl/" * last(split(fn, "turbulenceconvection-ci/"))
-            fn = last(split(fn, "depot/cpu/packages/"))
-            return fn
-        end,
-        n_unique_allocs = n_unique_allocs,
-    )
+    # RM.report_allocs(;
+    #     job_name = case,
+    #     run_cmd = run_cmd,
+    #     dirs_to_monitor = dirs_to_monitor,
+    #     process_filename = function process_fn(fn)
+    #         fn = "TurbulenceConvection.jl/" * last(split(fn, "turbulenceconvection-ci/"))
+    #         fn = last(split(fn, "depot/cpu/packages/"))
+    #         return fn
+    #     end,
+    #     n_unique_allocs = n_unique_allocs,
+    # )
 end

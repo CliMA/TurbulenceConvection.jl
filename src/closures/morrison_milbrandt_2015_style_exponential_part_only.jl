@@ -25,7 +25,7 @@ This is in line w/ neglecting T changes, unlike the other regular MM2015 that fi
 
 function do_standard_fallback(milestone_t::FT, milestone::MilestoneType, time_tolerance::FT, S_ql::FT, S_qi::FT, q_liq::FT, q_ice::FT, δ_eq::FT, δi_eq::FT, dδdt_no_S::FT, Γ_l::FT, Γ_i::FT,
     regime::AbstractSaturationRegime, param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState; use_fix::Bool = true, return_mixing_ratio::Bool = false, depth::Int = 0, dqvdt::FT = FT(0), dTdt::FT = FT(0), fallback_to_standard_supersaturation_limiter::Bool = false
-    ) where {FT}
+    )::Tuple{FT, FT} where {FT}
 
     # @debug "do_standard_fallback: milestone_t = $milestone_t; milestone = $milestone; time_tolerance = $time_tolerance; S_ql = $S_ql; S_qi = $S_qi; q_liq = $q_liq; q_ice = $q_ice; δ_eq = $δ_eq; δi_eq = $δi_eq; dδdt_no_S = $dδdt_no_S; Γ_l = $Γ_l; Γ_i = $Γ_i; regime = $regime; area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q_eq = $q_eq; Δt = $Δt"
 
@@ -103,7 +103,7 @@ function do_standard_fallback(milestone_t::FT, milestone::MilestoneType, time_to
 
 
         # @debug "new_regime = $new_regime; milestone_t = $milestone_t; Δt_left = $Δt_left; milestone = $milestone; S_ql = $S_ql; S_qi = $S_qi; q_liq = $q_liq; q_ice = $q_ice; δ_0 = $δ_0; δ_0i = $δ_0i"
-        S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)
+        S_ql_addit, S_qi_addit = morrison_milbrandt_2015_style_exponential_part_only(new_regime, param_set, area, ρ, p, T, w, τ_liq, τ_ice, δ_0, δ_0i, new_q, q_eq, Δt_left, ts; use_fix = use_fix, return_mixing_ratio = true, depth = depth+1, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter, time_tolerance = time_tolerance)::Tuple{FT, FT}
         S_ql, S_qi = resolve_S_S_addit(S_ql, S_qi, dt, S_ql_addit, S_qi_addit, Δt_left, Δt)
 
 
@@ -692,20 +692,20 @@ end
 #=
     Instead of parametric types which complicate stability, we just have concrete types with fields and use a dispatcher function to call the right one.
 =#
-function morrison_milbrandt_2015_style_exponential_part_only_dispatcher(
-    regime::Union{Supersaturated{true, true, true}, Supersaturated{true, false, true}, Supersaturated{false, true, true}, Supersaturated{false, false, true}}, # these should all work the same, right? you'll end up with some liq/ice at the end no matter what
-    param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
-    use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
-    return_mixing_ratio::Bool = false,
-    depth::Int = 0,
-    dqvdt::FT = FT(0),
-    dTdt::FT = FT(0),
-    fallback_to_standard_supersaturation_limiter::Bool = false,
-    time_tolerance::FT = FT(1e-8),
-    ) where {FT}
+# function morrison_milbrandt_2015_style_exponential_part_only_dispatcher(
+#     regime::Union{Supersaturated{true, true, true}, Supersaturated{true, false, true}, Supersaturated{false, true, true}, Supersaturated{false, false, true}}, # these should all work the same, right? you'll end up with some liq/ice at the end no matter what
+#     param_set::APS, area::FT, ρ::FT, p::FT, T::FT, w::FT, τ_liq::FT, τ_ice::FT, δ_0::FT, δ_0i::FT, q::TD.PhasePartition, q_eq::TD.PhasePartition, Δt::FT, ts::TD.ThermodynamicState;
+#     use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
+#     return_mixing_ratio::Bool = false,
+#     depth::Int = 0,
+#     dqvdt::FT = FT(0),
+#     dTdt::FT = FT(0),
+#     fallback_to_standard_supersaturation_limiter::Bool = false,
+#     time_tolerance::FT = FT(1e-8),
+#     ) where {FT}
 
-    error("not implemented yet")
-end
+#     error("not implemented yet")
+# end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 
@@ -725,7 +725,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     dTdt::FT = FT(0),
     fallback_to_standard_supersaturation_limiter::Bool = false,
     time_tolerance::FT = FT(1e-8),
-    ) where {FT}
+    )::Tuple{FT,FT} where {FT}
     
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -822,7 +822,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     dTdt::FT = FT(0),
     fallback_to_standard_supersaturation_limiter::Bool = false,
     time_tolerance::FT = FT(1e-8),
-    ) where {FT}
+    )::Tuple{FT,FT} where {FT}
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -904,7 +904,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     dTdt::FT = FT(0),
     fallback_to_standard_supersaturation_limiter::Bool = false,
     time_tolerance::FT = FT(1e-8),
-    ) where {FT}
+    )::Tuple{FT,FT} where {FT}
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1069,7 +1069,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     dTdt::FT = FT(0),
     fallback_to_standard_supersaturation_limiter::Bool = false,
     time_tolerance::FT = FT(1e-8),
-    ) where {FT}
+    )::Tuple{FT,FT} where {FT}
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1181,7 +1181,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     dTdt::FT = FT(0),
     fallback_to_standard_supersaturation_limiter::Bool = false,
     time_tolerance::FT = FT(1e-8), # if time is shorter than the tolerance, we do a StandardSupersaturation step first, since we can't guarantee success w/ the lambert W methods...
-    ) where {FT} 
+    )::Tuple{FT,FT} where {FT} 
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1328,7 +1328,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     dTdt::FT = FT(0),
     fallback_to_standard_supersaturation_limiter::Bool = false,
     time_tolerance::FT = FT(1e-8), # if time is shorter than the tolerance, we do a StandardSupersaturation step first, since we can't guarantee success w/ the lambert W methods...
-    ) where {FT} 
+    )::Tuple{FT,FT} where {FT} 
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1437,7 +1437,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     dTdt::FT = FT(0),
     fallback_to_standard_supersaturation_limiter::Bool = false,
     time_tolerance::FT = FT(1e-8),
-    ) where {FT}
+    )::Tuple{FT,FT} where {FT}
 
 
     if depth ≥ 10
@@ -1606,7 +1606,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     dTdt::FT = FT(0),
     fallback_to_standard_supersaturation_limiter::Bool = false,
     time_tolerance::FT = FT(1e-8),
-    ) where {FT}
+    )::Tuple{FT,FT} where {FT}
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1733,7 +1733,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     dTdt::FT = FT(0),
     fallback_to_standard_supersaturation_limiter::Bool = false,
     time_tolerance::FT = FT(1e-8),
-    ) where {FT}
+    )::Tuple{FT,FT} where {FT}
 
     if depth ≥ 10
         @error "Failed on inputs area = $area; ρ = $ρ; p = $p; T = $T; w = $w; τ_liq = $τ_liq; τ_ice = $τ_ice; δ_0 = $δ_0; δ_0i = $δ_0i; q = $q; q_eq = $q_eq; Δt = $Δt; ts = $ts; dTdt = $dTdt; dqvdt = $dqvdt;"
@@ -1862,7 +1862,7 @@ function morrison_milbrandt_2015_style_exponential_part_only(
     dTdt::FT = FT(0),
     fallback_to_standard_supersaturation_limiter::Bool = false,
     time_tolerance::FT = FT(1e-8),
-    ) where {FT}
+    )::Tuple{FT,FT} where {FT}
 
 
 

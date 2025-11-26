@@ -1,6 +1,6 @@
 import SnoopCompile
 
-tinf = SnoopCompile.@snoopi_deep begin
+tinf = SnoopCompile.@snoop_inference begin
     import TurbulenceConvection
 
     local_tc_dir = pkgdir(TurbulenceConvection)
@@ -13,7 +13,7 @@ tinf = SnoopCompile.@snoopi_deep begin
     namelist = NameList.default_namelist(case_name)
     namelist["meta"]["uuid"] = "01"
     integrator, ds_tc_filenames, return_code = main(namelist)
-end
+end;
 
 import Profile
 

@@ -40,12 +40,14 @@ if reload_environment || !isdefined(Main, :TurbulenceConvection) || !isdefined(M
     using Revise
     Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/"))
     using Revise
+    using JLD2
     Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl/integration_tests"))
     using Revise
     using TurbulenceConvection
+    using NCDatasets
     tc = pkgdir(TurbulenceConvection)
-    includet(joinpath(tc, "driver", "main.jl"))
-    includet(joinpath(tc, "driver", "generate_namelist.jl"))
+    Revise.includet(joinpath(tc, "driver", "main.jl"))
+    Revise.includet(joinpath(tc, "driver", "generate_namelist.jl"))
 end
 # ------------------ #
 reload_param_set = false
@@ -306,7 +308,7 @@ for flight_number in flight_numbers
         if apply_edits
             # path_to_Costa_SOTA = "/groups/esm/cchristo/cedmf_results/james_v1_runs/results_Inversion_p22_e300_i15_mb_LES_2024-03-15_10-08_Vxo_longer_long_run/Diagnostics.nc"
             path_to_Costa_SOTA = joinpath(CEDMF_dir, "experiments", "SOCRATES", "Reference", "Costa_SOTA_Diagnostics.nc") #  "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/Reference/Costa_SOTA_Diagnostics.nc"
-            include(joinpath(CEDMF_dir, "tools", "DiagnosticsTools.jl")) # provides optimal_parameters()
+            Revise.includet(joinpath(CEDMF_dir, "tools", "DiagnosticsTools.jl")) # provides optimal_parameters()
             Costa_SOTA = optimal_parameters(path_to_Costa_SOTA, method = "last_nn_particle_mean")
             Costa_SOTA = Dict(zip(Costa_SOTA...)) # turn to dict
 
@@ -450,7 +452,9 @@ for flight_number in flight_numbers
 
         # path_to_Costa_SOTA = "/groups/esm/cchristo/cedmf_results/james_v1_runs/results_Inversion_p22_e300_i15_mb_LES_2024-03-15_10-08_Vxo_longer_long_run/Diagnostics.nc"
         path_to_Costa_SOTA = joinpath(CEDMF_dir, "experiments", "SOCRATES", "Reference", "Costa_SOTA_Diagnostics.nc") #  "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/Reference/Costa_SOTA_Diagnostics.nc"
-        include(joinpath(CEDMF_dir, "tools", "DiagnosticsTools.jl")) # provides optimal_parameters()
+        Pkg.activate(CEDMF_dir)
+        Revise.includet(joinpath(CEDMF_dir, "tools", "DiagnosticsTools.jl")) # provides optimal_parameters()
+        Pkg.activate(expanduser("~/Research_Schneider/CliMA/TurbulenceConvection.jl")) # go back to climajl environment
         Costa_SOTA = optimal_parameters(path_to_Costa_SOTA, method = "last_nn_particle_mean")
         Costa_SOTA = Dict(zip(Costa_SOTA...)) # turn to dict
 

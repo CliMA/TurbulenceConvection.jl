@@ -1094,7 +1094,7 @@ function morrison_milbrandt_2015_style(
     use_fix::Bool = true, # i think something is wrong with the forumula for large timesteps... is less essential now w/ the limiter but still needed... (unless I just don't understand the physics of it)
     emit_warnings::Bool = true,
     fallback_to_standard_supersaturation_limiter::Bool = false,
-) where {FT}
+)::Tuple{FT, FT} where {FT}
 
     if area > 0
 
@@ -1266,7 +1266,7 @@ function morrison_milbrandt_2015_style(
     dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
     dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
     fallback_to_standard_supersaturation_limiter::Bool = false,
-    ) where {FT}
+    )::Tuple{FT, FT} where {FT}
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
@@ -1425,7 +1425,7 @@ function morrison_milbrandt_2015_style(
     dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
     dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
     fallback_to_standard_supersaturation_limiter::Bool = false,
-    ) where {FT}
+    )::Tuple{FT, FT} where {FT}
 
     # @debug "Calling Supersaturated{$(q.liq > FT(0)), $(q.ice > FT(0)), false}"
 
@@ -1547,7 +1547,7 @@ function morrison_milbrandt_2015_style(
     dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
     dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
     fallback_to_standard_supersaturation_limiter::Bool = false,
-    ) where {FT}
+    )::Tuple{FT, FT} where {FT}
 
     # @debug "Calling WBF{true, $(q.ice > FT(0)), true}"
 
@@ -1788,7 +1788,7 @@ function morrison_milbrandt_2015_style(
     dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
     dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
     fallback_to_standard_supersaturation_limiter::Bool = false,
-    ) where {FT}
+    )::Tuple{FT, FT} where {FT}
 
     # @debug "Calling WBF{true, false, false}"
     # although we'd be moving towards liquid sat, with outside forcing could still be either, so still need to choose perspectives
@@ -2017,7 +2017,7 @@ function morrison_milbrandt_2015_style(
     dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
     dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
     fallback_to_standard_supersaturation_limiter::Bool = false,
-    ) where {FT}
+    )::Tuple{FT, FT} where {FT}
 
     # @debug "Calling WBF{true, true, false}"
 
@@ -2298,7 +2298,7 @@ function morrison_milbrandt_2015_style(
     dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
     dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
     fallback_to_standard_supersaturation_limiter::Bool = false,
-    ) where {FT}
+    )::Tuple{FT, FT} where {FT}
 
     # @debug "Calling WBF{false, $(q.ice > FT(0)), true}"
 
@@ -2494,7 +2494,7 @@ function morrison_milbrandt_2015_style(
     dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
     dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
     fallback_to_standard_supersaturation_limiter::Bool = false,
-    ) where {FT}
+    )::Tuple{FT, FT} where {FT}
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
@@ -2596,7 +2596,7 @@ function morrison_milbrandt_2015_style(
     dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
     dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
     fallback_to_standard_supersaturation_limiter::Bool = false,
-    ) where {FT}
+    )::Tuple{FT, FT} where {FT}
 
 
     if depth == max_depth
@@ -2752,7 +2752,7 @@ function morrison_milbrandt_2015_style(
 
             if !BF && (S_qi > FT(0))
                 # @debug "S_qi > 0 in Subsaturated{false, true, false}... setting to zero by making ice time scale infinite"
-                return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, δ_0 = δ_0, δ_0i = δ_0i, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
+                return morrison_milbrandt_2015_style(regime, param_set, area, ρ, p, T, w, τ_liq, FT(Inf), q_vap, q, q_eq, Δt, ts; use_fix = use_fix, return_mixing_ratio = return_mixing_ratio, max_depth = max_depth, depth = depth, δ_0_shum = δ_0, δ_0i_shum = δ_0i, dqvdt=dqvdt, dTdt=dTdt, fallback_to_standard_supersaturation_limiter = fallback_to_standard_supersaturation_limiter) # we had ice growth instead of loss, set τ_ice to infinity and recall
             end
 
             S_ql, S_qi = S_above_floor(S_ql, S_qi, q_liq, q_ice, min_t) # if t was too small for t_out_of_q for example, this makes sure we put a floor on S_ql and S_qi
@@ -2816,7 +2816,7 @@ function morrison_milbrandt_2015_style(
     dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
     dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
     fallback_to_standard_supersaturation_limiter::Bool = false,
-    ) where {FT}
+    )::Tuple{FT, FT} where {FT}
 
 
     if depth == max_depth
@@ -2944,7 +2944,7 @@ function morrison_milbrandt_2015_style(
     dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
     dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
     fallback_to_standard_supersaturation_limiter::Bool = false,
-    ) where {FT}
+    )::Tuple{FT, FT} where {FT}
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
@@ -3079,7 +3079,7 @@ function morrison_milbrandt_2015_style(
     dqvdt::FT = FT(0), # not used in this regime, but needed for the function signature
     dTdt::FT = FT(0), # not used in this regime, but needed for the function signature
     fallback_to_standard_supersaturation_limiter::Bool = false,
-    ) where {FT}
+    )::Tuple{FT, FT} where {FT}
 
     if depth == max_depth
         # @debug "Max depth reached, returning exponential part only fallback (no thermo adjustments)"
