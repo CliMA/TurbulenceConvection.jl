@@ -134,17 +134,17 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct ForcingBase{T, FT} # this gets initialized in main.jl and then unpacked including in dycore.jl where we need it :)       ( see https://github.com/CliMA/TurbulenceConvection.jl/blob/f3218667a67f7ee37fcd9db8d7076372ce20c20b/driver/main.jl#L212 ) # forcing = Cases.ForcingBase(case, FT; Cases.forcing_kwargs(case, namelist)...)
     "Coriolis parameter"
-    coriolis_param::FT = 0
+    coriolis_param::FT = zero(FT)
     "Wind relaxation timescale"
-    wind_nudge_τᵣ::FT = 0.0
+    wind_nudge_τᵣ::FT = zero(FT)
     "Scalar relaxation lower z"
-    scalar_nudge_zᵢ::FT = 0.0
+    scalar_nudge_zᵢ::FT = zero(FT)
     "Scalar relaxation upper z"
-    scalar_nudge_zᵣ::FT = 0.0
+    scalar_nudge_zᵣ::FT = zero(FT)
     "Scalar maximum relaxation timescale"
-    scalar_nudge_τᵣ::FT = 0.0
+    scalar_nudge_τᵣ::FT = zero(FT)
     "Large-scale divergence (same as in RadiationBase)"
-    divergence::FT = 0
+    divergence::FT = zero(FT)
     "Forcing Functions Storage"
     forcing_funcs::Array{NamedTuple, 0} = fill(NamedTuple()) # used 0 d array intead[nothing] to retain mutability in forcing_funcs[]  # use a list here, so that we can mutate the internals of the imutable type (could make it a named tuple type insdie i guess that's what the init returns),... # might be too specific, maybe just Array{NamedTuple,0}
 end
@@ -153,11 +153,11 @@ force_type(::ForcingBase{T}) where {T} = T
 
 Base.@kwdef struct RadiationBase{T, FT}
     "Large-scale divergence (same as in ForcingBase)"
-    divergence::FT = 0
-    alpha_z::FT = 0
-    kappa::FT = 0
-    F0::FT = 0
-    F1::FT = 0
+    divergence::FT = zero(FT)
+    alpha_z::FT = zero(FT)
+    kappa::FT = zero(FT)
+    F0::FT = zero(FT)
+    F1::FT = zero(FT)
     radiation_funcs::Array{NamedTuple, 0} = fill(NamedTuple()) # this is redundant no? but we don't wanna edit main1d to accomodate , main1d() says radiation = Cases.RadiationBase(case, FT) so we need to have this here... Alternatively you could just let forcing secretly set dTdt_rad but this is more consistent...
 end
 
@@ -169,7 +169,7 @@ Base.@kwdef struct LESData
     "End time index of LES"
     imax::Int = 0
     "Path to LES stats file used to drive SCM"
-    les_filename::String = nothing
+    les_filename::String = ""
     "Drive SCM with LES data from t = [end - t_interval_from_end_s, end]"
     t_interval_from_end_s::Float64 = 6 * 3600.0
     "Length of time to average over for SCM initialization"

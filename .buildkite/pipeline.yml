@@ -18,7 +18,7 @@ steps:
   # # Clear depot
   # - label: "clear depot"
   #   command:
-  #     - "rm -rf /central/scratch/esm/slurm-buildkite/turbulenceconvection-ci/depot/default"
+  #     - "rm -rf /resnick/scratch/esm/slurm-buildkite/turbulenceconvection-ci/depot/default"
   #   agents:
   #     config: init
   #     queue: new-central

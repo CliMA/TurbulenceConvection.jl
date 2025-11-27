@@ -2,7 +2,7 @@ if haskey(ENV, "BUILDKITE_COMMIT") && haskey(ENV, "BUILDKITE_BRANCH")
     commit = ENV["BUILDKITE_COMMIT"]
     branch = ENV["BUILDKITE_BRANCH"]
     # Note: cluster_data_prefix is also defined in integration_tests/utils/compute_mse.jl
-    cluster_data_prefix = "/central/scratch/esm/slurm-buildkite/turbulenceconvection-main"
+    cluster_data_prefix = "/resnick/scratch/esm/slurm-buildkite/turbulenceconvection-main"
 
     @info "pwd() = `$(pwd())`"
     @info "branch = `$(branch)`"

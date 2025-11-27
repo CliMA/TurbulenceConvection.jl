@@ -59,7 +59,7 @@ function compute_mse_wrapper(
 
     # Note: cluster_data_prefix is also defined in utils/move_output.jl
     if haskey(ENV, "BUILDKITE_COMMIT")
-        cluster_data_prefix = "/central/scratch/esm/slurm-buildkite/turbulenceconvection-main"
+        cluster_data_prefix = "/resnick/scratch/esm/slurm-buildkite/turbulenceconvection-main"
         path = find_latest_dataset_folder(; dir = cluster_data_prefix)
 
         # TODO: make this more robust in case folder/file changes

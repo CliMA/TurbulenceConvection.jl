@@ -245,7 +245,7 @@ for flight_number in flight_numbers
             # -- take parameters from a Diagnostics.nc (here you still need to set manually) -- #
 
             # nonequilibrium_moisture_scheme = :geometric_liq__powerlaw_T_scaling_ice
-            # path_to_my_SOTA = "/central/groups/esm/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/subexperiments/SOCRATES_geometric_liq__powerlaw_T_scaling_ice/Calibrate_and_Run/tau_autoconv_noneq/adapt_dt__dt_min_5.0__dt_max_10.0/iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean/calibrate/output/Atlas_LES/RFAll_obs/Diagnostics.nc"
+            # path_to_my_SOTA = "/resnick/groups/esm/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/subexperiments/SOCRATES_geometric_liq__powerlaw_T_scaling_ice/Calibrate_and_Run/tau_autoconv_noneq/adapt_dt__dt_min_5.0__dt_max_10.0/iwp_mean__lwp_mean__qi_mean__qip_mean__ql_mean__qr_mean/calibrate/output/Atlas_LES/RFAll_obs/Diagnostics.nc"
             # my_SOTA = optimal_parameters(path_to_my_SOTA, method = "best_particle_final")
             # my_SOTA = Dict(zip(my_SOTA...)) # turn to dict
             # namelist["relaxation_timescale_params"]["powerlaw_T_scaling_ice_c_1"] = my_SOTA["powerlaw_T_scaling_ice_c_1"]
@@ -261,11 +261,11 @@ for flight_number in flight_numbers
             # # --- run this jld2 --- #
 
             # param_results_path = "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/julia_parallel/slurm/param_results/jl_tCb99B_simulation_crashed/" # Output.SOCRATES_RF10_obs_data.jl_tCb99B/stats/Stats.SOCRATES_RF10_obs_data.nc"
-            # param_results_path = "/central/scratch/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/julia_parallel/slurm/param_results/jl_djcmkh_simulation_crashed/" # Output.SOCRATES_RF12_obs_data.jl_djcmkh/stats/Stats.SOCRATES_RF12_obs_data.nc"
-            # param_results_path = "/central/scratch/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/julia_parallel/slurm/param_results/jl_rEeUQl_simulation_crashed/" # Output.SOCRATES_RF10_obs_data.jl_rEeUQl/stats/Stats.SOCRATES_RF10_obs_data.nc"
+            # param_results_path = "/resnick/scratch/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/julia_parallel/slurm/param_results/jl_djcmkh_simulation_crashed/" # Output.SOCRATES_RF12_obs_data.jl_djcmkh/stats/Stats.SOCRATES_RF12_obs_data.nc"
+            # param_results_path = "/resnick/scratch/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/julia_parallel/slurm/param_results/jl_rEeUQl_simulation_crashed/" # Output.SOCRATES_RF10_obs_data.jl_rEeUQl/stats/Stats.SOCRATES_RF10_obs_data.nc"
             # param_results_path = "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/julia_parallel/slurm/param_results/jl_6vcECq_simulation_crashed/" #Output.SOCRATES_RF13_obs_data.jl_6vcECq/stats/Stats.SOCRATES_RF13_obs_data.nc"
-            # param_results_path = "/central/scratch/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/julia_parallel/slurm/param_results/jl_xiIubQ_simulation_crashed" #/param_results.jld2"
-            # param_results_path = "/central/scratch/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/julia_parallel/slurm/param_results/jl_Hty4CZ_simulation_crashed"
+            # param_results_path = "/resnick/scratch/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/julia_parallel/slurm/param_results/jl_xiIubQ_simulation_crashed" #/param_results.jld2"
+            # param_results_path = "/resnick/scratch/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/julia_parallel/slurm/param_results/jl_Hty4CZ_simulation_crashed"
             # param_results_path = "/home/jbenjami/Research_Schneider/CliMA/CalibrateEDMF.jl/experiments/SOCRATES/julia_parallel/slurm/param_results/jl_SNkTvT_simulation_crashed/" #Output.SOCRATES_RF10_obs_data.jl_SNkTvT/stats/Stats.SOCRATES_RF10_obs_data.nc"
 
             # setup =  JLD2.load(param_results_path * "/param_results.jld2")["param_results"]
